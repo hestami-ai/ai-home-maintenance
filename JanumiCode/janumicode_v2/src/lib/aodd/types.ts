@@ -266,8 +266,8 @@ export interface AoddEventPayload {
     record_type: string;
     /** Record that replaced this one (or null for plain rollbacks). */
     superseded_by_id: string | null;
-    /** Why this record was superseded — diagnostic free-form text. */
-    reason: 'rollback' | 'decomposition_revision' | string;
+    /** Why this record was superseded — diagnostic free-form text (e.g. 'rollback', 'decomposition_revision'). */
+    reason: string;
   };
 
   // Decisions

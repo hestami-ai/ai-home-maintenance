@@ -21,6 +21,7 @@ import type { TemplateLoader } from '../orchestrator/templateLoader';
 import type { OrchestratorEngine } from '../orchestrator/orchestratorEngine';
 import type { EmbeddingService } from '../embedding/embeddingService';
 import type { GovernedStreamRecord } from '../types/records';
+import type { GovernedStreamWriter } from '../orchestrator/governedStreamWriter';
 import { PriorityLLMCaller } from '../llm/priorityLLMCaller';
 import { randomUUID } from 'node:crypto';
 
@@ -46,6 +47,7 @@ import type {
   QueryClassification,
   QueryType,
   Reference,
+  SynthesisResult,
   UserInput,
 } from './clientLiaison/types';
 
@@ -166,12 +168,7 @@ export class ClientLiaisonAgent {
     // stamped onto every turn record (content-only — no DDL) so the webview
     // can render a card's sub-thread separately and history stays scoped.
     const threadId = input.threadId ?? 'main';
-    const anchorContent: Record<string, unknown> = input.anchor
-      ? {
-          anchor_item_id: input.anchor.itemId ?? input.anchor.recordId,
-          anchor_kind: input.anchor.kind,
-        }
-      : {};
+    const anchorContent = this.buildAnchorContent(input.anchor);
 
     // 1. Write the user input record up front when we already have an active
     //    workflow run (open_query mode). For raw_intent mode the run doesn't
@@ -179,24 +176,9 @@ export class ClientLiaisonAgent {
     //    foreign key. The startWorkflow capability creates the run AND writes
     //    its own raw_intent_received record via engine.startWorkflowRun(),
     //    so we deliberately skip the pre-write and rely on that path.
-    let inputRecord: GovernedStreamRecord | null = null;
-    if (ctx.activeRun) {
-      const inputRecordType =
-        input.inputMode === 'raw_intent' ? 'raw_intent_received' : 'open_query_received';
-      inputRecord = writer.writeRecord({
-        record_type: inputRecordType,
-        schema_version: '1.0',
-        workflow_run_id: ctx.activeRun.id,
-        janumicode_version_sha: versionSha,
-        content: {
-          text: input.text,
-          attachments: input.attachments,
-          references: input.references,
-          thread_id: threadId,
-          ...anchorContent,
-        },
-      });
-    }
+    const inputRecord = this.writeUserInputRecord(
+      input, ctx, threadId, anchorContent, writer, versionSha,
+    );
 
     // queryId stays stable across the function — it's the inputRecord id when
     // we have one, otherwise the synthetic id the composer generated.
@@ -213,41 +195,11 @@ export class ClientLiaisonAgent {
     };
 
     // 3. Classify (or honor forceCapability hint).
-    let classification: QueryClassification;
-    if (input.forceCapability) {
-      classification = {
-        queryType: this.guessTypeForCapability(input.forceCapability),
-        confidence: 1.0,
-        shouldQueue: false,
-        suggestedCapability: input.forceCapability,
-      };
-    } else if (input.inputMode === 'raw_intent') {
-      classification = {
-        queryType: 'workflow_initiation',
-        confidence: 1.0,
-        shouldQueue: false,
-        suggestedCapability: 'startWorkflow',
-      };
-    } else {
-      classification = await this.classifier.classify(openQuery);
-    }
+    const classification = await this.classifyInput(input, openQuery);
 
-    if (ctx.activeRun && inputRecord) {
-      writer.writeRecord({
-        record_type: 'query_classification_record',
-        schema_version: '1.0',
-        workflow_run_id: ctx.activeRun.id,
-        janumicode_version_sha: versionSha,
-        derived_from_record_ids: [inputRecord.id],
-        content: {
-          query_type: classification.queryType,
-          confidence: classification.confidence,
-          should_queue: classification.shouldQueue,
-          suggested_capability: classification.suggestedCapability,
-          thread_id: threadId,
-        },
-      });
-    }
+    this.writeClassificationRecord(
+      ctx, inputRecord, classification, threadId, writer, versionSha,
+    );
 
     // 4. Retrieve.
     const retrieval = await this.retriever.retrieve(
@@ -264,77 +216,24 @@ export class ClientLiaisonAgent {
       : [];
 
     // 6. Either short-circuit to a forced capability OR run the synthesizer.
-    let synthesis;
-    if (input.forceCapability) {
-      synthesis = await this.runForcedCapability(input.forceCapability, ctx);
-    } else if (
-      classification.suggestedCapability &&
-      classification.queryType === 'workflow_initiation'
-    ) {
-      synthesis = await this.runForcedCapability(
-        classification.suggestedCapability,
-        ctx,
-        { intent: input.text, attachments: input.attachments.map(a => a.uri) },
-      );
-    } else {
-      synthesis = await this.synthesizer.synthesize(
-        openQuery, classification, retrieval, ctx, conversationHistory,
-      );
-    }
+    const synthesis = await this.runSynthesis(
+      input, openQuery, classification, retrieval, ctx, conversationHistory,
+    );
 
-    // 6. Find the active run AFTER synthesis. The startWorkflow capability
-    //    creates a new workflow_run during step 5; for raw_intent mode the
+    // 7. Find the active run AFTER synthesis. The startWorkflow capability
+    //    creates a new workflow_run during step 6; for raw_intent mode the
     //    response record below needs that new run id.
     const activeRunAfter = ctx.activeRun ?? this.cdb.getCurrentWorkflowRun();
 
-    // 7. Write the response record. Only when there's a real workflow_run to
+    // 8. Write the response record. Only when there's a real workflow_run to
     //    attach it to — otherwise we'd hit the same FK constraint we just
     //    fixed at step 1.
-    if (activeRunAfter) {
-      // For raw_intent mode we deferred writing inputRecord; the
-      // raw_intent_received was instead created inside engine.startWorkflowRun().
-      // Look it up now so the response record has a proper anchor — without
-      // this the conversationalSort in the webview can't pin "Started
-      // workflow run…" beneath the user's intent and it lands at the bottom
-      // of the stream.
-      let anchorId = inputRecord?.id ?? null;
-      if (!anchorId && input.inputMode === 'raw_intent') {
-        const rawIntents = this.cdb.getRecordsByType(
-          'raw_intent_received',
-          activeRunAfter.id,
-        );
-        if (rawIntents.length > 0) {
-          anchorId = rawIntents.at(-1)!.id;
-        }
-      }
+    this.writeResponseRecord({
+      activeRunAfter, inputRecord, input, classification, synthesis,
+      ctx, threadId, anchorContent, writer, versionSha,
+    });
 
-      writer.writeRecord({
-        record_type: 'client_liaison_response',
-        schema_version: '1.0',
-        workflow_run_id: activeRunAfter.id,
-        // Stamp phase + agent role so the record isn't a row of NULLs in
-        // the DB. The Liaison runs at the boundary between user and
-        // workflow; for raw_intent mode the natural phase is 0 (the
-        // startWorkflow capability just created the run there).
-        phase_id: ctx.currentPhase ?? '0',
-        produced_by_agent_role: 'client_liaison',
-        janumicode_version_sha: versionSha,
-        derived_from_record_ids: anchorId ? [anchorId] : [],
-        content: {
-          query_type: classification.queryType,
-          response_text: synthesis.responseText,
-          provenance_record_ids: synthesis.provenanceRecordIds,
-          capability_calls: synthesis.capabilityCalls.map(c => ({
-            name: c.name,
-            error: c.error,
-          })),
-          thread_id: threadId,
-          ...anchorContent,
-        },
-      });
-    }
-
-    // 8. Escalation is now the `escalateInconsistency` capability's
+    // 9. Escalation is now the `escalateInconsistency` capability's
     //    responsibility (see capabilities/decisionHistory/index.ts). When
     //    the LLM invokes it during synthesis, that capability's execute()
     //    calls engine.escalateInconsistency() directly, which writes the
@@ -349,6 +248,200 @@ export class ClientLiaisonAgent {
       escalatedToOrchestrator: synthesis.escalatedToOrchestrator,
       capabilityCalls: synthesis.capabilityCalls,
     };
+  }
+
+  /**
+   * Build the content-only anchor discriminator stamped onto every turn
+   * record for a card sub-chat. Returns an empty object for the root chat.
+   */
+  private buildAnchorContent(anchor: UserInput['anchor']): Record<string, unknown> {
+    return anchor
+      ? {
+          anchor_item_id: anchor.itemId ?? anchor.recordId,
+          anchor_kind: anchor.kind,
+        }
+      : {};
+  }
+
+  /**
+   * Step 1 helper: write the user input record when a run is already active.
+   * Returns null (and writes nothing) in raw_intent mode where the run does
+   * not yet exist — the FK would otherwise be violated.
+   */
+  private writeUserInputRecord(
+    input: UserInput,
+    ctx: CapabilityContext,
+    threadId: string,
+    anchorContent: Record<string, unknown>,
+    writer: GovernedStreamWriter,
+    versionSha: string,
+  ): GovernedStreamRecord | null {
+    if (!ctx.activeRun) return null;
+    const inputRecordType =
+      input.inputMode === 'raw_intent' ? 'raw_intent_received' : 'open_query_received';
+    return writer.writeRecord({
+      record_type: inputRecordType,
+      schema_version: '1.0',
+      workflow_run_id: ctx.activeRun.id,
+      janumicode_version_sha: versionSha,
+      content: {
+        text: input.text,
+        attachments: input.attachments,
+        references: input.references,
+        thread_id: threadId,
+        ...anchorContent,
+      },
+    });
+  }
+
+  /**
+   * Step 3 helper: honor a forceCapability hint or the raw_intent shortcut,
+   * otherwise defer to the LLM classifier.
+   */
+  private async classifyInput(
+    input: UserInput,
+    openQuery: OpenQuery,
+  ): Promise<QueryClassification> {
+    if (input.forceCapability) {
+      return {
+        queryType: this.guessTypeForCapability(input.forceCapability),
+        confidence: 1.0,
+        shouldQueue: false,
+        suggestedCapability: input.forceCapability,
+      };
+    }
+    if (input.inputMode === 'raw_intent') {
+      return {
+        queryType: 'workflow_initiation',
+        confidence: 1.0,
+        shouldQueue: false,
+        suggestedCapability: 'startWorkflow',
+      };
+    }
+    return this.classifier.classify(openQuery);
+  }
+
+  /**
+   * Write the classification record. Only when both an active run and a
+   * previously-written input record exist to anchor it to.
+   */
+  private writeClassificationRecord(
+    ctx: CapabilityContext,
+    inputRecord: GovernedStreamRecord | null,
+    classification: QueryClassification,
+    threadId: string,
+    writer: GovernedStreamWriter,
+    versionSha: string,
+  ): void {
+    if (!ctx.activeRun || !inputRecord) return;
+    writer.writeRecord({
+      record_type: 'query_classification_record',
+      schema_version: '1.0',
+      workflow_run_id: ctx.activeRun.id,
+      janumicode_version_sha: versionSha,
+      derived_from_record_ids: [inputRecord.id],
+      content: {
+        query_type: classification.queryType,
+        confidence: classification.confidence,
+        should_queue: classification.shouldQueue,
+        suggested_capability: classification.suggestedCapability,
+        thread_id: threadId,
+      },
+    });
+  }
+
+  /**
+   * Step 6 helper: short-circuit to a forced capability (explicit hint or a
+   * workflow_initiation suggestion) OR run the synthesizer.
+   */
+  private async runSynthesis(
+    input: UserInput,
+    openQuery: OpenQuery,
+    classification: QueryClassification,
+    retrieval: Parameters<Synthesizer['synthesize']>[2],
+    ctx: CapabilityContext,
+    conversationHistory: Parameters<Synthesizer['synthesize']>[4],
+  ): Promise<SynthesisResult> {
+    if (input.forceCapability) {
+      return this.runForcedCapability(input.forceCapability, ctx);
+    }
+    if (
+      classification.suggestedCapability &&
+      classification.queryType === 'workflow_initiation'
+    ) {
+      return this.runForcedCapability(
+        classification.suggestedCapability,
+        ctx,
+        { intent: input.text, attachments: input.attachments.map(a => a.uri) },
+      );
+    }
+    return this.synthesizer.synthesize(
+      openQuery, classification, retrieval, ctx, conversationHistory,
+    );
+  }
+
+  /**
+   * Resolve the anchor for the response record's derived_from_record_ids.
+   * Prefers the input record id; in raw_intent mode (where we deferred the
+   * input write) it falls back to the latest raw_intent_received produced by
+   * engine.startWorkflowRun() so conversationalSort can pin the reply.
+   */
+  private resolveResponseAnchorId(
+    inputRecord: GovernedStreamRecord | null,
+    input: UserInput,
+    activeRunAfter: NonNullable<CapabilityContext['activeRun']>,
+  ): string | null {
+    const anchorId = inputRecord?.id ?? null;
+    if (anchorId) return anchorId;
+    if (input.inputMode !== 'raw_intent') return null;
+    const rawIntents = this.cdb.getRecordsByType('raw_intent_received', activeRunAfter.id);
+    if (rawIntents.length === 0) return null;
+    return rawIntents.at(-1)!.id;
+  }
+
+  /**
+   * Step 8 helper: write the client_liaison_response record when there is a
+   * real workflow_run to attach it to.
+   */
+  private writeResponseRecord(args: {
+    activeRunAfter: CapabilityContext['activeRun'];
+    inputRecord: GovernedStreamRecord | null;
+    input: UserInput;
+    classification: QueryClassification;
+    synthesis: SynthesisResult;
+    ctx: CapabilityContext;
+    threadId: string;
+    anchorContent: Record<string, unknown>;
+    writer: GovernedStreamWriter;
+    versionSha: string;
+  }): void {
+    const { activeRunAfter } = args;
+    if (!activeRunAfter) return;
+    const anchorId = this.resolveResponseAnchorId(args.inputRecord, args.input, activeRunAfter);
+    args.writer.writeRecord({
+      record_type: 'client_liaison_response',
+      schema_version: '1.0',
+      workflow_run_id: activeRunAfter.id,
+      // Stamp phase + agent role so the record isn't a row of NULLs in
+      // the DB. The Liaison runs at the boundary between user and
+      // workflow; for raw_intent mode the natural phase is 0 (the
+      // startWorkflow capability just created the run there).
+      phase_id: args.ctx.currentPhase ?? '0',
+      produced_by_agent_role: 'client_liaison',
+      janumicode_version_sha: args.versionSha,
+      derived_from_record_ids: anchorId ? [anchorId] : [],
+      content: {
+        query_type: args.classification.queryType,
+        response_text: args.synthesis.responseText,
+        provenance_record_ids: args.synthesis.provenanceRecordIds,
+        capability_calls: args.synthesis.capabilityCalls.map(c => ({
+          name: c.name,
+          error: c.error,
+        })),
+        thread_id: args.threadId,
+        ...args.anchorContent,
+      },
+    });
   }
 
   /**

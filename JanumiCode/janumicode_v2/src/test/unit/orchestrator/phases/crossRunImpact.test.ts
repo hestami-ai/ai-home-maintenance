@@ -180,6 +180,63 @@ describe('diffInterfaceMembers — member-level detail (Phase 0.5 refactoring in
   });
 });
 
+describe('extractMembers — guard branches + multi-section walk (via diffInterfaceMembers)', () => {
+  it('skips data_model fields that lack a name/id/field key', () => {
+    const withUnnamed = { kind: 'data_models', models: [{ name: 'E', entities: [{ name: 'E', fields: [
+      { name: 'a', type: 'string' },
+      { type: 'string' }, // no name → skipped, never becomes a member
+    ] }] }] };
+    const withoutUnnamed = { kind: 'data_models', models: [{ name: 'E', entities: [{ name: 'E', fields: [
+      { name: 'a', type: 'string' },
+    ] }] }] };
+    const d = diffInterfaceMembers(withUnnamed, withoutUnnamed);
+    expect(d.modificationType).toBe('non_breaking');
+    expect(d.removed).toEqual([]);
+    expect(d.added).toEqual([]);
+    expect(d.retyped).toEqual([]);
+  });
+
+  it('skips api endpoints that lack a path/route/url key', () => {
+    const withUnpathed = { kind: 'api_definitions', definitions: [{ endpoints: [
+      { path: '/x', method: 'GET' },
+      { method: 'GET' }, // no path → skipped
+    ] }] };
+    const withoutUnpathed = { kind: 'api_definitions', definitions: [{ endpoints: [
+      { path: '/x', method: 'GET' },
+    ] }] };
+    expect(diffInterfaceMembers(withUnpathed, withoutUnpathed).modificationType).toBe('non_breaking');
+  });
+
+  it('skips contracts that lack an id/name/operation/signature key', () => {
+    const withUnnamedContract = { kind: 'interface_contracts', contracts: [
+      { id: 'IC-1', protocol: 'rest' },
+      { protocol: 'rest' }, // no id/name → skipped
+    ] };
+    const withoutIt = { kind: 'interface_contracts', contracts: [{ id: 'IC-1', protocol: 'rest' }] };
+    expect(diffInterfaceMembers(withUnnamedContract, withoutIt).modificationType).toBe('non_breaking');
+  });
+
+  it('walks all three sections and preserves data→api→contract insertion order', () => {
+    const combined = {
+      models: [{ name: 'E', entities: [{ name: 'E', fields: [{ name: 'a', type: 'string' }] }] }],
+      definitions: [{ endpoints: [{ path: '/x', method: 'GET' }] }],
+      contracts: [{ id: 'IC-1', protocol: 'rest' }],
+    };
+    expect(diffInterfaceMembers(combined, combined).modificationType).toBe('non_breaking');
+
+    const combinedMinusField = {
+      models: [{ name: 'E', entities: [{ name: 'E', fields: [] }] }],
+      definitions: [{ endpoints: [{ path: '/x', method: 'GET' }] }],
+      contracts: [{ id: 'IC-1', protocol: 'rest' }],
+    };
+    const d = diffInterfaceMembers(combined, combinedMinusField);
+    expect(d.modificationType).toBe('breaking');
+    expect(d.removed).toEqual(['E.a']); // data_model members enumerated first
+    expect(d.added).toEqual([]);
+    expect(d.parseable).toBe(true);
+  });
+});
+
 describe('isCrossRunInterfaceKind', () => {
   it('accepts the three interface kinds', () => {
     expect(isCrossRunInterfaceKind('interface_contracts')).toBe(true);

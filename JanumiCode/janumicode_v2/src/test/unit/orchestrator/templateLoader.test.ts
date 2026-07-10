@@ -1,6 +1,16 @@
 import { describe, it, expect, beforeEach } from 'vitest';
-import { TemplateLoader, type PromptTemplate } from '../../../lib/orchestrator/templateLoader';
+import {
+  TemplateLoader,
+  type PromptTemplate,
+  type TemplateMetadata,
+} from '../../../lib/orchestrator/templateLoader';
 import path from 'path';
+
+/** Access the private frontmatter parser for characterization. */
+type FrontmatterParser = { parseFrontmatter(lines: string[]): TemplateMetadata };
+function parseFrontmatter(loader: TemplateLoader, lines: string[]): TemplateMetadata {
+  return (loader as unknown as FrontmatterParser).parseFrontmatter(lines);
+}
 
 describe('TemplateLoader', () => {
   describe('with project prompt templates', () => {
@@ -73,6 +83,101 @@ describe('TemplateLoader', () => {
       loader.addTemplate('test', template);
       const loaded = loader.getTemplate('test');
       expect(loaded!.metadata.required_variables).toEqual(['var1', 'var2']);
+    });
+  });
+
+  // Characterization tests: pin the current observable behaviour of the
+  // private parseFrontmatter() before refactoring it. Inputs mirror what the
+  // loader passes: the lines BETWEEN the two `---` delimiters, indentation
+  // preserved.
+  describe('parseFrontmatter (characterization)', () => {
+    let loader: TemplateLoader;
+
+    beforeEach(() => {
+      loader = new TemplateLoader('/nonexistent'); // Empty loader
+    });
+
+    it('parses scalars, booleans, arrays and skips the [JC:...] header', () => {
+      const md = parseFrontmatter(loader, [
+        '[JC:PROMPT TEMPLATE]',
+        'agent_role: executor_agent',
+        'sub_phase: 09_1_implementation_task_execution',
+        'schema_version: 1.2',
+        'co_invocation_exception: false',
+        'required_variables:',
+        '  - active_constraints',
+        '  - implementation_task',
+        'reasoning_review_triggers:',
+        '  - implementation_divergence_check',
+        'verification_ensemble_triggers:',
+        '  - implementation_divergence_check',
+      ]);
+
+      expect(md.agent_role).toBe('executor_agent');
+      expect(md.sub_phase).toBe('09_1_implementation_task_execution');
+      expect(md.schema_version).toBe('1.2');
+      expect(md.co_invocation_exception).toBe(false);
+      expect(md.required_variables).toEqual([
+        'active_constraints',
+        'implementation_task',
+      ]);
+      expect(md.reasoning_review_triggers).toEqual([
+        'implementation_divergence_check',
+      ]);
+      expect(md.verification_ensemble_triggers).toEqual([
+        'implementation_divergence_check',
+      ]);
+      expect(md.lens).toBeUndefined();
+    });
+
+    it('coerces true/false and passes an explicit lens through', () => {
+      const md = parseFrontmatter(loader, [
+        'co_invocation_exception: true',
+        'lens: enterprise',
+      ]);
+      expect(md.co_invocation_exception).toBe(true);
+      expect(md.lens).toBe('enterprise');
+    });
+
+    it('applies defaults when keys are absent', () => {
+      const md = parseFrontmatter(loader, []);
+      expect(md.agent_role).toBe('unknown');
+      expect(md.sub_phase).toBe('unknown');
+      expect(md.schema_version).toBe('1.0');
+      expect(md.co_invocation_exception).toBe(false);
+      expect(md.lens).toBeUndefined();
+      expect(md.co_invocation_rationale).toBeUndefined();
+      expect(md.co_invocation_artifact_types).toBeUndefined();
+      expect(md.required_variables).toEqual([]);
+      expect(md.reasoning_review_triggers).toEqual([]);
+      expect(md.verification_ensemble_triggers).toEqual([]);
+    });
+
+    it('skips blank lines, comments and lines without a colon', () => {
+      const md = parseFrontmatter(loader, [
+        '',
+        '# a comment',
+        'this line has no colon',
+        'agent_role: domain_interpreter',
+      ]);
+      expect(md.agent_role).toBe('domain_interpreter');
+      expect(md.sub_phase).toBe('unknown');
+    });
+
+    it('closes an array when a following scalar key begins', () => {
+      const md = parseFrontmatter(loader, [
+        'required_variables:',
+        '  - a',
+        '  - b',
+        'schema_version: 2.0',
+      ]);
+      expect(md.required_variables).toEqual(['a', 'b']);
+      expect(md.schema_version).toBe('2.0');
+    });
+
+    it('keeps the value after the first colon intact', () => {
+      const md = parseFrontmatter(loader, ['co_invocation_rationale: needs: nested']);
+      expect(md.co_invocation_rationale).toBe('needs: nested');
     });
   });
 

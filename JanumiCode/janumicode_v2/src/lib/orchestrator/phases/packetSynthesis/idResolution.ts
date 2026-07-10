@@ -47,107 +47,206 @@ interface DecompNode {
 }
 
 /**
+ * The deterministic id-lineage maps extracted from a run's governed-stream
+ * records. Populated once by {@link collectLineageMaps}; every resolver helper
+ * reads (and only reads) from this bag.
+ */
+interface LineageMaps {
+  /** SR id → its source US/NFR ids. */
+  srToSources: Map<string, string[]>;
+  /** NFR id → the US ids it applies to. */
+  nfrApplies: Map<string, string[]>;
+  /** Decomposition node display_key → node (for leaf→root canonicalization). */
+  byDisplayKey: Map<string, DecompNode>;
+  /** Decomposition node_id → node (parent walk). */
+  byNodeId: Map<string, DecompNode>;
+  /** Leaf acceptance-criterion id → its owning leaf user-story id. */
+  acToStory: Map<string, string>;
+}
+
+/** Coerce an unknown value to the array of strings it contains (else `[]`). */
+function toStringArray(value: unknown): string[] {
+  return Array.isArray(value)
+    ? (value as unknown[]).filter((x): x is string => typeof x === 'string')
+    : [];
+}
+
+/** Ingest a `system_requirements` artifact: SR id → source_requirement_ids. */
+function ingestSystemRequirements(
+  content: Record<string, unknown>,
+  srToSources: Map<string, string[]>,
+): void {
+  if (!Array.isArray(content.items)) return;
+  for (const it of content.items as Array<Record<string, unknown>>) {
+    const id = typeof it.id === 'string' ? it.id : '';
+    if (id) srToSources.set(id, toStringArray(it.source_requirement_ids));
+  }
+}
+
+/** Ingest a `non_functional_requirements` artifact: NFR id → applies_to US ids. */
+function ingestNonFunctionalRequirements(
+  content: Record<string, unknown>,
+  nfrApplies: Map<string, string[]>,
+): void {
+  if (!Array.isArray(content.requirements)) return;
+  for (const n of content.requirements as Array<Record<string, unknown>>) {
+    const id = typeof n.id === 'string' ? n.id : '';
+    if (id) nfrApplies.set(id, toStringArray(n.applies_to_requirements));
+  }
+}
+
+/** Dispatch an `artifact_produced` record to the matching kind ingester. */
+function ingestArtifactProduced(
+  record: GovernedStreamRecord,
+  srToSources: Map<string, string[]>,
+  nfrApplies: Map<string, string[]>,
+): void {
+  const c = record.content as Record<string, unknown>;
+  if (c.kind === 'system_requirements') {
+    ingestSystemRequirements(c, srToSources);
+  } else if (c.kind === 'non_functional_requirements') {
+    ingestNonFunctionalRequirements(c, nfrApplies);
+  }
+}
+
+/**
+ * Map each leaf AC id → its owning leaf user-story id (structural, no AC-id
+ * string parsing). No-op when the node carries no user_story/story id.
+ */
+function indexLeafAcsToStory(
+  record: GovernedStreamRecord,
+  acToStory: Map<string, string>,
+): void {
+  const story = (record.content as Record<string, unknown>).user_story as
+    | Record<string, unknown>
+    | undefined;
+  const storyId = story && typeof story.id === 'string' ? story.id : undefined;
+  if (!story || !storyId) return;
+  const acs = Array.isArray(story.acceptance_criteria) ? story.acceptance_criteria : [];
+  for (const ac of acs as Array<Record<string, unknown>>) {
+    if (ac && typeof ac.id === 'string' && ac.id.length > 0) acToStory.set(ac.id, storyId);
+  }
+}
+
+/** Ingest a `requirement_decomposition_node` record into the tree + AC maps. */
+function ingestDecompositionNode(
+  record: GovernedStreamRecord,
+  byDisplayKey: Map<string, DecompNode>,
+  byNodeId: Map<string, DecompNode>,
+  acToStory: Map<string, string>,
+): void {
+  const c = record.content as unknown as DecompNode;
+  if (c.display_key) byDisplayKey.set(c.display_key, c);
+  if (c.node_id) byNodeId.set(c.node_id, c);
+  indexLeafAcsToStory(record, acToStory);
+}
+
+/** Build all lineage maps in one pass over the governed-stream records. */
+function collectLineageMaps(records: GovernedStreamRecord[]): LineageMaps {
+  const maps: LineageMaps = {
+    srToSources: new Map<string, string[]>(),
+    nfrApplies: new Map<string, string[]>(),
+    byDisplayKey: new Map<string, DecompNode>(),
+    byNodeId: new Map<string, DecompNode>(),
+    acToStory: new Map<string, string>(),
+  };
+  for (const r of records) {
+    if (r.record_type === 'artifact_produced') {
+      ingestArtifactProduced(r, maps.srToSources, maps.nfrApplies);
+    } else if (r.record_type === 'requirement_decomposition_node') {
+      ingestDecompositionNode(r, maps.byDisplayKey, maps.byNodeId, maps.acToStory);
+    }
+  }
+  return maps;
+}
+
+/** Walk parent_node_id to the depth-0 root's display_key. */
+function canonicalizeId(
+  id: string,
+  byDisplayKey: Map<string, DecompNode>,
+  byNodeId: Map<string, DecompNode>,
+): string {
+  const node = byDisplayKey.get(id);
+  if (!node) return id;
+  if (node.depth === 0) return node.display_key ?? id;
+  let cur: DecompNode | undefined = node;
+  const guard = new Set<string>();
+  while (cur?.parent_node_id && !guard.has(cur.parent_node_id)) {
+    guard.add(cur.parent_node_id);
+    const next = byNodeId.get(cur.parent_node_id);
+    if (!next) break;
+    cur = next;
+    if (cur.depth === 0) return cur.display_key ?? id;
+  }
+  return cur?.display_key ?? id;
+}
+
+/**
+ * Classify a single id into the US/NFR sets by its canonical prefix. An NFR
+ * also implies (recursively) the user stories it governs.
+ */
+function classifyId(
+  id: string,
+  usIds: Set<string>,
+  nfrIds: Set<string>,
+  maps: LineageMaps,
+): void {
+  const c = canonicalizeId(id, maps.byDisplayKey, maps.byNodeId);
+  if (c.startsWith(US_PREFIX)) {
+    usIds.add(c);
+    return;
+  }
+  if (!c.startsWith(NFR_PREFIX)) return;
+  nfrIds.add(c);
+  for (const us of maps.nfrApplies.get(c) ?? maps.nfrApplies.get(id) ?? []) {
+    classifyId(us, usIds, nfrIds, maps);
+  }
+}
+
+/** Resolve task traces (SR-/NFR-/US-/leaf ids) to canonical US + NFR ids. */
+function resolveTracesFrom(
+  traces: Iterable<string>,
+  maps: LineageMaps,
+): { usIds: Set<string>; nfrIds: Set<string> } {
+  const usIds = new Set<string>();
+  const nfrIds = new Set<string>();
+  for (const raw of traces) {
+    const t = canonicalizeId(raw, maps.byDisplayKey, maps.byNodeId);
+    if (t.startsWith(SR_PREFIX)) {
+      // SR → its source US/NFR ids (one hop).
+      for (const src of maps.srToSources.get(t) ?? maps.srToSources.get(raw) ?? []) {
+        classifyId(src, usIds, nfrIds, maps);
+      }
+    } else {
+      classifyId(t, usIds, nfrIds, maps);
+    }
+  }
+  return { usIds, nfrIds };
+}
+
+/** Resolve leaf AC ids to their owning leaf user-story ids (unknown ignored). */
+function resolveAcsFrom(
+  acIds: Iterable<string>,
+  acToStory: Map<string, string>,
+): { storyIds: Set<string> } {
+  const storyIds = new Set<string>();
+  for (const ac of acIds) {
+    const story = acToStory.get(ac);
+    if (story) storyIds.add(story);
+  }
+  return { storyIds };
+}
+
+/**
  * Build the lineage resolver from the run's governed-stream records.
  * Reads system_requirements, non_functional_requirements, and the FR
  * requirement_decomposition_node tree (for leaf→root canonicalization).
  */
 export function buildRequirementLineage(records: GovernedStreamRecord[]): RequirementLineage {
-  // SR → its source US/NFR ids.
-  const srToSources = new Map<string, string[]>();
-  // NFR → the US ids it applies to.
-  const nfrApplies = new Map<string, string[]>();
-
-  // Decomposition tree for leaf→root canonicalization.
-  const byDisplayKey = new Map<string, DecompNode>();
-  const byNodeId = new Map<string, DecompNode>();
-  // Leaf acceptance-criterion id → its owning leaf user-story id. Built
-  // structurally from the decomposition leaves (no AC-id string parsing).
-  const acToStory = new Map<string, string>();
-
-  for (const r of records) {
-    if (r.record_type === 'artifact_produced') {
-      const c = r.content as Record<string, unknown>;
-      if (c.kind === 'system_requirements' && Array.isArray(c.items)) {
-        for (const it of c.items as Array<Record<string, unknown>>) {
-          const id = typeof it.id === 'string' ? it.id : '';
-          const src = Array.isArray(it.source_requirement_ids)
-            ? (it.source_requirement_ids as unknown[]).filter((x): x is string => typeof x === 'string') : [];
-          if (id) srToSources.set(id, src);
-        }
-      } else if (c.kind === 'non_functional_requirements' && Array.isArray(c.requirements)) {
-        for (const n of c.requirements as Array<Record<string, unknown>>) {
-          const id = typeof n.id === 'string' ? n.id : '';
-          const applies = Array.isArray(n.applies_to_requirements)
-            ? (n.applies_to_requirements as unknown[]).filter((x): x is string => typeof x === 'string') : [];
-          if (id) nfrApplies.set(id, applies);
-        }
-      }
-    } else if (r.record_type === 'requirement_decomposition_node') {
-      const c = r.content as unknown as DecompNode;
-      if (c.display_key) byDisplayKey.set(c.display_key, c);
-      if (c.node_id) byNodeId.set(c.node_id, c);
-      // Map each leaf AC id → its owning leaf user-story id (structural).
-      const story = (r.content as Record<string, unknown>).user_story as Record<string, unknown> | undefined;
-      const storyId = story && typeof story.id === 'string' ? story.id : undefined;
-      const acs = story && Array.isArray(story.acceptance_criteria) ? story.acceptance_criteria : [];
-      if (storyId) {
-        for (const ac of acs as Array<Record<string, unknown>>) {
-          if (ac && typeof ac.id === 'string' && ac.id.length > 0) acToStory.set(ac.id, storyId);
-        }
-      }
-    }
-  }
-
-  /** Walk parent_node_id to the depth-0 root's display_key. */
-  function canonicalize(id: string): string {
-    const node = byDisplayKey.get(id);
-    if (!node) return id;
-    if (node.depth === 0) return node.display_key ?? id;
-    let cur: DecompNode | undefined = node;
-    const guard = new Set<string>();
-    while (cur?.parent_node_id && !guard.has(cur.parent_node_id)) {
-      guard.add(cur.parent_node_id);
-      const next = byNodeId.get(cur.parent_node_id);
-      if (!next) break;
-      cur = next;
-      if (cur.depth === 0) return cur.display_key ?? id;
-    }
-    return cur?.display_key ?? id;
-  }
-
-  function classify(id: string, usIds: Set<string>, nfrIds: Set<string>): void {
-    const c = canonicalize(id);
-    if (c.startsWith(US_PREFIX)) usIds.add(c);
-    else if (c.startsWith(NFR_PREFIX)) {
-      nfrIds.add(c);
-      // An NFR also implies the user stories it governs.
-      for (const us of nfrApplies.get(c) ?? nfrApplies.get(id) ?? []) classify(us, usIds, nfrIds);
-    }
-  }
-
-  function resolveTraces(traces: Iterable<string>): { usIds: Set<string>; nfrIds: Set<string> } {
-    const usIds = new Set<string>();
-    const nfrIds = new Set<string>();
-    for (const raw of traces) {
-      const t = canonicalize(raw);
-      if (t.startsWith(SR_PREFIX)) {
-        // SR → its source US/NFR ids (one hop).
-        for (const src of srToSources.get(t) ?? srToSources.get(raw) ?? []) classify(src, usIds, nfrIds);
-      } else {
-        classify(t, usIds, nfrIds);
-      }
-    }
-    return { usIds, nfrIds };
-  }
-
-  function resolveAcs(acIds: Iterable<string>): { storyIds: Set<string> } {
-    const storyIds = new Set<string>();
-    for (const ac of acIds) {
-      const story = acToStory.get(ac);
-      if (story) storyIds.add(story);
-    }
-    return { storyIds };
-  }
-
-  return { resolveTraces, canonicalize, resolveAcs };
+  const maps = collectLineageMaps(records);
+  return {
+    resolveTraces: (traces) => resolveTracesFrom(traces, maps),
+    canonicalize: (id) => canonicalizeId(id, maps.byDisplayKey, maps.byNodeId),
+    resolveAcs: (acIds) => resolveAcsFrom(acIds, maps.acToStory),
+  };
 }

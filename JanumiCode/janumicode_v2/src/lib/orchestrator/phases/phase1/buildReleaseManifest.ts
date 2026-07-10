@@ -97,34 +97,74 @@ function uniqSorted(xs: string[]): string[] {
   return Array.from(new Set(xs)).sort((a, b) => a.localeCompare(b));
 }
 
-/**
- * Deterministic assignment. Returns a fully-populated
- * `ReleasePlanContentV2`-shaped manifest (minus schema metadata; caller
- * wraps) with every accepted artifact placed in exactly one release's
- * `contains[type]` or in `cross_cutting[type]`.
- */
-export function buildReleaseManifest(input: BuildManifestInputs): BuildManifestResult {
-  const llmReleases = [...input.releases].sort((a, b) => a.ordinal - b.ordinal);
-  llmReleases.forEach((r, i) => { r.ordinal = i + 1; });
+type WorkflowTrigger = WorkflowV2['triggers'][number];
+type ReleaseContentsMap = Map<string, ReleaseContents>;
+type ReleaseSkeletonMap = Map<string, LlmReleaseSkeleton>;
 
-  // Release-keyed ReleaseContents; journeys populated from LLM output.
-  // After filling, we compute the other types.
-  const byRelease = new Map<string, ReleaseContents>();
-  const llmByRelease = new Map<string, LlmReleaseSkeleton>();
+/**
+ * Record `ordinal` for `key` iff it is the earliest (lowest) seen so far.
+ * Shared "earliest-release wins" reducer for domain / compliance /
+ * integration id → release-ordinal maps.
+ */
+function setEarliestOrdinal(map: Map<string, number>, key: string, ordinal: number): void {
+  const cur = map.get(key);
+  if (cur === undefined || ordinal < cur) map.set(key, ordinal);
+}
+
+/**
+ * The ordinal of the release a workflow was placed in, or `undefined`
+ * when the workflow is cross-cutting (never placed in any release).
+ */
+function findWorkflowReleaseOrdinal(
+  w: WorkflowV2,
+  byRelease: ReleaseContentsMap,
+  llmByRelease: ReleaseSkeletonMap,
+): number | undefined {
+  for (const [relId, contents] of byRelease) {
+    if (contents.workflows.includes(w.id)) {
+      return llmByRelease.get(relId)!.ordinal;
+    }
+  }
+  return undefined;
+}
+
+/** Sort a copy by ordinal and renumber ordinals to contiguous 1..N. */
+function sortAndRenumberReleases(releases: LlmReleaseSkeleton[]): LlmReleaseSkeleton[] {
+  const llmReleases = [...releases].sort((a, b) => a.ordinal - b.ordinal);
+  llmReleases.forEach((r, i) => { r.ordinal = i + 1; });
+  return llmReleases;
+}
+
+/** Release-keyed empty ReleaseContents + skeleton lookup. */
+function buildReleaseMaps(
+  llmReleases: LlmReleaseSkeleton[],
+): { byRelease: ReleaseContentsMap; llmByRelease: ReleaseSkeletonMap } {
+  const byRelease: ReleaseContentsMap = new Map();
+  const llmByRelease: ReleaseSkeletonMap = new Map();
   for (const r of llmReleases) {
     byRelease.set(r.release_id, emptyContains());
     llmByRelease.set(r.release_id, r);
   }
+  return { byRelease, llmByRelease };
+}
 
-  // ── Journeys ─────────────────────────────────────────────────────
-  // Place each accepted journey into the release the LLM chose. Any
-  // journey the LLM missed is silently placed in REL-1 (or the first
-  // release) as a safety default — the 1.8 verifier will surface a
-  // gap if this happens, and we return the list for caller inspection.
-  const acceptedJourneyIds = new Set(input.journeys.map(j => j.id));
-  const journeyPlacement = new Map<string, string>(); // journeyId -> release_id
-  const firstReleaseId = llmReleases[0]?.release_id;
+function buildOrdinalToReleaseId(llmByRelease: ReleaseSkeletonMap): Map<number, string> {
+  const ordinalToReleaseId = new Map<number, string>();
+  for (const [relId, r] of llmByRelease) ordinalToReleaseId.set(r.ordinal, relId);
+  return ordinalToReleaseId;
+}
 
+/**
+ * Place each accepted journey into the release the LLM chose. LLM-invented
+ * ids (not accepted) are skipped; double-placed journeys keep the first
+ * placement. Mutates `byRelease`; returns journeyId → release_id.
+ */
+function placeDeclaredJourneys(
+  llmReleases: LlmReleaseSkeleton[],
+  acceptedJourneyIds: Set<string>,
+  byRelease: ReleaseContentsMap,
+): Map<string, string> {
+  const journeyPlacement = new Map<string, string>();
   for (const r of llmReleases) {
     for (const jId of r.contains_journeys) {
       if (!acceptedJourneyIds.has(jId)) continue; // LLM invented an id — skip silently
@@ -133,40 +173,84 @@ export function buildReleaseManifest(input: BuildManifestInputs): BuildManifestR
       byRelease.get(r.release_id)!.journeys.push(jId);
     }
   }
+  return journeyPlacement;
+}
+
+/**
+ * Any accepted journey the LLM missed is placed in the first release as a
+ * safety default. Mutates `byRelease` + `journeyPlacement`; returns the
+ * list of unplaced journey ids (in accepted-set iteration order).
+ */
+function placeUnplacedJourneys(
+  acceptedJourneyIds: Set<string>,
+  journeyPlacement: Map<string, string>,
+  byRelease: ReleaseContentsMap,
+  firstReleaseId: string | undefined,
+): string[] {
   const unplacedJourneys: string[] = [];
   for (const jId of acceptedJourneyIds) {
-    if (!journeyPlacement.has(jId)) {
-      unplacedJourneys.push(jId);
-      if (firstReleaseId) {
-        journeyPlacement.set(jId, firstReleaseId);
-        byRelease.get(firstReleaseId)!.journeys.push(jId);
-      }
+    if (journeyPlacement.has(jId)) continue;
+    unplacedJourneys.push(jId);
+    if (firstReleaseId) {
+      journeyPlacement.set(jId, firstReleaseId);
+      byRelease.get(firstReleaseId)!.journeys.push(jId);
     }
   }
+  return unplacedJourneys;
+}
 
-  // ── Workflows ────────────────────────────────────────────────────
-  // A workflow's release is the earliest release containing any
-  // journey it backs (via kind:journey_step triggers). If the workflow
-  // has no journey_step triggers, it goes to cross_cutting.
+function placeJourneys(
+  llmReleases: LlmReleaseSkeleton[],
+  journeys: UserJourney[],
+  byRelease: ReleaseContentsMap,
+  firstReleaseId: string | undefined,
+): { journeyPlacement: Map<string, string>; unplacedJourneys: string[] } {
+  const acceptedJourneyIds = new Set(journeys.map(j => j.id));
+  const journeyPlacement = placeDeclaredJourneys(llmReleases, acceptedJourneyIds, byRelease);
+  const unplacedJourneys = placeUnplacedJourneys(acceptedJourneyIds, journeyPlacement, byRelease, firstReleaseId);
+  return { journeyPlacement, unplacedJourneys };
+}
+
+/** Earliest-ordinal release among the placed journeys backed by a workflow. */
+function findEarliestReleaseForJourneys(
+  journeyIds: string[],
+  journeyPlacement: Map<string, string>,
+  llmByRelease: ReleaseSkeletonMap,
+): { release_id: string; ordinal: number } | null {
+  let earliest: { release_id: string; ordinal: number } | null = null;
+  for (const jId of journeyIds) {
+    const relId = journeyPlacement.get(jId);
+    if (!relId) continue;
+    const ord = llmByRelease.get(relId)!.ordinal;
+    if (earliest === null || ord < earliest.ordinal) {
+      earliest = { release_id: relId, ordinal: ord };
+    }
+  }
+  return earliest;
+}
+
+/**
+ * A workflow's release is the earliest release containing any journey it
+ * backs (via kind:journey_step triggers). Workflows with no journey_step
+ * triggers — or whose refs all point at non-placed journeys — go to
+ * cross_cutting. Mutates `byRelease`; returns cross-cutting workflow ids.
+ */
+function placeWorkflows(
+  workflows: WorkflowV2[],
+  journeyPlacement: Map<string, string>,
+  llmByRelease: ReleaseSkeletonMap,
+  byRelease: ReleaseContentsMap,
+): string[] {
   const crossCuttingWorkflows: string[] = [];
-  for (const w of input.workflows) {
+  for (const w of workflows) {
     const journeyIds = w.triggers
-      .filter((t): t is Extract<WorkflowV2['triggers'][number], { kind: 'journey_step' }> => t.kind === 'journey_step')
+      .filter((t): t is Extract<WorkflowTrigger, { kind: 'journey_step' }> => t.kind === 'journey_step')
       .map(t => t.journey_id);
     if (journeyIds.length === 0) {
       crossCuttingWorkflows.push(w.id);
       continue;
     }
-    // Find the earliest-ordinal release any of the backed journeys sit in.
-    let earliest: { release_id: string; ordinal: number } | null = null;
-    for (const jId of journeyIds) {
-      const relId = journeyPlacement.get(jId);
-      if (!relId) continue;
-      const ord = llmByRelease.get(relId)!.ordinal;
-      if (earliest === null || ord < earliest.ordinal) {
-        earliest = { release_id: relId, ordinal: ord };
-      }
-    }
+    const earliest = findEarliestReleaseForJourneys(journeyIds, journeyPlacement, llmByRelease);
     if (earliest) {
       byRelease.get(earliest.release_id)!.workflows.push(w.id);
     } else {
@@ -175,110 +259,196 @@ export function buildReleaseManifest(input: BuildManifestInputs): BuildManifestR
       crossCuttingWorkflows.push(w.id);
     }
   }
+  return crossCuttingWorkflows;
+}
 
-  // ── Entities ─────────────────────────────────────────────────────
-  // An entity goes in the earliest release that contains any journey
-  // or workflow in the entity's businessDomainId. Entities are never
-  // cross_cutting per schema — if no release has the entity's domain,
-  // it defaults to REL-1 (and is reported as orphan).
-  const domainToEarliestRelease = new Map<string, number>(); // domainId -> ordinal
-  const registerDomain = (domainId: string, ordinal: number) => {
-    const cur = domainToEarliestRelease.get(domainId);
-    if (cur === undefined || ordinal < cur) domainToEarliestRelease.set(domainId, ordinal);
-  };
-  for (const j of input.journeys) {
+/**
+ * domainId → earliest release ordinal, from journeys (via their
+ * businessDomainIds) and workflows (via their placed release).
+ */
+function buildDomainToEarliestRelease(
+  journeys: UserJourney[],
+  workflows: WorkflowV2[],
+  journeyPlacement: Map<string, string>,
+  llmByRelease: ReleaseSkeletonMap,
+  byRelease: ReleaseContentsMap,
+): Map<string, number> {
+  const domainToEarliestRelease = new Map<string, number>();
+  for (const j of journeys) {
     const relId = journeyPlacement.get(j.id);
     if (!relId) continue;
     const ord = llmByRelease.get(relId)!.ordinal;
     const domains = (j as unknown as { businessDomainIds?: string[] }).businessDomainIds ?? [];
-    for (const d of domains) registerDomain(d, ord);
+    for (const d of domains) setEarliestOrdinal(domainToEarliestRelease, d, ord);
   }
-  for (const w of input.workflows) {
-    // A workflow's release is determined by its triggers; find it here
-    // so we can map domain→ordinal.
-    let wfOrdinal: number | undefined;
-    for (const [relId, contents] of byRelease) {
-      if (contents.workflows.includes(w.id)) {
-        wfOrdinal = llmByRelease.get(relId)!.ordinal;
-        break;
-      }
-    }
+  for (const w of workflows) {
+    const wfOrdinal = findWorkflowReleaseOrdinal(w, byRelease, llmByRelease);
     if (wfOrdinal === undefined) continue; // workflow is cross_cutting
-    registerDomain(w.businessDomainId, wfOrdinal);
+    setEarliestOrdinal(domainToEarliestRelease, w.businessDomainId, wfOrdinal);
   }
-  const ordinalToReleaseId = new Map<number, string>();
-  for (const [relId, r] of llmByRelease) ordinalToReleaseId.set(r.ordinal, relId);
+  return domainToEarliestRelease;
+}
+
+/**
+ * An entity goes in the earliest release that contains any journey or
+ * workflow in its businessDomainId. Entities are never cross_cutting — if
+ * no release has the entity's domain it defaults to the first release and
+ * is reported as orphan. Mutates `byRelease`; returns orphan entity ids.
+ */
+function placeEntities(
+  entities: Entity[],
+  domainToEarliestRelease: Map<string, number>,
+  ordinalToReleaseId: Map<number, string>,
+  byRelease: ReleaseContentsMap,
+  firstReleaseId: string | undefined,
+): string[] {
   const orphanEntities: string[] = [];
-  for (const e of input.entities) {
+  for (const e of entities) {
     const ord = domainToEarliestRelease.get(e.businessDomainId);
     if (ord !== undefined) {
-      const relId = ordinalToReleaseId.get(ord)!;
-      byRelease.get(relId)!.entities.push(e.id);
-    } else {
-      orphanEntities.push(e.id);
-      if (firstReleaseId) byRelease.get(firstReleaseId)!.entities.push(e.id);
+      byRelease.get(ordinalToReleaseId.get(ord)!)!.entities.push(e.id);
+      continue;
+    }
+    orphanEntities.push(e.id);
+    if (firstReleaseId) byRelease.get(firstReleaseId)!.entities.push(e.id);
+  }
+  return orphanEntities;
+}
+
+function extractComplianceTriggerId(t: WorkflowTrigger): string | undefined {
+  return t.kind === 'compliance' ? t.regime_id : undefined;
+}
+
+function extractIntegrationTriggerId(t: WorkflowTrigger): string | undefined {
+  return t.kind === 'integration' ? t.integration_id : undefined;
+}
+
+/**
+ * triggerId → earliest workflow-release ordinal, for triggers matched by
+ * `extractId`. Used for the compliance / integration release overrides.
+ */
+function mapTriggerIdsToEarliestRelease(
+  workflows: WorkflowV2[],
+  byRelease: ReleaseContentsMap,
+  llmByRelease: ReleaseSkeletonMap,
+  extractId: (t: WorkflowTrigger) => string | undefined,
+): Map<string, number> {
+  const result = new Map<string, number>();
+  for (const w of workflows) {
+    const wfOrdinal = findWorkflowReleaseOrdinal(w, byRelease, llmByRelease);
+    if (wfOrdinal === undefined) continue;
+    for (const t of w.triggers) {
+      const id = extractId(t);
+      if (id === undefined) continue;
+      setEarliestOrdinal(result, id, wfOrdinal);
     }
   }
+  return result;
+}
+
+/**
+ * Split `ids` into per-release placements (via `idToOrdinal`, applied by
+ * `place`) vs cross_cutting (returned). Mutates `byRelease` through `place`.
+ */
+function partitionByRelease(
+  ids: string[],
+  idToOrdinal: Map<string, number>,
+  ordinalToReleaseId: Map<number, string>,
+  byRelease: ReleaseContentsMap,
+  place: (contents: ReleaseContents, id: string) => void,
+): string[] {
+  const crossCutting: string[] = [];
+  for (const id of ids) {
+    const ord = idToOrdinal.get(id);
+    if (ord !== undefined) {
+      place(byRelease.get(ordinalToReleaseId.get(ord)!)!, id);
+    } else {
+      crossCutting.push(id);
+    }
+  }
+  return crossCutting;
+}
+
+function buildRelease(r: LlmReleaseSkeleton, c: ReleaseContents): ReleaseV2 {
+  return {
+    release_id: r.release_id,
+    ordinal: r.ordinal,
+    name: r.name,
+    description: r.description,
+    rationale: r.rationale,
+    contains: {
+      journeys: uniqSorted(c.journeys),
+      workflows: uniqSorted(c.workflows),
+      entities: uniqSorted(c.entities),
+      compliance: uniqSorted(c.compliance),
+      integrations: uniqSorted(c.integrations),
+      vocabulary: uniqSorted(c.vocabulary),
+      // New slots — empty until the builder caller is wired to feed
+      // upstream VV / QA / TECH ids.
+      vv_requirements: uniqSorted(c.vv_requirements),
+      quality_attributes: uniqSorted(c.quality_attributes),
+      technical_constraints: uniqSorted(c.technical_constraints),
+    },
+  };
+}
+
+function assembleReleases(
+  llmReleases: LlmReleaseSkeleton[],
+  byRelease: ReleaseContentsMap,
+): ReleaseV2[] {
+  return llmReleases.map(r => buildRelease(r, byRelease.get(r.release_id)!));
+}
+
+/**
+ * Deterministic assignment. Returns a fully-populated
+ * `ReleasePlanContentV2`-shaped manifest (minus schema metadata; caller
+ * wraps) with every accepted artifact placed in exactly one release's
+ * `contains[type]` or in `cross_cutting[type]`.
+ */
+export function buildReleaseManifest(input: BuildManifestInputs): BuildManifestResult {
+  const llmReleases = sortAndRenumberReleases(input.releases);
+  const { byRelease, llmByRelease } = buildReleaseMaps(llmReleases);
+  const firstReleaseId = llmReleases[0]?.release_id;
+
+  // ── Journeys ─────────────────────────────────────────────────────
+  const { journeyPlacement, unplacedJourneys } =
+    placeJourneys(llmReleases, input.journeys, byRelease, firstReleaseId);
+
+  // ── Workflows ────────────────────────────────────────────────────
+  const crossCuttingWorkflows =
+    placeWorkflows(input.workflows, journeyPlacement, llmByRelease, byRelease);
+
+  const ordinalToReleaseId = buildOrdinalToReleaseId(llmByRelease);
+
+  // ── Entities ─────────────────────────────────────────────────────
+  const domainToEarliestRelease = buildDomainToEarliestRelease(
+    input.journeys, input.workflows, journeyPlacement, llmByRelease, byRelease,
+  );
+  const orphanEntities = placeEntities(
+    input.entities, domainToEarliestRelease, ordinalToReleaseId, byRelease, firstReleaseId,
+  );
 
   // ── Compliance ───────────────────────────────────────────────────
-  // Default: cross_cutting. Override: if any workflow's
-  // kind:compliance trigger references the compliance id, the item
-  // is placed in that workflow's release.
-  const complianceToWorkflowRelease = new Map<string, number>(); // compId -> earliest workflow ordinal
-  for (const w of input.workflows) {
-    let wfOrdinal: number | undefined;
-    for (const [relId, contents] of byRelease) {
-      if (contents.workflows.includes(w.id)) {
-        wfOrdinal = llmByRelease.get(relId)!.ordinal;
-        break;
-      }
-    }
-    if (wfOrdinal === undefined) continue;
-    for (const t of w.triggers) {
-      if (t.kind !== 'compliance') continue;
-      const cur = complianceToWorkflowRelease.get(t.regime_id);
-      if (cur === undefined || wfOrdinal < cur) complianceToWorkflowRelease.set(t.regime_id, wfOrdinal);
-    }
-  }
-  const crossCuttingCompliance: string[] = [];
-  for (const compId of input.complianceIds) {
-    const ord = complianceToWorkflowRelease.get(compId);
-    if (ord !== undefined) {
-      byRelease.get(ordinalToReleaseId.get(ord)!)!.compliance.push(compId);
-    } else {
-      crossCuttingCompliance.push(compId);
-    }
-  }
+  // Default: cross_cutting. Override: earliest workflow whose
+  // kind:compliance trigger references the compliance id.
+  const complianceToWorkflowRelease = mapTriggerIdsToEarliestRelease(
+    input.workflows, byRelease, llmByRelease, extractComplianceTriggerId,
+  );
+  const crossCuttingCompliance = partitionByRelease(
+    input.complianceIds, complianceToWorkflowRelease, ordinalToReleaseId, byRelease,
+    (c, id) => { c.compliance.push(id); },
+  );
 
   // ── Integrations ─────────────────────────────────────────────────
-  // Default: cross_cutting. Override: if any workflow's
-  // kind:integration trigger references the integration id, place
-  // in the earliest such workflow's release.
-  const integrationToWorkflowRelease = new Map<string, number>();
-  for (const w of input.workflows) {
-    let wfOrdinal: number | undefined;
-    for (const [relId, contents] of byRelease) {
-      if (contents.workflows.includes(w.id)) {
-        wfOrdinal = llmByRelease.get(relId)!.ordinal;
-        break;
-      }
-    }
-    if (wfOrdinal === undefined) continue;
-    for (const t of w.triggers) {
-      if (t.kind !== 'integration') continue;
-      const cur = integrationToWorkflowRelease.get(t.integration_id);
-      if (cur === undefined || wfOrdinal < cur) integrationToWorkflowRelease.set(t.integration_id, wfOrdinal);
-    }
-  }
-  const crossCuttingIntegrations: string[] = [];
-  for (const it of input.integrations) {
-    const ord = integrationToWorkflowRelease.get(it.id);
-    if (ord !== undefined) {
-      byRelease.get(ordinalToReleaseId.get(ord)!)!.integrations.push(it.id);
-    } else {
-      crossCuttingIntegrations.push(it.id);
-    }
-  }
+  // Default: cross_cutting. Override: earliest workflow whose
+  // kind:integration trigger references the integration id.
+  const integrationToWorkflowRelease = mapTriggerIdsToEarliestRelease(
+    input.workflows, byRelease, llmByRelease, extractIntegrationTriggerId,
+  );
+  const crossCuttingIntegrations = partitionByRelease(
+    input.integrations.map(it => it.id), integrationToWorkflowRelease, ordinalToReleaseId, byRelease,
+    (c, id) => { c.integrations.push(id); },
+  );
 
   // ── Vocabulary ───────────────────────────────────────────────────
   // Always cross_cutting. Canonical vocabulary is product-wide.
@@ -298,29 +468,7 @@ export function buildReleaseManifest(input: BuildManifestInputs): BuildManifestR
   const crossCuttingTech: string[] = input.technicalConstraintIds ?? [];
 
   // ── Assemble ─────────────────────────────────────────────────────
-  const releases: ReleaseV2[] = llmReleases.map(r => {
-    const c = byRelease.get(r.release_id)!;
-    return {
-      release_id: r.release_id,
-      ordinal: r.ordinal,
-      name: r.name,
-      description: r.description,
-      rationale: r.rationale,
-      contains: {
-        journeys: uniqSorted(c.journeys),
-        workflows: uniqSorted(c.workflows),
-        entities: uniqSorted(c.entities),
-        compliance: uniqSorted(c.compliance),
-        integrations: uniqSorted(c.integrations),
-        vocabulary: uniqSorted(c.vocabulary),
-        // New slots — empty until the builder caller is wired to feed
-        // upstream VV / QA / TECH ids.
-        vv_requirements: uniqSorted(c.vv_requirements),
-        quality_attributes: uniqSorted(c.quality_attributes),
-        technical_constraints: uniqSorted(c.technical_constraints),
-      },
-    };
-  });
+  const releases: ReleaseV2[] = assembleReleases(llmReleases, byRelease);
 
   return {
     releases,

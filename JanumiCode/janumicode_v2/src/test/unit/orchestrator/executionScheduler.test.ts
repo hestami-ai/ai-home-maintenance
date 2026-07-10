@@ -20,6 +20,14 @@ import {
   buildWorkspaceOrientation,
   detectSandboxEscapes,
   isTestFilePath,
+  orderLeavesByOwnershipRank,
+  buildLeafDistribution,
+  accumulateTestTotals,
+  buildQuarantineReason,
+  collectOwnedTestFiles,
+  buildScopeViolationOutcome,
+  buildHighSeverityOutcome,
+  buildSandboxEscapeOutcome,
   type SchedulerLeaf,
 } from '../../../lib/orchestrator/executionScheduler';
 import {
@@ -28,7 +36,10 @@ import {
   type FileSnapshot,
 } from '../../../lib/orchestrator/workspaceSnapshot';
 import { QuarantineLedger } from '../../../lib/orchestrator/quarantineLedger';
-import type { TaskQuarantineContent } from '../../../lib/types/records';
+import type { TaskQuarantineContent, QuarantineAttemptEntry } from '../../../lib/types/records';
+import type { ModuleOwnershipPlan, OrderingEdge } from '../../../lib/orchestrator/phases/moduleOwnershipPlanner';
+import type { LeafTestRunResult } from '../../../lib/orchestrator/leafTestRunner';
+import type { ExecutionResult } from '../../../lib/agents/executorAgent';
 
 describe('isTestFilePath — file-level test detection (attribution)', () => {
   it('matches common test conventions across stacks', () => {
@@ -371,5 +382,219 @@ describe('buildWorkspaceOrientation — Path N #5/#8', () => {
     const out = buildWorkspaceOrientation(ghost, ['src/foo']);
     expect(out).toContain('not yet created');
     expect(out).toContain('orchestrator will mkdir');
+  });
+});
+
+// ── Characterization tests for helpers extracted during the S3776
+//    cognitive-complexity refactor of biasLeavesByOwnership / runWave /
+//    runLeafAttempt. These pin the CURRENT observable behavior of the pure
+//    building blocks those methods now delegate to. ─────────────────────────
+
+function ownershipPlan(edges: OrderingEdge[]): ModuleOwnershipPlan {
+  return {
+    kind: 'module_ownership_plan',
+    schemaVersion: '1.0',
+    shared_modules: [],
+    ordering_edges: edges,
+  };
+}
+function edge(before: string, after: string): OrderingEdge {
+  return { before_component_id: before, after_component_id: after, module_key: `${before}->${after}` };
+}
+
+describe('orderLeavesByOwnershipRank — producer-before-consumer bias', () => {
+  it('returns the SAME array (no-op) when there is no plan', () => {
+    const ls = [leaf('a'), leaf('b')];
+    expect(orderLeavesByOwnershipRank(ls, null)).toBe(ls);
+  });
+
+  it('returns the SAME array (no-op) when the plan has no ordering edges', () => {
+    const ls = [leaf('a'), leaf('b')];
+    expect(orderLeavesByOwnershipRank(ls, ownershipPlan([]))).toBe(ls);
+  });
+
+  it('orders a producer component ahead of its consumer', () => {
+    const ls = [leaf('b', { component_id: 'compB' }), leaf('a', { component_id: 'compA' })];
+    // compA must run before compB.
+    const ordered = orderLeavesByOwnershipRank(ls, ownershipPlan([edge('compA', 'compB')]));
+    expect(ordered.map(l => l.id)).toEqual(['a', 'b']);
+  });
+
+  it('is a stable sort — preserves input order within the same rank', () => {
+    const ls = [
+      leaf('c1', { component_id: 'compC' }),
+      leaf('a1', { component_id: 'compA' }),
+      leaf('a2', { component_id: 'compA' }),
+    ];
+    // compA (rank 0) before compC (rank 1); a1 before a2 (tie → input order).
+    const ordered = orderLeavesByOwnershipRank(ls, ownershipPlan([edge('compA', 'compC')]));
+    expect(ordered.map(l => l.id)).toEqual(['a1', 'a2', 'c1']);
+  });
+
+  it('degrades gracefully on a component cycle (tied ranks → stable original order, no throw)', () => {
+    const ls = [leaf('b', { component_id: 'compB' }), leaf('a', { component_id: 'compA' })];
+    const plan = ownershipPlan([edge('compA', 'compB'), edge('compB', 'compA')]);
+    const ordered = orderLeavesByOwnershipRank(ls, plan);
+    expect(ordered.map(l => l.id)).toEqual(['b', 'a']);
+  });
+
+  it('ignores ordering edges whose components are absent from the wave', () => {
+    const ls = [leaf('a', { component_id: 'compA' }), leaf('b', { component_id: 'compB' })];
+    // Edge references a component not present → dropped → stable original order.
+    const ordered = orderLeavesByOwnershipRank(ls, ownershipPlan([edge('compX', 'compY')]));
+    expect(ordered.map(l => l.id)).toEqual(['a', 'b']);
+  });
+});
+
+describe('buildLeafDistribution — per-component telemetry counts', () => {
+  it('counts leaves by component_id', () => {
+    const dist = buildLeafDistribution([
+      leaf('a', { component_id: 'c1' }),
+      leaf('b', { component_id: 'c1' }),
+      leaf('c', { component_id: 'c2' }),
+    ]);
+    expect(dist).toEqual({ c1: 2, c2: 1 });
+  });
+  it('returns an empty object for no leaves', () => {
+    expect(buildLeafDistribution([])).toEqual({});
+  });
+});
+
+describe('accumulateTestTotals — folds one attempt into running wave totals', () => {
+  const mkTest = (passed: number, failed: number, skipped: number): LeafTestRunResult => ({
+    passed: failed === 0,
+    passedCount: passed,
+    failedCount: failed,
+    skippedCount: skipped,
+    exitCode: failed === 0 ? 0 : 1,
+    durationMs: 1,
+  });
+
+  it('sums counts and increments leaves_with_failing_tests only when failures > 0', () => {
+    const totals = { passed: 0, failed: 0, skipped: 0, leaves_with_failing_tests: 0 };
+    accumulateTestTotals(totals, mkTest(3, 2, 1));
+    expect(totals).toEqual({ passed: 3, failed: 2, skipped: 1, leaves_with_failing_tests: 1 });
+    accumulateTestTotals(totals, mkTest(1, 0, 0));
+    expect(totals).toEqual({ passed: 4, failed: 2, skipped: 1, leaves_with_failing_tests: 1 });
+  });
+});
+
+describe('buildQuarantineReason — final-attempt reason string', () => {
+  const attempt = (o: Partial<QuarantineAttemptEntry>): QuarantineAttemptEntry => ({
+    attempt_number: 1,
+    invocation_id: 'inv',
+    outcome: 'execution_failed',
+    ...o,
+  });
+
+  it('falls back to execution_failed (unspecified) when there is no attempt', () => {
+    expect(buildQuarantineReason(undefined)).toBe('execution_failed (unspecified)');
+  });
+
+  it('lists reasoning-review flaw types', () => {
+    const r = buildQuarantineReason(attempt({
+      outcome: 'reasoning_review_failed',
+      reasoning_review_flaws: [
+        { flaw_type: 'x', severity: 'high' },
+        { flaw_type: 'y', severity: 'high' },
+      ],
+    }));
+    expect(r).toBe('reasoning_review_failed (x, y)');
+  });
+
+  it('uses "unspecified" for a reasoning_review_failed attempt with no flaws', () => {
+    expect(buildQuarantineReason(attempt({ outcome: 'reasoning_review_failed' })))
+      .toBe('reasoning_review_failed (unspecified)');
+  });
+
+  it('lists at most the first 3 test failures', () => {
+    const r = buildQuarantineReason(attempt({
+      outcome: 'tests_failed',
+      test_failures: ['f1', 'f2', 'f3', 'f4'],
+    }));
+    expect(r).toBe('tests_failed (f1, f2, f3)');
+  });
+
+  it('uses "unspecified" for a tests_failed attempt with no failures', () => {
+    expect(buildQuarantineReason(attempt({ outcome: 'tests_failed' })))
+      .toBe('tests_failed (unspecified)');
+  });
+
+  it('reports the error message for a plain execution_failed attempt', () => {
+    expect(buildQuarantineReason(attempt({ outcome: 'execution_failed', error_message: 'boom' })))
+      .toBe('execution_failed (boom)');
+  });
+});
+
+describe('collectOwnedTestFiles — file-level test attribution', () => {
+  const ws = path.join(path.sep, 'ws', 'proj');
+  const abs = (rel: string) => path.join(ws, ...rel.split('/'));
+
+  it('adds in-workspace, non-deleted test files only', () => {
+    const owned = new Set<string>();
+    collectOwnedTestFiles([
+      { filePath: abs('src/foo.test.ts'), operation: 'create' },
+      { filePath: abs('src/foo.ts'), operation: 'create' },       // not a test file
+      { filePath: abs('src/bar.test.ts'), operation: 'delete' },  // deletes ignored
+    ], ws, owned);
+    expect([...owned]).toEqual(['src/foo.test.ts']);
+  });
+
+  it('accumulates across calls (dedup via the shared set)', () => {
+    const owned = new Set<string>(['src/pre.test.ts']);
+    collectOwnedTestFiles([{ filePath: abs('src/foo.test.ts'), operation: 'modify' }], ws, owned);
+    collectOwnedTestFiles([{ filePath: abs('src/foo.test.ts'), operation: 'modify' }], ws, owned);
+    expect([...owned].sort()).toEqual(['src/foo.test.ts', 'src/pre.test.ts']);
+  });
+});
+
+describe('runLeafAttempt outcome builders — quarantine attempt entries', () => {
+  const mkResult = (invocationId: string, filesWrittenCount: number): ExecutionResult => ({
+    taskId: 't',
+    success: true,
+    invocationId,
+    filesWritten: Array.from({ length: filesWrittenCount }, () => ({})),
+    skippedIdempotent: false,
+  } as unknown as ExecutionResult);
+
+  it('buildScopeViolationOutcome cites the violating paths', () => {
+    const out = buildScopeViolationOutcome(mkResult('inv-1', 2), ['src/shared/x.ts'], 3);
+    expect(out.testResult).toBeNull();
+    expect(out.invocationId).toBe('inv-1');
+    expect(out.entry.attempt_number).toBe(3);
+    expect(out.entry.invocation_id).toBe('inv-1');
+    expect(out.entry.outcome).toBe('reasoning_review_failed');
+    expect(out.entry.files_written_count).toBe(2);
+    const flaw = (out.entry.reasoning_review_flaws ?? [])[0];
+    expect(flaw.flaw_type).toBe('write_scope_violation');
+    expect(flaw.severity).toBe('high');
+    expect(flaw.description).toContain('src/shared/x.ts');
+  });
+
+  it('buildHighSeverityOutcome maps findings (summary truncated to 80, severity lowercased)', () => {
+    const longSummary = 'S'.repeat(100);
+    const out = buildHighSeverityOutcome(
+      mkResult('inv-2', 1),
+      [{ summary: longSummary, detail: 'D', severity: 'HIGH' }],
+      1,
+    );
+    expect(out.entry.outcome).toBe('reasoning_review_failed');
+    const flaw = (out.entry.reasoning_review_flaws ?? [])[0];
+    expect(flaw.flaw_type).toBe('S'.repeat(80));
+    expect(flaw.severity).toBe('high');
+    expect(flaw.description).toBe('D');
+    expect(out.entry.files_written_count).toBe(1);
+  });
+
+  it('buildSandboxEscapeOutcome cites the escape paths (rmSync on nonexistent is a no-op)', () => {
+    const ghost = path.join(os.tmpdir(), `janum-escape-${Date.now()}-${Math.random().toString(36).slice(2)}`, 'x.ts');
+    const out = buildSandboxEscapeOutcome(mkResult('inv-3', 0), [ghost], leaf('esc-leaf'), 2);
+    expect(out.testResult).toBeNull();
+    expect(out.entry.attempt_number).toBe(2);
+    expect(out.entry.outcome).toBe('reasoning_review_failed');
+    const flaw = (out.entry.reasoning_review_flaws ?? [])[0];
+    expect(flaw.flaw_type).toBe('write_scope_violation');
+    expect(flaw.description).toContain(ghost);
+    expect(out.entry.files_written_count).toBe(0);
   });
 });

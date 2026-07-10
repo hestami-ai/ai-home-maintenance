@@ -333,34 +333,51 @@ export function validateContractSchema(
     if (findingForRule) findings.push(findingForRule);
   }
 
-  // Optional fields — type checks when present.
+  // Optional fields (type checks when present) + closed-schema extra-key check.
+  findings.push(
+    ...checkOptionalFields(obj, schema),
+    ...checkClosedSchema(obj, schema),
+  );
+
+  return findings;
+}
+
+function checkOptionalFields(
+  obj: Record<string, unknown>,
+  schema: ContractSchema,
+): ValidatorFinding[] {
+  const findings: ValidatorFinding[] = [];
   for (const [field, rule] of Object.entries(schema.optional ?? {})) {
     if (!(field in obj) || obj[field] === undefined || obj[field] === null) continue;
     const findingForRule = checkFieldRule(field, obj[field], rule);
     if (findingForRule) findings.push(findingForRule);
   }
+  return findings;
+}
 
-  // Closed-schema extra-key check.
-  if (schema.closed) {
-    const allowed = new Set([
-      ...Object.keys(schema.required ?? {}),
-      ...Object.keys(schema.optional ?? {}),
-    ]);
-    for (const key of Object.keys(obj)) {
-      if (!allowed.has(key)) {
-        findings.push({
-          validatorId: 'contract_schema_validator',
-          severity: 'LOW',
-          type: 'format_violation',
-          summary: `Unexpected top-level field '${key}'`,
-          location: `$.${key}`,
-          detail: `Field '${key}' is not declared in the contract schema.`,
-          recommendation: `Remove '${key}' or update the contract.`,
-        });
-      }
+function checkClosedSchema(
+  obj: Record<string, unknown>,
+  schema: ContractSchema,
+): ValidatorFinding[] {
+  const findings: ValidatorFinding[] = [];
+  if (!schema.closed) return findings;
+  const allowed = new Set([
+    ...Object.keys(schema.required ?? {}),
+    ...Object.keys(schema.optional ?? {}),
+  ]);
+  for (const key of Object.keys(obj)) {
+    if (!allowed.has(key)) {
+      findings.push({
+        validatorId: 'contract_schema_validator',
+        severity: 'LOW',
+        type: 'format_violation',
+        summary: `Unexpected top-level field '${key}'`,
+        location: `$.${key}`,
+        detail: `Field '${key}' is not declared in the contract schema.`,
+        recommendation: `Remove '${key}' or update the contract.`,
+      });
     }
   }
-
   return findings;
 }
 

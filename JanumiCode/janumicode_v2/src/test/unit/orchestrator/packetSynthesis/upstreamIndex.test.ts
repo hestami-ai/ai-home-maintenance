@@ -171,3 +171,98 @@ describe('indexArtifacts — basic extraction', () => {
     expect(idx.allUpstreamIds.has('X-1')).toBe(false);
   });
 });
+
+/**
+ * Characterization tests pinning the saturation-node branches that the
+ * refactor (else-if chains → lookup maps) touches but that were previously
+ * only covered for component/task/requirement nodes. Assertions reflect the
+ * PRE-refactor observable behavior, including the intentional asymmetry where a
+ * data_model_decomposition_node reads its id from `content.entity.id` but stores
+ * `content.data_model` (absent → falls back to the whole node content).
+ */
+describe('indexArtifacts — saturation-node branch characterization', () => {
+  it('data_model_decomposition_node: id comes from content.entity.id', () => {
+    const idx = indexArtifacts({
+      artifacts: [],
+      saturationNodes: [{
+        recordType: 'data_model_decomposition_node',
+        content: { node_id: 'dmn-1', entity: { id: 'ENT-leaf-77', name: 'E' } },
+      }],
+    });
+    expect(idx.allUpstreamIds.has('dmn-1')).toBe(true);
+    expect(idx.allUpstreamIds.has('ENT-leaf-77')).toBe(true);
+    // Store key is `data_model` (absent) → falls back to the whole node content.
+    const stored = idx.artifactsById.get('ENT-leaf-77') as Record<string, unknown>;
+    expect(stored.node_id).toBe('dmn-1');
+  });
+
+  it('test_decomposition_node: id comes from content.test_case.test_case_id', () => {
+    const idx = indexArtifacts({
+      artifacts: [],
+      saturationNodes: [{
+        recordType: 'test_decomposition_node',
+        content: { node_id: 'tcn-1', test_case: { test_case_id: 'TC-leaf-55' } },
+      }],
+    });
+    expect(idx.allUpstreamIds.has('tcn-1')).toBe(true);
+    expect(idx.allUpstreamIds.has('TC-leaf-55')).toBe(true);
+    // Store key is `test_case` (present) → stores the test_case object itself.
+    const stored = idx.artifactsById.get('TC-leaf-55') as { test_case_id: string };
+    expect(stored.test_case_id).toBe('TC-leaf-55');
+  });
+
+  it('unknown saturation record type: only node_id indexed; stores whole content', () => {
+    const idx = indexArtifacts({
+      artifacts: [],
+      saturationNodes: [{
+        recordType: 'totally_unknown_node',
+        content: { node_id: 'unk-1', mystery: { id: 'M-1' } },
+      }],
+    });
+    expect(idx.allUpstreamIds.has('unk-1')).toBe(true);
+    expect(idx.allUpstreamIds.has('M-1')).toBe(false);
+    const stored = idx.artifactsById.get('unk-1') as Record<string, unknown>;
+    expect((stored as { node_id: string }).node_id).toBe('unk-1');
+    expect('mystery' in stored).toBe(true);
+  });
+
+  it('component_decomposition_node: artifactsById stores the component entity', () => {
+    const idx = indexArtifacts({
+      artifacts: [],
+      saturationNodes: [{
+        recordType: 'component_decomposition_node',
+        content: { node_id: 'cn-1', component: { id: 'comp-leaf-9', name: 'C' } },
+      }],
+    });
+    // Both the leaf entity id and the node UUID point at the component object.
+    expect((idx.artifactsById.get('comp-leaf-9') as { name: string }).name).toBe('C');
+    expect((idx.artifactsById.get('cn-1') as { name: string }).name).toBe('C');
+  });
+
+  it('requirement_decomposition_node: artifactsById stores the user_story entity', () => {
+    const idx = indexArtifacts({
+      artifacts: [],
+      saturationNodes: [{
+        recordType: 'requirement_decomposition_node',
+        content: {
+          node_id: 'rn-1',
+          user_story: { id: 'US-003-D1', acceptance_criteria: [{ id: 'AC-US-003-D1-001' }] },
+        },
+      }],
+    });
+    const stored = idx.artifactsById.get('US-003-D1') as { id: string };
+    expect(stored.id).toBe('US-003-D1');
+  });
+
+  it('requirement node with malformed user_story: only node_id indexed', () => {
+    const idx = indexArtifacts({
+      artifacts: [],
+      saturationNodes: [{
+        recordType: 'requirement_decomposition_node',
+        content: { node_id: 'rn-2', user_story: 'not-an-object' },
+      }],
+    });
+    expect(idx.allUpstreamIds.has('rn-2')).toBe(true);
+    expect(idx.allUpstreamIds.size).toBe(1);
+  });
+});

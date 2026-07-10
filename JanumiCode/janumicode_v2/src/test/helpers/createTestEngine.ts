@@ -119,68 +119,81 @@ export interface TestEngine {
 
 const REPO_ROOT = path.resolve(__dirname, '..', '..', '..');
 
-export async function createTestEngine(
-  opts: TestEngineOptions = {},
-): Promise<TestEngine> {
-  const extensionPath = opts.extensionPath ?? REPO_ROOT;
-  // Default to an empty temp workspace — Phase 0 scans the workspace for
-  // artifact ingestion, and defaulting to REPO_ROOT would pull the entire
-  // JanumiCode codebase into each test's governed stream. Tests that want
-  // the real workspace (e.g. harness) pass `workspacePath` explicitly.
-  const workspacePath = opts.workspacePath
-    ?? fs.mkdtempSync(path.join(os.tmpdir(), 'jc-test-ws-'));
+// ── Bootstrap helpers (extracted from createTestEngine to keep each unit's
+//    cognitive complexity low; all are behavior-preserving) ─────────────
 
-  // 1. Database
-  const db =
-    !opts.dbPath || opts.dbPath === ':memory:'
-      ? createTestDatabase()
-      : initializeDatabase({ path: opts.dbPath, extensionPath });
+type LLMMode = 'mock' | 'real' | 'capture';
+type OrchestratorRoutingOpt = TestEngineOptions['orchestratorRouting'];
 
-  // 2. Config
-  const configManager = new ConfigManager(workspacePath);
-
-  // 2b. Orchestrator routing override. Production default is
-  // `gemini_cli` which isn't appropriate for most tests — mock mode
-  // needs a direct_llm_api backing so the MockLLMProvider intercepts
-  // the call, and real-mode harnesses steer to a specific CLI via
-  // opts.orchestratorRouting. When the routing is a CLI backing, we
-  // register the builtin parsers so validateLLMRouting passes.
-  const effectiveModeForRouting = opts.llmMode
-    // eslint-disable-next-line @typescript-eslint/no-deprecated
-    ?? (opts.useRealProviders ? 'real' : 'mock');
-  const orchestratorRouting = opts.orchestratorRouting ?? (
-    effectiveModeForRouting === 'mock'
-      ? { backing_tool: 'direct_llm_api', provider: 'llamacpp', model: 'qwen3.5:9b' }
-      : undefined
-  );
-
-  // 3. Engine
-  const engine = new OrchestratorEngine(db, configManager, workspacePath, extensionPath);
-  if (orchestratorRouting) {
-    configManager.setOrchestratorRouting({
-      primary: {
-        backing_tool: orchestratorRouting.backing_tool,
-        provider: orchestratorRouting.provider,
-        model: orchestratorRouting.model,
-      },
-      temperature: orchestratorRouting.temperature,
-    });
+/** Open the test database: in-memory for vitest, file-backed for CLI runs. */
+function openTestDatabase(opts: TestEngineOptions, extensionPath: string): Database {
+  if (!opts.dbPath || opts.dbPath === ':memory:') {
+    return createTestDatabase();
   }
-  if (orchestratorRouting && orchestratorRouting.backing_tool !== 'direct_llm_api') {
-    // CLI backing — register the builtin parsers so validateLLMRouting
-    // finds the one the orchestrator is configured to use. Mock mode
-    // stays quiet (no parsers) so Phase 9 still fast-fails without
-    // trying to spawn a real CLI subprocess.
+  return initializeDatabase({ path: opts.dbPath, extensionPath });
+}
+
+/**
+ * Resolve the effective LLM mode. `llmMode` wins; otherwise the deprecated
+ * `useRealProviders` flag selects real vs mock.
+ */
+function resolveEffectiveMode(opts: TestEngineOptions): LLMMode {
+  // eslint-disable-next-line @typescript-eslint/no-deprecated
+  return opts.llmMode ?? (opts.useRealProviders ? 'real' : 'mock');
+}
+
+/**
+ * Resolve the orchestrator routing override. Explicit opts win; mock mode
+ * defaults to a direct_llm_api backing so MockLLMProvider intercepts the
+ * Orchestrator-role call; real/capture fall through to the production default.
+ */
+function resolveOrchestratorRouting(
+  opts: TestEngineOptions,
+  effectiveMode: LLMMode,
+): OrchestratorRoutingOpt {
+  if (opts.orchestratorRouting) return opts.orchestratorRouting;
+  if (effectiveMode === 'mock') {
+    return { backing_tool: 'direct_llm_api', provider: 'llamacpp', model: 'qwen3.5:9b' };
+  }
+  return undefined;
+}
+
+/**
+ * Apply the orchestrator routing override to config + engine. When the
+ * backing is a CLI (not direct_llm_api), register the builtin parsers so
+ * validateLLMRouting finds the one the orchestrator is configured to use.
+ */
+function applyOrchestratorRouting(
+  engine: OrchestratorEngine,
+  configManager: ConfigManager,
+  orchestratorRouting: OrchestratorRoutingOpt,
+): void {
+  if (!orchestratorRouting) return;
+  configManager.setOrchestratorRouting({
+    primary: {
+      backing_tool: orchestratorRouting.backing_tool,
+      provider: orchestratorRouting.provider,
+      model: orchestratorRouting.model,
+    },
+    temperature: orchestratorRouting.temperature,
+  });
+  if (orchestratorRouting.backing_tool !== 'direct_llm_api') {
     engine.registerBuiltinCLIParsers();
   }
+}
+
+/** Apply auto-approve + phase-limit engine options. */
+function applyEngineOptions(engine: OrchestratorEngine, opts: TestEngineOptions): void {
   if (opts.autoApprove !== false) {
     engine.setAutoApproveDecisions(true);
   }
   if (opts.phaseLimit !== undefined) {
     engine.setPhaseLimit(opts.phaseLimit);
   }
+}
 
-  // 4. Register phase handlers
+/** Register all phase handlers (0 through 10) on the engine. */
+function registerAllPhases(engine: OrchestratorEngine): void {
   engine.registerPhase(new Phase0Handler());
   engine.registerPhase(new Phase05Handler());
   engine.registerPhase(new Phase1Handler());
@@ -193,56 +206,68 @@ export async function createTestEngine(
   engine.registerPhase(new Phase8Handler());
   engine.registerPhase(new Phase9Handler());
   engine.registerPhase(new Phase10Handler());
+}
 
-  // 5. Embedding (created but NOT started — tests don't need background embedding)
-  // Mirrors extension.ts env-var plumbing so calibration runs that go
-  // through the test harness can route the embedding role at llama-swap.
+/**
+ * Create the embedding service (mirrors extension.ts env-var plumbing so
+ * calibration runs through the test harness can route the embedding role at
+ * llama-swap). NOT started here — see attachEmbeddingIfReal.
+ */
+function createEmbeddingService(db: Database): EmbeddingService {
   const embedProvider = (process.env.JANUMICODE_EMBED_PROVIDER as 'ollama' | 'llamacpp') ?? 'ollama';
   const embedDefaultModel = embedProvider === 'llamacpp' ? 'qwen3-embedding-8b' : 'qwen3-embedding:8b';
-  const embedding = new EmbeddingService(db, {
+  return new EmbeddingService(db, {
     provider: embedProvider,
     model: process.env.JANUMICODE_EMBED_MODEL ?? embedDefaultModel,
     baseUrl: process.env.JANUMICODE_EMBED_BASE_URL,
     maxParallel: 1,
   });
+}
 
-  // 6. LLM provider setup — mode-dependent.
-  const mockLLM = new MockLLMProvider();
-  // eslint-disable-next-line @typescript-eslint/no-deprecated
-  const effectiveMode = opts.llmMode ?? (opts.useRealProviders ? 'real' : 'mock');
+/**
+ * Wire the embedding service to the engine + writer and start the worker loop
+ * — non-mock modes only. Mock tests skip this (no Ollama; the embedding fetch
+ * would hang on connect). The three-part wiring mirrors extension.ts:
+ *   1. setEmbeddingService on engine — DMR's vector-similarity retrieval path.
+ *   2. setEmbeddingService on the WRITER — every writeRecord fires enqueue().
+ *   3. start() — drains the queue. Missing (2) left governed_stream_vec empty.
+ */
+function attachEmbeddingIfReal(
+  engine: OrchestratorEngine,
+  embedding: EmbeddingService,
+  effectiveMode: LLMMode,
+): void {
+  if (effectiveMode === 'mock') return;
+  engine.setEmbeddingService(embedding);
+  engine.writer.setEmbeddingService(embedding);
+  embedding.start();
+}
 
-  // Only attach the embedding service to the engine (and therefore to DMR's
-  // vector-similarity path) when the test mode uses real LLM providers.
-  // Tests using mock LLMs won't have Ollama running and the embedding fetch
-  // hangs on connect. DMR degrades gracefully without semantic similarity —
-  // it still uses FTS5 and authority-weighted harvest.
-  if (effectiveMode !== 'mock') {
-    // Three-part wiring (mirrors extension.ts):
-    //   1. setEmbeddingService on engine — DMR's vector-similarity path reads
-    //      from the embedding queue's results table at retrieval time.
-    //   2. setEmbeddingService on the WRITER — every successful writeRecord
-    //      call hands the record to embedding.enqueue(). Without this hook,
-    //      records are written but no enqueue ever fires.
-    //   3. start() the embedder so the worker loop drains the queue.
-    // Missing step (2) was the cause of `governed_stream_vec` staying empty
-    // across thin-slice-6 despite (1) and (3) being in place.
-    engine.setEmbeddingService(embedding);
-    engine.writer.setEmbeddingService(embedding);
-    embedding.start();
-  }
-
-  // Register inline fixtures (useful in all modes for fallback)
+/** Register inline + directory fixtures on the mock provider (all modes). */
+async function registerConfiguredFixtures(
+  mockLLM: MockLLMProvider,
+  opts: TestEngineOptions,
+): Promise<void> {
   if (opts.llmFixtures) {
     for (const [key, fixture] of Object.entries(opts.llmFixtures)) {
       mockLLM.setFixture(key, fixture);
     }
   }
-
-  // Load directory fixtures (useful in all modes for fallback)
   if (opts.fixtureDir) {
     await mockLLM.loadFixturesFromDir(opts.fixtureDir);
   }
+}
 
+/**
+ * Register LLM providers on the engine's caller. Mock mode binds the mock
+ * under every provider name; real/capture register the actual providers
+ * (wrapped for capture when recording fixtures), keeping mock as fallback.
+ */
+function registerEngineProviders(
+  engine: OrchestratorEngine,
+  mockLLM: MockLLMProvider,
+  effectiveMode: LLMMode,
+): void {
   if (effectiveMode === 'mock') {
     // Mock mode: every provider name routes to the fixture store.
     engine.llmCaller.registerProvider(mockLLM);
@@ -250,49 +275,57 @@ export async function createTestEngine(
     engine.llmCaller.registerProvider(mockLLM.bindAsProvider('ollama'));
     engine.llmCaller.registerProvider(mockLLM.bindAsProvider('anthropic'));
     engine.llmCaller.registerProvider(mockLLM.bindAsProvider('google'));
-  } else {
-    // Real or capture mode: register actual providers.
-    // eslint-disable-next-line @typescript-eslint/no-require-imports
-    const { OllamaProvider } = require('../../lib/llm/providers/ollama');
-    // eslint-disable-next-line @typescript-eslint/no-require-imports
-    const { AnthropicProvider } = require('../../lib/llm/providers/anthropic');
-    // eslint-disable-next-line @typescript-eslint/no-require-imports
-    const { GoogleProvider } = require('../../lib/llm/providers/google');
-
-    // eslint-disable-next-line @typescript-eslint/no-require-imports
-    const { LlamaCppProvider } = require('../../lib/llm/providers/llamacpp');
-
-    const ollama = new OllamaProvider();
-    const anthropic = new AnthropicProvider();
-    const google = new GoogleProvider();
-    const llamacpp = new LlamaCppProvider();
-
-    if (effectiveMode === 'capture') {
-      // Capture mode: wrap each real provider so every call is intercepted
-      // and recorded by MockLLMProvider for fixture generation. The wrapper
-      // preserves the provider name so routing is unchanged.
-      mockLLM.enableCapture();
-      engine.llmCaller.registerProvider(mockLLM.wrapForCapture(ollama));
-      engine.llmCaller.registerProvider(mockLLM.wrapForCapture(anthropic));
-      engine.llmCaller.registerProvider(mockLLM.wrapForCapture(google));
-      engine.llmCaller.registerProvider(mockLLM.wrapForCapture(llamacpp));
-    } else {
-      // Pure real mode: register providers directly.
-      engine.llmCaller.registerProvider(ollama);
-      engine.llmCaller.registerProvider(anthropic);
-      engine.llmCaller.registerProvider(google);
-      engine.llmCaller.registerProvider(llamacpp);
-    }
-    // Keep mock available as a fallback provider name
-    engine.llmCaller.registerProvider(mockLLM);
+    return;
   }
 
-  // 7. ClientLiaisonAgent — provider config matches the mode so Phase
-  //    handlers and the Liaison's classifier/synthesizer route correctly.
-  const liaisonProvider = effectiveMode === 'mock' ? 'mock' : 'ollama';
-  const liaisonModel = effectiveMode === 'mock' ? 'mock-model' : (process.env.JANUMICODE_DEV_MODEL ?? 'qwen3.5:9b');
+  // Real or capture mode: register actual providers.
+  // eslint-disable-next-line @typescript-eslint/no-require-imports
+  const { OllamaProvider } = require('../../lib/llm/providers/ollama');
+  // eslint-disable-next-line @typescript-eslint/no-require-imports
+  const { AnthropicProvider } = require('../../lib/llm/providers/anthropic');
+  // eslint-disable-next-line @typescript-eslint/no-require-imports
+  const { GoogleProvider } = require('../../lib/llm/providers/google');
+  // eslint-disable-next-line @typescript-eslint/no-require-imports
+  const { LlamaCppProvider } = require('../../lib/llm/providers/llamacpp');
 
-  const liaison = new ClientLiaisonAgent(
+  const ollama = new OllamaProvider();
+  const anthropic = new AnthropicProvider();
+  const google = new GoogleProvider();
+  const llamacpp = new LlamaCppProvider();
+
+  if (effectiveMode === 'capture') {
+    // Capture mode: wrap each real provider so every call is intercepted
+    // and recorded by MockLLMProvider for fixture generation. The wrapper
+    // preserves the provider name so routing is unchanged.
+    mockLLM.enableCapture();
+    engine.llmCaller.registerProvider(mockLLM.wrapForCapture(ollama));
+    engine.llmCaller.registerProvider(mockLLM.wrapForCapture(anthropic));
+    engine.llmCaller.registerProvider(mockLLM.wrapForCapture(google));
+    engine.llmCaller.registerProvider(mockLLM.wrapForCapture(llamacpp));
+  } else {
+    // Pure real mode: register providers directly.
+    engine.llmCaller.registerProvider(ollama);
+    engine.llmCaller.registerProvider(anthropic);
+    engine.llmCaller.registerProvider(google);
+    engine.llmCaller.registerProvider(llamacpp);
+  }
+  // Keep mock available as a fallback provider name
+  engine.llmCaller.registerProvider(mockLLM);
+}
+
+/** Create the ClientLiaisonAgent with provider config matching the mode. */
+function createTestLiaison(
+  db: Database,
+  engine: OrchestratorEngine,
+  embedding: EmbeddingService,
+  effectiveMode: LLMMode,
+): ClientLiaisonAgent {
+  const liaisonProvider = effectiveMode === 'mock' ? 'mock' : 'ollama';
+  const liaisonModel = effectiveMode === 'mock'
+    ? 'mock-model'
+    : (process.env.JANUMICODE_DEV_MODEL ?? 'qwen3.5:9b');
+
+  return new ClientLiaisonAgent(
     db,
     engine,
     {
@@ -302,22 +335,89 @@ export async function createTestEngine(
     },
     null, // no extension host adapter in test/CLI mode
   );
+}
 
-  // Register providers on the Liaison's internal PriorityLLMCaller too.
+/** Register providers on the Liaison's internal PriorityLLMCaller. */
+function registerLiaisonProviders(
+  liaison: ClientLiaisonAgent,
+  mockLLM: MockLLMProvider,
+  effectiveMode: LLMMode,
+): void {
   if (effectiveMode === 'mock') {
     liaison.registerProviders(mockLLM as unknown as LLMProviderAdapter);
     liaison.registerProviders(mockLLM.bindAsProvider('llamacpp') as unknown as LLMProviderAdapter);
-  } else {
-    // eslint-disable-next-line @typescript-eslint/no-require-imports
-    const { OllamaProvider: OllamaP } = require('../../lib/llm/providers/ollama');
-    const ollamaForLiaison = new OllamaP();
-    if (effectiveMode === 'capture') {
-      liaison.registerProviders(mockLLM.wrapForCapture(ollamaForLiaison) as unknown as LLMProviderAdapter);
-    } else {
-      liaison.registerProviders(ollamaForLiaison as unknown as LLMProviderAdapter);
-    }
-    liaison.registerProviders(mockLLM as unknown as LLMProviderAdapter); // fallback
+    return;
   }
+
+  // eslint-disable-next-line @typescript-eslint/no-require-imports
+  const { OllamaProvider: OllamaP } = require('../../lib/llm/providers/ollama');
+  const ollamaForLiaison = new OllamaP();
+  if (effectiveMode === 'capture') {
+    liaison.registerProviders(mockLLM.wrapForCapture(ollamaForLiaison) as unknown as LLMProviderAdapter);
+  } else {
+    liaison.registerProviders(ollamaForLiaison as unknown as LLMProviderAdapter);
+  }
+  liaison.registerProviders(mockLLM as unknown as LLMProviderAdapter); // fallback
+}
+
+/** Build the teardown closure: stop embedding, close DB. Both best-effort. */
+function makeCleanup(embedding: EmbeddingService, db: Database): () => void {
+  return () => {
+    try { embedding.stop(); } catch { /* ignore */ }
+    try { db.close(); } catch { /* ignore */ }
+  };
+}
+
+export async function createTestEngine(
+  opts: TestEngineOptions = {},
+): Promise<TestEngine> {
+  const extensionPath = opts.extensionPath ?? REPO_ROOT;
+  // Default to an empty temp workspace — Phase 0 scans the workspace for
+  // artifact ingestion, and defaulting to REPO_ROOT would pull the entire
+  // JanumiCode codebase into each test's governed stream. Tests that want
+  // the real workspace (e.g. harness) pass `workspacePath` explicitly.
+  const workspacePath = opts.workspacePath
+    ?? fs.mkdtempSync(path.join(os.tmpdir(), 'jc-test-ws-'));
+
+  // 1. Database
+  const db = openTestDatabase(opts, extensionPath);
+
+  // 2. Config
+  const configManager = new ConfigManager(workspacePath);
+
+  // 2b. Orchestrator routing override — mock mode needs a direct_llm_api
+  // backing so MockLLMProvider intercepts; real-mode harnesses steer to a
+  // specific CLI via opts.orchestratorRouting (which registers CLI parsers).
+  const effectiveMode = resolveEffectiveMode(opts);
+  const orchestratorRouting = resolveOrchestratorRouting(opts, effectiveMode);
+
+  // 3. Engine
+  const engine = new OrchestratorEngine(db, configManager, workspacePath, extensionPath);
+  applyOrchestratorRouting(engine, configManager, orchestratorRouting);
+  applyEngineOptions(engine, opts);
+
+  // 4. Register phase handlers
+  registerAllPhases(engine);
+
+  // 5. Embedding — created but only wired + started in non-mock modes (see
+  // attachEmbeddingIfReal). Mock tests have no Ollama and the embedding fetch
+  // would hang on connect; DMR degrades gracefully (FTS5 + authority harvest).
+  const embedding = createEmbeddingService(db);
+
+  // 6. LLM provider setup — mode-dependent.
+  const mockLLM = new MockLLMProvider();
+  attachEmbeddingIfReal(engine, embedding, effectiveMode);
+
+  // Register inline + directory fixtures (useful in all modes for fallback).
+  await registerConfiguredFixtures(mockLLM, opts);
+
+  // Register LLM providers on the engine's caller (mode-dependent).
+  registerEngineProviders(engine, mockLLM, effectiveMode);
+
+  // 7. ClientLiaisonAgent — provider config matches the mode so Phase
+  //    handlers and the Liaison's classifier/synthesizer route correctly.
+  const liaison = createTestLiaison(db, engine, embedding, effectiveMode);
+  registerLiaisonProviders(liaison, mockLLM, effectiveMode);
   liaison.setEventBus(engine.eventBus);
 
   // Verify that every provider referenced in llm_routing config is actually
@@ -333,9 +433,6 @@ export async function createTestEngine(
     db,
     mockLLM,
     embedding,
-    cleanup() {
-      try { embedding.stop(); } catch { /* ignore */ }
-      try { db.close(); } catch { /* ignore */ }
-    },
+    cleanup: makeCleanup(embedding, db),
   };
 }

@@ -169,7 +169,7 @@ export async function runAcceptanceTest(
   }
 
   // 3: live LLM call.
-  let parsed: unknown | null = null;
+  let parsed: unknown = null;
   let responseText = '';
   let llmError: string | undefined;
   try {

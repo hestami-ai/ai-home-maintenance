@@ -33,6 +33,7 @@ import type {
   ReleasePlanContentV2,
   UserJourney,
   VocabularyTerm,
+  WorkflowTrigger,
   WorkflowV2,
 } from '../../../types/records';
 
@@ -185,54 +186,92 @@ function checkOrdinalIntegrity(plan: ReleasePlanContentV2): CoverageGapContent[]
   })];
 }
 
+/**
+ * Build an id -> ordinal map for the backward-dependency check.
+ * cross_cutting = -Infinity so it never blocks anything — an artifact
+ * in cross_cutting is available in every release.
+ */
+function buildBackwardDepOrdinalMap(plan: ReleasePlanContentV2): Map<string, number> {
+  const ordinalOf = new Map<string, number>(); // id -> ordinal (or -Infinity for cross_cutting)
+  for (const r of plan.releases) {
+    const releaseBuckets = [
+      r.contains.journeys,
+      r.contains.workflows,
+      r.contains.entities,
+      r.contains.compliance,
+      r.contains.integrations,
+      r.contains.vocabulary,
+    ];
+    for (const bucket of releaseBuckets) {
+      for (const id of bucket) ordinalOf.set(id, r.ordinal);
+    }
+  }
+  const crossCuttingBuckets = [
+    plan.cross_cutting.workflows,
+    plan.cross_cutting.compliance,
+    plan.cross_cutting.integrations,
+    plan.cross_cutting.vocabulary,
+  ];
+  for (const bucket of crossCuttingBuckets) {
+    for (const id of bucket) ordinalOf.set(id, -Infinity);
+  }
+  return ordinalOf;
+}
+
+/** Resolve the artifact id a trigger points at, or undefined if the
+ * trigger kind carries no cross-release target. */
+function backwardDepTriggerTarget(t: WorkflowTrigger): string | undefined {
+  if (t.kind === 'journey_step') return t.journey_id;
+  if (t.kind === 'compliance') return t.regime_id;
+  if (t.kind === 'integration') return t.integration_id;
+  return undefined;
+}
+
+/**
+ * Backward-dependency violations contributed by a single workflow's
+ * triggers. `wfOrd` is the workflow's own ordinal (-Infinity for
+ * cross_cutting).
+ */
+function backwardDepViolationsForWorkflow(
+  w: WorkflowV2,
+  wfOrd: number,
+  ordinalOf: Map<string, number>,
+): string[] {
+  const violations: string[] = [];
+  for (const t of w.triggers) {
+    const target = backwardDepTriggerTarget(t);
+    if (target === undefined) continue;
+    const targetOrd = ordinalOf.get(target);
+    if (targetOrd === undefined) continue; // coverage already reports
+    // If workflow is cross_cutting (-Infinity), it must ONLY depend
+    // on cross_cutting targets — otherwise a cross_cutting workflow
+    // references a release-specific artifact, which is a dependency
+    // failure in the other direction (the workflow can't genuinely
+    // span all releases if it depends on something only available in
+    // some of them).
+    if (wfOrd === -Infinity && targetOrd !== -Infinity) {
+      violations.push(`${w.id}(cross_cutting) depends on ${target}(REL-ord=${targetOrd}) — cross_cutting workflows must only depend on cross_cutting targets.`);
+      continue;
+    }
+    if (targetOrd === -Infinity) continue; // cross_cutting target → available in all releases
+    if (typeof wfOrd === 'number' && typeof targetOrd === 'number' && wfOrd < targetOrd) {
+      violations.push(`${w.id}(REL-ord=${wfOrd}) depends on ${target}(REL-ord=${targetOrd}) — backward dependency.`);
+    }
+  }
+  return violations;
+}
+
 function checkBackwardDependencies(
   plan: ReleasePlanContentV2,
   workflows: WorkflowV2[],
 ): CoverageGapContent[] {
-  // Build an id -> ordinal map (cross_cutting = Infinity so it never
-  // blocks anything — an artifact in cross_cutting is available in
-  // every release).
-  const ordinalOf = new Map<string, number>(); // id -> ordinal (or -Infinity for cross_cutting)
-  for (const r of plan.releases) {
-    for (const id of r.contains.journeys) ordinalOf.set(id, r.ordinal);
-    for (const id of r.contains.workflows) ordinalOf.set(id, r.ordinal);
-    for (const id of r.contains.entities) ordinalOf.set(id, r.ordinal);
-    for (const id of r.contains.compliance) ordinalOf.set(id, r.ordinal);
-    for (const id of r.contains.integrations) ordinalOf.set(id, r.ordinal);
-    for (const id of r.contains.vocabulary) ordinalOf.set(id, r.ordinal);
-  }
-  for (const id of plan.cross_cutting.workflows) ordinalOf.set(id, -Infinity);
-  for (const id of plan.cross_cutting.compliance) ordinalOf.set(id, -Infinity);
-  for (const id of plan.cross_cutting.integrations) ordinalOf.set(id, -Infinity);
-  for (const id of plan.cross_cutting.vocabulary) ordinalOf.set(id, -Infinity);
+  const ordinalOf = buildBackwardDepOrdinalMap(plan);
 
   const violations: string[] = [];
   for (const w of workflows) {
     const wfOrd = ordinalOf.get(w.id);
     if (wfOrd === undefined) continue; // coverage check already reports this
-    for (const t of w.triggers) {
-      let target: string | undefined;
-      if (t.kind === 'journey_step') target = t.journey_id;
-      else if (t.kind === 'compliance') target = t.regime_id;
-      else if (t.kind === 'integration') target = t.integration_id;
-      if (target === undefined) continue;
-      const targetOrd = ordinalOf.get(target);
-      if (targetOrd === undefined) continue; // coverage already reports
-      // If workflow is cross_cutting (-Infinity), it must ONLY depend
-      // on cross_cutting targets — otherwise a cross_cutting workflow
-      // references a release-specific artifact, which is a dependency
-      // failure in the other direction (the workflow can't genuinely
-      // span all releases if it depends on something only available in
-      // some of them).
-      if (wfOrd === -Infinity && targetOrd !== -Infinity) {
-        violations.push(`${w.id}(cross_cutting) depends on ${target}(REL-ord=${targetOrd}) — cross_cutting workflows must only depend on cross_cutting targets.`);
-        continue;
-      }
-      if (targetOrd === -Infinity) continue; // cross_cutting target → available in all releases
-      if (typeof wfOrd === 'number' && typeof targetOrd === 'number' && wfOrd < targetOrd) {
-        violations.push(`${w.id}(REL-ord=${wfOrd}) depends on ${target}(REL-ord=${targetOrd}) — backward dependency.`);
-      }
-    }
+    violations.push(...backwardDepViolationsForWorkflow(w, wfOrd, ordinalOf));
   }
   if (violations.length === 0) return [];
   return [mkGap({
@@ -252,15 +291,20 @@ function checkBackwardDependencies(
  * workflow itself is release-specific, backing a journey in a different
  * release is a planning smell worth surfacing.
  */
-function checkTraceCoherence(
-  plan: ReleasePlanContentV2,
-  workflows: WorkflowV2[],
-): CoverageGapContent[] {
+function journeyWorkflowOrdinals(plan: ReleasePlanContentV2): Map<string, number> {
   const ordinalOf = new Map<string, number>();
   for (const r of plan.releases) {
     for (const id of r.contains.journeys) ordinalOf.set(id, r.ordinal);
     for (const id of r.contains.workflows) ordinalOf.set(id, r.ordinal);
   }
+  return ordinalOf;
+}
+
+function checkTraceCoherence(
+  plan: ReleasePlanContentV2,
+  workflows: WorkflowV2[],
+): CoverageGapContent[] {
+  const ordinalOf = journeyWorkflowOrdinals(plan);
   const findings: string[] = [];
   for (const w of workflows) {
     const wfOrd = ordinalOf.get(w.id);

@@ -73,6 +73,39 @@ function listFilesRecursive(absRoot: string, accumulator: string[], maxFiles = 5
 }
 
 /**
+ * Capture (hash + optionally content) a single file into `snapshot`.
+ * Oversized files are recorded hash-only; capture failures are logged and skipped.
+ * Extracted from `captureWaveSnapshot` to keep its cognitive complexity low.
+ */
+function captureFile(filePath: string, snapshot: Map<string, FileSnapshot>): void {
+  try {
+    const stat = fs.statSync(filePath);
+    if (!stat.isFile()) return;
+    if (stat.size > PER_FILE_BYTE_CAP) {
+      snapshot.set(filePath, {
+        path: filePath,
+        hash: null,
+        content: null,
+        size: stat.size,
+        oversize: true,
+      });
+      return;
+    }
+    const buf = fs.readFileSync(filePath);
+    snapshot.set(filePath, {
+      path: filePath,
+      hash: safeHash(buf),
+      content: buf,
+      size: stat.size,
+    });
+  } catch (err) {
+    getLogger().warn('workflow', 'workspaceSnapshot: capture failed for file', {
+      filePath, error: err instanceof Error ? err.message : String(err),
+    });
+  }
+}
+
+/**
  * Capture a snapshot of every file under each `writeDirectoryPath`.
  * `cwd` is the workspace root; relative paths resolve against it.
  * Captured `content` is used by `revertSnapshot` to restore on rejection;
@@ -91,34 +124,36 @@ export function captureWaveSnapshot(
     const files: string[] = [];
     listFilesRecursive(abs, files);
     for (const filePath of files) {
-      try {
-        const stat = fs.statSync(filePath);
-        if (!stat.isFile()) continue;
-        if (stat.size > PER_FILE_BYTE_CAP) {
-          snapshot.set(filePath, {
-            path: filePath,
-            hash: null,
-            content: null,
-            size: stat.size,
-            oversize: true,
-          });
-          continue;
-        }
-        const buf = fs.readFileSync(filePath);
-        snapshot.set(filePath, {
-          path: filePath,
-          hash: safeHash(buf),
-          content: buf,
-          size: stat.size,
-        });
-      } catch (err) {
-        getLogger().warn('workflow', 'workspaceSnapshot: capture failed for file', {
-          filePath, error: err instanceof Error ? err.message : String(err),
-        });
-      }
+      captureFile(filePath, snapshot);
     }
   }
   return snapshot;
+}
+
+/**
+ * Classify a path present in BOTH snapshots as modified (different hash) or
+ * unchanged, returning the diff entry plus the modified-count and positive
+ * byte-delta contributions. Extracted from `diffWaveSnapshots` to flatten its
+ * nesting; byte accounting matches the original (only positive deltas count).
+ */
+function diffExistingFile(
+  p: string,
+  a: FileSnapshot,
+  b: FileSnapshot,
+): { entry: WaveDiffEntry; modifiedCount: number; bytesAdded: number } {
+  if (a.hash !== b.hash) {
+    const delta = (b.size ?? 0) - (a.size ?? 0);
+    return {
+      entry: { path: p, operation: 'modified', pre: a, post: b },
+      modifiedCount: 1,
+      bytesAdded: Math.max(0, delta),
+    };
+  }
+  return {
+    entry: { path: p, operation: 'unchanged', pre: a, post: b },
+    modifiedCount: 0,
+    bytesAdded: 0,
+  };
 }
 
 /**
@@ -147,17 +182,59 @@ export function diffWaveSnapshots(
       deleted++;
       files.push({ path: p, operation: 'deleted', pre: a, post: null });
     } else if (a && b) {
-      if (a.hash !== b.hash) {
-        modified++;
-        const delta = (b.size ?? 0) - (a.size ?? 0);
-        if (delta > 0) totalBytesAdded += delta;
-        files.push({ path: p, operation: 'modified', pre: a, post: b });
-      } else {
-        files.push({ path: p, operation: 'unchanged', pre: a, post: b });
-      }
+      const result = diffExistingFile(p, a, b);
+      modified += result.modifiedCount;
+      totalBytesAdded += result.bytesAdded;
+      files.push(result.entry);
     }
   }
   return { created, modified, deleted, total_bytes_added: totalBytesAdded, files };
+}
+
+/**
+ * Restore a captured pre-wave file content to disk, creating parent dirs.
+ * Extracted from `revertWaveSnapshot` so its per-entry dispatch stays flat.
+ */
+function restorePreContent(filePath: string, content: Buffer): void {
+  fs.mkdirSync(path.dirname(filePath), { recursive: true });
+  fs.writeFileSync(filePath, content);
+}
+
+/**
+ * Reverse-apply a single wave-diff entry. Returns whether a file was reverted
+ * plus an optional non-throwing failure record. Any fs error is left to
+ * propagate so the caller records it uniformly via its per-entry try/catch.
+ * Extracted from `revertWaveSnapshot` to keep its loop under the complexity cap.
+ */
+function revertDiffEntry(entry: WaveDiffEntry): {
+  reverted: boolean;
+  failure: { path: string; reason: string } | null;
+} {
+  if (entry.operation === 'created') {
+    if (fs.existsSync(entry.path)) {
+      fs.unlinkSync(entry.path);
+      return { reverted: true, failure: null };
+    }
+    return { reverted: false, failure: null };
+  }
+  if (entry.operation === 'modified') {
+    if (entry.pre?.content) {
+      restorePreContent(entry.path, entry.pre.content);
+      return { reverted: true, failure: null };
+    }
+    if (entry.pre?.oversize) {
+      return { reverted: false, failure: { path: entry.path, reason: 'oversize_uncaptured' } };
+    }
+    return { reverted: false, failure: { path: entry.path, reason: 'no_pre_content' } };
+  }
+  if (entry.operation === 'deleted') {
+    if (entry.pre?.content) {
+      restorePreContent(entry.path, entry.pre.content);
+      return { reverted: true, failure: null };
+    }
+    return { reverted: false, failure: { path: entry.path, reason: 'no_pre_content' } };
+  }
+  return { reverted: false, failure: null };
 }
 
 /**
@@ -177,30 +254,9 @@ export function revertWaveSnapshot(diff: WaveDiffSummary): {
   const failed: Array<{ path: string; reason: string }> = [];
   for (const entry of diff.files) {
     try {
-      if (entry.operation === 'created') {
-        if (fs.existsSync(entry.path)) {
-          fs.unlinkSync(entry.path);
-          reverted++;
-        }
-      } else if (entry.operation === 'modified') {
-        if (entry.pre?.content) {
-          fs.mkdirSync(path.dirname(entry.path), { recursive: true });
-          fs.writeFileSync(entry.path, entry.pre.content);
-          reverted++;
-        } else if (entry.pre?.oversize) {
-          failed.push({ path: entry.path, reason: 'oversize_uncaptured' });
-        } else {
-          failed.push({ path: entry.path, reason: 'no_pre_content' });
-        }
-      } else if (entry.operation === 'deleted') {
-        if (entry.pre?.content) {
-          fs.mkdirSync(path.dirname(entry.path), { recursive: true });
-          fs.writeFileSync(entry.path, entry.pre.content);
-          reverted++;
-        } else {
-          failed.push({ path: entry.path, reason: 'no_pre_content' });
-        }
-      }
+      const result = revertDiffEntry(entry);
+      if (result.reverted) reverted++;
+      if (result.failure) failed.push(result.failure);
     } catch (err) {
       failed.push({
         path: entry.path,
@@ -257,6 +313,32 @@ function isTestFile(base: string): boolean {
 }
 
 /**
+ * Classify one absolute file path for the divergent-duplicate scan: apply the
+ * protected-prefix, ubiquitous-name, test-file and root-config skip rules, then
+ * stat + hash it. Returns `null` for any skipped/unreadable file. Extracted from
+ * `detectDivergentDuplicates` to keep its scan loop under the complexity cap.
+ */
+function classifyFileForDuplicates(
+  abs: string,
+  workspaceRoot: string,
+  normPrefixes: string[],
+): { base: string; rel: string; hash: string } | null {
+  const rel = path.relative(workspaceRoot, abs).split(path.sep).join('/');
+  if (normPrefixes.some(p => rel === p.slice(0, -1) || rel.startsWith(p))) return null;
+  const base = path.basename(abs).toLowerCase();
+  const stem = base.replace(/\.[^.]+$/, '');
+  if (UBIQUITOUS_BASENAMES.has(stem) || isTestFile(base)) return null;
+  if (ROOT_CONFIG_BASENAMES.has(base)) return null;
+  try {
+    const stat = fs.statSync(abs);
+    if (!stat.isFile() || stat.size > PER_FILE_BYTE_CAP) return null;
+    return { base, rel, hash: safeHash(fs.readFileSync(abs)) };
+  } catch {
+    return null;
+  }
+}
+
+/**
  * Lever 2c — detect divergent duplicate modules across the generated
  * workspace: files that share a basename but have DIFFERENT content hashes
  * in different directories (e.g. two `encryption-service.js`, one ESM/sync
@@ -281,20 +363,9 @@ export function detectDivergentDuplicates(
 
   const byBase = new Map<string, Array<{ path: string; hash: string }>>();
   for (const abs of files) {
-    const rel = path.relative(workspaceRoot, abs).split(path.sep).join('/');
-    if (normPrefixes.some(p => rel === p.slice(0, -1) || rel.startsWith(p))) continue;
-    const base = path.basename(abs).toLowerCase();
-    const stem = base.replace(/\.[^.]+$/, '');
-    if (UBIQUITOUS_BASENAMES.has(stem) || isTestFile(base)) continue;
-    if (ROOT_CONFIG_BASENAMES.has(base)) continue;
-    let hash: string;
-    try {
-      const stat = fs.statSync(abs);
-      if (!stat.isFile() || stat.size > PER_FILE_BYTE_CAP) continue;
-      hash = safeHash(fs.readFileSync(abs));
-    } catch {
-      continue;
-    }
+    const classified = classifyFileForDuplicates(abs, workspaceRoot, normPrefixes);
+    if (!classified) continue;
+    const { base, rel, hash } = classified;
     const group = byBase.get(base);
     if (group) group.push({ path: rel, hash });
     else byBase.set(base, [{ path: rel, hash }]);

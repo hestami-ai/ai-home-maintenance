@@ -97,24 +97,28 @@ export class AnthropicProvider implements LLMProviderAdapter {
   }
 
   private mapError(err: unknown): LLMError {
-    if (err && typeof err === 'object' && 'status' in err) {
-      const status = (err as { status: number }).status;
-      const message = (err as { message?: string }).message ?? JSON.stringify(err);
-
-      if (status === 429) return new LLMError(message, 'rate_limit', status, true);
-      if (status === 503 || status === 504) return new LLMError(message, 'service_unavailable', status, true);
-      if (status === 401 || status === 403) return new LLMError(message, 'auth_error', status);
-      if (status === 500) return new LLMError(message, 'model_error', status, true);
-      if (status === 400) {
-        if (message.includes('context') || message.includes('too long')) {
-          return new LLMError(message, 'context_exceeded', status);
-        }
-        return new LLMError(message, 'schema_error', status);
-      }
+    if (!(err && typeof err === 'object' && 'status' in err)) {
+      return new LLMError(
+        err instanceof Error ? err.message : String(err),
+        'unknown',
+      );
     }
-    return new LLMError(
-      err instanceof Error ? err.message : String(err),
-      'unknown',
-    );
+    const status = (err as { status: number }).status;
+    const message = (err as { message?: string }).message ?? JSON.stringify(err);
+
+    if (status === 429) return new LLMError(message, 'rate_limit', status, true);
+    if (status === 503 || status === 504) return new LLMError(message, 'service_unavailable', status, true);
+    if (status === 401 || status === 403) return new LLMError(message, 'auth_error', status);
+    if (status === 500) return new LLMError(message, 'model_error', status, true);
+    if (status === 400) {
+      if (message.includes('context') || message.includes('too long')) {
+        return new LLMError(message, 'context_exceeded', status);
+      }
+      return new LLMError(message, 'schema_error', status);
+    }
+    // err is a known object-with-status here (passed the guard) but matched no
+    // specific status; reuse the already-computed `message` (`.message ?? JSON.stringify(err)`)
+    // rather than String(err), which would render a plain object as '[object Object]'.
+    return new LLMError(message, 'unknown');
   }
 }

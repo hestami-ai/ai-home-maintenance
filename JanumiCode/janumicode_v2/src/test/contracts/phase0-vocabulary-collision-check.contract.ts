@@ -10,7 +10,7 @@ import type { ContractSuite } from './types';
 
 export interface VocabularyCollision {
   term: string;
-  severity?: 'HIGH' | 'MEDIUM' | 'LOW' | string;
+  severity?: 'HIGH' | 'MEDIUM' | 'LOW' | (string & {});
   description?: string;
   proposed_resolution?: string;
 }

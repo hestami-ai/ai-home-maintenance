@@ -31,6 +31,45 @@ const SR_ID_PATTERN = /^SR-\d+$/;
 const US_ID_PATTERN = /^US-\d+$/;
 const NFR_ID_PATTERN = /^NFR-/;
 
+/**
+ * Collect every known requirement id in scope: user-story ids from the
+ * functional_requirements artifacts plus requirement ids from the
+ * non_functional_requirements artifacts. (Extracted from C-3.2.5 to
+ * keep that clause's cognitive complexity under threshold.)
+ */
+function collectKnownRequirementIds(
+  frArtifacts: ReadonlyArray<unknown>,
+  nfrArtifacts: ReadonlyArray<unknown>,
+): Set<string> {
+  const known = new Set<string>();
+  for (const fr of frArtifacts) {
+    const stories = (fr as { user_stories?: Array<{ id?: string }> }).user_stories ?? [];
+    for (const s of stories) if (s.id) known.add(s.id);
+  }
+  for (const nfr of nfrArtifacts) {
+    const reqs = (nfr as { requirements?: Array<{ id?: string }> }).requirements ?? [];
+    for (const r of reqs) if (r.id) known.add(r.id);
+  }
+  return known;
+}
+
+/**
+ * Return every (srId, sourceId) pair whose sourceId does not appear in
+ * the known-id set. (Extracted from C-3.2.5.)
+ */
+function collectUnresolvedSourceRefs(
+  items: SystemRequirement[],
+  known: ReadonlySet<string>,
+): Array<{ srId: string; sourceId: string }> {
+  const unresolved: Array<{ srId: string; sourceId: string }> = [];
+  for (const sr of items) {
+    for (const s of sr.source_requirement_ids ?? []) {
+      if (!known.has(s)) unresolved.push({ srId: sr.id, sourceId: s });
+    }
+  }
+  return unresolved;
+}
+
 export const phase3SystemRequirementsContract: ContractSuite<SystemRequirementsArtifact> = {
   boundaryId: '3.2_system_requirements',
   phaseId: '3',
@@ -112,21 +151,8 @@ export const phase3SystemRequirementsContract: ContractSuite<SystemRequirementsA
         const frArtifacts = context.relatedArtifacts.get('functional_requirements') ?? [];
         const nfrArtifacts = context.relatedArtifacts.get('non_functional_requirements') ?? [];
         if (frArtifacts.length === 0 && nfrArtifacts.length === 0) return true;
-        const known = new Set<string>();
-        for (const fr of frArtifacts) {
-          const stories = (fr as { user_stories?: Array<{ id?: string }> }).user_stories ?? [];
-          for (const s of stories) if (s.id) known.add(s.id);
-        }
-        for (const nfr of nfrArtifacts) {
-          const reqs = (nfr as { requirements?: Array<{ id?: string }> }).requirements ?? [];
-          for (const r of reqs) if (r.id) known.add(r.id);
-        }
-        const unresolved: Array<{ srId: string; sourceId: string }> = [];
-        for (const sr of artifact.items) {
-          for (const s of sr.source_requirement_ids ?? []) {
-            if (!known.has(s)) unresolved.push({ srId: sr.id, sourceId: s });
-          }
-        }
+        const known = collectKnownRequirementIds(frArtifacts, nfrArtifacts);
+        const unresolved = collectUnresolvedSourceRefs(artifact.items, known);
         if (unresolved.length === 0) return true;
         return {
           message: `${unresolved.length} source-id ref(s) do not resolve`,

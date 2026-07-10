@@ -768,3 +768,36 @@ describe('parseTestCounts — cargo test (Rust / proptest)', () => {
     expect(parseTestCounts('some unrelated log line', '')).toEqual({ passed: 0, failed: 0, skipped: 0 });
   });
 });
+
+describe('buildPackets — compliance-item collection across trace paths (ts-108)', () => {
+  // Characterization: pins gatherComplianceRefs' multi-path collection.
+  // Refs are gathered from matched user_stories.traces_to, component.traces_to,
+  // task.traces_to, and matchedNfrs.traces_to (the load-bearing ts-108 hop),
+  // filtered to /^(COMP|VV|QA)-/, then materialized ONLY for refs present in
+  // complianceItemsById. Insertion order: user_stories → component → task → NFRs.
+  it('collects COMP-/VV-/QA- refs from US + NFR trace paths and drops unmapped refs', () => {
+    const input: BuilderInput = {
+      ...emptyInput(),
+      // Task traces its NFR + US directly, plus a QA- ref with no catalog entry.
+      atomicTasks: [atomicTask({ id: 'task-comp', component_id: 'comp-001', traces_to: ['NFR-001', 'US-001', 'QA-UNMAPPED'] })],
+      userStories: [
+        { id: 'US-001', action: 'a', traces_to: ['COMP-GDPR'], acceptance_criteria: [{ id: 'AC-001', description: 'd' }] },
+      ],
+      nfrs: [{ id: 'NFR-001', traces_to: ['VV-LAT'] }],
+      componentsById: new Map([['comp-001', { id: 'comp-001', responsibilities: [] }]]),
+      complianceItemsById: new Map<string, BuilderComplianceItem>([
+        ['COMP-GDPR', { id: 'COMP-GDPR', kind: 'compliance', description: 'gdpr' }],
+        ['VV-LAT', { id: 'VV-LAT', kind: 'vv_requirement', description: 'latency', measurable_condition: '<200ms' }],
+      ]),
+    };
+    const packets = buildPackets(input);
+    const items = packets[0].compliance_items;
+    // COMP-GDPR (from US traces) before VV-LAT (from NFR traces); QA-UNMAPPED dropped (no catalog entry).
+    expect(items.map((c) => c.id)).toEqual(['COMP-GDPR', 'VV-LAT']);
+    const vv = items.find((c) => c.id === 'VV-LAT')!;
+    expect(vv.kind).toBe('vv_requirement');
+    expect(vv.description).toBe('latency');
+    expect(vv.measurable_condition).toBe('<200ms');
+    expect(items.map((c) => c.id)).not.toContain('QA-UNMAPPED');
+  });
+});

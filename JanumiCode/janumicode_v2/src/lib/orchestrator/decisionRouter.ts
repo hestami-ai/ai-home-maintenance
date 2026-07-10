@@ -132,23 +132,33 @@ export class DecisionRouter {
 
     // 4. Phase Gate approval triggers next phase.
     if (decision.type === 'phase_gate_approval') {
-      const next = this.computeNextPhase(runId);
-      if (next) {
-        const ok = this.engine.advanceToNextPhase(runId, next);
-        if (ok) {
-          // Fire-and-forget the next phase. Errors flow through the eventBus.
-          this.engine.executeCurrentPhase(runId).catch(err => {
-            this.engine.eventBus.emit('error:occurred', {
-              message: `Phase ${next} execution failed: ${err}`,
-              context: runId,
-            });
+      this.advanceAfterPhaseGate(runId);
+    }
+  }
+
+  /**
+   * Advance the workflow after a Phase-Gate approval: move to the next phase
+   * and fire-and-forget its execution, or complete the run when there is no
+   * next phase. Extracted verbatim from route()'s step 4 to keep each step's
+   * control flow shallow — behaviour is unchanged.
+   */
+  private advanceAfterPhaseGate(runId: string): void {
+    const next = this.computeNextPhase(runId);
+    if (next) {
+      const ok = this.engine.advanceToNextPhase(runId, next);
+      if (ok) {
+        // Fire-and-forget the next phase. Errors flow through the eventBus.
+        this.engine.executeCurrentPhase(runId).catch(err => {
+          this.engine.eventBus.emit('error:occurred', {
+            message: `Phase ${next} execution failed: ${err}`,
+            context: runId,
           });
-        }
-      } else {
-        // No next phase — workflow complete.
-        this.engine.stateMachine.completeWorkflowRun(runId);
-        this.engine.eventBus.emit('workflow:completed', { workflowRunId: runId });
+        });
       }
+    } else {
+      // No next phase — workflow complete.
+      this.engine.stateMachine.completeWorkflowRun(runId);
+      this.engine.eventBus.emit('workflow:completed', { workflowRunId: runId });
     }
   }
 

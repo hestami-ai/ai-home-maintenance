@@ -16,7 +16,7 @@ export type IntentLensValue =
 
 export interface IntentLensClassificationArtifact {
   kind: 'intent_lens_classification';
-  lens: IntentLensValue | string;
+  lens: IntentLensValue | (string & {});
   confidence?: number;
   rationale?: string;
 }

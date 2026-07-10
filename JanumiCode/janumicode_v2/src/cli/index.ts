@@ -19,7 +19,8 @@ import * as path from 'node:path';
 import * as fs from 'node:fs';
 import { runPipeline } from './runner';
 import { loadDotenv } from '../lib/config/dotenv';
-import type { PipelineRunnerConfig } from '../test/harness/types';
+import { buildConfig, type RunOptions } from './runConfig';
+import type { PipelineRunnerConfig, HarnessResult } from '../test/harness/types';
 
 /**
  * Ancestor-watcher: capture the full parent-PID chain at startup, then
@@ -177,7 +178,7 @@ program
   .option('--llm-gap-enhance', 'Call an LLM to produce a grounded suggested_fix on the gap report. Opt-in: adds one LLM call per failed run.', false)
   .option('--llm-gap-provider <provider>', 'Provider for --llm-gap-enhance. When omitted, the runner uses the workspace orchestrator routing.')
   .option('--llm-gap-model <model>', 'Model for --llm-gap-enhance. When omitted, the runner uses the workspace orchestrator routing.')
-  .action(async (options: { intent: string; workspace: string; llmMode: string; autoApprove: boolean; phaseLimit?: string; fixtureDir?: string; gapReport?: string; decisionOverrides?: string; captureFixtures?: boolean; captureOutputDir?: string; resumeFromDb?: string; resumeAtPhase?: string; resumeAtSubPhase?: string; resumeResetCycles?: boolean; thinSlice?: boolean; fullSlice?: boolean; simulateHumanDecisions?: boolean; injectOverrides?: string; dbPath?: string; json?: boolean; llmGapEnhance?: boolean; llmGapProvider?: string; llmGapModel?: string }) => {
+  .action(async (options: RunOptions) => {
     // When JSON output is requested, redirect INFO/DEBUG logs to stderr
     // via the logging handler's env-controlled switch. Otherwise stdout
     // would carry both JSON and logger lines, and nothing downstream
@@ -188,39 +189,18 @@ program
     // try to run the pipeline). Caught as early as possible so a bad
     // command line doesn't masquerade as a workflow exception.
     const workspacePath = path.resolve(options.workspace);
-    if (!fs.existsSync(workspacePath)) {
-      emitError(options.json, `Workspace path does not exist: ${workspacePath}`, 'bootstrap_error');
-      process.exit(4);
-    }
-    if (options.resumeFromDb) {
-      const dbPath = path.resolve(options.resumeFromDb);
-      if (!fs.existsSync(dbPath)) {
-        emitError(options.json, `Resume DB does not exist: ${dbPath}`, 'bootstrap_error');
-        process.exit(4);
-      }
-      if (!options.resumeAtPhase && !options.resumeAtSubPhase) {
-        emitError(options.json, '--resume-from-db requires --resume-at-phase or --resume-at-sub-phase', 'bootstrap_error');
-        process.exit(4);
-      }
-    }
-    let parsedOverrides: Record<string, unknown> | undefined;
-    if (options.decisionOverrides) {
-      try {
-        parsedOverrides = JSON.parse(options.decisionOverrides);
-      } catch (err) {
-        emitError(options.json, `Invalid --decision-overrides JSON: ${(err as Error).message}`, 'bootstrap_error');
-        process.exit(4);
-      }
-    }
-    let parsedInjectOverrides: PipelineRunnerConfig['overrideInjections'] | undefined;
-    if (options.injectOverrides) {
-      try {
-        parsedInjectOverrides = JSON.parse(options.injectOverrides);
-      } catch (err) {
-        emitError(options.json, `Invalid --inject-overrides JSON: ${(err as Error).message}`, 'bootstrap_error');
-        process.exit(4);
-      }
-    }
+    validateBootstrap(options, workspacePath);
+
+    const parsedOverrides = parseJsonOptionOrExit<Record<string, unknown>>(
+      options.decisionOverrides,
+      options.json,
+      '--decision-overrides',
+    );
+    const parsedInjectOverrides = parseJsonOptionOrExit<PipelineRunnerConfig['overrideInjections']>(
+      options.injectOverrides,
+      options.json,
+      '--inject-overrides',
+    );
 
     // Bootstrap validation passed — now install the ancestor watcher for
     // the long-running pipeline. Installed here (not at module scope) so
@@ -228,62 +208,87 @@ program
     // envelope that exit-4 consumers parse from stderr.
     installParentWatcher();
 
-    const config: PipelineRunnerConfig = {
-      workspacePath,
-      llmMode: options.llmMode as 'mock' | 'real',
-      autoApprove: options.autoApprove,
-      simulateHumanDecisions: options.simulateHumanDecisions,
-      overrideInjections: parsedInjectOverrides,
-      dbPath: options.dbPath,
-      phaseLimit: options.phaseLimit,
-      fixtureDir: options.fixtureDir ? path.resolve(options.fixtureDir) : undefined,
-      decisionOverrides: parsedOverrides as PipelineRunnerConfig['decisionOverrides'],
-      captureFixtures: options.captureFixtures,
-      captureOutputDir: options.captureOutputDir ? path.resolve(options.captureOutputDir) : undefined,
-      resumeFromDb: options.resumeFromDb ? path.resolve(options.resumeFromDb) : undefined,
-      resumeAtPhase: options.resumeAtPhase,
-      resumeAtSubPhase: options.resumeAtSubPhase,
-      resumeResetCycles: options.resumeResetCycles,
-      thinSlice: options.thinSlice,
-      fullSlice: options.fullSlice,
-      llmGapEnhance: options.llmGapEnhance
-        ? {
-            // Empty strings here signal "let the runner resolve from
-            // workspace orchestrator routing." The runner fills these in
-            // before invoking the gap-enhance LLM call.
-            provider: options.llmGapProvider ?? '',
-            model: options.llmGapModel ?? '',
-          }
-        : undefined,
-    };
+    const config = buildConfig(options, workspacePath, parsedOverrides, parsedInjectOverrides);
 
     try {
       const result = await runPipeline(options.intent, config);
-
-      // Gap report is always written to file when requested, regardless
-      // of --json mode. The --json flag controls stdout format only.
-      if (options.gapReport && result.gapReport) {
-        fs.writeFileSync(options.gapReport, JSON.stringify(result.gapReport, null, 2));
-      }
-
-      if (options.json) {
-        process.stdout.write(JSON.stringify(result, null, 2) + '\n');
-      } else {
-        printHumanResult(result, options.gapReport);
-      }
-
-      // Exit code mapping for the virtuous cycle:
-      //   0 = success OR paused (paused is operator-initiated, not a failure)
-      //   1 = partial OR failed (the normal "gap found, fix, rerun" signal)
-      //   2 = runtime exception thrown by the pipeline (bug or infra)
-      //   4 = bootstrap/config error caught above (never reaches here)
-      if (result.status === 'success' || result.paused) process.exit(0);
-      process.exit(1);
+      handleResult(result, options);
     } catch (err) {
       emitError(options.json, (err as Error).message ?? String(err), 'workflow_exception', err);
       process.exit(2);
     }
   });
+
+/**
+ * Bootstrap validation for the `run` command. On any failure this emits a
+ * bootstrap error in the caller's chosen output mode and exits with code
+ * 4 (config/setup failure), so a bad command line never masquerades as a
+ * workflow exception. Returns normally only when all checks pass.
+ */
+function validateBootstrap(options: RunOptions, workspacePath: string): void {
+  if (!fs.existsSync(workspacePath)) {
+    emitError(options.json, `Workspace path does not exist: ${workspacePath}`, 'bootstrap_error');
+    process.exit(4);
+  }
+  if (options.resumeFromDb) {
+    const dbPath = path.resolve(options.resumeFromDb);
+    if (!fs.existsSync(dbPath)) {
+      emitError(options.json, `Resume DB does not exist: ${dbPath}`, 'bootstrap_error');
+      process.exit(4);
+    }
+    if (!options.resumeAtPhase && !options.resumeAtSubPhase) {
+      emitError(options.json, '--resume-from-db requires --resume-at-phase or --resume-at-sub-phase', 'bootstrap_error');
+      process.exit(4);
+    }
+  }
+}
+
+/**
+ * Parse a JSON-valued CLI option. Returns undefined when the option was
+ * not provided, the parsed value on success, and emits a bootstrap error
+ * + exits with code 4 on malformed JSON — mirroring the inline validation
+ * the `run` action previously performed for each JSON option.
+ */
+function parseJsonOptionOrExit<T>(
+  raw: string | undefined,
+  json: boolean | undefined,
+  label: string,
+): T | undefined {
+  if (!raw) return undefined;
+  try {
+    return JSON.parse(raw) as T;
+  } catch (err) {
+    emitError(json, `Invalid ${label} JSON: ${(err as Error).message}`, 'bootstrap_error');
+    process.exit(4);
+  }
+}
+
+/**
+ * Emit the pipeline result in the caller's chosen output mode, persist the
+ * gap report when requested, and exit with the virtuous-cycle exit code.
+ * Never returns — every path terminates the process.
+ */
+function handleResult(result: HarnessResult, options: RunOptions): never {
+  // Gap report is always written to file when requested, regardless
+  // of --json mode. The --json flag controls stdout format only.
+  if (options.gapReport && result.gapReport) {
+    fs.writeFileSync(options.gapReport, JSON.stringify(result.gapReport, null, 2));
+  }
+
+  if (options.json) {
+    process.stdout.write(JSON.stringify(result, null, 2) + '\n');
+  } else {
+    printHumanResult(result, options.gapReport);
+  }
+
+  // Exit code mapping for the virtuous cycle:
+  //   0 = success OR paused (paused is operator-initiated, not a failure)
+  //   1 = partial OR failed (the normal "gap found, fix, rerun" signal)
+  //   2 = runtime exception thrown by the pipeline (bug or infra)
+  //   4 = bootstrap/config error caught above (never reaches here)
+  if (result.status === 'success' || result.paused) process.exit(0);
+  process.exit(1);
+}
 
 /**
  * Emit an error in a shape that matches the chosen output mode. JSON

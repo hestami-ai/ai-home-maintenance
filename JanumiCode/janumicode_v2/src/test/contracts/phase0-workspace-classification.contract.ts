@@ -19,8 +19,8 @@ export interface WorkspaceClassificationArtifact {
    * called this `classification`; for back-compat the contract accepts
    * either. See pickClassification() below.
    */
-  workspace_type?: WorkspaceClassValue | string;
-  classification?: WorkspaceClassValue | string;
+  workspace_type?: WorkspaceClassValue | (string & {});
+  classification?: WorkspaceClassValue | (string & {});
   rationale?: string;
   detected_artifacts?: string[];
 }

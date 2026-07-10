@@ -57,7 +57,7 @@ export interface MirrorItem {
 }
 
 export interface MirrorSection {
-  kind: 'assumption_mirror' | 'steelman' | 'field_review' | string;
+  kind: 'assumption_mirror' | 'steelman' | 'field_review' | (string & {});
   items: MirrorItem[];
 }
 

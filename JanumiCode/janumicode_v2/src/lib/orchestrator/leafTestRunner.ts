@@ -66,6 +66,8 @@ export interface LeafTestRunnerConfig {
   timeoutMs: number;
 }
 
+type ResolvedCommand = { executable: string; args: string[] };
+
 export class LeafTestRunner {
   constructor(
     private readonly writer: GovernedStreamWriter,
@@ -149,65 +151,67 @@ export class LeafTestRunner {
     };
   }
 
-  private resolveCommand(
-    input: LeafTestRunInput,
-  ): { executable: string; args: string[] } | null {
-    if (input.explicitCommand) {
-      const parts = splitCommand(input.explicitCommand);
-      if (parts.length > 0) {
-        return { executable: parts[0], args: parts.slice(1) };
-      }
-    }
+  private resolveCommand(input: LeafTestRunInput): ResolvedCommand | null {
+    const explicit = this.resolveExplicitCommand(input);
+    if (explicit) return explicit;
     if (this.config.resolution === 'explicit_per_leaf') return null;
     if (
       this.config.resolution === 'package_json_scripts'
       || this.config.resolution === 'framework_autodetect'
     ) {
-      const pkgPath = path.join(input.workspacePath, 'package.json');
-      if (fs.existsSync(pkgPath)) {
-        try {
-          const pkg = JSON.parse(fs.readFileSync(pkgPath, 'utf-8')) as {
-            scripts?: Record<string, string>;
-          };
-          if (pkg.scripts?.test) {
-            const npm = process.platform === 'win32' ? 'npm.cmd' : 'npm';
-            // SCOPE the run to positional filters after `--` (vitest/jest/
-            // node:test all accept them). PREFER the leaf's OWN test files
-            // (file-level attribution — the leaf is graded only on tests it
-            // authored, never a sibling's broken file in the same dir,
-            // slice-145). Fall back to the write DIRECTORIES when the leaf
-            // authored no test files (slice-144: still better than the
-            // workspace-global gate). Leaves with neither (e.g. the
-            // composition root) run the full suite — that global gate is the
-            // composition root's / stabilization loop's job.
-            const norm = (p: string): string => stripTrailingSlashes(p.replaceAll('\\', '/'));
-            const exists = (p: string): boolean => fs.existsSync(path.join(input.workspacePath, p));
-            const ownFiles = (input.ownTestFiles ?? []).map(norm).filter((p) => p && exists(p));
-            const scopeDirs = (input.writeDirectoryPaths ?? []).map(norm).filter((p) => p && exists(p));
-            const scope = ownFiles.length > 0 ? ownFiles : scopeDirs;
-            const scopeArgs = scope.length > 0 ? ['--', ...scope] : [];
-            return { executable: npm, args: ['test', '--silent', ...scopeArgs] };
-          }
-        } catch (err) {
-          getLogger().warn('workflow', 'leafTestRunner: failed to read package.json', {
-            error: err instanceof Error ? err.message : String(err),
-          });
-        }
-      }
+      const fromPkg = this.resolveFromPackageJson(input);
+      if (fromPkg) return fromPkg;
     }
     if (this.config.resolution === 'framework_autodetect') {
-      const pyprojectPath = path.join(input.workspacePath, 'pyproject.toml');
-      if (fs.existsSync(pyprojectPath)) {
-        return { executable: 'pytest', args: ['-q'] };
-      }
-      const cargoPath = path.join(input.workspacePath, 'Cargo.toml');
-      if (fs.existsSync(cargoPath)) {
-        return { executable: 'cargo', args: ['test', '--quiet'] };
-      }
-      const goModPath = path.join(input.workspacePath, 'go.mod');
-      if (fs.existsSync(goModPath)) {
-        return { executable: 'go', args: ['test', './...'] };
-      }
+      return this.resolveFromFramework(input);
+    }
+    return null;
+  }
+
+  /** Resolve an explicit per-leaf command string, when one is provided. */
+  private resolveExplicitCommand(input: LeafTestRunInput): ResolvedCommand | null {
+    if (!input.explicitCommand) return null;
+    const parts = splitCommand(input.explicitCommand);
+    return parts.length > 0 ? { executable: parts[0], args: parts.slice(1) } : null;
+  }
+
+  /**
+   * Resolve `npm test` from package.json's `scripts.test`, scoped to the leaf's
+   * own test files (falling back to its write directories). Returns null when
+   * there is no package.json, no `test` script, or the file cannot be read.
+   */
+  private resolveFromPackageJson(input: LeafTestRunInput): ResolvedCommand | null {
+    const pkgPath = path.join(input.workspacePath, 'package.json');
+    if (!fs.existsSync(pkgPath)) return null;
+    try {
+      const pkg = JSON.parse(fs.readFileSync(pkgPath, 'utf-8')) as {
+        scripts?: Record<string, string>;
+      };
+      if (!pkg.scripts?.test) return null;
+      const npm = process.platform === 'win32' ? 'npm.cmd' : 'npm';
+      const scopeArgs = buildScopeArgs(input);
+      return { executable: npm, args: ['test', '--silent', ...scopeArgs] };
+    } catch (err) {
+      getLogger().warn('workflow', 'leafTestRunner: failed to read package.json', {
+        error: err instanceof Error ? err.message : String(err),
+      });
+      return null;
+    }
+  }
+
+  /** Autodetect a framework runner from marker files (pytest / cargo / go). */
+  private resolveFromFramework(input: LeafTestRunInput): ResolvedCommand | null {
+    const pyprojectPath = path.join(input.workspacePath, 'pyproject.toml');
+    if (fs.existsSync(pyprojectPath)) {
+      return { executable: 'pytest', args: ['-q'] };
+    }
+    const cargoPath = path.join(input.workspacePath, 'Cargo.toml');
+    if (fs.existsSync(cargoPath)) {
+      return { executable: 'cargo', args: ['test', '--quiet'] };
+    }
+    const goModPath = path.join(input.workspacePath, 'go.mod');
+    if (fs.existsSync(goModPath)) {
+      return { executable: 'go', args: ['test', './...'] };
     }
     return null;
   }
@@ -255,6 +259,25 @@ function stripTrailingSlashes(s: string): string {
 }
 
 /**
+ * Positional test-file filters (after `--`) that scope an `npm test` run
+ * (vitest/jest/node:test all accept them). PREFER the leaf's OWN test files —
+ * file-level attribution so a leaf is graded only on tests it authored, never a
+ * sibling's broken file in the same dir (slice-145). Fall back to the write
+ * DIRECTORIES when the leaf authored no test files (slice-144: still better than
+ * the workspace-global gate). Returns `[]` when neither exists (e.g. the
+ * composition root), so it runs the full suite — that global gate is the
+ * composition root's / stabilization loop's job.
+ */
+function buildScopeArgs(input: LeafTestRunInput): string[] {
+  const norm = (p: string): string => stripTrailingSlashes(p.replaceAll('\\', '/'));
+  const exists = (p: string): boolean => fs.existsSync(path.join(input.workspacePath, p));
+  const ownFiles = (input.ownTestFiles ?? []).map(norm).filter((p) => p && exists(p));
+  const scopeDirs = (input.writeDirectoryPaths ?? []).map(norm).filter((p) => p && exists(p));
+  const scope = ownFiles.length > 0 ? ownFiles : scopeDirs;
+  return scope.length > 0 ? ['--', ...scope] : [];
+}
+
+/**
  * Parse pass/fail/skip counts from a runner's combined output. Handles
  * vitest, jest, npm-test-text-summary, node:test, mocha, pytest. Best-
  * effort — returns zeros when nothing matches; the caller still gates
@@ -264,16 +287,23 @@ export function parseTestCounts(stdout: string, stderr: string): {
   passed: number; failed: number; skipped: number;
 } {
   const text = `${stdout}\n${stderr}`;
-  let passed = 0;
-  let failed = 0;
-  let skipped = 0;
+  return parseVitestCounts(text)
+    ?? parseJestCounts(text)
+    ?? parseNodeTestCounts(text)
+    ?? parsePytestCounts(text)
+    ?? parseCargoCounts(text)
+    ?? { passed: 0, failed: 0, skipped: 0 };
+}
 
-  // vitest summary line — e.g. "Tests  4 failed | 10 passed | 2 skipped (16)".
-  // Scan each "Tests…" line (the "Test Files" line's token is "Test", not
-  // "Tests", so it is never matched) and pull each count out with a small,
-  // independent regex. A "passed" count is required — mirroring the original
-  // pattern, so any earlier "Tests…" line without one is skipped. Line-scoping
-  // plus small regexes stays linear where the monolithic alternation backtracked.
+type ParsedCounts = { passed: number; failed: number; skipped: number };
+
+// vitest summary line — e.g. "Tests  4 failed | 10 passed | 2 skipped (16)".
+// Scan each "Tests…" line (the "Test Files" line's token is "Test", not
+// "Tests", so it is never matched) and pull each count out with a small,
+// independent regex. A "passed" count is required — mirroring the original
+// pattern, so any earlier "Tests…" line without one is skipped. Line-scoping
+// plus small regexes stays linear where the monolithic alternation backtracked.
+function parseVitestCounts(text: string): ParsedCounts | null {
   for (const testsLine of text.matchAll(/Tests[^\n]*/gi)) {
     const line = testsLine[0];
     const vp = /(?<!\d)(\d+)\s+passed/i.exec(line);
@@ -286,57 +316,66 @@ export function parseTestCounts(stdout: string, stderr: string): {
       skipped: vs ? Number.parseInt(vs[1], 10) : 0,
     };
   }
+  return null;
+}
 
+function parseJestCounts(text: string): ParsedCounts | null {
   const jestSummary = /Tests:\s+(?:(\d+)\s+failed,\s*)?(?:(\d+)\s+skipped,\s*)?(\d+)\s+passed,\s+\d+\s+total/i.exec(text);
-  if (jestSummary) {
-    failed = jestSummary[1] ? Number.parseInt(jestSummary[1], 10) : 0;
-    skipped = jestSummary[2] ? Number.parseInt(jestSummary[2], 10) : 0;
-    passed = Number.parseInt(jestSummary[3], 10);
-    return { passed, failed, skipped };
-  }
+  if (!jestSummary) return null;
+  return {
+    passed: Number.parseInt(jestSummary[3], 10),
+    failed: jestSummary[1] ? Number.parseInt(jestSummary[1], 10) : 0,
+    skipped: jestSummary[2] ? Number.parseInt(jestSummary[2], 10) : 0,
+  };
+}
 
+function parseNodeTestCounts(text: string): ParsedCounts | null {
   const nodeTest = /[#ℹ]\s*pass\s+(\d+)/i.exec(text);
   const nodeFail = /[#ℹ]\s*fail\s+(\d+)/i.exec(text);
   const nodeSkip = /[#ℹ]\s*skipped\s+(\d+)/i.exec(text);
-  if (nodeTest || nodeFail || nodeSkip) {
-    passed = nodeTest ? Number.parseInt(nodeTest[1], 10) : 0;
-    failed = nodeFail ? Number.parseInt(nodeFail[1], 10) : 0;
-    skipped = nodeSkip ? Number.parseInt(nodeSkip[1], 10) : 0;
-    return { passed, failed, skipped };
-  }
+  if (!nodeTest && !nodeFail && !nodeSkip) return null;
+  return {
+    passed: nodeTest ? Number.parseInt(nodeTest[1], 10) : 0,
+    failed: nodeFail ? Number.parseInt(nodeFail[1], 10) : 0,
+    skipped: nodeSkip ? Number.parseInt(nodeSkip[1], 10) : 0,
+  };
+}
 
-  // pytest banner — e.g. "===== 1 failed, 2 passed, 3 skipped in 0.1s =====".
-  // Match the first '='-fenced body with a class excluding '=' and newline
-  // (linear: the body cannot contain '=', so there is no backtracking against
-  // the trailing fence), then pull each count out with a small independent
-  // regex. As before, only the FIRST fenced region is inspected and counts are
-  // reported only when at least one is present.
+// pytest banner — e.g. "===== 1 failed, 2 passed, 3 skipped in 0.1s =====".
+// Match the first '='-fenced body with a class excluding '=' and newline
+// (linear: the body cannot contain '=', so there is no backtracking against
+// the trailing fence), then pull each count out with a small independent
+// regex. As before, only the FIRST fenced region is inspected and counts are
+// reported only when at least one is present (else the caller falls through).
+function parsePytestCounts(text: string): ParsedCounts | null {
   const pytestBanner = /=+[^=\n]*=+/.exec(text);
-  if (pytestBanner) {
-    const banner = pytestBanner[0];
-    const pf = /(?<!\d)(\d+)\s+failed/i.exec(banner);
-    const pp = /(?<!\d)(\d+)\s+passed/i.exec(banner);
-    const ps = /(?<!\d)(\d+)\s+skipped/i.exec(banner);
-    failed = pf ? Number.parseInt(pf[1], 10) : 0;
-    passed = pp ? Number.parseInt(pp[1], 10) : 0;
-    skipped = ps ? Number.parseInt(ps[1], 10) : 0;
-    if (passed + failed + skipped > 0) return { passed, failed, skipped };
-  }
+  if (!pytestBanner) return null;
+  const banner = pytestBanner[0];
+  const pf = /(?<!\d)(\d+)\s+failed/i.exec(banner);
+  const pp = /(?<!\d)(\d+)\s+passed/i.exec(banner);
+  const ps = /(?<!\d)(\d+)\s+skipped/i.exec(banner);
+  const failed = pf ? Number.parseInt(pf[1], 10) : 0;
+  const passed = pp ? Number.parseInt(pp[1], 10) : 0;
+  const skipped = ps ? Number.parseInt(ps[1], 10) : 0;
+  return passed + failed + skipped > 0 ? { passed, failed, skipped } : null;
+}
 
-  // cargo test (Rust; covers proptest) — one or more lines of the form:
-  //   "test result: ok. 12 passed; 0 failed; 1 ignored; ..."
-  // A binary/integration run emits several such lines; sum them so a proptest
-  // counterexample (which increments `failed`) is reported, not just exit-coded.
+// cargo test (Rust; covers proptest) — one or more lines of the form:
+//   "test result: ok. 12 passed; 0 failed; 1 ignored; ..."
+// A binary/integration run emits several such lines; sum them so a proptest
+// counterexample (which increments `failed`) is reported, not just exit-coded.
+function parseCargoCounts(text: string): ParsedCounts | null {
   const cargoLine = /test result:\s+\w+\.\s+(\d+)\s+passed;\s+(\d+)\s+failed(?:;\s+(\d+)\s+ignored)?/gi;
   let cargoMatch: RegExpExecArray | null;
   let cargoSeen = false;
+  let passed = 0;
+  let failed = 0;
+  let skipped = 0;
   while ((cargoMatch = cargoLine.exec(text)) !== null) {
     cargoSeen = true;
     passed += Number.parseInt(cargoMatch[1], 10);
     failed += Number.parseInt(cargoMatch[2], 10);
     skipped += cargoMatch[3] ? Number.parseInt(cargoMatch[3], 10) : 0;
   }
-  if (cargoSeen) return { passed, failed, skipped };
-
-  return { passed: 0, failed: 0, skipped: 0 };
+  return cargoSeen ? { passed, failed, skipped } : null;
 }

@@ -148,6 +148,73 @@ export function findingInScope(finding: SurfacedFinding, scope: TaskScope): bool
 }
 
 /**
+ * Collect the finding record ids the MitigationEngine already acted on, via
+ * auto_mitigation_action.finding_record_id.
+ */
+function collectMitigatedFindingIds(
+  writer: GovernedStreamWriter,
+  workflowRunId: string,
+): Set<string> {
+  const mitigated = new Set<string>();
+  for (const r of writer.getRecordsByType(workflowRunId, 'auto_mitigation_action')) {
+    const c = r.content as unknown as AutoMitigationActionContent;
+    if (typeof c.finding_record_id === 'string') mitigated.add(c.finding_record_id);
+  }
+  return mitigated;
+}
+
+/**
+ * Map each harness logical id (content.harness_id) → reviewed_agent_output_id, so
+ * we can later check whether the reviewed artifact was superseded by a revision.
+ */
+function buildReviewedOutputByHarness(
+  writer: GovernedStreamWriter,
+  workflowRunId: string,
+): Map<string, string> {
+  const reviewedOutputByHarness = new Map<string, string>();
+  for (const r of writer.getRecordsByType(workflowRunId, 'reasoning_review_harness_record')) {
+    const c = r.content as unknown as ReasoningReviewHarnessRecordContent;
+    if (typeof c.harness_id === 'string' && typeof c.reviewed_agent_output_id === 'string') {
+      reviewedOutputByHarness.set(c.harness_id, c.reviewed_agent_output_id);
+    }
+  }
+  return reviewedOutputByHarness;
+}
+
+/** Was the artifact a harness reviewed later superseded by a revision? (unknown → fail open) */
+function isReviewedOutputSuperseded(
+  writer: GovernedStreamWriter,
+  reviewedOutputByHarness: Map<string, string>,
+  harnessId: string,
+): boolean {
+  const outId = reviewedOutputByHarness.get(harnessId);
+  if (!outId) return false; // unknown → fail open (keep the finding)
+  const rec = writer.getRecord(outId);
+  return rec !== null && rec.is_current_version === false;
+}
+
+/**
+ * Whether a single finding record should be surfaced: substantive HIGH/MEDIUM,
+ * not auto-fix, not auto-mitigated, not superseded. `forExecutor` additionally
+ * drops reasoning-PROCESS validators. Short-circuits in the historical order.
+ */
+function shouldSurfaceFinding(
+  recordId: string,
+  c: ReasoningReviewFindingRecordContent,
+  opts: { forExecutor: boolean },
+  mitigated: Set<string>,
+  writer: GovernedStreamWriter,
+  reviewedOutputByHarness: Map<string, string>,
+): boolean {
+  if (mitigated.has(recordId)) return false;
+  if (c.severity !== 'HIGH' && c.severity !== 'MEDIUM') return false;
+  if (AUTO_FIX_VALIDATORS.has(c.validator_id)) return false;
+  if (opts.forExecutor && REASONING_PROCESS_VALIDATORS.has(c.validator_id)) return false;
+  if (typeof c.harness_id === 'string' && isReviewedOutputSuperseded(writer, reviewedOutputByHarness, c.harness_id)) return false;
+  return true;
+}
+
+/**
  * Select the surfaceable reasoning-review findings for a run: substantive,
  * HIGH/MEDIUM, not auto-fix, not auto-mitigated, not superseded. `forExecutor`
  * additionally drops reasoning-PROCESS validators (executor-irrelevant).
@@ -158,38 +225,13 @@ export function selectReasoningFindings(
   opts: { forExecutor: boolean },
 ): SurfacedFinding[] {
   const findingRecords = writer.getRecordsByType(workflowRunId, 'reasoning_review_finding_record');
-
-  // auto_mitigation_action.finding_record_id → already acted on by the engine.
-  const mitigated = new Set<string>();
-  for (const r of writer.getRecordsByType(workflowRunId, 'auto_mitigation_action')) {
-    const c = r.content as unknown as AutoMitigationActionContent;
-    if (typeof c.finding_record_id === 'string') mitigated.add(c.finding_record_id);
-  }
-
-  // harness logical id (content.harness_id) → reviewed_agent_output_id, so we can
-  // check whether the reviewed artifact was later superseded.
-  const reviewedOutputByHarness = new Map<string, string>();
-  for (const r of writer.getRecordsByType(workflowRunId, 'reasoning_review_harness_record')) {
-    const c = r.content as unknown as ReasoningReviewHarnessRecordContent;
-    if (typeof c.harness_id === 'string' && typeof c.reviewed_agent_output_id === 'string') {
-      reviewedOutputByHarness.set(c.harness_id, c.reviewed_agent_output_id);
-    }
-  }
-  const isSuperseded = (harnessId: string): boolean => {
-    const outId = reviewedOutputByHarness.get(harnessId);
-    if (!outId) return false; // unknown → fail open (keep the finding)
-    const rec = writer.getRecord(outId);
-    return rec !== null && rec.is_current_version === false;
-  };
+  const mitigated = collectMitigatedFindingIds(writer, workflowRunId);
+  const reviewedOutputByHarness = buildReviewedOutputByHarness(writer, workflowRunId);
 
   const out: SurfacedFinding[] = [];
   for (const r of findingRecords) {
-    if (mitigated.has(r.id)) continue;
     const c = r.content as unknown as ReasoningReviewFindingRecordContent;
-    if (c.severity !== 'HIGH' && c.severity !== 'MEDIUM') continue;
-    if (AUTO_FIX_VALIDATORS.has(c.validator_id)) continue;
-    if (opts.forExecutor && REASONING_PROCESS_VALIDATORS.has(c.validator_id)) continue;
-    if (typeof c.harness_id === 'string' && isSuperseded(c.harness_id)) continue;
+    if (!shouldSurfaceFinding(r.id, c, opts, mitigated, writer, reviewedOutputByHarness)) continue;
     out.push({
       recordId: r.id,
       validatorId: c.validator_id,

@@ -106,6 +106,138 @@ interface PauseMarker {
 }
 
 /**
+ * Cascade-skip decision. Returns true when the prior sub-phase did no
+ * real LLM work in THIS process — the signal is `agent_invocation`
+ * records, written only when the LLMCaller actually makes an HTTP call to
+ * a provider (a cache hit short-circuits and emits none). `produced_at >=
+ * processStartedAt` restricts the count to this process's lifetime.
+ *
+ * On a skip, `skipLog` (the exact stderr line the caller wants) is
+ * emitted. A query failure must NOT block the workflow: it logs a warning
+ * naming `warnLabel` and returns false so the caller falls through to a
+ * normal pause.
+ */
+function shouldCascadeSkip(
+  db: import('../database/init').Database,
+  workflowRunId: string,
+  subPhaseId: string,
+  skipLog: string,
+  warnLabel: string,
+): boolean {
+  try {
+    const row = db.prepare(`
+        SELECT COUNT(*) AS n
+          FROM governed_stream
+         WHERE workflow_run_id = ?
+           AND sub_phase_id    = ?
+           AND record_type     = 'agent_invocation'
+           AND produced_at     >= ?
+      `).get(workflowRunId, subPhaseId, processStartedAt) as { n: number } | undefined;
+    if ((row?.n ?? 0) === 0) {
+      process.stderr.write(skipLog);
+      return true;
+    }
+    return false;
+  } catch (err) {
+    // Defensive: a query failure must not block the workflow. Fall
+    // through to the normal pause path so the operator still sees it.
+    process.stderr.write(
+      `[audit-pause] WARN ${warnLabel} (${err instanceof Error ? err.message : String(err)}); falling through to pause\n`,
+    );
+    return false;
+  }
+}
+
+/** Ensure the audit pending/acks/done directories exist; return their paths. */
+function ensureAuditDirs(workspaceRoot: string): {
+  pendingDir: string;
+  ackDir: string;
+  doneDir: string;
+} {
+  const pendingDir = path.join(workspaceRoot, '.janumicode', 'audit', 'pending');
+  const ackDir = path.join(workspaceRoot, '.janumicode', 'audit', 'acks');
+  const doneDir = path.join(workspaceRoot, '.janumicode', 'audit', 'done');
+  for (const d of [pendingDir, ackDir, doneDir]) fs.mkdirSync(d, { recursive: true });
+  return { pendingDir, ackDir, doneDir };
+}
+
+interface AckWaitParams {
+  seq: number;
+  ackPath: string;
+  markerPath: string;
+  doneDir: string;
+  basename: string;
+  /** Exact stderr line to emit once the pause resumes (non-abort). */
+  resumedLog: string;
+  /** Build the abort Error message from the ack's reason. */
+  abortMessage: (reason: string) => string;
+}
+
+/**
+ * Process an ack file that has appeared: read + parse it, move the marker
+ * and ack into done/ (best effort), then either throw (abort) or emit the
+ * resolve event and log the resume. Empty/unreadable ack ⇒ treated as a
+ * plain continue.
+ */
+function resolveAck(p: AckWaitParams): void {
+  let ackContent = '';
+  try { ackContent = fs.readFileSync(p.ackPath, 'utf8'); } catch { /* race; loop */ }
+  let parsed: { action?: string; reason?: string } = {};
+  try { parsed = JSON.parse(ackContent); } catch { /* empty ack ⇒ continue */ }
+  // Move marker + ack to done/ so the pending dir reflects only
+  // outstanding pauses. Lets the operator visually verify nothing
+  // is hanging.
+  try {
+    fs.renameSync(p.markerPath, path.join(p.doneDir, `${p.basename}.json`));
+    fs.renameSync(p.ackPath, path.join(p.doneDir, `${p.basename}.ack`));
+  } catch { /* best effort */ }
+
+  if (parsed.action === 'abort') {
+    aoddEmit('audit.pause_resolved', {
+      seq: p.seq,
+      ack_path: p.ackPath,
+      action: 'abort',
+    });
+    throw new Error(p.abortMessage(parsed.reason ?? 'no reason given'));
+  }
+  aoddEmit('audit.pause_resolved', {
+    seq: p.seq,
+    ack_path: p.ackPath,
+    ...(parsed.action ? { action: parsed.action } : {}),
+  });
+  process.stderr.write(p.resumedLog);
+}
+
+/**
+ * Block the event loop until the ack file appears or the deadline passes.
+ * On ack: delegate to resolveAck (returns on continue, throws on abort).
+ * On deadline: throw the timeout error.
+ *
+ * Synchronous sleep via Atomics.wait on an SAB — blocks the JS event loop
+ * without burning CPU. SharedArrayBuffer support is universal in modern
+ * Node; falling back to busy-spin would peg a core.
+ */
+function waitForAck(
+  p: AckWaitParams & {
+    ackTimeoutSeconds: number;
+    pollIntervalMs: number;
+    timeoutMessage: string;
+  },
+): void {
+  const deadline = Date.now() + p.ackTimeoutSeconds * 1000;
+  const sab = new SharedArrayBuffer(4);
+  const view = new Int32Array(sab);
+  while (Date.now() < deadline) {
+    if (fs.existsSync(p.ackPath)) {
+      resolveAck(p);
+      return;
+    }
+    Atomics.wait(view, 0, 0, p.pollIntervalMs);
+  }
+  throw new Error(p.timeoutMessage);
+}
+
+/**
  * Block the event loop until an ack file appears for this pause. Called
  * by stateMachine.setSubPhase() right before the sub_phase.entered emit.
  *
@@ -136,31 +268,18 @@ export function auditPauseSync(args: {
   // run re-executes Phase 1 from its first sub-phase with every LLM
   // call hitting the primed cache. The first pause in a fresh run is
   // never skipped (Phase 0's first sub-phase makes real LLM calls).
-  if (config.db) {
-    try {
-      const row = config.db.prepare(`
-        SELECT COUNT(*) AS n
-          FROM governed_stream
-         WHERE workflow_run_id = ?
-           AND sub_phase_id    = ?
-           AND record_type     = 'agent_invocation'
-           AND produced_at     >= ?
-      `).get(args.workflowRunId, args.priorSubPhaseId, processStartedAt) as { n: number } | undefined;
-      const freshInvocations = row?.n ?? 0;
-      if (freshInvocations === 0) {
-        process.stderr.write(
-          `[audit-pause] SKIP (cascade) prior=${args.priorSubPhaseId} next=${args.nextSubPhaseId} ` +
-          `— no fresh LLM invocations this process\n`,
-        );
-        return;
-      }
-    } catch (err) {
-      // Defensive: a query failure must not block the workflow. Fall
-      // through to the normal pause path so the operator still sees it.
-      process.stderr.write(
-        `[audit-pause] WARN cascade-skip query failed (${err instanceof Error ? err.message : String(err)}); falling through to pause\n`,
-      );
-    }
+  if (
+    config.db &&
+    shouldCascadeSkip(
+      config.db,
+      args.workflowRunId,
+      args.priorSubPhaseId,
+      `[audit-pause] SKIP (cascade) prior=${args.priorSubPhaseId} next=${args.nextSubPhaseId} ` +
+      `— no fresh LLM invocations this process\n`,
+      'cascade-skip query failed',
+    )
+  ) {
+    return;
   }
 
   const seq = ++pauseSeq;
@@ -171,10 +290,7 @@ export function auditPauseSync(args: {
     : 'phaseno_phase';
   const basename = `${String(seq).padStart(4, '0')}__${phaseSeg}__${safeSub}`;
 
-  const pendingDir = path.join(config.workspaceRoot, '.janumicode', 'audit', 'pending');
-  const ackDir = path.join(config.workspaceRoot, '.janumicode', 'audit', 'acks');
-  const doneDir = path.join(config.workspaceRoot, '.janumicode', 'audit', 'done');
-  for (const d of [pendingDir, ackDir, doneDir]) fs.mkdirSync(d, { recursive: true });
+  const { pendingDir, ackDir, doneDir } = ensureAuditDirs(config.workspaceRoot);
 
   const marker: PauseMarker = {
     seq,
@@ -211,45 +327,19 @@ export function auditPauseSync(args: {
     debugger;
   }
 
-  const deadline = Date.now() + config.ackTimeoutSeconds * 1000;
-  // Synchronous sleep via Atomics.wait on an SAB — blocks the JS event
-  // loop without burning CPU. SharedArrayBuffer support is universal in
-  // modern Node; falling back to busy-spin would peg a core.
-  const sab = new SharedArrayBuffer(4);
-  const view = new Int32Array(sab);
-  while (Date.now() < deadline) {
-    if (fs.existsSync(ackPath)) {
-      let ackContent = '';
-      try { ackContent = fs.readFileSync(ackPath, 'utf8'); } catch { /* race; loop */ }
-      let parsed: { action?: string; reason?: string } = {};
-      try { parsed = JSON.parse(ackContent); } catch { /* empty ack ⇒ continue */ }
-      // Move marker + ack to done/ so the pending dir reflects only
-      // outstanding pauses. Lets the operator visually verify nothing
-      // is hanging.
-      try {
-        fs.renameSync(markerPath, path.join(doneDir, `${basename}.json`));
-        fs.renameSync(ackPath, path.join(doneDir, `${basename}.ack`));
-      } catch { /* best effort */ }
-
-      if (parsed.action === 'abort') {
-        aoddEmit('audit.pause_resolved', {
-          seq,
-          ack_path: ackPath,
-          action: 'abort',
-        });
-        throw new Error(`[audit-pause] aborted by audit agent at sub_phase.exited "${args.priorSubPhaseId}": ${parsed.reason ?? 'no reason given'}`);
-      }
-      aoddEmit('audit.pause_resolved', {
-        seq,
-        ack_path: ackPath,
-        ...(parsed.action ? { action: parsed.action } : {}),
-      });
-      process.stderr.write(`[audit-pause] resumed seq=${seq}\n`);
-      return;
-    }
-    Atomics.wait(view, 0, 0, config.pollIntervalMs);
-  }
-  throw new Error(`[audit-pause] timed out waiting for ack at sub_phase.exited "${args.priorSubPhaseId}" after ${config.ackTimeoutSeconds}s`);
+  waitForAck({
+    seq,
+    ackPath,
+    markerPath,
+    doneDir,
+    basename,
+    ackTimeoutSeconds: config.ackTimeoutSeconds,
+    pollIntervalMs: config.pollIntervalMs,
+    resumedLog: `[audit-pause] resumed seq=${seq}\n`,
+    abortMessage: (reason) =>
+      `[audit-pause] aborted by audit agent at sub_phase.exited "${args.priorSubPhaseId}": ${reason}`,
+    timeoutMessage: `[audit-pause] timed out waiting for ack at sub_phase.exited "${args.priorSubPhaseId}" after ${config.ackTimeoutSeconds}s`,
+  });
 }
 
 /**
@@ -280,28 +370,18 @@ export function auditPhaseExitPauseSync(args: {
   // priorSubPhaseId may be null on transitions out of phases that never
   // set a sub-phase (rare — Phase 0 cleanup); in that case skip.
   if (!args.priorSubPhaseId) return;
-  if (config.db) {
-    try {
-      const row = config.db.prepare(`
-        SELECT COUNT(*) AS n
-          FROM governed_stream
-         WHERE workflow_run_id = ?
-           AND sub_phase_id    = ?
-           AND record_type     = 'agent_invocation'
-           AND produced_at     >= ?
-      `).get(args.workflowRunId, args.priorSubPhaseId, processStartedAt) as { n: number } | undefined;
-      if ((row?.n ?? 0) === 0) {
-        process.stderr.write(
-          `[audit-pause] SKIP (cascade) phase_exit prior_phase=${args.priorPhaseId} last_sub=${args.priorSubPhaseId} ` +
-          `next_phase=${args.nextPhaseId} — no fresh LLM invocations\n`,
-        );
-        return;
-      }
-    } catch (err) {
-      process.stderr.write(
-        `[audit-pause] WARN cascade-skip query failed at phase exit (${err instanceof Error ? err.message : String(err)}); falling through to pause\n`,
-      );
-    }
+  if (
+    config.db &&
+    shouldCascadeSkip(
+      config.db,
+      args.workflowRunId,
+      args.priorSubPhaseId,
+      `[audit-pause] SKIP (cascade) phase_exit prior_phase=${args.priorPhaseId} last_sub=${args.priorSubPhaseId} ` +
+      `next_phase=${args.nextPhaseId} — no fresh LLM invocations\n`,
+      'cascade-skip query failed at phase exit',
+    )
+  ) {
+    return;
   }
 
   const seq = ++pauseSeq;
@@ -310,10 +390,7 @@ export function auditPhaseExitPauseSync(args: {
   const phaseSeg = phaseIdToFilenameSegment(args.priorPhaseId as PhaseId, { padded: false });
   const basename = `${String(seq).padStart(4, '0')}__${phaseSeg}_exit__lastsub_${safeSub}`;
 
-  const pendingDir = path.join(config.workspaceRoot, '.janumicode', 'audit', 'pending');
-  const ackDir = path.join(config.workspaceRoot, '.janumicode', 'audit', 'acks');
-  const doneDir = path.join(config.workspaceRoot, '.janumicode', 'audit', 'done');
-  for (const d of [pendingDir, ackDir, doneDir]) fs.mkdirSync(d, { recursive: true });
+  const { pendingDir, ackDir, doneDir } = ensureAuditDirs(config.workspaceRoot);
 
   const marker: PauseMarker = {
     seq,
@@ -342,36 +419,17 @@ export function auditPhaseExitPauseSync(args: {
     debugger;
   }
 
-  const deadline = Date.now() + config.ackTimeoutSeconds * 1000;
-  const sab = new SharedArrayBuffer(4);
-  const view = new Int32Array(sab);
-  while (Date.now() < deadline) {
-    if (fs.existsSync(ackPath)) {
-      let ackContent = '';
-      try { ackContent = fs.readFileSync(ackPath, 'utf8'); } catch { /* race; loop */ }
-      let parsed: { action?: string; reason?: string } = {};
-      try { parsed = JSON.parse(ackContent); } catch { /* empty ack ⇒ continue */ }
-      try {
-        fs.renameSync(markerPath, path.join(doneDir, `${basename}.json`));
-        fs.renameSync(ackPath, path.join(doneDir, `${basename}.ack`));
-      } catch { /* best effort */ }
-      if (parsed.action === 'abort') {
-        aoddEmit('audit.pause_resolved', {
-          seq,
-          ack_path: ackPath,
-          action: 'abort',
-        });
-        throw new Error(`[audit-pause] aborted at phase.exited "${args.priorPhaseId}": ${parsed.reason ?? 'no reason given'}`);
-      }
-      aoddEmit('audit.pause_resolved', {
-        seq,
-        ack_path: ackPath,
-        ...(parsed.action ? { action: parsed.action } : {}),
-      });
-      process.stderr.write(`[audit-pause] resumed phase_exit seq=${seq}\n`);
-      return;
-    }
-    Atomics.wait(view, 0, 0, config.pollIntervalMs);
-  }
-  throw new Error(`[audit-pause] timed out waiting for phase.exited ack on phase "${args.priorPhaseId}" after ${config.ackTimeoutSeconds}s`);
+  waitForAck({
+    seq,
+    ackPath,
+    markerPath,
+    doneDir,
+    basename,
+    ackTimeoutSeconds: config.ackTimeoutSeconds,
+    pollIntervalMs: config.pollIntervalMs,
+    resumedLog: `[audit-pause] resumed phase_exit seq=${seq}\n`,
+    abortMessage: (reason) =>
+      `[audit-pause] aborted at phase.exited "${args.priorPhaseId}": ${reason}`,
+    timeoutMessage: `[audit-pause] timed out waiting for phase.exited ack on phase "${args.priorPhaseId}" after ${config.ackTimeoutSeconds}s`,
+  });
 }

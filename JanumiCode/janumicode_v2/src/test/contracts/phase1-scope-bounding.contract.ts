@@ -19,8 +19,17 @@ import type { ContractSuite } from './types';
 
 // ── Producer artifact shape ─────────────────────────────────────
 
-export type ScopeBreadth = 'single_product' | 'multi_product' | 'platform' | 'feature' | 'extension' | string;
-export type ScopeDepth = 'prototype' | 'production_grade' | 'enterprise_grade' | string;
+// Open union: any string is accepted; the literals document the known-good
+// values (autocomplete). `string & {}` keeps the literals from being absorbed
+// by `string` while remaining assignment-compatible with `string`.
+export type ScopeBreadth =
+  | 'single_product'
+  | 'multi_product'
+  | 'platform'
+  | 'feature'
+  | 'extension'
+  | (string & {});
+export type ScopeDepth = 'prototype' | 'production_grade' | 'enterprise_grade' | (string & {});
 
 export interface ScopeClassificationArtifact {
   kind: 'scope_classification';

@@ -88,155 +88,201 @@ function responsibility_count(c: ComponentLike): number {
   return (c.responsibilities ?? []).filter(r => responsibility_text(r).trim().length > 0).length;
 }
 
-export function checkT4Principle(
-  assertion: T4PrincipleAssertion,
-  parsed: unknown | null,
-): AssertionCheck {
-  const severity = assertion.severity ?? 'advisory';
-  if (parsed === null || parsed === undefined) {
-    return {
-      tier: 'T4',
-      name: assertion.name,
-      passed: false,
-      severity,
-      detail: 'no parsed JSON available',
-    };
-  }
-  // Resolve the list of components to inspect. Default for component_skeleton
-  // is `$.components[*]`; for component_saturation it's `$.children[*]`.
-  const items = evalJsonPath(parsed, assertion.path);
-  if (items.length === 0) {
-    return {
-      tier: 'T4',
-      name: assertion.name,
-      passed: true,
-      severity,
-      detail: 'no components matched path (skipped)',
-    };
-  }
-
-  // Filter by tier if requested (saturation output has children of mixed
-  // tiers; skeleton output is implicitly all top-tier).
-  let comps = items as ComponentLike[];
-  if (assertion.tier_filter) {
-    comps = comps.filter(c => c.tier === assertion.tier_filter);
-    if (comps.length === 0) {
-      return {
-        tier: 'T4',
-        name: assertion.name,
-        passed: true,
-        severity,
-        detail: `no components match tier_filter=${assertion.tier_filter}`,
-      };
+// ── Smell A: same-noun sibling cluster with ≤1 responsibility ─────────
+// Detection: for each pair of top-tier siblings, intersect their
+// significant-token pools (name + id, minus stop tokens like verb/role
+// suffixes and prefix words like "comp"). Any token that appears in
+// ≥2 siblings whose responsibility counts are all ≤1 is reported as a
+// noun collision — these siblings likely share a business capability
+// that was split SRP-style at Tier A.
+//
+// Maps every significant token to the components whose name/id contribute
+// it (preserving component and token insertion order).
+function build_token_to_comps(comps: ComponentLike[]): Map<string, ComponentLike[]> {
+  const tokenToComps = new Map<string, ComponentLike[]>();
+  for (const c of comps) {
+    const tokens = significant_tokens(c.name, c.id);
+    for (const t of tokens) {
+      const arr = tokenToComps.get(t) ?? [];
+      arr.push(c);
+      tokenToComps.set(t, arr);
     }
   }
+  return tokenToComps;
+}
 
+function noun_collision_smell(token: string, group: ComponentLike[]): string | null {
+  if (group.length < 2) return null;
+  const allLowResp = group.every(c => responsibility_count(c) <= 1);
+  if (!allLowResp) return null;
+  const ids = group.map(c => c.id ?? c.name ?? '(unnamed)');
+  return `noun_collision: ${group.length} top-tier siblings share '${token}' (${ids.join(', ')}), each with ≤1 responsibility — should be one capability-shaped component (Single-Service Principle violation)`;
+}
+
+function detect_noun_collision(comps: ComponentLike[]): string[] {
+  const tokenToComps = build_token_to_comps(comps);
   const smells: string[] = [];
-
-  // ── Smell A: same-noun sibling cluster with ≤1 responsibility ────
-  // Detection: for each pair of top-tier siblings, intersect their
-  // significant-token pools (name + id, minus stop tokens like verb/role
-  // suffixes and prefix words like "comp"). Any token that appears in
-  // ≥2 siblings whose responsibility counts are all ≤1 is reported as a
-  // noun collision — these siblings likely share a business capability
-  // that was split SRP-style at Tier A.
-  if (assertion.noun_collision_check !== false) {
-    const tokensByComp = comps.map(c => ({ comp: c, tokens: significant_tokens(c.name, c.id) }));
-    const tokenToComps = new Map<string, ComponentLike[]>();
-    for (const { comp, tokens } of tokensByComp) {
-      for (const t of tokens) {
-        const arr = tokenToComps.get(t) ?? [];
-        arr.push(comp);
-        tokenToComps.set(t, arr);
-      }
-    }
-    const reportedTokens = new Set<string>();
-    for (const [token, group] of tokenToComps.entries()) {
-      if (group.length < 2) continue;
-      if (reportedTokens.has(token)) continue;
-      const allLowResp = group.every(c => responsibility_count(c) <= 1);
-      if (allLowResp) {
-        reportedTokens.add(token);
-        const ids = group.map(c => c.id ?? c.name ?? '(unnamed)');
-        smells.push(
-          `noun_collision: ${group.length} top-tier siblings share '${token}' (${ids.join(', ')}), each with ≤1 responsibility — should be one capability-shaped component (Single-Service Principle violation)`,
-        );
-      }
+  const reportedTokens = new Set<string>();
+  for (const [token, group] of tokenToComps.entries()) {
+    if (reportedTokens.has(token)) continue;
+    const smell = noun_collision_smell(token, group);
+    if (smell) {
+      reportedTokens.add(token);
+      smells.push(smell);
     }
   }
+  return smells;
+}
 
-  // ── Smell B: ID suffix drift ─────────────────────────────────────
-  if (assertion.id_suffix_check !== false) {
-    const byBase = new Map<string, string[]>();
-    for (const c of comps) {
-      const base = id_base(c.id);
-      if (!base || base === c.id) continue; // no suffix found
-      const arr = byBase.get(base) ?? [];
-      arr.push(c.id ?? '(no id)');
-      byBase.set(base, arr);
-    }
-    for (const [base, ids] of byBase.entries()) {
-      if (ids.length >= 2) {
-        smells.push(
-          `id_suffix_drift: ${ids.length} siblings share base id '${base}' with -A/-B/-N variants (${ids.slice(0, 5).join(', ')}) — capability was fragmented`,
-        );
-      }
-    }
+// ── Smell B: ID suffix drift ─────────────────────────────────────────
+function detect_id_suffix_drift(comps: ComponentLike[]): string[] {
+  const byBase = new Map<string, string[]>();
+  for (const c of comps) {
+    const base = id_base(c.id);
+    if (!base || base === c.id) continue; // no suffix found
+    const arr = byBase.get(base) ?? [];
+    arr.push(c.id ?? '(no id)');
+    byBase.set(base, arr);
   }
-
-  // ── Smell C: Tier-A node with exactly one verb-led responsibility ──
-  if (assertion.single_verb_responsibility_check !== false) {
-    const offenders: string[] = [];
-    for (const c of comps) {
-      const resps = c.responsibilities ?? [];
-      if (resps.length !== 1) continue;
-      const text = responsibility_text(resps[0]).trim();
-      if (text.length === 0) continue;
-      if (SINGLE_VERB_RESPONSIBILITY_REGEX.test(text)) {
-        offenders.push(`${c.id ?? c.name ?? '(unnamed)'}: "${text.slice(0, 60)}"`);
-      }
-    }
-    if (offenders.length >= 2) {
-      // A single Tier-A component with one verb-led responsibility may
-      // be legitimate (atomic service like an audit-log writer). The smell
-      // is the PATTERN — multiple Tier-A siblings each with a single
-      // verb-led responsibility is sprawl.
+  const smells: string[] = [];
+  for (const [base, ids] of byBase.entries()) {
+    if (ids.length >= 2) {
       smells.push(
-        `single_verb_responsibility: ${offenders.length} top-tier components have exactly one verb-led responsibility (${offenders.slice(0, 3).join('; ')}${offenders.length > 3 ? '; …' : ''}) — SRP applied at Tier A`,
+        `id_suffix_drift: ${ids.length} siblings share base id '${base}' with -A/-B/-N variants (${ids.slice(0, 5).join(', ')}) — capability was fragmented`,
       );
     }
   }
+  return smells;
+}
 
-  // ── Smell D: cross-sibling dependency density ────────────────────
-  if (assertion.cross_sibling_dependency_check !== false) {
-    const idSet = new Set(comps.map(c => c.id).filter((s): s is string => !!s));
-    if (idSet.size > 1) {
-      let totalCrossDeps = 0;
-      for (const c of comps) {
-        const deps = c.dependencies ?? [];
-        for (const d of deps) {
-          const targetId = d.component_id ?? d.target_component_id;
-          if (targetId && idSet.has(targetId)) totalCrossDeps++;
-        }
-      }
-      const avg = totalCrossDeps / comps.length;
-      const threshold = assertion.cross_sibling_dependency_threshold ?? 2;
-      if (avg > threshold) {
-        smells.push(
-          `cross_sibling_dependency_density: average ${avg.toFixed(2)} dependencies/component pointing at sibling top-tier components (threshold ${threshold}) — siblings are too entangled to be separate components`,
-        );
-      }
+// ── Smell C: Tier-A node with exactly one verb-led responsibility ─────
+function single_verb_offender(c: ComponentLike): string | null {
+  const resps = c.responsibilities ?? [];
+  if (resps.length !== 1) return null;
+  const text = responsibility_text(resps[0]).trim();
+  if (text.length === 0) return null;
+  if (!SINGLE_VERB_RESPONSIBILITY_REGEX.test(text)) return null;
+  return `${c.id ?? c.name ?? '(unnamed)'}: "${text.slice(0, 60)}"`;
+}
+
+function detect_single_verb_responsibility(comps: ComponentLike[]): string[] {
+  const offenders: string[] = [];
+  for (const c of comps) {
+    const offender = single_verb_offender(c);
+    if (offender) offenders.push(offender);
+  }
+  // A single Tier-A component with one verb-led responsibility may be
+  // legitimate (atomic service like an audit-log writer). The smell is the
+  // PATTERN — multiple Tier-A siblings each with a single verb-led
+  // responsibility is sprawl.
+  if (offenders.length < 2) return [];
+  return [
+    `single_verb_responsibility: ${offenders.length} top-tier components have exactly one verb-led responsibility (${offenders.slice(0, 3).join('; ')}${offenders.length > 3 ? '; …' : ''}) — SRP applied at Tier A`,
+  ];
+}
+
+// ── Smell D: cross-sibling dependency density ─────────────────────────
+function count_cross_sibling_deps(comps: ComponentLike[], idSet: Set<string>): number {
+  let totalCrossDeps = 0;
+  for (const c of comps) {
+    const deps = c.dependencies ?? [];
+    for (const d of deps) {
+      const targetId = d.component_id ?? d.target_component_id;
+      if (targetId && idSet.has(targetId)) totalCrossDeps++;
     }
   }
+  return totalCrossDeps;
+}
 
-  const passed = smells.length === 0;
+function detect_cross_sibling_dependency(comps: ComponentLike[], threshold: number): string[] {
+  const idSet = new Set(comps.map(c => c.id).filter((s): s is string => !!s));
+  if (idSet.size <= 1) return [];
+  const avg = count_cross_sibling_deps(comps, idSet) / comps.length;
+  if (avg <= threshold) return [];
+  return [
+    `cross_sibling_dependency_density: average ${avg.toFixed(2)} dependencies/component pointing at sibling top-tier components (threshold ${threshold}) — siblings are too entangled to be separate components`,
+  ];
+}
+
+// Resolve the components to inspect, applying an optional tier filter
+// (saturation output has children of mixed tiers; skeleton output is
+// implicitly all top-tier). Returns `null` when a tier filter is set but
+// matches nothing — a distinct "skipped" outcome from an empty path.
+function apply_tier_filter(
+  items: ComponentLike[],
+  tierFilter: string | undefined,
+): ComponentLike[] | null {
+  if (!tierFilter) return items;
+  const filtered = items.filter(c => c.tier === tierFilter);
+  if (filtered.length === 0) return null;
+  return filtered;
+}
+
+// Run each enabled smell detector and concatenate the reported violations
+// in detector order (A → B → C → D).
+function collect_smells(comps: ComponentLike[], assertion: T4PrincipleAssertion): string[] {
+  const smells: string[] = [];
+  if (assertion.noun_collision_check !== false) {
+    smells.push(...detect_noun_collision(comps));
+  }
+  if (assertion.id_suffix_check !== false) {
+    smells.push(...detect_id_suffix_drift(comps));
+  }
+  if (assertion.single_verb_responsibility_check !== false) {
+    smells.push(...detect_single_verb_responsibility(comps));
+  }
+  if (assertion.cross_sibling_dependency_check !== false) {
+    const threshold = assertion.cross_sibling_dependency_threshold ?? 2;
+    smells.push(...detect_cross_sibling_dependency(comps, threshold));
+  }
+  return smells;
+}
+
+function t4_check(
+  assertion: T4PrincipleAssertion,
+  severity: AssertionCheck['severity'],
+  passed: boolean,
+  detail: string | undefined,
+): AssertionCheck {
   return {
     tier: 'T4',
     name: assertion.name,
     passed,
     severity,
-    detail: passed
-      ? undefined
-      : `${smells.length} principle violation(s):\n    - ${smells.join('\n    - ')}`,
+    detail,
   };
+}
+
+export function checkT4Principle(
+  assertion: T4PrincipleAssertion,
+  parsed: unknown,
+): AssertionCheck {
+  const severity = assertion.severity ?? 'advisory';
+  if (parsed === null || parsed === undefined) {
+    return t4_check(assertion, severity, false, 'no parsed JSON available');
+  }
+
+  // Resolve the list of components to inspect. Default for component_skeleton
+  // is `$.components[*]`; for component_saturation it's `$.children[*]`.
+  const items = evalJsonPath(parsed, assertion.path) as ComponentLike[];
+  if (items.length === 0) {
+    return t4_check(assertion, severity, true, 'no components matched path (skipped)');
+  }
+
+  const comps = apply_tier_filter(items, assertion.tier_filter);
+  if (comps === null) {
+    return t4_check(
+      assertion,
+      severity,
+      true,
+      `no components match tier_filter=${assertion.tier_filter}`,
+    );
+  }
+
+  const smells = collect_smells(comps, assertion);
+  const passed = smells.length === 0;
+  const detail = passed
+    ? undefined
+    : `${smells.length} principle violation(s):\n    - ${smells.join('\n    - ')}`;
+  return t4_check(assertion, severity, passed, detail);
 }

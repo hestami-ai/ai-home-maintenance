@@ -74,4 +74,75 @@ describe('decomposition_fanout_discipline (deterministic)', () => {
     );
     expect(findings.some((f) => f.type === 'single_child_same_tier')).toBe(true);
   });
+
+  // --- characterization tests pinning guard-clause edge branches ---
+
+  it('flags HIGH for atomic_leaf with 2 children (childCount !== 1, >1)', () => {
+    const findings = validateDecompositionFanoutDiscipline(
+      makeRuntime({
+        outputContent: {
+          parent_branch_classification: 'atomic_leaf',
+          children: [{ id: 'c1', tier: 'D' }, { id: 'c2', tier: 'D' }],
+        },
+      }),
+    );
+    expect(findings.map((f) => f.type)).toEqual(['atomic_fanout_violation']);
+  });
+
+  it('flags decomposable with 0 children and uses the add/reclassify recommendation', () => {
+    const findings = validateDecompositionFanoutDiscipline(
+      makeRuntime({
+        outputContent: {
+          parent_branch_classification: 'decomposable',
+          children: [],
+        },
+      }),
+    );
+    const range = findings.find((f) => f.type === 'decomposable_fanout_out_of_range');
+    expect(range).toBeDefined();
+    expect(range?.recommendation).toBe(
+      'Add children or reclassify as atomic_leaf / invalid_parent.',
+    );
+  });
+
+  it('does NOT flag single_child_same_tier when both parent and child are tier D', () => {
+    const findings = validateDecompositionFanoutDiscipline(
+      makeRuntime({
+        outputContent: {
+          parent_branch_classification: 'decomposable',
+          tier: 'D',
+          description: 'parent',
+          children: [{ id: 'c1', tier: 'D', description: 'distinct child' }],
+        },
+      }),
+    );
+    expect(findings.some((f) => f.type === 'single_child_same_tier')).toBe(false);
+  });
+
+  it('does NOT flag single_child_same_tier when child tier differs from parent', () => {
+    const findings = validateDecompositionFanoutDiscipline(
+      makeRuntime({
+        outputContent: {
+          parent_branch_classification: 'decomposable',
+          tier: 'B',
+          description: 'parent',
+          children: [{ id: 'c1', tier: 'C', description: 'distinct child' }],
+        },
+      }),
+    );
+    expect(findings.some((f) => f.type === 'single_child_same_tier')).toBe(false);
+  });
+
+  it('returns [] for a classification that is neither atomic nor decomposable', () => {
+    expect(
+      validateDecompositionFanoutDiscipline(
+        makeRuntime({
+          outputContent: {
+            parent_branch_classification: 'invalid_parent',
+            children: [{ id: 'c1', tier: 'C' }],
+          },
+        }),
+      ),
+    ).toEqual([]);
+  });
 });

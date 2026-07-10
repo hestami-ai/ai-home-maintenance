@@ -1705,48 +1705,61 @@ export function selectValidators(params: {
 }
 
 /**
- * Sanity-check the registry shape. Returns a list of human-readable
- * error strings, empty when valid. Intended for unit tests + a
- * one-time call at engine startup.
+ * Validate the `kind`-specific fields of one entry. Split out of
+ * {@link validateRegistryStructure} to keep cognitive complexity in check.
  */
-export function validateRegistryStructure(): string[] {
+function validateEntryKind(entry: ValidatorEntry): string[] {
   const errors: string[] = [];
-  const seen = new Set<string>();
-
-  for (const entry of VALIDATOR_REGISTRY) {
-    if (!entry.id || typeof entry.id !== 'string') {
-      errors.push(`Validator entry missing id: ${JSON.stringify(entry)}`);
-      continue;
+  if (entry.kind === 'llm') {
+    if (!entry.promptTemplatePath) {
+      errors.push(`LLM validator ${entry.id} missing promptTemplatePath.`);
+    } else if (!entry.promptTemplatePath.startsWith('prompts/review/')) {
+      errors.push(
+        `LLM validator ${entry.id} promptTemplatePath must start with 'prompts/review/' (got '${entry.promptTemplatePath}').`,
+      );
     }
-    if (seen.has(entry.id)) {
-      errors.push(`Duplicate validator id: ${entry.id}`);
-    }
-    seen.add(entry.id);
-    if (!entry.family) errors.push(`Validator ${entry.id} missing family.`);
-    if (!entry.description) errors.push(`Validator ${entry.id} missing description.`);
-    if (typeof entry.appliesTo !== 'function') {
-      errors.push(`Validator ${entry.id} missing appliesTo predicate.`);
-    }
-    if (entry.kind === 'llm') {
-      if (!entry.promptTemplatePath) {
-        errors.push(`LLM validator ${entry.id} missing promptTemplatePath.`);
-      } else if (!entry.promptTemplatePath.startsWith('prompts/review/')) {
-        errors.push(
-          `LLM validator ${entry.id} promptTemplatePath must start with 'prompts/review/' (got '${entry.promptTemplatePath}').`,
-        );
-      }
-    } else if (entry.kind !== 'deterministic') {
-      // Defensive future-proof branch: if a new ValidatorEntry kind is added
-      // to the union, this catches it before silent dispatch failure. TS
-      // narrows `entry` to `never` here because the union is exhausted, so
-      // access via cast.
-      const stranded = entry as { id: string; kind: unknown };
-      errors.push(`Validator ${stranded.id} has unknown kind: ${stranded.kind}`);
-    }
+  } else if (entry.kind !== 'deterministic') {
+    // Defensive future-proof branch: if a new ValidatorEntry kind is added
+    // to the union, this catches it before silent dispatch failure. TS
+    // narrows `entry` to `never` here because the union is exhausted, so
+    // access via cast.
+    const stranded = entry as { id: string; kind: unknown };
+    errors.push(`Validator ${stranded.id} has unknown kind: ${stranded.kind}`);
   }
+  return errors;
+}
 
-  // Cross-check: every id referenced by a dispatch bundle must exist
-  // in the registry. Catches typos in the bundle table.
+/**
+ * Validate the shared shape of one entry. `seen` accumulates ids across
+ * calls so duplicate detection spans the whole registry (it is mutated in
+ * place, matching the original inline loop). Returns [] when the entry is
+ * well-formed.
+ */
+function validateEntryShape(entry: ValidatorEntry, seen: Set<string>): string[] {
+  const errors: string[] = [];
+  if (!entry.id || typeof entry.id !== 'string') {
+    errors.push(`Validator entry missing id: ${JSON.stringify(entry)}`);
+    return errors;
+  }
+  if (seen.has(entry.id)) {
+    errors.push(`Duplicate validator id: ${entry.id}`);
+  }
+  seen.add(entry.id);
+  if (!entry.family) errors.push(`Validator ${entry.id} missing family.`);
+  if (!entry.description) errors.push(`Validator ${entry.id} missing description.`);
+  if (typeof entry.appliesTo !== 'function') {
+    errors.push(`Validator ${entry.id} missing appliesTo predicate.`);
+  }
+  errors.push(...validateEntryKind(entry));
+  return errors;
+}
+
+/**
+ * Cross-check: every id referenced by a dispatch bundle or the placeholder
+ * bundle must exist in the registry. Catches typos in the bundle tables.
+ */
+function validateBundleReferences(): string[] {
+  const errors: string[] = [];
   for (const [key, ids] of DISPATCH_BUNDLES) {
     for (const id of ids) {
       if (!ENTRIES_BY_ID.has(id)) {
@@ -1759,6 +1772,23 @@ export function validateRegistryStructure(): string[] {
       errors.push(`Placeholder bundle references unknown validator id: ${id}`);
     }
   }
+  return errors;
+}
+
+/**
+ * Sanity-check the registry shape. Returns a list of human-readable
+ * error strings, empty when valid. Intended for unit tests + a
+ * one-time call at engine startup.
+ */
+export function validateRegistryStructure(): string[] {
+  const errors: string[] = [];
+  const seen = new Set<string>();
+
+  for (const entry of VALIDATOR_REGISTRY) {
+    errors.push(...validateEntryShape(entry, seen));
+  }
+
+  errors.push(...validateBundleReferences());
 
   return errors;
 }

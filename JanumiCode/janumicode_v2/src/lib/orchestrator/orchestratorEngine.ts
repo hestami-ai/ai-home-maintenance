@@ -362,82 +362,12 @@ export class OrchestratorEngine {
     // the webview as it lands, so the user sees agent activity live.
     this.llmCaller.setWriter(this.writer, this.versionSha);
 
-    // Wire the reasoning-review HARNESS (Track D Commit 10) on every
-    // successful agent_output. The hook runs synchronously after each
-    // LLM call so harness findings land in the governed_stream BEFORE
-    // the next phase scrolls them out of the user's attention. The
-    // harness owns its own loop-guard (skips agentRole ∈ {harness,
-    // json_repair, reasoning_review}) so it never reviews itself.
-    //
-    // Auto-disabled in vitest: review issues a real LLM call which
-    // would either hit Ollama (network) or fail expectations counting
-    // governed_stream records. Same pattern as createEmbeddingClient.
-    // Explicit override: JANUMICODE_REVIEW_ENABLED=false disables in
-    // production runs (e.g. operator triage); =true forces it on in
-    // tests if a future test needs it.
-    const reviewEnabledFlag = process.env.JANUMICODE_REVIEW_ENABLED;
-    let reviewEnabled: boolean;
-    if (reviewEnabledFlag === 'true') {
-      reviewEnabled = true;
-    } else if (reviewEnabledFlag === 'false') {
-      reviewEnabled = false;
-    } else {
-      reviewEnabled = process.env.VITEST !== 'true' && process.env.NODE_ENV !== 'test';
-    }
-    if (reviewEnabled) {
-      // Harness LLM validators route through the same provider/model the
-      // legacy reasoning_review step used (Track D Commit 10). Falling
-      // back to undefined when unconfigured leaves validators stub-routed
-      // → validator_unavailable, which is what tests expect.
-      const reasoningReviewCfg = this.configManager.getLLMRouting().reasoning_review;
-      const harnessRouting = reasoningReviewCfg?.primary?.provider && reasoningReviewCfg?.primary?.model
-        ? {
-            provider: reasoningReviewCfg.primary.provider,
-            model: reasoningReviewCfg.primary.model,
-            temperature: reasoningReviewCfg.temperature ?? 0,
-          }
-        : undefined;
-      this.llmCaller.setReviewHarnessHook(async (params) => {
-        // Harness owns its own loop-guard, empty-output handling, and
-        // failure recording. The orchestrator wiring stays thin.
-        await runReviewHarness(
-          params,
-          this.llmCaller,
-          this.writer,
-          this.versionSha,
-          this.templateLoader,
-          harnessRouting,
-        );
-      });
-    }
-
-    // LLM-based JSON repair fallback (json_repair agent role): when a
-    // call requests `responseFormat: 'json'` and the response doesn't
-    // parse, the LLMCaller hands the broken text to a dedicated repair
-    // sequence — primary model first, fallback model if primary fails.
-    // Both attempts include the original prompt + system + thinking
-    // chain (and optional schema hint) as grounding context. Read from
-    // `config.llm_routing.json_repair`. Skipped silently if not
-    // configured (caller halts on parse failure).
-    const jsonRepairConfig = this.configManager.getLLMRouting().json_repair;
-    if (jsonRepairConfig?.primary?.provider && jsonRepairConfig?.primary?.model) {
-      this.llmCaller.setJsonRepairRouting({
-        primary: {
-          provider: jsonRepairConfig.primary.provider,
-          model: jsonRepairConfig.primary.model,
-          baseUrl: jsonRepairConfig.primary.base_url,
-          temperature: jsonRepairConfig.temperature ?? 0,
-        },
-        fallback: jsonRepairConfig.fallback?.provider && jsonRepairConfig.fallback?.model
-          ? {
-              provider: jsonRepairConfig.fallback.provider,
-              model: jsonRepairConfig.fallback.model,
-              baseUrl: jsonRepairConfig.fallback.base_url,
-              temperature: jsonRepairConfig.fallback_temperature ?? 0,
-            }
-          : undefined,
-      });
-    }
+    // Wire the reasoning-review HARNESS (Track D Commit 10) and the
+    // LLM-based JSON repair fallback. Both are extracted into helpers so the
+    // constructor stays within cognitive-complexity limits; each is a no-op
+    // unless enabled/configured.
+    this.configureReviewHarness();
+    this.configureJsonRepair();
 
     // Executor backstops come from the SHARED policy (executorTimeouts), not the
     // (short) `cli_invocation` config — those local defaults are exactly what let
@@ -564,6 +494,90 @@ export class OrchestratorEngine {
 
     this.workspacePath = workspacePath;
     this.projectRoot = projectRootOf(workspacePath);
+  }
+
+  /**
+   * Wire the reasoning-review HARNESS (Track D Commit 10) on every
+   * successful agent_output. The hook runs synchronously after each
+   * LLM call so harness findings land in the governed_stream BEFORE
+   * the next phase scrolls them out of the user's attention. The
+   * harness owns its own loop-guard (skips agentRole ∈ {harness,
+   * json_repair, reasoning_review}) so it never reviews itself.
+   *
+   * Auto-disabled in vitest: review issues a real LLM call which
+   * would either hit Ollama (network) or fail expectations counting
+   * governed_stream records. Same pattern as createEmbeddingClient.
+   * Explicit override: JANUMICODE_REVIEW_ENABLED=false disables in
+   * production runs (e.g. operator triage); =true forces it on in
+   * tests if a future test needs it.
+   */
+  private configureReviewHarness(): void {
+    const reviewEnabledFlag = process.env.JANUMICODE_REVIEW_ENABLED;
+    let reviewEnabled: boolean;
+    if (reviewEnabledFlag === 'true') {
+      reviewEnabled = true;
+    } else if (reviewEnabledFlag === 'false') {
+      reviewEnabled = false;
+    } else {
+      reviewEnabled = process.env.VITEST !== 'true' && process.env.NODE_ENV !== 'test';
+    }
+    if (!reviewEnabled) return;
+
+    // Harness LLM validators route through the same provider/model the
+    // legacy reasoning_review step used (Track D Commit 10). Falling
+    // back to undefined when unconfigured leaves validators stub-routed
+    // → validator_unavailable, which is what tests expect.
+    const reasoningReviewCfg = this.configManager.getLLMRouting().reasoning_review;
+    const harnessRouting = reasoningReviewCfg?.primary?.provider && reasoningReviewCfg?.primary?.model
+      ? {
+          provider: reasoningReviewCfg.primary.provider,
+          model: reasoningReviewCfg.primary.model,
+          temperature: reasoningReviewCfg.temperature ?? 0,
+        }
+      : undefined;
+    this.llmCaller.setReviewHarnessHook(async (params) => {
+      // Harness owns its own loop-guard, empty-output handling, and
+      // failure recording. The orchestrator wiring stays thin.
+      await runReviewHarness(
+        params,
+        this.llmCaller,
+        this.writer,
+        this.versionSha,
+        this.templateLoader,
+        harnessRouting,
+      );
+    });
+  }
+
+  /**
+   * LLM-based JSON repair fallback (json_repair agent role): when a
+   * call requests `responseFormat: 'json'` and the response doesn't
+   * parse, the LLMCaller hands the broken text to a dedicated repair
+   * sequence — primary model first, fallback model if primary fails.
+   * Both attempts include the original prompt + system + thinking
+   * chain (and optional schema hint) as grounding context. Read from
+   * `config.llm_routing.json_repair`. Skipped silently if not
+   * configured (caller halts on parse failure).
+   */
+  private configureJsonRepair(): void {
+    const jsonRepairConfig = this.configManager.getLLMRouting().json_repair;
+    if (!jsonRepairConfig?.primary?.provider || !jsonRepairConfig?.primary?.model) return;
+    this.llmCaller.setJsonRepairRouting({
+      primary: {
+        provider: jsonRepairConfig.primary.provider,
+        model: jsonRepairConfig.primary.model,
+        baseUrl: jsonRepairConfig.primary.base_url,
+        temperature: jsonRepairConfig.temperature ?? 0,
+      },
+      fallback: jsonRepairConfig.fallback?.provider && jsonRepairConfig.fallback?.model
+        ? {
+            provider: jsonRepairConfig.fallback.provider,
+            model: jsonRepairConfig.fallback.model,
+            baseUrl: jsonRepairConfig.fallback.base_url,
+            temperature: jsonRepairConfig.fallback_temperature ?? 0,
+          }
+        : undefined,
+    });
   }
 
   /**
@@ -702,17 +716,8 @@ export class OrchestratorEngine {
     // this check, `--phase-limit 0` still runs Phase 1 because the
     // Client Liaison's startWorkflow capability kicks it off regardless
     // of the engine's own advance policy.
-    if (this.phaseLimit) {
-      const limitIdx = PHASE_ORDER.indexOf(this.phaseLimit);
-      const phaseIdx = PHASE_ORDER.indexOf(phaseId);
-      if (limitIdx >= 0 && phaseIdx > limitIdx) {
-        getLogger().info('workflow', 'Skipping phase execution (past phase-limit)', {
-          workflow_run_id: runId,
-          phase_id: phaseId,
-          phase_limit: this.phaseLimit,
-        });
-        return { success: true, artifactIds: [] };
-      }
+    if (this.isPastPhaseLimit(runId, phaseId)) {
+      return { success: true, artifactIds: [] };
     }
 
     // Create or update trace context with current phase
@@ -737,77 +742,7 @@ export class OrchestratorEngine {
       });
       getLogger().info('workflow', 'Phase started', { workflow_run_id: runId, phase_id: phaseId, phase_name: PHASE_NAMES[phaseId] }, phaseTrace);
 
-      // Convert thrown errors from the handler into `success: false`
-      // phase results. Serial-pipeline invariant: an unrecoverable LLM /
-      // CLI failure at any sub-phase HALTS the workflow — downstream
-      // phases reason on upstream artifacts, so a silent fallback
-      // corrupts every phase that follows. Phase handlers therefore
-      // let LLM helpers throw instead of returning default values;
-      // this catch is the engine-level seam that turns those throws
-      // into gap-reportable phase failures.
-      let result: PhaseResult;
-      const phaseStartedAt = Date.now();
-      try {
-        // Wrap the handler's execution in a TraceCtx so any nested code
-        // (LLM calls, normalizers, context assemblers) can emit
-        // transformation_step records without arg-threading. Sub-phase
-        // id is null at the frame root; downstream code (notably the
-        // LLM caller) supplies sub_phase_id_override at emit time based
-        // on its LLMTraceContext.
-        result = await withTraceContext(
-          { workflow_run_id: runId, phase_id: phaseId, sub_phase_id: null },
-          async () => {
-            aoddEmit('phase.entered', {
-              phase_name: PHASE_NAMES[phaseId] ?? phaseId,
-            });
-            const r = await handler.execute({ workflowRun: run, engine: this });
-            // Cover the last sub-phase of the phase: stateMachine.setSubPhase
-            // only fires sub_phase.exited for the *prior* sub-phase when a
-            // new one is set, so the final sub-phase never gets one.
-            // Emit it here so per-sub-phase-exit summary writes also cover
-            // the terminal sub-phase, and so its diagnostic status carries
-            // through.
-            this.emitFinalSubPhaseExitedIfAny(runId);
-            const phaseDuration = Date.now() - phaseStartedAt;
-            aoddEmit('phase.exited', {
-              phase_name: PHASE_NAMES[phaseId] ?? phaseId,
-              status: r.success ? 'success' : 'failed',
-              duration_ms: phaseDuration,
-              artifact_count: r.artifactIds.length,
-              ...(r.success ? {} : { error: { message: r.error ?? 'unknown error' } }),
-            });
-            return r;
-          },
-        );
-      } catch (err) {
-        const phaseDuration = Date.now() - phaseStartedAt;
-        const errMsg = err instanceof Error ? err.message : String(err);
-        // Same coverage as the happy path: close out the current sub-phase
-        // before emitting phase.exited so the bulk-derive and per-exit
-        // summary writers see a complete picture.
-        this.emitFinalSubPhaseExitedIfAny(runId);
-        aoddEmit('phase.exited', {
-          phase_name: PHASE_NAMES[phaseId] ?? phaseId,
-          status: 'failed',
-          duration_ms: phaseDuration,
-          artifact_count: 0,
-          error: { message: errMsg },
-        });
-        const message = err instanceof Error ? err.message : String(err);
-        const subPhase = this.stateMachine.getWorkflowRun(runId)?.current_sub_phase_id;
-        const location = subPhase ? `Phase ${subPhase}` : `Phase ${phaseId}`;
-        getLogger().error('workflow', 'Phase handler threw — halting workflow', {
-          workflow_run_id: runId,
-          phase_id: phaseId,
-          sub_phase_id: subPhase,
-          error: message,
-        }, phaseTrace);
-        result = {
-          success: false,
-          error: `${location} halted: ${message}`,
-          artifactIds: [],
-        };
-      }
+      const result = await this.runPhaseHandler(runId, run, phaseId, handler, phaseTrace);
 
       if (result.success) {
         this.eventBus.emit('phase:completed', {
@@ -816,103 +751,7 @@ export class OrchestratorEngine {
         });
         getLogger().info('workflow', 'Phase completed', { workflow_run_id: runId, phase_id: phaseId, artifact_count: result.artifactIds.length }, phaseTrace);
 
-        // Phase 0.5.2 "Revise the override" back-transition (spec §4 Phase
-        // 0.5.2 B) — honored in BOTH approval modes (it is a deterministic
-        // routing instruction, not a gate approval, and the revise branch
-        // writes no phase gate). Clearing the trigger prevents Phase 1 from
-        // immediately bouncing back into 0.5 on its re-run.
-        if (result.reviseTo) {
-          this.stateMachine.setCrossRunImpactTriggered(runId, false);
-          const reback = this.advanceToNextPhase(runId, result.reviseTo);
-          if (reback) {
-            getLogger().info('workflow', 'Phase 0.5 revise — returning to Phase 1', {
-              workflow_run_id: runId, to_phase: result.reviseTo,
-            }, phaseTrace);
-            await this.executeCurrentPhase(runId, phaseTrace);
-          }
-        }
-        // In auto-approve mode, chain to the next phase automatically.
-        // In normal (webview) mode, the DecisionRouter handles this when
-        // the human approves the phase gate. We await here (not fire-and-forget)
-        // so the full pipeline completes before the caller returns, which
-        // lets waitForQuiescence track in-flight LLM calls correctly.
-        // Skip Phase 0 — the ClientLiaisonAgent handles 0→1 advancement itself.
-        else if (this.autoApproveDecisions && phaseId !== '0') {
-          // Headless simulate-human-decisions: certify this phase's gate the
-          // way a human approval would — writing phase_gate_approved + ingesting
-          // it so `validates` edges form and the phase's governing artifacts
-          // elevate to Authority 6 (which the DMR surfaces as active_constraints).
-          // Auto-approve otherwise advances silently and never certifies. [headless injection]
-          if (this.simulateHumanDecisions) {
-            this.simulateGateApproval(runId, phaseId);
-          }
-          // Fire any scripted prior_decision_override injections registered for
-          // this just-completed phase (semantic-supersession exerciser). [headless injection]
-          this.runOverrideInjectionsForPhase(runId, phaseId);
-          // phaseLimit stops the chain AFTER the named phase completes,
-          // so the harness can capture phase-N fixtures + assertions in
-          // isolation instead of running the whole pipeline to phase 10.
-          if (this.phaseLimit && phaseId === this.phaseLimit) {
-            getLogger().info('workflow', 'Phase limit reached; halting auto-advance', {
-              workflow_run_id: runId,
-              phase_id: phaseId,
-              phase_limit: this.phaseLimit,
-            }, phaseTrace);
-          } else if (result.cycleRestartTo) {
-            // Cycle controller back-transition (Phase 9 → Phase 6/7/8).
-            // The iterative-implementation-backlog cycle controller has
-            // decided to loop instead of advancing to Phase 10.
-            const restart = this.stateMachine.cycleRestartPhase(runId, result.cycleRestartTo);
-            if (restart.success) {
-              getLogger().info('workflow', 'Cycle restart — looping back', {
-                workflow_run_id: runId,
-                from_phase: phaseId,
-                to_phase: result.cycleRestartTo,
-              }, phaseTrace);
-              await this.executeCurrentPhase(runId, phaseTrace);
-            } else {
-              getLogger().error('workflow', 'Cycle restart failed', {
-                workflow_run_id: runId,
-                target_phase: result.cycleRestartTo,
-                error: restart.error,
-              }, phaseTrace);
-            }
-          } else {
-            // Cross-run impact routing (spec §4 Phase 0.5): after Phase 1, if a
-            // prior_decision_override changed a certified prior-run interface,
-            // detour through Phase 0.5 before Phase 2. Phase 0.5 itself advances
-            // to Phase 2. All other phases follow PHASE_ORDER.
-            const idx = PHASE_ORDER.indexOf(phaseId);
-            let nextPhase: PhaseId | undefined;
-            if (phaseId === '1') {
-              if (this.detectCrossRunImpactTrigger(runId)) {
-                this.stateMachine.setCrossRunImpactTriggered(runId, true);
-                nextPhase = '0.5';
-              } else {
-                nextPhase = '2';
-              }
-            } else if (phaseId === '0.5') {
-              nextPhase = '2';
-            } else if (idx >= 0 && idx < PHASE_ORDER.length - 1) {
-              nextPhase = PHASE_ORDER[idx + 1];
-            }
-            if (nextPhase) {
-              if (this.phaseHandlers.has(nextPhase)) {
-                const advanced = this.advanceToNextPhase(runId, nextPhase);
-                if (advanced) {
-                  await this.executeCurrentPhase(runId, phaseTrace);
-                }
-              }
-            } else if (idx === PHASE_ORDER.length - 1) {
-              this.stateMachine.completeWorkflowRun(runId);
-              this.eventBus.emit('workflow:completed', { workflowRunId: runId });
-              // AODD: close the trace. endRun emits run.completed and
-              // writes index.json. After this point, AODD emits for runId
-              // are no-ops until startRun is called again.
-              aoddEndRun({ status: 'success' });
-            }
-          }
-        }
+        await this.routePhaseSuccess(runId, phaseId, result, phaseTrace);
       } else {
         getLogger().error('workflow', 'Phase failed', { workflow_run_id: runId, phase_id: phaseId, error: result.error }, phaseTrace);
       }
@@ -921,6 +760,294 @@ export class OrchestratorEngine {
     } finally {
       this._executingPhaseCount--;
     }
+  }
+
+  /**
+   * Phase-limit gate: true when `phaseId` sits strictly past the configured
+   * phase limit (and a limit is set), logging the skip when it fires. Enforcing
+   * this before any handler runs catches the startWorkflow capability's
+   * fire-and-forget advance → executeCurrentPhase path too.
+   */
+  private isPastPhaseLimit(runId: string, phaseId: PhaseId): boolean {
+    if (!this.phaseLimit) return false;
+    const limitIdx = PHASE_ORDER.indexOf(this.phaseLimit);
+    const phaseIdx = PHASE_ORDER.indexOf(phaseId);
+    if (limitIdx >= 0 && phaseIdx > limitIdx) {
+      getLogger().info('workflow', 'Skipping phase execution (past phase-limit)', {
+        workflow_run_id: runId,
+        phase_id: phaseId,
+        phase_limit: this.phaseLimit,
+      });
+      return true;
+    }
+    return false;
+  }
+
+  /**
+   * Run the phase handler inside a TraceCtx frame — emitting phase.entered /
+   * phase.exited AODD events — and convert any thrown error into a
+   * `success: false` PhaseResult.
+   *
+   * Serial-pipeline invariant: an unrecoverable LLM / CLI failure at any
+   * sub-phase HALTS the workflow — downstream phases reason on upstream
+   * artifacts, so a silent fallback corrupts every phase that follows. Phase
+   * handlers therefore let LLM helpers throw instead of returning default
+   * values; the catch here is the engine-level seam that turns those throws
+   * into gap-reportable phase failures.
+   */
+  private async runPhaseHandler(
+    runId: string,
+    run: WorkflowRun,
+    phaseId: PhaseId,
+    handler: PhaseHandler,
+    phaseTrace: TraceContext,
+  ): Promise<PhaseResult> {
+    const phaseStartedAt = Date.now();
+    try {
+      // Wrap the handler's execution in a TraceCtx so any nested code
+      // (LLM calls, normalizers, context assemblers) can emit
+      // transformation_step records without arg-threading. Sub-phase
+      // id is null at the frame root; downstream code (notably the
+      // LLM caller) supplies sub_phase_id_override at emit time based
+      // on its LLMTraceContext.
+      return await withTraceContext(
+        { workflow_run_id: runId, phase_id: phaseId, sub_phase_id: null },
+        async () => {
+          aoddEmit('phase.entered', {
+            phase_name: PHASE_NAMES[phaseId] ?? phaseId,
+          });
+          const r = await handler.execute({ workflowRun: run, engine: this });
+          // Cover the last sub-phase of the phase: stateMachine.setSubPhase
+          // only fires sub_phase.exited for the *prior* sub-phase when a
+          // new one is set, so the final sub-phase never gets one.
+          // Emit it here so per-sub-phase-exit summary writes also cover
+          // the terminal sub-phase, and so its diagnostic status carries
+          // through.
+          this.emitFinalSubPhaseExitedIfAny(runId);
+          const phaseDuration = Date.now() - phaseStartedAt;
+          aoddEmit('phase.exited', {
+            phase_name: PHASE_NAMES[phaseId] ?? phaseId,
+            status: r.success ? 'success' : 'failed',
+            duration_ms: phaseDuration,
+            artifact_count: r.artifactIds.length,
+            ...(r.success ? {} : { error: { message: r.error ?? 'unknown error' } }),
+          });
+          return r;
+        },
+      );
+    } catch (err) {
+      return this.buildHaltedPhaseResult(runId, phaseId, phaseStartedAt, err, phaseTrace);
+    }
+  }
+
+  /**
+   * Turn a thrown handler error into a halted PhaseResult: close out the
+   * current sub-phase, emit phase.exited(failed), log the halt, and return the
+   * `success: false` result. Same sub-phase coverage as the happy path so the
+   * bulk-derive and per-exit summary writers see a complete picture.
+   */
+  private buildHaltedPhaseResult(
+    runId: string,
+    phaseId: PhaseId,
+    phaseStartedAt: number,
+    err: unknown,
+    phaseTrace: TraceContext,
+  ): PhaseResult {
+    const phaseDuration = Date.now() - phaseStartedAt;
+    const errMsg = err instanceof Error ? err.message : String(err);
+    this.emitFinalSubPhaseExitedIfAny(runId);
+    aoddEmit('phase.exited', {
+      phase_name: PHASE_NAMES[phaseId] ?? phaseId,
+      status: 'failed',
+      duration_ms: phaseDuration,
+      artifact_count: 0,
+      error: { message: errMsg },
+    });
+    const message = err instanceof Error ? err.message : String(err);
+    const subPhase = this.stateMachine.getWorkflowRun(runId)?.current_sub_phase_id;
+    const location = subPhase ? `Phase ${subPhase}` : `Phase ${phaseId}`;
+    getLogger().error('workflow', 'Phase handler threw — halting workflow', {
+      workflow_run_id: runId,
+      phase_id: phaseId,
+      sub_phase_id: subPhase,
+      error: message,
+    }, phaseTrace);
+    return {
+      success: false,
+      error: `${location} halted: ${message}`,
+      artifactIds: [],
+    };
+  }
+
+  /**
+   * Post-success routing: the Phase 0.5.2 "Revise the override" back-transition,
+   * or (in auto-approve mode, except Phase 0) the forward auto-advance chain.
+   */
+  private async routePhaseSuccess(
+    runId: string,
+    phaseId: PhaseId,
+    result: PhaseResult,
+    phaseTrace: TraceContext,
+  ): Promise<void> {
+    // Phase 0.5.2 "Revise the override" back-transition (spec §4 Phase
+    // 0.5.2 B) — honored in BOTH approval modes (it is a deterministic
+    // routing instruction, not a gate approval, and the revise branch
+    // writes no phase gate). Clearing the trigger prevents Phase 1 from
+    // immediately bouncing back into 0.5 on its re-run.
+    if (result.reviseTo) {
+      await this.routeReviseTransition(runId, result.reviseTo, phaseTrace);
+      return;
+    }
+    // In auto-approve mode, chain to the next phase automatically.
+    // In normal (webview) mode, the DecisionRouter handles this when
+    // the human approves the phase gate. We await here (not fire-and-forget)
+    // so the full pipeline completes before the caller returns, which
+    // lets waitForQuiescence track in-flight LLM calls correctly.
+    // Skip Phase 0 — the ClientLiaisonAgent handles 0→1 advancement itself.
+    if (this.autoApproveDecisions && phaseId !== '0') {
+      await this.autoAdvanceAfterPhase(runId, phaseId, result, phaseTrace);
+    }
+  }
+
+  /**
+   * Phase 0.5 revise back-transition: clear the cross-run trigger, advance back
+   * to `reviseTo`, and re-run the (now earlier) current phase if the advance
+   * succeeded.
+   */
+  private async routeReviseTransition(
+    runId: string,
+    reviseTo: PhaseId,
+    phaseTrace: TraceContext,
+  ): Promise<void> {
+    this.stateMachine.setCrossRunImpactTriggered(runId, false);
+    const reback = this.advanceToNextPhase(runId, reviseTo);
+    if (reback) {
+      getLogger().info('workflow', 'Phase 0.5 revise — returning to Phase 1', {
+        workflow_run_id: runId, to_phase: reviseTo,
+      }, phaseTrace);
+      await this.executeCurrentPhase(runId, phaseTrace);
+    }
+  }
+
+  /**
+   * Auto-approve chain for a just-completed phase: simulate the gate approval
+   * (headless), fire scripted override injections, then either stop at the
+   * phase limit, honor a cycle-restart back-transition, or advance forward.
+   */
+  private async autoAdvanceAfterPhase(
+    runId: string,
+    phaseId: PhaseId,
+    result: PhaseResult,
+    phaseTrace: TraceContext,
+  ): Promise<void> {
+    // Headless simulate-human-decisions: certify this phase's gate the
+    // way a human approval would — writing phase_gate_approved + ingesting
+    // it so `validates` edges form and the phase's governing artifacts
+    // elevate to Authority 6 (which the DMR surfaces as active_constraints).
+    // Auto-approve otherwise advances silently and never certifies. [headless injection]
+    if (this.simulateHumanDecisions) {
+      this.simulateGateApproval(runId, phaseId);
+    }
+    // Fire any scripted prior_decision_override injections registered for
+    // this just-completed phase (semantic-supersession exerciser). [headless injection]
+    this.runOverrideInjectionsForPhase(runId, phaseId);
+    // phaseLimit stops the chain AFTER the named phase completes,
+    // so the harness can capture phase-N fixtures + assertions in
+    // isolation instead of running the whole pipeline to phase 10.
+    if (this.phaseLimit && phaseId === this.phaseLimit) {
+      getLogger().info('workflow', 'Phase limit reached; halting auto-advance', {
+        workflow_run_id: runId,
+        phase_id: phaseId,
+        phase_limit: this.phaseLimit,
+      }, phaseTrace);
+      return;
+    }
+    if (result.cycleRestartTo) {
+      await this.routeCycleRestart(runId, phaseId, result.cycleRestartTo, phaseTrace);
+      return;
+    }
+    await this.advanceToComputedNextPhase(runId, phaseId, phaseTrace);
+  }
+
+  /**
+   * Cycle controller back-transition (Phase 9 → Phase 6/7/8). The
+   * iterative-implementation-backlog cycle controller has decided to loop
+   * instead of advancing to Phase 10.
+   */
+  private async routeCycleRestart(
+    runId: string,
+    phaseId: PhaseId,
+    cycleRestartTo: PhaseId,
+    phaseTrace: TraceContext,
+  ): Promise<void> {
+    const restart = this.stateMachine.cycleRestartPhase(runId, cycleRestartTo);
+    if (restart.success) {
+      getLogger().info('workflow', 'Cycle restart — looping back', {
+        workflow_run_id: runId,
+        from_phase: phaseId,
+        to_phase: cycleRestartTo,
+      }, phaseTrace);
+      await this.executeCurrentPhase(runId, phaseTrace);
+    } else {
+      getLogger().error('workflow', 'Cycle restart failed', {
+        workflow_run_id: runId,
+        target_phase: cycleRestartTo,
+        error: restart.error,
+      }, phaseTrace);
+    }
+  }
+
+  /**
+   * Forward advance in the auto-approve chain: compute the next phase (honoring
+   * cross-run impact routing), advance + recurse when a handler exists, or
+   * complete the workflow when the final phase has finished.
+   */
+  private async advanceToComputedNextPhase(
+    runId: string,
+    phaseId: PhaseId,
+    phaseTrace: TraceContext,
+  ): Promise<void> {
+    const idx = PHASE_ORDER.indexOf(phaseId);
+    const nextPhase = this.computeNextPhase(runId, phaseId, idx);
+    if (nextPhase) {
+      if (this.phaseHandlers.has(nextPhase)) {
+        const advanced = this.advanceToNextPhase(runId, nextPhase);
+        if (advanced) {
+          await this.executeCurrentPhase(runId, phaseTrace);
+        }
+      }
+    } else if (idx === PHASE_ORDER.length - 1) {
+      this.stateMachine.completeWorkflowRun(runId);
+      this.eventBus.emit('workflow:completed', { workflowRunId: runId });
+      // AODD: close the trace. endRun emits run.completed and
+      // writes index.json. After this point, AODD emits for runId
+      // are no-ops until startRun is called again.
+      aoddEndRun({ status: 'success' });
+    }
+  }
+
+  /**
+   * Cross-run impact routing (spec §4 Phase 0.5): after Phase 1, if a
+   * prior_decision_override changed a certified prior-run interface, detour
+   * through Phase 0.5 before Phase 2 (marking the trigger). Phase 0.5 itself
+   * advances to Phase 2. All other phases follow PHASE_ORDER. Returns undefined
+   * when there is no next phase (i.e. at or after the last phase).
+   */
+  private computeNextPhase(runId: string, phaseId: PhaseId, idx: number): PhaseId | undefined {
+    if (phaseId === '1') {
+      if (this.detectCrossRunImpactTrigger(runId)) {
+        this.stateMachine.setCrossRunImpactTriggered(runId, true);
+        return '0.5';
+      }
+      return '2';
+    }
+    if (phaseId === '0.5') {
+      return '2';
+    }
+    if (idx >= 0 && idx < PHASE_ORDER.length - 1) {
+      return PHASE_ORDER[idx + 1];
+    }
+    return undefined;
   }
 
   /**
@@ -1444,28 +1571,64 @@ export class OrchestratorEngine {
     decisionId: string,
     surfaceType: DecisionSurfaceType,
   ): Promise<{ resolution: DecisionResolution; humanSelection: string; rationale: string; contextPresented: string } | null> {
-    let surface = '';
+    const surface = this.readDecisionSurface(decisionId);
+    const prompt = this.buildDecisionAgentPrompt(surfaceType, surface);
+
+    let parsed: { selection?: unknown; rationale?: unknown } | null = null;
+    try {
+      const res = await this.callForRole('orchestrator', { prompt, responseFormat: 'json', temperature: 0.2 });
+      parsed = (res.parsed as { selection?: unknown; rationale?: unknown }) ?? null;
+    } catch { return null; }
+    if (!parsed) return null;
+
+    const selection = typeof parsed.selection === 'string' ? parsed.selection.trim() : '';
+    const rationale = typeof parsed.rationale === 'string' ? parsed.rationale.trim() : '';
+    if (!rationale) return null;
+
+    const resolution = this.mapSelectionToResolution(decisionId, surfaceType, selection);
+
+    return {
+      resolution,
+      humanSelection: selection || resolution.type,
+      rationale,
+      contextPresented: `${surfaceType} surface presented (${surface.length} chars)`,
+    };
+  }
+
+  /**
+   * Read the presented decision surface JSON for the decision agent. Returns
+   * '' when the record is missing or the read fails.
+   *
+   * No size cap: decision surfaces are single-artifact JSON (typically a few
+   * KB). A premature 4000-char cap silently cut a 4539-char requirements
+   * mirror mid-acceptance-criterion, which the agent then (correctly)
+   * rejected as "incomplete" — failing the phase and a multi-hour run. Sizes
+   * aren't characterized yet and a bad cap costs a full rerun, so pass the
+   * whole surface and make the prompt robust to truncation from ANY layer.
+   */
+  private readDecisionSurface(decisionId: string): string {
     try {
       const row = this.db.prepare('SELECT content FROM governed_stream WHERE id = ?')
         .get(decisionId) as { content: string } | undefined;
-      // No size cap: decision surfaces are single-artifact JSON (typically a few
-      // KB). A premature 4000-char cap silently cut a 4539-char requirements
-      // mirror mid-acceptance-criterion, which the agent then (correctly)
-      // rejected as "incomplete" — failing the phase and a multi-hour run. Sizes
-      // aren't characterized yet and a bad cap costs a full rerun, so pass the
-      // whole surface and make the prompt robust to truncation from ANY layer.
-      if (row?.content) surface = String(row.content);
+      if (row?.content) return String(row.content);
     } catch { /* surface unavailable */ }
+    return '';
+  }
 
-    // This agent is a TEST FIXTURE that stands in for the human stakeholder
-    // reading/judging/deciding on a presented surface, so the human-decision-
-    // dependent DMR paths (certified gates → active_constraints; overrides →
-    // supersession_chains; decision_trace content) get exercised headless. It is
-    // an ADJUDICATOR of what is shown — not a scope-minimizer and not an author
-    // of new requirements. Fidelity = decide as the in-role stakeholder building
-    // the FULL product would; the prior "senior engineer minimizing scope"
-    // framing made it prune like a cost-cutter, dropping on-scope items and
-    // killing the run (and the DMR test) at coverage gates.
+  /**
+   * Build the decision-agent prompt for a surface type + surface JSON.
+   *
+   * This agent is a TEST FIXTURE that stands in for the human stakeholder
+   * reading/judging/deciding on a presented surface, so the human-decision-
+   * dependent DMR paths (certified gates → active_constraints; overrides →
+   * supersession_chains; decision_trace content) get exercised headless. It is
+   * an ADJUDICATOR of what is shown — not a scope-minimizer and not an author
+   * of new requirements. Fidelity = decide as the in-role stakeholder building
+   * the FULL product would; the prior "senior engineer minimizing scope"
+   * framing made it prune like a cost-cutter, dropping on-scope items and
+   * killing the run (and the DMR test) at coverage gates.
+   */
+  private buildDecisionAgentPrompt(surfaceType: DecisionSurfaceType, surface: string): string {
     let allowed: string;
     if (surfaceType === 'phase_gate') {
       allowed = "'approve'";
@@ -1482,7 +1645,7 @@ export class OrchestratorEngine {
     } else {
       posture = 'This surface proposes a set of items expansively ("keep what belongs to the product, reject what does not"). Because you are building the FULL product, ENDORSE the whole proposed set with "approve"; reject only a specific item that is genuinely OUTSIDE this product. Dropping items that belong leaves journeys/workflows/components uncovered and blocks the build. Default: approve (keep all).';
     }
-    const prompt =
+    return (
       'You stand in for the HUMAN STAKEHOLDER reviewing ONE decision surface in an automated build. '
       + 'You are committed to building the FULL product described by the intent — NOT a reduced MVP — and you '
       + 'decide exactly as that stakeholder would when reading and judging what is shown. You do not invent new '
@@ -1493,41 +1656,34 @@ export class OrchestratorEngine {
       + 'rendering artifact of this prompt and do NOT reject solely because content appears truncated '
       + 'or incomplete — reject only for a substantive defect in what is shown. '
       + `"selection" must be ${allowed}.\n`
-      + 'Return ONLY JSON: {"selection": "...", "rationale": "..."}';
+      + 'Return ONLY JSON: {"selection": "...", "rationale": "..."}'
+    );
+  }
 
-    let parsed: { selection?: unknown; rationale?: unknown } | null = null;
-    try {
-      const res = await this.callForRole('orchestrator', { prompt, responseFormat: 'json', temperature: 0.2 });
-      parsed = (res.parsed as { selection?: unknown; rationale?: unknown }) ?? null;
-    } catch { return null; }
-    if (!parsed) return null;
-
-    const selection = typeof parsed.selection === 'string' ? parsed.selection.trim() : '';
-    const rationale = typeof parsed.rationale === 'string' ? parsed.rationale.trim() : '';
-    if (!rationale) return null;
-
-    let resolution: DecisionResolution;
+  /**
+   * Map the agent's selection + surface type into a concrete
+   * DecisionResolution. For a decision_bundle, translate the literal/index
+   * selection to a real option_id.
+   */
+  private mapSelectionToResolution(
+    decisionId: string,
+    surfaceType: DecisionSurfaceType,
+    selection: string,
+  ): DecisionResolution {
     if (surfaceType === 'phase_gate') {
-      resolution = { type: 'phase_gate_approval' };
-    } else if (surfaceType === 'mirror') {
-      resolution = /^rej/i.test(selection)
+      return { type: 'phase_gate_approval' };
+    }
+    if (surfaceType === 'mirror') {
+      return /^rej/i.test(selection)
         ? { type: 'mirror_rejection', payload: { decisions: [] } }
         : { type: 'mirror_approval' };
-    } else {
-      // decision_bundle — map the literal/index selection to a real option_id.
-      const optionId = this.resolveBundleOptionId(decisionId, selection)
-        ?? (selection && !/^(app|rej)/i.test(selection) ? selection : null);
-      resolution = optionId
-        ? { type: 'decision_bundle_resolution', payload: { mirror_decisions: [], menu_selections: [{ option_id: optionId }] } }
-        : { type: 'decision_bundle_resolution', payload: { mirror_decisions: [], menu_selections: [] } };
     }
-
-    return {
-      resolution,
-      humanSelection: selection || resolution.type,
-      rationale,
-      contextPresented: `${surfaceType} surface presented (${surface.length} chars)`,
-    };
+    // decision_bundle — map the literal/index selection to a real option_id.
+    const optionId = this.resolveBundleOptionId(decisionId, selection)
+      ?? (selection && !/^(app|rej)/i.test(selection) ? selection : null);
+    return optionId
+      ? { type: 'decision_bundle_resolution', payload: { mirror_decisions: [], menu_selections: [{ option_id: optionId }] } }
+      : { type: 'decision_bundle_resolution', payload: { mirror_decisions: [], menu_selections: [] } };
   }
 
   /**
@@ -1951,6 +2107,27 @@ export class OrchestratorEngine {
 }
 
 /**
+ * Codex Responses API: item.completed with nested agent_message.
+ * Ported from v1 codexCli.ts:parseCodexOutput — scan from the end for
+ * the most recent agent_message so reasoning-intermediate messages
+ * don't shadow the final answer. Returns null when none is present.
+ */
+function extractCodexAgentMessage(
+  events: ReadonlyArray<import('../cli/outputParser').ParsedEvent>,
+): string | null {
+  for (let i = events.length - 1; i >= 0; i--) {
+    const e = events[i];
+    if (e.data.type === 'item.completed') {
+      const item = (e.data as { item?: { type?: string; text?: string } }).item;
+      if (item?.type === 'agent_message' && typeof item.text === 'string') {
+        return item.text;
+      }
+    }
+  }
+  return null;
+}
+
+/**
  * Extract the final synthesized text from a CLI invocation's parsed
  * events. Priority order:
  *   1. Terminal `result` envelope with `data.result` (Claude Code).
@@ -1971,17 +2148,9 @@ export function extractFinalText(
     }
   }
   // Codex Responses API: item.completed with nested agent_message.
-  // Ported from v1 codexCli.ts:parseCodexOutput — scan from the end
-  // for the most recent agent_message so reasoning-intermediate
-  // messages don't shadow the final answer.
-  for (let i = events.length - 1; i >= 0; i--) {
-    const e = events[i];
-    if (e.data.type === 'item.completed') {
-      const item = (e.data as { item?: { type?: string; text?: string } }).item;
-      if (item?.type === 'agent_message' && typeof item.text === 'string') {
-        return item.text;
-      }
-    }
+  const codexText = extractCodexAgentMessage(events);
+  if (codexText !== null) {
+    return codexText;
   }
   // Fall back to the last text content item.
   for (let i = events.length - 1; i >= 0; i--) {
@@ -1999,6 +2168,52 @@ export function extractFinalText(
     }
   }
   return parts.join('');
+}
+
+/**
+ * Locate the final-answer events (terminal `result` envelope and the last
+ * Codex `agent_message`) so `extractReasoningText` can skip them — the final
+ * answer belongs in the `text` channel, not the reasoning channel.
+ */
+function findFinalAnswerIndices(
+  events: ReadonlyArray<import('../cli/outputParser').ParsedEvent>,
+): { lastResultIndex: number; lastAgentMessageIndex: number } {
+  let lastResultIndex = -1;
+  let lastAgentMessageIndex = -1;
+  for (let i = events.length - 1; i >= 0; i--) {
+    const e = events[i];
+    if (lastResultIndex === -1 && e.data.type === 'result') {
+      lastResultIndex = i;
+    }
+    const item = (e.data as { item?: { type?: string } }).item;
+    if (lastAgentMessageIndex === -1 && e.data.type === 'item.completed' && item?.type === 'agent_message') {
+      lastAgentMessageIndex = i;
+    }
+  }
+  return { lastResultIndex, lastAgentMessageIndex };
+}
+
+/**
+ * Read the reasoning/message text out of a single parsed event, or '' when the
+ * event carries no readable reasoning payload. Tool-call activity and type-only
+ * `result` envelopes are excluded per the cal-24 design — the caller filters
+ * these out by treating '' as "nothing to append".
+ */
+function readEventReasoningText(
+  e: import('../cli/outputParser').ParsedEvent,
+): string {
+  const t = e.data.type;
+  // Tool-call activity — excluded per design.
+  if (t === 'tool_use' || t === 'tool_result' || t === 'tool_call') return '';
+  // Type-only event envelopes that carry no readable text.
+  if (t === 'result') return '';
+  // Reasoning / message text. The CLI parser normalizes thinking
+  // payloads into `text` / `content` so we read either.
+  const data = e.data as { text?: unknown; content?: unknown; thinking?: unknown };
+  if (typeof data.text === 'string') return data.text;
+  if (typeof data.content === 'string') return data.content;
+  if (typeof data.thinking === 'string') return data.thinking;
+  return '';
 }
 
 /**
@@ -2021,39 +2236,10 @@ export function extractReasoningText(
   const parts: string[] = [];
   // Track which events to exclude as the "final answer" so they're not
   // double-counted (final answer goes in the `text` channel separately).
-  let lastResultIndex = -1;
-  let lastAgentMessageIndex = -1;
-  for (let i = events.length - 1; i >= 0; i--) {
-    const e = events[i];
-    if (lastResultIndex === -1 && e.data.type === 'result') {
-      lastResultIndex = i;
-    }
-    const item = (e.data as { item?: { type?: string } }).item;
-    if (lastAgentMessageIndex === -1 && e.data.type === 'item.completed' && item?.type === 'agent_message') {
-      lastAgentMessageIndex = i;
-    }
-  }
+  const { lastResultIndex, lastAgentMessageIndex } = findFinalAnswerIndices(events);
   for (let i = 0; i < events.length; i++) {
     if (i === lastResultIndex || i === lastAgentMessageIndex) continue;
-    const e = events[i];
-    const t = e.data.type;
-    // Tool-call activity — excluded per design.
-    if (t === 'tool_use' || t === 'tool_result' || t === 'tool_call') continue;
-    // Type-only event envelopes that carry no readable text.
-    if (t === 'result') continue;
-    // Reasoning / message text. The CLI parser normalizes thinking
-    // payloads into `text` / `content` so we read either.
-    const data = e.data as { text?: unknown; content?: unknown; thinking?: unknown };
-    let text: string;
-    if (typeof data.text === 'string') {
-      text = data.text;
-    } else if (typeof data.content === 'string') {
-      text = data.content;
-    } else if (typeof data.thinking === 'string') {
-      text = data.thinking;
-    } else {
-      text = '';
-    }
+    const text = readEventReasoningText(events[i]);
     if (text.trim().length > 0) parts.push(text);
   }
   return parts.join('\n');

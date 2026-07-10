@@ -200,5 +200,84 @@ describe('MockLLMProvider — phase-organized fixture corpus', () => {
       const contents = JSON.parse(fs.readFileSync(preexisting, 'utf-8')) as { match: string };
       expect(contents.match).toBe('New');
     });
+
+    // --- Characterization: branches not covered by the routing/overwrite
+    // tests above, pinned before a cognitive-complexity refactor. ---
+
+    it('appends a _N sequence suffix when captures share a base key', async () => {
+      const provider = new MockLLMProvider();
+      seedCapture(provider, 'orchestrator__1_0__01', '1.0');
+      seedCapture(provider, 'orchestrator__1_0__01', '1.0');
+
+      const saved = await provider.saveCapturedFixtures(tmp, 'dev');
+      const paths = saved.map((p) => path.relative(tmp, p).replace(/\\/g, '/'));
+      expect(paths).toContain('phase_01/orchestrator__1_0__01_1.json');
+      expect(paths).toContain('phase_01/orchestrator__1_0__01_2.json');
+      // The single-capture case keeps the bare key (no suffix).
+      expect(paths).not.toContain('phase_01/orchestrator__1_0__01.json');
+    });
+
+    it('writes prompt/request/response probe artifacts and omits thinking/parsed when absent', async () => {
+      const provider = new MockLLMProvider();
+      seedCapture(provider, 'orchestrator__1_0__01', '1.0');
+
+      await provider.saveCapturedFixtures(tmp, 'dev');
+      const probeDir = path.join(tmp, 'phase_01', 'orchestrator__1_0__01');
+      expect(fs.existsSync(path.join(probeDir, 'prompt.txt'))).toBe(true);
+      expect(fs.existsSync(path.join(probeDir, 'request.json'))).toBe(true);
+      expect(fs.existsSync(path.join(probeDir, 'response.json'))).toBe(true);
+      // Seeded result has no thinking chain and parsed: null → omitted.
+      expect(fs.existsSync(path.join(probeDir, 'thinking.txt'))).toBe(false);
+      expect(fs.existsSync(path.join(probeDir, 'parsed.json'))).toBe(false);
+      // Prompt probe carries the rendered prompt verbatim.
+      expect(fs.readFileSync(path.join(probeDir, 'prompt.txt'), 'utf-8')).toBe('test prompt');
+    });
+
+    it('writes thinking.txt and parsed.json probe artifacts when the result carries them', async () => {
+      const provider = new MockLLMProvider();
+      const options: LLMCallOptions = {
+        provider: 'llamacpp',
+        model: 'qwen3.5:9b',
+        prompt: 'test prompt',
+        traceContext: {
+          workflowRunId: 'run-1',
+          phaseId: '1',
+          subPhaseId: '1.0',
+          agentRole: 'orchestrator',
+          label: 'test',
+        },
+      };
+      const result: LLMCallResult = {
+        text: 'captured output',
+        parsed: { answer: 42 },
+        thinking: 'chain of thought',
+        toolCalls: [],
+        provider: 'llamacpp',
+        model: 'qwen3.5:9b',
+        inputTokens: 1,
+        outputTokens: 2,
+        usedFallback: false,
+        retryAttempts: 0,
+      };
+      (provider as unknown as {
+        capturedCalls: Array<{ options: LLMCallOptions; result: LLMCallResult; fixture: { match: string; key: string }; timestamp: number }>;
+      }).capturedCalls.push({ options, result, fixture: { match: 'm', key: 'orchestrator__1_0__01' }, timestamp: Date.now() });
+
+      await provider.saveCapturedFixtures(tmp, 'dev');
+      const probeDir = path.join(tmp, 'phase_01', 'orchestrator__1_0__01');
+      expect(fs.existsSync(path.join(probeDir, 'thinking.txt'))).toBe(true);
+      expect(fs.existsSync(path.join(probeDir, 'parsed.json'))).toBe(true);
+      expect(fs.readFileSync(path.join(probeDir, 'thinking.txt'), 'utf-8')).toBe('chain of thought');
+      const parsed = JSON.parse(fs.readFileSync(path.join(probeDir, 'parsed.json'), 'utf-8')) as { answer: number };
+      expect(parsed.answer).toBe(42);
+      // Enriched fixture JSON reflects the captured provider/model/text.
+      const fixtureJson = JSON.parse(
+        fs.readFileSync(path.join(tmp, 'phase_01', 'orchestrator__1_0__01.json'), 'utf-8'),
+      ) as { llm_provider: string; llm_model: string; text: string; janumicode_version_sha: string };
+      expect(fixtureJson.llm_provider).toBe('llamacpp');
+      expect(fixtureJson.llm_model).toBe('qwen3.5:9b');
+      expect(fixtureJson.text).toBe('captured output');
+      expect(fixtureJson.janumicode_version_sha).toBe('dev');
+    });
   });
 });

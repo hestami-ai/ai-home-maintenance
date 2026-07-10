@@ -1417,7 +1417,7 @@ export interface PacketTask {
   name: string;
   description: string;
   task_type: string;
-  estimated_complexity: 'low' | 'medium' | 'high' | string;
+  estimated_complexity: 'low' | 'medium' | 'high' | (string & {});
   completion_criteria: Array<{
     criterion_id: string;
     description: string;

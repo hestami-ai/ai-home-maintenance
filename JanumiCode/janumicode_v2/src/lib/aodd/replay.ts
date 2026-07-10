@@ -102,41 +102,49 @@ export function listRuns(workspaceRoot: string): RunInfo[] {
   for (const entry of fs.readdirSync(root)) {
     const aodd = aoddDir(workspaceRoot, entry);
     if (!fs.existsSync(aodd)) continue;
-    let info: RunInfo;
-    const idxFile = indexPath(workspaceRoot, entry);
-    if (fs.existsSync(idxFile)) {
-      try {
-        const idx = JSON.parse(fs.readFileSync(idxFile, 'utf8')) as {
-          started_at?: string;
-          completed_at?: string;
-          status?: RunInfo['status'];
-        };
-        const startedMs = idx.started_at ? Date.parse(idx.started_at) : Number.NaN;
-        const completedMs = idx.completed_at ? Date.parse(idx.completed_at) : Number.NaN;
-        const duration_ms =
-          Number.isFinite(startedMs) && Number.isFinite(completedMs)
-            ? Math.max(0, completedMs - startedMs)
-            : null;
-        info = {
-          run_id: entry,
-          started_at: idx.started_at ?? '',
-          completed_at: idx.completed_at ?? null,
-          status: idx.status ?? 'in_progress',
-          duration_ms,
-          has_keep: fs.existsSync(path.join(aodd, '.keep')),
-        };
-      } catch {
-        info = fallbackRunInfo(workspaceRoot, entry, aodd);
-      }
-    } else {
-      info = fallbackRunInfo(workspaceRoot, entry, aodd);
-    }
-    out.push(info);
+    out.push(runInfoForEntry(workspaceRoot, entry, aodd));
   }
   // Newest first. Use started_at if present; otherwise empty string sorts
   // to the bottom.
   out.sort((a, b) => (a.started_at < b.started_at ? 1 : -1));
   return out;
+}
+
+/**
+ * Build the {@link RunInfo} for a single run directory entry. Reads the
+ * run's index.json when present; falls back to directory mtime on a
+ * missing or malformed index.
+ */
+function runInfoForEntry(
+  workspaceRoot: string,
+  entry: string,
+  aodd: string,
+): RunInfo {
+  const idxFile = indexPath(workspaceRoot, entry);
+  if (!fs.existsSync(idxFile)) return fallbackRunInfo(workspaceRoot, entry, aodd);
+  try {
+    const idx = JSON.parse(fs.readFileSync(idxFile, 'utf8')) as {
+      started_at?: string;
+      completed_at?: string;
+      status?: RunInfo['status'];
+    };
+    const startedMs = idx.started_at ? Date.parse(idx.started_at) : Number.NaN;
+    const completedMs = idx.completed_at ? Date.parse(idx.completed_at) : Number.NaN;
+    const duration_ms =
+      Number.isFinite(startedMs) && Number.isFinite(completedMs)
+        ? Math.max(0, completedMs - startedMs)
+        : null;
+    return {
+      run_id: entry,
+      started_at: idx.started_at ?? '',
+      completed_at: idx.completed_at ?? null,
+      status: idx.status ?? 'in_progress',
+      duration_ms,
+      has_keep: fs.existsSync(path.join(aodd, '.keep')),
+    };
+  } catch {
+    return fallbackRunInfo(workspaceRoot, entry, aodd);
+  }
 }
 
 function fallbackRunInfo(
@@ -233,16 +241,26 @@ export function listSubPhaseSummaries(
     }
     const phaseDir = path.join(summariesDir, entry);
     if (!fs.statSync(phaseDir).isDirectory()) continue;
-    for (const file of fs.readdirSync(phaseDir)) {
-      if (!file.endsWith('.summary.json')) continue;
-      try {
-        const s = JSON.parse(
-          fs.readFileSync(path.join(phaseDir, file), 'utf8'),
-        ) as SubPhaseSummary;
-        out.push(s);
-      } catch {
-        // skip malformed
-      }
+    out.push(...readPhaseDirSummaries(phaseDir));
+  }
+  return out;
+}
+
+/**
+ * Read every `*.summary.json` in a single phase directory, skipping
+ * malformed files. Preserves directory read order.
+ */
+function readPhaseDirSummaries(phaseDir: string): SubPhaseSummary[] {
+  const out: SubPhaseSummary[] = [];
+  for (const file of fs.readdirSync(phaseDir)) {
+    if (!file.endsWith('.summary.json')) continue;
+    try {
+      const s = JSON.parse(
+        fs.readFileSync(path.join(phaseDir, file), 'utf8'),
+      ) as SubPhaseSummary;
+      out.push(s);
+    } catch {
+      // skip malformed
     }
   }
   return out;

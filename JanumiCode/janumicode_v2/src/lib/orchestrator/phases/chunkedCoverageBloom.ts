@@ -85,6 +85,161 @@ export interface ChunkedCoverageBloomResult<TProduced> {
   residual: Set<string>;
 }
 
+type BloomLog = ReturnType<typeof getLogger>;
+
+/**
+ * Append items not already `seen` (by `idOf`) to `produced`; return how many
+ * were newly added. Mutates `produced` and `seen` in place. An empty id ('')
+ * opts an item out of dedup (always kept). Extracted verbatim from the former
+ * inner `pushUnique` closure.
+ */
+function pushUniqueProduced<TProduced>(
+  items: TProduced[],
+  produced: TProduced[],
+  seen: Set<string>,
+  idOf: (produced: TProduced) => string,
+): number {
+  let added = 0;
+  for (const item of items) {
+    const id = idOf(item);
+    if (id && seen.has(id)) continue; // dedup across chunks + passes
+    if (id) seen.add(id);
+    produced.push(item);
+    added++;
+  }
+  return added;
+}
+
+/** Recompute the still-uncovered target ids from everything produced so far. */
+function computeUncoveredTargets<TChunk, TProduced>(
+  cfg: ChunkedCoverageBloomConfig<TChunk, TProduced>,
+  produced: TProduced[],
+): Set<string> {
+  if (cfg.targetCoverageSet.size === 0) return new Set<string>();
+  const remaining = new Set(cfg.targetCoverageSet);
+  for (const item of produced) {
+    for (const id of cfg.coveredBy(item)) {
+      remaining.delete(id);
+    }
+  }
+  return remaining;
+}
+
+/** Per-chunk generation: ONE bounded call per primary item (SEQUENTIAL). */
+async function runPerChunkGeneration<TChunk, TProduced>(
+  cfg: ChunkedCoverageBloomConfig<TChunk, TProduced>,
+  produced: TProduced[],
+  seen: Set<string>,
+  log: BloomLog,
+): Promise<void> {
+  for (let i = 0; i < cfg.chunks.length; i++) {
+    try {
+      const items = await cfg.generateForChunk(cfg.chunks[i], i);
+      pushUniqueProduced(items, produced, seen, cfg.idOf);
+    } catch (err) {
+      // A single chunk's failure must not sink the bloom — the reconciliation
+      // pass below recovers any targets it would have covered.
+      log.warn('workflow', `${cfg.logLabel} per-chunk generation failed — continuing`, {
+        chunk_index: i, error: err instanceof Error ? err.message : String(err),
+      });
+    }
+  }
+}
+
+/** Coverage-driven reconciliation is only possible with a non-empty target set,
+ *  a positive pass budget, and BOTH reconciliation callbacks supplied. */
+function canReconcile<TChunk, TProduced>(
+  cfg: ChunkedCoverageBloomConfig<TChunk, TProduced>,
+): boolean {
+  return cfg.targetCoverageSet.size > 0
+    && cfg.maxReconPasses > 0
+    && !!cfg.chunkUncovered
+    && !!cfg.reconcileBatch;
+}
+
+/** Robust crediting: keep only recon items that cover a still-uncovered target
+ *  in THIS batch (matches P6.1 taskCoversAny). */
+function filterBatchCovering<TProduced>(
+  reconItems: TProduced[],
+  batch: Set<string>,
+  coveredBy: (produced: TProduced) => Iterable<string>,
+): TProduced[] {
+  return reconItems.filter((item) => {
+    for (const id of coveredBy(item)) {
+      if (batch.has(id)) return true;
+    }
+    return false;
+  });
+}
+
+/** One reconciliation batch: generate → credit only batch-intersecting items →
+ *  merge. Returns how many items were newly added to `produced`. */
+async function runReconciliationBatch<TChunk, TProduced>(
+  cfg: ChunkedCoverageBloomConfig<TChunk, TProduced>,
+  produced: TProduced[],
+  seen: Set<string>,
+  log: BloomLog,
+  batch: Set<string>,
+  passInfo: { pass: number; batchIndex: number; batchCount: number },
+): Promise<number> {
+  let reconItems: TProduced[] = [];
+  try {
+    reconItems = await cfg.reconcileBatch!(batch, passInfo);
+  } catch (err) {
+    log.warn('workflow', `${cfg.logLabel} reconciliation batch failed — continuing`, {
+      pass: passInfo.pass, batch_index: passInfo.batchIndex,
+      error: err instanceof Error ? err.message : String(err),
+    });
+  }
+  const useful = filterBatchCovering(reconItems, batch, cfg.coveredBy);
+  return pushUniqueProduced(useful, produced, seen, cfg.idOf);
+}
+
+/** Coverage-driven reconciliation: the orchestrator owns the 100% guarantee. */
+async function runReconciliation<TChunk, TProduced>(
+  cfg: ChunkedCoverageBloomConfig<TChunk, TProduced>,
+  produced: TProduced[],
+  seen: Set<string>,
+  log: BloomLog,
+): Promise<void> {
+  for (let pass = 1; pass <= cfg.maxReconPasses; pass++) {
+    const uncovered = computeUncoveredTargets(cfg, produced);
+    if (uncovered.size === 0) break;
+    const batches = cfg.chunkUncovered!(uncovered);
+    log.info('workflow', `${cfg.logLabel} reconciliation pass — covering orphan targets in bounded batches`, {
+      pass, uncovered: uncovered.size, total: cfg.targetCoverageSet.size, batches: batches.length,
+    });
+    let addedThisPass = 0;
+    for (let b = 0; b < batches.length; b++) {
+      addedThisPass += await runReconciliationBatch(
+        cfg, produced, seen, log,
+        batches[b], { pass, batchIndex: b + 1, batchCount: batches.length },
+      );
+    }
+    if (addedThisPass === 0) break; // whole pass made no forward progress → stop (residual logged)
+  }
+}
+
+/** Honest residual reporter — NO fabrication. Emits onResidual + a warn when
+ *  targets remain, else a completion info when the target set was non-empty. */
+function reportResidual<TChunk, TProduced>(
+  cfg: ChunkedCoverageBloomConfig<TChunk, TProduced>,
+  produced: TProduced[],
+  residual: Set<string>,
+  log: BloomLog,
+): void {
+  if (residual.size > 0) {
+    cfg.onResidual?.(residual);
+    log.warn('workflow', `${cfg.logLabel} residual uncovered targets after reconciliation (honest gap — not fabricated)`, {
+      residual: residual.size, total: cfg.targetCoverageSet.size,
+    });
+  } else if (cfg.targetCoverageSet.size > 0) {
+    log.info('workflow', `${cfg.logLabel} coverage complete (100%)`, {
+      total: cfg.targetCoverageSet.size, produced: produced.length,
+    });
+  }
+}
+
 /**
  * Run the chunked-coverage bloom. Pure orchestration — all LLM/template/parse
  * work lives in the injected callbacks. A faithful generalization of
@@ -97,95 +252,17 @@ export async function chunkedCoverageBloom<TChunk, TProduced>(
   const produced: TProduced[] = [];
   const seen = new Set<string>();
 
-  const pushUnique = (items: TProduced[]): number => {
-    let added = 0;
-    for (const item of items) {
-      const id = cfg.idOf(item);
-      if (id && seen.has(id)) continue; // dedup across chunks + passes
-      if (id) seen.add(id);
-      produced.push(item);
-      added++;
-    }
-    return added;
-  };
-
-  // Recompute the still-uncovered target ids from everything produced so far.
-  const computeUncovered = (): Set<string> => {
-    if (cfg.targetCoverageSet.size === 0) return new Set<string>();
-    const remaining = new Set(cfg.targetCoverageSet);
-    for (const item of produced) {
-      for (const id of cfg.coveredBy(item)) {
-        remaining.delete(id);
-      }
-    }
-    return remaining;
-  };
-
   // ── Per-chunk generation: ONE bounded call per primary item (SEQUENTIAL) ──
-  for (let i = 0; i < cfg.chunks.length; i++) {
-    try {
-      const items = await cfg.generateForChunk(cfg.chunks[i], i);
-      pushUnique(items);
-    } catch (err) {
-      // A single chunk's failure must not sink the bloom — the reconciliation
-      // pass below recovers any targets it would have covered.
-      log.warn('workflow', `${cfg.logLabel} per-chunk generation failed — continuing`, {
-        chunk_index: i, error: err instanceof Error ? err.message : String(err),
-      });
-    }
-  }
+  await runPerChunkGeneration(cfg, produced, seen, log);
 
   // ── Coverage-driven reconciliation: the orchestrator owns the 100% guarantee ──
-  const canReconcile = cfg.targetCoverageSet.size > 0
-    && cfg.maxReconPasses > 0
-    && !!cfg.chunkUncovered
-    && !!cfg.reconcileBatch;
-
-  if (canReconcile) {
-    for (let pass = 1; pass <= cfg.maxReconPasses; pass++) {
-      const uncovered = computeUncovered();
-      if (uncovered.size === 0) break;
-      const batches = cfg.chunkUncovered!(uncovered);
-      log.info('workflow', `${cfg.logLabel} reconciliation pass — covering orphan targets in bounded batches`, {
-        pass, uncovered: uncovered.size, total: cfg.targetCoverageSet.size, batches: batches.length,
-      });
-      let addedThisPass = 0;
-      for (let b = 0; b < batches.length; b++) {
-        const batch = batches[b];
-        let reconItems: TProduced[] = [];
-        try {
-          reconItems = await cfg.reconcileBatch!(batch, { pass, batchIndex: b + 1, batchCount: batches.length });
-        } catch (err) {
-          log.warn('workflow', `${cfg.logLabel} reconciliation batch failed — continuing`, {
-            pass, batch_index: b + 1, error: err instanceof Error ? err.message : String(err),
-          });
-        }
-        // Robust crediting: accept a recon item only if it covers a
-        // still-uncovered target in THIS batch (matches P6.1 taskCoversAny).
-        const useful = reconItems.filter((item) => {
-          for (const id of cfg.coveredBy(item)) {
-            if (batch.has(id)) return true;
-          }
-          return false;
-        });
-        addedThisPass += pushUnique(useful);
-      }
-      if (addedThisPass === 0) break; // whole pass made no forward progress → stop (residual logged)
-    }
+  if (canReconcile(cfg)) {
+    await runReconciliation(cfg, produced, seen, log);
   }
 
   // ── Honest residual — NO fabrication ──
-  const residual = computeUncovered();
-  if (residual.size > 0) {
-    cfg.onResidual?.(residual);
-    log.warn('workflow', `${cfg.logLabel} residual uncovered targets after reconciliation (honest gap — not fabricated)`, {
-      residual: residual.size, total: cfg.targetCoverageSet.size,
-    });
-  } else if (cfg.targetCoverageSet.size > 0) {
-    log.info('workflow', `${cfg.logLabel} coverage complete (100%)`, {
-      total: cfg.targetCoverageSet.size, produced: produced.length,
-    });
-  }
+  const residual = computeUncoveredTargets(cfg, produced);
+  reportResidual(cfg, produced, residual, log);
 
   const total = cfg.targetCoverageSet.size;
   const coveragePct = total === 0 ? 100 : Math.round(((total - residual.size) / total) * 100);

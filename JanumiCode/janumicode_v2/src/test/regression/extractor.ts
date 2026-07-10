@@ -452,6 +452,74 @@ function tokenizeTemplate(body: string): TemplateSegment[] {
 }
 
 /**
+ * Capture the value of the placeholder that immediately precedes a
+ * literal segment: everything in `rendered` between `pos` (end of the
+ * previous anchor) and `idx` (start of this literal). When the
+ * placeholder already carries a *different* recovered value, first
+ * occurrence wins and a warning string is returned without overwriting;
+ * otherwise the value is recorded in `vars` and `undefined` is returned.
+ */
+function capturePrecedingPlaceholder(
+  placeholder: TemplateSegment,
+  rendered: string,
+  pos: number,
+  idx: number,
+  vars: Record<string, string>,
+): string | undefined {
+  const value = rendered.slice(pos, idx);
+  const existing = vars[placeholder.value];
+  if (existing !== undefined && existing !== value) {
+    return `variable "${placeholder.value}" appears multiple times with differing extracted values; using first.`;
+  }
+  vars[placeholder.value] = value;
+  return undefined;
+}
+
+/**
+ * Anchor literal `segments[i]` in the rendered prompt at or after `pos`.
+ * On success returns the new cursor position and any warning raised while
+ * capturing the placeholder preceding this literal; returns an error when
+ * the literal cannot be located.
+ */
+function anchorLiteralSegment(
+  rendered: string,
+  segments: TemplateSegment[],
+  i: number,
+  pos: number,
+  vars: Record<string, string>,
+): { pos: number; warning?: string } | { error: string } {
+  const seg = segments[i];
+  const idx = rendered.indexOf(seg.value, pos);
+  if (idx === -1) {
+    return {
+      error: `template literal segment not found in rendered prompt; segment[${i}] preview: "${seg.value.slice(0, 80).replace(/\n/g, '\\n')}"`,
+    };
+  }
+  let warning: string | undefined;
+  if (i > 0 && segments[i - 1].kind === 'placeholder') {
+    warning = capturePrecedingPlaceholder(segments[i - 1], rendered, pos, idx, vars);
+  }
+  return { pos: idx + seg.value.length, warning };
+}
+
+/**
+ * Capture a trailing placeholder (template ends with a placeholder):
+ * everything from `pos` to the end of the rendered prompt, recorded only
+ * if the variable is not already present (first occurrence wins). Returns
+ * the new cursor position (end of prompt).
+ */
+function captureTrailingPlaceholder(
+  seg: TemplateSegment,
+  rendered: string,
+  pos: number,
+  vars: Record<string, string>,
+): number {
+  const value = rendered.slice(pos);
+  if (vars[seg.value] === undefined) vars[seg.value] = value;
+  return rendered.length;
+}
+
+/**
  * Walk the rendered prompt using the template's segment structure,
  * extracting each variable's value. Returns null on alignment failure.
  */
@@ -470,28 +538,13 @@ export function recoverVariables(
   for (let i = 0; i < segments.length; i++) {
     const seg = segments[i];
     if (seg.kind === 'literal') {
-      const idx = rendered.indexOf(seg.value, pos);
-      if (idx === -1) {
-        return {
-          error: `template literal segment not found in rendered prompt; segment[${i}] preview: "${seg.value.slice(0, 80).replace(/\n/g, '\\n')}"`,
-        };
-      }
-      if (i > 0 && segments[i - 1].kind === 'placeholder') {
-        const placeholder = segments[i - 1];
-        const value = rendered.slice(pos, idx);
-        const existing = vars[placeholder.value];
-        if (existing !== undefined && existing !== value) {
-          warning = `variable "${placeholder.value}" appears multiple times with differing extracted values; using first.`;
-        } else {
-          vars[placeholder.value] = value;
-        }
-      }
-      pos = idx + seg.value.length;
+      const anchored = anchorLiteralSegment(rendered, segments, i, pos, vars);
+      if ('error' in anchored) return anchored;
+      if (anchored.warning) warning = anchored.warning;
+      pos = anchored.pos;
     } else if (i === segments.length - 1) {
       // Template ends with a placeholder — everything from cursor to end.
-      const value = rendered.slice(pos);
-      if (vars[seg.value] === undefined) vars[seg.value] = value;
-      pos = rendered.length;
+      pos = captureTrailingPlaceholder(seg, rendered, pos, vars);
     }
   }
 
@@ -572,6 +625,186 @@ function findOutput(db: Database.Database, invocationId: string): OutputRow | nu
 
 // ── Main extract ────────────────────────────────────────────────────
 
+/** Skip entry recorded against a producer that did not yield a fixture. */
+interface SkipEntry {
+  reason: string;
+  sub_phase: string;
+}
+
+/** Outcome of processing a single producer: one fixture written, or a skip. */
+type ProducerOutcome =
+  | { kind: 'written'; path: string }
+  | { kind: 'skipped'; entry: SkipEntry };
+
+/** Subset of an agent_invocation's parsed content that a fixture reads. */
+interface InvocationContentLike {
+  provider?: string;
+  model?: string;
+  temperature?: number;
+  response_format?: 'json' | 'text';
+  system?: string;
+  prompt?: string;
+}
+
+/** Subset of an agent_output's parsed content that a fixture reads. */
+interface OutputContentLike {
+  text?: string;
+  duration_ms?: number;
+  thinking?: string;
+}
+
+/** Human-readable message for a caught unknown throwable. */
+function describeUnexpectedError(err: unknown): string {
+  return err instanceof Error ? err.message : String(err);
+}
+
+/**
+ * Default any declared required variable that recovery did not produce to
+ * the empty string. Mutates `vars` in place (matching the original inline
+ * loop). `janumicode_version_sha` is the common example — declared in
+ * frontmatter but never referenced in the rendered body.
+ */
+function fillMissingRequiredVariables(
+  vars: Record<string, string>,
+  requiredVariables: string[],
+): void {
+  for (const req of requiredVariables) {
+    if (!(req in vars)) vars[req] = '';
+  }
+}
+
+/**
+ * Assemble a Fixture from a matched (invocation, output) pair and the
+ * recovered template variables. Pure transformation — no I/O — so it is
+ * unit-tested directly (see extractor.test.ts).
+ */
+export function buildFixtureFromRecords(input: {
+  producer: ProducerSpec;
+  workflowRunId: string;
+  dbPath: string;
+  sampleSlug: string;
+  invocationContent: InvocationContentLike;
+  outputContent: OutputContentLike;
+  vars: Record<string, string>;
+  usesSeparateUserMessage: boolean;
+  invocationPrompt: string;
+}): Fixture {
+  const {
+    producer, workflowRunId, dbPath, sampleSlug,
+    invocationContent, outputContent, vars,
+    usesSeparateUserMessage, invocationPrompt,
+  } = input;
+  return {
+    fixture_id: `${producer.fixture_prefix}__${sampleSlug}`,
+    description: producer.description,
+    extracted_from_run: workflowRunId,
+    extracted_from_db: dbPath.replace(/\\/g, '/'),
+    extracted_at: new Date().toISOString(),
+    template_ref: {
+      agent_role: producer.agent_role,
+      sub_phase: producer.sub_phase,
+      ...(producer.lens ? { lens: producer.lens } : {}),
+    },
+    invocation_params: {
+      provider: invocationContent.provider ?? 'ollama',
+      model: invocationContent.model ?? 'qwen3.5:9b',
+      temperature: invocationContent.temperature ?? 0.4,
+      response_format: invocationContent.response_format ?? 'json',
+    },
+    template_variables: vars,
+    ...(usesSeparateUserMessage ? { user_message: invocationPrompt } : {}),
+    baseline: {
+      response_text: outputContent.text ?? '',
+      parsed_json: tryParse(outputContent.text ?? ''),
+      duration_ms: outputContent.duration_ms ?? 0,
+      thinking: outputContent.thinking ?? undefined,
+    },
+    assertions: assertionsFor(producer.sub_phase),
+  };
+}
+
+/**
+ * Process a single producer: template lookup → invocation match → output
+ * match → variable recovery → fixture build → schema validation → file
+ * write. Short-circuits to a skip outcome at the first failed
+ * precondition. This is one iteration of the original extract() loop body
+ * with `continue`s rewritten as early `return`s.
+ */
+function extractOneProducer(
+  db: Database.Database,
+  loader: ReturnType<typeof getTemplateLoader>,
+  workflowRunId: string,
+  producer: ProducerSpec,
+  opts: ExtractOptions,
+  outDir: string,
+  sampleSlug: string,
+): ProducerOutcome {
+  const skip = (reason: string): ProducerOutcome => ({
+    kind: 'skipped',
+    entry: { reason, sub_phase: producer.sub_phase },
+  });
+
+  const tpl = loader.findTemplate(producer.agent_role, producer.sub_phase, producer.lens);
+  if (!tpl) {
+    const lensSuffix = producer.lens ? ` lens=${producer.lens}` : '';
+    return skip(`no template found for agent_role=${producer.agent_role} sub_phase=${producer.sub_phase}${lensSuffix}`);
+  }
+
+  const invocation = findInvocation(db, workflowRunId, producer);
+  if (!invocation) {
+    return skip(`no matching agent_invocation in run ${workflowRunId}`);
+  }
+  const invocationContent = JSON.parse(invocation.content);
+
+  const output = findOutput(db, invocation.id);
+  if (!output) {
+    return skip(`no agent_output found for invocation ${invocation.id}`);
+  }
+  const outputContent = JSON.parse(output.content);
+
+  // makeLLMValidator templates: invocation records BOTH `system`
+  // (rendered template) and `prompt` (audit material). For these,
+  // align against the rendered system and capture prompt as
+  // user_message. Standard producers store only `prompt` (which IS
+  // the rendered template).
+  const invocationSystem: string = invocationContent.system ?? '';
+  const invocationPrompt: string = invocationContent.prompt ?? '';
+  const usesSeparateUserMessage = invocationSystem.length > 0;
+  const alignmentTarget = usesSeparateUserMessage ? invocationSystem : invocationPrompt;
+  const varResult = recoverVariablesWithFallback(tpl.body, alignmentTarget, producer);
+  if ('error' in varResult) {
+    return skip(varResult.error);
+  }
+  const vars = varResult.vars;
+  // Ensure all required variables present (default missing to '').
+  fillMissingRequiredVariables(vars, tpl.metadata.required_variables);
+
+  const fixture: Fixture = buildFixtureFromRecords({
+    producer,
+    workflowRunId,
+    dbPath: opts.dbPath,
+    sampleSlug,
+    invocationContent,
+    outputContent,
+    vars,
+    usesSeparateUserMessage,
+    invocationPrompt,
+  });
+
+  const validated = FixtureSchema.safeParse(fixture);
+  if (!validated.success) {
+    const issues = validated.error.issues.map((i) => `${i.path.join('.')}: ${i.message}`).join('; ');
+    return skip(`fixture validation failed: ${issues}`);
+  }
+
+  const outPath = join(outDir, `${fixture.fixture_id}.fixture.json`);
+  if (existsSync(outPath) && !opts.overwrite) {
+    return skip(`fixture file already exists at ${outPath} (use --overwrite)`);
+  }
+  writeFileSync(outPath, JSON.stringify(validated.data, null, 2) + '\n', 'utf-8');
+  return { kind: 'written', path: outPath };
+}
+
 export async function extract(opts: ExtractOptions): Promise<ExtractResult> {
   const outDir = opts.outputDir ?? FIXTURE_DIR;
   if (!existsSync(outDir)) mkdirSync(outDir, { recursive: true });
@@ -588,93 +821,19 @@ export async function extract(opts: ExtractOptions): Promise<ExtractResult> {
     : PRODUCERS;
 
   const written: string[] = [];
-  const skipped: { reason: string; sub_phase: string }[] = [];
+  const skipped: SkipEntry[] = [];
 
   for (const producer of producers) {
     try {
-      const tpl = loader.findTemplate(producer.agent_role, producer.sub_phase, producer.lens);
-      if (!tpl) {
-        skipped.push({ reason: `no template found for agent_role=${producer.agent_role} sub_phase=${producer.sub_phase}${producer.lens ? ` lens=${producer.lens}` : ''}`, sub_phase: producer.sub_phase });
-        continue;
+      const outcome = extractOneProducer(db, loader, workflowRunId, producer, opts, outDir, sampleSlug);
+      if (outcome.kind === 'written') {
+        written.push(outcome.path);
+      } else {
+        skipped.push(outcome.entry);
       }
-      const invocation = findInvocation(db, workflowRunId, producer);
-      if (!invocation) {
-        skipped.push({ reason: `no matching agent_invocation in run ${workflowRunId}`, sub_phase: producer.sub_phase });
-        continue;
-      }
-      const invocationContent = JSON.parse(invocation.content);
-      const output = findOutput(db, invocation.id);
-      if (!output) {
-        skipped.push({ reason: `no agent_output found for invocation ${invocation.id}`, sub_phase: producer.sub_phase });
-        continue;
-      }
-      const outputContent = JSON.parse(output.content);
-
-      // makeLLMValidator templates: invocation records BOTH `system`
-      // (rendered template) and `prompt` (audit material). For these,
-      // align against the rendered system and capture prompt as
-      // user_message. Standard producers store only `prompt` (which IS
-      // the rendered template).
-      const invocationSystem: string = invocationContent.system ?? '';
-      const invocationPrompt: string = invocationContent.prompt ?? '';
-      const usesSeparateUserMessage = invocationSystem.length > 0;
-      const alignmentTarget = usesSeparateUserMessage ? invocationSystem : invocationPrompt;
-      const varResult = recoverVariablesWithFallback(tpl.body, alignmentTarget, producer);
-      if ('error' in varResult) {
-        skipped.push({ reason: varResult.error, sub_phase: producer.sub_phase });
-        continue;
-      }
-      const vars = varResult.vars;
-      // Ensure all required variables present (default missing to '').
-      for (const req of tpl.metadata.required_variables) {
-        if (!(req in vars)) vars[req] = '';
-      }
-
-      const fixture: Fixture = {
-        fixture_id: `${producer.fixture_prefix}__${sampleSlug}`,
-        description: producer.description,
-        extracted_from_run: workflowRunId,
-        extracted_from_db: opts.dbPath.replace(/\\/g, '/'),
-        extracted_at: new Date().toISOString(),
-        template_ref: {
-          agent_role: producer.agent_role,
-          sub_phase: producer.sub_phase,
-          ...(producer.lens ? { lens: producer.lens } : {}),
-        },
-        invocation_params: {
-          provider: invocationContent.provider ?? 'ollama',
-          model: invocationContent.model ?? 'qwen3.5:9b',
-          temperature: invocationContent.temperature ?? 0.4,
-          response_format: invocationContent.response_format ?? 'json',
-        },
-        template_variables: vars,
-        ...(usesSeparateUserMessage ? { user_message: invocationPrompt } : {}),
-        baseline: {
-          response_text: outputContent.text ?? '',
-          parsed_json: tryParse(outputContent.text ?? ''),
-          duration_ms: outputContent.duration_ms ?? 0,
-          thinking: outputContent.thinking ?? undefined,
-        },
-        assertions: assertionsFor(producer.sub_phase),
-      };
-
-      const validated = FixtureSchema.safeParse(fixture);
-      if (!validated.success) {
-        const issues = validated.error.issues.map((i) => `${i.path.join('.')}: ${i.message}`).join('; ');
-        skipped.push({ reason: `fixture validation failed: ${issues}`, sub_phase: producer.sub_phase });
-        continue;
-      }
-
-      const outPath = join(outDir, `${fixture.fixture_id}.fixture.json`);
-      if (existsSync(outPath) && !opts.overwrite) {
-        skipped.push({ reason: `fixture file already exists at ${outPath} (use --overwrite)`, sub_phase: producer.sub_phase });
-        continue;
-      }
-      writeFileSync(outPath, JSON.stringify(validated.data, null, 2) + '\n', 'utf-8');
-      written.push(outPath);
     } catch (err) {
       skipped.push({
-        reason: `unexpected error: ${err instanceof Error ? err.message : String(err)}`,
+        reason: `unexpected error: ${describeUnexpectedError(err)}`,
         sub_phase: producer.sub_phase,
       });
     }
@@ -684,7 +843,7 @@ export async function extract(opts: ExtractOptions): Promise<ExtractResult> {
   return { written, skipped };
 }
 
-function tryParse(text: string): unknown | null {
+function tryParse(text: string): unknown {
   try {
     // Strip leading code-fence if present.
     const trimmed = text.trim().replace(/^```(?:json)?\s*/i, '').replace(/```\s*$/i, '');

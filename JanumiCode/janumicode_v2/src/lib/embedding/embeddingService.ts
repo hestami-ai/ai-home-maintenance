@@ -250,41 +250,53 @@ export class EmbeddingService {
         return;
       }
 
+      // Non-hard failures (transient aborts, generic errors) are handled
+      // out-of-line to keep this method's control flow shallow. Skip when
+      // the circuit breaker has already tripped — the user has been notified.
       if (!this.disabled) {
-        const isAbort = err instanceof Error
-          && (err.name === 'AbortError' || /aborted/i.test(message));
-
-        // Retry transient aborts (model-swap latency, brief Ollama
-        // contention) by re-enqueueing with exponential backoff. Records
-        // were previously dropped silently after a single 30s abort —
-        // see thin-slice-8 postmortem where ~80% of records went unembedded.
-        if (isAbort && job.attempt < this.maxRetries) {
-          const backoff = RETRY_BACKOFF_MS[Math.min(job.attempt, RETRY_BACKOFF_MS.length - 1)];
-          getLogger().warn('embedding', 'Embed call aborted — re-enqueueing with backoff', {
-            recordId: job.recordId,
-            attempt: job.attempt + 1,
-            maxRetries: this.maxRetries,
-            backoffMs: backoff,
-          });
-          setTimeout(() => {
-            // Honor stop() / circuit breaker if either fired during backoff.
-            if (!this.running || this.disabled) return;
-            this.queue.push({ ...job, attempt: job.attempt + 1 });
-            this.tick();
-          }, backoff).unref?.();
-        } else if (isAbort) {
-          getLogger().warn('embedding', 'Embed call aborted on final attempt — record will not be embedded', {
-            recordId: job.recordId,
-            attempts: job.attempt + 1,
-          });
-        } else {
-          getLogger().warn('embedding', 'Failed to embed record', {
-            recordId: job.recordId,
-            error: message,
-            attempt: job.attempt + 1,
-          });
-        }
+        this.handleTransientFailure(job, err, message);
       }
+    }
+  }
+
+  /**
+   * Log / retry a non-hard embedding failure. Extracted verbatim from
+   * `process` so the primary path stays shallow.
+   *
+   * Retry transient aborts (model-swap latency, brief Ollama contention)
+   * by re-enqueueing with exponential backoff. Records were previously
+   * dropped silently after a single 30s abort — see thin-slice-8 postmortem
+   * where ~80% of records went unembedded.
+   */
+  private handleTransientFailure(job: QueuedJob, err: unknown, message: string): void {
+    const isAbort = err instanceof Error
+      && (err.name === 'AbortError' || /aborted/i.test(message));
+
+    if (isAbort && job.attempt < this.maxRetries) {
+      const backoff = RETRY_BACKOFF_MS[Math.min(job.attempt, RETRY_BACKOFF_MS.length - 1)];
+      getLogger().warn('embedding', 'Embed call aborted — re-enqueueing with backoff', {
+        recordId: job.recordId,
+        attempt: job.attempt + 1,
+        maxRetries: this.maxRetries,
+        backoffMs: backoff,
+      });
+      setTimeout(() => {
+        // Honor stop() / circuit breaker if either fired during backoff.
+        if (!this.running || this.disabled) return;
+        this.queue.push({ ...job, attempt: job.attempt + 1 });
+        this.tick();
+      }, backoff).unref?.();
+    } else if (isAbort) {
+      getLogger().warn('embedding', 'Embed call aborted on final attempt — record will not be embedded', {
+        recordId: job.recordId,
+        attempts: job.attempt + 1,
+      });
+    } else {
+      getLogger().warn('embedding', 'Failed to embed record', {
+        recordId: job.recordId,
+        error: message,
+        attempt: job.attempt + 1,
+      });
     }
   }
 

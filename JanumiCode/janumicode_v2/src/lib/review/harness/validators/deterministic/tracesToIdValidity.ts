@@ -85,6 +85,24 @@ const CONFIGS: Record<string, FieldPathConfig> = {
   },
 };
 
+/**
+ * Add every string id yielded by `getId` over the object entries of `source`
+ * to `ids`. Non-array sources and non-object / non-string-id entries are
+ * skipped, matching the original inline collection loops exactly.
+ */
+function addStringIds(
+  ids: Set<string>,
+  source: unknown,
+  getId: (rec: Record<string, unknown>) => unknown,
+): void {
+  if (!Array.isArray(source)) return;
+  for (const item of source) {
+    if (!item || typeof item !== 'object') continue;
+    const idVal = getId(item as Record<string, unknown>);
+    if (typeof idVal === 'string') ids.add(idVal);
+  }
+}
+
 function collectKnownIds(
   outputContent: Record<string, unknown>,
   prompt: string,
@@ -93,26 +111,18 @@ function collectKnownIds(
   const ids = new Set<string>();
 
   // From sibling_context / handoff_context / data_models in output
-  const contextArray = outputContent[config.knownIdField ?? ''];
-  if (Array.isArray(contextArray)) {
-    for (const item of contextArray) {
-      if (!item || typeof item !== 'object') continue;
-      const rec = item as Record<string, unknown>;
-      const idVal = rec[config.knownIdSubField ?? 'id'];
-      if (typeof idVal === 'string') ids.add(idVal);
-    }
-  }
+  addStringIds(
+    ids,
+    outputContent[config.knownIdField ?? ''],
+    (rec) => rec[config.knownIdSubField ?? 'id'],
+  );
 
   // From top-level emitted children in the same batch
-  const children = outputContent[config.childrenField];
-  if (Array.isArray(children)) {
-    for (const child of children) {
-      if (!child || typeof child !== 'object') continue;
-      const c = child as Record<string, unknown>;
-      const childId = c.id ?? c.component_id ?? c.entity_id;
-      if (typeof childId === 'string') ids.add(childId);
-    }
-  }
+  addStringIds(
+    ids,
+    outputContent[config.childrenField],
+    (rec) => rec.id ?? rec.component_id ?? rec.entity_id,
+  );
 
   // From prompt — extract well-formed IDs. The prefix set MUST cover every id
   // namespace the prompts actually emit as trace targets, or valid traces are
@@ -135,30 +145,111 @@ function collectKnownIds(
   return ids;
 }
 
-function extractRefs(
+/**
+ * Refs for `refMode: 'array'`: the string entries of `item[config.refField]`.
+ * Non-array fields and non-string entries are skipped.
+ */
+function extractArrayRefs(
   item: Record<string, unknown>,
   config: FieldPathConfig,
 ): string[] {
   const refs: string[] = [];
-  if (config.refMode === 'array') {
-    const val = item[config.refField];
-    if (Array.isArray(val)) {
-      for (const v of val) {
-        if (typeof v === 'string') refs.push(v);
-      }
-    }
-  } else if (config.refMode === 'sub_array_field') {
-    const arr = item[config.refField];
-    if (Array.isArray(arr)) {
-      for (const entry of arr) {
-        if (!entry || typeof entry !== 'object') continue;
-        const e = entry as Record<string, unknown>;
-        const v = e[config.subField ?? 'id'];
-        if (typeof v === 'string') refs.push(v);
-      }
+  const val = item[config.refField];
+  if (Array.isArray(val)) {
+    for (const v of val) {
+      if (typeof v === 'string') refs.push(v);
     }
   }
   return refs;
+}
+
+/**
+ * Refs for `refMode: 'sub_array_field'`: the string value at `config.subField`
+ * (default 'id') within each object entry of `item[config.refField]`. Non-array
+ * fields, non-object entries, and non-string sub-values are skipped.
+ */
+function extractSubArrayRefs(
+  item: Record<string, unknown>,
+  config: FieldPathConfig,
+): string[] {
+  const refs: string[] = [];
+  const arr = item[config.refField];
+  if (Array.isArray(arr)) {
+    for (const entry of arr) {
+      if (!entry || typeof entry !== 'object') continue;
+      const e = entry as Record<string, unknown>;
+      const v = e[config.subField ?? 'id'];
+      if (typeof v === 'string') refs.push(v);
+    }
+  }
+  return refs;
+}
+
+function extractRefs(
+  item: Record<string, unknown>,
+  config: FieldPathConfig,
+): string[] {
+  if (config.refMode === 'array') return extractArrayRefs(item, config);
+  if (config.refMode === 'sub_array_field') return extractSubArrayRefs(item, config);
+  return [];
+}
+
+/**
+ * Resolve the saturation depth used for severity grading, preferring `depth`
+ * over `saturation_depth`, returning null when neither is a number.
+ */
+function resolveDepth(outputContent: Record<string, unknown>): number | null {
+  if (typeof outputContent.depth === 'number') return outputContent.depth;
+  if (typeof outputContent.saturation_depth === 'number') {
+    return outputContent.saturation_depth;
+  }
+  return null;
+}
+
+/** Severity: HIGH at depth ≥ 2; LOW at depth 0–1; MEDIUM when unknown. */
+function severityForDepth(depth: number | null): ValidatorFinding['severity'] {
+  if (depth === null) return 'MEDIUM';
+  if (depth >= 2) return 'HIGH';
+  return 'LOW';
+}
+
+/**
+ * Resolve a display id for a child item, preferring id → component_id →
+ * entity_id, falling back to a positional marker.
+ */
+function resolveItemId(rec: Record<string, unknown>, idx: number): string {
+  if (typeof rec.id === 'string') return rec.id;
+  if (typeof rec.component_id === 'string') return rec.component_id;
+  if (typeof rec.entity_id === 'string') return rec.entity_id;
+  return `[${idx}]`;
+}
+
+/**
+ * Produce broken_reference findings for a single child item: every reference
+ * not present in `knownIds` yields one finding.
+ */
+function collectItemFindings(
+  rec: Record<string, unknown>,
+  idx: number,
+  config: FieldPathConfig,
+  knownIds: Set<string>,
+  severity: ValidatorFinding['severity'],
+): ValidatorFinding[] {
+  const itemId = resolveItemId(rec, idx);
+  const findings: ValidatorFinding[] = [];
+  for (const ref of extractRefs(rec, config)) {
+    if (knownIds.has(ref)) continue;
+    findings.push({
+      validatorId: 'traces_to_id_validity',
+      severity,
+      type: 'broken_reference',
+      summary: `Item '${itemId}' references unknown id '${ref}'`,
+      location: `$.${config.childrenField}[${idx}].${config.refField}`,
+      detail: `Reference '${ref}' in item '${itemId}' does not match any known id in handoff_context, sibling_context, or emitted children. This may be a fabricated namespace.`,
+      recommendation: `Verify '${ref}' exists in the handoff context or sibling context. Remove or correct the reference if fabricated.`,
+    });
+  }
+  return findings;
 }
 
 export function validateTracesToIdValidity(
@@ -170,57 +261,18 @@ export function validateTracesToIdValidity(
   const config = CONFIGS[`${agentRole}:${subPhaseId}`];
   if (!config) return [];
 
-  let depth: number | null;
-  if (typeof outputContent.depth === 'number') {
-    depth = outputContent.depth;
-  } else if (typeof outputContent.saturation_depth === 'number') {
-    depth = outputContent.saturation_depth;
-  } else {
-    depth = null;
-  }
-
-  // Severity: HIGH at depth ≥ 2; LOW at depth 0–1; MEDIUM when unknown
-  const getSeverity = (): ValidatorFinding['severity'] => {
-    if (depth === null) return 'MEDIUM';
-    if (depth >= 2) return 'HIGH';
-    return 'LOW';
-  };
-
+  const depth = resolveDepth(outputContent);
+  const severity = severityForDepth(depth);
   const knownIds = collectKnownIds(outputContent, originalPrompt ?? '', config);
 
   const items = outputContent[config.childrenField];
   if (!Array.isArray(items)) return [];
 
   const findings: ValidatorFinding[] = [];
-
   items.forEach((item, idx) => {
     if (!item || typeof item !== 'object') return;
     const rec = item as Record<string, unknown>;
-    let itemId: string;
-    if (typeof rec.id === 'string') {
-      itemId = rec.id;
-    } else if (typeof rec.component_id === 'string') {
-      itemId = rec.component_id;
-    } else if (typeof rec.entity_id === 'string') {
-      itemId = rec.entity_id;
-    } else {
-      itemId = `[${idx}]`;
-    }
-
-    const refs = extractRefs(rec, config);
-    for (const ref of refs) {
-      if (!knownIds.has(ref)) {
-        findings.push({
-          validatorId: 'traces_to_id_validity',
-          severity: getSeverity(),
-          type: 'broken_reference',
-          summary: `Item '${itemId}' references unknown id '${ref}'`,
-          location: `$.${config.childrenField}[${idx}].${config.refField}`,
-          detail: `Reference '${ref}' in item '${itemId}' does not match any known id in handoff_context, sibling_context, or emitted children. This may be a fabricated namespace.`,
-          recommendation: `Verify '${ref}' exists in the handoff context or sibling context. Remove or correct the reference if fabricated.`,
-        });
-      }
-    }
+    findings.push(...collectItemFindings(rec, idx, config, knownIds, severity));
   });
 
   return findings;

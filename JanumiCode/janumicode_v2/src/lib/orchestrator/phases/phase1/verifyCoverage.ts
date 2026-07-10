@@ -372,146 +372,250 @@ function checkVVCoverage(i: CoverageVerifierInputs): CoverageGapContent[] {
  * bad references shows up — the human sees one gap per category rather
  * than a flood of one-gap-per-offender.
  */
-function checkReferentialIntegrity(i: CoverageVerifierInputs): CoverageGapContent[] {
-  const personaIds = new Set(i.personas.map(p => p.id));
-  const domainIds = new Set(i.domainIds);
-  const integrationIds = new Set(i.integrations.map(it => it.id));
-  const complianceIds = new Set(i.complianceItems.map(c => c.id));
-  const retentionIds = new Set(i.retentionRules.map(r => r.id));
-  const vvIds = new Set(i.vvRequirements.map(v => v.id));
-  const vocabularyIds = new Set(i.vocabulary.map(v => v.id));
+/** Surfaces block shared by journeys and workflows (structurally cast). */
+type SurfacesShape = {
+  compliance_regimes?: string[];
+  retention_rules?: string[];
+  vv_requirements?: string[];
+  integrations?: string[];
+};
+
+/** Pre-computed accepted-id lookup sets for referential-integrity checks. */
+interface RefIntegrityCtx {
+  personaIds: Set<string>;
+  domainIds: Set<string>;
+  integrationIds: Set<string>;
+  complianceIds: Set<string>;
+  retentionIds: Set<string>;
+  vvIds: Set<string>;
+  vocabularyIds: Set<string>;
+  journeyByIdAndStep: Map<string, UserJourney>;
+}
+
+function buildRefIntegrityCtx(i: CoverageVerifierInputs): RefIntegrityCtx {
   const journeyByIdAndStep = new Map<string, UserJourney>();
   for (const j of i.journeys) journeyByIdAndStep.set(j.id, j);
-
-  const gaps: CoverageGapContent[] = [];
-  const addGap = (params: {
-    check: string;
-    assertion: string;
-    offenders: string[];
-  }) => {
-    if (params.offenders.length === 0) return;
-    gaps.push(mkGap({
-      check: params.check,
-      assertion: params.assertion,
-      severity: 'blocking',
-      expected: [],
-      actual: [],
-      missing: params.offenders,
-    }));
+  return {
+    personaIds: new Set(i.personas.map(p => p.id)),
+    domainIds: new Set(i.domainIds),
+    integrationIds: new Set(i.integrations.map(it => it.id)),
+    complianceIds: new Set(i.complianceItems.map(c => c.id)),
+    retentionIds: new Set(i.retentionRules.map(r => r.id)),
+    vvIds: new Set(i.vvRequirements.map(v => v.id)),
+    vocabularyIds: new Set(i.vocabulary.map(v => v.id)),
+    journeyByIdAndStep,
   };
+}
+
+/** Structural read of the (untyped) businessDomainIds field on a journey. */
+function readBusinessDomainIds(j: UserJourney): string[] {
+  return (j as unknown as { businessDomainIds?: string[] }).businessDomainIds ?? [];
+}
+
+/** Structural read of the (untyped) surfaces block on a journey or workflow. */
+function readSurfaces(item: UserJourney | WorkflowV2): SurfacesShape | undefined {
+  return (item as unknown as { surfaces?: SurfacesShape }).surfaces;
+}
+
+/**
+ * Offenders for a single step's actor. An actor is valid when it is the
+ * literal "System", a `P-` id that resolves to an accepted persona, or an
+ * `INT-` id that resolves to an accepted integration. Preserves the
+ * original two-`if` structure (a malformed id could in principle match
+ * neither prefix and produce no offender).
+ */
+function badActorRefs(
+  ownerId: string,
+  stepNumber: number,
+  actor: string,
+  personaIds: Set<string>,
+  integrationIds: Set<string>,
+): string[] {
+  if (actor === 'System') return [];
+  const out: string[] = [];
+  if (actor.startsWith('P-') && !personaIds.has(actor)) out.push(`${ownerId}#${stepNumber}:${actor}`);
+  if (actor.startsWith('INT-') && !integrationIds.has(actor)) out.push(`${ownerId}#${stepNumber}:${actor}`);
+  return out;
+}
+
+/**
+ * Offenders for a single owner's surfaces block. Emits in the fixed order
+ * compliance → retention → vv → integration, matching the original loop.
+ * A retention id is valid if it resolves to an accepted retention rule OR
+ * an accepted compliance item.
+ */
+function badSurfaceRefs(ownerId: string, surfaces: SurfacesShape | undefined, ctx: RefIntegrityCtx): string[] {
+  if (!surfaces) return [];
+  const out: string[] = [];
+  for (const id of surfaces.compliance_regimes ?? []) if (!ctx.complianceIds.has(id)) out.push(`${ownerId}:compliance:${id}`);
+  for (const id of surfaces.retention_rules ?? []) if (!ctx.retentionIds.has(id) && !ctx.complianceIds.has(id)) out.push(`${ownerId}:retention:${id}`);
+  for (const id of surfaces.vv_requirements ?? []) if (!ctx.vvIds.has(id)) out.push(`${ownerId}:vv:${id}`);
+  for (const id of surfaces.integrations ?? []) if (!ctx.integrationIds.has(id)) out.push(`${ownerId}:integration:${id}`);
+  return out;
+}
+
+function collectBadJourneyPersonas(journeys: UserJourney[], personaIds: Set<string>): string[] {
+  const out: string[] = [];
+  for (const j of journeys) if (!personaIds.has(j.personaId)) out.push(`${j.id}:${j.personaId}`);
+  return out;
+}
+
+function collectBadJourneyDomains(journeys: UserJourney[], domainIds: Set<string>): string[] {
+  const out: string[] = [];
+  for (const j of journeys) {
+    for (const d of readBusinessDomainIds(j)) if (!domainIds.has(d)) out.push(`${j.id}:${d}`);
+  }
+  return out;
+}
+
+function collectBadJourneyStepActors(journeys: UserJourney[], personaIds: Set<string>, integrationIds: Set<string>): string[] {
+  const out: string[] = [];
+  for (const j of journeys) {
+    for (const s of j.steps) out.push(...badActorRefs(j.id, s.stepNumber, s.actor, personaIds, integrationIds));
+  }
+  return out;
+}
+
+function collectBadJourneySurfaces(journeys: UserJourney[], ctx: RefIntegrityCtx): string[] {
+  const out: string[] = [];
+  for (const j of journeys) out.push(...badSurfaceRefs(j.id, readSurfaces(j), ctx));
+  return out;
+}
+
+function collectBadWorkflowDomains(workflows: WorkflowV2[], domainIds: Set<string>): string[] {
+  const out: string[] = [];
+  for (const w of workflows) if (!domainIds.has(w.businessDomainId)) out.push(`${w.id}:${w.businessDomainId}`);
+  return out;
+}
+
+function collectBadWorkflowTriggers(workflows: WorkflowV2[], ctx: RefIntegrityCtx): string[] {
+  const out: string[] = [];
+  for (const w of workflows) {
+    for (const t of w.triggers) {
+      const bad = triggerIsInvalid(t, ctx);
+      if (bad) out.push(`${w.id}:${bad}`);
+    }
+  }
+  return out;
+}
+
+function collectBadWorkflowStepActors(workflows: WorkflowV2[], personaIds: Set<string>, integrationIds: Set<string>): string[] {
+  const out: string[] = [];
+  for (const w of workflows) {
+    for (const s of w.steps) out.push(...badActorRefs(w.id, s.stepNumber, s.actor, personaIds, integrationIds));
+  }
+  return out;
+}
+
+function collectBadWorkflowSurfaces(workflows: WorkflowV2[], ctx: RefIntegrityCtx): string[] {
+  const out: string[] = [];
+  for (const w of workflows) out.push(...badSurfaceRefs(w.id, readSurfaces(w), ctx));
+  return out;
+}
+
+/**
+ * Offenders for one workflow's backs_journeys cache. `backs_journeys` must
+ * equal the distinct set of journey_ids across its `journey_step` triggers;
+ * missing entries are emitted before extras (matching the original order).
+ */
+function backsJourneysOffenders(w: WorkflowV2): string[] {
+  const derived = new Set<string>();
+  for (const t of w.triggers) if (t.kind === 'journey_step') derived.add(t.journey_id);
+  const declared = new Set(w.backs_journeys ?? []);
+  const out: string[] = [];
+  for (const id of derived) if (!declared.has(id)) out.push(`${w.id}:missing-in-backs_journeys:${id}`);
+  for (const id of declared) if (!derived.has(id)) out.push(`${w.id}:extra-in-backs_journeys:${id}`);
+  return out;
+}
+
+function collectBadBacksJourneys(workflows: WorkflowV2[]): string[] {
+  const out: string[] = [];
+  for (const w of workflows) out.push(...backsJourneysOffenders(w));
+  return out;
+}
+
+/** Push a single blocking referential-integrity gap when offenders exist. */
+function pushGapIfOffenders(gaps: CoverageGapContent[], check: string, assertion: string, offenders: string[]): void {
+  if (offenders.length === 0) return;
+  gaps.push(mkGap({
+    check,
+    assertion,
+    severity: 'blocking',
+    expected: [],
+    actual: [],
+    missing: offenders,
+  }));
+}
+
+function checkReferentialIntegrity(i: CoverageVerifierInputs): CoverageGapContent[] {
+  const ctx = buildRefIntegrityCtx(i);
+  const gaps: CoverageGapContent[] = [];
 
   // Journey references.
-  const badJourneyPersonas: string[] = [];
-  const badJourneyDomains: string[] = [];
-  const badJourneyStepActors: string[] = [];
-  for (const j of i.journeys) {
-    if (!personaIds.has(j.personaId)) badJourneyPersonas.push(`${j.id}:${j.personaId}`);
-    const dids = (j as unknown as { businessDomainIds?: string[] }).businessDomainIds ?? [];
-    for (const d of dids) if (!domainIds.has(d)) badJourneyDomains.push(`${j.id}:${d}`);
-    for (const s of j.steps) {
-      const a = s.actor;
-      if (a === 'System') continue;
-      if (a.startsWith('P-') && !personaIds.has(a)) badJourneyStepActors.push(`${j.id}#${s.stepNumber}:${a}`);
-      if (a.startsWith('INT-') && !integrationIds.has(a)) badJourneyStepActors.push(`${j.id}#${s.stepNumber}:${a}`);
-    }
-  }
-  addGap({
-    check: 'referential_integrity_journey_persona',
-    assertion: 'Every journey.personaId must reference an accepted persona.',
-    offenders: badJourneyPersonas,
-  });
-  addGap({
-    check: 'referential_integrity_journey_domain',
-    assertion: 'Every journey.businessDomainIds entry must reference an accepted domain.',
-    offenders: badJourneyDomains,
-  });
-  addGap({
-    check: 'referential_integrity_journey_step_actor',
-    assertion: 'Every journey step actor must be a persona id, an integration id, or the literal "System".',
-    offenders: badJourneyStepActors,
-  });
+  pushGapIfOffenders(
+    gaps,
+    'referential_integrity_journey_persona',
+    'Every journey.personaId must reference an accepted persona.',
+    collectBadJourneyPersonas(i.journeys, ctx.personaIds),
+  );
+  pushGapIfOffenders(
+    gaps,
+    'referential_integrity_journey_domain',
+    'Every journey.businessDomainIds entry must reference an accepted domain.',
+    collectBadJourneyDomains(i.journeys, ctx.domainIds),
+  );
+  pushGapIfOffenders(
+    gaps,
+    'referential_integrity_journey_step_actor',
+    'Every journey step actor must be a persona id, an integration id, or the literal "System".',
+    collectBadJourneyStepActors(i.journeys, ctx.personaIds, ctx.integrationIds),
+  );
 
   // Journey surfaces.
-  const badJourneySurfaces: string[] = [];
-  for (const j of i.journeys) {
-    const s = (j as unknown as { surfaces?: { compliance_regimes?: string[]; retention_rules?: string[]; vv_requirements?: string[]; integrations?: string[] } }).surfaces;
-    if (!s) continue;
-    for (const id of s.compliance_regimes ?? []) if (!complianceIds.has(id)) badJourneySurfaces.push(`${j.id}:compliance:${id}`);
-    for (const id of s.retention_rules ?? []) if (!retentionIds.has(id) && !complianceIds.has(id)) badJourneySurfaces.push(`${j.id}:retention:${id}`);
-    for (const id of s.vv_requirements ?? []) if (!vvIds.has(id)) badJourneySurfaces.push(`${j.id}:vv:${id}`);
-    for (const id of s.integrations ?? []) if (!integrationIds.has(id)) badJourneySurfaces.push(`${j.id}:integration:${id}`);
-  }
-  addGap({
-    check: 'referential_integrity_journey_surfaces',
-    assertion: 'Every journey.surfaces[] id must reference an accepted item of the corresponding type.',
-    offenders: badJourneySurfaces,
-  });
+  pushGapIfOffenders(
+    gaps,
+    'referential_integrity_journey_surfaces',
+    'Every journey.surfaces[] id must reference an accepted item of the corresponding type.',
+    collectBadJourneySurfaces(i.journeys, ctx),
+  );
 
   // Workflow references.
-  const badWfDomains: string[] = [];
-  const badWfTriggers: string[] = [];
-  const badWfStepActors: string[] = [];
-  const badWfSurfaces: string[] = [];
-  const badBacksJourneys: string[] = [];
-  for (const w of i.workflows) {
-    if (!domainIds.has(w.businessDomainId)) badWfDomains.push(`${w.id}:${w.businessDomainId}`);
-    for (const t of w.triggers) {
-      const bad = triggerIsInvalid(t, { journeyByIdAndStep, complianceIds, integrationIds });
-      if (bad) badWfTriggers.push(`${w.id}:${bad}`);
-    }
-    for (const s of w.steps) {
-      const a = s.actor;
-      if (a === 'System') continue;
-      if (a.startsWith('P-') && !personaIds.has(a)) badWfStepActors.push(`${w.id}#${s.stepNumber}:${a}`);
-      if (a.startsWith('INT-') && !integrationIds.has(a)) badWfStepActors.push(`${w.id}#${s.stepNumber}:${a}`);
-    }
-    const surf = (w as unknown as { surfaces?: { compliance_regimes?: string[]; retention_rules?: string[]; vv_requirements?: string[]; integrations?: string[] } }).surfaces;
-    if (surf) {
-      for (const id of surf.compliance_regimes ?? []) if (!complianceIds.has(id)) badWfSurfaces.push(`${w.id}:compliance:${id}`);
-      for (const id of surf.retention_rules ?? []) if (!retentionIds.has(id) && !complianceIds.has(id)) badWfSurfaces.push(`${w.id}:retention:${id}`);
-      for (const id of surf.vv_requirements ?? []) if (!vvIds.has(id)) badWfSurfaces.push(`${w.id}:vv:${id}`);
-      for (const id of surf.integrations ?? []) if (!integrationIds.has(id)) badWfSurfaces.push(`${w.id}:integration:${id}`);
-    }
-    // backs_journeys must match the distinct journey_id set from triggers.
-    const derived = new Set<string>();
-    for (const t of w.triggers) if (t.kind === 'journey_step') derived.add(t.journey_id);
-    const declared = new Set(w.backs_journeys ?? []);
-    const missing = [...derived].filter(id => !declared.has(id));
-    const extra = [...declared].filter(id => !derived.has(id));
-    for (const id of missing) badBacksJourneys.push(`${w.id}:missing-in-backs_journeys:${id}`);
-    for (const id of extra) badBacksJourneys.push(`${w.id}:extra-in-backs_journeys:${id}`);
-  }
-  addGap({
-    check: 'referential_integrity_workflow_domain',
-    assertion: 'Every workflow.businessDomainId must reference an accepted domain.',
-    offenders: badWfDomains,
-  });
-  addGap({
-    check: 'referential_integrity_workflow_triggers',
-    assertion: 'Every workflow trigger must resolve: journey_step -> real (journey, step); compliance -> accepted regime; integration -> accepted integration.',
-    offenders: badWfTriggers,
-  });
-  addGap({
-    check: 'referential_integrity_workflow_step_actor',
-    assertion: 'Every workflow step actor must be a persona id, an integration id, or the literal "System".',
-    offenders: badWfStepActors,
-  });
-  addGap({
-    check: 'referential_integrity_workflow_surfaces',
-    assertion: 'Every workflow.surfaces[] id must reference an accepted item of the corresponding type.',
-    offenders: badWfSurfaces,
-  });
-  addGap({
-    check: 'referential_integrity_backs_journeys',
-    assertion: 'workflow.backs_journeys[] must equal the distinct journey_id set across kind:journey_step triggers.',
-    offenders: badBacksJourneys,
-  });
+  pushGapIfOffenders(
+    gaps,
+    'referential_integrity_workflow_domain',
+    'Every workflow.businessDomainId must reference an accepted domain.',
+    collectBadWorkflowDomains(i.workflows, ctx.domainIds),
+  );
+  pushGapIfOffenders(
+    gaps,
+    'referential_integrity_workflow_triggers',
+    'Every workflow trigger must resolve: journey_step -> real (journey, step); compliance -> accepted regime; integration -> accepted integration.',
+    collectBadWorkflowTriggers(i.workflows, ctx),
+  );
+  pushGapIfOffenders(
+    gaps,
+    'referential_integrity_workflow_step_actor',
+    'Every workflow step actor must be a persona id, an integration id, or the literal "System".',
+    collectBadWorkflowStepActors(i.workflows, ctx.personaIds, ctx.integrationIds),
+  );
+  pushGapIfOffenders(
+    gaps,
+    'referential_integrity_workflow_surfaces',
+    'Every workflow.surfaces[] id must reference an accepted item of the corresponding type.',
+    collectBadWorkflowSurfaces(i.workflows, ctx),
+  );
+  pushGapIfOffenders(
+    gaps,
+    'referential_integrity_backs_journeys',
+    'workflow.backs_journeys[] must equal the distinct journey_id set across kind:journey_step triggers.',
+    collectBadBacksJourneys(i.workflows),
+  );
 
   // Used-but-not-referenced vocabulary is not a gap in 1.3c — vocabulary
   // coverage is checked via the release manifest in 1.8 (every VOC-*
   // must appear in some release or cross_cutting). Kept here as a no-op
   // so the shape of the check is obvious on future schema changes.
-  void vocabularyIds;
+  void ctx.vocabularyIds;
 
   return gaps;
 }

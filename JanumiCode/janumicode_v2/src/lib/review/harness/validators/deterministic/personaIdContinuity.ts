@@ -29,11 +29,15 @@ function collectPersonaIds(personas: unknown): Set<string> {
   return ids;
 }
 
+function collectStringReferences(value: string, refs: Set<string>): void {
+  const matches = value.match(PERSONA_ID_REGEX);
+  if (matches) for (const m of matches) refs.add(m);
+}
+
 function collectReferences(value: unknown, refs: Set<string>, skipPersonas = false): void {
   if (value == null) return;
   if (typeof value === 'string') {
-    const matches = value.match(PERSONA_ID_REGEX);
-    if (matches) for (const m of matches) refs.add(m);
+    collectStringReferences(value, refs);
     return;
   }
   if (Array.isArray(value)) {

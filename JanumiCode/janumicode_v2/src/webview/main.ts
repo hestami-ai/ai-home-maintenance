@@ -40,6 +40,10 @@ function postError(message: string, stack?: string): void {
   }
 }
 
+function errMessage(err: unknown): string {
+  return err instanceof Error ? err.message : String(err);
+}
+
 function bootstrap(): void {
   log('info', 'main.ts loaded; resolving vscode handle');
 
@@ -56,7 +60,7 @@ function bootstrap(): void {
       const target = document.getElementById('app');
       if (target) {
         target.innerHTML = '<div style="padding:16px;color:#f88">Failed to acquire VS Code API: ' +
-          (err instanceof Error ? err.message : String(err)) + '</div>';
+          errMessage(err) + '</div>';
       }
       return;
     }

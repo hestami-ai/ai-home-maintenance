@@ -166,7 +166,7 @@ describe('SD-3 runDataModelSpecification — chunked coverage bloom', () => {
     const componentIds = components.map(c => c.id as string);
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     return (handler as any).runDataModelSpecification(
-      ctx, components, componentIds, componentSummaryById,
+      ctx, { components, componentIds, componentSummaryById },
       'domains summary', 'SR-001: some requirement', 'TECH-1: postgres', dmr,
     ) as Promise<DMResult>;
   }

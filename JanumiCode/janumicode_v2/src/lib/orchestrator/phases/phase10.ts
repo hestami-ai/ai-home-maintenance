@@ -30,163 +30,7 @@ export class Phase10Handler implements PhaseHandler {
     const artifactIds: string[] = [];
 
     // ── 10.1 — Pre-Commit Consistency Check ───────────────────
-    engine.stateMachine.setSubPhase(workflowRun.id, 'pre_commit_consistency_check');
-
-    // Cross-run refactoring verification (spec §4 Phase 10.1 gate criterion,
-    // §15.5 cross_run_impact_triggered): if Phase 0.5 ran, every Refactoring
-    // Task in the refactoring_scope MUST have a cross_run_modification record
-    // from Phase 9.1. A missing one is a blocking failure.
-    const crossRunCheck = this.verifyCrossRunModifications(ctx);
-    const blockingFailures: Array<Record<string, unknown>> = [];
-    if (crossRunCheck && crossRunCheck.missing.length > 0) {
-      blockingFailures.push({
-        kind: 'missing_cross_run_modification',
-        missing_refactoring_task_ids: crossRunCheck.missing,
-        detail: `${crossRunCheck.missing.length} Refactoring Task(s) have no cross_run_modification record from Phase 9.1.`,
-      });
-      getLogger().warn('workflow', 'Phase 10.1: missing cross_run_modification records', {
-        workflow_run_id: workflowRun.id, missing: crossRunCheck.missing,
-      });
-    }
-
-    // Lever 2c — divergent-duplicate detection. Enumerate the generated
-    // workspace and flag files that share a basename but have divergent
-    // content across paths (the fragmentation symptom: two implementations
-    // of the same module). With the 2a scaffold + 2b import-don't-reinvent
-    // in place this should be empty; a non-empty result is real drift. Each
-    // finding records technical debt; severity (block vs warn) is configurable.
-    const divergence = this.checkDivergentDuplicates(ctx);
-    const internalFindings: Array<Record<string, unknown>> = divergence.findings.map(f => ({
-      kind: 'divergent_duplicate',
-      basename: f.basename,
-      paths: f.files.map(x => x.path),
-    }));
-    if (divergence.findings.length > 0 && divergence.severity === 'block') {
-      blockingFailures.push({
-        kind: 'divergent_duplicate_modules',
-        count: divergence.findings.length,
-        basenames: divergence.findings.map(f => f.basename),
-        detail: `${divergence.findings.length} module name(s) have divergent duplicate implementations across the workspace. Consolidate to a single canonical copy.`,
-      });
-    }
-
-    // Project Layout Contract conformance + import-resolution (advisory by
-    // default). Surfaces stray top-level dirs / shared trees, foreign-language
-    // files, committed build output, and broken imports (`tsc --noEmit`).
-    const structural = this.checkStructuralConformance(ctx);
-    internalFindings.push(...structural.findings);
-    if (structural.layoutSeverity === 'block' && structural.layoutViolations > 0) {
-      blockingFailures.push({ kind: 'layout_violations', count: structural.layoutViolations, detail: 'Project layout contract violations present.' });
-    }
-    if (structural.tscSeverity === 'block' && structural.tscErrors > 0) {
-      blockingFailures.push({ kind: 'tsc_errors', count: structural.tscErrors, detail: `${structural.tscErrors} TypeScript error(s) in the generated workspace.` });
-    }
-
-    // Craft-conformance (Engineering Constitution) — advisory by default.
-    // Verifies the executor prompt's "verified at Phase 10" claim: did exported
-    // symbols get doc/why comments, did code cite the requirements it satisfies?
-    // Report-only unless `consistency.craft_severity` is flipped to 'block'.
-    const craftCfg = (engine.configManager.get() as unknown as {
-      consistency?: { craft_severity?: 'block' | 'warn' | 'advisory'; craft_documented_ratio_min?: number };
-    }).consistency;
-    const craftSeverity = craftCfg?.craft_severity ?? 'advisory';
-    const craftMinRatio = craftCfg?.craft_documented_ratio_min ?? 0.5;
-    const craft = detectCraftConformance(engine.projectRoot);
-    const craftBelow = craft.exportedSymbols > 0 && craft.documentedRatio < craftMinRatio;
-    internalFindings.push({ kind: 'craft_conformance', ...craft, documented_ratio_min: craftMinRatio, below_threshold: craftBelow });
-    getLogger().info('workflow', 'Phase 10.1: engineering-constitution craft conformance', {
-      workflow_run_id: workflowRun.id,
-      files_scanned: craft.filesScanned,
-      documented_ratio: Number(craft.documentedRatio.toFixed(2)),
-      exported_symbols: craft.exportedSymbols,
-      files_citing_requirements: craft.filesCitingRequirements,
-      uncommented_files: craft.uncommentedFiles,
-      below_threshold: craftBelow, severity: craftSeverity,
-    });
-    if (craftSeverity === 'block' && craftBelow) {
-      blockingFailures.push({
-        kind: 'craft_conformance',
-        documented_ratio: Number(craft.documentedRatio.toFixed(2)),
-        detail: `Engineering-constitution craft below threshold: ${Math.round(craft.documentedRatio * 100)}% of exported symbols documented (min ${Math.round(craftMinRatio * 100)}%).`,
-      });
-    }
-
-    // Finding adjudication (spec §4 Phase 10.1): render the missing verdict on
-    // the run's unadjudicated validator + coherence findings, judged against the
-    // actual implementation. Advisory by default — never blocks the commit —
-    // and fully guarded so a disabled/unavailable LLM (e.g. review-off runs)
-    // degrades to an empty result instead of failing the phase.
-    const adjCfg = (engine.configManager.get() as unknown as {
-      consistency?: { adjudication_enabled?: boolean; adjudication_severity?: 'block' | 'advisory' };
-    }).consistency;
-    const adjudicationEnabled = adjCfg?.adjudication_enabled ?? true;
-    let adjudication: import('./phase10/findingAdjudication').AdjudicationResult | null = null;
-    if (adjudicationEnabled) {
-      adjudication = await runFindingAdjudication({
-        writer: engine.writer,
-        workflowRunId: workflowRun.id,
-        implementationSummary: this.buildImplementationSummary(ctx),
-        invokeLlm: async (prompt) => {
-          const res = await engine.callForRole('orchestrator', {
-            prompt, responseFormat: 'json', temperature: 0.2,
-            traceContext: { workflowRunId: workflowRun.id, phaseId: '10', subPhaseId: 'pre_commit_consistency_check', agentRole: 'consistency_checker', label: 'Phase 10.1 — Finding Adjudication' },
-          });
-          return res.text;
-        },
-      });
-      // Still-open findings surface as advisory semantic findings; blocking only
-      // when the operator opts in via consistency.adjudication_severity='block'.
-      const stillOpen = adjudication.adjudications.filter(a => a.verdict === 'still_open');
-      for (const a of stillOpen) {
-        internalFindings.push({ kind: 'unresolved_finding', finding_ref: a.finding_ref, rationale: a.rationale });
-      }
-      if (adjCfg?.adjudication_severity === 'block' && stillOpen.length > 0) {
-        blockingFailures.push({
-          kind: 'unresolved_findings',
-          count: stillOpen.length,
-          detail: `${stillOpen.length} upstream finding(s) remain unresolved at pre-commit (adjudication_severity=block).`,
-        });
-      }
-      getLogger().info('workflow', 'Phase 10.1: finding adjudication', {
-        workflow_run_id: workflowRun.id, ...adjudication.summary, note: adjudication.note,
-      });
-    }
-
-    const overallPass = blockingFailures.length === 0;
-
-    const consistencyRecord = engine.writer.writeRecord({
-      record_type: 'artifact_produced',
-      schema_version: '1.0',
-      workflow_run_id: workflowRun.id,
-      phase_id: '10',
-      sub_phase_id: 'pre_commit_consistency_check',
-      produced_by_agent_role: 'consistency_checker',
-      janumicode_version_sha: engine.janumiCodeVersionSha,
-      content: {
-        kind: 'consistency_report',
-        overall_pass: overallPass,
-        traceability_results: [],
-        semantic_findings: [],
-        internal_findings: internalFindings,
-        blocking_failures: blockingFailures,
-        warnings: divergence.severity === 'warn'
-          ? internalFindings.map(f => ({ kind: 'divergent_duplicate', ...f }))
-          : [],
-        cross_run_modification_check: crossRunCheck ?? undefined,
-        divergent_duplicate_count: divergence.findings.length,
-        layout_violation_count: structural.layoutViolations,
-        tsc_error_count: structural.tscErrors,
-        craft_documented_ratio: Number(craft.documentedRatio.toFixed(3)),
-        craft_files_citing_requirements: craft.filesCitingRequirements,
-        craft_uncommented_files: craft.uncommentedFiles,
-        // Phase 10.1 finding adjudication (advisory).
-        finding_adjudications: adjudication?.adjudications ?? [],
-        finding_adjudication_summary: adjudication?.summary ?? null,
-        finding_adjudication_note: adjudication?.note ?? null,
-      },
-    });
-    artifactIds.push(consistencyRecord.id);
-    engine.ingestionPipeline.ingest(consistencyRecord);
+    const { consistencyRecord, overallPass } = await this.runPreCommitConsistencyCheck(ctx, artifactIds);
 
     // ── 10.2 — Commit Preparation ─────────────────────────────
     engine.stateMachine.setSubPhase(workflowRun.id, 'commit_preparation');
@@ -315,6 +159,237 @@ export class Phase10Handler implements PhaseHandler {
     artifactIds.push(gateRecord.id);
 
     return { success: true, artifactIds };
+  }
+
+  /**
+   * Phase 10.1 — Pre-Commit Consistency Check. Runs the read-only consistency
+   * checks (cross-run, divergent duplicates, structural, craft, finding
+   * adjudication), accumulates blocking failures + internal findings, then
+   * writes + ingests the consistency_report artifact. Behavior-preserving
+   * extraction from execute(); the check ordering (and hence the order of
+   * blocking_failures / internal_findings) is identical to the inline version.
+   */
+  private async runPreCommitConsistencyCheck(ctx: PhaseContext, artifactIds: string[]) {
+    const { workflowRun, engine } = ctx;
+    engine.stateMachine.setSubPhase(workflowRun.id, 'pre_commit_consistency_check');
+
+    const blockingFailures: Array<Record<string, unknown>> = [];
+    const internalFindings: Array<Record<string, unknown>> = [];
+
+    // Cross-run refactoring verification (spec §4 Phase 10.1 gate criterion,
+    // §15.5 cross_run_impact_triggered): if Phase 0.5 ran, every Refactoring
+    // Task in the refactoring_scope MUST have a cross_run_modification record
+    // from Phase 9.1. A missing one is a blocking failure.
+    const crossRunCheck = this.checkCrossRunModifications(ctx, blockingFailures);
+
+    // Lever 2c — divergent-duplicate detection. Flags files that share a
+    // basename but have divergent content across paths (fragmentation). Records
+    // technical debt; severity (block vs warn) is configurable.
+    const divergence = this.appendDivergentDuplicateFindings(ctx, blockingFailures, internalFindings);
+
+    // Project Layout Contract conformance + import-resolution (advisory by
+    // default): stray top-level dirs / shared trees, foreign-language files,
+    // committed build output, and broken imports (`tsc --noEmit`).
+    const structural = this.appendStructuralFindings(ctx, blockingFailures, internalFindings);
+
+    // Craft-conformance (Engineering Constitution) — advisory by default.
+    const { craft } = this.appendCraftFindings(ctx, blockingFailures, internalFindings);
+
+    // Finding adjudication (spec §4 Phase 10.1): render the missing verdict on
+    // the run's unadjudicated validator + coherence findings. Advisory by
+    // default — never blocks the commit — and fully guarded.
+    const adjudication = await this.appendAdjudicationFindings(ctx, blockingFailures, internalFindings);
+
+    const overallPass = blockingFailures.length === 0;
+
+    const consistencyRecord = engine.writer.writeRecord({
+      record_type: 'artifact_produced',
+      schema_version: '1.0',
+      workflow_run_id: workflowRun.id,
+      phase_id: '10',
+      sub_phase_id: 'pre_commit_consistency_check',
+      produced_by_agent_role: 'consistency_checker',
+      janumicode_version_sha: engine.janumiCodeVersionSha,
+      content: {
+        kind: 'consistency_report',
+        overall_pass: overallPass,
+        traceability_results: [],
+        semantic_findings: [],
+        internal_findings: internalFindings,
+        blocking_failures: blockingFailures,
+        warnings: divergence.severity === 'warn'
+          ? internalFindings.map(f => ({ kind: 'divergent_duplicate', ...f }))
+          : [],
+        cross_run_modification_check: crossRunCheck ?? undefined,
+        divergent_duplicate_count: divergence.findings.length,
+        layout_violation_count: structural.layoutViolations,
+        tsc_error_count: structural.tscErrors,
+        craft_documented_ratio: Number(craft.documentedRatio.toFixed(3)),
+        craft_files_citing_requirements: craft.filesCitingRequirements,
+        craft_uncommented_files: craft.uncommentedFiles,
+        // Phase 10.1 finding adjudication (advisory).
+        finding_adjudications: adjudication?.adjudications ?? [],
+        finding_adjudication_summary: adjudication?.summary ?? null,
+        finding_adjudication_note: adjudication?.note ?? null,
+      },
+    });
+    artifactIds.push(consistencyRecord.id);
+    engine.ingestionPipeline.ingest(consistencyRecord);
+
+    return { consistencyRecord, overallPass };
+  }
+
+  /**
+   * Cross-run modification gate. Pushes the blocking failure (+ warn log) when
+   * a Refactoring Task is missing its cross_run_modification record; returns the
+   * raw check result (null when Phase 0.5 did not run) for the report body.
+   */
+  private checkCrossRunModifications(ctx: PhaseContext, blockingFailures: Array<Record<string, unknown>>) {
+    const crossRunCheck = this.verifyCrossRunModifications(ctx);
+    if (crossRunCheck && crossRunCheck.missing.length > 0) {
+      blockingFailures.push({
+        kind: 'missing_cross_run_modification',
+        missing_refactoring_task_ids: crossRunCheck.missing,
+        detail: `${crossRunCheck.missing.length} Refactoring Task(s) have no cross_run_modification record from Phase 9.1.`,
+      });
+      getLogger().warn('workflow', 'Phase 10.1: missing cross_run_modification records', {
+        workflow_run_id: ctx.workflowRun.id, missing: crossRunCheck.missing,
+      });
+    }
+    return crossRunCheck;
+  }
+
+  /**
+   * Appends divergent-duplicate internal findings (+ blocking failure when the
+   * severity is 'block') and returns the divergence result for the report body.
+   */
+  private appendDivergentDuplicateFindings(
+    ctx: PhaseContext,
+    blockingFailures: Array<Record<string, unknown>>,
+    internalFindings: Array<Record<string, unknown>>,
+  ) {
+    const divergence = this.checkDivergentDuplicates(ctx);
+    internalFindings.push(...divergence.findings.map(f => ({
+      kind: 'divergent_duplicate',
+      basename: f.basename,
+      paths: f.files.map(x => x.path),
+    })));
+    if (divergence.findings.length > 0 && divergence.severity === 'block') {
+      blockingFailures.push({
+        kind: 'divergent_duplicate_modules',
+        count: divergence.findings.length,
+        basenames: divergence.findings.map(f => f.basename),
+        detail: `${divergence.findings.length} module name(s) have divergent duplicate implementations across the workspace. Consolidate to a single canonical copy.`,
+      });
+    }
+    return divergence;
+  }
+
+  /**
+   * Appends structural (layout + tsc) internal findings and their blocking
+   * failures, returning the structural result for the report body.
+   */
+  private appendStructuralFindings(
+    ctx: PhaseContext,
+    blockingFailures: Array<Record<string, unknown>>,
+    internalFindings: Array<Record<string, unknown>>,
+  ) {
+    const structural = this.checkStructuralConformance(ctx);
+    internalFindings.push(...structural.findings);
+    if (structural.layoutSeverity === 'block' && structural.layoutViolations > 0) {
+      blockingFailures.push({ kind: 'layout_violations', count: structural.layoutViolations, detail: 'Project layout contract violations present.' });
+    }
+    if (structural.tscSeverity === 'block' && structural.tscErrors > 0) {
+      blockingFailures.push({ kind: 'tsc_errors', count: structural.tscErrors, detail: `${structural.tscErrors} TypeScript error(s) in the generated workspace.` });
+    }
+    return structural;
+  }
+
+  /**
+   * Runs craft-conformance detection, appends the internal finding (+ blocking
+   * failure when severity='block' and below threshold), logs the metrics, and
+   * returns the craft result + the configured minimum ratio for the report body.
+   */
+  private appendCraftFindings(
+    ctx: PhaseContext,
+    blockingFailures: Array<Record<string, unknown>>,
+    internalFindings: Array<Record<string, unknown>>,
+  ) {
+    const { engine, workflowRun } = ctx;
+    const craftCfg = (engine.configManager.get() as unknown as {
+      consistency?: { craft_severity?: 'block' | 'warn' | 'advisory'; craft_documented_ratio_min?: number };
+    }).consistency;
+    const craftSeverity = craftCfg?.craft_severity ?? 'advisory';
+    const craftMinRatio = craftCfg?.craft_documented_ratio_min ?? 0.5;
+    const craft = detectCraftConformance(engine.projectRoot);
+    const craftBelow = craft.exportedSymbols > 0 && craft.documentedRatio < craftMinRatio;
+    internalFindings.push({ kind: 'craft_conformance', ...craft, documented_ratio_min: craftMinRatio, below_threshold: craftBelow });
+    getLogger().info('workflow', 'Phase 10.1: engineering-constitution craft conformance', {
+      workflow_run_id: workflowRun.id,
+      files_scanned: craft.filesScanned,
+      documented_ratio: Number(craft.documentedRatio.toFixed(2)),
+      exported_symbols: craft.exportedSymbols,
+      files_citing_requirements: craft.filesCitingRequirements,
+      uncommented_files: craft.uncommentedFiles,
+      below_threshold: craftBelow, severity: craftSeverity,
+    });
+    if (craftSeverity === 'block' && craftBelow) {
+      blockingFailures.push({
+        kind: 'craft_conformance',
+        documented_ratio: Number(craft.documentedRatio.toFixed(2)),
+        detail: `Engineering-constitution craft below threshold: ${Math.round(craft.documentedRatio * 100)}% of exported symbols documented (min ${Math.round(craftMinRatio * 100)}%).`,
+      });
+    }
+    return { craft, craftMinRatio };
+  }
+
+  /**
+   * Runs finding adjudication when enabled (guard-clause early return to null
+   * when disabled), appends still-open internal findings (+ blocking failure
+   * when adjudication_severity='block'), logs, and returns the adjudication
+   * result for the report body.
+   */
+  private async appendAdjudicationFindings(
+    ctx: PhaseContext,
+    blockingFailures: Array<Record<string, unknown>>,
+    internalFindings: Array<Record<string, unknown>>,
+  ): Promise<import('./phase10/findingAdjudication').AdjudicationResult | null> {
+    const { engine, workflowRun } = ctx;
+    const adjCfg = (engine.configManager.get() as unknown as {
+      consistency?: { adjudication_enabled?: boolean; adjudication_severity?: 'block' | 'advisory' };
+    }).consistency;
+    const adjudicationEnabled = adjCfg?.adjudication_enabled ?? true;
+    if (!adjudicationEnabled) return null;
+
+    const adjudication = await runFindingAdjudication({
+      writer: engine.writer,
+      workflowRunId: workflowRun.id,
+      implementationSummary: this.buildImplementationSummary(ctx),
+      invokeLlm: async (prompt) => {
+        const res = await engine.callForRole('orchestrator', {
+          prompt, responseFormat: 'json', temperature: 0.2,
+          traceContext: { workflowRunId: workflowRun.id, phaseId: '10', subPhaseId: 'pre_commit_consistency_check', agentRole: 'consistency_checker', label: 'Phase 10.1 — Finding Adjudication' },
+        });
+        return res.text;
+      },
+    });
+    // Still-open findings surface as advisory semantic findings; blocking only
+    // when the operator opts in via consistency.adjudication_severity='block'.
+    const stillOpen = adjudication.adjudications.filter(a => a.verdict === 'still_open');
+    for (const a of stillOpen) {
+      internalFindings.push({ kind: 'unresolved_finding', finding_ref: a.finding_ref, rationale: a.rationale });
+    }
+    if (adjCfg?.adjudication_severity === 'block' && stillOpen.length > 0) {
+      blockingFailures.push({
+        kind: 'unresolved_findings',
+        count: stillOpen.length,
+        detail: `${stillOpen.length} upstream finding(s) remain unresolved at pre-commit (adjudication_severity=block).`,
+      });
+    }
+    getLogger().info('workflow', 'Phase 10.1: finding adjudication', {
+      workflow_run_id: workflowRun.id, ...adjudication.summary, note: adjudication.note,
+    });
+    return adjudication;
   }
 
   /**
@@ -467,7 +542,7 @@ export class Phase10Handler implements PhaseHandler {
         const report = detectLayoutViolations(engine.projectRoot, contract);
         if (!report.passed) {
           layoutViolations = report.stray_top_level_dirs.length + report.stray_shared_trees.length
-            + report.foreign_language_files.length + (report.build_output_has_source ? 1 : 0);
+            + report.foreign_language_files.length + Number(report.build_output_has_source);
           findings.push({
             kind: 'layout_violation',
             stray_top_level_dirs: report.stray_top_level_dirs,

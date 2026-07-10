@@ -30,18 +30,40 @@ export function validateParentBranchClassification(
   const classification = outputContent.parent_branch_classification as string | undefined;
   if (!classification) return [];
 
-  const children: unknown[] =
-    (outputContent.children as unknown[]) ??
-    (outputContent.decomposed_children as unknown[]) ??
-    [];
+  const children = extractChildren(outputContent);
   const childCount = children.length;
 
-  const findings: ValidatorFinding[] = [];
-
   if (ATOMIC_CLASSES.has(classification)) {
-    // Rule: atomic → exactly 1 mirror child at tier D
-    if (childCount === 0) {
-      findings.push({
+    return checkAtomicClassification(classification, children, childCount);
+  }
+  if (classification === DECOMPOSABLE) {
+    return checkDecomposableClassification(childCount);
+  }
+  if (classification === INVALID_PARENT) {
+    return checkInvalidParentClassification(childCount);
+  }
+
+  return [];
+}
+
+/** Resolve the emitted children array, preferring `children` over the legacy `decomposed_children` alias. */
+function extractChildren(outputContent: Record<string, unknown>): unknown[] {
+  return (
+    (outputContent.children as unknown[]) ??
+    (outputContent.decomposed_children as unknown[]) ??
+    []
+  );
+}
+
+/** Rule: atomic → exactly 1 mirror child at tier D. */
+function checkAtomicClassification(
+  classification: string,
+  children: unknown[],
+  childCount: number,
+): ValidatorFinding[] {
+  if (childCount === 0) {
+    return [
+      {
         validatorId: 'parent_branch_classification_check',
         severity: 'HIGH',
         type: 'atomic_missing_mirror_child',
@@ -49,9 +71,12 @@ export function validateParentBranchClassification(
         location: '$.children',
         detail: `When parent_branch_classification='${classification}', the agent must emit exactly one mirror child (tier D). Found ${childCount} children.`,
         recommendation: 'Emit one mirror child at tier D that replicates the parent content without further decomposition.',
-      });
-    } else if (childCount > 1) {
-      findings.push({
+      },
+    ];
+  }
+  if (childCount > 1) {
+    return [
+      {
         validatorId: 'parent_branch_classification_check',
         severity: 'HIGH',
         type: 'atomic_too_many_children',
@@ -59,28 +84,39 @@ export function validateParentBranchClassification(
         location: '$.children',
         detail: `When parent_branch_classification='${classification}', exactly 1 child is expected. Found ${childCount}.`,
         recommendation: 'Reduce to one mirror child or reclassify as decomposable.',
-      });
-    } else {
-      // 1 child — verify it is tier D
-      const child = children[0] as Record<string, unknown> | null;
-      if (child && typeof child === 'object') {
-        const childTier = child.tier;
-        if (childTier !== 'D') {
-          findings.push({
-            validatorId: 'parent_branch_classification_check',
-            severity: 'HIGH',
-            type: 'atomic_mirror_wrong_tier',
-            summary: `Mirror child of '${classification}' parent must be tier D but got tier '${childTier}'`,
-            location: '$.children[0].tier',
-            detail: `Atomic leaf/value mirror child must have tier='D'. Got '${childTier}'.`,
-            recommendation: "Set the mirror child's tier to 'D'.",
-          });
-        }
-      }
-    }
-  } else if (classification === DECOMPOSABLE) {
-    if (childCount < 1) {
-      findings.push({
+      },
+    ];
+  }
+  // 1 child — verify it is tier D
+  return checkAtomicMirrorTier(classification, children);
+}
+
+/** With exactly 1 atomic mirror child present, verify it sits at tier D. */
+function checkAtomicMirrorTier(classification: string, children: unknown[]): ValidatorFinding[] {
+  const child = children[0] as Record<string, unknown> | null;
+  if (!child || typeof child !== 'object') return [];
+
+  const childTier = child.tier;
+  if (childTier === 'D') return [];
+
+  return [
+    {
+      validatorId: 'parent_branch_classification_check',
+      severity: 'HIGH',
+      type: 'atomic_mirror_wrong_tier',
+      summary: `Mirror child of '${classification}' parent must be tier D but got tier '${childTier}'`,
+      location: '$.children[0].tier',
+      detail: `Atomic leaf/value mirror child must have tier='D'. Got '${childTier}'.`,
+      recommendation: "Set the mirror child's tier to 'D'.",
+    },
+  ];
+}
+
+/** Rule: decomposable → 1–8 children. */
+function checkDecomposableClassification(childCount: number): ValidatorFinding[] {
+  if (childCount < 1) {
+    return [
+      {
         validatorId: 'parent_branch_classification_check',
         severity: 'HIGH',
         type: 'decomposable_no_children',
@@ -88,9 +124,12 @@ export function validateParentBranchClassification(
         location: '$.children',
         detail: 'A decomposable parent must emit at least 1 child to justify the classification.',
         recommendation: 'Emit children or reclassify as atomic_leaf / invalid_parent.',
-      });
-    } else if (childCount > 8) {
-      findings.push({
+      },
+    ];
+  }
+  if (childCount > 8) {
+    return [
+      {
         validatorId: 'parent_branch_classification_check',
         severity: 'HIGH',
         type: 'decomposable_fanout_exceeded',
@@ -98,11 +137,17 @@ export function validateParentBranchClassification(
         location: '$.children',
         detail: `Fan-out of ${childCount} exceeds the 1–8 rule for decomposable parents.`,
         recommendation: 'Collapse children into sub-groups or reclassify as multiple decomposable parents.',
-      });
-    }
-  } else if (classification === INVALID_PARENT) {
-    if (childCount > 0) {
-      findings.push({
+      },
+    ];
+  }
+  return [];
+}
+
+/** Rule: invalid_parent → no children emitted. */
+function checkInvalidParentClassification(childCount: number): ValidatorFinding[] {
+  if (childCount > 0) {
+    return [
+      {
         validatorId: 'parent_branch_classification_check',
         severity: 'HIGH',
         type: 'invalid_parent_has_children',
@@ -110,9 +155,8 @@ export function validateParentBranchClassification(
         location: '$.children',
         detail: `invalid_parent means the node should not have been decomposed at all. Emitting ${childCount} children contradicts this classification.`,
         recommendation: "Remove children or reclassify. An invalid_parent should emit [] children and explain in decomposition_rationale.",
-      });
-    }
+      },
+    ];
   }
-
-  return findings;
+  return [];
 }

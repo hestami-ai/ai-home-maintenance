@@ -128,6 +128,44 @@ describe('classifier — synthetic screens', () => {
   });
 });
 
+describe('detectBoxRegions — characterization (golden snapshot)', () => {
+  it('clean single box → exactly one region with pinned bounds, score, text, actions', () => {
+    const input = [
+      '┌─────────┐',
+      '│ hello   │',
+      '│ [ OK ]  │',
+      '└─────────┘',
+    ];
+    const boxes = detectBoxRegions(synth(input));
+    expect(boxes).toHaveLength(1);
+    // Outer rectangle: top-left at (0,0), bottom-right at the last row/col.
+    expect(boxes[0].region).toEqual({
+      top: 0,
+      left: 0,
+      bottom: input.length - 1,
+      right: input[0].length - 1,
+    });
+    // synth() leaves s.cols undefined → scoreBox defaults cols to 120, so for a
+    // small centered-off box the score is width*height>40 (+0.2) + height≥3
+    // (+0.1) + an action word present (+0.3) = 0.6.
+    expect(boxes[0].score).toBeCloseTo(0.6); // FP: 0.2 + 0.1 + 0.3 === 0.6000000000000001
+    expect(boxes[0].actions).toEqual(['ok']);
+    // extractText returns the full region span, i.e. the input verbatim.
+    expect(boxes[0].text).toBe(input.join('\n'));
+  });
+
+  it('a box whose vertical side is broken on an interior row is rejected', () => {
+    // Corners + top/bottom edges are valid, but the right side (col 4) carries a
+    // non-box glyph on the middle row → sidesAreVertical fails → no region.
+    const boxes = detectBoxRegions(synth([
+      '┌───┐',
+      '│ x X',
+      '└───┘',
+    ]));
+    expect(boxes).toEqual([]);
+  });
+});
+
 describe('action guard', () => {
   const busy = { kind: 'busy' as const, confidence: 0.9, agentContentSig: '', inputReady: false };
   const modal = { kind: 'modal' as const, confidence: 0.8, agentContentSig: '', inputReady: true, actions: ['ok', 'cancel'] };

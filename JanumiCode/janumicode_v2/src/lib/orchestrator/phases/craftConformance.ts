@@ -51,6 +51,59 @@ function collectSourceFiles(root: string): string[] {
   return out;
 }
 
+/** Per-file craft metrics accumulated across the scan. */
+interface FileCraftMetrics {
+  exportedSymbols: number;
+  exportedCommented: number;
+  citations: number;
+  citing: boolean;
+  uncommented: boolean;
+}
+
+/**
+ * True iff the nearest preceding non-blank line of `lines[index]` is a comment
+ * or the close of a block comment.
+ */
+function isPrecededByComment(lines: string[], index: number): boolean {
+  let j = index - 1;
+  while (j >= 0 && lines[j].trim() === '') j--;
+  return j >= 0 && /^\s*(?:\*\/|\/\/|\*|\/\*)/.test(lines[j]);
+}
+
+/** Count exported top-level symbols and how many carry a preceding comment. */
+function countExportedSymbols(lines: string[]): { exportedSymbols: number; exportedCommented: number } {
+  let exportedSymbols = 0;
+  let exportedCommented = 0;
+  for (let i = 0; i < lines.length; i++) {
+    if (!EXPORTED.test(lines[i])) continue;
+    exportedSymbols++;
+    if (isPrecededByComment(lines, i)) exportedCommented++;
+  }
+  return { exportedSymbols, exportedCommented };
+}
+
+/**
+ * Read and measure a single source file. Returns null if the file cannot be
+ * read (the file is then skipped by the caller, matching the original behaviour).
+ */
+function scanSourceFile(file: string): FileCraftMetrics | null {
+  let lines: string[];
+  try { lines = fs.readFileSync(file, 'utf8').split(/\r?\n/); } catch { return null; }
+  const text = lines.join('\n');
+
+  const cites = text.match(REQ_ID);
+  const citations = cites ? cites.length : 0;
+  const { exportedSymbols, exportedCommented } = countExportedSymbols(lines);
+
+  return {
+    exportedSymbols,
+    exportedCommented,
+    citations,
+    citing: citations > 0,
+    uncommented: !/\/\/|\/\*/.test(text),
+  };
+}
+
 /**
  * Scan the generated project (prefers `<projectRoot>/src`, else `projectRoot`)
  * and return craft-conformance metrics.
@@ -68,23 +121,12 @@ export function detectCraftConformance(projectRoot: string): CraftConformanceRep
   let uncommented = 0;
 
   for (const f of files) {
-    let lines: string[];
-    try { lines = fs.readFileSync(f, 'utf8').split(/\r?\n/); } catch { continue; }
-    const text = lines.join('\n');
-
-    const cites = text.match(REQ_ID);
-    if (cites && cites.length > 0) { filesCiting++; citations += cites.length; }
-    if (!/\/\/|\/\*/.test(text)) uncommented++;
-
-    for (let i = 0; i < lines.length; i++) {
-      if (!EXPORTED.test(lines[i])) continue;
-      exportedSymbols++;
-      // Commented iff the nearest preceding non-blank line is a comment / the
-      // close of a block comment.
-      let j = i - 1;
-      while (j >= 0 && lines[j].trim() === '') j--;
-      if (j >= 0 && /^\s*(?:\*\/|\/\/|\*|\/\*)/.test(lines[j])) exportedCommented++;
-    }
+    const m = scanSourceFile(f);
+    if (!m) continue;
+    exportedSymbols += m.exportedSymbols;
+    exportedCommented += m.exportedCommented;
+    if (m.citing) { filesCiting++; citations += m.citations; }
+    if (m.uncommented) uncommented++;
   }
 
   return {

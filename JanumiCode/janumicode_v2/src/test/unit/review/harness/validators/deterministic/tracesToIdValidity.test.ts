@@ -113,4 +113,72 @@ describe('traces_to_id_validity (deterministic)', () => {
     );
     expect(findings).toEqual([]);
   });
+
+  // --- Characterization tests: pin current behavior on branches the
+  // --- refactor isolates into helpers (saturation_depth, sub_array_field
+  // --- refMode, component_id / [idx] item-id resolution).
+
+  it('uses saturation_depth when depth is absent (>=2 → HIGH)', () => {
+    const findings = validateTracesToIdValidity(
+      makeRuntime({
+        agentRole: 'requirements_agent',
+        subPhaseId: 'fr_saturation',
+        outputContent: {
+          saturation_depth: 2,
+          children: [{ id: 'FR-001-D1', traces_to: ['UNKNOWN-ID'] }],
+          handoff_context: [],
+        },
+      }),
+    );
+    expect(findings.length).toBeGreaterThan(0);
+    expect(findings[0].severity).toBe('HIGH');
+  });
+
+  it('flags sub_array_field refs and resolves item id from component_id', () => {
+    const findings = validateTracesToIdValidity(
+      makeRuntime({
+        agentRole: 'domain_interpreter',
+        subPhaseId: 'component_saturation',
+        outputContent: {
+          depth: 2,
+          children: [
+            {
+              component_id: 'COMP-A',
+              dependencies: [
+                { component_id: 'COMP-B' },
+                { component_id: 'COMP-UNKNOWN' },
+              ],
+            },
+          ],
+          sibling_context: [{ id: 'COMP-B' }],
+        },
+      }),
+    );
+    expect(findings.length).toBe(1);
+    const finding = findings[0];
+    expect(finding.severity).toBe('HIGH');
+    expect(finding.type).toBe('broken_reference');
+    expect(finding.summary).toBe(
+      "Item 'COMP-A' references unknown id 'COMP-UNKNOWN'",
+    );
+    expect(finding.location).toBe('$.children[0].dependencies');
+  });
+
+  it('falls back to positional [idx] item id when no id fields present', () => {
+    const findings = validateTracesToIdValidity(
+      makeRuntime({
+        agentRole: 'requirements_agent',
+        subPhaseId: 'fr_saturation',
+        outputContent: {
+          depth: 2,
+          children: [{ traces_to: ['UNKNOWN-ID'] }],
+          handoff_context: [],
+        },
+      }),
+    );
+    expect(findings.length).toBe(1);
+    expect(findings[0].summary).toBe(
+      "Item '[0]' references unknown id 'UNKNOWN-ID'",
+    );
+  });
 });

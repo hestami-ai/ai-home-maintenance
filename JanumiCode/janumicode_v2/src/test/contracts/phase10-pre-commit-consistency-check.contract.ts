@@ -10,7 +10,7 @@ import type { ContractSuite } from './types';
 
 export interface ConsistencyFinding {
   id?: string;
-  severity?: 'HIGH' | 'MEDIUM' | 'LOW' | string;
+  severity?: 'HIGH' | 'MEDIUM' | 'LOW' | (string & {});
   description: string;
   source_record_id?: string;
 }

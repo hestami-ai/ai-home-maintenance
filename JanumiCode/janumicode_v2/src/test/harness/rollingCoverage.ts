@@ -255,6 +255,56 @@ export class RollingCoverageTracker {
   }
 }
 
+interface LcovAccumulator {
+  totalLines: number;
+  coveredLines: number;
+  totalBranches: number;
+  coveredBranches: number;
+  totalFunctions: number;
+  coveredFunctions: number;
+  files: Array<{ path: string; lines: { total: number; covered: number } }>;
+  currentFile: string;
+  fileLines: number;
+  fileCovered: number;
+}
+
+/**
+ * Process a single lcov line, mutating the accumulator in place.
+ */
+function accumulateLcovLine(line: string, acc: LcovAccumulator): void {
+  if (line.startsWith('SF:')) {
+    if (acc.currentFile) {
+      acc.files.push({ path: acc.currentFile, lines: { total: acc.fileLines, covered: acc.fileCovered } });
+    }
+    acc.currentFile = line.slice(3);
+    acc.fileLines = 0;
+    acc.fileCovered = 0;
+  } else if (line.startsWith('DA:')) {
+    const parts = line.slice(3).split(',');
+    const hit = Number.parseInt(parts[1] ?? '0', 10);
+    acc.fileLines++;
+    acc.totalLines++;
+    if (hit > 0) {
+      acc.fileCovered++;
+      acc.coveredLines++;
+    }
+  } else if (line.startsWith('BRDA:')) {
+    const parts = line.slice(5).split(',');
+    const taken = Number.parseInt(parts[3] ?? '0', 10);
+    acc.totalBranches++;
+    if (taken > 0) {
+      acc.coveredBranches++;
+    }
+  } else if (line.startsWith('FNDA:')) {
+    const parts = line.slice(5).split(',');
+    const execCount = Number.parseInt(parts[0] ?? '0', 10);
+    acc.totalFunctions++;
+    if (execCount > 0) {
+      acc.coveredFunctions++;
+    }
+  }
+}
+
 /**
  * Parse coverage from lcov.info file.
  */
@@ -266,61 +316,32 @@ export function parseLcovFile(lcovPath: string): {
 } {
   const content = fs.readFileSync(lcovPath, 'utf-8');
 
-  let totalLines = 0;
-  let coveredLines = 0;
-  let totalBranches = 0;
-  let coveredBranches = 0;
-  let totalFunctions = 0;
-  let coveredFunctions = 0;
-  const files: Array<{ path: string; lines: { total: number; covered: number } }> = [];
-
-  let currentFile = '';
-  let fileLines = 0;
-  let fileCovered = 0;
+  const acc: LcovAccumulator = {
+    totalLines: 0,
+    coveredLines: 0,
+    totalBranches: 0,
+    coveredBranches: 0,
+    totalFunctions: 0,
+    coveredFunctions: 0,
+    files: [],
+    currentFile: '',
+    fileLines: 0,
+    fileCovered: 0,
+  };
 
   for (const line of content.split('\n')) {
-    if (line.startsWith('SF:')) {
-      if (currentFile) {
-        files.push({ path: currentFile, lines: { total: fileLines, covered: fileCovered } });
-      }
-      currentFile = line.slice(3);
-      fileLines = 0;
-      fileCovered = 0;
-    } else if (line.startsWith('DA:')) {
-      const parts = line.slice(3).split(',');
-      const hit = Number.parseInt(parts[1] ?? '0', 10);
-      fileLines++;
-      totalLines++;
-      if (hit > 0) {
-        fileCovered++;
-        coveredLines++;
-      }
-    } else if (line.startsWith('BRDA:')) {
-      const parts = line.slice(5).split(',');
-      const taken = Number.parseInt(parts[3] ?? '0', 10);
-      totalBranches++;
-      if (taken > 0) {
-        coveredBranches++;
-      }
-    } else if (line.startsWith('FNDA:')) {
-      const parts = line.slice(5).split(',');
-      const execCount = Number.parseInt(parts[0] ?? '0', 10);
-      totalFunctions++;
-      if (execCount > 0) {
-        coveredFunctions++;
-      }
-    }
+    accumulateLcovLine(line, acc);
   }
 
-  if (currentFile) {
-    files.push({ path: currentFile, lines: { total: fileLines, covered: fileCovered } });
+  if (acc.currentFile) {
+    acc.files.push({ path: acc.currentFile, lines: { total: acc.fileLines, covered: acc.fileCovered } });
   }
 
   return {
-    lines: { total: totalLines, covered: coveredLines },
-    branches: { total: totalBranches, covered: coveredBranches },
-    functions: { total: totalFunctions, covered: coveredFunctions },
-    files,
+    lines: { total: acc.totalLines, covered: acc.coveredLines },
+    branches: { total: acc.totalBranches, covered: acc.coveredBranches },
+    functions: { total: acc.totalFunctions, covered: acc.coveredFunctions },
+    files: acc.files,
   };
 }
 

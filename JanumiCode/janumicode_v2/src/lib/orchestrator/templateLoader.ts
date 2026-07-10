@@ -62,6 +62,13 @@ export interface TemplateRenderResult {
   missing_variables: string[];
 }
 
+/** Mutable accumulator threaded through the per-line frontmatter parse. */
+interface FrontmatterParseState {
+  result: Record<string, unknown>;
+  currentKey: string | null;
+  currentArray: string[] | null;
+}
+
 // ── TemplateLoader ──────────────────────────────────────────────────
 
 export class TemplateLoader {
@@ -161,56 +168,87 @@ export class TemplateLoader {
    * Supports single values and arrays (- item format).
    */
   private parseFrontmatter(lines: string[]): TemplateMetadata {
-    const result: Record<string, unknown> = {};
-    let currentKey: string | null = null;
-    let currentArray: string[] | null = null;
+    const state: FrontmatterParseState = {
+      result: {},
+      currentKey: null,
+      currentArray: null,
+    };
 
     for (const line of lines) {
-      const trimmed = line.trim();
-
-      // Skip the [JC:PROMPT TEMPLATE] header
-      if (trimmed.startsWith('[') && trimmed.endsWith(']')) continue;
-      if (trimmed === '' || trimmed.startsWith('#')) continue;
-
-      // Array item
-      if (trimmed.startsWith('- ') && currentKey) {
-        currentArray ??= [];
-        currentArray.push(trimmed.slice(2).trim());
-        continue;
-      }
-
-      // Save accumulated array
-      if (currentKey && currentArray) {
-        result[currentKey] = currentArray;
-        currentArray = null;
-      }
-
-      // Key: value pair
-      const colonIdx = trimmed.indexOf(':');
-      if (colonIdx === -1) continue;
-
-      const key = trimmed.slice(0, colonIdx).trim();
-      const value = trimmed.slice(colonIdx + 1).trim();
-
-      currentKey = key;
-
-      if (value === '') {
-        // Next lines might be array items
-        currentArray = [];
-      } else if (value === 'true') {
-        result[key] = true;
-      } else if (value === 'false') {
-        result[key] = false;
-      } else {
-        result[key] = value;
-      }
+      this.parseFrontmatterLine(state, line);
     }
 
     // Save final accumulated array
-    if (currentKey && currentArray) {
-      result[currentKey] = currentArray;
+    this.flushFrontmatterArray(state);
+
+    return this.buildTemplateMetadata(state.result);
+  }
+
+  /** Process a single frontmatter line, mutating parse state in place. */
+  private parseFrontmatterLine(state: FrontmatterParseState, line: string): void {
+    const trimmed = line.trim();
+
+    if (this.isSkippableFrontmatterLine(trimmed)) return;
+
+    // Array item — continues the array opened by the current key.
+    if (trimmed.startsWith('- ') && state.currentKey) {
+      state.currentArray ??= [];
+      state.currentArray.push(trimmed.slice(2).trim());
+      return;
     }
 
+    // A non-array line ends any array accumulated under the previous key.
+    this.flushFrontmatterArray(state);
+
+    // Key: value pair
+    const colonIdx = trimmed.indexOf(':');
+    if (colonIdx === -1) return;
+
+    const key = trimmed.slice(0, colonIdx).trim();
+    const value = trimmed.slice(colonIdx + 1).trim();
+
+    state.currentKey = key;
+    this.assignFrontmatterValue(state, key, value);
+  }
+
+  /** Header ([JC:...]) lines, blank lines and comments carry no metadata. */
+  private isSkippableFrontmatterLine(trimmed: string): boolean {
+    // Skip the [JC:PROMPT TEMPLATE] header
+    if (trimmed.startsWith('[') && trimmed.endsWith(']')) return true;
+    return trimmed === '' || trimmed.startsWith('#');
+  }
+
+  /** Persist a pending array under its key and clear the accumulator. */
+  private flushFrontmatterArray(state: FrontmatterParseState): void {
+    if (state.currentKey && state.currentArray) {
+      state.result[state.currentKey] = state.currentArray;
+      state.currentArray = null;
+    }
+  }
+
+  /**
+   * Assign a scalar value for `key`, coercing booleans; an empty value opens
+   * a new array to be filled by subsequent `- item` lines.
+   */
+  private assignFrontmatterValue(
+    state: FrontmatterParseState,
+    key: string,
+    value: string,
+  ): void {
+    if (value === '') {
+      // Next lines might be array items
+      state.currentArray = [];
+    } else if (value === 'true') {
+      state.result[key] = true;
+    } else if (value === 'false') {
+      state.result[key] = false;
+    } else {
+      state.result[key] = value;
+    }
+  }
+
+  /** Build a typed TemplateMetadata from the raw parsed key/value map. */
+  private buildTemplateMetadata(result: Record<string, unknown>): TemplateMetadata {
     return {
       agent_role: (result.agent_role as string) ?? 'unknown',
       sub_phase: (result.sub_phase as string) ?? 'unknown',

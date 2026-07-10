@@ -82,68 +82,57 @@ export function scanWorkspace(
   const extraPatterns = options.extraIgnorePatterns ?? [];
   const allPatterns = [...gitignorePatterns, ...extraPatterns];
 
-  function walk(dir: string): void {
-    if (files.length >= maxFiles) return;
+  // Process a single directory entry: recurse into subdirectories (honoring
+  // skip/ignore rules) or classify and collect a file. Returning early here is
+  // equivalent to `continue` in the enclosing walk loop.
+  function processEntry(entry: fs.Dirent, dir: string): void {
+    const absolutePath = path.join(dir, entry.name);
+    const relativePath = path.relative(workspaceRoot, absolutePath).replaceAll('\\', '/');
 
-    let entries: fs.Dirent[];
-    try {
-      entries = fs.readdirSync(dir, { withFileTypes: true });
-    } catch (err) {
-      skipped.push({
-        path: dir,
-        reason: `readdir failed: ${err instanceof Error ? err.message : String(err)}`,
-      });
+    if (entry.isDirectory()) {
+      if (shouldSkipDir(entry.name) || extraSkipDirs.has(entry.name)) return;
+      if (matchesIgnorePattern(relativePath + '/', allPatterns)) return;
+      walk(absolutePath);
       return;
     }
 
+    if (!entry.isFile()) return;
+    if (matchesIgnorePattern(relativePath, allPatterns)) return;
+
+    const stat = statFile(absolutePath, relativePath, skipped);
+    if (stat === null) return;
+
+    if (stat.size > maxFileSize) {
+      skipped.push({ path: relativePath, reason: `exceeds max file size (${stat.size} > ${maxFileSize})` });
+      return;
+    }
+
+    const classification: FileClassification = classifyFile(absolutePath);
+    if (includeTypes && !includeTypes.has(classification.type)) return;
+
+    const scanned: ScannedFile = {
+      absolutePath,
+      relativePath,
+      name: entry.name,
+      sizeBytes: stat.size,
+      type: classification.type,
+      language: classification.language,
+      isText: classification.isText,
+    };
+
+    files.push(scanned);
+    filesByType[classification.type]++;
+  }
+
+  function walk(dir: string): void {
+    if (files.length >= maxFiles) return;
+
+    const entries = readDirEntries(dir, skipped);
+    if (entries === null) return;
+
     for (const entry of entries) {
       if (files.length >= maxFiles) return;
-
-      const absolutePath = path.join(dir, entry.name);
-      const relativePath = path.relative(workspaceRoot, absolutePath).replaceAll('\\', '/');
-
-      if (entry.isDirectory()) {
-        if (shouldSkipDir(entry.name) || extraSkipDirs.has(entry.name)) continue;
-        if (matchesIgnorePattern(relativePath + '/', allPatterns)) continue;
-        walk(absolutePath);
-        continue;
-      }
-
-      if (!entry.isFile()) continue;
-
-      if (matchesIgnorePattern(relativePath, allPatterns)) continue;
-
-      let stat: fs.Stats;
-      try {
-        stat = fs.statSync(absolutePath);
-      } catch (err) {
-        skipped.push({
-          path: relativePath,
-          reason: `stat failed: ${err instanceof Error ? err.message : String(err)}`,
-        });
-        continue;
-      }
-
-      if (stat.size > maxFileSize) {
-        skipped.push({ path: relativePath, reason: `exceeds max file size (${stat.size} > ${maxFileSize})` });
-        continue;
-      }
-
-      const classification: FileClassification = classifyFile(absolutePath);
-      if (includeTypes && !includeTypes.has(classification.type)) continue;
-
-      const scanned: ScannedFile = {
-        absolutePath,
-        relativePath,
-        name: entry.name,
-        sizeBytes: stat.size,
-        type: classification.type,
-        language: classification.language,
-        isText: classification.isText,
-      };
-
-      files.push(scanned);
-      filesByType[classification.type]++;
+      processEntry(entry, dir);
     }
   }
 
@@ -229,25 +218,65 @@ function loadGitignorePatterns(workspaceRoot: string): string[] {
   }
 }
 
+/** Extract a human-readable message from an unknown thrown value. */
+function describeError(err: unknown): string {
+  return err instanceof Error ? err.message : String(err);
+}
+
+/**
+ * Read directory entries, recording a `skipped` entry and returning null when
+ * the directory cannot be read (mirrors the original try/catch semantics).
+ */
+function readDirEntries(
+  dir: string,
+  skipped: WorkspaceScanResult['skipped'],
+): fs.Dirent[] | null {
+  try {
+    return fs.readdirSync(dir, { withFileTypes: true });
+  } catch (err) {
+    skipped.push({ path: dir, reason: `readdir failed: ${describeError(err)}` });
+    return null;
+  }
+}
+
+/**
+ * Stat a file, recording a `skipped` entry and returning null when the file
+ * cannot be stat-ed (mirrors the original try/catch semantics).
+ */
+function statFile(
+  absolutePath: string,
+  relativePath: string,
+  skipped: WorkspaceScanResult['skipped'],
+): fs.Stats | null {
+  try {
+    return fs.statSync(absolutePath);
+  } catch (err) {
+    skipped.push({ path: relativePath, reason: `stat failed: ${describeError(err)}` });
+    return null;
+  }
+}
+
+function matchesSingleIgnorePattern(relativePath: string, raw: string): boolean {
+  let pattern = raw;
+  if (pattern.startsWith('!')) return false; // negation not supported
+  if (pattern.startsWith('/')) pattern = pattern.slice(1);
+
+  // `*.ext` — extension suffix match
+  if (pattern.startsWith('*.')) {
+    const ext = pattern.slice(1);
+    return relativePath.endsWith(ext);
+  }
+  // Trailing slash = directory-only pattern
+  if (pattern.endsWith('/')) {
+    return relativePath.startsWith(pattern) || relativePath.includes('/' + pattern);
+  }
+  // Literal match
+  return relativePath === pattern || relativePath.startsWith(pattern + '/');
+}
+
 function matchesIgnorePattern(relativePath: string, patterns: string[]): boolean {
   for (const raw of patterns) {
-    let pattern = raw;
-    if (pattern.startsWith('!')) continue; // negation not supported
-    if (pattern.startsWith('/')) pattern = pattern.slice(1);
-
-    // `*.ext` — extension suffix match
-    if (pattern.startsWith('*.')) {
-      const ext = pattern.slice(1);
-      if (relativePath.endsWith(ext)) return true;
-      continue;
-    }
-    // Trailing slash = directory-only pattern
-    if (pattern.endsWith('/')) {
-      if (relativePath.startsWith(pattern) || relativePath.includes('/' + pattern)) return true;
-      continue;
-    }
-    // Literal match
-    if (relativePath === pattern || relativePath.startsWith(pattern + '/')) return true;
+    if (matchesSingleIgnorePattern(relativePath, raw)) return true;
   }
   return false;
 }

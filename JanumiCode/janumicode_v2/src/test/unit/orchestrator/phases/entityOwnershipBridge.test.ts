@@ -127,4 +127,30 @@ describe('reconcileEntityOwnership (P5.1b)', () => {
     expect(models[0].entities[0].ownership_role).toBe('owned');       // domain chain, not the bogus suggestion
     expect(ownershipMap.decisions.find((d) => d.concept_key === 'workorder')!.owner_component_id).toBe('comp-workorder-service');
   });
+
+  // Golden snapshot across ALL branches in one reconcile: pins the `stats` tallies
+  // (unasserted elsewhere) + the decision emission order [...separate, ...needsVerdict].
+  it('aggregate stats + decision ordering across single / owned / value-object / coincidental concepts', async () => {
+    const models = [
+      model('comp-a', [ent('LocalThing', ['id'])]),                                   // single → owned
+      model('comp-workorder-service', [ent('WorkOrder', ['id', 'status', 'assigned_to'])]),
+      model('comp-invoice-service', [ent('WorkOrder', ['id', 'billable_cost'])]),      // shared → owned_aggregate
+      model('comp-x', [ent('Address', ['street', 'city', 'zip'])]),
+      model('comp-y', [ent('Address', ['street', 'city', 'zip', 'country'])]),         // shared → value object
+      model('comp-billing', [ent('Invoice', ['amount', 'due_date'])]),
+      model('comp-vendor', [ent('Invoice', ['vendor_ref', 'po_number'])]),            // coincidental → separate
+    ];
+    const adj: Adjudicator = async (reqs) =>
+      reqs.map((r) => ({ concept_key: r.concept_key, verdict: r.concept_key === 'address' ? 'shared_value_object' : 'owned_aggregate' }));
+
+    const { ownershipMap, stats } = await reconcileEntityOwnership(models, ctx, adj);
+
+    expect(stats).toEqual({ concepts: 4, multiComponent: 3, owned: 4, referenced: 1, value_object: 2, separate: 1, adjudicated: 2 });
+    expect(ownershipMap.unresolved).toEqual(['invoice']);
+    expect(ownershipMap.decisions.map((d) => [d.concept_key, d.verdict, d.source])).toEqual([
+      ['invoice', 'separate', 'fail_open'],
+      ['workorder', 'owned_aggregate', 'adjudicator'],
+      ['address', 'shared_value_object', 'adjudicator'],
+    ]);
+  });
 });

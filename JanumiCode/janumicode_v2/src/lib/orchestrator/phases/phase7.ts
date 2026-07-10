@@ -20,7 +20,7 @@ import type {
   PropertySpec,
 } from '../../types/records';
 import { getLogger } from '../../logging';
-import { extractPriorPhaseContext, buildEffectiveFrView } from './phaseContext';
+import { extractPriorPhaseContext, buildEffectiveFrView, type PriorPhaseContext } from './phaseContext';
 import { buildPhaseContextPacket, type PhaseContextPacketResult } from './dmrContext';
 import { runTestSaturationLoop } from './phase7_1a';
 import {
@@ -105,20 +105,13 @@ export class Phase7Handler implements PhaseHandler {
     const frSummary = frView.summary;
     // PA-2: per-component scoped context so a single-test-case saturation call
     // sees only its own component(s), not the whole ~17-component model.
-    const componentSummaryById: Record<string, string> = {};
-    for (const c of (prior.componentModel?.content.components as Array<Record<string, unknown>> | undefined) ?? []) {
-      const cid = typeof c.id === 'string' ? c.id : '';
-      if (cid) componentSummaryById[cid] = renderComponentBlockForTask(c);
-    }
+    const componentSummaryById = buildComponentSummaryById(
+      (prior.componentModel?.content.components as Array<Record<string, unknown>> | undefined) ?? [],
+    );
 
     // Collect all acceptance criterion IDs for coverage analysis
-    const allAcIds: string[] = [];
     const frStories = frView.stories;
-    for (const story of frStories) {
-      for (const ac of (story.acceptance_criteria as Array<Record<string, unknown>>) ?? []) {
-        if (ac.id) allAcIds.push(ac.id as string);
-      }
-    }
+    const allAcIds = collectAllAcIds(frStories);
 
     // Canonical AC index drives the deterministic ref-resolver applied
     // before this phase persists. See phase7/acRefResolver.ts header.
@@ -129,16 +122,11 @@ export class Phase7Handler implements PhaseHandler {
     // ── 7.1 — Test Case Generation ────────────────────────────
     engine.stateMachine.setSubPhase(workflowRun.id, 'test_case_skeleton');
 
-    const frIds = frStories.map(s => (typeof s.id === 'string' ? s.id : '')).filter(Boolean);
-    const nfrIds = ((prior.nonFunctionalRequirements?.content.requirements as Array<Record<string, unknown>>) ?? [])
-      .map(n => (typeof n.id === 'string' ? n.id : ''))
-      .filter(Boolean);
-    const dmr71Seeds = [
-      ...(prior.functionalRequirements ? [prior.functionalRequirements.recordId] : []),
-      ...(prior.nonFunctionalRequirements ? [prior.nonFunctionalRequirements.recordId] : []),
-      ...(prior.componentModel ? [prior.componentModel.recordId] : []),
-      ...(prior.implementationPlan ? [prior.implementationPlan.recordId] : []),
-    ];
+    const frIds = extractStringIds(frStories);
+    const nfrIds = extractStringIds(
+      (prior.nonFunctionalRequirements?.content.requirements as Array<Record<string, unknown>>) ?? [],
+    );
+    const dmr71Seeds = collectDmr71Seeds(prior);
     const dmr71 = await buildPhaseContextPacket(ctx, {
       subPhaseId: 'test_case_skeleton',
       requestingAgentRole: 'test_design_agent',
@@ -153,9 +141,7 @@ export class Phase7Handler implements PhaseHandler {
     // invariant; packet_synthesis joins suites to tasks by component_id).
     const leafComponents: Array<Record<string, unknown>> =
       (prior.componentModel?.content.components as Array<Record<string, unknown>> | undefined) ?? [];
-    const componentIds: string[] = leafComponents
-      .map(c => (typeof c.id === 'string' ? c.id : ''))
-      .filter(Boolean);
+    const componentIds: string[] = extractStringIds(leafComponents);
 
     // SD-4 / PA-15: per-component chunking + orchestrator-owned AC-coverage
     // reconciliation. The authoritative leaf-AC inventory (the same set Phase 6
@@ -226,91 +212,12 @@ export class Phase7Handler implements PhaseHandler {
       ? (((techConstraintsRecord.content as Record<string, unknown>).technicalConstraints) as TechnicalConstraint[] ?? [])
       : [];
 
-    // Resume guard — skip seeding when depth-0 nodes already exist.
-    const existingTestRoots = engine.writer.getRecordsByType(workflowRun.id, 'test_decomposition_node')
-      .filter(r => (r.content as unknown as TestDecompositionNodeContent).depth === 0);
-    let rootTestCases: DecompositionTestCase[];
-    let rootTestRecordIds: string[];
-    let rootTestLogicalIds: string[];
-    if (existingTestRoots.length > 0) {
-      getLogger().info('workflow', 'Phase 7.1a RESUME: depth-0 test nodes already present', {
-        existingRoots: existingTestRoots.length,
-      });
-      rootTestCases = existingTestRoots.map(r => (r.content as unknown as TestDecompositionNodeContent).test_case);
-      rootTestRecordIds = existingTestRoots.map(r => r.id);
-      rootTestLogicalIds = existingTestRoots.map(r => (r.content as unknown as TestDecompositionNodeContent).node_id);
-    } else {
-      // Convert Phase 7.1's flat test plan into per-case roots. Each
-      // test_suites[].test_cases[] entry becomes one depth-0 root.
-      const constraintIds = technicalConstraints.map(t => t.id);
-      rootTestCases = testPlanContent.test_suites.flatMap(s =>
-        s.test_cases.map(tc => {
-          // PA-2 fix: the 7.1 skeleton binds components at the SUITE level, so a
-          // root test case usually has no component_ids of its own. Inherit the
-          // suite's component_id so 7.1a sibling_context/component_context scoping
-          // has a real id to key on (otherwise parentComps is empty and every root
-          // renders as "sole child", starving the cross-sibling roster).
-          let componentIds: string[];
-          if (tc.component_ids && tc.component_ids.length > 0) {
-            componentIds = tc.component_ids;
-          } else {
-            componentIds = s.component_id ? [s.component_id] : [];
-          }
-          return {
-          id: tc.test_case_id,
-          name: tc.expected_outcome ?? tc.test_case_id,
-          test_type: tc.type,
-          component_ids: componentIds,
-          acceptance_criterion_ids: tc.acceptance_criterion_ids,
-          preconditions: tc.preconditions,
-          steps: (tc.execution_steps && tc.execution_steps.length > 0)
-            ? tc.execution_steps.map((stp, idx) => ({
-                id: `step-${String(idx + 1).padStart(2, '0')}`,
-                description: stp,
-              }))
-            : [{ id: 'step-01', description: tc.expected_outcome ?? tc.test_case_id }],
-          expected_outcome: tc.expected_outcome,
-          edge_cases: tc.edge_cases,
-          active_constraints: constraintIds,
-          // Carry a skeleton-minted property into the saturation tree so the
-          // decomposition pass can refine/fan it out rather than re-derive it.
-          property_spec: tc.property_spec,
-          };
-        }),
+    // Resume guard — skip seeding when depth-0 nodes already exist; otherwise
+    // convert Phase 7.1's flat plan into per-case roots and persist them.
+    const { rootTestCases, rootTestRecordIds, rootTestLogicalIds } =
+      this.seedOrResumeRootTestCases(
+        ctx, testPlanContent, testPlanRecord.id, technicalConstraints, artifactIds,
       );
-      rootTestRecordIds = [];
-      rootTestLogicalIds = [];
-      for (const tc of rootTestCases) {
-        const logicalNodeId = randomUUID();
-        const rec = engine.writer.writeRecord({
-          record_type: 'test_decomposition_node',
-          schema_version: '1.0',
-          workflow_run_id: workflowRun.id,
-          phase_id: '7',
-          sub_phase_id: 'test_case_saturation',
-          produced_by_agent_role: 'test_design_agent',
-          janumicode_version_sha: engine.janumiCodeVersionSha,
-          derived_from_record_ids: [testPlanRecord.id],
-          content: {
-            kind: 'test_decomposition_node',
-            node_id: logicalNodeId,
-            parent_node_id: null,
-            display_key: tc.id,
-            root_test_id: logicalNodeId,
-            depth: 0,
-            pass_number: 0,
-            status: 'pending',
-            test_case: tc,
-            surfaced_assumption_ids: [],
-            release_id: null,
-            release_ordinal: null,
-          } satisfies TestDecompositionNodeContent,
-        });
-        rootTestRecordIds.push(rec.id);
-        rootTestLogicalIds.push(logicalNodeId);
-        artifactIds.push(rec.id);
-      }
-    }
 
     if (rootTestCases.length > 0) {
       await runTestSaturationLoop(ctx, {
@@ -658,6 +565,184 @@ export class Phase7Handler implements PhaseHandler {
       coverage_percentage: Math.round((covered / total) * 100),
     };
   }
+
+  /**
+   * Wave 10 — seed (or resume) the depth-0 test-decomposition roots for 7.1a.
+   * Resume guard: when depth-0 nodes already exist, adopt them verbatim.
+   * Otherwise convert Phase 7.1's flat test plan into per-case roots, persist
+   * each as a `test_decomposition_node`, and record its ids. Behaviour-identical
+   * to the previous inline block (same records, order, and returned id lists).
+   */
+  private seedOrResumeRootTestCases(
+    ctx: PhaseContext,
+    testPlanContent: TestPlan,
+    testPlanRecordId: string,
+    technicalConstraints: TechnicalConstraint[],
+    artifactIds: string[],
+  ): {
+    rootTestCases: DecompositionTestCase[];
+    rootTestRecordIds: string[];
+    rootTestLogicalIds: string[];
+  } {
+    const { workflowRun, engine } = ctx;
+    // Resume guard — skip seeding when depth-0 nodes already exist.
+    const existingTestRoots = engine.writer.getRecordsByType(workflowRun.id, 'test_decomposition_node')
+      .filter(r => (r.content as unknown as TestDecompositionNodeContent).depth === 0);
+    if (existingTestRoots.length > 0) {
+      getLogger().info('workflow', 'Phase 7.1a RESUME: depth-0 test nodes already present', {
+        existingRoots: existingTestRoots.length,
+      });
+      return {
+        rootTestCases: existingTestRoots.map(r => (r.content as unknown as TestDecompositionNodeContent).test_case),
+        rootTestRecordIds: existingTestRoots.map(r => r.id),
+        rootTestLogicalIds: existingTestRoots.map(r => (r.content as unknown as TestDecompositionNodeContent).node_id),
+      };
+    }
+    // Convert Phase 7.1's flat test plan into per-case roots. Each
+    // test_suites[].test_cases[] entry becomes one depth-0 root.
+    const constraintIds = technicalConstraints.map(t => t.id);
+    const rootTestCases = buildRootTestCasesFromPlan(testPlanContent, constraintIds);
+    const rootTestRecordIds: string[] = [];
+    const rootTestLogicalIds: string[] = [];
+    for (const tc of rootTestCases) {
+      const logicalNodeId = randomUUID();
+      const rec = engine.writer.writeRecord({
+        record_type: 'test_decomposition_node',
+        schema_version: '1.0',
+        workflow_run_id: workflowRun.id,
+        phase_id: '7',
+        sub_phase_id: 'test_case_saturation',
+        produced_by_agent_role: 'test_design_agent',
+        janumicode_version_sha: engine.janumiCodeVersionSha,
+        derived_from_record_ids: [testPlanRecordId],
+        content: {
+          kind: 'test_decomposition_node',
+          node_id: logicalNodeId,
+          parent_node_id: null,
+          display_key: tc.id,
+          root_test_id: logicalNodeId,
+          depth: 0,
+          pass_number: 0,
+          status: 'pending',
+          test_case: tc,
+          surfaced_assumption_ids: [],
+          release_id: null,
+          release_ordinal: null,
+        } satisfies TestDecompositionNodeContent,
+      });
+      rootTestRecordIds.push(rec.id);
+      rootTestLogicalIds.push(logicalNodeId);
+      artifactIds.push(rec.id);
+    }
+    return { rootTestCases, rootTestRecordIds, rootTestLogicalIds };
+  }
+}
+
+// ── Phase 7 execute() decomposition helpers (exported for unit tests) ──
+
+/**
+ * Build the per-component scoped summary map (PA-2): componentId →
+ * renderComponentBlockForTask(component). Components without a string `id` are
+ * skipped. Pure — preserves the input array's order in the resulting keys.
+ */
+export function buildComponentSummaryById(
+  components: Array<Record<string, unknown>>,
+): Record<string, string> {
+  const componentSummaryById: Record<string, string> = {};
+  for (const c of components) {
+    const cid = typeof c.id === 'string' ? c.id : '';
+    if (cid) componentSummaryById[cid] = renderComponentBlockForTask(c);
+  }
+  return componentSummaryById;
+}
+
+/**
+ * Collect every acceptance-criterion id across the FR view's stories (in story
+ * then AC order) for coverage analysis. AC entries with a falsy `id` are dropped.
+ */
+export function collectAllAcIds(
+  frStories: Array<Record<string, unknown>>,
+): string[] {
+  const allAcIds: string[] = [];
+  for (const story of frStories) {
+    for (const ac of (story.acceptance_criteria as Array<Record<string, unknown>>) ?? []) {
+      if (ac.id) allAcIds.push(ac.id as string);
+    }
+  }
+  return allAcIds;
+}
+
+/**
+ * Map a list of `{ id }`-bearing records to their string ids, dropping any whose
+ * `id` is absent/non-string (the `.map(...).filter(Boolean)` idiom used for the
+ * FR / NFR / component id lists).
+ */
+export function extractStringIds(
+  items: Array<Record<string, unknown>>,
+): string[] {
+  return items.map(x => (typeof x.id === 'string' ? x.id : '')).filter(Boolean);
+}
+
+/**
+ * Known-relevant DMR seed record ids for the 7.1 test-skeleton context packet:
+ * the FR / NFR / component-model / implementation-plan artifacts, each included
+ * only when present. Order is fixed (FR, NFR, component, plan).
+ */
+export function collectDmr71Seeds(prior: PriorPhaseContext): string[] {
+  return [
+    ...(prior.functionalRequirements ? [prior.functionalRequirements.recordId] : []),
+    ...(prior.nonFunctionalRequirements ? [prior.nonFunctionalRequirements.recordId] : []),
+    ...(prior.componentModel ? [prior.componentModel.recordId] : []),
+    ...(prior.implementationPlan ? [prior.implementationPlan.recordId] : []),
+  ];
+}
+
+/**
+ * Convert Phase 7.1's flat test plan into per-case depth-0 decomposition roots.
+ * Each `test_suites[].test_cases[]` entry becomes one root; a case with no
+ * `component_ids` inherits its suite's `component_id` (PA-2), and a case with no
+ * `execution_steps` gets a single synthetic step from its expected outcome.
+ * Pure — no persistence; the caller assigns node ids and writes records.
+ */
+export function buildRootTestCasesFromPlan(
+  testPlanContent: TestPlan,
+  constraintIds: string[],
+): DecompositionTestCase[] {
+  return testPlanContent.test_suites.flatMap(s =>
+    s.test_cases.map(tc => {
+      // PA-2 fix: the 7.1 skeleton binds components at the SUITE level, so a
+      // root test case usually has no component_ids of its own. Inherit the
+      // suite's component_id so 7.1a sibling_context/component_context scoping
+      // has a real id to key on (otherwise parentComps is empty and every root
+      // renders as "sole child", starving the cross-sibling roster).
+      let componentIds: string[];
+      if (tc.component_ids && tc.component_ids.length > 0) {
+        componentIds = tc.component_ids;
+      } else {
+        componentIds = s.component_id ? [s.component_id] : [];
+      }
+      return {
+        id: tc.test_case_id,
+        name: tc.expected_outcome ?? tc.test_case_id,
+        test_type: tc.type,
+        component_ids: componentIds,
+        acceptance_criterion_ids: tc.acceptance_criterion_ids,
+        preconditions: tc.preconditions,
+        steps: (tc.execution_steps && tc.execution_steps.length > 0)
+          ? tc.execution_steps.map((stp, idx) => ({
+              id: `step-${String(idx + 1).padStart(2, '0')}`,
+              description: stp,
+            }))
+          : [{ id: 'step-01', description: tc.expected_outcome ?? tc.test_case_id }],
+        expected_outcome: tc.expected_outcome,
+        edge_cases: tc.edge_cases,
+        active_constraints: constraintIds,
+        // Carry a skeleton-minted property into the saturation tree so the
+        // decomposition pass can refine/fan it out rather than re-derive it.
+        property_spec: tc.property_spec,
+      };
+    }),
+  );
 }
 
 // ── SD-4 / PA-15 per-component chunking helpers (exported for unit tests) ──

@@ -16,7 +16,13 @@
  * testable and has no DB/FS coupling.
  */
 
-import type { ActiveConstraint, ContextPacket } from '../../agents/deepMemoryResearch';
+import type {
+  ActiveConstraint,
+  ContextPacket,
+  Contradiction,
+  MaterialFinding,
+  SupersessionChain,
+} from '../../agents/deepMemoryResearch';
 
 /** Minimal shape of a resolved governed-stream record. */
 export interface ResolvedRecord {
@@ -71,129 +77,224 @@ export function renderHydratedPacket(
   options: HydrateOptions = {},
 ): string {
   const opts = { ...DEFAULTS, ...options };
-  const out: string[] = [];
+  const out: string[] = [
+    ...renderHeaderSection(packet),
+    ...renderGoverningSections(packet, resolve, opts),
+    ...renderSupersessionSection(packet, resolve),
+    ...renderContradictionsSection(packet),
+    ...renderConflictZonesSection(packet),
+    ...renderMaterialFindingsSection(packet, resolve, opts),
+  ];
+  return capTotal(out.join('\n'), opts.totalCap);
+}
 
-  out.push(
+// ── Header ────────────────────────────────────────────────────────────
+
+function renderHeaderSection(packet: ContextPacket): string[] {
+  return [
     '# Deep Memory Research — Context Reference',
     `_Completeness: ${packet.completenessStatus}. ${oneLine(packet.completenessNarrative)}_\n\n` +
     `_This is a curated reference — read the section relevant to your current step. ` +
     `Authoritative task content is delivered inline in the prompt; this file supplies supporting governing context._`,
     '',
-  );
+  ];
+}
 
-  // ── Governing records — split BINDING rules from CERTIFIED CONTEXT ──────
-  // Authority>=6 ADMITS a record into the governing set; `bindingClass` decides
-  // whether it is a normative rule ("apply without exception") or authoritative
-  // reference ("build within this; do not contradict"). Previously every
-  // authority-6 record was labeled "apply without exception", mislabeling
-  // certified architecture context — component_model, system_boundary, the
-  // user-story roster, … — as hard rules (ws-156: 12 of 14). Legacy packets with
-  // no `bindingClass` default to binding (exactly the prior behavior).
-  const renderConstraint = (c: ActiveConstraint): string => {
-    const head = `- **[Auth ${c.authorityLevel}]** ${cleanStatement(c.statement)}`;
-    if (isPlaceholderSummary(c.statement) && c.sourceRecordIds[0]) {
-      const rec = resolve(c.sourceRecordIds[0]);
-      return rec ? `${head}\n${indent(renderRecordExcerpt(rec, opts.excerptCap))}` : head;
-    }
-    return head;
-  };
+// ── Governing records — split BINDING rules from CERTIFIED CONTEXT ──────
+// Authority>=6 ADMITS a record into the governing set; `bindingClass` decides
+// whether it is a normative rule ("apply without exception") or authoritative
+// reference ("build within this; do not contradict"). Previously every
+// authority-6 record was labeled "apply without exception", mislabeling
+// certified architecture context — component_model, system_boundary, the
+// user-story roster, … — as hard rules (ws-156: 12 of 14). Legacy packets with
+// no `bindingClass` default to binding (exactly the prior behavior).
+
+function renderConstraint(
+  c: ActiveConstraint,
+  resolve: RecordResolver,
+  excerptCap: number,
+): string {
+  const head = `- **[Auth ${c.authorityLevel}]** ${cleanStatement(c.statement)}`;
+  if (isPlaceholderSummary(c.statement) && c.sourceRecordIds[0]) {
+    const rec = resolve(c.sourceRecordIds[0]);
+    return rec ? `${head}\n${indent(renderRecordExcerpt(rec, excerptCap))}` : head;
+  }
+  return head;
+}
+
+/** Render a titled constraint block; returns [] (no header) when empty. */
+function renderConstraintBlock(
+  title: string,
+  constraints: ActiveConstraint[],
+  resolve: RecordResolver,
+  excerptCap: number,
+): string[] {
+  if (constraints.length === 0) return [];
+  const lines = [title];
+  for (const c of constraints) lines.push(renderConstraint(c, resolve, excerptCap));
+  lines.push('');
+  return lines;
+}
+
+function renderGoverningSections(
+  packet: ContextPacket,
+  resolve: RecordResolver,
+  opts: Required<HydrateOptions>,
+): string[] {
+  if (opts.omitGoverningSections) return [];
   const binding = packet.activeConstraints.filter(c => c.bindingClass !== 'certified_context');
   const certifiedContext = packet.activeConstraints.filter(c => c.bindingClass === 'certified_context');
+  return [
+    ...renderConstraintBlock(
+      '## Governing Constraints (binding — apply without exception)',
+      binding, resolve, opts.excerptCap,
+    ),
+    ...renderConstraintBlock(
+      '## Certified Architecture Context (authoritative reference — build within this; do not contradict)',
+      certifiedContext, resolve, opts.excerptCap,
+    ),
+  ];
+}
 
-  if (!opts.omitGoverningSections && binding.length > 0) {
-    out.push('## Governing Constraints (binding — apply without exception)');
-    for (const c of binding) out.push(renderConstraint(c));
-    out.push('');
-  }
-  if (!opts.omitGoverningSections && certifiedContext.length > 0) {
-    out.push('## Certified Architecture Context (authoritative reference — build within this; do not contradict)');
-    for (const c of certifiedContext) out.push(renderConstraint(c));
-    out.push('');
-  }
+// ── Supersession chains (resolved before → after) ───────────────────
 
-  // ── Supersession chains (resolved before → after) ───────────────────
-  if (packet.supersessionChains.length > 0) {
-    out.push('## Supersession Chains (a prior decision was overridden — honor the LATEST)');
-    for (const sc of packet.supersessionChains) {
-      out.push(`### ${sc.subject}`);
-      for (const link of sc.chain) {
-        const rec = resolve(link.recordId);
-        const label = `- ${link.position}${link.timestamp ? ` (${link.timestamp})` : ''}`;
-        out.push(rec ? `${label}: ${oneLine(renderRecordExcerpt(rec, 280))}` : `${label}: ${short(link.recordId)}`);
-      }
-    }
-    out.push('');
-  }
+function renderSupersessionLink(
+  link: SupersessionChain['chain'][number],
+  resolve: RecordResolver,
+): string {
+  const rec = resolve(link.recordId);
+  const tsSuffix = link.timestamp ? ` (${link.timestamp})` : '';
+  const label = `- ${link.position}${tsSuffix}`;
+  return rec ? `${label}: ${oneLine(renderRecordExcerpt(rec, 280))}` : `${label}: ${short(link.recordId)}`;
+}
 
-  // ── Contradictions ──────────────────────────────────────────────────
-  if (packet.contradictions.length > 0) {
-    out.push('## Contradictions (unresolved conflicts — escalate rather than guess)');
-    for (const c of packet.contradictions) {
-      out.push(`- **${c.resolutionStatus}** — ${oneLine(c.explanation)}` +
-        (c.resolvedByRecordId ? ` (resolved by ${short(c.resolvedByRecordId)})` : ''));
-    }
-    out.push('');
+function renderSupersessionSection(
+  packet: ContextPacket,
+  resolve: RecordResolver,
+): string[] {
+  if (packet.supersessionChains.length === 0) return [];
+  const lines = ['## Supersession Chains (a prior decision was overridden — honor the LATEST)'];
+  for (const sc of packet.supersessionChains) {
+    lines.push(`### ${sc.subject}`);
+    for (const link of sc.chain) lines.push(renderSupersessionLink(link, resolve));
   }
+  lines.push('');
+  return lines;
+}
 
-  // ── Known conflict zones (subjects with active contradiction/supersession) ──
+// ── Contradictions ──────────────────────────────────────────────────
+
+function renderContradictionLine(c: Contradiction): string {
+  const resolvedSuffix = c.resolvedByRecordId ? ` (resolved by ${short(c.resolvedByRecordId)})` : '';
+  return `- **${c.resolutionStatus}** — ${oneLine(c.explanation)}${resolvedSuffix}`;
+}
+
+function renderContradictionsSection(packet: ContextPacket): string[] {
+  if (packet.contradictions.length === 0) return [];
+  const lines = ['## Contradictions (unresolved conflicts — escalate rather than guess)'];
+  for (const c of packet.contradictions) lines.push(renderContradictionLine(c));
+  lines.push('');
+  return lines;
+}
+
+// ── Known conflict zones (subjects with active contradiction/supersession) ──
+
+function renderConflictZonesSection(packet: ContextPacket): string[] {
   const conflictZones = packet.queryDecomposition?.knownConflictZones ?? [];
-  if (conflictZones.length > 0) {
-    out.push(
-      '## Known Conflict Zones (these subjects already disagree — read them with extra care)',
-      `- ${conflictZones.join(', ')}`,
-      '',
-    );
-  }
+  if (conflictZones.length === 0) return [];
+  return [
+    '## Known Conflict Zones (these subjects already disagree — read them with extra care)',
+    `- ${conflictZones.join(', ')}`,
+    '',
+  ];
+}
 
-  // ── Material findings (top N, resolved one-liners) ──────────────────
-  // Dedup against the governing/context sections above: every record already
-  // shown there is skipped here (ws-156: 14/14 active constraints were ALSO
-  // material findings → the same id rendered 2-3×). Match on the finding id AND
-  // each constraint's source record ids.
-  const renderedAboveIds = new Set<string>();
+// ── Material findings (top N, resolved one-liners) ──────────────────
+// Dedup against the governing/context sections above: every record already
+// shown there is skipped here (ws-156: 14/14 active constraints were ALSO
+// material findings → the same id rendered 2-3×). Match on the finding id AND
+// each constraint's source record ids.
+
+/** Record ids already surfaced in the governing/context sections (finding id + source ids). */
+function collectRenderedAboveIds(packet: ContextPacket): Set<string> {
+  const ids = new Set<string>();
   for (const c of packet.activeConstraints) {
-    renderedAboveIds.add(c.id);
-    for (const sid of c.sourceRecordIds) renderedAboveIds.add(sid);
+    ids.add(c.id);
+    for (const sid of c.sourceRecordIds) ids.add(sid);
   }
+  return ids;
+}
+
+interface FindingsPartition {
+  /** De-duplicated, materiality-sorted substantive findings (all of them). */
+  substantive: MaterialFinding[];
+  /** The `maxFindings`-capped prefix actually rendered. */
+  shown: MaterialFinding[];
+  /** Substantive findings dropped because already shown above. */
+  dedupedCount: number;
+  /** Placeholder-summary provenance records collapsed to the footer. */
+  provenanceCount: number;
+}
+
+function partitionFindings(packet: ContextPacket, maxFindings: number): FindingsPartition {
+  const renderedAboveIds = collectRenderedAboveIds(packet);
   const sorted = [...packet.materialFindings].sort((a, b) => b.materialityScore - a.materialityScore);
-  const provenance = sorted.filter(f => PROVENANCE_TYPES.has(f.recordType) && isPlaceholderSummary(f.summary));
-  const substantiveAll = sorted.filter(f => !(PROVENANCE_TYPES.has(f.recordType) && isPlaceholderSummary(f.summary)));
+  const isProvenancePlaceholder = (f: MaterialFinding): boolean =>
+    PROVENANCE_TYPES.has(f.recordType) && isPlaceholderSummary(f.summary);
+  const provenance = sorted.filter(isProvenancePlaceholder);
+  const substantiveAll = sorted.filter(f => !isProvenancePlaceholder(f));
   const substantive = substantiveAll.filter(f => !renderedAboveIds.has(f.id));
-  const dedupedCount = substantiveAll.length - substantive.length;
-  const shown = substantive.slice(0, opts.maxFindings);
+  return {
+    substantive,
+    shown: substantive.slice(0, maxFindings),
+    dedupedCount: substantiveAll.length - substantive.length,
+    provenanceCount: provenance.length,
+  };
+}
+
+function renderFindingLine(f: MaterialFinding, resolve: RecordResolver): string {
+  let line = `- **${f.recordType}** (Auth ${f.authorityLevel}, ${f.governingStatus})`;
+  if (!isPlaceholderSummary(f.summary)) {
+    line += `: ${oneLine(f.summary, 200)}`;
+  } else {
+    const rec = resolve(f.id);
+    line += rec ? `: ${oneLine(renderRecordExcerpt(rec, 280))}` : '';
+  }
+  return line;
+}
+
+function renderMaterialFindingsSection(
+  packet: ContextPacket,
+  resolve: RecordResolver,
+  opts: Required<HydrateOptions>,
+): string[] {
+  const { substantive, shown, dedupedCount, provenanceCount } = partitionFindings(packet, opts.maxFindings);
+  const lines: string[] = [];
 
   if (shown.length > 0) {
-    out.push(`## Most Material Findings (top ${shown.length})`);
-    for (const f of shown) {
-      let line = `- **${f.recordType}** (Auth ${f.authorityLevel}, ${f.governingStatus})`;
-      if (!isPlaceholderSummary(f.summary)) {
-        line += `: ${oneLine(f.summary, 200)}`;
-      } else {
-        const rec = resolve(f.id);
-        line += rec ? `: ${oneLine(renderRecordExcerpt(rec, 280))}` : '';
-      }
-      out.push(line);
-    }
+    lines.push(`## Most Material Findings (top ${shown.length})`);
+    for (const f of shown) lines.push(renderFindingLine(f, resolve));
     const remaining = substantive.length - shown.length;
-    if (remaining > 0) out.push(`- _… +${remaining} more material finding(s) (lower materiality)_`);
-    if (dedupedCount > 0) out.push(`- _(${dedupedCount} finding(s) already shown above as governing constraints / certified context — not repeated)_`);
-    out.push('');
+    if (remaining > 0) lines.push(`- _… +${remaining} more material finding(s) (lower materiality)_`);
+    if (dedupedCount > 0) lines.push(`- _(${dedupedCount} finding(s) already shown above as governing constraints / certified context — not repeated)_`);
+    lines.push('');
   } else if (dedupedCount > 0) {
-    out.push(
+    lines.push(
       `_All material findings are already shown above as governing constraints / certified context (${dedupedCount} de-duplicated)._`,
       '',
     );
   }
 
-  if (provenance.length > 0) {
-    out.push(`_+${provenance.length} provenance record(s) (decision traces / gate approvals) omitted — audit only._`);
+  if (provenanceCount > 0) {
+    lines.push(`_+${provenanceCount} provenance record(s) (decision traces / gate approvals) omitted — audit only._`);
   }
 
-  let md = out.join('\n');
-  if (md.length > opts.totalCap) {
-    md = `${md.slice(0, opts.totalCap)}\n\n_[truncated — hydrated reference exceeded ${opts.totalCap} chars]_`;
-  }
-  return md;
+  return lines;
+}
+
+function capTotal(md: string, totalCap: number): string {
+  if (md.length <= totalCap) return md;
+  return `${md.slice(0, totalCap)}\n\n_[truncated — hydrated reference exceeded ${totalCap} chars]_`;
 }
 
 // ── Record excerpt rendering (kind-aware) ─────────────────────────────

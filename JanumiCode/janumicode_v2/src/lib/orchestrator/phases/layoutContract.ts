@@ -302,6 +302,33 @@ function extOf(file: string): string {
 }
 
 /**
+ * Scan the workspace's immediate top-level directories for strays (dirs not in
+ * `allowed`) and shared-tree shadows (a top-level dir matching the shared leaf
+ * that is not the canonical shared dir). Read-only; on an unreadable workspace
+ * returns empty arrays. Extracted from `detectLayoutViolations` to keep it
+ * within cognitive-complexity limits — behaviour is identical.
+ */
+function scanTopLevelStrays(
+  workspacePath: string,
+  allowed: Set<string>,
+  sharedLeaf: string,
+  sharedDir: string,
+): { strayTopLevel: string[]; strayShared: string[] } {
+  const strayTopLevel: string[] = [];
+  const strayShared: string[] = [];
+  try {
+    for (const e of fs.readdirSync(workspacePath, { withFileTypes: true })) {
+      if (!e.isDirectory()) continue;
+      if (SCAN_SKIP_DIRS.has(e.name)) continue;
+      if (!allowed.has(e.name)) strayTopLevel.push(e.name);
+      // A top-level dir matching the shared leaf (e.g. root `shared/`) shadows the canonical one.
+      if (e.name === sharedLeaf && sharedDir !== e.name) strayShared.push(e.name);
+    }
+  } catch { /* workspace unreadable — empty report */ }
+  return { strayTopLevel, strayShared };
+}
+
+/**
  * Read-only structural scan of the generated workspace against the contract.
  * Never throws, never blocks — returns a report the caller records/annotates.
  */
@@ -312,17 +339,9 @@ export function detectLayoutViolations(
   const allowed = new Set(contract.allowed_top_level_dirs);
   const sharedLeaf = contract.shared_dir.split('/').pop() ?? 'shared';
 
-  const strayTopLevel: string[] = [];
-  const strayShared: string[] = [];
-  try {
-    for (const e of fs.readdirSync(workspacePath, { withFileTypes: true })) {
-      if (!e.isDirectory()) continue;
-      if (SCAN_SKIP_DIRS.has(e.name)) continue;
-      if (!allowed.has(e.name)) strayTopLevel.push(e.name);
-      // A top-level dir matching the shared leaf (e.g. root `shared/`) shadows the canonical one.
-      if (e.name === sharedLeaf && contract.shared_dir !== e.name) strayShared.push(e.name);
-    }
-  } catch { /* workspace unreadable — empty report */ }
+  const { strayTopLevel, strayShared } = scanTopLevelStrays(
+    workspacePath, allowed, sharedLeaf, contract.shared_dir,
+  );
 
   const allowedExt = new Set(contract.allowed_source_extensions);
   const files: string[] = [];

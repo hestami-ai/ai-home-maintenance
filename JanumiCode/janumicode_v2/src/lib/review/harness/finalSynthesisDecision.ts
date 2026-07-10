@@ -75,13 +75,24 @@ function countFailures(failures: readonly DecisionInputFailure[]): number {
   return n;
 }
 
+/** Plural suffix helper: `''` for exactly one, `'s'` otherwise. */
+function pluralSuffix(n: number): string {
+  return n === 1 ? '' : 's';
+}
+
+interface SeverityTally {
+  high: number;
+  medium: number;
+  low: number;
+  contractDesign: ReviewHarnessContractDesignFinding[];
+}
+
 /**
- * Compute the advisory decision per the locked policy. Pure function.
+ * Split findings into operational severity counts (HIGH/MEDIUM/LOW) and the
+ * informational-only contract-design collation. Contract-design findings do
+ * NOT contribute to the severity tally (§6.5 locked).
  */
-export function computeFinalSynthesisDecision(
-  findings: readonly ValidatorFinding[],
-  failures: readonly DecisionInputFailure[],
-): FinalSynthesisDecisionResult {
+function tallyFindings(findings: readonly ValidatorFinding[]): SeverityTally {
   let high = 0;
   let medium = 0;
   let low = 0;
@@ -105,62 +116,103 @@ export function computeFinalSynthesisDecision(
     else if (f.severity === 'LOW') low += 1;
   }
 
+  return { high, medium, low, contractDesign };
+}
+
+/** Base decision before unavailable escalation, per the locked severity floor. */
+function computeBaseDecision(
+  high: number,
+  medium: number,
+  low: number,
+): ReviewHarnessDecision {
+  if (high >= 2) return 'QUARANTINE';
+  if (high === 1) return 'REVISE';
+  if (medium >= 1) return 'REVISE';
+  if (low >= 1) return 'ACCEPT_WITH_NOTES';
+  return 'ACCEPT';
+}
+
+/** Rationale fragments describing the operational severity counts. */
+function buildSeverityRationale(
+  high: number,
+  medium: number,
+  low: number,
+): string[] {
+  const parts: string[] = [];
+  if (high > 0) parts.push(`${high} HIGH finding${pluralSuffix(high)}`);
+  if (medium > 0) parts.push(`${medium} MEDIUM finding${pluralSuffix(medium)}`);
+  if (low > 0) parts.push(`${low} LOW finding${pluralSuffix(low)}`);
+  if (parts.length === 0) parts.push('no operational findings');
+  return parts;
+}
+
+interface EscalationOutcome {
+  decision: ReviewHarnessDecision;
+  rationaleParts: string[];
+}
+
+/**
+ * Apply validator_unavailable escalation to the base decision, returning the
+ * final decision plus the rationale fragments that describe the transition.
+ */
+function applyUnavailableEscalation(
+  base: ReviewHarnessDecision,
+  high: number,
+  validatorUnavailableCount: number,
+): EscalationOutcome {
+  if (validatorUnavailableCount === 0) {
+    return { decision: base, rationaleParts: [`-> ${base}`] };
+  }
+
+  const parts: string[] = [
+    `${validatorUnavailableCount} validator_unavailable failure${pluralSuffix(
+      validatorUnavailableCount,
+    )}`,
+  ];
+
+  // HIGH + unavailable → ESCALATE (degraded coverage on serious finding).
+  if (high >= 1) {
+    parts.push('-> ESCALATE (HIGH + degraded coverage)');
+    return { decision: 'ESCALATE', rationaleParts: parts };
+  }
+
+  // Escalate by one tier.
+  const decision = escalateOneTier(base);
+  if (decision !== base) {
+    parts.push(`-> ${base} escalated to ${decision}`);
+  }
+  return { decision, rationaleParts: parts };
+}
+
+/**
+ * Compute the advisory decision per the locked policy. Pure function.
+ */
+export function computeFinalSynthesisDecision(
+  findings: readonly ValidatorFinding[],
+  failures: readonly DecisionInputFailure[],
+): FinalSynthesisDecisionResult {
+  const { high, medium, low, contractDesign } = tallyFindings(findings);
   const validatorUnavailableCount = countFailures(failures);
+  const base = computeBaseDecision(high, medium, low);
 
-  // Base decision before unavailable escalation.
-  let base: ReviewHarnessDecision;
-  if (high >= 2) {
-    base = 'QUARANTINE';
-  } else if (high === 1) {
-    base = 'REVISE';
-  } else if (medium >= 1) {
-    base = 'REVISE';
-  } else if (low >= 1) {
-    base = 'ACCEPT_WITH_NOTES';
-  } else {
-    base = 'ACCEPT';
-  }
-
-  let decision: ReviewHarnessDecision = base;
-  const rationaleParts: string[] = [];
-
-  if (high > 0) rationaleParts.push(`${high} HIGH finding${high === 1 ? '' : 's'}`);
-  if (medium > 0) rationaleParts.push(`${medium} MEDIUM finding${medium === 1 ? '' : 's'}`);
-  if (low > 0) rationaleParts.push(`${low} LOW finding${low === 1 ? '' : 's'}`);
-  if (rationaleParts.length === 0) rationaleParts.push('no operational findings');
-
-  if (validatorUnavailableCount > 0) {
-    rationaleParts.push(
-      `${validatorUnavailableCount} validator_unavailable failure${
-        validatorUnavailableCount === 1 ? '' : 's'
-      }`,
-    );
-
-    // HIGH + unavailable → ESCALATE (degraded coverage on serious finding).
-    if (high >= 1) {
-      decision = 'ESCALATE';
-      rationaleParts.push('-> ESCALATE (HIGH + degraded coverage)');
-    } else {
-      // Escalate by one tier.
-      decision = escalateOneTier(base);
-      if (decision !== base) {
-        rationaleParts.push(`-> ${base} escalated to ${decision}`);
-      }
-    }
-  } else {
-    rationaleParts.push(`-> ${decision}`);
-  }
+  const rationaleParts = buildSeverityRationale(high, medium, low);
+  const escalation = applyUnavailableEscalation(
+    base,
+    high,
+    validatorUnavailableCount,
+  );
+  rationaleParts.push(...escalation.rationaleParts);
 
   if (contractDesign.length > 0) {
     rationaleParts.push(
-      `${contractDesign.length} contract-design finding${
-        contractDesign.length === 1 ? '' : 's'
-      } (informational)`,
+      `${contractDesign.length} contract-design finding${pluralSuffix(
+        contractDesign.length,
+      )} (informational)`,
     );
   }
 
   return {
-    decision,
+    decision: escalation.decision,
     rationale: rationaleParts.join('; '),
     contractDesignFindings: contractDesign,
     highCount: high,

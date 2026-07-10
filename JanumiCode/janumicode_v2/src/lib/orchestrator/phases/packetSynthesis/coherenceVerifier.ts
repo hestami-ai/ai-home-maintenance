@@ -202,46 +202,54 @@ function hasUpstreamStoryAnchor(traces: string[] | undefined, upstreamIndex: Ups
   return false;
 }
 
-function verifyPacket(
+/**
+ * P1 — packet has at least one user story. EXEMPTION: a cross-run refactoring
+ * task (task_type 'refactoring', e.g. REFACTOR-1 from Phase 0.5) legitimately has
+ * NO user story — it traces to a cross_run_modification, not a user-facing
+ * feature. Blocking it is a false positive the route-restart can NEVER heal
+ * (Phase 6 task deltas don't mint Phase-1 user stories) → futile cycling.
+ *
+ * Resolvability gate: a task whose footprint has NO resolvable upstream FR anchor
+ * is STRUCTURALLY storyless (a technical leaf that traces only to a component id /
+ * invented CC id / nothing) — no join can heal it, so blocking is a false positive
+ * the route-restart cycles on futilely (same as the D11 task-type exemption). A
+ * task citing a REAL upstream AC/US/SR/NFR that still got zero stories is a genuine
+ * join defect → stays BLOCKING (surfaced).
+ *
+ * Returns null when the packet HAS a user story; otherwise the single finding plus
+ * whether it is exempt (advisory) or blocking. Caller routes it to the right list.
+ */
+function checkUserStoryPresence(
   packet: ImplementationPacketContent,
   upstreamIndex: UpstreamIndex,
-  packetIds: Set<string>,
-  canonicalize: (id: string) => string,
-): PacketCoherenceResult {
-  const blocking: string[] = [];
-  const advisory: string[] = [];
+): { message: string; exempt: boolean } | null {
+  if (packet.user_stories.length !== 0) return null;
+  const exemptType = STORYLESS_EXEMPT_TASK_TYPES.has((packet.task.task_type ?? '').toLowerCase());
+  const structurallyStoryless = !hasUpstreamStoryAnchor(packet.task.traces_to, upstreamIndex);
+  const exempt = exemptType || structurallyStoryless;
+  const msg = `P1_NO_USER_STORY: packet ${packet.packet_id} (task ${packet.task.id}) has no user stories`;
+  const taskTypeLabel = `${packet.task.task_type} task`;
+  const message = exempt
+    ? `${msg} (${exemptType ? taskTypeLabel : 'no resolvable upstream FR anchor'} — exempt, non-user-facing / no joinable story)`
+    : msg;
+  return { message, exempt };
+}
 
-  // P1 — Has at least one user story. EXEMPTION: a cross-run refactoring task
-  // (task_type 'refactoring', e.g. REFACTOR-1 from Phase 0.5) legitimately has NO
-  // user story — it traces to a cross_run_modification, not a user-facing feature.
-  // Blocking it is a false positive the route-restart can NEVER heal (Phase 6 task
-  // deltas don't mint Phase-1 user stories) → futile cycling. Advisory only.
-  if (packet.user_stories.length === 0) {
-    const exemptType = STORYLESS_EXEMPT_TASK_TYPES.has((packet.task.task_type ?? '').toLowerCase());
-    // Resolvability gate: a task whose footprint has NO resolvable upstream FR
-    // anchor is STRUCTURALLY storyless (a technical leaf that traces only to a
-    // component id / invented CC id / nothing) — no join can heal it, so blocking
-    // is a false positive the route-restart cycles on futilely (same as the D11
-    // task-type exemption). A task citing a REAL upstream AC/US/SR/NFR that still
-    // got zero stories is a genuine join defect → stays BLOCKING (surfaced).
-    const structurallyStoryless = !hasUpstreamStoryAnchor(packet.task.traces_to, upstreamIndex);
-    const exempt = exemptType || structurallyStoryless;
-    const msg = `P1_NO_USER_STORY: packet ${packet.packet_id} (task ${packet.task.id}) has no user stories`;
-    (exempt ? advisory : blocking).push(
-      exempt
-        ? `${msg} (${exemptType ? `${packet.task.task_type} task` : 'no resolvable upstream FR anchor'} — exempt, non-user-facing / no joinable story)`
-        : msg,
-    );
-  }
-
-  // P2 — Every user story has at least one AC.
+/** P2 — every user story has at least one AC (blocking). */
+function checkUserStoriesHaveAcs(packet: ImplementationPacketContent): string[] {
+  const out: string[] = [];
   for (const us of packet.user_stories) {
     if (us.acceptance_criteria.length === 0) {
-      blocking.push(`P2_USER_STORY_NO_AC: ${us.id} has no acceptance criteria`);
+      out.push(`P2_USER_STORY_NO_AC: ${us.id} has no acceptance criteria`);
     }
   }
+  return out;
+}
 
-  // P3 — Every AC has at least one test case.
+/** P3 — every AC is covered by at least one test case (blocking). A test may cite
+ *  the AC directly, or via a `${us.id}-${ac.id}` / `${us.id}-…` composite key. */
+function checkAcsHaveTests(packet: ImplementationPacketContent): string[] {
+  const out: string[] = [];
   const testRefs = new Set<string>();
   for (const tc of packet.test_cases) {
     for (const r of tc.acceptance_criterion_ids) testRefs.add(r);
@@ -251,149 +259,246 @@ function verifyPacket(
       const direct = testRefs.has(ac.id);
       const composite = Array.from(testRefs).some((r) => r === `${us.id}-${ac.id}` || r.startsWith(`${us.id}-`));
       if (!direct && !composite) {
-        blocking.push(`P3_AC_NO_TEST: ${us.id}/${ac.id} has no test case`);
+        out.push(`P3_AC_NO_TEST: ${us.id}/${ac.id} has no test case`);
       }
     }
   }
+  return out;
+}
 
-  // P4 — Every user story has at least one functional evaluation criterion.
-  // A leaf story (US-001-01-1) is satisfied by an eval targeting its canonical
-  // root (US-001): Phase-8 evals are root-grained, packets carry leaf slices.
-  // Canonicalize BOTH sides: on the resume/cycle-delta path Phase-8 may persist
-  // a functional eval against a RAW decomposition leaf (US-012-02-D) it never
-  // collapsed to the root (US-012). Functional eval is root/story-level by
-  // design, so a SIBLING-leaf-targeted eval under the same root satisfies every
-  // leaf slice of that story (cal-41 US-012-01-* branch: the only eval coverage
-  // was on sibling leaves -02-D/-03-1/… that all canonicalize to US-012). The
-  // half-implemented bridge previously canonicalized only the query us.id, so a
-  // raw-leaf-targeted eval never matched. NFR/P5 stays exact (NFRs aren't
-  // decomposed and canonicalize to identity).
+/**
+ * P4 — every user story has at least one functional evaluation criterion (blocking).
+ * A leaf story (US-001-01-1) is satisfied by an eval targeting its canonical root
+ * (US-001): Phase-8 evals are root-grained, packets carry leaf slices. Canonicalize
+ * BOTH sides: on the resume/cycle-delta path Phase-8 may persist a functional eval
+ * against a RAW decomposition leaf (US-012-02-D) it never collapsed to the root
+ * (US-012). Functional eval is root/story-level by design, so a SIBLING-leaf-
+ * targeted eval under the same root satisfies every leaf slice of that story
+ * (cal-41 US-012-01-* branch: the only eval coverage was on sibling leaves
+ * -02-D/-03-1/… that all canonicalize to US-012). The half-implemented bridge
+ * previously canonicalized only the query us.id, so a raw-leaf-targeted eval never
+ * matched. NFR/P5 stays exact (NFRs aren't decomposed and canonicalize to identity).
+ */
+function checkUserStoriesHaveEvals(
+  packet: ImplementationPacketContent,
+  canonicalize: (id: string) => string,
+): string[] {
+  const out: string[] = [];
   const evalTargets = new Set(packet.evaluation_criteria.map((e) => e.target_id));
   const evalTargetRoots = new Set(packet.evaluation_criteria.map((e) => canonicalize(e.target_id)));
   for (const us of packet.user_stories) {
     const root = canonicalize(us.id);
     if (!evalTargets.has(us.id) && !evalTargets.has(root) && !evalTargetRoots.has(root)) {
-      blocking.push(`P4_USER_STORY_NO_EVAL: ${us.id} has no evaluation criterion`);
+      out.push(`P4_USER_STORY_NO_EVAL: ${us.id} has no evaluation criterion`);
     }
   }
+  return out;
+}
 
-  // P5 — Every NFR has at least one quality evaluation criterion.
+/** P5 — every NFR has at least one quality evaluation criterion (blocking, exact
+ *  match: NFRs aren't decomposed and canonicalize to identity). */
+function checkNfrsHaveEvals(packet: ImplementationPacketContent): string[] {
+  const out: string[] = [];
+  const evalTargets = new Set(packet.evaluation_criteria.map((e) => e.target_id));
   for (const n of packet.nfrs) {
     if (!evalTargets.has(n.id)) {
-      blocking.push(`P5_NFR_NO_EVAL: ${n.id} has no evaluation criterion`);
+      out.push(`P5_NFR_NO_EVAL: ${n.id} has no evaluation criterion`);
     }
   }
+  return out;
+}
 
-  // P6 — Component contract present (id + ≥1 responsibility).
+/** P6 — component contract present (id + ≥1 responsibility) (blocking). */
+function checkComponentContract(packet: ImplementationPacketContent): string[] {
   if (!packet.component.id || packet.component.responsibilities.length === 0) {
-    blocking.push(`P6_COMPONENT_CONTRACT_MISSING: packet ${packet.packet_id} has no resolvable component contract`);
+    return [`P6_COMPONENT_CONTRACT_MISSING: packet ${packet.packet_id} has no resolvable component contract`];
   }
+  return [];
+}
 
-  // P7 — No invented id references.
+/**
+ * P7 — no invented id references (blocking). Every referenced upstream id must
+ * resolve in the index, and every depends_on_packets id must be a real packet_id.
+ *
+ * (Per-ref resolution events used to fan out into lifecycle.ndjson for granular
+ * forensics on fabricated dm-… / api-… ids. With the legacy lifecycle stream
+ * retired, unresolved refs are still surfaced via the blocking list; the packet
+ * record's coherence verdict captures the rollup.)
+ *
+ * ACs use a per-user-story namespace (AC-001 may appear under multiple user
+ * stories); a literal AC-id may not appear standalone in the index but is still
+ * grounded if nested under a known US. The indexer DOES collect nested AC ids, so
+ * direct match is the expected path. Packet ids are validated separately (C4-side).
+ */
+function checkInventedIdReferences(
+  packet: ImplementationPacketContent,
+  upstreamIndex: UpstreamIndex,
+  packetIds: Set<string>,
+): string[] {
+  const out: string[] = [];
   for (const ref of collectReferencedIds(packet)) {
     if (!ref) continue;
-    const resolved = upstreamIndex.allUpstreamIds.has(ref);
-    // (Per-ref resolution events used to fan out into lifecycle.ndjson
-    // for granular forensics on fabricated dm-*/api-* ids. With the
-    // legacy lifecycle stream retired, unresolved refs are still
-    // surfaced via the blocking-failure list below; the packet record's
-    // coherence verdict captures the rollup.)
-    if (resolved) continue;
-    // ACs use a per-user-story namespace (AC-001 may appear under multiple
-    // user stories); a literal AC-id may not appear in the upstream index
-    // as a standalone id but is still grounded if it appears nested under
-    // a known US. The indexer DOES collect nested AC ids (see EXTRACTION_RULES
-    // fr_bloom_skeleton.nested), so direct match is the expected path.
-    // Packet ids (depends_on_packets) are validated separately in C4.
-    blocking.push(`P7_INVENTED_ID_REFERENCE: '${ref}' not found upstream`);
+    if (upstreamIndex.allUpstreamIds.has(ref)) continue;
+    out.push(`P7_INVENTED_ID_REFERENCE: '${ref}' not found upstream`);
   }
-  // C4-side P7 check: depends_on_packets must reference real packet_ids.
   for (const depPacketId of packet.depends_on_packets) {
     if (!packetIds.has(depPacketId)) {
-      blocking.push(`P7_INVENTED_ID_REFERENCE: depends_on_packets references unknown packet ${depPacketId}`);
+      out.push(`P7_INVENTED_ID_REFERENCE: depends_on_packets references unknown packet ${depPacketId}`);
     }
   }
+  return out;
+}
 
-  // A1 — Task write-paths inside component boundary (advisory).
-  if (packet.component.id && packet.task.write_directory_paths.length > 0) {
-    const compSlug = packet.component.id.replace(/^(comp|component|cmp)[-_]/, '').toLowerCase();
-    const insideBoundary = packet.task.write_directory_paths.some((p) =>
-      p.toLowerCase().includes(compSlug),
-    );
-    if (!insideBoundary && compSlug.length > 0) {
-      advisory.push(`A1_TASK_OUTSIDE_COMPONENT_BOUNDARY: task ${packet.task.id} write_directory_paths do not mention component '${packet.component.id}' slug`);
-    }
+/** A1 — task write-paths mention the component's slug (advisory). */
+function checkTaskBoundary(packet: ImplementationPacketContent): string[] {
+  if (!packet.component.id || packet.task.write_directory_paths.length === 0) return [];
+  const compSlug = packet.component.id.replace(/^(comp|component|cmp)[-_]/, '').toLowerCase();
+  const insideBoundary = packet.task.write_directory_paths.some((p) =>
+    p.toLowerCase().includes(compSlug),
+  );
+  if (!insideBoundary && compSlug.length > 0) {
+    return [`A1_TASK_OUTSIDE_COMPONENT_BOUNDARY: task ${packet.task.id} write_directory_paths do not mention component '${packet.component.id}' slug`];
   }
+  return [];
+}
 
-  // A4 (PD-7) — more than one COMPONENT API reached this packet. The
-  // component-scoped join can't say which endpoint THIS task implements, so the
-  // executor may pick the wrong contract (the `POST /board-decisions` vs
-  // `/decisions/{id}/approve` symptom). Advisory: surfaced for telemetry and
-  // reinforced by the prompt's hedged header. Step-D task-scoping narrows most
-  // packets to a single endpoint; this counts the residual it couldn't scope.
+/**
+ * A4 (PD-7) — more than one COMPONENT API reached this packet (advisory). The
+ * component-scoped join can't say which endpoint THIS task implements, so the
+ * executor may pick the wrong contract (the `POST /board-decisions` vs
+ * `/decisions/{id}/approve` symptom). Surfaced for telemetry and reinforced by the
+ * prompt's hedged header. Step-D task-scoping narrows most packets to a single
+ * endpoint; this counts the residual it couldn't scope.
+ */
+function checkMultiApi(packet: ImplementationPacketContent): string[] {
   if (packet.api_definitions.length > 1) {
-    advisory.push(`A4_UNSCOPED_MULTI_API: packet ${packet.packet_id} carries ${packet.api_definitions.length} component API endpoints; the executor must implement only the one(s) its completion criteria require`);
+    return [`A4_UNSCOPED_MULTI_API: packet ${packet.packet_id} carries ${packet.api_definitions.length} component API endpoints; the executor must implement only the one(s) its completion criteria require`];
   }
+  return [];
+}
 
-  // P8 — Each test_execution completion criterion should be covered by a test
-  // case (advisory). The criterion is the executor's authoritative deliverable;
-  // packetBuilder binds covering tests via the criterion's verified ACs (or the
-  // task's AC set). An uncovered criterion means the deliverable has no
-  // pre-written test — the executor must author one. Advisory, not blocking:
-  // routing to Phase 7 cannot synthesize a CC-targeted test (CC live outside
-  // Phase 7's AC namespace); honest gap surfaced for the executor + telemetry.
+/**
+ * P8 — each test_execution completion criterion should be covered by a test case
+ * (advisory). The criterion is the executor's authoritative deliverable;
+ * packetBuilder binds covering tests via the criterion's verified ACs (or the
+ * task's AC set). An uncovered criterion means the deliverable has no pre-written
+ * test — the executor must author one. Advisory, not blocking: routing to Phase 7
+ * cannot synthesize a CC-targeted test (CC live outside Phase 7's AC namespace).
+ */
+function checkCompletionCriteriaHaveTests(packet: ImplementationPacketContent): string[] {
+  const out: string[] = [];
   for (const cc of packet.task.completion_criteria) {
     if (cc.verification_method !== 'test_execution') continue;
     if (!cc.covered_by_test_ids || cc.covered_by_test_ids.length === 0) {
-      advisory.push(`P8_CC_NO_TEST: completion criterion ${cc.criterion_id} (task ${packet.task.id}) has no covering test case — executor must author one`);
+      out.push(`P8_CC_NO_TEST: completion criterion ${cc.criterion_id} (task ${packet.task.id}) has no covering test case — executor must author one`);
     }
   }
+  return out;
+}
 
-  // P9 (PD-4) — completion-criterion ↔ acceptance-criterion contradictions.
-  advisory.push(...ccAcContradictions(packet));
+/**
+ * Coerce a test case's expected_outcome to a stable comparison string. It is
+ * normalised to a string by the packet builder, but never assume — a stray
+ * array/undefined here would otherwise crash the whole phase.
+ */
+function normalizeExpectedOutcome(expected: unknown): string {
+  if (typeof expected === 'string') return expected.trim();
+  if (Array.isArray(expected)) return (expected as unknown[]).filter((x) => typeof x === 'string').join('; ');
+  if (expected === null || expected === undefined) return '';
+  // Preserve the original `String(expected ?? '')` fall-through exactly (object ->
+  // '[object Object]', bigint/number/boolean -> String form) as a stable dedup key.
+  // Cast keeps SonarLint S6551 quiet without changing runtime coercion; do NOT use
+  // JSON.stringify here — it throws on bigint and would change dedup-key collisions.
+  return String(expected as string | number | boolean);
+}
 
-  // A2 — No two test cases share identical AC refs + expected_outcome.
+/** A2 — no two test cases share identical AC refs + expected_outcome (advisory). */
+function checkDuplicateTests(packet: ImplementationPacketContent): string[] {
+  const out: string[] = [];
   const seenTests = new Map<string, string>();
   for (const tc of packet.test_cases) {
-    // expected_outcome is normalised to a string by the packet builder, but
-    // never assume — a stray array/undefined here would crash the whole phase.
-    let outcome: string;
-    if (typeof tc.expected_outcome === 'string') {
-      outcome = tc.expected_outcome.trim();
-    } else if (Array.isArray(tc.expected_outcome)) {
-      outcome = (tc.expected_outcome as unknown[]).filter((x) => typeof x === 'string').join('; ');
-    } else {
-      outcome = String(tc.expected_outcome ?? '');
-    }
+    const outcome = normalizeExpectedOutcome(tc.expected_outcome);
     const key = `${[...tc.acceptance_criterion_ids].sort((a, b) => a.localeCompare(b)).join(',')}::${outcome}`;
     if (seenTests.has(key)) {
-      advisory.push(`A2_DUPLICATE_TEST_CASE: ${tc.test_case_id} duplicates ${seenTests.get(key)}`);
+      out.push(`A2_DUPLICATE_TEST_CASE: ${tc.test_case_id} duplicates ${seenTests.get(key)}`);
     } else {
       seenTests.set(key, tc.test_case_id);
     }
   }
+  return out;
+}
 
-  // A3 — Eval criterion measurability (heuristic: success_condition mentions
-  // an HTTP status, a number, a comparison operator, a percentile, or a time unit).
-  const isMeasurable = (s: string): boolean =>
+/** Eval measurability heuristic: success_condition mentions an HTTP status, a
+ *  number, a comparison operator, a percentile, or a time unit. */
+function isMeasurableCondition(s: string): boolean {
+  return (
     /HTTP|equal/i.test(s) ||
     /\b[12345]\d{2}\b/.test(s) ||
     /\b\d+(\.\d+)?\s*(ms|s|min|hr|%|MB|GB)\b/i.test(s) ||
-    /<=|>=|≤|≥|<|>/.test(s);
+    /<=|>=|≤|≥|<|>/.test(s)
+  );
+}
+
+/** A3 — eval criterion measurability (advisory). A property-backed criterion IS
+ *  measurable by construction: a generator samples the input domain and asserts
+ *  the invariant for every case. */
+function checkEvalMeasurability(packet: ImplementationPacketContent): string[] {
+  const out: string[] = [];
   for (const ec of packet.evaluation_criteria) {
-    // A property-backed criterion IS measurable by construction: a generator
-    // samples the input domain and asserts the invariant for every case.
     if (ec.property_spec && ec.property_spec.invariant.length > 0) continue;
-    if (!isMeasurable(ec.success_condition)) {
-      advisory.push(`A3_UNMEASURABLE_EVAL_CRITERION: target ${ec.target_id} success_condition lacks measurable predicate`);
+    if (!isMeasurableCondition(ec.success_condition)) {
+      out.push(`A3_UNMEASURABLE_EVAL_CRITERION: target ${ec.target_id} success_condition lacks measurable predicate`);
     }
   }
+  return out;
+}
 
-  // Annotations — ai_proposed_root_count over every referenced id.
+/** Annotations — every referenced id that is an ai_proposed_root. */
+function collectAiProposedRefs(
+  packet: ImplementationPacketContent,
+  upstreamIndex: UpstreamIndex,
+): string[] {
   const aiRefs: string[] = [];
   for (const ref of collectReferencedIds(packet)) {
     if (upstreamIndex.aiProposedIds.has(ref)) aiRefs.push(ref);
   }
+  return aiRefs;
+}
+
+function verifyPacket(
+  packet: ImplementationPacketContent,
+  upstreamIndex: UpstreamIndex,
+  packetIds: Set<string>,
+  canonicalize: (id: string) => string,
+): PacketCoherenceResult {
+  const blocking: string[] = [];
+  const advisory: string[] = [];
+
+  // P1 — user-story presence routes to either list depending on the exemption.
+  const p1 = checkUserStoryPresence(packet, upstreamIndex);
+  if (p1) (p1.exempt ? advisory : blocking).push(p1.message);
+
+  // P2–P7 — blocking structural assertions.
+  blocking.push(
+    ...checkUserStoriesHaveAcs(packet),
+    ...checkAcsHaveTests(packet),
+    ...checkUserStoriesHaveEvals(packet, canonicalize),
+    ...checkNfrsHaveEvals(packet),
+    ...checkComponentContract(packet),
+    ...checkInventedIdReferences(packet, upstreamIndex, packetIds),
+  );
+
+  // A1 / A4 / P8 / P9 / A2 / A3 — advisory findings (order preserved).
+  advisory.push(
+    ...checkTaskBoundary(packet),
+    ...checkMultiApi(packet),
+    ...checkCompletionCriteriaHaveTests(packet),
+    ...ccAcContradictions(packet), // P9 (PD-4) CC↔AC contradictions
+    ...checkDuplicateTests(packet),
+    ...checkEvalMeasurability(packet),
+  );
+
+  const aiRefs = collectAiProposedRefs(packet, upstreamIndex);
 
   return {
     passed: blocking.length === 0,

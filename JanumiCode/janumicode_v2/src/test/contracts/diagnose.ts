@@ -171,13 +171,17 @@ function selectSuites(args: CliArgs): ReadonlyArray<ContractSuite<unknown>> {
 function findProducerArtifact(
   suite: ContractSuite<unknown>,
   artifacts: DbArtifact[],
-): unknown | undefined {
+): unknown {
   // The most-recent producer artifact of the matching kind.
   // (If a sub-phase re-ran during a cycle, we want the freshest.)
   const matches = artifacts.filter((a) => a.kind === suite.producerArtifactKind);
   if (matches.length === 0) return undefined;
   matches.sort((a, b) => b.producedAt.localeCompare(a.producedAt));
   return matches[0].content;
+}
+
+function markerFor(severity: ContractResult['severity']): string {
+  return severity === 'blocking' ? '✖' : '○';
 }
 
 function printText(
@@ -211,7 +215,7 @@ function printText(
     out.push(`   ${s.passed}/${s.total} clauses passed · ${s.blockingFailures} blocking · ${s.advisoryFailures} advisory`);
     for (const r of results) {
       if (r.passed) continue;
-      const marker = r.severity === 'blocking' ? '✖' : '○';
+      const marker = markerFor(r.severity);
       out.push(`   ${marker} [${r.clauseId}] ${r.clauseDescription}`);
       if (r.message) out.push(`        ${r.message}`);
     }

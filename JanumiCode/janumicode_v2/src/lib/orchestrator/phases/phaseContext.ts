@@ -294,7 +294,9 @@ function summarizeBusinessDomainsBloom(c: Record<string, unknown>): string {
     const id = (d.id as string) ?? '(no id)';
     const name = (d.name as string) ?? '';
     const description = (d.description as string) ?? '';
-    return `- ${id}${name ? ` — ${name}` : ''}${description ? `: ${description}` : ''}`;
+    const namePart = name ? ` — ${name}` : '';
+    const descPart = description ? `: ${description}` : '';
+    return `- ${id}${namePart}${descPart}`;
   });
   return `Business Domains (${list.length}):\n${lines.join('\n')}`;
 }
@@ -321,10 +323,11 @@ function summarizeSystemBoundary(c: Record<string, unknown>): string {
   const inScope = (c.in_scope as unknown[]) ?? [];
   const outScope = (c.out_of_scope as unknown[]) ?? [];
   const external = (c.external_systems as Array<Record<string, unknown>>) ?? [];
+  const externalList = external.map(e => `${e.id}: ${e.name} (${e.interface_type})`).join('; ') || 'none';
   return [
     `In scope: ${inScope.map(displayCapability).join('; ')}`,
     `Out of scope: ${outScope.map(displayCapability).join('; ')}`,
-    `External systems: ${external.map(e => `${e.id}: ${e.name} (${e.interface_type})`).join('; ') || 'none'}`,
+    `External systems: ${externalList}`,
   ].join('\n');
 }
 
@@ -391,7 +394,8 @@ function summarizeDataModels(c: Record<string, unknown>): string {
     const entities = (m.entities as Array<Record<string, unknown>>) ?? [];
     const entList = entities.map(e => {
       const fields = (e.fields as Array<Record<string, unknown>>) ?? [];
-      return `    ${e.name}: ${fields.map(f => `${f.name}:${f.type}`).join(', ')}`;
+      const fieldStr = fields.map(f => `${f.name}:${f.type}`).join(', ');
+      return `    ${e.name}: ${fieldStr}`;
     }).join('\n');
     return `  Component ${m.component_id}:\n${entList}`;
   });
@@ -611,13 +615,26 @@ export function buildEffectiveFrView(
   };
 }
 
-export function getFrozenFrLeaves(
+// ── Shared frozen-leaf projection helpers ──────────────────────────
+// The five getFrozen*Leaves projections below share the same three-pass
+// shape: (1) reduce the stream to the latest revision per node_id for a
+// given record type, (2) build the depth-0 root display-key lookup, and
+// (3) coerce the metadata fields common to every leaf shape. Extracted
+// here so each projection stays flat and readable.
+
+/**
+ * Pass 1 — reduce the stream to the latest revision per `content.node_id`
+ * for records of `recordType`. "Latest" is by `produced_at` (string
+ * compare, matching the original inline logic). Records lacking a string
+ * `node_id` are skipped.
+ */
+function latestNodesByNodeId(
   allArtifacts: GovernedStreamRecord[],
-): FrozenFrLeaf[] {
-  // Collect current version per node_id (logical UUID).
+  recordType: GovernedStreamRecord['record_type'],
+): Map<string, GovernedStreamRecord> {
   const latestByNodeId = new Map<string, GovernedStreamRecord>();
   for (const r of allArtifacts) {
-    if (r.record_type !== 'requirement_decomposition_node') continue;
+    if (r.record_type !== recordType) continue;
     const c = r.content as Record<string, unknown>;
     const nodeId = typeof c.node_id === 'string' ? c.node_id : null;
     if (!nodeId) continue;
@@ -626,9 +643,18 @@ export function getFrozenFrLeaves(
       latestByNodeId.set(nodeId, r);
     }
   }
-  // Root display-key lookup: root's logical UUID → its display_key (if
-  // available). Roots are depth-0 nodes; their display_key is the LLM's
-  // raw story.id (sibling-collision-suffixed if required).
+  return latestByNodeId;
+}
+
+/**
+ * Pass 2 — map each depth-0 (root) node's logical UUID to its display_key
+ * when both are present. Roots' display_key is the LLM's raw story/entity
+ * id (sibling-collision-suffixed if required); leaves resolve their
+ * `root_display_key` through this lookup.
+ */
+function rootDisplayKeyMap(
+  latestByNodeId: Map<string, GovernedStreamRecord>,
+): Map<string, string> {
   const rootDisplayKeyByUuid = new Map<string, string>();
   for (const r of latestByNodeId.values()) {
     const c = r.content as Record<string, unknown>;
@@ -637,6 +663,59 @@ export function getFrozenFrLeaves(
     const display = typeof c.display_key === 'string' ? c.display_key : null;
     if (rootUuid && display) rootDisplayKeyByUuid.set(rootUuid, display);
   }
+  return rootDisplayKeyByUuid;
+}
+
+/** Coerce an unknown `content.tier` to a LeafTier (null unless A/B/C/D). */
+function coerceTier(value: unknown): LeafTier {
+  return (value === 'A' || value === 'B' || value === 'C' || value === 'D')
+    ? value as LeafTier
+    : null;
+}
+
+/** Metadata common to every frozen-leaf shape. `rootId` carries the value
+ *  of the leaf's root-id field (root_fr_id / root_component_id / …). */
+interface FrozenLeafMeta {
+  node_id: string;
+  rootId: string;
+  display_key: string;
+  root_display_key: string;
+  depth: number;
+  tier: LeafTier;
+  release_id: string | null;
+  release_ordinal: number | null;
+}
+
+/**
+ * Pass 3 — extract the metadata fields shared by all frozen-leaf shapes
+ * from a node's content. `rootIdField` names the node's root-id property
+ * (e.g. 'root_fr_id'); `fallbackDisplayKey` is used when the node has no
+ * string `display_key` (the payload's own id, matching the originals).
+ */
+function extractLeafMeta(
+  c: Record<string, unknown>,
+  rootIdField: string,
+  rootDisplayKeyByUuid: Map<string, string>,
+  fallbackDisplayKey: string,
+): FrozenLeafMeta {
+  const rootId = typeof c[rootIdField] === 'string' ? c[rootIdField] as string : '';
+  return {
+    node_id: typeof c.node_id === 'string' ? c.node_id : '',
+    rootId,
+    display_key: typeof c.display_key === 'string' ? c.display_key : fallbackDisplayKey,
+    root_display_key: rootDisplayKeyByUuid.get(rootId) ?? rootId,
+    depth: typeof c.depth === 'number' ? c.depth : 0,
+    tier: coerceTier(c.tier),
+    release_id: typeof c.release_id === 'string' ? c.release_id : null,
+    release_ordinal: typeof c.release_ordinal === 'number' ? c.release_ordinal : null,
+  };
+}
+
+export function getFrozenFrLeaves(
+  allArtifacts: GovernedStreamRecord[],
+): FrozenFrLeaf[] {
+  const latestByNodeId = latestNodesByNodeId(allArtifacts, 'requirement_decomposition_node');
+  const rootDisplayKeyByUuid = rootDisplayKeyMap(latestByNodeId);
   const leaves: FrozenFrLeaf[] = [];
   for (const r of latestByNodeId.values()) {
     const c = r.content as Record<string, unknown>;
@@ -649,18 +728,16 @@ export function getFrozenFrLeaves(
     if (c.root_kind && c.root_kind !== 'fr') continue;
     const story = c.user_story as FrozenFrLeaf['user_story'] | undefined;
     if (!story) continue;
-    const rootFrId = typeof c.root_fr_id === 'string' ? c.root_fr_id : '';
+    const meta = extractLeafMeta(c, 'root_fr_id', rootDisplayKeyByUuid, story.id ?? '');
     leaves.push({
-      node_id: typeof c.node_id === 'string' ? c.node_id : '',
-      root_fr_id: rootFrId,
-      display_key: typeof c.display_key === 'string' ? c.display_key : (story.id ?? ''),
-      root_display_key: rootDisplayKeyByUuid.get(rootFrId) ?? rootFrId,
-      depth: typeof c.depth === 'number' ? c.depth : 0,
-      tier: (c.tier === 'A' || c.tier === 'B' || c.tier === 'C' || c.tier === 'D')
-        ? c.tier as FrozenFrLeaf['tier']
-        : null,
-      release_id: typeof c.release_id === 'string' ? c.release_id : null,
-      release_ordinal: typeof c.release_ordinal === 'number' ? c.release_ordinal : null,
+      node_id: meta.node_id,
+      root_fr_id: meta.rootId,
+      display_key: meta.display_key,
+      root_display_key: meta.root_display_key,
+      depth: meta.depth,
+      tier: meta.tier,
+      release_id: meta.release_id,
+      release_ordinal: meta.release_ordinal,
       user_story: story,
     });
   }
@@ -702,45 +779,24 @@ export interface FrozenComponentLeaf {
 export function getFrozenComponentLeaves(
   allArtifacts: GovernedStreamRecord[],
 ): FrozenComponentLeaf[] {
-  const latestByNodeId = new Map<string, GovernedStreamRecord>();
-  for (const r of allArtifacts) {
-    if (r.record_type !== 'component_decomposition_node') continue;
-    const c = r.content as Record<string, unknown>;
-    const nodeId = typeof c.node_id === 'string' ? c.node_id : null;
-    if (!nodeId) continue;
-    const existing = latestByNodeId.get(nodeId);
-    if (!existing || r.produced_at > existing.produced_at) {
-      latestByNodeId.set(nodeId, r);
-    }
-  }
-
-  const rootDisplayKeyByUuid = new Map<string, string>();
-  for (const r of latestByNodeId.values()) {
-    const c = r.content as Record<string, unknown>;
-    if (c.depth !== 0) continue;
-    const rootUuid = typeof c.node_id === 'string' ? c.node_id : null;
-    const display = typeof c.display_key === 'string' ? c.display_key : null;
-    if (rootUuid && display) rootDisplayKeyByUuid.set(rootUuid, display);
-  }
-
+  const latestByNodeId = latestNodesByNodeId(allArtifacts, 'component_decomposition_node');
+  const rootDisplayKeyByUuid = rootDisplayKeyMap(latestByNodeId);
   const leaves: FrozenComponentLeaf[] = [];
   for (const r of latestByNodeId.values()) {
     const c = r.content as Record<string, unknown>;
     if (c.status !== 'atomic') continue;
     const component = c.component as FrozenComponentLeaf['component'] | undefined;
     if (!component) continue;
-    const rootId = typeof c.root_component_id === 'string' ? c.root_component_id : '';
+    const meta = extractLeafMeta(c, 'root_component_id', rootDisplayKeyByUuid, component.id ?? '');
     leaves.push({
-      node_id: typeof c.node_id === 'string' ? c.node_id : '',
-      root_component_id: rootId,
-      display_key: typeof c.display_key === 'string' ? c.display_key : (component.id ?? ''),
-      root_display_key: rootDisplayKeyByUuid.get(rootId) ?? rootId,
-      depth: typeof c.depth === 'number' ? c.depth : 0,
-      tier: (c.tier === 'A' || c.tier === 'B' || c.tier === 'C' || c.tier === 'D')
-        ? c.tier as FrozenComponentLeaf['tier']
-        : null,
-      release_id: typeof c.release_id === 'string' ? c.release_id : null,
-      release_ordinal: typeof c.release_ordinal === 'number' ? c.release_ordinal : null,
+      node_id: meta.node_id,
+      root_component_id: meta.rootId,
+      display_key: meta.display_key,
+      root_display_key: meta.root_display_key,
+      depth: meta.depth,
+      tier: meta.tier,
+      release_id: meta.release_id,
+      release_ordinal: meta.release_ordinal,
       component,
     });
   }
@@ -907,45 +963,24 @@ export interface FrozenTaskLeaf {
 export function getFrozenTaskLeaves(
   allArtifacts: GovernedStreamRecord[],
 ): FrozenTaskLeaf[] {
-  const latestByNodeId = new Map<string, GovernedStreamRecord>();
-  for (const r of allArtifacts) {
-    if (r.record_type !== 'task_decomposition_node') continue;
-    const c = r.content as Record<string, unknown>;
-    const nodeId = typeof c.node_id === 'string' ? c.node_id : null;
-    if (!nodeId) continue;
-    const existing = latestByNodeId.get(nodeId);
-    if (!existing || r.produced_at > existing.produced_at) {
-      latestByNodeId.set(nodeId, r);
-    }
-  }
-
-  const rootDisplayKeyByUuid = new Map<string, string>();
-  for (const r of latestByNodeId.values()) {
-    const c = r.content as Record<string, unknown>;
-    if (c.depth !== 0) continue;
-    const rootUuid = typeof c.node_id === 'string' ? c.node_id : null;
-    const display = typeof c.display_key === 'string' ? c.display_key : null;
-    if (rootUuid && display) rootDisplayKeyByUuid.set(rootUuid, display);
-  }
-
+  const latestByNodeId = latestNodesByNodeId(allArtifacts, 'task_decomposition_node');
+  const rootDisplayKeyByUuid = rootDisplayKeyMap(latestByNodeId);
   const leaves: FrozenTaskLeaf[] = [];
   for (const r of latestByNodeId.values()) {
     const c = r.content as Record<string, unknown>;
     if (c.status !== 'atomic') continue;
     const task = c.task as FrozenTaskLeaf['task'] | undefined;
     if (!task) continue;
-    const rootId = typeof c.root_task_id === 'string' ? c.root_task_id : '';
+    const meta = extractLeafMeta(c, 'root_task_id', rootDisplayKeyByUuid, task.id ?? '');
     leaves.push({
-      node_id: typeof c.node_id === 'string' ? c.node_id : '',
-      root_task_id: rootId,
-      display_key: typeof c.display_key === 'string' ? c.display_key : (task.id ?? ''),
-      root_display_key: rootDisplayKeyByUuid.get(rootId) ?? rootId,
-      depth: typeof c.depth === 'number' ? c.depth : 0,
-      tier: (c.tier === 'A' || c.tier === 'B' || c.tier === 'C' || c.tier === 'D')
-        ? c.tier as FrozenTaskLeaf['tier']
-        : null,
-      release_id: typeof c.release_id === 'string' ? c.release_id : null,
-      release_ordinal: typeof c.release_ordinal === 'number' ? c.release_ordinal : null,
+      node_id: meta.node_id,
+      root_task_id: meta.rootId,
+      display_key: meta.display_key,
+      root_display_key: meta.root_display_key,
+      depth: meta.depth,
+      tier: meta.tier,
+      release_id: meta.release_id,
+      release_ordinal: meta.release_ordinal,
       task,
     });
   }
@@ -1079,42 +1114,24 @@ export interface FrozenDataModelLeaf {
 export function getFrozenDataModelLeaves(
   allArtifacts: GovernedStreamRecord[],
 ): FrozenDataModelLeaf[] {
-  const latestByNodeId = new Map<string, GovernedStreamRecord>();
-  for (const r of allArtifacts) {
-    if (r.record_type !== 'data_model_decomposition_node') continue;
-    const c = r.content as Record<string, unknown>;
-    const nodeId = typeof c.node_id === 'string' ? c.node_id : null;
-    if (!nodeId) continue;
-    const existing = latestByNodeId.get(nodeId);
-    if (!existing || r.produced_at > existing.produced_at) {
-      latestByNodeId.set(nodeId, r);
-    }
-  }
-  const rootDisplayKeyByUuid = new Map<string, string>();
-  for (const r of latestByNodeId.values()) {
-    const c = r.content as Record<string, unknown>;
-    if (c.depth !== 0) continue;
-    const rootUuid = typeof c.node_id === 'string' ? c.node_id : null;
-    const display = typeof c.display_key === 'string' ? c.display_key : null;
-    if (rootUuid && display) rootDisplayKeyByUuid.set(rootUuid, display);
-  }
+  const latestByNodeId = latestNodesByNodeId(allArtifacts, 'data_model_decomposition_node');
+  const rootDisplayKeyByUuid = rootDisplayKeyMap(latestByNodeId);
   const leaves: FrozenDataModelLeaf[] = [];
   for (const r of latestByNodeId.values()) {
     const c = r.content as Record<string, unknown>;
     if (c.status !== 'atomic') continue;
     const entity = c.entity as FrozenDataModelLeaf['entity'] | undefined;
     if (!entity) continue;
-    const rootId = typeof c.root_entity_id === 'string' ? c.root_entity_id : '';
+    const meta = extractLeafMeta(c, 'root_entity_id', rootDisplayKeyByUuid, entity.id ?? '');
     leaves.push({
-      node_id: typeof c.node_id === 'string' ? c.node_id : '',
-      root_entity_id: rootId,
-      display_key: typeof c.display_key === 'string' ? c.display_key : (entity.id ?? ''),
-      root_display_key: rootDisplayKeyByUuid.get(rootId) ?? rootId,
-      depth: typeof c.depth === 'number' ? c.depth : 0,
-      tier: (c.tier === 'A' || c.tier === 'B' || c.tier === 'C' || c.tier === 'D')
-        ? c.tier as FrozenDataModelLeaf['tier'] : null,
-      release_id: typeof c.release_id === 'string' ? c.release_id : null,
-      release_ordinal: typeof c.release_ordinal === 'number' ? c.release_ordinal : null,
+      node_id: meta.node_id,
+      root_entity_id: meta.rootId,
+      display_key: meta.display_key,
+      root_display_key: meta.root_display_key,
+      depth: meta.depth,
+      tier: meta.tier,
+      release_id: meta.release_id,
+      release_ordinal: meta.release_ordinal,
       entity,
     });
   }
@@ -1237,42 +1254,24 @@ export interface FrozenTestLeaf {
 export function getFrozenTestLeaves(
   allArtifacts: GovernedStreamRecord[],
 ): FrozenTestLeaf[] {
-  const latestByNodeId = new Map<string, GovernedStreamRecord>();
-  for (const r of allArtifacts) {
-    if (r.record_type !== 'test_decomposition_node') continue;
-    const c = r.content as Record<string, unknown>;
-    const nodeId = typeof c.node_id === 'string' ? c.node_id : null;
-    if (!nodeId) continue;
-    const existing = latestByNodeId.get(nodeId);
-    if (!existing || r.produced_at > existing.produced_at) {
-      latestByNodeId.set(nodeId, r);
-    }
-  }
-  const rootDisplayKeyByUuid = new Map<string, string>();
-  for (const r of latestByNodeId.values()) {
-    const c = r.content as Record<string, unknown>;
-    if (c.depth !== 0) continue;
-    const rootUuid = typeof c.node_id === 'string' ? c.node_id : null;
-    const display = typeof c.display_key === 'string' ? c.display_key : null;
-    if (rootUuid && display) rootDisplayKeyByUuid.set(rootUuid, display);
-  }
+  const latestByNodeId = latestNodesByNodeId(allArtifacts, 'test_decomposition_node');
+  const rootDisplayKeyByUuid = rootDisplayKeyMap(latestByNodeId);
   const leaves: FrozenTestLeaf[] = [];
   for (const r of latestByNodeId.values()) {
     const c = r.content as Record<string, unknown>;
     if (c.status !== 'atomic') continue;
     const tc = c.test_case as FrozenTestLeaf['test_case'] | undefined;
     if (!tc) continue;
-    const rootId = typeof c.root_test_id === 'string' ? c.root_test_id : '';
+    const meta = extractLeafMeta(c, 'root_test_id', rootDisplayKeyByUuid, tc.id ?? '');
     leaves.push({
-      node_id: typeof c.node_id === 'string' ? c.node_id : '',
-      root_test_id: rootId,
-      display_key: typeof c.display_key === 'string' ? c.display_key : (tc.id ?? ''),
-      root_display_key: rootDisplayKeyByUuid.get(rootId) ?? rootId,
-      depth: typeof c.depth === 'number' ? c.depth : 0,
-      tier: (c.tier === 'A' || c.tier === 'B' || c.tier === 'C' || c.tier === 'D')
-        ? c.tier as FrozenTestLeaf['tier'] : null,
-      release_id: typeof c.release_id === 'string' ? c.release_id : null,
-      release_ordinal: typeof c.release_ordinal === 'number' ? c.release_ordinal : null,
+      node_id: meta.node_id,
+      root_test_id: meta.rootId,
+      display_key: meta.display_key,
+      root_display_key: meta.root_display_key,
+      depth: meta.depth,
+      tier: meta.tier,
+      release_id: meta.release_id,
+      release_ordinal: meta.release_ordinal,
       test_case: tc,
     });
   }

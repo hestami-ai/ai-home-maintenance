@@ -159,31 +159,99 @@ function checkUnreachedJourneyIntegrity(i: FrCoverageVerifierInputs): CoverageGa
   })];
 }
 
+/** Accepted-id lookup sets, one per upstream artifact family. */
+interface TraceResolutionTables {
+  journeyIds: Set<string>;
+  entityIds: Set<string>;
+  workflowIds: Set<string>;
+  complianceIds: Set<string>;
+  vocabIds: Set<string>;
+  openQIds: Set<string>;
+}
+
+type TraceVerdict = 'ok' | 'dangling' | 'unknown_prefix';
+
+/**
+ * One prefix-dispatch rule: a `traces_to` id matching any of `prefixes`
+ * is validated against the set returned by `accepted`. Rules are
+ * consulted in order and the first matching prefix decides the verdict.
+ * (Preserves the original if-chain order: UJ → ENT → WF → COMP → VOC →
+ * OPEN/Q. Prefixes are mutually exclusive, so order is not observable,
+ * but it is kept identical.)
+ */
+interface TracePrefixRule {
+  prefixes: string[];
+  accepted: (tbl: TraceResolutionTables) => Set<string>;
+}
+
+const TRACE_PREFIX_RULES: TracePrefixRule[] = [
+  { prefixes: ['UJ-'], accepted: tbl => tbl.journeyIds },
+  { prefixes: ['ENT-'], accepted: tbl => tbl.entityIds },
+  { prefixes: ['WF-'], accepted: tbl => tbl.workflowIds },
+  { prefixes: ['COMP-'], accepted: tbl => tbl.complianceIds },
+  { prefixes: ['VOC-'], accepted: tbl => tbl.vocabIds },
+  { prefixes: ['OPEN-', 'Q-'], accepted: tbl => tbl.openQIds },
+];
+
+function buildTraceResolutionTables(i: FrCoverageVerifierInputs): TraceResolutionTables {
+  return {
+    journeyIds: new Set(i.journeys.map(j => j.id)),
+    entityIds: new Set(i.entities.map(e => e.id)),
+    workflowIds: new Set(i.workflows.map(w => w.id)),
+    complianceIds: new Set(i.complianceItems.map(c => c.id)),
+    vocabIds: new Set(i.vocabulary.map(v => v.id)),
+    openQIds: new Set(i.openQuestionIds),
+  };
+}
+
+/**
+ * Classify a single `traces_to` id: the first rule whose prefix matches
+ * decides — `ok` when the id is in that rule's accepted set, `dangling`
+ * otherwise. No prefix match ⇒ `unknown_prefix`.
+ */
+function classifyTrace(t: string, tables: TraceResolutionTables): TraceVerdict {
+  for (const rule of TRACE_PREFIX_RULES) {
+    if (rule.prefixes.some(p => t.startsWith(p))) {
+      return rule.accepted(tables).has(t) ? 'ok' : 'dangling';
+    }
+  }
+  return 'unknown_prefix';
+}
+
+interface TraceViolations {
+  badUnknownPrefix: string[];
+  badDangling: string[];
+}
+
+/**
+ * Walk every FR's `traces_to` in iteration order, bucketing each id
+ * into unknown-prefix / dangling violations (valid ids contribute
+ * nothing). Iteration order is preserved; final output is sorted by
+ * mkGap.
+ */
+function collectTraceViolations(
+  userStories: UserStorySkeleton[],
+  tables: TraceResolutionTables,
+): TraceViolations {
+  const badUnknownPrefix: string[] = [];
+  const badDangling: string[] = [];
+  for (const s of userStories) {
+    for (const t of s.traces_to ?? []) {
+      const verdict = classifyTrace(t, tables);
+      if (verdict === 'unknown_prefix') badUnknownPrefix.push(`${s.id}:${t}`);
+      else if (verdict === 'dangling') badDangling.push(`${s.id}:${t}`);
+    }
+  }
+  return { badUnknownPrefix, badDangling };
+}
+
 /**
  * Every `traces_to` id must resolve to an accepted upstream artifact.
  * Unknown prefixes and dangling refs are blocking.
  */
 function checkTracesReferentialIntegrity(i: FrCoverageVerifierInputs): CoverageGapContent[] {
-  const journeyIds = new Set(i.journeys.map(j => j.id));
-  const entityIds = new Set(i.entities.map(e => e.id));
-  const workflowIds = new Set(i.workflows.map(w => w.id));
-  const complianceIds = new Set(i.complianceItems.map(c => c.id));
-  const vocabIds = new Set(i.vocabulary.map(v => v.id));
-  const openQIds = new Set(i.openQuestionIds);
-
-  const badUnknownPrefix: string[] = [];
-  const badDangling: string[] = [];
-  for (const s of i.userStories) {
-    for (const t of s.traces_to ?? []) {
-      if (t.startsWith('UJ-')) { if (!journeyIds.has(t)) badDangling.push(`${s.id}:${t}`); continue; }
-      if (t.startsWith('ENT-')) { if (!entityIds.has(t)) badDangling.push(`${s.id}:${t}`); continue; }
-      if (t.startsWith('WF-')) { if (!workflowIds.has(t)) badDangling.push(`${s.id}:${t}`); continue; }
-      if (t.startsWith('COMP-')) { if (!complianceIds.has(t)) badDangling.push(`${s.id}:${t}`); continue; }
-      if (t.startsWith('VOC-')) { if (!vocabIds.has(t)) badDangling.push(`${s.id}:${t}`); continue; }
-      if (t.startsWith('OPEN-') || t.startsWith('Q-')) { if (!openQIds.has(t)) badDangling.push(`${s.id}:${t}`); continue; }
-      badUnknownPrefix.push(`${s.id}:${t}`);
-    }
-  }
+  const tables = buildTraceResolutionTables(i);
+  const { badUnknownPrefix, badDangling } = collectTraceViolations(i.userStories, tables);
   const gaps: CoverageGapContent[] = [];
   if (badUnknownPrefix.length > 0) {
     gaps.push(mkGap({

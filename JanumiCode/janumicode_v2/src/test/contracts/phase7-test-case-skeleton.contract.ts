@@ -17,7 +17,7 @@ export type TestCaseFunctionalKind = 'functional' | 'performance' | 'security' |
 
 export interface TestCase {
   test_case_id: string;
-  type: TestCaseFunctionalKind | string;
+  type: TestCaseFunctionalKind | (string & {});
   acceptance_criterion_ids: string[];
   preconditions?: string[];
   expected_outcome: string;
@@ -42,6 +42,63 @@ const COMP_ID_PATTERN = /^comp-/;
 const AC_ID_PATTERN = /^AC-/;
 const US_ID_PATTERN = /^US-\d+$/;
 const VALID_TEST_TYPES = new Set<string>(['unit', 'integration', 'end_to_end']);
+
+// ── Clause check helpers (extracted to keep clause bodies flat) ──
+
+/** Shape issues for a single test case (C-7.1.4). Preserves the
+ *  original push order: a missing id short-circuits to one issue;
+ *  otherwise expected_outcome then acceptance_criterion_ids. */
+function collectTestCaseShapeIssues(
+  suiteId: string,
+  tc: TestCase,
+): Array<{ suiteId: string; testId: string; reason: string }> {
+  if (!tc.test_case_id) {
+    return [{ suiteId, testId: '(missing)', reason: 'missing test_case_id' }];
+  }
+  const issues: Array<{ suiteId: string; testId: string; reason: string }> = [];
+  if (typeof tc.expected_outcome !== 'string' || tc.expected_outcome.trim().length === 0) {
+    issues.push({
+      suiteId,
+      testId: tc.test_case_id,
+      reason: typeof tc.expected_outcome === 'string' ? 'empty expected_outcome' : `expected_outcome not a string (got ${typeof tc.expected_outcome})`,
+    });
+  }
+  if (!Array.isArray(tc.acceptance_criterion_ids) || tc.acceptance_criterion_ids.length === 0) {
+    issues.push({ suiteId, testId: tc.test_case_id, reason: 'empty acceptance_criterion_ids' });
+  }
+  return issues;
+}
+
+/** Set of every AC id declared across functional_requirements artifacts (C-7.1.7). */
+function collectKnownAcIds(frArtifacts: ReadonlyArray<unknown>): Set<string> {
+  const known = new Set<string>();
+  for (const fr of frArtifacts) {
+    const stories = (fr as FunctionalRequirementsArtifact).user_stories ?? [];
+    for (const us of stories) for (const ac of us.acceptance_criteria ?? []) known.add(ac.id);
+  }
+  return known;
+}
+
+/** AC refs in the test plan that fail to resolve against `known` (C-7.1.7). */
+function collectUnresolvedAcRefs(
+  testSuites: TestSuite[],
+  known: Set<string>,
+): Array<{ testId: string; acId: string }> {
+  const unresolved: Array<{ testId: string; acId: string }> = [];
+  for (const s of testSuites) {
+    for (const tc of s.test_cases ?? []) {
+      for (const acRef of tc.acceptance_criterion_ids ?? []) {
+        // Allow composite refs of the form "<US-id>-AC-…" — extract trailing AC part if present.
+        if (AC_ID_PATTERN.test(acRef) && !known.has(acRef)) {
+          unresolved.push({ testId: tc.test_case_id, acId: acRef });
+        } else if (US_ID_PATTERN.test(acRef)) {
+          // Suite-level US ref (rare); skip resolution check.
+        }
+      }
+    }
+  }
+  return unresolved;
+}
 
 export const phase7TestCaseSkeletonContract: ContractSuite<TestPlanArtifact> = {
   boundaryId: '7.1_test_case_skeleton',
@@ -101,20 +158,7 @@ export const phase7TestCaseSkeletonContract: ContractSuite<TestPlanArtifact> = {
         const bad: Array<{ suiteId: string; testId: string; reason: string }> = [];
         for (const s of artifact.test_suites) {
           for (const tc of s.test_cases ?? []) {
-            if (!tc.test_case_id) {
-              bad.push({ suiteId: s.suite_id, testId: '(missing)', reason: 'missing test_case_id' });
-              continue;
-            }
-            if (typeof tc.expected_outcome !== 'string' || tc.expected_outcome.trim().length === 0) {
-              bad.push({
-                suiteId: s.suite_id,
-                testId: tc.test_case_id,
-                reason: typeof tc.expected_outcome === 'string' ? 'empty expected_outcome' : `expected_outcome not a string (got ${typeof tc.expected_outcome})`,
-              });
-            }
-            if (!Array.isArray(tc.acceptance_criterion_ids) || tc.acceptance_criterion_ids.length === 0) {
-              bad.push({ suiteId: s.suite_id, testId: tc.test_case_id, reason: 'empty acceptance_criterion_ids' });
-            }
+            bad.push(...collectTestCaseShapeIssues(s.suite_id, tc));
           }
         }
         if (bad.length === 0) return true;
@@ -161,24 +205,8 @@ export const phase7TestCaseSkeletonContract: ContractSuite<TestPlanArtifact> = {
       check: (artifact, context) => {
         const frArtifacts = context.relatedArtifacts.get('functional_requirements') ?? [];
         if (frArtifacts.length === 0) return true;
-        const known = new Set<string>();
-        for (const fr of frArtifacts) {
-          const stories = (fr as FunctionalRequirementsArtifact).user_stories ?? [];
-          for (const us of stories) for (const ac of us.acceptance_criteria ?? []) known.add(ac.id);
-        }
-        const unresolved: Array<{ testId: string; acId: string }> = [];
-        for (const s of artifact.test_suites) {
-          for (const tc of s.test_cases ?? []) {
-            for (const acRef of tc.acceptance_criterion_ids ?? []) {
-              // Allow composite refs of the form "<US-id>-AC-…" — extract trailing AC part if present.
-              if (AC_ID_PATTERN.test(acRef) && !known.has(acRef)) {
-                unresolved.push({ testId: tc.test_case_id, acId: acRef });
-              } else if (US_ID_PATTERN.test(acRef)) {
-                // Suite-level US ref (rare); skip resolution check.
-              }
-            }
-          }
-        }
+        const known = collectKnownAcIds(frArtifacts);
+        const unresolved = collectUnresolvedAcRefs(artifact.test_suites, known);
         if (unresolved.length === 0) return true;
         return { message: `${unresolved.length} AC ref(s) do not resolve`, details: { examples: unresolved.slice(0, 10) } };
       },

@@ -284,13 +284,7 @@ export class LlamaCppProvider implements LLMProviderAdapter {
         let idleTimer: NodeJS.Timeout | null = null;
         const resetIdleTimer = (): void => {
           if (idleTimer) clearTimeout(idleTimer);
-          idleTimer = setTimeout(() => {
-            req.destroy();
-            reject(new LLMError(
-              `llama.cpp stream stalled — no data for ${Math.round(stallMs / 1000)}s`,
-              'network_timeout', undefined, true,
-            ));
-          }, stallMs);
+          idleTimer = setTimeout(onStreamStall.bind(null, req, stallMs, reject), stallMs);
         };
         resetIdleTimer();
 
@@ -451,4 +445,23 @@ function applyDelta(
     acc.fullThinking += r;
     onChunk({ text: r, channel: 'thinking' });
   }
+}
+
+/**
+ * Fired when the SSE stream goes idle past the stall threshold: destroy
+ * the request and reject with a retryable network_timeout. Lifted to
+ * module scope (bound with its captured request/timeout/reject in
+ * `resetIdleTimer`) so the streaming handler's idle-timer setup stays
+ * within SonarLint's function-nesting ceiling.
+ */
+function onStreamStall(
+  req: http.ClientRequest,
+  stallMs: number,
+  reject: (err: LLMError) => void,
+): void {
+  req.destroy();
+  reject(new LLMError(
+    `llama.cpp stream stalled — no data for ${Math.round(stallMs / 1000)}s`,
+    'network_timeout', undefined, true,
+  ));
 }

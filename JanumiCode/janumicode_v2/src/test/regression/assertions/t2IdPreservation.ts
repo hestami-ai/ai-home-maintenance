@@ -28,7 +28,7 @@ function extractIds(text: string, pattern: string): string[] {
 export function checkT2IdPreservation(
   assertion: T2IdPreservationAssertion,
   fixture: Fixture,
-  parsed: unknown | null,
+  parsed: unknown,
 ): AssertionCheck {
   const varName = assertion.input_source.variable;
   const variableText = fixture.template_variables[varName];

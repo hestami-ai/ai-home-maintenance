@@ -133,18 +133,7 @@ export class QuarantineLedger {
       'Prior attempts:',
     );
     for (const a of prior.attempts) {
-      lines.push(`  Attempt ${a.attempt_number} — ${a.outcome}`);
-      if (a.reasoning_review_flaws && a.reasoning_review_flaws.length > 0) {
-        for (const f of a.reasoning_review_flaws) {
-          lines.push(`    [flaw ${f.severity}] ${f.flaw_type}${f.description ? `: ${f.description}` : ''}`);
-        }
-      }
-      if (a.test_failures && a.test_failures.length > 0) {
-        lines.push(`    Failing tests: ${a.test_failures.join(', ')}`);
-      }
-      if (a.error_message) {
-        lines.push(`    Error: ${a.error_message}`);
-      }
+      lines.push(...renderAttemptLines(a));
     }
     lines.push(
       '',
@@ -154,4 +143,22 @@ export class QuarantineLedger {
     );
     return lines.join('\n');
   }
+}
+
+/** Render the prompt lines for a single prior quarantine attempt. */
+function renderAttemptLines(a: QuarantineAttemptEntry): string[] {
+  const lines: string[] = [`  Attempt ${a.attempt_number} — ${a.outcome}`];
+  if (a.reasoning_review_flaws && a.reasoning_review_flaws.length > 0) {
+    for (const f of a.reasoning_review_flaws) {
+      const descSuffix = f.description ? `: ${f.description}` : '';
+      lines.push(`    [flaw ${f.severity}] ${f.flaw_type}${descSuffix}`);
+    }
+  }
+  if (a.test_failures && a.test_failures.length > 0) {
+    lines.push(`    Failing tests: ${a.test_failures.join(', ')}`);
+  }
+  if (a.error_message) {
+    lines.push(`    Error: ${a.error_message}`);
+  }
+  return lines;
 }

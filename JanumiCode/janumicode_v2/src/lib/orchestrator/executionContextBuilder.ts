@@ -490,99 +490,53 @@ export function filterEvalCriteriaForTask(
   const initialRelated = collectRelatedIdentifiers(task, componentModel, implementationPlan);
   const componentToken = task.component_id;
 
-  // Provisionally compute kept counts with the initial lineage. If the
-  // filter would drop everything despite having lineage data, it almost
-  // always means the lineage tokens (file paths, internal ids) don't
-  // share a namespace with the eval criteria's FR/NFR ids — fall back
-  // to "keep all" rather than starving the agent of context entirely.
-  // The coverage > precision rule applies here just as it does when
-  // lineage data is absent.
   const totalAll = (plans.functional?.criteria?.length ?? 0)
     + (plans.quality?.criteria?.length ?? 0)
     + (plans.reasoning?.scenarios?.length ?? 0);
 
-  let relatedIdentifiers: Set<string> | null = initialRelated;
-  let lineageEmptyMatch = false;
-  if (initialRelated !== null && totalAll > 0) {
-    const narrowed = initialRelated;
-    const provisionalKept = (plans.functional?.criteria ?? []).filter(c => idMatches(c.functional_requirement_id, narrowed, componentToken)).length
-      + (plans.quality?.criteria ?? []).filter(c => idMatches(c.nfr_id, narrowed, componentToken)).length
-      + (plans.reasoning?.scenarios ?? []).filter(s => s.description.includes(componentToken)
-          || idMatches(s.id, narrowed, componentToken)
-          || [...narrowed].some(id => s.description.includes(id))).length;
-    if (provisionalKept === 0) {
-      // Treat lineage-present-but-zero-matches as lineage-effectively-missing.
-      relatedIdentifiers = null;
-      lineageEmptyMatch = true;
-    }
-  }
-
-  let kf = 0, fq = 0, kq = 0, fqq = 0, kr = 0, fr = 0;
-  let keptFunctionalCriteria: FunctionalEvalCriterion[] = [];
-  let keptQualityCriteria: QualityEvalCriterion[] = [];
-  let keptReasoningScenarios: ReasoningScenario[] = [];
-
-  const sections: string[] = [];
-
+  // Provisionally apply the lineage filter. If it would drop everything despite
+  // having lineage data, it almost always means the lineage tokens (file paths,
+  // internal ids) don't share a namespace with the eval criteria's FR/NFR ids —
+  // fall back to "keep all" rather than starving the agent of context entirely.
+  // The coverage > precision rule applies here just as it does when lineage data
+  // is absent.
+  const { relatedIdentifiers, lineageEmptyMatch } = resolveEffectiveRelated(
+    plans, initialRelated, componentToken, totalAll,
+  );
   const effectiveRelated = relatedIdentifiers;
 
-  if (plans.functional?.criteria?.length) {
-    const all = plans.functional.criteria;
-    const kept = effectiveRelated === null
-      ? all
-      : all.filter(c => idMatches(c.functional_requirement_id, effectiveRelated, componentToken));
-    keptFunctionalCriteria = kept;
-    kf = kept.length; fq = all.length - kept.length;
-    if (kept.length) {
-      sections.push('### Functional Criteria\n' + kept.map(c =>
-        `- [${c.functional_requirement_id}] ${c.evaluation_method}: ${c.success_condition}`,
-      ).join('\n'));
-    }
-  }
+  const functional = filterEvalSection(
+    plans.functional?.criteria ?? [],
+    effectiveRelated,
+    (c, related) => functionalCriterionMatches(c, related, componentToken),
+    renderFunctionalSection,
+  );
+  const quality = filterEvalSection(
+    plans.quality?.criteria ?? [],
+    effectiveRelated,
+    (c, related) => qualityCriterionMatches(c, related, componentToken),
+    renderQualitySection,
+  );
+  const reasoning = filterEvalSection(
+    plans.reasoning?.scenarios ?? [],
+    effectiveRelated,
+    (s, related) => reasoningScenarioMatches(s, related, componentToken),
+    renderReasoningSection,
+  );
 
-  if (plans.quality?.criteria?.length) {
-    const all = plans.quality.criteria;
-    const kept = effectiveRelated === null
-      ? all
-      : all.filter(c => idMatches(c.nfr_id, effectiveRelated, componentToken));
-    keptQualityCriteria = kept;
-    kq = kept.length; fqq = all.length - kept.length;
-    if (kept.length) {
-      sections.push('### Quality Criteria\n' + kept.map(c =>
-        `- [${c.nfr_id}] ${c.category}: ${c.threshold} via ${c.evaluation_tool}`,
-      ).join('\n'));
-    }
-  }
+  const sections = [functional.section, quality.section, reasoning.section]
+    .filter((s): s is string => s !== null);
 
-  if (plans.reasoning?.scenarios?.length) {
-    const all = plans.reasoning.scenarios;
-    const kept = effectiveRelated === null
-      ? all
-      : all.filter(s =>
-        s.description.includes(componentToken)
-        || idMatches(s.id, effectiveRelated, componentToken)
-        || [...effectiveRelated].some(id => s.description.includes(id)),
-      );
-    keptReasoningScenarios = kept;
-    kr = kept.length; fr = all.length - kept.length;
-    if (kept.length) {
-      sections.push('### Reasoning Scenarios\n' + kept.map(s =>
-        `- [${s.id}] ${s.description} (pass: ${s.pass_criteria})`,
-      ).join('\n'));
-    }
-  }
-
+  const kf = functional.keptCount, fq = functional.filteredCount;
+  const kq = quality.keptCount, fqq = quality.filteredCount;
+  const kr = reasoning.keptCount, fr = reasoning.filteredCount;
   const totalFiltered = fq + fqq + fr;
 
   let rendered = sections.length ? sections.join('\n\n') : '(no evaluation criteria registered)';
   if (totalAll > 0) {
-    let suffix = '';
-    if (lineageEmptyMatch) suffix = ' (lineage tokens did not match any eval criterion id — kept all as fallback)';
-    else if (relatedIdentifiers === null) suffix = ' (lineage data missing — kept all as fallback)';
-    rendered = `RELEVANCE FILTER NOTE: kept ${kf + kq + kr} of ${totalAll} eval criteria; ` +
-      `filtered ${totalFiltered} as unrelated to component ${componentToken}` +
-      suffix +
-      `.\n\n` + rendered;
+    rendered = renderRelevanceNote(
+      kf + kq + kr, totalAll, totalFiltered, componentToken, lineageEmptyMatch, relatedIdentifiers,
+    ) + rendered;
   }
 
   return { rendered, filteredFunctional: fq, filteredQuality: fqq, filteredReasoning: fr,
@@ -590,10 +544,129 @@ export function filterEvalCriteriaForTask(
     // The task-scoped criteria objects — used by the detail-file bundle so it
     // carries only this task's evals, not the full plan.
     keptCriteria: {
-      functional: { criteria: keptFunctionalCriteria },
-      quality: { criteria: keptQualityCriteria },
-      reasoning: { scenarios: keptReasoningScenarios, ai_subsystems_detected: plans.reasoning?.ai_subsystems_detected ?? false },
+      functional: { criteria: functional.kept },
+      quality: { criteria: quality.kept },
+      reasoning: { scenarios: reasoning.kept, ai_subsystems_detected: plans.reasoning?.ai_subsystems_detected ?? false },
     } as EvaluationPlans };
+}
+
+// ── filterEvalCriteriaForTask helpers (S3776 decomposition) ─────────
+// Behavior-preserving extractions from filterEvalCriteriaForTask above: the
+// three near-identical filter/render blocks, the provisional zero-match
+// fallback, and the relevance-note suffix. Each is a pure function.
+
+/** Match predicate for a functional criterion (unchanged from the inline form). */
+function functionalCriterionMatches(c: FunctionalEvalCriterion, related: Set<string>, componentToken: string): boolean {
+  return idMatches(c.functional_requirement_id, related, componentToken);
+}
+
+/** Match predicate for a quality criterion (unchanged from the inline form). */
+function qualityCriterionMatches(c: QualityEvalCriterion, related: Set<string>, componentToken: string): boolean {
+  return idMatches(c.nfr_id, related, componentToken);
+}
+
+/** Match predicate for a reasoning scenario (unchanged three-clause OR). */
+function reasoningScenarioMatches(s: ReasoningScenario, related: Set<string>, componentToken: string): boolean {
+  return s.description.includes(componentToken)
+    || idMatches(s.id, related, componentToken)
+    || [...related].some(id => s.description.includes(id));
+}
+
+function renderFunctionalSection(kept: FunctionalEvalCriterion[]): string {
+  return '### Functional Criteria\n' + kept.map(c =>
+    `- [${c.functional_requirement_id}] ${c.evaluation_method}: ${c.success_condition}`,
+  ).join('\n');
+}
+
+function renderQualitySection(kept: QualityEvalCriterion[]): string {
+  return '### Quality Criteria\n' + kept.map(c =>
+    `- [${c.nfr_id}] ${c.category}: ${c.threshold} via ${c.evaluation_tool}`,
+  ).join('\n');
+}
+
+function renderReasoningSection(kept: ReasoningScenario[]): string {
+  return '### Reasoning Scenarios\n' + kept.map(s =>
+    `- [${s.id}] ${s.description} (pass: ${s.pass_criteria})`,
+  ).join('\n');
+}
+
+interface FilteredEvalSection<T> {
+  kept: T[];
+  keptCount: number;
+  filteredCount: number;
+  /** Rendered section block, or null when nothing was kept (nothing to render). */
+  section: string | null;
+}
+
+/**
+ * Apply the relevance filter to one eval-criteria list and render its section.
+ * When `effectiveRelated` is null the filter is skipped (keep all), matching the
+ * inline `effectiveRelated === null ? all : all.filter(...)` behavior exactly.
+ */
+function filterEvalSection<T>(
+  all: T[],
+  effectiveRelated: Set<string> | null,
+  predicate: (item: T, related: Set<string>) => boolean,
+  render: (kept: T[]) => string,
+): FilteredEvalSection<T> {
+  let kept: T[];
+  if (effectiveRelated === null) {
+    kept = all;
+  } else {
+    const related = effectiveRelated;
+    kept = all.filter(item => predicate(item, related));
+  }
+  return {
+    kept,
+    keptCount: kept.length,
+    filteredCount: all.length - kept.length,
+    section: kept.length ? render(kept) : null,
+  };
+}
+
+/**
+ * Decide the effective related-id set for the relevance filter. If lineage is
+ * present but the provisional filter would drop EVERY criterion, treat lineage
+ * as effectively missing (coverage > precision) so the caller keeps all. Pure —
+ * no side effects.
+ */
+function resolveEffectiveRelated(
+  plans: EvaluationPlans,
+  initialRelated: Set<string> | null,
+  componentToken: string,
+  totalAll: number,
+): { relatedIdentifiers: Set<string> | null; lineageEmptyMatch: boolean } {
+  if (initialRelated === null || totalAll <= 0) {
+    return { relatedIdentifiers: initialRelated, lineageEmptyMatch: false };
+  }
+  const narrowed = initialRelated;
+  const provisionalKept =
+    (plans.functional?.criteria ?? []).filter(c => functionalCriterionMatches(c, narrowed, componentToken)).length
+    + (plans.quality?.criteria ?? []).filter(c => qualityCriterionMatches(c, narrowed, componentToken)).length
+    + (plans.reasoning?.scenarios ?? []).filter(s => reasoningScenarioMatches(s, narrowed, componentToken)).length;
+  if (provisionalKept === 0) {
+    // Treat lineage-present-but-zero-matches as lineage-effectively-missing.
+    return { relatedIdentifiers: null, lineageEmptyMatch: true };
+  }
+  return { relatedIdentifiers: initialRelated, lineageEmptyMatch: false };
+}
+
+/** Build the "RELEVANCE FILTER NOTE: …" prefix (including trailing blank line). */
+function renderRelevanceNote(
+  keptCount: number,
+  totalAll: number,
+  totalFiltered: number,
+  componentToken: string,
+  lineageEmptyMatch: boolean,
+  relatedIdentifiers: Set<string> | null,
+): string {
+  let suffix = '';
+  if (lineageEmptyMatch) suffix = ' (lineage tokens did not match any eval criterion id — kept all as fallback)';
+  else if (relatedIdentifiers === null) suffix = ' (lineage data missing — kept all as fallback)';
+  return `RELEVANCE FILTER NOTE: kept ${keptCount} of ${totalAll} eval criteria; ` +
+    `filtered ${totalFiltered} as unrelated to component ${componentToken}` +
+    suffix +
+    `.\n\n`;
 }
 
 function idMatches(id: string, related: Set<string>, componentToken: string): boolean {
@@ -601,6 +674,46 @@ function idMatches(id: string, related: Set<string>, componentToken: string): bo
   if (related.has(id)) return true;
   if (id.includes(componentToken)) return true;
   return false;
+}
+
+/**
+ * Fold ONE task's own lineage into `ids`: its `traces_to` + legacy
+ * `technical_spec_ids`, plus any completion-criteria `artifact_ref`s. Mutates
+ * `ids` in place; returns true when any lineage token was seen (so the caller
+ * can distinguish "lineage present" from "lineage unknown, keep all").
+ */
+function addTaskLineage(task: ImplementationTask, ids: Set<string>): boolean {
+  let sawLineage = false;
+  // Primary lineage source: Phase 6's `traces_to`. Legacy `technical_spec_ids`
+  // slot is also folded in for callers that populate it directly.
+  const lineage = [...(task.traces_to ?? []), ...(task.technical_spec_ids ?? [])];
+  if (lineage.length) {
+    sawLineage = true;
+    for (const sid of lineage) ids.add(sid);
+  }
+  for (const c of task.completion_criteria) {
+    if (c.artifact_ref) { sawLineage = true; ids.add(c.artifact_ref); }
+  }
+  return sawLineage;
+}
+
+/**
+ * Fold the lineage of every implementation-plan peer that shares the task's
+ * component into `ids`. Mutates `ids`; returns true when any matching peer
+ * contributed a lineage token.
+ */
+function addPeerLineage(
+  task: ImplementationTask,
+  implementationPlan: ImplementationTask[],
+  ids: Set<string>,
+): boolean {
+  let sawLineage = false;
+  for (const t of implementationPlan) {
+    if (componentIdMatches(t.component_id, task.component_id) && addTaskLineage(t, ids)) {
+      sawLineage = true;
+    }
+  }
+  return sawLineage;
 }
 
 /**
@@ -615,30 +728,16 @@ function collectRelatedIdentifiers(
   const ids = new Set<string>();
   let sawLineage = false;
 
-  // Primary lineage source: Phase 6's `traces_to`. Legacy
-  // `technical_spec_ids` slot is also folded in for callers that
-  // populate it directly.
-  const taskLineage = [...(task.traces_to ?? []), ...(task.technical_spec_ids ?? [])];
-  if (taskLineage.length) {
-    sawLineage = true;
-    for (const sid of taskLineage) ids.add(sid);
-  }
-  for (const c of task.completion_criteria) {
-    if (c.artifact_ref) { sawLineage = true; ids.add(c.artifact_ref); }
-  }
-  if (implementationPlan) {
-    for (const t of implementationPlan) {
-      if (componentIdMatches(t.component_id, task.component_id)) {
-        const peerLineage = [...(t.traces_to ?? []), ...(t.technical_spec_ids ?? [])];
-        for (const sid of peerLineage) { sawLineage = true; ids.add(sid); }
-        for (const c of t.completion_criteria) {
-          if (c.artifact_ref) { sawLineage = true; ids.add(c.artifact_ref); }
-        }
-      }
-    }
-  }
+  // Primary lineage: the task's own traces_to / technical_spec_ids / artifact_refs.
+  if (addTaskLineage(task, ids)) sawLineage = true;
+
+  // Peer lineage: other plan tasks that share this component.
+  if (implementationPlan && addPeerLineage(task, implementationPlan, ids)) sawLineage = true;
+
   if (componentModel) {
-    // Component itself: id and name can serve as match tokens.
+    // Component itself: id can serve as a match token. NOTE: a component match
+    // alone does NOT set sawLineage — a task with only this signal still returns
+    // null ("keep all"), preserving the original behavior.
     const comp = lookupComponent(task.component_id, componentModel);
     if (comp) ids.add(comp.id);
   }
@@ -741,6 +840,20 @@ export function findUpstreamFindingsForTask(
     ? `(showing ${UPSTREAM_FINDINGS_CAP} of ${deduped.length} HIGH/MEDIUM findings)\n`
     : '';
   return header + capped.map(renderFindingLine).join('\n');
+}
+
+/**
+ * Rendered content sections consumed by the legacy (no-templateLoader)
+ * summary-context assembler. Grouped into a single options object to keep
+ * the assembler's parameter list manageable.
+ */
+interface LegacySummarySections {
+  evalCriteriaRendered: string;
+  componentContext: string;
+  componentModelSummary: string;
+  testCases: string;
+  dependencyTasks: string;
+  upstreamFindings: string;
 }
 
 /**
@@ -951,7 +1064,8 @@ export class ExecutionContextBuilder {
       // clip) so a cross-run whole-catalog dump can't dominate the leaf prompt.
       detailFileContentInline = `${taskDetailFileContent}\n\n---\n\n${capInlinedDmrContext(dmrPacket.detailFileContent)}`;
     } else {
-      detailFileContentInline = `${taskDetailFileContent}\n\n---\n\n_A curated Deep Memory Research context reference (governing constraints, supersession chains, contradictions, material findings — with record references resolved to actual content) is on disk${dmrDetailPath ? `:\n\n    ${dmrDetailPath}` : ''}\n\nRead it selectively if you need supporting governing context beyond what is inlined above._`;
+      const onDiskPathSuffix = dmrDetailPath ? `:\n\n    ${dmrDetailPath}` : '';
+      detailFileContentInline = `${taskDetailFileContent}\n\n---\n\n_A curated Deep Memory Research context reference (governing constraints, supersession chains, contradictions, material findings — with record references resolved to actual content) is on disk${onDiskPathSuffix}\n\nRead it selectively if you need supporting governing context beyond what is inlined above._`;
     }
 
     // ── 3. Render the template (when loader is available) ─────────
@@ -988,22 +1102,7 @@ export class ExecutionContextBuilder {
       janumicode_version_sha: this.options.janumiCodeVersionSha,
     };
 
-    let renderedText: string | null = null;
-    if (this.templateLoader) {
-      const template = this.templateLoader.findTemplate('executor_agent', 'implementation_task_execution');
-      if (template) {
-        const result = this.templateLoader.render(template, variables);
-        if (result.missing_variables.length > 0) {
-          getLogger().warn('workflow', 'executionContextBuilder: template missing variables', {
-            missing: result.missing_variables, taskId: task.id,
-          });
-        }
-        renderedText = result.rendered;
-      } else {
-        getLogger().warn('workflow', 'executionContextBuilder: template not found, falling back to inline assembly',
-          { agentRole: 'executor_agent', subPhase: 'implementation_task_execution' });
-      }
-    }
+    const renderedText = this.renderExecutorTemplate(variables, task.id);
 
     // ── 4. Build the final stdin via the base builder so token-budget,
     //       retry-context, and detail-file-reference handling stay
@@ -1028,9 +1127,14 @@ export class ExecutionContextBuilder {
         // shape so older tests still get a populated prompt.
         governingConstraints: this.legacyGoverningConstraints(task, artifacts.adrs),
         requiredOutputSpec: this.legacyRequiredOutputSpec(task),
-        summaryContext: this.legacySummaryContext(task, artifacts, evalFilterResult.rendered,
-          componentContextStr, componentModelSummary, testCasesStr, dependencyTasksStr,
-          upstreamFindingsStr),
+        summaryContext: this.legacySummaryContext(task, artifacts, {
+          evalCriteriaRendered: evalFilterResult.rendered,
+          componentContext: componentContextStr,
+          componentModelSummary,
+          testCases: testCasesStr,
+          dependencyTasks: dependencyTasksStr,
+          upstreamFindings: upstreamFindingsStr,
+        }),
         detailFileReference:
           `Full context available in detail file at .janumicode/runs/${workflowRunId}/context/9.1_${task.id}_${invocationId}.md`,
         invariantViolations: retryContext?.invariantViolations,
@@ -1039,6 +1143,32 @@ export class ExecutionContextBuilder {
 
     const stdin = this.baseBuilder.buildStdinDirective(stdinContent);
     return { stdin, detailFile: payload.detailFile };
+  }
+
+  /**
+   * Render the executor prompt body via the TemplateLoader, or return null to
+   * signal the caller should fall back to legacy inline assembly. Extracted
+   * from buildTaskContext to keep that method's cognitive complexity in check;
+   * behavior is identical to the previous inline block.
+   */
+  private renderExecutorTemplate(
+    variables: Record<string, string>,
+    taskId: string,
+  ): string | null {
+    if (!this.templateLoader) return null;
+    const template = this.templateLoader.findTemplate('executor_agent', 'implementation_task_execution');
+    if (!template) {
+      getLogger().warn('workflow', 'executionContextBuilder: template not found, falling back to inline assembly',
+        { agentRole: 'executor_agent', subPhase: 'implementation_task_execution' });
+      return null;
+    }
+    const result = this.templateLoader.render(template, variables);
+    if (result.missing_variables.length > 0) {
+      getLogger().warn('workflow', 'executionContextBuilder: template missing variables', {
+        missing: result.missing_variables, taskId,
+      });
+    }
+    return result.rendered;
   }
 
   private formatDetailFilePath(subPhaseId: string, invocationId: string, workflowRunId: string): string {
@@ -1080,13 +1210,16 @@ export class ExecutionContextBuilder {
   private legacySummaryContext(
     _task: ImplementationTask,
     _artifacts: unknown,
-    evalCriteriaRendered: string,
-    componentContext: string,
-    componentModelSummary: string,
-    testCases: string,
-    dependencyTasks: string,
-    upstreamFindings: string,
+    sections: LegacySummarySections,
   ): string {
+    const {
+      evalCriteriaRendered,
+      componentContext,
+      componentModelSummary,
+      testCases,
+      dependencyTasks,
+      upstreamFindings,
+    } = sections;
     const summary = componentModelSummary && componentModelSummary.trim().length > 0
       && componentModelSummary !== '(component model unavailable)'
       ? `### Component Model Summary\n${componentModelSummary}`

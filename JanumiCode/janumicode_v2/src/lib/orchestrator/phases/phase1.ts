@@ -212,6 +212,69 @@ export function resolveJourneyDomainRefs<J extends { id?: unknown; businessDomai
   return { journeys: out, remapped };
 }
 
+/** Normalize an unknown thrown value to a display message. */
+function errMessage(err: unknown): string {
+  return err instanceof Error ? err.message : String(err);
+}
+
+/** Per-journey and total LLM-retry budgets for the 1.3a persona self-heal. */
+const PER_JOURNEY_RETRY_BUDGET = 2;
+const TOTAL_RETRY_BUDGET = 10;
+
+/**
+ * Deterministic oracle-resolution for workflow → business-domain references.
+ * Mirrors {@link resolveJourneyDomainRefs} but for a workflow's single
+ * `businessDomainId`, mutating each workflow in place and logging an
+ * aggregate remap line. Extracted from executeProductLens's 1.3b runProposer
+ * to keep that method under the cognitive-complexity budget; behavior is
+ * identical (resolve via oracle → token-subset fallback; keep unresolvable
+ * refs verbatim so 1.3c flags them).
+ */
+function resolveWorkflowDomainRefs(
+  workflows: WorkflowV2[],
+  acceptedDomainIds: string[],
+  workflowRunId: string,
+): void {
+  const wfRemapped: Array<{ workflow: string; from: string; to: string }> = [];
+  for (const w of workflows) {
+    if (typeof w.businessDomainId === 'string' && w.businessDomainId) {
+      const resolved = resolveAgainstOracle(w.businessDomainId, acceptedDomainIds)
+        ?? resolveByTokenSubset(w.businessDomainId, acceptedDomainIds);
+      if (resolved && resolved !== w.businessDomainId) {
+        wfRemapped.push({ workflow: w.id, from: w.businessDomainId, to: resolved });
+        w.businessDomainId = resolved;
+      }
+    }
+  }
+  if (wfRemapped.length > 0) {
+    getLogger().info('workflow', `Phase 1.3b: oracle-resolved ${wfRemapped.length} workflow→domain ref(s) to the accepted-domain set`, {
+      workflow_run_id: workflowRunId,
+      remapped: wfRemapped,
+    });
+  }
+}
+
+/**
+ * Apply {@link resolveJourneyDomainRefs} to a journey bloom result in place:
+ * when any ref was remapped, swap in the canonicalized journeys and log the
+ * aggregate. Extracted from executeProductLens's 1.3a runProposer to keep
+ * that method under the cognitive-complexity budget; behavior is identical.
+ */
+function applyJourneyDomainResolution(
+  r: { userJourneys: UserJourney[] },
+  acceptedDomainIds: string[],
+  workflowRunId: string,
+): void {
+  const journeyResolution = resolveJourneyDomainRefs(r.userJourneys, acceptedDomainIds);
+  if (journeyResolution.remapped.length > 0) {
+    r.userJourneys = journeyResolution.journeys;
+    getLogger().info('workflow', `Phase 1.3a: oracle-resolved ${journeyResolution.remapped.length} journey→domain ref(s) to the accepted-domain set`, {
+      workflow_run_id: workflowRunId,
+      remapped: journeyResolution.remapped,
+    });
+  }
+}
+
 export class Phase1Handler implements PhaseHandler {
   readonly phaseId: PhaseId = '1';
 
@@ -712,28 +775,48 @@ export class Phase1Handler implements PhaseHandler {
     let index = 0;
     for (const candidate of keptCandidates) {
       for (const entry of candidate.assumptions) {
-        const text = assumptionText(entry).trim();
-        if (!text) continue;
-        const key = text.toLowerCase();
-        const rationale = typeof entry === 'object' ? entry.basis : undefined;
-        const existing = deduped.get(key);
-        if (existing) {
-          if (!existing.source_candidate_ids.includes(candidate.id)) {
-            existing.source_candidate_ids.push(candidate.id);
-          }
-          if (!existing.rationale && rationale) existing.rationale = rationale;
-          continue;
-        }
-        deduped.set(key, {
-          id: `assumption-${++index}`,
-          text,
-          rationale,
-          source_candidate_ids: [candidate.id],
-          source: 'ai_proposed',
-        });
+        index = this.mergeSurfacedAssumption(deduped, candidate, entry, index);
       }
     }
     return Array.from(deduped.values());
+  }
+
+  /**
+   * Fold one candidate assumption into the dedup map. Empty text is
+   * skipped; a duplicate (same lowercased text) merges the candidate id
+   * and back-fills a missing rationale; a novel assumption is inserted
+   * with the next `assumption-N` id. Returns the (possibly incremented)
+   * index so the caller keeps the counter monotonic across candidates.
+   * Extracted from extractSurfacedAssumptions to bound its cognitive
+   * complexity; behavior is identical to the former inner-loop body.
+   */
+  private mergeSurfacedAssumption(
+    deduped: Map<string, SurfacedAssumption>,
+    candidate: BloomCandidate,
+    entry: AssumptionEntry,
+    index: number,
+  ): number {
+    const text = assumptionText(entry).trim();
+    if (!text) return index;
+    const key = text.toLowerCase();
+    const rationale = typeof entry === 'object' ? entry.basis : undefined;
+    const existing = deduped.get(key);
+    if (existing) {
+      if (!existing.source_candidate_ids.includes(candidate.id)) {
+        existing.source_candidate_ids.push(candidate.id);
+      }
+      if (!existing.rationale && rationale) existing.rationale = rationale;
+      return index;
+    }
+    const nextIndex = index + 1;
+    deduped.set(key, {
+      id: `assumption-${nextIndex}`,
+      text,
+      rationale,
+      source_candidate_ids: [candidate.id],
+      source: 'ai_proposed',
+    });
+    return nextIndex;
   }
 
   private materializeAssumptionAdjudication(
@@ -892,6 +975,117 @@ export class Phase1Handler implements PhaseHandler {
   // rejection on any gate also returns requires_input.
   // ══════════════════════════════════════════════════════════════════
 
+  /**
+   * Run one silent (non-fatal) 1.0c–1.0f discovery step: set the sub-phase,
+   * invoke `run` (falling back to `fallback` and WARN-logging on failure),
+   * persist an `artifact_produced` record of `contentKind` carrying the
+   * result under `resultKey`, push its id onto `artifactIds`, and ingest it.
+   * Extracted from executeProductLens so that method stays under the
+   * cognitive-complexity budget; behavior mirrors the former inline blocks.
+   */
+  private async runSilentDiscoveryStep<T>(
+    ctx: PhaseContext,
+    opts: {
+      subPhaseId: string;
+      contentKind: string;
+      resultKey: string;
+      warnMessage: string;
+      derivedFromRecordIds: string[];
+      artifactIds: string[];
+      fallback: T;
+      run: () => Promise<T>;
+    },
+  ): Promise<{ value: T; record: GovernedStreamRecord }> {
+    const { workflowRun, engine } = ctx;
+    engine.stateMachine.setSubPhase(workflowRun.id, opts.subPhaseId);
+    let value: T = opts.fallback;
+    try {
+      value = await opts.run();
+    } catch (err) {
+      getLogger().warn('workflow', opts.warnMessage, {
+        workflow_run_id: workflowRun.id,
+        error: errMessage(err),
+      });
+    }
+    const record = engine.writer.writeRecord({
+      record_type: 'artifact_produced',
+      schema_version: '1.0',
+      workflow_run_id: workflowRun.id,
+      phase_id: '1',
+      sub_phase_id: opts.subPhaseId,
+      produced_by_agent_role: 'domain_interpreter',
+      janumicode_version_sha: engine.janumiCodeVersionSha,
+      derived_from_record_ids: opts.derivedFromRecordIds,
+      content: { kind: opts.contentKind, [opts.resultKey]: value } as unknown as Record<string, unknown>,
+    });
+    opts.artifactIds.push(record.id);
+    engine.ingestionPipeline.ingest(record);
+    return { value, record };
+  }
+
+  /** Prefer the human-accepted subset; fall back to the full bloom when the
+   *  accept set is empty (a keep-nothing gate is treated as keep-all so the
+   *  pipeline never starves). Extracted from executeProductLens's repeated
+   *  `accepted.length > 0 ? accepted : all` ternaries. */
+  private pickAcceptedOrAll<T>(accepted: T[], fallbackAll: T[]): T[] {
+    return accepted.length > 0 ? accepted : fallbackAll;
+  }
+
+  /** Build the QA menu items — synthetic `QA-N` ids indexing into the
+   *  qualityAttributes array by position. Extracted from executeProductLens. */
+  private buildQaItems(qas: string[]): Array<{ id: string; label: string; description: string }> {
+    return qas.map((q, i) => ({
+      id: `QA-${i + 1}`,
+      label: `[Quality] ${q.slice(0, 80)}${q.length > 80 ? '…' : ''}`,
+      description: q,
+    }));
+  }
+
+  /** Render one release as a decision-menu item, including the per-category
+   *  `contains:` id detail. Extracted from executeProductLens's 1.8 mapItems. */
+  private formatReleaseMenuItem(r: ReleaseV2): { id: string; label: string; description: string; tradeoffs: string; detail: string } {
+    const fmt = (label: string, ids: string[]): string =>
+      ids.length > 0 ? `      ${label} (${ids.length}): ${ids.join(', ')}` : `      ${label} (0): —`;
+    const detail = [
+      `      contains:`,
+      fmt('journeys', r.contains.journeys),
+      fmt('workflows', r.contains.workflows),
+      fmt('entities', r.contains.entities),
+      fmt('compliance', r.contains.compliance),
+      fmt('integrations', r.contains.integrations),
+      fmt('vocabulary', r.contains.vocabulary),
+    ].join('\n');
+    return {
+      id: r.release_id,
+      label: `Release ${r.ordinal}: ${r.name}`,
+      description: r.description,
+      tradeoffs: `${r.rationale} • contains ${r.contains.journeys.length}j/${r.contains.workflows.length}w/${r.contains.entities.length}e/${r.contains.compliance.length}c/${r.contains.integrations.length}i/${r.contains.vocabulary.length}v`,
+      detail,
+    };
+  }
+
+  /** Apply the 1.8 release_plan gatekeeper prune. A total wipeout (keep
+   *  nothing) is treated as keep-all — zero releases is structurally invalid,
+   *  so the deterministic verifier does the real structural check. Extracted
+   *  from executeProductLens's 1.8 applyPrune. */
+  private applyReleasePrune(
+    bloom: { releases: ReleaseV2[]; crossCutting: CrossCuttingContents },
+    keptIds: Set<string>,
+    workflowRunId: string,
+  ): { releases: ReleaseV2[]; crossCutting: CrossCuttingContents } {
+    if (keptIds.size === 0) {
+      getLogger().warn('workflow', 'Phase 1.8 release_plan gatekeeper dropped ALL releases — keeping all (zero releases is invalid; deferring to the deterministic 1.8 verifier)', {
+        workflow_run_id: workflowRunId,
+        proposed_releases: bloom.releases.length,
+      });
+      return { releases: bloom.releases, crossCutting: bloom.crossCutting };
+    }
+    return {
+      releases: bloom.releases.filter(r => keptIds.has(r.release_id)),
+      crossCutting: bloom.crossCutting,
+    };
+  }
+
   private async executeProductLens(
     ctx: PhaseContext,
     state: {
@@ -913,7 +1107,7 @@ export class Phase1Handler implements PhaseHandler {
     try {
       discovery = await this.runIntentDiscovery(ctx, rawIntentText);
     } catch (err) {
-      return { success: false, error: `Product Intent Discovery failed: ${err instanceof Error ? err.message : String(err)}`, artifactIds };
+      return { success: false, error: `Product Intent Discovery failed: ${errMessage(err)}`, artifactIds };
     }
     const discoveryRecord = engine.writer.writeRecord({
       record_type: 'artifact_produced',
@@ -930,108 +1124,63 @@ export class Phase1Handler implements PhaseHandler {
     engine.ingestionPipeline.ingest(discoveryRecord);
 
     // ── 1.0c Technical Constraints Discovery (silent) ───────
-    engine.stateMachine.setSubPhase(workflowRun.id, 'technical_constraints_discovery');
-    let technicalConstraints: TechnicalConstraint[] = [];
-    try {
-      technicalConstraints = await this.runTechnicalConstraintsDiscovery(ctx, rawIntentText);
-    } catch (err) {
-      // Non-fatal: tech-extraction failure degrades gracefully — we
-      // log the gap but the product flow continues. Harness oracle
-      // will flag missing captures for the virtuous-cycle loop to
-      // address.
-      getLogger().warn('workflow', 'Phase 1.0c Technical Constraints Discovery failed — continuing with empty captures', {
-        workflow_run_id: workflowRun.id,
-        error: err instanceof Error ? err.message : String(err),
-      });
-    }
-    const techRecord = engine.writer.writeRecord({
-      record_type: 'artifact_produced',
-      schema_version: '1.0',
-      workflow_run_id: workflowRun.id,
-      phase_id: '1',
-      sub_phase_id: 'technical_constraints_discovery',
-      produced_by_agent_role: 'domain_interpreter',
-      janumicode_version_sha: engine.janumiCodeVersionSha,
-      derived_from_record_ids: [rawIntent.id, lensRecord.id],
-      content: { kind: 'technical_constraints_discovery', technicalConstraints } as unknown as Record<string, unknown>,
+    // Non-fatal: extraction failure degrades gracefully — the step logs
+    // the gap but the product flow continues. Harness oracle flags
+    // missing captures for the virtuous-cycle loop to address.
+    const techStep = await this.runSilentDiscoveryStep<TechnicalConstraint[]>(ctx, {
+      subPhaseId: 'technical_constraints_discovery',
+      contentKind: 'technical_constraints_discovery',
+      resultKey: 'technicalConstraints',
+      warnMessage: 'Phase 1.0c Technical Constraints Discovery failed — continuing with empty captures',
+      derivedFromRecordIds: [rawIntent.id, lensRecord.id],
+      artifactIds,
+      fallback: [],
+      run: () => this.runTechnicalConstraintsDiscovery(ctx, rawIntentText),
     });
-    artifactIds.push(techRecord.id);
-    engine.ingestionPipeline.ingest(techRecord);
+    const technicalConstraints = techStep.value;
+    const techRecord = techStep.record;
 
     // ── 1.0d Compliance & Retention Discovery (silent) ──────
-    engine.stateMachine.setSubPhase(workflowRun.id, 'compliance_retention_discovery');
-    let complianceExtractedItems: ExtractedItem[] = [];
-    try {
-      complianceExtractedItems = await this.runComplianceRetentionDiscovery(ctx, rawIntentText);
-    } catch (err) {
-      getLogger().warn('workflow', 'Phase 1.0d Compliance & Retention Discovery failed — continuing with empty captures', {
-        workflow_run_id: workflowRun.id,
-        error: err instanceof Error ? err.message : String(err),
-      });
-    }
-    const complianceRecord_extraction = engine.writer.writeRecord({
-      record_type: 'artifact_produced',
-      schema_version: '1.0',
-      workflow_run_id: workflowRun.id,
-      phase_id: '1',
-      sub_phase_id: 'compliance_retention_discovery',
-      produced_by_agent_role: 'domain_interpreter',
-      janumicode_version_sha: engine.janumiCodeVersionSha,
-      derived_from_record_ids: [rawIntent.id, lensRecord.id],
-      content: { kind: 'compliance_retention_discovery', complianceExtractedItems } as unknown as Record<string, unknown>,
+    const complianceStep = await this.runSilentDiscoveryStep<ExtractedItem[]>(ctx, {
+      subPhaseId: 'compliance_retention_discovery',
+      contentKind: 'compliance_retention_discovery',
+      resultKey: 'complianceExtractedItems',
+      warnMessage: 'Phase 1.0d Compliance & Retention Discovery failed — continuing with empty captures',
+      derivedFromRecordIds: [rawIntent.id, lensRecord.id],
+      artifactIds,
+      fallback: [],
+      run: () => this.runComplianceRetentionDiscovery(ctx, rawIntentText),
     });
-    artifactIds.push(complianceRecord_extraction.id);
-    engine.ingestionPipeline.ingest(complianceRecord_extraction);
+    const complianceExtractedItems = complianceStep.value;
+    const complianceRecord_extraction = complianceStep.record;
 
     // ── 1.0e V&V Requirements Discovery (silent) ────────────
-    engine.stateMachine.setSubPhase(workflowRun.id, 'vv_requirements_discovery');
-    let vvRequirements: VVRequirement[] = [];
-    try {
-      vvRequirements = await this.runVVRequirementsDiscovery(ctx, rawIntentText);
-    } catch (err) {
-      getLogger().warn('workflow', 'Phase 1.0e V&V Requirements Discovery failed — continuing with empty captures', {
-        workflow_run_id: workflowRun.id,
-        error: err instanceof Error ? err.message : String(err),
-      });
-    }
-    const vvRecord = engine.writer.writeRecord({
-      record_type: 'artifact_produced',
-      schema_version: '1.0',
-      workflow_run_id: workflowRun.id,
-      phase_id: '1',
-      sub_phase_id: 'vv_requirements_discovery',
-      produced_by_agent_role: 'domain_interpreter',
-      janumicode_version_sha: engine.janumiCodeVersionSha,
-      derived_from_record_ids: [rawIntent.id, lensRecord.id],
-      content: { kind: 'vv_requirements_discovery', vvRequirements } as unknown as Record<string, unknown>,
+    const vvStep = await this.runSilentDiscoveryStep<VVRequirement[]>(ctx, {
+      subPhaseId: 'vv_requirements_discovery',
+      contentKind: 'vv_requirements_discovery',
+      resultKey: 'vvRequirements',
+      warnMessage: 'Phase 1.0e V&V Requirements Discovery failed — continuing with empty captures',
+      derivedFromRecordIds: [rawIntent.id, lensRecord.id],
+      artifactIds,
+      fallback: [],
+      run: () => this.runVVRequirementsDiscovery(ctx, rawIntentText),
     });
-    artifactIds.push(vvRecord.id);
-    engine.ingestionPipeline.ingest(vvRecord);
+    const vvRequirements = vvStep.value;
+    const vvRecord = vvStep.record;
 
     // ── 1.0f Canonical Vocabulary Discovery (silent) ────────
-    engine.stateMachine.setSubPhase(workflowRun.id, 'canonical_vocabulary_discovery');
-    let canonicalVocabulary: VocabularyTerm[] = [];
-    try {
-      canonicalVocabulary = await this.runCanonicalVocabularyDiscovery(ctx, rawIntentText);
-    } catch (err) {
-      getLogger().warn('workflow', 'Phase 1.0f Canonical Vocabulary Discovery failed — continuing with empty captures', {
-        workflow_run_id: workflowRun.id,
-        error: err instanceof Error ? err.message : String(err),
-      });
-    }
-    const vocabRecord = engine.writer.writeRecord({
-      record_type: 'artifact_produced',
-      schema_version: '1.0',
-      workflow_run_id: workflowRun.id,
-      phase_id: '1',
-      sub_phase_id: 'canonical_vocabulary_discovery',
-      produced_by_agent_role: 'domain_interpreter',
-      janumicode_version_sha: engine.janumiCodeVersionSha,
-      derived_from_record_ids: [rawIntent.id, lensRecord.id],
-      content: { kind: 'canonical_vocabulary_discovery', canonicalVocabulary } as unknown as Record<string, unknown>,
+    const vocabStep = await this.runSilentDiscoveryStep<VocabularyTerm[]>(ctx, {
+      subPhaseId: 'canonical_vocabulary_discovery',
+      contentKind: 'canonical_vocabulary_discovery',
+      resultKey: 'canonicalVocabulary',
+      warnMessage: 'Phase 1.0f Canonical Vocabulary Discovery failed — continuing with empty captures',
+      derivedFromRecordIds: [rawIntent.id, lensRecord.id],
+      artifactIds,
+      fallback: [],
+      run: () => this.runCanonicalVocabularyDiscovery(ctx, rawIntentText),
     });
-    artifactIds.push(vocabRecord.id);
-    engine.ingestionPipeline.ingest(vocabRecord);
+    const canonicalVocabulary = vocabStep.value;
+    const vocabRecord = vocabStep.record;
 
     // ── 1.0g Intent Discovery Synthesis (deterministic compose) ──
     engine.stateMachine.setSubPhase(workflowRun.id, 'discovery_bundle_compose');
@@ -1181,8 +1330,8 @@ grounding judgements for the persona shape specifically.`,
     const keptDomainIds = new Set(round12.keptIds);
     const acceptedDomains = domainsBloom.domains.filter(d => keptDomainIds.has(d.id));
     const acceptedPersonas = domainsBloom.personas.filter(p => keptDomainIds.has(p.id));
-    const safeDomains = acceptedDomains.length > 0 ? acceptedDomains : domainsBloom.domains;
-    const safePersonas = acceptedPersonas.length > 0 ? acceptedPersonas : domainsBloom.personas;
+    const safeDomains = this.pickAcceptedOrAll(acceptedDomains, domainsBloom.domains);
+    const safePersonas = this.pickAcceptedOrAll(acceptedPersonas, domainsBloom.personas);
 
     // ── Wave 7 Phase 1.3 — split into 1.3a (journeys) + 1.3b (workflows) + 1.3c (verifier) ──
     // Inputs discovered upstream (1.0d compliance + retention, 1.0e V&V). Integrations
@@ -1219,19 +1368,11 @@ grounding judgements for the persona shape specifically.`,
         // BEFORE the bloom is persisted (writeBloomRecord below) or flows into
         // safeJourneys / the P2 handoff — so the persisted user_journey_bloom
         // record AND every downstream consumer carry canonical accepted-domain
-        // ids. gpt-oss drifts businessDomainIds a new way each run (cal-33
-        // underscore, cal-36 plural); the hyphen normalizer can't reach a token
-        // drift, so 1.3c referential_integrity_journey_domain keeps failing.
-        // resolveJourneyDomainRefs re-anchors each ref to safeDomains and KEEPS
-        // any that don't resolve (1.3c then flags a genuine error).
-        const journeyResolution = resolveJourneyDomainRefs(r.userJourneys, safeDomains.map(d => d.id));
-        if (journeyResolution.remapped.length > 0) {
-          r.userJourneys = journeyResolution.journeys;
-          getLogger().info('workflow', `Phase 1.3a: oracle-resolved ${journeyResolution.remapped.length} journey→domain ref(s) to the accepted-domain set`, {
-            workflow_run_id: workflowRun.id,
-            remapped: journeyResolution.remapped,
-          });
-        }
+        // ids. gpt-oss drifts businessDomainIds a new way each run; the hyphen
+        // normalizer can't reach a token drift. See applyJourneyDomainResolution:
+        // it re-anchors each ref to safeDomains and KEEPS any that don't resolve
+        // (1.3c then flags a genuine error).
+        applyJourneyDomainResolution(r, safeDomains.map(d => d.id), workflowRun.id);
         return r;
       },
       writeBloomRecord: (bloom, derivedFrom) => {
@@ -1297,7 +1438,7 @@ grounding for the journey shape.`,
     const journeysRecord = round13a.record;
     const keptJourneyIds = new Set(round13a.keptIds);
     const acceptedJourneys = journeyBloom.userJourneys.filter(j => keptJourneyIds.has(j.id));
-    const safeJourneys = acceptedJourneys.length > 0 ? acceptedJourneys : journeyBloom.userJourneys;
+    const safeJourneys = this.pickAcceptedOrAll(acceptedJourneys, journeyBloom.userJourneys);
 
     // ── 1.3b — System Workflow Bloom ──────────────────────────
     engine.stateMachine.setSubPhase(workflowRun.id, 'system_workflow_bloom');
@@ -1323,24 +1464,7 @@ grounding for the journey shape.`,
         // safeWorkflowsV2, so the 1.3c domain_workflow_coverage advisory (and
         // the persisted record) survive the same gpt-oss token drift that hits
         // journeys. Unresolvable refs are KEPT so 1.3c still flags them.
-        const acceptedDomainIds = safeDomains.map(d => d.id);
-        const wfRemapped: Array<{ workflow: string; from: string; to: string }> = [];
-        for (const w of r.workflows) {
-          if (typeof w.businessDomainId === 'string' && w.businessDomainId) {
-            const resolved = resolveAgainstOracle(w.businessDomainId, acceptedDomainIds)
-              ?? resolveByTokenSubset(w.businessDomainId, acceptedDomainIds);
-            if (resolved && resolved !== w.businessDomainId) {
-              wfRemapped.push({ workflow: w.id, from: w.businessDomainId, to: resolved });
-              w.businessDomainId = resolved;
-            }
-          }
-        }
-        if (wfRemapped.length > 0) {
-          getLogger().info('workflow', `Phase 1.3b: oracle-resolved ${wfRemapped.length} workflow→domain ref(s) to the accepted-domain set`, {
-            workflow_run_id: workflowRun.id,
-            remapped: wfRemapped,
-          });
-        }
+        resolveWorkflowDomainRefs(r.workflows, safeDomains.map(d => d.id), workflowRun.id);
         return r;
       },
       writeBloomRecord: (bloom, derivedFrom) => {
@@ -1412,7 +1536,7 @@ grounding for the workflow shape.`,
     const workflowsRecord = round13b.record;
     const keptWorkflowIds = new Set(round13b.keptIds);
     const acceptedWorkflowsV2 = workflowBloom.workflows.filter(w => keptWorkflowIds.has(w.id));
-    const safeWorkflowsV2 = acceptedWorkflowsV2.length > 0 ? acceptedWorkflowsV2 : workflowBloom.workflows;
+    const safeWorkflowsV2 = this.pickAcceptedOrAll(acceptedWorkflowsV2, workflowBloom.workflows);
 
     // ── 1.3c — Coverage Verifier (deterministic) ─────────────
     engine.stateMachine.setSubPhase(workflowRun.id, 'coverage_verifier');
@@ -1565,18 +1689,13 @@ for the entity shape.`,
     const entitiesRecord = round14.record;
     const keptEntityIds = new Set(round14.keptIds);
     const acceptedEntities = entitiesBloom.entities.filter(e => keptEntityIds.has(e.id));
-    const safeEntities = acceptedEntities.length > 0 ? acceptedEntities : entitiesBloom.entities;
+    const safeEntities = this.pickAcceptedOrAll(acceptedEntities, entitiesBloom.entities);
 
     // ── 1.5 Integrations + Quality Attributes Bloom (Round 4) ──
     engine.stateMachine.setSubPhase(workflowRun.id, 'integrations_qa_bloom');
-    // Hoist the id-generator so the QA synthetic ids are stable across
-    // feedback iterations — a re-bloom produces a new array, but the
-    // same id scheme resolves accept/reject consistently.
-    const buildQaItems = (qas: string[]) => qas.map((q, i) => ({
-      id: `QA-${i + 1}`,
-      label: `[Quality] ${q.slice(0, 80)}${q.length > 80 ? '…' : ''}`,
-      description: q,
-    }));
+    // QA synthetic ids are stable across feedback iterations — a re-bloom
+    // produces a new array, but the same id scheme (see buildQaItems)
+    // resolves accept/reject consistently.
     let lastQaItems: Array<{ id: string; label: string; description: string }> = [];
     const round15 = await this.runBloomRoundWithFeedbackLoop<{ integrations: Integration[]; qualityAttributes: string[] }>(ctx, {
       subPhaseId: 'integrations_qa_bloom',
@@ -1602,7 +1721,7 @@ for the entity shape.`,
         return rec;
       },
       mapItems: (bloom) => {
-        lastQaItems = buildQaItems(bloom.qualityAttributes);
+        lastQaItems = this.buildQaItems(bloom.qualityAttributes);
         return [
           ...bloom.integrations.map(i => ({ id: i.id, label: `[Integration] ${i.name}`, description: i.description, tradeoffs: `${i.category} • ${i.ownershipModel}` })),
           ...lastQaItems,
@@ -1654,8 +1773,8 @@ fabricates a new threshold is unsupported.`,
     const keptIntegrationIds = new Set(round15.keptIds);
     const acceptedIntegrations = integrationsBloom.integrations.filter(i => keptIntegrationIds.has(i.id));
     const acceptedQAs = lastQaItems.filter(q => keptIntegrationIds.has(q.id)).map(q => q.description);
-    const safeIntegrations = acceptedIntegrations.length > 0 ? acceptedIntegrations : integrationsBloom.integrations;
-    const safeQAs = acceptedQAs.length > 0 ? acceptedQAs : integrationsBloom.qualityAttributes;
+    const safeIntegrations = this.pickAcceptedOrAll(acceptedIntegrations, integrationsBloom.integrations);
+    const safeQAs = this.pickAcceptedOrAll(acceptedQAs, integrationsBloom.qualityAttributes);
 
     // ── 1.6 Product Description Synthesis (silent) ──────────
     engine.stateMachine.setSubPhase(workflowRun.id, 'product_description_synthesis');
@@ -1678,7 +1797,7 @@ fabricates a new threshold is unsupported.`,
         canonicalVocabulary: discoveryBundle.canonicalVocabulary,
       });
     } catch (err) {
-      return { success: false, error: `Product description synthesis failed: ${err instanceof Error ? err.message : String(err)}`, artifactIds };
+      return { success: false, error: `Product description synthesis failed: ${errMessage(err)}`, artifactIds };
     }
     const handoffRecord = engine.writer.writeRecord({
       record_type: 'product_description_handoff',
@@ -1827,58 +1946,19 @@ fabricates a new threshold is unsupported.`,
         artifactIds.push(rec.id);
         return rec;
       },
-      mapItems: (bloom) => bloom.releases.map(r => {
-        // Render the ACTUAL contained ids per category — not just counts —
-        // so the gatekeeper can id-match each claimed member against the
-        // Accepted Journeys/Workflows/Entities sets (its core DROP rule).
-        // Rendering only "6j/3w/1e" left the model structurally unable to
-        // detect a hallucinated or over-claimed id and it rubber-stamped
-        // KEEP (observed in slice-138 release_plan log).
-        const fmt = (label: string, ids: string[]): string =>
-          ids.length > 0 ? `      ${label} (${ids.length}): ${ids.join(', ')}` : `      ${label} (0): —`;
-        const detail = [
-          `      contains:`,
-          fmt('journeys', r.contains.journeys),
-          fmt('workflows', r.contains.workflows),
-          fmt('entities', r.contains.entities),
-          fmt('compliance', r.contains.compliance),
-          fmt('integrations', r.contains.integrations),
-          fmt('vocabulary', r.contains.vocabulary),
-        ].join('\n');
-        return {
-          id: r.release_id,
-          label: `Release ${r.ordinal}: ${r.name}`,
-          description: r.description,
-          tradeoffs: `${r.rationale} • contains ${r.contains.journeys.length}j/${r.contains.workflows.length}w/${r.contains.entities.length}e/${r.contains.compliance.length}c/${r.contains.integrations.length}i/${r.contains.vocabulary.length}v`,
-          detail,
-        };
-      }),
+      // Render the ACTUAL contained ids per category — not just counts — so
+      // the gatekeeper can id-match each claimed member against the Accepted
+      // Journeys/Workflows/Entities sets (its core DROP rule). See
+      // formatReleaseMenuItem.
+      mapItems: (bloom) => bloom.releases.map(r => this.formatReleaseMenuItem(r)),
       buildTitle: () => 'Review the proposed release plan (v2 manifest)',
       buildSummary: (bloom) => `${bloom.releases.length} release(s) proposed. Every accepted handoff artifact is assigned to exactly one release OR to the cross_cutting bucket. The deterministic 1.8 verifier will confirm exact coverage, ordinal integrity, and forward-only dependencies before final approval.`,
       gatekeeper: {
         bloomDescription: 'release plan slicing the accepted handoff artifacts into ordered releases',
-        applyPrune: (bloom, keptIds) => {
-          // A release plan with ZERO releases is structurally invalid — there
-          // is nothing to implement. When the (LLM-backed) gatekeeper drops
-          // EVERY release it is over-pruning, not signalling a real defect
-          // (slice-128/129 kept 2/2; slice-130's gatekeeper dropped 2/2 on the
-          // same input). Treat a total wipeout as keep-all and let the
-          // deterministic 1.8 verifier below do the real structural check
-          // (coverage, ordinals, forward-only deps). Without this, applyPrune
-          // empties `releases` and the downstream keep-all guard never sees
-          // them → "no releases remain" hard-abort on gatekeeper whim.
-          if (keptIds.size === 0) {
-            getLogger().warn('workflow', 'Phase 1.8 release_plan gatekeeper dropped ALL releases — keeping all (zero releases is invalid; deferring to the deterministic 1.8 verifier)', {
-              workflow_run_id: workflowRun.id,
-              proposed_releases: bloom.releases.length,
-            });
-            return { releases: bloom.releases, crossCutting: bloom.crossCutting };
-          }
-          return {
-            releases: bloom.releases.filter(r => keptIds.has(r.release_id)),
-            crossCutting: bloom.crossCutting,
-          };
-        },
+        // A total wipeout (keep nothing) is treated as keep-all — zero
+        // releases is structurally invalid, so the deterministic 1.8 verifier
+        // below does the real structural check. See applyReleasePrune.
+        applyPrune: (bloom, keptIds) => this.applyReleasePrune(bloom, keptIds, workflowRun.id),
         // release_plan's evaluation is fundamentally different from
         // member-drop: it checks structural validity of proposed
         // releases (malformed, hallucinated artifact ids, explicit
@@ -1888,8 +1968,64 @@ fabricates a new threshold is unsupported.`,
       },
     });
     if (!round18.success) return { success: false, error: round18.error, artifactIds };
-    const releasePlan = round18.bloom;
-    const keptReleaseIds = new Set(round18.keptIds);
+
+    // ── 1.8 deterministic verify + auto-fix + approve + phase gate ──
+    return this.verifyAndFinalizeReleasePlan(ctx, {
+      round18Bloom: round18.bloom,
+      round18Record: round18.record,
+      round18KeptIds: round18.keptIds,
+      lastCrossCutting,
+      safeJourneys,
+      workflows: acceptedWorkflowsForPlan,
+      entities: acceptedEntitiesForPlan,
+      compliance: acceptedComplianceForPlan,
+      integrations: acceptedIntegrationsForPlan,
+      vocabulary: acceptedVocabularyForPlan,
+      vvRequirements: discoveryBundle.vvRequirements,
+      technicalConstraints: discoveryBundle.technicalConstraints,
+      safeQAs,
+      handoffRecord,
+      statementRecord,
+      approvalMirrorRecord,
+      artifactIds,
+    });
+  }
+
+  /**
+   * Phase 1.8 — deterministic release-manifest verify + auto-fix + persist.
+   * Sorts/re-ordinals the approved releases, runs the manifest verifier (with
+   * a backward-dependency auto-fix pass and a harness-only advisory downgrade),
+   * fails with coverage_gap records on any blocking gap, and otherwise mints
+   * the approved release_plan record, sets the active pointer, and writes the
+   * phase gate. Extracted from executeProductLens to keep it under the
+   * cognitive-complexity budget; behavior mirrors the former inline tail.
+   */
+  private verifyAndFinalizeReleasePlan(
+    ctx: PhaseContext,
+    args: {
+      round18Bloom: { releases: ReleaseV2[]; crossCutting: CrossCuttingContents };
+      round18Record: GovernedStreamRecord;
+      round18KeptIds: string[];
+      lastCrossCutting: CrossCuttingContents;
+      safeJourneys: UserJourney[];
+      workflows: WorkflowV2[];
+      entities: Entity[];
+      compliance: ExtractedItem[];
+      integrations: Integration[];
+      vocabulary: VocabularyTerm[];
+      vvRequirements: VVRequirement[];
+      technicalConstraints: TechnicalConstraint[];
+      safeQAs: string[];
+      handoffRecord: GovernedStreamRecord;
+      statementRecord: GovernedStreamRecord;
+      approvalMirrorRecord: GovernedStreamRecord;
+      artifactIds: string[];
+    },
+  ): PhaseResult {
+    const { workflowRun, engine } = ctx;
+    const { artifactIds, lastCrossCutting, safeJourneys } = args;
+    const releasePlan = args.round18Bloom;
+    const keptReleaseIds = new Set(args.round18KeptIds);
     const approvedReleases: ReleaseV2[] = releasePlan.releases
       .filter(r => keptReleaseIds.size === 0 || keptReleaseIds.has(r.release_id));
     approvedReleases.sort((a, b) => a.ordinal - b.ordinal);
@@ -1912,17 +2048,17 @@ fabricates a new threshold is unsupported.`,
       cross_cutting: lastCrossCutting,
       approved: false,
     };
-    const acceptedVvIdsForPlan = discoveryBundle.vvRequirements.map(v => v.id);
-    const acceptedTechIdsForPlan = discoveryBundle.technicalConstraints.map(t => t.id);
-    const acceptedQaIdsForPlan = safeQAs.map((_q, i) => `QA-${i + 1}`);
+    const acceptedVvIdsForPlan = args.vvRequirements.map(v => v.id);
+    const acceptedTechIdsForPlan = args.technicalConstraints.map(t => t.id);
+    const acceptedQaIdsForPlan = args.safeQAs.map((_q, i) => `QA-${i + 1}`);
     let manifestGaps = verifyReleaseManifest({
       plan: draftPlan,
       journeys: safeJourneys,
-      workflows: acceptedWorkflowsForPlan,
-      entityIds: acceptedEntitiesForPlan.map(e => e.id),
-      complianceIds: acceptedComplianceForPlan.map(c => c.id),
-      integrations: acceptedIntegrationsForPlan,
-      vocabulary: acceptedVocabularyForPlan,
+      workflows: args.workflows,
+      entityIds: args.entities.map(e => e.id),
+      complianceIds: args.compliance.map(c => c.id),
+      integrations: args.integrations,
+      vocabulary: args.vocabulary,
       vvRequirementIds: acceptedVvIdsForPlan,
       qualityAttributeIds: acceptedQaIdsForPlan,
       technicalConstraintIds: acceptedTechIdsForPlan,
@@ -1936,7 +2072,7 @@ fabricates a new threshold is unsupported.`,
     // path if violations remain.
     const backwardGap = manifestGaps.some(g => g.check === 'release_backward_dependency' && g.severity === 'blocking');
     if (backwardGap) {
-      const fixesApplied = autoFixBackwardDependencies(draftPlan, acceptedWorkflowsForPlan, safeJourneys);
+      const fixesApplied = autoFixBackwardDependencies(draftPlan, args.workflows, safeJourneys);
       if (fixesApplied.length > 0) {
         getLogger().warn('workflow', `Phase 1.8: auto-fixed ${fixesApplied.length} backward-dependency violation(s) — promoted workflow(s) to a later release`, {
           workflow_run_id: workflowRun.id,
@@ -1945,11 +2081,11 @@ fabricates a new threshold is unsupported.`,
         manifestGaps = verifyReleaseManifest({
           plan: draftPlan,
           journeys: safeJourneys,
-          workflows: acceptedWorkflowsForPlan,
-          entityIds: acceptedEntitiesForPlan.map(e => e.id),
-          complianceIds: acceptedComplianceForPlan.map(c => c.id),
-          integrations: acceptedIntegrationsForPlan,
-          vocabulary: acceptedVocabularyForPlan,
+          workflows: args.workflows,
+          entityIds: args.entities.map(e => e.id),
+          complianceIds: args.compliance.map(c => c.id),
+          integrations: args.integrations,
+          vocabulary: args.vocabulary,
           vvRequirementIds: acceptedVvIdsForPlan,
           qualityAttributeIds: acceptedQaIdsForPlan,
           technicalConstraintIds: acceptedTechIdsForPlan,
@@ -1975,7 +2111,7 @@ fabricates a new threshold is unsupported.`,
       blockingManifestGaps = [];
     }
     if (blockingManifestGaps.length > 0) {
-      const gapRecIds = this.persistCoverageGaps(ctx, manifestGaps, [round18.record.id]);
+      const gapRecIds = this.persistCoverageGaps(ctx, manifestGaps, [args.round18Record.id]);
       getLogger().warn('workflow', 'Phase 1.8 verifier: blocking coverage/coherence gaps detected', {
         workflow_run_id: workflowRun.id,
         gap_count: blockingManifestGaps.length,
@@ -1989,7 +2125,7 @@ fabricates a new threshold is unsupported.`,
       };
     }
     if (manifestGaps.length > 0) {
-      this.persistCoverageGaps(ctx, manifestGaps, [round18.record.id]);
+      this.persistCoverageGaps(ctx, manifestGaps, [args.round18Record.id]);
       getLogger().info('workflow', 'Phase 1.8 verifier: advisory-only findings', {
         workflow_run_id: workflowRun.id,
         advisory_count: manifestGaps.length,
@@ -2006,7 +2142,7 @@ fabricates a new threshold is unsupported.`,
       sub_phase_id: 'release_plan',
       produced_by_agent_role: 'orchestrator',
       janumicode_version_sha: engine.janumiCodeVersionSha,
-      derived_from_record_ids: [round18.record.id],
+      derived_from_record_ids: [args.round18Record.id],
       content: {
         kind: 'release_plan',
         schemaVersion: '2.0',
@@ -2029,14 +2165,14 @@ fabricates a new threshold is unsupported.`,
       produced_by_agent_role: 'orchestrator',
       janumicode_version_sha: engine.janumiCodeVersionSha,
       derived_from_record_ids: [
-        handoffRecord.id, statementRecord.id, approvalMirrorRecord.id,
+        args.handoffRecord.id, args.statementRecord.id, args.approvalMirrorRecord.id,
         approvedReleasePlanRecord.id,
       ],
       content: {
         kind: 'phase_gate',
         phase_id: '1',
-        intent_statement_record_id: statementRecord.id,
-        product_description_handoff_record_id: handoffRecord.id,
+        intent_statement_record_id: args.statementRecord.id,
+        product_description_handoff_record_id: args.handoffRecord.id,
         active_release_plan_record_id: approvedReleasePlanRecord.id,
         has_unresolved_warnings: false,
         has_unapproved_proposals: false,
@@ -2270,27 +2406,7 @@ fabricates a new threshold is unsupported.`,
       // Env var JANUMICODE_SCOPE_GATEKEEPER=off skips it (tests with
       // mock LLM queues that don't account for the extra gatekeeper
       // call use this to keep their fixture counts deterministic).
-      const gatekeeperEnabled = (process.env.JANUMICODE_SCOPE_GATEKEEPER ?? 'on') !== 'off';
-      if (spec.gatekeeper && gatekeeperEnabled) {
-        const pruneOutcome = await this.runScopeGatekeeperForBloom(
-          ctx, spec.subPhaseId, spec.gatekeeper.bloomDescription,
-          spec.mapItems(bloom), record.id,
-          {
-            overlay: spec.gatekeeper.overlay,
-            customPromptBuilder: spec.gatekeeper.customPromptBuilder,
-          },
-        );
-        if (pruneOutcome.dropped.length > 0 || pruneOutcome.error) {
-          // Apply the prune to the bloom and write the pruned artifact.
-          const keptSet = new Set(pruneOutcome.kept_ids);
-          const prunedBloom = spec.gatekeeper.applyPrune(bloom, keptSet);
-          const prunedRecord = spec.writeBloomRecord(prunedBloom, [record.id]);
-          ctx.engine.ingestionPipeline.ingest(prunedRecord);
-          ctx.engine.writer.supersedByRollback(record.id, prunedRecord.id);
-          bloom = prunedBloom;
-          record = prunedRecord;
-        }
-      }
+      ({ bloom, record } = await this.applyBloomGatekeeper(ctx, spec, bloom, record));
 
       lastRecord = record;
 
@@ -2326,6 +2442,53 @@ fabricates a new threshold is unsupported.`,
 
     // Unreachable — loop always returns via success or max-iterations path.
     return { success: false, error: `Sub-phase ${spec.subPhaseId} feedback loop exited unexpectedly`, };
+  }
+
+  /**
+   * Apply the opt-in scope gatekeeper to a freshly-written bloom record.
+   * Extracted from runBloomRoundWithFeedbackLoop to keep that loop's
+   * cognitive complexity in check. Returns the (possibly pruned) bloom
+   * and its current governed-stream record — identical values to the
+   * inline logic it replaced.
+   */
+  private async applyBloomGatekeeper<T>(
+    ctx: PhaseContext,
+    spec: {
+      subPhaseId: string;
+      mapItems: (bloom: T) => Array<{ id: string; label: string; description?: string; tradeoffs?: string }>;
+      writeBloomRecord: (bloom: T, derivedFrom: string[]) => GovernedStreamRecord;
+      gatekeeper?: {
+        bloomDescription: string;
+        applyPrune: (bloom: T, keptIds: Set<string>) => T;
+        overlay?: string;
+        customPromptBuilder?: NonNullable<import('../scopeGatekeeper').GatekeeperConfig['customPromptBuilder']>;
+      };
+    },
+    bloom: T,
+    record: GovernedStreamRecord,
+  ): Promise<{ bloom: T; record: GovernedStreamRecord }> {
+    const gatekeeperEnabled = (process.env.JANUMICODE_SCOPE_GATEKEEPER ?? 'on') !== 'off';
+    if (spec.gatekeeper && gatekeeperEnabled) {
+      const pruneOutcome = await this.runScopeGatekeeperForBloom(
+        ctx, spec.subPhaseId, spec.gatekeeper.bloomDescription,
+        spec.mapItems(bloom), record.id,
+        {
+          overlay: spec.gatekeeper.overlay,
+          customPromptBuilder: spec.gatekeeper.customPromptBuilder,
+        },
+      );
+      if (pruneOutcome.dropped.length > 0 || pruneOutcome.error) {
+        // Apply the prune to the bloom and write the pruned artifact.
+        const keptSet = new Set(pruneOutcome.kept_ids);
+        const prunedBloom = spec.gatekeeper.applyPrune(bloom, keptSet);
+        const prunedRecord = spec.writeBloomRecord(prunedBloom, [record.id]);
+        ctx.engine.ingestionPipeline.ingest(prunedRecord);
+        ctx.engine.writer.supersedByRollback(record.id, prunedRecord.id);
+        bloom = prunedBloom;
+        record = prunedRecord;
+      }
+    }
+    return { bloom, record };
   }
 
   /**
@@ -2434,14 +2597,9 @@ fabricates a new threshold is unsupported.`,
    */
   private collectGatekeeperUpstreamContext(ctx: PhaseContext, subPhaseId?: string): GatekeeperUpstreamContext {
     const { engine, workflowRun } = ctx;
-    const all = engine.writer.getRecordsByType(workflowRun.id, 'artifact_produced');
-    const byKind = new Map<string, Record<string, unknown>>();
-    for (const r of all) {
-      if (!r.is_current_version) continue;
-      const c = r.content as Record<string, unknown>;
-      const kind = typeof c.kind === 'string' ? c.kind : undefined;
-      if (kind) byKind.set(kind, c);
-    }
+    const byKind = this.indexCurrentArtifactsByKind(
+      engine.writer.getRecordsByType(workflowRun.id, 'artifact_produced'),
+    );
     const id = byKind.get('intent_discovery');
     const tcd = byKind.get('technical_constraints_discovery');
     const crd = byKind.get('compliance_retention_discovery');
@@ -2482,6 +2640,26 @@ fabricates a new threshold is unsupported.`,
     // Strip the accepted set(s) this gatekeeper's own bloom produced so
     // it doesn't see its un-pruned proposal as "already accepted".
     return subPhaseId ? stripSelfProducedAcceptedSets(ctx_, subPhaseId) : ctx_;
+  }
+
+  /**
+   * Index current-version artifact records by their content `kind`,
+   * keeping the last-seen record for each kind (matches the prior inline
+   * loop's overwrite semantics). Non-current records and records without
+   * a string `kind` are skipped. Extracted from
+   * collectGatekeeperUpstreamContext to bound its cognitive complexity.
+   */
+  private indexCurrentArtifactsByKind(
+    records: GovernedStreamRecord[],
+  ): Map<string, Record<string, unknown>> {
+    const byKind = new Map<string, Record<string, unknown>>();
+    for (const r of records) {
+      if (!r.is_current_version) continue;
+      const c = r.content as Record<string, unknown>;
+      const kind = typeof c.kind === 'string' ? c.kind : undefined;
+      if (kind) byKind.set(kind, c);
+    }
+    return byKind;
   }
 
   /**
@@ -2957,12 +3135,12 @@ fabricates a new threshold is unsupported.`,
     // Compact summary of the bloom shape — names + counts only, no full
     // JSON payload. Keeps input tokens ~1 K and output tokens ~500.
     const bloomSummary = [
-      `Personas (${input.personas.length}): ${input.personas.map(p => `${p.id} ${p.name}`).join('; ')}`,
-      `User Journeys (${input.journeys.length}): ${input.journeys.map(j => `${j.id} ${j.title}`).join('; ')}`,
-      `Business Domains (${input.domains.length}): ${input.domains.map(d => `${d.id} ${d.name}`).join('; ')}`,
+      `Personas (${input.personas.length}): ${input.personas.map(p => p.id + ' ' + p.name).join('; ')}`,
+      `User Journeys (${input.journeys.length}): ${input.journeys.map(j => j.id + ' ' + j.title).join('; ')}`,
+      `Business Domains (${input.domains.length}): ${input.domains.map(d => d.id + ' ' + d.name).join('; ')}`,
       `Entities: ${input.entities.length}`,
-      `Workflows (${input.workflows.length}): ${input.workflows.map(w => `${w.id} ${w.name}`).join('; ')}`,
-      `Integrations (${input.integrations.length}): ${input.integrations.map(i => `${i.id} ${i.name}`).join('; ')}`,
+      `Workflows (${input.workflows.length}): ${input.workflows.map(w => w.id + ' ' + w.name).join('; ')}`,
+      `Integrations (${input.integrations.length}): ${input.integrations.map(i => i.id + ' ' + i.name).join('; ')}`,
       `Quality Attributes: ${input.qualityAttributes.length}`,
     ].join('\n');
 
@@ -3359,12 +3537,8 @@ fabricates a new threshold is unsupported.`,
     });
     const parsed = this.safeParseJson(result);
     if (!parsed) throw new Error('1.3a bloom returned unparseable JSON');
-    const unreachedPersonas = Array.isArray(parsed.unreached_personas)
-      ? (parsed.unreached_personas as Array<{ personaId?: string }>).map(u => u.personaId ?? '').filter(Boolean)
-      : [];
-    const unreachedDomains = Array.isArray(parsed.unreached_domains)
-      ? (parsed.unreached_domains as Array<{ domainId?: string }>).map(u => u.domainId ?? '').filter(Boolean)
-      : [];
+    const unreachedPersonas = this.extractUnreachedIds(parsed.unreached_personas, 'personaId');
+    const unreachedDomains = this.extractUnreachedIds(parsed.unreached_domains, 'domainId');
     // Self-heal filter: drop any surfaces[*] id that isn't in the
     // accepted set for its type. Mirrors the Path C 1.8 filter. When
     // the LLM emits free-text ("Compliance monitoring rules") or a
@@ -3386,172 +3560,30 @@ fabricates a new threshold is unsupported.`,
     };
     // Persona-ID self-heal. Mirrors the surfaces[*] drop pattern but
     // applied to journey.personaId, journey.additionalPersonas[], and
-    // journey.steps[].actor (where actor MAY be a persona id, "System",
-    // or an integration id). Resolution order:
-    //   1. Per-journey LLM retry — re-emit the offending journey with
-    //      explicit "use ONLY these accepted persona IDs" feedback.
-    //      Most correct: lets the model pick the right initiator from
-    //      context rather than us guessing by string distance.
-    //   2. Fuzzy-remap fallback — when the retry budget is exhausted or
-    //      the retry also produced an invalid id, remap to the closest
-    //      accepted persona by token-overlap or Levenshtein distance.
-    //   3. Drop — when no reasonable fuzzy match exists either.
+    // journey.steps[].actor. Resolution order per journey: (1) per-journey
+    // LLM retry, (2) fuzzy-remap fallback, (3) drop. See
+    // repairJourneyPersonaRefs; the log arrays and the cross-journey
+    // TOTAL_RETRY_BUDGET counter are threaded through by reference / return.
     const personaRemapLog: Array<{ from: string; to: string; where: string }> = [];
     const personaDropLog: Array<{ id: string; where: string }> = [];
     const personaRetryLog: Array<{ journey_id: string; from: string; to: string; outcome: string }> = [];
-    const remapPersona = (raw: string, where: string): string | null => {
-      if (acceptedPersonaIds.has(raw)) return raw;
-      const best = nearestAcceptedPersona(raw, [...acceptedPersonaIds]);
-      if (best) {
-        personaRemapLog.push({ from: raw, to: best, where });
-        return best;
-      }
-      personaDropLog.push({ id: raw, where });
-      return null;
+    const accepted = {
+      personaIds: acceptedPersonaIds,
+      integrations: acceptedIntegrations,
+      compliance: acceptedCompliance,
+      retention: acceptedRetention,
+      vv: acceptedVV,
+      personas: inputs.acceptedPersonas,
     };
-    const filterSurfaces = (j: Record<string, unknown>) => {
-      const s = (j as { surfaces?: Record<string, unknown> }).surfaces;
-      if (!s || typeof s !== 'object') return;
-      const filterArr = (key: string, accepted: Set<string>, mergeAccepted?: Set<string>) => {
-        const xs = Array.isArray((s as Record<string, unknown>)[key])
-          ? (s as Record<string, string[]>)[key].filter(x => typeof x === 'string')
-          : [];
-        const kept: string[] = [];
-        for (const x of xs) {
-          if (accepted.has(x) || mergeAccepted?.has(x)) kept.push(x);
-          else droppedBySurfaceType[key].push(x);
-        }
-        (s as Record<string, string[]>)[key] = kept;
-      };
-      filterArr('compliance_regimes', acceptedCompliance);
-      filterArr('retention_rules', acceptedRetention, acceptedCompliance);
-      filterArr('vv_requirements', acceptedVV);
-      filterArr('integrations', acceptedIntegrations);
-    };
-    // Identify hallucinated persona references on a journey BEFORE
-    // mutating it. Used to gate the per-journey LLM retry: only
-    // journeys with at least one offending id pay the retry cost.
-    const collectInvalidPersonaRefs = (j: Record<string, unknown>): Array<{ id: string; where: string }> => {
-      const refs: Array<{ id: string; where: string }> = [];
-      const journeyId = typeof j.id === 'string' ? j.id : '<unknown>';
-      if (typeof j.personaId === 'string' && !acceptedPersonaIds.has(j.personaId)) {
-        refs.push({ id: j.personaId, where: `${journeyId}.personaId` });
-      }
-      if (Array.isArray(j.additionalPersonas)) {
-        for (const p of j.additionalPersonas) {
-          if (typeof p === 'string' && !acceptedPersonaIds.has(p)) {
-            refs.push({ id: p, where: `${journeyId}.additionalPersonas` });
-          }
-        }
-      }
-      if (Array.isArray(j.steps)) {
-        for (const stepRaw of j.steps) {
-          if (!stepRaw || typeof stepRaw !== 'object') continue;
-          const step = stepRaw as Record<string, unknown>;
-          const actor = step.actor;
-          if (typeof actor !== 'string') continue;
-          if (actor === 'System' || acceptedIntegrations.has(actor)) continue;
-          if (!actor.startsWith('P-')) continue;
-          if (!acceptedPersonaIds.has(actor)) {
-            refs.push({ id: actor, where: `${journeyId}.step#${step.stepNumber}.actor` });
-          }
-        }
-      }
-      return refs;
-    };
-    // Apply remapPersona to a journey in place. Returns true on
-    // success; false when the initiator persona is unrecoverable.
-    const applyRemap = (j: Record<string, unknown>): boolean => {
-      const journeyId = typeof j.id === 'string' ? j.id : '<unknown>';
-      if (typeof j.personaId === 'string') {
-        const remapped = remapPersona(j.personaId, `${journeyId}.personaId`);
-        if (!remapped) return false;
-        j.personaId = remapped;
-      }
-      if (Array.isArray(j.additionalPersonas)) {
-        const kept: string[] = [];
-        for (const p of j.additionalPersonas) {
-          if (typeof p !== 'string') continue;
-          const remapped = remapPersona(p, `${journeyId}.additionalPersonas`);
-          if (remapped) kept.push(remapped);
-        }
-        j.additionalPersonas = kept;
-      }
-      if (Array.isArray(j.steps)) {
-        for (const stepRaw of j.steps) {
-          if (!stepRaw || typeof stepRaw !== 'object') continue;
-          const step = stepRaw as Record<string, unknown>;
-          const actor = step.actor;
-          if (typeof actor !== 'string') continue;
-          if (actor === 'System' || acceptedIntegrations.has(actor) || !actor.startsWith('P-')) continue;
-          const remapped = remapPersona(actor, `${journeyId}.step#${step.stepNumber}.actor`);
-          step.actor = remapped ?? 'System';
-        }
-      }
-      return true;
-    };
-    const PER_JOURNEY_RETRY_BUDGET = 2;
-    const TOTAL_RETRY_BUDGET = 10;
+    const logs = { personaRemapLog, personaDropLog, personaRetryLog };
     let totalRetriesUsed = 0;
     const journeysAfterDrop: Array<Record<string, unknown>> = [];
-    for (let j of rawJourneys) {
-      filterSurfaces(j);
-      const ac = (j as Record<string, unknown>).acceptanceCriteria;
-      (j as Record<string, unknown>).acceptanceCriteria = normalizeAcceptanceCriteria(ac);
-      const journeyId = typeof (j as { id?: string }).id === 'string' ? (j as { id: string }).id : '<unknown>';
-
-      // Step 1 — LLM retry per offending journey (most correct path).
-      let invalidRefs = collectInvalidPersonaRefs(j);
-      let retriesForThisJourney = 0;
-      while (invalidRefs.length > 0
-        && retriesForThisJourney < PER_JOURNEY_RETRY_BUDGET
-        && totalRetriesUsed < TOTAL_RETRY_BUDGET) {
-        retriesForThisJourney++;
-        totalRetriesUsed++;
-        const fixed = await this.retryJourneyForPersonaFix(
-          ctx, j, invalidRefs, inputs.acceptedPersonas, retriesForThisJourney,
-        );
-        if (fixed) {
-          filterSurfaces(fixed);
-          const fac = (fixed as Record<string, unknown>).acceptanceCriteria;
-          (fixed as Record<string, unknown>).acceptanceCriteria = normalizeAcceptanceCriteria(fac);
-          j = fixed;
-          const stillInvalid = collectInvalidPersonaRefs(j);
-          personaRetryLog.push({
-            journey_id: journeyId,
-            from: invalidRefs.map(r => r.id).join(','),
-            to: typeof j.personaId === 'string' ? j.personaId : '?',
-            outcome: stillInvalid.length === 0 ? 'fixed' : 'still_invalid',
-          });
-          invalidRefs = stillInvalid;
-        } else {
-          personaRetryLog.push({
-            journey_id: journeyId,
-            from: invalidRefs.map(r => r.id).join(','),
-            to: '',
-            outcome: 'retry_call_failed',
-          });
-          break;
-        }
-      }
-      if (invalidRefs.length > 0 && totalRetriesUsed >= TOTAL_RETRY_BUDGET) {
-        personaRetryLog.push({
-          journey_id: journeyId,
-          from: invalidRefs.map(r => r.id).join(','),
-          to: '',
-          outcome: 'retry_budget_exhausted',
-        });
-      }
-
-      // Step 2 — fuzzy-remap fallback for any residual invalid refs.
-      if (!applyRemap(j as Record<string, unknown>)) {
-        getLogger().warn('workflow', 'Phase 1.3a: dropping journey — personaId unrecoverable after retry + fuzzy-remap', {
-          journey_id: journeyId,
-          persona_id: (j as { personaId?: unknown }).personaId,
-        });
-        continue;
-      }
-      journeysAfterDrop.push(j as Record<string, unknown>);
+    for (const jRaw of rawJourneys) {
+      const res = await this.repairJourneyPersonaRefs(
+        ctx, jRaw as Record<string, unknown>, accepted, droppedBySurfaceType, logs, totalRetriesUsed,
+      );
+      totalRetriesUsed = res.totalRetriesUsed;
+      if (res.journey) journeysAfterDrop.push(res.journey);
     }
     const userJourneys: UserJourney[] = journeysAfterDrop as unknown as UserJourney[];
     if (personaRetryLog.length > 0) {
@@ -3589,6 +3621,305 @@ fabricates a new threshold is unsupported.`,
       unreachedPersonas,
       unreachedDomains,
     };
+  }
+
+  /**
+   * Extract a de-blanked id list from an `unreached_*` array where each entry
+   * is `{ [key]: string }`. Mirrors the former inline
+   * `Array.isArray(x) ? x.map(u => u[key] ?? '').filter(Boolean) : []`.
+   * Extracted from runJourneyBloom13a to keep it under the complexity budget.
+   */
+  private extractUnreachedIds(raw: unknown, key: string): string[] {
+    if (!Array.isArray(raw)) return [];
+    return (raw as Array<Record<string, unknown>>)
+      .map(u => (u[key] ?? '') as string)
+      .filter(Boolean);
+  }
+
+  /**
+   * Resolve a persona ref against the accepted set: pass it through when
+   * already accepted, else fuzzy-remap to the nearest accepted persona
+   * (logging the remap), else log a drop and return null. Mutates the passed
+   * log arrays. Extracted from runJourneyBloom13a's `remapPersona` closure.
+   */
+  private remapPersonaAgainstAccepted(
+    raw: string,
+    where: string,
+    acceptedPersonaIds: Set<string>,
+    personaRemapLog: Array<{ from: string; to: string; where: string }>,
+    personaDropLog: Array<{ id: string; where: string }>,
+  ): string | null {
+    if (acceptedPersonaIds.has(raw)) return raw;
+    const best = nearestAcceptedPersona(raw, [...acceptedPersonaIds]);
+    if (best) {
+      personaRemapLog.push({ from: raw, to: best, where });
+      return best;
+    }
+    personaDropLog.push({ id: raw, where });
+    return null;
+  }
+
+  /**
+   * Drop any surfaces[*] id that isn't in the accepted set for its type,
+   * mutating the journey's `surfaces` in place and recording each dropped id
+   * on `droppedBySurfaceType`. retention_rules also accept a compliance id
+   * (merge set). Extracted from runJourneyBloom13a's `filterSurfaces` closure.
+   */
+  private filterJourneySurfaces(
+    j: Record<string, unknown>,
+    accepted: { compliance: Set<string>; retention: Set<string>; vv: Set<string>; integrations: Set<string> },
+    droppedBySurfaceType: Record<string, string[]>,
+  ): void {
+    const s = (j as { surfaces?: Record<string, unknown> }).surfaces;
+    if (!s || typeof s !== 'object') return;
+    const filterArr = (key: string, acc: Set<string>, mergeAccepted?: Set<string>) => {
+      const xs = Array.isArray((s as Record<string, unknown>)[key])
+        ? (s as Record<string, string[]>)[key].filter(x => typeof x === 'string')
+        : [];
+      const kept: string[] = [];
+      for (const x of xs) {
+        if (acc.has(x) || mergeAccepted?.has(x)) kept.push(x);
+        else droppedBySurfaceType[key].push(x);
+      }
+      (s as Record<string, string[]>)[key] = kept;
+    };
+    filterArr('compliance_regimes', accepted.compliance);
+    filterArr('retention_rules', accepted.retention, accepted.compliance);
+    filterArr('vv_requirements', accepted.vv);
+    filterArr('integrations', accepted.integrations);
+  }
+
+  /**
+   * Identify hallucinated persona references on a journey BEFORE mutating it —
+   * `personaId`, `additionalPersonas[]`, and persona-shaped `steps[].actor`
+   * refs not in the accepted set. Pure (no mutation). Extracted from
+   * runJourneyBloom13a's `collectInvalidPersonaRefs` closure.
+   */
+  private collectInvalidPersonaRefs(
+    j: Record<string, unknown>,
+    acceptedPersonaIds: Set<string>,
+    acceptedIntegrations: Set<string>,
+  ): Array<{ id: string; where: string }> {
+    const refs: Array<{ id: string; where: string }> = [];
+    const journeyId = typeof j.id === 'string' ? j.id : '<unknown>';
+    if (typeof j.personaId === 'string' && !acceptedPersonaIds.has(j.personaId)) {
+      refs.push({ id: j.personaId, where: `${journeyId}.personaId` });
+    }
+    if (Array.isArray(j.additionalPersonas)) {
+      for (const p of j.additionalPersonas) {
+        if (typeof p === 'string' && !acceptedPersonaIds.has(p)) {
+          refs.push({ id: p, where: `${journeyId}.additionalPersonas` });
+        }
+      }
+    }
+    refs.push(...this.collectInvalidStepActorRefs(j.steps, journeyId, acceptedPersonaIds, acceptedIntegrations));
+    return refs;
+  }
+
+  /**
+   * Apply `remapPersona` to a journey in place. Returns true on success;
+   * false when the initiator persona is unrecoverable (caller drops the
+   * journey). Extracted from runJourneyBloom13a's `applyRemap` closure.
+   */
+  private applyPersonaRemap(
+    j: Record<string, unknown>,
+    acceptedIntegrations: Set<string>,
+    remapPersona: (raw: string, where: string) => string | null,
+  ): boolean {
+    const journeyId = typeof j.id === 'string' ? j.id : '<unknown>';
+    if (typeof j.personaId === 'string') {
+      const remapped = remapPersona(j.personaId, `${journeyId}.personaId`);
+      if (!remapped) return false;
+      j.personaId = remapped;
+    }
+    if (Array.isArray(j.additionalPersonas)) {
+      const kept: string[] = [];
+      for (const p of j.additionalPersonas) {
+        if (typeof p !== 'string') continue;
+        const remapped = remapPersona(p, `${journeyId}.additionalPersonas`);
+        if (remapped) kept.push(remapped);
+      }
+      j.additionalPersonas = kept;
+    }
+    this.remapJourneyStepActors(j.steps, journeyId, acceptedIntegrations, remapPersona);
+    return true;
+  }
+
+  /**
+   * Per-journey persona-ref self-heal for 1.3a: filter the journey's surfaces
+   * against the accepted sets, then repair hallucinated persona refs via
+   * (1) per-journey LLM retry, (2) fuzzy-remap fallback, (3) drop. Threads the
+   * shared cross-journey retry budget through `totalRetriesUsed`. Mutates the
+   * journey, `droppedBySurfaceType`, and the log arrays in place. Returns the
+   * repaired journey (or null when its initiator persona is unrecoverable)
+   * plus the running retry total. Extracted from runJourneyBloom13a's
+   * per-journey loop to keep it under the cognitive-complexity budget.
+   */
+  private async repairJourneyPersonaRefs(
+    ctx: PhaseContext,
+    journey: Record<string, unknown>,
+    accepted: {
+      personaIds: Set<string>;
+      integrations: Set<string>;
+      compliance: Set<string>;
+      retention: Set<string>;
+      vv: Set<string>;
+      personas: Persona[];
+    },
+    droppedBySurfaceType: Record<string, string[]>,
+    logs: {
+      personaRemapLog: Array<{ from: string; to: string; where: string }>;
+      personaDropLog: Array<{ id: string; where: string }>;
+      personaRetryLog: Array<{ journey_id: string; from: string; to: string; outcome: string }>;
+    },
+    totalRetriesUsed: number,
+  ): Promise<{ journey: Record<string, unknown> | null; totalRetriesUsed: number }> {
+    const remapPersona = (raw: string, where: string): string | null =>
+      this.remapPersonaAgainstAccepted(raw, where, accepted.personaIds, logs.personaRemapLog, logs.personaDropLog);
+    this.filterJourneySurfaces(journey, accepted, droppedBySurfaceType);
+    journey.acceptanceCriteria = normalizeAcceptanceCriteria(journey.acceptanceCriteria);
+    const journeyId = typeof journey.id === 'string' ? journey.id : '<unknown>';
+
+    // Step 1 — LLM retry per offending journey (most correct path).
+    const loop = await this.retryJourneyPersonaFixLoop(
+      ctx, journey, accepted, droppedBySurfaceType, logs.personaRetryLog, journeyId, totalRetriesUsed,
+    );
+    const j = loop.journey;
+    totalRetriesUsed = loop.totalRetriesUsed;
+    if (loop.invalidRefs.length > 0 && totalRetriesUsed >= TOTAL_RETRY_BUDGET) {
+      logs.personaRetryLog.push({
+        journey_id: journeyId,
+        from: loop.invalidRefs.map(r => r.id).join(','),
+        to: '',
+        outcome: 'retry_budget_exhausted',
+      });
+    }
+
+    // Step 2 — fuzzy-remap fallback for any residual invalid refs.
+    if (!this.applyPersonaRemap(j, accepted.integrations, remapPersona)) {
+      getLogger().warn('workflow', 'Phase 1.3a: dropping journey — personaId unrecoverable after retry + fuzzy-remap', {
+        journey_id: journeyId,
+        persona_id: (j as { personaId?: unknown }).personaId,
+      });
+      return { journey: null, totalRetriesUsed };
+    }
+    return { journey: j, totalRetriesUsed };
+  }
+
+  /**
+   * Step 1 of the 1.3a persona self-heal: retry each offending journey via a
+   * focused LLM call up to PER_JOURNEY_RETRY_BUDGET times (capped by the
+   * cross-journey TOTAL_RETRY_BUDGET). Each attempt re-filters surfaces and
+   * re-normalizes acceptanceCriteria and logs its outcome. Returns the latest
+   * journey object, the residual invalid refs, and the running retry total.
+   * Extracted from repairJourneyPersonaRefs to keep it under the complexity
+   * budget; the former `if (fixed) {…} else {…break}` becomes a guard clause.
+   */
+  private async retryJourneyPersonaFixLoop(
+    ctx: PhaseContext,
+    journey: Record<string, unknown>,
+    accepted: {
+      personaIds: Set<string>;
+      integrations: Set<string>;
+      compliance: Set<string>;
+      retention: Set<string>;
+      vv: Set<string>;
+      personas: Persona[];
+    },
+    droppedBySurfaceType: Record<string, string[]>,
+    personaRetryLog: Array<{ journey_id: string; from: string; to: string; outcome: string }>,
+    journeyId: string,
+    totalRetriesUsed: number,
+  ): Promise<{ journey: Record<string, unknown>; invalidRefs: Array<{ id: string; where: string }>; totalRetriesUsed: number }> {
+    let j = journey;
+    let invalidRefs = this.collectInvalidPersonaRefs(j, accepted.personaIds, accepted.integrations);
+    let retriesForThisJourney = 0;
+    while (invalidRefs.length > 0
+      && retriesForThisJourney < PER_JOURNEY_RETRY_BUDGET
+      && totalRetriesUsed < TOTAL_RETRY_BUDGET) {
+      retriesForThisJourney++;
+      totalRetriesUsed++;
+      const fixed = await this.retryJourneyForPersonaFix(
+        ctx, j, invalidRefs, accepted.personas, retriesForThisJourney,
+      );
+      if (!fixed) {
+        personaRetryLog.push({
+          journey_id: journeyId,
+          from: invalidRefs.map(r => r.id).join(','),
+          to: '',
+          outcome: 'retry_call_failed',
+        });
+        break;
+      }
+      this.filterJourneySurfaces(fixed, accepted, droppedBySurfaceType);
+      fixed.acceptanceCriteria = normalizeAcceptanceCriteria(fixed.acceptanceCriteria);
+      j = fixed;
+      const stillInvalid = this.collectInvalidPersonaRefs(j, accepted.personaIds, accepted.integrations);
+      personaRetryLog.push({
+        journey_id: journeyId,
+        from: invalidRefs.map(r => r.id).join(','),
+        to: typeof j.personaId === 'string' ? j.personaId : '?',
+        outcome: stillInvalid.length === 0 ? 'fixed' : 'still_invalid',
+      });
+      invalidRefs = stillInvalid;
+    }
+    return { journey: j, invalidRefs, totalRetriesUsed };
+  }
+
+  /**
+   * Collect hallucinated persona-id references from a journey's steps[].
+   * A step.actor is invalid when it is persona-shaped (`P-` prefix) but
+   * not in the accepted-persona set; `System` and accepted integration
+   * ids are always valid. Extracted from runJourneyBloom13a's
+   * collectInvalidPersonaRefs to keep it under the complexity budget;
+   * behavior mirrors the former inline `if (Array.isArray(j.steps))` scan.
+   */
+  private collectInvalidStepActorRefs(
+    steps: unknown,
+    journeyId: string,
+    acceptedPersonaIds: Set<string>,
+    acceptedIntegrations: Set<string>,
+  ): Array<{ id: string; where: string }> {
+    const refs: Array<{ id: string; where: string }> = [];
+    if (!Array.isArray(steps)) return refs;
+    for (const stepRaw of steps) {
+      if (!stepRaw || typeof stepRaw !== 'object') continue;
+      const step = stepRaw as Record<string, unknown>;
+      const actor = step.actor;
+      if (typeof actor !== 'string') continue;
+      if (actor === 'System' || acceptedIntegrations.has(actor)) continue;
+      if (!actor.startsWith('P-')) continue;
+      if (!acceptedPersonaIds.has(actor)) {
+        refs.push({ id: actor, where: `${journeyId}.step#${step.stepNumber}.actor` });
+      }
+    }
+    return refs;
+  }
+
+  /**
+   * Fuzzy-remap persona-shaped step.actor values on a journey in place.
+   * `System`, accepted integration ids, and non-`P-` actors are left
+   * untouched; a persona-shaped actor is remapped via `remap`, falling
+   * back to `System` when unrecoverable. Extracted from
+   * runJourneyBloom13a's applyRemap to keep it under the complexity
+   * budget; mirrors the former inline `if (Array.isArray(j.steps))` block.
+   */
+  private remapJourneyStepActors(
+    steps: unknown,
+    journeyId: string,
+    acceptedIntegrations: Set<string>,
+    remap: (raw: string, where: string) => string | null,
+  ): void {
+    if (!Array.isArray(steps)) return;
+    for (const stepRaw of steps) {
+      if (!stepRaw || typeof stepRaw !== 'object') continue;
+      const step = stepRaw as Record<string, unknown>;
+      const actor = step.actor;
+      if (typeof actor !== 'string') continue;
+      if (actor === 'System' || acceptedIntegrations.has(actor) || !actor.startsWith('P-')) continue;
+      const remapped = remap(actor, `${journeyId}.step#${step.stepNumber}.actor`);
+      step.actor = remapped ?? 'System';
+    }
   }
 
   /**
@@ -3675,6 +4006,78 @@ Re-emit this single journey as a JSON object that matches the original schema (i
   }
 
   /**
+   * Self-heal one raw workflow from the 1.3b bloom against the accepted-id
+   * sets: normalize it, filter its triggers/surfaces to accepted refs, and
+   * drop it (returning null) when it has zero valid triggers or an
+   * unaccepted business domain. The `dropped*` arrays are appended in place
+   * so the caller can log the aggregate drop reasons. Extracted from
+   * runWorkflowBloom13b to keep that method's cognitive complexity bounded;
+   * behavior is identical (the two `return null` paths mirror the former
+   * `continue` statements).
+   */
+  private buildFilteredWorkflowV2(
+    raw: Record<string, unknown>,
+    accepted: {
+      journeyIds: Set<string>;
+      stepCountByJourney: Map<string, number>;
+      compliance: Set<string>;
+      retention: Set<string>;
+      vv: Set<string>;
+      integrations: Set<string>;
+      domains: Set<string>;
+    },
+    dropped: { triggers: string[]; workflows: string[]; surfaces: string[] },
+  ): WorkflowV2 | null {
+    const w = this.normalizeWorkflowV2(raw);
+    // Filter triggers against accepted sets. A journey_step trigger is
+    // valid if the journey is accepted AND the step_number is within
+    // the journey's steps. Compliance/integration triggers must point
+    // at accepted ids. Schedule/event triggers carry no id refs and
+    // always pass.
+    const keptTriggers = w.triggers.filter(t =>
+      isWorkflowTriggerAccepted(t, w.id, {
+        journeyIds: accepted.journeyIds,
+        stepCountByJourney: accepted.stepCountByJourney,
+        compliance: accepted.compliance,
+        integrations: accepted.integrations,
+      }, dropped.triggers));
+    // A workflow with zero valid triggers can't exist — drop it.
+    if (keptTriggers.length === 0) {
+      dropped.workflows.push(w.id);
+      return null;
+    }
+    // Re-derive backs_journeys from the filtered trigger set.
+    const derivedBacks = Array.from(new Set(keptTriggers
+      .filter((t): t is Extract<WorkflowTrigger, { kind: 'journey_step' }> => t.kind === 'journey_step')
+      .map(t => t.journey_id)));
+    // Filter surfaces[*] against accepted sets.
+    const raws = (raw as { surfaces?: Record<string, unknown> }).surfaces;
+    const surfaces = {
+      compliance_regimes: filterAcceptedSurfaces(raws, w.id, 'compliance_regimes', accepted.compliance, dropped.surfaces),
+      retention_rules:    filterAcceptedSurfaces(raws, w.id, 'retention_rules', accepted.retention, dropped.surfaces, accepted.compliance),
+      vv_requirements:    filterAcceptedSurfaces(raws, w.id, 'vv_requirements', accepted.vv, dropped.surfaces),
+      integrations:       filterAcceptedSurfaces(raws, w.id, 'integrations', accepted.integrations, dropped.surfaces),
+    };
+    // Drop workflows whose businessDomainId is not accepted (another
+    // referential-integrity class — the verifier would block on this
+    // but the self-heal approach is to drop with WARN instead).
+    if (!accepted.domains.has(w.businessDomainId)) {
+      dropped.workflows.push(w.id);
+      dropped.triggers.push(`${w.id}:domain:${w.businessDomainId}:domain-not-accepted`);
+      return null;
+    }
+    return {
+      ...w,
+      triggers: keptTriggers,
+      backs_journeys: derivedBacks,
+      // Re-attach filtered surfaces (casting — surfaces aren't in
+      // WorkflowV2's public type yet, but are set on the content record
+      // via the cast-through from raw LLM output).
+      ...(raws ? { surfaces } as unknown as Partial<WorkflowV2> : {}),
+    };
+  }
+
+  /**
    * 1.3b — System Workflow Bloom proposer. Runs after the human has
    * accepted a set of journeys via 1.3a MMP. Every workflow MUST carry
    * at least one typed trigger; the coverage verifier (1.3c) enforces
@@ -3732,86 +4135,20 @@ Re-emit this single journey as a JSON object that matches the original schema (i
     const droppedSurfaces: string[] = [];
     const workflows: WorkflowV2[] = [];
     for (const raw of rawWfs) {
-      const w = this.normalizeWorkflowV2(raw);
-      // Filter triggers against accepted sets. A journey_step trigger is
-      // valid if the journey is accepted AND the step_number is within
-      // the journey's steps. Compliance/integration triggers must point
-      // at accepted ids. Schedule/event triggers carry no id refs and
-      // always pass.
-      const keptTriggers = w.triggers.filter(t => {
-        if (t.kind === 'journey_step') {
-          if (!acceptedJourneyIds.has(t.journey_id)) {
-            droppedTriggers.push(`${w.id}:journey_step:${t.journey_id}#${t.step_number}:journey-not-accepted`);
-            return false;
-          }
-          const n = stepCountByJourney.get(t.journey_id) ?? 0;
-          if (t.step_number < 1 || t.step_number > n) {
-            droppedTriggers.push(`${w.id}:journey_step:${t.journey_id}#${t.step_number}:step-out-of-range`);
-            return false;
-          }
-          return true;
-        }
-        if (t.kind === 'compliance') {
-          if (!acceptedCompliance.has(t.regime_id)) {
-            droppedTriggers.push(`${w.id}:compliance:${t.regime_id}:regime-not-accepted`);
-            return false;
-          }
-          return true;
-        }
-        if (t.kind === 'integration') {
-          if (!acceptedIntegrations.has(t.integration_id)) {
-            droppedTriggers.push(`${w.id}:integration:${t.integration_id}:integration-not-accepted`);
-            return false;
-          }
-          return true;
-        }
-        return true; // schedule, event
-      });
-      // A workflow with zero valid triggers can't exist — drop it.
-      if (keptTriggers.length === 0) {
-        droppedWorkflows.push(w.id);
-        continue;
-      }
-      // Re-derive backs_journeys from the filtered trigger set.
-      const derivedBacks = Array.from(new Set(keptTriggers
-        .filter((t): t is Extract<WorkflowTrigger, { kind: 'journey_step' }> => t.kind === 'journey_step')
-        .map(t => t.journey_id)));
-      // Filter surfaces[*] against accepted sets.
-      const raws = (raw as { surfaces?: Record<string, unknown> }).surfaces;
-      const filterSurfaces = (key: string, accepted: Set<string>, mergeAccepted?: Set<string>): string[] => {
-        const xs = (raws && Array.isArray(raws[key]))
-          ? (raws[key] as unknown[]).filter((x): x is string => typeof x === 'string')
-          : [];
-        const kept: string[] = [];
-        for (const x of xs) {
-          if (accepted.has(x) || mergeAccepted?.has(x)) kept.push(x);
-          else droppedSurfaces.push(`${w.id}:${key}:${x}`);
-        }
-        return kept;
-      };
-      const surfaces = {
-        compliance_regimes: filterSurfaces('compliance_regimes', acceptedCompliance),
-        retention_rules:    filterSurfaces('retention_rules', acceptedRetention, acceptedCompliance),
-        vv_requirements:    filterSurfaces('vv_requirements', acceptedVV),
-        integrations:       filterSurfaces('integrations', acceptedIntegrations),
-      };
-      // Drop workflows whose businessDomainId is not accepted (another
-      // referential-integrity class — the verifier would block on this
-      // but the self-heal approach is to drop with WARN instead).
-      if (!acceptedDomains.has(w.businessDomainId)) {
-        droppedWorkflows.push(w.id);
-        droppedTriggers.push(`${w.id}:domain:${w.businessDomainId}:domain-not-accepted`);
-        continue;
-      }
-      workflows.push({
-        ...w,
-        triggers: keptTriggers,
-        backs_journeys: derivedBacks,
-        // Re-attach filtered surfaces (casting — surfaces aren't in
-        // WorkflowV2's public type yet, but are set on the content record
-        // via the cast-through from raw LLM output).
-        ...(raws ? { surfaces } as unknown as Partial<WorkflowV2> : {}),
-      });
+      const built = this.buildFilteredWorkflowV2(
+        raw,
+        {
+          journeyIds: acceptedJourneyIds,
+          stepCountByJourney,
+          compliance: acceptedCompliance,
+          retention: acceptedRetention,
+          vv: acceptedVV,
+          integrations: acceptedIntegrations,
+          domains: acceptedDomains,
+        },
+        { triggers: droppedTriggers, workflows: droppedWorkflows, surfaces: droppedSurfaces },
+      );
+      if (built) workflows.push(built);
     }
     if (droppedTriggers.length > 0) {
       getLogger().warn('workflow', `Phase 1.3b: dropped ${droppedTriggers.length} invalid workflow trigger ref(s)`, {
@@ -4015,7 +4352,10 @@ Re-emit this single journey as a JSON object that matches the original schema (i
 
   private formatVVRequirements(vvs: VVRequirement[]): string {
     if (!vvs.length) return '(none)';
-    return vvs.map(v => `- **${v.id}** (${v.category}): ${v.target} — ${v.measurement}${v.threshold ? ` (threshold: ${v.threshold})` : ''}`).join('\n');
+    return vvs.map(v => {
+      const thresholdSuffix = v.threshold ? ` (threshold: ${v.threshold})` : '';
+      return `- **${v.id}** (${v.category}): ${v.target} — ${v.measurement}${thresholdSuffix}`;
+    }).join('\n');
   }
 
   private formatIntegrations(ints: Integration[]): string {
@@ -4244,15 +4584,34 @@ function levenshtein(a: string, b: string): number {
  *
  * Returns a per-workflow log of what was moved (for the WARN line).
  */
-function autoFixBackwardDependencies(
+export function autoFixBackwardDependencies(
   plan: ReleasePlanContentV2,
   workflows: WorkflowV2[],
   journeys: UserJourney[],
 ): Array<{ workflow_id: string; from: string; to: string; reason: string }> {
   const fixes: Array<{ workflow_id: string; from: string; to: string; reason: string }> = [];
+  // id → ordinal lookup (cross_cutting → -Infinity) and workflow → its
+  // current placement, so applyBackwardDependencyFix can find each source
+  // release fast. ordinalOf is mutated as workflows move so subsequent
+  // iterations see the new placement.
+  const ordinalOf = buildReleaseOrdinalLookup(plan);
+  const journeyIdSet = new Set(journeys.map(j => j.id));
+  const workflowPlacementSource = buildWorkflowPlacementSource(plan);
 
-  // Build id → ordinal lookup. cross_cutting → -Infinity (never blocks
-  // anything) and matches verifyReleaseManifest's mapping exactly.
+  for (const w of workflows) {
+    const fix = applyBackwardDependencyFix(w, plan, ordinalOf, workflowPlacementSource, journeyIdSet);
+    if (fix) fixes.push(fix);
+  }
+  return fixes;
+}
+
+/**
+ * Build the id → release-ordinal lookup used by the 1.8 backward-dependency
+ * auto-fix. cross_cutting members map to -Infinity (never block anything),
+ * matching verifyReleaseManifest's mapping exactly. Extracted from
+ * autoFixBackwardDependencies to keep it under the complexity budget.
+ */
+function buildReleaseOrdinalLookup(plan: ReleasePlanContentV2): Map<string, number> {
   const ordinalOf = new Map<string, number>();
   for (const r of plan.releases) {
     for (const id of r.contains.journeys) ordinalOf.set(id, r.ordinal);
@@ -4263,69 +4622,72 @@ function autoFixBackwardDependencies(
   for (const id of plan.cross_cutting.workflows) ordinalOf.set(id, -Infinity);
   for (const id of plan.cross_cutting.compliance) ordinalOf.set(id, -Infinity);
   for (const id of plan.cross_cutting.integrations) ordinalOf.set(id, -Infinity);
+  return ordinalOf;
+}
 
-  const journeyIdSet = new Set(journeys.map(j => j.id));
-
-  // Workflow id → its current placement (release ordinal or
-  // 'cross_cutting'). Lets us find the source release fast.
+/**
+ * Build a workflow id → current placement (release object or 'cross_cutting')
+ * map. Extracted from autoFixBackwardDependencies to keep it under the
+ * complexity budget.
+ */
+function buildWorkflowPlacementSource(plan: ReleasePlanContentV2): Map<string, ReleaseV2 | 'cross_cutting'> {
   const workflowPlacementSource = new Map<string, ReleaseV2 | 'cross_cutting'>();
   for (const r of plan.releases) {
     for (const wid of r.contains.workflows) workflowPlacementSource.set(wid, r);
   }
   for (const wid of plan.cross_cutting.workflows) workflowPlacementSource.set(wid, 'cross_cutting');
+  return workflowPlacementSource;
+}
 
-  for (const w of workflows) {
-    const wfPlacement = workflowPlacementSource.get(w.id);
-    if (wfPlacement === undefined) continue; // not placed; coverage check reports it
-    const wfOrd = wfPlacement === 'cross_cutting' ? -Infinity : wfPlacement.ordinal;
+/**
+ * Move one workflow forward if its triggers reference targets in a later
+ * release than its current placement. Mutates `plan` (removes the workflow
+ * from its source, adds it to the target release) and `ordinalOf` in place,
+ * and returns a fix log entry — or null when no move is needed. Extracted
+ * from autoFixBackwardDependencies to keep it under the complexity budget;
+ * each former `continue` becomes an early `return null`.
+ */
+function applyBackwardDependencyFix(
+  w: WorkflowV2,
+  plan: ReleasePlanContentV2,
+  ordinalOf: Map<string, number>,
+  workflowPlacementSource: Map<string, ReleaseV2 | 'cross_cutting'>,
+  journeyIdSet: Set<string>,
+): { workflow_id: string; from: string; to: string; reason: string } | null {
+  const wfPlacement = workflowPlacementSource.get(w.id);
+  if (wfPlacement === undefined) return null; // not placed; coverage check reports it
+  const wfOrd = wfPlacement === 'cross_cutting' ? -Infinity : wfPlacement.ordinal;
 
-    // Compute the maximum trigger-target ordinal. Targets that are
-    // cross_cutting (-Infinity) don't constrain placement; targets
-    // not present in ordinalOf are coverage failures (ignored here).
-    let maxTargetOrd = -Infinity;
-    for (const t of w.triggers) {
-      let target: string | undefined;
-      if (t.kind === 'journey_step') target = t.journey_id;
-      else if (t.kind === 'compliance') target = t.regime_id;
-      else if (t.kind === 'integration') target = t.integration_id;
-      if (target === undefined) continue;
-      const o = ordinalOf.get(target);
-      if (o === undefined) continue; // unknown target — coverage check reports
-      if (o === -Infinity) continue; // cross_cutting target; doesn't constrain
-      // For journey_step triggers, double-check the journey is
-      // actually a known accepted journey — guards against stale
-      // references that survived earlier filtering.
-      if (t.kind === 'journey_step' && !journeyIdSet.has(t.journey_id)) continue;
-      if (o > maxTargetOrd) maxTargetOrd = o;
-    }
+  // Compute the maximum trigger-target ordinal. Targets that are
+  // cross_cutting (-Infinity) don't constrain placement; targets
+  // not present in ordinalOf are coverage failures (ignored here).
+  const maxTargetOrd = computeMaxTargetOrdinal(w.triggers, ordinalOf, journeyIdSet);
 
-    if (maxTargetOrd === -Infinity) continue; // no constraining targets
-    if (typeof wfOrd === 'number' && wfOrd >= maxTargetOrd && wfOrd !== -Infinity) continue; // already satisfies
+  if (maxTargetOrd === -Infinity) return null; // no constraining targets
+  if (typeof wfOrd === 'number' && wfOrd >= maxTargetOrd && wfOrd !== -Infinity) return null; // already satisfies
 
-    const targetRelease = plan.releases.find(r => r.ordinal === maxTargetOrd);
-    if (!targetRelease) continue; // shouldn't happen; bail safely
+  const targetRelease = plan.releases.find(r => r.ordinal === maxTargetOrd);
+  if (!targetRelease) return null; // shouldn't happen; bail safely
 
-    // Remove from current placement.
-    if (wfPlacement === 'cross_cutting') {
-      plan.cross_cutting.workflows = plan.cross_cutting.workflows.filter(id => id !== w.id);
-    } else {
-      wfPlacement.contains.workflows = wfPlacement.contains.workflows.filter(id => id !== w.id);
-    }
-    // Add to target release (dedupe just in case).
-    if (!targetRelease.contains.workflows.includes(w.id)) {
-      targetRelease.contains.workflows.push(w.id);
-    }
-    // Update ordinalOf so subsequent iterations see the new placement.
-    ordinalOf.set(w.id, targetRelease.ordinal);
-
-    fixes.push({
-      workflow_id: w.id,
-      from: wfPlacement === 'cross_cutting' ? 'cross_cutting' : `REL-ord=${wfPlacement.ordinal}`,
-      to: `REL-ord=${targetRelease.ordinal}`,
-      reason: `triggers reference targets up to REL-ord=${maxTargetOrd}`,
-    });
+  // Remove from current placement.
+  if (wfPlacement === 'cross_cutting') {
+    plan.cross_cutting.workflows = plan.cross_cutting.workflows.filter(id => id !== w.id);
+  } else {
+    wfPlacement.contains.workflows = wfPlacement.contains.workflows.filter(id => id !== w.id);
   }
-  return fixes;
+  // Add to target release (dedupe just in case).
+  if (!targetRelease.contains.workflows.includes(w.id)) {
+    targetRelease.contains.workflows.push(w.id);
+  }
+  // Update ordinalOf so subsequent iterations see the new placement.
+  ordinalOf.set(w.id, targetRelease.ordinal);
+
+  return {
+    workflow_id: w.id,
+    from: wfPlacement === 'cross_cutting' ? 'cross_cutting' : `REL-ord=${wfPlacement.ordinal}`,
+    to: `REL-ord=${targetRelease.ordinal}`,
+    reason: `triggers reference targets up to REL-ord=${maxTargetOrd}`,
+  };
 }
 
 function normalizeAcceptanceCriteria(v: unknown): string[] {
@@ -4334,8 +4696,8 @@ function normalizeAcceptanceCriteria(v: unknown): string[] {
   if (!Array.isArray(v)) return [];
   const out: string[] = [];
   for (const item of v) {
-    if (typeof item === 'string') {
-      if (item.length > 0) out.push(item);
+    if (typeof item === 'string' && item.length > 0) {
+      out.push(item);
     } else if (item && typeof item === 'object') {
       const o = item as Record<string, unknown>;
       const text = (o.description ?? o.text ?? o.title ?? o.criterion) as string | undefined;
@@ -4343,5 +4705,114 @@ function normalizeAcceptanceCriteria(v: unknown): string[] {
     }
   }
   return out;
+}
+
+/**
+ * Decide whether a single workflow trigger references an accepted target.
+ * Extracted from runWorkflowBloom13b's trigger-filter callback so that
+ * loop's cognitive complexity stays under threshold. Behaviour is
+ * identical: journey_step triggers require an accepted journey with an
+ * in-range step; compliance/integration triggers require accepted ids;
+ * schedule/event triggers always pass. Rejected triggers push a reason
+ * onto `droppedTriggers` (same array reference the caller reads).
+ */
+function isWorkflowTriggerAccepted(
+  t: WorkflowTrigger,
+  wId: string,
+  accepted: {
+    journeyIds: Set<string>;
+    stepCountByJourney: Map<string, number>;
+    compliance: Set<string>;
+    integrations: Set<string>;
+  },
+  droppedTriggers: string[],
+): boolean {
+  if (t.kind === 'journey_step') {
+    if (!accepted.journeyIds.has(t.journey_id)) {
+      droppedTriggers.push(`${wId}:journey_step:${t.journey_id}#${t.step_number}:journey-not-accepted`);
+      return false;
+    }
+    const n = accepted.stepCountByJourney.get(t.journey_id) ?? 0;
+    if (t.step_number < 1 || t.step_number > n) {
+      droppedTriggers.push(`${wId}:journey_step:${t.journey_id}#${t.step_number}:step-out-of-range`);
+      return false;
+    }
+    return true;
+  }
+  if (t.kind === 'compliance') {
+    if (!accepted.compliance.has(t.regime_id)) {
+      droppedTriggers.push(`${wId}:compliance:${t.regime_id}:regime-not-accepted`);
+      return false;
+    }
+    return true;
+  }
+  if (t.kind === 'integration') {
+    if (!accepted.integrations.has(t.integration_id)) {
+      droppedTriggers.push(`${wId}:integration:${t.integration_id}:integration-not-accepted`);
+      return false;
+    }
+    return true;
+  }
+  return true; // schedule, event
+}
+
+/**
+ * Filter a workflow's raw surface id list against an accepted-id set.
+ * Extracted from runWorkflowBloom13b's per-workflow loop so that loop's
+ * cognitive complexity stays under threshold. Behaviour is identical: only
+ * string entries present in `accepted` (or the optional `mergeAccepted`
+ * set) are kept; every rejected id is recorded on `droppedSurfaces` (the
+ * same array reference the caller reads) as `${workflowId}:${key}:${id}`.
+ */
+function filterAcceptedSurfaces(
+  raws: Record<string, unknown> | undefined,
+  workflowId: string,
+  key: string,
+  accepted: Set<string>,
+  droppedSurfaces: string[],
+  mergeAccepted?: Set<string>,
+): string[] {
+  const xs = (raws && Array.isArray(raws[key]))
+    ? (raws[key] as unknown[]).filter((x): x is string => typeof x === 'string')
+    : [];
+  const kept: string[] = [];
+  for (const x of xs) {
+    if (accepted.has(x) || mergeAccepted?.has(x)) kept.push(x);
+    else droppedSurfaces.push(`${workflowId}:${key}:${x}`);
+  }
+  return kept;
+}
+
+/**
+ * Compute the maximum constraining release ordinal across a workflow's
+ * triggers. Extracted from autoFixBackwardDependencies to keep that
+ * function's cognitive complexity under threshold. Targets that are
+ * cross_cutting (-Infinity), unknown to `ordinalOf`, or (for journey_step)
+ * not a known accepted journey do not constrain placement, matching the
+ * original inline logic exactly. Returns -Infinity when nothing constrains.
+ */
+function computeMaxTargetOrdinal(
+  triggers: WorkflowTrigger[],
+  ordinalOf: Map<string, number>,
+  journeyIdSet: Set<string>,
+): number {
+  let maxTargetOrd = -Infinity;
+  for (const t of triggers) {
+    let target: string | undefined;
+    if (t.kind === 'journey_step') target = t.journey_id;
+    else if (t.kind === 'compliance') target = t.regime_id;
+    else if (t.kind === 'integration') target = t.integration_id;
+    if (target === undefined) continue;
+    const o = ordinalOf.get(target);
+    // undefined = unknown target (coverage check reports it);
+    // -Infinity = cross_cutting target (doesn't constrain placement).
+    if (o === undefined || o === -Infinity) continue;
+    // For journey_step triggers, double-check the journey is
+    // actually a known accepted journey — guards against stale
+    // references that survived earlier filtering.
+    if (t.kind === 'journey_step' && !journeyIdSet.has(t.journey_id)) continue;
+    if (o > maxTargetOrd) maxTargetOrd = o;
+  }
+  return maxTargetOrd;
 }
 

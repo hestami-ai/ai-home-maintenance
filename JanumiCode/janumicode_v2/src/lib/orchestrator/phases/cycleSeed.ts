@@ -124,6 +124,23 @@ interface ImplementationPacketLike {
 }
 
 /**
+ * Build a quick packet_id → implementation_packet map from governed_stream
+ * records, skipping non-packet records and packets without an id.
+ */
+function buildPacketsById(
+  packetRecords: GovernedStreamRecord[],
+): Map<string, ImplementationPacketLike> {
+  const packetsById = new Map<string, ImplementationPacketLike>();
+  for (const r of packetRecords) {
+    const c = r.content as unknown as ImplementationPacketLike;
+    if (c?.kind === 'implementation_packet' && c.packet_id) {
+      packetsById.set(c.packet_id, c);
+    }
+  }
+  return packetsById;
+}
+
+/**
  * Build the cycle-restart seed by reading:
  *   - the latest packet_synthesis_failure record (failure codes)
  *   - the implementation_packet records (so we can correlate packet
@@ -147,13 +164,7 @@ export function buildCycleRestartSeed(
 
   // Build a quick packet_id → packet map so the per-packet failures can
   // be correlated back to packet contents.
-  const packetsById = new Map<string, ImplementationPacketLike>();
-  for (const r of packetRecords) {
-    const c = r.content as unknown as ImplementationPacketLike;
-    if (c?.kind === 'implementation_packet' && c.packet_id) {
-      packetsById.set(c.packet_id, c);
-    }
-  }
+  const packetsById = buildPacketsById(packetRecords);
 
   for (const [packetId, failures] of Object.entries(failure.failures_by_packet ?? {})) {
     accumulatePacketFailures(failures, seed, packetsById.get(packetId) ?? null);

@@ -306,8 +306,38 @@ export class MockLLMProvider implements LLMProviderAdapter {
     const saved: string[] = [];
     await fs.mkdir(outputDir, { recursive: true });
 
-    // Group by key prefix to handle sequences
-    const byKey = new Map<string, Array<{ fixture: MockFixture; result: LLMCallResult; options: LLMCallOptions }>>();
+    const byKey = this.groupCapturedCallsByKey();
+
+    for (const [baseKey, calls] of byKey) {
+      for (let i = 0; i < calls.length; i++) {
+        const filePath = await this.writeCapturedFixtureAt(
+          outputDir,
+          janumicodeSha,
+          baseKey,
+          calls,
+          i,
+          opts.overwrite ?? false,
+        );
+        if (filePath) saved.push(filePath);
+      }
+    }
+
+    return saved;
+  }
+
+  /**
+   * Group captured calls by their fixture base key (preserving insertion
+   * order) so calls that share a key can be written with `_N` sequence
+   * suffixes. Calls without a key land under `'unknown'`.
+   */
+  private groupCapturedCallsByKey(): Map<
+    string,
+    Array<{ fixture: MockFixture; result: LLMCallResult; options: LLMCallOptions }>
+  > {
+    const byKey = new Map<
+      string,
+      Array<{ fixture: MockFixture; result: LLMCallResult; options: LLMCallOptions }>
+    >();
     for (const call of this.capturedCalls) {
       const baseKey = call.fixture.key ?? 'unknown';
       if (!byKey.has(baseKey)) {
@@ -315,105 +345,129 @@ export class MockLLMProvider implements LLMProviderAdapter {
       }
       byKey.get(baseKey)!.push({ fixture: call.fixture, result: call.result, options: call.options });
     }
+    return byKey;
+  }
 
-    for (const [baseKey, calls] of byKey) {
-      for (let i = 0; i < calls.length; i++) {
-        const { fixture, result, options } = calls[i];
-        const key = calls.length > 1 ? `${baseKey}_${i + 1}` : baseKey;
-        const enrichedFixture: MockFixture = {
-          ...fixture,
-          key,
-          captured_at: new Date().toISOString(),
-          janumicode_version_sha: janumicodeSha,
-          llm_provider: result.provider,
-          llm_model: result.model,
-          text: result.text,
-          parsedJson: result.parsed ?? undefined,
-          thinking: result.thinking,
-        };
+  /**
+   * Write a single captured fixture (JSON + probe artifacts) for the
+   * i-th call sharing `baseKey`. Returns the written fixture path, or
+   * `null` when a pre-existing fixture was preserved (no overwrite).
+   */
+  private async writeCapturedFixtureAt(
+    outputDir: string,
+    janumicodeSha: string,
+    baseKey: string,
+    calls: Array<{ fixture: MockFixture; result: LLMCallResult; options: LLMCallOptions }>,
+    i: number,
+    overwrite: boolean,
+  ): Promise<string | null> {
+    const { fixture, result, options } = calls[i];
+    const key = calls.length > 1 ? `${baseKey}_${i + 1}` : baseKey;
+    const enrichedFixture: MockFixture = {
+      ...fixture,
+      key,
+      captured_at: new Date().toISOString(),
+      janumicode_version_sha: janumicodeSha,
+      llm_provider: result.provider,
+      llm_model: result.model,
+      text: result.text,
+      parsedJson: result.parsed ?? undefined,
+      thinking: result.thinking,
+    };
 
-        const phaseDir = subPhaseToPhaseDir(options.traceContext?.subPhaseId);
-        const targetDir = phaseDir ? path.join(outputDir, phaseDir) : outputDir;
-        await fs.mkdir(targetDir, { recursive: true });
+    const phaseDir = subPhaseToPhaseDir(options.traceContext?.subPhaseId);
+    const targetDir = phaseDir ? path.join(outputDir, phaseDir) : outputDir;
+    await fs.mkdir(targetDir, { recursive: true });
 
-        // 1. Fixture JSON (for mock-mode replay)
-        const filePath = path.join(targetDir, `${key}.json`);
-        if (!opts.overwrite && await fileExists(filePath)) {
-          // Preserve prior captures — an earlier `--phase-limit 2` run
-          // writes phase_01/phase_02 fixtures; a later `--phase-limit 3`
-          // re-emits LLM calls for 1-2 as part of the rerun. We keep
-          // the first capture to prevent accidental regressions.
-          continue;
-        }
-        await fs.writeFile(filePath, JSON.stringify(enrichedFixture, null, 2), 'utf-8');
-        saved.push(filePath);
+    // 1. Fixture JSON (for mock-mode replay)
+    const filePath = path.join(targetDir, `${key}.json`);
+    if (!overwrite && await fileExists(filePath)) {
+      // Preserve prior captures — an earlier `--phase-limit 2` run
+      // writes phase_01/phase_02 fixtures; a later `--phase-limit 3`
+      // re-emits LLM calls for 1-2 as part of the rerun. We keep
+      // the first capture to prevent accidental regressions.
+      return null;
+    }
+    await fs.writeFile(filePath, JSON.stringify(enrichedFixture, null, 2), 'utf-8');
 
-        // 2. Probe-style inspection artifacts in a subdirectory
-        const probeDir = path.join(targetDir, key);
-        await fs.mkdir(probeDir, { recursive: true });
+    // 2. Probe-style inspection artifacts in a subdirectory
+    await this.writeProbeArtifacts(targetDir, key, options, result);
 
-        // Full rendered prompt
-        await fs.writeFile(
-          path.join(probeDir, 'prompt.txt'),
-          options.prompt,
-          'utf-8',
-        );
+    return filePath;
+  }
 
-        // Request body (for manual curl/Postman replay)
-        const requestBody = {
-          model: options.model,
-          provider: options.provider,
-          prompt: options.prompt,
-          system: options.system ?? null,
-          responseFormat: options.responseFormat ?? 'text',
-          temperature: options.temperature,
-          maxTokens: options.maxTokens,
-          traceContext: options.traceContext,
-        };
-        await fs.writeFile(
-          path.join(probeDir, 'request.json'),
-          JSON.stringify(requestBody, null, 2),
-          'utf-8',
-        );
+  /**
+   * Emit the probe-style inspection artifacts (prompt.txt, request.json,
+   * response.json, and — when present — thinking.txt / parsed.json) into a
+   * per-call subdirectory next to the fixture JSON.
+   */
+  private async writeProbeArtifacts(
+    targetDir: string,
+    key: string,
+    options: LLMCallOptions,
+    result: LLMCallResult,
+  ): Promise<void> {
+    const probeDir = path.join(targetDir, key);
+    await fs.mkdir(probeDir, { recursive: true });
 
-        // Full response with metadata
-        await fs.writeFile(
-          path.join(probeDir, 'response.json'),
-          JSON.stringify({
-            text: result.text,
-            parsed: result.parsed,
-            thinking: result.thinking,
-            provider: result.provider,
-            model: result.model,
-            inputTokens: result.inputTokens,
-            outputTokens: result.outputTokens,
-            usedFallback: result.usedFallback,
-            retryAttempts: result.retryAttempts,
-          }, null, 2),
-          'utf-8',
-        );
+    // Full rendered prompt
+    await fs.writeFile(
+      path.join(probeDir, 'prompt.txt'),
+      options.prompt,
+      'utf-8',
+    );
 
-        // Thinking chain (plain text for easy reading)
-        if (result.thinking) {
-          await fs.writeFile(
-            path.join(probeDir, 'thinking.txt'),
-            result.thinking,
-            'utf-8',
-          );
-        }
+    // Request body (for manual curl/Postman replay)
+    const requestBody = {
+      model: options.model,
+      provider: options.provider,
+      prompt: options.prompt,
+      system: options.system ?? null,
+      responseFormat: options.responseFormat ?? 'text',
+      temperature: options.temperature,
+      maxTokens: options.maxTokens,
+      traceContext: options.traceContext,
+    };
+    await fs.writeFile(
+      path.join(probeDir, 'request.json'),
+      JSON.stringify(requestBody, null, 2),
+      'utf-8',
+    );
 
-        // Parsed JSON output
-        if (result.parsed) {
-          await fs.writeFile(
-            path.join(probeDir, 'parsed.json'),
-            JSON.stringify(result.parsed, null, 2),
-            'utf-8',
-          );
-        }
-      }
+    // Full response with metadata
+    await fs.writeFile(
+      path.join(probeDir, 'response.json'),
+      JSON.stringify({
+        text: result.text,
+        parsed: result.parsed,
+        thinking: result.thinking,
+        provider: result.provider,
+        model: result.model,
+        inputTokens: result.inputTokens,
+        outputTokens: result.outputTokens,
+        usedFallback: result.usedFallback,
+        retryAttempts: result.retryAttempts,
+      }, null, 2),
+      'utf-8',
+    );
+
+    // Thinking chain (plain text for easy reading)
+    if (result.thinking) {
+      await fs.writeFile(
+        path.join(probeDir, 'thinking.txt'),
+        result.thinking,
+        'utf-8',
+      );
     }
 
-    return saved;
+    // Parsed JSON output
+    if (result.parsed) {
+      await fs.writeFile(
+        path.join(probeDir, 'parsed.json'),
+        JSON.stringify(result.parsed, null, 2),
+        'utf-8',
+      );
+    }
   }
 
   /**

@@ -276,20 +276,30 @@ function renderUpstreamSection(label: string, items: Array<unknown> | undefined)
   if (!items || items.length === 0) return '';
   const lines: string[] = [`## ${label}`];
   for (const it of items) {
-    if (it && typeof it === 'object') {
-      const o = it as Record<string, unknown>;
-      const id = typeof o.id === 'string' ? o.id : '';
-      const text =
-        (typeof o.text === 'string' && o.text) ||
-        (typeof o.target === 'string' && o.target) ||
-        '';
-      const type = typeof o.type === 'string' ? ` [${o.type}]` : '';
-      const threshold = typeof o.threshold === 'string' ? `  (threshold: ${o.threshold})` : '';
-      const idStr = id ? `${id}: ` : '';
-      lines.push(`  - ${idStr}${type ? type + ' ' : ''}${text}${threshold}`);
-    }
+    const line = renderUpstreamItemLine(it);
+    if (line !== null) lines.push(line);
   }
   return lines.join('\n') + '\n';
+}
+
+/**
+ * Render one upstream-context item to a bullet line, or `null` when the
+ * item is not a renderable object (so the caller skips it). Reads the
+ * loosely-typed shape shared across the upstream sections: `id`, `text`
+ * (falling back to `target`), `type`, and `threshold`.
+ */
+function renderUpstreamItemLine(it: unknown): string | null {
+  if (!it || typeof it !== 'object') return null;
+  const o = it as Record<string, unknown>;
+  const id = typeof o.id === 'string' ? o.id : '';
+  const text =
+    (typeof o.text === 'string' && o.text) ||
+    (typeof o.target === 'string' && o.target) ||
+    '';
+  const type = typeof o.type === 'string' ? ` [${o.type}]` : '';
+  const threshold = typeof o.threshold === 'string' ? `  (threshold: ${o.threshold})` : '';
+  const idStr = id ? `${id}: ` : '';
+  return `  - ${idStr}${type ? type + ' ' : ''}${text}${threshold}`;
 }
 
 /**
@@ -538,7 +548,7 @@ export async function runScopeGatekeeperPrune(
     getLogger().warn('workflow', 'Scope gatekeeper LLM call failed — keeping all items as fallback', {
       workflow_run_id: cfg.workflowRunId,
       sub_phase_id: cfg.subPhaseId,
-      error: err instanceof Error ? err.message : String(err),
+      error: gatekeeperErrorMessage(err),
     });
     return {
       kept_ids: cfg.items.map((it) => it.id),
@@ -547,7 +557,7 @@ export async function runScopeGatekeeperPrune(
       provider: routing.provider,
       model: routing.model,
       duration_ms: Date.now() - started,
-      error: err instanceof Error ? err.message : String(err),
+      error: gatekeeperErrorMessage(err),
     };
   }
   const duration_ms = Date.now() - started;
@@ -574,19 +584,70 @@ export async function runScopeGatekeeperPrune(
     };
   }
 
+  return reconcileGatekeeperDecision(parsed, cfg, result.provider, result.model, duration_ms);
+}
+
+/** Normalize a thrown value to a message string (Error.message or String). */
+function gatekeeperErrorMessage(err: unknown): string {
+  return err instanceof Error ? err.message : String(err);
+}
+
+/**
+ * Parse the LLM's raw `dropped[]` array into validated {id, reason}
+ * entries, skipping any entry that is not an object or is missing a
+ * string `id` / `reason`.
+ */
+function parseDroppedEntries(droppedRaw: unknown[]): Array<{ id: string; reason: string }> {
+  const dropped: Array<{ id: string; reason: string }> = [];
+  for (const d of droppedRaw) {
+    if (!d || typeof d !== 'object') continue;
+    const o = d as Record<string, unknown>;
+    if (typeof o.id === 'string' && typeof o.reason === 'string') {
+      dropped.push({ id: o.id, reason: o.reason });
+    }
+  }
+  return dropped;
+}
+
+/**
+ * Deterministic literal-match safety net for ids the LLM omitted from
+ * BOTH kept_ids and dropped. For each unaccounted id, force-drop it when
+ * `deterministicLiteralDrop` finds a matching negative upstream
+ * constraint. Preserves `unaccounted` ordering.
+ */
+function computeSafetyNetDrops(
+  unaccounted: string[],
+  items: BloomItemForPrune[],
+  ctx: GatekeeperUpstreamContext,
+): Array<{ id: string; reason: string }> {
+  const drops: Array<{ id: string; reason: string }> = [];
+  for (const id of unaccounted) {
+    const item = items.find((it) => it.id === id);
+    if (!item) continue;
+    const hit = deterministicLiteralDrop(item, ctx);
+    if (hit) drops.push({ id, reason: hit });
+  }
+  return drops;
+}
+
+/**
+ * Shared post-processing for a successfully-parsed gatekeeper response:
+ * extracts kept/dropped/rationale, reconciles unaccounted ids (safety
+ * net + default-keep), resolves keep/drop contradictions (drop wins),
+ * and assembles the final GatekeeperResult.
+ */
+function reconcileGatekeeperDecision(
+  parsed: Record<string, unknown>,
+  cfg: GatekeeperConfig,
+  provider: string,
+  model: string,
+  duration_ms: number,
+): GatekeeperResult {
   const kept_ids = Array.isArray(parsed.kept_ids)
     ? (parsed.kept_ids as unknown[]).filter((x): x is string => typeof x === 'string')
     : [];
   const droppedRaw = Array.isArray(parsed.dropped) ? (parsed.dropped as unknown[]) : [];
-  const dropped: Array<{ id: string; reason: string }> = [];
-  for (const d of droppedRaw) {
-    if (d && typeof d === 'object') {
-      const o = d as Record<string, unknown>;
-      if (typeof o.id === 'string' && typeof o.reason === 'string') {
-        dropped.push({ id: o.id, reason: o.reason });
-      }
-    }
-  }
+  const dropped = parseDroppedEntries(droppedRaw);
   const rationale_summary = typeof parsed.rationale_summary === 'string'
     ? parsed.rationale_summary
     : 'no summary provided';
@@ -610,14 +671,7 @@ export async function runScopeGatekeeperPrune(
   // if any upstream constraint contains a "no X / X out of scope / X
   // forbidden / X not supported" pattern that matches the item's id or
   // label, force-drop it with an explicit safety-net rationale.
-  const safetyNetDrops = unaccounted
-    .map((id) => {
-      const item = cfg.items.find((it) => it.id === id);
-      if (!item) return null;
-      const hit = deterministicLiteralDrop(item, cfg.upstreamContext);
-      return hit ? { id, reason: hit } : null;
-    })
-    .filter((x): x is { id: string; reason: string } => x != null);
+  const safetyNetDrops = computeSafetyNetDrops(unaccounted, cfg.items, cfg.upstreamContext);
   for (const drop of safetyNetDrops) finalDropped.push(drop);
 
   const droppedSet = new Set(finalDropped.map((d) => d.id));
@@ -653,8 +707,8 @@ export async function runScopeGatekeeperPrune(
     kept_ids: finalKept,
     dropped: finalDropped,
     rationale_summary,
-    provider: result.provider,
-    model: result.model,
+    provider,
+    model,
     duration_ms,
   };
 }

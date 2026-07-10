@@ -129,17 +129,10 @@ interface ResumeState {
   currentPipelineRecordId: string;
 }
 
-export function rebuildTaskSaturationStateFromStream(
-  ctx: PhaseContext,
-  config: TaskSaturationConfig,
-  pipelineId: string,
-): ResumeState | null {
-  const { engine, workflowRun } = ctx;
-  const allNodes = engine.writer.getRecordsByType(
-    workflowRun.id, 'task_decomposition_node', false,
-  );
-  if (allNodes.length === 0) return null;
-
+/** Latest record per logical node_id (by produced_at). */
+function selectLatestNodeRecordsByNodeId(
+  allNodes: GovernedStreamRecord[],
+): Map<string, GovernedStreamRecord> {
   const latestByNodeId = new Map<string, GovernedStreamRecord>();
   for (const r of allNodes) {
     const c = r.content as unknown as TaskDecompositionNodeContent;
@@ -148,7 +141,20 @@ export function rebuildTaskSaturationStateFromStream(
       latestByNodeId.set(c.node_id, r);
     }
   }
+  return latestByNodeId;
+}
 
+/**
+ * Rebuild the pending-work queue, the per-parent sibling roster, and the
+ * deepest depth seen from the latest node records.
+ */
+function rebuildQueueAndSiblings(
+  latestByNodeId: Map<string, GovernedStreamRecord>,
+): {
+  queue: QueueEntry[];
+  siblingsByParent: Map<string | null, DecompositionTask[]>;
+  maxDepthReached: number;
+} {
   const queue: QueueEntry[] = [];
   const siblingsByParent = new Map<string | null, DecompositionTask[]>();
   let maxDepthReached = 0;
@@ -179,10 +185,13 @@ export function rebuildTaskSaturationStateFromStream(
       });
     }
   }
+  return { queue, siblingsByParent, maxDepthReached };
+}
 
-  const snapshotRecords = engine.writer.getRecordsByType(
-    workflowRun.id, 'task_assumption_set_snapshot',
-  );
+/** Assumptions and pass number from the highest-numbered snapshot. */
+function loadLatestAssumptionSnapshot(
+  snapshotRecords: GovernedStreamRecord[],
+): { allAssumptions: TaskAssumptionEntry[]; passNumber: number } {
   let allAssumptions: TaskAssumptionEntry[] = [];
   let passNumber = 0;
   for (const r of snapshotRecords) {
@@ -192,6 +201,11 @@ export function rebuildTaskSaturationStateFromStream(
       allAssumptions = [...c.assumptions];
     }
   }
+  return { allAssumptions, passNumber };
+}
+
+/** Highest `TA-<n>` sequence number among the given assumptions (0 if none). */
+function computeMaxAssumptionSeq(allAssumptions: TaskAssumptionEntry[]): number {
   let assumptionSeq = 0;
   for (const a of allAssumptions) {
     const m = /^TA-(\d+)$/.exec(a.id);
@@ -200,13 +214,20 @@ export function rebuildTaskSaturationStateFromStream(
       if (n > assumptionSeq) assumptionSeq = n;
     }
   }
+  return assumptionSeq;
+}
 
-  const pipelineRecords = engine.writer.getRecordsByType(
-    workflowRun.id, 'task_decomposition_pipeline', false,
-  ).filter(r => {
-    const c = r.content as unknown as TaskDecompositionPipelineContent;
-    return c.pipeline_id === pipelineId;
-  });
+/**
+ * Earliest / latest pipeline record bounds. Returns null when no pipeline
+ * records exist for this run (the caller treats that as "cannot resume").
+ */
+function resolvePipelineBounds(
+  pipelineRecords: GovernedStreamRecord[],
+): {
+  pipelineStartRecord: GovernedStreamRecord;
+  pipelinePasses: DecompositionPassEntry[];
+  currentPipelineRecordId: string;
+} | null {
   if (pipelineRecords.length === 0) return null;
   const pipelineStartRecord = pipelineRecords.reduce((earliest, r) =>
     !earliest || r.produced_at < earliest.produced_at ? r : earliest,
@@ -215,6 +236,41 @@ export function rebuildTaskSaturationStateFromStream(
     !latest || r.produced_at > latest.produced_at ? r : latest,
   pipelineRecords[0]);
   const latestContent = latestPipelineRecord.content as unknown as TaskDecompositionPipelineContent;
+  return {
+    pipelineStartRecord,
+    pipelinePasses: latestContent.passes,
+    currentPipelineRecordId: latestPipelineRecord.id,
+  };
+}
+
+export function rebuildTaskSaturationStateFromStream(
+  ctx: PhaseContext,
+  config: TaskSaturationConfig,
+  pipelineId: string,
+): ResumeState | null {
+  const { engine, workflowRun } = ctx;
+  const allNodes = engine.writer.getRecordsByType(
+    workflowRun.id, 'task_decomposition_node', false,
+  );
+  if (allNodes.length === 0) return null;
+
+  const latestByNodeId = selectLatestNodeRecordsByNodeId(allNodes);
+  const { queue, siblingsByParent, maxDepthReached } = rebuildQueueAndSiblings(latestByNodeId);
+
+  const snapshotRecords = engine.writer.getRecordsByType(
+    workflowRun.id, 'task_assumption_set_snapshot',
+  );
+  const { allAssumptions, passNumber } = loadLatestAssumptionSnapshot(snapshotRecords);
+  const assumptionSeq = computeMaxAssumptionSeq(allAssumptions);
+
+  const pipelineRecords = engine.writer.getRecordsByType(
+    workflowRun.id, 'task_decomposition_pipeline', false,
+  ).filter(r => {
+    const c = r.content as unknown as TaskDecompositionPipelineContent;
+    return c.pipeline_id === pipelineId;
+  });
+  const pipelineBounds = resolvePipelineBounds(pipelineRecords);
+  if (!pipelineBounds) return null;
 
   getLogger().info('workflow', `Phase ${config.recordSubPhaseId} RESUME: state reconstructed from stream`, {
     queueSize: queue.length,
@@ -230,13 +286,82 @@ export function rebuildTaskSaturationStateFromStream(
     siblingsByParent,
     maxDepthReached,
     passNumber,
-    pipelinePasses: latestContent.passes,
-    pipelineStartRecord,
-    currentPipelineRecordId: latestPipelineRecord.id,
+    pipelinePasses: pipelineBounds.pipelinePasses,
+    pipelineStartRecord: pipelineBounds.pipelineStartRecord,
+    currentPipelineRecordId: pipelineBounds.currentPipelineRecordId,
   };
 }
 
 // ── Sanitizers ─────────────────────────────────────────────────────
+
+function extractChildAcSet(c: Record<string, unknown>): Set<string> {
+  return new Set(
+    (Array.isArray(c.traces_to) ? c.traces_to as unknown[] : [])
+      .filter((x): x is string => typeof x === 'string' && x.startsWith('AC-')),
+  );
+}
+
+function sanitizeCriterion(
+  r: Record<string, unknown>,
+  idx: number,
+  taskId: string,
+  childAcSet: Set<string>,
+): TaskCompletionCriterion {
+  const desc = typeof r.description === 'string' ? r.description : '';
+  const cid = typeof r.criterion_id === 'string' ? r.criterion_id : `cc-${taskId}-${String(idx + 1).padStart(3, '0')}`;
+  const vm = typeof r.verification_method === 'string' ? r.verification_method : undefined;
+  const ar = typeof r.artifact_ref === 'string' ? r.artifact_ref : undefined;
+  const validVms = ['schema_check', 'invariant', 'output_comparison', 'test_execution'];
+  const rawVacs = r.verifies_acceptance_criteria ?? r.verifies_acs;
+  const citedVacs = Array.isArray(rawVacs)
+    ? (rawVacs as unknown[]).filter((x): x is string => typeof x === 'string' && x.length > 0)
+    : [];
+  const scopedVacs = childAcSet.size > 0
+    ? citedVacs.filter(ac => childAcSet.has(ac))
+    : citedVacs;
+  const verifies_acceptance_criteria = citedVacs.length === 0
+    ? undefined
+    : scopedVacs;
+  return {
+    criterion_id: cid,
+    description: desc,
+    verification_method: vm && validVms.includes(vm)
+      ? vm as TaskCompletionCriterion['verification_method'] : undefined,
+    artifact_ref: ar,
+    verifies_acceptance_criteria: verifies_acceptance_criteria && verifies_acceptance_criteria.length > 0
+      ? verifies_acceptance_criteria : undefined,
+  };
+}
+
+function extractStringArrayField(
+  c: Record<string, unknown>,
+  key: string,
+): string[] | undefined {
+  const raw = c[key];
+  return Array.isArray(raw)
+    ? (raw as unknown[]).filter((x): x is string => typeof x === 'string')
+    : undefined;
+}
+
+function resolveChildTechConstraints(
+  c: Record<string, unknown>,
+  childId: string,
+  logContext: { rootId: string; childIndex: number },
+  techOracle: ReadonlySet<string>,
+  techConstraints: readonly TechnicalConstraint[],
+): { active_constraints: string[] | undefined; traces_to: string[] | undefined } {
+  const rawConstraints = extractStringArrayField(c, 'active_constraints');
+  const rawTraces = extractStringArrayField(c, 'traces_to');
+  const resolvedC = rawConstraints ? resolveTechConstraintIds(rawConstraints, techOracle, techConstraints) : null;
+  const resolvedT = rawTraces ? resolveTechConstraintIds(rawTraces, techOracle, techConstraints) : null;
+  const techRewrites = [...(resolvedC?.rewrites ?? []), ...(resolvedT?.rewrites ?? [])];
+  if (techRewrites.length > 0) {
+    getLogger().warn('workflow', 'Phase 6.1a: resolved drifted TECH-* constraint ids to registry', {
+      ...logContext, childId, rewrites: techRewrites,
+    });
+  }
+  return { active_constraints: resolvedC?.ids, traces_to: resolvedT?.ids };
+}
 
 function sanitizeChildTask(
   c: Record<string, unknown>,
@@ -267,39 +392,11 @@ function sanitizeChildTask(
   // it carries — propagated alongside AC inheritance so a saturation child's
   // completion criteria stay test-bindable. When the child cites no ACs the
   // link passes through (packet synthesis falls back to the task's AC set).
-  const childAcSet = new Set(
-    (Array.isArray(c.traces_to) ? c.traces_to as unknown[] : [])
-      .filter((x): x is string => typeof x === 'string' && x.startsWith('AC-')),
-  );
+  const childAcSet = extractChildAcSet(c);
   const rawCriteria = Array.isArray(c.completion_criteria)
     ? c.completion_criteria as Array<Record<string, unknown>> : [];
   const completion_criteria: TaskCompletionCriterion[] = rawCriteria
-    .map((r, idx) => {
-      const desc = typeof r.description === 'string' ? r.description : '';
-      const cid = typeof r.criterion_id === 'string' ? r.criterion_id : `cc-${id}-${String(idx + 1).padStart(3, '0')}`;
-      const vm = typeof r.verification_method === 'string' ? r.verification_method : undefined;
-      const ar = typeof r.artifact_ref === 'string' ? r.artifact_ref : undefined;
-      const validVms = ['schema_check', 'invariant', 'output_comparison', 'test_execution'];
-      const rawVacs = r.verifies_acceptance_criteria ?? r.verifies_acs;
-      const citedVacs = Array.isArray(rawVacs)
-        ? (rawVacs as unknown[]).filter((x): x is string => typeof x === 'string' && x.length > 0)
-        : [];
-      const scopedVacs = childAcSet.size > 0
-        ? citedVacs.filter(ac => childAcSet.has(ac))
-        : citedVacs;
-      const verifies_acceptance_criteria = citedVacs.length === 0
-        ? undefined
-        : scopedVacs;
-      return {
-        criterion_id: cid,
-        description: desc,
-        verification_method: vm && validVms.includes(vm)
-          ? vm as TaskCompletionCriterion['verification_method'] : undefined,
-        artifact_ref: ar,
-        verifies_acceptance_criteria: verifies_acceptance_criteria && verifies_acceptance_criteria.length > 0
-          ? verifies_acceptance_criteria : undefined,
-      };
-    })
+    .map((r, idx) => sanitizeCriterion(r, idx, id, childAcSet))
     .filter(r => r.description.length > 0);
   if (completion_criteria.length === 0) {
     getLogger().warn('workflow', 'Phase 6.1a: dropped malformed child (no valid completion criteria)', {
@@ -314,26 +411,11 @@ function sanitizeChildTask(
     ? c.estimated_complexity as DecompositionTask['estimated_complexity']
     : undefined;
   const complexity_flag = typeof c.complexity_flag === 'string' ? c.complexity_flag : undefined;
-  const stringArr = (key: string): string[] | undefined => {
-    const raw = c[key];
-    return Array.isArray(raw)
-      ? (raw as unknown[]).filter((x): x is string => typeof x === 'string')
-      : undefined;
-  };
   // PA-9: snap LLM-drifted TECH-* constraint ids (missing "-1" suffix, drifted
   // separator, close typo) back to the canonical registry so a saturation
   // child's active_constraints / traces_to actually join it. Unresolvable
   // residuals (semantic aliases, noise) pass through unchanged and are logged.
-  const rawConstraints = stringArr('active_constraints');
-  const rawTraces = stringArr('traces_to');
-  const resolvedC = rawConstraints ? resolveTechConstraintIds(rawConstraints, techOracle, techConstraints) : null;
-  const resolvedT = rawTraces ? resolveTechConstraintIds(rawTraces, techOracle, techConstraints) : null;
-  const techRewrites = [...(resolvedC?.rewrites ?? []), ...(resolvedT?.rewrites ?? [])];
-  if (techRewrites.length > 0) {
-    getLogger().warn('workflow', 'Phase 6.1a: resolved drifted TECH-* constraint ids to registry', {
-      ...logContext, childId: id, rewrites: techRewrites,
-    });
-  }
+  const resolvedTech = resolveChildTechConstraints(c, id, logContext, techOracle, techConstraints);
   return {
     id,
     name,
@@ -348,10 +430,10 @@ function sanitizeChildTask(
     // inherit the canonical component dir regardless of what the LLM emitted,
     // so a task's whole subtree stays under src/<component>.
     write_directory_paths: [canonicalComponentDir(componentId || 'unknown', 'src')],
-    read_directory_paths: stringArr('read_directory_paths'),
-    dependency_task_ids: stringArr('dependency_task_ids'),
-    active_constraints: resolvedC?.ids,
-    traces_to: resolvedT?.ids,
+    read_directory_paths: extractStringArrayField(c, 'read_directory_paths'),
+    dependency_task_ids: extractStringArrayField(c, 'dependency_task_ids'),
+    active_constraints: resolvedTech.active_constraints,
+    traces_to: resolvedTech.traces_to,
   };
 }
 
@@ -397,6 +479,84 @@ function formatTechnicalConstraints(tcs: TechnicalConstraint[]): string {
   }).join('\n');
 }
 
+// ── Run state (threaded by reference through the pass helpers) ──────
+
+type SaturationEngine = PhaseContext['engine'];
+type DecompositionCaps = ReturnType<SaturationEngine['configManager']['get']>['decomposition'];
+type SaturationTemplate = NonNullable<ReturnType<SaturationEngine['templateLoader']['findTemplate']>>;
+
+/**
+ * All shared, resolved-immutable + mutable state for one saturation run.
+ * Threaded by reference through every pass / entry / post-pass helper so each
+ * queue / sibling / counter / cursor write-back lands on the SAME object — the
+ * behavior-preserving replacement for the original single-function closure.
+ */
+interface SaturationRun {
+  ctx: PhaseContext;
+  engine: SaturationEngine;
+  workflowRun: PhaseContext['workflowRun'];
+  input: TaskSaturationInput;
+  config: TaskSaturationConfig;
+  caps: DecompositionCaps;
+  template: SaturationTemplate;
+  techIdOracle: Set<string>;
+  componentOracle: string[];
+  pipelineId: string;
+  pipelineStartRecord: GovernedStreamRecord;
+  currentPipelineRecordId: string;
+  embeddingClient: EmbeddingClient;
+  embeddingCache: Map<string, number[]>;
+  dedupThreshold: number;
+  dedupEnabled: boolean;
+  divergeGrowthRatio: number;
+  divergeWarnPasses: number;
+  divergeTerminatePasses: number;
+  dedupOfflineWarnPasses: number;
+  allAssumptions: TaskAssumptionEntry[];
+  assumptionSeq: number;
+  queue: QueueEntry[];
+  siblingsByParent: Map<string | null, DecompositionTask[]>;
+  callsByRoot: Map<string, number>;
+  maxDepthReached: number;
+  passNumber: number;
+  pipelinePasses: DecompositionPassEntry[];
+  parentChain: Map<string, string | null>;
+  fellOpenCompIds: Set<string>;
+  resolvedCompIds: Set<string>;
+  consecutiveGrowthPasses: number;
+  consecutiveDedupOfflinePasses: number;
+  dedupOfflineAnnounced: boolean;
+  divergingEarlyTerminate: boolean;
+}
+
+interface PendingGateChild {
+  nodeRecordId: string;
+  logicalNodeId: string;
+  displayKey: string;
+  task: DecompositionTask;
+  rationale?: string;
+}
+
+interface PostGateCleanAudit {
+  parentLogicalNodeId: string;
+  parentDisplayKey: string;
+  parentTask: DecompositionTask;
+  children: DecompositionTask[];
+}
+
+/** Pass-scoped accumulators — recreated fresh at the top of each pass. */
+interface PassState {
+  passAssumptions: TaskAssumptionEntry[];
+  pendingGateByParent: Map<string, PendingGateChild[]>;
+  downgradeNotesByParent: Map<string, string>;
+  postGateCleanAudits: PostGateCleanAudit[];
+}
+
+/** Next `TA-<nnnn>` id — pre-increments the shared sequence (order-preserving). */
+function mintAssumptionId(run: SaturationRun): string {
+  return `TA-${String(++run.assumptionSeq).padStart(4, '0')}`;
+}
+
 // ── Main loop ──────────────────────────────────────────────────────
 
 export async function runTaskSaturationLoop(
@@ -404,9 +564,17 @@ export async function runTaskSaturationLoop(
   input: TaskSaturationInput,
   config: TaskSaturationConfig = DEFAULT_CONFIG,
 ): Promise<void> {
-  const { engine, workflowRun } = ctx;
-  const caps = engine.configManager.get().decomposition;
+  const run = await prepareSaturationRun(ctx, input, config);
+  await runSaturationPasses(run);
+  finalizeSaturationRun(run);
+}
 
+// ── Setup ──────────────────────────────────────────────────────────
+
+function resolveTemplateOrThrow(
+  engine: SaturationEngine,
+  config: TaskSaturationConfig,
+): SaturationTemplate {
   const template = engine.templateLoader.findTemplate(
     'implementation_planner',
     config.templateSubPhase,
@@ -418,25 +586,45 @@ export async function runTaskSaturationLoop(
       `This is a configuration error; Wave 8 cannot proceed without the template.`,
     );
   }
+  return template;
+}
 
-  const constraintsText = formatTechnicalConstraints(input.technicalConstraints);
-  void constraintsText;
-  // PA-9: canonical TECH-* registry oracle — saturation children routinely drift
-  // these ids; each child is snapped back to a registry member (or kept + logged).
-  const techIdOracle = new Set(input.technicalConstraints.map(t => t.id));
-  // PA-1: component oracle (every id-form keyed in the scoped map) — resolve a
-  // drifted/composite task component_id before component_context falls open.
-  const componentOracle = Object.keys(input.componentSummaryById ?? {});
+function resolveDivergenceConfig(): {
+  divergeGrowthRatio: number;
+  divergeWarnPasses: number;
+  divergeTerminatePasses: number;
+  dedupOfflineWarnPasses: number;
+} {
+  return {
+    divergeGrowthRatio: Number.parseFloat(
+      process.env.JANUMICODE_DIVERGE_GROWTH_RATIO ?? '1.2'),
+    divergeWarnPasses: Number.parseInt(
+      process.env.JANUMICODE_DIVERGE_WARN_PASSES ?? '3', 10),
+    divergeTerminatePasses: Number.parseInt(
+      process.env.JANUMICODE_DIVERGE_TERMINATE_PASSES ?? '4', 10),
+    dedupOfflineWarnPasses: Number.parseInt(
+      process.env.JANUMICODE_DEDUP_OFFLINE_WARN_PASSES ?? '3', 10),
+  };
+}
 
-  const pipelineId = `task-decomp-pipe-${workflowRun.id.slice(0, 8)}`;
+function resolveDedupConfig(engine: SaturationEngine): {
+  embeddingClient: EmbeddingClient;
+  embeddingCache: Map<string, number[]>;
+  dedupThreshold: number;
+  dedupEnabled: boolean;
+} {
+  const embeddingClient: EmbeddingClient = engine.getEmbeddingClientOverride() ?? createEmbeddingClient();
+  const embeddingCache = new Map<string, number[]>();
+  const dedupThreshold = Number.parseFloat(
+    process.env.JANUMICODE_ASSUMPTION_DEDUP_THRESHOLD ?? '0.92');
+  const dedupEnabled = Number.isFinite(dedupThreshold)
+    && dedupThreshold > 0
+    && (process.env.JANUMICODE_ASSUMPTION_DEDUP_DISABLED ?? '') !== '1';
+  return { embeddingClient, embeddingCache, dedupThreshold, dedupEnabled };
+}
 
-  const resumed = rebuildTaskSaturationStateFromStream(ctx, config, pipelineId);
-
-  const allAssumptions: TaskAssumptionEntry[] = resumed?.allAssumptions ?? [];
-  let assumptionSeq = resumed?.assumptionSeq ?? 0;
-  const newAssumptionId = (): string => `TA-${String(++assumptionSeq).padStart(4, '0')}`;
-
-  const queue: QueueEntry[] = resumed?.queue ?? input.rootTasks.map((t, i) => ({
+function seedQueueFromRoots(input: TaskSaturationInput): QueueEntry[] {
+  return input.rootTasks.map((t, i) => ({
     parentRecordId: input.rootNodeRecordIds[i],
     nodeId: input.rootLogicalIds[i],
     parentNodeId: null,
@@ -449,30 +637,26 @@ export async function runTaskSaturationLoop(
     releaseOrdinal: null,
     activeConstraints: t.active_constraints ?? [],
   }));
+}
 
-  const siblingsByParent = resumed?.siblingsByParent ?? new Map<string | null, DecompositionTask[]>();
-  if (!resumed) {
-    siblingsByParent.set(null, [...input.rootTasks]);
-  }
+function initSiblingsByParent(
+  resumed: ResumeState | null,
+  input: TaskSaturationInput,
+): Map<string | null, DecompositionTask[]> {
+  if (resumed) return resumed.siblingsByParent;
+  const siblingsByParent = new Map<string | null, DecompositionTask[]>();
+  siblingsByParent.set(null, [...input.rootTasks]);
+  return siblingsByParent;
+}
 
-  const callsByRoot = new Map<string, number>();
-  let maxDepthReached = resumed?.maxDepthReached ?? 0;
-  let passNumber = resumed?.passNumber ?? 0;
-
-  const divergeGrowthRatio = Number.parseFloat(
-    process.env.JANUMICODE_DIVERGE_GROWTH_RATIO ?? '1.2');
-  const divergeWarnPasses = Number.parseInt(
-    process.env.JANUMICODE_DIVERGE_WARN_PASSES ?? '3', 10);
-  const divergeTerminatePasses = Number.parseInt(
-    process.env.JANUMICODE_DIVERGE_TERMINATE_PASSES ?? '4', 10);
-  const dedupOfflineWarnPasses = Number.parseInt(
-    process.env.JANUMICODE_DEDUP_OFFLINE_WARN_PASSES ?? '3', 10);
-  let consecutiveGrowthPasses = 0;
-  let consecutiveDedupOfflinePasses = 0;
-  let dedupOfflineAnnounced = false;
-  let divergingEarlyTerminate = false;
-
-  const pipelinePasses: DecompositionPassEntry[] = resumed?.pipelinePasses ?? [];
+function resolvePipelineStartRecord(
+  engine: SaturationEngine,
+  workflowRun: PhaseContext['workflowRun'],
+  config: TaskSaturationConfig,
+  input: TaskSaturationInput,
+  pipelineId: string,
+  resumed: ResumeState | null,
+): { pipelineStartRecord: GovernedStreamRecord; currentPipelineRecordId: string } {
   const pipelineStartRecord = resumed?.pipelineStartRecord ?? engine.writer.writeRecord({
     record_type: 'task_decomposition_pipeline',
     schema_version: '1.0',
@@ -489,639 +673,892 @@ export async function runTaskSaturationLoop(
       passes: [],
     } satisfies TaskDecompositionPipelineContent,
   });
-  let currentPipelineRecordId = resumed?.currentPipelineRecordId ?? pipelineStartRecord.id;
+  const currentPipelineRecordId = resumed?.currentPipelineRecordId ?? pipelineStartRecord.id;
+  return { pipelineStartRecord, currentPipelineRecordId };
+}
 
-  const embeddingClient: EmbeddingClient = engine.getEmbeddingClientOverride() ?? createEmbeddingClient();
-  const embeddingCache = new Map<string, number[]>();
-  const dedupThreshold = Number.parseFloat(
-    process.env.JANUMICODE_ASSUMPTION_DEDUP_THRESHOLD ?? '0.92');
-  const dedupEnabled = Number.isFinite(dedupThreshold)
-    && dedupThreshold > 0
-    && (process.env.JANUMICODE_ASSUMPTION_DEDUP_DISABLED ?? '') !== '1';
-
-  if (dedupEnabled && allAssumptions.length > 0) {
-    try {
-      const vecs = await embeddingClient.embed(
-        allAssumptions.map(a => a.text),
-        { signal: engine.getSessionAbortSignal() },
-      );
-      allAssumptions.forEach((a, i) => {
-        if (vecs[i]) embeddingCache.set(a.id, vecs[i]);
-      });
-      getLogger().info('workflow', `Phase ${config.recordSubPhaseId}: dedup cache seeded from existing assumptions`, {
-        cached: embeddingCache.size, total: allAssumptions.length,
-      });
-    } catch (err) {
-      getLogger().warn('workflow', `Phase ${config.recordSubPhaseId}: dedup seed failed — continuing without dedup`, {
-        error: err instanceof Error ? err.message : String(err),
-      });
-    }
-  }
-
+function buildParentChain(
+  engine: SaturationEngine,
+  workflowRun: PhaseContext['workflowRun'],
+): Map<string, string | null> {
   const parentChain = new Map<string, string | null>();
-  {
-    const existingNodes = engine.writer.getRecordsByType(
-      workflowRun.id, 'task_decomposition_node',
-    );
-    for (const r of existingNodes) {
-      const c = r.content as unknown as TaskDecompositionNodeContent;
-      parentChain.set(c.node_id, c.parent_node_id);
-    }
+  const existingNodes = engine.writer.getRecordsByType(
+    workflowRun.id, 'task_decomposition_node',
+  );
+  for (const r of existingNodes) {
+    const c = r.content as unknown as TaskDecompositionNodeContent;
+    parentChain.set(c.node_id, c.parent_node_id);
   }
+  return parentChain;
+}
 
-  // PA-1 fail-safe visibility: component_context silently falls open to the FULL
-  // summary when a task's component_id isn't a key in componentSummaryById (leaf /
-  // mid-tier id drift — same class as PA-4). Track unique missed ids and WARN once
-  // each so a high fall-open rate surfaces instead of shipping silently.
-  const fellOpenCompIds = new Set<string>();
-  const resolvedCompIds = new Set<string>();
+async function seedDedupCacheFromExistingAssumptions(run: SaturationRun): Promise<void> {
+  if (!(run.dedupEnabled && run.allAssumptions.length > 0)) return;
+  try {
+    const vecs = await run.embeddingClient.embed(
+      run.allAssumptions.map(a => a.text),
+      { signal: run.engine.getSessionAbortSignal() },
+    );
+    run.allAssumptions.forEach((a, i) => {
+      if (vecs[i]) run.embeddingCache.set(a.id, vecs[i]);
+    });
+    getLogger().info('workflow', `Phase ${run.config.recordSubPhaseId}: dedup cache seeded from existing assumptions`, {
+      cached: run.embeddingCache.size, total: run.allAssumptions.length,
+    });
+  } catch (err) {
+    getLogger().warn('workflow', `Phase ${run.config.recordSubPhaseId}: dedup seed failed — continuing without dedup`, {
+      error: err instanceof Error ? err.message : String(err),
+    });
+  }
+}
 
-  while (queue.length > 0) {
-    passNumber++;
+async function prepareSaturationRun(
+  ctx: PhaseContext,
+  input: TaskSaturationInput,
+  config: TaskSaturationConfig,
+): Promise<SaturationRun> {
+  const { engine, workflowRun } = ctx;
+  const caps = engine.configManager.get().decomposition;
+  const template = resolveTemplateOrThrow(engine, config);
+
+  const constraintsText = formatTechnicalConstraints(input.technicalConstraints);
+  void constraintsText;
+  // PA-9: canonical TECH-* registry oracle — saturation children routinely drift
+  // these ids; each child is snapped back to a registry member (or kept + logged).
+  const techIdOracle = new Set(input.technicalConstraints.map(t => t.id));
+  // PA-1: component oracle (every id-form keyed in the scoped map) — resolve a
+  // drifted/composite task component_id before component_context falls open.
+  const componentOracle = Object.keys(input.componentSummaryById ?? {});
+
+  const pipelineId = `task-decomp-pipe-${workflowRun.id.slice(0, 8)}`;
+  const resumed = rebuildTaskSaturationStateFromStream(ctx, config, pipelineId);
+
+  // Order-sensitive: the divergence config has no side effects; the pipeline
+  // start record is WRITTEN here (unless resuming); the dedup config only news
+  // up the client — matching the original setup ordering.
+  const divergence = resolveDivergenceConfig();
+  const pipeline = resolvePipelineStartRecord(engine, workflowRun, config, input, pipelineId, resumed);
+  const dedup = resolveDedupConfig(engine);
+
+  const run: SaturationRun = {
+    ctx,
+    engine,
+    workflowRun,
+    input,
+    config,
+    caps,
+    template,
+    techIdOracle,
+    componentOracle,
+    pipelineId,
+    pipelineStartRecord: pipeline.pipelineStartRecord,
+    currentPipelineRecordId: pipeline.currentPipelineRecordId,
+    embeddingClient: dedup.embeddingClient,
+    embeddingCache: dedup.embeddingCache,
+    dedupThreshold: dedup.dedupThreshold,
+    dedupEnabled: dedup.dedupEnabled,
+    divergeGrowthRatio: divergence.divergeGrowthRatio,
+    divergeWarnPasses: divergence.divergeWarnPasses,
+    divergeTerminatePasses: divergence.divergeTerminatePasses,
+    dedupOfflineWarnPasses: divergence.dedupOfflineWarnPasses,
+    allAssumptions: resumed?.allAssumptions ?? [],
+    assumptionSeq: resumed?.assumptionSeq ?? 0,
+    queue: resumed?.queue ?? seedQueueFromRoots(input),
+    siblingsByParent: initSiblingsByParent(resumed, input),
+    callsByRoot: new Map<string, number>(),
+    maxDepthReached: resumed?.maxDepthReached ?? 0,
+    passNumber: resumed?.passNumber ?? 0,
+    pipelinePasses: resumed?.pipelinePasses ?? [],
+    // Pure read (task_decomposition_node) — the dedup seed writes no records, so
+    // building this before it yields identical results to the original ordering.
+    parentChain: buildParentChain(engine, workflowRun),
+    // PA-1 fail-safe visibility: component_context silently falls open to the FULL
+    // summary when a task's component_id isn't a key in componentSummaryById. Track
+    // unique missed ids and WARN once each so a high fall-open rate surfaces.
+    fellOpenCompIds: new Set<string>(),
+    resolvedCompIds: new Set<string>(),
+    consecutiveGrowthPasses: 0,
+    consecutiveDedupOfflinePasses: 0,
+    dedupOfflineAnnounced: false,
+    divergingEarlyTerminate: false,
+  };
+
+  await seedDedupCacheFromExistingAssumptions(run);
+  return run;
+}
+
+async function runSaturationPasses(run: SaturationRun): Promise<void> {
+  const { engine, workflowRun } = run;
+  while (run.queue.length > 0) {
+    run.passNumber++;
     const passStartedAt = new Date().toISOString();
     const nodesProducedAtPassStart = engine.writer.getRecordsByType(
       workflowRun.id, 'task_decomposition_node',
     ).length;
-    const passEntries = queue.splice(0, queue.length);
-    const passAssumptions: TaskAssumptionEntry[] = [];
-    const pendingGateByParent = new Map<string, Array<{
-      nodeRecordId: string;
-      logicalNodeId: string;
-      displayKey: string;
-      task: DecompositionTask;
-      rationale?: string;
-    }>>();
-    const downgradeNotesByParent = new Map<string, string>();
-    const postGateCleanAudits: Array<{
-      parentLogicalNodeId: string;
-      parentDisplayKey: string;
-      parentTask: DecompositionTask;
-      children: DecompositionTask[];
-    }> = [];
+    const passEntries = run.queue.splice(0, run.queue.length);
+    const pass: PassState = {
+      passAssumptions: [],
+      pendingGateByParent: new Map<string, PendingGateChild[]>(),
+      downgradeNotesByParent: new Map<string, string>(),
+      postGateCleanAudits: [],
+    };
 
     for (const entry of passEntries) {
-      if (entry.depth >= caps.task_depth_cap) {
-        getLogger().warn('workflow', `Phase ${config.recordSubPhaseId}: depth cap reached on branch — freezing as deferred`, {
-          nodeId: entry.nodeId, displayKey: entry.displayKey, depth: entry.depth, cap: caps.task_depth_cap,
-        });
-        writeDeferredSupersession(ctx, entry, passNumber, 'depth_cap_reached', config);
-        continue;
-      }
-      const rootCalls = callsByRoot.get(entry.rootTaskId) ?? 0;
-      if (rootCalls >= caps.task_budget_cap) {
-        getLogger().warn('workflow', `Phase ${config.recordSubPhaseId}: per-root budget cap reached — deferring`, {
-          rootTaskId: entry.rootTaskId, rootCalls, cap: caps.task_budget_cap,
-        });
-        writeDeferredSupersession(ctx, entry, passNumber, 'budget_cap_reached', config);
-        continue;
-      }
-
-      try {
-        const siblings = siblingsByParent.get(entry.parentNodeId) ?? [];
-        const ancestorIds = new Set<string | null>();
-        ancestorIds.add(entry.nodeId);
-        let cursor: string | null | undefined = entry.parentNodeId;
-        while (cursor) {
-          if (ancestorIds.has(cursor)) break;
-          ancestorIds.add(cursor);
-          cursor = parentChain.get(cursor) ?? null;
-        }
-        const scopedAssumptions = [...allAssumptions, ...passAssumptions]
-          .filter(a => !a.duplicate_of)
-          .filter(a => a.surfaced_at_node == null || ancestorIds.has(a.surfaced_at_node));
-
-        const inherited = entry.activeConstraints.length > 0
-          ? input.technicalConstraints.filter(t => entry.activeConstraints.includes(t.id))
-          : input.technicalConstraints;
-        const activeConstraintsForPrompt = formatTechnicalConstraints(inherited);
-
-        // Cross-branch `dependency_task_ids[]` need to point at root
-        // tasks from other branches. `sibling_context` only carries
-        // same-parent siblings, so without this roster the model
-        // either omits valid cross-branch deps or fabricates ids.
-        // Mirrors the `depth_zero_entities` pattern used in Phase 5.1a.
-        // Compact id-only roster (PA-1): the model needs the valid cross-branch
-        // dependency-target id namespace, not 186 `id: name` lines (~33KB) that
-        // duplicated sibling_context and buried the 14-line parent block.
-        const depthZeroTasksText = input.rootTasks.length === 0
-          ? '(none)'
-          : input.rootTasks.map(t => t.id).join(', ');
-
-        // PA-1: scope component_context to the task's OWN component. On a direct
-        // miss, resolve the id (separator/case drift OR a fabricated composite
-        // `comp-<component>-<entity>`) against the component oracle before falling
-        // open to the full catalog. Only a genuine residual logs.
-        const citedCompId = entry.task.component_id;
-        let scopedComponentCtx = input.componentSummaryById?.[citedCompId];
-        if (citedCompId && scopedComponentCtx === undefined && componentOracle.length > 0) {
-          const resolved = resolveComponentId(citedCompId, componentOracle);
-          if (resolved && resolved !== citedCompId) {
-            scopedComponentCtx = input.componentSummaryById?.[resolved];
-            if (!resolvedCompIds.has(citedCompId)) {
-              resolvedCompIds.add(citedCompId);
-              getLogger().warn('workflow', 'Phase 6.1a task_saturation: resolved drifted/composite component_id to its scoped component (PA-1)', {
-                workflow_run_id: workflowRun.id, component_id: citedCompId, resolved_to: resolved,
-              });
-            }
-          }
-        }
-        if (citedCompId && scopedComponentCtx === undefined
-            && !fellOpenCompIds.has(citedCompId)) {
-          fellOpenCompIds.add(citedCompId);
-          getLogger().warn('workflow', 'Phase 6.1a task_saturation: component_context fell open to the FULL summary — component id unresolvable against the component oracle (PA-1 residual)', {
-            workflow_run_id: workflowRun.id, component_id: citedCompId,
-          });
-        }
-
-        const variables: Record<string, string> = {
-          active_constraints: activeConstraintsForPrompt,
-          parent_task: formatRootTaskForPrompt(entry.task),
-          parent_tier_hint: entry.tierHint,
-          sibling_context: (() => {
-            // Scope root-node siblings to the same component (PA-1): at depth 0
-            // `siblingsByParent.get(null)` is EVERY root task across ALL
-            // components (~186), which duplicated depth_zero_tasks and buried
-            // the parent block, driving wrong-node decomposition.
-            const isRoot = entry.parentNodeId == null;
-            const sibs = siblings
-              .filter(s => s.id !== entry.task.id)
-              .filter(s => !isRoot || s.component_id === entry.task.component_id);
-            return sibs.length === 0
-              ? '(none — sole child under this parent)'
-              : sibs.map(s => `- ${s.id}: ${s.name}`).join('\n');
-          })(),
-          component_context: scopedComponentCtx ?? input.componentSummary,
-          depth_zero_tasks: depthZeroTasksText,
-          existing_assumptions: scopedAssumptions.length === 0
-            ? '(none yet)'
-            : scopedAssumptions.map(a => `- [${a.id}] (${a.category}) ${a.text}`).join('\n'),
-          current_depth: String(entry.depth),
-          janumicode_version_sha: engine.janumiCodeVersionSha,
-        };
-
-        const rendered = engine.templateLoader.render(template, variables);
-        if (rendered.missing_variables.length > 0) {
-          throw new Error(
-            `Phase ${config.recordSubPhaseId}: decomposition template has unfilled variables ` +
-            `[${rendered.missing_variables.join(', ')}].`,
-          );
-        }
-
-        callsByRoot.set(entry.rootTaskId, (callsByRoot.get(entry.rootTaskId) ?? 0) + 1);
-        const result = await engine.callForRole('requirements_agent', {
-          prompt: rendered.rendered,
-          responseFormat: 'json',
-          temperature: 0.4,
-          traceContext: {
-            workflowRunId: workflowRun.id,
-            phaseId: '6',
-            subPhaseId: config.recordSubPhaseId,
-            agentRole: 'implementation_planner',
-            label: `Phase ${config.recordSubPhaseId} Pass-${passNumber} — decomposition of ${entry.displayKey} (depth ${entry.depth}, hint ${entry.tierHint})`,
-          },
-        });
-
-        const parsed = result.parsed as Record<string, unknown> | null;
-        const childrenRaw = Array.isArray(parsed?.children)
-          ? parsed.children as Array<Record<string, unknown>> : [];
-        const surfacedRaw = Array.isArray(parsed?.surfaced_assumptions)
-          ? parsed.surfaced_assumptions as Array<Record<string, unknown>> : [];
-        const tierAssessment = parsed?.parent_tier_assessment as Record<string, unknown> | undefined;
-        if (tierAssessment?.agrees_with_hint === false) {
-          getLogger().warn('workflow', `Phase ${config.recordSubPhaseId}: decomposer disagrees with tier hint`, {
-            nodeId: entry.nodeId, displayKey: entry.displayKey, hint: entry.tierHint,
-            assessed: tierAssessment.tier, rationale: tierAssessment.rationale,
-          });
-        }
-
-        const childAssumptionIds: string[] = [];
-        for (const a of surfacedRaw) {
-          const text = typeof a.text === 'string' ? a.text : null;
-          if (!text) continue;
-          const cat = typeof a.category === 'string' ? a.category : 'open_question';
-          const validCats: TaskAssumptionEntry['category'][] = [
-            'implementation_choice', 'sequencing', 'dependency',
-            'tooling', 'scope_boundary', 'integration_seam', 'open_question',
-          ];
-          const category = (validCats as string[]).includes(cat)
-            ? cat as TaskAssumptionEntry['category']
-            : 'open_question';
-          const citations = Array.isArray(a.citations)
-            ? (a.citations as unknown[]).filter((x): x is string => typeof x === 'string')
-            : undefined;
-          const assumption: TaskAssumptionEntry = {
-            id: newAssumptionId(),
-            text,
-            source: 'decomposition',
-            surfaced_at_node: entry.nodeId,
-            surfaced_at_pass: passNumber,
-            category,
-            citations,
-          };
-          passAssumptions.push(assumption);
-          childAssumptionIds.push(assumption.id);
-        }
-
-        const childDepth = entry.depth + 1;
-        maxDepthReached = Math.max(maxDepthReached, childDepth);
-        const emittedChildren: DecompositionTask[] = [];
-        const emittedChildrenWithTier: Array<{ task: DecompositionTask; tier: DecompositionTier; logicalNodeId: string; displayKey: string }> = [];
-        const siblingDisplayKeys = new Set<string>();
-        let fanoutCount = 0;
-        for (const c of childrenRaw) {
-          if (++fanoutCount > caps.task_fanout_cap) {
-            getLogger().warn('workflow', `Phase ${config.recordSubPhaseId}: fanout cap reached — dropping remaining children`, {
-              parentNodeId: entry.nodeId, parentDisplayKey: entry.displayKey,
-              cap: caps.task_fanout_cap, totalOffered: childrenRaw.length,
-            });
-            break;
-          }
-          const child = sanitizeChildTask(c, { rootId: entry.displayKey, childIndex: fanoutCount }, techIdOracle, input.technicalConstraints);
-          if (!child) continue;
-          const tier = normalizeTier(c.tier);
-          const rationale = typeof c.decomposition_rationale === 'string'
-            ? c.decomposition_rationale : undefined;
-          const initialStatus: DecompositionNodeStatus = tier === 'D' ? 'atomic' : 'pending';
-          const logicalNodeId = mintLogicalNodeId();
-          const displayKey = collisionSafeDisplayKey(child.id, siblingDisplayKeys, logicalNodeId);
-          siblingDisplayKeys.add(displayKey);
-
-          const childActiveConstraints = child.active_constraints && child.active_constraints.length > 0
-            ? child.active_constraints
-            : entry.activeConstraints;
-          // Carry the parent's leaf AC ids (the task→leaf-AC binding) down to a
-          // child that didn't cite its own. Deterministic — the LLM routinely
-          // drops the AC ids during saturation, which would strand every atomic
-          // leaf with no binding and force the packet builder back to coarse
-          // component lineage (the whole point of the binding lost). When the
-          // child DID partition the ACs itself, keep its (more precise) set.
-          const parentAcIds = (entry.task?.traces_to ?? [])
-            .filter((x): x is string => typeof x === 'string' && x.startsWith('AC-'));
-          const childTraces = child.traces_to ?? [];
-          const childCitesAc = childTraces.some((x) => typeof x === 'string' && x.startsWith('AC-'));
-          // Saturation keeps a task's whole subtree within ONE component, so a
-          // child inherits the parent's (already id-drift-resolved) component_id
-          // rather than the LLM's possibly-drifted re-emission. Deterministic —
-          // no oracle needed at this depth.
-          const parentComponentId = entry.task?.component_id;
-          const childComponentId = (parentComponentId && parentComponentId.length > 0) ? parentComponentId : child.component_id;
-          const enrichedChild: DecompositionTask = {
-            ...child,
-            component_id: childComponentId,
-            write_directory_paths: [canonicalComponentDir(childComponentId || 'unknown', 'src')],
-            active_constraints: childActiveConstraints,
-            traces_to: childCitesAc ? childTraces : [...childTraces, ...parentAcIds],
-          };
-
-          const childRec = engine.writer.writeRecord({
-            record_type: 'task_decomposition_node',
-            schema_version: '1.0',
-            workflow_run_id: workflowRun.id,
-            phase_id: '6',
-            sub_phase_id: config.recordSubPhaseId,
-            produced_by_agent_role: 'implementation_planner',
-            janumicode_version_sha: engine.janumiCodeVersionSha,
-            derived_from_record_ids: [entry.parentRecordId],
-            content: {
-              kind: 'task_decomposition_node',
-              node_id: logicalNodeId,
-              parent_node_id: entry.nodeId,
-              display_key: displayKey,
-              root_task_id: entry.rootTaskId,
-              depth: childDepth,
-              pass_number: passNumber,
-              status: initialStatus,
-              tier,
-              task: enrichedChild,
-              decomposition_rationale: rationale,
-              surfaced_assumption_ids: childAssumptionIds,
-              release_id: entry.releaseId,
-              release_ordinal: entry.releaseOrdinal,
-            } satisfies TaskDecompositionNodeContent,
-          });
-          emittedChildren.push(enrichedChild);
-          emittedChildrenWithTier.push({ task: enrichedChild, tier, logicalNodeId, displayKey });
-          parentChain.set(logicalNodeId, entry.nodeId);
-
-          if (tier === 'A') {
-            queue.push({
-              parentRecordId: childRec.id, nodeId: logicalNodeId, parentNodeId: entry.nodeId,
-              rootTaskId: entry.rootTaskId, depth: childDepth, task: enrichedChild,
-              displayKey, tierHint: 'A',
-              releaseId: entry.releaseId, releaseOrdinal: entry.releaseOrdinal,
-              activeConstraints: childActiveConstraints,
-            });
-          } else if (tier === 'B') {
-            const batch = pendingGateByParent.get(entry.nodeId) ?? [];
-            batch.push({ nodeRecordId: childRec.id, logicalNodeId, displayKey, task: enrichedChild, rationale });
-            pendingGateByParent.set(entry.nodeId, batch);
-          } else if (tier === 'C') {
-            queue.push({
-              parentRecordId: childRec.id, nodeId: logicalNodeId, parentNodeId: entry.nodeId,
-              rootTaskId: entry.rootTaskId, depth: childDepth, task: enrichedChild,
-              displayKey, tierHint: 'C',
-              releaseId: entry.releaseId, releaseOrdinal: entry.releaseOrdinal,
-              activeConstraints: childActiveConstraints,
-            });
-          }
-        }
-        if (emittedChildren.length > 0) {
-          siblingsByParent.set(entry.nodeId, emittedChildren);
-        }
-
-        let parentDowngraded = false;
-        if (entry.tierHint === 'B') {
-          const explicitDisagreement = tierAssessment?.agrees_with_hint === false
-            && typeof tierAssessment.tier === 'string'
-            && (tierAssessment.tier === 'A' || tierAssessment.tier === 'B');
-          const producedTierBChildren = (pendingGateByParent.get(entry.nodeId)?.length ?? 0) > 0;
-          if (explicitDisagreement || producedTierBChildren) {
-            parentDowngraded = true;
-            const reason = explicitDisagreement
-              ? `tier_downgrade: decomposer_assessed_${tierAssessment?.tier}_not_B`
-              : 'tier_downgrade: post_gate_children_still_tier_B';
-            getLogger().warn('workflow', `Phase ${config.recordSubPhaseId} Step 4b: downgrading previously-accepted Tier-B parent`, {
-              nodeId: entry.nodeId, displayKey: entry.displayKey, reason,
-              producedTierB: pendingGateByParent.get(entry.nodeId)?.length ?? 0,
-              explicitDisagreement,
-            });
-            const downgradedRec = engine.writer.writeRecord({
-              record_type: 'task_decomposition_node',
-              schema_version: '1.0',
-              workflow_run_id: workflowRun.id,
-              phase_id: '6',
-              sub_phase_id: config.recordSubPhaseId,
-              produced_by_agent_role: 'orchestrator',
-              janumicode_version_sha: engine.janumiCodeVersionSha,
-              derived_from_record_ids: [entry.parentRecordId],
-              content: {
-                kind: 'task_decomposition_node',
-                node_id: entry.nodeId,
-                parent_node_id: entry.parentNodeId,
-                display_key: entry.displayKey,
-                root_task_id: entry.rootTaskId,
-                depth: entry.depth,
-                pass_number: passNumber,
-                status: 'downgraded',
-                task: entry.task,
-                surfaced_assumption_ids: [],
-                pruning_reason: reason,
-                release_id: entry.releaseId,
-                release_ordinal: entry.releaseOrdinal,
-              } satisfies TaskDecompositionNodeContent,
-            });
-            engine.writer.supersedeTaskDecompositionNodeByLogicalId(
-              workflowRun.id, entry.nodeId, downgradedRec.id,
-            );
-            if (producedTierBChildren) {
-              downgradeNotesByParent.set(
-                entry.nodeId,
-                `The task '${entry.displayKey}' you accepted earlier turned out to ` +
-                `have its own commitment layer underneath. The tasks below are ` +
-                `sub-commitments within '${entry.displayKey}' that need your review as well.`,
-              );
-            }
-          } else if (emittedChildrenWithTier.length > 0) {
-            postGateCleanAudits.push({
-              parentLogicalNodeId: entry.nodeId,
-              parentDisplayKey: entry.displayKey,
-              parentTask: entry.task,
-              children: emittedChildrenWithTier.map(x => x.task),
-            });
-          }
-        }
-
-        // Status transition for successful decomposition. See Wave 6
-        // labelling-correctness fix: parents that produced children
-        // need a `decomposed` supersession or they stay forever
-        // labelled `pending`.
-        if (emittedChildren.length > 0 && !parentDowngraded) {
-          // Preserve creation provenance — see phase2.ts pending→decomposed
-          // transition for rationale.
-          const originalRec = engine.writer.getRecord(entry.parentRecordId);
-          const originalSubPhase = originalRec?.sub_phase_id ?? config.recordSubPhaseId;
-          const decomposedRec = engine.writer.writeRecord({
-            record_type: 'task_decomposition_node',
-            schema_version: '1.0',
-            workflow_run_id: workflowRun.id,
-            phase_id: '6',
-            sub_phase_id: originalSubPhase,
-            produced_by_agent_role: 'orchestrator',
-            janumicode_version_sha: engine.janumiCodeVersionSha,
-            derived_from_record_ids: [entry.parentRecordId],
-            content: {
-              kind: 'task_decomposition_node',
-              node_id: entry.nodeId,
-              parent_node_id: entry.parentNodeId,
-              display_key: entry.displayKey,
-              root_task_id: entry.rootTaskId,
-              depth: entry.depth,
-              pass_number: passNumber,
-              status: 'decomposed',
-              tier: entry.tierHint === 'root' ? undefined : (entry.tierHint as DecompositionTier),
-              task: entry.task,
-              surfaced_assumption_ids: [],
-              release_id: entry.releaseId,
-              release_ordinal: entry.releaseOrdinal,
-            } satisfies TaskDecompositionNodeContent,
-          });
-          engine.writer.supersedeTaskDecompositionNodeByLogicalId(
-            workflowRun.id, entry.nodeId, decomposedRec.id,
-          );
-        }
-      } catch (err) {
-        const reason = err instanceof Error ? err.message : String(err);
-        getLogger().warn('workflow', `Phase ${config.recordSubPhaseId}: decomposition failed — marking node deferred`, {
-          nodeId: entry.nodeId, displayKey: entry.displayKey, error: reason,
-        });
-        writeDeferredSupersession(ctx, entry, passNumber, `decomposition_failed: ${reason}`, config);
-      }
+      await processPassEntry(run, pass, entry);
     }
 
     const nodesProducedThisPass = engine.writer.getRecordsByType(
       workflowRun.id, 'task_decomposition_node',
     ).length - nodesProducedAtPassStart;
-    pipelinePasses.push({
-      pass_number: passNumber,
-      status: 'completed',
-      started_at: passStartedAt,
-      completed_at: new Date().toISOString(),
-      nodes_produced: nodesProducedThisPass,
-      assumption_delta: passAssumptions.length,
-    });
-    const passUpdateRecord = engine.writer.writeRecord({
-      record_type: 'task_decomposition_pipeline',
-      schema_version: '1.0',
-      workflow_run_id: workflowRun.id,
-      phase_id: '6',
-      sub_phase_id: config.recordSubPhaseId,
-      produced_by_agent_role: 'orchestrator',
-      janumicode_version_sha: engine.janumiCodeVersionSha,
-      derived_from_record_ids: [pipelineStartRecord.id],
-      content: {
-        kind: 'task_decomposition_pipeline',
-        pipeline_id: pipelineId,
-        root_task_id: '*',
-        passes: [...pipelinePasses],
-      } satisfies TaskDecompositionPipelineContent,
-    });
-    engine.writer.supersedByRollback(currentPipelineRecordId, passUpdateRecord.id);
-    currentPipelineRecordId = passUpdateRecord.id;
+    recordPipelinePass(run, pass, passStartedAt, nodesProducedThisPass);
 
-    let dedupFailedThisPass = false;
-    if (dedupEnabled && passAssumptions.length > 0) {
-      try {
-        const newVecs = await embeddingClient.embed(
-          passAssumptions.map(a => a.text),
-          { signal: engine.getSessionAbortSignal() },
-        );
-        for (let i = 0; i < passAssumptions.length; i++) {
-          const a = passAssumptions[i];
-          const v = newVecs[i];
-          if (!v) continue;
-          const priors = [...embeddingCache.entries()].map(([id, vector]) => ({ id, vector }));
-          const match = findNearestAbove(v, priors, dedupThreshold);
-          if (match) {
-            a.duplicate_of = match.id;
-            a.duplicate_similarity = match.similarity;
-          }
-          embeddingCache.set(a.id, v);
-        }
-      } catch (err) {
-        dedupFailedThisPass = true;
-        getLogger().warn('workflow', `Phase ${config.recordSubPhaseId}: dedup embed failed this pass — flags skipped`, {
-          error: err instanceof Error ? err.message : String(err),
+    const dedupFailedThisPass = await applyPassDedup(run, pass);
+    const semanticDelta = pass.passAssumptions.filter(a => !a.duplicate_of).length;
+    appendAndSnapshotAssumptions(run, pass, semanticDelta);
+
+    await runAtomicShapeAuditsIfEnabled(run, pass);
+    await resolveTierBGates(run, pass);
+
+    if (dedupFailedThisPass) noteDedupOfflinePass(run);
+    else noteDedupOnlinePass(run);
+    detectAndHandleDivergence(run, nodesProducedThisPass);
+
+    if (run.divergingEarlyTerminate) break;
+    if (semanticDelta === 0 && run.queue.length === 0) break;
+  }
+}
+
+/** One queue entry: safety-cap gates, then decompose (deferred on any throw). */
+async function processPassEntry(
+  run: SaturationRun,
+  pass: PassState,
+  entry: QueueEntry,
+): Promise<void> {
+  const { ctx, config, caps } = run;
+  if (entry.depth >= caps.task_depth_cap) {
+    getLogger().warn('workflow', `Phase ${config.recordSubPhaseId}: depth cap reached on branch — freezing as deferred`, {
+      nodeId: entry.nodeId, displayKey: entry.displayKey, depth: entry.depth, cap: caps.task_depth_cap,
+    });
+    writeDeferredSupersession(ctx, entry, run.passNumber, 'depth_cap_reached', config);
+    return;
+  }
+  const rootCalls = run.callsByRoot.get(entry.rootTaskId) ?? 0;
+  if (rootCalls >= caps.task_budget_cap) {
+    getLogger().warn('workflow', `Phase ${config.recordSubPhaseId}: per-root budget cap reached — deferring`, {
+      rootTaskId: entry.rootTaskId, rootCalls, cap: caps.task_budget_cap,
+    });
+    writeDeferredSupersession(ctx, entry, run.passNumber, 'budget_cap_reached', config);
+    return;
+  }
+
+  try {
+    await decomposeEntry(run, pass, entry);
+  } catch (err) {
+    const reason = err instanceof Error ? err.message : String(err);
+    getLogger().warn('workflow', `Phase ${config.recordSubPhaseId}: decomposition failed — marking node deferred`, {
+      nodeId: entry.nodeId, displayKey: entry.displayKey, error: reason,
+    });
+    writeDeferredSupersession(ctx, entry, run.passNumber, `decomposition_failed: ${reason}`, config);
+  }
+}
+
+/**
+ * The decomposer call + child emission for one entry. Everything here runs
+ * inside the caller's try/catch, so any throw defers the node — matching the
+ * original single try block (siblings → render → LLM → children → supersession).
+ */
+async function decomposeEntry(
+  run: SaturationRun,
+  pass: PassState,
+  entry: QueueEntry,
+): Promise<void> {
+  const { engine, workflowRun, config } = run;
+
+  const variables = buildDecompositionVariables(run, pass, entry);
+  const rendered = engine.templateLoader.render(run.template, variables);
+  if (rendered.missing_variables.length > 0) {
+    throw new Error(
+      `Phase ${config.recordSubPhaseId}: decomposition template has unfilled variables ` +
+      `[${rendered.missing_variables.join(', ')}].`,
+    );
+  }
+
+  run.callsByRoot.set(entry.rootTaskId, (run.callsByRoot.get(entry.rootTaskId) ?? 0) + 1);
+  const result = await engine.callForRole('requirements_agent', {
+    prompt: rendered.rendered,
+    responseFormat: 'json',
+    temperature: 0.4,
+    traceContext: {
+      workflowRunId: workflowRun.id,
+      phaseId: '6',
+      subPhaseId: config.recordSubPhaseId,
+      agentRole: 'implementation_planner',
+      label: `Phase ${config.recordSubPhaseId} Pass-${run.passNumber} — decomposition of ${entry.displayKey} (depth ${entry.depth}, hint ${entry.tierHint})`,
+    },
+  });
+
+  const parsed = result.parsed as Record<string, unknown> | null;
+  const childrenRaw = Array.isArray(parsed?.children)
+    ? parsed.children as Array<Record<string, unknown>> : [];
+  const surfacedRaw = Array.isArray(parsed?.surfaced_assumptions)
+    ? parsed.surfaced_assumptions as Array<Record<string, unknown>> : [];
+  const tierAssessment = parsed?.parent_tier_assessment as Record<string, unknown> | undefined;
+  if (tierAssessment?.agrees_with_hint === false) {
+    getLogger().warn('workflow', `Phase ${config.recordSubPhaseId}: decomposer disagrees with tier hint`, {
+      nodeId: entry.nodeId, displayKey: entry.displayKey, hint: entry.tierHint,
+      assessed: tierAssessment.tier, rationale: tierAssessment.rationale,
+    });
+  }
+
+  const childAssumptionIds = collectSurfacedAssumptions(run, pass, entry, surfacedRaw);
+
+  const childDepth = entry.depth + 1;
+  run.maxDepthReached = Math.max(run.maxDepthReached, childDepth);
+
+  const { emittedChildren, emittedChildrenWithTier } = emitChildNodes(
+    run, pass, entry, childrenRaw, childAssumptionIds, childDepth,
+  );
+  if (emittedChildren.length > 0) {
+    run.siblingsByParent.set(entry.nodeId, emittedChildren);
+  }
+
+  const parentDowngraded = applyTierBDowngradeIfNeeded(run, pass, entry, tierAssessment, emittedChildrenWithTier);
+  // Status transition for successful decomposition. See Wave 6 labelling-
+  // correctness fix: parents that produced children need a `decomposed`
+  // supersession or they stay forever labelled `pending`.
+  writeDecomposedSupersession(run, entry, emittedChildren.length, parentDowngraded);
+}
+
+/** Assemble the template variables (component/sibling scoping + assumptions). */
+function buildDecompositionVariables(
+  run: SaturationRun,
+  pass: PassState,
+  entry: QueueEntry,
+): Record<string, string> {
+  const { input, engine } = run;
+  const siblings = run.siblingsByParent.get(entry.parentNodeId) ?? [];
+  const ancestorIds = collectAncestorNodeIds(entry, run.parentChain);
+  const scopedAssumptions = [...run.allAssumptions, ...pass.passAssumptions]
+    .filter(a => !a.duplicate_of)
+    .filter(a => a.surfaced_at_node == null || ancestorIds.has(a.surfaced_at_node));
+
+  const inherited = entry.activeConstraints.length > 0
+    ? input.technicalConstraints.filter(t => entry.activeConstraints.includes(t.id))
+    : input.technicalConstraints;
+  const activeConstraintsForPrompt = formatTechnicalConstraints(inherited);
+
+  // Cross-branch `dependency_task_ids[]` need to point at root tasks from other
+  // branches. `sibling_context` only carries same-parent siblings, so without
+  // this roster the model omits valid cross-branch deps or fabricates ids.
+  // Compact id-only roster (PA-1): just the valid cross-branch dependency-target
+  // id namespace, not 186 `id: name` lines (~33KB) that buried the parent block.
+  const depthZeroTasksText = input.rootTasks.length === 0
+    ? '(none)'
+    : input.rootTasks.map(t => t.id).join(', ');
+
+  const scopedComponentCtx = resolveScopedComponentContext(run, entry);
+
+  return {
+    active_constraints: activeConstraintsForPrompt,
+    parent_task: formatRootTaskForPrompt(entry.task),
+    parent_tier_hint: entry.tierHint,
+    sibling_context: formatSiblingContext(siblings, entry),
+    component_context: scopedComponentCtx ?? input.componentSummary,
+    depth_zero_tasks: depthZeroTasksText,
+    existing_assumptions: scopedAssumptions.length === 0
+      ? '(none yet)'
+      : scopedAssumptions.map(a => `- [${a.id}] (${a.category}) ${a.text}`).join('\n'),
+    current_depth: String(entry.depth),
+    janumicode_version_sha: engine.janumiCodeVersionSha,
+  };
+}
+
+/** Walk parent links to the root, guarding against cycles. */
+function collectAncestorNodeIds(
+  entry: QueueEntry,
+  parentChain: Map<string, string | null>,
+): Set<string | null> {
+  const ancestorIds = new Set<string | null>();
+  ancestorIds.add(entry.nodeId);
+  let cursor: string | null | undefined = entry.parentNodeId;
+  while (cursor) {
+    if (ancestorIds.has(cursor)) break;
+    ancestorIds.add(cursor);
+    cursor = parentChain.get(cursor) ?? null;
+  }
+  return ancestorIds;
+}
+
+/**
+ * PA-1: scope component_context to the task's OWN component. On a direct miss,
+ * resolve the id against the component oracle before falling open to the full
+ * catalog. Mutates the run's resolved/fell-open id sets so each id warns once.
+ */
+function resolveScopedComponentContext(
+  run: SaturationRun,
+  entry: QueueEntry,
+): string | undefined {
+  const { input, componentOracle, workflowRun } = run;
+  const citedCompId = entry.task.component_id;
+  let scopedComponentCtx = input.componentSummaryById?.[citedCompId];
+  if (citedCompId && scopedComponentCtx === undefined && componentOracle.length > 0) {
+    const resolved = resolveComponentId(citedCompId, componentOracle);
+    if (resolved && resolved !== citedCompId) {
+      scopedComponentCtx = input.componentSummaryById?.[resolved];
+      if (!run.resolvedCompIds.has(citedCompId)) {
+        run.resolvedCompIds.add(citedCompId);
+        getLogger().warn('workflow', 'Phase 6.1a task_saturation: resolved drifted/composite component_id to its scoped component (PA-1)', {
+          workflow_run_id: workflowRun.id, component_id: citedCompId, resolved_to: resolved,
         });
       }
     }
+  }
+  if (citedCompId && scopedComponentCtx === undefined
+      && !run.fellOpenCompIds.has(citedCompId)) {
+    run.fellOpenCompIds.add(citedCompId);
+    getLogger().warn('workflow', 'Phase 6.1a task_saturation: component_context fell open to the FULL summary — component id unresolvable against the component oracle (PA-1 residual)', {
+      workflow_run_id: workflowRun.id, component_id: citedCompId,
+    });
+  }
+  return scopedComponentCtx;
+}
 
-    const semanticDelta = passAssumptions.filter(a => !a.duplicate_of).length;
+/**
+ * Render the sibling roster. Scope root-node siblings to the same component
+ * (PA-1): at depth 0 `siblingsByParent.get(null)` is EVERY root task across ALL
+ * components, which duplicated depth_zero_tasks and buried the parent block.
+ */
+function formatSiblingContext(
+  siblings: DecompositionTask[],
+  entry: QueueEntry,
+): string {
+  const isRoot = entry.parentNodeId == null;
+  const sibs = siblings
+    .filter(s => s.id !== entry.task.id)
+    .filter(s => !isRoot || s.component_id === entry.task.component_id);
+  return sibs.length === 0
+    ? '(none — sole child under this parent)'
+    : sibs.map(s => `- ${s.id}: ${s.name}`).join('\n');
+}
 
-    allAssumptions.push(...passAssumptions);
-    engine.writer.writeRecord({
-      record_type: 'task_assumption_set_snapshot',
+/** Mint TA-ids for the surfaced assumptions, appending to the pass batch. */
+function collectSurfacedAssumptions(
+  run: SaturationRun,
+  pass: PassState,
+  entry: QueueEntry,
+  surfacedRaw: Array<Record<string, unknown>>,
+): string[] {
+  const childAssumptionIds: string[] = [];
+  for (const a of surfacedRaw) {
+    const text = typeof a.text === 'string' ? a.text : null;
+    if (!text) continue;
+    const cat = typeof a.category === 'string' ? a.category : 'open_question';
+    const validCats: TaskAssumptionEntry['category'][] = [
+      'implementation_choice', 'sequencing', 'dependency',
+      'tooling', 'scope_boundary', 'integration_seam', 'open_question',
+    ];
+    const category = (validCats as string[]).includes(cat)
+      ? cat as TaskAssumptionEntry['category']
+      : 'open_question';
+    const citations = Array.isArray(a.citations)
+      ? (a.citations as unknown[]).filter((x): x is string => typeof x === 'string')
+      : undefined;
+    const assumption: TaskAssumptionEntry = {
+      id: mintAssumptionId(run),
+      text,
+      source: 'decomposition',
+      surfaced_at_node: entry.nodeId,
+      surfaced_at_pass: run.passNumber,
+      category,
+      citations,
+    };
+    pass.passAssumptions.push(assumption);
+    childAssumptionIds.push(assumption.id);
+  }
+  return childAssumptionIds;
+}
+
+/** Sanitize, enrich, persist and route each child (tier A/C → queue, B → gate). */
+function emitChildNodes(
+  run: SaturationRun,
+  pass: PassState,
+  entry: QueueEntry,
+  childrenRaw: Array<Record<string, unknown>>,
+  childAssumptionIds: string[],
+  childDepth: number,
+): {
+  emittedChildren: DecompositionTask[];
+  emittedChildrenWithTier: Array<{ task: DecompositionTask; tier: DecompositionTier; logicalNodeId: string; displayKey: string }>;
+} {
+  const { engine, workflowRun, config, caps } = run;
+  const emittedChildren: DecompositionTask[] = [];
+  const emittedChildrenWithTier: Array<{ task: DecompositionTask; tier: DecompositionTier; logicalNodeId: string; displayKey: string }> = [];
+  const siblingDisplayKeys = new Set<string>();
+  let fanoutCount = 0;
+  for (const c of childrenRaw) {
+    if (++fanoutCount > caps.task_fanout_cap) {
+      getLogger().warn('workflow', `Phase ${config.recordSubPhaseId}: fanout cap reached — dropping remaining children`, {
+        parentNodeId: entry.nodeId, parentDisplayKey: entry.displayKey,
+        cap: caps.task_fanout_cap, totalOffered: childrenRaw.length,
+      });
+      break;
+    }
+    const child = sanitizeChildTask(c, { rootId: entry.displayKey, childIndex: fanoutCount }, run.techIdOracle, run.input.technicalConstraints);
+    if (!child) continue;
+    const tier = normalizeTier(c.tier);
+    const rationale = typeof c.decomposition_rationale === 'string'
+      ? c.decomposition_rationale : undefined;
+    const initialStatus: DecompositionNodeStatus = tier === 'D' ? 'atomic' : 'pending';
+    const logicalNodeId = mintLogicalNodeId();
+    const displayKey = collisionSafeDisplayKey(child.id, siblingDisplayKeys, logicalNodeId);
+    siblingDisplayKeys.add(displayKey);
+
+    const { enrichedChild, childActiveConstraints } = buildEnrichedChild(child, entry);
+
+    const childRec = engine.writer.writeRecord({
+      record_type: 'task_decomposition_node',
       schema_version: '1.0',
       workflow_run_id: workflowRun.id,
       phase_id: '6',
       sub_phase_id: config.recordSubPhaseId,
       produced_by_agent_role: 'implementation_planner',
       janumicode_version_sha: engine.janumiCodeVersionSha,
-      derived_from_record_ids: [],
+      derived_from_record_ids: [entry.parentRecordId],
       content: {
-        kind: 'task_assumption_set_snapshot',
-        pass_number: passNumber,
-        root_task_id: '*',
-        assumptions: [...allAssumptions],
-        delta_from_previous_pass: passAssumptions.length,
-        semantic_delta: semanticDelta,
-      } satisfies TaskAssumptionSetSnapshotContent,
+        kind: 'task_decomposition_node',
+        node_id: logicalNodeId,
+        parent_node_id: entry.nodeId,
+        display_key: displayKey,
+        root_task_id: entry.rootTaskId,
+        depth: childDepth,
+        pass_number: run.passNumber,
+        status: initialStatus,
+        tier,
+        task: enrichedChild,
+        decomposition_rationale: rationale,
+        surfaced_assumption_ids: childAssumptionIds,
+        release_id: entry.releaseId,
+        release_ordinal: entry.releaseOrdinal,
+      } satisfies TaskDecompositionNodeContent,
     });
+    emittedChildren.push(enrichedChild);
+    emittedChildrenWithTier.push({ task: enrichedChild, tier, logicalNodeId, displayKey });
+    run.parentChain.set(logicalNodeId, entry.nodeId);
 
-    if (caps.task_reasoning_review_on_tier_c && postGateCleanAudits.length > 0) {
-      for (const audit of postGateCleanAudits) {
-        await runAtomicShapeAudit(
-          ctx,
-          audit.parentLogicalNodeId,
-          audit.parentDisplayKey,
-          audit.parentTask,
-          audit.children,
-          passNumber,
-          config.recordSubPhaseId,
-        );
-      }
-    }
-
-    if (pendingGateByParent.size > 0) {
-      const bundlePlans = emitTierBGateBundles(
-        ctx, pendingGateByParent, downgradeNotesByParent, config,
-      );
-      const resolutions = await Promise.all(
-        bundlePlans.map(p => engine.pauseForDecision(workflowRun.id, p.bundleRecordId, 'decision_bundle')),
-      );
-      for (let i = 0; i < bundlePlans.length; i++) {
-        const plan = bundlePlans[i];
-        const resolution = resolutions[i];
-        const payload = (resolution as unknown as { payload?: { mirror_decisions?: MirrorItemDecision[] } }).payload;
-        const decisions = Array.isArray(payload?.mirror_decisions) ? payload.mirror_decisions : [];
-        const rejectedIds = new Set(decisions.filter(d => d.action === 'rejected').map(d => d.item_id));
-        for (const child of plan.childItems) {
-          if (rejectedIds.has(child.itemId)) {
-            writePrunedSupersession(ctx, plan.parentNodeId, child, 'human-rejected', config);
-          } else {
-            queue.push({
-              parentRecordId: child.nodeRecordId,
-              nodeId: child.logicalNodeId,
-              parentNodeId: plan.parentNodeId,
-              rootTaskId: child.rootTaskId,
-              depth: child.depth,
-              task: child.task,
-              displayKey: child.displayKey,
-              tierHint: 'B',
-              releaseId: child.releaseId,
-              releaseOrdinal: child.releaseOrdinal,
-              activeConstraints: child.task.active_constraints ?? [],
-            });
-          }
-        }
-      }
-    }
-
-    if (dedupFailedThisPass) {
-      consecutiveDedupOfflinePasses++;
-      if (consecutiveDedupOfflinePasses >= dedupOfflineWarnPasses && !dedupOfflineAnnounced) {
-        getLogger().warn('workflow',
-          `Phase ${config.recordSubPhaseId}: assumption dedup has been offline for ${consecutiveDedupOfflinePasses} consecutive passes`,
-          { consecutiveDedupOfflinePasses, passNumber });
-        dedupOfflineAnnounced = true;
-      }
-    } else {
-      if (dedupOfflineAnnounced) {
-        dedupOfflineAnnounced = false;
-      }
-      consecutiveDedupOfflinePasses = 0;
-    }
-
-    const priorPass = pipelinePasses.length >= 2
-      ? pipelinePasses.at(-2)
-      : null;
-    const growthObserved = priorPass
-      && priorPass.nodes_produced > 0
-      && nodesProducedThisPass > priorPass.nodes_produced * divergeGrowthRatio;
-    if (growthObserved) {
-      consecutiveGrowthPasses++;
-      if (consecutiveGrowthPasses >= divergeWarnPasses) {
-        getLogger().warn('workflow',
-          `Phase ${config.recordSubPhaseId}: saturation loop appears to be diverging`,
-          { passNumber, consecutiveGrowthPasses });
-      }
-      if (consecutiveGrowthPasses >= divergeTerminatePasses) {
-        getLogger().warn('workflow',
-          `Phase ${config.recordSubPhaseId}: EARLY TERMINATE — diverging loop`,
-          { passNumber, remainingQueueSize: queue.length });
-        for (const remaining of queue) {
-          writeDeferredSupersession(ctx, remaining, passNumber, 'diverging', config);
-        }
-        queue.length = 0;
-        divergingEarlyTerminate = true;
-      }
-    } else {
-      consecutiveGrowthPasses = 0;
-    }
-
-    if (divergingEarlyTerminate) break;
-    if (semanticDelta === 0 && queue.length === 0) break;
+    routeChildByTier(run, pass, entry, {
+      tier,
+      enrichedChild,
+      childRecordId: childRec.id,
+      logicalNodeId,
+      displayKey,
+      childDepth,
+      childActiveConstraints,
+      rationale,
+    });
   }
+  return { emittedChildren, emittedChildrenWithTier };
+}
 
-  const totalLlmCalls = [...callsByRoot.values()].reduce((a, b) => a + b, 0);
-  const maxRootCalls = callsByRoot.size > 0 ? Math.max(...callsByRoot.values()) : 0;
-  let terminationReason: DecompositionTerminationReason;
-  if (divergingEarlyTerminate) terminationReason = 'diverging';
-  else if (maxRootCalls >= caps.task_budget_cap) terminationReason = 'budget_cap';
-  else if (maxDepthReached >= caps.task_depth_cap) terminationReason = 'depth_cap';
-  else if (dedupOfflineAnnounced) terminationReason = 'dedup_offline';
-  else terminationReason = 'fixed_point';
+/**
+ * Deterministic child enrichment: inherit active_constraints, carry the parent's
+ * leaf AC ids (task→leaf-AC binding) when the child cited none, and keep the
+ * subtree under the parent's (id-drift-resolved) component_id.
+ */
+function buildEnrichedChild(
+  child: DecompositionTask,
+  entry: QueueEntry,
+): { enrichedChild: DecompositionTask; childActiveConstraints: string[] } {
+  const childActiveConstraints = child.active_constraints && child.active_constraints.length > 0
+    ? child.active_constraints
+    : entry.activeConstraints;
+  const parentAcIds = (entry.task?.traces_to ?? [])
+    .filter((x): x is string => typeof x === 'string' && x.startsWith('AC-'));
+  const childTraces = child.traces_to ?? [];
+  const childCitesAc = childTraces.some((x) => typeof x === 'string' && x.startsWith('AC-'));
+  const parentComponentId = entry.task?.component_id;
+  const childComponentId = (parentComponentId && parentComponentId.length > 0) ? parentComponentId : child.component_id;
+  const enrichedChild: DecompositionTask = {
+    ...child,
+    component_id: childComponentId,
+    write_directory_paths: [canonicalComponentDir(childComponentId || 'unknown', 'src')],
+    active_constraints: childActiveConstraints,
+    traces_to: childCitesAc ? childTraces : [...childTraces, ...parentAcIds],
+  };
+  return { enrichedChild, childActiveConstraints };
+}
 
-  const finalNodes = engine.writer.getRecordsByType(workflowRun.id, 'task_decomposition_node');
+/** Route an emitted child by tier: A/C recurse (queue), B waits for the gate. */
+function routeChildByTier(
+  run: SaturationRun,
+  pass: PassState,
+  entry: QueueEntry,
+  args: {
+    tier: DecompositionTier;
+    enrichedChild: DecompositionTask;
+    childRecordId: string;
+    logicalNodeId: string;
+    displayKey: string;
+    childDepth: number;
+    childActiveConstraints: string[];
+    rationale: string | undefined;
+  },
+): void {
+  if (args.tier === 'A') {
+    run.queue.push({
+      parentRecordId: args.childRecordId, nodeId: args.logicalNodeId, parentNodeId: entry.nodeId,
+      rootTaskId: entry.rootTaskId, depth: args.childDepth, task: args.enrichedChild,
+      displayKey: args.displayKey, tierHint: 'A',
+      releaseId: entry.releaseId, releaseOrdinal: entry.releaseOrdinal,
+      activeConstraints: args.childActiveConstraints,
+    });
+  } else if (args.tier === 'B') {
+    const batch = pass.pendingGateByParent.get(entry.nodeId) ?? [];
+    batch.push({ nodeRecordId: args.childRecordId, logicalNodeId: args.logicalNodeId, displayKey: args.displayKey, task: args.enrichedChild, rationale: args.rationale });
+    pass.pendingGateByParent.set(entry.nodeId, batch);
+  } else if (args.tier === 'C') {
+    run.queue.push({
+      parentRecordId: args.childRecordId, nodeId: args.logicalNodeId, parentNodeId: entry.nodeId,
+      rootTaskId: entry.rootTaskId, depth: args.childDepth, task: args.enrichedChild,
+      displayKey: args.displayKey, tierHint: 'C',
+      releaseId: entry.releaseId, releaseOrdinal: entry.releaseOrdinal,
+      activeConstraints: args.childActiveConstraints,
+    });
+  }
+}
+
+/**
+ * Step 4b: a previously-accepted Tier-B parent that either the decomposer
+ * disagreed with, or that produced its own Tier-B children, is downgraded
+ * (superseded). Returns true when the parent was downgraded (which suppresses
+ * the `decomposed` supersession). Clean Tier-B parents queue a shape audit.
+ */
+function applyTierBDowngradeIfNeeded(
+  run: SaturationRun,
+  pass: PassState,
+  entry: QueueEntry,
+  tierAssessment: Record<string, unknown> | undefined,
+  emittedChildrenWithTier: Array<{ task: DecompositionTask; tier: DecompositionTier; logicalNodeId: string; displayKey: string }>,
+): boolean {
+  if (entry.tierHint !== 'B') return false;
+  const { engine, workflowRun, config } = run;
+
+  const explicitDisagreement = tierAssessment?.agrees_with_hint === false
+    && typeof tierAssessment.tier === 'string'
+    && (tierAssessment.tier === 'A' || tierAssessment.tier === 'B');
+  const producedTierBChildren = (pass.pendingGateByParent.get(entry.nodeId)?.length ?? 0) > 0;
+  if (explicitDisagreement || producedTierBChildren) {
+    const reason = explicitDisagreement
+      ? `tier_downgrade: decomposer_assessed_${tierAssessment?.tier}_not_B`
+      : 'tier_downgrade: post_gate_children_still_tier_B';
+    getLogger().warn('workflow', `Phase ${config.recordSubPhaseId} Step 4b: downgrading previously-accepted Tier-B parent`, {
+      nodeId: entry.nodeId, displayKey: entry.displayKey, reason,
+      producedTierB: pass.pendingGateByParent.get(entry.nodeId)?.length ?? 0,
+      explicitDisagreement,
+    });
+    const downgradedRec = engine.writer.writeRecord({
+      record_type: 'task_decomposition_node',
+      schema_version: '1.0',
+      workflow_run_id: workflowRun.id,
+      phase_id: '6',
+      sub_phase_id: config.recordSubPhaseId,
+      produced_by_agent_role: 'orchestrator',
+      janumicode_version_sha: engine.janumiCodeVersionSha,
+      derived_from_record_ids: [entry.parentRecordId],
+      content: {
+        kind: 'task_decomposition_node',
+        node_id: entry.nodeId,
+        parent_node_id: entry.parentNodeId,
+        display_key: entry.displayKey,
+        root_task_id: entry.rootTaskId,
+        depth: entry.depth,
+        pass_number: run.passNumber,
+        status: 'downgraded',
+        task: entry.task,
+        surfaced_assumption_ids: [],
+        pruning_reason: reason,
+        release_id: entry.releaseId,
+        release_ordinal: entry.releaseOrdinal,
+      } satisfies TaskDecompositionNodeContent,
+    });
+    engine.writer.supersedeTaskDecompositionNodeByLogicalId(
+      workflowRun.id, entry.nodeId, downgradedRec.id,
+    );
+    if (producedTierBChildren) {
+      pass.downgradeNotesByParent.set(
+        entry.nodeId,
+        `The task '${entry.displayKey}' you accepted earlier turned out to ` +
+        `have its own commitment layer underneath. The tasks below are ` +
+        `sub-commitments within '${entry.displayKey}' that need your review as well.`,
+      );
+    }
+    return true;
+  }
+  if (emittedChildrenWithTier.length > 0) {
+    pass.postGateCleanAudits.push({
+      parentLogicalNodeId: entry.nodeId,
+      parentDisplayKey: entry.displayKey,
+      parentTask: entry.task,
+      children: emittedChildrenWithTier.map(x => x.task),
+    });
+  }
+  return false;
+}
+
+/** Supersede a parent that produced children (and wasn't downgraded) as decomposed. */
+function writeDecomposedSupersession(
+  run: SaturationRun,
+  entry: QueueEntry,
+  emittedChildrenCount: number,
+  parentDowngraded: boolean,
+): void {
+  if (!(emittedChildrenCount > 0 && !parentDowngraded)) return;
+  const { engine, workflowRun, config } = run;
+  // Preserve creation provenance — see phase2.ts pending→decomposed transition.
+  const originalRec = engine.writer.getRecord(entry.parentRecordId);
+  const originalSubPhase = originalRec?.sub_phase_id ?? config.recordSubPhaseId;
+  const decomposedRec = engine.writer.writeRecord({
+    record_type: 'task_decomposition_node',
+    schema_version: '1.0',
+    workflow_run_id: workflowRun.id,
+    phase_id: '6',
+    sub_phase_id: originalSubPhase,
+    produced_by_agent_role: 'orchestrator',
+    janumicode_version_sha: engine.janumiCodeVersionSha,
+    derived_from_record_ids: [entry.parentRecordId],
+    content: {
+      kind: 'task_decomposition_node',
+      node_id: entry.nodeId,
+      parent_node_id: entry.parentNodeId,
+      display_key: entry.displayKey,
+      root_task_id: entry.rootTaskId,
+      depth: entry.depth,
+      pass_number: run.passNumber,
+      status: 'decomposed',
+      tier: entry.tierHint === 'root' ? undefined : (entry.tierHint as DecompositionTier),
+      task: entry.task,
+      surfaced_assumption_ids: [],
+      release_id: entry.releaseId,
+      release_ordinal: entry.releaseOrdinal,
+    } satisfies TaskDecompositionNodeContent,
+  });
+  engine.writer.supersedeTaskDecompositionNodeByLogicalId(
+    workflowRun.id, entry.nodeId, decomposedRec.id,
+  );
+}
+
+/** Append this pass to the pipeline record and roll the current-record cursor. */
+function recordPipelinePass(
+  run: SaturationRun,
+  pass: PassState,
+  passStartedAt: string,
+  nodesProducedThisPass: number,
+): void {
+  const { engine, workflowRun, config } = run;
+  run.pipelinePasses.push({
+    pass_number: run.passNumber,
+    status: 'completed',
+    started_at: passStartedAt,
+    completed_at: new Date().toISOString(),
+    nodes_produced: nodesProducedThisPass,
+    assumption_delta: pass.passAssumptions.length,
+  });
+  const passUpdateRecord = engine.writer.writeRecord({
+    record_type: 'task_decomposition_pipeline',
+    schema_version: '1.0',
+    workflow_run_id: workflowRun.id,
+    phase_id: '6',
+    sub_phase_id: config.recordSubPhaseId,
+    produced_by_agent_role: 'orchestrator',
+    janumicode_version_sha: engine.janumiCodeVersionSha,
+    derived_from_record_ids: [run.pipelineStartRecord.id],
+    content: {
+      kind: 'task_decomposition_pipeline',
+      pipeline_id: run.pipelineId,
+      root_task_id: '*',
+      passes: [...run.pipelinePasses],
+    } satisfies TaskDecompositionPipelineContent,
+  });
+  engine.writer.supersedByRollback(run.currentPipelineRecordId, passUpdateRecord.id);
+  run.currentPipelineRecordId = passUpdateRecord.id;
+}
+
+/**
+ * Flag this pass's assumptions that duplicate a prior (by embedding similarity).
+ * Returns true only when the embed itself failed (dedup went offline this pass).
+ */
+async function applyPassDedup(run: SaturationRun, pass: PassState): Promise<boolean> {
+  if (!(run.dedupEnabled && pass.passAssumptions.length > 0)) return false;
+  try {
+    const newVecs = await run.embeddingClient.embed(
+      pass.passAssumptions.map(a => a.text),
+      { signal: run.engine.getSessionAbortSignal() },
+    );
+    for (let i = 0; i < pass.passAssumptions.length; i++) {
+      const a = pass.passAssumptions[i];
+      const v = newVecs[i];
+      if (!v) continue;
+      const priors = [...run.embeddingCache.entries()].map(([id, vector]) => ({ id, vector }));
+      const match = findNearestAbove(v, priors, run.dedupThreshold);
+      if (match) {
+        a.duplicate_of = match.id;
+        a.duplicate_similarity = match.similarity;
+      }
+      run.embeddingCache.set(a.id, v);
+    }
+    return false;
+  } catch (err) {
+    getLogger().warn('workflow', `Phase ${run.config.recordSubPhaseId}: dedup embed failed this pass — flags skipped`, {
+      error: err instanceof Error ? err.message : String(err),
+    });
+    return true;
+  }
+}
+
+/** Fold the pass batch into the running set and snapshot the assumption state. */
+function appendAndSnapshotAssumptions(
+  run: SaturationRun,
+  pass: PassState,
+  semanticDelta: number,
+): void {
+  const { engine, workflowRun, config } = run;
+  run.allAssumptions.push(...pass.passAssumptions);
+  engine.writer.writeRecord({
+    record_type: 'task_assumption_set_snapshot',
+    schema_version: '1.0',
+    workflow_run_id: workflowRun.id,
+    phase_id: '6',
+    sub_phase_id: config.recordSubPhaseId,
+    produced_by_agent_role: 'implementation_planner',
+    janumicode_version_sha: engine.janumiCodeVersionSha,
+    derived_from_record_ids: [],
+    content: {
+      kind: 'task_assumption_set_snapshot',
+      pass_number: run.passNumber,
+      root_task_id: '*',
+      assumptions: [...run.allAssumptions],
+      delta_from_previous_pass: pass.passAssumptions.length,
+      semantic_delta: semanticDelta,
+    } satisfies TaskAssumptionSetSnapshotContent,
+  });
+}
+
+/** Step 4c (advisory): audit clean Tier-B parents' children for atomic shape. */
+async function runAtomicShapeAuditsIfEnabled(run: SaturationRun, pass: PassState): Promise<void> {
+  if (!(run.caps.task_reasoning_review_on_tier_c && pass.postGateCleanAudits.length > 0)) return;
+  for (const audit of pass.postGateCleanAudits) {
+    await runAtomicShapeAudit(
+      run.ctx,
+      audit.parentLogicalNodeId,
+      audit.parentDisplayKey,
+      audit.parentTask,
+      audit.children,
+      run.passNumber,
+      run.config.recordSubPhaseId,
+    );
+  }
+}
+
+/** Present the Tier-B mirror gates, then prune human-rejected children / queue the rest. */
+async function resolveTierBGates(run: SaturationRun, pass: PassState): Promise<void> {
+  if (pass.pendingGateByParent.size === 0) return;
+  const { engine, workflowRun, config } = run;
+  const bundlePlans = emitTierBGateBundles(
+    run.ctx, pass.pendingGateByParent, pass.downgradeNotesByParent, config,
+  );
+  const resolutions = await Promise.all(
+    bundlePlans.map(p => engine.pauseForDecision(workflowRun.id, p.bundleRecordId, 'decision_bundle')),
+  );
+  for (let i = 0; i < bundlePlans.length; i++) {
+    const plan = bundlePlans[i];
+    const resolution = resolutions[i];
+    const payload = (resolution as unknown as { payload?: { mirror_decisions?: MirrorItemDecision[] } }).payload;
+    const decisions = Array.isArray(payload?.mirror_decisions) ? payload.mirror_decisions : [];
+    const rejectedIds = new Set(decisions.filter(d => d.action === 'rejected').map(d => d.item_id));
+    for (const child of plan.childItems) {
+      if (rejectedIds.has(child.itemId)) {
+        writePrunedSupersession(run.ctx, plan.parentNodeId, child, 'human-rejected', config);
+      } else {
+        run.queue.push({
+          parentRecordId: child.nodeRecordId,
+          nodeId: child.logicalNodeId,
+          parentNodeId: plan.parentNodeId,
+          rootTaskId: child.rootTaskId,
+          depth: child.depth,
+          task: child.task,
+          displayKey: child.displayKey,
+          tierHint: 'B',
+          releaseId: child.releaseId,
+          releaseOrdinal: child.releaseOrdinal,
+          activeConstraints: child.task.active_constraints ?? [],
+        });
+      }
+    }
+  }
+}
+
+/** Track consecutive dedup-offline passes and announce once past the threshold. */
+/** A pass where assumption dedup was offline: bump the streak, warn once at threshold. */
+function noteDedupOfflinePass(run: SaturationRun): void {
+  run.consecutiveDedupOfflinePasses++;
+  if (run.consecutiveDedupOfflinePasses >= run.dedupOfflineWarnPasses && !run.dedupOfflineAnnounced) {
+    getLogger().warn('workflow',
+      `Phase ${run.config.recordSubPhaseId}: assumption dedup has been offline for ${run.consecutiveDedupOfflinePasses} consecutive passes`,
+      { consecutiveDedupOfflinePasses: run.consecutiveDedupOfflinePasses, passNumber: run.passNumber });
+    run.dedupOfflineAnnounced = true;
+  }
+}
+
+/** A pass where assumption dedup was online: reset the offline streak + announcement. */
+function noteDedupOnlinePass(run: SaturationRun): void {
+  run.dedupOfflineAnnounced = false;
+  run.consecutiveDedupOfflinePasses = 0;
+}
+
+/** Divergence rail: warn then EARLY-TERMINATE (defer the queue) on sustained growth. */
+function detectAndHandleDivergence(run: SaturationRun, nodesProducedThisPass: number): void {
+  const priorPass = run.pipelinePasses.length >= 2
+    ? run.pipelinePasses.at(-2)
+    : null;
+  const growthObserved = priorPass
+    && priorPass.nodes_produced > 0
+    && nodesProducedThisPass > priorPass.nodes_produced * run.divergeGrowthRatio;
+  if (growthObserved) {
+    run.consecutiveGrowthPasses++;
+    if (run.consecutiveGrowthPasses >= run.divergeWarnPasses) {
+      getLogger().warn('workflow',
+        `Phase ${run.config.recordSubPhaseId}: saturation loop appears to be diverging`,
+        { passNumber: run.passNumber, consecutiveGrowthPasses: run.consecutiveGrowthPasses });
+    }
+    if (run.consecutiveGrowthPasses >= run.divergeTerminatePasses) {
+      getLogger().warn('workflow',
+        `Phase ${run.config.recordSubPhaseId}: EARLY TERMINATE — diverging loop`,
+        { passNumber: run.passNumber, remainingQueueSize: run.queue.length });
+      for (const remaining of run.queue) {
+        writeDeferredSupersession(run.ctx, remaining, run.passNumber, 'diverging', run.config);
+      }
+      run.queue.length = 0;
+      run.divergingEarlyTerminate = true;
+    }
+  } else {
+    run.consecutiveGrowthPasses = 0;
+  }
+}
+
+// ── Finalization ───────────────────────────────────────────────────
+
+/** Pick the termination reason in the original precedence order. */
+function resolveTerminationReason(run: SaturationRun, maxRootCalls: number): DecompositionTerminationReason {
+  if (run.divergingEarlyTerminate) return 'diverging';
+  if (maxRootCalls >= run.caps.task_budget_cap) return 'budget_cap';
+  if (run.maxDepthReached >= run.caps.task_depth_cap) return 'depth_cap';
+  if (run.dedupOfflineAnnounced) return 'dedup_offline';
+  return 'fixed_point';
+}
+
+/** Tally the final tier distribution and atomic-leaf count over all node records. */
+function summarizeFinalNodes(
+  finalNodes: GovernedStreamRecord[],
+): { tierDistribution: { A: number; B: number; C: number; D: number }; atomicLeafCount: number } {
   const tierDistribution: { A: number; B: number; C: number; D: number } = { A: 0, B: 0, C: 0, D: 0 };
   let atomicLeafCount = 0;
   for (const n of finalNodes) {
@@ -1131,6 +1568,37 @@ export async function runTaskSaturationLoop(
     }
     if (c.status === 'atomic') atomicLeafCount++;
   }
+  return { tierDistribution, atomicLeafCount };
+}
+
+/** Best-effort workflow_runs telemetry (budget / depth / active pipeline). */
+function writeTaskDecompositionTelemetry(run: SaturationRun, totalLlmCalls: number): void {
+  const { engine, workflowRun, config } = run;
+  try {
+    const db = engine.db;
+    db.prepare(`
+      UPDATE workflow_runs
+      SET task_decomposition_budget_calls_used = ?,
+          task_decomposition_max_depth_reached = MAX(task_decomposition_max_depth_reached, ?),
+          active_task_pipeline_id = ?
+      WHERE id = ?
+    `).run(totalLlmCalls, run.maxDepthReached, run.pipelineId, workflowRun.id);
+  } catch (err) {
+    getLogger().warn('workflow', `Phase ${config.recordSubPhaseId}: telemetry write failed`, {
+      error: err instanceof Error ? err.message : String(err),
+    });
+  }
+}
+
+/** Write the terminal pipeline record + telemetry once the loop has settled. */
+function finalizeSaturationRun(run: SaturationRun): void {
+  const { engine, workflowRun, config } = run;
+  const totalLlmCalls = [...run.callsByRoot.values()].reduce((a, b) => a + b, 0);
+  const maxRootCalls = run.callsByRoot.size > 0 ? Math.max(...run.callsByRoot.values()) : 0;
+  const terminationReason = resolveTerminationReason(run, maxRootCalls);
+
+  const finalNodes = engine.writer.getRecordsByType(workflowRun.id, 'task_decomposition_node');
+  const { tierDistribution, atomicLeafCount } = summarizeFinalNodes(finalNodes);
 
   const pipelineFinalRecord = engine.writer.writeRecord({
     record_type: 'task_decomposition_pipeline',
@@ -1140,38 +1608,25 @@ export async function runTaskSaturationLoop(
     sub_phase_id: config.recordSubPhaseId,
     produced_by_agent_role: 'orchestrator',
     janumicode_version_sha: engine.janumiCodeVersionSha,
-    derived_from_record_ids: [pipelineStartRecord.id],
+    derived_from_record_ids: [run.pipelineStartRecord.id],
     content: {
       kind: 'task_decomposition_pipeline',
-      pipeline_id: pipelineId,
+      pipeline_id: run.pipelineId,
       root_task_id: '*',
-      passes: pipelinePasses.map((p, i) =>
-        i === pipelinePasses.length - 1
+      passes: run.pipelinePasses.map((p, i) =>
+        i === run.pipelinePasses.length - 1
           ? { ...p, termination_reason: terminationReason }
           : p,
       ),
       final_leaf_count: atomicLeafCount,
-      final_max_depth: maxDepthReached,
+      final_max_depth: run.maxDepthReached,
       total_llm_calls: totalLlmCalls,
       tier_distribution: tierDistribution,
     } satisfies TaskDecompositionPipelineContent,
   });
-  engine.writer.supersedByRollback(currentPipelineRecordId, pipelineFinalRecord.id);
+  engine.writer.supersedByRollback(run.currentPipelineRecordId, pipelineFinalRecord.id);
 
-  try {
-    const db = engine.db;
-    db.prepare(`
-      UPDATE workflow_runs
-      SET task_decomposition_budget_calls_used = ?,
-          task_decomposition_max_depth_reached = MAX(task_decomposition_max_depth_reached, ?),
-          active_task_pipeline_id = ?
-      WHERE id = ?
-    `).run(totalLlmCalls, maxDepthReached, pipelineId, workflowRun.id);
-  } catch (err) {
-    getLogger().warn('workflow', `Phase ${config.recordSubPhaseId}: telemetry write failed`, {
-      error: err instanceof Error ? err.message : String(err),
-    });
-  }
+  writeTaskDecompositionTelemetry(run, totalLlmCalls);
 }
 
 // ── Helpers — supersession writers ─────────────────────────────────
@@ -1376,9 +1831,10 @@ async function runAtomicShapeAudit(
 ): Promise<void> {
   const { engine, workflowRun } = ctx;
 
-  const childrenText = children.map(c =>
-    `${c.id} (${c.name}):\n${c.completion_criteria.map(r => `  • ${r.description}`).join('\n')}`,
-  ).join('\n\n');
+  const childrenText = children.map(c => {
+    const criteriaText = c.completion_criteria.map(r => `  • ${r.description}`).join('\n');
+    return `${c.id} (${c.name}):\n${criteriaText}`;
+  }).join('\n\n');
 
   const prompt = `You are auditing a Tier-C task decomposition for atomic-unit shape.
 

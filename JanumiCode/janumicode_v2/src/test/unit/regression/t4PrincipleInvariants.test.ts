@@ -195,4 +195,50 @@ describe('T4 — tier_a_srp_violation', () => {
     );
     expect(c.passed).toBe(true);
   });
+
+  it('returns pass with tier_filter skip-detail when no component matches the filter', () => {
+    const parsed = {
+      children: [
+        { id: 'comp-foo', tier: 'C', responsibilities: [{ id: 'r1', description: 'Validate foo' }] },
+        { id: 'comp-bar', tier: 'C', responsibilities: [{ id: 'r2', description: 'Persist bar' }] },
+      ],
+    };
+    const c = checkT4Principle(
+      baseAssertion({ path: 'children[]', tier_filter: 'A' }),
+      parsed,
+    );
+    expect(c.passed).toBe(true);
+    expect(c.detail).toMatch(/no components match tier_filter=A/);
+  });
+
+  it('emits multiple violations in detector order (A before C) under the numbered wrapper', () => {
+    // This input trips BOTH the noun-collision smell (A) and the
+    // single-verb-responsibility smell (C): three siblings share the noun
+    // 'order' with one verb-led responsibility each. Pins detector ordering
+    // and the "N principle violation(s):\n    - " wrapper/join format.
+    const parsed = {
+      components: [
+        { id: 'comp-order-validation', name: 'Order Validation',
+          responsibilities: [{ id: 'r1', description: 'Validate order data' }], dependencies: [] },
+        { id: 'comp-order-persistence', name: 'Order Persistence',
+          responsibilities: [{ id: 'r2', description: 'Persist order' }], dependencies: [] },
+        { id: 'comp-order-emission', name: 'Order Emission',
+          responsibilities: [{ id: 'r3', description: 'Emit order events' }], dependencies: [] },
+      ],
+    };
+    const c = checkT4Principle(baseAssertion(), parsed);
+    expect(c.passed).toBe(false);
+    const detail = c.detail as string;
+    expect(detail).toBeDefined();
+    // Two violations reported under the numbered wrapper.
+    expect(detail.startsWith('2 principle violation(s):')).toBe(true);
+    // One bullet separator per violation.
+    expect(detail.split('\n    - ').length - 1).toBe(2);
+    // Noun-collision (A) is emitted before single-verb (C).
+    const nounIdx = detail.indexOf('noun_collision');
+    const verbIdx = detail.indexOf('single_verb_responsibility');
+    expect(nounIdx).toBeGreaterThan(-1);
+    expect(verbIdx).toBeGreaterThan(-1);
+    expect(nounIdx).toBeLessThan(verbIdx);
+  });
 });

@@ -14,7 +14,7 @@ export interface EvaluationResultArtifact {
   kind: 'evaluation_result';
   criterion_id?: string;
   target_id?: string;
-  evaluation_kind?: 'functional' | 'quality' | 'reasoning' | string;
+  evaluation_kind?: 'functional' | 'quality' | 'reasoning' | (string & {});
   verdict: 'pass' | 'fail' | 'inconclusive';
   rationale?: string;
   measured_value?: string | number;

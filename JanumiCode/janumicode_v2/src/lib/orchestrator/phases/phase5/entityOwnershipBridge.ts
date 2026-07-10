@@ -134,7 +134,9 @@ export function buildComponentContextLines(
       let detail = '';
       if (c.responsibility) detail = ` — ${c.responsibility}`;
       else if (c.description) detail = ` — ${c.description}`;
-      return `- ${c.id}${c.name ? ` (${c.name})` : ''}${detail}${c.domain_id ? ` [${c.domain_id}]` : ''}`;
+      const namePart = c.name ? ` (${c.name})` : '';
+      const domainPart = c.domain_id ? ` [${c.domain_id}]` : '';
+      return `- ${c.id}${namePart}${detail}${domainPart}`;
     })
     .join('\n');
 }
@@ -196,6 +198,194 @@ function electOwner(
   return { owner, source: 'deterministic' };
 }
 
+// ── Reconciliation steps (pure; each extracted for a single responsibility) ──
+
+type ConceptMember = { component_id: string; entity: BridgeEntity };
+type ConceptGroups = Map<string, ConceptMember[]>;
+type ReconcileStats = ReconcileResult['stats'];
+
+/** Group per-component entity copies by concept (structural natural-key slug).
+ *  Entities without a (trimmed) name are skipped. Insertion order = model order. */
+function groupByConcept(models: BridgeModel[]): ConceptGroups {
+  const groups: ConceptGroups = new Map();
+  for (const m of models) {
+    for (const e of m.entities ?? []) {
+      const name = (e.name ?? '').trim();
+      if (!name) continue;
+      const key = slug(name);
+      const g = groups.get(key) ?? [];
+      g.push({ component_id: m.component_id, entity: e });
+      groups.set(key, g);
+    }
+  }
+  return groups;
+}
+
+/** Pre-classify each group: single-component (tagged 'owned' here), coincidental
+ *  collision (no shared field → separate), or genuinely shared (needs a verdict).
+ *  Mutates `stats.owned` / `stats.multiComponent` and single-component entities. */
+function preClassifyGroups(
+  groups: ConceptGroups,
+  stats: ReconcileStats,
+): { needsVerdict: string[]; separateKeys: Set<string> } {
+  const needsVerdict: string[] = [];
+  const separateKeys = new Set<string>();
+  for (const [key, members] of groups) {
+    if (members.length === 1) {
+      members[0].entity.ownership_role = 'owned';
+      stats.owned++;
+      continue;
+    }
+    stats.multiComponent++;
+    const withFields = members.map((m) => ({ fields: fieldNames(m.entity) }));
+    if (!anySharedField(withFields)) separateKeys.add(key);
+    else needsVerdict.push(key);
+  }
+  return { needsVerdict, separateKeys };
+}
+
+/** Ask the injected adjudicator for a semantic verdict on each shared concept.
+ *  Fail-open: no adjudicator / no shared concepts / any error → no verdicts.
+ *  Mutates `stats.adjudicated` only when the adjudicator actually ran. */
+async function adjudicateSharedConcepts(
+  needsVerdict: string[],
+  groups: ConceptGroups,
+  adjudicate: Adjudicator | undefined,
+  stats: ReconcileStats,
+): Promise<Map<string, AdjudicationVerdict>> {
+  const verdictByKey = new Map<string, AdjudicationVerdict>();
+  if (needsVerdict.length === 0 || !adjudicate) return verdictByKey;
+  const reqs: AdjudicationRequest[] = needsVerdict.map((key) => {
+    const members = groups.get(key)!;
+    return {
+      concept_key: key,
+      concept_name: members[0].entity.name,
+      members: members.map((m) => ({ component_id: m.component_id, fields: [...fieldNames(m.entity)] })),
+    };
+  });
+  let out: AdjudicationVerdict[] = [];
+  try { out = (await adjudicate(reqs)) ?? []; } catch { out = []; }
+  for (const v of out) if (v && typeof v.concept_key === 'string') verdictByKey.set(v.concept_key, v);
+  stats.adjudicated = verdictByKey.size;
+  return verdictByKey;
+}
+
+/** Decide the final verdict: coincidental collision → 'separate'; otherwise the
+ *  adjudicator's verdict if it is one of the three valid values, else 'owned_aggregate'. */
+function resolveVerdict(isCoincidental: boolean, v: AdjudicationVerdict | undefined): EntityOwnershipVerdict {
+  if (isCoincidental) return 'separate';
+  if (v?.verdict === 'shared_value_object' || v?.verdict === 'separate' || v?.verdict === 'owned_aggregate') {
+    return v.verdict;
+  }
+  return 'owned_aggregate';
+}
+
+/** Elect an owner for a genuinely-shared aggregate, tag members owned/referenced
+ *  (reference stubs keep their own fields), and record the decision. */
+function applyOwnedAggregate(
+  key: string,
+  members: ConceptMember[],
+  ctx: OwnershipContext,
+  decisions: EntityOwnershipDecision[],
+  stats: ReconcileStats,
+  verdict: { suggested?: string; source0?: EntityOwnershipDecision['source']; rationale?: string } = {},
+): void {
+  const { suggested, source0, rationale } = verdict;
+  const { owner, source } = electOwner(
+    key,
+    members.map((m) => ({ component_id: m.component_id, fieldCount: fieldNames(m.entity).size })),
+    ctx,
+    suggested,
+  );
+  const ownerName = members.find((m) => m.component_id === owner)?.entity.name ?? members[0].entity.name;
+  const ownerEntityId = mintEntityId(owner, ownerName);
+  for (const { component_id, entity } of members) {
+    if (component_id === owner) {
+      entity.ownership_role = 'owned';
+      stats.owned++;
+    } else {
+      entity.ownership_role = 'referenced';
+      entity.owner_entity_id = ownerEntityId;
+      entity.owner_component_id = owner;
+      stats.referenced++;
+    }
+  }
+  decisions.push({
+    concept_key: key,
+    concept_name: ownerName,
+    verdict: 'owned_aggregate',
+    owner_component_id: owner,
+    owner_entity_id: ownerEntityId,
+    member_component_ids: members.map((m) => m.component_id),
+    source: source0 === 'adjudicator' ? 'adjudicator' : source,
+    rationale,
+  });
+}
+
+/** Coincidental collision or adjudicated 'separate': keep every copy owned and
+ *  surface the concept as unresolved. `isCoincidental` selects source/rationale. */
+function applySeparate(
+  key: string,
+  members: ConceptMember[],
+  isCoincidental: boolean,
+  v: AdjudicationVerdict | undefined,
+  decisions: EntityOwnershipDecision[],
+  unresolved: string[],
+  stats: ReconcileStats,
+): void {
+  for (const { entity } of members) { entity.ownership_role = 'owned'; stats.owned++; }
+  stats.separate++;
+  decisions.push({
+    concept_key: key, concept_name: members[0].entity.name, verdict: 'separate',
+    member_component_ids: members.map((m) => m.component_id),
+    source: isCoincidental ? 'fail_open' : 'adjudicator',
+    rationale: isCoincidental ? 'coincidental name collision (no shared field) — kept all owned' : v?.rationale,
+  });
+  unresolved.push(key);
+}
+
+/** Adjudicated shared value object: copied by value into every context (no owner). */
+function applyValueObject(
+  key: string,
+  members: ConceptMember[],
+  v: AdjudicationVerdict | undefined,
+  decisions: EntityOwnershipDecision[],
+  stats: ReconcileStats,
+): void {
+  for (const { entity } of members) { entity.ownership_role = 'shared_value_object'; stats.value_object++; }
+  decisions.push({
+    concept_key: key, concept_name: members[0].entity.name, verdict: 'shared_value_object',
+    member_component_ids: members.map((m) => m.component_id),
+    source: 'adjudicator', rationale: v?.rationale,
+  });
+}
+
+/** Apply every multi-component concept's verdict in `[...separateKeys, ...needsVerdict]`
+ *  order, dispatching to the per-verdict tagger. Mutates entities/decisions/unresolved/stats. */
+function applyDecisions(
+  groups: ConceptGroups,
+  separateKeys: Set<string>,
+  needsVerdict: string[],
+  verdictByKey: Map<string, AdjudicationVerdict>,
+  ctx: OwnershipContext,
+  out: { decisions: EntityOwnershipDecision[]; unresolved: string[]; stats: ReconcileStats },
+): void {
+  const { decisions, unresolved, stats } = out;
+  for (const key of [...separateKeys, ...needsVerdict]) {
+    const members = groups.get(key)!;
+    const v = verdictByKey.get(key);
+    const isCoincidental = separateKeys.has(key);
+    const verdict = resolveVerdict(isCoincidental, v);
+    if (verdict === 'separate') {
+      applySeparate(key, members, isCoincidental, v, decisions, unresolved, stats);
+    } else if (verdict === 'shared_value_object') {
+      applyValueObject(key, members, v, decisions, stats);
+    } else {
+      applyOwnedAggregate(key, members, ctx, decisions, stats, { suggested: v?.owner_component_id, source0: v ? 'adjudicator' : undefined, rationale: v?.rationale });
+    }
+  }
+}
+
 // ── Main entry ──────────────────────────────────────────────────────
 
 /**
@@ -211,117 +401,18 @@ export async function reconcileEntityOwnership(
   ctx: OwnershipContext,
   adjudicate?: Adjudicator,
 ): Promise<ReconcileResult> {
-  // ── Group per-component copies by concept (structural natural key) ──
-  const groups = new Map<string, Array<{ component_id: string; entity: BridgeEntity }>>();
-  for (const m of models) {
-    for (const e of m.entities ?? []) {
-      const name = (e.name ?? '').trim();
-      if (!name) continue;
-      const key = slug(name);
-      const g = groups.get(key) ?? [];
-      g.push({ component_id: m.component_id, entity: e });
-      groups.set(key, g);
-    }
-  }
+  // Group per-component copies by concept (structural natural key).
+  const groups = groupByConcept(models);
 
   const decisions: EntityOwnershipDecision[] = [];
   const unresolved: string[] = [];
-  const stats = { concepts: groups.size, multiComponent: 0, owned: 0, referenced: 0, value_object: 0, separate: 0, adjudicated: 0 };
+  const stats: ReconcileStats = { concepts: groups.size, multiComponent: 0, owned: 0, referenced: 0, value_object: 0, separate: 0, adjudicated: 0 };
 
-  // ── Pre-classify: single-component (trivially owned), coincidental (separate),
-  //    shared (needs verdict) ──
-  const needsVerdict: string[] = [];
-  const separateKeys = new Set<string>();
-  for (const [key, members] of groups) {
-    if (members.length === 1) { members[0].entity.ownership_role = 'owned'; stats.owned++; continue; }
-    stats.multiComponent++;
-    const withFields = members.map((m) => ({ fields: fieldNames(m.entity) }));
-    if (!anySharedField(withFields)) { separateKeys.add(key); } else { needsVerdict.push(key); }
-  }
-
-  // ── Adjudicate the shared concepts (semantic verdict + owner suggestion) ──
-  const verdictByKey = new Map<string, AdjudicationVerdict>();
-  if (needsVerdict.length > 0 && adjudicate) {
-    const reqs: AdjudicationRequest[] = needsVerdict.map((key) => {
-      const members = groups.get(key)!;
-      return {
-        concept_key: key,
-        concept_name: members[0].entity.name,
-        members: members.map((m) => ({ component_id: m.component_id, fields: [...fieldNames(m.entity)] })),
-      };
-    });
-    let out: AdjudicationVerdict[] = [];
-    try { out = (await adjudicate(reqs)) ?? []; } catch { out = []; }
-    for (const v of out) if (v && typeof v.concept_key === 'string') verdictByKey.set(v.concept_key, v);
-    stats.adjudicated = verdictByKey.size;
-  }
-
-  // ── Apply ──
-  const applyOwnedAggregate = (key: string, members: Array<{ component_id: string; entity: BridgeEntity }>, suggested?: string, source0?: EntityOwnershipDecision['source'], rationale?: string) => {
-    const { owner, source } = electOwner(
-      key,
-      members.map((m) => ({ component_id: m.component_id, fieldCount: fieldNames(m.entity).size })),
-      ctx,
-      suggested,
-    );
-    const ownerName = members.find((m) => m.component_id === owner)?.entity.name ?? members[0].entity.name;
-    const ownerEntityId = mintEntityId(owner, ownerName);
-    for (const { component_id, entity } of members) {
-      if (component_id === owner) {
-        entity.ownership_role = 'owned';
-        stats.owned++;
-      } else {
-        entity.ownership_role = 'referenced';
-        entity.owner_entity_id = ownerEntityId;
-        entity.owner_component_id = owner;
-        stats.referenced++;
-      }
-    }
-    decisions.push({
-      concept_key: key,
-      concept_name: ownerName,
-      verdict: 'owned_aggregate',
-      owner_component_id: owner,
-      owner_entity_id: ownerEntityId,
-      member_component_ids: members.map((m) => m.component_id),
-      source: source0 === 'adjudicator' ? 'adjudicator' : source,
-      rationale,
-    });
-  };
-
-  for (const key of [...separateKeys, ...needsVerdict]) {
-    const members = groups.get(key)!;
-    const v = verdictByKey.get(key);
-    let verdict: EntityOwnershipVerdict;
-    if (separateKeys.has(key)) {
-      verdict = 'separate';
-    } else if (v?.verdict === 'shared_value_object' || v?.verdict === 'separate' || v?.verdict === 'owned_aggregate') {
-      verdict = v.verdict;
-    } else {
-      verdict = 'owned_aggregate';
-    }
-
-    if (verdict === 'separate') {
-      for (const { entity } of members) { entity.ownership_role = 'owned'; stats.owned++; }
-      stats.separate++;
-      decisions.push({
-        concept_key: key, concept_name: members[0].entity.name, verdict: 'separate',
-        member_component_ids: members.map((m) => m.component_id),
-        source: separateKeys.has(key) ? 'fail_open' : 'adjudicator',
-        rationale: separateKeys.has(key) ? 'coincidental name collision (no shared field) — kept all owned' : v?.rationale,
-      });
-      unresolved.push(key);
-    } else if (verdict === 'shared_value_object') {
-      for (const { entity } of members) { entity.ownership_role = 'shared_value_object'; stats.value_object++; }
-      decisions.push({
-        concept_key: key, concept_name: members[0].entity.name, verdict: 'shared_value_object',
-        member_component_ids: members.map((m) => m.component_id),
-        source: 'adjudicator', rationale: v?.rationale,
-      });
-    } else {
-      applyOwnedAggregate(key, members, v?.owner_component_id, v ? 'adjudicator' : undefined, v?.rationale);
-    }
-  }
+  // Pre-classify (single / coincidental / shared), then adjudicate the shared set
+  // and apply every verdict — each step mutates decisions/unresolved/stats/entities.
+  const { needsVerdict, separateKeys } = preClassifyGroups(groups, stats);
+  const verdictByKey = await adjudicateSharedConcepts(needsVerdict, groups, adjudicate, stats);
+  applyDecisions(groups, separateKeys, needsVerdict, verdictByKey, ctx, { decisions, unresolved, stats });
 
   const ownershipMap: EntityOwnershipMapContent = { kind: 'entity_ownership_map', decisions, unresolved };
   return { ownershipMap, stats };

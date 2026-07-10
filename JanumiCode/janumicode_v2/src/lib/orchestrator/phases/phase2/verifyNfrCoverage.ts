@@ -165,58 +165,95 @@ function checkUnreachedSeedIntegrity(i: NfrCoverageVerifierInputs): CoverageGapC
   })];
 }
 
-/** Every `traces_to` id must resolve; FR-id leakage is flagged. */
-function checkTracesReferentialIntegrity(i: NfrCoverageVerifierInputs): CoverageGapContent[] {
-  const vvIds = new Set(i.vvRequirements.map(v => v.id));
-  const techIds = new Set(i.technicalConstraints.map(t => t.id));
-  const compIds = new Set(i.complianceItems.map(c => c.id));
-  const journeyIds = new Set(i.journeys.map(j => j.id));
-  const qaMax = i.qualityAttributesCount;
+interface TraceRefIdSets {
+  vvIds: Set<string>;
+  techIds: Set<string>;
+  compIds: Set<string>;
+  journeyIds: Set<string>;
+  qaMax: number;
+}
 
-  const badUnknownPrefix: string[] = [];
-  const badDangling: string[] = [];
-  const frLeakage: string[] = [];
-  for (const n of i.nfrs) {
-    for (const t of n.traces_to ?? []) {
-      if (t.startsWith('US-')) { frLeakage.push(`${n.id}:${t}`); continue; }
-      if (t.startsWith('VV-')) { if (!vvIds.has(t)) badDangling.push(`${n.id}:${t}`); continue; }
-      if (t.startsWith('TECH-')) { if (!techIds.has(t)) badDangling.push(`${n.id}:${t}`); continue; }
-      if (t.startsWith('COMP-')) { if (!compIds.has(t)) badDangling.push(`${n.id}:${t}`); continue; }
-      if (t.startsWith('UJ-')) { if (!journeyIds.has(t)) badDangling.push(`${n.id}:${t}`); continue; }
-      if (t.startsWith('QA-')) {
-        const idx = Number(t.slice(3));
-        if (!Number.isInteger(idx) || idx < 1 || idx > qaMax) badDangling.push(`${n.id}:${t}`);
-        continue;
-      }
-      badUnknownPrefix.push(`${n.id}:${t}`);
-    }
-  }
+type TraceRefVerdict = 'ok' | 'fr_leakage' | 'dangling' | 'unknown_prefix';
+
+interface TraceRefBuckets {
+  badUnknownPrefix: string[];
+  badDangling: string[];
+  frLeakage: string[];
+}
+
+/** `ok` when the id is a member of its accepted set, else `dangling`. */
+function verdictFromSet(t: string, set: Set<string>): TraceRefVerdict {
+  return set.has(t) ? 'ok' : 'dangling';
+}
+
+/** `ok` when `QA-<n>` names a 1-based index within the quality-attribute count. */
+function verdictFromQaIndex(t: string, qaMax: number): TraceRefVerdict {
+  const idx = Number(t.slice(3));
+  const valid = Number.isInteger(idx) && idx >= 1 && idx <= qaMax;
+  return valid ? 'ok' : 'dangling';
+}
+
+/** Classify a single `traces_to` id against the accepted upstream id sets. */
+function classifyTraceRef(t: string, sets: TraceRefIdSets): TraceRefVerdict {
+  if (t.startsWith('US-')) return 'fr_leakage';
+  if (t.startsWith('VV-')) return verdictFromSet(t, sets.vvIds);
+  if (t.startsWith('TECH-')) return verdictFromSet(t, sets.techIds);
+  if (t.startsWith('COMP-')) return verdictFromSet(t, sets.compIds);
+  if (t.startsWith('UJ-')) return verdictFromSet(t, sets.journeyIds);
+  if (t.startsWith('QA-')) return verdictFromQaIndex(t, sets.qaMax);
+  return 'unknown_prefix';
+}
+
+/** Assemble the traces_to gap records from the accumulated offender buckets. */
+function buildTracesGaps(buckets: TraceRefBuckets): CoverageGapContent[] {
   const gaps: CoverageGapContent[] = [];
-  if (badUnknownPrefix.length > 0) {
+  if (buckets.badUnknownPrefix.length > 0) {
     gaps.push(mkGap({
       check: 'nfr_traces_to_unknown_prefix',
       assertion: 'Every NFR traces_to entry must use a known id prefix (VV-/QA-/TECH-/COMP-/UJ-).',
       severity: 'blocking',
-      expected: [], actual: [], missing: badUnknownPrefix,
+      expected: [], actual: [], missing: buckets.badUnknownPrefix,
     }));
   }
-  if (badDangling.length > 0) {
+  if (buckets.badDangling.length > 0) {
     gaps.push(mkGap({
       check: 'nfr_traces_to_dangling',
       assertion: 'Every NFR traces_to entry must reference an accepted upstream artifact.',
       severity: 'blocking',
-      expected: [], actual: [], missing: badDangling,
+      expected: [], actual: [], missing: buckets.badDangling,
     }));
   }
-  if (frLeakage.length > 0) {
+  if (buckets.frLeakage.length > 0) {
     gaps.push(mkGap({
       check: 'nfr_traces_to_fr_leakage',
       assertion: 'NFR traces_to must reference handoff items, not FR ids. FR linkage belongs in applies_to_requirements.',
       severity: 'blocking',
-      expected: [], actual: [], missing: frLeakage,
+      expected: [], actual: [], missing: buckets.frLeakage,
     }));
   }
   return gaps;
+}
+
+/** Every `traces_to` id must resolve; FR-id leakage is flagged. */
+function checkTracesReferentialIntegrity(i: NfrCoverageVerifierInputs): CoverageGapContent[] {
+  const sets: TraceRefIdSets = {
+    vvIds: new Set(i.vvRequirements.map(v => v.id)),
+    techIds: new Set(i.technicalConstraints.map(t => t.id)),
+    compIds: new Set(i.complianceItems.map(c => c.id)),
+    journeyIds: new Set(i.journeys.map(j => j.id)),
+    qaMax: i.qualityAttributesCount,
+  };
+
+  const buckets: TraceRefBuckets = { badUnknownPrefix: [], badDangling: [], frLeakage: [] };
+  for (const n of i.nfrs) {
+    for (const t of n.traces_to ?? []) {
+      const verdict = classifyTraceRef(t, sets);
+      if (verdict === 'fr_leakage') buckets.frLeakage.push(`${n.id}:${t}`);
+      else if (verdict === 'dangling') buckets.badDangling.push(`${n.id}:${t}`);
+      else if (verdict === 'unknown_prefix') buckets.badUnknownPrefix.push(`${n.id}:${t}`);
+    }
+  }
+  return buildTracesGaps(buckets);
 }
 
 /** `applies_to_requirements` must reference accepted FR ids. */

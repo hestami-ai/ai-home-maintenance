@@ -14,9 +14,9 @@
 // ── Tier / status tags mirrored from records.ts ──────────────────
 
 export type ViewerTier = 'A' | 'B' | 'C' | 'D' | null;
-export type ViewerStatus =
-  | 'pending' | 'atomic' | 'pruned' | 'deferred' | 'downgraded'
-  | string;
+// Known values enumerated for editor autocomplete; the `string & {}` member keeps
+// the union open so records carrying newer/older status tags still type-check.
+export type ViewerStatus = 'pending' | 'atomic' | 'pruned' | 'deferred' | 'downgraded' | (string & {});
 export type ViewerRootKind = 'fr' | 'nfr' | null;
 
 // ── Tree nodes ───────────────────────────────────────────────────

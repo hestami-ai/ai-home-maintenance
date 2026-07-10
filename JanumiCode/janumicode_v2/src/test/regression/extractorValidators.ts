@@ -30,6 +30,7 @@ import { join } from 'node:path';
 import Database from 'better-sqlite3';
 
 import { FixtureSchema, type Fixture, type AssertionBlock, type T3InvariantAssertion } from './fixtureSchema.js';
+import type { PromptTemplate, TemplateLoader } from '../../lib/orchestrator/templateLoader.js';
 import { getTemplateLoader } from './runner.js';
 import { FIXTURE_DIR } from './loadFixtures.js';
 import { recoverVariables } from './extractor.js';
@@ -108,7 +109,7 @@ function findOutput(db: Database.Database, invocationId: string): OutputRow | nu
   return rows[0] ?? null;
 }
 
-function tryParse(text: string): unknown | null {
+function tryParse(text: string): unknown {
   try {
     const trimmed = text.trim().replace(/^```(?:json)?\s*/i, '').replace(/```\s*$/i, '');
     return JSON.parse(trimmed);
@@ -232,6 +233,27 @@ function inspectBaseline(parsed: unknown): BaselineShape {
   };
 }
 
+/**
+ * Populate the per-finding entries of the T1 shape map (mutates in place).
+ * Extracted from buildValidatorAssertions to keep that function's cognitive
+ * complexity under threshold; behavior is identical.
+ */
+function applyFindingsShapeEntries(
+  shapeMap: Record<string, 'string' | 'number' | 'boolean' | 'array' | 'object' | 'null'>,
+  bucket: 'A' | 'B',
+  shape: BaselineShape,
+): void {
+  if (shape.allHaveSeverity) shapeMap['findings[].severity'] = 'string';
+  if (shape.allHaveSummary) shapeMap['findings[].summary'] = 'string';
+  if (shape.allHaveLocation) shapeMap['findings[].location'] = 'string';
+  if (shape.allHaveDetail) shapeMap['findings[].detail'] = 'string';
+  if (shape.allHaveRecommendation) shapeMap['findings[].recommendation'] = 'string';
+  if (bucket === 'A' && shape.allHaveTargetFields) {
+    shapeMap['findings[].target_field'] = 'string';
+    shapeMap['findings[].target_identifier'] = 'string';
+  }
+}
+
 function buildValidatorAssertions(
   validatorId: string,
   bucket: 'A' | 'B',
@@ -245,15 +267,7 @@ function buildValidatorAssertions(
   if (shape.hasPassed) shapeMap['passed'] = 'boolean';
   if (shape.hasOverallAssessment) shapeMap['overallAssessment'] = 'string';
   if (shape.hasFindings) {
-    if (shape.allHaveSeverity) shapeMap['findings[].severity'] = 'string';
-    if (shape.allHaveSummary) shapeMap['findings[].summary'] = 'string';
-    if (shape.allHaveLocation) shapeMap['findings[].location'] = 'string';
-    if (shape.allHaveDetail) shapeMap['findings[].detail'] = 'string';
-    if (shape.allHaveRecommendation) shapeMap['findings[].recommendation'] = 'string';
-    if (bucket === 'A' && shape.allHaveTargetFields) {
-      shapeMap['findings[].target_field'] = 'string';
-      shapeMap['findings[].target_identifier'] = 'string';
-    }
+    applyFindingsShapeEntries(shapeMap, bucket, shape);
   }
 
   // ── T3: invariants ──
@@ -290,6 +304,149 @@ function buildValidatorAssertions(
   };
 }
 
+// ── Per-validator processing ─────────────────────────────────────────
+
+/** Outcome of processing a single validator: a written fixture or a skip. */
+type ProcessResult =
+  | { kind: 'written'; path: string }
+  | { kind: 'skipped'; reason: string };
+
+/** Parameters threaded through the per-validator processing helpers. */
+interface ProcessContext {
+  db: Database.Database;
+  loader: TemplateLoader;
+  workflowRunId: string;
+  validatorId: string;
+  opts: ValidatorExtractOptions;
+  outDir: string;
+  sampleSlug: string;
+}
+
+/**
+ * Recover the template variables for a validator. Most validators declare
+ * none; when they do, we back-substitute from the rendered system prompt and
+ * default any that couldn't be recovered. Behavior identical to the inline
+ * version previously in extractValidators.
+ */
+function recoverValidatorVariables(tpl: PromptTemplate, pair: ChosenPair): Record<string, string> {
+  const renderedSystem: string = pair.invocationContent.system ?? '';
+  let vars: Record<string, string> = {};
+  if (tpl.metadata.required_variables.length > 0 && renderedSystem.length > 0) {
+    const rec = recoverVariables(tpl.body, renderedSystem);
+    if ('vars' in rec) {
+      vars = rec.vars;
+    }
+  }
+  // Default any declared required variables that weren't recovered.
+  for (const req of tpl.metadata.required_variables) {
+    if (!(req in vars)) vars[req] = '';
+  }
+  return vars;
+}
+
+/** Assemble the Fixture record for a validator (pure object construction). */
+function buildValidatorFixture(args: {
+  validatorId: string;
+  sampleSlug: string;
+  workflowRunId: string;
+  dbPath: string;
+  bucket: 'A' | 'B';
+  baselineShape: BaselineShape;
+  vars: Record<string, string>;
+  pair: ChosenPair;
+  assertions: AssertionBlock;
+}): Fixture {
+  const { validatorId, sampleSlug, workflowRunId, dbPath, bucket, baselineShape, vars, pair, assertions } = args;
+  return {
+    fixture_id: `validator__${validatorId}__${sampleSlug}`,
+    description: `Validator fixture for ${validatorId} (Bucket ${bucket}): pins the harness output contract — validator id self-identification, severity enum, finding shape from baseline (${baselineShape.hasFindings ? 'with findings' : 'no findings'}).`,
+    extracted_from_run: workflowRunId,
+    extracted_from_db: dbPath.replace(/\\/g, '/'),
+    extracted_at: new Date().toISOString(),
+    template_ref: {
+      agent_role: 'harness',
+      sub_phase: validatorId,
+    },
+    invocation_params: {
+      provider: pair.invocationContent.provider ?? 'ollama',
+      model: pair.invocationContent.model ?? 'qwen3.5:9b',
+      temperature: pair.invocationContent.temperature ?? 0.4,
+      response_format: pair.invocationContent.response_format ?? 'json',
+    },
+    template_variables: vars,
+    user_message: pair.invocationContent.prompt ?? '',
+    baseline: {
+      response_text: pair.outputContent.text ?? '',
+      parsed_json: pair.parsed,
+      duration_ms: pair.outputContent.duration_ms ?? 0,
+      thinking: pair.outputContent.thinking ?? undefined,
+    },
+    assertions,
+  };
+}
+
+/**
+ * Process a single validator: resolve template + invocation/output pair,
+ * build + validate the fixture, and write it. Returns a skip result (instead
+ * of pushing) so the caller aggregates. Behavior identical to the original
+ * inline loop body; unexpected errors are caught by runOneValidator.
+ */
+function processValidator(ctx: ProcessContext): ProcessResult {
+  const { db, loader, workflowRunId, validatorId, opts, outDir, sampleSlug } = ctx;
+
+  const tpl = loader.findTemplate('harness', validatorId);
+  if (!tpl) {
+    return { kind: 'skipped', reason: `no template found at agent_role=harness sub_phase=${validatorId}` };
+  }
+  const invocations = findValidatorInvocations(db, workflowRunId, validatorId);
+  if (invocations.length === 0) {
+    return { kind: 'skipped', reason: `no harness agent_invocation in run ${workflowRunId} with label harness:${validatorId}` };
+  }
+  const pair = chooseRepresentativePair(db, invocations);
+  if (!pair) {
+    return { kind: 'skipped', reason: `no invocation paired with a JSON-parseable agent_output (parsed_json null in all candidates)` };
+  }
+
+  const vars = recoverValidatorVariables(tpl, pair);
+  const bucket = determineBucket(tpl.body);
+  const baselineShape = inspectBaseline(pair.parsed);
+  const assertions = buildValidatorAssertions(validatorId, bucket, baselineShape);
+
+  const fixture = buildValidatorFixture({
+    validatorId,
+    sampleSlug,
+    workflowRunId,
+    dbPath: opts.dbPath,
+    bucket,
+    baselineShape,
+    vars,
+    pair,
+    assertions,
+  });
+
+  const validated = FixtureSchema.safeParse(fixture);
+  if (!validated.success) {
+    const issues = validated.error.issues.map((i) => `${i.path.join('.')}: ${i.message}`).join('; ');
+    return { kind: 'skipped', reason: `fixture validation failed: ${issues}` };
+  }
+
+  const outPath = join(outDir, `${fixture.fixture_id}.fixture.json`);
+  if (existsSync(outPath) && !opts.overwrite) {
+    return { kind: 'skipped', reason: `fixture file already exists at ${outPath} (use --overwrite)` };
+  }
+  writeFileSync(outPath, JSON.stringify(validated.data, null, 2) + '\n', 'utf-8');
+  return { kind: 'written', path: outPath };
+}
+
+/** processValidator wrapped so any unexpected error becomes a skip result. */
+function runOneValidator(ctx: ProcessContext): ProcessResult {
+  try {
+    return processValidator(ctx);
+  } catch (err) {
+    return { kind: 'skipped', reason: `unexpected error: ${err instanceof Error ? err.message : String(err)}` };
+  }
+}
+
 // ── Main extract ────────────────────────────────────────────────────
 
 export async function extractValidators(opts: ValidatorExtractOptions): Promise<ValidatorExtractResult> {
@@ -316,87 +473,11 @@ export async function extractValidators(opts: ValidatorExtractOptions): Promise<
   const skipped: { reason: string; validator_id: string }[] = [];
 
   for (const validatorId of targets) {
-    try {
-      const tpl = loader.findTemplate('harness', validatorId);
-      if (!tpl) {
-        skipped.push({ reason: `no template found at agent_role=harness sub_phase=${validatorId}`, validator_id: validatorId });
-        continue;
-      }
-      const invocations = findValidatorInvocations(db, workflowRunId, validatorId);
-      if (invocations.length === 0) {
-        skipped.push({ reason: `no harness agent_invocation in run ${workflowRunId} with label harness:${validatorId}`, validator_id: validatorId });
-        continue;
-      }
-      const pair = chooseRepresentativePair(db, invocations);
-      if (!pair) {
-        skipped.push({ reason: `no invocation paired with a JSON-parseable agent_output (parsed_json null in all candidates)`, validator_id: validatorId });
-        continue;
-      }
-
-      // Recover variables from the rendered system prompt.
-      const renderedSystem: string = pair.invocationContent.system ?? '';
-      let vars: Record<string, string> = {};
-      if (tpl.metadata.required_variables.length > 0 && renderedSystem.length > 0) {
-        const rec = recoverVariables(tpl.body, renderedSystem);
-        if ('vars' in rec) {
-          vars = rec.vars;
-        }
-      }
-      // Default any declared required variables that weren't recovered.
-      for (const req of tpl.metadata.required_variables) {
-        if (!(req in vars)) vars[req] = '';
-      }
-
-      const bucket = determineBucket(tpl.body);
-      const baselineShape = inspectBaseline(pair.parsed);
-      const assertions = buildValidatorAssertions(validatorId, bucket, baselineShape);
-
-      const fixture: Fixture = {
-        fixture_id: `validator__${validatorId}__${sampleSlug}`,
-        description: `Validator fixture for ${validatorId} (Bucket ${bucket}): pins the harness output contract — validator id self-identification, severity enum, finding shape from baseline (${baselineShape.hasFindings ? 'with findings' : 'no findings'}).`,
-        extracted_from_run: workflowRunId,
-        extracted_from_db: opts.dbPath.replace(/\\/g, '/'),
-        extracted_at: new Date().toISOString(),
-        template_ref: {
-          agent_role: 'harness',
-          sub_phase: validatorId,
-        },
-        invocation_params: {
-          provider: pair.invocationContent.provider ?? 'ollama',
-          model: pair.invocationContent.model ?? 'qwen3.5:9b',
-          temperature: pair.invocationContent.temperature ?? 0.4,
-          response_format: pair.invocationContent.response_format ?? 'json',
-        },
-        template_variables: vars,
-        user_message: pair.invocationContent.prompt ?? '',
-        baseline: {
-          response_text: pair.outputContent.text ?? '',
-          parsed_json: pair.parsed,
-          duration_ms: pair.outputContent.duration_ms ?? 0,
-          thinking: pair.outputContent.thinking ?? undefined,
-        },
-        assertions,
-      };
-
-      const validated = FixtureSchema.safeParse(fixture);
-      if (!validated.success) {
-        const issues = validated.error.issues.map((i) => `${i.path.join('.')}: ${i.message}`).join('; ');
-        skipped.push({ reason: `fixture validation failed: ${issues}`, validator_id: validatorId });
-        continue;
-      }
-
-      const outPath = join(outDir, `${fixture.fixture_id}.fixture.json`);
-      if (existsSync(outPath) && !opts.overwrite) {
-        skipped.push({ reason: `fixture file already exists at ${outPath} (use --overwrite)`, validator_id: validatorId });
-        continue;
-      }
-      writeFileSync(outPath, JSON.stringify(validated.data, null, 2) + '\n', 'utf-8');
-      written.push(outPath);
-    } catch (err) {
-      skipped.push({
-        reason: `unexpected error: ${err instanceof Error ? err.message : String(err)}`,
-        validator_id: validatorId,
-      });
+    const result = runOneValidator({ db, loader, workflowRunId, validatorId, opts, outDir, sampleSlug });
+    if (result.kind === 'written') {
+      written.push(result.path);
+    } else {
+      skipped.push({ reason: result.reason, validator_id: validatorId });
     }
   }
 

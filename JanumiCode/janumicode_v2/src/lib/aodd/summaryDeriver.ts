@@ -168,6 +168,48 @@ function deriveWho(events: AoddEvent[]): SubPhaseSummary['who'] {
   };
 }
 
+function deriveDecisionRef(e: AoddEvent): SubPhaseDecisionRef | null {
+  if (e.event_type === 'validator.finding') {
+    const p = e.payload as Record<string, unknown>;
+    return {
+      kind: 'validator_finding',
+      ref_event_id: e.event_id,
+      brief: typeof p.message === 'string' ? p.message : '',
+    };
+  } else if (e.event_type === 'mirror.presented') {
+    const p = e.payload as Record<string, unknown>;
+    const artifactType =
+      typeof p.artifact_type === 'string' ? p.artifact_type : 'unknown';
+    return {
+      kind: 'mirror',
+      ref_event_id: e.event_id,
+      brief: `mirror presented: ${artifactType}`,
+    };
+  } else if (
+    e.event_type === 'gate.pending' ||
+    e.event_type === 'gate.approved' ||
+    e.event_type === 'gate.rejected'
+  ) {
+    const p = e.payload as Record<string, unknown>;
+    const action = e.event_type.split('.')[1];
+    const gateKind = typeof p.gate_kind === 'string' ? p.gate_kind : 'unknown';
+    return {
+      kind: 'gate',
+      ref_event_id: e.event_id,
+      brief: `gate ${action}: ${gateKind}`,
+    };
+  } else if (e.event_type === 'decision.escalated') {
+    const p = e.payload as Record<string, unknown>;
+    return {
+      kind: 'escalation',
+      ref_event_id: e.event_id,
+      brief:
+        typeof p.description === 'string' ? p.description : 'escalation raised',
+    };
+  }
+  return null;
+}
+
 function deriveWhat(events: AoddEvent[]): SubPhaseSummary['what'] {
   // P5 didn't wire record.* events (deferred). Inputs/outputs are
   // therefore empty here until the deferred wiring lands.
@@ -176,46 +218,8 @@ function deriveWhat(events: AoddEvent[]): SubPhaseSummary['what'] {
 
   const decisions: SubPhaseDecisionRef[] = [];
   for (const e of events) {
-    if (e.event_type === 'validator.finding') {
-      const p = e.payload as Record<string, unknown>;
-      decisions.push({
-        kind: 'validator_finding',
-        ref_event_id: e.event_id,
-        brief: typeof p.message === 'string' ? p.message : '',
-      });
-    } else if (e.event_type === 'mirror.presented') {
-      const p = e.payload as Record<string, unknown>;
-      const artifactType =
-        typeof p.artifact_type === 'string' ? p.artifact_type : 'unknown';
-      decisions.push({
-        kind: 'mirror',
-        ref_event_id: e.event_id,
-        brief: `mirror presented: ${artifactType}`,
-      });
-    } else if (
-      e.event_type === 'gate.pending' ||
-      e.event_type === 'gate.approved' ||
-      e.event_type === 'gate.rejected'
-    ) {
-      const p = e.payload as Record<string, unknown>;
-      const action = e.event_type.split('.')[1];
-      const gateKind = typeof p.gate_kind === 'string' ? p.gate_kind : 'unknown';
-      decisions.push({
-        kind: 'gate',
-        ref_event_id: e.event_id,
-        brief: `gate ${action}: ${gateKind}`,
-      });
-    } else if (e.event_type === 'decision.escalated') {
-      const p = e.payload as Record<string, unknown>;
-      decisions.push({
-        kind: 'escalation',
-        ref_event_id: e.event_id,
-        brief:
-          typeof p.description === 'string'
-            ? p.description
-            : 'escalation raised',
-      });
-    }
+    const ref = deriveDecisionRef(e);
+    if (ref) decisions.push(ref);
   }
 
   return { inputs_consumed, outputs_produced, decisions };
@@ -331,6 +335,18 @@ export function deriveSubPhaseSummary(
   };
 }
 
+function deriveRunStatus(
+  runFailed: AoddEvent | undefined,
+  runCompleted: AoddEvent | undefined,
+): RunSummary['status'] {
+  if (runFailed) return 'failed';
+  if (runCompleted) {
+    const rawStatus = (runCompleted.payload as Record<string, unknown>).status;
+    return rawStatus === 'partial' ? 'partial' : 'success';
+  }
+  return 'in_progress';
+}
+
 /**
  * Derive a RunSummary from the full event stream.
  */
@@ -358,15 +374,7 @@ export function deriveRunSummary(
     completedMs !== null && !Number.isNaN(startedMs) && !Number.isNaN(completedMs)
       ? Math.max(0, completedMs - startedMs)
       : null;
-  let status: RunSummary['status'];
-  if (runFailed) {
-    status = 'failed';
-  } else if (runCompleted) {
-    const rawStatus = (runCompleted.payload as Record<string, unknown>).status;
-    status = rawStatus === 'partial' ? 'partial' : 'success';
-  } else {
-    status = 'in_progress';
-  }
+  const status: RunSummary['status'] = deriveRunStatus(runFailed, runCompleted);
 
   // Phase rollups.
   const phaseEntered = events.filter((e) => e.event_type === 'phase.entered');

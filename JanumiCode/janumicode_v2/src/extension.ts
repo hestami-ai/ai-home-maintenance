@@ -132,12 +132,7 @@ async function bootstrap(
   //    In replay mode, JANUMICODE_REPLAY_DB (absolute path to a prepared
   //    cal-40 clone) overrides the configured path so we don't have to copy
   //    the clone into the workspace's .janumicode/.
-  const configuredDbPath = path.isAbsolute(configManager.get().governed_stream.sqlite_path)
-    ? configManager.get().governed_stream.sqlite_path
-    : path.join(workspacePath, configManager.get().governed_stream.sqlite_path);
-  const dbPath = replayMode && process.env.JANUMICODE_REPLAY_DB
-    ? path.resolve(process.env.JANUMICODE_REPLAY_DB)
-    : configuredDbPath;
+  const dbPath = resolveDbPath(configManager, workspacePath, replayMode);
   await fs.promises.mkdir(path.dirname(dbPath), { recursive: true });
   log.info('activation', 'Bootstrap step 5/14: opening database', {
     dbPath,
@@ -166,16 +161,7 @@ async function bootstrap(
   //   JANUMICODE_EMBED_PROVIDER  → 'ollama' | 'llamacpp'      (default 'ollama')
   //   JANUMICODE_EMBED_MODEL     → tag/key for the embed model
   //   JANUMICODE_EMBED_BASE_URL  → backend URL (default http://127.0.0.1:11434)
-  const embedProvider = (process.env.JANUMICODE_EMBED_PROVIDER as 'ollama' | 'llamacpp') ?? 'ollama';
-  const embedDefaultModel = embedProvider === 'llamacpp'
-    ? 'qwen3-embedding-8b'  // llama-swap key (no colon)
-    : 'qwen3-embedding:8b'; // Ollama tag
-  const embedding = new EmbeddingService(db, {
-    provider: embedProvider,
-    model: process.env.JANUMICODE_EMBED_MODEL ?? embedDefaultModel,
-    baseUrl: process.env.JANUMICODE_EMBED_BASE_URL,
-    maxParallel: 1,
-  });
+  const embedding = createEmbeddingService(db);
   // Replay mode: construct the service (the liaison config references it) but
   // never start the background worker — no Ollama embedding traffic. DMR
   // degrades to FTS5 + authority-weighted harvest, exactly as the mock test
@@ -211,20 +197,7 @@ async function bootstrap(
     : null;
 
   // Register LLM provider adapters on the engine's caller.
-  if (replayInstall) {
-    for (const p of replayInstall.llmProviders) engine.llmCaller.registerProvider(p);
-    if (replayInstall.cliResolver) engine.agentInvoker.setReplayResolver(replayInstall.cliResolver);
-    log.info('activation', 'Bootstrap step 8/14: replay providers registered', {
-      tier: replayInstall.map ? 2 : 1,
-      fixtureStats: replayInstall.map?.stats,
-    });
-  } else {
-    engine.llmCaller.registerProvider(new OllamaProvider());
-    engine.llmCaller.registerProvider(new AnthropicProvider());
-    engine.llmCaller.registerProvider(new GoogleProvider());
-    engine.llmCaller.registerProvider(new LlamaCppProvider());
-    log.info('activation', 'Bootstrap step 8/14: LLM provider adapters registered');
-  }
+  registerLlmProviders(engine, replayInstall, log);
 
   // Register builtin CLI output parsers BEFORE validateLLMRouting so
   // any llm_routing entry with a CLI backing (default orchestrator
@@ -268,13 +241,7 @@ async function bootstrap(
   );
 
   // Mirror provider registrations into the Liaison's internal PriorityLLMCaller.
-  if (replayInstall) {
-    for (const p of replayInstall.llmProviders) liaison.registerProviders(p);
-  } else {
-    liaison.registerProviders(new OllamaProvider());
-    liaison.registerProviders(new AnthropicProvider());
-    liaison.registerProviders(new GoogleProvider());
-  }
+  mirrorProvidersToLiaison(liaison, replayInstall);
   liaison.setEventBus(engine.eventBus);
   log.info('activation', 'Bootstrap step 10/14: ClientLiaisonAgent constructed');
 
@@ -323,17 +290,7 @@ async function bootstrap(
   //      recorded run's records to the (empty) view over time so the store's
   //      per-record add() path is exercised as it would be on a live run.
   //      Started on webviewReady so the provider is subscribed first.
-  if (replayMode && process.env.JANUMICODE_REPLAY_APPEND === '1') {
-    const activeRun = liaison.getDB().getActiveWorkflowRun();
-    if (activeRun) {
-      const driver = new ReplayDriver({ db, eventBus: engine.eventBus, runId: activeRun.id });
-      provider.setReplayOnReady(() => driver.start());
-      context.subscriptions.push({ dispose: () => driver.stop() });
-      log.info('activation', 'Bootstrap 13a: replay live-append driver armed', { runId: activeRun.id });
-    } else {
-      log.warn('activation', 'Bootstrap 13a: JANUMICODE_REPLAY_APPEND set but no active run in DB — driver not started');
-    }
-  }
+  armReplayAppendDriver(context, { replayMode, liaison, provider, engine, db, log });
 
   // 13b. Architecture Canvas custom editor
   context.subscriptions.push(CanvasEditorProvider.register(context, db, liaison.getDB()));
@@ -360,24 +317,10 @@ async function bootstrap(
       await provider?.focusComposer();
     }),
     vscode.commands.registerCommand('janumicode.showWorkflowStatus', async () => {
-      if (!liaison || !provider) return;
-      try {
-        const result = await liaison.runCapability('getStatus', {}, provider.getCapabilityContext());
-        void vscode.window.showInformationMessage(result.formattedText);
-      } catch (err) {
-        void vscode.window.showErrorMessage(`Status failed: ${err instanceof Error ? err.message : String(err)}`);
-      }
+      await showWorkflowStatusCommand();
     }),
     vscode.commands.registerCommand('janumicode.openSettings', async () => {
-      const uri = vscode.Uri.file(path.join(workspacePath, '.janumicode', 'config.json'));
-      try {
-        await vscode.workspace.fs.stat(uri);
-        await vscode.window.showTextDocument(uri);
-      } catch {
-        void vscode.window.showInformationMessage(
-          'No .janumicode/config.json — create one to override defaults.',
-        );
-      }
+      await openSettingsCommand(workspacePath);
     }),
     vscode.commands.registerCommand('janumicode.findInStream', () => {
       provider?.postFindFocus();
@@ -386,155 +329,10 @@ async function bootstrap(
       outputHandler.show();
     }),
     vscode.commands.registerCommand('janumicode.openDecompViewer', async () => {
-      // DB-as-truth: open the run-agnostic `/active` URI by default.
-      // The viewer's resolver picks the right run on every tick, so
-      // this works whether the workspace has 0, 1, or N runs and is
-      // robust to DB swaps. The picker is offered as a follow-up to
-      // pin a specific older run when the user wants post-mortem
-      // viewing of a non-active run.
-      if (!liaison) return;
-      const ldb = liaison.getDB();
-      const active = ldb.getActiveWorkflowRun();
-      // workflow_runs has no intent_summary column — schema carries
-      // raw_intent_record_id pointing at the raw_intent_received record
-      // in governed_stream where the human-readable text lives. We
-      // LEFT JOIN to get a short label per run; runs without a raw-intent
-      // pointer still show via the id-prefix fallback in the label.
-      // .all() on the sidecar RPC client may return undefined on query
-      // error (rather than throwing) — defensively coerce to [].
-      let runs: Array<{ id: string; current_phase_id: string | null; status: string | null; intent_text: string | null }> = [];
-      try {
-        const rows = db.prepare(
-          `SELECT wr.id, wr.current_phase_id, wr.status,
-                  json_extract(gs.content, '$.text') AS intent_text
-             FROM workflow_runs wr
-             LEFT JOIN governed_stream gs ON gs.id = wr.raw_intent_record_id
-            ORDER BY wr.initiated_at DESC LIMIT 10`,
-        ).all() as Array<{ id: string; current_phase_id: string | null; status: string | null; intent_text: string | null }> | null | undefined;
-        runs = Array.isArray(rows) ? rows : [];
-      } catch (err) {
-        log.warn('ui', 'workflow_runs query failed in openDecompViewer; falling back to /active', {
-          error: err instanceof Error ? err.message : String(err),
-        });
-      }
-      if (runs.length === 0) {
-        if (active) {
-          // Resolver found something but the picker query failed — open
-          // /active anyway so the user still sees the data.
-          await vscode.commands.executeCommand(
-            'vscode.openWith', DecompViewerEditorProvider.buildActiveUri(), 'janumicode.decompViewer');
-          return;
-        }
-        void vscode.window.showInformationMessage('No workflow runs found in this database. Start a workflow or copy in a calibration DB.');
-        return;
-      }
-      // Single-run shortcut: skip the picker entirely.
-      if (runs.length === 1) {
-        await vscode.commands.executeCommand(
-          'vscode.openWith', DecompViewerEditorProvider.buildActiveUri(), 'janumicode.decompViewer');
-        return;
-      }
-      // Multi-run: let the user pick. First option is always "Active
-      // (auto-resolve)" so the default flow stays DB-as-truth.
-      const summarize = (text: string | null, id: string): string => {
-        const trimmed = (text ?? '').trim().replace(/\s+/g, ' ');
-        return trimmed.length > 0 ? trimmed.slice(0, 80) : `Run ${id.slice(0, 8)}…`;
-      };
-      const items: Array<vscode.QuickPickItem & { runId: string | null }> = [
-        {
-          label: '$(refresh) Active run (auto-resolve)',
-          description: active ? `Currently: ${active.id.slice(0, 8)}…` : 'No runs to resolve',
-          runId: null,
-        },
-        ...runs.map(r => ({
-          label: summarize(r.intent_text, r.id),
-          description: `Phase ${r.current_phase_id ?? '?'} · ${r.status ?? '?'} · ${r.id.slice(0, 8)}…`,
-          runId: r.id,
-        })),
-      ];
-      const selected = await vscode.window.showQuickPick(items, {
-        placeHolder: 'Open viewer for the active run, or pin a specific past run',
-      });
-      if (!selected) return;
-      // "Active" choice persists the focus as null (clears any prior
-      // pin); specific-run choice writes the focus to ui_state so the
-      // selection survives across viewer re-opens until cleared.
-      if (selected.runId === null) {
-        ldb.setFocusedWorkflowRun(null);
-        await vscode.commands.executeCommand(
-          'vscode.openWith', DecompViewerEditorProvider.buildActiveUri(), 'janumicode.decompViewer');
-      } else {
-        ldb.setFocusedWorkflowRun(selected.runId);
-        await vscode.commands.executeCommand(
-          'vscode.openWith', DecompViewerEditorProvider.buildPinnedUri(selected.runId), 'janumicode.decompViewer');
-      }
+      await openDecompViewerCommand(db, log);
     }),
     vscode.commands.registerCommand('janumicode.openArchitectureCanvas', async () => {
-      // DB-as-truth: same pattern as openDecompViewer — open the
-      // run-agnostic `/active` URI by default, offer a picker only when
-      // the DB has multiple runs and the user might want to pin a
-      // specific one. Survives DB swaps.
-      if (!liaison) return;
-      const ldb = liaison.getDB();
-      const active = ldb.getActiveWorkflowRun();
-      let runs: Array<{ id: string; current_phase_id: string | null; status: string | null; intent_text: string | null }> = [];
-      try {
-        const rows = db.prepare(
-          `SELECT wr.id, wr.current_phase_id, wr.status,
-                  json_extract(gs.content, '$.text') AS intent_text
-             FROM workflow_runs wr
-             LEFT JOIN governed_stream gs ON gs.id = wr.raw_intent_record_id
-            ORDER BY wr.initiated_at DESC LIMIT 10`,
-        ).all() as Array<{ id: string; current_phase_id: string | null; status: string | null; intent_text: string | null }> | null | undefined;
-        runs = Array.isArray(rows) ? rows : [];
-      } catch (err) {
-        log.warn('ui', 'workflow_runs query failed in openArchitectureCanvas; falling back to /active', {
-          error: err instanceof Error ? err.message : String(err),
-        });
-      }
-      if (runs.length === 0) {
-        if (active) {
-          await vscode.commands.executeCommand(
-            'vscode.openWith', CanvasEditorProvider.buildActiveUri(), 'janumicode.canvas');
-          return;
-        }
-        void vscode.window.showInformationMessage('No workflow runs found in this database. Start a workflow or copy in a calibration DB.');
-        return;
-      }
-      if (runs.length === 1) {
-        await vscode.commands.executeCommand(
-          'vscode.openWith', CanvasEditorProvider.buildActiveUri(), 'janumicode.canvas');
-        return;
-      }
-      const summarize = (text: string | null, id: string): string => {
-        const trimmed = (text ?? '').trim().replaceAll(/\s+/g, ' ');
-        return trimmed.length > 0 ? trimmed.slice(0, 80) : `Run ${id.slice(0, 8)}…`;
-      };
-      const items: Array<vscode.QuickPickItem & { runId: string | null }> = [
-        {
-          label: '$(refresh) Active run (auto-resolve)',
-          description: active ? `Currently: ${active.id.slice(0, 8)}…` : 'No runs to resolve',
-          runId: null,
-        },
-        ...runs.map(r => ({
-          label: summarize(r.intent_text, r.id),
-          description: `Phase ${r.current_phase_id ?? '?'} · ${r.status ?? '?'} · ${r.id.slice(0, 8)}…`,
-          runId: r.id,
-        })),
-      ];
-      const selected = await vscode.window.showQuickPick(items, {
-        placeHolder: 'Open canvas for the active run, or pin a specific past run',
-      });
-      if (!selected) return;
-      if (selected.runId === null) {
-        ldb.setFocusedWorkflowRun(null);
-        await vscode.commands.executeCommand(
-          'vscode.openWith', CanvasEditorProvider.buildActiveUri(), 'janumicode.canvas');
-      } else {
-        ldb.setFocusedWorkflowRun(selected.runId);
-        await vscode.commands.executeCommand(
-          'vscode.openWith', CanvasEditorProvider.buildPinnedUri(selected.runId), 'janumicode.canvas');
-      }
+      await openArchitectureCanvasCommand(db, log);
     }),
   );
 
@@ -569,6 +367,290 @@ async function bootstrap(
 
 export function deactivate(): void {
   getLogger().info('activation', 'JanumiCode v2 deactivated.');
+}
+
+// ---------------------------------------------------------------------------
+// Bootstrap / command helpers — extracted verbatim from bootstrap() and the
+// command handlers to keep each unit's cognitive complexity low. Behavior is
+// identical to the inlined code: each helper is invoked in the same order with
+// the same inputs and returns the same values / performs the same side effects.
+// ---------------------------------------------------------------------------
+
+type WorkflowRunRow = {
+  id: string;
+  current_phase_id: string | null;
+  status: string | null;
+  intent_text: string | null;
+};
+
+/** Resolve the sqlite path, honoring JANUMICODE_REPLAY_DB in replay mode. */
+function resolveDbPath(
+  configManager: ConfigManager,
+  workspacePath: string,
+  replayMode: boolean,
+): string {
+  const configuredDbPath = path.isAbsolute(configManager.get().governed_stream.sqlite_path)
+    ? configManager.get().governed_stream.sqlite_path
+    : path.join(workspacePath, configManager.get().governed_stream.sqlite_path);
+  return replayMode && process.env.JANUMICODE_REPLAY_DB
+    ? path.resolve(process.env.JANUMICODE_REPLAY_DB)
+    : configuredDbPath;
+}
+
+/** Construct the background embedding service from env-overridable config. */
+function createEmbeddingService(db: ReturnType<typeof initializeDatabase>): EmbeddingService {
+  const embedProvider = (process.env.JANUMICODE_EMBED_PROVIDER as 'ollama' | 'llamacpp') ?? 'ollama';
+  const embedDefaultModel = embedProvider === 'llamacpp'
+    ? 'qwen3-embedding-8b'  // llama-swap key (no colon)
+    : 'qwen3-embedding:8b'; // Ollama tag
+  return new EmbeddingService(db, {
+    provider: embedProvider,
+    model: process.env.JANUMICODE_EMBED_MODEL ?? embedDefaultModel,
+    baseUrl: process.env.JANUMICODE_EMBED_BASE_URL,
+    maxParallel: 1,
+  });
+}
+
+/** Register LLM provider adapters on the engine's caller (replay vs. live). */
+function registerLlmProviders(
+  engine: OrchestratorEngine,
+  replayInstall: ReturnType<typeof buildReplayInstall> | null,
+  log: ReturnType<typeof getLogger>,
+): void {
+  if (replayInstall) {
+    for (const p of replayInstall.llmProviders) engine.llmCaller.registerProvider(p);
+    if (replayInstall.cliResolver) engine.agentInvoker.setReplayResolver(replayInstall.cliResolver);
+    log.info('activation', 'Bootstrap step 8/14: replay providers registered', {
+      tier: replayInstall.map ? 2 : 1,
+      fixtureStats: replayInstall.map?.stats,
+    });
+  } else {
+    engine.llmCaller.registerProvider(new OllamaProvider());
+    engine.llmCaller.registerProvider(new AnthropicProvider());
+    engine.llmCaller.registerProvider(new GoogleProvider());
+    engine.llmCaller.registerProvider(new LlamaCppProvider());
+    log.info('activation', 'Bootstrap step 8/14: LLM provider adapters registered');
+  }
+}
+
+/** Mirror provider registrations into the Liaison's internal PriorityLLMCaller. */
+function mirrorProvidersToLiaison(
+  liaisonAgent: ClientLiaisonAgent,
+  replayInstall: ReturnType<typeof buildReplayInstall> | null,
+): void {
+  if (replayInstall) {
+    for (const p of replayInstall.llmProviders) liaisonAgent.registerProviders(p);
+  } else {
+    liaisonAgent.registerProviders(new OllamaProvider());
+    liaisonAgent.registerProviders(new AnthropicProvider());
+    liaisonAgent.registerProviders(new GoogleProvider());
+  }
+}
+
+/**
+ * 13a. Replay live-append driver (JANUMICODE_REPLAY_APPEND=1). Feeds the
+ * recorded run's records to the (empty) view over time so the store's
+ * per-record add() path is exercised as it would be on a live run. No-op
+ * unless replay mode and the append flag are both set.
+ */
+function armReplayAppendDriver(
+  context: vscode.ExtensionContext,
+  opts: {
+    replayMode: boolean;
+    liaison: ClientLiaisonAgent;
+    provider: GovernedStreamViewProvider;
+    engine: OrchestratorEngine;
+    db: ReturnType<typeof initializeDatabase>;
+    log: ReturnType<typeof getLogger>;
+  },
+): void {
+  const { replayMode, liaison: liaisonAgent, provider: viewProvider, engine, db, log } = opts;
+  if (!(replayMode && process.env.JANUMICODE_REPLAY_APPEND === '1')) return;
+  const activeRun = liaisonAgent.getDB().getActiveWorkflowRun();
+  if (activeRun) {
+    const driver = new ReplayDriver({ db, eventBus: engine.eventBus, runId: activeRun.id });
+    viewProvider.setReplayOnReady(() => driver.start());
+    context.subscriptions.push({ dispose: () => driver.stop() });
+    log.info('activation', 'Bootstrap 13a: replay live-append driver armed', { runId: activeRun.id });
+  } else {
+    log.warn('activation', 'Bootstrap 13a: JANUMICODE_REPLAY_APPEND set but no active run in DB — driver not started');
+  }
+}
+
+/** Query up to 10 recent workflow runs, coercing query failures to []. */
+function queryRecentWorkflowRuns(
+  db: ReturnType<typeof initializeDatabase>,
+  log: ReturnType<typeof getLogger>,
+  commandName: string,
+): WorkflowRunRow[] {
+  // workflow_runs has no intent_summary column — schema carries
+  // raw_intent_record_id pointing at the raw_intent_received record in
+  // governed_stream where the human-readable text lives. We LEFT JOIN to
+  // get a short label per run; runs without a raw-intent pointer still
+  // show via the id-prefix fallback in the label. .all() on the sidecar
+  // RPC client may return undefined on query error (rather than throwing)
+  // — defensively coerce to [].
+  try {
+    const rows = db.prepare(
+      `SELECT wr.id, wr.current_phase_id, wr.status,
+              json_extract(gs.content, '$.text') AS intent_text
+         FROM workflow_runs wr
+         LEFT JOIN governed_stream gs ON gs.id = wr.raw_intent_record_id
+        ORDER BY wr.initiated_at DESC LIMIT 10`,
+    ).all() as WorkflowRunRow[] | null | undefined;
+    return Array.isArray(rows) ? rows : [];
+  } catch (err) {
+    log.warn('ui', `workflow_runs query failed in ${commandName}; falling back to /active`, {
+      error: err instanceof Error ? err.message : String(err),
+    });
+    return [];
+  }
+}
+
+/** Short, whitespace-collapsed label for a run's quick-pick entry. */
+function summarizeRunLabel(text: string | null, id: string): string {
+  const trimmed = (text ?? '').trim().replace(/\s+/g, ' ');
+  return trimmed.length > 0 ? trimmed.slice(0, 80) : `Run ${id.slice(0, 8)}…`;
+}
+
+/** Quick-pick items: an "Active (auto-resolve)" entry followed by one per run. */
+function buildRunQuickPickItems(
+  runs: WorkflowRunRow[],
+  active: { id: string } | null,
+): Array<vscode.QuickPickItem & { runId: string | null }> {
+  return [
+    {
+      label: '$(refresh) Active run (auto-resolve)',
+      description: active ? `Currently: ${active.id.slice(0, 8)}…` : 'No runs to resolve',
+      runId: null,
+    },
+    ...runs.map(r => ({
+      label: summarizeRunLabel(r.intent_text, r.id),
+      description: `Phase ${r.current_phase_id ?? '?'} · ${r.status ?? '?'} · ${r.id.slice(0, 8)}…`,
+      runId: r.id,
+    })),
+  ];
+}
+
+/** `janumicode.showWorkflowStatus` — surface the current run's status. */
+async function showWorkflowStatusCommand(): Promise<void> {
+  if (!liaison || !provider) return;
+  try {
+    const result = await liaison.runCapability('getStatus', {}, provider.getCapabilityContext());
+    void vscode.window.showInformationMessage(result.formattedText);
+  } catch (err) {
+    void vscode.window.showErrorMessage(`Status failed: ${err instanceof Error ? err.message : String(err)}`);
+  }
+}
+
+/** `janumicode.openSettings` — open (or hint at) the workspace config file. */
+async function openSettingsCommand(workspacePath: string): Promise<void> {
+  const uri = vscode.Uri.file(path.join(workspacePath, '.janumicode', 'config.json'));
+  try {
+    await vscode.workspace.fs.stat(uri);
+    await vscode.window.showTextDocument(uri);
+  } catch {
+    void vscode.window.showInformationMessage(
+      'No .janumicode/config.json — create one to override defaults.',
+    );
+  }
+}
+
+/**
+ * `janumicode.openDecompViewer` — open the Decomposition Viewer.
+ *
+ * DB-as-truth: open the run-agnostic `/active` URI by default. The viewer's
+ * resolver picks the right run on every tick, so this works whether the
+ * workspace has 0, 1, or N runs and is robust to DB swaps. The picker is
+ * offered as a follow-up to pin a specific older run for post-mortem viewing.
+ */
+async function openDecompViewerCommand(
+  db: ReturnType<typeof initializeDatabase>,
+  log: ReturnType<typeof getLogger>,
+): Promise<void> {
+  if (!liaison) return;
+  const ldb = liaison.getDB();
+  const active = ldb.getActiveWorkflowRun();
+  const runs = queryRecentWorkflowRuns(db, log, 'openDecompViewer');
+  if (runs.length === 0) {
+    if (active) {
+      // Resolver found something but the picker query failed — open
+      // /active anyway so the user still sees the data.
+      await vscode.commands.executeCommand(
+        'vscode.openWith', DecompViewerEditorProvider.buildActiveUri(), 'janumicode.decompViewer');
+      return;
+    }
+    void vscode.window.showInformationMessage('No workflow runs found in this database. Start a workflow or copy in a calibration DB.');
+    return;
+  }
+  // Single-run shortcut: skip the picker entirely.
+  if (runs.length === 1) {
+    await vscode.commands.executeCommand(
+      'vscode.openWith', DecompViewerEditorProvider.buildActiveUri(), 'janumicode.decompViewer');
+    return;
+  }
+  // Multi-run: let the user pick. First option is always "Active
+  // (auto-resolve)" so the default flow stays DB-as-truth.
+  const items = buildRunQuickPickItems(runs, active);
+  const selected = await vscode.window.showQuickPick(items, {
+    placeHolder: 'Open viewer for the active run, or pin a specific past run',
+  });
+  if (!selected) return;
+  // "Active" choice persists the focus as null (clears any prior pin);
+  // specific-run choice writes the focus to ui_state so the selection
+  // survives across viewer re-opens until cleared.
+  if (selected.runId === null) {
+    ldb.setFocusedWorkflowRun(null);
+    await vscode.commands.executeCommand(
+      'vscode.openWith', DecompViewerEditorProvider.buildActiveUri(), 'janumicode.decompViewer');
+  } else {
+    ldb.setFocusedWorkflowRun(selected.runId);
+    await vscode.commands.executeCommand(
+      'vscode.openWith', DecompViewerEditorProvider.buildPinnedUri(selected.runId), 'janumicode.decompViewer');
+  }
+}
+
+/**
+ * `janumicode.openArchitectureCanvas` — open the Architecture Canvas. Same
+ * DB-as-truth pattern as openDecompViewerCommand: open the run-agnostic
+ * `/active` URI by default, offer a picker only when the DB has multiple runs.
+ */
+async function openArchitectureCanvasCommand(
+  db: ReturnType<typeof initializeDatabase>,
+  log: ReturnType<typeof getLogger>,
+): Promise<void> {
+  if (!liaison) return;
+  const ldb = liaison.getDB();
+  const active = ldb.getActiveWorkflowRun();
+  const runs = queryRecentWorkflowRuns(db, log, 'openArchitectureCanvas');
+  if (runs.length === 0) {
+    if (active) {
+      await vscode.commands.executeCommand(
+        'vscode.openWith', CanvasEditorProvider.buildActiveUri(), 'janumicode.canvas');
+      return;
+    }
+    void vscode.window.showInformationMessage('No workflow runs found in this database. Start a workflow or copy in a calibration DB.');
+    return;
+  }
+  if (runs.length === 1) {
+    await vscode.commands.executeCommand(
+      'vscode.openWith', CanvasEditorProvider.buildActiveUri(), 'janumicode.canvas');
+    return;
+  }
+  const items = buildRunQuickPickItems(runs, active);
+  const selected = await vscode.window.showQuickPick(items, {
+    placeHolder: 'Open canvas for the active run, or pin a specific past run',
+  });
+  if (!selected) return;
+  if (selected.runId === null) {
+    ldb.setFocusedWorkflowRun(null);
+    await vscode.commands.executeCommand(
+      'vscode.openWith', CanvasEditorProvider.buildActiveUri(), 'janumicode.canvas');
+  } else {
+    ldb.setFocusedWorkflowRun(selected.runId);
+    await vscode.commands.executeCommand(
+      'vscode.openWith', CanvasEditorProvider.buildPinnedUri(selected.runId), 'janumicode.canvas');
+  }
 }
 
 // loadDotenv moved to src/lib/config/dotenv.ts so the CLI entry

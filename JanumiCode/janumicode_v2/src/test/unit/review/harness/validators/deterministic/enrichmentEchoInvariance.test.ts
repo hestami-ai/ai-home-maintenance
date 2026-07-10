@@ -74,6 +74,73 @@ describe('enrichment_echo_invariance (deterministic)', () => {
     expect(findings[0].type).toBe('mutated_field');
   });
 
+  it('returns [] when every skeleton NFR echoes verbatim', () => {
+    const findings = validateEnrichmentEchoInvariance(
+      withSubstrate(
+        {
+          skeletonNfrs: [
+            { id: 'NFR-001', category: 'performance', description: 'fast' },
+          ],
+        },
+        {
+          outputContent: {
+            requirements: [
+              { id: 'NFR-001', category: 'performance', description: 'fast' },
+            ],
+          },
+        },
+      ),
+    );
+    expect(findings).toEqual([]);
+  });
+
+  it('flags HIGH on dropped NFR', () => {
+    const findings = validateEnrichmentEchoInvariance(
+      withSubstrate(
+        { skeletonNfrs: [{ id: 'NFR-001' }] },
+        { outputContent: { requirements: [] } },
+      ),
+    );
+    expect(findings[0].severity).toBe('HIGH');
+    expect(findings[0].type).toBe('dropped_nfr');
+    expect(findings[0].location).toBe('$.requirements');
+  });
+
+  it('flags HIGH on mutated NFR field', () => {
+    const findings = validateEnrichmentEchoInvariance(
+      withSubstrate(
+        {
+          skeletonNfrs: [
+            { id: 'NFR-001', category: 'perf', description: 'x' },
+          ],
+        },
+        {
+          outputContent: {
+            requirements: [
+              { id: 'NFR-001', category: 'security', description: 'x' },
+            ],
+          },
+        },
+      ),
+    );
+    expect(findings[0].severity).toBe('HIGH');
+    expect(findings[0].type).toBe('mutated_field');
+    expect(findings[0].location).toBe('$.requirements[id=NFR-001].category');
+  });
+
+  it('reports FR findings before NFR findings when both drop', () => {
+    const findings = validateEnrichmentEchoInvariance(
+      withSubstrate(
+        {
+          skeletonStories: [{ id: 'US-001' }],
+          skeletonNfrs: [{ id: 'NFR-001' }],
+        },
+        { outputContent: { user_stories: [], requirements: [] } },
+      ),
+    );
+    expect(findings.map((f) => f.type)).toEqual(['dropped_story', 'dropped_nfr']);
+  });
+
   it('returns [] when no substrate is provided (degraded mode)', () => {
     const findings = validateEnrichmentEchoInvariance(
       makeRuntime({ outputContent: { user_stories: [] } }),

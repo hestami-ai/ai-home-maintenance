@@ -58,6 +58,20 @@ const DMR_STAGE_KINDS: Record<number, DmrStageEntry['kind']> = {
   7: 'llm',
 };
 
+// ── Content-distillation plumbing (shared by the distill* helpers) ──
+/** Coerce an unknown value to an array of records; non-arrays yield []. */
+function asRecordArray(v: unknown): Record<string, unknown>[] {
+  return Array.isArray(v) ? (v as Record<string, unknown>[]) : [];
+}
+/** Coerce an unknown value to a string; non-strings yield ''. */
+function asStr(v: unknown): string {
+  return typeof v === 'string' ? v : '';
+}
+/** Case-insensitive equality against a pre-lowercased focus component id. */
+function focusMatches(focus: string | undefined, id: unknown): boolean {
+  return !!focus && typeof id === 'string' && id.toLowerCase() === focus;
+}
+
 /**
  * Pure-plumbing record types excluded entirely from FTS/vector harvest.
  * These carry no semantic content worth retrieving on — they're error
@@ -522,59 +536,85 @@ export class DeepMemoryResearchAgent {
   ): Promise<MaterialFinding[]> {
     const byId = new Map<string, MaterialFinding>();
 
-    // FTS5 keyword search
+    // FTS5 keyword search — the first writer into an empty map, so `set`
+    // unconditionally (there is nothing earlier to preserve).
     for (const f of this.searchFTS(brief.query, brief.workflowRunId, brief.scopeTier)) {
       byId.set(f.id, f);
     }
 
-    // Vector similarity search (if embedding service is available)
-    if (this.embedding) {
-      try {
-        const queryVec = await this.embedding.embedQuery(brief.query);
-        const vectorHits = this.searchVector(queryVec, brief.workflowRunId, brief.scopeTier);
-        for (const f of vectorHits) {
-          if (!byId.has(f.id)) byId.set(f.id, f);
-        }
-      } catch (err) {
-        getLogger().debug('dmr', 'Vector search unavailable — continuing with FTS only', {
-          error: err instanceof Error ? err.message : String(err),
-        });
-      }
-    }
+    // Vector similarity search (if embedding service is available).
+    await this.harvestVectorHits(byId, brief);
 
     // Authority-weighted filter — always include governing records (Authority 6+)
     // within scope, even if they didn't match FTS/vector.
-    for (const f of this.harvestByAuthority(brief, decomposition.authorityLevelsIncluded)) {
-      if (!byId.has(f.id)) byId.set(f.id, f);
-    }
+    this.mergeFindings(byId, this.harvestByAuthority(brief, decomposition.authorityLevelsIncluded));
 
     // Topic entity exact-match sweep — guard against FTS tokenization quirks.
-    for (const entity of decomposition.topicEntities.slice(0, 20)) {
-      for (const f of this.searchFTS(entity, brief.workflowRunId, brief.scopeTier)) {
-        if (!byId.has(f.id)) byId.set(f.id, f);
-      }
-    }
+    this.harvestTopicEntitySweep(byId, brief, decomposition);
 
-    // Known relevant records
+    // Known relevant records — seeded at max materiality; these deliberately
+    // OVERWRITE any earlier harvest entry for the same id.
+    this.harvestKnownRelevant(byId, brief);
+
+    return Array.from(byId.values());
+  }
+
+  /**
+   * Merge findings into `byId` first-writer-wins: an id already present keeps
+   * its earlier (higher-priority) entry. Used by every harvest pass except the
+   * known-relevant seed, which deliberately overwrites.
+   */
+  private mergeFindings(byId: Map<string, MaterialFinding>, findings: Iterable<MaterialFinding>): void {
+    for (const f of findings) {
+      if (!byId.has(f.id)) byId.set(f.id, f);
+    }
+  }
+
+  /**
+   * Vector-similarity harvest pass. No-op when no embedding service is attached;
+   * on any embedding/search failure it logs and leaves `byId` untouched so the
+   * FTS results still stand.
+   */
+  private async harvestVectorHits(byId: Map<string, MaterialFinding>, brief: RetrievalBrief): Promise<void> {
+    if (!this.embedding) return;
+    try {
+      const queryVec = await this.embedding.embedQuery(brief.query);
+      this.mergeFindings(byId, this.searchVector(queryVec, brief.workflowRunId, brief.scopeTier));
+    } catch (err) {
+      getLogger().debug('dmr', 'Vector search unavailable — continuing with FTS only', {
+        error: err instanceof Error ? err.message : String(err),
+      });
+    }
+  }
+
+  /** Topic-entity exact-match FTS sweep (first 20 entities), first-writer-wins. */
+  private harvestTopicEntitySweep(
+    byId: Map<string, MaterialFinding>,
+    brief: RetrievalBrief,
+    decomposition: ContextPacket['queryDecomposition'],
+  ): void {
+    for (const entity of decomposition.topicEntities.slice(0, 20)) {
+      this.mergeFindings(byId, this.searchFTS(entity, brief.workflowRunId, brief.scopeTier));
+    }
+  }
+
+  /** Seed the caller's known-relevant record ids at max materiality (overwrites). */
+  private harvestKnownRelevant(byId: Map<string, MaterialFinding>, brief: RetrievalBrief): void {
     for (const recordId of brief.knownRelevantRecordIds) {
       const record = this.db.prepare(
         'SELECT id, record_type, authority_level, content, effective_at, produced_at FROM governed_stream WHERE id = ? AND is_current_version = 1',
       ).get(recordId) as Record<string, unknown> | undefined;
-
-      if (record) {
-        byId.set(record.id as string, {
-          id: record.id as string,
-          recordType: record.record_type as string,
-          authorityLevel: record.authority_level as number,
-          governingStatus: 'active',
-          summary: this.extractSummary(record),
-          sourceRecordIds: [record.id as string],
-          materialityScore: 1.0, // Known relevant = max score
-        });
-      }
+      if (!record) continue;
+      byId.set(record.id as string, {
+        id: record.id as string,
+        recordType: record.record_type as string,
+        authorityLevel: record.authority_level as number,
+        governingStatus: 'active',
+        summary: this.extractSummary(record),
+        sourceRecordIds: [record.id as string],
+        materialityScore: 1.0, // Known relevant = max score
+      });
     }
-
-    return Array.from(byId.values());
   }
 
   // ── Stage 3: Materiality Scoring ────────────────────────────────
@@ -924,37 +964,9 @@ export class DeepMemoryResearchAgent {
   ): Promise<ContextPacket> {
     // Enrich the summaries of the findings that will actually be emitted
     // (active_constraints + the Stage-7 prompt + hydration) with the query's
-    // component scope. Harvest-time summaries are component-blind and were
-    // `[kind]`/"" for structured artifacts + decision_traces; re-derive them
-    // here via the record-type-aware, component-scoped distiller so the
-    // synthesis — and `activeConstraint.statement` below — carry real substance.
-    // Capture each enriched record's KIND (content.kind, else record_type) so
-    // activeConstraints can be classified binding-vs-context below. Every
-    // authority>=6 record passes through this loop (the `continue` only skips
-    // sub-threshold, sub-authority-6 findings), so every activeConstraint's kind
-    // is captured here without an extra DB round-trip.
-    const kindById = new Map<string, string>();
-    for (const f of findings) {
-      if (f.authorityLevel < 6 && f.materialityScore < this.materialityThreshold) continue;
-      try {
-        const rec = this.db.prepare(
-          'SELECT record_type, content FROM governed_stream WHERE id = ?',
-        ).get(f.id) as { record_type: string; content: string } | undefined;
-        if (rec) {
-          const enriched = this.extractSummary(
-            { record_type: rec.record_type, content: rec.content },
-            brief.focusComponentId,
-          );
-          if (enriched) f.summary = enriched;
-          let kind = rec.record_type;
-          try {
-            const parsed = JSON.parse(rec.content) as { kind?: unknown };
-            if (typeof parsed.kind === 'string' && parsed.kind) kind = parsed.kind;
-          } catch { /* content unparseable — keep record_type as the kind */ }
-          kindById.set(f.id, kind);
-        }
-      } catch { /* keep the harvest-time summary */ }
-    }
+    // component scope, and capture each record's KIND for binding-class
+    // classification. See `enrichFindingSummaries`.
+    const kindById = this.enrichFindingSummaries(findings, brief);
 
     // Deterministic base — always built. LLM synthesis adds narrative.
     // Authority>=6 + active is the ADMISSION gate; bindingClass is the second
@@ -970,21 +982,11 @@ export class DeepMemoryResearchAgent {
         bindingClass: classifyGoverningKind(kindById.get(f.id) ?? f.recordType),
       }));
 
-    let completenessStatus: CompletenessStatus = 'complete';
-    if (unavailableSources.some(s => s.materiality === 'high')) {
-      completenessStatus = 'incomplete_high';
-    } else if (unavailableSources.some(s => s.materiality === 'medium')) {
-      completenessStatus = 'partial_medium';
-    } else if (knownGaps.length > 0) {
-      completenessStatus = 'partial_low';
-    }
+    const completenessStatus = this.computeCompletenessStatus(unavailableSources, knownGaps);
 
     const filteredFindings = findings.filter(f => f.materialityScore >= this.materialityThreshold);
 
-    let coverageConfidence = 0.4;
-    if (completenessStatus === 'complete') coverageConfidence = 1.0;
-    else if (completenessStatus === 'partial_low') coverageConfidence = 0.85;
-    else if (completenessStatus === 'partial_medium') coverageConfidence = 0.65;
+    const coverageConfidence = this.computeCoverageConfidence(completenessStatus);
 
     const basePacket: ContextPacket = {
       queryDecomposition: decomposition,
@@ -1010,6 +1012,109 @@ export class DeepMemoryResearchAgent {
     // LLM synthesis layer — optional. Enriches narrative and surfaces
     // open questions / implicit decisions beyond what deterministic
     // analysis can infer. Falls back to the base packet on any failure.
+    return this.applyLlmSynthesis(
+      basePacket, decomposition, filteredFindings, supersessionChains, contradictions, brief,
+    );
+  }
+
+  /**
+   * Re-derive component-scoped, record-type-aware summaries for the findings
+   * that will actually be emitted (authority>=6 OR at/above the materiality
+   * threshold), and capture each record's KIND (content.kind, else record_type)
+   * so active_constraints can be classified binding-vs-context. Harvest-time
+   * summaries are component-blind and were `[kind]`/"" for structured artifacts
+   * + decision_traces; this re-derives real substance for the synthesis and for
+   * `activeConstraint.statement`. Every authority>=6 record passes through (the
+   * skip only drops sub-threshold, sub-authority-6 findings), so every
+   * activeConstraint's kind is captured without an extra DB round-trip. Mutates
+   * each qualifying finding's `summary` in place; returns the id→kind map.
+   */
+  private enrichFindingSummaries(
+    findings: MaterialFinding[],
+    brief: RetrievalBrief,
+  ): Map<string, string> {
+    const kindById = new Map<string, string>();
+    for (const f of findings) {
+      if (f.authorityLevel < 6 && f.materialityScore < this.materialityThreshold) continue;
+      this.enrichSingleFinding(f, brief, kindById);
+    }
+    return kindById;
+  }
+
+  /**
+   * Enrich a single finding's summary from its stored content and record its
+   * kind into `kindById`. Best-effort: any DB/parse failure leaves the
+   * harvest-time summary untouched and adds no kind entry.
+   */
+  private enrichSingleFinding(
+    f: MaterialFinding,
+    brief: RetrievalBrief,
+    kindById: Map<string, string>,
+  ): void {
+    try {
+      const rec = this.db.prepare(
+        'SELECT record_type, content FROM governed_stream WHERE id = ?',
+      ).get(f.id) as { record_type: string; content: string } | undefined;
+      if (!rec) return;
+      const enriched = this.extractSummary(
+        { record_type: rec.record_type, content: rec.content },
+        brief.focusComponentId,
+      );
+      if (enriched) f.summary = enriched;
+      kindById.set(f.id, this.extractContentKind(rec.record_type, rec.content));
+    } catch { /* keep the harvest-time summary */ }
+  }
+
+  /**
+   * The KIND used for binding-class classification: `content.kind` when the
+   * content is parseable JSON carrying a non-empty string kind, else the
+   * record_type.
+   */
+  private extractContentKind(recordType: string, content: string): string {
+    try {
+      const parsed = JSON.parse(content) as { kind?: unknown };
+      if (typeof parsed.kind === 'string' && parsed.kind) return parsed.kind;
+    } catch { /* content unparseable — keep record_type as the kind */ }
+    return recordType;
+  }
+
+  /**
+   * Completeness status: high-materiality unavailable source dominates, then a
+   * medium one, then any known gap; otherwise complete.
+   */
+  private computeCompletenessStatus(
+    unavailableSources: UnavailableSource[],
+    knownGaps: string[],
+  ): CompletenessStatus {
+    if (unavailableSources.some(s => s.materiality === 'high')) return 'incomplete_high';
+    if (unavailableSources.some(s => s.materiality === 'medium')) return 'partial_medium';
+    if (knownGaps.length > 0) return 'partial_low';
+    return 'complete';
+  }
+
+  /** Coverage confidence keyed off the completeness status. */
+  private computeCoverageConfidence(completenessStatus: CompletenessStatus): number {
+    if (completenessStatus === 'complete') return 1.0;
+    if (completenessStatus === 'partial_low') return 0.85;
+    if (completenessStatus === 'partial_medium') return 0.65;
+    return 0.4;
+  }
+
+  /**
+   * Optional Stage-7 LLM synthesis layer. Returns `basePacket` unchanged when
+   * no template loader / template is available, when required template
+   * variables are missing, or on any LLM/parse failure; throws (as before) when
+   * a template renders but no model is configured. On success it merges the LLM
+   * narrative + open questions into the base packet.
+   */
+  private async applyLlmSynthesis(
+    basePacket: ContextPacket,
+    decomposition: ContextPacket['queryDecomposition'],
+    filteredFindings: MaterialFinding[],
+    supersessionChains: SupersessionChain[],
+    contradictions: Contradiction[],
+    brief: RetrievalBrief,
+  ): Promise<ContextPacket> {
     if (!this.templateLoader) return basePacket;
 
     const template = this.templateLoader.findTemplate(
@@ -1066,46 +1171,57 @@ export class DeepMemoryResearchAgent {
 
       // LLM may wrap response in a top-level key like "context_packet"
       const unwrapped = (parsed.context_packet ?? parsed.packet ?? parsed) as Record<string, unknown>;
-
-      // Enrich base packet with LLM narrative and open questions.
-      // Coerce LLM-supplied unknown fields to strings; JSON-encode any object
-      // value so it surfaces real content instead of "[object Object]".
-      const asField = (v: unknown, fallback: string): string => {
-        if (typeof v === 'string') return v;
-        if (v == null) return fallback;
-        return JSON.stringify(v);
-      };
-      const openQuestionsRaw = unwrapped.open_questions;
-      const openQuestions: OpenQuestion[] = Array.isArray(openQuestionsRaw)
-        ? (openQuestionsRaw as Array<Record<string, unknown>>).map(oq => ({
-            question: asField(oq.question, ''),
-            firstRaised: asField(oq.first_raised, new Date().toISOString()),
-            stillUnresolved: oq.still_unresolved !== false,
-            sourceRecordId: asField(oq.source_record_id, ''),
-          }))
-        : [];
-
-      const llmNarrative = typeof unwrapped.completeness_narrative === 'string'
-        ? unwrapped.completeness_narrative
-        : basePacket.completenessNarrative;
-
-      const decisionSummary = typeof unwrapped.decision_context_summary === 'string'
-        && unwrapped.decision_context_summary.trim().length > 0
-          ? unwrapped.decision_context_summary
-          : basePacket.decisionContextSummary;
-
-      return {
-        ...basePacket,
-        decisionContextSummary: decisionSummary,
-        completenessNarrative: llmNarrative,
-        openQuestions,
-      };
+      return this.mergeLlmPacket(basePacket, unwrapped);
     } catch (err) {
       getLogger().warn('dmr', 'Stage 7 synthesis LLM call failed — using deterministic packet', {
         error: err instanceof Error ? err.message : String(err),
       });
       return basePacket;
     }
+  }
+
+  /**
+   * Merge the parsed Stage-7 LLM response into the deterministic base packet:
+   * coerce open questions, and prefer LLM-supplied narrative / decision summary
+   * over the deterministic fallbacks when present.
+   */
+  private mergeLlmPacket(
+    basePacket: ContextPacket,
+    unwrapped: Record<string, unknown>,
+  ): ContextPacket {
+    // Enrich base packet with LLM narrative and open questions.
+    // Coerce LLM-supplied unknown fields to strings; JSON-encode any object
+    // value so it surfaces real content instead of "[object Object]".
+    const asField = (v: unknown, fallback: string): string => {
+      if (typeof v === 'string') return v;
+      if (v == null) return fallback;
+      return JSON.stringify(v);
+    };
+    const openQuestionsRaw = unwrapped.open_questions;
+    const openQuestions: OpenQuestion[] = Array.isArray(openQuestionsRaw)
+      ? (openQuestionsRaw as Array<Record<string, unknown>>).map(oq => ({
+          question: asField(oq.question, ''),
+          firstRaised: asField(oq.first_raised, new Date().toISOString()),
+          stillUnresolved: oq.still_unresolved !== false,
+          sourceRecordId: asField(oq.source_record_id, ''),
+        }))
+      : [];
+
+    const llmNarrative = typeof unwrapped.completeness_narrative === 'string'
+      ? unwrapped.completeness_narrative
+      : basePacket.completenessNarrative;
+
+    const decisionSummary = typeof unwrapped.decision_context_summary === 'string'
+      && unwrapped.decision_context_summary.trim().length > 0
+        ? unwrapped.decision_context_summary
+        : basePacket.decisionContextSummary;
+
+    return {
+      ...basePacket,
+      decisionContextSummary: decisionSummary,
+      completenessNarrative: llmNarrative,
+      openQuestions,
+    };
   }
 
   // ── Helpers ─────────────────────────────────────────────────────
@@ -1357,6 +1473,20 @@ export class DeepMemoryResearchAgent {
     return tokens.map(t => `"${t}"`).join(' OR ');
   }
 
+  /**
+   * Fast path for records that expose a direct narrative field. Returns the
+   * first non-empty narrative (sliced to 300 chars) in priority order, or null
+   * when none is present so the caller can fall through to distillation.
+   */
+  private extractDirectNarrative(content: Record<string, unknown>): string | null {
+    const fields = ['summary', 'description', 'statement', 'text', 'response_text'];
+    for (const field of fields) {
+      const value = content[field];
+      if (typeof value === 'string' && value.trim()) return value.slice(0, 300);
+    }
+    return null;
+  }
+
   private extractSummary(record: Record<string, unknown>, focusComponentId?: string): string {
     let content: Record<string, unknown>;
     if (typeof record.content === 'string') {
@@ -1369,11 +1499,8 @@ export class DeepMemoryResearchAgent {
     }
 
     // Fast path: records that expose a direct narrative field.
-    if (typeof content.summary === 'string' && content.summary.trim()) return content.summary.slice(0, 300);
-    if (typeof content.description === 'string' && content.description.trim()) return content.description.slice(0, 300);
-    if (typeof content.statement === 'string' && content.statement.trim()) return content.statement.slice(0, 300);
-    if (typeof content.text === 'string' && content.text.trim()) return content.text.slice(0, 300);
-    if (typeof content.response_text === 'string' && content.response_text.trim()) return content.response_text.slice(0, 300);
+    const direct = this.extractDirectNarrative(content);
+    if (direct !== null) return direct;
 
     // Record-type-aware distillation — the substance the fast-path fields miss.
     // Without it, decision_traces summarised to "" (their content lives in
@@ -1402,146 +1529,210 @@ export class DeepMemoryResearchAgent {
     content: Record<string, unknown>,
     focusComponentId?: string,
   ): string {
-    const arr = (v: unknown): Record<string, unknown>[] =>
-      Array.isArray(v) ? (v as Record<string, unknown>[]) : [];
-    const str = (v: unknown): string => (typeof v === 'string' ? v : '');
     const focus = focusComponentId?.toLowerCase();
-    const matchesFocus = (id: unknown): boolean =>
-      !!focus && typeof id === 'string' && id.toLowerCase() === focus;
-
     try {
-      // Human decisions — the substance lives in fields the fast-path never
-      // reads. Prefer the canonical selection/rationale (populated by a real or
-      // simulated decision-maker); otherwise derive from what the DecisionRouter
-      // actually writes (decision_type / attribution / option_id / action /
-      // payload bundle) so an auto-approved trace still summarises as "what
-      // happened" instead of "".
-      if (kind === 'decision_trace' || /decision|override|approval/.test(kind)) {
-        const dt = str(content.decision_type) || kind || 'decision';
-        const sel = str(content.human_selection) || str(content.option_id) || str(content.action);
-        const rat = str(content.rationale_captured);
-        const ctxP = str(content.context_presented);
-        const attribution = str(content.attribution);
-        const autoBy = str(content.auto_approved_by);
-        const payload = (content.payload && typeof content.payload === 'object')
-          ? content.payload as Record<string, unknown> : {};
-        const menu = arr(payload.menu_selections);
-        const mirror = arr(payload.mirror_decisions);
-        const bundle = [
-          menu.length ? `${menu.length} menu selection(s)` : '',
-          mirror.length ? `${mirror.length} mirror decision(s)` : '',
-        ].filter(Boolean).join(', ');
-        const autoBySuffix = autoBy ? ` by ${autoBy}` : '';
-        const attributionLabel = attribution === 'auto_approve'
-          ? `auto-approved${autoBySuffix}`
-          : attribution;
-        const parts = [
-          sel && `chose: ${sel}`,
-          rat && `rationale: ${rat}`,
-          !sel && !rat && attribution && attributionLabel,
-          bundle,
-          !sel && !rat && !attribution && ctxP && `context: ${ctxP.slice(0, 200)}`,
-        ].filter(Boolean);
-        return parts.length ? `${dt} — ${parts.join('; ')}` : dt;
-      }
-
-      // Component model — the (focus) component's responsibilities.
-      if (kind === 'component_model' || content.components) {
-        const all = arr(content.components);
-        const scoped = focus ? all.filter(c => matchesFocus(c.id) || matchesFocus(c.component_id)) : [];
-        const pick = (scoped.length ? scoped : all).slice(0, focus ? 1 : 3);
-        return pick.map(c => {
-          const id = str(c.id) || str(c.component_id) || str(c.name);
-          const resp = arr(c.responsibilities)
-            .map(r => str(r.statement) || str(r.description) || str(r)).filter(Boolean);
-          return `${id}: ${resp.slice(0, 5).join('; ')}`;
-        }).filter(Boolean).join(' | ');
-      }
-
-      // Data models — the (focus) component's entities + key fields.
-      if (kind === 'data_models' || content.models) {
-        const all = arr(content.models);
-        const scoped = focus ? all.filter(m => matchesFocus(m.component_id)) : [];
-        const pick = (scoped.length ? scoped : all).slice(0, focus ? 3 : 4);
-        return pick.map(m => {
-          const ents = arr(m.entities).map(e => {
-            const fields = arr(e.fields).map(f => str(f.name)).filter(Boolean).slice(0, 6);
-            return `${str(e.name)}(${fields.join(',')})`;
-          });
-          return `${str(m.component_id)}: ${ents.join(', ')}`;
-        }).filter(Boolean).join(' | ');
-      }
-
-      // Interface contracts — ids + protocol + auth posture.
-      if (kind === 'interface_contracts' || content.contracts) {
-        return arr(content.contracts).slice(0, 5).map(c =>
-          `${str(c.id)}: ${str(c.protocol)}${str(c.auth_mechanism) ? ` auth=${str(c.auth_mechanism)}` : ''}`.trim(),
-        ).filter(Boolean).join(' | ');
-      }
-
-      // API definitions — endpoint signatures.
-      if (kind === 'api_definitions' || content.api_definitions || content.endpoints) {
-        const eps = arr(content.api_definitions).length ? arr(content.api_definitions) : arr(content.endpoints);
-        return eps.slice(0, 6).map(e =>
-          `${str(e.method) || str(e.verb)} ${str(e.path) || str(e.route) || str(e.name)}`.trim(),
-        ).filter(Boolean).join(', ');
-      }
-
-      // Intent statement — the product concept. Its substance lives in
-      // `product_concept` (an object with name/description), which the fast-path
-      // never reads, so a certified intent collapsed to `[intent_statement]`.
-      if (kind === 'intent_statement' || content.product_concept) {
-        const pc = content.product_concept;
-        if (pc && typeof pc === 'object') {
-          const o = pc as Record<string, unknown>;
-          const line = str(o.description) || str(o.name);
-          if (line) return line;
-        }
-        if (typeof pc === 'string' && pc.trim()) return pc;
-      }
-
-      // Functional requirements — user-story lines (id + the action/outcome).
-      // The certified FR collection holds an array under `user_stories`; each
-      // story has no narrative field, so compose one from id + action.
-      if (kind === 'functional_requirements' || content.user_stories) {
-        return arr(content.user_stories).slice(0, 5).map(s => {
-          const id = str(s.id);
-          const body = str(s.action) || str(s.outcome) || str(s.role);
-          return id || body ? `${id}: ${body}`.trim() : '';
-        }).filter(Boolean).join(' | ');
-      }
-
-      // Cross-run modification — the applied refactoring that supersedes a
-      // prior-run artifact (so the supersession chain says WHAT was applied).
-      if (kind === 'cross_run_modification') {
-        const mod = str(content.modification_type);
-        const changed = str(content.changed_interface_id) || str(content.modified_artifact_id);
-        const status = str(content.applied_status);
-        const parts = [
-          mod && `${mod} change`,
-          changed && `to ${changed}`,
-          status && `(${status})`,
-        ].filter(Boolean);
-        return parts.length ? `cross-run modification: ${parts.join(' ')}` : '';
-      }
-
-      // Non-functional requirements — id (category): description. The certified
-      // NFR collection holds an array under `requirements`.
-      if (kind === 'non_functional_requirements' || content.requirements) {
-        return arr(content.requirements).slice(0, 5).map(n => {
-          const id = str(n.id);
-          const cat = str(n.category);
-          const desc = str(n.description) || str(n.statement) || str(n.threshold);
-          const catSuffix = cat ? ` (${cat})` : '';
-          return id || desc ? `${id}${catSuffix}: ${desc}`.trim() : '';
-        }).filter(Boolean).join(' | ');
-      }
+      // Each distill* helper returns its distilled summary (possibly '') when it
+      // OWNS the record's kind, or null to fall through to the next handler. The
+      // `??` chain therefore preserves the original if/return ordering AND the
+      // original short-circuit: the first owning handler wins even when it
+      // yields '' (the record matched but had no substance), exactly as the
+      // sequential `if (…) return …` blocks did.
+      const distilled =
+        this.distillDecision(kind, content) ??
+        this.distillComponentModel(kind, content, focus) ??
+        this.distillDataModels(kind, content, focus) ??
+        this.distillInterfaceContracts(kind, content) ??
+        this.distillApiDefinitions(kind, content) ??
+        this.distillIntent(kind, content) ??
+        this.distillFunctionalRequirements(kind, content) ??
+        this.distillCrossRunModification(kind, content) ??
+        this.distillNonFunctionalRequirements(kind, content);
+      if (distilled !== null) return distilled;
 
       // Requirements / intent — a name/title line.
-      const title = str(content.title) || str(content.name) || str(content.intent) || str(content.requirement);
+      const title = asStr(content.title) || asStr(content.name)
+        || asStr(content.intent) || asStr(content.requirement);
       if (title) return title;
     } catch { /* fall through to the [kind] label */ }
     return '';
+  }
+
+  /**
+   * Human decisions — the substance lives in fields the fast-path never reads.
+   * Prefer the canonical selection/rationale (populated by a real or simulated
+   * decision-maker); otherwise derive from what the DecisionRouter actually
+   * writes (decision_type / attribution / option_id / action / payload bundle)
+   * so an auto-approved trace still summarises as "what happened" instead of "".
+   * Returns null when the record is not a decision (fall through).
+   */
+  private distillDecision(kind: string, content: Record<string, unknown>): string | null {
+    if (!(kind === 'decision_trace' || /decision|override|approval/.test(kind))) return null;
+    const dt = asStr(content.decision_type) || kind || 'decision';
+    const sel = asStr(content.human_selection) || asStr(content.option_id) || asStr(content.action);
+    const rat = asStr(content.rationale_captured);
+    const ctxP = asStr(content.context_presented);
+    const attribution = asStr(content.attribution);
+    const autoBy = asStr(content.auto_approved_by);
+    const payload = (content.payload && typeof content.payload === 'object')
+      ? content.payload as Record<string, unknown> : {};
+    const menu = asRecordArray(payload.menu_selections);
+    const mirror = asRecordArray(payload.mirror_decisions);
+    const bundle = [
+      menu.length ? `${menu.length} menu selection(s)` : '',
+      mirror.length ? `${mirror.length} mirror decision(s)` : '',
+    ].filter(Boolean).join(', ');
+    const autoBySuffix = autoBy ? ` by ${autoBy}` : '';
+    const attributionLabel = attribution === 'auto_approve'
+      ? `auto-approved${autoBySuffix}`
+      : attribution;
+    const parts = [
+      sel && `chose: ${sel}`,
+      rat && `rationale: ${rat}`,
+      !sel && !rat && attribution && attributionLabel,
+      bundle,
+      !sel && !rat && !attribution && ctxP && `context: ${ctxP.slice(0, 200)}`,
+    ].filter(Boolean);
+    return parts.length ? `${dt} — ${parts.join('; ')}` : dt;
+  }
+
+  /**
+   * Component model — the (focus) component's responsibilities. Returns null
+   * when the record is not a component model (fall through).
+   */
+  private distillComponentModel(
+    kind: string,
+    content: Record<string, unknown>,
+    focus?: string,
+  ): string | null {
+    if (!(kind === 'component_model' || content.components)) return null;
+    const all = asRecordArray(content.components);
+    const scoped = focus
+      ? all.filter(c => focusMatches(focus, c.id) || focusMatches(focus, c.component_id))
+      : [];
+    const pick = (scoped.length ? scoped : all).slice(0, focus ? 1 : 3);
+    return pick.map(c => {
+      const id = asStr(c.id) || asStr(c.component_id) || asStr(c.name);
+      const resp = asRecordArray(c.responsibilities)
+        .map(r => asStr(r.statement) || asStr(r.description) || asStr(r)).filter(Boolean);
+      return `${id}: ${resp.slice(0, 5).join('; ')}`;
+    }).filter(Boolean).join(' | ');
+  }
+
+  /**
+   * Data models — the (focus) component's entities + key fields. Returns null
+   * when the record has no data models (fall through).
+   */
+  private distillDataModels(
+    kind: string,
+    content: Record<string, unknown>,
+    focus?: string,
+  ): string | null {
+    if (!(kind === 'data_models' || content.models)) return null;
+    const all = asRecordArray(content.models);
+    const scoped = focus ? all.filter(m => focusMatches(focus, m.component_id)) : [];
+    const pick = (scoped.length ? scoped : all).slice(0, focus ? 3 : 4);
+    return pick.map(m => {
+      const ents = asRecordArray(m.entities).map(e => {
+        const fields = asRecordArray(e.fields).map(f => asStr(f.name)).filter(Boolean).slice(0, 6);
+        return `${asStr(e.name)}(${fields.join(',')})`;
+      });
+      return `${asStr(m.component_id)}: ${ents.join(', ')}`;
+    }).filter(Boolean).join(' | ');
+  }
+
+  /**
+   * Interface contracts — ids + protocol + auth posture. Returns null when the
+   * record has no contracts (fall through).
+   */
+  private distillInterfaceContracts(kind: string, content: Record<string, unknown>): string | null {
+    if (!(kind === 'interface_contracts' || content.contracts)) return null;
+    return asRecordArray(content.contracts).slice(0, 5).map(c => {
+      const auth = asStr(c.auth_mechanism) ? ` auth=${asStr(c.auth_mechanism)}` : '';
+      return `${asStr(c.id)}: ${asStr(c.protocol)}${auth}`.trim();
+    }).filter(Boolean).join(' | ');
+  }
+
+  /**
+   * API definitions — endpoint signatures. Returns null when the record has no
+   * endpoints/definitions (fall through).
+   */
+  private distillApiDefinitions(kind: string, content: Record<string, unknown>): string | null {
+    if (!(kind === 'api_definitions' || content.api_definitions || content.endpoints)) return null;
+    const eps = asRecordArray(content.api_definitions).length
+      ? asRecordArray(content.api_definitions)
+      : asRecordArray(content.endpoints);
+    return eps.slice(0, 6).map(e =>
+      `${asStr(e.method) || asStr(e.verb)} ${asStr(e.path) || asStr(e.route) || asStr(e.name)}`.trim(),
+    ).filter(Boolean).join(', ');
+  }
+
+  /**
+   * Intent statement — the product concept. Its substance lives in
+   * `product_concept` (an object with name/description), which the fast-path
+   * never reads, so a certified intent collapsed to `[intent_statement]`.
+   * Returns null when there is no usable product concept — even if the guard
+   * matched — so the caller falls through to the title/label path (preserving
+   * the original block's fall-through behavior).
+   */
+  private distillIntent(kind: string, content: Record<string, unknown>): string | null {
+    if (!(kind === 'intent_statement' || content.product_concept)) return null;
+    const pc = content.product_concept;
+    if (pc && typeof pc === 'object') {
+      const o = pc as Record<string, unknown>;
+      const line = asStr(o.description) || asStr(o.name);
+      if (line) return line;
+    }
+    if (typeof pc === 'string' && pc.trim()) return pc;
+    return null;
+  }
+
+  /**
+   * Functional requirements — user-story lines (id + the action/outcome). The
+   * certified FR collection holds an array under `user_stories`; each story has
+   * no narrative field, so compose one from id + action. Returns null when the
+   * record has no user stories (fall through).
+   */
+  private distillFunctionalRequirements(kind: string, content: Record<string, unknown>): string | null {
+    if (!(kind === 'functional_requirements' || content.user_stories)) return null;
+    return asRecordArray(content.user_stories).slice(0, 5).map(s => {
+      const id = asStr(s.id);
+      const body = asStr(s.action) || asStr(s.outcome) || asStr(s.role);
+      return id || body ? `${id}: ${body}`.trim() : '';
+    }).filter(Boolean).join(' | ');
+  }
+
+  /**
+   * Cross-run modification — the applied refactoring that supersedes a
+   * prior-run artifact (so the supersession chain says WHAT was applied).
+   * Returns null when the record is not a cross-run modification (fall through).
+   */
+  private distillCrossRunModification(kind: string, content: Record<string, unknown>): string | null {
+    if (kind !== 'cross_run_modification') return null;
+    const mod = asStr(content.modification_type);
+    const changed = asStr(content.changed_interface_id) || asStr(content.modified_artifact_id);
+    const status = asStr(content.applied_status);
+    const parts = [
+      mod && `${mod} change`,
+      changed && `to ${changed}`,
+      status && `(${status})`,
+    ].filter(Boolean);
+    return parts.length ? `cross-run modification: ${parts.join(' ')}` : '';
+  }
+
+  /**
+   * Non-functional requirements — id (category): description. The certified NFR
+   * collection holds an array under `requirements`. Returns null when the
+   * record has no requirements (fall through).
+   */
+  private distillNonFunctionalRequirements(kind: string, content: Record<string, unknown>): string | null {
+    if (!(kind === 'non_functional_requirements' || content.requirements)) return null;
+    return asRecordArray(content.requirements).slice(0, 5).map(n => {
+      const id = asStr(n.id);
+      const cat = asStr(n.category);
+      const desc = asStr(n.description) || asStr(n.statement) || asStr(n.threshold);
+      const catSuffix = cat ? ` (${cat})` : '';
+      return id || desc ? `${id}${catSuffix}: ${desc}`.trim() : '';
+    }).filter(Boolean).join(' | ');
   }
 
   // ── Record writing ──────────────────────────────────────────────

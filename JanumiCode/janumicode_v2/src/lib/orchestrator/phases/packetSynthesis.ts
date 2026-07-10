@@ -109,33 +109,46 @@ function collectAtomicTasks(records: GovernedStreamRecord[]): BuilderAtomicTask[
   return out;
 }
 
-export function collectUserStories(records: GovernedStreamRecord[]): BuilderUserStory[] {
-  const byId = new Map<string, BuilderUserStory>();
+function addUserStoriesFromArray(
+  us: unknown,
+  byId: Map<string, BuilderUserStory>,
+): void {
+  if (!Array.isArray(us)) return;
+  for (const story of us as BuilderUserStory[]) {
+    if (story?.id && !byId.has(story.id)) byId.set(story.id, story);
+  }
+}
+
+function collectRootUserStories(
+  records: GovernedStreamRecord[],
+  byId: Map<string, BuilderUserStory>,
+): void {
   // Roots first (the canonical 27 US-001..US-NNN from fr_bloom_skeleton).
   for (const r of records) {
     if (r.record_type !== 'artifact_produced') continue;
     if (r.sub_phase_id !== 'fr_bloom_skeleton') continue;
     const content = r.content as Record<string, unknown>;
     if (content.kind !== 'functional_requirements') continue;
-    const us = content.user_stories;
-    if (!Array.isArray(us)) continue;
-    for (const story of us as BuilderUserStory[]) {
-      if (story?.id && !byId.has(story.id)) byId.set(story.id, story);
-    }
+    addUserStoriesFromArray(content.user_stories, byId);
   }
-  // Atomic FR-rooted saturation leaves — each carries a user_story under
-  // the leaf's own id (e.g. `FR-CAM-1.1`, `US-004-AUTH-D1`). These are the
-  // anchors for composite AC ids that Phase 7 test cases reference. Without
-  // them in the userStories pool, packet_synthesis cannot recover the
-  // parent story from a test case's `acceptance_criterion_ids[]`.
+}
+
+/** True for a current FR-rooted atomic requirement-decomposition leaf node. */
+function isFrLeafNodeContent(c: Record<string, unknown>): boolean {
+  return c.kind === 'requirement_decomposition_node'
+    && (!c.root_kind || c.root_kind === 'fr')
+    && c.status === 'atomic';
+}
+
+function selectLatestFrLeafNodes(
+  records: GovernedStreamRecord[],
+): Map<string, GovernedStreamRecord> {
   // Latest-per-node selection — supersession-aware.
   const latestByNodeId = new Map<string, GovernedStreamRecord>();
   for (const r of records) {
     if (r.record_type !== 'requirement_decomposition_node') continue;
     const c = r.content as Record<string, unknown>;
-    if (c.kind !== 'requirement_decomposition_node') continue;
-    if (c.root_kind && c.root_kind !== 'fr') continue;
-    if (c.status !== 'atomic') continue;
+    if (!isFrLeafNodeContent(c)) continue;
     const nodeId = typeof c.node_id === 'string' ? c.node_id : null;
     if (!nodeId) continue;
     const existing = latestByNodeId.get(nodeId);
@@ -143,12 +156,30 @@ export function collectUserStories(records: GovernedStreamRecord[]): BuilderUser
       latestByNodeId.set(nodeId, r);
     }
   }
+  return latestByNodeId;
+}
+
+function addLeafUserStories(
+  latestByNodeId: Map<string, GovernedStreamRecord>,
+  byId: Map<string, BuilderUserStory>,
+): void {
   for (const r of latestByNodeId.values()) {
     const c = r.content as Record<string, unknown>;
     const story = c.user_story as BuilderUserStory | undefined;
     if (!story?.id || byId.has(story.id)) continue;
     byId.set(story.id, story);
   }
+}
+
+export function collectUserStories(records: GovernedStreamRecord[]): BuilderUserStory[] {
+  const byId = new Map<string, BuilderUserStory>();
+  collectRootUserStories(records, byId);
+  // Atomic FR-rooted saturation leaves — each carries a user_story under
+  // the leaf's own id (e.g. `FR-CAM-1.1`, `US-004-AUTH-D1`). These are the
+  // anchors for composite AC ids that Phase 7 test cases reference. Without
+  // them in the userStories pool, packet_synthesis cannot recover the
+  // parent story from a test case's `acceptance_criterion_ids[]`.
+  addLeafUserStories(selectLatestFrLeafNodes(records), byId);
   return [...byId.values()];
 }
 
@@ -172,9 +203,10 @@ export function collectNfrs(records: GovernedStreamRecord[]): BuilderNfr[] {
   return [];
 }
 
-function collectComponents(records: GovernedStreamRecord[]): Map<string, BuilderComponent> {
-  const byId = new Map<string, BuilderComponent>();
-  // Skeleton roots first.
+function collectSkeletonComponents(
+  records: GovernedStreamRecord[],
+  byId: Map<string, BuilderComponent>,
+): void {
   for (const r of records) {
     if (r.record_type !== 'artifact_produced') continue;
     if (r.sub_phase_id !== 'component_skeleton') continue;
@@ -185,6 +217,12 @@ function collectComponents(records: GovernedStreamRecord[]): Map<string, Builder
       if (c.id) byId.set(c.id, c);
     }
   }
+}
+
+function collectComponents(records: GovernedStreamRecord[]): Map<string, BuilderComponent> {
+  const byId = new Map<string, BuilderComponent>();
+  // Skeleton roots first.
+  collectSkeletonComponents(records, byId);
   // Saturation children — overwrite the skeleton with the more-decomposed
   // leaf shape when present.
   for (const r of records) {
@@ -211,6 +249,58 @@ function asTraceIds(...vals: unknown[]): string[] {
   return [];
 }
 
+/** Coerce one raw data-model field object into the builder field shape. */
+function buildDataModelField(f: Record<string, unknown>): { name: string; type: string; constraints: string | undefined } {
+  let constraints: string | undefined;
+  if (typeof f.constraints === 'string') {
+    constraints = f.constraints;
+  } else if (Array.isArray(f.constraints)) {
+    constraints = f.constraints.join(', ');
+  }
+  return {
+    name: typeof f.name === 'string' ? f.name : '',
+    type: typeof f.type === 'string' ? f.type : '',
+    constraints,
+  };
+}
+
+function extractEntityFields(e: Record<string, unknown>): Array<{ name: string; type: string; constraints: string | undefined }> {
+  if (!Array.isArray(e.fields)) return [];
+  return (e.fields as Array<Record<string, unknown>>).map(buildDataModelField);
+}
+
+function addEntityDataModel(
+  e: Record<string, unknown>,
+  componentId: string,
+  out: BuilderDataModel[],
+): void {
+  const name = typeof e.name === 'string' ? e.name : '';
+  const id = typeof e.id === 'string' ? e.id : mintEntityId(componentId, name);
+  if (!name) return;
+  const fields = extractEntityFields(e);
+  const dmTraces = asTraceIds(e.traces_to, e.verifies, e.source_requirement_ids, e.serves);
+  const existingDm = out.find((x) => x.id === id);
+  if (!existingDm) {
+    out.push({ id, name, component_id: componentId, fields, ...(dmTraces.length ? { traces_to: dmTraces } : {}) });
+  } else if (dmTraces.length > 0 && !(existingDm.traces_to && existingDm.traces_to.length > 0)) {
+    // PD-7: the same entity emitted across chunks/records — a LATER occurrence
+    // carries the requirement linkage the first-wins winner lacked. Merge it on
+    // rather than discarding it (first-wins dedup otherwise silently loses it).
+    existingDm.traces_to = dmTraces;
+  }
+}
+
+function collectEntitiesFromModel(
+  m: Record<string, unknown>,
+  out: BuilderDataModel[],
+): void {
+  const componentId = typeof m.component_id === 'string' ? m.component_id : '';
+  const entities = Array.isArray(m.entities) ? (m.entities as Array<Record<string, unknown>>) : [];
+  for (const e of entities) {
+    addEntityDataModel(e, componentId, out);
+  }
+}
+
 export function collectDataModels(records: GovernedStreamRecord[]): BuilderDataModel[] {
   // Phase 5.1 emits `data_models` with shape:
   //   { kind: 'data_models', models: [{ component_id, entities: [{ id, name, fields[] }] }] }
@@ -227,41 +317,61 @@ export function collectDataModels(records: GovernedStreamRecord[]): BuilderDataM
     const models = content[spec.arrayKey];
     if (!Array.isArray(models)) continue;
     for (const m of models as Array<Record<string, unknown>>) {
-      const componentId = typeof m.component_id === 'string' ? m.component_id : '';
-      const entities = Array.isArray(m.entities) ? (m.entities as Array<Record<string, unknown>>) : [];
-      for (const e of entities) {
-        const name = typeof e.name === 'string' ? e.name : '';
-        const id = typeof e.id === 'string' ? e.id : mintEntityId(componentId, name);
-        if (!name) continue;
-        const fields = Array.isArray(e.fields)
-          ? (e.fields as Array<Record<string, unknown>>).map((f) => {
-              let constraints: string | undefined;
-              if (typeof f.constraints === 'string') {
-                constraints = f.constraints;
-              } else if (Array.isArray(f.constraints)) {
-                constraints = f.constraints.join(', ');
-              }
-              return {
-                name: typeof f.name === 'string' ? f.name : '',
-                type: typeof f.type === 'string' ? f.type : '',
-                constraints,
-              };
-            })
-          : [];
-        const dmTraces = asTraceIds(e.traces_to, e.verifies, e.source_requirement_ids, e.serves);
-        const existingDm = out.find((x) => x.id === id);
-        if (!existingDm) {
-          out.push({ id, name, component_id: componentId, fields, ...(dmTraces.length ? { traces_to: dmTraces } : {}) });
-        } else if (dmTraces.length > 0 && !(existingDm.traces_to && existingDm.traces_to.length > 0)) {
-          // PD-7: the same entity emitted across chunks/records — a LATER occurrence
-          // carries the requirement linkage the first-wins winner lacked. Merge it on
-          // rather than discarding it (first-wins dedup otherwise silently loses it).
-          existingDm.traces_to = dmTraces;
-        }
-      }
+      collectEntitiesFromModel(m, out);
     }
   }
   return out;
+}
+
+function buildApiEndpoint(
+  ep: Record<string, unknown>,
+  componentId: string,
+  method: string,
+  path: string,
+  id: string,
+  apiTraces: string[],
+): BuilderApiDef {
+  return {
+    id,
+    method,
+    path,
+    description: typeof ep.description === 'string' ? ep.description : undefined,
+    component_id: componentId,
+    request_shape: ep.inputs ?? ep.request_shape,
+    response_shape: ep.outputs ?? ep.response_shape,
+    error_codes: Array.isArray(ep.error_codes) ? ep.error_codes as string[] : undefined,
+    ...(apiTraces.length ? { traces_to: apiTraces } : {}),
+  };
+}
+
+function addApiEndpoint(
+  ep: Record<string, unknown>,
+  componentId: string,
+  out: BuilderApiDef[],
+): void {
+  const method = typeof ep.method === 'string' ? ep.method : '';
+  const path = typeof ep.path === 'string' ? ep.path : '';
+  if (!method && !path) return;
+  const id = typeof ep.id === 'string' ? ep.id : mintEndpointId(componentId, method, path);
+  const apiTraces = asTraceIds(ep.traces_to, ep.verifies, ep.source_requirement_ids, ep.serves);
+  const existingApi = out.find((x) => x.id === id);
+  if (existingApi) {
+    // PD-7: merge a later occurrence's linkage onto the first-wins winner (see collectDataModels).
+    if (apiTraces.length > 0 && !(existingApi.traces_to && existingApi.traces_to.length > 0)) existingApi.traces_to = apiTraces;
+    return;
+  }
+  out.push(buildApiEndpoint(ep, componentId, method, path, id, apiTraces));
+}
+
+function collectEndpointsFromDef(
+  d: Record<string, unknown>,
+  out: BuilderApiDef[],
+): void {
+  const componentId = typeof d.component_id === 'string' ? d.component_id : '';
+  const endpoints = Array.isArray(d.endpoints) ? (d.endpoints as Array<Record<string, unknown>>) : [];
+  for (const ep of endpoints) {
+    addApiEndpoint(ep, componentId, out);
+  }
 }
 
 export function collectApiDefs(records: GovernedStreamRecord[]): BuilderApiDef[] {
@@ -277,32 +387,7 @@ export function collectApiDefs(records: GovernedStreamRecord[]): BuilderApiDef[]
     const defs = content[spec.arrayKey];
     if (!Array.isArray(defs)) continue;
     for (const d of defs as Array<Record<string, unknown>>) {
-      const componentId = typeof d.component_id === 'string' ? d.component_id : '';
-      const endpoints = Array.isArray(d.endpoints) ? (d.endpoints as Array<Record<string, unknown>>) : [];
-      for (const ep of endpoints) {
-        const method = typeof ep.method === 'string' ? ep.method : '';
-        const path = typeof ep.path === 'string' ? ep.path : '';
-        if (!method && !path) continue;
-        const id = typeof ep.id === 'string' ? ep.id : mintEndpointId(componentId, method, path);
-        const apiTraces = asTraceIds(ep.traces_to, ep.verifies, ep.source_requirement_ids, ep.serves);
-        const existingApi = out.find((x) => x.id === id);
-        if (existingApi) {
-          // PD-7: merge a later occurrence's linkage onto the first-wins winner (see collectDataModels).
-          if (apiTraces.length > 0 && !(existingApi.traces_to && existingApi.traces_to.length > 0)) existingApi.traces_to = apiTraces;
-          continue;
-        }
-        out.push({
-          id,
-          method,
-          path,
-          description: typeof ep.description === 'string' ? ep.description : undefined,
-          component_id: componentId,
-          request_shape: ep.inputs ?? ep.request_shape,
-          response_shape: ep.outputs ?? ep.response_shape,
-          error_codes: Array.isArray(ep.error_codes) ? ep.error_codes as string[] : undefined,
-          ...(apiTraces.length ? { traces_to: apiTraces } : {}),
-        });
-      }
+      collectEndpointsFromDef(d, out);
     }
   }
   return out;
@@ -317,6 +402,60 @@ export function collectTestSuites(records: GovernedStreamRecord[]): BuilderTestS
     if (Array.isArray(arr)) return arr as BuilderTestSuite[];
   }
   return [];
+}
+
+// ts-108 audit: evaluation_metrics actually emits `nfr_id` (not
+// `nonfunctional_requirement_id`), `measurement_method` (not
+// `evaluation_method`), and `threshold` (not `success_condition`).
+// Accept both field families so the collector tolerates either
+// schema. Same pattern as the FR/NFR collector key fixes.
+function resolveCriterionTargetId(obj: Record<string, unknown>, idField: string): string | undefined {
+  return (obj[idField]
+    ?? obj.functional_requirement_id
+    ?? obj.nonfunctional_requirement_id
+    ?? obj.nfr_id
+    ?? obj.fr_id) as string | undefined;
+}
+
+function resolveEvaluationMethod(obj: Record<string, unknown>): string {
+  if (typeof obj.evaluation_method === 'string') return obj.evaluation_method;
+  if (typeof obj.measurement_method === 'string') return obj.measurement_method;
+  return '';
+}
+
+function resolveSuccessCondition(obj: Record<string, unknown>): string {
+  if (typeof obj.success_condition === 'string') return obj.success_condition;
+  if (typeof obj.threshold === 'string') return obj.threshold;
+  return '';
+}
+
+// A quality criterion may carry a generative property_spec (Phase 8).
+// Validate the minimal shape here so a malformed spec never reaches the
+// executor as a property with no rule to check.
+function extractPropertySpec(obj: Record<string, unknown>): PropertySpec | undefined {
+  const ps = obj.property_spec;
+  if (ps === null || typeof ps !== 'object') return undefined;
+  const p = ps as Record<string, unknown>;
+  if (typeof p.invariant === 'string' && p.invariant.length > 0
+    && typeof p.input_domain === 'string' && p.input_domain.length > 0) {
+    return p as unknown as PropertySpec;
+  }
+  return undefined;
+}
+
+function buildEvaluationCriterion(
+  obj: Record<string, unknown>,
+  kind: BuilderEvaluationCriterion['kind'],
+  targetId: string,
+): BuilderEvaluationCriterion {
+  const property_spec = extractPropertySpec(obj);
+  return {
+    kind,
+    target_id: targetId,
+    evaluation_method: resolveEvaluationMethod(obj),
+    success_condition: resolveSuccessCondition(obj),
+    ...(property_spec ? { property_spec } : {}),
+  };
 }
 
 function extractCriteriaArray(
@@ -334,51 +473,28 @@ function extractCriteriaArray(
     if (!Array.isArray(criteria)) continue;
     for (const c of criteria) {
       const obj = c as Record<string, unknown>;
-      // ts-108 audit: evaluation_metrics actually emits `nfr_id` (not
-      // `nonfunctional_requirement_id`), `measurement_method` (not
-      // `evaluation_method`), and `threshold` (not `success_condition`).
-      // Accept both field families so the collector tolerates either
-      // schema. Same pattern as the FR/NFR collector key fixes.
-      const targetId = (obj[idField]
-        ?? obj.functional_requirement_id
-        ?? obj.nonfunctional_requirement_id
-        ?? obj.nfr_id
-        ?? obj.fr_id) as string | undefined;
+      const targetId = resolveCriterionTargetId(obj, idField);
       if (!targetId) continue;
-      let evaluation_method = '';
-      if (typeof obj.evaluation_method === 'string') {
-        evaluation_method = obj.evaluation_method;
-      } else if (typeof obj.measurement_method === 'string') {
-        evaluation_method = obj.measurement_method;
-      }
-      let success_condition = '';
-      if (typeof obj.success_condition === 'string') {
-        success_condition = obj.success_condition;
-      } else if (typeof obj.threshold === 'string') {
-        success_condition = obj.threshold;
-      }
-      // A quality criterion may carry a generative property_spec (Phase 8).
-      // Validate the minimal shape here so a malformed spec never reaches the
-      // executor as a property with no rule to check.
-      const ps = obj.property_spec;
-      let property_spec: PropertySpec | undefined;
-      if (ps !== null && typeof ps === 'object') {
-        const p = ps as Record<string, unknown>;
-        if (typeof p.invariant === 'string' && p.invariant.length > 0
-          && typeof p.input_domain === 'string' && p.input_domain.length > 0) {
-          property_spec = p as unknown as PropertySpec;
-        }
-      }
-      out.push({
-        kind,
-        target_id: targetId,
-        evaluation_method,
-        success_condition,
-        ...(property_spec ? { property_spec } : {}),
-      });
+      out.push(buildEvaluationCriterion(obj, kind, targetId));
     }
   }
   return out;
+}
+
+/**
+ * Map one raw evaluation_thresholds scenario to a reasoning-kind criterion.
+ * Returns null for a scenario lacking a non-empty string `id` (skipped by the
+ * caller), mirroring the original inline `if (!id) continue` guard.
+ */
+function buildThresholdScenarioCriterion(obj: Record<string, unknown>): BuilderEvaluationCriterion | null {
+  const id = typeof obj.id === 'string' ? obj.id : '';
+  if (!id) return null;
+  return {
+    kind: 'reasoning',
+    target_id: id,
+    evaluation_method: typeof obj.description === 'string' ? obj.description : '',
+    success_condition: typeof obj.pass_criteria === 'string' ? obj.pass_criteria : '',
+  };
 }
 
 function extractThresholdScenarios(records: GovernedStreamRecord[]): BuilderEvaluationCriterion[] {
@@ -390,15 +506,8 @@ function extractThresholdScenarios(records: GovernedStreamRecord[]): BuilderEval
     const scenarios = content.scenarios;
     if (!Array.isArray(scenarios)) continue;
     for (const s of scenarios) {
-      const obj = s as Record<string, unknown>;
-      const id = typeof obj.id === 'string' ? obj.id : '';
-      if (!id) continue;
-      out.push({
-        kind: 'reasoning',
-        target_id: id,
-        evaluation_method: typeof obj.description === 'string' ? obj.description : '',
-        success_condition: typeof obj.pass_criteria === 'string' ? obj.pass_criteria : '',
-      });
+      const criterion = buildThresholdScenarioCriterion(s as Record<string, unknown>);
+      if (criterion) out.push(criterion);
     }
   }
   return out;
@@ -432,41 +541,50 @@ function collectTechnicalConstraints(records: GovernedStreamRecord[]): Map<strin
   return byId;
 }
 
-export function collectComplianceItems(records: GovernedStreamRecord[]): Map<string, BuilderComplianceItem> {
-  const byId = new Map<string, BuilderComplianceItem>();
-  // compliance_retention_discovery emits its array under
-  // `complianceExtractedItems` (camelCase); the previous spelling
-  // (`compliance_extracted_items`, snake) silently returned no items.
-  // Same shape-mismatch class as the collectNfrs fix.
-  const mappings: Array<{ subPhase: string; arrayKey: string; kind: BuilderComplianceItem['kind'] }> = [
-    { subPhase: 'compliance_retention_discovery', arrayKey: 'complianceExtractedItems', kind: 'compliance' },
-    { subPhase: 'vv_requirements_discovery', arrayKey: 'vvRequirements', kind: 'vv_requirement' },
-  ];
-  for (const { subPhase, arrayKey, kind } of mappings) {
-    for (const r of records) {
-      if (r.record_type !== 'artifact_produced') continue;
-      if (r.sub_phase_id !== subPhase) continue;
-      const content = r.content as Record<string, unknown>;
-      const arr = content[arrayKey];
-      if (!Array.isArray(arr)) continue;
-      for (const item of arr as Array<Record<string, unknown>>) {
-        const id = item.id;
-        if (typeof id !== 'string' || id.length === 0) continue;
-        let description = '';
-        if (typeof item.text === 'string') {
-          description = item.text;
-        } else if (typeof item.target === 'string') {
-          description = item.target;
-        }
-        byId.set(id, {
-          id,
-          kind,
-          description,
-          measurable_condition: typeof item.threshold === 'string' ? item.threshold : undefined,
-        });
-      }
+function complianceItemDescription(item: Record<string, unknown>): string {
+  if (typeof item.text === 'string') return item.text;
+  if (typeof item.target === 'string') return item.target;
+  return '';
+}
+
+function addComplianceItem(
+  item: Record<string, unknown>,
+  kind: BuilderComplianceItem['kind'],
+  byId: Map<string, BuilderComplianceItem>,
+): void {
+  const id = item.id;
+  if (typeof id !== 'string' || id.length === 0) return;
+  byId.set(id, {
+    id,
+    kind,
+    description: complianceItemDescription(item),
+    measurable_condition: typeof item.threshold === 'string' ? item.threshold : undefined,
+  });
+}
+
+function collectComplianceMapping(
+  records: GovernedStreamRecord[],
+  subPhase: string,
+  arrayKey: string,
+  kind: BuilderComplianceItem['kind'],
+  byId: Map<string, BuilderComplianceItem>,
+): void {
+  for (const r of records) {
+    if (r.record_type !== 'artifact_produced') continue;
+    if (r.sub_phase_id !== subPhase) continue;
+    const content = r.content as Record<string, unknown>;
+    const arr = content[arrayKey];
+    if (!Array.isArray(arr)) continue;
+    for (const item of arr as Array<Record<string, unknown>>) {
+      addComplianceItem(item, kind, byId);
     }
   }
+}
+
+function collectQualityAttributes(
+  records: GovernedStreamRecord[],
+  byId: Map<string, BuilderComplianceItem>,
+): void {
   // QA-N synthetic ids — string-array, no original id field.
   for (const r of records) {
     if (r.record_type !== 'artifact_produced') continue;
@@ -479,7 +597,48 @@ export function collectComplianceItems(records: GovernedStreamRecord[]): Map<str
       byId.set(id, { id, kind: 'quality_attribute', description: typeof q === 'string' ? q : '' });
     });
   }
+}
+
+export function collectComplianceItems(records: GovernedStreamRecord[]): Map<string, BuilderComplianceItem> {
+  const byId = new Map<string, BuilderComplianceItem>();
+  // compliance_retention_discovery emits its array under
+  // `complianceExtractedItems` (camelCase); the previous spelling
+  // (`compliance_extracted_items`, snake) silently returned no items.
+  // Same shape-mismatch class as the collectNfrs fix.
+  const mappings: Array<{ subPhase: string; arrayKey: string; kind: BuilderComplianceItem['kind'] }> = [
+    { subPhase: 'compliance_retention_discovery', arrayKey: 'complianceExtractedItems', kind: 'compliance' },
+    { subPhase: 'vv_requirements_discovery', arrayKey: 'vvRequirements', kind: 'vv_requirement' },
+  ];
+  for (const { subPhase, arrayKey, kind } of mappings) {
+    collectComplianceMapping(records, subPhase, arrayKey, kind, byId);
+  }
+  collectQualityAttributes(records, byId);
   return byId;
+}
+
+function toStringArray(v: unknown): string[] {
+  return Array.isArray(v)
+    ? (v as unknown[]).filter((x): x is string => typeof x === 'string')
+    : [];
+}
+
+function buildCrossCuttingConstraint(c: Record<string, unknown>): BuilderCrossCuttingConstraint {
+  return {
+    id: c.id as string,
+    name: typeof c.name === 'string' ? c.name : (c.id as string),
+    responsibilities: toStringArray(c.responsibilities),
+    applies_to_components: toStringArray(c.applies_to_components),
+  };
+}
+
+function collectConcernsInto(
+  concerns: Array<Record<string, unknown>>,
+  out: BuilderCrossCuttingConstraint[],
+): void {
+  for (const c of concerns) {
+    if (typeof c.id !== 'string') continue;
+    out.push(buildCrossCuttingConstraint(c));
+  }
 }
 
 /** Lever 1a cross-cutting NFR concerns (the `cross_cutting_constraints` artifact). */
@@ -494,22 +653,121 @@ export function collectCrossCuttingConstraints(
     if (content.kind !== 'cross_cutting_constraints') continue;
     const concerns = content.concerns;
     if (!Array.isArray(concerns)) continue;
-    for (const c of concerns as Array<Record<string, unknown>>) {
-      if (typeof c.id !== 'string') continue;
-      out.push({
-        id: c.id,
-        name: typeof c.name === 'string' ? c.name : c.id,
-        responsibilities: Array.isArray(c.responsibilities)
-          ? (c.responsibilities as unknown[]).filter((x): x is string => typeof x === 'string') : [],
-        applies_to_components: Array.isArray(c.applies_to_components)
-          ? (c.applies_to_components as unknown[]).filter((x): x is string => typeof x === 'string') : [],
-      });
-    }
+    collectConcernsInto(concerns as Array<Record<string, unknown>>, out);
   }
   return out;
 }
 
 // ── Main entry ──────────────────────────────────────────────────────
+
+interface CompletionCriteriaCoverage {
+  total: number;
+  covered: number;
+  uncovered: Array<{ packet_id: string; task_id: string; criterion_id: string }>;
+}
+
+/** Aggregate per-CC P8_CC_NO_TEST test-execution coverage across all packets. */
+function computeCompletionCriteriaCoverage(packets: ImplementationPacketContent[]): CompletionCriteriaCoverage {
+  let ccTotal = 0;
+  let ccCovered = 0;
+  const uncovered: Array<{ packet_id: string; task_id: string; criterion_id: string }> = [];
+  for (const p of packets) {
+    for (const cc of p.task.completion_criteria) {
+      if (cc.verification_method !== 'test_execution') continue;
+      ccTotal++;
+      if (cc.covered_by_test_ids && cc.covered_by_test_ids.length > 0) ccCovered++;
+      else uncovered.push({ packet_id: p.packet_id, task_id: p.task.id, criterion_id: cc.criterion_id });
+    }
+  }
+  return { total: ccTotal, covered: ccCovered, uncovered };
+}
+
+/**
+ * Persist the packet_synthesis_failure record when any blocking coherence
+ * failure occurred (and log it); otherwise log the all-coherent info line.
+ */
+function persistCoherenceOutcome(
+  engine: OrchestratorEngine,
+  workflowRun: WorkflowRun,
+  packets: ImplementationPacketContent[],
+  verifierResult: ReturnType<typeof verifyCoherence>,
+  logger: ReturnType<typeof getLogger>,
+): void {
+  if (verifierResult.totals.blockingFailures <= 0) {
+    logger.info('workflow', 'packet_synthesis: all packets coherent', {
+      workflow_run_id: workflowRun.id,
+      packets_total: verifierResult.totals.packetsTotal,
+      advisory_findings: verifierResult.totals.advisoryFindings,
+      ai_proposed_root_count: verifierResult.totals.aiProposedRootCount,
+    });
+    return;
+  }
+  const failuresByPacket: Record<string, string[]> = {};
+  for (const p of packets) {
+    if (p.coherence.blocking_failures.length > 0) {
+      failuresByPacket[p.packet_id] = p.coherence.blocking_failures;
+    }
+  }
+  const crossPacketFailures: Record<string, string[]> = {};
+  for (const [code, details] of verifierResult.crossPacket) {
+    crossPacketFailures[code] = details;
+  }
+  const failureContent: PacketSynthesisFailureContent = {
+    kind: 'packet_synthesis_failure',
+    schemaVersion: '1.0',
+    failures_by_packet: failuresByPacket,
+    cross_packet_failures: crossPacketFailures,
+    total_packets: verifierResult.totals.packetsTotal,
+    failed_packets: verifierResult.totals.packetsFailed,
+    total_blocking_failures: verifierResult.totals.blockingFailures,
+    total_advisory_findings: verifierResult.totals.advisoryFindings,
+    total_ai_proposed_root_count: verifierResult.totals.aiProposedRootCount,
+  };
+  engine.writer.writeRecord({
+    record_type: 'packet_synthesis_failure',
+    schema_version: '1.0',
+    workflow_run_id: workflowRun.id,
+    phase_id: '9',
+    sub_phase_id: 'packet_synthesis',
+    produced_by_agent_role: 'orchestrator',
+    janumicode_version_sha: engine.janumiCodeVersionSha,
+    derived_from_record_ids: [],
+    content: failureContent as unknown as Record<string, unknown>,
+  });
+  logger.warn('workflow', 'packet_synthesis: coherence failures detected (auto-routing to cycle_controller is b.4, currently log-only)', {
+    workflow_run_id: workflowRun.id,
+    packets_total: verifierResult.totals.packetsTotal,
+    packets_failed: verifierResult.totals.packetsFailed,
+    blocking_failures: verifierResult.totals.blockingFailures,
+    advisory_findings: verifierResult.totals.advisoryFindings,
+    ai_proposed_root_count: verifierResult.totals.aiProposedRootCount,
+  });
+}
+
+/** Best-effort telemetry column update (logs a warning on failure, never throws). */
+function updateWorkflowTelemetry(
+  engine: OrchestratorEngine,
+  workflowRun: WorkflowRun,
+  verifierResult: ReturnType<typeof verifyCoherence>,
+  logger: ReturnType<typeof getLogger>,
+): void {
+  try {
+    engine.db.prepare(
+      `UPDATE workflow_runs
+         SET packet_count = ?,
+             packet_coherence_blocking_count = ?,
+             packet_coherence_advisory_count = ?
+       WHERE id = ?`,
+    ).run(
+      verifierResult.totals.packetsTotal,
+      verifierResult.totals.blockingFailures,
+      verifierResult.totals.advisoryFindings,
+      workflowRun.id,
+    );
+  } catch (err) {
+    logger.warn('workflow', 'packet_synthesis: failed to update workflow_runs telemetry', { error: String(err) });
+  }
+}
 
 export function runPacketSynthesisSubPhase(
   ctx: PacketSynthesisContext,
@@ -611,106 +869,32 @@ export function runPacketSynthesisSubPhase(
   // Honest completion-criteria test-coverage report (aggregate of the per-CC
   // P8_CC_NO_TEST binding). Mirrors the other coverage reports — surfaces real
   // gaps (no fabrication); the executor authors tests for uncovered criteria.
-  {
-    let ccTotal = 0;
-    let ccCovered = 0;
-    const uncovered: Array<{ packet_id: string; task_id: string; criterion_id: string }> = [];
-    for (const p of packets) {
-      for (const cc of p.task.completion_criteria) {
-        if (cc.verification_method !== 'test_execution') continue;
-        ccTotal++;
-        if (cc.covered_by_test_ids && cc.covered_by_test_ids.length > 0) ccCovered++;
-        else uncovered.push({ packet_id: p.packet_id, task_id: p.task.id, criterion_id: cc.criterion_id });
-      }
-    }
-    engine.writer.writeRecord({
-      record_type: 'artifact_produced',
-      schema_version: '1.0',
-      workflow_run_id: workflowRun.id,
-      phase_id: '9',
-      sub_phase_id: 'packet_synthesis',
-      produced_by_agent_role: 'orchestrator',
-      janumicode_version_sha: engine.janumiCodeVersionSha,
-      derived_from_record_ids: [],
-      content: {
-        kind: 'completion_criteria_coverage_report',
-        total_test_execution_criteria: ccTotal,
-        covered: ccCovered,
-        uncovered_count: uncovered.length,
-        coverage_percentage: ccTotal > 0 ? Math.round((ccCovered / ccTotal) * 100) : 100,
-        uncovered,
-      },
-    });
-  }
+  const ccCoverage = computeCompletionCriteriaCoverage(packets);
+  engine.writer.writeRecord({
+    record_type: 'artifact_produced',
+    schema_version: '1.0',
+    workflow_run_id: workflowRun.id,
+    phase_id: '9',
+    sub_phase_id: 'packet_synthesis',
+    produced_by_agent_role: 'orchestrator',
+    janumicode_version_sha: engine.janumiCodeVersionSha,
+    derived_from_record_ids: [],
+    content: {
+      kind: 'completion_criteria_coverage_report',
+      total_test_execution_criteria: ccCoverage.total,
+      covered: ccCoverage.covered,
+      uncovered_count: ccCoverage.uncovered.length,
+      coverage_percentage: ccCoverage.total > 0 ? Math.round((ccCoverage.covered / ccCoverage.total) * 100) : 100,
+      uncovered: ccCoverage.uncovered,
+    },
+  });
 
-  // Persist failure record if any blocking failures occurred.
-  if (verifierResult.totals.blockingFailures > 0) {
-    const failuresByPacket: Record<string, string[]> = {};
-    for (const p of packets) {
-      if (p.coherence.blocking_failures.length > 0) {
-        failuresByPacket[p.packet_id] = p.coherence.blocking_failures;
-      }
-    }
-    const crossPacketFailures: Record<string, string[]> = {};
-    for (const [code, details] of verifierResult.crossPacket) {
-      crossPacketFailures[code] = details;
-    }
-    const failureContent: PacketSynthesisFailureContent = {
-      kind: 'packet_synthesis_failure',
-      schemaVersion: '1.0',
-      failures_by_packet: failuresByPacket,
-      cross_packet_failures: crossPacketFailures,
-      total_packets: verifierResult.totals.packetsTotal,
-      failed_packets: verifierResult.totals.packetsFailed,
-      total_blocking_failures: verifierResult.totals.blockingFailures,
-      total_advisory_findings: verifierResult.totals.advisoryFindings,
-      total_ai_proposed_root_count: verifierResult.totals.aiProposedRootCount,
-    };
-    engine.writer.writeRecord({
-      record_type: 'packet_synthesis_failure',
-      schema_version: '1.0',
-      workflow_run_id: workflowRun.id,
-      phase_id: '9',
-      sub_phase_id: 'packet_synthesis',
-      produced_by_agent_role: 'orchestrator',
-      janumicode_version_sha: engine.janumiCodeVersionSha,
-      derived_from_record_ids: [],
-      content: failureContent as unknown as Record<string, unknown>,
-    });
-    logger.warn('workflow', 'packet_synthesis: coherence failures detected (auto-routing to cycle_controller is b.4, currently log-only)', {
-      workflow_run_id: workflowRun.id,
-      packets_total: verifierResult.totals.packetsTotal,
-      packets_failed: verifierResult.totals.packetsFailed,
-      blocking_failures: verifierResult.totals.blockingFailures,
-      advisory_findings: verifierResult.totals.advisoryFindings,
-      ai_proposed_root_count: verifierResult.totals.aiProposedRootCount,
-    });
-  } else {
-    logger.info('workflow', 'packet_synthesis: all packets coherent', {
-      workflow_run_id: workflowRun.id,
-      packets_total: verifierResult.totals.packetsTotal,
-      advisory_findings: verifierResult.totals.advisoryFindings,
-      ai_proposed_root_count: verifierResult.totals.aiProposedRootCount,
-    });
-  }
+  // Persist failure record (and log) if any blocking failures occurred;
+  // otherwise log the all-coherent info line.
+  persistCoherenceOutcome(engine, workflowRun, packets, verifierResult, logger);
 
   // Update workflow_runs telemetry columns.
-  try {
-    engine.db.prepare(
-      `UPDATE workflow_runs
-         SET packet_count = ?,
-             packet_coherence_blocking_count = ?,
-             packet_coherence_advisory_count = ?
-       WHERE id = ?`,
-    ).run(
-      verifierResult.totals.packetsTotal,
-      verifierResult.totals.blockingFailures,
-      verifierResult.totals.advisoryFindings,
-      workflowRun.id,
-    );
-  } catch (err) {
-    logger.warn('workflow', 'packet_synthesis: failed to update workflow_runs telemetry', { error: String(err) });
-  }
+  updateWorkflowTelemetry(engine, workflowRun, verifierResult, logger);
 
   return {
     packets,

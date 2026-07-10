@@ -36,7 +36,8 @@ export interface HeadlessLiaisonConfig {
 }
 
 export interface DecisionOverride {
-  selection: 'index_0' | 'index_1' | 'index_2' | string;
+  /** Selection value; conventionally one of 'index_0' | 'index_1' | 'index_2' but any string is accepted. */
+  selection: string;
   rationale?: string;
 }
 

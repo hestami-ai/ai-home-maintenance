@@ -41,81 +41,119 @@ export function validateDecompositionFanoutDiscipline(
     [];
   const childCount = children.length;
 
-  const findings: ValidatorFinding[] = [];
-
   // Rule (a): atomic → exactly 1 child
   if (ATOMIC_CLASSES.has(classification)) {
-    if (childCount !== 1) {
-      findings.push({
-        validatorId: 'decomposition_fanout_discipline',
-        severity: 'HIGH',
-        type: 'atomic_fanout_violation',
-        summary: `Atomic classification '${classification}' must produce exactly 1 mirror child; got ${childCount}`,
-        location: '$.children',
-        detail: `Fanout rule: atomic → 1 mirror child. Got ${childCount}.`,
-        recommendation: 'Emit exactly one mirror child for atomic classifications.',
-      });
-    }
-    return findings;
+    return checkAtomicFanout(classification, childCount);
   }
 
-  // Rule (b): decomposable → 1–8 children
+  // Rule (b) + (c): decomposable fanout range and flat-mapping anti-patterns
   if (classification === 'decomposable') {
-    if (childCount < 1 || childCount > 8) {
-      findings.push({
-        validatorId: 'decomposition_fanout_discipline',
-        severity: 'HIGH',
-        type: 'decomposable_fanout_out_of_range',
-        summary: `Decomposable parent must produce 1–8 children; got ${childCount}`,
-        location: '$.children',
-        detail: `Fanout rule: decomposable → 1–8 children. Got ${childCount}.`,
-        recommendation: childCount === 0
-          ? 'Add children or reclassify as atomic_leaf / invalid_parent.'
-          : 'Reduce children to 8 or fewer by grouping into sub-parents.',
-      });
-    }
+    return checkDecomposableFanout(children, childCount, parentDescription, parentTier);
+  }
 
-    // Rule (c): flat-mapping anti-pattern
-    if (childCount >= 1 && childCount <= 8) {
-      const childDescriptions = children
-        .filter((c): c is Record<string, unknown> => !!c && typeof c === 'object')
-        .map((c) => (typeof c.description === 'string' ? c.description.trim() : ''));
+  return [];
+}
 
-      // Flat-mapping: ALL children descriptions are identical to the parent
-      const allMirrorParent =
-        parentDescription.length > 0 &&
-        childDescriptions.every((d) => d === parentDescription.trim());
+/** Rule (a): atomic classifications must emit exactly one mirror child. */
+function checkAtomicFanout(classification: string, childCount: number): ValidatorFinding[] {
+  if (childCount === 1) return [];
+  return [
+    {
+      validatorId: 'decomposition_fanout_discipline',
+      severity: 'HIGH',
+      type: 'atomic_fanout_violation',
+      summary: `Atomic classification '${classification}' must produce exactly 1 mirror child; got ${childCount}`,
+      location: '$.children',
+      detail: `Fanout rule: atomic → 1 mirror child. Got ${childCount}.`,
+      recommendation: 'Emit exactly one mirror child for atomic classifications.',
+    },
+  ];
+}
 
-      if (allMirrorParent) {
-        findings.push({
-          validatorId: 'decomposition_fanout_discipline',
-          severity: 'HIGH',
-          type: 'flat_mapping',
-          summary: `All ${childCount} children mirror the parent description without sub-area distinction`,
-          location: '$.children',
-          detail: `Every child description matches the parent ("${parentDescription.slice(0, 80)}"). Flat-mapping does not decompose the component.`,
-          recommendation: 'Each child must represent a distinct sub-area. Rethink the decomposition so children divide responsibilities.',
-        });
-      }
+/** Rule (b): 1–8 children; Rule (c): flat-mapping anti-patterns. */
+function checkDecomposableFanout(
+  children: unknown[],
+  childCount: number,
+  parentDescription: string,
+  parentTier: string | null,
+): ValidatorFinding[] {
+  const findings: ValidatorFinding[] = [];
 
-      // Flat-mapping: single child and same tier as parent
-      if (childCount === 1 && parentTier) {
-        const onlyChild = children[0] as Record<string, unknown>;
-        const childTier = typeof onlyChild?.tier === 'string' ? onlyChild.tier : null;
-        if (childTier === parentTier && childTier !== 'D') {
-          findings.push({
-            validatorId: 'decomposition_fanout_discipline',
-            severity: 'HIGH',
-            type: 'single_child_same_tier',
-            summary: `Single decomposable child has same tier '${childTier}' as parent — likely flat-mapping`,
-            location: '$.children[0].tier',
-            detail: `A single-child decomposition where the child has the same tier as the parent is a flat mapping that does not advance the decomposition hierarchy.`,
-            recommendation: 'Reclassify parent as atomic_leaf or add meaningful sub-area children at a lower tier.',
-          });
-        }
-      }
-    }
+  // Rule (b): decomposable → 1–8 children
+  if (childCount < 1 || childCount > 8) {
+    findings.push({
+      validatorId: 'decomposition_fanout_discipline',
+      severity: 'HIGH',
+      type: 'decomposable_fanout_out_of_range',
+      summary: `Decomposable parent must produce 1–8 children; got ${childCount}`,
+      location: '$.children',
+      detail: `Fanout rule: decomposable → 1–8 children. Got ${childCount}.`,
+      recommendation: childCount === 0
+        ? 'Add children or reclassify as atomic_leaf / invalid_parent.'
+        : 'Reduce children to 8 or fewer by grouping into sub-parents.',
+    });
+  }
+
+  // Rule (c): flat-mapping anti-pattern (only within the valid fanout range)
+  if (childCount >= 1 && childCount <= 8) {
+    findings.push(
+      ...checkAllChildrenMirrorParent(children, childCount, parentDescription),
+      ...checkSingleChildSameTier(children, childCount, parentTier),
+    );
   }
 
   return findings;
+}
+
+/** Flat-mapping: ALL children descriptions are identical to the parent. */
+function checkAllChildrenMirrorParent(
+  children: unknown[],
+  childCount: number,
+  parentDescription: string,
+): ValidatorFinding[] {
+  const childDescriptions = children
+    .filter((c): c is Record<string, unknown> => !!c && typeof c === 'object')
+    .map((c) => (typeof c.description === 'string' ? c.description.trim() : ''));
+
+  const allMirrorParent =
+    parentDescription.length > 0 &&
+    childDescriptions.every((d) => d === parentDescription.trim());
+
+  if (!allMirrorParent) return [];
+  return [
+    {
+      validatorId: 'decomposition_fanout_discipline',
+      severity: 'HIGH',
+      type: 'flat_mapping',
+      summary: `All ${childCount} children mirror the parent description without sub-area distinction`,
+      location: '$.children',
+      detail: `Every child description matches the parent ("${parentDescription.slice(0, 80)}"). Flat-mapping does not decompose the component.`,
+      recommendation: 'Each child must represent a distinct sub-area. Rethink the decomposition so children divide responsibilities.',
+    },
+  ];
+}
+
+/** Flat-mapping: single child sharing the parent's (non-D) tier. */
+function checkSingleChildSameTier(
+  children: unknown[],
+  childCount: number,
+  parentTier: string | null,
+): ValidatorFinding[] {
+  if (childCount !== 1 || !parentTier) return [];
+
+  const onlyChild = children[0] as Record<string, unknown>;
+  const childTier = typeof onlyChild?.tier === 'string' ? onlyChild.tier : null;
+  if (childTier !== parentTier || childTier === 'D') return [];
+
+  return [
+    {
+      validatorId: 'decomposition_fanout_discipline',
+      severity: 'HIGH',
+      type: 'single_child_same_tier',
+      summary: `Single decomposable child has same tier '${childTier}' as parent — likely flat-mapping`,
+      location: '$.children[0].tier',
+      detail: `A single-child decomposition where the child has the same tier as the parent is a flat mapping that does not advance the decomposition hierarchy.`,
+      recommendation: 'Reclassify parent as atomic_leaf or add meaningful sub-area children at a lower tier.',
+    },
+  ];
 }

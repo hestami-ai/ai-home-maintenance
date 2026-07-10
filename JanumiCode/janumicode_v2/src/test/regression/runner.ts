@@ -29,7 +29,7 @@ import { ollamaBaseUrl } from './ollamaPrecheck.js';
 
 export interface RunResult {
   fresh_response_text: string;
-  fresh_parsed_json: unknown | null;
+  fresh_parsed_json: unknown;
   fresh_duration_ms: number;
 }
 
@@ -98,7 +98,7 @@ export async function invokeFromFixture(
     maxTokens: fixture.invocation_params.max_tokens,
   });
   const duration = Date.now() - started;
-  let parsed: unknown | null = result.parsed;
+  let parsed: unknown = result.parsed;
   if (parsed === null && fixture.invocation_params.response_format === 'json') {
     const recovered = parseJsonWithRecovery(result.text);
     parsed = recovered.parsed ?? null;
@@ -115,7 +115,7 @@ export async function invokeFromFixture(
 export async function applyAssertions(
   fixture: Fixture,
   responseText: string,
-  parsedJson: unknown | null,
+  parsedJson: unknown,
 ): Promise<AssertionResult> {
   const checks: AssertionCheck[] = [];
   const requireJsonParse = fixture.assertions.require_json_parse

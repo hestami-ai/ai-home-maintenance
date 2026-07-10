@@ -92,6 +92,52 @@ describe('ReplayFixtureMap', () => {
   });
 });
 
+describe('ReplayFixtureMap.fromNdjson edge branches', () => {
+  let edgePath: string;
+  let edgeMap: ReplayFixtureMap;
+
+  beforeAll(() => {
+    edgePath = path.join(os.tmpdir(), `replay-fixture-edge-${process.pid}.ndjson`);
+    const lines = [
+      '', // blank line — skipped, not counted in rows
+      'this is not json {', // malformed — skipped, not counted in rows
+      row({
+        id: 'inv-noout', record_type: 'agent_invocation', derived_from_record_ids: '[]',
+        content: JSON.stringify({ provider: 'ollama', model: 'm', prompt: 'no output recorded' }),
+      }),
+      row({
+        id: 'inv-fail', record_type: 'agent_invocation', derived_from_record_ids: '[]',
+        content: JSON.stringify({ provider: 'ollama', model: 'm', prompt: 'failed output recorded' }),
+      }),
+      row({
+        id: 'out-fail', record_type: 'agent_output', derived_from_record_ids: '["inv-fail"]',
+        content: JSON.stringify({ text: 'x', status: 'error' }),
+      }),
+    ];
+    fs.writeFileSync(edgePath, lines.join('\n') + '\n', 'utf-8');
+    edgeMap = ReplayFixtureMap.fromNdjson(edgePath);
+  });
+
+  afterAll(() => {
+    if (fs.existsSync(edgePath)) fs.rmSync(edgePath);
+  });
+
+  it('skips blank + malformed lines (only valid JSON counted in rows)', () => {
+    expect(edgeMap.stats.rows).toBe(3);
+  });
+
+  it('non-success output is excluded, leaving its invocation unmatched', () => {
+    expect(edgeMap.stats.skippedNoOutput).toBe(2);
+    expect(edgeMap.stats.llm).toBe(0);
+    expect(edgeMap.stats.cli).toBe(0);
+  });
+
+  it('invocations without a usable output are not indexed', () => {
+    expect(edgeMap.lookupLLM({ ...baseLLM, prompt: 'no output recorded' })).toBeNull();
+    expect(edgeMap.lookupLLM({ ...baseLLM, prompt: 'failed output recorded' })).toBeNull();
+  });
+});
+
 describe('ReplayLLMProvider (Seam A)', () => {
   function opts(prompt: string): LLMCallOptions {
     return { ...baseLLM, prompt } as unknown as LLMCallOptions;

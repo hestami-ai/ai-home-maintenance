@@ -269,6 +269,21 @@ function extractAdrProjectProfile(
 }
 
 /**
+ * Absorb one array of dependency strings (`"name"` / `"name@range"`) into
+ * `out`. Extracted verbatim from `extractDeclaredDependencies`' array branch
+ * to reduce that closure's cognitive complexity (S3776).
+ */
+function absorbDependencyArray(raw: unknown[], out: Record<string, string>): void {
+  for (const item of raw) {
+    if (typeof item !== 'string' || !item.trim()) continue;
+    const s = item.trim();
+    const at = s.lastIndexOf('@');
+    if (at > 0) out[s.slice(0, at)] = s.slice(at + 1) || '*';
+    else out[s] = '*';
+  }
+}
+
+/**
  * Extract DECLARED runtime dependencies from the architecture artifacts —
  * generically. The tech stack is whatever the user's intent + decomposition
  * require (fastify/pg are particulars of one test scenario), so this never
@@ -286,13 +301,7 @@ export function extractDeclaredDependencies(
   const absorb = (raw: unknown): void => {
     if (!raw) return;
     if (Array.isArray(raw)) {
-      for (const item of raw) {
-        if (typeof item !== 'string' || !item.trim()) continue;
-        const s = item.trim();
-        const at = s.lastIndexOf('@');
-        if (at > 0) out[s.slice(0, at)] = s.slice(at + 1) || '*';
-        else out[s] = '*';
-      }
+      absorbDependencyArray(raw, out);
     } else if (typeof raw === 'object') {
       for (const [k, v] of Object.entries(raw as Record<string, unknown>)) {
         if (k && typeof v === 'string' && v) out[k] = v;
@@ -381,7 +390,8 @@ function renderEntityModule(entity: DataModelEntity, componentId: string): strin
     const tsType = toTsType(f.type);
     const fieldType = isNullableField(f) ? `${tsType} | null` : tsType;
     const comment = [f.type, f.constraints].filter(Boolean).join(' — ');
-    lines.push(`  ${f.name}: ${fieldType};${comment ? ` // ${comment}` : ''}`);
+    const commentSuffix = comment ? ` // ${comment}` : '';
+    lines.push(`  ${f.name}: ${fieldType};${commentSuffix}`);
   }
   lines.push(`}`);
   if (entity.relationships?.length) {
@@ -394,10 +404,10 @@ function renderEntityModule(entity: DataModelEntity, componentId: string): strin
 function renderContractModule(c: InterfaceContract): string {
   const name = pascalCase(c.id);
   const lines: string[] = [];
+  const authSuffix = c.auth_mechanism ? ` | Auth: ${c.auth_mechanism}` : '';
   lines.push(
     `// Generated shared interface contract — ${c.id}.`,
-    `// Protocol: ${c.protocol ?? 'n/a'} | Format: ${c.data_format ?? 'n/a'}` +
-    `${c.auth_mechanism ? ` | Auth: ${c.auth_mechanism}` : ''}`,
+    `// Protocol: ${c.protocol ?? 'n/a'} | Format: ${c.data_format ?? 'n/a'}` + authSuffix,
   );
   if (c.systems_involved?.length) lines.push(`// Systems: ${c.systems_involved.join(', ')}`);
   lines.push(
@@ -487,7 +497,8 @@ function renderPyEntity(entity: DataModelEntity, componentId: string): string {
     const pyType = toPyType(f.type);
     const fieldType = isNullableField(f) ? `Optional[${pyType}]` : pyType;
     const comment = [f.type, f.constraints].filter(Boolean).join(' — ');
-    lines.push(`    ${f.name}: ${fieldType}${comment ? `  # ${comment}` : ''}`);
+    const commentSuffix = comment ? `  # ${comment}` : '';
+    lines.push(`    ${f.name}: ${fieldType}${commentSuffix}`);
   }
   if (entity.relationships?.length) {
     lines.push('', `    # Relationships: ${entity.relationships.join(', ')}`);
@@ -499,10 +510,10 @@ function renderPyEntity(entity: DataModelEntity, componentId: string): string {
 function renderPyContract(c: InterfaceContract): string {
   const name = pySnake(c.id);
   const lines: string[] = [];
+  const authSuffix = c.auth_mechanism ? ` | Auth: ${c.auth_mechanism}` : '';
   lines.push(
     `# Generated shared interface contract — ${c.id}.`,
-    `# Protocol: ${c.protocol ?? 'n/a'} | Format: ${c.data_format ?? 'n/a'}` +
-    `${c.auth_mechanism ? ` | Auth: ${c.auth_mechanism}` : ''}`,
+    `# Protocol: ${c.protocol ?? 'n/a'} | Format: ${c.data_format ?? 'n/a'}` + authSuffix,
   );
   if (c.systems_involved?.length) lines.push(`# Systems: ${c.systems_involved.join(', ')}`);
   lines.push(
@@ -697,6 +708,9 @@ export function materializeScaffold(
 
   // Shared data models — one file per entity, deduped by entity name.
   const barrelExports: string[] = [];
+  // Barrel specifiers omit the extension for TS, but need `.js` for JS ESM.
+  // `profile.language` is immutable here, so hoist the (pure) suffix once.
+  const barrelSuffix = profile.language === 'typescript' ? '' : '.js';
   const seenEntities = new Set<string>();
   for (const model of dataModels?.models ?? []) {
     for (const entity of model.entities ?? []) {
@@ -705,7 +719,7 @@ export function materializeScaffold(
       seenEntities.add(key);
       const rel = `${shared}/models/${key}.${e}`;
       writeIfAbsent(workspacePath, rel, renderEntityModule(entity, model.component_id), result);
-      barrelExports.push(`./models/${key}${profile.language === 'typescript' ? '' : '.js'}`);
+      barrelExports.push(`./models/${key}${barrelSuffix}`);
     }
   }
 
@@ -717,7 +731,7 @@ export function materializeScaffold(
     const key = pascalCase(c.id);
     const rel = `${shared}/contracts/${key}.${e}`;
     writeIfAbsent(workspacePath, rel, renderContractModule(c), result);
-    barrelExports.push(`./contracts/${key}${profile.language === 'typescript' ? '' : '.js'}`);
+    barrelExports.push(`./contracts/${key}${barrelSuffix}`);
   }
 
   // Barrel — re-export everything so leaves import from one place.

@@ -403,6 +403,115 @@ describe('buildReleaseManifest — VV / QA / TECH (ts-13 cross-cutting routing)'
   });
 });
 
+describe('buildReleaseManifest — golden snapshot (characterization)', () => {
+  // Pins the ENTIRE result object (shape, ordering, every field) for a
+  // representative multi-release input. Guards behaviour-preserving
+  // refactors of the builder against subtle reordering / field drift.
+  it('produces the exact full manifest object for a representative input', () => {
+    const r = buildReleaseManifest({
+      releases: [
+        skeleton('REL-1', 1, ['UJ-ONBOARD']),
+        skeleton('REL-2', 2, ['UJ-CLAIM']),
+      ],
+      journeys: [
+        journey('UJ-ONBOARD', { domains: ['DOM-IDENTITY'] }),
+        journey('UJ-CLAIM', { domains: ['DOM-CLAIMS'] }),
+      ],
+      workflows: [
+        workflow({
+          id: 'WF-PROVISION',
+          domain: 'DOM-IDENTITY',
+          triggers: [{ kind: 'journey_step', journey_id: 'UJ-ONBOARD', step_number: 1 }],
+        }),
+        workflow({
+          id: 'WF-AUDIT-NIGHTLY',
+          domain: 'DOM-AUDIT',
+          triggers: [{ kind: 'schedule', cadence: 'daily at 02:00 UTC' }],
+        }),
+      ],
+      entities: [entity('ENT-USER', 'DOM-IDENTITY'), entity('ENT-CLAIM', 'DOM-CLAIMS')],
+      complianceIds: ['COMP-GDPR-RTBF'],
+      integrations: [integration('INT-EMAIL')],
+      vocabulary: [voc('VOC-CLAIM')],
+    });
+
+    expect(r).toEqual({
+      releases: [
+        {
+          release_id: 'REL-1',
+          ordinal: 1,
+          name: 'Release 1',
+          description: 'd',
+          rationale: 'r',
+          contains: {
+            journeys: ['UJ-ONBOARD'],
+            workflows: ['WF-PROVISION'],
+            entities: ['ENT-USER'],
+            compliance: [],
+            integrations: [],
+            vocabulary: [],
+            vv_requirements: [],
+            quality_attributes: [],
+            technical_constraints: [],
+          },
+        },
+        {
+          release_id: 'REL-2',
+          ordinal: 2,
+          name: 'Release 2',
+          description: 'd',
+          rationale: 'r',
+          contains: {
+            journeys: ['UJ-CLAIM'],
+            workflows: [],
+            entities: ['ENT-CLAIM'],
+            compliance: [],
+            integrations: [],
+            vocabulary: [],
+            vv_requirements: [],
+            quality_attributes: [],
+            technical_constraints: [],
+          },
+        },
+      ],
+      crossCutting: {
+        workflows: ['WF-AUDIT-NIGHTLY'],
+        compliance: ['COMP-GDPR-RTBF'],
+        integrations: ['INT-EMAIL'],
+        vocabulary: ['VOC-CLAIM'],
+        vv_requirements: [],
+        quality_attributes: [],
+        technical_constraints: [],
+      },
+      unplacedJourneys: [],
+      orphanEntities: [],
+    });
+  });
+
+  it('pins the defaulting paths: unplaced journeys and orphan entities sort + REL-1 fallback', () => {
+    const r = buildReleaseManifest({
+      releases: [skeleton('REL-1', 1, ['UJ-A'])],
+      journeys: [
+        journey('UJ-A', { domains: ['DOM-KNOWN'] }),
+        journey('UJ-Z'),
+        journey('UJ-B'),
+      ],
+      workflows: [],
+      entities: [entity('ENT-Z', 'DOM-MISSING'), entity('ENT-A', 'DOM-MISSING')],
+      complianceIds: [],
+      integrations: [],
+      vocabulary: [],
+    });
+
+    // Un-placed journeys UJ-Z, UJ-B default into REL-1 (sorted in report).
+    expect(r.releases[0].contains.journeys).toEqual(['UJ-A', 'UJ-B', 'UJ-Z']);
+    expect(r.unplacedJourneys).toEqual(['UJ-B', 'UJ-Z']);
+    // Orphan entities default into REL-1 (sorted in report + in contains).
+    expect(r.releases[0].contains.entities).toEqual(['ENT-A', 'ENT-Z']);
+    expect(r.orphanEntities).toEqual(['ENT-A', 'ENT-Z']);
+  });
+});
+
 describe('buildReleaseManifest — full end-to-end coherence', () => {
   it('produces a fully-populated manifest with exact coverage and no drops', () => {
     const r = buildReleaseManifest({

@@ -334,6 +334,55 @@ describe('stripSelfProducedAcceptedSets — gatekeeper self-reference guard', ()
   });
 });
 
+describe('renderUpstreamSection (via buildGatekeeperPrompt) — characterization of item-line formatting', () => {
+  // Characterization: pins the exact bullet-line rendering of each
+  // upstream field branch (id / text / target-fallback / type /
+  // threshold / no-id) that flows through the private
+  // renderUpstreamSection. Existing tests only exercise the id-only
+  // path (acceptedDomains); these lock the type/threshold/target/no-id
+  // branches so the extraction into renderUpstreamItemLine is provably
+  // behavior-preserving.
+  it('formats id/text, type, threshold-with-target, and no-id lines verbatim', async () => {
+    const { buildGatekeeperPrompt } = await import('../../../lib/orchestrator/scopeGatekeeper');
+    const cfg: GatekeeperConfig = {
+      workflowRunId: 'wf', phaseId: '1', subPhaseId: 'business_domains_bloom',
+      bloomDescription: 'domains',
+      items: [{ id: 'DOM-A', label: '[Domain] A' }],
+      upstreamContext: {
+        // id + text branch
+        intentConstraints: [{ id: 'CON-1', text: 'no feature X' }],
+        // no-id branch (idStr === '')
+        intentRequirements: [{ text: 'anon requirement' }],
+        // type branch (renders " [<type>] ")
+        complianceItems: [{ id: 'CMP-1', text: 'GDPR compliance', type: 'regulatory' }],
+        // target-as-text fallback + threshold branch
+        vvRequirements: [{ id: 'VV-1', target: '99.9% uptime', threshold: '99.9' }],
+      },
+    };
+    const prompt = buildGatekeeperPrompt(cfg);
+    expect(prompt).toContain('  - CON-1: no feature X');
+    expect(prompt).toContain('  - anon requirement');
+    expect(prompt).toContain('  - CMP-1:  [regulatory] GDPR compliance');
+    expect(prompt).toContain('  - VV-1: 99.9% uptime  (threshold: 99.9)');
+  });
+
+  it('omits a section entirely when its list is empty or undefined', async () => {
+    const { buildGatekeeperPrompt } = await import('../../../lib/orchestrator/scopeGatekeeper');
+    const cfg: GatekeeperConfig = {
+      workflowRunId: 'wf', phaseId: '1', subPhaseId: 'business_domains_bloom',
+      bloomDescription: 'domains',
+      items: [{ id: 'DOM-A', label: '[Domain] A' }],
+      upstreamContext: {
+        intentConstraints: [{ id: 'CON-1', text: 'no feature X' }],
+        // complianceItems / vvRequirements absent → their headers must not appear
+      },
+    };
+    const prompt = buildGatekeeperPrompt(cfg);
+    expect(prompt).not.toContain('Upstream Compliance Items');
+    expect(prompt).not.toContain('Upstream V&V Requirements');
+  });
+});
+
 describe('component gatekeeper prompt renders software-domain namespace (ts-113 fix)', () => {
   it('buildGatekeeperPrompt includes the Accepted Software Domains section with domain-* ids', async () => {
     const { buildGatekeeperPrompt } = await import('../../../lib/orchestrator/scopeGatekeeper');

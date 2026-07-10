@@ -212,37 +212,82 @@ export interface BoxEvidence { region: Region; score: number; text: string; acti
 
 export function detectBoxRegions(s: ScreenSnapshot): BoxEvidence[] {
   const top0 = s.viewportTop ?? 0;
-  const lines = s.lines;
   const out: BoxEvidence[] = [];
-  for (let r1 = top0; r1 < lines.length; r1++) {
-    const row = lines[r1] ?? '';
-    for (let c1 = 0; c1 < row.length; c1++) {
-      if (!TL.has(row[c1])) continue;
-      for (let c2 = c1 + 4; c2 < row.length; c2++) {
-        if (!TR.has(row[c2])) continue;
-        // Top edge: mostly horizontal chars (≥50% — allows embedded titles
-        // like `┌──── Confirm ────┐`).
-        const topOk = countEdge(row, c1 + 1, c2 - 1) >= (c2 - c1 - 1) * 0.5;
-        if (!topOk) continue;
-        for (let r2 = r1 + 2; r2 < lines.length; r2++) {
-          const bot = lines[r2] ?? '';
-          if (!BL.has(bot[c1] ?? '') || !BR.has(bot[c2] ?? '')) continue;
-          if (countEdge(bot, c1 + 1, c2 - 1) < (c2 - c1 - 1) * 0.5) continue;
-          let sidesOk = true;
-          for (let r = r1 + 1; r < r2; r++) {
-            const l = lines[r] ?? '';
-            if (!VC.has(l[c1] ?? '') || !VC.has(l[c2] ?? '')) { sidesOk = false; break; }
-          }
-          if (!sidesOk) continue;
-          const region: Region = { top: r1, left: c1, bottom: r2, right: c2 };
-          const text = extractText(s, region);
-          const actions = detectActions(text);
-          out.push({ region, score: scoreBox(region, s, text), text, actions });
-        }
-      }
-    }
-  }
+  for (let r1 = top0; r1 < s.lines.length; r1++) collectBoxesFromRow(s, r1, out);
   return out;
+}
+
+/** Scan one row for box top-left corners; collect any boxes rooted at each. */
+function collectBoxesFromRow(s: ScreenSnapshot, r1: number, out: BoxEvidence[]): void {
+  const row = s.lines[r1] ?? '';
+  for (let c1 = 0; c1 < row.length; c1++) {
+    if (!TL.has(row[c1])) continue;
+    collectBoxesFromTopLeft(s, row, r1, c1, out);
+  }
+}
+
+/** From a confirmed top-left corner, find valid top edges and collect their boxes. */
+function collectBoxesFromTopLeft(
+  s: ScreenSnapshot,
+  row: string,
+  r1: number,
+  c1: number,
+  out: BoxEvidence[],
+): void {
+  // Top-right corner must be at least 4 columns to the right.
+  for (let c2 = c1 + 4; c2 < row.length; c2++) {
+    if (!TR.has(row[c2])) continue;
+    // Top edge: mostly horizontal chars (≥50% — allows embedded titles
+    // like `┌──── Confirm ────┐`).
+    if (!isEdgeMostlyHorizontal(row, c1, c2)) continue;
+    collectBoxesForTopEdge(s, r1, c1, c2, out);
+  }
+}
+
+/** For a confirmed top edge (r1, c1..c2), find matching bottom edges with intact sides. */
+function collectBoxesForTopEdge(
+  s: ScreenSnapshot,
+  r1: number,
+  c1: number,
+  c2: number,
+  out: BoxEvidence[],
+): void {
+  const lines = s.lines;
+  for (let r2 = r1 + 2; r2 < lines.length; r2++) {
+    const bot = lines[r2] ?? '';
+    if (!BL.has(bot[c1] ?? '') || !BR.has(bot[c2] ?? '')) continue;
+    if (!isEdgeMostlyHorizontal(bot, c1, c2)) continue;
+    if (!sidesAreVertical(lines, r1, r2, c1, c2)) continue;
+    out.push(buildBoxEvidence(s, r1, c1, r2, c2));
+  }
+}
+
+/** Both edge columns (c1 and c2) carry a vertical box char on every interior row. */
+function sidesAreVertical(lines: string[], r1: number, r2: number, c1: number, c2: number): boolean {
+  for (let r = r1 + 1; r < r2; r++) {
+    const l = lines[r] ?? '';
+    if (!VC.has(l[c1] ?? '') || !VC.has(l[c2] ?? '')) return false;
+  }
+  return true;
+}
+
+/** The `c1+1..c2-1` interior span of `row` is ≥50% horizontal box chars. */
+function isEdgeMostlyHorizontal(row: string, c1: number, c2: number): boolean {
+  return countEdge(row, c1 + 1, c2 - 1) >= (c2 - c1 - 1) * 0.5;
+}
+
+/** Materialize the evidence record for a confirmed box region. */
+function buildBoxEvidence(
+  s: ScreenSnapshot,
+  r1: number,
+  c1: number,
+  r2: number,
+  c2: number,
+): BoxEvidence {
+  const region: Region = { top: r1, left: c1, bottom: r2, right: c2 };
+  const text = extractText(s, region);
+  const actions = detectActions(text);
+  return { region, score: scoreBox(region, s, text), text, actions };
 }
 
 function countEdge(row: string, from: number, to: number): number {

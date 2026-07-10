@@ -518,6 +518,52 @@ describe('verifyCoherence — totals', () => {
   });
 });
 
+// ── Golden snapshot: exact per-packet result shape + ordering ──────
+// Pins verifyPacket's full observable output (message text AND the order of the
+// blocking/advisory arrays) for a packet that trips several assertions at once —
+// a behaviour lock for the helper decomposition. Values are derived by hand from
+// the original assertion logic (P2→P3→P4→P5 blocking order; A1 advisory).
+
+describe('verifyCoherence — golden per-packet result', () => {
+  it('emits the exact blocking/advisory arrays and annotations for a multi-defect packet', () => {
+    const p = packet({
+      user_stories: [
+        {
+          id: 'US-001', role: 'r', action: 'a', outcome: 'o', priority: 'critical',
+          acceptance_criteria: [{ id: 'AC-001', description: 'ac1', measurable_condition: 'HTTP 201' }],
+        },
+        {
+          id: 'US-002', role: 'r', action: 'a', outcome: 'o', priority: 'high',
+          acceptance_criteria: [],
+        },
+      ],
+      nfrs: [{ id: 'NFR-1', category: 'perf', description: 'd' }],
+      test_cases: [],          // → P3 for US-001/AC-001
+      evaluation_criteria: [], // → P4 for both stories, P5 for NFR-1
+      // default task write_directory_paths ['src/server/foo'] lacks the comp slug → A1
+    });
+    const r = verifyCoherence({
+      packets: [p],
+      upstreamIndex: idxWithAll(['US-001', 'AC-001', 'US-002', 'NFR-1', 'comp-001']),
+      atomicTaskIds: new Set(['task-001']),
+    });
+    expect(r.byPacketId.get('pkt-1')!).toEqual({
+      passed: false,
+      blocking_failures: [
+        'P2_USER_STORY_NO_AC: US-002 has no acceptance criteria',
+        'P3_AC_NO_TEST: US-001/AC-001 has no test case',
+        'P4_USER_STORY_NO_EVAL: US-001 has no evaluation criterion',
+        'P4_USER_STORY_NO_EVAL: US-002 has no evaluation criterion',
+        'P5_NFR_NO_EVAL: NFR-1 has no evaluation criterion',
+      ],
+      advisory_findings: [
+        "A1_TASK_OUTSIDE_COMPONENT_BOUNDARY: task task-001 write_directory_paths do not mention component 'comp-001' slug",
+      ],
+      annotations: { ai_proposed_root_count: 0, ai_proposed_root_ids: [] },
+    });
+  });
+});
+
 // ── expected_outcome robustness (slice-129 crash) ──────────────────
 // The LLM (test_case_saturation) sometimes emits expected_outcome as an
 // ARRAY of outcome strings. The A2 advisory did `tc.expected_outcome.trim()`

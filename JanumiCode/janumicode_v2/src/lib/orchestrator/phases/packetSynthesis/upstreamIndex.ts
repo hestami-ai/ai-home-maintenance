@@ -75,50 +75,121 @@ const EXTRACTION_RULES: Record<string, ExtractionRule[]> = (() => {
   return rules;
 })();
 
+/** (id, item, source) triple emitted by the artifact extractor. */
+type ExtractedTriple = { id: string; item: unknown; source: string | undefined };
+
+/**
+ * Resolve the id for one array element under a rule: either the synthetic
+ * position id, or the object's `idField`. Returns undefined when no valid id is
+ * present. Mirrors the original syntheticId-else-object-id precedence exactly —
+ * a rule with a syntheticId never falls through to the object-id path.
+ */
+function resolveRuleItemId(rule: ExtractionRule, raw: unknown, index: number): string | undefined {
+  if (rule.syntheticId) {
+    const synth = rule.syntheticId(raw, index);
+    if (synth) return synth;
+    return undefined;
+  }
+  if (raw && typeof raw === 'object') {
+    const candidate = (raw as Record<string, unknown>)[rule.idField];
+    if (typeof candidate === 'string' && candidate.length > 0) return candidate;
+  }
+  return undefined;
+}
+
+/** Pull the `source` string off an item, or undefined when absent/non-string. */
+function extractSource(raw: unknown): string | undefined {
+  if (raw && typeof raw === 'object') {
+    const source = (raw as Record<string, unknown>).source;
+    if (typeof source === 'string') return source;
+  }
+  return undefined;
+}
+
+/**
+ * Walk one array under `rule`, appending extracted triples to `out`, then
+ * recurse into nested rules — even when the outer item has no id, so a
+ * malformed parent can't hide a valid child id.
+ */
+function walkExtractionRule(
+  rule: ExtractionRule,
+  parent: Record<string, unknown>,
+  out: ExtractedTriple[],
+): void {
+  const arr = parent[rule.arrayKey];
+  if (!Array.isArray(arr)) return;
+  for (let i = 0; i < arr.length; i++) {
+    const raw = arr[i];
+    const id = resolveRuleItemId(rule, raw, i);
+    if (id) out.push({ id, item: raw, source: extractSource(raw) });
+    if (rule.nested && raw && typeof raw === 'object') {
+      for (const sub of rule.nested) walkExtractionRule(sub, raw as Record<string, unknown>, out);
+    }
+  }
+}
+
 /**
  * Walk one content blob, applying the rules registered for its
  * sub_phase_id. Returns the (id, item, source) triples extracted.
  */
-function extractFromArtifact(
-  subPhaseId: string,
-  content: Record<string, unknown>,
-): Array<{ id: string; item: unknown; source: string | undefined }> {
+function extractFromArtifact(subPhaseId: string, content: Record<string, unknown>): ExtractedTriple[] {
   const rules = EXTRACTION_RULES[subPhaseId];
   if (!rules) return [];
-  const out: Array<{ id: string; item: unknown; source: string | undefined }> = [];
-
-  function walk(rule: ExtractionRule, parent: Record<string, unknown>): void {
-    const arr = parent[rule.arrayKey];
-    if (!Array.isArray(arr)) return;
-    for (let i = 0; i < arr.length; i++) {
-      const raw = arr[i];
-      let id: string | undefined;
-      let item: unknown = raw;
-      if (rule.syntheticId) {
-        const synth = rule.syntheticId(raw, i);
-        if (synth) id = synth;
-      } else if (raw && typeof raw === 'object') {
-        const obj = raw as Record<string, unknown>;
-        const candidate = obj[rule.idField];
-        if (typeof candidate === 'string' && candidate.length > 0) id = candidate;
-      }
-      if (id) {
-        const src =
-          raw && typeof raw === 'object' && typeof (raw as Record<string, unknown>).source === 'string'
-            ? ((raw as Record<string, unknown>).source as string)
-            : undefined;
-        out.push({ id, item, source: src });
-      }
-      // Recurse into nested rules even when the outer item has no id —
-      // a malformed parent shouldn't hide a valid child id.
-      if (rule.nested && raw && typeof raw === 'object') {
-        for (const sub of rule.nested) walk(sub, raw as Record<string, unknown>);
-      }
-    }
-  }
-
-  for (const r of rules) walk(r, content);
+  const out: ExtractedTriple[] = [];
+  for (const r of rules) walkExtractionRule(r, content, out);
   return out;
+}
+
+/**
+ * Record-type → the content key whose `.id` (or `.test_case_id`) is the leaf
+ * entity id for a saturation node. `data_model_decomposition_node` intentionally
+ * reads `entity` here (the id source), which differs from the artifact-store
+ * mapping (SATURATION_ARTIFACT_KEY) that reads `data_model`.
+ */
+const SATURATION_ENTITY_KEY: Record<string, 'component' | 'entity' | 'task' | 'test_case'> = {
+  component_decomposition_node: 'component',
+  data_model_decomposition_node: 'entity',
+  task_decomposition_node: 'task',
+  test_decomposition_node: 'test_case',
+};
+
+/**
+ * FR/NFR-saturation leaf ids: the decomposed user story's OWN leaf id (e.g.
+ * US-002-D1) plus every composite leaf acceptance-criterion id
+ * (AC-US-002-D1-001). Phase 7/8 trace to these; indexing them stops every leaf
+ * reference from flagging as a false P7_INVENTED_ID_REFERENCE. Does NOT include
+ * the node_id — the caller prepends that.
+ */
+function extractRequirementLeafIds(content: Record<string, unknown>): string[] {
+  const ids: string[] = [];
+  const story = content.user_story;
+  if (!story || typeof story !== 'object') return ids;
+  const s = story as Record<string, unknown>;
+  if (typeof s.id === 'string' && s.id.length > 0) ids.push(s.id);
+  const acs = s.acceptance_criteria;
+  if (!Array.isArray(acs)) return ids;
+  for (const ac of acs) {
+    if (!ac || typeof ac !== 'object') continue;
+    const acId = (ac as Record<string, unknown>).id;
+    if (typeof acId === 'string' && acId.length > 0) ids.push(acId);
+  }
+  return ids;
+}
+
+/**
+ * Leaf entity id for component/data-model/task/test saturation nodes. Returns a
+ * single-element array with the id, or [] when the record type is unknown or the
+ * entity carries no valid id.
+ */
+function extractEntityNodeId(nodeRecordType: string, content: Record<string, unknown>): string[] {
+  const entityKey = SATURATION_ENTITY_KEY[nodeRecordType];
+  if (!entityKey) return [];
+  const entity = content[entityKey];
+  if (!entity || typeof entity !== 'object') return [];
+  const idField = entityKey === 'test_case' ? 'test_case_id' : 'id';
+  const candidate = (entity as Record<string, unknown>)[idField];
+  if (typeof candidate === 'string' && candidate.length > 0) return [candidate];
+  return [];
 }
 
 /**
@@ -139,43 +210,12 @@ function extractFromSaturationNode(
   const nodeId = content.node_id;
   if (typeof nodeId === 'string' && nodeId.length > 0) ids.push(nodeId);
 
-  // FR/NFR-saturation leaves: the decomposed user story lives at
-  // content.user_story with its OWN leaf id (e.g. US-002-D1) and composite
-  // acceptance-criterion ids (AC-US-002-D1-001). Index both the leaf story id
-  // and every leaf AC id — Phase 7/8 trace to these, and the canonical roots
-  // alone (US-002 / AC-US002-001) leave every leaf reference flagged as a
-  // false P7_INVENTED_ID_REFERENCE.
   if (nodeRecordType === 'requirement_decomposition_node') {
-    const story = content.user_story;
-    if (story && typeof story === 'object') {
-      const s = story as Record<string, unknown>;
-      if (typeof s.id === 'string' && s.id.length > 0) ids.push(s.id);
-      const acs = s.acceptance_criteria;
-      if (Array.isArray(acs)) {
-        for (const ac of acs) {
-          if (ac && typeof ac === 'object') {
-            const acId = (ac as Record<string, unknown>).id;
-            if (typeof acId === 'string' && acId.length > 0) ids.push(acId);
-          }
-        }
-      }
-    }
+    ids.push(...extractRequirementLeafIds(content));
     return ids;
   }
 
-  let entityKey: 'component' | 'entity' | 'task' | 'test_case' | null;
-  if (nodeRecordType === 'component_decomposition_node') entityKey = 'component';
-  else if (nodeRecordType === 'data_model_decomposition_node') entityKey = 'entity';
-  else if (nodeRecordType === 'task_decomposition_node') entityKey = 'task';
-  else if (nodeRecordType === 'test_decomposition_node') entityKey = 'test_case';
-  else entityKey = null;
-  if (!entityKey) return ids;
-  const entity = content[entityKey];
-  if (entity && typeof entity === 'object') {
-    const idField = entityKey === 'test_case' ? 'test_case_id' : 'id';
-    const candidate = (entity as Record<string, unknown>)[idField];
-    if (typeof candidate === 'string' && candidate.length > 0) ids.push(candidate);
-  }
+  ids.push(...extractEntityNodeId(nodeRecordType, content));
   return ids;
 }
 
@@ -190,54 +230,85 @@ export interface IndexInput {
 }
 
 /**
+ * Record-type → the content key holding the full entity to copy into
+ * `artifactsById`. Note `data_model_decomposition_node` reads `data_model` here
+ * (the stored artifact), which differs from SATURATION_ENTITY_KEY (the id
+ * source). Unknown types fall back to the whole node content.
+ */
+const SATURATION_ARTIFACT_KEY: Record<
+  string,
+  'component' | 'data_model' | 'task' | 'test_case' | 'user_story'
+> = {
+  component_decomposition_node: 'component',
+  data_model_decomposition_node: 'data_model',
+  task_decomposition_node: 'task',
+  test_decomposition_node: 'test_case',
+  requirement_decomposition_node: 'user_story',
+};
+
+/**
+ * The most useful copy of a saturation node's entity for artifactsById — the
+ * underlying entity object, or the whole node content when the entity is absent
+ * or the record type is unknown.
+ */
+function resolveSaturationEntity(node: {
+  recordType: string;
+  content: Record<string, unknown>;
+}): unknown {
+  const entityKey = SATURATION_ARTIFACT_KEY[node.recordType];
+  const entity = entityKey ? node.content[entityKey] : node.content;
+  return entity ?? node.content;
+}
+
+/** Index one artifact's extracted triples into the accumulator. */
+function indexArtifactItems(a: UpstreamArtifactInput, index: UpstreamIndex): void {
+  const extracted = extractFromArtifact(a.sub_phase_id, a.content);
+  for (const { id, item, source } of extracted) {
+    index.allUpstreamIds.add(id);
+    if (source === 'ai-proposed') index.aiProposedIds.add(id);
+    else if (source === 'user-specified') index.userSpecifiedIds.add(id);
+    // First writer wins for the artifacts map — preserves the original
+    // (skeleton) item over any later supersession revisions in the
+    // caller's input order.
+    if (!index.artifactsById.has(id)) index.artifactsById.set(id, item);
+  }
+}
+
+/**
+ * Index one saturation node's ids into the accumulator (first-seen wins for the
+ * artifacts map, mirroring the artifact path).
+ */
+function indexSaturationNode(
+  node: { recordType: string; content: Record<string, unknown> },
+  allUpstreamIds: Set<string>,
+  artifactsById: Map<string, unknown>,
+): void {
+  const ids = extractFromSaturationNode(node.recordType, node.content);
+  for (const id of ids) {
+    allUpstreamIds.add(id);
+    if (!artifactsById.has(id)) artifactsById.set(id, resolveSaturationEntity(node));
+  }
+}
+
+/**
  * Pure indexer. Given a snapshot of upstream artifacts + saturation
  * nodes, returns the index. No DB; no async; deterministic.
  */
 export function indexArtifacts(input: IndexInput): UpstreamIndex {
-  const allUpstreamIds = new Set<string>();
-  const aiProposedIds = new Set<string>();
-  const userSpecifiedIds = new Set<string>();
-  const artifactsById = new Map<string, unknown>();
+  const index: UpstreamIndex = {
+    allUpstreamIds: new Set<string>(),
+    aiProposedIds: new Set<string>(),
+    userSpecifiedIds: new Set<string>(),
+    artifactsById: new Map<string, unknown>(),
+  };
 
   for (const a of input.artifacts) {
-    const extracted = extractFromArtifact(a.sub_phase_id, a.content);
-    for (const { id, item, source } of extracted) {
-      allUpstreamIds.add(id);
-      if (source === 'ai-proposed') aiProposedIds.add(id);
-      else if (source === 'user-specified') userSpecifiedIds.add(id);
-      // First writer wins for the artifacts map — preserves the original
-      // (skeleton) item over any later supersession revisions in the
-      // caller's input order.
-      if (!artifactsById.has(id)) artifactsById.set(id, item);
-    }
+    indexArtifactItems(a, index);
   }
 
   for (const node of input.saturationNodes ?? []) {
-    const ids = extractFromSaturationNode(node.recordType, node.content);
-    for (const id of ids) {
-      allUpstreamIds.add(id);
-      // Saturation entity (the full task/component/etc.) — preserve
-      // first-seen.
-      if (!artifactsById.has(id)) {
-        // For saturation, the underlying entity is the most useful copy.
-        let entityKey:
-          | 'component'
-          | 'data_model'
-          | 'task'
-          | 'test_case'
-          | 'user_story'
-          | null;
-        if (node.recordType === 'component_decomposition_node') entityKey = 'component';
-        else if (node.recordType === 'data_model_decomposition_node') entityKey = 'data_model';
-        else if (node.recordType === 'task_decomposition_node') entityKey = 'task';
-        else if (node.recordType === 'test_decomposition_node') entityKey = 'test_case';
-        else if (node.recordType === 'requirement_decomposition_node') entityKey = 'user_story';
-        else entityKey = null;
-        const entity = entityKey ? node.content[entityKey] : node.content;
-        artifactsById.set(id, entity ?? node.content);
-      }
-    }
+    indexSaturationNode(node, index.allUpstreamIds, index.artifactsById);
   }
 
-  return { allUpstreamIds, aiProposedIds, userSpecifiedIds, artifactsById };
+  return index;
 }

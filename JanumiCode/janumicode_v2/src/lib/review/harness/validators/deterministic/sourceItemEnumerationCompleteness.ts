@@ -149,6 +149,94 @@ function collectOutputRefs(items: unknown[], refField: string): Set<string> {
   return refs;
 }
 
+/**
+ * Build findings for the case where the output field is structurally absent.
+ * Every source id is flagged as silently dropped (HIGH).
+ */
+function buildOutputFieldMissingFindings(
+  sourceIds: Set<string>,
+  config: SubPhaseConfig,
+): ValidatorFinding[] {
+  return [...sourceIds].map((id) => ({
+    validatorId: 'source_item_enumeration_completeness',
+    severity: 'HIGH' as const,
+    type: 'output_field_missing',
+    summary: `Output field '${config.outputFieldPath}' is absent; source item '${id}' silently dropped`,
+    location: `$.${config.outputFieldPath}`,
+    detail: `Source context contained id '${id}' but output field '${config.outputFieldPath}' is missing entirely.`,
+    recommendation: `Ensure '${config.outputFieldPath}' is populated with an entry referencing '${id}'.`,
+  }));
+}
+
+/**
+ * id_match mode: flag any source id not referenced by an output item's ref field.
+ */
+function buildIdMatchFindings(
+  sourceIds: Set<string>,
+  outputRefs: Set<string>,
+  config: SubPhaseConfig,
+): ValidatorFinding[] {
+  const findings: ValidatorFinding[] = [];
+  for (const id of sourceIds) {
+    if (!outputRefs.has(id)) {
+      findings.push({
+        validatorId: 'source_item_enumeration_completeness',
+        severity: 'HIGH',
+        type: 'source_item_silently_dropped',
+        summary: `Source item '${id}' not referenced in any ${config.outputFieldPath} entry`,
+        location: `$.${config.outputFieldPath}[*].${config.itemRefField}`,
+        detail: `Source id '${id}' extracted from prompt context but no output item references it in '${config.itemRefField}'.`,
+        recommendation: `Add an entry in '${config.outputFieldPath}' that references '${id}' in its '${config.itemRefField}' field.`,
+      });
+    }
+  }
+  return findings;
+}
+
+/**
+ * Collect the set of SR ids traced by any vocabulary term. Each term may
+ * carry its refs under `traces_to`, `source_requirements`, or `sr_refs`.
+ */
+function collectCoveredSRs(termItems: Record<string, unknown>[]): Set<string> {
+  const coveredSRs = new Set<string>();
+  for (const item of termItems) {
+    const traces = item.traces_to ?? item.source_requirements ?? item.sr_refs;
+    if (Array.isArray(traces)) {
+      for (const t of traces) {
+        if (typeof t === 'string') coveredSRs.add(t);
+      }
+    }
+  }
+  return coveredSRs;
+}
+
+/**
+ * vocabulary_grounding mode (Phase 4.1 software_domains): bidirectional check —
+ * each SR in the source should appear in at least one term definition.
+ * (Term→SR direction is the primary check; SR→term requires LLM for full coverage.)
+ */
+function buildVocabularyGroundingFindings(
+  sourceIds: Set<string>,
+  outputItems: unknown[],
+): ValidatorFinding[] {
+  const coveredSRs = collectCoveredSRs(outputItems as Record<string, unknown>[]);
+  const findings: ValidatorFinding[] = [];
+  for (const id of sourceIds) {
+    if (!coveredSRs.has(id)) {
+      findings.push({
+        validatorId: 'source_item_enumeration_completeness',
+        severity: 'HIGH',
+        type: 'source_item_silently_dropped',
+        summary: `SR '${id}' not traced by any ubiquitous_language term`,
+        location: `$.domains[*].ubiquitous_language[*].traces_to`,
+        detail: `SR '${id}' was in the input but no vocabulary term's traces_to includes it.`,
+        recommendation: `Add or annotate a term whose definition is grounded in SR '${id}'.`,
+      });
+    }
+  }
+  return findings;
+}
+
 export function validateSourceItemEnumerationCompleteness(
   params: ValidatorRuntimeParams,
 ): ValidatorFinding[] {
@@ -168,66 +256,19 @@ export function validateSourceItemEnumerationCompleteness(
   if (!Array.isArray(outputItems)) {
     // If the output field is missing entirely, flag all source IDs as dropped.
     // HIGH severity — output field is structurally absent.
-    return [...sourceIds].map((id) => ({
-      validatorId: 'source_item_enumeration_completeness',
-      severity: 'HIGH' as const,
-      type: 'output_field_missing',
-      summary: `Output field '${config.outputFieldPath}' is absent; source item '${id}' silently dropped`,
-      location: `$.${config.outputFieldPath}`,
-      detail: `Source context contained id '${id}' but output field '${config.outputFieldPath}' is missing entirely.`,
-      recommendation: `Ensure '${config.outputFieldPath}' is populated with an entry referencing '${id}'.`,
-    }));
+    return buildOutputFieldMissingFindings(sourceIds, config);
   }
 
-  const outputRefs = collectOutputRefs(outputItems, config.itemRefField ?? '');
-
-  const findings: ValidatorFinding[] = [];
-
   if (config.mode === 'id_match') {
-    for (const id of sourceIds) {
-      if (!outputRefs.has(id)) {
-        findings.push({
-          validatorId: 'source_item_enumeration_completeness',
-          severity: 'HIGH',
-          type: 'source_item_silently_dropped',
-          summary: `Source item '${id}' not referenced in any ${config.outputFieldPath} entry`,
-          location: `$.${config.outputFieldPath}[*].${config.itemRefField}`,
-          detail: `Source id '${id}' extracted from prompt context but no output item references it in '${config.itemRefField}'.`,
-          recommendation: `Add an entry in '${config.outputFieldPath}' that references '${id}' in its '${config.itemRefField}' field.`,
-        });
-      }
-    }
+    const outputRefs = collectOutputRefs(outputItems, config.itemRefField ?? '');
+    return buildIdMatchFindings(sourceIds, outputRefs, config);
   }
 
   if (config.mode === 'vocabulary_grounding') {
-    // Bidirectional: each SR in source should appear in at least one term definition.
-    // (Term→SR direction is the primary check; SR→term direction requires LLM for full coverage.)
-    const termItems = outputItems as Record<string, unknown>[];
-    const coveredSRs = new Set<string>();
-    for (const item of termItems) {
-      const traces = item.traces_to ?? item.source_requirements ?? item.sr_refs;
-      if (Array.isArray(traces)) {
-        for (const t of traces) {
-          if (typeof t === 'string') coveredSRs.add(t);
-        }
-      }
-    }
-    for (const id of sourceIds) {
-      if (!coveredSRs.has(id)) {
-        findings.push({
-          validatorId: 'source_item_enumeration_completeness',
-          severity: 'HIGH',
-          type: 'source_item_silently_dropped',
-          summary: `SR '${id}' not traced by any ubiquitous_language term`,
-          location: `$.domains[*].ubiquitous_language[*].traces_to`,
-          detail: `SR '${id}' was in the input but no vocabulary term's traces_to includes it.`,
-          recommendation: `Add or annotate a term whose definition is grounded in SR '${id}'.`,
-        });
-      }
-    }
+    return buildVocabularyGroundingFindings(sourceIds, outputItems);
   }
 
-  return findings;
+  return [];
 }
 
 // ── LLM semantic mode invoke function ─────────────────────────────────────

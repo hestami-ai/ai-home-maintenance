@@ -172,6 +172,72 @@ describe('OrchestratorEngine — simulate-human-decisions gate certification', (
     }
   });
 
+  it('decision agent approves a phase_gate surface (phase_gate_approval)', async () => {
+    // Characterization for mapSelectionToResolution's phase_gate branch — not
+    // exercised by the mirror/bundle tests above.
+    process.env.JANUMICODE_SIMULATE_DECISION_AGENT = '1';
+    try {
+      (engine as unknown as { callForRole: unknown }).callForRole = async () => ({
+        parsed: { selection: 'approve', rationale: 'No blocking inconsistency in the gate.' }, text: '', raw: '',
+      });
+      const { run } = engine.startWorkflowRun('ws-1', 'test');
+      const surface = engine.writer.writeRecord({
+        record_type: 'phase_gate_evaluation', schema_version: '1.0', workflow_run_id: run.id,
+        phase_id: '1', janumicode_version_sha: engine.janumiCodeVersionSha,
+        content: { kind: 'gate' },
+      });
+      const resolution = await engine.pauseForDecision(run.id, surface.id, 'phase_gate');
+      expect(resolution.type).toBe('phase_gate_approval');
+    } finally {
+      delete process.env.JANUMICODE_SIMULATE_DECISION_AGENT;
+    }
+  });
+
+  it('decision agent rejecting a mirror maps to mirror_rejection with empty decisions', async () => {
+    // Characterization for mapSelectionToResolution's mirror-reject branch.
+    process.env.JANUMICODE_SIMULATE_DECISION_AGENT = '1';
+    try {
+      (engine as unknown as { callForRole: unknown }).callForRole = async () => ({
+        parsed: { selection: 'reject', rationale: 'Substantive defect: the artifact contradicts itself.' }, text: '', raw: '',
+      });
+      const { run } = engine.startWorkflowRun('ws-1', 'test');
+      const surface = engine.writer.writeRecord({
+        record_type: 'mirror_presented', schema_version: '1.0', workflow_run_id: run.id,
+        phase_id: '1', janumicode_version_sha: engine.janumiCodeVersionSha,
+        content: { kind: 'mirror', assumptions: [{ id: 'a1', text: 'single tenant' }] },
+      });
+      const resolution = await engine.pauseForDecision(run.id, surface.id, 'mirror');
+      expect(resolution.type).toBe('mirror_rejection');
+      expect((resolution as { payload?: { decisions?: unknown[] } }).payload?.decisions).toEqual([]);
+    } finally {
+      delete process.env.JANUMICODE_SIMULATE_DECISION_AGENT;
+    }
+  });
+
+  it('decision agent maps a bundle index selection to a concrete option_id', async () => {
+    // Characterization for mapSelectionToResolution's decision_bundle branch —
+    // resolveBundleOptionId translates index_1 → the second option's id.
+    process.env.JANUMICODE_SIMULATE_DECISION_AGENT = '1';
+    try {
+      (engine as unknown as { callForRole: unknown }).callForRole = async () => ({
+        parsed: { selection: 'index_1', rationale: 'The second option is genuinely out of scope.' }, text: '', raw: '',
+      });
+      const { run } = engine.startWorkflowRun('ws-1', 'test');
+      const surface = engine.writer.writeRecord({
+        record_type: 'decision_bundle_presented', schema_version: '1.0', workflow_run_id: run.id,
+        phase_id: '1', janumicode_version_sha: engine.janumiCodeVersionSha,
+        content: { kind: 'product_bloom_mirror', title: 'Review Business Domains',
+          mirror: { items: [] }, menu: { options: [{ id: 'OPT-A' }, { id: 'OPT-B' }] } },
+      });
+      const resolution = await engine.pauseForDecision(run.id, surface.id, 'decision_bundle');
+      expect(resolution.type).toBe('decision_bundle_resolution');
+      const payload = (resolution as { payload?: { menu_selections?: Array<{ option_id: string }> } }).payload;
+      expect(payload?.menu_selections).toEqual([{ option_id: 'OPT-B' }]);
+    } finally {
+      delete process.env.JANUMICODE_SIMULATE_DECISION_AGENT;
+    }
+  });
+
   it('endorsing a bloom decision_bundle keeps the whole set (coverage-safe, no prune)', async () => {
     // Fidelity: the fixture stands in for a stakeholder building the FULL
     // product, so on an expansive "keep what belongs" bundle it endorses with

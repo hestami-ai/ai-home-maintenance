@@ -47,18 +47,21 @@ Return ONLY raw JSON (no markdown fences), shape:
 { "verdicts": [ { "concept_key": "<verbatim key>", "verdict": "owned_aggregate" | "shared_value_object" | "separate", "owner_component_id": "<one of the listed components, only for owned_aggregate>", "rationale": "<one sentence>" } ] }`;
 }
 
+/** Coerce a raw LLM payload to the verdict array. Tolerates {verdicts:[...]} or a
+ *  bare array; anything else yields []. */
+function toVerdictArray(parsed: unknown): unknown[] {
+  if (Array.isArray(parsed)) return parsed;
+  if (parsed && typeof parsed === 'object' && Array.isArray((parsed as Record<string, unknown>).verdicts)) {
+    return (parsed as { verdicts: unknown[] }).verdicts;
+  }
+  return [];
+}
+
 /** Parse the LLM response into validated verdicts, filtered to the requested keys.
  *  Tolerates {verdicts:[...]} or a bare array. Invalid/unknown entries are dropped
  *  (the bridge then falls back to its deterministic default — no fabrication). */
 export function parseAdjudicationVerdicts(parsed: unknown, validKeys: Set<string>): AdjudicationVerdict[] {
-  let arr: unknown[];
-  if (Array.isArray(parsed)) {
-    arr = parsed;
-  } else if (parsed && typeof parsed === 'object' && Array.isArray((parsed as Record<string, unknown>).verdicts)) {
-    arr = (parsed as { verdicts: unknown[] }).verdicts;
-  } else {
-    arr = [];
-  }
+  const arr = toVerdictArray(parsed);
   const out: AdjudicationVerdict[] = [];
   const seen = new Set<string>();
   for (const raw of arr) {

@@ -156,6 +156,43 @@ describe('verifyReleaseManifest — backward dependencies', () => {
     }));
     expect(r.find(g => g.check === 'release_backward_dependency')).toBeUndefined();
   });
+  // Characterization: pins the integration-trigger backward-dependency branch.
+  it('reports backward dep when workflow in REL-1 triggers off an integration in REL-2', () => {
+    const p = plan({
+      releases: [
+        { release_id: 'REL-1', ordinal: 1, name: 'A', description: 'd', rationale: 'r',
+          contains: { ...emptyContains(), workflows: ['WF-1'] } },
+        { release_id: 'REL-2', ordinal: 2, name: 'B', description: 'd', rationale: 'r',
+          contains: { ...emptyContains(), integrations: ['INT-2'] } },
+      ],
+    });
+    const r = verifyReleaseManifest(inputs({
+      plan: p,
+      integrations: [integration('INT-2')],
+      workflows: [workflow({ id: 'WF-1', triggers: [{ kind: 'integration', integration_id: 'INT-2', event: 'x' }] })],
+    }));
+    const gap = r.find(g => g.check === 'release_backward_dependency');
+    expect(gap).toBeDefined();
+    expect(gap!.missing.some(m => m.includes('WF-1(REL-ord=1)') && m.includes('INT-2(REL-ord=2)'))).toBe(true);
+  });
+  // Characterization: pins the "cross_cutting workflow depends on a release-specific target" branch.
+  it('reports violation when a cross_cutting workflow depends on a release-specific journey', () => {
+    const p = plan({
+      releases: [
+        { release_id: 'REL-1', ordinal: 1, name: 'A', description: 'd', rationale: 'r',
+          contains: { ...emptyContains(), journeys: ['UJ-1'] } },
+      ],
+      cross_cutting: { ...emptyCrossCutting(), workflows: ['WF-1'] },
+    });
+    const r = verifyReleaseManifest(inputs({
+      plan: p,
+      journeys: [journey('UJ-1')],
+      workflows: [workflow({ id: 'WF-1', triggers: [{ kind: 'journey_step', journey_id: 'UJ-1', step_number: 1 }] })],
+    }));
+    const gap = r.find(g => g.check === 'release_backward_dependency');
+    expect(gap).toBeDefined();
+    expect(gap!.missing.some(m => m.includes('WF-1(cross_cutting)') && m.includes('UJ-1(REL-ord=1)'))).toBe(true);
+  });
 });
 
 describe('verifyReleaseManifest — trace coherence (advisory)', () => {

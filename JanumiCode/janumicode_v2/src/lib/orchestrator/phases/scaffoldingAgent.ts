@@ -180,7 +180,8 @@ function fieldDisplay(fo: Record<string, unknown>): { name: string; text: string
   if (typeof fo.constraints === 'string' && fo.constraints) cons.push(fo.constraints);
   else if (Array.isArray(fo.constraints)) for (const c of fo.constraints) { if (typeof c === 'string' && c) cons.push(c); }
   if (asStr(fo.foreign_key)) cons.push(`fk:${fo.foreign_key as string}`);
-  return { name: fname, text: `${ftype}${cons.length ? ` (${cons.join(', ')})` : ''}` };
+  const consText = cons.length ? ` (${cons.join(', ')})` : '';
+  return { name: fname, text: `${ftype}${consText}` };
 }
 
 /**
@@ -198,11 +199,30 @@ function relationshipLine(ro: Record<string, unknown>): string {
   const target = rawTarget ? rawTarget.split('.')[0] : '?';
   const kind = asStr(ro.kind) ?? asStr(ro.type) ?? asStr(ro.relationship_type) ?? 'references';
   const own = asStr(ro.ownership);
-  return `  → ${target} (${kind}${own ? `, ${own}` : ''})`;
+  const ownText = own ? `, ${own}` : '';
+  return `  → ${target} (${kind}${ownText})`;
 }
 
 /** A raw per-component member of a same-named entity group. */
 interface EntityMember { compId?: string; e: Record<string, unknown>; }
+
+/** Add a model item's entities to the by-name groups (mutates `groups`/`order`
+ *  in place, preserving first-seen order). Extracted from {@link groupEntitiesByName}. */
+function addEntitiesToGroups(
+  entities: unknown[],
+  compId: string | undefined,
+  groups: Map<string, EntityMember[]>,
+  order: string[],
+): void {
+  for (const e of entities) {
+    if (typeof e !== 'object' || e === null) continue;
+    const eo = e as Record<string, unknown>;
+    const name = asStr(eo.name) ?? asStr(eo.id);
+    if (!name) continue;
+    if (!groups.has(name)) { groups.set(name, []); order.push(name); }
+    groups.get(name)!.push({ compId, e: eo });
+  }
+}
 
 /** Group the models' entities by name, preserving first-seen order. */
 function groupEntitiesByName(list: unknown[]): { order: string[]; groups: Map<string, EntityMember[]> } {
@@ -213,14 +233,7 @@ function groupEntitiesByName(list: unknown[]): { order: string[]; groups: Map<st
     const mo = m as Record<string, unknown>;
     const compId = asStr(mo.component_id);
     const entities = Array.isArray(mo.entities) ? mo.entities : [mo]; // element may itself be an entity
-    for (const e of entities) {
-      if (typeof e !== 'object' || e === null) continue;
-      const eo = e as Record<string, unknown>;
-      const name = asStr(eo.name) ?? asStr(eo.id);
-      if (!name) continue;
-      if (!groups.has(name)) { groups.set(name, []); order.push(name); }
-      groups.get(name)!.push({ compId, e: eo });
-    }
+    addEntitiesToGroups(entities, compId, groups, order);
   }
   return { order, groups };
 }
@@ -247,40 +260,79 @@ function renderEntityBlock(m: EntityMember, name: string, label: string): string
   return lines.join('\n');
 }
 
-/** LEGACY (untagged) path — pre-P5.1b behavior: MERGE same-named entities, UNION
- *  their fields (annotating divergence), dedup relationships. Retained for
- *  data_models artifacts that predate entity_ownership_reconciliation. */
-function renderLegacyMergedGroup(name: string, members: EntityMember[]): string {
+/** A merged legacy field: the first-seen display `primary`, plus every text variant. */
+interface MergedField { primary: string; variants: Set<string> }
+
+/** Merge one member's fields into the by-name field map (first-seen text becomes
+ *  `primary`; every text is collected as a `variant` for divergence annotation).
+ *  Extracted from {@link collectLegacyGroupData}. */
+function mergeMemberFields(m: EntityMember, fields: Map<string, MergedField>): void {
+  for (const f of Array.isArray(m.e.fields) ? m.e.fields : []) {
+    if (typeof f !== 'object' || f === null) continue;
+    const { name: fn, text } = fieldDisplay(f as Record<string, unknown>);
+    const mf = fields.get(fn);
+    if (!mf) fields.set(fn, { primary: text, variants: new Set([text]) });
+    else mf.variants.add(text);
+  }
+}
+
+/** Append one member's not-yet-seen relationship lines (deduped via `relSeen`,
+ *  preserving first-seen order). Extracted from {@link collectLegacyGroupData}. */
+function mergeMemberRelationships(m: EntityMember, rels: string[], relSeen: Set<string>): void {
+  for (const r of Array.isArray(m.e.relationships) ? m.e.relationships : []) {
+    if (typeof r !== 'object' || r === null) continue;
+    const line = relationshipLine(r as Record<string, unknown>);
+    if (!relSeen.has(line)) { relSeen.add(line); rels.push(line); }
+  }
+}
+
+/** The aggregated legacy group: elected `id` (first member's), first-seen unique
+ *  component ids, merged fields, deduped relationship lines. */
+interface LegacyGroupData {
+  id: string;
+  comps: string[];
+  fields: Map<string, MergedField>;
+  rels: string[];
+}
+
+/** Fold all same-named members into one merged group (id/comps/fields/rels),
+ *  preserving first-seen order throughout. Extracted from {@link renderLegacyMergedGroup}. */
+function collectLegacyGroupData(name: string, members: EntityMember[]): LegacyGroupData {
   const comps: string[] = [];
-  const fields = new Map<string, { primary: string; variants: Set<string> }>();
+  const fields = new Map<string, MergedField>();
   const rels: string[] = [];
   const relSeen = new Set<string>();
   let id = '';
   for (const m of members) {
     if (!id) id = memberId(m, name);
     if (m.compId && !comps.includes(m.compId)) comps.push(m.compId);
-    for (const f of Array.isArray(m.e.fields) ? m.e.fields : []) {
-      if (typeof f !== 'object' || f === null) continue;
-      const { name: fn, text } = fieldDisplay(f as Record<string, unknown>);
-      const mf = fields.get(fn);
-      if (!mf) fields.set(fn, { primary: text, variants: new Set([text]) });
-      else mf.variants.add(text);
-    }
-    for (const r of Array.isArray(m.e.relationships) ? m.e.relationships : []) {
-      if (typeof r !== 'object' || r === null) continue;
-      const line = relationshipLine(r as Record<string, unknown>);
-      if (!relSeen.has(line)) { relSeen.add(line); rels.push(line); }
-    }
+    mergeMemberFields(m, fields);
+    mergeMemberRelationships(m, rels, relSeen);
   }
-  let compLabel: string;
-  if (comps.length === 0) compLabel = '';
-  else if (comps.length === 1) compLabel = ` (component: ${comps[0]})`;
-  else compLabel = ` (shared across components: ${comps.join(', ')} — materialize ONCE)`;
-  const lines = [`### ${id} — ${name}${compLabel}`, 'Fields:'];
-  for (const [fn, mf] of fields) {
-    const alts = [...mf.variants].filter((v) => v !== mf.primary);
-    lines.push(`  - ${fn}: ${mf.primary}${alts.length ? ` [divergent — also defined as: ${alts.join(' | ')} — reconcile to ONE canonical shape]` : ''}`);
-  }
+  return { id, comps, fields, rels };
+}
+
+/** The component-scope label suffix for a merged legacy group header. */
+function legacyCompLabel(comps: string[]): string {
+  if (comps.length === 0) return '';
+  if (comps.length === 1) return ` (component: ${comps[0]})`;
+  return ` (shared across components: ${comps.join(', ')} — materialize ONCE)`;
+}
+
+/** Render one merged field line, annotating divergent alternate shapes. */
+function renderMergedFieldLine(fn: string, mf: MergedField): string {
+  const alts = [...mf.variants].filter((v) => v !== mf.primary);
+  const altsText = alts.length ? ` [divergent — also defined as: ${alts.join(' | ')} — reconcile to ONE canonical shape]` : '';
+  return `  - ${fn}: ${mf.primary}${altsText}`;
+}
+
+/** LEGACY (untagged) path — pre-P5.1b behavior: MERGE same-named entities, UNION
+ *  their fields (annotating divergence), dedup relationships. Retained for
+ *  data_models artifacts that predate entity_ownership_reconciliation. */
+function renderLegacyMergedGroup(name: string, members: EntityMember[]): string {
+  const { id, comps, fields, rels } = collectLegacyGroupData(name, members);
+  const lines = [`### ${id} — ${name}${legacyCompLabel(comps)}`, 'Fields:'];
+  for (const [fn, mf] of fields) lines.push(renderMergedFieldLine(fn, mf));
   lines.push(...rels);
   return lines.join('\n');
 }
@@ -325,6 +377,12 @@ function renderOwnershipGroup(name: string, members: EntityMember[]): string[] {
   return [`### ${ownerId} — ${name} (referenced — owned by ${ownerComp}; IMPORT this type, do NOT redefine)`];
 }
 
+/** The "N more entities omitted for length" tail note (extracted so the entity
+ *  singular/plural wording lives in one place). */
+function droppedEntitiesNote(dropped: number): string {
+  return `\n\n… (${dropped} more shared entit${dropped === 1 ? 'y' : 'ies'} omitted for length — define ${dropped === 1 ? 'it' : 'them'} following the same owned-vs-reference pattern shown above)`;
+}
+
 export function renderSharedDataModels(models: unknown, budget: number): string {
   const list = Array.isArray(models) ? models : [];
   const { order, groups } = groupEntitiesByName(list);
@@ -346,7 +404,7 @@ export function renderSharedDataModels(models: unknown, budget: number): string 
   }
   if (blocks.length === 0) return '(none)';
   let out = blocks.join('\n\n');
-  if (dropped > 0) out += `\n\n… (${dropped} more shared entit${dropped === 1 ? 'y' : 'ies'} omitted for length — define ${dropped === 1 ? 'it' : 'them'} following the same owned-vs-reference pattern shown above)`;
+  if (dropped > 0) out += droppedEntitiesNote(dropped);
   return out;
 }
 
@@ -558,14 +616,18 @@ export function buildAreaScaffoldingPrompt(
   // language — see phase9Recon). Render it as "importable as (per <stack>)" so
   // the agent honors the same specifier the implementation tasks will import by.
   const mods = area.canonical_modules.length
-    ? area.canonical_modules.map(m =>
-        `  - ${m.path}${m.import_specifier ? `  — importable as (per ${stack}): ${m.import_specifier}` : ''}${m.description ? `  — ${m.description}` : ''}`).join('\n')
+    ? area.canonical_modules.map(m => {
+        const specText = m.import_specifier ? `  — importable as (per ${stack}): ${m.import_specifier}` : '';
+        const descText = m.description ? `  — ${m.description}` : '';
+        return `  - ${m.path}${specText}${descText}`;
+      }).join('\n')
     : '  (none listed — derive the shared types this area needs from the data models / contracts)';
   // Aliases are a stack-SPECIFIC concept (TS/JS path aliases); only render the
   // line when recon actually emitted them. Other stacks import by module path.
   // Targets are the reconciled ones (rebased onto the coherent tree — PD-3).
+  const aliasPairs = layout.aliases.map(al => `${al.alias} → ${al.target}`).join(', ');
   const aliasLine = layout.aliases.length
-    ? `- import aliases (${stack}): ${layout.aliases.map(al => `${al.alias} → ${al.target}`).join(', ')}\n`
+    ? `- import aliases (${stack}): ${aliasPairs}\n`
     : '';
   // The CANONICAL per-component directories — the exact paths the implementation
   // tasks will write to and Phase 10 enforces. Rendering them (and forbidding any
@@ -581,11 +643,13 @@ export function buildAreaScaffoldingPrompt(
   // agent couldn't honor the specific runtime/library or author a skeleton that
   // passes the gates it will be checked against. Render both.
   const techRefs = area.source_refs.filter(r => r.toUpperCase().startsWith('TECH-'));
+  const techRefsList = techRefs.map(r => `  - ${r}`).join('\n');
   const techRefsBlock = techRefs.length
-    ? `## Prescribed technologies (honor these — do NOT substitute a different runtime/library)\n${techRefs.map(r => `  - ${r}`).join('\n')}\n\n`
+    ? `## Prescribed technologies (honor these — do NOT substitute a different runtime/library)\n${techRefsList}\n\n`
     : '';
+  const gatesList = area.gate_commands.map(g => `  - ${g.kind}: \`${g.command}${Array.isArray(g.args) && g.args.length ? ' ' + g.args.join(' ') : ''}\``).join('\n');
   const gatesBlock = area.gate_commands.length
-    ? `## Verification gates — the authored skeleton MUST pass these once complete\n${area.gate_commands.map(g => `  - ${g.kind}: \`${g.command}${Array.isArray(g.args) && g.args.length ? ' ' + g.args.join(' ') : ''}\``).join('\n')}\n\n`
+    ? `## Verification gates — the authored skeleton MUST pass these once complete\n${gatesList}\n\n`
     : '';
   const manifest = area.dependency_manifest || `(the ${stack} standard manifest)`;
   return `# Project Scaffolding — area "${area.area_id}" (stack: ${stack})\n\n`

@@ -56,6 +56,71 @@ export function sumRollups(rollups: Iterable<CoverageRollup>): CoverageRollup {
   return out;
 }
 
+/** Score one AC from its realization rows: task/test counts + gap/unrealized flags. */
+function scoreAcCoverage(realizations: ViewerRealizationNode[]): AcCoverage {
+  let task = 0;
+  let test = 0;
+  for (const x of realizations) {
+    if (x.layer === 'task') task++;
+    else if (x.layer === 'test') test++;
+  }
+  const gap = task > 0 && test === 0;
+  const unrealized = task === 0 && test === 0;
+  return { task, test, gap, unrealized };
+}
+
+/**
+ * Score every AC on one node: record each AC's coverage, fold it into the
+ * node's root rollup, and register the node in `ownGap` if it directly owns a
+ * gap AC. Mutates `acCov`, `byRoot`, and `ownGap` in place.
+ */
+function scoreNode(
+  n: ViewerDecompositionNode,
+  realizationByAc: Map<string, ViewerRealizationNode[]>,
+  acCov: Map<string, AcCoverage>,
+  byRoot: Map<string, CoverageRollup>,
+  ownGap: Set<string>,
+): void {
+  const roll = byRoot.get(n.root_fr_id) ?? { ...EMPTY_ROLLUP };
+  for (const ac of n.acceptance_criteria) {
+    const cov = scoreAcCoverage(realizationByAc.get(ac.id) ?? []);
+    acCov.set(ac.id, cov);
+    roll.totalAc++;
+    if (cov.task > 0) roll.realized++;
+    if (cov.test > 0) roll.tested++;
+    if (cov.gap) { roll.gaps++; ownGap.add(n.node_id); }
+    if (cov.unrealized) roll.unrealized++;
+  }
+  byRoot.set(n.root_fr_id, roll);
+}
+
+/**
+ * Propagate gap membership up each parent chain from the gap-owning nodes. Stop
+ * early once a node is already marked — its ancestors were marked on a previous
+ * propagation.
+ */
+function propagateGapMembership(
+  ownGap: Set<string>,
+  byNodeId: Map<string, ViewerDecompositionNode>,
+): Set<string> {
+  const reqSubtreeHasGap = new Set<string>();
+  for (const startId of ownGap) {
+    let cur: ViewerDecompositionNode | undefined = byNodeId.get(startId);
+    while (cur && !reqSubtreeHasGap.has(cur.node_id)) {
+      reqSubtreeHasGap.add(cur.node_id);
+      cur = cur.parent_node_id ? byNodeId.get(cur.parent_node_id) : undefined;
+    }
+  }
+  return reqSubtreeHasGap;
+}
+
+/** Collect the root_fr_ids whose rollup contains ≥1 gap. */
+function collectRootsWithGaps(byRoot: Map<string, CoverageRollup>): Set<string> {
+  const rootHasGap = new Set<string>();
+  for (const [rootFr, roll] of byRoot) if (roll.gaps > 0) rootHasGap.add(rootFr);
+  return rootHasGap;
+}
+
 /**
  * Build the coverage model from the requirement nodes + the AC→realization
  * index. Every AC found on a leaf is scored; rollups accumulate per root; gap
@@ -75,40 +140,11 @@ export function buildCoverageModel(
 
   for (const n of nodes) {
     if (n.acceptance_criteria.length === 0) continue;
-    const roll = byRoot.get(n.root_fr_id) ?? { ...EMPTY_ROLLUP };
-    for (const ac of n.acceptance_criteria) {
-      const rz = realizationByAc.get(ac.id) ?? [];
-      let task = 0;
-      let test = 0;
-      for (const x of rz) {
-        if (x.layer === 'task') task++;
-        else if (x.layer === 'test') test++;
-      }
-      const gap = task > 0 && test === 0;
-      const unrealized = task === 0 && test === 0;
-      acCov.set(ac.id, { task, test, gap, unrealized });
-      roll.totalAc++;
-      if (task > 0) roll.realized++;
-      if (test > 0) roll.tested++;
-      if (gap) { roll.gaps++; ownGap.add(n.node_id); }
-      if (unrealized) roll.unrealized++;
-    }
-    byRoot.set(n.root_fr_id, roll);
+    scoreNode(n, realizationByAc, acCov, byRoot, ownGap);
   }
 
-  // Propagate gap membership up each parent chain. Stop early once a node is
-  // already marked — its ancestors were marked on a previous propagation.
-  const reqSubtreeHasGap = new Set<string>();
-  for (const startId of ownGap) {
-    let cur: ViewerDecompositionNode | undefined = byNodeId.get(startId);
-    while (cur && !reqSubtreeHasGap.has(cur.node_id)) {
-      reqSubtreeHasGap.add(cur.node_id);
-      cur = cur.parent_node_id ? byNodeId.get(cur.parent_node_id) : undefined;
-    }
-  }
-
-  const rootHasGap = new Set<string>();
-  for (const [rootFr, roll] of byRoot) if (roll.gaps > 0) rootHasGap.add(rootFr);
+  const reqSubtreeHasGap = propagateGapMembership(ownGap, byNodeId);
+  const rootHasGap = collectRootsWithGaps(byRoot);
 
   return { acCov, byRoot, reqSubtreeHasGap, rootHasGap };
 }

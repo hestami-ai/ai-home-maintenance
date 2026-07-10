@@ -50,6 +50,29 @@ export function isNodePtyAvailable(): boolean {
   return loadNodePty() !== null;
 }
 
+/** Scan PATH × PATHEXT for the first existing executable file; null if none. */
+function scanPathForExecutable(
+  command: string,
+  pathDirs: string[],
+  exts: string[],
+  hasExt: boolean,
+): string | null {
+  for (const dir of pathDirs) {
+    if (hasExt) {
+      const p = path.join(dir, command);
+      if (fs.existsSync(p)) return p;
+      continue;
+    }
+    for (const ext of exts) {
+      const p = path.join(dir, command + ext.toLowerCase());
+      if (fs.existsSync(p)) return p;
+      const pUpper = path.join(dir, command + ext);
+      if (fs.existsSync(pUpper)) return pUpper;
+    }
+  }
+  return null;
+}
+
 /**
  * Resolve a bare command name to an absolute executable path on Windows.
  *
@@ -69,20 +92,7 @@ export function resolveCommandForPty(command: string, env: NodeJS.ProcessEnv = p
   const pathDirs = (env.PATH ?? env.Path ?? '').split(';').filter(Boolean);
   const exts = (env.PATHEXT ?? '.COM;.EXE;.BAT;.CMD').split(';').filter(Boolean);
   const hasExt = path.extname(command) !== '';
-  for (const dir of pathDirs) {
-    if (hasExt) {
-      const p = path.join(dir, command);
-      if (fs.existsSync(p)) return p;
-      continue;
-    }
-    for (const ext of exts) {
-      const p = path.join(dir, command + ext.toLowerCase());
-      if (fs.existsSync(p)) return p;
-      const pUpper = path.join(dir, command + ext);
-      if (fs.existsSync(pUpper)) return pUpper;
-    }
-  }
-  return command;
+  return scanPathForExecutable(command, pathDirs, exts, hasExt) ?? command;
 }
 
 export class NodePtySpawner implements PtySpawner {

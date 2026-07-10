@@ -759,218 +759,292 @@ export function bindCompletionCriteriaToTests(
  * downstream code will still treat as if it had passed (matching the
  * conservative "synthesize as if coherent, then check" flow).
  */
-export function buildPackets(input: BuilderInput): ImplementationPacketContent[] {
-  const packets: ImplementationPacketContent[] = [];
-  const packetIdByTaskId = new Map<string, string>();
-
-  // D10 (C1 implement-once): dedupe atomic tasks by task.id. The same atomic task
-  // can arrive more than once (task saturation / area fan-out); building one packet
-  // per entry would place that task in ≥2 packets (C1_TASK_IN_MULTIPLE_PACKETS) — a
-  // finding the re-synthesis loop can never heal, so it persisted to the fixpoint.
-  // Keep the FIRST occurrence; each atomic task now maps to exactly one packet.
+/**
+ * D10 (C1 implement-once): dedupe atomic tasks by task.id. The same atomic task
+ * can arrive more than once (task saturation / area fan-out); building one packet
+ * per entry would place that task in ≥2 packets (C1_TASK_IN_MULTIPLE_PACKETS) — a
+ * finding the re-synthesis loop can never heal, so it persisted to the fixpoint.
+ * Keep the FIRST occurrence; each atomic task now maps to exactly one packet.
+ */
+function dedupeAtomicTasks(tasks: BuilderAtomicTask[]): BuilderAtomicTask[] {
   const seenTaskIds = new Set<string>();
-  const atomicTasks = input.atomicTasks.filter((t) => {
+  return tasks.filter((t) => {
     const id = t.content.task.id;
     if (seenTaskIds.has(id)) return false;
     seenTaskIds.add(id);
     return true;
   });
+}
+
+/**
+ * Fix 4 — cross-cutting fallback containment. A task with NO leaf-AC binding
+ * (its traces_to cites no AC-* id) reaches the SR/component fallback, which
+ * can leaf-expand a broad NFR-derived story (e.g. monitoring US-007/US-008)
+ * into a dozen stories it doesn't really implement (the slice-135 13-story
+ * packet). Cap such AC-less tasks to ONE representative per canonical root so
+ * the packet doesn't balloon. Functional, AC-bound tasks are untouched.
+ */
+function capAcLessStories(
+  task: BuilderAtomicTask['content']['task'],
+  leafPreferredStories: BuilderUserStory[],
+  canonicalize: (id: string) => string,
+): BuilderUserStory[] {
+  const taskCitesAc = (task.traces_to ?? []).some((x) => x.startsWith('AC-'));
+  if (taskCitesAc || leafPreferredStories.length <= 1) return leafPreferredStories;
+  const seenRoot = new Set<string>();
+  return leafPreferredStories.filter((us) => {
+    const root = canonicalize(us.id);
+    if (seenRoot.has(root)) return false;
+    seenRoot.add(root);
+    return true;
+  });
+}
+
+/**
+ * Expand matched story ids (often DECOMPOSED leaves, e.g. US-004-1) with their
+ * CANONICAL parents (US-004) so the NFR / eval / compliance joins — which key on
+ * canonical US ids — resolve. ts-118: packets matched leaf US-004-1 while
+ * NFR.applies_to_requirements and eval target_id use canonical US-004, giving
+ * zero overlap → nfrs/evals/compliance all 0%. (Built from matchedUs so both
+ * leaf + root ids are present even after the content-level leaf collapse.)
+ * Canonicalize via the decomposition tree — handles every leaf form (US-002-1-D,
+ * US-002-3-Leaf) that no regex could.
+ */
+function collectUsIds(matchedUs: BuilderUserStory[], canonicalize: (id: string) => string): Set<string> {
+  const usIds = new Set<string>();
+  for (const us of matchedUs) {
+    usIds.add(us.id);
+    usIds.add(canonicalize(us.id));
+  }
+  return usIds;
+}
+
+function collectAcIds(packetStories: BuilderUserStory[]): Set<string> {
+  const acIds = new Set<string>();
+  for (const us of packetStories) {
+    for (const ac of us.acceptance_criteria ?? []) acIds.add(ac.id);
+  }
+  return acIds;
+}
+
+function resolvePacketComponent(
+  comp: BuilderComponent | undefined,
+  componentId: string,
+): PacketComponent {
+  return comp
+    ? toPacketComponent(comp)
+    : {
+        id: componentId,
+        name: '',
+        domain_id: null,
+        responsibilities: [],
+        dependencies: [],
+        active_constraints: [],
+      };
+}
+
+/**
+ * Active constraints inherited from the atomic task's saturation node, PLUS
+ * Lever 1a cross-cutting NFR concerns whose applies_to_components includes this
+ * task's component (or that apply to all). The executor receives the concerns as
+ * constraints-to-honor, NOT as separate modules/tasks to build.
+ */
+function buildActiveConstraintsWithCrossCutting(
+  activeConstraintIds: string[],
+  byId: Map<string, BuilderTechnicalConstraint>,
+  crossCutting: BuilderCrossCuttingConstraint[],
+  componentId: string,
+): PacketActiveConstraint[] {
+  const activeConstraints = buildActiveConstraints(activeConstraintIds, byId);
+  for (const cc of crossCutting) {
+    const applies = cc.applies_to_components ?? [];
+    if (applies.length === 0 || applies.includes(componentId)) {
+      activeConstraints.push({
+        id: cc.id,
+        category: 'cross_cutting_nfr',
+        text: `NFR concern (${cc.name}): ${(cc.responsibilities ?? []).join('; ')}`,
+      });
+    }
+  }
+  return activeConstraints;
+}
+
+/**
+ * Compliance items — gather all upstream COMP-*, VV-*, QA-* refs from every
+ * reachable trace path:
+ *   user_stories.traces_to    (when US matching produces hits)
+ *   component.traces_to       (when components reference compliance directly)
+ *   task.traces_to            (rarely — tasks usually trace SR-/NFR-)
+ *   matchedNfrs.traces_to     (the load-bearing path in ts-108 — tasks trace
+ *                              NFR-* ids; those NFRs in turn trace VV-* ids)
+ *
+ * ts-108 audit: tasks emit only SR-*, NFR-* in their traces_to; without walking
+ * matchedNfrs.traces_to, VV-* compliance items never reach the packet. Same
+ * shape as the US-traces gap but one hop deeper. Insertion order (US → component
+ * → task → NFRs) is preserved so buildComplianceItems materializes them in order.
+ */
+function collectComplianceRefs(
+  matchedUs: BuilderUserStory[],
+  comp: BuilderComponent | undefined,
+  task: BuilderAtomicTask['content']['task'],
+  allNfrs: BuilderNfr[],
+): Set<string> {
+  const complianceRefs = new Set<string>();
+  const collectFromTraces = (traces: string[] | undefined): void => {
+    if (!traces) return;
+    for (const t of traces) {
+      if (/^(COMP|VV|QA)-/.test(t)) complianceRefs.add(t);
+    }
+  };
+  for (const us of matchedUs) collectFromTraces(us.traces_to);
+  if (comp) collectFromTraces(comp.traces_to);
+  collectFromTraces(task.traces_to);
+  for (const n of allNfrs) collectFromTraces(n.traces_to);
+  return complianceRefs;
+}
+
+/** Translate the task's dependency_task_ids → the pre-allocated packet ids. */
+function resolveDependsOnPackets(
+  task: BuilderAtomicTask['content']['task'],
+  packetIdByTaskId: Map<string, string>,
+): string[] {
+  const dependsOnPackets: string[] = [];
+  for (const depTaskId of task.dependency_task_ids ?? []) {
+    const depPacketId = packetIdByTaskId.get(depTaskId);
+    if (depPacketId) dependsOnPackets.push(depPacketId);
+  }
+  return dependsOnPackets;
+}
+
+/**
+ * Build the single `ImplementationPacketContent` for one atomic task by running
+ * the full upstream join. `packetIdByTaskId` must be pre-populated for every task
+ * so depends_on_packets resolves regardless of build order.
+ */
+function buildPacketForTask(
+  t: BuilderAtomicTask,
+  input: BuilderInput,
+  packetIdByTaskId: Map<string, string>,
+): ImplementationPacketContent {
+  const task = t.content.task;
+  const componentId = task.component_id ?? '';
+
+  // Provisional test-case match using only the suite.component_id fallback —
+  // populated even when matchedUs/acIds are still empty. We extract composite-AC
+  // parents from these and feed them into the US/NFR matchers (Pass 4) so the
+  // join can recover from the task-only-traces-to-component shape that broke
+  // ts-108/ts-109.
+  const provisionalTestCases = findTestCasesForAcs(new Set(), new Set(), input.testSuites, componentId);
+  const provisionalAcParents = parentRefsFromTestCases(provisionalTestCases);
+
+  // Match NFRs first — US matcher's Pass 3 walks matchedNfrs[].applies_to_requirements
+  // to bridge the tasks-trace-NFR-but-not-US gap.
+  const matchedNfrs = findNfrsForTask(task, input.nfrs, input.componentsById, input.lineage);
+  const matchedUs = findUserStoriesForTask(
+    task,
+    input.userStories,
+    input.componentsById,
+    matchedNfrs,
+    provisionalAcParents,
+    input.lineage,
+  );
+
+  // Collapse to a consistent LEAF granularity for the packet CONTENT: the leaf
+  // stories the task implements, matching its leaf-grained tests. The canonical
+  // roots are dropped from `user_stories`/`acIds` (so P3 no longer fires on
+  // un-tested root ACs) but kept in `usIds` below for the joins. Leaf-vs-root is
+  // resolved STRUCTURALLY via the decomposition tree.
+  const leafPreferredStories = preferLeafStories(matchedUs, input.lineage.canonicalize);
+  const packetStories = capAcLessStories(task, leafPreferredStories, input.lineage.canonicalize);
+
+  const usIds = collectUsIds(matchedUs, input.lineage.canonicalize);
+  // Bridge NFRs that GOVERN the matched user stories. findNfrsForTask's
+  // trace/component passes miss them here (tasks trace SR-*; NFRs predate Phase-4
+  // components), but NFR.applies_to_requirements carries the canonical US ids the
+  // matched leaves normalize to.
+  const directNfrIds = new Set(matchedNfrs.map((n) => n.id));
+  const bridgedNfrs = findNfrsByUserStories(usIds, input.nfrs).filter((n) => !directNfrIds.has(n.id));
+  const allNfrs = [...matchedNfrs, ...bridgedNfrs];
+  const nfrIds = new Set(allNfrs.map((n) => n.id));
+  const acIds = collectAcIds(packetStories);
+
+  const comp = componentId ? input.componentsById.get(componentId) : undefined;
+  const packetComponent = resolvePacketComponent(comp, componentId);
+
+  // PD-7 — the task's requirement footprint: the SR/AC ids the task traces, plus
+  // the packet's resolved US/AC/NFR ids. API/DM endpoints minted with `traces_to`
+  // are scoped to a task by intersecting against this set (see findApisForTask /
+  // findDataModelsForTask); unlinked artifacts fall back to component scope.
+  const taskReqIds = new Set<string>([
+    ...(task.traces_to ?? []),
+    ...acIds, ...usIds, ...nfrIds,
+  ]);
+  const dataModels = findDataModelsForTask(componentId, input.dataModels, taskReqIds);
+  const apis = findApisForTask(componentId, input.apiDefinitions, taskReqIds);
+  const testCases = findTestCasesForAcs(acIds, usIds, input.testSuites, componentId);
+  const evals = findEvalsForUserStoriesAndNfrs(usIds, nfrIds, input.evaluationCriteria, input.lineage.canonicalize);
+
+  const activeConstraints = buildActiveConstraintsWithCrossCutting(
+    task.active_constraints ?? [],
+    input.technicalConstraintsById,
+    input.crossCuttingConstraints ?? [],
+    componentId,
+  );
+
+  const complianceRefs = collectComplianceRefs(matchedUs, comp, task, allNfrs);
+  const complianceItems = buildComplianceItems(complianceRefs, input.complianceItemsById);
+
+  const dependsOnPackets = resolveDependsOnPackets(task, packetIdByTaskId);
+
+  const packetId = packetIdByTaskId.get(task.id) as string;
+
+  // Bind each completion criterion to its covering test cases (via its verified
+  // ACs, or the task's AC set as fallback) so the executor's authoritative
+  // deliverable is test-backed, not just the ACs.
+  const packetTask = toPacketTask(t);
+  packetTask.completion_criteria = bindCompletionCriteriaToTests(
+    packetTask.completion_criteria, testCases, acIds,
+  );
+
+  return {
+    kind: 'implementation_packet',
+    schemaVersion: '1.0',
+    packet_id: packetId,
+    task: packetTask,
+    user_stories: packetStories.map(toPacketUserStory),
+    nfrs: allNfrs.map(toPacketNfr),
+    component: packetComponent,
+    data_models: dataModels,
+    api_definitions: apis,
+    test_cases: testCases,
+    evaluation_criteria: evals,
+    active_constraints: activeConstraints,
+    compliance_items: complianceItems,
+    depends_on_packets: dependsOnPackets,
+    coherence: {
+      passed: true,
+      blocking_failures: [],
+      advisory_findings: [],
+      annotations: { ai_proposed_root_count: 0, ai_proposed_root_ids: [] },
+    },
+    release_id: t.content.release_id ?? null,
+    release_ordinal: t.content.release_ordinal ?? null,
+  };
+}
+
+export function buildPackets(input: BuilderInput): ImplementationPacketContent[] {
+  const atomicTasks = dedupeAtomicTasks(input.atomicTasks);
 
   // Pre-allocate packet ids so depends_on_packets resolution works
   // regardless of build order.
+  const packetIdByTaskId = new Map<string, string>();
   for (const t of atomicTasks) {
     packetIdByTaskId.set(t.content.task.id, randomUUID());
   }
 
+  const packets: ImplementationPacketContent[] = [];
   for (const t of atomicTasks) {
-    const task = t.content.task;
-    const componentId = task.component_id ?? '';
-    // Provisional test-case match using only the suite.component_id
-    // fallback — populated even when matchedUs/acIds are still empty.
-    // We extract composite-AC parents from these and feed them into the
-    // US/NFR matchers (Pass 4) so the join can recover from the
-    // task-only-traces-to-component shape that broke ts-108/ts-109.
-    const provisionalTestCases = findTestCasesForAcs(
-      new Set(),
-      new Set(),
-      input.testSuites,
-      componentId,
-    );
-    const provisionalAcParents = parentRefsFromTestCases(provisionalTestCases);
-
-    // Match NFRs first — US matcher's Pass 3 walks matchedNfrs[].applies_to_requirements
-    // to bridge the tasks-trace-NFR-but-not-US gap.
-    const matchedNfrs = findNfrsForTask(task, input.nfrs, input.componentsById, input.lineage);
-    const matchedUs = findUserStoriesForTask(
-      task,
-      input.userStories,
-      input.componentsById,
-      matchedNfrs,
-      provisionalAcParents,
-      input.lineage,
-    );
-
-    // Collapse to a consistent LEAF granularity for the packet CONTENT: the
-    // leaf stories the task implements, matching its leaf-grained tests. The
-    // canonical roots are dropped from `user_stories`/`acIds` (so P3 no longer
-    // fires on un-tested root ACs) but kept in `usIds` below for the joins.
-    // Leaf-vs-root is resolved STRUCTURALLY via the decomposition tree.
-    const leafPreferredStories = preferLeafStories(matchedUs, input.lineage.canonicalize);
-
-    // Fix 4 — cross-cutting fallback containment. A task with NO leaf-AC binding
-    // (its traces_to cites no AC-* id) reaches the SR/component fallback, which
-    // can leaf-expand a broad NFR-derived story (e.g. monitoring US-007/US-008)
-    // into a dozen stories it doesn't really implement (the slice-135 13-story
-    // packet). Cap such AC-less tasks to ONE representative per canonical root so
-    // the packet doesn't balloon. Functional, AC-bound tasks are untouched.
-    const taskCitesAc = (task.traces_to ?? []).some((x) => x.startsWith('AC-'));
-    let packetStories = leafPreferredStories;
-    if (!taskCitesAc && leafPreferredStories.length > 1) {
-      const seenRoot = new Set<string>();
-      packetStories = leafPreferredStories.filter((us) => {
-        const root = input.lineage.canonicalize(us.id);
-        if (seenRoot.has(root)) return false;
-        seenRoot.add(root);
-        return true;
-      });
-    }
-
-    // Expand matched story ids (often DECOMPOSED leaves, e.g. US-004-1)
-    // with their CANONICAL parents (US-004) so the NFR / eval / compliance
-    // joins — which key on canonical US ids — resolve. ts-118: packets
-    // matched leaf US-004-1 while NFR.applies_to_requirements and eval
-    // target_id use canonical US-004, giving zero overlap → nfrs/evals/
-    // compliance all 0%. (Built from matchedUs so both leaf + root ids are
-    // present even after the content-level leaf collapse above.) Canonicalize
-    // via the decomposition tree — handles every leaf form (US-002-1-D,
-    // US-002-3-Leaf) that no regex could.
-    const usIds = new Set<string>();
-    for (const us of matchedUs) {
-      usIds.add(us.id);
-      usIds.add(input.lineage.canonicalize(us.id));
-    }
-    // Bridge NFRs that GOVERN the matched user stories. findNfrsForTask's
-    // trace/component passes miss them here (tasks trace SR-*; NFRs predate
-    // Phase-4 components), but NFR.applies_to_requirements carries the
-    // canonical US ids the matched leaves normalize to.
-    const directNfrIds = new Set(matchedNfrs.map((n) => n.id));
-    const bridgedNfrs = findNfrsByUserStories(usIds, input.nfrs).filter((n) => !directNfrIds.has(n.id));
-    const allNfrs = [...matchedNfrs, ...bridgedNfrs];
-    const nfrIds = new Set(allNfrs.map((n) => n.id));
-    const acIds = new Set<string>();
-    for (const us of packetStories) {
-      for (const ac of us.acceptance_criteria ?? []) acIds.add(ac.id);
-    }
-
-    const comp = componentId ? input.componentsById.get(componentId) : undefined;
-    const packetComponent: PacketComponent = comp
-      ? toPacketComponent(comp)
-      : {
-          id: componentId,
-          name: '',
-          domain_id: null,
-          responsibilities: [],
-          dependencies: [],
-          active_constraints: [],
-        };
-
-    // PD-7 — the task's requirement footprint: the SR/AC ids the task traces, plus
-    // the packet's resolved US/AC/NFR ids. API/DM endpoints minted with `traces_to`
-    // are scoped to a task by intersecting against this set (see findApisForTask /
-    // findDataModelsForTask); unlinked artifacts fall back to component scope.
-    const taskReqIds = new Set<string>([
-      ...(task.traces_to ?? []),
-      ...acIds, ...usIds, ...nfrIds,
-    ]);
-    const dataModels = findDataModelsForTask(componentId, input.dataModels, taskReqIds);
-    const apis = findApisForTask(componentId, input.apiDefinitions, taskReqIds);
-    const testCases = findTestCasesForAcs(acIds, usIds, input.testSuites, componentId);
-    const evals = findEvalsForUserStoriesAndNfrs(usIds, nfrIds, input.evaluationCriteria, input.lineage.canonicalize);
-
-    // Active constraints inherited from the atomic task's saturation node.
-    const activeConstraintIds = task.active_constraints ?? [];
-    const activeConstraints = buildActiveConstraints(activeConstraintIds, input.technicalConstraintsById);
-    // Lever 1a delivery: attach cross-cutting NFR concerns whose
-    // applies_to_components includes this task's component (or that apply to
-    // all). The executor receives them as constraints-to-honor, NOT as
-    // separate modules/tasks to build.
-    for (const cc of input.crossCuttingConstraints ?? []) {
-      const applies = cc.applies_to_components ?? [];
-      if (applies.length === 0 || applies.includes(componentId)) {
-        activeConstraints.push({
-          id: cc.id,
-          category: 'cross_cutting_nfr',
-          text: `NFR concern (${cc.name}): ${(cc.responsibilities ?? []).join('; ')}`,
-        });
-      }
-    }
-
-    // Compliance items — gather all upstream COMP-*/VV-*/QA-* refs from
-    // every reachable trace path:
-    //   user_stories.traces_to    (when US matching produces hits)
-    //   component.traces_to       (when components reference compliance directly)
-    //   task.traces_to            (rarely — tasks usually trace SR-/NFR-)
-    //   matchedNfrs.traces_to     (the load-bearing path in ts-108 — tasks trace
-    //                              NFR-* ids; those NFRs in turn trace VV-* ids)
-    //
-    // ts-108 audit: tasks emit only SR-*/NFR-* in their traces_to; without
-    // walking matchedNfrs.traces_to, VV-* compliance items never reach
-    // the packet. Same shape as the US-traces gap but one hop deeper.
-    const complianceRefs = new Set<string>();
-    const collectFromTraces = (traces: string[] | undefined): void => {
-      if (!traces) return;
-      for (const t of traces) {
-        if (/^(COMP|VV|QA)-/.test(t)) complianceRefs.add(t);
-      }
-    };
-    for (const us of matchedUs) collectFromTraces(us.traces_to);
-    if (comp) collectFromTraces(comp.traces_to);
-    collectFromTraces(task.traces_to);
-    for (const n of allNfrs) collectFromTraces(n.traces_to);
-    const complianceItems = buildComplianceItems(complianceRefs, input.complianceItemsById);
-
-    // depends_on_packets — translate dependency_task_ids → packet ids.
-    const dependsOnPackets: string[] = [];
-    for (const depTaskId of task.dependency_task_ids ?? []) {
-      const depPacketId = packetIdByTaskId.get(depTaskId);
-      if (depPacketId) dependsOnPackets.push(depPacketId);
-    }
-
-    const packetId = packetIdByTaskId.get(task.id) as string;
-
-    // Bind each completion criterion to its covering test cases (via its
-    // verified ACs, or the task's AC set as fallback) so the executor's
-    // authoritative deliverable is test-backed, not just the ACs.
-    const packetTask = toPacketTask(t);
-    packetTask.completion_criteria = bindCompletionCriteriaToTests(
-      packetTask.completion_criteria, testCases, acIds,
-    );
-
-    packets.push({
-      kind: 'implementation_packet',
-      schemaVersion: '1.0',
-      packet_id: packetId,
-      task: packetTask,
-      user_stories: packetStories.map(toPacketUserStory),
-      nfrs: allNfrs.map(toPacketNfr),
-      component: packetComponent,
-      data_models: dataModels,
-      api_definitions: apis,
-      test_cases: testCases,
-      evaluation_criteria: evals,
-      active_constraints: activeConstraints,
-      compliance_items: complianceItems,
-      depends_on_packets: dependsOnPackets,
-      coherence: {
-        passed: true,
-        blocking_failures: [],
-        advisory_findings: [],
-        annotations: { ai_proposed_root_count: 0, ai_proposed_root_ids: [] },
-      },
-      release_id: t.content.release_id ?? null,
-      release_ordinal: t.content.release_ordinal ?? null,
-    });
+    packets.push(buildPacketForTask(t, input, packetIdByTaskId));
   }
-
   return packets;
 }

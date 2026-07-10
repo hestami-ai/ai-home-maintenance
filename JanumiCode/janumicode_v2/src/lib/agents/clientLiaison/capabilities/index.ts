@@ -175,10 +175,10 @@ export class CapabilityRegistry {
       grouped.set(c.category, list);
     }
     return [...grouped.entries()]
-      .map(
-        ([cat, caps]) =>
-          `${cat}:\n${caps.map(c => `  - ${c.name}: ${c.description}`).join('\n')}`,
-      )
+      .map(([cat, caps]) => {
+        const items = caps.map(c => `  - ${c.name}: ${c.description}`).join('\n');
+        return `${cat}:\n${items}`;
+      })
       .join('\n');
   }
 

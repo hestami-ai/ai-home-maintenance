@@ -164,6 +164,106 @@ describe('filterEvalCriteriaForTask', () => {
     expect(result.keptFunctional).toBe(2);
     expect(result.rendered).toContain('lineage data missing');
   });
+
+  // ── Characterization (S3776 decomposition) ──────────────────────────
+  // Pin behaviors of the collectRelatedIdentifiers peer-walk / component-model
+  // quirk and the reasoning-scenario filter path, which the extractions
+  // (addTaskLineage / addPeerLineage / reasoningScenarioMatches) touch but the
+  // prior tests never exercised (implementationPlan + componentModel + reasoning
+  // were all absent). These assert CURRENT behavior and are unchanged by the
+  // refactor.
+  it('collects lineage from an implementation-plan peer that shares the component (characterization)', () => {
+    // The task itself carries NO lineage; a peer task sharing its component
+    // supplies traces_to → collectRelatedIdentifiers must fold the peer's
+    // lineage in, so the matching NFR is kept and the unrelated one dropped.
+    const plans: EvaluationPlans = {
+      quality: {
+        criteria: [
+          { nfr_id: 'NFR-042', category: 'perf', evaluation_tool: 'bench', threshold: 'x', measurement_method: 'auto' },
+          { nfr_id: 'NFR-099-unrelated', category: 'sec', evaluation_tool: 'scan', threshold: 'A', measurement_method: 'auto' },
+        ],
+      },
+    };
+    const task = makeTask({
+      component_id: 'foo',
+      technical_spec_ids: undefined,
+      traces_to: undefined,
+      completion_criteria: [{ criterion_id: 'cc-1', description: 'x', verification_method: 'invariant' }],
+    });
+    const implementationPlan: ImplementationTask[] = [
+      makeTask({
+        id: 'peer-1', component_id: 'foo', technical_spec_ids: undefined, traces_to: ['NFR-042'],
+        completion_criteria: [{ criterion_id: 'pc-1', description: 'y', verification_method: 'invariant' }],
+      }),
+      makeTask({
+        id: 'peer-2', component_id: 'bar', technical_spec_ids: undefined, traces_to: ['NFR-999'],
+        completion_criteria: [{ criterion_id: 'pc-2', description: 'z', verification_method: 'invariant' }],
+      }),
+    ];
+    const result = filterEvalCriteriaForTask(plans, task, null, implementationPlan);
+    expect(result.keptQuality).toBe(1);
+    expect(result.filteredQuality).toBe(1);
+    expect(result.rendered).toContain('NFR-042');
+    expect(result.rendered).not.toContain('NFR-099-unrelated');
+    // Peer lineage WAS detected → neither keep-all fallback fired.
+    expect(result.rendered).not.toContain('lineage data missing');
+    expect(result.rendered).not.toContain('lineage tokens did not match');
+  });
+
+  it('does NOT treat a component_model match alone as lineage → keeps all (characterization)', () => {
+    // A component_model match adds the component id to the token set but must NOT
+    // count as lineage: with no task/peer lineage the filter returns "keep all"
+    // and emits the "lineage data missing" note (collectRelatedIdentifiers → null).
+    const plans: EvaluationPlans = {
+      functional: {
+        criteria: [
+          { functional_requirement_id: 'FR-1', evaluation_method: 'm', success_condition: 'c' },
+          { functional_requirement_id: 'FR-2', evaluation_method: 'm', success_condition: 'c' },
+        ],
+      },
+    };
+    const task = makeTask({
+      component_id: 'foo',
+      technical_spec_ids: undefined,
+      traces_to: undefined,
+      completion_criteria: [{ criterion_id: 'cc-1', description: 'x', verification_method: 'invariant' }],
+    });
+    const componentModel = { components: [{ id: 'foo', name: 'Foo', responsibility: 'r' }] };
+    const result = filterEvalCriteriaForTask(plans, task, componentModel, null);
+    expect(result.keptFunctional).toBe(2);
+    expect(result.filteredFunctional).toBe(0);
+    expect(result.rendered).toContain('lineage data missing');
+    expect(result.rendered).toContain('FR-1');
+    expect(result.rendered).toContain('FR-2');
+  });
+
+  it('filters reasoning scenarios via all three match clauses (characterization)', () => {
+    // Pins reasoningScenarioMatches: kept via (1) description contains the
+    // component token, (2) scenario id ∈ related lineage, (3) a related id
+    // appears in the description. The unrelated scenario is dropped.
+    const plans: EvaluationPlans = {
+      reasoning: {
+        ai_subsystems_detected: true,
+        scenarios: [
+          { id: 'RS-desc', description: 'Handles foo edge cases', pass_criteria: 'graceful' },       // clause 1
+          { id: 'NFR-007', description: 'load reliability scenario', pass_criteria: 'p99 ok' },       // clause 2 (id ∈ related)
+          { id: 'RS-mentions', description: 'validates the NFR-007 threshold', pass_criteria: 'ok' }, // clause 3
+          { id: 'RS-drop', description: 'completely unrelated behavior', pass_criteria: 'n/a' },      // dropped
+        ],
+      },
+    };
+    const task = makeTask({ component_id: 'foo', technical_spec_ids: undefined, traces_to: ['NFR-007'] });
+    const result = filterEvalCriteriaForTask(plans, task, null, null);
+    expect(result.keptReasoning).toBe(3);
+    expect(result.filteredReasoning).toBe(1);
+    expect(result.rendered).toContain('### Reasoning Scenarios');
+    expect(result.rendered).toContain('Handles foo edge cases');
+    expect(result.rendered).toContain('load reliability scenario');
+    expect(result.rendered).toContain('validates the NFR-007 threshold');
+    expect(result.rendered).not.toContain('completely unrelated behavior');
+    // ai_subsystems_detected is preserved into the task-scoped kept criteria.
+    expect(result.keptCriteria.reasoning?.ai_subsystems_detected).toBe(true);
+  });
 });
 
 describe('findUpstreamFindingsForTask (packet-scoped)', () => {

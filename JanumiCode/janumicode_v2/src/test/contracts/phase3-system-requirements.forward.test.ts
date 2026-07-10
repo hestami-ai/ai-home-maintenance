@@ -33,4 +33,40 @@ describe('Phase 3.2 system_requirements contract — forward', () => {
     const f = results.find((r) => r.clauseId === 'C-3.2.4');
     expect(f?.passed).toBe(false);
   });
+
+  it('C-3.2.5 flags unresolved source ids against FR/NFR context (characterization)', () => {
+    const context = {
+      workflowRunId: 'char',
+      relatedArtifacts: new Map<string, ReadonlyArray<unknown>>([
+        ['functional_requirements', [{ user_stories: [{ id: 'US-001' }, { id: 'US-002' }] }]],
+        ['non_functional_requirements', [{ requirements: [{ id: 'NFR-001' }] }]],
+      ]),
+    };
+    const artifact: SystemRequirementsArtifact = {
+      kind: 'system_requirements',
+      items: [
+        { id: 'SR-001', statement: 'ok', source_requirement_ids: ['US-001', 'NFR-001'] },
+        { id: 'SR-002', statement: 'bad', source_requirement_ids: ['US-999', 'NFR-001'] },
+      ],
+    };
+    const results = runContractSuite(phase3SystemRequirementsContract, artifact, context);
+    const f = results.find((r) => r.clauseId === 'C-3.2.5');
+    expect(f?.passed).toBe(false);
+    expect(f?.severity).toBe('advisory');
+    expect(f?.message).toBe('1 source-id ref(s) do not resolve');
+    expect(f?.details).toEqual({ examples: [{ srId: 'SR-002', sourceId: 'US-999' }] });
+  });
+
+  it('C-3.2.5 passes with no FR/NFR context in scope (characterization)', () => {
+    const artifact: SystemRequirementsArtifact = {
+      kind: 'system_requirements',
+      items: [{ id: 'SR-001', statement: 'ok', source_requirement_ids: ['US-001'] }],
+    };
+    const results = runContractSuite(phase3SystemRequirementsContract, artifact, {
+      workflowRunId: 'char2',
+      relatedArtifacts: new Map(),
+    });
+    const f = results.find((r) => r.clauseId === 'C-3.2.5');
+    expect(f?.passed).toBe(true);
+  });
 });

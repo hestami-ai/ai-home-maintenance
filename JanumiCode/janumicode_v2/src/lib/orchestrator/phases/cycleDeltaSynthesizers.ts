@@ -199,20 +199,31 @@ export interface PhaseEightSynthResult {
   newQuality: PhaseEightCriterion[];
 }
 
+/**
+ * Idempotency: aggregate the target_ids already covered by existing
+ * functional/quality criteria.
+ */
+function collectCoveredEvaluationTargets(
+  existingFunctional: PhaseEightCriterion[],
+  existingQuality: PhaseEightCriterion[],
+): Set<string> {
+  const covered = new Set<string>();
+  for (const c of existingFunctional) {
+    if (c.functional_requirement_id) covered.add(c.functional_requirement_id);
+  }
+  for (const c of existingQuality) {
+    if (c.nonfunctional_requirement_id) covered.add(c.nonfunctional_requirement_id);
+    if (c.functional_requirement_id) covered.add(c.functional_requirement_id);
+  }
+  return covered;
+}
+
 export function synthesizeDeltaEvaluations(input: PhaseEightSynthInput): PhaseEightSynthResult {
   if (input.seed.orphanEvaluationTargets.size === 0) {
     return { newFunctional: [], newQuality: [] };
   }
 
-  // Idempotency: aggregate target_ids already covered.
-  const covered = new Set<string>();
-  for (const c of input.existingFunctional) {
-    if (c.functional_requirement_id) covered.add(c.functional_requirement_id);
-  }
-  for (const c of input.existingQuality) {
-    if (c.nonfunctional_requirement_id) covered.add(c.nonfunctional_requirement_id);
-    if (c.functional_requirement_id) covered.add(c.functional_requirement_id);
-  }
+  const covered = collectCoveredEvaluationTargets(input.existingFunctional, input.existingQuality);
 
   const newFunctional: PhaseEightCriterion[] = [];
   const newQuality: PhaseEightCriterion[] = [];

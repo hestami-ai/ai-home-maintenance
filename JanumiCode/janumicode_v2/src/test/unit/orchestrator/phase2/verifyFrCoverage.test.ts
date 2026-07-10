@@ -160,6 +160,60 @@ describe('verifyFrCoverage — traces_to referential integrity', () => {
     }));
     expect(r.filter(g => g.check === 'traces_to_dangling')).toHaveLength(0);
   });
+
+  // Characterization / golden-snapshot: pins the EXACT combined
+  // referential-integrity output across every classification bucket,
+  // including the dangling UJ- and dangling OPEN-/Q- paths that the
+  // targeted tests above do not individually cover. Guards the
+  // decomposition of checkTracesReferentialIntegrity.
+  it('golden: classifies every traces_to bucket deterministically', () => {
+    const r = verifyFrCoverage(baseInputs({
+      journeys: [journey('UJ-A')],
+      entities: [entity('ENT-P')],
+      workflows: [workflow('WF-1')],
+      complianceItems: [compItem('COMP-GDPR')],
+      vocabulary: [vocab('VOC-assessment')],
+      openQuestionIds: ['OPEN-42', 'Q-7'],
+      userStories: [
+        story({
+          id: 'US-001',
+          traces_to: [
+            'UJ-A',        // valid journey  -> ok
+            'UJ-GHOST',    // dangling journey
+            'ENT-P',       // valid entity   -> ok
+            'ENT-MISSING', // dangling entity
+            'WF-MISSING',  // dangling workflow
+            'COMP-GDPR',   // valid compliance -> ok
+            'COMP-MISSING',// dangling compliance
+            'VOC-MISSING', // dangling vocab
+            'OPEN-42',     // valid open question -> ok
+            'OPEN-99',     // dangling open question
+            'Q-7',         // valid question -> ok
+            'Q-404',       // dangling question
+            'FOO-1',       // unknown prefix
+            'BAR-2',       // unknown prefix
+          ],
+        }),
+      ],
+    }));
+    const unknown = r.find(g => g.check === 'traces_to_unknown_prefix');
+    const dangling = r.find(g => g.check === 'traces_to_dangling');
+    expect(unknown).toBeDefined();
+    expect(dangling).toBeDefined();
+    expect(unknown!.severity).toBe('blocking');
+    expect(dangling!.severity).toBe('blocking');
+    // uniqSorted (localeCompare) ordering is part of the contract.
+    expect(unknown!.missing).toEqual(['US-001:BAR-2', 'US-001:FOO-1']);
+    expect(dangling!.missing).toEqual([
+      'US-001:COMP-MISSING',
+      'US-001:ENT-MISSING',
+      'US-001:OPEN-99',
+      'US-001:Q-404',
+      'US-001:UJ-GHOST',
+      'US-001:VOC-MISSING',
+      'US-001:WF-MISSING',
+    ]);
+  });
 });
 
 describe('verifyFrCoverage — AC presence', () => {

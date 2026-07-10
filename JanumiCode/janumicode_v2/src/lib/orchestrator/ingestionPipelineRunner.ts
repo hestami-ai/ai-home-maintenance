@@ -300,27 +300,58 @@ export class IngestionPipelineRunner {
       });
       const parsed = result.parsed as Record<string, unknown> | null;
       if (!parsed) return;
-      const proposed = Array.isArray(parsed.proposed_edges) ? parsed.proposed_edges : [];
-      const candidateIds = new Set(candidates.map(c => c.id));
-      for (const raw of proposed as Array<Record<string, unknown>>) {
-        const edgeType = typeof raw.edge_type === 'string' ? raw.edge_type : '';
-        const targetId = typeof raw.target_record_id === 'string' ? raw.target_record_id : '';
-        const confidence = typeof raw.confidence === 'number' ? raw.confidence : 0;
-        const rationale = typeof raw.rationale === 'string' ? raw.rationale : '';
-
-        if (!ALLOWED_EDGE_TYPES.has(edgeType)) continue;
-        if (!candidateIds.has(targetId)) continue; // anti-hallucination: target must be in candidates
-        if (targetId === record.id) continue; // no self-edges
-        if (confidence < 0 || confidence > 1) continue;
-
-        this.writeProposedEdge(record, edgeType as MemoryEdgeType, targetId, confidence, rationale);
-      }
+      this.writeStageIIIProposedEdges(record, parsed, candidates);
     } catch (err) {
       getLogger().warn('governed_stream', 'Stage III LLM call failed', {
         recordId: record.id,
         error: err instanceof Error ? err.message : String(err),
       });
     }
+  }
+
+  /**
+   * Parse the LLM's `proposed_edges` array and persist every edge that
+   * survives validation. Extracted from `invokeStageIIIAsync` to keep that
+   * method's cognitive complexity manageable. Behavior is identical: edges
+   * are validated and written in array order; dropped edges are skipped.
+   */
+  private writeStageIIIProposedEdges(
+    record: GovernedStreamRecord,
+    parsed: Record<string, unknown>,
+    candidates: ReadonlyArray<Stage3Candidate>,
+  ): void {
+    const proposed = Array.isArray(parsed.proposed_edges) ? parsed.proposed_edges : [];
+    const candidateIds = new Set(candidates.map(c => c.id));
+    for (const raw of proposed as Array<Record<string, unknown>>) {
+      const edge = this.parseValidatedStageIIIEdge(raw, candidateIds, record.id);
+      if (!edge) continue;
+      this.writeProposedEdge(record, edge.edgeType as MemoryEdgeType, edge.targetId, edge.confidence, edge.rationale);
+    }
+  }
+
+  /**
+   * Coerce a raw proposed-edge object into typed fields and apply the
+   * post-LLM validation guards (allowed edge type, target in candidate set,
+   * no self-edge, confidence in range). Returns `null` when the edge should
+   * be dropped. Field coercion is side-effect free; guard order and the
+   * `||` short-circuit match the original inline logic exactly.
+   */
+  private parseValidatedStageIIIEdge(
+    raw: Record<string, unknown>,
+    candidateIds: ReadonlySet<string>,
+    sourceRecordId: string,
+  ): { edgeType: string; targetId: string; confidence: number; rationale: string } | null {
+    const edgeType = typeof raw.edge_type === 'string' ? raw.edge_type : '';
+    const targetId = typeof raw.target_record_id === 'string' ? raw.target_record_id : '';
+    const confidence = typeof raw.confidence === 'number' ? raw.confidence : 0;
+    const rationale = typeof raw.rationale === 'string' ? raw.rationale : '';
+
+    if (!ALLOWED_EDGE_TYPES.has(edgeType)) return null;
+    if (!candidateIds.has(targetId)) return null; // anti-hallucination: target must be in candidates
+    if (targetId === sourceRecordId) return null; // no self-edges
+    if (confidence < 0 || confidence > 1) return null;
+
+    return { edgeType, targetId, confidence, rationale };
   }
 
   /**
@@ -484,23 +515,7 @@ export class IngestionPipelineRunner {
       }
 
       case 'decision_trace': {
-        const content = record.content as Record<string, unknown>;
-        if (content.decision_type === 'prior_decision_override') {
-          const supersededId = content.superseded_record_id as string;
-          if (supersededId) {
-            // The record that supersedes is the NEW governing decision
-            // (`superseding_record_id`) — so the edge reads
-            // superseding → superseded and its source is a harvestable
-            // governing artifact (which DMR Stage 5 actually surfaces).
-            // Fall back to the decision_trace itself as source only when no
-            // superseding record is named, preserving the prior contract.
-            const supersedingId = typeof content.superseding_record_id === 'string'
-              && content.superseding_record_id.length > 0
-              ? content.superseding_record_id
-              : record.id;
-            edges.push(this.createEdge('supersedes', supersedingId, supersededId, 'system_asserted'));
-          }
-        }
+        edges.push(...this.decisionTraceEdges(record));
         break;
       }
 
@@ -515,6 +530,27 @@ export class IngestionPipelineRunner {
     }
 
     return edges;
+  }
+
+  /**
+   * Compute the deterministic supersedes edge(s) for a decision_trace record.
+   */
+  private decisionTraceEdges(record: GovernedStreamRecord): EdgeCreated[] {
+    const content = record.content as Record<string, unknown>;
+    if (content.decision_type !== 'prior_decision_override') return [];
+    const supersededId = content.superseded_record_id as string;
+    if (!supersededId) return [];
+    // The record that supersedes is the NEW governing decision
+    // (`superseding_record_id`) — so the edge reads
+    // superseding → superseded and its source is a harvestable
+    // governing artifact (which DMR Stage 5 actually surfaces).
+    // Fall back to the decision_trace itself as source only when no
+    // superseding record is named, preserving the prior contract.
+    const supersedingId = typeof content.superseding_record_id === 'string'
+      && content.superseding_record_id.length > 0
+      ? content.superseding_record_id
+      : record.id;
+    return [this.createEdge('supersedes', supersedingId, supersededId, 'system_asserted')];
   }
 
   /**
@@ -592,20 +628,31 @@ export class IngestionPipelineRunner {
 
       // Extract depends_on edges (component -> component)
       const deps = comp.dependencies as Array<Record<string, unknown>> | undefined;
-      if (Array.isArray(deps)) {
-        for (const dep of deps) {
-          const targetId = dep.target_component_id as string;
-          if (targetId) {
-            this.registerSubArtifactEdge({
-              sourceId: compId,
-              targetId,
-              edgeType: 'depends_on',
-              workflowRunId: record.workflow_run_id,
-              assertedBy: 'ingestion_pipeline',
-              assertedAt: now,
-            });
-          }
-        }
+      this.registerComponentDependencyEdges(compId, deps, record, now);
+    }
+  }
+
+  /**
+   * Extract depends_on edges (component -> component) for a single component.
+   */
+  private registerComponentDependencyEdges(
+    compId: string,
+    deps: Array<Record<string, unknown>> | undefined,
+    record: GovernedStreamRecord,
+    now: string,
+  ): void {
+    if (!Array.isArray(deps)) return;
+    for (const dep of deps) {
+      const targetId = dep.target_component_id as string;
+      if (targetId) {
+        this.registerSubArtifactEdge({
+          sourceId: compId,
+          targetId,
+          edgeType: 'depends_on',
+          workflowRunId: record.workflow_run_id,
+          assertedBy: 'ingestion_pipeline',
+          assertedAt: now,
+        });
       }
     }
   }

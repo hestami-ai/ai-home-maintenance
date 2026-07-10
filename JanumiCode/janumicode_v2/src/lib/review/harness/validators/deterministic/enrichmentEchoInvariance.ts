@@ -61,6 +61,80 @@ function findStory(stories: unknown, id: string): Record<string, unknown> | null
   return null;
 }
 
+/** FR enrichment echo: every skeleton story must reappear verbatim in the enrichment output. */
+function checkStoryEchoes(
+  skeletonStories: StoryEcho[],
+  out: Record<string, unknown>,
+): ValidatorFinding[] {
+  const findings: ValidatorFinding[] = [];
+  for (const skel of skeletonStories) {
+    const echoed = findStory(out.user_stories, skel.id);
+    if (!echoed) {
+      findings.push({
+        validatorId: 'enrichment_echo_invariance',
+        severity: 'HIGH',
+        type: 'dropped_story',
+        summary: `Story '${skel.id}' from skeleton pass is missing in enrichment output`,
+        location: `$.user_stories`,
+        detail: `Skeleton story '${skel.id}' was not echoed. Enrichment must echo the spine verbatim.`,
+        recommendation: `Restore story '${skel.id}' or flag the omission with rationale.`,
+      });
+      continue;
+    }
+    for (const field of ['role', 'action', 'outcome'] as const) {
+      if (skel[field] !== undefined && echoed[field] !== skel[field]) {
+        findings.push({
+          validatorId: 'enrichment_echo_invariance',
+          severity: 'HIGH',
+          type: 'mutated_field',
+          summary: `Story '${skel.id}' field '${field}' mutated between skeleton and enrichment`,
+          location: `$.user_stories[id=${skel.id}].${field}`,
+          detail: `Skeleton: '${displayField(skel[field])}'\nEnrichment: '${displayField(echoed[field])}'`,
+          recommendation: `Echo skeleton '${field}' verbatim; mutations require an explicit revision note.`,
+        });
+      }
+    }
+  }
+  return findings;
+}
+
+/** NFR enrichment echo: every skeleton NFR must reappear verbatim in the enrichment output. */
+function checkNfrEchoes(
+  skeletonNfrs: NfrEcho[],
+  out: Record<string, unknown>,
+): ValidatorFinding[] {
+  const findings: ValidatorFinding[] = [];
+  for (const skel of skeletonNfrs) {
+    const echoed = findStory(out.requirements, skel.id);
+    if (!echoed) {
+      findings.push({
+        validatorId: 'enrichment_echo_invariance',
+        severity: 'HIGH',
+        type: 'dropped_nfr',
+        summary: `NFR '${skel.id}' from skeleton pass is missing in enrichment output`,
+        location: `$.requirements`,
+        detail: `Skeleton NFR '${skel.id}' was not echoed.`,
+        recommendation: `Restore NFR '${skel.id}' or flag the omission with rationale.`,
+      });
+      continue;
+    }
+    for (const field of ['category', 'description'] as const) {
+      if (skel[field] !== undefined && echoed[field] !== skel[field]) {
+        findings.push({
+          validatorId: 'enrichment_echo_invariance',
+          severity: 'HIGH',
+          type: 'mutated_field',
+          summary: `NFR '${skel.id}' field '${field}' mutated`,
+          location: `$.requirements[id=${skel.id}].${field}`,
+          detail: `Skeleton: '${displayField(skel[field])}'\nEnrichment: '${displayField(echoed[field])}'`,
+          recommendation: `Echo skeleton '${field}' verbatim.`,
+        });
+      }
+    }
+  }
+  return findings;
+}
+
 export function validateEnrichmentEchoInvariance(
   params: ValidatorRuntimeParams,
 ): ValidatorFinding[] {
@@ -71,68 +145,12 @@ export function validateEnrichmentEchoInvariance(
 
   const findings: ValidatorFinding[] = [];
 
-  // FR enrichment echo
   if (Array.isArray(sub.skeletonStories)) {
-    for (const skel of sub.skeletonStories) {
-      const echoed = findStory(out.user_stories, skel.id);
-      if (!echoed) {
-        findings.push({
-          validatorId: 'enrichment_echo_invariance',
-          severity: 'HIGH',
-          type: 'dropped_story',
-          summary: `Story '${skel.id}' from skeleton pass is missing in enrichment output`,
-          location: `$.user_stories`,
-          detail: `Skeleton story '${skel.id}' was not echoed. Enrichment must echo the spine verbatim.`,
-          recommendation: `Restore story '${skel.id}' or flag the omission with rationale.`,
-        });
-        continue;
-      }
-      for (const field of ['role', 'action', 'outcome'] as const) {
-        if (skel[field] !== undefined && echoed[field] !== skel[field]) {
-          findings.push({
-            validatorId: 'enrichment_echo_invariance',
-            severity: 'HIGH',
-            type: 'mutated_field',
-            summary: `Story '${skel.id}' field '${field}' mutated between skeleton and enrichment`,
-            location: `$.user_stories[id=${skel.id}].${field}`,
-            detail: `Skeleton: '${displayField(skel[field])}'\nEnrichment: '${displayField(echoed[field])}'`,
-            recommendation: `Echo skeleton '${field}' verbatim; mutations require an explicit revision note.`,
-          });
-        }
-      }
-    }
+    findings.push(...checkStoryEchoes(sub.skeletonStories, out));
   }
 
-  // NFR enrichment echo
   if (Array.isArray(sub.skeletonNfrs)) {
-    for (const skel of sub.skeletonNfrs) {
-      const echoed = findStory(out.requirements, skel.id);
-      if (!echoed) {
-        findings.push({
-          validatorId: 'enrichment_echo_invariance',
-          severity: 'HIGH',
-          type: 'dropped_nfr',
-          summary: `NFR '${skel.id}' from skeleton pass is missing in enrichment output`,
-          location: `$.requirements`,
-          detail: `Skeleton NFR '${skel.id}' was not echoed.`,
-          recommendation: `Restore NFR '${skel.id}' or flag the omission with rationale.`,
-        });
-        continue;
-      }
-      for (const field of ['category', 'description'] as const) {
-        if (skel[field] !== undefined && echoed[field] !== skel[field]) {
-          findings.push({
-            validatorId: 'enrichment_echo_invariance',
-            severity: 'HIGH',
-            type: 'mutated_field',
-            summary: `NFR '${skel.id}' field '${field}' mutated`,
-            location: `$.requirements[id=${skel.id}].${field}`,
-            detail: `Skeleton: '${displayField(skel[field])}'\nEnrichment: '${displayField(echoed[field])}'`,
-            recommendation: `Echo skeleton '${field}' verbatim.`,
-          });
-        }
-      }
-    }
+    findings.push(...checkNfrEchoes(sub.skeletonNfrs, out));
   }
 
   return findings;

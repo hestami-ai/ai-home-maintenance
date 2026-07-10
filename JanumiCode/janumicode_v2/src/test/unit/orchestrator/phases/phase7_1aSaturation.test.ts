@@ -9,7 +9,12 @@ import * as path from 'node:path';
 import { createTestDatabase, type Database } from '../../../../lib/database/init';
 import { ConfigManager } from '../../../../lib/config/configManager';
 import { OrchestratorEngine } from '../../../../lib/orchestrator/orchestratorEngine';
-import { runTestSaturationLoop, renderScopedAcSummary } from '../../../../lib/orchestrator/phases/phase7_1a';
+import {
+  runTestSaturationLoop,
+  renderScopedAcSummary,
+  rebuildTestSaturationStateFromStream,
+  type TestSaturationConfig,
+} from '../../../../lib/orchestrator/phases/phase7_1a';
 import { buildCanonicalAcIndex } from '../../../../lib/orchestrator/phases/phase7/acRefResolver';
 import { MockLLMProvider } from '../../../helpers/mockLLMProvider';
 import type {
@@ -17,6 +22,10 @@ import type {
   TestDecompositionNodeContent,
   TestDecompositionPipelineContent,
   TestAssumptionSetSnapshotContent,
+  TestAssumptionEntry,
+  DecompositionPassEntry,
+  DecompositionNodeStatus,
+  DecompositionTier,
 } from '../../../../lib/types/records';
 
 const extensionPath = path.resolve(__dirname, '..', '..', '..', '..', '..');
@@ -379,6 +388,62 @@ describe('runTestSaturationLoop — Wave 10 saturation', () => {
     expect(bad.test_case.steps.length).toBeGreaterThan(0);
   });
 
+  it('sanitizes a child: array expected_outcome is joined and empty-description steps are dropped (characterization)', async () => {
+    const mock = new MockLLMProvider();
+    mock.setFixture('decompose-root', {
+      match: 'test-root',
+      parsedJson: {
+        parent_branch_classification: 'decomposable',
+        parent_tier_assessment: { tier: 'A', agrees_with_hint: true, rationale: 'suite' },
+        children: [
+          {
+            id: 'test-arr', tier: 'D', name: 'Array-outcome leaf',
+            test_type: 'integration',
+            component_ids: ['comp-x'],
+            acceptance_criterion_ids: ['AC-001'],
+            steps: [
+              { id: 's-empty', phase: 'arrange', description: '' }, // dropped — empty description
+              { id: 's-keep', phase: 'assert', description: 'verify result' },
+            ],
+            // LLM emitted expected_outcome as an array (non-strings filtered, rest joined with '; ')
+            expected_outcome: ['first outcome', 42, 'second outcome'],
+          },
+        ],
+        surfaced_assumptions: [],
+      },
+    });
+    configureMock(mock);
+
+    const { run } = engine.startWorkflowRun('ws', 'test');
+    const root = tinyTest('test-root');
+    const seeded = seedRootNode(engine, run.id, root);
+
+    await runTestSaturationLoop(
+      { engine, workflowRun: { id: run.id } as Parameters<typeof runTestSaturationLoop>[0]['workflowRun'] },
+      {
+        technicalConstraints: [],
+        componentSummary: 'comp-x: Component X',
+        acceptanceCriteriaSummary: 'AC-001',
+        interfaceContractsSummary: 'IC-001',
+        rootTestCases: [root],
+        rootNodeRecordIds: [seeded.recordId],
+        rootLogicalIds: [seeded.logicalNodeId],
+      },
+    );
+
+    const child = engine.writer.getRecordsByType(run.id, 'test_decomposition_node')
+      .map(n => n.content as unknown as TestDecompositionNodeContent)
+      .find(c => c.test_case.id === 'test-arr');
+    expect(child).toBeDefined();
+    // Array expected_outcome → non-strings filtered, remainder joined with '; '.
+    expect(child!.test_case.expected_outcome).toBe('first outcome; second outcome');
+    // Empty-description step dropped; only the valid step survives, with its own id/phase.
+    expect(child!.test_case.steps).toHaveLength(1);
+    expect(child!.test_case.steps[0].id).toBe('s-keep');
+    expect(child!.test_case.steps[0].phase).toBe('assert');
+    expect(child!.test_case.steps[0].description).toBe('verify result');
+  });
+
   it('Tier-B children fire mirror gate; auto-accept queues for Tier-C decomposition', async () => {
     const mock = new MockLLMProvider();
     mock.setFixture('decompose-root', {
@@ -549,5 +614,214 @@ describe('runTestSaturationLoop — Wave 10 saturation', () => {
     expect(row.test_decomposition_budget_calls_used).toBeGreaterThanOrEqual(1);
     expect(row.test_decomposition_max_depth_reached).toBe(1);
     expect(row.active_test_pipeline_id).toMatch(/^test-decomp-pipe-/);
+  });
+});
+
+describe('rebuildTestSaturationStateFromStream — resume-state reconstruction (characterization)', () => {
+  let db: Database;
+  let engine: OrchestratorEngine;
+
+  beforeEach(() => {
+    db = createTestDatabase();
+    const cm = new ConfigManager();
+    engine = new OrchestratorEngine(db, cm, workspacePath, extensionPath);
+  });
+  afterEach(() => { db.close(); });
+
+  const config: TestSaturationConfig = {
+    recordSubPhaseId: 'test_case_saturation',
+    templateSubPhase: 'test_case_saturation',
+    gateSurfacePrefix: 'test-decomp-gate-',
+  };
+
+  function tc(id: string, activeConstraints?: string[]): DecompositionTestCase {
+    return {
+      id, name: id,
+      test_type: 'integration',
+      steps: [{ id: 's1', description: 'do', phase: 'act' }],
+      active_constraints: activeConstraints,
+    };
+  }
+
+  function writeNode(
+    runId: string,
+    opts: {
+      nodeId: string;
+      parentNodeId: string | null;
+      depth: number;
+      status: DecompositionNodeStatus;
+      testCase: DecompositionTestCase;
+      tier?: DecompositionTier;
+      rootTestId?: string;
+    },
+  ): string {
+    const rec = engine.writer.writeRecord({
+      record_type: 'test_decomposition_node',
+      schema_version: '1.0',
+      workflow_run_id: runId,
+      phase_id: '7',
+      sub_phase_id: 'test_case_saturation',
+      produced_by_agent_role: 'test_design_agent',
+      janumicode_version_sha: 'dev',
+      derived_from_record_ids: [],
+      content: {
+        kind: 'test_decomposition_node',
+        node_id: opts.nodeId,
+        parent_node_id: opts.parentNodeId,
+        display_key: opts.testCase.id,
+        root_test_id: opts.rootTestId ?? opts.nodeId,
+        depth: opts.depth,
+        pass_number: 0,
+        status: opts.status,
+        tier: opts.tier,
+        test_case: opts.testCase,
+        surfaced_assumption_ids: [],
+        release_id: null,
+        release_ordinal: null,
+      } satisfies TestDecompositionNodeContent,
+    });
+    return rec.id;
+  }
+
+  function writeSnapshot(runId: string, passNumber: number, assumptions: TestAssumptionEntry[]): void {
+    engine.writer.writeRecord({
+      record_type: 'test_assumption_set_snapshot',
+      schema_version: '1.0',
+      workflow_run_id: runId,
+      phase_id: '7',
+      sub_phase_id: 'test_case_saturation',
+      produced_by_agent_role: 'test_design_agent',
+      janumicode_version_sha: 'dev',
+      derived_from_record_ids: [],
+      content: {
+        kind: 'test_assumption_set_snapshot',
+        pass_number: passNumber,
+        root_test_id: '*',
+        assumptions,
+        delta_from_previous_pass: assumptions.length,
+        semantic_delta: assumptions.length,
+      } satisfies TestAssumptionSetSnapshotContent,
+    });
+  }
+
+  function writePipeline(runId: string, pipelineId: string, passes: DecompositionPassEntry[]): string {
+    const rec = engine.writer.writeRecord({
+      record_type: 'test_decomposition_pipeline',
+      schema_version: '1.0',
+      workflow_run_id: runId,
+      phase_id: '7',
+      sub_phase_id: 'test_case_saturation',
+      produced_by_agent_role: 'orchestrator',
+      janumicode_version_sha: 'dev',
+      derived_from_record_ids: [],
+      content: {
+        kind: 'test_decomposition_pipeline',
+        pipeline_id: pipelineId,
+        root_test_id: '*',
+        passes,
+      } satisfies TestDecompositionPipelineContent,
+    });
+    return rec.id;
+  }
+
+  const pass = (passNumber: number, nodesProduced: number): DecompositionPassEntry => ({
+    pass_number: passNumber,
+    status: 'completed',
+    started_at: null,
+    completed_at: null,
+    nodes_produced: nodesProduced,
+    assumption_delta: 0,
+  });
+
+  const assumption = (id: string, passNumber: number): TestAssumptionEntry => ({
+    id, text: `assumption ${id}`, source: 'decomposition', surfaced_at_pass: passNumber, category: 'open_question',
+  });
+
+  // produced_at is millisecond-resolution and can collide between records written
+  // in the same tick; pin it explicitly so earliest/latest selection is deterministic.
+  function setProducedAt(recordId: string, iso: string): void {
+    db.prepare('UPDATE governed_stream SET produced_at = ? WHERE id = ?').run(iso, recordId);
+  }
+
+  function ctxFor(runId: string): Parameters<typeof rebuildTestSaturationStateFromStream>[0] {
+    return { engine, workflowRun: { id: runId } as Parameters<typeof rebuildTestSaturationStateFromStream>[0]['workflowRun'] };
+  }
+
+  it('returns null when there are no node records', () => {
+    const { run } = engine.startWorkflowRun('ws', 'test');
+    expect(rebuildTestSaturationStateFromStream(ctxFor(run.id), config, 'pipe-x')).toBeNull();
+  });
+
+  it('returns null when nodes exist but no pipeline record matches the pipelineId', () => {
+    const { run } = engine.startWorkflowRun('ws', 'test');
+    writeNode(run.id, { nodeId: 'n-root', parentNodeId: null, depth: 0, status: 'pending', testCase: tc('T-root') });
+    writePipeline(run.id, 'other-pipe', [pass(1, 0)]); // present, but under a different pipeline id
+    expect(rebuildTestSaturationStateFromStream(ctxFor(run.id), config, 'pipe-x')).toBeNull();
+  });
+
+  it('reconstructs queue, siblings, assumptions, and pipeline pointers from the stream', () => {
+    const { run } = engine.startWorkflowRun('ws', 'test');
+    const pipelineId = 'pipe-x';
+
+    // Node tree: root(pending, depth 0) → child-c(pending, tier C, depth 1) + child-d(decomposed, tier A, depth 1)
+    const rootRecId = writeNode(run.id, {
+      nodeId: 'n-root', parentNodeId: null, depth: 0, status: 'pending',
+      testCase: tc('T-root', ['TC-9']),
+    });
+    const childCRecId = writeNode(run.id, {
+      nodeId: 'n-child-c', parentNodeId: 'n-root', depth: 1, status: 'pending', tier: 'C',
+      testCase: tc('T-child-c'), rootTestId: 'n-root',
+    });
+    writeNode(run.id, {
+      nodeId: 'n-child-d', parentNodeId: 'n-root', depth: 1, status: 'decomposed', tier: 'A',
+      testCase: tc('T-child-d'), rootTestId: 'n-root',
+    });
+
+    // Two snapshots; the highest pass_number wins.
+    writeSnapshot(run.id, 1, [assumption('TS-0001', 1)]);
+    writeSnapshot(run.id, 3, [assumption('TS-0001', 1), assumption('TS-0005', 3)]);
+
+    // Two pipeline records for THIS pipeline: earliest = start, latest = current.
+    const startRecId = writePipeline(run.id, pipelineId, [pass(1, 2)]);
+    const latestRecId = writePipeline(run.id, pipelineId, [pass(1, 2), pass(2, 0)]);
+    setProducedAt(startRecId, '2020-01-01T00:00:00.000Z');
+    setProducedAt(latestRecId, '2020-01-02T00:00:00.000Z');
+    // A pipeline record under a different id must be ignored by the filter.
+    writePipeline(run.id, 'other-pipe', []);
+
+    const state = rebuildTestSaturationStateFromStream(ctxFor(run.id), config, pipelineId);
+    expect(state).not.toBeNull();
+
+    // Queue: only the two PENDING nodes (root + child-c); the decomposed node is excluded.
+    expect(state!.queue).toHaveLength(2);
+    const rootEntry = state!.queue.find(q => q.nodeId === 'n-root')!;
+    expect(rootEntry.tierHint).toBe('root');
+    expect(rootEntry.depth).toBe(0);
+    expect(rootEntry.parentNodeId).toBeNull();
+    expect(rootEntry.parentRecordId).toBe(rootRecId);
+    expect(rootEntry.activeConstraints).toEqual(['TC-9']);
+    const childEntry = state!.queue.find(q => q.nodeId === 'n-child-c')!;
+    expect(childEntry.tierHint).toBe('C');
+    expect(childEntry.depth).toBe(1);
+    expect(childEntry.parentNodeId).toBe('n-root');
+    expect(childEntry.parentRecordId).toBe(childCRecId);
+    expect(childEntry.activeConstraints).toEqual([]);
+
+    // Siblings: null-parent holds the root; 'n-root' holds both children.
+    expect((state!.siblingsByParent.get(null) ?? []).map(t => t.id)).toEqual(['T-root']);
+    expect((state!.siblingsByParent.get('n-root') ?? []).map(t => t.id).sort())
+      .toEqual(['T-child-c', 'T-child-d']);
+
+    expect(state!.maxDepthReached).toBe(1);
+
+    // Assumptions: highest-pass snapshot wins; seq = max TS-<n>.
+    expect(state!.passNumber).toBe(3);
+    expect(state!.allAssumptions.map(a => a.id)).toEqual(['TS-0001', 'TS-0005']);
+    expect(state!.assumptionSeq).toBe(5);
+
+    // Pipeline pointers: start = earliest, current = latest, passes come from the latest record.
+    expect(state!.pipelineStartRecord.id).toBe(startRecId);
+    expect(state!.currentPipelineRecordId).toBe(latestRecId);
+    expect(state!.pipelinePasses.map(p => p.pass_number)).toEqual([1, 2]);
   });
 });

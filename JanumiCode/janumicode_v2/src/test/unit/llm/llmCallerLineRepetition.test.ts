@@ -13,11 +13,16 @@
  */
 
 import { describe, it, expect } from 'vitest';
-import { LLMCaller, LLMError } from '../../../lib/llm/llmCaller';
+import {
+  LLMCaller,
+  LLMError,
+  detectConsecutiveLineRepeat,
+} from '../../../lib/llm/llmCaller';
 import type {
   LLMCallResult,
   LLMProviderAdapter,
   LLMStreamingCallOptions,
+  LineRepeatState,
 } from '../../../lib/llm/llmCaller';
 
 function loopingProvider(
@@ -287,5 +292,97 @@ describe('LLMCaller — line-repetition detector', () => {
       if (prev === undefined) delete process.env.JANUMICODE_LLM_MAX_REPEATED_LINE;
       else process.env.JANUMICODE_LLM_MAX_REPEATED_LINE = prev;
     }
+  });
+});
+
+/**
+ * Characterization tests for `detectConsecutiveLineRepeat`, the pure helper
+ * extracted from call()'s onChunk callback (S3776 decomposition). These pin
+ * the exact behaviour the inline loop had so the refactor stays
+ * behaviour-preserving: 8-char floor, consecutive-only counting, partial-line
+ * buffering across chunks, preview truncation, and the early-exit buffer state
+ * the original `break` left behind.
+ */
+describe('detectConsecutiveLineRepeat (extracted pure helper)', () => {
+  const fresh = (): LineRepeatState => ({
+    lineBuffer: '',
+    lastLine: null,
+    consecutiveLineCount: 0,
+  });
+
+  it('buffers a partial line across chunks and counts it once the newline arrives', () => {
+    const first = detectConsecutiveLineRepeat(fresh(), 'PARTIAL_LON', 30);
+    expect(first.lineBuffer).toBe('PARTIAL_LON');
+    expect(first.lastLine).toBeNull();
+    expect(first.consecutiveLineCount).toBe(0);
+    expect(first.abortReason).toBeNull();
+
+    const second = detectConsecutiveLineRepeat(first, 'G_LINE\n', 30);
+    expect(second.lineBuffer).toBe('');
+    expect(second.lastLine).toBe('PARTIAL_LONG_LINE');
+    expect(second.consecutiveLineCount).toBe(1);
+    expect(second.abortReason).toBeNull();
+  });
+
+  it('aborts on the FIRST crossing of maxRepeatedLine consecutive occurrences', () => {
+    let state: LineRepeatState = fresh();
+    let last = detectConsecutiveLineRepeat(state, 'REPEAT_ME_XX\n', 3);
+    expect(last.consecutiveLineCount).toBe(1);
+    expect(last.abortReason).toBeNull();
+    state = last;
+
+    last = detectConsecutiveLineRepeat(state, 'REPEAT_ME_XX\n', 3);
+    expect(last.consecutiveLineCount).toBe(2);
+    expect(last.abortReason).toBeNull();
+    state = last;
+
+    last = detectConsecutiveLineRepeat(state, 'REPEAT_ME_XX\n', 3);
+    expect(last.consecutiveLineCount).toBe(3);
+    expect(last.abortReason).toBe(
+      'degenerate loop detected (line repeated 3× consecutively this attempt): "REPEAT_ME_XX"',
+    );
+  });
+
+  it('resets the consecutive run to 1 when a different >= 8-char line appears', () => {
+    let state = detectConsecutiveLineRepeat(fresh(), 'AAAAAAAA\n', 30);
+    state = detectConsecutiveLineRepeat(state, 'AAAAAAAA\n', 30);
+    expect(state.lastLine).toBe('AAAAAAAA');
+    expect(state.consecutiveLineCount).toBe(2);
+
+    const reset = detectConsecutiveLineRepeat(state, 'BBBBBBBB\n', 30);
+    expect(reset.lastLine).toBe('BBBBBBBB');
+    expect(reset.consecutiveLineCount).toBe(1);
+    expect(reset.abortReason).toBeNull();
+  });
+
+  it('ignores lines under 8 trimmed chars (never tracked, never aborts)', () => {
+    // Structural punctuation like `  },` trims to 2 chars and must not count.
+    const out = detectConsecutiveLineRepeat(fresh(), '  },\n  },\n  },\n', 2);
+    expect(out.lastLine).toBeNull();
+    expect(out.consecutiveLineCount).toBe(0);
+    expect(out.abortReason).toBeNull();
+    expect(out.lineBuffer).toBe('');
+  });
+
+  it('truncates the preview to 60 chars + ellipsis for long lines', () => {
+    const longLine = 'X'.repeat(70);
+    const out = detectConsecutiveLineRepeat(fresh(), longLine + '\n', 1);
+    expect(out.abortReason).toBe(
+      `degenerate loop detected (line repeated 1× consecutively this attempt): "${'X'.repeat(60)}…"`,
+    );
+  });
+
+  it('early-exits mid-buffer on threshold and returns the unprocessed remainder', () => {
+    // Three identical lines + a trailing partial in ONE chunk; the abort must
+    // fire on the 2nd line (threshold 2) and leave the rest of the buffer
+    // intact — mirroring the original inline `break`.
+    const out = detectConsecutiveLineRepeat(
+      fresh(),
+      'SAMELINEXX\nSAMELINEXX\nSAMELINEXX\nLEFTOVER',
+      2,
+    );
+    expect(out.consecutiveLineCount).toBe(2);
+    expect(out.lineBuffer).toBe('SAMELINEXX\nLEFTOVER');
+    expect(out.abortReason).toContain('degenerate loop detected');
   });
 });

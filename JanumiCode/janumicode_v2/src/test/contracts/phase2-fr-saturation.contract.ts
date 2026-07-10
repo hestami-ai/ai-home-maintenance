@@ -11,7 +11,7 @@ export interface RequirementDecompositionNodeArtifact {
   kind: 'requirement_decomposition_node';
   node_id: string;
   parent_node_id?: string | null;
-  root_kind?: 'fr' | 'nfr' | string;
+  root_kind?: 'fr' | 'nfr' | (string & {});
   status: string;
   tier?: string;
   depth?: number;

@@ -378,6 +378,24 @@ function buildElkGraph(
 }
 
 /**
+ * Collapse the accumulated bounds into a finite rectangle, substituting
+ * the canonical empty-graph defaults when a min/max never got updated.
+ */
+function finalizeBounds(
+  minX: number,
+  minY: number,
+  maxX: number,
+  maxY: number,
+): { minX: number; minY: number; maxX: number; maxY: number } {
+  return {
+    minX: minX === Infinity ? 0 : minX,
+    minY: minY === Infinity ? 0 : minY,
+    maxX: maxX === -Infinity ? 1000 : maxX,
+    maxY: maxY === -Infinity ? 1000 : maxY,
+  };
+}
+
+/**
  * Extract node positions from ELK layout result.
  */
 function extractPositions(
@@ -440,12 +458,7 @@ function extractPositions(
 
   return {
     nodes,
-    bounds: {
-      minX: minX === Infinity ? 0 : minX,
-      minY: minY === Infinity ? 0 : minY,
-      maxX: maxX === -Infinity ? 1000 : maxX,
-      maxY: maxY === -Infinity ? 1000 : maxY,
-    },
+    bounds: finalizeBounds(minX, minY, maxX, maxY),
   };
 }
 

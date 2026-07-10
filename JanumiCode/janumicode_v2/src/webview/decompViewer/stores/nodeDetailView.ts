@@ -110,7 +110,8 @@ function buildTest(p: NodeDetailPayload): NodeDetailView {
     sections, 'Steps', 'list',
     arr(tc.steps).map((raw, i) => {
       const s = obj(raw);
-      return plain(`${str(s.id, `step-${i + 1}`)}: ${str(s.description)}`);
+      const stepId = str(s.id, `step-${i + 1}`);
+      return plain(`${stepId}: ${str(s.description)}`);
     }),
   );
   pushSection(sections, 'Constraints', 'chips', strArr(tc.active_constraints).map(plain));

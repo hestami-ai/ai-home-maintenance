@@ -155,7 +155,7 @@ export class DecompViewerDataProvider {
     const systemRequirements = this.loadSystemRequirements(workflowRunId);
 
     const duplicateAssumptions = assumptions.filter(a => !!a.duplicate_of).length;
-    const byStatus: Record<ViewerStatus, number> = {};
+    const byStatus: Partial<Record<ViewerStatus, number>> = {};
     for (const n of nodes) {
       byStatus[n.status] = (byStatus[n.status] ?? 0) + 1;
     }
@@ -435,22 +435,7 @@ export class DecompViewerDataProvider {
     const out: ViewerAssumption[] = [];
     for (const [, arr] of byKind) {
       for (const a of arr) {
-        out.push({
-          id: (a.id as string) ?? '',
-          text: (a.text as string) ?? '',
-          category: (a.category as string) ?? 'scope',
-          citations: Array.isArray(a.citations)
-            ? (a.citations as unknown[]).filter((x): x is string => typeof x === 'string')
-            : undefined,
-          surfaced_at_node: (a.surfaced_at_node as string) ?? '',
-          surfaced_at_pass: typeof a.surfaced_at_pass === 'number' ? a.surfaced_at_pass : 0,
-          source: (a.source as string) ?? undefined,
-          duplicate_of: (a.duplicate_of as string) ?? undefined,
-          duplicate_similarity:
-            typeof a.duplicate_similarity === 'number'
-              ? a.duplicate_similarity
-              : undefined,
-        });
+        out.push(toViewerAssumption(a));
       }
     }
     return out;
@@ -881,4 +866,24 @@ function pickString(obj: Record<string, unknown>, keys: string[]): string | unde
     if (typeof v === 'string' && v.length > 0) return v;
   }
   return undefined;
+}
+
+/** Normalize one raw assumption record into a ViewerAssumption. */
+function toViewerAssumption(a: Record<string, unknown>): ViewerAssumption {
+  return {
+    id: (a.id as string) ?? '',
+    text: (a.text as string) ?? '',
+    category: (a.category as string) ?? 'scope',
+    citations: Array.isArray(a.citations)
+      ? (a.citations as unknown[]).filter((x): x is string => typeof x === 'string')
+      : undefined,
+    surfaced_at_node: (a.surfaced_at_node as string) ?? '',
+    surfaced_at_pass: typeof a.surfaced_at_pass === 'number' ? a.surfaced_at_pass : 0,
+    source: (a.source as string) ?? undefined,
+    duplicate_of: (a.duplicate_of as string) ?? undefined,
+    duplicate_similarity:
+      typeof a.duplicate_similarity === 'number'
+        ? a.duplicate_similarity
+        : undefined,
+  };
 }

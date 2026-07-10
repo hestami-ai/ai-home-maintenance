@@ -120,7 +120,18 @@ function extractMembers(def: Definition): Map<string, string> {
   if (!def || typeof def !== 'object') return members;
   const content = def as Record<string, unknown>;
 
-  // ── data_models ────────────────────────────────────────────────────
+  // Each walker mutates `members` in place, in this fixed order, so the
+  // resulting insertion order (and thus removed/added/retyped ordering) is
+  // identical to the original single-function walk.
+  collectDataModelMembers(content, members);
+  collectApiDefinitionMembers(content, members);
+  collectContractMembers(content, members);
+
+  return members;
+}
+
+/** data_models: content.models[].entities[].fields[] → `entity.field`. */
+function collectDataModelMembers(content: Record<string, unknown>, members: Map<string, string>): void {
   for (const model of asArray(content.models)) {
     const entityName = stringField(model, ['name', 'id', 'entity', 'component_id']) ?? 'entity';
     for (const entity of asArray((model as Record<string, unknown>)?.entities)) {
@@ -133,8 +144,10 @@ function extractMembers(def: Definition): Map<string, string> {
       }
     }
   }
+}
 
-  // ── api_definitions ────────────────────────────────────────────────
+/** api_definitions: content.definitions[].endpoints[] → `METHOD path`. */
+function collectApiDefinitionMembers(content: Record<string, unknown>, members: Map<string, string>): void {
   for (const definition of asArray(content.definitions)) {
     for (const ep of asArray((definition as Record<string, unknown>)?.endpoints)) {
       const path = stringField(ep, ['path', 'route', 'url']);
@@ -146,8 +159,10 @@ function extractMembers(def: Definition): Map<string, string> {
       members.set(`${method} ${path}`, `in:${inputs}|out:${outputs}`);
     }
   }
+}
 
-  // ── interface_contracts (and generic operation lists) ──────────────
+/** interface_contracts (and generic operation lists) → contract/operation id. */
+function collectContractMembers(content: Record<string, unknown>, members: Map<string, string>): void {
   for (const key of ['contracts', 'operations', 'interfaces'] as const) {
     for (const item of asArray(content[key])) {
       const name = stringField(item, ['id', 'name', 'operation', 'signature']);
@@ -156,8 +171,6 @@ function extractMembers(def: Definition): Map<string, string> {
       members.set(name, `sig:${protocol}`);
     }
   }
-
-  return members;
 }
 
 /** Stable, order-independent type surface for an inputs/outputs blob. */

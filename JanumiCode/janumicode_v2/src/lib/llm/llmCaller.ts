@@ -294,6 +294,176 @@ export function computeLLMCacheKey(opts: LLMCacheKeyInput): string {
   return createHash('sha256').update(canonical).digest('hex');
 }
 
+// ── call() attempt machinery ────────────────────────────────────────
+
+/** Per-attempt streaming budgets, resolved once per call(). */
+interface AttemptBudgets {
+  maxLogFileBytes: number;
+  maxCallSeconds: number;
+  maxRepeatedLine: number;
+  maxNoProgressSeconds: number;
+}
+
+/** Discriminated result of a single provider attempt. */
+type AttemptOutcome =
+  | { kind: 'success'; result: LLMCallResult }
+  | { kind: 'failure'; error: LLMError; retryAttempts: number };
+
+/**
+ * Shared per-call context threaded through the attempt/finalize/fail helpers:
+ * the invocation id, the call start timestamp, the live log file, and the two
+ * AODD trace overrides. Grouped so these helpers stay under the parameter cap.
+ */
+interface LlmCallContext {
+  invocationId: string | null;
+  startedAt: number;
+  logFile: InvocationLogFile | null;
+  traceSubPhaseId: string | undefined;
+  traceAgentRole: AgentRole | null;
+}
+
+/**
+ * Per-attempt abort machinery for a streaming LLM call — extracted from
+ * call()'s retry loop so the streaming hot path and the timer/abort wiring
+ * live in one cohesive, self-contained place. Owns:
+ *   - the AbortController threaded into the provider,
+ *   - a no-progress timer (re-armed on every chunk),
+ *   - a wall-clock timer (outer last-resort cap),
+ *   - the caller-supplied session-abort signal bridge,
+ *   - the invocation-log byte cap and consecutive-line-repeat detectors.
+ *
+ * `abortReason` / `sessionAborted` are read by resolveAttemptError() after
+ * the provider call rejects, exactly as the inline locals were. `cumulativeChars`
+ * is read by handleStreamChunk() for the live-log writeChunk field. A fresh
+ * guard is constructed per attempt so each retry starts with clean budgets
+ * and line-repeat state.
+ */
+class StreamAbortGuard {
+  readonly controller = new AbortController();
+  abortReason: string | null = null;
+  sessionAborted = false;
+  cumulativeChars = 0;
+  private noProgressHandle: NodeJS.Timeout | null = null;
+  private readonly callTimeoutHandle: NodeJS.Timeout | null = null;
+  private externalCleanup: (() => void) | null = null;
+  private lineBuffer = '';
+  private lastLine: string | null = null;
+  private consecutiveLineCount = 0;
+  private readonly bytesBaseline: number;
+
+  constructor(
+    private readonly budgets: AttemptBudgets,
+    private readonly logFile: InvocationLogFile | null,
+    externalSignal: AbortSignal | undefined,
+  ) {
+    // bytesBaseline captures the log-file size at attempt start so the
+    // size-cap only measures THIS attempt's growth.
+    this.bytesBaseline = logFile?.bytesWritten ?? 0;
+    // Arm initially so a provider that never emits a single chunk (e.g. a
+    // wedged socket before TTFB) still aborts.
+    this.armNoProgressTimer();
+    this.callTimeoutHandle = this.startWallClockTimer();
+    this.attachExternalSignal(externalSignal);
+  }
+
+  // Shared by the no-progress and wall-clock timers: record the reason
+  // (first-writer-wins) and abort the in-flight request.
+  private timerAbort(reason: string): void {
+    if (this.abortReason) return;
+    this.abortReason = reason;
+    if (!this.controller.signal.aborted) this.controller.abort();
+  }
+
+  // No-progress timer — re-armed on every streaming chunk; aborts when no
+  // chunk has arrived for N seconds. Cleared/re-set here on each re-arm.
+  armNoProgressTimer(): void {
+    if (this.noProgressHandle) clearTimeout(this.noProgressHandle);
+    if (this.budgets.maxNoProgressSeconds <= 0) return;
+    this.noProgressHandle = setTimeout(
+      () => this.timerAbort(
+        `no-progress timeout (${this.budgets.maxNoProgressSeconds}s without a streaming chunk) — likely silent hang`,
+      ),
+      this.budgets.maxNoProgressSeconds * 1000,
+    );
+    this.noProgressHandle.unref?.();
+  }
+
+  // Wall-clock timer — outer safety cap for adversarial cases where a model
+  // emits a chunk every N-1 seconds (resetting no-progress) and never converges.
+  private startWallClockTimer(): NodeJS.Timeout | null {
+    if (this.budgets.maxCallSeconds <= 0) return null;
+    const handle = setTimeout(
+      () => this.timerAbort(
+        `invocation wall-clock exceeded (${this.budgets.maxCallSeconds}s this attempt) — likely silent hang`,
+      ),
+      this.budgets.maxCallSeconds * 1000,
+    );
+    // Don't keep the process alive on this timer if the run otherwise finishes.
+    handle.unref?.();
+    return handle;
+  }
+
+  // Union the caller-provided abort signal (session abort from
+  // waitForQuiescence) with our internal one. Session abort is non-retryable.
+  private attachExternalSignal(externalSignal: AbortSignal | undefined): void {
+    if (!externalSignal) return;
+    const external = externalSignal;
+    const onExternalAbort = () => {
+      this.sessionAborted = true;
+      this.abortReason ??= 'session abort (external signal)';
+      if (!this.controller.signal.aborted) this.controller.abort();
+    };
+    if (external.aborted) {
+      onExternalAbort();
+      return;
+    }
+    external.addEventListener('abort', onExternalAbort, { once: true });
+    this.externalCleanup = () => external.removeEventListener('abort', onExternalAbort);
+  }
+
+  // Re-arm the no-progress timer and accumulate this chunk's char count —
+  // any chunk counts as forward progress from the streaming socket.
+  onChunkProgress(charCount: number): void {
+    this.armNoProgressTimer();
+    this.cumulativeChars += charCount;
+  }
+
+  // Invocation-log size cap — measured against THIS attempt's baseline so a
+  // prior failed attempt's growth doesn't instantly re-trip the next one.
+  checkByteCap(): void {
+    if (this.abortReason || this.budgets.maxLogFileBytes <= 0 || !this.logFile) return;
+    const attemptBytes = this.logFile.bytesWritten - this.bytesBaseline;
+    if (attemptBytes > this.budgets.maxLogFileBytes) {
+      this.abortReason = `invocation log size exceeded (${attemptBytes} > ${this.budgets.maxLogFileBytes} bytes this attempt) — likely runaway thinking`;
+      this.controller.abort();
+    }
+  }
+
+  // Consecutive-line-repetition detector — degenerate low-entropy loop guard.
+  checkLineRepeat(chunkText: string): void {
+    if (this.abortReason || this.budgets.maxRepeatedLine <= 0) return;
+    const repeat = detectConsecutiveLineRepeat(
+      { lineBuffer: this.lineBuffer, lastLine: this.lastLine, consecutiveLineCount: this.consecutiveLineCount },
+      chunkText,
+      this.budgets.maxRepeatedLine,
+    );
+    this.lineBuffer = repeat.lineBuffer;
+    this.lastLine = repeat.lastLine;
+    this.consecutiveLineCount = repeat.consecutiveLineCount;
+    if (repeat.abortReason) {
+      this.abortReason = repeat.abortReason;
+      this.controller.abort();
+    }
+  }
+
+  // Clear every timer/listener. Called in the attempt's finally block.
+  cleanup(): void {
+    this.externalCleanup?.();
+    if (this.callTimeoutHandle) clearTimeout(this.callTimeoutHandle);
+    if (this.noProgressHandle) clearTimeout(this.noProgressHandle);
+  }
+}
+
 // ── LLMCaller ───────────────────────────────────────────────────────
 
 export class LLMCaller {
@@ -538,48 +708,8 @@ export class LLMCaller {
     // we don't re-write them. lifecycle + transformation_step ARE emitted
     // with cache_hit=true so the resumed session's audit trail stays
     // complete and walk-back can show "this call came from cache".
-    if (this.llmCache.size > 0) {
-      const cacheKey = this.computeCacheKey({
-        provider: options.provider,
-        model: options.model,
-        responseFormat: options.responseFormat ?? 'text',
-        temperature: options.temperature ?? null,
-        maxTokens: options.maxTokens ?? null,
-        system: options.system ?? null,
-        prompt: options.prompt,
-        tools: options.tools ?? [],
-        toolChoice: options.toolChoice ?? null,
-      });
-      const cached = this.llmCache.get(cacheKey);
-      if (cached) {
-        const traceSubPhaseId = options.traceContext?.subPhaseId ?? undefined;
-        const traceAgentRole = options.traceContext?.agentRole ?? null;
-        const cachedResult: LLMCallResult = {
-          text: cached.text,
-          parsed: cached.parsed,
-          thinking: cached.thinking,
-          toolCalls: cached.toolCalls,
-          provider: cached.provider,
-          model: cached.model,
-          inputTokens: cached.inputTokens,
-          outputTokens: cached.outputTokens,
-          usedFallback: false,
-          retryAttempts: 0,
-        };
-        aoddEmit(
-          'llm.cache_hit',
-          {
-            source_invocation_id: cached.sourceInvocationId,
-            text: maybeSpillText(cached.text),
-          },
-          {
-            sub_phase_id_override: traceSubPhaseId,
-            agent_role: traceAgentRole ?? undefined,
-          },
-        );
-        return cachedResult;
-      }
-    }
+    const cached = this.tryCacheHit(options);
+    if (cached) return cached;
 
     // Pre-call instrumentation: write agent_invocation BEFORE the call so the
     // webview sees it as 'running' immediately. The card flips to ✅/❌ when
@@ -593,17 +723,109 @@ export class LLMCaller {
     // the finally below.
     if (invocationId) setInvocation(invocationId);
 
-    // Transformation trace: capture the materialized prompt at call entry
-    // so walk-back can answer "what was the input to this LLM call?". The
-    // four trace steps (prompt_materialized / llm_returned / json_parsed
-    // or json_repaired) all share an `invocation_id` in their metadata so
-    // the walk-back CLI can group them into a single call's chain even
-    // without explicit parent_step_id linking.
+    // Transformation trace: the AODD steps for this call share an
+    // `invocation_id` so the walk-back CLI can group them into one chain.
+    // traceSubPhaseId / traceAgentRole are threaded into every emit below.
     const traceSubPhaseId = options.traceContext?.subPhaseId ?? undefined;
     const traceAgentRole = options.traceContext?.agentRole ?? null;
-    // AODD emits. prompt.materialized captures the finalized prompt;
-    // llm.invoked marks the boundary just before the API call so
-    // llm.returned / llm.failed can be paired with it on replay.
+    this.emitCallStartAodd(options, invocationId, traceSubPhaseId, traceAgentRole);
+
+    // Open the per-invocation live log (C8): writes the prompt header
+    // immediately, appends chunks as they stream, and a trailer on
+    // completion. See openLiveLog() for the filename-prefix (phase/sub-phase
+    // glob) and raw-token-stream env-opt-in rationale.
+    const logFile = this.openLiveLog(options, invocationId);
+
+    // Emit llm:started so the ActivityStrip shows what is running. Plain
+    // LLMCaller has no queue, so we don't emit llm:queued — started fires
+    // the moment the call enters this method.
+    const trace = options.traceContext;
+    this.emitLlmStarted(options.provider, trace);
+
+    try {
+      // The retry loop, in-stream abort machinery, JSON-repair layers,
+      // fallback provider, and terminal error path all live in
+      // runWithRetryAndFallback() and its helpers (S3776 decomposition).
+      return await this.runWithRetryAndFallback(
+        adapter,
+        options,
+        invocationId,
+        startedAt,
+        logFile,
+        traceSubPhaseId,
+        traceAgentRole,
+      );
+    } finally {
+      this._inFlightCount--;
+      // Clear the invocation_id we set above so subsequent emits in the
+      // same TraceCtx frame don't inherit a stale id.
+      if (invocationId) setInvocation(null);
+      this.emitLlmFinished(options.provider, trace, Date.now() - startedAt);
+    }
+  }
+
+  // ── call() decomposition helpers ─────────────────────────────────
+
+  /**
+   * Cache short-circuit (resume optimization). Returns the cached result
+   * when this exact prompt was already executed in a prior/current run, or
+   * null when there is no hit (or the cache is empty). On a hit, emits
+   * `llm.cache_hit` so the resumed session's audit trail stays complete.
+   */
+  private tryCacheHit(options: LLMCallOptions): LLMCallResult | null {
+    if (this.llmCache.size === 0) return null;
+    const cacheKey = this.computeCacheKey({
+      provider: options.provider,
+      model: options.model,
+      responseFormat: options.responseFormat ?? 'text',
+      temperature: options.temperature ?? null,
+      maxTokens: options.maxTokens ?? null,
+      system: options.system ?? null,
+      prompt: options.prompt,
+      tools: options.tools ?? [],
+      toolChoice: options.toolChoice ?? null,
+    });
+    const cached = this.llmCache.get(cacheKey);
+    if (!cached) return null;
+    const traceSubPhaseId = options.traceContext?.subPhaseId ?? undefined;
+    const traceAgentRole = options.traceContext?.agentRole ?? null;
+    const cachedResult: LLMCallResult = {
+      text: cached.text,
+      parsed: cached.parsed,
+      thinking: cached.thinking,
+      toolCalls: cached.toolCalls,
+      provider: cached.provider,
+      model: cached.model,
+      inputTokens: cached.inputTokens,
+      outputTokens: cached.outputTokens,
+      usedFallback: false,
+      retryAttempts: 0,
+    };
+    aoddEmit(
+      'llm.cache_hit',
+      {
+        source_invocation_id: cached.sourceInvocationId,
+        text: maybeSpillText(cached.text),
+      },
+      {
+        sub_phase_id_override: traceSubPhaseId,
+        agent_role: traceAgentRole ?? undefined,
+      },
+    );
+    return cachedResult;
+  }
+
+  /**
+   * Emit the call-entry AODD steps: `prompt.materialized` (the finalized
+   * prompt) and `llm.invoked` (the boundary just before the API call so
+   * llm.returned / llm.failed can be paired with it on replay).
+   */
+  private emitCallStartAodd(
+    options: LLMCallOptions,
+    invocationId: string | null,
+    traceSubPhaseId: string | undefined,
+    traceAgentRole: AgentRole | null,
+  ): void {
     const promptForAodd = maybeSpillText(options.prompt);
     const systemForAodd = options.system ? maybeSpillText(options.system) : undefined;
     if (invocationId) {
@@ -633,21 +855,21 @@ export class LLMCaller {
         agent_role: traceAgentRole ?? undefined,
       },
     );
+  }
 
-    // Open the per-invocation live log (C8). Writes the prompt header
-    // immediately, then appends chunks as they stream, and a trailer on
-    // completion. Lets `tail -f .janumicode/live/<id>.log` show live
-    // model progress independent of DB commits.
-    // Filename prefix encodes phase / sub-phase so operators scanning
-    // .janumicode/live/ can find every call for a given sub-phase via
-    // glob (e.g. `phase06_1__*.log`). Falls back to no prefix when
-    // traceContext is absent (rare — typically only test fixtures).
-    //
-    // Raw-token-stream writing is opt-in via JANUMICODE_LLM_LIVE_RAW_STREAM=1.
-    // Default off because cal-21 produced ~700 MB of live logs largely
-    // from per-chunk lines; the trailer's full text + thinking chain
-    // is what operators actually consume. Loop detection is unaffected
-    // (bytesWritten is incremented in JS regardless of disk write).
+  /**
+   * Open the per-invocation live log (C8). Filename prefix encodes
+   * phase / sub-phase so operators scanning .janumicode/live/ can glob a
+   * given sub-phase (e.g. `phase06_1__*.log`); falls back to no prefix when
+   * traceContext is absent. Raw-token-stream writing is opt-in via
+   * JANUMICODE_LLM_LIVE_RAW_STREAM=1 (default off — cal-21 produced ~700 MB
+   * of per-chunk lines; loop detection is unaffected because bytesWritten is
+   * incremented in JS regardless of disk write).
+   */
+  private openLiveLog(
+    options: LLMCallOptions,
+    invocationId: string | null,
+  ): InvocationLogFile | null {
     const filenamePrefix = buildLogFilenamePrefix(
       options.traceContext?.phaseId ?? null,
       options.traceContext?.subPhaseId ?? null,
@@ -673,610 +895,605 @@ export class LLMCaller {
         startedAt: new Date().toISOString(),
       });
     }
+    return logFile;
+  }
 
-    // Emit llm:started so the ActivityStrip shows what is running. Plain
-    // LLMCaller has no queue, so we don't emit llm:queued — started fires
-    // the moment the call enters this method.
-    const trace = options.traceContext;
+  /** Emit `llm:started` so the ActivityStrip shows what is running. */
+  private emitLlmStarted(provider: string, trace: LLMTraceContext | undefined): void {
     this.eventBus?.emit('llm:started', {
-      provider: options.provider,
+      provider,
       lane: 'phase',
       label: trace?.label ?? null,
       agentRole: trace?.agentRole ?? null,
       subPhaseId: trace?.subPhaseId ?? null,
     });
+  }
 
+  /** Emit `llm:finished` (in call()'s finally) so the strip leaves 'running'. */
+  private emitLlmFinished(
+    provider: string,
+    trace: LLMTraceContext | undefined,
+    durationMs: number,
+  ): void {
+    this.eventBus?.emit('llm:finished', {
+      provider,
+      lane: 'phase',
+      durationMs,
+      label: trace?.label ?? null,
+      agentRole: trace?.agentRole ?? null,
+      subPhaseId: trace?.subPhaseId ?? null,
+    });
+  }
+
+  /**
+   * Resolve the per-attempt streaming budgets once per call(). See the
+   * StreamAbortGuard docs and llmTimeouts.ts for the tuning rationale
+   * behind each knob (byte cap = runaway-thinking; wall-clock = adversarial
+   * pauses; repeated-line = degenerate loop; no-progress = silent hang).
+   */
+  private resolveAttemptBudgets(options: LLMCallOptions): AttemptBudgets {
+    const maxLogFileBytes = Number.parseInt(
+      process.env.JANUMICODE_LLM_MAX_LOG_FILE_BYTES ?? '1572864', 10);
+    const llmTimeouts = resolveLlmTimeouts(options.provider, options.model);
+    const maxRepeatedLine = Number.parseInt(
+      process.env.JANUMICODE_LLM_MAX_REPEATED_LINE ?? '30', 10);
+    return {
+      maxLogFileBytes,
+      maxCallSeconds: llmTimeouts.maxCallSeconds,
+      maxRepeatedLine,
+      maxNoProgressSeconds: llmTimeouts.noProgressSeconds,
+    };
+  }
+
+  /**
+   * Drive the primary provider with retries, then the fallback provider, then
+   * the terminal error path. Returns the successful result or throws the last
+   * error (writing the terminal error record + AODD llm.failed first).
+   */
+  private async runWithRetryAndFallback(
+    adapter: LLMProviderAdapter,
+    options: LLMCallOptions,
+    invocationId: string | null,
+    startedAt: number,
+    logFile: InvocationLogFile | null,
+    traceSubPhaseId: string | undefined,
+    traceAgentRole: AgentRole | null,
+  ): Promise<LLMCallResult> {
+    const budgets = this.resolveAttemptBudgets(options);
+    // Shared chunk-sequence counter — persists across attempts AND the
+    // fallback so llm:stream_chunk sequence numbers stay monotonic.
+    const seqRef = { value: 0 };
+    let lastError: LLMError | null = null;
+    let retryAttempts = 0;
+    const callContext: LlmCallContext = {
+      invocationId, startedAt, logFile, traceSubPhaseId, traceAgentRole,
+    };
+
+    for (let attempt = 0; attempt <= this.config.maxRetries; attempt++) {
+      const outcome = await this.runSingleAttempt(
+        adapter, options, budgets, seqRef, retryAttempts, callContext,
+      );
+      if (outcome.kind === 'success') return outcome.result;
+      retryAttempts = outcome.retryAttempts;
+      lastError = outcome.error;
+      if (!this.isRetryable(lastError)) break;
+      await this.backoffBeforeRetry(
+        lastError, attempt, retryAttempts, invocationId, traceSubPhaseId, traceAgentRole,
+      );
+    }
+
+    const fallbackResult = await this.tryFallbackProvider(
+      options, invocationId, startedAt, retryAttempts, seqRef,
+    );
+    if (fallbackResult) return fallbackResult;
+
+    return this.failCall(
+      options, retryAttempts, lastError, callContext,
+    );
+  }
+
+  /**
+   * Execute one provider attempt: build the streaming options (wiring the
+   * per-attempt StreamAbortGuard's timers + in-stream detectors), call the
+   * adapter, run the JSON recoveries + success finalization, and translate
+   * a rejection into a classified {failure} outcome. The guard's timers are
+   * always cleared in the finally.
+   */
+  private async runSingleAttempt(
+    adapter: LLMProviderAdapter,
+    options: LLMCallOptions,
+    budgets: AttemptBudgets,
+    seqRef: { value: number },
+    retryAttempts: number,
+    ctx: LlmCallContext,
+  ): Promise<AttemptOutcome> {
+    const { invocationId, startedAt, logFile, traceSubPhaseId, traceAgentRole } = ctx;
+    const guard = new StreamAbortGuard(budgets, logFile, options.abortSignal);
+    const streamingOptions: LLMStreamingCallOptions = {
+      ...options,
+      abortSignal: guard.controller.signal,
+      onChunk: (chunk) => this.handleStreamChunk(
+        chunk, guard, invocationId, options, startedAt, logFile, seqRef,
+      ),
+    };
     try {
-      // Try primary provider with retries
-      let lastError: LLMError | null = null;
-      let retryAttempts = 0;
+      const result = await adapter.call(streamingOptions);
+      result.retryAttempts = retryAttempts;
+      await this.applyJsonRecoveries(options, result, invocationId, traceSubPhaseId, traceAgentRole);
+      const finalized = await this.finalizeSuccess(
+        options, result, retryAttempts, ctx,
+      );
+      return { kind: 'success', result: finalized };
+    } catch (err) {
+      const error = this.resolveAttemptError(err, guard.abortReason, guard.sessionAborted);
+      return { kind: 'failure', error, retryAttempts: retryAttempts + 1 };
+    } finally {
+      guard.cleanup();
+    }
+  }
 
-      // Attach streaming callback so providers that support it can emit
-      // agent_output_chunk records as tokens arrive. Adapters that don't
-      // stream just ignore the extra field on the options object.
-      let chunkSequence = 0;
-      // Invocation-log size cap — primary in-stream stall signature.
-      // We measure the bytes written to the per-invocation .log file
-      // (prompt + chunk metadata + streamed text), not just cumulative
-      // stream chars, because a thinking-mode loop keeps growing the
-      // log monotonically even when individual tokens are tiny. 1.5 MB
-      // of log file = practically certain to be stuck. Retryable up to
-      // maxRetries so sampling variance can rescue the next attempt.
-      // Tuning history (cal-26 cycle): tried 100 KB and 256 KB to catch
-      // loops earlier; both falsely tripped on qwen3.5:9b's normal
-      // verbose-but-converging thinking on bloom/discovery sub-phases
-      // (user_journey_bloom hit 92 KB of legit deliberation before the
-      // model started emitting JSON). Reverted to 1.5 MB — the real
-      // loop pathology in cal-25 was at NFR saturation and is rare
-      // enough that letting it run longer is acceptable.
-      const maxLogFileBytes = Number.parseInt(
-        process.env.JANUMICODE_LLM_MAX_LOG_FILE_BYTES ?? '1572864', 10);
+  /**
+   * Streaming hot path for one chunk: re-arm the no-progress timer + tally
+   * chars (via the guard), append to the live log, forward the chunk as an
+   * event, then run the byte-cap and consecutive-line-repeat detectors.
+   * Order matches the original inline callback exactly.
+   */
+  private handleStreamChunk(
+    chunk: LLMStreamChunk,
+    guard: StreamAbortGuard,
+    invocationId: string | null,
+    options: LLMCallOptions,
+    startedAt: number,
+    logFile: InvocationLogFile | null,
+    seqRef: { value: number },
+  ): void {
+    guard.onChunkProgress(chunk.text.length);
+    logFile?.writeChunk({
+      channel: chunk.channel,
+      msSinceStart: Date.now() - startedAt,
+      cumulativeChars: guard.cumulativeChars,
+      text: chunk.text,
+    });
+    this.writeOutputChunk(invocationId, options, chunk, seqRef.value++);
+    guard.checkByteCap();
+    guard.checkLineRepeat(chunk.text);
+  }
 
-      // Model/provider-aware timeout budgets. LOCAL providers (ollama/llamacpp)
-      // pay model reload + prompt prefill (time-to-first-token) on every call
-      // after a swap — for a large dense model at full context that exceeds the
-      // old flat 90 s no-progress default and was killing gemma4:31b mid-stream
-      // (cal-29). See llmTimeouts.ts. Per-knob env vars still override.
-      const llmTimeouts = resolveLlmTimeouts(options.provider, options.model);
+  /**
+   * Run the three JSON-recovery layers in order, each a no-op unless its
+   * precondition holds: 2a deterministic structural, 2b LLM repair, 2c
+   * thinking-channel recovery. Each mutates result.parsed in place, so a
+   * layer that recovers short-circuits the later layers' `!result.parsed`
+   * guards.
+   */
+  private async applyJsonRecoveries(
+    options: LLMCallOptions,
+    result: LLMCallResult,
+    invocationId: string | null,
+    traceSubPhaseId: string | undefined,
+    traceAgentRole: AgentRole | null,
+  ): Promise<void> {
+    await this.recoverJsonStructurally(options, result, invocationId, traceSubPhaseId, traceAgentRole);
+    await this.recoverJsonViaRepair(options, result, invocationId, traceSubPhaseId, traceAgentRole);
+    await this.recoverJsonFromThinking(options, result, invocationId, traceSubPhaseId, traceAgentRole);
+  }
 
-      // Per-call wall-clock timeout — companion to the byte-cap retry.
-      // The byte cap catches token-producing loops (log grows fast). It
-      // does NOT catch silent hangs where the call produces no tokens
-      // for a long time (cal-26 cycle: ollama call wedged for 15+ min,
-      // records-idle stall fired session abort, deferred 9 nodes).
-      // This timeout fires the same per-attempt abort path so the call
-      // is retryable (sampling variance can rescue the next attempt).
-      // Default 600 s — chosen after the Apriel-1.6:15b bake-off where a
-      // legit system_workflow_bloom run completed in 8:11 (491s) on a
-      // 22KB prompt. 240s and 180s defaults both timed out on Apriel
-      // for the larger Phase-1 producer prompts. Pair with maxRetries=1
-      // for a worst-case 1200s; pair with maxRetries=0 for a strict
-      // 600s budget that fits inside the orchestrator's records-idle
-      // stall (default 900s). Cal-27 ran with 300s × 3 = 900s exactly,
-      // so a single hung node tied up the whole stall budget and
-      // aborted the session — keep total maxCallSeconds × (1 + maxRetries)
-      // under the stall ceiling when adjusting either knob.
-      // Set to 0 to disable. Model-aware (local providers get a larger backstop;
-      // env JANUMICODE_LLM_MAX_CALL_SECONDS overrides) — see llmTimeouts.ts.
-      const maxCallSeconds = llmTimeouts.maxCallSeconds;
-
-      // Line-repetition cap — fast-fail for degenerate-loop pathologies
-      // (cal-27 NFR saturation: qwen3.5:9b emitted "* `1`: Count/status
-      // check." 1000+ times before the wall-clock fired). When the same
-      // non-trivial line appears N times CONSECUTIVELY, the model is
-      // stuck in a low-entropy attractor and a fresh sampling pass is
-      // the only way out — so we abort and let retry sample from a
-      // different state. Threshold of 30 is well above any legitimate
-      // enumeration. Consecutive-only avoids false positives on
-      // legitimate JSON whose common fields (e.g. "actor": "System")
-      // repeat many times across a list interspersed with other lines.
-      // Set to 0 to disable.
-      const maxRepeatedLine = Number.parseInt(
-        process.env.JANUMICODE_LLM_MAX_REPEATED_LINE ?? '30', 10);
-
-      // No-progress timer — primary silent-hang safety net. Resets on
-      // every streaming chunk; aborts when no chunk has arrived for N
-      // seconds. Replaces total-wall-clock as the precise "is the model
-      // making progress?" signal — a slow-but-streaming valid output
-      // (Phase 1 bloom prompts can stream 200+ KB over 5+ minutes)
-      // never trips, while a wedged socket or paused generation does.
-      // The total-wall-clock below is kept as an outer last-resort cap.
-      // Model-aware: cloud/fast → 90 s; LOCAL providers (ollama/llamacpp) →
-      // 600 s, because a model reload + prompt prefill (time-to-first-token)
-      // after a swap legitimately produces no chunk for >90 s on a large dense
-      // model at full context (cal-29 killed gemma4:31b here). The timer
-      // re-arms on every chunk, so once streaming starts the larger budget is
-      // moot. env JANUMICODE_LLM_NO_PROGRESS_SECONDS overrides; 0 disables.
-      const maxNoProgressSeconds = llmTimeouts.noProgressSeconds;
-
-      for (let attempt = 0; attempt <= this.config.maxRetries; attempt++) {
-        // Per-attempt abort + stream state so a retry starts with a
-        // fresh budget. bytesBaseline captures the log-file size at
-        // attempt start so the size-cap only measures THIS attempt's
-        // growth — otherwise a failed attempt 1 at 1.5 MB would
-        // instantly re-trip attempt 2 on the very first chunk.
-        let cumulativeChars = 0;
-        const bytesBaseline = logFile?.bytesWritten ?? 0;
-        const abortController = new AbortController();
-        let abortReason: string | null = null;
-        // Per-attempt line-repetition tracking (consecutive). Reset
-        // every retry so sampling variance gets a clean slate.
-        let lineBuffer = '';
-        let lastLine: string | null = null;
-        let consecutiveLineCount = 0;
-        // No-progress timer — re-armed on every streaming chunk. Cleared
-        // in every exit path (success, error, retry) below alongside
-        // the wall-clock handle.
-        let noProgressHandle: NodeJS.Timeout | null = null;
-        const armNoProgressTimer = () => {
-          if (noProgressHandle) clearTimeout(noProgressHandle);
-          if (maxNoProgressSeconds <= 0) return;
-          noProgressHandle = setTimeout(() => {
-            if (abortReason) return;
-            abortReason = `no-progress timeout (${maxNoProgressSeconds}s without a streaming chunk) — likely silent hang`;
-            if (!abortController.signal.aborted) abortController.abort();
-          }, maxNoProgressSeconds * 1000);
-          noProgressHandle.unref?.();
-        };
-        // Arm initially so a provider that never emits a single chunk
-        // (e.g. wedged socket before TTFB) still aborts.
-        armNoProgressTimer();
-
-        // Wall-clock timer — outer safety cap for adversarial cases
-        // where a model pauses, emits a chunk every N-1 seconds (just
-        // resetting no-progress), and never converges. Cleared in every
-        // exit path (success, error, retry) below.
-        let callTimeoutHandle: NodeJS.Timeout | null = null;
-        if (maxCallSeconds > 0) {
-          callTimeoutHandle = setTimeout(() => {
-            if (abortReason) return;
-            abortReason = `invocation wall-clock exceeded (${maxCallSeconds}s this attempt) — likely silent hang`;
-            if (!abortController.signal.aborted) abortController.abort();
-          }, maxCallSeconds * 1000);
-          // Don't keep the process alive on this timer if the run otherwise finishes.
-          callTimeoutHandle.unref?.();
-        }
-        // Union the caller-provided abort signal (session abort from
-        // waitForQuiescence) with our internal one. Session abort is
-        // non-retryable: the outer orchestrator is shutting down.
-        let sessionAborted = false;
-        let externalCleanup: (() => void) | null = null;
-        if (options.abortSignal) {
-          const external = options.abortSignal;
-          const onExternalAbort = () => {
-            sessionAborted = true;
-            abortReason ??= 'session abort (external signal)';
-            if (!abortController.signal.aborted) abortController.abort();
-          };
-          if (external.aborted) onExternalAbort();
-          else {
-            external.addEventListener('abort', onExternalAbort, { once: true });
-            externalCleanup = () => external.removeEventListener('abort', onExternalAbort);
-          }
-        }
-        const streamingOptions: LLMStreamingCallOptions = {
-          ...options,
-          abortSignal: abortController.signal,
-          onChunk: (chunk) => {
-            // Re-arm the no-progress timer on every chunk — any chunk
-            // (response text, thinking, even empty whitespace) counts
-            // as forward progress from the streaming socket.
-            armNoProgressTimer();
-            cumulativeChars += chunk.text.length;
-            logFile?.writeChunk({
-              channel: chunk.channel,
-              msSinceStart: Date.now() - startedAt,
-              cumulativeChars,
-              text: chunk.text,
-            });
-            this.writeOutputChunk(invocationId, options, chunk, chunkSequence++);
-            if (!abortReason && maxLogFileBytes > 0 && logFile) {
-              const attemptBytes = logFile.bytesWritten - bytesBaseline;
-              if (attemptBytes > maxLogFileBytes) {
-                abortReason = `invocation log size exceeded (${attemptBytes} > ${maxLogFileBytes} bytes this attempt) — likely runaway thinking`;
-                abortController.abort();
-              }
-            }
-            // Consecutive-line-repetition detector: count identical
-            // non-trivial lines that appear back-to-back with no other
-            // line types between them. Cal-27 pathology: qwen3.5:9b
-            // emitted "* `1`: Count/status check." 1000+ times with NO
-            // other lines between — a true degenerate loop. Thin-slice
-            // false-positive (initial design): `"actor": "System",`
-            // repeats 100+ times across a list of workflows but is
-            // INTERSPERSED with `"action"`, `"step_number"`, etc., so
-            // the consecutive count resets every few lines and never
-            // hits the threshold. The total-count variant flagged this
-            // legitimate JSON output as a loop; consecutive-count does
-            // not. Catches degenerate loops at ~10s while leaving valid
-            // verbose JSON alone.
-            if (!abortReason && maxRepeatedLine > 0) {
-              lineBuffer += chunk.text;
-              let nl = lineBuffer.indexOf('\n');
-              while (nl !== -1) {
-                const line = lineBuffer.slice(0, nl).trim();
-                lineBuffer = lineBuffer.slice(nl + 1);
-                if (line.length >= 8) {
-                  if (line === lastLine) {
-                    consecutiveLineCount++;
-                  } else {
-                    lastLine = line;
-                    consecutiveLineCount = 1;
-                  }
-                  if (consecutiveLineCount >= maxRepeatedLine) {
-                    const preview = line.length > 60 ? line.slice(0, 60) + '…' : line;
-                    abortReason = `degenerate loop detected (line repeated ${consecutiveLineCount}× consecutively this attempt): "${preview}"`;
-                    abortController.abort();
-                    break;
-                  }
-                }
-                nl = lineBuffer.indexOf('\n');
-              }
-            }
-          },
-        };
-
-        try {
-          const result = await adapter.call(streamingOptions);
-          result.retryAttempts = retryAttempts;
-          // Layer 2a — DETERMINISTIC structural recovery FIRST. Before the
-          // expensive LLM repair, try cheap brace/bracket-balancing +
-          // trailing-comma stripping (`tryParseJson`). Models reliably
-          // miscount closers on deeply nested output (Phase 5
-          // api_definitions); this salvages the model's REAL content
-          // without an extra LLM round-trip or risk of semantic drift.
-          if (
-            options.responseFormat === 'json' &&
-            !result.parsed &&
-            typeof result.text === 'string' &&
-            result.text.trim().length > 0 &&
-            options.traceContext?.agentRole !== 'json_repair' &&
-            options.traceContext?.agentRole !== 'reasoning_review'
-          ) {
-            const { tryParseJson } = await import('./jsonRecovery.js');
-            const recov = tryParseJson(result.text);
-            if (recov.parsed && recov.structurallyRepaired) {
-              result.parsed = recov.parsed;
-              aoddEmit(
-                'repair.json_succeeded',
-                { strategy: 'deterministic_structural', repaired: maybeSpillText(recov.jsonText ?? '') },
-                { invocation_id: invocationId ?? undefined, sub_phase_id_override: traceSubPhaseId, agent_role: traceAgentRole ?? undefined },
-              );
-            }
-          }
-          // LLM-based JSON repair fallback (json_repair agent role): if
-          // the call requested json and the response didn't parse, hand
-          // the broken text to a dedicated repair sequence (primary →
-          // fallback). Both attempts receive the original prompt +
-          // system + thinking chain as grounding so the repair model
-          // can produce a semantically faithful fix. Sequential by
-          // design (single-GPU host). Skip the loop guard cases:
-          //   - this call IS a repair call (agentRole === 'json_repair')
-          //   - this call IS reasoning-review (separate domain)
-          // Repair runs BEFORE persistence so result.parsed reflects
-          // the repaired value when downstream consumers read it.
-          if (
-            options.responseFormat === 'json' &&
-            !result.parsed &&
-            typeof result.text === 'string' &&
-            result.text.trim().length > 0 &&
-            this.jsonRepairRouting &&
-            options.traceContext?.agentRole !== 'json_repair' &&
-            options.traceContext?.agentRole !== 'reasoning_review'
-          ) {
-            const { repairJsonViaLLM } = await import('./jsonRepairLLM.js');
-            const repair = await repairJsonViaLLM(
-              result.text,
-              this.jsonRepairRouting,
-              {
-                originalPrompt: options.prompt,
-                originalSystem: options.system ?? null,
-                originalThinking: result.thinking ?? null,
-                originalAgentRole: options.traceContext?.agentRole ?? null,
-                expectedJsonSchema: options.expectedJsonSchema ?? null,
-              },
-              {
-                workflowRunId: options.traceContext?.workflowRunId ?? '',
-                phaseId: options.traceContext?.phaseId ?? null,
-                subPhaseId: options.traceContext?.subPhaseId ?? null,
-              },
-              this,
-            );
-            if (repair.parsed) {
-              result.parsed = repair.parsed;
-            }
-            // Always write a json_repair_record so the operator can see
-            // exactly what was attempted (and what each attempt
-            // returned). Useful even on success — confirms which model
-            // ultimately produced the parsed output.
-            this.writeJsonRepairRecord(invocationId, options, repair);
-            // AODD emit. We synthesize `repair.json_succeeded` when
-            // the repair recovered a parsed payload, `repair.json_failed`
-            // otherwise. `strategy` is a coarse identifier — the per-attempt
-            // detail lives in the json_repair_record DB row.
-            if (repair.parsed !== null) {
-              aoddEmit(
-                'repair.json_succeeded',
-                {
-                  strategy: 'multi_attempt',
-                  repaired: maybeSpillText(JSON.stringify(repair.parsed)),
-                },
-                {
-                  invocation_id: invocationId ?? undefined,
-                  sub_phase_id_override: traceSubPhaseId,
-                  agent_role: 'json_repair',
-                },
-              );
-            } else {
-              aoddEmit(
-                'repair.json_failed',
-                {
-                  strategy: 'multi_attempt',
-                  error: { message: 'repair exhausted attempts' },
-                },
-                {
-                  invocation_id: invocationId ?? undefined,
-                  sub_phase_id_override: traceSubPhaseId,
-                  agent_role: 'json_repair',
-                },
-              );
-            }
-          }
-          // Layer 2c — THINKING-CHANNEL recovery. Some thinking-mode models
-          // (observed: gemma4:31b-it-qat on complex compliance NFRs) emit
-          // their ENTIRE answer — the final JSON values, even a self-check
-          // "starts with {, ends with }" — into the THINKING channel and
-          // leave the response channel EMPTY (no done frame). Layers 2a/2b
-          // above both require result.text to be non-empty, so NEITHER fires:
-          // the answer the model already spent 40-50s producing sits unused
-          // in result.thinking, and the call resolves as a silent empty
-          // success (→ caller sees "incomplete" and a zero-tolerance gate
-          // like Phase-2.2c blocks the whole run). Recover it by handing the
-          // thinking to the SAME json_repair sequence in reasoning-channel
-          // mode (LLM-backed, so it reads the markdown-bullet reasoning and
-          // emits clean JSON), grounded by the original prompt + schema — no
-          // 40-50s re-generation. If the thinking is itself truncated/
-          // incomplete the repair returns _repair_error and result.parsed
-          // stays null, so the caller's existing retry path re-generates
-          // exactly as before. See project_gemma4_31b_decomposition_divergence.
-          if (
-            options.responseFormat === 'json' &&
-            !result.parsed &&
-            (typeof result.text !== 'string' || result.text.trim().length === 0) &&
-            typeof result.thinking === 'string' &&
-            result.thinking.trim().length > 0 &&
-            this.jsonRepairRouting &&
-            options.traceContext?.agentRole !== 'json_repair' &&
-            options.traceContext?.agentRole !== 'reasoning_review'
-          ) {
-            const { repairJsonViaLLM } = await import('./jsonRepairLLM.js');
-            const recovery = await repairJsonViaLLM(
-              result.thinking,
-              this.jsonRepairRouting,
-              {
-                originalPrompt: options.prompt,
-                originalSystem: options.system ?? null,
-                // brokenText already IS the thinking — don't duplicate it
-                // into the grounding "ORIGINAL AGENT REASONING" section.
-                originalThinking: null,
-                originalAgentRole: options.traceContext?.agentRole ?? null,
-                expectedJsonSchema: options.expectedJsonSchema ?? null,
-                inputIsReasoningChannel: true,
-              },
-              {
-                workflowRunId: options.traceContext?.workflowRunId ?? '',
-                phaseId: options.traceContext?.phaseId ?? null,
-                subPhaseId: options.traceContext?.subPhaseId ?? null,
-              },
-              this,
-            );
-            // Reject the repair model's "I couldn't recover" sentinel — never
-            // let it masquerade as the real parsed answer downstream.
-            const recovered =
-              recovery.parsed &&
-              typeof recovery.parsed === 'object' &&
-              !('_repair_error' in recovery.parsed)
-                ? recovery.parsed
-                : null;
-            if (recovered) {
-              result.parsed = recovered;
-            }
-            this.writeJsonRepairRecord(invocationId, options, recovery);
-            aoddEmit(
-              recovered ? 'repair.json_succeeded' : 'repair.json_failed',
-              recovered
-                ? { strategy: 'thinking_channel_recovery', repaired: maybeSpillText(JSON.stringify(recovered)) }
-                : { strategy: 'thinking_channel_recovery', error: { message: 'thinking did not contain a recoverable answer' } },
-              {
-                invocation_id: invocationId ?? undefined,
-                sub_phase_id_override: traceSubPhaseId,
-                agent_role: 'json_repair',
-              },
-            );
-          }
-          const { agentOutputId } = this.writeOutputRecords(invocationId, options, result, Date.now() - startedAt, null);
-          logFile?.writeFinal({
-            status: 'success',
-            text: result.text,
-            thinking: result.thinking ?? null,
-            inputTokens: result.inputTokens,
-            outputTokens: result.outputTokens,
-            durationMs: Date.now() - startedAt,
-            retryAttempts,
-          });
-          const llmReturnedDurationMs = Date.now() - startedAt;
-          aoddEmit(
-            'llm.returned',
-            {
-              text: maybeSpillText(result.text),
-              thinking: result.thinking ? maybeSpillText(result.thinking) : null,
-              input_tokens: result.inputTokens,
-              output_tokens: result.outputTokens,
-              duration_ms: llmReturnedDurationMs,
-              retry_attempts: result.retryAttempts,
-            },
-            {
-              invocation_id: invocationId ?? undefined,
-              sub_phase_id_override: traceSubPhaseId,
-              agent_role: traceAgentRole ?? undefined,
-            },
-          );
-          // Populate cache so within-session repeats of the same prompt
-          // (and any future resume of THIS run) short-circuit. Only cache
-          // successful calls — error results would mask provider recovery.
-          if (invocationId) {
-            const cacheKey = this.computeCacheKey({
-              provider: options.provider,
-              model: options.model,
-              responseFormat: options.responseFormat ?? 'text',
-              temperature: options.temperature ?? null,
-              maxTokens: options.maxTokens ?? null,
-              system: options.system ?? null,
-              prompt: options.prompt,
-              tools: options.tools ?? [],
-              toolChoice: options.toolChoice ?? null,
-            });
-            this.llmCache.set(cacheKey, {
-              text: result.text,
-              parsed: result.parsed,
-              thinking: result.thinking,
-              toolCalls: result.toolCalls,
-              provider: result.provider,
-              model: result.model,
-              inputTokens: result.inputTokens,
-              outputTokens: result.outputTokens,
-              sourceInvocationId: invocationId,
-            });
-          }
-          await this.runReviewerHook(invocationId, agentOutputId, options, result);
-          return result;
-        } catch (err) {
-          retryAttempts++;
-          // Stream was aborted by our in-stream detectors — override the
-          // provider's error with our own, marking session-aborts as
-          // non-retryable and size/flail aborts as retryable.
-          if (abortReason) {
-            // Our in-stream detectors triggered an abort. Classify:
-            //   - session abort → not retryable (outer orchestrator shutting down)
-            //   - runaway-thinking (log-size cap tripped) → retryable; a
-            //     fresh attempt gets a fresh log-file baseline and sampling
-            //     variance can rescue it. This is distinct from a true
-            //     HTTP 400 context_exceeded where the server itself
-            //     rejects the request.
-            // Both byte-cap ("invocation log size exceeded") and wall-clock
-            // ("invocation wall-clock exceeded") in-stream aborts are
-            // treated as `runaway_thinking` — same retry semantics: a
-            // fresh attempt gets fresh budget and sampling variance can
-            // rescue it. Distinguish from true HTTP 400 context_exceeded
-            // where the server rejects the request.
-            const reason = abortReason as string;
-            const isRunawayThinking =
-              reason.includes('invocation log size exceeded') ||
-              reason.includes('invocation wall-clock exceeded') ||
-              reason.includes('degenerate loop detected') ||
-              reason.includes('no-progress timeout');
-            const abortErrorType: LLMErrorType = isRunawayThinking
-              ? 'runaway_thinking'
-              : 'context_exceeded';
-            const errorType: LLMErrorType = sessionAborted
-              ? 'unknown'
-              : abortErrorType;
-            lastError = new LLMError(
-              `LLM stream aborted: ${abortReason}`,
-              errorType,
-              undefined,
-              !sessionAborted,
-            );
-          } else if (err instanceof LLMError) {
-            lastError = err;
-          } else {
-            const msg = err instanceof Error ? err.message : String(err);
-            lastError = new LLMError(msg, 'unknown');
-          }
-
-          if (!this.isRetryable(lastError)) break;
-
-          // Backoff before retry
-          const delay = this.getBackoffDelay(lastError, attempt);
-          aoddEmit(
-            'retry.scheduled',
-            { attempt: retryAttempts, reason: lastError.message },
-            {
-              invocation_id: invocationId ?? undefined,
-              sub_phase_id_override: traceSubPhaseId,
-              agent_role: traceAgentRole ?? undefined,
-            },
-          );
-          if (delay > 0) {
-            await this.sleep(delay);
-          }
-          aoddEmit(
-            'retry.attempted',
-            { attempt: retryAttempts },
-            {
-              invocation_id: invocationId ?? undefined,
-              sub_phase_id_override: traceSubPhaseId,
-              agent_role: traceAgentRole ?? undefined,
-            },
-          );
-        } finally {
-          externalCleanup?.();
-          if (callTimeoutHandle) clearTimeout(callTimeoutHandle);
-          if (noProgressHandle) clearTimeout(noProgressHandle);
-        }
-      }
-
-      // Try fallback provider if configured
-      if (this.config.fallback) {
-        const fallbackAdapter = this.providers.get(this.config.fallback.provider);
-        if (fallbackAdapter) {
-          try {
-            const fallbackOptions: LLMStreamingCallOptions = {
-              ...options,
-              provider: this.config.fallback.provider,
-              model: this.config.fallback.model,
-              onChunk: (chunk) => {
-                this.writeOutputChunk(invocationId, options, chunk, chunkSequence++);
-              },
-            };
-            const result = await fallbackAdapter.call(fallbackOptions);
-            result.usedFallback = true;
-            result.retryAttempts = retryAttempts;
-            const { agentOutputId } = this.writeOutputRecords(invocationId, fallbackOptions, result, Date.now() - startedAt, null);
-            await this.runReviewerHook(invocationId, agentOutputId, fallbackOptions, result);
-            return result;
-          } catch {
-            // Fallback also failed — throw original error
-          }
-        }
-      }
-
-      // All retries + fallback exhausted: write a final error output record so
-      // the AgentInvocationCard's status flips from running → error.
-      this.writeOutputRecords(invocationId, options, null, Date.now() - startedAt, lastError);
-      logFile?.writeFinal({
-        status: 'error',
-        text: '',
-        thinking: null,
-        inputTokens: null,
-        outputTokens: null,
-        durationMs: Date.now() - startedAt,
-        retryAttempts,
-        errorMessage: lastError?.message ?? 'unknown',
-      });
-      // AODD emit: terminal llm.failed with the error.
-      const llmFailedDurationMs = Date.now() - startedAt;
+  /**
+   * Layer 2a — DETERMINISTIC structural recovery. Cheap brace/bracket
+   * balancing + trailing-comma stripping (`tryParseJson`) before the
+   * expensive LLM repair. Salvages the model's REAL content without an extra
+   * round-trip or semantic-drift risk. Skipped for json_repair /
+   * reasoning_review calls.
+   */
+  private async recoverJsonStructurally(
+    options: LLMCallOptions,
+    result: LLMCallResult,
+    invocationId: string | null,
+    traceSubPhaseId: string | undefined,
+    traceAgentRole: AgentRole | null,
+  ): Promise<void> {
+    if (!(
+      options.responseFormat === 'json' &&
+      !result.parsed &&
+      typeof result.text === 'string' &&
+      result.text.trim().length > 0 &&
+      options.traceContext?.agentRole !== 'json_repair' &&
+      options.traceContext?.agentRole !== 'reasoning_review'
+    )) return;
+    const { tryParseJson } = await import('./jsonRecovery.js');
+    const recov = tryParseJson(result.text);
+    if (recov.parsed && recov.structurallyRepaired) {
+      result.parsed = recov.parsed;
       aoddEmit(
-        'llm.failed',
+        'repair.json_succeeded',
+        { strategy: 'deterministic_structural', repaired: maybeSpillText(recov.jsonText ?? '') },
+        { invocation_id: invocationId ?? undefined, sub_phase_id_override: traceSubPhaseId, agent_role: traceAgentRole ?? undefined },
+      );
+    }
+  }
+
+  /**
+   * Layer 2b — LLM-based JSON repair. Hands the broken text to a dedicated
+   * repair sequence (primary → fallback), grounded by the original prompt +
+   * system + thinking chain. Sequential by design (single-GPU host). Always
+   * writes a json_repair_record. Skipped for json_repair / reasoning_review
+   * calls, and when no repair routing is configured.
+   */
+  private async recoverJsonViaRepair(
+    options: LLMCallOptions,
+    result: LLMCallResult,
+    invocationId: string | null,
+    traceSubPhaseId: string | undefined,
+    traceAgentRole: AgentRole | null,
+  ): Promise<void> {
+    const routing = this.jsonRepairRouting;
+    if (!(
+      options.responseFormat === 'json' &&
+      !result.parsed &&
+      typeof result.text === 'string' &&
+      result.text.trim().length > 0 &&
+      routing &&
+      options.traceContext?.agentRole !== 'json_repair' &&
+      options.traceContext?.agentRole !== 'reasoning_review'
+    )) return;
+    const { repairJsonViaLLM } = await import('./jsonRepairLLM.js');
+    const repair = await repairJsonViaLLM(
+      result.text,
+      routing,
+      {
+        originalPrompt: options.prompt,
+        originalSystem: options.system ?? null,
+        originalThinking: result.thinking ?? null,
+        originalAgentRole: options.traceContext?.agentRole ?? null,
+        expectedJsonSchema: options.expectedJsonSchema ?? null,
+      },
+      {
+        workflowRunId: options.traceContext?.workflowRunId ?? '',
+        phaseId: options.traceContext?.phaseId ?? null,
+        subPhaseId: options.traceContext?.subPhaseId ?? null,
+      },
+      this,
+    );
+    if (repair.parsed) {
+      result.parsed = repair.parsed;
+    }
+    // Always write a json_repair_record so the operator can see exactly what
+    // was attempted (and what each attempt returned) — useful even on success.
+    this.writeJsonRepairRecord(invocationId, options, repair);
+    if (repair.parsed !== null) {
+      aoddEmit(
+        'repair.json_succeeded',
         {
-          error: {
-            message: lastError?.message ?? 'unknown',
-            code: lastError?.errorType,
-          },
-          duration_ms: llmFailedDurationMs,
-          retry_attempts: retryAttempts,
+          strategy: 'multi_attempt',
+          repaired: maybeSpillText(JSON.stringify(repair.parsed)),
         },
         {
           invocation_id: invocationId ?? undefined,
           sub_phase_id_override: traceSubPhaseId,
-          agent_role: traceAgentRole ?? undefined,
+          agent_role: 'json_repair',
         },
       );
-      throw lastError ?? new LLMError('LLM call failed', 'unknown');
-    } finally {
-      this._inFlightCount--;
-      // Clear the invocation_id we set above so subsequent emits in the
-      // same TraceCtx frame don't inherit a stale id.
-      if (invocationId) setInvocation(null);
-      this.eventBus?.emit('llm:finished', {
-        provider: options.provider,
-        lane: 'phase',
-        durationMs: Date.now() - startedAt,
-        label: trace?.label ?? null,
-        agentRole: trace?.agentRole ?? null,
-        subPhaseId: trace?.subPhaseId ?? null,
-      });
+    } else {
+      aoddEmit(
+        'repair.json_failed',
+        {
+          strategy: 'multi_attempt',
+          error: { message: 'repair exhausted attempts' },
+        },
+        {
+          invocation_id: invocationId ?? undefined,
+          sub_phase_id_override: traceSubPhaseId,
+          agent_role: 'json_repair',
+        },
+      );
     }
+  }
+
+  /**
+   * Layer 2c — THINKING-CHANNEL recovery. Some thinking-mode models emit
+   * their ENTIRE answer into the THINKING channel and leave the response
+   * channel EMPTY, so layers 2a/2b (which require non-empty text) never fire.
+   * Hand the thinking to the SAME json_repair sequence in reasoning-channel
+   * mode, grounded by the original prompt + schema — no re-generation. The
+   * repair model's `_repair_error` sentinel is rejected so it can never
+   * masquerade as the real parsed answer. See
+   * project_gemma4_31b_decomposition_divergence.
+   */
+  private async recoverJsonFromThinking(
+    options: LLMCallOptions,
+    result: LLMCallResult,
+    invocationId: string | null,
+    traceSubPhaseId: string | undefined,
+    traceAgentRole: AgentRole | null,
+  ): Promise<void> {
+    const routing = this.jsonRepairRouting;
+    const thinkingText = result.thinking;
+    if (!(
+      options.responseFormat === 'json' &&
+      !result.parsed &&
+      (typeof result.text !== 'string' || result.text.trim().length === 0) &&
+      typeof thinkingText === 'string' &&
+      thinkingText.trim().length > 0 &&
+      routing &&
+      options.traceContext?.agentRole !== 'json_repair' &&
+      options.traceContext?.agentRole !== 'reasoning_review'
+    )) return;
+    const { repairJsonViaLLM } = await import('./jsonRepairLLM.js');
+    const recovery = await repairJsonViaLLM(
+      thinkingText,
+      routing,
+      {
+        originalPrompt: options.prompt,
+        originalSystem: options.system ?? null,
+        // brokenText already IS the thinking — don't duplicate it into the
+        // grounding "ORIGINAL AGENT REASONING" section.
+        originalThinking: null,
+        originalAgentRole: options.traceContext?.agentRole ?? null,
+        expectedJsonSchema: options.expectedJsonSchema ?? null,
+        inputIsReasoningChannel: true,
+      },
+      {
+        workflowRunId: options.traceContext?.workflowRunId ?? '',
+        phaseId: options.traceContext?.phaseId ?? null,
+        subPhaseId: options.traceContext?.subPhaseId ?? null,
+      },
+      this,
+    );
+    const recovered =
+      recovery.parsed &&
+      typeof recovery.parsed === 'object' &&
+      !('_repair_error' in recovery.parsed)
+        ? recovery.parsed
+        : null;
+    if (recovered) {
+      result.parsed = recovered;
+    }
+    this.writeJsonRepairRecord(invocationId, options, recovery);
+    aoddEmit(
+      recovered ? 'repair.json_succeeded' : 'repair.json_failed',
+      recovered
+        ? { strategy: 'thinking_channel_recovery', repaired: maybeSpillText(JSON.stringify(recovered)) }
+        : { strategy: 'thinking_channel_recovery', error: { message: 'thinking did not contain a recoverable answer' } },
+      {
+        invocation_id: invocationId ?? undefined,
+        sub_phase_id_override: traceSubPhaseId,
+        agent_role: 'json_repair',
+      },
+    );
+  }
+
+  /**
+   * Finalize a successful attempt: write the agent_output (+ tool_call)
+   * records, the live-log success trailer, the `llm.returned` AODD emit,
+   * populate the in-session cache, and fire the reasoning-review hook. Returns
+   * the same result object (with any repaired parsed value already applied).
+   */
+  private async finalizeSuccess(
+    options: LLMCallOptions,
+    result: LLMCallResult,
+    retryAttempts: number,
+    ctx: LlmCallContext,
+  ): Promise<LLMCallResult> {
+    const { invocationId, startedAt, logFile, traceSubPhaseId, traceAgentRole } = ctx;
+    const { agentOutputId } = this.writeOutputRecords(invocationId, options, result, Date.now() - startedAt, null);
+    logFile?.writeFinal({
+      status: 'success',
+      text: result.text,
+      thinking: result.thinking ?? null,
+      inputTokens: result.inputTokens,
+      outputTokens: result.outputTokens,
+      durationMs: Date.now() - startedAt,
+      retryAttempts,
+    });
+    const llmReturnedDurationMs = Date.now() - startedAt;
+    aoddEmit(
+      'llm.returned',
+      {
+        text: maybeSpillText(result.text),
+        thinking: result.thinking ? maybeSpillText(result.thinking) : null,
+        input_tokens: result.inputTokens,
+        output_tokens: result.outputTokens,
+        duration_ms: llmReturnedDurationMs,
+        retry_attempts: result.retryAttempts,
+      },
+      {
+        invocation_id: invocationId ?? undefined,
+        sub_phase_id_override: traceSubPhaseId,
+        agent_role: traceAgentRole ?? undefined,
+      },
+    );
+    this.cacheSuccessfulResult(invocationId, options, result);
+    await this.runReviewerHook(invocationId, agentOutputId, options, result);
+    return result;
+  }
+
+  /**
+   * Populate the in-memory cache so within-session repeats of the same prompt
+   * (and any future resume of THIS run) short-circuit. Only successful calls
+   * are cached — error results would mask provider recovery. No-op without an
+   * invocationId (instrumentation disabled).
+   */
+  private cacheSuccessfulResult(
+    invocationId: string | null,
+    options: LLMCallOptions,
+    result: LLMCallResult,
+  ): void {
+    if (!invocationId) return;
+    const cacheKey = this.computeCacheKey({
+      provider: options.provider,
+      model: options.model,
+      responseFormat: options.responseFormat ?? 'text',
+      temperature: options.temperature ?? null,
+      maxTokens: options.maxTokens ?? null,
+      system: options.system ?? null,
+      prompt: options.prompt,
+      tools: options.tools ?? [],
+      toolChoice: options.toolChoice ?? null,
+    });
+    this.llmCache.set(cacheKey, {
+      text: result.text,
+      parsed: result.parsed,
+      thinking: result.thinking,
+      toolCalls: result.toolCalls,
+      provider: result.provider,
+      model: result.model,
+      inputTokens: result.inputTokens,
+      outputTokens: result.outputTokens,
+      sourceInvocationId: invocationId,
+    });
+  }
+
+  /**
+   * Classify a failed attempt into an LLMError. An in-stream abort
+   * (guard.abortReason set) overrides the provider's error: byte-cap /
+   * wall-clock / degenerate-loop / no-progress → runaway_thinking (retryable),
+   * anything else → context_exceeded; a session abort → unknown +
+   * non-retryable. Otherwise pass through the provider's LLMError, or wrap a
+   * non-LLMError.
+   */
+  private resolveAttemptError(
+    err: unknown,
+    abortReason: string | null,
+    sessionAborted: boolean,
+  ): LLMError {
+    if (abortReason) {
+      const reason = abortReason;
+      const isRunawayThinking =
+        reason.includes('invocation log size exceeded') ||
+        reason.includes('invocation wall-clock exceeded') ||
+        reason.includes('degenerate loop detected') ||
+        reason.includes('no-progress timeout');
+      const abortErrorType: LLMErrorType = isRunawayThinking
+        ? 'runaway_thinking'
+        : 'context_exceeded';
+      const errorType: LLMErrorType = sessionAborted ? 'unknown' : abortErrorType;
+      return new LLMError(
+        `LLM stream aborted: ${abortReason}`,
+        errorType,
+        undefined,
+        !sessionAborted,
+      );
+    }
+    if (err instanceof LLMError) return err;
+    const msg = err instanceof Error ? err.message : String(err);
+    return new LLMError(msg, 'unknown');
+  }
+
+  /**
+   * Backoff + AODD retry emits between attempts: `retry.scheduled`, then the
+   * (optional) sleep, then `retry.attempted`.
+   */
+  private async backoffBeforeRetry(
+    lastError: LLMError,
+    attempt: number,
+    retryAttempts: number,
+    invocationId: string | null,
+    traceSubPhaseId: string | undefined,
+    traceAgentRole: AgentRole | null,
+  ): Promise<void> {
+    const delay = this.getBackoffDelay(lastError, attempt);
+    aoddEmit(
+      'retry.scheduled',
+      { attempt: retryAttempts, reason: lastError.message },
+      {
+        invocation_id: invocationId ?? undefined,
+        sub_phase_id_override: traceSubPhaseId,
+        agent_role: traceAgentRole ?? undefined,
+      },
+    );
+    if (delay > 0) {
+      await this.sleep(delay);
+    }
+    aoddEmit(
+      'retry.attempted',
+      { attempt: retryAttempts },
+      {
+        invocation_id: invocationId ?? undefined,
+        sub_phase_id_override: traceSubPhaseId,
+        agent_role: traceAgentRole ?? undefined,
+      },
+    );
+  }
+
+  /**
+   * Try the configured fallback provider once (no retries). Returns the
+   * successful result (usedFallback=true, records + review hook written) or
+   * null when there is no fallback, it isn't registered, or it also fails —
+   * in which case the caller throws the primary error.
+   */
+  private async tryFallbackProvider(
+    options: LLMCallOptions,
+    invocationId: string | null,
+    startedAt: number,
+    retryAttempts: number,
+    seqRef: { value: number },
+  ): Promise<LLMCallResult | null> {
+    if (!this.config.fallback) return null;
+    const fallbackAdapter = this.providers.get(this.config.fallback.provider);
+    if (!fallbackAdapter) return null;
+    try {
+      const fallbackOptions: LLMStreamingCallOptions = {
+        ...options,
+        provider: this.config.fallback.provider,
+        model: this.config.fallback.model,
+        onChunk: (chunk) => {
+          this.writeOutputChunk(invocationId, options, chunk, seqRef.value++);
+        },
+      };
+      const result = await fallbackAdapter.call(fallbackOptions);
+      result.usedFallback = true;
+      result.retryAttempts = retryAttempts;
+      const { agentOutputId } = this.writeOutputRecords(invocationId, fallbackOptions, result, Date.now() - startedAt, null);
+      await this.runReviewerHook(invocationId, agentOutputId, fallbackOptions, result);
+      return result;
+    } catch {
+      // Fallback also failed — signal the caller to throw the primary error.
+      return null;
+    }
+  }
+
+  /**
+   * Terminal error path: all retries + fallback exhausted. Writes the final
+   * error output record (so the AgentInvocationCard flips running → error),
+   * the live-log error trailer, and the terminal `llm.failed` AODD emit, then
+   * throws the last error.
+   */
+  private failCall(
+    options: LLMCallOptions,
+    retryAttempts: number,
+    lastError: LLMError | null,
+    ctx: LlmCallContext,
+  ): never {
+    const { invocationId, startedAt, logFile, traceSubPhaseId, traceAgentRole } = ctx;
+    this.writeOutputRecords(invocationId, options, null, Date.now() - startedAt, lastError);
+    logFile?.writeFinal({
+      status: 'error',
+      text: '',
+      thinking: null,
+      inputTokens: null,
+      outputTokens: null,
+      durationMs: Date.now() - startedAt,
+      retryAttempts,
+      errorMessage: lastError?.message ?? 'unknown',
+    });
+    const llmFailedDurationMs = Date.now() - startedAt;
+    aoddEmit(
+      'llm.failed',
+      {
+        error: {
+          message: lastError?.message ?? 'unknown',
+          code: lastError?.errorType,
+        },
+        duration_ms: llmFailedDurationMs,
+        retry_attempts: retryAttempts,
+      },
+      {
+        invocation_id: invocationId ?? undefined,
+        sub_phase_id_override: traceSubPhaseId,
+        agent_role: traceAgentRole ?? undefined,
+      },
+    );
+    throw lastError ?? new LLMError('LLM call failed', 'unknown');
   }
 
   // ── Instrumentation helpers ─────────────────────────────────────
@@ -1592,4 +1809,73 @@ export function buildLogFilenamePrefix(
   if (!phasePart) return `phase_${subSafe}`;
   if (!subSafe) return phasePart;
   return `${phasePart}_${subSafe}`;
+}
+
+/**
+ * Per-attempt state for the consecutive-line-repetition detector.
+ * `lineBuffer` accumulates the tail of a chunk that has no trailing
+ * newline yet; `lastLine` / `consecutiveLineCount` track the current
+ * back-to-back run of an identical non-trivial line.
+ */
+export interface LineRepeatState {
+  lineBuffer: string;
+  lastLine: string | null;
+  consecutiveLineCount: number;
+}
+
+/**
+ * Truncate a matched line for the abort-reason preview: at most 60 chars
+ * followed by an ellipsis when longer.
+ */
+function truncateLinePreview(line: string): string {
+  return line.length > 60 ? line.slice(0, 60) + '…' : line;
+}
+
+/**
+ * Consecutive-line-repetition detector — extracted from call()'s onChunk
+ * callback so the streaming hot path stays flat. Appends `chunkText` to the
+ * running `lineBuffer`, peels off every complete line, and counts identical
+ * non-trivial (>= 8 trimmed chars) lines that appear back-to-back. When a
+ * line crosses `maxRepeatedLine` consecutive occurrences the model is stuck
+ * in a low-entropy attractor, so an `abortReason` string is returned (the
+ * caller fires the AbortController).
+ *
+ * Behaviour is identical to the original inline loop: the 8-char floor, the
+ * consecutive-only counting (the run resets to 1 when a different >= 8-char
+ * line appears), and early-exit on the FIRST threshold crossing — the
+ * returned `lineBuffer` / `lastLine` / `consecutiveLineCount` reflect the
+ * exact state the inline `break` left behind. See project_gemma4_31b and the
+ * cal-27 pathology comment at the call site for rationale.
+ */
+export function detectConsecutiveLineRepeat(
+  state: LineRepeatState,
+  chunkText: string,
+  maxRepeatedLine: number,
+): LineRepeatState & { abortReason: string | null } {
+  let { lineBuffer, lastLine, consecutiveLineCount } = state;
+  lineBuffer += chunkText;
+  let nl = lineBuffer.indexOf('\n');
+  while (nl !== -1) {
+    const line = lineBuffer.slice(0, nl).trim();
+    lineBuffer = lineBuffer.slice(nl + 1);
+    if (line.length >= 8) {
+      if (line === lastLine) {
+        consecutiveLineCount++;
+      } else {
+        lastLine = line;
+        consecutiveLineCount = 1;
+      }
+      if (consecutiveLineCount >= maxRepeatedLine) {
+        const preview = truncateLinePreview(line);
+        return {
+          lineBuffer,
+          lastLine,
+          consecutiveLineCount,
+          abortReason: `degenerate loop detected (line repeated ${consecutiveLineCount}× consecutively this attempt): "${preview}"`,
+        };
+      }
+    }
+    nl = lineBuffer.indexOf('\n');
+  }
+  return { lineBuffer, lastLine, consecutiveLineCount, abortReason: null };
 }

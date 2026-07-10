@@ -352,6 +352,43 @@ describe('gatherTechnicalConstraints — Phase-1 → recon contract', () => {
   it('returns empty for unrelated artifact kinds', () => {
     expect(gatherTechnicalConstraints(fakeEngine([{ kind: 'component_model', components: [] }]), 'run-1')).toEqual([]);
   });
+
+  it('falls back to `.statement` then `.description` item fields (in that precedence)', () => {
+    const out = gatherTechnicalConstraints(fakeEngine([
+      {
+        kind: 'technical_constraint',
+        technicalConstraints: [
+          { id: 'S-1', statement: 'stmt wins over desc', description: 'ignored' },
+          { id: 'D-1', description: 'description only' },
+        ],
+      },
+    ]), 'run-1');
+    expect(out).toEqual(['S-1: stmt wins over desc', 'D-1: description only']);
+  });
+
+  it('skips items with no text and omits the id prefix when id is absent', () => {
+    const out = gatherTechnicalConstraints(fakeEngine([
+      {
+        kind: 'technical_constraint',
+        technicalConstraints: [
+          { id: 'HAS-ID', text: '' },        // empty text → skipped entirely
+          { category: 'x' },                 // no text at all → skipped
+          { text: 'no id here' },            // text but no id → bare text, no prefix
+        ],
+      },
+    ]), 'run-1');
+    expect(out).toEqual(['no id here']);
+  });
+
+  it('caps the output at 60 constraints', () => {
+    const many = Array.from({ length: 75 }, (_, i) => ({ id: `T-${i}`, text: `c${i}` }));
+    const out = gatherTechnicalConstraints(fakeEngine([
+      { kind: 'technical_constraints_discovery', technicalConstraints: many },
+    ]), 'run-1');
+    expect(out).toHaveLength(60);
+    expect(out[0]).toBe('T-0: c0');
+    expect(out[59]).toBe('T-59: c59');
+  });
 });
 
 describe('isDecisiveForArea — TECH-* constraint classification for the recon prompt split', () => {

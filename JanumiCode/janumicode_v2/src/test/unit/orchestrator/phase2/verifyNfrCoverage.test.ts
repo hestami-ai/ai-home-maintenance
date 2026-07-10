@@ -134,6 +134,26 @@ describe('verifyNfrCoverage — traces referential', () => {
     }));
     expect(r.filter(g => g.check === 'nfr_traces_to_dangling')).toHaveLength(0);
   });
+  it('flags an unknown traces_to prefix', () => {
+    const r = verifyNfrCoverage(base({
+      vvRequirements: [vv('VV-1')],
+      nfrs: [nfr({ id: 'NFR-001', traces_to: ['VV-1', 'XYZ-9'] })],
+    }));
+    const g = r.find(x => x.check === 'nfr_traces_to_unknown_prefix');
+    expect(g).toBeDefined();
+    expect(g!.severity).toBe('blocking');
+    expect(g!.missing).toEqual(['NFR-001:XYZ-9']);
+  });
+  it('treats a non-integer QA-# as dangling', () => {
+    const r = verifyNfrCoverage(base({
+      vvRequirements: [vv('VV-1')],
+      qualityAttributesCount: 3,
+      nfrs: [nfr({ id: 'NFR-001', traces_to: ['VV-1', 'QA-abc', 'QA-0'] })],
+    }));
+    const g = r.find(x => x.check === 'nfr_traces_to_dangling');
+    expect(g).toBeDefined();
+    expect(g!.missing).toEqual(['NFR-001:QA-0', 'NFR-001:QA-abc']);
+  });
 });
 
 describe('verifyNfrCoverage — applies_to_requirements', () => {

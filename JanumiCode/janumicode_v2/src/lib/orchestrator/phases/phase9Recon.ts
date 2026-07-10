@@ -923,29 +923,52 @@ export async function runPhase9ReconSubPhase(ctx: PhaseContext): Promise<Phase9R
 
 // ── Prompt + context gathering ──────────────────────────────────────
 
+/**
+ * The technical-constraint item objects under one `artifact_produced` record, or
+ * `[]` when the record is not a technical-constraint artifact. Accepts both the
+ * camelCase key Phase 1.0c writes (`technicalConstraints`, see phase1.ts) and the
+ * snake_case an LLM might emit — the dual-key normalizer principle. A single-key
+ * reader silently empties the list and the recon agent then sees "(none stated)"
+ * and free-invents a stack.
+ */
+function extractConstraintList(content: Record<string, unknown>): Array<Record<string, unknown>> {
+  const kind = typeof content.kind === 'string' ? content.kind : '';
+  if (!/technical_constraint/i.test(kind)) return [];
+  const list = (content.technicalConstraints ?? content.technical_constraints ?? content.constraints) as
+    Array<Record<string, unknown>> | undefined;
+  return Array.isArray(list) ? list : [];
+}
+
+/**
+ * The constraint text. `TechnicalConstraint.text` is the real field (records.ts);
+ * keep the other names as fallbacks for differently-shaped sources. Empty string
+ * when none is present.
+ */
+function constraintText(tc: Record<string, unknown>): string {
+  if (typeof tc.text === 'string') return tc.text;
+  if (typeof tc.constraint === 'string') return tc.constraint;
+  if (typeof tc.statement === 'string') return tc.statement;
+  if (typeof tc.description === 'string') return tc.description;
+  return '';
+}
+
+/** Render one constraint item as `ID: text` (id prefix omitted when absent), or
+ *  '' when the item carries no text (caller skips it). */
+function formatConstraint(tc: Record<string, unknown>): string {
+  const text = constraintText(tc);
+  if (!text) return '';
+  const id = typeof tc.id === 'string' ? tc.id : '';
+  return `${id ? id + ': ' : ''}${text}`;
+}
+
 export function gatherTechnicalConstraints(engine: PhaseContext['engine'], runId: string): string[] {
   const out: string[] = [];
   try {
     const recs = engine.writer.getRecordsByType(runId, 'artifact_produced');
     for (const r of recs) {
-      const c = r.content as Record<string, unknown>;
-      const kind = typeof c.kind === 'string' ? c.kind : '';
-      if (!/technical_constraint/i.test(kind)) continue;
-      // Accept both the camelCase key Phase 1.0c writes (`technicalConstraints`,
-      // see phase1.ts) and the snake_case an LLM might emit — the dual-key
-      // normalizer principle. A single-key reader silently empties the list and
-      // the recon agent then sees "(none stated)" and free-invents a stack.
-      const list = (c.technicalConstraints ?? c.technical_constraints ?? c.constraints) as Array<Record<string, unknown>> | undefined;
-      for (const tc of Array.isArray(list) ? list : []) {
-        const id = typeof tc.id === 'string' ? tc.id : '';
-        // `TechnicalConstraint.text` is the real field (records.ts); keep the
-        // other names as fallbacks for differently-shaped sources.
-        let text = '';
-        if (typeof tc.text === 'string') text = tc.text;
-        else if (typeof tc.constraint === 'string') text = tc.constraint;
-        else if (typeof tc.statement === 'string') text = tc.statement;
-        else if (typeof tc.description === 'string') text = tc.description;
-        if (text) out.push(`${id ? id + ': ' : ''}${text}`);
+      for (const tc of extractConstraintList(r.content as Record<string, unknown>)) {
+        const formatted = formatConstraint(tc);
+        if (formatted) out.push(formatted);
       }
     }
   } catch { /* advisory — tolerate */ }
@@ -1012,10 +1035,22 @@ function buildReconPrompt(
         `root manifests: ${inv.root_manifests.join(', ') || '(none)'}`,
         `detected single root stack: ${inv.detected_root_stack ?? '(none / ambiguous)'}`,
         'per-directory signals:',
-        ...inv.dir_signals.map(d =>
-          `  ${d.dir}/ — languages: ${Object.entries(d.languages).map(([l, n]) => `${l}×${n}`).join(', ') || '(none)'}`
-          + (d.manifests.length ? `; manifests: ${d.manifests.join(', ')}` : '')),
+        ...inv.dir_signals.map(d => {
+          const langs = Object.entries(d.languages).map(([l, n]) => `${l}×${n}`).join(', ') || '(none)';
+          const manifests = d.manifests.length ? `; manifests: ${d.manifests.join(', ')}` : '';
+          return `  ${d.dir}/ — languages: ${langs}${manifests}`;
+        }),
       ].join('\n');
+
+  const componentsList = components.length
+    ? components
+        .map(c => {
+          const nameSuffix = c.name ? ` (${c.name})` : '';
+          const domainSuffix = c.domain ? ` [domain ${c.domain}]` : '';
+          return `- ${c.id}${nameSuffix}${domainSuffix}`;
+        })
+        .join('\n')
+    : '(none)';
 
   return `You are the Phase 9 RECONNAISSANCE agent. From the filesystem facts and the BINDING technical constraints below, decide the EXECUTION ground: per-area tech stack, the directories each area owns, how areas integrate, and the per-area verification gate commands. This is JUDGMENT — show your evidence and surface conflicts; do not pretend certainty. The technical constraints are binding, not advisory: obey them (including topology constraints like "a single service" / "no microservices") unless the filesystem makes one infeasible, in which case surface it in \`conflicts\` rather than silently overriding.
 
@@ -1038,7 +1073,7 @@ ${(() => {
 
 ## Candidate modules (internal building blocks of the service — NOT a service list)
 Treat these as modules WITHIN ONE deployable service (one area) unless a BINDING stack/topology constraint above explicitly mandates a separate deployable for one. Do NOT create one area/service per component — that 1:1 mapping is the over-decomposition this phase exists to prevent.
-${components.length ? components.map(c => `- ${c.id}${c.name ? ` (${c.name})` : ''}${c.domain ? ` [domain ${c.domain}]` : ''}`).join('\n') : '(none)'}
+${componentsList}
 
 ## Rules
 - An "area" is a coherent slice of the workspace that uses ONE stack (a new feature, or an existing subsystem). Greenfield single-stack ⇒ ONE area. Default to the FEWEST areas the work needs: prefer a single area unless the filesystem shows distinct existing subsystems, or a binding constraint requires separate deployables. Multiple internal concerns inside ONE deployable service are ONE area, not several — do NOT split a single-service intent into per-feature microservices.

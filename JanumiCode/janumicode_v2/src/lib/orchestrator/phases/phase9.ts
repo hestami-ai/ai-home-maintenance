@@ -28,7 +28,7 @@ import { ExecutorAgent, type ExecutorBackingTool } from '../../agents/executorAg
 import { ExecutionContextBuilder, type ImplementationTask as CtxTask } from '../executionContextBuilder';
 import { TestRunner, type TestSuite } from '../testRunner';
 import { EvalRunner, type EvaluationCriterion } from '../evalRunner';
-import { ExecutionScheduler, type SchedulerLeaf, type SchedulerReleaseEntry } from '../executionScheduler';
+import { ExecutionScheduler, type SchedulerLeaf, type SchedulerReleaseEntry, type ExecutionSchedulerConfig } from '../executionScheduler';
 import { extractPriorPhaseContext, buildEffectiveTaskView, buildEffectiveTestPlanView } from './phaseContext';
 import { runPacketSynthesisSubPhase } from './packetSynthesis';
 import { runScaffoldSynthesis, copyEngineeringConstitution, type ScaffoldManifest } from './scaffoldSynthesis';
@@ -39,6 +39,9 @@ import { runPhase9ReconSubPhase, reconGlobalGates, buildReconEnforcementManifest
 import { runCycleControllerSubPhase, decideRestartTarget } from './cycleController';
 import { randomUUID } from 'node:crypto';
 import { emit as aoddEmit } from '../../aodd';
+
+type PhaseEngine = PhaseContext['engine'];
+type EngineConfig = ReturnType<PhaseEngine['configManager']['get']>;
 
 export class Phase9Handler implements PhaseHandler {
   readonly phaseId: PhaseId = '9';
@@ -87,33 +90,8 @@ export class Phase9Handler implements PhaseHandler {
     // over config so operators can flip executors per-run without
     // editing janumicode.json.
     const cfg = engine.configManager.get();
-    const cfgExecutor = cfg.llm_routing.executor?.primary;
-    const envExecutor = process.env.JANUMICODE_EXECUTOR_BACKING_TOOL;
-    const executorBackingTool = (envExecutor ?? cfgExecutor?.backing_tool) as
-      ExecutorBackingTool | undefined;
-    // Calibration runs flip this on so the executor can run Bash to
-    // self-verify (e.g. `node --test` to confirm the tests it just
-    // wrote actually pass). Production CLI / VS Code use cases keep
-    // it off so permission prompts surface to the human as designed.
-    // Resolution: per-workflow config beats env var; default false.
-    const cfgExecution = (cfg as unknown as { execution?: { unattended_skip_permissions?: boolean } }).execution;
-    const unattendedSkipPermissions =
-      cfgExecution?.unattended_skip_permissions === true
-      || process.env.JANUMICODE_EXECUTOR_UNATTENDED === '1';
-    // Workflow-level override (e.g. `--thin-slice` pins to goose_cli).
-    // Read here so calibration runs route every Phase 9 task through a
-    // single executor regardless of what Phase 6 planner emitted.
-    const forcedExecutorBackingTool = (cfg as unknown as {
-      workflow?: { force_executor_backing_tool?: ExecutorBackingTool };
-    }).workflow?.force_executor_backing_tool ?? undefined;
-    const executorAgent = new ExecutorAgent(
-      engine.db,
-      engine.agentInvoker,
-      engine.writer,
-      engine.eventBus,
-      generateId,
-      { executorBackingTool, unattendedSkipPermissions, forcedExecutorBackingTool },
-    );
+    const { executorAgent, unattendedSkipPermissions } =
+      this.buildExecutorAgent(engine, cfg, generateId);
 
     // ── Extract artifacts from prior phases ────────────────────────
     const artifacts = execContextBuilder.extractArtifacts(workflowRun.id);
@@ -179,30 +157,11 @@ export class Phase9Handler implements PhaseHandler {
       engine.workspacePath,
       (cfg as unknown as { scaffold?: { engineering_constitution_path?: string } }).scaffold?.engineering_constitution_path,
     );
-    let scaffoldManifest: ScaffoldManifest | null = null;
-    const scaffoldingResult = await runScaffoldingAgentSubPhase({ workflowRun, engine }, reconPlan, executorAgent);
-    if (!scaffoldingResult.producedPrimaryManifest) {
-      getLogger().warn('workflow', 'Phase 9.0: scaffolding agent produced no primary manifest — catastrophic safety net (deterministic materializer)', {
-        workflow_run_id: workflowRun.id, manifests_present: scaffoldingResult.manifestsPresent,
-      });
-      try {
-        // Pass recon's stack so the deterministic safety net materializes a
-        // stack-appropriate scaffold (python/etc) instead of always TypeScript.
-        const reconStack = reconPlan?.areas?.[0]?.stack;
-        scaffoldManifest = runScaffoldSynthesis({ workflowRun, engine }, reconStack);
-      } catch (err) {
-        getLogger().warn('workflow', 'Phase 9.0a scaffold_synthesis safety-net failed (continuing without scaffold)', {
-          workflow_run_id: workflowRun.id, error: err instanceof Error ? err.message : String(err),
-        });
-      }
-    }
+    const scaffoldManifest = await this.runScaffoldWithSafetyNet(ctx, reconPlan, executorAgent);
 
     engine.stateMachine.setSubPhase(workflowRun.id, 'packet_synthesis');
     const packetResult = runPacketSynthesisSubPhase({ workflowRun, engine });
-    const packetByTaskId = new Map<string, ImplementationPacketContent>();
-    for (const p of packetResult.packets) {
-      packetByTaskId.set(p.task.id, p);
-    }
+    const packetByTaskId = indexPacketsByTaskId(packetResult.packets);
     getLogger().info('workflow', 'Phase 9.0 packet_synthesis complete', {
       workflow_run_id: workflowRun.id,
       packets_total: packetResult.packets.length,
@@ -219,20 +178,9 @@ export class Phase9Handler implements PhaseHandler {
     // broken packets — bounded by max_cycles_per_release. At/over the cap, or
     // when no delta phase can fix it, fall through to execution; the
     // end-of-Phase-9 cycle_controller surfaces the ceiling to the operator.
-    if (packetResult.totalBlockingFailures > 0) {
-      const cycleNumber = workflowRun.current_cycle_number ?? 0;
-      const cfgMaxCycles = (cfg as unknown as { execution?: { max_cycles_per_release?: number } })
-        .execution?.max_cycles_per_release ?? 3;
-      const maxCycles = workflowRun.max_cycles_per_release ?? cfgMaxCycles;
-      const restart = decideRestartTarget({ workflowRun, engine });
-      if (restart && cycleNumber + 1 <= maxCycles) {
-        getLogger().warn('workflow', 'Phase 9.0b: routable packet coherence failures — regenerating before execution', {
-          workflow_run_id: workflowRun.id, target_phase: restart.target, reason: restart.reason,
-          cycle_number: cycleNumber, max_cycles: maxCycles,
-          blocking_failures: packetResult.totalBlockingFailures,
-        });
-        return { success: true, artifactIds, cycleRestartTo: restart.target };
-      }
+    const preRestartTarget = this.decidePreExecutionRestart(ctx, cfg, packetResult);
+    if (preRestartTarget) {
+      return { success: true, artifactIds, cycleRestartTo: preRestartTarget };
     }
 
     // ── 9.1 — Implementation Task Execution ───────────────────
@@ -246,15 +194,7 @@ export class Phase9Handler implements PhaseHandler {
     const priorForTasks = extractPriorPhaseContext(allArtifactRecords);
     const taskNodes = engine.writer.getRecordsByType(workflowRun.id, 'task_decomposition_node');
     const effectiveTasks = buildEffectiveTaskView(taskNodes, priorForTasks);
-    if (effectiveTasks.source === 'leaves') {
-      getLogger().info('workflow', 'Phase 9: consuming Wave 8 task leaves', {
-        leafCount: effectiveTasks.leafCount,
-        rootCount: effectiveTasks.rootCount,
-      });
-    }
-    const tasks: CtxTask[] = (effectiveTasks.source === 'leaves'
-      ? (effectiveTasks.tasks as unknown as CtxTask[])
-      : (artifacts.implementationPlan ?? []));
+    const tasks: CtxTask[] = this.resolveTaskList(effectiveTasks, artifacts);
 
     // ── Wave R — release-plan-driven execution scheduler ──────────
     // Replaces the prior flat for-loop with wave-based scheduling.
@@ -276,32 +216,14 @@ export class Phase9Handler implements PhaseHandler {
 
     // Cast leaves to SchedulerLeaf (enriches with release_id /
     // release_ordinal / _leaf_node_id from buildEffectiveTaskView).
-    const schedulerLeaves: SchedulerLeaf[] = tasks.map(t => {
-      const meta = t as unknown as Record<string, unknown>;
-      return {
-        ...t,
-        release_id: (meta._leaf_release_id as string | undefined)
-          ?? (meta.release_id as string | null | undefined)
-          ?? null,
-        release_ordinal: (meta._leaf_release_ordinal as number | null | undefined)
-          ?? (meta.release_ordinal as number | null | undefined)
-          ?? null,
-        _leaf_node_id: meta._leaf_node_id as string | undefined,
-      };
-    });
+    const schedulerLeaves: SchedulerLeaf[] = buildSchedulerLeaves(tasks);
 
     // Bakeoff/experiment lever: cap the implemented leaf set to the first N
     // (JANUMICODE_BAKEOFF_MAX_LEAVES). A model bakeoff measures per-leaf code
     // quality on a few representative leaves — running all ~20 is hours per
     // candidate. The composition root is injected AFTER this, so the capped
     // project still wires + gates. Unset/<=0 ⇒ no cap (normal runs).
-    const leafCapRaw = Number.parseInt(process.env.JANUMICODE_BAKEOFF_MAX_LEAVES ?? '', 10);
-    if (Number.isFinite(leafCapRaw) && leafCapRaw > 0 && schedulerLeaves.length > leafCapRaw) {
-      getLogger().warn('workflow', 'Phase 9: BAKEOFF leaf cap applied — implementing a SUBSET', {
-        workflow_run_id: workflowRun.id, cap: leafCapRaw, original_leaf_count: schedulerLeaves.length,
-      });
-      schedulerLeaves.length = leafCapRaw;
-    }
+    this.applyBakeoffLeafCap(schedulerLeaves, workflowRun.id);
 
     // Tier-A injection #3 — the COMPOSITION ROOT ("make it run"). Slice-144:
     // app bootstrap/wiring was nobody's task, so the run produced a parts bin
@@ -311,17 +233,7 @@ export class Phase9Handler implements PhaseHandler {
     // decomposition. Depends on every other leaf + carries no release →
     // lands last; owns the GLOBAL verification gate (src-wide write scope)
     // now that ordinary leaf gates are scoped to their own write dirs.
-    if (schedulerLeaves.length > 0) {
-      const icRecord = engine.writer.getArtifactByKind(workflowRun.id, 'interface_contracts');
-      const icContracts = ((icRecord?.content as Record<string, unknown> | undefined)
-        ?.contracts as Array<{ id: string; protocol?: string; data_format?: string }> | undefined) ?? [];
-      schedulerLeaves.push(buildCompositionRootLeaf(schedulerLeaves, scaffoldManifest, icContracts));
-      getLogger().info('workflow', 'Phase 9: composition-root leaf injected', {
-        workflow_run_id: workflowRun.id,
-        depends_on: schedulerLeaves.length - 1,
-        contracts: icContracts.length,
-      });
-    }
+    this.injectCompositionRootLeaf(ctx, schedulerLeaves, scaffoldManifest);
 
     const scheduler = new ExecutionScheduler(
       engine,
@@ -329,58 +241,14 @@ export class Phase9Handler implements PhaseHandler {
       execContextBuilder,
       executorAgent,
       artifacts,
-      {
-        // Cap at 2 attempts (was 3). Calibrated from thin-slice-13
-        // where extra retries past 2 dominated the wall-clock budget
-        // without often yielding a successful task. The no-content
-        // detector in cliInvoker already short-circuits stuck tasks
-        // sooner than the per-call wall-clock used to, so each attempt
-        // is also less likely to drag.
-        leafRetryBudget: cfg.execution?.leaf_retry_budget ?? 2,
-        deferredRetryBudget: cfg.execution?.deferred_retry_budget ?? 2,
-        autoApproveWaveGates: cfg.execution?.auto_approve_wave_gates ?? false,
-        testsPerLeaf: {
-          enabled: cfg.execution?.tests_per_leaf?.enabled ?? true,
-          resolution: cfg.execution?.tests_per_leaf?.test_command_resolution ?? 'package_json_scripts',
-          timeoutMs: cfg.execution?.tests_per_leaf?.timeout_ms ?? 120_000,
-        },
-        stabilizationBudget: (cfg as unknown as { execution?: { stabilization_budget?: number } })
-          .execution?.stabilization_budget ?? 2,
-        // A human is in the loop iff this is NOT an unattended (calibration/CI)
-        // run — selects the mode-aware execution-mode directive tail (attended
-        // escalates; headless self-resolves). Same signal that governs the mimo
-        // `question` policy + agent-prompt framing, so the three stay consistent.
-        attended: !unattendedSkipPermissions,
-      },
+      buildSchedulerOptions(cfg, unattendedSkipPermissions),
       generateId,
     );
 
-    // Inject the packet map so each leaf's executor invocation sees the
-    // full bundled context (user stories, ACs, tests, etc.).
-    if (packetByTaskId.size > 0) {
-      scheduler.setPacketContext(packetByTaskId);
-    }
-
-    // Enforcement source matches whoever authored the skeleton: recon when the
-    // scaffolding agent succeeded (the polyglot path), the scaffold manifest
-    // when the deterministic safety net ran. Both feed the executor "import,
-    // don't reinvent" directives + the post-leaf protected-path guard.
-    if (scaffoldManifest) {
-      scheduler.setScaffoldManifest(scaffoldManifest);
-    } else {
-      scheduler.setReconEnforcement(reconEnforcement);
-    }
-
-    // Tier-A coordination: hand the (deterministic, TS-shaped) ownership plan to
-    // the scheduler ONLY on the safety-net path. Under the recon Replace path
-    // it is superseded: the scaffolding agent pre-authors the canonical shared
-    // modules and the recon enforcement's conventions already carry the
-    // "import the canonical module, don't reinvent" directive — so applying the
-    // deterministic plan too would duplicate/conflict (and mis-shape paths for a
-    // non-TS area).
-    if (ownershipPlan && scaffoldManifest) {
-      scheduler.setOwnershipPlan(ownershipPlan);
-    }
+    // Thread packet context, the enforcement substrate (scaffold manifest vs
+    // recon), and the Tier-A ownership plan into the scheduler. See
+    // configureScheduler for the per-channel rationale.
+    this.configureScheduler(scheduler, { packetByTaskId, scaffoldManifest, reconEnforcement, ownershipPlan });
 
     const scheduleResult = await scheduler.run({
       workflowRunId: workflowRun.id,
@@ -457,36 +325,7 @@ export class Phase9Handler implements PhaseHandler {
     // plan when no tree exists.
     const testNodes = engine.writer.getRecordsByType(workflowRun.id, 'test_decomposition_node');
     const effectiveTests = buildEffectiveTestPlanView(testNodes, priorForTasks);
-    let testSuites: TestSuite[] = [];
-    if (effectiveTests.source === 'leaves') {
-      getLogger().info('workflow', 'Phase 9.2: consuming Wave 10 test leaves', {
-        leafCount: effectiveTests.leafCount,
-        rootCount: effectiveTests.rootCount,
-      });
-      // Adapt buildEffectiveTestPlanView shape into TestRunner suites.
-      for (const s of effectiveTests.test_suites) {
-        testSuites.push({
-          id: s.suite_id,
-          name: `${s.test_type.charAt(0).toUpperCase() + s.test_type.slice(1)} Tests (${s.component_id})`,
-          type: s.test_type,
-          testFilePaths: s.test_cases
-            .map(tc => tc.test_file_path ?? '')
-            .filter(p => p.length > 0),
-          validatesTaskIds: [],
-          coversCriteriaIds: s.test_cases.flatMap(tc => tc.acceptance_criterion_ids),
-        });
-      }
-    } else {
-      const testPlanRecord = engine.db.prepare(`
-        SELECT content FROM governed_stream
-        WHERE workflow_run_id = ? AND record_type = 'artifact_produced'
-        AND json_extract(content, '$.kind') = 'test_plan'
-        ORDER BY produced_at DESC LIMIT 1
-      `).get(workflowRun.id) as { content: string } | undefined;
-      testSuites = testPlanRecord
-        ? this.extractTestSuites(testPlanRecord.content, generateId)
-        : [];
-    }
+    const testSuites: TestSuite[] = this.buildTestSuites(ctx, effectiveTests, generateId);
 
     const testRunner = new TestRunner(
       engine.db,
@@ -603,43 +442,12 @@ export class Phase9Handler implements PhaseHandler {
     // quarantined leaf already has a task_quarantine record. Roll up a
     // summary so downstream consumers (workflow run summary, future
     // brownfield retries) see the gap surface.
-    if (tasksQuarantined > 0 || tasksFailed > 0) {
-      engine.stateMachine.setSubPhase(workflowRun.id, 'execution_synthesis');
-
-      const quarantineRecords = engine.writer.getRecordsByType(workflowRun.id, 'task_quarantine');
-      const latestByLeaf = new Map<string, TaskQuarantineContent>();
-      for (const r of quarantineRecords) {
-        const c = r.content as unknown as TaskQuarantineContent;
-        if (!latestByLeaf.has(c.leaf_task_id)) latestByLeaf.set(c.leaf_task_id, c);
-      }
-      const summary = engine.writer.writeRecord({
-        record_type: 'artifact_produced',
-        schema_version: '1.0',
-        workflow_run_id: workflowRun.id,
-        phase_id: '9',
-        sub_phase_id: 'execution_synthesis',
-        produced_by_agent_role: 'orchestrator',
-        janumicode_version_sha: engine.janumiCodeVersionSha,
-        derived_from_record_ids: [executionRecord.id],
-        content: {
-          kind: 'quarantine_summary',
-          quarantined_count: tasksQuarantined,
-          rescued_count: scheduleResult.rescuedLeafCount,
-          terminally_deferred_count: tasksFailed,
-          quarantined_leaves: [...latestByLeaf.values()].map(q => ({
-            leaf_task_id: q.leaf_task_id,
-            wave_number: q.wave_number,
-            release_id: q.release_id,
-            release_ordinal: q.release_ordinal,
-            attempt_count: q.attempts.length,
-            quarantine_reason: q.quarantine_reason,
-            rescue_status: q.rescue_status,
-          })),
-        },
-      });
-      artifactIds.push(summary.id);
-      engine.ingestionPipeline.ingest(summary);
-    }
+    artifactIds.push(...this.writeQuarantineSummary(ctx, {
+      executionRecordId: executionRecord.id,
+      tasksQuarantined,
+      tasksFailed,
+      rescuedLeafCount: scheduleResult.rescuedLeafCount,
+    }));
 
     // ── 9.5 — Final phase summary ──────────────────────────────
     // Wave R: per-wave gates already gated each release as it
@@ -697,18 +505,9 @@ export class Phase9Handler implements PhaseHandler {
     // mode (the per-wave gates already had their own auto-approve
     // applied; surfacing this one too keeps the pause-free run path
     // coherent). Otherwise pause for the human.
-    if (cfg.execution?.auto_approve_wave_gates !== true) {
-      try {
-        const resolution = await engine.pauseForDecision(workflowRun.id, mirrorRecord.id, 'mirror');
-        if (resolution.type === 'mirror_rejection') {
-          return { success: false, error: 'User rejected execution results', artifactIds };
-        }
-      } catch (err) {
-        getLogger().warn('workflow', 'Phase 9 approval failed', { error: String(err) });
-        return { success: false, error: 'Execution approval failed', artifactIds };
-      }
-    } else {
-      getLogger().info('workflow', 'Wave R: terminal mirror auto-approved (auto_approve_wave_gates=true)');
+    const approval = await this.approveExecutionMirror(ctx, cfg, mirrorRecord.id);
+    if (!approval.approved) {
+      return { success: false, error: approval.error, artifactIds };
     }
     void anyRejected;
 
@@ -724,15 +523,8 @@ export class Phase9Handler implements PhaseHandler {
     // rescued would be falsely flagged. A quarantine that NEEDED a rescue is a
     // (resolved) warning, not a flaw. (A stabilization residual will OR into
     // has_high_severity_flaws in Stage 0.5 once that loop exists.)
-    const execHighSeverity =
-      scheduleResult.terminallyDeferredLeafCount > 0
-      || scheduleResult.rejectedWaveCount > 0
-      || scheduleResult.stabilizationResidual != null
-      || testResults.totalFailed > 0
-      || !evalResults.overallPass;
-    const execUnresolvedWarnings =
-      scheduleResult.quarantinedLeafCount > 0
-      || testResults.totalSkipped > 0;
+    const { hasHighSeverityFlaws, hasUnresolvedWarnings } =
+      computeExecutionGateSeverity(scheduleResult, testResults, evalResults);
     const gateRecord = engine.writer.writeRecord({
       record_type: 'phase_gate_evaluation',
       schema_version: '1.0',
@@ -745,8 +537,8 @@ export class Phase9Handler implements PhaseHandler {
       content: {
         kind: 'phase_gate',
         phase_id: '9',
-        has_unresolved_warnings: execUnresolvedWarnings,
-        has_high_severity_flaws: execHighSeverity,
+        has_unresolved_warnings: hasUnresolvedWarnings,
+        has_high_severity_flaws: hasHighSeverityFlaws,
       },
     });
     artifactIds.push(gateRecord.id);
@@ -779,6 +571,298 @@ export class Phase9Handler implements PhaseHandler {
       return { success: true, artifactIds, cycleRestartTo: cycleResult.cycleRestartTo };
     }
     return { success: true, artifactIds };
+  }
+
+  /**
+   * Resolve the executor backing tool + unattended flag from config/env and
+   * construct the ExecutorAgent.
+   *
+   * Resolution: JANUMICODE_EXECUTOR_BACKING_TOOL env beats config
+   * (llm_routing.executor.primary.backing_tool). Calibration/CI runs flip
+   * `unattended_skip_permissions` on (per-workflow config beats
+   * JANUMICODE_EXECUTOR_UNATTENDED env; default false) so the executor can
+   * self-verify without surfacing permission prompts. A workflow-level
+   * force_executor_backing_tool pins every task to one executor.
+   */
+  private buildExecutorAgent(
+    engine: PhaseEngine,
+    cfg: EngineConfig,
+    generateId: () => string,
+  ): { executorAgent: ExecutorAgent; unattendedSkipPermissions: boolean } {
+    const cfgExecutor = cfg.llm_routing.executor?.primary;
+    const envExecutor = process.env.JANUMICODE_EXECUTOR_BACKING_TOOL;
+    const executorBackingTool = (envExecutor ?? cfgExecutor?.backing_tool) as
+      ExecutorBackingTool | undefined;
+    const cfgExecution = (cfg as unknown as { execution?: { unattended_skip_permissions?: boolean } }).execution;
+    const unattendedSkipPermissions =
+      cfgExecution?.unattended_skip_permissions === true
+      || process.env.JANUMICODE_EXECUTOR_UNATTENDED === '1';
+    const forcedExecutorBackingTool = (cfg as unknown as {
+      workflow?: { force_executor_backing_tool?: ExecutorBackingTool };
+    }).workflow?.force_executor_backing_tool ?? undefined;
+    const executorAgent = new ExecutorAgent(
+      engine.db,
+      engine.agentInvoker,
+      engine.writer,
+      engine.eventBus,
+      generateId,
+      { executorBackingTool, unattendedSkipPermissions, forcedExecutorBackingTool },
+    );
+    return { executorAgent, unattendedSkipPermissions };
+  }
+
+  /**
+   * Run the scaffolding agent; when it produces no primary dependency manifest
+   * (a foundational failure), fall back to the deterministic scaffold
+   * materializer (CATASTROPHIC SAFETY NET) using recon's stack. Returns the
+   * scaffold manifest only when the safety net ran (null otherwise).
+   */
+  private async runScaffoldWithSafetyNet(
+    ctx: PhaseContext,
+    reconPlan: Awaited<ReturnType<typeof runPhase9ReconSubPhase>>,
+    executorAgent: ExecutorAgent,
+  ): Promise<ScaffoldManifest | null> {
+    const { workflowRun, engine } = ctx;
+    let scaffoldManifest: ScaffoldManifest | null = null;
+    const scaffoldingResult = await runScaffoldingAgentSubPhase({ workflowRun, engine }, reconPlan, executorAgent);
+    if (!scaffoldingResult.producedPrimaryManifest) {
+      getLogger().warn('workflow', 'Phase 9.0: scaffolding agent produced no primary manifest — catastrophic safety net (deterministic materializer)', {
+        workflow_run_id: workflowRun.id, manifests_present: scaffoldingResult.manifestsPresent,
+      });
+      try {
+        // Pass recon's stack so the deterministic safety net materializes a
+        // stack-appropriate scaffold (python/etc) instead of always TypeScript.
+        const reconStack = reconPlan?.areas?.[0]?.stack;
+        scaffoldManifest = runScaffoldSynthesis({ workflowRun, engine }, reconStack);
+      } catch (err) {
+        getLogger().warn('workflow', 'Phase 9.0a scaffold_synthesis safety-net failed (continuing without scaffold)', {
+          workflow_run_id: workflowRun.id, error: err instanceof Error ? err.message : String(err),
+        });
+      }
+    }
+    return scaffoldManifest;
+  }
+
+  /**
+   * 9.0b pre-execution self-correction. When routable blocking packet-coherence
+   * failures remain AND the cycle budget allows another cycle, return the
+   * upstream phase to regenerate before executing on broken packets; else null
+   * (fall through to execution). Bounded by max_cycles_per_release.
+   */
+  private decidePreExecutionRestart(
+    ctx: PhaseContext,
+    cfg: EngineConfig,
+    packetResult: { totalBlockingFailures: number },
+  ): PhaseId | null {
+    const { workflowRun, engine } = ctx;
+    if (packetResult.totalBlockingFailures <= 0) return null;
+    const cycleNumber = workflowRun.current_cycle_number ?? 0;
+    const cfgMaxCycles = (cfg as unknown as { execution?: { max_cycles_per_release?: number } })
+      .execution?.max_cycles_per_release ?? 3;
+    const maxCycles = workflowRun.max_cycles_per_release ?? cfgMaxCycles;
+    const restart = decideRestartTarget({ workflowRun, engine });
+    if (restart && cycleNumber + 1 <= maxCycles) {
+      getLogger().warn('workflow', 'Phase 9.0b: routable packet coherence failures — regenerating before execution', {
+        workflow_run_id: workflowRun.id, target_phase: restart.target, reason: restart.reason,
+        cycle_number: cycleNumber, max_cycles: maxCycles,
+        blocking_failures: packetResult.totalBlockingFailures,
+      });
+      return restart.target;
+    }
+    return null;
+  }
+
+  /**
+   * Prefer Phase 6.1a leaf tasks when available (the decomposed atomic-unit
+   * set); fall back to the flat implementation plan. Logs when leaves are used.
+   */
+  private resolveTaskList(
+    effectiveTasks: ReturnType<typeof buildEffectiveTaskView>,
+    artifacts: ReturnType<ExecutionContextBuilder['extractArtifacts']>,
+  ): CtxTask[] {
+    if (effectiveTasks.source === 'leaves') {
+      getLogger().info('workflow', 'Phase 9: consuming Wave 8 task leaves', {
+        leafCount: effectiveTasks.leafCount,
+        rootCount: effectiveTasks.rootCount,
+      });
+      return effectiveTasks.tasks as unknown as CtxTask[];
+    }
+    return artifacts.implementationPlan ?? [];
+  }
+
+  /**
+   * Bakeoff/experiment lever — cap the implemented leaf set (in place) to the
+   * first N from JANUMICODE_BAKEOFF_MAX_LEAVES. No-op when unset/<=0 or already
+   * under the cap.
+   */
+  private applyBakeoffLeafCap(schedulerLeaves: SchedulerLeaf[], workflowRunId: string): void {
+    const cap = computeBakeoffLeafCap(process.env.JANUMICODE_BAKEOFF_MAX_LEAVES, schedulerLeaves.length);
+    if (cap === null) return;
+    getLogger().warn('workflow', 'Phase 9: BAKEOFF leaf cap applied — implementing a SUBSET', {
+      workflow_run_id: workflowRunId, cap, original_leaf_count: schedulerLeaves.length,
+    });
+    schedulerLeaves.length = cap;
+  }
+
+  /**
+   * Tier-A injection #3 — the COMPOSITION ROOT ("make it run"). Appends (in
+   * place) a leaf that depends on every other leaf and owns the GLOBAL
+   * verification gate. No-op when there are no leaves.
+   */
+  private injectCompositionRootLeaf(
+    ctx: PhaseContext,
+    schedulerLeaves: SchedulerLeaf[],
+    scaffoldManifest: ScaffoldManifest | null,
+  ): void {
+    const { workflowRun, engine } = ctx;
+    if (schedulerLeaves.length === 0) return;
+    const icRecord = engine.writer.getArtifactByKind(workflowRun.id, 'interface_contracts');
+    const icContracts = ((icRecord?.content as Record<string, unknown> | undefined)
+      ?.contracts as Array<{ id: string; protocol?: string; data_format?: string }> | undefined) ?? [];
+    schedulerLeaves.push(buildCompositionRootLeaf(schedulerLeaves, scaffoldManifest, icContracts));
+    getLogger().info('workflow', 'Phase 9: composition-root leaf injected', {
+      workflow_run_id: workflowRun.id,
+      depends_on: schedulerLeaves.length - 1,
+      contracts: icContracts.length,
+    });
+  }
+
+  /**
+   * Thread the packet map, enforcement substrate, and ownership plan into the
+   * scheduler. Enforcement source matches whoever authored the skeleton: recon
+   * when the scaffolding agent succeeded (polyglot path), the scaffold manifest
+   * when the deterministic safety net ran. The Tier-A ownership plan is applied
+   * ONLY on the safety-net path (superseded by recon enforcement otherwise).
+   */
+  private configureScheduler(
+    scheduler: ExecutionScheduler,
+    opts: {
+      packetByTaskId: Map<string, ImplementationPacketContent>;
+      scaffoldManifest: ScaffoldManifest | null;
+      reconEnforcement: ReturnType<typeof buildReconEnforcementManifest>;
+      ownershipPlan: ReturnType<typeof runModuleOwnershipPlanningSubPhase>;
+    },
+  ): void {
+    if (opts.packetByTaskId.size > 0) {
+      scheduler.setPacketContext(opts.packetByTaskId);
+    }
+    if (opts.scaffoldManifest) {
+      scheduler.setScaffoldManifest(opts.scaffoldManifest);
+    } else {
+      scheduler.setReconEnforcement(opts.reconEnforcement);
+    }
+    if (opts.ownershipPlan && opts.scaffoldManifest) {
+      scheduler.setOwnershipPlan(opts.ownershipPlan);
+    }
+  }
+
+  /**
+   * 9.2 — resolve TestRunner suites: prefer Phase 7.1a test leaves when
+   * available (decomposed atomic-step cases), else read the newest test_plan
+   * artifact and walk it via extractTestSuites.
+   */
+  private buildTestSuites(
+    ctx: PhaseContext,
+    effectiveTests: ReturnType<typeof buildEffectiveTestPlanView>,
+    generateId: () => string,
+  ): TestSuite[] {
+    const { workflowRun, engine } = ctx;
+    if (effectiveTests.source === 'leaves') {
+      getLogger().info('workflow', 'Phase 9.2: consuming Wave 10 test leaves', {
+        leafCount: effectiveTests.leafCount,
+        rootCount: effectiveTests.rootCount,
+      });
+      return buildTestSuitesFromLeaves(effectiveTests.test_suites);
+    }
+    const testPlanRecord = engine.db.prepare(`
+      SELECT content FROM governed_stream
+      WHERE workflow_run_id = ? AND record_type = 'artifact_produced'
+      AND json_extract(content, '$.kind') = 'test_plan'
+      ORDER BY produced_at DESC LIMIT 1
+    `).get(workflowRun.id) as { content: string } | undefined;
+    return testPlanRecord
+      ? this.extractTestSuites(testPlanRecord.content, generateId)
+      : [];
+  }
+
+  /**
+   * 9.4 — roll up a quarantine_summary record when any leaf was quarantined or
+   * terminally deferred. Returns the written record id(s) (empty when neither).
+   * The latest quarantine record per leaf wins.
+   */
+  private writeQuarantineSummary(
+    ctx: PhaseContext,
+    args: {
+      executionRecordId: string;
+      tasksQuarantined: number;
+      tasksFailed: number;
+      rescuedLeafCount: number;
+    },
+  ): string[] {
+    const { workflowRun, engine } = ctx;
+    if (args.tasksQuarantined <= 0 && args.tasksFailed <= 0) return [];
+    engine.stateMachine.setSubPhase(workflowRun.id, 'execution_synthesis');
+
+    const quarantineRecords = engine.writer.getRecordsByType(workflowRun.id, 'task_quarantine');
+    const latestByLeaf = new Map<string, TaskQuarantineContent>();
+    for (const r of quarantineRecords) {
+      const c = r.content as unknown as TaskQuarantineContent;
+      if (!latestByLeaf.has(c.leaf_task_id)) latestByLeaf.set(c.leaf_task_id, c);
+    }
+    const summary = engine.writer.writeRecord({
+      record_type: 'artifact_produced',
+      schema_version: '1.0',
+      workflow_run_id: workflowRun.id,
+      phase_id: '9',
+      sub_phase_id: 'execution_synthesis',
+      produced_by_agent_role: 'orchestrator',
+      janumicode_version_sha: engine.janumiCodeVersionSha,
+      derived_from_record_ids: [args.executionRecordId],
+      content: {
+        kind: 'quarantine_summary',
+        quarantined_count: args.tasksQuarantined,
+        rescued_count: args.rescuedLeafCount,
+        terminally_deferred_count: args.tasksFailed,
+        quarantined_leaves: [...latestByLeaf.values()].map(q => ({
+          leaf_task_id: q.leaf_task_id,
+          wave_number: q.wave_number,
+          release_id: q.release_id,
+          release_ordinal: q.release_ordinal,
+          attempt_count: q.attempts.length,
+          quarantine_reason: q.quarantine_reason,
+          rescue_status: q.rescue_status,
+        })),
+      },
+    });
+    engine.ingestionPipeline.ingest(summary);
+    return [summary.id];
+  }
+
+  /**
+   * Present-and-approve gate for the terminal execution mirror. Auto-approves
+   * under unattended/calibration mode; otherwise pauses for the human. Returns
+   * `{ approved:false, error }` on rejection or approval failure.
+   */
+  private async approveExecutionMirror(
+    ctx: PhaseContext,
+    cfg: EngineConfig,
+    mirrorRecordId: string,
+  ): Promise<{ approved: boolean; error?: string }> {
+    const { workflowRun, engine } = ctx;
+    if (cfg.execution?.auto_approve_wave_gates === true) {
+      getLogger().info('workflow', 'Wave R: terminal mirror auto-approved (auto_approve_wave_gates=true)');
+      return { approved: true };
+    }
+    try {
+      const resolution = await engine.pauseForDecision(workflowRun.id, mirrorRecordId, 'mirror');
+      if (resolution.type === 'mirror_rejection') {
+        return { approved: false, error: 'User rejected execution results' };
+      }
+      return { approved: true };
+    } catch (err) {
+      getLogger().warn('workflow', 'Phase 9 approval failed', { error: String(err) });
+      return { approved: false, error: 'Execution approval failed' };
+    }
   }
 
   /**
@@ -830,32 +914,15 @@ export class Phase9Handler implements PhaseHandler {
     if (refactoringLeafIds.length === 0) return out;
 
     // Per-task metadata from the refactoring_scope (newest wins).
-    const scopes = engine.writer.getRecordsByType(runId, 'refactoring_scope');
-    const metaById = new Map<string, Record<string, unknown>>();
-    let impactReportId = '';
-    if (scopes.length > 0) {
-      const scope = scopes.reduce((a, b) => (a.produced_at >= b.produced_at ? a : b));
-      const content = scope.content as Record<string, unknown>;
-      impactReportId = typeof content.cross_run_impact_report_id === 'string'
-        ? content.cross_run_impact_report_id : '';
-      const tasks = Array.isArray(content.refactoring_tasks) ? content.refactoring_tasks : [];
-      for (const raw of tasks as Array<Record<string, unknown>>) {
-        if (typeof raw.id === 'string') metaById.set(raw.id, raw);
-      }
-    }
+    const { impactReportId, metaById } = this.collectRefactoringScopeMeta(engine, runId);
 
     const succeeded = new Set(scheduleResult.successfulLeafIds);
-    const skipped = new Set(
-      engine.writer.getRecordsByType(runId, 'refactoring_skipped_idempotent')
-        .map(r => (r.content as Record<string, unknown>).task_id)
-        .filter((id): id is string => typeof id === 'string'),
-    );
+    const skipped = this.collectIdempotentSkippedTaskIds(engine, runId);
 
     for (const taskId of refactoringLeafIds) {
       const wasSkipped = skipped.has(taskId);
       if (!succeeded.has(taskId) && !wasSkipped) continue; // not completed → no record
       const meta = metaById.get(taskId) ?? {};
-      const modType = meta.modification_type;
       const rec = engine.writer.writeRecord({
         record_type: 'cross_run_modification',
         schema_version: '1.0',
@@ -865,18 +932,7 @@ export class Phase9Handler implements PhaseHandler {
         produced_by_agent_role: 'executor_agent',
         janumicode_version_sha: engine.janumiCodeVersionSha,
         derived_from_record_ids: impactReportId ? [impactReportId] : [],
-        content: {
-          kind: 'cross_run_modification',
-          current_workflow_run_id: runId,
-          prior_workflow_run_id: typeof meta.target_workflow_run_id === 'string' ? meta.target_workflow_run_id : null,
-          modified_artifact_id: typeof meta.target_artifact_id === 'string' ? meta.target_artifact_id : null,
-          changed_interface_id: typeof meta.changed_interface_id === 'string' ? meta.changed_interface_id : null,
-          modification_type: (modType === 'additive' || modType === 'breaking' || modType === 'non_breaking') ? modType : null,
-          refactoring_task_id: taskId,
-          verification_passed: true,
-          applied_status: wasSkipped ? 'skipped_idempotent' : 'applied',
-          cross_run_impact_report_id: impactReportId || null,
-        },
+        content: this.buildCrossRunModificationContent(runId, taskId, meta, wasSkipped, impactReportId),
       });
       engine.ingestionPipeline.ingest(rec);
       out.push(rec.id);
@@ -887,6 +943,71 @@ export class Phase9Handler implements PhaseHandler {
       });
     }
     return out;
+  }
+
+  /**
+   * Read per-refactoring-task metadata from the newest refactoring_scope
+   * record (newest wins). Returns the cross-run impact report id (empty
+   * string when absent) and a map of task id → raw task metadata.
+   */
+  private collectRefactoringScopeMeta(
+    engine: PhaseContext['engine'],
+    runId: string,
+  ): { impactReportId: string; metaById: Map<string, Record<string, unknown>> } {
+    const metaById = new Map<string, Record<string, unknown>>();
+    const scopes = engine.writer.getRecordsByType(runId, 'refactoring_scope');
+    if (scopes.length === 0) return { impactReportId: '', metaById };
+    const scope = scopes.reduce((a, b) => (a.produced_at >= b.produced_at ? a : b));
+    const content = scope.content as Record<string, unknown>;
+    const impactReportId = typeof content.cross_run_impact_report_id === 'string'
+      ? content.cross_run_impact_report_id : '';
+    const tasks = Array.isArray(content.refactoring_tasks) ? content.refactoring_tasks : [];
+    for (const raw of tasks as Array<Record<string, unknown>>) {
+      if (typeof raw.id === 'string') metaById.set(raw.id, raw);
+    }
+    return { impactReportId, metaById };
+  }
+
+  /**
+   * Task ids skipped this run as already-applied (idempotent). A verified
+   * prior application counts as "completed" for cross-run modification.
+   */
+  private collectIdempotentSkippedTaskIds(
+    engine: PhaseContext['engine'],
+    runId: string,
+  ): Set<string> {
+    return new Set(
+      engine.writer.getRecordsByType(runId, 'refactoring_skipped_idempotent')
+        .map(r => (r.content as Record<string, unknown>).task_id)
+        .filter((id): id is string => typeof id === 'string'),
+    );
+  }
+
+  /**
+   * Build the cross_run_modification content payload for one completed
+   * refactoring task. modification_type is normalized to the allowed set
+   * (else null); target/interface fields fall back to null when absent.
+   */
+  private buildCrossRunModificationContent(
+    runId: string,
+    taskId: string,
+    meta: Record<string, unknown>,
+    wasSkipped: boolean,
+    impactReportId: string,
+  ): Record<string, unknown> {
+    const modType = meta.modification_type;
+    return {
+      kind: 'cross_run_modification',
+      current_workflow_run_id: runId,
+      prior_workflow_run_id: typeof meta.target_workflow_run_id === 'string' ? meta.target_workflow_run_id : null,
+      modified_artifact_id: typeof meta.target_artifact_id === 'string' ? meta.target_artifact_id : null,
+      changed_interface_id: typeof meta.changed_interface_id === 'string' ? meta.changed_interface_id : null,
+      modification_type: (modType === 'additive' || modType === 'breaking' || modType === 'non_breaking') ? modType : null,
+      refactoring_task_id: taskId,
+      verification_passed: true,
+      applied_status: wasSkipped ? 'skipped_idempotent' : 'applied',
+      cross_run_impact_report_id: impactReportId || null,
+    };
   }
 
   private extractTestSuites(
@@ -1105,4 +1226,135 @@ export class Phase9Handler implements PhaseHandler {
       };
     });
   }
+}
+
+// ── Pure helpers (extracted from Phase9Handler.execute for S3776) ──────────
+// Behaviour-preserving projections with no side effects; unit-tested directly
+// in phase9ExecuteHelpers.test.ts.
+
+/**
+ * Index implementation packets by their task id. On duplicate task ids the last
+ * packet wins (mirrors the original Map.set loop).
+ */
+export function indexPacketsByTaskId(
+  packets: ImplementationPacketContent[],
+): Map<string, ImplementationPacketContent> {
+  const byTaskId = new Map<string, ImplementationPacketContent>();
+  for (const p of packets) {
+    byTaskId.set(p.task.id, p);
+  }
+  return byTaskId;
+}
+
+/**
+ * Enrich each task into a SchedulerLeaf, resolving release_id / release_ordinal
+ * from the leaf-derived `_leaf_*` metadata first, then the legacy field, then
+ * null. `_leaf_node_id` is surfaced verbatim.
+ */
+export function buildSchedulerLeaves(tasks: CtxTask[]): SchedulerLeaf[] {
+  return tasks.map(t => {
+    const meta = t as unknown as Record<string, unknown>;
+    return {
+      ...t,
+      release_id: (meta._leaf_release_id as string | undefined)
+        ?? (meta.release_id as string | null | undefined)
+        ?? null,
+      release_ordinal: (meta._leaf_release_ordinal as number | null | undefined)
+        ?? (meta.release_ordinal as number | null | undefined)
+        ?? null,
+      _leaf_node_id: meta._leaf_node_id as string | undefined,
+    };
+  });
+}
+
+/**
+ * Resolve the bakeoff leaf cap. Returns the cap to apply only when the env
+ * value parses to a finite positive integer AND the current set is larger than
+ * it; otherwise null (no cap).
+ */
+export function computeBakeoffLeafCap(
+  envRaw: string | undefined,
+  currentLength: number,
+): number | null {
+  const leafCapRaw = Number.parseInt(envRaw ?? '', 10);
+  if (Number.isFinite(leafCapRaw) && leafCapRaw > 0 && currentLength > leafCapRaw) {
+    return leafCapRaw;
+  }
+  return null;
+}
+
+/**
+ * Build the ExecutionScheduler config from workflow config, applying the same
+ * defaults as the original inline literal. `attended` is the inverse of the
+ * unattended-skip-permissions signal.
+ */
+export function buildSchedulerOptions(
+  cfg: EngineConfig,
+  unattendedSkipPermissions: boolean,
+): ExecutionSchedulerConfig {
+  return {
+    leafRetryBudget: cfg.execution?.leaf_retry_budget ?? 2,
+    deferredRetryBudget: cfg.execution?.deferred_retry_budget ?? 2,
+    autoApproveWaveGates: cfg.execution?.auto_approve_wave_gates ?? false,
+    testsPerLeaf: {
+      enabled: cfg.execution?.tests_per_leaf?.enabled ?? true,
+      resolution: cfg.execution?.tests_per_leaf?.test_command_resolution ?? 'package_json_scripts',
+      timeoutMs: cfg.execution?.tests_per_leaf?.timeout_ms ?? 120_000,
+    },
+    stabilizationBudget: (cfg as unknown as { execution?: { stabilization_budget?: number } })
+      .execution?.stabilization_budget ?? 2,
+    attended: !unattendedSkipPermissions,
+  };
+}
+
+/**
+ * Adapt the buildEffectiveTestPlanView leaf shape into TestRunner suites. Suite
+ * name is `<Type> Tests (<component>)`; empty test-file paths are dropped.
+ */
+export function buildTestSuitesFromLeaves(
+  suites: ReturnType<typeof buildEffectiveTestPlanView>['test_suites'],
+): TestSuite[] {
+  const out: TestSuite[] = [];
+  for (const s of suites) {
+    out.push({
+      id: s.suite_id,
+      name: `${s.test_type.charAt(0).toUpperCase() + s.test_type.slice(1)} Tests (${s.component_id})`,
+      type: s.test_type,
+      testFilePaths: s.test_cases
+        .map(tc => tc.test_file_path ?? '')
+        .filter(p => p.length > 0),
+      validatesTaskIds: [],
+      coversCriteriaIds: s.test_cases.flatMap(tc => tc.acceptance_criterion_ids),
+    });
+  }
+  return out;
+}
+
+/**
+ * Derive the Phase-9 gate severity from real execution state. High-severity =
+ * a terminally-deferred leaf, a rejected wave, a stabilization residual, a
+ * failed global test, or a failed evaluation. Unresolved warnings = a
+ * (possibly-rescued) quarantine or a skipped test. Quarantine count is
+ * deliberately a warning, NOT a flaw (the scheduler never decrements it).
+ */
+export function computeExecutionGateSeverity(
+  scheduleResult: {
+    terminallyDeferredLeafCount: number;
+    rejectedWaveCount: number;
+    stabilizationResidual: unknown;
+    quarantinedLeafCount: number;
+  },
+  testResults: { totalFailed: number; totalSkipped: number },
+  evalResults: { overallPass: boolean },
+): { hasHighSeverityFlaws: boolean; hasUnresolvedWarnings: boolean } {
+  const hasHighSeverityFlaws =
+    scheduleResult.terminallyDeferredLeafCount > 0
+    || scheduleResult.rejectedWaveCount > 0
+    || scheduleResult.stabilizationResidual != null
+    || testResults.totalFailed > 0
+    || !evalResults.overallPass;
+  const hasUnresolvedWarnings =
+    scheduleResult.quarantinedLeafCount > 0
+    || testResults.totalSkipped > 0;
+  return { hasHighSeverityFlaws, hasUnresolvedWarnings };
 }

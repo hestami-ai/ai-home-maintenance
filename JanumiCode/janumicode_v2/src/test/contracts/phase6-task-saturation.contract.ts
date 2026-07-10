@@ -20,8 +20,8 @@ export interface TaskDecompositionNodeArtifact {
   kind: 'task_decomposition_node';
   node_id: string;
   parent_node_id?: string | null;
-  status: DecompositionNodeStatus | string;
-  tier?: DecompositionTierValue | string;
+  status: DecompositionNodeStatus | (string & {});
+  tier?: DecompositionTierValue | (string & {});
   depth?: number;
   pass_number?: number;
   pruning_reason?: string;

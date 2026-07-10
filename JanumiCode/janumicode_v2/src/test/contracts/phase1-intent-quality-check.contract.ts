@@ -18,25 +18,25 @@ import type { ContractSuite } from './types';
 export type IntentQualityFindingStatus = 'present' | 'absent' | 'partial' | 'unclear';
 export type IntentQualityFindingSeverity = 'high' | 'medium' | 'low' | 'blocking' | 'warning';
 export type IntentQualityOverallStatus =
-  | 'pass' | 'block' | 'blocking' | 'requires_input' | 'needs_clarification' | string;
+  | 'pass' | 'block' | 'blocking' | 'requires_input' | 'needs_clarification' | (string & {});
 
 export interface CompletenessFinding {
   field: string;
-  status: IntentQualityFindingStatus | string;
-  severity: IntentQualityFindingSeverity | string;
+  status: IntentQualityFindingStatus | (string & {});
+  severity: IntentQualityFindingSeverity | (string & {});
   explanation: string;
 }
 
 export interface ConsistencyFinding {
   elements_in_conflict: string[];
   explanation: string;
-  severity: IntentQualityFindingSeverity | string;
+  severity: IntentQualityFindingSeverity | (string & {});
 }
 
 export interface CoherenceFinding {
   concern: string;
   explanation: string;
-  severity: IntentQualityFindingSeverity | string;
+  severity: IntentQualityFindingSeverity | (string & {});
 }
 
 export interface IntentQualityCheckArtifact {

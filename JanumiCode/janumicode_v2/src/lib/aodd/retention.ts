@@ -57,6 +57,49 @@ interface DiscoveredRun {
   hasKeep: boolean;
 }
 
+/** Parse an ISO-8601 timestamp to ms-since-epoch, or null when absent/invalid. */
+function parseEpoch(value: string | undefined): number | null {
+  if (!value) return null;
+  const parsed = Date.parse(value);
+  return Number.isFinite(parsed) ? parsed : null;
+}
+
+/**
+ * Read `started_at` / `completed_at` from a run's `aodd/index.json`.
+ * `startedMs` is 0 (caller falls back to dir mtime) and `completedMs` is
+ * null whenever the file is missing, unreadable, unparseable, or lacks a
+ * valid value for the field.
+ */
+function parseIndexTimestamps(idxPath: string): {
+  startedMs: number;
+  completedMs: number | null;
+} {
+  if (!fs.existsSync(idxPath)) return { startedMs: 0, completedMs: null };
+  try {
+    const idx = JSON.parse(fs.readFileSync(idxPath, 'utf8')) as {
+      started_at?: string;
+      completed_at?: string;
+    };
+    return {
+      startedMs: parseEpoch(idx.started_at) ?? 0,
+      completedMs: parseEpoch(idx.completed_at),
+    };
+  } catch {
+    // fall through to mtime
+    return { startedMs: 0, completedMs: null };
+  }
+}
+
+/** `aodd/` directory mtime in ms, or 0 when the dir can't be stat'd. */
+function aoddMtimeMs(aoddPath: string): number {
+  try {
+    return fs.statSync(aoddPath).mtime.getTime();
+  } catch {
+    // leave as 0
+    return 0;
+  }
+}
+
 function discoverRuns(workspaceRoot: string): DiscoveredRun[] {
   const runsRoot = path.join(workspaceRoot, '.janumicode', 'runs');
   if (!fs.existsSync(runsRoot)) return [];
@@ -64,38 +107,25 @@ function discoverRuns(workspaceRoot: string): DiscoveredRun[] {
   for (const entry of fs.readdirSync(runsRoot)) {
     const aoddPath = path.join(runsRoot, entry, 'aodd');
     if (!fs.existsSync(aoddPath)) continue;
-    let startedMs = 0;
-    let completedMs: number | null = null;
-    const idxPath = path.join(aoddPath, 'index.json');
-    if (fs.existsSync(idxPath)) {
-      try {
-        const idx = JSON.parse(fs.readFileSync(idxPath, 'utf8')) as {
-          started_at?: string;
-          completed_at?: string;
-        };
-        if (idx.started_at) {
-          const parsed = Date.parse(idx.started_at);
-          if (Number.isFinite(parsed)) startedMs = parsed;
-        }
-        if (idx.completed_at) {
-          const parsed = Date.parse(idx.completed_at);
-          if (Number.isFinite(parsed)) completedMs = parsed;
-        }
-      } catch {
-        // fall through to mtime
-      }
-    }
-    if (startedMs === 0) {
-      try {
-        startedMs = fs.statSync(aoddPath).mtime.getTime();
-      } catch {
-        // leave as 0
-      }
-    }
+    const { startedMs: indexStartedMs, completedMs } = parseIndexTimestamps(
+      path.join(aoddPath, 'index.json'),
+    );
+    const startedMs =
+      indexStartedMs === 0 ? aoddMtimeMs(aoddPath) : indexStartedMs;
     const hasKeep = fs.existsSync(path.join(aoddPath, '.keep'));
-    out.push({ runId: entry, aoddPath, sortKey: startedMs, completedAt: completedMs, hasKeep });
+    out.push({
+      runId: entry,
+      aoddPath,
+      sortKey: startedMs,
+      completedAt: completedMs,
+      hasKeep,
+    });
   }
   return out;
+}
+
+function describeError(err: unknown): string {
+  return err instanceof Error ? err.message : String(err);
 }
 
 /**
@@ -153,7 +183,7 @@ export function pruneAoddRuns(
     } catch (err) {
       process.stderr.write(
         `[aodd] WARN: failed to prune ${r.aoddPath}: ` +
-          `${err instanceof Error ? err.message : String(err)}\n`,
+          `${describeError(err)}\n`,
       );
     }
   }

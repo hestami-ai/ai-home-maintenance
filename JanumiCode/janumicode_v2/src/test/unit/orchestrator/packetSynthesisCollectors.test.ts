@@ -39,6 +39,7 @@ import {
   collectUserStories,
   collectNfrs,
   collectComplianceItems,
+  collectCrossCuttingConstraints,
   collectEvaluationCriteria,
   collectTestSuites,
 } from '../../../lib/orchestrator/phases/packetSynthesis';
@@ -98,6 +99,64 @@ describe('collectUserStories', () => {
   it('skips records with wrong kind (defensive against shape drift)', () => {
     const rec = artifactRec('fr_bloom_skeleton', { kind: 'something_else', user_stories: [{ id: 'US-001' }] });
     expect(collectUserStories([rec])).toEqual([]);
+  });
+
+  // ── FR-rooted atomic saturation-leaf path (requirement_decomposition_node) ──
+  // Characterization: leaves carry a `user_story` under the leaf's own id and
+  // are the anchors for composite AC ids; selection is latest-per-node
+  // (supersession-aware) and gated on kind/root_kind/status.
+  const leafNode = (
+    id: string,
+    nodeId: string,
+    producedAt: string,
+    story: Record<string, unknown>,
+    extra: Record<string, unknown> = {},
+  ): GovernedStreamRecord => ({
+    id,
+    record_type: 'requirement_decomposition_node',
+    is_current_version: 1,
+    produced_at: producedAt,
+    content: {
+      kind: 'requirement_decomposition_node',
+      root_kind: 'fr',
+      status: 'atomic',
+      node_id: nodeId,
+      user_story: story,
+      ...extra,
+    },
+  } as unknown as GovernedStreamRecord);
+
+  it('collects an FR-rooted atomic leaf user_story, latest-per-node (supersession-aware)', () => {
+    const older = leafNode('r-old', 'N-1', '2026-01-01T00:00:00.000Z', { id: 'US-004-AUTH-D1', action: 'old' });
+    const newer = leafNode('r-new', 'N-1', '2026-02-01T00:00:00.000Z', { id: 'US-004-AUTH-D1', action: 'new' });
+    const got = collectUserStories([older, newer]);
+    expect(got).toHaveLength(1);
+    expect(got[0].id).toBe('US-004-AUTH-D1');
+    expect(got[0].action).toBe('new'); // later produced_at wins
+  });
+
+  it('includes a leaf with no root_kind (treated as FR)', () => {
+    const leaf = leafNode('r1', 'N-4', '2026-01-01T00:00:00.000Z', { id: 'US-NR-1' });
+    // remove root_kind to exercise the `!c.root_kind` branch
+    delete (leaf.content as Record<string, unknown>).root_kind;
+    expect(collectUserStories([leaf]).map((s) => s.id)).toEqual(['US-NR-1']);
+  });
+
+  it('excludes non-FR-rooted or non-atomic leaves', () => {
+    const nonFr = leafNode('r2', 'N-2', '2026-01-01T00:00:00.000Z', { id: 'X-1' }, { root_kind: 'nfr' });
+    const nonAtomic = leafNode('r3', 'N-3', '2026-01-01T00:00:00.000Z', { id: 'X-2' }, { status: 'decomposed' });
+    expect(collectUserStories([nonFr, nonAtomic])).toEqual([]);
+  });
+
+  it('roots take precedence over a same-id leaf (roots inserted first)', () => {
+    const root = artifactRec('fr_bloom_skeleton', {
+      kind: 'functional_requirements',
+      user_stories: [{ id: 'US-001', action: 'root' }],
+    });
+    const leaf = leafNode('r-leaf', 'N-9', '2026-03-01T00:00:00.000Z', { id: 'US-001', action: 'leaf' });
+    const got = collectUserStories([root, leaf]);
+    expect(got).toHaveLength(1);
+    expect(got[0].action).toBe('root'); // first-wins: root kept, leaf skipped
   });
 });
 
@@ -193,6 +252,74 @@ describe('collectComplianceItems', () => {
     expect(got.size).toBe(1);
     expect(got.get('VV-REDIRECT-LATENCY')?.kind).toBe('vv_requirement');
   });
+
+  it('collects integrations_qa_bloom qualityAttributes as synthetic QA-N ids', () => {
+    const rec = artifactRec('integrations_qa_bloom', {
+      kind: 'quality_attributes',
+      qualityAttributes: ['Low latency redirects', 'High availability'],
+    });
+    const got = collectComplianceItems([rec]);
+    expect(got.size).toBe(2);
+    expect(got.get('QA-1')).toMatchObject({ kind: 'quality_attribute', description: 'Low latency redirects' });
+    expect(got.get('QA-2')?.description).toBe('High availability');
+  });
+
+  it('prefers item.text over item.target for the description', () => {
+    const rec = artifactRec('compliance_retention_discovery', {
+      kind: 'compliance_retention_discovery',
+      complianceExtractedItems: [
+        { id: 'COMP-1', text: 'from text', target: 'from target' },
+        { id: 'COMP-2', target: 'target only' },
+      ],
+    });
+    const got = collectComplianceItems([rec]);
+    expect(got.get('COMP-1')?.description).toBe('from text');
+    expect(got.get('COMP-2')?.description).toBe('target only');
+  });
+});
+
+// ── Cross-cutting constraints collector (Lever 1a) ───────────────────
+
+describe('collectCrossCuttingConstraints', () => {
+  it('collects concerns from a current cross_cutting_constraints artifact (id fallback + non-string filtering)', () => {
+    const rec = artifactRec('cross_cutting_bloom', {
+      kind: 'cross_cutting_constraints',
+      concerns: [
+        { id: 'CC-LOG', name: 'Logging', responsibilities: ['structured logs', 42], applies_to_components: ['comp-a', 'comp-b'] },
+        { id: 'CC-SEC' }, // minimal — name falls back to id, arrays default to []
+      ],
+    });
+    const got = collectCrossCuttingConstraints([rec]);
+    expect(got).toHaveLength(2);
+    expect(got[0]).toEqual({
+      id: 'CC-LOG',
+      name: 'Logging',
+      responsibilities: ['structured logs'], // non-string 42 filtered out
+      applies_to_components: ['comp-a', 'comp-b'],
+    });
+    expect(got[1]).toEqual({ id: 'CC-SEC', name: 'CC-SEC', responsibilities: [], applies_to_components: [] });
+  });
+
+  it('skips records that are not the current version', () => {
+    const rec = artifactRec('cross_cutting_bloom', {
+      kind: 'cross_cutting_constraints',
+      concerns: [{ id: 'CC-X' }],
+    });
+    (rec as unknown as { is_current_version: number }).is_current_version = 0;
+    expect(collectCrossCuttingConstraints([rec])).toEqual([]);
+  });
+
+  it('skips concerns without a string id', () => {
+    const rec = artifactRec('cross_cutting_bloom', {
+      kind: 'cross_cutting_constraints',
+      concerns: [{ name: 'no id here' }, { id: 42 }],
+    });
+    expect(collectCrossCuttingConstraints([rec])).toEqual([]);
+  });
+
+  it('returns [] when no cross_cutting_constraints artifact present', () => {
+    expect(collectCrossCuttingConstraints([])).toEqual([]);
+  });
 });
 
 // ── Evaluation criteria collector ────────────────────────────────
@@ -277,6 +404,70 @@ describe('collectEvaluationCriteria', () => {
       target_id: 'RS-001',
       success_condition: 'System rejects with HTTP 400 and logs a warning',
     });
+  });
+
+  it('CHARACTERIZATION: drops evaluation_thresholds scenarios lacking a string id, and defaults missing description/pass_criteria to ""', () => {
+    // Pins the per-scenario mapping branches: a scenario with no (or
+    // non-string) `id` is skipped entirely; a kept scenario with missing
+    // `description` / `pass_criteria` yields empty-string method/condition.
+    const rec = artifactRec('evaluation_thresholds', {
+      kind: 'reasoning_evaluation_plan',
+      scenarios: [
+        { description: 'no id here', pass_criteria: 'ignored' }, // dropped: no id
+        { id: 123, description: 'numeric id', pass_criteria: 'ignored' }, // dropped: non-string id
+        { id: 'RS-002' }, // kept: missing description/pass_criteria default to ''
+      ],
+    });
+    const got = collectEvaluationCriteria([rec]);
+    expect(got).toHaveLength(1);
+    expect(got[0]).toEqual({
+      kind: 'reasoning',
+      target_id: 'RS-002',
+      evaluation_method: '',
+      success_condition: '',
+    });
+  });
+
+  it('CHARACTERIZATION: ignores an evaluation_thresholds record whose scenarios is not an array', () => {
+    const rec = artifactRec('evaluation_thresholds', {
+      kind: 'reasoning_evaluation_plan',
+      scenarios: { id: 'RS-003' }, // not an array
+    });
+    expect(collectEvaluationCriteria([rec])).toEqual([]);
+  });
+
+  it('attaches a VALID property_spec on a quality criterion (Phase 8 generative property)', () => {
+    const rec = artifactRec('evaluation_metrics', {
+      kind: 'quality_evaluation_plan',
+      criteria: [
+        {
+          nfr_id: 'NFR-010',
+          measurement_method: 'property-based test',
+          threshold: 'holds for all inputs',
+          property_spec: { invariant: 'output is idempotent', input_domain: 'all valid urls' },
+        },
+      ],
+    });
+    const got = collectEvaluationCriteria([rec]);
+    expect(got).toHaveLength(1);
+    expect(got[0].property_spec).toMatchObject({ invariant: 'output is idempotent', input_domain: 'all valid urls' });
+  });
+
+  it('DROPS a malformed property_spec (missing input_domain) — no rule-less property reaches the executor', () => {
+    const rec = artifactRec('evaluation_metrics', {
+      kind: 'quality_evaluation_plan',
+      criteria: [
+        {
+          nfr_id: 'NFR-011',
+          measurement_method: 'x',
+          threshold: 'y',
+          property_spec: { invariant: 'only invariant, no domain' },
+        },
+      ],
+    });
+    const got = collectEvaluationCriteria([rec]);
+    expect(got).toHaveLength(1);
+    expect(got[0].property_spec).toBeUndefined();
   });
 
   it('returns [] when no evaluation artifacts present', () => {

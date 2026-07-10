@@ -68,31 +68,30 @@ function categorizeAssumption(text: string): MirrorItemCategory {
   return 'constraint';
 }
 
-/**
- * Assemble the ordered Mirror items:
- *   1. A single `lens` row summarizing the classifier's framing.
- *   2. Any cross-cutting scope / compliance boundaries (if non-empty).
- *   3. Assumptions that appear in ≥ 2 candidates (cross-cutting).
- * Leaves candidate-specific assumptions off the Mirror — those live on the
- * candidate cards in the Menu section.
- */
-export function buildInterpretationMirror(
-  inputs: InterpretationMirrorInputs,
-): MirrorItem[] {
-  const items: MirrorItem[] = [];
+/** One distinct assumption text and the candidates it appeared in. */
+interface AssumptionOccurrence {
+  text: string;
+  basis?: string;
+  count: number;
+  candidateIds: string[];
+}
 
-  // 1. Lens assumption — always first, always present.
+/** Build the always-present lens framing row (the first Mirror item). */
+function buildLensItem(inputs: InterpretationMirrorInputs): MirrorItem {
   const lensText = inputs.classifiedLens === inputs.activeLens
     ? `I'm interpreting this as a **${inputs.classifiedLens}** intent.`
     : `I classified this as a **${inputs.classifiedLens}** intent; templates for that lens haven't shipped yet, so I'm using the **${inputs.activeLens}** lens downstream.`;
-  items.push({
+  return {
     id: 'lens-assumption',
     text: lensText,
     rationale: inputs.lensRationale,
     category: 'lens',
-  });
+  };
+}
 
-  // 2. Scope + compliance framing, when non-trivial.
+/** Scope + compliance framing rows, emitted only when non-trivial. */
+function buildScopeComplianceItems(inputs: InterpretationMirrorInputs): MirrorItem[] {
+  const items: MirrorItem[] = [];
   if (inputs.scopeSummary && inputs.scopeSummary.trim().length > 0) {
     items.push({
       id: 'scope-framing',
@@ -108,33 +107,63 @@ export function buildInterpretationMirror(
       category: 'constraint',
     });
   }
+  return items;
+}
 
-  // 3. Cross-cutting assumptions — text shared by ≥ 2 candidates.
-  const occurrences = new Map<string, { text: string; basis?: string; count: number; candidateIds: string[] }>();
-  for (const candidate of inputs.candidates) {
+/**
+ * Fold a single assumption entry into the running occurrence map, de-duplicating
+ * against `seenInThisCandidate` so a statement repeated within one candidate is
+ * counted once for that candidate.
+ */
+function recordAssumption(
+  occurrences: Map<string, AssumptionOccurrence>,
+  seenInThisCandidate: Set<string>,
+  entry: string | { statement?: string; inference?: string; assumption?: string; basis?: string },
+  candidateId: string,
+): void {
+  const text = assumptionText(entry).trim();
+  if (!text) return;
+  const key = text.toLowerCase();
+  if (seenInThisCandidate.has(key)) return;
+  seenInThisCandidate.add(key);
+  const existing = occurrences.get(key);
+  if (existing) {
+    existing.count += 1;
+    existing.candidateIds.push(candidateId);
+    if (!existing.basis) existing.basis = assumptionBasis(entry);
+  } else {
+    occurrences.set(key, {
+      text,
+      basis: assumptionBasis(entry),
+      count: 1,
+      candidateIds: [candidateId],
+    });
+  }
+}
+
+/**
+ * Tally each distinct assumption text across candidates, de-duplicating within
+ * a single candidate so a repeated statement counts once per candidate. Map
+ * insertion order is preserved so downstream numbering stays stable.
+ */
+function collectAssumptionOccurrences(
+  candidates: InterpretationMirrorInputs['candidates'],
+): Map<string, AssumptionOccurrence> {
+  const occurrences = new Map<string, AssumptionOccurrence>();
+  for (const candidate of candidates) {
     const seenInThisCandidate = new Set<string>();
     for (const entry of candidate.assumptions) {
-      const text = assumptionText(entry).trim();
-      if (!text) continue;
-      const key = text.toLowerCase();
-      if (seenInThisCandidate.has(key)) continue;
-      seenInThisCandidate.add(key);
-      const existing = occurrences.get(key);
-      if (existing) {
-        existing.count += 1;
-        existing.candidateIds.push(candidate.id);
-        if (!existing.basis) existing.basis = assumptionBasis(entry);
-      } else {
-        occurrences.set(key, {
-          text,
-          basis: assumptionBasis(entry),
-          count: 1,
-          candidateIds: [candidate.id],
-        });
-      }
+      recordAssumption(occurrences, seenInThisCandidate, entry, candidate.id);
     }
   }
+  return occurrences;
+}
 
+/** Emit a Mirror row for each assumption shared by ≥ 2 candidates. */
+function buildSharedAssumptionItems(
+  occurrences: Map<string, AssumptionOccurrence>,
+): MirrorItem[] {
+  const items: MirrorItem[] = [];
   let crossCuttingIndex = 0;
   for (const entry of occurrences.values()) {
     if (entry.count < 2) continue;
@@ -148,6 +177,28 @@ export function buildInterpretationMirror(
       category: categorizeAssumption(entry.text),
     });
   }
+  return items;
+}
+
+/**
+ * Assemble the ordered Mirror items:
+ *   1. A single `lens` row summarizing the classifier's framing.
+ *   2. Any cross-cutting scope / compliance boundaries (if non-empty).
+ *   3. Assumptions that appear in ≥ 2 candidates (cross-cutting).
+ * Leaves candidate-specific assumptions off the Mirror — those live on the
+ * candidate cards in the Menu section.
+ */
+export function buildInterpretationMirror(
+  inputs: InterpretationMirrorInputs,
+): MirrorItem[] {
+  // Assembled in order: (1) lens assumption — always first, always present;
+  // (2) scope + compliance framing, when non-trivial; (3) cross-cutting
+  // assumptions — text shared by ≥ 2 candidates.
+  const items: MirrorItem[] = [
+    buildLensItem(inputs),
+    ...buildScopeComplianceItems(inputs),
+    ...buildSharedAssumptionItems(collectAssumptionOccurrences(inputs.candidates)),
+  ];
 
   return items;
 }

@@ -7,8 +7,8 @@
  */
 
 import { CLIInvoker, type CLIInvocationResult } from '../cli/cliInvoker';
-import { selectExecutorAdapter } from '../cli/session/capabilityRegistry';
-import type { ExecutorTaskOutcome } from '../cli/session/adapter';
+import { selectExecutorAdapter, type ExecutorAdapterSelection } from '../cli/session/capabilityRegistry';
+import type { ExecutorAdapter, ExecutorTaskOutcome } from '../cli/session/adapter';
 import type { ExecutorEscalation, ResponderInput, SessionResponder } from '../cli/session/responder';
 import { type OutputParser } from '../cli/outputParser';
 import { LLMCaller, type LLMCallOptions, type LLMCallResult } from '../llm/llmCaller';
@@ -155,6 +155,24 @@ export interface AgentInvocationResult {
   llmResult?: LLMCallResult;
   /** Error message if failed */
   error?: string;
+}
+
+/**
+ * Mutable per-invocation stream counters shared between the interactive
+ * session's onLog callback and the one-shot path's onStdout/onStderr callbacks
+ * (only one path runs per invocation). Passed by reference so the chunk writer
+ * can advance them; not read after the invocation's execution branch settles.
+ */
+interface CliStreamState {
+  chunkSequence: number;
+  cumulativeChars: number;
+}
+
+/** Shape returned by the interactive/one-shot execution branches of invokeCLI. */
+interface CliExecutionResult {
+  result: CLIInvocationResult;
+  finalText: string;
+  reasoningText: string;
 }
 
 // ── AgentInvoker ────────────────────────────────────────────────────
@@ -368,8 +386,6 @@ export class AgentInvoker {
     // what the agent role was.
     const invocationRecordId = this.writeCLIInvocationRecord(options, command, args);
     const startedAt = Date.now();
-    let chunkSequence = 0;
-    let cumulativeChars = 0;
     // Publish the active invocation_id into TraceCtx so any AODD event
     // fired during this CLI invocation (log.*, record.*, etc.) carries
     // it in the envelope. Cleared in the finally below.
@@ -387,31 +403,7 @@ export class AgentInvoker {
     // reasoning. Lets `tail -f .janumicode/live/<id>.log` show live CLI
     // progress without waiting on DB commits.
     const ctx = options.traceContext;
-    const filenamePrefix = buildLogFilenamePrefix(
-      ctx?.phaseId ?? null,
-      ctx?.subPhaseId ?? null,
-    );
-    const writeRawTokenStream = process.env.JANUMICODE_LLM_LIVE_RAW_STREAM === '1';
-    const logFile = invocationRecordId && this.liveLogDir
-      ? new InvocationLogFile(this.liveLogDir, invocationRecordId, {
-          filenamePrefix,
-          writeRawTokenStream,
-        })
-      : null;
-    if (logFile) {
-      logFile.writeHeader({
-        invocationId: invocationRecordId!,
-        provider: options.backingTool,
-        model: options.model ?? options.backingTool,
-        agentRole: ctx?.agentRole ?? null,
-        phaseId: ctx?.phaseId ?? null,
-        subPhaseId: ctx?.subPhaseId ?? null,
-        label: ctx?.label ?? this.backingToolDisplayName(options.backingTool),
-        prompt: options.prompt,
-        system: options.system ?? null,
-        startedAt: new Date().toISOString(),
-      });
-    }
+    const logFile = this.openCliLiveLog(options, invocationRecordId);
 
     // Emit llm:started so the ActivityStrip / live monitor sees the CLI
     // invocation the same way it sees direct LLM calls. Mirrors
@@ -429,180 +421,39 @@ export class AgentInvoker {
     // For Phase-9 executor tasks the DEFAULT is the highest interactive tier
     // the CLI supports — the mandatory filesystem research→plan→implement step
     // is TUI-resident (phases 1–8 are FS-blind). The structured one-shot path
-    // (below) is the fallback when the CLI has no interactive adapter or the
-    // PTY substrate (node-pty) is unavailable. Live chunks from the session are
+    // is the fallback when the CLI has no interactive adapter or the PTY
+    // substrate (node-pty) is unavailable. Live chunks from the session are
     // forwarded into the same output-chunk + live-log plumbing.
     // A human is in the loop iff this is NOT an unattended (calibration/CI) run.
-    // Governs the mimo `question` policy + agent-prompt framing + the escalation
-    // sink, all consistent with the mode-aware execution-mode directive. The
-    // escalation sink is passed ONLY when attended AND registered, so a headless
-    // run can never surface a human prompt (it self-resolves instead).
+    const streamState: CliStreamState = { chunkSequence: 0, cumulativeChars: 0 };
     const attended = !options.unattendedSkipPermissions;
-    const interactiveSel = options.agentRole === 'executor_agent'
-      ? selectExecutorAdapter(options.backingTool, {
-          cwd: options.cwd,
-          env: options.env,
-          responder: this.buildSessionResponder(options),
-          attended,
-          onEscalate: attended ? (this.executorEscalationSink ?? undefined) : undefined,
-          onLog: (e) => {
-            if (e.kind !== 'data') return;
-            cumulativeChars += e.chunk.length;
-            logFile?.writeChunk({ channel: 'stdout', msSinceStart: Date.now() - startedAt, cumulativeChars, text: e.chunk });
-            this.writeCLIOutputChunk(invocationRecordId, options, 'stdout', e.chunk, chunkSequence++);
-          },
-        })
-      : { adapter: null, fallbackReason: 'no_interactive_adapter' as const };
-    if (interactiveSel.adapter) {
-      getLogger().info('workflow', 'executor: routing through interactive TUI session adapter', {
-        backing_tool: options.backingTool,
-      });
-    } else if (options.agentRole === 'executor_agent' && interactiveSel.fallbackReason === 'pty_unavailable') {
-      getLogger().warn('workflow', 'executor: node-pty unavailable — falling back to one-shot structured executor (run `npm install node-pty` for interactive research→plan→implement)', {
-        backing_tool: options.backingTool,
-      });
-    }
+    const interactiveSel = this.selectExecutorInteractiveAdapter(options, {
+      logFile,
+      invocationRecordId,
+      startedAt,
+      attended,
+      streamState,
+    });
+    this.logInteractiveSelection(options, interactiveSel);
 
     try {
-      let result: CLIInvocationResult;
-      let finalText: string;
-      let reasoningText = '';
-
-      if (interactiveSel.adapter) {
-        // Tier-2/3 interactive session (PTY). The adapter spawns + drives the
-        // CLI's own plan/research mode and returns the settled outcome.
-        const outcome = await interactiveSel.adapter.run({
-          command,
-          args,
-          cwd: options.cwd,
-          prompt: options.prompt,
-          // Write the task spec at the PROJECT ROOT (the agent's own cwd).
-          // Weak interactive models anchor their writes on the spec file's
-          // directory rather than the PTY cwd (slice-149: gemma created
-          // `<specDir>/implementations/...`). Putting the spec at the project
-          // root keeps the agent's anchored writes INSIDE the sandbox and
-          // aligned with where the gates expect the dependency manifest — and
-          // never under `.janumicode` (control plane or otherwise).
-          taskSpecDir: options.cwd,
-          env: options.env,
-          timeoutSeconds: this.cliConfig.timeoutSeconds,
-          idleTimeoutSeconds: this.cliConfig.idleTimeoutSeconds,
-        });
-        result = adaptOutcomeToCliResult(outcome);
-        finalText = outcome.finalText || (result.stdoutText ?? '');
-      } else {
-        result = await this.cliInvoker.invoke({
-          command,
-          args,
-          stdinContent: options.prompt,
-          cwd: options.cwd,
-          env: options.env,
-          timeoutSeconds: this.cliConfig.timeoutSeconds,
-          idleTimeoutSeconds: this.cliConfig.idleTimeoutSeconds,
-          noContentTimeoutSeconds: this.cliConfig.noContentTimeoutSeconds,
-          bufferMaxEvents: this.cliConfig.bufferMaxEvents,
-          outputParser: parser,
-          onStdoutChunk: (text) => {
-            cumulativeChars += text.length;
-            logFile?.writeChunk({
-              channel: 'stdout',
-              msSinceStart: Date.now() - startedAt,
-              cumulativeChars,
-              text,
-            });
-            this.writeCLIOutputChunk(invocationRecordId, options, 'stdout', text, chunkSequence++);
-          },
-          onStderrChunk: (text) => {
-            cumulativeChars += text.length;
-            logFile?.writeChunk({
-              channel: 'stderr',
-              msSinceStart: Date.now() - startedAt,
-              cumulativeChars,
-              text,
-            });
-            this.writeCLIOutputChunk(invocationRecordId, options, 'stderr', text, chunkSequence++);
-          },
-        });
-
-        // Best-effort extraction of final text + reasoning from the parsed
-        // event stream — parity with the LLM agent_output shape (text +
-        // thinking). Imported lazily to avoid a circular module reference
-        // (orchestratorEngine imports agentInvoker).
-        finalText = result.stdoutText ?? '';
-        try {
-          const { extractFinalText, extractReasoningText } = await import('./orchestratorEngine.js');
-          finalText = extractFinalText(result.events) || (result.stdoutText ?? '');
-          reasoningText = extractReasoningText(result.events) ?? '';
-        } catch {
-          /* fall back to raw stdoutText */
-        }
-      }
-
-      const errorMessage = this.resolveCLIError(result);
-      const success = result.exitCode === 0 && !result.timedOut && !result.idledOut;
-
-      const { agentOutputId } = this.writeCLIOutputRecord(
-        invocationRecordId,
-        options,
-        result,
-        Date.now() - startedAt,
-        success ? null : errorMessage ?? 'CLI invocation failed',
-        finalText,
-        reasoningText,
-      );
+      const executed = interactiveSel.adapter
+        ? await this.runInteractiveExecutor(interactiveSel.adapter, command, args, options)
+        : await this.runOneShotCli(parser, command, args, options, { logFile, invocationRecordId, startedAt, streamState });
 
       // (Invocation-completion is emitted at the executorAgent layer as
       // agent.invocation_completed. Earlier this layer fired the same
       // status change as a duplicate lifecycle event; with the legacy
       // lifecycle stream retired, only the upstream pair remains.)
-
-      logFile?.writeFinal({
-        status: success ? 'success' : 'error',
-        text: finalText,
-        thinking: reasoningText || null,
-        inputTokens: null,
-        outputTokens: null,
-        durationMs: Date.now() - startedAt,
-        retryAttempts: 0,
-        errorMessage: success ? undefined : errorMessage ?? 'CLI invocation failed',
-      });
-
-      // Fire the reasoning-review hook on successful CLI completions so
-      // Phase 9 executor calls (Goose, Claude Code) get the same advisory
-      // review coverage as direct LLM calls. We construct a minimal
-      // LLMCallResult-shaped envelope from the CLI invocation; tool-call
-      // events and stderr are intentionally omitted from the prompt the
-      // reviewer sees — per cal-24 design, tool-call output bloats the
-      // review prompt without surfacing reasoning flaws the reviewer can
-      // act on. `text` is the synthesized final response (best-effort
-      // extraction); `thinking` is left empty until per-CLI-tool reasoning
-      // extractors are wired (a separate task).
-      if (success && agentOutputId && options.traceContext) {
-        const reviewResult = {
-          text: finalText,
-          parsed: null,
-          thinking: reasoningText || undefined,
-          toolCalls: [],
-          provider: options.backingTool,
-          model: options.model ?? options.backingTool,
-          inputTokens: null,
-          outputTokens: null,
-          usedFallback: false,
-          retryAttempts: 0,
-        };
-        await this.llmCaller.runReviewerHook(
-          invocationRecordId,
-          agentOutputId,
-          { traceContext: options.traceContext, prompt: options.prompt },
-          reviewResult,
-        );
-      }
-
-      return {
-        success,
-        cliResult: result,
-        error: errorMessage,
-      };
+      return await this.finalizeCliInvocation(
+        invocationRecordId,
+        options,
+        executed.result,
+        startedAt,
+        logFile,
+        executed.finalText,
+        executed.reasoningText,
+      );
     } catch (err) {
       const msg = err instanceof Error ? err.message : String(err);
       this.writeCLIOutputRecord(invocationRecordId, options, null, Date.now() - startedAt, msg, '', '');
@@ -633,6 +484,293 @@ export class AgentInvoker {
         subPhaseId: ctx?.subPhaseId ?? null,
       });
     }
+  }
+
+  /**
+   * Open the per-invocation live log and write its header. Returns null when
+   * there's no invocation id or no configured live-log dir (instrumentation
+   * silently disabled). Extracted from invokeCLI to keep its complexity down.
+   */
+  private openCliLiveLog(
+    options: AgentInvocationOptions,
+    invocationRecordId: string | null,
+  ): InvocationLogFile | null {
+    const ctx = options.traceContext;
+    const filenamePrefix = buildLogFilenamePrefix(
+      ctx?.phaseId ?? null,
+      ctx?.subPhaseId ?? null,
+    );
+    const writeRawTokenStream = process.env.JANUMICODE_LLM_LIVE_RAW_STREAM === '1';
+    const logFile = invocationRecordId && this.liveLogDir
+      ? new InvocationLogFile(this.liveLogDir, invocationRecordId, {
+          filenamePrefix,
+          writeRawTokenStream,
+        })
+      : null;
+    if (logFile) {
+      logFile.writeHeader({
+        invocationId: invocationRecordId!,
+        provider: options.backingTool,
+        model: options.model ?? options.backingTool,
+        agentRole: ctx?.agentRole ?? null,
+        phaseId: ctx?.phaseId ?? null,
+        subPhaseId: ctx?.subPhaseId ?? null,
+        label: ctx?.label ?? this.backingToolDisplayName(options.backingTool),
+        prompt: options.prompt,
+        system: options.system ?? null,
+        startedAt: new Date().toISOString(),
+      });
+    }
+    return logFile;
+  }
+
+  /**
+   * Select the interactive executor adapter for a Phase-9 executor task, or
+   * `{ adapter: null }` for any other role. The onLog closure forwards live
+   * PTY/session chunks into the same live-log + output-chunk plumbing the
+   * one-shot path uses (advancing the shared stream counters). The escalation
+   * sink is passed ONLY when attended AND registered, so a headless run can
+   * never surface a human prompt (it self-resolves instead); it governs the
+   * mimo `question` policy + agent-prompt framing per the execution-mode
+   * directive.
+   */
+  private selectExecutorInteractiveAdapter(
+    options: AgentInvocationOptions,
+    deps: {
+      logFile: InvocationLogFile | null;
+      invocationRecordId: string | null;
+      startedAt: number;
+      attended: boolean;
+      streamState: CliStreamState;
+    },
+  ): ExecutorAdapterSelection {
+    if (options.agentRole !== 'executor_agent') {
+      return { adapter: null, fallbackReason: 'no_interactive_adapter' };
+    }
+    const { logFile, invocationRecordId, startedAt, attended, streamState } = deps;
+    return selectExecutorAdapter(options.backingTool, {
+      cwd: options.cwd,
+      env: options.env,
+      responder: this.buildSessionResponder(options),
+      attended,
+      onEscalate: attended ? (this.executorEscalationSink ?? undefined) : undefined,
+      onLog: (e) => {
+        if (e.kind !== 'data') return;
+        this.streamCliChunk(streamState, logFile, invocationRecordId, options, 'stdout', e.chunk, startedAt);
+      },
+    });
+  }
+
+  /** Log the executor routing decision (interactive TUI vs one-shot fallback). */
+  private logInteractiveSelection(
+    options: AgentInvocationOptions,
+    interactiveSel: ExecutorAdapterSelection,
+  ): void {
+    if (interactiveSel.adapter) {
+      getLogger().info('workflow', 'executor: routing through interactive TUI session adapter', {
+        backing_tool: options.backingTool,
+      });
+    } else if (options.agentRole === 'executor_agent' && interactiveSel.fallbackReason === 'pty_unavailable') {
+      getLogger().warn('workflow', 'executor: node-pty unavailable — falling back to one-shot structured executor (run `npm install node-pty` for interactive research→plan→implement)', {
+        backing_tool: options.backingTool,
+      });
+    }
+  }
+
+  /**
+   * Write one CLI output chunk to the live log + output-chunk stream, advancing
+   * the shared stream counters. Shared by the interactive session's onLog and
+   * the one-shot path's onStdout/onStderr callbacks so both lanes emit identical
+   * chunk records.
+   */
+  private streamCliChunk(
+    streamState: CliStreamState,
+    logFile: InvocationLogFile | null,
+    invocationRecordId: string | null,
+    options: AgentInvocationOptions,
+    channel: 'stdout' | 'stderr',
+    text: string,
+    startedAt: number,
+  ): void {
+    streamState.cumulativeChars += text.length;
+    logFile?.writeChunk({
+      channel,
+      msSinceStart: Date.now() - startedAt,
+      cumulativeChars: streamState.cumulativeChars,
+      text,
+    });
+    this.writeCLIOutputChunk(invocationRecordId, options, channel, text, streamState.chunkSequence++);
+  }
+
+  /**
+   * Tier-2/3 interactive session (PTY). The adapter spawns + drives the CLI's
+   * own plan/research mode and returns the settled outcome. The session
+   * produces no parsed event stream, so reasoning text is empty.
+   */
+  private async runInteractiveExecutor(
+    adapter: ExecutorAdapter,
+    command: string,
+    args: string[],
+    options: AgentInvocationOptions,
+  ): Promise<CliExecutionResult> {
+    const outcome = await adapter.run({
+      command,
+      args,
+      cwd: options.cwd,
+      prompt: options.prompt,
+      // Write the task spec at the PROJECT ROOT (the agent's own cwd).
+      // Weak interactive models anchor their writes on the spec file's
+      // directory rather than the PTY cwd (slice-149: gemma created
+      // `<specDir>/implementations/...`). Putting the spec at the project
+      // root keeps the agent's anchored writes INSIDE the sandbox and
+      // aligned with where the gates expect the dependency manifest — and
+      // never under `.janumicode` (control plane or otherwise).
+      taskSpecDir: options.cwd,
+      env: options.env,
+      timeoutSeconds: this.cliConfig.timeoutSeconds,
+      idleTimeoutSeconds: this.cliConfig.idleTimeoutSeconds,
+    });
+    const result = adaptOutcomeToCliResult(outcome);
+    const finalText = outcome.finalText || (result.stdoutText ?? '');
+    return { result, finalText, reasoningText: '' };
+  }
+
+  /**
+   * Structured one-shot path (fallback when no interactive adapter / no PTY).
+   * Streams stdout/stderr into the live-log + output-chunk plumbing, then does
+   * a best-effort extraction of final text + reasoning from the parsed event
+   * stream — parity with the LLM agent_output shape (text + thinking). The
+   * extractors are imported lazily to avoid a circular module reference
+   * (orchestratorEngine imports agentInvoker).
+   */
+  private async runOneShotCli(
+    parser: OutputParser,
+    command: string,
+    args: string[],
+    options: AgentInvocationOptions,
+    stream: {
+      logFile: InvocationLogFile | null;
+      invocationRecordId: string | null;
+      startedAt: number;
+      streamState: CliStreamState;
+    },
+  ): Promise<CliExecutionResult> {
+    const { logFile, invocationRecordId, startedAt, streamState } = stream;
+    const result = await this.cliInvoker.invoke({
+      command,
+      args,
+      stdinContent: options.prompt,
+      cwd: options.cwd,
+      env: options.env,
+      timeoutSeconds: this.cliConfig.timeoutSeconds,
+      idleTimeoutSeconds: this.cliConfig.idleTimeoutSeconds,
+      noContentTimeoutSeconds: this.cliConfig.noContentTimeoutSeconds,
+      bufferMaxEvents: this.cliConfig.bufferMaxEvents,
+      outputParser: parser,
+      onStdoutChunk: (text) =>
+        this.streamCliChunk(streamState, logFile, invocationRecordId, options, 'stdout', text, startedAt),
+      onStderrChunk: (text) =>
+        this.streamCliChunk(streamState, logFile, invocationRecordId, options, 'stderr', text, startedAt),
+    });
+
+    let finalText = result.stdoutText ?? '';
+    let reasoningText = '';
+    try {
+      const { extractFinalText, extractReasoningText } = await import('./orchestratorEngine.js');
+      finalText = extractFinalText(result.events) || (result.stdoutText ?? '');
+      reasoningText = extractReasoningText(result.events) ?? '';
+    } catch {
+      /* fall back to raw stdoutText */
+    }
+    return { result, finalText, reasoningText };
+  }
+
+  /**
+   * Write the terminal agent_output record + live-log trailer, then fire the
+   * reasoning-review hook on success. Returns the AgentInvocationResult the
+   * caller propagates.
+   */
+  private async finalizeCliInvocation(
+    invocationRecordId: string | null,
+    options: AgentInvocationOptions,
+    result: CLIInvocationResult,
+    startedAt: number,
+    logFile: InvocationLogFile | null,
+    finalText: string,
+    reasoningText: string,
+  ): Promise<AgentInvocationResult> {
+    const errorMessage = this.resolveCLIError(result);
+    const success = result.exitCode === 0 && !result.timedOut && !result.idledOut;
+    const failureMessage = errorMessage ?? 'CLI invocation failed';
+
+    const { agentOutputId } = this.writeCLIOutputRecord(
+      invocationRecordId,
+      options,
+      result,
+      Date.now() - startedAt,
+      success ? null : failureMessage,
+      finalText,
+      reasoningText,
+    );
+
+    logFile?.writeFinal({
+      status: success ? 'success' : 'error',
+      text: finalText,
+      thinking: reasoningText || null,
+      inputTokens: null,
+      outputTokens: null,
+      durationMs: Date.now() - startedAt,
+      retryAttempts: 0,
+      errorMessage: success ? undefined : failureMessage,
+    });
+
+    await this.maybeFireReviewerHook(success, agentOutputId, options, invocationRecordId, finalText, reasoningText);
+
+    return {
+      success,
+      cliResult: result,
+      error: errorMessage,
+    };
+  }
+
+  /**
+   * Fire the reasoning-review hook on successful CLI completions so Phase 9
+   * executor calls (Goose, Claude Code) get the same advisory review coverage
+   * as direct LLM calls. We construct a minimal LLMCallResult-shaped envelope
+   * from the CLI invocation; tool-call events and stderr are intentionally
+   * omitted from the prompt the reviewer sees — per cal-24 design, tool-call
+   * output bloats the review prompt without surfacing reasoning flaws the
+   * reviewer can act on. `text` is the synthesized final response (best-effort
+   * extraction); `thinking` is left empty until per-CLI-tool reasoning
+   * extractors are wired (a separate task).
+   */
+  private async maybeFireReviewerHook(
+    success: boolean,
+    agentOutputId: string | null,
+    options: AgentInvocationOptions,
+    invocationRecordId: string | null,
+    finalText: string,
+    reasoningText: string,
+  ): Promise<void> {
+    if (!success || !agentOutputId || !options.traceContext) return;
+    const reviewResult = {
+      text: finalText,
+      parsed: null,
+      thinking: reasoningText || undefined,
+      toolCalls: [],
+      provider: options.backingTool,
+      model: options.model ?? options.backingTool,
+      inputTokens: null,
+      outputTokens: null,
+      usedFallback: false,
+      retryAttempts: 0,
+    };
+    await this.llmCaller.runReviewerHook(
+      invocationRecordId,
+      agentOutputId,
+      { traceContext: options.traceContext, prompt: options.prompt },
+      reviewResult,
+    );
   }
 
   // ── Governed-stream instrumentation for CLI invocations ────────────
@@ -912,134 +1050,11 @@ export class AgentInvoker {
    */
   private buildCLICommand(options: AgentInvocationOptions): { command: string; args: string[] } {
     switch (options.backingTool) {
-      case 'claude_code_cli': {
-        const args: string[] = [
-          '-p', '',
-          '--output-format', 'stream-json',
-          '--verbose',
-          '--add-dir', options.cwd,
-        ];
-        // Permission mode resolution, in priority order:
-        //   1. options.unattendedSkipPermissions — per-invocation
-        //      override set by callers that know the call is
-        //      definitionally headless (e.g. Phase 9 executor in
-        //      calibration mode).
-        //   2. JANUMICODE_CLAUDE_SKIP_PERMISSIONS=1 — process-wide
-        //      env override, kept for backward compat.
-        //   3. Default — `acceptEdits`. Auto-approves Edit/Write/
-        //      Patch but Bash and other tool calls still surface
-        //      permission requests to the human / IDE.
-        if (options.unattendedSkipPermissions || process.env.JANUMICODE_CLAUDE_SKIP_PERMISSIONS === '1') {
-          args.push('--dangerously-skip-permissions');
-        } else {
-          args.push('--permission-mode', 'acceptEdits');
-        }
-        const model = options.model ?? process.env.JANUMICODE_CLAUDE_MODEL;
-        if (model) args.push('--model', model);
-        const extra = process.env.JANUMICODE_CLAUDE_EXTRA_ARGS;
-        if (extra) {
-          for (const a of extra.split(/\s+/).filter(Boolean)) args.push(a);
-        }
-        return { command: 'claude', args };
-      }
-      case 'gemini_cli': {
-        // Gemini CLI treats piped stdin as a positional prompt. Passing
-        // `--prompt` AT THE SAME TIME makes it error with
-        //   Cannot use both a positional prompt and the --prompt (-p) flag together
-        // Since `options.prompt` is always piped to stdin by
-        // CLIInvoker, we route the prompt through stdin only. Gemini
-        // auto-detects non-interactive mode when stdin is piped, so
-        // `-p` is not required.
-        //
-        // Env knobs mirror the Claude Code / Goose hooks for symmetry:
-        //   JANUMICODE_GEMINI_MODEL      — `--model <name>` (per-invocation
-        //                                  options.model wins)
-        //   JANUMICODE_GEMINI_YOLO=1     — add `--yolo` to auto-approve
-        //                                  tool calls unattended (Phase 9
-        //                                  executor). Off by default so the
-        //                                  Orchestrator's JSON-only calls
-        //                                  don't need a dangerous flag.
-        //   JANUMICODE_GEMINI_EXTRA_ARGS — verbatim space-delimited flags
-        const args: string[] = [];
-        if (process.env.JANUMICODE_GEMINI_YOLO === '1') args.push('--yolo');
-        const model = options.model ?? process.env.JANUMICODE_GEMINI_MODEL;
-        if (model) args.push('--model', model);
-        const extra = process.env.JANUMICODE_GEMINI_EXTRA_ARGS;
-        if (extra) {
-          for (const a of extra.split(/\s+/).filter(Boolean)) args.push(a);
-        }
-        return { command: 'gemini', args };
-      }
-      case 'goose_cli': {
-        // Goose `run` reads the instruction body from stdin when
-        // `-i -` is passed. Same rationale as Claude Code: realistic
-        // Phase 9 prompts run 20-50KB and would blow past the OS
-        // argv-length cap if we inlined them with `-t <text>`.
-        //
-        // Flags:
-        //   --no-session          — headless runs don't want Goose's
-        //                           session DB polluting the workspace
-        //   --output-format stream-json — line-delimited NDJSON for
-        //                           the OutputParser
-        //   --quiet               — suppress Goose's banner + spinner
-        //                           so only the stream-json lines hit
-        //                           stdout (banner goes to stderr)
-        //   --with-builtin developer — wires file/shell tools so the
-        //                           coding agent can actually write
-        //                           to --add-dir (no equivalent flag
-        //                           in Goose; relies on --working-dir
-        //                           + developer extension's sandbox)
-        //
-        // Env knobs mirror the Claude Code hooks so operators can
-        // steer both agents with the same mental model:
-        //   JANUMICODE_GOOSE_PROVIDER — `--provider <name>` override
-        //   JANUMICODE_GOOSE_MODEL    — `--model <name>` override
-        //                               (per-invocation options.model
-        //                               wins if set)
-        //   JANUMICODE_GOOSE_MAX_TURNS — safety cap on unattended runs
-        //   JANUMICODE_GOOSE_EXTRA_ARGS — space-delimited extras
-        const args: string[] = [
-          'run',
-          '-i', '-',
-          '--no-session',
-          '--quiet',
-          '--output-format', 'stream-json',
-          '--with-builtin', 'developer',
-        ];
-        const provider = process.env.JANUMICODE_GOOSE_PROVIDER;
-        if (provider) args.push('--provider', provider);
-        const model = options.model ?? process.env.JANUMICODE_GOOSE_MODEL;
-        if (model) args.push('--model', model);
-        const maxTurns = process.env.JANUMICODE_GOOSE_MAX_TURNS;
-        if (maxTurns) args.push('--max-turns', maxTurns);
-        const extra = process.env.JANUMICODE_GOOSE_EXTRA_ARGS;
-        if (extra) {
-          for (const a of extra.split(/\s+/).filter(Boolean)) args.push(a);
-        }
-        return { command: 'goose', args };
-      }
-      case 'codex_cli': {
-        // `codex exec --sandbox read-only --json -` runs non-interactively
-        // and reads the prompt from stdin (the `-` sentinel). Ported from
-        // v1 (janumicode/src/lib/cli/providers/codexCli.ts:buildCodexArgs).
-        //   --sandbox read-only  — OS-level read-only enforcement
-        //   --json               — JSONL event output (Responses API shape)
-        //   -                    — consume stdin as prompt
-        // The cliInvoker always pipes `options.prompt` to stdin, so argv
-        // stays small. Critical on Windows where cmd.exe's ~8191-char
-        // ARG_MAX kills invocations that put the whole spec-inlined
-        // prompt on the command line.
-        const codexArgs = ['exec', '--sandbox', 'read-only', '--json'];
-        if (options.model) {
-          codexArgs.push('--model', options.model);
-        }
-        codexArgs.push('-');
-        return {
-          command: 'codex',
-          args: codexArgs,
-        };
-      }
-      case 'mimo_cli': {
+      case 'claude_code_cli': return buildClaudeCodeCommand(options);
+      case 'gemini_cli':      return buildGeminiCommand(options);
+      case 'goose_cli':       return buildGooseCommand(options);
+      case 'codex_cli':       return buildCodexCommand(options);
+      case 'mimo_cli':
         // mimo runs as a Phase-9 executor via the `mimo serve` HTTP/SSE server
         // adapter (MimoServerAdapter), which manages its own server process and
         // ignores this command/args pair (the request's cwd drives session
@@ -1048,11 +1063,147 @@ export class AgentInvoker {
         // adapter is selected, so return a harmless placeholder rather than
         // throwing on the default branch.
         return { command: 'mimo', args: ['serve'] };
-      }
       default:
         throw new Error(`Unknown backing tool: ${options.backingTool}`);
     }
   }
+}
+
+// ── CLI command builders (per backing tool) ─────────────────────────────
+// Extracted from AgentInvoker.buildCLICommand so each tool's arg assembly is a
+// small, independently-testable unit (S3776 cognitive-complexity reduction).
+// None depend on instance state, so they're module-level functions.
+
+/**
+ * Split a shell-safe, space-delimited env string (e.g. JANUMICODE_*_EXTRA_ARGS)
+ * and append each non-empty token to `args`. No-op when `extra` is unset/empty.
+ */
+function appendExtraArgs(args: string[], extra: string | undefined): void {
+  if (!extra) return;
+  for (const a of extra.split(/\s+/).filter(Boolean)) args.push(a);
+}
+
+/**
+ * Claude Code:
+ *   - Prompt is fed via STDIN (CLIInvoker pipes `options.prompt` to stdin).
+ *     `-p ''` selects non-interactive mode WITHOUT supplying the prompt on the
+ *     command line, which would blow the OS arg-length cap (~32KB on Windows)
+ *     on realistic 20-50KB Phase 9 task contexts.
+ *   - `--output-format stream-json` + `--verbose` = line-oriented NDJSON the
+ *     OutputParser can consume (without `--verbose` stream-json aggregates).
+ *   - `--add-dir <cwd>` grants explicit write access to the working tree.
+ *   - Permission mode resolution, in priority order:
+ *       1. options.unattendedSkipPermissions — per-invocation override for
+ *          definitionally-headless callers (Phase 9 executor in calibration).
+ *       2. JANUMICODE_CLAUDE_SKIP_PERMISSIONS=1 — process-wide env override,
+ *          kept for backward compat.
+ *       3. Default — `acceptEdits`: auto-approves Edit/Write/Patch but Bash and
+ *          other tool calls still surface permission requests to the human/IDE.
+ *   - options.model wins over the JANUMICODE_CLAUDE_MODEL process fallback.
+ *   - JANUMICODE_CLAUDE_EXTRA_ARGS appended verbatim.
+ */
+function buildClaudeCodeCommand(options: AgentInvocationOptions): { command: string; args: string[] } {
+  const args: string[] = [
+    '-p', '',
+    '--output-format', 'stream-json',
+    '--verbose',
+    '--add-dir', options.cwd,
+  ];
+  if (options.unattendedSkipPermissions || process.env.JANUMICODE_CLAUDE_SKIP_PERMISSIONS === '1') {
+    args.push('--dangerously-skip-permissions');
+  } else {
+    args.push('--permission-mode', 'acceptEdits');
+  }
+  const model = options.model ?? process.env.JANUMICODE_CLAUDE_MODEL;
+  if (model) args.push('--model', model);
+  appendExtraArgs(args, process.env.JANUMICODE_CLAUDE_EXTRA_ARGS);
+  return { command: 'claude', args };
+}
+
+/**
+ * Gemini CLI treats piped stdin as a positional prompt, so passing `--prompt`
+ * at the same time errors with
+ *   "Cannot use both a positional prompt and the --prompt (-p) flag together".
+ * Since `options.prompt` is always piped to stdin by CLIInvoker, we route the
+ * prompt through stdin only (Gemini auto-detects non-interactive mode when
+ * stdin is piped, so `-p` is not required).
+ *
+ * Env knobs mirror the Claude Code / Goose hooks for symmetry:
+ *   JANUMICODE_GEMINI_YOLO=1     — add `--yolo` to auto-approve tool calls
+ *                                  unattended (Phase 9 executor). Off by
+ *                                  default so JSON-only Orchestrator calls
+ *                                  don't need a dangerous flag.
+ *   JANUMICODE_GEMINI_MODEL      — `--model <name>` (per-invocation
+ *                                  options.model wins).
+ *   JANUMICODE_GEMINI_EXTRA_ARGS — verbatim space-delimited flags.
+ */
+function buildGeminiCommand(options: AgentInvocationOptions): { command: string; args: string[] } {
+  const args: string[] = [];
+  if (process.env.JANUMICODE_GEMINI_YOLO === '1') args.push('--yolo');
+  const model = options.model ?? process.env.JANUMICODE_GEMINI_MODEL;
+  if (model) args.push('--model', model);
+  appendExtraArgs(args, process.env.JANUMICODE_GEMINI_EXTRA_ARGS);
+  return { command: 'gemini', args };
+}
+
+/**
+ * Goose `run` reads the instruction body from stdin when `-i -` is passed (same
+ * argv-length rationale as Claude Code). Flags:
+ *   --no-session                — headless runs keep Goose's session DB out of
+ *                                 the workspace.
+ *   --quiet                     — suppress banner + spinner so only stream-json
+ *                                 lines hit stdout (banner goes to stderr).
+ *   --output-format stream-json — line-delimited NDJSON for the OutputParser.
+ *   --with-builtin developer    — wires file/shell tools so the agent can write
+ *                                 to the working dir.
+ *
+ * Env knobs mirror the Claude Code hooks:
+ *   JANUMICODE_GOOSE_PROVIDER   — `--provider <name>`.
+ *   JANUMICODE_GOOSE_MODEL      — `--model <name>` (per-invocation wins).
+ *   JANUMICODE_GOOSE_MAX_TURNS  — `--max-turns <n>` safety cap on unattended runs.
+ *   JANUMICODE_GOOSE_EXTRA_ARGS — space-delimited extras.
+ */
+function buildGooseCommand(options: AgentInvocationOptions): { command: string; args: string[] } {
+  const args: string[] = [
+    'run',
+    '-i', '-',
+    '--no-session',
+    '--quiet',
+    '--output-format', 'stream-json',
+    '--with-builtin', 'developer',
+  ];
+  const provider = process.env.JANUMICODE_GOOSE_PROVIDER;
+  if (provider) args.push('--provider', provider);
+  const model = options.model ?? process.env.JANUMICODE_GOOSE_MODEL;
+  if (model) args.push('--model', model);
+  const maxTurns = process.env.JANUMICODE_GOOSE_MAX_TURNS;
+  if (maxTurns) args.push('--max-turns', maxTurns);
+  appendExtraArgs(args, process.env.JANUMICODE_GOOSE_EXTRA_ARGS);
+  return { command: 'goose', args };
+}
+
+/**
+ * `codex exec --sandbox read-only --json -` runs non-interactively and reads
+ * the prompt from stdin (the `-` sentinel). Ported from v1
+ * (janumicode/src/lib/cli/providers/codexCli.ts:buildCodexArgs):
+ *   --sandbox read-only — OS-level read-only enforcement.
+ *   --json              — JSONL event output (Responses API shape).
+ *   -                   — consume stdin as prompt.
+ * The cliInvoker always pipes `options.prompt` to stdin, so argv stays small —
+ * critical on Windows where cmd.exe's ~8191-char ARG_MAX kills invocations that
+ * put the whole spec-inlined prompt on the command line. options.model adds
+ * `--model <name>`.
+ */
+function buildCodexCommand(options: AgentInvocationOptions): { command: string; args: string[] } {
+  const codexArgs = ['exec', '--sandbox', 'read-only', '--json'];
+  if (options.model) {
+    codexArgs.push('--model', options.model);
+  }
+  codexArgs.push('-');
+  return {
+    command: 'codex',
+    args: codexArgs,
+  };
 }
 
 /**

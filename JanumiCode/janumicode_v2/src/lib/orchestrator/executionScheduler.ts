@@ -49,9 +49,12 @@ import { QuarantineLedger } from './quarantineLedger';
 import { WaveGate, type WaveGateOutcome } from './waveGate';
 import { buildPhaseContextPacket } from './phases/dmrContext';
 import type { ScaffoldManifest } from './phases/scaffoldSynthesis';
-import type { ModuleOwnershipPlan } from './phases/moduleOwnershipPlanner';
+import type { ModuleOwnershipPlan, OrderingEdge } from './phases/moduleOwnershipPlanner';
 
 // ── Public types ───────────────────────────────────────────────────
+
+/** A file write reported by an executor agent (path + operation kind). */
+type WrittenFile = { filePath: string; operation: 'create' | 'modify' | 'delete' };
 
 export interface SchedulerLeaf extends CtxTask {
   /** Inherited from Wave 6/8 — null = backlog (run in last wave). */
@@ -339,45 +342,7 @@ export class ExecutionScheduler {
    * original order). No-op when no plan.
    */
   private biasLeavesByOwnership(leaves: SchedulerLeaf[]): SchedulerLeaf[] {
-    const plan = this.ownershipPlan;
-    if (!plan || plan.ordering_edges.length === 0) return leaves;
-
-    const comps = new Set<string>();
-    for (const l of leaves) if (l.component_id) comps.add(l.component_id);
-    const indeg = new Map<string, number>();
-    const out = new Map<string, string[]>();
-    for (const c of comps) { indeg.set(c, 0); out.set(c, []); }
-    for (const e of plan.ordering_edges) {
-      if (!comps.has(e.before_component_id) || !comps.has(e.after_component_id)) continue;
-      out.get(e.before_component_id)!.push(e.after_component_id);
-      indeg.set(e.after_component_id, (indeg.get(e.after_component_id) ?? 0) + 1);
-    }
-    // Kahn rank: BFS layers from indegree-0 producers.
-    const rank = new Map<string, number>();
-    let frontier = [...comps].filter((c) => (indeg.get(c) ?? 0) === 0);
-    let r = 0;
-    const seen = new Set<string>();
-    while (frontier.length > 0) {
-      const next: string[] = [];
-      for (const c of frontier) {
-        if (seen.has(c)) continue;
-        seen.add(c);
-        rank.set(c, r);
-        for (const m of out.get(c) ?? []) {
-          const d = (indeg.get(m) ?? 0) - 1;
-          indeg.set(m, d);
-          if (d <= 0 && !seen.has(m)) next.push(m);
-        }
-      }
-      frontier = next;
-      r++;
-    }
-    const rankOf = (c: string | undefined): number => (c && rank.has(c) ? rank.get(c)! : Number.MAX_SAFE_INTEGER);
-    // Stable sort: decorate with original index to preserve order within a rank.
-    return leaves
-      .map((l, i) => ({ l, i }))
-      .sort((a, b) => (rankOf(a.l.component_id) - rankOf(b.l.component_id)) || (a.i - b.i))
-      .map((x) => x.l);
+    return orderLeavesByOwnershipRank(leaves, this.ownershipPlan);
   }
 
   async run(input: {
@@ -472,79 +437,9 @@ export class ExecutionScheduler {
     }
 
     // Deferred-batch wave for any quarantined leaves.
-    const pending = this.quarantineLedger.pendingForRun(workflowRunId);
-    if (pending.length > 0) {
-      logger.info('workflow', 'Wave R: starting deferred-batch wave', {
-        leaves: pending.length,
-      });
-      waveNumber++;
-      const idByLeaf = new Map<string, SchedulerLeaf>();
-      for (const l of leaves) idByLeaf.set(l.id, l);
-      const deferredLeaves = pending
-        .map(p => idByLeaf.get(p.leaf_task_id))
-        .filter((l): l is SchedulerLeaf => l !== undefined);
-      const priorByLeaf = new Map<string, TaskQuarantineContent>(
-        pending.map(p => [p.leaf_task_id, p]),
-      );
-      const outcome = await this.runWave({
-        wave: {
-          kind: 'deferred_batch',
-          release_id: null,
-          release_ordinal: null,
-          release_name: 'Deferred batch',
-          leaves: deferredLeaves,
-        },
-        waveNumber,
-        workflowRunId,
-        workspacePath,
-        janumiCodeVersionSha,
-        retryBudget: this.config.deferredRetryBudget,
-        attemptHintBuilder: leafId => {
-          const prior = priorByLeaf.get(leafId);
-          return prior ? QuarantineLedger.buildAugmentedContext(prior) : null;
-        },
-      });
-      // Mark rescued / terminally-deferred for each deferred leaf.
-      for (const leaf of deferredLeaves) {
-        const wasSuccess = outcome.successfulLeafIds.has(leaf.id);
-        const additionalAttempts = outcome.attemptsByLeaf.get(leaf.id) ?? [];
-        if (wasSuccess) {
-          this.quarantineLedger.updateRescueStatus({
-            workflowRunId,
-            janumiCodeVersionSha,
-            leafTaskId: leaf.id,
-            rescueStatus: 'rescued',
-            additionalAttempts,
-            reason: 'rescued in deferred-batch wave',
-          });
-          result.rescuedLeafCount++;
-          result.successfulLeafIds.push(leaf.id);
-        } else {
-          this.quarantineLedger.updateRescueStatus({
-            workflowRunId,
-            janumiCodeVersionSha,
-            leafTaskId: leaf.id,
-            rescueStatus: 'terminally_deferred',
-            additionalAttempts,
-            reason: 'failed in deferred-batch wave',
-          });
-          result.terminallyDeferredLeafCount++;
-        }
-      }
-      result.invocationIds.push(...outcome.invocationIds);
-      result.waveOutcomes.push({
-        waveNumber,
-        waveKind: 'deferred_batch',
-        successful: outcome.successCount,
-        quarantined: outcome.quarantineCount,
-        decision: outcome.gateDecision,
-      });
-      result.totalWaves = waveNumber;
-      this.updateRunTotals(workflowRunId, {
-        current_execution_wave: waveNumber,
-        total_execution_waves: waveNumber,
-      });
-    }
+    waveNumber = await this.runDeferredBatchWave({
+      workflowRunId, workspacePath, janumiCodeVersionSha, leaves, waveNumber, result,
+    });
 
     this.updateRunTotals(workflowRunId, {
       quarantined_leaf_count: result.quarantinedLeafCount,
@@ -562,6 +457,100 @@ export class ExecutionScheduler {
     });
 
     return result;
+  }
+
+  /**
+   * Deferred-batch wave for any quarantined leaves: re-run every pending leaf
+   * with its augmented retry context, then mark each rescued or terminally
+   * deferred. Returns the (possibly incremented) wave number so the caller can
+   * carry it into the closing act.
+   */
+  private async runDeferredBatchWave(input: {
+    workflowRunId: string;
+    workspacePath: string;
+    janumiCodeVersionSha: string;
+    leaves: SchedulerLeaf[];
+    waveNumber: number;
+    result: ExecutionScheduleResult;
+  }): Promise<number> {
+    const { workflowRunId, workspacePath, janumiCodeVersionSha, leaves, result } = input;
+    const logger = getLogger();
+    let waveNumber = input.waveNumber;
+
+    const pending = this.quarantineLedger.pendingForRun(workflowRunId);
+    if (pending.length === 0) return waveNumber;
+
+    logger.info('workflow', 'Wave R: starting deferred-batch wave', {
+      leaves: pending.length,
+    });
+    waveNumber++;
+    const idByLeaf = new Map<string, SchedulerLeaf>();
+    for (const l of leaves) idByLeaf.set(l.id, l);
+    const deferredLeaves = pending
+      .map(p => idByLeaf.get(p.leaf_task_id))
+      .filter((l): l is SchedulerLeaf => l !== undefined);
+    const priorByLeaf = new Map<string, TaskQuarantineContent>(
+      pending.map(p => [p.leaf_task_id, p]),
+    );
+    const outcome = await this.runWave({
+      wave: {
+        kind: 'deferred_batch',
+        release_id: null,
+        release_ordinal: null,
+        release_name: 'Deferred batch',
+        leaves: deferredLeaves,
+      },
+      waveNumber,
+      workflowRunId,
+      workspacePath,
+      janumiCodeVersionSha,
+      retryBudget: this.config.deferredRetryBudget,
+      attemptHintBuilder: leafId => {
+        const prior = priorByLeaf.get(leafId);
+        return prior ? QuarantineLedger.buildAugmentedContext(prior) : null;
+      },
+    });
+    // Mark rescued / terminally-deferred for each deferred leaf.
+    for (const leaf of deferredLeaves) {
+      const wasSuccess = outcome.successfulLeafIds.has(leaf.id);
+      const additionalAttempts = outcome.attemptsByLeaf.get(leaf.id) ?? [];
+      if (wasSuccess) {
+        this.quarantineLedger.updateRescueStatus({
+          workflowRunId,
+          janumiCodeVersionSha,
+          leafTaskId: leaf.id,
+          rescueStatus: 'rescued',
+          additionalAttempts,
+          reason: 'rescued in deferred-batch wave',
+        });
+        result.rescuedLeafCount++;
+        result.successfulLeafIds.push(leaf.id);
+      } else {
+        this.quarantineLedger.updateRescueStatus({
+          workflowRunId,
+          janumiCodeVersionSha,
+          leafTaskId: leaf.id,
+          rescueStatus: 'terminally_deferred',
+          additionalAttempts,
+          reason: 'failed in deferred-batch wave',
+        });
+        result.terminallyDeferredLeafCount++;
+      }
+    }
+    result.invocationIds.push(...outcome.invocationIds);
+    result.waveOutcomes.push({
+      waveNumber,
+      waveKind: 'deferred_batch',
+      successful: outcome.successCount,
+      quarantined: outcome.quarantineCount,
+      decision: outcome.gateDecision,
+    });
+    result.totalWaves = waveNumber;
+    this.updateRunTotals(workflowRunId, {
+      current_execution_wave: waveNumber,
+      total_execution_waves: waveNumber,
+    });
+    return waveNumber;
   }
 
   /**
@@ -781,10 +770,7 @@ export class ExecutionScheduler {
     const topo = topoSortRespectingWave(biased, idsInWave);
 
     // Component distribution for telemetry.
-    const distribution: Record<string, number> = {};
-    for (const l of wave.leaves) {
-      distribution[l.component_id] = (distribution[l.component_id] ?? 0) + 1;
-    }
+    const distribution = buildLeafDistribution(wave.leaves);
 
     const startContent: ExecutionWaveStartedContent = {
       kind: 'execution_wave_started',
@@ -833,78 +819,22 @@ export class ExecutionScheduler {
     const testTotals = { passed: 0, failed: 0, skipped: 0, leaves_with_failing_tests: 0 };
 
     for (const leaf of topo) {
-      const attempts: QuarantineAttemptEntry[] = [];
-      let leafPassed = false;
-      // Test files this leaf authors, accumulated across its attempts — the
-      // file-level ownership evidence the per-leaf verdict is scoped to.
-      const ownedTestFiles = new Set<string>();
-      let priorFailureContext: string | null = input.attemptHintBuilder
-        ? input.attemptHintBuilder(leaf.id)
-        : null;
-
-      for (let attempt = 1; attempt <= input.retryBudget; attempt++) {
-        const attemptOutcome = await this.runLeafAttempt({
-          leaf,
-          attemptNumber: attempt,
-          waveNumber,
-          workflowRunId,
-          workspacePath,
-          janumiCodeVersionSha,
-          augmentedContext: priorFailureContext,
-          ownedTestFiles,
-        });
-        invocationIds.push(attemptOutcome.invocationId);
-        attempts.push(attemptOutcome.entry);
-        if (attemptOutcome.testResult) {
-          testTotals.passed += attemptOutcome.testResult.passedCount;
-          testTotals.failed += attemptOutcome.testResult.failedCount;
-          testTotals.skipped += attemptOutcome.testResult.skippedCount;
-          if (attemptOutcome.testResult.failedCount > 0) testTotals.leaves_with_failing_tests++;
-        }
-        if (attemptOutcome.entry.outcome === 'passed') {
-          leafPassed = true;
-          break;
-        }
-        // Tally reasoning_review flaws for the wave summary.
-        for (const f of attemptOutcome.entry.reasoning_review_flaws ?? []) {
-          reasoningReviewSummary[f.flaw_type] = (reasoningReviewSummary[f.flaw_type] ?? 0) + 1;
-        }
-        if (attempt < input.retryBudget) {
-          priorFailureContext = buildRetryContext(attempts, attemptOutcome.entry);
-        }
-      }
-
-      attemptsByLeaf.set(leaf.id, attempts);
-      if (leafPassed) {
-        successfulLeafIds.add(leaf.id);
-      } else {
-        quarantinedLeafIds.add(leaf.id);
-        const lastAttempt = attempts.at(-1);
-        let reason: string;
-        if (lastAttempt?.outcome === 'reasoning_review_failed') {
-          reason = `reasoning_review_failed (${(lastAttempt.reasoning_review_flaws ?? []).map(f => f.flaw_type).join(', ') || 'unspecified'})`;
-        } else if (lastAttempt?.outcome === 'tests_failed') {
-          reason = `tests_failed (${(lastAttempt.test_failures ?? []).slice(0, 3).join(', ') || 'unspecified'})`;
-        } else {
-          reason = `execution_failed (${lastAttempt?.error_message ?? 'unspecified'})`;
-        }
-        // For deferred-batch waves, the existing quarantine entry is
-        // updated with rescue_status by the outer caller — don't enqueue
-        // a new one. For release waves, this is the first quarantine.
-        if (wave.kind !== 'deferred_batch') {
-          this.quarantineLedger.enqueue({
-            workflowRunId,
-            janumiCodeVersionSha,
-            leafTaskId: leaf.id,
-            leafNodeId: leaf._leaf_node_id ?? null,
-            waveNumber,
-            releaseId: wave.release_id,
-            releaseOrdinal: wave.release_ordinal,
-            attempts,
-            reason,
-          });
-        }
-      }
+      await this.runLeafWithRetries({
+        leaf,
+        wave,
+        waveNumber,
+        workflowRunId,
+        workspacePath,
+        janumiCodeVersionSha,
+        retryBudget: input.retryBudget,
+        attemptHintBuilder: input.attemptHintBuilder,
+        successfulLeafIds,
+        quarantinedLeafIds,
+        attemptsByLeaf,
+        invocationIds,
+        reasoningReviewSummary,
+        testTotals,
+      });
     }
 
     // Post-wave snapshot diff.
@@ -976,6 +906,95 @@ export class ExecutionScheduler {
     };
   }
 
+  /**
+   * Run a single leaf to completion within a wave: retry up to `retryBudget`
+   * times (augmenting the prompt with prior-failure context each round), tally
+   * per-attempt test + reasoning-review stats, then record success or quarantine
+   * the leaf. All accumulators are mutated in place — behavior is identical to
+   * the prior inline `for (const leaf of topo)` body.
+   */
+  private async runLeafWithRetries(input: {
+    leaf: SchedulerLeaf;
+    wave: WaveSlice;
+    waveNumber: number;
+    workflowRunId: string;
+    workspacePath: string;
+    janumiCodeVersionSha: string;
+    retryBudget: number;
+    attemptHintBuilder: ((leafId: string) => string | null) | null;
+    successfulLeafIds: Set<string>;
+    quarantinedLeafIds: Set<string>;
+    attemptsByLeaf: Map<string, QuarantineAttemptEntry[]>;
+    invocationIds: string[];
+    reasoningReviewSummary: Record<string, number>;
+    testTotals: { passed: number; failed: number; skipped: number; leaves_with_failing_tests: number };
+  }): Promise<void> {
+    const {
+      leaf, wave, waveNumber, workflowRunId, workspacePath, janumiCodeVersionSha,
+      retryBudget, attemptHintBuilder, successfulLeafIds, quarantinedLeafIds,
+      attemptsByLeaf, invocationIds, reasoningReviewSummary, testTotals,
+    } = input;
+
+    const attempts: QuarantineAttemptEntry[] = [];
+    let leafPassed = false;
+    // Test files this leaf authors, accumulated across its attempts — the
+    // file-level ownership evidence the per-leaf verdict is scoped to.
+    const ownedTestFiles = new Set<string>();
+    let priorFailureContext: string | null = attemptHintBuilder
+      ? attemptHintBuilder(leaf.id)
+      : null;
+
+    for (let attempt = 1; attempt <= retryBudget; attempt++) {
+      const attemptOutcome = await this.runLeafAttempt({
+        leaf,
+        attemptNumber: attempt,
+        waveNumber,
+        workflowRunId,
+        workspacePath,
+        janumiCodeVersionSha,
+        augmentedContext: priorFailureContext,
+        ownedTestFiles,
+      });
+      invocationIds.push(attemptOutcome.invocationId);
+      attempts.push(attemptOutcome.entry);
+      if (attemptOutcome.testResult) accumulateTestTotals(testTotals, attemptOutcome.testResult);
+      if (attemptOutcome.entry.outcome === 'passed') {
+        leafPassed = true;
+        break;
+      }
+      // Tally reasoning_review flaws for the wave summary.
+      for (const f of attemptOutcome.entry.reasoning_review_flaws ?? []) {
+        reasoningReviewSummary[f.flaw_type] = (reasoningReviewSummary[f.flaw_type] ?? 0) + 1;
+      }
+      if (attempt < retryBudget) {
+        priorFailureContext = buildRetryContext(attempts, attemptOutcome.entry);
+      }
+    }
+
+    attemptsByLeaf.set(leaf.id, attempts);
+    if (leafPassed) {
+      successfulLeafIds.add(leaf.id);
+      return;
+    }
+    quarantinedLeafIds.add(leaf.id);
+    // For deferred-batch waves, the existing quarantine entry is updated with
+    // rescue_status by the outer caller — don't enqueue a new one. For release
+    // waves, this is the first quarantine.
+    if (wave.kind !== 'deferred_batch') {
+      this.quarantineLedger.enqueue({
+        workflowRunId,
+        janumiCodeVersionSha,
+        leafTaskId: leaf.id,
+        leafNodeId: leaf._leaf_node_id ?? null,
+        waveNumber,
+        releaseId: wave.release_id,
+        releaseOrdinal: wave.release_ordinal,
+        attempts,
+        reason: buildQuarantineReason(attempts.at(-1)),
+      });
+    }
+  }
+
   // ── per-leaf attempt ───────────────────────────────────────────
 
   private async runLeafAttempt(input: {
@@ -989,149 +1008,14 @@ export class ExecutionScheduler {
     /** Accumulates, across this leaf's attempts, the test files it authored —
      *  the file-level ownership evidence the verdict is scoped to. */
     ownedTestFiles: Set<string>;
-  }): Promise<{ entry: QuarantineAttemptEntry; invocationId: string; testResult: LeafTestRunResult | null }> {
+  }): Promise<LeafAttemptOutcome> {
     const { leaf, attemptNumber, waveNumber, workflowRunId, workspacePath, janumiCodeVersionSha, augmentedContext, ownedTestFiles } = input;
     const logger = getLogger();
-    const contextFileId = this.generateId();
 
-    // Per-task DMR call — pulls active_constraints + material findings
-    // scoped to this specific task. Phases 5-8 call DMR for their own
-    // work; Phase 9 follows the same pattern so the executor sees
-    // task-relevant constraints rather than only the constitutional
-    // invariants the builder would surface by default. DMR failure is
-    // non-fatal: buildTaskContext falls back to its builder-time
-    // active_constraints option.
-    const dmrPacket = await this.fetchDmrPacketForTask(leaf, workflowRunId);
-
-    // The task's implementation packet is the single coherent source of its
-    // scoped context — pass it into the builder so the detail bundle's
-    // test_cases + evaluation_criteria come from the packet (root/leaf-safe,
-    // task-scoped) rather than the raw-artifact re-derivation, and the
-    // detail file stays consistent with the prepended packet block below.
-    const packet = this.packetByTaskId?.get(leaf.id);
-
-    let layoutScaffold: {
-      conventions: string;
-      sharedDir: string;
-      canonicalFiles: string[];
-      protectedPaths: string[];
-      language?: string;
-    } | null;
-    if (this.reconEnforcement) {
-      layoutScaffold = {
-        conventions: this.reconEnforcement.conventions,
-        sharedDir: '', // recon is per-area; the conventions carry the aliases/paths
-        canonicalFiles: this.reconEnforcement.canonical_modules.map(m => m.path),
-        protectedPaths: this.reconEnforcement.protected_paths,
-        language: this.reconEnforcement.primary_stack,
-      };
-    } else if (this.scaffoldManifest) {
-      layoutScaffold = {
-        conventions: this.scaffoldManifest.conventions,
-        sharedDir: this.scaffoldManifest.profile.shared_dir,
-        canonicalFiles: this.scaffoldManifest.canonical_files,
-        protectedPaths: this.scaffoldManifest.protected_paths,
-        language: this.scaffoldManifest.profile.language,
-      };
-    } else {
-      layoutScaffold = null;
-    }
-
-    let stdinText = this.executionContextBuilder.buildTaskContext(
-      leaf as unknown as CtxTask,
-      workflowRunId,
-      contextFileId,
-      this.artifacts,
-      undefined,
-      dmrPacket,
-      layoutScaffold,
-      packet,
-    ).stdin.text;
-
-    // Prepend the implementation packet's bundled context when available.
-    // The packet carries user stories + ACs + tests + eval criteria +
-    // component contract + active constraints + compliance items — the
-    // structural ts-16 fix that gives the executor the full context it
-    // needs without inventing.
-    //
-    // Path N item 6: when a packet is being prepended, the legacy
-    // template's Component Context / Component Model Summary / Test
-    // Cases / Evaluation Criteria sections duplicate what the packet
-    // already provides (and historically with broken renderings —
-    // `Responsibility: undefined`, 8 unrelated eval criteria, etc.).
-    // The packet block is the canonical source; collapse the legacy
-    // sections to a single-line pointer when packet is present.
-    //
-    // Path N item 5/8: prepend a workspace orientation block. In ts-17
-    // the executor looped "Let me check the workspace structure" eight
-    // times before concluding the workspace was empty. Telling it
-    // upfront — workspace root, greenfield/existing flag, and which
-    // write-scope paths exist — removes that loop entirely.
-    if (packet) {
-      // Normalize the orientation's write-scope paths to the stack's package
-      // convention (python: hyphen→underscore) so the top-of-prompt orientation
-      // and the "## Write Scope Constraint" section agree — a mismatch re-creates
-      // the directory-contradiction deadlock (slice-156).
-      const stackLang = this.reconEnforcement?.primary_stack ?? this.scaffoldManifest?.profile.language;
-      const orientation = buildWorkspaceOrientation(
-        workspacePath,
-        (leaf.write_directory_paths ?? []).map(p => normalizeComponentDirForStack(p, stackLang)),
-      );
-      const packetContext = formatPacketAsExecutorContext(packet);
-      const ownership = this.renderOwnershipDirective(leaf.component_id);
-      stdinText = collapseLegacySectionsWhenPacketPresent(stdinText);
-      stdinText = `${orientation}${ownership ? `\n\n${ownership}` : ''}\n\n${packetContext}\n\n${stdinText}`;
-    }
-
-    // Engineering Constitution — craft standard inlined into EVERY attempt (each
-    // retry is a fresh session). slice-151 showed the executor READ the inlined
-    // doc but never acted on it: it was framed purely ADVISORY, buried as the
-    // prompt tail, and craft doesn't affect the test/typecheck gate the model
-    // optimises for (a probe confirmed the model reads the content fine — the
-    // `<engineering_constitution>` tags don't filter it). So we (a) LEAD with a
-    // short, specific, actionable craft directive, then (b) inline the full doc as
-    // the detailed reference. This is the SOLE comment instruction the executor
-    // sees — the harness's system-level "DO NOT ADD COMMENTS" rule that used to
-    // override it is gone (the custom `janumicode` mimo agent, see
-    // mimoServerManager), so the directive is framed as REQUIRED (not the old
-    // "soft completion requirement"; an earlier soft framing produced comments but
-    // no CC-/constraint citations once the suppression was lifted). Still
-    // SUBORDINATE to the task spec / completion criteria / technical constraints
-    // (those always win) to avoid the slice-139 "everything authoritative" mess.
-    const constitutionPath = this.reconEnforcement?.engineering_constitution_path
-      ?? this.scaffoldManifest?.engineering_constitution_path;
-    if (constitutionPath) {
-      // Resolve to ABSOLUTE against the control-plane workspace root before
-      // reading. The path can arrive RELATIVE (`.janumicode/…`), and the
-      // executor's cwd is the projectRoot sandbox, so a relative read resolves
-      // to `<projectRoot>/.janumicode/…` and THROWS — slice-151 had 15/45 leaves
-      // silently fall back to an unreadable path-reference for exactly this
-      // reason. The orchestrator reads the control plane directly (the agent
-      // never needs filesystem access to it).
-      // PD-1 (P9 prompt audit, cal-40): the full <engineering_constitution> doc was
-      // inlined verbatim here (~27.5K chars = 45-66% of every leaf prompt) and
-      // DROWNED the leading write-scope/task directives (audit A5/A4) without
-      // changing behavior — it is advisory craft, VERIFIED at Phase 10 regardless.
-      // Replace the inline dump with the actionable 5-bullet core (its three topics:
-      // commenting, observability, testing) + a provenance note. The full standard
-      // is a control-plane doc (`<ws>/.janumicode/engineering-constitution.md`,
-      // copied by scaffoldSynthesis) enforced at P10; the executor's sandbox cannot
-      // read it in-band (slice-151), so there is no dead file pointer to chase.
-      stdinText += '\n\n## Engineering Constitution (required craft standard — verified at Phase 10)\n'
-        + EXECUTOR_CRAFT_LEAD
-        + '\n\n(These five bullets are the actionable core — for THIS leaf — of the full engineering-constitution craft standard: source-comment discipline, debugging/observability, and testing. The full standard is enforced at the Phase-10 craft-conformance check.)';
-    }
-
-    if (augmentedContext) {
-      stdinText = `${stdinText}\n\n## RETRY CONTEXT\n\n${augmentedContext}`;
-    }
-
-    // Lead with the execution-mode directive (governed RPI autonomy) so it is the
-    // first thing the executor reads — it frames the voice-of-intent reviewer, permits
-    // codebase research, and forbids deadlocking on a possibly-missed blocked prompt.
-    // The tail is mode-aware: headless (calibration/CI, the default) tells the agent
-    // to self-resolve since there is no human to escalate to.
-    stdinText = `${buildExecutionModeDirective(this.config.attended === true)}\n\n${stdinText}`;
+    // Assemble the full executor prompt (DMR context, packet, layout scaffold,
+    // constitution, retry context, execution-mode directive). Extracted so the
+    // attempt-gating flow below stays readable; see assembleLeafStdin.
+    const stdinText = await this.assembleLeafStdin({ leaf, workflowRunId, workspacePath, augmentedContext });
 
     const execTask: ExecutionTask = {
       id: leaf.id,
@@ -1205,63 +1089,15 @@ export class ExecutionScheduler {
     // creations outside the sandbox).
     const sandboxEscapes = detectSandboxEscapes(executionResult.filesWritten, workspacePath);
     if (sandboxEscapes.length > 0) {
-      logger.error('workflow', 'SANDBOX ESCAPE: leaf wrote OUTSIDE the project root (quarantining + cleaning up)', {
-        leaf: leaf.id, attempt: attemptNumber, escapes: sandboxEscapes,
-      });
-      for (const esc of sandboxEscapes) {
-        try { fs.rmSync(esc, { force: true }); } catch { /* dir or locked — leave for operator */ }
-      }
-      return {
-        invocationId: executionResult.invocationId,
-        testResult: null,
-        entry: {
-          attempt_number: attemptNumber,
-          invocation_id: executionResult.invocationId,
-          outcome: 'reasoning_review_failed',
-          reasoning_review_flaws: [{
-            flaw_type: 'write_scope_violation',
-            severity: 'high',
-            description:
-              'Wrote files OUTSIDE the project root using absolute or parent (`..`) paths — these are rejected: ' +
-              sandboxEscapes.join(', ') +
-              '. Write ONLY paths relative to your current directory (the project root); never absolute paths.',
-          }],
-          files_written_count: executionResult.filesWritten.length,
-        },
-      };
+      return buildSandboxEscapeOutcome(executionResult, sandboxEscapes, leaf, attemptNumber);
     }
 
-    let scopeViolations = this.detectWriteScopeViolations(executionResult.filesWritten, workspacePath);
-    if (scopeViolations.length > 0 && leaf._composition_root) {
-      // The composition root OWNS root-config edits (dependency installs,
-      // entrypoint scripts). Only directory-prefix protections (the shared
-      // dir) still apply to it.
-      const dirPrefixes = this.effectiveProtectedPaths().filter((p) => p.endsWith('/'));
-      scopeViolations = scopeViolations.filter((rel) =>
-        dirPrefixes.some((p) => rel === p.slice(0, -1) || rel.startsWith(p)));
-    }
+    const scopeViolations = this.resolveScopeViolations(executionResult.filesWritten, workspacePath, leaf);
     if (scopeViolations.length > 0) {
       logger.warn('workflow', 'Wave R: leaf wrote into protected scaffold scope (quarantining)', {
         leaf: leaf.id, attempt: attemptNumber, violations: scopeViolations,
       });
-      return {
-        invocationId: executionResult.invocationId,
-        testResult: null,
-        entry: {
-          attempt_number: attemptNumber,
-          invocation_id: executionResult.invocationId,
-          outcome: 'reasoning_review_failed',
-          reasoning_review_flaws: [{
-            flaw_type: 'write_scope_violation',
-            severity: 'high',
-            description:
-              'Wrote into protected scaffold paths. Import the canonical shared ' +
-              'modules / root config instead of recreating them: ' +
-              scopeViolations.join(', '),
-          }],
-          files_written_count: executionResult.filesWritten.length,
-        },
-      };
+      return buildScopeViolationOutcome(executionResult, scopeViolations, attemptNumber);
     }
 
     // Reasoning review — Phase 9 gating policy.
@@ -1284,32 +1120,14 @@ export class ExecutionScheduler {
       executionResult.invocationId,
     );
     if (highSeverityFindings.length > 0) {
-      return {
-        invocationId: executionResult.invocationId,
-        testResult: null,
-        entry: {
-          attempt_number: attemptNumber,
-          invocation_id: executionResult.invocationId,
-          outcome: 'reasoning_review_failed',
-          reasoning_review_flaws: highSeverityFindings.map(f => ({
-            flaw_type: f.summary.slice(0, 80),
-            severity: f.severity.toLowerCase(),
-            description: f.detail,
-          })),
-          files_written_count: executionResult.filesWritten.length,
-        },
-      };
+      return buildHighSeverityOutcome(executionResult, highSeverityFindings, attemptNumber);
     }
 
     // Record the test files THIS attempt authored (file-level ownership
     // evidence), accumulated across the leaf's attempts so a test written in an
     // earlier attempt still scopes the verdict even if a later attempt only
     // touched the implementation.
-    for (const w of executionResult.filesWritten) {
-      if (w.operation === 'delete') continue;
-      const rel = path.relative(workspacePath, w.filePath).split(path.sep).join('/');
-      if (rel && !rel.startsWith('..') && isTestFilePath(rel)) ownedTestFiles.add(rel);
-    }
+    collectOwnedTestFiles(executionResult.filesWritten, workspacePath, ownedTestFiles);
 
     // Per-leaf test execution. Scoped to the leaf's OWN test files when it
     // authored any (file-level attribution); else its write directories.
@@ -1353,6 +1171,160 @@ export class ExecutionScheduler {
     };
   }
 
+  /**
+   * Assemble the complete executor prompt for one leaf attempt: the per-task DMR
+   * context, the builder's base task context, the prepended implementation-packet
+   * block (workspace orientation + ownership directive + packet), the Engineering
+   * Constitution craft lead, any retry context, and — first — the execution-mode
+   * directive. Extracted verbatim from runLeafAttempt; ordering + content unchanged.
+   */
+  private async assembleLeafStdin(input: {
+    leaf: SchedulerLeaf;
+    workflowRunId: string;
+    workspacePath: string;
+    augmentedContext: string | null;
+  }): Promise<string> {
+    const { leaf, workflowRunId, workspacePath, augmentedContext } = input;
+    const contextFileId = this.generateId();
+
+    // Per-task DMR call — pulls active_constraints + material findings scoped to
+    // this task (Phase 9 mirrors phases 5-8). DMR failure is non-fatal:
+    // buildTaskContext falls back to its builder-time active_constraints option.
+    const dmrPacket = await this.fetchDmrPacketForTask(leaf, workflowRunId);
+
+    // The task's implementation packet is the single coherent source of its
+    // scoped context — pass it into the builder so the detail bundle's test_cases
+    // + evaluation_criteria come from the packet rather than raw re-derivation.
+    const packet = this.packetByTaskId?.get(leaf.id);
+    const layoutScaffold = this.resolveLayoutScaffold();
+
+    let stdinText = this.executionContextBuilder.buildTaskContext(
+      leaf as unknown as CtxTask,
+      workflowRunId,
+      contextFileId,
+      this.artifacts,
+      undefined,
+      dmrPacket,
+      layoutScaffold,
+      packet,
+    ).stdin.text;
+
+    // Prepend the implementation packet's bundled context (user stories + ACs +
+    // tests + eval criteria + component contract + constraints) and a workspace
+    // orientation block; collapse the now-duplicate legacy template sections.
+    if (packet) {
+      stdinText = this.prependPacketContext(stdinText, leaf, packet, workspacePath);
+    }
+
+    // Engineering Constitution craft standard (inlined into every attempt).
+    stdinText = this.appendConstitution(stdinText);
+
+    if (augmentedContext) {
+      stdinText = `${stdinText}\n\n## RETRY CONTEXT\n\n${augmentedContext}`;
+    }
+
+    // Lead with the execution-mode directive (governed RPI autonomy) so it is the
+    // first thing the executor reads. The tail is mode-aware: headless
+    // (calibration/CI, the default) tells the agent to self-resolve.
+    return `${buildExecutionModeDirective(this.config.attended === true)}\n\n${stdinText}`;
+  }
+
+  /**
+   * Resolve the layout scaffold passed to the context builder: recon enforcement
+   * (polyglot, per-area) wins; else the TS-shaped scaffold manifest; else null.
+   */
+  private resolveLayoutScaffold(): {
+    conventions: string;
+    sharedDir: string;
+    canonicalFiles: string[];
+    protectedPaths: string[];
+    language?: string;
+  } | null {
+    if (this.reconEnforcement) {
+      return {
+        conventions: this.reconEnforcement.conventions,
+        sharedDir: '', // recon is per-area; the conventions carry the aliases/paths
+        canonicalFiles: this.reconEnforcement.canonical_modules.map(m => m.path),
+        protectedPaths: this.reconEnforcement.protected_paths,
+        language: this.reconEnforcement.primary_stack,
+      };
+    }
+    if (this.scaffoldManifest) {
+      return {
+        conventions: this.scaffoldManifest.conventions,
+        sharedDir: this.scaffoldManifest.profile.shared_dir,
+        canonicalFiles: this.scaffoldManifest.canonical_files,
+        protectedPaths: this.scaffoldManifest.protected_paths,
+        language: this.scaffoldManifest.profile.language,
+      };
+    }
+    return null;
+  }
+
+  /**
+   * Prepend the implementation-packet block: workspace orientation (stack-
+   * normalized write-scope paths), the two-sided ownership directive, and the
+   * rendered packet context, with the legacy duplicate template sections collapsed
+   * to a pointer. Produces the identical string the prior inline block did.
+   */
+  private prependPacketContext(
+    stdinText: string,
+    leaf: SchedulerLeaf,
+    packet: ImplementationPacketContent,
+    workspacePath: string,
+  ): string {
+    // Normalize the orientation's write-scope paths to the stack's package
+    // convention (python: hyphen→underscore) so the top-of-prompt orientation and
+    // the "## Write Scope Constraint" section agree (slice-156).
+    const stackLang = this.reconEnforcement?.primary_stack ?? this.scaffoldManifest?.profile.language;
+    const orientation = buildWorkspaceOrientation(
+      workspacePath,
+      (leaf.write_directory_paths ?? []).map(p => normalizeComponentDirForStack(p, stackLang)),
+    );
+    const packetContext = formatPacketAsExecutorContext(packet);
+    const ownership = this.renderOwnershipDirective(leaf.component_id);
+    const collapsed = collapseLegacySectionsWhenPacketPresent(stdinText);
+    const ownershipBlock = ownership ? `\n\n${ownership}` : '';
+    return `${orientation}${ownershipBlock}\n\n${packetContext}\n\n${collapsed}`;
+  }
+
+  /**
+   * Append the Engineering Constitution craft lead (PD-1: the actionable 5-bullet
+   * core in place of the ~27.5K verbatim dump) when a constitution path is in
+   * force; verified at the Phase-10 craft-conformance check. No-op otherwise.
+   */
+  private appendConstitution(stdinText: string): string {
+    const constitutionPath = this.reconEnforcement?.engineering_constitution_path
+      ?? this.scaffoldManifest?.engineering_constitution_path;
+    if (!constitutionPath) return stdinText;
+    return stdinText
+      + '\n\n## Engineering Constitution (required craft standard — verified at Phase 10)\n'
+      + EXECUTOR_CRAFT_LEAD
+      + '\n\n(These five bullets are the actionable core — for THIS leaf — of the full engineering-constitution craft standard: source-comment discipline, debugging/observability, and testing. The full standard is enforced at the Phase-10 craft-conformance check.)';
+  }
+
+  /**
+   * Detect protected-scope write violations, then relax them for the composition
+   * root (which OWNS root-config edits — only directory-prefix protections still
+   * apply). Identical to the prior inline detect + comp-root filter.
+   */
+  private resolveScopeViolations(
+    filesWritten: WrittenFile[],
+    workspacePath: string,
+    leaf: SchedulerLeaf,
+  ): string[] {
+    let scopeViolations = this.detectWriteScopeViolations(filesWritten, workspacePath);
+    if (scopeViolations.length > 0 && leaf._composition_root) {
+      // The composition root OWNS root-config edits (dependency installs,
+      // entrypoint scripts). Only directory-prefix protections (the shared dir)
+      // still apply to it.
+      const dirPrefixes = this.effectiveProtectedPaths().filter((p) => p.endsWith('/'));
+      scopeViolations = scopeViolations.filter((rel) =>
+        dirPrefixes.some((p) => rel === p.slice(0, -1) || rel.startsWith(p)));
+    }
+    return scopeViolations;
+  }
+
   // ── helpers ────────────────────────────────────────────────────
 
   /**
@@ -1364,7 +1336,7 @@ export class ExecutionScheduler {
    * no scaffold manifest is set.
    */
   private detectWriteScopeViolations(
-    filesWritten: Array<{ filePath: string; operation: 'create' | 'modify' | 'delete' }>,
+    filesWritten: WrittenFile[],
     workspacePath: string,
   ): string[] {
     const protectedPaths = this.effectiveProtectedPaths();
@@ -1534,6 +1506,13 @@ interface WaveSlice {
   leaves: SchedulerLeaf[];
 }
 
+/** The result shape a single leaf attempt returns to the wave loop. */
+export type LeafAttemptOutcome = {
+  entry: QuarantineAttemptEntry;
+  invocationId: string;
+  testResult: LeafTestRunResult | null;
+};
+
 /** Whether a workspace-relative path is a test file (common conventions across
  *  vitest/jest/pytest/go/rust): `*.test.*` / `*.spec.*` / `*_test.*` /
  *  `test_*` basenames, or a path under a `__tests__` / `tests` directory. */
@@ -1602,6 +1581,90 @@ export function sliceLeavesIntoWaves(
 }
 
 /**
+ * Stable-sort leaves so producer components precede their consumers, using a
+ * component rank derived from the ownership plan's `ordering_edges` (Kahn —
+ * owners get a lower rank than the components that depend on them). Pure
+ * reordering; the subsequent topo-sort still enforces real task deps. A
+ * dependency cycle among components degrades gracefully (tied ranks → stable
+ * original order). No-op (returns the same array) when no plan / no edges.
+ */
+export function orderLeavesByOwnershipRank(
+  leaves: SchedulerLeaf[],
+  plan: ModuleOwnershipPlan | null,
+): SchedulerLeaf[] {
+  if (!plan || plan.ordering_edges.length === 0) return leaves;
+
+  const comps = new Set<string>();
+  for (const l of leaves) if (l.component_id) comps.add(l.component_id);
+  const { indeg, out } = buildComponentOrderingGraph(comps, plan.ordering_edges);
+  const rank = kahnRankComponents(comps, indeg, out);
+  const rankOf = (c: string | undefined): number => (c && rank.has(c) ? rank.get(c)! : Number.MAX_SAFE_INTEGER);
+  // Stable sort: decorate with original index to preserve order within a rank.
+  return leaves
+    .map((l, i) => ({ l, i }))
+    .sort((a, b) => (rankOf(a.l.component_id) - rankOf(b.l.component_id)) || (a.i - b.i))
+    .map((x) => x.l);
+}
+
+/** Build the component ordering graph (indegree + adjacency) from the ownership
+ *  plan's edges, restricted to components actually present in this wave. */
+function buildComponentOrderingGraph(
+  comps: Set<string>,
+  edges: OrderingEdge[],
+): { indeg: Map<string, number>; out: Map<string, string[]> } {
+  const indeg = new Map<string, number>();
+  const out = new Map<string, string[]>();
+  for (const c of comps) { indeg.set(c, 0); out.set(c, []); }
+  for (const e of edges) {
+    if (!comps.has(e.before_component_id) || !comps.has(e.after_component_id)) continue;
+    out.get(e.before_component_id)!.push(e.after_component_id);
+    indeg.set(e.after_component_id, (indeg.get(e.after_component_id) ?? 0) + 1);
+  }
+  return { indeg, out };
+}
+
+/** Kahn rank: BFS layers from indegree-0 producers → component→rank map. */
+function kahnRankComponents(
+  comps: Set<string>,
+  indeg: Map<string, number>,
+  out: Map<string, string[]>,
+): Map<string, number> {
+  const rank = new Map<string, number>();
+  let frontier = [...comps].filter((c) => (indeg.get(c) ?? 0) === 0);
+  let r = 0;
+  const seen = new Set<string>();
+  while (frontier.length > 0) {
+    const next: string[] = [];
+    for (const c of frontier) {
+      if (seen.has(c)) continue;
+      seen.add(c);
+      rank.set(c, r);
+      next.push(...relaxComponentNeighbors(c, indeg, out, seen));
+    }
+    frontier = next;
+    r++;
+  }
+  return rank;
+}
+
+/** Decrement each neighbor's indegree; return those that just became ready
+ *  (indegree ≤ 0 and not yet seen) to seed the next BFS layer. Mutates `indeg`. */
+function relaxComponentNeighbors(
+  c: string,
+  indeg: Map<string, number>,
+  out: Map<string, string[]>,
+  seen: Set<string>,
+): string[] {
+  const ready: string[] = [];
+  for (const m of out.get(c) ?? []) {
+    const d = (indeg.get(m) ?? 0) - 1;
+    indeg.set(m, d);
+    if (d <= 0 && !seen.has(m)) ready.push(m);
+  }
+  return ready;
+}
+
+/**
  * Topological sort over leaves restricted to deps within the wave.
  * Cross-wave dependencies (deps that point at leaf-ids not in this
  * wave) are dropped from the in-wave graph — they're already satisfied
@@ -1611,6 +1674,22 @@ export function topoSortRespectingWave(
   leaves: SchedulerLeaf[],
   inWave: Set<string>,
 ): SchedulerLeaf[] {
+  const { byId, indeg, outgoing } = buildInWaveDependencyGraph(leaves, inWave);
+  const ordered = drainTopoQueue(byId, indeg, outgoing);
+  appendCycleParticipants(ordered, leaves);
+  return ordered;
+}
+
+/**
+ * Build the in-wave dependency graph: id→leaf lookup, per-leaf indegree, and
+ * adjacency (outgoing edges). Cross-wave deps (not in `inWave`) and deps that
+ * point at leaf-ids absent from this set are dropped — they're already
+ * satisfied by execution order across waves.
+ */
+function buildInWaveDependencyGraph(
+  leaves: SchedulerLeaf[],
+  inWave: Set<string>,
+): { byId: Map<string, SchedulerLeaf>; indeg: Map<string, number>; outgoing: Map<string, string[]> } {
   const byId = new Map<string, SchedulerLeaf>();
   for (const l of leaves) byId.set(l.id, l);
   const indeg = new Map<string, number>();
@@ -1627,6 +1706,15 @@ export function topoSortRespectingWave(
       indeg.set(l.id, (indeg.get(l.id) ?? 0) + 1);
     }
   }
+  return { byId, indeg, outgoing };
+}
+
+/** Kahn's-algorithm drain: emit leaves in dependency order (indegree-0 first). */
+function drainTopoQueue(
+  byId: Map<string, SchedulerLeaf>,
+  indeg: Map<string, number>,
+  outgoing: Map<string, string[]>,
+): SchedulerLeaf[] {
   const queue: string[] = [];
   for (const [id, deg] of indeg) if (deg === 0) queue.push(id);
   const ordered: SchedulerLeaf[] = [];
@@ -1639,15 +1727,21 @@ export function topoSortRespectingWave(
       if (d === 0) queue.push(next);
     }
   }
-  if (ordered.length < leaves.length) {
-    // Cycle — append remaining in input order so they still run.
-    const placed = new Set(ordered.map(o => o.id));
-    for (const l of leaves) if (!placed.has(l.id)) ordered.push(l);
-    getLogger().warn('workflow', 'Wave R: topo-sort detected dependency cycle', {
-      cycle_leaves: leaves.filter(l => !placed.has(l.id)).map(l => l.id),
-    });
-  }
   return ordered;
+}
+
+/**
+ * Cycle fallback: append any leaves the topo-sort could not place (participants
+ * in a dependency cycle) in input order so they still run, and log the cycle.
+ * Mutates `ordered` in place — identical to the prior inline behavior.
+ */
+function appendCycleParticipants(ordered: SchedulerLeaf[], leaves: SchedulerLeaf[]): void {
+  if (ordered.length >= leaves.length) return;
+  const placed = new Set(ordered.map(o => o.id));
+  for (const l of leaves) if (!placed.has(l.id)) ordered.push(l);
+  getLogger().warn('workflow', 'Wave R: topo-sort detected dependency cycle', {
+    cycle_leaves: leaves.filter(l => !placed.has(l.id)).map(l => l.id),
+  });
 }
 
 /**
@@ -1685,7 +1779,7 @@ export function topoSortRespectingWave(
  * reported escapes are visible here. Returns POSIX absolute paths of escapes.
  */
 export function detectSandboxEscapes(
-  filesWritten: Array<{ filePath: string; operation: 'create' | 'modify' | 'delete' }>,
+  filesWritten: WrittenFile[],
   projectRoot: string,
 ): string[] {
   const escapes = new Set<string>();
@@ -1700,6 +1794,14 @@ export function detectSandboxEscapes(
     }
   }
   return [...escapes];
+}
+
+function formatWriteScopeLine(rel: string, workspacePath: string): string {
+  const abs = path.isAbsolute(rel) ? rel : path.join(workspacePath, rel);
+  let exists = false;
+  try { exists = fs.existsSync(abs); } catch { exists = false; }
+  const flag = exists ? 'exists' : 'does not exist — create it';
+  return `- \`${rel}\` (${flag})`;
 }
 
 export function buildWorkspaceOrientation(workspacePath: string, writeDirectoryPaths: string[]): string {
@@ -1740,11 +1842,7 @@ export function buildWorkspaceOrientation(workspacePath: string, writeDirectoryP
   if (writeDirectoryPaths.length > 0) {
     lines.push('', 'Write-scope paths (you may create or modify ONLY these):');
     for (const rel of writeDirectoryPaths) {
-      const abs = path.isAbsolute(rel) ? rel : path.join(workspacePath, rel);
-      let exists = false;
-      try { exists = fs.existsSync(abs); } catch { exists = false; }
-      const flag = exists ? 'exists' : 'does not exist — create it';
-      lines.push(`- \`${rel}\` (${flag})`);
+      lines.push(formatWriteScopeLine(rel, workspacePath));
     }
   }
 
@@ -1778,6 +1876,151 @@ function uniqueWritePaths(leaves: SchedulerLeaf[]): string[] {
   return [...set];
 }
 
+/** Count leaves per component_id for the wave-started telemetry record. */
+export function buildLeafDistribution(leaves: SchedulerLeaf[]): Record<string, number> {
+  const distribution: Record<string, number> = {};
+  for (const l of leaves) {
+    distribution[l.component_id] = (distribution[l.component_id] ?? 0) + 1;
+  }
+  return distribution;
+}
+
+/** Fold one attempt's test counts into the running wave totals (mutates). */
+export function accumulateTestTotals(
+  testTotals: { passed: number; failed: number; skipped: number; leaves_with_failing_tests: number },
+  testResult: LeafTestRunResult,
+): void {
+  testTotals.passed += testResult.passedCount;
+  testTotals.failed += testResult.failedCount;
+  testTotals.skipped += testResult.skippedCount;
+  if (testResult.failedCount > 0) testTotals.leaves_with_failing_tests++;
+}
+
+/** Human-readable quarantine reason derived from a leaf's final failing attempt.
+ *  Mirrors the prior inline if/else-if/else chain verbatim. */
+export function buildQuarantineReason(lastAttempt: QuarantineAttemptEntry | undefined): string {
+  if (lastAttempt?.outcome === 'reasoning_review_failed') {
+    const flaws = (lastAttempt.reasoning_review_flaws ?? []).map(f => f.flaw_type).join(', ') || 'unspecified';
+    return `reasoning_review_failed (${flaws})`;
+  }
+  if (lastAttempt?.outcome === 'tests_failed') {
+    const failures = (lastAttempt.test_failures ?? []).slice(0, 3).join(', ') || 'unspecified';
+    return `tests_failed (${failures})`;
+  }
+  return `execution_failed (${lastAttempt?.error_message ?? 'unspecified'})`;
+}
+
+/**
+ * Sandbox-escape outcome: log the escape, best-effort delete the escaped files
+ * (safe — known agent creations outside the sandbox; a dir or locked file is
+ * left for the operator), and return a write-scope-violation attempt entry.
+ * Identical to the prior inline block in runLeafAttempt.
+ */
+export function buildSandboxEscapeOutcome(
+  executionResult: ExecutionResult,
+  sandboxEscapes: string[],
+  leaf: SchedulerLeaf,
+  attemptNumber: number,
+): LeafAttemptOutcome {
+  getLogger().error('workflow', 'SANDBOX ESCAPE: leaf wrote OUTSIDE the project root (quarantining + cleaning up)', {
+    leaf: leaf.id, attempt: attemptNumber, escapes: sandboxEscapes,
+  });
+  for (const esc of sandboxEscapes) {
+    try { fs.rmSync(esc, { force: true }); } catch { /* dir or locked — leave for operator */ }
+  }
+  return {
+    invocationId: executionResult.invocationId,
+    testResult: null,
+    entry: {
+      attempt_number: attemptNumber,
+      invocation_id: executionResult.invocationId,
+      outcome: 'reasoning_review_failed',
+      reasoning_review_flaws: [{
+        flaw_type: 'write_scope_violation',
+        severity: 'high',
+        description:
+          'Wrote files OUTSIDE the project root using absolute or parent (`..`) paths — these are rejected: ' +
+          sandboxEscapes.join(', ') +
+          '. Write ONLY paths relative to your current directory (the project root); never absolute paths.',
+      }],
+      files_written_count: executionResult.filesWritten.length,
+    },
+  };
+}
+
+/**
+ * Protected-scope write-violation outcome: a write-scope-violation attempt entry
+ * steering the executor to import the canonical shared modules / root config.
+ * Identical to the prior inline block in runLeafAttempt.
+ */
+export function buildScopeViolationOutcome(
+  executionResult: ExecutionResult,
+  scopeViolations: string[],
+  attemptNumber: number,
+): LeafAttemptOutcome {
+  return {
+    invocationId: executionResult.invocationId,
+    testResult: null,
+    entry: {
+      attempt_number: attemptNumber,
+      invocation_id: executionResult.invocationId,
+      outcome: 'reasoning_review_failed',
+      reasoning_review_flaws: [{
+        flaw_type: 'write_scope_violation',
+        severity: 'high',
+        description:
+          'Wrote into protected scaffold paths. Import the canonical shared ' +
+          'modules / root config instead of recreating them: ' +
+          scopeViolations.join(', '),
+      }],
+      files_written_count: executionResult.filesWritten.length,
+    },
+  };
+}
+
+/**
+ * HIGH-severity reasoning-review outcome: map each finding into a reasoning-review
+ * flaw. Identical to the prior inline block in runLeafAttempt.
+ */
+export function buildHighSeverityOutcome(
+  executionResult: ExecutionResult,
+  highSeverityFindings: Array<{ summary: string; detail: string; severity: string }>,
+  attemptNumber: number,
+): LeafAttemptOutcome {
+  return {
+    invocationId: executionResult.invocationId,
+    testResult: null,
+    entry: {
+      attempt_number: attemptNumber,
+      invocation_id: executionResult.invocationId,
+      outcome: 'reasoning_review_failed',
+      reasoning_review_flaws: highSeverityFindings.map(f => ({
+        flaw_type: f.summary.slice(0, 80),
+        severity: f.severity.toLowerCase(),
+        description: f.detail,
+      })),
+      files_written_count: executionResult.filesWritten.length,
+    },
+  };
+}
+
+/**
+ * Record the test files an attempt authored (file-level ownership evidence),
+ * adding each in-workspace, non-deleted test-file path to `ownedTestFiles`
+ * (mutated). Identical to the prior inline loop in runLeafAttempt.
+ */
+export function collectOwnedTestFiles(
+  filesWritten: WrittenFile[],
+  workspacePath: string,
+  ownedTestFiles: Set<string>,
+): void {
+  for (const w of filesWritten) {
+    if (w.operation === 'delete') continue;
+    const rel = path.relative(workspacePath, w.filePath).split(path.sep).join('/');
+    if (rel && !rel.startsWith('..') && isTestFilePath(rel)) ownedTestFiles.add(rel);
+  }
+}
+
 function buildRetryContext(
   attempts: QuarantineAttemptEntry[],
   last: QuarantineAttemptEntry,
@@ -1788,7 +2031,8 @@ function buildRetryContext(
   if (last.reasoning_review_flaws && last.reasoning_review_flaws.length > 0) {
     lines.push('Reasoning review flagged:');
     for (const f of last.reasoning_review_flaws) {
-      lines.push(`  - [${f.severity}] ${f.flaw_type}${f.description ? `: ${f.description}` : ''}`);
+      const descSuffix = f.description ? `: ${f.description}` : '';
+      lines.push(`  - [${f.severity}] ${f.flaw_type}${descSuffix}`);
     }
     lines.push('Address each flaw above by adjusting your approach for this retry.');
   }

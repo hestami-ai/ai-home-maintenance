@@ -105,24 +105,7 @@ export async function runPipeline(
   // is overwritten — we don't assert orphan-process behavior here.
   writePidFile(workspacePath);
 
-  let resolvedDbPath: string;
-  if (config.resumeFromDb) {
-    // Copy the source DB so we don't mutate the original.
-    resolvedDbPath = path.join(dbDir, `resume-${Date.now()}.db`);
-    fs.copyFileSync(config.resumeFromDb, resolvedDbPath);
-    for (const ext of ['-wal', '-shm']) {
-      const src = config.resumeFromDb + ext;
-      if (fs.existsSync(src)) fs.copyFileSync(src, resolvedDbPath + ext);
-    }
-  } else if (config.dbPath) {
-    // Explicit DB path — reuse an existing DB (a fresh workflow run is appended
-    // to it) or create it. Enables cross-run scenarios (the two-run
-    // semantic-supersession driver) where run 2 must SHARE run 1's DB so the
-    // all_runs DMR scope sees run 1's records.
-    resolvedDbPath = path.isAbsolute(config.dbPath) ? config.dbPath : path.join(dbDir, config.dbPath);
-  } else {
-    resolvedDbPath = path.join(dbDir, `${Date.now()}.db`);
-  }
+  const resolvedDbPath = resolveRunDbPath(config, dbDir);
 
   const realOrCapture = config.captureFixtures ? 'capture' : 'real';
   const llmMode = config.llmMode === 'real' ? realOrCapture : 'mock';
@@ -137,87 +120,145 @@ export async function runPipeline(
   });
   const { engine, liaison, db, mockLLM, embedding } = te;
 
-  // --phase-limit wiring: the CLI parses the flag, stores it on config,
-  // and we tell the engine to stop its auto-advance loop after the
-  // named phase. Without this the engine slides past the target, which
-  // defeats the spec's "fix Phase N, rerun `--phase-limit N`" inner
-  // loop for incremental fixture capture + assertion work.
+  applyEngineRunModeFlags(engine, config);
+
+  configureTimeoutRails(engine, config);
+  applyDecompositionCaps(engine, config);
+
+  const liveLogDir = configureLiveObservability(engine, workspacePath, llmMode);
+  const detachMonitor = llmMode !== 'mock'
+    ? attachLiveMonitor(engine.eventBus, liveLogDir)
+    : null;
+
+  try {
+    // Both branches below assign these; quiescenceReason lets the
+    // post-loop result-shaping distinguish operator pause from a stall
+    // or clean completion.
+    let workflowRunId: string | null;
+    let quiescenceReason: QuiescenceExitReason;
+
+    if (config.resumeFromDb && (config.resumeAtPhase || config.resumeAtSubPhase)) {
+      const out = await runResumeMode(engine, db, config, workspacePath, llmMode);
+      workflowRunId = out.workflowRunId;
+      quiescenceReason = out.quiescenceReason;
+    } else {
+      const out = await runNormalMode(
+        engine, liaison, embedding, db, config,
+        { intent, workspacePath, extensionPath, llmMode },
+      );
+      workflowRunId = out.workflowRunId;
+      quiescenceReason = out.quiescenceReason;
+    }
+
+    await maybeSaveCapturedFixtures(mockLLM, engine, config, llmMode, repoRoot);
+
+    const result = collectHarnessResult(db, workflowRunId, {
+      dbPath: resolvedDbPath,
+      startTimeMs: startTime,
+    });
+
+    applyPauseMarker(result, quiescenceReason, workflowRunId);
+
+    await maybeApplyLlmGapEnhancement(result, config, engine, db, workflowRunId);
+
+    return result;
+  } finally {
+    detachMonitor?.();
+    te.cleanup();
+  }
+}
+
+// ── runPipeline sub-steps (extracted to keep runPipeline's cognitive
+//    complexity within bounds; all are behavior-preserving) ─────────────
+
+type RunnerConfig = import('../test/harness/types').PipelineRunnerConfig;
+type RunnerResult = import('../test/harness/types').HarnessResult;
+type LiveLLMMode = 'mock' | 'real' | 'capture';
+
+/**
+ * Resolve the governed_stream DB path for this run: copy-and-use a resume
+ * source, reuse an explicit path (absolute or relative to the harness
+ * dir), or mint a fresh timestamped DB. `fsImpl` is injectable so unit
+ * tests can pin each branch without touching disk (mirrors
+ * detectAndConsumePauseFlag).
+ */
+export function resolveRunDbPath(
+  config: RunnerConfig,
+  dbDir: string,
+  fsImpl: Pick<typeof fs, 'copyFileSync' | 'existsSync'> = fs,
+): string {
+  if (config.resumeFromDb) {
+    // Copy the source DB so we don't mutate the original.
+    const resolved = path.join(dbDir, `resume-${Date.now()}.db`);
+    fsImpl.copyFileSync(config.resumeFromDb, resolved);
+    for (const ext of ['-wal', '-shm']) {
+      const src = config.resumeFromDb + ext;
+      if (fsImpl.existsSync(src)) fsImpl.copyFileSync(src, resolved + ext);
+    }
+    return resolved;
+  }
+  if (config.dbPath) {
+    // Explicit DB path — reuse an existing DB (a fresh workflow run is
+    // appended) or create it. Enables cross-run scenarios (the two-run
+    // semantic-supersession driver) where run 2 must SHARE run 1's DB so
+    // the all_runs DMR scope sees run 1's records.
+    return path.isAbsolute(config.dbPath) ? config.dbPath : path.join(dbDir, config.dbPath);
+  }
+  return path.join(dbDir, `${Date.now()}.db`);
+}
+
+/**
+ * Apply the run-mode engine flags parsed from CLI config: phase limit,
+ * simulate-human-decisions gate certification, and scripted override
+ * injections. Order preserved from the original inline sequence.
+ */
+function applyEngineRunModeFlags(engine: OrchestratorEngine, config: RunnerConfig): void {
+  // --phase-limit: stop the engine's auto-advance loop after the named phase.
   if (config.phaseLimit) {
     engine.setPhaseLimit(config.phaseLimit as PhaseId);
   }
-
-  // --simulate-human-decisions: in headless auto-approve runs, certify each
-  // phase gate through the real approval path (phase_gate_approved + ingested
-  // → `validates` edges → Authority-6 elevation) instead of advancing silently.
-  // This exercises the governance machinery the DMR depends on — active
-  // constraints accumulation in particular — which is otherwise dormant in
-  // headless mode. Off by default.
+  // --simulate-human-decisions: certify each phase gate through the real
+  // approval path instead of advancing silently (exercises DMR governance).
   if (config.simulateHumanDecisions) {
     engine.setSimulateHumanDecisions(true);
   }
-
   // --inject-overrides: scripted prior_decision_override injections fired at
-  // phase boundaries, exercising the DMR's semantic-supersession path. For a
-  // cross-run chain, run twice against the same workspace DB (run 1 establishes
-  // the governing record; run 2 overrides it).
+  // phase boundaries (DMR semantic-supersession path).
   if (config.overrideInjections && config.overrideInjections.length > 0) {
     engine.setOverrideInjections(config.overrideInjections);
   }
+}
 
-  // --thin-slice mode: tighten every decomposition cap and limit root
-  // counts so the workflow exercises every sub-phase prompt template
-  // end-to-end without saturating fully. Goal: validate prompt
-  // templates between full calibration runs in hours, not days.
-  // Reasoning-review-on-tier-c flips to true across all four trees so
-  // the audit prompt templates are also exercised. Override is applied
-  // after createTestEngine so it takes precedence over any inherited
-  // workspace config.
-  // Operational rails — applied for BOTH thin-slice (template iteration) and
-  // full-slice (real end-to-end build). These are headless-real-LLM safety
-  // settings, independent of the decomposition caps (which are thin-slice only).
+/**
+ * Configure the headless operational timeout rails. Slice modes (thin OR
+ * full) extend the records-idle stall window, force a single Phase-9
+ * executor surface, and bump the per-call wall-clock; non-slice runs get a
+ * model-aware records-idle floor. The two branches are mutually exclusive
+ * by construction, matching the original inline behavior.
+ */
+function configureTimeoutRails(engine: OrchestratorEngine, config: RunnerConfig): void {
   if (config.thinSlice || config.fullSlice) {
-    // Workflow overrides: extend the records-idle stall window. Phase 1
-    // bloom prompts on qwen3.5:9b legitimately stream 200+ KB of valid
-    // JSON over 4-7 minutes. The no-progress timer now catches genuine
-    // hangs precisely (90s without a chunk), so the orchestrator stall
-    // window only needs to exceed the worst-case retry burst on a
-    // legitimately slow call. 60 min covers 3 retries at ~15 min each
-    // with healthy headroom.
+    // Extend the records-idle stall window (slow legitimate streams) and pin
+    // a single Phase-9 executor so calibration cycles are debuggable.
     engine.configManager.setWorkflowOverrides({
       records_idle_stall_ms: 3600000,
       auto_mitigation_policy: 'auto',
-      // Thin/full-slice runs pin a SINGLE Phase-9 executor surface (overriding
-      // the implementation_planner's per-task choice) so calibration cycles are
-      // debuggable. Default is now `mimo_cli` (the default executor); override
-      // via JANUMICODE_EXECUTOR_BACKING_TOOL (e.g. `goose_cli` to pin the local
-      // PTY executor).
       force_executor_backing_tool:
         (process.env.JANUMICODE_EXECUTOR_BACKING_TOOL as
           | 'mimo_cli' | 'goose_cli' | 'claude_code_cli' | 'gemini_cli' | 'codex_cli' | 'direct_llm_api'
           | undefined) ?? 'mimo_cli',
     });
-
-    // The no-progress timer (default 90s, env JANUMICODE_LLM_NO_PROGRESS_SECONDS)
-    // is now the primary silent-hang safety net — re-armed on every
-    // streaming chunk, so legitimate slow generations never trip it.
-    // The wall-clock is just an outer adversarial cap. Bump it generously
-    // for thin-slice (1800s = 30 min) so it never fires for valid output.
-    // Operator can override by setting JANUMICODE_LLM_MAX_CALL_SECONDS
-    // explicitly.
+    // Bump the outer per-call wall-clock cap generously (30 min) unless the
+    // operator set it explicitly; the no-progress timer is the primary net.
     if (!process.env.JANUMICODE_LLM_MAX_CALL_SECONDS) {
       process.env.JANUMICODE_LLM_MAX_CALL_SECONDS = '1800';
     }
   }
 
-  // Records-idle session-stall generalization (NOT slice-gated). The session
-  // watchdog (waitForQuiescence) must never undercut the per-call wall-clock:
-  // a streaming call produces no governed_stream record until it COMPLETES, so
-  // if the session stall is shorter than a single slow LOCAL call's wall-clock,
-  // the watchdog guillotines a legitimately-progressing call mid-stream. cal-29
-  // P6.1 died exactly this way — a 922 s call killed by the 900 s default while
-  // the per-call wall-clock was 1200 s. Slice modes already raise it to 3600000
-  // above; extend the same model-aware floor to ANY run that routes a role to a
-  // local model. See llmTimeouts.resolveRecordsIdleStallMs.
+  // Records-idle session-stall generalization (NOT slice-gated). Extend the
+  // model-aware floor to ANY run that routes a role to a local model so the
+  // session watchdog never undercuts a slow local call's wall-clock. See
+  // llmTimeouts.resolveRecordsIdleStallMs.
   if (!config.thinSlice && !config.fullSlice) {
     const routes = Object.values(engine.llmRouting ?? {}) as Array<{ primary?: { provider?: string } }>;
     const usesLocalModels = routes.some(r => isLocalProvider(r?.primary?.provider));
@@ -225,380 +266,437 @@ export async function runPipeline(
       records_idle_stall_ms: resolveRecordsIdleStallMs(usesLocalModels),
     });
   }
+}
 
-  // Decomposition caps — thin-slice ONLY. Full-slice decomposes the entire
-  // intent (no caps) while keeping the operational rails set above.
-  if (config.thinSlice) {
-    engine.configManager.setDecompositionOverrides({
-      depth_cap: 2,
-      budget_cap: 30,
-      fanout_cap: 1,
-      max_root_count_fr: 2,
-      max_root_count_nfr: 2,
-      reasoning_review_on_tier_c: true,
-      component_depth_cap: 2,
-      component_budget_cap: 15,
-      component_fanout_cap: 2,
-      component_reasoning_review_on_tier_c: true,
-      task_depth_cap: 2,
-      task_budget_cap: 20,
-      task_fanout_cap: 2,
-      task_reasoning_review_on_tier_c: true,
-      data_model_depth_cap: 2,
-      data_model_budget_cap: 15,
-      data_model_fanout_cap: 2,
-      data_model_reasoning_review_on_tier_c: true,
-      test_depth_cap: 2,
-      test_budget_cap: 20,
-      test_fanout_cap: 2,
-      test_reasoning_review_on_tier_c: true,
+/**
+ * Apply the thin-slice decomposition caps. Full-slice decomposes the
+ * entire intent (no caps) while keeping the operational rails above.
+ */
+function applyDecompositionCaps(engine: OrchestratorEngine, config: RunnerConfig): void {
+  if (!config.thinSlice) return;
+  engine.configManager.setDecompositionOverrides({
+    depth_cap: 2,
+    budget_cap: 30,
+    fanout_cap: 1,
+    max_root_count_fr: 2,
+    max_root_count_nfr: 2,
+    reasoning_review_on_tier_c: true,
+    component_depth_cap: 2,
+    component_budget_cap: 15,
+    component_fanout_cap: 2,
+    component_reasoning_review_on_tier_c: true,
+    task_depth_cap: 2,
+    task_budget_cap: 20,
+    task_fanout_cap: 2,
+    task_reasoning_review_on_tier_c: true,
+    data_model_depth_cap: 2,
+    data_model_budget_cap: 15,
+    data_model_fanout_cap: 2,
+    data_model_reasoning_review_on_tier_c: true,
+    test_depth_cap: 2,
+    test_budget_cap: 20,
+    test_fanout_cap: 2,
+    test_reasoning_review_on_tier_c: true,
+  });
+}
+
+/**
+ * Real-mode routing overrides from env vars: steer the Orchestrator,
+ * Domain Interpreter, and Requirements Agent roles to specific CLI
+ * backings without editing config.json. Unset → role keeps DEFAULT_CONFIG.
+ */
+function applyRealModeRoutingOverrides(engine: OrchestratorEngine): void {
+  const orchBacking = process.env.JANUMICODE_ORCHESTRATOR_BACKING;
+  if (orchBacking) {
+    engine.configManager.setOrchestratorRouting({
+      primary: {
+        backing_tool: orchBacking,
+        provider: process.env.JANUMICODE_ORCHESTRATOR_PROVIDER,
+        model: process.env.JANUMICODE_ORCHESTRATOR_MODEL,
+      },
+      temperature: 0.3,
     });
   }
+  const diBacking = process.env.JANUMICODE_DOMAIN_INTERPRETER_BACKING;
+  if (diBacking) {
+    engine.configManager.setDomainInterpreterRouting({
+      primary: {
+        backing_tool: diBacking,
+        provider: process.env.JANUMICODE_DOMAIN_INTERPRETER_PROVIDER,
+        model: process.env.JANUMICODE_DOMAIN_INTERPRETER_MODEL,
+      },
+      temperature: 0.5,
+    });
+  }
+  // Wave 5 — Phase 2 Requirements Agent routing override.
+  const raBacking = process.env.JANUMICODE_REQUIREMENTS_AGENT_BACKING;
+  if (raBacking) {
+    engine.configManager.setRequirementsAgentRouting({
+      primary: {
+        backing_tool: raBacking,
+        provider: process.env.JANUMICODE_REQUIREMENTS_AGENT_PROVIDER,
+        model: process.env.JANUMICODE_REQUIREMENTS_AGENT_MODEL,
+      },
+      temperature: 0.5,
+    });
+  }
+}
 
-  // Live observability for live (non-mock) runs. Writes per-call .log
-  // files under <workspace>/.janumicode/live/ (C8) and prints a
-  // heartbeat + live tail to stdout (A1 + A3) so you can tell a
-  // running call from a stalled one without opening the DB.
+/**
+ * Configure live observability for non-mock runs: per-call .log files
+ * under <workspace>/.janumicode/live, CLI parser registration, and env-var
+ * routing overrides. Returns the live-log directory (computed in every mode
+ * so the caller can wire attachLiveMonitor when non-mock).
+ */
+function configureLiveObservability(
+  engine: OrchestratorEngine,
+  workspacePath: string,
+  llmMode: LiveLLMMode,
+): string {
   const liveLogDir = path.join(workspacePath, '.janumicode', 'live');
-  if (llmMode !== 'mock') {
-    fs.mkdirSync(liveLogDir, { recursive: true });
-    engine.llmCaller.setLiveLogDir(liveLogDir);
-    // CLI parity: AgentInvoker also writes per-invocation live logs for
-    // Goose / Claude Code / Gemini / Codex calls so operators can tail
-    // them the same way as LLM calls.
-    engine.agentInvoker.setLiveLogDir(liveLogDir);
-    // Real-mode runs spawn the Claude Code subprocess for Phase 9 task
-    // execution. Mock mode deliberately skips this — Phase 9 should
-    // fail fast with "No output parser registered for backing tool:
-    // claude_code_cli" so fixture-only tests don't hang waiting for a
-    // coding agent that isn't configured in the test env.
-    engine.registerBuiltinCLIParsers();
+  if (llmMode === 'mock') return liveLogDir;
+  fs.mkdirSync(liveLogDir, { recursive: true });
+  engine.llmCaller.setLiveLogDir(liveLogDir);
+  // CLI parity: AgentInvoker also writes per-invocation live logs.
+  engine.agentInvoker.setLiveLogDir(liveLogDir);
+  // Real-mode runs spawn the coding-agent subprocess for Phase 9. Mock mode
+  // deliberately skips this so fixture-only tests fail fast instead of hanging.
+  engine.registerBuiltinCLIParsers();
+  applyRealModeRoutingOverrides(engine);
+  return liveLogDir;
+}
 
-    // Real-mode routing overrides from env vars. Lets operators steer
-    // the Orchestrator and Domain Interpreter roles to specific CLI
-    // backings (e.g. OpenAI Codex for a gold-capture run) without
-    // editing config.json. Unset → role uses DEFAULT_CONFIG routing.
-    //
-    //   JANUMICODE_ORCHESTRATOR_BACKING        — 'claude_code_cli' | 'codex_cli' | 'openai_codex_cli' | 'gemini_cli' | 'goose_cli' | 'direct_llm_api'
-    //   JANUMICODE_ORCHESTRATOR_MODEL          — model id for CLI / direct backing
-    //   JANUMICODE_ORCHESTRATOR_PROVIDER       — only for direct_llm_api
-    //   JANUMICODE_DOMAIN_INTERPRETER_BACKING  — same enum as above
-    //   JANUMICODE_DOMAIN_INTERPRETER_MODEL
-    //   JANUMICODE_DOMAIN_INTERPRETER_PROVIDER
-    const orchBacking = process.env.JANUMICODE_ORCHESTRATOR_BACKING;
-    if (orchBacking) {
-      engine.configManager.setOrchestratorRouting({
-        primary: {
-          backing_tool: orchBacking,
-          provider: process.env.JANUMICODE_ORCHESTRATOR_PROVIDER,
-          model: process.env.JANUMICODE_ORCHESTRATOR_MODEL,
-        },
-        temperature: 0.3,
-      });
-    }
-    const diBacking = process.env.JANUMICODE_DOMAIN_INTERPRETER_BACKING;
-    if (diBacking) {
-      engine.configManager.setDomainInterpreterRouting({
-        primary: {
-          backing_tool: diBacking,
-          provider: process.env.JANUMICODE_DOMAIN_INTERPRETER_PROVIDER,
-          model: process.env.JANUMICODE_DOMAIN_INTERPRETER_MODEL,
-        },
-        temperature: 0.5,
-      });
-    }
-    // Wave 5 — Phase 2 Requirements Agent routing override.
-    //   JANUMICODE_REQUIREMENTS_AGENT_BACKING / _PROVIDER / _MODEL
-    const raBacking = process.env.JANUMICODE_REQUIREMENTS_AGENT_BACKING;
-    if (raBacking) {
-      engine.configManager.setRequirementsAgentRouting({
-        primary: {
-          backing_tool: raBacking,
-          provider: process.env.JANUMICODE_REQUIREMENTS_AGENT_PROVIDER,
-          model: process.env.JANUMICODE_REQUIREMENTS_AGENT_MODEL,
-        },
-        temperature: 0.5,
-      });
-    }
+/**
+ * Resolve the resume target phase (and optional sub-phase). The sub-phase
+ * flag takes precedence; when given, look up its owning phase in the prior
+ * run's records and throw if none exist.
+ */
+function resolveResumeTarget(
+  db: Database,
+  config: RunnerConfig,
+  workflowRunId: string,
+): { targetPhase: PhaseId; targetSubPhase: string | null } {
+  const targetSubPhase: string | null = config.resumeAtSubPhase ?? null;
+  if (!targetSubPhase) {
+    return { targetPhase: config.resumeAtPhase as PhaseId, targetSubPhase: null };
   }
-  const detachMonitor = llmMode !== 'mock'
-    ? attachLiveMonitor(engine.eventBus, liveLogDir)
-    : null;
+  const row = db.prepare(`
+    SELECT phase_id FROM governed_stream
+     WHERE workflow_run_id = ? AND sub_phase_id = ?
+     ORDER BY produced_at ASC LIMIT 1
+  `).get(workflowRunId, targetSubPhase) as { phase_id: string | null } | undefined;
+  if (!row?.phase_id) {
+    throw new Error(
+      `Could not resolve phase for sub_phase_id="${targetSubPhase}" — no records found in the prior run`,
+    );
+  }
+  return { targetPhase: row.phase_id as PhaseId, targetSubPhase };
+}
 
+/**
+ * Roll back stale records at-or-after the FIRST occurrence of the resume
+ * sub-phase before advancing the state machine. No-op (and no rollback) for
+ * a phase-only resume. Throws if the sub-phase has no current-version
+ * records in the prior run.
+ */
+function performResumeRollback(
+  db: Database,
+  workflowRunId: string,
+  targetSubPhase: string | null,
+): void {
+  if (!targetSubPhase) return;
+  const rollbackResult = rollbackToSubPhase(db, workflowRunId, targetSubPhase);
+  if (!rollbackResult.cutoff_produced_at) {
+    throw new Error(
+      `Sub-phase "${targetSubPhase}" has no current-version records in the prior run; cannot resume from there.`,
+    );
+  }
+  console.log(
+    `[resume] Rolled back ${rollbackResult.rolled_back_count} stale records ` +
+    `(preserved ${rollbackResult.preserved_count} immutable history). ` +
+    `Cutoff: ${rollbackResult.cutoff_produced_at}`,
+  );
+}
+
+/**
+ * Prime the LLM-call cache from the prior run's persisted invocation /
+ * output pairs so re-executed phases replay cached calls instead of hitting
+ * the provider. Non-fatal on failure (calls just re-execute).
+ */
+function primeResumeCache(engine: OrchestratorEngine, db: Database, workflowRunId: string): void {
   try {
-    let workflowRunId: string | null = null;
-    // Captured by the waitForQuiescence().then handlers below so the
-    // post-loop result-shaping code can distinguish operator pause
-    // from a stall or clean completion.
-    let quiescenceReason: QuiescenceExitReason = 'completed';
+    const cacheStats = engine.llmCaller.loadCacheFromDb(db, workflowRunId);
+    console.log(
+      `[resume] LLM-call cache primed: ${cacheStats.entries} entries ` +
+      `(scanned ${cacheStats.scanned} invocations, skipped ${cacheStats.skipped})`,
+    );
+  } catch (err) {
+    console.warn(
+      `[resume] LLM-call cache prime failed (non-fatal — calls will re-execute): ` +
+      `${err instanceof Error ? err.message : String(err)}`,
+    );
+  }
+}
 
-    if (config.resumeFromDb && (config.resumeAtPhase || config.resumeAtSubPhase)) {
-      // ── Resume mode: skip bootstrapIntent, advance to target phase ──
-      workflowRunId = findLatestRunId(db);
-      if (!workflowRunId) {
-        throw new Error(`No workflow run found in resumed database: ${config.resumeFromDb}`);
-      }
-
-      // Resolve the target phase. When --resume-at-sub-phase is given,
-      // look up that sub-phase's owning phase in the prior run's records.
-      // The sub-phase flag takes precedence over the phase flag.
-      let targetPhase: PhaseId;
-      let targetSubPhase: string | null = config.resumeAtSubPhase ?? null;
-      if (targetSubPhase) {
-        const row = db.prepare(`
-          SELECT phase_id FROM governed_stream
-           WHERE workflow_run_id = ? AND sub_phase_id = ?
-           ORDER BY produced_at ASC LIMIT 1
-        `).get(workflowRunId, targetSubPhase) as { phase_id: string | null } | undefined;
-        if (!row?.phase_id) {
-          throw new Error(
-            `Could not resolve phase for sub_phase_id="${targetSubPhase}" — no records found in the prior run`,
-          );
-        }
-        targetPhase = row.phase_id as PhaseId;
-      } else {
-        targetPhase = config.resumeAtPhase as PhaseId;
-      }
-
-      // Roll back stale records before advancing the state machine.
-      // When resuming at a sub-phase, the cutoff is the FIRST occurrence
-      // of that sub-phase. When resuming only at a phase (legacy flag),
-      // we'd need a phase-cutoff variant — for now we use the first
-      // record of the phase as the cutoff target.
-      let rollbackResult = null;
-      if (targetSubPhase) {
-        rollbackResult = rollbackToSubPhase(db, workflowRunId, targetSubPhase);
-        if (!rollbackResult.cutoff_produced_at) {
-          throw new Error(
-            `Sub-phase "${targetSubPhase}" has no current-version records in the prior run; cannot resume from there.`,
-          );
-        }
-        console.log(
-          `[resume] Rolled back ${rollbackResult.rolled_back_count} stale records ` +
-          `(preserved ${rollbackResult.preserved_count} immutable history). ` +
-          `Cutoff: ${rollbackResult.cutoff_produced_at}`,
-        );
-      }
-
-      // Optionally clear the cycle counter so resumed phases run their FULL
-      // execute() path (full regeneration + gatekeepers) instead of the
-      // packet-synthesis-failure cycle-delta path. Phase 6/7/8 branch to
-      // runPhaseNCycleDelta whenever current_cycle_number > 0 (phase7.ts:91);
-      // that delta path only heals failure-seed orphans and never re-runs the
-      // generator, so a fix living in the main path (e.g. a Phase-7 gatekeeper
-      // change) would be silently skipped on a cycle-mode resume.
-      if (config.resumeResetCycles) {
-        const priorCycle = resetRunCycleCounter(db, workflowRunId);
-        console.log(`[resume] Reset current_cycle_number ${priorCycle}→0 (phases run full re-execution, not cycle-delta)`);
-      }
-      console.log(`Resuming run ${workflowRunId} at Phase ${targetPhase}${targetSubPhase ? ` (sub-phase: ${targetSubPhase})` : ''}`);
-
-      // Prime the LLM call cache from the prior run's persisted
-      // agent_invocation + agent_output pairs. Phase handlers below the
-      // resume cutoff still re-execute their pipeline (parse, normalize,
-      // persist) — but any LLM call whose prompt matches the prior run
-      // returns instantly from cache instead of hitting the provider.
-      // The rolled-back records remain is_current_version=0 (so reads
-      // see the clean upstream state) while the cache holds the
-      // original outputs keyed by prompt hash. This is the single-seam
-      // replacement for per-handler "skip if already done" logic.
-      try {
-        const cacheStats = engine.llmCaller.loadCacheFromDb(db, workflowRunId);
-        console.log(
-          `[resume] LLM-call cache primed: ${cacheStats.entries} entries ` +
-          `(scanned ${cacheStats.scanned} invocations, skipped ${cacheStats.skipped})`,
-        );
-      } catch (err) {
-        console.warn(
-          `[resume] LLM-call cache prime failed (non-fatal — calls will re-execute): ` +
-          `${err instanceof Error ? err.message : String(err)}`,
-        );
-      }
-
-      // Re-open the per-run AODD trace before emitting run.resumed.
-      // The orchestrator was constructed for an existing workflow_run_id,
-      // so startWorkflowRun() did not call aoddStartRun for this run id.
-      aoddStartRun(workflowRunId!);
-      withTraceContext(
-        { workflow_run_id: workflowRunId, phase_id: targetPhase, sub_phase_id: null },
-        () => {
-          aoddEmit('run.resumed', { resumed_at: new Date().toISOString() });
-        },
-      );
-
-      // Advance through intermediate phases to reach the target.
-      // The state machine only allows adjacent forward transitions.
-      const { PHASE_ORDER: phaseOrder } = require('../lib/types/records');
-      const run = engine.stateMachine.getWorkflowRun(workflowRunId);
-      const currentIdx = phaseOrder.indexOf(run?.current_phase_id);
-      const targetIdx = phaseOrder.indexOf(targetPhase);
-      if (currentIdx >= 0 && targetIdx > currentIdx) {
-        for (let i = currentIdx + 1; i <= targetIdx; i++) {
-          engine.advanceToNextPhase(workflowRunId, phaseOrder[i]);
-        }
-      } else if (run?.current_phase_id !== targetPhase) {
-        // We're already at or past the target phase. Reset the
-        // state-machine cursor so we re-execute. is_current_version=0
-        // on the rolled-back records means the phase will see clean
-        // upstream + empty target-phase outputs.
-        // Note: this uses the same advanceToNextPhase API but in
-        // "reset" mode. If the API doesn't support backward moves,
-        // we fall back to a direct DB update.
-        try {
-          db.prepare(`UPDATE workflow_runs SET current_phase_id = ? WHERE id = ?`)
-            .run(targetPhase, workflowRunId);
-          console.log(`[resume] Reset current_phase_id to ${targetPhase} (state machine cursor moved backward)`);
-        } catch (err) {
-          throw new Error(
-            `Could not reset to Phase ${targetPhase}. Current: ${run?.current_phase_id}. ` +
-            `Error: ${err instanceof Error ? err.message : String(err)}`,
-          );
-        }
-      }
-
-      // Session abort plumbing: create a controller, hand it to the
-      // engine so every LLM call this session makes receives its
-      // signal, and race the phase execution against waitForQuiescence.
-      // On stall detection, abortSession() cancels the in-flight
-      // ollama call, the saturation loop catches the abort, writes a
-      // deferred supersession for the hung node, and executeCurrentPhase
-      // unwinds. Without this, a hung ollama call holds the await
-      // forever and the watchdog can only log (not intervene).
-      const abortController = new AbortController();
-      engine.setSessionAbortController(abortController);
-
-      const mockCapMs = llmMode === 'mock' ? 10000 : null;
-      const stableThreshold = llmMode === 'mock' ? 3 : 100;
-      const recordsIdleStallMs = engine.configManager.get().workflow.records_idle_stall_ms;
-      const phasePromise = engine.executeCurrentPhase(workflowRunId)
-        .catch((err: unknown) => {
-          const msg = err instanceof Error ? err.message : String(err);
-          console.warn(`[resume] Phase execution ended: ${msg}`);
-        });
-      const quiescencePromise = waitForQuiescence(engine, db, workflowRunId, {
-        mockCapMs, stableThreshold, recordsIdleStallMs, workspacePath,
-      }).then((reason) => {
-        quiescenceReason = reason;
-        // Stall detected, paused, or workflow completed — abort any
-        // in-flight LLM call so the phase promise unwinds. The
-        // abortSession call is a no-op if nothing is in flight (and
-        // also a no-op on a second call when the pause path already
-        // aborted), so this is safe in every case.
-        engine.abortSession('waitForQuiescence exited (stall or completion)');
-      });
-      await Promise.race([phasePromise, quiescencePromise]);
-      // After race wins, give the other side ~3 seconds to unwind
-      // (HTTP abort → saturation loop catch → supersession write).
-      await Promise.race([
-        Promise.all([phasePromise, quiescencePromise]),
-        new Promise<void>((r) => setTimeout(r, 3000)),
-      ]);
-    } else {
-      // ── Normal mode: full pipeline from intent ──
-      const headlessConfig: HeadlessLiaisonConfig = {
-        intent,
-        autoApprove: config.autoApprove,
-        decisionOverrides: config.decisionOverrides,
-        workspacePath,
-        extensionPath,
-      };
-
-      const headlessAdapter = new HeadlessLiaisonAdapter(
-        engine, liaison, liaison.getDB(), engine.eventBus, embedding,
-      );
-
-      const result = await headlessAdapter.bootstrapIntent(headlessConfig);
-      workflowRunId = result.workflowRunId;
-
-      // Wait for quiescence. No wall-clock cap in real mode — we
-      // exit when the workflow reports completed/failed OR the stream
-      // goes silent for `records_idle_stall_ms` (default 15 min) which
-      // is the real "something is stuck" signal. Mock mode retains a
-      // short safety cap because mock runs should complete in seconds.
-      // Session abort: plumb a controller so stall detection can
-      // cancel any in-flight LLM call (same pattern as resume mode).
-      const abortController = new AbortController();
-      engine.setSessionAbortController(abortController);
-      const mockCapMs = 10000;
-      const stableThreshold = llmMode === 'mock' ? 3 : 100;
-      const recordsIdleStallMs = engine.configManager.get().workflow.records_idle_stall_ms;
-      if (workflowRunId) {
-        quiescenceReason = await waitForQuiescence(engine, db, workflowRunId, {
-          mockCapMs: llmMode === 'mock' ? mockCapMs : null,
-          stableThreshold,
-          recordsIdleStallMs,
-          workspacePath,
-        });
-        engine.abortSession('waitForQuiescence exited (stall or completion)');
-      }
+/**
+ * Move the state-machine cursor to the resume target. Forward moves step
+ * through each adjacent phase (the only transitions the state machine
+ * allows); if we're already at/past the target, reset the cursor via a
+ * direct DB update so the phase re-executes against clean upstream state.
+ */
+function advanceToResumeTarget(
+  engine: OrchestratorEngine,
+  db: Database,
+  workflowRunId: string,
+  targetPhase: PhaseId,
+): void {
+  const { PHASE_ORDER: phaseOrder } = require('../lib/types/records');
+  const run = engine.stateMachine.getWorkflowRun(workflowRunId);
+  const currentIdx = phaseOrder.indexOf(run?.current_phase_id);
+  const targetIdx = phaseOrder.indexOf(targetPhase);
+  if (currentIdx >= 0 && targetIdx > currentIdx) {
+    for (let i = currentIdx + 1; i <= targetIdx; i++) {
+      engine.advanceToNextPhase(workflowRunId, phaseOrder[i]);
     }
+    return;
+  }
+  if (run?.current_phase_id === targetPhase) return;
+  // We're already at or past the target phase — reset the state-machine
+  // cursor so we re-execute against clean (is_current_version=0) upstream.
+  try {
+    db.prepare(`UPDATE workflow_runs SET current_phase_id = ? WHERE id = ?`)
+      .run(targetPhase, workflowRunId);
+    console.log(`[resume] Reset current_phase_id to ${targetPhase} (state machine cursor moved backward)`);
+  } catch (err) {
+    throw new Error(
+      `Could not reset to Phase ${targetPhase}. Current: ${run?.current_phase_id}. ` +
+      `Error: ${err instanceof Error ? err.message : String(err)}`,
+    );
+  }
+}
 
-    // Save captured fixtures if in capture mode.
-    if (llmMode === 'capture' && mockLLM.getCapturedCalls().length > 0) {
-      const captureDir = config.captureOutputDir
-        ?? path.join(repoRoot, 'src', 'test', 'fixtures', 'captured');
-      fs.mkdirSync(captureDir, { recursive: true });
-      const saved = await mockLLM.saveCapturedFixtures(
-        captureDir,
-        engine.janumiCodeVersionSha,
-      );
-      console.log(`\nCaptured ${saved.length} fixture(s) to ${captureDir}`);
-      for (const f of saved) {
-        console.log(`  ${path.relative(repoRoot, f)}`);
-      }
-    }
+/**
+ * Race the resumed phase execution against waitForQuiescence with a session
+ * AbortController, then give the losing side ~3s to unwind (HTTP abort →
+ * saturation-loop catch → supersession write). Returns the quiescence exit
+ * reason captured from the watchdog.
+ */
+async function raceResumeExecution(
+  engine: OrchestratorEngine,
+  db: Database,
+  workflowRunId: string,
+  workspacePath: string,
+  llmMode: LiveLLMMode,
+): Promise<QuiescenceExitReason> {
+  const abortController = new AbortController();
+  engine.setSessionAbortController(abortController);
 
-    const result = collectHarnessResult(db, workflowRunId, {
-      dbPath: resolvedDbPath,
-      startTimeMs: startTime,
+  const mockCapMs = llmMode === 'mock' ? 10000 : null;
+  const stableThreshold = llmMode === 'mock' ? 3 : 100;
+  const recordsIdleStallMs = engine.configManager.get().workflow.records_idle_stall_ms;
+  let quiescenceReason: QuiescenceExitReason = 'completed';
+  const phasePromise = engine.executeCurrentPhase(workflowRunId)
+    .catch((err: unknown) => {
+      const msg = err instanceof Error ? err.message : String(err);
+      console.warn(`[resume] Phase execution ended: ${msg}`);
     });
+  const quiescencePromise = waitForQuiescence(engine, db, workflowRunId, {
+    mockCapMs, stableThreshold, recordsIdleStallMs, workspacePath,
+  }).then((reason) => {
+    quiescenceReason = reason;
+    // Abort any in-flight LLM call so the phase promise unwinds. No-op when
+    // nothing is in flight, and idempotent on a second call.
+    engine.abortSession('waitForQuiescence exited (stall or completion)');
+  });
+  await Promise.race([phasePromise, quiescencePromise]);
+  // After race wins, give the other side ~3 seconds to unwind.
+  await Promise.race([
+    Promise.all([phasePromise, quiescencePromise]),
+    new Promise<void>((r) => setTimeout(r, 3000)),
+  ]);
+  return quiescenceReason;
+}
 
-    // Attach the pause marker when the loop exited via the operator
-    // pause-flag path so the CLI / virtuous-cycle consumer can tell
-    // the difference between "run finished" and "run was paused mid-flow,
-    // resume with --resume-from-db". Stall and clean-completion exits
-    // leave `paused` undefined.
-    if (quiescenceReason === 'paused') {
-      result.paused = {
-        paused_at: new Date().toISOString(),
-        workflow_run_id: workflowRunId,
-      };
-      // Suppress the gap report on pause — the workflow isn't broken,
-      // it's intentionally suspended. Surfacing a "Phase X failed"
-      // gap report would mislead the operator and the virtuous-cycle
-      // consumer into thinking they need to fix something before
-      // resuming. The DB still has every record produced up to the
-      // pause; resuming via --resume-from-db continues from there.
-      result.gapReport = undefined;
-    }
+/**
+ * Resume mode: skip bootstrapIntent and re-execute from a target phase /
+ * sub-phase in a copied prior-run DB. Returns the workflow run id and the
+ * quiescence exit reason.
+ */
+async function runResumeMode(
+  engine: OrchestratorEngine,
+  db: Database,
+  config: RunnerConfig,
+  workspacePath: string,
+  llmMode: LiveLLMMode,
+): Promise<{ workflowRunId: string; quiescenceReason: QuiescenceExitReason }> {
+  const workflowRunId = findLatestRunId(db);
+  if (!workflowRunId) {
+    throw new Error(`No workflow run found in resumed database: ${config.resumeFromDb}`);
+  }
 
-    // Optional LLM-grounded suggested_fix. Runs after the rule-based
-    // enhancement so the prompt can reference the already-populated
-    // failed_at_phase. Any failure is swallowed inside
-    // generateLLMGapSuggestion — the base report is still returned.
-    if (config.llmGapEnhance && result.gapReport && workflowRunId) {
-      // Resolve "" sentinels from the CLI to workspace orchestrator
-      // routing — keeps the literal model name in one place (config).
-      const gapDefaults = engine.configManager.getRoutingModel('orchestrator');
-      const suggestion = await generateLLMGapSuggestion(
-        db,
-        workflowRunId,
-        result.gapReport,
-        engine.llmCaller,
-        {
-          provider: config.llmGapEnhance.provider || gapDefaults.provider,
-          model: config.llmGapEnhance.model || gapDefaults.model,
-        },
-      );
-      if (suggestion) {
-        result.gapReport.llm_suggested_fix = suggestion;
-      }
-    }
+  const { targetPhase, targetSubPhase } = resolveResumeTarget(db, config, workflowRunId);
 
-    return result;
-  } finally {
-    detachMonitor?.();
-    te.cleanup();
+  performResumeRollback(db, workflowRunId, targetSubPhase);
+
+  // Optionally clear the cycle counter so resumed phases run their FULL
+  // execute() path (full regeneration + gatekeepers) instead of the
+  // packet-synthesis-failure cycle-delta path.
+  if (config.resumeResetCycles) {
+    const priorCycle = resetRunCycleCounter(db, workflowRunId);
+    console.log(`[resume] Reset current_cycle_number ${priorCycle}→0 (phases run full re-execution, not cycle-delta)`);
+  }
+  const subPhaseSuffix = targetSubPhase ? ` (sub-phase: ${targetSubPhase})` : '';
+  console.log(`Resuming run ${workflowRunId} at Phase ${targetPhase}${subPhaseSuffix}`);
+
+  primeResumeCache(engine, db, workflowRunId);
+
+  // Re-open the per-run AODD trace before emitting run.resumed. The
+  // orchestrator was constructed for an existing workflow_run_id, so
+  // startWorkflowRun() did not call aoddStartRun for this run id.
+  aoddStartRun(workflowRunId);
+  withTraceContext(
+    { workflow_run_id: workflowRunId, phase_id: targetPhase, sub_phase_id: null },
+    () => {
+      aoddEmit('run.resumed', { resumed_at: new Date().toISOString() });
+    },
+  );
+
+  advanceToResumeTarget(engine, db, workflowRunId, targetPhase);
+
+  const quiescenceReason = await raceResumeExecution(engine, db, workflowRunId, workspacePath, llmMode);
+  return { workflowRunId, quiescenceReason };
+}
+
+/**
+ * Normal mode: bootstrap the intent through the headless liaison adapter,
+ * then wait for quiescence. Returns the workflow run id and quiescence exit
+ * reason.
+ */
+async function runNormalMode(
+  engine: OrchestratorEngine,
+  liaison: import('../lib/agents/clientLiaisonAgent').ClientLiaisonAgent,
+  embedding: import('../lib/embedding/embeddingService').EmbeddingService,
+  db: Database,
+  config: RunnerConfig,
+  ctx: {
+    intent: string;
+    workspacePath: string;
+    extensionPath: string;
+    llmMode: LiveLLMMode;
+  },
+): Promise<{ workflowRunId: string | null; quiescenceReason: QuiescenceExitReason }> {
+  const { intent, workspacePath, extensionPath, llmMode } = ctx;
+  const headlessConfig: HeadlessLiaisonConfig = {
+    intent,
+    autoApprove: config.autoApprove,
+    decisionOverrides: config.decisionOverrides,
+    workspacePath,
+    extensionPath,
+  };
+
+  const headlessAdapter = new HeadlessLiaisonAdapter(
+    engine, liaison, liaison.getDB(), engine.eventBus, embedding,
+  );
+
+  const result = await headlessAdapter.bootstrapIntent(headlessConfig);
+  const workflowRunId = result.workflowRunId;
+
+  // Session abort: plumb a controller so stall detection can cancel any
+  // in-flight LLM call (same pattern as resume mode). No wall-clock cap in
+  // real mode — mock mode retains a short safety cap.
+  const abortController = new AbortController();
+  engine.setSessionAbortController(abortController);
+  const mockCapMs = 10000;
+  const stableThreshold = llmMode === 'mock' ? 3 : 100;
+  const recordsIdleStallMs = engine.configManager.get().workflow.records_idle_stall_ms;
+  let quiescenceReason: QuiescenceExitReason = 'completed';
+  if (workflowRunId) {
+    quiescenceReason = await waitForQuiescence(engine, db, workflowRunId, {
+      mockCapMs: llmMode === 'mock' ? mockCapMs : null,
+      stableThreshold,
+      recordsIdleStallMs,
+      workspacePath,
+    });
+    engine.abortSession('waitForQuiescence exited (stall or completion)');
+  }
+  return { workflowRunId, quiescenceReason };
+}
+
+/**
+ * Save captured LLM fixtures when running in capture mode with recorded
+ * calls. No-op otherwise (guard preserves the original short-circuit: the
+ * captured-calls count is only read when the mode is 'capture').
+ */
+async function maybeSaveCapturedFixtures(
+  mockLLM: import('../test/helpers/mockLLMProvider').MockLLMProvider,
+  engine: OrchestratorEngine,
+  config: RunnerConfig,
+  llmMode: LiveLLMMode,
+  repoRoot: string,
+): Promise<void> {
+  if (llmMode !== 'capture' || mockLLM.getCapturedCalls().length === 0) return;
+  const captureDir = config.captureOutputDir
+    ?? path.join(repoRoot, 'src', 'test', 'fixtures', 'captured');
+  fs.mkdirSync(captureDir, { recursive: true });
+  const saved = await mockLLM.saveCapturedFixtures(
+    captureDir,
+    engine.janumiCodeVersionSha,
+  );
+  console.log(`\nCaptured ${saved.length} fixture(s) to ${captureDir}`);
+  for (const f of saved) {
+    console.log(`  ${path.relative(repoRoot, f)}`);
+  }
+}
+
+/**
+ * Attach the operator-pause marker to the result when the loop exited via
+ * the pause-flag path, and suppress the gap report (the workflow isn't
+ * broken, just suspended — resume via --resume-from-db).
+ */
+function applyPauseMarker(
+  result: RunnerResult,
+  quiescenceReason: QuiescenceExitReason,
+  workflowRunId: string | null,
+): void {
+  if (quiescenceReason !== 'paused') return;
+  result.paused = {
+    paused_at: new Date().toISOString(),
+    workflow_run_id: workflowRunId,
+  };
+  result.gapReport = undefined;
+}
+
+/**
+ * Optional LLM-grounded suggested_fix for the gap report. Runs after the
+ * rule-based enhancement; any failure is swallowed inside
+ * generateLLMGapSuggestion so the base report is still returned. `gapReport`
+ * is captured before the await so the reference (and its mutation) survives.
+ */
+async function maybeApplyLlmGapEnhancement(
+  result: RunnerResult,
+  config: RunnerConfig,
+  engine: OrchestratorEngine,
+  db: Database,
+  workflowRunId: string | null,
+): Promise<void> {
+  const gapEnhance = config.llmGapEnhance;
+  const gapReport = result.gapReport;
+  if (!gapEnhance || !gapReport || !workflowRunId) return;
+  // Resolve "" sentinels from the CLI to workspace orchestrator routing —
+  // keeps the literal model name in one place (config).
+  const gapDefaults = engine.configManager.getRoutingModel('orchestrator');
+  const suggestion = await generateLLMGapSuggestion(
+    db,
+    workflowRunId,
+    gapReport,
+    engine.llmCaller,
+    {
+      provider: gapEnhance.provider || gapDefaults.provider,
+      model: gapEnhance.model || gapDefaults.model,
+    },
+  );
+  if (suggestion) {
+    gapReport.llm_suggested_fix = suggestion;
   }
 }
 
@@ -884,7 +982,82 @@ function evaluateQuiescenceTick(
   return 'tick';
 }
 
-async function waitForQuiescence(
+/**
+ * Top-of-loop exit signals for {@link waitForQuiescence}: the mock-mode
+ * wall-clock cap and the operator pause-flag. Returns the exit reason to
+ * surface, or null to keep polling. Extracted to keep waitForQuiescence's
+ * cognitive complexity within bounds; the side effects (warn log,
+ * pause-flag consumption, session abort) fire in the same order as when
+ * these checks lived inline at the top of the loop body.
+ */
+function checkLoopExitSignals(
+  engine: OrchestratorEngine,
+  opts: QuiescenceOptions,
+  mockDeadline: number | null,
+  runId: string,
+): QuiescenceExitReason | null {
+  if (mockDeadline !== null && Date.now() > mockDeadline) {
+    console.warn(`[waitForQuiescence] Mock-mode cap ${(opts.mockCapMs! / 1000).toFixed(0)}s reached — exiting`);
+    return 'completed';
+  }
+
+  // Operator pause-flag check. Cheap fs.existsSync per tick; a no-op
+  // when the flag is absent. When present we abort the session so any
+  // in-flight ollama call unwinds, then exit with 'paused' so the
+  // CLI prints a marker and exit cleanly. The existing
+  // --resume-from-db path picks the run up where it left off.
+  if (opts.workspacePath && detectAndConsumePauseFlag(opts.workspacePath, runId)) {
+    console.warn('[waitForQuiescence] PAUSE_REQUESTED flag detected — aborting session');
+    engine.abortSession(PAUSE_ABORT_REASON);
+    return 'paused';
+  }
+
+  return null;
+}
+
+/**
+ * Map an evaluateQuiescenceTick 'done' decision to the concrete exit
+ * reason. The records-idle stall path inside evaluateQuiescenceTick logs
+ * its own warning and returns 'done'; surface that here as 'stalled' vs
+ * the clean-completion 'completed' so callers can colour the result
+ * accordingly.
+ */
+function classifyDoneReason(
+  run: { status: string; current_phase_id: string | null; current_sub_phase_id: string | null },
+  state: QuiescenceLoopState,
+  opts: QuiescenceOptions,
+  pendingCount: number,
+): QuiescenceExitReason {
+  const timeSinceProgress = Date.now() - state.lastProgressAt;
+  const stalled = timeSinceProgress > opts.recordsIdleStallMs && pendingCount === 0
+    && run.status !== 'completed' && run.status !== 'failed' && run.status !== 'rolled_back';
+  return stalled ? 'stalled' : 'completed';
+}
+
+/**
+ * Graceful-quiescence check for the 'tick' decision: the run is idle (no
+ * phase executing, no LLM in flight), so count consecutive polls at the
+ * same sub-phase with no pending decisions. Mutates `state` in place and
+ * returns true once the stable-count threshold is reached (the caller
+ * then returns 'completed').
+ */
+function applyGracefulTick(
+  run: { status: string; current_phase_id: string | null; current_sub_phase_id: string | null },
+  state: QuiescenceLoopState,
+  opts: QuiescenceOptions,
+  pendingCount: number,
+): boolean {
+  if (run.current_sub_phase_id === state.lastSubPhase && pendingCount === 0) {
+    state.stableCount++;
+    if (state.stableCount >= opts.stableThreshold) return true;
+  } else {
+    state.stableCount = 0;
+    state.lastSubPhase = run.current_sub_phase_id;
+  }
+  return false;
+}
+
+export async function waitForQuiescence(
   engine: OrchestratorEngine,
   db: Database,
   runId: string,
@@ -900,21 +1073,8 @@ async function waitForQuiescence(
   };
 
   while (true) {
-    if (mockDeadline !== null && Date.now() > mockDeadline) {
-      console.warn(`[waitForQuiescence] Mock-mode cap ${(opts.mockCapMs! / 1000).toFixed(0)}s reached — exiting`);
-      return 'completed';
-    }
-
-    // Operator pause-flag check. Cheap fs.existsSync per tick; a no-op
-    // when the flag is absent. When present we abort the session so any
-    // in-flight ollama call unwinds, then exit with 'paused' so the
-    // CLI prints a marker and exit cleanly. The existing
-    // --resume-from-db path picks the run up where it left off.
-    if (opts.workspacePath && detectAndConsumePauseFlag(opts.workspacePath, runId)) {
-      console.warn('[waitForQuiescence] PAUSE_REQUESTED flag detected — aborting session');
-      engine.abortSession(PAUSE_ABORT_REASON);
-      return 'paused';
-    }
+    const exitSignal = checkLoopExitSignals(engine, opts, mockDeadline, runId);
+    if (exitSignal) return exitSignal;
 
     const run = engine.stateMachine.getWorkflowRun(runId);
     if (!run) return 'completed';
@@ -928,14 +1088,7 @@ async function waitForQuiescence(
 
     const decision = evaluateQuiescenceTick(engine, run, state, currentRecordCount, pendingCount, opts);
     if (decision === 'done') {
-      // The records-idle stall path inside evaluateQuiescenceTick logs
-      // its own warning and returns 'done'; surface that here as
-      // 'stalled' vs the clean-completion 'completed' so callers can
-      // colour the result accordingly.
-      const timeSinceProgress = Date.now() - state.lastProgressAt;
-      const stalled = timeSinceProgress > opts.recordsIdleStallMs && pendingCount === 0
-        && run.status !== 'completed' && run.status !== 'failed' && run.status !== 'rolled_back';
-      return stalled ? 'stalled' : 'completed';
+      return classifyDoneReason(run, state, opts, pendingCount);
     }
     if (decision === 'continue') {
       await new Promise((r) => setTimeout(r, 50));
@@ -943,13 +1096,7 @@ async function waitForQuiescence(
     }
 
     // 'tick' — graceful quiescence check: same sub-phase N times + no pending decisions.
-    if (run.current_sub_phase_id === state.lastSubPhase && pendingCount === 0) {
-      state.stableCount++;
-      if (state.stableCount >= opts.stableThreshold) return 'completed';
-    } else {
-      state.stableCount = 0;
-      state.lastSubPhase = run.current_sub_phase_id;
-    }
+    if (applyGracefulTick(run, state, opts, pendingCount)) return 'completed';
     await new Promise((r) => setTimeout(r, 50));
   }
 }

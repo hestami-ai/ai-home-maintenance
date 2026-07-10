@@ -141,56 +141,59 @@ export function startRun(runId: string): void {
   configurePayloadStore({ workspaceRoot: config.workspaceRoot, runId });
 }
 
-/**
- * End the currently active run. On non-silent close, emits either
- * `run.completed` (success/partial) or `run.failed` (failed) — distinct
- * event types per design memo §1.2. Then writes `index.json` with the
- * first/last event_id and total count.
- *
- * P1: emits a minimal index.json. The full run summary lands in P6 via
- * runSummaryWriter.ts.
- */
-export function endRun(opts: {
+interface EndRunOptions {
   status: 'success' | 'partial' | 'failed';
   /** Required when status === 'failed'. Recorded in run.failed payload. */
   error?: { message: string; phase_id?: PhaseId | null };
   /** Suppress the run.completed/run.failed emit (used when abandoning
    * a previous run from inside startRun). Default false. */
   silent?: boolean;
-}): void {
-  if (!activeRun || !config) return;
+}
 
-  if (!opts.silent) {
-    const startedMs = Date.parse(activeRun.startedAt);
-    const duration_ms = Number.isNaN(startedMs) ? 0 : Date.now() - startedMs;
-    if (opts.status === 'failed') {
-      emit('run.failed', {
-        duration_ms,
-        error: opts.error ?? { message: 'workflow failed' },
-      });
-    } else {
-      emit('run.completed', { duration_ms, status: opts.status });
-    }
+/** Normalize an unknown thrown value into a log-friendly message. */
+function describeError(err: unknown): string {
+  return err instanceof Error ? err.message : String(err);
+}
+
+/**
+ * Emit the terminal run event for a non-silent close: `run.failed` when
+ * the status is failed (carrying the error), otherwise `run.completed` —
+ * distinct event types per design memo §1.2.
+ */
+function emitRunTerminalEvent(run: ActiveRun, opts: EndRunOptions): void {
+  const startedMs = Date.parse(run.startedAt);
+  const duration_ms = Number.isNaN(startedMs) ? 0 : Date.now() - startedMs;
+  if (opts.status === 'failed') {
+    emit('run.failed', {
+      duration_ms,
+      error: opts.error ?? { message: 'workflow failed' },
+    });
+  } else {
+    emit('run.completed', { duration_ms, status: opts.status });
   }
+}
 
+/**
+ * Write the minimal `index.json` for a run (first/last event_id + count).
+ * P1: full run summary lands in P6 via runSummaryWriter.ts. Failures are
+ * logged, never thrown — an index write must not break run completion.
+ */
+function writeRunIndex(run: ActiveRun, status: EndRunOptions['status']): void {
   try {
-    const indexPath = path.join(
-      path.dirname(activeRun.eventsPath),
-      'index.json',
-    );
+    const indexPath = path.join(path.dirname(run.eventsPath), 'index.json');
     fs.writeFileSync(
       indexPath,
       JSON.stringify(
         {
           schema_version: AODD_SCHEMA_VERSION,
-          run_id: activeRun.runId,
-          started_at: activeRun.startedAt,
+          run_id: run.runId,
+          started_at: run.startedAt,
           completed_at: new Date().toISOString(),
-          status: opts.status,
+          status,
           events: {
-            first_event_id: activeRun.firstEventId,
-            last_event_id: activeRun.lastEventId,
-            count: activeRun.eventCount,
+            first_event_id: run.firstEventId,
+            last_event_id: run.lastEventId,
+            count: run.eventCount,
           },
         },
         null,
@@ -200,37 +203,57 @@ export function endRun(opts: {
     );
   } catch (err) {
     process.stderr.write(
-      `[aodd] WARN: failed to write index.json for ${activeRun.runId}: ` +
-        `${err instanceof Error ? err.message : String(err)}\n`,
+      `[aodd] WARN: failed to write index.json for ${run.runId}: ` +
+        `${describeError(err)}\n`,
     );
   }
+}
 
-  // Write-time summaries (design memo §4). Sub-phase summaries are
-  // derived in bulk from events.ndjson after the index.json is written;
-  // the run summary follows. Errors here are logged but do not propagate
-  // — a failed summary write must not break workflow completion.
-  if (config) {
-    try {
-      deriveAndWriteSubPhaseSummaries(config.workspaceRoot, activeRun.runId);
-    } catch (err) {
-      process.stderr.write(
-        `[aodd] WARN: sub-phase summary derivation failed for ${activeRun.runId}: ` +
-          `${err instanceof Error ? err.message : String(err)}\n`,
-      );
-    }
-    try {
-      deriveAndWriteRunSummary(
-        config.workspaceRoot,
-        activeRun.runId,
-        config.janumicodeVersionSha,
-      );
-    } catch (err) {
-      process.stderr.write(
-        `[aodd] WARN: run summary derivation failed for ${activeRun.runId}: ` +
-          `${err instanceof Error ? err.message : String(err)}\n`,
-      );
-    }
+/**
+ * Write-time summaries (design memo §4). Sub-phase summaries are derived
+ * in bulk from events.ndjson after the index.json is written; the run
+ * summary follows. Errors here are logged but do not propagate — a failed
+ * summary write must not break workflow completion.
+ */
+function writeRunSummaries(cfg: AoddConfig, runId: string): void {
+  try {
+    deriveAndWriteSubPhaseSummaries(cfg.workspaceRoot, runId);
+  } catch (err) {
+    process.stderr.write(
+      `[aodd] WARN: sub-phase summary derivation failed for ${runId}: ` +
+        `${describeError(err)}\n`,
+    );
   }
+  try {
+    deriveAndWriteRunSummary(cfg.workspaceRoot, runId, cfg.janumicodeVersionSha);
+  } catch (err) {
+    process.stderr.write(
+      `[aodd] WARN: run summary derivation failed for ${runId}: ` +
+        `${describeError(err)}\n`,
+    );
+  }
+}
+
+/**
+ * End the currently active run. On non-silent close, emits either
+ * `run.completed` (success/partial) or `run.failed` (failed) — distinct
+ * event types per design memo §1.2. Then writes `index.json` with the
+ * first/last event_id and total count.
+ *
+ * P1: emits a minimal index.json. The full run summary lands in P6 via
+ * runSummaryWriter.ts.
+ */
+export function endRun(opts: EndRunOptions): void {
+  if (!activeRun || !config) return;
+  const run = activeRun;
+  const cfg = config;
+
+  if (!opts.silent) {
+    emitRunTerminalEvent(run, opts);
+  }
+
+  writeRunIndex(run, opts.status);
+  writeRunSummaries(cfg, run.runId);
 
   configurePayloadStore(null);
   activeRun = null;

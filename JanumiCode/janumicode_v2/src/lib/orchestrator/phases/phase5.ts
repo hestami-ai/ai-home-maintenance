@@ -19,9 +19,13 @@ import type {
   DecompositionEntity,
   DataModelDecompositionNodeContent,
   EntityOwnershipRole,
+  GovernedStreamRecord,
 } from '../../types/records';
 import { getLogger } from '../../logging';
-import { extractPriorPhaseContext, buildEffectiveComponentView } from './phaseContext';
+import {
+  extractPriorPhaseContext, buildEffectiveComponentView,
+  type PriorPhaseContext, type EffectiveComponentView,
+} from './phaseContext';
 import { normalizeIdsInTree, normalizeComponentIdRef } from '../idNormalization';
 import { buildPhaseContextPacket, type PhaseContextPacketResult } from './dmrContext';
 import { pickItemsArray } from '../parsedResponseHelpers';
@@ -96,6 +100,28 @@ interface ConfigurationParameters {
 /** One `models[]` entry (a single component's data model). */
 type DataModelEntry = DataModels['models'][number];
 
+/**
+ * Component-scoped inputs for `runDataModelSpecification`, grouped into one
+ * parameter object to keep the signature within the parameter budget. Purely a
+ * parameter-object wrapper — no behavior change.
+ */
+interface DataModelSpecInputs {
+  components: Array<Record<string, unknown>>;
+  componentIds: string[];
+  componentSummaryById: Record<string, string>;
+}
+
+/**
+ * Shared spec context for `reconcileUncoveredDataModels`, grouped into one
+ * parameter object to keep the signature within the parameter budget. Purely a
+ * parameter-object wrapper — no behavior change.
+ */
+interface UncoveredReconcileContext {
+  sysReqSummary: string;
+  technicalConstraintsSummary: string;
+  dmr: PhaseContextPacketResult;
+}
+
 // ── Phase 5.1 per-component chunking helpers (SD-3) ──────────────────
 //
 // The monolithic data_model_skeleton call asked ONE response to cover every
@@ -148,6 +174,27 @@ export function chunkComponentIds(ids: string[], maxPerBatch: number): Array<Set
 }
 
 /**
+ * Append each entity with a non-empty, not-yet-seen (case-insensitive by name)
+ * identity onto `into`, recording seen names in `seenNames`. Extracted from
+ * consolidateEntitiesForComponent so the dedup loop's nesting stays shallow;
+ * behavior is byte-identical (same guards, same order, same in-place mutation).
+ */
+function appendUniqueNamedEntities(
+  ents: DataModelEntry['entities'],
+  into: DataModelEntry['entities'],
+  seenNames: Set<string>,
+): void {
+  for (const e of ents) {
+    const name = e && typeof e.name === 'string' ? e.name : '';
+    if (!name) continue;
+    const key = name.toLowerCase();
+    if (seenNames.has(key)) continue;
+    seenNames.add(key);
+    into.push(e);
+  }
+}
+
+/**
  * Collapse a per-component generation call's `models[]` into ONE model for the
  * scoped component. The call is scoped to exactly `cid`, so every entity it
  * designs belongs to `cid` — force the attribution (a deterministic producer
@@ -164,17 +211,33 @@ export function consolidateEntitiesForComponent(
   const seenNames = new Set<string>();
   for (const m of models) {
     const ents = Array.isArray(m.entities) ? (m.entities as DataModelEntry['entities']) : [];
-    for (const e of ents) {
-      const name = e && typeof e.name === 'string' ? e.name : '';
-      if (!name) continue;
-      const key = name.toLowerCase();
-      if (seenNames.has(key)) continue;
-      seenNames.add(key);
-      entities.push(e);
-    }
+    appendUniqueNamedEntities(ents, entities, seenNames);
   }
   if (entities.length === 0) return null;
   return { component_id: cid, entities };
+}
+
+/**
+ * The display text for one responsibility. Preserves the original else-if
+ * precedence (description wins over statement, '' when neither is a string).
+ */
+function responsibilityText(r: Record<string, unknown>): string {
+  if (typeof r.description === 'string') return r.description;
+  if (typeof r.statement === 'string') return r.statement;
+  return '';
+}
+
+/**
+ * Append the indented responsibility bullet lines for a component onto `lines`.
+ * Extracted from renderUncoveredComponentsMenu to keep the menu loop shallow;
+ * behavior is byte-identical (same Array.isArray guard, same order, same texts).
+ */
+function appendResponsibilityLines(c: Record<string, unknown>, lines: string[]): void {
+  if (!Array.isArray(c.responsibilities)) return;
+  for (const r of c.responsibilities as Array<Record<string, unknown>>) {
+    const txt = responsibilityText(r);
+    if (txt) lines.push(`    - ${txt}`);
+  }
 }
 
 /**
@@ -195,19 +258,210 @@ export function renderUncoveredComponentsMenu(
       continue;
     }
     lines.push(`- ${normId}: ${typeof c.name === 'string' ? c.name : normId}`);
-    if (Array.isArray(c.responsibilities)) {
-      for (const r of c.responsibilities as Array<Record<string, unknown>>) {
-        let txt = '';
-        if (typeof r.description === 'string') {
-          txt = r.description;
-        } else if (typeof r.statement === 'string') {
-          txt = r.statement;
-        }
-        if (txt) lines.push(`    - ${txt}`);
+    appendResponsibilityLines(c, lines);
+  }
+  return lines.length > 0 ? lines.join('\n') : '';
+}
+
+/**
+ * DM-001 oracle: entity fields lacking a declared type. Extracted from
+ * runConsistencyCheck so the triple-nested scan doesn't inflate the method's
+ * cognitive complexity; behavior is byte-identical (same guard, same ids, same order).
+ */
+function findUntypedFields(dataModels: DataModels): Array<{ item_id: string; explanation: string }> {
+  const untypedFields: Array<{ item_id: string; explanation: string }> = [];
+  for (const model of dataModels.models) {
+    for (const entity of model.entities) {
+      for (const field of entity.fields) {
+        if (!field.type) untypedFields.push({ item_id: `${entity.name}.${field.name}`, explanation: `Field ${field.name} in ${entity.name} has no type` });
       }
     }
   }
-  return lines.length > 0 ? lines.join('\n') : '';
+  return untypedFields;
+}
+
+/**
+ * API-001 oracle: endpoints without an explicit auth_requirement. Extracted from
+ * runConsistencyCheck for the same reason; behavior is byte-identical.
+ */
+function findEndpointsWithoutAuth(apiDefs: ApiDefinitions): Array<{ item_id: string; explanation: string }> {
+  const noAuthEndpoints: Array<{ item_id: string; explanation: string }> = [];
+  for (const def of apiDefs.definitions) {
+    for (const ep of def.endpoints) {
+      if (!ep.auth_requirement) noAuthEndpoints.push({ item_id: `${def.component_id}:${ep.method} ${ep.path}`, explanation: `Endpoint ${ep.method} ${ep.path} has no auth_requirement` });
+    }
+  }
+  return noAuthEndpoints;
+}
+
+// ── execute() decomposition helpers (S3776) ─────────────────────────
+// The following pure/side-effect-free builders were extracted verbatim from
+// Phase5Handler.execute() to bring it under the cognitive-complexity threshold.
+// Each is behaviour-preserving: same inputs → same values/order as the inline
+// original. Exported so the extraction is unit-testable in isolation.
+
+/** Bundle of prior-phase context Phase 5 gathers once up front. */
+interface Phase5Gathered {
+  allArtifacts: GovernedStreamRecord[];
+  prior: PriorPhaseContext;
+  effectiveComponents: EffectiveComponentView;
+  componentSummary: string;
+  componentSummaryById: Record<string, string>;
+  domainsSummary: string;
+  contractsSummary: string;
+  sysReqSummary: string;
+  derivedFromIds: string[];
+}
+
+/**
+ * Collapse the repeated DMR-seed spread (`prior.X ? [prior.X.recordId] : []`
+ * and `id ? [id] : []`) into a single ordered list. Plain string ids pass
+ * through; artifact contexts contribute their `recordId`; falsy entries
+ * (null/undefined/'') contribute nothing. Order is preserved.
+ */
+export function flattenSeedIds(
+  items: Array<string | { recordId: string } | null | undefined>,
+): string[] {
+  const out: string[] = [];
+  for (const it of items) {
+    if (!it) continue;
+    out.push(typeof it === 'string' ? it : it.recordId);
+  }
+  return out;
+}
+
+/**
+ * Per-component scoped context map keyed by component `id` (PA-4). Components
+ * without a string `id` are skipped. Byte-identical to the inline execute loop:
+ * each value is `PROJECT TYPE: <desc>\n\n<renderComponentBlockForTask(c)>`.
+ */
+export function buildComponentSummariesById(
+  components: Array<Record<string, unknown>>,
+  projectTypeDescription: string,
+): Record<string, string> {
+  const out: Record<string, string> = {};
+  for (const c of components) {
+    const cid = typeof c.id === 'string' ? c.id : '';
+    if (cid) out[cid] = `PROJECT TYPE: ${projectTypeDescription}\n\n${renderComponentBlockForTask(c)}`;
+  }
+  return out;
+}
+
+/**
+ * Build the verbatim TECH-* roster summary for every Phase 5 sub-phase prompt.
+ * Preserves the original precedence (technology→name, text→rationale) and the
+ * `id — tech — category — text` join, dropping empty fields. Returns the
+ * placeholder string when the constraints artifact is absent/empty.
+ */
+export function buildTechnicalConstraintsSummary(
+  techConstraintsArtifact: GovernedStreamRecord | undefined,
+): string {
+  const techConstraintsForPrompt = (
+    techConstraintsArtifact
+      ? ((techConstraintsArtifact.content as Record<string, unknown>).technicalConstraints as Array<Record<string, unknown>> ?? [])
+      : []
+  );
+  if (techConstraintsForPrompt.length === 0) {
+    return 'No technical_constraints_discovery artifact available';
+  }
+  return techConstraintsForPrompt
+    .map(t => {
+      const id = (t.id as string) ?? '';
+      const tech = (t.technology as string) ?? (t.name as string) ?? '';
+      const category = (t.category as string) ?? '';
+      const text = (t.text as string) ?? (t.rationale as string) ?? '';
+      return [id, tech, category, text].filter(Boolean).join(' — ');
+    })
+    .filter(Boolean)
+    .join('\n');
+}
+
+/** Render the API-summary context block (Phase 5.3 input). Byte-identical to the inline map. */
+export function buildApiSummary(definitions: ApiDefinitions['definitions']): string {
+  return definitions.map(d => {
+    const eps = d.endpoints.map(e => `  ${e.method} ${e.path} (auth: ${e.auth_requirement ?? 'none'})`).join('\n');
+    return `Component ${d.component_id}:\n${eps}`;
+  }).join('\n');
+}
+
+/** Render the data-models context block (Phase 5.4 input). Byte-identical to the inline map. */
+export function buildDataModelsSummary(models: DataModels['models']): string {
+  return models.map(m => {
+    const ents = m.entities.map(e => {
+      const fieldList = e.fields.map(f => `${f.name}:${f.type}`).join(', ');
+      return `  ${e.name}: ${fieldList}`;
+    }).join('\n');
+    return `Component ${m.component_id}:\n${ents}`;
+  }).join('\n');
+}
+
+/**
+ * One depth-0 seed instruction derived from a Phase 5.1 entity. `enqueue` marks
+ * the OWNED aggregates that re-enter the saturation loop (status 'pending');
+ * referenced / shared-value-object copies seed TERMINAL ('pruned') and are never
+ * enqueued. Pure — no DB writes; the caller performs the write per op.
+ */
+export interface RootSeedOp {
+  entity: DecompositionEntity;
+  status: 'pending' | 'pruned';
+  pruningReason?: string;
+  enqueue: boolean;
+}
+
+/**
+ * Map one Phase 5.1 entity to its depth-0 seed op, split by the 5.1b ownership
+ * verdict. Byte-identical to the inline per-entity construction: same id
+ * fallback, kind mapping, field/relationship shaping, owner-id passthrough, and
+ * pruning-reason selection.
+ */
+export function buildRootSeedOp(
+  e: DataModelEntry['entities'][number],
+  componentId: string,
+  constraintIds: string[],
+): RootSeedOp {
+  const role = (e as { ownership_role?: EntityOwnershipRole }).ownership_role;
+  const isValueObject = role === 'shared_value_object';
+  const isReferenced = role === 'referenced';
+  const entity: DecompositionEntity = {
+    // Producer-minted stable id (Pillar A) so the tree references the same DM-* id.
+    id: e.id ?? e.name,
+    name: e.name,
+    kind: isValueObject ? 'value_type' : 'aggregate',
+    component_id: componentId,
+    fields: e.fields.map(f => ({ name: f.name, type: f.type, constraints: f.constraints })),
+    relationships: (e.relationships ?? []).map(rel => ({ target_entity_id: rel, kind: 'references' as const })),
+    active_constraints: constraintIds,
+    ownership_role: role,
+    owner_entity_id: (e as { owner_entity_id?: string }).owner_entity_id,
+    owner_component_id: (e as { owner_component_id?: string }).owner_component_id,
+  };
+  if (isReferenced || isValueObject) {
+    return {
+      entity,
+      status: 'pruned',
+      pruningReason: isReferenced ? 'foreign_context_reference' : 'shared_value_object',
+      enqueue: false,
+    };
+  }
+  return { entity, status: 'pending', enqueue: true };
+}
+
+/**
+ * Ordered depth-0 seed plan for all entities across all Phase 5.1 models.
+ * Iteration order (models, then entities) is preserved so the downstream record
+ * writes + saturation-root ordering are byte-identical to the inline loop.
+ */
+export function buildRootSeedPlan(
+  models: DataModels['models'],
+  constraintIds: string[],
+): RootSeedOp[] {
+  const ops: RootSeedOp[] = [];
+  for (const m of models) {
+    for (const e of m.entities) {
+      ops.push(buildRootSeedOp(e, m.component_id, constraintIds));
+    }
+  }
+  return ops;
 }
 
 // ── Handler ────────────────────────────────────────────────────────
@@ -216,10 +470,93 @@ export class Phase5Handler implements PhaseHandler {
   readonly phaseId: PhaseId = '5';
 
   async execute(ctx: PhaseContext): Promise<PhaseResult> {
-    const { workflowRun, engine } = ctx;
     const artifactIds: string[] = [];
 
-    // ── Gather prior phase outputs ──────────────────────────────
+    const g = this.gatherPhase5Context(ctx);
+
+    // ── 5.1 + 5.1b — Data Model Specification + Entity Ownership ──
+    const dm = await this.runDataModelStage(ctx, g, artifactIds);
+
+    // ── 5.1a — Recursive Data Model Decomposition (Wave 9) ────
+    await this.runDataModelDecompositionStage(ctx, {
+      allArtifacts: g.allArtifacts,
+      dataModelsContent: dm.dataModelsContent,
+      dataModelsRecordId: dm.dataModelsRecordId,
+      componentSummary: g.componentSummary,
+      componentSummaryById: g.componentSummaryById,
+      sysReqSummary: g.sysReqSummary,
+    }, artifactIds);
+
+    // ── 5.2 — API Definition ──────────────────────────────────
+    const api = await this.runApiStage(ctx, {
+      componentIds: dm.componentIds,
+      componentSummary: g.componentSummary,
+      contractsSummary: g.contractsSummary,
+      sysReqSummary: g.sysReqSummary,
+      technicalConstraintsSummary: dm.technicalConstraintsSummary,
+      prior: g.prior,
+      dataModelsRecordId: dm.dataModelsRecordId,
+    }, artifactIds);
+
+    // ── 5.3 — Error Handling Strategy ─────────────────────────
+    const errh = await this.runErrorHandlingStage(ctx, {
+      componentIds: dm.componentIds,
+      componentSummary: g.componentSummary,
+      apiContent: api.apiContent,
+      sysReqSummary: g.sysReqSummary,
+      technicalConstraintsSummary: dm.technicalConstraintsSummary,
+      prior: g.prior,
+      apiRecordId: api.apiRecordId,
+    }, artifactIds);
+
+    // ── 5.4 — Configuration Parameters ────────────────────────
+    const cfg = await this.runConfigurationStage(ctx, {
+      componentIds: dm.componentIds,
+      componentSummary: g.componentSummary,
+      dataModelsContent: dm.dataModelsContent,
+      sysReqSummary: g.sysReqSummary,
+      technicalConstraintsSummary: dm.technicalConstraintsSummary,
+      prior: g.prior,
+      dataModelsRecordId: dm.dataModelsRecordId,
+    }, artifactIds);
+
+    // ── 5.5 — Mirror and Menu ─────────────────────────────────
+    const mirror = await this.presentTechnicalSpecMirror(ctx, {
+      dataModelsContent: dm.dataModelsContent,
+      apiContent: api.apiContent,
+      errorContent: errh.errorContent,
+      configContent: cfg.configContent,
+      dataModelsRecordId: dm.dataModelsRecordId,
+      apiRecordId: api.apiRecordId,
+      errorRecordId: errh.errorRecordId,
+      configRecordId: cfg.configRecordId,
+    }, artifactIds);
+    if (mirror.rejected) {
+      return { success: false, error: mirror.error, artifactIds };
+    }
+
+    // ── 5.6 — Consistency Check and Approval ──────────────────
+    this.finalizeConsistencyGate(ctx, {
+      dataModelsContent: dm.dataModelsContent,
+      apiContent: api.apiContent,
+      dataModelsRecordId: dm.dataModelsRecordId,
+      apiRecordId: api.apiRecordId,
+      errorRecordId: errh.errorRecordId,
+      configRecordId: cfg.configRecordId,
+    }, artifactIds);
+
+    return { success: true, artifactIds };
+  }
+
+  // ── execute() sub-phase steps (S3776 decomposition) ───────────
+  // Each step owns one Phase 5 sub-phase: its setSubPhase call, LLM call(s),
+  // record write(s)/ingest, and artifactIds pushes — in the SAME order as the
+  // original inline execute(). Behaviour-preserving.
+
+  /** Gather all prior-phase context Phase 5 consumes (one pass over the stream). */
+  private gatherPhase5Context(ctx: PhaseContext): Phase5Gathered {
+    const { workflowRun, engine } = ctx;
+
     const allArtifacts = engine.writer.getRecordsByType(workflowRun.id, 'artifact_produced');
     const prior = extractPriorPhaseContext(allArtifacts);
 
@@ -239,26 +576,50 @@ export class Phase5Handler implements PhaseHandler {
     const componentSummary = `PROJECT TYPE: ${prior.projectTypeDescription}\n\n${effectiveComponents.summary || (prior.componentModel?.summary ?? 'No component model available')}`;
     // PA-4: per-component scoped context so a single-entity saturation call sees
     // only its OWN component, not the whole component backlog.
-    const componentSummaryById: Record<string, string> = {};
-    for (const c of effectiveComponents.components as Array<Record<string, unknown>>) {
-      const cid = typeof c.id === 'string' ? c.id : '';
-      if (cid) componentSummaryById[cid] = `PROJECT TYPE: ${prior.projectTypeDescription}\n\n${renderComponentBlockForTask(c)}`;
-    }
+    const componentSummaryById = buildComponentSummariesById(
+      effectiveComponents.components as Array<Record<string, unknown>>,
+      prior.projectTypeDescription,
+    );
     const domainsSummary = prior.softwareDomains?.summary ?? 'No domains available';
     const contractsSummary = prior.interfaceContracts?.summary ?? 'No interface contracts available';
-    // Phase 3.2 SR layer threaded into every Phase 5 sub-phase:
-    //   5.1 entities — what each model must support per SR
-    //   5.2 endpoints — what each API call satisfies per SR
-    //   5.3 error strategies — error-handling expectations per SR
-    //   5.4 config params — retention, audit, SLO knobs per SR
-    // Pre-cal-22 the SR layer was a placeholder so threading it
-    // would have hurt; post-replay (or post-fix on next run) the
-    // 16-SR list adds real signal without prompt-template changes
-    // beyond `system_requirements_summary` (already wired here).
+    // Phase 3.2 SR layer threaded into every Phase 5 sub-phase (5.1 entities,
+    // 5.2 endpoints, 5.3 error strategies, 5.4 config params). Wired via
+    // `system_requirements_summary` in each sub-phase's prompt template.
     const sysReqSummary = prior.systemRequirements?.summary ?? 'No system requirements available';
-    const derivedFromIds = prior.allRecordIds;
 
-    // ── 5.1 — Data Model Specification ────────────────────────
+    return {
+      allArtifacts,
+      prior,
+      effectiveComponents,
+      componentSummary,
+      componentSummaryById,
+      domainsSummary,
+      contractsSummary,
+      sysReqSummary,
+      derivedFromIds: prior.allRecordIds,
+    };
+  }
+
+  /**
+   * 5.1 Data Model Specification + 5.1b Entity Ownership Reconciliation. Runs the
+   * per-component chunked generation, normalizes + mints ids in place, reconciles
+   * ownership (mutating the entities the decomposition stage later reads), then
+   * writes the data_models artifact. TECH-* verbatim roster is built up front
+   * (ts-104) and returned for reuse by the 5.2/5.3/5.4 sub-phases.
+   */
+  private async runDataModelStage(
+    ctx: PhaseContext,
+    g: Phase5Gathered,
+    artifactIds: string[],
+  ): Promise<{
+    dataModelsContent: DataModels;
+    dataModelsRecordId: string;
+    componentIds: string[];
+    technicalConstraintsSummary: string;
+  }> {
+    const { workflowRun, engine } = ctx;
+    const { allArtifacts, prior, effectiveComponents, componentSummaryById, domainsSummary, sysReqSummary, derivedFromIds } = g;
+
     engine.stateMachine.setSubPhase(workflowRun.id, 'data_model_skeleton');
 
     const componentIds = effectiveComponents.components
@@ -268,39 +629,14 @@ export class Phase5Handler implements PhaseHandler {
       r => (r.content as Record<string, unknown>).kind === 'technical_constraints_discovery',
     );
     const techConstraintsRecId = techConstraintsArtifact?.id;
-    // Build the canonical TECH-* roster summary up front. Every Phase 5
-    // sub-phase (data_model_skeleton, api_definitions, error_handling,
-    // configuration_parameters) needs to see the verbatim spec excerpts
-    // — the LLM-rephrased active_constraints narrative loses critical
-    // exclusion phrases ("no microservices", "logs to stdout", etc.).
-    // ts-104 audit found Phase 5 prompts emitting decisions that
-    // contradicted TECH-* (e.g. POST /logs endpoints despite stdout-only
-    // mandate, max_events_per_minute despite rate-limiting being out of
-    // scope). Same fix pattern as Phase 4 ADR (cycle from 2026-05-22).
-    const techConstraintsForPrompt = (
-      techConstraintsArtifact
-        ? ((techConstraintsArtifact.content as Record<string, unknown>).technicalConstraints as Array<Record<string, unknown>> ?? [])
-        : []
-    );
-    const technicalConstraintsSummary = techConstraintsForPrompt.length === 0
-      ? 'No technical_constraints_discovery artifact available'
-      : techConstraintsForPrompt
-          .map(t => {
-            const id = (t.id as string) ?? '';
-            const tech = (t.technology as string) ?? (t.name as string) ?? '';
-            const category = (t.category as string) ?? '';
-            const text = (t.text as string) ?? (t.rationale as string) ?? '';
-            return [id, tech, category, text].filter(Boolean).join(' — ');
-          })
-          .filter(Boolean)
-          .join('\n');
-    const dmr51Seeds = [
-      ...(prior.componentModel ? [prior.componentModel.recordId] : []),
-      ...(prior.functionalRequirements ? [prior.functionalRequirements.recordId] : []),
-      ...(prior.nonFunctionalRequirements ? [prior.nonFunctionalRequirements.recordId] : []),
-      ...(prior.systemRequirements ? [prior.systemRequirements.recordId] : []),
-      ...(techConstraintsRecId ? [techConstraintsRecId] : []),
-    ];
+    const technicalConstraintsSummary = buildTechnicalConstraintsSummary(techConstraintsArtifact);
+    const dmr51Seeds = flattenSeedIds([
+      prior.componentModel,
+      prior.functionalRequirements,
+      prior.nonFunctionalRequirements,
+      prior.systemRequirements,
+      techConstraintsRecId,
+    ]);
     const dmr51 = await buildPhaseContextPacket(ctx, {
       subPhaseId: 'data_model_skeleton',
       requestingAgentRole: 'technical_spec_agent',
@@ -312,32 +648,62 @@ export class Phase5Handler implements PhaseHandler {
 
     const dataModelsContent = await this.runDataModelSpecification(
       ctx,
-      effectiveComponents.components as Array<Record<string, unknown>>,
-      componentIds,
-      componentSummaryById,
+      {
+        components: effectiveComponents.components as Array<Record<string, unknown>>,
+        componentIds,
+        componentSummaryById,
+      },
       domainsSummary, sysReqSummary, technicalConstraintsSummary, dmr51,
     );
 
-    // Normalize component_id refs to the canonical lowercase `comp-`
-    // prefix that the Phase 4 component_skeleton + recursive component
-    // decomposition tree uses. ts-13 showed the Phase 5 LLM emitting
-    // `COMP-001` while Phase 4 used `comp-001`, silently breaking
-    // referential integrity for downstream data_model_saturation and
-    // Phase 6 task decomposition.
+    // Normalize component_id refs to the canonical lowercase `comp-` prefix
+    // (ts-13). Producer-side stable entity ids (Pillar A) — deterministic +
+    // idempotent — so the packet collector + coherence index share the real id.
     const dmContent = { kind: 'data_models', ...dataModelsContent } as unknown as Record<string, unknown>;
     normalizeIdsInTree(dmContent, new Set(['component_id']), normalizeComponentIdRef);
-    // Producer-side stable entity ids (Pillar A) — deterministic + idempotent,
-    // so the packet collector + coherence index reference the same real id.
     mintEntityIds(dmContent as Parameters<typeof mintEntityIds>[0]);
 
     // ── 5.1b — Entity Ownership Reconciliation (DDD owned-vs-referenced) ──
-    // The per-component skeleton independently re-models every concept a context
-    // TOUCHES, so a shared aggregate (WorkOrder) is re-declared + deep-decomposed
-    // in 7-9 components. Elect ONE owning context per concept; non-owners become
-    // thin reference-by-id stubs (or value-object copies) that saturation never
-    // deep-decomposes. No shared kernel; per-context fields preserved; reference-by-id
-    // is the seam that survives a microservice split. Deterministic core + a scoped,
-    // env-gated LLM adjudicator for the semantic aggregate/value-object/owner calls.
+    await this.runEntityOwnershipReconciliation(ctx, dmContent, effectiveComponents, allArtifacts, derivedFromIds, artifactIds);
+
+    const dataModelsRecord = engine.writer.writeRecord({
+      record_type: 'artifact_produced',
+      schema_version: '1.0',
+      workflow_run_id: workflowRun.id,
+      phase_id: '5',
+      sub_phase_id: 'data_model_skeleton',
+      produced_by_agent_role: 'technical_spec_agent',
+      janumicode_version_sha: engine.janumiCodeVersionSha,
+      derived_from_record_ids: derivedFromIds,
+      content: dmContent,
+    });
+    artifactIds.push(dataModelsRecord.id);
+    engine.ingestionPipeline.ingest(dataModelsRecord);
+
+    return {
+      dataModelsContent,
+      dataModelsRecordId: dataModelsRecord.id,
+      componentIds,
+      technicalConstraintsSummary,
+    };
+  }
+
+  /**
+   * 5.1b — elect ONE owning context per shared concept; non-owners become thin
+   * reference-by-id / value-object stubs. Deterministic core + env-gated LLM
+   * adjudicator. Mutates `dmContent.models[].entities[]` in place (adds
+   * ownership_role) — the same array the decomposition stage reads.
+   */
+  private async runEntityOwnershipReconciliation(
+    ctx: PhaseContext,
+    dmContent: Record<string, unknown>,
+    effectiveComponents: EffectiveComponentView,
+    allArtifacts: GovernedStreamRecord[],
+    derivedFromIds: string[],
+    artifactIds: string[],
+  ): Promise<void> {
+    const { workflowRun, engine } = ctx;
+
     engine.stateMachine.setSubPhase(workflowRun.id, 'entity_ownership_reconciliation');
     const p1EntitiesRec = allArtifacts.find(r => r.sub_phase_id === 'entities_bloom');
     const swDomainsRec = allArtifacts.find(r => r.sub_phase_id === 'software_domains');
@@ -377,22 +743,28 @@ export class Phase5Handler implements PhaseHandler {
     getLogger().info('workflow', 'Phase 5.1b entity ownership reconciled', {
       workflow_run_id: workflowRun.id, adjudicator: adjudicatorOn, ...ownershipStats,
     });
+  }
 
-    const dataModelsRecord = engine.writer.writeRecord({
-      record_type: 'artifact_produced',
-      schema_version: '1.0',
-      workflow_run_id: workflowRun.id,
-      phase_id: '5',
-      sub_phase_id: 'data_model_skeleton',
-      produced_by_agent_role: 'technical_spec_agent',
-      janumicode_version_sha: engine.janumiCodeVersionSha,
-      derived_from_record_ids: derivedFromIds,
-      content: dmContent,
-    });
-    artifactIds.push(dataModelsRecord.id);
-    engine.ingestionPipeline.ingest(dataModelsRecord);
+  /**
+   * 5.1a — recursive data-model decomposition. Resolves the depth-0 roots
+   * (resume-aware, ownership-split seeding) then runs the saturation loop when
+   * there are owned roots to deepen.
+   */
+  private async runDataModelDecompositionStage(
+    ctx: PhaseContext,
+    params: {
+      allArtifacts: GovernedStreamRecord[];
+      dataModelsContent: DataModels;
+      dataModelsRecordId: string;
+      componentSummary: string;
+      componentSummaryById: Record<string, string>;
+      sysReqSummary: string;
+    },
+    artifactIds: string[],
+  ): Promise<void> {
+    const { workflowRun, engine } = ctx;
+    const { allArtifacts, dataModelsContent, dataModelsRecordId, componentSummary, componentSummaryById, sysReqSummary } = params;
 
-    // ── 5.1a — Recursive Data Model Decomposition (Wave 9) ────
     engine.stateMachine.setSubPhase(workflowRun.id, 'data_model_saturation');
 
     const techConstraintsRecord = allArtifacts.find(
@@ -402,102 +774,8 @@ export class Phase5Handler implements PhaseHandler {
       ? (((techConstraintsRecord.content as Record<string, unknown>).technicalConstraints) as TechnicalConstraint[] ?? [])
       : [];
 
-    // Resume guard — skip seeding when depth-0 nodes already exist. OWNERSHIP-AWARE
-    // (P5.1b): roots that predate the ownership reconciliation (no `ownership_role`
-    // on their entity) are a STALE generation — ignore them so seeding regenerates
-    // the owned/referenced split. A prior 5.1b run's roots ARE tagged → reuse them.
-    const allExistingDataModelRoots = engine.writer.getRecordsByType(workflowRun.id, 'data_model_decomposition_node')
-      .filter(r => (r.content as unknown as DataModelDecompositionNodeContent).depth === 0);
-    const existingDataModelRoots = allExistingDataModelRoots.filter(r =>
-      (r.content as unknown as DataModelDecompositionNodeContent).entity?.ownership_role !== undefined);
-    if (allExistingDataModelRoots.length > 0 && existingDataModelRoots.length === 0) {
-      getLogger().info('workflow', 'Phase 5.1a: existing depth-0 roots predate ownership reconciliation — re-seeding owned/referenced split', {
-        staleRoots: allExistingDataModelRoots.length,
-      });
-    }
-    let rootEntities: DecompositionEntity[];
-    let rootDataModelRecordIds: string[];
-    let rootDataModelLogicalIds: string[];
-    if (existingDataModelRoots.length > 0) {
-      // Only OWNED roots (status 'pending') re-enter the loop; referenced /
-      // value-object roots are terminal ('pruned') and the loop skips them anyway.
-      const ownedExisting = existingDataModelRoots.filter(r =>
-        (r.content as unknown as DataModelDecompositionNodeContent).status === 'pending');
-      getLogger().info('workflow', 'Phase 5.1a RESUME: reconciled depth-0 entity nodes already present', {
-        existingRoots: existingDataModelRoots.length, ownedRoots: ownedExisting.length,
-      });
-      rootEntities = ownedExisting.map(r => (r.content as unknown as DataModelDecompositionNodeContent).entity);
-      rootDataModelRecordIds = ownedExisting.map(r => r.id);
-      rootDataModelLogicalIds = ownedExisting.map(r => (r.content as unknown as DataModelDecompositionNodeContent).node_id);
-    } else {
-      // Convert Phase 5.1's data_models entries into per-entity roots, split by the
-      // 5.1b ownership verdict: OWNED aggregates seed 'pending' (deep-decomposed);
-      // referenced / shared-value-object copies seed TERMINAL 'pruned' — recorded for
-      // the packet/DMR contract but NEVER enqueued (saturation gates on 'pending').
-      const constraintIds = technicalConstraints.map(t => t.id);
-      rootEntities = [];
-      rootDataModelRecordIds = [];
-      rootDataModelLogicalIds = [];
-      const seedRoot = (entity: DecompositionEntity, status: 'pending' | 'pruned', pruningReason?: string): { recId: string; nodeId: string } => {
-        const logicalNodeId = randomUUID();
-        const rec = engine.writer.writeRecord({
-          record_type: 'data_model_decomposition_node',
-          schema_version: '1.0',
-          workflow_run_id: workflowRun.id,
-          phase_id: '5',
-          sub_phase_id: 'data_model_saturation',
-          produced_by_agent_role: 'technical_spec_agent',
-          janumicode_version_sha: engine.janumiCodeVersionSha,
-          derived_from_record_ids: [dataModelsRecord.id],
-          content: {
-            kind: 'data_model_decomposition_node',
-            node_id: logicalNodeId,
-            parent_node_id: null,
-            display_key: entity.id,
-            root_entity_id: logicalNodeId,
-            depth: 0,
-            pass_number: 0,
-            status,
-            tier: status === 'pruned' ? 'D' : undefined,
-            entity,
-            surfaced_assumption_ids: [],
-            pruning_reason: pruningReason,
-            release_id: null,
-            release_ordinal: null,
-          } satisfies DataModelDecompositionNodeContent,
-        });
-        artifactIds.push(rec.id);
-        return { recId: rec.id, nodeId: logicalNodeId };
-      };
-      for (const m of dataModelsContent.models) {
-        for (const e of m.entities) {
-          const role = (e as { ownership_role?: EntityOwnershipRole }).ownership_role;
-          const isValueObject = role === 'shared_value_object';
-          const isReferenced = role === 'referenced';
-          const entity: DecompositionEntity = {
-            // Producer-minted stable id (Pillar A) so the tree references the same DM-* id.
-            id: e.id ?? e.name,
-            name: e.name,
-            kind: isValueObject ? 'value_type' : 'aggregate',
-            component_id: m.component_id,
-            fields: e.fields.map(f => ({ name: f.name, type: f.type, constraints: f.constraints })),
-            relationships: (e.relationships ?? []).map(rel => ({ target_entity_id: rel, kind: 'references' as const })),
-            active_constraints: constraintIds,
-            ownership_role: role,
-            owner_entity_id: (e as { owner_entity_id?: string }).owner_entity_id,
-            owner_component_id: (e as { owner_component_id?: string }).owner_component_id,
-          };
-          if (isReferenced || isValueObject) {
-            seedRoot(entity, 'pruned', isReferenced ? 'foreign_context_reference' : 'shared_value_object');
-          } else {
-            rootEntities.push(entity);
-            const { recId, nodeId } = seedRoot(entity, 'pending');
-            rootDataModelRecordIds.push(recId);
-            rootDataModelLogicalIds.push(nodeId);
-          }
-        }
-      }
-    }
+    const { rootEntities, rootDataModelRecordIds, rootDataModelLogicalIds } =
+      this.resolveDataModelRoots(ctx, dataModelsContent, technicalConstraints, dataModelsRecordId, artifactIds);
 
     if (rootEntities.length > 0) {
       await runDataModelSaturationLoop(ctx, {
@@ -510,23 +788,144 @@ export class Phase5Handler implements PhaseHandler {
         systemRequirementsSummary: sysReqSummary,
       });
     }
+  }
 
-    // ── 5.2 — API Definition ──────────────────────────────────
+  /**
+   * Resolve the depth-0 data-model roots for saturation. RESUME path: reuse the
+   * ownership-tagged depth-0 nodes already in the stream (only 'pending'/owned
+   * ones re-enter the loop; roots predating 5.1b are STALE and ignored). FRESH
+   * path: seed one node per Phase 5.1 entity via the ownership-split plan (owned →
+   * 'pending'+enqueued; referenced / value-object → terminal 'pruned'). Ordering
+   * + artifactIds pushes are byte-identical to the original inline block.
+   */
+  private resolveDataModelRoots(
+    ctx: PhaseContext,
+    dataModelsContent: DataModels,
+    technicalConstraints: TechnicalConstraint[],
+    dataModelsRecordId: string,
+    artifactIds: string[],
+  ): { rootEntities: DecompositionEntity[]; rootDataModelRecordIds: string[]; rootDataModelLogicalIds: string[] } {
+    const { workflowRun, engine } = ctx;
+
+    const allExistingDataModelRoots = engine.writer.getRecordsByType(workflowRun.id, 'data_model_decomposition_node')
+      .filter(r => (r.content as unknown as DataModelDecompositionNodeContent).depth === 0);
+    const existingDataModelRoots = allExistingDataModelRoots.filter(r =>
+      (r.content as unknown as DataModelDecompositionNodeContent).entity?.ownership_role !== undefined);
+    if (allExistingDataModelRoots.length > 0 && existingDataModelRoots.length === 0) {
+      getLogger().info('workflow', 'Phase 5.1a: existing depth-0 roots predate ownership reconciliation — re-seeding owned/referenced split', {
+        staleRoots: allExistingDataModelRoots.length,
+      });
+    }
+    if (existingDataModelRoots.length > 0) {
+      // Only OWNED roots (status 'pending') re-enter the loop; referenced /
+      // value-object roots are terminal ('pruned') and the loop skips them anyway.
+      const ownedExisting = existingDataModelRoots.filter(r =>
+        (r.content as unknown as DataModelDecompositionNodeContent).status === 'pending');
+      getLogger().info('workflow', 'Phase 5.1a RESUME: reconciled depth-0 entity nodes already present', {
+        existingRoots: existingDataModelRoots.length, ownedRoots: ownedExisting.length,
+      });
+      return {
+        rootEntities: ownedExisting.map(r => (r.content as unknown as DataModelDecompositionNodeContent).entity),
+        rootDataModelRecordIds: ownedExisting.map(r => r.id),
+        rootDataModelLogicalIds: ownedExisting.map(r => (r.content as unknown as DataModelDecompositionNodeContent).node_id),
+      };
+    }
+
+    // Convert Phase 5.1's data_models entries into per-entity roots, split by the
+    // 5.1b ownership verdict (see buildRootSeedPlan): OWNED aggregates seed
+    // 'pending' (deep-decomposed) + enqueue; referenced / shared-value-object
+    // copies seed TERMINAL 'pruned' — recorded but NEVER enqueued.
+    const constraintIds = technicalConstraints.map(t => t.id);
+    const rootEntities: DecompositionEntity[] = [];
+    const rootDataModelRecordIds: string[] = [];
+    const rootDataModelLogicalIds: string[] = [];
+    const seedPlan = buildRootSeedPlan(dataModelsContent.models, constraintIds);
+    for (const op of seedPlan) {
+      if (op.enqueue) rootEntities.push(op.entity);
+      const { recId, nodeId } = this.seedDataModelRootNode(
+        ctx, dataModelsRecordId, op.entity, op.status, op.pruningReason, artifactIds,
+      );
+      if (op.enqueue) {
+        rootDataModelRecordIds.push(recId);
+        rootDataModelLogicalIds.push(nodeId);
+      }
+    }
+    return { rootEntities, rootDataModelRecordIds, rootDataModelLogicalIds };
+  }
+
+  /** Write one depth-0 data_model_decomposition_node and record its id. */
+  private seedDataModelRootNode(
+    ctx: PhaseContext,
+    dataModelsRecordId: string,
+    entity: DecompositionEntity,
+    status: 'pending' | 'pruned',
+    pruningReason: string | undefined,
+    artifactIds: string[],
+  ): { recId: string; nodeId: string } {
+    const { workflowRun, engine } = ctx;
+    const logicalNodeId = randomUUID();
+    const rec = engine.writer.writeRecord({
+      record_type: 'data_model_decomposition_node',
+      schema_version: '1.0',
+      workflow_run_id: workflowRun.id,
+      phase_id: '5',
+      sub_phase_id: 'data_model_saturation',
+      produced_by_agent_role: 'technical_spec_agent',
+      janumicode_version_sha: engine.janumiCodeVersionSha,
+      derived_from_record_ids: [dataModelsRecordId],
+      content: {
+        kind: 'data_model_decomposition_node',
+        node_id: logicalNodeId,
+        parent_node_id: null,
+        display_key: entity.id,
+        root_entity_id: logicalNodeId,
+        depth: 0,
+        pass_number: 0,
+        status,
+        tier: status === 'pruned' ? 'D' : undefined,
+        entity,
+        surfaced_assumption_ids: [],
+        pruning_reason: pruningReason,
+        release_id: null,
+        release_ordinal: null,
+      } satisfies DataModelDecompositionNodeContent,
+    });
+    artifactIds.push(rec.id);
+    return { recId: rec.id, nodeId: logicalNodeId };
+  }
+
+  /** 5.2 — API Definition. */
+  private async runApiStage(
+    ctx: PhaseContext,
+    params: {
+      componentIds: string[];
+      componentSummary: string;
+      contractsSummary: string;
+      sysReqSummary: string;
+      technicalConstraintsSummary: string;
+      prior: PriorPhaseContext;
+      dataModelsRecordId: string;
+    },
+    artifactIds: string[],
+  ): Promise<{ apiContent: ApiDefinitions; apiRecordId: string }> {
+    const { workflowRun, engine } = ctx;
+    const { componentIds, componentSummary, contractsSummary, sysReqSummary, technicalConstraintsSummary, prior, dataModelsRecordId } = params;
+
     engine.stateMachine.setSubPhase(workflowRun.id, 'api_definitions');
 
     const contractIds = ((prior.interfaceContracts?.content.contracts as Array<Record<string, unknown>>) ?? [])
       .map(c => (typeof c.id === 'string' ? c.id : ''))
       .filter(Boolean);
-    const dmr52Seeds = [
-      dataModelsRecord.id,
-      ...(prior.componentModel ? [prior.componentModel.recordId] : []),
-      ...(prior.interfaceContracts ? [prior.interfaceContracts.recordId] : []),
-      ...(prior.systemRequirements ? [prior.systemRequirements.recordId] : []),
-    ];
+    const dmr52Seeds = flattenSeedIds([
+      dataModelsRecordId,
+      prior.componentModel,
+      prior.interfaceContracts,
+      prior.systemRequirements,
+    ]);
     const dmr52 = await buildPhaseContextPacket(ctx, {
       subPhaseId: 'api_definitions',
       requestingAgentRole: 'technical_spec_agent',
-      query: `API definitions for components ${componentIds.join(', ')} fulfilling interface_contracts ${contractIds.join(', ')} on data_models ${dataModelsRecord.id}.`,
+      query: `API definitions for components ${componentIds.join(', ')} fulfilling interface_contracts ${contractIds.join(', ')} on data_models ${dataModelsRecordId}.`,
       knownRelevantRecordIds: dmr52Seeds,
       detailFileLabel: 'p5_2_apis',
       requiredOutputSpec: 'api_definitions JSON — endpoints with inputs, outputs, error codes, auth',
@@ -547,30 +946,46 @@ export class Phase5Handler implements PhaseHandler {
       sub_phase_id: 'api_definitions',
       produced_by_agent_role: 'technical_spec_agent',
       janumicode_version_sha: engine.janumiCodeVersionSha,
-      derived_from_record_ids: [dataModelsRecord.id, ...(prior.interfaceContracts ? [prior.interfaceContracts.recordId] : [])],
+      derived_from_record_ids: [dataModelsRecordId, ...(prior.interfaceContracts ? [prior.interfaceContracts.recordId] : [])],
       content: apiContentWithKind,
     });
     artifactIds.push(apiRecord.id);
     engine.ingestionPipeline.ingest(apiRecord);
 
-    // ── 5.3 — Error Handling Strategy ─────────────────────────
+    return { apiContent, apiRecordId: apiRecord.id };
+  }
+
+  /** 5.3 — Error Handling Strategy. */
+  private async runErrorHandlingStage(
+    ctx: PhaseContext,
+    params: {
+      componentIds: string[];
+      componentSummary: string;
+      apiContent: ApiDefinitions;
+      sysReqSummary: string;
+      technicalConstraintsSummary: string;
+      prior: PriorPhaseContext;
+      apiRecordId: string;
+    },
+    artifactIds: string[],
+  ): Promise<{ errorContent: ErrorHandlingStrategies; errorRecordId: string }> {
+    const { workflowRun, engine } = ctx;
+    const { componentIds, componentSummary, apiContent, sysReqSummary, technicalConstraintsSummary, prior, apiRecordId } = params;
+
     engine.stateMachine.setSubPhase(workflowRun.id, 'error_handling');
 
-    const apiSummary = apiContent.definitions.map(d => {
-      const eps = d.endpoints.map(e => `  ${e.method} ${e.path} (auth: ${e.auth_requirement ?? 'none'})`).join('\n');
-      return `Component ${d.component_id}:\n${eps}`;
-    }).join('\n');
+    const apiSummary = buildApiSummary(apiContent.definitions);
 
-    const dmr53Seeds = [
-      apiRecord.id,
-      ...(prior.componentModel ? [prior.componentModel.recordId] : []),
-      ...(prior.systemRequirements ? [prior.systemRequirements.recordId] : []),
-      ...(prior.nonFunctionalRequirements ? [prior.nonFunctionalRequirements.recordId] : []),
-    ];
+    const dmr53Seeds = flattenSeedIds([
+      apiRecordId,
+      prior.componentModel,
+      prior.systemRequirements,
+      prior.nonFunctionalRequirements,
+    ]);
     const dmr53 = await buildPhaseContextPacket(ctx, {
       subPhaseId: 'error_handling',
       requestingAgentRole: 'technical_spec_agent',
-      query: `Error handling strategies for components ${componentIds.join(', ')} against api_definitions ${apiRecord.id} per NFRs ${prior.nonFunctionalRequirements?.recordId ?? 'unknown'}.`,
+      query: `Error handling strategies for components ${componentIds.join(', ')} against api_definitions ${apiRecordId} per NFRs ${prior.nonFunctionalRequirements?.recordId ?? 'unknown'}.`,
       knownRelevantRecordIds: dmr53Seeds,
       detailFileLabel: 'p5_3_errors',
       requiredOutputSpec: 'error_handling_strategies JSON — strategies with error types, detection, response',
@@ -588,30 +1003,46 @@ export class Phase5Handler implements PhaseHandler {
       sub_phase_id: 'error_handling',
       produced_by_agent_role: 'technical_spec_agent',
       janumicode_version_sha: engine.janumiCodeVersionSha,
-      derived_from_record_ids: [apiRecord.id],
+      derived_from_record_ids: [apiRecordId],
       content: { kind: 'error_handling_strategies', ...errorContent },
     });
     artifactIds.push(errorRecord.id);
     engine.ingestionPipeline.ingest(errorRecord);
 
-    // ── 5.4 — Configuration Parameters ────────────────────────
+    return { errorContent, errorRecordId: errorRecord.id };
+  }
+
+  /** 5.4 — Configuration Parameters. */
+  private async runConfigurationStage(
+    ctx: PhaseContext,
+    params: {
+      componentIds: string[];
+      componentSummary: string;
+      dataModelsContent: DataModels;
+      sysReqSummary: string;
+      technicalConstraintsSummary: string;
+      prior: PriorPhaseContext;
+      dataModelsRecordId: string;
+    },
+    artifactIds: string[],
+  ): Promise<{ configContent: ConfigurationParameters; configRecordId: string }> {
+    const { workflowRun, engine } = ctx;
+    const { componentIds, componentSummary, dataModelsContent, sysReqSummary, technicalConstraintsSummary, prior, dataModelsRecordId } = params;
+
     engine.stateMachine.setSubPhase(workflowRun.id, 'configuration_parameters');
 
-    const dataModelsSummary = dataModelsContent.models.map(m => {
-      const ents = m.entities.map(e => `  ${e.name}: ${e.fields.map(f => `${f.name}:${f.type}`).join(', ')}`).join('\n');
-      return `Component ${m.component_id}:\n${ents}`;
-    }).join('\n');
+    const dataModelsSummary = buildDataModelsSummary(dataModelsContent.models);
 
-    const dmr54Seeds = [
-      dataModelsRecord.id,
-      ...(prior.componentModel ? [prior.componentModel.recordId] : []),
-      ...(prior.systemRequirements ? [prior.systemRequirements.recordId] : []),
-      ...(prior.nonFunctionalRequirements ? [prior.nonFunctionalRequirements.recordId] : []),
-    ];
+    const dmr54Seeds = flattenSeedIds([
+      dataModelsRecordId,
+      prior.componentModel,
+      prior.systemRequirements,
+      prior.nonFunctionalRequirements,
+    ]);
     const dmr54 = await buildPhaseContextPacket(ctx, {
       subPhaseId: 'configuration_parameters',
       requestingAgentRole: 'technical_spec_agent',
-      query: `Configuration parameters for components ${componentIds.join(', ')} against data_models ${dataModelsRecord.id} per NFRs ${prior.nonFunctionalRequirements?.recordId ?? 'unknown'}.`,
+      query: `Configuration parameters for components ${componentIds.join(', ')} against data_models ${dataModelsRecordId} per NFRs ${prior.nonFunctionalRequirements?.recordId ?? 'unknown'}.`,
       knownRelevantRecordIds: dmr54Seeds,
       detailFileLabel: 'p5_4_config',
       requiredOutputSpec: 'configuration_parameters JSON — params with name, type, default, description',
@@ -629,17 +1060,41 @@ export class Phase5Handler implements PhaseHandler {
       sub_phase_id: 'configuration_parameters',
       produced_by_agent_role: 'technical_spec_agent',
       janumicode_version_sha: engine.janumiCodeVersionSha,
-      derived_from_record_ids: [dataModelsRecord.id],
+      derived_from_record_ids: [dataModelsRecordId],
       content: { kind: 'configuration_parameters', ...configContent },
     });
     artifactIds.push(configRecord.id);
     engine.ingestionPipeline.ingest(configRecord);
 
-    // ── 5.5 — Mirror and Menu ─────────────────────────────────
+    return { configContent, configRecordId: configRecord.id };
+  }
+
+  /**
+   * 5.5 — Mirror and Menu (human review). Writes the mirror record, emits the
+   * mirror events, and pauses for the decision. Returns `{ rejected }` so
+   * execute() maps it to the PhaseResult (preserving both failure messages).
+   */
+  private async presentTechnicalSpecMirror(
+    ctx: PhaseContext,
+    params: {
+      dataModelsContent: DataModels;
+      apiContent: ApiDefinitions;
+      errorContent: ErrorHandlingStrategies;
+      configContent: ConfigurationParameters;
+      dataModelsRecordId: string;
+      apiRecordId: string;
+      errorRecordId: string;
+      configRecordId: string;
+    },
+    artifactIds: string[],
+  ): Promise<{ rejected: boolean; error?: string }> {
+    const { workflowRun, engine } = ctx;
+    const { dataModelsContent, apiContent, errorContent, configContent, dataModelsRecordId, apiRecordId, errorRecordId, configRecordId } = params;
+
     engine.stateMachine.setSubPhase(workflowRun.id, 'technical_spec_synthesis');
 
     const specMirror = engine.mirrorGenerator.generate({
-      artifactId: dataModelsRecord.id,
+      artifactId: dataModelsRecordId,
       artifactType: 'technical_specification',
       content: {
         data_models_count: dataModelsContent.models.length,
@@ -657,11 +1112,11 @@ export class Phase5Handler implements PhaseHandler {
       sub_phase_id: 'technical_spec_synthesis',
       produced_by_agent_role: 'orchestrator',
       janumicode_version_sha: engine.janumiCodeVersionSha,
-      derived_from_record_ids: [dataModelsRecord.id, apiRecord.id, errorRecord.id, configRecord.id],
+      derived_from_record_ids: [dataModelsRecordId, apiRecordId, errorRecordId, configRecordId],
       content: {
         kind: 'technical_specification_mirror',
         mirror_id: specMirror.mirrorId,
-        artifact_id: dataModelsRecord.id,
+        artifact_id: dataModelsRecordId,
         artifact_type: 'technical_specification',
         fields: specMirror.fields,
         data_models_count: dataModelsContent.models.length,
@@ -685,14 +1140,31 @@ export class Phase5Handler implements PhaseHandler {
         workflowRun.id, mirrorRecord.id, 'mirror',
       );
       if (resolution.type === 'mirror_rejection') {
-        return { success: false, error: 'User rejected technical specification', artifactIds };
+        return { rejected: true, error: 'User rejected technical specification' };
       }
     } catch (err) {
       getLogger().warn('workflow', 'Phase 5 review failed', { error: String(err) });
-      return { success: false, error: 'Technical specification review failed', artifactIds };
+      return { rejected: true, error: 'Technical specification review failed' };
     }
+    return { rejected: false };
+  }
 
-    // ── 5.6 — Consistency Check and Approval ──────────────────
+  /** 5.6 — Consistency Check and Approval (phase gate). */
+  private finalizeConsistencyGate(
+    ctx: PhaseContext,
+    params: {
+      dataModelsContent: DataModels;
+      apiContent: ApiDefinitions;
+      dataModelsRecordId: string;
+      apiRecordId: string;
+      errorRecordId: string;
+      configRecordId: string;
+    },
+    artifactIds: string[],
+  ): void {
+    const { workflowRun, engine } = ctx;
+    const { dataModelsContent, apiContent, dataModelsRecordId, apiRecordId, errorRecordId, configRecordId } = params;
+
     engine.stateMachine.setSubPhase(workflowRun.id, 'technical_spec_gate');
 
     const consistencyReport = this.runConsistencyCheck(dataModelsContent, apiContent);
@@ -705,7 +1177,7 @@ export class Phase5Handler implements PhaseHandler {
       sub_phase_id: 'technical_spec_gate',
       produced_by_agent_role: 'consistency_checker',
       janumicode_version_sha: engine.janumiCodeVersionSha,
-      derived_from_record_ids: [dataModelsRecord.id, apiRecord.id, errorRecord.id, configRecord.id],
+      derived_from_record_ids: [dataModelsRecordId, apiRecordId, errorRecordId, configRecordId],
       content: { kind: 'consistency_report', ...consistencyReport },
     });
     artifactIds.push(consistencyRecord.id);
@@ -720,14 +1192,14 @@ export class Phase5Handler implements PhaseHandler {
       sub_phase_id: 'technical_spec_gate',
       produced_by_agent_role: 'orchestrator',
       janumicode_version_sha: engine.janumiCodeVersionSha,
-      derived_from_record_ids: [dataModelsRecord.id, apiRecord.id, errorRecord.id, configRecord.id, consistencyRecord.id],
+      derived_from_record_ids: [dataModelsRecordId, apiRecordId, errorRecordId, configRecordId, consistencyRecord.id],
       content: {
         kind: 'phase_gate',
         phase_id: '5',
-        data_models_record_id: dataModelsRecord.id,
-        api_definitions_record_id: apiRecord.id,
-        error_handling_record_id: errorRecord.id,
-        configuration_record_id: configRecord.id,
+        data_models_record_id: dataModelsRecordId,
+        api_definitions_record_id: apiRecordId,
+        error_handling_record_id: errorRecordId,
+        configuration_record_id: configRecordId,
         consistency_pass: consistencyReport.overall_pass,
         has_unresolved_warnings: consistencyReport.warnings.length > 0,
         has_high_severity_flaws: !consistencyReport.overall_pass,
@@ -736,8 +1208,6 @@ export class Phase5Handler implements PhaseHandler {
     artifactIds.push(gateRecord.id);
     engine.eventBus.emit('phase_gate:pending', { phaseId: '5' });
     aoddEmit('gate.pending', { gate_kind: 'phase_gate' });
-
-    return { success: true, artifactIds };
   }
 
   // ── LLM call helpers ──────────────────────────────────────────
@@ -755,13 +1225,12 @@ export class Phase5Handler implements PhaseHandler {
    */
   private async runDataModelSpecification(
     ctx: PhaseContext,
-    components: Array<Record<string, unknown>>,
-    componentIds: string[],
-    componentSummaryById: Record<string, string>,
+    componentInputs: DataModelSpecInputs,
     domainsSummary: string,
     sysReqSummary: string, technicalConstraintsSummary: string, dmr: PhaseContextPacketResult,
   ): Promise<DataModels> {
     const { engine } = ctx;
+    const { components, componentIds, componentSummaryById } = componentInputs;
     const template = engine.templateLoader.findTemplate('technical_spec_agent', 'data_model_skeleton');
     // Empty — NEVER fabricate placeholder content (ts-117: a fabricated
     // api fallback shipped spec-violating endpoints downstream). On
@@ -835,7 +1304,8 @@ export class Phase5Handler implements PhaseHandler {
       chunkUncovered: (uncovered) => chunkComponentIds([...uncovered], maxComponentsPerBatch),
       reconcileBatch: reconTemplate
         ? (batch, info) => this.reconcileUncoveredDataModels(
-            ctx, reconTemplate, batch, componentByNormId, sysReqSummary, technicalConstraintsSummary, dmr, info,
+            ctx, reconTemplate, batch, componentByNormId,
+            { sysReqSummary, technicalConstraintsSummary, dmr }, info,
           )
         : undefined,
       maxReconPasses,
@@ -868,12 +1338,11 @@ export class Phase5Handler implements PhaseHandler {
     template: PromptTemplate,
     uncovered: Set<string>,
     componentByNormId: Map<string, Record<string, unknown>>,
-    sysReqSummary: string,
-    technicalConstraintsSummary: string,
-    dmr: PhaseContextPacketResult,
+    reconcileContext: UncoveredReconcileContext,
     batchInfo?: { pass: number; batchIndex: number; batchCount: number },
   ): Promise<DataModelEntry[]> {
     const { engine } = ctx;
+    const { sysReqSummary, technicalConstraintsSummary, dmr } = reconcileContext;
     const menu = renderUncoveredComponentsMenu(uncovered, componentByNormId);
     if (!menu) return [];
     const rendered = engine.templateLoader.render(template, {
@@ -1029,26 +1498,14 @@ export class Phase5Handler implements PhaseHandler {
     const traceability: unknown[] = [];
 
     // DM-001: No entity field without a type
-    const untypedFields: Array<{ item_id: string; explanation: string }> = [];
-    for (const model of dataModels.models) {
-      for (const entity of model.entities) {
-        for (const field of entity.fields) {
-          if (!field.type) untypedFields.push({ item_id: `${entity.name}.${field.name}`, explanation: `Field ${field.name} in ${entity.name} has no type` });
-        }
-      }
-    }
+    const untypedFields = findUntypedFields(dataModels);
     if (untypedFields.length > 0) {
       blockingFailures.push('untyped-entity-fields');
       traceability.push({ assertion: 'Every entity field has a specified type (DM-001)', pass: false, failures: untypedFields });
     }
 
     // API-001: Every endpoint has auth_requirement
-    const noAuthEndpoints: Array<{ item_id: string; explanation: string }> = [];
-    for (const def of apiDefs.definitions) {
-      for (const ep of def.endpoints) {
-        if (!ep.auth_requirement) noAuthEndpoints.push({ item_id: `${def.component_id}:${ep.method} ${ep.path}`, explanation: `Endpoint ${ep.method} ${ep.path} has no auth_requirement` });
-      }
-    }
+    const noAuthEndpoints = findEndpointsWithoutAuth(apiDefs);
     if (noAuthEndpoints.length > 0) {
       warnings.push('endpoints-without-auth');
       traceability.push({ assertion: 'Every endpoint has an explicit auth requirement (API-001)', pass: false, failures: noAuthEndpoints });

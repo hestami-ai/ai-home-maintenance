@@ -19,6 +19,7 @@ import type {
   TechnicalConstraint,
   DecompositionComponent,
   ComponentDecompositionNodeContent,
+  GovernedStreamRecord,
 } from '../../types/records';
 import { getLogger } from '../../logging';
 import { extractPriorPhaseContext, buildEffectiveComponentView } from './phaseContext';
@@ -27,7 +28,7 @@ import { pickItemsArray } from '../parsedResponseHelpers';
 import { resolveAgainstOracle } from '../idResolver';
 import { chunkedCoverageBloom } from './chunkedCoverageBloom';
 import { runComponentSaturationLoop } from './phase4_2a';
-import { runDownstreamScopeGatekeeper } from './downstreamGatekeeper';
+import { runDownstreamScopeGatekeeper, type DownstreamGatekeeperOutcome } from './downstreamGatekeeper';
 import { buildRequirementLineage } from './packetSynthesis/idResolution';
 import {
   normalizeComponentKinds,
@@ -389,10 +390,13 @@ export async function runAdrCaptureBloom(
         // both emitting `ADR-001` are NOT collapsed by the helper's idOf-dedup
         // (they are distinct decisions, not duplicates). Genuine within-chunk
         // repeats still collapse. Clean sequential re-id happens post-merge.
-        return adrs.map((adr, j) => ({
-          ...adr,
-          id: `d${index}-${typeof adr.id === 'string' && adr.id.length > 0 ? adr.id : `ADR-${j + 1}`}`,
-        }));
+        return adrs.map((adr, j) => {
+          const fallbackId = `ADR-${j + 1}`;
+          return {
+            ...adr,
+            id: `d${index}-${typeof adr.id === 'string' && adr.id.length > 0 ? adr.id : fallbackId}`,
+          };
+        });
       } catch (err) {
         getLogger().warn('workflow', 'Phase 4.3 per-domain ADR generation failed — continuing', {
           domain_id: chunk.domainId, error: err instanceof Error ? err.message : String(err),
@@ -419,6 +423,509 @@ export async function runAdrCaptureBloom(
   return { adrs };
 }
 
+// ── execute() decomposition helpers ─────────────────────────────────
+//
+// Behaviour-preserving extractions of blocks that lived inline in
+// Phase4Handler.execute(). Each is a pure projection or a self-contained
+// side-effecting step, kept small so the orchestration in execute() reads as
+// a linear pipeline. Exported for direct unit testing.
+
+/**
+ * Collapse the repeated DMR-seed spread `prior.X ? [prior.X.recordId] : []`
+ * into a single ordered collection. Present artifact contexts contribute
+ * their `recordId`; absent ones contribute nothing. Order is preserved.
+ */
+export function optRecordIds(
+  ...records: Array<{ recordId: string } | null | undefined>
+): string[] {
+  const ids: string[] = [];
+  for (const rec of records) {
+    if (rec) ids.push(rec.recordId);
+  }
+  return ids;
+}
+
+/**
+ * PA-6 — build the per-domain context block (keyed by id) plus the
+ * byte-identical full-catalog `domainsSummary` and a thin `domainIndex`.
+ * `domainsSummary` preserves the exact order/format of the original inline
+ * construction (map over domains → join('\n')).
+ */
+export function buildDomainContext(
+  domains: SoftwareDomain[],
+): { domainContextById: Record<string, string>; domainsSummary: string; domainIndex: string } {
+  const domainContextById: Record<string, string> = {};
+  for (const d of domains) {
+    const terms = d.ubiquitous_language.map(t => `${t.term}: ${t.definition}`).join('; ');
+    domainContextById[d.id] = `${d.id}: ${d.name} (reqs: ${(d.system_requirement_ids ?? []).join(', ')})\n  Terms: ${terms}`;
+  }
+  const domainsSummary = domains.map(d => domainContextById[d.id]).join('\n');
+  const domainIndex = domains.map(d => `${d.id}: ${d.name}`).join('\n');
+  return { domainContextById, domainsSummary, domainIndex };
+}
+
+/**
+ * Project the proposed component set into the advisory scope-gatekeeper's
+ * item shape (id / label / description / tradeoffs). Pure — identical to the
+ * pre-refactor inline `.map`.
+ */
+export function buildComponentGatekeeperItems(
+  components: Array<Record<string, unknown>>,
+): Array<{ id: string; label: string; description?: string; tradeoffs?: string }> {
+  return components.map(c => ({
+    id: typeof c.id === 'string' ? c.id : '',
+    label: `${c.id}: ${c.name} [domain: ${typeof c.domain_id === 'string' ? c.domain_id : '?'}]`,
+    description: typeof c.description === 'string' ? c.description : undefined,
+    tradeoffs: Array.isArray(c.traces_to) ? `traces_to: ${(c.traces_to as string[]).join(', ')}` : undefined,
+  }));
+}
+
+/**
+ * Collect the two acceptance sets the deterministic component-scope filter
+ * needs from the current-version artifacts: accepted BUSINESS domains
+ * (Phase 1.2 post-gatekeeper `business_domains_bloom`) and accepted USER
+ * STORIES (Phase 2.1 post-gatekeeper `functional_requirements`).
+ */
+export function computeAcceptedScopeSets(
+  allArtifacts: ReadonlyArray<{ is_current_version: boolean; content: Record<string, unknown> }>,
+): { acceptedBizDomainIds: Set<string>; acceptedUserStoryIds: Set<string> } {
+  const acceptedBizDomainIds = new Set(
+    allArtifacts
+      .filter(r => r.is_current_version && (r.content as Record<string, unknown>).kind === 'business_domains_bloom')
+      .flatMap(r => (((r.content as Record<string, unknown>).domains as Array<{ id?: string }>) ?? []))
+      .map(d => d.id)
+      .filter((x): x is string => typeof x === 'string'),
+  );
+  const acceptedUserStoryIds = new Set(
+    allArtifacts
+      .filter(r => r.is_current_version && (r.content as Record<string, unknown>).kind === 'functional_requirements')
+      .flatMap(r => (((r.content as Record<string, unknown>).user_stories as Array<{ id?: string }>) ?? []))
+      .map(s => s.id)
+      .filter((x): x is string => typeof x === 'string'),
+  );
+  return { acceptedBizDomainIds, acceptedUserStoryIds };
+}
+
+/**
+ * Convert the deterministically pruned Phase 4.2 component set into the
+ * Wave-7 DecompositionComponent shape used to seed the saturation loop.
+ * Pure — identical mapping to the pre-refactor inline conversion (each
+ * component gets its own fresh `active_constraints` array).
+ */
+export function toDecompositionComponents(
+  components: Component[],
+  technicalConstraints: TechnicalConstraint[],
+): DecompositionComponent[] {
+  return components.map(c => ({
+    id: c.id,
+    name: c.name,
+    domain_id: c.domain_id ?? null,
+    responsibilities: c.responsibilities.map(r => ({ id: r.id, description: r.statement })),
+    dependencies: (c.dependencies ?? []).map(d => ({
+      component_id: d.target_component_id,
+      // Phase 4.2's `dependency_type` is free-form string; coerce to the
+      // four kinds Wave 7 supports — fall back to sync_call for unknowns.
+      kind: ((['sync_call', 'async_event', 'data_read', 'data_write'] as const) as readonly string[])
+        .includes(d.dependency_type)
+        ? (d.dependency_type as 'sync_call' | 'async_event' | 'data_read' | 'data_write')
+        : 'sync_call',
+    })),
+    active_constraints: technicalConstraints.map(t => t.id),
+    traces_to: c.satisfies_requirement_ids,
+  }));
+}
+
+/**
+ * Pick the component roster the ADR fan-out governs: the Wave-7 LEAF
+ * projection when a decomposition tree exists, else the flat Phase 4.2
+ * component_model fallback (returned by reference). Pure — identical to the
+ * pre-refactor inline ternary + projection.
+ */
+export function buildAdrComponentsSource(
+  effectiveForAdr: { source: string; components: Array<Record<string, unknown>> },
+  fallbackComponents: AdrCaptureComponent[],
+): AdrCaptureComponent[] {
+  if (effectiveForAdr.source !== 'leaves') return fallbackComponents;
+  return effectiveForAdr.components.map(c => ({
+    id: c.id as string,
+    name: c.name as string,
+    domain_id: c.domain_id as string | undefined,
+    responsibilities: (c.responsibilities as Array<{ id: string; statement?: string; description?: string }>)
+      .map(r => ({ id: r.id, statement: r.statement ?? r.description ?? '' })),
+    dependencies: (c.dependencies as Array<{ target_component_id?: string; component_id?: string; dependency_type?: string; kind?: string }>)
+      .map(d => ({
+        target_component_id: d.target_component_id ?? d.component_id ?? '',
+        dependency_type: d.dependency_type ?? d.kind ?? 'sync_call',
+      })),
+  }));
+}
+
+/**
+ * Render the verbatim TECH-* roster for the ADR prompt's non-contradiction
+ * self-check. Pure — identical to the pre-refactor inline construction.
+ */
+export function summarizeTechnicalConstraints(technicalConstraints: TechnicalConstraint[]): string {
+  if (technicalConstraints.length === 0) {
+    return 'No technical_constraints_discovery artifact available';
+  }
+  return technicalConstraints
+    .map(t => {
+      const id = (t as { id?: string }).id ?? '';
+      const tech = (t as { technology?: string; name?: string }).technology
+        ?? (t as { name?: string }).name ?? '';
+      const category = (t as { category?: string }).category ?? '';
+      const text = (t as { text?: string; rationale?: string }).text
+        ?? (t as { rationale?: string }).rationale ?? '';
+      return [id, tech, category, text].filter(Boolean).join(' — ');
+    })
+    .filter(Boolean)
+    .join('\n');
+}
+
+/**
+ * Wave-7 tier histogram over the decomposition nodes (for the architecture
+ * mirror). Pure — identical to the pre-refactor inline reduce.
+ */
+export function computeComponentTierDistribution(
+  decompositionNodes: Array<{ content: Record<string, unknown> }>,
+): Record<string, number> {
+  return decompositionNodes.reduce<Record<string, number>>((acc, r) => {
+    const c = r.content as unknown as ComponentDecompositionNodeContent;
+    if (c.tier) acc[c.tier] = (acc[c.tier] ?? 0) + 1;
+    return acc;
+  }, {});
+}
+
+/**
+ * Resolve each ADR's `governs_components` against the real component-id
+ * oracle (drops ids that don't resolve; an empty list stays empty = global
+ * ADR). Mutates the ADRs in place — identical to the pre-refactor inline block.
+ */
+function resolveAdrGovernsComponents(adrs: ADR[], componentOracle: Set<string>): void {
+  for (const adr of adrs) {
+    if (!Array.isArray(adr.governs_components)) continue;
+    adr.governs_components = adr.governs_components
+      .map((id) => resolveAgainstOracle(id, componentOracle))
+      .filter((id): id is string => id !== null);
+  }
+}
+
+/**
+ * Read the Phase 4.2a / 4.3 prerequisites in one place: the product handoff
+ * and the Phase 1.0c `technical_constraints_discovery` artifact (with its
+ * parsed constraint list). Both 4.2a (leaf `active_constraints`) and 4.3
+ * (dmr43 seed + non-contradiction roster) consume the result.
+ */
+function readArchitectureInputs(ctx: PhaseContext): {
+  handoff: ProductDescriptionHandoffContent;
+  techConstraintsRecord: GovernedStreamRecord | undefined;
+  technicalConstraints: TechnicalConstraint[];
+} {
+  const { engine, workflowRun } = ctx;
+  const handoffRecord = engine.writer.getRecordsByType(workflowRun.id, 'product_description_handoff')[0];
+  const handoff = (handoffRecord?.content ?? {}) as unknown as ProductDescriptionHandoffContent;
+  const techConstraintsRecord = engine.writer.getRecordsByType(workflowRun.id, 'artifact_produced')
+    .find(r => (r.content as Record<string, unknown>).kind === 'technical_constraints_discovery');
+  const technicalConstraints: TechnicalConstraint[] = techConstraintsRecord
+    ? (((techConstraintsRecord.content as Record<string, unknown>).technicalConstraints) as TechnicalConstraint[] ?? [])
+    : [];
+  return { handoff, techConstraintsRecord, technicalConstraints };
+}
+
+/**
+ * Lever 1a — partition the proposed components into functional services and
+ * cross-cutting NFR concerns. Cross-cutting components are reified as
+ * `cross_cutting_constraints` (never built as standalone services) and
+ * REMOVED from `componentContent.components`; only the functional set flows
+ * downstream. The NFR information still reaches the executor via the packet's
+ * NFR section, so nothing is lost. Mutates `componentContent.components` in
+ * place and appends any written record id to `artifactIds`.
+ */
+function applyCrossCuttingLever1a(
+  ctx: PhaseContext,
+  componentContent: ComponentModel,
+  domainsRecordId: string,
+  artifactIds: string[],
+): void {
+  const { engine, workflowRun } = ctx;
+  // Normalize first: local models often omit the per-component
+  // `component_kind` field (schema-adherence wobble). Infer it structurally
+  // (empty traces_to / applies_to_components present ⇒ cross_cutting) so 1a
+  // is not a silent no-op when the field is missing.
+  const kindNorm = normalizeComponentKinds(
+    componentContent.components as unknown as Array<{ component_kind?: string; traces_to?: string[]; applies_to_components?: string[] }>,
+  );
+  if (kindNorm.inferred > 0) {
+    componentContent.components = kindNorm.components as unknown as Component[];
+    getLogger().info('workflow', 'Lever 1a: inferred component_kind for components missing the field', {
+      workflow_run_id: workflowRun.id, inferred: kindNorm.inferred,
+    });
+  }
+  const kindPartition = partitionComponentsByKind(
+    componentContent.components as unknown as Array<{ component_kind?: string }>,
+  );
+  const crossCuttingComponents = kindPartition.crossCutting as unknown as Component[];
+  if (crossCuttingComponents.length === 0) return;
+  componentContent.components = kindPartition.functional as unknown as Component[];
+  const ccContent = buildCrossCuttingConstraints(
+    crossCuttingComponents as unknown as ShapingComponent[],
+  );
+  const ccRecord = engine.writer.writeRecord({
+    record_type: 'artifact_produced',
+    schema_version: '1.0',
+    workflow_run_id: workflowRun.id,
+    phase_id: '4',
+    sub_phase_id: 'component_skeleton',
+    produced_by_agent_role: 'architecture_agent',
+    janumicode_version_sha: engine.janumiCodeVersionSha,
+    derived_from_record_ids: [domainsRecordId],
+    content: ccContent as unknown as Record<string, unknown>,
+  });
+  artifactIds.push(ccRecord.id);
+  engine.ingestionPipeline.ingest(ccRecord);
+  getLogger().info('workflow', 'Lever 1a: NFR/cross-cutting components reified as constraints (not services)', {
+    workflow_run_id: workflowRun.id,
+    cross_cutting: crossCuttingComponents.map(c => c.id),
+    functional_remaining: componentContent.components.length,
+  });
+}
+
+/**
+ * Lever 1b — right-size the functional component count to intent scale (keyed
+ * to accepted user-story + functional-domain counts, not a hardcoded number).
+ * When the pruned set exceeds the budget, consolidate by merging within the
+ * same software domain; a consolidation that would drop coverage is rejected
+ * (fail-safe: original set kept). Always writes a `decomposition_scale_decision`
+ * audit record when the budget bites. Returns the (possibly consolidated) set.
+ */
+function applyScaleBudget(
+  ctx: PhaseContext,
+  args: {
+    finalKeptComps: Component[];
+    componentRecordId: string;
+    proposedComponents: Component[];
+    compDropSet: Set<string>;
+    acceptedUserStoryIds: Set<string>;
+    softwareDomainCount: number;
+  },
+): { finalKeptComps: Component[]; scaleConsolidated: boolean } {
+  const { engine, workflowRun } = ctx;
+  const scaleRatio = (engine.configManager.get().decomposition as unknown as {
+    component_scale_ratio?: number;
+  }).component_scale_ratio ?? 1.0;
+  // Floor on the domains that actually host a FUNCTIONAL component (post-1a /
+  // post-drop), NOT the total software-domain count. Otherwise NFR domains
+  // inflate the floor and the gate never bites.
+  const functionalDomainCount = new Set(
+    args.finalKeptComps.map(c => c.domain_id).filter((d): d is string => typeof d === 'string'),
+  ).size;
+  const componentBudget = computeComponentBudget(
+    args.acceptedUserStoryIds.size, functionalDomainCount, scaleRatio,
+  );
+  let finalKeptComps = args.finalKeptComps;
+  let scaleConsolidated = false;
+  if (!(Number.isFinite(componentBudget) && finalKeptComps.length > componentBudget)) {
+    return { finalKeptComps, scaleConsolidated };
+  }
+  const consolidation = consolidateToBudget(
+    finalKeptComps as unknown as ShapingComponent[],
+    componentBudget,
+    args.acceptedUserStoryIds,
+  );
+  const accepted = consolidation.coveragePreserved && consolidation.merges.length > 0;
+  if (accepted) {
+    finalKeptComps = consolidation.components as unknown as Component[];
+    scaleConsolidated = true;
+  }
+  engine.writer.writeRecord({
+    record_type: 'artifact_produced',
+    schema_version: '1.0',
+    workflow_run_id: workflowRun.id,
+    phase_id: '4',
+    sub_phase_id: 'component_skeleton',
+    produced_by_agent_role: 'architecture_agent',
+    janumicode_version_sha: engine.janumiCodeVersionSha,
+    derived_from_record_ids: [args.componentRecordId],
+    content: {
+      kind: 'decomposition_scale_decision',
+      budget: componentBudget,
+      scale_ratio: scaleRatio,
+      accepted_user_story_count: args.acceptedUserStoryIds.size,
+      software_domain_count: args.softwareDomainCount,
+      functional_domain_count: functionalDomainCount,
+      proposed_functional_count: args.proposedComponents.length,
+      post_drop_count: args.proposedComponents.filter(c => !args.compDropSet.has(c.id)).length,
+      consolidated: accepted,
+      coverage_preserved: consolidation.coveragePreserved,
+      merges: consolidation.merges,
+      final_count: finalKeptComps.length,
+    },
+  });
+  getLogger().info('workflow', 'Lever 1b: decomposition scale budget applied', {
+    workflow_run_id: workflowRun.id,
+    budget: componentBudget, proposed: args.proposedComponents.length,
+    consolidated: accepted, coverage_preserved: consolidation.coveragePreserved,
+    final: finalKeptComps.length,
+  });
+  return { finalKeptComps, scaleConsolidated };
+}
+
+/**
+ * Persist the deterministic component-scope decisions: (1) an audit log of
+ * LLM-vs-deterministic disagreement, (2) a superseding pruned `component_model`
+ * when anything changed (drops or scale consolidation), and (3) the
+ * authoritative `scope_prune_decision` record when components were dropped.
+ * Returns the (possibly superseding) current component record and appends any
+ * newly written pruned-model id to `artifactIds`.
+ */
+function persistComponentScopeDecisions(
+  ctx: PhaseContext,
+  args: {
+    componentContent: ComponentModel;
+    componentRecord: GovernedStreamRecord;
+    compPrune: DownstreamGatekeeperOutcome;
+    componentDrops: Array<{ id: string; reason: string }>;
+    compDropSet: Set<string>;
+    finalKeptComps: Component[];
+    scaleConsolidated: boolean;
+    acceptedBizDomainIds: Set<string>;
+    artifactIds: string[];
+  },
+): GovernedStreamRecord {
+  const { engine, workflowRun } = ctx;
+  const {
+    componentContent, compPrune, componentDrops, compDropSet,
+    finalKeptComps, scaleConsolidated, acceptedBizDomainIds, artifactIds,
+  } = args;
+  let componentRecord = args.componentRecord;
+
+  // Surface LLM-vs-deterministic disagreement for the audit trail.
+  const llmDroppedIds = new Set(compPrune.skipped ? [] : compPrune.dropped.map(d => d.id));
+  const disagreements = componentContent.components
+    .filter(c => llmDroppedIds.has(c.id) && !compDropSet.has(c.id))
+    .map(c => c.id);
+  if (componentDrops.length > 0 || disagreements.length > 0) {
+    getLogger().info('workflow', 'Deterministic component-scope filter (authoritative)', {
+      workflow_run_id: workflowRun.id,
+      deterministic_dropped: componentDrops.map(d => d.id),
+      llm_advisory_dropped: [...llmDroppedIds],
+      kept_over_llm_advice: disagreements,
+      accepted_business_domains: [...acceptedBizDomainIds],
+    });
+  }
+
+  if (componentDrops.length > 0 || scaleConsolidated) {
+    const prunedCompContent = { ...componentContent, components: finalKeptComps };
+    const prunedCompRecord = engine.writer.writeRecord({
+      record_type: 'artifact_produced',
+      schema_version: '1.0',
+      workflow_run_id: workflowRun.id,
+      phase_id: '4',
+      sub_phase_id: 'component_skeleton',
+      produced_by_agent_role: 'architecture_agent',
+      janumicode_version_sha: engine.janumiCodeVersionSha,
+      derived_from_record_ids: [componentRecord.id],
+      content: { kind: 'component_model', ...prunedCompContent },
+    });
+    engine.writer.supersedByRollback(componentRecord.id, prunedCompRecord.id);
+    engine.ingestionPipeline.ingest(prunedCompRecord);
+    componentRecord = prunedCompRecord;
+    artifactIds.push(prunedCompRecord.id);
+  }
+  // Authoritative deterministic audit record (the LLM's advisory
+  // scope_prune_decision was already written by runDownstreamScopeGatekeeper).
+  if (componentDrops.length > 0) {
+    engine.writer.writeRecord({
+      record_type: 'scope_prune_decision',
+      schema_version: '1.0',
+      workflow_run_id: workflowRun.id,
+      phase_id: '4',
+      sub_phase_id: 'component_skeleton',
+      produced_by_agent_role: 'architecture_agent',
+      janumicode_version_sha: engine.janumiCodeVersionSha,
+      derived_from_record_ids: [componentRecord.id],
+      content: {
+        kind: 'scope_prune_decision',
+        schemaVersion: '1.0',
+        sub_phase_id: 'component_skeleton',
+        original_artifact_id: componentRecord.id,
+        pruned_artifact_id: componentRecord.id,
+        kept_ids: finalKeptComps.map(c => c.id),
+        dropped: componentDrops.map(d => ({ id: d.id, reason: d.reason })),
+        rationale_summary: 'Authoritative deterministic component-scope filter: domain 2-hop (software domain must map to an accepted business domain) + user-story coverage (must trace to >=1 accepted story, unless cross-cutting with no traces_to). LLM gatekeeper is advisory only.',
+        gatekeeper_provider: 'deterministic',
+        gatekeeper_model: 'component_scope_filter_v2',
+        duration_ms: 0,
+      } as unknown as Record<string, unknown>,
+    });
+  }
+  return componentRecord;
+}
+
+/**
+ * Phase 4.2a seed step: materialize the depth-0 `component_decomposition_node`
+ * roots. RESUME-safe — when depth-0 nodes already exist it rehydrates from
+ * them; otherwise it converts the pruned component set (finalKeptComps) into
+ * DecompositionComponents and writes fresh depth-0 seed rows (seeding from the
+ * DETERMINISTICALLY PRUNED set so dropped components can't re-enter as roots).
+ * Appends newly written record ids onto `artifactIds`.
+ */
+function seedDecompositionRoots(
+  ctx: PhaseContext,
+  finalKeptComps: Component[],
+  technicalConstraints: TechnicalConstraint[],
+  componentRecordId: string,
+  artifactIds: string[],
+): { rootComponents: DecompositionComponent[]; rootNodeRecordIds: string[]; rootLogicalIds: string[] } {
+  const { engine, workflowRun } = ctx;
+  const existingRoots = engine.writer.getRecordsByType(workflowRun.id, 'component_decomposition_node')
+    .filter(r => (r.content as unknown as ComponentDecompositionNodeContent).depth === 0);
+  if (existingRoots.length > 0) {
+    getLogger().info('workflow', 'Phase 4.2a RESUME: depth-0 nodes already present', {
+      existingRoots: existingRoots.length,
+    });
+    return {
+      rootComponents: existingRoots.map(r => (r.content as unknown as ComponentDecompositionNodeContent).component),
+      rootNodeRecordIds: existingRoots.map(r => r.id),
+      rootLogicalIds: existingRoots.map(r => (r.content as unknown as ComponentDecompositionNodeContent).node_id),
+    };
+  }
+  const rootComponents = toDecompositionComponents(finalKeptComps, technicalConstraints);
+  const rootNodeRecordIds: string[] = [];
+  const rootLogicalIds: string[] = [];
+  for (const rc of rootComponents) {
+    const logicalNodeId = randomUUID();
+    const rec = engine.writer.writeRecord({
+      record_type: 'component_decomposition_node',
+      schema_version: '1.0',
+      workflow_run_id: workflowRun.id,
+      phase_id: '4',
+      sub_phase_id: 'component_saturation',
+      produced_by_agent_role: 'architecture_agent',
+      janumicode_version_sha: engine.janumiCodeVersionSha,
+      derived_from_record_ids: [componentRecordId],
+      content: {
+        kind: 'component_decomposition_node',
+        node_id: logicalNodeId,
+        parent_node_id: null,
+        display_key: rc.id,
+        root_component_id: logicalNodeId,
+        depth: 0,
+        pass_number: 0,
+        status: 'pending',
+        component: rc,
+        surfaced_assumption_ids: [],
+        release_id: null,
+        release_ordinal: null,
+      } satisfies ComponentDecompositionNodeContent,
+    });
+    rootNodeRecordIds.push(rec.id);
+    rootLogicalIds.push(logicalNodeId);
+    artifactIds.push(rec.id);
+  }
+  return { rootComponents, rootNodeRecordIds, rootLogicalIds };
+}
+
 // ── Handler ────────────────────────────────────────────────────────
 
 export class Phase4Handler implements PhaseHandler {
@@ -441,12 +948,10 @@ export class Phase4Handler implements PhaseHandler {
     engine.stateMachine.setSubPhase(workflowRun.id, 'software_domains');
 
     const srIds = sysReqItems.map(i => i.id as string).filter(Boolean);
-    const dmr41Seeds = [
-      ...(prior.systemBoundary ? [prior.systemBoundary.recordId] : []),
-      ...(prior.systemRequirements ? [prior.systemRequirements.recordId] : []),
-      ...(prior.functionalRequirements ? [prior.functionalRequirements.recordId] : []),
-      ...(prior.nonFunctionalRequirements ? [prior.nonFunctionalRequirements.recordId] : []),
-    ];
+    const dmr41Seeds = optRecordIds(
+      prior.systemBoundary, prior.systemRequirements,
+      prior.functionalRequirements, prior.nonFunctionalRequirements,
+    );
     const dmr41 = await buildPhaseContextPacket(ctx, {
       subPhaseId: 'software_domains',
       requestingAgentRole: 'architecture_agent',
@@ -483,20 +988,13 @@ export class Phase4Handler implements PhaseHandler {
     // can scope each node to its own domain (domainContextById) + a thin index
     // (domainIndex). domainsSummary stays byte-identical (same order/format) as
     // the full-catalog fallback.
-    const domainContextById: Record<string, string> = {};
-    for (const d of domainsContent.domains) {
-      const terms = d.ubiquitous_language.map(t => `${t.term}: ${t.definition}`).join('; ');
-      domainContextById[d.id] = `${d.id}: ${d.name} (reqs: ${(d.system_requirement_ids ?? []).join(', ')})\n  Terms: ${terms}`;
-    }
-    const domainsSummary = domainsContent.domains.map(d => domainContextById[d.id]).join('\n');
-    const domainIndex = domainsContent.domains.map(d => `${d.id}: ${d.name}`).join('\n');
+    const { domainContextById, domainsSummary, domainIndex } =
+      buildDomainContext(domainsContent.domains);
 
     const domainIds = domainsContent.domains.map(d => d.id).filter(Boolean);
     const dmr42Seeds = [
       domainsRecord.id,
-      ...(prior.systemRequirements ? [prior.systemRequirements.recordId] : []),
-      ...(prior.functionalRequirements ? [prior.functionalRequirements.recordId] : []),
-      ...(prior.nonFunctionalRequirements ? [prior.nonFunctionalRequirements.recordId] : []),
+      ...optRecordIds(prior.systemRequirements, prior.functionalRequirements, prior.nonFunctionalRequirements),
     ];
     const dmr42 = await buildPhaseContextPacket(ctx, {
       subPhaseId: 'component_skeleton',
@@ -520,55 +1018,10 @@ export class Phase4Handler implements PhaseHandler {
 
     // ── Lever 1a — NFRs are cross-cutting concerns, not services ───
     // Partition the LLM's components into functional (buildable services
-    // realizing user stories) and cross_cutting (NFR concerns: latency,
-    // encryption, availability, security, compliance). Cross-cutting
-    // components are NEVER decomposed/built as standalone services — they
-    // are persisted as `cross_cutting_constraints` attached to the
-    // functional components they apply to. The NFR information still reaches
-    // the executor independently via the packet's NFR section, so nothing
-    // is lost. Only the FUNCTIONAL set flows into the component_model
-    // artifact and the saturation loop below.
-    // Normalize first: local models often omit the per-component
-    // `component_kind` field (schema-adherence wobble). Infer it structurally
-    // (empty traces_to / applies_to_components present ⇒ cross_cutting) so 1a
-    // is not a silent no-op when the field is missing.
-    const kindNorm = normalizeComponentKinds(
-      componentContent.components as unknown as Array<{ component_kind?: string; traces_to?: string[]; applies_to_components?: string[] }>,
-    );
-    if (kindNorm.inferred > 0) {
-      componentContent.components = kindNorm.components as unknown as Component[];
-      getLogger().info('workflow', 'Lever 1a: inferred component_kind for components missing the field', {
-        workflow_run_id: workflowRun.id, inferred: kindNorm.inferred,
-      });
-    }
-    const kindPartition = partitionComponentsByKind(
-      componentContent.components as unknown as Array<{ component_kind?: string }>,
-    );
-    const crossCuttingComponents = kindPartition.crossCutting as unknown as Component[];
-    if (crossCuttingComponents.length > 0) {
-      componentContent.components = kindPartition.functional as unknown as Component[];
-      const ccContent = buildCrossCuttingConstraints(
-        crossCuttingComponents as unknown as ShapingComponent[],
-      );
-      const ccRecord = engine.writer.writeRecord({
-        record_type: 'artifact_produced',
-        schema_version: '1.0',
-        workflow_run_id: workflowRun.id,
-        phase_id: '4',
-        sub_phase_id: 'component_skeleton',
-        produced_by_agent_role: 'architecture_agent',
-        janumicode_version_sha: engine.janumiCodeVersionSha,
-        derived_from_record_ids: [domainsRecord.id],
-        content: ccContent as unknown as Record<string, unknown>,
-      });
-      artifactIds.push(ccRecord.id);
-      engine.ingestionPipeline.ingest(ccRecord);
-      getLogger().info('workflow', 'Lever 1a: NFR/cross-cutting components reified as constraints (not services)', {
-        workflow_run_id: workflowRun.id,
-        cross_cutting: crossCuttingComponents.map(c => c.id),
-        functional_remaining: componentContent.components.length,
-      });
-    }
+    // realizing user stories) and cross_cutting (NFR concerns). Cross-cutting
+    // components become `cross_cutting_constraints`; only the FUNCTIONAL set
+    // flows into the component_model artifact and the saturation loop below.
+    applyCrossCuttingLever1a(ctx, componentContent, domainsRecord.id, artifactIds);
 
     let componentRecord = engine.writer.writeRecord({
       record_type: 'artifact_produced',
@@ -593,12 +1046,9 @@ export class Phase4Handler implements PhaseHandler {
     // which would have lost URL-decryption coverage). The deterministic
     // result drives BOTH the artifact AND the 4.2a saturation seed so
     // they stay consistent.
-    const compItems = ((componentContent as unknown as { components?: Array<Record<string, unknown>> }).components ?? []).map(c => ({
-      id: typeof c.id === 'string' ? c.id : '',
-      label: `${c.id}: ${c.name} [domain: ${typeof c.domain_id === 'string' ? c.domain_id : '?'}]`,
-      description: typeof c.description === 'string' ? c.description : undefined,
-      tradeoffs: Array.isArray(c.traces_to) ? `traces_to: ${(c.traces_to as string[]).join(', ')}` : undefined,
-    }));
+    const compItems = buildComponentGatekeeperItems(
+      (componentContent as unknown as { components?: Array<Record<string, unknown>> }).components ?? [],
+    );
     const compPrune = await runDownstreamScopeGatekeeper(ctx, {
       phaseId: '4',
       subPhaseId: 'component_skeleton',
@@ -615,20 +1065,7 @@ export class Phase4Handler implements PhaseHandler {
     // `deterministicComponentDrops`. Accepted business domains come from
     // the Phase 1.2 post-gatekeeper set; accepted user stories from the
     // Phase 2.1 post-gatekeeper functional_requirements artifact.
-    const acceptedBizDomainIds = new Set(
-      allArtifacts
-        .filter(r => r.is_current_version && (r.content as Record<string, unknown>).kind === 'business_domains_bloom')
-        .flatMap(r => (((r.content as Record<string, unknown>).domains as Array<{ id?: string }>) ?? []))
-        .map(d => d.id)
-        .filter((x): x is string => typeof x === 'string'),
-    );
-    const acceptedUserStoryIds = new Set(
-      allArtifacts
-        .filter(r => r.is_current_version && (r.content as Record<string, unknown>).kind === 'functional_requirements')
-        .flatMap(r => (((r.content as Record<string, unknown>).user_stories as Array<{ id?: string }>) ?? []))
-        .map(s => s.id)
-        .filter((x): x is string => typeof x === 'string'),
-    );
+    const { acceptedBizDomainIds, acceptedUserStoryIds } = computeAcceptedScopeSets(allArtifacts);
     // Requirement decomposition lineage canonicalizes the components' LEAF
     // story traces (`US-001-D`) to their accepted ROOT (`US-001`) before the
     // coverage check — without it every leaf-tracing component is dropped and
@@ -663,129 +1100,32 @@ export class Phase4Handler implements PhaseHandler {
 
     // ── Lever 1b — decomposition scale budget ──────────────────────
     // Right-size the functional component count to intent scale, keyed to
-    // upstream artifact counts (accepted user stories + software domains),
-    // NOT a hardcoded number. When the proposed set exceeds the budget,
-    // consolidate by merging within the same software domain (union-ing
-    // coverage so no accepted user story is dropped). A `decomposition_
-    // scale_decision` record audits the result; a consolidation that would
-    // drop coverage is rejected (fail-safe: original set kept).
-    const scaleRatio = (engine.configManager.get().decomposition as unknown as {
-      component_scale_ratio?: number;
-    }).component_scale_ratio ?? 1.0;
-    // Floor on the domains that actually host a FUNCTIONAL component (post-1a /
-    // post-drop), NOT the total software-domain count. Otherwise NFR domains
-    // (which 1a strips at the component level but which remain in
-    // domainsContent.domains) inflate the floor and the gate never bites.
-    const functionalDomainCount = new Set(
-      finalKeptComps.map(c => c.domain_id).filter((d): d is string => typeof d === 'string'),
-    ).size;
-    const componentBudget = computeComponentBudget(
-      acceptedUserStoryIds.size, functionalDomainCount, scaleRatio,
-    );
-    let scaleConsolidated = false;
-    if (Number.isFinite(componentBudget) && finalKeptComps.length > componentBudget) {
-      const consolidation = consolidateToBudget(
-        finalKeptComps as unknown as ShapingComponent[],
-        componentBudget,
-        acceptedUserStoryIds,
-      );
-      const accepted = consolidation.coveragePreserved && consolidation.merges.length > 0;
-      if (accepted) {
-        finalKeptComps = consolidation.components as unknown as Component[];
-        scaleConsolidated = true;
-      }
-      engine.writer.writeRecord({
-        record_type: 'artifact_produced',
-        schema_version: '1.0',
-        workflow_run_id: workflowRun.id,
-        phase_id: '4',
-        sub_phase_id: 'component_skeleton',
-        produced_by_agent_role: 'architecture_agent',
-        janumicode_version_sha: engine.janumiCodeVersionSha,
-        derived_from_record_ids: [componentRecord.id],
-        content: {
-          kind: 'decomposition_scale_decision',
-          budget: componentBudget,
-          scale_ratio: scaleRatio,
-          accepted_user_story_count: acceptedUserStoryIds.size,
-          software_domain_count: domainsContent.domains.length,
-          functional_domain_count: functionalDomainCount,
-          proposed_functional_count: componentContent.components.length,
-          post_drop_count: componentContent.components.filter(c => !compDropSet.has(c.id)).length,
-          consolidated: accepted,
-          coverage_preserved: consolidation.coveragePreserved,
-          merges: consolidation.merges,
-          final_count: finalKeptComps.length,
-        },
-      });
-      getLogger().info('workflow', 'Lever 1b: decomposition scale budget applied', {
-        workflow_run_id: workflowRun.id,
-        budget: componentBudget, proposed: componentContent.components.length,
-        consolidated: accepted, coverage_preserved: consolidation.coveragePreserved,
-        final: finalKeptComps.length,
-      });
-    }
+    // upstream artifact counts (accepted user stories + software domains).
+    const scale = applyScaleBudget(ctx, {
+      finalKeptComps,
+      componentRecordId: componentRecord.id,
+      proposedComponents: componentContent.components,
+      compDropSet,
+      acceptedUserStoryIds,
+      softwareDomainCount: domainsContent.domains.length,
+    });
+    finalKeptComps = scale.finalKeptComps;
+    const scaleConsolidated = scale.scaleConsolidated;
 
-    // Surface LLM-vs-deterministic disagreement for the audit trail.
-    const llmDroppedIds = new Set(compPrune.skipped ? [] : compPrune.dropped.map(d => d.id));
-    const disagreements = componentContent.components
-      .filter(c => llmDroppedIds.has(c.id) && !compDropSet.has(c.id))
-      .map(c => c.id);
-    if (componentDrops.length > 0 || disagreements.length > 0) {
-      getLogger().info('workflow', 'Deterministic component-scope filter (authoritative)', {
-        workflow_run_id: workflowRun.id,
-        deterministic_dropped: componentDrops.map(d => d.id),
-        llm_advisory_dropped: [...llmDroppedIds],
-        kept_over_llm_advice: disagreements,
-        accepted_business_domains: [...acceptedBizDomainIds],
-      });
-    }
-
-    if (componentDrops.length > 0 || scaleConsolidated) {
-      const prunedCompContent = { ...componentContent, components: finalKeptComps };
-      const prunedCompRecord = engine.writer.writeRecord({
-        record_type: 'artifact_produced',
-        schema_version: '1.0',
-        workflow_run_id: workflowRun.id,
-        phase_id: '4',
-        sub_phase_id: 'component_skeleton',
-        produced_by_agent_role: 'architecture_agent',
-        janumicode_version_sha: engine.janumiCodeVersionSha,
-        derived_from_record_ids: [componentRecord.id],
-        content: { kind: 'component_model', ...prunedCompContent },
-      });
-      engine.writer.supersedByRollback(componentRecord.id, prunedCompRecord.id);
-      engine.ingestionPipeline.ingest(prunedCompRecord);
-      componentRecord = prunedCompRecord;
-      artifactIds.push(prunedCompRecord.id);
-    }
-    // Authoritative deterministic audit record (the LLM's advisory
-    // scope_prune_decision was already written by runDownstreamScopeGatekeeper).
-    if (componentDrops.length > 0) {
-      engine.writer.writeRecord({
-        record_type: 'scope_prune_decision',
-        schema_version: '1.0',
-        workflow_run_id: workflowRun.id,
-        phase_id: '4',
-        sub_phase_id: 'component_skeleton',
-        produced_by_agent_role: 'architecture_agent',
-        janumicode_version_sha: engine.janumiCodeVersionSha,
-        derived_from_record_ids: [componentRecord.id],
-        content: {
-          kind: 'scope_prune_decision',
-          schemaVersion: '1.0',
-          sub_phase_id: 'component_skeleton',
-          original_artifact_id: componentRecord.id,
-          pruned_artifact_id: componentRecord.id,
-          kept_ids: finalKeptComps.map(c => c.id),
-          dropped: componentDrops.map(d => ({ id: d.id, reason: d.reason })),
-          rationale_summary: 'Authoritative deterministic component-scope filter: domain 2-hop (software domain must map to an accepted business domain) + user-story coverage (must trace to >=1 accepted story, unless cross-cutting with no traces_to). LLM gatekeeper is advisory only.',
-          gatekeeper_provider: 'deterministic',
-          gatekeeper_model: 'component_scope_filter_v2',
-          duration_ms: 0,
-        } as unknown as Record<string, unknown>,
-      });
-    }
+    // Persist the deterministic scope decisions (disagreement audit log +
+    // superseding pruned component_model + authoritative scope_prune_decision).
+    // Returns the current (possibly superseding) component record.
+    componentRecord = persistComponentScopeDecisions(ctx, {
+      componentContent,
+      componentRecord,
+      compPrune,
+      componentDrops,
+      compDropSet,
+      finalKeptComps,
+      scaleConsolidated,
+      acceptedBizDomainIds,
+      artifactIds,
+    });
 
     // Collapse the in-memory component set to the kept components so EVERY
     // downstream use within this phase (4.2a saturation seed, 4.3 ADR
@@ -801,87 +1141,17 @@ export class Phase4Handler implements PhaseHandler {
     // constraints. The constraints anchor each leaf component to the
     // user's stated stack (SvelteKit / Bun / PostgreSQL / etc.) so
     // downstream phases don't reinvent defaults from training data.
-    const handoffRecord = engine.writer.getRecordsByType(workflowRun.id, 'product_description_handoff')[0];
-    const handoff = (handoffRecord?.content ?? {}) as unknown as ProductDescriptionHandoffContent;
-    const techConstraintsRecord = engine.writer.getRecordsByType(workflowRun.id, 'artifact_produced')
-      .find(r => (r.content as Record<string, unknown>).kind === 'technical_constraints_discovery');
-    const technicalConstraints: TechnicalConstraint[] = techConstraintsRecord
-      ? (((techConstraintsRecord.content as Record<string, unknown>).technicalConstraints) as TechnicalConstraint[] ?? [])
-      : [];
+    const { handoff, techConstraintsRecord, technicalConstraints } = readArchitectureInputs(ctx);
 
     // Convert Phase 4.2's flat ComponentModel shape into the
     // DecompositionComponent shape Wave 7 uses, and emit depth-0
     // component_decomposition_node records as seeds for the saturation
     // loop. Resume guard — skip if depth-0 nodes already exist (the
-    // loop's resume helper will pick up from the prior state).
-    const existingRoots = engine.writer.getRecordsByType(workflowRun.id, 'component_decomposition_node')
-      .filter(r => (r.content as unknown as ComponentDecompositionNodeContent).depth === 0);
-    let rootComponents: DecompositionComponent[];
-    let rootNodeRecordIds: string[];
-    let rootLogicalIds: string[];
-    if (existingRoots.length > 0) {
-      getLogger().info('workflow', 'Phase 4.2a RESUME: depth-0 nodes already present', {
-        existingRoots: existingRoots.length,
-      });
-      rootComponents = existingRoots.map(r => (r.content as unknown as ComponentDecompositionNodeContent).component);
-      rootNodeRecordIds = existingRoots.map(r => r.id);
-      rootLogicalIds = existingRoots.map(r => (r.content as unknown as ComponentDecompositionNodeContent).node_id);
-    } else {
-      // Seed saturation from the DETERMINISTICALLY PRUNED set (finalKeptComps),
-      // NOT the un-pruned componentContent.components — otherwise the
-      // gatekeeper/scope prune is cosmetic and dropped components re-enter
-      // downstream as depth-0 roots (ts-116: artifact said 3, saturation
-      // re-expanded to 7).
-      rootComponents = finalKeptComps.map(c => ({
-        id: c.id,
-        name: c.name,
-        domain_id: c.domain_id ?? null,
-        responsibilities: c.responsibilities.map(r => ({ id: r.id, description: r.statement })),
-        dependencies: (c.dependencies ?? []).map(d => ({
-          component_id: d.target_component_id,
-          // Phase 4.2's `dependency_type` is free-form string; coerce to the
-          // four kinds Wave 7 supports — fall back to sync_call for unknowns.
-          kind: ((['sync_call', 'async_event', 'data_read', 'data_write'] as const) as readonly string[])
-            .includes(d.dependency_type)
-            ? (d.dependency_type as 'sync_call' | 'async_event' | 'data_read' | 'data_write')
-            : 'sync_call',
-        })),
-        active_constraints: technicalConstraints.map(t => t.id),
-        traces_to: c.satisfies_requirement_ids,
-      }));
-      rootNodeRecordIds = [];
-      rootLogicalIds = [];
-      for (const rc of rootComponents) {
-        const logicalNodeId = randomUUID();
-        const rec = engine.writer.writeRecord({
-          record_type: 'component_decomposition_node',
-          schema_version: '1.0',
-          workflow_run_id: workflowRun.id,
-          phase_id: '4',
-          sub_phase_id: 'component_saturation',
-          produced_by_agent_role: 'architecture_agent',
-          janumicode_version_sha: engine.janumiCodeVersionSha,
-          derived_from_record_ids: [componentRecord.id],
-          content: {
-            kind: 'component_decomposition_node',
-            node_id: logicalNodeId,
-            parent_node_id: null,
-            display_key: rc.id,
-            root_component_id: logicalNodeId,
-            depth: 0,
-            pass_number: 0,
-            status: 'pending',
-            component: rc,
-            surfaced_assumption_ids: [],
-            release_id: null,
-            release_ordinal: null,
-          } satisfies ComponentDecompositionNodeContent,
-        });
-        rootNodeRecordIds.push(rec.id);
-        rootLogicalIds.push(logicalNodeId);
-        artifactIds.push(rec.id);
-      }
-    }
+    // loop's resume helper will pick up from the prior state). Seeds from
+    // the DETERMINISTICALLY PRUNED set (finalKeptComps).
+    const { rootComponents, rootNodeRecordIds, rootLogicalIds } = seedDecompositionRoots(
+      ctx, finalKeptComps, technicalConstraints, componentRecord.id, artifactIds,
+    );
 
     // Run the saturation loop. Throws on configuration errors
     // (missing template etc.); per-node decomposition failures are
@@ -911,20 +1181,7 @@ export class Phase4Handler implements PhaseHandler {
       workflowRun.id, 'component_decomposition_node',
     );
     const effectiveForAdr = buildEffectiveComponentView(decompNodesForAdr, prior);
-    const adrComponentsSource = effectiveForAdr.source === 'leaves'
-      ? effectiveForAdr.components.map(c => ({
-          id: c.id as string,
-          name: c.name as string,
-          domain_id: c.domain_id as string | undefined,
-          responsibilities: (c.responsibilities as Array<{ id: string; statement?: string; description?: string }>)
-            .map(r => ({ id: r.id, statement: r.statement ?? r.description ?? '' })),
-          dependencies: (c.dependencies as Array<{ target_component_id?: string; component_id?: string; dependency_type?: string; kind?: string }>)
-            .map(d => ({
-              target_component_id: d.target_component_id ?? d.component_id ?? '',
-              dependency_type: d.dependency_type ?? d.kind ?? 'sync_call',
-            })),
-        }))
-      : componentContent.components;
+    const adrComponentsSource = buildAdrComponentsSource(effectiveForAdr, componentContent.components);
 
     const adrComponentIds = adrComponentsSource.map(c => c.id).filter(Boolean);
     const dmr43Seeds = [
@@ -946,20 +1203,7 @@ export class Phase4Handler implements PhaseHandler {
     // DMR-derived `active_constraints` narrative, not the canonical
     // TECH-* roster. Pass the verbatim roster so the LLM can do a
     // text-level non-contradiction check on its own decisions.
-    const technicalConstraintsSummary = technicalConstraints.length === 0
-      ? 'No technical_constraints_discovery artifact available'
-      : technicalConstraints
-          .map(t => {
-            const id = (t as { id?: string }).id ?? '';
-            const tech = (t as { technology?: string; name?: string }).technology
-              ?? (t as { name?: string }).name ?? '';
-            const category = (t as { category?: string }).category ?? '';
-            const text = (t as { text?: string; rationale?: string }).text
-              ?? (t as { rationale?: string }).rationale ?? '';
-            return [id, tech, category, text].filter(Boolean).join(' — ');
-          })
-          .filter(Boolean)
-          .join('\n');
+    const technicalConstraintsSummary = summarizeTechnicalConstraints(technicalConstraints);
 
     // SD-2 — capture ADRs via PER-DOMAIN chunked fan-out (one focused call per
     // software domain) instead of a single all-components roll-up. Pure fan-out:
@@ -976,15 +1220,7 @@ export class Phase4Handler implements PhaseHandler {
     // real component-id oracle, so the downstream per-task ADR filter
     // (filterADRsForTask) matches. Drop ids that don't resolve (LLM invented a
     // non-component); an empty list stays empty = global ADR.
-    {
-      const componentOracle = new Set(adrComponentIds);
-      for (const adr of adrsContent.adrs ?? []) {
-        if (!Array.isArray(adr.governs_components)) continue;
-        adr.governs_components = adr.governs_components
-          .map((id) => resolveAgainstOracle(id, componentOracle))
-          .filter((id): id is string => id !== null);
-      }
-    }
+    resolveAdrGovernsComponents(adrsContent.adrs ?? [], new Set(adrComponentIds));
 
     const adrsRecord = engine.writer.writeRecord({
       record_type: 'artifact_produced',
@@ -1010,11 +1246,7 @@ export class Phase4Handler implements PhaseHandler {
       workflowRun.id, 'component_decomposition_node',
     );
     const effectiveForMirror = buildEffectiveComponentView(decompNodesForMirror, prior);
-    const tierDistribution = decompNodesForMirror.reduce<Record<string, number>>((acc, r) => {
-      const c = r.content as unknown as ComponentDecompositionNodeContent;
-      if (c.tier) acc[c.tier] = (acc[c.tier] ?? 0) + 1;
-      return acc;
-    }, {});
+    const tierDistribution = computeComponentTierDistribution(decompNodesForMirror);
 
     const archMirror = engine.mirrorGenerator.generate({
       artifactId: componentRecord.id,

@@ -46,7 +46,7 @@ import type { AoddEvent } from '../lib/aodd';
 
 type Severity = 'BLOCK' | 'WARN' | 'INFO';
 
-interface Finding {
+export interface Finding {
   category: string;
   severity: Severity;
   phase_id?: string | null;
@@ -57,7 +57,7 @@ interface Finding {
   details?: unknown;
 }
 
-interface DbArtifact {
+export interface DbArtifact {
   record_id: string;
   record_type: string;
   phase_id: string | null;
@@ -67,7 +67,7 @@ interface DbArtifact {
   kind: string | undefined;
 }
 
-interface TransformStep {
+export interface TransformStep {
   step_id: string;
   ts: string;
   step_type: string;
@@ -82,7 +82,7 @@ interface TransformStep {
   payload?: unknown;
 }
 
-interface LifecycleEvent {
+export interface LifecycleEvent {
   ts: string;
   event: string;
   workflow_run_id: string;
@@ -294,6 +294,29 @@ function loadIntent(workspace: string, override?: string): string {
 // ── Categories ─────────────────────────────────────────────────────
 
 /**
+ * Map a single suite's ContractResults for one artifact into findings.
+ * Extracted from categoryA_contracts to keep its cognitive complexity
+ * within budget; behavior (order + shape) is identical.
+ */
+function contractResultsToFindings(results: ContractResult[], artifact: DbArtifact): Finding[] {
+  const out: Finding[] = [];
+  for (const r of results) {
+    if (r.passed) continue;
+    out.push({
+      category: 'A',
+      severity: r.severity === 'blocking' ? 'BLOCK' : 'WARN',
+      phase_id: artifact.phase_id,
+      sub_phase_id: artifact.sub_phase_id,
+      record_id: artifact.record_id,
+      ref: `${r.boundaryId} ${r.clauseId}`,
+      message: `${r.clauseDescription} — ${r.message ?? '(no message)'}`,
+      details: r.details,
+    });
+  }
+  return out;
+}
+
+/**
  * A. Contract conformance.
  * For each artifact whose `content.kind` has a matching ContractSuite,
  * run the suite and surface any blocking failures as BLOCK findings,
@@ -326,19 +349,7 @@ function categoryA_contracts(artifacts: DbArtifact[], runId: string): Finding[] 
       artifact.content as unknown,
       ctx,
     );
-    for (const r of results) {
-      if (r.passed) continue;
-      findings.push({
-        category: 'A',
-        severity: r.severity === 'blocking' ? 'BLOCK' : 'WARN',
-        phase_id: artifact.phase_id,
-        sub_phase_id: artifact.sub_phase_id,
-        record_id: artifact.record_id,
-        ref: `${r.boundaryId} ${r.clauseId}`,
-        message: `${r.clauseDescription} — ${r.message ?? '(no message)'}`,
-        details: r.details,
-      });
-    }
+    findings.push(...contractResultsToFindings(results, artifact));
   }
   // Info finding noting coverage.
   findings.push({
@@ -366,15 +377,24 @@ function categoryB_emptyVars(steps: TransformStep[]): Finding[] {
     for (const [name, info] of Object.entries(vars)) {
       if (!info?.empty) continue;
       const isRequired = required.includes(name);
-      findings.push({
-        category: 'B',
-        severity: isRequired ? 'BLOCK' : 'WARN',
-        sub_phase_id: s.sub_phase_id,
-        ref: `template:${JSON.stringify(payload.template_key ?? '?')} var:${name}`,
-        message: isRequired
-          ? `Required variable {{${name}}} substituted with empty value`
-          : `Optional variable {{${name}}} substituted with empty value`,
-      });
+      const ref = `template:${JSON.stringify(payload.template_key ?? '?')} var:${name}`;
+      if (isRequired) {
+        findings.push({
+          category: 'B',
+          severity: 'BLOCK',
+          sub_phase_id: s.sub_phase_id,
+          ref,
+          message: `Required variable {{${name}}} substituted with empty value`,
+        });
+      } else {
+        findings.push({
+          category: 'B',
+          severity: 'WARN',
+          sub_phase_id: s.sub_phase_id,
+          ref,
+          message: `Optional variable {{${name}}} substituted with empty value`,
+        });
+      }
     }
     const missing = (payload.missing_variables ?? []) as string[];
     for (const m of missing) {
@@ -437,6 +457,7 @@ function categoryD_normalize(steps: TransformStep[]): Finding[] {
     const removed = diff.removed ?? [];
     const shrunk = (diff.size_changed ?? []).filter((sc) => sc.to < sc.from);
     if (removed.length === 0 && shrunk.length === 0) continue;
+    const shrunkCells = shrunk.map((c) => `${c.field}[${c.from}→${c.to}]`);
     findings.push({
       category: 'D',
       severity: 'WARN',
@@ -445,7 +466,7 @@ function categoryD_normalize(steps: TransformStep[]): Finding[] {
       message:
         (removed.length ? `removed fields: ${removed.join(',')}` : '') +
         (removed.length && shrunk.length ? '; ' : '') +
-        (shrunk.length ? `shrunk arrays: ${shrunk.map((c) => `${c.field}[${c.from}→${c.to}]`).join(',')}` : ''),
+        (shrunk.length ? `shrunk arrays: ${shrunkCells.join(',')}` : ''),
       details: diff,
     });
   }
@@ -512,27 +533,30 @@ function categoryE_xref(artifacts: DbArtifact[]): Finding[] {
   // are no longer treated as references (they don't match the regex).
   const findings: Finding[] = [];
   const seenRefs = new Set<string>();
+  const collectStringRef = (node: string, nodePath: string[], artifact: DbArtifact): void => {
+    // Skip the SELF id field on this record — that's a definition,
+    // not a reference. Other id-shaped strings in any field ARE
+    // references and need to resolve.
+    if (nodePath.at(-1) === 'id') return;
+    const match = matchIdPattern(node);
+    if (!match) return;
+    if (knownIds.has(node)) return;
+    const key = `${artifact.record_id}::${node}`;
+    if (seenRefs.has(key)) return;
+    seenRefs.add(key);
+    findings.push({
+      category: 'E',
+      severity: 'BLOCK',
+      phase_id: artifact.phase_id,
+      sub_phase_id: artifact.sub_phase_id,
+      record_id: artifact.record_id,
+      ref: node,
+      message: `Reference "${node}" (${match.namespace}) does not resolve to any current-version artifact`,
+    });
+  };
   const collectRefs = (node: unknown, path: string[], artifact: DbArtifact): void => {
     if (typeof node === 'string') {
-      // Skip the SELF id field on this record — that's a definition,
-      // not a reference. Other id-shaped strings in any field ARE
-      // references and need to resolve.
-      if (path.at(-1) === 'id') return;
-      const match = matchIdPattern(node);
-      if (!match) return;
-      if (knownIds.has(node)) return;
-      const key = `${artifact.record_id}::${node}`;
-      if (seenRefs.has(key)) return;
-      seenRefs.add(key);
-      findings.push({
-        category: 'E',
-        severity: 'BLOCK',
-        phase_id: artifact.phase_id,
-        sub_phase_id: artifact.sub_phase_id,
-        record_id: artifact.record_id,
-        ref: node,
-        message: `Reference "${node}" (${match.namespace}) does not resolve to any current-version artifact`,
-      });
+      collectStringRef(node, path, artifact);
       return;
     }
     if (Array.isArray(node)) {
@@ -610,6 +634,37 @@ function categoryF_oos(artifacts: DbArtifact[]): Finding[] {
 }
 
 /**
+ * Intent-anchored count bounds for category G. Each entry names the
+ * artifact `kind` to inspect, the array field to size, the inclusive
+ * upper bound, and a message builder (invoked only when exceeded).
+ */
+const CATEGORY_G_BOUNDS: Array<{
+  kind: string;
+  field: string;
+  max: number;
+  message: (n: number) => string;
+}> = [
+  {
+    kind: 'component_model',
+    field: 'components',
+    max: 8,
+    message: (n) => `Phase 4 component_model has ${n} components — expected ≤8 for tinyurl (ts-18 was 11)`,
+  },
+  {
+    kind: 'business_domains_bloom',
+    field: 'domains',
+    max: 5,
+    message: (n) => `business_domains_bloom has ${n} domains — expected ≤5 (intent is one small product)`,
+  },
+  {
+    kind: 'functional_requirements',
+    field: 'user_stories',
+    max: 16,
+    message: (n) => `functional_requirements has ${n} user_stories — expected ~3 (intent has 3 FRs)`,
+  },
+];
+
+/**
  * G. Intent-anchored counts (a pared-down version of the existing
  * tinyurl-expectations predicates — included here so the deep auditor
  * is self-contained).
@@ -617,47 +672,74 @@ function categoryF_oos(artifacts: DbArtifact[]): Finding[] {
 function categoryG_counts(artifacts: DbArtifact[]): Finding[] {
   const findings: Finding[] = [];
   const arrLen = (v: unknown): number => (Array.isArray(v) ? v.length : 0);
-  // Phase 4 component_model bound
   for (const a of artifacts) {
-    if (a.kind === 'component_model') {
-      const n = arrLen(a.content.components);
-      if (n > 8) {
+    for (const bound of CATEGORY_G_BOUNDS) {
+      if (a.kind !== bound.kind) continue;
+      const n = arrLen(a.content[bound.field]);
+      if (n > bound.max) {
         findings.push({
           category: 'G', severity: 'BLOCK', phase_id: a.phase_id, sub_phase_id: a.sub_phase_id, record_id: a.record_id,
-          message: `Phase 4 component_model has ${n} components — expected ≤8 for tinyurl (ts-18 was 11)`,
+          message: bound.message(n),
         });
       }
     }
-    if (a.kind === 'business_domains_bloom') {
-      const n = arrLen(a.content.domains);
-      if (n > 5) {
-        findings.push({
-          category: 'G', severity: 'BLOCK', phase_id: a.phase_id, sub_phase_id: a.sub_phase_id, record_id: a.record_id,
-          message: `business_domains_bloom has ${n} domains — expected ≤5 (intent is one small product)`,
-        });
-      }
-    }
-    if (a.kind === 'functional_requirements') {
-      const n = arrLen(a.content.user_stories);
-      if (n > 16) {
-        findings.push({
-          category: 'G', severity: 'BLOCK', phase_id: a.phase_id, sub_phase_id: a.sub_phase_id, record_id: a.record_id,
-          message: `functional_requirements has ${n} user_stories — expected ~3 (intent has 3 FRs)`,
-        });
-      }
-    }
-
-    // Note: semantic content checks (does the output match what the
-    // intent doc actually declared?) are deliberately NOT done here.
-    // They're the audit-agent's job, not the deep auditor's. Hard-
-    // coding intent-specific assertions (e.g., "must mention Postgres")
-    // would only work for the corpus we authored them against; what
-    // we want is intent-doc-aware semantic validation that runs at
-    // every sub-phase. That belongs in the audit-agent pass, where
-    // the agent reads the rendered prompt + parsed output + intent
-    // doc and reasons about consistency.
   }
+
+  // Note: semantic content checks (does the output match what the
+  // intent doc actually declared?) are deliberately NOT done here.
+  // They're the audit-agent's job, not the deep auditor's. Hard-
+  // coding intent-specific assertions (e.g., "must mention Postgres")
+  // would only work for the corpus we authored them against; what
+  // we want is intent-doc-aware semantic validation that runs at
+  // every sub-phase. That belongs in the audit-agent pass, where
+  // the agent reads the rendered prompt + parsed output + intent
+  // doc and reasons about consistency.
   return findings;
+}
+
+/**
+ * Stable `ref` string for a packet finding. Mirrors the original inline
+ * `packet:${JSON.stringify(c.packet_id ?? '?')}` expression verbatim.
+ */
+function packetRef(c: Record<string, unknown>): string {
+  return `packet:${JSON.stringify(c.packet_id ?? '?')}`;
+}
+
+/**
+ * BLOCK finding when a packet failed coherence, else null. Extracted from
+ * categoryH_packets to keep its cognitive complexity within budget; the
+ * predicate, severity, ref, message, and details are byte-identical.
+ */
+function packetCoherenceFinding(a: DbArtifact, c: Record<string, unknown>): Finding | null {
+  const coherence = (c.coherence ?? {}) as { passed?: boolean; blocking_failures?: string[] };
+  if (coherence.passed) return null;
+  const blockingFailures = coherence.blocking_failures ?? [];
+  return {
+    category: 'H', severity: 'BLOCK', phase_id: a.phase_id, sub_phase_id: a.sub_phase_id, record_id: a.record_id,
+    ref: packetRef(c),
+    message: `Packet failed coherence: ${blockingFailures.slice(0, 3).join('; ')}`,
+    details: { blocking_failures: coherence.blocking_failures },
+  };
+}
+
+/** BLOCK finding when a packet's user_stories is an empty array, else null. */
+function packetEmptyUserStoriesFinding(a: DbArtifact, c: Record<string, unknown>): Finding | null {
+  if (!Array.isArray(c.user_stories) || c.user_stories.length !== 0) return null;
+  return {
+    category: 'H', severity: 'BLOCK', phase_id: a.phase_id, sub_phase_id: a.sub_phase_id, record_id: a.record_id,
+    ref: packetRef(c),
+    message: `Packet has user_stories=[] (no acceptance criteria reach executor)`,
+  };
+}
+
+/** WARN finding when a packet's nfrs is an empty array, else null. */
+function packetEmptyNfrsFinding(a: DbArtifact, c: Record<string, unknown>): Finding | null {
+  if (!Array.isArray(c.nfrs) || c.nfrs.length !== 0) return null;
+  return {
+    category: 'H', severity: 'WARN', phase_id: a.phase_id, sub_phase_id: a.sub_phase_id, record_id: a.record_id,
+    ref: packetRef(c),
+    message: `Packet has nfrs=[] (no quality bars reach executor)`,
+  };
 }
 
 /**
@@ -665,55 +747,44 @@ function categoryG_counts(artifacts: DbArtifact[]): Finding[] {
  * Per implementation_packet record: coherence.passed, user_stories /
  * nfrs non-empty. Mirrors the ts-18 forensic findings.
  */
-function categoryH_packets(artifacts: DbArtifact[]): Finding[] {
+export function categoryH_packets(artifacts: DbArtifact[]): Finding[] {
   const findings: Finding[] = [];
   for (const a of artifacts) {
     if (a.record_type !== 'implementation_packet') continue;
     const c = a.content as Record<string, unknown>;
-    const coherence = (c.coherence ?? {}) as { passed?: boolean; blocking_failures?: string[] };
-    if (!coherence.passed) {
-      findings.push({
-        category: 'H', severity: 'BLOCK', phase_id: a.phase_id, sub_phase_id: a.sub_phase_id, record_id: a.record_id,
-        ref: `packet:${JSON.stringify(c.packet_id ?? '?')}`,
-        message: `Packet failed coherence: ${(coherence.blocking_failures ?? []).slice(0, 3).join('; ')}`,
-        details: { blocking_failures: coherence.blocking_failures },
-      });
-    }
-    if (Array.isArray(c.user_stories) && c.user_stories.length === 0) {
-      findings.push({
-        category: 'H', severity: 'BLOCK', phase_id: a.phase_id, sub_phase_id: a.sub_phase_id, record_id: a.record_id,
-        ref: `packet:${JSON.stringify(c.packet_id ?? '?')}`,
-        message: `Packet has user_stories=[] (no acceptance criteria reach executor)`,
-      });
-    }
-    if (Array.isArray(c.nfrs) && c.nfrs.length === 0) {
-      findings.push({
-        category: 'H', severity: 'WARN', phase_id: a.phase_id, sub_phase_id: a.sub_phase_id, record_id: a.record_id,
-        ref: `packet:${JSON.stringify(c.packet_id ?? '?')}`,
-        message: `Packet has nfrs=[] (no quality bars reach executor)`,
-      });
-    }
+    const coherence = packetCoherenceFinding(a, c);
+    if (coherence) findings.push(coherence);
+    const emptyUserStories = packetEmptyUserStoriesFinding(a, c);
+    if (emptyUserStories) findings.push(emptyUserStories);
+    const emptyNfrs = packetEmptyNfrsFinding(a, c);
+    if (emptyNfrs) findings.push(emptyNfrs);
   }
   return findings;
 }
 
 /**
- * I. Phase 9 executor lifecycle.
- * Per agent_invocation in Phase 9: was there a matching agent_output
- * OR did executor.invocation_status_change reach a terminal state?
+ * Set of invocation record ids that reached a terminal executor status
+ * (`completed` / `failed`). Extracted from categoryI_executors to keep its
+ * cognitive complexity within budget; the event filter and id predicate are
+ * identical to the original inline loop.
  */
-function categoryI_executors(artifacts: DbArtifact[], lifecycle: LifecycleEvent[]): Finding[] {
-  const findings: Finding[] = [];
-  // Build a set of invocation_ids that reached terminal status.
+function collectTerminalInvocationIds(lifecycle: LifecycleEvent[]): Set<string> {
   const terminal = new Set<string>();
   for (const ev of lifecycle) {
     if (ev.event !== 'executor.invocation_status_change') continue;
-    if (ev.to === 'completed' || ev.to === 'failed') {
-      const id = ev.invocation_record_id as string | undefined;
-      if (id) terminal.add(id);
-    }
+    if (ev.to !== 'completed' && ev.to !== 'failed') continue;
+    const id = ev.invocation_record_id as string | undefined;
+    if (id) terminal.add(id);
   }
-  // Build a map of invocation_id → agent_output presence.
+  return terminal;
+}
+
+/**
+ * Set of invocation record ids that produced an `agent_output` artifact.
+ * Extracted from categoryI_executors; the record_type filter and id
+ * predicate match the original inline loop.
+ */
+function collectAgentOutputInvocationIds(artifacts: DbArtifact[]): Set<string> {
   const hasOutput = new Set<string>();
   for (const a of artifacts) {
     if (a.record_type !== 'agent_output') continue;
@@ -721,30 +792,290 @@ function categoryI_executors(artifacts: DbArtifact[], lifecycle: LifecycleEvent[
     const inv = c.invocation_record_id as string | undefined;
     if (inv) hasOutput.add(inv);
   }
+  return hasOutput;
+}
+
+/**
+ * BLOCK/WARN finding for a single Phase 9 executor invocation, or null when
+ * the artifact isn't an executor-style agent_invocation in Phase 9 or when it
+ * completed cleanly (has agent_output). Extracted from categoryI_executors so
+ * the loop body's branching no longer inflates the caller's complexity; the
+ * predicate, severity, ref, and message are byte-identical to the original.
+ */
+function executorLifecycleFinding(
+  a: DbArtifact,
+  hasOutput: Set<string>,
+  terminal: Set<string>,
+): Finding | null {
+  if (a.record_type !== 'agent_invocation') return null;
+  if (a.phase_id !== '9') return null;
+  const c = a.content as Record<string, unknown>;
+  // Only flag executor-style invocations (CLI agents), not direct LLM.
+  const backing = (c.backing_tool as string) ?? (c.provider as string) ?? '';
+  if (!/cli/.test(backing) && backing !== 'goose_cli' && backing !== 'claude_code_cli') return null;
+  const hasOut = hasOutput.has(a.record_id);
+  const reachedTerminal = terminal.has(a.record_id);
+  if (!hasOut && !reachedTerminal) {
+    return {
+      category: 'I', severity: 'BLOCK', phase_id: a.phase_id, sub_phase_id: a.sub_phase_id, record_id: a.record_id,
+      ref: `task:${JSON.stringify(c.task_id ?? '?')}`,
+      message: `Phase 9 executor invocation has neither agent_output nor terminal status_change (stuck or output-write failed)`,
+    };
+  }
+  if (!hasOut) {
+    return {
+      category: 'I', severity: 'WARN', phase_id: a.phase_id, sub_phase_id: a.sub_phase_id, record_id: a.record_id,
+      ref: `task:${JSON.stringify(c.task_id ?? '?')}`,
+      message: `Phase 9 executor invocation has no agent_output (reached terminal status_change, but DB record-write may have failed)`,
+    };
+  }
+  return null;
+}
+
+/**
+ * I. Phase 9 executor lifecycle.
+ * Per agent_invocation in Phase 9: was there a matching agent_output
+ * OR did executor.invocation_status_change reach a terminal state?
+ */
+export function categoryI_executors(artifacts: DbArtifact[], lifecycle: LifecycleEvent[]): Finding[] {
+  const findings: Finding[] = [];
+  const terminal = collectTerminalInvocationIds(lifecycle);
+  const hasOutput = collectAgentOutputInvocationIds(artifacts);
   // Surface stuck Phase 9 invocations.
   for (const a of artifacts) {
-    if (a.record_type !== 'agent_invocation') continue;
-    if (a.phase_id !== '9') continue;
-    const c = a.content as Record<string, unknown>;
-    // Only flag executor-style invocations (CLI agents), not direct LLM.
-    const backing = (c.backing_tool as string) ?? (c.provider as string) ?? '';
-    if (!/cli/.test(backing) && backing !== 'goose_cli' && backing !== 'claude_code_cli') continue;
-    const hasOut = hasOutput.has(a.record_id);
-    const reachedTerminal = terminal.has(a.record_id);
-    if (!hasOut && !reachedTerminal) {
+    const finding = executorLifecycleFinding(a, hasOutput, terminal);
+    if (finding) findings.push(finding);
+  }
+  return findings;
+}
+
+// ── Category J helpers (persistence-integrity decomposition) ───────
+
+/**
+ * Top-level keys that are structural metadata, not payload content, and are
+ * therefore excluded from category J's dropped/surplus key comparisons.
+ */
+const PERSISTENCE_IGNORED_KEYS = new Set(['kind', 'schemaVersion']);
+
+/**
+ * Index steps that explicitly declare which DB record they produced. Steps
+ * with an `output_record_id` are the trustworthy persist matches (last write
+ * wins on duplicate ids, matching the original inline loop).
+ */
+function buildStepByOutputRecordId(steps: TransformStep[]): Map<string, TransformStep> {
+  const map = new Map<string, TransformStep>();
+  for (const s of steps) {
+    if (s.output_record_id) map.set(s.output_record_id, s);
+  }
+  return map;
+}
+
+/**
+ * Group steps by sub_phase_id (each list sorted ascending by ts) as a fallback
+ * for artifacts whose producer step didn't declare output_record_id.
+ */
+function buildStepsBySubPhase(steps: TransformStep[]): Map<string, TransformStep[]> {
+  const map = new Map<string, TransformStep[]>();
+  for (const s of steps) {
+    const list = map.get(s.sub_phase_id);
+    if (list) list.push(s); else map.set(s.sub_phase_id, [s]);
+  }
+  for (const list of map.values()) {
+    list.sort((a, b) => a.ts.localeCompare(b.ts));
+  }
+  return map;
+}
+
+/**
+ * Top-level keys a normalized/json_parsed step claims to have produced. Prefers
+ * the explicit metadata list; falls back to the keys of a normalized step's
+ * payload.output; a json_parsed step without metadata contributes none.
+ */
+function stepTopLevelKeys(s: TransformStep): string[] {
+  const meta = s.metadata ?? {};
+  const declared = meta.parsed_top_level_keys as string[] | undefined;
+  if (declared) return declared;
+  if (s.step_type === 'normalized') {
+    const payload = (s.payload ?? {}) as { output?: Record<string, unknown> };
+    return Object.keys(payload.output ?? {});
+  }
+  return [];
+}
+
+/**
+ * Fallback producer-step match for an artifact whose producer step didn't
+ * declare output_record_id: the LAST normalized/json_parsed step in the same
+ * sub-phase at or before the artifact's produced_at whose parsed top-level keys
+ * intersect the artifact's top-level keys (excluding kind + schemaVersion). The
+ * intersection guards against picking up a reasoning_review validator's parse
+ * step whose keys don't match the artifact's.
+ */
+function findFallbackCandidate(
+  a: DbArtifact,
+  stepsBySubPhase: Map<string, TransformStep[]>,
+): TransformStep | null {
+  const list = stepsBySubPhase.get(a.sub_phase_id ?? '');
+  if (!list) return null;
+  const artifactKeys = new Set(
+    Object.keys(a.content).filter((k) => !PERSISTENCE_IGNORED_KEYS.has(k)),
+  );
+  let candidate: TransformStep | null = null;
+  for (const s of list) {
+    if (s.ts > a.produced_at) break;
+    if (s.step_type !== 'normalized' && s.step_type !== 'json_parsed') continue;
+    const overlaps = stepTopLevelKeys(s).some((k) => artifactKeys.has(k));
+    if (overlaps) candidate = s;
+  }
+  return candidate;
+}
+
+/**
+ * Producer step for an artifact: primary match on output_record_id, else the
+ * sub-phase/key-intersection fallback.
+ */
+function findPersistenceCandidate(
+  a: DbArtifact,
+  stepByOutputRecordId: Map<string, TransformStep>,
+  stepsBySubPhase: Map<string, TransformStep[]>,
+): TransformStep | null {
+  const primary = stepByOutputRecordId.get(a.record_id);
+  if (primary) return primary;
+  return findFallbackCandidate(a, stepsBySubPhase);
+}
+
+/**
+ * The producer step's output object: payload.output for a normalized step,
+ * payload.parsed otherwise (null when absent).
+ */
+function extractTraceOutput(candidate: TransformStep): Record<string, unknown> | null {
+  if (candidate.step_type === 'normalized') {
+    const payload = (candidate.payload ?? {}) as { output?: unknown };
+    return (payload.output ?? null) as Record<string, unknown> | null;
+  }
+  const payload = (candidate.payload ?? {}) as { parsed?: unknown };
+  return (payload.parsed ?? null) as Record<string, unknown> | null;
+}
+
+/**
+ * Detect snake↔camel↔kebab rename pairs among `dropped` keys: a dropped trace
+ * key whose case-variant appears in dbKeys is a rename, not a real drop. Each
+ * dbKey target is claimed at most once. Returns the pairs plus the set of
+ * dropped keys that were renamed (so they can be excluded from true drops).
+ */
+function detectRenames(
+  dropped: string[],
+  dbKeys: Set<string>,
+): { renamed: Array<{ from: string; to: string }>; renamedFrom: Set<string> } {
+  const renamed: Array<{ from: string; to: string }> = [];
+  const renamedFrom = new Set<string>();
+  const renamedTo = new Set<string>();
+  for (const d of dropped) {
+    for (const v of caseVariants(d)) {
+      if (v === d) continue;
+      if (dbKeys.has(v) && !renamedTo.has(v)) {
+        renamed.push({ from: d, to: v });
+        renamedFrom.add(d);
+        renamedTo.add(v);
+        break;
+      }
+    }
+  }
+  return { renamed, renamedFrom };
+}
+
+/** BLOCK finding when trace-step keys were dropped at the persist boundary. */
+function droppedKeysFinding(a: DbArtifact, candidate: TransformStep, trueDropped: string[]): Finding | null {
+  if (trueDropped.length === 0) return null;
+  return {
+    category: 'J', severity: 'BLOCK', phase_id: a.phase_id, sub_phase_id: a.sub_phase_id, record_id: a.record_id,
+    ref: `step:${candidate.step_id.slice(0, 8)}`,
+    message: `Keys in trace-step output dropped at persist boundary: ${trueDropped.join(',')}`,
+  };
+}
+
+/** INFO finding recording normalizer key renames (case-variant remaps). */
+function renamedKeysFinding(
+  a: DbArtifact,
+  candidate: TransformStep,
+  renamed: Array<{ from: string; to: string }>,
+): Finding | null {
+  if (renamed.length === 0) return null;
+  const renamedPairs = renamed.map((r) => `${r.from}→${r.to}`);
+  return {
+    category: 'J', severity: 'INFO', phase_id: a.phase_id, sub_phase_id: a.sub_phase_id, record_id: a.record_id,
+    ref: `step:${candidate.step_id.slice(0, 8)}`,
+    message: `Normalizer renamed ${renamed.length} key(s): ${renamedPairs.join(',')}`,
+  };
+}
+
+/** INFO finding when the DB content has top-level keys absent from the trace. */
+function surplusKeysFinding(a: DbArtifact, candidate: TransformStep, surplus: string[]): Finding | null {
+  if (surplus.length === 0) return null;
+  return {
+    category: 'J', severity: 'INFO', phase_id: a.phase_id, sub_phase_id: a.sub_phase_id, record_id: a.record_id,
+    ref: `step:${candidate.step_id.slice(0, 8)}`,
+    message: `Keys in DB content not present in trace-step output: ${surplus.join(',')}`,
+  };
+}
+
+/**
+ * BLOCK/WARN findings for shared top-level array keys whose length differs
+ * between the trace-step output and the persisted DB content (BLOCK when the
+ * trace had MORE elements — a persist-side loss — WARN otherwise). Emitted in
+ * traceKeys iteration order.
+ */
+function arraySizeFindings(
+  a: DbArtifact,
+  candidate: TransformStep,
+  traceOutput: Record<string, unknown>,
+  traceKeys: Set<string>,
+  dbKeys: Set<string>,
+): Finding[] {
+  const findings: Finding[] = [];
+  for (const k of traceKeys) {
+    if (!dbKeys.has(k)) continue;
+    const tv = traceOutput[k];
+    const dv = (a.content as Record<string, unknown>)[k];
+    if (Array.isArray(tv) && Array.isArray(dv) && tv.length !== dv.length) {
       findings.push({
-        category: 'I', severity: 'BLOCK', phase_id: a.phase_id, sub_phase_id: a.sub_phase_id, record_id: a.record_id,
-        ref: `task:${JSON.stringify(c.task_id ?? '?')}`,
-        message: `Phase 9 executor invocation has neither agent_output nor terminal status_change (stuck or output-write failed)`,
-      });
-    } else if (!hasOut) {
-      findings.push({
-        category: 'I', severity: 'WARN', phase_id: a.phase_id, sub_phase_id: a.sub_phase_id, record_id: a.record_id,
-        ref: `task:${JSON.stringify(c.task_id ?? '?')}`,
-        message: `Phase 9 executor invocation has no agent_output (reached terminal status_change, but DB record-write may have failed)`,
+        category: 'J',
+        severity: tv.length > dv.length ? 'BLOCK' : 'WARN',
+        phase_id: a.phase_id,
+        sub_phase_id: a.sub_phase_id,
+        record_id: a.record_id,
+        ref: `step:${candidate.step_id.slice(0, 8)} field:${k}`,
+        message: `Array size mismatch on persist: trace[${k}]=${tv.length}, db[${k}]=${dv.length}`,
       });
     }
   }
+  return findings;
+}
+
+/**
+ * All category-J findings for one artifact given its matched producer step's
+ * output. Emission order matches the original inline implementation: dropped
+ * keys, renames, array-size mismatches (in traceKeys order), then surplus.
+ */
+function persistenceFindingsForArtifact(
+  a: DbArtifact,
+  candidate: TransformStep,
+  traceOutput: Record<string, unknown>,
+): Finding[] {
+  const findings: Finding[] = [];
+  const dbKeys = new Set(Object.keys(a.content));
+  const traceKeys = new Set(Object.keys(traceOutput));
+  const dropped = [...traceKeys].filter((k) => !dbKeys.has(k) && !PERSISTENCE_IGNORED_KEYS.has(k));
+  const surplus = [...dbKeys].filter((k) => !traceKeys.has(k) && !PERSISTENCE_IGNORED_KEYS.has(k));
+  const { renamed, renamedFrom } = detectRenames(dropped, dbKeys);
+  const trueDropped = dropped.filter((k) => !renamedFrom.has(k));
+
+  const droppedFinding = droppedKeysFinding(a, candidate, trueDropped);
+  if (droppedFinding) findings.push(droppedFinding);
+  const renamedFinding = renamedKeysFinding(a, candidate, renamed);
+  if (renamedFinding) findings.push(renamedFinding);
+  findings.push(...arraySizeFindings(a, candidate, traceOutput, traceKeys, dbKeys));
+  const surplusFinding = surplusKeysFinding(a, candidate, surplus);
+  if (surplusFinding) findings.push(surplusFinding);
   return findings;
 }
 
@@ -756,141 +1087,20 @@ function categoryI_executors(artifacts: DbArtifact[], lifecycle: LifecycleEvent[
  *   - top-level array sizes
  *   - missing/surplus keys
  */
-function categoryJ_persistence(artifacts: DbArtifact[], steps: TransformStep[]): Finding[] {
+export function categoryJ_persistence(artifacts: DbArtifact[], steps: TransformStep[]): Finding[] {
   const findings: Finding[] = [];
-  // Build an output_record_id → step index. Steps that explicitly
-  // declare which DB record they produced are the trustworthy matches.
-  const stepByOutputRecordId = new Map<string, TransformStep>();
-  for (const s of steps) {
-    if (s.output_record_id) {
-      stepByOutputRecordId.set(s.output_record_id, s);
-    }
-  }
-  // Group steps by sub_phase_id as a fallback for artifacts whose
-  // producer step didn't declare output_record_id. Used only when the
-  // primary match (output_record_id) fails AND the artifact's content
-  // shape (kind) matches the most-recent json_parsed top-level keys.
-  const stepsBySubPhase = new Map<string, TransformStep[]>();
-  for (const s of steps) {
-    const list = stepsBySubPhase.get(s.sub_phase_id);
-    if (list) list.push(s); else stepsBySubPhase.set(s.sub_phase_id, [s]);
-  }
-  for (const list of stepsBySubPhase.values()) {
-    list.sort((a, b) => a.ts.localeCompare(b.ts));
-  }
+  const stepByOutputRecordId = buildStepByOutputRecordId(steps);
+  const stepsBySubPhase = buildStepsBySubPhase(steps);
 
   for (const a of artifacts) {
     if (a.record_type !== 'artifact_produced') continue;
     if (!a.sub_phase_id) continue;
-
-    // Primary match: step's output_record_id == artifact.record_id.
-    let candidate: TransformStep | null = stepByOutputRecordId.get(a.record_id) ?? null;
-
-    // Fallback: most recent normalized/json_parsed step BEFORE the
-    // artifact in the SAME sub-phase, AND whose parsed top-level keys
-    // intersect with the artifact's top-level keys (excluding `kind` +
-    // `schemaVersion`). The intersection guards against picking up a
-    // reasoning_review validator's parse step whose keys (validator,
-    // passed, findings, overallAssessment) don't match the artifact's.
-    if (!candidate) {
-      const list = stepsBySubPhase.get(a.sub_phase_id);
-      if (list) {
-        const artifactKeys = new Set(
-          Object.keys(a.content).filter((k) => !['kind', 'schemaVersion'].includes(k)),
-        );
-        for (const s of list) {
-          if (s.ts > a.produced_at) break;
-          if (s.step_type !== 'normalized' && s.step_type !== 'json_parsed') continue;
-          const meta = s.metadata ?? {};
-          const stepKeys = (meta.parsed_top_level_keys as string[] | undefined) ??
-            (s.step_type === 'normalized'
-              ? Object.keys(((s.payload ?? {}) as { output?: Record<string, unknown> }).output ?? {})
-              : []);
-          // Intersection test
-          const overlaps = stepKeys.some((k) => artifactKeys.has(k));
-          if (overlaps) candidate = s;
-        }
-      }
-    }
+    const candidate = findPersistenceCandidate(a, stepByOutputRecordId, stepsBySubPhase);
     if (!candidate) continue;
 
-    // Get the trace-step's output object.
-    let traceOutput: Record<string, unknown> | null = null;
-    if (candidate.step_type === 'normalized') {
-      const payload = (candidate.payload ?? {}) as { output?: unknown };
-      traceOutput = (payload.output ?? null) as Record<string, unknown> | null;
-    } else {
-      const payload = (candidate.payload ?? {}) as { parsed?: unknown };
-      traceOutput = (payload.parsed ?? null) as Record<string, unknown> | null;
-    }
+    const traceOutput = extractTraceOutput(candidate);
     if (!traceOutput || typeof traceOutput !== 'object') continue;
-
-    const dbKeys = new Set(Object.keys(a.content));
-    const traceKeys = new Set(Object.keys(traceOutput));
-    const dropped = [...traceKeys].filter((k) => !dbKeys.has(k) && !['kind', 'schemaVersion'].includes(k));
-    const surplus = [...dbKeys].filter((k) => !traceKeys.has(k) && !['kind', 'schemaVersion'].includes(k));
-
-    // Detect rename pairs (snake↔camel + kebab variants). A "dropped"
-    // trace key whose case-variant appears in dbKeys is a rename, not
-    // a real drop — the normalizer is doing its job. We check against
-    // dbKeys (not just surplus), because some normalizers dual-emit
-    // BOTH cases on the trace-step output side, in which case the
-    // variant is in both sets (not surplus-only).
-    const renamed: Array<{ from: string; to: string }> = [];
-    const renamedFrom = new Set<string>();
-    const renamedTo = new Set<string>();
-    for (const d of dropped) {
-      const variants = caseVariants(d);
-      for (const v of variants) {
-        if (v === d) continue;
-        if (dbKeys.has(v) && !renamedTo.has(v)) {
-          renamed.push({ from: d, to: v });
-          renamedFrom.add(d);
-          renamedTo.add(v);
-          break;
-        }
-      }
-    }
-    const trueDropped = dropped.filter((k) => !renamedFrom.has(k));
-
-    if (trueDropped.length > 0) {
-      findings.push({
-        category: 'J', severity: 'BLOCK', phase_id: a.phase_id, sub_phase_id: a.sub_phase_id, record_id: a.record_id,
-        ref: `step:${candidate.step_id.slice(0, 8)}`,
-        message: `Keys in trace-step output dropped at persist boundary: ${trueDropped.join(',')}`,
-      });
-    }
-    if (renamed.length > 0) {
-      findings.push({
-        category: 'J', severity: 'INFO', phase_id: a.phase_id, sub_phase_id: a.sub_phase_id, record_id: a.record_id,
-        ref: `step:${candidate.step_id.slice(0, 8)}`,
-        message: `Normalizer renamed ${renamed.length} key(s): ${renamed.map((r) => `${r.from}→${r.to}`).join(',')}`,
-      });
-    }
-    // Array-size parity for shared keys.
-    for (const k of traceKeys) {
-      if (!dbKeys.has(k)) continue;
-      const tv = (traceOutput as Record<string, unknown>)[k];
-      const dv = (a.content as Record<string, unknown>)[k];
-      if (Array.isArray(tv) && Array.isArray(dv) && tv.length !== dv.length) {
-        findings.push({
-          category: 'J',
-          severity: tv.length > dv.length ? 'BLOCK' : 'WARN',
-          phase_id: a.phase_id,
-          sub_phase_id: a.sub_phase_id,
-          record_id: a.record_id,
-          ref: `step:${candidate.step_id.slice(0, 8)} field:${k}`,
-          message: `Array size mismatch on persist: trace[${k}]=${tv.length}, db[${k}]=${dv.length}`,
-        });
-      }
-    }
-    if (surplus.length > 0) {
-      findings.push({
-        category: 'J', severity: 'INFO', phase_id: a.phase_id, sub_phase_id: a.sub_phase_id, record_id: a.record_id,
-        ref: `step:${candidate.step_id.slice(0, 8)}`,
-        message: `Keys in DB content not present in trace-step output: ${surplus.join(',')}`,
-      });
-    }
+    findings.push(...persistenceFindingsForArtifact(a, candidate, traceOutput));
   }
   return findings;
 }
@@ -965,7 +1175,12 @@ function main(): void {
   }
 }
 
-main();
+// Run as a CLI only when executed directly, not when imported (e.g. by
+// unit tests). The `typeof` guard keeps this safe under ESM test runners
+// where the CommonJS `require`/`module` globals may be absent.
+if (typeof require !== 'undefined' && require.main === module) {
+  main();
+}
 
 // ── Case-variant helper (used by category J to recognize renames) ──
 

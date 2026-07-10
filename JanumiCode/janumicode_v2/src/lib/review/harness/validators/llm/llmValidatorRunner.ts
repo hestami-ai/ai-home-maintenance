@@ -168,24 +168,38 @@ export function parseFindings(
   }
   const findings: ValidatorFinding[] = [];
   for (const raw of rawFindings) {
-    if (!raw || typeof raw !== 'object') continue;
-    const f = raw as Record<string, unknown>;
-    findings.push({
-      validatorId,
-      severity: normaliseSeverity(f.severity),
-      type: typeof f.type === 'string' ? f.type : 'unspecified',
-      summary: typeof f.summary === 'string' ? f.summary : '',
-      location: typeof f.location === 'string' ? f.location : '',
-      detail: typeof f.detail === 'string' ? f.detail : '',
-      recommendation: typeof f.recommendation === 'string' ? f.recommendation : '',
-      // Optional structured target fields — picked up when the validator's
-      // output contract emits them. Required for auto-mitigation; absent
-      // for advisory-only validators.
-      targetField: typeof f.target_field === 'string' ? f.target_field : undefined,
-      targetIdentifier: typeof f.target_identifier === 'string' ? f.target_identifier : undefined,
-    });
+    const finding = normaliseFinding(raw, validatorId);
+    if (finding) findings.push(finding);
   }
   return findings;
+}
+
+/**
+ * Normalise a single raw finding entry into a ValidatorFinding, or null
+ * when the entry is not an object. Extracted from parseFindings so the
+ * per-field coercion stays off the parser's cognitive-complexity budget;
+ * behaviour is identical to the former inline loop body.
+ */
+function normaliseFinding(
+  raw: unknown,
+  validatorId: string,
+): ValidatorFinding | null {
+  if (!raw || typeof raw !== 'object') return null;
+  const f = raw as Record<string, unknown>;
+  return {
+    validatorId,
+    severity: normaliseSeverity(f.severity),
+    type: typeof f.type === 'string' ? f.type : 'unspecified',
+    summary: typeof f.summary === 'string' ? f.summary : '',
+    location: typeof f.location === 'string' ? f.location : '',
+    detail: typeof f.detail === 'string' ? f.detail : '',
+    recommendation: typeof f.recommendation === 'string' ? f.recommendation : '',
+    // Optional structured target fields — picked up when the validator's
+    // output contract emits them. Required for auto-mitigation; absent
+    // for advisory-only validators.
+    targetField: typeof f.target_field === 'string' ? f.target_field : undefined,
+    targetIdentifier: typeof f.target_identifier === 'string' ? f.target_identifier : undefined,
+  };
 }
 
 function normaliseSeverity(value: unknown): ValidatorFinding['severity'] {

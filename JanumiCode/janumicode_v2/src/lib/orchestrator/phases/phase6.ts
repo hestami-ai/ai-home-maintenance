@@ -24,11 +24,12 @@ import { buildPhaseContextPacket, type PhaseContextPacketResult } from './dmrCon
 import { pickItemsArray } from '../parsedResponseHelpers';
 import { runTaskSaturationLoop } from './phase6_1a';
 import { runPhase6CycleDelta } from './runCycleDelta';
-import { runDownstreamScopeGatekeeper } from './downstreamGatekeeper';
+import { runDownstreamScopeGatekeeper, type DownstreamGatekeeperOutcome } from './downstreamGatekeeper';
 import { canonicalComponentDir } from './layoutContract';
 import { resolveAgainstOracle, resolveTechId } from '../idResolver';
 import { buildRequirementLineage } from './packetSynthesis/idResolution';
 import { emit as aoddEmit } from '../../aodd';
+import type { PromptTemplate } from '../templateLoader';
 
 // ── Artifact shape interfaces ──────────────────────────────────────
 
@@ -76,6 +77,65 @@ interface ImplementationPlan {
   total_tasks?: number;
   complexity_flagged_count?: number;
   refactoring_tasks_included?: boolean;
+}
+
+/** Options bag for {@link Phase6Handler.runTaskDecomposition} (S107: keep the signature ≤ 7 params). */
+interface RunTaskDecompositionOptions {
+  projectTypeDescription: string;
+  techSpecsSummary: string;
+  crossCuttingSummary: string;
+  dmr: PhaseContextPacketResult;
+  leafAcceptanceCriteria: LeafAcceptanceCriteria[];
+  // PA-3: STRUCTURAL leaf→root tree-walk (buildRequirementLineage.canonicalize).
+  canonicalize: (id: string) => string;
+  // PA-3: per-component tech-specs slice; empty map ⇒ full-summary fallback.
+  techSpecsSummaryById?: Record<string, string>;
+}
+
+/**
+ * Roll up the prior-phase technical-specification summaries into the single
+ * `techSpecsSummary` block the task_skeleton prompt consumes. Extracted verbatim
+ * from Phase6Handler.execute (S3776 cognitive-complexity decomposition); ordering,
+ * defaults, and the empty-string `filter(Boolean)` drop are unchanged.
+ */
+export function buildTaskGenTechSpecsSummary(prior: PriorPhaseContext): string {
+  return [
+    prior.systemRequirements?.summary ?? '',
+    prior.interfaceContracts?.summary ?? '',
+    prior.dataModels?.summary ?? 'No data models',
+    prior.apiDefinitions?.summary ?? 'No API definitions',
+    prior.errorHandlingStrategies?.summary ?? '',
+    prior.configurationParameters?.summary ?? '',
+  ].filter(Boolean).join('\n\n');
+}
+
+/**
+ * Collect the DMR seed record ids for the Phase 6.1 task_skeleton context packet
+ * — one id per prior-phase artifact that exists, in a fixed order. Extracted
+ * verbatim from Phase6Handler.execute (S3776 decomposition); membership and order
+ * are unchanged.
+ */
+export function collectDmr61Seeds(prior: PriorPhaseContext): string[] {
+  return [
+    ...(prior.componentModel ? [prior.componentModel.recordId] : []),
+    ...(prior.dataModels ? [prior.dataModels.recordId] : []),
+    ...(prior.apiDefinitions ? [prior.apiDefinitions.recordId] : []),
+    ...(prior.functionalRequirements ? [prior.functionalRequirements.recordId] : []),
+    ...(prior.systemRequirements ? [prior.systemRequirements.recordId] : []),
+    ...(prior.interfaceContracts ? [prior.interfaceContracts.recordId] : []),
+    ...(prior.errorHandlingStrategies ? [prior.errorHandlingStrategies.recordId] : []),
+    ...(prior.configurationParameters ? [prior.configurationParameters.recordId] : []),
+  ];
+}
+
+/**
+ * Collect the non-empty string `id` fields from a list of loosely-typed records,
+ * dropping entries whose `id` is missing or non-string. Extracted from
+ * execute()'s inline `.map(x => typeof x.id === 'string' ? x.id : '').filter(Boolean)`
+ * (used for both component ids and FR user-story ids); behavior is unchanged.
+ */
+export function pluckStringIds(items: Array<Record<string, unknown>>): string[] {
+  return items.map(x => (typeof x.id === 'string' ? x.id : '')).filter(Boolean);
 }
 
 // ── Handler ────────────────────────────────────────────────────────
@@ -132,34 +192,16 @@ export class Phase6Handler implements PhaseHandler {
     // them (Hestami-shaped specs), the ids were fabricated. Include
     // both so the model can ground citations and so the validator can
     // verify coverage.
-    const techSpecsSummary = [
-      prior.systemRequirements?.summary ?? '',
-      prior.interfaceContracts?.summary ?? '',
-      prior.dataModels?.summary ?? 'No data models',
-      prior.apiDefinitions?.summary ?? 'No API definitions',
-      prior.errorHandlingStrategies?.summary ?? '',
-      prior.configurationParameters?.summary ?? '',
-    ].filter(Boolean).join('\n\n');
+    const techSpecsSummary = buildTaskGenTechSpecsSummary(prior);
     const derivedFromIds = prior.allRecordIds;
 
     // ── 6.1 — Implementation Task Decomposition ──────────────
     engine.stateMachine.setSubPhase(workflowRun.id, 'task_skeleton');
 
-    const componentIds = effectiveComponents.components
-      .map(c => (typeof c.id === 'string' ? c.id : ''))
-      .filter(Boolean);
+    const componentIds = pluckStringIds(effectiveComponents.components as Array<Record<string, unknown>>);
     const frUserStories = (prior.functionalRequirements?.content.user_stories as Array<Record<string, unknown>>) ?? [];
-    const frIds = frUserStories.map(s => (typeof s.id === 'string' ? s.id : '')).filter(Boolean);
-    const dmr61Seeds = [
-      ...(prior.componentModel ? [prior.componentModel.recordId] : []),
-      ...(prior.dataModels ? [prior.dataModels.recordId] : []),
-      ...(prior.apiDefinitions ? [prior.apiDefinitions.recordId] : []),
-      ...(prior.functionalRequirements ? [prior.functionalRequirements.recordId] : []),
-      ...(prior.systemRequirements ? [prior.systemRequirements.recordId] : []),
-      ...(prior.interfaceContracts ? [prior.interfaceContracts.recordId] : []),
-      ...(prior.errorHandlingStrategies ? [prior.errorHandlingStrategies.recordId] : []),
-      ...(prior.configurationParameters ? [prior.configurationParameters.recordId] : []),
-    ];
+    const frIds = pluckStringIds(frUserStories);
+    const dmr61Seeds = collectDmr61Seeds(prior);
     const dmr61 = await buildPhaseContextPacket(ctx, {
       subPhaseId: 'task_skeleton',
       requestingAgentRole: 'implementation_planner',
@@ -201,13 +243,15 @@ export class Phase6Handler implements PhaseHandler {
     const rawPlan = await this.runTaskDecomposition(
       ctx,
       effectiveComponents.components as Array<Record<string, unknown>>,
-      prior.projectTypeDescription,
-      techSpecsSummary,
-      crossCuttingSummary,
-      dmr61,
-      leafAcceptanceCriteria,
-      reqLineage.canonicalize,
-      techSpecsSummaryById,
+      {
+        projectTypeDescription: prior.projectTypeDescription,
+        techSpecsSummary,
+        crossCuttingSummary,
+        dmr: dmr61,
+        leafAcceptanceCriteria,
+        canonicalize: reqLineage.canonicalize,
+        techSpecsSummaryById,
+      },
     );
 
     // Normalize write/read paths to workspace-relative form. cal-21
@@ -288,36 +332,9 @@ export class Phase6Handler implements PhaseHandler {
       originalArtifactId: planRecord.id,
       overlay: 'DROP tasks whose `component_id` is NOT in Accepted Components — those components were pruned upstream and any task tied to them is stale. DROP tasks that describe work explicitly Out-of-Scope in upstream Intent Constraints. KEEP infrastructure/cross-cutting tasks (CI, observability) when their component anchor is accepted.',
     });
-    if (!taskPrune.skipped && taskPrune.dropped.length > 0) {
-      const keptTaskSet = new Set(taskPrune.kept_ids);
-      // Refactoring tasks were never gatekeeper candidates — always retain them.
-      const prunedTasks = planContent.tasks.filter(
-        t => keptTaskSet.has(t.id) || isRefactoringTaskId.has(t.id),
-      );
-      const prunedPlanContent: ImplementationPlan = { ...planContent, tasks: prunedTasks };
-      const prunedPlanRecord = engine.writer.writeRecord({
-        record_type: 'artifact_produced',
-        schema_version: '1.0',
-        workflow_run_id: workflowRun.id,
-        phase_id: '6',
-        sub_phase_id: 'task_skeleton',
-        produced_by_agent_role: 'implementation_planner',
-        janumicode_version_sha: engine.janumiCodeVersionSha,
-        derived_from_record_ids: [planRecord.id],
-        content: {
-          kind: 'implementation_plan',
-          ...prunedPlanContent,
-          total_tasks: prunedPlanContent.tasks.length,
-          complexity_flagged_count: prunedPlanContent.tasks.filter(t => t.complexity_flag).length,
-          refactoring_tasks_included: prunedPlanContent.tasks.some(t => t.task_type === 'refactoring'),
-        },
-      });
-      engine.writer.supersedByRollback(planRecord.id, prunedPlanRecord.id);
-      engine.ingestionPipeline.ingest(prunedPlanRecord);
-      planContent.tasks = prunedTasks;
-      planRecord = prunedPlanRecord;
-      artifactIds.push(prunedPlanRecord.id);
-    }
+    planRecord = this.applyTaskPrune(ctx, {
+      taskPrune, planContent, planRecord, isRefactoringTaskId, artifactIds,
+    });
 
     // ── 6.1a — Recursive Task Decomposition (Wave 8) ──────────
     engine.stateMachine.setSubPhase(workflowRun.id, 'task_saturation');
@@ -328,138 +345,19 @@ export class Phase6Handler implements PhaseHandler {
       ? (((techConstraintsRecord.content as Record<string, unknown>).technicalConstraints) as TechnicalConstraint[] ?? [])
       : [];
 
-    // Resume guard — skip seeding when depth-0 nodes already exist.
-    const existingTaskRoots = engine.writer.getRecordsByType(workflowRun.id, 'task_decomposition_node')
-      .filter(r => (r.content as unknown as TaskDecompositionNodeContent).depth === 0);
-    let rootTasks: DecompositionTask[];
-    let rootNodeRecordIds: string[];
-    let rootLogicalIds: string[];
-    if (existingTaskRoots.length > 0) {
-      getLogger().info('workflow', 'Phase 6.1a RESUME: depth-0 task nodes already present', {
-        existingRoots: existingTaskRoots.length,
-      });
-      rootTasks = existingTaskRoots.map(r => (r.content as unknown as TaskDecompositionNodeContent).task);
-      rootNodeRecordIds = existingTaskRoots.map(r => r.id);
-      rootLogicalIds = existingTaskRoots.map(r => (r.content as unknown as TaskDecompositionNodeContent).node_id);
-    } else {
-      const constraintIds = technicalConstraints.map(t => t.id);
-      // Standard tasks get decomposed by saturation. Refactoring tasks are
-      // already atomic (one prior-run artifact each) — they must NOT be
-      // decomposed, so they are seeded separately as depth-0 `atomic` leaf
-      // nodes below and excluded from the saturation root set here.
-      rootTasks = planContent.tasks
-        .filter(t => !isRefactoringTaskId.has(t.id))
-        .map((t, taskIdx) => {
-          // cal-26 surfaced three LLM-output shape defects the prompt didn't
-          // explicitly forbid; coerce them defensively here so downstream
-          // saturation/render code sees a clean shape regardless of whether
-          // the (rewritten) prompt also enforces them. Logged via the
-          // post-coercion warning in normalizeRootTaskShape() below.
-          return normalizeRootTaskShape(t as unknown as Record<string, unknown>, taskIdx, constraintIds, 'src', leafAcIdSet, componentIdOracle, new Set(constraintIds));
-        });
-      // Seed refactoring tasks as terminal (atomic) leaves so Phase 9 consumes
-      // them unchanged via getFrozenTaskLeaves (status === 'atomic').
-      for (const rt of injectedRefactoringTasks) {
-        const logicalNodeId = randomUUID();
-        const refLeaf = engine.writer.writeRecord({
-          record_type: 'task_decomposition_node',
-          schema_version: '1.0',
-          workflow_run_id: workflowRun.id,
-          phase_id: '6',
-          sub_phase_id: 'task_saturation',
-          produced_by_agent_role: 'implementation_planner',
-          janumicode_version_sha: engine.janumiCodeVersionSha,
-          derived_from_record_ids: [planRecord.id],
-          content: {
-            kind: 'task_decomposition_node',
-            node_id: logicalNodeId,
-            parent_node_id: null,
-            display_key: rt.id,
-            root_task_id: logicalNodeId,
-            depth: 0,
-            pass_number: 0,
-            status: 'atomic',
-            task: {
-              id: rt.id,
-              name: rt.id,
-              description: rt.description,
-              task_type: 'refactoring',
-              component_id: rt.component_id,
-              component_responsibility: rt.component_responsibility,
-              estimated_complexity: rt.estimated_complexity,
-              completion_criteria: rt.completion_criteria,
-              write_directory_paths: rt.write_directory_paths,
-              dependency_task_ids: rt.dependency_task_ids,
-              // Idempotency fields the Phase 9.1 executor reads.
-              expected_pre_state_hash: rt.expected_pre_state_hash,
-              verification_step: rt.verification_step,
-              // Self-contained refactoring directive (old/new def + diff + files).
-              refactoring_instructions: rt.refactoring_instructions,
-            },
-            surfaced_assumption_ids: [],
-            release_id: null,
-            release_ordinal: 0,
-          } satisfies TaskDecompositionNodeContent,
-        });
-        artifactIds.push(refLeaf.id);
-      }
-      rootNodeRecordIds = [];
-      rootLogicalIds = [];
-      for (const rt of rootTasks) {
-        const logicalNodeId = randomUUID();
-        const rec = engine.writer.writeRecord({
-          record_type: 'task_decomposition_node',
-          schema_version: '1.0',
-          workflow_run_id: workflowRun.id,
-          phase_id: '6',
-          sub_phase_id: 'task_saturation',
-          produced_by_agent_role: 'implementation_planner',
-          janumicode_version_sha: engine.janumiCodeVersionSha,
-          derived_from_record_ids: [planRecord.id],
-          content: {
-            kind: 'task_decomposition_node',
-            node_id: logicalNodeId,
-            parent_node_id: null,
-            display_key: rt.id,
-            root_task_id: logicalNodeId,
-            depth: 0,
-            pass_number: 0,
-            status: 'pending',
-            task: rt,
-            surfaced_assumption_ids: [],
-            release_id: null,
-            release_ordinal: null,
-          } satisfies TaskDecompositionNodeContent,
-        });
-        rootNodeRecordIds.push(rec.id);
-        rootLogicalIds.push(logicalNodeId);
-        artifactIds.push(rec.id);
-      }
-    }
+    const { rootTasks, rootNodeRecordIds, rootLogicalIds } = this.resolveRootTasks(ctx, {
+      planTasks: planContent.tasks,
+      injectedRefactoringTasks,
+      isRefactoringTaskId,
+      technicalConstraints,
+      leafAcIdSet,
+      componentIdOracle,
+      planRecordId: planRecord.id,
+      artifactIds,
+    });
 
     // task→AC coverage report (visibility only — honest gaps, NO backfill).
-    if (leafAcceptanceCriteria.length > 0) {
-      const acCoverage = computeTaskAcCoverage(rootTasks, leafAcceptanceCriteria);
-      const acCoverageRecord = engine.writer.writeRecord({
-        record_type: 'artifact_produced',
-        schema_version: '1.0',
-        workflow_run_id: workflowRun.id,
-        phase_id: '6',
-        sub_phase_id: 'task_skeleton',
-        produced_by_agent_role: 'implementation_planner',
-        janumicode_version_sha: engine.janumiCodeVersionSha,
-        derived_from_record_ids: [planRecord.id],
-        content: acCoverage as unknown as Record<string, unknown>,
-      });
-      artifactIds.push(acCoverageRecord.id);
-      if (acCoverage.gaps.length > 0) {
-        getLogger().warn('workflow', 'Phase 6 task→AC coverage gaps (honest — not backfilled)', {
-          workflow_run_id: workflowRun.id,
-          uncovered: acCoverage.gaps.length,
-          total: acCoverage.total_leaf_acs,
-        });
-      }
-    }
+    this.writeTaskAcCoverageReport(ctx, rootTasks, leafAcceptanceCriteria, planRecord.id, artifactIds);
 
     if (rootTasks.length > 0) {
       await runTaskSaturationLoop(ctx, {
@@ -473,53 +371,8 @@ export class Phase6Handler implements PhaseHandler {
     }
 
     // ── 6.2 — Mirror and Menu ─────────────────────────────────
-    engine.stateMachine.setSubPhase(workflowRun.id, 'implementation_plan_synthesis');
-
-    const planMirror = engine.mirrorGenerator.generate({
-      artifactId: planRecord.id,
-      artifactType: 'implementation_plan',
-      content: {
-        total_tasks: planContent.tasks.length,
-        complexity_flagged: planContent.tasks.filter(t => t.complexity_flag).map(t => t.id),
-      },
-    });
-
-    const mirrorRecord = engine.writer.writeRecord({
-      record_type: 'mirror_presented',
-      schema_version: '1.0',
-      workflow_run_id: workflowRun.id,
-      phase_id: '6',
-      sub_phase_id: 'implementation_plan_synthesis',
-      produced_by_agent_role: 'orchestrator',
-      janumicode_version_sha: engine.janumiCodeVersionSha,
-      derived_from_record_ids: [planRecord.id],
-      content: {
-        kind: 'implementation_plan_mirror',
-        mirror_id: planMirror.mirrorId,
-        artifact_id: planRecord.id,
-        artifact_type: 'implementation_plan',
-        fields: planMirror.fields,
-        total_tasks: planContent.tasks.length,
-        complexity_flagged_count: planContent.tasks.filter(t => t.complexity_flag).length,
-      },
-    });
-    artifactIds.push(mirrorRecord.id);
-    engine.eventBus.emit('mirror:presented', {
-      mirrorId: planMirror.mirrorId,
-      artifactType: 'implementation_plan',
-    });
-
-    try {
-      const resolution = await engine.pauseForDecision(
-        workflowRun.id, mirrorRecord.id, 'mirror',
-      );
-      if (resolution.type === 'mirror_rejection') {
-        return { success: false, error: 'User rejected implementation plan', artifactIds };
-      }
-    } catch (err) {
-      getLogger().warn('workflow', 'Phase 6 review failed', { error: String(err) });
-      return { success: false, error: 'Implementation plan review failed', artifactIds };
-    }
+    const mirrorOutcome = await this.presentPlanMirror(ctx, planRecord, planContent, artifactIds);
+    if (mirrorOutcome) return mirrorOutcome;
 
     // ── 6.3 — Approval ────────────────────────────────────────
     engine.stateMachine.setSubPhase(workflowRun.id, 'implementation_plan_gate');
@@ -567,6 +420,297 @@ export class Phase6Handler implements PhaseHandler {
     return { success: true, artifactIds };
   }
 
+  // ── execute() block helpers (S3776 cognitive-complexity decomposition) ──
+
+  /**
+   * Phase-exit scope-gatekeeper prune: when the gatekeeper dropped tasks, write a
+   * pruned implementation_plan that supersedes `planRecord`, mutate
+   * `planContent.tasks` in place, push the new record id onto `artifactIds`, and
+   * return the new plan record. When the gatekeeper was skipped or dropped
+   * nothing, return `planRecord` unchanged (no write). Extracted verbatim from
+   * execute(); every write, supersession, mutation, and push is unchanged.
+   */
+  private applyTaskPrune(
+    ctx: PhaseContext,
+    opts: {
+      taskPrune: DownstreamGatekeeperOutcome;
+      planContent: ImplementationPlan;
+      planRecord: GovernedStreamRecord;
+      isRefactoringTaskId: Set<string>;
+      artifactIds: string[];
+    },
+  ): GovernedStreamRecord {
+    const { taskPrune, planContent, planRecord, isRefactoringTaskId, artifactIds } = opts;
+    if (taskPrune.skipped || taskPrune.dropped.length === 0) return planRecord;
+    const { engine, workflowRun } = ctx;
+    const keptTaskSet = new Set(taskPrune.kept_ids);
+    // Refactoring tasks were never gatekeeper candidates — always retain them.
+    const prunedTasks = planContent.tasks.filter(
+      t => keptTaskSet.has(t.id) || isRefactoringTaskId.has(t.id),
+    );
+    const prunedPlanContent: ImplementationPlan = { ...planContent, tasks: prunedTasks };
+    const prunedPlanRecord = engine.writer.writeRecord({
+      record_type: 'artifact_produced',
+      schema_version: '1.0',
+      workflow_run_id: workflowRun.id,
+      phase_id: '6',
+      sub_phase_id: 'task_skeleton',
+      produced_by_agent_role: 'implementation_planner',
+      janumicode_version_sha: engine.janumiCodeVersionSha,
+      derived_from_record_ids: [planRecord.id],
+      content: {
+        kind: 'implementation_plan',
+        ...prunedPlanContent,
+        total_tasks: prunedPlanContent.tasks.length,
+        complexity_flagged_count: prunedPlanContent.tasks.filter(t => t.complexity_flag).length,
+        refactoring_tasks_included: prunedPlanContent.tasks.some(t => t.task_type === 'refactoring'),
+      },
+    });
+    engine.writer.supersedByRollback(planRecord.id, prunedPlanRecord.id);
+    engine.ingestionPipeline.ingest(prunedPlanRecord);
+    planContent.tasks = prunedTasks;
+    artifactIds.push(prunedPlanRecord.id);
+    return prunedPlanRecord;
+  }
+
+  /**
+   * 6.1a root-task resolution: on resume (depth-0 nodes already present) rehydrate
+   * the roots from the existing task_decomposition_node records; otherwise seed
+   * fresh depth-0 nodes — refactoring tasks as terminal `atomic` leaves, standard
+   * tasks (shape-normalized) as `pending` roots — pushing every written record id
+   * onto `artifactIds`. Extracted verbatim from execute(); write order,
+   * derived_from ids, and returned arrays are unchanged.
+   */
+  private resolveRootTasks(
+    ctx: PhaseContext,
+    opts: {
+      planTasks: ImplementationTask[];
+      injectedRefactoringTasks: ImplementationTask[];
+      isRefactoringTaskId: Set<string>;
+      technicalConstraints: TechnicalConstraint[];
+      leafAcIdSet: Set<string>;
+      componentIdOracle: Set<string>;
+      planRecordId: string;
+      artifactIds: string[];
+    },
+  ): { rootTasks: DecompositionTask[]; rootNodeRecordIds: string[]; rootLogicalIds: string[] } {
+    const { engine, workflowRun } = ctx;
+    const {
+      planTasks, injectedRefactoringTasks, isRefactoringTaskId, technicalConstraints,
+      leafAcIdSet, componentIdOracle, planRecordId, artifactIds,
+    } = opts;
+
+    // Resume guard — skip seeding when depth-0 nodes already exist.
+    const existingTaskRoots = engine.writer.getRecordsByType(workflowRun.id, 'task_decomposition_node')
+      .filter(r => (r.content as unknown as TaskDecompositionNodeContent).depth === 0);
+    if (existingTaskRoots.length > 0) {
+      getLogger().info('workflow', 'Phase 6.1a RESUME: depth-0 task nodes already present', {
+        existingRoots: existingTaskRoots.length,
+      });
+      return {
+        rootTasks: existingTaskRoots.map(r => (r.content as unknown as TaskDecompositionNodeContent).task),
+        rootNodeRecordIds: existingTaskRoots.map(r => r.id),
+        rootLogicalIds: existingTaskRoots.map(r => (r.content as unknown as TaskDecompositionNodeContent).node_id),
+      };
+    }
+
+    const constraintIds = technicalConstraints.map(t => t.id);
+    // Standard tasks get decomposed by saturation. Refactoring tasks are
+    // already atomic (one prior-run artifact each) — they must NOT be
+    // decomposed, so they are seeded separately as depth-0 `atomic` leaf
+    // nodes below and excluded from the saturation root set here.
+    const rootTasks = planTasks
+      .filter(t => !isRefactoringTaskId.has(t.id))
+      .map((t, taskIdx) => {
+        // cal-26 surfaced three LLM-output shape defects the prompt didn't
+        // explicitly forbid; coerce them defensively here so downstream
+        // saturation/render code sees a clean shape regardless of whether
+        // the (rewritten) prompt also enforces them. Logged via the
+        // post-coercion warning in normalizeRootTaskShape() below.
+        return normalizeRootTaskShape(t as unknown as Record<string, unknown>, taskIdx, constraintIds, 'src', leafAcIdSet, componentIdOracle, new Set(constraintIds));
+      });
+    // Seed refactoring tasks as terminal (atomic) leaves so Phase 9 consumes
+    // them unchanged via getFrozenTaskLeaves (status === 'atomic').
+    for (const rt of injectedRefactoringTasks) {
+      const logicalNodeId = randomUUID();
+      const refLeaf = engine.writer.writeRecord({
+        record_type: 'task_decomposition_node',
+        schema_version: '1.0',
+        workflow_run_id: workflowRun.id,
+        phase_id: '6',
+        sub_phase_id: 'task_saturation',
+        produced_by_agent_role: 'implementation_planner',
+        janumicode_version_sha: engine.janumiCodeVersionSha,
+        derived_from_record_ids: [planRecordId],
+        content: {
+          kind: 'task_decomposition_node',
+          node_id: logicalNodeId,
+          parent_node_id: null,
+          display_key: rt.id,
+          root_task_id: logicalNodeId,
+          depth: 0,
+          pass_number: 0,
+          status: 'atomic',
+          task: {
+            id: rt.id,
+            name: rt.id,
+            description: rt.description,
+            task_type: 'refactoring',
+            component_id: rt.component_id,
+            component_responsibility: rt.component_responsibility,
+            estimated_complexity: rt.estimated_complexity,
+            completion_criteria: rt.completion_criteria,
+            write_directory_paths: rt.write_directory_paths,
+            dependency_task_ids: rt.dependency_task_ids,
+            // Idempotency fields the Phase 9.1 executor reads.
+            expected_pre_state_hash: rt.expected_pre_state_hash,
+            verification_step: rt.verification_step,
+            // Self-contained refactoring directive (old/new def + diff + files).
+            refactoring_instructions: rt.refactoring_instructions,
+          },
+          surfaced_assumption_ids: [],
+          release_id: null,
+          release_ordinal: 0,
+        } satisfies TaskDecompositionNodeContent,
+      });
+      artifactIds.push(refLeaf.id);
+    }
+    const rootNodeRecordIds: string[] = [];
+    const rootLogicalIds: string[] = [];
+    for (const rt of rootTasks) {
+      const logicalNodeId = randomUUID();
+      const rec = engine.writer.writeRecord({
+        record_type: 'task_decomposition_node',
+        schema_version: '1.0',
+        workflow_run_id: workflowRun.id,
+        phase_id: '6',
+        sub_phase_id: 'task_saturation',
+        produced_by_agent_role: 'implementation_planner',
+        janumicode_version_sha: engine.janumiCodeVersionSha,
+        derived_from_record_ids: [planRecordId],
+        content: {
+          kind: 'task_decomposition_node',
+          node_id: logicalNodeId,
+          parent_node_id: null,
+          display_key: rt.id,
+          root_task_id: logicalNodeId,
+          depth: 0,
+          pass_number: 0,
+          status: 'pending',
+          task: rt,
+          surfaced_assumption_ids: [],
+          release_id: null,
+          release_ordinal: null,
+        } satisfies TaskDecompositionNodeContent,
+      });
+      rootNodeRecordIds.push(rec.id);
+      rootLogicalIds.push(logicalNodeId);
+      artifactIds.push(rec.id);
+    }
+    return { rootTasks, rootNodeRecordIds, rootLogicalIds };
+  }
+
+  /**
+   * task→AC coverage report (visibility only — honest gaps, NO backfill). Writes
+   * the deterministic coverage record and pushes its id onto `artifactIds`,
+   * warning when uncovered leaf ACs remain. No-op when there are no leaf ACs.
+   * Extracted verbatim from execute().
+   */
+  private writeTaskAcCoverageReport(
+    ctx: PhaseContext,
+    rootTasks: DecompositionTask[],
+    leafAcceptanceCriteria: LeafAcceptanceCriteria[],
+    planRecordId: string,
+    artifactIds: string[],
+  ): void {
+    if (leafAcceptanceCriteria.length === 0) return;
+    const { engine, workflowRun } = ctx;
+    const acCoverage = computeTaskAcCoverage(rootTasks, leafAcceptanceCriteria);
+    const acCoverageRecord = engine.writer.writeRecord({
+      record_type: 'artifact_produced',
+      schema_version: '1.0',
+      workflow_run_id: workflowRun.id,
+      phase_id: '6',
+      sub_phase_id: 'task_skeleton',
+      produced_by_agent_role: 'implementation_planner',
+      janumicode_version_sha: engine.janumiCodeVersionSha,
+      derived_from_record_ids: [planRecordId],
+      content: acCoverage as unknown as Record<string, unknown>,
+    });
+    artifactIds.push(acCoverageRecord.id);
+    if (acCoverage.gaps.length > 0) {
+      getLogger().warn('workflow', 'Phase 6 task→AC coverage gaps (honest — not backfilled)', {
+        workflow_run_id: workflowRun.id,
+        uncovered: acCoverage.gaps.length,
+        total: acCoverage.total_leaf_acs,
+      });
+    }
+  }
+
+  /**
+   * 6.2 Mirror and Menu: set the synthesis sub-phase, generate + persist the
+   * implementation-plan mirror, emit the presentation event, and pause for the
+   * human decision. Returns a failure `PhaseResult` when the user rejected the
+   * plan or the review threw; returns `null` to proceed to the gate. Extracted
+   * verbatim from execute(); the caller returns any non-null result unchanged.
+   */
+  private async presentPlanMirror(
+    ctx: PhaseContext,
+    planRecord: GovernedStreamRecord,
+    planContent: ImplementationPlan,
+    artifactIds: string[],
+  ): Promise<PhaseResult | null> {
+    const { engine, workflowRun } = ctx;
+    engine.stateMachine.setSubPhase(workflowRun.id, 'implementation_plan_synthesis');
+
+    const planMirror = engine.mirrorGenerator.generate({
+      artifactId: planRecord.id,
+      artifactType: 'implementation_plan',
+      content: {
+        total_tasks: planContent.tasks.length,
+        complexity_flagged: planContent.tasks.filter(t => t.complexity_flag).map(t => t.id),
+      },
+    });
+
+    const mirrorRecord = engine.writer.writeRecord({
+      record_type: 'mirror_presented',
+      schema_version: '1.0',
+      workflow_run_id: workflowRun.id,
+      phase_id: '6',
+      sub_phase_id: 'implementation_plan_synthesis',
+      produced_by_agent_role: 'orchestrator',
+      janumicode_version_sha: engine.janumiCodeVersionSha,
+      derived_from_record_ids: [planRecord.id],
+      content: {
+        kind: 'implementation_plan_mirror',
+        mirror_id: planMirror.mirrorId,
+        artifact_id: planRecord.id,
+        artifact_type: 'implementation_plan',
+        fields: planMirror.fields,
+        total_tasks: planContent.tasks.length,
+        complexity_flagged_count: planContent.tasks.filter(t => t.complexity_flag).length,
+      },
+    });
+    artifactIds.push(mirrorRecord.id);
+    engine.eventBus.emit('mirror:presented', {
+      mirrorId: planMirror.mirrorId,
+      artifactType: 'implementation_plan',
+    });
+
+    try {
+      const resolution = await engine.pauseForDecision(
+        workflowRun.id, mirrorRecord.id, 'mirror',
+      );
+      if (resolution.type === 'mirror_rejection') {
+        return { success: false, error: 'User rejected implementation plan', artifactIds };
+      }
+    } catch (err) {
+      getLogger().warn('workflow', 'Phase 6 review failed', { error: String(err) });
+      return { success: false, error: 'Implementation plan review failed', artifactIds };
+    }
+    return null;
+  }
+
   // ── Cross-run refactoring (spec §4 Phase 0.5 → Phase 6) ───────
 
   /**
@@ -586,54 +730,13 @@ export class Phase6Handler implements PhaseHandler {
     const scope = scopes.reduce((a, b) => (a.produced_at >= b.produced_at ? a : b));
     const content = scope.content as Record<string, unknown>;
     const rawTasks = Array.isArray(content.refactoring_tasks) ? content.refactoring_tasks : [];
+    const crossRunImpactReportId = typeof content.cross_run_impact_report_id === 'string'
+      ? content.cross_run_impact_report_id
+      : undefined;
     const out: ImplementationTask[] = [];
     for (const raw of rawTasks as Array<Record<string, unknown>>) {
-      const id = typeof raw.id === 'string' ? raw.id : null;
-      if (!id) continue;
-      const targetArtifactId = typeof raw.target_artifact_id === 'string' ? raw.target_artifact_id : '';
-      const description = typeof raw.description === 'string' ? raw.description : `Refactoring task ${id}`;
-      const modType = raw.modification_type;
-      out.push({
-        id,
-        task_type: 'refactoring',
-        // A refactoring task has NO current component — it modifies a prior-run
-        // artifact. Use a stable, human-readable anchor (NOT the prior-run UUID,
-        // which produced confusing "Component: <uuid> — (no name)" noise and
-        // matched nothing in the current run). The substantive content reaches
-        // the executor via `refactoring_instructions`, not component-keyed
-        // channels (component context / packet / tests all legitimately empty).
-        component_id: 'cross_run_refactoring',
-        component_responsibility: `Cross-run refactoring of prior-run artifact ${targetArtifactId || '(unknown)'}`,
-        description,
-        estimated_complexity: 'medium',
-        completion_criteria: [{
-          criterion_id: `${id}-VERIFY`,
-          description: typeof raw.verification_step === 'string'
-            ? raw.verification_step
-            : 'Confirm prior-run artifact conforms to the revised interface.',
-          verification_method: 'test_execution',
-        }],
-        write_directory_paths: Array.isArray(raw.write_directory_paths)
-          ? (raw.write_directory_paths as string[])
-          : [],
-        dependency_task_ids: Array.isArray(raw.dependency_task_ids)
-          ? (raw.dependency_task_ids as string[])
-          : [],
-        target_artifact_id: targetArtifactId,
-        target_workflow_run_id: typeof raw.target_workflow_run_id === 'string' ? raw.target_workflow_run_id : undefined,
-        changed_interface_id: typeof raw.changed_interface_id === 'string' ? raw.changed_interface_id : undefined,
-        expected_pre_state_hash: typeof raw.expected_pre_state_hash === 'string' ? raw.expected_pre_state_hash : '',
-        verification_step: typeof raw.verification_step === 'string' ? raw.verification_step : undefined,
-        modification_type: (modType === 'additive' || modType === 'breaking' || modType === 'non_breaking')
-          ? modType
-          : undefined,
-        cross_run_impact_report_id: typeof content.cross_run_impact_report_id === 'string'
-          ? content.cross_run_impact_report_id
-          : undefined,
-        refactoring_instructions: typeof raw.refactoring_instructions === 'string'
-          ? raw.refactoring_instructions
-          : undefined,
-      });
+      const task = mapRefactoringScopeTask(raw, crossRunImpactReportId);
+      if (task) out.push(task);
     }
     return out;
   }
@@ -661,16 +764,9 @@ export class Phase6Handler implements PhaseHandler {
   private async runTaskDecomposition(
     ctx: PhaseContext,
     components: Array<Record<string, unknown>>,
-    projectTypeDescription: string,
-    techSpecsSummary: string,
-    crossCuttingSummary: string,
-    dmr: PhaseContextPacketResult,
-    leafAcceptanceCriteria: LeafAcceptanceCriteria[],
-    // PA-3: STRUCTURAL leaf→root tree-walk (buildRequirementLineage.canonicalize).
-    canonicalize: (id: string) => string,
-    // PA-3: per-component tech-specs slice; empty map ⇒ full-summary fallback.
-    techSpecsSummaryById: Record<string, string> = {},
+    options: RunTaskDecompositionOptions,
   ): Promise<ImplementationPlan> {
+    const { techSpecsSummary, dmr, leafAcceptanceCriteria } = options;
     const { engine } = ctx;
     const template = engine.templateLoader.findTemplate('implementation_planner', 'task_skeleton');
 
@@ -695,19 +791,46 @@ export class Phase6Handler implements PhaseHandler {
 
     const allTasks: ImplementationTask[] = [];
     const seenIds = new Set<string>();
-    const pushUnique = (tasks: ImplementationTask[]): number => {
-      let added = 0;
-      for (const t of tasks) {
-        const id = typeof t.id === 'string' ? t.id : '';
-        if (id && seenIds.has(id)) continue; // dedup across chunks
-        if (id) seenIds.add(id);
-        allTasks.push(t);
-        added++;
-      }
-      return added;
-    };
 
     // ── Per-component generation: ONE bounded call per leaf component ──
+    const fellOpenComponents = await this.generatePerComponentTasks(
+      ctx, leafComponents, options, template, allTasks, seenIds,
+    );
+    logFellOpenComponents(fellOpenComponents, leafComponents.length, ctx.workflowRun.id);
+
+    if (allTasks.length === 0) return fallback;
+
+    // ── Coverage-driven reconciliation: orchestrator owns the 100% guarantee ──
+    const leafAcIdSet = new Set(leafAcceptanceCriteria.flatMap(s => s.acs.map(a => a.id)));
+    await this.runReconciliationPasses(
+      ctx, allTasks, seenIds, leafAcIdSet, leafAcceptanceCriteria, leafComponents, techSpecsSummary, dmr,
+    );
+
+    const residual = computeUncoveredAcIds(allTasks, leafAcIdSet);
+    logResidualCoverage(residual, leafAcceptanceCriteria, leafAcIdSet.size, allTasks.length);
+
+    return { tasks: allTasks };
+  }
+
+  /**
+   * Per-component generation loop: one bounded LLM call per leaf component,
+   * dedup-appending its tasks into the shared accumulator. Returns the ids of
+   * components whose scoped AC menu fell open to the full inventory (a
+   * visibility metric — see PA-3 stop-and-fix).
+   */
+  private async generatePerComponentTasks(
+    ctx: PhaseContext,
+    leafComponents: Array<Record<string, unknown>>,
+    options: RunTaskDecompositionOptions,
+    template: PromptTemplate,
+    allTasks: ImplementationTask[],
+    seenIds: Set<string>,
+  ): Promise<string[]> {
+    const {
+      projectTypeDescription, techSpecsSummary, crossCuttingSummary, dmr,
+      leafAcceptanceCriteria, canonicalize, techSpecsSummaryById = {},
+    } = options;
+    const { engine } = ctx;
     const fellOpenComponents: string[] = [];
     for (const component of leafComponents) {
       const cid = String(component.id);
@@ -717,9 +840,9 @@ export class Phase6Handler implements PhaseHandler {
       // full menu when no owned ACs resolve (unresolved traces / namespace drift)
       // so coverage can never regress below the pre-scoping baseline.
       const componentRoots = componentRootStorySet(component, canonicalize);
-      // Fail-safe VISIBILITY (PA-3 stop-and-fix): the fallback below is SILENT, so a
-      // component→requirement id-namespace break (cal-38: 30/30 fell open, undetected)
-      // reads as success. Track fall-opens and log the rate after the loop.
+      // Fail-safe VISIBILITY (PA-3 stop-and-fix): the fallback is SILENT, so a
+      // component→requirement id-namespace break (cal-38: 30/30 fell open,
+      // undetected) reads as success. Track fall-opens and log the rate.
       const anyOwned = leafAcceptanceCriteria.some(
         (l) => componentRoots.has(canonicalize(l.leafDisplayKey ?? l.leafStoryId)),
       );
@@ -729,7 +852,7 @@ export class Phase6Handler implements PhaseHandler {
         componentRoots,
         canonicalize,
       );
-      const rendered = engine.templateLoader.render(template, {
+      const tasks = await this.decomposeComponent(ctx, cid, template, {
         active_constraints: dmr.activeConstraintsText,
         acceptance_criteria_menu: scopedAcMenu,
         component_model_summary: block,
@@ -739,51 +862,65 @@ export class Phase6Handler implements PhaseHandler {
         detail_file_content: dmr.detailFileContent,
         janumicode_version_sha: engine.janumiCodeVersionSha,
       });
-      if (rendered.missing_variables.length > 0) continue;
-      try {
-        const result = await engine.callForRole('requirements_agent', {
-          prompt: rendered.rendered,
-          responseFormat: 'json',
-          temperature: 0.4,
-          traceContext: {
-            workflowRunId: ctx.workflowRun.id,
-            phaseId: '6',
-            subPhaseId: 'task_skeleton',
-            agentRole: 'implementation_planner',
-            label: `Phase 6.1 — Task Decomposition (${cid})`,
-          },
-        });
-        const tasks = parseImplementationTasks(result.parsed as Record<string, unknown> | null);
-        for (const t of tasks) backfillTracesFromCriteria(t);
-        pushUnique(tasks);
-      } catch (err) {
-        // One component's failure must not sink the whole phase — log and move
-        // on; the reconciliation pass below catches any ACs it would have covered.
-        getLogger().warn('workflow', 'Phase 6.1 per-component generation failed — continuing', {
-          component_id: cid, error: err instanceof Error ? err.message : String(err),
-        });
-      }
+      pushUniqueTasks(allTasks, seenIds, tasks);
     }
+    return fellOpenComponents;
+  }
 
-    if (fellOpenComponents.length > 0) {
-      const rate = fellOpenComponents.length / Math.max(1, leafComponents.length);
-      const msg = `Phase 6.1 AC-menu scoping fell open to the FULL inventory for `
-        + `${fellOpenComponents.length}/${leafComponents.length} components (${Math.round(rate * 100)}%)`;
-      const meta = { workflow_run_id: ctx.workflowRun.id, sample: fellOpenComponents.slice(0, 10), rate };
-      if (rate >= 1) {
-        getLogger().error('workflow', `${msg} — 100% fallback = component→requirement id-namespace break (structural defect, not per-component no-trace)`, meta);
-      } else {
-        getLogger().warn('workflow', msg, meta);
-      }
+  /**
+   * Render + call + parse a single per-component task_skeleton call. Returns []
+   * on missing template variables or a call failure (one component's failure
+   * must not sink the whole phase; reconciliation catches any ACs it missed).
+   */
+  private async decomposeComponent(
+    ctx: PhaseContext,
+    cid: string,
+    template: PromptTemplate,
+    variables: Record<string, string>,
+  ): Promise<ImplementationTask[]> {
+    const { engine } = ctx;
+    const rendered = engine.templateLoader.render(template, variables);
+    if (rendered.missing_variables.length > 0) return [];
+    try {
+      const result = await engine.callForRole('requirements_agent', {
+        prompt: rendered.rendered,
+        responseFormat: 'json',
+        temperature: 0.4,
+        traceContext: {
+          workflowRunId: ctx.workflowRun.id,
+          phaseId: '6',
+          subPhaseId: 'task_skeleton',
+          agentRole: 'implementation_planner',
+          label: `Phase 6.1 — Task Decomposition (${cid})`,
+        },
+      });
+      const tasks = parseImplementationTasks(result.parsed as Record<string, unknown> | null);
+      for (const t of tasks) backfillTracesFromCriteria(t);
+      return tasks;
+    } catch (err) {
+      getLogger().warn('workflow', 'Phase 6.1 per-component generation failed — continuing', {
+        component_id: cid, error: err instanceof Error ? err.message : String(err),
+      });
+      return [];
     }
+  }
 
-    if (allTasks.length === 0) return fallback;
-
-    // ── Coverage-driven reconciliation: orchestrator owns the 100% guarantee ──
-    // Each pass partitions the still-uncovered ACs into BOUNDED batches (one
-    // call per batch) so the model never reasons over the whole orphan set at
-    // once — the same "chunk the reasoning" insight as per-component generation.
-    const leafAcIdSet = new Set(leafAcceptanceCriteria.flatMap(s => s.acs.map(a => a.id)));
+  /**
+   * Coverage-driven reconciliation: each pass partitions the still-uncovered
+   * ACs into BOUNDED batches (one call per batch) so the model never reasons
+   * over the whole orphan set at once. Mutates allTasks / seenIds; stops when
+   * covered or a pass makes no forward progress (residual logged by the caller).
+   */
+  private async runReconciliationPasses(
+    ctx: PhaseContext,
+    allTasks: ImplementationTask[],
+    seenIds: Set<string>,
+    leafAcIdSet: Set<string>,
+    leafAcceptanceCriteria: LeafAcceptanceCriteria[],
+    leafComponents: Array<Record<string, unknown>>,
+    techSpecsSummary: string,
+    dmr: PhaseContextPacketResult,
+  ): Promise<void> {
     const maxReconPasses = Math.max(0, Number.parseInt(process.env.JANUMICODE_P6_RECON_PASSES ?? '2', 10) || 0);
     const maxAcsPerBatch = Math.max(1, Number.parseInt(process.env.JANUMICODE_P6_RECON_BATCH_AC ?? '25', 10) || 25);
     for (let pass = 1; pass <= maxReconPasses; pass++) {
@@ -803,25 +940,10 @@ export class Phase6Handler implements PhaseHandler {
         // Robust crediting: accept a recon task only if it covers a
         // still-uncovered AC in THIS batch via traces_to ∪ CC verifies.
         const useful = reconTasks.filter(t => taskCoversAny(t, batch));
-        addedThisPass += pushUnique(useful);
+        addedThisPass += pushUniqueTasks(allTasks, seenIds, useful);
       }
       if (addedThisPass === 0) break; // whole pass made no forward progress → stop (residual logged)
     }
-
-    const residual = computeUncoveredAcIds(allTasks, leafAcIdSet);
-    if (residual.size > 0) {
-      getLogger().warn(
-        'workflow',
-        'Phase 6.1 residual uncovered leaf ACs after reconciliation (honest gap — upstream component/FR divergence, not fabricated)',
-        summarizeResidualDivergence(residual, leafAcceptanceCriteria, leafAcIdSet.size),
-      );
-    } else if (leafAcIdSet.size > 0) {
-      getLogger().info('workflow', 'Phase 6.1 leaf-AC coverage complete (100%)', {
-        total: leafAcIdSet.size, tasks: allTasks.length,
-      });
-    }
-
-    return { tasks: allTasks };
   }
 
   /**
@@ -976,6 +1098,111 @@ export class Phase6Handler implements PhaseHandler {
   }
 }
 
+/** Dedup-append tasks by id into the shared accumulator; returns how many were added. */
+function pushUniqueTasks(allTasks: ImplementationTask[], seenIds: Set<string>, tasks: ImplementationTask[]): number {
+  let added = 0;
+  for (const t of tasks) {
+    const id = typeof t.id === 'string' ? t.id : '';
+    if (id && seenIds.has(id)) continue; // dedup across chunks
+    if (id) seenIds.add(id);
+    allTasks.push(t);
+    added++;
+  }
+  return added;
+}
+
+/** Fail-safe visibility: log the rate of components whose scoped AC menu fell open to the full inventory. */
+function logFellOpenComponents(fellOpenComponents: string[], totalLeafComponents: number, workflowRunId: string): void {
+  if (fellOpenComponents.length === 0) return;
+  const rate = fellOpenComponents.length / Math.max(1, totalLeafComponents);
+  const msg = `Phase 6.1 AC-menu scoping fell open to the FULL inventory for `
+    + `${fellOpenComponents.length}/${totalLeafComponents} components (${Math.round(rate * 100)}%)`;
+  const meta = { workflow_run_id: workflowRunId, sample: fellOpenComponents.slice(0, 10), rate };
+  if (rate >= 1) {
+    getLogger().error('workflow', `${msg} — 100% fallback = component→requirement id-namespace break (structural defect, not per-component no-trace)`, meta);
+  } else {
+    getLogger().warn('workflow', msg, meta);
+  }
+}
+
+/** Log residual leaf-AC coverage after reconciliation (honest gap) or 100%-complete. */
+function logResidualCoverage(
+  residual: Set<string>,
+  leafAcceptanceCriteria: LeafAcceptanceCriteria[],
+  totalLeafAcs: number,
+  taskCount: number,
+): void {
+  if (residual.size > 0) {
+    getLogger().warn(
+      'workflow',
+      'Phase 6.1 residual uncovered leaf ACs after reconciliation (honest gap — upstream component/FR divergence, not fabricated)',
+      summarizeResidualDivergence(residual, leafAcceptanceCriteria, totalLeafAcs),
+    );
+  } else if (totalLeafAcs > 0) {
+    getLogger().info('workflow', 'Phase 6.1 leaf-AC coverage complete (100%)', {
+      total: totalLeafAcs, tasks: taskCount,
+    });
+  }
+}
+
+/** Narrow an LLM-emitted modification_type to the allowed union (else undefined). */
+function coerceModificationType(v: unknown): ImplementationTask['modification_type'] {
+  return (v === 'additive' || v === 'breaking' || v === 'non_breaking') ? v : undefined;
+}
+
+/**
+ * Map one `refactoring_scope.refactoring_tasks[]` entry into the ImplementationTask
+ * shape the plan + saturation expect (idempotency fields carried through). Returns
+ * null when the entry has no id. Extracted from Phase6Handler.loadRefactoringTasks
+ * to keep that method under the cognitive-complexity threshold; coercion unchanged.
+ */
+function mapRefactoringScopeTask(
+  raw: Record<string, unknown>,
+  crossRunImpactReportId: string | undefined,
+): ImplementationTask | null {
+  const id = typeof raw.id === 'string' ? raw.id : null;
+  if (!id) return null;
+  const targetArtifactId = typeof raw.target_artifact_id === 'string' ? raw.target_artifact_id : '';
+  const description = typeof raw.description === 'string' ? raw.description : `Refactoring task ${id}`;
+  return {
+    id,
+    task_type: 'refactoring',
+    // A refactoring task has NO current component — it modifies a prior-run
+    // artifact. Use a stable, human-readable anchor (NOT the prior-run UUID,
+    // which produced confusing "Component: <uuid> — (no name)" noise and
+    // matched nothing in the current run). The substantive content reaches
+    // the executor via `refactoring_instructions`, not component-keyed
+    // channels (component context / packet / tests all legitimately empty).
+    component_id: 'cross_run_refactoring',
+    component_responsibility: `Cross-run refactoring of prior-run artifact ${targetArtifactId || '(unknown)'}`,
+    description,
+    estimated_complexity: 'medium',
+    completion_criteria: [{
+      criterion_id: `${id}-VERIFY`,
+      description: typeof raw.verification_step === 'string'
+        ? raw.verification_step
+        : 'Confirm prior-run artifact conforms to the revised interface.',
+      verification_method: 'test_execution',
+    }],
+    write_directory_paths: Array.isArray(raw.write_directory_paths)
+      ? (raw.write_directory_paths as string[])
+      : [],
+    dependency_task_ids: Array.isArray(raw.dependency_task_ids)
+      ? (raw.dependency_task_ids as string[])
+      : [],
+    target_artifact_id: targetArtifactId,
+    target_workflow_run_id: typeof raw.target_workflow_run_id === 'string' ? raw.target_workflow_run_id : undefined,
+    changed_interface_id: typeof raw.changed_interface_id === 'string' ? raw.changed_interface_id : undefined,
+    expected_pre_state_hash: typeof raw.expected_pre_state_hash === 'string' ? raw.expected_pre_state_hash : '',
+    verification_step: typeof raw.verification_step === 'string' ? raw.verification_step : undefined,
+    modification_type: coerceModificationType(raw.modification_type),
+    cross_run_impact_report_id: crossRunImpactReportId,
+    refactoring_instructions: typeof raw.refactoring_instructions === 'string'
+      ? raw.refactoring_instructions
+      : undefined,
+  };
+}
+
 /**
  * Coerce an LLM-emitted directory path into a workspace-relative
  * form that the Phase 9 executor can resolve regardless of host OS.
@@ -1067,42 +1294,63 @@ export interface LeafAcceptanceCriteria {
  * each carrying `user_story.acceptance_criteria[]`. This is the same leaf set
  * Phase 7 tests reference, so task↔test alignment becomes structural.
  */
-export function collectLeafAcceptanceCriteria(records: GovernedStreamRecord[]): LeafAcceptanceCriteria[] {
+/** True when a requirement_decomposition_node record is an atomic FR-rooted leaf. */
+function isAtomicFrLeafNode(r: GovernedStreamRecord, c: Record<string, unknown>): boolean {
+  if (r.record_type !== 'requirement_decomposition_node') return false;
+  if (c.kind && c.kind !== 'requirement_decomposition_node') return false;
+  if (c.root_kind && c.root_kind !== 'fr') return false;
+  return c.status === 'atomic';
+}
+
+/** Latest-per-node atomic FR-rooted requirement leaves (supersession-aware). */
+function latestAtomicFrLeaves(records: GovernedStreamRecord[]): GovernedStreamRecord[] {
   const latestByNodeId = new Map<string, GovernedStreamRecord>();
   for (const r of records) {
-    if (r.record_type !== 'requirement_decomposition_node') continue;
     const c = r.content as Record<string, unknown>;
-    if (c.kind && c.kind !== 'requirement_decomposition_node') continue;
-    if (c.root_kind && c.root_kind !== 'fr') continue;
-    if (c.status !== 'atomic') continue;
+    if (!isAtomicFrLeafNode(r, c)) continue;
     const nodeId = typeof c.node_id === 'string' ? c.node_id : null;
     if (!nodeId) continue;
     const existing = latestByNodeId.get(nodeId);
     if (!existing || r.produced_at > existing.produced_at) latestByNodeId.set(nodeId, r);
   }
+  return [...latestByNodeId.values()];
+}
+
+/** Resolve an acceptance-criterion record's display text (description → text alias → ''). */
+function acceptanceCriterionText(a: Record<string, unknown>): string {
+  if (typeof a.description === 'string') return a.description;
+  if (typeof a.text === 'string') return a.text;
+  return '';
+}
+
+/**
+ * Map one atomic FR-leaf record into a LeafAcceptanceCriteria, or null when it
+ * carries no usable story / acceptance criteria.
+ */
+function leafRecordToAcceptanceCriteria(r: GovernedStreamRecord): LeafAcceptanceCriteria | null {
+  const content = r.content as Record<string, unknown>;
+  const story = content.user_story as Record<string, unknown> | undefined;
+  if (!story || typeof story.id !== 'string') return null;
+  const acsRaw = Array.isArray(story.acceptance_criteria) ? story.acceptance_criteria : [];
+  const acs = (acsRaw as Array<Record<string, unknown>>)
+    .filter((a) => a && typeof a.id === 'string' && (a.id as string).length > 0)
+    .map((a) => ({ id: a.id as string, text: acceptanceCriterionText(a) }));
+  if (acs.length === 0) return null;
+  const storyText = [story.role, story.action, story.outcome]
+    .filter((x): x is string => typeof x === 'string' && x.length > 0).join(' / ')
+    || (typeof story.description === 'string' ? story.description : '');
+  // PA-3: capture the leaf node's own display_key for canonicalize() — the
+  // structural id the tree-walk keys on (collision-safe when it diverges from
+  // user_story.id under suffixing).
+  const leafDisplayKey = typeof content.display_key === 'string' ? content.display_key : undefined;
+  return { leafStoryId: story.id, storyText, leafDisplayKey, acs };
+}
+
+export function collectLeafAcceptanceCriteria(records: GovernedStreamRecord[]): LeafAcceptanceCriteria[] {
   const out: LeafAcceptanceCriteria[] = [];
-  for (const r of latestByNodeId.values()) {
-    const content = r.content as Record<string, unknown>;
-    const story = content.user_story as Record<string, unknown> | undefined;
-    if (!story || typeof story.id !== 'string') continue;
-    const acsRaw = Array.isArray(story.acceptance_criteria) ? story.acceptance_criteria : [];
-    const acs = (acsRaw as Array<Record<string, unknown>>)
-      .filter((a) => a && typeof a.id === 'string' && (a.id as string).length > 0)
-      .map((a) => {
-        let text = '';
-        if (typeof a.description === 'string') text = a.description;
-        else if (typeof a.text === 'string') text = a.text;
-        return { id: a.id as string, text };
-      });
-    if (acs.length === 0) continue;
-    const storyText = [story.role, story.action, story.outcome]
-      .filter((x): x is string => typeof x === 'string' && x.length > 0).join(' / ')
-      || (typeof story.description === 'string' ? story.description : '');
-    // PA-3: capture the leaf node's own display_key for canonicalize() — the
-    // structural id the tree-walk keys on (collision-safe when it diverges from
-    // user_story.id under suffixing).
-    const leafDisplayKey = typeof content.display_key === 'string' ? content.display_key : undefined;
-    out.push({ leafStoryId: story.id, storyText, leafDisplayKey, acs });
+  for (const r of latestAtomicFrLeaves(records)) {
+    const leaf = leafRecordToAcceptanceCriteria(r);
+    if (leaf) out.push(leaf);
   }
   return out;
 }
@@ -1148,8 +1396,12 @@ export function renderAcceptanceCriteriaMenu(leaves: LeafAcceptanceCriteria[]): 
   if (leaves.length === 0) return '(no leaf acceptance criteria available)';
   const lines: string[] = [];
   for (const l of leaves) {
-    lines.push(`- ${l.leafStoryId}${l.storyText ? ` — ${l.storyText}` : ''}`);
-    for (const ac of l.acs) lines.push(`  - ${ac.id}${ac.text ? `: ${ac.text}` : ''}`);
+    const storySuffix = l.storyText ? ` — ${l.storyText}` : '';
+    lines.push(`- ${l.leafStoryId}${storySuffix}`);
+    for (const ac of l.acs) {
+      const acSuffix = ac.text ? `: ${ac.text}` : '';
+      lines.push(`  - ${ac.id}${acSuffix}`);
+    }
   }
   return lines.join('\n');
 }
@@ -1319,7 +1571,8 @@ function renderDataModelsSlice(models: Array<Record<string, unknown>>): string {
     const entities = Array.isArray(m.entities) ? m.entities as Array<Record<string, unknown>> : [];
     const entList = entities.map((e) => {
       const fields = Array.isArray(e.fields) ? e.fields as Array<Record<string, unknown>> : [];
-      return `    ${e.name}: ${fields.map((f) => `${f.name}:${f.type}`).join(', ')}`;
+      const fieldList = fields.map((f) => `${f.name}:${f.type}`).join(', ');
+      return `    ${e.name}: ${fieldList}`;
     }).join('\n');
     return `  Component ${m.component_id}:\n${entList}`;
   });
@@ -1340,6 +1593,24 @@ function renderApiDefinitionsSlice(defs: Array<Record<string, unknown>>): string
   return `${defs.length} API Definitions:\n${lines.join('\n')}`;
 }
 
+/** Resolve a responsibility record's display text (description → statement alias → ''). */
+function responsibilityText(r: Record<string, unknown>): string {
+  if (typeof r.description === 'string') return r.description;
+  if (typeof r.statement === 'string') return r.statement;
+  return '';
+}
+
+/** Render a component's responsibility bullet lines for the compact reconciliation menu. */
+function renderComponentMenuResponsibilities(c: Record<string, unknown>): string[] {
+  if (!Array.isArray(c.responsibilities)) return [];
+  const out: string[] = [];
+  for (const r of c.responsibilities as Array<Record<string, unknown>>) {
+    const txt = responsibilityText(r);
+    if (txt) out.push(`    - ${txt}`);
+  }
+  return out;
+}
+
 /** Compact component menu (id + responsibilities) — the routing target for reconciliation. */
 export function renderComponentMenu(components: Array<Record<string, unknown>>): string {
   const lines: string[] = [];
@@ -1347,15 +1618,10 @@ export function renderComponentMenu(components: Array<Record<string, unknown>>):
     const id = typeof c.id === 'string' ? c.id : '';
     if (!id) continue;
     const name = typeof c.name === 'string' ? c.name : id;
-    lines.push(`- ${id}: ${name}`);
-    if (Array.isArray(c.responsibilities)) {
-      for (const r of c.responsibilities as Array<Record<string, unknown>>) {
-        let txt = '';
-        if (typeof r.description === 'string') txt = r.description;
-        else if (typeof r.statement === 'string') txt = r.statement;
-        if (txt) lines.push(`    - ${txt}`);
-      }
-    }
+    lines.push(
+      `- ${id}: ${name}`,
+      ...renderComponentMenuResponsibilities(c),
+    );
   }
   return lines.length > 0 ? lines.join('\n') : '(no components)';
 }
@@ -1431,8 +1697,12 @@ export function renderUncoveredAcsMenu(uncovered: Set<string>, leaves: LeafAccep
   for (const l of leaves) {
     const acs = l.acs.filter(a => uncovered.has(a.id));
     if (acs.length === 0) continue;
-    lines.push(`- ${l.leafStoryId}${l.storyText ? ` — ${l.storyText}` : ''}`);
-    for (const ac of acs) lines.push(`  - ${ac.id}${ac.text ? `: ${ac.text}` : ''}`);
+    const storySuffix = l.storyText ? ` — ${l.storyText}` : '';
+    lines.push(`- ${l.leafStoryId}${storySuffix}`);
+    for (const ac of acs) {
+      const acSuffix = ac.text ? `: ${ac.text}` : '';
+      lines.push(`  - ${ac.id}${acSuffix}`);
+    }
   }
   return lines.length > 0 ? lines.join('\n') : '';
 }
@@ -1554,6 +1824,187 @@ export function parseImplementationTasks(parsed: Record<string, unknown> | null)
 }
 
 /**
+ * Resolve a completion-criterion description from the canonical `description`
+ * field or the `text` alias, defaulting to a placeholder when neither is a
+ * string. Extracted from normalizeRootTaskShape's completion_criteria mapper to
+ * keep that mapper under the cognitive-complexity threshold; the missing-
+ * description drift metric stays in the caller (behavior unchanged).
+ */
+function resolveCriterionDescription(cobj: Record<string, unknown>): string {
+  if (typeof cobj.description === 'string') return cobj.description;
+  if (typeof cobj.text === 'string') return cobj.text;
+  return '(missing description)';
+}
+
+/** Resolve a task's `name`, deriving from description (truncated) then id; records drift. */
+function resolveTaskName(
+  t: Partial<DecompositionTask> & Record<string, unknown>,
+  taskIdx: number,
+  drifts: string[],
+): string {
+  const explicit = typeof t.name === 'string' && t.name.trim().length > 0 ? t.name : null;
+  if (explicit) return explicit;
+  const desc = typeof t.description === 'string' ? t.description.trim() : '';
+  if (desc.length > 0) {
+    drifts.push('name_missing_derived_from_description');
+    return desc.length > 80 ? `${desc.slice(0, 77)}...` : desc;
+  }
+  drifts.push('name_missing_fell_back_to_id');
+  return String(t.id ?? `task-${taskIdx + 1}`);
+}
+
+/**
+ * Validate a criterion's cited AC ids against the leaf-AC set (drops non-members;
+ * regex-free membership). When no leaf-AC set is supplied the cited ids pass
+ * through untouched (coverage > precision when unknown). Records drop drift.
+ */
+function validateVerifiesAcs(
+  cobj: Record<string, unknown>,
+  leafAcIds: Set<string> | undefined,
+  drifts: string[],
+): string[] | undefined {
+  const rawIds = cobj.verifies_acceptance_criteria ?? cobj.verifies_acs ?? cobj.acceptance_criterion_ids;
+  if (!Array.isArray(rawIds)) return undefined;
+  const cited = rawIds.filter((x): x is string => typeof x === 'string' && x.length > 0);
+  if (cited.length === 0) return undefined;
+  if (!leafAcIds || leafAcIds.size === 0) return cited;
+  const kept = cited.filter(id => leafAcIds.has(id));
+  if (kept.length < cited.length) drifts.push('completion_criteria_verifies_ac_dropped_nonmember');
+  return kept.length > 0 ? kept : undefined;
+}
+
+/** Coerce one LLM completion criterion (string | object | junk) into canonical shape; records drift. */
+function coerceOneCriterion(
+  c: unknown,
+  idx: number,
+  leafAcIds: Set<string> | undefined,
+  drifts: string[],
+): TaskCompletionCriterion {
+  const fallbackId = `CC-${String(idx + 1).padStart(3, '0')}`;
+  if (typeof c === 'string') {
+    drifts.push('completion_criteria_string_coerced');
+    return { criterion_id: fallbackId, description: c, verification_method: 'test_execution' };
+  }
+  if (c && typeof c === 'object') {
+    const cobj = c as unknown as Record<string, unknown>;
+    const criterion_id = typeof cobj.criterion_id === 'string' ? cobj.criterion_id : fallbackId;
+    if (typeof cobj.criterion_id !== 'string') drifts.push('completion_criteria_missing_id');
+    if (typeof cobj.description !== 'string') drifts.push('completion_criteria_missing_description');
+    const verification_method = typeof cobj.verification_method === 'string'
+      ? cobj.verification_method as TaskCompletionCriterion['verification_method']
+      : 'test_execution';
+    return {
+      criterion_id,
+      description: resolveCriterionDescription(cobj),
+      verification_method,
+      artifact_ref: typeof cobj.artifact_ref === 'string' ? cobj.artifact_ref : undefined,
+      verifies_acceptance_criteria: validateVerifiesAcs(cobj, leafAcIds, drifts),
+    };
+  }
+  drifts.push('completion_criteria_unparseable');
+  return {
+    criterion_id: fallbackId,
+    description: '(unparseable completion criterion)',
+    verification_method: 'test_execution',
+  };
+}
+
+/** Coerce the LLM `completion_criteria` array (each entry via coerceOneCriterion); records empty drift. */
+function coerceCompletionCriteria(
+  rawCC: unknown[],
+  leafAcIds: Set<string> | undefined,
+  drifts: string[],
+): TaskCompletionCriterion[] {
+  const completion_criteria = rawCC.map((c, idx) => coerceOneCriterion(c, idx, leafAcIds, drifts));
+  if (completion_criteria.length === 0) drifts.push('completion_criteria_empty');
+  return completion_criteria;
+}
+
+/** Resolve a task's component_id against the component oracle (bounded id-drift); records drift. */
+function resolveComponentId(
+  t: Partial<DecompositionTask> & Record<string, unknown>,
+  componentOracle: Set<string> | undefined,
+  drifts: string[],
+): string {
+  let componentId = typeof t.component_id === 'string' ? t.component_id : '';
+  if (componentId && componentOracle) {
+    const resolved = resolveAgainstOracle(componentId, componentOracle);
+    if (resolved && resolved !== componentId) {
+      drifts.push(`component_id_resolved:${componentId}→${resolved}`);
+      componentId = resolved;
+    }
+  }
+  return componentId;
+}
+
+/**
+ * Deterministic write-scope (Project Layout Contract): compute the canonical
+ * component directory; records drift when the LLM-invented value differs.
+ */
+function canonicalWriteDir(
+  t: Partial<DecompositionTask> & Record<string, unknown>,
+  componentId: string,
+  srcRoot: string,
+  drifts: string[],
+): string {
+  const canonicalDir = canonicalComponentDir(componentId || 'unknown', srcRoot);
+  const llmWriteDirs = Array.isArray(t.write_directory_paths)
+    ? t.write_directory_paths.filter((p): p is string => typeof p === 'string').map(normalizeWorkspacePath)
+    : [];
+  if (llmWriteDirs.length > 0 && llmWriteDirs[0] !== canonicalDir) {
+    drifts.push(`write_dirs_overridden:[${llmWriteDirs.join(',')}]→${canonicalDir}`);
+  }
+  return canonicalDir;
+}
+
+/** Gather the raw trace id list, preferring the `technical_spec_ids` alias over `traces_to`. */
+function gatherRawTraces(t: Partial<DecompositionTask> & Record<string, unknown>): string[] {
+  const techIds = (t as Record<string, unknown>).technical_spec_ids;
+  if (Array.isArray(techIds)) return techIds.filter((p): p is string => typeof p === 'string');
+  if (Array.isArray(t.traces_to)) return t.traces_to.filter((p): p is string => typeof p === 'string');
+  return [];
+}
+
+/** Resolve a single trace id against the component / TECH oracles (string drift only). */
+function resolveTraceId(
+  id: string,
+  componentOracle: Set<string> | undefined,
+  techOracle: Set<string> | undefined,
+): string {
+  if (componentOracle && id.startsWith('comp')) return resolveAgainstOracle(id, componentOracle) ?? id;
+  // PA-9: suffix/separator-aware TECH resolution (the generic resolver misses
+  // the canonical "-1" enumeration suffix, e.g. TECH-CERBOS → TECH-CERBOS-1).
+  if (techOracle && id.startsWith('TECH-')) return resolveTechId(id, techOracle) ?? id;
+  return id;
+}
+
+/**
+ * Structurally validate and resolve a task's trace ids: drop invented AC refs
+ * (an `AC-` prefixed id absent from the leaf-AC set), then resolve component /
+ * TECH id drift against the oracles. Records the dropped-AC drift.
+ */
+function resolveTracesTo(
+  rawTraces: string[],
+  leafAcIds: Set<string> | undefined,
+  componentOracle: Set<string> | undefined,
+  techOracle: Set<string> | undefined,
+  drifts: string[],
+): string[] {
+  let traces_to = rawTraces;
+  if (leafAcIds) {
+    const droppedAcRefs = rawTraces.filter((id) => id.startsWith('AC-') && !leafAcIds.has(id));
+    if (droppedAcRefs.length > 0) {
+      traces_to = rawTraces.filter((id) => !id.startsWith('AC-') || leafAcIds.has(id));
+      drifts.push(`invalid_ac_refs_dropped:[${droppedAcRefs.join(',')}]`);
+    }
+  }
+  if (componentOracle || techOracle) {
+    traces_to = traces_to.map((id) => resolveTraceId(id, componentOracle, techOracle));
+  }
+  return traces_to;
+}
+
+/**
  * Coerce a Phase 6.1 LLM-emitted task into the canonical DecompositionTask
  * shape that Phase 6.1a saturation + downstream consumers expect.
  *
@@ -1581,139 +2032,14 @@ export function normalizeRootTaskShape(
   const t = raw as Partial<DecompositionTask> & Record<string, unknown>;
   const drifts: string[] = [];
 
-  // 1. `name` fallback: prompt should require it; if missing, derive from
-  // description (truncated) before falling back to id.
-  let name = typeof t.name === 'string' && t.name.trim().length > 0 ? t.name : null;
-  if (!name) {
-    const desc = typeof t.description === 'string' ? t.description.trim() : '';
-    if (desc.length > 0) {
-      name = desc.length > 80 ? `${desc.slice(0, 77)}...` : desc;
-      drifts.push('name_missing_derived_from_description');
-    } else {
-      name = String(t.id ?? `task-${taskIdx + 1}`);
-      drifts.push('name_missing_fell_back_to_id');
-    }
-  }
-
-  // 2. `completion_criteria` shape coercion: accept array of strings
-  // (cal-26 LLM behavior) by lifting each into an object with a synthetic
-  // criterion_id and verification_method=test_execution. Empty / missing
-  // arrays surface as a single placeholder so downstream invariants
-  // (Invariant IP-001 — at least one CC per task) can flag rather than
-  // crash on undefined access.
-  // CC→AC validation: keep only AC ids the LLM cited that are genuinely in
-  // this task's leaf-AC set (regex-free membership; never invents). When the
-  // task carries no leaf-AC set (lineage absent), pass the cited ids through
-  // untouched rather than dropping all — coverage > precision when unknown.
-  const validateVerifiesAcs = (cobj: Record<string, unknown>): string[] | undefined => {
-    const rawIds = cobj.verifies_acceptance_criteria ?? cobj.verifies_acs ?? cobj.acceptance_criterion_ids;
-    if (!Array.isArray(rawIds)) return undefined;
-    const cited = rawIds.filter((x): x is string => typeof x === 'string' && x.length > 0);
-    if (cited.length === 0) return undefined;
-    if (!leafAcIds || leafAcIds.size === 0) return cited;
-    const kept = cited.filter(id => leafAcIds.has(id));
-    if (kept.length < cited.length) drifts.push('completion_criteria_verifies_ac_dropped_nonmember');
-    return kept.length > 0 ? kept : undefined;
-  };
-
+  // Each block records its own drift strings into `drifts` in call order, so the
+  // single structured warning below is identical to the pre-extraction behavior.
+  const name = resolveTaskName(t, taskIdx, drifts);
   const rawCC = Array.isArray(t.completion_criteria) ? t.completion_criteria : [];
-  const completion_criteria: TaskCompletionCriterion[] = rawCC.map((c, idx) => {
-    if (typeof c === 'string') {
-      drifts.push('completion_criteria_string_coerced');
-      return {
-        criterion_id: `CC-${String(idx + 1).padStart(3, '0')}`,
-        description: c,
-        verification_method: 'test_execution',
-      };
-    }
-    if (c && typeof c === 'object') {
-      const cobj = c as unknown as Record<string, unknown>;
-      const criterion_id = typeof cobj.criterion_id === 'string'
-        ? cobj.criterion_id
-        : `CC-${String(idx + 1).padStart(3, '0')}`;
-      let description: string;
-      if (typeof cobj.description === 'string') description = cobj.description;
-      else if (typeof cobj.text === 'string') description = cobj.text;
-      else description = '(missing description)';
-      if (typeof cobj.criterion_id !== 'string') drifts.push('completion_criteria_missing_id');
-      if (typeof cobj.description !== 'string') drifts.push('completion_criteria_missing_description');
-      const verification_method = typeof cobj.verification_method === 'string'
-        ? cobj.verification_method as TaskCompletionCriterion['verification_method']
-        : 'test_execution';
-      const artifact_ref = typeof cobj.artifact_ref === 'string' ? cobj.artifact_ref : undefined;
-      const verifies_acceptance_criteria = validateVerifiesAcs(cobj);
-      return { criterion_id, description, verification_method, artifact_ref, verifies_acceptance_criteria };
-    }
-    drifts.push('completion_criteria_unparseable');
-    return {
-      criterion_id: `CC-${String(idx + 1).padStart(3, '0')}`,
-      description: '(unparseable completion criterion)',
-      verification_method: 'test_execution',
-    };
-  });
-  if (completion_criteria.length === 0) {
-    drifts.push('completion_criteria_empty');
-  }
-
-  // Deterministic write-scope (Project Layout Contract): the orchestrator owns
-  // directories, the LLM owns task semantics. Override the LLM-invented
-  // write_directory_paths with the canonical component dir so every task on a
-  // component lands in the same place (no stray ./shared, no per-leaf layout
-  // drift). The discarded LLM value is logged as a drift metric.
-  let componentId = typeof t.component_id === 'string' ? t.component_id : '';
-  // Resolve LLM separator/case drift in component_id against the real
-  // component-model id set (the oracle). The planner routinely emits
-  // `comp-redirect_handling_service` for the canonical
-  // `comp-redirect-handling-service`; bounded similarity resolution maps it
-  // back so the index / gatekeeper / packets see a real id (no exact-naming
-  // dependency on the LLM).
-  if (componentId && componentOracle) {
-    const resolved = resolveAgainstOracle(componentId, componentOracle);
-    if (resolved && resolved !== componentId) {
-      drifts.push(`component_id_resolved:${componentId}→${resolved}`);
-      componentId = resolved;
-    }
-  }
-  const canonicalDir = canonicalComponentDir(componentId || 'unknown', srcRoot);
-  const llmWriteDirs = Array.isArray(t.write_directory_paths)
-    ? t.write_directory_paths.filter((p): p is string => typeof p === 'string').map(normalizeWorkspacePath)
-    : [];
-  if (llmWriteDirs.length > 0 && llmWriteDirs[0] !== canonicalDir) {
-    drifts.push(`write_dirs_overridden:[${llmWriteDirs.join(',')}]→${canonicalDir}`);
-  }
-
-  // traces_to — accept `technical_spec_ids` alias, else `traces_to`. When the
-  // leaf-AC set is supplied, VALIDATE cited AC ids STRUCTURALLY: an `AC-`
-  // prefixed id (namespace classification, not a regex reduction) must be an
-  // exact member of the leaf-AC set; non-members are LLM-invented refs and are
-  // dropped (logged as drift). Non-AC ids (res-*/TECH-*/SR-*/comp-*) pass through.
-  let rawTraces: string[];
-  if (Array.isArray((t as Record<string, unknown>).technical_spec_ids)) {
-    rawTraces = ((t as Record<string, unknown>).technical_spec_ids as unknown[]).filter((p): p is string => typeof p === 'string');
-  } else if (Array.isArray(t.traces_to)) {
-    rawTraces = t.traces_to.filter((p): p is string => typeof p === 'string');
-  } else {
-    rawTraces = [];
-  }
-  let traces_to = rawTraces;
-  if (leafAcIds) {
-    const droppedAcRefs = rawTraces.filter((id) => id.startsWith('AC-') && !leafAcIds.has(id));
-    if (droppedAcRefs.length > 0) {
-      traces_to = rawTraces.filter((id) => !id.startsWith('AC-') || leafAcIds.has(id));
-      drifts.push(`invalid_ac_refs_dropped:[${droppedAcRefs.join(',')}]`);
-    }
-  }
-  // Resolve drifted comp-*/TECH-* ids in traces_to against their oracles, so
-  // P7 doesn't flag a real component/constraint referenced under a drifted id.
-  if (componentOracle || techOracle) {
-    traces_to = traces_to.map((id) => {
-      if (componentOracle && id.startsWith('comp')) return resolveAgainstOracle(id, componentOracle) ?? id;
-      // PA-9: suffix/separator-aware TECH resolution (the generic resolver misses
-      // the canonical "-1" enumeration suffix, e.g. TECH-CERBOS → TECH-CERBOS-1).
-      if (techOracle && id.startsWith('TECH-')) return resolveTechId(id, techOracle) ?? id;
-      return id;
-    });
-  }
+  const completion_criteria = coerceCompletionCriteria(rawCC, leafAcIds, drifts);
+  const componentId = resolveComponentId(t, componentOracle, drifts);
+  const canonicalDir = canonicalWriteDir(t, componentId, srcRoot, drifts);
+  const traces_to = resolveTracesTo(gatherRawTraces(t), leafAcIds, componentOracle, techOracle, drifts);
 
   if (drifts.length > 0) {
     getLogger().warn('workflow', 'Phase 6.1 task shape drift coerced', {

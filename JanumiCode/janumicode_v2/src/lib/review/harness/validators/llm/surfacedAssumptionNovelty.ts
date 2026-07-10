@@ -27,6 +27,17 @@ import type { LLMInvokeContext } from './llmValidatorRunner';
 import { runLLMValidator } from './llmValidatorRunner';
 
 /**
+ * Extract an assumption id from a record, preferring `id` then `assumption_id`.
+ * Returns '' when neither is a string. Mirrors the original inline lookup:
+ * `id` wins if it is a string; otherwise `assumption_id` is consulted.
+ */
+function extractAssumptionId(obj: Record<string, unknown>): string {
+  if (typeof obj.id === 'string') return obj.id;
+  if (typeof obj.assumption_id === 'string') return obj.assumption_id;
+  return '';
+}
+
+/**
  * Deterministic dedup: find surfaced_assumptions whose id matches an existing
  * assumption id (from existing_assumptions or parent context).
  */
@@ -48,20 +59,14 @@ function runDeterministicDedup(
   const existingIds = new Set<string>();
   for (const ea of existing) {
     if (!ea || typeof ea !== 'object') continue;
-    const e = ea as Record<string, unknown>;
-    let id = '';
-    if (typeof e.id === 'string') id = e.id;
-    else if (typeof e.assumption_id === 'string') id = e.assumption_id;
+    const id = extractAssumptionId(ea as Record<string, unknown>);
     if (id) existingIds.add(id);
   }
 
   for (let i = 0; i < surfaced.length; i++) {
     const sa = surfaced[i];
     if (!sa || typeof sa !== 'object') continue;
-    const s = sa as Record<string, unknown>;
-    let id = '';
-    if (typeof s.id === 'string') id = s.id;
-    else if (typeof s.assumption_id === 'string') id = s.assumption_id;
+    const id = extractAssumptionId(sa as Record<string, unknown>);
     if (id && existingIds.has(id)) {
       findings.push({
         validatorId: 'surfaced_assumption_novelty',

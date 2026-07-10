@@ -68,6 +68,32 @@ export interface PhaseContextPacketResult {
 }
 
 /**
+ * Render the active-constraint set for inclusion in prompts. Splits BINDING
+ * rules from CERTIFIED CONTEXT (the same axis the executor's hydrated detail
+ * file uses) so a reasoning agent isn't told to "apply without exception" a
+ * certified-context artifact (component_model, system_boundary, the user-story
+ * roster, …). Legacy packets without bindingClass default to binding (prior
+ * behavior).
+ */
+function renderActiveConstraints(
+  constraints: ContextPacket['activeConstraints'],
+): string {
+  if (constraints.length === 0) return '(none)';
+  const fmtConstraint = (c: ContextPacket['activeConstraints'][number], i: number): string =>
+    `${i + 1}. ${c.statement} (Authority ${c.authorityLevel}, source: ${c.sourceRecordIds[0] ?? 'unknown'})`;
+  const bindingConstraints = constraints.filter(c => c.bindingClass !== 'certified_context');
+  const contextConstraints = constraints.filter(c => c.bindingClass === 'certified_context');
+  return [
+    bindingConstraints.length
+      ? `BINDING (apply without exception):\n${bindingConstraints.map(fmtConstraint).join('\n')}`
+      : '',
+    contextConstraints.length
+      ? `CERTIFIED CONTEXT (authoritative reference — build within this; do not contradict):\n${contextConstraints.map(fmtConstraint).join('\n')}`
+      : '',
+  ].filter(Boolean).join('\n\n');
+}
+
+/**
  * Invoke DMR for a phase, write the detail file, and return the assembled
  * context. Safe to call even if DMR / ContextBuilder fail — returns an
  * empty-but-usable result.
@@ -108,25 +134,7 @@ export async function buildPhaseContextPacket(
 
   if (!packet) return empty;
 
-  // Split BINDING rules from CERTIFIED CONTEXT (the same axis the executor's
-  // hydrated detail file uses) so a reasoning agent isn't told to "apply without
-  // exception" a certified-context artifact (component_model, system_boundary,
-  // the user-story roster, …). Legacy packets without bindingClass default to
-  // binding (prior behavior).
-  const fmtConstraint = (c: typeof packet.activeConstraints[number], i: number): string =>
-    `${i + 1}. ${c.statement} (Authority ${c.authorityLevel}, source: ${c.sourceRecordIds[0] ?? 'unknown'})`;
-  const bindingConstraints = packet.activeConstraints.filter(c => c.bindingClass !== 'certified_context');
-  const contextConstraints = packet.activeConstraints.filter(c => c.bindingClass === 'certified_context');
-  const activeConstraintsText = packet.activeConstraints.length > 0
-    ? [
-        bindingConstraints.length
-          ? `BINDING (apply without exception):\n${bindingConstraints.map(fmtConstraint).join('\n')}`
-          : '',
-        contextConstraints.length
-          ? `CERTIFIED CONTEXT (authoritative reference — build within this; do not contradict):\n${contextConstraints.map(fmtConstraint).join('\n')}`
-          : '',
-      ].filter(Boolean).join('\n\n')
-    : '(none)';
+  const activeConstraintsText = renderActiveConstraints(packet.activeConstraints);
 
   // Write the detail file via ContextBuilder for audit + Phase 9 readiness.
   // Also capture the markdown content so phases 0-8 (direct LLM API calls,

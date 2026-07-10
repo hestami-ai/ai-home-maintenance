@@ -118,13 +118,29 @@ export interface CompletenessFailure {
  * manifest. For now: required fields must be present and non-empty.
  */
 export function check5WH(summary: SubPhaseSummary): string[] {
-  const failures: string[] = [];
+  // Failure order is part of the contract: sections run WHO → WHAT → WHY
+  // → HOW → WHEN → events, matching the original single-block ordering.
+  return [
+    ...check5WHWho(summary),
+    ...check5WHWhat(summary),
+    ...check5WHWhy(summary),
+    ...check5WHHow(summary),
+    ...check5WHWhen(summary),
+    ...check5WHEvents(summary),
+  ];
+}
 
+function check5WHWho(summary: SubPhaseSummary): string[] {
+  const failures: string[] = [];
   // WHO
   if (!summary.who.model) failures.push('who.model is empty');
   // agent_role may legitimately be null when an event chain has no
   // agent_role-stamped events. Don't fail on null.
+  return failures;
+}
 
+function check5WHWhat(summary: SubPhaseSummary): string[] {
+  const failures: string[] = [];
   // WHAT — arrays may be empty (no inputs/outputs declared yet); just
   // verify they're arrays.
   if (!Array.isArray(summary.what.inputs_consumed)) {
@@ -136,7 +152,11 @@ export function check5WH(summary: SubPhaseSummary): string[] {
   if (!Array.isArray(summary.what.decisions)) {
     failures.push('what.decisions is not an array');
   }
+  return failures;
+}
 
+function check5WHWhy(summary: SubPhaseSummary): string[] {
+  const failures: string[] = [];
   // WHY
   if (!summary.why.template_key) failures.push('why.template_key is empty');
   if (!summary.why.template_source_sha) {
@@ -148,7 +168,11 @@ export function check5WH(summary: SubPhaseSummary): string[] {
   if (!Array.isArray(summary.why.governing_constraints)) {
     failures.push('why.governing_constraints is not an array');
   }
+  return failures;
+}
 
+function check5WHHow(summary: SubPhaseSummary): string[] {
+  const failures: string[] = [];
   // HOW
   if (typeof summary.how.retries !== 'number') {
     failures.push('how.retries is not a number');
@@ -168,21 +192,28 @@ export function check5WH(summary: SubPhaseSummary): string[] {
   if (summary.how.error !== null && (!summary.how.error.event_id || !summary.how.error.message)) {
     failures.push('how.error is partially populated');
   }
+  return failures;
+}
 
+function check5WHWhen(summary: SubPhaseSummary): string[] {
+  const failures: string[] = [];
   // WHEN
   if (!summary.started_at) failures.push('started_at is empty');
   if (!summary.completed_at) failures.push('completed_at is empty');
   if (typeof summary.duration_ms !== 'number') {
     failures.push('duration_ms is not a number');
   }
+  return failures;
+}
 
+function check5WHEvents(summary: SubPhaseSummary): string[] {
+  const failures: string[] = [];
   // events range
   if (!summary.events.first_event_id) failures.push('events.first_event_id is empty');
   if (!summary.events.last_event_id) failures.push('events.last_event_id is empty');
   if (typeof summary.events.count !== 'number' || summary.events.count < 1) {
     failures.push('events.count is invalid');
   }
-
   return failures;
 }
 
@@ -206,36 +237,58 @@ export function runSpotChecks(
   if (!checks || checks.length === 0) return [];
   const failures: string[] = [];
   for (const c of checks) {
-    const actual = resolvePath(summary, c.path);
-    if (c.equals !== undefined && actual !== c.equals) {
-      failures.push(
-        `spot check ${c.path}: expected ${JSON.stringify(c.equals)}, got ${JSON.stringify(actual)}`,
-      );
-    }
-    if (c.matches !== undefined) {
-      let re: RegExp;
-      try {
-        re = new RegExp(c.matches);
-      } catch (err) {
-        failures.push(`spot check ${c.path}: invalid regex "${c.matches}" (${err instanceof Error ? err.message : String(err)})`);
-        continue;
-      }
-      if (typeof actual !== 'string' || !re.test(actual)) {
-        failures.push(`spot check ${c.path}: ${JSON.stringify(actual)} did not match /${c.matches}/`);
-      }
-    }
-    if (c.not_null === true) {
-      if (
-        actual === null ||
-        actual === undefined ||
-        (typeof actual === 'string' && actual.length === 0) ||
-        (Array.isArray(actual) && actual.length === 0)
-      ) {
-        failures.push(`spot check ${c.path}: required non-null/non-empty, got ${JSON.stringify(actual)}`);
-      }
-    }
+    failures.push(...evaluateSpotCheck(summary, c));
   }
   return failures;
+}
+
+/**
+ * Evaluate a single spot check against the summary, in clause order
+ * (`equals` → `matches` → `not_null`). An invalid `matches` regex short-
+ * circuits the remaining clauses for THIS check (originally a `continue`),
+ * so `not_null` is not evaluated when the regex fails to compile.
+ */
+function evaluateSpotCheck(
+  summary: SubPhaseSummary,
+  c: FixtureSpotCheck,
+): string[] {
+  const failures: string[] = [];
+  const actual = resolvePath(summary, c.path);
+
+  if (c.equals !== undefined && actual !== c.equals) {
+    failures.push(
+      `spot check ${c.path}: expected ${JSON.stringify(c.equals)}, got ${JSON.stringify(actual)}`,
+    );
+  }
+
+  if (c.matches !== undefined) {
+    let re: RegExp;
+    try {
+      re = new RegExp(c.matches);
+    } catch (err) {
+      failures.push(`spot check ${c.path}: invalid regex "${c.matches}" (${err instanceof Error ? err.message : String(err)})`);
+      return failures;
+    }
+    if (typeof actual !== 'string' || !re.test(actual)) {
+      failures.push(`spot check ${c.path}: ${JSON.stringify(actual)} did not match /${c.matches}/`);
+    }
+  }
+
+  if (c.not_null === true && isNullOrEmpty(actual)) {
+    failures.push(`spot check ${c.path}: required non-null/non-empty, got ${JSON.stringify(actual)}`);
+  }
+
+  return failures;
+}
+
+/** True when a resolved spot-check value is null/undefined or an empty string/array. */
+function isNullOrEmpty(actual: unknown): boolean {
+  return (
+    actual === null ||
+    actual === undefined ||
+    (typeof actual === 'string' && actual.length === 0) ||
+    (Array.isArray(actual) && actual.length === 0)
+  );
 }
 
 // ── Parent/caused-by chain validation ──────────────────────────────

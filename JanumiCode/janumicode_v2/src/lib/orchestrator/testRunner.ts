@@ -73,6 +73,27 @@ const DEFAULT_CONFIG: TestRunnerConfig = {
   parallelSuites: false,
 };
 
+// Structured Vitest/Jest JSON report shapes (subset consumed here).
+interface VitestAssertionResult {
+  status?: string;
+  fullName?: string;
+  title?: string;
+  duration?: number;
+  failureMessages?: string[];
+}
+
+interface VitestFileResult {
+  assertionResults?: VitestAssertionResult[];
+}
+
+// Uniform parsed shape returned by the output parser and its branches.
+interface ParsedVitestOutput {
+  passed: number;
+  failed: number;
+  skipped: number;
+  testCases: TestCaseResult[];
+}
+
 // TestRunner class
 
 export class TestRunner {
@@ -339,90 +360,130 @@ export class TestRunner {
   }
 
   /**
-   * Parse Vitest JSON output.
+   * Parse test-runner output into counts + per-case results.
+   *
+   * Prefers the structured Vitest/Jest JSON report; when that yields no
+   * test cases (absent / unparseable / empty), falls back to scraping
+   * the plain-text summary.
    */
-  private parseVitestOutput(output: string, suiteId: string): {
-    passed: number;
-    failed: number;
-    skipped: number;
-    testCases: TestCaseResult[];
-  } {
-    const testCases: TestCaseResult[] = [];
-    let passed = 0;
-    let failed = 0;
-    let skipped = 0;
+  private parseVitestOutput(output: string, suiteId: string): ParsedVitestOutput {
+    const fromJson = this.parseVitestJson(output, suiteId);
+    if (fromJson && fromJson.testCases.length > 0) {
+      return fromJson;
+    }
+    return this.parseVitestTextFallback(output, suiteId);
+  }
 
-    // Try to extract JSON from output (Vitest outputs JSON after the default reporter).
-    // Linear scan for the first '{' .. last '}' span that contains "testResults";
-    // byte-identical to /\{[\s\S]*"testResults"[\s\S]*\}/ but without its
-    // super-linear backtracking on inputs that lack a closing brace.
+  /**
+   * Extract the JSON blob Vitest/Jest emit after the default reporter.
+   *
+   * Linear scan for the first '{' .. last '}' span that contains
+   * "testResults"; byte-identical to /\{[\s\S]*"testResults"[\s\S]*\}/
+   * but without its super-linear backtracking on inputs that lack a
+   * closing brace. Returns null when no such span exists.
+   */
+  private extractTestResultsJson(output: string): string | null {
     const firstBrace = output.indexOf('{');
     const lastBrace = output.lastIndexOf('}');
     const jsonCandidate =
       firstBrace !== -1 && lastBrace > firstBrace ? output.slice(firstBrace, lastBrace + 1) : null;
-    const jsonMatch = jsonCandidate?.includes('"testResults"') ? [jsonCandidate] : null;
-    if (jsonMatch) {
-      try {
-        const json = JSON.parse(jsonMatch[0]);
-        if (json.testResults) {
-          for (const fileResult of json.testResults) {
-            for (const test of fileResult.assertionResults ?? []) {
-              const status = this.mapVitestStatus(test.status);
-              const testCase: TestCaseResult = {
-                id: this.generateId(),
-                suiteId,
-                name: test.fullName ?? test.title,
-                status,
-                durationMs: test.duration ?? 0,
-                error: status === 'failed' ? test.failureMessages?.join('\n') : undefined,
-                stack: status === 'failed' ? test.failureMessages?.join('\n') : undefined,
-              };
-              testCases.push(testCase);
+    return jsonCandidate?.includes('"testResults"') ? jsonCandidate : null;
+  }
 
-              if (status === 'passed') passed++;
-              else if (status === 'failed') failed++;
-              else skipped++;
-            }
-          }
+  /**
+   * Parse the structured Vitest/Jest JSON report. Returns null when no
+   * JSON blob is present, it fails to parse, or it carries no
+   * `testResults`, so the caller can fall back to text parsing.
+   */
+  private parseVitestJson(output: string, suiteId: string): ParsedVitestOutput | null {
+    const candidate = this.extractTestResultsJson(output);
+    if (!candidate) return null;
+
+    // Wrap the ENTIRE parse+iteration in one try/catch (as the original did): any
+    // error — JSON.parse failure OR a malformed-but-parseable report (non-iterable
+    // testResults, null file/assertion entries) — degrades gracefully to text
+    // parsing rather than throwing out to runSuite's catch (which would report a
+    // bogus failed=1 'Suite Invocation' and discard the real text-summary counts).
+    try {
+      const json: { testResults?: VitestFileResult[] } = JSON.parse(candidate);
+      if (!json.testResults) return null;
+
+      const testCases: TestCaseResult[] = [];
+      let passed = 0;
+      let failed = 0;
+      let skipped = 0;
+      for (const fileResult of json.testResults) {
+        for (const test of fileResult.assertionResults ?? []) {
+          const testCase = this.buildTestCaseFromAssertion(test, suiteId);
+          testCases.push(testCase);
+
+          if (testCase.status === 'passed') passed++;
+          else if (testCase.status === 'failed') failed++;
+          else skipped++;
         }
-      } catch {
-        // JSON parse failed, fall through to text parsing
       }
+
+      return { passed, failed, skipped, testCases };
+    } catch {
+      // Malformed JSON report — caller falls back to text parsing.
+      return null;
     }
+  }
 
-    // Fallback: parse text output. Handles three common shapes —
-    // vitest's "N passed / N failed / N skipped", node:test's
-    // "ℹ pass N / ℹ fail N / ℹ skipped N", and pytest's
-    // "N passed, M failed in...". Whichever matches first wins.
-    if (testCases.length === 0) {
-      const passMatch = /(?<!\d)(\d+) passed/.exec(output) ?? /[ℹi]\s*pass(?:ed)?\s+(\d+)/i.exec(output);
-      const failMatch = /(?<!\d)(\d+) failed/.exec(output) ?? /[ℹi]\s*fail(?:ed)?\s+(\d+)/i.exec(output);
-      const skipMatch = /(?<!\d)(\d+) skipped/.exec(output) ?? /[ℹi]\s*skipped\s+(\d+)/i.exec(output);
+  /**
+   * Build a single TestCaseResult from a Vitest/Jest assertion record.
+   * error/stack carry the joined failure messages only for failures.
+   */
+  private buildTestCaseFromAssertion(test: VitestAssertionResult, suiteId: string): TestCaseResult {
+    const status = this.mapVitestStatus(test.status as string);
+    const failureText = status === 'failed' ? test.failureMessages?.join('\n') : undefined;
+    return {
+      id: this.generateId(),
+      suiteId,
+      name: (test.fullName ?? test.title) as string,
+      status,
+      durationMs: test.duration ?? 0,
+      error: failureText,
+      stack: failureText,
+    };
+  }
 
-      passed = passMatch ? Number.parseInt(passMatch[1], 10) : 0;
-      failed = failMatch ? Number.parseInt(failMatch[1], 10) : 0;
-      skipped = skipMatch ? Number.parseInt(skipMatch[1], 10) : 0;
+  /**
+   * Fallback: parse plain-text summary output. Handles three common
+   * shapes — vitest's "N passed / N failed / N skipped", node:test's
+   * "ℹ pass N / ℹ fail N / ℹ skipped N", and pytest's
+   * "N passed, M failed in...". Whichever matches first wins.
+   * Synthesizes test cases from the passed + failed counts only.
+   */
+  private parseVitestTextFallback(output: string, suiteId: string): ParsedVitestOutput {
+    const passMatch = /(?<!\d)(\d+) passed/.exec(output) ?? /[ℹi]\s*pass(?:ed)?\s+(\d+)/i.exec(output);
+    const failMatch = /(?<!\d)(\d+) failed/.exec(output) ?? /[ℹi]\s*fail(?:ed)?\s+(\d+)/i.exec(output);
+    const skipMatch = /(?<!\d)(\d+) skipped/.exec(output) ?? /[ℹi]\s*skipped\s+(\d+)/i.exec(output);
 
-      // Create synthetic test cases from summary
-      for (let i = 0; i < passed; i++) {
-        testCases.push({
-          id: this.generateId(),
-          suiteId,
-          name: `Test ${i + 1}`,
-          status: 'passed',
-          durationMs: 0,
-        });
-      }
-      for (let i = 0; i < failed; i++) {
-        testCases.push({
-          id: this.generateId(),
-          suiteId,
-          name: `Failed Test ${i + 1}`,
-          status: 'failed',
-          durationMs: 0,
-          error: 'Test failed (details in Vitest output)',
-        });
-      }
+    const passed = passMatch ? Number.parseInt(passMatch[1], 10) : 0;
+    const failed = failMatch ? Number.parseInt(failMatch[1], 10) : 0;
+    const skipped = skipMatch ? Number.parseInt(skipMatch[1], 10) : 0;
+
+    const testCases: TestCaseResult[] = [];
+    // Create synthetic test cases from summary
+    for (let i = 0; i < passed; i++) {
+      testCases.push({
+        id: this.generateId(),
+        suiteId,
+        name: `Test ${i + 1}`,
+        status: 'passed',
+        durationMs: 0,
+      });
+    }
+    for (let i = 0; i < failed; i++) {
+      testCases.push({
+        id: this.generateId(),
+        suiteId,
+        name: `Failed Test ${i + 1}`,
+        status: 'failed',
+        durationMs: 0,
+        error: 'Test failed (details in Vitest output)',
+      });
     }
 
     return { passed, failed, skipped, testCases };

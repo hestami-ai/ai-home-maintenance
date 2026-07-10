@@ -60,7 +60,7 @@ interface JudgeVerdict {
   reasoning: string;
 }
 
-function parseJudgeOutput(text: string, parsed: unknown | null): JudgeVerdict | null {
+function parseJudgeOutput(text: string, parsed: unknown): JudgeVerdict | null {
   let obj = parsed;
   if (obj === null) {
     const r = parseJsonWithRecovery(text);
@@ -106,7 +106,7 @@ export async function checkT5LlmJudge(
   const judgeModel = assertion.judge_model ?? process.env.JANUMICODE_REGRESSION_LLM_JUDGE_MODEL ?? 'gemma3:4b';
   const judgeProvider = assertion.judge_provider ?? 'ollama';
 
-  let result: { text: string; parsed: unknown | null };
+  let result: { text: string; parsed: unknown };
   try {
     const caller = getJudgeCaller();
     const r = await caller.call({

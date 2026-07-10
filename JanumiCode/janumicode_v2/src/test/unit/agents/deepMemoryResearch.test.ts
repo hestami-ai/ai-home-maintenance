@@ -1101,4 +1101,275 @@ describe('DeepMemoryResearchAgent', () => {
       expect(constraint!.bindingClass).toBe('binding');
     });
   });
+
+  // ── Characterization pins for the S3776 decomposition refactor ────
+  // These lock the observable behavior of harvestCandidates + synthesize on
+  // the specific paths extracted into helpers (known-relevant overwrite vs
+  // ordinary FTS scoring; the deterministic no-LLM synthesis packet with its
+  // completeness-status → confidence mapping and deterministic decision
+  // summary), so the refactor is provably behavior-preserving.
+  describe('characterization — harvest/synthesize decomposition', () => {
+    it('the same FTS-matched record scores < 1.0 normally but exactly 1.0 when known-relevant', async () => {
+      const rec = writer.writeRecord({
+        record_type: 'artifact_produced', schema_version: '1.0', workflow_run_id: 'run-1',
+        janumicode_version_sha: 'abc', authority_level: 5,
+        content: { description: 'authentication service login session handling' },
+      });
+
+      // Ordinary harvest pass: computed materiality < 1.0 (still above threshold
+      // so it surfaces), pinning that the FTS/authority passes are first-wins.
+      const normal = await agent.research(baseBrief({ query: 'authentication login session' }));
+      const normalFinding = normal.materialFindings.find(f => f.id === rec.id);
+      expect(normalFinding).toBeDefined();
+      expect(normalFinding!.materialityScore).toBeLessThan(1.0);
+
+      // Known-relevant seed OVERWRITES the earlier entry with materialityScore 1.0.
+      const seeded = await agent.research(baseBrief({
+        query: 'authentication login session',
+        knownRelevantRecordIds: [rec.id],
+      }));
+      const seededFinding = seeded.materialFindings.find(f => f.id === rec.id);
+      expect(seededFinding).toBeDefined();
+      expect(seededFinding!.materialityScore).toBe(1.0);
+    });
+
+    it('no-LLM synthesis: deterministic decision summary + completeness/confidence mapping', async () => {
+      // Agent (default) has no templateLoader and no embedding service, so Stage 7
+      // returns the deterministic base packet unchanged.
+      const gov = writer.writeRecord({
+        record_type: 'phase_gate_approved', schema_version: '1.0', workflow_run_id: 'run-1',
+        janumicode_version_sha: 'abc', authority_level: 6,
+        content: { summary: 'All URLs must be encrypted at rest with AES-256-GCM' },
+      });
+
+      const packet = await agent.research(baseBrief({ query: 'encrypted at rest AES-256-GCM' }));
+
+      // Authority-6 + active → an active constraint drives the summary.
+      const constraint = packet.activeConstraints.find(c => c.id === gov.id);
+      expect(constraint).toBeDefined();
+
+      // Deterministic decision summary (no LLM path) names governing decisions
+      // and cites the source record id.
+      expect(packet.decisionContextSummary).toMatch(/^Governing decisions:/);
+      expect(packet.decisionContextSummary).toContain(gov.id);
+
+      // No embedding service → embedding known-gap → partial_low → confidence 0.85.
+      expect(packet.coverageAssessment.knownGaps.length).toBeGreaterThan(0);
+      expect(packet.completenessStatus).toBe('partial_low');
+      expect(packet.coverageAssessment.confidence).toBe(0.85);
+
+      // Completeness narrative reports material vs candidate counts.
+      expect(packet.completenessNarrative).toMatch(/material finding\(s\) over .* candidate\(s\)/);
+    });
+
+    it('no active constraints → deterministic summary states none in scope', async () => {
+      // A low-authority record that matches the query is a finding but not an
+      // active constraint (authority < 6), so the deterministic summary reports
+      // the empty-constraint sentinel.
+      writer.writeRecord({
+        record_type: 'artifact_produced', schema_version: '1.0', workflow_run_id: 'run-1',
+        janumicode_version_sha: 'abc', authority_level: 2,
+        content: { description: 'a low authority note about widgets' },
+      });
+
+      const packet = await agent.research(baseBrief({ query: 'widgets note' }));
+
+      expect(packet.activeConstraints.length).toBe(0);
+      expect(packet.decisionContextSummary).toBe('No active constraints identified in scope.');
+    });
+  });
+
+  // ── Characterization pins for the S3776 distillContentSummary refactor ────
+  // distillContentSummary is a pure (kind, content, focus?) -> string function.
+  // The research()-level tests above cover decision_trace / component_model /
+  // intent / FR / NFR / cross_run / interface_contracts INDIRECTLY, but NOT
+  // data_models, api_definitions, the product_concept string + fall-through
+  // paths, or the title/name label fallback. These golden snapshots pin the
+  // EXACT current output of every branch (computed from the pre-refactor logic)
+  // so the if/return -> per-kind-helper decomposition is provably behavior-
+  // preserving, including the short-circuit "first owning handler wins even
+  // when it yields ''" semantics.
+  describe('characterization — distillContentSummary golden snapshots', () => {
+    type DistillFn = (kind: string, content: Record<string, unknown>, focus?: string) => string;
+    const distill = (kind: string, content: Record<string, unknown>, focus?: string): string =>
+      (agent as unknown as { distillContentSummary: DistillFn }).distillContentSummary(kind, content, focus);
+
+    const cases: Array<{
+      name: string;
+      kind: string;
+      content: Record<string, unknown>;
+      focus?: string;
+      expected: string;
+    }> = [
+      {
+        name: 'decision_trace — full (selection + rationale + payload bundle)',
+        kind: 'decision_trace',
+        content: {
+          decision_type: 'menu_selection',
+          human_selection: 'AES-256-GCM',
+          rationale_captured: 'FIPS required',
+          context_presented: 'cipher choice',
+          attribution: 'auto_approve',
+          auto_approved_by: 'orchestrator',
+          payload: { menu_selections: [{}, {}], mirror_decisions: [{}] },
+        },
+        expected:
+          'menu_selection — chose: AES-256-GCM; rationale: FIPS required; 2 menu selection(s), 1 mirror decision(s)',
+      },
+      {
+        name: 'decision_trace — auto-approve fallback (no selection/rationale)',
+        kind: 'decision_trace',
+        content: { decision_type: 'bundle', attribution: 'auto_approve', auto_approved_by: 'orch', payload: {} },
+        expected: 'bundle — auto-approved by orch',
+      },
+      {
+        name: 'decision via regex kind + kind-as-decision-type fallback',
+        kind: 'approval_gate',
+        content: { human_selection: 'yes' },
+        expected: 'approval_gate — chose: yes',
+      },
+      {
+        name: 'component_model — scoped to focus component',
+        kind: 'component_model',
+        content: {
+          components: [
+            { id: 'comp-a', responsibilities: [{ statement: 'do A' }, { description: 'do A2' }] },
+            { id: 'comp-b', responsibilities: [{ statement: 'do B' }] },
+          ],
+        },
+        focus: 'comp-a',
+        expected: 'comp-a: do A; do A2',
+      },
+      {
+        name: 'component_model — no focus (first 3)',
+        kind: 'component_model',
+        content: {
+          components: [
+            { id: 'comp-a', responsibilities: [{ statement: 'do A' }, { description: 'do A2' }] },
+            { id: 'comp-b', responsibilities: [{ statement: 'do B' }] },
+          ],
+        },
+        expected: 'comp-a: do A; do A2 | comp-b: do B',
+      },
+      {
+        name: 'component guard truthy but non-array components -> empty string (short-circuit, no fall-through)',
+        kind: 'random',
+        content: { components: 'nope' },
+        expected: '',
+      },
+      {
+        name: 'data_models — entities + fields',
+        kind: 'data_models',
+        content: {
+          models: [
+            {
+              component_id: 'comp-a',
+              entities: [
+                { name: 'User', fields: [{ name: 'id' }, { name: 'email' }] },
+                { name: 'Session', fields: [{ name: 'token' }] },
+              ],
+            },
+          ],
+        },
+        expected: 'comp-a: User(id,email), Session(token)',
+      },
+      {
+        name: 'interface_contracts — protocol + auth',
+        kind: 'interface_contracts',
+        content: {
+          contracts: [
+            { id: 'IC-1', protocol: 'HTTP', auth_mechanism: 'api-key' },
+            { id: 'IC-2', protocol: 'gRPC' },
+          ],
+        },
+        expected: 'IC-1: HTTP auth=api-key | IC-2: gRPC',
+      },
+      {
+        name: 'api_definitions — method/verb + path/route',
+        kind: 'api_definitions',
+        content: { api_definitions: [{ method: 'GET', path: '/users' }, { verb: 'POST', route: '/login' }] },
+        expected: 'GET /users, POST /login',
+      },
+      {
+        name: 'api_definitions — falls back to endpoints array',
+        kind: 'api_definitions',
+        content: { endpoints: [{ method: 'DELETE', path: '/users/:id' }] },
+        expected: 'DELETE /users/:id',
+      },
+      {
+        name: 'intent_statement — product_concept object (description preferred)',
+        kind: 'intent_statement',
+        content: { product_concept: { name: 'App', description: 'A great app' } },
+        expected: 'A great app',
+      },
+      {
+        name: 'intent_statement — product_concept string (returned UNTRIMMED)',
+        kind: 'intent_statement',
+        content: { product_concept: '  my concept  ' },
+        expected: '  my concept  ',
+      },
+      {
+        name: 'intent_statement — empty concept falls through to title label',
+        kind: 'intent_statement',
+        content: { product_concept: {}, title: 'Fallback Title' },
+        expected: 'Fallback Title',
+      },
+      {
+        name: 'functional_requirements — id + action/outcome',
+        kind: 'functional_requirements',
+        content: {
+          user_stories: [
+            { id: 'US-001', role: 'user', action: 'log in', outcome: 'access' },
+            { id: 'US-002', outcome: 'see dashboard' },
+          ],
+        },
+        expected: 'US-001: log in | US-002: see dashboard',
+      },
+      {
+        name: 'cross_run_modification — what was applied',
+        kind: 'cross_run_modification',
+        content: { modification_type: 'breaking', changed_interface_id: 'IC-DELETE-001', applied_status: 'applied' },
+        expected: 'cross-run modification: breaking change to IC-DELETE-001 (applied)',
+      },
+      {
+        name: 'cross_run_modification — empty parts -> empty string (owns kind, no fall-through)',
+        kind: 'cross_run_modification',
+        content: {},
+        expected: '',
+      },
+      {
+        name: 'non_functional_requirements — id (category): description',
+        kind: 'non_functional_requirements',
+        content: {
+          requirements: [
+            { id: 'NFR-001', category: 'security', description: 'encrypt at rest' },
+            { id: 'NFR-002', statement: 'p99 < 100ms' },
+          ],
+        },
+        expected: 'NFR-001 (security): encrypt at rest | NFR-002: p99 < 100ms',
+      },
+      {
+        name: 'title label fallback (unknown kind, title present)',
+        kind: 'unknown_kind',
+        content: { title: 'Some Title' },
+        expected: 'Some Title',
+      },
+      {
+        name: 'name label fallback (unknown kind, name present)',
+        kind: 'x',
+        content: { name: 'The Name' },
+        expected: 'The Name',
+      },
+      {
+        name: 'nothing matches -> empty string',
+        kind: 'mystery',
+        content: { foo: 'bar' },
+        expected: '',
+      },
+    ];
+
+    it.each(cases)('$name', ({ kind, content, focus, expected }) => {
+      expect(distill(kind, content, focus)).toBe(expected);
+    });
+  });
 });

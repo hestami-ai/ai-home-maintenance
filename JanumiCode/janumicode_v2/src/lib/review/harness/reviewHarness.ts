@@ -94,6 +94,16 @@ export interface ReviewHarnessOutcome {
   skipReason: string | null;
 }
 
+/** Shared base fields stamped onto every harness/finding record. */
+interface BaseHarnessRecordOptions {
+  schema_version: string;
+  workflow_run_id: string;
+  phase_id: string | null;
+  sub_phase_id: string | null;
+  produced_by_agent_role: 'harness';
+  janumicode_version_sha: string;
+}
+
 /**
  * Run the harness for one reviewed agent_output. Always returns; never
  * throws. Validator failures are captured in `validatorFailures` so the
@@ -217,63 +227,36 @@ export async function runReviewHarness(
   // spec_boundary_respect_bloom needs product_intent_discovery decisions
   // and technical_constraints_discovery constraints). Single DB read per
   // harness invocation; validators that don't need it ignore the field.
-  const priorArtifactsByKind: Map<string, Record<string, unknown>[]> = new Map();
-  try {
-    const artifactRecords = writer.getRecordsByType(traceContext.workflowRunId, 'artifact_produced');
-    for (const rec of artifactRecords) {
-      const content = rec.content as Record<string, unknown> | null;
-      if (!content) continue;
-      const kind = typeof content.kind === 'string' ? content.kind : null;
-      if (!kind) continue;
-      const bucket = priorArtifactsByKind.get(kind) ?? [];
-      bucket.push(content);
-      priorArtifactsByKind.set(kind, bucket);
-    }
-  } catch {
-    // Non-fatal: validators tolerate empty/undefined priorArtifactsByKind.
-  }
+  const priorArtifactsByKind = loadPriorArtifactsByKind(
+    writer,
+    traceContext.workflowRunId,
+  );
 
   // Pre-validator: run json_output_discipline_check if dispatched.
   // Short-circuit LLM validators on HIGH findings.
-  let shortCircuitLLM = false;
-  const preValidatorEntry = dispatched.find((v) => v.id === 'json_output_discipline_check');
-  if (preValidatorEntry) {
-    const preParams: ValidatorRuntimeParams = {
-      agentRole: effectiveRole,
-      subPhaseId,
-      agentOutputId,
-      outputText: result.text ?? '',
-      outputContent,
-      outputThinking,
-      originalPrompt: prompt,
-      originalSystem: null,
-      upstreamFindings: [],
-      priorArtifactsByKind,
-    };
-    const preFindings = await runOneValidator(
-      preValidatorEntry,
-      preParams,
-      llmCaller,
-      templateLoader,
-      { upstreamTrace: traceContext, failures, recordLLMUsage, harnessRouting },
-    );
-    for (const finding of preFindings) {
-      allFindings.push(finding);
-      writeFindingRecord({
-        writer,
-        baseRecordOptions,
-        harnessId,
-        harnessRecordId: initialHarnessRecord.id,
-        finding,
-        durationMs: 0,
-        inputTokens: null,
-        outputTokens: null,
-      });
-    }
-    if (preFindings.some((f) => f.severity === 'HIGH')) {
-      shortCircuitLLM = true;
-    }
-  }
+  const preResult = await runPreValidatorChain({
+    dispatched,
+    effectiveRole,
+    subPhaseId,
+    agentOutputId,
+    result,
+    prompt,
+    outputContent,
+    outputThinking,
+    priorArtifactsByKind,
+    llmCaller,
+    templateLoader,
+    traceContext,
+    failures,
+    recordLLMUsage,
+    harnessRouting,
+    writer,
+    baseRecordOptions,
+    harnessId,
+    harnessRecordId: initialHarnessRecord.id,
+  });
+  allFindings.push(...preResult.findings);
+  const shortCircuitLLM = preResult.shortCircuitLLM;
 
   for (const entry of dispatched) {
     // Skip the pre-validator in the main loop (already ran above).
@@ -409,6 +392,116 @@ export async function runReviewHarness(
 // ── Helpers ────────────────────────────────────────────────────────
 
 /**
+ * Pre-load prior `artifact_produced` records, bucketed by their content
+ * `kind`, for cross-record validators. Single DB read per harness
+ * invocation; non-fatal on error (returns an empty map). Behavior mirrors
+ * the inline block it replaced exactly (skips content-less/kind-less recs).
+ */
+function loadPriorArtifactsByKind(
+  writer: GovernedStreamWriter,
+  workflowRunId: string,
+): Map<string, Record<string, unknown>[]> {
+  const priorArtifactsByKind: Map<string, Record<string, unknown>[]> = new Map();
+  try {
+    const artifactRecords = writer.getRecordsByType(workflowRunId, 'artifact_produced');
+    for (const rec of artifactRecords) {
+      const content = rec.content as Record<string, unknown> | null;
+      if (!content) continue;
+      const kind = typeof content.kind === 'string' ? content.kind : null;
+      if (!kind) continue;
+      const bucket = priorArtifactsByKind.get(kind) ?? [];
+      bucket.push(content);
+      priorArtifactsByKind.set(kind, bucket);
+    }
+  } catch {
+    // Non-fatal: validators tolerate empty/undefined priorArtifactsByKind.
+  }
+  return priorArtifactsByKind;
+}
+
+interface PreValidatorChainArgs {
+  dispatched: ValidatorEntry[];
+  effectiveRole: string;
+  subPhaseId: string;
+  agentOutputId: string;
+  result: LLMCallResult;
+  prompt: string;
+  outputContent: Record<string, unknown> | null;
+  outputThinking: string | null;
+  priorArtifactsByKind: Map<string, Record<string, unknown>[]>;
+  llmCaller: LLMCaller;
+  templateLoader: TemplateLoader;
+  traceContext: LLMTraceContext;
+  failures: { validatorId: string; error: string }[];
+  recordLLMUsage: (
+    validatorId: string,
+    usage: { inputTokens: number | null; outputTokens: number | null },
+  ) => void;
+  harnessRouting: HarnessLLMRouting | undefined;
+  writer: GovernedStreamWriter;
+  baseRecordOptions: BaseHarnessRecordOptions;
+  harnessId: string;
+  harnessRecordId: string;
+}
+
+/**
+ * Run the pre-validator (`json_output_discipline_check`) when it appears
+ * in the dispatch bundle, writing one finding record per finding. Returns
+ * the findings (for the caller to prepend to the corpus) and whether the
+ * LLM validator chain should short-circuit (any HIGH finding). When the
+ * pre-validator is not dispatched, returns no findings and no short-circuit.
+ */
+async function runPreValidatorChain(
+  args: PreValidatorChainArgs,
+): Promise<{ findings: ValidatorFinding[]; shortCircuitLLM: boolean }> {
+  const preValidatorEntry = args.dispatched.find(
+    (v) => v.id === 'json_output_discipline_check',
+  );
+  if (!preValidatorEntry) {
+    return { findings: [], shortCircuitLLM: false };
+  }
+
+  const preParams: ValidatorRuntimeParams = {
+    agentRole: args.effectiveRole,
+    subPhaseId: args.subPhaseId,
+    agentOutputId: args.agentOutputId,
+    outputText: args.result.text ?? '',
+    outputContent: args.outputContent,
+    outputThinking: args.outputThinking,
+    originalPrompt: args.prompt,
+    originalSystem: null,
+    upstreamFindings: [],
+    priorArtifactsByKind: args.priorArtifactsByKind,
+  };
+  const preFindings = await runOneValidator(
+    preValidatorEntry,
+    preParams,
+    args.llmCaller,
+    args.templateLoader,
+    {
+      upstreamTrace: args.traceContext,
+      failures: args.failures,
+      recordLLMUsage: args.recordLLMUsage,
+      harnessRouting: args.harnessRouting,
+    },
+  );
+  for (const finding of preFindings) {
+    writeFindingRecord({
+      writer: args.writer,
+      baseRecordOptions: args.baseRecordOptions,
+      harnessId: args.harnessId,
+      harnessRecordId: args.harnessRecordId,
+      finding,
+      durationMs: 0,
+      inputTokens: null,
+      outputTokens: null,
+    });
+  }
+  const shortCircuitLLM = preFindings.some((f) => f.severity === 'HIGH');
+  return { findings: preFindings, shortCircuitLLM };
+}
+
+/**
  * Run a single validator. Captures every failure mode and returns
  * findings (or [] when unavailable). Pushes a `validator_unavailable`
  * failure into `failures` when applicable. Never throws.
@@ -514,14 +607,7 @@ function extractOutputContent(
 
 function writeFindingRecord(args: {
   writer: GovernedStreamWriter;
-  baseRecordOptions: {
-    schema_version: string;
-    workflow_run_id: string;
-    phase_id: string | null;
-    sub_phase_id: string | null;
-    produced_by_agent_role: 'harness';
-    janumicode_version_sha: string;
-  };
+  baseRecordOptions: BaseHarnessRecordOptions;
   harnessId: string;
   harnessRecordId: string;
   finding: ValidatorFinding;

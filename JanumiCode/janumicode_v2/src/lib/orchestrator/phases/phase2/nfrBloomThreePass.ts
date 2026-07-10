@@ -12,6 +12,7 @@ import type {
   VVRequirement,
 } from '../../../types/records';
 import type { PhaseContext } from '../../orchestratorEngine';
+import type { PromptTemplate } from '../../templateLoader';
 import type { PhaseContextPacketResult } from '../dmrContext';
 import {
   verifyNfrCoverage,
@@ -216,7 +217,90 @@ async function runSkeletonPass(deps: NfrBloomDeps): Promise<{
   return parseSkeletonResponse(result.parsed as Record<string, unknown> | null);
 }
 
-async function runEnrichmentPass(
+/**
+ * Number of semantic-aware enrichment retries per NFR. If the LLM returns
+ * content that doesn't parse into a complete (threshold + measurement_method)
+ * pair — a transient model-output failure distinct from LLMCaller's
+ * transport-level retries — the call is repeated up to this many times.
+ * Sampling variance typically rescues these.
+ */
+const ENRICHMENT_MAX_ATTEMPTS = 3;
+
+/**
+ * Names the enrichment fields the LLM left unpopulated, in stable order
+ * (threshold before measurement_method). Drives the retry warning's
+ * `missing` list.
+ */
+function describeMissingEnrichmentFields(candidate: NfrSkeleton): string[] {
+  const missing: string[] = [];
+  if (!candidate.threshold) missing.push('threshold');
+  if (!candidate.measurement_method) missing.push('measurement_method');
+  return missing;
+}
+
+/**
+ * Enrich a single NFR skeleton with a threshold + measurement_method pair.
+ * Retries up to ENRICHMENT_MAX_ATTEMPTS times when the model returns output
+ * that doesn't parse into a complete pair. Falls back to the skeleton
+ * verbatim after all attempts are exhausted — the Pass-3 verifier then
+ * catches and blocks it, surfacing the affected NFR for human review.
+ */
+async function enrichOneNfr(
+  deps: NfrBloomDeps,
+  template: PromptTemplate,
+  skeleton: NfrSkeleton,
+): Promise<NfrSkeleton> {
+  const { ctx } = deps;
+  const variables = buildEnrichmentVariables(skeleton, deps);
+  const rendered = ctx.engine.templateLoader.render(template, variables);
+  if (rendered.missing_variables.length > 0) {
+    getLogger().warn('workflow', 'Phase 2.2b: missing variables — keeping skeleton', {
+      nfr_id: skeleton.id, missing: rendered.missing_variables,
+    });
+    return skeleton;
+  }
+  for (let attempt = 1; attempt <= ENRICHMENT_MAX_ATTEMPTS; attempt++) {
+    try {
+      const result = await ctx.engine.callForRole('requirements_agent', {
+        prompt: rendered.rendered,
+        responseFormat: 'json',
+        temperature: 0.4,
+        traceContext: {
+          workflowRunId: ctx.workflowRun.id,
+          phaseId: '2',
+          subPhaseId: 'nfr_bloom_enrichment',
+          agentRole: 'requirements_agent',
+          label: `Phase 2.2b — NFR Threshold Enrichment (${skeleton.id}) attempt ${attempt}/${ENRICHMENT_MAX_ATTEMPTS}`,
+        },
+      });
+      const candidate = parseEnrichmentResponse(result.parsed as Record<string, unknown> | null, skeleton);
+      // parseEnrichmentResponse returns the skeleton verbatim when the
+      // LLM output lacked threshold/measurement_method. Detect that
+      // and retry — the skeleton has empty threshold + measurement_method.
+      if (candidate.threshold && candidate.measurement_method) {
+        return candidate;
+      }
+      getLogger().warn('workflow', `Phase 2.2b enrichment returned incomplete output — retrying`, {
+        nfr_id: skeleton.id, attempt, max_attempts: ENRICHMENT_MAX_ATTEMPTS,
+        missing: describeMissingEnrichmentFields(candidate),
+      });
+    } catch (err) {
+      getLogger().warn('workflow', `Phase 2.2b enrichment LLM call threw — retrying`, {
+        nfr_id: skeleton.id, attempt, max_attempts: ENRICHMENT_MAX_ATTEMPTS, error: String(err),
+      });
+    }
+  }
+  getLogger().error('workflow', `Phase 2.2b enrichment exhausted ${ENRICHMENT_MAX_ATTEMPTS} attempts — keeping skeleton (will be flagged by 2.2c verifier)`, {
+    nfr_id: skeleton.id,
+  });
+  return skeleton;
+}
+
+/**
+ * Exported for characterization tests. Runs Pass-2 threshold enrichment
+ * over every skeleton, delegating per-NFR retry logic to enrichOneNfr.
+ */
+export async function runEnrichmentPass(
   deps: NfrBloomDeps,
   skeletons: NfrSkeleton[],
 ): Promise<NfrSkeleton[]> {
@@ -230,69 +314,9 @@ async function runEnrichmentPass(
     getLogger().warn('workflow', 'Phase 2.2b enrichment template not found — returning skeletons as-is', {});
     return skeletons;
   }
-  // Semantic-aware retry: if the LLM returns content that doesn't parse
-  // into a complete (threshold + measurement_method) pair (transient
-  // model output failure, distinct from LLMCaller's transport-level
-  // retries), re-call up to MAX_ATTEMPTS times. Sampling variance
-  // typically rescues these. Fall back to the skeleton only after all
-  // attempts exhausted — the Pass-3 verifier will then catch and block,
-  // surfacing the affected NFR for human review.
-  const MAX_ATTEMPTS = 3;
   const enriched: NfrSkeleton[] = [];
   for (const s of skeletons) {
-    const variables = buildEnrichmentVariables(s, deps);
-    const rendered = ctx.engine.templateLoader.render(template, variables);
-    if (rendered.missing_variables.length > 0) {
-      getLogger().warn('workflow', 'Phase 2.2b: missing variables — keeping skeleton', {
-        nfr_id: s.id, missing: rendered.missing_variables,
-      });
-      enriched.push(s);
-      continue;
-    }
-    let final: NfrSkeleton = s;
-    let success = false;
-    for (let attempt = 1; attempt <= MAX_ATTEMPTS; attempt++) {
-      try {
-        const result = await ctx.engine.callForRole('requirements_agent', {
-          prompt: rendered.rendered,
-          responseFormat: 'json',
-          temperature: 0.4,
-          traceContext: {
-            workflowRunId: ctx.workflowRun.id,
-            phaseId: '2',
-            subPhaseId: 'nfr_bloom_enrichment',
-            agentRole: 'requirements_agent',
-            label: `Phase 2.2b — NFR Threshold Enrichment (${s.id}) attempt ${attempt}/${MAX_ATTEMPTS}`,
-          },
-        });
-        const candidate = parseEnrichmentResponse(result.parsed as Record<string, unknown> | null, s);
-        // parseEnrichmentResponse returns the skeleton verbatim when the
-        // LLM output lacked threshold/measurement_method. Detect that
-        // and retry — the skeleton has empty threshold + measurement_method.
-        if (candidate.threshold && candidate.measurement_method) {
-          final = candidate;
-          success = true;
-          break;
-        }
-        getLogger().warn('workflow', `Phase 2.2b enrichment returned incomplete output — retrying`, {
-          nfr_id: s.id, attempt, max_attempts: MAX_ATTEMPTS,
-          missing: [
-            ...(!candidate.threshold ? ['threshold'] : []),
-            ...(!candidate.measurement_method ? ['measurement_method'] : []),
-          ],
-        });
-      } catch (err) {
-        getLogger().warn('workflow', `Phase 2.2b enrichment LLM call threw — retrying`, {
-          nfr_id: s.id, attempt, max_attempts: MAX_ATTEMPTS, error: String(err),
-        });
-      }
-    }
-    if (!success) {
-      getLogger().error('workflow', `Phase 2.2b enrichment exhausted ${MAX_ATTEMPTS} attempts — keeping skeleton (will be flagged by 2.2c verifier)`, {
-        nfr_id: s.id,
-      });
-    }
-    enriched.push(final);
+    enriched.push(await enrichOneNfr(deps, template, s));
   }
   return enriched;
 }

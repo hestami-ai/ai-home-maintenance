@@ -36,6 +36,62 @@ function isPlaceholder(text: string): boolean {
   return PLACEHOLDER_PATTERNS.some((p) => p.test(t));
 }
 
+function evaluateHandoffField(
+  field: string,
+  value: unknown,
+): ValidatorFinding | null {
+  if (value === undefined || value === null) {
+    return {
+      validatorId: 'handoff_field_completeness',
+      severity: 'HIGH',
+      type: 'missing_handoff_field',
+      summary: `Required handoff field '${field}' missing`,
+      location: `$.${field}`,
+      detail: `Handoff contract requires '${field}'; value is missing.`,
+      recommendation: `Populate '${field}' with substantive content.`,
+    };
+  }
+  if (typeof value === 'string') {
+    if (isPlaceholder(value)) {
+      return {
+        validatorId: 'handoff_field_completeness',
+        severity: 'HIGH',
+        type: 'placeholder_handoff_field',
+        summary: `Field '${field}' is a placeholder`,
+        location: `$.${field}`,
+        detail: `Field value '${value.trim()}' looks like a TODO/TBD placeholder.`,
+        recommendation: `Replace placeholder with real handoff content.`,
+      };
+    }
+    if (value.trim().length < MIN_FIELD_LENGTH) {
+      return {
+        validatorId: 'handoff_field_completeness',
+        severity: 'MEDIUM',
+        type: 'trivial_handoff_field',
+        summary: `Field '${field}' is suspiciously short`,
+        location: `$.${field}`,
+        detail: `Field value is ${value.trim().length} chars (< ${MIN_FIELD_LENGTH}).`,
+        recommendation: `Expand '${field}' to convey full handoff context.`,
+      };
+    }
+    return null;
+  }
+  if (Array.isArray(value)) {
+    if (value.length === 0) {
+      return {
+        validatorId: 'handoff_field_completeness',
+        severity: 'HIGH',
+        type: 'empty_handoff_array',
+        summary: `Required handoff array '${field}' is empty`,
+        location: `$.${field}`,
+        detail: `Array '${field}' is empty; the handoff contract expects non-empty content.`,
+        recommendation: `Populate '${field}' with at least one entry.`,
+      };
+    }
+  }
+  return null;
+}
+
 export function validateHandoffFieldCompleteness(
   params: ValidatorRuntimeParams,
 ): ValidatorFinding[] {
@@ -45,56 +101,8 @@ export function validateHandoffFieldCompleteness(
   const findings: ValidatorFinding[] = [];
 
   for (const field of required) {
-    const value = out[field];
-    if (value === undefined || value === null) {
-      findings.push({
-        validatorId: 'handoff_field_completeness',
-        severity: 'HIGH',
-        type: 'missing_handoff_field',
-        summary: `Required handoff field '${field}' missing`,
-        location: `$.${field}`,
-        detail: `Handoff contract requires '${field}'; value is missing.`,
-        recommendation: `Populate '${field}' with substantive content.`,
-      });
-      continue;
-    }
-    if (typeof value === 'string') {
-      if (isPlaceholder(value)) {
-        findings.push({
-          validatorId: 'handoff_field_completeness',
-          severity: 'HIGH',
-          type: 'placeholder_handoff_field',
-          summary: `Field '${field}' is a placeholder`,
-          location: `$.${field}`,
-          detail: `Field value '${value.trim()}' looks like a TODO/TBD placeholder.`,
-          recommendation: `Replace placeholder with real handoff content.`,
-        });
-        continue;
-      }
-      if (value.trim().length < MIN_FIELD_LENGTH) {
-        findings.push({
-          validatorId: 'handoff_field_completeness',
-          severity: 'MEDIUM',
-          type: 'trivial_handoff_field',
-          summary: `Field '${field}' is suspiciously short`,
-          location: `$.${field}`,
-          detail: `Field value is ${value.trim().length} chars (< ${MIN_FIELD_LENGTH}).`,
-          recommendation: `Expand '${field}' to convey full handoff context.`,
-        });
-      }
-    } else if (Array.isArray(value)) {
-      if (value.length === 0) {
-        findings.push({
-          validatorId: 'handoff_field_completeness',
-          severity: 'HIGH',
-          type: 'empty_handoff_array',
-          summary: `Required handoff array '${field}' is empty`,
-          location: `$.${field}`,
-          detail: `Array '${field}' is empty; the handoff contract expects non-empty content.`,
-          recommendation: `Populate '${field}' with at least one entry.`,
-        });
-      }
-    }
+    const finding = evaluateHandoffField(field, out[field]);
+    if (finding) findings.push(finding);
   }
 
   return findings;

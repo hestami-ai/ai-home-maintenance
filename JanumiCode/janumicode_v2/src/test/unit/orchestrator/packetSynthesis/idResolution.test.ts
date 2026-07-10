@@ -71,3 +71,71 @@ describe('buildRequirementLineage — SR→US/NFR resolution', () => {
     expect([...lineage.resolveAcs(['AC-US-003-D1-001', 'AC-BOGUS']).storyIds]).toEqual(['US-003-D1']);
   });
 });
+
+// Characterization tests pinning malformed / edge-shaped records. These lock in
+// the exact current behavior of the record-ingestion dispatch (kind match +
+// array guard), the id filters, and the leaf→root cycle guard.
+describe('buildRequirementLineage — malformed / edge records (characterization)', () => {
+  it('ignores a system_requirements artifact whose items is not an array', () => {
+    const l = buildRequirementLineage([
+      rec('artifact_produced', { kind: 'system_requirements', items: 'nope' }),
+    ]);
+    const { usIds, nfrIds } = l.resolveTraces(['SR-007']);
+    expect(usIds.size).toBe(0);
+    expect(nfrIds.size).toBe(0);
+  });
+
+  it('skips SR items with a non-string id and coerces non-array source ids to empty', () => {
+    const l = buildRequirementLineage([
+      rec('artifact_produced', {
+        kind: 'system_requirements',
+        items: [
+          { id: 123, source_requirement_ids: ['US-100'] }, // non-string id → skipped
+          { id: 'SR-050', source_requirement_ids: 'US-200' }, // non-array → []
+        ],
+      }),
+    ]);
+    // Non-string-id item never registered → no resolution.
+    expect(l.resolveTraces(['SR-100']).usIds.size).toBe(0);
+    // SR-050 registered but with empty sources → resolves to nothing.
+    const r = l.resolveTraces(['SR-050']);
+    expect(r.usIds.size).toBe(0);
+    expect(r.nfrIds.size).toBe(0);
+  });
+
+  it('ignores a non_functional_requirements artifact whose requirements is not an array', () => {
+    const l = buildRequirementLineage([
+      rec('artifact_produced', { kind: 'non_functional_requirements', requirements: null }),
+    ]);
+    const r = l.resolveTraces(['NFR-011']);
+    // NFR still classifies itself (prefix match) but implies no user stories.
+    expect([...r.nfrIds]).toEqual(['NFR-011']);
+    expect(r.usIds.size).toBe(0);
+  });
+
+  it('leaves an unknown id unchanged when canonicalizing', () => {
+    const l = buildRequirementLineage([]);
+    expect(l.canonicalize('US-777')).toBe('US-777');
+  });
+
+  it('canonicalize terminates on a cyclic parent chain (cycle guard)', () => {
+    const l = buildRequirementLineage([
+      rec('requirement_decomposition_node', {
+        node_id: 'a', display_key: 'US-A', depth: 1, parent_node_id: 'a', // self-cycle
+      }),
+    ]);
+    // No depth-0 root reachable; the walk visits 'a' once, the guard then trips
+    // and it returns the last visited node's display_key without looping forever.
+    expect(l.canonicalize('US-A')).toBe('US-A');
+  });
+
+  it('does not map ACs from a decomposition node without a user_story id', () => {
+    const l = buildRequirementLineage([
+      rec('requirement_decomposition_node', {
+        node_id: 'n', display_key: 'US-Z', depth: 1,
+        user_story: { acceptance_criteria: [{ id: 'AC-X' }] }, // no story id
+      }),
+    ]);
+    expect(l.resolveAcs(['AC-X']).storyIds.size).toBe(0);
+  });
+});

@@ -183,3 +183,130 @@ describe('verifyCoverage — backs_journeys cache correctness', () => {
     expect(r.find(g => g.check === 'referential_integrity_backs_journeys')).toBeDefined();
   });
 });
+
+// ── Characterization test (pins referential-integrity behavior across
+//    ALL nine categories before/after the S3776 decomposition of
+//    checkReferentialIntegrity). Order-independent set comparison on
+//    `missing` avoids coupling to the localeCompare sort used by mkGap;
+//    the ORDER of the emitted checks (deterministic addGap sequence) is
+//    asserted explicitly. ────────────────────────────────────────────
+describe('verifyCoverage — referential integrity characterization (all categories)', () => {
+  // A journey that violates every journey-side referential rule at once.
+  const badJourney = {
+    id: 'UJ-1',
+    personaId: 'P-BAD',                 // not an accepted persona
+    title: 'J', scenario: 's', acceptanceCriteria: ['ok'], implementationPhase: 'Phase 1',
+    businessDomainIds: ['DOM-BAD'],     // not an accepted domain
+    steps: [
+      { stepNumber: 1, actor: 'P-BAD2', action: 'a', expectedOutcome: 'o' },   // unaccepted persona actor
+      { stepNumber: 2, actor: 'INT-BAD', action: 'a', expectedOutcome: 'o' },  // unaccepted integration actor
+      { stepNumber: 3, actor: 'System', action: 'a', expectedOutcome: 'o' },   // System → skipped
+    ],
+    surfaces: {
+      compliance_regimes: ['COMP-BAD'],
+      retention_rules: ['RET-BAD'],
+      vv_requirements: ['VV-BAD'],
+      integrations: ['INT-BADSURF'],
+    },
+  } as unknown as UserJourney;
+
+  // A workflow that violates every workflow-side referential rule at once.
+  const badWorkflow = {
+    id: 'WF-1',
+    businessDomainId: 'DOM-BAD',        // not an accepted domain
+    name: 'W', description: 'd',
+    steps: [
+      { stepNumber: 1, actor: 'P-BADW', action: 'a', expectedOutcome: 'o' },   // unaccepted persona actor
+      { stepNumber: 2, actor: 'INT-BADW', action: 'a', expectedOutcome: 'o' }, // unaccepted integration actor
+    ],
+    triggers: [{ kind: 'integration', integration_id: 'INT-UNKNOWN', event: 'e' }], // unaccepted integration
+    actors: ['System'],
+    backs_journeys: ['UJ-EXTRA'],       // extra id not derivable from triggers
+    surfaces: {
+      compliance_regimes: ['COMP-BADW'],
+      retention_rules: ['RET-BADW'],
+      vv_requirements: ['VV-BADW'],
+      integrations: ['INT-BADWSURF'],
+    },
+  } as unknown as WorkflowV2;
+
+  const result = verifyCoverage(minimalInputs({
+    personas: [persona('P-1')],
+    domainIds: ['DOM-X'],
+    integrations: [integration('INT-KNOWN')],
+    complianceItems: [{ id: 'COMP-1', type: 'REQUIREMENT', text: 'x', timestamp: 't' }],
+    retentionRules: [{ id: 'RET-1', type: 'REQUIREMENT', text: 'x', timestamp: 't' }],
+    vvRequirements: [{ id: 'VV-1', category: 'performance', target: 't', measurement: 'm' }],
+    journeys: [badJourney],
+    workflows: [badWorkflow],
+  }));
+
+  const refGaps = result.filter(g => g.check.startsWith('referential_integrity_'));
+  const byCheck = Object.fromEntries(refGaps.map(g => [g.check, g]));
+  const asSet = (xs: string[]) => [...xs].sort();
+
+  it('emits exactly the nine referential-integrity checks in deterministic order', () => {
+    expect(refGaps.map(g => g.check)).toEqual([
+      'referential_integrity_journey_persona',
+      'referential_integrity_journey_domain',
+      'referential_integrity_journey_step_actor',
+      'referential_integrity_journey_surfaces',
+      'referential_integrity_workflow_domain',
+      'referential_integrity_workflow_triggers',
+      'referential_integrity_workflow_step_actor',
+      'referential_integrity_workflow_surfaces',
+      'referential_integrity_backs_journeys',
+    ]);
+  });
+
+  it('tags every referential gap blocking with empty expected/actual', () => {
+    for (const g of refGaps) {
+      expect(g.severity).toBe('blocking');
+      expect(g.expected).toEqual([]);
+      expect(g.actual).toEqual([]);
+    }
+  });
+
+  it('collects the exact offender set for each journey-side category', () => {
+    expect(asSet(byCheck['referential_integrity_journey_persona'].missing))
+      .toEqual(asSet(['UJ-1:P-BAD']));
+    expect(asSet(byCheck['referential_integrity_journey_domain'].missing))
+      .toEqual(asSet(['UJ-1:DOM-BAD']));
+    expect(asSet(byCheck['referential_integrity_journey_step_actor'].missing))
+      .toEqual(asSet(['UJ-1#1:P-BAD2', 'UJ-1#2:INT-BAD']));
+    expect(asSet(byCheck['referential_integrity_journey_surfaces'].missing))
+      .toEqual(asSet([
+        'UJ-1:compliance:COMP-BAD',
+        'UJ-1:retention:RET-BAD',
+        'UJ-1:vv:VV-BAD',
+        'UJ-1:integration:INT-BADSURF',
+      ]));
+  });
+
+  it('collects the exact offender set for each workflow-side category', () => {
+    expect(asSet(byCheck['referential_integrity_workflow_domain'].missing))
+      .toEqual(asSet(['WF-1:DOM-BAD']));
+    expect(asSet(byCheck['referential_integrity_workflow_triggers'].missing))
+      .toEqual(asSet(['WF-1:integration:INT-UNKNOWN:integration-not-accepted']));
+    expect(asSet(byCheck['referential_integrity_workflow_step_actor'].missing))
+      .toEqual(asSet(['WF-1#1:P-BADW', 'WF-1#2:INT-BADW']));
+    expect(asSet(byCheck['referential_integrity_workflow_surfaces'].missing))
+      .toEqual(asSet([
+        'WF-1:compliance:COMP-BADW',
+        'WF-1:retention:RET-BADW',
+        'WF-1:vv:VV-BADW',
+        'WF-1:integration:INT-BADWSURF',
+      ]));
+    expect(asSet(byCheck['referential_integrity_backs_journeys'].missing))
+      .toEqual(asSet(['WF-1:extra-in-backs_journeys:UJ-EXTRA']));
+  });
+
+  it('does not resolve accepted retention ids to a gap when surfaced ids are unaccepted', () => {
+    // A retention surface id counts as valid if it is in retentionIds OR
+    // complianceIds; here neither holds for RET-BAD/RET-BADW so both fail.
+    expect(byCheck['referential_integrity_journey_surfaces'].missing)
+      .toContain('UJ-1:retention:RET-BAD');
+    expect(byCheck['referential_integrity_workflow_surfaces'].missing)
+      .toContain('WF-1:retention:RET-BADW');
+  });
+});

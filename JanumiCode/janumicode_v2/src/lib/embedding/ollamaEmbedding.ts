@@ -68,7 +68,7 @@ export class OllamaEmbeddingProvider {
             const embeddings = (json.embeddings ?? []) as number[][];
 
             // Truncate/pad to target dimensions if needed
-            const normalized = embeddings.map(emb => this.normalizeDimensions(emb));
+            const normalized = embeddings.map(this.normalizeDimensions.bind(this));
 
             resolve({
               embeddings: normalized,

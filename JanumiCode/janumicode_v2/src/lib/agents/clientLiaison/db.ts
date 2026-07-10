@@ -248,6 +248,25 @@ export class ClientLiaisonDBImpl implements ClientLiaisonDB {
 
   // ── Memory edge graph traversal ───────────────────────────────
 
+  // The memory_edge columns are source_record_id / target_record_id
+  // (schema.ts) — aliased here to the MemoryEdge field names so the
+  // traversal code below is unchanged. (Prior code queried source_id /
+  // target_id, which do not exist on memory_edge and threw at runtime.)
+  private queryEdgesFrom(id: string, edgeType?: MemoryEdgeType): MemoryEdge[] {
+    const sql = edgeType
+      ? `SELECT id, source_record_id AS source_id, target_record_id AS target_id, edge_type, status
+           FROM memory_edge
+          WHERE source_record_id = ? AND edge_type = ? AND status != 'rejected'`
+      : `SELECT id, source_record_id AS source_id, target_record_id AS target_id, edge_type, status
+           FROM memory_edge
+          WHERE source_record_id = ? AND status != 'rejected'`;
+    return (
+      edgeType
+        ? this.db.prepare(sql).all(id, edgeType)
+        : this.db.prepare(sql).all(id)
+    ) as MemoryEdge[];
+  }
+
   traverseEdges(fromId: string, edgeType?: MemoryEdgeType, depth = 5): MemoryEdge[] {
     const visited = new Set<string>([fromId]);
     const result: MemoryEdge[] = [];
@@ -257,22 +276,7 @@ export class ClientLiaisonDBImpl implements ClientLiaisonDB {
     while (frontier.length > 0 && currentDepth < depth) {
       const next: string[] = [];
       for (const id of frontier) {
-        // The memory_edge columns are source_record_id / target_record_id
-        // (schema.ts) — aliased here to the MemoryEdge field names so the
-        // traversal code below is unchanged. (Prior code queried source_id /
-        // target_id, which do not exist on memory_edge and threw at runtime.)
-        const sql = edgeType
-          ? `SELECT id, source_record_id AS source_id, target_record_id AS target_id, edge_type, status
-               FROM memory_edge
-              WHERE source_record_id = ? AND edge_type = ? AND status != 'rejected'`
-          : `SELECT id, source_record_id AS source_id, target_record_id AS target_id, edge_type, status
-               FROM memory_edge
-              WHERE source_record_id = ? AND status != 'rejected'`;
-        const rows = (
-          edgeType
-            ? this.db.prepare(sql).all(id, edgeType)
-            : this.db.prepare(sql).all(id)
-        ) as MemoryEdge[];
+        const rows = this.queryEdgesFrom(id, edgeType);
         for (const edge of rows) {
           result.push(edge);
           if (!visited.has(edge.target_id)) {

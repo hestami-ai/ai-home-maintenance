@@ -48,70 +48,98 @@ function collectIds(node: unknown, ids: { id: string; path: string }[], path: st
   }
 }
 
+/** Build the optional machine-resolvable target block shared by
+ * duplicate/malformed findings. */
+function targetBlock(
+  targetField: string | null,
+  id: string,
+): Partial<Pick<ValidatorFinding, 'targetField' | 'targetIdentifier'>> {
+  return targetField ? { targetField, targetIdentifier: id } : {};
+}
+
+/** Duplicate detection (within whole output). */
+function detectDuplicateIds(
+  ids: { id: string; path: string }[],
+): ValidatorFinding[] {
+  const findings: ValidatorFinding[] = [];
+  const seen = new Map<string, string>();
+  for (const { id, path } of ids) {
+    if (!seen.has(id)) {
+      seen.set(id, path);
+      continue;
+    }
+    const targetField = topLevelFieldFromPath(path);
+    findings.push({
+      validatorId: 'extraction_id_traceability',
+      severity: targetField ? 'HIGH' : 'MEDIUM',
+      type: 'duplicate_id',
+      summary: `Duplicate id '${id}'`,
+      location: path,
+      detail: `Id '${id}' already appears at ${seen.get(id)}.`,
+      recommendation: 'Make every id unique within the output.',
+      ...targetBlock(targetField, id),
+    });
+  }
+  return findings;
+}
+
+/** Format check: every id must match the PREFIX-NNN pattern. */
+function detectMalformedIds(
+  ids: { id: string; path: string }[],
+): ValidatorFinding[] {
+  const findings: ValidatorFinding[] = [];
+  for (const { id, path } of ids) {
+    if (ID_FIELD_PATTERN.test(id)) continue;
+    const targetField = topLevelFieldFromPath(path);
+    findings.push({
+      validatorId: 'extraction_id_traceability',
+      severity: targetField ? 'HIGH' : 'MEDIUM',
+      type: 'malformed_id',
+      summary: `Malformed id '${id}'`,
+      location: path,
+      detail: `Id '${id}' does not match PREFIX-NNN pattern.`,
+      recommendation: 'Use the documented PREFIX-NNN convention.',
+      ...targetBlock(targetField, id),
+    });
+  }
+  return findings;
+}
+
+/** Pass-aware prefix check. */
+function detectUnexpectedPrefixes(
+  ids: { id: string; path: string }[],
+  subPhaseId: string,
+): ValidatorFinding[] {
+  const expected = PREFIX_RULES[subPhaseId];
+  if (!expected || expected.length === 0) return [];
+  const findings: ValidatorFinding[] = [];
+  for (const { id, path } of ids) {
+    if (expected.some((p) => id.startsWith(p))) continue;
+    findings.push({
+      validatorId: 'extraction_id_traceability',
+      severity: 'MEDIUM',
+      type: 'unexpected_prefix',
+      summary: `Id '${id}' has unexpected prefix for pass`,
+      location: path,
+      detail: `Pass ${subPhaseId} expects prefixes: ${expected.join(', ')}.`,
+      recommendation: 'Renumber with the documented prefix for this pass.',
+    });
+  }
+  return findings;
+}
+
 export function validateExtractionIdTraceability(
   params: ValidatorRuntimeParams,
 ): ValidatorFinding[] {
   const out = params.outputContent;
   if (!out) return [];
-  const findings: ValidatorFinding[] = [];
 
   const ids: { id: string; path: string }[] = [];
   collectIds(out, ids, '$');
 
-  // Duplicate detection (within whole output).
-  const seen = new Map<string, string>();
-  for (const { id, path } of ids) {
-    if (seen.has(id)) {
-      const targetField = topLevelFieldFromPath(path);
-      findings.push({
-        validatorId: 'extraction_id_traceability',
-        severity: targetField ? 'HIGH' : 'MEDIUM',
-        type: 'duplicate_id',
-        summary: `Duplicate id '${id}'`,
-        location: path,
-        detail: `Id '${id}' already appears at ${seen.get(id)}.`,
-        recommendation: 'Make every id unique within the output.',
-        ...(targetField ? { targetField, targetIdentifier: id } : {}),
-      });
-    } else {
-      seen.set(id, path);
-    }
-  }
-
-  // Format check.
-  for (const { id, path } of ids) {
-    if (!ID_FIELD_PATTERN.test(id)) {
-      const targetField = topLevelFieldFromPath(path);
-      findings.push({
-        validatorId: 'extraction_id_traceability',
-        severity: targetField ? 'HIGH' : 'MEDIUM',
-        type: 'malformed_id',
-        summary: `Malformed id '${id}'`,
-        location: path,
-        detail: `Id '${id}' does not match PREFIX-NNN pattern.`,
-        recommendation: 'Use the documented PREFIX-NNN convention.',
-        ...(targetField ? { targetField, targetIdentifier: id } : {}),
-      });
-    }
-  }
-
-  // Pass-aware prefix check.
-  const expected = PREFIX_RULES[params.subPhaseId];
-  if (expected && expected.length > 0) {
-    for (const { id, path } of ids) {
-      if (!expected.some((p) => id.startsWith(p))) {
-        findings.push({
-          validatorId: 'extraction_id_traceability',
-          severity: 'MEDIUM',
-          type: 'unexpected_prefix',
-          summary: `Id '${id}' has unexpected prefix for pass`,
-          location: path,
-          detail: `Pass ${params.subPhaseId} expects prefixes: ${expected.join(', ')}.`,
-          recommendation: 'Renumber with the documented prefix for this pass.',
-        });
-      }
-    }
-  }
-
-  return findings;
+  return [
+    ...detectDuplicateIds(ids),
+    ...detectMalformedIds(ids),
+    ...detectUnexpectedPrefixes(ids, params.subPhaseId),
+  ];
 }

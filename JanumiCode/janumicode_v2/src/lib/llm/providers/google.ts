@@ -13,6 +13,23 @@ import type {
 import { LLMError } from '../llmCaller';
 import { assertNotReplayMode } from '../../replay/gpuGuard';
 
+function isTextPart(p: Record<string, unknown>): boolean {
+  return typeof p.text === 'string';
+}
+
+function extractPartText(p: Record<string, unknown>): string {
+  return p.text as string;
+}
+
+function isFunctionCallPart(p: Record<string, unknown>): boolean {
+  return Boolean(p.functionCall);
+}
+
+function toToolCall(p: Record<string, unknown>): ToolCall {
+  const fc = p.functionCall as { name: string; args?: Record<string, unknown> };
+  return { name: fc.name, params: fc.args ?? {} };
+}
+
 export class GoogleProvider implements LLMProviderAdapter {
   readonly name = 'google';
 
@@ -74,16 +91,13 @@ export class GoogleProvider implements LLMProviderAdapter {
             const parts: Array<Record<string, unknown>> = candidate?.content?.parts ?? [];
 
             const text = parts
-              .filter(p => typeof p.text === 'string')
-              .map(p => p.text as string)
+              .filter(isTextPart)
+              .map(extractPartText)
               .join('');
 
             const toolCalls: ToolCall[] = parts
-              .filter(p => p.functionCall)
-              .map(p => {
-                const fc = p.functionCall as { name: string; args?: Record<string, unknown> };
-                return { name: fc.name, params: fc.args ?? {} };
-              });
+              .filter(isFunctionCallPart)
+              .map(toToolCall);
 
             let parsed: Record<string, unknown> | null = null;
             if (options.responseFormat === 'json') {

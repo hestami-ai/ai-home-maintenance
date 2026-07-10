@@ -276,76 +276,12 @@ export class ExecutorAgent {
     warnStrayTopLevelDirs(cwd);
 
     // Record execution trace events
-    if (result.cliResult) {
-      for (const event of result.cliResult.events) {
-        this.writer.writeRecord({
-          record_type: event.recordType as 'agent_reasoning_step',
-          schema_version: '1.0',
-          workflow_run_id: workflowRunId,
-          phase_id: '9',
-          sub_phase_id: '9.1',
-          produced_by_agent_role: 'executor_agent',
-          produced_by_record_id: invocationId,
-          janumicode_version_sha: janumiCodeVersionSha,
-          content: event.data,
-        });
-
-        // Emit real-time events for the webview (EventBus) + persistent
-        // AODD trace (dual-emit per design memo §5).
-        if (event.recordType === 'agent_reasoning_step') {
-          const content = (event.data.content ?? event.data.text ?? '') as string;
-          this.eventBus.emit('agent:reasoning_step', {
-            invocationId,
-            content,
-            sequencePosition: event.sequencePosition,
-          });
-          aoddEmit(
-            'agent.reasoning_step',
-            {
-              invocation_id: invocationId,
-              content,
-              sequence_position: event.sequencePosition,
-            },
-            { invocation_id: invocationId },
-          );
-        } else if (event.recordType === 'agent_self_correction') {
-          const content = (event.data.content ?? '') as string;
-          this.eventBus.emit('agent:self_correction', {
-            invocationId,
-            content,
-            sequencePosition: event.sequencePosition,
-          });
-          aoddEmit(
-            'agent.self_correction',
-            {
-              invocation_id: invocationId,
-              content,
-              sequence_position: event.sequencePosition,
-            },
-            { invocation_id: invocationId },
-          );
-        } else if (event.recordType === 'tool_call') {
-          const toolName = (event.data.name ?? '') as string;
-          const params = JSON.stringify(event.data.input ?? '');
-          this.eventBus.emit('agent:tool_call', {
-            invocationId,
-            toolName,
-            params,
-            sequencePosition: event.sequencePosition,
-          });
-          aoddEmit(
-            'agent.tool_call',
-            {
-              invocation_id: invocationId,
-              tool_name: toolName,
-              params,
-              sequence_position: event.sequencePosition,
-            },
-            { invocation_id: invocationId },
-          );
-        }
-      }
-    }
+    this.recordExecutionTraceEvents(
+      result.cliResult?.events ?? [],
+      invocationId,
+      workflowRunId,
+      janumiCodeVersionSha,
+    );
 
     this.eventBus.emit('agent:invocation_completed', {
       invocationId,
@@ -386,6 +322,87 @@ export class ExecutorAgent {
       skippedIdempotent: false,
       error: result.error,
     };
+  }
+
+  /**
+   * Persist each CLI trace event as a governed_stream record and dual-emit
+   * the real-time EventBus + AODD signals. Extracted verbatim from execute()
+   * to keep its cognitive complexity within budget; behavior is unchanged.
+   */
+  private recordExecutionTraceEvents(
+    events: Array<{ recordType: string; data: Record<string, unknown>; sequencePosition: number }>,
+    invocationId: string,
+    workflowRunId: string,
+    janumiCodeVersionSha: string,
+  ): void {
+    for (const event of events) {
+      this.writer.writeRecord({
+        record_type: event.recordType as 'agent_reasoning_step',
+        schema_version: '1.0',
+        workflow_run_id: workflowRunId,
+        phase_id: '9',
+        sub_phase_id: '9.1',
+        produced_by_agent_role: 'executor_agent',
+        produced_by_record_id: invocationId,
+        janumicode_version_sha: janumiCodeVersionSha,
+        content: event.data,
+      });
+
+      // Emit real-time events for the webview (EventBus) + persistent
+      // AODD trace (dual-emit per design memo §5).
+      if (event.recordType === 'agent_reasoning_step') {
+        const content = (event.data.content ?? event.data.text ?? '') as string;
+        this.eventBus.emit('agent:reasoning_step', {
+          invocationId,
+          content,
+          sequencePosition: event.sequencePosition,
+        });
+        aoddEmit(
+          'agent.reasoning_step',
+          {
+            invocation_id: invocationId,
+            content,
+            sequence_position: event.sequencePosition,
+          },
+          { invocation_id: invocationId },
+        );
+      } else if (event.recordType === 'agent_self_correction') {
+        const content = (event.data.content ?? '') as string;
+        this.eventBus.emit('agent:self_correction', {
+          invocationId,
+          content,
+          sequencePosition: event.sequencePosition,
+        });
+        aoddEmit(
+          'agent.self_correction',
+          {
+            invocation_id: invocationId,
+            content,
+            sequence_position: event.sequencePosition,
+          },
+          { invocation_id: invocationId },
+        );
+      } else if (event.recordType === 'tool_call') {
+        const toolName = (event.data.name ?? '') as string;
+        const params = JSON.stringify(event.data.input ?? '');
+        this.eventBus.emit('agent:tool_call', {
+          invocationId,
+          toolName,
+          params,
+          sequencePosition: event.sequencePosition,
+        });
+        aoddEmit(
+          'agent.tool_call',
+          {
+            invocation_id: invocationId,
+            tool_name: toolName,
+            params,
+            sequence_position: event.sequencePosition,
+          },
+          { invocation_id: invocationId },
+        );
+      }
+    }
   }
 
   // ── File-write detection helpers ────────────────────────────────────

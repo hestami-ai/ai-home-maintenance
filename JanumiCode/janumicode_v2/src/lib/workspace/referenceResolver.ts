@@ -80,6 +80,25 @@ function stripTrailingPunctuation(s: string): string {
 }
 
 /**
+ * Parse a reference's raw text into a candidate filesystem path.
+ * Returns null if parsing fails (e.g. malformed file:// URI).
+ */
+function parseCandidatePath(ref: FileReference, raw: string): string | null {
+  try {
+    if (ref.form === 'file_uri') {
+      const url = new URL(raw);
+      return url.protocol === 'file:'
+        ? decodeURIComponent(url.pathname.replace(/^\/([a-zA-Z]):/, '$1:'))
+        : raw;
+    }
+    // Normalize Windows-style separators and strip any trailing punctuation
+    return stripTrailingPunctuation(raw.replaceAll('\\', '/'));
+  } catch {
+    return null;
+  }
+}
+
+/**
  * Detect all file references in the given text.
  * Returns references in document order.
  */
@@ -127,19 +146,8 @@ export function resolveReference(
   const maxFile = options.maxFileSizeBytes ?? DEFAULT_MAX_FILE;
 
   const raw = ref.referenceText;
-  let candidatePath: string;
-
-  try {
-    if (ref.form === 'file_uri') {
-      const url = new URL(raw);
-      candidatePath = url.protocol === 'file:'
-        ? decodeURIComponent(url.pathname.replace(/^\/([a-zA-Z]):/, '$1:'))
-        : raw;
-    } else {
-      // Normalize Windows-style separators and strip any trailing punctuation
-      candidatePath = stripTrailingPunctuation(raw.replaceAll('\\', '/'));
-    }
-  } catch {
+  const candidatePath = parseCandidatePath(ref, raw);
+  if (candidatePath === null) {
     return failure(ref, 'not_found', 'Could not parse reference as a path or URI');
   }
 

@@ -25,7 +25,13 @@ import {
   renderScopedAcMenu,
   dedupeTestSuiteIds,
   retainAcCoverageOnPrune,
+  buildComponentSummaryById,
+  collectAllAcIds,
+  extractStringIds,
+  collectDmr71Seeds,
+  buildRootTestCasesFromPlan,
 } from '../../../../lib/orchestrator/phases/phase7';
+import { renderComponentBlockForTask } from '../../../../lib/orchestrator/phases/phase6';
 import type { LeafAcceptanceCriteria } from '../../../../lib/orchestrator/phases/phase6';
 import type { PhaseContextPacketResult } from '../../../../lib/orchestrator/phases/dmrContext';
 
@@ -58,6 +64,150 @@ function components(): Array<Record<string, unknown>> {
 }
 
 // ── Pure helper tests ──────────────────────────────────────────────
+
+// Characterization tests pinning the behaviour of the execute() decomposition
+// helpers extracted from Phase7Handler.execute (S3776 cognitive-complexity
+// reduction). Assertions mirror the pre-refactor inline logic.
+describe('extractStringIds', () => {
+  it('maps { id } records to string ids, dropping absent/non-string ids, preserving order', () => {
+    expect(extractStringIds([
+      { id: 'US-1' },
+      { id: 'US-2' },
+      { name: 'no id' },
+      { id: 5 as unknown as string },
+      { id: '' },
+    ])).toEqual(['US-1', 'US-2']);
+  });
+
+  it('returns [] for an empty input', () => {
+    expect(extractStringIds([])).toEqual([]);
+  });
+});
+
+describe('collectAllAcIds', () => {
+  it('collects truthy AC ids in story-then-AC order, skipping missing/empty', () => {
+    const stories = [
+      { acceptance_criteria: [{ id: 'AC-1' }, { id: 'AC-2' }] },
+      { acceptance_criteria: [{ id: 'AC-3' }] },
+      { name: 'story with no acceptance_criteria' },
+      { acceptance_criteria: [{ id: '' }, { note: 'x' }, { id: 'AC-4' }] },
+    ];
+    expect(collectAllAcIds(stories)).toEqual(['AC-1', 'AC-2', 'AC-3', 'AC-4']);
+  });
+});
+
+describe('buildComponentSummaryById', () => {
+  it('keys only string-id components (in input order) to renderComponentBlockForTask output', () => {
+    const comps = components();
+    const map = buildComponentSummaryById([...comps, { name: 'no id' }]);
+    expect(Object.keys(map)).toEqual(['comp-a', 'comp-b', 'comp-c']);
+    expect(map['comp-a']).toBe(renderComponentBlockForTask(comps[0]));
+    expect(map['comp-c']).toBe(renderComponentBlockForTask(comps[2]));
+  });
+});
+
+describe('collectDmr71Seeds', () => {
+  type Prior = Parameters<typeof collectDmr71Seeds>[0];
+  it('emits present artifact record ids in fixed FR/NFR/CM/IP order, skipping absent', () => {
+    const prior = {
+      functionalRequirements: { recordId: 'fr-1' },
+      nonFunctionalRequirements: null,
+      componentModel: { recordId: 'cm-1' },
+      implementationPlan: { recordId: 'ip-1' },
+    } as unknown as Prior;
+    expect(collectDmr71Seeds(prior)).toEqual(['fr-1', 'cm-1', 'ip-1']);
+  });
+
+  it('emits all four when present, in order', () => {
+    const prior = {
+      functionalRequirements: { recordId: 'fr' },
+      nonFunctionalRequirements: { recordId: 'nfr' },
+      componentModel: { recordId: 'cm' },
+      implementationPlan: { recordId: 'ip' },
+    } as unknown as Prior;
+    expect(collectDmr71Seeds(prior)).toEqual(['fr', 'nfr', 'cm', 'ip']);
+  });
+
+  it('returns [] when none are present', () => {
+    const prior = {
+      functionalRequirements: null,
+      nonFunctionalRequirements: null,
+      componentModel: null,
+      implementationPlan: null,
+    } as unknown as Prior;
+    expect(collectDmr71Seeds(prior)).toEqual([]);
+  });
+});
+
+describe('buildRootTestCasesFromPlan', () => {
+  type Plan = Parameters<typeof buildRootTestCasesFromPlan>[0];
+  const plan = {
+    test_suites: [
+      {
+        suite_id: 'TS-1', component_id: 'comp-a', test_type: 'unit',
+        test_cases: [
+          {
+            test_case_id: 'TC-1', type: 'unit', acceptance_criterion_ids: ['AC-1'],
+            preconditions: ['p1'], execution_steps: ['do x', 'do y'],
+            expected_outcome: 'works', edge_cases: ['edge'],
+            property_spec: { invariant: 'i' },
+          },
+          {
+            test_case_id: 'TC-2', type: 'integration', acceptance_criterion_ids: ['AC-2'],
+            preconditions: [], component_ids: ['comp-z'],
+          },
+        ],
+      },
+      {
+        suite_id: 'TS-2', component_id: '', test_type: 'unit',
+        test_cases: [
+          { test_case_id: 'TC-3', type: 'unit', acceptance_criterion_ids: ['AC-3'], preconditions: [] },
+        ],
+      },
+    ],
+  } as unknown as Plan;
+
+  it('produces one root per test case, in suite-then-case order', () => {
+    const roots = buildRootTestCasesFromPlan(plan, ['TECH-1']);
+    expect(roots.map(r => r.id)).toEqual(['TC-1', 'TC-2', 'TC-3']);
+  });
+
+  it('TC-1: carries fields, inherits suite component_id, maps execution_steps, passes constraints', () => {
+    const [tc1] = buildRootTestCasesFromPlan(plan, ['TECH-1']);
+    expect(tc1).toMatchObject({
+      id: 'TC-1',
+      name: 'works',
+      test_type: 'unit',
+      component_ids: ['comp-a'],
+      acceptance_criterion_ids: ['AC-1'],
+      preconditions: ['p1'],
+      expected_outcome: 'works',
+      edge_cases: ['edge'],
+      active_constraints: ['TECH-1'],
+    });
+    expect(tc1.steps).toEqual([
+      { id: 'step-01', description: 'do x' },
+      { id: 'step-02', description: 'do y' },
+    ]);
+    expect(tc1.property_spec).toEqual({ invariant: 'i' });
+  });
+
+  it('TC-2: own component_ids win; no steps/outcome → single synthetic step from test_case_id', () => {
+    const roots = buildRootTestCasesFromPlan(plan, []);
+    const tc2 = roots[1];
+    expect(tc2.component_ids).toEqual(['comp-z']);
+    expect(tc2.name).toBe('TC-2'); // no expected_outcome → falls back to test_case_id
+    expect(tc2.steps).toEqual([{ id: 'step-01', description: 'TC-2' }]);
+    expect(tc2.active_constraints).toEqual([]);
+  });
+
+  it('TC-3: falsy suite component_id → empty component_ids; synthetic step from test_case_id', () => {
+    const roots = buildRootTestCasesFromPlan(plan, ['TECH-1']);
+    const tc3 = roots[2];
+    expect(tc3.component_ids).toEqual([]);
+    expect(tc3.steps).toEqual([{ id: 'step-01', description: 'TC-3' }]);
+  });
+});
 
 describe('retainAcCoverageOnPrune — root-vs-leaf coverage guard', () => {
   type Suite = Parameters<typeof retainAcCoverageOnPrune>[0][number];

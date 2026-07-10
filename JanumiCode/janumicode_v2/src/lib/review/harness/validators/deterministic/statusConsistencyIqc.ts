@@ -46,39 +46,53 @@ export function validateStatusConsistencyIqc(
 
   // overall_status ↔ concerns severity rules.
   if (overallStatus && concerns) {
-    const blockingConcerns = concerns.filter(
-      (c) =>
-        c &&
-        typeof c === 'object' &&
-        (c as Record<string, unknown>).severity === 'blocking',
-    );
-
-    if (overallStatus === 'blocking' && blockingConcerns.length === 0) {
-      findings.push({
-        validatorId: 'status_consistency_iqc',
-        severity: 'HIGH',
-        type: 'status_concerns_disagreement',
-        summary: 'overall_status=blocking but no blocking concerns',
-        location: '$.overall_status',
-        detail:
-          'overall_status=blocking requires at least one concern with severity=blocking.',
-        recommendation:
-          'Either downgrade overall_status (pass / requires_input) or add the blocking concern.',
-      });
-    }
-    if (overallStatus === 'pass' && blockingConcerns.length > 0) {
-      findings.push({
-        validatorId: 'status_consistency_iqc',
-        severity: 'HIGH',
-        type: 'status_concerns_disagreement',
-        summary: `overall_status=pass with ${blockingConcerns.length} blocking concern(s)`,
-        location: '$.overall_status',
-        detail:
-          'overall_status=pass forbids any concern with severity=blocking.',
-        recommendation: 'Upgrade overall_status to blocking, or downgrade the concerns.',
-      });
-    }
+    findings.push(...checkStatusSeverityRules(overallStatus, concerns));
   }
 
+  return findings;
+}
+
+/**
+ * overall_status ↔ concerns severity consistency rules. Extracted so the
+ * top-level validator stays under the cognitive-complexity threshold; the
+ * caller guards `overallStatus && concerns` before invoking.
+ */
+function checkStatusSeverityRules(
+  overallStatus: string,
+  concerns: unknown[],
+): ValidatorFinding[] {
+  const findings: ValidatorFinding[] = [];
+  const blockingConcerns = concerns.filter(
+    (c) =>
+      c &&
+      typeof c === 'object' &&
+      (c as Record<string, unknown>).severity === 'blocking',
+  );
+
+  if (overallStatus === 'blocking' && blockingConcerns.length === 0) {
+    findings.push({
+      validatorId: 'status_consistency_iqc',
+      severity: 'HIGH',
+      type: 'status_concerns_disagreement',
+      summary: 'overall_status=blocking but no blocking concerns',
+      location: '$.overall_status',
+      detail:
+        'overall_status=blocking requires at least one concern with severity=blocking.',
+      recommendation:
+        'Either downgrade overall_status (pass / requires_input) or add the blocking concern.',
+    });
+  }
+  if (overallStatus === 'pass' && blockingConcerns.length > 0) {
+    findings.push({
+      validatorId: 'status_consistency_iqc',
+      severity: 'HIGH',
+      type: 'status_concerns_disagreement',
+      summary: `overall_status=pass with ${blockingConcerns.length} blocking concern(s)`,
+      location: '$.overall_status',
+      detail:
+        'overall_status=pass forbids any concern with severity=blocking.',
+      recommendation: 'Upgrade overall_status to blocking, or downgrade the concerns.',
+    });
+  }
   return findings;
 }

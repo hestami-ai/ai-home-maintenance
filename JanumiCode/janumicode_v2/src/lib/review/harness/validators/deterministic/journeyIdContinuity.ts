@@ -22,11 +22,15 @@ function collectIds(arr: unknown): Set<string> {
   return ids;
 }
 
+function collectStringRefs(value: string, refs: Set<string>): void {
+  const m = value.match(JOURNEY_ID_REGEX);
+  if (m) for (const id of m) refs.add(id);
+}
+
 function walk(value: unknown, refs: Set<string>, skip: string | null = null): void {
   if (value == null) return;
   if (typeof value === 'string') {
-    const m = value.match(JOURNEY_ID_REGEX);
-    if (m) for (const id of m) refs.add(id);
+    collectStringRefs(value, refs);
     return;
   }
   if (Array.isArray(value)) {

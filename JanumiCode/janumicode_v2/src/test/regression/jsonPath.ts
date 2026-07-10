@@ -50,24 +50,57 @@ export interface JsonPathResult {
   traversedEmptyArray: boolean;
 }
 
+function isPlainObject(v: unknown): v is Record<string, unknown> {
+  return v !== null && typeof v === 'object' && !Array.isArray(v);
+}
+
+/**
+ * Apply a `prop` segment: for each plain-object value in `current` that owns
+ * `name`, collect that property's value. Non-objects, arrays, null, and
+ * objects missing the key are skipped (mirrors the original nested-if).
+ */
+function applyPropSegment(current: unknown[], name: string): unknown[] {
+  const next: unknown[] = [];
+  for (const v of current) {
+    if (isPlainObject(v) && name in v) {
+      next.push(v[name]);
+    }
+  }
+  return next;
+}
+
+/**
+ * Apply an `array` segment: flatten one array level, collecting each element.
+ * Non-array values are skipped. Reports whether any array flattened here was
+ * empty so the caller can OR it into the running `traversedEmptyArray` flag.
+ */
+function applyArraySegment(current: unknown[]): {
+  next: unknown[];
+  traversedEmptyArray: boolean;
+} {
+  const next: unknown[] = [];
+  let traversedEmptyArray = false;
+  for (const v of current) {
+    if (Array.isArray(v)) {
+      if (v.length === 0) traversedEmptyArray = true;
+      for (const el of v) next.push(el);
+    }
+  }
+  return { next, traversedEmptyArray };
+}
+
 export function evalJsonPathDetailed(root: unknown, path: string): JsonPathResult {
   const segments = parseJsonPath(path);
   let current: unknown[] = [root];
   let traversedEmptyArray = false;
   for (const seg of segments) {
-    const next: unknown[] = [];
-    for (const v of current) {
-      if (seg.kind === 'prop') {
-        if (v !== null && typeof v === 'object' && !Array.isArray(v)) {
-          const obj = v as Record<string, unknown>;
-          if (seg.name in obj) next.push(obj[seg.name]);
-        }
-      } else if (Array.isArray(v)) {
-        if (v.length === 0) traversedEmptyArray = true;
-        for (const el of v) next.push(el);
-      }
+    if (seg.kind === 'prop') {
+      current = applyPropSegment(current, seg.name);
+    } else {
+      const applied = applyArraySegment(current);
+      current = applied.next;
+      if (applied.traversedEmptyArray) traversedEmptyArray = true;
     }
-    current = next;
   }
   return { values: current, traversedEmptyArray };
 }

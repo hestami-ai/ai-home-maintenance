@@ -18,6 +18,7 @@ import { displayCapability } from './summaryFormat';
 import { buildPhaseContextPacket, type PhaseContextPacketResult } from './dmrContext';
 import { pickItemsArray, pickEnvelope } from '../parsedResponseHelpers';
 import { chunkedCoverageBloom } from './chunkedCoverageBloom';
+import type { PromptTemplate } from '../templateLoader';
 import { emit as aoddEmit } from '../../aodd';
 
 // ── Artifact shape interfaces ──────────────────────────────────────
@@ -64,6 +65,8 @@ export function formatSystemBoundarySummary(
   boundary: SystemBoundary,
   projectTypeDescription: string,
 ): string {
+  const externalSystems =
+    boundary.external_systems.map(e => `${e.id}: ${e.name} (${e.interface_type})`).join('; ') || 'none';
   return [
     `PROJECT TYPE: ${projectTypeDescription}`,
     ``,
@@ -73,7 +76,7 @@ export function formatSystemBoundarySummary(
     boundary.open_questions.length > 0
       ? `Open questions (unresolved Phase 1 items): ${boundary.open_questions.join('; ')}`
       : ``,
-    `External systems: ${boundary.external_systems.map(e => `${e.id}: ${e.name} (${e.interface_type})`).join('; ') || 'none'}`,
+    `External systems: ${externalSystems}`,
   ].filter(Boolean).join('\n');
 }
 
@@ -661,6 +664,25 @@ export interface SrFrStory { id: string; release_ordinal: number | null; label: 
 export interface SrNfr { id: string; label: string }
 
 /**
+ * Dedupe-and-push a single story into the SR cohort input. Shared by both the
+ * frozen-leaf and root-story branches of `buildSrFrStories` so the id-space and
+ * label format stay identical. Skips ids that are empty or already seen.
+ */
+function pushSrStory(
+  out: SrFrStory[],
+  seen: Set<string>,
+  raw: { id?: unknown; role?: unknown; action?: unknown; outcome?: unknown; priority?: unknown },
+  release_ordinal: number | null,
+  displayKey?: string,
+): void {
+  const id = typeof raw.id === 'string' ? raw.id : '';
+  if (!id || seen.has(id)) return;
+  seen.add(id);
+  const label = `${displayKey || id} [${srOneLine(raw.priority, 20) || 'priority?'}]: As a ${srOneLine(raw.role, 40)}, I want to ${srOneLine(raw.action, 80)}, so that ${srOneLine(raw.outcome, 80)}.`;
+  out.push({ id, release_ordinal, label });
+}
+
+/**
  * Build the per-story cohort input for SR derivation. Prefers the frozen leaf
  * tree (each leaf carries a release_ordinal on its decomposition node); falls
  * back to the root user-story list (no ordinals → a single Backlog cohort).
@@ -679,22 +701,13 @@ export function buildSrFrStories(
   const seen = new Set<string>();
   if (leaves.length > 0) {
     for (const l of leaves) {
-      const us = l.user_story ?? { id: '' };
-      const id = typeof us.id === 'string' ? us.id : '';
-      if (!id || seen.has(id)) continue;
-      seen.add(id);
-      const label = `${l.display_key || id} [${srOneLine(us.priority, 20) || 'priority?'}]: As a ${srOneLine(us.role, 40)}, I want to ${srOneLine(us.action, 80)}, so that ${srOneLine(us.outcome, 80)}.`;
-      out.push({ id, release_ordinal: l.release_ordinal ?? null, label });
+      pushSrStory(out, seen, l.user_story ?? { id: '' }, l.release_ordinal ?? null, l.display_key);
     }
     return out;
   }
   for (const s of rootStories) {
-    const id = typeof s.id === 'string' ? s.id : '';
-    if (!id || seen.has(id)) continue;
-    seen.add(id);
     const ro = typeof s.release_ordinal === 'number' ? s.release_ordinal : null;
-    const label = `${id} [${srOneLine(s.priority, 20) || 'priority?'}]: As a ${srOneLine(s.role, 40)}, I want to ${srOneLine(s.action, 80)}, so that ${srOneLine(s.outcome, 80)}.`;
-    out.push({ id, release_ordinal: ro, label });
+    pushSrStory(out, seen, s, ro);
   }
   return out;
 }
@@ -839,6 +852,126 @@ export interface SrDerivationResult {
 
 type SrDerivationCtx = Pick<PhaseContext, 'engine' | 'workflowRun'>;
 
+type SrLogger = ReturnType<typeof getLogger>;
+
+/**
+ * Parse a bounded non-negative integer tunable from an env var, preserving the
+ * exact `?? defaultStr` → `|| orValue` → `Math.max(min, …)` semantics the two
+ * Phase 3.2 knobs (recon passes / batch size) previously inlined.
+ */
+function boundedEnvInt(envName: string, defaultStr: string, orValue: number, min: number): number {
+  return Math.max(min, Number.parseInt(process.env[envName] ?? defaultStr, 10) || orValue);
+}
+
+/**
+ * Generate System Requirements for a single cohort — ONE bounded Phase 3.2
+ * generation call. Namespaces ids per cohort (`SR-<key>-<n>`) so two cohorts
+ * can't both surface SR-001 and get collapsed by idOf dedup (re-numbered to a
+ * global SR-### on merge). Returns [] on a missing template variable or an
+ * LLM/parse failure (never a fabricated SR — the reconciliation loop recovers).
+ */
+async function generateSrChunk(
+  cohort: SrCohort,
+  ctx: SrDerivationCtx,
+  input: SrDerivationInput,
+  genTemplate: PromptTemplate,
+  log: SrLogger,
+): Promise<SystemRequirementItem[]> {
+  const { engine } = ctx;
+  const rendered = engine.templateLoader.render(genTemplate, {
+    active_constraints: input.activeConstraintsText,
+    system_boundary_summary: input.boundarySummary,
+    cohort_label: cohort.label,
+    cohort_requirements: cohort.cohortRequirements,
+    cross_cutting_reference: cohort.crossCuttingReference,
+    janumicode_version_sha: input.janumicodeVersionSha,
+  });
+  if (rendered.missing_variables.length > 0) return [];
+  try {
+    const result = await engine.callForRole('requirements_agent', {
+      prompt: rendered.rendered,
+      responseFormat: 'json',
+      temperature: 0.4,
+      traceContext: {
+        workflowRunId: ctx.workflowRun.id,
+        phaseId: '3',
+        subPhaseId: 'system_requirements',
+        agentRole: 'systems_agent',
+        label: `Phase 3.2 — System Requirements Derivation (${cohort.label})`,
+      },
+    });
+    const items = parseSystemRequirements(result.parsed as Record<string, unknown> | null);
+    // Namespace ids per cohort so two cohorts can't both surface SR-001 and
+    // get collapsed by idOf dedup. Cleaned to a global SR-### on merge.
+    return items.map((it, i) => ({ ...it, id: `SR-${cohort.key}-${i + 1}` }));
+  } catch (err) {
+    log.warn('workflow', 'Phase 3.2 per-cohort SR generation failed — continuing', {
+      cohort: cohort.key, error: err instanceof Error ? err.message : String(err),
+    });
+    return [];
+  }
+}
+
+/**
+ * Partition the still-uncovered id set into deterministic, sorted batches of at
+ * most `maxIdsPerBatch` ids for scoped reconciliation.
+ */
+function chunkUncoveredIds(uncovered: Set<string>, maxIdsPerBatch: number): Array<Set<string>> {
+  const ids = [...uncovered].sort((a, b) => a.localeCompare(b));
+  const batches: Array<Set<string>> = [];
+  for (let i = 0; i < ids.length; i += maxIdsPerBatch) {
+    batches.push(new Set(ids.slice(i, i + maxIdsPerBatch)));
+  }
+  return batches;
+}
+
+/**
+ * Reconcile a single uncovered-id batch — ONE bounded Phase 3.2 coverage
+ * reconciliation call. Returns [] when the reconciliation template is absent, a
+ * template variable is missing, or the LLM/parse fails (never a fabricated SR).
+ */
+async function reconcileSrBatch(
+  batch: Set<string>,
+  passInfo: { pass: number; batchIndex: number; batchCount: number },
+  ctx: SrDerivationCtx,
+  input: SrDerivationInput,
+  reconTemplate: PromptTemplate | null,
+  labelById: Map<string, string>,
+  log: SrLogger,
+): Promise<SystemRequirementItem[]> {
+  if (!reconTemplate) return [];
+  const { engine } = ctx;
+  const menu = [...batch].sort((a, b) => a.localeCompare(b)).map(id => `- ${labelById.get(id) ?? id}`).join('\n');
+  const rendered = engine.templateLoader.render(reconTemplate, {
+    active_constraints: input.activeConstraintsText,
+    uncovered_requirements: menu,
+    system_boundary_summary: input.boundarySummary,
+  });
+  if (rendered.missing_variables.length > 0) return [];
+  try {
+    const result = await engine.callForRole('requirements_agent', {
+      prompt: rendered.rendered,
+      responseFormat: 'json',
+      temperature: 0.4,
+      traceContext: {
+        workflowRunId: ctx.workflowRun.id,
+        phaseId: '3',
+        subPhaseId: 'system_requirements',
+        agentRole: 'systems_agent',
+        label: `Phase 3.2 — Coverage Reconciliation (pass ${passInfo.pass}, batch ${passInfo.batchIndex}/${passInfo.batchCount}, ${batch.size} ids)`,
+      },
+    });
+    const items = parseSystemRequirements(result.parsed as Record<string, unknown> | null);
+    return items.map((it, i) => ({ ...it, id: `SR-recon-${passInfo.pass}-${passInfo.batchIndex}-${i + 1}` }));
+  } catch (err) {
+    log.warn('workflow', 'Phase 3.2 SR reconciliation batch failed — continuing', {
+      pass: passInfo.pass, batch_index: passInfo.batchIndex,
+      error: err instanceof Error ? err.message : String(err),
+    });
+    return [];
+  }
+}
+
 /**
  * Derive System Requirements via per-cohort generation + coverage
  * reconciliation. Returns the merged, globally re-numbered SRs plus an honest
@@ -879,97 +1012,17 @@ export async function deriveSystemRequirementsChunked(
   for (const s of input.frStories) labelById.set(s.id, s.label);
   for (const n of input.nfrs) labelById.set(n.id, n.label);
 
-  const maxReconPasses = Math.max(0, Number.parseInt(process.env.JANUMICODE_P3_RECON_PASSES ?? '2', 10) || 0);
-  const maxIdsPerBatch = Math.max(1, Number.parseInt(process.env.JANUMICODE_P3_RECON_BATCH_IDS ?? '25', 10) || 25);
-
-  const generateForChunk = async (cohort: SrCohort): Promise<SystemRequirementItem[]> => {
-    const rendered = engine.templateLoader.render(genTemplate, {
-      active_constraints: input.activeConstraintsText,
-      system_boundary_summary: input.boundarySummary,
-      cohort_label: cohort.label,
-      cohort_requirements: cohort.cohortRequirements,
-      cross_cutting_reference: cohort.crossCuttingReference,
-      janumicode_version_sha: input.janumicodeVersionSha,
-    });
-    if (rendered.missing_variables.length > 0) return [];
-    try {
-      const result = await engine.callForRole('requirements_agent', {
-        prompt: rendered.rendered,
-        responseFormat: 'json',
-        temperature: 0.4,
-        traceContext: {
-          workflowRunId: ctx.workflowRun.id,
-          phaseId: '3',
-          subPhaseId: 'system_requirements',
-          agentRole: 'systems_agent',
-          label: `Phase 3.2 — System Requirements Derivation (${cohort.label})`,
-        },
-      });
-      const items = parseSystemRequirements(result.parsed as Record<string, unknown> | null);
-      // Namespace ids per cohort so two cohorts can't both surface SR-001 and
-      // get collapsed by idOf dedup. Cleaned to a global SR-### on merge.
-      return items.map((it, i) => ({ ...it, id: `SR-${cohort.key}-${i + 1}` }));
-    } catch (err) {
-      log.warn('workflow', 'Phase 3.2 per-cohort SR generation failed — continuing', {
-        cohort: cohort.key, error: err instanceof Error ? err.message : String(err),
-      });
-      return [];
-    }
-  };
-
-  const chunkUncovered = (uncovered: Set<string>): Array<Set<string>> => {
-    const ids = [...uncovered].sort((a, b) => a.localeCompare(b));
-    const batches: Array<Set<string>> = [];
-    for (let i = 0; i < ids.length; i += maxIdsPerBatch) {
-      batches.push(new Set(ids.slice(i, i + maxIdsPerBatch)));
-    }
-    return batches;
-  };
-
-  const reconcileBatch = async (
-    batch: Set<string>,
-    passInfo: { pass: number; batchIndex: number; batchCount: number },
-  ): Promise<SystemRequirementItem[]> => {
-    if (!reconTemplate) return [];
-    const menu = [...batch].sort((a, b) => a.localeCompare(b)).map(id => `- ${labelById.get(id) ?? id}`).join('\n');
-    const rendered = engine.templateLoader.render(reconTemplate, {
-      active_constraints: input.activeConstraintsText,
-      uncovered_requirements: menu,
-      system_boundary_summary: input.boundarySummary,
-    });
-    if (rendered.missing_variables.length > 0) return [];
-    try {
-      const result = await engine.callForRole('requirements_agent', {
-        prompt: rendered.rendered,
-        responseFormat: 'json',
-        temperature: 0.4,
-        traceContext: {
-          workflowRunId: ctx.workflowRun.id,
-          phaseId: '3',
-          subPhaseId: 'system_requirements',
-          agentRole: 'systems_agent',
-          label: `Phase 3.2 — Coverage Reconciliation (pass ${passInfo.pass}, batch ${passInfo.batchIndex}/${passInfo.batchCount}, ${batch.size} ids)`,
-        },
-      });
-      const items = parseSystemRequirements(result.parsed as Record<string, unknown> | null);
-      return items.map((it, i) => ({ ...it, id: `SR-recon-${passInfo.pass}-${passInfo.batchIndex}-${i + 1}` }));
-    } catch (err) {
-      log.warn('workflow', 'Phase 3.2 SR reconciliation batch failed — continuing', {
-        pass: passInfo.pass, batch_index: passInfo.batchIndex,
-        error: err instanceof Error ? err.message : String(err),
-      });
-      return [];
-    }
-  };
+  const maxReconPasses = boundedEnvInt('JANUMICODE_P3_RECON_PASSES', '2', 0, 0);
+  const maxIdsPerBatch = boundedEnvInt('JANUMICODE_P3_RECON_BATCH_IDS', '25', 25, 1);
 
   const bloom = await chunkedCoverageBloom<SrCohort, SystemRequirementItem>({
     chunks: cohorts,
-    generateForChunk,
+    generateForChunk: (cohort) => generateSrChunk(cohort, ctx, input, genTemplate, log),
     idOf: (sr) => (typeof sr.id === 'string' ? sr.id : ''),
     targetCoverageSet,
     coveredBy: (sr) => srAsStringArray(sr.source_requirement_ids),
-    chunkUncovered,
-    reconcileBatch,
+    chunkUncovered: (uncovered) => chunkUncoveredIds(uncovered, maxIdsPerBatch),
+    reconcileBatch: (batch, passInfo) => reconcileSrBatch(batch, passInfo, ctx, input, reconTemplate, labelById, log),
     maxReconPasses,
     onResidual: (residual) => {
       log.warn(
@@ -1030,31 +1083,30 @@ const OPEN_QUESTION_LEADERS = new Set([
  * meta-decision verbs above, route to questions. Everything else
  * stays in decisions.
  */
+// The LLM occasionally emits structured entries — `{ item, rationale }` or
+// similar — instead of plain strings. Coerce to a usable string (preferring
+// known fields); returns '' for anything we can't reduce to text.
+function coerceOutOfScopeEntry(entry: unknown): string {
+  if (typeof entry === 'string') return entry;
+  if (entry && typeof entry === 'object') {
+    const obj = entry as Record<string, unknown>;
+    return (
+      (typeof obj.item === 'string' && obj.item) ||
+      (typeof obj.text === 'string' && obj.text) ||
+      (typeof obj.description === 'string' && obj.description) ||
+      ''
+    );
+  }
+  return '';
+}
+
 function classifyOutOfScopeEntries(
   entries: unknown[],
 ): { decisions: string[]; questions: string[] } {
   const decisions: string[] = [];
   const questions: string[] = [];
   for (const entry of entries) {
-    // The LLM occasionally emits structured entries — `{ item, rationale }`
-    // or similar — instead of plain strings. Coerce to a usable string
-    // (preferring known fields) and skip anything we can't reduce to text.
-    let asString: string;
-    if (typeof entry === 'string') {
-      asString = entry;
-    } else if (entry && typeof entry === 'object') {
-      const obj = entry as Record<string, unknown>;
-      const candidate =
-        (typeof obj.item === 'string' && obj.item) ||
-        (typeof obj.text === 'string' && obj.text) ||
-        (typeof obj.description === 'string' && obj.description) ||
-        '';
-      if (!candidate) continue;
-      asString = candidate;
-    } else {
-      continue;
-    }
-    const trimmed = asString.trim();
+    const trimmed = coerceOutOfScopeEntry(entry).trim();
     if (!trimmed) continue;
     if (trimmed.endsWith('?')) { questions.push(trimmed); continue; }
     const firstWord = trimmed.split(/\s+/, 1)[0]?.toLowerCase() ?? '';
@@ -1225,6 +1277,18 @@ function filterLlmExternals(
   });
 }
 
+/** Index one technical_constraints_discovery item roster into `idx` by id→category. */
+function indexTechCategories(
+  idx: Map<string, string>,
+  items: Array<Record<string, unknown>>,
+): void {
+  for (const it of items) {
+    const id = typeof it.id === 'string' ? it.id : '';
+    const cat = typeof it.category === 'string' ? it.category : '';
+    if (id) idx.set(id.toLowerCase(), cat);
+  }
+}
+
 function buildTechCategoryIndex(
   artifacts: GovernedStreamRecord[],
 ): Map<string, string> {
@@ -1234,11 +1298,7 @@ function buildTechCategoryIndex(
     if (c.kind !== 'technical_constraints_discovery') continue;
     const items = arr(c.technicalConstraints ?? c.technical_constraints);
     if (!items) continue;
-    for (const it of items) {
-      const id = typeof it.id === 'string' ? it.id : '';
-      const cat = typeof it.category === 'string' ? it.category : '';
-      if (id) idx.set(id.toLowerCase(), cat);
-    }
+    indexTechCategories(idx, items);
   }
   return idx;
 }
@@ -1294,7 +1354,7 @@ function isExclusionConstraint(text: string): boolean {
  * shape — downstream serialisation (`boundarySummary`) calls
  * `.join('; ')` so this MUST remain a flat string array.
  */
-function reconstructOutOfScopeFromIntent(
+export function reconstructOutOfScopeFromIntent(
   llmOutOfScope: SystemBoundary['out_of_scope'] | undefined,
   artifacts: GovernedStreamRecord[],
 ): SystemBoundary['out_of_scope'] {
@@ -1313,39 +1373,75 @@ function reconstructOutOfScopeFromIntent(
   };
 
   // Sources 1 & 2: intent_statement
-  const intentRecord = artifacts.find(
-    a => (a.content as Record<string, unknown>)?.kind === 'intent_statement',
-  );
-  if (intentRecord) {
-    const ic = intentRecord.content as Record<string, unknown>;
-    const intentOos = arr(ic.out_of_scope) ?? [];
-    for (const entry of intentOos) {
-      if (typeof entry === 'string') push(entry);
-      else if (entry && typeof entry === 'object' && typeof (entry as { capability?: unknown }).capability === 'string') {
-        push((entry as { capability: string }).capability);
-      }
-    }
-    const constraints = arr(ic.confirmed_constraints) ?? arr(ic.confirmedConstraints) ?? [];
-    for (const entry of constraints) {
-      const text = typeof entry === 'string' ? entry : '';
-      if (text && isExclusionConstraint(text)) push(text);
-    }
+  const intentContent = findArtifactContentByKind(artifacts, 'intent_statement');
+  if (intentContent) {
+    collectDeclaredOutOfScope(intentContent, push);   // source 1
+    collectExclusionConstraints(intentContent, push); // source 2
   }
 
   // Source 3: technical_constraints[].text (verbatim spec excerpts)
-  const techRecord = artifacts.find(
-    a => (a.content as Record<string, unknown>)?.kind === 'technical_constraints_discovery',
-  );
-  if (techRecord) {
-    const tc = techRecord.content as Record<string, unknown>;
-    const items = arr(tc.technicalConstraints ?? tc.technical_constraints) ?? [];
-    for (const it of items) {
-      const text = typeof it.text === 'string' ? it.text : '';
-      if (text && isExclusionConstraint(text)) push(text);
-    }
-  }
+  const techContent = findArtifactContentByKind(artifacts, 'technical_constraints_discovery');
+  if (techContent) collectTechConstraintExclusions(techContent, push);
 
   return reconstructed;
+}
+
+/** First artifact whose `content.kind` matches `kind`, returning its content. */
+function findArtifactContentByKind(
+  artifacts: GovernedStreamRecord[],
+  kind: string,
+): Record<string, unknown> | undefined {
+  const record = artifacts.find(
+    a => (a.content as Record<string, unknown>)?.kind === kind,
+  );
+  return record ? (record.content as Record<string, unknown>) : undefined;
+}
+
+/**
+ * Source 1: `intent_statement.out_of_scope[]` passthrough. Entries may be
+ * bare strings or `{ capability }` objects.
+ */
+function collectDeclaredOutOfScope(
+  ic: Record<string, unknown>,
+  push: (text: string) => void,
+): void {
+  const intentOos = arr(ic.out_of_scope) ?? [];
+  for (const entry of intentOos) {
+    if (typeof entry === 'string') push(entry);
+    else if (entry && typeof entry === 'object' && typeof (entry as { capability?: unknown }).capability === 'string') {
+      push((entry as { capability: string }).capability);
+    }
+  }
+}
+
+/**
+ * Source 2: `intent_statement.confirmed_constraints[]` filtered for items
+ * whose text contains an exclusion verb.
+ */
+function collectExclusionConstraints(
+  ic: Record<string, unknown>,
+  push: (text: string) => void,
+): void {
+  const constraints = arr(ic.confirmed_constraints) ?? arr(ic.confirmedConstraints) ?? [];
+  for (const entry of constraints) {
+    const text = typeof entry === 'string' ? entry : '';
+    if (text && isExclusionConstraint(text)) push(text);
+  }
+}
+
+/**
+ * Source 3: `technical_constraints[].text` filtered for exclusion verbs
+ * (verbatim spec excerpts preserved by the constraint extractor).
+ */
+function collectTechConstraintExclusions(
+  tc: Record<string, unknown>,
+  push: (text: string) => void,
+): void {
+  const items = arr(tc.technicalConstraints ?? tc.technical_constraints) ?? [];
+  for (const it of items) {
+    const text = typeof it.text === 'string' ? it.text : '';
+    if (text && isExclusionConstraint(text)) push(text);
+  }
 }
 
 function integrationToExternal(i: Record<string, unknown>): ExternalSystem | null {

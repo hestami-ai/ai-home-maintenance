@@ -16,13 +16,19 @@ import * as path from 'node:path';
 import { createTestDatabase, type Database } from '../../../../lib/database/init';
 import { ConfigManager } from '../../../../lib/config/configManager';
 import { OrchestratorEngine } from '../../../../lib/orchestrator/orchestratorEngine';
-import { runTaskSaturationLoop } from '../../../../lib/orchestrator/phases/phase6_1a';
+import {
+  runTaskSaturationLoop,
+  rebuildTaskSaturationStateFromStream,
+  type TaskSaturationConfig,
+} from '../../../../lib/orchestrator/phases/phase6_1a';
 import { MockLLMProvider } from '../../../helpers/mockLLMProvider';
 import type {
   DecompositionTask,
   TaskDecompositionNodeContent,
   TaskDecompositionPipelineContent,
   TaskAssumptionSetSnapshotContent,
+  TaskAssumptionEntry,
+  DecompositionPassEntry,
 } from '../../../../lib/types/records';
 
 const extensionPath = path.resolve(__dirname, '..', '..', '..', '..', '..');
@@ -391,5 +397,215 @@ describe('runTaskSaturationLoop — Wave 8 saturation', () => {
     expect(row.task_decomposition_budget_calls_used).toBeGreaterThanOrEqual(1);
     expect(row.task_decomposition_max_depth_reached).toBe(1);
     expect(row.active_task_pipeline_id).toMatch(/^task-decomp-pipe-/);
+  });
+});
+
+// Characterization: pins the current observable behavior of the exported
+// resume-state reconstructor. The runTaskSaturationLoop tests above only ever
+// hit the early `return null` path (no prior pipeline record exists on a fresh
+// run), so the non-null resume reconstruction was previously unexercised.
+describe('rebuildTaskSaturationStateFromStream — resume state reconstruction', () => {
+  let db: Database;
+  let engine: OrchestratorEngine;
+
+  const config: TaskSaturationConfig = {
+    recordSubPhaseId: 'task_saturation',
+    templateSubPhase: 'task_saturation',
+    gateSurfacePrefix: 'task-decomp-gate-',
+  };
+
+  beforeEach(() => {
+    db = createTestDatabase();
+    const configManager = new ConfigManager();
+    engine = new OrchestratorEngine(db, configManager, workspacePath, extensionPath);
+  });
+
+  afterEach(() => { db.close(); });
+
+  function ctxFor(runId: string) {
+    return {
+      engine,
+      workflowRun: { id: runId } as
+        Parameters<typeof rebuildTaskSaturationStateFromStream>[0]['workflowRun'],
+    };
+  }
+
+  function task(id: string, activeConstraints?: string[]): DecompositionTask {
+    const t: DecompositionTask = {
+      id, name: id, description: `Implement ${id}`,
+      component_id: 'comp-x', component_responsibility: 'do work',
+      estimated_complexity: 'medium',
+      completion_criteria: [{ criterion_id: `cc-${id}`, description: `${id} works` }],
+    };
+    if (activeConstraints) t.active_constraints = activeConstraints;
+    return t;
+  }
+
+  function writeNode(runId: string, content: TaskDecompositionNodeContent): string {
+    return engine.writer.writeRecord({
+      record_type: 'task_decomposition_node',
+      schema_version: '1.0',
+      workflow_run_id: runId,
+      phase_id: '6',
+      sub_phase_id: 'task_saturation',
+      produced_by_agent_role: 'implementation_planner',
+      janumicode_version_sha: 'dev',
+      derived_from_record_ids: [],
+      content,
+    }).id;
+  }
+
+  function writeSnapshot(runId: string, content: TaskAssumptionSetSnapshotContent): string {
+    return engine.writer.writeRecord({
+      record_type: 'task_assumption_set_snapshot',
+      schema_version: '1.0',
+      workflow_run_id: runId,
+      phase_id: '6',
+      sub_phase_id: 'task_saturation',
+      produced_by_agent_role: 'implementation_planner',
+      janumicode_version_sha: 'dev',
+      derived_from_record_ids: [],
+      content,
+    }).id;
+  }
+
+  function writePipeline(runId: string, content: TaskDecompositionPipelineContent): string {
+    return engine.writer.writeRecord({
+      record_type: 'task_decomposition_pipeline',
+      schema_version: '1.0',
+      workflow_run_id: runId,
+      phase_id: '6',
+      sub_phase_id: 'task_saturation',
+      produced_by_agent_role: 'orchestrator',
+      janumicode_version_sha: 'dev',
+      derived_from_record_ids: [],
+      content,
+    }).id;
+  }
+
+  it('returns null when no task_decomposition_node records exist', () => {
+    const { run } = engine.startWorkflowRun('ws', 'test');
+    expect(rebuildTaskSaturationStateFromStream(ctxFor(run.id), config, 'pipe-x')).toBeNull();
+  });
+
+  it('returns null when nodes exist but no pipeline record matches the pipeline id', () => {
+    const { run } = engine.startWorkflowRun('ws', 'test');
+    writeNode(run.id, {
+      kind: 'task_decomposition_node',
+      node_id: 'nR', parent_node_id: null, display_key: 'task-r',
+      root_task_id: 'nR', depth: 0, pass_number: 0, status: 'pending',
+      task: task('task-r'), surfaced_assumption_ids: [],
+      release_id: null, release_ordinal: null,
+    });
+    // A pipeline record exists but with a different id → filtered out → null.
+    writePipeline(run.id, {
+      kind: 'task_decomposition_pipeline', pipeline_id: 'other-pipe',
+      root_task_id: '*', passes: [],
+    });
+    expect(rebuildTaskSaturationStateFromStream(ctxFor(run.id), config, 'pipe-x')).toBeNull();
+  });
+
+  it('reconstructs queue, siblings, assumptions, seq, and pipeline bounds', () => {
+    const { run } = engine.startWorkflowRun('ws', 'test');
+
+    // depth-0 pending root (tierHint → 'root'), one pending Tier-C child,
+    // one already-decomposed child (excluded from queue but present as sibling),
+    // and one pending child with no tier (tierHint falls back to 'A').
+    writeNode(run.id, {
+      kind: 'task_decomposition_node',
+      node_id: 'nR', parent_node_id: null, display_key: 'task-r',
+      root_task_id: 'nR', depth: 0, pass_number: 0, status: 'pending',
+      task: task('task-r', ['TECH-1']), surfaced_assumption_ids: [],
+      release_id: null, release_ordinal: null,
+    });
+    writeNode(run.id, {
+      kind: 'task_decomposition_node',
+      node_id: 'nC1', parent_node_id: 'nR', display_key: 'task-c1',
+      root_task_id: 'nR', depth: 1, pass_number: 1, status: 'pending', tier: 'C',
+      task: task('task-c1'), surfaced_assumption_ids: [],
+      release_id: 'rel-1', release_ordinal: 2,
+    });
+    writeNode(run.id, {
+      kind: 'task_decomposition_node',
+      node_id: 'nC2', parent_node_id: 'nR', display_key: 'task-c2',
+      root_task_id: 'nR', depth: 1, pass_number: 1, status: 'decomposed', tier: 'A',
+      task: task('task-c2'), surfaced_assumption_ids: [],
+      release_id: null, release_ordinal: null,
+    });
+    writeNode(run.id, {
+      kind: 'task_decomposition_node',
+      node_id: 'nC3', parent_node_id: 'nR', display_key: 'task-c3',
+      root_task_id: 'nR', depth: 1, pass_number: 1, status: 'pending',
+      task: task('task-c3'), surfaced_assumption_ids: [],
+      release_id: null, release_ordinal: null,
+    });
+
+    const mkAssumption = (id: string, pass: number): TaskAssumptionEntry => ({
+      id, text: `assumption ${id}`, source: 'decomposition',
+      surfaced_at_pass: pass, category: 'implementation_choice',
+    });
+    // Two snapshots; the highest pass_number wins regardless of write order.
+    writeSnapshot(run.id, {
+      kind: 'task_assumption_set_snapshot', pass_number: 1, root_task_id: '*',
+      assumptions: [mkAssumption('TA-0003', 1)], delta_from_previous_pass: 1,
+    });
+    writeSnapshot(run.id, {
+      kind: 'task_assumption_set_snapshot', pass_number: 2, root_task_id: '*',
+      assumptions: [
+        mkAssumption('TA-0003', 1),
+        mkAssumption('TA-0007', 2),
+        mkAssumption('X-99', 2), // non-TA id → ignored by seq computation
+      ],
+      delta_from_previous_pass: 2,
+    });
+
+    const passEntry = (n: number): DecompositionPassEntry => ({
+      pass_number: n, status: 'completed', started_at: null, completed_at: null,
+      nodes_produced: n, assumption_delta: n,
+    });
+    // Non-matching pipeline (filtered out) + the matching pipeline record.
+    writePipeline(run.id, {
+      kind: 'task_decomposition_pipeline', pipeline_id: 'other-pipe',
+      root_task_id: '*', passes: [passEntry(9)],
+    });
+    const matchingId = writePipeline(run.id, {
+      kind: 'task_decomposition_pipeline', pipeline_id: 'pipe-x',
+      root_task_id: '*', passes: [passEntry(1), passEntry(2)],
+    });
+
+    const state = rebuildTaskSaturationStateFromStream(ctxFor(run.id), config, 'pipe-x');
+    expect(state).not.toBeNull();
+
+    // Queue: only the three pending nodes.
+    expect(state!.queue).toHaveLength(3);
+    const qR = state!.queue.find(q => q.nodeId === 'nR')!;
+    const qC1 = state!.queue.find(q => q.nodeId === 'nC1')!;
+    const qC3 = state!.queue.find(q => q.nodeId === 'nC3')!;
+    expect(qR.tierHint).toBe('root');               // depth 0
+    expect(qR.activeConstraints).toEqual(['TECH-1']);
+    expect(qC1.tierHint).toBe('C');                 // explicit tier
+    expect(qC1.releaseId).toBe('rel-1');
+    expect(qC1.releaseOrdinal).toBe(2);
+    expect(qC3.tierHint).toBe('A');                 // no tier → fallback 'A'
+    // The decomposed child is not queued.
+    expect(state!.queue.find(q => q.nodeId === 'nC2')).toBeUndefined();
+
+    // Siblings: root under null; all three children under 'nR' regardless of status.
+    expect(state!.siblingsByParent.get(null)!.map(t => t.id)).toEqual(['task-r']);
+    expect(state!.siblingsByParent.get('nR')!.map(t => t.id).sort())
+      .toEqual(['task-c1', 'task-c2', 'task-c3']);
+
+    expect(state!.maxDepthReached).toBe(1);
+
+    // Assumptions come from the highest-pass snapshot.
+    expect(state!.passNumber).toBe(2);
+    expect(state!.allAssumptions.map(a => a.id)).toEqual(['TA-0003', 'TA-0007', 'X-99']);
+    // Seq = max TA-<n>; the non-TA id is ignored.
+    expect(state!.assumptionSeq).toBe(7);
+
+    // Pipeline bounds resolve to the matching record only.
+    expect(state!.currentPipelineRecordId).toBe(matchingId);
+    expect(state!.pipelineStartRecord.id).toBe(matchingId);
+    expect(state!.pipelinePasses.map(p => p.pass_number)).toEqual([1, 2]);
   });
 });

@@ -349,4 +349,57 @@ describe('Wave 4 — product_description_handoff shape/coverage oracle', () => {
     const ids = (res: typeof a) => res.gaps.map(g => g.gap_id).sort();
     expect(ids(a)).toEqual(ids(b));
   });
+
+  it('characterization — pins element-level shape + provenance findings across every handoff category', () => {
+    // Behavior baseline for the shape/coverage oracle's per-category
+    // element checks that the other tests don't exercise directly:
+    // userJourneys, businessDomainProposals, workflowProposals,
+    // integrationProposals, phasingStrategy journey-id resolution, and
+    // the iter-4 traceability-spine provenance check. Each tweak below
+    // targets exactly one category so the emitted gap set is predictable.
+    const broken = validHandoff();
+    // userJourney with only 2 steps (min 3)
+    broken.userJourneys[0] = { ...broken.userJourneys[0], steps: broken.userJourneys[0].steps.slice(0, 2) };
+    // businessDomain with no entityPreview (min 3)
+    broken.businessDomainProposals[0] = { ...broken.businessDomainProposals[0], entityPreview: [] };
+    // workflow with no triggers (min 1)
+    broken.workflowProposals[0] = { ...broken.workflowProposals[0], triggers: [] };
+    // integration with an ownershipModel outside the allowed set
+    broken.integrationProposals[0] = { ...broken.integrationProposals[0], ownershipModel: 'invalid' as never };
+    // phasingStrategy referencing a journey id that doesn't exist
+    broken.phasingStrategy[0] = { ...broken.phasingStrategy[0], journeyIds: ['UJ-999'] };
+    // a technicalConstraint with no source_ref.excerpt (traceability spine)
+    broken.technicalConstraints = [{ id: 'TC-1', description: 'x' } as never];
+    seedPhase1ProductLensRun(broken);
+
+    const result = validateLineage(db, runId, ['1']);
+    expect(result.valid).toBe(false);
+
+    const byFieldPrefix = (prefix: string) =>
+      result.gaps.find(g => typeof g.expected.field === 'string' && (g.expected.field as string).startsWith(prefix));
+
+    const journeyGap = byFieldPrefix('userJourneys[id=UJ-1]');
+    expect(journeyGap, 'expected userJourney element-level shape gap').toBeDefined();
+    expect(journeyGap!.category).toBe('shape_violation');
+
+    const domainGap = byFieldPrefix('businessDomainProposals[id=DOM-1]');
+    expect(domainGap, 'expected businessDomain element-level shape gap').toBeDefined();
+    expect(domainGap!.category).toBe('shape_violation');
+
+    const workflowGap = byFieldPrefix('workflowProposals[id=WF-1]');
+    expect(workflowGap, 'expected workflow element-level shape gap').toBeDefined();
+    expect((workflowGap!.observed.value as string)).toContain('triggers=0');
+
+    const integrationGap = byFieldPrefix('integrationProposals[id=INT-1]');
+    expect(integrationGap, 'expected integration element-level shape gap').toBeDefined();
+    expect((integrationGap!.observed.value as string)).toContain('ownershipModel=invalid');
+
+    const phasingGap = byFieldPrefix('phasingStrategy[phase=Phase 1].journeyIds');
+    expect(phasingGap, 'expected phasingStrategy unknown-journey gap').toBeDefined();
+    expect((phasingGap!.observed.value as string)).toContain('UJ-999');
+
+    const provenanceGap = result.gaps.find(g => g.expected.field === 'technicalConstraints[].source_ref');
+    expect(provenanceGap, 'expected traceability-spine provenance gap').toBeDefined();
+    expect((provenanceGap!.observed.value as string)).toContain('missing source_ref.excerpt');
+  });
 });

@@ -78,4 +78,33 @@ describe('computeFieldDiff', () => {
     expect(d.added).toEqual(['also_new']);
     expect(d.size_changed).toEqual([{ field: 'items', from: 3, to: 0 }]);
   });
+
+  // Golden-snapshot characterization: exercises all five signal types plus
+  // rename-subtraction in a single call and pins the exact output shape.
+  // Guards behavior against refactors of the diff computation.
+  it('produces the exact diff shape for a payload touching every signal', () => {
+    const d = computeFieldDiff(
+      {
+        common_num: 5,
+        user_stories: [{ id: 'US-1' }, { id: 'US-2' }],
+        dropped_obj: { x: 1 },
+        changed: 'text',
+        arr: [1, 2, 3],
+      },
+      {
+        common_num: 5,
+        userStories: [{ id: 'US-1' }, { id: 'US-2' }],
+        brand_new: 42,
+        changed: 99,
+        arr: [1],
+      },
+    );
+    expect(d).toEqual({
+      added: ['brand_new'],
+      removed: ['dropped_obj'],
+      renamed: [{ from: 'user_stories', to: 'userStories' }],
+      type_changed: ['changed'],
+      size_changed: [{ field: 'arr', from: 3, to: 1 }],
+    });
+  });
 });

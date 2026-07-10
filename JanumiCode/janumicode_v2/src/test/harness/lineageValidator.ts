@@ -407,6 +407,322 @@ interface ShapeCoverageFinding {
 
 type MultiFailureCheck = (records: StreamRecord[]) => ShapeCoverageFinding[];
 
+/**
+ * Walk user_stories once and collect the set of userJourney ids covered
+ * by any story's `traces_to` (UJ-prefixed trace targets).
+ */
+function collectCoveredJourneys(stories: Array<Record<string, unknown>>): Set<string> {
+  const coveredJourneys = new Set<string>();
+  for (const s of stories) {
+    const traces = Array.isArray(s.traces_to) ? s.traces_to as string[] : [];
+    for (const t of traces) if (t.startsWith('UJ-')) coveredJourneys.add(t);
+  }
+  return coveredJourneys;
+}
+
+/** `content[key]` as an array, or [] when the key is absent / not an array. */
+function arrField(content: Record<string, unknown>, key: string): unknown[] {
+  return Array.isArray(content[key]) ? content[key] as unknown[] : [];
+}
+
+/**
+ * Range checks for the top-level handoff collections. Ranges widened in
+ * iter-3c to accommodate Codex gpt-5.4's richer generation (2–2.5x the
+ * v1 reference counts); lower bounds unchanged — same quality floor. The
+ * iter-4 decomposed extraction fields have a lower bound of 0 (a simple
+ * intent legitimately has no constraints / compliance / V&V / vocabulary).
+ */
+function checkHandoffRanges(content: Record<string, unknown>): ShapeCoverageFinding[] {
+  const findings: ShapeCoverageFinding[] = [];
+  const pushRange = (field: string, actualCount: number, min: number, max: number) => {
+    if (actualCount < min || actualCount > max) {
+      findings.push({
+        field,
+        expected: `length in [${min}, ${max}]`,
+        actual: `length=${actualCount}`,
+        sub_phase_id: '1.6',
+      });
+    }
+  };
+  pushRange('personas', arrField(content, 'personas').length, 3, 15);
+  pushRange('userJourneys', arrField(content, 'userJourneys').length, 5, 15);
+  pushRange('businessDomainProposals', arrField(content, 'businessDomainProposals').length, 6, 30);
+  pushRange('entityProposals', arrField(content, 'entityProposals').length, 20, 150);
+  pushRange('workflowProposals', arrField(content, 'workflowProposals').length, 3, 30);
+  pushRange('integrationProposals', arrField(content, 'integrationProposals').length, 5, 35);
+  pushRange('qualityAttributes', arrField(content, 'qualityAttributes').length, 8, 25);
+  pushRange('phasingStrategy', arrField(content, 'phasingStrategy').length, 2, 5);
+  pushRange('technicalConstraints', arrField(content, 'technicalConstraints').length, 0, 40);
+  pushRange('complianceExtractedItems', arrField(content, 'complianceExtractedItems').length, 0, 30);
+  pushRange('vvRequirements', arrField(content, 'vvRequirements').length, 0, 40);
+  pushRange('canonicalVocabulary', arrField(content, 'canonicalVocabulary').length, 0, 60);
+  return findings;
+}
+
+function checkPersonaShapes(content: Record<string, unknown>): ShapeCoverageFinding[] {
+  const findings: ShapeCoverageFinding[] = [];
+  for (const p of arrField(content, 'personas') as Array<Record<string, unknown>>) {
+    if (!p.name || !Array.isArray(p.goals) || (p.goals as unknown[]).length < 1 ||
+        !Array.isArray(p.painPoints) || (p.painPoints as unknown[]).length < 1) {
+      findings.push({
+        field: `personas[id=${p.id ?? '?'}]`,
+        expected: 'name + goals[≥1] + painPoints[≥1]',
+        actual: `goals=${Array.isArray(p.goals) ? (p.goals as unknown[]).length : 0}, painPoints=${Array.isArray(p.painPoints) ? (p.painPoints as unknown[]).length : 0}`,
+        sub_phase_id: '1.6',
+      });
+    }
+  }
+  return findings;
+}
+
+function checkUserJourneyShapes(content: Record<string, unknown>): ShapeCoverageFinding[] {
+  const findings: ShapeCoverageFinding[] = [];
+  for (const j of arrField(content, 'userJourneys') as Array<Record<string, unknown>>) {
+    if (!Array.isArray(j.steps) || (j.steps as unknown[]).length < 3 ||
+        !Array.isArray(j.acceptanceCriteria) || (j.acceptanceCriteria as unknown[]).length < 1 ||
+        typeof j.implementationPhase !== 'string') {
+      findings.push({
+        field: `userJourneys[id=${j.id ?? '?'}]`,
+        expected: 'steps[≥3] + acceptanceCriteria[≥1] + implementationPhase',
+        actual: `steps=${Array.isArray(j.steps) ? (j.steps as unknown[]).length : 0}, acceptanceCriteria=${Array.isArray(j.acceptanceCriteria) ? (j.acceptanceCriteria as unknown[]).length : 0}, implementationPhase=${typeof j.implementationPhase}`,
+        sub_phase_id: '1.6',
+      });
+    }
+  }
+  return findings;
+}
+
+function checkBusinessDomainShapes(content: Record<string, unknown>): ShapeCoverageFinding[] {
+  const findings: ShapeCoverageFinding[] = [];
+  for (const d of arrField(content, 'businessDomainProposals') as Array<Record<string, unknown>>) {
+    if (!Array.isArray(d.entityPreview) || (d.entityPreview as unknown[]).length < 3 ||
+        !Array.isArray(d.workflowPreview) || (d.workflowPreview as unknown[]).length < 1) {
+      findings.push({
+        field: `businessDomainProposals[id=${d.id ?? '?'}]`,
+        expected: 'entityPreview[≥3] + workflowPreview[≥1]',
+        actual: `entityPreview=${Array.isArray(d.entityPreview) ? (d.entityPreview as unknown[]).length : 0}, workflowPreview=${Array.isArray(d.workflowPreview) ? (d.workflowPreview as unknown[]).length : 0}`,
+        sub_phase_id: '1.6',
+      });
+    }
+  }
+  return findings;
+}
+
+function checkEntityShapes(content: Record<string, unknown>): ShapeCoverageFinding[] {
+  const findings: ShapeCoverageFinding[] = [];
+  const domainIds = new Set(
+    (arrField(content, 'businessDomainProposals') as Array<Record<string, unknown>>).map(d => d.id as string),
+  );
+  for (const e of arrField(content, 'entityProposals') as Array<Record<string, unknown>>) {
+    const ka = Array.isArray(e.keyAttributes) ? (e.keyAttributes as unknown[]).length : 0;
+    const rel = Array.isArray(e.relationships) ? (e.relationships as unknown[]).length : 0;
+    const bdi = e.businessDomainId as string | undefined;
+    const unknownDomain = bdi && !domainIds.has(bdi);
+    if (ka < 2 || rel < 1 || unknownDomain) {
+      findings.push({
+        field: `entityProposals[id=${e.id ?? '?'}]`,
+        expected: 'keyAttributes[≥2] + relationships[≥1] + businessDomainId in domains',
+        actual: `keyAttributes=${ka}, relationships=${rel}, businessDomainId=${bdi ?? 'missing'}${unknownDomain ? ' (UNKNOWN)' : ''}`,
+        sub_phase_id: '1.6',
+      });
+    }
+  }
+  return findings;
+}
+
+function checkWorkflowShapes(content: Record<string, unknown>): ShapeCoverageFinding[] {
+  const findings: ShapeCoverageFinding[] = [];
+  for (const w of arrField(content, 'workflowProposals') as Array<Record<string, unknown>>) {
+    const s = Array.isArray(w.steps) ? (w.steps as unknown[]).length : 0;
+    const t = Array.isArray(w.triggers) ? (w.triggers as unknown[]).length : 0;
+    if (s < 3 || t < 1) {
+      findings.push({
+        field: `workflowProposals[id=${w.id ?? '?'}]`,
+        expected: 'steps[≥3] + triggers[≥1]',
+        actual: `steps=${s}, triggers=${t}`,
+        sub_phase_id: '1.6',
+      });
+    }
+  }
+  return findings;
+}
+
+function checkIntegrationShapes(content: Record<string, unknown>): ShapeCoverageFinding[] {
+  const findings: ShapeCoverageFinding[] = [];
+  const allowedOwnership = new Set(['delegated', 'synced', 'consumed', 'owned']);
+  for (const i of arrField(content, 'integrationProposals') as Array<Record<string, unknown>>) {
+    const sp = Array.isArray(i.standardProviders) ? (i.standardProviders as unknown[]).length : 0;
+    const om = i.ownershipModel as string | undefined;
+    if (sp < 1 || !om || !allowedOwnership.has(om)) {
+      findings.push({
+        field: `integrationProposals[id=${i.id ?? '?'}]`,
+        expected: 'standardProviders[≥1] + ownershipModel in {delegated,synced,consumed,owned}',
+        actual: `standardProviders=${sp}, ownershipModel=${om ?? 'missing'}`,
+        sub_phase_id: '1.6',
+      });
+    }
+  }
+  return findings;
+}
+
+function checkPhasingStrategy(content: Record<string, unknown>): ShapeCoverageFinding[] {
+  const findings: ShapeCoverageFinding[] = [];
+  const journeyIds = new Set(
+    (arrField(content, 'userJourneys') as Array<Record<string, unknown>>).map(j => j.id as string),
+  );
+  for (const ph of arrField(content, 'phasingStrategy') as Array<Record<string, unknown>>) {
+    const jids = Array.isArray(ph.journeyIds) ? ph.journeyIds as string[] : [];
+    const unknownJourneys = jids.filter(id => !journeyIds.has(id));
+    if (unknownJourneys.length > 0) {
+      findings.push({
+        field: `phasingStrategy[phase=${ph.phase ?? '?'}].journeyIds`,
+        expected: 'all ids refer to real userJourneys',
+        actual: `unknown journey ids: ${unknownJourneys.join(', ')}`,
+        sub_phase_id: '1.6',
+      });
+    }
+  }
+  return findings;
+}
+
+/**
+ * iter-4 traceability spine: each captured item in the decomposed
+ * extraction categories SHOULD carry source_ref.excerpt (load-bearing
+ * for downstream drift-detection chains). A missing source_ref is a
+ * warning, not a hard failure, and is only emitted when the category has
+ * items — extraction passes against intents with no external source doc
+ * legitimately lack provenance targets.
+ */
+function checkProvenanceSpine(content: Record<string, unknown>): ShapeCoverageFinding[] {
+  const findings: ShapeCoverageFinding[] = [];
+  const provenanceCheck = (field: string, items: Array<Record<string, unknown>>) => {
+    const missing = items.filter(it => {
+      const ref = it.source_ref as Record<string, unknown> | undefined;
+      return !ref || typeof ref.excerpt !== 'string' || (ref.excerpt as string).length === 0;
+    });
+    if (missing.length > 0 && items.length > 0) {
+      findings.push({
+        field: `${field}[].source_ref`,
+        expected: `each item has source_ref.excerpt (traceability spine)`,
+        actual: `${missing.length}/${items.length} items missing source_ref.excerpt`,
+        sub_phase_id: '1.6',
+      });
+    }
+  };
+  provenanceCheck('technicalConstraints', arrField(content, 'technicalConstraints') as Array<Record<string, unknown>>);
+  provenanceCheck('complianceExtractedItems', arrField(content, 'complianceExtractedItems') as Array<Record<string, unknown>>);
+  provenanceCheck('vvRequirements', arrField(content, 'vvRequirements') as Array<Record<string, unknown>>);
+  provenanceCheck('canonicalVocabulary', arrField(content, 'canonicalVocabulary') as Array<Record<string, unknown>>);
+  return findings;
+}
+
+/**
+ * Collect the set of valid trace-target ids from a product handoff: every
+ * catalog item id across the tracked collections, plus the synthetic QA-#
+ * ids derived (by index) from the qualityAttributes count.
+ */
+function collectHandoffTraceIds(h: Record<string, unknown>): Set<string> {
+  const collectIds = (key: string): string[] => {
+    const a = Array.isArray(h[key]) ? h[key] as Array<Record<string, unknown>> : [];
+    return a.map(x => typeof x.id === 'string' ? x.id : '').filter(Boolean);
+  };
+  const validIds = new Set<string>([
+    ...collectIds('personas'),
+    ...collectIds('userJourneys'),
+    ...collectIds('businessDomainProposals'),
+    ...collectIds('entityProposals'),
+    ...collectIds('workflowProposals'),
+    ...collectIds('integrationProposals'),
+    ...collectIds('technicalConstraints'),
+    ...collectIds('vvRequirements'),
+    ...collectIds('complianceExtractedItems'),
+    ...collectIds('canonicalVocabulary'),
+    ...collectIds('requirements'),
+    ...collectIds('decisions'),
+    ...collectIds('constraints'),
+    ...collectIds('openQuestions'),
+  ]);
+  // QA-# ids are synthetic — build them by index.
+  const qaCount = Array.isArray(h.qualityAttributes) ? (h.qualityAttributes as unknown[]).length : 0;
+  for (let i = 1; i <= qaCount; i++) validIds.add(`QA-${i}`);
+  return validIds;
+}
+
+/** Parse a functional_requirements artifact's user_stories array. */
+function extractUserStories(fr: StreamRecord): Array<Record<string, unknown>> {
+  const frc = tryParseContent(fr.content) ?? {};
+  return Array.isArray(frc.user_stories) ? frc.user_stories as Array<Record<string, unknown>> : [];
+}
+
+/** Parse a non_functional_requirements artifact's requirements array. */
+function extractNfrRequirements(nfr: StreamRecord): Array<Record<string, unknown>> {
+  const nfrc = tryParseContent(nfr.content) ?? {};
+  return Array.isArray(nfrc.requirements) ? nfrc.requirements as Array<Record<string, unknown>> : [];
+}
+
+/**
+ * For each item, verify it carries a non-empty traces_to[] whose ids all
+ * resolve against `validIds`. Pushes one finding per empty / unresolved
+ * item (appended to `findings` in item order).
+ */
+function checkTracesResolve(
+  artifactKind: string,
+  items: Array<Record<string, unknown>>,
+  subPhase: string,
+  validIds: Set<string>,
+  findings: ShapeCoverageFinding[],
+): void {
+  for (const it of items) {
+    const id = typeof it.id === 'string' ? it.id : '?';
+    const traces = Array.isArray(it.traces_to) ? it.traces_to as string[] : [];
+    if (traces.length === 0) {
+      findings.push({
+        field: `${artifactKind}[id=${id}].traces_to`,
+        expected: 'non-empty traces_to[] referencing handoff item ids',
+        actual: 'empty',
+        sub_phase_id: subPhase,
+      });
+      continue;
+    }
+    const unknown = traces.filter(t => !validIds.has(t));
+    if (unknown.length > 0) {
+      findings.push({
+        field: `${artifactKind}[id=${id}].traces_to`,
+        expected: 'all traces_to ids resolve to real handoff items',
+        actual: `unknown trace ids: ${unknown.join(', ')}`,
+        sub_phase_id: subPhase,
+      });
+    }
+  }
+}
+
+/**
+ * NFR applies_to_requirements (when present) must reference real FR
+ * user_story ids. Catches the qwen failure mode where US-* ids were
+ * stuffed into traces_to. Pushes one finding per item with unresolved ids.
+ */
+function checkNfrAppliesToRequirements(
+  items: Array<Record<string, unknown>>,
+  frStoryIds: Set<string>,
+  findings: ShapeCoverageFinding[],
+): void {
+  for (const it of items) {
+    const id = typeof it.id === 'string' ? it.id : '?';
+    const applies = Array.isArray(it.applies_to_requirements)
+      ? it.applies_to_requirements as string[] : [];
+    if (applies.length === 0) continue;
+    const unknownFr = applies.filter(a => !frStoryIds.has(a));
+    if (unknownFr.length > 0) {
+      findings.push({
+        field: `non_functional_requirements.requirements[id=${id}].applies_to_requirements`,
+        expected: 'all ids resolve to FR user_story ids from sub-phase 2.1',
+        actual: `unknown FR ids: ${unknownFr.join(', ')}`,
+        sub_phase_id: '2.2',
+      });
+    }
+  }
+}
+
 const MULTI_FAILURE_VALIDATORS: Record<string, MultiFailureCheck> = {
   /**
    * Product description handoff shape/coverage oracle. Thresholds are
@@ -416,170 +732,30 @@ const MULTI_FAILURE_VALIDATORS: Record<string, MultiFailureCheck> = {
    * intent.
    */
   validateProductDescriptionHandoffShape: (recs) => {
-    const findings: ShapeCoverageFinding[] = [];
     const rec = recs.find(r => r.record_type === 'product_description_handoff');
     if (!rec) {
-      findings.push({
+      return [{
         field: 'record_type:product_description_handoff',
         expected: 'present at 1.6',
         actual: 'missing',
         sub_phase_id: '1.6',
-      });
-      return findings;
+      }];
     }
     const content = tryParseContent(rec.content) ?? {};
-
-    const pushRange = (field: string, actualCount: number, min: number, max: number) => {
-      if (actualCount < min || actualCount > max) {
-        findings.push({
-          field,
-          expected: `length in [${min}, ${max}]`,
-          actual: `length=${actualCount}`,
-          sub_phase_id: '1.6',
-        });
-      }
-    };
-    const arr = (k: string): unknown[] => Array.isArray(content[k]) ? content[k] as unknown[] : [];
-
-    // Ranges widened in iter-3c to accommodate Codex gpt-5.4's richer
-    // generation. qwen3.5:9b produced outputs near the v1 reference
-    // counts (6 personas / 45 entities etc.); Codex produces 2–2.5x
-    // more (13 personas / 106 entities). Upper bounds reflect the
-    // capable-CLI reality; lower bounds are unchanged — same minimum
-    // quality floor regardless of backing.
-    pushRange('personas', arr('personas').length, 3, 15);
-    pushRange('userJourneys', arr('userJourneys').length, 5, 15);
-    pushRange('businessDomainProposals', arr('businessDomainProposals').length, 6, 30);
-    pushRange('entityProposals', arr('entityProposals').length, 20, 150);
-    pushRange('workflowProposals', arr('workflowProposals').length, 3, 30);
-    pushRange('integrationProposals', arr('integrationProposals').length, 5, 35);
-    pushRange('qualityAttributes', arr('qualityAttributes').length, 8, 25);
-    pushRange('phasingStrategy', arr('phasingStrategy').length, 2, 5);
-    // iter-4 decomposed extraction fields — lower bound is 0 because a
-    // simple intent (e.g. a one-line "build a todo app") legitimately
-    // has no stated technical constraints / compliance regimes / V&V
-    // targets / vocabulary. Upper bounds reflect what Codex produces
-    // for a rich spec like Hestami.
-    pushRange('technicalConstraints', arr('technicalConstraints').length, 0, 40);
-    pushRange('complianceExtractedItems', arr('complianceExtractedItems').length, 0, 30);
-    pushRange('vvRequirements', arr('vvRequirements').length, 0, 40);
-    pushRange('canonicalVocabulary', arr('canonicalVocabulary').length, 0, 60);
-
-    // Element-level shape checks
-    for (const p of arr('personas') as Array<Record<string, unknown>>) {
-      if (!p.name || !Array.isArray(p.goals) || (p.goals as unknown[]).length < 1 ||
-          !Array.isArray(p.painPoints) || (p.painPoints as unknown[]).length < 1) {
-        findings.push({
-          field: `personas[id=${p.id ?? '?'}]`,
-          expected: 'name + goals[≥1] + painPoints[≥1]',
-          actual: `goals=${Array.isArray(p.goals) ? (p.goals as unknown[]).length : 0}, painPoints=${Array.isArray(p.painPoints) ? (p.painPoints as unknown[]).length : 0}`,
-          sub_phase_id: '1.6',
-        });
-      }
-    }
-    for (const j of arr('userJourneys') as Array<Record<string, unknown>>) {
-      if (!Array.isArray(j.steps) || (j.steps as unknown[]).length < 3 ||
-          !Array.isArray(j.acceptanceCriteria) || (j.acceptanceCriteria as unknown[]).length < 1 ||
-          typeof j.implementationPhase !== 'string') {
-        findings.push({
-          field: `userJourneys[id=${j.id ?? '?'}]`,
-          expected: 'steps[≥3] + acceptanceCriteria[≥1] + implementationPhase',
-          actual: `steps=${Array.isArray(j.steps) ? (j.steps as unknown[]).length : 0}, acceptanceCriteria=${Array.isArray(j.acceptanceCriteria) ? (j.acceptanceCriteria as unknown[]).length : 0}, implementationPhase=${typeof j.implementationPhase}`,
-          sub_phase_id: '1.6',
-        });
-      }
-    }
-    for (const d of arr('businessDomainProposals') as Array<Record<string, unknown>>) {
-      if (!Array.isArray(d.entityPreview) || (d.entityPreview as unknown[]).length < 3 ||
-          !Array.isArray(d.workflowPreview) || (d.workflowPreview as unknown[]).length < 1) {
-        findings.push({
-          field: `businessDomainProposals[id=${d.id ?? '?'}]`,
-          expected: 'entityPreview[≥3] + workflowPreview[≥1]',
-          actual: `entityPreview=${Array.isArray(d.entityPreview) ? (d.entityPreview as unknown[]).length : 0}, workflowPreview=${Array.isArray(d.workflowPreview) ? (d.workflowPreview as unknown[]).length : 0}`,
-          sub_phase_id: '1.6',
-        });
-      }
-    }
-    const domainIds = new Set((arr('businessDomainProposals') as Array<Record<string, unknown>>).map(d => d.id as string));
-    for (const e of arr('entityProposals') as Array<Record<string, unknown>>) {
-      const ka = Array.isArray(e.keyAttributes) ? (e.keyAttributes as unknown[]).length : 0;
-      const rel = Array.isArray(e.relationships) ? (e.relationships as unknown[]).length : 0;
-      const bdi = e.businessDomainId as string | undefined;
-      const unknownDomain = bdi && !domainIds.has(bdi);
-      if (ka < 2 || rel < 1 || unknownDomain) {
-        findings.push({
-          field: `entityProposals[id=${e.id ?? '?'}]`,
-          expected: 'keyAttributes[≥2] + relationships[≥1] + businessDomainId in domains',
-          actual: `keyAttributes=${ka}, relationships=${rel}, businessDomainId=${bdi ?? 'missing'}${unknownDomain ? ' (UNKNOWN)' : ''}`,
-          sub_phase_id: '1.6',
-        });
-      }
-    }
-    for (const w of arr('workflowProposals') as Array<Record<string, unknown>>) {
-      const s = Array.isArray(w.steps) ? (w.steps as unknown[]).length : 0;
-      const t = Array.isArray(w.triggers) ? (w.triggers as unknown[]).length : 0;
-      if (s < 3 || t < 1) {
-        findings.push({
-          field: `workflowProposals[id=${w.id ?? '?'}]`,
-          expected: 'steps[≥3] + triggers[≥1]',
-          actual: `steps=${s}, triggers=${t}`,
-          sub_phase_id: '1.6',
-        });
-      }
-    }
-    const allowedOwnership = new Set(['delegated', 'synced', 'consumed', 'owned']);
-    for (const i of arr('integrationProposals') as Array<Record<string, unknown>>) {
-      const sp = Array.isArray(i.standardProviders) ? (i.standardProviders as unknown[]).length : 0;
-      const om = i.ownershipModel as string | undefined;
-      if (sp < 1 || !om || !allowedOwnership.has(om)) {
-        findings.push({
-          field: `integrationProposals[id=${i.id ?? '?'}]`,
-          expected: 'standardProviders[≥1] + ownershipModel in {delegated,synced,consumed,owned}',
-          actual: `standardProviders=${sp}, ownershipModel=${om ?? 'missing'}`,
-          sub_phase_id: '1.6',
-        });
-      }
-    }
-    const journeyIds = new Set((arr('userJourneys') as Array<Record<string, unknown>>).map(j => j.id as string));
-    for (const ph of arr('phasingStrategy') as Array<Record<string, unknown>>) {
-      const jids = Array.isArray(ph.journeyIds) ? ph.journeyIds as string[] : [];
-      const unknownJourneys = jids.filter(id => !journeyIds.has(id));
-      if (unknownJourneys.length > 0) {
-        findings.push({
-          field: `phasingStrategy[phase=${ph.phase ?? '?'}].journeyIds`,
-          expected: 'all ids refer to real userJourneys',
-          actual: `unknown journey ids: ${unknownJourneys.join(', ')}`,
-          sub_phase_id: '1.6',
-        });
-      }
-    }
-
-    // iter-4 traceability spine: each captured item in the decomposed
-    // extraction categories SHOULD carry source_ref.excerpt (load-
-    // bearing for downstream drift-detection chains). A missing
-    // source_ref is a warning, not a hard failure — extraction passes
-    // running against intents with no external source doc legitimately
-    // lack provenance targets.
-    const provenanceCheck = (field: string, items: Array<Record<string, unknown>>) => {
-      const missing = items.filter(it => {
-        const ref = it.source_ref as Record<string, unknown> | undefined;
-        return !ref || typeof ref.excerpt !== 'string' || (ref.excerpt as string).length === 0;
-      });
-      if (missing.length > 0 && items.length > 0) {
-        findings.push({
-          field: `${field}[].source_ref`,
-          expected: `each item has source_ref.excerpt (traceability spine)`,
-          actual: `${missing.length}/${items.length} items missing source_ref.excerpt`,
-          sub_phase_id: '1.6',
-        });
-      }
-    };
-    provenanceCheck('technicalConstraints', arr('technicalConstraints') as Array<Record<string, unknown>>);
-    provenanceCheck('complianceExtractedItems', arr('complianceExtractedItems') as Array<Record<string, unknown>>);
-    provenanceCheck('vvRequirements', arr('vvRequirements') as Array<Record<string, unknown>>);
-    provenanceCheck('canonicalVocabulary', arr('canonicalVocabulary') as Array<Record<string, unknown>>);
-
-    return findings;
+    // Order is load-bearing: ranges, then per-category element shapes,
+    // then the traceability-spine provenance checks — same emission
+    // order the monolithic oracle produced.
+    return [
+      ...checkHandoffRanges(content),
+      ...checkPersonaShapes(content),
+      ...checkUserJourneyShapes(content),
+      ...checkBusinessDomainShapes(content),
+      ...checkEntityShapes(content),
+      ...checkWorkflowShapes(content),
+      ...checkIntegrationShapes(content),
+      ...checkPhasingStrategy(content),
+      ...checkProvenanceSpine(content),
+    ];
   },
 
   /**
@@ -589,99 +765,29 @@ const MULTI_FAILURE_VALIDATORS: Record<string, MultiFailureCheck> = {
    * handoff catalog once, then verifies each FR / NFR entry.
    */
   validateRequirementsProductTraceability: (recs) => {
-    const findings: ShapeCoverageFinding[] = [];
     // Build the set of valid trace-target ids from the latest handoff.
     const handoff = recs.find(r => r.record_type === 'product_description_handoff');
-    if (!handoff) return findings; // Non-product lens — invariant doesn't apply.
-    const h = tryParseContent(handoff.content) ?? {};
-    const collectIds = (key: string): string[] => {
-      const a = Array.isArray(h[key]) ? h[key] as Array<Record<string, unknown>> : [];
-      return a.map(x => typeof x.id === 'string' ? x.id : '').filter(Boolean);
-    };
-    const validIds = new Set<string>([
-      ...collectIds('personas'),
-      ...collectIds('userJourneys'),
-      ...collectIds('businessDomainProposals'),
-      ...collectIds('entityProposals'),
-      ...collectIds('workflowProposals'),
-      ...collectIds('integrationProposals'),
-      ...collectIds('technicalConstraints'),
-      ...collectIds('vvRequirements'),
-      ...collectIds('complianceExtractedItems'),
-      ...collectIds('canonicalVocabulary'),
-      ...collectIds('requirements'),
-      ...collectIds('decisions'),
-      ...collectIds('constraints'),
-      ...collectIds('openQuestions'),
-    ]);
-    // QA-# ids are synthetic — build them by index.
-    const qaCount = Array.isArray(h.qualityAttributes) ? (h.qualityAttributes as unknown[]).length : 0;
-    for (let i = 1; i <= qaCount; i++) validIds.add(`QA-${i}`);
+    if (!handoff) return []; // Non-product lens — invariant doesn't apply.
+    const validIds = collectHandoffTraceIds(tryParseContent(handoff.content) ?? {});
 
-    const checkItem = (artifactKind: string, items: Array<Record<string, unknown>>, subPhase: string) => {
-      for (const it of items) {
-        const id = typeof it.id === 'string' ? it.id : '?';
-        const traces = Array.isArray(it.traces_to) ? it.traces_to as string[] : [];
-        if (traces.length === 0) {
-          findings.push({
-            field: `${artifactKind}[id=${id}].traces_to`,
-            expected: 'non-empty traces_to[] referencing handoff item ids',
-            actual: 'empty',
-            sub_phase_id: subPhase,
-          });
-          continue;
-        }
-        const unknown = traces.filter(t => !validIds.has(t));
-        if (unknown.length > 0) {
-          findings.push({
-            field: `${artifactKind}[id=${id}].traces_to`,
-            expected: 'all traces_to ids resolve to real handoff items',
-            actual: `unknown trace ids: ${unknown.join(', ')}`,
-            sub_phase_id: subPhase,
-          });
-        }
-      }
-    };
+    const findings: ShapeCoverageFinding[] = [];
 
     const fr = recs.find(r => r.record_type === 'artifact_produced'
       && tryParseContent(r.content)?.kind === 'functional_requirements');
+    const frStories = fr ? extractUserStories(fr) : [];
     if (fr) {
-      const frc = tryParseContent(fr.content) ?? {};
-      const stories = Array.isArray(frc.user_stories) ? frc.user_stories as Array<Record<string, unknown>> : [];
-      checkItem('functional_requirements.user_stories', stories, '2.1');
+      checkTracesResolve('functional_requirements.user_stories', frStories, '2.1', validIds, findings);
     }
     // Build the set of FR user_story ids for applies_to_requirements validation.
     const frStoryIds = new Set<string>();
-    if (fr) {
-      const frc = tryParseContent(fr.content) ?? {};
-      const stories = Array.isArray(frc.user_stories) ? frc.user_stories as Array<Record<string, unknown>> : [];
-      for (const s of stories) if (typeof s.id === 'string') frStoryIds.add(s.id);
-    }
+    for (const s of frStories) if (typeof s.id === 'string') frStoryIds.add(s.id);
 
     const nfr = recs.find(r => r.record_type === 'artifact_produced'
       && tryParseContent(r.content)?.kind === 'non_functional_requirements');
     if (nfr) {
-      const nfrc = tryParseContent(nfr.content) ?? {};
-      const items = Array.isArray(nfrc.requirements) ? nfrc.requirements as Array<Record<string, unknown>> : [];
-      checkItem('non_functional_requirements.requirements', items, '2.2');
-      // Wave 5 trace-id fix: applies_to_requirements (when present) must
-      // reference real FR user_story ids. This catches the qwen failure
-      // mode where US-* ids were stuffed into traces_to.
-      for (const it of items) {
-        const id = typeof it.id === 'string' ? it.id : '?';
-        const applies = Array.isArray(it.applies_to_requirements)
-          ? it.applies_to_requirements as string[] : [];
-        if (applies.length === 0) continue;
-        const unknownFr = applies.filter(a => !frStoryIds.has(a));
-        if (unknownFr.length > 0) {
-          findings.push({
-            field: `non_functional_requirements.requirements[id=${id}].applies_to_requirements`,
-            expected: 'all ids resolve to FR user_story ids from sub-phase 2.1',
-            actual: `unknown FR ids: ${unknownFr.join(', ')}`,
-            sub_phase_id: '2.2',
-          });
-        }
-      }
+      const items = extractNfrRequirements(nfr);
+      checkTracesResolve('non_functional_requirements.requirements', items, '2.2', validIds, findings);
+      checkNfrAppliesToRequirements(items, frStoryIds, findings);
     }
     return findings;
   },
@@ -712,11 +818,7 @@ const MULTI_FAILURE_VALIDATORS: Record<string, MultiFailureCheck> = {
     }
     const frc = tryParseContent(fr.content) ?? {};
     const stories = Array.isArray(frc.user_stories) ? frc.user_stories as Array<Record<string, unknown>> : [];
-    const coveredJourneys = new Set<string>();
-    for (const s of stories) {
-      const traces = Array.isArray(s.traces_to) ? s.traces_to as string[] : [];
-      for (const t of traces) if (t.startsWith('UJ-')) coveredJourneys.add(t);
-    }
+    const coveredJourneys = collectCoveredJourneys(stories);
     for (const j of journeys) {
       const jid = typeof j.id === 'string' ? j.id : '?';
       if (!coveredJourneys.has(jid)) {
@@ -749,13 +851,14 @@ function buildMissingArtifactGap(
   display: string,
 ): StructuredGap {
   const category: StructuredGapCategory = 'missing_artifact';
+  const subPhaseClause = req.sub_phase_id ? ` sub-phase ${req.sub_phase_id}` : '';
   return {
     gap_id: gapIdFor(['phase', phaseId, 'sub', req.sub_phase_id, 'missing', display]),
     phase_id: phaseId,
     sub_phase_id: req.sub_phase_id,
     severity: 'error',
     category,
-    summary: `Phase ${phaseId}${req.sub_phase_id ? ` sub-phase ${req.sub_phase_id}` : ''} did not emit ${display}.`,
+    summary: `Phase ${phaseId}${subPhaseClause} did not emit ${display}.`,
     expected: {
       record_type: req.record_type,
       content_kind: req.content_kind,

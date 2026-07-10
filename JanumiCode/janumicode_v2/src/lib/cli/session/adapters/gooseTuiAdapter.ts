@@ -171,23 +171,7 @@ export class GooseTuiAdapter implements ExecutorAdapter {
     let timedOut = false;
     let lastDetection: Detection | null = null;
     try {
-      // Thread provider/model into the session (goose session has no CLI
-      // flags for these; without env it silently uses goose's config default)
-      // + the PLANNER pair, which /plan warns about and falls back from.
-      const env: Record<string, string> = { ...(req.env ?? {}) };
-      const provider = process.env.JANUMICODE_GOOSE_PROVIDER;
-      const model = process.env.JANUMICODE_GOOSE_MODEL;
-      if (provider && !env.GOOSE_PROVIDER) env.GOOSE_PROVIDER = provider;
-      if (model && !env.GOOSE_MODEL) env.GOOSE_MODEL = model;
-      const plannerProvider = process.env.JANUMICODE_GOOSE_PLANNER_PROVIDER ?? provider;
-      const plannerModel = process.env.JANUMICODE_GOOSE_PLANNER_MODEL ?? model;
-      if (plannerProvider && !env.GOOSE_PLANNER_PROVIDER) env.GOOSE_PLANNER_PROVIDER = plannerProvider;
-      if (plannerModel && !env.GOOSE_PLANNER_MODEL) env.GOOSE_PLANNER_MODEL = plannerModel;
-      // Model reasoning visible in the PTY stream; random "thinking…"
-      // spinner phrases off (they churn the screen model for no signal).
-      // req.env wins when the caller already set either var.
-      if (!env.GOOSE_CLI_SHOW_THINKING) env.GOOSE_CLI_SHOW_THINKING = 'true';
-      if (!env.GOOSE_RANDOM_THINKING_MESSAGES) env.GOOSE_RANDOM_THINKING_MESSAGES = 'false';
+      const env = this.buildSessionEnv(req.env);
 
       driver.start({ command: this.cfg.command, args: this.cfg.sessionArgs, cwd: req.cwd, env });
       // ConPTY size nudge: the slice-142 capture shows goose rendering for a
@@ -212,43 +196,11 @@ export class GooseTuiAdapter implements ExecutorAdapter {
 
       if (!driver.exited && !timedOut) {
         const specPath = this.writeTaskSpec(req);
-
-        if (this.cfg.usePlanMode) {
-          // Pre-read sequencing: have the MAIN agent (tools available) read
-          // the spec into conversation context, THEN enter plan mode — the
-          // planner model may not have file tools.
-          timedOut = (await this.exchange(driver,
-            'Read the file "' + specPath + '" now and summarize the task it specifies in a few sentences. Do not start implementing yet.',
-            deadline, now, 'pre-read')).timedOut || timedOut;
-          if (!driver.exited && !timedOut) {
-            timedOut = (await this.exchange(driver, this.cfg.planEnterCommand, deadline, now, 'enter-plan-mode')).timedOut || timedOut;
-          }
-          if (!driver.exited && !timedOut) {
-            const r = await this.exchange(driver,
-              'Create a plan for the task you just read, then act on it: implement the task fully and verify its completion criteria. '
-              + this.relativePathRule()
-              + this.sentinelInstruction(),
-              deadline, now, 'task-prompt', /* requireCompletion */ true);
-            timedOut = r.timedOut || timedOut;
-            lastDetection = r.detection ?? lastDetection;
-          }
-          if (!driver.exited) {
-            await this.exchange(driver, this.cfg.planExitCommand, deadline, now, 'exit-plan-mode');
-          }
-        } else {
-          // Prompt-level RPI: one instruction carrying the 3-step discipline.
-          const r = await this.exchange(driver,
-            'Read the file "' + specPath + '" now — it is your complete task specification. '
-            + 'Work in three steps: (1) RESEARCH — read the spec, then inspect the workspace: the write-scope directory, the canonical shared-module paths it names, and any existing implementations you should import or extend; '
-            + '(2) PLAN — state a short plan consistent with what you found; '
-            + '(3) IMPLEMENT — write the code and tests, honoring the write scope and the Shared Module Ownership rules, and verify the completion criteria. '
-            + 'Do not ask me questions; make reasonable decisions and proceed to completion. '
-            + this.relativePathRule()
-            + this.sentinelInstruction(),
-            deadline, now, 'task-prompt', /* requireCompletion */ true);
-          timedOut = r.timedOut || timedOut;
-          lastDetection = r.detection ?? lastDetection;
-        }
+        const flow = this.cfg.usePlanMode
+          ? await this.runPlanModeFlow(driver, specPath, deadline, now)
+          : await this.runDirectFlow(driver, specPath, deadline, now);
+        timedOut = flow.timedOut;
+        lastDetection = flow.detection ?? lastDetection;
       }
 
       const finalDetection = lastDetection ?? driver.classify(this.markers);
@@ -264,6 +216,89 @@ export class GooseTuiAdapter implements ExecutorAdapter {
     } finally {
       driver.end();
     }
+  }
+
+  /**
+   * Build the session env: thread provider/model into the session (goose
+   * session has no CLI flags for these; without env it silently uses goose's
+   * config default) + the PLANNER pair, which /plan warns about and falls back
+   * from. `req.env` wins when the caller already set a var.
+   */
+  private buildSessionEnv(reqEnv: Record<string, string> | undefined): Record<string, string> {
+    const env: Record<string, string> = { ...(reqEnv ?? {}) };
+    const provider = process.env.JANUMICODE_GOOSE_PROVIDER;
+    const model = process.env.JANUMICODE_GOOSE_MODEL;
+    if (provider && !env.GOOSE_PROVIDER) env.GOOSE_PROVIDER = provider;
+    if (model && !env.GOOSE_MODEL) env.GOOSE_MODEL = model;
+    const plannerProvider = process.env.JANUMICODE_GOOSE_PLANNER_PROVIDER ?? provider;
+    const plannerModel = process.env.JANUMICODE_GOOSE_PLANNER_MODEL ?? model;
+    if (plannerProvider && !env.GOOSE_PLANNER_PROVIDER) env.GOOSE_PLANNER_PROVIDER = plannerProvider;
+    if (plannerModel && !env.GOOSE_PLANNER_MODEL) env.GOOSE_PLANNER_MODEL = plannerModel;
+    // Model reasoning visible in the PTY stream; random "thinking…" spinner
+    // phrases off (they churn the screen model for no signal).
+    if (!env.GOOSE_CLI_SHOW_THINKING) env.GOOSE_CLI_SHOW_THINKING = 'true';
+    if (!env.GOOSE_RANDOM_THINKING_MESSAGES) env.GOOSE_RANDOM_THINKING_MESSAGES = 'false';
+    return env;
+  }
+
+  /**
+   * Native /plan flow: pre-read the spec in normal mode (tools available) so
+   * the planner model has it in conversation context, enter plan mode, run the
+   * task prompt (completion-gated), then exit plan mode. Each step is guarded
+   * by driver liveness + the accumulated timeout, exactly as inline.
+   */
+  private async runPlanModeFlow(
+    driver: SessionDriver,
+    specPath: string,
+    deadline: number,
+    now: () => number,
+  ): Promise<{ timedOut: boolean; detection: Detection | null }> {
+    let timedOut = false;
+    let detection: Detection | null = null;
+    // Pre-read sequencing: have the MAIN agent (tools available) read the spec
+    // into conversation context, THEN enter plan mode — the planner model may
+    // not have file tools.
+    timedOut = (await this.exchange(driver,
+      'Read the file "' + specPath + '" now and summarize the task it specifies in a few sentences. Do not start implementing yet.',
+      deadline, now, 'pre-read')).timedOut || timedOut;
+    if (!driver.exited && !timedOut) {
+      timedOut = (await this.exchange(driver, this.cfg.planEnterCommand, deadline, now, 'enter-plan-mode')).timedOut || timedOut;
+    }
+    if (!driver.exited && !timedOut) {
+      const r = await this.exchange(driver,
+        'Create a plan for the task you just read, then act on it: implement the task fully and verify its completion criteria. '
+        + this.relativePathRule()
+        + this.sentinelInstruction(),
+        deadline, now, 'task-prompt', /* requireCompletion */ true);
+      timedOut = r.timedOut || timedOut;
+      detection = r.detection ?? detection;
+    }
+    if (!driver.exited) {
+      await this.exchange(driver, this.cfg.planExitCommand, deadline, now, 'exit-plan-mode');
+    }
+    return { timedOut, detection };
+  }
+
+  /**
+   * Default prompt-level RPI: one completion-gated instruction carrying the
+   * 3-step research → plan → implement discipline.
+   */
+  private async runDirectFlow(
+    driver: SessionDriver,
+    specPath: string,
+    deadline: number,
+    now: () => number,
+  ): Promise<{ timedOut: boolean; detection: Detection | null }> {
+    const r = await this.exchange(driver,
+      'Read the file "' + specPath + '" now — it is your complete task specification. '
+      + 'Work in three steps: (1) RESEARCH — read the spec, then inspect the workspace: the write-scope directory, the canonical shared-module paths it names, and any existing implementations you should import or extend; '
+      + '(2) PLAN — state a short plan consistent with what you found; '
+      + '(3) IMPLEMENT — write the code and tests, honoring the write scope and the Shared Module Ownership rules, and verify the completion criteria. '
+      + 'Do not ask me questions; make reasonable decisions and proceed to completion. '
+      + this.relativePathRule()
+      + this.sentinelInstruction(),
+      deadline, now, 'task-prompt', /* requireCompletion */ true);
+    return { timedOut: r.timedOut, detection: r.detection };
   }
 
   /**
@@ -298,8 +333,7 @@ export class GooseTuiAdapter implements ExecutorAdapter {
       // the STALE prompt and re-answers (answer spam, found via fake-PTY
       // trace before it could double-send to live goose).
       const r = await driver.waitForDetection(
-        (d) => d.agentContentSig !== sigAtSend
-          && (d.kind === 'prompt' || d.kind === 'modal' || d.kind === 'idle'),
+        (d) => this.turnSettled(d, sigAtSend),
         windowMs,
         this.markers,
       );
@@ -310,75 +344,109 @@ export class GooseTuiAdapter implements ExecutorAdapter {
         if (d.kind === 'busy' || d.agentContentSig !== lastSig) { lastSig = d.agentContentSig; continue; }
         return { timedOut: true, detection: d };
       }
-      // matched:
-      // The sentinel is AUTHORITATIVE over the classified kind: a short final
-      // turn ("Implemented. / TASK COMPLETE") can leave a stale question
-      // inside the wrap-tolerant last-3-lines prompt window, classifying as
-      // `prompt` — without this, the loop re-answers the already-answered
-      // question instead of finishing (caught by the responder fake-PTY test).
-      if (requireCompletion && this.hasCompletionMarker(d.agentContentSig)) {
-        return { timedOut: false, detection: d };
-      }
-      if (d.kind === 'idle') {
-        // A goose TURN ends whenever the model emits plain text — that is NOT
-        // task completion (live finding: the agent settled mid-thought with
-        // zero files written). With requireCompletion, only the sentinel ends
-        // the exchange; otherwise nudge it to continue (bounded by maxTurns).
-        if (!requireCompletion) {
-          return { timedOut: false, detection: d };
-        }
-        if (++answered > this.cfg.maxTurns) return { timedOut: true, detection: d };
-        // Contextual steering beats a generic cattle prod: let the responder
-        // read what the agent just said and compose the continuation; the
-        // sentinel requirement is re-stated deterministically by US, never
-        // left to the responder (sanitize strips it from LLM output).
-        const nudge = await this.respondVia('nudge', '', d.agentContentSig);
-        this.guardedSendLine(
-          driver,
-          nudge === null ? this.cfg.continueNudge : nudge + ' ' + this.sentinelInstruction(),
-          'continue-nudge',
-        );
-        sigAtSend = driver.classify(this.markers).agentContentSig;
-        lastSig = sigAtSend;
-        continue;
-      }
-      if (++answered > this.cfg.maxTurns) return { timedOut: true, detection: d };
-      if (d.kind === 'modal') {
-        // Accept the dialog's default under the guard.
-        if (checkAction(d, { type: 'key', key: 'enter' }).allowed) driver.sendKey('enter');
-        sigAtSend = d.agentContentSig;
-        lastSig = sigAtSend;
-        continue;
-      }
-      // prompt — pick the answer by what is being asked. The two PROTOCOL
-      // prompts (/plan flow control) stay canned — they are yes/no rails, not
-      // questions about the task. Everything else is a real clarifying
-      // question: the responder answers it FROM THE SPEC (the 566s live
-      // session died on numbered questions whose answers were all in the
-      // spec); canned deflection is the fallback.
-      const q = d.line ?? '';
-      // The responder gets the trailing content BLOCK, not just the detected
-      // line — numbered clarification questions span several lines and the
-      // detected prompt line is only the final one.
-      const questionBlock = d.agentContentSig.split('\n').slice(-8).join('\n') || q;
-      // Protocol prompts (yes/no /plan rails) stay canned. A real clarifying
-      // question goes to the spec-grounded responder FIRST; if it can't answer,
-      // escalate to the human (attended) and type THEIR reply — the PTY can
-      // inject it, unlike mimo's compose API; canned deflection is the last resort.
-      let answer: string;
-      if (this.cfg.planActionPattern.test(q)) {
-        answer = this.cfg.planActionResponse;
-      } else if (this.cfg.clearHistoryPattern.test(q)) {
-        answer = this.cfg.clearHistoryResponse;
-      } else {
-        answer = (await this.respondVia('question', questionBlock, d.agentContentSig))
-          ?? (await this.escalateVia(questionBlock, d.agentContentSig))
-          ?? this.cfg.clarificationResponse;
-      }
-      this.guardedSendLine(driver, answer, 'clarification-answer');
-      sigAtSend = driver.classify(this.markers).agentContentSig;
-      lastSig = sigAtSend;
+      // matched — decide the turn's next move (finish / nudge / accept / answer).
+      const step = await this.handleMatch(driver, d, requireCompletion, answered);
+      if (step.kind === 'return') return { timedOut: step.timedOut, detection: step.detection };
+      answered = step.answered;
+      sigAtSend = step.sig;
+      lastSig = step.sig;
     }
+  }
+
+  /**
+   * A prompt/modal/idle SETTLES the wait only when agent content changed since
+   * our last send — otherwise the loop re-matches the stale (already-answered)
+   * prompt and re-answers it (answer spam).
+   */
+  private turnSettled(d: Detection, sigAtSend: string): boolean {
+    return d.agentContentSig !== sigAtSend
+      && (d.kind === 'prompt' || d.kind === 'modal' || d.kind === 'idle');
+  }
+
+  /**
+   * Handle a settled detection: finish on the completion sentinel, nudge an
+   * idle mid-thought turn, accept a modal default, or answer a prompt. Returns
+   * either a terminal result or the updated (answered, signature) state for the
+   * next wait window; in every continue case sigAtSend and lastSig track the
+   * same signature.
+   */
+  private async handleMatch(
+    driver: SessionDriver,
+    d: Detection,
+    requireCompletion: boolean,
+    answered: number,
+  ): Promise<
+    | { kind: 'return'; timedOut: boolean; detection: Detection | null }
+    | { kind: 'continue'; answered: number; sig: string }
+  > {
+    // The sentinel is AUTHORITATIVE over the classified kind: a short final
+    // turn ("Implemented. / TASK COMPLETE") can leave a stale question inside
+    // the wrap-tolerant last-3-lines prompt window, classifying as `prompt` —
+    // without this, the loop re-answers the already-answered question instead
+    // of finishing (caught by the responder fake-PTY test).
+    if (requireCompletion && this.hasCompletionMarker(d.agentContentSig)) {
+      return { kind: 'return', timedOut: false, detection: d };
+    }
+    if (d.kind === 'idle') {
+      // A goose TURN ends whenever the model emits plain text — that is NOT
+      // task completion (live finding: the agent settled mid-thought with zero
+      // files written). With requireCompletion, only the sentinel ends the
+      // exchange; otherwise nudge it to continue (bounded by maxTurns).
+      if (!requireCompletion) return { kind: 'return', timedOut: false, detection: d };
+      if (++answered > this.cfg.maxTurns) return { kind: 'return', timedOut: true, detection: d };
+      const sig = await this.sendContinuationNudge(driver, d.agentContentSig);
+      return { kind: 'continue', answered, sig };
+    }
+    if (++answered > this.cfg.maxTurns) return { kind: 'return', timedOut: true, detection: d };
+    if (d.kind === 'modal') {
+      // Accept the dialog's default under the guard.
+      if (checkAction(d, { type: 'key', key: 'enter' }).allowed) driver.sendKey('enter');
+      return { kind: 'continue', answered, sig: d.agentContentSig };
+    }
+    // prompt — answer it, then re-classify for the post-send (echoed) signature.
+    const answer = await this.resolvePromptAnswer(d);
+    this.guardedSendLine(driver, answer, 'clarification-answer');
+    return { kind: 'continue', answered, sig: driver.classify(this.markers).agentContentSig };
+  }
+
+  /**
+   * Compose and send a continuation nudge for an idle mid-thought turn.
+   * Contextual steering beats a generic cattle prod: let the responder read
+   * what the agent just said and compose the continuation; the sentinel
+   * requirement is re-stated deterministically by US, never left to the
+   * responder (sanitize strips it from LLM output). Returns the post-send
+   * agent-content signature.
+   */
+  private async sendContinuationNudge(driver: SessionDriver, agentContentSig: string): Promise<string> {
+    const nudge = await this.respondVia('nudge', '', agentContentSig);
+    this.guardedSendLine(
+      driver,
+      nudge === null ? this.cfg.continueNudge : nudge + ' ' + this.sentinelInstruction(),
+      'continue-nudge',
+    );
+    return driver.classify(this.markers).agentContentSig;
+  }
+
+  /**
+   * Pick a prompt's answer by what is being asked. The two PROTOCOL prompts
+   * (/plan flow control) stay canned — they are yes/no rails, not questions
+   * about the task. Everything else is a real clarifying question: the
+   * spec-grounded responder answers it FIRST (the 566s live session died on
+   * numbered questions whose answers were all in the spec); if it can't, escalate
+   * to the human (attended) and type THEIR reply — the PTY can inject it, unlike
+   * mimo's compose API; canned deflection is the last resort.
+   */
+  private async resolvePromptAnswer(d: Detection): Promise<string> {
+    const q = d.line ?? '';
+    // The responder gets the trailing content BLOCK, not just the detected
+    // line — numbered clarification questions span several lines and the
+    // detected prompt line is only the final one.
+    const questionBlock = d.agentContentSig.split('\n').slice(-8).join('\n') || q;
+    if (this.cfg.planActionPattern.test(q)) return this.cfg.planActionResponse;
+    if (this.cfg.clearHistoryPattern.test(q)) return this.cfg.clearHistoryResponse;
+    return (await this.respondVia('question', questionBlock, d.agentContentSig))
+      ?? (await this.escalateVia(questionBlock, d.agentContentSig))
+      ?? this.cfg.clarificationResponse;
   }
 
   /**

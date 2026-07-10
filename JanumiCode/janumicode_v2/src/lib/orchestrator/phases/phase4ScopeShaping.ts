@@ -127,6 +127,29 @@ function unionIds(a?: string[], b?: string[]): string[] {
   return [...new Set([...(a ?? []), ...(b ?? [])])];
 }
 
+/**
+ * Remap dependency edges pointing at a merged component to its survivor,
+ * dropping self-edges and duplicates. Mutates each component's `dependencies`
+ * in place (operates on the same objects the caller holds).
+ */
+function remapMergedDependencyEdges(
+  components: ShapingComponent[],
+  remap: Map<string, string>,
+): void {
+  for (const c of components) {
+    const seen = new Set<string>();
+    c.dependencies = (c.dependencies ?? [])
+      .map(d => ({ ...d, target_component_id: remap.get(d.target_component_id) ?? d.target_component_id }))
+      .filter(d => {
+        if (d.target_component_id === c.id) return false;
+        const key = `${d.target_component_id}|${d.dependency_type}`;
+        if (seen.has(key)) return false;
+        seen.add(key);
+        return true;
+      });
+  }
+}
+
 export interface ConsolidationResult {
   components: ShapingComponent[];
   merges: Array<{ into: string; merged: string[] }>;
@@ -174,9 +197,35 @@ export function consolidateToBudget(
     if (g) g.push(c); else byDomain.set(d, [c]);
   }
 
+  const { merges, remap } = mergeDomainsDownToBudget(byDomain, budget, components.length);
+
+  const result = [...byDomain.values()].flat();
+
+  // Remap dependency edges pointing at a merged component to its survivor,
+  // drop self-edges and duplicates.
+  remapMergedDependencyEdges(result, remap);
+
+  const coveredAfter = coverageOf(result, acceptedUserStoryIds);
+  const coveragePreserved = [...coveredBefore].every(id => coveredAfter.has(id));
+
+  return { components: result, merges, coveragePreserved };
+}
+
+/**
+ * Repeatedly merge the largest same-domain group (least architectural blast
+ * radius) into its survivor until the component total is within `budget` or no
+ * domain has ≥2 members (the floor). Mutates `byDomain`'s group arrays and the
+ * survivor components in place; returns the recorded merges and the merged-id →
+ * survivor-id remap.
+ */
+function mergeDomainsDownToBudget(
+  byDomain: Map<string, ShapingComponent[]>,
+  budget: number,
+  totalComponents: number,
+): { merges: Array<{ into: string; merged: string[] }>; remap: Map<string, string> } {
   const merges: Array<{ into: string; merged: string[] }> = [];
   const remap = new Map<string, string>(); // merged id → survivor id
-  let total = components.length;
+  let total = totalComponents;
 
   while (total > budget) {
     // Largest domain group with ≥2 members is the next merge target.
@@ -199,27 +248,7 @@ export function consolidateToBudget(
     total--;
   }
 
-  const result = [...byDomain.values()].flat();
-
-  // Remap dependency edges pointing at a merged component to its survivor,
-  // drop self-edges and duplicates.
-  for (const c of result) {
-    const seen = new Set<string>();
-    c.dependencies = (c.dependencies ?? [])
-      .map(d => ({ ...d, target_component_id: remap.get(d.target_component_id) ?? d.target_component_id }))
-      .filter(d => {
-        if (d.target_component_id === c.id) return false;
-        const key = `${d.target_component_id}|${d.dependency_type}`;
-        if (seen.has(key)) return false;
-        seen.add(key);
-        return true;
-      });
-  }
-
-  const coveredAfter = coverageOf(result, acceptedUserStoryIds);
-  const coveragePreserved = [...coveredBefore].every(id => coveredAfter.has(id));
-
-  return { components: result, merges, coveragePreserved };
+  return { merges, remap };
 }
 
 function coverageOf(components: ShapingComponent[], acceptedUserStoryIds: Set<string>): Set<string> {

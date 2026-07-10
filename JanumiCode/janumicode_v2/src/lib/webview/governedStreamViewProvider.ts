@@ -423,23 +423,23 @@ export class GovernedStreamViewProvider implements vscode.WebviewViewProvider {
       }
 
       // Re-create pending decisions so the user can resume mid-flow after reload.
-      const pending = this.liaison.getDB().getPendingDecisions(this.session.currentRunId);
-      for (const surface of pending) {
-        const surfaceType = this.surfaceTypeOf(surface.record_type);
-        if (surfaceType) {
-          // Fire-and-forget — the user will resolve via the next decision message.
-          void this.engine.recreatePendingFromRecord(
-            this.session.currentRunId,
-            surface.id,
-            surfaceType,
-          );
-        }
-      }
+      this.recreatePendingDecisions(this.session.currentRunId);
     }
 
     // Replay live-append: the webview is now mounted + subscribed, so let
     // bootstrap begin feeding recorded records (no-op in production).
     this.replayOnReady?.();
+  }
+
+  private recreatePendingDecisions(runId: string): void {
+    const pending = this.liaison.getDB().getPendingDecisions(runId);
+    for (const surface of pending) {
+      const surfaceType = this.surfaceTypeOf(surface.record_type);
+      if (surfaceType) {
+        // Fire-and-forget — the user will resolve via the next decision message.
+        void this.engine.recreatePendingFromRecord(runId, surface.id, surfaceType);
+      }
+    }
   }
 
   private async handleSubmitIntent(msg: {

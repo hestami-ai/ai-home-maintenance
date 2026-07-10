@@ -16,7 +16,7 @@ export type NfrCategory =
 
 export interface NonFunctionalRequirement {
   id: string;
-  category: NfrCategory | string;
+  category: NfrCategory | (string & {});
   description: string;
   priority?: 'critical' | 'high' | 'medium' | 'low';
   /**

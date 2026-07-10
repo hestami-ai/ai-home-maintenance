@@ -376,33 +376,10 @@ export function formatEnhancedGapReport(report: EnhancedGapReport): string {
   lines.push(`# Gap Report: Phase ${report.phase}`);
   lines.push('');
 
-  if (report.missing_record_analysis.length > 0) {
-    lines.push('## Missing Records');
-    for (const missing of report.missing_record_analysis) {
-      lines.push(`- **${missing.record_type}** (${missing.impact})`);
-      lines.push(`  - Reason: ${missing.reason}`);
-      lines.push(`  - Fix: ${missing.suggested_fix}`);
-      if (missing.code_snippet) {
-        lines.push(`  \`\`\`typescript`);
-        lines.push(`  ${missing.code_snippet}`);
-        lines.push(`  \`\`\``);
-      }
-    }
-    lines.push('');
-  }
-
-  if (report.violation_categories.authority.length > 0 ||
-      report.violation_categories.schema.length > 0 ||
-      report.violation_categories.semantic.length > 0) {
-    lines.push('## Schema Violations');
-    for (const v of report.violation_categories.authority) {
-      lines.push(`- Authority: ${v.record_type} - ${v.error}`);
-    }
-    for (const v of report.violation_categories.schema) {
-      lines.push(`- Schema: ${v.record_type}.${v.field} - ${v.error}`);
-    }
-    lines.push('');
-  }
+  lines.push(
+    ...formatMissingRecordsSection(report),
+    ...formatSchemaViolationsSection(report),
+  );
 
   if (report.assertion_context.length > 0) {
     lines.push('## Assertion Failures');
@@ -442,6 +419,44 @@ export function formatEnhancedGapReport(report: EnhancedGapReport): string {
   }
 
   return lines.join('\n');
+}
+
+function formatMissingRecordsSection(report: EnhancedGapReport): string[] {
+  if (report.missing_record_analysis.length === 0) {
+    return [];
+  }
+  const lines: string[] = [];
+  lines.push('## Missing Records');
+  for (const missing of report.missing_record_analysis) {
+    lines.push(`- **${missing.record_type}** (${missing.impact})`);
+    lines.push(`  - Reason: ${missing.reason}`);
+    lines.push(`  - Fix: ${missing.suggested_fix}`);
+    if (missing.code_snippet) {
+      lines.push(`  \`\`\`typescript`);
+      lines.push(`  ${missing.code_snippet}`);
+      lines.push(`  \`\`\``);
+    }
+  }
+  lines.push('');
+  return lines;
+}
+
+function formatSchemaViolationsSection(report: EnhancedGapReport): string[] {
+  if (report.violation_categories.authority.length === 0 &&
+      report.violation_categories.schema.length === 0 &&
+      report.violation_categories.semantic.length === 0) {
+    return [];
+  }
+  const lines: string[] = [];
+  lines.push('## Schema Violations');
+  for (const v of report.violation_categories.authority) {
+    lines.push(`- Authority: ${v.record_type} - ${v.error}`);
+  }
+  for (const v of report.violation_categories.schema) {
+    lines.push(`- Schema: ${v.record_type}.${v.field} - ${v.error}`);
+  }
+  lines.push('');
+  return lines;
 }
 
 // ── LLM-powered gap suggestions ────────────────────────────────────

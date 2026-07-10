@@ -226,6 +226,104 @@ describe('pruneAoddRuns (P9)', () => {
       ),
     ).toBe(true);
   });
+
+  // --- Characterization tests for discoverRuns() fallback branches ---
+  // discoverRuns is private; these pin its behavior through pruneAoddRuns
+  // for the paths seedRun() never produces: a run dir with no aodd/ subdir,
+  // and index.json that is missing / malformed / partial / has invalid
+  // timestamp fields (all of which fall back to the aodd/ dir mtime for the
+  // sort key while leaving completedAt null unless completed_at parses).
+
+  it('ignores run directories that lack an aodd/ subdir', () => {
+    // A run dir with production files but no aodd/ trace subdir is invisible
+    // to retention regardless of how aggressive the policy is.
+    const runDir = path.join(workspaceRoot, '.janumicode', 'runs', 'no-aodd');
+    fs.mkdirSync(runDir, { recursive: true });
+    fs.writeFileSync(path.join(runDir, 'transforms.jsonl'), 'legacy\n');
+
+    const r = pruneAoddRuns(workspaceRoot, {
+      max_runs: 0,
+      ttl_days: 0,
+      min_runs: 0,
+    });
+    expect(r.candidates).toEqual([]);
+    expect(r.pruned).toEqual([]);
+    expect(r.kept_by_sentinel).toEqual([]);
+    expect(fs.existsSync(path.join(runDir, 'transforms.jsonl'))).toBe(true);
+  });
+
+  it('falls back to aodd/ dir mtime when index.json is missing/malformed/partial', () => {
+    const now = Date.now();
+    const day = 24 * 60 * 60 * 1000;
+
+    // Baseline: a valid, old run that IS over TTL and must be pruned.
+    seedRun(workspaceRoot, 'old', new Date(now - 60 * day), new Date(now - 60 * day));
+
+    // Helper to make an aodd/ dir with an optional index.json body.
+    const mkAodd = (runId: string, indexBody?: string): void => {
+      const aodd = path.join(workspaceRoot, '.janumicode', 'runs', runId, 'aodd');
+      fs.mkdirSync(aodd, { recursive: true });
+      if (indexBody !== undefined) {
+        fs.writeFileSync(path.join(aodd, 'index.json'), indexBody);
+      }
+    };
+
+    // No index.json at all -> sortKey falls back to dir mtime (~now),
+    // completedAt is null so the TTL check uses that mtime -> NOT over TTL.
+    mkAodd('no-index');
+    // Malformed index.json -> JSON.parse throws -> same mtime fallback.
+    mkAodd('bad-index', '{ not valid json');
+    // Valid JSON but no timestamp fields -> mtime fallback, completedAt null.
+    mkAodd('empty-index', '{}');
+    // Valid JSON with non-parseable timestamp strings -> mtime fallback.
+    mkAodd(
+      'invalid-dates',
+      JSON.stringify({ started_at: 'nope', completed_at: 'also-nope' }),
+    );
+
+    const r = pruneAoddRuns(workspaceRoot, {
+      max_runs: 100,
+      ttl_days: 30,
+      min_runs: 0,
+    });
+
+    // Only the genuinely-old run is over TTL; every mtime-fallback run is
+    // recent (created just now) so it survives.
+    expect(r.pruned).toEqual(['old']);
+    expect(aoddExists(workspaceRoot, 'old')).toBe(false);
+    expect(aoddExists(workspaceRoot, 'no-index')).toBe(true);
+    expect(aoddExists(workspaceRoot, 'bad-index')).toBe(true);
+    expect(aoddExists(workspaceRoot, 'empty-index')).toBe(true);
+    expect(aoddExists(workspaceRoot, 'invalid-dates')).toBe(true);
+  });
+
+  it('parses completed_at independently of the started_at mtime fallback', () => {
+    const now = Date.now();
+    const day = 24 * 60 * 60 * 1000;
+
+    // A recent run to occupy a fresh slot (not over TTL, not over cap).
+    seedRun(workspaceRoot, 'fresh', new Date(now), new Date(now));
+
+    // index.json with ONLY completed_at (60d ago) and no started_at.
+    // started_at is absent -> sortKey falls back to the aodd/ dir mtime
+    // (~now, so it sorts near the top), but completed_at IS parsed, so the
+    // TTL check sees 60d ago -> over TTL -> pruned.
+    const aodd = path.join(workspaceRoot, '.janumicode', 'runs', 'partial-old', 'aodd');
+    fs.mkdirSync(aodd, { recursive: true });
+    fs.writeFileSync(
+      path.join(aodd, 'index.json'),
+      JSON.stringify({ completed_at: new Date(now - 60 * day).toISOString() }),
+    );
+
+    const r = pruneAoddRuns(workspaceRoot, {
+      max_runs: 100,
+      ttl_days: 30,
+      min_runs: 0,
+    });
+    expect(r.pruned).toEqual(['partial-old']);
+    expect(aoddExists(workspaceRoot, 'partial-old')).toBe(false);
+    expect(aoddExists(workspaceRoot, 'fresh')).toBe(true);
+  });
 });
 
 describe('AODD CLI prune + diff (P9)', () => {
