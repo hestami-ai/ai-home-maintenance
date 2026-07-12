@@ -1,0 +1,17 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "type": "string",
+  "enum": [
+    "VALIDATION",
+    "AUTHORIZATION",
+    "CONCURRENCY",
+    "NOT_FOUND",
+    "INVARIANT",
+    "EXECUTION",
+    "ASSURANCE",
+    "PERSISTENCE",
+    "EXTERNAL_DEPENDENCY",
+    "SCHEMA_COMPATIBILITY"
+  ],
+  "$id": "urn:janumi:rph:schema:enum:RphErrorCategory:1"
+}

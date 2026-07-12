@@ -1,0 +1,13 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "type": "string",
+  "enum": [
+    "USER",
+    "ORGANIZATIONAL_ROLE",
+    "POLICY",
+    "LEGAL_REQUIREMENT",
+    "SYSTEM_OWNER",
+    "DELEGATED_AGENT"
+  ],
+  "$id": "urn:janumi:rph:schema:enum:AuthorityType:1"
+}

@@ -1,0 +1,14 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "type": "string",
+  "enum": [
+    "PROPOSED",
+    "ACTIVE",
+    "WAIVED",
+    "INAPPLICABLE",
+    "VIOLATED",
+    "SUPERSEDED",
+    "INVALIDATED"
+  ],
+  "$id": "urn:janumi:rph:schema:enum:ConstraintStatus:1"
+}

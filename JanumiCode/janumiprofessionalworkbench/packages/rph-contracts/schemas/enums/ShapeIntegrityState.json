@@ -1,0 +1,14 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "type": "string",
+  "enum": [
+    "UNKNOWN",
+    "PRESERVED",
+    "AT_RISK",
+    "VIOLATED",
+    "RESHAPING_REQUIRED",
+    "RESHAPING_IN_PROGRESS",
+    "RESTORED"
+  ],
+  "$id": "urn:janumi:rph:schema:enum:ShapeIntegrityState:1"
+}

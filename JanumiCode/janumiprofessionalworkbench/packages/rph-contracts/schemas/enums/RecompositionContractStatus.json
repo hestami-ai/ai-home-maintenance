@@ -1,0 +1,15 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "type": "string",
+  "enum": [
+    "DRAFT",
+    "READY",
+    "EVALUATING",
+    "COMPOSABLE",
+    "CONFLICTED",
+    "INSUFFICIENT",
+    "SATISFIED",
+    "SUPERSEDED"
+  ],
+  "$id": "urn:janumi:rph:schema:enum:RecompositionContractStatus:1"
+}

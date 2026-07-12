@@ -1,0 +1,7 @@
+# Bun install configuration.
+# hoisted linker: the isolated linker (default since Bun 1.3.0) causes phantom-dependency
+# ENOENT failures in workspaces (learned on the janumi platform monorepo). Keep hoisted.
+# Do NOT add a partial `trustedDependencies` array — it REPLACES Bun's default trust list
+# (which already trusts esbuild/prisma/etc.) and breaks native postinstalls.
+[install]
+linker = "hoisted"

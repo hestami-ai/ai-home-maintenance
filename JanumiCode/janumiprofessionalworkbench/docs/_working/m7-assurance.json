@@ -1,0 +1,298 @@
+{
+  "applicabilityOps": [
+    {
+      "op": "ALL",
+      "operands": "operands: ApplicabilityExpression[] (recursive array; plural key)",
+      "semantics": "Logical AND / conjunction. Applicable iff EVERY child operand evaluates true. Deterministic, no arbitrary code (DOC-007 §18 forbids JS/SQL). Boolean node composing leaves into a tree. DOC-007 §18 lines 1240-1243."
+    },
+    {
+      "op": "ANY",
+      "operands": "operands: ApplicabilityExpression[] (recursive array; plural key)",
+      "semantics": "Logical OR / disjunction. Applicable iff AT LEAST ONE child operand evaluates true. DOC-007 §18 lines 1244-1247."
+    },
+    {
+      "op": "NOT",
+      "operands": "operand: ApplicabilityExpression (SINGULAR key `operand`, exactly one child — NOT `operands`)",
+      "semantics": "Logical negation. True iff its single child evaluates false. IMPLEMENTATION GOTCHA: NOT uses singular `operand` while ALL/ANY use plural `operands`; wrong key = silent evaluator bug. DOC-007 §18 lines 1248-1251."
+    },
+    {
+      "op": "EQUALS",
+      "operands": "path: string (JSONPath-like, e.g. $.objectType, $.pwuKind); value: string | number | boolean",
+      "semantics": "Scalar strict equality. Resolve `path` against the subject ObjectEnvelope and test strict equality to `value`. DOC-007 §18 lines 1252-1256."
+    },
+    {
+      "op": "IN",
+      "operands": "path: string; values: Array<string | number> (plural `values` list)",
+      "semantics": "Set membership. True iff the scalar at `path` is a member of `values` (e.g. $.workLifecycleState IN [EVIDENCE_PENDING, UNDER_ASSURANCE]). DOC-007 §18 lines 1257-1261."
+    },
+    {
+      "op": "CONTAINS",
+      "operands": "path: string; value: string (SINGULAR `value`, unlike IN's `values`)",
+      "semantics": "Containment. True iff the collection/string at `path` contains `value` (array-membership or substring). DOC-007 §18 lines 1262-1266."
+    },
+    {
+      "op": "EXISTS",
+      "operands": "path: string",
+      "semantics": "Presence test. True iff a value is present at `path` on the subject (existence, independent of truthiness). DOC-007 §18 lines 1267-1270."
+    },
+    {
+      "op": "RISK_AT_LEAST",
+      "operands": "dimension: CONSEQUENCE | UNCERTAINTY | IRREVERSIBILITY | SECURITY_SENSITIVITY | REGULATORY_EXPOSURE; level: LOW | MEDIUM | HIGH | CRITICAL",
+      "semantics": "Ordinal risk threshold. True iff the subject's risk on `dimension` >= `level` over the ordered scale LOW < MEDIUM < HIGH < CRITICAL. This is the hook that escalates the required INDEPENDENCE tier and drives the REQUIRED/RECOMMENDED/OPTIONAL applicability outcome. DOC-007 §18 lines 1271-1284."
+    }
+  ],
+  "admissibilityConditions": [
+    {
+      "condition": "Its identity is stable",
+      "sourceSection": "DOC-004 §6.2 (line 344); reinforced by EvidenceRequirement.admissibilityRules §6.1"
+    },
+    {
+      "condition": "Provenance is present",
+      "sourceSection": "DOC-004 §6.2 (line 345)"
+    },
+    {
+      "condition": "Content or reference is available",
+      "sourceSection": "DOC-004 §6.2 (line 346)"
+    },
+    {
+      "condition": "Scope is stated",
+      "sourceSection": "DOC-004 §6.2 (line 347)"
+    },
+    {
+      "condition": "Limitations are recorded",
+      "sourceSection": "DOC-004 §6.2 (line 348)"
+    },
+    {
+      "condition": "It is not invalidated (status != INVALIDATED)",
+      "sourceSection": "DOC-004 §6.2 (line 349); reinforced DOC-007 §35.4, invariant 15"
+    },
+    {
+      "condition": "It is sufficiently current (freshness)",
+      "sourceSection": "DOC-004 §6.2 (line 350); cf. EvidenceRequirement.freshnessRule §6.1"
+    },
+    {
+      "condition": "It is relevant to the assessed claim (evidence is not proof by existence — §6.3)",
+      "sourceSection": "DOC-004 §6.2 (line 351), §6.3"
+    }
+  ],
+  "dispositionRules": [
+    {
+      "rule": "AUTHORITY SEPARATION: validators only RECOMMEND. ValidatorResult.dispositionRecommendation ∈ {SATISFIED, CONDITIONALLY_SATISFIED, REJECTED, INCONCLUSIVE, ESCALATED} — exactly 5 values. WAIVED is NOT a validator recommendation and is NOT a DispositionRule target; it is set only by an authorized actor via the Assurance Service. The validator recommendation does not itself mutate assurance state (Invariant 10).",
+      "sourceSection": "DOC-004 §4.2; DOC-007 §20 (dispositionRecommendation), §42"
+    },
+    {
+      "rule": "CRITERION-RESULT OUTCOMES: every criterion result MUST be exactly one of MET | PARTIALLY_MET | NOT_MET | NOT_APPLICABLE | UNABLE_TO_DETERMINE (uppercase enum per §33/§20.1). UNABLE_TO_DETERMINE is a first-class distinct outcome and CANNOT be treated as MET (not a silent pass).",
+      "sourceSection": "DOC-004 §7 (lines 399-407), Core Invariant 6 (line 2045); DOC-007 §20.1 CriterionResult.result"
+    },
+    {
+      "rule": "DISPOSITION MEANINGS: SATISFIED = admissible evidence supports the claims under criteria, subject to recorded limitations; CONDITIONALLY_SATISFIED = supportable only if explicit conditions remain true / required follow-up occurs; REJECTED = one or more material claims unsupported/contradicted OR a blocking criterion violated; INCONCLUSIVE = evidence insufficient to support OR reject; ESCALATED = validator/policy cannot resolve within its authority/competence; WAIVED = authorized actor accepts proceeding without satisfaction (governance-only).",
+      "sourceSection": "DOC-004 §10.1 (lines 517-539)"
+    },
+    {
+      "rule": "DEFAULT SINGLE-POLICY PRECEDENCE LADDER (override-able by policy): CRITICAL open finding → REJECTED or ESCALATED; BLOCKING open finding → REJECTED; MATERIAL open finding → CONDITIONALLY_SATISFIED / INCONCLUSIVE / REJECTED; evidence deficit → INCONCLUSIVE; all mandatory criteria met → SATISFIED.",
+      "sourceSection": "DOC-004 §10.3 (lines 564-579)"
+    },
+    {
+      "rule": "STRICTEST-UNRESOLVED AGGREGATE (multi-policy) — NEVER A NUMERIC AVERAGE. The aggregate must preserve the strictest unresolved disposition relevant to the work and MUST NOT be reduced to a numerical average and MUST NOT silently average disagreement. Resolution order: any critical rejection → REJECTED; any blocking rejection → REJECTED; any required assessment missing → EVIDENCE_REQUIRED or UNASSESSED; any inconclusive required assessment → INCONCLUSIVE; any conditional required assessment → CONDITIONALLY_SATISFIED; all required assessments satisfied → SATISFIED. A SATISFIED advisory policy NEVER overrides a REJECTED blocking policy; policy conflict is surfaced and results remain independently inspectable.",
+      "sourceSection": "DOC-004 §28.1 (line 1622), §28.2 (lines 1628-1648), §34.4 (line 1887)"
+    },
+    {
+      "rule": "CONFLICTING VALIDATORS: conflicting assessments remain visible; the system MAY invoke a tie-breaking validator, gather discriminating evidence, escalate, or permit an authorized human decision — but MUST NOT silently average disagreement. Aggregate becomes 'contested'.",
+      "sourceSection": "DOC-004 §34.4, Invariant 17 (Test 8)"
+    },
+    {
+      "rule": "ASSURANCE SERVICE OVERRIDES THE RECOMMENDATION: if a validator recommends SATISFIED while a mandatory criterion is NOT_MET, the Assurance Service rejects the recommendation at the boundary (unsupported pass is not accepted; every required criterion must have a result — Invariant 5).",
+      "sourceSection": "DOC-004 Conformance Test 3 (lines 2091-2095); DOC-007 §20.2 (disposition contradicts mandatory policy rules)"
+    },
+    {
+      "rule": "EXECUTION != ASSURANCE: ExecutionStepSucceeded cannot produce AssuranceState=SATISFIED; a baseline cannot be promoted solely because all execution steps completed; assurance stays UNASSESSED until required policies complete. Open CRITICAL findings block satisfaction; open BLOCKING findings block baseline promotion.",
+      "sourceSection": "DOC-004 Invariants 11,12,20, Test 9, §10.3, §26.6; DOC-007 §16 last line, §35.2"
+    },
+    {
+      "rule": "CONFIDENCE IS NOT EVIDENCE / EVIDENCE IS NOT PROOF BY EXISTENCE: a SATISFIED claim MUST reference admissible evidence; unscoped confidence cannot substitute; a test result / execution trace / citation / validator opinion does not by itself prove coverage/intent/correctness/independence unless the relationship is shown or policy permits professional judgment.",
+      "sourceSection": "DOC-004 Core Invariants 3,7, §6.3"
+    },
+    {
+      "rule": "DispositionRule SHAPE: { disposition: SATISFIED|CONDITIONALLY_SATISFIED|REJECTED|INCONCLUSIVE|ESCALATED; condition: PolicyExpression; requiredEvidenceIds?: string[]; forbiddenOpenSeverities?: string[]; requiredIndependence?: IndependenceRequirement }. WAIVED is not a DispositionRule target — waiver is a separate governed act.",
+      "sourceSection": "DOC-004 §10.2 (lines 543-558)"
+    },
+    {
+      "rule": "SEVERITY SCALE feeding precedence (findings/criteria): INFORMATIONAL | ADVISORY | MATERIAL | BLOCKING | CRITICAL (AssessmentCriterion.severityIfNotMet §7; FindingDefinition.defaultSeverity §9.1; AssuranceObservation.severity DOC-007 §21).",
+      "sourceSection": "DOC-004 §7 (lines 388-393), §9.1 (lines 476-481); DOC-007 §21"
+    },
+    {
+      "rule": "EVIDENCE-ACCESS FAILURE (distinct from validator failure and from rejection): if required evidence cannot be retrieved, disposition becomes EVIDENCE_PENDING or INCONCLUSIVE — do NOT infer evidence content. Invalidated evidence triggers reassessment of dependent claims; a semantic change to the subject drives SATISFIED/CONDITIONALLY_SATISFIED → INVALIDATED.",
+      "sourceSection": "DOC-004 §34.3, Invariants 15,16; DOC-007 §35.4, §35.1"
+    }
+  ],
+  "independenceTiers": [
+    {
+      "tier": "IndependenceRequirement enum ladder (ascending strength): NONE → DIFFERENT_INVOCATION → DIFFERENT_CONTEXT_INSTANCE → DIFFERENT_AGENT → DIFFERENT_MODEL → DIFFERENT_PROVIDER → HUMAN → ORGANIZATIONALLY_INDEPENDENT",
+      "requires": "The declared level, VERIFIED (multi-dimensional) by comparing producer vs evaluator invocation, agent identity, model identity, provider, shared hidden context, shared prompt lineage, and organizational authority. A validator is NOT independent merely because it is labeled a 'Verifier'.",
+      "riskLevel": "Full ordered lattice (DOC-004 §8.1 lines 416-424, §8.2)"
+    },
+    {
+      "tier": "Lightweight profile",
+      "requires": "DIFFERENT_INVOCATION (same model permitted in a separate invocation). Advisory findings; limited evidence package; no human approval unless a material change emerges; policy-based auto-acceptance allowed ONLY for low-risk reversible work.",
+      "riskLevel": "Low-risk / routine / reversible work (DOC-004 §8.3.1 line 448, §36.1)"
+    },
+    {
+      "tier": "Standard profile",
+      "requires": "DIFFERENT_AGENT role from the producer; a DIFFERENT_MODEL is PREFERRED for MATERIAL claims; independent evidence review; blocking findings enabled; human approval for material scope, architecture, or baseline changes.",
+      "riskLevel": "Material claims / medium (standard) work (DOC-004 §8.3.2 line 452, §36.2)"
+    },
+    {
+      "tier": "High-assurance profile",
+      "requires": "DIFFERENT_MODEL or DIFFERENT_PROVIDER, PLUS HUMAN or ORGANIZATIONALLY_INDEPENDENT assessment for CRITICAL claims; stronger evidence; explicit residual risk; restricted waivers; immutable assessment package.",
+      "riskLevel": "Critical claims / high risk (DOC-004 §8.3.3 line 454, §36.3)"
+    },
+    {
+      "tier": "RISK → INDEPENDENCE MAPPING (derived; keyed on claim materiality/risk assessed via RISK_AT_LEAST over CONSEQUENCE/UNCERTAINTY/IRREVERSIBILITY/SECURITY_SENSITIVITY/REGULATORY_EXPOSURE)",
+      "requires": "low/reversible → DIFFERENT_INVOCATION (Lightweight); material → DIFFERENT_AGENT + DIFFERENT_MODEL preferred (Standard); critical → DIFFERENT_MODEL or DIFFERENT_PROVIDER + HUMAN or ORGANIZATIONALLY_INDEPENDENT (High assurance). The RISK_AT_LEAST applicability op is the trigger that escalates the required tier.",
+      "riskLevel": "Mapping spans Lightweight → Standard → High assurance (DOC-004 §8.3, §36; Semantic Inventory Decision 4)"
+    },
+    {
+      "tier": "INDEPENDENCE-VIOLATION handling (gate on all tiers)",
+      "requires": "INDEPENDENCE GATES SATISFACTION: if required independence is not satisfied the assessment CANNOT receive SATISFIED; an Independence Violation Observation is created; another evaluator must be invoked or a waiver obtained. State: ASSESSING → INDEPENDENCE_VIOLATION; error RPH_VALIDATOR_INDEPENDENCE_VIOLATION.",
+      "riskLevel": "Gate on all tiers (DOC-004 §8.4 lines 458-462, §30; DOC-007 §25.1)"
+    }
+  ],
+  "validatorContractFields": [
+    {
+      "field": "validatorId",
+      "required": true,
+      "type": "string"
+    },
+    {
+      "field": "validatorVersion",
+      "required": true,
+      "type": "string"
+    },
+    {
+      "field": "supportedPolicyIds",
+      "required": true,
+      "type": "string[]"
+    },
+    {
+      "field": "implementationType",
+      "required": true,
+      "type": "enum: MODEL | DETERMINISTIC | HYBRID | HUMAN | EXTERNAL_SERVICE"
+    },
+    {
+      "field": "requiredInputSchemas",
+      "required": true,
+      "type": "SchemaReference[]"
+    },
+    {
+      "field": "outputSchema",
+      "required": true,
+      "type": "SchemaReference (boundary-rejection uses this to schema-validate ValidatorResult; failure → RPH_VALIDATOR_OUTPUT_INVALID)"
+    },
+    {
+      "field": "requiredCapabilities",
+      "required": true,
+      "type": "CapabilityRequest[]"
+    },
+    {
+      "field": "contextPolicyId",
+      "required": true,
+      "type": "string"
+    },
+    {
+      "field": "producerIndependenceMetadata",
+      "required": true,
+      "type": "IndependenceMetadata (basis for §8.2 multi-dimensional independence verification)"
+    },
+    {
+      "field": "executionLimits",
+      "required": true,
+      "type": "object { timeoutSeconds?: number; maximumRetries?: number; maximumEvidenceItems?: number; maximumContextTokens?: number } — object present, each sub-field optional"
+    },
+    {
+      "field": "determinism",
+      "required": true,
+      "type": "enum: DETERMINISTIC | BOUNDED_NONDETERMINISTIC | NONDETERMINISTIC"
+    },
+    {
+      "field": "knownLimitations",
+      "required": true,
+      "type": "string[]"
+    }
+  ],
+  "validatorFailedConditions": [
+    "VALIDATOR_FAILED (DOC-004 §34.1; state ASSESSING → VALIDATOR_FAILED, §30) = validator EXECUTION failure: the validator could NOT complete / produce a usable result (crash, timeout, exceeded maximumRetries, tool/model/provider error, unavailable). Produces VALIDATOR_FAILED + execution error + incomplete assessment + a retry / alternate-validator / escalation action. It is NEVER an assurance REJECTED disposition (Core Invariant 9, line 2051).",
+    "BOUNDARY-REJECTION (DOC-007 §20.2; DOC-004 §34.2, Invariant 10) is DISTINCT from VALIDATOR_FAILED: a result WAS returned but the Assurance Service rejects it at the boundary with a typed RphError + retry/alternate/escalate. It does NOT become a REJECTED disposition and does NOT create authoritative findings from unparsed prose. The Assurance Service MUST reject a validator result when:",
+    "BOUNDARY-REJECTION [1] policy identity or version mismatches (RPH_POLICY_VERSION_MISMATCH). DOC-007 §20.2.",
+    "BOUNDARY-REJECTION [2] assessment identity mismatches. DOC-007 §20.2.",
+    "BOUNDARY-REJECTION [3] subject semantic version mismatches (RPH_SUBJECT_VERSION_MISMATCH). DOC-007 §20.2, §35.1.",
+    "BOUNDARY-REJECTION [4] required criteria are missing. DOC-007 §20.2.",
+    "BOUNDARY-REJECTION [5] referenced evidence does not exist (RPH_EVIDENCE_MISSING). DOC-007 §20.2.",
+    "BOUNDARY-REJECTION [6] evidence is invalidated (RPH_EVIDENCE_INVALIDATED). DOC-007 §20.2, §35.4.",
+    "BOUNDARY-REJECTION [7] disposition contradicts mandatory policy rules (e.g. recommends SATISFIED while a mandatory criterion is NOT_MET). DOC-007 §20.2; DOC-004 Test 3.",
+    "BOUNDARY-REJECTION [8] output fails schema validation (RPH_VALIDATOR_OUTPUT_INVALID) — malformed/incomplete output rejected at the boundary; preserve raw output for diagnostics; record schema-validation failure; create NO authoritative findings from unparsed prose; retry or use another validator. DOC-007 §20.2; DOC-004 §34.2.",
+    "BOUNDARY-REJECTION [9] independence requirements are not satisfied (RPH_VALIDATOR_INDEPENDENCE_VIOLATION; state ASSESSING → INDEPENDENCE_VIOLATION). DOC-007 §20.2; DOC-004 §8.4.",
+    "EVIDENCE-ACCESS FAILURE is a related-but-separate boundary outcome: if required evidence cannot be retrieved, disposition becomes EVIDENCE_PENDING or INCONCLUSIVE (do NOT infer evidence content) — it is NOT VALIDATOR_FAILED and NOT REJECTED. DOC-004 §34.3.",
+    "KEY DISTINCTION (what makes it VALIDATOR_FAILED rather than a rejection): a REJECTED disposition requires a WELL-FORMED, schema-valid result whose one-or-more MATERIAL claims are unsupported/contradicted or which violates a BLOCKING criterion. If the validator did not run OR produced malformed/incomplete/unparseable output, the outcome is VALIDATOR_FAILED (execution failure) or a §20.2 boundary RphError (bad result) → retry / alternate validator / escalate — NEVER an authoritative rejection. NEITHER may mutate authoritative state (Invariants 9 & 10, lines 2051-2053)."
+  ],
+  "waiverRules": [
+    "WaiverRule SHAPE (DOC-004 §12.1, lines 622-636): { waiverAllowed: boolean; eligibleCriteriaIds: string[]; prohibitedFindingSeverities: string[]; requiredAuthorityType: string; maximumDuration?: string; requiredRationaleFields: string[]; requiredCompensatingControls?: string[]; revalidationTrigger?: PolicyExpression }.",
+    "A WAIVER MUST RECORD (DOC-004 §12.2, lines 641-651): exact policy and criterion; exact object AND semantic version; the finding being waived; authority; rationale; duration/expiration; compensating controls; downstream impact; review conditions.",
+    "A WAIVER MUST NOT (DOC-004 §12.2, Invariant 13, lines 653-658): erase a finding; transform false evidence into valid evidence; declare a rejected claim true; apply to future semantic versions unless explicitly renewed.",
+    "SCOPE BINDING (Invariant 14, line 2061; §28.1): a waiver applies ONLY to its specified policy + criterion + object. A waiver on one policy/criterion does NOT cover another; prohibitedFindingSeverities blocks waiving findings at/above the listed severities.",
+    "VERSION BINDING (Invariant 14; Conformance Test 7, lines 2115-2119): a waiver bound to object semantic version N does NOT apply to version N+1 (a waiver for architecture v2 does NOT apply to v3); requires explicit renewal.",
+    "AUTHORITY CEILING (§26.7 line 1512, §15.11 lines 824-826): critical integrity failures cannot be waived by ordinary product authority; unauthorized intent alteration cannot be waived AT ALL — an authorized user-approved revised intent yields a governed intent revision, NOT a waiver.",
+    "LIFECYCLE / GOVERNANCE-ONLY: WAIVED is a disposition set ONLY via governed commands (requestAssuranceWaiver / grantAssuranceWaiver / denyAssuranceWaiver / expireAssuranceWaiver, §32); it is NOT a validator recommendation and NOT a DispositionRule target. State WAIVED → WAIVER_EXPIRED on expiry (§30). Waivers must be included in the baseline-promotion package (§26.4); an expired/invalid waiver is itself a baseline-promotion finding INVALID_OR_EXPIRED_WAIVER (§26.5)."
+  ],
+  "conflicts": [
+    {
+      "topic": "ValidatorResult schema divergence: DOC-007 §20 includes `subjectSemanticVersions: Record<string,number>` (load-bearing for the §20.2 subject-version-mismatch boundary rejection and §35.1 version binding), whereas DOC-004 §4.2 ValidatorResult omits it.",
+      "resolution": "Prefer the DOC-007 §20 form. The Contract Package is the serialization authority (README precedence: domain/contracts outrank convenience descriptions). Verified present at DOC-007 lines 1427. Keep subjectSemanticVersions REQUIRED."
+    },
+    {
+      "topic": "WAIVED appears in the disposition-MEANINGS list (DOC-004 §10.1) but is NOT in the validator dispositionRecommendation set (§4.2 / DOC-007 §20 = 5 values) nor a DispositionRule target (§10.2).",
+      "resolution": "Reconcile as: WAIVED is a governance-only assurance-state outcome, never a validator recommendation. The dispositionRecommendation enum is exactly {SATISFIED, CONDITIONALLY_SATISFIED, REJECTED, INCONCLUSIVE, ESCALATED}; the assessment-state SUPERSET additionally includes WAIVED, VALIDATOR_FAILED, INDEPENDENCE_VIOLATION, INVALIDATED, CANCELLED."
+    },
+    {
+      "topic": "Aggregate resolution (§28.2) introduces states EVIDENCE_REQUIRED and UNASSESSED that are NOT members of the per-assessment disposition enum (§10.1).",
+      "resolution": "Treat the aggregate/cross-policy vocabulary as a superset of the single-assessment disposition enum: EVIDENCE_REQUIRED / UNASSESSED are aggregate-level states meaning 'a required assessment is missing', not per-assessment dispositions. Preserve them at aggregate granularity; do not coerce them into INCONCLUSIVE (strictest-unresolved must be preserved, never averaged)."
+    },
+    {
+      "topic": "ApplicabilityExpression DSL op set (ALL/ANY/NOT/EQUALS/IN/CONTAINS/EXISTS/RISK_AT_LEAST) is NOT defined in DOC-004; that file references the DSL only opaquely as `PolicyExpression` (§5.1 line 277, §10.2 line 552, §12.1 line 635, §13 line 666). The concrete grammar lives in DOC-007 §18.",
+      "resolution": "Treat `PolicyExpression` (DOC-004) and `ApplicabilityExpression` (DOC-007 §18) as the SAME declarative code-free DSL. DOC-004 §5.1 ApplicabilityRule is a higher-level wrapper whose `expression` slot carries the §18 DSL; applicability yields an ApplicabilityOutcome (§5.2: REQUIRED | RECOMMENDED | OPTIONAL | NOT_APPLICABLE | REQUIRES_HUMAN_DETERMINATION)."
+    },
+    {
+      "topic": "DSL key-name asymmetry (silent-bug hazard): NOT uses singular `operand` while ALL/ANY use plural `operands`; CONTAINS/EQUALS use singular `value` while IN uses plural `values`.",
+      "resolution": "Verified against DOC-007 §18 source (lines 1240-1266). Bind evaluator/serializer to these exact keys: ALL.operands[], ANY.operands[], NOT.operand, EQUALS.value, IN.values[], CONTAINS.value. This is an implementation gotcha, not a semantic conflict."
+    },
+    {
+      "topic": "VALIDATOR_FAILED (execution failure, §34.1) vs BOUNDARY-REJECTION (§20.2 / §34.2) are two DISTINCT non-disposition mechanisms that must not be collapsed.",
+      "resolution": "Preserve both as separate outcomes: VALIDATOR_FAILED = no usable result (assessment state VALIDATOR_FAILED); BOUNDARY-REJECTION = a result returned but rejected at §20.2 (typed RphError). Neither may become a REJECTED assurance disposition; neither may mutate authoritative state (Invariants 9 & 10)."
+    }
+  ],
+  "openItems": [
+    {
+      "item": "JSONPath-like `path` resolution semantics for leaf ops (EQUALS/IN/CONTAINS/EXISTS) are specified only as 'resolved deterministically against the subject object envelope' with examples ($.objectType, $.pwuKind, $.workLifecycleState). The exact supported JSONPath subset (nesting, arrays, wildcards, missing-path behavior) is not defined.",
+      "why": "Determinism (DOC-007 §18: no arbitrary JS/SQL) requires a pinned, spec'd resolver grammar; ambiguity risks per-implementation divergence in applicability outcomes."
+    },
+    {
+      "item": "CONTAINS is defined as 'the collection/string at path contains value' but does not disambiguate array-membership vs substring behavior when `path` resolves to different types.",
+      "why": "Type-dependent evaluation of the same node could yield different applicability results across subjects; needs a typed-behavior rule."
+    },
+    {
+      "item": "RISK_AT_LEAST reads the subject's risk on a dimension, but how the per-dimension risk profile (CONSEQUENCE/UNCERTAINTY/IRREVERSIBILITY/SECURITY_SENSITIVITY/REGULATORY_EXPOSURE) is populated/sourced/provenanced on the subject envelope is not specified in DOC-004/DOC-007 §18.",
+      "why": "The risk→independence escalation and REQUIRED/RECOMMENDED gating hinge on these values; unsourced risk = ungoverned tier selection."
+    },
+    {
+      "item": "CriterionResult schema (DOC-007 §20.1) has no claim-level status, but the DOC-004 §33 example nests criterionResults under each claimResult and adds a claim-level `recommendedStatus` (e.g. CONTESTED) not present in the §20 ValidatorResult/ClaimAssessmentResult contract.",
+      "why": "A field used in the canonical example but absent from the authoritative schema is a contract gap; 'CONTESTED' also overlaps the §34.4 aggregate 'contested' concept and needs a single definition."
+    },
+    {
+      "item": "Aggregate 'contested' outcome (§34.4, Test 8) and the tie-break process (invoke tie-breaking validator / gather discriminating evidence / escalate / authorized human decision) are described but the selection criteria and who has authority to pick the path are not fully specified.",
+      "why": "Without a deterministic trigger and authority binding, 'must not silently average' is stated but the resolution routing is under-defined."
+    },
+    {
+      "item": "DispositionRule.requiredIndependence (§10.2) vs ValidatorContract.producerIndependenceMetadata (§4.1) vs §8.2 verification: the docs state independence must be verified multi-dimensionally but do not pin WHICH component computes the comparison or how DIFFERENT_CONTEXT_INSTANCE (shared hidden context / shared prompt lineage) is detected in practice.",
+      "why": "The independence GATE (§8.4) blocks SATISFIED; an unspecified detector for shared-context/prompt-lineage leaves a verifiable-in-principle but unimplementable rule."
+    }
+  ]
+}

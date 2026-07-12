@@ -1,0 +1,10 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "type": "string",
+  "enum": [
+    "ALL",
+    "SATISFIED_ONLY",
+    "CONDITIONAL_OR_SATISFIED"
+  ],
+  "$id": "urn:janumi:rph:schema:enum:RequiredForDispositions:1"
+}

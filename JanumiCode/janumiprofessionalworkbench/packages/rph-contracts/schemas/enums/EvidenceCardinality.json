@@ -1,0 +1,12 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "type": "string",
+  "enum": [
+    "EXACTLY_ONE",
+    "AT_LEAST_ONE",
+    "ZERO_OR_MORE",
+    "ONE_PER_SUBJECT",
+    "ONE_PER_OBLIGATION"
+  ],
+  "$id": "urn:janumi:rph:schema:enum:EvidenceCardinality:1"
+}

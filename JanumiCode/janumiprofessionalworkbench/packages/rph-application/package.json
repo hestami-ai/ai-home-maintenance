@@ -1,0 +1,35 @@
+{
+  "name": "@janumipwb/rph-application",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "description": "The RPH command/query core — the fixed command pipeline (validate, guard, produce event, persist atomically, project), idempotency, optimistic concurrency. Depends on the StorageAdapter port, not on any concrete store.",
+  "license": "AGPL-3.0-only",
+  "exports": {
+    ".": {
+      "source": "./src/index.ts",
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js",
+      "default": "./dist/index.js"
+    }
+  },
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "files": [
+    "dist"
+  ],
+  "scripts": {
+    "build": "tsc -p tsconfig.build.json",
+    "check-types": "tsc --noEmit -p tsconfig.json",
+    "test": "vitest run --passWithNoTests"
+  },
+  "dependencies": {
+    "@janumipwb/rph-contracts": "workspace:*",
+    "@janumipwb/rph-domain": "workspace:*",
+    "@janumipwb/rph-ports": "workspace:*"
+  },
+  "devDependencies": {
+    "@janumipwb/rph-persistence": "workspace:*",
+    "@janumipwb/typescript-config": "workspace:*"
+  }
+}

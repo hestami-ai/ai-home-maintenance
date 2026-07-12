@@ -1,0 +1,8 @@
+{
+  "extends": "@janumipwb/typescript-config/base.json",
+  "compilerOptions": {
+    "noEmit": true
+  },
+  "include": [],
+  "files": []
+}

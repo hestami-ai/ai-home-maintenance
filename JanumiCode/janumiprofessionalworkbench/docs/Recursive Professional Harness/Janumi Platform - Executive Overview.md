@@ -1,0 +1,27 @@
+# Janumi Platform — Executive Overview
+
+**What it is.** Janumi is the company and product family. The **Janumi Platform** is its shared multi-tenant technical, operational, commercial, and governance foundation. The **Janumi Professional Workbench (JPWB)** is the general-purpose environment for defining Professional Work Architectures (PWAs) and operating the Undertakings instantiated from them. The **Recursive Professional Harness (RPH)** supplies the underlying control and runtime architecture.
+
+**Where JanumiCode fits.** JanumiCode is the software-product domain specialization of JPWB, not a single PWA. It combines software-product PWAs, specialized Views, assurance policies, coding-agent integrations, repository and IDE integrations, build and test systems, and deployment capabilities. Its Product Realization PWA takes product intent through reusable types of professional work such as behavior definition, architecture, implementation, validation, and baseline promotion.
+
+For a concrete product, a tenant instantiates a selected Product Realization PWA version as an **Undertaking**. That Undertaking owns a **Professional Work Graph** of PWU Instances. Execution Plans and temporal Execution Workflows perform those PWUs; claims, evidence, assurance, decisions, and baselines govern whether the resulting work is accepted. The resulting software product is distinct from the Undertaking that produces it.
+
+**The problem it solves.** The early JanumiCode harness is valuable but trapped on the desktop: it requires a local editor, local model/GPU infrastructure, and a local database. That excludes users without the toolchain, blocks teams from collaborating on one governed Undertaking, and gives organizations no tenancy, identity, or audit foundation. Janumi Platform makes the shared services available to browser, self-hosted, and mobile clients; JPWB and JanumiCode provide the corresponding professional-work experiences.
+
+**The core principle — governance is the product, not a feature.** An AI agent may propose anything, but is never silently promoted to authority (Capability ≠ Authority). Every consequential decision is adjudicated by an authorized human—approve, refine, reject, waive, or escalate—through three tiers (`READ`, `PROPOSE`, `GOVERN`). Decisions persist so they can be acted on later, including from mobile. Alongside this are faithful traceability, bring-your-own-keys, and hard tenant isolation.
+
+**Architecture — two planes.** A trusted control plane provides durable RPH execution, professional-work services, assurance, governance, identity, tenancy, and audit on a modular monolith (SvelteKit · Bun · oRPC · Prisma/PostgreSQL-RLS · DBOS · Cerbos). Its durable workflows are temporal execution machinery; they are not the PWAs or Professional Work Graphs they operate. An isolated execution plane runs untrusted compilers and coding agents in ephemeral, per-tenant sandboxes under a Compute Broker that meters and fair-shares. Three trust tiers (`control-plane`, `sandbox`, `tenant-app`), two separate Postgres trust domains, and Vault-minted short-lived credentials keep tenants apart. The same images support Docker Compose for development and smaller self-hosted installations and RKE2/Kubernetes for multi-tenant, highly available, and regulated deployments.
+
+**Platform editions — open core, one codebase.** Three Janumi Platform editions differ by build-time inclusion of a commercial `ee/` set plus a runtime license—never by a source fork:
+
+* **Community** (AGPL, single-tenant, self-hosted, BYOK)—RPH services, JPWB surfaces, delivery and hosting, self-hosted VCS, sandboxed execution, base audit, and encryption.
+* **Enterprise** (commercial, self-hosted)—adds SSO and full SCIM, private or air-gapped models, compliance-evidence automation, and multi-tenant credential isolation.
+* **Cloud** (hosted, multi-tenant)—adds managed hosted operations, metered billing, and cross-tenant fairness to the Enterprise capabilities.
+
+Web, Mobile, and the VS Code extension are clients, not edition splits. Domain products such as JanumiCode may reuse or specialize JPWB surfaces across those clients.
+
+**Built for regulated trust.** The platform is designed, built, and documented to support SOC 2 Type 2, DoD RMF (NIST SP 800-53), and GDPR obligations, with a tamper-evident, hash-chained audit trail; four principal types (human, machine, workload, and agent) resolving to one authorization decision; no unauthenticated internal endpoints; and encryption in transit and at rest.
+
+**Roadmap.** REL-1 (shared platform foundation, Cloud beta, and Community) → REL-2 (Enterprise, Cloud GA on RKE2, and the compliance audit) → REL-3 (Mobile) → REL-4 (HA/multi-node, stronger isolation, and contractual SLA).
+
+**Where it stands today.** Work is proceeding platform-first: the monorepo and open-core boundary, control-plane identity/tenancy/authorization with Cerbos and RLS, contract-first API, tamper-evident audit log, membership and invite flows, and infrastructure for proxying, Vault, object storage, and telemetry are built and verified; the Compose and RKE2 VM images are authored. Migration of the legacy decomposition engine is deliberately parked until its behavior can move cleanly into RPH, PWA, Undertaking, and Professional Work Graph semantics. Janumi Platform remains independent of any single PWA or domain product by design.

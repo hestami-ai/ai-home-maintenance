@@ -1,0 +1,315 @@
+{
+  "_meta": {
+    "milestone": "M12",
+    "sourceDoc": "docs/Recursive Professional Harness/Janumi Professional Workbench Recursive Professional Harness - Executable Invariant and Conformance Test Specification.md",
+    "purpose": "Ground the M12 executable conformance suite + property tests (P1-P8) by extracting the authoritative test taxonomy (§3 seven layers), the full RPH-* rule catalog (§6-24), the property-based catalog (§25 P1-P8), and the mutation-testing requirements (§26). Verbatim ids/spellings. This is the vocab source-of-truth the M12 suite is generated against.",
+    "specStatus": "Initial test baseline",
+    "specAppliesTo": "Product Realization PWA intent-to-architecture vertical slice",
+    "totalRphRules": 125,
+    "totalProperties": 8,
+    "totalMutations": 9,
+    "layerModel": "The spec offers TWO orthogonal seven-way organizations: §3 Test Taxonomy (the seven LAYERS this file uses, the ones the roadmap calls the '7-layer suite') and §30 CI Test Stages (seven STAGES, a pipeline ordering). Layers are used here as the authoritative structure; CI stages are recorded per-layer as ciStage for cross-reference.",
+    "prefixCatalogNote": "The §4.2 recommended-prefix table lists 16 prefixes (RPH-CON, RPH-INT, RPH-PWU, RPH-DEC, RPH-CNS, RPH-ASM, RPH-EXE, RPH-EVD, RPH-ASR, RPH-GOV, RPH-BAS, RPH-TRC, RPH-PER, RPH-PRJ, RPH-CMP, RPH-E2E). A 17th prefix, RPH-FIX, is used in §23 (Product Realization PWA Fixture Tests) but is NOT in the §4.2 table. The task prompt's example list omitted RPH-CON, RPH-EVD, and RPH-CMP; all three exist in the spec and are included here."
+  },
+  "layers": [
+    {
+      "n": 1,
+      "name": "Schema conformance tests",
+      "validates": "Structural validity of commands, events, domain objects, validator outputs, policy definitions, projections, and fixture files. Envelope/contract shape, unknown-property rejection, RFC-3339 timestamps, version-field discipline, and the rule that presentation schemas cannot carry semantic mutations.",
+      "rphPrefixes": ["RPH-CON", "RPH-FIX (schema-validity portion, RPH-FIX-002)"],
+      "ciStage": "Stage 1 — Static contracts (§30)",
+      "sourceRef": "§3.1; rules in §6 (RPH-CON-001..008)"
+    },
+    {
+      "n": 2,
+      "name": "Domain invariant tests",
+      "validates": "Rules inside and across aggregates. E.g. execution success cannot imply assurance success; approved intent must contain desired outcomes; authoritative baselines are immutable. Covers obligation preservation, constraint strength, assumption disclosure/falsification, claim-evidence integrity, assurance disposition, governance authority, and baseline integrity.",
+      "rphPrefixes": ["RPH-INT (invariant portion)", "RPH-PWU", "RPH-DEC", "RPH-CNS", "RPH-ASM", "RPH-EVD", "RPH-ASR", "RPH-GOV", "RPH-BAS"],
+      "ciStage": "Stage 2 — Domain unit tests (§30)",
+      "sourceRef": "§3.2; invariant rules in §7-16 (RPH-INT-004/005, RPH-PWU-*, RPH-DEC-001..006, RPH-CNS-*, RPH-ASM-*, RPH-EVD-*, RPH-ASR-*, RPH-GOV-*, RPH-BAS-*)"
+    },
+    {
+      "n": 3,
+      "name": "State-transition tests",
+      "validates": "That legal transitions succeed, illegal transitions fail, required preconditions are enforced, and appropriate events are emitted. Covers the Intent, PWU, and Execution lifecycles.",
+      "rphPrefixes": ["RPH-INT (lifecycle portion)", "RPH-PWU", "RPH-EXE"],
+      "ciStage": "Stage 2 — Domain unit tests (§30)",
+      "sourceRef": "§3.3; lifecycle rules in §7 (RPH-INT-001..003,006,007), §8 (RPH-PWU-001..010), §12 (RPH-EXE-001..009)"
+    },
+    {
+      "n": 4,
+      "name": "Property-based tests",
+      "validates": "General properties over generated command sequences and structures: mandatory obligations never silently disappear; duplicate commands never produce duplicate decisions; execution never implies assurance; semantic-version approval isolation; baseline immutability; presentation independence.",
+      "rphPrefixes": ["Property P1..P8", "RPH-DEC-007 (embedded 'Property: no obligation disappears', == P2)"],
+      "ciStage": "Stage 3 — Property and mutation tests (§30)",
+      "sourceRef": "§3.4; catalog in §25 (P1..P8); embedded property RPH-DEC-007 in §9"
+    },
+    {
+      "n": 5,
+      "name": "Persistence and replay tests",
+      "validates": "Event durability, aggregate reconstruction, projection rebuilding, outbox correctness, restart recovery, event upcasting, plus optimistic concurrency and idempotency. Concurrency/idempotency (§18), persistence/replay (§19), and restart/recovery (§20) all mint RPH-PER ids.",
+      "rphPrefixes": ["RPH-PER"],
+      "ciStage": "Stage 4 — Persistence tests (§30)",
+      "sourceRef": "§3.5; rules in §18 (RPH-PER-001..005), §19 (RPH-PER-006..010), §20 (RPH-PER-011..014)"
+    },
+    {
+      "n": 6,
+      "name": "Service integration tests",
+      "validates": "Collaboration among Work, Execution, Assurance, Governance, Baseline, and Traceability Services. Covers typed traceability paths across services, projection views (Work/Assurance/Traceability/linked-selection/counts), and the non-authoritative compatibility projection.",
+      "rphPrefixes": ["RPH-TRC", "RPH-PRJ", "RPH-CMP"],
+      "ciStage": "Stage 5 — Fixture conformance (traceability) + Stage 7 — UI projection tests (§30)",
+      "sourceRef": "§3.6; rules in §17 (RPH-TRC-001..005), §21 (RPH-PRJ-001..005), §22 (RPH-CMP-001..004)"
+    },
+    {
+      "n": 7,
+      "name": "End-to-end conformance tests",
+      "validates": "Complete professional scenarios from intent through baseline promotion, plus the deterministic field-service reference fixture (reference integrity, schema validity, expected-event replay, decomposition coverage, tenant-isolation traceability, offline residual condition).",
+      "rphPrefixes": ["RPH-E2E", "RPH-FIX"],
+      "ciStage": "Stage 5 — Fixture conformance + Stage 6 — Vertical-slice integration (§30)",
+      "sourceRef": "§3.7; rules in §23 (RPH-FIX-001..006), §24 (RPH-E2E-001..007)"
+    }
+  ],
+  "ruleCatalog": [
+    { "id": "RPH-CON-001", "statement": "A command envelope containing all required fields validates successfully against the command schema.", "layer": 1, "sourceRef": "§6" },
+    { "id": "RPH-CON-002", "statement": "A canonical command payload with an undeclared property fails validation with RPH_VALIDATION_SCHEMA_FAILED.", "layer": 1, "sourceRef": "§6" },
+    { "id": "RPH-CON-003", "statement": "A command updating an existing aggregate with expectedRevision omitted is rejected unless the command type is explicitly exempt.", "layer": 1, "sourceRef": "§6" },
+    { "id": "RPH-CON-004", "statement": "A command containing a non-RFC-3339 timestamp fails schema validation.", "layer": 1, "sourceRef": "§6" },
+    { "id": "RPH-CON-005", "statement": "A validator result covering only four of five mandatory policy criteria is rejected by the Assurance Service with RPH_VALIDATOR_OUTPUT_INVALID.", "layer": 1, "sourceRef": "§6" },
+    { "id": "RPH-CON-006", "statement": "A validator result for policy version 1.1.0 against an assessment created under policy version 1.2.0 is rejected with RPH_POLICY_VERSION_MISMATCH.", "layer": 1, "sourceRef": "§6" },
+    { "id": "RPH-CON-007", "statement": "A validator result claiming to assess Architecture version 1 for an assessment targeting version 2 is rejected with RPH_SUBJECT_VERSION_MISMATCH.", "layer": 1, "sourceRef": "§6" },
+    { "id": "RPH-CON-008", "statement": "A presentation/canvas-layout command schema cannot contain semantic version fields, PWU lifecycle mutations, assurance disposition mutations, or baseline operations.", "layer": 1, "sourceRef": "§6" },
+
+    { "id": "RPH-INT-001", "statement": "Accepting CaptureIntent emits IntentCaptured, sets status RAW, semantic version 1, revision 1, preserves the originating expression exactly, and infers no formalized objective automatically.", "layer": 3, "sourceRef": "§7" },
+    { "id": "RPH-INT-002", "statement": "Accepting FormalizeIntent on an UNDER_DISCOVERY intent sets status FORMALIZED, increments semantic version, persists desired outcomes and success conditions, and emits IntentFormalized.", "layer": 3, "sourceRef": "§7" },
+    { "id": "RPH-INT-003", "statement": "ApproveIntent on a RAW intent is rejected with RPH_ILLEGAL_STATE_TRANSITION.", "layer": 3, "sourceRef": "§7" },
+    { "id": "RPH-INT-004", "statement": "Approving a formalized intent with no desired outcomes is rejected with RPH_INVARIANT_VIOLATION.", "layer": 2, "sourceRef": "§7" },
+    { "id": "RPH-INT-005", "statement": "A human approval of intent semantic version 3 binds to version 3; a later version 4 is not authorized by the version-3 approval.", "layer": 2, "sourceRef": "§7" },
+    { "id": "RPH-INT-006", "statement": "Materially revising an approved intent with descendant PWUs and an Architecture Baseline increments semantic version, emits IntentRevised, requests impact analysis, classifies affected descendants, keeps the prior baseline immutable, and marks prior approvals review-required where applicable.", "layer": 3, "sourceRef": "§7" },
+    { "id": "RPH-INT-007", "statement": "A SUPERSEDED intent cannot be used as authority to propose a new PWU.", "layer": 3, "sourceRef": "§7" },
+
+    { "id": "RPH-PWU-001", "statement": "Accepting ProposePwu sets state PROPOSED, execution state NOT_PLANNED, assurance state UNASSESSED, shape integrity UNKNOWN, and emits PwuProposed.", "layer": 3, "sourceRef": "§8" },
+    { "id": "RPH-PWU-002", "statement": "A proposed PWU without an intent reference is rejected.", "layer": 2, "sourceRef": "§8" },
+    { "id": "RPH-PWU-003", "statement": "A non-root PWU without a parent or independent authority is rejected.", "layer": 2, "sourceRef": "§8" },
+    { "id": "RPH-PWU-004", "statement": "MarkPwuReady on a PWU missing expected outputs and verification criteria is rejected.", "layer": 3, "sourceRef": "§8" },
+    { "id": "RPH-PWU-005", "statement": "When a PWU's active execution plan succeeds, execution state becomes SUCCEEDED and lifecycle becomes EVIDENCE_PENDING, but assurance state is not automatically SATISFIED and PWU lifecycle is not SATISFIED.", "layer": 2, "sourceRef": "§8" },
+    { "id": "RPH-PWU-006", "statement": "When execution succeeded, required evidence is admitted, and all mandatory assurance assessments are satisfied, the PWU may transition to SATISFIED.", "layer": 3, "sourceRef": "§8" },
+    { "id": "RPH-PWU-007", "statement": "With execution SUCCEEDED but a required assurance assessment REJECTED, the PWU cannot transition to SATISFIED.", "layer": 2, "sourceRef": "§8" },
+    { "id": "RPH-PWU-008", "statement": "A PWU in INVALIDATED cannot be promoted to baseline.", "layer": 3, "sourceRef": "§8" },
+    { "id": "RPH-PWU-009", "statement": "A PWU in SUPERSEDED cannot start an execution step.", "layer": 3, "sourceRef": "§8" },
+    { "id": "RPH-PWU-010", "statement": "A BASELINED PWU cannot resume execution against the same semantic version; a successor revision or successor PWU is required.", "layer": 3, "sourceRef": "§8" },
+
+    { "id": "RPH-DEC-001", "statement": "A decomposition whose children allocate all mandatory obligations, propagate/retain all applicable constraints, and has a recomposition contract may become VALID.", "layer": 2, "sourceRef": "§9" },
+    { "id": "RPH-DEC-002", "statement": "A mandatory parent obligation not allocated, retained, satisfied, or waived emits finding MISSING_OBLIGATION_ALLOCATION, makes the decomposition INVALID, and blocks child execution.", "layer": 2, "sourceRef": "§9" },
+    { "id": "RPH-DEC-003", "statement": "A mandatory parent security constraint that a relevant child neither inherits nor dispositions causes the decomposition to be rejected (silent constraint drop).", "layer": 2, "sourceRef": "§9" },
+    { "id": "RPH-DEC-004", "statement": "A child PWU introducing unauthorized scope (national-enterprise workforce optimization under a small-business parent) emits CHILD_INTENT_DIVERGENCE and is rejected or requires a human decision.", "layer": 2, "sourceRef": "§9" },
+    { "id": "RPH-DEC-005", "statement": "A material parent decomposed into children with no recomposition strategy cannot become valid.", "layer": 2, "sourceRef": "§9" },
+    { "id": "RPH-DEC-006", "statement": "When all child PWUs are individually satisfied but their artifacts use incompatible tenant-identity models, recomposition leaves the parent not satisfied, sets recomposition state CONFLICTED, and emits a conflict observation.", "layer": 2, "sourceRef": "§9" },
+    { "id": "RPH-DEC-007", "statement": "Property: mandatory parent obligations == allocated + retained + already satisfied + authorized waivers; any generated decomposition violating the equation must be rejected. (Equivalent to Property P2.)", "layer": 4, "sourceRef": "§9 (embedded property; == §25 P2)" },
+
+    { "id": "RPH-CNS-001", "statement": "A mandatory parent constraint propagated to a child remains mandatory unless an authorized decision changes it.", "layer": 2, "sourceRef": "§10" },
+    { "id": "RPH-CNS-002", "statement": "A model proposal to weaken a mandatory security constraint to advisory is rejected without authority.", "layer": 2, "sourceRef": "§10" },
+    { "id": "RPH-CNS-003", "statement": "A child marking a mandatory parent constraint inapplicable requires a rationale and an authority or policy basis.", "layer": 2, "sourceRef": "§10" },
+    { "id": "RPH-CNS-004", "statement": "When a constraint waiver's expiration passes, the waiver becomes expired, affected work becomes review-required, and baseline promotion is blocked if the constraint remains applicable.", "layer": 2, "sourceRef": "§10" },
+
+    { "id": "RPH-ASM-001", "statement": "A material implementation premise in model output causes Assumption Disclosure to create an Assumption Object linked to affected objects.", "layer": 2, "sourceRef": "§11" },
+    { "id": "RPH-ASM-002", "statement": "A validator-identified material assumption whose assessment completes without creating an Assumption Object causes the assessment result to be rejected or left incomplete (cannot remain only in prose).", "layer": 2, "sourceRef": "§11" },
+    { "id": "RPH-ASM-003", "statement": "A human accepting a material assumption sets its status to ACCEPTED, not VERIFIED.", "layer": 2, "sourceRef": "§11" },
+    { "id": "RPH-ASM-004", "statement": "Contradicting evidence that falsifies a verified/accepted assumption sets status FALSIFIED, emits AssumptionFalsified, requires impact analysis, moves affected PWUs to AT_RISK / RESHAPING_REQUIRED / INVALIDATED, and triggers review of dependent claims.", "layer": 2, "sourceRef": "§11" },
+    { "id": "RPH-ASM-005", "statement": "An unresolved critical assumption blocks an irreversible execution step unless the assumption is verified or authorized acceptance explicitly permits proceeding.", "layer": 2, "sourceRef": "§11" },
+    { "id": "RPH-ASM-006", "statement": "A new execution plan depending on an EXPIRED assumption has its plan approval rejected.", "layer": 2, "sourceRef": "§11" },
+
+    { "id": "RPH-EXE-001", "statement": "Activating a second execution plan for a PWU without superseding the first is rejected (one active plan per PWU).", "layer": 3, "sourceRef": "§12" },
+    { "id": "RPH-EXE-002", "statement": "Starting a step on a SUPERSEDED execution plan is rejected.", "layer": 3, "sourceRef": "§12" },
+    { "id": "RPH-EXE-003", "statement": "Starting execution with a runtime binding still in REQUESTED is rejected (runtime binding authorization required).", "layer": 3, "sourceRef": "§12" },
+    { "id": "RPH-EXE-004", "statement": "When a binding requests file-system and network access but only file-system is granted, network operations fail authorization (requested capability is not granted capability).", "layer": 3, "sourceRef": "§12" },
+    { "id": "RPH-EXE-005", "statement": "Starting a step whose required input artifact is absent leaves the step not ready and performs no model/tool invocation.", "layer": 3, "sourceRef": "§12" },
+    { "id": "RPH-EXE-006", "statement": "Completing a running step without output or an explicit no-output result is rejected (step success requires explicit result).", "layer": 3, "sourceRef": "§12" },
+    { "id": "RPH-EXE-007", "statement": "Retrying an execution that creates a source-control commit with the same idempotency key produces no second commit (duplicate external side effect prevented).", "layer": 3, "sourceRef": "§12 (idempotency; relates to Layer 5 / Property P6)" },
+    { "id": "RPH-EXE-008", "statement": "After a retry policy's third attempt fails, the controller must not issue a fourth retry and must select change tactic, replan, escalate, reject, or abandon.", "layer": 3, "sourceRef": "§12" },
+    { "id": "RPH-EXE-009", "statement": "A malformed structured model result is treated as untrusted: raw output is retained for diagnostics, boundary validation fails, no authoritative objects are created, and retry or an alternate strategy may be selected.", "layer": 3, "sourceRef": "§12" },
+
+    { "id": "RPH-EVD-001", "statement": "An agent's completion assertion must become or reference a Claim Object before assurance can evaluate it.", "layer": 2, "sourceRef": "§13" },
+    { "id": "RPH-EVD-002", "statement": "Changing a claim with no admissible evidence to SUPPORTED is rejected.", "layer": 2, "sourceRef": "§13" },
+    { "id": "RPH-EVD-003", "statement": "An Evidence Object with no producing actor or source has its admission rejected (evidence requires provenance).", "layer": 2, "sourceRef": "§13" },
+    { "id": "RPH-EVD-004", "statement": "A unit-test result used to support full product fitness must be rejected or qualified as out of scope (evidence scope enforced).", "layer": 2, "sourceRef": "§13" },
+    { "id": "RPH-EVD-005", "statement": "Invalidating evidence that supports two claims and one assessment makes dependent claims contested/under-assessment, makes the dependent assessment invalidated/review-required, and recalculates baseline readiness.", "layer": 2, "sourceRef": "§13" },
+    { "id": "RPH-EVD-006", "statement": "When one evidence item supports a claim and another contradicts it, both remain attached; the system cannot silently discard the contradicting evidence.", "layer": 2, "sourceRef": "§13" },
+    { "id": "RPH-EVD-007", "statement": "Model-generated prose may be an Artifact but becomes Evidence only after evidence admission evaluates provenance, relevance, scope, and limitations.", "layer": 2, "sourceRef": "§13" },
+
+    { "id": "RPH-ASR-001", "statement": "When an Architecture PWU enters EVIDENCE_PENDING and Architecture Coverage is required for its profile, an Assurance Assessment is requested.", "layer": 2, "sourceRef": "§14" },
+    { "id": "RPH-ASR-002", "statement": "An Architecture Coverage assessment without a requirement trace matrix becomes EVIDENCE_PENDING or INCONCLUSIVE and cannot become SATISFIED.", "layer": 2, "sourceRef": "§14" },
+    { "id": "RPH-ASR-003", "statement": "When a policy requires DIFFERENT_AGENT and the same producing agent is selected as validator, evaluation is blocked, INDEPENDENCE_VIOLATION is recorded, and a different validator or waiver is required.", "layer": 2, "sourceRef": "§14" },
+    { "id": "RPH-ASR-004", "statement": "When a validator recommends SATISFIED but one blocking criterion is NOT_MET, the Assurance Service rejects the recommendation and produces REJECTED (validator recommendation is not authoritative disposition).", "layer": 2, "sourceRef": "§14" },
+    { "id": "RPH-ASR-005", "statement": "A mandatory criterion result of UNABLE_TO_DETERMINE prevents the assessment from becoming satisfied.", "layer": 2, "sourceRef": "§14" },
+    { "id": "RPH-ASR-006", "statement": "A validator timeout makes assessment state VALIDATOR_FAILED or returns it to ready for retry; the assessed work is not automatically rejected (execution failure differs from rejection).", "layer": 2, "sourceRef": "§14" },
+    { "id": "RPH-ASR-007", "statement": "Malformed validator JSON is rejected: no authoritative observations are created, no assurance disposition changes, and diagnostic evidence is retained.", "layer": 2, "sourceRef": "§14" },
+    { "id": "RPH-ASR-008", "statement": "A critical open observation prevents aggregate assurance from being SATISFIED.", "layer": 2, "sourceRef": "§14" },
+    { "id": "RPH-ASR-009", "statement": "A conditionally satisfied assessment keeps its condition visible in the assessment, PWU assurance view, review package, and baseline package.", "layer": 2, "sourceRef": "§14" },
+    { "id": "RPH-ASR-010", "statement": "Creating Architecture version 3 means a version-2 assessment cannot satisfy version 3 (semantic change invalidates prior assessment).", "layer": 2, "sourceRef": "§14" },
+    { "id": "RPH-ASR-011", "statement": "When one valid assessment supports a claim and another valid assessment rejects it, both remain visible, the aggregate becomes contested/inconclusive/escalated, and results are not averaged silently.", "layer": 2, "sourceRef": "§14" },
+    { "id": "RPH-ASR-012", "statement": "With five required policies where four are satisfied and one is rejected, aggregate assurance is rejected (policy composition uses strictest unresolved disposition).", "layer": 2, "sourceRef": "§14" },
+
+    { "id": "RPH-GOV-001", "statement": "An agent without approval authority issuing ApproveDecision is rejected with RPH_AUTHORITY_INSUFFICIENT.", "layer": 2, "sourceRef": "§15" },
+    { "id": "RPH-GOV-002", "statement": "A Product Owner agent recommending approval creates no effective governance decision until an authorized actor approves it.", "layer": 2, "sourceRef": "§15" },
+    { "id": "RPH-GOV-003", "statement": "An approval of Architecture version 2 does not approve Architecture version 3 (decision binds subject versions).", "layer": 2, "sourceRef": "§15" },
+    { "id": "RPH-GOV-004", "statement": "A human waiver for a material finding keeps the finding visible, sets disposition WAIVED, records rationale and authority, and leaves evidence unchanged (human override preserves findings).", "layer": 2, "sourceRef": "§15" },
+    { "id": "RPH-GOV-005", "statement": "A waiver for policy criterion AC-04 on Architecture version 2 does not waive another criterion, another object, or Architecture version 3 (waiver scope enforced).", "layer": 2, "sourceRef": "§15" },
+    { "id": "RPH-GOV-006", "statement": "Requesting baseline promotion when a required waiver is expired is rejected.", "layer": 2, "sourceRef": "§15" },
+    { "id": "RPH-GOV-007", "statement": "Revoking an effective Architecture approval makes the Architecture Baseline review-required or revoked, impacts downstream planning, and initiates impact analysis.", "layer": 2, "sourceRef": "§15" },
+
+    { "id": "RPH-BAS-001", "statement": "Every item in an Architecture Baseline candidate includes object ID, semantic version, and content hash where applicable (candidate baseline identifies exact versions).", "layer": 2, "sourceRef": "§16" },
+    { "id": "RPH-BAS-002", "statement": "Promotion specifying a hash different from the reviewed artifact hash fails with RPH_BASELINE_VERSION_MISMATCH.", "layer": 2, "sourceRef": "§16" },
+    { "id": "RPH-BAS-003", "statement": "An open blocking tenant-isolation finding causes Architecture Baseline promotion to be rejected.", "layer": 2, "sourceRef": "§16" },
+    { "id": "RPH-BAS-004", "statement": "When Baseline Promotion requires Architecture Coverage, Intent Preservation, and Assumption Disclosure but Intent Preservation has not completed, promotion is rejected.", "layer": 2, "sourceRef": "§16" },
+    { "id": "RPH-BAS-005", "statement": "Changing an item of an authoritative Architecture Baseline leaves the original baseline unchanged; a successor baseline must be created (authoritative baseline immutable).", "layer": 2, "sourceRef": "§16" },
+    { "id": "RPH-BAS-006", "statement": "Committing source or architecture artifacts to version control makes no baseline authoritative without a promotion decision and assurance (commit is not baseline).", "layer": 2, "sourceRef": "§16" },
+    { "id": "RPH-BAS-007", "statement": "When Baseline 1 is superseded by Baseline 2, Baseline 1 remains queryable, a supersession trace exists, and prior evidence and decision remain intact.", "layer": 2, "sourceRef": "§16" },
+
+    { "id": "RPH-TRC-001", "statement": "For an authoritative Architecture Baseline a typed path must exist: originating expression -> approved intent -> Architecture PWU -> Architecture Artifact -> Claim -> Evidence -> Assurance Assessment -> Approval Decision -> Architecture Baseline.", "layer": 6, "sourceRef": "§17" },
+    { "id": "RPH-TRC-002", "statement": "For each mandatory architecture constraint a trace must exist to relevant child PWUs and artifacts (constraint propagation path exists).", "layer": 6, "sourceRef": "§17" },
+    { "id": "RPH-TRC-003", "statement": "An Architecture Artifact with no producing PWU or execution attempt causes traceability validation to fail (unsupported object detected).", "layer": 6, "sourceRef": "§17" },
+    { "id": "RPH-TRC-004", "statement": "Correcting an existing trace link's relation creates a replacement or superseding link; the old link is not overwritten silently (trace link is immutable).", "layer": 6, "sourceRef": "§17" },
+    { "id": "RPH-TRC-005", "statement": "Invalidated evidence supporting a claim causes downstream traceability to indicate that the claim support is no longer valid.", "layer": 6, "sourceRef": "§17" },
+
+    { "id": "RPH-PER-001", "statement": "When two commands expect aggregate revision 5 and the first produces revision 6, the second is rejected with RPH_REVISION_CONFLICT (optimistic concurrency conflict).", "layer": 5, "sourceRef": "§18" },
+    { "id": "RPH-PER-002", "statement": "Re-submitting a previously accepted command's idempotency key emits no new domain events and returns the original result (duplicate command returns prior result).", "layer": 5, "sourceRef": "§18" },
+    { "id": "RPH-PER-003", "statement": "A retried approval request cannot create two effective decisions (duplicate decision prevented).", "layer": 5, "sourceRef": "§18" },
+    { "id": "RPH-PER-004", "statement": "A retried baseline-promotion command cannot create two authoritative baselines (duplicate baseline prevented).", "layer": 5, "sourceRef": "§18" },
+    { "id": "RPH-PER-005", "statement": "Events for an aggregate must have contiguous revisions; a gap or duplicate revision is rejected by the event store (event revision sequence enforced).", "layer": 5, "sourceRef": "§18" },
+    { "id": "RPH-PER-006", "statement": "An aggregate reconstructed from its event stream has state matching the materialized current state (aggregate replay equivalence).", "layer": 5, "sourceRef": "§19" },
+    { "id": "RPH-PER-007", "statement": "Rebuilding projections from all domain events into empty tables makes Work, Assurance, and Compatibility views match the expected fixture projections (projection rebuild).", "layer": 5, "sourceRef": "§19" },
+    { "id": "RPH-PER-008", "statement": "A successful aggregate mutation commits domain events and outbox rows atomically; a transaction rollback leaves neither persisted (outbox atomicity).", "layer": 5, "sourceRef": "§19" },
+    { "id": "RPH-PER-009", "statement": "When the read projection is behind, commands continue to validate against canonical aggregate state, not stale projection state (projection lag does not change authoritative state).", "layer": 5, "sourceRef": "§19" },
+    { "id": "RPH-PER-010", "statement": "Loading a persisted version-1 event runs the registered upcaster to produce the current internal representation without rewriting the event (event upcasting).", "layer": 5, "sourceRef": "§19" },
+    { "id": "RPH-PER-011", "statement": "After events are committed but the projection update is interrupted, restarting the service eventually updates the projection from the event/outbox stream (restart after command persistence).", "layer": 5, "sourceRef": "§20" },
+    { "id": "RPH-PER-012", "statement": "When an execution attempt was started before restart with uncertain external completion, the runtime restart moves the attempt into a reconciliation state and must not blindly repeat the side effect (restart during model invocation).", "layer": 5, "sourceRef": "§20" },
+    { "id": "RPH-PER-013", "statement": "When the extension restarts while a PWU waits for human approval, the pending decision remains available and no duplicate review request is created (restart during human wait).", "layer": 5, "sourceRef": "§20" },
+    { "id": "RPH-PER-014", "statement": "When a valid raw validator result is persisted and the Assurance Service restarts before authoritative disposition, processing resumes idempotently.", "layer": 5, "sourceRef": "§20" },
+
+    { "id": "RPH-PRJ-001", "statement": "A PWU with execution SUCCEEDED, assurance REJECTED, and shape integrity AT_RISK must display all three states distinctly in Work View (independent states).", "layer": 6, "sourceRef": "§21" },
+    { "id": "RPH-PRJ-002", "statement": "The UI cannot show an unqualified green completion indicator when execution succeeded but assurance remains incomplete (green status requires assurance).", "layer": 6, "sourceRef": "§21" },
+    { "id": "RPH-PRJ-003", "statement": "Selecting a PWU in Work View selects the same underlying object in Execution View, Assurance View, and Traceability View (linked selection consistency).", "layer": 6, "sourceRef": "§21" },
+    { "id": "RPH-PRJ-004", "statement": "Moving a node updates presentation revision only: it does not change semantic version, emits no PWU semantic event, and does not invalidate assurance (layout change updates presentation only).", "layer": 6, "sourceRef": "§21" },
+    { "id": "RPH-PRJ-005", "statement": "Observation counts shown on a node must match canonical open observations by severity (open finding count accurate).", "layer": 6, "sourceRef": "§21" },
+
+    { "id": "RPH-CMP-001", "statement": "An approved Intent Baseline with completed intent PWUs derives compatibility milestone INTAKE = COMPLETE.", "layer": 6, "sourceRef": "§22" },
+    { "id": "RPH-CMP-002", "statement": "Changing the compatibility phase field directly must not mutate PWU or assurance state (phase is non-authoritative).", "layer": 6, "sourceRef": "§22" },
+    { "id": "RPH-CMP-003", "statement": "With Architecture Baseline promoted but implementation not begun, ARCHITECTURE = COMPLETE while the root Product Realization PWU is not complete.", "layer": 6, "sourceRef": "§22" },
+    { "id": "RPH-CMP-004", "statement": "A REPLAN compatibility milestone may be shown when a replan control action is active and is not stored as the semantic lifecycle state (REPLAN derived from control action).", "layer": 6, "sourceRef": "§22" },
+
+    { "id": "RPH-FIX-001", "statement": "Every object reference in the field-service fixture resolves (fixture reference integrity).", "layer": 7, "sourceRef": "§23" },
+    { "id": "RPH-FIX-002", "statement": "Every fixture file validates against its registered schema (fixture schema validity).", "layer": 7, "sourceRef": "§23 (schema-validity; also exercises Layer 1)" },
+    { "id": "RPH-FIX-003", "statement": "Replaying expected-events.jsonl produces an approved Intent Baseline, a satisfied Product Behavior PWU, an authoritative Architecture Baseline, and the expected open residual condition (expected event replay).", "layer": 7, "sourceRef": "§23" },
+    { "id": "RPH-FIX-004", "statement": "All architecture obligations in the fixture are allocated to child PWUs (architecture decomposition coverage).", "layer": 7, "sourceRef": "§23" },
+    { "id": "RPH-FIX-005", "statement": "The fixture exposes the trace: Multi-Tenancy Constraint -> Multi-Tenancy Architecture PWU -> Tenant Isolation Artifact -> Tenant Isolation Claim -> Assurance Assessment -> Implementation Verification Obligation (tenant isolation traceability).", "layer": 7, "sourceRef": "§23" },
+    { "id": "RPH-FIX-006", "statement": "The deferred offline capability remains represented as an assumption or constraint, a residual condition, a baseline scope statement, and a future implementation obligation where applicable (offline condition remains explicit).", "layer": 7, "sourceRef": "§23" },
+
+    { "id": "RPH-E2E-001", "statement": "The normal intent-to-architecture flow (capture, discovery, formalize, Intent Fidelity/Completeness, human approval, Intent Baseline, Architecture PWU + decomposition, decomposition validation, architecture generation, assumption/evidence capture, Architecture Coverage + Intent Preservation, human approval, Architecture Baseline promotion) ends with intent approved, Architecture PWU baselined, traceable evidence/assessments, compatibility Architecture complete, and the root Product Realization PWU still incomplete.", "layer": 7, "sourceRef": "§24" },
+    { "id": "RPH-E2E-002", "statement": "When architecture generation succeeds but lacks enforceable tenant isolation, execution is SUCCEEDED, assurance is REJECTED, the Architecture PWU is not satisfied, a blocking observation is created, baseline promotion is unavailable, and the controller recommends reshape or replan.", "layer": 7, "sourceRef": "§24" },
+    { "id": "RPH-E2E-003", "statement": "When the user clarifies national-enterprise scale against a small-business assumption, the assumption becomes falsified, intent is revised, impact analysis identifies architecture and behavior PWUs, the Architecture Baseline remains immutable but review-required, successor architecture work is created, and the stale approval is not reused.", "layer": 7, "sourceRef": "§24" },
+    { "id": "RPH-E2E-004", "statement": "When an authorized human grants a scoped waiver for a material but noncritical open observation, the finding remains visible, the waiver records rationale and expiration, assurance becomes waived or conditionally satisfied, the baseline package includes the waiver, and unrelated findings remain unaffected.", "layer": 7, "sourceRef": "§24" },
+    { "id": "RPH-E2E-005", "statement": "When one architecture validator approves tenant isolation and an independent security validator rejects it, both assessments are preserved, aggregate assurance is contested or rejected, the human review package summarizes the disagreement, and the baseline is not promoted automatically.", "layer": 7, "sourceRef": "§24" },
+    { "id": "RPH-E2E-006", "statement": "When the extension or runtime restarts during architecture generation before completion status is known, the attempt state is reconciled, duplicate generation/side effects are avoided, execution resumes or is retried per policy, and event history remains coherent.", "layer": 7, "sourceRef": "§24" },
+    { "id": "RPH-E2E-007", "statement": "When Architecture changes from approved version 2 to version 3 before baseline promotion, promotion using the version-2 decision is rejected and assurance and approval for version 3 are required (changed artifact after approval).", "layer": 7, "sourceRef": "§24" }
+  ],
+  "ruleCountsByPrefix": {
+    "RPH-CON": 8,
+    "RPH-INT": 7,
+    "RPH-PWU": 10,
+    "RPH-DEC": 7,
+    "RPH-CNS": 4,
+    "RPH-ASM": 6,
+    "RPH-EXE": 9,
+    "RPH-EVD": 7,
+    "RPH-ASR": 12,
+    "RPH-GOV": 7,
+    "RPH-BAS": 7,
+    "RPH-TRC": 5,
+    "RPH-PER": 14,
+    "RPH-PRJ": 5,
+    "RPH-CMP": 4,
+    "RPH-FIX": 6,
+    "RPH-E2E": 7,
+    "_total": 125
+  },
+  "properties": [
+    {
+      "id": "P1",
+      "name": "Execution never implies assurance",
+      "invariant": "For any generated legal command sequence, executionState = SUCCEEDED must never alone cause assuranceState = SATISFIED.",
+      "generatorNeeds": "A legal-command-sequence generator that drives a PWU aggregate through ProposePwu -> plan activation -> step start/complete to executionState SUCCEEDED WITHOUT admitting evidence or completing mandatory assurance. Needs: PwuBuilder, ExecutionPlanBuilder, the PWU state machine (execution/assurance/lifecycle/shape axes), and an assertion that assuranceState never auto-transitions to SATISFIED.",
+      "sourceRef": "§25 P1 (see RPH-PWU-005, RPH-E2E-002)"
+    },
+    {
+      "id": "P2",
+      "name": "Mandatory obligations persist",
+      "invariant": "For every valid decomposition, every mandatory parent obligation has exactly one or more valid dispositions: allocated, retained, satisfied, or authorized waiver.",
+      "generatorNeeds": "Generators for arbitrary parent obligation sets, arbitrary child allocations, retained obligations, and waivers (per RPH-DEC-007). Needs: ObligationBuilder, decomposition/child-PWU tree builder, WaiverBuilder, and the disposition-checking validator. Any generated decomposition violating obligations == allocated + retained + already-satisfied + authorized-waivers must be rejected.",
+      "sourceRef": "§25 P2 (== embedded RPH-DEC-007; see RPH-DEC-002)"
+    },
+    {
+      "id": "P3",
+      "name": "Mandatory constraints persist",
+      "invariant": "For every relevant child, every mandatory applicable parent constraint is propagated, retained, inapplicable with valid rationale, waived, or superseded.",
+      "generatorNeeds": "Generators for arbitrary mandatory parent constraint sets, a child-relevance mapping, and per-child dispositions. Needs: ConstraintBuilder (with strength=mandatory), parent/child PWU tree, rationale/authority stubs, and the constraint-propagation validator (must reject silent drops).",
+      "sourceRef": "§25 P3 (see RPH-CNS-001, RPH-DEC-003)"
+    },
+    {
+      "id": "P4",
+      "name": "Invalid evidence cannot support active satisfaction",
+      "invariant": "For every state, if evidence is invalidated, no active supported claim or satisfied assessment may rely exclusively on it.",
+      "generatorNeeds": "Generators for evidence-graph structures (Evidence -> Claim(s) -> Assessment(s)) plus invalidation events. Needs: EvidenceBuilder, ClaimBuilder, AssessmentBuilder, a dependency-graph generator, and propagation logic asserting dependent claims/assessments lose active satisfaction when their sole supporting evidence is invalidated.",
+      "sourceRef": "§25 P4 (see RPH-EVD-005, RPH-EVD-002/003)"
+    },
+    {
+      "id": "P5",
+      "name": "Semantic version approval isolation",
+      "invariant": "A decision approving semantic version n never authorizes semantic version n+1.",
+      "generatorNeeds": "Generators for sequences of approve-decision commands interleaved with subject version-increment commands across Intent and Architecture. Needs: DecisionBuilder, subject aggregates carrying semanticVersion (Intent/Architecture), a version-increment generator, and an assertion that authority is scoped to the exact approved version.",
+      "sourceRef": "§25 P5 (see RPH-INT-005, RPH-GOV-003, RPH-ASR-010, RPH-CON-007)"
+    },
+    {
+      "id": "P6",
+      "name": "Idempotent commands",
+      "invariant": "For every command, executing the same idempotency key multiple times produces the same business result and no additional domain events.",
+      "generatorNeeds": "A command generator that emits arbitrary commands each with an idempotency key, plus a duplication/retry harness. Needs: the command bus, event store (to assert no new domain events), and result-equality comparison across the original and each replay.",
+      "sourceRef": "§25 P6 (see RPH-PER-002, RPH-PER-003/004, RPH-EXE-007)"
+    },
+    {
+      "id": "P7",
+      "name": "Authoritative baselines immutable",
+      "invariant": "No legal command mutates an authoritative baseline's item set.",
+      "generatorNeeds": "Generators for an authoritative Baseline plus arbitrary legal command sequences targeting baseline items. Needs: BaselineBuilder (authoritative state), a legal-command generator, and an assertion that the baseline item set (ids + versions + hashes) is byte-stable; mutation must instead force a successor baseline.",
+      "sourceRef": "§25 P7 (see RPH-BAS-005, RPH-BAS-007)"
+    },
+    {
+      "id": "P8",
+      "name": "Presentation independence",
+      "invariant": "For arbitrary layout changes, semantic object versions and assurance states remain unchanged.",
+      "generatorNeeds": "A generator for arbitrary canvas-layout / node-move (presentation) commands, plus snapshots of PWU semantic versions and assurance states before/after. Needs: the presentation projection / layout command schema (which cannot carry semantic fields per RPH-CON-008), and equality assertions on semantic version + assurance state across layout mutations.",
+      "sourceRef": "§25 P8 (see RPH-PRJ-004, RPH-CON-008)"
+    }
+  ],
+  "mutationCatalog": [
+    { "mutation": "removing the assurance check before PWU satisfaction", "mustBeCaughtBy": ["RPH-PWU-005", "RPH-PWU-006", "RPH-PWU-007", "RPH-ASR-008", "P1", "RPH-E2E-002"], "sourceRef": "§26" },
+    { "mutation": "allowing baseline promotion with an open blocking finding", "mustBeCaughtBy": ["RPH-BAS-003", "RPH-E2E-002"], "sourceRef": "§26" },
+    { "mutation": "removing semantic-version comparison", "mustBeCaughtBy": ["RPH-CON-007", "RPH-INT-005", "RPH-GOV-003", "RPH-ASR-010", "RPH-E2E-007", "P5"], "sourceRef": "§26" },
+    { "mutation": "treating UNABLE_TO_DETERMINE as MET", "mustBeCaughtBy": ["RPH-ASR-005"], "sourceRef": "§26" },
+    { "mutation": "allowing expired waivers", "mustBeCaughtBy": ["RPH-CNS-004", "RPH-GOV-006"], "sourceRef": "§26" },
+    { "mutation": "omitting expected-revision checks", "mustBeCaughtBy": ["RPH-CON-003", "RPH-PER-001"], "sourceRef": "§26" },
+    { "mutation": "accepting invalid evidence", "mustBeCaughtBy": ["RPH-EVD-003", "RPH-EVD-002", "RPH-EVD-005", "P4"], "sourceRef": "§26" },
+    { "mutation": "allowing duplicate idempotency effects", "mustBeCaughtBy": ["RPH-PER-002", "RPH-EXE-007", "P6"], "sourceRef": "§26" },
+    { "mutation": "dropping mandatory constraints during decomposition", "mustBeCaughtBy": ["RPH-DEC-003", "RPH-CNS-001", "P3"], "sourceRef": "§26" }
+  ],
+  "_openItems": [
+    "Layer assignment for RPH-INT and RPH-PWU is dual: the spec groups rules by DOMAIN AREA (§7 Intent, §8 PWU) not by taxonomy layer, so their lifecycle rules serve Layer 3 (state-transition) while their guard rules (RPH-INT-004/005, RPH-PWU-002/003/005/007) serve Layer 2 (domain invariant). Per-rule layer here reflects the dominant intent; a generated suite may tag some rules with both.",
+    "RPH-EXE-007 (duplicate external side effect) and RPH-PER-002/003/004 are all idempotency rules; RPH-EXE-007 is filed under §12 (Execution, Layer 3) but semantically also belongs to Layer 5 / Property P6. Cross-referenced, not double-counted.",
+    "RPH-FIX-002 (fixture schema validity) exercises Layer 1 (schema conformance) even though RPH-FIX is filed under Layer 7 (end-to-end/fixture). Recorded on the rule.",
+    "RPH-FIX is the 17th prefix and is NOT in the §4.2 recommended-prefix table (which lists 16). It first appears in §23. Treated as authoritative because §23 uses it verbatim.",
+    "The spec provides TWO seven-way structures: §3 Test Taxonomy (LAYERS, used here) and §30 CI Test Stages (STAGES). They are not identical: §30 splits UI projection (Stage 7) from fixture conformance (Stage 5) and folds property + mutation into one stage (Stage 3). ciStage is recorded per layer for cross-walk.",
+    "No properties exist beyond P8; §25 defines exactly P1-P8. RPH-DEC-007 is an eighth property-style rule embedded in §9 but is semantically identical to P2 (obligation preservation) and is catalogued under RPH-DEC with layer 4.",
+    "RPH-PRJ and RPH-CMP are projection/UI tests; §5 warns against relying on UI snapshot tests for semantic correctness and requires canonical domain behavior to be tested below the UI (Layers 2/3). Playwright is only for §30 Stage 7.",
+    "§27 sets branch-coverage minimums (100% for state-transition guards, invariant handlers, assurance disposition, baseline promotion, idempotency, upcasters; 90% projections) and §26 requires HIGH MUTATION SCORE on critical modules, not merely line coverage — both are acceptance gates for M12, captured as coverageExpectations context but not enumerated as rules.",
+    "§28 Test Data Builders (IntentBuilder, PwuBuilder, ConstraintBuilder, AssumptionBuilder, ClaimBuilder, EvidenceBuilder, AssurancePolicyBuilder, AssessmentBuilder, ObservationBuilder, ExecutionPlanBuilder, DecisionBuilder, BaselineBuilder) and §29 Test Doubles (deterministic/malformed/timeout models, contradictory/stale-evidence/same-agent validators, human-approval + denied-authority actors, idempotent + uncertain-completion external tools) are the generator/fixture infrastructure the property tests (generatorNeeds above) depend on."
+  ]
+}

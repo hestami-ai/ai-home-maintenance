@@ -1,0 +1,13 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "type": "string",
+  "enum": [
+    "NOT_STARTED",
+    "IN_PROGRESS",
+    "WAITING",
+    "COMPLETE",
+    "FAILED",
+    "BLOCKED"
+  ],
+  "$id": "urn:janumi:rph:schema:enum:MilestoneStatus:1"
+}

@@ -1,0 +1,105 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "type": "object",
+  "properties": {
+    "commandId": {
+      "type": "string",
+      "minLength": 1
+    },
+    "status": {
+      "type": "string",
+      "enum": [
+        "ACCEPTED",
+        "REJECTED",
+        "CONFLICT",
+        "DUPLICATE",
+        "UNAUTHORIZED",
+        "VALIDATION_FAILED"
+      ]
+    },
+    "producedEventIds": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    },
+    "error": {
+      "type": "object",
+      "properties": {
+        "code": {
+          "type": "string",
+          "enum": [
+            "RPH_VALIDATION_SCHEMA_FAILED",
+            "RPH_VALIDATION_SEMANTIC_FAILED",
+            "RPH_AUTHORITY_INSUFFICIENT",
+            "RPH_REVISION_CONFLICT",
+            "RPH_ILLEGAL_STATE_TRANSITION",
+            "RPH_INVARIANT_VIOLATION",
+            "RPH_EVIDENCE_MISSING",
+            "RPH_EVIDENCE_INVALIDATED",
+            "RPH_VALIDATOR_OUTPUT_INVALID",
+            "RPH_VALIDATOR_INDEPENDENCE_VIOLATION",
+            "RPH_POLICY_VERSION_MISMATCH",
+            "RPH_SUBJECT_VERSION_MISMATCH",
+            "RPH_BASELINE_VERSION_MISMATCH",
+            "RPH_IDEMPOTENCY_DUPLICATE",
+            "RPH_EXTERNAL_OPERATION_UNCERTAIN"
+          ]
+        },
+        "category": {
+          "type": "string",
+          "enum": [
+            "VALIDATION",
+            "AUTHORIZATION",
+            "CONCURRENCY",
+            "NOT_FOUND",
+            "INVARIANT",
+            "EXECUTION",
+            "ASSURANCE",
+            "PERSISTENCE",
+            "EXTERNAL_DEPENDENCY",
+            "SCHEMA_COMPATIBILITY"
+          ]
+        },
+        "message": {
+          "type": "string"
+        },
+        "retryable": {
+          "type": "boolean"
+        },
+        "targetObjectIds": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "details": {
+          "type": "object",
+          "propertyNames": {
+            "type": "string"
+          },
+          "additionalProperties": {}
+        },
+        "correlationId": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "code",
+        "category",
+        "message",
+        "retryable",
+        "targetObjectIds",
+        "correlationId"
+      ],
+      "additionalProperties": false
+    }
+  },
+  "required": [
+    "commandId",
+    "status",
+    "producedEventIds"
+  ],
+  "additionalProperties": false,
+  "$id": "urn:janumi:rph:schema:result:CommandResult:1"
+}

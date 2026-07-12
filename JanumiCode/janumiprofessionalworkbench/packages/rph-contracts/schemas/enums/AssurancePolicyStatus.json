@@ -1,0 +1,11 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "type": "string",
+  "enum": [
+    "DRAFT",
+    "ACTIVE",
+    "SUSPENDED",
+    "SUPERSEDED"
+  ],
+  "$id": "urn:janumi:rph:schema:enum:AssurancePolicyStatus:1"
+}

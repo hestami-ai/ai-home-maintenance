@@ -1,0 +1,2687 @@
+{
+  "canonicalEnums": [
+    {
+      "name": "ProfessionalWorkObjectType",
+      "appliesTo": "ObjectEnvelope.objectType (all Professional Work Objects); AssurancePolicyDefinition.applicableObjectTypes",
+      "values": [
+        "INTENT",
+        "PROFESSIONAL_WORK_UNIT",
+        "OBLIGATION",
+        "CONSTRAINT",
+        "ASSUMPTION",
+        "CLAIM",
+        "EVIDENCE",
+        "ASSURANCE_POLICY",
+        "ASSURANCE_ASSESSMENT",
+        "ASSURANCE_OBSERVATION",
+        "DECISION",
+        "ARTIFACT",
+        "DECOMPOSITION_CONTRACT",
+        "RECOMPOSITION_CONTRACT",
+        "EXECUTION_PLAN",
+        "RUNTIME_BINDING",
+        "BASELINE"
+      ],
+      "canonicalSource": "RPH-DOC-002 §4 (17 values)",
+      "note": "DOC-004/DOC-007 reference this type but do not re-enumerate it. DOC-006 fixture emits only a 10-value subset (display). ARTIFACT is in the union but has no dedicated interface."
+    },
+    {
+      "name": "ActorType",
+      "appliesTo": "ActorReference.actorType",
+      "values": [
+        "HUMAN",
+        "AGENT",
+        "MODEL",
+        "SERVICE",
+        "POLICY_ENGINE",
+        "EXTERNAL_SYSTEM"
+      ],
+      "canonicalSource": "RPH-DOC-007 §6 (identical to DOC-002 §5)",
+      "note": "DOC-006 fixture uses only HUMAN, AGENT."
+    },
+    {
+      "name": "AuthorityType",
+      "appliesTo": "AuthorityReference.authorityType",
+      "values": [
+        "USER",
+        "ORGANIZATIONAL_ROLE",
+        "POLICY",
+        "LEGAL_REQUIREMENT",
+        "SYSTEM_OWNER",
+        "DELEGATED_AGENT"
+      ],
+      "canonicalSource": "RPH-DOC-002 §5"
+    },
+    {
+      "name": "OriginType",
+      "appliesTo": "ProvenanceRecord.originType",
+      "values": [
+        "USER_INPUT",
+        "MODEL_GENERATION",
+        "TOOL_OUTPUT",
+        "HUMAN_DECISION",
+        "MIGRATION",
+        "DERIVED",
+        "IMPORTED"
+      ],
+      "canonicalSource": "RPH-DOC-007 §7.1"
+    },
+    {
+      "name": "IntentStatus",
+      "appliesTo": "IntentObject.intentStatus",
+      "values": [
+        "RAW",
+        "UNDER_DISCOVERY",
+        "PROVISIONAL",
+        "FORMALIZED",
+        "APPROVED",
+        "REVISED",
+        "SUPERSEDED",
+        "WITHDRAWN"
+      ],
+      "canonicalSource": "RPH-DOC-007 §10.1 (identical to DOC-002 §6.1)",
+      "note": "Fixture DOC-006 carries duplicated lifecycleStatus + intentStatus both = UNDER_DISCOVERY; canonical serialized field is intentStatus."
+    },
+    {
+      "name": "WorkLifecycleState",
+      "appliesTo": "ProfessionalWorkUnit.workLifecycleState",
+      "values": [
+        "PROPOSED",
+        "SHAPING",
+        "READY",
+        "PLANNED",
+        "EXECUTING",
+        "EVIDENCE_PENDING",
+        "UNDER_ASSURANCE",
+        "CONDITIONALLY_SATISFIED",
+        "SATISFIED",
+        "RECOMPOSING",
+        "RECOMPOSED",
+        "BASELINED",
+        "BLOCKED",
+        "CHALLENGED",
+        "RESHAPING",
+        "ESCALATED",
+        "INVALIDATED",
+        "REJECTED",
+        "ABANDONED",
+        "SUPERSEDED"
+      ],
+      "canonicalSource": "RPH-DOC-002 §7.2 (20 values)",
+      "note": "DOC-007 references type WorkLifecycleState (PwuStateChanged) but does not enumerate; DOC-006 fixture shows only SHAPING, PLANNED."
+    },
+    {
+      "name": "ExecutionState",
+      "appliesTo": "ProfessionalWorkUnit.executionState",
+      "values": [
+        "NOT_PLANNED",
+        "PLANNED",
+        "QUEUED",
+        "RUNNING",
+        "WAITING",
+        "RETRYING",
+        "SUCCEEDED",
+        "FAILED",
+        "CANCELLED",
+        "SUPERSEDED"
+      ],
+      "canonicalSource": "RPH-DOC-002 §7.3 (10 values)"
+    },
+    {
+      "name": "AssuranceState",
+      "appliesTo": "ProfessionalWorkUnit.assuranceState (PWU-level rollup — NOT the assessment state machine)",
+      "values": [
+        "NOT_REQUIRED",
+        "UNASSESSED",
+        "EVIDENCE_REQUIRED",
+        "READY_FOR_ASSESSMENT",
+        "ASSESSING",
+        "CONDITIONALLY_SATISFIED",
+        "SATISFIED",
+        "REJECTED",
+        "WAIVED",
+        "INVALIDATED",
+        "ESCALATED"
+      ],
+      "canonicalSource": "RPH-DOC-002 §7.4 (11 values)",
+      "note": "Distinct from AssuranceAssessment.state (15) and AssuranceViewProjection.aggregateDisposition (9). Do not merge."
+    },
+    {
+      "name": "ShapeIntegrityState",
+      "appliesTo": "ProfessionalWorkUnit.shapeIntegrityState",
+      "values": [
+        "UNKNOWN",
+        "PRESERVED",
+        "AT_RISK",
+        "VIOLATED",
+        "RESHAPING_REQUIRED",
+        "RESHAPING_IN_PROGRESS",
+        "RESTORED"
+      ],
+      "canonicalSource": "RPH-DOC-002 §7.5 (7 values)"
+    },
+    {
+      "name": "WorkRiskProfile.consequence",
+      "appliesTo": "WorkRiskProfile.consequence",
+      "values": [
+        "LOW",
+        "MEDIUM",
+        "HIGH",
+        "CRITICAL"
+      ],
+      "canonicalSource": "RPH-DOC-002 §9.2"
+    },
+    {
+      "name": "WorkRiskProfile.uncertainty",
+      "appliesTo": "WorkRiskProfile.uncertainty",
+      "values": [
+        "LOW",
+        "MEDIUM",
+        "HIGH",
+        "CRITICAL"
+      ],
+      "canonicalSource": "RPH-DOC-002 §9.2"
+    },
+    {
+      "name": "WorkRiskProfile.irreversibility",
+      "appliesTo": "WorkRiskProfile.irreversibility",
+      "values": [
+        "LOW",
+        "MEDIUM",
+        "HIGH",
+        "CRITICAL"
+      ],
+      "canonicalSource": "RPH-DOC-002 §9.2"
+    },
+    {
+      "name": "WorkRiskProfile.securitySensitivity",
+      "appliesTo": "WorkRiskProfile.securitySensitivity",
+      "values": [
+        "NONE",
+        "LOW",
+        "MEDIUM",
+        "HIGH"
+      ],
+      "canonicalSource": "RPH-DOC-002 §9.2",
+      "note": "NONE-based scale (no CRITICAL), differs from consequence/uncertainty/irreversibility. DOC-007 §18 RISK_AT_LEAST applies a 4-level LOW..CRITICAL scale across ALL dimensions incl. SECURITY_SENSITIVITY — see conflicts."
+    },
+    {
+      "name": "WorkRiskProfile.regulatoryExposure",
+      "appliesTo": "WorkRiskProfile.regulatoryExposure",
+      "values": [
+        "NONE",
+        "LOW",
+        "MEDIUM",
+        "HIGH"
+      ],
+      "canonicalSource": "RPH-DOC-002 §9.2"
+    },
+    {
+      "name": "ObligationType",
+      "appliesTo": "ObligationObject.obligationType",
+      "values": [
+        "FUNCTIONAL",
+        "QUALITY",
+        "COMPLIANCE",
+        "SAFETY",
+        "SECURITY",
+        "PROCESS",
+        "EVIDENCE",
+        "GOVERNANCE"
+      ],
+      "canonicalSource": "RPH-DOC-002 §10.1"
+    },
+    {
+      "name": "ObligationStrength",
+      "appliesTo": "ObligationObject.strength",
+      "values": [
+        "MANDATORY",
+        "CONDITIONAL",
+        "ADVISORY"
+      ],
+      "canonicalSource": "RPH-DOC-002 §10.1",
+      "note": "Obligation uses CONDITIONAL; Constraint uses PREFERRED. Keep separate."
+    },
+    {
+      "name": "ObligationStatus",
+      "appliesTo": "ObligationObject.status",
+      "values": [
+        "PROPOSED",
+        "ACTIVE",
+        "ALLOCATED",
+        "SATISFIED",
+        "WAIVED",
+        "VIOLATED",
+        "SUPERSEDED"
+      ],
+      "canonicalSource": "RPH-DOC-002 §10.1"
+    },
+    {
+      "name": "ConstraintType",
+      "appliesTo": "ConstraintObject.constraintType",
+      "values": [
+        "TECHNICAL",
+        "BUSINESS",
+        "LEGAL",
+        "SECURITY",
+        "POLICY",
+        "RESOURCE",
+        "TEMPORAL",
+        "USER_PREFERENCE",
+        "ARCHITECTURAL"
+      ],
+      "canonicalSource": "RPH-DOC-002 §11.1 (9 values)",
+      "note": "DOC-006 fixture uses only SECURITY, BUSINESS, ARCHITECTURAL, TECHNICAL."
+    },
+    {
+      "name": "ConstraintStrength",
+      "appliesTo": "ConstraintObject.strength",
+      "values": [
+        "MANDATORY",
+        "PREFERRED",
+        "ADVISORY"
+      ],
+      "canonicalSource": "RPH-DOC-002 §11.1",
+      "note": "Uses PREFERRED (vs Obligation CONDITIONAL)."
+    },
+    {
+      "name": "ConstraintStatus",
+      "appliesTo": "ConstraintObject.status",
+      "values": [
+        "PROPOSED",
+        "ACTIVE",
+        "WAIVED",
+        "INAPPLICABLE",
+        "VIOLATED",
+        "SUPERSEDED",
+        "INVALIDATED"
+      ],
+      "canonicalSource": "RPH-DOC-002 §11.1"
+    },
+    {
+      "name": "Materiality",
+      "appliesTo": "AssumptionObject.materiality",
+      "values": [
+        "IMMATERIAL",
+        "MATERIAL",
+        "CRITICAL"
+      ],
+      "canonicalSource": "RPH-DOC-007 §12.1 (identical DOC-002 §12.1)"
+    },
+    {
+      "name": "AssumptionStatus",
+      "appliesTo": "AssumptionObject.status",
+      "values": [
+        "PROPOSED",
+        "DISCLOSED",
+        "UNDER_VERIFICATION",
+        "ACCEPTED",
+        "VERIFIED",
+        "FALSIFIED",
+        "EXPIRED",
+        "SUPERSEDED"
+      ],
+      "canonicalSource": "RPH-DOC-007 §12.1 / DOC-002 §12.1 (8 values)",
+      "note": "Per sponsor rule the 8-value set incl. UNDER_VERIFICATION wins; DOC-006 fixture shows only DISCLOSED."
+    },
+    {
+      "name": "DecompositionContractStatus",
+      "appliesTo": "DecompositionContract.status",
+      "values": [
+        "DRAFT",
+        "UNDER_REVIEW",
+        "VALID",
+        "CONDITIONALLY_VALID",
+        "INVALID",
+        "SUPERSEDED"
+      ],
+      "canonicalSource": "RPH-DOC-002 §13.1"
+    },
+    {
+      "name": "CoverageType",
+      "appliesTo": "CoverageClaim.coverageType",
+      "values": [
+        "COMPLETE",
+        "PARTIAL",
+        "CONDITIONAL",
+        "EXPLORATORY"
+      ],
+      "canonicalSource": "RPH-DOC-002 §13.3"
+    },
+    {
+      "name": "RecompositionContractStatus",
+      "appliesTo": "RecompositionContract.status",
+      "values": [
+        "DRAFT",
+        "READY",
+        "EVALUATING",
+        "COMPOSABLE",
+        "CONFLICTED",
+        "INSUFFICIENT",
+        "SATISFIED",
+        "SUPERSEDED"
+      ],
+      "canonicalSource": "RPH-DOC-002 §14 (8 values)"
+    },
+    {
+      "name": "ClaimType",
+      "appliesTo": "ClaimObject.claimType; AssurancePolicyDefinition.evaluatedClaimTypes; FindingDefinition.affectedClaimTypes",
+      "values": [
+        "COMPLETENESS",
+        "CORRECTNESS",
+        "COMPLIANCE",
+        "CONSISTENCY",
+        "FITNESS",
+        "PRESERVATION",
+        "FEASIBILITY",
+        "PERFORMANCE",
+        "SECURITY",
+        "COVERAGE"
+      ],
+      "canonicalSource": "RPH-DOC-007 §13 / DOC-002 §15.1 (10 values)"
+    },
+    {
+      "name": "ClaimStatus",
+      "appliesTo": "ClaimObject.status",
+      "values": [
+        "OPEN",
+        "UNDER_ASSESSMENT",
+        "SUPPORTED",
+        "CONDITIONALLY_SUPPORTED",
+        "CONTESTED",
+        "REJECTED",
+        "WAIVED",
+        "SUPERSEDED"
+      ],
+      "canonicalSource": "RPH-DOC-007 §13 / DOC-002 §15.1 (8 values)",
+      "note": "DOC-004 §33 observes claimResults[].recommendedStatus='CONTESTED' consistent with this set."
+    },
+    {
+      "name": "EvidenceType",
+      "appliesTo": "EvidenceObject.evidenceType; EvidenceRequirement.evidenceType",
+      "values": [
+        "ARTIFACT",
+        "TEST_RESULT",
+        "SOURCE",
+        "TRACE",
+        "OBSERVATION",
+        "ANALYSIS",
+        "MEASUREMENT",
+        "APPROVAL",
+        "REVIEW"
+      ],
+      "canonicalSource": "RPH-DOC-007 §14 / DOC-002 §16.1 (9 values)"
+    },
+    {
+      "name": "EvidenceStatus",
+      "appliesTo": "EvidenceObject.status",
+      "values": [
+        "PROPOSED",
+        "ADMISSIBLE",
+        "REJECTED",
+        "SUPERSEDED",
+        "INVALIDATED"
+      ],
+      "canonicalSource": "RPH-DOC-007 §14 / DOC-002 §16.1"
+    },
+    {
+      "name": "IndependenceRequirement",
+      "appliesTo": "AssurancePolicyDefinition.independenceRequirement; DispositionRule.requiredIndependence",
+      "values": [
+        "NONE",
+        "DIFFERENT_INVOCATION",
+        "DIFFERENT_CONTEXT_INSTANCE",
+        "DIFFERENT_AGENT",
+        "DIFFERENT_MODEL",
+        "DIFFERENT_PROVIDER",
+        "HUMAN",
+        "ORGANIZATIONALLY_INDEPENDENT"
+      ],
+      "canonicalSource": "RPH-DOC-004 §8.1 (8 values; governs assurance enums)",
+      "note": "CONFLICT: DOC-002 §17.1 gives only 5 (NONE, DIFFERENT_INVOCATION, DIFFERENT_AGENT, DIFFERENT_MODEL, HUMAN). DOC-004 8-value superset wins."
+    },
+    {
+      "name": "FailureSeverity",
+      "appliesTo": "AssurancePolicy.failureSeverity",
+      "values": [
+        "ADVISORY",
+        "MATERIAL",
+        "BLOCKING",
+        "CRITICAL"
+      ],
+      "canonicalSource": "RPH-DOC-002 §17.1 (4 values)",
+      "note": "4-value scale WITHOUT INFORMATIONAL. Distinct from AssuranceSeverity (5). Do not merge."
+    },
+    {
+      "name": "AssurancePolicyStatus",
+      "appliesTo": "AssurancePolicyDefinition.status",
+      "values": [
+        "DRAFT",
+        "ACTIVE",
+        "SUSPENDED",
+        "SUPERSEDED"
+      ],
+      "canonicalSource": "RPH-DOC-007 §17 / DOC-004 §3.1 / DOC-002 §17.1 (all agree)"
+    },
+    {
+      "name": "AssuranceAssessmentState",
+      "appliesTo": "AssuranceAssessment.state / .assessmentState (assessment aggregate state machine)",
+      "values": [
+        "REQUESTED",
+        "EVIDENCE_PENDING",
+        "READY",
+        "ASSESSING",
+        "SATISFIED",
+        "CONDITIONALLY_SATISFIED",
+        "REJECTED",
+        "INCONCLUSIVE",
+        "ESCALATED",
+        "WAIVED",
+        "VALIDATOR_FAILED",
+        "INDEPENDENCE_VIOLATION",
+        "INVALIDATED",
+        "WAIVER_EXPIRED",
+        "CANCELLED"
+      ],
+      "canonicalSource": "RPH-DOC-004 §30 (15 values; governs assessment state)",
+      "note": "CONFLICT: DOC-007 §19 gives 14 (no WAIVER_EXPIRED). DOC-004 15-value superset wins. 'ANY ACTIVE' is a meta-token, excluded. Distinct from PWU.assuranceState and from terminal disposition sets."
+    },
+    {
+      "name": "AssuranceDisposition",
+      "appliesTo": "Terminal assurance disposition meanings (semantic outcome vocabulary)",
+      "values": [
+        "SATISFIED",
+        "CONDITIONALLY_SATISFIED",
+        "REJECTED",
+        "INCONCLUSIVE",
+        "WAIVED",
+        "ESCALATED"
+      ],
+      "canonicalSource": "RPH-DOC-004 §10.1 (6 disposition meanings; governs disposition)",
+      "note": "Full terminal disposition set INCLUDING WAIVED. WAIVED is reached only via the waiver command/event flow, never via a DispositionRule or validator recommendation — those use the 5-value set below."
+    },
+    {
+      "name": "AssuranceDispositionRecommendation",
+      "appliesTo": "ValidatorResult.dispositionRecommendation; DispositionRule.disposition; AssuranceAssessmentCompletedPayload.disposition",
+      "values": [
+        "SATISFIED",
+        "CONDITIONALLY_SATISFIED",
+        "REJECTED",
+        "INCONCLUSIVE",
+        "ESCALATED"
+      ],
+      "canonicalSource": "RPH-DOC-004 §4.2 & §10.2 (WAIVED excluded) / DOC-007 §19.3 & §20",
+      "note": "5-value set — WAIVED deliberately excluded per DOC-004. Identical set is reused by all three fields; author as one shared enum."
+    },
+    {
+      "name": "CriterionResultOutcome",
+      "appliesTo": "CriterionResult.result",
+      "values": [
+        "MET",
+        "PARTIALLY_MET",
+        "NOT_MET",
+        "NOT_APPLICABLE",
+        "UNABLE_TO_DETERMINE"
+      ],
+      "canonicalSource": "RPH-DOC-007 §20.1 (UPPERCASE_SNAKE_CASE per DOC-007 §4.5)",
+      "note": "CONFLICT: DOC-004 §7 states these in lowercase prose ('met','partially met','not met','not applicable','unable to determine'); DOC-004 §33 example serializes uppercase. UPPERCASE serialized form wins. Invariant: 'unable to determine' != 'met'."
+    },
+    {
+      "name": "ObservationType",
+      "appliesTo": "AssuranceObservation.observationType",
+      "values": [
+        "FINDING",
+        "MEASUREMENT",
+        "CONFLICT",
+        "EVIDENCE_DEFICIT",
+        "SHAPE_RISK",
+        "POLICY_VIOLATION",
+        "RECOMMENDATION"
+      ],
+      "canonicalSource": "RPH-DOC-007 §21 / DOC-002 §19 (7 values)"
+    },
+    {
+      "name": "AssuranceSeverity",
+      "appliesTo": "AssuranceObservation.severity (ObservationSeverity); AssessmentCriterion.severityIfNotMet; FindingDefinition.defaultSeverity",
+      "values": [
+        "INFORMATIONAL",
+        "ADVISORY",
+        "MATERIAL",
+        "BLOCKING",
+        "CRITICAL"
+      ],
+      "canonicalSource": "RPH-DOC-007 §21 / DOC-002 §19 / DOC-004 §7 & §9.1 (5 values; all agree)",
+      "note": "5-value scale WITH INFORMATIONAL. Distinct from FailureSeverity (4). Shared across observation/criterion/finding severity fields."
+    },
+    {
+      "name": "ObservationDisposition",
+      "appliesTo": "AssuranceObservation.disposition",
+      "values": [
+        "OPEN",
+        "ACCEPTED",
+        "REMEDIATED",
+        "WAIVED",
+        "REJECTED",
+        "SUPERSEDED"
+      ],
+      "canonicalSource": "RPH-DOC-007 §21 / DOC-002 §19 (6 values)",
+      "note": "Distinct enum from AssuranceAssessment.disposition despite shared field name 'disposition'."
+    },
+    {
+      "name": "ControlAction",
+      "appliesTo": "AssurancePolicyDefinition.permittedControlActions; FindingDefinition.defaultControlActions; EscalationRule.timeoutAction; ControlActionRecommendation.action; ProposedAssuranceObservation.recommendedControlActions",
+      "values": [
+        "CONTINUE",
+        "WAIT",
+        "CLARIFY",
+        "GATHER_CONTEXT",
+        "GATHER_EVIDENCE",
+        "REVISE_PROMPT",
+        "REVISE_CONTEXT",
+        "RETRY",
+        "CHANGE_MODEL",
+        "CHANGE_TOOL",
+        "CHANGE_VALIDATOR",
+        "CHANGE_TACTIC",
+        "RESHAPE_PWU",
+        "REVISE_DECOMPOSITION",
+        "REPLAN_EXECUTION",
+        "INVALIDATE_DEPENDENTS",
+        "REQUEST_HUMAN_DECISION",
+        "REQUEST_WAIVER",
+        "ESCALATE",
+        "REJECT",
+        "ABANDON",
+        "ACCEPT",
+        "PROMOTE_BASELINE"
+      ],
+      "canonicalSource": "RPH-DOC-004 §11 (23 values, superset; governs ControlAction)",
+      "note": "NORMALIZATION into this canonical set: (a) DOC-002 §18 AssuranceAssessment.recommendedControlAction RESHAPE→RESHAPE_PWU, REPLAN→REPLAN_EXECUTION (other 8 of its 10 already match); (b) DOC-002 §37 ControlAction token WAIVE→REQUEST_WAIVER. DOC-004 adds CLARIFY, GATHER_CONTEXT, CHANGE_VALIDATOR, INVALIDATE_DEPENDENTS, REQUEST_HUMAN_DECISION over DOC-002 §37's 18. See openItems re: whether legacy WAIVE should persist as a distinct token."
+    },
+    {
+      "name": "DecisionType",
+      "appliesTo": "DecisionObject.decisionType",
+      "values": [
+        "APPROVAL",
+        "REJECTION",
+        "WAIVER",
+        "ESCALATION",
+        "RESHAPE",
+        "REPLAN",
+        "PROMOTE_BASELINE",
+        "ABANDON",
+        "REVOKE"
+      ],
+      "canonicalSource": "RPH-DOC-007 §22 / DOC-002 §23.1 (9 values)",
+      "note": "decisionType keeps its own RESHAPE/REPLAN tokens verbatim (a different type from ControlAction) — do NOT normalize these to RESHAPE_PWU/REPLAN_EXECUTION."
+    },
+    {
+      "name": "DecisionStatus",
+      "appliesTo": "DecisionObject.status",
+      "values": [
+        "PROPOSED",
+        "EFFECTIVE",
+        "REVOKED",
+        "SUPERSEDED"
+      ],
+      "canonicalSource": "RPH-DOC-007 §22 / DOC-002 §23.1"
+    },
+    {
+      "name": "BaselineType",
+      "appliesTo": "BaselineObject.baselineType",
+      "values": [
+        "INTENT",
+        "REQUIREMENTS",
+        "ARCHITECTURE",
+        "IMPLEMENTATION",
+        "RELEASE",
+        "EVIDENCE_PACKAGE"
+      ],
+      "canonicalSource": "RPH-DOC-007 §23 / DOC-002 §24.1 (6 values)"
+    },
+    {
+      "name": "BaselineStatus",
+      "appliesTo": "BaselineObject.status",
+      "values": [
+        "DRAFT",
+        "CANDIDATE",
+        "UNDER_REVIEW",
+        "APPROVED",
+        "AUTHORITATIVE",
+        "SUPERSEDED",
+        "REVOKED"
+      ],
+      "canonicalSource": "RPH-DOC-007 §23 / DOC-002 §24.1 (7 values)"
+    },
+    {
+      "name": "TraceRelation",
+      "appliesTo": "TraceLink.relation",
+      "values": [
+        "DERIVED_FROM",
+        "REFINES",
+        "DECOMPOSES",
+        "SATISFIES",
+        "DEPENDS_ON",
+        "CONSTRAINED_BY",
+        "ASSUMES",
+        "PRODUCES",
+        "SUPPORTS",
+        "CONTRADICTS",
+        "VERIFIES",
+        "INVALIDATES",
+        "SUPERSEDES",
+        "PROMOTES",
+        "ALLOCATES",
+        "PROPAGATES",
+        "GOVERNS"
+      ],
+      "canonicalSource": "RPH-DOC-007 §24 / DOC-002 §25 (17 values; DOC-007 governs TraceRelation)",
+      "note": "CONFLICT: DOC-006 fixture §25 shows 12 different edge labels (DERIVED_FROM, DEFINES, REALIZED_BY, REFINED_BY, ALLOCATED_TO, PRODUCES, SUPPORTS, VERIFIED_BY, APPROVED_BY, PROMOTES, PROPAGATES_TO, BECOMES) — those are display-only ASCII-chain annotations, NOT canonical relation tokens."
+    },
+    {
+      "name": "ExecutionPlanStatus",
+      "appliesTo": "ExecutionPlan.status",
+      "values": [
+        "PROPOSED",
+        "UNDER_REVIEW",
+        "APPROVED",
+        "ACTIVE",
+        "COMPLETED",
+        "FAILED",
+        "SUPERSEDED",
+        "CANCELLED"
+      ],
+      "canonicalSource": "RPH-DOC-007 §15 / DOC-002 §20.1 (8 values)"
+    },
+    {
+      "name": "StepType",
+      "appliesTo": "ExecutionStep.stepType",
+      "values": [
+        "MODEL_INVOCATION",
+        "TOOL_INVOCATION",
+        "RETRIEVAL",
+        "TRANSFORMATION",
+        "HUMAN_INTERACTION",
+        "WAIT",
+        "BRANCH",
+        "PARALLEL_GROUP",
+        "ASSURANCE_INVOCATION"
+      ],
+      "canonicalSource": "RPH-DOC-002 §21 (9 values)"
+    },
+    {
+      "name": "StepState",
+      "appliesTo": "ExecutionStep.stepState",
+      "values": [
+        "NOT_READY",
+        "READY",
+        "QUEUED",
+        "RUNNING",
+        "WAITING",
+        "SUCCEEDED",
+        "FAILED",
+        "SKIPPED",
+        "CANCELLED",
+        "SUPERSEDED"
+      ],
+      "canonicalSource": "RPH-DOC-002 §21 (10 values)"
+    },
+    {
+      "name": "AuthorizationStatus",
+      "appliesTo": "RuntimeBinding.authorizationStatus",
+      "values": [
+        "REQUESTED",
+        "AUTHORIZED",
+        "PARTIALLY_AUTHORIZED",
+        "DENIED",
+        "REVOKED"
+      ],
+      "canonicalSource": "RPH-DOC-002 §22"
+    },
+    {
+      "name": "CommandResultStatus",
+      "appliesTo": "CommandResult.status",
+      "values": [
+        "ACCEPTED",
+        "REJECTED",
+        "CONFLICT",
+        "DUPLICATE",
+        "UNAUTHORIZED",
+        "VALIDATION_FAILED"
+      ],
+      "canonicalSource": "RPH-DOC-007 §8.2"
+    },
+    {
+      "name": "CommandReceiptStatus",
+      "appliesTo": "CommandReceipt.status",
+      "values": [
+        "PROCESSING",
+        "ACCEPTED",
+        "REJECTED"
+      ],
+      "canonicalSource": "RPH-DOC-007 §30"
+    },
+    {
+      "name": "OutboxStatus",
+      "appliesTo": "OutboxMessage.status",
+      "values": [
+        "PENDING",
+        "PUBLISHED",
+        "FAILED"
+      ],
+      "canonicalSource": "RPH-DOC-007 §29"
+    },
+    {
+      "name": "RphErrorCategory",
+      "appliesTo": "RphError.category",
+      "values": [
+        "VALIDATION",
+        "AUTHORIZATION",
+        "CONCURRENCY",
+        "NOT_FOUND",
+        "INVARIANT",
+        "EXECUTION",
+        "ASSURANCE",
+        "PERSISTENCE",
+        "EXTERNAL_DEPENDENCY",
+        "SCHEMA_COMPATIBILITY"
+      ],
+      "canonicalSource": "RPH-DOC-007 §25 (10 values)"
+    },
+    {
+      "name": "SemanticViolationSeverity",
+      "appliesTo": "SemanticViolation.severity",
+      "values": [
+        "ERROR",
+        "WARNING"
+      ],
+      "canonicalSource": "RPH-DOC-007 §37"
+    },
+    {
+      "name": "ApplicabilityExpressionOp",
+      "appliesTo": "ApplicabilityExpression.op (union discriminant)",
+      "values": [
+        "ALL",
+        "ANY",
+        "NOT",
+        "EQUALS",
+        "IN",
+        "CONTAINS",
+        "EXISTS",
+        "RISK_AT_LEAST"
+      ],
+      "canonicalSource": "RPH-DOC-007 §18 (8 ops)",
+      "note": "Only doc that defines an operator grammar. See applicabilityGrammar for operand shapes."
+    },
+    {
+      "name": "RiskDimension",
+      "appliesTo": "ApplicabilityExpression op=RISK_AT_LEAST .dimension",
+      "values": [
+        "CONSEQUENCE",
+        "UNCERTAINTY",
+        "IRREVERSIBILITY",
+        "SECURITY_SENSITIVITY",
+        "REGULATORY_EXPOSURE"
+      ],
+      "canonicalSource": "RPH-DOC-007 §18"
+    },
+    {
+      "name": "RiskLevel",
+      "appliesTo": "ApplicabilityExpression op=RISK_AT_LEAST .level",
+      "values": [
+        "LOW",
+        "MEDIUM",
+        "HIGH",
+        "CRITICAL"
+      ],
+      "canonicalSource": "RPH-DOC-007 §18",
+      "note": "DOC-007 applies this 4-level scale across all 5 dimensions; DOC-002 §9.2 caps securitySensitivity/regulatoryExposure at NONE..HIGH. See conflicts."
+    },
+    {
+      "name": "CompatibilityMilestone",
+      "appliesTo": "CompatibilityMilestoneProjection.currentMilestone",
+      "values": [
+        "INTAKE",
+        "ARCHITECTURE",
+        "PROPOSE",
+        "ASSUMPTION_SURFACING",
+        "VERIFY",
+        "HISTORICAL_CHECK",
+        "REVIEW",
+        "EXECUTE",
+        "VALIDATE",
+        "COMMIT",
+        "REPLAN"
+      ],
+      "canonicalSource": "RPH-DOC-007 §26.3 (11 values; latest serialized projection)",
+      "note": "CONFLICT: DOC-006 gives two shorter display lists — §27 (7: INTAKE, ARCHITECTURE, ASSUMPTION_SURFACING, VERIFY, HISTORICAL_CHECK, REVIEW, COMMIT) and §32.4 (8: INTAKE, ARCHITECTURE, PROPOSE, VERIFY, REVIEW, EXECUTE, VALIDATE, COMMIT). Both docs stress this label MUST NOT be authoritative state — it is a derived projection."
+    },
+    {
+      "name": "MilestoneStatus",
+      "appliesTo": "CompatibilityMilestoneProjection.milestoneStatus",
+      "values": [
+        "NOT_STARTED",
+        "IN_PROGRESS",
+        "WAITING",
+        "COMPLETE",
+        "FAILED",
+        "BLOCKED"
+      ],
+      "canonicalSource": "RPH-DOC-007 §26.3"
+    },
+    {
+      "name": "AssuranceViewAggregateDisposition",
+      "appliesTo": "AssuranceViewProjection.aggregateDisposition (read-model projection field)",
+      "values": [
+        "UNASSESSED",
+        "EVIDENCE_REQUIRED",
+        "ASSESSING",
+        "SATISFIED",
+        "CONDITIONALLY_SATISFIED",
+        "REJECTED",
+        "INCONCLUSIVE",
+        "WAIVED",
+        "INVALIDATED"
+      ],
+      "canonicalSource": "RPH-DOC-007 §26.2 (9 values; serialized projection)",
+      "note": "See AggregateAssuranceDisposition (composition) — the two rollups diverge; reconciliation flagged for sponsor."
+    },
+    {
+      "name": "AggregateAssuranceDisposition",
+      "appliesTo": "Aggregate assurance disposition — composition-across-policies outcome (semantic rule)",
+      "values": [
+        "REJECTED",
+        "EVIDENCE_REQUIRED",
+        "UNASSESSED",
+        "INCONCLUSIVE",
+        "CONDITIONALLY_SATISFIED",
+        "SATISFIED"
+      ],
+      "canonicalSource": "RPH-DOC-004 §28.2 (6 values)",
+      "note": "Must preserve strictest unresolved disposition; 'must not be reduced to a numerical average.' Lacks ASSESSING/WAIVED/INVALIDATED that DOC-007 §26.2 projection carries."
+    },
+    {
+      "name": "ValidatorImplementationType",
+      "appliesTo": "ValidatorContract.implementationType",
+      "values": [
+        "MODEL",
+        "DETERMINISTIC",
+        "HYBRID",
+        "HUMAN",
+        "EXTERNAL_SERVICE"
+      ],
+      "canonicalSource": "RPH-DOC-004 §4.1",
+      "note": "ValidatorRegistryEntry.implementationType (§35) is typed as a plain string, not this union."
+    },
+    {
+      "name": "ValidatorDeterminism",
+      "appliesTo": "ValidatorContract.determinism",
+      "values": [
+        "DETERMINISTIC",
+        "BOUNDED_NONDETERMINISTIC",
+        "NONDETERMINISTIC"
+      ],
+      "canonicalSource": "RPH-DOC-004 §4.1"
+    },
+    {
+      "name": "ApplicabilityOutcome",
+      "appliesTo": "ApplicabilityOutcome type alias",
+      "values": [
+        "REQUIRED",
+        "RECOMMENDED",
+        "OPTIONAL",
+        "NOT_APPLICABLE",
+        "REQUIRES_HUMAN_DETERMINATION"
+      ],
+      "canonicalSource": "RPH-DOC-004 §5.2"
+    },
+    {
+      "name": "EvidenceCardinality",
+      "appliesTo": "EvidenceRequirement.cardinality",
+      "values": [
+        "EXACTLY_ONE",
+        "AT_LEAST_ONE",
+        "ZERO_OR_MORE",
+        "ONE_PER_SUBJECT",
+        "ONE_PER_OBLIGATION"
+      ],
+      "canonicalSource": "RPH-DOC-004 §6.1"
+    },
+    {
+      "name": "RequiredForDispositions",
+      "appliesTo": "EvidenceRequirement.requiredForDispositions",
+      "values": [
+        "ALL",
+        "SATISFIED_ONLY",
+        "CONDITIONAL_OR_SATISFIED"
+      ],
+      "canonicalSource": "RPH-DOC-004 §6.1"
+    },
+    {
+      "name": "CriterionType",
+      "appliesTo": "AssessmentCriterion.criterionType",
+      "values": [
+        "BOOLEAN",
+        "ENUMERATED",
+        "QUALITATIVE",
+        "QUANTITATIVE",
+        "COMPOSITE"
+      ],
+      "canonicalSource": "RPH-DOC-004 §7"
+    },
+    {
+      "name": "EvaluationMethod",
+      "appliesTo": "AssessmentCriterion.evaluationMethod",
+      "values": [
+        "DETERMINISTIC",
+        "MODEL_JUDGMENT",
+        "HUMAN_JUDGMENT",
+        "HYBRID"
+      ],
+      "canonicalSource": "RPH-DOC-004 §7"
+    },
+    {
+      "name": "EscalationTarget",
+      "appliesTo": "EscalationRule.escalationTarget",
+      "values": [
+        "HUMAN_USER",
+        "PRODUCT_OWNER",
+        "ARCHITECT",
+        "SECURITY_REVIEWER",
+        "LEGAL_REVIEWER",
+        "SYSTEM_OWNER",
+        "INDEPENDENT_VALIDATOR"
+      ],
+      "canonicalSource": "RPH-DOC-004 §13"
+    },
+    {
+      "name": "ValidatorCostClass",
+      "appliesTo": "ValidatorRegistryEntry.costClass",
+      "values": [
+        "LOW",
+        "MEDIUM",
+        "HIGH"
+      ],
+      "canonicalSource": "RPH-DOC-004 §35"
+    },
+    {
+      "name": "ValidatorLatencyClass",
+      "appliesTo": "ValidatorRegistryEntry.latencyClass",
+      "values": [
+        "INTERACTIVE",
+        "STANDARD",
+        "LONG_RUNNING"
+      ],
+      "canonicalSource": "RPH-DOC-004 §35"
+    },
+    {
+      "name": "ValidatorRegistryStatus",
+      "appliesTo": "ValidatorRegistryEntry.status",
+      "values": [
+        "ACTIVE",
+        "DEGRADED",
+        "DISABLED"
+      ],
+      "canonicalSource": "RPH-DOC-004 §35"
+    },
+    {
+      "name": "Finding.POL-INTENT-FIDELITY",
+      "appliesTo": "POL-INTENT-FIDELITY finding codes (FindingDefinition.code)",
+      "values": [
+        "SOLUTION_SUBSTITUTION",
+        "UNAUTHORIZED_SCOPE_EXPANSION",
+        "MISSING_USER_CONSTRAINT",
+        "FALSELY_CLOSED_AMBIGUITY",
+        "INFERRED_NEED_PRESENTED_AS_FACT",
+        "OUTCOME_EROSION",
+        "NON_GOAL_CONFLICT"
+      ],
+      "canonicalSource": "RPH-DOC-004 §15.7"
+    },
+    {
+      "name": "Finding.POL-INTENT-COMPLETENESS",
+      "appliesTo": "POL-INTENT-COMPLETENESS finding codes",
+      "values": [
+        "MISSING_DESIRED_OUTCOME",
+        "UNBOUNDED_PRODUCT_SCOPE",
+        "MISSING_MANDATORY_CONSTRAINT",
+        "UNRESOLVED_CRITICAL_AMBIGUITY",
+        "NO_SUCCESS_CONDITION",
+        "PREMATURE_DOWNSTREAM_SHAPING",
+        "FALSE_COMPLETENESS"
+      ],
+      "canonicalSource": "RPH-DOC-004 §16.5"
+    },
+    {
+      "name": "Finding.POL-ASSUMPTION-DISCLOSURE",
+      "appliesTo": "POL-ASSUMPTION-DISCLOSURE finding codes",
+      "values": [
+        "HIDDEN_MATERIAL_ASSUMPTION",
+        "ASSUMPTION_PRESENTED_AS_FACT",
+        "UNBOUNDED_ASSUMPTION_SCOPE",
+        "MISSING_ASSUMPTION_BASIS",
+        "UNASSESSED_CRITICAL_ASSUMPTION",
+        "EXPIRED_ASSUMPTION",
+        "CONFLICTING_ASSUMPTIONS"
+      ],
+      "canonicalSource": "RPH-DOC-004 §17.5"
+    },
+    {
+      "name": "Finding.POL-REQUIREMENT-COVERAGE",
+      "appliesTo": "POL-REQUIREMENT-COVERAGE finding codes",
+      "values": [
+        "UNCOVERED_OUTCOME",
+        "UNCOVERED_CAPABILITY",
+        "UNCOVERED_JOURNEY_STEP",
+        "MISSING_FAILURE_REQUIREMENT",
+        "ORPHAN_REQUIREMENT",
+        "CONSTRAINT_WITHOUT_OBLIGATION",
+        "UNAUTHORIZED_REQUIREMENT",
+        "DUPLICATE_REQUIREMENT"
+      ],
+      "canonicalSource": "RPH-DOC-004 §18.5"
+    },
+    {
+      "name": "Finding.POL-DECOMPOSITION-COVERAGE",
+      "appliesTo": "POL-DECOMPOSITION-COVERAGE finding codes",
+      "values": [
+        "MISSING_OBLIGATION_ALLOCATION",
+        "DROPPED_CONSTRAINT",
+        "ORPHAN_CHILD_PWU",
+        "OVERLAPPING_CHILD_SCOPE",
+        "EXCESSIVE_CHILD_COUPLING",
+        "INVALID_GRANULARITY",
+        "MISSING_SIBLING_DEPENDENCY",
+        "MISSING_RECOMPOSITION_STRATEGY",
+        "CHILD_INTENT_DIVERGENCE",
+        "FALSE_COMPLETE_COVERAGE"
+      ],
+      "canonicalSource": "RPH-DOC-004 §19.6"
+    },
+    {
+      "name": "Finding.POL-CONSTRAINT-PROPAGATION",
+      "appliesTo": "POL-CONSTRAINT-PROPAGATION finding codes",
+      "values": [
+        "SILENT_CONSTRAINT_DROP",
+        "WEAKENED_CONSTRAINT",
+        "UNAUTHORIZED_INAPPLICABILITY",
+        "EXPIRED_CONSTRAINT_WAIVER",
+        "CONSTRAINT_CONTRADICTION",
+        "MISSING_CONSTRAINT_TRACE",
+        "CONSTRAINT_SCOPE_ERROR"
+      ],
+      "canonicalSource": "RPH-DOC-004 §20.4"
+    },
+    {
+      "name": "Finding.POL-ARCHITECTURE-COVERAGE",
+      "appliesTo": "POL-ARCHITECTURE-COVERAGE finding codes",
+      "values": [
+        "UNCOVERED_REQUIREMENT",
+        "UNCLEAR_SYSTEM_BOUNDARY",
+        "UNCLEAR_COMPONENT_RESPONSIBILITY",
+        "MISSING_INTERFACE_DEFINITION",
+        "AMBIGUOUS_DATA_OWNERSHIP",
+        "MISSING_SECURITY_BOUNDARY",
+        "MISSING_OPERATIONAL_CONCERN",
+        "ARCHITECTURE_CONSTRAINT_VIOLATION",
+        "UNRESOLVED_ARCHITECTURE_CONFLICT",
+        "UNSUPPORTED_FEASIBILITY_CLAIM",
+        "ARCHITECTURE_OVERFIT",
+        "ARCHITECTURE_UNDERFIT"
+      ],
+      "canonicalSource": "RPH-DOC-004 §21.5"
+    },
+    {
+      "name": "Finding.POL-HISTORICAL-CONSISTENCY",
+      "appliesTo": "POL-HISTORICAL-CONSISTENCY finding codes",
+      "values": [
+        "KNOWN_FAILURE_RECURRENCE",
+        "ACTIVE_DECISION_CONFLICT",
+        "UNEXPLAINED_PRECEDENT_DIVERGENCE",
+        "STALE_PRECEDENT_APPLIED",
+        "MISSING_DESIGN_RATIONALE",
+        "HISTORICAL_CONTEXT_INSUFFICIENT",
+        "CHESTERTONS_FENCE_RISK"
+      ],
+      "canonicalSource": "RPH-DOC-004 §22.5"
+    },
+    {
+      "name": "Finding.POL-INTENT-PRESERVATION",
+      "appliesTo": "POL-INTENT-PRESERVATION finding codes",
+      "values": [
+        "INTENT_EROSION",
+        "INTENT_EXPANSION",
+        "CHILD_OBJECTIVE_DRIFT",
+        "IMPLEMENTATION_SUBSTITUTION",
+        "LOCAL_SUCCESS_GLOBAL_FAILURE",
+        "LOST_USER_OUTCOME",
+        "UNAUTHORIZED_INTENT_REVISION",
+        "TRACEABILITY_BREAK"
+      ],
+      "canonicalSource": "RPH-DOC-004 §23.5"
+    },
+    {
+      "name": "Finding.POL-TEST-ADEQUACY",
+      "appliesTo": "POL-TEST-ADEQUACY finding codes",
+      "values": [
+        "UNTESTED_REQUIREMENT",
+        "UNTESTED_CRITICAL_JOURNEY",
+        "MISSING_FAILURE_PATH_TEST",
+        "INADEQUATE_INTEGRATION_TEST",
+        "UNJUSTIFIED_REGRESSION_SCOPE",
+        "NONREPRESENTATIVE_TEST_ENVIRONMENT",
+        "FLAKY_TEST_EVIDENCE",
+        "STALE_TEST_RESULT",
+        "TEST_CLAIM_OVERREACH",
+        "TEST_ORACLE_WEAKNESS"
+      ],
+      "canonicalSource": "RPH-DOC-004 §24.5"
+    },
+    {
+      "name": "Finding.POL-FITNESS-FOR-PURPOSE",
+      "appliesTo": "POL-FITNESS-FOR-PURPOSE finding codes",
+      "values": [
+        "PRODUCT_OUTCOME_NOT_ACHIEVABLE",
+        "CRITICAL_JOURNEY_FAILURE",
+        "TECHNICALLY_CORRECT_PRODUCT_FAILURE",
+        "MISSING_OPERATIONAL_REALITY",
+        "UNACCEPTABLE_LIMITATION",
+        "UNRESOLVED_USER_VALUE_GAP",
+        "FITNESS_EVIDENCE_INSUFFICIENT"
+      ],
+      "canonicalSource": "RPH-DOC-004 §25.5"
+    },
+    {
+      "name": "Finding.POL-BASELINE-PROMOTION",
+      "appliesTo": "POL-BASELINE-PROMOTION finding codes",
+      "values": [
+        "CANDIDATE_VERSION_MISMATCH",
+        "MISSING_REQUIRED_ASSESSMENT",
+        "OPEN_BLOCKING_FINDING",
+        "INVALID_OR_EXPIRED_WAIVER",
+        "INVALIDATED_EVIDENCE",
+        "MISSING_DECISION_AUTHORITY",
+        "UNACCEPTED_RESIDUAL_RISK",
+        "MISSING_RECOVERY_PLAN",
+        "AMBIGUOUS_BASELINE_SCOPE"
+      ],
+      "canonicalSource": "RPH-DOC-004 §26.5"
+    }
+  ],
+  "idPrefixRegistry": [
+    {
+      "objectType": "INTENT",
+      "prefix": "int"
+    },
+    {
+      "objectType": "PROFESSIONAL_WORK_UNIT",
+      "prefix": "pwu"
+    },
+    {
+      "objectType": "CONSTRAINT",
+      "prefix": "con"
+    },
+    {
+      "objectType": "ASSUMPTION",
+      "prefix": "asm"
+    },
+    {
+      "objectType": "CLAIM",
+      "prefix": "clm"
+    },
+    {
+      "objectType": "EVIDENCE",
+      "prefix": "evd"
+    },
+    {
+      "objectType": "ASSURANCE_POLICY",
+      "prefix": "pol"
+    },
+    {
+      "objectType": "ASSURANCE_ASSESSMENT",
+      "prefix": "assess"
+    },
+    {
+      "objectType": "ASSURANCE_OBSERVATION",
+      "prefix": "obs"
+    },
+    {
+      "objectType": "EXECUTION_PLAN",
+      "prefix": "plan"
+    },
+    {
+      "objectType": "EXECUTION_STEP",
+      "prefix": "step"
+    },
+    {
+      "objectType": "RUNTIME_BINDING",
+      "prefix": "bind"
+    },
+    {
+      "objectType": "DECISION",
+      "prefix": "dec"
+    },
+    {
+      "objectType": "BASELINE",
+      "prefix": "base"
+    },
+    {
+      "objectType": "TRACE_LINK",
+      "prefix": "trace"
+    },
+    {
+      "objectType": "COMMAND",
+      "prefix": "cmd"
+    },
+    {
+      "objectType": "EVENT",
+      "prefix": "evt"
+    },
+    {
+      "objectType": "EXECUTION_ATTEMPT",
+      "prefix": "attempt"
+    },
+    {
+      "objectType": "OBLIGATION",
+      "prefix": "obl"
+    },
+    {
+      "objectType": "ARTIFACT",
+      "prefix": "art"
+    },
+    {
+      "objectType": "DECOMPOSITION_CONTRACT",
+      "prefix": "dcp"
+    },
+    {
+      "objectType": "RECOMPOSITION_CONTRACT",
+      "prefix": "rcp"
+    }
+  ],
+  "errorCodes": [
+    {
+      "code": "RPH_VALIDATION_SCHEMA_FAILED",
+      "category": "",
+      "meaning": "Structural (JSON Schema) validation of the payload failed. DOC-007 §25.1 required code; per-code category mapping not given in doc."
+    },
+    {
+      "code": "RPH_VALIDATION_SEMANTIC_FAILED",
+      "category": "",
+      "meaning": "Semantic (SemanticValidator §37) validation failed. DOC-007 §25.1."
+    },
+    {
+      "code": "RPH_AUTHORITY_INSUFFICIENT",
+      "category": "",
+      "meaning": "Actor lacked authority for the requested action (e.g. approval without sufficient authority, §35.5). DOC-007 §25.1."
+    },
+    {
+      "code": "RPH_REVISION_CONFLICT",
+      "category": "",
+      "meaning": "Optimistic-concurrency expectedRevision mismatch. DOC-007 §25.1 / §35.6."
+    },
+    {
+      "code": "RPH_ILLEGAL_STATE_TRANSITION",
+      "category": "",
+      "meaning": "Requested lifecycle transition is not permitted. DOC-007 §25.1."
+    },
+    {
+      "code": "RPH_INVARIANT_VIOLATION",
+      "category": "",
+      "meaning": "A domain invariant would be violated. DOC-007 §25.1."
+    },
+    {
+      "code": "RPH_EVIDENCE_MISSING",
+      "category": "",
+      "meaning": "Required evidence absent. DOC-007 §25.1."
+    },
+    {
+      "code": "RPH_EVIDENCE_INVALIDATED",
+      "category": "",
+      "meaning": "Referenced evidence has status INVALIDATED and cannot support an active claim/assessment (§35.4). DOC-007 §25.1."
+    },
+    {
+      "code": "RPH_VALIDATOR_OUTPUT_INVALID",
+      "category": "",
+      "meaning": "Validator result failed acceptance rules (§20.2). DOC-007 §25.1."
+    },
+    {
+      "code": "RPH_VALIDATOR_INDEPENDENCE_VIOLATION",
+      "category": "",
+      "meaning": "Required independence not met. DOC-007 §25.1."
+    },
+    {
+      "code": "RPH_POLICY_VERSION_MISMATCH",
+      "category": "",
+      "meaning": "Assessment/validator references wrong policy version. DOC-007 §25.1."
+    },
+    {
+      "code": "RPH_SUBJECT_VERSION_MISMATCH",
+      "category": "",
+      "meaning": "Result applied to a semantic version other than the one assessed (§35.1). DOC-007 §25.1."
+    },
+    {
+      "code": "RPH_BASELINE_VERSION_MISMATCH",
+      "category": "",
+      "meaning": "Baseline promotion item version/hash mismatch (§35.3). DOC-007 §25.1."
+    },
+    {
+      "code": "RPH_IDEMPOTENCY_DUPLICATE",
+      "category": "",
+      "meaning": "Duplicate idempotencyKey; no additional domain event produced (§35.7). DOC-007 §25.1."
+    },
+    {
+      "code": "RPH_EXTERNAL_OPERATION_UNCERTAIN",
+      "category": "",
+      "meaning": "Outcome of an external operation could not be determined. DOC-007 §25.1."
+    },
+    {
+      "code": "VALIDATOR_FAILED",
+      "category": "Validator execution failure",
+      "meaning": "DOC-004 §34.1 — validator failed to EXECUTE. NOT an assurance rejection: yields an execution error + incomplete assessment + retry/alternate-validator/escalation. Also a state-machine state (ASSESSING→VALIDATOR_FAILED, §30). Only backticked error token in DOC-004."
+    }
+  ],
+  "commandResultStatuses": [
+    "ACCEPTED",
+    "REJECTED",
+    "CONFLICT",
+    "DUPLICATE",
+    "UNAUTHORIZED",
+    "VALIDATION_FAILED"
+  ],
+  "envelopes": [
+    {
+      "name": "ObjectEnvelope",
+      "fields": [
+        {
+          "field": "id",
+          "type": "RphId (string)",
+          "required": true,
+          "note": "format <prefix>_<ULID>, DOC-007 §5.1"
+        },
+        {
+          "field": "objectType",
+          "type": "ProfessionalWorkObjectType",
+          "required": true
+        },
+        {
+          "field": "schemaVersion",
+          "type": "number",
+          "required": true,
+          "note": "DOC-007 §7 adds this; absent in DOC-002 §4"
+        },
+        {
+          "field": "semanticVersion",
+          "type": "number",
+          "required": true,
+          "note": "increments only on meaning/obligation/assurance/authority change"
+        },
+        {
+          "field": "revision",
+          "type": "number",
+          "required": true,
+          "note": "increments for any persisted change"
+        },
+        {
+          "field": "lifecycleStatus",
+          "type": "string",
+          "required": true
+        },
+        {
+          "field": "createdAt",
+          "type": "string (RFC3339)",
+          "required": true
+        },
+        {
+          "field": "createdBy",
+          "type": "ActorReference",
+          "required": true
+        },
+        {
+          "field": "updatedAt",
+          "type": "string (RFC3339)",
+          "required": true
+        },
+        {
+          "field": "updatedBy",
+          "type": "ActorReference",
+          "required": true
+        },
+        {
+          "field": "provenance",
+          "type": "ProvenanceRecord",
+          "required": true
+        },
+        {
+          "field": "ontologyId",
+          "type": "string",
+          "required": false
+        },
+        {
+          "field": "ontologyVersion",
+          "type": "string",
+          "required": false
+        },
+        {
+          "field": "tags",
+          "type": "string[]",
+          "required": true
+        },
+        {
+          "field": "extensions",
+          "type": "ExtensionPayload[]",
+          "required": true,
+          "note": "only extensibility channel (additionalProperties:false elsewhere)"
+        },
+        {
+          "field": "authorityId",
+          "type": "string",
+          "required": false,
+          "note": "DOC-002 §4 only; DROPPED in DOC-007 §7 canonical envelope — see conflicts"
+        }
+      ]
+    },
+    {
+      "name": "ActorReference",
+      "fields": [
+        {
+          "field": "actorId",
+          "type": "string",
+          "required": true,
+          "note": "minLength 1"
+        },
+        {
+          "field": "actorType",
+          "type": "ActorType",
+          "required": true
+        },
+        {
+          "field": "displayName",
+          "type": "string",
+          "required": true,
+          "note": "minLength 1"
+        },
+        {
+          "field": "roleId",
+          "type": "string",
+          "required": false
+        },
+        {
+          "field": "modelId",
+          "type": "string",
+          "required": false
+        },
+        {
+          "field": "providerId",
+          "type": "string",
+          "required": false,
+          "note": "DOC-007 §6 adds this vs DOC-002 §5"
+        },
+        {
+          "field": "executionInstanceId",
+          "type": "string",
+          "required": false
+        }
+      ]
+    },
+    {
+      "name": "ProvenanceRecord",
+      "fields": [
+        {
+          "field": "originType",
+          "type": "OriginType",
+          "required": true
+        },
+        {
+          "field": "sourceObjectIds",
+          "type": "string[]",
+          "required": true
+        },
+        {
+          "field": "sourceEventIds",
+          "type": "string[]",
+          "required": true
+        },
+        {
+          "field": "producingExecutionAttemptId",
+          "type": "string",
+          "required": false
+        },
+        {
+          "field": "producingValidatorId",
+          "type": "string",
+          "required": false
+        },
+        {
+          "field": "contentHash",
+          "type": "string",
+          "required": false
+        }
+      ]
+    },
+    {
+      "name": "DomainCommand<TPayload>",
+      "fields": [
+        {
+          "field": "commandId",
+          "type": "string",
+          "required": true,
+          "note": "globally unique"
+        },
+        {
+          "field": "commandType",
+          "type": "string",
+          "required": true
+        },
+        {
+          "field": "commandSchemaVersion",
+          "type": "number",
+          "required": true,
+          "note": "DOC-007 §8 adds vs DOC-002 §27"
+        },
+        {
+          "field": "targetAggregateType",
+          "type": "string",
+          "required": true,
+          "note": "DOC-007 §8 adds"
+        },
+        {
+          "field": "targetAggregateId",
+          "type": "string",
+          "required": true
+        },
+        {
+          "field": "expectedRevision",
+          "type": "number",
+          "required": false,
+          "note": "mandatory for updates to existing aggregates"
+        },
+        {
+          "field": "issuedAt",
+          "type": "string",
+          "required": true
+        },
+        {
+          "field": "issuedBy",
+          "type": "ActorReference",
+          "required": true
+        },
+        {
+          "field": "correlationId",
+          "type": "string",
+          "required": true
+        },
+        {
+          "field": "causationId",
+          "type": "string",
+          "required": false
+        },
+        {
+          "field": "idempotencyKey",
+          "type": "string",
+          "required": true,
+          "note": "DOC-007 §8 adds; prevents repeated business effects"
+        },
+        {
+          "field": "payload",
+          "type": "TPayload",
+          "required": true
+        }
+      ]
+    },
+    {
+      "name": "CommandResult",
+      "fields": [
+        {
+          "field": "commandId",
+          "type": "string",
+          "required": true
+        },
+        {
+          "field": "status",
+          "type": "CommandResultStatus",
+          "required": true
+        },
+        {
+          "field": "producedEventIds",
+          "type": "string[]",
+          "required": true
+        },
+        {
+          "field": "error",
+          "type": "RphError",
+          "required": false
+        }
+      ]
+    },
+    {
+      "name": "DomainEvent<TPayload>",
+      "fields": [
+        {
+          "field": "eventId",
+          "type": "string",
+          "required": true
+        },
+        {
+          "field": "eventType",
+          "type": "string",
+          "required": true,
+          "note": "past tense"
+        },
+        {
+          "field": "eventSchemaVersion",
+          "type": "number",
+          "required": true,
+          "note": "DOC-007 §9 adds vs DOC-002 §26"
+        },
+        {
+          "field": "aggregateType",
+          "type": "string",
+          "required": true
+        },
+        {
+          "field": "aggregateId",
+          "type": "string",
+          "required": true
+        },
+        {
+          "field": "aggregateRevision",
+          "type": "number",
+          "required": true,
+          "note": "monotonic; must equal prior+1 (§35.6)"
+        },
+        {
+          "field": "occurredAt",
+          "type": "string",
+          "required": true
+        },
+        {
+          "field": "recordedAt",
+          "type": "string",
+          "required": true
+        },
+        {
+          "field": "actor",
+          "type": "ActorReference",
+          "required": true
+        },
+        {
+          "field": "correlationId",
+          "type": "string",
+          "required": true
+        },
+        {
+          "field": "causationId",
+          "type": "string",
+          "required": false
+        },
+        {
+          "field": "commandId",
+          "type": "string",
+          "required": false
+        },
+        {
+          "field": "payload",
+          "type": "TPayload",
+          "required": true,
+          "note": "accepted facts, not original request"
+        }
+      ]
+    },
+    {
+      "name": "RphError",
+      "fields": [
+        {
+          "field": "code",
+          "type": "string",
+          "required": true
+        },
+        {
+          "field": "category",
+          "type": "RphErrorCategory",
+          "required": true
+        },
+        {
+          "field": "message",
+          "type": "string",
+          "required": true
+        },
+        {
+          "field": "retryable",
+          "type": "boolean",
+          "required": true
+        },
+        {
+          "field": "targetObjectIds",
+          "type": "string[]",
+          "required": true
+        },
+        {
+          "field": "details",
+          "type": "Record<string,unknown>",
+          "required": false
+        },
+        {
+          "field": "correlationId",
+          "type": "string",
+          "required": true
+        }
+      ]
+    },
+    {
+      "name": "CommandReceipt",
+      "fields": [
+        {
+          "field": "commandId",
+          "type": "string",
+          "required": true
+        },
+        {
+          "field": "idempotencyKey",
+          "type": "string",
+          "required": true
+        },
+        {
+          "field": "commandType",
+          "type": "string",
+          "required": true
+        },
+        {
+          "field": "targetAggregateId",
+          "type": "string",
+          "required": true
+        },
+        {
+          "field": "status",
+          "type": "CommandReceiptStatus",
+          "required": true
+        },
+        {
+          "field": "producedEventIds",
+          "type": "string[]",
+          "required": true
+        },
+        {
+          "field": "resultHash",
+          "type": "string",
+          "required": false
+        },
+        {
+          "field": "createdAt",
+          "type": "string",
+          "required": true
+        },
+        {
+          "field": "completedAt",
+          "type": "string",
+          "required": false
+        }
+      ]
+    },
+    {
+      "name": "OutboxMessage",
+      "fields": [
+        {
+          "field": "outboxId",
+          "type": "string",
+          "required": true
+        },
+        {
+          "field": "eventId",
+          "type": "string",
+          "required": true
+        },
+        {
+          "field": "topic",
+          "type": "string",
+          "required": true
+        },
+        {
+          "field": "partitionKey",
+          "type": "string",
+          "required": true
+        },
+        {
+          "field": "payload",
+          "type": "DomainEvent<unknown>",
+          "required": true
+        },
+        {
+          "field": "status",
+          "type": "OutboxStatus",
+          "required": true
+        },
+        {
+          "field": "attemptCount",
+          "type": "number",
+          "required": true
+        },
+        {
+          "field": "createdAt",
+          "type": "string",
+          "required": true
+        },
+        {
+          "field": "publishedAt",
+          "type": "string",
+          "required": false
+        },
+        {
+          "field": "lastError",
+          "type": "string",
+          "required": false
+        }
+      ]
+    },
+    {
+      "name": "ValidatorResult",
+      "fields": [
+        {
+          "field": "validatorId",
+          "type": "string",
+          "required": true
+        },
+        {
+          "field": "validatorVersion",
+          "type": "string",
+          "required": true
+        },
+        {
+          "field": "policyId",
+          "type": "string",
+          "required": true
+        },
+        {
+          "field": "policyVersion",
+          "type": "string",
+          "required": true
+        },
+        {
+          "field": "assessmentId",
+          "type": "string",
+          "required": true
+        },
+        {
+          "field": "subjectObjectIds",
+          "type": "string[]",
+          "required": true
+        },
+        {
+          "field": "subjectSemanticVersions",
+          "type": "Record<string,number>",
+          "required": true,
+          "note": "DOC-007 §20 field; absent in DOC-004 §4.2 version"
+        },
+        {
+          "field": "claimResults",
+          "type": "ClaimAssessmentResult[]",
+          "required": true
+        },
+        {
+          "field": "evidenceConsideredIds",
+          "type": "string[]",
+          "required": true
+        },
+        {
+          "field": "evidenceRejected",
+          "type": "RejectedEvidenceReference[]",
+          "required": true
+        },
+        {
+          "field": "observations",
+          "type": "ProposedAssuranceObservation[]",
+          "required": true
+        },
+        {
+          "field": "dispositionRecommendation",
+          "type": "AssuranceDispositionRecommendation",
+          "required": true
+        },
+        {
+          "field": "recommendedControlActions",
+          "type": "ControlActionRecommendation[]",
+          "required": true
+        },
+        {
+          "field": "residualUncertainty",
+          "type": "string[]",
+          "required": true
+        },
+        {
+          "field": "limitations",
+          "type": "string[]",
+          "required": true
+        },
+        {
+          "field": "executionProvenance",
+          "type": "ExecutionProvenance",
+          "required": true
+        }
+      ]
+    },
+    {
+      "name": "CriterionResult",
+      "fields": [
+        {
+          "field": "criterionId",
+          "type": "string",
+          "required": true
+        },
+        {
+          "field": "result",
+          "type": "CriterionResultOutcome",
+          "required": true
+        },
+        {
+          "field": "rationale",
+          "type": "string",
+          "required": true
+        },
+        {
+          "field": "evidenceIds",
+          "type": "string[]",
+          "required": true
+        }
+      ]
+    },
+    {
+      "name": "SemanticValidationResult",
+      "fields": [
+        {
+          "field": "valid",
+          "type": "boolean",
+          "required": true
+        },
+        {
+          "field": "violations",
+          "type": "SemanticViolation[]",
+          "required": true
+        }
+      ]
+    },
+    {
+      "name": "SemanticViolation",
+      "fields": [
+        {
+          "field": "code",
+          "type": "string",
+          "required": true
+        },
+        {
+          "field": "message",
+          "type": "string",
+          "required": true
+        },
+        {
+          "field": "severity",
+          "type": "SemanticViolationSeverity",
+          "required": true
+        },
+        {
+          "field": "objectIds",
+          "type": "string[]",
+          "required": true
+        },
+        {
+          "field": "fieldPath",
+          "type": "string",
+          "required": false
+        }
+      ]
+    },
+    {
+      "name": "AssurancePolicyDefinition",
+      "fields": [
+        {
+          "field": "id",
+          "type": "string",
+          "required": true
+        },
+        {
+          "field": "version",
+          "type": "string",
+          "required": true
+        },
+        {
+          "field": "semanticVersion",
+          "type": "number",
+          "required": true
+        },
+        {
+          "field": "name",
+          "type": "string",
+          "required": true
+        },
+        {
+          "field": "purpose",
+          "type": "string",
+          "required": true
+        },
+        {
+          "field": "rationale",
+          "type": "string",
+          "required": true
+        },
+        {
+          "field": "applicableObjectTypes",
+          "type": "ProfessionalWorkObjectType[]",
+          "required": true
+        },
+        {
+          "field": "applicability",
+          "type": "ApplicabilityExpression",
+          "required": true,
+          "note": "DOC-007 §18 op-grammar; DOC-004 §5.1 alternatively uses ApplicabilityRule structured fields — see conflicts"
+        },
+        {
+          "field": "evaluatedClaimTypes",
+          "type": "ClaimType[]",
+          "required": true
+        },
+        {
+          "field": "defaultClaimTemplates",
+          "type": "ClaimTemplate[]",
+          "required": true
+        },
+        {
+          "field": "requiredEvidence",
+          "type": "EvidenceRequirement[]",
+          "required": true
+        },
+        {
+          "field": "optionalEvidence",
+          "type": "EvidenceRequirement[]",
+          "required": true,
+          "note": "DOC-007 §17 required; DOC-004 §3.1 optional"
+        },
+        {
+          "field": "criteria",
+          "type": "AssessmentCriterion[]",
+          "required": true
+        },
+        {
+          "field": "evaluatorRole",
+          "type": "string",
+          "required": true
+        },
+        {
+          "field": "independenceRequirement",
+          "type": "IndependenceRequirement",
+          "required": true
+        },
+        {
+          "field": "findingDefinitions",
+          "type": "FindingDefinition[]",
+          "required": true
+        },
+        {
+          "field": "dispositionRules",
+          "type": "DispositionRule[]",
+          "required": true
+        },
+        {
+          "field": "permittedControlActions",
+          "type": "ControlAction[]",
+          "required": true
+        },
+        {
+          "field": "remediationRules",
+          "type": "RemediationRule[]",
+          "required": true
+        },
+        {
+          "field": "escalationRules",
+          "type": "EscalationRule[]",
+          "required": true
+        },
+        {
+          "field": "waiverRules",
+          "type": "WaiverRule[]",
+          "required": true,
+          "note": "DOC-007 §17 required; DOC-004 §3.1 optional"
+        },
+        {
+          "field": "riskProfiles",
+          "type": "AssuranceProfileRule[]",
+          "required": false,
+          "note": "DOC-004 §3.1 has this as REQUIRED; DOC-007 §17 OMITS it — flagged for sponsor"
+        },
+        {
+          "field": "status",
+          "type": "AssurancePolicyStatus",
+          "required": true
+        }
+      ]
+    },
+    {
+      "name": "ValidatorContract",
+      "fields": [
+        {
+          "field": "validatorId",
+          "type": "string",
+          "required": true
+        },
+        {
+          "field": "validatorVersion",
+          "type": "string",
+          "required": true
+        },
+        {
+          "field": "supportedPolicyIds",
+          "type": "string[]",
+          "required": true
+        },
+        {
+          "field": "implementationType",
+          "type": "ValidatorImplementationType",
+          "required": true
+        },
+        {
+          "field": "requiredInputSchemas",
+          "type": "SchemaReference[]",
+          "required": true
+        },
+        {
+          "field": "outputSchema",
+          "type": "SchemaReference",
+          "required": true
+        },
+        {
+          "field": "requiredCapabilities",
+          "type": "CapabilityRequest[]",
+          "required": true
+        },
+        {
+          "field": "contextPolicyId",
+          "type": "string",
+          "required": true
+        },
+        {
+          "field": "producerIndependenceMetadata",
+          "type": "IndependenceMetadata",
+          "required": true
+        },
+        {
+          "field": "executionLimits",
+          "type": "object{timeoutSeconds?;maximumRetries?;maximumEvidenceItems?;maximumContextTokens?}",
+          "required": true,
+          "note": "object required; all four inner fields optional"
+        },
+        {
+          "field": "determinism",
+          "type": "ValidatorDeterminism",
+          "required": true
+        },
+        {
+          "field": "knownLimitations",
+          "type": "string[]",
+          "required": true
+        }
+      ]
+    },
+    {
+      "name": "EvidenceRequirement",
+      "fields": [
+        {
+          "field": "id",
+          "type": "string",
+          "required": true
+        },
+        {
+          "field": "evidenceType",
+          "type": "EvidenceType",
+          "required": true
+        },
+        {
+          "field": "description",
+          "type": "string",
+          "required": true
+        },
+        {
+          "field": "purpose",
+          "type": "string",
+          "required": true
+        },
+        {
+          "field": "cardinality",
+          "type": "EvidenceCardinality",
+          "required": true
+        },
+        {
+          "field": "admissibilityRules",
+          "type": "AdmissibilityRule[]",
+          "required": true
+        },
+        {
+          "field": "freshnessRule",
+          "type": "FreshnessRule",
+          "required": false
+        },
+        {
+          "field": "requiredForDispositions",
+          "type": "RequiredForDispositions",
+          "required": true
+        },
+        {
+          "field": "mayBeWaived",
+          "type": "boolean",
+          "required": true
+        }
+      ]
+    },
+    {
+      "name": "AssessmentCriterion",
+      "fields": [
+        {
+          "field": "id",
+          "type": "string",
+          "required": true
+        },
+        {
+          "field": "name",
+          "type": "string",
+          "required": true
+        },
+        {
+          "field": "description",
+          "type": "string",
+          "required": true
+        },
+        {
+          "field": "criterionType",
+          "type": "CriterionType",
+          "required": true
+        },
+        {
+          "field": "evaluationMethod",
+          "type": "EvaluationMethod",
+          "required": true
+        },
+        {
+          "field": "requiredEvidenceIds",
+          "type": "string[]",
+          "required": true
+        },
+        {
+          "field": "severityIfNotMet",
+          "type": "AssuranceSeverity",
+          "required": true
+        },
+        {
+          "field": "mayBeNotApplicable",
+          "type": "boolean",
+          "required": true
+        }
+      ]
+    },
+    {
+      "name": "FindingDefinition",
+      "fields": [
+        {
+          "field": "code",
+          "type": "string",
+          "required": true,
+          "note": "one of the per-policy Finding.* code enums"
+        },
+        {
+          "field": "name",
+          "type": "string",
+          "required": true
+        },
+        {
+          "field": "description",
+          "type": "string",
+          "required": true
+        },
+        {
+          "field": "defaultSeverity",
+          "type": "AssuranceSeverity",
+          "required": true
+        },
+        {
+          "field": "affectedClaimTypes",
+          "type": "ClaimType[]",
+          "required": true
+        },
+        {
+          "field": "defaultControlActions",
+          "type": "ControlAction[]",
+          "required": true
+        }
+      ]
+    },
+    {
+      "name": "DispositionRule",
+      "fields": [
+        {
+          "field": "disposition",
+          "type": "AssuranceDispositionRecommendation",
+          "required": true,
+          "note": "5-value set, WAIVED excluded"
+        },
+        {
+          "field": "condition",
+          "type": "PolicyExpression",
+          "required": true,
+          "note": "operator grammar undefined in docs"
+        },
+        {
+          "field": "requiredEvidenceIds",
+          "type": "string[]",
+          "required": false
+        },
+        {
+          "field": "forbiddenOpenSeverities",
+          "type": "string[]",
+          "required": false,
+          "note": "values from AssuranceSeverity"
+        },
+        {
+          "field": "requiredIndependence",
+          "type": "IndependenceRequirement",
+          "required": false
+        }
+      ]
+    },
+    {
+      "name": "EscalationRule",
+      "fields": [
+        {
+          "field": "trigger",
+          "type": "PolicyExpression",
+          "required": true
+        },
+        {
+          "field": "escalationTarget",
+          "type": "EscalationTarget",
+          "required": true
+        },
+        {
+          "field": "requiredPackage",
+          "type": "string[]",
+          "required": true
+        },
+        {
+          "field": "timeoutAction",
+          "type": "ControlAction",
+          "required": false
+        }
+      ]
+    },
+    {
+      "name": "ValidatorRegistryEntry",
+      "fields": [
+        {
+          "field": "validatorId",
+          "type": "string",
+          "required": true
+        },
+        {
+          "field": "supportedPolicies",
+          "type": "string[]",
+          "required": true
+        },
+        {
+          "field": "roleId",
+          "type": "string",
+          "required": true
+        },
+        {
+          "field": "implementationType",
+          "type": "string",
+          "required": true,
+          "note": "plain string here, NOT the §4.1 union"
+        },
+        {
+          "field": "modelPolicy",
+          "type": "ModelSelectionPolicy",
+          "required": false
+        },
+        {
+          "field": "requiredCapabilities",
+          "type": "CapabilityRequest[]",
+          "required": true
+        },
+        {
+          "field": "independenceAttributes",
+          "type": "object{agentFamily?;modelFamily?;provider?;organization?}",
+          "required": true,
+          "note": "object required; inner fields optional"
+        },
+        {
+          "field": "costClass",
+          "type": "ValidatorCostClass",
+          "required": true
+        },
+        {
+          "field": "latencyClass",
+          "type": "ValidatorLatencyClass",
+          "required": true
+        },
+        {
+          "field": "status",
+          "type": "ValidatorRegistryStatus",
+          "required": true
+        }
+      ]
+    },
+    {
+      "name": "FixtureManifest",
+      "fields": [
+        {
+          "field": "fixtureId",
+          "type": "string",
+          "required": true
+        },
+        {
+          "field": "fixtureVersion",
+          "type": "string",
+          "required": true
+        },
+        {
+          "field": "name",
+          "type": "string",
+          "required": true
+        },
+        {
+          "field": "description",
+          "type": "string",
+          "required": true
+        },
+        {
+          "field": "contractPackageVersion",
+          "type": "string",
+          "required": true
+        },
+        {
+          "field": "ontologyId",
+          "type": "string",
+          "required": true
+        },
+        {
+          "field": "ontologyVersion",
+          "type": "string",
+          "required": true
+        },
+        {
+          "field": "files",
+          "type": "FixtureFileReference[]",
+          "required": true
+        },
+        {
+          "field": "rootIntentId",
+          "type": "string",
+          "required": true
+        },
+        {
+          "field": "rootWorkUnitId",
+          "type": "string",
+          "required": true
+        },
+        {
+          "field": "expectedFinalState",
+          "type": "object{intentStatus:string;rootWorkLifecycleState:string;authoritativeBaselineIds:string[]}",
+          "required": true
+        }
+      ]
+    }
+  ],
+  "applicabilityGrammar": {
+    "ops": [
+      "ALL",
+      "ANY",
+      "NOT",
+      "EQUALS",
+      "IN",
+      "CONTAINS",
+      "EXISTS",
+      "RISK_AT_LEAST"
+    ],
+    "notes": "Canonical operator grammar = RPH-DOC-007 §18 ApplicabilityExpression (discriminated union on `op`). Operand shapes per op: ALL{operands:ApplicabilityExpression[]}; ANY{operands:ApplicabilityExpression[]}; NOT{operand:ApplicabilityExpression}; EQUALS{path,value}; IN{path,values[]}; CONTAINS{path,value}; EXISTS{path}; RISK_AT_LEAST{dimension:RiskDimension, level:RiskLevel} where dimension in {CONSEQUENCE,UNCERTAINTY,IRREVERSIBILITY,SECURITY_SENSITIVITY,REGULATORY_EXPOSURE} and level in {LOW,MEDIUM,HIGH,CRITICAL}. Expressions are declarative and MUST NOT execute arbitrary code (§18/§39). NO OTHER DOC DEFINES OPERATORS: DOC-002 references type ApplicabilityRule (ConstraintObject.applicability §11.1; AssurancePolicy.applicabilityRule §17.1) but never defines its structure. DOC-004 §5.1 ApplicabilityRule offers structured condition FIELDS (objectTypeConditions, pwuKindConditions, lifecycleTriggers, eventTriggers, riskConditions, semanticChangeConditions, requiredTags, excludedTags, expression) plus an opaque `PolicyExpression` (also used by DispositionRule.condition §10.2, WaiverRule.revalidationTrigger §12.1, EscalationRule.trigger §13) whose operator grammar is undefined. DOC-006 gives only prose applicability rules (§29.4) implying object-type/risk-tier applicability + a change-surface trigger set {public interface|data boundary|security boundary|migration strategy|irreversible commitment}. Recommendation: adopt DOC-007 §18 op set as the single canonical grammar; treat DOC-004 PolicyExpression as an alias for ApplicabilityExpression (sponsor confirmation needed)."
+  },
+  "conflicts": [
+    {
+      "topic": "IndependenceRequirement value set",
+      "docs": "DOC-002 §17.1 vs DOC-004 §8.1",
+      "divergence": "DOC-002 has 5 (NONE, DIFFERENT_INVOCATION, DIFFERENT_AGENT, DIFFERENT_MODEL, HUMAN). DOC-004 has 8 (adds DIFFERENT_CONTEXT_INSTANCE, DIFFERENT_PROVIDER, ORGANIZATIONALLY_INDEPENDENT).",
+      "resolution": "Adopt DOC-004 §8.1 8-value superset.",
+      "authorityRule": "DOC-004 governs assurance-facing enums (incl. IndependenceRequirement)."
+    },
+    {
+      "topic": "ControlAction value set + token spelling",
+      "docs": "DOC-002 §37 (18) vs DOC-002 §18 recommendedControlAction (10) vs DOC-004 §11 (23)",
+      "divergence": "DOC-002 §37 uses RESHAPE_PWU/REPLAN_EXECUTION and token WAIVE; DOC-002 §18 uses shorter RESHAPE/REPLAN; DOC-004 §11 adds CLARIFY, GATHER_CONTEXT, CHANGE_VALIDATOR, INVALIDATE_DEPENDENTS, REQUEST_HUMAN_DECISION, REQUEST_WAIVER and has no WAIVE token.",
+      "resolution": "Canonical = DOC-004 §11 23-value superset. Normalize on ingest: §18 RESHAPE→RESHAPE_PWU, REPLAN→REPLAN_EXECUTION; §37 WAIVE→REQUEST_WAIVER. DecisionType RESHAPE/REPLAN are a SEPARATE enum and stay verbatim.",
+      "authorityRule": "DOC-004 governs ControlAction; take fullest superset + record normalization."
+    },
+    {
+      "topic": "Assurance assessment STATE vs terminal DISPOSITION conflation",
+      "docs": "DOC-002 §18 vs DOC-007 §19 vs DOC-004 §30/§10.1/§10.2",
+      "divergence": "DOC-002 §18 AssuranceAssessment.disposition = 8 values mixing in-flight PENDING/ASSESSING with terminal outcomes. DOC-007 §19 assessmentState = 14. DOC-004 §30 state machine = 15. DOC-004 §10.1 disposition meanings = 6 (incl WAIVED); §10.2/§4.2/DOC-007 §19.3 = 5 (excl WAIVED).",
+      "resolution": "Separate axes: (a) AssuranceAssessmentState = DOC-004 §30 (15, incl WAIVER_EXPIRED); (b) AssuranceDisposition meanings = DOC-004 §10.1 (6, incl WAIVED, waiver-flow-only); (c) AssuranceDispositionRecommendation = 5 (WAIVED excluded) for validator/rule/completed-event. DOC-002 §18 PENDING/ASSESSING are states, not dispositions.",
+      "authorityRule": "DOC-004 governs assessment state + disposition; DOC-007 §19.3 confirms the 5-value completed set."
+    },
+    {
+      "topic": "assessmentState WAIVER_EXPIRED",
+      "docs": "DOC-007 §19 (14) vs DOC-004 §30 (15)",
+      "divergence": "DOC-007 omits WAIVER_EXPIRED; DOC-004 includes it (WAIVED→WAIVER_EXPIRED transition).",
+      "resolution": "Include WAIVER_EXPIRED (15-value set).",
+      "authorityRule": "DOC-004 governs assessment state."
+    },
+    {
+      "topic": "TraceRelation tokens",
+      "docs": "DOC-007 §24 / DOC-002 §25 (17) vs DOC-006 §25 fixture (12)",
+      "divergence": "Fixture uses DEFINES, REALIZED_BY, REFINED_BY, ALLOCATED_TO, VERIFIED_BY, APPROVED_BY, PROPAGATES_TO, BECOMES — none of which exist in the canonical 17.",
+      "resolution": "Adopt DOC-007 §24 17-value set. Fixture edge labels are display-only, non-authoritative.",
+      "authorityRule": "DOC-007 is latest serialized contract for TraceRelation; DOC-006 fixture is lowest authority (display labels only)."
+    },
+    {
+      "topic": "CriterionResult casing",
+      "docs": "DOC-004 §7 (lowercase prose) vs DOC-007 §20.1 (UPPERCASE)",
+      "divergence": "DOC-004 prose: 'met','partially met','not met','not applicable','unable to determine'. DOC-007 serialized: MET, PARTIALLY_MET, NOT_MET, NOT_APPLICABLE, UNABLE_TO_DETERMINE.",
+      "resolution": "Use UPPERCASE_SNAKE_CASE serialized form.",
+      "authorityRule": "DOC-007 latest serialized contract + DOC-007 §4.5 mandates UPPERCASE_SNAKE_CASE enums."
+    },
+    {
+      "topic": "ObjectEnvelope shape",
+      "docs": "DOC-002 §4 vs DOC-007 §7",
+      "divergence": "DOC-002 has authorityId? and no schemaVersion. DOC-007 adds schemaVersion (required) and drops authorityId.",
+      "resolution": "Adopt DOC-007 §7. Version quartet: contractVersion(package)/schemaVersion(payload)/semanticVersion(meaning)/revision(concurrency).",
+      "authorityRule": "DOC-007 is latest serialized contract for envelopes."
+    },
+    {
+      "topic": "AssurancePolicyDefinition shape",
+      "docs": "DOC-004 §3.1 vs DOC-007 §17",
+      "divergence": "DOC-004 §3.1 has riskProfiles:AssuranceProfileRule[] (REQUIRED) and makes optionalEvidence/waiverRules optional. DOC-007 §17 omits riskProfiles and makes optionalEvidence/waiverRules required.",
+      "resolution": "Envelope shape follows DOC-007 §17; retain riskProfiles as an optional field pending sponsor decision (its omission from the serialized contract looks unintended).",
+      "authorityRule": "DOC-007 governs serialized envelopes; DOC-004 governs assurance semantics — genuine tension, flagged."
+    },
+    {
+      "topic": "Aggregate assurance disposition",
+      "docs": "DOC-007 §26.2 (9) vs DOC-004 §28.2 (6)",
+      "divergence": "DOC-007 projection adds ASSESSING, WAIVED, INVALIDATED; DOC-004 composition = {REJECTED, EVIDENCE_REQUIRED, UNASSESSED, INCONCLUSIVE, CONDITIONALLY_SATISFIED, SATISFIED}.",
+      "resolution": "Keep as two distinct enums: AssuranceViewAggregateDisposition (read-model, DOC-007 §26.2) vs AggregateAssuranceDisposition (composition rule, DOC-004 §28.2). Flag for reconciliation.",
+      "authorityRule": "DOC-007 governs the serialized projection field; DOC-004 governs the semantic composition; not a same-field conflict."
+    },
+    {
+      "topic": "Compatibility phase / milestone labels",
+      "docs": "DOC-007 §26.3 (11) vs DOC-006 §27 (7) vs DOC-006 §32.4 (8)",
+      "divergence": "Three different phase lists.",
+      "resolution": "Adopt DOC-007 §26.3 currentMilestone (11, superset). Both DOC-006 lists are display-only; docs explicitly forbid using phase labels as authoritative state.",
+      "authorityRule": "DOC-007 latest serialized projection; DOC-006 fixture lowest authority."
+    },
+    {
+      "topic": "DomainCommand / DomainEvent / ActorReference shape",
+      "docs": "DOC-002 §26/§27/§5 vs DOC-007 §8/§9/§6",
+      "divergence": "DOC-007 adds commandSchemaVersion, targetAggregateType, idempotencyKey (command); eventSchemaVersion (event); providerId (actor).",
+      "resolution": "Adopt DOC-007 envelopes.",
+      "authorityRule": "DOC-007 latest serialized contract for envelopes."
+    },
+    {
+      "topic": "ID prefix format + coverage",
+      "docs": "DOC-002 §4.2 (pwu_, 4 prefixes) vs DOC-007 §5.1 (18 prefixes, <prefix>_<ULID>) vs DOC-006 fixture (trailing-underscore, +dcp_/rcp_/obl_/art_/evreq_/ver_/amb_/human_/agent_/exec_)",
+      "divergence": "DOC-002 shows prefixes with trailing underscore; DOC-007 defines the underscore as separator (prefix token has none). Fixture adds prefixes for object types DOC-007 does not register.",
+      "resolution": "Canonical registry = DOC-007 §5.1 tokens (no trailing underscore). obl/art/dcp/rcp carried from the fixture as UNRATIFIED candidates for the 4 uncovered union types; extra fixture prefixes (evreq/ver/amb/human/agent/exec) are for non-union sub-objects/actors and excluded pending sponsor.",
+      "authorityRule": "DOC-007 is latest serialized contract for ids; DOC-006 fixture ids are display labels only."
+    },
+    {
+      "topic": "ProfessionalWorkObjectType coverage",
+      "docs": "DOC-002 §4 (17) vs DOC-006 fixture (10)",
+      "divergence": "Fixture emits only 10 objectType literals; ExecutionPlan/AssurancePolicy have no literal shown in any fixture JSON.",
+      "resolution": "Adopt DOC-002 §4 17-value set.",
+      "authorityRule": "Domain model doc over fixture convenience."
+    },
+    {
+      "topic": "FailureSeverity vs AssuranceSeverity",
+      "docs": "DOC-002 §17.1 (4) vs DOC-002 §19 / DOC-007 §21 / DOC-004 §7,§9.1 (5)",
+      "divergence": "AssurancePolicy.failureSeverity omits INFORMATIONAL; observation/criterion/finding severity includes it.",
+      "resolution": "Keep as two separate enums (FailureSeverity 4, AssuranceSeverity 5). Do not merge.",
+      "authorityRule": "Both authoritative for their own fields; distinct member sets."
+    }
+  ],
+  "openItemsForSponsor": [
+    {
+      "item": "pwuKind closed value set",
+      "why": "Only fixture-observed values exist (DOC-006: PRODUCT_REALIZATION, INTENT_AND_PRODUCT_DEFINITION, ARCHITECTURE_DEFINITION); DOC-006 §9 hierarchy names ~9 more branches with no literal. No schema doc enumerates pwuKind. AssurancePolicyDefinition.applicability keys on pwuKindConditions, so a closed set is needed for Zod. Sponsor must supply the authoritative enum."
+    },
+    {
+      "item": "artifactType (ProfessionalWorkUnit.expectedOutputs[].artifactType) closed set",
+      "why": "Only 3 fixture-observed values (PRODUCT_INTENT, PRODUCT_BOUNDARY, CONSTRAINT_CATALOG); no schema doc defines the enum. Almost certainly non-exhaustive."
+    },
+    {
+      "item": "RecompositionContract conflictResolutionRules[].conflictType and .action",
+      "why": "Fixture-only, domain-instance-specific strings (TENANT_IDENTITY_MISMATCH/OFFLINE_AUDIT_CONFLICT; REJECT_RECOMPOSITION/RESHAPE_MOBILE_ARCHITECTURE). These read as data, not a closed system enum — should likely be free-form strings unless sponsor defines a registry."
+    },
+    {
+      "item": "ControlAction legacy WAIVE token",
+      "why": "DOC-002 §37 has WAIVE; DOC-004 §11 (canonical) has REQUEST_WAIVER instead. We normalize WAIVE→REQUEST_WAIVER. Confirm WAIVE need not persist as a distinct action."
+    },
+    {
+      "item": "AssurancePolicyDefinition.riskProfiles",
+      "why": "REQUIRED in DOC-004 §3.1 but entirely absent from the DOC-007 §17 serialized contract. Confirm whether the serialized contract intentionally drops risk-profile-driven policy rules."
+    },
+    {
+      "item": "RphError per-code category mapping",
+      "why": "DOC-007 §25.1 lists 15 required error codes and separately defines the 10-value RphError.category enum, but gives NO code→category mapping. Left blank rather than guessed. Sponsor must fix the mapping (and whether DOC-004 VALIDATOR_FAILED becomes an RphError code or stays a state)."
+    },
+    {
+      "item": "Aggregate assurance disposition reconciliation",
+      "why": "DOC-007 §26.2 (9) and DOC-004 §28.2 (6) describe the same rollup concept with different value sets. Confirm whether the projection field should equal the composition set or intentionally add ASSESSING/WAIVED/INVALIDATED."
+    },
+    {
+      "item": "ID prefixes for OBLIGATION/ARTIFACT/DECOMPOSITION_CONTRACT/RECOMPOSITION_CONTRACT",
+      "why": "These 4 union object types have no DOC-007 §5.1 prefix; only fixture forms (obl_/art_/dcp_/rcp_) exist. Ratify the canonical prefix tokens. Also decide prefixes for non-union sub-objects (EvidenceRequirement, VerificationCriterion, Ambiguity, actors) seen only in the fixture."
+    },
+    {
+      "item": "PolicyExpression operator grammar",
+      "why": "DOC-004 uses an opaque PolicyExpression (DispositionRule.condition, WaiverRule.revalidationTrigger, EscalationRule.trigger, ApplicabilityRule.expression) with no defined operators. Confirm it may be unified with the DOC-007 §18 ApplicabilityExpression op set."
+    },
+    {
+      "item": "Intent duplicate status fields",
+      "why": "DOC-006 fixture carries both lifecycleStatus and intentStatus (both UNDER_DISCOVERY). Confirm intentStatus is the single canonical field and lifecycleStatus is the generic ObjectEnvelope mirror."
+    },
+    {
+      "item": "AssuranceDisposition-recommended vocabulary (DOC-006 §30.3)",
+      "why": "Fixture recommends a lowercase mixed set (satisfied/conditionally satisfied/rejected/inconclusive/residual uncertainty/severity/evidence sufficiency) mixing dispositions with dimensions. Not a field enum; superseded by DOC-004 disposition sets. Noted so it is not mistaken for a schema enum."
+    }
+  ]
+}

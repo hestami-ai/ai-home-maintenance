@@ -1,0 +1,13 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "type": "string",
+  "enum": [
+    "ACCEPTED",
+    "REJECTED",
+    "CONFLICT",
+    "DUPLICATE",
+    "UNAUTHORIZED",
+    "VALIDATION_FAILED"
+  ],
+  "$id": "urn:janumi:rph:schema:enum:CommandResultStatus:1"
+}

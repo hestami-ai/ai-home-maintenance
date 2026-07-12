@@ -1,0 +1,24 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "type": "string",
+  "enum": [
+    "DERIVED_FROM",
+    "REFINES",
+    "DECOMPOSES",
+    "SATISFIES",
+    "DEPENDS_ON",
+    "CONSTRAINED_BY",
+    "ASSUMES",
+    "PRODUCES",
+    "SUPPORTS",
+    "CONTRADICTS",
+    "VERIFIES",
+    "INVALIDATES",
+    "SUPERSEDES",
+    "PROMOTES",
+    "ALLOCATES",
+    "PROPAGATES",
+    "GOVERNS"
+  ],
+  "$id": "urn:janumi:rph:schema:enum:TraceRelation:1"
+}

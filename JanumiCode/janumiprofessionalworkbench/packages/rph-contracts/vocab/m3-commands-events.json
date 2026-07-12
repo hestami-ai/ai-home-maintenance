@@ -1,0 +1,4871 @@
+{
+  "firstSliceCommands": [
+    "CaptureIntent",
+    "FormalizeIntent",
+    "ApproveIntent",
+    "ProposePwu",
+    "MarkPwuReady",
+    "ProposeExecutionPlan",
+    "ActivateExecutionPlan",
+    "CompleteExecutionStep",
+    "ProposeEvidence",
+    "AdmitEvidence",
+    "RequestAssuranceAssessment",
+    "CompleteAssuranceAssessment",
+    "ApproveDecision",
+    "PromoteBaseline"
+  ],
+  "commands": [
+    {
+      "commandType": "CaptureIntent",
+      "targetAggregateType": "INTENT",
+      "emitsEvent": "IntentCaptured",
+      "drivesMachine": "Intent.intentStatus",
+      "drivesFrom": "(initial)",
+      "drivesTo": "RAW",
+      "schematized": true,
+      "sourceSection": "DOC-007 §10.2 / §10.3",
+      "payloadFields": [
+        {
+          "field": "intentId",
+          "required": true,
+          "type": "string",
+          "note": "id-ref"
+        },
+        {
+          "field": "originatingExpression",
+          "required": true,
+          "type": "string"
+        },
+        {
+          "field": "ontologyId",
+          "required": true,
+          "type": "string"
+        },
+        {
+          "field": "ontologyVersion",
+          "required": true,
+          "type": "string"
+        }
+      ]
+    },
+    {
+      "commandType": "FormalizeIntent",
+      "targetAggregateType": "INTENT",
+      "emitsEvent": "IntentFormalized",
+      "drivesMachine": "Intent.intentStatus",
+      "drivesFrom": "PROVISIONAL",
+      "drivesTo": "FORMALIZED",
+      "schematized": true,
+      "sourceSection": "DOC-007 §10.4 / §10.5",
+      "payloadFields": [
+        {
+          "field": "formalizedObjective",
+          "required": true,
+          "type": "string"
+        },
+        {
+          "field": "desiredOutcomes",
+          "required": true,
+          "type": "DesiredOutcome[]",
+          "note": "complex type — needs own schema"
+        },
+        {
+          "field": "successConditions",
+          "required": true,
+          "type": "SuccessCondition[]",
+          "note": "complex type — needs own schema"
+        },
+        {
+          "field": "nonGoals",
+          "required": true,
+          "type": "string[]"
+        },
+        {
+          "field": "ambiguityIds",
+          "required": true,
+          "type": "string[]",
+          "note": "id-ref[]"
+        },
+        {
+          "field": "constraintIds",
+          "required": true,
+          "type": "string[]",
+          "note": "id-ref[]"
+        },
+        {
+          "field": "stakeholderIds",
+          "required": true,
+          "type": "string[]",
+          "note": "id-ref[]"
+        }
+      ]
+    },
+    {
+      "commandType": "ApproveIntent",
+      "targetAggregateType": "INTENT",
+      "emitsEvent": "IntentApproved",
+      "drivesMachine": "Intent.intentStatus",
+      "drivesFrom": "FORMALIZED",
+      "drivesTo": "APPROVED",
+      "schematized": true,
+      "sourceSection": "DOC-007 §10.6 / §10.7",
+      "payloadFields": [
+        {
+          "field": "decisionId",
+          "required": true,
+          "type": "string",
+          "note": "id-ref"
+        },
+        {
+          "field": "approvedSemanticVersion",
+          "required": true,
+          "type": "number"
+        },
+        {
+          "field": "approvalScope",
+          "required": true,
+          "type": "string"
+        }
+      ]
+    },
+    {
+      "commandType": "ProposePwu",
+      "targetAggregateType": "PROFESSIONAL_WORK_UNIT",
+      "emitsEvent": "PwuProposed",
+      "drivesMachine": "PWU.workLifecycleState",
+      "drivesFrom": "(initial)",
+      "drivesTo": "PROPOSED",
+      "schematized": true,
+      "sourceSection": "DOC-007 §11.2 / §11.3",
+      "payloadFields": [
+        {
+          "field": "pwuId",
+          "required": true,
+          "type": "string",
+          "note": "id-ref"
+        },
+        {
+          "field": "pwuKind",
+          "required": true,
+          "type": "string"
+        },
+        {
+          "field": "title",
+          "required": true,
+          "type": "string"
+        },
+        {
+          "field": "description",
+          "required": true,
+          "type": "string"
+        },
+        {
+          "field": "intentId",
+          "required": true,
+          "type": "string",
+          "note": "id-ref"
+        },
+        {
+          "field": "parentWorkUnitId",
+          "required": false,
+          "type": "string",
+          "note": "id-ref; optional"
+        },
+        {
+          "field": "boundaries",
+          "required": true,
+          "type": "WorkBoundary",
+          "note": "complex type {inScope,outOfScope,permittedChanges,prohibitedChanges: string[]}"
+        },
+        {
+          "field": "obligationIds",
+          "required": true,
+          "type": "string[]",
+          "note": "id-ref[]"
+        },
+        {
+          "field": "constraintIds",
+          "required": true,
+          "type": "string[]",
+          "note": "id-ref[]"
+        },
+        {
+          "field": "assumptionIds",
+          "required": true,
+          "type": "string[]",
+          "note": "id-ref[]"
+        },
+        {
+          "field": "expectedOutputs",
+          "required": true,
+          "type": "OutputDefinition[]",
+          "note": "complex type — needs own schema"
+        },
+        {
+          "field": "assurancePolicyIds",
+          "required": true,
+          "type": "string[]",
+          "note": "id-ref[]"
+        },
+        {
+          "field": "riskProfile",
+          "required": true,
+          "type": "WorkRiskProfile",
+          "note": "complex type — needs own schema"
+        }
+      ]
+    },
+    {
+      "commandType": "MarkPwuReady",
+      "targetAggregateType": "PROFESSIONAL_WORK_UNIT",
+      "emitsEvent": "PwuStateChanged",
+      "drivesMachine": "PWU.workLifecycleState",
+      "drivesFrom": "SHAPING",
+      "drivesTo": "READY",
+      "schematized": true,
+      "sourceSection": "DOC-007 §11.4 / §11.5",
+      "payloadFields": [
+        {
+          "field": "shapeReadinessAssessmentId",
+          "required": true,
+          "type": "string",
+          "note": "id-ref; DOC-002 §34.1 names it shapeReadinessAttestationId (optional) — field-name drift"
+        },
+        {
+          "field": "expectedSemanticVersion",
+          "required": true,
+          "type": "number"
+        }
+      ]
+    },
+    {
+      "commandType": "ProposeExecutionPlan",
+      "targetAggregateType": "EXECUTION_PLAN",
+      "emitsEvent": "ExecutionPlanProposed",
+      "drivesMachine": "ExecutionPlan.status",
+      "drivesFrom": "(initial)",
+      "drivesTo": "PROPOSED",
+      "schematized": true,
+      "sourceSection": "DOC-007 §15.1 (cmd); event payload from DOC-002 §26.4",
+      "payloadFields": [
+        {
+          "field": "executionPlanId",
+          "required": true,
+          "type": "string",
+          "note": "id-ref"
+        },
+        {
+          "field": "workUnitId",
+          "required": true,
+          "type": "string",
+          "note": "id-ref"
+        },
+        {
+          "field": "steps",
+          "required": true,
+          "type": "ExecutionStep[]",
+          "note": "complex type — needs own schema"
+        },
+        {
+          "field": "transitions",
+          "required": true,
+          "type": "ExecutionTransition[]",
+          "note": "complex type — needs own schema"
+        },
+        {
+          "field": "retryPolicy",
+          "required": true,
+          "type": "RetryPolicy",
+          "note": "complex type — needs own schema"
+        },
+        {
+          "field": "tacticalChangePolicy",
+          "required": true,
+          "type": "TacticalChangePolicy",
+          "note": "complex type — needs own schema"
+        },
+        {
+          "field": "escalationPolicy",
+          "required": true,
+          "type": "EscalationPolicy",
+          "note": "complex type — needs own schema"
+        },
+        {
+          "field": "terminationPolicy",
+          "required": true,
+          "type": "TerminationPolicy",
+          "note": "complex type — needs own schema"
+        }
+      ]
+    },
+    {
+      "commandType": "ActivateExecutionPlan",
+      "targetAggregateType": "EXECUTION_PLAN",
+      "emitsEvent": "ExecutionPlanActivated",
+      "drivesMachine": "ExecutionPlan.status",
+      "drivesFrom": "APPROVED",
+      "drivesTo": "ACTIVE",
+      "schematized": true,
+      "sourceSection": "DOC-007 §15.2 / §15.3",
+      "payloadFields": [
+        {
+          "field": "approvalDecisionId",
+          "required": false,
+          "type": "string",
+          "note": "id-ref; optional"
+        },
+        {
+          "field": "authorizedRuntimeBindingIds",
+          "required": true,
+          "type": "string[]",
+          "note": "id-ref[] (bind_ prefix)"
+        }
+      ]
+    },
+    {
+      "commandType": "CompleteExecutionStep",
+      "targetAggregateType": "EXECUTION_PLAN",
+      "emitsEvent": "ExecutionStepSucceeded",
+      "drivesMachine": "ExecutionStep.stepState",
+      "drivesFrom": "RUNNING",
+      "drivesTo": "SUCCEEDED",
+      "schematized": true,
+      "sourceSection": "DOC-007 §16.1 / §16.2 (machine name per DOC-002; DOC-007 calls it ExecutionStep.executionState)",
+      "payloadFields": [
+        {
+          "field": "executionStepId",
+          "required": true,
+          "type": "string",
+          "note": "id-ref (step_ prefix); DOC-002 event field name is stepId"
+        },
+        {
+          "field": "executionAttemptId",
+          "required": true,
+          "type": "string",
+          "note": "id-ref (attempt_ prefix)"
+        },
+        {
+          "field": "resultStatus",
+          "required": true,
+          "type": "'SUCCEEDED'",
+          "note": "literal const"
+        },
+        {
+          "field": "outputArtifactIds",
+          "required": true,
+          "type": "string[]",
+          "note": "id-ref[]"
+        },
+        {
+          "field": "proposedEvidenceIds",
+          "required": true,
+          "type": "string[]",
+          "note": "id-ref[]"
+        },
+        {
+          "field": "detectedAssumptionIds",
+          "required": true,
+          "type": "string[]",
+          "note": "id-ref[]"
+        },
+        {
+          "field": "structuredResult",
+          "required": true,
+          "type": "unknown"
+        },
+        {
+          "field": "executionProvenance",
+          "required": true,
+          "type": "ExecutionProvenance",
+          "note": "complex type; §16/§35.2: success drives execution dim only, must NOT set assuranceState=SATISFIED"
+        }
+      ]
+    },
+    {
+      "commandType": "ProposeEvidence",
+      "targetAggregateType": "EVIDENCE",
+      "emitsEvent": "EvidenceProposed",
+      "drivesMachine": "Evidence.status",
+      "drivesFrom": "(initial)",
+      "drivesTo": "PROPOSED",
+      "schematized": true,
+      "sourceSection": "DOC-007 §14.1 (cmd); event payload from DOC-002 §26.5",
+      "payloadFields": [
+        {
+          "field": "evidenceId",
+          "required": true,
+          "type": "string",
+          "note": "id-ref"
+        },
+        {
+          "field": "evidenceType",
+          "required": true,
+          "type": "EvidenceType",
+          "enumRef": "EvidenceTypeSchema"
+        },
+        {
+          "field": "contentReference",
+          "required": true,
+          "type": "ArtifactReference",
+          "note": "complex type"
+        },
+        {
+          "field": "producedBy",
+          "required": true,
+          "type": "ActorReference",
+          "note": "complex type §6"
+        },
+        {
+          "field": "supportsClaimIds",
+          "required": true,
+          "type": "string[]",
+          "note": "id-ref[]"
+        },
+        {
+          "field": "contradictsClaimIds",
+          "required": true,
+          "type": "string[]",
+          "note": "id-ref[]"
+        },
+        {
+          "field": "scope",
+          "required": true,
+          "type": "string"
+        },
+        {
+          "field": "limitations",
+          "required": true,
+          "type": "string[]"
+        },
+        {
+          "field": "capturedAt",
+          "required": true,
+          "type": "string",
+          "note": "RFC3339; DOC-002 adds optional validFrom/validUntil"
+        }
+      ]
+    },
+    {
+      "commandType": "AdmitEvidence",
+      "targetAggregateType": "EVIDENCE",
+      "emitsEvent": "EvidenceAdmitted",
+      "drivesMachine": "Evidence.status",
+      "drivesFrom": "PROPOSED",
+      "drivesTo": "ADMISSIBLE",
+      "schematized": true,
+      "sourceSection": "DOC-007 §14.2 / §14.3",
+      "payloadFields": [
+        {
+          "field": "admissibilityAssessmentId",
+          "required": true,
+          "type": "string",
+          "note": "id-ref"
+        },
+        {
+          "field": "admittedScope",
+          "required": true,
+          "type": "string"
+        },
+        {
+          "field": "admittedClaimIds",
+          "required": true,
+          "type": "string[]",
+          "note": "id-ref[]"
+        }
+      ]
+    },
+    {
+      "commandType": "RequestAssuranceAssessment",
+      "targetAggregateType": "ASSURANCE_ASSESSMENT",
+      "emitsEvent": "AssuranceAssessmentRequested",
+      "drivesMachine": "AssuranceAssessment.disposition",
+      "drivesFrom": "(initial)",
+      "drivesTo": "PENDING",
+      "schematized": true,
+      "sourceSection": "DOC-007 §19.1 (cmd); machine/state per DOC-002 §26.5 (DOC-007: assessmentState (initial)->REQUESTED)",
+      "payloadFields": [
+        {
+          "field": "assessmentId",
+          "required": true,
+          "type": "string",
+          "note": "id-ref (assess_ prefix)"
+        },
+        {
+          "field": "assurancePolicyId",
+          "required": true,
+          "type": "string",
+          "note": "id-ref (pol_ prefix)"
+        },
+        {
+          "field": "policyVersion",
+          "required": true,
+          "type": "string",
+          "note": "DOC-002 uses policySemanticVersion:number — type drift"
+        },
+        {
+          "field": "subjectObjectIds",
+          "required": true,
+          "type": "string[]",
+          "note": "id-ref[]"
+        },
+        {
+          "field": "subjectSemanticVersions",
+          "required": true,
+          "type": "Record<string,number>",
+          "note": "map objectId->semanticVersion"
+        },
+        {
+          "field": "claimIds",
+          "required": true,
+          "type": "string[]",
+          "note": "id-ref[]; DOC-002 also requires evaluator:ActorReference"
+        }
+      ]
+    },
+    {
+      "commandType": "CompleteAssuranceAssessment",
+      "targetAggregateType": "ASSURANCE_ASSESSMENT",
+      "emitsEvent": "AssuranceAssessmentCompleted",
+      "drivesMachine": "AssuranceAssessment.disposition",
+      "drivesFrom": "ASSESSING",
+      "drivesTo": "SATISFIED | CONDITIONALLY_SATISFIED | REJECTED | INCONCLUSIVE | ESCALATED",
+      "schematized": true,
+      "sourceSection": "DOC-007 §19.2 / §19.3",
+      "payloadFields": [
+        {
+          "field": "validatorResult",
+          "required": true,
+          "type": "ValidatorResult",
+          "note": "complex type §20; disposition/target-state derived from validatorResult.dispositionRecommendation. DOC-002 flattens to disposition + evidenceConsideredIds + criteriaMetIds? + confidence? + residualUncertainty? + recommendedControlAction?"
+        }
+      ]
+    },
+    {
+      "commandType": "ApproveDecision",
+      "targetAggregateType": "DECISION",
+      "emitsEvent": "DecisionEffective",
+      "drivesMachine": "Decision.status",
+      "drivesFrom": "PROPOSED",
+      "drivesTo": "EFFECTIVE",
+      "schematized": true,
+      "sourceSection": "DOC-007 §22.1 / §22.2",
+      "payloadFields": [
+        {
+          "field": "selectedOption",
+          "required": true,
+          "type": "string"
+        },
+        {
+          "field": "rationale",
+          "required": true,
+          "type": "string"
+        },
+        {
+          "field": "consideredEvidenceIds",
+          "required": true,
+          "type": "string[]",
+          "note": "id-ref[]"
+        },
+        {
+          "field": "consideredObservationIds",
+          "required": true,
+          "type": "string[]",
+          "note": "id-ref[]"
+        },
+        {
+          "field": "subjectSemanticVersions",
+          "required": true,
+          "type": "Record<string,number>",
+          "note": "map objectId->semanticVersion; §35.5 insufficient authority must reject before DecisionEffective. DOC-002 approveDecision payload=approvalAuthority only (these fields sit on DecisionProposed there)"
+        }
+      ]
+    },
+    {
+      "commandType": "PromoteBaseline",
+      "targetAggregateType": "BASELINE",
+      "emitsEvent": "BaselinePromoted",
+      "drivesMachine": "Baseline.status",
+      "drivesFrom": "APPROVED",
+      "drivesTo": "AUTHORITATIVE",
+      "schematized": true,
+      "sourceSection": "DOC-007 §23.1 / §23.2 (from=APPROVED per DOC-002; DOC-007 inferred CANDIDATE)",
+      "payloadFields": [
+        {
+          "field": "promotionDecisionId",
+          "required": true,
+          "type": "string",
+          "note": "id-ref"
+        },
+        {
+          "field": "expectedItemObjectVersions",
+          "required": true,
+          "type": "Array<{objectId:string;semanticVersion:number;contentHash?:string}>",
+          "note": "§35.3 exact semantic versions + hashes; DOC-002 has thinner itemObjectIds"
+        },
+        {
+          "field": "requiredAssessmentIds",
+          "required": true,
+          "type": "string[]",
+          "note": "id-ref[]"
+        }
+      ]
+    },
+    {
+      "commandType": "BeginPwuShaping",
+      "targetAggregateType": "PROFESSIONAL_WORK_UNIT",
+      "emitsEvent": "PwuShapingStarted",
+      "drivesMachine": "PWU.workLifecycleState",
+      "drivesFrom": "PROPOSED",
+      "drivesTo": "SHAPING",
+      "schematized": false,
+      "sourceSection": "DOC-007 §32 / DOC-002 §34.1",
+      "payloadFields": []
+    },
+    {
+      "commandType": "ChangePwuState",
+      "targetAggregateType": "PROFESSIONAL_WORK_UNIT",
+      "emitsEvent": "PwuStateChanged",
+      "drivesMachine": "PWU.workLifecycleState",
+      "drivesFrom": "(any)",
+      "drivesTo": "(any)",
+      "schematized": false,
+      "sourceSection": "DOC-007 §32 (no DOC-002 counterpart)",
+      "payloadFields": [
+        {
+          "field": "previousState",
+          "required": true,
+          "type": "WorkLifecycleState",
+          "enumRef": "WorkLifecycleStateSchema",
+          "note": "derived from emitted event PwuStateChanged §11.5"
+        },
+        {
+          "field": "newState",
+          "required": true,
+          "type": "WorkLifecycleState",
+          "enumRef": "WorkLifecycleStateSchema"
+        },
+        {
+          "field": "executionState",
+          "required": true,
+          "type": "ExecutionState",
+          "enumRef": "ExecutionStateSchema"
+        },
+        {
+          "field": "assuranceState",
+          "required": true,
+          "type": "AssuranceState",
+          "enumRef": "AssuranceStateSchema"
+        },
+        {
+          "field": "shapeIntegrityState",
+          "required": true,
+          "type": "ShapeIntegrityState",
+          "enumRef": "ShapeIntegrityStateSchema"
+        },
+        {
+          "field": "reasonCode",
+          "required": true,
+          "type": "string"
+        },
+        {
+          "field": "supportingObjectIds",
+          "required": true,
+          "type": "string[]",
+          "note": "id-ref[]"
+        }
+      ]
+    },
+    {
+      "commandType": "ApproveExecutionPlan",
+      "targetAggregateType": "EXECUTION_PLAN",
+      "emitsEvent": "ExecutionPlanApproved",
+      "drivesMachine": "ExecutionPlan.status",
+      "drivesFrom": "UNDER_REVIEW",
+      "drivesTo": "APPROVED",
+      "schematized": false,
+      "sourceSection": "DOC-007 §32/§33 (payload from DOC-002 §34.3)",
+      "payloadFields": [
+        {
+          "field": "approvalDecisionId",
+          "required": false,
+          "type": "string",
+          "note": "id-ref; DOC-002 primary drive is PWU.workLifecycleState READY->PLANNED + PWU.executionState NOT_PLANNED->PLANNED; event from={PROPOSED,UNDER_REVIEW}"
+        }
+      ]
+    },
+    {
+      "commandType": "StartExecutionStep",
+      "targetAggregateType": "EXECUTION_PLAN",
+      "emitsEvent": "ExecutionStepStarted",
+      "drivesMachine": "ExecutionStep.stepState",
+      "drivesFrom": "READY|QUEUED",
+      "drivesTo": "RUNNING",
+      "schematized": false,
+      "sourceSection": "DOC-007 §32/§33 (payload from DOC-002 §34.3; DOC-007 from=PENDING)",
+      "payloadFields": [
+        {
+          "field": "stepId",
+          "required": true,
+          "type": "string",
+          "note": "id-ref"
+        }
+      ]
+    },
+    {
+      "commandType": "FailExecutionStep",
+      "targetAggregateType": "EXECUTION_PLAN",
+      "emitsEvent": "ExecutionStepFailed",
+      "drivesMachine": "ExecutionStep.stepState",
+      "drivesFrom": "RUNNING",
+      "drivesTo": "FAILED",
+      "schematized": false,
+      "sourceSection": "DOC-007 §32/§33 (payload from DOC-002 §34.3)",
+      "payloadFields": [
+        {
+          "field": "stepId",
+          "required": true,
+          "type": "string",
+          "note": "id-ref"
+        },
+        {
+          "field": "failureReason",
+          "required": true,
+          "type": "string"
+        },
+        {
+          "field": "failureClass",
+          "required": false,
+          "type": "ExecutionFailureClass",
+          "enumRef": "ExecutionFailureClassSchema",
+          "note": "§36.2; also drives PWU.executionState ->FAILED"
+        }
+      ]
+    },
+    {
+      "commandType": "DetectAssumption",
+      "targetAggregateType": "ASSUMPTION",
+      "emitsEvent": "AssumptionDetected",
+      "drivesMachine": "Assumption.status",
+      "drivesFrom": "(initial)",
+      "drivesTo": "PROPOSED",
+      "schematized": false,
+      "sourceSection": "DOC-007 §32 (drivesTo=DISCLOSED in DOC-007; DOC-002 §26.3 uses PROPOSED)",
+      "payloadFields": [
+        {
+          "field": "assumptionId",
+          "required": true,
+          "type": "string",
+          "note": "id-ref; derived from emitted event AssumptionDetected §12.2"
+        },
+        {
+          "field": "statement",
+          "required": true,
+          "type": "string"
+        },
+        {
+          "field": "basis",
+          "required": false,
+          "type": "string"
+        },
+        {
+          "field": "introducedBy",
+          "required": true,
+          "type": "ActorReference",
+          "note": "complex type §6"
+        },
+        {
+          "field": "affectedObjectIds",
+          "required": true,
+          "type": "string[]",
+          "note": "id-ref[]"
+        },
+        {
+          "field": "materiality",
+          "required": true,
+          "type": "Materiality",
+          "enumRef": "MaterialitySchema",
+          "note": "DOC-002 enumRef=AssumptionMaterialitySchema"
+        },
+        {
+          "field": "sourceArtifactId",
+          "required": false,
+          "type": "string",
+          "note": "id-ref"
+        },
+        {
+          "field": "sourceExecutionAttemptId",
+          "required": false,
+          "type": "string",
+          "note": "id-ref"
+        }
+      ]
+    },
+    {
+      "commandType": "AssertClaim",
+      "targetAggregateType": "CLAIM",
+      "emitsEvent": "ClaimAsserted",
+      "drivesMachine": "Claim.status",
+      "drivesFrom": "(initial)",
+      "drivesTo": "OPEN",
+      "schematized": false,
+      "sourceSection": "DOC-007 §32 (payload from DOC-002 §34.2)",
+      "payloadFields": [
+        {
+          "field": "statement",
+          "required": true,
+          "type": "string"
+        },
+        {
+          "field": "claimType",
+          "required": true,
+          "type": "ClaimType",
+          "enumRef": "ClaimTypeSchema"
+        },
+        {
+          "field": "subjectObjectIds",
+          "required": true,
+          "type": "string[]",
+          "note": "id-ref[]"
+        },
+        {
+          "field": "supportingEvidenceIds",
+          "required": false,
+          "type": "string[]",
+          "note": "id-ref[]"
+        },
+        {
+          "field": "contradictingEvidenceIds",
+          "required": false,
+          "type": "string[]",
+          "note": "id-ref[]"
+        }
+      ]
+    },
+    {
+      "commandType": "RecordAssuranceObservation",
+      "targetAggregateType": "ASSURANCE_OBSERVATION",
+      "emitsEvent": "AssuranceObservationRecorded",
+      "drivesMachine": "AssuranceObservation.disposition",
+      "drivesFrom": "(initial)",
+      "drivesTo": "OPEN",
+      "schematized": false,
+      "sourceSection": "DOC-007 §32 (payload from DOC-002 §34.2; DOC-002 targetAggregate=AssuranceAssessment)",
+      "payloadFields": [
+        {
+          "field": "assessmentId",
+          "required": true,
+          "type": "string",
+          "note": "id-ref"
+        },
+        {
+          "field": "observationType",
+          "required": true,
+          "type": "ObservationType",
+          "enumRef": "ObservationTypeSchema"
+        },
+        {
+          "field": "severity",
+          "required": true,
+          "type": "ObservationSeverity",
+          "enumRef": "ObservationSeveritySchema"
+        },
+        {
+          "field": "statement",
+          "required": true,
+          "type": "string"
+        },
+        {
+          "field": "evidenceIds",
+          "required": false,
+          "type": "string[]",
+          "note": "id-ref[]"
+        }
+      ]
+    },
+    {
+      "commandType": "ProposeDecision",
+      "targetAggregateType": "DECISION",
+      "emitsEvent": "DecisionProposed",
+      "drivesMachine": "Decision.status",
+      "drivesFrom": "(initial)",
+      "drivesTo": "PROPOSED",
+      "schematized": false,
+      "sourceSection": "DOC-007 §32/§33 (payload from DOC-002 §34.4)",
+      "payloadFields": [
+        {
+          "field": "decisionType",
+          "required": true,
+          "type": "DecisionType",
+          "enumRef": "DecisionTypeSchema"
+        },
+        {
+          "field": "subjectObjectIds",
+          "required": true,
+          "type": "string[]",
+          "note": "id-ref[]"
+        },
+        {
+          "field": "selectedOption",
+          "required": true,
+          "type": "string"
+        },
+        {
+          "field": "rationale",
+          "required": true,
+          "type": "string"
+        },
+        {
+          "field": "authority",
+          "required": true,
+          "type": "ActorReference",
+          "note": "complex type"
+        },
+        {
+          "field": "consideredEvidenceIds",
+          "required": false,
+          "type": "string[]",
+          "note": "id-ref[]"
+        },
+        {
+          "field": "consideredObservationIds",
+          "required": false,
+          "type": "string[]",
+          "note": "id-ref[]"
+        },
+        {
+          "field": "effectiveAt",
+          "required": false,
+          "type": "string"
+        }
+      ]
+    },
+    {
+      "commandType": "CreateBaseline",
+      "targetAggregateType": "BASELINE",
+      "emitsEvent": "BaselineCreated",
+      "drivesMachine": "Baseline.status",
+      "drivesFrom": "(initial)",
+      "drivesTo": "DRAFT",
+      "schematized": false,
+      "sourceSection": "DOC-007 §32/§33 (no createBaseline in DOC-002 §34; event DOC-002 §26.6)",
+      "payloadFields": [
+        {
+          "field": "baselineType",
+          "required": true,
+          "type": "BaselineType",
+          "enumRef": "BaselineTypeSchema",
+          "note": "derived from event BaselineCreated"
+        },
+        {
+          "field": "itemObjectIds",
+          "required": true,
+          "type": "string[]",
+          "note": "id-ref[]"
+        },
+        {
+          "field": "assuranceAssessmentIds",
+          "required": false,
+          "type": "string[]",
+          "note": "id-ref[]"
+        }
+      ]
+    },
+    {
+      "commandType": "ReviseIntent",
+      "targetAggregateType": "Intent",
+      "emitsEvent": "IntentRevised",
+      "drivesMachine": "Intent.intentStatus",
+      "drivesFrom": "APPROVED",
+      "drivesTo": "REVISED",
+      "schematized": false,
+      "sourceSection": "DOC-002 §34.1 (reviseIntent)",
+      "payloadFields": [
+        {
+          "field": "changeRationale",
+          "required": true,
+          "type": "string"
+        },
+        {
+          "field": "impactAnalysisId",
+          "required": false,
+          "type": "string",
+          "note": "id-ref"
+        }
+      ]
+    },
+    {
+      "commandType": "ChallengePwu",
+      "targetAggregateType": "ProfessionalWorkUnit",
+      "emitsEvent": "PwuChallenged",
+      "drivesMachine": "PWU.workLifecycleState",
+      "drivesFrom": "READY",
+      "drivesTo": "CHALLENGED",
+      "schematized": false,
+      "sourceSection": "DOC-002 §34.1 (challengePwu)",
+      "payloadFields": [
+        {
+          "field": "challengeReason",
+          "required": true,
+          "type": "string"
+        },
+        {
+          "field": "observationIds",
+          "required": false,
+          "type": "string[]",
+          "note": "id-ref[]"
+        }
+      ]
+    },
+    {
+      "commandType": "ReshapePwu",
+      "targetAggregateType": "ProfessionalWorkUnit",
+      "emitsEvent": "PwuReshapingStarted",
+      "drivesMachine": "PWU.workLifecycleState",
+      "drivesFrom": "EXECUTING",
+      "drivesTo": "RESHAPING",
+      "schematized": false,
+      "sourceSection": "DOC-002 §34.1 (reshapePwu)",
+      "payloadFields": [
+        {
+          "field": "reason",
+          "required": true,
+          "type": "string"
+        },
+        {
+          "field": "triggeringObjectId",
+          "required": false,
+          "type": "string",
+          "note": "id-ref; also UNDER_ASSURANCE->RESHAPING; drives shapeIntegrityState ->RESHAPING_IN_PROGRESS"
+        }
+      ]
+    },
+    {
+      "commandType": "InvalidatePwu",
+      "targetAggregateType": "ProfessionalWorkUnit",
+      "emitsEvent": "PwuInvalidated",
+      "drivesMachine": "PWU.workLifecycleState",
+      "drivesFrom": "SATISFIED|CONDITIONALLY_SATISFIED|RECOMPOSED",
+      "drivesTo": "INVALIDATED",
+      "schematized": false,
+      "sourceSection": "DOC-002 §34.1 (invalidatePwu)",
+      "payloadFields": [
+        {
+          "field": "invalidationReason",
+          "required": true,
+          "type": "string"
+        },
+        {
+          "field": "triggeringObjectId",
+          "required": false,
+          "type": "string",
+          "note": "id-ref"
+        }
+      ]
+    },
+    {
+      "commandType": "SupersedePwu",
+      "targetAggregateType": "ProfessionalWorkUnit",
+      "emitsEvent": "PwuSuperseded",
+      "drivesMachine": "PWU.workLifecycleState",
+      "drivesFrom": "(any non-baselined)",
+      "drivesTo": "SUPERSEDED",
+      "schematized": false,
+      "sourceSection": "DOC-002 §34.1 (supersedePwu)",
+      "payloadFields": [
+        {
+          "field": "supersedingWorkUnitId",
+          "required": true,
+          "type": "string",
+          "note": "id-ref"
+        }
+      ]
+    },
+    {
+      "commandType": "ProposeDecomposition",
+      "targetAggregateType": "DecompositionContract",
+      "emitsEvent": "DecompositionProposed",
+      "drivesMachine": "DecompositionContract.status",
+      "drivesFrom": "(initial)",
+      "drivesTo": "DRAFT",
+      "schematized": false,
+      "sourceSection": "DOC-002 §34.1 (proposeDecomposition)",
+      "payloadFields": [
+        {
+          "field": "parentWorkUnitId",
+          "required": true,
+          "type": "string",
+          "note": "id-ref"
+        },
+        {
+          "field": "childWorkUnitIds",
+          "required": true,
+          "type": "string[]",
+          "note": "id-ref[]"
+        },
+        {
+          "field": "rationale",
+          "required": true,
+          "type": "string"
+        },
+        {
+          "field": "intentMappings",
+          "required": false,
+          "type": "IntentMapping[]",
+          "note": "complex type"
+        },
+        {
+          "field": "obligationAllocations",
+          "required": false,
+          "type": "ObligationAllocation[]",
+          "note": "complex type"
+        },
+        {
+          "field": "constraintPropagations",
+          "required": false,
+          "type": "ConstraintPropagation[]",
+          "note": "complex type"
+        },
+        {
+          "field": "assumptionPropagations",
+          "required": false,
+          "type": "AssumptionPropagation[]",
+          "note": "complex type"
+        },
+        {
+          "field": "retainedParentObligationIds",
+          "required": false,
+          "type": "string[]",
+          "note": "id-ref[]"
+        },
+        {
+          "field": "coverageClaims",
+          "required": false,
+          "type": "CoverageClaim[]",
+          "note": "complex type"
+        },
+        {
+          "field": "siblingDependencyIds",
+          "required": false,
+          "type": "string[]",
+          "note": "id-ref[]"
+        },
+        {
+          "field": "recompositionContractId",
+          "required": false,
+          "type": "string",
+          "note": "id-ref"
+        }
+      ]
+    },
+    {
+      "commandType": "ValidateDecomposition",
+      "targetAggregateType": "DecompositionContract",
+      "emitsEvent": "DecompositionValidated",
+      "drivesMachine": "DecompositionContract.status",
+      "drivesFrom": "UNDER_REVIEW",
+      "drivesTo": "VALID | CONDITIONALLY_VALID",
+      "schematized": false,
+      "sourceSection": "DOC-002 §34.1 (validateDecomposition)",
+      "payloadFields": [
+        {
+          "field": "disposition",
+          "required": true,
+          "type": "DecompositionValidationDisposition",
+          "enumRef": "DecompositionValidationDispositionSchema",
+          "note": "VALID|CONDITIONALLY_VALID|INVALID; INVALID emits DecompositionRejected UNDER_REVIEW->INVALID"
+        },
+        {
+          "field": "validatorRole",
+          "required": false,
+          "type": "string"
+        },
+        {
+          "field": "observationIds",
+          "required": false,
+          "type": "string[]",
+          "note": "id-ref[]"
+        }
+      ]
+    },
+    {
+      "commandType": "ReviseDecomposition",
+      "targetAggregateType": "DecompositionContract",
+      "emitsEvent": "DecompositionRevised",
+      "drivesMachine": "DecompositionContract.status",
+      "drivesFrom": "(prior)",
+      "drivesTo": "SUPERSEDED",
+      "schematized": false,
+      "sourceSection": "DOC-002 §34.1 (reviseDecomposition)",
+      "payloadFields": [
+        {
+          "field": "rationale",
+          "required": true,
+          "type": "string",
+          "note": "increments semanticVersion; new contract = DRAFT"
+        },
+        {
+          "field": "childWorkUnitIds",
+          "required": false,
+          "type": "string[]",
+          "note": "id-ref[]"
+        },
+        {
+          "field": "obligationAllocations",
+          "required": false,
+          "type": "ObligationAllocation[]",
+          "note": "complex type"
+        },
+        {
+          "field": "constraintPropagations",
+          "required": false,
+          "type": "ConstraintPropagation[]",
+          "note": "complex type"
+        }
+      ]
+    },
+    {
+      "commandType": "BeginRecomposition",
+      "targetAggregateType": "RecompositionContract",
+      "emitsEvent": "RecompositionStarted",
+      "drivesMachine": "PWU.workLifecycleState",
+      "drivesFrom": "SATISFIED",
+      "drivesTo": "RECOMPOSING",
+      "schematized": false,
+      "sourceSection": "DOC-002 §34.1 (beginRecomposition)",
+      "payloadFields": [
+        {
+          "field": "recompositionContractId",
+          "required": true,
+          "type": "string",
+          "note": "id-ref; also RecompositionContract.status READY->EVALUATING"
+        }
+      ]
+    },
+    {
+      "commandType": "CompleteRecomposition",
+      "targetAggregateType": "RecompositionContract",
+      "emitsEvent": "RecompositionCompleted",
+      "drivesMachine": "PWU.workLifecycleState",
+      "drivesFrom": "RECOMPOSING",
+      "drivesTo": "RECOMPOSED",
+      "schematized": false,
+      "sourceSection": "DOC-002 §34.1 (completeRecomposition)",
+      "payloadFields": [
+        {
+          "field": "parentCompletionClaimId",
+          "required": true,
+          "type": "string",
+          "note": "id-ref; also RecompositionContract.status EVALUATING->SATISFIED"
+        }
+      ]
+    },
+    {
+      "commandType": "InvalidateEvidence",
+      "targetAggregateType": "Evidence",
+      "emitsEvent": "EvidenceInvalidated",
+      "drivesMachine": "Evidence.status",
+      "drivesFrom": "ADMISSIBLE",
+      "drivesTo": "INVALIDATED",
+      "schematized": false,
+      "sourceSection": "DOC-002 §34.2 (invalidateEvidence)",
+      "payloadFields": [
+        {
+          "field": "invalidationReason",
+          "required": true,
+          "type": "string"
+        },
+        {
+          "field": "affectedClaimIds",
+          "required": false,
+          "type": "string[]",
+          "note": "id-ref[]; dependent claims become contested/under-review/invalidated"
+        }
+      ]
+    },
+    {
+      "commandType": "RequestWaiver",
+      "targetAggregateType": "Decision",
+      "emitsEvent": "WaiverRequested",
+      "drivesMachine": "Decision.status",
+      "drivesFrom": "(initial)",
+      "drivesTo": "PROPOSED",
+      "schematized": false,
+      "sourceSection": "DOC-002 §34.2 (requestWaiver)",
+      "payloadFields": [
+        {
+          "field": "subjectObjectIds",
+          "required": true,
+          "type": "string[]",
+          "note": "id-ref[]"
+        },
+        {
+          "field": "scope",
+          "required": true,
+          "type": "string"
+        },
+        {
+          "field": "rationale",
+          "required": true,
+          "type": "string"
+        },
+        {
+          "field": "duration",
+          "required": true,
+          "type": "string"
+        },
+        {
+          "field": "affectedObjectIds",
+          "required": true,
+          "type": "string[]",
+          "note": "id-ref[]"
+        }
+      ]
+    },
+    {
+      "commandType": "GrantWaiver",
+      "targetAggregateType": "Decision",
+      "emitsEvent": "WaiverGranted",
+      "drivesMachine": "Decision.status",
+      "drivesFrom": "PROPOSED",
+      "drivesTo": "EFFECTIVE",
+      "schematized": false,
+      "sourceSection": "DOC-002 §34.2 (grantWaiver)",
+      "payloadFields": [
+        {
+          "field": "waiverDecisionId",
+          "required": true,
+          "type": "string",
+          "note": "id-ref; also target Obligation.status/Constraint.status/AssuranceObservation.disposition ->WAIVED"
+        },
+        {
+          "field": "effectiveAt",
+          "required": true,
+          "type": "string"
+        },
+        {
+          "field": "duration",
+          "required": true,
+          "type": "string"
+        }
+      ]
+    },
+    {
+      "commandType": "DenyWaiver",
+      "targetAggregateType": "Decision",
+      "emitsEvent": "WaiverDenied",
+      "drivesMachine": "Decision.status",
+      "drivesFrom": "PROPOSED",
+      "drivesTo": "(denied — no status value; §23.1 gap)",
+      "schematized": false,
+      "sourceSection": "DOC-002 §34.2 (denyWaiver)",
+      "payloadFields": [
+        {
+          "field": "rationale",
+          "required": true,
+          "type": "string"
+        }
+      ]
+    },
+    {
+      "commandType": "RetryExecutionStep",
+      "targetAggregateType": "ExecutionPlan",
+      "emitsEvent": "ExecutionStepRetried",
+      "drivesMachine": "ExecutionStep.stepState",
+      "drivesFrom": "FAILED",
+      "drivesTo": "QUEUED",
+      "schematized": false,
+      "sourceSection": "DOC-002 §34.3 (retryExecutionStep)",
+      "payloadFields": [
+        {
+          "field": "stepId",
+          "required": true,
+          "type": "string",
+          "note": "id-ref"
+        },
+        {
+          "field": "retryReason",
+          "required": false,
+          "type": "string",
+          "note": "also drives PWU.executionState ->RETRYING"
+        }
+      ]
+    },
+    {
+      "commandType": "ApplyTacticalChange",
+      "targetAggregateType": "ExecutionPlan",
+      "emitsEvent": "TacticalChangeApplied",
+      "drivesMachine": "ExecutionPlan.status",
+      "drivesFrom": "ACTIVE",
+      "drivesTo": "ACTIVE",
+      "schematized": false,
+      "sourceSection": "DOC-002 §34.3 (applyTacticalChange)",
+      "payloadFields": [
+        {
+          "field": "stepId",
+          "required": false,
+          "type": "string",
+          "note": "id-ref"
+        },
+        {
+          "field": "changeType",
+          "required": true,
+          "type": "string"
+        },
+        {
+          "field": "rationale",
+          "required": true,
+          "type": "string"
+        },
+        {
+          "field": "authorizingPolicyId",
+          "required": true,
+          "type": "string",
+          "note": "id-ref; no state change — preceded by TacticalChangeRequested"
+        }
+      ]
+    },
+    {
+      "commandType": "CancelExecutionPlan",
+      "targetAggregateType": "ExecutionPlan",
+      "emitsEvent": "ExecutionTerminated",
+      "drivesMachine": "ExecutionPlan.status",
+      "drivesFrom": "ACTIVE",
+      "drivesTo": "CANCELLED",
+      "schematized": false,
+      "sourceSection": "DOC-002 §34.3 (cancelExecutionPlan)",
+      "payloadFields": [
+        {
+          "field": "reason",
+          "required": true,
+          "type": "string",
+          "note": "no ExecutionPlanCancelled event; maps to ExecutionTerminated (ACTIVE->CANCELLED|FAILED); also PWU.executionState ->CANCELLED"
+        }
+      ]
+    },
+    {
+      "commandType": "RevokeDecision",
+      "targetAggregateType": "Decision",
+      "emitsEvent": "DecisionRevoked",
+      "drivesMachine": "Decision.status",
+      "drivesFrom": "EFFECTIVE",
+      "drivesTo": "REVOKED",
+      "schematized": false,
+      "sourceSection": "DOC-002 §34.4 (revokeDecision)",
+      "payloadFields": [
+        {
+          "field": "revocationRationale",
+          "required": true,
+          "type": "string",
+          "note": "triggers impact analysis"
+        }
+      ]
+    },
+    {
+      "commandType": "SupersedeBaseline",
+      "targetAggregateType": "Baseline",
+      "emitsEvent": "BaselineSuperseded",
+      "drivesMachine": "Baseline.status",
+      "drivesFrom": "AUTHORITATIVE",
+      "drivesTo": "SUPERSEDED",
+      "schematized": false,
+      "sourceSection": "DOC-002 §34.4 (supersedeBaseline)",
+      "payloadFields": [
+        {
+          "field": "supersedingBaselineId",
+          "required": true,
+          "type": "string",
+          "note": "id-ref"
+        }
+      ]
+    }
+  ],
+  "events": [
+    {
+      "eventType": "AssumptionAccepted",
+      "aggregateType": "Assumption",
+      "sourceSection": "DOC-002 §26.3",
+      "payloadFields": [
+        {
+          "field": "acceptanceDecisionId",
+          "required": false,
+          "type": "string",
+          "note": "id-ref"
+        },
+        {
+          "field": "status",
+          "required": true,
+          "type": "enum",
+          "enumRef": "AssumptionStatusSchema",
+          "note": "{DISCLOSED,UNDER_VERIFICATION}->ACCEPTED; accepted!=verified"
+        }
+      ]
+    },
+    {
+      "eventType": "AssumptionDetected",
+      "aggregateType": "Assumption",
+      "sourceSection": "DOC-007 §12.2 (wins) / DOC-002 §26.3",
+      "payloadFields": [
+        {
+          "field": "assumptionId",
+          "required": true,
+          "type": "string",
+          "note": "id-ref"
+        },
+        {
+          "field": "statement",
+          "required": true,
+          "type": "string"
+        },
+        {
+          "field": "basis",
+          "required": false,
+          "type": "string"
+        },
+        {
+          "field": "introducedBy",
+          "required": true,
+          "type": "ActorReference",
+          "note": "complex type §6"
+        },
+        {
+          "field": "affectedObjectIds",
+          "required": true,
+          "type": "string[]",
+          "note": "id-ref[]"
+        },
+        {
+          "field": "materiality",
+          "required": true,
+          "type": "'IMMATERIAL' | 'MATERIAL' | 'CRITICAL'",
+          "enumRef": "MaterialitySchema",
+          "note": "DOC-002 enumRef=AssumptionMaterialitySchema"
+        },
+        {
+          "field": "status",
+          "required": true,
+          "type": "'DISCLOSED'",
+          "enumRef": "AssumptionStatusSchema",
+          "note": "literal const in DOC-007; DOC-002 sets =PROPOSED (initial) — VALUE DRIFT"
+        },
+        {
+          "field": "sourceArtifactId",
+          "required": false,
+          "type": "string",
+          "note": "id-ref"
+        },
+        {
+          "field": "sourceExecutionAttemptId",
+          "required": false,
+          "type": "string",
+          "note": "id-ref; DOC-002 instead adds verificationMethod/expirationCondition"
+        }
+      ]
+    },
+    {
+      "eventType": "AssumptionDisclosed",
+      "aggregateType": "Assumption",
+      "sourceSection": "DOC-002 §26.3",
+      "payloadFields": [
+        {
+          "field": "status",
+          "required": true,
+          "type": "enum",
+          "enumRef": "AssumptionStatusSchema",
+          "note": "PROPOSED->DISCLOSED"
+        }
+      ]
+    },
+    {
+      "eventType": "AssumptionExpired",
+      "aggregateType": "Assumption",
+      "sourceSection": "DOC-002 §26.3",
+      "payloadFields": [
+        {
+          "field": "expirationCondition",
+          "required": false,
+          "type": "string"
+        },
+        {
+          "field": "status",
+          "required": true,
+          "type": "enum",
+          "enumRef": "AssumptionStatusSchema",
+          "note": "{ACCEPTED,VERIFIED}->EXPIRED; expired cannot authorize work"
+        }
+      ]
+    },
+    {
+      "eventType": "AssumptionFalsified",
+      "aggregateType": "Assumption",
+      "sourceSection": "DOC-007 §12.3 (wins) / DOC-002 §26.3",
+      "payloadFields": [
+        {
+          "field": "assumptionId",
+          "required": true,
+          "type": "string",
+          "note": "id-ref"
+        },
+        {
+          "field": "priorStatus",
+          "required": true,
+          "type": "string",
+          "enumRef": "AssumptionStatusSchema",
+          "note": "declared string though holds AssumptionStatus — tighten"
+        },
+        {
+          "field": "newStatus",
+          "required": true,
+          "type": "'FALSIFIED'",
+          "enumRef": "AssumptionStatusSchema",
+          "note": "literal const"
+        },
+        {
+          "field": "contradictingEvidenceIds",
+          "required": true,
+          "type": "string[]",
+          "note": "id-ref[]; DOC-002 names this evidenceIds + adds impactAnalysisId"
+        },
+        {
+          "field": "affectedObjectIds",
+          "required": true,
+          "type": "string[]",
+          "note": "id-ref[]"
+        },
+        {
+          "field": "impactAnalysisRequired",
+          "required": true,
+          "type": "true",
+          "note": "boolean literal const; NOT in §32/§33 first-slice catalogs; may drive PWU RESHAPING + shapeIntegrityState AT_RISK/VIOLATED"
+        }
+      ]
+    },
+    {
+      "eventType": "AssumptionVerificationStarted",
+      "aggregateType": "Assumption",
+      "sourceSection": "DOC-002 §26.3",
+      "payloadFields": [
+        {
+          "field": "verificationMethod",
+          "required": false,
+          "type": "string"
+        },
+        {
+          "field": "status",
+          "required": true,
+          "type": "enum",
+          "enumRef": "AssumptionStatusSchema",
+          "note": "DISCLOSED->UNDER_VERIFICATION"
+        }
+      ]
+    },
+    {
+      "eventType": "AssumptionVerified",
+      "aggregateType": "Assumption",
+      "sourceSection": "DOC-002 §26.3",
+      "payloadFields": [
+        {
+          "field": "evidenceIds",
+          "required": false,
+          "type": "string[]",
+          "note": "id-ref[]"
+        },
+        {
+          "field": "status",
+          "required": true,
+          "type": "enum",
+          "enumRef": "AssumptionStatusSchema",
+          "note": "UNDER_VERIFICATION->VERIFIED"
+        }
+      ]
+    },
+    {
+      "eventType": "AssuranceAssessmentCompleted",
+      "aggregateType": "AssuranceAssessment",
+      "sourceSection": "DOC-007 §19.3 (DOC-007-only; DOC-002 splits into 5 outcome events)",
+      "payloadFields": [
+        {
+          "field": "assessmentId",
+          "required": true,
+          "type": "string",
+          "note": "id-ref"
+        },
+        {
+          "field": "assurancePolicyId",
+          "required": true,
+          "type": "string",
+          "note": "id-ref"
+        },
+        {
+          "field": "policyVersion",
+          "required": true,
+          "type": "string"
+        },
+        {
+          "field": "subjectObjectIds",
+          "required": true,
+          "type": "string[]",
+          "note": "id-ref[]"
+        },
+        {
+          "field": "subjectSemanticVersions",
+          "required": true,
+          "type": "Record<string,number>",
+          "note": "map objectId->semanticVersion; §35.1"
+        },
+        {
+          "field": "disposition",
+          "required": true,
+          "type": "'SATISFIED' | 'CONDITIONALLY_SATISFIED' | 'REJECTED' | 'INCONCLUSIVE' | 'ESCALATED'",
+          "enumRef": "AssessmentDispositionSchema"
+        },
+        {
+          "field": "evidenceConsideredIds",
+          "required": true,
+          "type": "string[]",
+          "note": "id-ref[]"
+        },
+        {
+          "field": "observationIds",
+          "required": true,
+          "type": "string[]",
+          "note": "id-ref[]"
+        },
+        {
+          "field": "residualUncertainty",
+          "required": true,
+          "type": "string[]"
+        },
+        {
+          "field": "recommendedControlActions",
+          "required": true,
+          "type": "ControlActionRecommendation[]",
+          "note": "complex type"
+        }
+      ]
+    },
+    {
+      "eventType": "AssuranceAssessmentConditionallySatisfied",
+      "aggregateType": "AssuranceAssessment",
+      "sourceSection": "DOC-002 §26.5",
+      "payloadFields": [
+        {
+          "field": "conditions",
+          "required": true,
+          "type": "string[]"
+        },
+        {
+          "field": "residualUncertainty",
+          "required": false,
+          "type": "string[]"
+        },
+        {
+          "field": "disposition",
+          "required": true,
+          "type": "enum",
+          "enumRef": "AssuranceDispositionSchema",
+          "note": "ASSESSING->CONDITIONALLY_SATISFIED; drives PWU ->CONDITIONALLY_SATISFIED"
+        }
+      ]
+    },
+    {
+      "eventType": "AssuranceAssessmentEscalated",
+      "aggregateType": "AssuranceAssessment",
+      "sourceSection": "DOC-002 §26.5",
+      "payloadFields": [
+        {
+          "field": "escalationReason",
+          "required": true,
+          "type": "string"
+        },
+        {
+          "field": "disposition",
+          "required": true,
+          "type": "enum",
+          "enumRef": "AssuranceDispositionSchema",
+          "note": "ASSESSING->ESCALATED; drives PWU.assuranceState ->ESCALATED"
+        }
+      ]
+    },
+    {
+      "eventType": "AssuranceAssessmentInconclusive",
+      "aggregateType": "AssuranceAssessment",
+      "sourceSection": "DOC-002 §26.5",
+      "payloadFields": [
+        {
+          "field": "residualUncertainty",
+          "required": true,
+          "type": "string[]"
+        },
+        {
+          "field": "disposition",
+          "required": true,
+          "type": "enum",
+          "enumRef": "AssuranceDispositionSchema",
+          "note": "ASSESSING->INCONCLUSIVE; cannot be treated as satisfied"
+        }
+      ]
+    },
+    {
+      "eventType": "AssuranceAssessmentRejected",
+      "aggregateType": "AssuranceAssessment",
+      "sourceSection": "DOC-002 §26.5",
+      "payloadFields": [
+        {
+          "field": "blockingObservationIds",
+          "required": true,
+          "type": "string[]",
+          "note": "id-ref[]"
+        },
+        {
+          "field": "recommendedControlAction",
+          "required": false,
+          "type": "enum",
+          "enumRef": "RecommendedControlActionSchema"
+        },
+        {
+          "field": "disposition",
+          "required": true,
+          "type": "enum",
+          "enumRef": "AssuranceDispositionSchema",
+          "note": "ASSESSING->REJECTED; drives PWU ->REJECTED or RESHAPING"
+        }
+      ]
+    },
+    {
+      "eventType": "AssuranceAssessmentRequested",
+      "aggregateType": "AssuranceAssessment",
+      "sourceSection": "DOC-002 §26.5 (DOC-007 §33 lists it unschematized — author payload)",
+      "payloadFields": [
+        {
+          "field": "assurancePolicyId",
+          "required": true,
+          "type": "string",
+          "note": "id-ref"
+        },
+        {
+          "field": "policySemanticVersion",
+          "required": true,
+          "type": "number",
+          "note": "DOC-007 cmd used policyVersion:string"
+        },
+        {
+          "field": "subjectObjectIds",
+          "required": true,
+          "type": "string[]",
+          "note": "id-ref[]"
+        },
+        {
+          "field": "claimIds",
+          "required": true,
+          "type": "string[]",
+          "note": "id-ref[]"
+        },
+        {
+          "field": "evaluator",
+          "required": true,
+          "type": "ActorReference",
+          "note": "complex type"
+        },
+        {
+          "field": "disposition",
+          "required": true,
+          "type": "enum",
+          "enumRef": "AssuranceDispositionSchema",
+          "note": "=PENDING; drives PWU EVIDENCE_PENDING->UNDER_ASSURANCE + assuranceState ->READY_FOR_ASSESSMENT"
+        }
+      ]
+    },
+    {
+      "eventType": "AssuranceAssessmentSatisfied",
+      "aggregateType": "AssuranceAssessment",
+      "sourceSection": "DOC-002 §26.5",
+      "payloadFields": [
+        {
+          "field": "evidenceConsideredIds",
+          "required": true,
+          "type": "string[]",
+          "note": "id-ref[]"
+        },
+        {
+          "field": "criteriaMetIds",
+          "required": false,
+          "type": "string[]",
+          "note": "id-ref[]"
+        },
+        {
+          "field": "confidence",
+          "required": false,
+          "type": "ConfidenceAssessment",
+          "note": "complex type (basis+limitations)"
+        },
+        {
+          "field": "disposition",
+          "required": true,
+          "type": "enum",
+          "enumRef": "AssuranceDispositionSchema",
+          "note": "ASSESSING->SATISFIED; drives PWU.assuranceState SATISFIED + workLifecycleState UNDER_ASSURANCE->SATISFIED"
+        }
+      ]
+    },
+    {
+      "eventType": "AssuranceAssessmentStarted",
+      "aggregateType": "AssuranceAssessment",
+      "sourceSection": "DOC-002 §26.5",
+      "payloadFields": [
+        {
+          "field": "disposition",
+          "required": true,
+          "type": "enum",
+          "enumRef": "AssuranceDispositionSchema",
+          "note": "PENDING->ASSESSING; independence checked before start; PWU.assuranceState ->ASSESSING"
+        }
+      ]
+    },
+    {
+      "eventType": "AssuranceObservationRecorded",
+      "aggregateType": "AssuranceObservation",
+      "sourceSection": "DOC-007 §21.1 (wins) / DOC-002 §26.5",
+      "payloadFields": [
+        {
+          "field": "observationId",
+          "required": true,
+          "type": "string",
+          "note": "id-ref (obs_ prefix)"
+        },
+        {
+          "field": "assessmentId",
+          "required": true,
+          "type": "string",
+          "note": "id-ref"
+        },
+        {
+          "field": "policyId",
+          "required": true,
+          "type": "string",
+          "note": "id-ref"
+        },
+        {
+          "field": "subjectObjectIds",
+          "required": true,
+          "type": "string[]",
+          "note": "id-ref[]"
+        },
+        {
+          "field": "findingCode",
+          "required": true,
+          "type": "string"
+        },
+        {
+          "field": "severity",
+          "required": true,
+          "type": "ObservationSeverity",
+          "enumRef": "ObservationSeveritySchema"
+        },
+        {
+          "field": "statement",
+          "required": true,
+          "type": "string"
+        },
+        {
+          "field": "implication",
+          "required": true,
+          "type": "string"
+        },
+        {
+          "field": "evidenceIds",
+          "required": true,
+          "type": "string[]",
+          "note": "id-ref[]"
+        },
+        {
+          "field": "disposition",
+          "required": true,
+          "type": "'OPEN'",
+          "enumRef": "ObservationDispositionSchema",
+          "note": "literal const; DOC-002 adds observationType (ObservationTypeSchema), omits findingCode/implication/policyId"
+        }
+      ]
+    },
+    {
+      "eventType": "BaselineApproved",
+      "aggregateType": "Baseline",
+      "sourceSection": "DOC-002 §26.6",
+      "payloadFields": [
+        {
+          "field": "status",
+          "required": true,
+          "type": "enum",
+          "enumRef": "BaselineStatusSchema",
+          "note": "UNDER_REVIEW->APPROVED"
+        }
+      ]
+    },
+    {
+      "eventType": "BaselineCreated",
+      "aggregateType": "Baseline",
+      "sourceSection": "DOC-002 §26.6 (DOC-007 §33 lists it unschematized)",
+      "payloadFields": [
+        {
+          "field": "baselineType",
+          "required": true,
+          "type": "enum",
+          "enumRef": "BaselineTypeSchema"
+        },
+        {
+          "field": "itemObjectIds",
+          "required": true,
+          "type": "string[]",
+          "note": "id-ref[]"
+        },
+        {
+          "field": "assuranceAssessmentIds",
+          "required": false,
+          "type": "string[]",
+          "note": "id-ref[]"
+        },
+        {
+          "field": "status",
+          "required": true,
+          "type": "enum",
+          "enumRef": "BaselineStatusSchema",
+          "note": "=DRAFT|CANDIDATE"
+        }
+      ]
+    },
+    {
+      "eventType": "BaselinePromoted",
+      "aggregateType": "Baseline",
+      "sourceSection": "DOC-007 §23.2 (wins) / DOC-002 §26.6",
+      "payloadFields": [
+        {
+          "field": "baselineId",
+          "required": true,
+          "type": "string",
+          "note": "id-ref"
+        },
+        {
+          "field": "baselineType",
+          "required": true,
+          "type": "string",
+          "enumRef": "BaselineTypeSchema",
+          "note": "declared string though BaselineObject types it as enum (INTENT|REQUIREMENTS|ARCHITECTURE|IMPLEMENTATION|RELEASE|EVIDENCE_PACKAGE) — tighten"
+        },
+        {
+          "field": "promotionDecisionId",
+          "required": true,
+          "type": "string",
+          "note": "id-ref"
+        },
+        {
+          "field": "itemObjectVersions",
+          "required": true,
+          "type": "Array<{objectId:string;semanticVersion:number;contentHash?:string}>",
+          "note": "objectId=id-ref"
+        },
+        {
+          "field": "assuranceAssessmentIds",
+          "required": true,
+          "type": "string[]",
+          "note": "id-ref[]"
+        },
+        {
+          "field": "status",
+          "required": true,
+          "type": "'AUTHORITATIVE'",
+          "enumRef": "BaselineStatusSchema",
+          "note": "literal const; APPROVED->AUTHORITATIVE; drives PWU {SATISFIED,RECOMPOSED}->BASELINED; DOC-002 variant carries only promotionDecisionId+status"
+        }
+      ]
+    },
+    {
+      "eventType": "BaselineRevoked",
+      "aggregateType": "Baseline",
+      "sourceSection": "DOC-002 §26.6",
+      "payloadFields": [
+        {
+          "field": "revocationDecisionId",
+          "required": true,
+          "type": "string",
+          "note": "id-ref"
+        },
+        {
+          "field": "status",
+          "required": true,
+          "type": "enum",
+          "enumRef": "BaselineStatusSchema",
+          "note": "{APPROVED,AUTHORITATIVE}->REVOKED"
+        }
+      ]
+    },
+    {
+      "eventType": "BaselineSubmittedForReview",
+      "aggregateType": "Baseline",
+      "sourceSection": "DOC-002 §26.6",
+      "payloadFields": [
+        {
+          "field": "status",
+          "required": true,
+          "type": "enum",
+          "enumRef": "BaselineStatusSchema",
+          "note": "CANDIDATE->UNDER_REVIEW"
+        }
+      ]
+    },
+    {
+      "eventType": "BaselineSuperseded",
+      "aggregateType": "Baseline",
+      "sourceSection": "DOC-002 §26.6",
+      "payloadFields": [
+        {
+          "field": "supersedingBaselineId",
+          "required": true,
+          "type": "string",
+          "note": "id-ref; supersession preserves traceability"
+        },
+        {
+          "field": "status",
+          "required": true,
+          "type": "enum",
+          "enumRef": "BaselineStatusSchema",
+          "note": "AUTHORITATIVE->SUPERSEDED"
+        }
+      ]
+    },
+    {
+      "eventType": "ClaimAsserted",
+      "aggregateType": "Claim",
+      "sourceSection": "DOC-007 §13.1 (wins) / DOC-002 §26.5",
+      "payloadFields": [
+        {
+          "field": "claimId",
+          "required": true,
+          "type": "string",
+          "note": "id-ref"
+        },
+        {
+          "field": "statement",
+          "required": true,
+          "type": "string"
+        },
+        {
+          "field": "claimType",
+          "required": true,
+          "type": "ClaimType",
+          "enumRef": "ClaimTypeSchema"
+        },
+        {
+          "field": "subjectObjectIds",
+          "required": true,
+          "type": "string[]",
+          "note": "id-ref[]"
+        },
+        {
+          "field": "assertedBy",
+          "required": true,
+          "type": "ActorReference",
+          "note": "complex type §6"
+        },
+        {
+          "field": "status",
+          "required": true,
+          "type": "'OPEN'",
+          "enumRef": "ClaimStatusSchema",
+          "note": "literal const; DOC-002 adds optional supporting/contradicting evidence ids"
+        }
+      ]
+    },
+    {
+      "eventType": "ClaimContested",
+      "aggregateType": "Claim",
+      "sourceSection": "DOC-002 §26.5",
+      "payloadFields": [
+        {
+          "field": "contradictingEvidenceIds",
+          "required": true,
+          "type": "string[]",
+          "note": "id-ref[]; must remain visible"
+        },
+        {
+          "field": "status",
+          "required": true,
+          "type": "enum",
+          "enumRef": "ClaimStatusSchema",
+          "note": "{OPEN,UNDER_ASSESSMENT,SUPPORTED}->CONTESTED"
+        }
+      ]
+    },
+    {
+      "eventType": "ClaimRejected",
+      "aggregateType": "Claim",
+      "sourceSection": "DOC-002 §26.5",
+      "payloadFields": [
+        {
+          "field": "assessmentId",
+          "required": false,
+          "type": "string",
+          "note": "id-ref"
+        },
+        {
+          "field": "rationale",
+          "required": false,
+          "type": "string"
+        },
+        {
+          "field": "status",
+          "required": true,
+          "type": "enum",
+          "enumRef": "ClaimStatusSchema",
+          "note": "UNDER_ASSESSMENT->REJECTED"
+        }
+      ]
+    },
+    {
+      "eventType": "ClaimSupported",
+      "aggregateType": "Claim",
+      "sourceSection": "DOC-002 §26.5",
+      "payloadFields": [
+        {
+          "field": "supportingEvidenceIds",
+          "required": true,
+          "type": "string[]",
+          "note": "id-ref[]; must be admissible"
+        },
+        {
+          "field": "assessmentId",
+          "required": false,
+          "type": "string",
+          "note": "id-ref"
+        },
+        {
+          "field": "status",
+          "required": true,
+          "type": "enum",
+          "enumRef": "ClaimStatusSchema",
+          "note": "UNDER_ASSESSMENT->SUPPORTED"
+        }
+      ]
+    },
+    {
+      "eventType": "ClarificationRequested",
+      "aggregateType": "ProfessionalWorkUnit",
+      "sourceSection": "DOC-002 §21 / fixture §26 step 52 (controller clarification)",
+      "payloadFields": [
+        {
+          "field": "pwuId",
+          "required": true,
+          "type": "string",
+          "note": "id-ref"
+        },
+        {
+          "field": "question",
+          "required": true,
+          "type": "string"
+        }
+      ]
+    },
+    {
+      "eventType": "ConstraintAdded",
+      "aggregateType": "Constraint",
+      "sourceSection": "DOC-002 §26.3",
+      "payloadFields": [
+        {
+          "field": "statement",
+          "required": true,
+          "type": "string"
+        },
+        {
+          "field": "constraintType",
+          "required": true,
+          "type": "enum",
+          "enumRef": "ConstraintTypeSchema"
+        },
+        {
+          "field": "authority",
+          "required": true,
+          "type": "AuthorityReference",
+          "note": "complex type"
+        },
+        {
+          "field": "applicability",
+          "required": false,
+          "type": "ApplicabilityRule",
+          "note": "complex type"
+        },
+        {
+          "field": "strength",
+          "required": true,
+          "type": "enum",
+          "enumRef": "ConstraintStrengthSchema"
+        },
+        {
+          "field": "status",
+          "required": true,
+          "type": "enum",
+          "enumRef": "ConstraintStatusSchema",
+          "note": "=PROPOSED|ACTIVE"
+        }
+      ]
+    },
+    {
+      "eventType": "ConstraintDeclaredInapplicable",
+      "aggregateType": "Constraint",
+      "sourceSection": "DOC-002 §26.3",
+      "payloadFields": [
+        {
+          "field": "rationale",
+          "required": true,
+          "type": "string"
+        },
+        {
+          "field": "status",
+          "required": true,
+          "type": "enum",
+          "enumRef": "ConstraintStatusSchema",
+          "note": "ACTIVE->INAPPLICABLE"
+        }
+      ]
+    },
+    {
+      "eventType": "ConstraintPropagated",
+      "aggregateType": "Constraint",
+      "sourceSection": "DOC-002 §26.3",
+      "payloadFields": [
+        {
+          "field": "parentConstraintId",
+          "required": true,
+          "type": "string",
+          "note": "id-ref"
+        },
+        {
+          "field": "childWorkUnitId",
+          "required": true,
+          "type": "string",
+          "note": "id-ref"
+        },
+        {
+          "field": "status",
+          "required": true,
+          "type": "enum",
+          "enumRef": "ConstraintStatusSchema",
+          "note": "propagates trace; parent stays ACTIVE (no transition)"
+        }
+      ]
+    },
+    {
+      "eventType": "ConstraintSuperseded",
+      "aggregateType": "Constraint",
+      "sourceSection": "DOC-002 §26.3",
+      "payloadFields": [
+        {
+          "field": "supersedingConstraintId",
+          "required": true,
+          "type": "string",
+          "note": "id-ref; stronger constraint"
+        },
+        {
+          "field": "status",
+          "required": true,
+          "type": "enum",
+          "enumRef": "ConstraintStatusSchema",
+          "note": "ACTIVE->SUPERSEDED"
+        }
+      ]
+    },
+    {
+      "eventType": "ConstraintViolated",
+      "aggregateType": "Constraint",
+      "sourceSection": "DOC-002 §26.3",
+      "payloadFields": [
+        {
+          "field": "observationId",
+          "required": false,
+          "type": "string",
+          "note": "id-ref"
+        },
+        {
+          "field": "status",
+          "required": true,
+          "type": "enum",
+          "enumRef": "ConstraintStatusSchema",
+          "note": "ACTIVE->VIOLATED"
+        }
+      ]
+    },
+    {
+      "eventType": "ConstraintWaived",
+      "aggregateType": "Constraint",
+      "sourceSection": "DOC-002 §26.3",
+      "payloadFields": [
+        {
+          "field": "waiverDecisionId",
+          "required": true,
+          "type": "string",
+          "note": "id-ref"
+        },
+        {
+          "field": "status",
+          "required": true,
+          "type": "enum",
+          "enumRef": "ConstraintStatusSchema",
+          "note": "ACTIVE->WAIVED"
+        }
+      ]
+    },
+    {
+      "eventType": "DecisionApproved",
+      "aggregateType": "Decision",
+      "sourceSection": "DOC-002 §26.6",
+      "payloadFields": [
+        {
+          "field": "approvalAuthority",
+          "required": true,
+          "type": "ActorReference",
+          "note": "complex type; approval requires authority"
+        },
+        {
+          "field": "status",
+          "required": true,
+          "type": "enum",
+          "enumRef": "DecisionStatusSchema",
+          "note": "PROPOSED->EFFECTIVE — no distinct APPROVED value"
+        }
+      ]
+    },
+    {
+      "eventType": "DecisionEffective",
+      "aggregateType": "Decision",
+      "sourceSection": "DOC-007 §22.2 (wins) / DOC-002 §26.6",
+      "payloadFields": [
+        {
+          "field": "decisionId",
+          "required": true,
+          "type": "string",
+          "note": "id-ref"
+        },
+        {
+          "field": "decisionType",
+          "required": true,
+          "type": "string",
+          "enumRef": "DecisionTypeSchema",
+          "note": "declared string though DecisionObject types it as enum (APPROVAL|REJECTION|WAIVER|ESCALATION|RESHAPE|REPLAN|PROMOTE_BASELINE|ABANDON|REVOKE) — tighten"
+        },
+        {
+          "field": "subjectObjectIds",
+          "required": true,
+          "type": "string[]",
+          "note": "id-ref[]"
+        },
+        {
+          "field": "subjectSemanticVersions",
+          "required": true,
+          "type": "Record<string,number>",
+          "note": "map objectId->semanticVersion"
+        },
+        {
+          "field": "selectedOption",
+          "required": true,
+          "type": "string"
+        },
+        {
+          "field": "rationale",
+          "required": true,
+          "type": "string"
+        },
+        {
+          "field": "effectiveAt",
+          "required": true,
+          "type": "string",
+          "note": "RFC3339; DOC-002 minimal variant carries only effectiveAt + status ->EFFECTIVE"
+        }
+      ]
+    },
+    {
+      "eventType": "DecisionProposed",
+      "aggregateType": "Decision",
+      "sourceSection": "DOC-002 §26.6 (DOC-007 §33 lists it unschematized)",
+      "payloadFields": [
+        {
+          "field": "decisionType",
+          "required": true,
+          "type": "enum",
+          "enumRef": "DecisionTypeSchema"
+        },
+        {
+          "field": "subjectObjectIds",
+          "required": true,
+          "type": "string[]",
+          "note": "id-ref[]"
+        },
+        {
+          "field": "selectedOption",
+          "required": true,
+          "type": "string"
+        },
+        {
+          "field": "rationale",
+          "required": true,
+          "type": "string"
+        },
+        {
+          "field": "authority",
+          "required": true,
+          "type": "ActorReference",
+          "note": "complex type; agent may recommend but not exercise authority unless delegated"
+        },
+        {
+          "field": "consideredEvidenceIds",
+          "required": false,
+          "type": "string[]",
+          "note": "id-ref[]"
+        },
+        {
+          "field": "consideredObservationIds",
+          "required": false,
+          "type": "string[]",
+          "note": "id-ref[]"
+        },
+        {
+          "field": "effectiveAt",
+          "required": false,
+          "type": "string"
+        },
+        {
+          "field": "status",
+          "required": true,
+          "type": "enum",
+          "enumRef": "DecisionStatusSchema",
+          "note": "=PROPOSED"
+        }
+      ]
+    },
+    {
+      "eventType": "DecisionRejected",
+      "aggregateType": "Decision",
+      "sourceSection": "DOC-002 §26.6",
+      "payloadFields": [
+        {
+          "field": "rationale",
+          "required": true,
+          "type": "string",
+          "note": "Decision.status has NO REJECTED value (§23.1 gap)"
+        }
+      ]
+    },
+    {
+      "eventType": "DecisionRevoked",
+      "aggregateType": "Decision",
+      "sourceSection": "DOC-002 §26.6",
+      "payloadFields": [
+        {
+          "field": "revocationRationale",
+          "required": true,
+          "type": "string"
+        },
+        {
+          "field": "status",
+          "required": true,
+          "type": "enum",
+          "enumRef": "DecisionStatusSchema",
+          "note": "EFFECTIVE->REVOKED; triggers impact analysis"
+        }
+      ]
+    },
+    {
+      "eventType": "DecompositionProposed",
+      "aggregateType": "DecompositionContract",
+      "sourceSection": "DOC-002 §26.2",
+      "payloadFields": [
+        {
+          "field": "parentWorkUnitId",
+          "required": true,
+          "type": "string",
+          "note": "id-ref"
+        },
+        {
+          "field": "childWorkUnitIds",
+          "required": true,
+          "type": "string[]",
+          "note": "id-ref[]"
+        },
+        {
+          "field": "rationale",
+          "required": true,
+          "type": "string"
+        },
+        {
+          "field": "intentMappings",
+          "required": false,
+          "type": "IntentMapping[]",
+          "note": "complex type"
+        },
+        {
+          "field": "obligationAllocations",
+          "required": false,
+          "type": "ObligationAllocation[]",
+          "note": "complex type"
+        },
+        {
+          "field": "constraintPropagations",
+          "required": false,
+          "type": "ConstraintPropagation[]",
+          "note": "complex type"
+        },
+        {
+          "field": "assumptionPropagations",
+          "required": false,
+          "type": "AssumptionPropagation[]",
+          "note": "complex type"
+        },
+        {
+          "field": "retainedParentObligationIds",
+          "required": false,
+          "type": "string[]",
+          "note": "id-ref[]"
+        },
+        {
+          "field": "coverageClaims",
+          "required": false,
+          "type": "CoverageClaim[]",
+          "note": "complex type"
+        },
+        {
+          "field": "siblingDependencyIds",
+          "required": false,
+          "type": "string[]",
+          "note": "id-ref[]"
+        },
+        {
+          "field": "recompositionContractId",
+          "required": false,
+          "type": "string",
+          "note": "id-ref"
+        },
+        {
+          "field": "status",
+          "required": true,
+          "type": "enum",
+          "enumRef": "DecompositionContractStatusSchema",
+          "note": "=DRAFT"
+        }
+      ]
+    },
+    {
+      "eventType": "DecompositionRejected",
+      "aggregateType": "DecompositionContract",
+      "sourceSection": "DOC-002 §26.2",
+      "payloadFields": [
+        {
+          "field": "blockingObservationIds",
+          "required": true,
+          "type": "string[]",
+          "note": "id-ref[]"
+        },
+        {
+          "field": "status",
+          "required": true,
+          "type": "enum",
+          "enumRef": "DecompositionContractStatusSchema",
+          "note": "UNDER_REVIEW->INVALID"
+        }
+      ]
+    },
+    {
+      "eventType": "DecompositionRevised",
+      "aggregateType": "DecompositionContract",
+      "sourceSection": "DOC-002 §26.2",
+      "payloadFields": [
+        {
+          "field": "supersedesDecompositionContractId",
+          "required": true,
+          "type": "string",
+          "note": "id-ref"
+        },
+        {
+          "field": "rationale",
+          "required": true,
+          "type": "string"
+        },
+        {
+          "field": "semanticVersion",
+          "required": true,
+          "type": "number"
+        },
+        {
+          "field": "status",
+          "required": true,
+          "type": "enum",
+          "enumRef": "DecompositionContractStatusSchema",
+          "note": "prior->SUPERSEDED; new=DRAFT"
+        }
+      ]
+    },
+    {
+      "eventType": "DecompositionValidated",
+      "aggregateType": "DecompositionContract",
+      "sourceSection": "DOC-002 §26.2",
+      "payloadFields": [
+        {
+          "field": "validatorRole",
+          "required": false,
+          "type": "string"
+        },
+        {
+          "field": "coverageClaims",
+          "required": false,
+          "type": "CoverageClaim[]",
+          "note": "complex type"
+        },
+        {
+          "field": "status",
+          "required": true,
+          "type": "enum",
+          "enumRef": "DecompositionContractStatusSchema",
+          "note": "UNDER_REVIEW->VALID|CONDITIONALLY_VALID"
+        }
+      ]
+    },
+    {
+      "eventType": "EvidenceAdmitted",
+      "aggregateType": "Evidence",
+      "sourceSection": "DOC-007 §14.3 (wins) / DOC-002 §26.5",
+      "payloadFields": [
+        {
+          "field": "evidenceId",
+          "required": true,
+          "type": "string",
+          "note": "id-ref"
+        },
+        {
+          "field": "status",
+          "required": true,
+          "type": "'ADMISSIBLE'",
+          "enumRef": "EvidenceStatusSchema",
+          "note": "literal const; PROPOSED->ADMISSIBLE"
+        },
+        {
+          "field": "admissibilityAssessmentId",
+          "required": true,
+          "type": "string",
+          "note": "id-ref"
+        },
+        {
+          "field": "admittedScope",
+          "required": true,
+          "type": "string"
+        },
+        {
+          "field": "admittedClaimIds",
+          "required": true,
+          "type": "string[]",
+          "note": "id-ref[]; DOC-002 variant carries status only"
+        }
+      ]
+    },
+    {
+      "eventType": "EvidenceExpired",
+      "aggregateType": "Evidence",
+      "sourceSection": "DOC-002 §26.5",
+      "payloadFields": [
+        {
+          "field": "status",
+          "required": true,
+          "type": "enum",
+          "enumRef": "EvidenceStatusSchema",
+          "note": "ADMISSIBLE->INVALIDATED — Evidence.status has NO EXPIRED value; validUntil passed; triggers reassessment"
+        }
+      ]
+    },
+    {
+      "eventType": "EvidenceInvalidated",
+      "aggregateType": "Evidence",
+      "sourceSection": "DOC-002 §26.5",
+      "payloadFields": [
+        {
+          "field": "invalidationReason",
+          "required": true,
+          "type": "string"
+        },
+        {
+          "field": "affectedClaimIds",
+          "required": false,
+          "type": "string[]",
+          "note": "id-ref[]; dependent supported claims become contested/under-review/invalidated"
+        },
+        {
+          "field": "status",
+          "required": true,
+          "type": "enum",
+          "enumRef": "EvidenceStatusSchema",
+          "note": "ADMISSIBLE->INVALIDATED"
+        }
+      ]
+    },
+    {
+      "eventType": "EvidenceProposed",
+      "aggregateType": "Evidence",
+      "sourceSection": "DOC-002 §26.5 (DOC-007 §33 lists it unschematized — author payload)",
+      "payloadFields": [
+        {
+          "field": "evidenceType",
+          "required": true,
+          "type": "enum",
+          "enumRef": "EvidenceTypeSchema"
+        },
+        {
+          "field": "contentReference",
+          "required": true,
+          "type": "ArtifactReference",
+          "note": "complex type; provenance required"
+        },
+        {
+          "field": "producedBy",
+          "required": true,
+          "type": "ActorReference",
+          "note": "complex type"
+        },
+        {
+          "field": "supportsClaimIds",
+          "required": false,
+          "type": "string[]",
+          "note": "id-ref[]"
+        },
+        {
+          "field": "contradictsClaimIds",
+          "required": false,
+          "type": "string[]",
+          "note": "id-ref[]"
+        },
+        {
+          "field": "scope",
+          "required": true,
+          "type": "string"
+        },
+        {
+          "field": "limitations",
+          "required": false,
+          "type": "string[]"
+        },
+        {
+          "field": "capturedAt",
+          "required": true,
+          "type": "string"
+        },
+        {
+          "field": "validFrom",
+          "required": false,
+          "type": "string"
+        },
+        {
+          "field": "validUntil",
+          "required": false,
+          "type": "string"
+        },
+        {
+          "field": "status",
+          "required": true,
+          "type": "enum",
+          "enumRef": "EvidenceStatusSchema",
+          "note": "=PROPOSED"
+        }
+      ]
+    },
+    {
+      "eventType": "EvidenceRejected",
+      "aggregateType": "Evidence",
+      "sourceSection": "DOC-002 §26.5",
+      "payloadFields": [
+        {
+          "field": "rationale",
+          "required": false,
+          "type": "string"
+        },
+        {
+          "field": "status",
+          "required": true,
+          "type": "enum",
+          "enumRef": "EvidenceStatusSchema",
+          "note": "PROPOSED->REJECTED"
+        }
+      ]
+    },
+    {
+      "eventType": "ExecutionEscalated",
+      "aggregateType": "ExecutionPlan",
+      "sourceSection": "DOC-002 §26.4",
+      "payloadFields": [
+        {
+          "field": "reason",
+          "required": true,
+          "type": "string"
+        },
+        {
+          "field": "observationIds",
+          "required": false,
+          "type": "string[]",
+          "note": "id-ref[]"
+        },
+        {
+          "field": "workLifecycleState",
+          "required": false,
+          "type": "enum",
+          "enumRef": "WorkLifecycleStateSchema",
+          "note": "drives PWU ->ESCALATED"
+        }
+      ]
+    },
+    {
+      "eventType": "ExecutionPlanActivated",
+      "aggregateType": "ExecutionPlan",
+      "sourceSection": "DOC-007 §15.3 (wins) / DOC-002 §26.4",
+      "payloadFields": [
+        {
+          "field": "executionPlanId",
+          "required": true,
+          "type": "string",
+          "note": "id-ref"
+        },
+        {
+          "field": "workUnitId",
+          "required": true,
+          "type": "string",
+          "note": "id-ref"
+        },
+        {
+          "field": "planVersion",
+          "required": true,
+          "type": "number"
+        },
+        {
+          "field": "status",
+          "required": true,
+          "type": "'ACTIVE'",
+          "enumRef": "ExecutionPlanStatusSchema",
+          "note": "literal const; APPROVED->ACTIVE; drives PWU PLANNED->EXECUTING + executionState ->RUNNING"
+        },
+        {
+          "field": "authorizedRuntimeBindingIds",
+          "required": true,
+          "type": "string[]",
+          "note": "id-ref[]; DOC-002 names runtimeBindingIds (optional)"
+        }
+      ]
+    },
+    {
+      "eventType": "ExecutionPlanApproved",
+      "aggregateType": "ExecutionPlan",
+      "sourceSection": "DOC-002 §26.4 (DOC-007 §33 lists it unschematized)",
+      "payloadFields": [
+        {
+          "field": "approvalDecisionId",
+          "required": false,
+          "type": "string",
+          "note": "id-ref"
+        },
+        {
+          "field": "status",
+          "required": true,
+          "type": "enum",
+          "enumRef": "ExecutionPlanStatusSchema",
+          "note": "{PROPOSED,UNDER_REVIEW}->APPROVED; drives PWU READY->PLANNED + executionState NOT_PLANNED->PLANNED"
+        }
+      ]
+    },
+    {
+      "eventType": "ExecutionPlanProposed",
+      "aggregateType": "ExecutionPlan",
+      "sourceSection": "DOC-002 §26.4 (DOC-007 §33 lists it unschematized — author payload)",
+      "payloadFields": [
+        {
+          "field": "workUnitId",
+          "required": true,
+          "type": "string",
+          "note": "id-ref"
+        },
+        {
+          "field": "planVersion",
+          "required": true,
+          "type": "number"
+        },
+        {
+          "field": "stepIds",
+          "required": false,
+          "type": "string[]",
+          "note": "id-ref[]"
+        },
+        {
+          "field": "transitionIds",
+          "required": false,
+          "type": "string[]",
+          "note": "id-ref[]"
+        },
+        {
+          "field": "retryPolicy",
+          "required": false,
+          "type": "RetryPolicy",
+          "note": "complex type"
+        },
+        {
+          "field": "tacticalChangePolicy",
+          "required": false,
+          "type": "TacticalChangePolicy",
+          "note": "complex type"
+        },
+        {
+          "field": "escalationPolicy",
+          "required": false,
+          "type": "EscalationPolicy",
+          "note": "complex type"
+        },
+        {
+          "field": "terminationPolicy",
+          "required": false,
+          "type": "TerminationPolicy",
+          "note": "complex type"
+        },
+        {
+          "field": "status",
+          "required": true,
+          "type": "enum",
+          "enumRef": "ExecutionPlanStatusSchema",
+          "note": "=PROPOSED"
+        }
+      ]
+    },
+    {
+      "eventType": "ExecutionPlanRevised",
+      "aggregateType": "ExecutionPlan",
+      "sourceSection": "DOC-002 §20.2 / fixture §26 step 54 (revise architecture plan)",
+      "payloadFields": [
+        {
+          "field": "executionPlanId",
+          "required": true,
+          "type": "string",
+          "note": "id-ref"
+        },
+        {
+          "field": "planVersion",
+          "required": true,
+          "type": "number",
+          "note": "incremented plan revision"
+        },
+        {
+          "field": "reason",
+          "required": true,
+          "type": "string"
+        }
+      ]
+    },
+    {
+      "eventType": "ExecutionPlanSuperseded",
+      "aggregateType": "ExecutionPlan",
+      "sourceSection": "DOC-002 §26.4",
+      "payloadFields": [
+        {
+          "field": "supersedingExecutionPlanId",
+          "required": true,
+          "type": "string",
+          "note": "id-ref"
+        },
+        {
+          "field": "status",
+          "required": true,
+          "type": "enum",
+          "enumRef": "ExecutionPlanStatusSchema",
+          "note": "{APPROVED,ACTIVE}->SUPERSEDED; superseded plan cannot create new attempts"
+        }
+      ]
+    },
+    {
+      "eventType": "ExecutionStepCancelled",
+      "aggregateType": "ExecutionPlan",
+      "sourceSection": "DOC-002 §26.4",
+      "payloadFields": [
+        {
+          "field": "stepId",
+          "required": true,
+          "type": "string",
+          "note": "id-ref"
+        },
+        {
+          "field": "stepState",
+          "required": true,
+          "type": "enum",
+          "enumRef": "StepStateSchema",
+          "note": "(active)->CANCELLED"
+        }
+      ]
+    },
+    {
+      "eventType": "ExecutionStepFailed",
+      "aggregateType": "ExecutionPlan",
+      "sourceSection": "DOC-002 §26.4 (DOC-007 §33 lists it unschematized)",
+      "payloadFields": [
+        {
+          "field": "stepId",
+          "required": true,
+          "type": "string",
+          "note": "id-ref"
+        },
+        {
+          "field": "failureReason",
+          "required": true,
+          "type": "string"
+        },
+        {
+          "field": "failureClass",
+          "required": false,
+          "type": "enum",
+          "enumRef": "ExecutionFailureClassSchema",
+          "note": "§36.2 taxonomy"
+        },
+        {
+          "field": "stepState",
+          "required": true,
+          "type": "enum",
+          "enumRef": "StepStateSchema",
+          "note": "RUNNING->FAILED"
+        }
+      ]
+    },
+    {
+      "eventType": "ExecutionStepReady",
+      "aggregateType": "ExecutionPlan",
+      "sourceSection": "DOC-002 §26.4",
+      "payloadFields": [
+        {
+          "field": "stepId",
+          "required": true,
+          "type": "string",
+          "note": "id-ref"
+        },
+        {
+          "field": "stepState",
+          "required": true,
+          "type": "enum",
+          "enumRef": "StepStateSchema",
+          "note": "NOT_READY->READY"
+        }
+      ]
+    },
+    {
+      "eventType": "ExecutionStepRetried",
+      "aggregateType": "ExecutionPlan",
+      "sourceSection": "DOC-002 §26.4",
+      "payloadFields": [
+        {
+          "field": "stepId",
+          "required": true,
+          "type": "string",
+          "note": "id-ref"
+        },
+        {
+          "field": "attemptNumber",
+          "required": false,
+          "type": "number"
+        },
+        {
+          "field": "stepState",
+          "required": true,
+          "type": "enum",
+          "enumRef": "StepStateSchema",
+          "note": "FAILED->QUEUED; drives PWU.executionState ->RETRYING"
+        }
+      ]
+    },
+    {
+      "eventType": "ExecutionStepSkipped",
+      "aggregateType": "ExecutionPlan",
+      "sourceSection": "DOC-002 §26.4",
+      "payloadFields": [
+        {
+          "field": "stepId",
+          "required": true,
+          "type": "string",
+          "note": "id-ref"
+        },
+        {
+          "field": "waiverOrRevisionId",
+          "required": false,
+          "type": "string",
+          "note": "id-ref; mandatory skip needs authorized revision/waiver"
+        },
+        {
+          "field": "stepState",
+          "required": true,
+          "type": "enum",
+          "enumRef": "StepStateSchema",
+          "note": "{NOT_READY,READY}->SKIPPED"
+        }
+      ]
+    },
+    {
+      "eventType": "ExecutionStepStarted",
+      "aggregateType": "ExecutionPlan",
+      "sourceSection": "DOC-002 §26.4 (DOC-007 §33 lists it unschematized)",
+      "payloadFields": [
+        {
+          "field": "stepId",
+          "required": true,
+          "type": "string",
+          "note": "id-ref"
+        },
+        {
+          "field": "runtimeBindingId",
+          "required": false,
+          "type": "string",
+          "note": "id-ref"
+        },
+        {
+          "field": "stepState",
+          "required": true,
+          "type": "enum",
+          "enumRef": "StepStateSchema",
+          "note": "{READY,QUEUED}->RUNNING"
+        }
+      ]
+    },
+    {
+      "eventType": "ExecutionStepSucceeded",
+      "aggregateType": "ExecutionPlan",
+      "sourceSection": "DOC-007 §16.2 (wins) / DOC-002 §26.4",
+      "payloadFields": [
+        {
+          "field": "executionStepId",
+          "required": true,
+          "type": "string",
+          "note": "id-ref; DOC-002 field name is stepId"
+        },
+        {
+          "field": "executionAttemptId",
+          "required": true,
+          "type": "string",
+          "note": "id-ref"
+        },
+        {
+          "field": "outputArtifactIds",
+          "required": true,
+          "type": "string[]",
+          "note": "id-ref[]"
+        },
+        {
+          "field": "proposedEvidenceIds",
+          "required": true,
+          "type": "string[]",
+          "note": "id-ref[]"
+        },
+        {
+          "field": "detectedAssumptionIds",
+          "required": true,
+          "type": "string[]",
+          "note": "id-ref[]"
+        },
+        {
+          "field": "resultingExecutionState",
+          "required": true,
+          "type": "'SUCCEEDED'",
+          "enumRef": "ExecutionStateSchema",
+          "note": "literal const; §35.2 forbids producing assuranceState=SATISFIED; DOC-002 names stepState (machine=ExecutionStep.stepState) + outputBindings"
+        }
+      ]
+    },
+    {
+      "eventType": "ExecutionStepWaiting",
+      "aggregateType": "ExecutionPlan",
+      "sourceSection": "DOC-002 §26.4",
+      "payloadFields": [
+        {
+          "field": "stepId",
+          "required": true,
+          "type": "string",
+          "note": "id-ref"
+        },
+        {
+          "field": "waitReason",
+          "required": false,
+          "type": "string"
+        },
+        {
+          "field": "stepState",
+          "required": true,
+          "type": "enum",
+          "enumRef": "StepStateSchema",
+          "note": "RUNNING->WAITING"
+        }
+      ]
+    },
+    {
+      "eventType": "ExecutionTerminated",
+      "aggregateType": "ExecutionPlan",
+      "sourceSection": "DOC-002 §26.4",
+      "payloadFields": [
+        {
+          "field": "reason",
+          "required": true,
+          "type": "string"
+        },
+        {
+          "field": "terminationPolicyId",
+          "required": false,
+          "type": "string",
+          "note": "id-ref"
+        },
+        {
+          "field": "status",
+          "required": true,
+          "type": "enum",
+          "enumRef": "ExecutionPlanStatusSchema",
+          "note": "ACTIVE->CANCELLED|FAILED"
+        }
+      ]
+    },
+    {
+      "eventType": "IntentApproved",
+      "aggregateType": "Intent",
+      "sourceSection": "DOC-007 §10.7 (wins) / DOC-002 §26.2",
+      "payloadFields": [
+        {
+          "field": "decisionId",
+          "required": true,
+          "type": "string",
+          "note": "id-ref"
+        },
+        {
+          "field": "approvedSemanticVersion",
+          "required": true,
+          "type": "number"
+        },
+        {
+          "field": "intentStatus",
+          "required": true,
+          "type": "'APPROVED'",
+          "enumRef": "IntentStatusSchema",
+          "note": "literal const; FORMALIZED->APPROVED, also REVISED->APPROVED"
+        }
+      ]
+    },
+    {
+      "eventType": "IntentCaptured",
+      "aggregateType": "Intent",
+      "sourceSection": "DOC-007 §10.3 (wins) / DOC-002 §26.2",
+      "payloadFields": [
+        {
+          "field": "intentId",
+          "required": true,
+          "type": "string",
+          "note": "id-ref"
+        },
+        {
+          "field": "originatingExpression",
+          "required": true,
+          "type": "string"
+        },
+        {
+          "field": "intentStatus",
+          "required": true,
+          "type": "'RAW'",
+          "enumRef": "IntentStatusSchema",
+          "note": "literal const"
+        },
+        {
+          "field": "ontologyId",
+          "required": true,
+          "type": "string"
+        },
+        {
+          "field": "ontologyVersion",
+          "required": true,
+          "type": "string",
+          "note": "DOC-002 variant instead carries optional parentIntentId/supersedesIntentId, no ontology fields"
+        }
+      ]
+    },
+    {
+      "eventType": "IntentConstraintRefined",
+      "aggregateType": "Intent",
+      "sourceSection": "DOC-002 §33 / fixture §26 step 53 (offline scope refinement)",
+      "payloadFields": [
+        {
+          "field": "intentId",
+          "required": true,
+          "type": "string",
+          "note": "id-ref"
+        },
+        {
+          "field": "constraintId",
+          "required": true,
+          "type": "string",
+          "note": "id-ref"
+        },
+        {
+          "field": "refinement",
+          "required": true,
+          "type": "string",
+          "note": "the refined constraint statement"
+        }
+      ]
+    },
+    {
+      "eventType": "IntentDiscoveryStarted",
+      "aggregateType": "Intent",
+      "sourceSection": "DOC-002 §26.2",
+      "payloadFields": [
+        {
+          "field": "intentStatus",
+          "required": true,
+          "type": "enum",
+          "enumRef": "IntentStatusSchema",
+          "note": "RAW->UNDER_DISCOVERY"
+        },
+        {
+          "field": "ambiguityIds",
+          "required": false,
+          "type": "string[]",
+          "note": "id-ref[]"
+        }
+      ]
+    },
+    {
+      "eventType": "IntentFormalized",
+      "aggregateType": "Intent",
+      "sourceSection": "DOC-007 §10.5 (wins) / DOC-002 §26.2",
+      "payloadFields": [
+        {
+          "field": "priorSemanticVersion",
+          "required": true,
+          "type": "number"
+        },
+        {
+          "field": "newSemanticVersion",
+          "required": true,
+          "type": "number"
+        },
+        {
+          "field": "formalizedObjective",
+          "required": true,
+          "type": "string"
+        },
+        {
+          "field": "desiredOutcomes",
+          "required": true,
+          "type": "DesiredOutcome[]",
+          "note": "complex type"
+        },
+        {
+          "field": "successConditions",
+          "required": true,
+          "type": "SuccessCondition[]",
+          "note": "complex type"
+        },
+        {
+          "field": "nonGoals",
+          "required": true,
+          "type": "string[]"
+        },
+        {
+          "field": "intentStatus",
+          "required": true,
+          "type": "'FORMALIZED'",
+          "enumRef": "IntentStatusSchema",
+          "note": "literal const; DOC-002 adds optional constraintIds"
+        }
+      ]
+    },
+    {
+      "eventType": "IntentRevised",
+      "aggregateType": "Intent",
+      "sourceSection": "DOC-002 §26.2",
+      "payloadFields": [
+        {
+          "field": "changeRationale",
+          "required": true,
+          "type": "string"
+        },
+        {
+          "field": "impactAnalysisId",
+          "required": false,
+          "type": "string",
+          "note": "id-ref"
+        },
+        {
+          "field": "semanticVersion",
+          "required": true,
+          "type": "number"
+        },
+        {
+          "field": "intentStatus",
+          "required": true,
+          "type": "enum",
+          "enumRef": "IntentStatusSchema",
+          "note": "APPROVED->REVISED"
+        }
+      ]
+    },
+    {
+      "eventType": "IntentSuperseded",
+      "aggregateType": "Intent",
+      "sourceSection": "DOC-002 §26.2",
+      "payloadFields": [
+        {
+          "field": "supersedingIntentId",
+          "required": true,
+          "type": "string",
+          "note": "id-ref"
+        },
+        {
+          "field": "intentStatus",
+          "required": true,
+          "type": "enum",
+          "enumRef": "IntentStatusSchema",
+          "note": "(any active)->SUPERSEDED"
+        }
+      ]
+    },
+    {
+      "eventType": "ObligationAllocated",
+      "aggregateType": "Obligation",
+      "sourceSection": "DOC-002 §26.3",
+      "payloadFields": [
+        {
+          "field": "allocatedToWorkUnitIds",
+          "required": true,
+          "type": "string[]",
+          "note": "id-ref[]"
+        },
+        {
+          "field": "decompositionContractId",
+          "required": true,
+          "type": "string",
+          "note": "id-ref"
+        },
+        {
+          "field": "status",
+          "required": true,
+          "type": "enum",
+          "enumRef": "ObligationStatusSchema",
+          "note": "ACTIVE->ALLOCATED"
+        }
+      ]
+    },
+    {
+      "eventType": "ObligationRetained",
+      "aggregateType": "Obligation",
+      "sourceSection": "DOC-002 §26.3",
+      "payloadFields": [
+        {
+          "field": "parentWorkUnitId",
+          "required": true,
+          "type": "string",
+          "note": "id-ref"
+        },
+        {
+          "field": "decompositionContractId",
+          "required": true,
+          "type": "string",
+          "note": "id-ref"
+        },
+        {
+          "field": "status",
+          "required": true,
+          "type": "enum",
+          "enumRef": "ObligationStatusSchema",
+          "note": "retained at parent; stays ACTIVE (no transition)"
+        }
+      ]
+    },
+    {
+      "eventType": "ObligationSatisfied",
+      "aggregateType": "Obligation",
+      "sourceSection": "DOC-002 §26.3",
+      "payloadFields": [
+        {
+          "field": "supportingClaimId",
+          "required": true,
+          "type": "string",
+          "note": "id-ref; requires supported claim, never PWU completion alone"
+        },
+        {
+          "field": "status",
+          "required": true,
+          "type": "enum",
+          "enumRef": "ObligationStatusSchema",
+          "note": "{ACTIVE,ALLOCATED}->SATISFIED"
+        }
+      ]
+    },
+    {
+      "eventType": "ObligationViolated",
+      "aggregateType": "Obligation",
+      "sourceSection": "DOC-002 §26.3",
+      "payloadFields": [
+        {
+          "field": "observationId",
+          "required": false,
+          "type": "string",
+          "note": "id-ref"
+        },
+        {
+          "field": "status",
+          "required": true,
+          "type": "enum",
+          "enumRef": "ObligationStatusSchema",
+          "note": "ACTIVE->VIOLATED; must affect assurance disposition"
+        }
+      ]
+    },
+    {
+      "eventType": "ObligationWaived",
+      "aggregateType": "Obligation",
+      "sourceSection": "DOC-002 §26.3",
+      "payloadFields": [
+        {
+          "field": "waiverDecisionId",
+          "required": true,
+          "type": "string",
+          "note": "id-ref; authorized waiver required for mandatory"
+        },
+        {
+          "field": "status",
+          "required": true,
+          "type": "enum",
+          "enumRef": "ObligationStatusSchema",
+          "note": "ACTIVE->WAIVED"
+        }
+      ]
+    },
+    {
+      "eventType": "PwuAbandoned",
+      "aggregateType": "ProfessionalWorkUnit",
+      "sourceSection": "DOC-002 §26.2",
+      "payloadFields": [
+        {
+          "field": "abandonmentDecisionId",
+          "required": true,
+          "type": "string",
+          "note": "id-ref; Decision decisionType=ABANDON"
+        },
+        {
+          "field": "workLifecycleState",
+          "required": true,
+          "type": "enum",
+          "enumRef": "WorkLifecycleStateSchema",
+          "note": "(any active)->ABANDONED"
+        }
+      ]
+    },
+    {
+      "eventType": "PwuBaselined",
+      "aggregateType": "ProfessionalWorkUnit",
+      "sourceSection": "DOC-002 §26.2 / §8.3 (M13 fixture trace step 72)",
+      "payloadFields": [
+        {
+          "field": "pwuId",
+          "required": true,
+          "type": "string",
+          "note": "id-ref"
+        },
+        {
+          "field": "baselineId",
+          "required": true,
+          "type": "string",
+          "note": "id-ref; the authoritative baseline that baselined this PWU"
+        },
+        {
+          "field": "newState",
+          "required": true,
+          "type": "string",
+          "note": "WorkLifecycleState -> BASELINED"
+        }
+      ]
+    },
+    {
+      "eventType": "PwuBlocked",
+      "aggregateType": "ProfessionalWorkUnit",
+      "sourceSection": "DOC-002 §26.2",
+      "payloadFields": [
+        {
+          "field": "blockReason",
+          "required": true,
+          "type": "string"
+        },
+        {
+          "field": "missingObjectIds",
+          "required": false,
+          "type": "string[]",
+          "note": "id-ref[]"
+        },
+        {
+          "field": "workLifecycleState",
+          "required": true,
+          "type": "enum",
+          "enumRef": "WorkLifecycleStateSchema",
+          "note": "{SHAPING,PLANNED,EXECUTING}->BLOCKED"
+        }
+      ]
+    },
+    {
+      "eventType": "PwuChallenged",
+      "aggregateType": "ProfessionalWorkUnit",
+      "sourceSection": "DOC-002 §26.2",
+      "payloadFields": [
+        {
+          "field": "challengeReason",
+          "required": true,
+          "type": "string"
+        },
+        {
+          "field": "observationIds",
+          "required": false,
+          "type": "string[]",
+          "note": "id-ref[]"
+        },
+        {
+          "field": "workLifecycleState",
+          "required": true,
+          "type": "enum",
+          "enumRef": "WorkLifecycleStateSchema",
+          "note": "READY->CHALLENGED"
+        }
+      ]
+    },
+    {
+      "eventType": "PwuConditionallySatisfied",
+      "aggregateType": "ProfessionalWorkUnit",
+      "sourceSection": "DOC-002 §26.2",
+      "payloadFields": [
+        {
+          "field": "conditionStatement",
+          "required": true,
+          "type": "string"
+        },
+        {
+          "field": "assuranceAssessmentId",
+          "required": true,
+          "type": "string",
+          "note": "id-ref"
+        },
+        {
+          "field": "assuranceState",
+          "required": true,
+          "type": "enum",
+          "enumRef": "AssuranceStateSchema",
+          "note": "=CONDITIONALLY_SATISFIED"
+        },
+        {
+          "field": "workLifecycleState",
+          "required": true,
+          "type": "enum",
+          "enumRef": "WorkLifecycleStateSchema",
+          "note": "UNDER_ASSURANCE->CONDITIONALLY_SATISFIED"
+        }
+      ]
+    },
+    {
+      "eventType": "PwuInvalidated",
+      "aggregateType": "ProfessionalWorkUnit",
+      "sourceSection": "DOC-002 §26.2",
+      "payloadFields": [
+        {
+          "field": "invalidationReason",
+          "required": true,
+          "type": "string"
+        },
+        {
+          "field": "triggeringObjectId",
+          "required": true,
+          "type": "string",
+          "note": "id-ref"
+        },
+        {
+          "field": "workLifecycleState",
+          "required": true,
+          "type": "enum",
+          "enumRef": "WorkLifecycleStateSchema",
+          "note": "{CONDITIONALLY_SATISFIED,SATISFIED,RECOMPOSED}->INVALIDATED"
+        }
+      ]
+    },
+    {
+      "eventType": "PwuMarkedReady",
+      "aggregateType": "ProfessionalWorkUnit",
+      "sourceSection": "DOC-002 §26.2 (DOC-007 §33 lists it; DOC-007 realizes MarkPwuReady via PwuStateChanged)",
+      "payloadFields": [
+        {
+          "field": "shapeReadinessAttestationId",
+          "required": false,
+          "type": "string",
+          "note": "id-ref"
+        },
+        {
+          "field": "workLifecycleState",
+          "required": true,
+          "type": "enum",
+          "enumRef": "WorkLifecycleStateSchema",
+          "note": "SHAPING->READY"
+        },
+        {
+          "field": "shapeIntegrityState",
+          "required": false,
+          "type": "enum",
+          "enumRef": "ShapeIntegrityStateSchema",
+          "note": "->PRESERVED"
+        }
+      ]
+    },
+    {
+      "eventType": "PwuProposed",
+      "aggregateType": "ProfessionalWorkUnit",
+      "sourceSection": "DOC-007 §11.3 (wins) / DOC-002 §26.2",
+      "payloadFields": [
+        {
+          "field": "pwuId",
+          "required": true,
+          "type": "string",
+          "note": "id-ref"
+        },
+        {
+          "field": "pwuKind",
+          "required": true,
+          "type": "string"
+        },
+        {
+          "field": "title",
+          "required": true,
+          "type": "string"
+        },
+        {
+          "field": "intentId",
+          "required": true,
+          "type": "string",
+          "note": "id-ref"
+        },
+        {
+          "field": "parentWorkUnitId",
+          "required": false,
+          "type": "string",
+          "note": "id-ref"
+        },
+        {
+          "field": "workLifecycleState",
+          "required": true,
+          "type": "'PROPOSED'",
+          "enumRef": "WorkLifecycleStateSchema",
+          "note": "literal const"
+        },
+        {
+          "field": "executionState",
+          "required": true,
+          "type": "'NOT_PLANNED'",
+          "enumRef": "ExecutionStateSchema",
+          "note": "literal const"
+        },
+        {
+          "field": "assuranceState",
+          "required": true,
+          "type": "'UNASSESSED'",
+          "enumRef": "AssuranceStateSchema",
+          "note": "literal const"
+        },
+        {
+          "field": "shapeIntegrityState",
+          "required": true,
+          "type": "'UNKNOWN'",
+          "enumRef": "ShapeIntegrityStateSchema",
+          "note": "literal const; DOC-002 adds optional description/boundary/riskProfile"
+        }
+      ]
+    },
+    {
+      "eventType": "PwuRejected",
+      "aggregateType": "ProfessionalWorkUnit",
+      "sourceSection": "DOC-002 §26.2",
+      "payloadFields": [
+        {
+          "field": "blockingObservationIds",
+          "required": true,
+          "type": "string[]",
+          "note": "id-ref[]"
+        },
+        {
+          "field": "assuranceState",
+          "required": true,
+          "type": "enum",
+          "enumRef": "AssuranceStateSchema",
+          "note": "=REJECTED"
+        },
+        {
+          "field": "workLifecycleState",
+          "required": true,
+          "type": "enum",
+          "enumRef": "WorkLifecycleStateSchema",
+          "note": "UNDER_ASSURANCE->REJECTED"
+        }
+      ]
+    },
+    {
+      "eventType": "PwuReshapingStarted",
+      "aggregateType": "ProfessionalWorkUnit",
+      "sourceSection": "DOC-002 §26.2",
+      "payloadFields": [
+        {
+          "field": "reason",
+          "required": true,
+          "type": "string"
+        },
+        {
+          "field": "triggeringObjectId",
+          "required": false,
+          "type": "string",
+          "note": "id-ref"
+        },
+        {
+          "field": "workLifecycleState",
+          "required": true,
+          "type": "enum",
+          "enumRef": "WorkLifecycleStateSchema",
+          "note": "{EXECUTING,UNDER_ASSURANCE}->RESHAPING"
+        },
+        {
+          "field": "shapeIntegrityState",
+          "required": true,
+          "type": "enum",
+          "enumRef": "ShapeIntegrityStateSchema",
+          "note": "->RESHAPING_IN_PROGRESS"
+        }
+      ]
+    },
+    {
+      "eventType": "PwuSatisfied",
+      "aggregateType": "ProfessionalWorkUnit",
+      "sourceSection": "DOC-002 §26.2",
+      "payloadFields": [
+        {
+          "field": "assuranceAssessmentId",
+          "required": true,
+          "type": "string",
+          "note": "id-ref"
+        },
+        {
+          "field": "assuranceState",
+          "required": true,
+          "type": "enum",
+          "enumRef": "AssuranceStateSchema",
+          "note": "=SATISFIED"
+        },
+        {
+          "field": "workLifecycleState",
+          "required": true,
+          "type": "enum",
+          "enumRef": "WorkLifecycleStateSchema",
+          "note": "UNDER_ASSURANCE->SATISFIED"
+        }
+      ]
+    },
+    {
+      "eventType": "PwuShapingStarted",
+      "aggregateType": "ProfessionalWorkUnit",
+      "sourceSection": "DOC-002 §26.2 (DOC-007 §33 lists it unschematized)",
+      "payloadFields": [
+        {
+          "field": "workLifecycleState",
+          "required": true,
+          "type": "enum",
+          "enumRef": "WorkLifecycleStateSchema",
+          "note": "PROPOSED->SHAPING"
+        }
+      ]
+    },
+    {
+      "eventType": "PwuStateChanged",
+      "aggregateType": "ProfessionalWorkUnit",
+      "sourceSection": "DOC-007 §11.5 (DOC-007-only; DOC-002 uses named per-transition events)",
+      "payloadFields": [
+        {
+          "field": "previousState",
+          "required": true,
+          "type": "WorkLifecycleState",
+          "enumRef": "WorkLifecycleStateSchema"
+        },
+        {
+          "field": "newState",
+          "required": true,
+          "type": "WorkLifecycleState",
+          "enumRef": "WorkLifecycleStateSchema"
+        },
+        {
+          "field": "executionState",
+          "required": true,
+          "type": "ExecutionState",
+          "enumRef": "ExecutionStateSchema"
+        },
+        {
+          "field": "assuranceState",
+          "required": true,
+          "type": "AssuranceState",
+          "enumRef": "AssuranceStateSchema"
+        },
+        {
+          "field": "shapeIntegrityState",
+          "required": true,
+          "type": "ShapeIntegrityState",
+          "enumRef": "ShapeIntegrityStateSchema"
+        },
+        {
+          "field": "reasonCode",
+          "required": true,
+          "type": "string"
+        },
+        {
+          "field": "supportingObjectIds",
+          "required": true,
+          "type": "string[]",
+          "note": "id-ref[]"
+        }
+      ]
+    },
+    {
+      "eventType": "PwuSuperseded",
+      "aggregateType": "ProfessionalWorkUnit",
+      "sourceSection": "DOC-002 §26.2",
+      "payloadFields": [
+        {
+          "field": "supersedingWorkUnitId",
+          "required": true,
+          "type": "string",
+          "note": "id-ref"
+        },
+        {
+          "field": "workLifecycleState",
+          "required": true,
+          "type": "enum",
+          "enumRef": "WorkLifecycleStateSchema",
+          "note": "(any non-baselined)->SUPERSEDED"
+        }
+      ]
+    },
+    {
+      "eventType": "RecompositionCompleted",
+      "aggregateType": "RecompositionContract",
+      "sourceSection": "DOC-002 §26.2",
+      "payloadFields": [
+        {
+          "field": "parentCompletionClaimId",
+          "required": true,
+          "type": "string",
+          "note": "id-ref"
+        },
+        {
+          "field": "status",
+          "required": true,
+          "type": "enum",
+          "enumRef": "RecompositionContractStatusSchema",
+          "note": "EVALUATING->SATISFIED|COMPOSABLE"
+        },
+        {
+          "field": "workLifecycleState",
+          "required": false,
+          "type": "enum",
+          "enumRef": "WorkLifecycleStateSchema",
+          "note": "parent PWU RECOMPOSING->RECOMPOSED"
+        }
+      ]
+    },
+    {
+      "eventType": "RecompositionConflictDetected",
+      "aggregateType": "RecompositionContract",
+      "sourceSection": "DOC-002 §26.2",
+      "payloadFields": [
+        {
+          "field": "conflictingChildWorkUnitIds",
+          "required": true,
+          "type": "string[]",
+          "note": "id-ref[]"
+        },
+        {
+          "field": "conflictDescription",
+          "required": true,
+          "type": "string"
+        },
+        {
+          "field": "status",
+          "required": true,
+          "type": "enum",
+          "enumRef": "RecompositionContractStatusSchema",
+          "note": "EVALUATING->CONFLICTED"
+        }
+      ]
+    },
+    {
+      "eventType": "RecompositionFailed",
+      "aggregateType": "RecompositionContract",
+      "sourceSection": "DOC-002 §26.2",
+      "payloadFields": [
+        {
+          "field": "reason",
+          "required": true,
+          "type": "string"
+        },
+        {
+          "field": "unsatisfiedChildWorkUnitIds",
+          "required": false,
+          "type": "string[]",
+          "note": "id-ref[]"
+        },
+        {
+          "field": "status",
+          "required": true,
+          "type": "enum",
+          "enumRef": "RecompositionContractStatusSchema",
+          "note": "EVALUATING->INSUFFICIENT|CONFLICTED"
+        }
+      ]
+    },
+    {
+      "eventType": "RecompositionStarted",
+      "aggregateType": "RecompositionContract",
+      "sourceSection": "DOC-002 §26.2",
+      "payloadFields": [
+        {
+          "field": "parentWorkUnitId",
+          "required": true,
+          "type": "string",
+          "note": "id-ref"
+        },
+        {
+          "field": "requiredChildWorkUnitIds",
+          "required": true,
+          "type": "string[]",
+          "note": "id-ref[]"
+        },
+        {
+          "field": "status",
+          "required": true,
+          "type": "enum",
+          "enumRef": "RecompositionContractStatusSchema",
+          "note": "READY->EVALUATING"
+        },
+        {
+          "field": "workLifecycleState",
+          "required": false,
+          "type": "enum",
+          "enumRef": "WorkLifecycleStateSchema",
+          "note": "parent PWU SATISFIED->RECOMPOSING"
+        }
+      ]
+    },
+    {
+      "eventType": "RuntimeBindingAuthorized",
+      "aggregateType": "RuntimeBinding",
+      "sourceSection": "DOC-002 §26.4",
+      "payloadFields": [
+        {
+          "field": "grantedCapabilities",
+          "required": true,
+          "type": "CapabilityGrant[]",
+          "note": "complex type; scope explicit"
+        },
+        {
+          "field": "authorizationStatus",
+          "required": true,
+          "type": "enum",
+          "enumRef": "AuthorizationStatusSchema",
+          "note": "REQUESTED->AUTHORIZED|PARTIALLY_AUTHORIZED"
+        }
+      ]
+    },
+    {
+      "eventType": "RuntimeBindingDenied",
+      "aggregateType": "RuntimeBinding",
+      "sourceSection": "DOC-002 §26.4",
+      "payloadFields": [
+        {
+          "field": "denialReason",
+          "required": false,
+          "type": "string"
+        },
+        {
+          "field": "authorizationStatus",
+          "required": true,
+          "type": "enum",
+          "enumRef": "AuthorizationStatusSchema",
+          "note": "REQUESTED->DENIED"
+        }
+      ]
+    },
+    {
+      "eventType": "RuntimeBindingRequested",
+      "aggregateType": "RuntimeBinding",
+      "sourceSection": "DOC-002 §26.4",
+      "payloadFields": [
+        {
+          "field": "executionStepId",
+          "required": true,
+          "type": "string",
+          "note": "id-ref"
+        },
+        {
+          "field": "roleId",
+          "required": true,
+          "type": "string",
+          "note": "id-ref"
+        },
+        {
+          "field": "modelSelectionPolicy",
+          "required": false,
+          "type": "ModelSelectionPolicy",
+          "note": "complex type"
+        },
+        {
+          "field": "requestedCapabilities",
+          "required": true,
+          "type": "CapabilityRequest[]",
+          "note": "complex type"
+        },
+        {
+          "field": "sandboxPolicy",
+          "required": false,
+          "type": "SandboxPolicy",
+          "note": "complex type"
+        },
+        {
+          "field": "authorizationStatus",
+          "required": true,
+          "type": "enum",
+          "enumRef": "AuthorizationStatusSchema",
+          "note": "=REQUESTED; requested!=granted"
+        }
+      ]
+    },
+    {
+      "eventType": "RuntimeCapabilityRevoked",
+      "aggregateType": "RuntimeBinding",
+      "sourceSection": "DOC-002 §26.4",
+      "payloadFields": [
+        {
+          "field": "revocationReason",
+          "required": true,
+          "type": "string"
+        },
+        {
+          "field": "revokedCapabilities",
+          "required": false,
+          "type": "CapabilityGrant[]",
+          "note": "complex type"
+        },
+        {
+          "field": "authorizationStatus",
+          "required": true,
+          "type": "enum",
+          "enumRef": "AuthorizationStatusSchema",
+          "note": "AUTHORIZED->REVOKED; privilege expansion requires new authorization event"
+        }
+      ]
+    },
+    {
+      "eventType": "TacticalChangeApplied",
+      "aggregateType": "ExecutionPlan",
+      "sourceSection": "DOC-002 §26.4",
+      "payloadFields": [
+        {
+          "field": "executionPlanId",
+          "required": true,
+          "type": "string",
+          "note": "id-ref"
+        },
+        {
+          "field": "stepId",
+          "required": false,
+          "type": "string",
+          "note": "id-ref"
+        },
+        {
+          "field": "changeType",
+          "required": true,
+          "type": "string"
+        },
+        {
+          "field": "authorizingPolicyId",
+          "required": true,
+          "type": "string",
+          "note": "id-ref; only if authorized by policy"
+        }
+      ]
+    },
+    {
+      "eventType": "TacticalChangeRequested",
+      "aggregateType": "ExecutionPlan",
+      "sourceSection": "DOC-002 §26.4",
+      "payloadFields": [
+        {
+          "field": "executionPlanId",
+          "required": true,
+          "type": "string",
+          "note": "id-ref"
+        },
+        {
+          "field": "stepId",
+          "required": false,
+          "type": "string",
+          "note": "id-ref"
+        },
+        {
+          "field": "changeType",
+          "required": true,
+          "type": "string"
+        },
+        {
+          "field": "rationale",
+          "required": true,
+          "type": "string"
+        }
+      ]
+    },
+    {
+      "eventType": "WaiverDenied",
+      "aggregateType": "Decision",
+      "sourceSection": "DOC-002 §26.5",
+      "payloadFields": [
+        {
+          "field": "rationale",
+          "required": true,
+          "type": "string",
+          "note": "Decision.status has NO REJECTED/DENIED value (§23.1 gap)"
+        }
+      ]
+    },
+    {
+      "eventType": "WaiverExpired",
+      "aggregateType": "Decision",
+      "sourceSection": "DOC-002 §26.5",
+      "payloadFields": [
+        {
+          "field": "waiverDecisionId",
+          "required": true,
+          "type": "string",
+          "note": "id-ref; duration elapsed; target Obligation/Constraint returns to ACTIVE/VIOLATED; reassessment triggered"
+        }
+      ]
+    },
+    {
+      "eventType": "WaiverGranted",
+      "aggregateType": "Decision",
+      "sourceSection": "DOC-002 §26.5",
+      "payloadFields": [
+        {
+          "field": "waiverDecisionId",
+          "required": true,
+          "type": "string",
+          "note": "id-ref"
+        },
+        {
+          "field": "effectiveAt",
+          "required": true,
+          "type": "string"
+        },
+        {
+          "field": "duration",
+          "required": true,
+          "type": "string"
+        },
+        {
+          "field": "status",
+          "required": true,
+          "type": "enum",
+          "enumRef": "DecisionStatusSchema",
+          "note": "PROPOSED->EFFECTIVE; target Obligation/Constraint/Observation ->WAIVED; blocking observation stays visible"
+        }
+      ]
+    },
+    {
+      "eventType": "WaiverRequested",
+      "aggregateType": "Decision",
+      "sourceSection": "DOC-002 §26.5",
+      "payloadFields": [
+        {
+          "field": "subjectObjectIds",
+          "required": true,
+          "type": "string[]",
+          "note": "id-ref[]"
+        },
+        {
+          "field": "scope",
+          "required": true,
+          "type": "string"
+        },
+        {
+          "field": "rationale",
+          "required": true,
+          "type": "string"
+        },
+        {
+          "field": "duration",
+          "required": true,
+          "type": "string"
+        },
+        {
+          "field": "affectedObjectIds",
+          "required": true,
+          "type": "string[]",
+          "note": "id-ref[]"
+        },
+        {
+          "field": "decisionType",
+          "required": true,
+          "type": "enum",
+          "enumRef": "DecisionTypeSchema",
+          "note": "=WAIVER"
+        },
+        {
+          "field": "status",
+          "required": true,
+          "type": "enum",
+          "enumRef": "DecisionStatusSchema",
+          "note": "=PROPOSED"
+        }
+      ]
+    }
+  ],
+  "bindings": [
+    {
+      "commandType": "CaptureIntent",
+      "eventType": "IntentCaptured",
+      "machine": "Intent.intentStatus",
+      "from": "(initial)",
+      "to": "RAW",
+      "note": "DOC-007 emit + DOC-002 §26.2 transition agree"
+    },
+    {
+      "commandType": "FormalizeIntent",
+      "eventType": "IntentFormalized",
+      "machine": "Intent.intentStatus",
+      "from": "PROVISIONAL",
+      "to": "FORMALIZED",
+      "note": "FROM DRIFT: DOC-007 says RAW->FORMALIZED; DOC-002 inserts UNDER_DISCOVERY/PROVISIONAL, so PROVISIONAL->FORMALIZED"
+    },
+    {
+      "commandType": "ApproveIntent",
+      "eventType": "IntentApproved",
+      "machine": "Intent.intentStatus",
+      "from": "FORMALIZED",
+      "to": "APPROVED",
+      "note": "also REVISED->APPROVED"
+    },
+    {
+      "commandType": "ProposePwu",
+      "eventType": "PwuProposed",
+      "machine": "PWU.workLifecycleState",
+      "from": "(initial)",
+      "to": "PROPOSED",
+      "note": "also seeds executionState=NOT_PLANNED, assuranceState=UNASSESSED, shapeIntegrityState=UNKNOWN"
+    },
+    {
+      "commandType": "MarkPwuReady",
+      "eventType": "PwuMarkedReady",
+      "machine": "PWU.workLifecycleState",
+      "from": "SHAPING",
+      "to": "READY",
+      "note": "NAME DRIFT: DOC-007 emits generic PwuStateChanged (§11.5); DOC-002 emits semantic PwuMarkedReady (§26.2). Realize PwuMarkedReady carrying the PwuStateChanged payload shape"
+    },
+    {
+      "commandType": "ProposeExecutionPlan",
+      "eventType": "ExecutionPlanProposed",
+      "machine": "ExecutionPlan.status",
+      "from": "(initial)",
+      "to": "PROPOSED",
+      "note": "event unschematized in DOC-007 §33; DOC-002 §26.4 supplies payload+transition"
+    },
+    {
+      "commandType": "ActivateExecutionPlan",
+      "eventType": "ExecutionPlanActivated",
+      "machine": "ExecutionPlan.status",
+      "from": "APPROVED",
+      "to": "ACTIVE",
+      "note": "CROSS-PLANE: also PWU.workLifecycleState PLANNED->EXECUTING and PWU.executionState ->RUNNING"
+    },
+    {
+      "commandType": "CompleteExecutionStep",
+      "eventType": "ExecutionStepSucceeded",
+      "machine": "ExecutionStep.stepState",
+      "from": "RUNNING",
+      "to": "SUCCEEDED",
+      "note": "MACHINE-NAME DRIFT: DOC-007 calls it ExecutionStep.executionState. CROSS-PLANE: all-steps-succeeded -> PWU.executionState ->SUCCEEDED -> PWU EXECUTING->EVIDENCE_PENDING. Must NOT set assuranceState=SATISFIED (§35.2)"
+    },
+    {
+      "commandType": "ProposeEvidence",
+      "eventType": "EvidenceProposed",
+      "machine": "Evidence.status",
+      "from": "(initial)",
+      "to": "PROPOSED",
+      "note": "event unschematized in DOC-007 §33; DOC-002 §26.5 supplies payload"
+    },
+    {
+      "commandType": "AdmitEvidence",
+      "eventType": "EvidenceAdmitted",
+      "machine": "Evidence.status",
+      "from": "PROPOSED",
+      "to": "ADMISSIBLE",
+      "note": "deny path emits EvidenceRejected PROPOSED->REJECTED"
+    },
+    {
+      "commandType": "RequestAssuranceAssessment",
+      "eventType": "AssuranceAssessmentRequested",
+      "machine": "AssuranceAssessment.disposition",
+      "from": "(initial)",
+      "to": "PENDING",
+      "note": "MACHINE DRIFT: DOC-007 uses AssuranceAssessment.assessmentState (initial)->REQUESTED; DOC-002 uses disposition (initial)->PENDING. CROSS-PLANE: PWU EVIDENCE_PENDING->UNDER_ASSURANCE"
+    },
+    {
+      "commandType": "CompleteAssuranceAssessment",
+      "eventType": "AssuranceAssessmentCompleted",
+      "machine": "AssuranceAssessment.disposition",
+      "from": "ASSESSING",
+      "to": "SATISFIED | CONDITIONALLY_SATISFIED | REJECTED | INCONCLUSIVE | ESCALATED",
+      "note": "NAME/CARDINALITY DRIFT: DOC-007 emits one AssuranceAssessmentCompleted (disposition in payload); DOC-002 emits five outcome events (AssuranceAssessmentSatisfied/ConditionallySatisfied/Rejected/Inconclusive/Escalated). Each drives PWU to the matching state"
+    },
+    {
+      "commandType": "ApproveDecision",
+      "eventType": "DecisionEffective",
+      "machine": "Decision.status",
+      "from": "PROPOSED",
+      "to": "EFFECTIVE",
+      "note": "NAME DRIFT: DOC-002 approveDecision emits DecisionApproved (PROPOSED->EFFECTIVE); DOC-002 also has a separate time-gated DecisionEffective event. Decision.status has no distinct APPROVED value"
+    },
+    {
+      "commandType": "PromoteBaseline",
+      "eventType": "BaselinePromoted",
+      "machine": "Baseline.status",
+      "from": "APPROVED",
+      "to": "AUTHORITATIVE",
+      "note": "FROM DRIFT: DOC-007 inferred CANDIDATE->AUTHORITATIVE; DOC-002 APPROVED->AUTHORITATIVE. CROSS-PLANE: PWU {SATISFIED,RECOMPOSED}->BASELINED; open blocking observations must be waived first"
+    },
+    {
+      "commandType": "BeginPwuShaping",
+      "eventType": "PwuShapingStarted",
+      "machine": "PWU.workLifecycleState",
+      "from": "PROPOSED",
+      "to": "SHAPING"
+    },
+    {
+      "commandType": "ChangePwuState",
+      "eventType": "PwuStateChanged",
+      "machine": "PWU.workLifecycleState",
+      "from": "(any)",
+      "to": "(any)",
+      "note": "DOC-007-only generic transition; DOC-002 has no ChangePwuState (uses named per-transition commands)"
+    },
+    {
+      "commandType": "ApproveExecutionPlan",
+      "eventType": "ExecutionPlanApproved",
+      "machine": "ExecutionPlan.status",
+      "from": "UNDER_REVIEW",
+      "to": "APPROVED",
+      "note": "DOC-007 binds ExecutionPlan.status UNDER_REVIEW->APPROVED; DOC-002 primary drive is PWU.workLifecycleState READY->PLANNED + PWU.executionState NOT_PLANNED->PLANNED; event from={PROPOSED,UNDER_REVIEW}"
+    },
+    {
+      "commandType": "StartExecutionStep",
+      "eventType": "ExecutionStepStarted",
+      "machine": "ExecutionStep.stepState",
+      "from": "READY|QUEUED",
+      "to": "RUNNING",
+      "note": "DOC-007 from=PENDING, machine=ExecutionStep.executionState (drift)"
+    },
+    {
+      "commandType": "FailExecutionStep",
+      "eventType": "ExecutionStepFailed",
+      "machine": "ExecutionStep.stepState",
+      "from": "RUNNING",
+      "to": "FAILED",
+      "note": "also PWU.executionState ->FAILED"
+    },
+    {
+      "commandType": "DetectAssumption",
+      "eventType": "AssumptionDetected",
+      "machine": "Assumption.status",
+      "from": "(initial)",
+      "to": "PROPOSED",
+      "note": "VALUE DRIFT: DOC-007 AssumptionDetected sets status=DISCLOSED ((initial)->DISCLOSED); DOC-002 sets PROPOSED, with separate AssumptionDisclosed PROPOSED->DISCLOSED. No DOC-002 command counterpart"
+    },
+    {
+      "commandType": "AssertClaim",
+      "eventType": "ClaimAsserted",
+      "machine": "Claim.status",
+      "from": "(initial)",
+      "to": "OPEN"
+    },
+    {
+      "commandType": "RecordAssuranceObservation",
+      "eventType": "AssuranceObservationRecorded",
+      "machine": "AssuranceObservation.disposition",
+      "from": "(initial)",
+      "to": "OPEN",
+      "note": "DOC-007 targetAggregate=ASSURANCE_OBSERVATION; DOC-002 targetAggregate=AssuranceAssessment (observation carries assessmentId)"
+    },
+    {
+      "commandType": "ProposeDecision",
+      "eventType": "DecisionProposed",
+      "machine": "Decision.status",
+      "from": "(initial)",
+      "to": "PROPOSED"
+    },
+    {
+      "commandType": "CreateBaseline",
+      "eventType": "BaselineCreated",
+      "machine": "Baseline.status",
+      "from": "(initial)",
+      "to": "DRAFT",
+      "note": "DOC-007 §32 command; DOC-002 event init=DRAFT|CANDIDATE and has NO createBaseline command in §34"
+    },
+    {
+      "commandType": "ReviseIntent",
+      "eventType": "IntentRevised",
+      "machine": "Intent.intentStatus",
+      "from": "APPROVED",
+      "to": "REVISED",
+      "note": "DOC-002-only"
+    },
+    {
+      "commandType": "ChallengePwu",
+      "eventType": "PwuChallenged",
+      "machine": "PWU.workLifecycleState",
+      "from": "READY",
+      "to": "CHALLENGED",
+      "note": "DOC-002-only"
+    },
+    {
+      "commandType": "ReshapePwu",
+      "eventType": "PwuReshapingStarted",
+      "machine": "PWU.workLifecycleState",
+      "from": "EXECUTING",
+      "to": "RESHAPING",
+      "note": "DOC-002-only; also UNDER_ASSURANCE->RESHAPING; drives shapeIntegrityState ->RESHAPING_IN_PROGRESS"
+    },
+    {
+      "commandType": "InvalidatePwu",
+      "eventType": "PwuInvalidated",
+      "machine": "PWU.workLifecycleState",
+      "from": "SATISFIED|CONDITIONALLY_SATISFIED|RECOMPOSED",
+      "to": "INVALIDATED",
+      "note": "DOC-002-only"
+    },
+    {
+      "commandType": "SupersedePwu",
+      "eventType": "PwuSuperseded",
+      "machine": "PWU.workLifecycleState",
+      "from": "(any non-baselined)",
+      "to": "SUPERSEDED",
+      "note": "DOC-002-only"
+    },
+    {
+      "commandType": "ProposeDecomposition",
+      "eventType": "DecompositionProposed",
+      "machine": "DecompositionContract.status",
+      "from": "(initial)",
+      "to": "DRAFT",
+      "note": "DOC-002-only"
+    },
+    {
+      "commandType": "ValidateDecomposition",
+      "eventType": "DecompositionValidated",
+      "machine": "DecompositionContract.status",
+      "from": "UNDER_REVIEW",
+      "to": "VALID | CONDITIONALLY_VALID",
+      "note": "DOC-002-only; disposition=INVALID emits DecompositionRejected UNDER_REVIEW->INVALID"
+    },
+    {
+      "commandType": "ReviseDecomposition",
+      "eventType": "DecompositionRevised",
+      "machine": "DecompositionContract.status",
+      "from": "(prior)",
+      "to": "SUPERSEDED",
+      "note": "DOC-002-only; new contract = DRAFT"
+    },
+    {
+      "commandType": "BeginRecomposition",
+      "eventType": "RecompositionStarted",
+      "machine": "PWU.workLifecycleState",
+      "from": "SATISFIED",
+      "to": "RECOMPOSING",
+      "note": "DOC-002-only; also RecompositionContract.status READY->EVALUATING"
+    },
+    {
+      "commandType": "CompleteRecomposition",
+      "eventType": "RecompositionCompleted",
+      "machine": "PWU.workLifecycleState",
+      "from": "RECOMPOSING",
+      "to": "RECOMPOSED",
+      "note": "DOC-002-only; also RecompositionContract.status EVALUATING->SATISFIED"
+    },
+    {
+      "commandType": "InvalidateEvidence",
+      "eventType": "EvidenceInvalidated",
+      "machine": "Evidence.status",
+      "from": "ADMISSIBLE",
+      "to": "INVALIDATED",
+      "note": "DOC-002-only; dependent claims -> contested/under-review/invalidated"
+    },
+    {
+      "commandType": "RequestWaiver",
+      "eventType": "WaiverRequested",
+      "machine": "Decision.status",
+      "from": "(initial)",
+      "to": "PROPOSED",
+      "note": "DOC-002-only; decisionType=WAIVER"
+    },
+    {
+      "commandType": "GrantWaiver",
+      "eventType": "WaiverGranted",
+      "machine": "Decision.status",
+      "from": "PROPOSED",
+      "to": "EFFECTIVE",
+      "note": "DOC-002-only; CROSS-OBJECT: target Obligation.status/Constraint.status/AssuranceObservation.disposition ->WAIVED; blocking observation stays visible"
+    },
+    {
+      "commandType": "DenyWaiver",
+      "eventType": "WaiverDenied",
+      "machine": "Decision.status",
+      "from": "PROPOSED",
+      "to": "(no status value — §23.1 gap)",
+      "note": "DOC-002-only; GAP: Decision.status has no DENIED/REJECTED value"
+    },
+    {
+      "commandType": "RetryExecutionStep",
+      "eventType": "ExecutionStepRetried",
+      "machine": "ExecutionStep.stepState",
+      "from": "FAILED",
+      "to": "QUEUED",
+      "note": "DOC-002-only; also PWU.executionState ->RETRYING"
+    },
+    {
+      "commandType": "ApplyTacticalChange",
+      "eventType": "TacticalChangeApplied",
+      "machine": "ExecutionPlan.status",
+      "from": "ACTIVE",
+      "to": "ACTIVE",
+      "note": "DOC-002-only; no state change (tactical within active plan); preceded by TacticalChangeRequested"
+    },
+    {
+      "commandType": "CancelExecutionPlan",
+      "eventType": "ExecutionTerminated",
+      "machine": "ExecutionPlan.status",
+      "from": "ACTIVE",
+      "to": "CANCELLED",
+      "note": "DOC-002-only; no ExecutionPlanCancelled event, maps to ExecutionTerminated (ACTIVE->CANCELLED|FAILED); also PWU.executionState ->CANCELLED"
+    },
+    {
+      "commandType": "RevokeDecision",
+      "eventType": "DecisionRevoked",
+      "machine": "Decision.status",
+      "from": "EFFECTIVE",
+      "to": "REVOKED",
+      "note": "DOC-002-only; triggers impact analysis"
+    },
+    {
+      "commandType": "SupersedeBaseline",
+      "eventType": "BaselineSuperseded",
+      "machine": "Baseline.status",
+      "from": "AUTHORITATIVE",
+      "to": "SUPERSEDED",
+      "note": "DOC-002-only"
+    }
+  ],
+  "conflicts": [
+    {
+      "topic": "Command name casing drift (systematic)",
+      "resolution": "DOC-007 names commands in PascalCase (CaptureIntent, MarkPwuReady, ProposePwu); DOC-002 §34 names them camelCase (captureIntent, markPwuReady, proposePwu). Canonicalized commandType to PascalCase (DOC-007 wins); the camelCase form is the §34 API method name. Applies to all 21 overlapping commands."
+    },
+    {
+      "topic": "MarkPwuReady -> PwuMarkedReady vs PwuStateChanged (event name drift)",
+      "resolution": "DOC-007 emits generic PwuStateChanged (§11.5, previousState->newState); DOC-002 §26.2 emits semantic PwuMarkedReady with the same SHAPING->READY transition. Recommend emitting the semantic PwuMarkedReady but structurally realizing it with the PwuStateChanged payload (carry the 5 state fields + reasonCode). Do not ship both."
+    },
+    {
+      "topic": "CompleteAssuranceAssessment: one event vs five outcome events",
+      "resolution": "DOC-007 emits a single AssuranceAssessmentCompleted carrying disposition in payload; DOC-002 emits five distinct events (AssuranceAssessmentSatisfied/ConditionallySatisfied/Rejected/Inconclusive/Escalated). Pick one modeling: recommend the 5 named outcome events (they read cleaner into per-state PWU drives) OR keep 1 event with a disposition discriminator — but not both. Command carries ValidatorResult (DOC-007) whose dispositionRecommendation selects the branch."
+    },
+    {
+      "topic": "ApproveDecision: DecisionEffective vs DecisionApproved",
+      "resolution": "DOC-007 emits DecisionEffective (PROPOSED->EFFECTIVE); DOC-002 approveDecision emits DecisionApproved (PROPOSED->EFFECTIVE) AND separately defines a time-gated DecisionEffective event. Decision.status has NO distinct APPROVED value. Recommend: DecisionApproved for the authority act, DecisionEffective only when effectiveAt is time-gated apart from approval; if not time-gating, collapse to one."
+    },
+    {
+      "topic": "AssuranceAssessment machine name + initial state",
+      "resolution": "DOC-007 machine = AssuranceAssessment.assessmentState with (initial)->REQUESTED; DOC-002 machine = AssuranceAssessment.disposition with (initial)->PENDING. Pick one field name + one initial value. Binding table used DOC-002 (disposition/PENDING) as the transition authority."
+    },
+    {
+      "topic": "ExecutionStep machine name + state set",
+      "resolution": "DOC-007 machine = ExecutionStep.executionState with states PENDING/RUNNING/SUCCEEDED/FAILED and start from PENDING; DOC-002 machine = ExecutionStep.stepState with NOT_READY/READY/QUEUED/RUNNING/WAITING/SUCCEEDED/FAILED/SKIPPED/CANCELLED and start from READY|QUEUED. Adopt DOC-002 stepState (richer scheduler set); reconcile the DOC-007 PENDING start to NOT_READY/READY."
+    },
+    {
+      "topic": "AssumptionDetected initial status value",
+      "resolution": "DOC-007 AssumptionDetected sets status=DISCLOSED (skips PROPOSED); DOC-002 sets status=PROPOSED with a separate AssumptionDisclosed for PROPOSED->DISCLOSED. Also enum name drift MaterialitySchema (DOC-007) vs AssumptionMaterialitySchema (DOC-002). Pick the two-step DOC-002 model if disclosure is a governed act; else DOC-007 one-step."
+    },
+    {
+      "topic": "PromoteBaseline from-state",
+      "resolution": "DOC-007 inferred CANDIDATE->AUTHORITATIVE; DOC-002 APPROVED->AUTHORITATIVE (with CANDIDATE->UNDER_REVIEW->APPROVED preceding). Use APPROVED->AUTHORITATIVE (DOC-002 has the fuller Baseline lifecycle)."
+    },
+    {
+      "topic": "RequestAssuranceAssessment payload field drift",
+      "resolution": "DOC-007 command: policyVersion:string + subjectSemanticVersions:Record<string,number>; DOC-002: policySemanticVersion:number + evaluator:ActorReference. DOC-007 serialized wins for shape, but adopt policySemanticVersion:number (typed) and add evaluator (needed to record assessor)."
+    },
+    {
+      "topic": "ApproveDecision payload divergence",
+      "resolution": "DOC-007 ApproveDecision payload = selectedOption/rationale/consideredEvidenceIds/consideredObservationIds/subjectSemanticVersions (these are really DecisionProposed content); DOC-002 approveDecision payload = approvalAuthority only. Resolve by placing proposal content on ProposeDecision and keeping ApproveDecision minimal (authority + version-binding)."
+    },
+    {
+      "topic": "Enum fields typed as `string` in event payloads",
+      "resolution": "DecisionEffective.decisionType, BaselinePromoted.baselineType, AssumptionFalsified.priorStatus are declared `string` in DOC-007 though the object contracts define them as enums. Tighten to DecisionTypeSchema / BaselineTypeSchema / AssumptionStatusSchema respectively."
+    },
+    {
+      "topic": "ExecutionStepSucceeded / MarkPwuReady field-name drift",
+      "resolution": "DOC-007 uses executionStepId; DOC-002 uses stepId. DOC-007 uses shapeReadinessAssessmentId (required); DOC-002 uses shapeReadinessAttestationId (optional). Pick one field name + one required-ness per field before code-gen."
+    },
+    {
+      "topic": "Aggregate-type naming drift",
+      "resolution": "DOC-007 targetAggregateType = ALLCAPS objectType strings (PROFESSIONAL_WORK_UNIT, EXECUTION_PLAN, ASSURANCE_ASSESSMENT); DOC-002 = PascalCase aggregate roots (ProfessionalWorkUnit, ExecutionPlan, AssuranceAssessment). Kept each source's form in this table; pick one canonical registry value."
+    },
+    {
+      "topic": "Envelope divergence between docs",
+      "resolution": "DOC-002 §26.1/§27.1 envelope lacks commandSchemaVersion/targetAggregateType/idempotencyKey and names the version field schemaVersion (vs eventSchemaVersion). The task's already-implemented DomainCommand/DomainEvent envelope is the superset and is authoritative; payload lists here exclude all envelope fields."
+    }
+  ],
+  "openItems": [
+    {
+      "item": "Author payload schemas for 3 first-slice EVENTS unschematized in DOC-007: ExecutionPlanProposed, EvidenceProposed, AssuranceAssessmentRequested",
+      "why": "Their commands (ProposeExecutionPlan/ProposeEvidence/RequestAssuranceAssessment) are schematized in DOC-007 but the emitted events have NO payload schema there. DOC-002 §26.4/§26.5 supplies derived payloads to seed them; promote to DOC-007-style const/target-state fields."
+    },
+    {
+      "item": "Schematize the derivable-but-unschematized DOC-007 §32 commands: ChangePwuState, DetectAssumption, AssertClaim, RecordAssuranceObservation, plus BeginPwuShaping/ApproveExecutionPlan/StartExecutionStep/FailExecutionStep/ProposeDecision/CreateBaseline",
+      "why": "These commands have no payload schema in DOC-007, but their emitted events ARE schematized (or DOC-002 §34 gives command payloads). Command payloads should be lifted from the event facts / DOC-002 derivations and made authoritative."
+    },
+    {
+      "item": "Define the ~15 complex nested types referenced but schematized in neither doc",
+      "why": "DesiredOutcome, SuccessCondition, WorkBoundary, OutputDefinition, WorkRiskProfile, ExecutionStep, ExecutionTransition, RetryPolicy/TacticalChangePolicy/EscalationPolicy/TerminationPolicy, ArtifactReference, ExecutionProvenance, ValidatorResult, ControlActionRecommendation, ActorReference, ConfidenceAssessment, OutputBinding, CapabilityRequest/Grant, ModelSelectionPolicy, SandboxPolicy, AuthorityReference, ApplicabilityRule, IntentMapping, ObligationAllocation, ConstraintPropagation, AssumptionPropagation, CoverageClaim, itemObjectVersions entry — all block payload code-gen."
+    },
+    {
+      "item": "Fully enumerate WorkLifecycleStateSchema",
+      "why": "Neither doc enumerates it completely (DOC-007 observed only PROPOSED + EVIDENCE_PENDING/UNDER_ASSURANCE; SHAPING/READY inferred). DOC-002 transitions imply the full set: PROPOSED,SHAPING,READY,PLANNED,EXECUTING,EVIDENCE_PENDING,UNDER_ASSURANCE,SATISFIED,CONDITIONALLY_SATISFIED,REJECTED,RESHAPING,BLOCKED,CHALLENGED,ESCALATED,INVALIDATED,SUPERSEDED,ABANDONED,RECOMPOSING,RECOMPOSED,BASELINED. Confirm and freeze."
+    },
+    {
+      "item": "Resolve Decision.status gap: no REJECTED/DENIED value",
+      "why": "DecisionRejected and WaiverDenied events have no target status value (§23.1 gap). Either add a REJECTED/DENIED enum member or model denial as a non-status terminal event."
+    },
+    {
+      "item": "Resolve Evidence.status gap: no EXPIRED value",
+      "why": "EvidenceExpired maps to ADMISSIBLE->INVALIDATED because Evidence.status has no EXPIRED member (§16.1). Confirm expiry should collapse into INVALIDATED and trigger reassessment."
+    },
+    {
+      "item": "Confirm two inferred enum schema names",
+      "why": "ExecutionFailureClassSchema (from §36.2 taxonomy) and DecompositionValidationDispositionSchema (validateDecomposition VALID|CONDITIONALLY_VALID|INVALID) are not literally present in either doc; verify before wiring failExecutionStep/validateDecomposition."
+    },
+    {
+      "item": "Add missing lifecycle commands for events that have no command in either §34/§32",
+      "why": "Trigger/scheduler/outcome-driven events lack command entry points: assumption lifecycle (disclose/accept/verify/expire), constraint lifecycle (add/propagate/inapplicable/violate/supersede), obligation lifecycle (allocate/retain/satisfy/violate), runtime binding (request/authorize/deny/revoke), execution step scheduler (ready/waiting/skip/cancel), claim outcomes (contest/support/reject), evidence reject/expire, baseline submit/approve/revoke, intent discovery/supersede/withdraw. Decide which are agent-issued commands vs engine-internal reactions."
+    },
+    {
+      "item": "Baseline command surface incomplete",
+      "why": "BaselineCreated/SubmittedForReview/Approved/Revoked events exist but only PromoteBaseline/SupersedeBaseline (DOC-002) + CreateBaseline (DOC-007 §32) appear as commands. Add createBaseline/submitBaseline/approveBaseline/revokeBaseline or bind those events to internal transitions."
+    },
+    {
+      "item": "Decide canonical machine names + aggregate registry before code-gen",
+      "why": "Two machines (ExecutionStep executionState/stepState, AssuranceAssessment assessmentState/disposition) and the aggregate-type casing must be frozen so binding table -> reducer wiring is unambiguous."
+    }
+  ]
+}

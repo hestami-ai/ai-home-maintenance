@@ -1,0 +1,17 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "type": "string",
+  "enum": [
+    "NOT_READY",
+    "READY",
+    "QUEUED",
+    "RUNNING",
+    "WAITING",
+    "SUCCEEDED",
+    "FAILED",
+    "SKIPPED",
+    "CANCELLED",
+    "SUPERSEDED"
+  ],
+  "$id": "urn:janumi:rph:schema:enum:StepState:1"
+}

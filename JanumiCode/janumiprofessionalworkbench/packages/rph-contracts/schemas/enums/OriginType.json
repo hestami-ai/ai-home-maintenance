@@ -1,0 +1,14 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "type": "string",
+  "enum": [
+    "USER_INPUT",
+    "MODEL_GENERATION",
+    "TOOL_OUTPUT",
+    "HUMAN_DECISION",
+    "MIGRATION",
+    "DERIVED",
+    "IMPORTED"
+  ],
+  "$id": "urn:janumi:rph:schema:enum:OriginType:1"
+}

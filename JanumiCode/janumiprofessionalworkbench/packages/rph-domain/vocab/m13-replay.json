@@ -1,0 +1,230 @@
+{
+  "_meta": {
+    "milestone": "M13",
+    "title": "Reference Undertaking replay (FSM): seed / replay / conformance modes",
+    "purpose": "Ground M13 by extracting the replay oracle for the Field Service Management SaaS Reference Undertaking: the full ordered §26 expected event trace (72 steps), the RPH-FIX-001..006 fixture-conformance rules, the three fixture modes (seed / replay / conformance), and the end-state the conformance mode asserts. This vocab is the source-of-truth the M13 Seed/Replay/Conformance harness is generated and checked against. Verbatim event names and ids preserved.",
+    "sourceDocs": [
+      {
+        "role": "fixture (replay oracle)",
+        "path": "docs/Recursive Professional Harness/Janumi Professional Workbench Field Service Management SaaS Reference Undertaking.md",
+        "keySections": "§3 object index; §26 expected event trace (the 72-step oracle); §31 machine-readable fixture package + three modes; §32 expected read models; §33 fixture acceptance criteria"
+      },
+      {
+        "role": "conformance spec",
+        "path": "docs/Recursive Professional Harness/Janumi Professional Workbench Recursive Professional Harness - Executable Invariant and Conformance Test Specification.md",
+        "keySections": "§23 RPH-FIX-001..006; §24 RPH-E2E-001..007; §19 RPH-PER-006..010 (replay); §20 RPH-PER-011..014 (restart/recovery)"
+      },
+      {
+        "role": "persistence design",
+        "path": "docs/Recursive Professional Harness/Janumi Professional Workbench Recursive Professional Harness - Persistence, Migration, Dual-Run, and Cutover Design.md",
+        "keySections": "§14 domain event store (event-sourcing shape); §15 outbox; §16 command receipts/idempotency; §34 backup & recovery ordering; §35 active execution recovery; §42 vertical-slice persistence sequence; §43 migration conformance tests; §44 definition of done"
+      }
+    ],
+    "referenceUndertaking": "Multi-tenant Field Service Management SaaS for small trades businesses (intent int_fsm_001).",
+    "fixtureScope": "Raw intent capture through approved Architecture Baseline. Implementation, integrated validation, release baseline and deployment are DEFERRED — so the root Product Realization PWU is intentionally left incomplete.",
+    "traceLength": 72,
+    "traceIsRepresentative": "§26 states the sequence is 'representative rather than exhaustive'. The authored expected-events.jsonl derives from it but must reconcile with the §42 vertical-slice persistence sequence and the M2 canonical event catalog.",
+    "roadmapAcceptance": "DOC-006 §33 (15 acceptance criteria) + CT-1..10 (the §28 invariant conformance tests) + RPH-FIX-001..006 + RPH-E2E-001 + DOC-009 §44 (persistence Definition of Done). Roadmap row M13; depends on M12.",
+    "eventSourcingModel": "Authoritative history = append-only domain_events (§14): each row carries event_id, event_type, event_schema_version, aggregate_type, aggregate_id, aggregate_revision (contiguous, no gaps — RPH-PER-005), occurred_at, actor, correlation_id, causation_id, command_id, payload. Current-state tables + Work/Assurance/Execution/Compatibility projections are DERIVED and rebuildable (RPH-PER-006 aggregate reconstruction; RPH-PER-007 projection rebuild). Recovery ordering (§34): restore DB -> restore artifacts -> verify event sequence -> replay outbox -> rebuild projections -> reconcile active execution attempts -> resume controllers.",
+    "expectedEventsArtifact": {
+      "existsToday": false,
+      "status": "MUST BE AUTHORED. §31 of the fixture prescribes fixtures/product-realization-pwa/field-service-management/expected-events.jsonl but neither the file nor the fixtures/product-realization-pwa tree exists in the repo yet (verified). M13 authors it from the §26 trace below.",
+      "prescribedLocation": "fixtures/product-realization-pwa/field-service-management/expected-events.jsonl (§31), alongside manifest.json, intent.json, constraints.json, assumptions.json, pwu-hierarchy.json, decomposition-contracts.json, recomposition-contracts.json, execution-plans.json, runtime-bindings.json, claims.json, evidence.json, assurance-policies.json, assurance-assessments.json, observations.json, decisions.json, baselines.json, trace-links.json.",
+      "format": "JSON Lines — one domain event per line, in global_sequence order.",
+      "perLineShape": "Each line SHOULD carry the §14 domain_events envelope: { event_id, event_type, event_schema_version, aggregate_type, aggregate_id, aggregate_revision, occurred_at, actor, correlation_id, causation_id, command_id, payload }. Minimal replay requires at least event_type + aggregate_type + aggregate_id + aggregate_revision + payload; RPH-FIX-002 requires each line validate against the registered event schema; RPH-PER-005 requires contiguous per-aggregate revisions.",
+      "authoringRules": [
+        "Preserve the §26 order and event names verbatim (the ':' qualifiers are human labels, not part of event_type — see label field).",
+        "Assign each event to an aggregate (Intent, PWU, ExecutionPlan, Assessment, Observation, Decision, Baseline, RuntimeBinding, DecompositionContract, RecompositionContract) and give contiguous aggregate_revision per aggregate.",
+        "Set causation_id/command_id so idempotent duplicate replay produces no duplicate Decision or Baseline (§33 criterion; RPH-PER-002).",
+        "Reconcile against §42 vertical-slice sequence: the trace omits some persisted rows (e.g. explicit CommandReceipt/outbox rows) which the harness synthesizes.",
+        "Replaying it must reconstruct the §32 read models exactly (RPH-PER-007)."
+      ]
+    }
+  },
+  "eventTrace": [
+    { "seq": 1, "event": "IntentCaptured", "label": null, "phase": "INTENT", "aggregate": "Intent" },
+    { "seq": 2, "event": "PwuProposed", "label": "Product Realization", "phase": "INTENT", "aggregate": "PWU" },
+    { "seq": 3, "event": "PwuProposed", "label": "Intent and Product Definition", "phase": "INTENT", "aggregate": "PWU" },
+    { "seq": 4, "event": "IntentDiscoveryStarted", "label": null, "phase": "INTENT", "aggregate": "Intent" },
+    { "seq": 5, "event": "AssumptionDetected", "label": "Initial customer size", "phase": "INTENT", "aggregate": "Assumption" },
+    { "seq": 6, "event": "AssumptionDetected", "label": "US-first scope", "phase": "INTENT", "aggregate": "Assumption" },
+    { "seq": 7, "event": "IntentFormalized", "label": null, "phase": "INTENT", "aggregate": "Intent" },
+    { "seq": 8, "event": "AssuranceAssessmentRequested", "label": "Intent Fidelity", "phase": "INTENT", "aggregate": "Assessment" },
+    { "seq": 9, "event": "AssuranceAssessmentStarted", "label": null, "phase": "INTENT", "aggregate": "Assessment" },
+    { "seq": 10, "event": "AssuranceObservationRecorded", "label": null, "phase": "INTENT", "aggregate": "Observation" },
+    { "seq": 11, "event": "AssuranceAssessmentSatisfied", "label": null, "phase": "INTENT", "aggregate": "Assessment" },
+    { "seq": 12, "event": "DecisionProposed", "label": "Approve Intent", "phase": "INTENT", "aggregate": "Decision" },
+    { "seq": 13, "event": "DecisionEffective", "label": null, "phase": "INTENT", "aggregate": "Decision" },
+    { "seq": 14, "event": "IntentApproved", "label": null, "phase": "INTENT", "aggregate": "Intent" },
+    { "seq": 15, "event": "BaselineCreated", "label": "Intent Baseline", "phase": "INTENT", "aggregate": "Baseline" },
+    { "seq": 16, "event": "BaselinePromoted", "label": "Intent Baseline", "phase": "INTENT", "aggregate": "Baseline" },
+
+    { "seq": 17, "event": "PwuProposed", "label": "Product Behavior Definition", "phase": "BEHAVIOR", "aggregate": "PWU" },
+    { "seq": 18, "event": "PwuShapingStarted", "label": null, "phase": "BEHAVIOR", "aggregate": "PWU" },
+    { "seq": 19, "event": "ClaimAsserted", "label": "Behavior sufficiently covers intent", "phase": "BEHAVIOR", "aggregate": "Claim" },
+    { "seq": 20, "event": "PwuMarkedReady", "label": null, "phase": "BEHAVIOR", "aggregate": "PWU" },
+    { "seq": 21, "event": "ExecutionPlanProposed", "label": null, "phase": "BEHAVIOR", "aggregate": "ExecutionPlan" },
+    { "seq": 22, "event": "ExecutionPlanApproved", "label": null, "phase": "BEHAVIOR", "aggregate": "ExecutionPlan" },
+    { "seq": 23, "event": "ExecutionPlanActivated", "label": null, "phase": "BEHAVIOR", "aggregate": "ExecutionPlan" },
+    { "seq": 24, "event": "ExecutionStepStarted", "label": null, "phase": "BEHAVIOR", "aggregate": "ExecutionPlan" },
+    { "seq": 25, "event": "ExecutionStepSucceeded", "label": null, "phase": "BEHAVIOR", "aggregate": "ExecutionPlan" },
+    { "seq": 26, "event": "EvidenceProposed", "label": "Journey and requirement artifacts", "phase": "BEHAVIOR", "aggregate": "Evidence" },
+    { "seq": 27, "event": "EvidenceAdmitted", "label": null, "phase": "BEHAVIOR", "aggregate": "Evidence" },
+    { "seq": 28, "event": "PwuSatisfied", "label": "Product Behavior Definition", "phase": "BEHAVIOR", "aggregate": "PWU" },
+
+    { "seq": 29, "event": "PwuProposed", "label": "Architecture Definition", "phase": "ARCHITECTURE_SHAPE", "aggregate": "PWU" },
+    { "seq": 30, "event": "DecompositionProposed", "label": null, "phase": "ARCHITECTURE_SHAPE", "aggregate": "DecompositionContract" },
+    { "seq": 31, "event": "AssuranceAssessmentRequested", "label": "Decomposition Coverage", "phase": "ARCHITECTURE_SHAPE", "aggregate": "Assessment" },
+    { "seq": 32, "event": "DecompositionValidated", "label": null, "phase": "ARCHITECTURE_SHAPE", "aggregate": "DecompositionContract" },
+    { "seq": 33, "event": "PwuMarkedReady", "label": "Architecture Definition", "phase": "ARCHITECTURE_SHAPE", "aggregate": "PWU" },
+    { "seq": 34, "event": "ExecutionPlanProposed", "label": null, "phase": "ARCHITECTURE_SHAPE", "aggregate": "ExecutionPlan" },
+    { "seq": 35, "event": "ExecutionPlanApproved", "label": null, "phase": "ARCHITECTURE_SHAPE", "aggregate": "ExecutionPlan" },
+    { "seq": 36, "event": "RuntimeBindingRequested", "label": null, "phase": "ARCHITECTURE_SHAPE", "aggregate": "RuntimeBinding" },
+    { "seq": 37, "event": "RuntimeBindingAuthorized", "label": null, "phase": "ARCHITECTURE_SHAPE", "aggregate": "RuntimeBinding" },
+    { "seq": 38, "event": "ExecutionPlanActivated", "label": null, "phase": "ARCHITECTURE_GENERATE", "aggregate": "ExecutionPlan" },
+    { "seq": 39, "event": "ExecutionStepStarted", "label": "Generate architecture", "phase": "ARCHITECTURE_GENERATE", "aggregate": "ExecutionPlan" },
+    { "seq": 40, "event": "ExecutionStepSucceeded", "label": null, "phase": "ARCHITECTURE_GENERATE", "aggregate": "ExecutionPlan" },
+    { "seq": 41, "event": "EvidenceProposed", "label": "Architecture artifacts", "phase": "ARCHITECTURE_GENERATE", "aggregate": "Evidence" },
+    { "seq": 42, "event": "AssumptionDetected", "label": "Offline behavior", "phase": "ASSUMPTION_SURFACING", "aggregate": "Assumption" },
+    { "seq": 43, "event": "AssumptionDetected", "label": "Payment provider delegation", "phase": "ASSUMPTION_SURFACING", "aggregate": "Assumption" },
+    { "seq": 44, "event": "AssuranceAssessmentRequested", "label": "Assumption Disclosure", "phase": "ASSUMPTION_SURFACING", "aggregate": "Assessment" },
+    { "seq": 45, "event": "AssuranceAssessmentSatisfied", "label": "Assumption Disclosure", "phase": "ASSUMPTION_SURFACING", "aggregate": "Assessment" },
+    { "seq": 46, "event": "AssuranceAssessmentRequested", "label": "Architecture Coverage", "phase": "ARCHITECTURE_ASSURE", "aggregate": "Assessment" },
+    { "seq": 47, "event": "AssuranceObservationRecorded", "label": "Offline ambiguity", "phase": "ARCHITECTURE_ASSURE", "aggregate": "Observation" },
+    { "seq": 48, "event": "AssuranceObservationRecorded", "label": "Tenant isolation criteria", "phase": "ARCHITECTURE_ASSURE", "aggregate": "Observation" },
+    { "seq": 49, "event": "AssuranceAssessmentConditionallySatisfied", "label": "Architecture Coverage", "phase": "ARCHITECTURE_ASSURE", "aggregate": "Assessment" },
+
+    { "seq": 50, "event": "PwuChallenged", "label": null, "phase": "REMEDIATION", "aggregate": "PWU" },
+    { "seq": 51, "event": "TacticalChangeRequested", "label": null, "phase": "REMEDIATION", "aggregate": "PWU" },
+    { "seq": 52, "event": "ClarificationRequested", "label": null, "phase": "REMEDIATION", "aggregate": "Intent" },
+    { "seq": 53, "event": "IntentConstraintRefined", "label": "Offline scope", "phase": "REMEDIATION", "aggregate": "Intent" },
+    { "seq": 54, "event": "ExecutionPlanRevised", "label": null, "phase": "REMEDIATION", "aggregate": "ExecutionPlan" },
+    { "seq": 55, "event": "ExecutionStepStarted", "label": "Revise architecture", "phase": "REMEDIATION", "aggregate": "ExecutionPlan" },
+    { "seq": 56, "event": "ExecutionStepSucceeded", "label": null, "phase": "REMEDIATION", "aggregate": "ExecutionPlan" },
+    { "seq": 57, "event": "EvidenceProposed", "label": "Revised mobile architecture", "phase": "REMEDIATION", "aggregate": "Evidence" },
+    { "seq": 58, "event": "EvidenceAdmitted", "label": null, "phase": "REMEDIATION", "aggregate": "Evidence" },
+    { "seq": 59, "event": "AssuranceAssessmentRequested", "label": "Architecture Coverage", "phase": "REVERIFY", "aggregate": "Assessment" },
+    { "seq": 60, "event": "AssuranceAssessmentSatisfied", "label": "Architecture Coverage", "phase": "REVERIFY", "aggregate": "Assessment" },
+    { "seq": 61, "event": "AssuranceAssessmentRequested", "label": "Intent Preservation", "phase": "REVERIFY", "aggregate": "Assessment" },
+    { "seq": 62, "event": "AssuranceAssessmentSatisfied", "label": "Intent Preservation", "phase": "REVERIFY", "aggregate": "Assessment" },
+    { "seq": 63, "event": "PwuSatisfied", "label": "Architecture Definition", "phase": "RECOMPOSE", "aggregate": "PWU" },
+    { "seq": 64, "event": "RecompositionStarted", "label": null, "phase": "RECOMPOSE", "aggregate": "RecompositionContract" },
+    { "seq": 65, "event": "RecompositionCompleted", "label": null, "phase": "RECOMPOSE", "aggregate": "RecompositionContract" },
+
+    { "seq": 66, "event": "DecisionProposed", "label": "Approve Architecture", "phase": "GOVERNANCE", "aggregate": "Decision" },
+    { "seq": 67, "event": "DecisionEffective", "label": null, "phase": "GOVERNANCE", "aggregate": "Decision" },
+    { "seq": 68, "event": "BaselineCreated", "label": "Architecture", "phase": "BASELINE", "aggregate": "Baseline" },
+    { "seq": 69, "event": "BaselineSubmittedForReview", "label": null, "phase": "BASELINE", "aggregate": "Baseline" },
+    { "seq": 70, "event": "BaselineApproved", "label": null, "phase": "BASELINE", "aggregate": "Baseline" },
+    { "seq": 71, "event": "BaselinePromoted", "label": "Architecture Baseline", "phase": "BASELINE", "aggregate": "Baseline" },
+    { "seq": 72, "event": "PwuBaselined", "label": "Architecture Definition", "phase": "BASELINE", "aggregate": "PWU" }
+  ],
+  "tracePhases": [
+    { "phase": "INTENT", "seqRange": "1-16", "summary": "Capture raw intent, propose root + intent PWUs, discover intent, detect the two intent-level assumptions (customer size, US-first), formalize, run Intent Fidelity assurance to SATISFIED, human approves, create + promote the Intent Baseline.", "compatPhase": "INTAKE (events 1-16)" },
+    { "phase": "BEHAVIOR", "seqRange": "17-28", "summary": "Product Behavior Definition PWU: shape, assert behavior-covers-intent claim, mark ready, run a static execution plan, admit journey + requirement evidence, PWU reaches SATISFIED. NOTE: no behavior baseline is created — only Intent and Architecture are baselined.", "compatPhase": "(bridges INTAKE -> ARCHITECTURE)" },
+    { "phase": "ARCHITECTURE_SHAPE", "seqRange": "29-37", "summary": "Propose Architecture Definition PWU, propose decomposition into 5 child concerns, run + pass Decomposition Coverage, mark ready, approve plan, request + authorize the runtime binding (governed execution).", "compatPhase": "ARCHITECTURE (events 29-43)" },
+    { "phase": "ARCHITECTURE_GENERATE", "seqRange": "38-41", "summary": "Activate plan, generate the candidate architecture, succeed, propose architecture-artifact evidence.", "compatPhase": "ARCHITECTURE (events 29-43)" },
+    { "phase": "ASSUMPTION_SURFACING", "seqRange": "42-45", "summary": "Detect the two architecture-level assumptions (offline behavior, payment-provider delegation), run + pass Assumption Disclosure.", "compatPhase": "ASSUMPTION_SURFACING (events 42-45)" },
+    { "phase": "ARCHITECTURE_ASSURE", "seqRange": "46-49", "summary": "Run Architecture Coverage; record two MATERIAL open observations (offline ambiguity, tenant-isolation criteria); assessment lands CONDITIONALLY_SATISFIED — execution succeeded but assurance did NOT auto-satisfy.", "compatPhase": "VERIFY (events 46-62)" },
+    { "phase": "REMEDIATION", "seqRange": "50-58", "summary": "Controller challenges the PWU, requests a tactical change, raises a clarification, refines the offline-scope intent constraint, revises the execution plan, regenerates, admits revised mobile-architecture evidence.", "compatPhase": "VERIFY (events 46-62)" },
+    { "phase": "REVERIFY", "seqRange": "59-62", "summary": "Re-run Architecture Coverage -> SATISFIED and Intent Preservation -> SATISFIED.", "compatPhase": "VERIFY (events 46-62)" },
+    { "phase": "RECOMPOSE", "seqRange": "63-65", "summary": "Architecture Definition PWU SATISFIED; recomposition of the 5 children starts and completes under the recomposition contract (rcp_fsm_arch_001).", "compatPhase": "HISTORICAL_CHECK (optional, before event 63)" },
+    { "phase": "GOVERNANCE", "seqRange": "66-67", "summary": "Human decision proposed (Approve Architecture) then made effective — bound to the exact architecture semantic version (art_fsm_architecture_002).", "compatPhase": "REVIEW (events 66-67)" },
+    { "phase": "BASELINE", "seqRange": "68-72", "summary": "Create Architecture Baseline, submit for review, approve, promote to AUTHORITATIVE, PWU becomes BASELINED. Root Product Realization PWU stays incomplete by design.", "compatPhase": "COMMIT (events 68-72)" }
+  ],
+  "fixtureRules": [
+    {
+      "id": "RPH-FIX-001",
+      "name": "Fixture reference integrity",
+      "statement": "Every object reference in the field-service fixture resolves.",
+      "provesReplay": "REFERENCE INTEGRITY. Every id cited across intent/constraints/assumptions/PWU-hierarchy/decomposition/recomposition/plans/bindings/claims/evidence/policies/assessments/observations/decisions/baselines/trace-links points at a real object — no dangling reference. Backs §33 criterion 'all references resolve'. Concretely: baseline itemObjectIds (art_fsm_architecture_002, art_fsm_context_001, art_fsm_tenant_arch_001, art_fsm_data_arch_001, art_fsm_mobile_arch_002, art_fsm_integration_arch_001) and assuranceAssessmentIds all resolve; dcp_fsm_arch_001 childWorkUnitIds resolve to the 5 arch PWUs.",
+      "sourceRef": "Conformance Spec §23 RPH-FIX-001; fixture §3 object index; fixture §33"
+    },
+    {
+      "id": "RPH-FIX-002",
+      "name": "Fixture schema validity",
+      "statement": "Every fixture file validates against its registered schema.",
+      "provesReplay": "SCHEMA VALIDITY (including of the expected-events). Each of the §31 fixture files — and every line of expected-events.jsonl against the §14 domain-event envelope schema — validates: closed enums honored, no unknown props, version fields present, contiguous aggregate revisions (RPH-PER-005). This is the M13-anchored completion of RPH-FIX-002 that M1 deferred (registry = 97 schemas).",
+      "sourceRef": "Conformance Spec §23 RPH-FIX-002; Persistence §14; roadmap M1 note 'RPH-FIX-002 deferred to M13'"
+    },
+    {
+      "id": "RPH-FIX-003",
+      "name": "Expected event replay",
+      "statement": "Replaying expected-events.jsonl produces: (a) approved Intent Baseline; (b) satisfied Product Behavior PWU; (c) authoritative Architecture Baseline; (d) expected open residual condition.",
+      "provesReplay": "THE CORE REPLAY ORACLE. Feeding the 72-step event stream through the command/event machinery and rebuilding aggregate + projection state reconstructs the exact terminal state: base_fsm_intent_001 promoted; pwu_fsm_behavior SATISFIED; base_fsm_arch_001 AUTHORITATIVE (promotionDecisionId dec_fsm_arch_001); and the offline residual condition still OPEN/visible. Equivalent to RPH-PER-006 (aggregate reconstruction == materialized state) + RPH-PER-007 (projection rebuild == fixture projections).",
+      "sourceRef": "Conformance Spec §23 RPH-FIX-003; fixture §26, §32; Persistence §19 RPH-PER-006/007"
+    },
+    {
+      "id": "RPH-FIX-004",
+      "name": "Architecture decomposition coverage",
+      "statement": "All architecture obligations in the fixture are allocated to child PWUs.",
+      "provesReplay": "DECOMPOSITION COVERAGE. dcp_fsm_arch_001 allocates all five arch obligations (obl_fsm_arch_cover_requirements, _isolate_tenants, _preserve_audit, _support_mobile, _support_extensions) across the five child PWUs (context, multitenancy, data, mobile, integrations) with COMPLETE coverageType — no obligation is dropped in decomposition, and constraints propagate. Mirrors §28 Test 4 and DOC-004 decomposition-coverage.",
+      "sourceRef": "Conformance Spec §23 RPH-FIX-004; fixture §13 dcp_fsm_arch_001; fixture §28 Test 4"
+    },
+    {
+      "id": "RPH-FIX-005",
+      "name": "Tenant isolation traceability",
+      "statement": "The fixture must expose the chain: Multi-Tenancy Constraint -> Multi-Tenancy Architecture PWU -> Tenant Isolation Artifact -> Tenant Isolation Claim -> Assurance Assessment -> Implementation Verification Obligation.",
+      "provesReplay": "REFERENCE INTEGRITY along a constraint path. con_fsm_multitenancy propagates to pwu_fsm_arch_multitenancy (and data/integrations), produces evd_fsm_tenant_model, supports clm_fsm_arch_002, is verified by assess_fsm_arch_coverage_*, and BECOMES a mandatory implementation-level verification obligation (obs_fsm_arch_002 is a RECOMMENDATION that survives as an obligation). Backs §28 Test 3 constraint-propagation and the §25 second traceability chain.",
+      "sourceRef": "Conformance Spec §23 RPH-FIX-005; fixture §25 (constraint chain), §28 Test 3, obs_fsm_arch_002"
+    },
+    {
+      "id": "RPH-FIX-006",
+      "name": "Offline condition remains explicit",
+      "statement": "The deferred offline capability must remain represented as an assumption or constraint, a residual condition, a baseline scope statement, and a future implementation obligation where applicable.",
+      "provesReplay": "THE OPEN OFFLINE RESIDUAL CONDITION persists visibly after replay. asm_fsm_003 (offline) + con_fsm_mobile_ready stay live; obs_fsm_arch_001 (offline ambiguity) is retained; the Architecture Baseline scope statement records 'limited offline capability retained as an architectural requirement but deferred from the first implementation increment' (dec_fsm_arch_001 rationale); the Assurance View shows 'Open Residual Condition -> Offline behavior deferred from first increment'. Conditional satisfaction must NOT be displayed as unconditional success (§28 Test 7).",
+      "sourceRef": "Conformance Spec §23 RPH-FIX-006; fixture §22 decision rationale, §20 obs_fsm_arch_001, §32.2 Assurance View, §28 Test 7"
+    }
+  ],
+  "modes": [
+    {
+      "name": "seed",
+      "specGloss": "Loads the final canonical undertaking.",
+      "definition": "Write the fixture objects — the TERMINAL-STATE canonical object graph (intent, constraints, assumptions, the PWU hierarchy, decomposition + recomposition contracts, execution plans, runtime bindings, claims, evidence, assurance policies + assessments + observations, decisions, baselines, trace-links) — directly into the store at their final semantic versions/statuses. No event replay: seed materializes current-state + projections so the fixture can be inspected/rendered without running the 72 steps. Establishes the oracle that Replay and Conformance are checked against.",
+      "proves": "RPH-FIX-001 (references resolve), RPH-FIX-002 (files validate against schema), RPH-FIX-004 (decomposition coverage), RPH-FIX-005 (tenant-isolation trace present), RPH-FIX-006 (offline residual represented). Also §33 'all object IDs stable / all references resolve'.",
+      "sourceRef": "fixture §31 mode 1; §3 object index; §32 read models"
+    },
+    {
+      "name": "replay",
+      "specGloss": "Replays the expected event stream.",
+      "definition": "Feed expected-events.jsonl (the authored §26 72-step trace) through the command/event machinery — appending to the append-only domain event store (§14) with contiguous per-aggregate revisions — then REBUILD aggregate state (RPH-PER-006) and the Work/Assurance/Execution/Compatibility projections (RPH-PER-007) purely from events. Proves the event stream reconstructs the final state and projections are rebuildable from history alone, following the §34 recovery ordering (verify event sequence -> replay outbox -> rebuild projections -> reconcile attempts). Duplicate/idempotent replay must NOT create duplicate decisions or baselines (RPH-PER-002, §33).",
+      "proves": "RPH-FIX-003 core outcomes; RPH-PER-006/007; §33 'the event stream reconstructs the final state', 'projection state can be rebuilt', 'duplicate command replay does not create duplicate decisions or baselines'. Restart mid-replay is covered by RPH-PER-011..014 / RPH-E2E-006.",
+      "sourceRef": "fixture §31 mode 2; §26 trace; Persistence §14, §19 (RPH-PER-006/007), §34 recovery ordering, §42 vertical-slice sequence"
+    },
+    {
+      "name": "conformance",
+      "specGloss": "Runs commands and checks resulting state against expected projections.",
+      "definition": "Replay (or drive the real commands) AND THEN ASSERT the resulting canonical + projection state against the expected read models and the RPH-FIX/RPH-E2E/CT expectations. This is replay plus an oracle: compare rebuilt Work View, Assurance View, Trace View, and Compatibility View (§32) to the fixture's expected projections, and assert the §28 invariant tests (CT-1..10) and RPH-E2E-001 end-state hold. Conformance is where 'execution succeeded but assurance is not automatically satisfied' is proven as a checkable property, not just narrated.",
+      "proves": "RPH-FIX-001..006 as assertions; RPH-E2E-001 (normal intent-to-architecture success, root remains incomplete); §28 Tests 1-10 / CT-1..10; §33 15 acceptance criteria; §32 read models match; DOC-009 §44 'the intent-to-architecture reference fixture persists, replays, and reconstructs correctly'.",
+      "sourceRef": "fixture §31 mode 3; §32 read models, §33 acceptance criteria, §28 invariant tests; Conformance Spec §24 RPH-E2E-001"
+    }
+  ],
+  "expectedOutcomes": [
+    { "assertion": "Intent Baseline (base_fsm_intent_001) is created and PROMOTED — intent is approved via an effective decision (dec_fsm_intent_001).", "sourceRef": "RPH-FIX-003(a); fixture §26 steps 12-16; §32.1", "kind": "baseline" },
+    { "assertion": "Product Behavior Definition PWU (pwu_fsm_behavior) reaches SATISFIED — and is NOT baselined (behavior has no baseline; only Intent and Architecture do).", "sourceRef": "RPH-FIX-003(b); fixture §26 step 28; §32.1", "kind": "pwu-state" },
+    { "assertion": "Architecture Baseline (base_fsm_arch_001) is AUTHORITATIVE, promoted by the effective, version-bound decision dec_fsm_arch_001, binding exactly art_fsm_architecture_002 + the five child artifacts.", "sourceRef": "RPH-FIX-003(c); fixture §23, §22; §26 steps 66-72", "kind": "baseline" },
+    { "assertion": "Architecture Definition PWU (pwu_fsm_arch) is BASELINED.", "sourceRef": "fixture §26 step 72; §32.1", "kind": "pwu-state" },
+    { "assertion": "Architecture child PWUs: System Context SATISFIED, Multi-Tenancy SATISFIED, Data SATISFIED, Integration SATISFIED, and Mobile/Offline Architecture CONDITIONALLY SATISFIED.", "sourceRef": "fixture §32.1 Work View", "kind": "pwu-state" },
+    { "assertion": "The four architecture assurance assessments are SATISFIED: Decomposition Coverage, Assumption Disclosure, Architecture Coverage (after remediation), Intent Preservation.", "sourceRef": "fixture §32.2 Assurance View; §26 steps 32,45,60,62", "kind": "assurance" },
+    { "assertion": "An OPEN residual condition remains VISIBLE: 'Offline behavior deferred from first increment' — offline capability retained as an architectural requirement but deferred from the first implementation increment. Conditional satisfaction is not shown as unconditional success.", "sourceRef": "RPH-FIX-003(d), RPH-FIX-006; fixture §32.2, §22, §28 Test 7", "kind": "residual" },
+    { "assertion": "Execution success did NOT imply assurance success: at step 40/49 ExecutionState=SUCCEEDED while the Architecture Coverage assessment was CONDITIONALLY_SATISFIED (never auto-SATISFIED). Root distinction of the whole fixture.", "sourceRef": "fixture §21 controller response, §28 Test 1; Conformance §24 RPH-E2E-002 property P1", "kind": "invariant" },
+    { "assertion": "The ROOT Product Realization PWU (pwu_fsm_root) remains INCOMPLETE / not baselined — implementation, integrated validation and release baseline are deferred (legitimately incomplete).", "sourceRef": "fixture §2.2, §9; Conformance §24 RPH-E2E-001 'root Product Realization PWU remains incomplete'; RPH-CMP-003", "kind": "root-incomplete" },
+    { "assertion": "Compatibility projection: INTAKE COMPLETE, ARCHITECTURE COMPLETE, PROPOSE NOT STARTED, VERIFY COMPLETE FOR ARCHITECTURE, REVIEW APPROVED, EXECUTE NOT STARTED, VALIDATE PARTIAL, COMMIT ARCHITECTURE-BASELINE-ONLY — derived from canonical state, never authoritative. ARCHITECTURE=COMPLETE while the root PWU is incomplete.", "sourceRef": "fixture §32.4, §27; Conformance RPH-CMP-001/002/003", "kind": "compatibility" },
+    { "assertion": "Traceability reaches the originating user expression: user intent -> Product Intent Baseline -> Journey (Request to Completed Job) -> Requirement (FSM-FUNC-004) -> Scheduling/Dispatch architecture concern -> architecture artifact -> claim -> evidence -> assessment -> human decision -> Architecture Baseline.", "sourceRef": "fixture §25, §32.3; Conformance RPH-TRC / RPH-FIX-005", "kind": "traceability" },
+    { "assertion": "Human decision is bound to a specific semantic version; a later semantic architecture change would invalidate/supersede the approval (approval version-binding).", "sourceRef": "fixture §22, §28 Test 5; Conformance RPH-E2E-007", "kind": "governance" },
+    { "assertion": "Idempotency: duplicate/replayed commands or events produce no duplicate decisions and no duplicate baseline promotions; the rebuilt state is identical.", "sourceRef": "fixture §33; Conformance RPH-PER-002; Persistence §16", "kind": "idempotency" },
+    { "assertion": "The whole result is renderable WITHOUT relying on hardcoded Product Realization PWA phases — phase labels are a derived compatibility projection only.", "sourceRef": "fixture §33 last criterion, §27; Conformance RPH-CMP-002", "kind": "non-authoritative-phase" }
+  ],
+  "_openItems": [
+    "expected-events.jsonl does NOT exist yet and MUST be authored (verified: no fixtures/product-realization-pwa tree and no *.jsonl in repo). §26 is the ordered source but is 'representative rather than exhaustive' — the authored file must reconcile with the §42 vertical-slice persistence sequence, which persists rows the trace omits (explicit CommandReceipt/outbox/object-version rows, compatibility-phase projection). Treat §26 as the semantic oracle, §42 as the persistence completeness check.",
+    "The §26 event NAMES are display/catalog spellings; M13 must map each to the M2/DOC-002 canonical event catalog before emitting event_type. Likely-drift names to reconcile: PwuMarkedReady, PwuChallenged, TacticalChangeRequested, IntentConstraintRefined, AssuranceAssessmentConditionallySatisfied, RuntimeBindingAuthorized, PwuBaselined. The ':' qualifier (e.g. 'Product Realization') is a human label captured in eventTrace[].label, NOT part of event_type.",
+    "aggregate per event in eventTrace[] is an INFERRED assignment (which aggregate stream each event belongs to) to help authoring; confirm against the actual aggregate boundaries in the M2 machines. Assumptions/Observations/Claims/Evidence may be modeled as their own aggregates OR as sub-entities of the owning PWU/Assessment — this changes revision numbering.",
+    "The trace shows only two baselines (Intent at 15-16, Architecture at 68-72). The Behavior branch ends at PwuSatisfied (28) with NO baseline. Do not synthesize a behavior baseline during authoring.",
+    "Baseline promotion appears as a 5-step ceremony for Architecture (Created 68 -> SubmittedForReview 69 -> Approved 70 -> Promoted 71 -> PwuBaselined 72) but a 2-step one for Intent (Created 15 -> Promoted 16). Authoring should not force symmetry; the intent baseline path is intentionally shorter.",
+    "RPH-FIX-003 asserts four terminal outcomes; §32 read models are richer (five child PWU states incl. Mobile/Offline CONDITIONALLY SATISFIED). The authored jsonl must reproduce the full §32 projection under RPH-PER-007, not merely the four headline outcomes.",
+    "Restart-during-replay conformance (RPH-PER-011..014, RPH-E2E-006) is adjacent to M13 but overlaps M11 execution-recovery. M13 should at minimum exercise 'restart mid-replay then finish -> identical terminal state' (reconcile uncertain attempts per §35 'never blindly retry an uncertain side effect'); deeper restart matrices may stay in M11.",
+    "assess ids drift between phases: §19 sample uses assess_fsm_arch_coverage_001 (CONDITIONALLY_SATISFIED, pre-remediation) while §23 baseline binds assess_fsm_arch_coverage_002 (post-remediation SATISFIED) plus intent_preservation_001 / assumption_disclosure_001 / decomposition_001. The authored assessments.json must contain BOTH coverage assessments (the superseded conditional one and the satisfying one) so the trace steps 46-49 and 59-60 resolve.",
+    "Evidence version drift: pre-remediation used evd_fsm_mobile_strategy; the human decision (§22) considered evd_fsm_mobile_strategy_v2 and the baseline binds art_fsm_mobile_arch_002. Authoring must mint the v2 evidence/artifact at remediation (steps 55-58) so version-binding (§28 Test 5) is demonstrable.",
+    "art_fsm_architecture_001 (candidate, §19 subject) vs art_fsm_architecture_002 (approved/baselined, §22-23) are two semantic versions of the architecture artifact; the conditional assessment targets _001, the decision + baseline target _002. This version pair is what makes RPH-E2E-007 ('changed artifact after approval') and Test 5 checkable — preserve both."
+  ]
+}

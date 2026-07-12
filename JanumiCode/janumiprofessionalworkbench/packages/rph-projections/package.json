@@ -1,0 +1,33 @@
+{
+  "name": "@janumipwb/rph-projections",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "description": "Rebuildable read-model projections built from the event stream. Data only — never a write target, never renders. Work/Execution/Assurance/Traceability/Change-Impact + the derived non-authoritative Compatibility view.",
+  "license": "AGPL-3.0-only",
+  "exports": {
+    ".": {
+      "source": "./src/index.ts",
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js",
+      "default": "./dist/index.js"
+    }
+  },
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "files": [
+    "dist"
+  ],
+  "scripts": {
+    "build": "tsc -p tsconfig.build.json",
+    "check-types": "tsc --noEmit -p tsconfig.json",
+    "test": "vitest run --passWithNoTests"
+  },
+  "dependencies": {
+    "@janumipwb/rph-contracts": "workspace:*",
+    "@janumipwb/rph-ports": "workspace:*"
+  },
+  "devDependencies": {
+    "@janumipwb/typescript-config": "workspace:*"
+  }
+}

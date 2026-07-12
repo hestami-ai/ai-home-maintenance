@@ -1,0 +1,35 @@
+{
+  "name": "@janumipwb/rph-domain",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "description": "Pure, deterministic RPH domain kernel — state machines, transition guards, invariant predicates. No I/O.",
+  "license": "AGPL-3.0-only",
+  "exports": {
+    ".": {
+      "source": "./src/index.ts",
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js",
+      "default": "./dist/index.js"
+    }
+  },
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "files": [
+    "dist"
+  ],
+  "scripts": {
+    "build": "tsc -p tsconfig.build.json",
+    "check-types": "tsc --noEmit -p tsconfig.json",
+    "test": "vitest run --passWithNoTests",
+    "gen": "bun run src/gen/gen-transitions.ts",
+    "gen:transitions": "bun run src/gen/gen-transitions.ts"
+  },
+  "dependencies": {
+    "@janumipwb/rph-contracts": "workspace:*"
+  },
+  "devDependencies": {
+    "@janumipwb/typescript-config": "workspace:*",
+    "fast-check": "4.9.0"
+  }
+}

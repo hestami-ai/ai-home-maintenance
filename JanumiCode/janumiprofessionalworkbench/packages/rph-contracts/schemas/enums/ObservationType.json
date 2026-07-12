@@ -1,0 +1,14 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "type": "string",
+  "enum": [
+    "FINDING",
+    "MEASUREMENT",
+    "CONFLICT",
+    "EVIDENCE_DEFICIT",
+    "SHAPE_RISK",
+    "POLICY_VIOLATION",
+    "RECOMMENDATION"
+  ],
+  "$id": "urn:janumi:rph:schema:enum:ObservationType:1"
+}

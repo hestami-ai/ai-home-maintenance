@@ -1,0 +1,32 @@
+{
+  "name": "@janumipwb/rph-ports",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "description": "Host-injectable port interfaces so the RPH engine holds zero platform/UI/host assumptions.",
+  "license": "AGPL-3.0-only",
+  "exports": {
+    ".": {
+      "source": "./src/index.ts",
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js",
+      "default": "./dist/index.js"
+    }
+  },
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "files": [
+    "dist"
+  ],
+  "scripts": {
+    "build": "tsc -p tsconfig.build.json",
+    "check-types": "tsc --noEmit -p tsconfig.json",
+    "test": "vitest run --passWithNoTests"
+  },
+  "dependencies": {
+    "@janumipwb/rph-contracts": "workspace:*"
+  },
+  "devDependencies": {
+    "@janumipwb/typescript-config": "workspace:*"
+  }
+}

@@ -1,0 +1,17 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "type": "string",
+  "enum": [
+    "COMPLETENESS",
+    "CORRECTNESS",
+    "COMPLIANCE",
+    "CONSISTENCY",
+    "FITNESS",
+    "PRESERVATION",
+    "FEASIBILITY",
+    "PERFORMANCE",
+    "SECURITY",
+    "COVERAGE"
+  ],
+  "$id": "urn:janumi:rph:schema:enum:ClaimType:1"
+}

@@ -1,0 +1,15 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "type": "string",
+  "enum": [
+    "PROPOSED",
+    "UNDER_REVIEW",
+    "APPROVED",
+    "ACTIVE",
+    "COMPLETED",
+    "FAILED",
+    "SUPERSEDED",
+    "CANCELLED"
+  ],
+  "$id": "urn:janumi:rph:schema:enum:ExecutionPlanStatus:1"
+}

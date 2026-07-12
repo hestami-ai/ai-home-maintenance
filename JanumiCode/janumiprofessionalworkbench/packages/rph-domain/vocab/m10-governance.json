@@ -1,0 +1,298 @@
+{
+  "_meta": {
+    "milestone": "M10",
+    "sourceDocs": [
+      "Janumi Professional Workbench Recursive Professional Harness - Canonical Domain Model, Invariant Catalog, State Machines, and Event Contract",
+      "Janumi Professional Workbench Recursive Professional Harness - Executable Invariant and Conformance Test Specification",
+      "Janumi Professional Workbench Recursive Professional Harness - Command, Event, Schema Contract Package",
+      "Janumi Professional Workbench Recursive Professional Harness - Persistence, Migration, Dual-Run, and Cutover Design",
+      "Janumi Professional Workbench Product Realization PWA - Assurance Policy Catalog and Validator Contract",
+      "Janumi Professional Workbench Product Realization PWA - Migration to the Recursive Professional Harness",
+      "Janumi Professional Workbench Field Service Management SaaS Reference Undertaking"
+    ],
+    "purpose": "controller / governance decisions / baseline promotion",
+    "sourceRefConvention": "Bare '§N' = section number in the Canonical Domain Model doc (authoritative for structure/enums). 'Contract §N' = Command/Event/Schema Contract Package doc. 'Persistence §N' = Persistence/Migration/Dual-Run/Cutover doc. 'Catalog §N' = Assurance Policy Catalog and Validator Contract doc. 'Migration §N' = Migration to the RPH doc. 'FIXTURE §N' = Reference Undertaking fixture doc. Test ids (RPH-GOV-*, RPH-BAS-*, RPH-CNS-*, Property P*) and error codes live in the Conformance Test Spec doc.",
+    "authoritativeNote": "The Canonical Domain Model is authoritative for object structure and enum spellings. Where the Contract Package refines a shape (Decision.subjectSemanticVersions, Baseline.itemObjectVersions with hash, purpose/scope), the Contract shape is the operative one because the conformance tests (RPH-GOV-003, RPH-BAS-001/002, Property P5) depend on it; both are recorded with sourceRefs and the divergence is captured in _openItems. There is NO standalone Waiver object/table: a waiver is a Decision of decisionType 'WAIVER' (§23.1) shaped by the assurance policy's WaiverRule (Catalog §12) and tracked by Waiver* events (§26.5)."
+  },
+
+  "governanceDecision": {
+    "description": "A GovernanceDecision (objectType 'DECISION', §4 ProfessionalWorkObjectType) is the aggregate root of the Governance Aggregate (§3.4), which owns Decision, Approval, Waiver authorization, Escalation, Baseline Promotion, and revocation. A Decision records an authority-verified governance act on one or more subject objects at specific semantic versions. It does not itself mutate the subject; it becomes EFFECTIVE and downstream handlers react. An agent may recommend a decision but cannot exercise authority unless delegated (§23.2). Baseline promotion, approvals, rejections, waivers, reshapes, replans, abandonment, and revocations are all Decisions.",
+    "extends": "ObjectEnvelope (§4: id, objectType, semanticVersion, revision, lifecycleStatus, provenance, authorityId, etc.)",
+    "fields": [
+      { "name": "objectType", "type": "'DECISION'", "required": true, "description": "Discriminant fixing this envelope as a governance Decision.", "sourceRef": "§23.1; Contract §22" },
+      { "name": "decisionType", "type": "enum (see decisionTypes)", "required": true, "description": "The kind of governance act.", "sourceRef": "§23.1; Contract §22" },
+      { "name": "subjectObjectIds", "type": "string[]", "required": true, "description": "The object(s) this decision acts on (e.g., an Architecture PWU, an artifact, a Baseline).", "sourceRef": "§23.1; Contract §22; Persistence §12.2 (decision_subjects)" },
+      { "name": "subjectSemanticVersions", "type": "Record<string, number>", "required": true, "description": "Per-subject semantic version the decision binds to. This is the version-binding field: a decision approves subject S at version n, not n+1. Present in the Contract shape and the persistence table (decision_subjects.subject_semantic_version); ABSENT from the Canonical §23.1 interface (see _openItems). Required by RPH-GOV-003 / Property P5.", "sourceRef": "Contract §22 (DecisionObject, ApproveDecisionPayload, DecisionEffectivePayload); Persistence §12.2" },
+      { "name": "selectedOption", "type": "string", "required": true, "description": "The option chosen among those presented (e.g., 'Approve architecture for implementation planning').", "sourceRef": "§23.1; Contract §22; FIXTURE §22" },
+      { "name": "rationale", "type": "string", "required": true, "description": "Why the decision was made. Approvals and waivers require rationale.", "sourceRef": "§23.1; §23.2; Contract §22" },
+      { "name": "authority", "type": "ActorReference", "required": true, "description": "The authority exercising the decision. Typed ActorReference in both §23.1 and Contract §22 (NOTE: this is ActorReference, not the AuthorityReference of §5 — see _openItems). Persisted as decisions.authority jsonb. Approval requires authority (§23.2) and is rejected as RPH_AUTHORITY_INSUFFICIENT if the actor lacks it.", "sourceRef": "§23.1; Contract §22; Persistence §12.1; §35.5" },
+      { "name": "consideredEvidenceIds", "type": "string[]", "required": true, "description": "Evidence the decision considered; a decision cannot retroactively change evidence (§23.2).", "sourceRef": "§23.1; Contract §22; Persistence §12.3 (decision_evidence)" },
+      { "name": "consideredObservationIds", "type": "string[]", "required": true, "description": "Assurance observations/findings the decision considered; a human override must not erase prior findings (§23.2).", "sourceRef": "§23.1; Contract §22; Persistence §12.3 (decision_observations)" },
+      { "name": "effectiveAt", "type": "string (timestamp)", "required": false, "description": "When the decision takes effect. Baseline promotion requires an explicit effective decision (§23.2).", "sourceRef": "§23.1; Contract §22; Persistence §12.1" },
+      { "name": "status", "type": "enum (see decisionStatuses)", "required": true, "description": "Lifecycle state of the decision itself.", "sourceRef": "§23.1; Contract §22; Persistence §12.1" }
+    ],
+    "decisionTypes": [
+      { "value": "APPROVAL", "meaning": "Authorized approval of the subject at the bound versions. Requires authority (§23.2).", "sourceRef": "§23.1; Contract §22" },
+      { "value": "REJECTION", "meaning": "Authorized rejection of the subject.", "sourceRef": "§23.1; Contract §22" },
+      { "value": "WAIVER", "meaning": "Authorized waiver discharging a finding/obligation/constraint for a scoped subject+version and duration (there is no separate Waiver object; the waiver IS this decision, shaped by the policy WaiverRule).", "sourceRef": "§23.1; §23.2; Catalog §12" },
+      { "value": "ESCALATION", "meaning": "Authorized escalation of the matter to a higher authority/target.", "sourceRef": "§23.1; Contract §22" },
+      { "value": "RESHAPE", "meaning": "Authorized decision to reshape the PWU (governance-level analogue of the RESHAPE_PWU control action).", "sourceRef": "§23.1; Contract §22" },
+      { "value": "REPLAN", "meaning": "Authorized decision to replan execution (governance-level analogue of the REPLAN_EXECUTION control action).", "sourceRef": "§23.1; Contract §22" },
+      { "value": "PROMOTE_BASELINE", "meaning": "Authorized promotion of a candidate baseline to AUTHORITATIVE; the promotionDecisionId a Baseline references. Baseline promotion is a governance event, not an execution step (§24.2).", "sourceRef": "§23.1; §24.2; Contract §22; Contract §23.1" },
+      { "value": "ABANDON", "meaning": "Authorized abandonment of the subject work.", "sourceRef": "§23.1; Contract §22" },
+      { "value": "REVOKE", "meaning": "Authorized revocation of a prior effective decision; revocation triggers impact analysis (§23.2; RPH-GOV-007).", "sourceRef": "§23.1; §23.2; Contract §22" }
+    ],
+    "decisionStatuses": [
+      { "value": "PROPOSED", "meaning": "Decision proposed/recommended but not yet authorized; no effective governance decision exists (RPH-GOV-002). Emitted as DecisionProposed.", "sourceRef": "§23.1; §26.6; RPH-GOV-002" },
+      { "value": "EFFECTIVE", "meaning": "Authorized and in force. Emitted as DecisionEffective; an approval command without sufficient authority must be rejected BEFORE producing DecisionEffective (§35.5).", "sourceRef": "§23.1; §26.6; Contract §22.2; §35.5" },
+      { "value": "REVOKED", "meaning": "Withdrawn after being effective; triggers impact analysis on affected baselines/downstream (RPH-GOV-007). Emitted as DecisionRevoked.", "sourceRef": "§23.1; §26.6; RPH-GOV-007" },
+      { "value": "SUPERSEDED", "meaning": "Replaced by a successor decision. (No dedicated 'DecisionSuperseded' event is listed in §26.6 — see _openItems.)", "sourceRef": "§23.1" }
+    ],
+    "stateMachine": {
+      "note": "There is no dedicated Decision transition table in the docs; the state machine is the status enum (§23.1) plus the governance events (§26.6). Implied transitions:",
+      "transitions": [
+        { "from": "(none)", "event": "DecisionProposed", "to": "PROPOSED", "guard": "A proposer/recommender may create a proposal without approval authority (§5, §23.2, RPH-GOV-002).", "sourceRef": "§26.6" },
+        { "from": "PROPOSED", "event": "DecisionApproved / DecisionEffective", "to": "EFFECTIVE", "guard": "Actor holds sufficient authority for the decisionType, else rejected RPH_AUTHORITY_INSUFFICIENT before any effective event (§35.5, RPH-GOV-001).", "sourceRef": "§26.6; §35.5" },
+        { "from": "PROPOSED", "event": "DecisionRejected", "to": "(rejected; no effective decision)", "guard": "Authorized rejection or insufficient authority.", "sourceRef": "§26.6; RPH-GOV-001/002" },
+        { "from": "EFFECTIVE", "event": "DecisionRevoked", "to": "REVOKED", "guard": "Authorized revocation; initiates impact analysis (RPH-GOV-007).", "sourceRef": "§26.6; RPH-GOV-007" },
+        { "from": "EFFECTIVE", "event": "(supersession)", "to": "SUPERSEDED", "guard": "A successor decision replaces this one; supersede-never-mutate. No named event in §26.6.", "sourceRef": "§23.1; _openItems" }
+      ]
+    },
+    "authorityVerification": "A decision is authority-verified by checking the acting authority (Decision.authority) against the operation being requested BEFORE any effective state is produced: the command handler authenticates the actor and authorizes the requested operation (§27.2), and an approval command without sufficient authority is rejected with RPH_AUTHORITY_INSUFFICIENT before producing DecisionEffective (§35.5, RPH-GOV-001). Authority is distinct from actor identity (§5): an agent may create a PROPOSED decision / recommend an option, but a recommendation is not an approval and no effective governance decision exists until an authorized actor approves it (RPH-GOV-002, §23.2 'an agent may recommend a decision but cannot exercise authority unless delegated'). Authority is scoped and time-bounded via AuthorityReference (scope[], validFrom, validUntil) (§5). VERSION-BINDING: a decision binds the exact semantic version(s) of its subject via subjectSemanticVersions (Contract §22; Persistence decision_subjects.subject_semantic_version). A decision approving semantic version n NEVER authorizes version n+1 (Property P5, RPH-GOV-003): when a new semantic version of an approved subject is created, the prior decision does not carry to it and the subject is (re-)review-required; a waiver 'does not apply to future semantic versions unless explicitly renewed' (Catalog §12.2). Semantic version increments only when meaning, obligations, assurance requirements, or authority change (§4).",
+    "rules": [
+      { "id": "RPH-GOV-001", "statement": "Approval requires authority: an agent without approval authority issuing ApproveDecision is rejected with error RPH_AUTHORITY_INSUFFICIENT.", "sourceRef": "RPH-GOV-001; §23.2; §35.5" },
+      { "id": "RPH-GOV-002", "statement": "Recommendation is not approval: when a Product Owner agent recommends approval, no effective governance decision exists until an authorized actor approves it.", "sourceRef": "RPH-GOV-002; §23.2" },
+      { "id": "RPH-GOV-003", "statement": "Decision binds subject versions: an approval of Architecture version 2 does not approve version 3 once version 3 is created.", "sourceRef": "RPH-GOV-003; Property P5" },
+      { "id": "RPH-GOV-004", "statement": "Human override preserves findings: a human waiver for a material finding leaves the finding visible, sets disposition WAIVED, records rationale and authority, and leaves evidence unchanged.", "sourceRef": "RPH-GOV-004; §23.2" },
+      { "id": "RPH-GOV-005", "statement": "Waiver scope enforced: a waiver for criterion AC-04 on Architecture version 2 does not waive another criterion, another object, or Architecture version 3.", "sourceRef": "RPH-GOV-005; Catalog §12.2" },
+      { "id": "RPH-GOV-006", "statement": "Expired waiver blocks promotion: if a required waiver is expired, baseline promotion is rejected.", "sourceRef": "RPH-GOV-006; §24.2; RPH-CNS-004" },
+      { "id": "RPH-GOV-007", "statement": "Decision revocation triggers impact analysis: revoking an effective Architecture approval makes the Architecture Baseline review-required or revoked, impacts downstream planning, and initiates impact analysis.", "sourceRef": "RPH-GOV-007; §23.2" }
+    ],
+    "governanceInvariants": [
+      { "statement": "Approval requires authority.", "sourceRef": "§23.2" },
+      { "statement": "Waiver requires scope, rationale, duration, and affected objects.", "sourceRef": "§23.2; Catalog §12.2" },
+      { "statement": "Human override must not erase prior assurance findings.", "sourceRef": "§23.2; §18.1 ('Assurance observations must remain visible after remediation')" },
+      { "statement": "A decision cannot retroactively change evidence.", "sourceRef": "§23.2" },
+      { "statement": "Revocation triggers impact analysis.", "sourceRef": "§23.2" },
+      { "statement": "Baseline promotion requires an explicit effective decision.", "sourceRef": "§23.2" },
+      { "statement": "An agent may recommend a decision but cannot exercise authority unless delegated.", "sourceRef": "§23.2" }
+    ]
+  },
+
+  "controlAction": {
+    "description": "ControlAction is the closed set of actions the CONTROLLER may select after evaluating current PWU state, execution state, assurance state, shape-integrity state, and open observations (§37 Controller Decision Contract; Migration §14). A validator/assurance policy only RECOMMENDS a control action; the controller selects and executes them under policy (Catalog §11: 'A validator recommends control actions. The controller selects and executes them under policy.'). A validator recommendation does not itself mutate assurance state (Catalog §7). Every control action the controller executes must record its triggering condition, evidence/observations considered, the policy authorizing the action, actor, affected objects, and expected outcome (§37).",
+    "canonicalValues_domainModel_s37": [
+      { "value": "CONTINUE", "meaning": "Proceed with the current course.", "sourceRef": "§37" },
+      { "value": "WAIT", "meaning": "Hold; wait on a dependency/condition before proceeding.", "sourceRef": "§37" },
+      { "value": "RETRY", "meaning": "Retry the step (bounded by retry policy; see RPH-EXE-008 — no fourth retry after 3 failures).", "sourceRef": "§37; RPH-EXE-008" },
+      { "value": "GATHER_EVIDENCE", "meaning": "Collect additional evidence before deciding.", "sourceRef": "§37" },
+      { "value": "REVISE_CONTEXT", "meaning": "Revise the assembled context.", "sourceRef": "§37" },
+      { "value": "REVISE_PROMPT", "meaning": "Revise the prompt.", "sourceRef": "§37" },
+      { "value": "CHANGE_MODEL", "meaning": "Switch the model.", "sourceRef": "§37" },
+      { "value": "CHANGE_TOOL", "meaning": "Switch the tool.", "sourceRef": "§37" },
+      { "value": "CHANGE_TACTIC", "meaning": "Change tactics within the plan (authorized by policy; §20.2).", "sourceRef": "§37" },
+      { "value": "RESHAPE_PWU", "meaning": "Reshape the work unit's obligations/scope (shape-integrity response).", "sourceRef": "§37" },
+      { "value": "REVISE_DECOMPOSITION", "meaning": "Revise the decomposition contract.", "sourceRef": "§37" },
+      { "value": "REPLAN_EXECUTION", "meaning": "Produce a revised execution plan/strategy.", "sourceRef": "§37" },
+      { "value": "ESCALATE", "meaning": "Escalate to a human/authority target with a synthesized package.", "sourceRef": "§37; Catalog §13" },
+      { "value": "WAIVE", "meaning": "Apply/record a waiver (requires waiver authority; a policy cannot waive its own blocking finding unless waiver authority is separately defined, §18.1).", "sourceRef": "§37" },
+      { "value": "REJECT", "meaning": "Reject the subject/result.", "sourceRef": "§37" },
+      { "value": "ABANDON", "meaning": "Abandon the work.", "sourceRef": "§37" },
+      { "value": "ACCEPT", "meaning": "Accept the result/disposition.", "sourceRef": "§37" },
+      { "value": "PROMOTE_BASELINE", "meaning": "Request/perform baseline promotion (governance event, gated by preconditions).", "sourceRef": "§37; §24.2" }
+    ],
+    "isSuperset": "The controller's ControlAction set (§37, 18 values) is a SUPERSET of the assurance layer's AssuranceAssessment.recommendedControlAction set (§18, 10 values: CONTINUE, GATHER_EVIDENCE, RETRY, CHANGE_TACTIC, REVISE_CONTEXT, RESHAPE, REPLAN, ESCALATE, REJECT, ACCEPT). The validator layer can only RECOMMEND from the narrower assurance set; the controller can additionally select governance/runtime actions the validator cannot recommend on its own: WAIT, REVISE_PROMPT, CHANGE_MODEL, CHANGE_TOOL, REVISE_DECOMPOSITION, WAIVE, ABANDON, PROMOTE_BASELINE. (Naming: the assurance set spells the shape/plan actions RESHAPE and REPLAN, whereas the controller set spells them RESHAPE_PWU and REPLAN_EXECUTION — see _openItems.) A THIRD, still-broader ControlAction enum appears in the Assurance Policy Catalog §11 / Contract §21 (23 values, adding CLARIFY, GATHER_CONTEXT, CHANGE_VALIDATOR, INVALIDATE_DEPENDENTS, REQUEST_HUMAN_DECISION, REQUEST_WAIVER); the Canonical §37 set is treated as authoritative for the controller and the divergence is recorded in _openItems.",
+    "controllerDecisionSequence": [
+      { "step": 1, "check": "Is the PWU sufficiently shaped?", "onNo": "continue shaping or escalate", "sourceRef": "Migration §14" },
+      { "step": 2, "check": "Is decomposition required?", "onYes": "create and validate decomposition", "sourceRef": "Migration §14" },
+      { "step": 3, "check": "Is there an approved execution plan?", "onNo": "generate or select plan", "sourceRef": "Migration §14" },
+      { "step": 4, "check": "Are runtime bindings authorized?", "onNo": "request authorization or select alternative", "sourceRef": "Migration §14" },
+      { "step": 5, "action": "Execute next eligible step", "sourceRef": "Migration §14" },
+      { "step": 6, "action": "Capture artifacts, evidence, and observations", "sourceRef": "Migration §14" },
+      { "step": 7, "action": "Evaluate assurance policies", "sourceRef": "Migration §14" },
+      { "step": 8, "action": "Select control action (continue | retry | gather evidence | revise context | change tactics | reshape | replan | escalate | reject | accept)", "sourceRef": "Migration §14" },
+      { "step": 9, "action": "If child PWU is satisfied: recompose into parent", "sourceRef": "Migration §14" },
+      { "step": 10, "action": "If root PWU is satisfied: assemble evidence package and request baseline promotion", "sourceRef": "Migration §14" }
+    ],
+    "recordingObligations": [
+      "triggering condition",
+      "evidence or observations considered",
+      "policy authorizing the action",
+      "actor",
+      "affected objects",
+      "expected outcome"
+    ],
+    "recordingObligationsSourceRef": "§37",
+    "controllerExampleFromFixture": {
+      "note": "Reference undertaking: controller saw Execution=SUCCEEDED, Assurance=CONDITIONALLY_SATISFIED, ShapeIntegrity=AT_RISK, 2 open material observations; it did NOT mark the Architecture PWU satisfied and instead sequenced clarify/revise-evidence/create-verification-obligation/re-run-coverage/present-for-human-approval — demonstrating execution success != assurance completion.",
+      "sourceRef": "FIXTURE §21"
+    }
+  },
+
+  "waiver": {
+    "description": "A waiver is an authorized discharge of a finding/obligation/constraint. It is NOT a standalone object in the domain model: it is realized as a Decision of decisionType 'WAIVER' (§23.1) whose permissibility and shape are governed by the assurance policy's WaiverRule (Catalog §12.1), and whose lifecycle is tracked by the Waiver* assurance events (WaiverRequested, WaiverGranted, WaiverDenied, WaiverExpired; §26.5). A waived mandatory obligation requires an authorized waiver with scope, rationale, duration, and affected objects (§10.2, §23.2). A policy cannot waive its own blocking finding unless waiver authority is separately defined (§18.1).",
+    "waiverRuleFields": [
+      { "name": "waiverAllowed", "type": "boolean", "required": true, "description": "Whether a waiver is permitted at all for this policy/criterion.", "sourceRef": "Catalog §12.1" },
+      { "name": "eligibleCriteriaIds", "type": "string[]", "required": true, "description": "The exact policy criteria that may be waived.", "sourceRef": "Catalog §12.1" },
+      { "name": "prohibitedFindingSeverities", "type": "string[]", "required": true, "description": "Finding severities that can never be waived (e.g., CRITICAL).", "sourceRef": "Catalog §12.1" },
+      { "name": "requiredAuthorityType", "type": "string", "required": true, "description": "The authority type that must grant the waiver.", "sourceRef": "Catalog §12.1" },
+      { "name": "maximumDuration", "type": "string", "required": false, "description": "Maximum permitted waiver duration/expiration horizon.", "sourceRef": "Catalog §12.1" },
+      { "name": "requiredRationaleFields", "type": "string[]", "required": true, "description": "Rationale fields that must be supplied.", "sourceRef": "Catalog §12.1" },
+      { "name": "requiredCompensatingControls", "type": "string[]", "required": false, "description": "Compensating controls that must accompany the waiver.", "sourceRef": "Catalog §12.1" },
+      { "name": "revalidationTrigger", "type": "PolicyExpression", "required": false, "description": "Condition that forces revalidation of the waiver.", "sourceRef": "Catalog §12.1" }
+    ],
+    "waiverMustRecord": [
+      "exact policy and criterion",
+      "exact object and semantic version",
+      "finding being waived",
+      "authority",
+      "rationale",
+      "duration or expiration",
+      "compensating controls",
+      "downstream impact",
+      "review conditions"
+    ],
+    "waiverMustRecordSourceRef": "Catalog §12.2",
+    "waiverDoesNot": [
+      "erase a finding",
+      "transform false evidence into valid evidence",
+      "declare a rejected claim true",
+      "apply to future semantic versions unless explicitly renewed"
+    ],
+    "waiverDoesNotSourceRef": "Catalog §12.2",
+    "waiverEvents": [
+      { "value": "WaiverRequested", "sourceRef": "§26.5" },
+      { "value": "WaiverGranted", "sourceRef": "§26.5" },
+      { "value": "WaiverDenied", "sourceRef": "§26.5" },
+      { "value": "WaiverExpired", "sourceRef": "§26.5" }
+    ],
+    "rules": [
+      { "id": "RPH-CNS-004", "statement": "Expired waiver no longer satisfies constraint disposition: when a constraint waiver's expiration passes, the waiver becomes expired, affected work becomes review-required, and baseline promotion is blocked if the constraint remains applicable. (This is the M9-deferred waiver-expiry tie that M10 governance/baseline consumes.)", "sourceRef": "RPH-CNS-004" },
+      { "id": "RPH-GOV-004", "statement": "Human override preserves findings: waiver leaves finding visible, disposition WAIVED, rationale+authority recorded, evidence unchanged.", "sourceRef": "RPH-GOV-004" },
+      { "id": "RPH-GOV-005", "statement": "Waiver scope enforced: bound to exact criterion + object + semantic version; does not bleed to other criteria/objects/versions.", "sourceRef": "RPH-GOV-005; Catalog §12.2" },
+      { "id": "RPH-GOV-006", "statement": "Expired waiver blocks promotion: a required-but-expired waiver causes baseline promotion to be rejected.", "sourceRef": "RPH-GOV-006" }
+    ],
+    "expiryBehavior": "Waiver expiry is a review-required + baseline-promotion-block trigger and is the tie back to RPH-CNS-004 that was deferred from M9. On expiry: (1) the waiver becomes expired (WaiverExpired event, §26.5); (2) affected work becomes review-required (RPH-CNS-004); and (3) baseline promotion is BLOCKED if the underlying finding/constraint remains applicable — RPH-GOV-006 rejects promotion when a required waiver is expired, and RPH-BAS-003 rejects promotion when the newly re-opened blocking finding is unwaived. Mutation testing must catch 'allowing expired waivers' (§26 Mutation Testing). Because a waiver 'does not apply to future semantic versions unless explicitly renewed' (Catalog §12.2), a version bump can also strand a waiver, re-opening the finding for the successor version."
+  },
+
+  "baseline": {
+    "description": "A Baseline (objectType 'BASELINE', §24) is the aggregate root of the Baseline Aggregate (§3.5), which owns Baseline, Baseline Item, promoted artifacts, the assurance package, configuration state, and supersession. A Baseline binds an exact set of subject object versions (id + semanticVersion + optional contentHash) together with the assurance assessments and the promotion Decision that authorized it. Baseline promotion is a governance event, not an execution step (§24.2). An authoritative baseline is immutable; change is expressed by creating a successor baseline, never by mutation.",
+    "extends": "ObjectEnvelope (§4)",
+    "fields": [
+      { "name": "objectType", "type": "'BASELINE'", "required": true, "description": "Discriminant.", "sourceRef": "§24.1; Contract §23" },
+      { "name": "baselineType", "type": "enum (see baselineTypes)", "required": true, "description": "What kind of baseline this is.", "sourceRef": "§24.1; Contract §23" },
+      { "name": "purpose", "type": "string", "required": true, "description": "Why this baseline exists. (Present in Contract §23; not in Canonical §24.1.)", "sourceRef": "Contract §23; Persistence §12.4" },
+      { "name": "scope", "type": "string", "required": true, "description": "What the baseline covers. (Present in Contract §23; not in Canonical §24.1.)", "sourceRef": "Contract §23; Persistence §12.4" },
+      { "name": "itemObjectVersions", "type": "Array<{ objectId: string; semanticVersion: number; contentHash?: string }>", "required": true, "description": "The exact frozen item versions. The Contract shape carries semanticVersion + optional contentHash per item (required by RPH-BAS-001); the Canonical §24.1 field is the plainer 'itemObjectIds: string[]' — see _openItems. Persisted as baseline_items(object_id, semantic_version, content_hash).", "sourceRef": "Contract §23; §24.1; Persistence §12.5" },
+      { "name": "assuranceAssessmentIds", "type": "string[]", "required": true, "description": "The assurance assessments backing the promotion; promotion evidence must be retained (§24.2). Persisted as baseline_assessments.", "sourceRef": "§24.1; Contract §23; Persistence §12.6" },
+      { "name": "promotionDecisionId", "type": "string", "required": true, "description": "The PROMOTE_BASELINE Decision that authorized promotion; baseline promotion requires an explicit effective decision (§23.2).", "sourceRef": "§24.1; Contract §23; Persistence §12.4" },
+      { "name": "status", "type": "enum (see baselineStatuses)", "required": true, "description": "Lifecycle state of the baseline.", "sourceRef": "§24.1; Contract §23; Persistence §12.4" }
+    ],
+    "baselineTypes": [
+      { "value": "INTENT", "meaning": "Baseline over approved intent.", "sourceRef": "§24.1; Contract §23" },
+      { "value": "REQUIREMENTS", "meaning": "Baseline over requirements.", "sourceRef": "§24.1; Contract §23" },
+      { "value": "ARCHITECTURE", "meaning": "Baseline over architecture artifacts (the running fixture example).", "sourceRef": "§24.1; Contract §23; FIXTURE §22" },
+      { "value": "IMPLEMENTATION", "meaning": "Baseline over implementation.", "sourceRef": "§24.1; Contract §23" },
+      { "value": "RELEASE", "meaning": "Baseline over a release.", "sourceRef": "§24.1; Contract §23" },
+      { "value": "EVIDENCE_PACKAGE", "meaning": "Baseline over an assembled evidence package.", "sourceRef": "§24.1; Contract §23" }
+    ],
+    "baselineStatuses": [
+      { "value": "DRAFT", "meaning": "Initial working baseline. Emitted around BaselineCreated.", "sourceRef": "§24.1; §26.6" },
+      { "value": "CANDIDATE", "meaning": "Candidate identifying exact item versions (each item has objectId + semanticVersion + contentHash-where-applicable, RPH-BAS-001).", "sourceRef": "§24.1; RPH-BAS-001" },
+      { "value": "UNDER_REVIEW", "meaning": "Submitted for review. Emitted as BaselineSubmittedForReview.", "sourceRef": "§24.1; §26.6" },
+      { "value": "APPROVED", "meaning": "Review approved. Emitted as BaselineApproved. (Approved != authoritative until promoted.)", "sourceRef": "§24.1; §26.6" },
+      { "value": "AUTHORITATIVE", "meaning": "Promoted and immutable; the operative baseline. Emitted as BaselinePromoted (payload status: 'AUTHORITATIVE'). An authoritative baseline is immutable (§24.2, RPH-BAS-005, Property P7).", "sourceRef": "§24.1; §26.6; Contract §23.2; §24.2" },
+      { "value": "SUPERSEDED", "meaning": "Replaced by a successor baseline; original remains queryable with supersession trace (RPH-BAS-007). Emitted as BaselineSuperseded.", "sourceRef": "§24.1; §26.6; RPH-BAS-007" },
+      { "value": "REVOKED", "meaning": "Revoked (e.g., after the promotion decision is revoked, RPH-GOV-007). Emitted as BaselineRevoked.", "sourceRef": "§24.1; §26.6; RPH-GOV-007" }
+    ],
+    "stateMachine": {
+      "note": "No dedicated Baseline transition table in the docs; the state machine is the status enum (§24.1) plus governance/baseline events (§26.6). Implied transitions:",
+      "transitions": [
+        { "from": "(none)", "event": "BaselineCreated", "to": "DRAFT", "sourceRef": "§26.6" },
+        { "from": "DRAFT", "event": "(identify exact item versions)", "to": "CANDIDATE", "guard": "Each item carries objectId+semanticVersion+contentHash where applicable (RPH-BAS-001). No distinct named event.", "sourceRef": "§24.1; RPH-BAS-001; _openItems" },
+        { "from": "CANDIDATE", "event": "BaselineSubmittedForReview", "to": "UNDER_REVIEW", "sourceRef": "§26.6" },
+        { "from": "UNDER_REVIEW", "event": "BaselineApproved", "to": "APPROVED", "sourceRef": "§26.6" },
+        { "from": "APPROVED", "event": "BaselinePromoted", "to": "AUTHORITATIVE", "guard": "All promotion preconditions hold: effective PROMOTE_BASELINE decision, no open blocking finding (RPH-BAS-003), all required assessments complete/satisfied (RPH-BAS-004), item hashes match reviewed hashes (RPH-BAS-002), no expired required waiver (RPH-GOV-006).", "sourceRef": "§26.6; §24.2" },
+        { "from": "AUTHORITATIVE", "event": "BaselineSuperseded", "to": "SUPERSEDED", "guard": "A successor baseline replaces it; supersession preserves traceability (RPH-BAS-007). The authoritative baseline itself is never mutated (RPH-BAS-005, P7).", "sourceRef": "§26.6; §24.2; RPH-BAS-005/007" },
+        { "from": "AUTHORITATIVE", "event": "BaselineRevoked", "to": "REVOKED", "guard": "Typically after promotion decision revocation (RPH-GOV-007); prior baseline stays queryable/immutable.", "sourceRef": "§26.6; RPH-GOV-007" }
+      ]
+    },
+    "promotionPreconditions": [
+      { "requirement": "An explicit effective PROMOTE_BASELINE governance decision exists (baseline promotion requires an explicit effective decision).", "sourceRef": "§23.2; §24.2" },
+      { "requirement": "No open blocking observation/finding remains unless waived (open blocking findings prevent promotion).", "sourceRef": "§24.2; RPH-BAS-003" },
+      { "requirement": "All REQUIRED assurance assessments have completed and are satisfied — no missing required assessment (e.g., Intent Preservation incomplete => promotion rejected). This is the 'no green without assurance' rule: ExecutionStepSucceeded cannot directly produce AssuranceState=SATISFIED (§35.2), and if execution succeeds but validation fails the PWU does not become SATISFIED and promotion is blocked (Scenario 3).", "sourceRef": "RPH-BAS-004; §35.2; §39 Scenario 3; §42 litmus 3" },
+      { "requirement": "Promoted item versions/hashes exactly match the reviewed item versions/hashes (PromoteBaseline includes exact semantic versions and hashes; a mismatch is rejected RPH_BASELINE_VERSION_MISMATCH).", "sourceRef": "RPH-BAS-001; RPH-BAS-002; Contract §23.1; §35.3" },
+      { "requirement": "No required waiver is expired (an expired required waiver blocks promotion).", "sourceRef": "RPH-GOV-006; RPH-CNS-004" },
+      { "requirement": "Promotion evidence (assurance package) is retained.", "sourceRef": "§24.2" }
+    ],
+    "noGreenWithoutAssurance": "A baseline cannot become AUTHORITATIVE on execution success alone. Execution state and assurance state are independent (§38, litmus test 3): ExecutionStepSucceeded cannot directly produce AssuranceState=SATISFIED (§35.2). If execution SUCCEEDED but assurance is REJECTED, the PWU does not become SATISFIED and baseline promotion is blocked (Scenario 3). Missing/incomplete required assessments (RPH-BAS-004) and open blocking findings (RPH-BAS-003) each independently block promotion.",
+    "immutabilityRule": "An authoritative baseline is immutable. (§24.2: 'An authoritative baseline is immutable.') Verbatim conformance: 'No legal command mutates an authoritative baseline's item set.' (Property P7). Given an authoritative Architecture Baseline, when an item is changed, the original baseline is unchanged and a successor baseline must be created (RPH-BAS-005). Immutability is enforced through application policy AND database permissions (Persistence §12.6 note). Mutation testing must catch 'allowing baseline promotion with an open blocking finding' (§26).",
+    "supersessionRule": "Change to a baselined object is expressed by creating a SUCCESSOR baseline, never by mutating the authoritative one ('Changes create a successor baseline', §24.2). Supersession preserves history: when Baseline 1 is superseded by Baseline 2, Baseline 1 remains queryable, a supersession trace exists (SUPERSEDES / BaselineSuperseded), and prior evidence and decision remain intact (RPH-BAS-007, §24.2 'Supersession preserves traceability'). A prior baseline remains immutable even when intent changes downstream (Scenario 5: 'prior baseline remains immutable; successor baseline is required').",
+    "commitVsBaseline": "Repository commit and baseline are related but not synonymous: a commit may exist without baseline promotion, and no baseline becomes authoritative without a promotion decision and assurance (§24.2, RPH-BAS-006).",
+    "rules": [
+      { "id": "RPH-BAS-001", "statement": "Candidate baseline identifies exact versions: every item includes object ID, semantic version, and content hash where applicable.", "sourceRef": "RPH-BAS-001; Contract §23" },
+      { "id": "RPH-BAS-002", "statement": "Baseline version mismatch rejected: if promotion specifies a hash different from the reviewed artifact hash, promotion fails with RPH_BASELINE_VERSION_MISMATCH.", "sourceRef": "RPH-BAS-002; §35.3" },
+      { "id": "RPH-BAS-003", "statement": "Open blocking finding prevents promotion: an open blocking (e.g., tenant-isolation) finding causes baseline promotion to be rejected.", "sourceRef": "RPH-BAS-003; §24.2" },
+      { "id": "RPH-BAS-004", "statement": "Missing required assessment prevents promotion: if a required assessment (e.g., Intent Preservation) has not completed, promotion is rejected.", "sourceRef": "RPH-BAS-004" },
+      { "id": "RPH-BAS-005", "statement": "Authoritative baseline immutable: changing an item leaves the original authoritative baseline unchanged and requires a successor baseline.", "sourceRef": "RPH-BAS-005; Property P7; §24.2" },
+      { "id": "RPH-BAS-006", "statement": "Commit is not baseline: committing source/architecture artifacts to version control does not make any baseline authoritative without a promotion decision and assurance.", "sourceRef": "RPH-BAS-006; §24.2" },
+      { "id": "RPH-BAS-007", "statement": "Supersession preserves history: when Baseline 1 is superseded by Baseline 2, Baseline 1 remains queryable, a supersession trace exists, and prior evidence and decision remain intact.", "sourceRef": "RPH-BAS-007; §24.2" }
+    ],
+    "baselineInvariants": [
+      { "statement": "An authoritative baseline is immutable.", "sourceRef": "§24.2" },
+      { "statement": "Changes create a successor baseline.", "sourceRef": "§24.2" },
+      { "statement": "Open blocking observations prevent promotion unless waived.", "sourceRef": "§24.2" },
+      { "statement": "Promotion evidence must be retained.", "sourceRef": "§24.2" },
+      { "statement": "Supersession preserves traceability.", "sourceRef": "§24.2" },
+      { "statement": "Repository commit and baseline are related but not synonymous.", "sourceRef": "§24.2" },
+      { "statement": "A commit may exist without baseline promotion.", "sourceRef": "§24.2" },
+      { "statement": "Baseline promotion is a governance event, not an execution step.", "sourceRef": "§24.2" },
+      { "statement": "PROMOTES trace must connect a Decision to a Baseline or Baseline Item.", "sourceRef": "§25.1" }
+    ]
+  },
+
+  "conformanceTests": [
+    { "id": "RPH-GOV-001", "name": "Approval requires authority", "given": "an agent without approval authority.", "when": "it issues ApproveDecision.", "then": "the command is rejected with error RPH_AUTHORITY_INSUFFICIENT.", "sourceRef": "Conformance §15" },
+    { "id": "RPH-GOV-002", "name": "Recommendation is not approval", "given": "a Product Owner agent recommends approval.", "when": "(recommendation is made).", "then": "no effective governance decision exists until an authorized actor approves it.", "sourceRef": "Conformance §15" },
+    { "id": "RPH-GOV-003", "name": "Decision binds subject versions", "given": "Architecture version 2 is approved.", "when": "Architecture version 3 is created.", "then": "the version-2 decision does not approve version 3.", "sourceRef": "Conformance §15" },
+    { "id": "RPH-GOV-004", "name": "Human override preserves findings", "given": "a human grants a waiver for a material finding.", "when": "(waiver is granted).", "then": "the finding remains visible; disposition becomes WAIVED; rationale and authority are recorded; evidence is unchanged.", "sourceRef": "Conformance §15" },
+    { "id": "RPH-GOV-005", "name": "Waiver scope enforced", "given": "a waiver for policy criterion AC-04 on Architecture version 2.", "when": "(waiver is applied).", "then": "it does not waive another criterion, another object, or Architecture version 3.", "sourceRef": "Conformance §15" },
+    { "id": "RPH-GOV-006", "name": "Expired waiver blocks promotion", "given": "a required waiver is expired.", "when": "baseline promotion is requested.", "then": "promotion is rejected.", "sourceRef": "Conformance §15" },
+    { "id": "RPH-GOV-007", "name": "Decision revocation triggers impact analysis", "given": "an effective Architecture approval.", "when": "the decision is revoked.", "then": "the Architecture Baseline becomes review-required or revoked; downstream planning is impacted; impact analysis is initiated.", "sourceRef": "Conformance §15" },
+    { "id": "RPH-BAS-001", "name": "Candidate baseline identifies exact versions", "given": "an Architecture Baseline candidate.", "when": "(items are inspected).", "then": "every item includes object ID, semantic version, and content hash where applicable.", "sourceRef": "Conformance §16" },
+    { "id": "RPH-BAS-002", "name": "Baseline version mismatch rejected", "given": "a reviewed artifact hash.", "when": "promotion specifies a different hash.", "then": "promotion fails with error RPH_BASELINE_VERSION_MISMATCH.", "sourceRef": "Conformance §16" },
+    { "id": "RPH-BAS-003", "name": "Open blocking finding prevents promotion", "given": "an open blocking tenant-isolation finding.", "when": "Architecture Baseline promotion is requested.", "then": "promotion is rejected.", "sourceRef": "Conformance §16" },
+    { "id": "RPH-BAS-004", "name": "Missing required assessment prevents promotion", "given": "Baseline Promotion requires Architecture Coverage, Intent Preservation, and Assumption Disclosure, and Intent Preservation has not completed.", "when": "promotion is requested.", "then": "promotion is rejected.", "sourceRef": "Conformance §16" },
+    { "id": "RPH-BAS-005", "name": "Authoritative baseline immutable", "given": "an authoritative Architecture Baseline.", "when": "an item is changed.", "then": "the original baseline is unchanged; a successor baseline must be created.", "sourceRef": "Conformance §16" },
+    { "id": "RPH-BAS-006", "name": "Commit is not baseline", "given": "source code or architecture artifacts are committed to version control.", "when": "(commit occurs).", "then": "no baseline becomes authoritative without a promotion decision and assurance.", "sourceRef": "Conformance §16" },
+    { "id": "RPH-BAS-007", "name": "Supersession preserves history", "given": "Architecture Baseline 1 is superseded by Baseline 2.", "when": "(supersession occurs).", "then": "Baseline 1 remains queryable; a supersession trace exists; prior evidence and decision remain intact.", "sourceRef": "Conformance §16" },
+    { "id": "Property P5", "name": "Semantic version approval isolation", "given": "a decision approving semantic version n.", "when": "semantic version n+1 exists.", "then": "the decision never authorizes semantic version n+1.", "sourceRef": "Conformance §25 (Property-based)" },
+    { "id": "Property P7", "name": "Authoritative baselines immutable", "given": "an authoritative baseline with an item set.", "when": "any legal command is applied.", "then": "no legal command mutates the authoritative baseline's item set.", "sourceRef": "Conformance §25 (Property-based)" },
+    { "id": "RPH-CNS-004", "name": "Expired waiver no longer satisfies constraint disposition (M9-deferred waiver-expiry tie consumed by M10)", "given": "a constraint waiver with an expiration.", "when": "the expiration passes.", "then": "the waiver becomes expired; affected work becomes review-required; baseline promotion is blocked if the constraint remains applicable.", "sourceRef": "Conformance §10" }
+  ],
+
+  "enumsIntroduced": [
+    { "name": "DecisionType", "values": ["APPROVAL", "REJECTION", "WAIVER", "ESCALATION", "RESHAPE", "REPLAN", "PROMOTE_BASELINE", "ABANDON", "REVOKE"], "note": "New at M10 (governance). DecisionObject.decisionType, §23.1 / Contract §22. Distinct from ControlAction though several values overlap semantically (RESHAPE vs RESHAPE_PWU, REPLAN vs REPLAN_EXECUTION, WAIVER-decision vs WAIVE-action, PROMOTE_BASELINE in both)." },
+    { "name": "DecisionStatus", "values": ["PROPOSED", "EFFECTIVE", "REVOKED", "SUPERSEDED"], "note": "New at M10. Decision.status, §23.1 / Contract §22 / Persistence §12.1." },
+    { "name": "BaselineType", "values": ["INTENT", "REQUIREMENTS", "ARCHITECTURE", "IMPLEMENTATION", "RELEASE", "EVIDENCE_PACKAGE"], "note": "New at M10. Baseline.baselineType, §24.1 / Contract §23." },
+    { "name": "BaselineStatus", "values": ["DRAFT", "CANDIDATE", "UNDER_REVIEW", "APPROVED", "AUTHORITATIVE", "SUPERSEDED", "REVOKED"], "note": "New at M10. Baseline.status, §24.1 / Contract §23 / Persistence §12.4." },
+    { "name": "ControlAction (canonical, controller — §37)", "values": ["CONTINUE", "WAIT", "RETRY", "GATHER_EVIDENCE", "REVISE_CONTEXT", "REVISE_PROMPT", "CHANGE_MODEL", "CHANGE_TOOL", "CHANGE_TACTIC", "RESHAPE_PWU", "REVISE_DECOMPOSITION", "REPLAN_EXECUTION", "ESCALATE", "WAIVE", "REJECT", "ABANDON", "ACCEPT", "PROMOTE_BASELINE"], "note": "Authoritative controller set (§37). Superset of AssuranceAssessment.recommendedControlAction. NOTE two competing definitions exist elsewhere — see enum below and _openItems." },
+    { "name": "AssuranceAssessment.recommendedControlAction (validator subset — §18)", "values": ["CONTINUE", "GATHER_EVIDENCE", "RETRY", "CHANGE_TACTIC", "REVISE_CONTEXT", "RESHAPE", "REPLAN", "ESCALATE", "REJECT", "ACCEPT"], "note": "Already in canonical vocab (§18, part of M8 assurance). The narrower set a validator may RECOMMEND; spells RESHAPE/REPLAN (not RESHAPE_PWU/REPLAN_EXECUTION). The controller ControlAction (§37) is a superset of this." },
+    { "name": "ControlAction (Assurance Policy Catalog / Contract §21 variant)", "values": ["CONTINUE", "WAIT", "CLARIFY", "GATHER_CONTEXT", "GATHER_EVIDENCE", "REVISE_PROMPT", "REVISE_CONTEXT", "RETRY", "CHANGE_MODEL", "CHANGE_TOOL", "CHANGE_VALIDATOR", "CHANGE_TACTIC", "RESHAPE_PWU", "REVISE_DECOMPOSITION", "REPLAN_EXECUTION", "INVALIDATE_DEPENDENTS", "REQUEST_HUMAN_DECISION", "REQUEST_WAIVER", "ESCALATE", "REJECT", "ABANDON", "ACCEPT", "PROMOTE_BASELINE"], "note": "Competing/broader 23-value definition in Catalog §11 and Contract §21. Uses REQUEST_WAIVER (not WAIVE), REQUEST_HUMAN_DECISION, CLARIFY, GATHER_CONTEXT, CHANGE_VALIDATOR, INVALIDATE_DEPENDENTS. See _openItems — Canonical §37 is treated as authoritative for the controller." },
+    { "name": "AuthorityReference.authorityType", "values": ["USER", "ORGANIZATIONAL_ROLE", "POLICY", "LEGAL_REQUIREMENT", "SYSTEM_OWNER", "DELEGATED_AGENT"], "note": "Already in canonical vocab (§5, M2 actor/authority). Governs who may authority-verify a decision; scope[]/validFrom/validUntil bound the authority." },
+    { "name": "ActorType", "values": ["HUMAN", "AGENT", "MODEL", "SERVICE", "POLICY_ENGINE", "EXTERNAL_SYSTEM"], "note": "Already in canonical vocab (§5). Decision.authority is typed ActorReference (uses ActorType), which is the field-typing conflict flagged in _openItems." },
+    { "name": "Governance & baseline events", "values": ["DecisionProposed", "DecisionApproved", "DecisionRejected", "DecisionEffective", "DecisionRevoked", "BaselineCreated", "BaselineSubmittedForReview", "BaselineApproved", "BaselinePromoted", "BaselineSuperseded", "BaselineRevoked"], "note": "§26.6. Contract §33 only enumerates DecisionProposed/DecisionEffective/BaselineCreated/BaselinePromoted as first-class payloads — see _openItems." },
+    { "name": "Waiver events", "values": ["WaiverRequested", "WaiverGranted", "WaiverDenied", "WaiverExpired"], "note": "Already listed under assurance events (§26.5, M8). Consumed by M10 governance (waiver = WAIVER decision) and baseline promotion gating." }
+  ],
+
+  "_openItems": [
+    { "item": "ControlAction has THREE non-identical definitions.", "detail": "Canonical §37 = 18 values (uses WAIVE). Assurance Policy Catalog §11 / Contract §21 = 23 values (uses REQUEST_WAIVER, adds CLARIFY, GATHER_CONTEXT, CHANGE_VALIDATOR, INVALIDATE_DEPENDENTS, REQUEST_HUMAN_DECISION). AssuranceAssessment.recommendedControlAction §18 = 10 values (uses RESHAPE/REPLAN, not RESHAPE_PWU/REPLAN_EXECUTION). Resolution taken: Canonical §37 authoritative for the controller; §18 is the validator-recommendation subset; the Catalog 23-value set is a broader still-unreconciled superset. Implementations must pick one enum and map the others.", "sourceRef": "§37; §18; Catalog §11; Contract §21" },
+    { "item": "Decision.authority is typed ActorReference, not AuthorityReference.", "detail": "Both §23.1 and Contract §22 type DecisionObject.authority as ActorReference (identity), yet the governance model (§5, §23.2, §35.5, RPH-GOV-001) requires an AUTHORITY check (AuthorityReference: authorityType/scope/validFrom/validUntil). The docs do not say whether the handler dereferences an AuthorityReference by the actor's roleId or whether authority is carried separately. Authority verification is specified behaviorally (reject before DecisionEffective) but the field type does not carry the authority scope.", "sourceRef": "§23.1; §5; §35.5; Contract §22" },
+    { "item": "subjectSemanticVersions present in Contract §22 but ABSENT from Canonical §23.1.", "detail": "The version-binding field the conformance tests depend on (RPH-GOV-003, Property P5) exists in the Contract DecisionObject and the persistence table (decision_subjects.subject_semantic_version) but not in the Canonical §23.1 interface, which only has subjectObjectIds. The Contract shape is the operative one.", "sourceRef": "§23.1; Contract §22; Persistence §12.2" },
+    { "item": "Baseline item shape differs: itemObjectIds (Canonical §24.1) vs itemObjectVersions with semanticVersion+contentHash (Contract §23).", "detail": "RPH-BAS-001/002 and §35.3 require exact version + hash per item, which only the Contract shape (and baseline_items table) provides. The Canonical §24.1 'itemObjectIds: string[]' is under-specified; treat the Contract shape as operative.", "sourceRef": "§24.1; Contract §23; Persistence §12.5; RPH-BAS-001" },
+    { "item": "Event coverage gaps between status enums and §26.6 events.", "detail": "Decision.status has SUPERSEDED but §26.6 lists no DecisionSuperseded event. Baseline.status has DRAFT and CANDIDATE but §26.6 has BaselineCreated with no explicit DRAFT->CANDIDATE event; BaselinePromoted maps status to AUTHORITATIVE (payload status:'AUTHORITATIVE') rather than a 'PROMOTED' status value. Contract §33 first-class payloads only cover DecisionProposed/DecisionEffective and BaselineCreated/BaselinePromoted, omitting Approved/Rejected/Revoked/SubmittedForReview/Superseded payloads defined narratively in §26.6.", "sourceRef": "§23.1; §24.1; §26.6; Contract §33" },
+    { "item": "No standalone Waiver object or persistence table.", "detail": "A waiver is realized as a Decision (decisionType 'WAIVER') plus a policy-embedded WaiverRule (Catalog §12) plus Waiver* events (§26.5). RPH-CNS-004/RPH-GOV-006 reference 'the waiver becomes expired' and enforce expiry, but there is no waivers table, no Waiver aggregate, and no explicit handler location for detecting/firing WaiverExpired. Expiry detection mechanism (scheduler vs lazy-on-read) is unspecified.", "sourceRef": "§23.1; Catalog §12; §26.5; RPH-CNS-004; Persistence §12" },
+    { "item": "decisionType RESHAPE/REPLAN vs ControlAction RESHAPE_PWU/REPLAN_EXECUTION naming mismatch.", "detail": "Decision.decisionType (§23.1) spells them RESHAPE and REPLAN; the controller ControlAction (§37) spells them RESHAPE_PWU and REPLAN_EXECUTION. Same intent, different tokens; a control action of RESHAPE_PWU that requires governance would map to a RESHAPE decision.", "sourceRef": "§23.1; §37" },
+    { "item": "Promotion-precondition 'assurance SATISFIED' vs 'CONDITIONALLY_SATISFIED / WAIVED'.", "detail": "RPH-BAS-004 requires required assessments to have 'completed'; §39 Scenario 4 permits promotion with a waiver where assurance becomes WAIVED or conditionally satisfied and the baseline record includes the waiver. The docs do not give a single precise predicate over AssuranceAssessment.disposition (SATISFIED vs CONDITIONALLY_SATISFIED vs WAIVED) that gates promotion; it is expressed as 'no open blocking finding unless waived' + 'required assessments complete'. Contested claim cannot authorize promotion unless resolved or waived (§15.2).", "sourceRef": "RPH-BAS-003; RPH-BAS-004; §39 Scenario 4; §15.2" }
+  ]
+}

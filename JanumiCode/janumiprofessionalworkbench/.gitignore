@@ -1,0 +1,28 @@
+# Janumi Professional Workbench — Bun + Turborepo + SvelteKit workspace.
+# Dependencies, build output, caches, and local tooling artifacts.
+node_modules/
+dist/
+build/
+coverage/
+.turbo/
+.svelte-kit/
+*.tsbuildinfo
+.env
+.env.*
+.DS_Store
+
+# Local tooling / scratch (SonarLint remediation tracker, test-harness sqlite DBs).
+.sonar-remediation/
+.janumicode/
+
+# --- IMPORTANT: re-include our source (case-insensitive Windows collision) ---
+# The PARENT repo's aggregated .gitignore contains a Swift-template rule `Packages/`. Because
+# core.ignorecase=true on this host, `Packages/` matches THIS workspace's lowercase `packages/` and
+# would ignore ALL engine source. A deeper .gitignore overrides a parent, so re-include the tree here.
+# The dependency/build rules above (node_modules/, dist/) still apply WITHIN it, so
+# packages/*/node_modules and packages/*/dist stay ignored — only the source is re-included.
+!/packages/
+!/packages/**
+/packages/**/node_modules/
+/packages/**/dist/
+/packages/**/.turbo/

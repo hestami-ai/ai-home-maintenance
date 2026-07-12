@@ -1,0 +1,35 @@
+{
+  "name": "@janumipwb/rph-persistence",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "description": "better-sqlite3 StorageAdapter for the RPH engine — event store, outbox, idempotency, optimistic concurrency. All SQL lives here behind a dialect-neutral seam (Postgres adapter slots in later).",
+  "license": "AGPL-3.0-only",
+  "exports": {
+    ".": {
+      "source": "./src/index.ts",
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js",
+      "default": "./dist/index.js"
+    }
+  },
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "files": [
+    "dist"
+  ],
+  "scripts": {
+    "build": "tsc -p tsconfig.build.json",
+    "check-types": "tsc --noEmit -p tsconfig.json",
+    "test": "vitest run --passWithNoTests"
+  },
+  "dependencies": {
+    "@janumipwb/rph-contracts": "workspace:*",
+    "@janumipwb/rph-ports": "workspace:*",
+    "better-sqlite3": "^12.8.0"
+  },
+  "devDependencies": {
+    "@janumipwb/typescript-config": "workspace:*",
+    "@types/better-sqlite3": "^7.6.13"
+  }
+}

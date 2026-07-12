@@ -1,0 +1,16 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "type": "string",
+  "enum": [
+    "MODEL_INVOCATION",
+    "TOOL_INVOCATION",
+    "RETRIEVAL",
+    "TRANSFORMATION",
+    "HUMAN_INTERACTION",
+    "WAIT",
+    "BRANCH",
+    "PARALLEL_GROUP",
+    "ASSURANCE_INVOCATION"
+  ],
+  "$id": "urn:janumi:rph:schema:enum:StepType:1"
+}

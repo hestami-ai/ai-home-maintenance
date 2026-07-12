@@ -1,0 +1,16 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "type": "string",
+  "enum": [
+    "APPROVAL",
+    "REJECTION",
+    "WAIVER",
+    "ESCALATION",
+    "RESHAPE",
+    "REPLAN",
+    "PROMOTE_BASELINE",
+    "ABANDON",
+    "REVOKE"
+  ],
+  "$id": "urn:janumi:rph:schema:enum:DecisionType:1"
+}

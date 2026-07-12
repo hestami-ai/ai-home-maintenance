@@ -1,0 +1,333 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "type": "object",
+  "properties": {
+    "id": {
+      "type": "string",
+      "pattern": "^([a-z]+)_([0-9A-HJKMNP-TV-Z]{26})$"
+    },
+    "objectType": {
+      "type": "string",
+      "enum": [
+        "INTENT",
+        "PROFESSIONAL_WORK_UNIT",
+        "OBLIGATION",
+        "CONSTRAINT",
+        "ASSUMPTION",
+        "CLAIM",
+        "EVIDENCE",
+        "ASSURANCE_POLICY",
+        "ASSURANCE_ASSESSMENT",
+        "ASSURANCE_OBSERVATION",
+        "DECISION",
+        "ARTIFACT",
+        "DECOMPOSITION_CONTRACT",
+        "RECOMPOSITION_CONTRACT",
+        "EXECUTION_PLAN",
+        "RUNTIME_BINDING",
+        "BASELINE"
+      ]
+    },
+    "schemaVersion": {
+      "type": "integer",
+      "minimum": 0,
+      "maximum": 9007199254740991
+    },
+    "semanticVersion": {
+      "type": "integer",
+      "minimum": 0,
+      "maximum": 9007199254740991
+    },
+    "revision": {
+      "type": "integer",
+      "minimum": 0,
+      "maximum": 9007199254740991
+    },
+    "lifecycleStatus": {
+      "type": "string"
+    },
+    "createdAt": {
+      "type": "string",
+      "format": "date-time",
+      "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d(?::[0-5]\\d(?:\\.\\d+)?)?(?:Z))$"
+    },
+    "createdBy": {
+      "type": "object",
+      "properties": {
+        "actorId": {
+          "type": "string",
+          "minLength": 1
+        },
+        "actorType": {
+          "type": "string",
+          "enum": [
+            "HUMAN",
+            "AGENT",
+            "MODEL",
+            "SERVICE",
+            "POLICY_ENGINE",
+            "EXTERNAL_SYSTEM"
+          ]
+        },
+        "displayName": {
+          "type": "string",
+          "minLength": 1
+        },
+        "roleId": {
+          "type": "string"
+        },
+        "modelId": {
+          "type": "string"
+        },
+        "providerId": {
+          "type": "string"
+        },
+        "executionInstanceId": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "actorId",
+        "actorType",
+        "displayName"
+      ],
+      "additionalProperties": false
+    },
+    "updatedAt": {
+      "type": "string",
+      "format": "date-time",
+      "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d(?::[0-5]\\d(?:\\.\\d+)?)?(?:Z))$"
+    },
+    "updatedBy": {
+      "type": "object",
+      "properties": {
+        "actorId": {
+          "type": "string",
+          "minLength": 1
+        },
+        "actorType": {
+          "type": "string",
+          "enum": [
+            "HUMAN",
+            "AGENT",
+            "MODEL",
+            "SERVICE",
+            "POLICY_ENGINE",
+            "EXTERNAL_SYSTEM"
+          ]
+        },
+        "displayName": {
+          "type": "string",
+          "minLength": 1
+        },
+        "roleId": {
+          "type": "string"
+        },
+        "modelId": {
+          "type": "string"
+        },
+        "providerId": {
+          "type": "string"
+        },
+        "executionInstanceId": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "actorId",
+        "actorType",
+        "displayName"
+      ],
+      "additionalProperties": false
+    },
+    "provenance": {
+      "type": "object",
+      "properties": {
+        "originType": {
+          "type": "string",
+          "enum": [
+            "USER_INPUT",
+            "MODEL_GENERATION",
+            "TOOL_OUTPUT",
+            "HUMAN_DECISION",
+            "MIGRATION",
+            "DERIVED",
+            "IMPORTED"
+          ]
+        },
+        "sourceObjectIds": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "sourceEventIds": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "producingExecutionAttemptId": {
+          "type": "string"
+        },
+        "producingValidatorId": {
+          "type": "string"
+        },
+        "contentHash": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "originType",
+        "sourceObjectIds",
+        "sourceEventIds"
+      ],
+      "additionalProperties": false
+    },
+    "ontologyId": {
+      "type": "string"
+    },
+    "ontologyVersion": {
+      "type": "string"
+    },
+    "tags": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    },
+    "extensions": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "properties": {
+          "namespace": {
+            "type": "string",
+            "minLength": 1
+          },
+          "schemaVersion": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 9007199254740991
+          },
+          "data": {
+            "type": "object",
+            "propertyNames": {
+              "type": "string"
+            },
+            "additionalProperties": {}
+          }
+        },
+        "required": [
+          "namespace",
+          "schemaVersion",
+          "data"
+        ],
+        "additionalProperties": false
+      }
+    },
+    "statement": {
+      "type": "string"
+    },
+    "basis": {
+      "type": "string"
+    },
+    "introducedBy": {
+      "type": "object",
+      "properties": {
+        "actorId": {
+          "type": "string",
+          "minLength": 1
+        },
+        "actorType": {
+          "type": "string",
+          "enum": [
+            "HUMAN",
+            "AGENT",
+            "MODEL",
+            "SERVICE",
+            "POLICY_ENGINE",
+            "EXTERNAL_SYSTEM"
+          ]
+        },
+        "displayName": {
+          "type": "string",
+          "minLength": 1
+        },
+        "roleId": {
+          "type": "string"
+        },
+        "modelId": {
+          "type": "string"
+        },
+        "providerId": {
+          "type": "string"
+        },
+        "executionInstanceId": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "actorId",
+        "actorType",
+        "displayName"
+      ],
+      "additionalProperties": false
+    },
+    "affectedObjectIds": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    },
+    "materiality": {
+      "type": "string",
+      "enum": [
+        "IMMATERIAL",
+        "MATERIAL",
+        "CRITICAL"
+      ]
+    },
+    "verificationMethod": {
+      "type": "string"
+    },
+    "expirationCondition": {
+      "type": "string"
+    },
+    "status": {
+      "type": "string",
+      "enum": [
+        "PROPOSED",
+        "DISCLOSED",
+        "UNDER_VERIFICATION",
+        "ACCEPTED",
+        "VERIFIED",
+        "FALSIFIED",
+        "EXPIRED",
+        "SUPERSEDED"
+      ]
+    }
+  },
+  "required": [
+    "id",
+    "objectType",
+    "schemaVersion",
+    "semanticVersion",
+    "revision",
+    "lifecycleStatus",
+    "createdAt",
+    "createdBy",
+    "updatedAt",
+    "updatedBy",
+    "provenance",
+    "tags",
+    "extensions",
+    "statement",
+    "introducedBy",
+    "affectedObjectIds",
+    "materiality",
+    "status"
+  ],
+  "additionalProperties": false,
+  "$id": "urn:janumi:rph:schema:object:AssumptionObject:1"
+}

@@ -1,0 +1,272 @@
+{
+  "_meta": {
+    "milestone": "M11",
+    "title": "Execution model, runtime bindings & restart recovery",
+    "sourceDocs": [
+      "Janumi Professional Workbench Recursive Professional Harness - Canonical Domain Model, Invariant Catalog, State Machines, and Event Contract",
+      "Janumi Professional Workbench Recursive Professional Harness - Executable Invariant and Conformance Test Specification",
+      "Janumi Professional Workbench Recursive Professional Harness - Command, Event, Schema Contract Package",
+      "Janumi Professional Workbench Recursive Professional Harness - Persistence, Migration, Dual-Run, and Cutover Design"
+    ],
+    "purpose": "Authoritative vocabulary for the RPH Execution Aggregate: ExecutionPlan lifecycle + approval, ExecutionStep lifecycle with pre/postconditions, RuntimeBinding capability authorization, the retry cap and exhaustion behavior, the execution-not-equals-assurance boundary (INV-5 / §35.2 at the execution layer), and restart/recovery + idempotency for in-flight execution.",
+    "sourceRefConvention": "Bare '§N' = section number in the Canonical Domain Model doc (authoritative for object structure and enum spellings). 'Contract §N' = Command/Event/Schema Contract Package doc (operative for wire shapes and payloads). 'Persistence §N' = Persistence, Migration, Dual-Run, and Cutover Design doc (tables, outbox, recovery). Test ids (RPH-EXE-*, RPH-PWU-*, RPH-PER-*, RPH-E2E-*, RPH-FIX-*, Property P*) live in the Conformance Test Spec doc.",
+    "authoritativeNote": "The Canonical Domain Model is authoritative for enum spellings and object structure. The Contract Package refines two shapes: ExecutionPlan embeds steps/transitions inline (steps: ExecutionStep[], transitions: ExecutionTransition[]) whereas Canonical §20.1 references them by id (stepIds, transitionIds); the Persistence schema normalizes them into separate tables with FKs, matching the Canonical id-reference model. The exec!=assurance boundary is stated verbatim in Contract §35.2 and Contract §16.2, mirrored by Canonical §35.1 (Property 'No execution implies assurance') and Conformance Property P1 + RPH-PWU-005. Divergences captured in _openItems.",
+    "generatedAt": "2026-07-11"
+  },
+
+  "executionPlan": {
+    "description": "An ExecutionPlan (objectType 'EXECUTION_PLAN', §4 ProfessionalWorkObjectType) is the aggregate root of the Execution Aggregate (§3.3), which owns Execution Plan, Execution Step, Execution Attempt, Execution Event, runtime result, and retry/tactical-change state. It describes HOW a PWU is currently intended to be performed (§2.3). A plan is a replaceable strategy: changing the plan does not change the identity or meaning of the PWU, and a PWU may have no plan, exactly one active plan, several superseded plans, or alternative candidate plans (§2.3). A plan may not change PWU intent or obligations, and plan approval grants NO runtime privileges (§20.2).",
+    "extends": "ObjectEnvelope (§4: id, objectType, semanticVersion, revision, lifecycleStatus, provenance, authorityId, etc.)",
+    "fields": [
+      { "name": "objectType", "type": "'EXECUTION_PLAN'", "required": true, "description": "Discriminant fixing this envelope as an ExecutionPlan.", "sourceRef": "§20.1; Contract §15" },
+      { "name": "workUnitId", "type": "string", "required": true, "description": "The single PWU this plan performs. An active plan must reference exactly one PWU.", "sourceRef": "§20.1; §20.2; Contract §15; Persistence §10.1 (execution_plans.work_unit_id)" },
+      { "name": "planVersion", "type": "number", "required": true, "description": "Monotonic plan revision. Plan revision preserves prior attempt history. Unique per (work_unit_id, plan_version).", "sourceRef": "§20.1; §20.2; Contract §15; Persistence §10.1 (uq_execution_plan_version)" },
+      { "name": "stepIds", "type": "string[]", "required": true, "description": "Canonical §20.1 references steps by id. Contract §15 instead embeds them as 'steps: ExecutionStep[]'. Persistence normalizes into the execution_steps table (FK execution_plan_id). See _openItems.", "sourceRef": "§20.1 (stepIds); Contract §15 (steps); Persistence §10.2" },
+      { "name": "transitionIds", "type": "string[]", "required": true, "description": "Canonical §20.1 references transitions by id; Contract §15 embeds 'transitions: ExecutionTransition[]'; Persistence normalizes into execution_transitions (source_step_id, target_step_id, condition_expression, transition_type).", "sourceRef": "§20.1 (transitionIds); Contract §15 (transitions); Persistence §10.3" },
+      { "name": "retryPolicy", "type": "RetryPolicy", "required": true, "description": "Policy governing retry count/backoff for step attempts. Shape not defined in the docs (see _openItems); RPH-EXE-008 exercises a policy whose maximum is three attempts.", "sourceRef": "§20.1; Contract §15; Persistence §10.1 (retry_policy jsonb)" },
+      { "name": "tacticalChangePolicy", "type": "TacticalChangePolicy", "required": true, "description": "Authorizes in-plan tactical changes. Tactical changes may occur within a plan only if authorized by policy.", "sourceRef": "§20.1; §20.2; Contract §15; Persistence §10.1 (tactical_change_policy jsonb)" },
+      { "name": "escalationPolicy", "type": "EscalationPolicy", "required": true, "description": "Governs escalation when execution cannot proceed.", "sourceRef": "§20.1; Contract §15; Persistence §10.1 (escalation_policy jsonb)" },
+      { "name": "terminationPolicy", "type": "TerminationPolicy", "required": true, "description": "Governs plan/step termination conditions.", "sourceRef": "§20.1; Contract §15; Persistence §10.1 (termination_policy jsonb)" },
+      { "name": "status", "type": "enum (see statuses)", "required": true, "description": "Lifecycle state of the plan itself.", "sourceRef": "§20.1; Contract §15; Persistence §10.1 (execution_plans.status)" }
+    ],
+    "statuses": [
+      { "value": "PROPOSED", "meaning": "Plan proposed (proposeExecutionPlan / ExecutionPlanProposed); not yet approved or active.", "sourceRef": "§20.1; §26.4; Contract §15; §34.3" },
+      { "value": "UNDER_REVIEW", "meaning": "Plan submitted for approval review.", "sourceRef": "§20.1; Contract §15" },
+      { "value": "APPROVED", "meaning": "Plan approved (approveExecutionPlan / ExecutionPlanApproved). Approval is required before irreversible execution for high-risk work, and PWU READY->PLANNED requires an active execution plan approved. Approval grants no runtime privileges.", "sourceRef": "§20.1; §20.2; §8.1; §26.4" },
+      { "value": "ACTIVE", "meaning": "Plan activated (activateExecutionPlan / ExecutionPlanActivated) and driving execution. A PWU may have only one active plan at a time (enforced by uq_active_execution_plan_per_pwu WHERE status='ACTIVE').", "sourceRef": "§20.1; §20.2; §26.4; Persistence §10.1; RPH-EXE-001" },
+      { "value": "COMPLETED", "meaning": "All required steps reached terminal success; plan finished.", "sourceRef": "§20.1; Contract §15" },
+      { "value": "FAILED", "meaning": "Plan terminated in failure per failure taxonomy §36.2 (e.g., retry exhaustion, dependency unavailable).", "sourceRef": "§20.1; §36.2; Contract §15" },
+      { "value": "SUPERSEDED", "meaning": "Replaced by a successor plan (ExecutionPlanSuperseded). A superseded plan cannot create new execution attempts and no new step may begin under it.", "sourceRef": "§20.1; §20.2; §26.4; §35.1 ('No superseded execution'); RPH-EXE-002" },
+      { "value": "CANCELLED", "meaning": "Plan cancelled (cancelExecutionPlan).", "sourceRef": "§20.1; §34.3; Contract §15" }
+    ],
+    "stateMachine": {
+      "note": "No dedicated ExecutionPlan transition table exists in the docs; the machine is the status enum (§20.1) + execution commands (§34.3) + execution events (§26.4) + the PWU lifecycle rows that gate on plan state (§8.1).",
+      "transitions": [
+        { "from": "(none)", "command": "proposeExecutionPlan", "event": "ExecutionPlanProposed", "to": "PROPOSED", "sourceRef": "§34.3; §26.4" },
+        { "from": "PROPOSED / UNDER_REVIEW", "command": "approveExecutionPlan", "event": "ExecutionPlanApproved", "to": "APPROVED", "guard": "Approval required before irreversible execution for high-risk work (§20.2). Gates PWU READY->PLANNED (§8.1).", "sourceRef": "§34.3; §26.4; §8.1" },
+        { "from": "APPROVED", "command": "activateExecutionPlan", "event": "ExecutionPlanActivated", "to": "ACTIVE", "guard": "Only one ACTIVE plan per PWU (RPH-EXE-001); ActivateExecutionPlanPayload carries approvalDecisionId? and authorizedRuntimeBindingIds. Gates PWU PLANNED->EXECUTING which requires 'Runtime bindings authorized' (§8.1).", "sourceRef": "§34.3; §26.4; Contract §15.2/§15.3; §8.1; RPH-EXE-001" },
+        { "from": "ACTIVE", "command": "(successor activated)", "event": "ExecutionPlanSuperseded", "to": "SUPERSEDED", "guard": "A new plan supersedes; superseded plan cannot start steps (RPH-EXE-002) or create new attempts (§20.2).", "sourceRef": "§26.4; §20.2; RPH-EXE-002" },
+        { "from": "ACTIVE", "command": "cancelExecutionPlan", "event": "(cancellation)", "to": "CANCELLED", "sourceRef": "§34.3" },
+        { "from": "ACTIVE", "command": "(all steps succeed / terminate)", "event": "(completion / ExecutionTerminated)", "to": "COMPLETED or FAILED", "sourceRef": "§20.1; §26.4; §36.2" }
+      ]
+    },
+    "approvalRule": "Plan approval is required before irreversible execution for high-risk work (§20.2). Approval is a distinct governance gate: the PWU transition READY -> PLANNED requires 'Active execution plan approved' (§8.1), and the subsequent PLANNED -> EXECUTING requires 'Runtime bindings authorized' (§8.1). Plan approval does NOT grant runtime privileges (§20.2) -- capability authorization is a separate RuntimeBinding step. Activation carries an optional approvalDecisionId plus the set of authorizedRuntimeBindingIds (Contract §15.2). RPH-EXE-001 enforces exactly one ACTIVE plan per PWU; RPH-EXE-002 blocks step start under a SUPERSEDED plan; RPH-PWU-010 blocks resuming execution in place against a BASELINED PWU semantic version (a successor revision/PWU is required).",
+    "invariants": [
+      { "statement": "An active plan must reference exactly one PWU.", "sourceRef": "§20.2" },
+      { "statement": "A PWU may have only one active plan at a time.", "sourceRef": "§20.2; Persistence §10.1 (uq_active_execution_plan_per_pwu); RPH-EXE-001" },
+      { "statement": "A plan may not change PWU intent or obligations.", "sourceRef": "§20.2; §2.3" },
+      { "statement": "Plan approval is required before irreversible execution for high-risk work.", "sourceRef": "§20.2" },
+      { "statement": "Runtime privileges are not granted by plan approval.", "sourceRef": "§20.2; §2.4" },
+      { "statement": "A superseded plan cannot create new execution attempts.", "sourceRef": "§20.2; §35.1" },
+      { "statement": "Plan revision preserves prior attempt history.", "sourceRef": "§20.2" },
+      { "statement": "Tactical changes may occur within a plan only if authorized by policy.", "sourceRef": "§20.2" }
+    ],
+    "rules": [
+      { "id": "RPH-EXE-001", "statement": "One active plan per PWU: activating a second plan without superseding the first is rejected.", "sourceRef": "RPH-EXE-001; §20.2; Persistence §10.1" },
+      { "id": "RPH-EXE-002", "statement": "Superseded plan cannot start step: a step-start request against a plan in SUPERSEDED is rejected.", "sourceRef": "RPH-EXE-002; §20.2; §35.1" },
+      { "id": "RPH-PWU-010", "statement": "Baselined PWU cannot resume execution in place: new execution against the same semantic version of a BASELINED PWU is rejected; a successor revision or successor PWU is required.", "sourceRef": "RPH-PWU-010; §8.3 (BASELINED->EXECUTING without new revision/successor)" }
+    ]
+  },
+
+  "executionStep": {
+    "description": "An ExecutionStep is a single unit of the plan's execution graph, owned by the Execution Aggregate. It carries a stepType, input/output bindings, an optional RuntimeBinding, explicit pre/postconditions, and a stepState. A step cannot run until its preconditions are satisfied; a succeeded step must record outputs (or an explicit no-output result); every tool/model invocation must produce provenance; and external outputs are untrusted until parsed and validated. Step success does NOT imply PWU success.",
+    "fields": [
+      { "name": "id", "type": "string", "required": true, "description": "Step identifier.", "sourceRef": "§21; Persistence §10.2 (execution_steps.id)" },
+      { "name": "executionPlanId", "type": "string", "required": true, "description": "Owning plan (FK).", "sourceRef": "§21; Persistence §10.2" },
+      { "name": "stepType", "type": "enum (see stepTypes)", "required": true, "description": "Kind of execution action.", "sourceRef": "§21; Persistence §10.2 (step_type)" },
+      { "name": "purpose", "type": "string", "required": true, "description": "What the step is for.", "sourceRef": "§21; Persistence §10.2 (purpose)" },
+      { "name": "inputBindings", "type": "InputBinding[]", "required": true, "description": "Inputs consumed. External inputs are untrusted until parsed and validated.", "sourceRef": "§21; §21.1; Persistence §10.2 (input_bindings jsonb)" },
+      { "name": "outputBindings", "type": "OutputBinding[]", "required": true, "description": "Outputs produced. A succeeded step must record outputs or an explicit no-output result.", "sourceRef": "§21; §21.1; Persistence §10.2 (output_bindings jsonb)" },
+      { "name": "runtimeBindingId", "type": "string", "required": false, "description": "The RuntimeBinding that grants the step its runtime (agent/model/tool/sandbox/capabilities). Must be AUTHORIZED before the step executes.", "sourceRef": "§21; §8.1; Persistence §10.2 (runtime_binding_id); RPH-EXE-003" },
+      { "name": "preconditions", "type": "Condition[]", "required": true, "description": "Must all be satisfied before the step may run.", "sourceRef": "§21; §21.1; Persistence §10.2 (preconditions jsonb); RPH-EXE-005" },
+      { "name": "postconditions", "type": "Condition[]", "required": true, "description": "Must hold on step success; success requires an explicit result.", "sourceRef": "§21; §21.1; Persistence §10.2 (postconditions jsonb); RPH-EXE-006" },
+      { "name": "stepState", "type": "enum (see stepStates)", "required": true, "description": "Lifecycle state of the step.", "sourceRef": "§21; Persistence §10.2 (step_state)" },
+      { "name": "ordinal", "type": "integer", "required": false, "description": "Ordering position (persistence only; not in the Canonical interface).", "sourceRef": "Persistence §10.2 (ordinal)" }
+    ],
+    "stepTypes": [
+      { "value": "MODEL_INVOCATION", "meaning": "Invoke a model.", "sourceRef": "§21" },
+      { "value": "TOOL_INVOCATION", "meaning": "Invoke a tool.", "sourceRef": "§21" },
+      { "value": "RETRIEVAL", "meaning": "Retrieve context/data.", "sourceRef": "§21" },
+      { "value": "TRANSFORMATION", "meaning": "Transform data.", "sourceRef": "§21" },
+      { "value": "HUMAN_INTERACTION", "meaning": "Require a human action/decision.", "sourceRef": "§21" },
+      { "value": "WAIT", "meaning": "Wait on a condition/timer.", "sourceRef": "§21" },
+      { "value": "BRANCH", "meaning": "Conditional branch.", "sourceRef": "§21" },
+      { "value": "PARALLEL_GROUP", "meaning": "Group of steps executed in parallel.", "sourceRef": "§21" },
+      { "value": "ASSURANCE_INVOCATION", "meaning": "Invoke an assurance evaluation (a step may TRIGGER assurance, but its own success still does not set AssuranceState=SATISFIED).", "sourceRef": "§21; §35.2" }
+    ],
+    "stepStates": [
+      { "value": "NOT_READY", "meaning": "Preconditions not yet satisfied; may not run. RPH-EXE-005: a step whose required input artifact is absent remains not ready and no model/tool invocation occurs.", "sourceRef": "§21; §21.1; RPH-EXE-005" },
+      { "value": "READY", "meaning": "Preconditions satisfied; eligible to be scheduled (ExecutionStepReady).", "sourceRef": "§21; §26.4" },
+      { "value": "QUEUED", "meaning": "Scheduled/queued for execution. (No dedicated ExecutionStepQueued event in §26.4 -- see _openItems.)", "sourceRef": "§21" },
+      { "value": "RUNNING", "meaning": "Executing (ExecutionStepStarted).", "sourceRef": "§21; §26.4" },
+      { "value": "WAITING", "meaning": "Paused awaiting an external condition/human (ExecutionStepWaiting).", "sourceRef": "§21; §26.4" },
+      { "value": "SUCCEEDED", "meaning": "Completed successfully with recorded output/explicit no-output result (ExecutionStepSucceeded; resultingExecutionState 'SUCCEEDED'). Does NOT imply PWU success or AssuranceState=SATISFIED.", "sourceRef": "§21; §21.1; §26.4; Contract §16.2; §35.2" },
+      { "value": "FAILED", "meaning": "Attempt failed (ExecutionStepFailed); may retry within the RetryPolicy cap.", "sourceRef": "§21; §26.4; §36.2" },
+      { "value": "SKIPPED", "meaning": "Skipped (ExecutionStepSkipped). A skipped MANDATORY step requires an authorized plan revision or waiver.", "sourceRef": "§21; §21.1; §26.4" },
+      { "value": "CANCELLED", "meaning": "Cancelled (ExecutionStepCancelled).", "sourceRef": "§21; §26.4" },
+      { "value": "SUPERSEDED", "meaning": "Superseded by a plan revision; cannot run. (No dedicated ExecutionStepSuperseded event in §26.4 -- see _openItems.)", "sourceRef": "§21" }
+    ],
+    "preconditionPostconditionRule": "A step cannot run until ALL preconditions are satisfied (§21.1); if a required input artifact is absent the step remains NOT_READY and no model/tool invocation occurs (RPH-EXE-005). On completion, a succeeded step MUST record outputs or an explicit no-output result -- completion requested without output or an explicit no-output result is rejected (RPH-EXE-006, §21.1). Preconditions and postconditions are persisted as explicit jsonb (execution_steps.preconditions / .postconditions); state is explicit and never inferred from absent output (§2.6).",
+    "invariants": [
+      { "statement": "A step cannot run until preconditions are satisfied.", "sourceRef": "§21.1; RPH-EXE-005" },
+      { "statement": "A succeeded step must record outputs or an explicit no-output result.", "sourceRef": "§21.1; RPH-EXE-006" },
+      { "statement": "Step success does not imply PWU success.", "sourceRef": "§21.1" },
+      { "statement": "A skipped mandatory step requires an authorized plan revision or waiver.", "sourceRef": "§21.1" },
+      { "statement": "Every tool or model invocation must produce provenance.", "sourceRef": "§21.1; Persistence §10.4 (execution_attempts.provenance not null)" },
+      { "statement": "External outputs are untrusted until parsed and validated.", "sourceRef": "§21.1; RPH-EXE-009" }
+    ],
+    "rules": [
+      { "id": "RPH-EXE-005", "statement": "Step precondition enforcement: a step whose required input artifact is absent, when started, remains not ready and no model/tool invocation occurs.", "sourceRef": "RPH-EXE-005; §21.1" },
+      { "id": "RPH-EXE-006", "statement": "Step success requires explicit result: completing a running step without output or an explicit no-output result is rejected.", "sourceRef": "RPH-EXE-006; §21.1" },
+      { "id": "RPH-EXE-009", "statement": "Model output treated as untrusted: a malformed structured result retains raw output for diagnostics, fails boundary validation, does not create authoritative objects, and may trigger retry/alternate strategy.", "sourceRef": "RPH-EXE-009; §21.1; §36.2 (invalid output schema)" }
+    ],
+    "executionAttempt": {
+      "note": "Execution Attempt is owned by the Execution Aggregate (§3.3) and is where retries and external side effects materialize; the Canonical §21 interface does not declare it but persistence does.",
+      "fields": [
+        { "name": "id", "type": "string", "sourceRef": "Persistence §10.4" },
+        { "name": "executionStepId", "type": "string", "sourceRef": "Persistence §10.4" },
+        { "name": "attemptNumber", "type": "integer", "note": "Unique per (execution_step_id, attempt_number). The retry cap bounds this.", "sourceRef": "Persistence §10.4 (uq_execution_attempt)" },
+        { "name": "state", "type": "string", "sourceRef": "Persistence §10.4" },
+        { "name": "runtimeBindingId", "type": "string", "sourceRef": "Persistence §10.4" },
+        { "name": "idempotencyKey", "type": "string", "note": "Unique (uq_execution_idempotency) -- prevents duplicate external side effects on retry.", "sourceRef": "Persistence §10.4; RPH-EXE-007" },
+        { "name": "externalOperationId", "type": "string", "note": "Observable external ID used for restart reconciliation.", "sourceRef": "Persistence §10.4; §35 (Active Execution Recovery)" },
+        { "name": "reconciliationState", "type": "string", "note": "Set on restart when completion is uncertain; free-text (no enumerated values in docs).", "sourceRef": "Persistence §10.4; RPH-PER-012" },
+        { "name": "result", "type": "jsonb", "sourceRef": "Persistence §10.4" },
+        { "name": "error", "type": "jsonb", "sourceRef": "Persistence §10.4" },
+        { "name": "provenance", "type": "jsonb (not null)", "sourceRef": "Persistence §10.4; §21.1" }
+      ]
+    }
+  },
+
+  "runtimeBinding": {
+    "description": "A RuntimeBinding (objectType 'RUNTIME_BINDING') connects an ExecutionStep to its runtime: agents, models, tools, sandboxes, permissions, context policies, and observability policies (§2.4). It grants NO semantic authority -- it cannot redefine the intent or obligations of the work (§2.4). Requested capability is not granted capability; capability scope must be explicit; secret access must never be inferred from tool availability; privilege expansion requires a new authorization event; revoked bindings cannot be used for new attempts; and model output is treated as untrusted external input.",
+    "extends": "ObjectEnvelope (§4)",
+    "fields": [
+      { "name": "objectType", "type": "'RUNTIME_BINDING'", "required": true, "description": "Discriminant.", "sourceRef": "§22; Persistence §10.5" },
+      { "name": "executionStepId", "type": "string", "required": true, "description": "The step this binding serves (FK).", "sourceRef": "§22; Persistence §10.5" },
+      { "name": "roleId", "type": "string", "required": true, "description": "The role/agent identity bound.", "sourceRef": "§22; Persistence §10.5 (role_id)" },
+      { "name": "modelSelectionPolicy", "type": "ModelSelectionPolicy", "required": true, "description": "Policy for selecting the model.", "sourceRef": "§22; Persistence §10.5 (model_selection_policy jsonb)" },
+      { "name": "requestedCapabilities", "type": "CapabilityRequest[]", "required": true, "description": "Capabilities requested. Requested is NOT granted.", "sourceRef": "§22; §22.1; Persistence §10.5 (requested_capabilities jsonb); RPH-EXE-004" },
+      { "name": "grantedCapabilities", "type": "CapabilityGrant[]", "required": true, "description": "Capabilities actually granted with explicit scope. Operations outside the grant fail authorization.", "sourceRef": "§22; §22.1; Persistence §10.5 (granted_capabilities jsonb); RPH-EXE-004" },
+      { "name": "sandboxPolicy", "type": "SandboxPolicy", "required": true, "description": "Sandbox restrictions enforced by the Runtime Authorization Service.", "sourceRef": "§22; §33.4; Persistence §10.5 (sandbox_policy jsonb)" },
+      { "name": "contextAssemblyPolicyId", "type": "string", "required": true, "description": "Context assembly policy reference.", "sourceRef": "§22; Persistence §10.5 (context_assembly_policy_id)" },
+      { "name": "observabilityPolicyId", "type": "string", "required": true, "description": "Observability policy reference.", "sourceRef": "§22; Persistence §10.5 (observability_policy_id)" },
+      { "name": "memoryPolicyId", "type": "string", "required": false, "description": "Optional memory policy reference.", "sourceRef": "§22; Persistence §10.5 (memory_policy_id)" },
+      { "name": "authorizationStatus", "type": "enum (see authorizationStatuses)", "required": true, "description": "Authorization state of the binding.", "sourceRef": "§22; Persistence §10.5 (authorization_status not null)" }
+    ],
+    "authorizationStatuses": [
+      { "value": "REQUESTED", "meaning": "Capabilities requested but not yet authorized (RuntimeBindingRequested). Execution cannot start against a REQUESTED binding.", "sourceRef": "§22; §26.4; RPH-EXE-003" },
+      { "value": "AUTHORIZED", "meaning": "Fully authorized (RuntimeBindingAuthorized). Required before a step executes (PWU PLANNED->EXECUTING gate).", "sourceRef": "§22; §26.4; §8.1" },
+      { "value": "PARTIALLY_AUTHORIZED", "meaning": "Some but not all requested capabilities granted; operations outside the grant fail authorization (RPH-EXE-004).", "sourceRef": "§22; RPH-EXE-004" },
+      { "value": "DENIED", "meaning": "Authorization denied (RuntimeBindingDenied).", "sourceRef": "§22; §26.4" },
+      { "value": "REVOKED", "meaning": "Authorization revoked (RuntimeCapabilityRevoked). Revoked bindings cannot be used for new attempts.", "sourceRef": "§22; §22.1; §26.4" }
+    ],
+    "stateMachine": {
+      "note": "No dedicated RuntimeBinding transition table; the machine is the authorizationStatus enum (§22) + runtime events (§26.4). Privilege expansion requires a NEW authorization event (§22.1) rather than mutating an existing grant.",
+      "transitions": [
+        { "from": "(none)", "event": "RuntimeBindingRequested", "to": "REQUESTED", "sourceRef": "§26.4" },
+        { "from": "REQUESTED", "event": "RuntimeBindingAuthorized", "to": "AUTHORIZED or PARTIALLY_AUTHORIZED", "guard": "Runtime Authorization Service evaluates capability requests and grants scoped privileges (§33.4).", "sourceRef": "§26.4; §33.4" },
+        { "from": "REQUESTED", "event": "RuntimeBindingDenied", "to": "DENIED", "sourceRef": "§26.4" },
+        { "from": "AUTHORIZED / PARTIALLY_AUTHORIZED", "event": "RuntimeCapabilityRevoked", "to": "REVOKED", "guard": "Revoked bindings cannot be used for new attempts (§22.1).", "sourceRef": "§26.4; §22.1" },
+        { "from": "AUTHORIZED / PARTIALLY_AUTHORIZED", "event": "(new) RuntimeBindingAuthorized", "to": "AUTHORIZED", "guard": "Privilege expansion requires a NEW authorization event; increments revision but not necessarily PWU semantic version.", "sourceRef": "§22.1" }
+      ]
+    },
+    "authorizationRule": "A RuntimeBinding MUST be AUTHORIZED before its step executes: the PWU transition PLANNED -> EXECUTING requires 'Runtime bindings authorized' (§8.1), and starting execution with a binding still in REQUESTED is rejected (RPH-EXE-003). Requested capability is not granted capability (§22.1): granted capabilities carry explicit scope, and any operation outside the grant fails authorization -- e.g., a binding that requests file-system AND network but is granted only file-system has its network operations fail authorization (RPH-EXE-004). The Runtime Authorization Service (§33.4) evaluates capability requests, grants scoped privileges, revokes access, and enforces sandbox/tool policies. RuntimeBindings grant no semantic authority and cannot redefine intent or obligations (§2.4); secret access must never be inferred from tool availability, and privilege expansion requires a new authorization event (§22.1).",
+    "invariants": [
+      { "statement": "Requested capability is not granted capability.", "sourceRef": "§22.1; RPH-EXE-004" },
+      { "statement": "Capability scope must be explicit.", "sourceRef": "§22.1" },
+      { "statement": "Secret access must never be inferred from tool availability.", "sourceRef": "§22.1" },
+      { "statement": "Runtime Binding changes increment revision but not necessarily PWU semantic version.", "sourceRef": "§22.1" },
+      { "statement": "Privilege expansion requires a new authorization event.", "sourceRef": "§22.1" },
+      { "statement": "Revoked bindings cannot be used for new attempts.", "sourceRef": "§22.1" },
+      { "statement": "Model output is treated as untrusted external input.", "sourceRef": "§22.1; RPH-EXE-009" }
+    ],
+    "rules": [
+      { "id": "RPH-EXE-003", "statement": "Runtime binding authorization required: starting execution while the runtime binding is in REQUESTED (on an otherwise approved plan) is rejected.", "sourceRef": "RPH-EXE-003; §8.1; §22" },
+      { "id": "RPH-EXE-004", "statement": "Requested capability is not granted capability: with only file-system granted against a binding requesting file-system and network, network operations fail authorization.", "sourceRef": "RPH-EXE-004; §22.1" }
+    ]
+  },
+
+  "retry": {
+    "cap": "The retry cap is policy-driven by the plan's RetryPolicy. RPH-EXE-008 exercises 'a retry policy with maximum three attempts': when the third retry fails, the controller MUST NOT issue a fourth retry. (The concrete '3' is the test's policy value, not a hardcoded domain constant; the RetryPolicy field shape is not defined in the docs -- see _openItems.)",
+    "onExhaustion": "On retry exhaustion the controller must not retry again and instead MUST select an alternate control action, one of: change tactic (CHANGE_TACTIC); replan (REPLAN_EXECUTION); escalate (ESCALATE); reject (REJECT); or abandon (ABANDON). 'retry exhaustion' is an enumerated execution failure (§36.2), and each failure class must map to permitted control actions (§36).",
+    "attemptTracking": "Attempts are tracked as ExecutionAttempt rows with attemptNumber unique per (execution_step_id, attempt_number) (Persistence §10.4); each attempt carries its own idempotencyKey so a retried side-effecting operation does not duplicate its effect (RPH-EXE-007). Retry is emitted as ExecutionStepRetried; escalation/termination as ExecutionEscalated / ExecutionTerminated.",
+    "controlActions": ["CHANGE_TACTIC", "REPLAN_EXECUTION", "ESCALATE", "REJECT", "ABANDON"],
+    "rules": [
+      { "id": "RPH-EXE-008", "statement": "Retry exhaustion triggers alternate control action: given a retry policy with maximum three attempts, when the third retry fails, the controller must not issue a fourth retry; it must select change tactic, replan, escalate, reject, or abandon.", "sourceRef": "RPH-EXE-008; §36.2 (retry exhaustion); §37 (ControlAction)" },
+      { "id": "RPH-EXE-007", "statement": "Duplicate external side effect prevented: an execution attempt that creates a source-control commit, when retried with the same idempotency key, produces no second commit.", "sourceRef": "RPH-EXE-007; §28.2; Persistence §10.4 (uq_execution_idempotency)" }
+    ]
+  },
+
+  "execVsAssurance": "Contract §35.2 (verbatim): `ExecutionStepSucceeded` cannot directly produce `AssuranceState = SATISFIED`. Restated in Contract §16.2: 'Execution-step success does not alter assurance state to SATISFIED.' This is the execution-layer expression of the exec!=assurance separation (INV-5 / the P1 property). Mirrors: Canonical §35.1 ('No execution implies assurance') -- ExecutionState = SUCCEEDED must not automatically imply AssuranceState = SATISFIED; Conformance Property P1 ('Execution never implies assurance') -- executionState = SUCCEEDED must never ALONE cause assuranceState = SATISFIED. Lifecycle consequence (RPH-PWU-005): when a PWU's active plan succeeds, execution state becomes SUCCEEDED and lifecycle becomes EVIDENCE_PENDING, but assurance state is NOT automatically SATISFIED and the PWU lifecycle is NOT SATISFIED; EXECUTING -> SATISFIED without assurance is an illegal transition (§8.3). Rejected assurance still blocks satisfaction even after execution SUCCEEDED (RPH-PWU-007, RPH-E2E-002). Enforced independence is also a projection rule: the UI cannot show unqualified green when execution succeeded but assurance is incomplete (RPH-PRJ-001/002).",
+
+  "restartRecovery": {
+    "description": "In-flight execution is durable and rebuildable: domain events are append-only and authoritative, projections are rebuildable, and a transactional outbox plus command_receipts (idempotency) let the system reconstruct state and resume after a crash WITHOUT duplicating side effects. On restart, active (nonterminal) execution attempts are reconciled before any controller resumes; uncertain external side effects are never blindly retried.",
+    "mechanism": "Event-log replay + transactional outbox + command-receipt idempotency keys + per-attempt reconciliation. Recovery ordering (Persistence §34): restore canonical database -> restore artifact storage -> verify event sequence -> replay outbox -> rebuild projections -> reconcile active execution attempts -> resume controllers. Active Execution Recovery (Persistence §35): on restart classify each nonterminal attempt as one of {definitely not started; running with observable external ID; succeeded but result not recorded; failed; completion uncertain}, using the stored external operation ID, invocation timestamp, idempotency key, provider, and reconciliation method; never blindly retry an uncertain side effect; the controller performs reconciliation first.",
+    "reconciliationClassification": ["definitely not started", "running with observable external ID", "succeeded but result not recorded", "failed", "completion uncertain"],
+    "idempotencyRule": "Commands with the same commandId must not execute twice (§28.2). A duplicate idempotencyKey emits NO new domain events and returns the original result (RPH-PER-002; Contract §35.7; Property P6); command_receipts enforces this (unique idempotency_key: first command -> PROCESSING, then ACCEPTED/REJECTED; duplicate key returns prior result; stale PROCESSING receipts are reconciled). Agent retries must not duplicate commits, external API mutations, baseline promotion, approval decisions, or evidence records (§28.2); side-effecting tool calls use related external idempotency keys, and execution_attempts.idempotency_key is uniquely constrained (uq_execution_idempotency). Duplicate decisions/baselines are specifically prevented (RPH-PER-003, RPH-PER-004). NOTE: the task's citation of 'Persistence §33' for the duplicate-command-replay guarantee is imprecise -- Persistence §33 is 'Data Retention'; the guarantee lives in Persistence §16 (command_receipts), Contract §35.7, RPH-PER-002, and Property P6 (see _openItems).",
+    "rules": [
+      { "id": "RPH-PER-011", "statement": "Restart after command persistence: if events are committed but the projection update is interrupted, after the service restarts the projection is eventually updated from the event/outbox stream.", "sourceRef": "RPH-PER-011; §34" },
+      { "id": "RPH-PER-012", "statement": "Restart during model invocation: if an execution attempt was started and completion is uncertain, on restart the attempt enters a reconciliation state and the system must not blindly repeat the side effect.", "sourceRef": "RPH-PER-012; §35" },
+      { "id": "RPH-PER-013", "statement": "Restart during human wait: if a PWU is waiting for human approval and the extension restarts, the pending decision remains available and no duplicate review request is created.", "sourceRef": "RPH-PER-013" },
+      { "id": "RPH-PER-014", "statement": "Restart after validator result but before assessment disposition: if a valid raw validator result is persisted and the Assurance Service restarts before authoritative disposition, processing resumes idempotently.", "sourceRef": "RPH-PER-014" },
+      { "id": "RPH-PER-008", "statement": "Outbox atomicity: on a successful aggregate mutation, domain events and outbox rows are committed atomically; a transaction rollback leaves neither persisted.", "sourceRef": "RPH-PER-008; Persistence §15/§30.1" },
+      { "id": "RPH-PER-006", "statement": "Aggregate replay equivalence: reconstructing an aggregate from its event stream yields state matching the materialized current state.", "sourceRef": "RPH-PER-006; §32 (event sourcing)" },
+      { "id": "RPH-E2E-006", "statement": "Restart during architecture execution: if the extension/runtime restarts before completion status is known, attempt state is reconciled, duplicate generation/side effects are avoided, execution resumes or is retried per policy, and event history remains coherent.", "sourceRef": "RPH-E2E-006; §35" }
+    ]
+  },
+
+  "conformanceTests": [
+    { "id": "RPH-EXE-001", "name": "One active plan per PWU", "given": "a PWU with an active plan", "when": "a second plan is activated without superseding the first", "then": "the command is rejected", "sourceRef": "Conformance §12; §20.2; Persistence §10.1 (uq_active_execution_plan_per_pwu)" },
+    { "id": "RPH-EXE-002", "name": "Superseded plan cannot start step", "given": "an execution plan in SUPERSEDED", "when": "a step start is requested", "then": "the command is rejected", "sourceRef": "Conformance §12; §20.2; §35.1" },
+    { "id": "RPH-EXE-003", "name": "Runtime binding authorization required", "given": "an approved execution plan and a runtime binding in REQUESTED", "when": "execution starts", "then": "the command is rejected", "sourceRef": "Conformance §12; §8.1; §22" },
+    { "id": "RPH-EXE-004", "name": "Requested capability is not granted capability", "given": "a runtime binding requesting file-system and network access; only file-system access is granted", "when": "network operations are attempted", "then": "network operations fail authorization", "sourceRef": "Conformance §12; §22.1" },
+    { "id": "RPH-EXE-005", "name": "Step precondition enforcement", "given": "an execution step whose required input artifact is absent", "when": "the step is started", "then": "the step remains not ready and no model/tool invocation occurs", "sourceRef": "Conformance §12; §21.1" },
+    { "id": "RPH-EXE-006", "name": "Step success requires explicit result", "given": "a running step", "when": "completion is requested without output or explicit no-output result", "then": "completion is rejected", "sourceRef": "Conformance §12; §21.1" },
+    { "id": "RPH-EXE-007", "name": "Duplicate external side effect prevented", "given": "an execution attempt that creates a source-control commit", "when": "the command is retried with the same idempotency key", "then": "no second commit occurs", "sourceRef": "Conformance §12; §28.2; Persistence §10.4" },
+    { "id": "RPH-EXE-008", "name": "Retry exhaustion triggers alternate control action", "given": "a retry policy with maximum three attempts", "when": "the third retry fails", "then": "the controller must not issue a fourth retry; it must select change tactic, replan, escalate, reject, or abandon", "sourceRef": "Conformance §12; §36.2; §37" },
+    { "id": "RPH-EXE-009", "name": "Model output treated as untrusted", "given": "a model returns a malformed structured result", "when": "boundary validation runs", "then": "raw output is retained for diagnostics; boundary validation fails; authoritative objects are not created; retry or alternate strategy may be selected", "sourceRef": "Conformance §12; §21.1; §36.2" },
+    { "id": "RPH-PWU-005", "name": "Execution success does not satisfy PWU", "given": "a PWU in EXECUTING", "when": "its active execution plan succeeds", "then": "execution state becomes SUCCEEDED; lifecycle becomes EVIDENCE_PENDING; assurance state is not automatically SATISFIED; PWU lifecycle is not SATISFIED", "sourceRef": "Conformance §7; §8.1; §35.2" },
+    { "id": "RPH-PWU-007", "name": "Rejected assurance prevents satisfaction", "given": "execution state SUCCEEDED and a required assurance assessment REJECTED", "when": "satisfaction is evaluated", "then": "the PWU cannot transition to SATISFIED", "sourceRef": "Conformance §7; §35.2" },
+    { "id": "RPH-PWU-010", "name": "Baselined PWU cannot resume execution in place", "given": "a PWU in BASELINED", "when": "new execution is requested against the same semantic version", "then": "the command is rejected; a successor revision or successor PWU is required", "sourceRef": "Conformance §8; §8.3" },
+    { "id": "RPH-E2E-002", "name": "Architecture execution succeeds but assurance fails", "given": "architecture generation succeeds but lacks enforceable tenant isolation", "when": "Architecture Coverage assurance runs", "then": "execution state is SUCCEEDED; assurance state is REJECTED; the PWU is not satisfied; a blocking observation is created; baseline promotion is unavailable; controller recommends reshape or replan", "sourceRef": "Conformance §24; §35.2" },
+    { "id": "RPH-E2E-006", "name": "Restart during architecture execution", "given": "architecture generation begins", "when": "the extension or runtime restarts before completion status is known", "then": "attempt state is reconciled; duplicate generation/side effects avoided; execution resumes or is retried per policy; event history remains coherent", "sourceRef": "Conformance §24; Persistence §35" },
+    { "id": "RPH-PER-002", "name": "Duplicate command returns prior result", "given": "a previously accepted command with an idempotency key", "when": "the same key is submitted again", "then": "no new domain events are emitted; the original result is returned", "sourceRef": "Conformance §18; §28.2; Persistence §16" },
+    { "id": "RPH-PER-003", "name": "Duplicate decision prevented", "given": "an approval request", "when": "it is retried", "then": "it cannot create two effective decisions", "sourceRef": "Conformance §18; §28.2" },
+    { "id": "RPH-PER-004", "name": "Duplicate baseline prevented", "given": "a baseline-promotion command", "when": "it is retried", "then": "it cannot create two authoritative baselines", "sourceRef": "Conformance §18; §28.2" },
+    { "id": "RPH-PER-006", "name": "Aggregate replay equivalence", "given": "an event stream for an Intent or PWU", "when": "the aggregate is reconstructed", "then": "its state matches the materialized current state", "sourceRef": "Conformance §19; §32" },
+    { "id": "RPH-PER-008", "name": "Outbox atomicity", "given": "a successful aggregate mutation", "when": "events and outbox rows are written", "then": "they are committed atomically; a transaction rollback leaves neither persisted", "sourceRef": "Conformance §19; Persistence §15/§30.1" },
+    { "id": "RPH-PER-011", "name": "Restart after command persistence", "given": "events are committed but projection update is interrupted", "when": "the service restarts", "then": "the projection is eventually updated from the event/outbox stream", "sourceRef": "Conformance §20; Persistence §34" },
+    { "id": "RPH-PER-012", "name": "Restart during model invocation", "given": "an execution attempt was started and the external operation's completion is uncertain", "when": "the runtime restarts", "then": "the attempt enters a reconciliation state; the system must not blindly repeat the side effect", "sourceRef": "Conformance §20; Persistence §35" },
+    { "id": "RPH-PER-013", "name": "Restart during human wait", "given": "a PWU waiting for human approval", "when": "the extension restarts", "then": "the pending decision remains available and no duplicate review request is created", "sourceRef": "Conformance §20" },
+    { "id": "RPH-PER-014", "name": "Restart after validator result but before assessment disposition", "given": "a valid raw validator result persisted", "when": "the Assurance Service restarts before authoritative disposition", "then": "processing resumes idempotently", "sourceRef": "Conformance §20" },
+    { "id": "RPH-FIX-003", "name": "Expected event replay", "given": "the reference undertaking expected-events.jsonl", "when": "the events are replayed", "then": "produces approved Intent Baseline; satisfied Product Behavior PWU; authoritative Architecture Baseline; expected open residual condition", "sourceRef": "Conformance (Fixture tests)" },
+    { "id": "Property P1", "name": "Execution never implies assurance", "given": "any generated legal command sequence", "when": "executionState = SUCCEEDED", "then": "must never ALONE cause assuranceState = SATISFIED", "sourceRef": "Conformance §25; §35.1; §35.2" },
+    { "id": "Property P6", "name": "Idempotent commands", "given": "any command with an idempotency key", "when": "the same idempotency key is executed multiple times", "then": "produces the same business result and no additional domain events", "sourceRef": "Conformance §25; §28.2" },
+    { "id": "Property P8", "name": "Presentation independence", "given": "arbitrary layout/canvas changes", "when": "presentation changes are applied", "then": "semantic object versions and assurance states remain unchanged", "sourceRef": "Conformance §25; §35.8" }
+  ],
+
+  "enumsIntroduced": [
+    { "name": "ExecutionPlanStatus", "values": ["PROPOSED", "UNDER_REVIEW", "APPROVED", "ACTIVE", "COMPLETED", "FAILED", "SUPERSEDED", "CANCELLED"], "note": "Canonical §20.1 = Contract §15 (identical spellings). One ACTIVE per PWU enforced in persistence.", "sourceRef": "§20.1; Contract §15" },
+    { "name": "ExecutionStepType", "values": ["MODEL_INVOCATION", "TOOL_INVOCATION", "RETRIEVAL", "TRANSFORMATION", "HUMAN_INTERACTION", "WAIT", "BRANCH", "PARALLEL_GROUP", "ASSURANCE_INVOCATION"], "note": "§21. ASSURANCE_INVOCATION may trigger assurance but does not by itself set AssuranceState=SATISFIED (§35.2).", "sourceRef": "§21" },
+    { "name": "ExecutionStepState", "values": ["NOT_READY", "READY", "QUEUED", "RUNNING", "WAITING", "SUCCEEDED", "FAILED", "SKIPPED", "CANCELLED", "SUPERSEDED"], "note": "§21. Event names (§26.4) do not 1:1 match: Started<->RUNNING, Ready<->READY; no dedicated events for QUEUED/NOT_READY/SUPERSEDED (see _openItems).", "sourceRef": "§21" },
+    { "name": "RuntimeBindingAuthorizationStatus", "values": ["REQUESTED", "AUTHORIZED", "PARTIALLY_AUTHORIZED", "DENIED", "REVOKED"], "note": "§22. AUTHORIZED required before a step executes.", "sourceRef": "§22" },
+    { "name": "ControlAction", "values": ["CONTINUE", "WAIT", "RETRY", "GATHER_EVIDENCE", "REVISE_CONTEXT", "REVISE_PROMPT", "CHANGE_MODEL", "CHANGE_TOOL", "CHANGE_TACTIC", "RESHAPE_PWU", "REVISE_DECOMPOSITION", "REPLAN_EXECUTION", "ESCALATE", "WAIVE", "REJECT", "ABANDON", "ACCEPT", "PROMOTE_BASELINE"], "note": "§37 Controller Decision Contract. On retry exhaustion the permitted subset is {CHANGE_TACTIC, REPLAN_EXECUTION, ESCALATE, REJECT, ABANDON} (RPH-EXE-008). Every control action records triggering condition, evidence/observations considered, authorizing policy, actor, affected objects, expected outcome.", "sourceRef": "§37" },
+    { "name": "ExecutionState (result)", "values": ["SUCCEEDED", "FAILED"], "note": "Referenced (resultingExecutionState:'SUCCEEDED'; PWU matrix 'Execution state is SUCCEEDED'; failure taxonomy) but NOT enumerated as a single named type in the docs -- SUCCEEDED and FAILED are the two observed values; a full enumeration is not provided (see _openItems).", "sourceRef": "§8.1; Contract §16.2; §36.2" },
+    { "name": "ExecutionFailureClass (§36.2)", "values": ["tool failure", "model failure", "timeout", "sandbox failure", "dependency unavailable", "retry exhaustion", "invalid output schema"], "note": "Prose taxonomy, not a code enum; each class must map to permitted control actions (§36).", "sourceRef": "§36.2" },
+    { "name": "DualRunComparisonClassification", "values": ["EQUIVALENT", "RPH_STRONGER", "LEGACY_BEHAVIOR_MISSING", "ACCIDENTAL_LEGACY_BEHAVIOR", "SEMANTIC_CONFLICT", "IMPLEMENTATION_DEFECT", "UNRESOLVED"], "note": "Shadow/dual-run comparison classification (Persistence §29). Relevant to dual-run migration validation, not to core execution runtime.", "sourceRef": "Persistence §29" }
+  ],
+
+  "_openItems": [
+    { "item": "ExecutionPlan step/transition shape divergence", "detail": "Canonical §20.1 references steps and transitions by id (stepIds: string[], transitionIds: string[]); Contract §15 embeds them inline (steps: ExecutionStep[], transitions: ExecutionTransition[]). Persistence normalizes into separate execution_steps / execution_transitions tables (FK execution_plan_id), matching the Canonical id-reference model. The embedded Contract shape is the wire/command shape (ProposeExecutionPlanPayload); the id-reference shape is the stored/aggregate shape.", "refs": ["§20.1", "Contract §15", "Persistence §10.2/§10.3"] },
+    { "item": "Location of the exec!=assurance boundary (§35.2)", "detail": "The task cites '§35.2' as the verbatim boundary. In the Canonical Domain Model doc this property is §35.1 ('No execution implies assurance'). The verbatim '`ExecutionStepSucceeded` cannot directly produce AssuranceState = SATISFIED' is CONTRACT PACKAGE §35.2 (and Contract §16.2). Both are recorded; the operative verbatim string is Contract §35.2.", "refs": ["Canonical §35.1", "Contract §35.2", "Contract §16.2"] },
+    { "item": "Property numbering (P1 vs P6/P8)", "detail": "The task references 'Property P6/P8 (execution / idempotency)'. In the Conformance Spec (§25) the execution-independence property is P1 ('Execution never implies assurance'); P6 is 'Idempotent commands'; P8 is 'Presentation independence' (NOT execution). Actual spellings recorded in conformanceTests. So: execution-vs-assurance = P1, idempotency = P6, presentation = P8.", "refs": ["Conformance §25"] },
+    { "item": "'§33' duplicate-command-replay citation is imprecise", "detail": "The task cites Persistence §33 for 'duplicate command replay does not create duplicate ...'. Persistence §33 is actually 'Data Retention'. The idempotency/duplicate-command guarantee lives in Persistence §16 (command_receipts: 'duplicate key returns prior result'), Contract §35.7 ('A duplicate idempotency key produces no additional domain event'), Conformance RPH-PER-002/003/004, and Property P6.", "refs": ["Persistence §16", "Persistence §33", "Contract §35.7", "RPH-PER-002", "Property P6"] },
+    { "item": "RetryPolicy (and sibling policy) shapes undefined", "detail": "RetryPolicy, TacticalChangePolicy, EscalationPolicy, TerminationPolicy are declared as ExecutionPlan field types but their internal shapes (e.g., a maxAttempts field) are never defined in any doc. RPH-EXE-008's 'maximum three attempts' is the test fixture's policy value, not a domain constant. Any implementation must define these policy shapes; the retry cap must be read from RetryPolicy, not hardcoded.", "refs": ["§20.1", "Contract §15", "RPH-EXE-008"] },
+    { "item": "RPH-EXE-008 'attempts' vs 'retries' wording", "detail": "The test title says 'maximum three attempts' but the body says 'the third retry fails' then 'must not issue a fourth retry', which conflates attempts with retries (3 attempts vs 3 retries = 4 attempts). The invariant to implement is unambiguous (no retry beyond the cap -> alternate control action), but the exact numeric mapping (is the cap 3 total attempts or 3 retries?) is ambiguous in the doc.", "refs": ["RPH-EXE-008"] },
+    { "item": "stepState enum vs execution events mismatch", "detail": "ExecutionStepState includes NOT_READY, QUEUED, RUNNING, SUPERSEDED, but §26.4 execution events are ExecutionStepReady/Started/Waiting/Succeeded/Failed/Retried/Skipped/Cancelled -- 'Started' implies RUNNING and there are no dedicated events for QUEUED, NOT_READY, or step-level SUPERSEDED. The state<->event name reconciliation is left implicit.", "refs": ["§21", "§26.4"] },
+    { "item": "ExecutionState result enum not fully enumerated", "detail": "Payloads use resultingExecutionState:'SUCCEEDED' and the PWU matrix references 'Execution state is SUCCEEDED', but a complete ExecutionState enum (beyond SUCCEEDED and the FAILED implied by failure taxonomy) is not defined in one authoritative place.", "refs": ["§8.1", "Contract §16.2", "§36.2"] },
+    { "item": "Restart reconciliation_state has no enumerated values", "detail": "Persistence §35 gives a PROSE classification of nonterminal attempts on restart (definitely not started / running with observable external ID / succeeded but result not recorded / failed / completion uncertain), and execution_attempts.reconciliation_state is a free-text column. RPH-PER-012 requires 'a reconciliation state' without specifying enumerated values. An implementation must define this enum.", "refs": ["Persistence §35", "Persistence §10.4", "RPH-PER-012"] },
+    { "item": "Execution Attempt not in the Canonical interface", "detail": "Execution Attempt is owned by the Execution Aggregate (§3.3) and is where retries/side-effects/idempotency-keys live (Persistence §10.4), but there is no ExecutionAttempt interface in Canonical §20-22; its fields are only defined by the persistence table. Recorded under executionStep.executionAttempt.", "refs": ["§3.3", "Persistence §10.4"] }
+  ]
+}

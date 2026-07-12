@@ -1,0 +1,15 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "type": "string",
+  "enum": [
+    "FUNCTIONAL",
+    "QUALITY",
+    "COMPLIANCE",
+    "SAFETY",
+    "SECURITY",
+    "PROCESS",
+    "EVIDENCE",
+    "GOVERNANCE"
+  ],
+  "$id": "urn:janumi:rph:schema:enum:ObligationType:1"
+}

@@ -1,0 +1,221 @@
+{
+  "_meta": {
+    "milestone": "M9",
+    "sourceDocs": [
+      "Janumi Professional Workbench Recursive Professional Harness - Canonical Domain Model, Invariant Catalog, State Machines, and Event Contract",
+      "Janumi Professional Workbench Recursive Professional Harness - Executable Invariant and Conformance Test Specification"
+    ],
+    "purpose": "decomposition/recomposition + obligation·constraint·assumption enforcement",
+    "sourceRefConvention": "'§N' = section number in the Canonical Domain Model doc unless prefixed with a test id (RPH-*, Property P*) which lives in the Conformance Test Spec doc; 'FIXTURE §N' = Reference Undertaking fixture doc.",
+    "authoritativeNote": "The Canonical Domain Model doc is treated as authoritative for structure/enums. The Conformance Test Spec supplies numbered rules (RPH-DEC/CNS/ASM, Property P1-P8). TENANT_IDENTITY_MISMATCH and concrete aggregation/conflict rule shapes come from the Reference Undertaking fixture and are noted as such."
+  },
+
+  "decompositionContract": {
+    "description": "A DecompositionContract (objectType 'DECOMPOSITION_CONTRACT') is a first-class Professional Work Object (extends ObjectEnvelope) owned by the Work Aggregate. It records how one parent PWU is split into child PWUs while conserving obligations, propagating constraints and assumptions, mapping intent, and pairing with a recomposition contract. Its validity gates whether the parent may become PLANNED via child execution. Decomposition is not a task tree: every child must trace to the parent and state which parent intent/obligation it serves.",
+    "extends": "ObjectEnvelope (§4: id, objectType, semanticVersion, revision, lifecycleStatus, provenance, authorityId, etc.)",
+    "fields": [
+      { "name": "parentWorkUnitId", "type": "string", "required": true, "description": "The parent PWU being decomposed.", "sourceRef": "§13.1" },
+      { "name": "childWorkUnitIds", "type": "string[]", "required": true, "description": "Child PWUs produced by the decomposition; each must trace to the parent.", "sourceRef": "§13.1; §13.2" },
+      { "name": "rationale", "type": "string", "required": true, "description": "Why the parent is decomposed this way.", "sourceRef": "§13.1" },
+      { "name": "intentMappings", "type": "IntentMapping[]", "required": true, "description": "Maps each child to the parent intent/obligation it serves. Structure of IntentMapping is opaque in the two authoritative docs.", "sourceRef": "§13.1; §13.2 ('Every child must state which parent intent or obligation it serves')" },
+      { "name": "obligationAllocations", "type": "ObligationAllocation[]", "required": true, "description": "Explicit allocations of parent obligations to children. A child may satisfy a parent obligation only through an explicit allocation. ObligationAllocation structure is opaque in these docs.", "sourceRef": "§13.1; §10.2" },
+      { "name": "constraintPropagations", "type": "ConstraintPropagation[]", "required": true, "description": "How each relevant mandatory parent constraint flows to children (propagate/retain/inapplicable/waive/supersede). Structure opaque in these docs.", "sourceRef": "§13.1; §11.2" },
+      { "name": "assumptionPropagations", "type": "AssumptionPropagation[]", "required": true, "description": "How material assumptions propagate to children when applicable. Structure opaque in these docs.", "sourceRef": "§13.1; §13.2" },
+      { "name": "retainedParentObligationIds", "type": "string[]", "required": true, "description": "Parent obligations NOT allocated down but retained at parent level; one of the four legal dispositions in the conservation equation.", "sourceRef": "§13.1; §13.2; §35.1" },
+      { "name": "coverageClaims", "type": "CoverageClaim[]", "required": true, "description": "Claims about how completely the children cover parent obligations (see coverageClaimTypes).", "sourceRef": "§13.1; §13.3" },
+      { "name": "siblingDependencyIds", "type": "string[]", "required": true, "description": "Explicit dependencies among sibling children. Sibling dependencies must be explicit — no implicit ordering.", "sourceRef": "§13.1; §13.2; Migration §8.2" },
+      { "name": "recompositionContractId", "type": "string", "required": true, "description": "The paired RecompositionContract. A material decomposition cannot become valid without a recomposition strategy (RPH-DEC-005).", "sourceRef": "§13.1; RPH-DEC-005" },
+      { "name": "status", "type": "'DRAFT' | 'UNDER_REVIEW' | 'VALID' | 'CONDITIONALLY_VALID' | 'INVALID' | 'SUPERSEDED'", "required": true, "description": "Lifecycle of the decomposition contract itself. Only VALID or CONDITIONALLY_VALID lets the parent become PLANNED through child execution.", "sourceRef": "§13.1; §13.2" }
+    ],
+    "coverageClaimTypes": [
+      { "value": "COMPLETE", "meaning": "Children fully cover the cited parent obligations.", "sourceRef": "§13.3 (CoverageClaim.coverageType)" },
+      { "value": "PARTIAL", "meaning": "Children cover the cited parent obligations only in part.", "sourceRef": "§13.3" },
+      { "value": "CONDITIONAL", "meaning": "Coverage holds subject to a stated condition.", "sourceRef": "§13.3" },
+      { "value": "EXPLORATORY", "meaning": "Coverage is provisional/exploratory rather than a firm completeness claim.", "sourceRef": "§13.3" }
+    ],
+    "coverageClaimShape": {
+      "note": "CoverageClaim (§13.3) fields: claimId, parentObligationIds[], childWorkUnitIds[], coverageType, rationale.",
+      "sourceRef": "§13.3"
+    },
+    "siblingDependencyModel": "Sibling dependencies are expressed as an explicit list of ids on the contract (siblingDependencyIds) and enforced by the invariant 'Sibling dependencies must be explicit' (§13.2). No dependency may be inferred from array/phase order. Parallel siblings may execute concurrently, but their outputs cannot be recomposed until required children reach acceptable states AND shared dependencies are resolved (§28.3). A sibling conflict discovered after RECOMPOSED drives the parent to INVALIDATED (§8.2). The typed trace relation for the dependency edge is DEPENDS_ON (§25).",
+    "gatingInvariants": [
+      { "id": null, "statement": "Every child must trace to the parent.", "sourceRef": "§13.2" },
+      { "id": null, "statement": "The parent cannot become PLANNED through child execution unless the decomposition contract is VALID or CONDITIONALLY_VALID.", "sourceRef": "§13.2" },
+      { "id": null, "statement": "Decomposition validation must be independent for high-risk work.", "sourceRef": "§13.2; Migration §8.2" },
+      { "id": null, "statement": "Child PWUs may introduce new obligations, but those must be traceable to evidence, policy, or discovered need.", "sourceRef": "§13.2" },
+      { "id": null, "statement": "A decomposition may be revised without changing parent identity, but it increments semantic version.", "sourceRef": "§13.2" }
+    ]
+  },
+
+  "obligationConservation": {
+    "equation": "Parent mandatory obligations = allocated + retained + satisfied + authorized waivers",
+    "equationVariants": [
+      { "wording": "Parent mandatory obligations = allocated + retained + satisfied + authorized waivers", "sourceRef": "§35.1 ('No obligation disappears')" },
+      { "wording": "mandatory parent obligations = allocated + retained + already satisfied + authorized waivers", "sourceRef": "RPH-DEC-007" },
+      { "wording": "every mandatory parent obligation has exactly one or more valid dispositions: allocated; retained; satisfied; authorized waiver", "sourceRef": "Property P2 (§25)" }
+    ],
+    "dispositionsOfAnObligation": [
+      { "value": "ALLOCATED", "meaning": "Explicitly allocated to one or more child PWUs (via obligationAllocations). A child satisfies a parent obligation ONLY through an explicit allocation.", "sourceRef": "§13.1; §10.2; RPH-DEC-002" },
+      { "value": "RETAINED", "meaning": "Kept at the parent level rather than delegated; recorded in retainedParentObligationIds and the ObligationRetained event. NOTE: 'RETAINED' is a decomposition-level disposition, NOT a value of the Obligation.status enum (§10.1).", "sourceRef": "§13.1; §26.3 (ObligationRetained)" },
+      { "value": "SATISFIED", "meaning": "Already satisfied by a supported claim before/independent of this decomposition. Satisfaction requires a supported claim — an obligation cannot become SATISFIED merely because a related PWU is completed.", "sourceRef": "§10.2; §35.1; RPH-DEC-007" },
+      { "value": "WAIVED (authorized waiver)", "meaning": "Discharged by an authorized waiver. A waived mandatory obligation requires an authorized waiver (scope, rationale, duration, affected objects).", "sourceRef": "§10.2; §23.2 (Governance)" }
+    ],
+    "rules": [
+      { "id": "RPH-DEC-002", "statement": "A parent mandatory obligation not allocated, retained, satisfied, or waived => finding MISSING_OBLIGATION_ALLOCATION emitted; decomposition becomes INVALID; child execution is blocked.", "sourceRef": "RPH-DEC-002" },
+      { "id": "RPH-DEC-007", "statement": "Property: mandatory parent obligations = allocated + retained + already satisfied + authorized waivers. Any generated decomposition violating the equation must be rejected.", "sourceRef": "RPH-DEC-007" },
+      { "id": null, "statement": "Every mandatory obligation must be allocated or retained.", "sourceRef": "§13.2" },
+      { "id": null, "statement": "An active obligation cannot disappear during decomposition.", "sourceRef": "§13.2; §10.2" },
+      { "id": null, "statement": "Every mandatory obligation must have an authoritative source.", "sourceRef": "§10.2" },
+      { "id": null, "statement": "A child PWU may satisfy a parent obligation only through an explicit allocation.", "sourceRef": "§10.2" },
+      { "id": null, "statement": "An obligation cannot become SATISFIED solely because a related PWU is completed; satisfaction requires a supported claim.", "sourceRef": "§10.2" },
+      { "id": null, "statement": "A violated obligation must affect assurance disposition.", "sourceRef": "§10.2" },
+      { "id": null, "statement": "Migration-doc restatement: every parent obligation must be delegated, retained, or explicitly removed through an authorized decision.", "sourceRef": "Migration §8.2" }
+    ],
+    "violationOutcome": "On decomposition validation, an unaccounted mandatory obligation yields the finding MISSING_OBLIGATION_ALLOCATION, sets the decomposition status to INVALID, and blocks child execution (RPH-DEC-002). Under property generation, any decomposition violating the conservation equation must be rejected (RPH-DEC-007 / Property P2). Dropping mandatory obligations during decomposition is a listed mutation that tests MUST catch (§26 Mutation Testing, Conformance doc).",
+    "propertyTests": [
+      { "id": "P2", "aliasInTask": "PBT-2", "statement": "For every valid decomposition, every mandatory parent obligation has exactly one or more valid dispositions: allocated; retained; satisfied; authorized waiver.", "sourceRef": "Property P2 (§25, Conformance doc)" },
+      { "id": "RPH-DEC-007", "statement": "Generated parents/child-allocations/retained/waivers must satisfy the conservation equation or be rejected.", "sourceRef": "RPH-DEC-007 (§9, Conformance doc)" }
+    ]
+  },
+
+  "constraintPropagation": {
+    "strengths": [
+      { "value": "MANDATORY", "meaning": "Must be honored; propagation preserves this strength unless an authorized decision changes it.", "sourceRef": "§11.1 (ConstraintObject.strength); RPH-CNS-001/002" },
+      { "value": "PREFERRED", "meaning": "Preferred but not mandatory. NOTE: for Constraints the middle strength is PREFERRED (contrast Obligation.strength middle value CONDITIONAL, §10.1).", "sourceRef": "§11.1" },
+      { "value": "ADVISORY", "meaning": "Advisory/non-binding.", "sourceRef": "§11.1" }
+    ],
+    "constraintStatuses": ["PROPOSED", "ACTIVE", "WAIVED", "INAPPLICABLE", "VIOLATED", "SUPERSEDED", "INVALIDATED"],
+    "constraintStatusSourceRef": "§11.1 (ConstraintObject.status)",
+    "rules": [
+      { "id": "RPH-CNS-001", "statement": "Constraint propagation preserves strength: a mandatory parent constraint propagated to a child remains mandatory unless an authorized decision changes it.", "sourceRef": "RPH-CNS-001" },
+      { "id": "RPH-CNS-002", "statement": "Constraint weakening requires authority: a model proposing to change a mandatory constraint to advisory is rejected without authority.", "sourceRef": "RPH-CNS-002" },
+      { "id": "RPH-CNS-003", "statement": "Inapplicability requires rationale: a child marking a mandatory parent constraint inapplicable must supply a rationale and an authority or policy basis.", "sourceRef": "RPH-CNS-003" },
+      { "id": "RPH-CNS-004", "statement": "Expired waiver no longer satisfies constraint disposition: on expiration the waiver becomes expired, affected work becomes review-required, and baseline promotion is blocked if the constraint remains applicable.", "sourceRef": "RPH-CNS-004" },
+      { "id": "RPH-DEC-003", "statement": "Silent constraint drop: a relevant child that neither inherits nor dispositions a mandatory parent security constraint => decomposition is rejected.", "sourceRef": "RPH-DEC-003" },
+      { "id": null, "statement": "Every relevant mandatory constraint must be propagated (decomposition invariant).", "sourceRef": "§13.2" },
+      { "id": null, "statement": "Constraint propagation rule: for every mandatory parent constraint, one of the following must hold for each relevant child — propagated; retained at parent level; marked inapplicable with rationale; waived through authority; superseded by a stronger constraint. No silent omission is permitted.", "sourceRef": "§11.2" }
+    ],
+    "propagationSemantics": "For every mandatory parent constraint, each relevant child must resolve it via exactly one of five dispositions: (1) propagated, (2) retained at parent level, (3) marked inapplicable with rationale, (4) waived through authority, or (5) superseded by a stronger constraint (§11.2). Silent omission is prohibited. When propagated, strength is preserved — a MANDATORY constraint stays MANDATORY at the child (RPH-CNS-001); weakening (e.g. MANDATORY→ADVISORY) requires authority (RPH-CNS-002); marking inapplicable requires rationale + authority/policy basis (RPH-CNS-003). Every mandatory applicable constraint must remain traceable after decomposition (§35.1 'No constraint silently drops'; RPH-TRC-002 requires a trace to relevant child PWUs and artifacts). Dropping mandatory constraints during decomposition is a mutation that tests MUST catch (§26 Mutation Testing).",
+    "propertyTests": [
+      { "id": "P3", "aliasInTask": "PBT-3", "statement": "For every relevant child, every mandatory applicable parent constraint is: propagated; retained; inapplicable with valid rationale; waived; or superseded.", "sourceRef": "Property P3 (§25, Conformance doc)" },
+      { "id": null, "statement": "No constraint silently drops: every mandatory applicable constraint must remain traceable after decomposition.", "sourceRef": "§35.1 'No constraint silently drops'; RPH-DEC-003" }
+    ]
+  },
+
+  "recomposition": {
+    "description": "A RecompositionContract (objectType 'RECOMPOSITION_CONTRACT', extends ObjectEnvelope) describes how the assured results of the required child PWUs are aggregated back into satisfaction of the parent completion claim. Recomposition is NOT concatenation: it must determine whether assured child results collectively satisfy the parent intent, checking child outputs for contradiction and evaluating parent constraints against the recomposed result. It is paired 1:1 with the DecompositionContract (recompositionContractId).",
+    "fields": [
+      { "name": "parentWorkUnitId", "type": "string", "required": true, "description": "Parent PWU whose completion is being recomposed.", "sourceRef": "§14" },
+      { "name": "requiredChildWorkUnitIds", "type": "string[]", "required": true, "description": "Children that must reach an acceptable state (satisfied/conditionally satisfied/waived/superseded via authorized decision) before recomposition can succeed.", "sourceRef": "§14; §14.1" },
+      { "name": "aggregationRules", "type": "AggregationRule[]", "required": true, "description": "Rules for how child results combine into the parent claim. AggregationRule is an opaque type in the domain doc; the fixture instantiates it as { rule: string } free-text rules.", "sourceRef": "§14; FIXTURE §24" },
+      { "name": "conflictResolutionRules", "type": "ConflictResolutionRule[]", "required": true, "description": "Rules mapping a conflictType to a resolution action. Opaque in domain doc; fixture instantiates as { conflictType, action }.", "sourceRef": "§14; FIXTURE §24" },
+      { "name": "parentCompletionClaimId", "type": "string", "required": true, "description": "The claim asserting the parent is complete; child evidence must support THIS claim, not merely child claims.", "sourceRef": "§14; §14.1" },
+      { "name": "status", "type": "'DRAFT' | 'READY' | 'EVALUATING' | 'COMPOSABLE' | 'CONFLICTED' | 'INSUFFICIENT' | 'SATISFIED' | 'SUPERSEDED'", "required": true, "description": "Lifecycle of the recomposition. CONFLICTED = child results contradict; INSUFFICIENT = children do not collectively satisfy the parent; COMPOSABLE = can be composed; SATISFIED = parent claim supported.", "sourceRef": "§14" }
+    ],
+    "strategies": [],
+    "strategiesNote": "The two authoritative docs do NOT define an enumerated 'recomposition strategy' set. RPH-DEC-005 requires that 'a recomposition strategy exists' but a strategy is operationalized as the PRESENCE of a RecompositionContract carrying aggregationRules + conflictResolutionRules, not a named enum. See _openItems.",
+    "aggregationRules": [
+      { "id": null, "statement": "All required child PWUs must be satisfied, conditionally satisfied, waived, or superseded through an authorized decision.", "sourceRef": "§14.1" },
+      { "id": null, "statement": "Child outputs must be checked for contradiction.", "sourceRef": "§14.1" },
+      { "id": null, "statement": "Child evidence must support the PARENT claim, not merely child claims.", "sourceRef": "§14.1" },
+      { "id": null, "statement": "Parent constraints must be evaluated against the recomposed result.", "sourceRef": "§14.1" },
+      { "id": null, "statement": "A recomposed result requires an explicit assessment.", "sourceRef": "§14.1" },
+      { "id": null, "statement": "Recomposition may fail even when all child PWUs are individually satisfied.", "sourceRef": "§14.1" },
+      { "id": "FIXTURE-agg-1", "statement": "All child artifacts must use a consistent tenant identity model.", "sourceRef": "FIXTURE §24 (aggregationRules)" },
+      { "id": "FIXTURE-agg-2", "statement": "Data ownership and integration contracts must preserve tenant context.", "sourceRef": "FIXTURE §24" },
+      { "id": "FIXTURE-agg-3", "statement": "Mobile synchronization must not bypass authorization or audit obligations.", "sourceRef": "FIXTURE §24" },
+      { "id": "FIXTURE-agg-4", "statement": "Trade-specific extensions must not alter universal entity identity.", "sourceRef": "FIXTURE §24" }
+    ],
+    "conflictOutcomes": [
+      { "value": "CONFLICTED", "trigger": "Child outputs contradict — e.g. children's artifacts use incompatible tenant-identity models (TENANT_IDENTITY_MISMATCH).", "meaning": "RecompositionContract.status becomes CONFLICTED; parent is NOT satisfied; a conflict observation is emitted (RecompositionConflictDetected event).", "sourceRef": "§14 status enum; RPH-DEC-006; §26.2 (RecompositionConflictDetected)" },
+      { "value": "INSUFFICIENT", "trigger": "Required children do not collectively satisfy the parent intent.", "meaning": "RecompositionContract.status becomes INSUFFICIENT.", "sourceRef": "§14 status enum" },
+      { "value": "REJECT_RECOMPOSITION", "trigger": "conflictType = TENANT_IDENTITY_MISMATCH", "meaning": "Conflict-resolution ACTION defined in the fixture's conflictResolutionRules; recomposition is rejected.", "sourceRef": "FIXTURE §24 (conflictResolutionRules)" },
+      { "value": "RESHAPE_MOBILE_ARCHITECTURE", "trigger": "conflictType = OFFLINE_AUDIT_CONFLICT", "meaning": "Conflict-resolution ACTION defined in the fixture; triggers reshaping of the mobile architecture rather than outright rejection.", "sourceRef": "FIXTURE §24" },
+      { "value": "INVALIDATED (parent PWU)", "trigger": "Sibling conflict discovered after the parent has RECOMPOSED.", "meaning": "Exception transition RECOMPOSED -> INVALIDATED.", "sourceRef": "§8.2 (Exception transitions)" },
+      { "value": "RecompositionFailed (event)", "trigger": "Recomposition cannot complete.", "meaning": "Domain event emitted; distinct from RecompositionCompleted.", "sourceRef": "§26.2" }
+    ],
+    "canBeConflictedThoughChildrenSatisfied": "§14.1 states verbatim: 'Recomposition may fail even when all child PWUs are individually satisfied.' RPH-DEC-006 operationalizes this: given all child PWUs individually SATISFIED but their artifacts use incompatible tenant-identity models, recomposition runs and the parent is NOT satisfied, recomposition state becomes CONFLICTED, and a conflict observation is emitted. Individual child satisfaction is necessary but not sufficient for parent satisfaction — the parent completion claim must be supported by the recomposed whole (child evidence must support the parent claim, and parent constraints must hold against the recomposed result).",
+    "requiredAssessment": "A recomposed result requires an explicit Assurance Assessment; recomposition success is not implicit from child states (§14.1)."
+  },
+
+  "assumptions": {
+    "description": "An Assumption (objectType 'ASSUMPTION', extends ObjectEnvelope) is a reified professional premise. A MATERIAL assumption detected during execution MUST become a first-class object — no material assumption may remain embedded only in model prose (§12.2, §35.1). Reification: when a validator/model output contains a material implementation premise, Assumption Disclosure creates an Assumption Object linked to affected objects (RPH-ASM-001/002). Materiality is graded IMMATERIAL | MATERIAL | CRITICAL.",
+    "materialityLevels": [
+      { "value": "IMMATERIAL", "meaning": "Not material to obligations/assurance.", "sourceRef": "§12.1 (materiality)" },
+      { "value": "MATERIAL", "meaning": "Material — must be reified as a first-class Assumption Object; cannot remain only in prose.", "sourceRef": "§12.1; §12.2; §35.1" },
+      { "value": "CRITICAL", "meaning": "Must be verified or explicitly accepted by authority before dependent irreversible work proceeds.", "sourceRef": "§12.1; §12.2; RPH-ASM-005" }
+    ],
+    "assumptionStates": [
+      { "value": "PROPOSED", "meaning": "Initial proposed assumption.", "sourceRef": "§12.1 (status)" },
+      { "value": "DISCLOSED", "meaning": "Surfaced as a first-class object via Assumption Disclosure.", "sourceRef": "§12.1; RPH-ASM-001; §26.3 (AssumptionDisclosed)" },
+      { "value": "UNDER_VERIFICATION", "meaning": "Verification in progress.", "sourceRef": "§12.1; §26.3 (AssumptionVerificationStarted)" },
+      { "value": "ACCEPTED", "meaning": "Explicitly accepted by authority. ACCEPTED is NOT equivalent to VERIFIED.", "sourceRef": "§12.1; §12.2; RPH-ASM-003" },
+      { "value": "VERIFIED", "meaning": "Verified by method/evidence.", "sourceRef": "§12.1; §26.3 (AssumptionVerified)" },
+      { "value": "FALSIFIED", "meaning": "Contradicting evidence falsifies it; triggers impact analysis.", "sourceRef": "§12.1; §12.2; RPH-ASM-004; §26.3 (AssumptionFalsified)" },
+      { "value": "EXPIRED", "meaning": "Expiration condition reached; cannot continue authorizing work.", "sourceRef": "§12.1; §12.2; RPH-ASM-006; §26.3 (AssumptionExpired)" },
+      { "value": "SUPERSEDED", "meaning": "Replaced by a newer assumption.", "sourceRef": "§12.1" }
+    ],
+    "acceptedIsNotVerified": "§12.2 invariant: 'Accepted is not equivalent to verified.' RPH-ASM-003: when a human accepts a material assumption, its status becomes ACCEPTED, not VERIFIED. Acceptance is an authority act permitting proceeding under residual risk; verification is an evidentiary act.",
+    "falsificationImpact": "§12.2: 'Falsification triggers impact analysis.' RPH-ASM-004: on contradicting evidence the status becomes FALSIFIED, AssumptionFalsified is emitted, impact analysis is required, affected PWUs become AT_RISK, RESHAPING_REQUIRED, or INVALIDATED (shape-integrity states), and dependent claims are reviewed. Assumption falsification is a first-class INVALIDATION TRIGGER (§29.1) and drives the exception transition EXECUTING -> RESHAPING (§8.2). Tie to evidence: falsification arrives via CONTRADICTING evidence; where the falsified assumption underpinned evidence/claims, dependent claims must be reviewed (parallels §16.2 / Property P4 evidence-invalidation propagation, though the doc routes assumption falsification through impact analysis rather than direct evidence invalidation).",
+    "rules": [
+      { "id": "RPH-ASM-001", "statement": "Material assumption becomes first-class: a model output containing a material implementation premise => Assumption Disclosure creates an Assumption Object linked to affected objects.", "sourceRef": "RPH-ASM-001" },
+      { "id": "RPH-ASM-002", "statement": "Assumption cannot remain only in prose: if an assessment identifies a material assumption but completes without creating an Assumption Object, the assessment result is rejected or remains incomplete.", "sourceRef": "RPH-ASM-002" },
+      { "id": "RPH-ASM-003", "statement": "Accepted is not verified: human acceptance sets status ACCEPTED, not VERIFIED.", "sourceRef": "RPH-ASM-003" },
+      { "id": "RPH-ASM-004", "statement": "Falsified assumption triggers impact analysis: status FALSIFIED, AssumptionFalsified emitted, impact analysis required, affected PWUs AT_RISK/RESHAPING_REQUIRED/INVALIDATED, dependent claims reviewed.", "sourceRef": "RPH-ASM-004" },
+      { "id": "RPH-ASM-005", "statement": "Critical assumption blocks irreversible work: an unresolved critical assumption blocks an irreversible execution step unless the assumption is verified OR authorized acceptance explicitly permits proceeding.", "sourceRef": "RPH-ASM-005" },
+      { "id": "RPH-ASM-006", "statement": "Expired assumption cannot authorize new work: a new execution plan depending on an EXPIRED assumption is rejected at plan approval.", "sourceRef": "RPH-ASM-006" },
+      { "id": null, "statement": "A material assumption detected during execution must become a first-class object.", "sourceRef": "§12.2" },
+      { "id": null, "statement": "No material assumption may remain embedded only in model prose.", "sourceRef": "§12.2" },
+      { "id": null, "statement": "A critical assumption must be verified or explicitly accepted by authority before dependent irreversible work proceeds.", "sourceRef": "§12.2" },
+      { "id": null, "statement": "Expired assumptions cannot continue authorizing work.", "sourceRef": "§12.2" },
+      { "id": null, "statement": "Property (No hidden material assumption): every material assumption emitted by an agent must become an Assumption Object before dependent work reaches READY.", "sourceRef": "§35.1 'No hidden material assumption'" }
+    ],
+    "linkToPwu": "An Assumption links to work via AssumptionObject.affectedObjectIds (§12.1), the typed trace relation ASSUMES (§25), the PWU's own assumptionIds array (§7.1), and, at decomposition time, assumptionPropagations on the DecompositionContract (§13.1). Impact traversal follows these typed edges when the assumption is falsified/expired (§29.1-§29.2)."
+  },
+
+  "conformanceTests": [
+    { "id": "RPH-DEC-001", "name": "Valid decomposition", "given": "A parent PWU with three mandatory obligations; children collectively allocate all three; all applicable constraints are propagated or retained; a recomposition contract exists.", "when": "The decomposition is assessed.", "then": "It may become VALID.", "sourceRef": "RPH-DEC-001 (§9)" },
+    { "id": "RPH-DEC-002", "name": "Missing mandatory obligation", "given": "A parent with a mandatory obligation not allocated, retained, satisfied, or waived.", "when": "Decomposition validation runs.", "then": "Finding MISSING_OBLIGATION_ALLOCATION emitted; decomposition is INVALID; child execution is blocked.", "sourceRef": "RPH-DEC-002 (§9)" },
+    { "id": "RPH-DEC-003", "name": "Silent constraint drop", "given": "A mandatory parent security constraint; a relevant child does not inherit or disposition it.", "when": "Decomposition is validated.", "then": "Decomposition is rejected.", "sourceRef": "RPH-DEC-003 (§9)" },
+    { "id": "RPH-DEC-004", "name": "Child intent divergence", "given": "A parent PWU for small-business field-service software; a child introduces national-enterprise workforce optimization without authorization.", "when": "Decomposition is validated.", "then": "CHILD_INTENT_DIVERGENCE emitted; decomposition is rejected or requires human decision.", "sourceRef": "RPH-DEC-004 (§9)" },
+    { "id": "RPH-DEC-005", "name": "Missing recomposition contract", "given": "A material parent decomposed into children.", "when": "No recomposition strategy exists.", "then": "The decomposition cannot become valid.", "sourceRef": "RPH-DEC-005 (§9)" },
+    { "id": "RPH-DEC-006", "name": "All children complete but parent recomposition fails", "given": "All child PWUs are individually satisfied; their artifacts use incompatible tenant-identity models.", "when": "Recomposition runs.", "then": "Parent is not satisfied; recomposition state becomes CONFLICTED; conflict observation is emitted.", "sourceRef": "RPH-DEC-006 (§9); trigger detail TENANT_IDENTITY_MISMATCH per FIXTURE §24" },
+    { "id": "RPH-DEC-007", "name": "Property: no obligation disappears", "given": "Arbitrary parent obligations, child allocations, retained obligations, and waivers.", "when": "The conservation equation is evaluated.", "then": "mandatory parent obligations = allocated + retained + already satisfied + authorized waivers; any decomposition violating it must be rejected.", "sourceRef": "RPH-DEC-007 (§9)" },
+    { "id": "RPH-CNS-001", "name": "Constraint propagation preserves strength", "given": "A mandatory parent constraint.", "when": "Propagated to a child.", "then": "The child constraint remains mandatory unless an authorized decision changes it.", "sourceRef": "RPH-CNS-001 (§10)" },
+    { "id": "RPH-CNS-002", "name": "Constraint weakening requires authority", "given": "A mandatory security constraint.", "when": "A model proposes changing it to advisory.", "then": "The mutation is rejected without authority.", "sourceRef": "RPH-CNS-002 (§10)" },
+    { "id": "RPH-CNS-003", "name": "Inapplicability requires rationale", "given": "A mandatory parent constraint.", "when": "A child marks it inapplicable.", "then": "A rationale and authority or policy basis are required.", "sourceRef": "RPH-CNS-003 (§10)" },
+    { "id": "RPH-CNS-004", "name": "Expired waiver no longer satisfies constraint disposition", "given": "A constraint waiver with an expiration.", "when": "The expiration passes.", "then": "Waiver becomes expired; affected work becomes review-required; baseline promotion is blocked if the constraint remains applicable.", "sourceRef": "RPH-CNS-004 (§10)" },
+    { "id": "RPH-ASM-003", "name": "Accepted is not verified", "given": "A human accepts a material assumption.", "when": "Acceptance is recorded.", "then": "Its status becomes ACCEPTED, not VERIFIED.", "sourceRef": "RPH-ASM-003 (§11)" },
+    { "id": "RPH-ASM-004", "name": "Falsified assumption triggers impact analysis", "given": "A verified or accepted assumption supporting architecture and plan objects.", "when": "Contradicting evidence falsifies it.", "then": "Status FALSIFIED; AssumptionFalsified emitted; impact analysis required; affected PWUs AT_RISK/RESHAPING_REQUIRED/INVALIDATED; dependent claims reviewed.", "sourceRef": "RPH-ASM-004 (§11)" },
+    { "id": "RPH-E2E-003", "name": "Material assumption falsified (end-to-end)", "given": "Architecture assumes small-business scale.", "when": "The user clarifies the product must support national enterprises.", "then": "Assumption becomes falsified; intent revised; impact analysis identifies architecture and behavior PWUs; Architecture Baseline remains immutable but review-required; successor architecture work is created; stale approval is not reused.", "sourceRef": "RPH-E2E-003 (§24)" }
+  ],
+
+  "enumsIntroduced": [
+    { "name": "CoverageType", "values": ["COMPLETE", "PARTIAL", "CONDITIONAL", "EXPLORATORY"], "note": "Canonical — defined in Domain Model §13.3 (CoverageClaim.coverageType). Not new for M9." },
+    { "name": "DecompositionContractStatus", "values": ["DRAFT", "UNDER_REVIEW", "VALID", "CONDITIONALLY_VALID", "INVALID", "SUPERSEDED"], "note": "Canonical — Domain Model §13.1. Migration doc §8.1 uses a narrower subset (VALID/CONDITIONALLY_VALID/INVALID); see _openItems." },
+    { "name": "RecompositionContractStatus", "values": ["DRAFT", "READY", "EVALUATING", "COMPOSABLE", "CONFLICTED", "INSUFFICIENT", "SATISFIED", "SUPERSEDED"], "note": "Canonical — Domain Model §14 (field name 'status'). Migration doc §8.3 names the field 'result' with a different set (PENDING/COMPOSABLE/CONFLICTED/INSUFFICIENT/SATISFIED); cross-doc disagreement, see _openItems." },
+    { "name": "ObligationStrength", "values": ["MANDATORY", "CONDITIONAL", "ADVISORY"], "note": "Canonical — Domain Model §10.1 (Obligation.strength). NOTE middle value differs from ConstraintStrength." },
+    { "name": "ObligationStatus", "values": ["PROPOSED", "ACTIVE", "ALLOCATED", "SATISFIED", "WAIVED", "VIOLATED", "SUPERSEDED"], "note": "Canonical — Domain Model §10.1. NOTE: 'RETAINED' is NOT here — retention is a decomposition-level disposition (retainedParentObligationIds / ObligationRetained event)." },
+    { "name": "ConstraintStrength", "values": ["MANDATORY", "PREFERRED", "ADVISORY"], "note": "Canonical — Domain Model §11.1 (Constraint.strength). Middle value is PREFERRED (vs Obligation CONDITIONAL)." },
+    { "name": "ConstraintStatus", "values": ["PROPOSED", "ACTIVE", "WAIVED", "INAPPLICABLE", "VIOLATED", "SUPERSEDED", "INVALIDATED"], "note": "Canonical — Domain Model §11.1." },
+    { "name": "AssumptionMateriality", "values": ["IMMATERIAL", "MATERIAL", "CRITICAL"], "note": "Canonical — Domain Model §12.1 (Assumption.materiality)." },
+    { "name": "AssumptionStatus", "values": ["PROPOSED", "DISCLOSED", "UNDER_VERIFICATION", "ACCEPTED", "VERIFIED", "FALSIFIED", "EXPIRED", "SUPERSEDED"], "note": "Canonical — Domain Model §12.1 (Assumption.status)." },
+    { "name": "conflictType (fixture instance values)", "values": ["TENANT_IDENTITY_MISMATCH", "OFFLINE_AUDIT_CONFLICT"], "note": "NOT an enumerated type in either authoritative doc. These are concrete values inside ConflictResolutionRule instances in the Reference Undertaking fixture (FIXTURE §24). ConflictResolutionRule is an opaque interface in Domain Model §14." },
+    { "name": "conflictResolution action (fixture instance values)", "values": ["REJECT_RECOMPOSITION", "RESHAPE_MOBILE_ARCHITECTURE"], "note": "NOT an enumerated type in the authoritative docs; fixture-defined actions (FIXTURE §24). No canonical 'recomposition strategy' enum exists." }
+  ],
+
+  "_openItems": [
+    "CT-2 / CT-4 (the task's naming) do NOT exist verbatim anywhere in the RPH docs. The nearest conformance tests are RPH-DEC-006 (all children individually SATISFIED but recomposition CONFLICTED via incompatible tenant-identity models) and RPH-DEC-002 (missing mandatory obligation). I populated conformanceTests with the real RPH-DEC/CNS/ASM/E2E ids instead of inventing CT-N ids.",
+    "PBT-2 / PBT-3 (the task's naming) do NOT exist verbatim. The property ids are 'Property P2' (mandatory obligations persist) and 'Property P3' (mandatory constraints persist) in Conformance doc §25, with parallel unnumbered named properties in Domain Model §35.1 ('No obligation disappears', 'No constraint silently drops') and the RPH-DEC-007 property test. I used ids P2/P3 and recorded 'PBT-2'/'PBT-3' only as aliasInTask.",
+    "CROSS-DOC DISAGREEMENT (RecompositionContract terminal field): Canonical Domain Model §14 names the field 'status' with values DRAFT/READY/EVALUATING/COMPOSABLE/CONFLICTED/INSUFFICIENT/SATISFIED/SUPERSEDED. The Migration doc §8.3 names the field 'result' with a smaller set PENDING/COMPOSABLE/CONFLICTED/INSUFFICIENT/SATISFIED (no DRAFT/READY/EVALUATING/SUPERSEDED; adds PENDING). The Reference Undertaking fixture (§24) uses 'status' with value 'SATISFIED', matching the Canonical doc. I treated the Canonical Domain Model as authoritative.",
+    "CROSS-DOC DISAGREEMENT (DecompositionContract.status): Canonical §13.1 = DRAFT/UNDER_REVIEW/VALID/CONDITIONALLY_VALID/INVALID/SUPERSEDED. Migration doc §8.1 shows only VALID/CONDITIONALLY_VALID/INVALID. Used the Canonical (fuller) set.",
+    "'Recomposition strategies' as an ENUM: the docs are SILENT. There is no named strategy enum. RPH-DEC-005 requires 'a recomposition strategy exists', operationalized as the presence of a RecompositionContract with aggregationRules + conflictResolutionRules. The only strategy-like values are the fixture's conflict-resolution ACTIONS (REJECT_RECOMPOSITION, RESHAPE_MOBILE_ARCHITECTURE), which are free-form instance values, not an enumerated type. recomposition.strategies is therefore an empty array with a note.",
+    "AggregationRule and ConflictResolutionRule are OPAQUE interface types in Domain Model §14 (no field structure given). Concrete shape only appears in the Reference Undertaking fixture §24: aggregationRules = [{ rule: string }]; conflictResolutionRules = [{ conflictType, action }]. Fuller schema, if any, may live in the 'RPH - Command, Event, Schema Contract Package' doc (not read in full here).",
+    "IntentMapping, ObligationAllocation, ConstraintPropagation, AssumptionPropagation, ApplicabilityRule (referenced by DecompositionContract §13.1) are NOT structurally defined in either of the two authoritative docs. Their concrete shapes are likely in the 'Command, Event, Schema Contract Package' or 'Persistence' docs (persistence tables decomposition_allocations exist per §31).",
+    "'RETAINED' obligation disposition is part of the conservation equation (§35.1, RPH-DEC-007) and has an ObligationRetained event (§26.3) and a DecompositionContract.retainedParentObligationIds field (§13.1), but it is NOT a value of the Obligation.status enum (§10.1: PROPOSED/ACTIVE/ALLOCATED/SATISFIED/WAIVED/VIOLATED/SUPERSEDED). Retention is a decomposition-level disposition, not an obligation lifecycle status.",
+    "Conservation-equation wording variance: §35.1 says 'satisfied'; RPH-DEC-007 says 'already satisfied'; Property P2 says 'satisfied' + 'authorized waiver' (singular) vs §35.1 'authorized waivers' (plural). Semantically identical (pre-existing satisfaction; authorized waivers). Captured under equationVariants.",
+    "Finding codes MISSING_OBLIGATION_ALLOCATION (RPH-DEC-002), CHILD_INTENT_DIVERGENCE (RPH-DEC-004), INDEPENDENCE_VIOLATION (RPH-ASR-003) are emitted by tests but are NOT enumerated as ObservationType values in Domain Model §19 (ObservationType = FINDING/MEASUREMENT/CONFLICT/EVIDENCE_DEFICIT/SHAPE_RISK/POLICY_VIOLATION/RECOMMENDATION). They are finding sub-codes/labels, likely carried on a FINDING/CONFLICT observation, not top-level enum members.",
+    "Assumption falsification -> evidence linkage: the docs route falsification through IMPACT ANALYSIS (§12.2, §29.1, RPH-ASM-004) with 'dependent claims are reviewed', rather than through the direct evidence-invalidation propagation path of Property P4 / §16.2. They are related but distinct mechanisms; the docs do not explicitly equate 'assumption falsified' with 'evidence invalidated'.",
+    "RPH-DEC-004 (child intent divergence) is a decomposition guard not covered by the obligation/constraint/assumption conservation trio; included in conformanceTests for completeness but has no dedicated Property P* or numbered domain rule beyond the §13.2 invariant 'Every child must state which parent intent or obligation it serves.'"
+  ]
+}

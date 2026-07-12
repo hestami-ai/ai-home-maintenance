@@ -1,0 +1,2254 @@
+{
+  "objects": [
+    {
+      "objectType": "INTENT",
+      "tsName": "IntentObject",
+      "idPrefixEntity": "INTENT",
+      "note": "DOC-002 §6.1 + DOC-007 §10.1. Extends ObjectEnvelope. DOC-007 wins on formalizedObjective optionality.",
+      "fields": [
+        {
+          "field": "originatingExpression",
+          "type": "string",
+          "required": true
+        },
+        {
+          "field": "formalizedObjective",
+          "type": "string",
+          "required": false,
+          "note": "CONFLICT: DOC-002 §6.1 required; DOC-007 §10.1 optional (formalizedObjective?). DOC-007 wins → optional."
+        },
+        {
+          "field": "desiredOutcomes",
+          "type": "DesiredOutcome[]",
+          "required": true,
+          "note": "Helper undefined in both docs."
+        },
+        {
+          "field": "successConditions",
+          "type": "SuccessCondition[]",
+          "required": true,
+          "note": "Helper undefined in both docs."
+        },
+        {
+          "field": "nonGoals",
+          "type": "string[]",
+          "required": true
+        },
+        {
+          "field": "ambiguityIds",
+          "type": "string[]",
+          "required": true
+        },
+        {
+          "field": "constraintIds",
+          "type": "string[]",
+          "required": true
+        },
+        {
+          "field": "stakeholderIds",
+          "type": "string[]",
+          "required": true
+        },
+        {
+          "field": "parentIntentId",
+          "type": "string",
+          "required": false
+        },
+        {
+          "field": "supersedesIntentId",
+          "type": "string",
+          "required": false
+        },
+        {
+          "field": "intentStatus",
+          "type": "IntentStatus",
+          "required": true,
+          "enumRef": "IntentStatusSchema"
+        }
+      ]
+    },
+    {
+      "objectType": "PROFESSIONAL_WORK_UNIT",
+      "tsName": "ProfessionalWorkUnit",
+      "idPrefixEntity": "PROFESSIONAL_WORK_UNIT",
+      "note": "DOC-002 §7.1 + DOC-007 §11.1. Extends ObjectEnvelope. DOC-007 renames boundary→boundaries and omits 3 optional link fields (retained per union rule).",
+      "fields": [
+        {
+          "field": "pwuKind",
+          "type": "string",
+          "required": true,
+          "note": "Validated string (ontology-defined, ratify A-5), not a global enum."
+        },
+        {
+          "field": "title",
+          "type": "string",
+          "required": true
+        },
+        {
+          "field": "description",
+          "type": "string",
+          "required": true
+        },
+        {
+          "field": "intentId",
+          "type": "string",
+          "required": true
+        },
+        {
+          "field": "parentWorkUnitId",
+          "type": "string",
+          "required": false
+        },
+        {
+          "field": "boundaries",
+          "type": "WorkBoundary",
+          "required": true,
+          "note": "CONFLICT: DOC-002 §7.1 field name 'boundary'; DOC-007 §11.1 name 'boundaries' (same WorkBoundary shape). DOC-007 wins → 'boundaries'."
+        },
+        {
+          "field": "obligationIds",
+          "type": "string[]",
+          "required": true
+        },
+        {
+          "field": "constraintIds",
+          "type": "string[]",
+          "required": true
+        },
+        {
+          "field": "assumptionIds",
+          "type": "string[]",
+          "required": true
+        },
+        {
+          "field": "dependencyIds",
+          "type": "string[]",
+          "required": true
+        },
+        {
+          "field": "inputRequirements",
+          "type": "ArtifactRequirement[]",
+          "required": true,
+          "note": "Helper undefined in both docs."
+        },
+        {
+          "field": "expectedOutputs",
+          "type": "OutputDefinition[]",
+          "required": true,
+          "note": "Helper undefined in both docs."
+        },
+        {
+          "field": "evidenceRequirementIds",
+          "type": "string[]",
+          "required": true
+        },
+        {
+          "field": "verificationCriterionIds",
+          "type": "string[]",
+          "required": true
+        },
+        {
+          "field": "decompositionContractId",
+          "type": "string",
+          "required": false,
+          "note": "DOC-002 §7.1 only; ABSENT from DOC-007 §11.1 serialized. Retained (optional) per union rule — OPEN ITEM."
+        },
+        {
+          "field": "recompositionContractId",
+          "type": "string",
+          "required": false,
+          "note": "DOC-002 §7.1 only; ABSENT from DOC-007 §11.1. Retained (optional) — OPEN ITEM."
+        },
+        {
+          "field": "activeExecutionPlanId",
+          "type": "string",
+          "required": false
+        },
+        {
+          "field": "assurancePolicyIds",
+          "type": "string[]",
+          "required": true
+        },
+        {
+          "field": "workLifecycleState",
+          "type": "WorkLifecycleState",
+          "required": true,
+          "enumRef": "WorkLifecycleStateSchema",
+          "note": "State-axis 4/4 (§7.2)."
+        },
+        {
+          "field": "executionState",
+          "type": "ExecutionState",
+          "required": true,
+          "enumRef": "ExecutionStateSchema",
+          "note": "State-axis 1/4 (§7.3)."
+        },
+        {
+          "field": "assuranceState",
+          "type": "AssuranceState",
+          "required": true,
+          "enumRef": "AssuranceStateSchema",
+          "note": "State-axis 2/4 (§7.4). PWU-level rollup, NOT the assessment state machine."
+        },
+        {
+          "field": "shapeIntegrityState",
+          "type": "ShapeIntegrityState",
+          "required": true,
+          "enumRef": "ShapeIntegrityStateSchema",
+          "note": "State-axis 3/4 (§7.5)."
+        },
+        {
+          "field": "riskProfile",
+          "type": "WorkRiskProfile",
+          "required": true,
+          "note": "Helper DEFINED (DOC-002 §9.2)."
+        },
+        {
+          "field": "currentBaselineId",
+          "type": "string",
+          "required": false,
+          "note": "DOC-002 §7.1 only; ABSENT from DOC-007 §11.1. Retained (optional) — OPEN ITEM."
+        }
+      ]
+    },
+    {
+      "objectType": "OBLIGATION",
+      "tsName": "ObligationObject",
+      "idPrefixEntity": "OBLIGATION",
+      "note": "DOC-002 §10.1 ONLY — no DOC-007 serialized field definition (no obligation.schema.json). Extends ObjectEnvelope.",
+      "fields": [
+        {
+          "field": "statement",
+          "type": "string",
+          "required": true
+        },
+        {
+          "field": "obligationType",
+          "type": "ObligationType",
+          "required": true,
+          "enumRef": "ObligationTypeSchema"
+        },
+        {
+          "field": "sourceObjectId",
+          "type": "string",
+          "required": true
+        },
+        {
+          "field": "authority",
+          "type": "AuthorityReference",
+          "required": true,
+          "note": "Uses AuthorityReference (helper DEFINED §5), NOT ActorReference."
+        },
+        {
+          "field": "strength",
+          "type": "ObligationStrength",
+          "required": true,
+          "enumRef": "ObligationStrengthSchema",
+          "note": "MANDATORY|CONDITIONAL|ADVISORY — distinct from ConstraintStrength (PREFERRED)."
+        },
+        {
+          "field": "status",
+          "type": "ObligationStatus",
+          "required": true,
+          "enumRef": "ObligationStatusSchema"
+        }
+      ]
+    },
+    {
+      "objectType": "CONSTRAINT",
+      "tsName": "ConstraintObject",
+      "idPrefixEntity": "CONSTRAINT",
+      "note": "DOC-002 §11.1 ONLY — constraint.schema.json listed in DOC-007 §3 but no field-level prose. Extends ObjectEnvelope.",
+      "fields": [
+        {
+          "field": "statement",
+          "type": "string",
+          "required": true
+        },
+        {
+          "field": "constraintType",
+          "type": "ConstraintType",
+          "required": true,
+          "enumRef": "ConstraintTypeSchema"
+        },
+        {
+          "field": "authority",
+          "type": "AuthorityReference",
+          "required": true,
+          "note": "Helper DEFINED §5."
+        },
+        {
+          "field": "applicability",
+          "type": "ApplicabilityRule",
+          "required": true,
+          "note": "Helper undefined. OPEN ITEM: planned to unify with DOC-007 §18 ApplicabilityExpression (one DSL, ratify sheet C / M7)."
+        },
+        {
+          "field": "strength",
+          "type": "ConstraintStrength",
+          "required": true,
+          "enumRef": "ConstraintStrengthSchema",
+          "note": "MANDATORY|PREFERRED|ADVISORY — distinct enum from ObligationStrength."
+        },
+        {
+          "field": "status",
+          "type": "ConstraintStatus",
+          "required": true,
+          "enumRef": "ConstraintStatusSchema"
+        }
+      ]
+    },
+    {
+      "objectType": "ASSUMPTION",
+      "tsName": "AssumptionObject",
+      "idPrefixEntity": "ASSUMPTION",
+      "note": "DOC-002 §12.1 + DOC-007 §12.1 — IDENTICAL field sets, no conflict. Extends ObjectEnvelope.",
+      "fields": [
+        {
+          "field": "statement",
+          "type": "string",
+          "required": true
+        },
+        {
+          "field": "basis",
+          "type": "string",
+          "required": false
+        },
+        {
+          "field": "introducedBy",
+          "type": "ActorReference",
+          "required": true
+        },
+        {
+          "field": "affectedObjectIds",
+          "type": "string[]",
+          "required": true
+        },
+        {
+          "field": "materiality",
+          "type": "Materiality",
+          "required": true,
+          "enumRef": "MaterialitySchema"
+        },
+        {
+          "field": "verificationMethod",
+          "type": "string",
+          "required": false
+        },
+        {
+          "field": "expirationCondition",
+          "type": "string",
+          "required": false
+        },
+        {
+          "field": "status",
+          "type": "AssumptionStatus",
+          "required": true,
+          "enumRef": "AssumptionStatusSchema"
+        }
+      ]
+    },
+    {
+      "objectType": "CLAIM",
+      "tsName": "ClaimObject",
+      "idPrefixEntity": "CLAIM",
+      "note": "DOC-002 §15.1 + DOC-007 §13 — IDENTICAL field sets, no conflict. Extends ObjectEnvelope.",
+      "fields": [
+        {
+          "field": "statement",
+          "type": "string",
+          "required": true
+        },
+        {
+          "field": "claimType",
+          "type": "ClaimType",
+          "required": true,
+          "enumRef": "ClaimTypeSchema"
+        },
+        {
+          "field": "assertedBy",
+          "type": "ActorReference",
+          "required": true
+        },
+        {
+          "field": "subjectObjectIds",
+          "type": "string[]",
+          "required": true
+        },
+        {
+          "field": "supportingEvidenceIds",
+          "type": "string[]",
+          "required": true
+        },
+        {
+          "field": "contradictingEvidenceIds",
+          "type": "string[]",
+          "required": true
+        },
+        {
+          "field": "status",
+          "type": "ClaimStatus",
+          "required": true,
+          "enumRef": "ClaimStatusSchema"
+        }
+      ]
+    },
+    {
+      "objectType": "EVIDENCE",
+      "tsName": "EvidenceObject",
+      "idPrefixEntity": "EVIDENCE",
+      "note": "DOC-002 §16.1 + DOC-007 §14 — IDENTICAL field sets, no conflict. Extends ObjectEnvelope.",
+      "fields": [
+        {
+          "field": "evidenceType",
+          "type": "EvidenceType",
+          "required": true,
+          "enumRef": "EvidenceTypeSchema"
+        },
+        {
+          "field": "contentReference",
+          "type": "ArtifactReference",
+          "required": true,
+          "note": "Helper undefined in prose; common/artifact-reference.schema.json listed in DOC-007 §3."
+        },
+        {
+          "field": "producedBy",
+          "type": "ActorReference",
+          "required": true
+        },
+        {
+          "field": "supportsClaimIds",
+          "type": "string[]",
+          "required": true
+        },
+        {
+          "field": "contradictsClaimIds",
+          "type": "string[]",
+          "required": true
+        },
+        {
+          "field": "scope",
+          "type": "string",
+          "required": true
+        },
+        {
+          "field": "limitations",
+          "type": "string[]",
+          "required": true
+        },
+        {
+          "field": "capturedAt",
+          "type": "string",
+          "required": true,
+          "note": "RFC-3339 UTC timestamp."
+        },
+        {
+          "field": "validFrom",
+          "type": "string",
+          "required": false,
+          "note": "RFC-3339 UTC timestamp."
+        },
+        {
+          "field": "validUntil",
+          "type": "string",
+          "required": false,
+          "note": "RFC-3339 UTC timestamp."
+        },
+        {
+          "field": "status",
+          "type": "EvidenceStatus",
+          "required": true,
+          "enumRef": "EvidenceStatusSchema"
+        }
+      ]
+    },
+    {
+      "objectType": "ASSURANCE_POLICY",
+      "tsName": "AssurancePolicyDefinition",
+      "idPrefixEntity": "ASSURANCE_POLICY",
+      "note": "MAJOR DIVERGENCE. DOC-007 §17 (AssurancePolicyDefinition) is STANDALONE — does NOT extend ObjectEnvelope; declares its own id/version/semanticVersion. Field set completely reshaped vs DOC-002 §17.1 (rules replace policies; failureSeverity dropped at policy level). DOC-007 wins. Fields below include the object's own id/version/semanticVersion since there is no inherited envelope.",
+      "fields": [
+        {
+          "field": "id",
+          "type": "string",
+          "required": true,
+          "note": "STANDALONE own id (idPrefix 'pol'); not envelope-inherited."
+        },
+        {
+          "field": "version",
+          "type": "string",
+          "required": true,
+          "note": "Own version string."
+        },
+        {
+          "field": "semanticVersion",
+          "type": "number",
+          "required": true,
+          "note": "Own semanticVersion."
+        },
+        {
+          "field": "name",
+          "type": "string",
+          "required": true
+        },
+        {
+          "field": "purpose",
+          "type": "string",
+          "required": true
+        },
+        {
+          "field": "rationale",
+          "type": "string",
+          "required": true
+        },
+        {
+          "field": "applicableObjectTypes",
+          "type": "ProfessionalWorkObjectType[]",
+          "required": true,
+          "enumRef": "ProfessionalWorkObjectTypeSchema",
+          "note": "DOC-002 called this 'targetTypes'; DOC-007 renames → 'applicableObjectTypes'."
+        },
+        {
+          "field": "applicability",
+          "type": "ApplicabilityExpression",
+          "required": true,
+          "note": "DOC-002 'applicabilityRule: ApplicabilityRule' → DOC-007 'applicability: ApplicabilityExpression' (§18 declarative union). Helper DEFINED."
+        },
+        {
+          "field": "evaluatedClaimTypes",
+          "type": "ClaimType[]",
+          "required": true,
+          "enumRef": "ClaimTypeSchema"
+        },
+        {
+          "field": "defaultClaimTemplates",
+          "type": "ClaimTemplate[]",
+          "required": true,
+          "note": "DOC-007 new; helper undefined."
+        },
+        {
+          "field": "requiredEvidence",
+          "type": "EvidenceRequirement[]",
+          "required": true,
+          "note": "DOC-002 'requiredEvidenceRequirements' → split into requiredEvidence + optionalEvidence. Helper undefined."
+        },
+        {
+          "field": "optionalEvidence",
+          "type": "EvidenceRequirement[]",
+          "required": true,
+          "note": "DOC-007 new; helper undefined."
+        },
+        {
+          "field": "criteria",
+          "type": "AssessmentCriterion[]",
+          "required": true,
+          "note": "DOC-002 typed as VerificationCriterion[]; DOC-007 AssessmentCriterion[]. Helper undefined."
+        },
+        {
+          "field": "evaluatorRole",
+          "type": "string",
+          "required": true,
+          "note": "DOC-002 'validatorRole' → DOC-007 'evaluatorRole'."
+        },
+        {
+          "field": "independenceRequirement",
+          "type": "IndependenceRequirement",
+          "required": true,
+          "enumRef": "IndependenceRequirementSchema",
+          "note": "Codebase enum is the 8-value superset (DOC-004 §8.1), NOT the DOC-002 5-value list."
+        },
+        {
+          "field": "findingDefinitions",
+          "type": "FindingDefinition[]",
+          "required": true,
+          "note": "DOC-007 new; helper undefined. Absorbs DOC-002 policy-level failureSeverity via FindingDefinition.defaultSeverity."
+        },
+        {
+          "field": "dispositionRules",
+          "type": "DispositionRule[]",
+          "required": true,
+          "note": "DOC-007 new; helper undefined (policies/disposition-rule.schema.json §3)."
+        },
+        {
+          "field": "permittedControlActions",
+          "type": "ControlAction[]",
+          "required": true,
+          "enumRef": "ControlActionSchema",
+          "note": "ControlAction is an ENUM (23-value ControlActionSchema), not a helper object."
+        },
+        {
+          "field": "remediationRules",
+          "type": "RemediationRule[]",
+          "required": true,
+          "note": "DOC-002 'remediationPolicy' (single) → DOC-007 'remediationRules' (array). Helper undefined."
+        },
+        {
+          "field": "escalationRules",
+          "type": "EscalationRule[]",
+          "required": true,
+          "note": "DOC-002 'escalationPolicy' (single) → DOC-007 'escalationRules' (array). Helper undefined."
+        },
+        {
+          "field": "waiverRules",
+          "type": "WaiverRule[]",
+          "required": true,
+          "note": "DOC-002 'waiverPolicy?' (single, optional) → DOC-007 'waiverRules' (array, required). Helper undefined."
+        },
+        {
+          "field": "status",
+          "type": "AssurancePolicyStatus",
+          "required": true,
+          "enumRef": "AssurancePolicyStatusSchema",
+          "note": "DRAFT|ACTIVE|SUSPENDED|SUPERSEDED. AssurancePolicyStatusSchema EXISTS in codebase (both extractions flagged it as missing — resolved)."
+        }
+      ]
+    },
+    {
+      "objectType": "ASSURANCE_ASSESSMENT",
+      "tsName": "AssuranceAssessment",
+      "idPrefixEntity": "ASSURANCE_ASSESSMENT",
+      "note": "DOC-002 §18 + DOC-007 §19. DOC-007 reshapes: adds policyVersion/subjectSemanticVersions/rejectedEvidence; replaces disposition→assessmentState and recommendedControlAction?→recommendedControlActions[]; evaluator becomes optional. DOC-002-only startedAt/completedAt/confidence retained per union rule (flagged). Extends ObjectEnvelope.",
+      "fields": [
+        {
+          "field": "assurancePolicyId",
+          "type": "string",
+          "required": true
+        },
+        {
+          "field": "policyVersion",
+          "type": "string",
+          "required": true,
+          "note": "DOC-007 new."
+        },
+        {
+          "field": "policySemanticVersion",
+          "type": "number",
+          "required": true
+        },
+        {
+          "field": "subjectObjectIds",
+          "type": "string[]",
+          "required": true
+        },
+        {
+          "field": "subjectSemanticVersions",
+          "type": "Record<string, number>",
+          "required": true,
+          "note": "DOC-007 new (version-pins subjects)."
+        },
+        {
+          "field": "claimIds",
+          "type": "string[]",
+          "required": true
+        },
+        {
+          "field": "evaluator",
+          "type": "ActorReference",
+          "required": false,
+          "note": "CONFLICT: DOC-002 §18 required; DOC-007 §19 optional (evaluator?). DOC-007 wins → optional."
+        },
+        {
+          "field": "evidenceConsideredIds",
+          "type": "string[]",
+          "required": true
+        },
+        {
+          "field": "rejectedEvidence",
+          "type": "RejectedEvidenceReference[]",
+          "required": true,
+          "note": "DOC-007 new; helper undefined."
+        },
+        {
+          "field": "observationIds",
+          "type": "string[]",
+          "required": true
+        },
+        {
+          "field": "startedAt",
+          "type": "string",
+          "required": true,
+          "note": "DOC-002 §18 only; ABSENT from DOC-007 §19 (likely superseded by event-envelope timestamps). OPEN ITEM: keep or drop."
+        },
+        {
+          "field": "completedAt",
+          "type": "string",
+          "required": false,
+          "note": "DOC-002 §18 only; ABSENT from DOC-007 §19. OPEN ITEM."
+        },
+        {
+          "field": "assessmentState",
+          "type": "AssuranceAssessmentState",
+          "required": true,
+          "enumRef": "AssuranceAssessmentStateSchema",
+          "note": "CONFLICT: replaces DOC-002 'disposition' (AssuranceDispositionSchema, 6 terminal values). DOC-007 §19 uses 15-value assessmentState state machine; terminal 5-value disposition now lives on the AssuranceAssessmentCompleted event (§19.3)."
+        },
+        {
+          "field": "confidence",
+          "type": "ConfidenceAssessment",
+          "required": false,
+          "note": "DOC-002 §18 only; ABSENT from DOC-007 §19. Helper undefined. OPEN ITEM."
+        },
+        {
+          "field": "residualUncertainty",
+          "type": "string[]",
+          "required": true
+        },
+        {
+          "field": "recommendedControlActions",
+          "type": "ControlActionRecommendation[]",
+          "required": true,
+          "note": "CONFLICT: DOC-002 'recommendedControlAction?' (single optional inline enum) → DOC-007 'recommendedControlActions' (required array of ControlActionRecommendation helper). DOC-007 wins."
+        }
+      ]
+    },
+    {
+      "objectType": "ASSURANCE_OBSERVATION",
+      "tsName": "AssuranceObservation",
+      "idPrefixEntity": "ASSURANCE_OBSERVATION",
+      "note": "DOC-002 §19 + DOC-007 §21. DOC-007 is a superset (adds policyId/criterionId?/findingCode/implication); all DOC-002 fields present. Extends ObjectEnvelope.",
+      "fields": [
+        {
+          "field": "assessmentId",
+          "type": "string",
+          "required": true
+        },
+        {
+          "field": "policyId",
+          "type": "string",
+          "required": true,
+          "note": "DOC-007 new."
+        },
+        {
+          "field": "criterionId",
+          "type": "string",
+          "required": false,
+          "note": "DOC-007 new (optional)."
+        },
+        {
+          "field": "subjectObjectIds",
+          "type": "string[]",
+          "required": true
+        },
+        {
+          "field": "findingCode",
+          "type": "string",
+          "required": true,
+          "note": "DOC-007 new."
+        },
+        {
+          "field": "observationType",
+          "type": "ObservationType",
+          "required": true,
+          "enumRef": "ObservationTypeSchema"
+        },
+        {
+          "field": "severity",
+          "type": "AssuranceSeverity",
+          "required": true,
+          "enumRef": "AssuranceSeveritySchema",
+          "note": "5-value (INFORMATIONAL|ADVISORY|MATERIAL|BLOCKING|CRITICAL) — superset of FailureSeveritySchema (no INFORMATIONAL). Distinct enums."
+        },
+        {
+          "field": "statement",
+          "type": "string",
+          "required": true
+        },
+        {
+          "field": "implication",
+          "type": "string",
+          "required": true,
+          "note": "DOC-007 new."
+        },
+        {
+          "field": "evidenceIds",
+          "type": "string[]",
+          "required": true
+        },
+        {
+          "field": "disposition",
+          "type": "ObservationDisposition",
+          "required": true,
+          "enumRef": "ObservationDispositionSchema",
+          "note": "6-value OPEN|ACCEPTED|REMEDIATED|WAIVED|REJECTED|SUPERSEDED. Distinct from AssuranceDispositionSchema."
+        }
+      ]
+    },
+    {
+      "objectType": "DECISION",
+      "tsName": "DecisionObject",
+      "idPrefixEntity": "DECISION",
+      "note": "DOC-002 §23.1 + DOC-007 §22. DOC-007 adds subjectSemanticVersions. Extends ObjectEnvelope.",
+      "fields": [
+        {
+          "field": "decisionType",
+          "type": "DecisionType",
+          "required": true,
+          "enumRef": "DecisionTypeSchema"
+        },
+        {
+          "field": "subjectObjectIds",
+          "type": "string[]",
+          "required": true
+        },
+        {
+          "field": "subjectSemanticVersions",
+          "type": "Record<string, number>",
+          "required": true,
+          "note": "DOC-007 new."
+        },
+        {
+          "field": "selectedOption",
+          "type": "string",
+          "required": true
+        },
+        {
+          "field": "rationale",
+          "type": "string",
+          "required": true
+        },
+        {
+          "field": "authority",
+          "type": "ActorReference",
+          "required": true,
+          "note": "Uses ActorReference (NOT AuthorityReference) — unlike Obligation/Constraint."
+        },
+        {
+          "field": "consideredEvidenceIds",
+          "type": "string[]",
+          "required": true
+        },
+        {
+          "field": "consideredObservationIds",
+          "type": "string[]",
+          "required": true
+        },
+        {
+          "field": "effectiveAt",
+          "type": "string",
+          "required": false,
+          "note": "Optional on object; becomes required in DecisionEffective event payload (§22.2)."
+        },
+        {
+          "field": "status",
+          "type": "DecisionStatus",
+          "required": true,
+          "enumRef": "DecisionStatusSchema"
+        }
+      ]
+    },
+    {
+      "objectType": "ARTIFACT",
+      "tsName": "ArtifactObject",
+      "idPrefixEntity": "ARTIFACT",
+      "note": "UNSPECIFIED in BOTH DOC-002 and DOC-007 — 'ARTIFACT' exists only as a ProfessionalWorkObjectType member (and an EvidenceType value). No interface/schema anywhere. Fields to-be-designed; do not fabricate. OPEN ITEM.",
+      "fields": []
+    },
+    {
+      "objectType": "DECOMPOSITION_CONTRACT",
+      "tsName": "DecompositionContract",
+      "idPrefixEntity": "DECOMPOSITION_CONTRACT",
+      "note": "DOC-002 §13.1 ONLY — no DOC-007 serialized field definition. Extends ObjectEnvelope. Carries the obligation-allocation / constraint-propagation arrays.",
+      "fields": [
+        {
+          "field": "parentWorkUnitId",
+          "type": "string",
+          "required": true
+        },
+        {
+          "field": "childWorkUnitIds",
+          "type": "string[]",
+          "required": true
+        },
+        {
+          "field": "rationale",
+          "type": "string",
+          "required": true
+        },
+        {
+          "field": "intentMappings",
+          "type": "IntentMapping[]",
+          "required": true,
+          "note": "Helper undefined."
+        },
+        {
+          "field": "obligationAllocations",
+          "type": "ObligationAllocation[]",
+          "required": true,
+          "note": "Helper undefined (persistence: decomposition_allocations §31)."
+        },
+        {
+          "field": "constraintPropagations",
+          "type": "ConstraintPropagation[]",
+          "required": true,
+          "note": "Helper undefined."
+        },
+        {
+          "field": "assumptionPropagations",
+          "type": "AssumptionPropagation[]",
+          "required": true,
+          "note": "Helper undefined."
+        },
+        {
+          "field": "retainedParentObligationIds",
+          "type": "string[]",
+          "required": true
+        },
+        {
+          "field": "coverageClaims",
+          "type": "CoverageClaim[]",
+          "required": true,
+          "note": "Helper DEFINED (DOC-002 §13.3)."
+        },
+        {
+          "field": "siblingDependencyIds",
+          "type": "string[]",
+          "required": true
+        },
+        {
+          "field": "recompositionContractId",
+          "type": "string",
+          "required": true,
+          "note": "Required (reciprocal of RecompositionContract.parentCompletionClaimId)."
+        },
+        {
+          "field": "status",
+          "type": "DecompositionContractStatus",
+          "required": true,
+          "enumRef": "DecompositionContractStatusSchema"
+        }
+      ]
+    },
+    {
+      "objectType": "RECOMPOSITION_CONTRACT",
+      "tsName": "RecompositionContract",
+      "idPrefixEntity": "RECOMPOSITION_CONTRACT",
+      "note": "DOC-002 §14 ONLY — no DOC-007 serialized field definition. Extends ObjectEnvelope.",
+      "fields": [
+        {
+          "field": "parentWorkUnitId",
+          "type": "string",
+          "required": true
+        },
+        {
+          "field": "requiredChildWorkUnitIds",
+          "type": "string[]",
+          "required": true
+        },
+        {
+          "field": "aggregationRules",
+          "type": "AggregationRule[]",
+          "required": true,
+          "note": "Helper undefined."
+        },
+        {
+          "field": "conflictResolutionRules",
+          "type": "ConflictResolutionRule[]",
+          "required": true,
+          "note": "Helper undefined (conflictType/action free-form strings for now, ratify sheet C)."
+        },
+        {
+          "field": "parentCompletionClaimId",
+          "type": "string",
+          "required": true
+        },
+        {
+          "field": "status",
+          "type": "RecompositionContractStatus",
+          "required": true,
+          "enumRef": "RecompositionContractStatusSchema"
+        }
+      ]
+    },
+    {
+      "objectType": "EXECUTION_PLAN",
+      "tsName": "ExecutionPlan",
+      "idPrefixEntity": "EXECUTION_PLAN",
+      "note": "DOC-002 §20.1 + DOC-007 §15. CONFLICT on containment: DOC-002 references steps/transitions by id array; DOC-007 EMBEDS them as object arrays. DOC-007 wins. Extends ObjectEnvelope.",
+      "fields": [
+        {
+          "field": "workUnitId",
+          "type": "string",
+          "required": true
+        },
+        {
+          "field": "planVersion",
+          "type": "number",
+          "required": true
+        },
+        {
+          "field": "steps",
+          "type": "ExecutionStep[]",
+          "required": true,
+          "note": "CONFLICT: DOC-002 'stepIds: string[]' → DOC-007 'steps: ExecutionStep[]' (embedded). DOC-007 wins. ExecutionStep helper DEFINED (§21)."
+        },
+        {
+          "field": "transitions",
+          "type": "ExecutionTransition[]",
+          "required": true,
+          "note": "CONFLICT: DOC-002 'transitionIds: string[]' → DOC-007 'transitions: ExecutionTransition[]' (embedded). DOC-007 wins. ExecutionTransition helper undefined."
+        },
+        {
+          "field": "retryPolicy",
+          "type": "RetryPolicy",
+          "required": true,
+          "note": "Helper undefined."
+        },
+        {
+          "field": "tacticalChangePolicy",
+          "type": "TacticalChangePolicy",
+          "required": true,
+          "note": "Helper undefined."
+        },
+        {
+          "field": "escalationPolicy",
+          "type": "EscalationPolicy",
+          "required": true,
+          "note": "Helper undefined (distinct from AssurancePolicy EscalationRule)."
+        },
+        {
+          "field": "terminationPolicy",
+          "type": "TerminationPolicy",
+          "required": true,
+          "note": "Helper undefined."
+        },
+        {
+          "field": "status",
+          "type": "ExecutionPlanStatus",
+          "required": true,
+          "enumRef": "ExecutionPlanStatusSchema"
+        }
+      ]
+    },
+    {
+      "objectType": "RUNTIME_BINDING",
+      "tsName": "RuntimeBinding",
+      "idPrefixEntity": "RUNTIME_BINDING",
+      "note": "DOC-002 §22 ONLY — runtime-binding.schema.json listed in DOC-007 §3 but no field-level prose. Extends ObjectEnvelope.",
+      "fields": [
+        {
+          "field": "executionStepId",
+          "type": "string",
+          "required": true
+        },
+        {
+          "field": "roleId",
+          "type": "string",
+          "required": true
+        },
+        {
+          "field": "modelSelectionPolicy",
+          "type": "ModelSelectionPolicy",
+          "required": true,
+          "note": "Helper undefined."
+        },
+        {
+          "field": "requestedCapabilities",
+          "type": "CapabilityRequest[]",
+          "required": true,
+          "note": "Helper undefined (persistence: capability_requests §31)."
+        },
+        {
+          "field": "grantedCapabilities",
+          "type": "CapabilityGrant[]",
+          "required": true,
+          "note": "Helper undefined (persistence: capability_grants §31)."
+        },
+        {
+          "field": "sandboxPolicy",
+          "type": "SandboxPolicy",
+          "required": true,
+          "note": "Helper undefined."
+        },
+        {
+          "field": "contextAssemblyPolicyId",
+          "type": "string",
+          "required": true
+        },
+        {
+          "field": "observabilityPolicyId",
+          "type": "string",
+          "required": true
+        },
+        {
+          "field": "memoryPolicyId",
+          "type": "string",
+          "required": false
+        },
+        {
+          "field": "authorizationStatus",
+          "type": "AuthorizationStatus",
+          "required": true,
+          "enumRef": "AuthorizationStatusSchema"
+        }
+      ]
+    },
+    {
+      "objectType": "BASELINE",
+      "tsName": "BaselineObject",
+      "idPrefixEntity": "BASELINE",
+      "note": "DOC-002 §24.1 + DOC-007 §23. CONFLICT: DOC-007 adds purpose/scope and replaces opaque itemObjectIds with versioned itemObjectVersions. DOC-007 wins. Extends ObjectEnvelope.",
+      "fields": [
+        {
+          "field": "baselineType",
+          "type": "BaselineType",
+          "required": true,
+          "enumRef": "BaselineTypeSchema"
+        },
+        {
+          "field": "purpose",
+          "type": "string",
+          "required": true,
+          "note": "DOC-007 new."
+        },
+        {
+          "field": "scope",
+          "type": "string",
+          "required": true,
+          "note": "DOC-007 new."
+        },
+        {
+          "field": "itemObjectVersions",
+          "type": "BaselineItemVersion[]",
+          "required": true,
+          "note": "CONFLICT: DOC-002 'itemObjectIds: string[]' → DOC-007 'itemObjectVersions: BaselineItemVersion[]' (version-pinned). DOC-007 wins. Helper DEFINED (inline §23)."
+        },
+        {
+          "field": "assuranceAssessmentIds",
+          "type": "string[]",
+          "required": true
+        },
+        {
+          "field": "promotionDecisionId",
+          "type": "string",
+          "required": true
+        },
+        {
+          "field": "status",
+          "type": "BaselineStatus",
+          "required": true,
+          "enumRef": "BaselineStatusSchema"
+        }
+      ]
+    }
+  ],
+  "helperSubTypes": [
+    {
+      "name": "ActorReference",
+      "fields": [
+        {
+          "field": "actorId",
+          "type": "string",
+          "required": true,
+          "note": "minLength 1. Referenced by Assumption.introducedBy, Claim.assertedBy, Evidence.producedBy, AssuranceAssessment.evaluator, Decision.authority, TraceLink.createdBy, envelope createdBy/updatedBy."
+        },
+        {
+          "field": "actorType",
+          "type": "ActorType",
+          "required": true,
+          "enumRef": "ActorTypeSchema",
+          "note": "ActorTypeSchema EXISTS in codebase (both extractions flagged it missing — resolved)."
+        },
+        {
+          "field": "displayName",
+          "type": "string",
+          "required": true,
+          "note": "minLength 1."
+        },
+        {
+          "field": "roleId",
+          "type": "string",
+          "required": false
+        },
+        {
+          "field": "modelId",
+          "type": "string",
+          "required": false
+        },
+        {
+          "field": "providerId",
+          "type": "string",
+          "required": false,
+          "note": "DOC-007 §6 addition (for validator-independence resolution); not in DOC-002 §5."
+        },
+        {
+          "field": "executionInstanceId",
+          "type": "string",
+          "required": false
+        }
+      ]
+    },
+    {
+      "name": "AuthorityReference",
+      "fields": [
+        {
+          "field": "authorityId",
+          "type": "string",
+          "required": true,
+          "note": "DOC-002 §5. Referenced by Obligation.authority, Constraint.authority."
+        },
+        {
+          "field": "authorityType",
+          "type": "AuthorityType",
+          "required": true,
+          "enumRef": "AuthorityTypeSchema",
+          "note": "AuthorityTypeSchema EXISTS in codebase (DOC-002 flagged it missing — resolved)."
+        },
+        {
+          "field": "grantedBy",
+          "type": "string",
+          "required": false
+        },
+        {
+          "field": "scope",
+          "type": "string[]",
+          "required": true
+        },
+        {
+          "field": "validFrom",
+          "type": "string",
+          "required": true,
+          "note": "RFC-3339 timestamp."
+        },
+        {
+          "field": "validUntil",
+          "type": "string",
+          "required": false,
+          "note": "RFC-3339 timestamp."
+        }
+      ]
+    },
+    {
+      "name": "ProvenanceRecord",
+      "fields": [
+        {
+          "field": "originType",
+          "type": "OriginType",
+          "required": true,
+          "enumRef": "OriginTypeSchema",
+          "note": "ENVELOPE COMPONENT (already implemented, DOC-007 §7.1). Listed for completeness."
+        },
+        {
+          "field": "sourceObjectIds",
+          "type": "string[]",
+          "required": true
+        },
+        {
+          "field": "sourceEventIds",
+          "type": "string[]",
+          "required": true
+        },
+        {
+          "field": "producingExecutionAttemptId",
+          "type": "string",
+          "required": false
+        },
+        {
+          "field": "producingValidatorId",
+          "type": "string",
+          "required": false
+        },
+        {
+          "field": "contentHash",
+          "type": "string",
+          "required": false
+        }
+      ]
+    },
+    {
+      "name": "WorkRiskProfile",
+      "fields": [
+        {
+          "field": "consequence",
+          "type": "RiskConsequence",
+          "required": true,
+          "enumRef": "RiskConsequenceSchema",
+          "note": "DOC-002 §9.2. LOW|MEDIUM|HIGH|CRITICAL. Referenced by PWU.riskProfile."
+        },
+        {
+          "field": "uncertainty",
+          "type": "RiskUncertainty",
+          "required": true,
+          "enumRef": "RiskUncertaintySchema",
+          "note": "LOW|MEDIUM|HIGH|CRITICAL."
+        },
+        {
+          "field": "irreversibility",
+          "type": "RiskIrreversibility",
+          "required": true,
+          "enumRef": "RiskIrreversibilitySchema",
+          "note": "LOW|MEDIUM|HIGH|CRITICAL."
+        },
+        {
+          "field": "securitySensitivity",
+          "type": "RiskSecuritySensitivity",
+          "required": true,
+          "enumRef": "RiskSecuritySensitivitySchema",
+          "note": "NONE|LOW|MEDIUM|HIGH (NO CRITICAL)."
+        },
+        {
+          "field": "regulatoryExposure",
+          "type": "RiskRegulatoryExposure",
+          "required": true,
+          "enumRef": "RiskRegulatoryExposureSchema",
+          "note": "NONE|LOW|MEDIUM|HIGH (NO CRITICAL)."
+        }
+      ]
+    },
+    {
+      "name": "WorkBoundary",
+      "fields": [
+        {
+          "field": "inScope",
+          "type": "string[]",
+          "required": true,
+          "note": "DOC-007 §11.1/§11.2. Referenced by PWU.boundaries."
+        },
+        {
+          "field": "outOfScope",
+          "type": "string[]",
+          "required": true
+        },
+        {
+          "field": "permittedChanges",
+          "type": "string[]",
+          "required": true
+        },
+        {
+          "field": "prohibitedChanges",
+          "type": "string[]",
+          "required": true
+        }
+      ]
+    },
+    {
+      "name": "CoverageClaim",
+      "fields": [
+        {
+          "field": "claimId",
+          "type": "string",
+          "required": true,
+          "note": "DOC-002 §13.3. Referenced by DecompositionContract.coverageClaims."
+        },
+        {
+          "field": "parentObligationIds",
+          "type": "string[]",
+          "required": true
+        },
+        {
+          "field": "childWorkUnitIds",
+          "type": "string[]",
+          "required": true
+        },
+        {
+          "field": "coverageType",
+          "type": "CoverageType",
+          "required": true,
+          "enumRef": "CoverageTypeSchema",
+          "note": "COMPLETE|PARTIAL|CONDITIONAL|EXPLORATORY."
+        },
+        {
+          "field": "rationale",
+          "type": "string",
+          "required": true
+        }
+      ]
+    },
+    {
+      "name": "ExecutionStep",
+      "fields": [
+        {
+          "field": "id",
+          "type": "string",
+          "required": true,
+          "note": "STANDALONE id-bearing sub-object (idPrefix EXECUTION_STEP = 'step'); does NOT extend ObjectEnvelope; NOT one of the 17 PWO types. DOC-002 §21. Embedded in ExecutionPlan.steps (DOC-007 §15)."
+        },
+        {
+          "field": "executionPlanId",
+          "type": "string",
+          "required": true
+        },
+        {
+          "field": "stepType",
+          "type": "StepType",
+          "required": true,
+          "enumRef": "StepTypeSchema"
+        },
+        {
+          "field": "purpose",
+          "type": "string",
+          "required": true
+        },
+        {
+          "field": "inputBindings",
+          "type": "InputBinding[]",
+          "required": true,
+          "note": "Helper undefined."
+        },
+        {
+          "field": "outputBindings",
+          "type": "OutputBinding[]",
+          "required": true,
+          "note": "Helper undefined."
+        },
+        {
+          "field": "runtimeBindingId",
+          "type": "string",
+          "required": false,
+          "note": "Links to a RUNTIME_BINDING object."
+        },
+        {
+          "field": "preconditions",
+          "type": "Condition[]",
+          "required": true,
+          "note": "Condition helper undefined."
+        },
+        {
+          "field": "postconditions",
+          "type": "Condition[]",
+          "required": true,
+          "note": "Condition helper undefined."
+        },
+        {
+          "field": "stepState",
+          "type": "StepState",
+          "required": true,
+          "enumRef": "StepStateSchema"
+        }
+      ]
+    },
+    {
+      "name": "TraceLink",
+      "fields": [
+        {
+          "field": "id",
+          "type": "string",
+          "required": true,
+          "note": "STANDALONE immutable relation object (idPrefix TRACE_LINK = 'trace'); does NOT extend ObjectEnvelope; NOT one of the 17 ProfessionalWorkObjectType. All fields are its own. DOC-002 §25 + DOC-007 §24 (DOC-007 adds source/target semanticVersion)."
+        },
+        {
+          "field": "sourceObjectId",
+          "type": "string",
+          "required": true
+        },
+        {
+          "field": "sourceSemanticVersion",
+          "type": "number",
+          "required": false,
+          "note": "DOC-007 §24 new."
+        },
+        {
+          "field": "targetObjectId",
+          "type": "string",
+          "required": true
+        },
+        {
+          "field": "targetSemanticVersion",
+          "type": "number",
+          "required": false,
+          "note": "DOC-007 §24 new."
+        },
+        {
+          "field": "relation",
+          "type": "TraceRelation",
+          "required": true,
+          "enumRef": "TraceRelationSchema",
+          "note": "17-value union; DOC-007 §24 governs."
+        },
+        {
+          "field": "rationale",
+          "type": "string",
+          "required": false
+        },
+        {
+          "field": "createdAt",
+          "type": "string",
+          "required": true,
+          "note": "Own field (RFC-3339)."
+        },
+        {
+          "field": "createdBy",
+          "type": "ActorReference",
+          "required": true,
+          "note": "Own field."
+        }
+      ]
+    },
+    {
+      "name": "ApplicabilityExpression",
+      "fields": [
+        {
+          "field": "op",
+          "type": "ApplicabilityExpressionOp",
+          "required": true,
+          "enumRef": "ApplicabilityExpressionOpSchema",
+          "note": "DOC-007 §18 discriminated-union tag: ALL|ANY|NOT|EQUALS|IN|CONTAINS|EXISTS|RISK_AT_LEAST. Declarative, non-executable. Referenced by AssurancePolicyDefinition.applicability (and target of Constraint.applicability unification, M7)."
+        },
+        {
+          "field": "operands",
+          "type": "ApplicabilityExpression[]",
+          "required": false,
+          "note": "Required within op=ALL|ANY variants."
+        },
+        {
+          "field": "operand",
+          "type": "ApplicabilityExpression",
+          "required": false,
+          "note": "Required within op=NOT variant."
+        },
+        {
+          "field": "path",
+          "type": "string",
+          "required": false,
+          "note": "Required within EQUALS|IN|CONTAINS|EXISTS (JSONPath-style)."
+        },
+        {
+          "field": "value",
+          "type": "string | number | boolean",
+          "required": false,
+          "note": "EQUALS.value (string|number|boolean); CONTAINS.value (string)."
+        },
+        {
+          "field": "values",
+          "type": "(string | number)[]",
+          "required": false,
+          "note": "Required within op=IN."
+        },
+        {
+          "field": "dimension",
+          "type": "RiskDimension",
+          "required": false,
+          "enumRef": "RiskDimensionSchema",
+          "note": "Required within op=RISK_AT_LEAST: CONSEQUENCE|UNCERTAINTY|IRREVERSIBILITY|SECURITY_SENSITIVITY|REGULATORY_EXPOSURE."
+        },
+        {
+          "field": "level",
+          "type": "RiskLevel",
+          "required": false,
+          "enumRef": "RiskLevelSchema",
+          "note": "Required within op=RISK_AT_LEAST: LOW|MEDIUM|HIGH|CRITICAL."
+        }
+      ]
+    },
+    {
+      "name": "BaselineItemVersion",
+      "fields": [
+        {
+          "field": "objectId",
+          "type": "string",
+          "required": true,
+          "note": "DOC-007 §23 inline element of Baseline.itemObjectVersions (reused in §23.1/§23.2)."
+        },
+        {
+          "field": "semanticVersion",
+          "type": "number",
+          "required": true
+        },
+        {
+          "field": "contentHash",
+          "type": "string",
+          "required": false
+        }
+      ]
+    },
+    {
+      "name": "ValidatorResult",
+      "fields": [
+        {
+          "field": "validatorId",
+          "type": "string",
+          "required": true,
+          "note": "DOC-007 §20 — VALIDATOR-PAYLOAD value-type (CompleteAssuranceAssessment §19.2), NOT referenced by any of the 17 objects; included for completeness."
+        },
+        {
+          "field": "validatorVersion",
+          "type": "string",
+          "required": true
+        },
+        {
+          "field": "policyId",
+          "type": "string",
+          "required": true
+        },
+        {
+          "field": "policyVersion",
+          "type": "string",
+          "required": true
+        },
+        {
+          "field": "assessmentId",
+          "type": "string",
+          "required": true
+        },
+        {
+          "field": "subjectObjectIds",
+          "type": "string[]",
+          "required": true
+        },
+        {
+          "field": "subjectSemanticVersions",
+          "type": "Record<string, number>",
+          "required": true
+        },
+        {
+          "field": "claimResults",
+          "type": "ClaimAssessmentResult[]",
+          "required": true,
+          "note": "Helper undefined."
+        },
+        {
+          "field": "evidenceConsideredIds",
+          "type": "string[]",
+          "required": true
+        },
+        {
+          "field": "evidenceRejected",
+          "type": "RejectedEvidenceReference[]",
+          "required": true,
+          "note": "Helper undefined."
+        },
+        {
+          "field": "observations",
+          "type": "ProposedAssuranceObservation[]",
+          "required": true,
+          "note": "Helper undefined."
+        },
+        {
+          "field": "dispositionRecommendation",
+          "type": "AssuranceDispositionRecommendation",
+          "required": true,
+          "enumRef": "AssuranceDispositionRecommendationSchema",
+          "note": "DOC-007 extraction said AssuranceDispositionSchema; codebase has a dedicated AssuranceDispositionRecommendationSchema (5 values, WAIVED excluded). Use the recommendation schema."
+        },
+        {
+          "field": "recommendedControlActions",
+          "type": "ControlActionRecommendation[]",
+          "required": true,
+          "note": "Helper undefined."
+        },
+        {
+          "field": "residualUncertainty",
+          "type": "string[]",
+          "required": true
+        },
+        {
+          "field": "limitations",
+          "type": "string[]",
+          "required": true
+        },
+        {
+          "field": "executionProvenance",
+          "type": "ExecutionProvenance",
+          "required": true,
+          "note": "Helper undefined (distinct from ProvenanceRecord)."
+        }
+      ]
+    },
+    {
+      "name": "CriterionResult",
+      "fields": [
+        {
+          "field": "criterionId",
+          "type": "string",
+          "required": true,
+          "note": "DOC-007 §20.1 (results of AssessmentCriterion)."
+        },
+        {
+          "field": "result",
+          "type": "CriterionResultOutcome",
+          "required": true,
+          "enumRef": "CriterionResultOutcomeSchema",
+          "note": "MET|PARTIALLY_MET|NOT_MET|NOT_APPLICABLE|UNABLE_TO_DETERMINE. CriterionResultOutcomeSchema EXISTS in codebase (extraction flagged it missing — resolved)."
+        },
+        {
+          "field": "rationale",
+          "type": "string",
+          "required": true
+        },
+        {
+          "field": "evidenceIds",
+          "type": "string[]",
+          "required": true
+        }
+      ]
+    },
+    {
+      "name": "DesiredOutcome",
+      "fields": [
+        {
+          "field": "(undefined)",
+          "type": "—",
+          "required": false,
+          "note": "Referenced by Intent.desiredOutcomes; NOT field-defined in DOC-002 or DOC-007. Source TBD."
+        }
+      ]
+    },
+    {
+      "name": "SuccessCondition",
+      "fields": [
+        {
+          "field": "(undefined)",
+          "type": "—",
+          "required": false,
+          "note": "Referenced by Intent.successConditions; NOT field-defined in either doc. Source TBD."
+        }
+      ]
+    },
+    {
+      "name": "ArtifactRequirement",
+      "fields": [
+        {
+          "field": "(undefined)",
+          "type": "—",
+          "required": false,
+          "note": "Referenced by PWU.inputRequirements; NOT field-defined in either doc. Source TBD."
+        }
+      ]
+    },
+    {
+      "name": "OutputDefinition",
+      "fields": [
+        {
+          "field": "(undefined)",
+          "type": "—",
+          "required": false,
+          "note": "Referenced by PWU.expectedOutputs; NOT field-defined in either doc. Source TBD."
+        }
+      ]
+    },
+    {
+      "name": "ArtifactReference",
+      "fields": [
+        {
+          "field": "(undefined)",
+          "type": "—",
+          "required": false,
+          "note": "Referenced by Evidence.contentReference. common/artifact-reference.schema.json listed in DOC-007 §3 but not field-defined in prose; DOC-007 §39 requires allowlisted schemes. Source from schema file."
+        }
+      ]
+    },
+    {
+      "name": "ApplicabilityRule",
+      "fields": [
+        {
+          "field": "(undefined)",
+          "type": "—",
+          "required": false,
+          "note": "Referenced by Constraint.applicability (DOC-002 §11.1). NOT field-defined. OPEN ITEM: planned to unify with ApplicabilityExpression (§18) as one DSL (ratify sheet C / M7)."
+        }
+      ]
+    },
+    {
+      "name": "IntentMapping",
+      "fields": [
+        {
+          "field": "childWorkUnitId",
+          "type": "string",
+          "required": true,
+          "note": "§13.2: every child must state which parent intent/obligation it serves"
+        },
+        {
+          "field": "servesParentIntentOrObligationId",
+          "type": "string",
+          "required": true,
+          "note": "the parent intent or obligation id the child serves"
+        },
+        {
+          "field": "rationale",
+          "type": "string",
+          "required": false
+        }
+      ],
+      "tightenedBy": "M9"
+    },
+    {
+      "name": "ObligationAllocation",
+      "fields": [
+        {
+          "field": "obligationId",
+          "type": "string",
+          "required": true,
+          "note": "parent obligation being allocated"
+        },
+        {
+          "field": "allocatedTo",
+          "type": "string[]",
+          "required": true,
+          "note": "child PWU ids the obligation is allocated to (fixture §13 shape; persistence pwu_obligation_allocations)"
+        }
+      ],
+      "tightenedBy": "M9"
+    },
+    {
+      "name": "ConstraintPropagation",
+      "fields": [
+        {
+          "field": "constraintId",
+          "type": "string",
+          "required": true,
+          "note": "parent constraint being dispositioned"
+        },
+        {
+          "field": "childWorkUnitIds",
+          "type": "string[]",
+          "required": true,
+          "note": "relevant child PWUs (fixture §13 shape)"
+        },
+        {
+          "field": "disposition",
+          "type": "'PROPAGATED' | 'RETAINED' | 'INAPPLICABLE' | 'WAIVED' | 'SUPERSEDED'",
+          "required": false,
+          "note": "§11.2 five dispositions; absent in fixture instances = PROPAGATED"
+        },
+        {
+          "field": "rationale",
+          "type": "string",
+          "required": false,
+          "note": "RPH-CNS-003 required when INAPPLICABLE"
+        },
+        {
+          "field": "authorityDecisionId",
+          "type": "string",
+          "required": false,
+          "note": "RPH-CNS-002 required to weaken; required when WAIVED"
+        },
+        {
+          "field": "supersededByConstraintId",
+          "type": "string",
+          "required": false,
+          "note": "required when SUPERSEDED"
+        }
+      ],
+      "tightenedBy": "M9"
+    },
+    {
+      "name": "AssumptionPropagation",
+      "fields": [
+        {
+          "field": "assumptionId",
+          "type": "string",
+          "required": true,
+          "note": "material assumption propagated to children (§13.1; shape authored by M9 — undefined in docs)"
+        },
+        {
+          "field": "childWorkUnitIds",
+          "type": "string[]",
+          "required": true
+        },
+        {
+          "field": "rationale",
+          "type": "string",
+          "required": false
+        }
+      ],
+      "tightenedBy": "M9"
+    },
+    {
+      "name": "AggregationRule",
+      "fields": [
+        {
+          "field": "rule",
+          "type": "string",
+          "required": true,
+          "note": "free-text aggregation rule statement (fixture §24: RecompositionContract.aggregationRules)"
+        }
+      ],
+      "tightenedBy": "M9"
+    },
+    {
+      "name": "ConflictResolutionRule",
+      "fields": [
+        {
+          "field": "conflictType",
+          "type": "string",
+          "required": true,
+          "note": "open value set; fixture §24: TENANT_IDENTITY_MISMATCH, OFFLINE_AUDIT_CONFLICT"
+        },
+        {
+          "field": "action",
+          "type": "string",
+          "required": true,
+          "note": "open value set; fixture §24: REJECT_RECOMPOSITION, RESHAPE_MOBILE_ARCHITECTURE"
+        }
+      ],
+      "tightenedBy": "M9"
+    },
+    {
+      "name": "RetryPolicy",
+      "fields": [
+        {
+          "field": "(undefined)",
+          "type": "—",
+          "required": false,
+          "note": "Referenced by ExecutionPlan.retryPolicy (DOC-002 §20.1 / DOC-007 §15). NOT field-defined. Source TBD."
+        }
+      ]
+    },
+    {
+      "name": "TacticalChangePolicy",
+      "fields": [
+        {
+          "field": "(undefined)",
+          "type": "—",
+          "required": false,
+          "note": "Referenced by ExecutionPlan.tacticalChangePolicy. NOT field-defined. Source TBD."
+        }
+      ]
+    },
+    {
+      "name": "EscalationPolicy",
+      "fields": [
+        {
+          "field": "(undefined)",
+          "type": "—",
+          "required": false,
+          "note": "Referenced by ExecutionPlan.escalationPolicy (and DOC-002 AssurancePolicy §17.1). NOT field-defined. Distinct from AssurancePolicyDefinition.escalationRules (EscalationRule). Source TBD."
+        }
+      ]
+    },
+    {
+      "name": "TerminationPolicy",
+      "fields": [
+        {
+          "field": "(undefined)",
+          "type": "—",
+          "required": false,
+          "note": "Referenced by ExecutionPlan.terminationPolicy. NOT field-defined. Source TBD."
+        }
+      ]
+    },
+    {
+      "name": "ExecutionTransition",
+      "fields": [
+        {
+          "field": "(undefined)",
+          "type": "—",
+          "required": false,
+          "note": "Referenced by ExecutionPlan.transitions (embedded per DOC-007 §15) / transitionIds (DOC-002 §20.1). NOT field-defined (persistence: execution_transitions §31). Source TBD."
+        }
+      ]
+    },
+    {
+      "name": "ModelSelectionPolicy",
+      "fields": [
+        {
+          "field": "(undefined)",
+          "type": "—",
+          "required": false,
+          "note": "Referenced by RuntimeBinding.modelSelectionPolicy (DOC-002 §22). NOT field-defined. Source TBD."
+        }
+      ]
+    },
+    {
+      "name": "CapabilityRequest",
+      "fields": [
+        {
+          "field": "(undefined)",
+          "type": "—",
+          "required": false,
+          "note": "Referenced by RuntimeBinding.requestedCapabilities. NOT field-defined (persistence: capability_requests §31). Source TBD."
+        }
+      ]
+    },
+    {
+      "name": "CapabilityGrant",
+      "fields": [
+        {
+          "field": "(undefined)",
+          "type": "—",
+          "required": false,
+          "note": "Referenced by RuntimeBinding.grantedCapabilities. NOT field-defined (persistence: capability_grants §31). Source TBD."
+        }
+      ]
+    },
+    {
+      "name": "SandboxPolicy",
+      "fields": [
+        {
+          "field": "(undefined)",
+          "type": "—",
+          "required": false,
+          "note": "Referenced by RuntimeBinding.sandboxPolicy. NOT field-defined. Source TBD."
+        }
+      ]
+    },
+    {
+      "name": "InputBinding",
+      "fields": [
+        {
+          "field": "(undefined)",
+          "type": "—",
+          "required": false,
+          "note": "Referenced by ExecutionStep.inputBindings (DOC-002 §21). NOT field-defined. Source TBD."
+        }
+      ]
+    },
+    {
+      "name": "OutputBinding",
+      "fields": [
+        {
+          "field": "(undefined)",
+          "type": "—",
+          "required": false,
+          "note": "Referenced by ExecutionStep.outputBindings. NOT field-defined. Source TBD."
+        }
+      ]
+    },
+    {
+      "name": "Condition",
+      "fields": [
+        {
+          "field": "(undefined)",
+          "type": "—",
+          "required": false,
+          "note": "Referenced by ExecutionStep.preconditions/postconditions. NOT field-defined. Source TBD."
+        }
+      ]
+    },
+    {
+      "name": "ClaimTemplate",
+      "fields": [
+        {
+          "field": "(undefined)",
+          "type": "—",
+          "required": false,
+          "note": "Referenced by AssurancePolicyDefinition.defaultClaimTemplates (DOC-007 §17). NOT field-defined. Source TBD."
+        }
+      ]
+    },
+    {
+      "name": "EvidenceRequirement",
+      "fields": [
+        {
+          "field": "(undefined)",
+          "type": "—",
+          "required": false,
+          "note": "Referenced by AssurancePolicyDefinition.requiredEvidence/optionalEvidence. policies/evidence-requirement.schema.json listed in DOC-007 §3; not field-defined in prose. DOC-004 §6.1 supplies cardinality (EvidenceCardinalitySchema) + requiredForDispositions (RequiredForDispositionsSchema) enums. Source from schema file."
+        }
+      ]
+    },
+    {
+      "name": "AssessmentCriterion",
+      "fields": [
+        {
+          "field": "(undefined)",
+          "type": "—",
+          "required": false,
+          "note": "Referenced by AssurancePolicyDefinition.criteria; results are CriterionResult (§20.1). NOT field-defined; DOC-004 §7 supplies criterionType/evaluationMethod/severityIfNotMet enums. Source TBD."
+        }
+      ]
+    },
+    {
+      "name": "FindingDefinition",
+      "fields": [
+        {
+          "field": "(undefined)",
+          "type": "—",
+          "required": false,
+          "note": "Referenced by AssurancePolicyDefinition.findingDefinitions. NOT field-defined; DOC-004 §9.1 supplies defaultSeverity (AssuranceSeveritySchema) + defaultControlActions (ControlActionSchema) + affectedClaimTypes (ClaimTypeSchema). Source TBD."
+        }
+      ]
+    },
+    {
+      "name": "DispositionRule",
+      "fields": [
+        {
+          "field": "(undefined)",
+          "type": "—",
+          "required": false,
+          "note": "Referenced by AssurancePolicyDefinition.dispositionRules. policies/disposition-rule.schema.json listed in DOC-007 §3; not field-defined in prose. DOC-004 §10.2 supplies disposition (AssuranceDispositionRecommendationSchema) + requiredIndependence (IndependenceRequirementSchema). Source from schema file."
+        }
+      ]
+    },
+    {
+      "name": "RemediationRule",
+      "fields": [
+        {
+          "field": "(undefined)",
+          "type": "—",
+          "required": false,
+          "note": "Referenced by AssurancePolicyDefinition.remediationRules. NOT field-defined. Source TBD."
+        }
+      ]
+    },
+    {
+      "name": "EscalationRule",
+      "fields": [
+        {
+          "field": "(undefined)",
+          "type": "—",
+          "required": false,
+          "note": "Referenced by AssurancePolicyDefinition.escalationRules. NOT field-defined; DOC-004 §13 supplies escalationTarget (EscalationTargetSchema) + timeoutAction (ControlActionSchema). Distinct from ExecutionPlan.escalationPolicy. Source TBD."
+        }
+      ]
+    },
+    {
+      "name": "WaiverRule",
+      "fields": [
+        {
+          "field": "(undefined)",
+          "type": "—",
+          "required": false,
+          "note": "Referenced by AssurancePolicyDefinition.waiverRules. NOT field-defined. Source TBD."
+        }
+      ]
+    },
+    {
+      "name": "RejectedEvidenceReference",
+      "fields": [
+        {
+          "field": "(undefined)",
+          "type": "—",
+          "required": false,
+          "note": "Referenced by AssuranceAssessment.rejectedEvidence (DOC-007 §19) and ValidatorResult.evidenceRejected (§20). NOT field-defined. Source TBD."
+        }
+      ]
+    },
+    {
+      "name": "ControlActionRecommendation",
+      "fields": [
+        {
+          "field": "(undefined)",
+          "type": "—",
+          "required": false,
+          "note": "Referenced by AssuranceAssessment.recommendedControlActions (DOC-007 §19), ValidatorResult, and AssuranceAssessmentCompleted. validators/control-action-recommendation.schema.json listed in DOC-007 §3. Its .action field ∈ ControlActionSchema (23-value). Distinct from the ControlAction enum. Source from schema file."
+        }
+      ]
+    },
+    {
+      "name": "ConfidenceAssessment",
+      "fields": [
+        {
+          "field": "(undefined)",
+          "type": "—",
+          "required": false,
+          "note": "Referenced by AssuranceAssessment.confidence (DOC-002 §18 ONLY; absent from DOC-007 §19). NOT field-defined. OPEN ITEM (retain or drop)."
+        }
+      ]
+    },
+    {
+      "name": "ExecutionProvenance",
+      "fields": [
+        {
+          "field": "(undefined)",
+          "type": "—",
+          "required": false,
+          "note": "Referenced by ValidatorResult.executionProvenance (§20) and CompleteExecutionStep (§16.1). NOT field-defined; distinct from ProvenanceRecord (§7.1). Source TBD."
+        }
+      ]
+    },
+    {
+      "name": "ClaimAssessmentResult",
+      "fields": [
+        {
+          "field": "(undefined)",
+          "type": "—",
+          "required": false,
+          "note": "Referenced by ValidatorResult.claimResults (§20). NOT field-defined; likely related to CriterionResult (§20.1). Source TBD. (Validator-payload type, not referenced by any of the 17 objects.)"
+        }
+      ]
+    },
+    {
+      "name": "ProposedAssuranceObservation",
+      "fields": [
+        {
+          "field": "(undefined)",
+          "type": "—",
+          "required": false,
+          "note": "Referenced by ValidatorResult.observations (§20). NOT field-defined; pre-persistence form of AssuranceObservation (§21). Source TBD. (Validator-payload type, not referenced by any of the 17 objects.)"
+        }
+      ]
+    }
+  ],
+  "conflicts": [
+    {
+      "topic": "ObjectEnvelope: schemaVersion vs authorityId",
+      "resolution": "Both DOC-002 extractions claimed the envelope has NO schemaVersion and an EXTRA optional authorityId?. The ratified codebase (packages/rph-contracts/src/envelopes.ts objectEnvelopeShape) is authoritative and RESOLVES this: schemaVersion IS present; authorityId is DROPPED (explicit comment 'authorityId (DOC-002 §4) is DROPPED per docs §5'). The task-prompt envelope description (schemaVersion in, no authorityId) is correct. schemaVersion is one of the version quartet (contract/schema/semantic/revision)."
+    },
+    {
+      "topic": "INTENT.formalizedObjective required-flag",
+      "resolution": "DOC-002 §6.1 = required; DOC-007 §10.1 = optional (formalizedObjective?). DOC-007 (latest serialized) wins → optional."
+    },
+    {
+      "topic": "PWU boundary field name",
+      "resolution": "DOC-002 §7.1 = 'boundary'; DOC-007 §11.1 = 'boundaries' (same WorkBoundary shape). DOC-007 wins → 'boundaries'."
+    },
+    {
+      "topic": "PWU DOC-002-only link fields",
+      "resolution": "decompositionContractId?, recompositionContractId?, currentBaselineId? appear in DOC-002 §7.1 but are ABSENT from DOC-007 §11.1. Per 'include every field from both' they are retained as OPTIONAL, flagged as open (DOC-007 may deliberately drop them)."
+    },
+    {
+      "topic": "ASSURANCE_POLICY envelope vs standalone + reshaped fields",
+      "resolution": "DOC-002 §17.1 models ASSURANCE_POLICY as extending ObjectEnvelope with fields targetTypes/applicabilityRule/requiredEvidenceRequirements/validatorRole/failureSeverity/remediationPolicy/escalationPolicy/waiverPolicy?. DOC-007 §17 defines a STANDALONE AssurancePolicyDefinition (own id/version/semanticVersion, no envelope) with a completely reshaped field set (applicableObjectTypes, applicability:ApplicabilityExpression, defaultClaimTemplates, requiredEvidence+optionalEvidence, criteria:AssessmentCriterion[], evaluatorRole, findingDefinitions, dispositionRules, permittedControlActions, remediationRules/escalationRules/waiverRules). policy-level failureSeverity is DROPPED (moves to FindingDefinition.defaultSeverity). DOC-007 wins. Note tension: ProfessionalWorkObjectTypeSchema still lists ASSURANCE_POLICY as an envelope objectType — see open items."
+    },
+    {
+      "topic": "ASSURANCE_ASSESSMENT disposition→assessmentState",
+      "resolution": "DOC-002 §18 field 'disposition' (AssuranceDispositionSchema, 6 terminal values) is REPLACED on the object by DOC-007 §19 'assessmentState' (AssuranceAssessmentStateSchema, 15-value state machine incl. VALIDATOR_FAILED/INDEPENDENCE_VIOLATION). The 5-value terminal disposition (AssuranceDispositionRecommendationSchema) now lives on the AssuranceAssessmentCompleted event (§19.3), not the object. DOC-007 wins."
+    },
+    {
+      "topic": "ASSURANCE_ASSESSMENT.evaluator + recommendedControlAction(s)",
+      "resolution": "evaluator: DOC-002 required → DOC-007 optional (wins). recommendedControlAction? (single optional inline enum, DOC-002) → recommendedControlActions (required array of ControlActionRecommendation, DOC-007) (wins). startedAt/completedAt/confidence are DOC-002-only, retained-flagged."
+    },
+    {
+      "topic": "EXECUTION_PLAN stepIds/transitionIds → steps/transitions (referenced vs embedded)",
+      "resolution": "DOC-002 §20.1 references by id array (stepIds: string[], transitionIds: string[]); DOC-007 §15 EMBEDS full object arrays (steps: ExecutionStep[], transitions: ExecutionTransition[]). DOC-007 wins → embedded."
+    },
+    {
+      "topic": "BASELINE itemObjectIds → itemObjectVersions",
+      "resolution": "DOC-002 §24.1 opaque itemObjectIds: string[]; DOC-007 §23 version-pinned itemObjectVersions: BaselineItemVersion[] ({objectId, semanticVersion, contentHash?}) + new purpose/scope. DOC-007 wins."
+    },
+    {
+      "topic": "IndependenceRequirement value set",
+      "resolution": "DOC-002 §17.1 listed 5 values (NONE|DIFFERENT_INVOCATION|DIFFERENT_AGENT|DIFFERENT_MODEL|HUMAN). Codebase IndependenceRequirementSchema (DOC-004 §8.1) is the authoritative 8-value superset (adds DIFFERENT_CONTEXT_INSTANCE, DIFFERENT_PROVIDER, ORGANIZATIONALLY_INDEPENDENT). Use the codebase schema."
+    },
+    {
+      "topic": "Enums flagged 'not in provided list' actually exist",
+      "resolution": "The extractions flagged ActorType, AuthorityType, AssurancePolicyStatus, CriterionResult.result, and ValidatorResult.dispositionRecommendation as having no closed-enum schema. All DO exist in codebase enums.ts: ActorTypeSchema, AuthorityTypeSchema, AssurancePolicyStatusSchema, CriterionResultOutcomeSchema, and AssuranceDispositionRecommendationSchema (5-value, distinct from the 6-value AssuranceDispositionSchema). Wired accordingly."
+    },
+    {
+      "topic": "AssuranceObservation.severity vs AssurancePolicy.failureSeverity",
+      "resolution": "Not a merge — two distinct closed enums. AssuranceSeveritySchema = 5 values (adds INFORMATIONAL); FailureSeveritySchema = 4 values. AssuranceObservation.severity → AssuranceSeveritySchema. (failureSeverity no longer appears at policy level in DOC-007.)"
+    },
+    {
+      "topic": "Decision.authority reference type",
+      "resolution": "No conflict but load-bearing: Decision.authority uses ActorReference (both DOC-002 §23.1 and DOC-007 §22), NOT AuthorityReference. Only Obligation.authority and Constraint.authority use AuthorityReference."
+    }
+  ],
+  "openItems": [
+    {
+      "item": "ARTIFACT object has no field definition anywhere",
+      "why": "ARTIFACT is one of the 17 ProfessionalWorkObjectType values but neither DOC-002 nor DOC-007 defines an ArtifactObject interface/schema (only the ArtifactReference helper and ARTIFACT EvidenceType value exist). Fields are to-be-designed; do not fabricate."
+    },
+    {
+      "item": "6 objects lack a DOC-007 serialized field contract",
+      "why": "OBLIGATION, CONSTRAINT, DECOMPOSITION_CONTRACT, RECOMPOSITION_CONTRACT, RUNTIME_BINDING (and ARTIFACT) have no field-level definition in the latest serialized contract (DOC-007). CONSTRAINT + RUNTIME_BINDING have schema FILES listed in DOC-007 §3 but no prose; the others have neither. All are sourced from DOC-002 prose and need serialization before codegen. Their enums (ObligationType/Strength/Status, ConstraintType/Strength/Status, CoverageType, DecompositionContractStatus, RecompositionContractStatus, AuthorizationStatus, StepType/State) exist but have no wired consumer field yet."
+    },
+    {
+      "item": "~40 helper sub-types are referenced but not field-defined",
+      "why": "Only 12 helpers are field-defined (ActorReference, AuthorityReference, ProvenanceRecord, WorkRiskProfile, WorkBoundary, CoverageClaim, ExecutionStep, ApplicabilityExpression, BaselineItemVersion, ValidatorResult, CriterionResult, TraceLink). The rest (DesiredOutcome, SuccessCondition, ArtifactRequirement, OutputDefinition, ArtifactReference, ApplicabilityRule, decomposition/recomposition rule+propagation+allocation types, execution-plan policy types, runtime-binding policy/capability types, execution-step bindings/conditions, and all AssurancePolicyDefinition helper arrays) need field definitions. Several have JSON-schema files listed in DOC-007 §3 (evidence-requirement, disposition-rule, control-action-recommendation, artifact-reference) that should be read for their shapes."
+    },
+    {
+      "item": "ApplicabilityRule (Constraint) vs ApplicabilityExpression (AssurancePolicy)",
+      "why": "DOC-002 Constraint.applicability uses helper ApplicabilityRule; DOC-007 AssurancePolicyDefinition.applicability uses the field-defined ApplicabilityExpression (§18 op union). Ratify sheet C plans to unify them into one DSL (M7). Decide whether Constraint.applicability adopts ApplicabilityExpression."
+    },
+    {
+      "item": "ASSURANCE_POLICY: envelope PWO vs standalone definition",
+      "why": "ProfessionalWorkObjectTypeSchema still enumerates ASSURANCE_POLICY as an envelope-extending objectType, but DOC-007 §17 models AssurancePolicyDefinition as standalone (own id/version/semanticVersion, no envelope). Confirm whether ASSURANCE_POLICY is a full PWO or a standalone definition object, and reconcile the objectType enum accordingly."
+    },
+    {
+      "item": "AssurancePolicyDefinition.riskProfiles (DOC-004 §3.1)",
+      "why": "Outside the three extractions but load-bearing: the ratify sheet (A-3) retained an optional riskProfiles field on AssurancePolicyDefinition — required by DOC-004 §3.1, absent from DOC-007 §17 serialized (suspected unintended omission). Confirm it belongs, then add it as optional."
+    },
+    {
+      "item": "PWU / AssuranceAssessment DOC-002-only fields retained",
+      "why": "PWU.decompositionContractId?/recompositionContractId?/currentBaselineId? and AssuranceAssessment.startedAt/completedAt?/confidence? are present in DOC-002 but absent from the DOC-007 serialized contract. Retained (optional) per union rule but flagged — confirm keep vs drop for the serialized shape (startedAt/completedAt likely superseded by event-envelope occurredAt/recordedAt)."
+    },
+    {
+      "item": "TraceLink and ExecutionStep are id-bearing but not PWO envelope objects",
+      "why": "Both are field-defined and carry their own id (idPrefix 'trace' / 'step') but do NOT extend ObjectEnvelope and are NOT among the 17 ProfessionalWorkObjectType. Modeled here in the helper-sub-type catalog (not the 17-object list). ExecutionTransition and ExecutionStep also have persistence tables in §31."
+    },
+    {
+      "item": "ControlAction is an enum, not a helper object",
+      "why": "DOC-007's helper listing tagged ControlAction as a referenced helper; it is actually the 23-value ControlActionSchema enum. AssurancePolicyDefinition.permittedControlActions is ControlAction[] with enumRef ControlActionSchema — excluded from the helper catalog. ControlActionRecommendation (whose .action ∈ ControlActionSchema) IS a distinct helper object and is retained."
+    }
+  ]
+}

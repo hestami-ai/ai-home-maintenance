@@ -1,0 +1,13 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "type": "string",
+  "enum": [
+    "INTENT",
+    "REQUIREMENTS",
+    "ARCHITECTURE",
+    "IMPLEMENTATION",
+    "RELEASE",
+    "EVIDENCE_PACKAGE"
+  ],
+  "$id": "urn:janumi:rph:schema:enum:BaselineType:1"
+}

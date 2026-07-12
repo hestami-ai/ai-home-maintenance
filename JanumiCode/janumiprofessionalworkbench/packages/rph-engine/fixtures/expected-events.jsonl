@@ -1,0 +1,72 @@
+{"seq":1,"event":"IntentCaptured","aggregate":"Intent","phase":"INTENT","label":null}
+{"seq":2,"event":"PwuProposed","aggregate":"PWU","phase":"INTENT","label":"Product Realization"}
+{"seq":3,"event":"PwuProposed","aggregate":"PWU","phase":"INTENT","label":"Intent and Product Definition"}
+{"seq":4,"event":"IntentDiscoveryStarted","aggregate":"Intent","phase":"INTENT","label":null}
+{"seq":5,"event":"AssumptionDetected","aggregate":"Assumption","phase":"INTENT","label":"Initial customer size"}
+{"seq":6,"event":"AssumptionDetected","aggregate":"Assumption","phase":"INTENT","label":"US-first scope"}
+{"seq":7,"event":"IntentFormalized","aggregate":"Intent","phase":"INTENT","label":null}
+{"seq":8,"event":"AssuranceAssessmentRequested","aggregate":"Assessment","phase":"INTENT","label":"Intent Fidelity"}
+{"seq":9,"event":"AssuranceAssessmentStarted","aggregate":"Assessment","phase":"INTENT","label":null}
+{"seq":10,"event":"AssuranceObservationRecorded","aggregate":"Observation","phase":"INTENT","label":null}
+{"seq":11,"event":"AssuranceAssessmentSatisfied","aggregate":"Assessment","phase":"INTENT","label":null}
+{"seq":12,"event":"DecisionProposed","aggregate":"Decision","phase":"INTENT","label":"Approve Intent"}
+{"seq":13,"event":"DecisionEffective","aggregate":"Decision","phase":"INTENT","label":null}
+{"seq":14,"event":"IntentApproved","aggregate":"Intent","phase":"INTENT","label":null}
+{"seq":15,"event":"BaselineCreated","aggregate":"Baseline","phase":"INTENT","label":"Intent Baseline"}
+{"seq":16,"event":"BaselinePromoted","aggregate":"Baseline","phase":"INTENT","label":"Intent Baseline"}
+{"seq":17,"event":"PwuProposed","aggregate":"PWU","phase":"BEHAVIOR","label":"Product Behavior Definition"}
+{"seq":18,"event":"PwuShapingStarted","aggregate":"PWU","phase":"BEHAVIOR","label":null}
+{"seq":19,"event":"ClaimAsserted","aggregate":"Claim","phase":"BEHAVIOR","label":"Behavior sufficiently covers intent"}
+{"seq":20,"event":"PwuMarkedReady","aggregate":"PWU","phase":"BEHAVIOR","label":null}
+{"seq":21,"event":"ExecutionPlanProposed","aggregate":"ExecutionPlan","phase":"BEHAVIOR","label":null}
+{"seq":22,"event":"ExecutionPlanApproved","aggregate":"ExecutionPlan","phase":"BEHAVIOR","label":null}
+{"seq":23,"event":"ExecutionPlanActivated","aggregate":"ExecutionPlan","phase":"BEHAVIOR","label":null}
+{"seq":24,"event":"ExecutionStepStarted","aggregate":"ExecutionPlan","phase":"BEHAVIOR","label":null}
+{"seq":25,"event":"ExecutionStepSucceeded","aggregate":"ExecutionPlan","phase":"BEHAVIOR","label":null}
+{"seq":26,"event":"EvidenceProposed","aggregate":"Evidence","phase":"BEHAVIOR","label":"Journey and requirement artifacts"}
+{"seq":27,"event":"EvidenceAdmitted","aggregate":"Evidence","phase":"BEHAVIOR","label":null}
+{"seq":28,"event":"PwuSatisfied","aggregate":"PWU","phase":"BEHAVIOR","label":"Product Behavior Definition"}
+{"seq":29,"event":"PwuProposed","aggregate":"PWU","phase":"ARCHITECTURE_SHAPE","label":"Architecture Definition"}
+{"seq":30,"event":"DecompositionProposed","aggregate":"DecompositionContract","phase":"ARCHITECTURE_SHAPE","label":null}
+{"seq":31,"event":"AssuranceAssessmentRequested","aggregate":"Assessment","phase":"ARCHITECTURE_SHAPE","label":"Decomposition Coverage"}
+{"seq":32,"event":"DecompositionValidated","aggregate":"DecompositionContract","phase":"ARCHITECTURE_SHAPE","label":null}
+{"seq":33,"event":"PwuMarkedReady","aggregate":"PWU","phase":"ARCHITECTURE_SHAPE","label":"Architecture Definition"}
+{"seq":34,"event":"ExecutionPlanProposed","aggregate":"ExecutionPlan","phase":"ARCHITECTURE_SHAPE","label":null}
+{"seq":35,"event":"ExecutionPlanApproved","aggregate":"ExecutionPlan","phase":"ARCHITECTURE_SHAPE","label":null}
+{"seq":36,"event":"RuntimeBindingRequested","aggregate":"RuntimeBinding","phase":"ARCHITECTURE_SHAPE","label":null}
+{"seq":37,"event":"RuntimeBindingAuthorized","aggregate":"RuntimeBinding","phase":"ARCHITECTURE_SHAPE","label":null}
+{"seq":38,"event":"ExecutionPlanActivated","aggregate":"ExecutionPlan","phase":"ARCHITECTURE_GENERATE","label":null}
+{"seq":39,"event":"ExecutionStepStarted","aggregate":"ExecutionPlan","phase":"ARCHITECTURE_GENERATE","label":"Generate architecture"}
+{"seq":40,"event":"ExecutionStepSucceeded","aggregate":"ExecutionPlan","phase":"ARCHITECTURE_GENERATE","label":null}
+{"seq":41,"event":"EvidenceProposed","aggregate":"Evidence","phase":"ARCHITECTURE_GENERATE","label":"Architecture artifacts"}
+{"seq":42,"event":"AssumptionDetected","aggregate":"Assumption","phase":"ASSUMPTION_SURFACING","label":"Offline behavior"}
+{"seq":43,"event":"AssumptionDetected","aggregate":"Assumption","phase":"ASSUMPTION_SURFACING","label":"Payment provider delegation"}
+{"seq":44,"event":"AssuranceAssessmentRequested","aggregate":"Assessment","phase":"ASSUMPTION_SURFACING","label":"Assumption Disclosure"}
+{"seq":45,"event":"AssuranceAssessmentSatisfied","aggregate":"Assessment","phase":"ASSUMPTION_SURFACING","label":"Assumption Disclosure"}
+{"seq":46,"event":"AssuranceAssessmentRequested","aggregate":"Assessment","phase":"ARCHITECTURE_ASSURE","label":"Architecture Coverage"}
+{"seq":47,"event":"AssuranceObservationRecorded","aggregate":"Observation","phase":"ARCHITECTURE_ASSURE","label":"Offline ambiguity"}
+{"seq":48,"event":"AssuranceObservationRecorded","aggregate":"Observation","phase":"ARCHITECTURE_ASSURE","label":"Tenant isolation criteria"}
+{"seq":49,"event":"AssuranceAssessmentConditionallySatisfied","aggregate":"Assessment","phase":"ARCHITECTURE_ASSURE","label":"Architecture Coverage"}
+{"seq":50,"event":"PwuChallenged","aggregate":"PWU","phase":"REMEDIATION","label":null}
+{"seq":51,"event":"TacticalChangeRequested","aggregate":"PWU","phase":"REMEDIATION","label":null}
+{"seq":52,"event":"ClarificationRequested","aggregate":"Intent","phase":"REMEDIATION","label":null}
+{"seq":53,"event":"IntentConstraintRefined","aggregate":"Intent","phase":"REMEDIATION","label":"Offline scope"}
+{"seq":54,"event":"ExecutionPlanRevised","aggregate":"ExecutionPlan","phase":"REMEDIATION","label":null}
+{"seq":55,"event":"ExecutionStepStarted","aggregate":"ExecutionPlan","phase":"REMEDIATION","label":"Revise architecture"}
+{"seq":56,"event":"ExecutionStepSucceeded","aggregate":"ExecutionPlan","phase":"REMEDIATION","label":null}
+{"seq":57,"event":"EvidenceProposed","aggregate":"Evidence","phase":"REMEDIATION","label":"Revised mobile architecture"}
+{"seq":58,"event":"EvidenceAdmitted","aggregate":"Evidence","phase":"REMEDIATION","label":null}
+{"seq":59,"event":"AssuranceAssessmentRequested","aggregate":"Assessment","phase":"REVERIFY","label":"Architecture Coverage"}
+{"seq":60,"event":"AssuranceAssessmentSatisfied","aggregate":"Assessment","phase":"REVERIFY","label":"Architecture Coverage"}
+{"seq":61,"event":"AssuranceAssessmentRequested","aggregate":"Assessment","phase":"REVERIFY","label":"Intent Preservation"}
+{"seq":62,"event":"AssuranceAssessmentSatisfied","aggregate":"Assessment","phase":"REVERIFY","label":"Intent Preservation"}
+{"seq":63,"event":"PwuSatisfied","aggregate":"PWU","phase":"RECOMPOSE","label":"Architecture Definition"}
+{"seq":64,"event":"RecompositionStarted","aggregate":"RecompositionContract","phase":"RECOMPOSE","label":null}
+{"seq":65,"event":"RecompositionCompleted","aggregate":"RecompositionContract","phase":"RECOMPOSE","label":null}
+{"seq":66,"event":"DecisionProposed","aggregate":"Decision","phase":"GOVERNANCE","label":"Approve Architecture"}
+{"seq":67,"event":"DecisionEffective","aggregate":"Decision","phase":"GOVERNANCE","label":null}
+{"seq":68,"event":"BaselineCreated","aggregate":"Baseline","phase":"BASELINE","label":"Architecture"}
+{"seq":69,"event":"BaselineSubmittedForReview","aggregate":"Baseline","phase":"BASELINE","label":null}
+{"seq":70,"event":"BaselineApproved","aggregate":"Baseline","phase":"BASELINE","label":null}
+{"seq":71,"event":"BaselinePromoted","aggregate":"Baseline","phase":"BASELINE","label":"Architecture Baseline"}
+{"seq":72,"event":"PwuBaselined","aggregate":"PWU","phase":"BASELINE","label":"Architecture Definition"}

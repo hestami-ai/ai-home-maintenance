@@ -1,0 +1,379 @@
+{
+  "traceRelations": [
+    {
+      "relation": "DERIVED_FROM",
+      "sourceTypes": [
+        "PROFESSIONAL_WORK_UNIT",
+        "INTENT",
+        "ARTIFACT",
+        "CLAIM",
+        "OBLIGATION"
+      ],
+      "targetTypes": [
+        "INTENT",
+        "OBLIGATION",
+        "PROFESSIONAL_WORK_UNIT"
+      ],
+      "direction": "downstream -> upstream: the derived object is the source and points back to the origin it was derived from",
+      "inverse": "gives-rise-to / basis-of (NOT a named member of the TraceRelation set)",
+      "note": "General derivation edge. NOT constrained by any §25.1 invariant, so direction is INFERRED from usage. §29.2 traversal walks it downstream (Intent -> ... derived objects). Impact flows FORWARD onto the source when the target/origin is invalidated (source points at origin).",
+      "sourceSection": "§25 enum; §29.2 traversal"
+    },
+    {
+      "relation": "REFINES",
+      "sourceTypes": [
+        "INTENT",
+        "PROFESSIONAL_WORK_UNIT"
+      ],
+      "targetTypes": [
+        "INTENT",
+        "PROFESSIONAL_WORK_UNIT"
+      ],
+      "direction": "more-specific/refining object -> coarser/refined object (source refines target)",
+      "inverse": "refined-by",
+      "note": "INFERRED (not in §25.1). Backed by IntentObject.parentIntentId (§6.1: child intent refines parent). §29.2's 'Intent -> refines -> Requirement' is worded downstream for traversal, but the semantic source is the refining (more specific) object. No REQUIREMENT object type exists in this model; requirement-level refinement is carried by PWUs/obligations.",
+      "sourceSection": "§25 enum; §6.1; §29.2"
+    },
+    {
+      "relation": "DECOMPOSES",
+      "sourceTypes": [
+        "PROFESSIONAL_WORK_UNIT"
+      ],
+      "targetTypes": [
+        "PROFESSIONAL_WORK_UNIT"
+      ],
+      "direction": "parent PWU -> child PWU",
+      "inverse": "part-of / composes-into (child -> parent)",
+      "note": "AUTHORITATIVE: §25.1 'DECOMPOSES must connect a parent PWU to a child PWU.' Mediated by DECOMPOSITION_CONTRACT (parentWorkUnitId + childWorkUnitIds, §13.1). Every child must trace to the parent (§13.2).",
+      "sourceSection": "§25.1; §13"
+    },
+    {
+      "relation": "SATISFIES",
+      "sourceTypes": [
+        "PROFESSIONAL_WORK_UNIT",
+        "CLAIM"
+      ],
+      "targetTypes": [
+        "OBLIGATION",
+        "CONSTRAINT",
+        "INTENT"
+      ],
+      "direction": "satisfier (work product / completion claim) -> satisfied obligation/intent",
+      "inverse": "satisfied-by",
+      "note": "INFERRED. Governed by §10.2: a child PWU may satisfy a parent obligation ONLY through explicit allocation; an obligation cannot become SATISFIED merely because a related PWU completed; satisfaction requires a SUPPORTED claim (§10.2, §15). Target is the obligation/constraint/intent-success-condition being fulfilled.",
+      "sourceSection": "§25 enum; §10.2; §15"
+    },
+    {
+      "relation": "DEPENDS_ON",
+      "sourceTypes": [
+        "PROFESSIONAL_WORK_UNIT",
+        "EXECUTION_STEP"
+      ],
+      "targetTypes": [
+        "PROFESSIONAL_WORK_UNIT",
+        "ARTIFACT"
+      ],
+      "direction": "dependent object -> object depended upon",
+      "inverse": "prerequisite-for / required-by",
+      "note": "INFERRED. Backed by PWU.dependencyIds (§7.1) and DecompositionContract.siblingDependencyIds (§13.1). Failure of the target is invalidation trigger 'dependency failure' (§29.1) -> BLOCKED (§8.2).",
+      "sourceSection": "§25 enum; §7.1; §13.1"
+    },
+    {
+      "relation": "CONSTRAINED_BY",
+      "sourceTypes": [
+        "PROFESSIONAL_WORK_UNIT",
+        "INTENT"
+      ],
+      "targetTypes": [
+        "CONSTRAINT"
+      ],
+      "direction": "constrained object -> constraint",
+      "inverse": "CONSTRAINS (constraint -> constrained object)",
+      "note": "INFERRED. Backed by PWU.constraintIds (§7.1) and Intent.constraintIds (§6.1). A mandatory-constraint change is invalidation trigger #2 (§29.1); impact flows FORWARD from the changed CONSTRAINT (target) back onto every object CONSTRAINED_BY it.",
+      "sourceSection": "§25 enum; §7.1; §6.1; §11"
+    },
+    {
+      "relation": "ASSUMES",
+      "sourceTypes": [
+        "PROFESSIONAL_WORK_UNIT"
+      ],
+      "targetTypes": [
+        "ASSUMPTION"
+      ],
+      "direction": "assuming object -> assumption relied upon",
+      "inverse": "affects (Assumption.affectedObjectIds)",
+      "note": "INFERRED. Backed by PWU.assumptionIds (§7.1) and AssumptionObject.affectedObjectIds (§12.1, the materialized inverse). Assumption FALSIFICATION/EXPIRY (trigger #3/#10) propagates along the inverse to every assuming object (§12.2, Scenario 2 §39).",
+      "sourceSection": "§25 enum; §7.1; §12"
+    },
+    {
+      "relation": "PRODUCES",
+      "sourceTypes": [
+        "PROFESSIONAL_WORK_UNIT",
+        "EXECUTION_STEP"
+      ],
+      "targetTypes": [
+        "ARTIFACT",
+        "EVIDENCE"
+      ],
+      "direction": "producer -> product",
+      "inverse": "produced-by",
+      "note": "INFERRED. Backed by §29.2 'PWU -> produces -> Artifact', PWU.expectedOutputs (§7.1) and ExecutionStep.outputBindings (§21). Note §16.2: generated prose is NOT automatically evidence, so PRODUCES(->ARTIFACT) does not imply an admissible EVIDENCE node.",
+      "sourceSection": "§25 enum; §29.2; §7.1; §21"
+    },
+    {
+      "relation": "SUPPORTS",
+      "sourceTypes": [
+        "EVIDENCE",
+        "ASSURANCE_ASSESSMENT"
+      ],
+      "targetTypes": [
+        "CLAIM"
+      ],
+      "direction": "evidence/assessment -> claim",
+      "inverse": "supported-by",
+      "note": "AUTHORITATIVE: §25.1 'SUPPORTS must originate from Evidence or Assessment and target a Claim.' Backed by Evidence.supportsClaimIds (§16.1) and Claim.supportingEvidenceIds (§15.1). THE key edge for evidence-invalidation propagation. (§29.2's informal 'Artifact -> supports -> Evidence' link is traversal wording only; §25.1 restricts the true source set to Evidence/Assessment and target to Claim.)",
+      "sourceSection": "§25.1; §16.1; §15.1"
+    },
+    {
+      "relation": "CONTRADICTS",
+      "sourceTypes": [
+        "EVIDENCE",
+        "ASSURANCE_OBSERVATION"
+      ],
+      "targetTypes": [
+        "CLAIM"
+      ],
+      "direction": "contradicting evidence/observation -> claim",
+      "inverse": "contradicted-by",
+      "note": "INFERRED (parallel to SUPPORTS). Backed by Evidence.contradictsClaimIds (§16.1) and Claim.contradictingEvidenceIds (§15.1). Contradicting evidence must remain VISIBLE and is not erased by remediation (§15.2, §18.1).",
+      "sourceSection": "§25 enum; §16.1; §15.1"
+    },
+    {
+      "relation": "VERIFIES",
+      "sourceTypes": [
+        "ASSURANCE_ASSESSMENT"
+      ],
+      "targetTypes": [
+        "CLAIM",
+        "PROFESSIONAL_WORK_UNIT",
+        "BASELINE"
+      ],
+      "direction": "assessment -> claim / subject object",
+      "inverse": "verified-by",
+      "note": "AUTHORITATIVE on source: §25.1 'VERIFIES must originate from an Assessment.' Target set drawn from AssuranceAssessment.claimIds + subjectObjectIds (§18) and §29.2 'Claim -> verifies -> Baseline' (the assessment's verification underpins baseline readiness).",
+      "sourceSection": "§25.1; §18; §29.2"
+    },
+    {
+      "relation": "INVALIDATES",
+      "sourceTypes": [
+        "INTENT",
+        "CONSTRAINT",
+        "ASSUMPTION",
+        "EVIDENCE",
+        "DECISION",
+        "BASELINE",
+        "PROFESSIONAL_WORK_UNIT",
+        "ASSURANCE_POLICY"
+      ],
+      "targetTypes": [
+        "CLAIM",
+        "PROFESSIONAL_WORK_UNIT",
+        "EVIDENCE",
+        "BASELINE",
+        "OBLIGATION",
+        "CONSTRAINT",
+        "DECISION"
+      ],
+      "direction": "invalidating/changed source object -> dependent (downstream) object",
+      "inverse": "invalidated-by",
+      "note": "AUTHORITATIVE intent: §25.1 'Invalidated source objects may invalidate downstream trace claims.' This is an engine-EMITTED edge produced by impact analysis (§29), never a silent mutation. It is the machine-readable record of a §29.3 'invalidated' classification.",
+      "sourceSection": "§25.1; §29"
+    },
+    {
+      "relation": "SUPERSEDES",
+      "sourceTypes": [
+        "ANY_OBJECT_TYPE (all 17 envelope types)"
+      ],
+      "targetTypes": [
+        "SAME_TYPE (the prior object it replaces)"
+      ],
+      "direction": "successor (new revision/replacement) -> predecessor (superseded)",
+      "inverse": "superseded-by",
+      "note": "INFERRED but strongly grounded. Every object carries a SUPERSEDED status; Intent has supersedesIntentId (§6.1). THIS is the correction relation: history is append-oriented (§2.7), evidence corrections create a NEW version (§16.2), baseline changes create a successor (§24.2), and trace links cannot be silently rewritten (§25.1). Corrections emit a new object + SUPERSEDES link, never mutate in place.",
+      "sourceSection": "§25.1; §2.7; §16.2; §24.2; §6.1"
+    },
+    {
+      "relation": "PROMOTES",
+      "sourceTypes": [
+        "DECISION"
+      ],
+      "targetTypes": [
+        "BASELINE",
+        "BASELINE_ITEM"
+      ],
+      "direction": "decision -> baseline / baseline item",
+      "inverse": "promoted-by",
+      "note": "AUTHORITATIVE: §25.1 'PROMOTES must connect a Decision to a Baseline or Baseline Item.' The Decision must be decisionType PROMOTE_BASELINE (§23.1) and EFFECTIVE; Baseline.promotionDecisionId is the inverse pointer (§24.1). Baseline promotion is a governance event, not an execution step (§24.2), requiring an explicit effective decision (§23.2).",
+      "sourceSection": "§25.1; §23; §24.1"
+    },
+    {
+      "relation": "ALLOCATES",
+      "sourceTypes": [
+        "OBLIGATION",
+        "DECOMPOSITION_CONTRACT"
+      ],
+      "targetTypes": [
+        "PROFESSIONAL_WORK_UNIT"
+      ],
+      "direction": "parent obligation (via decomposition contract) -> child PWU (allocatee)",
+      "inverse": "allocated-to / bears",
+      "note": "INFERRED. Backed by §29.2 'Requirement -> allocated to -> PWU', DecompositionContract.obligationAllocations (§13.1), and the ObligationAllocated event (§26.3). §10.2: a child PWU may satisfy a parent obligation ONLY through explicit allocation. The 'No obligation disappears' property (§35.1) audits this edge: parent mandatory obligations = allocated + retained + satisfied + authorized waivers.",
+      "sourceSection": "§25 enum; §29.2; §13.1; §10.2; §35.1"
+    },
+    {
+      "relation": "PROPAGATES",
+      "sourceTypes": [
+        "CONSTRAINT",
+        "ASSUMPTION"
+      ],
+      "targetTypes": [
+        "PROFESSIONAL_WORK_UNIT",
+        "CONSTRAINT"
+      ],
+      "direction": "parent-level constraint/assumption -> child PWU (or child constraint copy)",
+      "inverse": "propagated-from",
+      "note": "INFERRED. Backed by DecompositionContract.constraintPropagations + assumptionPropagations (§13.1) and ConstraintPropagated event (§26.3). Constraint propagation rule §11.2: every mandatory parent constraint must be propagated / retained / marked inapplicable / waived / superseded — 'No silent omission.' 'No constraint silently drops' property (§35.1) audits this edge.",
+      "sourceSection": "§25 enum; §13.1; §11.2; §35.1"
+    },
+    {
+      "relation": "GOVERNS",
+      "sourceTypes": [
+        "DECISION",
+        "ASSURANCE_POLICY",
+        "AUTHORITY (AuthorityReference)"
+      ],
+      "targetTypes": [
+        "PROFESSIONAL_WORK_UNIT",
+        "ASSURANCE_ASSESSMENT",
+        "BASELINE",
+        "EXECUTION_PLAN"
+      ],
+      "direction": "governing authority/policy/decision -> governed object",
+      "inverse": "governed-by",
+      "note": "INFERRED. Backed by §23 governance, AssurancePolicy.targetTypes (§17.1), and the authority model (§5). Authority REVOCATION is invalidation trigger #5 (§29.1) and 'Revocation triggers impact analysis' (§23.2) -> propagates along GOVERNS to every governed object (approvals, waivers, promotions).",
+      "sourceSection": "§25 enum; §23; §17.1; §5"
+    }
+  ],
+  "invalidationRules": [
+    {
+      "trigger": "Evidence INVALIDATED (or EXPIRED) [EMPHASIZED CASE]",
+      "affects": "Claims that are SUPPORTS-targets of that Evidence (Evidence -> Claim); AssuranceAssessments whose evidenceConsideredIds include it; and — via VERIFIES -> Baseline — baseline readiness.",
+      "classification": "invalidated | revalidation | needs-review — specifically: every dependent SUPPORTED claim must become CONTESTED, under-review (UNDER_ASSESSMENT), or INVALIDATED (never left silently SUPPORTED).",
+      "propagation": "Forward along SUPPORTS to each dependent Claim, then along VERIFIES to any Baseline. Claim.status OPEN->UNDER_ASSESSMENT or ->CONTESTED (§15.1). Assurance re-opens (revalidation) or requests fresh evidence (evidence-refresh). RECOMPUTE baseline-readiness: a CONTESTED claim cannot authorize baseline promotion unless resolved or waived (§15.2). If the evidence sits under an AUTHORITATIVE (immutable) baseline, the baseline is not mutated — a SUCCESSOR baseline is required (§24.2).",
+      "sourceSection": "§29.1 (evidence invalidation); §16.2 (Invalidated evidence cannot support an active claim; expiration triggers reassessment of dependent claims); §35.1 (Invalid evidence cannot support satisfaction: dependent supported claim -> contested/under-review/invalidated); §15.2; §24.2"
+    },
+    {
+      "trigger": "Intent REVISION (APPROVED -> REVISED, semantic version increments)",
+      "affects": "PWUs that REFINE / are DERIVED_FROM the intent and their downstream obligations, evidence, claims, and any baseline built on them.",
+      "classification": "needs-review or invalidated (affected SATISFIED PWUs become review-required or invalidated).",
+      "propagation": "Change-impact analysis is MANDATORY before proceeding (§6.3). Impact traverses affected PWUs and evidence (§29.2 chain). Prior baseline remains IMMUTABLE; a successor baseline is required (Scenario 5, §39).",
+      "sourceSection": "§29.1; §6.2; §6.3; §39 Scenario 5"
+    },
+    {
+      "trigger": "Mandatory CONSTRAINT change (add/alter mandatory constraint; semantic version = Yes per §4.1)",
+      "affects": "Objects CONSTRAINED_BY the constraint and every child it PROPAGATES to.",
+      "classification": "revalidation (re-assess conformance) escalating to reshaping/invalidated if the new constraint is now VIOLATED.",
+      "propagation": "Forward from the changed CONSTRAINT along CONSTRAINED_BY (and PROPAGATES to children). A VIOLATED constraint must affect assurance disposition; conformance claims re-enter assessment.",
+      "sourceSection": "§29.1; §4.1; §11.1 (status VIOLATED/INVALIDATED); §11.2; §35.1 (No constraint silently drops)"
+    },
+    {
+      "trigger": "ASSUMPTION FALSIFICATION",
+      "affects": "Objects in Assumption.affectedObjectIds (the ASSUMES inverse) — i.e., every PWU relying on it — and their evidence.",
+      "classification": "reshaping or replanning (controller selects reshape or replan); affected evidence -> needs-review; shape-integrity -> AT_RISK or VIOLATED. A falsified CRITICAL assumption may drive invalidated.",
+      "propagation": "Falsification triggers impact analysis (§12.2). During execution: EXECUTING -> RESHAPING (§8.2). Scenario 2: assumption FALSIFIED -> affected PWUs identified -> shapeIntegrityState AT_RISK/VIOLATED -> affected evidence reviewed -> controller selects reshape/replan -> execution does not continue blindly.",
+      "sourceSection": "§29.1; §12.2; §8.2; §39 Scenario 2"
+    },
+    {
+      "trigger": "AUTHORITY REVOCATION",
+      "affects": "Decisions/approvals/waivers granted under that authority (via GOVERNS) and the objects those decisions authorized (PWUs, baselines, waived obligations).",
+      "classification": "needs-review or invalidated for governed objects; revoked approvals cascade.",
+      "propagation": "Revocation triggers impact analysis (§23.2). Human override / revocation must NOT erase prior assurance findings (§23.2). Waived obligations lose cover and revert (ACTIVE/VIOLATED); a baseline whose promotion decision is revoked -> Baseline REVOKED (§24.1).",
+      "sourceSection": "§29.1; §23.2; §36.4 (revoked approval)"
+    },
+    {
+      "trigger": "ASSURANCE-POLICY change (new policy semanticVersion; e.g., changed evidence requirement or criteria)",
+      "affects": "AssuranceAssessments performed under the prior policySemanticVersion and the claims they VERIFIED.",
+      "classification": "revalidation (assessments must be re-run under the new policy version); evidence-refresh if evidence requirements changed.",
+      "propagation": "Every assessment records policyId + policySemanticVersion (§18.1), so stale assessments are detectable and re-opened. Verified claims re-enter UNDER_ASSESSMENT.",
+      "sourceSection": "§29.1; §17; §18.1; §4.1 (change evidence requirement = semantic Yes)"
+    },
+    {
+      "trigger": "ARCHITECTURE BASELINE change",
+      "affects": "Downstream PWUs / execution plans built on that architecture baseline and any dependent baselines.",
+      "classification": "replanning or reshaping for dependent PWUs; dependent baselines -> successor required (invalidated for readiness).",
+      "propagation": "An authoritative baseline is immutable; changes create a successor (§24.2); supersession preserves traceability. Impact flows to objects DERIVED_FROM / DEPENDS_ON the changed baseline.",
+      "sourceSection": "§29.1; §24.2"
+    },
+    {
+      "trigger": "DEPENDENCY FAILURE",
+      "affects": "PWUs / execution steps that DEPEND_ON the failed dependency.",
+      "classification": "replanning (BLOCKED, then change-tactic/replan); reshaping/invalidated if the dependency is permanently unavailable.",
+      "propagation": "PLANNED/EXECUTING -> BLOCKED on runtime dependency unavailable (§8.2). Step preconditions gate re-entry (§21.1).",
+      "sourceSection": "§29.1; §8.2; §21.1"
+    },
+    {
+      "trigger": "CHILD CONFLICT (sibling conflict discovered during/after recomposition)",
+      "affects": "The parent PWU's recomposition and conflicting sibling PWUs.",
+      "classification": "invalidated (RECOMPOSED + sibling conflict -> INVALIDATED) or reshaping; RecompositionContract -> CONFLICTED; siblings -> needs-review.",
+      "propagation": "Recomposition may FAIL even when every child PWU is individually satisfied (§14.1). RecompositionContract.status -> CONFLICTED/INSUFFICIENT (§14). Parent PWU RECOMPOSED -> INVALIDATED (§8.2).",
+      "sourceSection": "§29.1; §8.2; §14.1"
+    },
+    {
+      "trigger": "EXTERNAL REALITY change",
+      "affects": "Assumptions and Evidence keyed to external state (validUntil / expirationCondition) and the claims relying on them.",
+      "classification": "evidence-refresh and needs-review; assumptions -> EXPIRED (can no longer authorize work).",
+      "propagation": "Expired assumptions cannot continue authorizing work (§12.2). Evidence expiration must trigger reassessment of dependent claims (§16.2), routing dependent claims back through the evidence-invalidation rule above.",
+      "sourceSection": "§29.1; §12.2; §16.1 (validFrom/validUntil); §16.2"
+    },
+    {
+      "trigger": "IMPACT TRAVERSAL DIRECTION (engine behavior, all triggers)",
+      "affects": "Whatever lies along the typed TraceLink graph from the changed object.",
+      "classification": "n/a (mechanism) — produces one §29.3 classification per affected object.",
+      "propagation": "Traverse typed relationships: Intent -(refines)-> Requirement -(allocated to)-> PWU -(produces)-> Artifact -(supports)-> Evidence -(supports)-> Claim -(verifies)-> Baseline. Because TraceLinks are directed, impact flows FORWARD along SUPPORTS/VERIFIES/PROMOTES/PRODUCES/DECOMPOSES/ALLOCATES/PROPAGATES/GOVERNS/CONSTRAINED_BY-inverse, but REVERSE along DERIVED_FROM/REFINES/ASSUMES (which point upstream). Emit INVALIDATES / SUPERSEDES links for the record; never silently rewrite (§25.1).",
+      "sourceSection": "§29.2; §25.1; §32.5 (Change-Impact Projection: changed object, affected objects, invalidation status, required remediation)"
+    },
+    {
+      "trigger": "CONSERVATISM under high consequence (meta-rule over all triggers)",
+      "affects": "Any affected object whose PWU riskProfile has high consequence / irreversibility / security or regulatory exposure.",
+      "classification": "Bias UP the severity ladder: prefer invalidated/revalidation over needs-review when consequences are high.",
+      "propagation": "'Automatic invalidation must be conservative where consequences are high' (§29.3). Ties to WorkRiskProfile (§9.2) and risk-proportional readiness. Chosen classification maps to a ControlAction (§37: RESHAPE_PWU, REPLAN_EXECUTION, REVISE_DECOMPOSITION, GATHER_EVIDENCE, ESCALATE, REJECT, WAIVE) and to AssuranceAssessment.recommendedControlAction (§18).",
+      "sourceSection": "§29.3; §9.2; §37; §18"
+    },
+    {
+      "trigger": "CORRECTION = supersession, never mutation (invariant governing how invalidations are recorded)",
+      "affects": "The object being corrected + all objects tracing to its prior version.",
+      "classification": "Prior version -> SUPERSEDED; dependents re-classified per the relevant trigger rule.",
+      "propagation": "History is append-oriented (§2.7). A correction creates a NEW object version + a SUPERSEDES TraceLink (new -> old); evidence corrections create a new version (§16.2); baseline changes create a successor (§24.2). Trace links cannot be silently rewritten; invalidated source objects may invalidate downstream trace claims via emitted INVALIDATES edges (§25.1).",
+      "sourceSection": "§2.7; §16.2; §24.2; §25.1"
+    }
+  ],
+  "impactClassifications": [
+    "unaffected",
+    "review required (needs-review)",
+    "evidence refresh required (evidence-refresh)",
+    "revalidation required (revalidation)",
+    "replanning required (replanning)",
+    "reshaping required (reshaping)",
+    "invalidated"
+  ],
+  "notes": [
+    "CLOSED impact-classification set is EXACTLY the 7 outcomes enumerated in §29.3 (unaffected; review required; evidence refresh required; revalidation required; replanning required; reshaping required; invalidated). These match the client's parenthetical synonyms one-to-one. No other outcome values are defined in the document.",
+    "DISCREPANCY / GAP FLAG: The prompt says the canonical set is 'DOC-007's 18 values,' but the TraceRelation enum in THIS file (§25, lines 1391-1408) contains only 17: DERIVED_FROM, REFINES, DECOMPOSES, SATISFIES, DEPENDS_ON, CONSTRAINED_BY, ASSUMES, PRODUCES, SUPPORTS, CONTRADICTS, VERIFIES, INVALIDATES, SUPERSEDES, PROMOTES, ALLOCATES, PROPAGATES, GOVERNS. The 18th value cannot be recovered from this file — M6 must reconcile against DOC-007 directly (candidate missing edges by analogy: a REALIZES/TRACES_TO, or a split of ALLOCATES into ALLOCATES/ALLOCATED_TO). I did NOT fabricate an 18th.",
+    "AUTHORITATIVE vs INFERRED directionality: §25.1 hard-constrains only 4 relations — DECOMPOSES (parent PWU->child PWU), SUPPORTS (Evidence|Assessment->Claim), VERIFIES (from Assessment), PROMOTES (Decision->Baseline/Item). The other 13 source/target/direction assignments are INFERRED from object reference fields (§6-§24) and the §29.2 traversal, and are marked as such per-relation. Treat the 4 as invariants; treat the other 13 as strong-but-derived and confirm against DOC-007.",
+    "TraceLink is immutable and directed (§25.1: 'Trace links are directed and typed'; 'Trace links cannot be silently rewritten'). Corrections never mutate an edge or object in place — they emit a new object + a SUPERSEDES link (new->old) and, where downstream validity is affected, engine-emitted INVALIDATES links (source->dependent). SUPERSEDES and INVALIDATES are the two engine-authored relations; the other 15 are authored during normal work.",
+    "Object-state realization of each classification (for M6 to map onto): 'invalidated' -> PWU.workLifecycleState=INVALIDATED (§7.2) / AssuranceState=INVALIDATED (§7.4) / Evidence.status=INVALIDATED (§16.1) / Constraint.status=INVALIDATED (§11.1); 'reshaping required' -> workLifecycleState=RESHAPING + shapeIntegrityState=RESHAPING_REQUIRED (§7.2,§7.5); 'evidence refresh required' -> AssuranceState=EVIDENCE_REQUIRED + ControlAction GATHER_EVIDENCE (§7.4,§37); 'revalidation required' -> AssuranceState back to READY_FOR_ASSESSMENT/ASSESSING + Claim.status=UNDER_ASSESSMENT; 'replanning required' -> ControlAction REPLAN_EXECUTION/CHANGE_TACTIC + PWU BLOCKED->re-PLANNED (§8.2,§37); 'review required' has NO dedicated lifecycle literal — realize via CHALLENGED / Claim.UNDER_ASSESSMENT / an open AssuranceObservation (Scenario 5 uses the phrase 'review-required', §39).",
+    "Baseline-readiness recompute (the emphasized evidence case) is bounded by two invariants: §15.2 'A contested claim cannot authorize baseline promotion unless resolved or waived' and §35.1 'No unauthorized baseline' + 'Invalid evidence cannot support satisfaction.' Because an AUTHORITATIVE baseline is immutable (§24.2), invalidation never edits a promoted baseline — it forces a SUCCESSOR baseline (Scenario 5, §39).",
+    "The Change-Impact Projection (§32.5) is the read model this engine feeds: {changed object, affected objects, invalidation status, required remediation}. Chosen classifications map to ControlActions in §37 and to AssuranceAssessment.recommendedControlAction (§18): RESHAPE_PWU, REVISE_DECOMPOSITION, REPLAN_EXECUTION, GATHER_EVIDENCE, ESCALATE, WAIVE, REJECT, ACCEPT.",
+    "Source file (absolute): e:/Projects/hestami-ai/JanumiCode/janumiprofessionalworkbench/docs/Recursive Professional Harness/Janumi Professional Workbench Recursive Professional Harness - Canonical Domain Model, Invariant Catalog, State Machines, and Event Contract.md — §25 directionality at lines 1388-1432; §29 invalidation at lines 1685-1735; invalidation invariants cross-referenced from §12.2, §15.2, §16.2, §23.2, §24.2, §35.1, and §39 Scenarios 2 & 5."
+  ]
+}

@@ -1,0 +1,15 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "type": "string",
+  "enum": [
+    "OPEN",
+    "UNDER_ASSESSMENT",
+    "SUPPORTED",
+    "CONDITIONALLY_SUPPORTED",
+    "CONTESTED",
+    "REJECTED",
+    "WAIVED",
+    "SUPERSEDED"
+  ],
+  "$id": "urn:janumi:rph:schema:enum:ClaimStatus:1"
+}

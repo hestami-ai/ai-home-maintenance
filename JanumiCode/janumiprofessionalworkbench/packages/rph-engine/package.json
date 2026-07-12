@@ -1,0 +1,38 @@
+{
+  "name": "@janumipwb/rph-engine",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "description": "The RPH composition facade — createEngine(deps) wires contracts + persistence + application + domain into one public seam; the PWA ontology is INJECTED by the composition root (the engine is PWA-agnostic). Hosts the Reference Undertaking replay harness.",
+  "license": "AGPL-3.0-only",
+  "exports": {
+    ".": {
+      "source": "./src/index.ts",
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js",
+      "default": "./dist/index.js"
+    }
+  },
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "files": [
+    "dist",
+    "fixtures"
+  ],
+  "scripts": {
+    "build": "tsc -p tsconfig.build.json",
+    "check-types": "tsc --noEmit -p tsconfig.json",
+    "test": "vitest run --passWithNoTests"
+  },
+  "dependencies": {
+    "@janumipwb/rph-application": "workspace:*",
+    "@janumipwb/rph-contracts": "workspace:*",
+    "@janumipwb/rph-domain": "workspace:*",
+    "@janumipwb/rph-persistence": "workspace:*",
+    "@janumipwb/rph-ports": "workspace:*"
+  },
+  "devDependencies": {
+    "@janumipwb/rph-product-realization-pwa": "workspace:*",
+    "@janumipwb/typescript-config": "workspace:*"
+  }
+}

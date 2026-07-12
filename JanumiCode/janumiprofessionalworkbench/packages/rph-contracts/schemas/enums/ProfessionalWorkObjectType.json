@@ -1,0 +1,24 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "type": "string",
+  "enum": [
+    "INTENT",
+    "PROFESSIONAL_WORK_UNIT",
+    "OBLIGATION",
+    "CONSTRAINT",
+    "ASSUMPTION",
+    "CLAIM",
+    "EVIDENCE",
+    "ASSURANCE_POLICY",
+    "ASSURANCE_ASSESSMENT",
+    "ASSURANCE_OBSERVATION",
+    "DECISION",
+    "ARTIFACT",
+    "DECOMPOSITION_CONTRACT",
+    "RECOMPOSITION_CONTRACT",
+    "EXECUTION_PLAN",
+    "RUNTIME_BINDING",
+    "BASELINE"
+  ],
+  "$id": "urn:janumi:rph:schema:enum:ProfessionalWorkObjectType:1"
+}

@@ -1,0 +1,13 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "type": "string",
+  "enum": [
+    "DRAFT",
+    "UNDER_REVIEW",
+    "VALID",
+    "CONDITIONALLY_VALID",
+    "INVALID",
+    "SUPERSEDED"
+  ],
+  "$id": "urn:janumi:rph:schema:enum:DecompositionContractStatus:1"
+}

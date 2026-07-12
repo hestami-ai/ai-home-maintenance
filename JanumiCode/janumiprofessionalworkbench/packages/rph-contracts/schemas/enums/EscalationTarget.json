@@ -1,0 +1,14 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "type": "string",
+  "enum": [
+    "HUMAN_USER",
+    "PRODUCT_OWNER",
+    "ARCHITECT",
+    "SECURITY_REVIEWER",
+    "LEGAL_REVIEWER",
+    "SYSTEM_OWNER",
+    "INDEPENDENT_VALIDATOR"
+  ],
+  "$id": "urn:janumi:rph:schema:enum:EscalationTarget:1"
+}

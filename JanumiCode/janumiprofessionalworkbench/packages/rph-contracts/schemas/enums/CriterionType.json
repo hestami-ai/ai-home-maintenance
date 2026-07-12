@@ -1,0 +1,12 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "type": "string",
+  "enum": [
+    "BOOLEAN",
+    "ENUMERATED",
+    "QUALITATIVE",
+    "QUANTITATIVE",
+    "COMPOSITE"
+  ],
+  "$id": "urn:janumi:rph:schema:enum:CriterionType:1"
+}

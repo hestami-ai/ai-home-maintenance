@@ -1,0 +1,13 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "type": "string",
+  "enum": [
+    "HUMAN",
+    "AGENT",
+    "MODEL",
+    "SERVICE",
+    "POLICY_ENGINE",
+    "EXTERNAL_SYSTEM"
+  ],
+  "$id": "urn:janumi:rph:schema:enum:ActorType:1"
+}

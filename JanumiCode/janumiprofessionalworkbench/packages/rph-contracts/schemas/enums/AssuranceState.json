@@ -1,0 +1,18 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "type": "string",
+  "enum": [
+    "NOT_REQUIRED",
+    "UNASSESSED",
+    "EVIDENCE_REQUIRED",
+    "READY_FOR_ASSESSMENT",
+    "ASSESSING",
+    "CONDITIONALLY_SATISFIED",
+    "SATISFIED",
+    "REJECTED",
+    "WAIVED",
+    "INVALIDATED",
+    "ESCALATED"
+  ],
+  "$id": "urn:janumi:rph:schema:enum:AssuranceState:1"
+}

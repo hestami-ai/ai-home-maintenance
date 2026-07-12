@@ -1,0 +1,16 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "type": "string",
+  "enum": [
+    "UNASSESSED",
+    "EVIDENCE_REQUIRED",
+    "ASSESSING",
+    "SATISFIED",
+    "CONDITIONALLY_SATISFIED",
+    "REJECTED",
+    "INCONCLUSIVE",
+    "WAIVED",
+    "INVALIDATED"
+  ],
+  "$id": "urn:janumi:rph:schema:enum:AssuranceViewAggregateDisposition:1"
+}

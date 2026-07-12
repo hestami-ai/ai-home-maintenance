@@ -1,0 +1,15 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "type": "string",
+  "enum": [
+    "NONE",
+    "DIFFERENT_INVOCATION",
+    "DIFFERENT_CONTEXT_INSTANCE",
+    "DIFFERENT_AGENT",
+    "DIFFERENT_MODEL",
+    "DIFFERENT_PROVIDER",
+    "HUMAN",
+    "ORGANIZATIONALLY_INDEPENDENT"
+  ],
+  "$id": "urn:janumi:rph:schema:enum:IndependenceRequirement:1"
+}

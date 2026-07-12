@@ -1,0 +1,12 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "type": "string",
+  "enum": [
+    "INFORMATIONAL",
+    "ADVISORY",
+    "MATERIAL",
+    "BLOCKING",
+    "CRITICAL"
+  ],
+  "$id": "urn:janumi:rph:schema:enum:AssuranceSeverity:1"
+}

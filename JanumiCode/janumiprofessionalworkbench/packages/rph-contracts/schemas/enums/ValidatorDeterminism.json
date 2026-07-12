@@ -1,0 +1,10 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "type": "string",
+  "enum": [
+    "DETERMINISTIC",
+    "BOUNDED_NONDETERMINISTIC",
+    "NONDETERMINISTIC"
+  ],
+  "$id": "urn:janumi:rph:schema:enum:ValidatorDeterminism:1"
+}

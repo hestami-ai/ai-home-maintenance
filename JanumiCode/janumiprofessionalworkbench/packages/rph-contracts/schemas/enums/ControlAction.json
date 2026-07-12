@@ -1,0 +1,30 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "type": "string",
+  "enum": [
+    "CONTINUE",
+    "WAIT",
+    "CLARIFY",
+    "GATHER_CONTEXT",
+    "GATHER_EVIDENCE",
+    "REVISE_PROMPT",
+    "REVISE_CONTEXT",
+    "RETRY",
+    "CHANGE_MODEL",
+    "CHANGE_TOOL",
+    "CHANGE_VALIDATOR",
+    "CHANGE_TACTIC",
+    "RESHAPE_PWU",
+    "REVISE_DECOMPOSITION",
+    "REPLAN_EXECUTION",
+    "INVALIDATE_DEPENDENTS",
+    "REQUEST_HUMAN_DECISION",
+    "REQUEST_WAIVER",
+    "ESCALATE",
+    "REJECT",
+    "ABANDON",
+    "ACCEPT",
+    "PROMOTE_BASELINE"
+  ],
+  "$id": "urn:janumi:rph:schema:enum:ControlAction:1"
+}

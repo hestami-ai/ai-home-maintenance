@@ -1,0 +1,15 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "type": "string",
+  "enum": [
+    "RAW",
+    "UNDER_DISCOVERY",
+    "PROVISIONAL",
+    "FORMALIZED",
+    "APPROVED",
+    "REVISED",
+    "SUPERSEDED",
+    "WITHDRAWN"
+  ],
+  "$id": "urn:janumi:rph:schema:enum:IntentStatus:1"
+}

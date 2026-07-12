@@ -1,0 +1,14 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "type": "string",
+  "enum": [
+    "DRAFT",
+    "CANDIDATE",
+    "UNDER_REVIEW",
+    "APPROVED",
+    "AUTHORITATIVE",
+    "SUPERSEDED",
+    "REVOKED"
+  ],
+  "$id": "urn:janumi:rph:schema:enum:BaselineStatus:1"
+}

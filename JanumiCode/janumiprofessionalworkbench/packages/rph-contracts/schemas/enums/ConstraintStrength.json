@@ -1,0 +1,10 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "type": "string",
+  "enum": [
+    "MANDATORY",
+    "PREFERRED",
+    "ADVISORY"
+  ],
+  "$id": "urn:janumi:rph:schema:enum:ConstraintStrength:1"
+}

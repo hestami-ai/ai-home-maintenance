@@ -1,0 +1,46 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "type": "object",
+  "properties": {
+    "originType": {
+      "type": "string",
+      "enum": [
+        "USER_INPUT",
+        "MODEL_GENERATION",
+        "TOOL_OUTPUT",
+        "HUMAN_DECISION",
+        "MIGRATION",
+        "DERIVED",
+        "IMPORTED"
+      ]
+    },
+    "sourceObjectIds": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    },
+    "sourceEventIds": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    },
+    "producingExecutionAttemptId": {
+      "type": "string"
+    },
+    "producingValidatorId": {
+      "type": "string"
+    },
+    "contentHash": {
+      "type": "string"
+    }
+  },
+  "required": [
+    "originType",
+    "sourceObjectIds",
+    "sourceEventIds"
+  ],
+  "additionalProperties": false,
+  "$id": "urn:janumi:rph:schema:object:ProvenanceRecord:1"
+}

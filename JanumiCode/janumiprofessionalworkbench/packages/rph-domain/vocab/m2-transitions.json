@@ -1,0 +1,1896 @@
+{
+  "machines": [
+    {
+      "name": "Intent.intentStatus",
+      "appliesTo": "IntentObject",
+      "sourceSection": "core-model doc §6.1 enum / §6.2 transition matrix (VERBATIM) / §6.3 invariants",
+      "initialState": "RAW",
+      "states": [
+        "RAW",
+        "UNDER_DISCOVERY",
+        "PROVISIONAL",
+        "FORMALIZED",
+        "APPROVED",
+        "REVISED",
+        "SUPERSEDED",
+        "WITHDRAWN"
+      ],
+      "terminalStates": [
+        "SUPERSEDED",
+        "WITHDRAWN"
+      ],
+      "transitions": [
+        {
+          "from": "RAW",
+          "to": "UNDER_DISCOVERY",
+          "trigger": "Begin discovery",
+          "guard": "Originating expression exists"
+        },
+        {
+          "from": "UNDER_DISCOVERY",
+          "to": "PROVISIONAL",
+          "trigger": "Create provisional intent",
+          "guard": "Objective and known ambiguities recorded"
+        },
+        {
+          "from": "PROVISIONAL",
+          "to": "FORMALIZED",
+          "trigger": "Formalize",
+          "guard": "Outcomes, non-goals, and constraints defined"
+        },
+        {
+          "from": "FORMALIZED",
+          "to": "APPROVED",
+          "trigger": "Approve",
+          "guard": "Authorized decision exists"
+        },
+        {
+          "from": "APPROVED",
+          "to": "REVISED",
+          "trigger": "Revise",
+          "guard": "Change rationale and impact analysis initiated"
+        },
+        {
+          "from": "REVISED",
+          "to": "APPROVED",
+          "trigger": "Approve revision",
+          "guard": "Revised intent receives authorization"
+        },
+        {
+          "from": "Any active",
+          "to": "SUPERSEDED",
+          "trigger": "Supersede",
+          "guard": "Replacement intent identified",
+          "note": "VERBATIM §6.2. 'Any active' = any non-terminal state (RAW, UNDER_DISCOVERY, PROVISIONAL, FORMALIZED, APPROVED, REVISED)."
+        },
+        {
+          "from": "RAW/UNDER_DISCOVERY/PROVISIONAL",
+          "to": "WITHDRAWN",
+          "trigger": "Withdraw",
+          "guard": "Authorized actor",
+          "note": "VERBATIM §6.2. Withdraw permitted only from these three early states."
+        }
+      ],
+      "illegal": [
+        {
+          "from": "SUPERSEDED",
+          "to": "(authorizes new PWU)",
+          "reason": "§6.3: a superseded intent cannot authorize new PWUs. Prohibition on a terminal state, not an intra-machine transition."
+        }
+      ]
+    },
+    {
+      "name": "PWU.workLifecycleState",
+      "appliesTo": "Professional Work Unit (PWU) — aggregate root of the Work Aggregate (§3.1, §7.1). MERGED from both PWU-AXES and OTHER-OBJECTS extractions (identical substance).",
+      "sourceSection": "core-model doc §7.2 (enum) / §8.1 primary (VERBATIM) / §8.2 exception (VERBATIM) / §8.3 illegal (VERBATIM)",
+      "initialState": "PROPOSED",
+      "states": [
+        "PROPOSED",
+        "SHAPING",
+        "READY",
+        "PLANNED",
+        "EXECUTING",
+        "EVIDENCE_PENDING",
+        "UNDER_ASSURANCE",
+        "CONDITIONALLY_SATISFIED",
+        "SATISFIED",
+        "RECOMPOSING",
+        "RECOMPOSED",
+        "BASELINED",
+        "BLOCKED",
+        "CHALLENGED",
+        "RESHAPING",
+        "ESCALATED",
+        "INVALIDATED",
+        "REJECTED",
+        "ABANDONED",
+        "SUPERSEDED"
+      ],
+      "terminalStates": [
+        "BASELINED",
+        "ABANDONED",
+        "SUPERSEDED"
+      ],
+      "transitions": [
+        {
+          "from": "PROPOSED",
+          "to": "SHAPING",
+          "trigger": "Begin shaping (PwuShapingStarted)",
+          "guard": "Intent exists",
+          "note": "§8.1 primary chain"
+        },
+        {
+          "from": "SHAPING",
+          "to": "READY",
+          "trigger": "Mark ready (markPwuReady; PwuMarkedReady)",
+          "guard": "Shape readiness policy satisfied (§9 Shape Readiness Profile)",
+          "note": "§8.1"
+        },
+        {
+          "from": "READY",
+          "to": "PLANNED",
+          "trigger": "Approve plan",
+          "guard": "Active execution plan approved",
+          "note": "§8.1"
+        },
+        {
+          "from": "PLANNED",
+          "to": "EXECUTING",
+          "trigger": "Start execution",
+          "guard": "Runtime bindings authorized",
+          "note": "§8.1"
+        },
+        {
+          "from": "EXECUTING",
+          "to": "EVIDENCE_PENDING",
+          "trigger": "Record execution success",
+          "guard": "CROSS-AXIS guard: executionState=SUCCEEDED. Success does NOT auto-satisfy assurance (P1/INV-5).",
+          "note": "§8.1 — doc-explicit coupling of workLifecycle to the executionState axis."
+        },
+        {
+          "from": "EVIDENCE_PENDING",
+          "to": "UNDER_ASSURANCE",
+          "trigger": "Begin assurance",
+          "guard": "Required evidence available or deficit explicitly recorded",
+          "note": "§8.1"
+        },
+        {
+          "from": "UNDER_ASSURANCE",
+          "to": "CONDITIONALLY_SATISFIED",
+          "trigger": "Conditionally satisfy",
+          "guard": "Conditional disposition exists",
+          "note": "§8.1"
+        },
+        {
+          "from": "UNDER_ASSURANCE",
+          "to": "SATISFIED",
+          "trigger": "Satisfy",
+          "guard": "CROSS-AXIS guard: assuranceState=SATISFIED. This is the ONLY legal path into workLifecycle SATISFIED (P1/INV-5).",
+          "note": "§8.1 — SATISFIED requires assuranceState=SATISFIED, NOT executionState=SUCCEEDED."
+        },
+        {
+          "from": "SATISFIED",
+          "to": "RECOMPOSING",
+          "trigger": "Begin recomposition (beginRecomposition; RecompositionStarted)",
+          "guard": "Parent exists and recomposition is required",
+          "note": "§8.1"
+        },
+        {
+          "from": "RECOMPOSING",
+          "to": "RECOMPOSED",
+          "trigger": "Complete recomposition (completeRecomposition; RecompositionCompleted)",
+          "guard": "Recomposition contract satisfied",
+          "note": "§8.1"
+        },
+        {
+          "from": "SATISFIED",
+          "to": "BASELINED",
+          "trigger": "Promote baseline (promoteBaseline; BaselinePromoted)",
+          "guard": "Authorized promotion decision",
+          "note": "§8.1 row 'SATISFIED/RECOMPOSED → BASELINED' split: from SATISFIED."
+        },
+        {
+          "from": "RECOMPOSED",
+          "to": "BASELINED",
+          "trigger": "Promote baseline (promoteBaseline; BaselinePromoted)",
+          "guard": "Authorized promotion decision",
+          "note": "§8.1 row 'SATISFIED/RECOMPOSED → BASELINED' split: from RECOMPOSED."
+        },
+        {
+          "from": "SHAPING",
+          "to": "BLOCKED",
+          "trigger": "Missing information",
+          "note": "§8.2 exception"
+        },
+        {
+          "from": "READY",
+          "to": "CHALLENGED",
+          "trigger": "Shape challenge (challengePwu; PwuChallenged)",
+          "note": "§8.2 exception"
+        },
+        {
+          "from": "PLANNED",
+          "to": "BLOCKED",
+          "trigger": "Runtime dependency unavailable",
+          "note": "§8.2 row 'PLANNED/EXECUTING → BLOCKED' split: from PLANNED."
+        },
+        {
+          "from": "EXECUTING",
+          "to": "BLOCKED",
+          "trigger": "Runtime dependency unavailable",
+          "note": "§8.2 row 'PLANNED/EXECUTING → BLOCKED' split: from EXECUTING."
+        },
+        {
+          "from": "EXECUTING",
+          "to": "RESHAPING",
+          "trigger": "Material assumption falsified (reshapePwu; PwuReshapingStarted)",
+          "note": "§8.2 exception"
+        },
+        {
+          "from": "EVIDENCE_PENDING",
+          "to": "ESCALATED",
+          "trigger": "Evidence impossible to obtain",
+          "note": "§8.2 exception"
+        },
+        {
+          "from": "UNDER_ASSURANCE",
+          "to": "REJECTED",
+          "trigger": "Blocking finding",
+          "note": "§8.2 row 'UNDER_ASSURANCE → REJECTED or RESHAPING' — one trigger, two legal targets (branch: REJECTED)."
+        },
+        {
+          "from": "UNDER_ASSURANCE",
+          "to": "RESHAPING",
+          "trigger": "Blocking finding",
+          "note": "§8.2 row 'UNDER_ASSURANCE → REJECTED or RESHAPING' — one trigger, two legal targets (branch: RESHAPING)."
+        },
+        {
+          "from": "CONDITIONALLY_SATISFIED",
+          "to": "INVALIDATED",
+          "trigger": "Condition violated",
+          "note": "§8.2 exception"
+        },
+        {
+          "from": "SATISFIED",
+          "to": "INVALIDATED",
+          "trigger": "Upstream change (invalidatePwu; PwuInvalidated — §29 triggers)",
+          "note": "§8.2 exception"
+        },
+        {
+          "from": "RECOMPOSED",
+          "to": "INVALIDATED",
+          "trigger": "Sibling conflict discovered",
+          "note": "§8.2 exception"
+        },
+        {
+          "from": "Any active",
+          "to": "ABANDONED",
+          "trigger": "Authorized abandonment (PwuAbandoned)",
+          "guard": "Authorized decision (Decision.decisionType=ABANDON)",
+          "note": "§8.2 umbrella source — 'Any active' = any non-terminal state; kept verbatim, not enumerated per-state."
+        },
+        {
+          "from": "Any non-baselined",
+          "to": "SUPERSEDED",
+          "trigger": "Replacement PWU created (supersedePwu; PwuSuperseded)",
+          "guard": "Not already BASELINED",
+          "note": "§8.2 umbrella source — 'Any non-baselined' = every state except BASELINED; kept verbatim."
+        }
+      ],
+      "illegal": [
+        {
+          "from": "PROPOSED",
+          "to": "EXECUTING",
+          "reason": "§8.3 — must be rejected; skips SHAPING→READY→PLANNED gating."
+        },
+        {
+          "from": "SHAPING",
+          "to": "SATISFIED",
+          "reason": "§8.3 — must be rejected."
+        },
+        {
+          "from": "READY",
+          "to": "BASELINED",
+          "reason": "§8.3 — must be rejected."
+        },
+        {
+          "from": "EXECUTING",
+          "to": "SATISFIED",
+          "reason": "§8.3 'EXECUTING → SATISFIED without assurance' — encodes P1/INV-5 (§35.1 'No execution implies assurance'). Execution success alone can NEVER produce SATISFIED; only UNDER_ASSURANCE→SATISFIED with assuranceState=SATISFIED is legal."
+        },
+        {
+          "from": "FAILED",
+          "to": "SATISFIED",
+          "reason": "§8.3 — must be rejected. NOTE: FAILED is an executionState value (§7.3), NOT a workLifecycleState; the doc lists this cross-axis rule here — a failed execution can never yield a SATISFIED PWU."
+        },
+        {
+          "from": "INVALIDATED",
+          "to": "BASELINED",
+          "reason": "§8.3 — must be rejected."
+        },
+        {
+          "from": "SUPERSEDED",
+          "to": "EXECUTING",
+          "reason": "§8.3 — must be rejected."
+        },
+        {
+          "from": "ABANDONED",
+          "to": "READY",
+          "reason": "§8.3 — must be rejected."
+        },
+        {
+          "from": "BASELINED",
+          "to": "EXECUTING",
+          "reason": "§8.3 — must be rejected 'without creating a new revision or successor PWU'. An authoritative baseline is immutable (§24.2); re-execution requires a new revision/successor."
+        }
+      ]
+    },
+    {
+      "name": "PWU.executionState",
+      "appliesTo": "Professional Work Unit (PWU) — independent execution axis (§7.1 field executionState). Distinct from ExecutionStep.stepState (§21) and ExecutionPlan.status (§20.1).",
+      "sourceSection": "core-model doc §7.3 enum (VERBATIM). NO from→to matrix in doc; transitions RECONSTRUCTED from §26.4 events + enum semantics.",
+      "initialState": "NOT_PLANNED",
+      "states": [
+        "NOT_PLANNED",
+        "PLANNED",
+        "QUEUED",
+        "RUNNING",
+        "WAITING",
+        "RETRYING",
+        "SUCCEEDED",
+        "FAILED",
+        "CANCELLED",
+        "SUPERSEDED"
+      ],
+      "terminalStates": [
+        "SUCCEEDED",
+        "FAILED",
+        "CANCELLED",
+        "SUPERSEDED"
+      ],
+      "transitions": [
+        {
+          "from": "NOT_PLANNED",
+          "to": "PLANNED",
+          "trigger": "ExecutionPlanApproved / plan approved",
+          "note": "RECONSTRUCTED"
+        },
+        {
+          "from": "PLANNED",
+          "to": "QUEUED",
+          "trigger": "ExecutionPlanActivated / step scheduled",
+          "note": "RECONSTRUCTED"
+        },
+        {
+          "from": "QUEUED",
+          "to": "RUNNING",
+          "trigger": "ExecutionStepStarted",
+          "note": "RECONSTRUCTED"
+        },
+        {
+          "from": "RUNNING",
+          "to": "WAITING",
+          "trigger": "ExecutionStepWaiting",
+          "note": "RECONSTRUCTED"
+        },
+        {
+          "from": "WAITING",
+          "to": "RUNNING",
+          "trigger": "wait resolved",
+          "note": "RECONSTRUCTED"
+        },
+        {
+          "from": "RUNNING",
+          "to": "RETRYING",
+          "trigger": "ExecutionStepRetried / recoverable failure",
+          "note": "RECONSTRUCTED"
+        },
+        {
+          "from": "RETRYING",
+          "to": "RUNNING",
+          "trigger": "retry attempt started",
+          "note": "RECONSTRUCTED"
+        },
+        {
+          "from": "RUNNING",
+          "to": "SUCCEEDED",
+          "trigger": "ExecutionStepSucceeded (all steps)",
+          "guard": "step outputs recorded or explicit no-output",
+          "note": "RECONSTRUCTED. SUCCEEDED is the guard for workLifecycle EXECUTING→EVIDENCE_PENDING (§8.1). MUST NOT auto-imply assuranceState=SATISFIED (P1/INV-5)."
+        },
+        {
+          "from": "RUNNING/RETRYING",
+          "to": "FAILED",
+          "trigger": "ExecutionStepFailed / retry exhaustion / ExecutionTerminated",
+          "note": "RECONSTRUCTED. Both RUNNING and RETRYING are valid from-states."
+        },
+        {
+          "from": "PLANNED/QUEUED/RUNNING/WAITING",
+          "to": "CANCELLED",
+          "trigger": "cancelExecutionPlan / ExecutionStepCancelled",
+          "note": "RECONSTRUCTED. All four named from-states are in the states list."
+        },
+        {
+          "from": "Any active",
+          "to": "SUPERSEDED",
+          "trigger": "ExecutionPlanSuperseded",
+          "note": "RECONSTRUCTED; superseded plan cannot create new attempts (§20.2). 'Any active' = any non-terminal state."
+        }
+      ],
+      "illegal": []
+    },
+    {
+      "name": "PWU.assuranceState",
+      "appliesTo": "Professional Work Unit (PWU) — independent assurance axis (§7.1 field assuranceState). Rolled-up axis on the PWU. Distinct from AssuranceAssessment.disposition (§18) and AssuranceAssessment.state (§30 assurance doc).",
+      "sourceSection": "core-model doc §7.4 enum (VERBATIM). NO from→to matrix; transitions RECONSTRUCTED from §18 dispositions + §26.5 events + Scenario 3 (§39).",
+      "initialState": "NOT_REQUIRED",
+      "states": [
+        "NOT_REQUIRED",
+        "UNASSESSED",
+        "EVIDENCE_REQUIRED",
+        "READY_FOR_ASSESSMENT",
+        "ASSESSING",
+        "CONDITIONALLY_SATISFIED",
+        "SATISFIED",
+        "REJECTED",
+        "WAIVED",
+        "INVALIDATED",
+        "ESCALATED"
+      ],
+      "terminalStates": [
+        "NOT_REQUIRED",
+        "SATISFIED",
+        "REJECTED",
+        "WAIVED",
+        "INVALIDATED"
+      ],
+      "transitions": [
+        {
+          "from": "UNASSESSED",
+          "to": "EVIDENCE_REQUIRED",
+          "trigger": "policy requires evidence",
+          "note": "RECONSTRUCTED"
+        },
+        {
+          "from": "EVIDENCE_REQUIRED",
+          "to": "READY_FOR_ASSESSMENT",
+          "trigger": "EvidenceAdmitted / required evidence available",
+          "note": "RECONSTRUCTED"
+        },
+        {
+          "from": "READY_FOR_ASSESSMENT",
+          "to": "ASSESSING",
+          "trigger": "AssuranceAssessmentStarted",
+          "guard": "independence requirements checked before evaluation (§18.1)",
+          "note": "RECONSTRUCTED"
+        },
+        {
+          "from": "ASSESSING",
+          "to": "SATISFIED",
+          "trigger": "AssuranceAssessmentSatisfied",
+          "guard": "criteria met identified; evidence considered identified (§18.1) — NOT forced by executionState=SUCCEEDED (P1/INV-5)",
+          "note": "RECONSTRUCTED"
+        },
+        {
+          "from": "ASSESSING",
+          "to": "CONDITIONALLY_SATISFIED",
+          "trigger": "AssuranceAssessmentConditionallySatisfied",
+          "note": "RECONSTRUCTED"
+        },
+        {
+          "from": "ASSESSING",
+          "to": "REJECTED",
+          "trigger": "AssuranceAssessmentRejected / blocking finding",
+          "note": "RECONSTRUCTED; Scenario 3 (§39): execution SUCCEEDED + assurance REJECTED ⇒ PWU NOT SATISFIED."
+        },
+        {
+          "from": "ASSESSING",
+          "to": "ESCALATED",
+          "trigger": "AssuranceAssessmentEscalated",
+          "note": "RECONSTRUCTED"
+        },
+        {
+          "from": "ASSESSING/EVIDENCE_REQUIRED/CONDITIONALLY_SATISFIED",
+          "to": "WAIVED",
+          "trigger": "WaiverGranted",
+          "guard": "waiver authority separately defined (§18.1)",
+          "note": "RECONSTRUCTED. All three named from-states are in the states list."
+        },
+        {
+          "from": "SATISFIED/CONDITIONALLY_SATISFIED",
+          "to": "INVALIDATED",
+          "trigger": "EvidenceInvalidated / upstream change (§29.1)",
+          "note": "RECONSTRUCTED. Both named from-states are in the states list."
+        }
+      ],
+      "illegal": [
+        {
+          "from": "executionState=SUCCEEDED",
+          "to": "SATISFIED",
+          "reason": "CRITICAL — property P1 / INV-5 / §35.1 'No execution implies assurance'. ExecutionState=SUCCEEDED must NEVER automatically imply/force assuranceState=SATISFIED. The two axes are independent (§7.1, §38, §42 litmus #3). Corroborated by §39 Scenario 3 (execution SUCCEEDED while assurance REJECTED; PWU NOT SATISFIED) and §8.3 'EXECUTING→SATISFIED without assurance'. Assurance SATISFIED requires evaluated claims + admissible evidence + criteria met, independent of execution outcome. (Cross-axis coupling stated as a forbidden edge; the from-token names the executionState axis, not a state within this machine.)"
+        }
+      ]
+    },
+    {
+      "name": "PWU.shapeIntegrityState",
+      "appliesTo": "Professional Work Unit (PWU) — independent shape-integrity axis (§7.1 field shapeIntegrityState).",
+      "sourceSection": "core-model doc §7.5 enum (VERBATIM). NO from→to matrix; transitions RECONSTRUCTED from enum semantics + §39 Scenario 2 + §29 + failure taxonomy §36.1.",
+      "initialState": "UNKNOWN",
+      "states": [
+        "UNKNOWN",
+        "PRESERVED",
+        "AT_RISK",
+        "VIOLATED",
+        "RESHAPING_REQUIRED",
+        "RESHAPING_IN_PROGRESS",
+        "RESTORED"
+      ],
+      "terminalStates": [],
+      "transitions": [
+        {
+          "from": "UNKNOWN",
+          "to": "PRESERVED",
+          "trigger": "shape validated / shape readiness satisfied",
+          "note": "RECONSTRUCTED"
+        },
+        {
+          "from": "PRESERVED",
+          "to": "AT_RISK",
+          "trigger": "material assumption falsified / drift detected (SHAPE_RISK observation)",
+          "note": "RECONSTRUCTED; §39 Scenario 2: falsified assumption → AT_RISK or VIOLATED."
+        },
+        {
+          "from": "PRESERVED/AT_RISK",
+          "to": "VIOLATED",
+          "trigger": "shape-integrity violation / obligation loss / constraint erosion",
+          "note": "RECONSTRUCTED; §39 Scenario 2. Both named from-states are in the states list."
+        },
+        {
+          "from": "AT_RISK",
+          "to": "PRESERVED",
+          "trigger": "risk cleared",
+          "note": "RECONSTRUCTED"
+        },
+        {
+          "from": "VIOLATED",
+          "to": "RESHAPING_REQUIRED",
+          "trigger": "controller selects RESHAPE (§37)",
+          "note": "RECONSTRUCTED"
+        },
+        {
+          "from": "RESHAPING_REQUIRED",
+          "to": "RESHAPING_IN_PROGRESS",
+          "trigger": "PwuReshapingStarted",
+          "note": "RECONSTRUCTED"
+        },
+        {
+          "from": "RESHAPING_IN_PROGRESS",
+          "to": "RESTORED",
+          "trigger": "reshape complete",
+          "note": "RECONSTRUCTED"
+        },
+        {
+          "from": "RESTORED",
+          "to": "PRESERVED",
+          "trigger": "re-validated",
+          "note": "RECONSTRUCTED. Makes RESTORED non-terminal (conflicts with PWU-AXES extraction which marked RESTORED terminal — see conflicts)."
+        }
+      ],
+      "illegal": []
+    },
+    {
+      "name": "Obligation.status",
+      "appliesTo": "ObligationObject",
+      "sourceSection": "core-model doc §10.1 enum (VERBATIM). Transitions RECONSTRUCTED from §26.3 events + §10.2 invariants. NO explicit matrix.",
+      "initialState": "PROPOSED",
+      "states": [
+        "PROPOSED",
+        "ACTIVE",
+        "ALLOCATED",
+        "SATISFIED",
+        "WAIVED",
+        "VIOLATED",
+        "SUPERSEDED"
+      ],
+      "terminalStates": [
+        "SATISFIED",
+        "WAIVED",
+        "VIOLATED",
+        "SUPERSEDED"
+      ],
+      "transitions": [
+        {
+          "from": "PROPOSED",
+          "to": "ACTIVE",
+          "trigger": "obligation activated/accepted",
+          "note": "RECONSTRUCTED"
+        },
+        {
+          "from": "ACTIVE",
+          "to": "ALLOCATED",
+          "trigger": "ObligationAllocated",
+          "guard": "explicit allocation to a child PWU — a child may satisfy a parent obligation only through explicit allocation (§10.2)",
+          "note": "RECONSTRUCTED"
+        },
+        {
+          "from": "ACTIVE/ALLOCATED",
+          "to": "SATISFIED",
+          "trigger": "ObligationSatisfied",
+          "guard": "requires a supported claim — NOT merely because a related PWU is completed (§10.2)",
+          "note": "RECONSTRUCTED"
+        },
+        {
+          "from": "ACTIVE/ALLOCATED",
+          "to": "WAIVED",
+          "trigger": "ObligationWaived",
+          "guard": "a waived mandatory obligation requires an authorized waiver (§10.2)",
+          "note": "RECONSTRUCTED"
+        },
+        {
+          "from": "ACTIVE/ALLOCATED",
+          "to": "VIOLATED",
+          "trigger": "ObligationViolated",
+          "guard": "a violated obligation must affect assurance disposition (§10.2)",
+          "note": "RECONSTRUCTED"
+        },
+        {
+          "from": "ACTIVE/ALLOCATED",
+          "to": "SUPERSEDED",
+          "trigger": "obligation superseded",
+          "note": "RECONSTRUCTED"
+        }
+      ],
+      "illegal": [
+        {
+          "from": "ACTIVE",
+          "to": "SATISFIED",
+          "reason": "§10.2: an obligation cannot become SATISFIED solely because a related PWU is completed; satisfaction requires a supported claim (conditional guard on the legal ACTIVE→SATISFIED edge, not an unconditional prohibition)."
+        }
+      ]
+    },
+    {
+      "name": "Constraint.status",
+      "appliesTo": "ConstraintObject",
+      "sourceSection": "core-model doc §11.1 enum (VERBATIM). Transitions RECONSTRUCTED from §26.3 events + §11.2 propagation rule. NO explicit matrix.",
+      "initialState": "PROPOSED",
+      "states": [
+        "PROPOSED",
+        "ACTIVE",
+        "WAIVED",
+        "INAPPLICABLE",
+        "VIOLATED",
+        "SUPERSEDED",
+        "INVALIDATED"
+      ],
+      "terminalStates": [
+        "WAIVED",
+        "INAPPLICABLE",
+        "VIOLATED",
+        "SUPERSEDED",
+        "INVALIDATED"
+      ],
+      "transitions": [
+        {
+          "from": "PROPOSED",
+          "to": "ACTIVE",
+          "trigger": "ConstraintAdded / activated",
+          "note": "RECONSTRUCTED"
+        },
+        {
+          "from": "ACTIVE",
+          "to": "WAIVED",
+          "trigger": "ConstraintWaived",
+          "guard": "waived through authority (§11.2)",
+          "note": "RECONSTRUCTED"
+        },
+        {
+          "from": "ACTIVE",
+          "to": "INAPPLICABLE",
+          "trigger": "ConstraintDeclaredInapplicable",
+          "guard": "marked inapplicable with rationale (§11.2)",
+          "note": "RECONSTRUCTED"
+        },
+        {
+          "from": "ACTIVE",
+          "to": "VIOLATED",
+          "trigger": "ConstraintViolated",
+          "note": "RECONSTRUCTED"
+        },
+        {
+          "from": "ACTIVE",
+          "to": "SUPERSEDED",
+          "trigger": "ConstraintSuperseded",
+          "guard": "superseded by a stronger constraint (§11.2)",
+          "note": "RECONSTRUCTED"
+        },
+        {
+          "from": "ACTIVE",
+          "to": "INVALIDATED",
+          "trigger": "mandatory constraint change / invalidation (§29.1)",
+          "note": "RECONSTRUCTED"
+        }
+      ],
+      "illegal": []
+    },
+    {
+      "name": "Assumption.status",
+      "appliesTo": "AssumptionObject",
+      "sourceSection": "core-model doc §12.1 enum (VERBATIM). Transitions RECONSTRUCTED from §26.3 events + §12.2 invariants. NO explicit matrix.",
+      "initialState": "PROPOSED",
+      "states": [
+        "PROPOSED",
+        "DISCLOSED",
+        "UNDER_VERIFICATION",
+        "ACCEPTED",
+        "VERIFIED",
+        "FALSIFIED",
+        "EXPIRED",
+        "SUPERSEDED"
+      ],
+      "terminalStates": [
+        "VERIFIED",
+        "FALSIFIED",
+        "EXPIRED",
+        "SUPERSEDED"
+      ],
+      "transitions": [
+        {
+          "from": "PROPOSED",
+          "to": "DISCLOSED",
+          "trigger": "AssumptionDisclosed (from AssumptionDetected)",
+          "guard": "no material assumption may remain embedded only in model prose (§12.2)",
+          "note": "RECONSTRUCTED"
+        },
+        {
+          "from": "DISCLOSED",
+          "to": "UNDER_VERIFICATION",
+          "trigger": "AssumptionVerificationStarted",
+          "note": "RECONSTRUCTED"
+        },
+        {
+          "from": "DISCLOSED/UNDER_VERIFICATION",
+          "to": "ACCEPTED",
+          "trigger": "AssumptionAccepted",
+          "guard": "a critical assumption must be explicitly accepted by authority before dependent irreversible work; ACCEPTED is NOT equivalent to VERIFIED (§12.2)",
+          "note": "RECONSTRUCTED"
+        },
+        {
+          "from": "UNDER_VERIFICATION",
+          "to": "VERIFIED",
+          "trigger": "AssumptionVerified",
+          "note": "RECONSTRUCTED"
+        },
+        {
+          "from": "DISCLOSED/UNDER_VERIFICATION/ACCEPTED/VERIFIED",
+          "to": "FALSIFIED",
+          "trigger": "AssumptionFalsified",
+          "guard": "falsification triggers impact analysis (§12.2); drives PWU.shapeIntegrityState to AT_RISK/VIOLATED (§39 Scenario 2)",
+          "note": "RECONSTRUCTED. All four named from-states are in the states list."
+        },
+        {
+          "from": "Any active",
+          "to": "EXPIRED",
+          "trigger": "AssumptionExpired",
+          "guard": "expirationCondition met; expired assumptions cannot continue authorizing work (§12.2)",
+          "note": "RECONSTRUCTED. 'Any active' = any non-terminal state."
+        },
+        {
+          "from": "Any active",
+          "to": "SUPERSEDED",
+          "trigger": "assumption superseded",
+          "note": "RECONSTRUCTED. 'Any active' = any non-terminal state."
+        }
+      ],
+      "illegal": []
+    },
+    {
+      "name": "DecompositionContract.status",
+      "appliesTo": "DecompositionContract",
+      "sourceSection": "core-model doc §13.1 enum (VERBATIM). Transitions RECONSTRUCTED from §26.2 events + §34.1 commands + §13.2 invariants. NO explicit matrix.",
+      "initialState": "DRAFT",
+      "states": [
+        "DRAFT",
+        "UNDER_REVIEW",
+        "VALID",
+        "CONDITIONALLY_VALID",
+        "INVALID",
+        "SUPERSEDED"
+      ],
+      "terminalStates": [
+        "SUPERSEDED"
+      ],
+      "transitions": [
+        {
+          "from": "DRAFT",
+          "to": "UNDER_REVIEW",
+          "trigger": "proposeDecomposition / DecompositionProposed",
+          "note": "RECONSTRUCTED"
+        },
+        {
+          "from": "UNDER_REVIEW",
+          "to": "VALID",
+          "trigger": "validateDecomposition / DecompositionValidated",
+          "guard": "obligations allocated/retained, mandatory constraints propagated, siblings explicit; independent validation for high-risk work (§13.2)",
+          "note": "RECONSTRUCTED"
+        },
+        {
+          "from": "UNDER_REVIEW",
+          "to": "CONDITIONALLY_VALID",
+          "trigger": "validateDecomposition (conditional)",
+          "note": "RECONSTRUCTED"
+        },
+        {
+          "from": "UNDER_REVIEW",
+          "to": "INVALID",
+          "trigger": "DecompositionRejected",
+          "note": "RECONSTRUCTED"
+        },
+        {
+          "from": "VALID/CONDITIONALLY_VALID/INVALID",
+          "to": "SUPERSEDED",
+          "trigger": "reviseDecomposition / DecompositionRevised",
+          "guard": "revision preserves parent identity but increments semantic version (§13.2)",
+          "note": "RECONSTRUCTED; a revision supersedes the prior contract. All three named from-states are in the states list."
+        }
+      ],
+      "illegal": [
+        {
+          "from": "INVALID",
+          "to": "(parent PWU becomes PLANNED)",
+          "reason": "§13.2: the parent cannot become PLANNED through child execution unless the decomposition contract is VALID or CONDITIONALLY_VALID (guard on the parent PWU, not an intra-machine transition)."
+        }
+      ]
+    },
+    {
+      "name": "RecompositionContract.status",
+      "appliesTo": "RecompositionContract",
+      "sourceSection": "core-model doc §14 enum (VERBATIM). Transitions RECONSTRUCTED from §26.2 events + §34.1 commands + §14.1 invariants. NO explicit matrix.",
+      "initialState": "DRAFT",
+      "states": [
+        "DRAFT",
+        "READY",
+        "EVALUATING",
+        "COMPOSABLE",
+        "CONFLICTED",
+        "INSUFFICIENT",
+        "SATISFIED",
+        "SUPERSEDED"
+      ],
+      "terminalStates": [
+        "SATISFIED",
+        "SUPERSEDED"
+      ],
+      "transitions": [
+        {
+          "from": "DRAFT",
+          "to": "READY",
+          "trigger": "required children reach acceptable states",
+          "guard": "all required children satisfied/conditionally-satisfied/waived/superseded via authorized decision (§14.1)",
+          "note": "RECONSTRUCTED"
+        },
+        {
+          "from": "READY",
+          "to": "EVALUATING",
+          "trigger": "beginRecomposition / RecompositionStarted",
+          "note": "RECONSTRUCTED"
+        },
+        {
+          "from": "EVALUATING",
+          "to": "COMPOSABLE",
+          "trigger": "no contradiction found; parent constraints hold against recomposed result",
+          "note": "RECONSTRUCTED"
+        },
+        {
+          "from": "EVALUATING",
+          "to": "CONFLICTED",
+          "trigger": "RecompositionConflictDetected",
+          "guard": "recomposition may fail even when all children individually satisfied (§14.1)",
+          "note": "RECONSTRUCTED"
+        },
+        {
+          "from": "EVALUATING",
+          "to": "INSUFFICIENT",
+          "trigger": "RecompositionFailed (child evidence does not support the parent claim)",
+          "note": "RECONSTRUCTED"
+        },
+        {
+          "from": "COMPOSABLE",
+          "to": "SATISFIED",
+          "trigger": "completeRecomposition / RecompositionCompleted",
+          "guard": "a recomposed result requires an explicit assessment (§14.1)",
+          "note": "RECONSTRUCTED"
+        },
+        {
+          "from": "CONFLICTED/INSUFFICIENT",
+          "to": "EVALUATING",
+          "trigger": "re-evaluation after remediation",
+          "note": "RECONSTRUCTED. Both named from-states are in the states list."
+        },
+        {
+          "from": "Any active",
+          "to": "SUPERSEDED",
+          "trigger": "contract superseded",
+          "note": "RECONSTRUCTED. 'Any active' = any non-terminal state."
+        }
+      ],
+      "illegal": []
+    },
+    {
+      "name": "Claim.status",
+      "appliesTo": "ClaimObject",
+      "sourceSection": "core-model doc §15.1 enum (VERBATIM). Transitions RECONSTRUCTED from §26.5 events + §34.2 commands + §15.2/§35.1 invariants. NO explicit matrix.",
+      "initialState": "OPEN",
+      "states": [
+        "OPEN",
+        "UNDER_ASSESSMENT",
+        "SUPPORTED",
+        "CONDITIONALLY_SUPPORTED",
+        "CONTESTED",
+        "REJECTED",
+        "WAIVED",
+        "SUPERSEDED"
+      ],
+      "terminalStates": [
+        "REJECTED",
+        "WAIVED",
+        "SUPERSEDED"
+      ],
+      "transitions": [
+        {
+          "from": "OPEN",
+          "to": "UNDER_ASSESSMENT",
+          "trigger": "assertClaim then requestAssuranceAssessment / assessment begins",
+          "guard": "a claim must have a subject (§15.2)",
+          "note": "RECONSTRUCTED"
+        },
+        {
+          "from": "UNDER_ASSESSMENT",
+          "to": "SUPPORTED",
+          "trigger": "ClaimSupported",
+          "guard": "must reference admissible evidence; confidence values must not replace evidence (§15.2)",
+          "note": "RECONSTRUCTED"
+        },
+        {
+          "from": "UNDER_ASSESSMENT",
+          "to": "CONDITIONALLY_SUPPORTED",
+          "trigger": "conditional assessment disposition",
+          "note": "RECONSTRUCTED"
+        },
+        {
+          "from": "UNDER_ASSESSMENT/SUPPORTED/CONDITIONALLY_SUPPORTED",
+          "to": "CONTESTED",
+          "trigger": "ClaimContested / EvidenceInvalidated (dependent supported claim)",
+          "guard": "contradicting evidence must remain visible (§15.2)",
+          "note": "RECONSTRUCTED; §35.1: if supporting evidence is invalidated the claim must become CONTESTED/under-review/invalidated. All three named from-states are in the states list."
+        },
+        {
+          "from": "UNDER_ASSESSMENT/CONTESTED",
+          "to": "REJECTED",
+          "trigger": "ClaimRejected",
+          "note": "RECONSTRUCTED. Both named from-states are in the states list."
+        },
+        {
+          "from": "CONTESTED/UNDER_ASSESSMENT",
+          "to": "WAIVED",
+          "trigger": "WaiverGranted",
+          "note": "RECONSTRUCTED. Both named from-states are in the states list."
+        },
+        {
+          "from": "Any active",
+          "to": "SUPERSEDED",
+          "trigger": "claim superseded",
+          "note": "RECONSTRUCTED. 'Any active' = any non-terminal state."
+        }
+      ],
+      "illegal": [
+        {
+          "from": "CONTESTED",
+          "to": "(authorizes BaselinePromoted)",
+          "reason": "§15.2: a contested claim cannot authorize baseline promotion unless resolved or waived (guard on baseline promotion, not an intra-machine transition)."
+        }
+      ]
+    },
+    {
+      "name": "Evidence.status",
+      "appliesTo": "EvidenceObject",
+      "sourceSection": "core-model doc §16.1 enum (VERBATIM). Transitions RECONSTRUCTED from §26.5 events + §34.2 commands + §16.2 invariants. NO explicit matrix.",
+      "initialState": "PROPOSED",
+      "states": [
+        "PROPOSED",
+        "ADMISSIBLE",
+        "REJECTED",
+        "SUPERSEDED",
+        "INVALIDATED"
+      ],
+      "terminalStates": [
+        "REJECTED",
+        "SUPERSEDED",
+        "INVALIDATED"
+      ],
+      "transitions": [
+        {
+          "from": "PROPOSED",
+          "to": "ADMISSIBLE",
+          "trigger": "admitEvidence / EvidenceAdmitted",
+          "guard": "evidence must have provenance and state scope + limitations (§16.2)",
+          "note": "RECONSTRUCTED"
+        },
+        {
+          "from": "PROPOSED",
+          "to": "REJECTED",
+          "trigger": "EvidenceRejected",
+          "note": "RECONSTRUCTED"
+        },
+        {
+          "from": "ADMISSIBLE",
+          "to": "INVALIDATED",
+          "trigger": "invalidateEvidence / EvidenceInvalidated / EvidenceExpired",
+          "guard": "invalidated evidence cannot support an active claim; expiration triggers reassessment of dependent claims (§16.2)",
+          "note": "RECONSTRUCTED; the EvidenceExpired event has no matching EXPIRED status — see open items."
+        },
+        {
+          "from": "ADMISSIBLE",
+          "to": "SUPERSEDED",
+          "trigger": "correction creates a new version (evidence immutability preferred, §16.2)",
+          "note": "RECONSTRUCTED"
+        }
+      ],
+      "illegal": [
+        {
+          "from": "INVALIDATED",
+          "to": "(supports active claim)",
+          "reason": "§16.2: invalidated evidence cannot support an active claim; §35.1 property 'Invalid evidence cannot support satisfaction' (guard on claim support, not an intra-machine transition)."
+        }
+      ]
+    },
+    {
+      "name": "AssurancePolicy.status",
+      "appliesTo": "AssurancePolicy definition version. MERGED: appears as AssurancePolicy.status (core-model §17.1) and AssurancePolicyDefinition.status (assurance doc §3.1) — identical 4-state enum.",
+      "sourceSection": "core-model doc §17.1 enum + assurance doc §3.1 enum (both VERBATIM, same states). NO lifecycle events in either doc's §26; transitions RECONSTRUCTED from enum semantics.",
+      "initialState": "DRAFT",
+      "states": [
+        "DRAFT",
+        "ACTIVE",
+        "SUSPENDED",
+        "SUPERSEDED"
+      ],
+      "terminalStates": [
+        "SUPERSEDED"
+      ],
+      "transitions": [
+        {
+          "from": "DRAFT",
+          "to": "ACTIVE",
+          "trigger": "policy activated",
+          "note": "RECONSTRUCTED"
+        },
+        {
+          "from": "ACTIVE",
+          "to": "SUSPENDED",
+          "trigger": "policy suspended",
+          "note": "RECONSTRUCTED"
+        },
+        {
+          "from": "SUSPENDED",
+          "to": "ACTIVE",
+          "trigger": "policy resumed",
+          "note": "RECONSTRUCTED"
+        },
+        {
+          "from": "ACTIVE/SUSPENDED",
+          "to": "SUPERSEDED",
+          "trigger": "new policy version supersedes (assessments pin policySemanticVersion, §18)",
+          "note": "RECONSTRUCTED. Both named from-states are in the states list."
+        }
+      ],
+      "illegal": []
+    },
+    {
+      "name": "AssuranceAssessment.disposition",
+      "appliesTo": "AssuranceAssessment (aggregate root of the Assurance aggregate, §3.2) — VERDICT projection. Related to but distinct from AssuranceAssessment.state (§30 assurance doc) — see conflicts.",
+      "sourceSection": "core-model doc §18 enum (VERBATIM). Transitions RECONSTRUCTED from §26.5 events + §34.2 commands + §18.1 invariants. NO explicit matrix.",
+      "initialState": "PENDING",
+      "states": [
+        "PENDING",
+        "ASSESSING",
+        "SATISFIED",
+        "CONDITIONALLY_SATISFIED",
+        "REJECTED",
+        "INCONCLUSIVE",
+        "WAIVED",
+        "ESCALATED"
+      ],
+      "terminalStates": [
+        "SATISFIED",
+        "REJECTED",
+        "WAIVED"
+      ],
+      "transitions": [
+        {
+          "from": "PENDING",
+          "to": "ASSESSING",
+          "trigger": "requestAssuranceAssessment then AssuranceAssessmentStarted",
+          "guard": "independence requirements must be checked BEFORE evaluation begins (§18.1)",
+          "note": "RECONSTRUCTED"
+        },
+        {
+          "from": "ASSESSING",
+          "to": "SATISFIED",
+          "trigger": "completeAssuranceAssessment / AssuranceAssessmentSatisfied",
+          "guard": "must identify policy version used, evidence considered, and criteria met (§18.1) — must NOT be forced by executionState=SUCCEEDED (P1/INV-5)",
+          "note": "RECONSTRUCTED"
+        },
+        {
+          "from": "ASSESSING",
+          "to": "CONDITIONALLY_SATISFIED",
+          "trigger": "AssuranceAssessmentConditionallySatisfied",
+          "note": "RECONSTRUCTED"
+        },
+        {
+          "from": "ASSESSING",
+          "to": "REJECTED",
+          "trigger": "AssuranceAssessmentRejected",
+          "note": "RECONSTRUCTED"
+        },
+        {
+          "from": "ASSESSING",
+          "to": "INCONCLUSIVE",
+          "trigger": "AssuranceAssessmentInconclusive",
+          "guard": "an inconclusive disposition cannot be treated as satisfied (§18.1)",
+          "note": "RECONSTRUCTED"
+        },
+        {
+          "from": "ASSESSING",
+          "to": "ESCALATED",
+          "trigger": "AssuranceAssessmentEscalated",
+          "note": "RECONSTRUCTED"
+        },
+        {
+          "from": "ASSESSING/INCONCLUSIVE/ESCALATED",
+          "to": "WAIVED",
+          "trigger": "WaiverGranted",
+          "guard": "a policy cannot waive its own blocking finding unless waiver authority is separately defined (§18.1)",
+          "note": "RECONSTRUCTED. All three named from-states are in the states list."
+        }
+      ],
+      "illegal": [
+        {
+          "from": "INCONCLUSIVE",
+          "to": "SATISFIED",
+          "reason": "§18.1: an inconclusive disposition cannot be treated as satisfied."
+        },
+        {
+          "from": "executionState=SUCCEEDED",
+          "to": "SATISFIED",
+          "reason": "PROPERTY P1 / INV-5 (§35.1): execution success must never automatically imply a satisfied assessment. Cross-axis forbidden edge; the from-token names the executionState axis, not a state in this machine."
+        }
+      ]
+    },
+    {
+      "name": "AssuranceAssessment.state",
+      "appliesTo": "A single assurance assessment instance evaluating one policy version against a subject's semantic version (per-assessment lifecycle FSM; assurance-service doc §30). This is the AUTHORITATIVE full FSM; AssuranceAssessment.disposition (§18) is its verdict projection.",
+      "sourceSection": "assurance-service doc §30 (states/transitions, the ONLY object with a drawn FSM in that doc) + §29 pipeline + §31 events + §32 commands + §34 error handling + §8.4 independence + §10 dispositions + §12 waivers + §39 invariants",
+      "initialState": "REQUESTED",
+      "states": [
+        "REQUESTED",
+        "EVIDENCE_PENDING",
+        "READY",
+        "ASSESSING",
+        "SATISFIED",
+        "CONDITIONALLY_SATISFIED",
+        "REJECTED",
+        "INCONCLUSIVE",
+        "ESCALATED",
+        "WAIVED",
+        "VALIDATOR_FAILED",
+        "INDEPENDENCE_VIOLATION",
+        "INVALIDATED",
+        "WAIVER_EXPIRED",
+        "CANCELLED"
+      ],
+      "terminalStates": [
+        "REJECTED",
+        "INCONCLUSIVE",
+        "ESCALATED",
+        "VALIDATOR_FAILED",
+        "INDEPENDENCE_VIOLATION",
+        "INVALIDATED",
+        "WAIVER_EXPIRED",
+        "CANCELLED"
+      ],
+      "transitions": [
+        {
+          "from": "REQUESTED",
+          "to": "EVIDENCE_PENDING",
+          "trigger": "AssuranceAssessmentRequested; claims instantiated, evidence requirements evaluated, missing evidence requested (AssuranceEvidenceRequired)",
+          "guard": "one or more required EvidenceRequirements not yet satisfied",
+          "note": "§30 linear happy-path chain; §29 pipeline."
+        },
+        {
+          "from": "EVIDENCE_PENDING",
+          "to": "READY",
+          "trigger": "submitEvidenceForAssessment (AssuranceEvidenceReceived)",
+          "guard": "all required evidence present and admissible per §6.2 (identity stable, provenance present, in-scope, not invalidated, sufficiently current, relevant)",
+          "note": "§30. READY = evidence satisfied + validator selected + independence checked, pre-execution."
+        },
+        {
+          "from": "READY",
+          "to": "ASSESSING",
+          "trigger": "selectAssuranceEvaluator (AssuranceEvaluatorSelected) then beginAssuranceAssessment (AssuranceAssessmentStarted)",
+          "guard": "validator selected AND required independence verified (AssuranceIndependenceVerified) AND context assembled",
+          "note": "§30 / §29 pipeline: validator selected → independence checked → context assembled → validator executes."
+        },
+        {
+          "from": "ASSESSING",
+          "to": "SATISFIED",
+          "trigger": "completeAssuranceAssessment (AssuranceAssessmentSatisfied)",
+          "guard": "all mandatory criteria MET; no open BLOCKING/CRITICAL finding; required independence verified (§8.4, INV-8); every satisfied claim references admissible evidence (INV-3); required evidence admissible (§10.3, §15.9)",
+          "note": "§30. Authoritative disposition set by the Assurance Service, NOT by the validator recommendation (§4.2)."
+        },
+        {
+          "from": "ASSESSING",
+          "to": "CONDITIONALLY_SATISFIED",
+          "trigger": "completeAssuranceAssessment (AssuranceAssessmentConditionallySatisfied)",
+          "guard": "claims supportable only if explicit conditions remain true or required follow-up occurs; typically an open MATERIAL finding (§10.1, §10.3)",
+          "note": "§30"
+        },
+        {
+          "from": "ASSESSING",
+          "to": "REJECTED",
+          "trigger": "completeAssuranceAssessment (AssuranceAssessmentRejected)",
+          "guard": "open CRITICAL finding (→REJECTED or ESCALATED) OR open BLOCKING finding OR a material claim unsupported/contradicted/violates a blocking criterion (§10.1, §10.3, INV-11)",
+          "note": "§30"
+        },
+        {
+          "from": "ASSESSING",
+          "to": "INCONCLUSIVE",
+          "trigger": "completeAssuranceAssessment (AssuranceAssessmentInconclusive)",
+          "guard": "available admissible evidence insufficient to support or reject the claim; evidence deficit (§10.1, §10.3); also on evidence access failure (§34.3)",
+          "note": "§30"
+        },
+        {
+          "from": "ASSESSING",
+          "to": "ESCALATED",
+          "trigger": "completeAssuranceAssessment (AssuranceAssessmentEscalated); EscalationRule.trigger fires (§13)",
+          "guard": "validator or policy cannot resolve the issue within its authority/competence (§10.1); may also be the disposition for an open CRITICAL finding (§10.3)",
+          "note": "§30"
+        },
+        {
+          "from": "ASSESSING",
+          "to": "WAIVED",
+          "trigger": "requestAssuranceWaiver (WaiverRequested) → grantAssuranceWaiver (WaiverGranted)",
+          "guard": "WaiverRule.waiverAllowed; criterion ∈ eligibleCriteriaIds; finding severity ∉ prohibitedFindingSeverities; required authority present; rationale/compensating controls recorded (§12). NOT waivable: unauthorized intent alteration (§15.11), critical baseline-integrity failures by ordinary authority (§26.7)",
+          "note": "§30 lists WAIVED as a direct ASSESSING outcome. WaiverDenied (denyAssuranceWaiver) leaves the prior disposition unchanged (no drawn edge). A waiver never erases a finding (INV-13)."
+        },
+        {
+          "from": "ASSESSING",
+          "to": "VALIDATOR_FAILED",
+          "trigger": "validator execution failure (§34.1)",
+          "guard": "validator crashed / timed out / errored during execution",
+          "note": "§30. INV-9: a validator failure is NOT an assurance rejection. Next action = RETRY / alternate validator / ESCALATE (spawns a new assessment)."
+        },
+        {
+          "from": "ASSESSING",
+          "to": "INDEPENDENCE_VIOLATION",
+          "trigger": "AssuranceIndependenceViolated — required IndependenceRequirement not satisfied (§8.4)",
+          "guard": "producer and evaluator share invocation/agent/model/provider/hidden-context/prompt-lineage/authority in violation of policy's IndependenceRequirement (§8.2)",
+          "note": "§30. Creates an Independence Violation Observation; another evaluator must be invoked or a waiver obtained (§8.4). Cannot receive SATISFIED (INV-8)."
+        },
+        {
+          "from": "ASSESSING",
+          "to": "EVIDENCE_PENDING",
+          "trigger": "evidence access failure — required evidence cannot be retrieved (§34.3)",
+          "guard": "required evidence becomes unavailable during assessment",
+          "note": "NOT drawn in the §30 diagram; grounded in §34.3 (disposition becomes EVIDENCE_PENDING or INCONCLUSIVE; do not infer evidence content)."
+        },
+        {
+          "from": "SATISFIED",
+          "to": "INVALIDATED",
+          "trigger": "invalidateAssuranceAssessment (AssuranceAssessmentInvalidated)",
+          "guard": "subject semantic version changed (INV-16) OR supporting evidence invalidated (INV-15)",
+          "note": "§30. Triggers reassessment of dependent claims; a fresh assessment must run — not a self-revert to SATISFIED."
+        },
+        {
+          "from": "CONDITIONALLY_SATISFIED",
+          "to": "INVALIDATED",
+          "trigger": "invalidateAssuranceAssessment (AssuranceAssessmentInvalidated)",
+          "guard": "subject semantic version changed (INV-16) OR supporting evidence invalidated (INV-15) OR a required condition ceased to hold",
+          "note": "§30"
+        },
+        {
+          "from": "WAIVED",
+          "to": "WAIVER_EXPIRED",
+          "trigger": "expireAssuranceWaiver (WaiverExpired)",
+          "guard": "WaiverRule.maximumDuration / recorded expiration reached, OR revalidationTrigger fired, OR a new subject semantic version (waiver does not apply to future semantic versions unless explicitly renewed — §12.2, INV-14)",
+          "note": "§30"
+        },
+        {
+          "from": "ANY_ACTIVE",
+          "to": "CANCELLED",
+          "trigger": "assessment cancellation",
+          "guard": "assessment is in a non-terminal (active) state",
+          "note": "§30 'ANY ACTIVE → CANCELLED' wildcard. ACTIVE = {REQUESTED, EVIDENCE_PENDING, READY, ASSESSING} — each may transition directly to CANCELLED."
+        }
+      ],
+      "illegal": [
+        {
+          "from": "ASSESSING",
+          "to": "SATISFIED",
+          "reason": "Forbidden when a mandatory criterion is NOT met even if the validator recommends SATISFIED — the Assurance Service must reject the recommendation (§4.2, Test 3, §10.3). 'Unable to determine' cannot be treated as 'met' (INV-6). Confidence cannot substitute for evidence (INV-7)."
+        },
+        {
+          "from": "VALIDATOR_FAILED",
+          "to": "REJECTED",
+          "reason": "A validator failure is NOT an assurance rejection (§34.1; INV-9). It yields VALIDATOR_FAILED + retry/alternate-validator/escalation, never an authoritative REJECTED."
+        },
+        {
+          "from": "INDEPENDENCE_VIOLATION",
+          "to": "SATISFIED",
+          "reason": "If required independence is not satisfied, the assessment cannot receive SATISFIED (§8.4; INV-8). Another independent evaluator must be invoked or a waiver obtained first."
+        },
+        {
+          "from": "ASSESSING",
+          "to": "SATISFIED",
+          "reason": "CROSS-AXIS (P1/INV-5): executionState=SUCCEEDED must NEVER force assuranceState=SATISFIED. Execution success leaves assurance UNASSESSED until required policies complete (Test 9); a baseline cannot be promoted solely because all execution steps completed (INV-20); execution and assurance must use different visual indicators (§38). A successful execution trace proves execution occurred, not that the outcome satisfies intent (§6.3)."
+        },
+        {
+          "from": "ASSESSING",
+          "to": "SATISFIED",
+          "reason": "Malformed/incomplete (invalid) validator output cannot mutate authoritative state (INV-10; §34.2). Invalid output must be rejected at the boundary; no authoritative disposition may be created from unparsed prose."
+        }
+      ]
+    },
+    {
+      "name": "AssuranceObservation.disposition",
+      "appliesTo": "AssuranceObservation (a SEPARATE disposition machine from AssuranceAssessment.disposition).",
+      "sourceSection": "core-model doc §19 enum (VERBATIM). Transitions RECONSTRUCTED from §26.5 + §34.2 + §18.1/§24.2 invariants. NO explicit matrix.",
+      "initialState": "OPEN",
+      "states": [
+        "OPEN",
+        "ACCEPTED",
+        "REMEDIATED",
+        "WAIVED",
+        "REJECTED",
+        "SUPERSEDED"
+      ],
+      "terminalStates": [
+        "ACCEPTED",
+        "REMEDIATED",
+        "WAIVED",
+        "REJECTED",
+        "SUPERSEDED"
+      ],
+      "transitions": [
+        {
+          "from": "OPEN",
+          "to": "ACCEPTED",
+          "trigger": "observation accepted (residual risk acknowledged)",
+          "note": "RECONSTRUCTED"
+        },
+        {
+          "from": "OPEN",
+          "to": "REMEDIATED",
+          "trigger": "remediation applied",
+          "guard": "assurance observations must REMAIN VISIBLE after remediation — the observation is not deleted (§18.1)",
+          "note": "RECONSTRUCTED"
+        },
+        {
+          "from": "OPEN",
+          "to": "WAIVED",
+          "trigger": "WaiverGranted",
+          "guard": "waiver includes scope, rationale, authority, duration; human override must not erase prior findings (§23.2, Scenario 4)",
+          "note": "RECONSTRUCTED"
+        },
+        {
+          "from": "OPEN",
+          "to": "REJECTED",
+          "trigger": "observation dismissed/rejected",
+          "note": "RECONSTRUCTED"
+        },
+        {
+          "from": "OPEN",
+          "to": "SUPERSEDED",
+          "trigger": "observation superseded",
+          "note": "RECONSTRUCTED"
+        }
+      ],
+      "illegal": [
+        {
+          "from": "OPEN",
+          "to": "(authorizes BaselinePromoted)",
+          "reason": "§24.2: open BLOCKING observations prevent baseline promotion unless waived (guard on promotion, not an intra-machine transition)."
+        }
+      ]
+    },
+    {
+      "name": "ExecutionPlan.status",
+      "appliesTo": "ExecutionPlan (aggregate root of the Execution aggregate, §3.3).",
+      "sourceSection": "core-model doc §20.1 enum (VERBATIM). Transitions RECONSTRUCTED from §26.4 events + §34.3 commands + §20.2 invariants. NO explicit matrix.",
+      "initialState": "PROPOSED",
+      "states": [
+        "PROPOSED",
+        "UNDER_REVIEW",
+        "APPROVED",
+        "ACTIVE",
+        "COMPLETED",
+        "FAILED",
+        "SUPERSEDED",
+        "CANCELLED"
+      ],
+      "terminalStates": [
+        "COMPLETED",
+        "FAILED",
+        "SUPERSEDED",
+        "CANCELLED"
+      ],
+      "transitions": [
+        {
+          "from": "PROPOSED",
+          "to": "UNDER_REVIEW",
+          "trigger": "proposeExecutionPlan / ExecutionPlanProposed then submitted for review",
+          "note": "RECONSTRUCTED"
+        },
+        {
+          "from": "UNDER_REVIEW",
+          "to": "APPROVED",
+          "trigger": "approveExecutionPlan / ExecutionPlanApproved",
+          "guard": "plan approval required before irreversible execution for high-risk work; approval grants NO runtime privileges (§20.2)",
+          "note": "RECONSTRUCTED"
+        },
+        {
+          "from": "APPROVED",
+          "to": "ACTIVE",
+          "trigger": "activateExecutionPlan / ExecutionPlanActivated",
+          "guard": "a PWU may have only ONE active plan at a time; an active plan references exactly one PWU (§20.2)",
+          "note": "RECONSTRUCTED"
+        },
+        {
+          "from": "ACTIVE",
+          "to": "COMPLETED",
+          "trigger": "all steps succeeded",
+          "note": "RECONSTRUCTED"
+        },
+        {
+          "from": "ACTIVE",
+          "to": "FAILED",
+          "trigger": "ExecutionTerminated / unrecoverable failure",
+          "note": "RECONSTRUCTED"
+        },
+        {
+          "from": "APPROVED/ACTIVE",
+          "to": "CANCELLED",
+          "trigger": "cancelExecutionPlan",
+          "note": "RECONSTRUCTED. Both named from-states are in the states list."
+        },
+        {
+          "from": "Any active",
+          "to": "SUPERSEDED",
+          "trigger": "ExecutionPlanSuperseded (plan revision)",
+          "guard": "plan revision preserves prior attempt history (§20.2)",
+          "note": "RECONSTRUCTED. 'Any active' = any non-terminal state."
+        }
+      ],
+      "illegal": [
+        {
+          "from": "SUPERSEDED",
+          "to": "(creates new ExecutionAttempt/step)",
+          "reason": "§20.2 + §35.1 'No superseded execution': a superseded plan cannot create new execution attempts; no new step may begin under a superseded Execution Plan."
+        }
+      ]
+    },
+    {
+      "name": "ExecutionStep.stepState",
+      "appliesTo": "ExecutionStep (distinct from PWU.executionState §7.3).",
+      "sourceSection": "core-model doc §21 enum (VERBATIM). Transitions RECONSTRUCTED from §26.4 events + §34.3 commands + §21.1 invariants. NO explicit matrix.",
+      "initialState": "NOT_READY",
+      "states": [
+        "NOT_READY",
+        "READY",
+        "QUEUED",
+        "RUNNING",
+        "WAITING",
+        "SUCCEEDED",
+        "FAILED",
+        "SKIPPED",
+        "CANCELLED",
+        "SUPERSEDED"
+      ],
+      "terminalStates": [
+        "SUCCEEDED",
+        "FAILED",
+        "SKIPPED",
+        "CANCELLED",
+        "SUPERSEDED"
+      ],
+      "transitions": [
+        {
+          "from": "NOT_READY",
+          "to": "READY",
+          "trigger": "ExecutionStepReady",
+          "guard": "a step cannot run until preconditions are satisfied (§21.1)",
+          "note": "RECONSTRUCTED"
+        },
+        {
+          "from": "READY",
+          "to": "QUEUED",
+          "trigger": "step scheduled",
+          "note": "RECONSTRUCTED"
+        },
+        {
+          "from": "QUEUED",
+          "to": "RUNNING",
+          "trigger": "startExecutionStep / ExecutionStepStarted",
+          "note": "RECONSTRUCTED"
+        },
+        {
+          "from": "RUNNING",
+          "to": "WAITING",
+          "trigger": "ExecutionStepWaiting",
+          "note": "RECONSTRUCTED"
+        },
+        {
+          "from": "WAITING",
+          "to": "RUNNING",
+          "trigger": "wait resolved",
+          "note": "RECONSTRUCTED"
+        },
+        {
+          "from": "RUNNING",
+          "to": "SUCCEEDED",
+          "trigger": "completeExecutionStep / ExecutionStepSucceeded",
+          "guard": "must record outputs or an explicit no-output result; step success does NOT imply PWU success (§21.1)",
+          "note": "RECONSTRUCTED"
+        },
+        {
+          "from": "RUNNING",
+          "to": "FAILED",
+          "trigger": "failExecutionStep / ExecutionStepFailed",
+          "note": "RECONSTRUCTED"
+        },
+        {
+          "from": "FAILED",
+          "to": "QUEUED",
+          "trigger": "retryExecutionStep / ExecutionStepRetried",
+          "note": "RECONSTRUCTED; retry re-queues the step."
+        },
+        {
+          "from": "READY/QUEUED",
+          "to": "SKIPPED",
+          "trigger": "ExecutionStepSkipped",
+          "guard": "a skipped MANDATORY step requires an authorized plan revision or waiver (§21.1)",
+          "note": "RECONSTRUCTED. Both named from-states are in the states list."
+        },
+        {
+          "from": "READY/QUEUED/RUNNING/WAITING",
+          "to": "CANCELLED",
+          "trigger": "ExecutionStepCancelled",
+          "note": "RECONSTRUCTED. All four named from-states are in the states list."
+        },
+        {
+          "from": "Any active",
+          "to": "SUPERSEDED",
+          "trigger": "plan revised/superseded",
+          "note": "RECONSTRUCTED. 'Any active' = any non-terminal state."
+        }
+      ],
+      "illegal": [
+        {
+          "from": "NOT_READY",
+          "to": "RUNNING",
+          "reason": "§21.1: a step cannot run until preconditions are satisfied — must pass through READY."
+        }
+      ]
+    },
+    {
+      "name": "RuntimeBinding.authorizationStatus",
+      "appliesTo": "RuntimeBinding",
+      "sourceSection": "core-model doc §22 enum (VERBATIM). Transitions RECONSTRUCTED from §26.4 events + §22.1 invariants. NO explicit matrix.",
+      "initialState": "REQUESTED",
+      "states": [
+        "REQUESTED",
+        "AUTHORIZED",
+        "PARTIALLY_AUTHORIZED",
+        "DENIED",
+        "REVOKED"
+      ],
+      "terminalStates": [
+        "DENIED",
+        "REVOKED"
+      ],
+      "transitions": [
+        {
+          "from": "REQUESTED",
+          "to": "AUTHORIZED",
+          "trigger": "RuntimeBindingAuthorized",
+          "guard": "requested capability is NOT granted capability; capability scope must be explicit (§22.1)",
+          "note": "RECONSTRUCTED"
+        },
+        {
+          "from": "REQUESTED",
+          "to": "PARTIALLY_AUTHORIZED",
+          "trigger": "partial grant",
+          "note": "RECONSTRUCTED"
+        },
+        {
+          "from": "REQUESTED",
+          "to": "DENIED",
+          "trigger": "RuntimeBindingDenied",
+          "note": "RECONSTRUCTED"
+        },
+        {
+          "from": "PARTIALLY_AUTHORIZED",
+          "to": "AUTHORIZED",
+          "trigger": "new authorization event (privilege expansion)",
+          "guard": "privilege expansion requires a NEW authorization event (§22.1)",
+          "note": "RECONSTRUCTED"
+        },
+        {
+          "from": "AUTHORIZED/PARTIALLY_AUTHORIZED",
+          "to": "REVOKED",
+          "trigger": "RuntimeCapabilityRevoked",
+          "note": "RECONSTRUCTED. Both named from-states are in the states list."
+        }
+      ],
+      "illegal": [
+        {
+          "from": "REVOKED",
+          "to": "(used for a new attempt)",
+          "reason": "§22.1: revoked bindings cannot be used for new attempts."
+        }
+      ]
+    },
+    {
+      "name": "Decision.status",
+      "appliesTo": "DecisionObject (aggregate root of the Governance aggregate, §3.4).",
+      "sourceSection": "core-model doc §23.1 enum (VERBATIM). Transitions RECONSTRUCTED from §26.6 events + §34.4 commands + §23.2 invariants. NO explicit matrix.",
+      "initialState": "PROPOSED",
+      "states": [
+        "PROPOSED",
+        "EFFECTIVE",
+        "REVOKED",
+        "SUPERSEDED"
+      ],
+      "terminalStates": [
+        "REVOKED",
+        "SUPERSEDED"
+      ],
+      "transitions": [
+        {
+          "from": "PROPOSED",
+          "to": "EFFECTIVE",
+          "trigger": "approveDecision / DecisionApproved → DecisionEffective",
+          "guard": "approval requires authority; an agent may recommend but cannot exercise authority unless delegated (§23.2)",
+          "note": "RECONSTRUCTED; DecisionApproved and DecisionEffective both map onto the EFFECTIVE status."
+        },
+        {
+          "from": "EFFECTIVE",
+          "to": "REVOKED",
+          "trigger": "revokeDecision / DecisionRevoked",
+          "guard": "revocation triggers impact analysis; a decision cannot retroactively change evidence (§23.2)",
+          "note": "RECONSTRUCTED"
+        },
+        {
+          "from": "PROPOSED",
+          "to": "SUPERSEDED",
+          "trigger": "DecisionRejected / decision superseded",
+          "note": "RECONSTRUCTED; DecisionRejected has no matching status value — see open items."
+        },
+        {
+          "from": "EFFECTIVE",
+          "to": "SUPERSEDED",
+          "trigger": "decision superseded",
+          "note": "RECONSTRUCTED"
+        }
+      ],
+      "illegal": []
+    },
+    {
+      "name": "Baseline.status",
+      "appliesTo": "BaselineObject (aggregate root of the Baseline aggregate, §3.5).",
+      "sourceSection": "core-model doc §24.1 enum (VERBATIM). Transitions RECONSTRUCTED from §26.6 events + §34.4 commands + §24.2 invariants. NO explicit matrix.",
+      "initialState": "DRAFT",
+      "states": [
+        "DRAFT",
+        "CANDIDATE",
+        "UNDER_REVIEW",
+        "APPROVED",
+        "AUTHORITATIVE",
+        "SUPERSEDED",
+        "REVOKED"
+      ],
+      "terminalStates": [
+        "SUPERSEDED",
+        "REVOKED"
+      ],
+      "transitions": [
+        {
+          "from": "DRAFT",
+          "to": "CANDIDATE",
+          "trigger": "BaselineCreated / nominated as candidate",
+          "note": "RECONSTRUCTED"
+        },
+        {
+          "from": "CANDIDATE",
+          "to": "UNDER_REVIEW",
+          "trigger": "BaselineSubmittedForReview",
+          "note": "RECONSTRUCTED"
+        },
+        {
+          "from": "UNDER_REVIEW",
+          "to": "APPROVED",
+          "trigger": "BaselineApproved",
+          "guard": "open BLOCKING observations prevent promotion unless waived (§24.2)",
+          "note": "RECONSTRUCTED"
+        },
+        {
+          "from": "APPROVED",
+          "to": "AUTHORITATIVE",
+          "trigger": "promoteBaseline / BaselinePromoted",
+          "guard": "requires an explicit EFFECTIVE promotion decision (§23.2, §24.2); promotion evidence must be retained; promotion is a governance event, not an execution step (§24.2)",
+          "note": "RECONSTRUCTED"
+        },
+        {
+          "from": "AUTHORITATIVE",
+          "to": "SUPERSEDED",
+          "trigger": "supersedeBaseline / BaselineSuperseded",
+          "guard": "an authoritative baseline is immutable — changes create a SUCCESSOR baseline; supersession preserves traceability (§24.2)",
+          "note": "RECONSTRUCTED"
+        },
+        {
+          "from": "APPROVED/AUTHORITATIVE",
+          "to": "REVOKED",
+          "trigger": "BaselineRevoked",
+          "note": "RECONSTRUCTED. Both named from-states are in the states list."
+        }
+      ],
+      "illegal": [
+        {
+          "from": "UNDER_REVIEW",
+          "to": "AUTHORITATIVE",
+          "reason": "§24.2 + §35.1 'No unauthorized baseline': a baseline cannot become AUTHORITATIVE without an effective promotion decision (must be APPROVED + carry a promotion decision); open blocking observations block promotion unless waived."
+        },
+        {
+          "from": "AUTHORITATIVE",
+          "to": "AUTHORITATIVE",
+          "reason": "§24.2: an authoritative baseline is IMMUTABLE — it cannot be re-promoted/mutated in place; changes create a successor baseline."
+        }
+      ]
+    },
+    {
+      "name": "AggregateAssuranceDisposition",
+      "appliesTo": "Computed roll-up/reduction across ALL policies applicable to one object (assurance-service doc §28.2). NOT an event-driven lifecycle — each row is condition → aggregate state. Introduces two states (EVIDENCE_REQUIRED, UNASSESSED) not present in the per-assessment §30 machine.",
+      "sourceSection": "assurance-service doc §28.2 (aggregate disposition) + §28.1 (composition rules). 'This must not be reduced to a numerical average.'",
+      "states": [
+        "REJECTED",
+        "EVIDENCE_REQUIRED",
+        "UNASSESSED",
+        "INCONCLUSIVE",
+        "CONDITIONALLY_SATISFIED",
+        "SATISFIED"
+      ],
+      "transitions": [
+        {
+          "from": "(aggregate evaluation)",
+          "to": "REJECTED",
+          "trigger": "aggregate recomputation",
+          "guard": "any critical rejection OR any blocking rejection among applicable policies",
+          "note": "§28.2. Strictest unresolved disposition wins (§28.1); a satisfied advisory policy does not override a rejected blocking policy. Pseudo-source: this is a reduction, not an FSM edge."
+        },
+        {
+          "from": "(aggregate evaluation)",
+          "to": "EVIDENCE_REQUIRED",
+          "trigger": "aggregate recomputation",
+          "guard": "any required assessment missing (evidence-deficit variant)",
+          "note": "§28.2 lists 'EVIDENCE_REQUIRED or UNASSESSED' for a missing required assessment — see open items."
+        },
+        {
+          "from": "(aggregate evaluation)",
+          "to": "UNASSESSED",
+          "trigger": "aggregate recomputation",
+          "guard": "any required assessment missing / not yet run",
+          "note": "§28.2"
+        },
+        {
+          "from": "(aggregate evaluation)",
+          "to": "INCONCLUSIVE",
+          "trigger": "aggregate recomputation",
+          "guard": "any inconclusive required assessment (and no rejection / missing assessment of higher precedence)",
+          "note": "§28.2"
+        },
+        {
+          "from": "(aggregate evaluation)",
+          "to": "CONDITIONALLY_SATISFIED",
+          "trigger": "aggregate recomputation",
+          "guard": "any conditional required assessment (and none of the higher-precedence conditions hold)",
+          "note": "§28.2"
+        },
+        {
+          "from": "(aggregate evaluation)",
+          "to": "SATISFIED",
+          "trigger": "aggregate recomputation",
+          "guard": "all required assessments satisfied",
+          "note": "§28.2"
+        }
+      ],
+      "illegal": [
+        {
+          "from": "(aggregate evaluation)",
+          "to": "SATISFIED",
+          "reason": "Aggregate must preserve the strictest unresolved disposition (§28.1); it must NOT be reduced to a numerical average of policy results (§28.2). Conflicting assessments must remain visible, not silently averaged (INV-17, §34.4). I.e. SATISFIED is forbidden whenever any higher-precedence unresolved condition holds."
+        }
+      ]
+    },
+    {
+      "name": "ValidatorRegistryEntry.status",
+      "appliesTo": "Operational status of a registered validator in the Validator Registry (assurance-service doc §35).",
+      "sourceSection": "assurance-service doc §35 enum (VERBATIM). NO transition table specified in the doc.",
+      "states": [
+        "ACTIVE",
+        "DEGRADED",
+        "DISABLED"
+      ],
+      "transitions": [],
+      "illegal": []
+    }
+  ],
+  "conflicts": [
+    {
+      "topic": "CRITICAL RULE PRESERVED — executionState=SUCCEEDED must NEVER force assuranceState=SATISFIED (property P1 / INV-5). Not a disagreement; all three extractions agree. Recorded here to confirm the reconciliation kept it on every surface.",
+      "resolution": "Encoded consistently in FOUR machines: (1) PWU.workLifecycleState.illegal — 'EXECUTING→SATISFIED' and 'FAILED→SATISFIED' (§8.3); (2) PWU.assuranceState.illegal — 'executionState=SUCCEEDED → SATISFIED'; (3) AssuranceAssessment.disposition.illegal — 'executionState=SUCCEEDED → SATISFIED'; (4) AssuranceAssessment.state.illegal — 'ASSESSING→SATISFIED (cross-axis)'. The four PWU axes (workLifecycleState, executionState, assuranceState, shapeIntegrityState) remain INDEPENDENT §7.1 fields. The ONLY doc-explicit cross-axis couplings are the two §8.1 guards: EXECUTING→EVIDENCE_PENDING guarded by executionState=SUCCEEDED, and UNDER_ASSURANCE→SATISFIED guarded by assuranceState=SATISFIED. Neither collapses the axes; both are one-directional preconditions."
+    },
+    {
+      "topic": "PWU.executionState / assuranceState / shapeIntegrityState: transitions VERBATIM-empty vs RECONSTRUCTED. The PWU-AXES extraction left transitions empty (spec defines these three axes ONLY as §7.3/§7.4/§7.5 state enums, no from→to matrix); the OTHER-OBJECTS extraction reconstructed edges from §26 events + invariants.",
+      "resolution": "KEPT the reconstructed transitions (they are the best available and are event/invariant-grounded) but every such row is marked note:'RECONSTRUCTED'. The STATE LISTS are verbatim and authoritative; the EDGES are engineering inference and must be validated against the §26 event catalog before the kernel enforces them as a hard contract. No workLifecycle-style illegal table exists for these three axes except the P1/INV-5 cross-axis rule."
+    },
+    {
+      "topic": "AssuranceAssessment modeled twice by two different source documents: core-model §18 'disposition' (8 states) vs assurance-service §30 'state' (15 states incl. WAIVER_EXPIRED).",
+      "resolution": "KEPT as two separate machine entries because they have different axis names (.disposition vs .state), different cardinality, and different section sources. The §30 15-state FSM is the AUTHORITATIVE implementation lifecycle; its outcome states {SATISFIED, CONDITIONALLY_SATISFIED, REJECTED, INCONCLUSIVE, ESCALATED, WAIVED} are a superset of the §18 verdict. Recommendation: kernel implements the §30 FSM and derives the §18 .disposition as its verdict projection (§18 adds no states the §30 machine lacks, except it uses PENDING where §30 uses the richer REQUESTED/EVIDENCE_PENDING/READY pre-assessment states)."
+    },
+    {
+      "topic": "AssurancePolicy.status (core-model §17.1) vs AssurancePolicyDefinition.status (assurance-service §3.1): same 4-state enum DRAFT/ACTIVE/SUSPENDED/SUPERSEDED under two names in two docs.",
+      "resolution": "MERGED into a single machine 'AssurancePolicy.status'. Transitions are reconstructed (neither doc defines policy-lifecycle events). sourceSection cites both § references."
+    },
+    {
+      "topic": "Section-number NAMESPACE COLLISION between the two source documents. The core-model doc and the assurance-service doc each restart section numbering, so identical labels denote different content (e.g., core §8 = PWU workLifecycle; assurance §8.4 = independence. core §10 = Obligation; assurance §10 = dispositions. core §12 = Assumption; assurance §12 = waivers. core §18 = AssuranceAssessment.disposition; §30 is assurance-only).",
+      "resolution": "Every machine's sourceSection is now prefixed with its origin doc ('core-model doc' vs 'assurance-service doc'). Section refs MUST be namespaced by source; do not cross-wire them. Also: the task's example label 'DOC-002 §8.3' does NOT correspond to any label in either file — both are self-contained specs and §8.3 (core doc) is the ONLY enumerated illegal-transition table."
+    },
+    {
+      "topic": "PWU.shapeIntegrityState: is RESTORED terminal? PWU-AXES marked terminalStates=[RESTORED]; OTHER-OBJECTS reconstructed a RESTORED→PRESERVED re-validation edge (making it non-terminal) and left terminalStates=[].",
+      "resolution": "Set terminalStates=[] and kept the RESTORED→PRESERVED edge, because the repair-loop reading (RESTORED re-validates back to PRESERVED) is more consistent with the reconstructed RESHAPING_REQUIRED→RESHAPING_IN_PROGRESS→RESTORED chain. Neither is doc-authoritative (no §7.5 matrix); flagged as inference. If the kernel prefers RESTORED as absorbing, drop that one edge."
+    },
+    {
+      "topic": "PWU.workLifecycleState compound source rows. §8.1 'SATISFIED/RECOMPOSED → BASELINED', §8.2 'PLANNED/EXECUTING → BLOCKED', and §8.2 'UNDER_ASSURANCE → REJECTED or RESHAPING' were represented as split single-state edges in one extraction and compound rows in the other.",
+      "resolution": "Used the SPLIT form so no transition names a compound pseudo-state: SATISFIED→BASELINED + RECOMPOSED→BASELINED; PLANNED→BLOCKED + EXECUTING→BLOCKED; UNDER_ASSURANCE→REJECTED + UNDER_ASSURANCE→RESHAPING. The umbrella from-states 'Any active' (→ABANDONED) and 'Any non-baselined' (→SUPERSEDED) are kept verbatim (NOT enumerated per-state) because the doc states them as umbrellas; their set definitions are in each row's note."
+    }
+  ],
+  "openItems": [
+    {
+      "item": "PWU.assuranceState initial state is genuinely ambiguous (NOT_REQUIRED vs UNASSESSED).",
+      "why": "The doc labels neither §7.4 value as initial. NOT_REQUIRED (no policy applies) and UNASSESSED (assurance pending) are both legitimate entry points. Defaulted to NOT_REQUIRED, but the kernel must pick per-PWU based on whether any AssurancePolicy applies to the subject; picking wrong silently changes whether the P1/INV-5 gate is even armed."
+    },
+    {
+      "item": "Evidence emits an EvidenceExpired event (§26.5) but §16.1 status enum has NO EXPIRED value.",
+      "why": "Expiration (§16.2 triggers reassessment of dependent claims) currently has no target status. Folded into ADMISSIBLE→INVALIDATED, but it could equally map to SUPERSEDED. Kernel must decide and document the mapping; downstream claim CONTESTED logic depends on it."
+    },
+    {
+      "item": "Decision emits DecisionApproved and DecisionRejected events (§26.6) but §23.1 enum has only PROPOSED/EFFECTIVE/REVOKED/SUPERSEDED.",
+      "why": "Approval maps to EFFECTIVE, but a rejected decision has no status value — it presumably stays PROPOSED or moves to SUPERSEDED (currently mapped PROPOSED→SUPERSEDED). Kernel must define the rejected-decision resting state; governance authority checks read this field."
+    },
+    {
+      "item": "Three PWU axes (executionState, assuranceState, shapeIntegrityState) have NO verbatim transition matrix — all their edges are reconstructed.",
+      "why": "The spec guarantees only the state enums. Enforcing the reconstructed edges as hard invariants risks blocking valid event sequences the doc never forbade. Validate each reconstructed edge against the §26 event catalog before the kernel treats it as a contract; treat them as advisory until then."
+    },
+    {
+      "item": "AggregateAssuranceDisposition (§28.2) lists both EVIDENCE_REQUIRED and UNASSESSED for the same 'missing required assessment' condition.",
+      "why": "Precedence/selection between the two is unspecified. The reduction must preserve the strictest unresolved disposition and must NOT be a numerical average (§28.1, INV-17). Kernel needs a deterministic tie-break rule (likely EVIDENCE_REQUIRED when an EvidenceRequirement exists but is unmet; UNASSESSED when no assessment was ever started)."
+    },
+    {
+      "item": "PWU.workLifecycleState recovery/outgoing edges from non-terminal EXCEPTION states (BLOCKED, CHALLENGED, RESHAPING, ESCALATED, REJECTED, INVALIDATED) are NOT in the §8 matrix.",
+      "why": "The §8 tables enumerate how you ENTER these states but not how you leave them. Recovery is governed by Controller control actions (§37: RESHAPE_PWU, REPLAN_EXECUTION, REVISE_DECOMPOSITION, ESCALATE, WAIVE, REJECT, ABANDON) and invalidation outcomes (§29.3) — a separate surface the kernel must source, or those states become dead-ends."
+    },
+    {
+      "item": "AssuranceAssessment.state VALIDATOR_FAILED and INDEPENDENCE_VIOLATION have no in-machine recovery arrow (§30).",
+      "why": "Retry / alternate-validator / escalation / waiver (§34.1, §8.4) spawn a NEW assessment instance rather than transitioning the failed one. Kernel must model recovery as new-instance creation, not a self-loop; both states are terminal for THAT assessment instance."
+    }
+  ]
+}

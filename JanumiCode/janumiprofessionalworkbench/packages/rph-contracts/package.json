@@ -1,0 +1,46 @@
+{
+  "name": "@janumipwb/rph-contracts",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "description": "RPH machine-contract seam: single Zod schema source generating TS types + JSON Schema (envelope, ids, enums, errors, ApplicabilityExpression DSL).",
+  "license": "AGPL-3.0-only",
+  "exports": {
+    ".": {
+      "source": "./src/index.ts",
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js",
+      "default": "./dist/index.js"
+    },
+    "./hash": {
+      "source": "./src/hash.ts",
+      "types": "./dist/hash.d.ts",
+      "import": "./dist/hash.js",
+      "default": "./dist/hash.js"
+    }
+  },
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "files": [
+    "dist",
+    "schemas"
+  ],
+  "scripts": {
+    "build": "tsc -p tsconfig.build.json",
+    "check-types": "tsc --noEmit -p tsconfig.json",
+    "test": "vitest run --passWithNoTests",
+    "gen": "bun run src/gen/gen-enums.ts && bun run src/gen/gen-objects.ts && bun run src/gen/gen-messages.ts && bun run src/gen/emit.ts",
+    "gen:enums": "bun run src/gen/gen-enums.ts",
+    "gen:objects": "bun run src/gen/gen-objects.ts",
+    "gen:messages": "bun run src/gen/gen-messages.ts"
+  },
+  "dependencies": {
+    "ulid": "^2.3.0",
+    "zod": "^4.4.3"
+  },
+  "devDependencies": {
+    "@janumipwb/typescript-config": "workspace:*",
+    "ajv": "^8.17.0",
+    "ajv-formats": "^3.0.0"
+  }
+}

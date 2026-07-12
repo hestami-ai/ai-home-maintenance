@@ -1,0 +1,16 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "type": "string",
+  "enum": [
+    "ARTIFACT",
+    "TEST_RESULT",
+    "SOURCE",
+    "TRACE",
+    "OBSERVATION",
+    "ANALYSIS",
+    "MEASUREMENT",
+    "APPROVAL",
+    "REVIEW"
+  ],
+  "$id": "urn:janumi:rph:schema:enum:EvidenceType:1"
+}
