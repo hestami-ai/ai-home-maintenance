@@ -39,8 +39,9 @@ describe('validate', () => {
 	});
 
 	it('registers envelope + enum + object + command + event schemas', () => {
-		// 8 envelope/primitive + 72 enums + 17 domain objects + 43 commands + 102 events = 242
-		// (102 = 98 + the 4 M13 fixture-trace events: PwuBaselined, IntentConstraintRefined, ExecutionPlanRevised, ClarificationRequested)
-		expect(buildContractRegistry().ids().length).toBe(242);
+		// 8 envelope/primitive + 72 enums + 17 domain objects + 45 commands + 103 events = 245
+		// (45 = 43 + BeginIntentDiscovery + ProvisionIntent; 103 = 102 + IntentProvisioned — the intent
+		// discovery/provisional commands added for live command-drive, RPH-DOC-010; see OPEN-QUESTIONS)
+		expect(buildContractRegistry().ids().length).toBe(245);
 	});
 });

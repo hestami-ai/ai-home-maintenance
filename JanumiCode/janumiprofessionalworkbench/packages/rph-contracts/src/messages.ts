@@ -336,6 +336,12 @@ export const SupersedeBaselinePayloadSchema = z.strictObject({
 	supersedingBaselineId: z.string()
 });
 export type SupersedeBaselinePayload = z.infer<typeof SupersedeBaselinePayloadSchema>;
+export const BeginIntentDiscoveryPayloadSchema = z.strictObject({});
+export type BeginIntentDiscoveryPayload = z.infer<typeof BeginIntentDiscoveryPayloadSchema>;
+export const ProvisionIntentPayloadSchema = z.strictObject({
+	ambiguityIds: z.array(z.string())
+});
+export type ProvisionIntentPayload = z.infer<typeof ProvisionIntentPayloadSchema>;
 
 // ---- Event payload schemas ----
 export const AssumptionAcceptedPayloadSchema = z.strictObject({
@@ -1044,6 +1050,10 @@ export const WaiverRequestedPayloadSchema = z.strictObject({
 	status: DecisionStatusSchema
 });
 export type WaiverRequestedPayload = z.infer<typeof WaiverRequestedPayloadSchema>;
+export const IntentProvisionedPayloadSchema = z.strictObject({
+	ambiguityIds: z.array(z.string())
+});
+export type IntentProvisionedPayload = z.infer<typeof IntentProvisionedPayloadSchema>;
 
 export const FIRST_SLICE_COMMANDS = [
 	'CaptureIntent',
@@ -1321,6 +1331,18 @@ export const COMMANDS = {
 		targetAggregateType: 'Baseline',
 		emitsEvent: 'BaselineSuperseded',
 		firstSlice: false
+	},
+	BeginIntentDiscovery: {
+		payload: BeginIntentDiscoveryPayloadSchema,
+		targetAggregateType: 'INTENT',
+		emitsEvent: 'IntentDiscoveryStarted',
+		firstSlice: false
+	},
+	ProvisionIntent: {
+		payload: ProvisionIntentPayloadSchema,
+		targetAggregateType: 'INTENT',
+		emitsEvent: 'IntentProvisioned',
+		firstSlice: false
 	}
 } as const;
 
@@ -1559,7 +1581,8 @@ export const EVENTS = {
 	WaiverDenied: { payload: WaiverDeniedPayloadSchema, aggregateType: 'Decision' },
 	WaiverExpired: { payload: WaiverExpiredPayloadSchema, aggregateType: 'Decision' },
 	WaiverGranted: { payload: WaiverGrantedPayloadSchema, aggregateType: 'Decision' },
-	WaiverRequested: { payload: WaiverRequestedPayloadSchema, aggregateType: 'Decision' }
+	WaiverRequested: { payload: WaiverRequestedPayloadSchema, aggregateType: 'Decision' },
+	IntentProvisioned: { payload: IntentProvisionedPayloadSchema, aggregateType: 'Intent' }
 } as const;
 
 export interface CommandEventBinding {
@@ -1871,5 +1894,19 @@ export const BINDINGS: readonly CommandEventBinding[] = [
 		machine: 'Baseline.status',
 		from: 'AUTHORITATIVE',
 		to: 'SUPERSEDED'
+	},
+	{
+		commandType: 'BeginIntentDiscovery',
+		eventType: 'IntentDiscoveryStarted',
+		machine: 'Intent.intentStatus',
+		from: 'RAW',
+		to: 'UNDER_DISCOVERY'
+	},
+	{
+		commandType: 'ProvisionIntent',
+		eventType: 'IntentProvisioned',
+		machine: 'Intent.intentStatus',
+		from: 'UNDER_DISCOVERY',
+		to: 'PROVISIONAL'
 	}
 ];

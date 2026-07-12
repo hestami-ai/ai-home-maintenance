@@ -26,7 +26,8 @@
   "dependencies": {
     "@janumipwb/rph-contracts": "workspace:*",
     "@janumipwb/rph-domain": "workspace:*",
-    "@janumipwb/rph-ports": "workspace:*"
+    "@janumipwb/rph-ports": "workspace:*",
+    "zod": "^4.4.3"
   },
   "devDependencies": {
     "@janumipwb/rph-persistence": "workspace:*",

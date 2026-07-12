@@ -321,3 +321,25 @@ unilaterally redesign the engine API.
   (relative import). **Breaking-API note:** any code that imported `contentHash`/`sha256Hex`/`canonicalJson`/
   `CanonicalJsonError` from the barrel must switch to `@janumipwb/rph-contracts/hash`. (Option 3 — isomorphic sync
   SHA-256 — remains the future move only if a browser surface must someday *compute* hashes.)
+
+---
+
+## RPH-DOC-010 Full Live Buildout (P2/P3 — live command-drive) — 2026-07-12
+
+**Please confirm or correct (best judgment, non-blocking):**
+- **Two intent commands + one event added to make the Intent machine drivable live.** The Intent state machine
+  is `RAW → UNDER_DISCOVERY → PROVISIONAL → FORMALIZED → APPROVED ↔ REVISED` (DOC-002 §6), but the command
+  catalog had no command to reach `UNDER_DISCOVERY` or `PROVISIONAL` (the old M13 proof *replayed* an authored
+  event log rather than driving commands). Added, via the vocab+gen pipeline: **`BeginIntentDiscovery`**
+  (RAW→UNDER_DISCOVERY, emits the existing `IntentDiscoveryStarted`) and **`ProvisionIntent`**
+  (UNDER_DISCOVERY→PROVISIONAL, records known ambiguities). `ProvisionIntent` needed a target event — DOC-002
+  §6.1 defines the *transition* but §26.2 lists no event for it — so I added **`IntentProvisioned`** with a
+  minimal faithful payload (`ambiguityIds`), the same posture as the 4 M13-added events. Registry now 45
+  commands / 103 events / 45 bindings. Confirm the names, or point me at a canonical event if one exists.
+- **Command handler registry replaces the hardcoded CaptureIntent branch** (the deferred M13 refactor).
+  `rph-application/command-bus.ts` now runs the generic pre-stages (idempotency + payload validation) then
+  routes to `HANDLERS[commandType]`; a command with no handler is `REJECTED` (`RPH_VALIDATION_SEMANTIC_FAILED`)
+  — same posture the skeleton had for non-CaptureIntent, so the surface fills in one group at a time. Handlers
+  live in `rph-application/src/handlers/*` and share a kit (`kit.ts`) that enforces the fail-loud pipeline
+  (validate produced state, then atomic commit). `zod` added as a direct dep of rph-application (to type the
+  schema the kit validates against).

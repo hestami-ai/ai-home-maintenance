@@ -1,28 +1,26 @@
-// The command core. dispatch() runs the pipeline: idempotency check -> validate command payload -> produce
-// the new object state + domain event -> validate the produced state against its object schema (a produced
-// state that is not a valid domain object is a fail-loud internal invariant) -> commit events + outbox +
-// receipt atomically -> map the store result to a CommandResult. drainOutbox() delivers persisted events to
-// subscribers (the in-process outbox drain that stands in for a broker on the embedded tier).
+// The command core. dispatch() runs the pipeline: idempotency check -> validate command payload -> route to the
+// registered handler (which loads state, enforces the domain guards, produces the new object state + domain
+// event, validates the produced state, and commits events + outbox + receipt atomically) -> map to a
+// CommandResult. drainOutbox() delivers persisted events to subscribers (the in-process outbox drain that stands
+// in for a broker on the embedded tier).
 //
-// M4 (walking skeleton) implements one handler: CaptureIntent. The pipeline is command-agnostic; further
-// handlers register alongside it in later milestones.
+// The per-command handlers live in ./handlers/* and register in ./handlers/registry.ts; the pipeline here is
+// command-agnostic. A command whose type has no registered handler is REJECTED (RPH_VALIDATION_SEMANTIC_FAILED),
+// preserving the M4 posture while the handler surface fills in.
 import {
-	CaptureIntentPayloadSchema,
-	IntentObjectSchema,
 	COMMANDS,
 	makeRphError,
 	mintId,
 	validateAgainst,
-	type CaptureIntentPayload,
 	type CommandResult,
 	type DomainCommand,
 	type DomainEvent
 } from '@janumipwb/rph-contracts';
-// contentHash is a Node-only capability (node:crypto), so it lives behind the /hash subpath — kept out of the
-// contracts barrel to keep that barrel browser-safe (see rph-contracts/src/index.ts).
-import { contentHash } from '@janumipwb/rph-contracts/hash';
-import type { CommitInput, Logger, StorageAdapter } from '@janumipwb/rph-ports';
+import type { Logger, StorageAdapter } from '@janumipwb/rph-ports';
 import { NoopLogger } from '@janumipwb/rph-ports';
+import type { ZodType } from 'zod';
+import type { HandlerContext } from './handlers/kit.js';
+import { HANDLERS } from './handlers/registry.js';
 
 export interface EngineDeps {
 	readonly store: StorageAdapter;
@@ -32,6 +30,8 @@ export interface EngineDeps {
 }
 
 export type EventSubscriber = (event: DomainEvent) => void;
+
+type CommandSpec = { readonly payload: ZodType };
 
 export class Engine {
 	private readonly store: StorageAdapter;
@@ -75,12 +75,9 @@ export class Engine {
 		}
 
 		// 2. Validate the command payload against its contract.
-		const spec = (
-			COMMANDS as unknown as Record<
-				string,
-				{ payload: typeof CaptureIntentPayloadSchema } | undefined
-			>
-		)[command.commandType];
+		const spec = (COMMANDS as unknown as Record<string, CommandSpec | undefined>)[
+			command.commandType
+		];
 		if (!spec) {
 			return {
 				...base,
@@ -100,133 +97,26 @@ export class Engine {
 			return { ...base, status: 'VALIDATION_FAILED', error: parsed.error };
 		}
 
-		// 3. Produce the new state + event (M4: CaptureIntent only).
-		if (command.commandType !== 'CaptureIntent') {
+		// 3. Route to the registered handler for this command type.
+		const handler = HANDLERS[command.commandType];
+		if (!handler) {
 			return {
 				...base,
 				status: 'REJECTED',
 				error: makeRphError('RPH_VALIDATION_SEMANTIC_FAILED', {
-					message: `No handler for command type: ${command.commandType} (M4 walking skeleton handles CaptureIntent)`,
+					message: `No handler registered for command type: ${command.commandType}`,
 					correlationId,
 					targetObjectIds: [command.targetAggregateId]
 				})
 			};
 		}
-		return this.captureIntent(command, parsed.value as CaptureIntentPayload, correlationId);
-	}
-
-	private captureIntent(
-		command: DomainCommand,
-		payload: CaptureIntentPayload,
-		correlationId: string
-	): CommandResult {
-		const ts = command.issuedAt;
-		const actor = command.issuedBy;
-		const intent = {
-			id: payload.intentId,
-			objectType: 'INTENT' as const,
-			schemaVersion: 1,
-			semanticVersion: 1,
-			revision: 0,
-			lifecycleStatus: 'RAW',
-			createdAt: ts,
-			createdBy: actor,
-			updatedAt: ts,
-			updatedBy: actor,
-			provenance: { originType: 'USER_INPUT' as const, sourceObjectIds: [], sourceEventIds: [] },
-			ontologyId: payload.ontologyId,
-			ontologyVersion: payload.ontologyVersion,
-			tags: [] as string[],
-			extensions: [] as never[],
-			originatingExpression: payload.originatingExpression,
-			desiredOutcomes: [] as never[],
-			successConditions: [] as never[],
-			nonGoals: [] as string[],
-			ambiguityIds: [] as string[],
-			constraintIds: [] as string[],
-			stakeholderIds: [] as string[],
-			intentStatus: 'RAW' as const
+		const ctx: HandlerContext = {
+			store: this.store,
+			now: this.now,
+			newEventId: this.newEventId,
+			logger: this.logger
 		};
-
-		// The produced state MUST be a valid domain object — fail loud otherwise (never persist a bad state).
-		const stateCheck = validateAgainst(IntentObjectSchema, intent, {
-			correlationId,
-			targetObjectIds: [intent.id]
-		});
-		if (!stateCheck.ok) {
-			this.logger.error('invariant.produced_state_invalid', {
-				correlationId,
-				aggregateId: intent.id
-			});
-			return {
-				commandId: command.commandId,
-				producedEventIds: [],
-				status: 'REJECTED',
-				error: stateCheck.error
-			};
-		}
-
-		const eventId = this.newEventId();
-		const recordedAt = this.now();
-		const event: DomainEvent = {
-			eventId,
-			eventType: 'IntentCaptured',
-			eventSchemaVersion: 1,
-			aggregateType: 'INTENT',
-			aggregateId: payload.intentId,
-			aggregateRevision: 0,
-			occurredAt: ts,
-			recordedAt,
-			actor,
-			correlationId,
-			commandId: command.commandId,
-			payload
-		};
-
-		const input: CommitInput = {
-			aggregateType: 'INTENT',
-			aggregateId: payload.intentId,
-			objectType: 'INTENT',
-			expectedRevision: command.expectedRevision,
-			newRevision: 0,
-			newSemanticVersion: 1,
-			currentState: intent,
-			events: [event],
-			receipt: {
-				commandId: command.commandId,
-				idempotencyKey: command.idempotencyKey,
-				commandType: command.commandType,
-				targetAggregateId: payload.intentId,
-				status: 'ACCEPTED',
-				producedEventIds: [eventId],
-				resultHash: contentHash(intent)
-			}
-		};
-
-		const result = this.store.commit(input);
-		if (!result.ok) {
-			this.logger.warn('command.revision_conflict', {
-				correlationId,
-				aggregateId: payload.intentId
-			});
-			return {
-				commandId: command.commandId,
-				producedEventIds: [],
-				status: 'CONFLICT',
-				error: makeRphError('RPH_REVISION_CONFLICT', {
-					message: `Revision conflict on ${payload.intentId} (actual revision ${String(result.actualRevision)})`,
-					correlationId,
-					targetObjectIds: [payload.intentId]
-				})
-			};
-		}
-
-		this.logger.info('command.accepted', {
-			correlationId,
-			eventType: event.eventType,
-			aggregateId: payload.intentId
-		});
-		return { commandId: command.commandId, status: 'ACCEPTED', producedEventIds: [eventId] };
+		return handler(ctx, command, parsed.value);
 	}
 
 	/** Deliver pending outbox events to subscribers and mark them published. Returns the count drained. */

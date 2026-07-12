@@ -1478,6 +1478,35 @@
           "note": "id-ref"
         }
       ]
+    },
+    {
+      "commandType": "BeginIntentDiscovery",
+      "targetAggregateType": "INTENT",
+      "emitsEvent": "IntentDiscoveryStarted",
+      "drivesMachine": "Intent.intentStatus",
+      "drivesFrom": "RAW",
+      "drivesTo": "UNDER_DISCOVERY",
+      "schematized": false,
+      "sourceSection": "DOC-002 §6.1 (begin discovery); added for live command-drive (RPH-DOC-010)",
+      "payloadFields": []
+    },
+    {
+      "commandType": "ProvisionIntent",
+      "targetAggregateType": "INTENT",
+      "emitsEvent": "IntentProvisioned",
+      "drivesMachine": "Intent.intentStatus",
+      "drivesFrom": "UNDER_DISCOVERY",
+      "drivesTo": "PROVISIONAL",
+      "schematized": false,
+      "sourceSection": "DOC-002 §6.1 (create provisional intent); event IntentProvisioned added (no §26.2 name) — see OPEN-QUESTIONS",
+      "payloadFields": [
+        {
+          "field": "ambiguityIds",
+          "required": true,
+          "type": "string[]",
+          "note": "id-ref[]; known ambiguities recorded at provisional-intent time"
+        }
+      ]
     }
   ],
   "events": [
@@ -4423,6 +4452,19 @@
           "note": "=PROPOSED"
         }
       ]
+    },
+    {
+      "eventType": "IntentProvisioned",
+      "aggregateType": "Intent",
+      "sourceSection": "added (DOC-002 §6.1 provisional transition has no §26.2 event) — see OPEN-QUESTIONS",
+      "payloadFields": [
+        {
+          "field": "ambiguityIds",
+          "required": true,
+          "type": "string[]",
+          "note": "id-ref[]"
+        }
+      ]
     }
   ],
   "bindings": [
@@ -4766,6 +4808,20 @@
       "from": "AUTHORITATIVE",
       "to": "SUPERSEDED",
       "note": "DOC-002-only"
+    },
+    {
+      "commandType": "BeginIntentDiscovery",
+      "eventType": "IntentDiscoveryStarted",
+      "machine": "Intent.intentStatus",
+      "from": "RAW",
+      "to": "UNDER_DISCOVERY"
+    },
+    {
+      "commandType": "ProvisionIntent",
+      "eventType": "IntentProvisioned",
+      "machine": "Intent.intentStatus",
+      "from": "UNDER_DISCOVERY",
+      "to": "PROVISIONAL"
     }
   ],
   "conflicts": [
