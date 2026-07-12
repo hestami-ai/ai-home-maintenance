@@ -11,7 +11,7 @@
  * Point JANUMICODE_CAL40_EXPORT at the dir from `prep-replay-db.mjs
  * --export-json`. Skips cleanly when absent.
  */
-import { describe, it, expect } from 'vitest';
+import { describe, it, expect, beforeAll } from 'vitest';
 import * as fs from 'node:fs';
 import * as path from 'node:path';
 import { createHash } from 'node:crypto';
@@ -30,29 +30,36 @@ function normalize(s: string): string {
 }
 
 run('cal-40 fixture integrity (gated on JANUMICODE_CAL40_EXPORT)', () => {
-  // Load raw rows once and reconstruct LLM invocation→output pairs.
-  const rows = fs.readFileSync(ndjson, 'utf-8').split('\n').filter(Boolean).map((l) => JSON.parse(l));
-  const outByInv = new Map<string, Record<string, unknown>>();
-  for (const r of rows) {
-    if (r.record_type !== 'agent_output') continue;
-    const content = JSON.parse(r.content);
-    if ((content.status ?? 'success') !== 'success') continue;
-    for (const inv of JSON.parse(r.derived_from_record_ids ?? '[]')) {
-      if (!outByInv.has(inv)) outByInv.set(inv, content);
+  // Setup runs in beforeAll, NOT at describe-collection time, so the default
+  // skipped path (JANUMICODE_CAL40_EXPORT unset → describe.skip) never reads the
+  // absent ndjson. A collection-time fs.readFileSync('') throws ENOENT and fails
+  // the whole file even though every test is meant to be skipped.
+  let llmPairs: Array<{ inv: Record<string, unknown>; out: Record<string, unknown> }>;
+  let map: ReplayFixtureMap;
+  beforeAll(() => {
+    // Load raw rows once and reconstruct LLM invocation→output pairs.
+    const rows = fs.readFileSync(ndjson, 'utf-8').split('\n').filter(Boolean).map((l) => JSON.parse(l));
+    const outByInv = new Map<string, Record<string, unknown>>();
+    for (const r of rows) {
+      if (r.record_type !== 'agent_output') continue;
+      const content = JSON.parse(r.content);
+      if ((content.status ?? 'success') !== 'success') continue;
+      for (const inv of JSON.parse(r.derived_from_record_ids ?? '[]')) {
+        if (!outByInv.has(inv)) outByInv.set(inv, content);
+      }
     }
-  }
-  const llmPairs: Array<{ inv: Record<string, unknown>; out: Record<string, unknown> }> = [];
-  for (const r of rows) {
-    if (r.record_type !== 'agent_invocation') continue;
-    const out = outByInv.get(r.id);
-    if (!out) continue;
-    const inv = JSON.parse(r.content);
-    if (inv.provider && inv.prompt != null && typeof inv.command !== 'string') {
-      llmPairs.push({ inv, out });
+    llmPairs = [];
+    for (const r of rows) {
+      if (r.record_type !== 'agent_invocation') continue;
+      const out = outByInv.get(r.id);
+      if (!out) continue;
+      const inv = JSON.parse(r.content);
+      if (inv.provider && inv.prompt != null && typeof inv.command !== 'string') {
+        llmPairs.push({ inv, out });
+      }
     }
-  }
-
-  const map = ReplayFixtureMap.fromNdjson(ndjson);
+    map = ReplayFixtureMap.fromNdjson(ndjson);
+  });
 
   it('loads a non-trivial LLM + CLI corpus', () => {
     // eslint-disable-next-line no-console

@@ -457,30 +457,37 @@ export async function extractValidators(opts: ValidatorExtractOptions): Promise<
   const db = new Database(opts.dbPath, { readonly: true });
   db.pragma('journal_mode = WAL');
 
-  const workflowRunId = pickWorkflowRunId(db, opts.workflowRunId);
-  const loader = getTemplateLoader();
+  // try/finally so the readonly DB handle is ALWAYS released — even when
+  // pickWorkflowRunId throws ("No workflow_runs found") before the happy-path
+  // close. A leaked handle blocks temp-dir cleanup on Windows (afterAll rmSync
+  // → EPERM), and leaks a file descriptor in production too.
+  try {
+    const workflowRunId = pickWorkflowRunId(db, opts.workflowRunId);
+    const loader = getTemplateLoader();
 
-  let targets: string[];
-  if (!opts.validators || opts.validators === 'all') {
-    targets = listFiredValidators(db, workflowRunId);
-  } else {
-    targets = opts.validators;
-  }
-  // De-duplicate.
-  targets = Array.from(new Set(targets));
-
-  const written: string[] = [];
-  const skipped: { reason: string; validator_id: string }[] = [];
-
-  for (const validatorId of targets) {
-    const result = runOneValidator({ db, loader, workflowRunId, validatorId, opts, outDir, sampleSlug });
-    if (result.kind === 'written') {
-      written.push(result.path);
+    let targets: string[];
+    if (!opts.validators || opts.validators === 'all') {
+      targets = listFiredValidators(db, workflowRunId);
     } else {
-      skipped.push({ reason: result.reason, validator_id: validatorId });
+      targets = opts.validators;
     }
-  }
+    // De-duplicate.
+    targets = Array.from(new Set(targets));
 
-  db.close();
-  return { written, skipped };
+    const written: string[] = [];
+    const skipped: { reason: string; validator_id: string }[] = [];
+
+    for (const validatorId of targets) {
+      const result = runOneValidator({ db, loader, workflowRunId, validatorId, opts, outDir, sampleSlug });
+      if (result.kind === 'written') {
+        written.push(result.path);
+      } else {
+        skipped.push({ reason: result.reason, validator_id: validatorId });
+      }
+    }
+
+    return { written, skipped };
+  } finally {
+    db.close();
+  }
 }

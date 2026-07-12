@@ -38,7 +38,7 @@ function readSMTPConfig(configPath = './config/smtp.json') {
  * Formats abuse notification email
  */
 function formatAbuseNotificationEmail({ adminEmail, incident, flags }) {
-  const { id, severity, createdAt, flags } = incident;
+  const { id, severity, createdAt } = incident;
   
   const subject = `Abuse Flag Notification: Incident #${id}`;
   

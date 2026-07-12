@@ -1181,6 +1181,14 @@ Every change should answer:
 
 ---
 
+# **AI Coding Agent Source Code Quality Guide**
+
+Review "JanumiCode\janumicode_v2\docs\sonarqube-headless-remediation-guide.md" for details on how to run the SonarQube setup. 
+
+NOTA BENE: Complexity findings almost always (if not always) should be addressed fully.
+
+---
+
 # **AI Coding Agent Responsibilities**
 
 Before completing any implementation, verify:
@@ -1208,6 +1216,8 @@ Before completing any implementation, verify:
 ✓ Comments updated
 
 ✓ Documentation updated
+
+✓ SonarQube scans run and findings fully addressed (or documented exceptions where required or strongly recommended)
 
 ---
 

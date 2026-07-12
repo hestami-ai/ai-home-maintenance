@@ -5,7 +5,7 @@
  * a real run, with the right edge counts and drift surfaced (not fabricated).
  * Skips cleanly when no clone is present (commit-nothing policy).
  */
-import { describe, it, expect } from 'vitest';
+import { describe, it, expect, beforeAll } from 'vitest';
 import * as fs from 'node:fs';
 // eslint-disable-next-line @typescript-eslint/no-require-imports
 const BetterSqlite3 = require('better-sqlite3');
@@ -16,11 +16,22 @@ const CAL40 = process.env.JANUMICODE_CAL40_DB;
 const run = CAL40 && fs.existsSync(CAL40) ? describe : describe.skip;
 
 run('cal-40 realization join (gated on JANUMICODE_CAL40_DB)', () => {
-  const db = new BetterSqlite3(CAL40, { readonly: true }) as unknown as Database & { close(): void };
-  const runId = (db.prepare('SELECT id FROM workflow_runs ORDER BY rowid LIMIT 1').get() as { id: string }).id;
-  const provider = new DecompViewerDataProvider(db);
-  const snap = provider.getSnapshot(runId);
+  // Setup runs in beforeAll, NOT at describe-collection time, so the default
+  // skipped path (JANUMICODE_CAL40_DB unset → describe.skip) never opens a DB.
+  // A collection-time `new BetterSqlite3(undefined, { readonly: true })` throws
+  // "In-memory/temporary databases cannot be readonly" on better-sqlite3 12.8.0
+  // and fails the whole file even though every test is meant to be skipped.
+  let db: Database & { close(): void };
+  let runId: string;
+  let provider: DecompViewerDataProvider;
+  let snap: ReturnType<DecompViewerDataProvider['getSnapshot']>;
   const byLayer = (l: string) => snap.realization_nodes.filter((n) => n.layer === l);
+  beforeAll(() => {
+    db = new BetterSqlite3(CAL40, { readonly: true }) as unknown as Database & { close(): void };
+    runId = (db.prepare('SELECT id FROM workflow_runs ORDER BY rowid LIMIT 1').get() as { id: string }).id;
+    provider = new DecompViewerDataProvider(db);
+    snap = provider.getSnapshot(runId);
+  });
 
   // Invariants, not exact counts — the clone mutates (interactive Tier-2
   // driving, re-clones from a moving source), so we assert the join's shape.

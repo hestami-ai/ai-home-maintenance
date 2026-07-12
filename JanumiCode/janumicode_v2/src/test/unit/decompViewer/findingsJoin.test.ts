@@ -5,7 +5,7 @@
  * binds them to real items (AC/US/NFR/component) via cited ids, dropping the
  * auto-fix noise. Skips cleanly when no clone is present.
  */
-import { describe, it, expect } from 'vitest';
+import { describe, it, expect, beforeAll } from 'vitest';
 import * as fs from 'node:fs';
 // eslint-disable-next-line @typescript-eslint/no-require-imports
 const BetterSqlite3 = require('better-sqlite3');
@@ -18,9 +18,20 @@ const CAL40 = process.env.JANUMICODE_CAL40_DB;
 const run = CAL40 && fs.existsSync(CAL40) ? describe : describe.skip;
 
 run('cal-40 validator findings (gated on JANUMICODE_CAL40_DB)', () => {
-  const db = new BetterSqlite3(CAL40, { readonly: true }) as unknown as Database & { close(): void };
-  const runId = (db.prepare('SELECT id FROM workflow_runs ORDER BY rowid LIMIT 1').get() as { id: string }).id;
-  const { findings, summary } = loadFindings(db, runId);
+  // Setup runs in beforeAll, NOT at describe-collection time, so the default
+  // skipped path (JANUMICODE_CAL40_DB unset → describe.skip) never opens a DB.
+  // A collection-time `new BetterSqlite3(undefined, { readonly: true })` throws
+  // "In-memory/temporary databases cannot be readonly" on better-sqlite3 12.8.0
+  // and fails the whole file even though every test is meant to be skipped.
+  let db: Database & { close(): void };
+  let runId: string;
+  let findings: ReturnType<typeof loadFindings>['findings'];
+  let summary: ReturnType<typeof loadFindings>['summary'];
+  beforeAll(() => {
+    db = new BetterSqlite3(CAL40, { readonly: true }) as unknown as Database & { close(): void };
+    runId = (db.prepare('SELECT id FROM workflow_runs ORDER BY rowid LIMIT 1').get() as { id: string }).id;
+    ({ findings, summary } = loadFindings(db, runId));
+  });
 
   it('surfaces + binds a substantial set of findings', () => {
     expect(summary.total).toBeGreaterThan(1000);       // many raw findings
