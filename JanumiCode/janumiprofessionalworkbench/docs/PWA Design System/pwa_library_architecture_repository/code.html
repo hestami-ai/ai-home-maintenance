@@ -1,0 +1,452 @@
+<!DOCTYPE html>
+
+<html class="dark" lang="en"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<title>Janumi JPWB | PWA Library</title>
+<!-- Tailwind CSS -->
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<!-- Google Fonts -->
+<link href="https://fonts.googleapis.com" rel="preconnect"/>
+<link crossorigin="" href="https://fonts.gstatic.com" rel="preconnect"/>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&amp;family=Space+Grotesk:wght@300;400;500;600;700&amp;display=swap" rel="stylesheet"/>
+<!-- Material Symbols -->
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<script id="tailwind-config">
+      tailwind.config = {
+        darkMode: "class",
+        theme: {
+          extend: {
+            "colors": {
+                    "outline": "#8a919d",
+                    "on-tertiary": "#00382e",
+                    "surface-container": "#202020",
+                    "inverse-surface": "#e5e2e1",
+                    "tertiary-fixed-dim": "#61dac1",
+                    "surface-container-lowest": "#0e0e0e",
+                    "on-error": "#690005",
+                    "primary-container": "#007acc",
+                    "on-primary": "#003258",
+                    "error": "#ffb4ab",
+                    "background": "#131313",
+                    "secondary-container": "#474747",
+                    "on-primary-fixed": "#001d36",
+                    "on-secondary-fixed": "#1b1c1c",
+                    "surface-bright": "#393939",
+                    "on-tertiary-fixed": "#00201a",
+                    "secondary": "#c8c6c6",
+                    "on-tertiary-fixed-variant": "#005144",
+                    "tertiary-container": "#008672",
+                    "on-surface-variant": "#c0c7d3",
+                    "on-secondary": "#303030",
+                    "primary": "#9fcaff",
+                    "on-secondary-fixed-variant": "#474747",
+                    "surface-container-high": "#2a2a2a",
+                    "tertiary-fixed": "#80f7dc",
+                    "on-primary-fixed-variant": "#00497d",
+                    "primary-fixed": "#d1e4ff",
+                    "on-secondary-container": "#b6b5b4",
+                    "secondary-fixed": "#e4e2e1",
+                    "surface-tint": "#9fcaff",
+                    "primary-fixed-dim": "#9fcaff",
+                    "tertiary": "#61dac1",
+                    "secondary-fixed-dim": "#c8c6c6",
+                    "surface-container-highest": "#353535",
+                    "on-background": "#e5e2e1",
+                    "error-container": "#93000a",
+                    "surface": "#131313",
+                    "inverse-primary": "#0061a4",
+                    "on-surface": "#e5e2e1",
+                    "on-primary-container": "#ffffff",
+                    "on-tertiary-container": "#ffffff",
+                    "on-error-container": "#ffdad6",
+                    "inverse-on-surface": "#303030",
+                    "surface-container-low": "#1b1b1c",
+                    "surface-dim": "#131313",
+                    "surface-variant": "#353535",
+                    "outline-variant": "#404751"
+            },
+            "borderRadius": {
+                    "DEFAULT": "0.125rem",
+                    "lg": "0.25rem",
+                    "xl": "0.5rem",
+                    "full": "0.75rem"
+            },
+            "fontFamily": {
+                    "headline": ["Space Grotesk"],
+                    "display": ["Space Grotesk"],
+                    "body": ["Inter"],
+                    "label": ["Inter"]
+            }
+          },
+        },
+      }
+    </script>
+<style>
+        body { font-family: 'Inter', sans-serif; }
+        .font-headline { font-family: 'Space Grotesk', sans-serif; }
+        .material-symbols-outlined {
+            font-variation-settings: 'FILL' 0, 'wght' 400, 'GRAD' 0, 'opsz' 24;
+        }
+        /* Custom scrollbar */
+        ::-webkit-scrollbar { width: 6px; }
+        ::-webkit-scrollbar-track { background: #131313; }
+        ::-webkit-scrollbar-thumb { background: #353535; border-radius: 3px; }
+        ::-webkit-scrollbar-thumb:hover { background: #474747; }
+
+        .glass-panel {
+            background: rgba(53, 53, 53, 0.8);
+            backdrop-filter: blur(16px);
+            -webkit-backdrop-filter: blur(16px);
+        }
+        
+        .status-bar-active { border-left: 3px solid #61dac1; }
+        .status-bar-pending { border-left: 3px solid #9fcaff; }
+        
+        .shimmer {
+            background: linear-gradient(90deg, transparent, rgba(159, 202, 255, 0.05), transparent);
+            background-size: 200% 100%;
+            animation: shimmer 3s infinite linear;
+        }
+        @keyframes shimmer {
+            0% { background-position: -200% 0; }
+            100% { background-position: 200% 0; }
+        }
+    </style>
+</head>
+<body class="bg-surface text-on-surface selection:bg-primary/30 selection:text-primary min-h-screen flex overflow-hidden">
+<!-- SideNavBar (Execution from JSON) -->
+<aside class="fixed left-0 top-0 h-full flex flex-col border-r border-outline-variant/15 bg-surface-container-low dark:bg-surface-container-low w-64 z-50">
+<!-- Brand Header -->
+<div class="p-6">
+<div class="flex items-center gap-3 mb-6">
+<div class="w-10 h-10 rounded bg-primary-container flex items-center justify-center text-on-primary-container">
+<span class="material-symbols-outlined" style="font-variation-settings: 'FILL' 1;">architecture</span>
+</div>
+<div>
+<h1 class="font-headline font-bold text-lg tracking-tight text-on-surface">Janumi JPWB</h1>
+<p class="text-[10px] font-mono text-outline uppercase tracking-widest leading-none">v2.4.0-Alpha</p>
+</div>
+</div>
+<button class="w-full flex items-center justify-center gap-2 py-2.5 px-4 bg-primary text-on-primary font-bold rounded-lg hover:opacity-90 transition-all active:scale-[0.98]">
+<span class="material-symbols-outlined text-[20px]">add_circle</span>
+<span class="text-sm">New PWA</span>
+</button>
+</div>
+<!-- Navigation Links -->
+<nav class="flex-1 px-3 space-y-1">
+<!-- Active: PWA Design -->
+<a class="flex items-center gap-3 px-4 py-3 bg-surface-bright dark:bg-surface-bright text-primary dark:text-primary border-l-4 border-primary hover:bg-surface-container-high transition-colors duration-150" href="#">
+<span class="material-symbols-outlined" data-icon="architecture">architecture</span>
+<span class="font-body font-medium text-sm">PWA Design</span>
+</a>
+<a class="flex items-center gap-3 px-4 py-3 text-on-surface-variant dark:text-on-surface-variant hover:bg-surface-container-high transition-colors duration-150" href="#">
+<span class="material-symbols-outlined" data-icon="rocket_launch">rocket_launch</span>
+<span class="font-body font-medium text-sm">Undertaking</span>
+</a>
+<a class="flex items-center gap-3 px-4 py-3 text-on-surface-variant dark:text-on-surface-variant hover:bg-surface-container-high transition-colors duration-150" href="#">
+<span class="material-symbols-outlined" data-icon="library_books">library_books</span>
+<span class="font-body font-medium text-sm">Library</span>
+</a>
+<a class="flex items-center gap-3 px-4 py-3 text-on-surface-variant dark:text-on-surface-variant hover:bg-surface-container-high transition-colors duration-150" href="#">
+<span class="material-symbols-outlined" data-icon="work_history">work_history</span>
+<span class="font-body font-medium text-sm">Portfolios</span>
+</a>
+<a class="flex items-center gap-3 px-4 py-3 text-on-surface-variant dark:text-on-surface-variant hover:bg-surface-container-high transition-colors duration-150" href="#">
+<span class="material-symbols-outlined" data-icon="gavel">gavel</span>
+<span class="font-body font-medium text-sm">Governance</span>
+</a>
+<a class="flex items-center gap-3 px-4 py-3 text-on-surface-variant dark:text-on-surface-variant hover:bg-surface-container-high transition-colors duration-150" href="#">
+<span class="material-symbols-outlined" data-icon="settings">settings</span>
+<span class="font-body font-medium text-sm">Settings</span>
+</a>
+</nav>
+<!-- Footer Links -->
+<div class="px-3 pb-6 space-y-1">
+<a class="flex items-center gap-3 px-4 py-2 text-outline text-xs hover:text-on-surface transition-colors" href="#">
+<span class="material-symbols-outlined text-[18px]" data-icon="help">help</span>
+<span>Docs</span>
+</a>
+<a class="flex items-center gap-3 px-4 py-2 text-outline text-xs hover:text-on-surface transition-colors" href="#">
+<span class="material-symbols-outlined text-[18px]" data-icon="contact_support">contact_support</span>
+<span>Support</span>
+</a>
+<div class="mt-4 pt-4 border-t border-outline-variant/15 px-4 flex items-center gap-3">
+<img class="w-8 h-8 rounded-full bg-surface-container-high" data-alt="A professional headshot of a senior software architect with subtle salt-and-pepper hair, wearing a clean charcoal turtleneck. The lighting is dramatic and technical, with a cool blue rim light that reflects the high-tech, professional atmosphere of a high-performance development environment." src="https://lh3.googleusercontent.com/aida-public/AB6AXuD088XqVm0F8CWp2brK16og93OwMWsag5QyL4c12kywnRH-SOzrZb6OqlQn5JH5LKK_UU-Pi0RucDWxZOy1PNYcycinz0l2kRK39L26hVXO756ZbWSDgYDkxy3Zd97VxZf3xauw6SSnMfxnlublKQXF_wU52GHA47Xl2sJrO_wR9uYl7ZghuoZ0b5MurMZbezpZAXRIseeGPigXaOzCZCU-b0Fiwt-RXMosCHqAzR-OVmd3qrPyUGQp-w"/>
+<div class="overflow-hidden">
+<p class="text-xs font-bold text-on-surface truncate">Janumi Administrator</p>
+<p class="text-[10px] text-outline truncate">admin_root@system</p>
+</div>
+</div>
+</div>
+</aside>
+<!-- Main Canvas -->
+<main class="flex-1 ml-64 min-h-screen flex flex-col bg-surface overflow-y-auto">
+<!-- TopAppBar (Execution from JSON) -->
+<header class="sticky top-0 z-40 bg-surface dark:bg-surface flex justify-between items-center w-full h-16 px-8 border-b border-outline-variant/15">
+<div class="flex items-center gap-8">
+<h2 class="font-headline font-black text-xl text-on-surface tracking-tighter">Janumi Professional Workbench</h2>
+<nav class="hidden lg:flex items-center gap-6">
+<a class="text-on-surface-variant hover:text-primary transition-all font-medium text-sm" href="#">Architecture</a>
+<a class="text-on-surface-variant hover:text-primary transition-all font-medium text-sm" href="#">Instances</a>
+<a class="text-on-surface-variant hover:text-primary transition-all font-medium text-sm" href="#">Baselines</a>
+</nav>
+</div>
+<div class="flex items-center gap-6">
+<div class="flex items-center gap-3">
+<button class="material-symbols-outlined text-on-surface-variant hover:text-primary transition-opacity" data-icon="notifications">notifications</button>
+<button class="material-symbols-outlined text-on-surface-variant hover:text-primary transition-opacity" data-icon="cloud_done">cloud_done</button>
+<button class="material-symbols-outlined text-on-surface-variant hover:text-primary transition-opacity" data-icon="account_tree">account_tree</button>
+</div>
+<div class="h-6 w-[1px] bg-outline-variant/30"></div>
+<div class="flex gap-2">
+<button class="px-4 py-1.5 border border-outline-variant/30 text-on-surface text-xs font-bold rounded-lg hover:bg-surface-container-high transition-all active:opacity-80">Version</button>
+<button class="px-4 py-1.5 bg-primary-container text-on-primary-container text-xs font-bold rounded-lg hover:shadow-lg transition-all active:opacity-80">Publish</button>
+</div>
+</div>
+</header>
+<!-- Content Area -->
+<div class="p-8 max-w-7xl mx-auto w-full">
+<!-- Header Section -->
+<div class="flex flex-col md:flex-row md:items-end justify-between gap-6 mb-12">
+<div>
+<span class="text-xs font-mono text-primary font-bold uppercase tracking-[0.2em] mb-2 block">Enterprise Repository</span>
+<h1 class="text-5xl font-headline font-bold text-on-surface tracking-tight mb-4">PWA Library</h1>
+<div class="flex items-center gap-4 text-on-surface-variant">
+<div class="flex items-center gap-2 bg-surface-container-low px-3 py-1 rounded-full border border-outline-variant/20">
+<span class="w-2 h-2 rounded-full bg-tertiary"></span>
+<span class="text-xs font-medium">8 Architectures Active</span>
+</div>
+<div class="flex items-center gap-2 text-xs">
+<span class="material-symbols-outlined text-sm">swap_vert</span>
+<span>Version Comparison: Production v2.3 vs Beta v2.4</span>
+</div>
+</div>
+</div>
+<div class="flex gap-3">
+<button class="flex items-center gap-2 px-5 py-3 bg-surface-container-high text-on-surface font-bold rounded-xl hover:bg-surface-container-highest transition-all">
+<span class="material-symbols-outlined">filter_list</span>
+<span>Sort &amp; Filter</span>
+</button>
+<button class="flex items-center gap-2 px-6 py-3 bg-primary text-on-primary font-bold rounded-xl hover:opacity-90 shadow-xl shadow-primary/10 transition-all active:scale-95">
+<span class="material-symbols-outlined">add</span>
+<span>Create PWA</span>
+</button>
+</div>
+</div>
+<!-- Bento Grid of PWA Cards -->
+<div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+<!-- Card 1: Product Realization PWA -->
+<div class="group relative bg-surface-container-low p-6 rounded-xl border-t-2 border-transparent hover:border-primary transition-all duration-300 status-bar-active overflow-hidden">
+<div class="shimmer absolute inset-0 opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none"></div>
+<div class="flex justify-between items-start mb-6">
+<div class="w-12 h-12 bg-surface-container-highest flex items-center justify-center rounded-lg text-primary">
+<span class="material-symbols-outlined text-3xl">inventory_2</span>
+</div>
+<div class="text-right">
+<span class="text-[10px] font-mono text-tertiary bg-tertiary/10 px-2 py-0.5 rounded uppercase font-bold tracking-wider">Published</span>
+<p class="text-xs text-outline mt-1">v1.3.0</p>
+</div>
+</div>
+<h3 class="font-headline font-bold text-xl text-on-surface group-hover:text-primary transition-colors mb-2">Product Realization PWA</h3>
+<p class="text-sm text-on-surface-variant mb-6 line-clamp-2 font-body leading-relaxed">Framework for transitioning conceptual product requirements into validated, market-ready engineering blueprints.</p>
+<div class="space-y-3">
+<div class="flex items-center justify-between text-xs font-mono py-2 border-b border-outline-variant/10">
+<span class="text-outline">PWU Types</span>
+<span class="text-on-surface font-bold">7 Types</span>
+</div>
+<div class="flex items-center justify-between text-xs font-mono py-2">
+<span class="text-outline">Assurance Policies</span>
+<span class="text-on-surface font-bold">12 Policies</span>
+</div>
+</div>
+<div class="mt-6 flex items-center gap-2">
+<button class="flex-1 text-xs font-bold py-2 bg-surface-container-highest text-on-surface rounded-lg hover:bg-primary hover:text-on-primary transition-all">Open Editor</button>
+<button class="w-10 h-10 flex items-center justify-center rounded-lg border border-outline-variant/20 hover:border-primary text-outline hover:text-primary transition-all">
+<span class="material-symbols-outlined text-lg">more_horiz</span>
+</button>
+</div>
+</div>
+<!-- Card 2: Legal Compliance PWA -->
+<div class="group relative bg-surface-container-low p-6 rounded-xl border-t-2 border-transparent hover:border-primary transition-all duration-300 status-bar-active overflow-hidden">
+<div class="shimmer absolute inset-0 opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none"></div>
+<div class="flex justify-between items-start mb-6">
+<div class="w-12 h-12 bg-surface-container-highest flex items-center justify-center rounded-lg text-primary">
+<span class="material-symbols-outlined text-3xl">gavel</span>
+</div>
+<div class="text-right">
+<span class="text-[10px] font-mono text-tertiary bg-tertiary/10 px-2 py-0.5 rounded uppercase font-bold tracking-wider">Published</span>
+<p class="text-xs text-outline mt-1">v2.1.4</p>
+</div>
+</div>
+<h3 class="font-headline font-bold text-xl text-on-surface group-hover:text-primary transition-colors mb-2">Legal Compliance PWA</h3>
+<p class="text-sm text-on-surface-variant mb-6 line-clamp-2 font-body leading-relaxed">Automated regulatory monitoring and compliance baseline enforcement across international territories.</p>
+<div class="space-y-3">
+<div class="flex items-center justify-between text-xs font-mono py-2 border-b border-outline-variant/10">
+<span class="text-outline">PWU Types</span>
+<span class="text-on-surface font-bold">14 Types</span>
+</div>
+<div class="flex items-center justify-between text-xs font-mono py-2">
+<span class="text-outline">Assurance Policies</span>
+<span class="text-on-surface font-bold">32 Policies</span>
+</div>
+</div>
+<div class="mt-6 flex items-center gap-2">
+<button class="flex-1 text-xs font-bold py-2 bg-surface-container-highest text-on-surface rounded-lg hover:bg-primary hover:text-on-primary transition-all">Open Editor</button>
+<button class="w-10 h-10 flex items-center justify-center rounded-lg border border-outline-variant/20 hover:border-primary text-outline hover:text-primary transition-all">
+<span class="material-symbols-outlined text-lg">more_horiz</span>
+</button>
+</div>
+</div>
+<!-- Card 3: Enterprise Security PWA -->
+<div class="group relative bg-surface-container-low p-6 rounded-xl border-t-2 border-transparent hover:border-primary transition-all duration-300 status-bar-pending overflow-hidden">
+<div class="shimmer absolute inset-0 opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none"></div>
+<div class="flex justify-between items-start mb-6">
+<div class="w-12 h-12 bg-surface-container-highest flex items-center justify-center rounded-lg text-primary">
+<span class="material-symbols-outlined text-3xl">shield_lock</span>
+</div>
+<div class="text-right">
+<span class="text-[10px] font-mono text-primary bg-primary/10 px-2 py-0.5 rounded uppercase font-bold tracking-wider">Draft</span>
+<p class="text-xs text-outline mt-1">v0.9.2</p>
+</div>
+</div>
+<h3 class="font-headline font-bold text-xl text-on-surface group-hover:text-primary transition-colors mb-2">Enterprise Security PWA</h3>
+<p class="text-sm text-on-surface-variant mb-6 line-clamp-2 font-body leading-relaxed">SecOps integration architecture for multi-cloud infrastructure auditing and perimeter defense protocols.</p>
+<div class="space-y-3">
+<div class="flex items-center justify-between text-xs font-mono py-2 border-b border-outline-variant/10">
+<span class="text-outline">PWU Types</span>
+<span class="text-on-surface font-bold">9 Types</span>
+</div>
+<div class="flex items-center justify-between text-xs font-mono py-2">
+<span class="text-outline">Assurance Policies</span>
+<span class="text-on-surface font-bold">18 Policies</span>
+</div>
+</div>
+<div class="mt-6 flex items-center gap-2">
+<button class="flex-1 text-xs font-bold py-2 bg-surface-container-highest text-on-surface rounded-lg hover:bg-primary hover:text-on-primary transition-all">Resume Build</button>
+<button class="w-10 h-10 flex items-center justify-center rounded-lg border border-outline-variant/20 hover:border-primary text-outline hover:text-primary transition-all">
+<span class="material-symbols-outlined text-lg">more_horiz</span>
+</button>
+</div>
+</div>
+<!-- Card 4: Financial Governance PWA -->
+<div class="group relative bg-surface-container-low p-6 rounded-xl border-t-2 border-transparent hover:border-primary transition-all duration-300 status-bar-active overflow-hidden">
+<div class="shimmer absolute inset-0 opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none"></div>
+<div class="flex justify-between items-start mb-6">
+<div class="w-12 h-12 bg-surface-container-highest flex items-center justify-center rounded-lg text-primary">
+<span class="material-symbols-outlined text-3xl">account_balance_wallet</span>
+</div>
+<div class="text-right">
+<span class="text-[10px] font-mono text-tertiary bg-tertiary/10 px-2 py-0.5 rounded uppercase font-bold tracking-wider">Published</span>
+<p class="text-xs text-outline mt-1">v4.2.1</p>
+</div>
+</div>
+<h3 class="font-headline font-bold text-xl text-on-surface group-hover:text-primary transition-colors mb-2">Financial Governance PWA</h3>
+<p class="text-sm text-on-surface-variant mb-6 line-clamp-2 font-body leading-relaxed">Centralized ledger reconciliation and fiscal policy enforcement for multi-national corporate entities.</p>
+<div class="space-y-3">
+<div class="flex items-center justify-between text-xs font-mono py-2 border-b border-outline-variant/10">
+<span class="text-outline">PWU Types</span>
+<span class="text-on-surface font-bold">22 Types</span>
+</div>
+<div class="flex items-center justify-between text-xs font-mono py-2">
+<span class="text-outline">Assurance Policies</span>
+<span class="text-on-surface font-bold">45 Policies</span>
+</div>
+</div>
+<div class="mt-6 flex items-center gap-2">
+<button class="flex-1 text-xs font-bold py-2 bg-surface-container-highest text-on-surface rounded-lg hover:bg-primary hover:text-on-primary transition-all">Open Editor</button>
+<button class="w-10 h-10 flex items-center justify-center rounded-lg border border-outline-variant/20 hover:border-primary text-outline hover:text-primary transition-all">
+<span class="material-symbols-outlined text-lg">more_horiz</span>
+</button>
+</div>
+</div>
+<!-- Empty State / Create New -->
+<button class="group relative border-2 border-dashed border-outline-variant/30 p-6 rounded-xl flex flex-col items-center justify-center text-center hover:border-primary/50 hover:bg-surface-container-low transition-all duration-300">
+<div class="w-16 h-16 rounded-full bg-surface-container-highest flex items-center justify-center mb-4 group-hover:scale-110 transition-transform">
+<span class="material-symbols-outlined text-4xl text-outline group-hover:text-primary transition-colors">add_task</span>
+</div>
+<h4 class="font-headline font-bold text-lg text-on-surface mb-2">New Architecture</h4>
+<p class="text-xs text-outline max-w-[180px]">Start from a blank canvas or import a predefined schema baseline.</p>
+</button>
+</div>
+<!-- Library Statistics Bar -->
+<div class="mt-16 bg-surface-container-low rounded-xl p-8 flex flex-col md:flex-row items-center justify-between gap-8 border border-outline-variant/10">
+<div class="flex flex-col md:flex-row gap-12 w-full md:w-auto">
+<div>
+<p class="text-[10px] font-mono text-outline uppercase tracking-widest mb-1">Total Assets</p>
+<p class="text-3xl font-headline font-bold text-on-surface">142 <span class="text-sm font-normal text-outline">PWUs</span></p>
+</div>
+<div>
+<p class="text-[10px] font-mono text-outline uppercase tracking-widest mb-1">Active Polices</p>
+<p class="text-3xl font-headline font-bold text-on-surface">328 <span class="text-sm font-normal text-outline">Rules</span></p>
+</div>
+<div>
+<p class="text-[10px] font-mono text-outline uppercase tracking-widest mb-1">Schema Version</p>
+<p class="text-3xl font-headline font-bold text-primary">v2.4</p>
+</div>
+</div>
+<div class="flex items-center gap-4 w-full md:w-auto pt-6 md:pt-0 border-t md:border-t-0 border-outline-variant/10">
+<div class="flex -space-x-3">
+<img class="w-10 h-10 rounded-full border-2 border-surface-container-low ring-1 ring-outline-variant/10" data-alt="Close-up of a diverse, technical workspace with specialized mechanical keyboards and high-resolution monitors displaying complex diagrams. The scene is shot with a shallow depth of field, emphasizing the tactile quality of the professional environment." src="https://lh3.googleusercontent.com/aida-public/AB6AXuDOcn53USwnCNxDNIwR5kmlhtNnXgNQvtk80cRsGm9dHs4kPJw5948HPBp3_h0lugIDaItYrP6KPTFCqx53LmADs2KuFGI6-99j5f-DnOiSYRuEXnKXDAiKRIaodaOMVx2-EwCCcX6pXtXuKPWV4qD6HCdyD9bvyW_5IhJVb6xw61qvVzKdl-GzjSBoYmCQx4XG4qGn5TwiDh7f_9LkpaS4__1916pml3MiLpssv5XMUHRXHWc71pxquw"/>
+<img class="w-10 h-10 rounded-full border-2 border-surface-container-low ring-1 ring-outline-variant/10" data-alt="Abstract macro photography of fiber optic cables glowing with soft blue and green data pulses. The image conveys high-speed communication and complex networking, with a futuristic, clean aesthetic fitting for a technical architecture platform." src="https://lh3.googleusercontent.com/aida-public/AB6AXuArKMk9Muy648Q9g7y-3yqGR6NgCe-FRJpo8jGyCtOY8pT1BFzd9gdIVLPZFgVytSEARttoEWLJALGM761Bs--m5qYAb8rKs6hKVH6YpxoLNQyPbg0DDLMUgaDefXcTlT4q9-Om9-uC0EUEgWQ_Mn1iW4lvKcazjaKrl_nWZr3Ts0jA2Ob_wtAi9j4QJZrZ6w10qwvM7vQCl1W0yhjD1Yizu2fc9l-dDmiCBSnWGhbdDeTnFZNnHM5MBg"/>
+<img class="w-10 h-10 rounded-full border-2 border-surface-container-low ring-1 ring-outline-variant/10" data-alt="A minimalist architectural blueprint showing clean geometric lines and precise measurements on a dark grey background. The style is technical and elegant, representing the foundational structure of a professional architecture system." src="https://lh3.googleusercontent.com/aida-public/AB6AXuDoTTqt39F-Hm0NDZQX0HDo9WjG2NJMr5dtfKO5l45QoTfZ2RtthNyIrDvHppK6qpqzqLrm3aW1SEIqNYISaKPgYcPos_w1gw4SMzEmq3KsWYgpP-MHIFepKofk_RNd5KqjUwGG_Itv0hAYn8rNLlyR1mGyJ5ArEIpHfXs7YDy7fa27iUiucUcqGBBU9RUMhv5nkljJuMUci64QwWHpHMcMf_691XKqk9T_SmGLVC99mPdsYeKCA92A8w"/>
+<div class="w-10 h-10 rounded-full bg-surface-container-high border-2 border-surface-container-low flex items-center justify-center text-[10px] font-bold text-outline">+12</div>
+</div>
+<div class="text-left">
+<p class="text-xs font-bold text-on-surface">Collaborative Team</p>
+<p class="text-[10px] text-outline">Active on 4 architectures</p>
+</div>
+</div>
+</div>
+</div>
+</main>
+<!-- Floating Quick Actions (Contextual Suppressed based on Rule, but kept here for "New PWA" as specified in task) -->
+<div class="fixed bottom-8 right-8 flex flex-col gap-4 z-50">
+<button class="w-14 h-14 bg-tertiary text-on-tertiary rounded-xl shadow-2xl flex items-center justify-center hover:scale-105 active:scale-95 transition-all group overflow-hidden">
+<span class="material-symbols-outlined text-2xl group-hover:rotate-90 transition-transform">bolt</span>
+<div class="absolute right-16 bg-surface-container-highest px-4 py-2 rounded-lg text-xs font-bold text-on-surface opacity-0 group-hover:opacity-100 transition-opacity whitespace-nowrap pointer-events-none border border-outline-variant/20 shadow-xl">
+                Quick Deploy PWA
+            </div>
+</button>
+</div>
+<!-- Notification Toast (Micro-interaction) -->
+<div class="fixed bottom-8 left-1/2 -translate-x-1/2 translate-y-20 glass-panel border border-outline-variant/20 px-6 py-4 rounded-xl shadow-2xl flex items-center gap-4 transition-all duration-500 opacity-0 z-[60]" id="toast">
+<span class="material-symbols-outlined text-tertiary">check_circle</span>
+<div>
+<p class="text-sm font-bold text-on-surface">Library Synchronized</p>
+<p class="text-[10px] text-on-surface-variant">Production instances updated to v2.4.0-Alpha</p>
+</div>
+<button class="text-outline hover:text-on-surface ml-4" onclick="hideToast()">
+<span class="material-symbols-outlined text-sm">close</span>
+</button>
+</div>
+<script>
+        // Micro-interaction: Show sync toast on load
+        window.addEventListener('DOMContentLoaded', () => {
+            setTimeout(() => {
+                const toast = document.getElementById('toast');
+                toast.classList.remove('translate-y-20', 'opacity-0');
+            }, 2000);
+            
+            setTimeout(() => {
+                hideToast();
+            }, 8000);
+        });
+
+        function hideToast() {
+            const toast = document.getElementById('toast');
+            toast.classList.add('translate-y-20', 'opacity-0');
+        }
+
+        // Hover scale interaction for cards
+        document.querySelectorAll('.group').forEach(card => {
+            card.addEventListener('mousedown', () => {
+                card.style.transform = 'scale(0.98)';
+            });
+            card.addEventListener('mouseup', () => {
+                card.style.transform = 'scale(1)';
+            });
+        });
+    </script>
+</body></html>

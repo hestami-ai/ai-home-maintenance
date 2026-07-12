@@ -1,0 +1,487 @@
+<!DOCTYPE html>
+
+<html class="dark" lang="en"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<title>Janumi Workbench | PWU Type Editor</title>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@300;400;500;600;700&amp;family=Inter:wght@300;400;500;600;700&amp;family=Source+Code+Pro:wght@400;500&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<script id="tailwind-config">
+        tailwind.config = {
+            darkMode: "class",
+            theme: {
+                extend: {
+                    "colors": {
+                        "outline": "#8a919d",
+                        "on-tertiary": "#00382e",
+                        "surface-container": "#202020",
+                        "inverse-surface": "#e5e2e1",
+                        "tertiary-fixed-dim": "#61dac1",
+                        "surface-container-lowest": "#0e0e0e",
+                        "on-error": "#690005",
+                        "primary-container": "#007acc",
+                        "on-primary": "#003258",
+                        "error": "#ffb4ab",
+                        "background": "#131313",
+                        "secondary-container": "#474747",
+                        "on-primary-fixed": "#001d36",
+                        "on-secondary-fixed": "#1b1c1c",
+                        "surface-bright": "#393939",
+                        "on-tertiary-fixed": "#00201a",
+                        "secondary": "#c8c6c6",
+                        "on-tertiary-fixed-variant": "#005144",
+                        "tertiary-container": "#008672",
+                        "on-surface-variant": "#c0c7d3",
+                        "on-secondary": "#303030",
+                        "primary": "#9fcaff",
+                        "on-secondary-fixed-variant": "#474747",
+                        "surface-container-high": "#2a2a2a",
+                        "tertiary-fixed": "#80f7dc",
+                        "on-primary-fixed-variant": "#00497d",
+                        "primary-fixed": "#d1e4ff",
+                        "on-secondary-container": "#b6b5b4",
+                        "secondary-fixed": "#e4e2e1",
+                        "surface-tint": "#9fcaff",
+                        "primary-fixed-dim": "#9fcaff",
+                        "tertiary": "#61dac1",
+                        "secondary-fixed-dim": "#c8c6c6",
+                        "surface-container-highest": "#353535",
+                        "on-background": "#e5e2e1",
+                        "error-container": "#93000a",
+                        "surface": "#131313",
+                        "inverse-primary": "#0061a4",
+                        "on-surface": "#e5e2e1",
+                        "on-primary-container": "#ffffff",
+                        "on-tertiary-container": "#ffffff",
+                        "on-error-container": "#ffdad6",
+                        "inverse-on-surface": "#303030",
+                        "surface-container-low": "#1b1b1c",
+                        "surface-dim": "#131313",
+                        "surface-variant": "#353535",
+                        "outline-variant": "#404751"
+                    },
+                    "borderRadius": {
+                        "DEFAULT": "0.125rem",
+                        "lg": "0.25rem",
+                        "xl": "0.5rem",
+                        "full": "0.75rem"
+                    },
+                    "fontFamily": {
+                        "headline": ["Space Grotesk"],
+                        "display": ["Space Grotesk"],
+                        "body": ["Inter"],
+                        "label": ["Inter"],
+                        "mono": ["Source Code Pro"]
+                    }
+                }
+            }
+        }
+    </script>
+<style>
+        body { font-family: 'Inter', sans-serif; }
+        .font-headline { font-family: 'Space Grotesk', sans-serif; }
+        .font-mono { font-family: 'Source Code Pro', monospace; }
+        .material-symbols-outlined {
+            font-variation-settings: 'FILL' 0, 'wght' 400, 'GRAD' 0, 'opsz' 24;
+        }
+        ::-webkit-scrollbar { width: 6px; }
+        ::-webkit-scrollbar-track { background: #131313; }
+        ::-webkit-scrollbar-thumb { background: #353535; border-radius: 10px; }
+        ::-webkit-scrollbar-thumb:hover { background: #474747; }
+        
+        .glass-panel {
+            background: rgba(53, 53, 53, 0.8);
+            backdrop-filter: blur(16px);
+            border: 1px solid rgba(64, 71, 81, 0.15);
+        }
+    </style>
+</head>
+<body class="bg-background text-on-surface selection:bg-primary/30">
+<!-- Sidebar Shell -->
+<aside class="fixed left-0 top-0 h-full flex flex-col border-r border-outline-variant/15 bg-surface-container-low w-64 z-50">
+<div class="p-6">
+<div class="font-headline font-bold text-lg tracking-tight text-on-surface">Janumi JPWB</div>
+<div class="text-[10px] text-outline uppercase tracking-widest mt-1">v2.4.0-Alpha</div>
+</div>
+<nav class="flex-1 px-2 space-y-1">
+<div class="flex items-center gap-3 px-4 py-3 text-on-surface-variant hover:bg-surface-container-high transition-colors duration-150 group cursor-pointer">
+<span class="material-symbols-outlined text-outline group-hover:text-primary">architecture</span>
+<span class="text-sm font-medium">PWA Design</span>
+</div>
+<div class="flex items-center gap-3 px-4 py-3 text-on-surface-variant hover:bg-surface-container-high transition-colors duration-150 group cursor-pointer">
+<span class="material-symbols-outlined text-outline group-hover:text-primary">rocket_launch</span>
+<span class="text-sm font-medium">Undertaking</span>
+</div>
+<!-- Active State Logic: Mapping "PWA Library" breadcrumb to Library tab -->
+<div class="flex items-center gap-3 px-4 py-3 bg-surface-bright text-primary border-l-4 border-primary transition-colors duration-150 group cursor-pointer">
+<span class="material-symbols-outlined" style="font-variation-settings: 'FILL' 1;">library_books</span>
+<span class="text-sm font-bold">Library</span>
+</div>
+<div class="flex items-center gap-3 px-4 py-3 text-on-surface-variant hover:bg-surface-container-high transition-colors duration-150 group cursor-pointer">
+<span class="material-symbols-outlined text-outline group-hover:text-primary">work_history</span>
+<span class="text-sm font-medium">Portfolios</span>
+</div>
+<div class="flex items-center gap-3 px-4 py-3 text-on-surface-variant hover:bg-surface-container-high transition-colors duration-150 group cursor-pointer">
+<span class="material-symbols-outlined text-outline group-hover:text-primary">gavel</span>
+<span class="text-sm font-medium">Governance</span>
+</div>
+<div class="flex items-center gap-3 px-4 py-3 text-on-surface-variant hover:bg-surface-container-high transition-colors duration-150 group cursor-pointer">
+<span class="material-symbols-outlined text-outline group-hover:text-primary">settings</span>
+<span class="text-sm font-medium">Settings</span>
+</div>
+</nav>
+<div class="p-4 mt-auto space-y-1 border-t border-outline-variant/10">
+<div class="flex items-center gap-3 px-4 py-2 text-outline text-xs hover:text-on-surface cursor-pointer">
+<span class="material-symbols-outlined text-sm">help</span>
+<span>Docs</span>
+</div>
+<div class="flex items-center gap-3 px-4 py-2 text-outline text-xs hover:text-on-surface cursor-pointer">
+<span class="material-symbols-outlined text-sm">contact_support</span>
+<span>Support</span>
+</div>
+<div class="pt-4 flex items-center gap-3 px-4">
+<div class="w-8 h-8 rounded-full bg-primary-container flex items-center justify-center overflow-hidden">
+<img class="w-full h-full object-cover" data-alt="Close-up portrait of a professional technology administrator, wearing minimalist glasses, neutral background, soft dramatic studio lighting, 8k resolution, cinematic digital photography style." src="https://lh3.googleusercontent.com/aida-public/AB6AXuDmqLFmzkdSUZHI-bV3ROszaF2k_JX1TRCeTBxQMYoY8RRMj-aKU_eBQ7vPR9c1vYUy9SCu069uaz4IpDLbzZpAYfeSCI6E2Qa-osuN2XOJswinpSxTY4JAI5gJcWm5pkDn_uepY5IiHn16-G6wzmce9zfqB4mIoAaARMjRyf9IrmTfK9XrpzOCOjWGiOYTHawblrv58moJ--ierKlZ-Fvlh5YoVMOvRpt95GXI8TkesvMeCpiNJAkFmw"/>
+</div>
+<div class="flex flex-col">
+<span class="text-xs font-bold text-on-surface">Administrator</span>
+<span class="text-[10px] text-outline">System Lead</span>
+</div>
+</div>
+</div>
+</aside>
+<!-- Top AppBar Shell -->
+<header class="fixed top-0 left-64 right-0 h-16 flex justify-between items-center px-6 border-b border-outline-variant/15 bg-surface z-40">
+<div class="flex items-center gap-8">
+<div class="font-headline font-black text-xl text-on-surface tracking-tighter">Janumi Professional Workbench</div>
+<nav class="hidden lg:flex items-center gap-6">
+<a class="text-on-surface-variant hover:text-primary transition-opacity text-sm font-medium" href="#">Architecture</a>
+<a class="text-on-surface-variant hover:text-primary transition-opacity text-sm font-medium" href="#">Instances</a>
+<a class="text-primary font-bold border-b-2 border-primary pb-1 text-sm" href="#">Baselines</a>
+</nav>
+</div>
+<div class="flex items-center gap-4">
+<div class="flex items-center gap-3 px-3 py-1.5 bg-surface-container-low rounded-lg border border-outline-variant/10">
+<span class="material-symbols-outlined text-outline text-lg">search</span>
+<input class="bg-transparent border-none focus:ring-0 text-sm w-48 text-on-surface placeholder:text-outline/50" placeholder="Search resources..." type="text"/>
+</div>
+<div class="flex items-center gap-2">
+<button class="p-2 text-outline hover:text-primary transition-all active:scale-95">
+<span class="material-symbols-outlined">notifications</span>
+</button>
+<button class="p-2 text-outline hover:text-primary transition-all active:scale-95">
+<span class="material-symbols-outlined">cloud_done</span>
+</button>
+<div class="h-6 w-[1px] bg-outline-variant/30 mx-1"></div>
+<button class="px-4 py-1.5 bg-primary text-on-primary font-bold text-sm rounded-lg hover:opacity-90 active:scale-95 transition-all">
+                    Publish
+                </button>
+</div>
+</div>
+</header>
+<!-- Main Canvas -->
+<main class="ml-64 pt-16 min-h-screen">
+<div class="p-8 max-w-7xl mx-auto">
+<!-- Breadcrumb & Header -->
+<div class="mb-8">
+<nav class="flex items-center gap-2 text-xs font-medium text-outline mb-4">
+<span>PWA Library</span>
+<span class="material-symbols-outlined text-[14px]">chevron_right</span>
+<span>Product Realization</span>
+<span class="material-symbols-outlined text-[14px]">chevron_right</span>
+<span class="text-on-surface">Architecture Definition</span>
+</nav>
+<div class="flex justify-between items-end">
+<div>
+<h1 class="font-display text-4xl font-bold text-on-surface tracking-tight">Architecture Definition</h1>
+<p class="text-on-surface-variant mt-2 font-mono text-sm">TYPE_ID: PWU-ARCH-001</p>
+</div>
+<div class="flex gap-3">
+<button class="px-5 py-2 border border-outline-variant/30 text-on-surface text-sm font-bold hover:bg-surface-container transition-colors">
+                            Discard Changes
+                        </button>
+<button class="px-5 py-2 bg-tertiary text-on-tertiary text-sm font-bold hover:opacity-90 transition-all flex items-center gap-2">
+<span class="material-symbols-outlined text-sm">save</span>
+                            Commit Definition
+                        </button>
+</div>
+</div>
+</div>
+<!-- Bento Layout Content -->
+<div class="grid grid-cols-12 gap-6">
+<!-- Left Column: Purpose & Relations -->
+<div class="col-span-12 lg:col-span-7 space-y-6">
+<!-- Purpose Section -->
+<section class="bg-surface-container-low p-6 relative overflow-hidden group">
+<div class="absolute left-0 top-0 bottom-0 w-[3px] bg-primary"></div>
+<h2 class="font-display text-xl font-bold text-on-surface mb-4 flex items-center gap-2">
+<span class="material-symbols-outlined text-primary">description</span>
+                            Purpose &amp; Scope
+                        </h2>
+<textarea class="w-full h-40 bg-surface-container-lowest border border-outline-variant/20 focus:border-primary focus:ring-1 focus:ring-primary/20 text-on-surface p-4 text-sm leading-relaxed font-body resize-none" placeholder="Enter formal PWU type purpose description here...">This work unit type defines the structural blueprint and technical constraints for a product realization phase. It serves as the authoritative source for downstream development units, establishing interfaces, component hierarchies, and performance baselines that must be adhered to during implementation.</textarea>
+</section>
+<!-- Relations Section -->
+<section class="bg-surface-container-low p-6 relative overflow-hidden">
+<div class="absolute left-0 top-0 bottom-0 w-[3px] bg-tertiary"></div>
+<h2 class="font-display text-xl font-bold text-on-surface mb-6">Structural Hierarchy</h2>
+<div class="space-y-6">
+<div>
+<label class="text-[10px] uppercase tracking-widest text-outline block mb-3 font-bold">Permitted Parents</label>
+<div class="flex flex-wrap gap-2">
+<div class="flex items-center gap-2 px-3 py-1.5 bg-surface-container-highest rounded border border-outline-variant/10">
+<span class="font-mono text-xs text-primary">PRODUCT_SPEC</span>
+<button class="material-symbols-outlined text-xs text-outline hover:text-error">close</button>
+</div>
+<div class="flex items-center gap-2 px-3 py-1.5 bg-surface-container-highest rounded border border-outline-variant/10">
+<span class="font-mono text-xs text-primary">SYSTEM_DESIGN</span>
+<button class="material-symbols-outlined text-xs text-outline hover:text-error">close</button>
+</div>
+<button class="flex items-center gap-1 px-3 py-1.5 border border-dashed border-outline-variant/40 text-outline text-xs hover:border-primary hover:text-primary transition-all">
+<span class="material-symbols-outlined text-xs">add</span> Add Parent
+                                    </button>
+</div>
+</div>
+<div>
+<label class="text-[10px] uppercase tracking-widest text-outline block mb-3 font-bold">Permitted Children</label>
+<div class="flex flex-wrap gap-2">
+<div class="flex items-center gap-2 px-3 py-1.5 bg-surface-container-highest rounded border border-outline-variant/10">
+<span class="font-mono text-xs text-tertiary">MODULE_ARCH</span>
+<button class="material-symbols-outlined text-xs text-outline hover:text-error">close</button>
+</div>
+<div class="flex items-center gap-2 px-3 py-1.5 bg-surface-container-highest rounded border border-outline-variant/10">
+<span class="font-mono text-xs text-tertiary">INTERFACE_DEF</span>
+<button class="material-symbols-outlined text-xs text-outline hover:text-error">close</button>
+</div>
+<div class="flex items-center gap-2 px-3 py-1.5 bg-surface-container-highest rounded border border-outline-variant/10">
+<span class="font-mono text-xs text-tertiary">PROTO_BUILD</span>
+<button class="material-symbols-outlined text-xs text-outline hover:text-error">close</button>
+</div>
+<button class="flex items-center gap-1 px-3 py-1.5 border border-dashed border-outline-variant/40 text-outline text-xs hover:border-tertiary hover:text-tertiary transition-all">
+<span class="material-symbols-outlined text-xs">add</span> Add Child
+                                    </button>
+</div>
+</div>
+</div>
+</section>
+<!-- I/O Matrix -->
+<section class="bg-surface-container-low overflow-hidden">
+<div class="p-6 border-b border-outline-variant/10 flex justify-between items-center">
+<h2 class="font-display text-xl font-bold text-on-surface">Data Interface Matrix</h2>
+<button class="text-xs font-bold text-primary flex items-center gap-1 hover:underline">
+<span class="material-symbols-outlined text-sm">add_circle</span> Add Field
+                            </button>
+</div>
+<div class="overflow-x-auto">
+<table class="w-full text-left border-collapse">
+<thead class="bg-surface-container text-outline text-[10px] uppercase tracking-wider font-bold">
+<tr>
+<th class="px-6 py-3 border-b border-outline-variant/10">Flow</th>
+<th class="px-6 py-3 border-b border-outline-variant/10">Data Entity ID</th>
+<th class="px-6 py-3 border-b border-outline-variant/10">Format</th>
+<th class="px-6 py-3 border-b border-outline-variant/10">Strictness</th>
+<th class="px-6 py-3 border-b border-outline-variant/10"></th>
+</tr>
+</thead>
+<tbody class="text-sm font-mono divide-y divide-outline-variant/10">
+<tr class="hover:bg-surface-bright/30 transition-colors">
+<td class="px-6 py-4">
+<span class="px-2 py-0.5 bg-primary/10 text-primary rounded text-[10px] font-bold">INPUT</span>
+</td>
+<td class="px-6 py-4 text-on-surface">SYS_REQ_SPEC_V2</td>
+<td class="px-6 py-4 text-on-surface-variant">YAML/Schema</td>
+<td class="px-6 py-4">
+<div class="flex items-center gap-2">
+<div class="w-2 h-2 rounded-full bg-error"></div>
+<span class="text-[10px] font-body font-semibold">MANDATORY</span>
+</div>
+</td>
+<td class="px-6 py-4 text-right">
+<button class="material-symbols-outlined text-outline hover:text-on-surface">more_vert</button>
+</td>
+</tr>
+<tr class="hover:bg-surface-bright/30 transition-colors">
+<td class="px-6 py-4">
+<span class="px-2 py-0.5 bg-tertiary/10 text-tertiary rounded text-[10px] font-bold">OUTPUT</span>
+</td>
+<td class="px-6 py-4 text-on-surface">COMPONENT_MODEL</td>
+<td class="px-6 py-4 text-on-surface-variant">UML/JSON</td>
+<td class="px-6 py-4">
+<div class="flex items-center gap-2">
+<div class="w-2 h-2 rounded-full bg-error"></div>
+<span class="text-[10px] font-body font-semibold">MANDATORY</span>
+</div>
+</td>
+<td class="px-6 py-4 text-right">
+<button class="material-symbols-outlined text-outline hover:text-on-surface">more_vert</button>
+</td>
+</tr>
+<tr class="hover:bg-surface-bright/30 transition-colors">
+<td class="px-6 py-4">
+<span class="px-2 py-0.5 bg-tertiary/10 text-tertiary rounded text-[10px] font-bold">OUTPUT</span>
+</td>
+<td class="px-6 py-4 text-on-surface">ALLOCATION_TABLE</td>
+<td class="px-6 py-4 text-on-surface-variant">CSV</td>
+<td class="px-6 py-4">
+<div class="flex items-center gap-2">
+<div class="w-2 h-2 rounded-full bg-outline"></div>
+<span class="text-[10px] font-body font-semibold text-outline">OPTIONAL</span>
+</div>
+</td>
+<td class="px-6 py-4 text-right">
+<button class="material-symbols-outlined text-outline hover:text-on-surface">more_vert</button>
+</td>
+</tr>
+</tbody>
+</table>
+</div>
+</section>
+</div>
+<!-- Right Column: Governance & Policy -->
+<div class="col-span-12 lg:col-span-5 space-y-6">
+<!-- Governance Section -->
+<section class="bg-surface-container p-6 border border-outline-variant/10">
+<h2 class="font-display text-xl font-bold text-on-surface mb-6 flex items-center justify-between">
+                            Governance Model
+                            <span class="material-symbols-outlined text-outline">security</span>
+</h2>
+<div class="space-y-6">
+<div>
+<label class="text-[10px] uppercase tracking-widest text-outline block mb-4 font-bold">Required Roles</label>
+<div class="space-y-3">
+<div class="flex items-center justify-between p-3 bg-surface-container-low rounded border border-outline-variant/5">
+<div class="flex items-center gap-3">
+<div class="w-8 h-8 bg-primary/20 rounded flex items-center justify-center">
+<span class="material-symbols-outlined text-primary text-sm">person</span>
+</div>
+<div>
+<p class="text-sm font-bold text-on-surface">Technical Architect</p>
+<p class="text-[10px] text-outline font-mono">ROLE_CAT: ARCH_TECH</p>
+</div>
+</div>
+<input checked="" class="rounded border-outline-variant/40 bg-transparent text-primary focus:ring-primary" type="checkbox"/>
+</div>
+<div class="flex items-center justify-between p-3 bg-surface-container-low rounded border border-outline-variant/5">
+<div class="flex items-center gap-3">
+<div class="w-8 h-8 bg-tertiary/20 rounded flex items-center justify-center">
+<span class="material-symbols-outlined text-tertiary text-sm">gavel</span>
+</div>
+<div>
+<p class="text-sm font-bold text-on-surface">Quality Governor</p>
+<p class="text-[10px] text-outline font-mono">ROLE_CAT: GOV_QUAL</p>
+</div>
+</div>
+<input checked="" class="rounded border-outline-variant/40 bg-transparent text-tertiary focus:ring-tertiary" type="checkbox"/>
+</div>
+</div>
+</div>
+<div class="pt-4 border-t border-outline-variant/10">
+<label class="text-[10px] uppercase tracking-widest text-outline block mb-4 font-bold">Approval Threshold</label>
+<div class="flex items-center gap-4">
+<input class="flex-1 accent-primary" max="5" min="1" type="range" value="2"/>
+<div class="px-4 py-2 bg-surface-container-highest rounded font-mono text-sm font-bold text-primary">
+                                        2 / 5
+                                    </div>
+</div>
+<p class="text-[10px] text-outline-variant mt-2 italic">Requires signatures from at least 2 assigned governance roles.</p>
+</div>
+</div>
+</section>
+<!-- Assurance Policies -->
+<section class="bg-surface-container-low p-6">
+<h2 class="font-display text-xl font-bold text-on-surface mb-6">Assurance Policies</h2>
+<div class="space-y-4">
+<!-- Policy Item 1 -->
+<div class="flex items-start gap-3 p-3 hover:bg-surface-container-high transition-colors group rounded">
+<input checked="" class="mt-1 rounded border-outline-variant/40 bg-transparent text-primary focus:ring-primary" type="checkbox"/>
+<div class="flex-1">
+<div class="flex justify-between">
+<span class="text-sm font-medium text-on-surface">Interface Consistency Check</span>
+<span class="px-2 py-0.5 bg-error/20 text-error rounded text-[9px] font-bold">CRITICAL</span>
+</div>
+<p class="text-xs text-outline mt-1 leading-relaxed">Automated scan for interface breakages against baseline PRODUCT_SPEC.</p>
+</div>
+</div>
+<!-- Policy Item 2 -->
+<div class="flex items-start gap-3 p-3 hover:bg-surface-container-high transition-colors group rounded">
+<input checked="" class="mt-1 rounded border-outline-variant/40 bg-transparent text-primary focus:ring-primary" type="checkbox"/>
+<div class="flex-1">
+<div class="flex justify-between">
+<span class="text-sm font-medium text-on-surface">Security Baseline Alignment</span>
+<span class="px-2 py-0.5 bg-error/20 text-error rounded text-[9px] font-bold">CRITICAL</span>
+</div>
+<p class="text-xs text-outline mt-1 leading-relaxed">Must pass CVE-001 through CVE-045 architectural scans.</p>
+</div>
+</div>
+<!-- Policy Item 3 -->
+<div class="flex items-start gap-3 p-3 hover:bg-surface-container-high transition-colors group rounded">
+<input class="mt-1 rounded border-outline-variant/40 bg-transparent text-primary focus:ring-primary" type="checkbox"/>
+<div class="flex-1">
+<div class="flex justify-between">
+<span class="text-sm font-medium text-on-surface">Peer Design Review</span>
+<span class="px-2 py-0.5 bg-secondary-container text-on-secondary-container rounded text-[9px] font-bold">MODERATE</span>
+</div>
+<p class="text-xs text-outline mt-1 leading-relaxed">Formal review session with at least one senior architect peer.</p>
+</div>
+</div>
+<!-- Policy Item 4 -->
+<div class="flex items-start gap-3 p-3 hover:bg-surface-container-high transition-colors group rounded">
+<input checked="" class="mt-1 rounded border-outline-variant/40 bg-transparent text-primary focus:ring-primary" type="checkbox"/>
+<div class="flex-1">
+<div class="flex justify-between">
+<span class="text-sm font-medium text-on-surface">Traceability Map Export</span>
+<span class="px-2 py-0.5 bg-outline/20 text-outline rounded text-[9px] font-bold">LOW</span>
+</div>
+<p class="text-xs text-outline mt-1 leading-relaxed">Generation of the R-Matrix artifact for project archiving.</p>
+</div>
+</div>
+<button class="w-full mt-4 py-3 border border-dashed border-outline-variant/40 text-outline text-xs font-bold hover:bg-surface-container-high hover:border-primary hover:text-primary transition-all flex items-center justify-center gap-2">
+<span class="material-symbols-outlined text-sm">rule</span>
+                                Attach Policy Template
+                            </button>
+</div>
+</section>
+<!-- Preview Graphic -->
+<div class="glass-panel p-6 rounded-lg relative overflow-hidden h-48 group">
+<div class="relative z-10">
+<h3 class="font-headline font-bold text-sm text-on-surface">Architectural Schema Preview</h3>
+<p class="text-[10px] text-outline mt-1">Generated relationship graph</p>
+</div>
+<!-- Abstract visual representation -->
+<div class="absolute inset-0 flex items-center justify-center opacity-40 group-hover:opacity-60 transition-opacity">
+<div class="w-24 h-24 rounded-full border-2 border-primary animate-pulse"></div>
+<div class="absolute w-32 h-32 rounded-full border border-dashed border-tertiary rotate-45"></div>
+<div class="absolute w-16 h-16 bg-surface-container-highest border border-outline-variant rotate-12 flex items-center justify-center">
+<span class="material-symbols-outlined text-primary">hub</span>
+</div>
+</div>
+</div>
+</div>
+</div>
+</div>
+</main>
+<!-- Contextual FAB (Only for main creation screens, suppressed here as it's an editor) -->
+<!-- Micro-interaction Script -->
+<script>
+        // Tab switching logic (Simulated)
+        document.querySelectorAll('nav a').forEach(link => {
+            link.addEventListener('click', (e) => {
+                e.preventDefault();
+                // This is a static demo, so we just toggle visual classes
+            });
+        });
+
+        // Hover effects for the rows
+        const rows = document.querySelectorAll('tbody tr');
+        rows.forEach(row => {
+            row.addEventListener('mouseenter', () => {
+                row.style.transform = 'translateX(4px)';
+                row.style.transition = 'transform 0.2s ease-out';
+            });
+            row.addEventListener('mouseleave', () => {
+                row.style.transform = 'translateX(0)';
+            });
+        });
+    </script>
+</body></html>

@@ -1,0 +1,597 @@
+<!DOCTYPE html>
+<html class="dark" lang="en">
+<head>
+    <meta charset="utf-8"/>
+    <meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+    <title>Janumi JPWB | Professional Workbench</title>
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+    <!-- Google Fonts -->
+    <link rel="preconnect" href="https://fonts.googleapis.com"/>
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin=""/>
+    <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@300;400;500;600;700;900&family=Inter:wght@300;400;500;600;700&family=Source+Code+Pro:wght@400;500;600&display=swap" rel="stylesheet"/>
+    <!-- Material Symbols -->
+    <link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&display=swap" rel="stylesheet">
+    
+    <script id="tailwind-config">
+        tailwind.config = {
+            darkMode: "class",
+            theme: {
+                extend: {
+                    "colors": {
+                        "outline": "#8a919d",
+                        "on-tertiary": "#00382e",
+                        "surface-container": "#202020",
+                        "inverse-surface": "#e5e2e1",
+                        "tertiary-fixed-dim": "#61dac1",
+                        "surface-container-lowest": "#0e0e0e",
+                        "on-error": "#690005",
+                        "primary-container": "#007acc",
+                        "on-primary": "#003258",
+                        "error": "#ffb4ab",
+                        "background": "#131313",
+                        "secondary-container": "#474747",
+                        "on-primary-fixed": "#001d36",
+                        "on-secondary-fixed": "#1b1c1c",
+                        "surface-bright": "#393939",
+                        "on-tertiary-fixed": "#00201a",
+                        "secondary": "#c8c6c6",
+                        "on-tertiary-fixed-variant": "#005144",
+                        "tertiary-container": "#008672",
+                        "on-surface-variant": "#c0c7d3",
+                        "on-secondary": "#303030",
+                        "primary": "#9fcaff",
+                        "on-secondary-fixed-variant": "#474747",
+                        "surface-container-high": "#2a2a2a",
+                        "tertiary-fixed": "#80f7dc",
+                        "on-primary-fixed-variant": "#00497d",
+                        "primary-fixed": "#d1e4ff",
+                        "on-secondary-container": "#b6b5b4",
+                        "secondary-fixed": "#e4e2e1",
+                        "surface-tint": "#9fcaff",
+                        "primary-fixed-dim": "#9fcaff",
+                        "tertiary": "#61dac1",
+                        "secondary-fixed-dim": "#c8c6c6",
+                        "surface-container-highest": "#353535",
+                        "on-background": "#e5e2e1",
+                        "error-container": "#93000a",
+                        "surface": "#131313",
+                        "inverse-primary": "#0061a4",
+                        "on-surface": "#e5e2e1",
+                        "on-primary-container": "#ffffff",
+                        "on-tertiary-container": "#ffffff",
+                        "on-error-container": "#ffdad6",
+                        "inverse-on-surface": "#303030",
+                        "surface-container-low": "#1b1b1c",
+                        "surface-dim": "#131313",
+                        "surface-variant": "#353535",
+                        "outline-variant": "#404751"
+                    },
+                    "borderRadius": {
+                        "DEFAULT": "0.125rem",
+                        "lg": "0.25rem",
+                        "xl": "0.5rem",
+                        "full": "0.75rem"
+                    },
+                    "fontFamily": {
+                        "headline": ["Space Grotesk"],
+                        "display": ["Space Grotesk"],
+                        "body": ["Inter"],
+                        "label": ["Inter"],
+                        "mono": ["Source Code Pro"]
+                    }
+                }
+            }
+        }
+    </script>
+    <style>
+        .material-symbols-outlined {
+            font-variation-settings: 'FILL' 0, 'wght' 400, 'GRAD' 0, 'opsz' 24;
+        }
+        body {
+            font-family: 'Inter', sans-serif;
+            background-color: #131313;
+            color: #e5e2e1;
+        }
+        .canvas-grid {
+            background-image: radial-gradient(circle at 1px 1px, #2a2a2a 1px, transparent 0);
+            background-size: 40px 40px;
+        }
+        .glass-panel {
+            background: rgba(53, 53, 53, 0.8);
+            backdrop-filter: blur(16px);
+        }
+        .node-active {
+            box-shadow: 0 0 20px rgba(159, 202, 255, 0.2);
+        }
+        .connection-line {
+            stroke: #404751;
+            stroke-width: 1.5;
+            fill: none;
+        }
+        ::-webkit-scrollbar { width: 6px; }
+        ::-webkit-scrollbar-track { background: #131313; }
+        ::-webkit-scrollbar-thumb { background: #353535; border-radius: 10px; }
+        ::-webkit-scrollbar-thumb:hover { background: #474747; }
+        .shimmer {
+            background: linear-gradient(90deg, transparent, rgba(159, 202, 255, 0.05), transparent);
+            background-size: 200% 100%;
+            animation: shimmer 3s infinite linear;
+        }
+        @keyframes shimmer {
+            0% { background-position: -200% 0; }
+            100% { background-position: 200% 0; }
+        }
+        .status-bar-active { border-left: 3px solid #61dac1; }
+        .status-bar-pending { border-left: 3px solid #9fcaff; }
+    </style>
+</head>
+<body class="bg-background text-on-surface selection:bg-primary/30 h-screen overflow-hidden">
+    <div id="root"></div>
+
+    <script src="https://unpkg.com/react@18/umd/react.development.js"></script>
+    <script src="https://unpkg.com/react-dom@18/umd/react-dom.development.js"></script>
+    <script src="https://unpkg.com/history@5/umd/history.development.js"></script>
+    <script src="https://unpkg.com/react-router@6.3.0/umd/react-router.development.js"></script>
+    <script src="https://unpkg.com/react-router-dom@6.3.0/umd/react-router-dom.development.js"></script>
+    <script src="https://unpkg.com/babel-standalone@6/babel.min.js"></script>
+
+    <script type="text/babel">
+        const { useState, useEffect } = React;
+        const { createRoot } = ReactDOM;
+        const { MemoryRouter, Routes, Route, Link, useNavigate, useLocation } = ReactRouterDOM;
+
+        // --- Common Components ---
+
+        const Sidebar = () => {
+            const location = useLocation();
+            const navigate = useNavigate();
+
+            const navItems = [
+                { id: 'design', label: 'PWA Design', icon: 'architecture', path: '/' },
+                { id: 'undertaking', label: 'Undertaking', icon: 'rocket_launch', path: '/undertaking' },
+                { id: 'library', label: 'Library', icon: 'library_books', path: '/library' },
+                { id: 'portfolios', label: 'Portfolios', icon: 'work_history', path: '/portfolios' },
+                { id: 'governance', label: 'Governance', icon: 'gavel', path: '/governance' },
+                { id: 'settings', label: 'Settings', icon: 'settings', path: '/settings' },
+            ];
+
+            const isActive = (path) => location.pathname === path;
+
+            return (
+                <aside className="fixed left-0 top-0 h-full flex flex-col border-r border-outline-variant/15 bg-surface-container-low w-64 z-50">
+                    <div className="p-6">
+                        <div className="flex items-center gap-3 mb-6">
+                            <div className="w-10 h-10 rounded bg-primary-container flex items-center justify-center text-on-primary-container">
+                                <span className="material-symbols-outlined" style={{fontVariationSettings: "'FILL' 1"}}>architecture</span>
+                            </div>
+                            <div>
+                                <h1 className="font-headline font-bold text-lg tracking-tight text-on-surface leading-none">Janumi JPWB</h1>
+                                <p className="text-[10px] font-mono text-outline uppercase tracking-widest mt-1">v2.4.0-Alpha</p>
+                            </div>
+                        </div>
+                        <button 
+                            onClick={() => navigate('/library')}
+                            className="w-full py-2.5 bg-primary text-on-primary font-bold rounded-lg flex items-center justify-center gap-2 active:scale-95 transition-all shadow-lg shadow-primary/10"
+                        >
+                            <span className="material-symbols-outlined text-[20px]">add_circle</span>
+                            <span className="text-sm">New PWA</span>
+                        </button>
+                    </div>
+                    <nav className="flex-1 px-3 space-y-1">
+                        {navItems.map((item) => (
+                            <Link 
+                                key={item.id}
+                                to={item.path}
+                                className={`flex items-center gap-3 px-4 py-3 transition-colors duration-150 ${
+                                    isActive(item.path) 
+                                    ? 'bg-surface-bright text-primary border-l-4 border-primary' 
+                                    : 'text-on-surface-variant hover:bg-surface-container-high'
+                                }`}
+                            >
+                                <span className="material-symbols-outlined">{item.icon}</span>
+                                <span className="font-body text-sm font-medium">{item.label}</span>
+                            </Link>
+                        ))}
+                    </nav>
+                    <div className="mt-auto p-4 space-y-4">
+                        <div className="border-t border-outline-variant/10 pt-4">
+                            <a className="flex items-center gap-3 px-4 py-2 text-on-surface-variant text-xs hover:text-primary" href="#">
+                                <span className="material-symbols-outlined text-sm">help</span>
+                                Docs
+                            </a>
+                            <a className="flex items-center gap-3 px-4 py-2 text-on-surface-variant text-xs hover:text-primary" href="#">
+                                <span className="material-symbols-outlined text-sm">contact_support</span>
+                                Support
+                            </a>
+                        </div>
+                        <div className="flex items-center gap-3 px-4 pb-2">
+                            <div className="w-8 h-8 rounded-full overflow-hidden border border-outline-variant/30">
+                                <img className="w-full h-full object-cover" src="https://lh3.googleusercontent.com/aida-public/AB6AXuD088XqVm0F8CWp2brK16og93OwMWsag5QyL4c12kywnRH-SOzrZb6OqlQn5JH5LKK_UU-Pi0RucDWxZOy1PNYcycinz0l2kRK39L26hVXO756ZbWSDgYDkxy3Zd97VxZf3xauw6SSnMfxnlublKQXF_wU52GHA47Xl2sJrO_wR9uYl7ZghuoZ0b5MurMZbezpZAXRIseeGPigXaOzCZCU-b0Fiwt-RXMosCHqAzR-OVmd3qrPyUGQp-w" alt="Admin" />
+                            </div>
+                            <div className="overflow-hidden">
+                                <p className="text-xs font-bold text-on-surface truncate">Janumi Administrator</p>
+                                <p className="text-[10px] text-outline truncate">admin_root@system</p>
+                            </div>
+                        </div>
+                    </div>
+                </aside>
+            );
+        };
+
+        const TopAppBar = ({ title, activeTab }) => {
+            const navigate = useNavigate();
+            return (
+                <header className="flex justify-between items-center w-full px-8 border-b border-outline-variant/15 bg-surface h-16 shrink-0 z-40 sticky top-0">
+                    <div className="flex items-center gap-8">
+                        <div className="flex flex-col">
+                            <span className="font-headline font-black text-xl text-on-surface tracking-tighter leading-none">{title}</span>
+                            <span className="text-[10px] font-mono text-primary uppercase tracking-[0.2em] mt-1">v1.4-DRAFT</span>
+                        </div>
+                        <nav className="hidden md:flex items-center gap-6">
+                            <Link to="/" className={`text-sm font-medium transition-opacity ${activeTab === 'architecture' ? 'text-primary font-bold border-b-2 border-primary pb-1' : 'text-on-surface-variant hover:text-primary'}`}>Architecture</Link>
+                            <a className="text-on-surface-variant font-medium hover:text-primary transition-opacity text-sm" href="#">Instances</a>
+                            <Link to="/editor" className={`text-sm font-medium transition-opacity ${activeTab === 'editor' ? 'text-primary font-bold border-b-2 border-primary pb-1' : 'text-on-surface-variant hover:text-primary'}`}>Baselines</Link>
+                        </nav>
+                    </div>
+                    <div className="flex items-center gap-4">
+                        <div className="flex items-center gap-3 text-on-surface-variant">
+                            <span className="material-symbols-outlined cursor-pointer hover:text-primary">notifications</span>
+                            <span className="material-symbols-outlined cursor-pointer hover:text-primary">cloud_done</span>
+                            <span className="material-symbols-outlined cursor-pointer hover:text-primary">account_tree</span>
+                        </div>
+                        <div className="h-6 w-[1px] bg-outline-variant/30 mx-2"></div>
+                        <button className="px-4 py-1.5 border border-outline-variant/30 text-on-surface font-bold text-xs hover:bg-surface-container-high transition-all rounded-lg">
+                            Validate
+                        </button>
+                        <button className="px-5 py-1.5 bg-primary text-on-primary font-bold text-xs hover:opacity-90 active:scale-95 transition-all rounded-lg shadow-lg shadow-primary/10">
+                            Publish
+                        </button>
+                    </div>
+                </header>
+            );
+        };
+
+        // --- Screen Components ---
+
+        const PWADesignScreen = () => {
+            const [selectedNode, setSelectedNode] = useState('System Architecture');
+            const navigate = useNavigate();
+
+            const nodes = [
+                { id: 1, phase: 'DISCOVERY', title: 'Intent Definition', desc: 'System-level declaration of product purpose and high-level capability roadmap.', out: 'Capability_Map', status: 'check_circle', color: 'primary' },
+                { id: 2, phase: 'DISCOVERY', title: 'Functional Requirements', desc: 'Atomic definition of verifiable product behaviors and constraints.', out: 'Req_Spec_v1', status: 'pending', color: 'primary' },
+                { id: 3, phase: 'ARCHITECTURE', title: 'System Architecture', desc: 'Structural mapping of functional blocks to logical components.', out: 'Req_Spec_v1', status: 'sync', color: 'primary', active: true },
+                { id: 4, phase: 'IMPLEMENTATION', title: 'Module Implementation', desc: 'Realization of logical architecture via code and deployment configurations.', out: 'LOCKED: UNMET_DEP', status: 'lock', color: 'tertiary' },
+            ];
+
+            return (
+                <div className="flex h-screen overflow-hidden">
+                    <Sidebar />
+                    <main className="flex-1 flex flex-col ml-64 relative overflow-hidden">
+                        <TopAppBar title="PRODUCT REALIZATION PWA" activeTab="architecture" />
+                        <div className="flex-1 relative canvas-grid bg-surface overflow-auto p-20 flex justify-center">
+                            <svg className="absolute inset-0 w-full h-full pointer-events-none">
+                                <path className="connection-line" d="M 400 150 L 400 250"></path>
+                                <path className="connection-line" d="M 400 350 L 400 450"></path>
+                                <path className="connection-line" d="M 400 550 L 400 650"></path>
+                            </svg>
+                            <div className="relative z-10 space-y-24 flex flex-col items-center">
+                                {nodes.map((node) => (
+                                    <div 
+                                        key={node.id}
+                                        onClick={() => setSelectedNode(node.title)}
+                                        className={`w-72 bg-surface-container-low border-t-2 border-${node.color} group cursor-pointer hover:translate-y-[-4px] transition-all duration-300 ${selectedNode === node.title ? 'node-active ring-2 ring-primary/40' : ''}`}
+                                    >
+                                        <div className="p-4">
+                                            <div className="flex justify-between items-start mb-4">
+                                                <span className={`text-[10px] font-mono text-${node.color} uppercase tracking-tighter`}>PHASE: {node.phase}</span>
+                                                <span className={`material-symbols-outlined text-sm ${selectedNode === node.title ? 'text-primary' : 'text-outline'}`}>{selectedNode === node.title ? 'near_me' : 'drag_handle'}</span>
+                                            </div>
+                                            <h3 className="font-headline font-bold text-on-surface">{node.title}</h3>
+                                            <p className="text-xs text-on-surface-variant mt-2 font-body leading-relaxed">{node.desc}</p>
+                                        </div>
+                                        <div className="bg-surface-container border-t border-outline-variant/10 px-4 py-2 flex justify-between items-center">
+                                            <span className="text-[9px] font-mono text-outline">{node.id === 1 ? 'OUT:' : node.id === 4 ? 'LOCKED:' : 'IN:'} {node.out}</span>
+                                            {node.status === 'sync' ? (
+                                                <div className="w-1.5 h-1.5 rounded-full bg-primary animate-pulse"></div>
+                                            ) : (
+                                                <span className={`material-symbols-outlined text-xs text-${node.status === 'lock' ? 'error' : node.status === 'check_circle' ? 'tertiary' : 'outline'}`} style={node.status === 'check_circle' ? {fontVariationSettings: "'FILL' 1"} : {}}>{node.status}</span>
+                                            )}
+                                        </div>
+                                    </div>
+                                ))}
+                            </div>
+                        </div>
+
+                        {/* Designer Sidebar (Right) */}
+                        <aside className="absolute right-0 top-16 bottom-0 w-80 glass-panel border-l border-outline-variant/15 flex flex-col z-40 transform translate-x-0 transition-transform duration-300">
+                            <div className="p-6 border-b border-outline-variant/10">
+                                <div className="flex items-center gap-2 mb-2">
+                                    <span className="w-2 h-2 rounded-full bg-primary"></span>
+                                    <span className="text-[10px] font-mono font-bold text-primary uppercase tracking-widest">Active Selector</span>
+                                </div>
+                                <h2 className="font-headline font-bold text-xl text-on-surface">{selectedNode}</h2>
+                                <p className="text-xs text-on-surface-variant mt-1">PWU TYPE: LogicalArchitectNode</p>
+                            </div>
+                            <div className="flex-1 overflow-y-auto p-6 space-y-8">
+                                <section>
+                                    <label className="block text-[10px] font-mono text-outline uppercase mb-3">System Purpose</label>
+                                    <textarea className="w-full bg-surface-container-highest border-none rounded-sm text-sm text-on-surface focus:ring-1 focus:ring-primary h-24 font-body resize-none" defaultValue="Define the structural integrity and data flow protocols for the product realization lifecycle."></textarea>
+                                </section>
+                                <section>
+                                    <label className="block text-[10px] font-mono text-outline uppercase mb-3">Entry Conditions</label>
+                                    <div className="space-y-2">
+                                        <div className="flex items-center justify-between p-3 bg-surface-container-low rounded">
+                                            <span className="text-xs font-mono text-on-surface-variant">Validated_Reqs</span>
+                                            <span className="material-symbols-outlined text-sm text-tertiary">check_circle</span>
+                                        </div>
+                                        <div className="flex items-center justify-between p-3 bg-surface-container-low rounded border border-primary/20">
+                                            <span className="text-xs font-mono text-on-surface-variant">Baseline_Config</span>
+                                            <span className="material-symbols-outlined text-sm text-primary animate-spin">sync</span>
+                                        </div>
+                                        <button className="w-full py-2 border border-dashed border-outline-variant/30 text-outline text-[10px] uppercase font-bold hover:border-primary/50 hover:text-primary transition-all">
+                                            + Add Requirement
+                                        </button>
+                                    </div>
+                                </section>
+                            </div>
+                            <div className="p-4 bg-surface-container-high flex gap-2">
+                                <button className="flex-1 py-2 bg-surface-bright text-on-surface text-sm font-bold active:scale-95 transition-all">Discard</button>
+                                <button onClick={() => navigate('/editor')} className="flex-[2] py-2 bg-primary text-on-primary text-sm font-bold active:scale-95 transition-all flex items-center justify-center gap-2">
+                                    <span className="material-symbols-outlined text-sm">save</span>
+                                    Update PWU
+                                </button>
+                            </div>
+                        </aside>
+
+                        <div className="absolute left-6 bottom-6 flex flex-col gap-3">
+                            <div className="flex items-center bg-surface-container-highest border border-outline-variant/10 rounded p-1 shadow-2xl">
+                                <button className="p-2 hover:bg-surface-bright text-on-surface transition-colors"><span className="material-symbols-outlined text-sm">zoom_in</span></button>
+                                <div className="w-[1px] h-4 bg-outline-variant/20 mx-1"></div>
+                                <button className="p-2 hover:bg-surface-bright text-on-surface transition-colors"><span className="material-symbols-outlined text-sm">zoom_out</span></button>
+                                <div className="w-[1px] h-4 bg-outline-variant/20 mx-1"></div>
+                                <button className="p-2 hover:bg-surface-bright text-on-surface transition-colors"><span className="material-symbols-outlined text-sm">fit_screen</span></button>
+                            </div>
+                            <button className="w-12 h-12 rounded bg-primary-container text-on-primary-container shadow-xl flex items-center justify-center active:scale-95 transition-transform hover:shadow-primary/20">
+                                <span className="material-symbols-outlined">add</span>
+                            </button>
+                        </div>
+                    </main>
+                </div>
+            );
+        };
+
+        const PWUTypeEditorScreen = () => {
+            const navigate = useNavigate();
+            return (
+                <div className="flex h-screen overflow-hidden">
+                    <Sidebar />
+                    <main className="flex-1 flex flex-col ml-64 min-h-screen bg-background overflow-y-auto">
+                        <TopAppBar title="Janumi Professional Workbench" activeTab="editor" />
+                        <div className="p-8 max-w-7xl mx-auto w-full">
+                            <div className="mb-8">
+                                <nav className="flex items-center gap-2 text-xs font-medium text-outline mb-4">
+                                    <Link to="/library" className="hover:text-primary">PWA Library</Link>
+                                    <span className="material-symbols-outlined text-[14px]">chevron_right</span>
+                                    <span>Product Realization</span>
+                                    <span className="material-symbols-outlined text-[14px]">chevron_right</span>
+                                    <span className="text-on-surface">Architecture Definition</span>
+                                </nav>
+                                <div className="flex justify-between items-end">
+                                    <div>
+                                        <h1 className="font-display text-4xl font-bold text-on-surface tracking-tight">Architecture Definition</h1>
+                                        <p className="text-on-surface-variant mt-2 font-mono text-sm">TYPE_ID: PWU-ARCH-001</p>
+                                    </div>
+                                    <div className="flex gap-3">
+                                        <button className="px-5 py-2 border border-outline-variant/30 text-on-surface text-sm font-bold hover:bg-surface-container transition-colors">Discard Changes</button>
+                                        <button onClick={() => navigate('/library')} className="px-5 py-2 bg-tertiary text-on-tertiary text-sm font-bold hover:opacity-90 transition-all flex items-center gap-2">
+                                            <span className="material-symbols-outlined text-sm">save</span>
+                                            Commit Definition
+                                        </button>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <div className="grid grid-cols-12 gap-6 pb-12">
+                                <div className="col-span-12 lg:col-span-7 space-y-6">
+                                    <section className="bg-surface-container-low p-6 relative overflow-hidden group border border-outline-variant/5">
+                                        <div className="absolute left-0 top-0 bottom-0 w-[3px] bg-primary"></div>
+                                        <h2 className="font-display text-xl font-bold text-on-surface mb-4 flex items-center gap-2">
+                                            <span className="material-symbols-outlined text-primary">description</span> Purpose & Scope
+                                        </h2>
+                                        <textarea className="w-full h-40 bg-surface-container-lowest border border-outline-variant/20 focus:border-primary focus:ring-1 focus:ring-primary/20 text-on-surface p-4 text-sm leading-relaxed font-body resize-none" defaultValue="This work unit type defines the structural blueprint and technical constraints for a product realization phase..."></textarea>
+                                    </section>
+
+                                    <section className="bg-surface-container-low p-6 relative overflow-hidden border border-outline-variant/5">
+                                        <div className="absolute left-0 top-0 bottom-0 w-[3px] bg-tertiary"></div>
+                                        <h2 className="font-display text-xl font-bold text-on-surface mb-6">Structural Hierarchy</h2>
+                                        <div className="space-y-6">
+                                            <div>
+                                                <label className="text-[10px] uppercase tracking-widest text-outline block mb-3 font-bold">Permitted Parents</label>
+                                                <div className="flex flex-wrap gap-2">
+                                                    <span className="flex items-center gap-2 px-3 py-1.5 bg-surface-container-highest rounded border border-outline-variant/10 text-xs font-mono text-primary">PRODUCT_SPEC <button className="material-symbols-outlined text-xs">close</button></span>
+                                                    <span className="flex items-center gap-2 px-3 py-1.5 bg-surface-container-highest rounded border border-outline-variant/10 text-xs font-mono text-primary">SYSTEM_DESIGN <button className="material-symbols-outlined text-xs">close</button></span>
+                                                    <button className="px-3 py-1.5 border border-dashed border-outline-variant/40 text-outline text-xs">+ Add Parent</button>
+                                                </div>
+                                            </div>
+                                            <div>
+                                                <label className="text-[10px] uppercase tracking-widest text-outline block mb-3 font-bold">Permitted Children</label>
+                                                <div className="flex flex-wrap gap-2">
+                                                    <span className="flex items-center gap-2 px-3 py-1.5 bg-surface-container-highest rounded border border-outline-variant/10 text-xs font-mono text-tertiary">MODULE_ARCH <button className="material-symbols-outlined text-xs">close</button></span>
+                                                    <button className="px-3 py-1.5 border border-dashed border-outline-variant/40 text-outline text-xs">+ Add Child</button>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    </section>
+                                </div>
+
+                                <div className="col-span-12 lg:col-span-5 space-y-6">
+                                    <section className="bg-surface-container p-6 border border-outline-variant/10">
+                                        <h2 className="font-display text-xl font-bold text-on-surface mb-6 flex items-center justify-between">
+                                            Governance Model <span className="material-symbols-outlined text-outline">security</span>
+                                        </h2>
+                                        <div className="space-y-3">
+                                            <div className="flex items-center justify-between p-3 bg-surface-container-low rounded">
+                                                <div className="flex items-center gap-3">
+                                                    <div className="w-8 h-8 bg-primary/20 rounded flex items-center justify-center text-primary"><span className="material-symbols-outlined text-sm">person</span></div>
+                                                    <div><p className="text-sm font-bold">Technical Architect</p><p className="text-[10px] text-outline">ROLE_CAT: ARCH_TECH</p></div>
+                                                </div>
+                                                <input type="checkbox" checked className="rounded bg-transparent text-primary" readOnly/>
+                                            </div>
+                                            <div className="pt-4 border-t border-outline-variant/10">
+                                                <label className="text-[10px] uppercase tracking-widest text-outline block mb-4 font-bold">Approval Threshold</label>
+                                                <div className="flex items-center gap-4">
+                                                    <input type="range" className="flex-1 accent-primary" min="1" max="5" defaultValue="2" />
+                                                    <div className="px-4 py-2 bg-surface-container-highest rounded font-mono text-sm font-bold text-primary">2 / 5</div>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    </section>
+
+                                    <div className="glass-panel p-6 rounded-lg relative overflow-hidden h-48 group border border-outline-variant/10">
+                                        <div className="relative z-10">
+                                            <h3 className="font-headline font-bold text-sm">Architectural Schema Preview</h3>
+                                            <p className="text-[10px] text-outline mt-1">Generated relationship graph</p>
+                                        </div>
+                                        <div className="absolute inset-0 flex items-center justify-center opacity-40 group-hover:opacity-60 transition-opacity">
+                                            <div className="w-24 h-24 rounded-full border-2 border-primary animate-pulse"></div>
+                                            <div className="absolute w-16 h-16 bg-surface-container-highest border border-outline-variant flex items-center justify-center"><span className="material-symbols-outlined text-primary">hub</span></div>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </main>
+                </div>
+            );
+        };
+
+        const PWALibraryScreen = () => {
+            const [toastVisible, setToastVisible] = useState(false);
+            const navigate = useNavigate();
+
+            useEffect(() => {
+                const timer = setTimeout(() => setToastVisible(true), 1500);
+                const hideTimer = setTimeout(() => setToastVisible(false), 6000);
+                return () => { clearTimeout(timer); clearTimeout(hideTimer); };
+            }, []);
+
+            const cards = [
+                { title: 'Product Realization PWA', icon: 'inventory_2', version: 'v1.3.0', status: 'Published', types: 7, policies: 12, mode: 'active', desc: 'Framework for transitioning conceptual product requirements into validated engineering blueprints.' },
+                { title: 'Legal Compliance PWA', icon: 'gavel', version: 'v2.1.4', status: 'Published', types: 14, policies: 32, mode: 'active', desc: 'Automated regulatory monitoring and compliance baseline enforcement.' },
+                { title: 'Enterprise Security PWA', icon: 'shield_lock', version: 'v0.9.2', status: 'Draft', types: 9, policies: 18, mode: 'pending', desc: 'SecOps integration architecture for multi-cloud infrastructure auditing.' },
+                { title: 'Financial Governance PWA', icon: 'account_balance_wallet', version: 'v4.2.1', status: 'Published', types: 22, policies: 45, mode: 'active', desc: 'Centralized ledger reconciliation and fiscal policy enforcement.' },
+            ];
+
+            return (
+                <div className="flex h-screen overflow-hidden">
+                    <Sidebar />
+                    <main className="flex-1 flex flex-col ml-64 min-h-screen bg-surface overflow-y-auto">
+                        <TopAppBar title="Janumi Professional Workbench" />
+                        <div className="p-8 max-w-7xl mx-auto w-full">
+                            <div className="flex flex-col md:flex-row md:items-end justify-between gap-6 mb-12">
+                                <div>
+                                    <span className="text-xs font-mono text-primary font-bold uppercase tracking-[0.2em] mb-2 block">Enterprise Repository</span>
+                                    <h1 className="text-5xl font-headline font-bold text-on-surface tracking-tight mb-4">PWA Library</h1>
+                                    <div className="flex items-center gap-4 text-on-surface-variant">
+                                        <div className="flex items-center gap-2 bg-surface-container-low px-3 py-1 rounded-full border border-outline-variant/20">
+                                            <span className="w-2 h-2 rounded-full bg-tertiary"></span>
+                                            <span className="text-xs font-medium">8 Architectures Active</span>
+                                        </div>
+                                    </div>
+                                </div>
+                                <div className="flex gap-3">
+                                    <button className="flex items-center gap-2 px-5 py-3 bg-surface-container-high text-on-surface font-bold rounded-xl hover:bg-surface-container-highest transition-all"><span className="material-symbols-outlined">filter_list</span> Sort</button>
+                                    <button onClick={() => navigate('/')} className="flex items-center gap-2 px-6 py-3 bg-primary text-on-primary font-bold rounded-xl hover:opacity-90 shadow-xl shadow-primary/10 transition-all active:scale-95"><span className="material-symbols-outlined">add</span> Create PWA</button>
+                                </div>
+                            </div>
+
+                            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                                {cards.map((card, i) => (
+                                    <div key={i} className={`group relative bg-surface-container-low p-6 rounded-xl border-t-2 border-transparent hover:border-primary transition-all duration-300 status-bar-${card.mode} overflow-hidden`}>
+                                        <div className="shimmer absolute inset-0 opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none"></div>
+                                        <div className="flex justify-between items-start mb-6">
+                                            <div className="w-12 h-12 bg-surface-container-highest flex items-center justify-center rounded-lg text-primary"><span className="material-symbols-outlined text-3xl">{card.icon}</span></div>
+                                            <div className="text-right">
+                                                <span className={`text-[10px] font-mono ${card.status === 'Draft' ? 'text-primary bg-primary/10' : 'text-tertiary bg-tertiary/10'} px-2 py-0.5 rounded uppercase font-bold tracking-wider`}>{card.status}</span>
+                                                <p className="text-xs text-outline mt-1">{card.version}</p>
+                                            </div>
+                                        </div>
+                                        <h3 className="font-headline font-bold text-xl text-on-surface group-hover:text-primary transition-colors mb-2">{card.title}</h3>
+                                        <p className="text-sm text-on-surface-variant mb-6 line-clamp-2 font-body leading-relaxed">{card.desc}</p>
+                                        <div className="space-y-3">
+                                            <div className="flex items-center justify-between text-xs font-mono py-2 border-b border-outline-variant/10"><span className="text-outline">PWU Types</span><span className="text-on-surface font-bold">{card.types} Types</span></div>
+                                            <div className="flex items-center justify-between text-xs font-mono py-2"><span className="text-outline">Assurance Policies</span><span className="text-on-surface font-bold">{card.policies} Policies</span></div>
+                                        </div>
+                                        <div className="mt-6 flex items-center gap-2">
+                                            <button onClick={() => navigate('/editor')} className="flex-1 text-xs font-bold py-2 bg-surface-container-highest text-on-surface rounded-lg hover:bg-primary hover:text-on-primary transition-all">Open Editor</button>
+                                            <button className="w-10 h-10 flex items-center justify-center rounded-lg border border-outline-variant/20 hover:border-primary text-outline hover:text-primary transition-all"><span className="material-symbols-outlined text-lg">more_horiz</span></button>
+                                        </div>
+                                    </div>
+                                ))}
+                                <button onClick={() => navigate('/')} className="group relative border-2 border-dashed border-outline-variant/30 p-6 rounded-xl flex flex-col items-center justify-center text-center hover:border-primary/50 hover:bg-surface-container-low transition-all duration-300 min-h-[340px]">
+                                    <div className="w-16 h-16 rounded-full bg-surface-container-highest flex items-center justify-center mb-4 group-hover:scale-110 transition-transform"><span className="material-symbols-outlined text-4xl text-outline group-hover:text-primary transition-colors">add_task</span></div>
+                                    <h4 className="font-headline font-bold text-lg text-on-surface mb-2">New Architecture</h4>
+                                    <p className="text-xs text-outline max-w-[180px]">Start from a blank canvas or import a predefined schema baseline.</p>
+                                </button>
+                            </div>
+
+                            <div className="mt-16 bg-surface-container-low rounded-xl p-8 flex flex-col md:flex-row items-center justify-between gap-8 border border-outline-variant/10">
+                                <div className="flex flex-col md:flex-row gap-12 w-full md:w-auto">
+                                    <div><p className="text-[10px] font-mono text-outline uppercase tracking-widest mb-1">Total Assets</p><p className="text-3xl font-headline font-bold text-on-surface">142 <span className="text-sm font-normal text-outline">PWUs</span></p></div>
+                                    <div><p className="text-[10px] font-mono text-outline uppercase tracking-widest mb-1">Schema Version</p><p className="text-3xl font-headline font-bold text-primary">v2.4</p></div>
+                                </div>
+                                <div className="flex items-center gap-4 w-full md:w-auto pt-6 md:pt-0 border-t md:border-t-0 border-outline-variant/10">
+                                    <div className="flex -space-x-3">
+                                        {[1,2,3].map(n => <div key={n} className="w-10 h-10 rounded-full border-2 border-surface-container-low bg-surface-container-high ring-1 ring-outline-variant/10 overflow-hidden"><img src={`https://api.dicebear.com/7.x/avataaars/svg?seed=${n+10}`} alt="user"/></div>)}
+                                        <div className="w-10 h-10 rounded-full bg-surface-container-high border-2 border-surface-container-low flex items-center justify-center text-[10px] font-bold text-outline">+12</div>
+                                    </div>
+                                    <div className="text-left"><p className="text-xs font-bold">Collaborative Team</p><p className="text-[10px] text-outline">Active on 4 architectures</p></div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div className="fixed bottom-8 right-8 z-50">
+                            <button className="w-14 h-14 bg-tertiary text-on-tertiary rounded-xl shadow-2xl flex items-center justify-center hover:scale-105 active:scale-95 transition-all group relative">
+                                <span className="material-symbols-outlined text-2xl group-hover:rotate-90 transition-transform">bolt</span>
+                            </button>
+                        </div>
+
+                        {/* Notification Toast */}
+                        <div className={`fixed bottom-8 left-1/2 -translate-x-1/2 glass-panel border border-outline-variant/20 px-6 py-4 rounded-xl shadow-2xl flex items-center gap-4 transition-all duration-500 z-[60] ${toastVisible ? 'translate-y-0 opacity-100' : 'translate-y-20 opacity-0'}`}>
+                            <span className="material-symbols-outlined text-tertiary">check_circle</span>
+                            <div>
+                                <p className="text-sm font-bold text-on-surface">Library Synchronized</p>
+                                <p className="text-[10px] text-on-surface-variant">Production instances updated to v2.4.0-Alpha</p>
+                            </div>
+                            <button className="text-outline hover:text-on-surface ml-4" onClick={() => setToastVisible(false)}><span className="material-symbols-outlined text-sm">close</span></button>
+                        </div>
+                    </main>
+                </div>
+            );
+        };
+
+        const App = () => {
+            return (
+                <MemoryRouter>
+                    <Routes>
+                        <Route path="/" element={<PWADesignScreen />} />
+                        <Route path="/library" element={<PWALibraryScreen />} />
+                        <Route path="/editor" element={<PWUTypeEditorScreen />} />
+                        {/* Catch-all to library for nav items not specifically built */}
+                        <Route path="/undertaking" element={<PWALibraryScreen />} />
+                        <Route path="/portfolios" element={<PWALibraryScreen />} />
+                        <Route path="/governance" element={<PWALibraryScreen />} />
+                        <Route path="/settings" element={<PWALibraryScreen />} />
+                    </Routes>
+                </MemoryRouter>
+            );
+        };
+
+        const container = document.getElementById('root');
+        const root = createRoot(container);
+        root.render(<App />);
+    </script>
+</body>
+</html>

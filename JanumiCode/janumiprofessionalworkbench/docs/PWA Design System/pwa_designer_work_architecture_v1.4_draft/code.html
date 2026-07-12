@@ -1,0 +1,380 @@
+<!DOCTYPE html>
+
+<html class="dark" lang="en"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<title>Janumi JPWB | PWA Designer</title>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@300;400;500;600;700;900&amp;family=Inter:wght@300;400;500;600;700&amp;family=Source+Code+Pro:wght@400;600&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<script id="tailwind-config">
+        tailwind.config = {
+            darkMode: "class",
+            theme: {
+                extend: {
+                    "colors": {
+                        "outline": "#8a919d",
+                        "on-tertiary": "#00382e",
+                        "surface-container": "#202020",
+                        "inverse-surface": "#e5e2e1",
+                        "tertiary-fixed-dim": "#61dac1",
+                        "surface-container-lowest": "#0e0e0e",
+                        "on-error": "#690005",
+                        "primary-container": "#007acc",
+                        "on-primary": "#003258",
+                        "error": "#ffb4ab",
+                        "background": "#131313",
+                        "secondary-container": "#474747",
+                        "on-primary-fixed": "#001d36",
+                        "on-secondary-fixed": "#1b1c1c",
+                        "surface-bright": "#393939",
+                        "on-tertiary-fixed": "#00201a",
+                        "secondary": "#c8c6c6",
+                        "on-tertiary-fixed-variant": "#005144",
+                        "tertiary-container": "#008672",
+                        "on-surface-variant": "#c0c7d3",
+                        "on-secondary": "#303030",
+                        "primary": "#9fcaff",
+                        "on-secondary-fixed-variant": "#474747",
+                        "surface-container-high": "#2a2a2a",
+                        "tertiary-fixed": "#80f7dc",
+                        "on-primary-fixed-variant": "#00497d",
+                        "primary-fixed": "#d1e4ff",
+                        "on-secondary-container": "#b6b5b4",
+                        "secondary-fixed": "#e4e2e1",
+                        "surface-tint": "#9fcaff",
+                        "primary-fixed-dim": "#9fcaff",
+                        "tertiary": "#61dac1",
+                        "secondary-fixed-dim": "#c8c6c6",
+                        "surface-container-highest": "#353535",
+                        "on-background": "#e5e2e1",
+                        "error-container": "#93000a",
+                        "surface": "#131313",
+                        "inverse-primary": "#0061a4",
+                        "on-surface": "#e5e2e1",
+                        "on-primary-container": "#ffffff",
+                        "on-tertiary-container": "#ffffff",
+                        "on-error-container": "#ffdad6",
+                        "inverse-on-surface": "#303030",
+                        "surface-container-low": "#1b1b1c",
+                        "surface-dim": "#131313",
+                        "surface-variant": "#353535",
+                        "outline-variant": "#404751"
+                    },
+                    "borderRadius": {
+                        "DEFAULT": "0.125rem",
+                        "lg": "0.25rem",
+                        "xl": "0.5rem",
+                        "full": "0.75rem"
+                    },
+                    "fontFamily": {
+                        "headline": ["Space Grotesk"],
+                        "display": ["Space Grotesk"],
+                        "body": ["Inter"],
+                        "label": ["Inter"],
+                        "mono": ["Source Code Pro"]
+                    }
+                }
+            }
+        }
+    </script>
+<style>
+        .material-symbols-outlined {
+            font-variation-settings: 'FILL' 0, 'wght' 400, 'GRAD' 0, 'opsz' 24;
+        }
+        body {
+            font-family: 'Inter', sans-serif;
+            background-color: #131313;
+            color: #e5e2e1;
+            overflow: hidden;
+        }
+        .canvas-grid {
+            background-image: 
+                radial-gradient(circle at 1px 1px, #2a2a2a 1px, transparent 0);
+            background-size: 40px 40px;
+        }
+        .glass-panel {
+            background: rgba(53, 53, 53, 0.8);
+            backdrop-filter: blur(16px);
+        }
+        .node-active {
+            box-shadow: 0 0 20px rgba(159, 202, 255, 0.2);
+        }
+        .connection-line {
+            stroke: #404751;
+            stroke-width: 1.5;
+            fill: none;
+        }
+    </style>
+</head>
+<body class="flex h-screen overflow-hidden">
+<!-- SideNavBar (Execution from JSON) -->
+<aside class="fixed left-0 top-0 h-full flex flex-col border-r border-outline-variant/15 bg-surface-container-low w-64 z-50">
+<div class="p-6">
+<h1 class="font-headline font-bold text-lg tracking-tight text-on-surface">Janumi JPWB</h1>
+<p class="text-[10px] font-mono text-outline uppercase tracking-widest mt-1">v2.4.0-Alpha</p>
+</div>
+<nav class="flex-1 px-3 space-y-1">
+<!-- Active Navigation: PWA Design -->
+<a class="flex items-center gap-3 px-4 py-3 bg-surface-bright text-primary border-l-4 border-primary transition-colors duration-150" href="#">
+<span class="material-symbols-outlined" data-icon="architecture">architecture</span>
+<span class="font-body text-sm font-medium">PWA Design</span>
+</a>
+<a class="flex items-center gap-3 px-4 py-3 text-on-surface-variant hover:bg-surface-container-high transition-colors duration-150" href="#">
+<span class="material-symbols-outlined" data-icon="rocket_launch">rocket_launch</span>
+<span class="font-body text-sm font-medium">Undertaking</span>
+</a>
+<a class="flex items-center gap-3 px-4 py-3 text-on-surface-variant hover:bg-surface-container-high transition-colors duration-150" href="#">
+<span class="material-symbols-outlined" data-icon="library_books">library_books</span>
+<span class="font-body text-sm font-medium">Library</span>
+</a>
+<a class="flex items-center gap-3 px-4 py-3 text-on-surface-variant hover:bg-surface-container-high transition-colors duration-150" href="#">
+<span class="material-symbols-outlined" data-icon="work_history">work_history</span>
+<span class="font-body text-sm font-medium">Portfolios</span>
+</a>
+<a class="flex items-center gap-3 px-4 py-3 text-on-surface-variant hover:bg-surface-container-high transition-colors duration-150" href="#">
+<span class="material-symbols-outlined" data-icon="gavel">gavel</span>
+<span class="font-body text-sm font-medium">Governance</span>
+</a>
+<a class="flex items-center gap-3 px-4 py-3 text-on-surface-variant hover:bg-surface-container-high transition-colors duration-150" href="#">
+<span class="material-symbols-outlined" data-icon="settings">settings</span>
+<span class="font-body text-sm font-medium">Settings</span>
+</a>
+</nav>
+<div class="mt-auto p-4 space-y-4">
+<button class="w-full py-2.5 bg-primary-container text-on-primary-container font-bold rounded-lg flex items-center justify-center gap-2 active:scale-95 transition-all">
+<span class="material-symbols-outlined text-sm" data-icon="add">add</span>
+                New PWA
+            </button>
+<div class="border-t border-outline-variant/10 pt-4 pb-2">
+<a class="flex items-center gap-3 px-4 py-2 text-on-surface-variant text-xs hover:text-primary" href="#">
+<span class="material-symbols-outlined text-sm" data-icon="help">help</span>
+                    Docs
+                </a>
+<a class="flex items-center gap-3 px-4 py-2 text-on-surface-variant text-xs hover:text-primary" href="#">
+<span class="material-symbols-outlined text-sm" data-icon="contact_support">contact_support</span>
+                    Support
+                </a>
+</div>
+</div>
+</aside>
+<!-- Main Content Canvas Area -->
+<main class="flex-1 flex flex-col ml-64 relative overflow-hidden">
+<!-- TopAppBar (Execution from JSON) -->
+<header class="flex justify-between items-center w-full px-6 border-b border-outline-variant/15 bg-surface h-16 shrink-0 z-40">
+<div class="flex items-center gap-8">
+<div class="flex flex-col">
+<span class="font-headline font-black text-xl text-on-surface leading-none">PRODUCT REALIZATION PWA</span>
+<span class="text-[10px] font-mono text-primary uppercase tracking-[0.2em] mt-1">v1.4-DRAFT</span>
+</div>
+<nav class="hidden md:flex items-center gap-6">
+<a class="text-on-surface-variant font-medium hover:text-primary transition-opacity text-sm" href="#">Architecture</a>
+<a class="text-on-surface-variant font-medium hover:text-primary transition-opacity text-sm" href="#">Instances</a>
+<a class="text-on-surface-variant font-medium hover:text-primary transition-opacity text-sm" href="#">Baselines</a>
+</nav>
+</div>
+<div class="flex items-center gap-4">
+<div class="flex items-center gap-2 mr-4 text-on-surface-variant">
+<span class="material-symbols-outlined cursor-pointer hover:text-primary" data-icon="notifications">notifications</span>
+<span class="material-symbols-outlined cursor-pointer hover:text-primary" data-icon="cloud_done">cloud_done</span>
+<span class="material-symbols-outlined cursor-pointer hover:text-primary" data-icon="account_tree">account_tree</span>
+</div>
+<button class="px-4 py-1.5 border border-outline-variant/30 text-on-surface font-label text-sm hover:bg-surface-container-high active:opacity-80 transition-all rounded">
+                    Validate
+                </button>
+<button class="px-5 py-1.5 bg-primary text-on-primary font-bold text-sm hover:bg-primary-container active:opacity-80 transition-all rounded shadow-lg shadow-primary/10">
+                    Publish
+                </button>
+<div class="w-8 h-8 rounded-full overflow-hidden ml-2 border border-outline-variant/30">
+<img class="w-full h-full object-cover" data-alt="Close-up professional portrait of a software systems architect in a dark room. Minimalistic lighting highlights facial features against a background of faint blue digital code reflections. Cinematic photography style with shallow depth of field, high-contrast, and cool tonal grading consistent with a technical workbench interface." src="https://lh3.googleusercontent.com/aida-public/AB6AXuAjtG8uXE887H3xRr9kC-IcVesfvs38jqHg9I4Hfltz342Z9lkSsTA2-xUvgOlFmDTYrl9JkIFdhp87Ud7E2nkwIEqrz3cUJlMG5NRwilRQorF0aLJAJ_AsPVTqaWymsAszaaunuQpKNt34kgeOL6z-hw3jgxz5GzSp9LkLoIb6OIFXd0QByYzpXKVe8hq6jEOXOV0u9vs73FRzB2yKuKNsAiWiUYUBqTFKA3DymdE1qRQteRl_PU0xRw"/>
+</div>
+</div>
+</header>
+<!-- Whiteboard Canvas Grid -->
+<div class="flex-1 relative canvas-grid bg-surface overflow-auto p-20 flex justify-center">
+<svg class="absolute inset-0 w-full h-full pointer-events-none">
+<!-- SVG Connections would be dynamically calculated, here we provide static placeholders for the flow -->
+<path class="connection-line" d="M 400 150 L 400 250"></path>
+<path class="connection-line" d="M 400 350 L 400 450"></path>
+<path class="connection-line" d="M 400 550 L 400 650"></path>
+</svg>
+<div class="relative z-10 space-y-24 flex flex-col items-center">
+<!-- Node 1: Intent Definition -->
+<div class="w-72 bg-surface-container-low border-t-2 border-primary group cursor-pointer hover:translate-y-[-4px] transition-all duration-300">
+<div class="p-4">
+<div class="flex justify-between items-start mb-4">
+<span class="text-[10px] font-mono text-primary uppercase tracking-tighter">PHASE: DISCOVERY</span>
+<span class="material-symbols-outlined text-sm text-outline" data-icon="drag_handle">drag_handle</span>
+</div>
+<h3 class="font-headline font-bold text-on-surface">Intent Definition</h3>
+<p class="text-xs text-on-surface-variant mt-2 font-body leading-relaxed">System-level declaration of product purpose and high-level capability roadmap.</p>
+</div>
+<div class="bg-surface-container border-t border-outline-variant/10 px-4 py-2 flex justify-between">
+<span class="text-[9px] font-mono text-outline">OUT: Capability_Map</span>
+<span class="material-symbols-outlined text-xs text-tertiary" data-icon="check_circle" style="font-variation-settings: 'FILL' 1;">check_circle</span>
+</div>
+</div>
+<!-- Node 2: Requirements -->
+<div class="w-72 bg-surface-container-low border-t-2 border-primary group cursor-pointer hover:translate-y-[-4px] transition-all duration-300">
+<div class="p-4">
+<div class="flex justify-between items-start mb-4">
+<span class="text-[10px] font-mono text-primary uppercase tracking-tighter">PHASE: DISCOVERY</span>
+<span class="material-symbols-outlined text-sm text-outline" data-icon="drag_handle">drag_handle</span>
+</div>
+<h3 class="font-headline font-bold text-on-surface">Functional Requirements</h3>
+<p class="text-xs text-on-surface-variant mt-2 font-body leading-relaxed">Atomic definition of verifiable product behaviors and constraints.</p>
+</div>
+<div class="bg-surface-container border-t border-outline-variant/10 px-4 py-2 flex justify-between">
+<span class="text-[9px] font-mono text-outline">OUT: Req_Spec_v1</span>
+<span class="material-symbols-outlined text-xs text-outline" data-icon="pending">pending</span>
+</div>
+</div>
+<!-- Node 3: Architecture (Active/Selected) -->
+<div class="w-72 bg-surface-container-low border-t-2 border-primary node-active ring-2 ring-primary/40 group cursor-pointer hover:translate-y-[-4px] transition-all duration-300">
+<div class="p-4">
+<div class="flex justify-between items-start mb-4">
+<span class="text-[10px] font-mono text-primary uppercase tracking-tighter">PHASE: ARCHITECTURE</span>
+<span class="material-symbols-outlined text-sm text-primary" data-icon="near_me">near_me</span>
+</div>
+<h3 class="font-headline font-bold text-on-surface">System Architecture</h3>
+<p class="text-xs text-on-surface-variant mt-2 font-body leading-relaxed">Structural mapping of functional blocks to logical components.</p>
+</div>
+<div class="bg-surface-container border-t border-outline-variant/10 px-4 py-2 flex justify-between items-center">
+<span class="text-[9px] font-mono text-outline">IN: Req_Spec_v1</span>
+<div class="flex gap-1">
+<div class="w-1.5 h-1.5 rounded-full bg-primary animate-pulse"></div>
+</div>
+</div>
+</div>
+<!-- Node 4: Implementation -->
+<div class="w-72 bg-surface-container-low border-t-2 border-tertiary group cursor-pointer hover:translate-y-[-4px] transition-all duration-300">
+<div class="p-4">
+<div class="flex justify-between items-start mb-4">
+<span class="text-[10px] font-mono text-tertiary uppercase tracking-tighter">PHASE: IMPLEMENTATION</span>
+<span class="material-symbols-outlined text-sm text-outline" data-icon="drag_handle">drag_handle</span>
+</div>
+<h3 class="font-headline font-bold text-on-surface">Module Implementation</h3>
+<p class="text-xs text-on-surface-variant mt-2 font-body leading-relaxed">Realization of logical architecture via code and deployment configurations.</p>
+</div>
+<div class="bg-surface-container border-t border-outline-variant/10 px-4 py-2 flex justify-between">
+<span class="text-[9px] font-mono text-outline">LOCKED: UNMET_DEP</span>
+<span class="material-symbols-outlined text-xs text-error" data-icon="lock">lock</span>
+</div>
+</div>
+</div>
+</div>
+<!-- Designer Sidebar (Right) -->
+<aside class="absolute right-0 top-16 bottom-0 w-80 glass-panel border-l border-outline-variant/15 flex flex-col z-40 transform translate-x-0 transition-transform duration-300">
+<div class="p-6 border-b border-outline-variant/10">
+<div class="flex items-center gap-2 mb-2">
+<span class="w-2 h-2 rounded-full bg-primary"></span>
+<span class="text-[10px] font-mono font-bold text-primary uppercase tracking-widest">Active Selector</span>
+</div>
+<h2 class="font-headline font-bold text-xl text-on-surface">System Architecture</h2>
+<p class="text-xs text-on-surface-variant mt-1">PWU TYPE: LogicalArchitectNode</p>
+</div>
+<div class="flex-1 overflow-y-auto p-6 space-y-8">
+<!-- Section: Purpose -->
+<section>
+<label class="block text-[10px] font-mono text-outline uppercase mb-3">System Purpose</label>
+<textarea class="w-full bg-surface-container-highest border-none rounded-sm text-sm text-on-surface focus:ring-1 focus:ring-primary h-24 font-body resize-none" placeholder="Enter high-level purpose...">Define the structural integrity and data flow protocols for the product realization lifecycle.</textarea>
+</section>
+<!-- Section: Entry Conditions -->
+<section>
+<label class="block text-[10px] font-mono text-outline uppercase mb-3">Entry Conditions (Pre-reqs)</label>
+<div class="space-y-2">
+<div class="flex items-center justify-between p-3 bg-surface-container-low rounded group">
+<span class="text-xs font-mono text-on-surface-variant">Validated_Reqs</span>
+<span class="material-symbols-outlined text-sm text-tertiary" data-icon="check_circle">check_circle</span>
+</div>
+<div class="flex items-center justify-between p-3 bg-surface-container-low rounded border border-primary/20 group">
+<span class="text-xs font-mono text-on-surface-variant">Baseline_Config</span>
+<span class="material-symbols-outlined text-sm text-primary animate-spin" data-icon="sync">sync</span>
+</div>
+<button class="w-full py-2 border border-dashed border-outline-variant/30 text-outline text-[10px] uppercase font-bold hover:border-primary/50 hover:text-primary transition-all">
+                            + Add Requirement
+                        </button>
+</div>
+</section>
+<!-- Section: Governance -->
+<section>
+<label class="block text-[10px] font-mono text-outline uppercase mb-3">Governance Schema</label>
+<div class="bg-surface-container-highest p-4 rounded-sm">
+<div class="flex justify-between items-center mb-4">
+<span class="text-xs font-medium text-on-surface">Workflow Approval</span>
+<div class="w-8 h-4 bg-primary/20 rounded-full relative">
+<div class="absolute right-0 w-4 h-4 bg-primary rounded-full shadow-sm"></div>
+</div>
+</div>
+<div class="space-y-3">
+<div class="flex items-center gap-3">
+<div class="w-6 h-6 rounded-full bg-surface-container flex items-center justify-center text-[10px] border border-outline-variant/20">A</div>
+<span class="text-xs text-on-surface-variant">Lead Architect</span>
+</div>
+<div class="flex items-center gap-3">
+<div class="w-6 h-6 rounded-full bg-surface-container flex items-center justify-center text-[10px] border border-outline-variant/20">V</div>
+<span class="text-xs text-on-surface-variant">VP Engineering</span>
+</div>
+</div>
+</div>
+</section>
+</div>
+<!-- Sidebar Footer Actions -->
+<div class="p-4 bg-surface-container-high flex gap-2">
+<button class="flex-1 py-2 bg-surface-bright text-on-surface text-sm font-bold active:scale-95 transition-all">
+                    Discard
+                </button>
+<button class="flex-[2] py-2 bg-primary text-on-primary text-sm font-bold active:scale-95 transition-all flex items-center justify-center gap-2">
+<span class="material-symbols-outlined text-sm" data-icon="save">save</span>
+                    Update PWU
+                </button>
+</div>
+</aside>
+<!-- Floating Utilities -->
+<div class="absolute left-6 bottom-6 flex flex-col gap-3">
+<div class="flex items-center bg-surface-container-highest border border-outline-variant/10 rounded p-1 shadow-2xl">
+<button class="p-2 hover:bg-surface-bright text-on-surface transition-colors" title="Zoom In">
+<span class="material-symbols-outlined text-sm" data-icon="zoom_in">zoom_in</span>
+</button>
+<div class="w-[1px] h-4 bg-outline-variant/20 mx-1"></div>
+<button class="p-2 hover:bg-surface-bright text-on-surface transition-colors" title="Zoom Out">
+<span class="material-symbols-outlined text-sm" data-icon="zoom_out">zoom_out</span>
+</button>
+<div class="w-[1px] h-4 bg-outline-variant/20 mx-1"></div>
+<button class="p-2 hover:bg-surface-bright text-on-surface transition-colors" title="Fit to Screen">
+<span class="material-symbols-outlined text-sm" data-icon="fit_screen">fit_screen</span>
+</button>
+</div>
+<button class="w-12 h-12 rounded bg-primary-container text-on-primary-container shadow-xl flex items-center justify-center active:scale-95 transition-transform hover:shadow-primary/20">
+<span class="material-symbols-outlined" data-icon="add">add</span>
+</button>
+</div>
+</main>
+<script>
+        // Simple micro-interaction for canvas panning simulation or node selection
+        document.querySelectorAll('.group.cursor-pointer').forEach(node => {
+            node.addEventListener('click', function() {
+                document.querySelectorAll('.group.cursor-pointer').forEach(n => n.classList.remove('node-active', 'ring-2', 'ring-primary/40'));
+                this.classList.add('node-active', 'ring-2', 'ring-primary/40');
+                
+                // Simulated UI feedback for node change
+                const title = this.querySelector('h3').innerText;
+                document.querySelector('aside h2').innerText = title;
+            });
+        });
+
+        // Atmospheric grid pulse logic
+        const canvas = document.querySelector('.canvas-grid');
+        let opacity = 1;
+        let direction = -1;
+        
+        /* 
+        setInterval(() => {
+            opacity += (0.005 * direction);
+            if (opacity <= 0.7 || opacity >= 1) direction *= -1;
+            canvas.style.backgroundImage = `radial-gradient(circle at 1px 1px, rgba(42, 42, 42, ${opacity}) 1px, transparent 0)`;
+        }, 100);
+        */
+    </script>
+</body></html>
