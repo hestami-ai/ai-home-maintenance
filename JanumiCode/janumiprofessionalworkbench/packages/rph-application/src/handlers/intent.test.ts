@@ -152,17 +152,10 @@ describe('Intent lifecycle handlers (live command drive)', () => {
 		expect(status()).toBe('FORMALIZED'); // unchanged
 	});
 
-	it('rejects a command with no registered handler', () => {
+	it('rejects an unknown command type with RPH_VALIDATION_SCHEMA_FAILED', () => {
 		engine.dispatch(capture());
-		// SupersedePwu targets a PWU aggregate and has no handler yet -> REJECTED (semantic).
-		const r = engine.dispatch(
-			cmd(
-				'SupersedePwu',
-				{ supersedingWorkUnitId: 'pwu_x' },
-				{ targetAggregateType: 'ProfessionalWorkUnit' }
-			)
-		);
+		const r = engine.dispatch(cmd('NotARealCommand', {}));
 		expect(r.status).toBe('REJECTED');
-		expect(r.error?.code).toBe('RPH_VALIDATION_SEMANTIC_FAILED');
+		expect(r.error?.code).toBe('RPH_VALIDATION_SCHEMA_FAILED');
 	});
 });

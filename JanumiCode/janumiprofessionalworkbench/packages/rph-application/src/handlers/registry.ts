@@ -10,6 +10,16 @@ import {
 	provisionIntent,
 	reviseIntent
 } from './intent.js';
+import {
+	beginPwuShaping,
+	challengePwu,
+	changePwuState,
+	invalidatePwu,
+	markPwuReady,
+	proposePwu,
+	reshapePwu,
+	supersedePwu
+} from './pwu.js';
 
 export const HANDLERS: Readonly<Record<string, CommandHandler>> = {
 	// Intent lifecycle (DOC-002 §6)
@@ -18,5 +28,14 @@ export const HANDLERS: Readonly<Record<string, CommandHandler>> = {
 	ProvisionIntent: provisionIntent,
 	FormalizeIntent: formalizeIntent,
 	ApproveIntent: approveIntent,
-	ReviseIntent: reviseIntent
+	ReviseIntent: reviseIntent,
+	// PWU lifecycle (DOC-002 §7, §8)
+	ProposePwu: proposePwu,
+	BeginPwuShaping: beginPwuShaping,
+	MarkPwuReady: markPwuReady,
+	ChangePwuState: changePwuState,
+	ChallengePwu: challengePwu,
+	ReshapePwu: reshapePwu,
+	InvalidatePwu: invalidatePwu,
+	SupersedePwu: supersedePwu
 };
