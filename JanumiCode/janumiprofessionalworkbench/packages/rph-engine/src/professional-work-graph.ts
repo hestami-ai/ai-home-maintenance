@@ -22,10 +22,11 @@ interface PwuState {
 	readonly shapeIntegrityState?: string;
 }
 
-/** Build the Professional Work Graph View for an Undertaking's current state from the live engine. */
+/** Build the Professional Work Graph View for an Undertaking's current state from the live engine. Pass
+ * `undertakingId` to scope the graph to one Undertaking's PWUs (CON-009 ownership). */
 export function professionalWorkGraph(
 	handle: EngineHandle,
-	opts: { readonly openResiduals?: readonly string[] } = {}
+	opts: { readonly openResiduals?: readonly string[]; readonly undertakingId?: string } = {}
 ): DemoGraph {
 	const events = handle.readAllEvents();
 	const pwuIds: string[] = [];
@@ -56,7 +57,18 @@ export function professionalWorkGraph(
 	const edgeKey = (x: GraphEdge) => `${x.from}->${x.to}:${x.relation}`;
 	const uniqueEdges = [...new Map(edges.map((x) => [edgeKey(x), x])).values()];
 
-	const nodes: GraphNode[] = pwuIds.map((id) => {
+	const scopedPwuIds = opts.undertakingId
+		? pwuIds.filter((id) => {
+				const s = handle.loadObject(id)?.state as { undertakingId?: string } | undefined;
+				return s?.undertakingId === opts.undertakingId;
+			})
+		: pwuIds;
+	const keep = new Set(scopedPwuIds);
+	const scopedEdges = opts.undertakingId
+		? uniqueEdges.filter((e) => keep.has(e.from) && keep.has(e.to))
+		: uniqueEdges;
+
+	const nodes: GraphNode[] = scopedPwuIds.map((id) => {
 		const s = (handle.loadObject(id)?.state ?? {}) as PwuState;
 		return pwuGraphNode(
 			id,
@@ -72,5 +84,5 @@ export function professionalWorkGraph(
 		);
 	});
 
-	return { nodes, edges: uniqueEdges, openResiduals: opts.openResiduals ?? [] };
+	return { nodes, edges: scopedEdges, openResiduals: opts.openResiduals ?? [] };
 }

@@ -1,23 +1,39 @@
-// Server load — hosts the RPH engine on the SvelteKit NODE server (better-sqlite3 lives here, never the browser).
-// It stands up an in-memory engine over the injected Product Realization PWA ontology, DRIVES the Reference
-// Undertaking live (real commands → events → state), and hands the resulting Professional Work Graph (a pure,
-// serializable DemoGraph) to the page. The browser renders only this read-model; the engine never renders.
-import {
-	createEngine,
-	driveReferenceUndertaking,
-	professionalWorkGraph,
-	REFERENCE_OPEN_RESIDUALS
-} from '@janumipwb/rph-engine';
-import { ontology } from '@janumipwb/rph-product-realization-pwa';
-import type { PageServerLoad } from './$types';
+// PWA Library (PWA Design context) — lists the Professional Work Architectures and creates a new DRAFT PWA live.
+import { fail } from '@sveltejs/kit';
+import { listPwas, listPwuTypes } from '@janumipwb/rph-engine';
+import { dispatch, getEngine, mintUiId } from '$lib/server/workbench';
+import type { Actions, PageServerLoad } from './$types';
 
 export const load: PageServerLoad = () => {
-	const engine = createEngine({ ontology });
-	try {
-		driveReferenceUndertaking(engine);
-		const graph = professionalWorkGraph(engine, { openResiduals: REFERENCE_OPEN_RESIDUALS });
-		return { graph };
-	} finally {
-		engine.close();
+	const engine = getEngine();
+	const pwas = listPwas(engine).map((p) => ({
+		id: p.id,
+		name: String(p.state.name ?? p.id),
+		description: String(p.state.description ?? ''),
+		domain: String(p.state.domain ?? ''),
+		version: String(p.state.version ?? ''),
+		publicationStatus: String(p.state.publicationStatus ?? 'DRAFT'),
+		typeCount: listPwuTypes(engine, p.id).length,
+		policyCount: Array.isArray(p.state.assurancePolicyIds) ? p.state.assurancePolicyIds.length : 0
+	}));
+	return { pwas };
+};
+
+export const actions: Actions = {
+	create: async ({ request }) => {
+		const form = await request.formData();
+		const name = String(form.get('name') ?? '').trim();
+		const domain = String(form.get('domain') ?? '').trim();
+		if (!name) return fail(400, { error: 'A PWA name is required.' });
+		const id = mintUiId('pwa');
+		const r = dispatch('CreatePwa', 'PROFESSIONAL_WORK_ARCHITECTURE', id, {
+			pwaId: id,
+			name,
+			description: `${name} — authored in the PWA Designer.`,
+			domain: domain || 'general',
+			version: '0.1.0'
+		});
+		if (r.status !== 'ACCEPTED') return fail(400, { error: r.error?.message ?? r.status });
+		return { created: id };
 	}
 };
