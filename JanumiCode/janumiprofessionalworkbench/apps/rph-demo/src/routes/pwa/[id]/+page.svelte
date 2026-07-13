@@ -1,7 +1,7 @@
 <script lang="ts">
 	import { enhance } from '$app/forms';
 	import { invalidateAll } from '$app/navigation';
-	import { SvelteFlow, Background, Controls } from '@xyflow/svelte';
+	import { SvelteFlow, Background, Controls, Panel } from '@xyflow/svelte';
 	import '@xyflow/svelte/dist/style.css';
 	import type { Edge, Node } from '@xyflow/svelte';
 	import { toPwaFlow } from '$lib/pwaFlow';
@@ -23,8 +23,7 @@
 	} = $props();
 
 	// Selection = an explicit user/agent override, falling back to the root (or first) type. Deriving it from `data`
-	// (rather than seeding $state from data once) keeps it correct when the graph changes and avoids capturing only
-	// the initial prop value; it also self-heals when the selected type is removed.
+	// keeps it correct when the graph changes and self-heals when the selected type is removed.
 	let selectedOverride = $state<string | null>(null);
 	const selected = $derived(
 		selectedOverride && data.types.some((t) => t.id === selectedOverride)
@@ -45,8 +44,7 @@
 	const rank = $derived(RANK[data.pwa.publicationStatus] ?? 0);
 
 	// Node graph: PWU Types are nodes; permittedChildTypeIds are the composition ("permits") edges and matching
-	// requiredOutputs→requiredInputs are the data-flow edges. Recomputed when the DRAFT changes (form OR agent) or
-	// the selection changes.
+	// requiredOutputs→requiredInputs are the data-flow edges. Recomputed when the DRAFT changes or the selection does.
 	const flow = $derived(toPwaFlow(data.types, selected));
 	let nodes = $state<Node[]>([]);
 	let edges = $state<Edge[]>([]);
@@ -59,6 +57,7 @@
 	type FormMode = null | 'define' | { editId: string };
 	let formMode = $state<FormMode>(null);
 	let showPwaEdit = $state(false);
+	let agentCollapsed = $state(false);
 	const f = $state({
 		name: '',
 		pwuKind: '',
@@ -124,8 +123,8 @@
 		children = on ? [...children, id] : children.filter((c) => c !== id);
 	}
 
-	// ---- The authoring agent: chat (bottom) + reasoning log (left). It drives the SAME engine via the SSE relay;
-	// the graph re-renders live as each tool call commits (invalidateAll re-runs load -> data.types -> flow).
+	// ---- The authoring agent: chat + reasoning log, driving the SAME engine via the SSE relay; the graph
+	// re-renders live as each tool call commits (invalidateAll re-runs load -> data.types -> flow).
 	type LogEntry = {
 		kind: 'status' | 'text' | 'thinking' | 'tool' | 'toolend' | 'error';
 		text: string;
@@ -138,7 +137,8 @@
 		'edit_pwu_type',
 		'remove_pwu_type',
 		'link_types',
-		'unlink_types'
+		'unlink_types',
+		'scaffold_graph'
 	]);
 	let chatInput = $state('');
 	let running = $state(false);
@@ -160,6 +160,7 @@
 		const instruction = chatInput.trim();
 		if (!instruction || running) return;
 		running = true;
+		agentCollapsed = false;
 		push({ kind: 'text', text: `You: ${instruction}` });
 		chatInput = '';
 		try {
@@ -222,7 +223,6 @@
 				break;
 			case 'tool_end':
 				push({ kind: 'toolend', text: `${ev.tool}: ${ev.summary ?? ''}`, ok: ev.ok });
-				// Live refresh: as each mutating tool commits, re-render the graph so nodes/edges appear in real time.
 				if (ev.ok && ev.tool && MUTATING.has(ev.tool)) await invalidateAll();
 				break;
 			case 'error':
@@ -249,301 +249,327 @@
 
 <svelte:head><title>{data.pwa.name} — Work Architecture</title></svelte:head>
 
-<nav class="crumbs"><a href="/">PWA Library</a> › <span>{data.pwa.name}</span></nav>
-
-<header class="pagehead">
-	<div>
-		<h1>{data.pwa.name}</h1>
-		<p class="meta">
-			<span class="pill" class:pub={data.pwa.publicationStatus === 'PUBLISHED'}
-				>{data.pwa.publicationStatus}</span
-			>
-			v{data.pwa.version} · {data.pwa.domain}
-		</p>
-		<p class="sub">{data.pwa.description}</p>
-	</div>
-</header>
-
-{#if editable}
-	<div class="pwaedit">
-		{#if !showPwaEdit}
-			<button class="ghost small" onclick={() => (showPwaEdit = true)}>Edit PWA details</button>
-		{:else}
-			<form method="POST" action="?/editDetails" use:enhance class="detailform">
-				<input name="name" value={data.pwa.name} placeholder="PWA name" required />
-				<input name="domain" value={data.pwa.domain} placeholder="Domain" />
-				<input name="description" value={data.pwa.description} placeholder="Description" />
-				<button class="primary" type="submit">Save</button>
-				<button type="button" class="ghost small" onclick={() => (showPwaEdit = false)}>Cancel</button>
-			</form>
-		{/if}
-	</div>
-{/if}
-
-<div class="pubbar">
-	<ol class="steps">
-		<li class:done={rank > 1} class:active={data.pwa.publicationStatus === 'DRAFT'}>Draft</li>
-		<li class:done={rank > 2} class:active={data.pwa.publicationStatus === 'UNDER_REVIEW'}>
-			Under Review
-		</li>
-		<li class:done={rank > 3} class:active={data.pwa.publicationStatus === 'VALIDATED'}>Validated</li>
-		<li class:done={rank > 4} class:active={data.pwa.publicationStatus === 'PUBLISHED'}>Published</li>
-		<li class:done={rank > 5} class:active={data.pwa.publicationStatus === 'DEPRECATED'}>
-			Deprecated
-		</li>
-		<li class:done={rank > 6} class:active={data.pwa.publicationStatus === 'RETIRED'}>Retired</li>
-	</ol>
-	<div class="pubact">
-		{#if data.pwa.publicationStatus === 'DRAFT'}
-			<form method="POST" action="?/submitForReview" use:enhance>
-				<button class="ghost" type="submit" disabled={!hasRoot}>Submit for Review →</button>
-			</form>
-			{#if !hasRoot}<span class="hintline">Define a root PWU Type to submit.</span>{/if}
-		{:else if data.pwa.publicationStatus === 'UNDER_REVIEW'}
-			<form method="POST" action="?/validate" use:enhance>
-				<button class="ghost" type="submit">Validate →</button>
-			</form>
-		{:else if data.pwa.publicationStatus === 'VALIDATED'}
-			<form method="POST" action="?/publish" use:enhance>
-				<button class="primary" type="submit">Publish</button>
-			</form>
-		{:else if data.pwa.publicationStatus === 'PUBLISHED'}
-			<span class="immutable">🔒 Published versions are immutable</span>
-			<form method="POST" action="?/deprecate" use:enhance>
-				<button class="ghost" type="submit">Deprecate</button>
-			</form>
-		{:else if data.pwa.publicationStatus === 'DEPRECATED'}
-			<form method="POST" action="?/retire" use:enhance>
-				<button class="ghost" type="submit">Retire</button>
-			</form>
-		{:else if data.pwa.publicationStatus === 'RETIRED'}
-			<span class="retired">retired</span>
-		{/if}
-	</div>
-</div>
-{#if form?.error}<p class="err" role="alert">{form.error}</p>{/if}
-
-<div class="designer" class:with-agent={editable}>
-	{#if editable}
-		<aside class="agentrail">
-			<div class="railhead">
-				<span class="itag">AI AGENT</span>
-				{#if running}<span class="livedot">● working…</span>{/if}
-			</div>
-			<p class="hint">
-				A JPWB-expert agent authors this graph for you — describe what you want below and it proposes
-				the PWU Types + links. Every change is applied to this DRAFT; you review and publish.
-			</p>
-			<div class="agentlog" data-testid="agent-log">
-				{#if log.length === 0}
-					<p class="logempty">No agent activity yet.</p>
+<div class="designer">
+	<header class="topbar">
+		<div class="tbmain">
+			<nav class="crumbs"><a href="/">PWA Library</a> › <span>{data.pwa.name}</span></nav>
+			<div class="titlerow">
+				<h1>{data.pwa.name}</h1>
+				<span class="pill" class:pub={data.pwa.publicationStatus === 'PUBLISHED'}
+					>{data.pwa.publicationStatus}</span
+				>
+				<span class="tbmeta">v{data.pwa.version} · {data.pwa.domain}</span>
+				{#if editable}
+					<button class="ghost small" onclick={() => (showPwaEdit = !showPwaEdit)}>Edit details</button>
 				{/if}
-				{#each log as entry, i (i)}
-					<div class="logentry {entry.kind}" class:bad={entry.kind === 'toolend' && entry.ok === false}>
-						{#if entry.kind === 'tool'}<span class="logmark">▶</span>{:else if entry.kind === 'toolend'}<span
-								class="logmark">{entry.ok === false ? '✗' : '✓'}</span
-							>{:else if entry.kind === 'thinking'}<span class="logmark">…</span>{:else if entry.kind === 'error'}<span
-								class="logmark">!</span
-							>{/if}<span class="logtext">{entry.text}</span>
-					</div>
-				{/each}
 			</div>
-		</aside>
-	{/if}
-
-	<section class="canvaswrap">
-		<div class="canvashead">
-			<h2>Work Architecture — Professional Work Graph</h2>
-			{#if editable}
-				<button class="ghost small" onclick={openDefine}>+ Define PWU Type</button>
+			{#if editable && showPwaEdit}
+				<form method="POST" action="?/editDetails" use:enhance class="detailform">
+					<input name="name" value={data.pwa.name} placeholder="PWA name" required />
+					<input name="domain" value={data.pwa.domain} placeholder="Domain" />
+					<input name="description" value={data.pwa.description} placeholder="Description" />
+					<button class="primary small" type="submit">Save</button>
+					<button type="button" class="ghost small" onclick={() => (showPwaEdit = false)}>Cancel</button>
+				</form>
 			{/if}
+			{#if form?.error}<p class="err" role="alert">{form.error}</p>{/if}
 		</div>
-		<p class="hint">
-			Each node is a reusable PWU Type; a solid edge means the parent may be decomposed into the child
-			(permitted composition); a dashed <span class="flowkey">⤳</span> edge is a data-flow hand-off (one
-			type's output is another's required input). Click a node to inspect or edit it. PWU Types carry no
-			execution or assurance state.
-		</p>
-		<div class="canvas">
-			{#if data.types.length}
-				<SvelteFlow bind:nodes bind:edges onnodeclick={(e) => (selectedOverride = e.node.id)} fitView>
-					<Background />
-					<Controls />
-				</SvelteFlow>
-			{:else}
-				<div class="emptycanvas">
-					<p>No PWU Types yet.</p>
-					{#if editable}<p class="hint">Use “+ Define PWU Type”, or ask the agent to build the graph.</p>{/if}
-				</div>
-			{/if}
-		</div>
-	</section>
 
-	<aside class="inspector">
-		{#if editable && formMode !== null}
-			{@const editing = editingId !== ''}
-			<div class="itag">{editing ? 'EDIT PWU TYPE' : 'NEW PWU TYPE'}</div>
-			<form
-				method="POST"
-				action={editing ? '?/editType' : '?/defineType'}
-				use:enhance
-				class="typeform"
-			>
-				{#if editing}<input type="hidden" name="pwuTypeId" value={editingId} />{/if}
-				{#if !editing}
-					<div class="ffield">
-						<span class="flabel">Start from template</span>
-						<span class="fhelp">Copy a reusable blueprint from the catalog, then edit it freely.</span>
-						<select class="tplsel" onchange={(e) => applyTemplate(e.currentTarget.value)}>
-							<option value="">— blank —</option>
-							{#each PWU_TYPE_CATALOG as t (t.key)}<option value={t.key}>{t.name}</option>{/each}
-						</select>
-					</div>
+		<div class="tbpub">
+			<ol class="steps">
+				<li class:done={rank > 1} class:active={data.pwa.publicationStatus === 'DRAFT'}>Draft</li>
+				<li class:done={rank > 2} class:active={data.pwa.publicationStatus === 'UNDER_REVIEW'}>Review</li>
+				<li class:done={rank > 3} class:active={data.pwa.publicationStatus === 'VALIDATED'}>Valid.</li>
+				<li class:done={rank > 4} class:active={data.pwa.publicationStatus === 'PUBLISHED'}>Pub.</li>
+				<li class:done={rank > 5} class:active={data.pwa.publicationStatus === 'DEPRECATED'}>Deprec.</li>
+				<li class:done={rank > 6} class:active={data.pwa.publicationStatus === 'RETIRED'}>Retired</li>
+			</ol>
+			<div class="pubact">
+				{#if editable}
+					<button class="ghost small" onclick={openDefine}>+ Define PWU Type</button>
 				{/if}
-				<div class="ffield">
-					{@render fhead('Name', PWU_TYPE_HELP.name)}
-					<input name="name" bind:value={f.name} required />
-				</div>
-				<div class="ffield">
-					{@render fhead('Kind', PWU_TYPE_HELP.pwuKind)}
-					<input name="pwuKind" bind:value={f.pwuKind} placeholder="ARCHITECTURE" required />
-				</div>
-				<div class="ffield">
-					{@render fhead('Purpose', PWU_TYPE_HELP.purpose)}
-					<textarea name="purpose" bind:value={f.purpose} rows="2"></textarea>
-				</div>
-				<div class="ffield">
-					{@render fhead('Completion rule', PWU_TYPE_HELP.completionRule)}
-					<input
-						name="completionRule"
-						bind:value={f.completionRule}
-						placeholder="(defaults to the RPH rule)"
-					/>
-				</div>
-				<div class="ffield">
-					{@render fhead('Required inputs', PWU_TYPE_HELP.requiredInputs)}
-					<input name="requiredInputs" bind:value={f.requiredInputs} placeholder="approved-behavior" />
-				</div>
-				<div class="ffield">
-					{@render fhead('Required outputs', PWU_TYPE_HELP.requiredOutputs)}
-					<input
-						name="requiredOutputs"
-						bind:value={f.requiredOutputs}
-						placeholder="architecture-baseline"
-					/>
-				</div>
-				<div class="ffield">
-					<label class="rootcheck"
-						><input type="checkbox" name="isRoot" bind:checked={f.isRoot} /> Root type</label
-					>
-					<span class="fhelp">{PWU_TYPE_HELP.isRoot}</span>
-				</div>
-				<div class="ffield">
-					{@render fhead('Permitted child types', PWU_TYPE_HELP.permittedChildTypeIds)}
-					<div class="childlist">
-						{#each data.types.filter((t) => t.id !== editingId) as t (t.id)}
-							<label class="childopt">
-								<input
-									type="checkbox"
-									name="permittedChildTypeIds"
-									value={t.id}
-									checked={children.includes(t.id)}
-									onchange={(e) => toggleChild(t.id, e.currentTarget.checked)}
-								/>
-								{t.name}
-							</label>
-						{/each}
-						{#if data.types.filter((t) => t.id !== editingId).length === 0}
-							<span class="fhelp">Define more types to allow composition.</span>
-						{/if}
-					</div>
-				</div>
-				<div class="formactions">
-					<button class="primary" type="submit">{editing ? 'Save changes' : 'Add type'}</button>
-					<button type="button" class="ghost small" onclick={() => (formMode = null)}>Cancel</button>
-				</div>
-			</form>
-		{:else if current}
-			<div class="itag">PWU TYPE</div>
-			<h3>{current.name}</h3>
-			<div class="field"><span class="flabel">Kind</span><p class="mono">{current.pwuKind}</p></div>
-			<div class="field"><span class="flabel">Purpose</span><p>{current.purpose}</p></div>
-			<div class="field">
-				<span class="flabel">Completion rule</span><p class="mono">{current.completionRule || '—'}</p>
-			</div>
-			<div class="field">
-				<span class="flabel">Required inputs</span>
-				<p>{current.requiredInputs.length ? current.requiredInputs.join(', ') : '—'}</p>
-			</div>
-			<div class="field">
-				<span class="flabel">Required outputs</span>
-				<p>{current.requiredOutputs.length ? current.requiredOutputs.join(', ') : '—'}</p>
-			</div>
-			<div class="field">
-				<span class="flabel">Permitted children</span>
-				<p>{current.permittedChildTypeIds.length} type(s)</p>
-			</div>
-			{#if editable}
-				<div class="inspactions">
-					<button class="ghost small" onclick={() => openEdit(current.id)}>Edit</button>
-					<form method="POST" action="?/removeType" use:enhance>
-						<input type="hidden" name="pwuTypeId" value={current.id} />
-						<button class="ghost small danger" type="submit">Remove</button>
+				{#if data.pwa.publicationStatus === 'DRAFT'}
+					<form method="POST" action="?/submitForReview" use:enhance>
+						<button class="ghost small" type="submit" disabled={!hasRoot}>Submit for Review →</button>
 					</form>
-				</div>
-			{/if}
-		{:else}
-			<p class="hint">Select a node to inspect it.</p>
-		{/if}
-
-		{#if data.fixtures.length}
-			<div class="fixtures">
-				<span class="flabel">Conformance fixtures</span>
-				{#each data.fixtures as fx (fx.id)}
-					<a class="fixture" href={`/undertakings/${fx.id}`}>
-						{#if fx.isReferenceFixture}<span class="fxbadge">REFERENCE FIXTURE</span>{/if}
-						{fx.name} ↗
-					</a>
-				{/each}
+				{:else if data.pwa.publicationStatus === 'UNDER_REVIEW'}
+					<form method="POST" action="?/validate" use:enhance>
+						<button class="ghost small" type="submit">Validate →</button>
+					</form>
+				{:else if data.pwa.publicationStatus === 'VALIDATED'}
+					<form method="POST" action="?/publish" use:enhance>
+						<button class="primary small" type="submit">Publish</button>
+					</form>
+				{:else if data.pwa.publicationStatus === 'PUBLISHED'}
+					<span class="immutable">🔒 Published versions are immutable</span>
+					<form method="POST" action="?/deprecate" use:enhance>
+						<button class="ghost small" type="submit">Deprecate</button>
+					</form>
+				{:else if data.pwa.publicationStatus === 'DEPRECATED'}
+					<form method="POST" action="?/retire" use:enhance>
+						<button class="ghost small" type="submit">Retire</button>
+					</form>
+				{:else if data.pwa.publicationStatus === 'RETIRED'}
+					<span class="retired">retired</span>
+				{/if}
 			</div>
-		{/if}
-	</aside>
-</div>
+		</div>
+	</header>
 
-{#if editable}
-	<form class="chatbar" onsubmit={sendToAgent}>
-		<textarea
-			bind:value={chatInput}
-			placeholder="Ask the agent to build or modify the graph — e.g. “Draft a product realization architecture with the standard work areas.”"
-			rows="2"
-			data-testid="agent-input"
-			onkeydown={(e) => {
-				if (e.key === 'Enter' && (e.metaKey || e.ctrlKey)) sendToAgent(e as unknown as SubmitEvent);
-			}}
-		></textarea>
-		<button class="primary" type="submit" disabled={running || !chatInput.trim()}>
-			{running ? 'Working…' : 'Send'}
-		</button>
-	</form>
-{/if}
+	<div class="canvas">
+		<div class="flowarea">
+			<SvelteFlow
+			bind:nodes
+			bind:edges
+			onnodeclick={(e) => (selectedOverride = e.node.id)}
+			fitView
+			fitViewOptions={{ padding: 0.22, minZoom: 0.25 }}
+		>
+			<Background />
+			<Controls position="bottom-right" />
+
+			{#if editable}
+				<Panel position="top-left">
+					<section class="agentpanel" class:collapsed={agentCollapsed} data-testid="agent-panel">
+						<header class="ppanelhead">
+							<span class="itag">AI AGENT</span>
+							<div class="pheadright">
+								{#if running}<span class="livedot">● working…</span>{/if}
+								<button
+									class="collapsebtn"
+									onclick={() => (agentCollapsed = !agentCollapsed)}
+									aria-label={agentCollapsed ? 'Expand agent panel' : 'Collapse agent panel'}
+									>{agentCollapsed ? '▸' : '▾'}</button
+								>
+							</div>
+						</header>
+						{#if !agentCollapsed}
+							<div class="agentlog" data-testid="agent-log">
+								{#if log.length === 0}
+									<p class="logempty">
+										Describe what you want and the JPWB agent proposes the PWU Types + links onto this
+										DRAFT. You review and publish.
+									</p>
+								{/if}
+								{#each log as entry, i (i)}
+									<div
+										class="logentry {entry.kind}"
+										class:bad={entry.kind === 'toolend' && entry.ok === false}
+									>
+										{#if entry.kind === 'tool'}<span class="logmark">▶</span>{:else if entry.kind === 'toolend'}<span
+												class="logmark">{entry.ok === false ? '✗' : '✓'}</span
+											>{:else if entry.kind === 'thinking'}<span class="logmark">…</span>{:else if entry.kind === 'error'}<span
+												class="logmark">!</span
+											>{/if}<span class="logtext">{entry.text}</span>
+									</div>
+								{/each}
+							</div>
+						{/if}
+					</section>
+				</Panel>
+			{/if}
+
+			<Panel position="top-right">
+				<aside class="inspectorpanel">
+					{#if editable && formMode !== null}
+						{@const editing = editingId !== ''}
+						<div class="itag">{editing ? 'EDIT PWU TYPE' : 'NEW PWU TYPE'}</div>
+						<form
+							method="POST"
+							action={editing ? '?/editType' : '?/defineType'}
+							use:enhance
+							class="typeform"
+						>
+							{#if editing}<input type="hidden" name="pwuTypeId" value={editingId} />{/if}
+							{#if !editing}
+								<div class="ffield">
+									<span class="flabel">Start from template</span>
+									<span class="fhelp">Copy a reusable blueprint from the catalog, then edit it freely.</span>
+									<select class="tplsel" onchange={(e) => applyTemplate(e.currentTarget.value)}>
+										<option value="">— blank —</option>
+										{#each PWU_TYPE_CATALOG as t (t.key)}<option value={t.key}>{t.name}</option>{/each}
+									</select>
+								</div>
+							{/if}
+							<div class="ffield">
+								{@render fhead('Name', PWU_TYPE_HELP.name)}
+								<input name="name" bind:value={f.name} required />
+							</div>
+							<div class="ffield">
+								{@render fhead('Kind', PWU_TYPE_HELP.pwuKind)}
+								<input name="pwuKind" bind:value={f.pwuKind} placeholder="ARCHITECTURE" required />
+							</div>
+							<div class="ffield">
+								{@render fhead('Purpose', PWU_TYPE_HELP.purpose)}
+								<textarea name="purpose" bind:value={f.purpose} rows="2"></textarea>
+							</div>
+							<div class="ffield">
+								{@render fhead('Completion rule', PWU_TYPE_HELP.completionRule)}
+								<input
+									name="completionRule"
+									bind:value={f.completionRule}
+									placeholder="(defaults to the RPH rule)"
+								/>
+							</div>
+							<div class="ffield">
+								{@render fhead('Required inputs', PWU_TYPE_HELP.requiredInputs)}
+								<input name="requiredInputs" bind:value={f.requiredInputs} placeholder="approved-behavior" />
+							</div>
+							<div class="ffield">
+								{@render fhead('Required outputs', PWU_TYPE_HELP.requiredOutputs)}
+								<input
+									name="requiredOutputs"
+									bind:value={f.requiredOutputs}
+									placeholder="architecture-baseline"
+								/>
+							</div>
+							<div class="ffield">
+								<label class="rootcheck"
+									><input type="checkbox" name="isRoot" bind:checked={f.isRoot} /> Root type</label
+								>
+								<span class="fhelp">{PWU_TYPE_HELP.isRoot}</span>
+							</div>
+							<div class="ffield">
+								{@render fhead('Permitted child types', PWU_TYPE_HELP.permittedChildTypeIds)}
+								<div class="childlist">
+									{#each data.types.filter((t) => t.id !== editingId) as t (t.id)}
+										<label class="childopt">
+											<input
+												type="checkbox"
+												name="permittedChildTypeIds"
+												value={t.id}
+												checked={children.includes(t.id)}
+												onchange={(e) => toggleChild(t.id, e.currentTarget.checked)}
+											/>
+											{t.name}
+										</label>
+									{/each}
+									{#if data.types.filter((t) => t.id !== editingId).length === 0}
+										<span class="fhelp">Define more types to allow composition.</span>
+									{/if}
+								</div>
+							</div>
+							<div class="formactions">
+								<button class="primary small" type="submit">{editing ? 'Save changes' : 'Add type'}</button>
+								<button type="button" class="ghost small" onclick={() => (formMode = null)}>Cancel</button
+								>
+							</div>
+						</form>
+					{:else if current}
+						<div class="itag">PWU TYPE</div>
+						<h3>{current.name}</h3>
+						<div class="field"><span class="flabel">Kind</span><p class="mono">{current.pwuKind}</p></div>
+						<div class="field"><span class="flabel">Purpose</span><p>{current.purpose}</p></div>
+						<div class="field">
+							<span class="flabel">Completion rule</span><p class="mono">{current.completionRule || '—'}</p>
+						</div>
+						<div class="field">
+							<span class="flabel">Required inputs</span>
+							<p>{current.requiredInputs.length ? current.requiredInputs.join(', ') : '—'}</p>
+						</div>
+						<div class="field">
+							<span class="flabel">Required outputs</span>
+							<p>{current.requiredOutputs.length ? current.requiredOutputs.join(', ') : '—'}</p>
+						</div>
+						<div class="field">
+							<span class="flabel">Permitted children</span>
+							<p>{current.permittedChildTypeIds.length} type(s)</p>
+						</div>
+						{#if editable}
+							<div class="inspactions">
+								<button class="ghost small" onclick={() => openEdit(current.id)}>Edit</button>
+								<form method="POST" action="?/removeType" use:enhance>
+									<input type="hidden" name="pwuTypeId" value={current.id} />
+									<button class="ghost small danger" type="submit">Remove</button>
+								</form>
+							</div>
+						{/if}
+					{:else}
+						<div class="itag">INSPECTOR</div>
+						<p class="hint">Select a node to inspect it{#if editable}, or “+ Define PWU Type”.{/if}</p>
+					{/if}
+
+					{#if data.fixtures.length}
+						<div class="fixtures">
+							<span class="flabel">Conformance fixtures</span>
+							{#each data.fixtures as fx (fx.id)}
+								<a class="fixture" href={`/undertakings/${fx.id}`}>
+									{#if fx.isReferenceFixture}<span class="fxbadge">REFERENCE FIXTURE</span>{/if}
+									{fx.name} ↗
+								</a>
+							{/each}
+						</div>
+					{/if}
+				</aside>
+			</Panel>
+
+			{#if data.types.length === 0}
+				<Panel position="top-center">
+					<div class="emptyhint">
+						No PWU Types yet — use “+ Define PWU Type”{#if editable}, or ask the agent below{/if}.
+					</div>
+				</Panel>
+			{/if}
+			</SvelteFlow>
+		</div>
+		{#if editable}
+			<form class="chatbar" onsubmit={sendToAgent}>
+				<textarea
+					bind:value={chatInput}
+					placeholder="Ask the agent to build or modify the graph — e.g. “Draft a product realization architecture with the standard work areas.”"
+					rows="1"
+					data-testid="agent-input"
+					onkeydown={(e) => {
+						if (e.key === 'Enter' && (e.metaKey || e.ctrlKey)) sendToAgent(e as unknown as SubmitEvent);
+					}}
+				></textarea>
+				<button class="primary" type="submit" disabled={running || !chatInput.trim()}>
+					{running ? 'Working…' : 'Send'}
+				</button>
+			</form>
+		{/if}
+	</div>
+</div>
 
 <style>
+	.designer {
+		height: 100%;
+		display: flex;
+		flex-direction: column;
+		overflow: hidden;
+	}
+	.topbar {
+		flex: 0 0 auto;
+		display: flex;
+		justify-content: space-between;
+		align-items: flex-start;
+		gap: 18px;
+		padding: 12px 20px;
+		border-bottom: 1px solid var(--sc);
+		background: var(--surface);
+	}
+	.tbmain {
+		min-width: 0;
+	}
 	.crumbs {
-		font-size: 12px;
+		font-size: 11px;
 		color: var(--outline);
-		margin-bottom: 10px;
+		margin-bottom: 4px;
 	}
-	.pagehead h1 {
-		margin: 0 0 6px;
-		font-size: 28px;
+	.titlerow {
+		display: flex;
+		align-items: center;
+		gap: 10px;
+		flex-wrap: wrap;
 	}
-	.meta {
-		margin: 0 0 6px;
+	.titlerow h1 {
+		margin: 0;
+		font-size: 20px;
+		letter-spacing: -0.01em;
+	}
+	.tbmeta {
 		font-size: 12px;
 		color: var(--on-variant);
-		display: flex;
-		gap: 8px;
-		align-items: center;
 	}
 	.pill {
 		font-size: 10px;
@@ -557,55 +583,43 @@
 		background: rgba(97, 218, 193, 0.15);
 		color: var(--tertiary);
 	}
-	.sub {
-		margin: 0;
-		max-width: 680px;
-		color: var(--on-variant);
-		font-size: 13px;
-		line-height: 1.5;
-	}
-	.pwaedit {
-		margin-top: 12px;
-	}
 	.detailform {
 		display: flex;
 		flex-wrap: wrap;
 		gap: 8px;
 		align-items: center;
+		margin-top: 10px;
 	}
 	.detailform input {
 		background: var(--sc-highest);
 		border: 1px solid var(--outline-faint);
 		color: var(--on);
 		border-radius: 6px;
-		padding: 8px 11px;
+		padding: 7px 10px;
 		font-size: 12.5px;
 	}
-	.pubbar {
+	.tbpub {
 		display: flex;
-		align-items: center;
-		justify-content: space-between;
-		gap: 16px;
-		background: var(--surface-low);
-		border-radius: 12px;
-		padding: 12px 18px;
-		margin-top: 14px;
+		flex-direction: column;
+		align-items: flex-end;
+		gap: 8px;
+		flex-shrink: 0;
 	}
 	.steps {
 		display: flex;
-		gap: 8px;
+		gap: 5px;
 		list-style: none;
 		margin: 0;
 		padding: 0;
-		font-size: 11px;
+		font-size: 10px;
 		color: var(--outline);
-		flex-wrap: wrap;
 	}
 	.steps li {
-		padding: 3px 10px;
+		padding: 3px 8px;
 		border-radius: 20px;
 		background: var(--sc);
-		letter-spacing: 0.04em;
+		letter-spacing: 0.03em;
+		white-space: nowrap;
 	}
 	.steps li.done {
 		color: var(--tertiary);
@@ -618,50 +632,13 @@
 	.pubact {
 		display: flex;
 		align-items: center;
-		gap: 10px;
+		gap: 8px;
 	}
-	.pubact form,
-	.inspactions form {
+	.pubact form {
 		margin: 0;
 	}
-	button.ghost {
-		background: var(--sc-highest);
-		color: var(--on);
-		border: 1px solid var(--outline-faint);
-		border-radius: 8px;
-		padding: 8px 14px;
-		font-size: 13px;
-		font-weight: 600;
-		cursor: pointer;
-	}
-	button.ghost:disabled {
-		opacity: 0.5;
-		cursor: not-allowed;
-	}
-	button.ghost.small {
-		padding: 6px 11px;
-		font-size: 12px;
-	}
-	button.ghost.danger {
-		color: var(--error);
-		border-color: rgba(255, 180, 171, 0.4);
-	}
-	button.primary {
-		background: var(--primary);
-		color: #00263f;
-		border: none;
-		border-radius: 8px;
-		padding: 8px 16px;
-		font-weight: 700;
-		font-size: 13px;
-		cursor: pointer;
-	}
-	button.primary:disabled {
-		opacity: 0.5;
-		cursor: not-allowed;
-	}
 	.immutable {
-		font-size: 12px;
+		font-size: 11px;
 		color: var(--tertiary);
 		font-weight: 600;
 	}
@@ -672,108 +649,87 @@
 		color: var(--outline);
 		font-weight: 700;
 	}
-	.hintline {
-		font-size: 11px;
-		color: var(--outline);
-	}
 	.err {
 		color: var(--error);
 		font-size: 12.5px;
-		margin: 10px 0 0;
-	}
-	.designer {
-		display: grid;
-		grid-template-columns: 1fr 340px;
-		gap: 18px;
-		margin-top: 18px;
-	}
-	.designer.with-agent {
-		grid-template-columns: 300px 1fr 340px;
-	}
-	.canvaswrap,
-	.inspector,
-	.agentrail {
-		background: var(--surface-low);
-		border-radius: 12px;
-		padding: 18px;
-	}
-	.canvashead {
-		display: flex;
-		justify-content: space-between;
-		align-items: center;
-	}
-	h2 {
-		margin: 0 0 4px;
-		font-size: 16px;
-	}
-	.hint {
-		color: var(--outline);
-		font-size: 12px;
-		margin: 0 0 12px;
-	}
-	.flowkey {
-		color: var(--tertiary);
-		font-weight: 700;
+		margin: 8px 0 0;
 	}
 	.canvas {
-		height: calc(100vh - 360px);
-		min-height: 420px;
+		flex: 1;
+		min-height: 0;
+		display: flex;
+		flex-direction: column;
 		background: var(--surface);
-		border: 1px solid var(--sc);
-		border-radius: 10px;
-		overflow: hidden;
 	}
-	.emptycanvas {
-		height: 100%;
+	.flowarea {
+		flex: 1;
+		min-height: 0;
+		position: relative;
+	}
+	.canvas :global(.svelte-flow) {
+		background: var(--surface);
+	}
+	.canvas :global(.svelte-flow__node) {
+		cursor: pointer;
+	}
+	/* Floating panels overlaid on the canvas (Svelte Flow <Panel>) */
+	.agentpanel,
+	.inspectorpanel {
+		background: rgba(20, 20, 21, 0.94);
+		border: 1px solid var(--outline-faint);
+		border-radius: 12px;
+		backdrop-filter: blur(6px);
+		box-shadow: 0 10px 30px rgba(0, 0, 0, 0.4);
+	}
+	.agentpanel {
+		width: 288px;
+		/* Fits inside the flow area (which sits above the chat bar), scrolling internally. */
+		max-height: calc(100vh - 235px);
 		display: flex;
 		flex-direction: column;
-		align-items: center;
-		justify-content: center;
-		gap: 4px;
-		color: var(--on-variant);
+		padding: 12px;
 	}
-	.itag {
-		font-size: 10px;
-		letter-spacing: 0.14em;
-		color: var(--primary);
-		font-weight: 700;
+	.agentpanel.collapsed {
+		width: 200px;
 	}
-	.inspector h3 {
-		margin: 6px 0 16px;
-		font-size: 19px;
-	}
-	/* Agent rail */
-	.agentrail {
-		display: flex;
-		flex-direction: column;
-	}
-	.railhead {
+	.ppanelhead {
 		display: flex;
 		align-items: center;
 		justify-content: space-between;
-		margin-bottom: 6px;
+		gap: 8px;
+	}
+	.pheadright {
+		display: flex;
+		align-items: center;
+		gap: 8px;
 	}
 	.livedot {
 		font-size: 11px;
 		color: var(--tertiary);
 		font-weight: 600;
 	}
+	.collapsebtn {
+		background: var(--sc-high);
+		border: 1px solid var(--outline-faint);
+		color: var(--on-variant);
+		border-radius: 5px;
+		width: 22px;
+		height: 22px;
+		font-size: 11px;
+		cursor: pointer;
+	}
 	.agentlog {
-		flex: 1;
+		margin-top: 10px;
 		overflow-y: auto;
-		background: var(--surface);
-		border: 1px solid var(--sc);
-		border-radius: 10px;
-		padding: 10px;
 		display: flex;
 		flex-direction: column;
 		gap: 6px;
-		min-height: 300px;
-		max-height: calc(100vh - 420px);
+		min-height: 120px;
 	}
 	.logempty {
 		color: var(--outline);
-		font-size: 12px;
+		font-size: 11.5px;
+		line-height: 1.5;
 		margin: 0;
 	}
 	.logentry {
@@ -803,7 +759,7 @@
 	.logentry.status {
 		color: var(--outline);
 		font-size: 10px;
-		letter-spacing: 0.08em;
+		letter-spacing: 0.06em;
 		text-transform: uppercase;
 	}
 	.logentry.error {
@@ -813,15 +769,24 @@
 		flex-shrink: 0;
 		font-weight: 700;
 	}
-	/* Chat bar */
+	.inspectorpanel {
+		width: 320px;
+		max-height: calc(100vh - 235px);
+		overflow-y: auto;
+		padding: 14px 16px;
+	}
+	.inspectorpanel h3 {
+		margin: 6px 0 14px;
+		font-size: 18px;
+	}
 	.chatbar {
+		flex: 0 0 auto;
 		display: flex;
 		gap: 10px;
 		align-items: flex-end;
-		margin-top: 16px;
-		background: var(--surface-low);
-		border-radius: 12px;
-		padding: 14px 18px;
+		padding: 12px 20px;
+		border-top: 1px solid var(--sc);
+		background: var(--surface);
 	}
 	.chatbar textarea {
 		flex: 1;
@@ -829,10 +794,30 @@
 		border: 1px solid var(--outline-faint);
 		color: var(--on);
 		border-radius: 8px;
-		padding: 10px 12px;
+		padding: 9px 11px;
 		font-size: 13px;
 		font-family: inherit;
-		resize: vertical;
+		resize: none;
+		max-height: 96px;
+	}
+	.emptyhint {
+		background: rgba(20, 20, 21, 0.9);
+		border: 1px dashed var(--outline-faint);
+		border-radius: 10px;
+		padding: 10px 14px;
+		font-size: 12px;
+		color: var(--on-variant);
+	}
+	.itag {
+		font-size: 10px;
+		letter-spacing: 0.14em;
+		color: var(--primary);
+		font-weight: 700;
+	}
+	.hint {
+		color: var(--outline);
+		font-size: 12px;
+		margin: 8px 0 0;
 	}
 	.typeform {
 		display: flex;
@@ -891,7 +876,7 @@
 		align-items: center;
 	}
 	.field {
-		margin-bottom: 14px;
+		margin-bottom: 12px;
 	}
 	.flabel {
 		font-size: 10px;
@@ -918,16 +903,16 @@
 		margin-top: 4px;
 	}
 	.fixtures {
-		margin-top: 20px;
+		margin-top: 18px;
 		border-top: 1px solid var(--sc);
-		padding-top: 14px;
+		padding-top: 12px;
 	}
 	.fixture {
 		display: block;
 		background: var(--sc);
 		border-radius: 8px;
-		padding: 10px 12px;
-		font-size: 12.5px;
+		padding: 9px 11px;
+		font-size: 12px;
 		margin-bottom: 6px;
 		color: var(--on);
 	}
@@ -942,7 +927,42 @@
 		border-radius: 4px;
 		margin-right: 6px;
 	}
-	.canvas :global(.svelte-flow__node) {
+	/* Buttons */
+	button.ghost {
+		background: var(--sc-highest);
+		color: var(--on);
+		border: 1px solid var(--outline-faint);
+		border-radius: 8px;
+		padding: 8px 14px;
+		font-size: 13px;
+		font-weight: 600;
 		cursor: pointer;
+	}
+	button.ghost:disabled {
+		opacity: 0.5;
+		cursor: not-allowed;
+	}
+	button.ghost.small,
+	button.primary.small {
+		padding: 6px 11px;
+		font-size: 12px;
+	}
+	button.ghost.danger {
+		color: var(--error);
+		border-color: rgba(255, 180, 171, 0.4);
+	}
+	button.primary {
+		background: var(--primary);
+		color: #00263f;
+		border: none;
+		border-radius: 8px;
+		padding: 8px 16px;
+		font-weight: 700;
+		font-size: 13px;
+		cursor: pointer;
+	}
+	button.primary:disabled {
+		opacity: 0.5;
+		cursor: not-allowed;
 	}
 </style>

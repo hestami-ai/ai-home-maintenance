@@ -8,7 +8,16 @@
 	// in production — it just stamps one data attribute on <html>.
 	onMount(() => {
 		document.documentElement.dataset.hydrated = 'true';
+		const saved = localStorage.getItem('jpwb-nav-collapsed');
+		if (saved !== null) collapsed = saved === '1';
 	});
+
+	// The left navigation collapses to an icon rail to give the node-graph designer more room.
+	let collapsed = $state(false);
+	function toggleNav() {
+		collapsed = !collapsed;
+		localStorage.setItem('jpwb-nav-collapsed', collapsed ? '1' : '0');
+	}
 
 	// Two visibly-distinct contexts (RPH-DOC-010 §5/§35): PWA Design vs Undertaking. The nav + the context banner
 	// make the current level unmistakable — the reviewer can always tell which level they are examining.
@@ -25,6 +34,11 @@
 			? 'undertaking'
 			: 'design'
 	);
+	// The Work-Architecture designer and the Undertaking workbench are full-bleed, viewport-locked graph surfaces
+	// (their own internal panels scroll); list pages keep the padded, scrollable content box.
+	const fullBleed = $derived(
+		page.url.pathname.startsWith('/pwa/') || /^\/undertakings\/[^/]+$/.test(page.url.pathname)
+	);
 	function isActive(href: string): boolean {
 		if (href === '/') return page.url.pathname === '/' || page.url.pathname.startsWith('/pwa');
 		return page.url.pathname.startsWith(href);
@@ -32,32 +46,56 @@
 </script>
 
 <div class="app">
-	<aside>
+	<aside class:collapsed>
 		<div class="brand">
 			<div class="mark">◭</div>
-			<div>
-				<div class="title">Janumi JPWB</div>
-				<div class="ver">Professional Workbench</div>
-			</div>
+			{#if !collapsed}
+				<div class="brandtext">
+					<div class="title">Janumi JPWB</div>
+					<div class="ver">Professional Workbench</div>
+				</div>
+			{/if}
+			<button
+				class="navtoggle"
+				onclick={toggleNav}
+				aria-label={collapsed ? 'Expand navigation' : 'Collapse navigation'}
+				title={collapsed ? 'Expand navigation' : 'Collapse navigation'}>{collapsed ? '»' : '«'}</button
+			>
 		</div>
 		<nav>
 			{#each nav as item (item.href)}
-				<a href={item.href} class:active={isActive(item.href)}>
-					<span class="ic">{item.icon}</span>{item.label}
+				<a
+					href={item.href}
+					class:active={isActive(item.href)}
+					title={item.label}
+					aria-label={item.label}
+				>
+					<span class="ic">{item.icon}</span>{#if !collapsed}<span class="lbl">{item.label}</span>{/if}
 				</a>
 			{/each}
 		</nav>
-		<div class="foot">Recursive Professional Harness · live engine</div>
+		{#if !collapsed}
+			<div class="foot">Recursive Professional Harness · live engine</div>
+		{/if}
 	</aside>
 	<main>
-		<div class="ctxbar" class:design={activeContext === 'design'} class:undertaking={activeContext === 'undertaking'}>
-			{activeContext === 'design' ? 'PWA DESIGN CONTEXT — reusable Professional Work Architectures' : 'UNDERTAKING CONTEXT — concrete professional work'}
+		<div
+			class="ctxbar"
+			class:design={activeContext === 'design'}
+			class:undertaking={activeContext === 'undertaking'}
+		>
+			{activeContext === 'design'
+				? 'PWA DESIGN CONTEXT — reusable Professional Work Architectures'
+				: 'UNDERTAKING CONTEXT — concrete professional work'}
 		</div>
-		<div class="content">{@render children()}</div>
+		<div class="content" class:full={fullBleed}>{@render children()}</div>
 	</main>
 </div>
 
 <style>
+	:global(*, *::before, *::after) {
+		box-sizing: border-box;
+	}
 	:global(:root) {
 		--surface: #131313;
 		--surface-low: #1b1b1c;
@@ -87,32 +125,45 @@
 	}
 	.app {
 		display: flex;
-		min-height: 100vh;
+		height: 100vh;
+		overflow: hidden;
 	}
 	aside {
 		width: 232px;
+		flex-shrink: 0;
 		background: var(--surface-low);
 		display: flex;
 		flex-direction: column;
-		position: sticky;
-		top: 0;
 		height: 100vh;
+		transition: width 0.16s ease;
+	}
+	aside.collapsed {
+		width: 60px;
 	}
 	.brand {
 		display: flex;
 		gap: 10px;
 		align-items: center;
-		padding: 20px 18px;
+		padding: 18px 14px;
+		position: relative;
+	}
+	aside.collapsed .brand {
+		justify-content: center;
+		padding: 18px 0;
 	}
 	.mark {
 		width: 34px;
 		height: 34px;
+		flex-shrink: 0;
 		border-radius: 6px;
 		background: var(--primary-container);
 		color: #fff;
 		display: grid;
 		place-items: center;
 		font-size: 18px;
+	}
+	.brandtext {
+		min-width: 0;
 	}
 	.title {
 		font-weight: 700;
@@ -125,11 +176,37 @@
 		color: var(--outline);
 		margin-top: 2px;
 	}
+	.navtoggle {
+		margin-left: auto;
+		background: var(--sc-high);
+		border: 1px solid var(--outline-faint);
+		color: var(--on-variant);
+		border-radius: 6px;
+		width: 24px;
+		height: 24px;
+		font-size: 12px;
+		cursor: pointer;
+		display: grid;
+		place-items: center;
+	}
+	aside.collapsed .navtoggle {
+		position: absolute;
+		right: -12px;
+		top: 22px;
+		margin-left: 0;
+		z-index: 2;
+	}
+	.navtoggle:hover {
+		color: var(--primary);
+	}
 	nav {
 		display: flex;
 		flex-direction: column;
 		padding: 6px 10px;
 		gap: 2px;
+	}
+	aside.collapsed nav {
+		padding: 6px 8px;
 	}
 	nav a {
 		display: flex;
@@ -141,6 +218,11 @@
 		font-size: 14px;
 		border-left: 3px solid transparent;
 	}
+	aside.collapsed nav a {
+		justify-content: center;
+		padding: 10px 0;
+		gap: 0;
+	}
 	nav a:hover {
 		background: var(--sc-high);
 	}
@@ -148,6 +230,11 @@
 		background: var(--sc-high);
 		color: var(--primary);
 		border-left-color: var(--primary);
+	}
+	aside.collapsed nav a.active {
+		border-left-color: transparent;
+		border-bottom: 2px solid var(--primary);
+		border-radius: 6px 6px 0 0;
 	}
 	.ic {
 		width: 18px;
@@ -167,8 +254,10 @@
 		min-width: 0;
 		display: flex;
 		flex-direction: column;
+		min-height: 0;
 	}
 	.ctxbar {
+		flex-shrink: 0;
 		padding: 8px 24px;
 		font-size: 11px;
 		font-weight: 700;
@@ -187,5 +276,12 @@
 		padding: 24px;
 		flex: 1;
 		min-width: 0;
+		min-height: 0;
+		overflow: auto;
+	}
+	/* Full-bleed, viewport-locked graph surfaces manage their own internal scrolling. */
+	.content.full {
+		padding: 0;
+		overflow: hidden;
 	}
 </style>
