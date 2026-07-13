@@ -46,6 +46,19 @@
 		{:else}
 			<p class="hint">Select a PWU Type.</p>
 		{/if}
+
+		{#if data.fixtures.length}
+			<div class="fixtures">
+				<label>Conformance fixtures</label>
+				{#each data.fixtures as f (f.id)}
+					<a class="fixture" href={`/undertakings/${f.id}`}>
+						{#if f.isReferenceFixture}<span class="fxbadge">REFERENCE FIXTURE</span>{/if}
+						{f.name} ↗
+					</a>
+				{/each}
+				<p class="fxnote">A fixture is an Undertaking used to exercise this PWA — it is not the PWA definition.</p>
+			</div>
+		{/if}
 	</aside>
 </div>
 
@@ -180,5 +193,43 @@
 	.mono {
 		font-family: 'Source Code Pro', monospace;
 		font-size: 11.5px !important;
+	}
+	.fixtures {
+		margin-top: 20px;
+		border-top: 1px solid var(--sc);
+		padding-top: 14px;
+	}
+	.fixtures label {
+		font-size: 10px;
+		text-transform: uppercase;
+		letter-spacing: 0.1em;
+		color: var(--outline);
+		display: block;
+		margin-bottom: 8px;
+	}
+	.fixture {
+		display: block;
+		background: var(--sc);
+		border-radius: 8px;
+		padding: 10px 12px;
+		font-size: 12.5px;
+		margin-bottom: 6px;
+		color: var(--on);
+	}
+	.fxbadge {
+		display: inline-block;
+		font-size: 9px;
+		font-weight: 700;
+		letter-spacing: 0.08em;
+		background: var(--primary-container);
+		color: #fff;
+		padding: 1px 6px;
+		border-radius: 4px;
+		margin-right: 6px;
+	}
+	.fxnote {
+		font-size: 11px;
+		color: var(--outline);
+		margin: 6px 0 0;
 	}
 </style>

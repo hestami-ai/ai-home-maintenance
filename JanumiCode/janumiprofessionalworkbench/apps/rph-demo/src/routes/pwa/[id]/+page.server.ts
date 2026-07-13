@@ -1,7 +1,7 @@
 // PWA Overview + Work Architecture View (PWA Design context). Shows the PWA's PWU Types — reusable definitions,
 // with NO concrete execution/assurance state (RPH-DOC-010 §35.1) — and a type inspector.
 import { error } from '@sveltejs/kit';
-import { getObject, listPwuTypes } from '@janumipwb/rph-engine';
+import { getObject, listPwuTypes, listUndertakings, SEED_UNDERTAKING } from '@janumipwb/rph-engine';
 import { getEngine } from '$lib/server/workbench';
 import type { PageServerLoad } from './$types';
 
@@ -9,6 +9,14 @@ export const load: PageServerLoad = ({ params }) => {
 	const engine = getEngine();
 	const pwa = getObject(engine, params.id);
 	if (!pwa) throw error(404, 'PWA not found');
+	// Conformance fixtures (§13/§21): Undertakings instantiated from this PWA that serve as reference fixtures.
+	const fixtures = listUndertakings(engine)
+		.filter((u) => u.state.pwaId === params.id)
+		.map((u) => ({
+			id: u.id,
+			name: String(u.state.name ?? u.id),
+			isReferenceFixture: u.id === SEED_UNDERTAKING
+		}));
 	const types = listPwuTypes(engine, params.id).map((t) => ({
 		id: t.id,
 		name: String(t.state.name ?? t.id),
@@ -32,6 +40,7 @@ export const load: PageServerLoad = ({ params }) => {
 			version: String(pwa.version ?? ''),
 			publicationStatus: String(pwa.publicationStatus ?? 'DRAFT')
 		},
-		types
+		types,
+		fixtures
 	};
 };

@@ -33,6 +33,23 @@ export const load: PageServerLoad = ({ params }) => {
 		const s = String(p.state.workLifecycleState ?? 'PROPOSED');
 		rollup[s] = (rollup[s] ?? 0) + 1;
 	}
+	// Instance -> Type navigation (§14 / §28): each PWU Instance links to its PWU Type definition (in its PWA).
+	const pwuList = pwus.map((p) => {
+		const typeId = p.state.pwuTypeId ? String(p.state.pwuTypeId) : '';
+		const type = typeId ? getObject(engine, typeId) : undefined;
+		return {
+			id: p.id,
+			title: String(p.state.title ?? p.id),
+			workLifecycleState: String(p.state.workLifecycleState ?? ''),
+			assuranceState: String(p.state.assuranceState ?? ''),
+			typeName: type
+				? String(type.name ?? typeId)
+				: p.state.isLocalExtension
+					? 'Undertaking-local extension'
+					: '—',
+			typePwaId: type ? String(type.pwaId ?? '') : ''
+		};
+	});
 
 	const assessments = listAssessments(engine).map((a) => ({
 		id: a.id,

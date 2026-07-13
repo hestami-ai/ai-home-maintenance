@@ -57,6 +57,23 @@
 				<div class="chip"><span class="num">{n}</span> {state}</div>
 			{/each}
 		</div>
+		<h3>PWU Instances → PWU Types</h3>
+		<p class="hint">Each PWU Instance realizes a PWU Type defined by the PWA (or is a declared local extension). Follow the type link to inspect its definition (instance ↔ type navigation).</p>
+		<table>
+			<thead><tr><th>PWU Instance</th><th>Work state</th><th>Assurance</th><th>PWU Type (definition)</th></tr></thead>
+			<tbody>
+				{#each data.pwuList as p (p.id)}
+					<tr>
+						<td>{p.title}</td>
+						<td><span class="tag">{p.workLifecycleState}</span></td>
+						<td>{p.assuranceState}</td>
+						<td>
+							{#if p.typePwaId}<a href={`/pwa/${p.typePwaId}`}>{p.typeName} ↗</a>{:else}{p.typeName}{/if}
+						</td>
+					</tr>
+				{/each}
+			</tbody>
+		</table>
 	</div>
 {:else if tab === 'assurance'}
 	<div class="panel">
@@ -191,6 +208,11 @@
 	.panel h3 {
 		margin: 20px 0 8px;
 		font-size: 14px;
+	}
+	.panel .hint {
+		color: var(--outline);
+		font-size: 12px;
+		margin: 0 0 12px;
 	}
 	.rollup {
 		display: flex;
