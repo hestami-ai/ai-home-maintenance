@@ -4,6 +4,56 @@
 > list + the tracker (`docs/JPWB Implementation Roadmap and Tracker.md`) to resume losslessly. Updated at
 > every milestone boundary. **This is the single source of "where am I and what's next."**
 
+> **LATEST — 2026-07-12: RPH-DOC-010 FULL LIVE BUILDOUT — IN PROGRESS.** Sponsor chose (AskUserQuestion):
+> **full live stack** (implement the ~40 deferred handlers + a new PWA-authoring context so every UI action
+> drives the event-sourced engine), **adopt the design-system visuals but re-map all labels to the Canonical
+> Vocabulary Charter**, **Svelte 5 in the monorepo**, **autonomous full run**. Plan + reference in
+> `docs/_working/RPH-DOC-010-BUILD-PLAN.md` + `docs/_working/engine-reference-map.md` (the 4-agent engine map —
+> READ THIS to resume). Design system: `docs/PWA Design System/` (dark-flux DESIGN.md + 3 screens + React comp).
+>
+> **DONE (committed, gate-green — build incl. app / check-types / test / lint / dependency-cruiser / prettier):**
+> - P0 grounding + plan + baseline (`473d631`).
+> - **P2/P3 command handler registry + live handlers** — replaced the hardcoded CaptureIntent dispatch with a
+>   `commandType→handler` registry (`rph-application/src/handlers/`), a shared kit (`kit.ts`:
+>   reject/loadOrReject/checkTransition/makeEvent/nextEnvelope/commitState + generic newEnvelope/createObject/
+>   advanceStatus). **42 of 47 commands are now LIVE** across Intent (`66b822b`), PWU four-axis + ChangePwuState
+>   controller lever (`35871c2`), and Execution-plan/Assurance/Governance/Decomposition (`9c8b0ca`). Load-bearing
+>   invariants proven by tests: INT-004, INV-5 via canAdvanceWorkLifecycle, the decision authority gate
+>   (GOV-001/002), and the baseline promotion gate (canPromoteBaseline, INV-20). Added 4 commands via vocab+gen
+>   (BeginIntentDiscovery, ProvisionIntent, SubmitBaselineForReview, ApproveBaseline) + IntentProvisioned event;
+>   registry now 47 cmds/103 events/47 bindings. `zod` added as a direct dep of rph-application. 20 rph-app tests.
+>
+> **NEXT (in order) — none started:**
+> 1. **P2/P3 finish (~5 commands):** embedded per-step execution (Start/Complete/Fail/Retry ExecutionStep mutate
+>    the plan's `steps[]` array — bespoke, not advanceStatus); RuntimeBinding commands (Request/Authorize/Deny/
+>    Revoke — 4 MISSING commands, add via vocab+gen); ApplyTacticalChange (NOOP plan-status). Optionally wire the
+>    rich decomposition kernels (validateObligationConservation/validateConstraintPropagation) into
+>    ValidateDecomposition. Handler files pattern is established — copy the group files.
+> 2. **P1 PWA-authoring context:** the 3 DOC-002 §4 objects NOT in contracts — PROFESSIONAL_WORK_ARCHITECTURE,
+>    PWU_TYPE, UNDERTAKING — via the vocab→gen pipeline (add to `vocab/m1-object-fields.json` + a publication FSM
+>    DRAFT→UNDER_REVIEW→VALIDATED→PUBLISHED→DEPRECATED→RETIRED in `vocab/m2-transitions.json`, regen) + PWU
+>    ownership binding (CON-009: PWU carries `undertakingId`+`pwuTypeId`/`isLocalExtension`) + authoring handlers
+>    (CreatePwa/RevisePwa/PublishPwa, CreatePwuType, CreateUndertaking/instantiate). Published PWA version →
+>    EngineOntology (the seam `createEngine` already accepts). Seed Product Realization PWA v1.3 from the existing
+>    `rph-product-realization-pwa` ontology.
+> 3. **P4 projection + query surface:** add a `query`/`getProjection` read surface to `EngineHandle` (or host
+>    projections in the SvelteKit server via `readAllEvents()` + `rebuildProjection`). Build projectors for every
+>    RPH-DOC-010 view (PWA Library/Overview/Work-Architecture/Type; Undertaking Portfolio/Overview/Professional
+>    Work Graph; Execution/Assurance/Decisions/Baselines/Traceability/Diagnostics). Extend `graph-view`/
+>    `work-projection` fold arms for the new event types.
+> 4. **P5 reference undertaking driven LIVE:** replace the terminal-only `apps/rph-demo/src/lib/
+>    referenceUndertakingGraph.ts` with a command sequence (intent→PWU→ChangePwuState→…) that reproduces the §30
+>    Field Service Management graph via dispatch, not a hand-authored event log.
+> 5. **P6–P10 the Svelte 5 UI:** SvelteKit server hosts `createEngine()` (Node); browser posts commands via
+>    `+server.ts`/form actions and reads projections via `load()`; two visibly-distinct contexts (PWA Design /
+>    Undertaking) + workbenches. Port DESIGN.md tokens → a Tailwind theme; @xyflow/svelte canvases; charter vocab
+>    re-mapping (BUILD-PLAN §3). Rename `apps/rph-demo` → `apps/workbench` when starting.
+> 6. **P11 gate + DOC-008 conformance + fast-check P1–P8 + the §46 20-criteria checklist. P12 docs + memory.**
+>
+> **How to resume:** read `engine-reference-map.md` (§1 handler contract, §3 guards, §5 the 43→47 command plan),
+> `git log --oneline`, and this block. The handler pattern: load→domain-guard→transition(checkTransition or
+> canAdvanceWorkLifecycle)→event→commitState. Every commit must keep the full gate green.
+
 > **LATEST — 2026-07-12: Charter vocabulary remediation COMPLETE (post-M14 housekeeping).** All generated
 > artifacts aligned to the Canonical Vocabulary Charter (RPH-DOC-000): package `rph-product-lens` →
 > `rph-product-realization-pwa`; JPW→JPWB (+ both `JPW …` docs renamed); build-tooling "workflow"→"pass"; stale
