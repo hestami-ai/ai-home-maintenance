@@ -343,3 +343,26 @@ unilaterally redesign the engine API.
   live in `rph-application/src/handlers/*` and share a kit (`kit.ts`) that enforces the fail-loud pipeline
   (validate produced state, then atomic commit). `zod` added as a direct dep of rph-application (to type the
   schema the kit validates against).
+
+### P2/P3 continued (execution / assurance / governance / decomposition) — 2026-07-12
+
+Modeling choices made so the machines are drivable by commands (all faithful to the transition triggers;
+confirm or correct):
+- **ProposeExecutionPlan creates the plan at UNDER_REVIEW** (the PROPOSED→UNDER_REVIEW trigger reads
+  "proposeExecutionPlan / ExecutionPlanProposed then submitted for review", DOC-002 §20.1) — the distinct
+  PROPOSED state is a transient the create skips, so Approve→Activate is a clean chain. Same pattern for
+  **ProposeDecomposition → UNDER_REVIEW**.
+- **RequestAssuranceAssessment creates the assessment already in ASSESSING** (request-and-begin); the
+  EVIDENCE_PENDING/READY prep states of the 15-value AssuranceAssessment.state machine are a deeper increment.
+  **CompleteAssuranceAssessment** reads the disposition from `payload.validatorResult.dispositionRecommendation`
+  (one of SATISFIED|CONDITIONALLY_SATISFIED|REJECTED|INCONCLUSIVE|ESCALATED) and the state machine's illegal/
+  guarded edges enforce INV-8/9/10.
+- **Authority = HUMAN (or SYSTEM) actor.** Approve/GrantWaiver set a Decision EFFECTIVE only when the decision's
+  `authority.actorType` is HUMAN/SYSTEM — an AGENT/MODEL actor may recommend but not approve (GOV-001/002). A
+  full authorizer port (scope/validFrom/validUntil) is a later refinement.
+- **DenyWaiver → PROPOSED→SUPERSEDED** (DecisionStatus has no DENIED value — the §23.1 gap noted in the M10
+  questions). **SubmitBaselineForReview + ApproveBaseline** commands added (their events already existed).
+- **Deferred (documented in RESUME-STATE), not yet handled:** embedded per-step execution
+  (Start/Complete/Fail/Retry ExecutionStep mutate the plan's steps[] array), RuntimeBinding commands
+  (Request/Authorize/Deny/Revoke), ApplyTacticalChange, and wiring the rich decomposition coverage kernels
+  (validateObligationConservation / validateConstraintPropagation) into ValidateDecomposition.

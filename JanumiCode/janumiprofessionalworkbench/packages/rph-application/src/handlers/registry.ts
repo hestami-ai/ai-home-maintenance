@@ -20,6 +20,42 @@ import {
 	reshapePwu,
 	supersedePwu
 } from './pwu.js';
+import {
+	activateExecutionPlan,
+	approveExecutionPlan,
+	cancelExecutionPlan,
+	proposeExecutionPlan
+} from './execution.js';
+import {
+	admitEvidence,
+	assertClaim,
+	completeAssuranceAssessment,
+	detectAssumption,
+	invalidateEvidence,
+	proposeEvidence,
+	recordAssuranceObservation,
+	requestAssuranceAssessment
+} from './assurance.js';
+import {
+	approveBaseline,
+	approveDecision,
+	createBaseline,
+	denyWaiver,
+	grantWaiver,
+	promoteBaseline,
+	proposeDecision,
+	requestWaiver,
+	revokeDecision,
+	submitBaselineForReview,
+	supersedeBaseline
+} from './governance.js';
+import {
+	beginRecomposition,
+	completeRecomposition,
+	proposeDecomposition,
+	reviseDecomposition,
+	validateDecomposition
+} from './decomposition.js';
 
 export const HANDLERS: Readonly<Record<string, CommandHandler>> = {
 	// Intent lifecycle (DOC-002 §6)
@@ -37,5 +73,37 @@ export const HANDLERS: Readonly<Record<string, CommandHandler>> = {
 	ChallengePwu: challengePwu,
 	ReshapePwu: reshapePwu,
 	InvalidatePwu: invalidatePwu,
-	SupersedePwu: supersedePwu
+	SupersedePwu: supersedePwu,
+	// Execution plan (DOC-002 §20)
+	ProposeExecutionPlan: proposeExecutionPlan,
+	ApproveExecutionPlan: approveExecutionPlan,
+	ActivateExecutionPlan: activateExecutionPlan,
+	CancelExecutionPlan: cancelExecutionPlan,
+	// Assurance: evidence / claim / assumption / assessment / observation (DOC-002 §12, §15–19)
+	ProposeEvidence: proposeEvidence,
+	AdmitEvidence: admitEvidence,
+	InvalidateEvidence: invalidateEvidence,
+	AssertClaim: assertClaim,
+	DetectAssumption: detectAssumption,
+	RequestAssuranceAssessment: requestAssuranceAssessment,
+	CompleteAssuranceAssessment: completeAssuranceAssessment,
+	RecordAssuranceObservation: recordAssuranceObservation,
+	// Governance: decisions / waivers / baselines (DOC-002 §23, §24)
+	ProposeDecision: proposeDecision,
+	ApproveDecision: approveDecision,
+	RevokeDecision: revokeDecision,
+	RequestWaiver: requestWaiver,
+	GrantWaiver: grantWaiver,
+	DenyWaiver: denyWaiver,
+	CreateBaseline: createBaseline,
+	SubmitBaselineForReview: submitBaselineForReview,
+	ApproveBaseline: approveBaseline,
+	PromoteBaseline: promoteBaseline,
+	SupersedeBaseline: supersedeBaseline,
+	// Decomposition / recomposition (DOC-002 §13, §14)
+	ProposeDecomposition: proposeDecomposition,
+	ValidateDecomposition: validateDecomposition,
+	ReviseDecomposition: reviseDecomposition,
+	BeginRecomposition: beginRecomposition,
+	CompleteRecomposition: completeRecomposition
 };

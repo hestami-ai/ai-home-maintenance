@@ -342,6 +342,12 @@ export const ProvisionIntentPayloadSchema = z.strictObject({
 	ambiguityIds: z.array(z.string())
 });
 export type ProvisionIntentPayload = z.infer<typeof ProvisionIntentPayloadSchema>;
+export const SubmitBaselineForReviewPayloadSchema = z.strictObject({});
+export type SubmitBaselineForReviewPayload = z.infer<typeof SubmitBaselineForReviewPayloadSchema>;
+export const ApproveBaselinePayloadSchema = z.strictObject({
+	approvalDecisionId: z.string().optional()
+});
+export type ApproveBaselinePayload = z.infer<typeof ApproveBaselinePayloadSchema>;
 
 // ---- Event payload schemas ----
 export const AssumptionAcceptedPayloadSchema = z.strictObject({
@@ -1343,6 +1349,18 @@ export const COMMANDS = {
 		targetAggregateType: 'INTENT',
 		emitsEvent: 'IntentProvisioned',
 		firstSlice: false
+	},
+	SubmitBaselineForReview: {
+		payload: SubmitBaselineForReviewPayloadSchema,
+		targetAggregateType: 'BASELINE',
+		emitsEvent: 'BaselineSubmittedForReview',
+		firstSlice: false
+	},
+	ApproveBaseline: {
+		payload: ApproveBaselinePayloadSchema,
+		targetAggregateType: 'BASELINE',
+		emitsEvent: 'BaselineApproved',
+		firstSlice: false
 	}
 } as const;
 
@@ -1908,5 +1926,19 @@ export const BINDINGS: readonly CommandEventBinding[] = [
 		machine: 'Intent.intentStatus',
 		from: 'UNDER_DISCOVERY',
 		to: 'PROVISIONAL'
+	},
+	{
+		commandType: 'SubmitBaselineForReview',
+		eventType: 'BaselineSubmittedForReview',
+		machine: 'Baseline.status',
+		from: 'CANDIDATE',
+		to: 'UNDER_REVIEW'
+	},
+	{
+		commandType: 'ApproveBaseline',
+		eventType: 'BaselineApproved',
+		machine: 'Baseline.status',
+		from: 'UNDER_REVIEW',
+		to: 'APPROVED'
 	}
 ];

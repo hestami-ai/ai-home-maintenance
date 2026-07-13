@@ -248,3 +248,133 @@ export function commitState(
 		producedEventIds: [args.event.eventId]
 	};
 }
+
+/** Build the shared envelope fields for a NEW object (revision 0, semanticVersion 1). Callers merge their
+ * object-specific fields (including the typed lifecycle field) on top. */
+export function newEnvelope(
+	command: DomainCommand,
+	objectType: string,
+	id: string,
+	opts: {
+		readonly lifecycleStatus: string;
+		readonly originType?: string;
+		readonly sourceObjectIds?: string[];
+		readonly ontologyId?: string;
+		readonly ontologyVersion?: string;
+	}
+): Record<string, unknown> {
+	const ts = command.issuedAt;
+	return {
+		id,
+		objectType,
+		schemaVersion: 1,
+		semanticVersion: 1,
+		revision: 0,
+		lifecycleStatus: opts.lifecycleStatus,
+		createdAt: ts,
+		createdBy: command.issuedBy,
+		updatedAt: ts,
+		updatedBy: command.issuedBy,
+		provenance: {
+			originType: opts.originType ?? 'USER_INPUT',
+			sourceObjectIds: opts.sourceObjectIds ?? [],
+			sourceEventIds: []
+		},
+		...(opts.ontologyId ? { ontologyId: opts.ontologyId } : {}),
+		...(opts.ontologyVersion ? { ontologyVersion: opts.ontologyVersion } : {}),
+		tags: [],
+		extensions: []
+	};
+}
+
+/** Create a NEW aggregate (revision 0): validate the produced state + commit it, emitting `eventType`. */
+export function createObject(
+	ctx: HandlerContext,
+	command: DomainCommand,
+	args: {
+		readonly objectType: string;
+		readonly aggregateId: string;
+		readonly state: Record<string, unknown>;
+		readonly eventType: string;
+	}
+): CommandResult {
+	const event = makeEvent(ctx, command, {
+		eventType: args.eventType,
+		aggregateType: args.objectType,
+		aggregateId: args.aggregateId,
+		aggregateRevision: 0,
+		payload: command.payload
+	});
+	return commitState(ctx, command, {
+		objectType: args.objectType,
+		aggregateId: args.aggregateId,
+		expectedRevision: undefined,
+		newRevision: 0,
+		newSemanticVersion: 1,
+		nextState: args.state,
+		event
+	});
+}
+
+/**
+ * Advance a single status field of an existing aggregate along its state machine: load -> optional domain guard
+ * -> transition legality (checkTransition on `machine`) -> set the status field (+ mirror lifecycleStatus) ->
+ * commit. Covers the many "guarded single-status transition" commands compactly. `guard` runs a domain kernel
+ * check (returns a rejecting CommandResult or null); `mutate` applies payload-derived field updates.
+ */
+export function advanceStatus(
+	ctx: HandlerContext,
+	command: DomainCommand,
+	args: {
+		readonly objectType: string;
+		readonly statusField: string;
+		readonly machine: string;
+		readonly target: string;
+		readonly eventType: string;
+		readonly setLifecycleStatus?: boolean;
+		readonly guard?: (state: Record<string, unknown>, ctx: HandlerContext) => CommandResult | null;
+		readonly mutate?: (base: Record<string, unknown>) => Record<string, unknown>;
+		readonly bumpSemanticVersion?: boolean;
+	}
+): CommandResult {
+	const id = command.targetAggregateId;
+	const loaded = loadOrReject(ctx, command, id);
+	if (!loaded.ok) return loaded.result;
+	const guardFailure = args.guard?.(loaded.state, ctx);
+	if (guardFailure) return guardFailure;
+	const from = String(loaded.state[args.statusField]);
+	const illegal = checkTransition(command, args.machine, from, args.target);
+	if (illegal) return illegal;
+	const newRevision = loaded.revision + 1;
+	const newSemanticVersion = args.bumpSemanticVersion
+		? loaded.semanticVersion + 1
+		: loaded.semanticVersion;
+	const base = nextEnvelope(
+		loaded.state,
+		command,
+		newRevision,
+		args.bumpSemanticVersion ? newSemanticVersion : undefined
+	);
+	const mutated = args.mutate ? args.mutate(base) : base;
+	const next = {
+		...mutated,
+		[args.statusField]: args.target,
+		...(args.setLifecycleStatus === false ? {} : { lifecycleStatus: args.target })
+	};
+	const event = makeEvent(ctx, command, {
+		eventType: args.eventType,
+		aggregateType: args.objectType,
+		aggregateId: id,
+		aggregateRevision: newRevision,
+		payload: command.payload
+	});
+	return commitState(ctx, command, {
+		objectType: args.objectType,
+		aggregateId: id,
+		expectedRevision: loaded.revision,
+		newRevision,
+		newSemanticVersion,
+		nextState: next,
+		event
+	});
+}

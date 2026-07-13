@@ -1507,6 +1507,35 @@
           "note": "id-ref[]; known ambiguities recorded at provisional-intent time"
         }
       ]
+    },
+    {
+      "commandType": "SubmitBaselineForReview",
+      "targetAggregateType": "BASELINE",
+      "emitsEvent": "BaselineSubmittedForReview",
+      "drivesMachine": "Baseline.status",
+      "drivesFrom": "CANDIDATE",
+      "drivesTo": "UNDER_REVIEW",
+      "schematized": false,
+      "sourceSection": "DOC-002 §24.1 (event exists §26.6); command added for live command-drive",
+      "payloadFields": []
+    },
+    {
+      "commandType": "ApproveBaseline",
+      "targetAggregateType": "BASELINE",
+      "emitsEvent": "BaselineApproved",
+      "drivesMachine": "Baseline.status",
+      "drivesFrom": "UNDER_REVIEW",
+      "drivesTo": "APPROVED",
+      "schematized": false,
+      "sourceSection": "DOC-002 §24.1 (event exists §26.6); command added for live command-drive",
+      "payloadFields": [
+        {
+          "field": "approvalDecisionId",
+          "required": false,
+          "type": "string",
+          "note": "id-ref; optional"
+        }
+      ]
     }
   ],
   "events": [
@@ -4822,6 +4851,20 @@
       "machine": "Intent.intentStatus",
       "from": "UNDER_DISCOVERY",
       "to": "PROVISIONAL"
+    },
+    {
+      "commandType": "SubmitBaselineForReview",
+      "eventType": "BaselineSubmittedForReview",
+      "machine": "Baseline.status",
+      "from": "CANDIDATE",
+      "to": "UNDER_REVIEW"
+    },
+    {
+      "commandType": "ApproveBaseline",
+      "eventType": "BaselineApproved",
+      "machine": "Baseline.status",
+      "from": "UNDER_REVIEW",
+      "to": "APPROVED"
     }
   ],
   "conflicts": [

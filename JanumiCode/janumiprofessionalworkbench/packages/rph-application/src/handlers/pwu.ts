@@ -11,7 +11,7 @@ import type {
 	DomainCommand,
 	ProposePwuPayload
 } from '@janumipwb/rph-contracts';
-import { canAdvanceWorkLifecycle, classifyTransition } from '@janumipwb/rph-domain';
+import { canAdvanceWorkLifecycle } from '@janumipwb/rph-domain';
 import {
 	checkTransition,
 	commitState,
