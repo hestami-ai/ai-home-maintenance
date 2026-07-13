@@ -40,8 +40,8 @@ test.describe('PWA Designer — rich PWU Type authoring (fields, help, template,
 		expect(t!.state.completionRule).toBe('architecture done rule');
 		expect(t!.state.isRoot).toBe(true);
 
-		// EDIT the type in place (the control that was missing) — change its purpose.
-		await page.getByRole('button', { name: /Architecture Definition/ }).click();
+		// EDIT the type in place (the control that was missing) — it auto-selects into the inspector after define.
+		await expect(page.getByRole('button', { name: 'Edit', exact: true })).toBeVisible();
 		await page.getByRole('button', { name: 'Edit', exact: true }).click();
 		await page.locator('textarea[name="purpose"]').fill('the revised architecture purpose');
 		await page.getByRole('button', { name: 'Save changes' }).click();

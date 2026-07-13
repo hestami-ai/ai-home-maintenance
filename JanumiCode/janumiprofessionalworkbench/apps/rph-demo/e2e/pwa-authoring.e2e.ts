@@ -28,8 +28,10 @@ test.describe('PWA Designer — author PWU Types and publish', () => {
 		await page.getByLabel(/Root type/i).check();
 		await page.getByRole('button', { name: 'Add type' }).click();
 
-		// SEMANTIC: the new PWU Type shows in the Work Architecture list.
-		await expect(page.getByRole('button', { name: /Delivery Realization/ })).toBeVisible();
+		// SEMANTIC: the new PWU Type shows as a node in the Work Architecture graph.
+		await expect(
+			page.locator('.svelte-flow__node').filter({ hasText: 'Delivery Realization' })
+		).toBeVisible();
 
 		// 4. Advance the publication lifecycle to PUBLISHED.
 		await page.getByRole('button', { name: /Submit for Review/i }).click();

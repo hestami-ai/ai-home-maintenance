@@ -1,5 +1,9 @@
 <script lang="ts">
 	import { enhance } from '$app/forms';
+	import { SvelteFlow, Background, Controls } from '@xyflow/svelte';
+	import '@xyflow/svelte/dist/style.css';
+	import type { Edge, Node } from '@xyflow/svelte';
+	import { toPwaFlow } from '$lib/pwaFlow';
 	import { PWU_TYPE_CATALOG, PWU_TYPE_HELP } from '$lib/authoring/pwuType';
 	import type { PageData } from './$types';
 	let {
@@ -31,7 +35,17 @@
 	};
 	const rank = $derived(RANK[data.pwa.publicationStatus] ?? 0);
 
-	// Shared define/edit PWU Type form: formMode is null (hidden) | 'define' | { editId }.
+	// Node graph: PWU Types are nodes; permittedChildTypeIds are the composition edges. Recomputed when the DRAFT
+	// changes (authoring/agent) or the selection changes.
+	const flow = $derived(toPwaFlow(data.types, selected));
+	let nodes = $state<Node[]>([]);
+	let edges = $state<Edge[]>([]);
+	$effect(() => {
+		nodes = flow.nodes;
+		edges = flow.edges;
+	});
+
+	// Shared define/edit PWU Type form: formMode is null (inspector shows the selected node) | 'define' | { editId }.
 	type FormMode = null | 'define' | { editId: string };
 	let formMode = $state<FormMode>(null);
 	let showPwaEdit = $state(false);
@@ -39,8 +53,6 @@
 	let children = $state<string[]>([]);
 	const editingId = $derived(typeof formMode === 'object' && formMode ? formMode.editId : '');
 
-	// Close the type form once the engine accepts a define/edit/remove; auto-select a newly defined type so its
-	// inspector (Edit / Remove) is immediately available.
 	$effect(() => {
 		if (form?.definedType) {
 			selected = form.definedType;
@@ -161,21 +173,38 @@
 </div>
 {#if form?.error}<p class="err" role="alert">{form.error}</p>{/if}
 
-<div class="split">
-	<section class="arch">
-		<div class="archhead">
-			<h2>Work Architecture — PWU Types</h2>
+<div class="designer">
+	<section class="canvaswrap">
+		<div class="canvashead">
+			<h2>Work Architecture — Professional Work Graph</h2>
 			{#if editable}
 				<button class="ghost small" onclick={openDefine}>+ Define PWU Type</button>
 			{/if}
 		</div>
 		<p class="hint">
-			Reusable PWU Type definitions (allowed composition). This is a View of the PWA; it shows no
-			execution or assurance state.
+			Each node is a reusable PWU Type; an edge means the parent type may be decomposed into the child
+			(allowed composition). Click a node to inspect or edit it. This is a View of the PWA — PWU Types
+			carry no execution or assurance state.
 		</p>
+		<div class="canvas">
+			{#if data.types.length}
+				<SvelteFlow bind:nodes bind:edges onnodeclick={(e) => (selected = e.node.id)} fitView>
+					<Background />
+					<Controls />
+				</SvelteFlow>
+			{:else}
+				<div class="emptycanvas">
+					<p>No PWU Types yet.</p>
+					{#if editable}<p class="hint">Use “+ Define PWU Type”, or ask the agent to build the graph.</p>{/if}
+				</div>
+			{/if}
+		</div>
+	</section>
 
+	<aside class="inspector">
 		{#if editable && formMode !== null}
 			{@const editing = editingId !== ''}
+			<div class="itag">{editing ? 'EDIT PWU TYPE' : 'NEW PWU TYPE'}</div>
 			<form
 				method="POST"
 				action={editing ? '?/editType' : '?/defineType'}
@@ -183,7 +212,6 @@
 				class="typeform"
 			>
 				{#if editing}<input type="hidden" name="pwuTypeId" value={editingId} />{/if}
-				<div class="fmhead">{editing ? 'Edit PWU Type' : 'Define a PWU Type'}</div>
 				{#if !editing}
 					<div class="ffield">
 						<span class="flabel">Start from template</span>
@@ -222,7 +250,7 @@
 				</div>
 				<div class="ffield">
 					{@render fhead('Permitted child types', PWU_TYPE_HELP.permittedChildTypeIds)}
-					<div class="children">
+					<div class="childlist">
 						{#each data.types.filter((t) => t.id !== editingId) as t (t.id)}
 							<label class="childopt">
 								<input
@@ -245,28 +273,7 @@
 					<button type="button" class="ghost small" onclick={() => (formMode = null)}>Cancel</button>
 				</div>
 			</form>
-		{/if}
-
-		<div class="types">
-			{#each data.types as t (t.id)}
-				<button
-					class="type"
-					class:sel={selected === t.id}
-					class:root={t.isRoot}
-					onclick={() => (selected = t.id)}
-				>
-					<span class="tname"
-						>{t.name}{#if t.isRoot}<span class="rootbadge">ROOT</span>{/if}</span
-					>
-					<span class="tkind">{t.pwuKind}</span>
-				</button>
-			{/each}
-			{#if !data.types.length}<p class="hint">No PWU Types defined yet.</p>{/if}
-		</div>
-	</section>
-
-	<aside class="inspector">
-		{#if current}
+		{:else if current}
 			<div class="itag">PWU TYPE</div>
 			<h3>{current.name}</h3>
 			<div class="field"><span class="flabel">Kind</span><p class="mono">{current.pwuKind}</p></div>
@@ -278,10 +285,6 @@
 				<span class="flabel">Permitted children</span>
 				<p>{current.permittedChildTypeIds.length} type(s)</p>
 			</div>
-			<div class="field">
-				<span class="flabel">Required assurance</span>
-				<p>{current.requiredAssurancePolicyIds.length} policy(ies)</p>
-			</div>
 			{#if editable}
 				<div class="inspactions">
 					<button class="ghost small" onclick={() => openEdit(current.id)}>Edit</button>
@@ -292,7 +295,7 @@
 				</div>
 			{/if}
 		{:else}
-			<p class="hint">Select a PWU Type.</p>
+			<p class="hint">Select a node to inspect it.</p>
 		{/if}
 
 		{#if data.fixtures.length}
@@ -304,9 +307,6 @@
 						{fx.name} ↗
 					</a>
 				{/each}
-				<p class="fxnote">
-					A fixture is an Undertaking used to exercise this PWA — it is not the PWA definition.
-				</p>
 			</div>
 		{/if}
 	</aside>
@@ -462,19 +462,19 @@
 		font-size: 12.5px;
 		margin: 10px 0 0;
 	}
-	.split {
+	.designer {
 		display: grid;
-		grid-template-columns: 1fr 320px;
+		grid-template-columns: 1fr 340px;
 		gap: 18px;
 		margin-top: 18px;
 	}
-	.arch,
+	.canvaswrap,
 	.inspector {
 		background: var(--surface-low);
 		border-radius: 12px;
 		padding: 18px;
 	}
-	.archhead {
+	.canvashead {
 		display: flex;
 		justify-content: space-between;
 		align-items: center;
@@ -486,21 +486,40 @@
 	.hint {
 		color: var(--outline);
 		font-size: 12px;
-		margin: 0 0 14px;
+		margin: 0 0 12px;
+	}
+	.canvas {
+		height: calc(100vh - 360px);
+		min-height: 420px;
+		background: var(--surface);
+		border: 1px solid var(--sc);
+		border-radius: 10px;
+		overflow: hidden;
+	}
+	.emptycanvas {
+		height: 100%;
+		display: flex;
+		flex-direction: column;
+		align-items: center;
+		justify-content: center;
+		gap: 4px;
+		color: var(--on-variant);
+	}
+	.itag {
+		font-size: 10px;
+		letter-spacing: 0.14em;
+		color: var(--primary);
+		font-weight: 700;
+	}
+	.inspector h3 {
+		margin: 6px 0 16px;
+		font-size: 19px;
 	}
 	.typeform {
 		display: flex;
 		flex-direction: column;
 		gap: 12px;
-		background: var(--sc);
-		border-radius: 10px;
-		padding: 14px 16px;
-		margin-bottom: 16px;
-	}
-	.fmhead {
-		font-size: 13px;
-		font-weight: 700;
-		color: var(--on);
+		margin-top: 10px;
 	}
 	.ffield {
 		display: flex;
@@ -528,10 +547,6 @@
 		font-size: 12.5px;
 		font-family: inherit;
 	}
-	.tplsel {
-		align-self: flex-start;
-		min-width: 220px;
-	}
 	.rootcheck {
 		display: flex;
 		align-items: center;
@@ -539,7 +554,7 @@
 		font-size: 12.5px;
 		color: var(--on-variant);
 	}
-	.children {
+	.childlist {
 		display: flex;
 		flex-direction: column;
 		gap: 4px;
@@ -555,59 +570,6 @@
 		display: flex;
 		gap: 8px;
 		align-items: center;
-	}
-	.types {
-		display: flex;
-		flex-direction: column;
-		gap: 8px;
-	}
-	.type {
-		text-align: left;
-		background: var(--sc);
-		border: none;
-		border-top: 2px solid var(--outline-faint);
-		border-radius: 8px;
-		padding: 12px 14px;
-		color: var(--on);
-		cursor: pointer;
-		display: flex;
-		flex-direction: column;
-		gap: 3px;
-	}
-	.type.root {
-		border-top-color: var(--primary);
-	}
-	.type.sel {
-		outline: 2px solid rgba(159, 202, 255, 0.5);
-	}
-	.tname {
-		font-weight: 600;
-		display: flex;
-		gap: 8px;
-		align-items: center;
-	}
-	.rootbadge {
-		font-size: 9px;
-		background: var(--primary-container);
-		color: #fff;
-		padding: 1px 6px;
-		border-radius: 4px;
-		letter-spacing: 0.08em;
-	}
-	.tkind {
-		font-size: 11px;
-		color: var(--outline);
-		font-family: 'Source Code Pro', monospace;
-	}
-	.itag {
-		font-size: 10px;
-		letter-spacing: 0.14em;
-		color: var(--primary);
-		font-weight: 700;
-	}
-	.inspector h3 {
-		margin: 6px 0 16px;
-		font-size: 19px;
 	}
 	.field {
 		margin-bottom: 14px;
@@ -661,9 +623,7 @@
 		border-radius: 4px;
 		margin-right: 6px;
 	}
-	.fxnote {
-		font-size: 11px;
-		color: var(--outline);
-		margin: 6px 0 0;
+	.canvas :global(.svelte-flow__node) {
+		cursor: pointer;
 	}
 </style>
