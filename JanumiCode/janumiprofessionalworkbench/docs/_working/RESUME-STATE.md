@@ -4,6 +4,34 @@
 > list + the tracker (`docs/JPWB Implementation Roadmap and Tracker.md`) to resume losslessly. Updated at
 > every milestone boundary. **This is the single source of "where am I and what's next."**
 
+> **LATEST — 2026-07-13: RPH-DOC-010 FULL LIVE BUILDOUT — COMPLETE (all sponsor items delivered, gate-green).**
+> The four remaining items the sponsor asked to finish are done and committed locally (no push):
+> 1. **All 51 runtime commands live** — added the embedded ExecutionStep handlers (start/complete/fail/retry),
+>    ApplyTacticalChange, and the 4 RuntimeBinding commands (`81d2ce8`). Registry = 47 handlers / 59 cmds (incl.
+>    authoring) / 111 events.
+> 2. **PWA-authoring bounded context** (`672cda3`) — the 3 DOC-002 §4 objects (PROFESSIONAL_WORK_ARCHITECTURE /
+>    PWU_TYPE / UNDERTAKING) via vocab+gen (ProfessionalWorkObjectType 17→20; registry 270 schemas), publication
+>    FSM DRAFT→…→PUBLISHED, CON-009 ownership binding, 8 authoring handlers, and the published-PWA→EngineOntology
+>    seam (`pwa-ontology.ts`, author→publish→run round-trip test).
+> 3. **Full multi-context workbench UI** (`9b57029`+`fade971`) — `apps/rph-demo` is now the RPH-DOC-010 workbench:
+>    PWA Design context (PWA Library `/` + Work Architecture `/pwa/[id]` with a PWU Type inspector, fixture label,
+>    live CreatePwa) and Undertaking context (Portfolio `/undertakings` + Workbench `/undertakings/[id]` with the
+>    LIVE 13-node Professional Work Graph + overview/execution/assurance/decisions/baselines tabs) + Decision
+>    Center + Baseline Manager. SvelteKit server hosts `createEngine`+`seedWorkbench` (`lib/server/workbench.ts`);
+>    browser renders only read-models; dark-flux design tokens (CSS vars); distinct per-context banners. All 6
+>    routes verified HTTP 200 live.
+> 4. **P11 conformance + §46 acceptance** (`ab635e1`+`fade971`) — DOC-008 conformance manifest + fast-check P1–P8
+>    (16 tests) green; the §46 20 UX criteria verified by an adversarial workflow and reconciled to **17 ✅ / 3 ◑
+>    / 0 gap** (`docs/_working/RPH-DOC-010-ACCEPTANCE.md`).
+>
+> **The only remainder = the 3 §46 partials (Slice 5), each with its NEGATIVE guarantee already enforced
+> structurally:** §9 migration command+UI (the ACTIVE→MIGRATING machine exists; no silent version refresh), §10 a
+> richer §24 inherited-vs-local split (CON-009 data + a "local extension" label already shown), §15 a first-class
+> PWA Change Proposal object (§34; no Undertaking→PWA write path exists). Everything else in RPH-DOC-010 is live.
+> Engine query/seed layer: `rph-engine` `seed-workbench.ts` + `queries.ts` + `professional-work-graph.ts`.
+>
+> **HISTORICAL (2026-07-12: the in-progress plan that led here) follows.**
+
 > **LATEST — 2026-07-12: RPH-DOC-010 FULL LIVE BUILDOUT — IN PROGRESS.** Sponsor chose (AskUserQuestion):
 > **full live stack** (implement the ~40 deferred handlers + a new PWA-authoring context so every UI action
 > drives the event-sourced engine), **adopt the design-system visuals but re-map all labels to the Canonical
