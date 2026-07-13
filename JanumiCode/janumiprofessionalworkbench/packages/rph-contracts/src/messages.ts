@@ -68,7 +68,10 @@ export const ProposePwuPayloadSchema = z.strictObject({
 	assumptionIds: z.array(z.string()),
 	expectedOutputs: z.array(z.unknown()),
 	assurancePolicyIds: z.array(z.string()),
-	riskProfile: z.unknown()
+	riskProfile: z.unknown(),
+	undertakingId: z.string().optional(),
+	pwuTypeId: z.string().optional(),
+	isLocalExtension: z.boolean().optional()
 });
 export type ProposePwuPayload = z.infer<typeof ProposePwuPayloadSchema>;
 export const MarkPwuReadyPayloadSchema = z.strictObject({
@@ -367,6 +370,50 @@ export const RevokeRuntimeCapabilityPayloadSchema = z.strictObject({
 	reason: z.string()
 });
 export type RevokeRuntimeCapabilityPayload = z.infer<typeof RevokeRuntimeCapabilityPayloadSchema>;
+export const CreatePwaPayloadSchema = z.strictObject({
+	pwaId: z.string(),
+	name: z.string(),
+	description: z.string(),
+	domain: z.string(),
+	version: z.string()
+});
+export type CreatePwaPayload = z.infer<typeof CreatePwaPayloadSchema>;
+export const DefinePwuTypePayloadSchema = z.strictObject({
+	pwuTypeId: z.string(),
+	pwaId: z.string(),
+	pwuKind: z.string(),
+	name: z.string(),
+	purpose: z.string(),
+	isRoot: z.boolean(),
+	permittedParentTypeIds: z.array(z.string()).optional(),
+	permittedChildTypeIds: z.array(z.string()).optional(),
+	requiredAssurancePolicyIds: z.array(z.string()).optional(),
+	completionRule: z.string().optional()
+});
+export type DefinePwuTypePayload = z.infer<typeof DefinePwuTypePayloadSchema>;
+export const SubmitPwaForReviewPayloadSchema = z.strictObject({});
+export type SubmitPwaForReviewPayload = z.infer<typeof SubmitPwaForReviewPayloadSchema>;
+export const ValidatePwaPayloadSchema = z.strictObject({});
+export type ValidatePwaPayload = z.infer<typeof ValidatePwaPayloadSchema>;
+export const PublishPwaPayloadSchema = z.strictObject({
+	rootPwuTypeId: z.string().optional()
+});
+export type PublishPwaPayload = z.infer<typeof PublishPwaPayloadSchema>;
+export const DeprecatePwaPayloadSchema = z.strictObject({});
+export type DeprecatePwaPayload = z.infer<typeof DeprecatePwaPayloadSchema>;
+export const RetirePwaPayloadSchema = z.strictObject({});
+export type RetirePwaPayload = z.infer<typeof RetirePwaPayloadSchema>;
+export const CreateUndertakingPayloadSchema = z.strictObject({
+	undertakingId: z.string(),
+	name: z.string(),
+	description: z.string(),
+	pwaId: z.string(),
+	pwaVersion: z.string(),
+	instantiationProfile: z.string(),
+	objective: z.string(),
+	intendedOutputProduct: z.string()
+});
+export type CreateUndertakingPayload = z.infer<typeof CreateUndertakingPayloadSchema>;
 
 // ---- Event payload schemas ----
 export const AssumptionAcceptedPayloadSchema = z.strictObject({
@@ -1079,6 +1126,34 @@ export const IntentProvisionedPayloadSchema = z.strictObject({
 	ambiguityIds: z.array(z.string())
 });
 export type IntentProvisionedPayload = z.infer<typeof IntentProvisionedPayloadSchema>;
+export const PwaCreatedPayloadSchema = z.strictObject({
+	pwaId: z.string(),
+	name: z.string(),
+	version: z.string()
+});
+export type PwaCreatedPayload = z.infer<typeof PwaCreatedPayloadSchema>;
+export const PwuTypeDefinedPayloadSchema = z.strictObject({
+	pwuTypeId: z.string(),
+	pwaId: z.string(),
+	pwuKind: z.string()
+});
+export type PwuTypeDefinedPayload = z.infer<typeof PwuTypeDefinedPayloadSchema>;
+export const PwaSubmittedForReviewPayloadSchema = z.strictObject({});
+export type PwaSubmittedForReviewPayload = z.infer<typeof PwaSubmittedForReviewPayloadSchema>;
+export const PwaValidatedPayloadSchema = z.strictObject({});
+export type PwaValidatedPayload = z.infer<typeof PwaValidatedPayloadSchema>;
+export const PwaPublishedPayloadSchema = z.strictObject({});
+export type PwaPublishedPayload = z.infer<typeof PwaPublishedPayloadSchema>;
+export const PwaDeprecatedPayloadSchema = z.strictObject({});
+export type PwaDeprecatedPayload = z.infer<typeof PwaDeprecatedPayloadSchema>;
+export const PwaRetiredPayloadSchema = z.strictObject({});
+export type PwaRetiredPayload = z.infer<typeof PwaRetiredPayloadSchema>;
+export const UndertakingCreatedPayloadSchema = z.strictObject({
+	undertakingId: z.string(),
+	pwaId: z.string(),
+	pwaVersion: z.string()
+});
+export type UndertakingCreatedPayload = z.infer<typeof UndertakingCreatedPayloadSchema>;
 
 export const FIRST_SLICE_COMMANDS = [
 	'CaptureIntent',
@@ -1404,6 +1479,54 @@ export const COMMANDS = {
 		targetAggregateType: 'RUNTIME_BINDING',
 		emitsEvent: 'RuntimeCapabilityRevoked',
 		firstSlice: false
+	},
+	CreatePwa: {
+		payload: CreatePwaPayloadSchema,
+		targetAggregateType: 'PROFESSIONAL_WORK_ARCHITECTURE',
+		emitsEvent: 'PwaCreated',
+		firstSlice: false
+	},
+	DefinePwuType: {
+		payload: DefinePwuTypePayloadSchema,
+		targetAggregateType: 'PWU_TYPE',
+		emitsEvent: 'PwuTypeDefined',
+		firstSlice: false
+	},
+	SubmitPwaForReview: {
+		payload: SubmitPwaForReviewPayloadSchema,
+		targetAggregateType: 'PROFESSIONAL_WORK_ARCHITECTURE',
+		emitsEvent: 'PwaSubmittedForReview',
+		firstSlice: false
+	},
+	ValidatePwa: {
+		payload: ValidatePwaPayloadSchema,
+		targetAggregateType: 'PROFESSIONAL_WORK_ARCHITECTURE',
+		emitsEvent: 'PwaValidated',
+		firstSlice: false
+	},
+	PublishPwa: {
+		payload: PublishPwaPayloadSchema,
+		targetAggregateType: 'PROFESSIONAL_WORK_ARCHITECTURE',
+		emitsEvent: 'PwaPublished',
+		firstSlice: false
+	},
+	DeprecatePwa: {
+		payload: DeprecatePwaPayloadSchema,
+		targetAggregateType: 'PROFESSIONAL_WORK_ARCHITECTURE',
+		emitsEvent: 'PwaDeprecated',
+		firstSlice: false
+	},
+	RetirePwa: {
+		payload: RetirePwaPayloadSchema,
+		targetAggregateType: 'PROFESSIONAL_WORK_ARCHITECTURE',
+		emitsEvent: 'PwaRetired',
+		firstSlice: false
+	},
+	CreateUndertaking: {
+		payload: CreateUndertakingPayloadSchema,
+		targetAggregateType: 'UNDERTAKING',
+		emitsEvent: 'UndertakingCreated',
+		firstSlice: false
 	}
 } as const;
 
@@ -1643,7 +1766,27 @@ export const EVENTS = {
 	WaiverExpired: { payload: WaiverExpiredPayloadSchema, aggregateType: 'Decision' },
 	WaiverGranted: { payload: WaiverGrantedPayloadSchema, aggregateType: 'Decision' },
 	WaiverRequested: { payload: WaiverRequestedPayloadSchema, aggregateType: 'Decision' },
-	IntentProvisioned: { payload: IntentProvisionedPayloadSchema, aggregateType: 'Intent' }
+	IntentProvisioned: { payload: IntentProvisionedPayloadSchema, aggregateType: 'Intent' },
+	PwaCreated: { payload: PwaCreatedPayloadSchema, aggregateType: 'ProfessionalWorkArchitecture' },
+	PwuTypeDefined: { payload: PwuTypeDefinedPayloadSchema, aggregateType: 'PwuType' },
+	PwaSubmittedForReview: {
+		payload: PwaSubmittedForReviewPayloadSchema,
+		aggregateType: 'ProfessionalWorkArchitecture'
+	},
+	PwaValidated: {
+		payload: PwaValidatedPayloadSchema,
+		aggregateType: 'ProfessionalWorkArchitecture'
+	},
+	PwaPublished: {
+		payload: PwaPublishedPayloadSchema,
+		aggregateType: 'ProfessionalWorkArchitecture'
+	},
+	PwaDeprecated: {
+		payload: PwaDeprecatedPayloadSchema,
+		aggregateType: 'ProfessionalWorkArchitecture'
+	},
+	PwaRetired: { payload: PwaRetiredPayloadSchema, aggregateType: 'ProfessionalWorkArchitecture' },
+	UndertakingCreated: { payload: UndertakingCreatedPayloadSchema, aggregateType: 'Undertaking' }
 } as const;
 
 export interface CommandEventBinding {
@@ -2011,5 +2154,61 @@ export const BINDINGS: readonly CommandEventBinding[] = [
 		machine: 'RuntimeBinding.authorizationStatus',
 		from: 'AUTHORIZED',
 		to: 'REVOKED'
+	},
+	{
+		commandType: 'CreatePwa',
+		eventType: 'PwaCreated',
+		machine: 'PWA.publicationStatus',
+		from: '(initial)',
+		to: 'DRAFT'
+	},
+	{
+		commandType: 'DefinePwuType',
+		eventType: 'PwuTypeDefined',
+		machine: 'PwuType.status',
+		from: '(initial)',
+		to: 'DRAFT'
+	},
+	{
+		commandType: 'SubmitPwaForReview',
+		eventType: 'PwaSubmittedForReview',
+		machine: 'PWA.publicationStatus',
+		from: 'DRAFT',
+		to: 'UNDER_REVIEW'
+	},
+	{
+		commandType: 'ValidatePwa',
+		eventType: 'PwaValidated',
+		machine: 'PWA.publicationStatus',
+		from: 'UNDER_REVIEW',
+		to: 'VALIDATED'
+	},
+	{
+		commandType: 'PublishPwa',
+		eventType: 'PwaPublished',
+		machine: 'PWA.publicationStatus',
+		from: 'VALIDATED',
+		to: 'PUBLISHED'
+	},
+	{
+		commandType: 'DeprecatePwa',
+		eventType: 'PwaDeprecated',
+		machine: 'PWA.publicationStatus',
+		from: 'PUBLISHED',
+		to: 'DEPRECATED'
+	},
+	{
+		commandType: 'RetirePwa',
+		eventType: 'PwaRetired',
+		machine: 'PWA.publicationStatus',
+		from: 'DEPRECATED',
+		to: 'RETIRED'
+	},
+	{
+		commandType: 'CreateUndertaking',
+		eventType: 'UndertakingCreated',
+		machine: 'Undertaking.status',
+		from: '(initial)',
+		to: 'ACTIVE'
 	}
 ];

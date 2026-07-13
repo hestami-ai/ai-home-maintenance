@@ -273,7 +273,10 @@ export const ProfessionalWorkUnitSchema = z.strictObject({
 	assuranceState: AssuranceStateSchema,
 	shapeIntegrityState: ShapeIntegrityStateSchema,
 	riskProfile: WorkRiskProfileSchema,
-	currentBaselineId: z.string().optional()
+	currentBaselineId: z.string().optional(),
+	undertakingId: z.string().optional(),
+	pwuTypeId: z.string().optional(),
+	isLocalExtension: z.boolean().optional()
 });
 export type ProfessionalWorkUnit = z.infer<typeof ProfessionalWorkUnitSchema>;
 
@@ -506,6 +509,64 @@ export const BaselineObjectSchema = z.strictObject({
 });
 export type BaselineObject = z.infer<typeof BaselineObjectSchema>;
 
+/** PROFESSIONAL_WORK_ARCHITECTURE — id prefix: pwa */
+export const ProfessionalWorkArchitectureSchema = z.strictObject({
+	...objectEnvelopeShape,
+	name: z.string(),
+	description: z.string(),
+	domain: z.string(),
+	version: z.string(),
+	rootPwuTypeId: z.string().optional(),
+	pwuTypeIds: z.array(z.string()),
+	assurancePolicyIds: z.array(z.string()),
+	baselineTypeIds: z.array(z.string()),
+	roleIds: z.array(z.string()),
+	executionStrategyIds: z.array(z.string()),
+	conformanceFixtureIds: z.array(z.string()),
+	publicationStatus: z.enum([
+		'DRAFT',
+		'UNDER_REVIEW',
+		'VALIDATED',
+		'PUBLISHED',
+		'DEPRECATED',
+		'RETIRED'
+	])
+});
+export type ProfessionalWorkArchitecture = z.infer<typeof ProfessionalWorkArchitectureSchema>;
+
+/** PWU_TYPE — id prefix: pwut */
+export const PwuTypeSchema = z.strictObject({
+	...objectEnvelopeShape,
+	pwaId: z.string(),
+	pwuKind: z.string(),
+	name: z.string(),
+	purpose: z.string(),
+	isRoot: z.boolean(),
+	permittedParentTypeIds: z.array(z.string()),
+	permittedChildTypeIds: z.array(z.string()),
+	requiredInputs: z.array(z.string()),
+	requiredOutputs: z.array(z.string()),
+	requiredAssurancePolicyIds: z.array(z.string()),
+	completionRule: z.string(),
+	status: z.enum(['DRAFT', 'PUBLISHED', 'DEPRECATED'])
+});
+export type PwuType = z.infer<typeof PwuTypeSchema>;
+
+/** UNDERTAKING — id prefix: und */
+export const UndertakingSchema = z.strictObject({
+	...objectEnvelopeShape,
+	name: z.string(),
+	description: z.string(),
+	pwaId: z.string(),
+	pwaVersion: z.string(),
+	instantiationProfile: z.string(),
+	objective: z.string(),
+	intendedOutputProduct: z.string(),
+	rootWorkUnitId: z.string().optional(),
+	status: z.enum(['ACTIVE', 'MIGRATING', 'ARCHIVED'])
+});
+export type Undertaking = z.infer<typeof UndertakingSchema>;
+
 /** Registry: objectType literal -> { schema, idPrefixEntity, tsName }. */
 export const OBJECT_SCHEMAS = {
 	INTENT: { schema: IntentObjectSchema, idPrefixEntity: 'INTENT', tsName: 'IntentObject' },
@@ -568,5 +629,12 @@ export const OBJECT_SCHEMAS = {
 		idPrefixEntity: 'RUNTIME_BINDING',
 		tsName: 'RuntimeBinding'
 	},
-	BASELINE: { schema: BaselineObjectSchema, idPrefixEntity: 'BASELINE', tsName: 'BaselineObject' }
+	BASELINE: { schema: BaselineObjectSchema, idPrefixEntity: 'BASELINE', tsName: 'BaselineObject' },
+	PROFESSIONAL_WORK_ARCHITECTURE: {
+		schema: ProfessionalWorkArchitectureSchema,
+		idPrefixEntity: 'pwa',
+		tsName: 'ProfessionalWorkArchitecture'
+	},
+	PWU_TYPE: { schema: PwuTypeSchema, idPrefixEntity: 'pwut', tsName: 'PwuType' },
+	UNDERTAKING: { schema: UndertakingSchema, idPrefixEntity: 'und', tsName: 'Undertaking' }
 } as const;

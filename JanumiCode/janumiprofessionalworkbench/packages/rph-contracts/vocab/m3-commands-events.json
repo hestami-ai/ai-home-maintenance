@@ -213,6 +213,24 @@
           "required": true,
           "type": "WorkRiskProfile",
           "note": "complex type — needs own schema"
+        },
+        {
+          "field": "undertakingId",
+          "required": false,
+          "type": "string",
+          "note": "id-ref; CON-009 ownership binding"
+        },
+        {
+          "field": "pwuTypeId",
+          "required": false,
+          "type": "string",
+          "note": "id-ref; CON-009 ownership binding"
+        },
+        {
+          "field": "isLocalExtension",
+          "required": false,
+          "type": "boolean",
+          "note": "CON-009: Undertaking-local extension instance"
         }
       ]
     },
@@ -1619,6 +1637,218 @@
       "payloadFields": [
         {
           "field": "reason",
+          "required": true,
+          "type": "string"
+        }
+      ]
+    },
+    {
+      "commandType": "CreatePwa",
+      "targetAggregateType": "PROFESSIONAL_WORK_ARCHITECTURE",
+      "emitsEvent": "PwaCreated",
+      "drivesMachine": "PWA.publicationStatus",
+      "drivesFrom": "(initial)",
+      "drivesTo": "DRAFT",
+      "schematized": false,
+      "sourceSection": "RPH-DOC-010 §4.1/§20",
+      "payloadFields": [
+        {
+          "field": "pwaId",
+          "required": true,
+          "type": "string"
+        },
+        {
+          "field": "name",
+          "required": true,
+          "type": "string"
+        },
+        {
+          "field": "description",
+          "required": true,
+          "type": "string"
+        },
+        {
+          "field": "domain",
+          "required": true,
+          "type": "string"
+        },
+        {
+          "field": "version",
+          "required": true,
+          "type": "string"
+        }
+      ]
+    },
+    {
+      "commandType": "DefinePwuType",
+      "targetAggregateType": "PWU_TYPE",
+      "emitsEvent": "PwuTypeDefined",
+      "drivesMachine": "PwuType.status",
+      "drivesFrom": "(initial)",
+      "drivesTo": "DRAFT",
+      "schematized": false,
+      "sourceSection": "RPH-DOC-010 §11/§12",
+      "payloadFields": [
+        {
+          "field": "pwuTypeId",
+          "required": true,
+          "type": "string"
+        },
+        {
+          "field": "pwaId",
+          "required": true,
+          "type": "string"
+        },
+        {
+          "field": "pwuKind",
+          "required": true,
+          "type": "string"
+        },
+        {
+          "field": "name",
+          "required": true,
+          "type": "string"
+        },
+        {
+          "field": "purpose",
+          "required": true,
+          "type": "string"
+        },
+        {
+          "field": "isRoot",
+          "required": true,
+          "type": "boolean"
+        },
+        {
+          "field": "permittedParentTypeIds",
+          "required": false,
+          "type": "string[]"
+        },
+        {
+          "field": "permittedChildTypeIds",
+          "required": false,
+          "type": "string[]"
+        },
+        {
+          "field": "requiredAssurancePolicyIds",
+          "required": false,
+          "type": "string[]"
+        },
+        {
+          "field": "completionRule",
+          "required": false,
+          "type": "string"
+        }
+      ]
+    },
+    {
+      "commandType": "SubmitPwaForReview",
+      "targetAggregateType": "PROFESSIONAL_WORK_ARCHITECTURE",
+      "emitsEvent": "PwaSubmittedForReview",
+      "drivesMachine": "PWA.publicationStatus",
+      "drivesFrom": "DRAFT",
+      "drivesTo": "UNDER_REVIEW",
+      "schematized": false,
+      "sourceSection": "RPH-DOC-010 §20",
+      "payloadFields": []
+    },
+    {
+      "commandType": "ValidatePwa",
+      "targetAggregateType": "PROFESSIONAL_WORK_ARCHITECTURE",
+      "emitsEvent": "PwaValidated",
+      "drivesMachine": "PWA.publicationStatus",
+      "drivesFrom": "UNDER_REVIEW",
+      "drivesTo": "VALIDATED",
+      "schematized": false,
+      "sourceSection": "RPH-DOC-010 §20",
+      "payloadFields": []
+    },
+    {
+      "commandType": "PublishPwa",
+      "targetAggregateType": "PROFESSIONAL_WORK_ARCHITECTURE",
+      "emitsEvent": "PwaPublished",
+      "drivesMachine": "PWA.publicationStatus",
+      "drivesFrom": "VALIDATED",
+      "drivesTo": "PUBLISHED",
+      "schematized": false,
+      "sourceSection": "RPH-DOC-010 §20",
+      "payloadFields": [
+        {
+          "field": "rootPwuTypeId",
+          "required": false,
+          "type": "string"
+        }
+      ]
+    },
+    {
+      "commandType": "DeprecatePwa",
+      "targetAggregateType": "PROFESSIONAL_WORK_ARCHITECTURE",
+      "emitsEvent": "PwaDeprecated",
+      "drivesMachine": "PWA.publicationStatus",
+      "drivesFrom": "PUBLISHED",
+      "drivesTo": "DEPRECATED",
+      "schematized": false,
+      "sourceSection": "RPH-DOC-010 §20",
+      "payloadFields": []
+    },
+    {
+      "commandType": "RetirePwa",
+      "targetAggregateType": "PROFESSIONAL_WORK_ARCHITECTURE",
+      "emitsEvent": "PwaRetired",
+      "drivesMachine": "PWA.publicationStatus",
+      "drivesFrom": "DEPRECATED",
+      "drivesTo": "RETIRED",
+      "schematized": false,
+      "sourceSection": "RPH-DOC-010 §20",
+      "payloadFields": []
+    },
+    {
+      "commandType": "CreateUndertaking",
+      "targetAggregateType": "UNDERTAKING",
+      "emitsEvent": "UndertakingCreated",
+      "drivesMachine": "Undertaking.status",
+      "drivesFrom": "(initial)",
+      "drivesTo": "ACTIVE",
+      "schematized": false,
+      "sourceSection": "RPH-DOC-010 §22/§42",
+      "payloadFields": [
+        {
+          "field": "undertakingId",
+          "required": true,
+          "type": "string"
+        },
+        {
+          "field": "name",
+          "required": true,
+          "type": "string"
+        },
+        {
+          "field": "description",
+          "required": true,
+          "type": "string"
+        },
+        {
+          "field": "pwaId",
+          "required": true,
+          "type": "string"
+        },
+        {
+          "field": "pwaVersion",
+          "required": true,
+          "type": "string"
+        },
+        {
+          "field": "instantiationProfile",
+          "required": true,
+          "type": "string"
+        },
+        {
+          "field": "objective",
+          "required": true,
+          "type": "string"
+        },
+        {
+          "field": "intendedOutputProduct",
           "required": true,
           "type": "string"
         }
@@ -4581,6 +4811,102 @@
           "note": "id-ref[]"
         }
       ]
+    },
+    {
+      "eventType": "PwaCreated",
+      "aggregateType": "ProfessionalWorkArchitecture",
+      "sourceSection": "RPH-DOC-010 (PWA authoring)",
+      "payloadFields": [
+        {
+          "field": "pwaId",
+          "required": true,
+          "type": "string"
+        },
+        {
+          "field": "name",
+          "required": true,
+          "type": "string"
+        },
+        {
+          "field": "version",
+          "required": true,
+          "type": "string"
+        }
+      ]
+    },
+    {
+      "eventType": "PwuTypeDefined",
+      "aggregateType": "PwuType",
+      "sourceSection": "RPH-DOC-010 (PWA authoring)",
+      "payloadFields": [
+        {
+          "field": "pwuTypeId",
+          "required": true,
+          "type": "string"
+        },
+        {
+          "field": "pwaId",
+          "required": true,
+          "type": "string"
+        },
+        {
+          "field": "pwuKind",
+          "required": true,
+          "type": "string"
+        }
+      ]
+    },
+    {
+      "eventType": "PwaSubmittedForReview",
+      "aggregateType": "ProfessionalWorkArchitecture",
+      "sourceSection": "RPH-DOC-010 (PWA authoring)",
+      "payloadFields": []
+    },
+    {
+      "eventType": "PwaValidated",
+      "aggregateType": "ProfessionalWorkArchitecture",
+      "sourceSection": "RPH-DOC-010 (PWA authoring)",
+      "payloadFields": []
+    },
+    {
+      "eventType": "PwaPublished",
+      "aggregateType": "ProfessionalWorkArchitecture",
+      "sourceSection": "RPH-DOC-010 (PWA authoring)",
+      "payloadFields": []
+    },
+    {
+      "eventType": "PwaDeprecated",
+      "aggregateType": "ProfessionalWorkArchitecture",
+      "sourceSection": "RPH-DOC-010 (PWA authoring)",
+      "payloadFields": []
+    },
+    {
+      "eventType": "PwaRetired",
+      "aggregateType": "ProfessionalWorkArchitecture",
+      "sourceSection": "RPH-DOC-010 (PWA authoring)",
+      "payloadFields": []
+    },
+    {
+      "eventType": "UndertakingCreated",
+      "aggregateType": "Undertaking",
+      "sourceSection": "RPH-DOC-010 (PWA authoring)",
+      "payloadFields": [
+        {
+          "field": "undertakingId",
+          "required": true,
+          "type": "string"
+        },
+        {
+          "field": "pwaId",
+          "required": true,
+          "type": "string"
+        },
+        {
+          "field": "pwaVersion",
+          "required": true,
+          "type": "string"
+        }
+      ]
     }
   ],
   "bindings": [
@@ -4980,6 +5306,62 @@
       "machine": "RuntimeBinding.authorizationStatus",
       "from": "AUTHORIZED",
       "to": "REVOKED"
+    },
+    {
+      "commandType": "CreatePwa",
+      "eventType": "PwaCreated",
+      "machine": "PWA.publicationStatus",
+      "from": "(initial)",
+      "to": "DRAFT"
+    },
+    {
+      "commandType": "DefinePwuType",
+      "eventType": "PwuTypeDefined",
+      "machine": "PwuType.status",
+      "from": "(initial)",
+      "to": "DRAFT"
+    },
+    {
+      "commandType": "SubmitPwaForReview",
+      "eventType": "PwaSubmittedForReview",
+      "machine": "PWA.publicationStatus",
+      "from": "DRAFT",
+      "to": "UNDER_REVIEW"
+    },
+    {
+      "commandType": "ValidatePwa",
+      "eventType": "PwaValidated",
+      "machine": "PWA.publicationStatus",
+      "from": "UNDER_REVIEW",
+      "to": "VALIDATED"
+    },
+    {
+      "commandType": "PublishPwa",
+      "eventType": "PwaPublished",
+      "machine": "PWA.publicationStatus",
+      "from": "VALIDATED",
+      "to": "PUBLISHED"
+    },
+    {
+      "commandType": "DeprecatePwa",
+      "eventType": "PwaDeprecated",
+      "machine": "PWA.publicationStatus",
+      "from": "PUBLISHED",
+      "to": "DEPRECATED"
+    },
+    {
+      "commandType": "RetirePwa",
+      "eventType": "PwaRetired",
+      "machine": "PWA.publicationStatus",
+      "from": "DEPRECATED",
+      "to": "RETIRED"
+    },
+    {
+      "commandType": "CreateUndertaking",
+      "eventType": "UndertakingCreated",
+      "machine": "Undertaking.status",
+      "from": "(initial)",
+      "to": "ACTIVE"
     }
   ],
   "conflicts": [

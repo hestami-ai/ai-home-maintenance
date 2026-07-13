@@ -1831,6 +1831,107 @@
       ],
       "transitions": [],
       "illegal": []
+    },
+    {
+      "name": "PWA.publicationStatus",
+      "appliesTo": "ProfessionalWorkArchitecture",
+      "sourceSection": "RPH-DOC-010 §20 publication flow",
+      "initialState": "DRAFT",
+      "states": [
+        "DRAFT",
+        "UNDER_REVIEW",
+        "VALIDATED",
+        "PUBLISHED",
+        "DEPRECATED",
+        "RETIRED"
+      ],
+      "terminalStates": [
+        "RETIRED"
+      ],
+      "transitions": [
+        {
+          "from": "DRAFT",
+          "to": "UNDER_REVIEW",
+          "trigger": "submit for review"
+        },
+        {
+          "from": "UNDER_REVIEW",
+          "to": "VALIDATED",
+          "trigger": "validate"
+        },
+        {
+          "from": "VALIDATED",
+          "to": "PUBLISHED",
+          "trigger": "publish"
+        },
+        {
+          "from": "PUBLISHED",
+          "to": "DEPRECATED",
+          "trigger": "deprecate"
+        },
+        {
+          "from": "DEPRECATED",
+          "to": "RETIRED",
+          "trigger": "retire"
+        }
+      ]
+    },
+    {
+      "name": "PwuType.status",
+      "appliesTo": "PwuType",
+      "sourceSection": "RPH-DOC-010 §39",
+      "initialState": "DRAFT",
+      "states": [
+        "DRAFT",
+        "PUBLISHED",
+        "DEPRECATED"
+      ],
+      "terminalStates": [
+        "DEPRECATED"
+      ],
+      "transitions": [
+        {
+          "from": "DRAFT",
+          "to": "PUBLISHED",
+          "trigger": "publish via PWA"
+        },
+        {
+          "from": "PUBLISHED",
+          "to": "DEPRECATED",
+          "trigger": "deprecate via PWA"
+        }
+      ]
+    },
+    {
+      "name": "Undertaking.status",
+      "appliesTo": "Undertaking",
+      "sourceSection": "RPH-DOC-010 §22/§31",
+      "initialState": "ACTIVE",
+      "states": [
+        "ACTIVE",
+        "MIGRATING",
+        "ARCHIVED"
+      ],
+      "terminalStates": [
+        "ARCHIVED"
+      ],
+      "transitions": [
+        {
+          "from": "ACTIVE",
+          "to": "MIGRATING",
+          "trigger": "begin migration"
+        },
+        {
+          "from": "MIGRATING",
+          "to": "ACTIVE",
+          "trigger": "complete migration"
+        },
+        {
+          "from": "ACTIVE",
+          "to": "ARCHIVED",
+          "trigger": "archive"
+        }
+      ]
     }
   ],
   "conflicts": [

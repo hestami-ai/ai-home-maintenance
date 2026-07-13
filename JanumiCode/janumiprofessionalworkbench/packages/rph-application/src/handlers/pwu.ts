@@ -86,6 +86,11 @@ export const proposePwu: CommandHandler = (ctx, command, payload) => {
 		description: p.description,
 		intentId: p.intentId,
 		...(p.parentWorkUnitId ? { parentWorkUnitId: p.parentWorkUnitId } : {}),
+		// CON-009 ownership binding: a PWU Instance belongs to an Undertaking and realizes a PWU Type (or is a
+		// declared Undertaking-local extension) — pwuKind alone is insufficient.
+		...(p.undertakingId ? { undertakingId: p.undertakingId } : {}),
+		...(p.pwuTypeId ? { pwuTypeId: p.pwuTypeId } : {}),
+		...(p.isLocalExtension !== undefined ? { isLocalExtension: p.isLocalExtension } : {}),
 		boundaries: p.boundaries,
 		obligationIds: p.obligationIds,
 		constraintIds: p.constraintIds,

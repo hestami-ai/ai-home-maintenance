@@ -6,3 +6,4 @@ export * from './engine.js';
 export * from './replay.js';
 export * from './professional-work-graph.js';
 export * from './reference-undertaking.js';
+export * from './pwa-ontology.js';

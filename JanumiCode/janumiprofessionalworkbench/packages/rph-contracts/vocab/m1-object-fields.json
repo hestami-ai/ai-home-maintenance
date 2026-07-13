@@ -208,6 +208,21 @@
           "type": "string",
           "required": false,
           "note": "DOC-002 §7.1 only; ABSENT from DOC-007 §11.1. Retained (optional) — OPEN ITEM."
+        },
+        {
+          "field": "undertakingId",
+          "type": "string",
+          "required": false
+        },
+        {
+          "field": "pwuTypeId",
+          "type": "string",
+          "required": false
+        },
+        {
+          "field": "isLocalExtension",
+          "type": "boolean",
+          "required": false
         }
       ]
     },
@@ -1127,6 +1142,195 @@
           "type": "BaselineStatus",
           "required": true,
           "enumRef": "BaselineStatusSchema"
+        }
+      ]
+    },
+    {
+      "objectType": "PROFESSIONAL_WORK_ARCHITECTURE",
+      "tsName": "ProfessionalWorkArchitecture",
+      "idPrefixEntity": "pwa",
+      "note": "DOC-002 §3/§4: reusable, versioned architecture; owns PWU Types; publication flow RPH-DOC-010 §20",
+      "fields": [
+        {
+          "field": "name",
+          "type": "string",
+          "required": true
+        },
+        {
+          "field": "description",
+          "type": "string",
+          "required": true
+        },
+        {
+          "field": "domain",
+          "type": "string",
+          "required": true
+        },
+        {
+          "field": "version",
+          "type": "string",
+          "required": true
+        },
+        {
+          "field": "rootPwuTypeId",
+          "type": "string",
+          "required": false
+        },
+        {
+          "field": "pwuTypeIds",
+          "type": "string[]",
+          "required": true
+        },
+        {
+          "field": "assurancePolicyIds",
+          "type": "string[]",
+          "required": true
+        },
+        {
+          "field": "baselineTypeIds",
+          "type": "string[]",
+          "required": true
+        },
+        {
+          "field": "roleIds",
+          "type": "string[]",
+          "required": true
+        },
+        {
+          "field": "executionStrategyIds",
+          "type": "string[]",
+          "required": true
+        },
+        {
+          "field": "conformanceFixtureIds",
+          "type": "string[]",
+          "required": true
+        },
+        {
+          "field": "publicationStatus",
+          "type": "'DRAFT' | 'UNDER_REVIEW' | 'VALIDATED' | 'PUBLISHED' | 'DEPRECATED' | 'RETIRED'",
+          "required": true
+        }
+      ]
+    },
+    {
+      "objectType": "PWU_TYPE",
+      "tsName": "PwuType",
+      "idPrefixEntity": "pwut",
+      "note": "DOC-002 §4/§7.1: reusable PWU template owned by a published PWA version",
+      "fields": [
+        {
+          "field": "pwaId",
+          "type": "string",
+          "required": true
+        },
+        {
+          "field": "pwuKind",
+          "type": "string",
+          "required": true
+        },
+        {
+          "field": "name",
+          "type": "string",
+          "required": true
+        },
+        {
+          "field": "purpose",
+          "type": "string",
+          "required": true
+        },
+        {
+          "field": "isRoot",
+          "type": "boolean",
+          "required": true
+        },
+        {
+          "field": "permittedParentTypeIds",
+          "type": "string[]",
+          "required": true
+        },
+        {
+          "field": "permittedChildTypeIds",
+          "type": "string[]",
+          "required": true
+        },
+        {
+          "field": "requiredInputs",
+          "type": "string[]",
+          "required": true
+        },
+        {
+          "field": "requiredOutputs",
+          "type": "string[]",
+          "required": true
+        },
+        {
+          "field": "requiredAssurancePolicyIds",
+          "type": "string[]",
+          "required": true
+        },
+        {
+          "field": "completionRule",
+          "type": "string",
+          "required": true
+        },
+        {
+          "field": "status",
+          "type": "'DRAFT' | 'PUBLISHED' | 'DEPRECATED'",
+          "required": true
+        }
+      ]
+    },
+    {
+      "objectType": "UNDERTAKING",
+      "tsName": "Undertaking",
+      "idPrefixEntity": "und",
+      "note": "DOC-002 §3: concrete instantiation bound to one PWA version; owns the Professional Work Graph",
+      "fields": [
+        {
+          "field": "name",
+          "type": "string",
+          "required": true
+        },
+        {
+          "field": "description",
+          "type": "string",
+          "required": true
+        },
+        {
+          "field": "pwaId",
+          "type": "string",
+          "required": true
+        },
+        {
+          "field": "pwaVersion",
+          "type": "string",
+          "required": true
+        },
+        {
+          "field": "instantiationProfile",
+          "type": "string",
+          "required": true
+        },
+        {
+          "field": "objective",
+          "type": "string",
+          "required": true
+        },
+        {
+          "field": "intendedOutputProduct",
+          "type": "string",
+          "required": true
+        },
+        {
+          "field": "rootWorkUnitId",
+          "type": "string",
+          "required": false
+        },
+        {
+          "field": "status",
+          "type": "'ACTIVE' | 'MIGRATING' | 'ARCHIVED'",
+          "required": true
         }
       ]
     }

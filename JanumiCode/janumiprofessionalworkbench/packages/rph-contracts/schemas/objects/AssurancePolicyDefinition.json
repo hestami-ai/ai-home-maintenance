@@ -24,7 +24,10 @@
         "RECOMPOSITION_CONTRACT",
         "EXECUTION_PLAN",
         "RUNTIME_BINDING",
-        "BASELINE"
+        "BASELINE",
+        "PROFESSIONAL_WORK_ARCHITECTURE",
+        "PWU_TYPE",
+        "UNDERTAKING"
       ]
     },
     "schemaVersion": {
@@ -254,7 +257,10 @@
         "RECOMPOSITION_CONTRACT",
         "EXECUTION_PLAN",
         "RUNTIME_BINDING",
-        "BASELINE"
+        "BASELINE",
+        "PROFESSIONAL_WORK_ARCHITECTURE",
+        "PWU_TYPE",
+        "UNDERTAKING"
       ]
     },
     "applicability": {

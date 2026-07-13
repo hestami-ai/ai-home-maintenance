@@ -1612,6 +1612,46 @@ export const STATE_MACHINES: Record<string, StateMachineSpec> = {
 		transitions: [],
 		illegal: [],
 		guarded: []
+	},
+	'PWA.publicationStatus': {
+		name: 'PWA.publicationStatus',
+		states: ['DRAFT', 'UNDER_REVIEW', 'VALIDATED', 'PUBLISHED', 'DEPRECATED', 'RETIRED'],
+		initialState: 'DRAFT',
+		terminalStates: ['RETIRED'],
+		transitions: [
+			{ from: 'DRAFT', to: 'UNDER_REVIEW', trigger: 'submit for review' },
+			{ from: 'UNDER_REVIEW', to: 'VALIDATED', trigger: 'validate' },
+			{ from: 'VALIDATED', to: 'PUBLISHED', trigger: 'publish' },
+			{ from: 'PUBLISHED', to: 'DEPRECATED', trigger: 'deprecate' },
+			{ from: 'DEPRECATED', to: 'RETIRED', trigger: 'retire' }
+		],
+		illegal: [],
+		guarded: []
+	},
+	'PwuType.status': {
+		name: 'PwuType.status',
+		states: ['DRAFT', 'PUBLISHED', 'DEPRECATED'],
+		initialState: 'DRAFT',
+		terminalStates: ['DEPRECATED'],
+		transitions: [
+			{ from: 'DRAFT', to: 'PUBLISHED', trigger: 'publish via PWA' },
+			{ from: 'PUBLISHED', to: 'DEPRECATED', trigger: 'deprecate via PWA' }
+		],
+		illegal: [],
+		guarded: []
+	},
+	'Undertaking.status': {
+		name: 'Undertaking.status',
+		states: ['ACTIVE', 'MIGRATING', 'ARCHIVED'],
+		initialState: 'ACTIVE',
+		terminalStates: ['ARCHIVED'],
+		transitions: [
+			{ from: 'ACTIVE', to: 'MIGRATING', trigger: 'begin migration' },
+			{ from: 'MIGRATING', to: 'ACTIVE', trigger: 'complete migration' },
+			{ from: 'ACTIVE', to: 'ARCHIVED', trigger: 'archive' }
+		],
+		illegal: [],
+		guarded: []
 	}
 };
 

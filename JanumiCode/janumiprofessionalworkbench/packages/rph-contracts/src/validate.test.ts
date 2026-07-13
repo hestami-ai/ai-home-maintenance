@@ -39,10 +39,9 @@ describe('validate', () => {
 	});
 
 	it('registers envelope + enum + object + command + event schemas', () => {
-		// 8 envelope/primitive + 72 enums + 17 domain objects + 51 commands + 103 events = 251
-		// (51 = 43 + the 8 commands added for live command-drive: BeginIntentDiscovery, ProvisionIntent,
-		// SubmitBaselineForReview, ApproveBaseline, Request/Authorize/Deny RuntimeBinding, RevokeRuntimeCapability;
-		// 103 = 102 + IntentProvisioned — RPH-DOC-010; see OPEN-QUESTIONS)
-		expect(buildContractRegistry().ids().length).toBe(251);
+		// 8 envelope/primitive + 72 enums + 20 objects + 59 commands + 111 events = 270
+		// (+3 objects PROFESSIONAL_WORK_ARCHITECTURE / PWU_TYPE / UNDERTAKING; +8 PWA-authoring commands +8 events —
+		// the RPH-DOC-010 PWA-authoring context; see OPEN-QUESTIONS)
+		expect(buildContractRegistry().ids().length).toBe(270);
 	});
 });

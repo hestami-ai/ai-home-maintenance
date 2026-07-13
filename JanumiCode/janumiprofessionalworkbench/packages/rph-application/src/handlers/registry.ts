@@ -67,6 +67,16 @@ import {
 	reviseDecomposition,
 	validateDecomposition
 } from './decomposition.js';
+import {
+	createPwa,
+	createUndertaking,
+	definePwuType,
+	deprecatePwa,
+	publishPwa,
+	retirePwa,
+	submitPwaForReview,
+	validatePwa
+} from './pwa-authoring.js';
 
 export const HANDLERS: Readonly<Record<string, CommandHandler>> = {
 	// Intent lifecycle (DOC-002 §6)
@@ -125,5 +135,14 @@ export const HANDLERS: Readonly<Record<string, CommandHandler>> = {
 	ValidateDecomposition: validateDecomposition,
 	ReviseDecomposition: reviseDecomposition,
 	BeginRecomposition: beginRecomposition,
-	CompleteRecomposition: completeRecomposition
+	CompleteRecomposition: completeRecomposition,
+	// PWA-authoring context (RPH-DOC-010 §6, §11, §20, §42)
+	CreatePwa: createPwa,
+	DefinePwuType: definePwuType,
+	SubmitPwaForReview: submitPwaForReview,
+	ValidatePwa: validatePwa,
+	PublishPwa: publishPwa,
+	DeprecatePwa: deprecatePwa,
+	RetirePwa: retirePwa,
+	CreateUndertaking: createUndertaking
 };

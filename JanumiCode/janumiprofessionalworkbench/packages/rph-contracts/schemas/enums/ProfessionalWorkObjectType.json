@@ -18,7 +18,10 @@
     "RECOMPOSITION_CONTRACT",
     "EXECUTION_PLAN",
     "RUNTIME_BINDING",
-    "BASELINE"
+    "BASELINE",
+    "PROFESSIONAL_WORK_ARCHITECTURE",
+    "PWU_TYPE",
+    "UNDERTAKING"
   ],
   "$id": "urn:janumi:rph:schema:enum:ProfessionalWorkObjectType:1"
 }
