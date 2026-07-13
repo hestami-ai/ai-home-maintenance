@@ -89,8 +89,8 @@ export const definePwuType: CommandHandler = (ctx, command, payload) => {
 		isRoot: p.isRoot,
 		permittedParentTypeIds: p.permittedParentTypeIds ?? [],
 		permittedChildTypeIds: p.permittedChildTypeIds ?? [],
-		requiredInputs: [],
-		requiredOutputs: [],
+		requiredInputs: p.requiredInputs ?? [],
+		requiredOutputs: p.requiredOutputs ?? [],
 		requiredAssurancePolicyIds: p.requiredAssurancePolicyIds ?? [],
 		completionRule:
 			p.completionRule ?? 'Execution succeeded AND required outputs exist AND assurance satisfied',
@@ -184,6 +184,8 @@ export const editPwuType: CommandHandler = (ctx, command, payload) => {
 		...(p.permittedChildTypeIds !== undefined
 			? { permittedChildTypeIds: p.permittedChildTypeIds }
 			: {}),
+		...(p.requiredInputs !== undefined ? { requiredInputs: p.requiredInputs } : {}),
+		...(p.requiredOutputs !== undefined ? { requiredOutputs: p.requiredOutputs } : {}),
 		...(p.requiredAssurancePolicyIds !== undefined
 			? { requiredAssurancePolicyIds: p.requiredAssurancePolicyIds }
 			: {})

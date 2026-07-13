@@ -14,6 +14,7 @@
     "e2e:server": "svelte-kit sync && vite dev --host 127.0.0.1 --port 4319 --strictPort"
   },
   "dependencies": {
+    "@janumipwb/rph-authoring": "workspace:*",
     "@janumipwb/rph-engine": "workspace:*",
     "@janumipwb/rph-product-realization-pwa": "workspace:*",
     "@janumipwb/rph-projections": "workspace:*",

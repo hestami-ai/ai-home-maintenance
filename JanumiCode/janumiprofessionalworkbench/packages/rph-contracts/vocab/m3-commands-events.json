@@ -1730,6 +1730,16 @@
           "type": "string[]"
         },
         {
+          "field": "requiredInputs",
+          "required": false,
+          "type": "string[]"
+        },
+        {
+          "field": "requiredOutputs",
+          "required": false,
+          "type": "string[]"
+        },
+        {
           "field": "requiredAssurancePolicyIds",
           "required": false,
           "type": "string[]"
@@ -1927,6 +1937,16 @@
         },
         {
           "field": "permittedChildTypeIds",
+          "required": false,
+          "type": "string[]"
+        },
+        {
+          "field": "requiredInputs",
+          "required": false,
+          "type": "string[]"
+        },
+        {
+          "field": "requiredOutputs",
           "required": false,
           "type": "string[]"
         },

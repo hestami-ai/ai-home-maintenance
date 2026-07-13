@@ -1,0 +1,40 @@
+{
+  "name": "@janumipwb/rph-authoring",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "description": "The PWA-authoring capability layer — an LLM-agnostic CapabilityBroker of READ + PROPOSE operations over the rph-engine seam, scoped to a single DRAFT PWA. Every proposal issues a real domain command (as an AGENT actor) so the engine's fail-loud validation IS the guardrail; the same broker backs both the node-graph UI actions and the Pi agent's tools. Also the home of the copy-on-use PWU Type catalog + field help (browser-safe, exported from ./catalog).",
+  "license": "AGPL-3.0-only",
+  "exports": {
+    ".": {
+      "source": "./src/index.ts",
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js",
+      "default": "./dist/index.js"
+    },
+    "./catalog": {
+      "source": "./src/catalog.ts",
+      "types": "./dist/catalog.d.ts",
+      "import": "./dist/catalog.js",
+      "default": "./dist/catalog.js"
+    }
+  },
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "files": [
+    "dist"
+  ],
+  "scripts": {
+    "build": "tsc -p tsconfig.build.json",
+    "check-types": "tsc --noEmit -p tsconfig.json",
+    "test": "vitest run --passWithNoTests"
+  },
+  "dependencies": {
+    "@janumipwb/rph-contracts": "workspace:*",
+    "@janumipwb/rph-engine": "workspace:*"
+  },
+  "devDependencies": {
+    "@janumipwb/rph-product-realization-pwa": "workspace:*",
+    "@janumipwb/typescript-config": "workspace:*"
+  }
+}
