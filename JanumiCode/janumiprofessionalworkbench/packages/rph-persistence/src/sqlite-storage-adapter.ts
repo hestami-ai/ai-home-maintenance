@@ -49,6 +49,11 @@ export class SqliteStorageAdapter implements StorageAdapter {
 		this.db.exec(SCHEMA_SQL);
 	}
 
+	/** Run `fn` in one transaction (nestable via savepoints), so a batch of commits is all-or-nothing. */
+	transaction<T>(fn: () => T): T {
+		return this.db.transaction(fn);
+	}
+
 	getReceipt(idempotencyKey: string): CommandReceiptRecord | undefined {
 		const row = this.db
 			.prepare('SELECT * FROM command_receipts WHERE idempotency_key = ?')

@@ -61,6 +61,12 @@ export interface StorageAdapter {
 	 * receipt. Returns a REVISION_CONFLICT result (not a throw) when expectedRevision does not match.
 	 */
 	commit(input: CommitInput): CommitResult;
+	/**
+	 * Run `fn` inside a single storage transaction: commit on normal return, roll back on throw. Nestable — an
+	 * inner `commit`'s own transaction becomes a savepoint — so a caller can wrap several command dispatches and
+	 * have the WHOLE batch be atomic (all-or-nothing). Used by Engine.dispatchBatch.
+	 */
+	transaction<T>(fn: () => T): T;
 	/** Events for one aggregate in aggregateRevision order (for replay). */
 	readAggregateEvents(aggregateType: string, aggregateId: string): DomainEvent[];
 	/** All events in global_sequence order (for projection rebuild). */

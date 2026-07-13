@@ -33,6 +33,16 @@ export type EventSubscriber = (event: DomainEvent) => void;
 
 type CommandSpec = { readonly payload: ZodType };
 
+/** Internal marker to unwind a dispatchBatch transaction (rolls back every commit in the batch). */
+class BatchAbort extends Error {}
+
+/** Result of dispatchBatch: every command's result in order, plus whether the whole batch committed. */
+export interface BatchResult {
+	readonly ok: boolean;
+	readonly results: CommandResult[];
+	readonly failedIndex?: number;
+}
+
 export class Engine {
 	private readonly store: StorageAdapter;
 	private readonly now: () => string;
@@ -117,6 +127,33 @@ export class Engine {
 			logger: this.logger
 		};
 		return handler(ctx, command, parsed.value);
+	}
+
+	/**
+	 * Dispatch several commands ATOMICALLY: they all commit, or — on the first rejection — NONE do (the storage
+	 * transaction is rolled back, leaving no partial state). Each command's CommandResult is returned in order; a
+	 * non-mutating DUPLICATE (idempotency replay) counts as success. A multi-step authoring sequence (or the agent
+	 * proposing several linked commands) uses this so a mid-sequence failure can't strand a half-built DRAFT.
+	 */
+	dispatchBatch(commands: readonly DomainCommand[]): BatchResult {
+		const results: CommandResult[] = [];
+		let failedIndex: number | undefined;
+		try {
+			this.store.transaction(() => {
+				for (let i = 0; i < commands.length; i += 1) {
+					const r = this.dispatch(commands[i]!);
+					results.push(r);
+					if (r.status !== 'ACCEPTED' && r.status !== 'DUPLICATE') {
+						failedIndex = i;
+						throw new BatchAbort();
+					}
+				}
+			});
+		} catch (e) {
+			if (!(e instanceof BatchAbort)) throw e;
+			return { ok: false, results, failedIndex };
+		}
+		return { ok: true, results };
 	}
 
 	/** Deliver pending outbox events to subscribers and mark them published. Returns the count drained. */

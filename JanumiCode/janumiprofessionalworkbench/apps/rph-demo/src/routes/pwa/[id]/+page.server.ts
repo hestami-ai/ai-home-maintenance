@@ -141,22 +141,11 @@ export const actions: Actions = {
 		return { editedType: pwuTypeId };
 	},
 
-	// Remove a PWU Type (DRAFT only). Referential-integrity guard lives here (the sibling query): a type that is a
-	// permitted child of another cannot be removed until that reference is cleared.
-	removeType: async ({ request, params }) => {
+	// Remove a PWU Type (DRAFT only). Referential integrity + the DRAFT guard are enforced by the engine
+	// (RemovePwuType) — this just surfaces any rejection.
+	removeType: async ({ request }) => {
 		const pwuTypeId = String((await request.formData()).get('pwuTypeId') ?? '').trim();
 		if (!pwuTypeId) return fail(400, { error: 'Missing PWU Type.' });
-		const referenced = listPwuTypes(getEngine(), params.id).some(
-			(t) =>
-				t.id !== pwuTypeId &&
-				Array.isArray(t.state.permittedChildTypeIds) &&
-				(t.state.permittedChildTypeIds as string[]).includes(pwuTypeId)
-		);
-		if (referenced) {
-			return fail(400, {
-				error: 'This type is a permitted child of another type — clear that reference first.'
-			});
-		}
 		const r = dispatch('RemovePwuType', 'PWU_TYPE', pwuTypeId, { pwuTypeId });
 		if (r.status !== 'ACCEPTED') return fail(400, { error: r.error?.message ?? r.status });
 		return { removedType: pwuTypeId };

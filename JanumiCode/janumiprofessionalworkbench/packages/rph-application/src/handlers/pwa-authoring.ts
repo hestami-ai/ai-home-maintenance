@@ -206,15 +206,49 @@ export const editPwuType: CommandHandler = (ctx, command, payload) => {
 	});
 };
 
+/** Ids of sibling PWU Types (same PWA, still live) that reference `pwuTypeId` as a permitted parent/child. */
+function referencingSiblings(ctx: HandlerContext, pwaId: string, pwuTypeId: string): string[] {
+	const ids = new Set<string>();
+	for (const e of ctx.store.readAllEvents())
+		if (e.aggregateType === PWU_TYPE) ids.add(e.aggregateId);
+	const refs: string[] = [];
+	for (const sid of ids) {
+		if (sid === pwuTypeId) continue;
+		const s = ctx.store.loadObject(sid)?.state as
+			| {
+					pwaId?: string;
+					status?: string;
+					permittedChildTypeIds?: string[];
+					permittedParentTypeIds?: string[];
+			  }
+			| undefined;
+		if (!s || s.pwaId !== pwaId || s.status === 'REMOVED') continue;
+		const children = Array.isArray(s.permittedChildTypeIds) ? s.permittedChildTypeIds : [];
+		const parents = Array.isArray(s.permittedParentTypeIds) ? s.permittedParentTypeIds : [];
+		if (children.includes(pwuTypeId) || parents.includes(pwuTypeId)) refs.push(sid);
+	}
+	return refs;
+}
+
 /** RemovePwuType — tombstone a PWU Type (status REMOVED) while its PWA is DRAFT; the query surface hides REMOVED
- *  types so they disappear from the Work Architecture. (Referential integrity — not removing a type another lists
- *  as a permitted parent/child — is enforced in the authoring surface, which holds the sibling query.) */
+ *  types so they disappear from the Work Architecture. Referential integrity (no dangling permitted parent/child
+ *  reference) is enforced HERE, in the domain — not just the UI. */
 export const removePwuType: CommandHandler = (ctx, command) => {
 	const id = command.targetAggregateId;
 	const loaded = loadOrReject(ctx, command, id);
 	if (!loaded.ok) return loaded.result;
 	const guard = requireDraftOwner(ctx, command, loaded.state);
 	if (guard) return guard;
+	// Referential integrity is now enforced HERE (the domain), not just the UI: don't strand a dangling reference.
+	const refs = referencingSiblings(ctx, String(loaded.state.pwaId), id);
+	if (refs.length > 0) {
+		return reject(
+			command,
+			'RPH_INVARIANT_VIOLATION',
+			`Cannot remove PWU Type ${id}: ${refs.length} other type(s) reference it as a permitted parent/child; clear those references first`,
+			[id]
+		);
+	}
 	const newRevision = loaded.revision + 1;
 	const next: Record<string, unknown> = {
 		...nextEnvelope(loaded.state, command, newRevision),

@@ -39,6 +39,22 @@ describe('PWA-authoring handlers (live)', () => {
 		};
 		return engine.dispatch(command);
 	}
+	// Build a command WITHOUT dispatching it (for dispatchBatch).
+	function mk(commandType: string, payload: unknown, id: string, type: string): DomainCommand {
+		const n = ++seq;
+		return {
+			commandId: `c-${n}`,
+			commandType,
+			commandSchemaVersion: 1,
+			targetAggregateType: type,
+			targetAggregateId: id,
+			issuedAt: TS,
+			issuedBy: actor,
+			correlationId: 'corr',
+			idempotencyKey: `k-${n}`,
+			payload
+		};
+	}
 	const pubStatus = () =>
 		(store.loadObject(PWA)?.state as { publicationStatus: string }).publicationStatus;
 
@@ -264,5 +280,70 @@ describe('PWA-authoring handlers (live)', () => {
 		const r = d('RemovePwuType', { pwuTypeId: EXTRA }, EXTRA, 'PWU_TYPE');
 		expect(r.status, JSON.stringify(r.error)).toBe('ACCEPTED');
 		expect((store.loadObject(EXTRA)?.state as { status: string }).status).toBe('REMOVED');
+	});
+
+	it('RemovePwuType rejects a type another references as a permitted child (referential integrity, domain-enforced)', () => {
+		createDraftPwa();
+		defineRoot();
+		const CHILD = 'pwut_01ARZ3NDEKTSV4RRFFQ69G5PA0';
+		d(
+			'DefinePwuType',
+			{ pwuTypeId: CHILD, pwaId: PWA, pwuKind: 'C', name: 'C', purpose: 'p', isRoot: false },
+			CHILD,
+			'PWU_TYPE'
+		);
+		d(
+			'EditPwuType',
+			{ pwuTypeId: ROOT_TYPE, permittedChildTypeIds: [CHILD] },
+			ROOT_TYPE,
+			'PWU_TYPE'
+		);
+		const blocked = d('RemovePwuType', { pwuTypeId: CHILD }, CHILD, 'PWU_TYPE');
+		expect(blocked.status).toBe('REJECTED');
+		expect(blocked.error?.code).toBe('RPH_INVARIANT_VIOLATION');
+		// Clearing the reference lets the removal through.
+		d('EditPwuType', { pwuTypeId: ROOT_TYPE, permittedChildTypeIds: [] }, ROOT_TYPE, 'PWU_TYPE');
+		const ok = d('RemovePwuType', { pwuTypeId: CHILD }, CHILD, 'PWU_TYPE');
+		expect(ok.status, JSON.stringify(ok.error)).toBe('ACCEPTED');
+	});
+
+	it('dispatchBatch is atomic — a mid-batch rejection rolls back the whole batch', () => {
+		createDraftPwa();
+		const batch = engine.dispatchBatch([
+			mk('EditPwa', { pwaId: PWA, name: 'Batched Name' }, PWA, 'PROFESSIONAL_WORK_ARCHITECTURE'),
+			mk(
+				'EditPwuType',
+				{ pwuTypeId: 'pwut_does_not_exist', name: 'x' },
+				'pwut_does_not_exist',
+				'PWU_TYPE'
+			)
+		]);
+		expect(batch.ok).toBe(false);
+		expect(batch.failedIndex).toBe(1);
+		// The first command (EditPwa) must have ROLLED BACK — the name is unchanged.
+		expect((store.loadObject(PWA)?.state as { name: string }).name).toBe('Product Realization');
+	});
+
+	it('dispatchBatch commits every command on success', () => {
+		createDraftPwa();
+		const A = 'pwut_01ARZ3NDEKTSV4RRFFQ69G5PB0';
+		const B = 'pwut_01ARZ3NDEKTSV4RRFFQ69G5PC0';
+		const batch = engine.dispatchBatch([
+			mk(
+				'DefinePwuType',
+				{ pwuTypeId: A, pwaId: PWA, pwuKind: 'A', name: 'A', purpose: 'p', isRoot: true },
+				A,
+				'PWU_TYPE'
+			),
+			mk(
+				'DefinePwuType',
+				{ pwuTypeId: B, pwaId: PWA, pwuKind: 'B', name: 'B', purpose: 'p', isRoot: false },
+				B,
+				'PWU_TYPE'
+			)
+		]);
+		expect(batch.ok, JSON.stringify(batch.results.map((r) => r.error))).toBe(true);
+		expect(store.loadObject(A)).toBeDefined();
+		expect(store.loadObject(B)).toBeDefined();
 	});
 });

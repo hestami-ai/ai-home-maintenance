@@ -4,7 +4,7 @@
 // PWA-AGNOSTIC mechanism: the Product Realization PWA (or any PWA) is loaded as versioned DATA and INJECTED by
 // the composition root — the engine does not import or default to any specific PWA. Downstream surfaces consume
 // ONLY this seam; they never reach into the individual packages.
-import { Engine, type EventSubscriber } from '@janumipwb/rph-application';
+import { Engine, type BatchResult, type EventSubscriber } from '@janumipwb/rph-application';
 import type { CommandResult, DomainCommand, DomainEvent } from '@janumipwb/rph-contracts';
 import { SqliteStorageAdapter } from '@janumipwb/rph-persistence';
 import type { Logger, StorageAdapter, StoredObject } from '@janumipwb/rph-ports';
@@ -47,6 +47,8 @@ export interface CreateEngineDeps {
  *  projections, query current objects / the event log, and read the loaded ontology. */
 export interface EngineHandle {
 	dispatch(command: DomainCommand): CommandResult;
+	/** Dispatch several commands atomically (all-or-nothing) — for multi-step authoring / agent proposals. */
+	dispatchBatch(commands: readonly DomainCommand[]): BatchResult;
 	subscribe(handler: EventSubscriber): void;
 	drainOutbox(): number;
 	/** Read the current materialized state of an object by id (undefined if absent). */
@@ -91,6 +93,7 @@ export function createEngine(deps: CreateEngineDeps): EngineHandle {
 
 	return {
 		dispatch: (command) => engine.dispatch(command),
+		dispatchBatch: (commands) => engine.dispatchBatch(commands),
 		subscribe: (handler) => engine.subscribe(handler),
 		drainOutbox: () => engine.drainOutbox(),
 		loadObject: (id) => store.loadObject(id),
