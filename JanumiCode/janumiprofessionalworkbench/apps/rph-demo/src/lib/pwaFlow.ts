@@ -11,6 +11,8 @@ export interface PwuTypeNode {
 	readonly pwuKind: string;
 	readonly isRoot: boolean;
 	readonly permittedChildTypeIds: readonly string[];
+	readonly requiredInputs?: readonly string[];
+	readonly requiredOutputs?: readonly string[];
 }
 
 /** Layered layout: roots (no incoming composition edge) at the top; children one row down (BFS depth). */
@@ -63,6 +65,31 @@ export interface PwaFlow {
 	readonly edges: Edge[];
 }
 
+/** Data-flow edges (concern 3): a producer whose requiredOutputs name an artifact another type requires as input
+ *  gets a distinct dashed edge labeled with the shared artifact(s) — the hand-off that threads the graph. */
+function dataFlowEdges(types: readonly PwuTypeNode[]): Edge[] {
+	const edges: Edge[] = [];
+	for (const producer of types) {
+		const outputs = new Set(producer.requiredOutputs ?? []);
+		if (outputs.size === 0) continue;
+		for (const consumer of types) {
+			if (consumer.id === producer.id) continue;
+			const shared = (consumer.requiredInputs ?? []).filter((i) => outputs.has(i));
+			if (shared.length === 0) continue;
+			edges.push({
+				id: `flow:${producer.id}->${consumer.id}`,
+				source: producer.id,
+				target: consumer.id,
+				label: `⤳ ${shared.join(', ')}`,
+				animated: true,
+				style: 'stroke:#61dac1;stroke-dasharray:6 4;',
+				labelStyle: 'fill:#61dac1;font-size:10px;'
+			});
+		}
+	}
+	return edges;
+}
+
 export function toPwaFlow(types: readonly PwuTypeNode[], selectedId: string): PwaFlow {
 	const ids = new Set(types.map((t) => t.id));
 	const pairs = types.flatMap((t) =>
@@ -75,12 +102,12 @@ export function toPwaFlow(types: readonly PwuTypeNode[], selectedId: string): Pw
 		data: { label: `${t.name}${t.isRoot ? '  • ROOT' : ''}\n${t.pwuKind}` },
 		style: nodeStyle(t, selectedId === t.id)
 	}));
-	const edges: Edge[] = pairs.map((e) => ({
+	const permitsEdges: Edge[] = pairs.map((e) => ({
 		id: `${e.from}->${e.to}`,
 		source: e.from,
 		target: e.to,
 		label: 'permits',
 		animated: false
 	}));
-	return { nodes, edges };
+	return { nodes, edges: [...permitsEdges, ...dataFlowEdges(types)] };
 }

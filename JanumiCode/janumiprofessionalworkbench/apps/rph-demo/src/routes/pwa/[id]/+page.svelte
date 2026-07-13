@@ -1,5 +1,6 @@
 <script lang="ts">
 	import { enhance } from '$app/forms';
+	import { invalidateAll } from '$app/navigation';
 	import { SvelteFlow, Background, Controls } from '@xyflow/svelte';
 	import '@xyflow/svelte/dist/style.css';
 	import type { Edge, Node } from '@xyflow/svelte';
@@ -35,8 +36,9 @@
 	};
 	const rank = $derived(RANK[data.pwa.publicationStatus] ?? 0);
 
-	// Node graph: PWU Types are nodes; permittedChildTypeIds are the composition edges. Recomputed when the DRAFT
-	// changes (authoring/agent) or the selection changes.
+	// Node graph: PWU Types are nodes; permittedChildTypeIds are the composition ("permits") edges and matching
+	// requiredOutputs→requiredInputs are the data-flow edges. Recomputed when the DRAFT changes (form OR agent) or
+	// the selection changes.
 	const flow = $derived(toPwaFlow(data.types, selected));
 	let nodes = $state<Node[]>([]);
 	let edges = $state<Edge[]>([]);
@@ -49,7 +51,15 @@
 	type FormMode = null | 'define' | { editId: string };
 	let formMode = $state<FormMode>(null);
 	let showPwaEdit = $state(false);
-	const f = $state({ name: '', pwuKind: '', purpose: '', completionRule: '', isRoot: false });
+	const f = $state({
+		name: '',
+		pwuKind: '',
+		purpose: '',
+		completionRule: '',
+		isRoot: false,
+		requiredInputs: '',
+		requiredOutputs: ''
+	});
 	let children = $state<string[]>([]);
 	const editingId = $derived(typeof formMode === 'object' && formMode ? formMode.editId : '');
 
@@ -63,7 +73,15 @@
 	});
 
 	function openDefine() {
-		Object.assign(f, { name: '', pwuKind: '', purpose: '', completionRule: '', isRoot: false });
+		Object.assign(f, {
+			name: '',
+			pwuKind: '',
+			purpose: '',
+			completionRule: '',
+			isRoot: false,
+			requiredInputs: '',
+			requiredOutputs: ''
+		});
 		children = [];
 		formMode = 'define';
 	}
@@ -75,7 +93,9 @@
 			pwuKind: t.pwuKind,
 			purpose: t.purpose,
 			completionRule: t.completionRule,
-			isRoot: t.isRoot
+			isRoot: t.isRoot,
+			requiredInputs: t.requiredInputs.join(', '),
+			requiredOutputs: t.requiredOutputs.join(', ')
 		});
 		children = [...t.permittedChildTypeIds];
 		formMode = { editId: id };
@@ -83,10 +103,132 @@
 	function applyTemplate(key: string) {
 		const t = PWU_TYPE_CATALOG.find((x) => x.key === key);
 		if (!t) return;
-		Object.assign(f, { name: t.name, pwuKind: t.pwuKind, purpose: t.purpose, isRoot: t.isRoot });
+		Object.assign(f, {
+			name: t.name,
+			pwuKind: t.pwuKind,
+			purpose: t.purpose,
+			isRoot: t.isRoot,
+			requiredInputs: (t.requiredInputs ?? []).join(', '),
+			requiredOutputs: (t.requiredOutputs ?? []).join(', ')
+		});
 	}
 	function toggleChild(id: string, on: boolean) {
 		children = on ? [...children, id] : children.filter((c) => c !== id);
+	}
+
+	// ---- The authoring agent: chat (bottom) + reasoning log (left). It drives the SAME engine via the SSE relay;
+	// the graph re-renders live as each tool call commits (invalidateAll re-runs load -> data.types -> flow).
+	type LogEntry = {
+		kind: 'status' | 'text' | 'thinking' | 'tool' | 'toolend' | 'error';
+		text: string;
+		ok?: boolean;
+	};
+	const MUTATING = new Set([
+		'set_pwa_details',
+		'define_pwu_type',
+		'define_from_template',
+		'edit_pwu_type',
+		'remove_pwu_type',
+		'link_types',
+		'unlink_types'
+	]);
+	let chatInput = $state('');
+	let running = $state(false);
+	let log = $state<LogEntry[]>([]);
+
+	function push(entry: LogEntry) {
+		log = [...log, entry];
+	}
+	function appendText(kind: 'text' | 'thinking', t: string) {
+		const last = log[log.length - 1];
+		if (last && last.kind === kind) {
+			last.text += t;
+			log = [...log];
+		} else push({ kind, text: t });
+	}
+
+	async function sendToAgent(e: SubmitEvent) {
+		e.preventDefault();
+		const instruction = chatInput.trim();
+		if (!instruction || running) return;
+		running = true;
+		push({ kind: 'text', text: `You: ${instruction}` });
+		chatInput = '';
+		try {
+			const res = await fetch(`/pwa/${data.pwa.id}/agent`, {
+				method: 'POST',
+				headers: { 'content-type': 'application/json' },
+				body: JSON.stringify({ instruction })
+			});
+			if (!res.ok || !res.body) {
+				push({ kind: 'error', text: `Agent request failed (${res.status}).` });
+				return;
+			}
+			const reader = res.body.getReader();
+			const dec = new TextDecoder();
+			let buf = '';
+			for (;;) {
+				const { done, value } = await reader.read();
+				if (done) break;
+				buf += dec.decode(value, { stream: true });
+				let idx: number;
+				while ((idx = buf.indexOf('\n\n')) >= 0) {
+					const line = buf
+						.slice(0, idx)
+						.split('\n')
+						.find((l) => l.startsWith('data:'));
+					buf = buf.slice(idx + 2);
+					if (!line) continue;
+					await handleEvent(JSON.parse(line.slice(5).trim()));
+				}
+			}
+		} catch (err) {
+			push({ kind: 'error', text: err instanceof Error ? err.message : String(err) });
+		} finally {
+			running = false;
+			await invalidateAll();
+		}
+	}
+
+	async function handleEvent(ev: {
+		kind: string;
+		text?: string;
+		tool?: string;
+		args?: Record<string, unknown>;
+		ok?: boolean;
+		summary?: string;
+		message?: string;
+	}) {
+		switch (ev.kind) {
+			case 'status':
+				push({ kind: 'status', text: ev.text ?? '' });
+				break;
+			case 'text':
+				appendText('text', ev.text ?? '');
+				break;
+			case 'thinking':
+				appendText('thinking', ev.text ?? '');
+				break;
+			case 'tool_start':
+				push({ kind: 'tool', text: `${ev.tool}(${compactArgs(ev.args)})` });
+				break;
+			case 'tool_end':
+				push({ kind: 'toolend', text: `${ev.tool}: ${ev.summary ?? ''}`, ok: ev.ok });
+				// Live refresh: as each mutating tool commits, re-render the graph so nodes/edges appear in real time.
+				if (ev.ok && ev.tool && MUTATING.has(ev.tool)) await invalidateAll();
+				break;
+			case 'error':
+				push({ kind: 'error', text: ev.message ?? 'error' });
+				break;
+			default:
+				break;
+		}
+	}
+	function compactArgs(args: Record<string, unknown> | undefined): string {
+		if (!args) return '';
+		return Object.entries(args)
+			.map(([k, v]) => `${k}=${typeof v === 'string' ? v : JSON.stringify(v)}`)
+			.join(', ');
 	}
 </script>
 
@@ -173,7 +315,34 @@
 </div>
 {#if form?.error}<p class="err" role="alert">{form.error}</p>{/if}
 
-<div class="designer">
+<div class="designer" class:with-agent={editable}>
+	{#if editable}
+		<aside class="agentrail">
+			<div class="railhead">
+				<span class="itag">AI AGENT</span>
+				{#if running}<span class="livedot">● working…</span>{/if}
+			</div>
+			<p class="hint">
+				A JPWB-expert agent authors this graph for you — describe what you want below and it proposes
+				the PWU Types + links. Every change is applied to this DRAFT; you review and publish.
+			</p>
+			<div class="agentlog" data-testid="agent-log">
+				{#if log.length === 0}
+					<p class="logempty">No agent activity yet.</p>
+				{/if}
+				{#each log as entry, i (i)}
+					<div class="logentry {entry.kind}" class:bad={entry.kind === 'toolend' && entry.ok === false}>
+						{#if entry.kind === 'tool'}<span class="logmark">▶</span>{:else if entry.kind === 'toolend'}<span
+								class="logmark">{entry.ok === false ? '✗' : '✓'}</span
+							>{:else if entry.kind === 'thinking'}<span class="logmark">…</span>{:else if entry.kind === 'error'}<span
+								class="logmark">!</span
+							>{/if}<span class="logtext">{entry.text}</span>
+					</div>
+				{/each}
+			</div>
+		</aside>
+	{/if}
+
 	<section class="canvaswrap">
 		<div class="canvashead">
 			<h2>Work Architecture — Professional Work Graph</h2>
@@ -182,9 +351,10 @@
 			{/if}
 		</div>
 		<p class="hint">
-			Each node is a reusable PWU Type; an edge means the parent type may be decomposed into the child
-			(allowed composition). Click a node to inspect or edit it. This is a View of the PWA — PWU Types
-			carry no execution or assurance state.
+			Each node is a reusable PWU Type; a solid edge means the parent may be decomposed into the child
+			(permitted composition); a dashed <span class="flowkey">⤳</span> edge is a data-flow hand-off (one
+			type's output is another's required input). Click a node to inspect or edit it. PWU Types carry no
+			execution or assurance state.
 		</p>
 		<div class="canvas">
 			{#if data.types.length}
@@ -243,6 +413,18 @@
 					/>
 				</div>
 				<div class="ffield">
+					{@render fhead('Required inputs', PWU_TYPE_HELP.requiredInputs)}
+					<input name="requiredInputs" bind:value={f.requiredInputs} placeholder="approved-behavior" />
+				</div>
+				<div class="ffield">
+					{@render fhead('Required outputs', PWU_TYPE_HELP.requiredOutputs)}
+					<input
+						name="requiredOutputs"
+						bind:value={f.requiredOutputs}
+						placeholder="architecture-baseline"
+					/>
+				</div>
+				<div class="ffield">
 					<label class="rootcheck"
 						><input type="checkbox" name="isRoot" bind:checked={f.isRoot} /> Root type</label
 					>
@@ -282,6 +464,14 @@
 				<span class="flabel">Completion rule</span><p class="mono">{current.completionRule || '—'}</p>
 			</div>
 			<div class="field">
+				<span class="flabel">Required inputs</span>
+				<p>{current.requiredInputs.length ? current.requiredInputs.join(', ') : '—'}</p>
+			</div>
+			<div class="field">
+				<span class="flabel">Required outputs</span>
+				<p>{current.requiredOutputs.length ? current.requiredOutputs.join(', ') : '—'}</p>
+			</div>
+			<div class="field">
 				<span class="flabel">Permitted children</span>
 				<p>{current.permittedChildTypeIds.length} type(s)</p>
 			</div>
@@ -311,6 +501,23 @@
 		{/if}
 	</aside>
 </div>
+
+{#if editable}
+	<form class="chatbar" onsubmit={sendToAgent}>
+		<textarea
+			bind:value={chatInput}
+			placeholder="Ask the agent to build or modify the graph — e.g. “Draft a product realization architecture with the standard work areas.”"
+			rows="2"
+			data-testid="agent-input"
+			onkeydown={(e) => {
+				if (e.key === 'Enter' && (e.metaKey || e.ctrlKey)) sendToAgent(e as unknown as SubmitEvent);
+			}}
+		></textarea>
+		<button class="primary" type="submit" disabled={running || !chatInput.trim()}>
+			{running ? 'Working…' : 'Send'}
+		</button>
+	</form>
+{/if}
 
 <style>
 	.crumbs {
@@ -441,6 +648,10 @@
 		font-size: 13px;
 		cursor: pointer;
 	}
+	button.primary:disabled {
+		opacity: 0.5;
+		cursor: not-allowed;
+	}
 	.immutable {
 		font-size: 12px;
 		color: var(--tertiary);
@@ -468,8 +679,12 @@
 		gap: 18px;
 		margin-top: 18px;
 	}
+	.designer.with-agent {
+		grid-template-columns: 300px 1fr 340px;
+	}
 	.canvaswrap,
-	.inspector {
+	.inspector,
+	.agentrail {
 		background: var(--surface-low);
 		border-radius: 12px;
 		padding: 18px;
@@ -487,6 +702,10 @@
 		color: var(--outline);
 		font-size: 12px;
 		margin: 0 0 12px;
+	}
+	.flowkey {
+		color: var(--tertiary);
+		font-weight: 700;
 	}
 	.canvas {
 		height: calc(100vh - 360px);
@@ -514,6 +733,98 @@
 	.inspector h3 {
 		margin: 6px 0 16px;
 		font-size: 19px;
+	}
+	/* Agent rail */
+	.agentrail {
+		display: flex;
+		flex-direction: column;
+	}
+	.railhead {
+		display: flex;
+		align-items: center;
+		justify-content: space-between;
+		margin-bottom: 6px;
+	}
+	.livedot {
+		font-size: 11px;
+		color: var(--tertiary);
+		font-weight: 600;
+	}
+	.agentlog {
+		flex: 1;
+		overflow-y: auto;
+		background: var(--surface);
+		border: 1px solid var(--sc);
+		border-radius: 10px;
+		padding: 10px;
+		display: flex;
+		flex-direction: column;
+		gap: 6px;
+		min-height: 300px;
+		max-height: calc(100vh - 420px);
+	}
+	.logempty {
+		color: var(--outline);
+		font-size: 12px;
+		margin: 0;
+	}
+	.logentry {
+		font-size: 12px;
+		line-height: 1.45;
+		color: var(--on-variant);
+		display: flex;
+		gap: 6px;
+		white-space: pre-wrap;
+		word-break: break-word;
+	}
+	.logentry.tool,
+	.logentry.toolend {
+		font-family: 'Source Code Pro', monospace;
+		font-size: 11px;
+	}
+	.logentry.toolend {
+		color: var(--tertiary);
+	}
+	.logentry.toolend.bad {
+		color: var(--error);
+	}
+	.logentry.thinking {
+		color: var(--outline);
+		font-style: italic;
+	}
+	.logentry.status {
+		color: var(--outline);
+		font-size: 10px;
+		letter-spacing: 0.08em;
+		text-transform: uppercase;
+	}
+	.logentry.error {
+		color: var(--error);
+	}
+	.logmark {
+		flex-shrink: 0;
+		font-weight: 700;
+	}
+	/* Chat bar */
+	.chatbar {
+		display: flex;
+		gap: 10px;
+		align-items: flex-end;
+		margin-top: 16px;
+		background: var(--surface-low);
+		border-radius: 12px;
+		padding: 14px 18px;
+	}
+	.chatbar textarea {
+		flex: 1;
+		background: var(--sc-highest);
+		border: 1px solid var(--outline-faint);
+		color: var(--on);
+		border-radius: 8px;
+		padding: 10px 12px;
+		font-size: 13px;
+		font-family: inherit;
+		resize: vertical;
 	}
 	.typeform {
 		display: flex;

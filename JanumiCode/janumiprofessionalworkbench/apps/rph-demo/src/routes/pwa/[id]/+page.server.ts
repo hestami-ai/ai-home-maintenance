@@ -31,6 +31,12 @@ export const load: PageServerLoad = ({ params }) => {
 		permittedChildTypeIds: Array.isArray(t.state.permittedChildTypeIds)
 			? (t.state.permittedChildTypeIds as string[])
 			: [],
+		requiredInputs: Array.isArray(t.state.requiredInputs)
+			? (t.state.requiredInputs as string[])
+			: [],
+		requiredOutputs: Array.isArray(t.state.requiredOutputs)
+			? (t.state.requiredOutputs as string[])
+			: [],
 		requiredAssurancePolicyIds: Array.isArray(t.state.requiredAssurancePolicyIds)
 			? (t.state.requiredAssurancePolicyIds as string[])
 			: []
@@ -56,6 +62,16 @@ interface TypeFields {
 	completionRule: string;
 	isRoot: boolean;
 	permittedChildTypeIds: string[];
+	requiredInputs: string[];
+	requiredOutputs: string[];
+}
+
+/** Split a comma/newline-separated artifact list from a form field into a clean string[]. */
+function csv(v: FormDataEntryValue | null): string[] {
+	return String(v ?? '')
+		.split(/[\n,;]/)
+		.map((x) => x.trim())
+		.filter(Boolean);
 }
 
 /** Read the shared PWU-Type authoring fields from a form (used by both defineType and editType). */
@@ -73,7 +89,9 @@ function readTypeFields(form: FormData): TypeFields {
 		permittedChildTypeIds: form
 			.getAll('permittedChildTypeIds')
 			.map((v) => String(v))
-			.filter(Boolean)
+			.filter(Boolean),
+		requiredInputs: csv(form.get('requiredInputs')),
+		requiredOutputs: csv(form.get('requiredOutputs'))
 	};
 }
 
@@ -114,7 +132,9 @@ export const actions: Actions = {
 			purpose: f.purpose || f.name,
 			isRoot: f.isRoot,
 			...(f.completionRule ? { completionRule: f.completionRule } : {}),
-			permittedChildTypeIds: f.permittedChildTypeIds
+			permittedChildTypeIds: f.permittedChildTypeIds,
+			requiredInputs: f.requiredInputs,
+			requiredOutputs: f.requiredOutputs
 		});
 		if (r.status !== 'ACCEPTED') return fail(400, { error: r.error?.message ?? r.status });
 		return { definedType: id };
@@ -135,7 +155,9 @@ export const actions: Actions = {
 			purpose: f.purpose || f.name,
 			isRoot: f.isRoot,
 			...(f.completionRule ? { completionRule: f.completionRule } : {}),
-			permittedChildTypeIds: f.permittedChildTypeIds
+			permittedChildTypeIds: f.permittedChildTypeIds,
+			requiredInputs: f.requiredInputs,
+			requiredOutputs: f.requiredOutputs
 		});
 		if (r.status !== 'ACCEPTED') return fail(400, { error: r.error?.message ?? r.status });
 		return { editedType: pwuTypeId };
