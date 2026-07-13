@@ -1,6 +1,14 @@
 <script lang="ts">
+	import { onMount } from 'svelte';
 	import { page } from '$app/state';
 	let { children } = $props();
+
+	// E2E hydration marker: the client sets this once Svelte has hydrated, so tests can wait for interactivity
+	// before driving toggle/enhance controls (otherwise a click can land before its handler is attached). Harmless
+	// in production — it just stamps one data attribute on <html>.
+	onMount(() => {
+		document.documentElement.dataset.hydrated = 'true';
+	});
 
 	// Two visibly-distinct contexts (RPH-DOC-010 §5/§35): PWA Design vs Undertaking. The nav + the context banner
 	// make the current level unmistakable — the reviewer can always tell which level they are examining.
