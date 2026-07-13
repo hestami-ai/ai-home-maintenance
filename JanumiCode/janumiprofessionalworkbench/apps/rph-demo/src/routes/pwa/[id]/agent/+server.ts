@@ -4,9 +4,20 @@
 // the source of truth: the agent only proposes through the broker's tools, so a client disconnect (which aborts the
 // run) can never leave the DRAFT in a bad state — each accepted command already committed atomically.
 import { error, json } from '@sveltejs/kit';
-import { agentMode, makeAuthoringBroker } from '$lib/server/workbench';
+import { agentMode, makeAuthoringBroker, recordConversation } from '$lib/server/workbench';
 import { createAuthoringAgent, type AuthoringAgentEvent } from '$lib/server/agent';
 import type { RequestHandler } from './$types';
+
+// A mutable transcript entry (text is accumulated as deltas stream); assignable to the readonly ConversationEntry.
+type TurnEntry = { role: string; kind: string; text: string; success?: boolean };
+
+/** Compact a tool's args for the transcript (mirrors the client log). */
+function compactArgs(args: Record<string, unknown> | undefined): string {
+	if (!args) return '';
+	return Object.entries(args)
+		.map(([k, v]) => `${k}=${typeof v === 'string' ? v : JSON.stringify(v)}`)
+		.join(', ');
+}
 
 export const POST: RequestHandler = async ({ params, request }) => {
 	const broker = makeAuthoringBroker(params.id);
@@ -30,6 +41,32 @@ export const POST: RequestHandler = async ({ params, request }) => {
 				if (closed) return;
 				controller.enqueue(encoder.encode(`data: ${JSON.stringify(event)}\n\n`));
 			};
+			// Build the durable transcript for this turn as the run streams. It opens with the user's instruction,
+			// then accumulates the agent's messages / tool calls / results — persisted to the engine on completion.
+			const transcript: TurnEntry[] = [{ role: 'USER', kind: 'message', text: instruction }];
+			const record = (ev: AuthoringAgentEvent) => {
+				if (ev.kind === 'text' || ev.kind === 'thinking') {
+					const kind = ev.kind === 'text' ? 'message' : 'thinking';
+					const last = transcript[transcript.length - 1];
+					if (last && last.role === 'AGENT' && last.kind === kind) last.text += ev.text;
+					else transcript.push({ role: 'AGENT', kind, text: ev.text });
+				} else if (ev.kind === 'tool_start') {
+					transcript.push({
+						role: 'AGENT',
+						kind: 'tool_call',
+						text: `${ev.tool}(${compactArgs(ev.args)})`
+					});
+				} else if (ev.kind === 'tool_end') {
+					transcript.push({
+						role: 'AGENT',
+						kind: 'tool_result',
+						text: `${ev.tool}: ${ev.summary}`,
+						success: ev.ok
+					});
+				} else if (ev.kind === 'error') {
+					transcript.push({ role: 'SYSTEM', kind: 'error', text: ev.message });
+				}
+			};
 			try {
 				if (pwa.publicationStatus !== 'DRAFT') {
 					send({
@@ -40,11 +77,29 @@ export const POST: RequestHandler = async ({ params, request }) => {
 					return;
 				}
 				const agent = await createAuthoringAgent(broker, agentMode());
-				await agent.run(instruction, send, request.signal);
+				await agent.run(
+					instruction,
+					(ev) => {
+						send(ev);
+						record(ev);
+					},
+					request.signal
+				);
 			} catch (e) {
-				send({ kind: 'error', message: e instanceof Error ? e.message : String(e) });
+				const message = e instanceof Error ? e.message : String(e);
+				send({ kind: 'error', message });
 				send({ kind: 'done' });
+				record({ kind: 'error', message });
 			} finally {
+				// Persist the turn as event-sourced domain state (survives reloads; the client disconnecting mid-run
+				// still records what was said). Only DRAFT PWAs are authored, so only they carry a transcript.
+				if (pwa.publicationStatus === 'DRAFT') {
+					try {
+						recordConversation(params.id, transcript);
+					} catch {
+						// persistence best-effort — never break the stream teardown
+					}
+				}
 				closed = true;
 				try {
 					controller.close();

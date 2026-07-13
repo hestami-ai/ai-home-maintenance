@@ -6,8 +6,35 @@
 // (§11), so every authoring control disappears (and the engine rejects the command) once it is no longer DRAFT.
 import { error, fail } from '@sveltejs/kit';
 import { getObject, listPwuTypes, listUndertakings, SEED_UNDERTAKING } from '@janumipwb/rph-engine';
-import { dispatch, getEngine, mintUiId } from '$lib/server/workbench';
+import {
+	dispatch,
+	getEngine,
+	loadConversation,
+	mintUiId,
+	type ConversationEntry
+} from '$lib/server/workbench';
 import type { Actions, PageServerLoad } from './$types';
+
+/** The durable authoring transcript, mapped to the agent-log render shape the page consumes. */
+type LogEntry = {
+	kind: 'status' | 'text' | 'thinking' | 'tool' | 'toolend' | 'error';
+	text: string;
+	ok?: boolean;
+};
+function toLogEntry(e: ConversationEntry): LogEntry {
+	switch (e.kind) {
+		case 'message':
+			return { kind: 'text', text: e.role === 'USER' ? `You: ${e.text}` : e.text };
+		case 'thinking':
+			return { kind: 'thinking', text: e.text };
+		case 'tool_call':
+			return { kind: 'tool', text: e.text };
+		case 'tool_result':
+			return { kind: 'toolend', text: e.text, ok: e.success };
+		default:
+			return { kind: 'error', text: e.text };
+	}
+}
 
 export const load: PageServerLoad = ({ params }) => {
 	const engine = getEngine();
@@ -51,7 +78,8 @@ export const load: PageServerLoad = ({ params }) => {
 			publicationStatus: String(pwa.publicationStatus ?? 'DRAFT')
 		},
 		types,
-		fixtures
+		fixtures,
+		conversation: loadConversation(params.id).map(toLogEntry)
 	};
 };
 

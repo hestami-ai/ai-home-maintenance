@@ -230,85 +230,34 @@
         "additionalProperties": false
       }
     },
-    "statement": {
+    "pwaId": {
       "type": "string"
     },
-    "obligationType": {
-      "type": "string",
-      "enum": [
-        "FUNCTIONAL",
-        "QUALITY",
-        "COMPLIANCE",
-        "SAFETY",
-        "SECURITY",
-        "PROCESS",
-        "EVIDENCE",
-        "GOVERNANCE"
-      ]
-    },
-    "sourceObjectId": {
-      "type": "string"
-    },
-    "authority": {
-      "type": "object",
-      "properties": {
-        "authorityId": {
-          "type": "string"
-        },
-        "authorityType": {
-          "type": "string",
-          "enum": [
-            "USER",
-            "ORGANIZATIONAL_ROLE",
-            "POLICY",
-            "LEGAL_REQUIREMENT",
-            "SYSTEM_OWNER",
-            "DELEGATED_AGENT"
-          ]
-        },
-        "grantedBy": {
-          "type": "string"
-        },
-        "scope": {
-          "type": "array",
-          "items": {
+    "entries": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "properties": {
+          "role": {
             "type": "string"
+          },
+          "kind": {
+            "type": "string"
+          },
+          "text": {
+            "type": "string"
+          },
+          "success": {
+            "type": "boolean"
           }
         },
-        "validFrom": {
-          "type": "string"
-        },
-        "validUntil": {
-          "type": "string"
-        }
-      },
-      "required": [
-        "authorityId",
-        "authorityType",
-        "scope",
-        "validFrom"
-      ],
-      "additionalProperties": false
-    },
-    "strength": {
-      "type": "string",
-      "enum": [
-        "MANDATORY",
-        "CONDITIONAL",
-        "ADVISORY"
-      ]
-    },
-    "status": {
-      "type": "string",
-      "enum": [
-        "PROPOSED",
-        "ACTIVE",
-        "ALLOCATED",
-        "SATISFIED",
-        "WAIVED",
-        "VIOLATED",
-        "SUPERSEDED"
-      ]
+        "required": [
+          "role",
+          "kind",
+          "text"
+        ],
+        "additionalProperties": false
+      }
     }
   },
   "required": [
@@ -325,13 +274,9 @@
     "provenance",
     "tags",
     "extensions",
-    "statement",
-    "obligationType",
-    "sourceObjectId",
-    "authority",
-    "strength",
-    "status"
+    "pwaId",
+    "entries"
   ],
   "additionalProperties": false,
-  "$id": "urn:janumi:rph:schema:object:ObligationObject:1"
+  "$id": "urn:janumi:rph:schema:object:AuthoringConversation:1"
 }

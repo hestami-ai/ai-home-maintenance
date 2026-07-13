@@ -19,6 +19,7 @@ export interface EngineSnapshot {
 	readonly observations: ObjectRow[];
 	readonly decisions: ObjectRow[];
 	readonly baselines: ObjectRow[];
+	readonly conversations: ObjectRow[];
 }
 
 /** Reset the engine to a known state between specs (test mode only): 'empty' for authoring-from-scratch flows,

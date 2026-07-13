@@ -7,7 +7,12 @@
 // TEST MODE (RPH_DEMO_MODE=test, set by the Playwright webServer): the engine additionally runs on a deterministic
 // clock + id sequence and can be reset between specs (see resetEngine + the /test-api endpoints), so the E2E
 // harness gets stable, isolated state. Test mode is NEVER enabled in a normal `bun run dev` / production boot.
-import { createEngine, seedWorkbench, type EngineHandle } from '@janumipwb/rph-engine';
+import {
+	createEngine,
+	getConversation,
+	seedWorkbench,
+	type EngineHandle
+} from '@janumipwb/rph-engine';
 import { ontology } from '@janumipwb/rph-product-realization-pwa';
 import { PwaAuthoringBroker } from '@janumipwb/rph-authoring';
 import type { DomainCommand } from '@janumipwb/rph-contracts';
@@ -108,6 +113,35 @@ export function makeAuthoringBroker(pwaId: string): PwaAuthoringBroker {
 		now: TEST_MODE ? testNow : undefined,
 		sessionId: mintUiId('sess')
 	});
+}
+
+/** One durable authoring-conversation transcript entry (event-sourced domain state — see the AUTHORING_CONVERSATION
+ *  aggregate). role = USER | AGENT | SYSTEM; kind = message | thinking | tool_call | tool_result | error. */
+export interface ConversationEntry {
+	readonly role: string;
+	readonly kind: string;
+	readonly text: string;
+	readonly success?: boolean;
+}
+
+/** Append entries to a DRAFT PWA's durable authoring conversation (through the engine — critical domain state, a
+ *  precursor to the governed stream, NOT a side store). One conversation per PWA: its id is minted once and reused,
+ *  so the transcript survives reloads (and, when the engine is backed by a durable store, restarts). */
+export function recordConversation(pwaId: string, entries: ConversationEntry[]): void {
+	if (entries.length === 0) return;
+	const existing = getConversation(getEngine(), pwaId);
+	const conversationId = existing?.id ?? mintUiId('conv');
+	dispatch('AppendConversationEntries', 'AUTHORING_CONVERSATION', conversationId, {
+		conversationId,
+		pwaId,
+		entries
+	});
+}
+
+/** The DRAFT PWA's persisted authoring conversation entries (empty if none yet). */
+export function loadConversation(pwaId: string): ConversationEntry[] {
+	const entries = getConversation(getEngine(), pwaId)?.state.entries;
+	return Array.isArray(entries) ? (entries as ConversationEntry[]) : [];
 }
 
 /** Which authoring agent the SSE route should use: the deterministic mock under E2E (RPH_DEMO_MODE=test), the live

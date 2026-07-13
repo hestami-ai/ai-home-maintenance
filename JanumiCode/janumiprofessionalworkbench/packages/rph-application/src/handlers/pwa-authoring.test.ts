@@ -185,6 +185,41 @@ describe('PWA-authoring handlers (live)', () => {
 		expect(pubStatus()).toBe('PUBLISHED');
 	});
 
+	it('AppendConversationEntries creates then extends the durable authoring transcript', () => {
+		const CONV = 'conv_01ARZ3NDEKTSV4RRFFQ69G5P70';
+		const r1 = d(
+			'AppendConversationEntries',
+			{
+				conversationId: CONV,
+				pwaId: PWA,
+				entries: [{ role: 'USER', kind: 'message', text: 'build it' }]
+			},
+			CONV,
+			'AUTHORING_CONVERSATION'
+		);
+		expect(r1.status, JSON.stringify(r1.error)).toBe('ACCEPTED');
+		let c = store.loadObject(CONV)?.state as { pwaId: string; entries: unknown[] };
+		expect(c.pwaId).toBe(PWA);
+		expect(c.entries).toHaveLength(1);
+		// a second append EXTENDS the same conversation (event-sourced transcript).
+		const r2 = d(
+			'AppendConversationEntries',
+			{
+				conversationId: CONV,
+				pwaId: PWA,
+				entries: [
+					{ role: 'AGENT', kind: 'message', text: 'done' },
+					{ role: 'AGENT', kind: 'tool_result', text: 'define_pwu_type: ok', success: true }
+				]
+			},
+			CONV,
+			'AUTHORING_CONVERSATION'
+		);
+		expect(r2.status).toBe('ACCEPTED');
+		c = store.loadObject(CONV)?.state as { pwaId: string; entries: unknown[] };
+		expect(c.entries).toHaveLength(3);
+	});
+
 	it('binds a PWU Instance to its Undertaking + PWU Type (CON-009)', () => {
 		createDraftPwa();
 		defineRoot();

@@ -4,6 +4,7 @@
 // (§42): CreateUndertaking binds the exact PWA version; the root PWU Instance + children are then shaped in the
 // Undertaking context (via ProposePwu carrying undertakingId + pwuTypeId — the CON-009 ownership binding).
 import type {
+	AppendConversationEntriesPayload,
 	CommandResult,
 	CreatePwaPayload,
 	CreateUndertakingPayload,
@@ -29,7 +30,61 @@ import {
 const PWA = 'PROFESSIONAL_WORK_ARCHITECTURE';
 const PWU_TYPE = 'PWU_TYPE';
 const UNDERTAKING = 'UNDERTAKING';
+const CONVERSATION = 'AUTHORING_CONVERSATION';
 const PWA_MACHINE = 'PWA.publicationStatus';
+
+/** AppendConversationEntries — the durable, event-sourced transcript of the authoring agent's work on a DRAFT PWA.
+ *  This is DOMAIN state (a precursor to the JanumiCode v2 governed stream), NOT UI metadata: each turn's messages /
+ *  tool calls / results are appended as domain events, so the conversation survives reloads and (when the engine is
+ *  backed by a durable store) restarts, and is part of the authoritative audit trail. First append CREATES the
+ *  conversation aggregate; subsequent appends extend its ordered entries. One conversation per PWA (the host keys
+ *  the conversationId to the pwaId). */
+export const appendConversationEntries: CommandHandler = (ctx, command, payload) => {
+	const p = payload as AppendConversationEntriesPayload;
+	const id = command.targetAggregateId;
+	const existing = ctx.store.loadObject(id);
+	if (!existing) {
+		const state: Record<string, unknown> = {
+			...newEnvelope(command, CONVERSATION, id, {
+				lifecycleStatus: 'ACTIVE',
+				originType: 'USER_INPUT',
+				sourceObjectIds: [p.pwaId]
+			}),
+			pwaId: p.pwaId,
+			entries: p.entries
+		};
+		return createObject(ctx, command, {
+			objectType: CONVERSATION,
+			aggregateId: id,
+			state,
+			eventType: 'ConversationEntriesAppended'
+		});
+	}
+	const loaded = loadOrReject(ctx, command, id);
+	if (!loaded.ok) return loaded.result;
+	const prior = Array.isArray(loaded.state.entries) ? (loaded.state.entries as unknown[]) : [];
+	const newRevision = loaded.revision + 1;
+	const next: Record<string, unknown> = {
+		...nextEnvelope(loaded.state, command, newRevision),
+		entries: [...prior, ...p.entries]
+	};
+	const event = makeEvent(ctx, command, {
+		eventType: 'ConversationEntriesAppended',
+		aggregateType: CONVERSATION,
+		aggregateId: id,
+		aggregateRevision: newRevision,
+		payload
+	});
+	return commitState(ctx, command, {
+		objectType: CONVERSATION,
+		aggregateId: id,
+		expectedRevision: loaded.revision,
+		newRevision,
+		newSemanticVersion: loaded.semanticVersion,
+		nextState: next,
+		event
+	});
+};
 
 /** CreatePwa — create a Professional Work Architecture in DRAFT. */
 export const createPwa: CommandHandler = (ctx, command, payload) => {

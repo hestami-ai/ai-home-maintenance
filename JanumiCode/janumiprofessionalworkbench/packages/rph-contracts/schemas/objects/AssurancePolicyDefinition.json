@@ -27,7 +27,8 @@
         "BASELINE",
         "PROFESSIONAL_WORK_ARCHITECTURE",
         "PWU_TYPE",
-        "UNDERTAKING"
+        "UNDERTAKING",
+        "AUTHORING_CONVERSATION"
       ]
     },
     "schemaVersion": {
@@ -260,7 +261,8 @@
         "BASELINE",
         "PROFESSIONAL_WORK_ARCHITECTURE",
         "PWU_TYPE",
-        "UNDERTAKING"
+        "UNDERTAKING",
+        "AUTHORING_CONVERSATION"
       ]
     },
     "applicability": {

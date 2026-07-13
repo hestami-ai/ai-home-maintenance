@@ -69,6 +69,7 @@ import {
 } from './decomposition.js';
 import {
 	createPwa,
+	appendConversationEntries,
 	createUndertaking,
 	definePwuType,
 	deletePwa,
@@ -143,6 +144,7 @@ export const HANDLERS: Readonly<Record<string, CommandHandler>> = {
 	// PWA-authoring context (RPH-DOC-010 §6, §11, §20, §42)
 	CreatePwa: createPwa,
 	DeletePwa: deletePwa,
+	AppendConversationEntries: appendConversationEntries,
 	DefinePwuType: definePwuType,
 	EditPwa: editPwa,
 	EditPwuType: editPwuType,

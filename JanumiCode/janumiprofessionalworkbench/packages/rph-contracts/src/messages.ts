@@ -445,6 +445,14 @@ export const RemovePwuTypePayloadSchema = z.strictObject({
 	pwuTypeId: z.string()
 });
 export type RemovePwuTypePayload = z.infer<typeof RemovePwuTypePayloadSchema>;
+export const AppendConversationEntriesPayloadSchema = z.strictObject({
+	conversationId: z.string(),
+	pwaId: z.string(),
+	entries: z.array(z.unknown())
+});
+export type AppendConversationEntriesPayload = z.infer<
+	typeof AppendConversationEntriesPayloadSchema
+>;
 
 // ---- Event payload schemas ----
 export const AssumptionAcceptedPayloadSchema = z.strictObject({
@@ -1212,6 +1220,14 @@ export const PwuTypeRemovedPayloadSchema = z.strictObject({
 	pwuTypeId: z.string()
 });
 export type PwuTypeRemovedPayload = z.infer<typeof PwuTypeRemovedPayloadSchema>;
+export const ConversationEntriesAppendedPayloadSchema = z.strictObject({
+	conversationId: z.string(),
+	pwaId: z.string(),
+	entries: z.array(z.unknown())
+});
+export type ConversationEntriesAppendedPayload = z.infer<
+	typeof ConversationEntriesAppendedPayloadSchema
+>;
 
 export const FIRST_SLICE_COMMANDS = [
 	'CaptureIntent',
@@ -1609,6 +1625,12 @@ export const COMMANDS = {
 		targetAggregateType: 'PWU_TYPE',
 		emitsEvent: 'PwuTypeRemoved',
 		firstSlice: false
+	},
+	AppendConversationEntries: {
+		payload: AppendConversationEntriesPayloadSchema,
+		targetAggregateType: 'AUTHORING_CONVERSATION',
+		emitsEvent: 'ConversationEntriesAppended',
+		firstSlice: false
 	}
 } as const;
 
@@ -1872,7 +1894,11 @@ export const EVENTS = {
 	PwaEdited: { payload: PwaEditedPayloadSchema, aggregateType: 'PROFESSIONAL_WORK_ARCHITECTURE' },
 	PwaDeleted: { payload: PwaDeletedPayloadSchema, aggregateType: 'PROFESSIONAL_WORK_ARCHITECTURE' },
 	PwuTypeRedefined: { payload: PwuTypeRedefinedPayloadSchema, aggregateType: 'PWU_TYPE' },
-	PwuTypeRemoved: { payload: PwuTypeRemovedPayloadSchema, aggregateType: 'PWU_TYPE' }
+	PwuTypeRemoved: { payload: PwuTypeRemovedPayloadSchema, aggregateType: 'PWU_TYPE' },
+	ConversationEntriesAppended: {
+		payload: ConversationEntriesAppendedPayloadSchema,
+		aggregateType: 'AUTHORING_CONVERSATION'
+	}
 } as const;
 
 export interface CommandEventBinding {

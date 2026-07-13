@@ -50,6 +50,14 @@ export const listObservations = (h: EngineHandle): ObjectRow[] =>
 export const listDecisions = (h: EngineHandle): ObjectRow[] => listByType(h, 'DECISION');
 export const listBaselines = (h: EngineHandle): ObjectRow[] => listByType(h, 'BASELINE');
 
+export const listConversations = (h: EngineHandle): ObjectRow[] =>
+	listByType(h, 'AUTHORING_CONVERSATION');
+
+/** The durable authoring conversation for a PWA (by pwaId), or undefined. One per PWA. */
+export function getConversation(h: EngineHandle, pwaId: string): ObjectRow | undefined {
+	return byField(listByType(h, 'AUTHORING_CONVERSATION'), 'pwaId', pwaId)[0];
+}
+
 /** A single object's current state by id, or undefined. */
 export function getObject(handle: EngineHandle, id: string): Record<string, unknown> | undefined {
 	return handle.loadObject(id)?.state as Record<string, unknown> | undefined;

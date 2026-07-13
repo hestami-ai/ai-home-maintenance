@@ -162,6 +162,13 @@ export const ConstraintPropagationSchema = z.strictObject({
 	supersededByConstraintId: z.string().optional()
 });
 export type ConstraintPropagation = z.infer<typeof ConstraintPropagationSchema>;
+export const ConversationEntrySchema = z.strictObject({
+	role: z.string(),
+	kind: z.string(),
+	text: z.string(),
+	success: z.boolean().optional()
+});
+export type ConversationEntry = z.infer<typeof ConversationEntrySchema>;
 export const CoverageClaimSchema = z.strictObject({
 	claimId: z.string(),
 	parentObligationIds: z.array(z.string()),
@@ -568,6 +575,14 @@ export const UndertakingSchema = z.strictObject({
 });
 export type Undertaking = z.infer<typeof UndertakingSchema>;
 
+/** AUTHORING_CONVERSATION — id prefix: conv */
+export const AuthoringConversationSchema = z.strictObject({
+	...objectEnvelopeShape,
+	pwaId: z.string(),
+	entries: z.array(ConversationEntrySchema)
+});
+export type AuthoringConversation = z.infer<typeof AuthoringConversationSchema>;
+
 /** Registry: objectType literal -> { schema, idPrefixEntity, tsName }. */
 export const OBJECT_SCHEMAS = {
 	INTENT: { schema: IntentObjectSchema, idPrefixEntity: 'INTENT', tsName: 'IntentObject' },
@@ -637,5 +652,10 @@ export const OBJECT_SCHEMAS = {
 		tsName: 'ProfessionalWorkArchitecture'
 	},
 	PWU_TYPE: { schema: PwuTypeSchema, idPrefixEntity: 'pwut', tsName: 'PwuType' },
-	UNDERTAKING: { schema: UndertakingSchema, idPrefixEntity: 'und', tsName: 'Undertaking' }
+	UNDERTAKING: { schema: UndertakingSchema, idPrefixEntity: 'und', tsName: 'Undertaking' },
+	AUTHORING_CONVERSATION: {
+		schema: AuthoringConversationSchema,
+		idPrefixEntity: 'conv',
+		tsName: 'AuthoringConversation'
+	}
 } as const;

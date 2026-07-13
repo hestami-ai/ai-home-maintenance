@@ -1984,6 +1984,30 @@
           "type": "string"
         }
       ]
+    },
+    {
+      "commandType": "AppendConversationEntries",
+      "targetAggregateType": "AUTHORING_CONVERSATION",
+      "emitsEvent": "ConversationEntriesAppended",
+      "schematized": false,
+      "sourceSection": "RPH-DOC-010 — authoring conversation transcript (governed-stream precursor)",
+      "payloadFields": [
+        {
+          "field": "conversationId",
+          "required": true,
+          "type": "string"
+        },
+        {
+          "field": "pwaId",
+          "required": true,
+          "type": "string"
+        },
+        {
+          "field": "entries",
+          "required": true,
+          "type": "ConversationEntry[]"
+        }
+      ]
     }
   ],
   "events": [
@@ -5135,6 +5159,27 @@
           "field": "pwuTypeId",
           "required": true,
           "type": "string"
+        }
+      ]
+    },
+    {
+      "eventType": "ConversationEntriesAppended",
+      "aggregateType": "AUTHORING_CONVERSATION",
+      "payloadFields": [
+        {
+          "field": "conversationId",
+          "required": true,
+          "type": "string"
+        },
+        {
+          "field": "pwaId",
+          "required": true,
+          "type": "string"
+        },
+        {
+          "field": "entries",
+          "required": true,
+          "type": "ConversationEntry[]"
         }
       ]
     }

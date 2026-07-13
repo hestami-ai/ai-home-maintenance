@@ -1333,6 +1333,24 @@
           "required": true
         }
       ]
+    },
+    {
+      "objectType": "AUTHORING_CONVERSATION",
+      "tsName": "AuthoringConversation",
+      "idPrefixEntity": "conv",
+      "note": "The durable, event-sourced transcript of the authoring agent's work on a DRAFT PWA — critical domain state (a precursor to the JanumiCode v2 governed stream), not UI metadata.",
+      "fields": [
+        {
+          "field": "pwaId",
+          "type": "string",
+          "required": true
+        },
+        {
+          "field": "entries",
+          "type": "ConversationEntry[]",
+          "required": true
+        }
+      ]
     }
   ],
   "helperSubTypes": [
@@ -2359,6 +2377,34 @@
           "type": "—",
           "required": false,
           "note": "Referenced by ValidatorResult.observations (§20). NOT field-defined; pre-persistence form of AssuranceObservation (§21). Source TBD. (Validator-payload type, not referenced by any of the 17 objects.)"
+        }
+      ]
+    },
+    {
+      "name": "ConversationEntry",
+      "fields": [
+        {
+          "field": "role",
+          "type": "string",
+          "required": true,
+          "note": "USER | AGENT | SYSTEM — who produced this entry."
+        },
+        {
+          "field": "kind",
+          "type": "string",
+          "required": true,
+          "note": "Render/semantic kind: message | thinking | tool_call | tool_result | error."
+        },
+        {
+          "field": "text",
+          "type": "string",
+          "required": true
+        },
+        {
+          "field": "success",
+          "type": "boolean",
+          "required": false,
+          "note": "For tool_result entries: whether the proposed command was accepted."
         }
       ]
     }

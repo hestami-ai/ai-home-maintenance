@@ -144,6 +144,17 @@
 	let running = $state(false);
 	let log = $state<LogEntry[]>([]);
 
+	// Hydrate the log from the DURABLE, event-sourced conversation when the PWA loads or changes — the transcript
+	// survives reloads/navigation (it is domain state in the engine, not client memory). Guarded so a live run (and
+	// its invalidateAll graph refreshes) never clobbers the in-flight log.
+	let hydratedFor = $state('');
+	$effect(() => {
+		if (data.pwa.id !== hydratedFor && !running) {
+			log = data.conversation ?? [];
+			hydratedFor = data.pwa.id;
+		}
+	});
+
 	function push(entry: LogEntry) {
 		log = [...log, entry];
 	}

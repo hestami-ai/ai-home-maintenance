@@ -23,10 +23,11 @@
         "BASELINE",
         "PROFESSIONAL_WORK_ARCHITECTURE",
         "PWU_TYPE",
-        "UNDERTAKING"
+        "UNDERTAKING",
+        "AUTHORING_CONVERSATION"
       ],
       "canonicalSource": "RPH-DOC-002 §4 (17 runtime) + 3 authoring objects (RPH-DOC-010)",
-      "note": "DOC-004/DOC-007 reference this type but do not re-enumerate it. DOC-006 fixture emits only a 10-value subset (display). ARTIFACT is in the union but has no dedicated interface. (PWA/PWU_TYPE/UNDERTAKING added for the RPH-DOC-010 PWA-authoring context.)"
+      "note": "DOC-004/DOC-007 reference this type but do not re-enumerate it. DOC-006 fixture emits only a 10-value subset (display). ARTIFACT is in the union but has no dedicated interface. (PWA/PWU_TYPE/UNDERTAKING added for the RPH-DOC-010 PWA-authoring context.) AUTHORING_CONVERSATION added for the durable event-sourced authoring conversation (governed-stream precursor)."
     },
     {
       "name": "ActorType",

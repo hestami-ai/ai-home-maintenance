@@ -21,7 +21,8 @@
     "BASELINE",
     "PROFESSIONAL_WORK_ARCHITECTURE",
     "PWU_TYPE",
-    "UNDERTAKING"
+    "UNDERTAKING",
+    "AUTHORING_CONVERSATION"
   ],
   "$id": "urn:janumi:rph:schema:enum:ProfessionalWorkObjectType:1"
 }
