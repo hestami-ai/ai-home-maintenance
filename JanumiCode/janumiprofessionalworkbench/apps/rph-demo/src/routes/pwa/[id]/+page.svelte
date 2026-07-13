@@ -1,18 +1,26 @@
 <script lang="ts">
 	import { enhance } from '$app/forms';
+	import { PWU_TYPE_CATALOG, PWU_TYPE_HELP } from '$lib/authoring/pwuType';
 	import type { PageData } from './$types';
 	let {
 		data,
 		form
 	}: {
 		data: PageData;
-		form: { error?: string; definedType?: string; advanced?: string } | null;
+		form: {
+			error?: string;
+			definedType?: string;
+			editedType?: string;
+			removedType?: string;
+			editedPwa?: string;
+			advanced?: string;
+		} | null;
 	} = $props();
+
 	let selected = $state(data.types.find((t) => t.isRoot)?.id ?? data.types[0]?.id ?? '');
 	const current = $derived(data.types.find((t) => t.id === selected));
 	const editable = $derived(data.pwa.publicationStatus === 'DRAFT');
 	const hasRoot = $derived(data.types.some((t) => t.isRoot));
-	let showTypeForm = $state(false);
 	const RANK: Record<string, number> = {
 		DRAFT: 1,
 		UNDER_REVIEW: 2,
@@ -22,7 +30,60 @@
 		RETIRED: 6
 	};
 	const rank = $derived(RANK[data.pwa.publicationStatus] ?? 0);
+
+	// Shared define/edit PWU Type form: formMode is null (hidden) | 'define' | { editId }.
+	type FormMode = null | 'define' | { editId: string };
+	let formMode = $state<FormMode>(null);
+	let showPwaEdit = $state(false);
+	const f = $state({ name: '', pwuKind: '', purpose: '', completionRule: '', isRoot: false });
+	let children = $state<string[]>([]);
+	const editingId = $derived(typeof formMode === 'object' && formMode ? formMode.editId : '');
+
+	// Close the type form once the engine accepts a define/edit/remove; auto-select a newly defined type so its
+	// inspector (Edit / Remove) is immediately available.
+	$effect(() => {
+		if (form?.definedType) {
+			selected = form.definedType;
+			formMode = null;
+		} else if (form?.editedType || form?.removedType) {
+			formMode = null;
+		}
+	});
+
+	function openDefine() {
+		Object.assign(f, { name: '', pwuKind: '', purpose: '', completionRule: '', isRoot: false });
+		children = [];
+		formMode = 'define';
+	}
+	function openEdit(id: string) {
+		const t = data.types.find((x) => x.id === id);
+		if (!t) return;
+		Object.assign(f, {
+			name: t.name,
+			pwuKind: t.pwuKind,
+			purpose: t.purpose,
+			completionRule: t.completionRule,
+			isRoot: t.isRoot
+		});
+		children = [...t.permittedChildTypeIds];
+		formMode = { editId: id };
+	}
+	function applyTemplate(key: string) {
+		const t = PWU_TYPE_CATALOG.find((x) => x.key === key);
+		if (!t) return;
+		Object.assign(f, { name: t.name, pwuKind: t.pwuKind, purpose: t.purpose, isRoot: t.isRoot });
+	}
+	function toggleChild(id: string, on: boolean) {
+		children = on ? [...children, id] : children.filter((c) => c !== id);
+	}
 </script>
+
+{#snippet fhead(label: string, help: string)}
+	<div class="fld">
+		<span class="flabel">{label}</span>
+		<span class="fhelp">{help}</span>
+	</div>
+{/snippet}
 
 <svelte:head><title>{data.pwa.name} — Work Architecture</title></svelte:head>
 
@@ -40,6 +101,22 @@
 		<p class="sub">{data.pwa.description}</p>
 	</div>
 </header>
+
+{#if editable}
+	<div class="pwaedit">
+		{#if !showPwaEdit}
+			<button class="ghost small" onclick={() => (showPwaEdit = true)}>Edit PWA details</button>
+		{:else}
+			<form method="POST" action="?/editDetails" use:enhance class="detailform">
+				<input name="name" value={data.pwa.name} placeholder="PWA name" required />
+				<input name="domain" value={data.pwa.domain} placeholder="Domain" />
+				<input name="description" value={data.pwa.description} placeholder="Description" />
+				<button class="primary" type="submit">Save</button>
+				<button type="button" class="ghost small" onclick={() => (showPwaEdit = false)}>Cancel</button>
+			</form>
+		{/if}
+	</div>
+{/if}
 
 <div class="pubbar">
 	<ol class="steps">
@@ -89,24 +166,87 @@
 		<div class="archhead">
 			<h2>Work Architecture — PWU Types</h2>
 			{#if editable}
-				<button class="ghost small" onclick={() => (showTypeForm = !showTypeForm)}
-					>+ Define PWU Type</button
-				>
+				<button class="ghost small" onclick={openDefine}>+ Define PWU Type</button>
 			{/if}
 		</div>
 		<p class="hint">
 			Reusable PWU Type definitions (allowed composition). This is a View of the PWA; it shows no
 			execution or assurance state.
 		</p>
-		{#if editable && showTypeForm}
-			<form method="POST" action="?/defineType" use:enhance class="typeform">
-				<input name="name" placeholder="PWU Type name (e.g. Delivery Realization)" required />
-				<input name="pwuKind" placeholder="Kind (e.g. DELIVERY_REALIZATION)" required />
-				<input name="purpose" placeholder="Purpose (optional)" />
-				<label class="rootcheck"><input type="checkbox" name="isRoot" /> Root type</label>
-				<button class="primary" type="submit">Add type</button>
+
+		{#if editable && formMode !== null}
+			{@const editing = editingId !== ''}
+			<form
+				method="POST"
+				action={editing ? '?/editType' : '?/defineType'}
+				use:enhance
+				class="typeform"
+			>
+				{#if editing}<input type="hidden" name="pwuTypeId" value={editingId} />{/if}
+				<div class="fmhead">{editing ? 'Edit PWU Type' : 'Define a PWU Type'}</div>
+				{#if !editing}
+					<div class="ffield">
+						<span class="flabel">Start from template</span>
+						<span class="fhelp">Copy a reusable blueprint from the catalog, then edit it freely.</span>
+						<select class="tplsel" onchange={(e) => applyTemplate(e.currentTarget.value)}>
+							<option value="">— blank —</option>
+							{#each PWU_TYPE_CATALOG as t (t.key)}<option value={t.key}>{t.name}</option>{/each}
+						</select>
+					</div>
+				{/if}
+				<div class="ffield">
+					{@render fhead('Name', PWU_TYPE_HELP.name)}
+					<input name="name" bind:value={f.name} required />
+				</div>
+				<div class="ffield">
+					{@render fhead('Kind', PWU_TYPE_HELP.pwuKind)}
+					<input name="pwuKind" bind:value={f.pwuKind} placeholder="ARCHITECTURE" required />
+				</div>
+				<div class="ffield">
+					{@render fhead('Purpose', PWU_TYPE_HELP.purpose)}
+					<textarea name="purpose" bind:value={f.purpose} rows="2"></textarea>
+				</div>
+				<div class="ffield">
+					{@render fhead('Completion rule', PWU_TYPE_HELP.completionRule)}
+					<input
+						name="completionRule"
+						bind:value={f.completionRule}
+						placeholder="(defaults to the RPH rule)"
+					/>
+				</div>
+				<div class="ffield">
+					<label class="rootcheck"
+						><input type="checkbox" name="isRoot" bind:checked={f.isRoot} /> Root type</label
+					>
+					<span class="fhelp">{PWU_TYPE_HELP.isRoot}</span>
+				</div>
+				<div class="ffield">
+					{@render fhead('Permitted child types', PWU_TYPE_HELP.permittedChildTypeIds)}
+					<div class="children">
+						{#each data.types.filter((t) => t.id !== editingId) as t (t.id)}
+							<label class="childopt">
+								<input
+									type="checkbox"
+									name="permittedChildTypeIds"
+									value={t.id}
+									checked={children.includes(t.id)}
+									onchange={(e) => toggleChild(t.id, e.currentTarget.checked)}
+								/>
+								{t.name}
+							</label>
+						{/each}
+						{#if data.types.filter((t) => t.id !== editingId).length === 0}
+							<span class="fhelp">Define more types to allow composition.</span>
+						{/if}
+					</div>
+				</div>
+				<div class="formactions">
+					<button class="primary" type="submit">{editing ? 'Save changes' : 'Add type'}</button>
+					<button type="button" class="ghost small" onclick={() => (formMode = null)}>Cancel</button>
+				</div>
 			</form>
 		{/if}
+
 		<div class="types">
 			{#each data.types as t (t.id)}
 				<button
@@ -129,6 +269,7 @@
 		{#if current}
 			<div class="itag">PWU TYPE</div>
 			<h3>{current.name}</h3>
+			<div class="field"><span class="flabel">Kind</span><p class="mono">{current.pwuKind}</p></div>
 			<div class="field"><span class="flabel">Purpose</span><p>{current.purpose}</p></div>
 			<div class="field">
 				<span class="flabel">Completion rule</span><p class="mono">{current.completionRule || '—'}</p>
@@ -141,6 +282,15 @@
 				<span class="flabel">Required assurance</span>
 				<p>{current.requiredAssurancePolicyIds.length} policy(ies)</p>
 			</div>
+			{#if editable}
+				<div class="inspactions">
+					<button class="ghost small" onclick={() => openEdit(current.id)}>Edit</button>
+					<form method="POST" action="?/removeType" use:enhance>
+						<input type="hidden" name="pwuTypeId" value={current.id} />
+						<button class="ghost small danger" type="submit">Remove</button>
+					</form>
+				</div>
+			{/if}
 		{:else}
 			<p class="hint">Select a PWU Type.</p>
 		{/if}
@@ -148,10 +298,10 @@
 		{#if data.fixtures.length}
 			<div class="fixtures">
 				<span class="flabel">Conformance fixtures</span>
-				{#each data.fixtures as f (f.id)}
-					<a class="fixture" href={`/undertakings/${f.id}`}>
-						{#if f.isReferenceFixture}<span class="fxbadge">REFERENCE FIXTURE</span>{/if}
-						{f.name} ↗
+				{#each data.fixtures as fx (fx.id)}
+					<a class="fixture" href={`/undertakings/${fx.id}`}>
+						{#if fx.isReferenceFixture}<span class="fxbadge">REFERENCE FIXTURE</span>{/if}
+						{fx.name} ↗
 					</a>
 				{/each}
 				<p class="fxnote">
@@ -199,6 +349,23 @@
 		font-size: 13px;
 		line-height: 1.5;
 	}
+	.pwaedit {
+		margin-top: 12px;
+	}
+	.detailform {
+		display: flex;
+		flex-wrap: wrap;
+		gap: 8px;
+		align-items: center;
+	}
+	.detailform input {
+		background: var(--sc-highest);
+		border: 1px solid var(--outline-faint);
+		color: var(--on);
+		border-radius: 6px;
+		padding: 8px 11px;
+		font-size: 12.5px;
+	}
 	.pubbar {
 		display: flex;
 		align-items: center;
@@ -207,7 +374,7 @@
 		background: var(--surface-low);
 		border-radius: 12px;
 		padding: 12px 18px;
-		margin-top: 18px;
+		margin-top: 14px;
 	}
 	.steps {
 		display: flex;
@@ -238,7 +405,8 @@
 		align-items: center;
 		gap: 10px;
 	}
-	.pubact form {
+	.pubact form,
+	.inspactions form {
 		margin: 0;
 	}
 	button.ghost {
@@ -258,6 +426,10 @@
 	button.ghost.small {
 		padding: 6px 11px;
 		font-size: 12px;
+	}
+	button.ghost.danger {
+		color: var(--error);
+		border-color: rgba(255, 180, 171, 0.4);
 	}
 	button.primary {
 		background: var(--primary);
@@ -318,29 +490,71 @@
 	}
 	.typeform {
 		display: flex;
-		flex-wrap: wrap;
-		gap: 8px;
-		align-items: center;
+		flex-direction: column;
+		gap: 12px;
 		background: var(--sc);
 		border-radius: 10px;
-		padding: 12px;
-		margin-bottom: 14px;
+		padding: 14px 16px;
+		margin-bottom: 16px;
 	}
-	.typeform input[type='text'],
-	.typeform input:not([type]) {
+	.fmhead {
+		font-size: 13px;
+		font-weight: 700;
+		color: var(--on);
+	}
+	.ffield {
+		display: flex;
+		flex-direction: column;
+		gap: 4px;
+	}
+	.fld {
+		display: flex;
+		flex-direction: column;
+		gap: 2px;
+	}
+	.fhelp {
+		font-size: 11px;
+		color: var(--outline);
+		line-height: 1.4;
+	}
+	.typeform input,
+	.typeform textarea,
+	.tplsel {
 		background: var(--sc-highest);
 		border: 1px solid var(--outline-faint);
 		color: var(--on);
 		border-radius: 6px;
 		padding: 8px 11px;
 		font-size: 12.5px;
+		font-family: inherit;
+	}
+	.tplsel {
+		align-self: flex-start;
+		min-width: 220px;
 	}
 	.rootcheck {
 		display: flex;
 		align-items: center;
 		gap: 6px;
+		font-size: 12.5px;
+		color: var(--on-variant);
+	}
+	.children {
+		display: flex;
+		flex-direction: column;
+		gap: 4px;
+	}
+	.childopt {
+		display: flex;
+		align-items: center;
+		gap: 6px;
 		font-size: 12px;
 		color: var(--on-variant);
+	}
+	.formactions {
+		display: flex;
+		gap: 8px;
+		align-items: center;
 	}
 	.types {
 		display: flex;
@@ -415,6 +629,12 @@
 	.mono {
 		font-family: 'Source Code Pro', monospace;
 		font-size: 11.5px !important;
+	}
+	.inspactions {
+		display: flex;
+		gap: 8px;
+		align-items: center;
+		margin-top: 4px;
 	}
 	.fixtures {
 		margin-top: 20px;

@@ -23,13 +23,13 @@ test.describe('PWA Designer — author PWU Types and publish', () => {
 
 		// 3. Define a root PWU Type — the authoring control that was the dead-end.
 		await page.getByRole('button', { name: /Define PWU Type/i }).click();
-		await page.getByPlaceholder(/PWU Type name/i).fill('Delivery Realization');
-		await page.getByPlaceholder(/Kind/i).fill('DELIVERY_REALIZATION');
+		await page.locator('input[name="name"]').fill('Delivery Realization');
+		await page.locator('input[name="pwuKind"]').fill('DELIVERY_REALIZATION');
 		await page.getByLabel(/Root type/i).check();
 		await page.getByRole('button', { name: 'Add type' }).click();
 
 		// SEMANTIC: the new PWU Type shows in the Work Architecture list.
-		await expect(page.getByText('Delivery Realization', { exact: false })).toBeVisible();
+		await expect(page.getByRole('button', { name: /Delivery Realization/ })).toBeVisible();
 
 		// 4. Advance the publication lifecycle to PUBLISHED.
 		await page.getByRole('button', { name: /Submit for Review/i }).click();
