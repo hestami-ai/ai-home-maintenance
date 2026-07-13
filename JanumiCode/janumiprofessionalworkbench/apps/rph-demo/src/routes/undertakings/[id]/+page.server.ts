@@ -1,7 +1,7 @@
 // Undertaking Workbench — operates one Undertaking's Professional Work Graph. It shows the LIVE graph (scoped to
 // this Undertaking's PWUs), a lifecycle rollup, and the assurance / decision / baseline working sets — all read
 // from the live engine. The PWA-version binding is always visible (RPH-DOC-010 §25 header).
-import { error } from '@sveltejs/kit';
+import { error, fail } from '@sveltejs/kit';
 import {
 	getObject,
 	listAssessments,
@@ -10,18 +10,25 @@ import {
 	listExecutionPlans,
 	listObservations,
 	listPwus,
+	listPwuTypes,
 	professionalWorkGraph,
 	REFERENCE_OPEN_RESIDUALS,
 	SEED_UNDERTAKING
 } from '@janumipwb/rph-engine';
-import { getEngine } from '$lib/server/workbench';
-import type { PageServerLoad } from './$types';
+import { dispatch, getEngine, getRegisteredIntent, mintUiId } from '$lib/server/workbench';
+import type { Actions, PageServerLoad } from './$types';
 
 export const load: PageServerLoad = ({ params }) => {
 	const engine = getEngine();
 	const u = getObject(engine, params.id);
 	if (!u) throw error(404, 'Undertaking not found');
 	const pwa = getObject(engine, String(u.pwaId));
+	// The bound PWA's PWU Types are the instantiable options (§14 / §28: an instance realizes a type).
+	const pwuTypeOptions = listPwuTypes(engine, String(u.pwaId)).map((t) => ({
+		id: t.id,
+		name: String(t.state.name ?? t.id),
+		pwuKind: String(t.state.pwuKind ?? '')
+	}));
 
 	const graph = professionalWorkGraph(engine, {
 		undertakingId: params.id,
@@ -99,6 +106,60 @@ export const load: PageServerLoad = ({ params }) => {
 		assessments,
 		observations,
 		decisions,
-		baselines
+		baselines,
+		pwuTypeOptions
 	};
+};
+
+/** Resolve the Undertaking's originating Intent: from any existing PWU (they carry intentId), else the id
+ *  remembered at creation for a still-empty Undertaking. */
+function resolveIntentId(
+	engine: ReturnType<typeof getEngine>,
+	undertakingId: string
+): string | undefined {
+	const pwus = listPwus(engine, undertakingId);
+	if (pwus.length) return String(pwus[0].state.intentId);
+	return getRegisteredIntent(undertakingId);
+}
+
+export const actions: Actions = {
+	// Instantiate a PWU Instance in this Undertaking, realizing a selected PWU Type (CON-009 ownership binding).
+	proposePwu: async ({ request, params }) => {
+		const engine = getEngine();
+		const form = await request.formData();
+		const pwuTypeId = String(form.get('pwuTypeId') ?? '').trim();
+		const title = String(form.get('title') ?? '').trim();
+		if (!pwuTypeId) return fail(400, { error: 'Select a PWU Type to instantiate.' });
+		const type = getObject(engine, pwuTypeId);
+		if (!type) return fail(400, { error: 'Unknown PWU Type.' });
+		const intentId = resolveIntentId(engine, params.id);
+		if (!intentId)
+			return fail(400, { error: 'This Undertaking has no originating intent to bind the PWU to.' });
+		const pwuId = mintUiId('pwu');
+		const r = dispatch('ProposePwu', 'PROFESSIONAL_WORK_UNIT', pwuId, {
+			pwuId,
+			pwuKind: String(type.pwuKind ?? 'PWU'),
+			title: title || String(type.name ?? 'PWU'),
+			description: title || String(type.name ?? ''),
+			intentId,
+			undertakingId: params.id,
+			isLocalExtension: false,
+			pwuTypeId,
+			boundaries: { inScope: [], outOfScope: [], permittedChanges: [], prohibitedChanges: [] },
+			obligationIds: [],
+			constraintIds: [],
+			assumptionIds: [],
+			expectedOutputs: [],
+			assurancePolicyIds: [],
+			riskProfile: {
+				consequence: 'MEDIUM',
+				uncertainty: 'MEDIUM',
+				irreversibility: 'MEDIUM',
+				securitySensitivity: 'MEDIUM',
+				regulatoryExposure: 'LOW'
+			}
+		});
+		if (r.status !== 'ACCEPTED') return fail(400, { error: r.error?.message ?? r.status });
+		return { proposed: pwuId };
+	}
 };

@@ -17,6 +17,20 @@ let handle: EngineHandle | null = null;
 let cmdSeq = 0;
 let idSeq = 0;
 
+// Bridge: a fresh Undertaking's originating Intent id, remembered until its first PWU exists (after which the
+// intent is resolvable from any of the Undertaking's PWUs — they all carry intentId). Cleared on reset.
+const undertakingIntent = new Map<string, string>();
+
+/** Remember the originating Intent id for a newly created Undertaking (so its first PWU can bind to it). */
+export function registerUndertakingIntent(undertakingId: string, intentId: string): void {
+	undertakingIntent.set(undertakingId, intentId);
+}
+
+/** The remembered originating Intent id for an Undertaking created this process that has no PWU yet. */
+export function getRegisteredIntent(undertakingId: string): string | undefined {
+	return undertakingIntent.get(undertakingId);
+}
+
 // Deterministic monotonic clock for test mode: stable event timestamps => diffable screenshots + reproducible logs.
 const TEST_EPOCH = Date.UTC(2026, 0, 1);
 let clockTick = 0;
@@ -52,6 +66,7 @@ export function resetEngine(seed: 'reference' | 'empty'): void {
 	cmdSeq = 0;
 	idSeq = 0;
 	clockTick = 0;
+	undertakingIntent.clear();
 	handle = newEngine();
 	if (seed === 'reference') seedWorkbench(handle);
 }

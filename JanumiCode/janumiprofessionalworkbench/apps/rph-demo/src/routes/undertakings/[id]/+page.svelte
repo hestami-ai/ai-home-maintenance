@@ -1,10 +1,14 @@
 <script lang="ts">
 	import { SvelteFlow, Background, Controls, MiniMap } from '@xyflow/svelte';
 	import '@xyflow/svelte/dist/style.css';
+	import { enhance } from '$app/forms';
 	import { toFlow } from '$lib/toFlow';
 	import type { PageData } from './$types';
 
-	let { data }: { data: PageData } = $props();
+	let {
+		data,
+		form
+	}: { data: PageData; form: { error?: string; proposed?: string } | null } = $props();
 	const flow = $derived(toFlow(data.graph));
 	let nodes = $state(toFlow(data.graph).nodes);
 	let edges = $state(toFlow(data.graph).edges);
@@ -60,6 +64,24 @@
 				<div class="chip"><span class="num">{n}</span> {state}</div>
 			{/each}
 		</div>
+		{#if data.pwuTypeOptions.length}
+			<div class="instwrap">
+				<h3>Instantiate a PWU</h3>
+				<p class="hint">
+					Select a PWU Type from the bound PWA to instantiate it as a PWU Instance in this Undertaking
+					(the instance realizes that type — CON-009 ownership).
+				</p>
+				<form method="POST" action="?/proposePwu" use:enhance class="instform">
+					<select name="pwuTypeId" required>
+						<option value="" disabled selected>Select a PWU Type…</option>
+						{#each data.pwuTypeOptions as o (o.id)}<option value={o.id}>{o.name}</option>{/each}
+					</select>
+					<input name="title" placeholder="Instance title (optional)" />
+					<button class="primary" type="submit">Instantiate PWU</button>
+				</form>
+				{#if form?.error}<p class="err" role="alert">{form.error}</p>{/if}
+			</div>
+		{/if}
 		<h3>PWU Instances → PWU Types</h3>
 		<p class="hint">Each PWU Instance realizes a PWU Type defined by the PWA (or is a declared local extension). Follow the type link to inspect its definition (instance ↔ type navigation).</p>
 		<table>
@@ -228,6 +250,45 @@
 		color: var(--outline);
 		font-size: 12px;
 		margin: 0 0 12px;
+	}
+	.instwrap {
+		background: var(--sc);
+		border-radius: 10px;
+		padding: 14px 16px;
+		margin: 8px 0 20px;
+	}
+	.instwrap h3 {
+		margin: 0 0 6px;
+	}
+	.instform {
+		display: flex;
+		flex-wrap: wrap;
+		gap: 8px;
+		align-items: center;
+	}
+	.instform select,
+	.instform input {
+		background: var(--sc-highest);
+		border: 1px solid var(--outline-faint);
+		color: var(--on);
+		border-radius: 6px;
+		padding: 8px 11px;
+		font-size: 12.5px;
+	}
+	.instform button.primary {
+		background: var(--primary);
+		color: #00263f;
+		border: none;
+		border-radius: 8px;
+		padding: 8px 14px;
+		font-weight: 700;
+		font-size: 12.5px;
+		cursor: pointer;
+	}
+	.err {
+		color: var(--error);
+		font-size: 12.5px;
+		margin: 8px 0 0;
 	}
 	.rollup {
 		display: flex;
