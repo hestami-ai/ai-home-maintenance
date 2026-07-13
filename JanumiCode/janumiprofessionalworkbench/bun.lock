@@ -22,6 +22,8 @@
       "name": "@janumipwb/rph-demo",
       "version": "0.0.0",
       "dependencies": {
+        "@janumipwb/rph-engine": "workspace:*",
+        "@janumipwb/rph-product-realization-pwa": "workspace:*",
         "@janumipwb/rph-projections": "workspace:*",
         "@xyflow/svelte": "^1.4.0",
       },
@@ -42,6 +44,7 @@
         "@janumipwb/rph-contracts": "workspace:*",
         "@janumipwb/rph-domain": "workspace:*",
         "@janumipwb/rph-ports": "workspace:*",
+        "zod": "^4.4.3",
       },
       "devDependencies": {
         "@janumipwb/rph-persistence": "workspace:*",
@@ -93,6 +96,7 @@
         "@janumipwb/rph-domain": "workspace:*",
         "@janumipwb/rph-persistence": "workspace:*",
         "@janumipwb/rph-ports": "workspace:*",
+        "@janumipwb/rph-projections": "workspace:*",
       },
       "devDependencies": {
         "@janumipwb/rph-product-realization-pwa": "workspace:*",

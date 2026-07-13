@@ -2,30 +2,32 @@
 	import { SvelteFlow, Background, Controls, MiniMap } from '@xyflow/svelte';
 	import '@xyflow/svelte/dist/style.css';
 	import { toFlow } from '$lib/toFlow';
+	import type { PageData } from './$types';
 
-	const data = toFlow();
-	// Svelte 5 runes: SvelteFlow binds to reactive node/edge state.
-	let nodes = $state(data.nodes);
-	let edges = $state(data.edges);
+	// `data.graph` is produced LIVE server-side: the engine drove the Reference Undertaking through real commands
+	// and projected the current Professional Work Graph (see +page.server.ts).
+	let { data }: { data: PageData } = $props();
+	const flow = toFlow(data.graph);
+	let nodes = $state(flow.nodes);
+	let edges = $state(flow.edges);
 </script>
 
 <svelte:head>
-	<title>RPH Demo — Reference Undertaking</title>
+	<title>RPH Demo — Reference Undertaking (live)</title>
 </svelte:head>
 
 <header>
 	<h1>Janumi Professional Workbench — Recursive Professional Harness</h1>
 	<p>
-		The <strong>Reference Undertaking</strong> (a multi-tenant field-service SaaS) as a graph of Professional
-		Work Units. Each node shows its four independent state axes. A node is <strong>green</strong> only when
-		execution SUCCEEDED <em>and</em> assurance is SATISFIED — <strong>no green without assurance</strong>
-		(the flagship invariant). Amber = execution succeeded but assurance is not yet satisfied. The indigo
-		border marks a node frozen into an <strong>authoritative baseline</strong>.
+		The <strong>Reference Undertaking</strong> (a multi-tenant field-service SaaS) as a live Professional
+		Work Graph, <strong>driven server-side by real engine commands</strong> — not a static fixture. Each
+		node shows its four independent state axes. A node is <strong>green</strong> only when execution SUCCEEDED
+		<em>and</em> assurance is SATISFIED — <strong>no green without assurance</strong> (the flagship invariant).
+		Amber = execution succeeded but assurance not yet satisfied. The indigo border marks a node frozen into
+		an <strong>authoritative baseline</strong>.
 	</p>
-	{#if data.openResiduals.length}
-		<p class="residual">
-			⚠ Open residual (stays visible): {data.openResiduals.join('; ')}
-		</p>
+	{#if flow.openResiduals.length}
+		<p class="residual">⚠ Open residual (stays visible): {flow.openResiduals.join('; ')}</p>
 	{/if}
 </header>
 
