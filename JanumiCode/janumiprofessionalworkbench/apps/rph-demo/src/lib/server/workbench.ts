@@ -3,20 +3,57 @@
 // Product Realization PWA + the Field Service Management Undertaking + its live Professional Work Graph. Route
 // `load()`s read the current state through the query surface; form actions dispatch real commands into this same
 // engine, so authoring (create a PWA, advance a PWU, …) mutates live state.
+//
+// TEST MODE (RPH_DEMO_MODE=test, set by the Playwright webServer): the engine additionally runs on a deterministic
+// clock + id sequence and can be reset between specs (see resetEngine + the /test-api endpoints), so the E2E
+// harness gets stable, isolated state. Test mode is NEVER enabled in a normal `bun run dev` / production boot.
 import { createEngine, seedWorkbench, type EngineHandle } from '@janumipwb/rph-engine';
 import { ontology } from '@janumipwb/rph-product-realization-pwa';
 import type { DomainCommand } from '@janumipwb/rph-contracts';
 
+const TEST_MODE = process.env.RPH_DEMO_MODE === 'test';
+
 let handle: EngineHandle | null = null;
 let cmdSeq = 0;
+let idSeq = 0;
+
+// Deterministic monotonic clock for test mode: stable event timestamps => diffable screenshots + reproducible logs.
+const TEST_EPOCH = Date.UTC(2026, 0, 1);
+let clockTick = 0;
+function testNow(): string {
+	clockTick += 1;
+	return new Date(TEST_EPOCH + clockTick * 1000).toISOString();
+}
+
+function newEngine(): EngineHandle {
+	return createEngine(TEST_MODE ? { ontology, now: testNow } : { ontology });
+}
 
 /** The shared, seeded engine (created + seeded once per server process). */
 export function getEngine(): EngineHandle {
 	if (!handle) {
-		handle = createEngine({ ontology });
+		handle = newEngine();
 		seedWorkbench(handle);
 	}
 	return handle;
+}
+
+/** Whether the host is running in E2E test mode (RPH_DEMO_MODE=test). Guards the /test-api endpoints. */
+export function isTestMode(): boolean {
+	return TEST_MODE;
+}
+
+/** TEST MODE ONLY — tear down and recreate the engine so each E2E spec starts from a known state.
+ *  `reference` re-seeds the FSM reference workbench (published PWA + Undertaking + graph); `empty` leaves a bare
+ *  engine (no authored PWAs/Undertakings) so authoring flows can be driven from scratch. Throws outside test mode. */
+export function resetEngine(seed: 'reference' | 'empty'): void {
+	if (!TEST_MODE) throw new Error('resetEngine is only available when RPH_DEMO_MODE=test');
+	handle?.close();
+	cmdSeq = 0;
+	idSeq = 0;
+	clockTick = 0;
+	handle = newEngine();
+	if (seed === 'reference') seedWorkbench(handle);
 }
 
 /** Dispatch a command into the shared engine with sensible envelope defaults. Returns the CommandResult. */
@@ -33,20 +70,31 @@ export function dispatch(
 		commandSchemaVersion: 1,
 		targetAggregateType,
 		targetAggregateId,
-		issuedAt: new Date().toISOString(),
+		issuedAt: TEST_MODE ? testNow() : new Date().toISOString(),
 		issuedBy: { actorId: 'ui-user', actorType: 'HUMAN', displayName: 'Workbench User' },
 		correlationId: 'ui',
-		idempotencyKey: `ui-idem-${cmdSeq}-${Math.floor(performance.now())}`,
+		idempotencyKey: TEST_MODE ? `ui-idem-${cmdSeq}` : `ui-idem-${cmdSeq}-${Math.floor(performance.now())}`,
 		payload
 	};
 	return getEngine().dispatch(command);
 }
 
-/** A short, sortable id for new aggregates the UI creates (matches the RphId `<prefix>_<26-char>` format). */
+/** A short, sortable id for new aggregates the UI creates (matches the RphId `<prefix>_<26-char>` format).
+ *  Deterministic in test mode (a padded base32 sequence) so authored ids are stable across E2E runs. */
 export function mintUiId(prefix: string): string {
 	const alphabet = '0123456789ABCDEFGHJKMNPQRSTVWXYZ';
+	idSeq += 1;
+	if (TEST_MODE) {
+		let n = idSeq;
+		let s = '';
+		while (n > 0) {
+			s = alphabet[n % 32] + s;
+			n = Math.floor(n / 32);
+		}
+		return `${prefix}_${s.padStart(26, '0')}`;
+	}
 	let s = '';
-	const t = Date.now();
-	for (let i = 0; i < 26; i += 1) s += alphabet[(t + cmdSeq * 7 + i * 13) % 32];
+	const t = Date.now() + idSeq;
+	for (let i = 0; i < 26; i += 1) s += alphabet[(t + idSeq * 7 + i * 13) % 32];
 	return `${prefix}_${s}`;
 }
