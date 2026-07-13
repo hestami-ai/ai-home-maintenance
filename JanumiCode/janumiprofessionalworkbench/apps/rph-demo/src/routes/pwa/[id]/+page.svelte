@@ -48,7 +48,11 @@
 			Under Review
 		</li>
 		<li class:done={rank > 3} class:active={data.pwa.publicationStatus === 'VALIDATED'}>Validated</li>
-		<li class:done={rank >= 4} class:active={rank >= 4}>Published</li>
+		<li class:done={rank > 4} class:active={data.pwa.publicationStatus === 'PUBLISHED'}>Published</li>
+		<li class:done={rank > 5} class:active={data.pwa.publicationStatus === 'DEPRECATED'}>
+			Deprecated
+		</li>
+		<li class:done={rank > 6} class:active={data.pwa.publicationStatus === 'RETIRED'}>Retired</li>
 	</ol>
 	<div class="pubact">
 		{#if data.pwa.publicationStatus === 'DRAFT'}
@@ -64,8 +68,17 @@
 			<form method="POST" action="?/publish" use:enhance>
 				<button class="primary" type="submit">Publish</button>
 			</form>
-		{:else}
+		{:else if data.pwa.publicationStatus === 'PUBLISHED'}
 			<span class="immutable">🔒 Published versions are immutable</span>
+			<form method="POST" action="?/deprecate" use:enhance>
+				<button class="ghost" type="submit">Deprecate</button>
+			</form>
+		{:else if data.pwa.publicationStatus === 'DEPRECATED'}
+			<form method="POST" action="?/retire" use:enhance>
+				<button class="ghost" type="submit">Retire</button>
+			</form>
+		{:else if data.pwa.publicationStatus === 'RETIRED'}
+			<span class="retired">retired</span>
 		{/if}
 	</div>
 </div>
@@ -260,6 +273,13 @@
 		font-size: 12px;
 		color: var(--tertiary);
 		font-weight: 600;
+	}
+	.retired {
+		font-size: 11px;
+		letter-spacing: 0.08em;
+		text-transform: uppercase;
+		color: var(--outline);
+		font-weight: 700;
 	}
 	.hintline {
 		font-size: 11px;

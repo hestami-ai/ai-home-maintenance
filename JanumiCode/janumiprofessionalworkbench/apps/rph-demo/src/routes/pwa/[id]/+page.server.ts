@@ -87,5 +87,8 @@ export const actions: Actions = {
 		const root = listPwuTypes(getEngine(), params.id).find((t) => t.state.isRoot === true);
 		if (!root) return fail(400, { error: 'Define a root PWU Type before publishing.' });
 		return advancePwa('PublishPwa', params.id, { rootPwuTypeId: root.id });
-	}
+	},
+	// Continue the publication FSM past PUBLISHED: PUBLISHED -> DEPRECATED -> RETIRED.
+	deprecate: ({ params }) => advancePwa('DeprecatePwa', params.id, {}),
+	retire: ({ params }) => advancePwa('RetirePwa', params.id, {})
 };
