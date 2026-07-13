@@ -14,11 +14,14 @@
     "e2e:server": "svelte-kit sync && vite dev --host 127.0.0.1 --port 4319 --strictPort"
   },
   "dependencies": {
+    "@earendil-works/pi-ai": "0.80.6",
+    "@earendil-works/pi-coding-agent": "0.80.6",
     "@janumipwb/rph-authoring": "workspace:*",
     "@janumipwb/rph-engine": "workspace:*",
     "@janumipwb/rph-product-realization-pwa": "workspace:*",
     "@janumipwb/rph-projections": "workspace:*",
-    "@xyflow/svelte": "^1.4.0"
+    "@xyflow/svelte": "^1.4.0",
+    "typebox": "1.1.38"
   },
   "devDependencies": {
     "@playwright/test": "1.61.1",

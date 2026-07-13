@@ -9,6 +9,7 @@
 // harness gets stable, isolated state. Test mode is NEVER enabled in a normal `bun run dev` / production boot.
 import { createEngine, seedWorkbench, type EngineHandle } from '@janumipwb/rph-engine';
 import { ontology } from '@janumipwb/rph-product-realization-pwa';
+import { PwaAuthoringBroker } from '@janumipwb/rph-authoring';
 import type { DomainCommand } from '@janumipwb/rph-contracts';
 
 const TEST_MODE = process.env.RPH_DEMO_MODE === 'test';
@@ -94,6 +95,26 @@ export function dispatch(
 		payload
 	};
 	return getEngine().dispatch(command);
+}
+
+/** A PwaAuthoringBroker scoped to one DRAFT PWA, wired to the shared engine + this host's id/clock policy. Both the
+ *  agent tools and (future) UI "scaffold" actions go through it. The sessionId namespaces its command/idempotency
+ *  keys so concurrent authoring runs never collide. */
+export function makeAuthoringBroker(pwaId: string): PwaAuthoringBroker {
+	return new PwaAuthoringBroker({
+		engine: getEngine(),
+		pwaId,
+		mintId: mintUiId,
+		now: TEST_MODE ? testNow : undefined,
+		sessionId: mintUiId('sess')
+	});
+}
+
+/** Which authoring agent the SSE route should use: the deterministic mock under E2E (RPH_DEMO_MODE=test), the live
+ *  Pi agent otherwise — unless JPWB_AGENT explicitly overrides ('mock' to force the offline agent in dev). */
+export function agentMode(): 'mock' | 'pi' {
+	if (TEST_MODE) return 'mock';
+	return process.env.JPWB_AGENT === 'mock' ? 'mock' : 'pi';
 }
 
 /** A short, sortable id for new aggregates the UI creates (matches the RphId `<prefix>_<26-char>` format).
