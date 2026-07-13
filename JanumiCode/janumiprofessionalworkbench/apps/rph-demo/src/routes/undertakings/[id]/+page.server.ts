@@ -49,6 +49,7 @@ export const load: PageServerLoad = ({ params }) => {
 			id: p.id,
 			title: String(p.state.title ?? p.id),
 			workLifecycleState: String(p.state.workLifecycleState ?? ''),
+			executionState: String(p.state.executionState ?? ''),
 			assuranceState: String(p.state.assuranceState ?? ''),
 			typeName: type
 				? String(type.name ?? typeId)
@@ -122,6 +123,47 @@ function resolveIntentId(
 	return getRegisteredIntent(undertakingId);
 }
 
+const PWU = 'PROFESSIONAL_WORK_UNIT';
+type Step = [command: string, aggType: string, aggId: string, payload: unknown];
+
+/** A ChangePwuState step (the controller lever) that moves the four PWU axes together. */
+function chg(
+	pwuId: string,
+	previousState: string,
+	newState: string,
+	executionState: string,
+	assuranceState: string,
+	shapeIntegrityState: string
+): Step {
+	return [
+		'ChangePwuState',
+		PWU,
+		pwuId,
+		{
+			previousState,
+			newState,
+			executionState,
+			assuranceState,
+			shapeIntegrityState,
+			reasonCode: 'CONTROLLER',
+			supportingObjectIds: []
+		}
+	];
+}
+
+/** Run a command sequence, returning the first rejection message (DUPLICATE is fine) or null on success. */
+function runSteps(steps: Step[]): string | null {
+	for (const [ct, agg, id, pl] of steps) {
+		const r = dispatch(ct, agg, id, pl);
+		if (r.status !== 'ACCEPTED' && r.status !== 'DUPLICATE') return r.error?.message ?? r.status;
+	}
+	return null;
+}
+
+async function pwuIdFrom(request: Request): Promise<string> {
+	return String((await request.formData()).get('pwuId') ?? '');
+}
+
 export const actions: Actions = {
 	// Instantiate a PWU Instance in this Undertaking, realizing a selected PWU Type (CON-009 ownership binding).
 	proposePwu: async ({ request, params }) => {
@@ -161,5 +203,63 @@ export const actions: Actions = {
 		});
 		if (r.status !== 'ACCEPTED') return fail(400, { error: r.error?.message ?? r.status });
 		return { proposed: pwuId };
+	},
+
+	// Drive a PWU through shaping + execution to EXECUTED/SUCCEEDED — still UNASSESSED, so amber (not green).
+	beginExecute: async ({ request }) => {
+		const pwuId = await pwuIdFrom(request);
+		if (!pwuId) return fail(400, { error: 'Missing PWU.' });
+		const err = runSteps([
+			['BeginPwuShaping', PWU, pwuId, {}],
+			[
+				'MarkPwuReady',
+				PWU,
+				pwuId,
+				{ shapeReadinessAssessmentId: 'assess_shape', expectedSemanticVersion: 1 }
+			],
+			chg(pwuId, 'READY', 'PLANNED', 'PLANNED', 'UNASSESSED', 'PRESERVED'),
+			chg(pwuId, 'PLANNED', 'EXECUTING', 'QUEUED', 'UNASSESSED', 'PRESERVED'),
+			chg(pwuId, 'EXECUTING', 'EXECUTING', 'RUNNING', 'UNASSESSED', 'PRESERVED'),
+			chg(pwuId, 'EXECUTING', 'EXECUTING', 'SUCCEEDED', 'UNASSESSED', 'PRESERVED')
+		]);
+		if (err) return fail(400, { error: `Execution failed: ${err}` });
+		return { advanced: 'executed' };
+	},
+
+	// Move the PWU into assurance and set assuranceState -> SATISFIED via the controller lever (exactly as the
+	// reference undertaking does). The PWU is NOT yet green: workLifecycle stays UNDER_ASSURANCE until Mark
+	// Satisfied — execution success and assurance stay separate (INV-5). NOTE: authoring first-class assurance
+	// ASSESSMENT / OBSERVATION / EVIDENCE / CLAIM artifacts (with the full ValidatorResult) is a distinct flow and
+	// a documented follow-up; here we drive the assurance AXIS, which is what gates the green state.
+	recordAssurance: async ({ request }) => {
+		const pwuId = await pwuIdFrom(request);
+		if (!pwuId) return fail(400, { error: 'Missing PWU.' });
+		const err = runSteps([
+			chg(pwuId, 'EXECUTING', 'EVIDENCE_PENDING', 'SUCCEEDED', 'EVIDENCE_REQUIRED', 'PRESERVED'),
+			chg(
+				pwuId,
+				'EVIDENCE_PENDING',
+				'UNDER_ASSURANCE',
+				'SUCCEEDED',
+				'READY_FOR_ASSESSMENT',
+				'PRESERVED'
+			),
+			chg(pwuId, 'UNDER_ASSURANCE', 'UNDER_ASSURANCE', 'SUCCEEDED', 'ASSESSING', 'PRESERVED'),
+			chg(pwuId, 'UNDER_ASSURANCE', 'UNDER_ASSURANCE', 'SUCCEEDED', 'SATISFIED', 'PRESERVED')
+		]);
+		if (err) return fail(400, { error: `Assurance failed: ${err}` });
+		return { advanced: 'assured' };
+	},
+
+	// Promote to SATISFIED (green). Allowed ONLY because assuranceState is SATISFIED — "no green without assurance"
+	// (INV-5 / property P1). Invoked before assurance, the engine rejects and the error surfaces in the UI.
+	markSatisfied: async ({ request }) => {
+		const pwuId = await pwuIdFrom(request);
+		if (!pwuId) return fail(400, { error: 'Missing PWU.' });
+		const err = runSteps([
+			chg(pwuId, 'UNDER_ASSURANCE', 'SATISFIED', 'SUCCEEDED', 'SATISFIED', 'PRESERVED')
+		]);
+		if (err) return fail(400, { error: `No green without assurance: ${err}` });
+		return { advanced: 'satisfied' };
 	}
 };

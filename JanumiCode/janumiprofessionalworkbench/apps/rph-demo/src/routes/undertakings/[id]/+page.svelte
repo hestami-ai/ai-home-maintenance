@@ -8,7 +8,10 @@
 	let {
 		data,
 		form
-	}: { data: PageData; form: { error?: string; proposed?: string } | null } = $props();
+	}: {
+		data: PageData;
+		form: { error?: string; proposed?: string; advanced?: string } | null;
+	} = $props();
 	const flow = $derived(toFlow(data.graph));
 	let nodes = $state(toFlow(data.graph).nodes);
 	let edges = $state(toFlow(data.graph).edges);
@@ -20,7 +23,9 @@
 
 <svelte:head><title>{data.undertaking.name} — Workbench</title></svelte:head>
 
-<nav class="crumbs"><a href="/undertakings">Undertaking Portfolio</a> › <span>{data.undertaking.name}</span></nav>
+<nav class="crumbs"
+	><a href="/undertakings">Undertaking Portfolio</a> › <span>{data.undertaking.name}</span></nav
+>
 
 <header class="uhead">
 	<div>
@@ -29,7 +34,10 @@
 			Instantiated from <strong>{data.undertaking.pwaName} v{data.undertaking.pwaVersion}</strong> ·
 			status <span class="pill">{data.undertaking.status}</span>
 		</p>
-		<p class="obj">{data.undertaking.objective} <span class="product">→ {data.undertaking.intendedOutputProduct}</span></p>
+		<p class="obj">
+			{data.undertaking.objective}
+			<span class="product">→ {data.undertaking.intendedOutputProduct}</span>
+		</p>
 	</div>
 </header>
 
@@ -41,10 +49,10 @@
 
 {#if tab === 'graph'}
 	<p class="legend">
-		Live Professional Work Graph — a <em>projection</em> (View) of the Undertaking's PWU Instances; the engine
-		never renders. <b class="g">Green</b> = execution SUCCEEDED <em>and</em> assurance SATISFIED
-		(no green without assurance). <b class="a">Amber</b> = succeeded but not yet assured. <b class="i">Indigo
-		border</b> = baselined.
+		Live Professional Work Graph — a <em>projection</em> (View) of the Undertaking's PWU Instances; the
+		engine never renders. <b class="g">Green</b> = execution SUCCEEDED <em>and</em> assurance SATISFIED
+		(no green without assurance). <b class="a">Amber</b> = succeeded but not yet assured.
+		<b class="i">Indigo border</b> = baselined.
 	</p>
 	{#if flow.openResiduals.length}
 		<p class="residual">⚠ Open residual: {flow.openResiduals.join('; ')}</p>
@@ -79,35 +87,88 @@
 					<input name="title" placeholder="Instance title (optional)" />
 					<button class="primary" type="submit">Instantiate PWU</button>
 				</form>
-				{#if form?.error}<p class="err" role="alert">{form.error}</p>{/if}
 			</div>
 		{/if}
+		{#if form?.error}<p class="err" role="alert">{form.error}</p>{/if}
 		<h3>PWU Instances → PWU Types</h3>
-		<p class="hint">Each PWU Instance realizes a PWU Type defined by the PWA (or is a declared local extension). Follow the type link to inspect its definition (instance ↔ type navigation).</p>
-		<table>
-			<thead><tr><th>PWU Instance</th><th>Work state</th><th>Assurance</th><th>PWU Type (definition)</th></tr></thead>
-			<tbody>
-				{#each data.pwuList as p (p.id)}
+		<p class="hint">
+			Each PWU Instance realizes a PWU Type defined by the PWA (or is a declared local extension), and
+			carries its own four-axis state. Drive its lifecycle with the actions column — a PWU only turns
+			green (SATISFIED) once its assurance is SATISFIED (no green without assurance / INV-5).
+		</p>
+		<div class="tablewrap">
+			<table>
+				<thead>
 					<tr>
-						<td>{p.title}</td>
-						<td><span class="tag">{p.workLifecycleState}</span></td>
-						<td>{p.assuranceState}</td>
-						<td>
-							{#if p.typePwaId}<a href={`/pwa/${p.typePwaId}`}>{p.typeName} ↗</a>{:else}{p.typeName}{/if}
-						</td>
+						<th>PWU Instance</th>
+						<th>Work state</th>
+						<th>Execution</th>
+						<th>Assurance</th>
+						<th>PWU Type (definition)</th>
+						<th>Lifecycle actions</th>
 					</tr>
-				{/each}
-			</tbody>
-		</table>
+				</thead>
+				<tbody>
+					{#each data.pwuList as p (p.id)}
+						<tr>
+							<td>{p.title}</td>
+							<td><span class="tag">{p.workLifecycleState}</span></td>
+							<td>{p.executionState || '—'}</td>
+							<td>{p.assuranceState}</td>
+							<td>
+								{#if p.typePwaId}<a href={`/pwa/${p.typePwaId}`}>{p.typeName} ↗</a
+									>{:else}{p.typeName}{/if}
+							</td>
+							<td>
+								<div class="acts">
+									{#if p.workLifecycleState === 'PROPOSED'}
+										<form method="POST" action="?/beginExecute" use:enhance>
+											<input type="hidden" name="pwuId" value={p.id} />
+											<button class="mini" type="submit">Begin &amp; Execute</button>
+										</form>
+									{:else if p.workLifecycleState === 'EXECUTING'}
+										<form method="POST" action="?/recordAssurance" use:enhance>
+											<input type="hidden" name="pwuId" value={p.id} />
+											<button class="mini" type="submit">Record Assurance</button>
+										</form>
+										<form method="POST" action="?/markSatisfied" use:enhance>
+											<input type="hidden" name="pwuId" value={p.id} />
+											<button class="mini" type="submit">Mark Satisfied</button>
+										</form>
+									{:else if p.workLifecycleState === 'UNDER_ASSURANCE'}
+										<form method="POST" action="?/markSatisfied" use:enhance>
+											<input type="hidden" name="pwuId" value={p.id} />
+											<button class="mini primary" type="submit">Mark Satisfied</button>
+										</form>
+									{:else if p.workLifecycleState === 'SATISFIED'}
+										<span class="done">✓ satisfied</span>
+									{:else}
+										<span class="muted">{p.workLifecycleState}</span>
+									{/if}
+								</div>
+							</td>
+						</tr>
+					{/each}
+				</tbody>
+			</table>
+		</div>
 	</div>
 {:else if tab === 'execution'}
 	<div class="panel">
 		<h2>Execution — plans that perform PWU Instances</h2>
-		<p class="hint">An Execution Plan is a distinct object that <em>performs</em> a PWU Instance through temporal steps. It is not the Professional Work Graph, and it is not named a "workflow" here except for temporal execution machinery.</p>
+		<p class="hint">
+			An Execution Plan is a distinct object that <em>performs</em> a PWU Instance through temporal steps.
+			It is not the Professional Work Graph, and it is not named a "workflow" here except for temporal execution
+			machinery.
+		</p>
 		<table>
 			<thead><tr><th>Execution Plan</th><th>Performs PWU</th><th>Status</th><th>Steps</th></tr></thead>
 			<tbody>
-				{#each data.plans as pl (pl.id)}<tr><td class="mono">{pl.id.slice(0, 14)}…</td><td class="mono">{pl.workUnitId.slice(0, 14)}…</td><td><span class="tag">{pl.status}</span></td><td>{pl.steps}</td></tr>{/each}
+				{#each data.plans as pl (pl.id)}<tr
+						><td class="mono">{pl.id.slice(0, 14)}…</td><td class="mono"
+							>{pl.workUnitId.slice(0, 14)}…</td
+						><td><span class="tag">{pl.status}</span></td><td>{pl.steps}</td></tr
+					>{/each}
 				{#if !data.plans.length}<tr><td colspan="4" class="none">No execution plans.</td></tr>{/if}
 			</tbody>
 		</table>
@@ -118,13 +179,19 @@
 		<table>
 			<thead><tr><th>Assessment</th><th>Policy</th><th>State</th></tr></thead>
 			<tbody>
-				{#each data.assessments as a (a.id)}<tr><td class="mono">{a.id.slice(0, 14)}…</td><td>{a.policy}</td><td><span class="tag">{a.state}</span></td></tr>{/each}
+				{#each data.assessments as a (a.id)}<tr><td class="mono">{a.id.slice(0, 14)}…</td><td
+							>{a.policy}</td
+						><td><span class="tag">{a.state}</span></td></tr
+					>{/each}
 				{#if !data.assessments.length}<tr><td colspan="3" class="none">No assessments.</td></tr>{/if}
 			</tbody>
 		</table>
 		{#if data.observations.length}
 			<h3>Observations</h3>
-			{#each data.observations as o (o.id)}<div class="obs"><span class="sev">{o.severity}</span> {o.statement} <span class="disp">({o.disposition})</span></div>{/each}
+			{#each data.observations as o (o.id)}<div class="obs">
+					<span class="sev">{o.severity}</span>
+					{o.statement} <span class="disp">({o.disposition})</span>
+				</div>{/each}
 		{/if}
 	</div>
 {:else if tab === 'decisions'}
@@ -133,7 +200,10 @@
 		<table>
 			<thead><tr><th>Decision</th><th>Type</th><th>Status</th><th>Rationale</th></tr></thead>
 			<tbody>
-				{#each data.decisions as dc (dc.id)}<tr><td class="mono">{dc.id.slice(0, 14)}…</td><td>{dc.type}</td><td><span class="tag">{dc.status}</span></td><td>{dc.rationale}</td></tr>{/each}
+				{#each data.decisions as dc (dc.id)}<tr><td class="mono">{dc.id.slice(0, 14)}…</td><td
+							>{dc.type}</td
+						><td><span class="tag">{dc.status}</span></td><td>{dc.rationale}</td></tr
+					>{/each}
 				{#if !data.decisions.length}<tr><td colspan="4" class="none">No decisions.</td></tr>{/if}
 			</tbody>
 		</table>
@@ -144,7 +214,11 @@
 		<table>
 			<thead><tr><th>Baseline</th><th>Type</th><th>Status</th><th>Items</th></tr></thead>
 			<tbody>
-				{#each data.baselines as b (b.id)}<tr><td class="mono">{b.id.slice(0, 14)}…</td><td>{b.type}</td><td><span class="tag" class:auth={b.status === 'AUTHORITATIVE'}>{b.status}</span></td><td>{b.items}</td></tr>{/each}
+				{#each data.baselines as b (b.id)}<tr><td class="mono">{b.id.slice(0, 14)}…</td><td>{b.type}</td
+						><td><span class="tag" class:auth={b.status === 'AUTHORITATIVE'}>{b.status}</span></td><td
+							>{b.items}</td
+						></tr
+					>{/each}
 				{#if !data.baselines.length}<tr><td colspan="4" class="none">No baselines.</td></tr>{/if}
 			</tbody>
 		</table>
@@ -308,6 +382,9 @@
 		color: var(--on);
 		margin-right: 6px;
 	}
+	.tablewrap {
+		overflow-x: auto;
+	}
 	table {
 		width: 100%;
 		border-collapse: collapse;
@@ -345,6 +422,39 @@
 	.none {
 		color: var(--outline);
 		text-align: center;
+	}
+	.acts {
+		display: flex;
+		gap: 6px;
+		flex-wrap: wrap;
+	}
+	.acts form {
+		margin: 0;
+	}
+	button.mini {
+		background: var(--sc-highest);
+		color: var(--on);
+		border: 1px solid var(--outline-faint);
+		border-radius: 6px;
+		padding: 4px 9px;
+		font-size: 11px;
+		font-weight: 600;
+		cursor: pointer;
+		white-space: nowrap;
+	}
+	button.mini.primary {
+		background: var(--primary);
+		color: #00263f;
+		border: none;
+	}
+	.done {
+		color: var(--tertiary);
+		font-size: 11px;
+		font-weight: 700;
+	}
+	.muted {
+		color: var(--outline);
+		font-size: 11px;
 	}
 	.obs {
 		font-size: 12.5px;
