@@ -47,14 +47,14 @@ describe('seedWorkbench (live PWA + Undertaking + graph)', () => {
 		).toHaveLength(1);
 		expect(unds[0]!.state.pwaId).toBe(SEED_PWA);
 		const pwus = listPwus(engine, SEED_UNDERTAKING);
-		expect(pwus).toHaveLength(9);
+		expect(pwus).toHaveLength(13);
 		expect(pwus.every((p) => p.state.undertakingId === SEED_UNDERTAKING)).toBe(true);
 	});
 
 	it('drives the Undertaking to a graph that upholds INV-5', () => {
 		const engine = build();
 		const graph = professionalWorkGraph(engine);
-		expect(graph.nodes).toHaveLength(9);
+		expect(graph.nodes).toHaveLength(13);
 		const mobile = graph.nodes.find((n) => n.label === 'Mobile & Offline Architecture');
 		expect(mobile?.qualifiedSuccess).toBe(false);
 		const arch = graph.nodes.find((n) => n.label === 'Architecture Definition');

@@ -8,8 +8,10 @@
 	const flow = $derived(toFlow(data.graph));
 	let nodes = $state(toFlow(data.graph).nodes);
 	let edges = $state(toFlow(data.graph).edges);
-	let tab = $state<'graph' | 'overview' | 'assurance' | 'decisions' | 'baselines'>('graph');
-	const tabs = ['graph', 'overview', 'assurance', 'decisions', 'baselines'] as const;
+	let tab = $state<'graph' | 'overview' | 'execution' | 'assurance' | 'decisions' | 'baselines'>(
+		'graph'
+	);
+	const tabs = ['graph', 'overview', 'execution', 'assurance', 'decisions', 'baselines'] as const;
 </script>
 
 <svelte:head><title>{data.undertaking.name} — Workbench</title></svelte:head>
@@ -35,7 +37,8 @@
 
 {#if tab === 'graph'}
 	<p class="legend">
-		Live Professional Work Graph. <b class="g">Green</b> = execution SUCCEEDED <em>and</em> assurance SATISFIED
+		Live Professional Work Graph — a <em>projection</em> (View) of the Undertaking's PWU Instances; the engine
+		never renders. <b class="g">Green</b> = execution SUCCEEDED <em>and</em> assurance SATISFIED
 		(no green without assurance). <b class="a">Amber</b> = succeeded but not yet assured. <b class="i">Indigo
 		border</b> = baselined.
 	</p>
@@ -72,6 +75,18 @@
 						</td>
 					</tr>
 				{/each}
+			</tbody>
+		</table>
+	</div>
+{:else if tab === 'execution'}
+	<div class="panel">
+		<h2>Execution — plans that perform PWU Instances</h2>
+		<p class="hint">An Execution Plan is a distinct object that <em>performs</em> a PWU Instance through temporal steps. It is not the Professional Work Graph, and it is not named a "workflow" here except for temporal execution machinery.</p>
+		<table>
+			<thead><tr><th>Execution Plan</th><th>Performs PWU</th><th>Status</th><th>Steps</th></tr></thead>
+			<tbody>
+				{#each data.plans as pl (pl.id)}<tr><td class="mono">{pl.id.slice(0, 14)}…</td><td class="mono">{pl.workUnitId.slice(0, 14)}…</td><td><span class="tag">{pl.status}</span></td><td>{pl.steps}</td></tr>{/each}
+				{#if !data.plans.length}<tr><td colspan="4" class="none">No execution plans.</td></tr>{/if}
 			</tbody>
 		</table>
 	</div>

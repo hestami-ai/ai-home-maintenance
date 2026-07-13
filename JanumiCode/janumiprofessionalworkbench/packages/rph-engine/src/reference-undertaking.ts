@@ -26,7 +26,12 @@ export const REFERENCE_UNDERTAKING = {
 	multiTenancy: 'pwu_01ARZ3NDEKTSV4RRFFQ69G5A50',
 	dataArch: 'pwu_01ARZ3NDEKTSV4RRFFQ69G5A60',
 	integrations: 'pwu_01ARZ3NDEKTSV4RRFFQ69G5A70',
-	mobileOffline: 'pwu_01ARZ3NDEKTSV4RRFFQ69G5A80'
+	mobileOffline: 'pwu_01ARZ3NDEKTSV4RRFFQ69G5A80',
+	// The downstream work areas (§7) — NOT STARTED in the reference terminal state (§27).
+	planning: 'pwu_01ARZ3NDEKTSV4RRFFQ69G5A90',
+	implementation: 'pwu_01ARZ3NDEKTSV4RRFFQ69G5AB0',
+	validation: 'pwu_01ARZ3NDEKTSV4RRFFQ69G5AC0',
+	promotion: 'pwu_01ARZ3NDEKTSV4RRFFQ69G5AD0'
 } as const;
 
 export const REFERENCE_OPEN_RESIDUALS = [
@@ -57,6 +62,22 @@ const LABELS: Record<string, { title: string; kind: string }> = {
 	[REFERENCE_UNDERTAKING.mobileOffline]: {
 		title: 'Mobile & Offline Architecture',
 		kind: 'ARCHITECTURE_CONCERN'
+	},
+	[REFERENCE_UNDERTAKING.planning]: {
+		title: 'Implementation Planning',
+		kind: 'IMPLEMENTATION_PLANNING'
+	},
+	[REFERENCE_UNDERTAKING.implementation]: {
+		title: 'Product Implementation',
+		kind: 'PRODUCT_IMPLEMENTATION'
+	},
+	[REFERENCE_UNDERTAKING.validation]: {
+		title: 'Integrated Product Validation',
+		kind: 'INTEGRATED_VALIDATION'
+	},
+	[REFERENCE_UNDERTAKING.promotion]: {
+		title: 'Product Baseline Promotion',
+		kind: 'BASELINE_PROMOTION'
 	}
 };
 
@@ -164,6 +185,11 @@ export function driveReferenceUndertaking(
 	]) {
 		propose(concern, R.architecture);
 	}
+	// The downstream work areas — proposed but NOT STARTED in the reference terminal state (§27).
+	propose(R.planning, R.root);
+	propose(R.implementation, R.root);
+	propose(R.validation, R.root);
+	propose(R.promotion, R.root);
 
 	// --- Decomposition contracts (root -> areas, architecture -> concerns) ---
 	const decompose = (dcpId: string, parentWorkUnitId: string, childWorkUnitIds: string[]): void => {
@@ -174,7 +200,15 @@ export function driveReferenceUndertaking(
 		});
 		send('ValidateDecomposition', 'DECOMPOSITION_CONTRACT', dcpId, { disposition: 'VALID' });
 	};
-	decompose('dcp_01ARZ3NDEKTSV4RRFFQ69G5B00', R.root, [R.intentDef, R.behavior, R.architecture]);
+	decompose('dcp_01ARZ3NDEKTSV4RRFFQ69G5B00', R.root, [
+		R.intentDef,
+		R.behavior,
+		R.architecture,
+		R.planning,
+		R.implementation,
+		R.validation,
+		R.promotion
+	]);
 	decompose('dcp_01ARZ3NDEKTSV4RRFFQ69G5B10', R.architecture, [
 		R.systemContext,
 		R.multiTenancy,
@@ -182,6 +216,34 @@ export function driveReferenceUndertaking(
 		R.integrations,
 		R.mobileOffline
 	]);
+
+	// One Execution Plan for the Architecture PWU. An Execution Plan is a DISTINCT object that PERFORMS a PWU
+	// Instance through temporal steps — it is NOT the Professional Work Graph (§35.3 / criterion 16).
+	const archPlan = 'plan_01ARZ3NDEKTSV4RRFFQ69G5C00';
+	send('ProposeExecutionPlan', 'EXECUTION_PLAN', archPlan, {
+		executionPlanId: archPlan,
+		workUnitId: R.architecture,
+		steps: [
+			{
+				id: 'step_01ARZ3NDEKTSV4RRFFQ69G5C10',
+				executionPlanId: archPlan,
+				stepType: 'MODEL_INVOCATION',
+				purpose: 'Generate the architecture description',
+				inputBindings: [],
+				outputBindings: [],
+				preconditions: [],
+				postconditions: [],
+				stepState: 'QUEUED'
+			}
+		],
+		transitions: [],
+		retryPolicy: {},
+		tacticalChangePolicy: {},
+		escalationPolicy: {},
+		terminationPolicy: {}
+	});
+	send('ApproveExecutionPlan', 'EXECUTION_PLAN', archPlan, {});
+	send('ActivateExecutionPlan', 'EXECUTION_PLAN', archPlan, { authorizedRuntimeBindingIds: [] });
 
 	// --- Advance each PWU's four axes via the controller lever (ChangePwuState) ---
 	const chg = (

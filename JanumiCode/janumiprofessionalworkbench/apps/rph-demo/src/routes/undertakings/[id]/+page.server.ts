@@ -7,6 +7,7 @@ import {
 	listAssessments,
 	listBaselines,
 	listDecisions,
+	listExecutionPlans,
 	listObservations,
 	listPwus,
 	professionalWorkGraph,
@@ -74,6 +75,12 @@ export const load: PageServerLoad = ({ params }) => {
 		status: String(b.state.status ?? ''),
 		items: Array.isArray(b.state.itemObjectVersions) ? b.state.itemObjectVersions.length : 0
 	}));
+	const plans = listExecutionPlans(engine).map((pl) => ({
+		id: pl.id,
+		workUnitId: String(pl.state.workUnitId ?? ''),
+		status: String(pl.state.status ?? ''),
+		steps: Array.isArray(pl.state.steps) ? pl.state.steps.length : 0
+	}));
 
 	return {
 		undertaking: {
@@ -87,6 +94,8 @@ export const load: PageServerLoad = ({ params }) => {
 		},
 		graph,
 		rollup,
+		pwuList,
+		plans,
 		assessments,
 		observations,
 		decisions,

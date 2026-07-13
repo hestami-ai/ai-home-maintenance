@@ -29,10 +29,10 @@ describe('Reference Undertaking driven live', () => {
 		};
 	}
 
-	it('produces the full 9-node Professional Work Graph with the decomposition edges', () => {
+	it('produces the full 13-node Professional Work Graph with the decomposition edges', () => {
 		const { graph } = build();
-		expect(graph.nodes).toHaveLength(9);
-		expect(graph.edges).toHaveLength(8); // root -> 3 areas, architecture -> 5 concerns
+		expect(graph.nodes).toHaveLength(13);
+		expect(graph.edges).toHaveLength(12); // root -> 7 areas, architecture -> 5 concerns
 		const byId = new Map(graph.nodes.map((n) => [n.id, n]));
 		expect(byId.get(REFERENCE_UNDERTAKING.root)?.label).toBe('Product Realization');
 		expect(byId.get(REFERENCE_UNDERTAKING.mobileOffline)?.label).toBe(
