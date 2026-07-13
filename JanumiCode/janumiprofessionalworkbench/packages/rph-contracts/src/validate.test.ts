@@ -39,10 +39,10 @@ describe('validate', () => {
 	});
 
 	it('registers envelope + enum + object + command + event schemas', () => {
-		// 8 envelope/primitive + 72 enums + 20 objects + 62 commands + 114 events = 276
+		// 8 envelope/primitive + 72 enums + 20 objects + 63 commands + 115 events = 278
 		// (+3 objects PROFESSIONAL_WORK_ARCHITECTURE / PWU_TYPE / UNDERTAKING; +8 PWA-authoring commands +8 events —
 		// the RPH-DOC-010 PWA-authoring context; then +3 DRAFT-authoring commands EditPwa/EditPwuType/RemovePwuType
-		// +3 events; see OPEN-QUESTIONS)
-		expect(buildContractRegistry().ids().length).toBe(276);
+		// +3 events; then +1 DeletePwa command +1 PwaDeleted event — PWA discard/soft-delete; see OPEN-QUESTIONS)
+		expect(buildContractRegistry().ids().length).toBe(278);
 	});
 });

@@ -1,8 +1,25 @@
 <script lang="ts">
 	import { enhance } from '$app/forms';
 	import type { PageData } from './$types';
-	let { data, form }: { data: PageData; form: { error?: string; created?: string } | null } = $props();
+	let {
+		data,
+		form
+	}: {
+		data: PageData;
+		form: { error?: string; created?: string; deleted?: string; deleteFailedId?: string } | null;
+	} = $props();
 	let showForm = $state(false);
+	// Which card is showing its delete confirmation (only one at a time).
+	let confirmingId = $state<string | null>(null);
+
+	/** A status-aware warning shown before deleting — published PWAs get a stronger caution. */
+	function deleteWarning(status: string): string {
+		if (status === 'PUBLISHED')
+			return 'This PWA is PUBLISHED. Deleting removes it from the library. Prefer Deprecate → Retire for versions that were ever in use. (Deletion is blocked if any Undertaking was instantiated from it.)';
+		if (status === 'DEPRECATED' || status === 'RETIRED')
+			return 'Delete this archived PWA? It will be removed from the library. (Blocked if any Undertaking was instantiated from it.)';
+		return 'Delete this draft PWA? This discards it.';
+	}
 </script>
 
 <svelte:head><title>PWA Library — JPWB</title></svelte:head>
@@ -30,18 +47,51 @@
 
 <div class="grid">
 	{#each data.pwas as pwa (pwa.id)}
-		<a class="card" href={`/pwa/${pwa.id}`}>
-			<div class="cardtop">
-				<div class="cardicon">▤</div>
-				<span class="pill" class:pub={pwa.publicationStatus === 'PUBLISHED'}>{pwa.publicationStatus}</span>
+		<div class="card">
+			<a class="cardlink" href={`/pwa/${pwa.id}`}>
+				<div class="cardtop">
+					<div class="cardicon">▤</div>
+					<span class="pill" class:pub={pwa.publicationStatus === 'PUBLISHED'}
+						>{pwa.publicationStatus}</span
+					>
+				</div>
+				<h3>{pwa.name}</h3>
+				<p class="desc">{pwa.description}</p>
+				<div class="stats">
+					<div><span>{pwa.typeCount}</span> PWU Types</div>
+					<div><span>{pwa.version}</span> version</div>
+				</div>
+			</a>
+			<div class="cardfoot">
+				{#if confirmingId === pwa.id}
+					<form
+						method="POST"
+						action="?/delete"
+						use:enhance={() => {
+							return async ({ update }) => {
+								await update();
+								confirmingId = null;
+							};
+						}}
+						class="delconfirm"
+					>
+						<input type="hidden" name="pwaId" value={pwa.id} />
+						<p class="delwarn">{deleteWarning(pwa.publicationStatus)}</p>
+						{#if form?.deleteFailedId === pwa.id && form?.error}
+							<p class="err" role="alert">{form.error}</p>
+						{/if}
+						<div class="delactions">
+							<button class="danger" type="submit">Delete</button>
+							<button type="button" class="ghost" onclick={() => (confirmingId = null)}>Cancel</button>
+						</div>
+					</form>
+				{:else}
+					<button class="del" onclick={() => (confirmingId = pwa.id)} aria-label={`Delete ${pwa.name}`}
+						>Delete</button
+					>
+				{/if}
 			</div>
-			<h3>{pwa.name}</h3>
-			<p class="desc">{pwa.description}</p>
-			<div class="stats">
-				<div><span>{pwa.typeCount}</span> PWU Types</div>
-				<div><span>{pwa.version}</span> version</div>
-			</div>
-		</a>
+		</div>
 	{/each}
 	{#if !data.pwas.length}<p class="empty">No PWAs yet — create one.</p>{/if}
 </div>
@@ -108,13 +158,71 @@
 	.card {
 		background: var(--surface-low);
 		border-radius: 12px;
-		padding: 18px;
 		border-top: 2px solid transparent;
-		color: var(--on);
 		transition: border-color 0.2s;
+		display: flex;
+		flex-direction: column;
 	}
 	.card:hover {
 		border-top-color: var(--primary);
+	}
+	.cardlink {
+		display: block;
+		padding: 18px 18px 10px;
+		color: var(--on);
+	}
+	.cardfoot {
+		padding: 0 18px 14px;
+		display: flex;
+	}
+	.del {
+		background: transparent;
+		border: 1px solid var(--outline-faint);
+		color: var(--outline);
+		border-radius: 6px;
+		padding: 5px 11px;
+		font-size: 11px;
+		font-weight: 600;
+		cursor: pointer;
+	}
+	.del:hover {
+		color: var(--error);
+		border-color: rgba(255, 180, 171, 0.4);
+	}
+	.delconfirm {
+		display: flex;
+		flex-direction: column;
+		gap: 8px;
+		width: 100%;
+	}
+	.delwarn {
+		margin: 0;
+		font-size: 11px;
+		color: var(--on-variant);
+		line-height: 1.45;
+	}
+	.delactions {
+		display: flex;
+		gap: 8px;
+	}
+	.danger {
+		background: var(--error);
+		color: #3a0906;
+		border: none;
+		border-radius: 6px;
+		padding: 6px 12px;
+		font-weight: 700;
+		font-size: 12px;
+		cursor: pointer;
+	}
+	.ghost {
+		background: var(--sc-highest);
+		color: var(--on);
+		border: 1px solid var(--outline-faint);
+		border-radius: 6px;
+		padding: 6px 12px;
+		font-size: 12px;
+		cursor: pointer;
 	}
 	.cardtop {
 		display: flex;

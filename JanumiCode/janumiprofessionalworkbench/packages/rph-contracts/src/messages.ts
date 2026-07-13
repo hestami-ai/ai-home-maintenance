@@ -405,6 +405,10 @@ export const DeprecatePwaPayloadSchema = z.strictObject({});
 export type DeprecatePwaPayload = z.infer<typeof DeprecatePwaPayloadSchema>;
 export const RetirePwaPayloadSchema = z.strictObject({});
 export type RetirePwaPayload = z.infer<typeof RetirePwaPayloadSchema>;
+export const DeletePwaPayloadSchema = z.strictObject({
+	pwaId: z.string()
+});
+export type DeletePwaPayload = z.infer<typeof DeletePwaPayloadSchema>;
 export const CreateUndertakingPayloadSchema = z.strictObject({
 	undertakingId: z.string(),
 	name: z.string(),
@@ -1189,6 +1193,10 @@ export const PwaEditedPayloadSchema = z.strictObject({
 	version: z.string().optional()
 });
 export type PwaEditedPayload = z.infer<typeof PwaEditedPayloadSchema>;
+export const PwaDeletedPayloadSchema = z.strictObject({
+	pwaId: z.string()
+});
+export type PwaDeletedPayload = z.infer<typeof PwaDeletedPayloadSchema>;
 export const PwuTypeRedefinedPayloadSchema = z.strictObject({
 	pwuTypeId: z.string(),
 	name: z.string().optional(),
@@ -1572,6 +1580,12 @@ export const COMMANDS = {
 		emitsEvent: 'PwaRetired',
 		firstSlice: false
 	},
+	DeletePwa: {
+		payload: DeletePwaPayloadSchema,
+		targetAggregateType: 'PROFESSIONAL_WORK_ARCHITECTURE',
+		emitsEvent: 'PwaDeleted',
+		firstSlice: false
+	},
 	CreateUndertaking: {
 		payload: CreateUndertakingPayloadSchema,
 		targetAggregateType: 'UNDERTAKING',
@@ -1856,6 +1870,7 @@ export const EVENTS = {
 	PwaRetired: { payload: PwaRetiredPayloadSchema, aggregateType: 'ProfessionalWorkArchitecture' },
 	UndertakingCreated: { payload: UndertakingCreatedPayloadSchema, aggregateType: 'Undertaking' },
 	PwaEdited: { payload: PwaEditedPayloadSchema, aggregateType: 'PROFESSIONAL_WORK_ARCHITECTURE' },
+	PwaDeleted: { payload: PwaDeletedPayloadSchema, aggregateType: 'PROFESSIONAL_WORK_ARCHITECTURE' },
 	PwuTypeRedefined: { payload: PwuTypeRedefinedPayloadSchema, aggregateType: 'PWU_TYPE' },
 	PwuTypeRemoved: { payload: PwuTypeRemovedPayloadSchema, aggregateType: 'PWU_TYPE' }
 } as const;

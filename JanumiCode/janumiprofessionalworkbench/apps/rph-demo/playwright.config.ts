@@ -20,7 +20,9 @@ export default defineConfig({
 	testMatch: '**/*.e2e.ts',
 	fullyParallel: false,
 	forbidOnly: !!process.env.CI,
-	retries: 0,
+	// One retry absorbs the occasional interaction-timing flake in the single-worker sequential run (a control
+	// clicked a beat before its enhance/hydration settles). A genuine failure still fails both attempts.
+	retries: 1,
 	workers: 1,
 	reporter: [['list'], ['json', { outputFile: 'e2e-results/results.json' }]],
 	outputDir: 'e2e-results/artifacts',

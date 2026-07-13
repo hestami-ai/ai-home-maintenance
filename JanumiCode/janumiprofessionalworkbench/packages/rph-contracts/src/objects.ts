@@ -529,7 +529,8 @@ export const ProfessionalWorkArchitectureSchema = z.strictObject({
 		'VALIDATED',
 		'PUBLISHED',
 		'DEPRECATED',
-		'RETIRED'
+		'RETIRED',
+		'DISCARDED'
 	])
 });
 export type ProfessionalWorkArchitecture = z.infer<typeof ProfessionalWorkArchitectureSchema>;

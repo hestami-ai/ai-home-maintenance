@@ -35,5 +35,16 @@ export const actions: Actions = {
 		});
 		if (r.status !== 'ACCEPTED') return fail(400, { error: r.error?.message ?? r.status });
 		return { created: id };
+	},
+
+	// Delete (discard) a PWA. The engine rejects deletion of a PWA that is in use (has Undertakings) — that
+	// rejection is surfaced to the card. A published-but-unused PWA can still be deleted (the UI warns first).
+	delete: async ({ request }) => {
+		const pwaId = String((await request.formData()).get('pwaId') ?? '').trim();
+		if (!pwaId) return fail(400, { error: 'Missing PWA.' });
+		const r = dispatch('DeletePwa', 'PROFESSIONAL_WORK_ARCHITECTURE', pwaId, { pwaId });
+		if (r.status !== 'ACCEPTED')
+			return fail(400, { error: r.error?.message ?? r.status, deleteFailedId: pwaId });
+		return { deleted: pwaId };
 	}
 };

@@ -144,6 +144,62 @@ export const editPwa: CommandHandler = (ctx, command, payload) => {
 	});
 };
 
+/** Count Undertakings instantiated from this PWA (any status) — a PWA "in use" cannot be deleted. */
+function undertakingsOf(ctx: HandlerContext, pwaId: string): number {
+	const ids = new Set<string>();
+	for (const e of ctx.store.readAllEvents())
+		if (e.aggregateType === UNDERTAKING) ids.add(e.aggregateId);
+	let n = 0;
+	for (const id of ids) {
+		const s = ctx.store.loadObject(id)?.state as { pwaId?: string } | undefined;
+		if (s?.pwaId === pwaId) n += 1;
+	}
+	return n;
+}
+
+/** DeletePwa — discard a PWA (tombstone via publicationStatus DISCARDED; the Library hides it). Referential
+ *  integrity is enforced HERE: a PWA that any Undertaking was instantiated from is IN USE and cannot be deleted
+ *  (deprecate/retire it instead) — deleting it would strand those Undertakings' PWA binding. Deletion is otherwise
+ *  allowed from any status (a DRAFT you no longer want, or an unused published version). Idempotent-safe: a second
+ *  delete of an already-DISCARDED PWA is rejected by loadOrReject/guard naturally. */
+export const deletePwa: CommandHandler = (ctx, command) => {
+	const id = command.targetAggregateId;
+	const loaded = loadOrReject(ctx, command, id);
+	if (!loaded.ok) return loaded.result;
+	if (loaded.state.publicationStatus === 'DISCARDED') {
+		return reject(command, 'RPH_INVARIANT_VIOLATION', `PWA ${id} is already deleted`);
+	}
+	const inUse = undertakingsOf(ctx, id);
+	if (inUse > 0) {
+		return reject(
+			command,
+			'RPH_INVARIANT_VIOLATION',
+			`Cannot delete PWA ${id}: ${inUse} Undertaking(s) were instantiated from it (it is in use). Deprecate/retire it instead.`
+		);
+	}
+	const newRevision = loaded.revision + 1;
+	const next: Record<string, unknown> = {
+		...nextEnvelope(loaded.state, command, newRevision),
+		publicationStatus: 'DISCARDED'
+	};
+	const event = makeEvent(ctx, command, {
+		eventType: 'PwaDeleted',
+		aggregateType: PWA,
+		aggregateId: id,
+		aggregateRevision: newRevision,
+		payload: command.payload
+	});
+	return commitState(ctx, command, {
+		objectType: PWA,
+		aggregateId: id,
+		expectedRevision: loaded.revision,
+		newRevision,
+		newSemanticVersion: loaded.semanticVersion,
+		nextState: next,
+		event
+	});
+};
+
 /** A PWU Type may only be edited/removed while its OWNING PWA is DRAFT (types are draft-only, §39). */
 function requireDraftOwner(
 	ctx: HandlerContext,

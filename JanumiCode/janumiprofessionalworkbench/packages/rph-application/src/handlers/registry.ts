@@ -71,6 +71,7 @@ import {
 	createPwa,
 	createUndertaking,
 	definePwuType,
+	deletePwa,
 	deprecatePwa,
 	editPwa,
 	editPwuType,
@@ -141,6 +142,7 @@ export const HANDLERS: Readonly<Record<string, CommandHandler>> = {
 	CompleteRecomposition: completeRecomposition,
 	// PWA-authoring context (RPH-DOC-010 §6, §11, §20, §42)
 	CreatePwa: createPwa,
+	DeletePwa: deletePwa,
 	DefinePwuType: definePwuType,
 	EditPwa: editPwa,
 	EditPwuType: editPwuType,

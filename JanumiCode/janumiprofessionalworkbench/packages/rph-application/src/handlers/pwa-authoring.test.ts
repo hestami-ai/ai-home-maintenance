@@ -149,6 +149,42 @@ describe('PWA-authoring handlers (live)', () => {
 		expect((store.loadObject(UND)?.state as { status: string; pwaId: string }).pwaId).toBe(PWA);
 	});
 
+	it('DeletePwa discards a DRAFT PWA (tombstone) when it is not in use', () => {
+		createDraftPwa();
+		const r = d('DeletePwa', { pwaId: PWA }, PWA, 'PROFESSIONAL_WORK_ARCHITECTURE');
+		expect(r.status, JSON.stringify(r.error)).toBe('ACCEPTED');
+		expect(pubStatus()).toBe('DISCARDED');
+		// a second delete of an already-discarded PWA is rejected
+		expect(d('DeletePwa', { pwaId: PWA }, PWA, 'PROFESSIONAL_WORK_ARCHITECTURE').status).toBe(
+			'REJECTED'
+		);
+	});
+
+	it('DeletePwa rejects a PWA that has Undertakings instantiated from it (in use)', () => {
+		createDraftPwa();
+		defineRoot();
+		publish();
+		d(
+			'CreateUndertaking',
+			{
+				undertakingId: UND,
+				name: 'U',
+				description: 'd',
+				pwaId: PWA,
+				pwaVersion: '1.0.0',
+				instantiationProfile: 'Standard',
+				objective: 'o',
+				intendedOutputProduct: 'p'
+			},
+			UND,
+			'UNDERTAKING'
+		);
+		const r = d('DeletePwa', { pwaId: PWA }, PWA, 'PROFESSIONAL_WORK_ARCHITECTURE');
+		expect(r.status).toBe('REJECTED');
+		expect(r.error?.code).toBe('RPH_INVARIANT_VIOLATION');
+		expect(pubStatus()).toBe('PUBLISHED');
+	});
+
 	it('binds a PWU Instance to its Undertaking + PWU Type (CON-009)', () => {
 		createDraftPwa();
 		defineRoot();

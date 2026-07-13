@@ -1208,7 +1208,7 @@
         },
         {
           "field": "publicationStatus",
-          "type": "'DRAFT' | 'UNDER_REVIEW' | 'VALIDATED' | 'PUBLISHED' | 'DEPRECATED' | 'RETIRED'",
+          "type": "'DRAFT' | 'UNDER_REVIEW' | 'VALIDATED' | 'PUBLISHED' | 'DEPRECATED' | 'RETIRED' | 'DISCARDED'",
           "required": true
         }
       ]

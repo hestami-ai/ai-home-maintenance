@@ -28,7 +28,10 @@ function byField(rows: ObjectRow[], field: string, value: string): ObjectRow[] {
 }
 
 export const listPwas = (h: EngineHandle): ObjectRow[] =>
-	listByType(h, 'PROFESSIONAL_WORK_ARCHITECTURE');
+	// A DeletePwa tombstones the PWA as publicationStatus DISCARDED; the Library treats it as gone.
+	listByType(h, 'PROFESSIONAL_WORK_ARCHITECTURE').filter(
+		(r) => r.state.publicationStatus !== 'DISCARDED'
+	);
 export const listPwuTypes = (h: EngineHandle, pwaId?: string): ObjectRow[] => {
 	// A RemovePwuType tombstones the type as status REMOVED; the authoring/read surfaces treat it as gone.
 	const live = listByType(h, 'PWU_TYPE').filter((r) => r.state.status !== 'REMOVED');

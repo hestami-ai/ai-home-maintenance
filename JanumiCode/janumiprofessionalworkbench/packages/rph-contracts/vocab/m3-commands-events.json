@@ -1813,6 +1813,20 @@
       "payloadFields": []
     },
     {
+      "commandType": "DeletePwa",
+      "targetAggregateType": "PROFESSIONAL_WORK_ARCHITECTURE",
+      "emitsEvent": "PwaDeleted",
+      "schematized": false,
+      "sourceSection": "RPH-DOC-010 §20 — discard/soft-delete a PWA that is not in use",
+      "payloadFields": [
+        {
+          "field": "pwaId",
+          "required": true,
+          "type": "string"
+        }
+      ]
+    },
+    {
       "commandType": "CreateUndertaking",
       "targetAggregateType": "UNDERTAKING",
       "emitsEvent": "UndertakingCreated",
@@ -5052,6 +5066,17 @@
         {
           "field": "version",
           "required": false,
+          "type": "string"
+        }
+      ]
+    },
+    {
+      "eventType": "PwaDeleted",
+      "aggregateType": "PROFESSIONAL_WORK_ARCHITECTURE",
+      "payloadFields": [
+        {
+          "field": "pwaId",
+          "required": true,
           "type": "string"
         }
       ]
