@@ -95,6 +95,57 @@ export function buildAuthoringTools(broker: PwaAuthoringBroker): AuthoringToolDe
 
 		// ---- PROPOSE ----
 		{
+			name: 'scaffold_graph',
+			description:
+				'Build a WHOLE PWU Type graph in ONE atomic step: define several types and wire their permitted-child (composition) edges together. All are created or none are (a single failure rolls back the batch — no half-built graph). Give each type a short `tempKey` and reference children by their tempKeys. Prefer this when creating a multi-node architecture at once; use define_pwu_type + link_types for incremental edits.',
+			parameters: {
+				types: {
+					type: 'object[]',
+					required: true,
+					description: 'The PWU Types to create together (exactly one should be the root).',
+					items: {
+						tempKey: {
+							type: 'string',
+							required: true,
+							description:
+								'A short handle (e.g. "root", "arch") used to reference this type as another type’s child IN THIS BATCH. Not persisted.'
+						},
+						name: { type: 'string', required: true, description: help.name },
+						pwuKind: { type: 'string', required: true, description: help.pwuKind },
+						purpose: { type: 'string', description: help.purpose },
+						isRoot: { type: 'boolean', description: help.isRoot },
+						completionRule: { type: 'string', description: help.completionRule },
+						requiredInputs: { type: 'string[]', description: help.requiredInputs },
+						requiredOutputs: { type: 'string[]', description: help.requiredOutputs },
+						childTempKeys: {
+							type: 'string[]',
+							description:
+								'tempKeys of other types in THIS batch that this type permits as children (composition edges).'
+						}
+					}
+				}
+			},
+			mutates: true,
+			run: (a) => {
+				const rawTypes = Array.isArray(a.types) ? (a.types as Record<string, unknown>[]) : [];
+				const specs = rawTypes.map((o) => ({
+					tempKey: str(o.tempKey),
+					name: str(o.name),
+					pwuKind: str(o.pwuKind),
+					purpose: str(o.purpose) || undefined,
+					isRoot: bool(o.isRoot),
+					completionRule: str(o.completionRule) || undefined,
+					requiredInputs: strArr(o.requiredInputs),
+					requiredOutputs: strArr(o.requiredOutputs),
+					childTempKeys: strArr(o.childTempKeys)
+				}));
+				return fromProposal(
+					broker.scaffold(specs),
+					`Scaffolded ${specs.length} PWU Type(s) atomically.`
+				);
+			}
+		},
+		{
 			name: 'set_pwa_details',
 			description:
 				'Edit the DRAFT PWA’s own metadata. Only the fields you pass are changed. (The PWA must be DRAFT — a published version is immutable.)',

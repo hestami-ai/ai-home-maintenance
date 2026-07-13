@@ -22,7 +22,15 @@
 		} | null;
 	} = $props();
 
-	let selected = $state(data.types.find((t) => t.isRoot)?.id ?? data.types[0]?.id ?? '');
+	// Selection = an explicit user/agent override, falling back to the root (or first) type. Deriving it from `data`
+	// (rather than seeding $state from data once) keeps it correct when the graph changes and avoids capturing only
+	// the initial prop value; it also self-heals when the selected type is removed.
+	let selectedOverride = $state<string | null>(null);
+	const selected = $derived(
+		selectedOverride && data.types.some((t) => t.id === selectedOverride)
+			? selectedOverride
+			: (data.types.find((t) => t.isRoot)?.id ?? data.types[0]?.id ?? '')
+	);
 	const current = $derived(data.types.find((t) => t.id === selected));
 	const editable = $derived(data.pwa.publicationStatus === 'DRAFT');
 	const hasRoot = $derived(data.types.some((t) => t.isRoot));
@@ -65,7 +73,7 @@
 
 	$effect(() => {
 		if (form?.definedType) {
-			selected = form.definedType;
+			selectedOverride = form.definedType;
 			formMode = null;
 		} else if (form?.editedType || form?.removedType) {
 			formMode = null;
@@ -358,7 +366,7 @@
 		</p>
 		<div class="canvas">
 			{#if data.types.length}
-				<SvelteFlow bind:nodes bind:edges onnodeclick={(e) => (selected = e.node.id)} fitView>
+				<SvelteFlow bind:nodes bind:edges onnodeclick={(e) => (selectedOverride = e.node.id)} fitView>
 					<Background />
 					<Controls />
 				</SvelteFlow>

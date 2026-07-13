@@ -1,5 +1,6 @@
 <script lang="ts">
 	import { SvelteFlow, Background, Controls, MiniMap } from '@xyflow/svelte';
+	import type { Edge, Node } from '@xyflow/svelte';
 	import '@xyflow/svelte/dist/style.css';
 	import { enhance } from '$app/forms';
 	import { toFlow } from '$lib/toFlow';
@@ -12,9 +13,15 @@
 		data: PageData;
 		form: { error?: string; proposed?: string; advanced?: string } | null;
 	} = $props();
+	// Derive the graph from `data` and sync it into the bindable node/edge state (so it tracks server updates and
+	// doesn't just capture the initial prop value).
 	const flow = $derived(toFlow(data.graph));
-	let nodes = $state(toFlow(data.graph).nodes);
-	let edges = $state(toFlow(data.graph).edges);
+	let nodes = $state<Node[]>([]);
+	let edges = $state<Edge[]>([]);
+	$effect(() => {
+		nodes = flow.nodes;
+		edges = flow.edges;
+	});
 	let tab = $state<'graph' | 'overview' | 'execution' | 'assurance' | 'decisions' | 'baselines'>(
 		'graph'
 	);

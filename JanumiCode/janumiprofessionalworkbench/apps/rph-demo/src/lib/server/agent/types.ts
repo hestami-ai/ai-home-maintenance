@@ -31,12 +31,14 @@ export interface AuthoringAgent {
 // (concern 1: the field descriptions come from the shared @janumipwb/rph-authoring help), with no runtime schema
 // translation risk.
 
-export type ParamType = 'string' | 'boolean' | 'string[]';
+export type ParamType = 'string' | 'boolean' | 'string[]' | 'object[]';
 
 export interface ParamDef {
 	readonly type: ParamType;
 	readonly description: string;
 	readonly required?: boolean;
+	/** For type 'object[]': the per-item field schema (mapped to an array-of-objects for the model). */
+	readonly items?: ParamSpec;
 }
 
 export type ParamSpec = Record<string, ParamDef>;

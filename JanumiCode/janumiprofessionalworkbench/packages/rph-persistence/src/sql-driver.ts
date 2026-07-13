@@ -26,6 +26,16 @@ export interface SqlDriver {
 
 /** Open a SQLite database via better-sqlite3 (default backend). `:memory:` for tests. */
 export function createSqliteDriver(filename = ':memory:'): SqlDriver {
+	// better-sqlite3 is a Node native addon that cannot dlopen under the Bun runtime (bun#4290). Every real host
+	// runs the engine under Node (vitest workers; the SvelteKit server, which Bun only *launches* via the Node-based
+	// vite binary). Fail loud with an actionable message if someone runs engine code under Bun directly (e.g.
+	// `bun run script.ts`) instead of surfacing a cryptic ERR_DLOPEN_FAILED. A future Bun host would inject a
+	// bun:sqlite-backed SqlDriver behind this same interface.
+	if ((globalThis as { Bun?: unknown }).Bun !== undefined) {
+		throw new Error(
+			'The RPH engine cannot open its SQLite store under the Bun runtime (better-sqlite3 is a Node native addon; bun#4290). Run engine code under Node — the SvelteKit server does this automatically. For a standalone script, use `node` (or `vite-node`), not `bun run`.'
+		);
+	}
 	const db = new Database(filename);
 	db.pragma('journal_mode = WAL');
 	db.pragma('foreign_keys = ON');

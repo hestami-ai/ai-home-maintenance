@@ -10,6 +10,7 @@ import {
 	defineTool,
 	getAgentDir,
 	ModelRegistry,
+	resolveCliModel,
 	SessionManager,
 	SettingsManager
 } from '@earendil-works/pi-coding-agent';
@@ -24,6 +25,8 @@ function toTypeBox(spec: ParamSpec): TSchema {
 		if (def.type === 'boolean') t = Type.Boolean({ description: def.description });
 		else if (def.type === 'string[]')
 			t = Type.Array(Type.String(), { description: def.description });
+		else if (def.type === 'object[]' && def.items)
+			t = Type.Array(toTypeBox(def.items), { description: def.description });
 		else t = Type.String({ description: def.description });
 		props[key] = def.required ? t : Type.Optional(t);
 	}
@@ -50,23 +53,34 @@ function toPiTools(descriptors: AuthoringToolDescriptor[]) {
 }
 
 /**
- * Resolve the model to run with. Prefer models that actually have valid credentials (getAvailable) — modelRegistry
- * .find() returns a catalog entry even with NO key, which would then fail at session time, so we must not trust it
- * blindly. Order: the requested model IF it is authenticated → else the first authenticated model → else the
- * requested catalog entry as a last resort (surfaces Pi's own "no API key" message, which is the right diagnostic).
+ * Resolve the model to run with, honoring the SAME configuration the Pi TUI uses. Priority:
+ *   1. JPWB_AGENT_MODEL ("provider/id") — an explicit override for this app.
+ *   2. The user's configured DEFAULT model+provider from Pi's real settings (what the TUI shows).
+ *   3. The first model that actually has valid credentials.
+ * (Never hardcode a provider — a plain modelRegistry.find() would return a keyless catalog entry that fails at
+ * session time, and assuming "anthropic" is wrong when the user is on, e.g., OpenAI/Codex.)
  */
-async function resolveModel(modelRegistry: ModelRegistry) {
-	const spec = process.env.JPWB_AGENT_MODEL ?? 'anthropic/claude-opus-4-5';
-	const [provider, id] = spec.includes('/') ? spec.split('/') : ['anthropic', spec];
+async function resolveModel(modelRegistry: ModelRegistry, settingsManager: SettingsManager) {
+	const override = process.env.JPWB_AGENT_MODEL;
+	if (override) {
+		const r = resolveCliModel({ cliModel: override, modelRegistry });
+		if (r.model) return r.model;
+	} else {
+		const defaultModelId = settingsManager.getDefaultModel();
+		if (defaultModelId) {
+			const r = resolveCliModel({
+				cliProvider: settingsManager.getDefaultProvider(),
+				cliModel: defaultModelId,
+				modelRegistry
+			});
+			if (r.model) return r.model;
+		}
+	}
 	const available = await modelRegistry.getAvailable();
-	const requestedAvailable = available.find((m) => m.provider === provider && m.id === id);
-	const model =
-		requestedAvailable ?? available[0] ?? modelRegistry.find(provider!, id!) ?? undefined;
-	if (!model)
-		throw new Error(
-			'No Pi model available. Configure Pi credentials (pi login), or set JPWB_AGENT_MODEL to an available provider/id.'
-		);
-	return model;
+	if (available[0]) return available[0];
+	throw new Error(
+		'No Pi model available. Configure a model in Pi (run `pi` and log in, or the TUI), or set JPWB_AGENT_MODEL to a provider/id.'
+	);
 }
 
 export class PiAuthoringAgent implements AuthoringAgent {
@@ -76,24 +90,23 @@ export class PiAuthoringAgent implements AuthoringAgent {
 	) {}
 
 	async run(instruction: string, emit: EmitFn, signal?: AbortSignal): Promise<void> {
-		emit({ kind: 'status', text: 'pi agent' });
 		let session: Awaited<ReturnType<typeof createAgentSession>>['session'] | undefined;
 		let unsubscribe: (() => void) | undefined;
 		try {
 			const authStorage = AuthStorage.create();
 			const modelRegistry = ModelRegistry.create(authStorage);
-			const model = await resolveModel(modelRegistry);
+			// Read the user's REAL Pi settings (same agent dir the TUI uses) so we inherit their default model.
+			const settingsManager = SettingsManager.create(process.cwd(), getAgentDir());
+			const model = await resolveModel(modelRegistry, settingsManager);
+			emit({ kind: 'status', text: `pi agent · ${model.provider}/${model.id}` });
 
 			const loader = new DefaultResourceLoader({
 				cwd: process.cwd(),
 				agentDir: getAgentDir(),
+				settingsManager,
 				systemPromptOverride: () => this.systemPrompt
 			});
 			await loader.reload();
-			const settingsManager = SettingsManager.inMemory({
-				compaction: { enabled: false },
-				retry: { enabled: true, maxRetries: 2 }
-			});
 
 			const created = await createAgentSession({
 				model,

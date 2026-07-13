@@ -97,6 +97,59 @@ test.describe('PWA Designer — authoring agent (mock) over SSE', () => {
 		const after = await introspect(request);
 		expect(after.pwuTypes.filter((t) => t.state.status !== 'REMOVED')).toHaveLength(1);
 	});
+
+	test('scaffold_graph builds a whole wired graph in ONE atomic tool call', async ({
+		page,
+		request
+	}) => {
+		await gotoHydrated(page, '/');
+		await page.getByRole('button', { name: '+ New PWA' }).click();
+		await page.getByPlaceholder(/PWA name/i).fill('Scaffold PWA');
+		await page.getByRole('button', { name: 'Create draft' }).click();
+		await expect(page.getByRole('link', { name: /Scaffold PWA/ })).toBeVisible();
+		const pwaId = (await introspect(request)).pwas[0]!.id;
+
+		// A single scaffold_graph call defines a root + a child and wires the permits edge — all-or-nothing.
+		const plan = {
+			plan: [
+				{
+					tool: 'scaffold_graph',
+					args: {
+						types: [
+							{
+								tempKey: 'root',
+								name: 'Product Realization',
+								pwuKind: 'PRODUCT_REALIZATION',
+								isRoot: true,
+								childTempKeys: ['arch']
+							},
+							{
+								tempKey: 'arch',
+								name: 'Architecture Definition',
+								pwuKind: 'ARCHITECTURE',
+								requiredInputs: ['approved-behavior'],
+								requiredOutputs: ['architecture-baseline']
+							}
+						]
+					}
+				}
+			]
+		};
+		const res = await request.post(`/pwa/${pwaId}/agent`, {
+			data: { instruction: JSON.stringify(plan) }
+		});
+		const body = await res.text();
+		expect(body).toContain('scaffold_graph');
+		expect(body).toContain('"ok":true');
+
+		// TRUTH: both types exist and the root permits the child (the whole batch committed atomically).
+		const snap = await introspect(request);
+		const live = snap.pwuTypes.filter((t) => t.state.status !== 'REMOVED');
+		expect(live).toHaveLength(2);
+		const root = live.find((t) => t.state.isRoot === true)!;
+		const arch = live.find((t) => t.state.name === 'Architecture Definition')!;
+		expect(root.state.permittedChildTypeIds).toContain(arch.id);
+	});
 });
 
 function introspectNames(snap: { pwuTypes: { state: Record<string, unknown> }[] }): string[] {
