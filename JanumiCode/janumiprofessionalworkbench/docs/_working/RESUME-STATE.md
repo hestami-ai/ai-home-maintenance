@@ -22,9 +22,20 @@
 >   (GOV-001/002), and the baseline promotion gate (canPromoteBaseline, INV-20). Added 4 commands via vocab+gen
 >   (BeginIntentDiscovery, ProvisionIntent, SubmitBaselineForReview, ApproveBaseline) + IntentProvisioned event;
 >   registry now 47 cmds/103 events/47 bindings. `zod` added as a direct dep of rph-application. 20 rph-app tests.
+> - **P4/P5 core — live Professional Work Graph + reference undertaking driver (`fd7c775`).**
+>   `rph-engine/src/reference-undertaking.ts` `driveReferenceUndertaking(handle)` dispatches ~100 real commands
+>   to reproduce the §27 Field Service Management graph; `professional-work-graph.ts` `professionalWorkGraph(handle)`
+>   turns live state (event log for structure + loadObject for 4-axis state) into the pure DemoGraph via
+>   pwuGraphNode. ChangePwuState now allows a no-op workLifecycle move (advance a sub-axis while workLifecycle
+>   holds, still P1-guarded). 5 rph-engine tests prove the live graph (9 nodes/8 edges, INV-5, BASELINED, reproducible).
+> - **Live demo UI (`53efb42`).** `apps/rph-demo` now renders the LIVE graph: `+page.server.ts` hosts the engine
+>   on the SvelteKit Node server (better-sqlite3 SSR-external), drives the undertaking, projects the graph; the
+>   browser renders only the read-model. `toFlow.ts` = generic layered layout for any DemoGraph. Static seed
+>   removed. Verified: dev HTTP 200, SSR HTML carries live labels/states/BASELINED/CONDITIONALLY_SATISFIED/residual.
+>   **This delivers the "wire live command-driving" upgrade the sponsor flagged for M14.**
 >
 > **NEXT (in order) — none started:**
-> 1. **P2/P3 finish (~5 commands):** embedded per-step execution (Start/Complete/Fail/Retry ExecutionStep mutate
+> 0. **P2/P3 finish (~5 commands):** embedded per-step execution (Start/Complete/Fail/Retry ExecutionStep mutate
 >    the plan's `steps[]` array — bespoke, not advanceStatus); RuntimeBinding commands (Request/Authorize/Deny/
 >    Revoke — 4 MISSING commands, add via vocab+gen); ApplyTacticalChange (NOOP plan-status). Optionally wire the
 >    rich decomposition kernels (validateObligationConservation/validateConstraintPropagation) into
