@@ -11,7 +11,7 @@ import type {
 	DomainCommand,
 	ProposePwuPayload
 } from '@janumipwb/rph-contracts';
-import { canAdvanceWorkLifecycle } from '@janumipwb/rph-domain';
+import { canAdvanceWorkLifecycle, satisfiesP1 } from '@janumipwb/rph-domain';
 import {
 	checkTransition,
 	commitState,
@@ -225,14 +225,26 @@ export const changePwuState: CommandHandler = (ctx, command, payload) => {
 		const illegal = checkTransition(command, machine, from, to);
 		if (illegal) return illegal;
 	}
-	// The workLifecycle transition must be legal AND satisfy its cross-axis guard against the NEW sub-axes.
-	const advance = canAdvanceWorkLifecycle(current.workLifecycleState, p.newState, nextAxes);
-	if (!advance.ok) {
-		return reject(
-			command,
-			'RPH_ILLEGAL_STATE_TRANSITION',
-			`Cannot advance PWU ${id} ${current.workLifecycleState} -> ${p.newState}${advance.reason ? `: ${advance.reason}` : ''}`
-		);
+	// The workLifecycle axis either advances (legal transition + cross-axis guard against the NEW sub-axes) or
+	// holds (a no-op move that only advances the orthogonal sub-axes) — and a hold must still not park the PWU in
+	// a SATISFIED-without-assurance state (property P1 / INV-5).
+	if (p.newState === current.workLifecycleState) {
+		if (!satisfiesP1(nextAxes)) {
+			return reject(
+				command,
+				'RPH_INVARIANT_VIOLATION',
+				`PWU ${id} would hold in SATISFIED without assuranceState=SATISFIED (P1/INV-5)`
+			);
+		}
+	} else {
+		const advance = canAdvanceWorkLifecycle(current.workLifecycleState, p.newState, nextAxes);
+		if (!advance.ok) {
+			return reject(
+				command,
+				'RPH_ILLEGAL_STATE_TRANSITION',
+				`Cannot advance PWU ${id} ${current.workLifecycleState} -> ${p.newState}${advance.reason ? `: ${advance.reason}` : ''}`
+			);
+		}
 	}
 	const newRevision = loaded.revision + 1;
 	const next = {

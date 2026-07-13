@@ -4,3 +4,5 @@ export const RPH_ENGINE_VERSION = '0.0.0';
 
 export * from './engine.js';
 export * from './replay.js';
+export * from './professional-work-graph.js';
+export * from './reference-undertaking.js';

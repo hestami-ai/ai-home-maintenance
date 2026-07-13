@@ -29,7 +29,8 @@
     "@janumipwb/rph-contracts": "workspace:*",
     "@janumipwb/rph-domain": "workspace:*",
     "@janumipwb/rph-persistence": "workspace:*",
-    "@janumipwb/rph-ports": "workspace:*"
+    "@janumipwb/rph-ports": "workspace:*",
+    "@janumipwb/rph-projections": "workspace:*"
   },
   "devDependencies": {
     "@janumipwb/rph-product-realization-pwa": "workspace:*",
