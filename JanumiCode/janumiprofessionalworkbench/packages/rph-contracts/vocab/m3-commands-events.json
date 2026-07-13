@@ -1536,6 +1536,93 @@
           "note": "id-ref; optional"
         }
       ]
+    },
+    {
+      "commandType": "RequestRuntimeBinding",
+      "targetAggregateType": "RUNTIME_BINDING",
+      "emitsEvent": "RuntimeBindingRequested",
+      "drivesMachine": "RuntimeBinding.authorizationStatus",
+      "drivesFrom": "(initial)",
+      "drivesTo": "REQUESTED",
+      "schematized": false,
+      "sourceSection": "DOC-002 §22 (event §26.4); command added for live command-drive",
+      "payloadFields": [
+        {
+          "field": "runtimeBindingId",
+          "required": true,
+          "type": "string",
+          "note": "id-ref (bind_)"
+        },
+        {
+          "field": "executionStepId",
+          "required": true,
+          "type": "string",
+          "note": "id-ref (step_)"
+        },
+        {
+          "field": "roleId",
+          "required": true,
+          "type": "string"
+        },
+        {
+          "field": "requestedCapabilities",
+          "required": true,
+          "type": "CapabilityRequest[]",
+          "note": "complex placeholder"
+        }
+      ]
+    },
+    {
+      "commandType": "AuthorizeRuntimeBinding",
+      "targetAggregateType": "RUNTIME_BINDING",
+      "emitsEvent": "RuntimeBindingAuthorized",
+      "drivesMachine": "RuntimeBinding.authorizationStatus",
+      "drivesFrom": "REQUESTED",
+      "drivesTo": "AUTHORIZED",
+      "schematized": false,
+      "sourceSection": "DOC-002 §22 (event §26.4)",
+      "payloadFields": [
+        {
+          "field": "grantedCapabilities",
+          "required": true,
+          "type": "CapabilityGrant[]",
+          "note": "requested != granted (§22.1)"
+        }
+      ]
+    },
+    {
+      "commandType": "DenyRuntimeBinding",
+      "targetAggregateType": "RUNTIME_BINDING",
+      "emitsEvent": "RuntimeBindingDenied",
+      "drivesMachine": "RuntimeBinding.authorizationStatus",
+      "drivesFrom": "REQUESTED",
+      "drivesTo": "DENIED",
+      "schematized": false,
+      "sourceSection": "DOC-002 §22 (event §26.4)",
+      "payloadFields": [
+        {
+          "field": "reason",
+          "required": true,
+          "type": "string"
+        }
+      ]
+    },
+    {
+      "commandType": "RevokeRuntimeCapability",
+      "targetAggregateType": "RUNTIME_BINDING",
+      "emitsEvent": "RuntimeCapabilityRevoked",
+      "drivesMachine": "RuntimeBinding.authorizationStatus",
+      "drivesFrom": "AUTHORIZED",
+      "drivesTo": "REVOKED",
+      "schematized": false,
+      "sourceSection": "DOC-002 §22 (event §26.4)",
+      "payloadFields": [
+        {
+          "field": "reason",
+          "required": true,
+          "type": "string"
+        }
+      ]
     }
   ],
   "events": [
@@ -4865,6 +4952,34 @@
       "machine": "Baseline.status",
       "from": "UNDER_REVIEW",
       "to": "APPROVED"
+    },
+    {
+      "commandType": "RequestRuntimeBinding",
+      "eventType": "RuntimeBindingRequested",
+      "machine": "RuntimeBinding.authorizationStatus",
+      "from": "(initial)",
+      "to": "REQUESTED"
+    },
+    {
+      "commandType": "AuthorizeRuntimeBinding",
+      "eventType": "RuntimeBindingAuthorized",
+      "machine": "RuntimeBinding.authorizationStatus",
+      "from": "REQUESTED",
+      "to": "AUTHORIZED"
+    },
+    {
+      "commandType": "DenyRuntimeBinding",
+      "eventType": "RuntimeBindingDenied",
+      "machine": "RuntimeBinding.authorizationStatus",
+      "from": "REQUESTED",
+      "to": "DENIED"
+    },
+    {
+      "commandType": "RevokeRuntimeCapability",
+      "eventType": "RuntimeCapabilityRevoked",
+      "machine": "RuntimeBinding.authorizationStatus",
+      "from": "AUTHORIZED",
+      "to": "REVOKED"
     }
   ],
   "conflicts": [

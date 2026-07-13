@@ -348,6 +348,25 @@ export const ApproveBaselinePayloadSchema = z.strictObject({
 	approvalDecisionId: z.string().optional()
 });
 export type ApproveBaselinePayload = z.infer<typeof ApproveBaselinePayloadSchema>;
+export const RequestRuntimeBindingPayloadSchema = z.strictObject({
+	runtimeBindingId: z.string(),
+	executionStepId: z.string(),
+	roleId: z.string(),
+	requestedCapabilities: z.array(z.unknown())
+});
+export type RequestRuntimeBindingPayload = z.infer<typeof RequestRuntimeBindingPayloadSchema>;
+export const AuthorizeRuntimeBindingPayloadSchema = z.strictObject({
+	grantedCapabilities: z.array(z.unknown())
+});
+export type AuthorizeRuntimeBindingPayload = z.infer<typeof AuthorizeRuntimeBindingPayloadSchema>;
+export const DenyRuntimeBindingPayloadSchema = z.strictObject({
+	reason: z.string()
+});
+export type DenyRuntimeBindingPayload = z.infer<typeof DenyRuntimeBindingPayloadSchema>;
+export const RevokeRuntimeCapabilityPayloadSchema = z.strictObject({
+	reason: z.string()
+});
+export type RevokeRuntimeCapabilityPayload = z.infer<typeof RevokeRuntimeCapabilityPayloadSchema>;
 
 // ---- Event payload schemas ----
 export const AssumptionAcceptedPayloadSchema = z.strictObject({
@@ -1361,6 +1380,30 @@ export const COMMANDS = {
 		targetAggregateType: 'BASELINE',
 		emitsEvent: 'BaselineApproved',
 		firstSlice: false
+	},
+	RequestRuntimeBinding: {
+		payload: RequestRuntimeBindingPayloadSchema,
+		targetAggregateType: 'RUNTIME_BINDING',
+		emitsEvent: 'RuntimeBindingRequested',
+		firstSlice: false
+	},
+	AuthorizeRuntimeBinding: {
+		payload: AuthorizeRuntimeBindingPayloadSchema,
+		targetAggregateType: 'RUNTIME_BINDING',
+		emitsEvent: 'RuntimeBindingAuthorized',
+		firstSlice: false
+	},
+	DenyRuntimeBinding: {
+		payload: DenyRuntimeBindingPayloadSchema,
+		targetAggregateType: 'RUNTIME_BINDING',
+		emitsEvent: 'RuntimeBindingDenied',
+		firstSlice: false
+	},
+	RevokeRuntimeCapability: {
+		payload: RevokeRuntimeCapabilityPayloadSchema,
+		targetAggregateType: 'RUNTIME_BINDING',
+		emitsEvent: 'RuntimeCapabilityRevoked',
+		firstSlice: false
 	}
 } as const;
 
@@ -1940,5 +1983,33 @@ export const BINDINGS: readonly CommandEventBinding[] = [
 		machine: 'Baseline.status',
 		from: 'UNDER_REVIEW',
 		to: 'APPROVED'
+	},
+	{
+		commandType: 'RequestRuntimeBinding',
+		eventType: 'RuntimeBindingRequested',
+		machine: 'RuntimeBinding.authorizationStatus',
+		from: '(initial)',
+		to: 'REQUESTED'
+	},
+	{
+		commandType: 'AuthorizeRuntimeBinding',
+		eventType: 'RuntimeBindingAuthorized',
+		machine: 'RuntimeBinding.authorizationStatus',
+		from: 'REQUESTED',
+		to: 'AUTHORIZED'
+	},
+	{
+		commandType: 'DenyRuntimeBinding',
+		eventType: 'RuntimeBindingDenied',
+		machine: 'RuntimeBinding.authorizationStatus',
+		from: 'REQUESTED',
+		to: 'DENIED'
+	},
+	{
+		commandType: 'RevokeRuntimeCapability',
+		eventType: 'RuntimeCapabilityRevoked',
+		machine: 'RuntimeBinding.authorizationStatus',
+		from: 'AUTHORIZED',
+		to: 'REVOKED'
 	}
 ];

@@ -22,10 +22,21 @@ import {
 } from './pwu.js';
 import {
 	activateExecutionPlan,
+	applyTacticalChange,
 	approveExecutionPlan,
 	cancelExecutionPlan,
-	proposeExecutionPlan
+	completeExecutionStep,
+	failExecutionStep,
+	proposeExecutionPlan,
+	retryExecutionStep,
+	startExecutionStep
 } from './execution.js';
+import {
+	authorizeRuntimeBinding,
+	denyRuntimeBinding,
+	requestRuntimeBinding,
+	revokeRuntimeCapability
+} from './runtime-binding.js';
 import {
 	admitEvidence,
 	assertClaim,
@@ -74,11 +85,20 @@ export const HANDLERS: Readonly<Record<string, CommandHandler>> = {
 	ReshapePwu: reshapePwu,
 	InvalidatePwu: invalidatePwu,
 	SupersedePwu: supersedePwu,
-	// Execution plan (DOC-002 §20)
+	// Execution plan + steps + runtime bindings (DOC-002 §20, §21, §22)
 	ProposeExecutionPlan: proposeExecutionPlan,
 	ApproveExecutionPlan: approveExecutionPlan,
 	ActivateExecutionPlan: activateExecutionPlan,
 	CancelExecutionPlan: cancelExecutionPlan,
+	ApplyTacticalChange: applyTacticalChange,
+	StartExecutionStep: startExecutionStep,
+	CompleteExecutionStep: completeExecutionStep,
+	FailExecutionStep: failExecutionStep,
+	RetryExecutionStep: retryExecutionStep,
+	RequestRuntimeBinding: requestRuntimeBinding,
+	AuthorizeRuntimeBinding: authorizeRuntimeBinding,
+	DenyRuntimeBinding: denyRuntimeBinding,
+	RevokeRuntimeCapability: revokeRuntimeCapability,
 	// Assurance: evidence / claim / assumption / assessment / observation (DOC-002 §12, §15–19)
 	ProposeEvidence: proposeEvidence,
 	AdmitEvidence: admitEvidence,
