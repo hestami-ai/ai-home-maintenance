@@ -414,6 +414,29 @@ export const CreateUndertakingPayloadSchema = z.strictObject({
 	intendedOutputProduct: z.string()
 });
 export type CreateUndertakingPayload = z.infer<typeof CreateUndertakingPayloadSchema>;
+export const EditPwaPayloadSchema = z.strictObject({
+	pwaId: z.string(),
+	name: z.string().optional(),
+	description: z.string().optional(),
+	domain: z.string().optional(),
+	version: z.string().optional()
+});
+export type EditPwaPayload = z.infer<typeof EditPwaPayloadSchema>;
+export const EditPwuTypePayloadSchema = z.strictObject({
+	pwuTypeId: z.string(),
+	name: z.string().optional(),
+	purpose: z.string().optional(),
+	pwuKind: z.string().optional(),
+	isRoot: z.boolean().optional(),
+	completionRule: z.string().optional(),
+	permittedChildTypeIds: z.array(z.string()).optional(),
+	requiredAssurancePolicyIds: z.array(z.string()).optional()
+});
+export type EditPwuTypePayload = z.infer<typeof EditPwuTypePayloadSchema>;
+export const RemovePwuTypePayloadSchema = z.strictObject({
+	pwuTypeId: z.string()
+});
+export type RemovePwuTypePayload = z.infer<typeof RemovePwuTypePayloadSchema>;
 
 // ---- Event payload schemas ----
 export const AssumptionAcceptedPayloadSchema = z.strictObject({
@@ -1154,6 +1177,29 @@ export const UndertakingCreatedPayloadSchema = z.strictObject({
 	pwaVersion: z.string()
 });
 export type UndertakingCreatedPayload = z.infer<typeof UndertakingCreatedPayloadSchema>;
+export const PwaEditedPayloadSchema = z.strictObject({
+	pwaId: z.string(),
+	name: z.string().optional(),
+	description: z.string().optional(),
+	domain: z.string().optional(),
+	version: z.string().optional()
+});
+export type PwaEditedPayload = z.infer<typeof PwaEditedPayloadSchema>;
+export const PwuTypeRedefinedPayloadSchema = z.strictObject({
+	pwuTypeId: z.string(),
+	name: z.string().optional(),
+	purpose: z.string().optional(),
+	pwuKind: z.string().optional(),
+	isRoot: z.boolean().optional(),
+	completionRule: z.string().optional(),
+	permittedChildTypeIds: z.array(z.string()).optional(),
+	requiredAssurancePolicyIds: z.array(z.string()).optional()
+});
+export type PwuTypeRedefinedPayload = z.infer<typeof PwuTypeRedefinedPayloadSchema>;
+export const PwuTypeRemovedPayloadSchema = z.strictObject({
+	pwuTypeId: z.string()
+});
+export type PwuTypeRemovedPayload = z.infer<typeof PwuTypeRemovedPayloadSchema>;
 
 export const FIRST_SLICE_COMMANDS = [
 	'CaptureIntent',
@@ -1527,6 +1573,24 @@ export const COMMANDS = {
 		targetAggregateType: 'UNDERTAKING',
 		emitsEvent: 'UndertakingCreated',
 		firstSlice: false
+	},
+	EditPwa: {
+		payload: EditPwaPayloadSchema,
+		targetAggregateType: 'PROFESSIONAL_WORK_ARCHITECTURE',
+		emitsEvent: 'PwaEdited',
+		firstSlice: false
+	},
+	EditPwuType: {
+		payload: EditPwuTypePayloadSchema,
+		targetAggregateType: 'PWU_TYPE',
+		emitsEvent: 'PwuTypeRedefined',
+		firstSlice: false
+	},
+	RemovePwuType: {
+		payload: RemovePwuTypePayloadSchema,
+		targetAggregateType: 'PWU_TYPE',
+		emitsEvent: 'PwuTypeRemoved',
+		firstSlice: false
 	}
 } as const;
 
@@ -1786,7 +1850,10 @@ export const EVENTS = {
 		aggregateType: 'ProfessionalWorkArchitecture'
 	},
 	PwaRetired: { payload: PwaRetiredPayloadSchema, aggregateType: 'ProfessionalWorkArchitecture' },
-	UndertakingCreated: { payload: UndertakingCreatedPayloadSchema, aggregateType: 'Undertaking' }
+	UndertakingCreated: { payload: UndertakingCreatedPayloadSchema, aggregateType: 'Undertaking' },
+	PwaEdited: { payload: PwaEditedPayloadSchema, aggregateType: 'PROFESSIONAL_WORK_ARCHITECTURE' },
+	PwuTypeRedefined: { payload: PwuTypeRedefinedPayloadSchema, aggregateType: 'PWU_TYPE' },
+	PwuTypeRemoved: { payload: PwuTypeRemovedPayloadSchema, aggregateType: 'PWU_TYPE' }
 } as const;
 
 export interface CommandEventBinding {

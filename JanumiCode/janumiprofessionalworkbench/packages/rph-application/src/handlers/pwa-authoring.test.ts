@@ -193,4 +193,76 @@ describe('PWA-authoring handlers (live)', () => {
 		expect(pwu.undertakingId).toBe(UND);
 		expect(pwu.pwuTypeId).toBe(ROOT_TYPE);
 	});
+
+	it('EditPwuType updates a DRAFT type in place (untouched fields preserved); EditPwa updates PWA metadata', () => {
+		createDraftPwa();
+		defineRoot();
+		const e = d(
+			'EditPwuType',
+			{
+				pwuTypeId: ROOT_TYPE,
+				purpose: 'the revised root purpose',
+				completionRule: 'custom completion rule',
+				permittedChildTypeIds: ['pwut_child_x']
+			},
+			ROOT_TYPE,
+			'PWU_TYPE'
+		);
+		expect(e.status, JSON.stringify(e.error)).toBe('ACCEPTED');
+		const t = store.loadObject(ROOT_TYPE)?.state as {
+			purpose: string;
+			completionRule: string;
+			permittedChildTypeIds: string[];
+			name: string;
+			isRoot: boolean;
+		};
+		expect(t.purpose).toBe('the revised root purpose');
+		expect(t.completionRule).toBe('custom completion rule');
+		expect(t.permittedChildTypeIds).toEqual(['pwut_child_x']);
+		expect(t.name).toBe('Product Realization'); // untouched field preserved
+		expect(t.isRoot).toBe(true); // untouched field preserved
+
+		const ep = d(
+			'EditPwa',
+			{ pwaId: PWA, description: 'revised', domain: 'logistics' },
+			PWA,
+			'PROFESSIONAL_WORK_ARCHITECTURE'
+		);
+		expect(ep.status, JSON.stringify(ep.error)).toBe('ACCEPTED');
+		const pwa = store.loadObject(PWA)?.state as {
+			description: string;
+			domain: string;
+			name: string;
+		};
+		expect(pwa.description).toBe('revised');
+		expect(pwa.domain).toBe('logistics');
+		expect(pwa.name).toBe('Product Realization');
+	});
+
+	it('rejects EditPwuType and EditPwa once the PWA is PUBLISHED (immutable, §11)', () => {
+		createDraftPwa();
+		defineRoot();
+		publish();
+		const e = d('EditPwuType', { pwuTypeId: ROOT_TYPE, purpose: 'nope' }, ROOT_TYPE, 'PWU_TYPE');
+		expect(e.status).toBe('REJECTED');
+		expect(e.error?.code).toBe('RPH_INVARIANT_VIOLATION');
+		const ep = d('EditPwa', { pwaId: PWA, name: 'nope' }, PWA, 'PROFESSIONAL_WORK_ARCHITECTURE');
+		expect(ep.status).toBe('REJECTED');
+		expect(ep.error?.code).toBe('RPH_INVARIANT_VIOLATION');
+	});
+
+	it('RemovePwuType tombstones a type (status REMOVED) on a DRAFT PWA', () => {
+		createDraftPwa();
+		defineRoot();
+		const EXTRA = 'pwut_01ARZ3NDEKTSV4RRFFQ69G5P70';
+		d(
+			'DefinePwuType',
+			{ pwuTypeId: EXTRA, pwaId: PWA, pwuKind: 'X', name: 'X', purpose: 'p', isRoot: false },
+			EXTRA,
+			'PWU_TYPE'
+		);
+		const r = d('RemovePwuType', { pwuTypeId: EXTRA }, EXTRA, 'PWU_TYPE');
+		expect(r.status, JSON.stringify(r.error)).toBe('ACCEPTED');
+		expect((store.loadObject(EXTRA)?.state as { status: string }).status).toBe('REMOVED');
+	});
 });

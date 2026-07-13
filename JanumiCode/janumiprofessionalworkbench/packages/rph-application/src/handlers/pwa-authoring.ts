@@ -4,12 +4,27 @@
 // (§42): CreateUndertaking binds the exact PWA version; the root PWU Instance + children are then shaped in the
 // Undertaking context (via ProposePwu carrying undertakingId + pwuTypeId — the CON-009 ownership binding).
 import type {
+	CommandResult,
 	CreatePwaPayload,
 	CreateUndertakingPayload,
 	DefinePwuTypePayload,
+	DomainCommand,
+	EditPwaPayload,
+	EditPwuTypePayload,
 	PublishPwaPayload
 } from '@janumipwb/rph-contracts';
-import { advanceStatus, createObject, newEnvelope, reject, type CommandHandler } from './kit.js';
+import {
+	advanceStatus,
+	commitState,
+	createObject,
+	loadOrReject,
+	makeEvent,
+	newEnvelope,
+	nextEnvelope,
+	reject,
+	type CommandHandler,
+	type HandlerContext
+} from './kit.js';
 
 const PWA = 'PROFESSIONAL_WORK_ARCHITECTURE';
 const PWU_TYPE = 'PWU_TYPE';
@@ -86,6 +101,140 @@ export const definePwuType: CommandHandler = (ctx, command, payload) => {
 		aggregateId: p.pwuTypeId,
 		state,
 		eventType: 'PwuTypeDefined'
+	});
+};
+
+/** EditPwa — update a DRAFT PWA's metadata in place. A PUBLISHED version is immutable (§11), so this rejects
+ *  unless publicationStatus is DRAFT. Only the fields present in the payload are changed. */
+export const editPwa: CommandHandler = (ctx, command, payload) => {
+	const p = payload as EditPwaPayload;
+	const id = command.targetAggregateId;
+	const loaded = loadOrReject(ctx, command, id);
+	if (!loaded.ok) return loaded.result;
+	if (loaded.state.publicationStatus !== 'DRAFT') {
+		return reject(
+			command,
+			'RPH_INVARIANT_VIOLATION',
+			`A PWA can only be edited while DRAFT (${id} is ${String(loaded.state.publicationStatus)})`
+		);
+	}
+	const newRevision = loaded.revision + 1;
+	const next: Record<string, unknown> = {
+		...nextEnvelope(loaded.state, command, newRevision),
+		...(p.name !== undefined ? { name: p.name } : {}),
+		...(p.description !== undefined ? { description: p.description } : {}),
+		...(p.domain !== undefined ? { domain: p.domain } : {}),
+		...(p.version !== undefined ? { version: p.version } : {})
+	};
+	const event = makeEvent(ctx, command, {
+		eventType: 'PwaEdited',
+		aggregateType: PWA,
+		aggregateId: id,
+		aggregateRevision: newRevision,
+		payload
+	});
+	return commitState(ctx, command, {
+		objectType: PWA,
+		aggregateId: id,
+		expectedRevision: loaded.revision,
+		newRevision,
+		newSemanticVersion: loaded.semanticVersion,
+		nextState: next,
+		event
+	});
+};
+
+/** A PWU Type may only be edited/removed while its OWNING PWA is DRAFT (types are draft-only, §39). */
+function requireDraftOwner(
+	ctx: HandlerContext,
+	command: DomainCommand,
+	typeState: Record<string, unknown>
+): CommandResult | null {
+	const pwaId = String(typeState.pwaId);
+	const pwa = ctx.store.loadObject(pwaId)?.state as { publicationStatus?: string } | undefined;
+	if (pwa?.publicationStatus !== 'DRAFT') {
+		return reject(
+			command,
+			'RPH_INVARIANT_VIOLATION',
+			`A PWU Type can only be changed while its PWA is DRAFT (${pwaId} is ${String(pwa?.publicationStatus)})`,
+			[command.targetAggregateId]
+		);
+	}
+	return null;
+}
+
+/** EditPwuType — update a PWU Type's definition in place while its PWA is DRAFT. Only payload-present fields
+ *  change; this is how the richer fields (completionRule, permittedChildTypeIds, requiredAssurancePolicyIds) are
+ *  authored after the initial DefinePwuType. */
+export const editPwuType: CommandHandler = (ctx, command, payload) => {
+	const p = payload as EditPwuTypePayload;
+	const id = command.targetAggregateId;
+	const loaded = loadOrReject(ctx, command, id);
+	if (!loaded.ok) return loaded.result;
+	const guard = requireDraftOwner(ctx, command, loaded.state);
+	if (guard) return guard;
+	const newRevision = loaded.revision + 1;
+	const next: Record<string, unknown> = {
+		...nextEnvelope(loaded.state, command, newRevision),
+		...(p.name !== undefined ? { name: p.name } : {}),
+		...(p.purpose !== undefined ? { purpose: p.purpose } : {}),
+		...(p.pwuKind !== undefined ? { pwuKind: p.pwuKind } : {}),
+		...(p.isRoot !== undefined ? { isRoot: p.isRoot } : {}),
+		...(p.completionRule !== undefined ? { completionRule: p.completionRule } : {}),
+		...(p.permittedChildTypeIds !== undefined
+			? { permittedChildTypeIds: p.permittedChildTypeIds }
+			: {}),
+		...(p.requiredAssurancePolicyIds !== undefined
+			? { requiredAssurancePolicyIds: p.requiredAssurancePolicyIds }
+			: {})
+	};
+	const event = makeEvent(ctx, command, {
+		eventType: 'PwuTypeRedefined',
+		aggregateType: PWU_TYPE,
+		aggregateId: id,
+		aggregateRevision: newRevision,
+		payload
+	});
+	return commitState(ctx, command, {
+		objectType: PWU_TYPE,
+		aggregateId: id,
+		expectedRevision: loaded.revision,
+		newRevision,
+		newSemanticVersion: loaded.semanticVersion,
+		nextState: next,
+		event
+	});
+};
+
+/** RemovePwuType — tombstone a PWU Type (status REMOVED) while its PWA is DRAFT; the query surface hides REMOVED
+ *  types so they disappear from the Work Architecture. (Referential integrity — not removing a type another lists
+ *  as a permitted parent/child — is enforced in the authoring surface, which holds the sibling query.) */
+export const removePwuType: CommandHandler = (ctx, command) => {
+	const id = command.targetAggregateId;
+	const loaded = loadOrReject(ctx, command, id);
+	if (!loaded.ok) return loaded.result;
+	const guard = requireDraftOwner(ctx, command, loaded.state);
+	if (guard) return guard;
+	const newRevision = loaded.revision + 1;
+	const next: Record<string, unknown> = {
+		...nextEnvelope(loaded.state, command, newRevision),
+		status: 'REMOVED'
+	};
+	const event = makeEvent(ctx, command, {
+		eventType: 'PwuTypeRemoved',
+		aggregateType: PWU_TYPE,
+		aggregateId: id,
+		aggregateRevision: newRevision,
+		payload: command.payload
+	});
+	return commitState(ctx, command, {
+		objectType: PWU_TYPE,
+		aggregateId: id,
+		expectedRevision: loaded.revision,
+		newRevision,
+		newSemanticVersion: loaded.semanticVersion,
+		nextState: next,
+		event
 	});
 };
 

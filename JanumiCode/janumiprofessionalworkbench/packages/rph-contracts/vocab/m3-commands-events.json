@@ -1853,6 +1853,103 @@
           "type": "string"
         }
       ]
+    },
+    {
+      "commandType": "EditPwa",
+      "targetAggregateType": "PROFESSIONAL_WORK_ARCHITECTURE",
+      "emitsEvent": "PwaEdited",
+      "schematized": false,
+      "sourceSection": "RPH-DOC-010 §11/§20 — DRAFT-only metadata edit",
+      "payloadFields": [
+        {
+          "field": "pwaId",
+          "required": true,
+          "type": "string"
+        },
+        {
+          "field": "name",
+          "required": false,
+          "type": "string"
+        },
+        {
+          "field": "description",
+          "required": false,
+          "type": "string"
+        },
+        {
+          "field": "domain",
+          "required": false,
+          "type": "string"
+        },
+        {
+          "field": "version",
+          "required": false,
+          "type": "string"
+        }
+      ]
+    },
+    {
+      "commandType": "EditPwuType",
+      "targetAggregateType": "PWU_TYPE",
+      "emitsEvent": "PwuTypeRedefined",
+      "schematized": false,
+      "sourceSection": "RPH-DOC-010 §11/§39 — DRAFT-only PWU Type edit",
+      "payloadFields": [
+        {
+          "field": "pwuTypeId",
+          "required": true,
+          "type": "string"
+        },
+        {
+          "field": "name",
+          "required": false,
+          "type": "string"
+        },
+        {
+          "field": "purpose",
+          "required": false,
+          "type": "string"
+        },
+        {
+          "field": "pwuKind",
+          "required": false,
+          "type": "string"
+        },
+        {
+          "field": "isRoot",
+          "required": false,
+          "type": "boolean"
+        },
+        {
+          "field": "completionRule",
+          "required": false,
+          "type": "string"
+        },
+        {
+          "field": "permittedChildTypeIds",
+          "required": false,
+          "type": "string[]"
+        },
+        {
+          "field": "requiredAssurancePolicyIds",
+          "required": false,
+          "type": "string[]"
+        }
+      ]
+    },
+    {
+      "commandType": "RemovePwuType",
+      "targetAggregateType": "PWU_TYPE",
+      "emitsEvent": "PwuTypeRemoved",
+      "schematized": false,
+      "sourceSection": "RPH-DOC-010 §11/§39 — DRAFT-only PWU Type removal (tombstone)",
+      "payloadFields": [
+        {
+          "field": "pwuTypeId",
+          "required": true,
+          "type": "string"
+        }
+      ]
     }
   ],
   "events": [
@@ -4903,6 +5000,94 @@
         },
         {
           "field": "pwaVersion",
+          "required": true,
+          "type": "string"
+        }
+      ]
+    },
+    {
+      "eventType": "PwaEdited",
+      "aggregateType": "PROFESSIONAL_WORK_ARCHITECTURE",
+      "payloadFields": [
+        {
+          "field": "pwaId",
+          "required": true,
+          "type": "string"
+        },
+        {
+          "field": "name",
+          "required": false,
+          "type": "string"
+        },
+        {
+          "field": "description",
+          "required": false,
+          "type": "string"
+        },
+        {
+          "field": "domain",
+          "required": false,
+          "type": "string"
+        },
+        {
+          "field": "version",
+          "required": false,
+          "type": "string"
+        }
+      ]
+    },
+    {
+      "eventType": "PwuTypeRedefined",
+      "aggregateType": "PWU_TYPE",
+      "payloadFields": [
+        {
+          "field": "pwuTypeId",
+          "required": true,
+          "type": "string"
+        },
+        {
+          "field": "name",
+          "required": false,
+          "type": "string"
+        },
+        {
+          "field": "purpose",
+          "required": false,
+          "type": "string"
+        },
+        {
+          "field": "pwuKind",
+          "required": false,
+          "type": "string"
+        },
+        {
+          "field": "isRoot",
+          "required": false,
+          "type": "boolean"
+        },
+        {
+          "field": "completionRule",
+          "required": false,
+          "type": "string"
+        },
+        {
+          "field": "permittedChildTypeIds",
+          "required": false,
+          "type": "string[]"
+        },
+        {
+          "field": "requiredAssurancePolicyIds",
+          "required": false,
+          "type": "string[]"
+        }
+      ]
+    },
+    {
+      "eventType": "PwuTypeRemoved",
+      "aggregateType": "PWU_TYPE",
+      "payloadFields": [
+        {
+          "field": "pwuTypeId",
           "required": true,
           "type": "string"
         }

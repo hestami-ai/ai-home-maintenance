@@ -548,7 +548,7 @@ export const PwuTypeSchema = z.strictObject({
 	requiredOutputs: z.array(z.string()),
 	requiredAssurancePolicyIds: z.array(z.string()),
 	completionRule: z.string(),
-	status: z.enum(['DRAFT', 'PUBLISHED', 'DEPRECATED'])
+	status: z.enum(['DRAFT', 'PUBLISHED', 'DEPRECATED', 'REMOVED'])
 });
 export type PwuType = z.infer<typeof PwuTypeSchema>;
 

@@ -282,7 +282,8 @@
       "enum": [
         "DRAFT",
         "PUBLISHED",
-        "DEPRECATED"
+        "DEPRECATED",
+        "REMOVED"
       ]
     }
   },

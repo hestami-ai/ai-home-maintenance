@@ -72,7 +72,10 @@ import {
 	createUndertaking,
 	definePwuType,
 	deprecatePwa,
+	editPwa,
+	editPwuType,
 	publishPwa,
+	removePwuType,
 	retirePwa,
 	submitPwaForReview,
 	validatePwa
@@ -139,6 +142,9 @@ export const HANDLERS: Readonly<Record<string, CommandHandler>> = {
 	// PWA-authoring context (RPH-DOC-010 §6, §11, §20, §42)
 	CreatePwa: createPwa,
 	DefinePwuType: definePwuType,
+	EditPwa: editPwa,
+	EditPwuType: editPwuType,
+	RemovePwuType: removePwuType,
 	SubmitPwaForReview: submitPwaForReview,
 	ValidatePwa: validatePwa,
 	PublishPwa: publishPwa,

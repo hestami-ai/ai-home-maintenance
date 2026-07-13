@@ -29,8 +29,11 @@ function byField(rows: ObjectRow[], field: string, value: string): ObjectRow[] {
 
 export const listPwas = (h: EngineHandle): ObjectRow[] =>
 	listByType(h, 'PROFESSIONAL_WORK_ARCHITECTURE');
-export const listPwuTypes = (h: EngineHandle, pwaId?: string): ObjectRow[] =>
-	pwaId ? byField(listByType(h, 'PWU_TYPE'), 'pwaId', pwaId) : listByType(h, 'PWU_TYPE');
+export const listPwuTypes = (h: EngineHandle, pwaId?: string): ObjectRow[] => {
+	// A RemovePwuType tombstones the type as status REMOVED; the authoring/read surfaces treat it as gone.
+	const live = listByType(h, 'PWU_TYPE').filter((r) => r.state.status !== 'REMOVED');
+	return pwaId ? byField(live, 'pwaId', pwaId) : live;
+};
 export const listUndertakings = (h: EngineHandle): ObjectRow[] => listByType(h, 'UNDERTAKING');
 export const listPwus = (h: EngineHandle, undertakingId?: string): ObjectRow[] =>
 	undertakingId

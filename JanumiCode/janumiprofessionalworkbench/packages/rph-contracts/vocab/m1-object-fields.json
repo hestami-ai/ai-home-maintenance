@@ -1276,7 +1276,7 @@
         },
         {
           "field": "status",
-          "type": "'DRAFT' | 'PUBLISHED' | 'DEPRECATED'",
+          "type": "'DRAFT' | 'PUBLISHED' | 'DEPRECATED' | 'REMOVED'",
           "required": true
         }
       ]
