@@ -19,7 +19,9 @@ test.describe('PWA lifecycle — deprecate then retire a published PWA', () => {
 		await gotoHydrated(page, href!);
 		// level:1 targets the PWA title h1 specifically — the seeded root PWU Type is also named "Product
 		// Realization" and renders as an h3 in the inspector, so an unpinned heading match is ambiguous.
-		await expect(page.getByRole('heading', { name: 'Product Realization', level: 1 })).toBeVisible();
+		await expect(
+			page.getByRole('heading', { name: 'Product Realization', level: 1 })
+		).toBeVisible();
 
 		// 2. Deprecate the published PWA.
 		await page.getByRole('button', { name: /^Deprecate$/ }).click();
