@@ -73,7 +73,9 @@ export function dispatch(
 		issuedAt: TEST_MODE ? testNow() : new Date().toISOString(),
 		issuedBy: { actorId: 'ui-user', actorType: 'HUMAN', displayName: 'Workbench User' },
 		correlationId: 'ui',
-		idempotencyKey: TEST_MODE ? `ui-idem-${cmdSeq}` : `ui-idem-${cmdSeq}-${Math.floor(performance.now())}`,
+		idempotencyKey: TEST_MODE
+			? `ui-idem-${cmdSeq}`
+			: `ui-idem-${cmdSeq}-${Math.floor(performance.now())}`,
 		payload
 	};
 	return getEngine().dispatch(command);
