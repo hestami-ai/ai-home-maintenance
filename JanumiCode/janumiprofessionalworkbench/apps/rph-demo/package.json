@@ -5,10 +5,11 @@
   "type": "module",
   "description": "M14 demonstration UI — a SvelteKit + Svelte Flow surface that visualizes the RPH PWU decomposition (4 state axes, no-green-without-assurance) over the pure rph-projections read-model seam (never the Node engine facade). Run from the repo root with: bun install && bun run --filter @janumipwb/rph-demo dev  (this monorepo pins Bun via devEngines; npm will refuse). Or from this dir: bun run dev.",
   "scripts": {
-    "dev": "vite dev",
-    "build": "vite build",
+    "dev": "svelte-kit sync && vite dev",
+    "build": "svelte-kit sync && vite build",
     "preview": "vite preview",
-    "check": "svelte-kit sync && svelte-check --tsconfig ./tsconfig.json"
+    "check": "svelte-kit sync && svelte-check --tsconfig ./tsconfig.json",
+    "prepare": "svelte-kit sync"
   },
   "dependencies": {
     "@janumipwb/rph-engine": "workspace:*",
