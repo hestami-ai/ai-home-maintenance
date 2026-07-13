@@ -23,19 +23,19 @@
 <div>
 <div>
 <div aria-label="4.7 star rating" role="img">
-<div> </div>
-<div> </div>
-<div> </div>
-<div> </div>
-<div> </div>
+<div>Â </div>
+<div>Â </div>
+<div>Â </div>
+<div>Â </div>
+<div>Â </div>
 </div>
 </div>
 </div>
 </div>
-<div data-testid="BizHeaderReviewCount"><span data-font-weight="semibold">4.7 </span><span><a>(40 reviews)</a></span></div>
+<div data-testid="BizHeaderReviewCount"><span data-font-weight="semibold">4.7Â </span><span><a>(40 reviews)</a></span></div>
 </div>
-<div><span data-font-weight="semibold"> Claimed</span></div>
-<span><span data-font-weight="semibold" data-testid="BizHeaderCategory"><a>Roofing</a>, </span><span data-font-weight="semibold" data-testid="BizHeaderCategory"><a>Gutter Services</a>, </span><span data-font-weight="semibold" data-testid="BizHeaderCategory"><a>Siding</a></span></span>
+<div><span data-font-weight="semibold">Â Claimed</span></div>
+<span><span data-font-weight="semibold" data-testid="BizHeaderCategory"><a>Roofing</a>,Â </span><span data-font-weight="semibold" data-testid="BizHeaderCategory"><a>Gutter Services</a>,Â </span><span data-font-weight="semibold" data-testid="BizHeaderCategory"><a>Siding</a></span></span>
 <div>
 <div>
 <div>
@@ -52,35 +52,35 @@
 <div>
 <div><a data-activated="false" data-button="true">
 <div>
-<div> </div>
+<div>Â </div>
 <div><span>Write a review</span></div>
 </div>
 </a></div>
 <div><a data-activated="false" data-button="true">
 <div>
-<div> </div>
+<div>Â </div>
 <div><span>Add photo</span></div>
 </div>
 </a></div>
 <div>
 <div>
-<div> </div>
+<div>Â </div>
 <div><span>Share</span></div>
 </div>
 </div>
 <div>
 <div>
-<div> </div>
+<div>Â </div>
 <div><span>Save</span></div>
 </div>
 </div>
 <div>
 <div>
-<div> </div>
+<div>Â </div>
 <div><span>Follow</span></div>
 </div>
 </div>
-<div> </div>
+<div>Â </div>
 </div>
 <section aria-label="Updates From This Business">
 <div>
@@ -105,7 +105,7 @@
 <h5>James Hardie Siding in Alexandria!!</h5>
 </div>
 <div>
-<p>Looking to upgrade your home with a durable, Stylish…<span> read more</span></p>
+<p>Looking to upgrade your home with a durable, Stylishâ€¦<span>Â read more</span></p>
 </div>
 </div>
 </div>
@@ -115,11 +115,11 @@
 <div>
 <div>
 <div>
-<div data-testid="video-icon"> </div>
+<div data-testid="video-icon">Â </div>
 <div>
 <div><img alt="Certified TPO Flat Roof Replacement" draggable="true" height="130" loading="lazy" width="130"/></div>
 <div data-testid="overlay">
-<div> </div>
+<div>Â </div>
 </div>
 </div>
 </div>
@@ -128,7 +128,7 @@
 <h5>Certified TPO Flat Roof Replacement</h5>
 </div>
 <div>
-<p>Need a durable, energy-efficient flat roof? We…<span> read more</span></p>
+<p>Need a durable, energy-efficient flat roof? Weâ€¦<span>Â read more</span></p>
 </div>
 </div>
 </div>
@@ -147,7 +147,7 @@
 <h5>Top-Rated Shingle Roof Experts- Call Today!</h5>
 </div>
 <div>
-<p>We specialize in expert shingle roof replacement,…<span> read more</span></p>
+<p>We specialize in expert shingle roof replacement,â€¦<span>Â read more</span></p>
 </div>
 </div>
 </div>
@@ -166,7 +166,7 @@
 <h5>Emergency Roof Repairs!</h5>
 </div>
 <div>
-<p>Rain and snow are on the way! We’re offering…<span> read more</span></p>
+<p>Rain and snow are on the way! Weâ€™re offeringâ€¦<span>Â read more</span></p>
 </div>
 </div>
 </div>
@@ -185,7 +185,7 @@
 <h5>Stop Ice Dams Now- Free Inspection</h5>
 </div>
 <div>
-<p>Ice dams can cause costly roof damage, but we’re…<span> read more</span></p>
+<p>Ice dams can cause costly roof damage, but weâ€™reâ€¦<span>Â read more</span></p>
 </div>
 </div>
 </div>
@@ -195,11 +195,11 @@
 <div>
 <div>
 <div>
-<div data-testid="video-icon"> </div>
+<div data-testid="video-icon">Â </div>
 <div>
 <div><img alt="Get Your Roof Winter-Ready With Us!" draggable="true" height="130" loading="lazy" width="130"/></div>
 <div data-testid="overlay">
-<div> </div>
+<div>Â </div>
 </div>
 </div>
 </div>
@@ -208,7 +208,7 @@
 <h5>Get Your Roof Winter-Ready With Us!</h5>
 </div>
 <div>
-<p>Getting your roof ready before winter is crucial! By…<span> read more</span></p>
+<p>Getting your roof ready before winter is crucial! Byâ€¦<span>Â read more</span></p>
 </div>
 </div>
 </div>
@@ -227,7 +227,7 @@
 <h5>Looking for a commercial contractor?</h5>
 </div>
 <div>
-<p>We can help. We specialize in commercial roofing,…<span> read more</span></p>
+<p>We can help. We specialize in commercial roofing,â€¦<span>Â read more</span></p>
 </div>
 </div>
 </div>
@@ -246,7 +246,7 @@
 <h5>Boost Flat Roof Lifespan with Silicone Coating!</h5>
 </div>
 <div>
-<p>Add up to a decade to your flat roof's life with our…<span> read more</span></p>
+<p>Add up to a decade to your flat roof's life with ourâ€¦<span>Â read more</span></p>
 </div>
 </div>
 </div>
@@ -256,11 +256,11 @@
 <div>
 <div>
 <div>
-<div data-testid="video-icon"> </div>
+<div data-testid="video-icon">Â </div>
 <div>
 <div><img alt="Free Roof Inspection!" draggable="true" height="130" loading="lazy" width="130"/></div>
 <div data-testid="overlay">
-<div> </div>
+<div>Â </div>
 </div>
 </div>
 </div>
@@ -269,7 +269,7 @@
 <h5>Free Roof Inspection!</h5>
 </div>
 <div>
-<p>Our estimates are free! We are fully licensed…<span> read more</span></p>
+<p>Our estimates are free! We are fully licensedâ€¦<span>Â read more</span></p>
 </div>
 </div>
 </div>
@@ -288,7 +288,7 @@
 <h5>Eco-friendly Silicone Coating</h5>
 </div>
 <div>
-<p>Durability, UV resistance, Waterproof ponding water…<span> read more</span></p>
+<p>Durability, UV resistance, Waterproof ponding waterâ€¦<span>Â read more</span></p>
 </div>
 </div>
 </div>
@@ -307,7 +307,7 @@
 <h5>Local Experts For Commercial Roofing</h5>
 </div>
 <div>
-<p>Selecting the right roofing company is paramount.…<span> read more</span></p>
+<p>Selecting the right roofing company is paramount.â€¦<span>Â read more</span></p>
 </div>
 </div>
 </div>
@@ -317,11 +317,11 @@
 <div>
 <div>
 <div>
-<div data-testid="video-icon"> </div>
+<div data-testid="video-icon">Â </div>
 <div>
 <div><img alt="Top-Tier Roofing Solutions!" draggable="true" height="130" loading="lazy" width="130"/></div>
 <div data-testid="overlay">
-<div> </div>
+<div>Â </div>
 </div>
 </div>
 </div>
@@ -330,7 +330,7 @@
 <h5>Top-Tier Roofing Solutions!</h5>
 </div>
 <div>
-<p>At Impact Roofing &amp; Renovations, we know choosing…<span> read more</span></p>
+<p>At Impact Roofing &amp; Renovations, we know choosingâ€¦<span>Â read more</span></p>
 </div>
 </div>
 </div>
@@ -349,7 +349,7 @@
 <h5>Premium TPO Roofing Services!</h5>
 </div>
 <div>
-<p>Our team comprises skilled professionals with years…<span> read more</span></p>
+<p>Our team comprises skilled professionals with yearsâ€¦<span>Â read more</span></p>
 </div>
 </div>
 </div>
@@ -360,15 +360,15 @@
 <div>
 <div>
 <div>
-<div><img alt="Yesterday’s Hail: Replace Roof via Insurance" draggable="true" height="130" loading="lazy" width="130"/></div>
+<div><img alt="Yesterdayâ€™s Hail: Replace Roof via Insurance" draggable="true" height="130" loading="lazy" width="130"/></div>
 </div>
 </div>
 <div>
 <div>
-<h5>Yesterday’s Hail: Replace Roof via Insurance</h5>
+<h5>Yesterdayâ€™s Hail: Replace Roof via Insurance</h5>
 </div>
 <div>
-<p>If you or anyone you know experienced damage to your…<span> read more</span></p>
+<p>If you or anyone you know experienced damage to yourâ€¦<span>Â read more</span></p>
 </div>
 </div>
 </div>
@@ -387,7 +387,7 @@
 <h5>Unbeatable Deals on TPO Full Replacement</h5>
 </div>
 <div>
-<p>Get a fantastic $500.00 discount on TPO full…<span> read more</span></p>
+<p>Get a fantastic $500.00 discount on TPO fullâ€¦<span>Â read more</span></p>
 </div>
 </div>
 </div>
@@ -397,11 +397,11 @@
 <div>
 <div>
 <div>
-<div data-testid="video-icon"> </div>
+<div data-testid="video-icon">Â </div>
 <div>
 <div><img alt="Lifetime Warranty Roofing for Your Peace of Mind" draggable="true" height="130" loading="lazy" width="130"/></div>
 <div data-testid="overlay">
-<div> </div>
+<div>Â </div>
 </div>
 </div>
 </div>
@@ -410,7 +410,7 @@
 <h5>Lifetime Warranty Roofing for Your Peace of Mind</h5>
 </div>
 <div>
-<p>At Impact Roofing &amp; Renovations, we back our work…<span> read more</span></p>
+<p>At Impact Roofing &amp; Renovations, we back our workâ€¦<span>Â read more</span></p>
 </div>
 </div>
 </div>
@@ -420,11 +420,11 @@
 <div>
 <div>
 <div>
-<div data-testid="video-icon"> </div>
+<div data-testid="video-icon">Â </div>
 <div>
 <div><img alt="Get A Free Quote Today!" draggable="true" height="130" loading="lazy" width="130"/></div>
 <div data-testid="overlay">
-<div> </div>
+<div>Â </div>
 </div>
 </div>
 </div>
@@ -433,7 +433,7 @@
 <h5>Get A Free Quote Today!</h5>
 </div>
 <div>
-<p>Thank you to our brave men and women who have served…<span> read more</span></p>
+<p>Thank you to our brave men and women who have servedâ€¦<span>Â read more</span></p>
 </div>
 </div>
 </div>
@@ -452,7 +452,7 @@
 <h5>Limited-time offer!</h5>
 </div>
 <div>
-<p>Until July 4th you can get 10% off on a full home…<span> read more</span></p>
+<p>Until July 4th you can get 10% off on a full homeâ€¦<span>Â read more</span></p>
 </div>
 </div>
 </div>
@@ -471,7 +471,7 @@
 <h5>We specialize in exterior renovations and solar</h5>
 </div>
 <div>
-<p>Give us a call at (703) 329-2959 to book an…<span> read more</span></p>
+<p>Give us a call at (703) 329-2959 to book anâ€¦<span>Â read more</span></p>
 </div>
 </div>
 </div>
@@ -490,7 +490,7 @@
 <h5>10% off</h5>
 </div>
 <div>
-<p>Get 10% off on your purchase of $10000 or more.…<span> read more</span></p>
+<p>Get 10% off on your purchase of $10000 or more.â€¦<span>Â read more</span></p>
 </div>
 </div>
 </div>
@@ -500,11 +500,11 @@
 <div>
 <div>
 <div>
-<div data-testid="video-icon"> </div>
+<div data-testid="video-icon">Â </div>
 <div>
 <div><img alt="Make sure your roof is using the best equipment" draggable="true" height="130" loading="lazy" width="130"/></div>
 <div data-testid="overlay">
-<div> </div>
+<div>Â </div>
 </div>
 </div>
 </div>
@@ -513,7 +513,7 @@
 <h5>Make sure your roof is using the best equipment</h5>
 </div>
 <div>
-<p>During a roof replacement or large construction…<span> read more</span></p>
+<p>During a roof replacement or large constructionâ€¦<span>Â read more</span></p>
 </div>
 </div>
 </div>
@@ -532,7 +532,7 @@
 <h5>Kickstart Your Outdoor Projects This Summer!</h5>
 </div>
 <div>
-<p>Save $1000.00 on your New James Hardie Siding…<span> read more</span></p>
+<p>Save $1000.00 on your New James Hardie Sidingâ€¦<span>Â read more</span></p>
 </div>
 </div>
 </div>
@@ -542,11 +542,11 @@
 <div>
 <div>
 <div>
-<div data-testid="video-icon"> </div>
+<div data-testid="video-icon">Â </div>
 <div>
 <div><img alt="Summer Specials Now Available!" draggable="true" height="130" loading="lazy" width="130"/></div>
 <div data-testid="overlay">
-<div> </div>
+<div>Â </div>
 </div>
 </div>
 </div>
@@ -555,7 +555,7 @@
 <h5>Summer Specials Now Available!</h5>
 </div>
 <div>
-<p>Revitalize Your Roof and Gutters for a Refreshing…<span> read more</span></p>
+<p>Revitalize Your Roof and Gutters for a Refreshingâ€¦<span>Â read more</span></p>
 </div>
 </div>
 </div>
@@ -565,11 +565,11 @@
 <div>
 <div>
 <div>
-<div data-testid="video-icon"> </div>
+<div data-testid="video-icon">Â </div>
 <div>
 <div><img alt="Experience Top-Notch Roofing Services" draggable="true" height="130" loading="lazy" width="130"/></div>
 <div data-testid="overlay">
-<div> </div>
+<div>Â </div>
 </div>
 </div>
 </div>
@@ -578,7 +578,7 @@
 <h5>Experience Top-Notch Roofing Services</h5>
 </div>
 <div>
-<p>Hiring a good roofing company is essential for the…<span> read more</span></p>
+<p>Hiring a good roofing company is essential for theâ€¦<span>Â read more</span></p>
 </div>
 </div>
 </div>
@@ -597,7 +597,7 @@
 <h5>Need a manufacturers certified roof replacement?</h5>
 </div>
 <div>
-<p>We are certified with all of the major manufacturers…<span> read more</span></p>
+<p>We are certified with all of the major manufacturersâ€¦<span>Â read more</span></p>
 </div>
 </div>
 </div>
@@ -616,7 +616,7 @@
 <h5>We Are Here To Provide You Top-Notch Service!</h5>
 </div>
 <div>
-<p>At Impact Roofing we specialize in a wide range of…<span> read more</span></p>
+<p>At Impact Roofing we specialize in a wide range ofâ€¦<span>Â read more</span></p>
 </div>
 </div>
 </div>
@@ -635,7 +635,7 @@
 <h5>Call for a free roof replacement estimate!</h5>
 </div>
 <div>
-<p>We work with you to find the best roofing solution…<span> read more</span></p>
+<p>We work with you to find the best roofing solutionâ€¦<span>Â read more</span></p>
 </div>
 </div>
 </div>
@@ -654,7 +654,7 @@
 <h5>Our team has 15 years of experience</h5>
 </div>
 <div>
-<p>We can handle all your roofing needs. Call to…<span> read more</span></p>
+<p>We can handle all your roofing needs. Call toâ€¦<span>Â read more</span></p>
 </div>
 </div>
 </div>
@@ -673,7 +673,7 @@
 <h5>First-time customer special</h5>
 </div>
 <div>
-<p>New customers get free gutter guard inserts with a…<span> read more</span></p>
+<p>New customers get free gutter guard inserts with aâ€¦<span>Â read more</span></p>
 </div>
 </div>
 </div>
@@ -692,7 +692,7 @@
 <h5>Free estimate for Valentine's Day</h5>
 </div>
 <div>
-<p>Happy Valentine's Day! Get a free estimate now…<span> read more</span></p>
+<p>Happy Valentine's Day! Get a free estimate nowâ€¦<span>Â read more</span></p>
 </div>
 </div>
 </div>
@@ -724,7 +724,7 @@
 <h2>Portfolio from the Business</h2>
 <div>
 <div>
-<p data-font-weight="semibold">Sponsored </p>
+<p data-font-weight="semibold">SponsoredÂ </p>
 </div>
 </div>
 </div>
@@ -785,7 +785,7 @@
 </div>
 </div>
 <div>
-<p data-font-weight="semibold">More Projects </p>
+<p data-font-weight="semibold">More ProjectsÂ </p>
 </div>
 </div>
 </section>
@@ -1010,7 +1010,7 @@
 <h2>Services Offered</h2>
 <div>
 <div>
-<p data-font-weight="semibold">Verified by Business </p>
+<p data-font-weight="semibold">Verified by BusinessÂ </p>
 </div>
 </div>
 </div>
@@ -1029,7 +1029,7 @@
 <div><a data-testid="Service Offering" role="link">Siding installation</a></div>
 </div>
 </div>
-<button data-activated="false" data-button="true" type="submit" value="submit"><span>See 3 More </span></button></section>
+<button data-activated="false" data-button="true" type="submit" value="submit"><span>See 3 MoreÂ </span></button></section>
 <section aria-label="Review Highlights">
 <div>
 <div>
@@ -1043,7 +1043,7 @@
 <div><a target="_self"><img alt="Brittney A." draggable="true" height="60" loading="lazy" width="60"/></a></div>
 </div>
 <div>
-<p>“<span>I want to thank Jeff and </span><span data-font-weight="bold"><a role="button">Mason</a></span><span> for their help with a roof inspection that was required for my home owners insurance policy.</span>”<a role="button"> in 10 reviews</a></p>
+<p>â€œ<span>I want to thank Jeff andÂ </span><span data-font-weight="bold"><a role="button">Mason</a></span><span>Â for their help with a roof inspection that was required for my home owners insurance policy.</span>â€<a role="button">Â in 10 reviews</a></p>
 </div>
 </div>
 <div>
@@ -1051,7 +1051,7 @@
 <div><a target="_self"><img alt="Juliana C." draggable="true" height="60" loading="lazy" width="60"/></a></div>
 </div>
 <div>
-<p>“<span data-font-weight="bold"><a role="button">Ben</a></span><span> was our foreman and he was responsive to our questions and concerns.</span>”<a role="button"> in 3 reviews</a></p>
+<p>â€œ<span data-font-weight="bold"><a role="button">Ben</a></span><span>Â was our foreman and he was responsive to our questions and concerns.</span>â€<a role="button">Â in 3 reviews</a></p>
 </div>
 </div>
 <div>
@@ -1059,13 +1059,13 @@
 <div><a target="_self"><img alt="impact-roofing-and-renovations-alexandria-4 photo lGekAvoKq3tOF9bunMIDig" draggable="true" height="60" loading="lazy" width="60"/></a></div>
 </div>
 <div>
-<p>“<span>Very responsive, price beat everyone else's, left the house looking great , the </span><span data-font-weight="bold"><a role="button">new roof</a></span><span> and the surroundings!</span>”<a role="button"> in 7 reviews</a></p>
+<p>â€œ<span>Very responsive, price beat everyone else's, left the house looking great , theÂ </span><span data-font-weight="bold"><a role="button">new roof</a></span><span>Â and the surroundings!</span>â€<a role="button">Â in 7 reviews</a></p>
 </div>
 </div>
 </div>
 <div>
 <div>
-<p> </p>
+<p>Â </p>
 </div>
 </div>
 </div>
@@ -1078,7 +1078,7 @@
 </div>
 <div>
 <div>
-<p>Locally owned roofing contractor with expertise in traditional shingle roofs, as well as TPO, metal,<br/>slate and cedar. We have a goal to help reduce the 10 million tons of shingles that end up in land<br/>fills every year by educating homeowners on natural products and on the importance of a quality i…</p>
+<p>Locally owned roofing contractor with expertise in traditional shingle roofs, as well as TPO, metal,<br/>slate and cedar. We have a goal to help reduce the 10 million tons of shingles that end up in land<br/>fills every year by educating homeowners on natural products and on the importance of a quality iâ€¦</p>
 </div>
 <button aria-label="More information about the business. Opens a modal." data-activated="false" data-button="true" type="submit" value="submit"><span>Read more</span></button></div>
 </section>
@@ -1123,7 +1123,7 @@
 </li>
 </ul>
 </td>
-<td> </td>
+<td>Â </td>
 </tr>
 <tr></tr>
 <tr>
@@ -1137,7 +1137,7 @@
 </li>
 </ul>
 </td>
-<td> </td>
+<td>Â </td>
 </tr>
 <tr></tr>
 <tr>
@@ -1165,7 +1165,7 @@
 </li>
 </ul>
 </td>
-<td> </td>
+<td>Â </td>
 </tr>
 <tr></tr>
 <tr>
@@ -1179,7 +1179,7 @@
 </li>
 </ul>
 </td>
-<td> </td>
+<td>Â </td>
 </tr>
 <tr></tr>
 <tr>
@@ -1193,7 +1193,7 @@
 </li>
 </ul>
 </td>
-<td> </td>
+<td>Â </td>
 </tr>
 <tr></tr>
 <tr>
@@ -1207,7 +1207,7 @@
 </li>
 </ul>
 </td>
-<td> </td>
+<td>Â </td>
 </tr>
 </tbody>
 </table>
@@ -1229,25 +1229,25 @@
 <div>
 <div>
 <div>
-<div> </div>
+<div>Â </div>
 <div><span data-font-weight="semibold">ASL proficient</span></div>
 </div>
 </div>
 <div>
 <div>
-<div> </div>
+<div>Â </div>
 <div><span data-font-weight="semibold">Credit card processing fee</span></div>
 </div>
 </div>
 <div>
 <div>
-<div> </div>
+<div>Â </div>
 <div><span data-font-weight="semibold">Accepts Credit Cards</span></div>
 </div>
 </div>
 <div>
 <div>
-<div> </div>
+<div>Â </div>
 <div><span data-font-weight="semibold">Accepts Zelle</span></div>
 </div>
 </div>
@@ -1268,7 +1268,7 @@
 </div>
 <div>
 <div>
-<p>Got a question about <span>Impact Roofing &amp; Renovations</span>? Ask the Yelp community!</p>
+<p>Got a question aboutÂ <span>Impact Roofing &amp; Renovations</span>? Ask the Yelp community!</p>
 </div>
 </div>
 <div><a data-activated="false" data-button="true"><span>See 1 question</span></a></div>
@@ -1283,7 +1283,7 @@
 <div>
 <div>
 <div>
-<div> </div>
+<div>Â </div>
 </div>
 <div>
 <div>
@@ -1296,7 +1296,7 @@
 <div>
 <div>
 <div>
-<div> </div>
+<div>Â </div>
 </div>
 <div>
 <div>
@@ -1309,7 +1309,7 @@
 <div>
 <div>
 <div>
-<div> </div>
+<div>Â </div>
 </div>
 <div>
 <div>
@@ -1322,7 +1322,7 @@
 <div>
 <div>
 <div>
-<div> </div>
+<div>Â </div>
 </div>
 <div>
 <div>
@@ -1335,7 +1335,7 @@
 <div>
 <div>
 <div>
-<div> </div>
+<div>Â </div>
 </div>
 <div>
 <div>
@@ -1348,7 +1348,7 @@
 <div>
 <div>
 <div>
-<div> </div>
+<div>Â </div>
 </div>
 <div>
 <div>
@@ -1371,15 +1371,15 @@
 <div aria-label="Info" role="alert">
 <div>
 <div>
-<div> </div>
+<div>Â </div>
 </div>
 </div>
 <div>
 <div>
-<div><span><span data-font-weight="bold">Your trust is our top concern,</span> <span>so businesses can't pay to alter or remove their reviews. </span><a>Learn more about reviews.</a></span></div>
+<div><span><span data-font-weight="bold">Your trust is our top concern,</span>Â <span>so businesses can't pay to alter or remove their reviews.Â </span><a>Learn more about reviews.</a></span></div>
 </div>
 </div>
-<div> </div>
+<div>Â </div>
 </div>
 </div>
 <div>
@@ -1413,11 +1413,11 @@
 <div>
 <div>
 <div aria-label="(no rating)" role="img">
-<div> </div>
-<div> </div>
-<div> </div>
-<div> </div>
-<div> </div>
+<div>Â </div>
+<div>Â </div>
+<div>Â </div>
+<div>Â </div>
+<div>Â </div>
 </div>
 <ul aria-label="Rating">
 <li>
@@ -1442,7 +1442,7 @@
 </div>
 </div>
 </fieldset></div>
-<a>Start your review of <span>Impact Roofing &amp; Renovations</span></a></div>
+<a>Start your review ofÂ <span>Impact Roofing &amp; Renovations</span></a></div>
 </div>
 </div>
 </div>
@@ -1454,11 +1454,11 @@
 <div>
 <div>
 <div aria-label="4.5 star rating" role="img">
-<div> </div>
-<div> </div>
-<div> </div>
-<div> </div>
-<div> </div>
+<div>Â </div>
+<div>Â </div>
+<div>Â </div>
+<div>Â </div>
+<div>Â </div>
 </div>
 </div>
 <div>
@@ -1475,7 +1475,7 @@
 </div>
 <div>
 <div>
-<div> </div>
+<div>Â </div>
 </div>
 </div>
 </div>
@@ -1487,7 +1487,7 @@
 </div>
 <div>
 <div>
-<div> </div>
+<div>Â </div>
 </div>
 </div>
 </div>
@@ -1499,7 +1499,7 @@
 </div>
 <div>
 <div>
-<div> </div>
+<div>Â </div>
 </div>
 </div>
 </div>
@@ -1511,7 +1511,7 @@
 </div>
 <div>
 <div>
-<div> </div>
+<div>Â </div>
 </div>
 </div>
 </div>
@@ -1523,7 +1523,7 @@
 </div>
 <div>
 <div>
-<div> </div>
+<div>Â </div>
 </div>
 </div>
 </div>
@@ -1548,8 +1548,8 @@
 <div><label><input aria-labelledby="inline-search-:rm:" name="query" placeholder=" " type="text" value=""/><span>Search reviews</span></label></div>
 <div>
 <div>
-<div> </div>
-<div> </div>
+<div>Â </div>
+<div>Â </div>
 </div>
 </div>
 </div>
@@ -1572,7 +1572,7 @@
 <div data-testid="UserPassportInfoTextContainer"><span>Washington, DC</span></div>
 </div>
 <div>
-<div> </div>
+<div>Â </div>
 <a>8 Home Improvement reviews</a></div>
 </div>
 </div>
@@ -1581,7 +1581,7 @@
 <div>
 <div>
 <div role="presentation">
-<div> </div>
+<div>Â </div>
 </div>
 </div>
 </div>
@@ -1593,11 +1593,11 @@
 <div>
 <div>
 <div aria-label="5 star rating" role="img">
-<div> </div>
-<div> </div>
-<div> </div>
-<div> </div>
-<div> </div>
+<div>Â </div>
+<div>Â </div>
+<div>Â </div>
+<div>Â </div>
+<div>Â </div>
 </div>
 </div>
 </div>
@@ -1621,8 +1621,8 @@
 </div>
 <div>
 <div>
-<div><span>Helpful</span> <span>0</span></div>
-<div aria-hidden="true"> </div>
+<div><span>Helpful</span>Â <span>0</span></div>
+<div aria-hidden="true">Â </div>
 </div>
 </div>
 </div>
@@ -1638,8 +1638,8 @@
 </div>
 <div>
 <div>
-<div><span>Thanks</span> <span>0</span></div>
-<div aria-hidden="true"> </div>
+<div><span>Thanks</span>Â <span>0</span></div>
+<div aria-hidden="true">Â </div>
 </div>
 </div>
 </div>
@@ -1655,8 +1655,8 @@
 </div>
 <div>
 <div>
-<div><span>Love this</span> <span>0</span></div>
-<div aria-hidden="true"> </div>
+<div><span>Love this</span>Â <span>0</span></div>
+<div aria-hidden="true">Â </div>
 </div>
 </div>
 </div>
@@ -1672,8 +1672,8 @@
 </div>
 <div>
 <div>
-<div><span>Oh no</span> <span>0</span></div>
-<div aria-hidden="true"> </div>
+<div><span>Oh no</span>Â <span>0</span></div>
+<div aria-hidden="true">Â </div>
 </div>
 </div>
 </div>
@@ -1703,7 +1703,7 @@
 </div>
 </div>
 </div>
-<div> </div>
+<div>Â </div>
 </div>
 <div>
 <div aria-live="polite" id="expander-link-content-:rv:" role="region">
@@ -1754,7 +1754,7 @@
 <div>
 <div>
 <div role="presentation">
-<div> </div>
+<div>Â </div>
 </div>
 </div>
 </div>
@@ -1766,11 +1766,11 @@
 <div>
 <div>
 <div aria-label="4 star rating" role="img">
-<div> </div>
-<div> </div>
-<div> </div>
-<div> </div>
-<div> </div>
+<div>Â </div>
+<div>Â </div>
+<div>Â </div>
+<div>Â </div>
+<div>Â </div>
 </div>
 </div>
 </div>
@@ -1780,7 +1780,7 @@
 </div>
 <div>
 <div>
-<div> </div>
+<div>Â </div>
 <span data-font-weight="semibold"><a>1 photo</a></span></div>
 </div>
 <div>
@@ -1814,8 +1814,8 @@
 </div>
 <div>
 <div>
-<div><span>Helpful</span> <span>0</span></div>
-<div aria-hidden="true"> </div>
+<div><span>Helpful</span>Â <span>0</span></div>
+<div aria-hidden="true">Â </div>
 </div>
 </div>
 </div>
@@ -1831,8 +1831,8 @@
 </div>
 <div>
 <div>
-<div><span>Thanks</span> <span>0</span></div>
-<div aria-hidden="true"> </div>
+<div><span>Thanks</span>Â <span>0</span></div>
+<div aria-hidden="true">Â </div>
 </div>
 </div>
 </div>
@@ -1848,8 +1848,8 @@
 </div>
 <div>
 <div>
-<div><span>Love this</span> <span>0</span></div>
-<div aria-hidden="true"> </div>
+<div><span>Love this</span>Â <span>0</span></div>
+<div aria-hidden="true">Â </div>
 </div>
 </div>
 </div>
@@ -1865,8 +1865,8 @@
 </div>
 <div>
 <div>
-<div><span>Oh no</span> <span>0</span></div>
-<div aria-hidden="true"> </div>
+<div><span>Oh no</span>Â <span>0</span></div>
+<div aria-hidden="true">Â </div>
 </div>
 </div>
 </div>
@@ -1896,7 +1896,7 @@
 </div>
 </div>
 </div>
-<div> </div>
+<div>Â </div>
 </div>
 <div>
 <div aria-live="polite" id="expander-link-content-:r17:" role="region">
@@ -1904,7 +1904,7 @@
 <div>
 <p>Mar 18, 2024</p>
 </div>
-<p><span>Hello Rod. Thank you for taking the time to share your experience with us. We’re glad to hear that you found our response time prompt and our quote thorough. Providing transparent and reliable service is at the core of what we do so we are happy to know that you found us honest and dependable. We understand that price is an important factor, and we always strive to offer competitive pricing for the quality of service we provide. Your satisfaction is our priority and we are grateful for your trust and choosing Impact Roofing! We look forward to serving you again in the future. Should you ever need our services. Have a wonderful day!</span></p>
+<p><span>Hello Rod. Thank you for taking the time to share your experience with us. Weâ€™re glad to hear that you found our response time prompt and our quote thorough. Providing transparent and reliable service is at the core of what we do so we are happy to know that you found us honest and dependable. We understand that price is an important factor, and we always strive to offer competitive pricing for the quality of service we provide. Your satisfaction is our priority and we are grateful for your trust and choosing Impact Roofing! We look forward to serving you again in the future. Should you ever need our services. Have a wonderful day!</span></p>
 </div>
 </div>
 <div>
@@ -1947,7 +1947,7 @@
 <div>
 <div>
 <div role="presentation">
-<div> </div>
+<div>Â </div>
 </div>
 </div>
 </div>
@@ -1959,11 +1959,11 @@
 <div>
 <div>
 <div aria-label="5 star rating" role="img">
-<div> </div>
-<div> </div>
-<div> </div>
-<div> </div>
-<div> </div>
+<div>Â </div>
+<div>Â </div>
+<div>Â </div>
+<div>Â </div>
+<div>Â </div>
 </div>
 </div>
 </div>
@@ -1987,8 +1987,8 @@
 </div>
 <div>
 <div>
-<div><span>Helpful</span> <span>1</span></div>
-<div aria-hidden="true"> </div>
+<div><span>Helpful</span>Â <span>1</span></div>
+<div aria-hidden="true">Â </div>
 </div>
 </div>
 </div>
@@ -2004,8 +2004,8 @@
 </div>
 <div>
 <div>
-<div><span>Thanks</span> <span>1</span></div>
-<div aria-hidden="true"> </div>
+<div><span>Thanks</span>Â <span>1</span></div>
+<div aria-hidden="true">Â </div>
 </div>
 </div>
 </div>
@@ -2021,8 +2021,8 @@
 </div>
 <div>
 <div>
-<div><span>Love this</span> <span>0</span></div>
-<div aria-hidden="true"> </div>
+<div><span>Love this</span>Â <span>0</span></div>
+<div aria-hidden="true">Â </div>
 </div>
 </div>
 </div>
@@ -2038,8 +2038,8 @@
 </div>
 <div>
 <div>
-<div><span>Oh no</span> <span>0</span></div>
-<div aria-hidden="true"> </div>
+<div><span>Oh no</span>Â <span>0</span></div>
+<div aria-hidden="true">Â </div>
 </div>
 </div>
 </div>
@@ -2069,7 +2069,7 @@
 </div>
 </div>
 </div>
-<div> </div>
+<div>Â </div>
 </div>
 <div>
 <div>
@@ -2111,7 +2111,7 @@
 <div>
 <div>
 <div role="presentation">
-<div> </div>
+<div>Â </div>
 </div>
 </div>
 </div>
@@ -2123,11 +2123,11 @@
 <div>
 <div>
 <div aria-label="5 star rating" role="img">
-<div> </div>
-<div> </div>
-<div> </div>
-<div> </div>
-<div> </div>
+<div>Â </div>
+<div>Â </div>
+<div>Â </div>
+<div>Â </div>
+<div>Â </div>
 </div>
 </div>
 </div>
@@ -2151,8 +2151,8 @@
 </div>
 <div>
 <div>
-<div><span>Helpful</span> <span>0</span></div>
-<div aria-hidden="true"> </div>
+<div><span>Helpful</span>Â <span>0</span></div>
+<div aria-hidden="true">Â </div>
 </div>
 </div>
 </div>
@@ -2168,8 +2168,8 @@
 </div>
 <div>
 <div>
-<div><span>Thanks</span> <span>0</span></div>
-<div aria-hidden="true"> </div>
+<div><span>Thanks</span>Â <span>0</span></div>
+<div aria-hidden="true">Â </div>
 </div>
 </div>
 </div>
@@ -2185,8 +2185,8 @@
 </div>
 <div>
 <div>
-<div><span>Love this</span> <span>0</span></div>
-<div aria-hidden="true"> </div>
+<div><span>Love this</span>Â <span>0</span></div>
+<div aria-hidden="true">Â </div>
 </div>
 </div>
 </div>
@@ -2202,8 +2202,8 @@
 </div>
 <div>
 <div>
-<div><span>Oh no</span> <span>0</span></div>
-<div aria-hidden="true"> </div>
+<div><span>Oh no</span>Â <span>0</span></div>
+<div aria-hidden="true">Â </div>
 </div>
 </div>
 </div>
@@ -2233,7 +2233,7 @@
 </div>
 </div>
 </div>
-<div> </div>
+<div>Â </div>
 </div>
 <div>
 <div>
@@ -2275,7 +2275,7 @@
 <div>
 <div>
 <div role="presentation">
-<div> </div>
+<div>Â </div>
 </div>
 </div>
 </div>
@@ -2287,11 +2287,11 @@
 <div>
 <div>
 <div aria-label="5 star rating" role="img">
-<div> </div>
-<div> </div>
-<div> </div>
-<div> </div>
-<div> </div>
+<div>Â </div>
+<div>Â </div>
+<div>Â </div>
+<div>Â </div>
+<div>Â </div>
 </div>
 </div>
 </div>
@@ -2301,7 +2301,7 @@
 </div>
 <div>
 <div>
-<div> </div>
+<div>Â </div>
 <span data-font-weight="semibold"><a>6 photos</a></span></div>
 </div>
 <div>
@@ -2345,8 +2345,8 @@
 </div>
 <div>
 <div>
-<div><span>Helpful</span> <span>1</span></div>
-<div aria-hidden="true"> </div>
+<div><span>Helpful</span>Â <span>1</span></div>
+<div aria-hidden="true">Â </div>
 </div>
 </div>
 </div>
@@ -2362,8 +2362,8 @@
 </div>
 <div>
 <div>
-<div><span>Thanks</span> <span>1</span></div>
-<div aria-hidden="true"> </div>
+<div><span>Thanks</span>Â <span>1</span></div>
+<div aria-hidden="true">Â </div>
 </div>
 </div>
 </div>
@@ -2379,8 +2379,8 @@
 </div>
 <div>
 <div>
-<div><span>Love this</span> <span>1</span></div>
-<div aria-hidden="true"> </div>
+<div><span>Love this</span>Â <span>1</span></div>
+<div aria-hidden="true">Â </div>
 </div>
 </div>
 </div>
@@ -2396,8 +2396,8 @@
 </div>
 <div>
 <div>
-<div><span>Oh no</span> <span>0</span></div>
-<div aria-hidden="true"> </div>
+<div><span>Oh no</span>Â <span>0</span></div>
+<div aria-hidden="true">Â </div>
 </div>
 </div>
 </div>
@@ -2427,7 +2427,7 @@
 </div>
 </div>
 </div>
-<div> </div>
+<div>Â </div>
 </div>
 <div>
 <div aria-live="polite" id="expander-link-content-:r1t:" role="region">
@@ -2435,7 +2435,7 @@
 <div>
 <p>Jun 26, 2024</p>
 </div>
-<p><span>Thank you for the glowing review, Danielle! Thank you for noticing all of the effort the team puts in. Unfortunately builders cutting corners has become industry standard. It’s not the way we would have liked to meet you, but we are happy to have helped. Please reach out if you ever need anything in the future.</span></p>
+<p><span>Thank you for the glowing review, Danielle! Thank you for noticing all of the effort the team puts in. Unfortunately builders cutting corners has become industry standard. Itâ€™s not the way we would have liked to meet you, but we are happy to have helped. Please reach out if you ever need anything in the future.</span></p>
 </div>
 </div>
 <div>
@@ -2478,7 +2478,7 @@
 <div>
 <div>
 <div role="presentation">
-<div> </div>
+<div>Â </div>
 </div>
 </div>
 </div>
@@ -2490,11 +2490,11 @@
 <div>
 <div>
 <div aria-label="5 star rating" role="img">
-<div> </div>
-<div> </div>
-<div> </div>
-<div> </div>
-<div> </div>
+<div>Â </div>
+<div>Â </div>
+<div>Â </div>
+<div>Â </div>
+<div>Â </div>
 </div>
 </div>
 </div>
@@ -2518,8 +2518,8 @@
 </div>
 <div>
 <div>
-<div><span>Helpful</span> <span>1</span></div>
-<div aria-hidden="true"> </div>
+<div><span>Helpful</span>Â <span>1</span></div>
+<div aria-hidden="true">Â </div>
 </div>
 </div>
 </div>
@@ -2535,8 +2535,8 @@
 </div>
 <div>
 <div>
-<div><span>Thanks</span> <span>0</span></div>
-<div aria-hidden="true"> </div>
+<div><span>Thanks</span>Â <span>0</span></div>
+<div aria-hidden="true">Â </div>
 </div>
 </div>
 </div>
@@ -2552,8 +2552,8 @@
 </div>
 <div>
 <div>
-<div><span>Love this</span> <span>1</span></div>
-<div aria-hidden="true"> </div>
+<div><span>Love this</span>Â <span>1</span></div>
+<div aria-hidden="true">Â </div>
 </div>
 </div>
 </div>
@@ -2569,8 +2569,8 @@
 </div>
 <div>
 <div>
-<div><span>Oh no</span> <span>0</span></div>
-<div aria-hidden="true"> </div>
+<div><span>Oh no</span>Â <span>0</span></div>
+<div aria-hidden="true">Â </div>
 </div>
 </div>
 </div>
@@ -2600,7 +2600,7 @@
 </div>
 </div>
 </div>
-<div> </div>
+<div>Â </div>
 </div>
 <div>
 <div aria-live="polite" id="expander-link-content-:r25:" role="region">
@@ -2608,7 +2608,7 @@
 <div>
 <p>Nov 22, 2024</p>
 </div>
-<p><span>Thank you for the thoughtful review. It is our process to try to provide information and education. We want to make an impact on the communities we serve and we are happy we were able to do that today. We also don’t want to unnecessarily put shingles in a landfill if we can help prevent it. Thank you for noticing!</span></p>
+<p><span>Thank you for the thoughtful review. It is our process to try to provide information and education. We want to make an impact on the communities we serve and we are happy we were able to do that today. We also donâ€™t want to unnecessarily put shingles in a landfill if we can help prevent it. Thank you for noticing!</span></p>
 </div>
 </div>
 <div>
@@ -2651,7 +2651,7 @@
 <div>
 <div>
 <div role="presentation">
-<div> </div>
+<div>Â </div>
 </div>
 </div>
 </div>
@@ -2663,11 +2663,11 @@
 <div>
 <div>
 <div aria-label="1 star rating" role="img">
-<div> </div>
-<div> </div>
-<div> </div>
-<div> </div>
-<div> </div>
+<div>Â </div>
+<div>Â </div>
+<div>Â </div>
+<div>Â </div>
+<div>Â </div>
 </div>
 </div>
 </div>
@@ -2691,8 +2691,8 @@
 </div>
 <div>
 <div>
-<div><span>Helpful</span> <span>0</span></div>
-<div aria-hidden="true"> </div>
+<div><span>Helpful</span>Â <span>0</span></div>
+<div aria-hidden="true">Â </div>
 </div>
 </div>
 </div>
@@ -2708,8 +2708,8 @@
 </div>
 <div>
 <div>
-<div><span>Thanks</span> <span>0</span></div>
-<div aria-hidden="true"> </div>
+<div><span>Thanks</span>Â <span>0</span></div>
+<div aria-hidden="true">Â </div>
 </div>
 </div>
 </div>
@@ -2725,8 +2725,8 @@
 </div>
 <div>
 <div>
-<div><span>Love this</span> <span>0</span></div>
-<div aria-hidden="true"> </div>
+<div><span>Love this</span>Â <span>0</span></div>
+<div aria-hidden="true">Â </div>
 </div>
 </div>
 </div>
@@ -2742,8 +2742,8 @@
 </div>
 <div>
 <div>
-<div><span>Oh no</span> <span>0</span></div>
-<div aria-hidden="true"> </div>
+<div><span>Oh no</span>Â <span>0</span></div>
+<div aria-hidden="true">Â </div>
 </div>
 </div>
 </div>
@@ -2773,7 +2773,7 @@
 </div>
 </div>
 </div>
-<div> </div>
+<div>Â </div>
 </div>
 <div>
 <div aria-live="polite" id="expander-link-content-:r2d:" role="region">
@@ -2824,7 +2824,7 @@
 <div>
 <div>
 <div role="presentation">
-<div> </div>
+<div>Â </div>
 </div>
 </div>
 </div>
@@ -2836,11 +2836,11 @@
 <div>
 <div>
 <div aria-label="5 star rating" role="img">
-<div> </div>
-<div> </div>
-<div> </div>
-<div> </div>
-<div> </div>
+<div>Â </div>
+<div>Â </div>
+<div>Â </div>
+<div>Â </div>
+<div>Â </div>
 </div>
 </div>
 </div>
@@ -2864,8 +2864,8 @@
 </div>
 <div>
 <div>
-<div><span>Helpful</span> <span>0</span></div>
-<div aria-hidden="true"> </div>
+<div><span>Helpful</span>Â <span>0</span></div>
+<div aria-hidden="true">Â </div>
 </div>
 </div>
 </div>
@@ -2881,8 +2881,8 @@
 </div>
 <div>
 <div>
-<div><span>Thanks</span> <span>0</span></div>
-<div aria-hidden="true"> </div>
+<div><span>Thanks</span>Â <span>0</span></div>
+<div aria-hidden="true">Â </div>
 </div>
 </div>
 </div>
@@ -2898,8 +2898,8 @@
 </div>
 <div>
 <div>
-<div><span>Love this</span> <span>0</span></div>
-<div aria-hidden="true"> </div>
+<div><span>Love this</span>Â <span>0</span></div>
+<div aria-hidden="true">Â </div>
 </div>
 </div>
 </div>
@@ -2915,8 +2915,8 @@
 </div>
 <div>
 <div>
-<div><span>Oh no</span> <span>0</span></div>
-<div aria-hidden="true"> </div>
+<div><span>Oh no</span>Â <span>0</span></div>
+<div aria-hidden="true">Â </div>
 </div>
 </div>
 </div>
@@ -2946,7 +2946,7 @@
 </div>
 </div>
 </div>
-<div> </div>
+<div>Â </div>
 </div>
 <div>
 <div>
@@ -2988,7 +2988,7 @@
 <div>
 <div>
 <div role="presentation">
-<div> </div>
+<div>Â </div>
 </div>
 </div>
 </div>
@@ -3000,11 +3000,11 @@
 <div>
 <div>
 <div aria-label="5 star rating" role="img">
-<div> </div>
-<div> </div>
-<div> </div>
-<div> </div>
-<div> </div>
+<div>Â </div>
+<div>Â </div>
+<div>Â </div>
+<div>Â </div>
+<div>Â </div>
 </div>
 </div>
 </div>
@@ -3028,8 +3028,8 @@
 </div>
 <div>
 <div>
-<div><span>Helpful</span> <span>0</span></div>
-<div aria-hidden="true"> </div>
+<div><span>Helpful</span>Â <span>0</span></div>
+<div aria-hidden="true">Â </div>
 </div>
 </div>
 </div>
@@ -3045,8 +3045,8 @@
 </div>
 <div>
 <div>
-<div><span>Thanks</span> <span>0</span></div>
-<div aria-hidden="true"> </div>
+<div><span>Thanks</span>Â <span>0</span></div>
+<div aria-hidden="true">Â </div>
 </div>
 </div>
 </div>
@@ -3062,8 +3062,8 @@
 </div>
 <div>
 <div>
-<div><span>Love this</span> <span>0</span></div>
-<div aria-hidden="true"> </div>
+<div><span>Love this</span>Â <span>0</span></div>
+<div aria-hidden="true">Â </div>
 </div>
 </div>
 </div>
@@ -3079,8 +3079,8 @@
 </div>
 <div>
 <div>
-<div><span>Oh no</span> <span>0</span></div>
-<div aria-hidden="true"> </div>
+<div><span>Oh no</span>Â <span>0</span></div>
+<div aria-hidden="true">Â </div>
 </div>
 </div>
 </div>
@@ -3110,7 +3110,7 @@
 </div>
 </div>
 </div>
-<div> </div>
+<div>Â </div>
 </div>
 <div>
 <div>
@@ -3152,7 +3152,7 @@
 <div>
 <div>
 <div role="presentation">
-<div> </div>
+<div>Â </div>
 </div>
 </div>
 </div>
@@ -3164,11 +3164,11 @@
 <div>
 <div>
 <div aria-label="5 star rating" role="img">
-<div> </div>
-<div> </div>
-<div> </div>
-<div> </div>
-<div> </div>
+<div>Â </div>
+<div>Â </div>
+<div>Â </div>
+<div>Â </div>
+<div>Â </div>
 </div>
 </div>
 </div>
@@ -3178,7 +3178,7 @@
 </div>
 <div>
 <div>
-<div> </div>
+<div>Â </div>
 <span data-font-weight="semibold"><a>1 photo</a></span></div>
 </div>
 <div>
@@ -3206,8 +3206,8 @@
 </div>
 <div>
 <div>
-<div><span>Helpful</span> <span>0</span></div>
-<div aria-hidden="true"> </div>
+<div><span>Helpful</span>Â <span>0</span></div>
+<div aria-hidden="true">Â </div>
 </div>
 </div>
 </div>
@@ -3223,8 +3223,8 @@
 </div>
 <div>
 <div>
-<div><span>Thanks</span> <span>0</span></div>
-<div aria-hidden="true"> </div>
+<div><span>Thanks</span>Â <span>0</span></div>
+<div aria-hidden="true">Â </div>
 </div>
 </div>
 </div>
@@ -3240,8 +3240,8 @@
 </div>
 <div>
 <div>
-<div><span>Love this</span> <span>0</span></div>
-<div aria-hidden="true"> </div>
+<div><span>Love this</span>Â <span>0</span></div>
+<div aria-hidden="true">Â </div>
 </div>
 </div>
 </div>
@@ -3257,8 +3257,8 @@
 </div>
 <div>
 <div>
-<div><span>Oh no</span> <span>0</span></div>
-<div aria-hidden="true"> </div>
+<div><span>Oh no</span>Â <span>0</span></div>
+<div aria-hidden="true">Â </div>
 </div>
 </div>
 </div>
@@ -3288,7 +3288,7 @@
 </div>
 </div>
 </div>
-<div> </div>
+<div>Â </div>
 </div>
 <div>
 <div>
@@ -3300,12 +3300,12 @@
 </div>
 </div>
 </li>
-<li> </li>
+<li>Â </li>
 </ul>
 <div aria-label="Pagination navigation" role="navigation">
 <div>
 <div data-testid="pagination-links">
-<div> </div>
+<div>Â </div>
 <div>
 <div aria-label="Page: 1">1</div>
 </div>
@@ -3318,7 +3318,7 @@
 <div><span><a>
 <div aria-label="Page: 4">4</div>
 </a></span></div>
-<div> </div>
+<div>Â </div>
 </div>
 </div>
 <div><span>1 of 4</span></div>
@@ -3426,7 +3426,7 @@
 </div>
 <div>
 <div>
-<div> </div>
+<div>Â </div>
 <div>Show more suggestions</div>
 </div>
 </div>
@@ -3436,7 +3436,7 @@
 </main></div>
 <div data-testid="sidebar-content">
 <aside>
-<div> </div>
+<div>Â </div>
 <div>
 <section>
 <div id="raq-widget">
@@ -3497,7 +3497,7 @@
 <div>
 <div aria-hidden="false">
 <div>
-<p>Your project with this business is eligible for coverage up to $2,500 when you hire through 'Get a quote.' Terms apply. <a rel="noopener" target="_blank">Learn more</a></p>
+<p>Your project with this business is eligible for coverage up to $2,500 when you hire through 'Get a quote.' Terms apply.Â <a rel="noopener" target="_blank">Learn more</a></p>
 </div>
 </div>
 </div>
@@ -3523,7 +3523,7 @@
 <div data-testid="cookbook-island">
 <div>
 <div>
-<div> </div>
+<div>Â </div>
 <div>
 <p>Business website</p>
 <p data-font-weight="semibold"><a rel="noopener nofollow" target="_blank">impactroofing.solutions</a></p>
@@ -3532,7 +3532,7 @@
 </div>
 <div>
 <div>
-<div> </div>
+<div>Â </div>
 <div>
 <p>Phone number</p>
 <p data-font-weight="semibold">(703) 329-2959</p>
@@ -3541,7 +3541,7 @@
 </div>
 <div>
 <div>
-<div> </div>
+<div>Â </div>
 <div>
 <p data-font-weight="semibold"><a>View Service Area</a></p>
 </div>
@@ -3934,19 +3934,19 @@ You are an AI assistant tasked with extracting structured data from HTML content
 <div>
 <div>
 <div aria-label="4.7 star rating" role="img">
-<div> </div>
-<div> </div>
-<div> </div>
-<div> </div>
-<div> </div>
+<div>Â </div>
+<div>Â </div>
+<div>Â </div>
+<div>Â </div>
+<div>Â </div>
 </div>
 </div>
 </div>
 </div>
-<div data-testid="BizHeaderReviewCount"><span data-font-weight="semibold">4.7 </span><span><a>(40 reviews)</a></span></div>
+<div data-testid="BizHeaderReviewCount"><span data-font-weight="semibold">4.7Â </span><span><a>(40 reviews)</a></span></div>
 </div>
-<div><span data-font-weight="semibold"> Claimed</span></div>
-<span><span data-font-weight="semibold" data-testid="BizHeaderCategory"><a>Roofing</a>, </span><span data-font-weight="semibold" data-testid="BizHeaderCategory"><a>Gutter Services</a>, </span><span data-font-weight="semibold" data-testid="BizHeaderCategory"><a>Siding</a></span></span>
+<div><span data-font-weight="semibold">Â Claimed</span></div>
+<span><span data-font-weight="semibold" data-testid="BizHeaderCategory"><a>Roofing</a>,Â </span><span data-font-weight="semibold" data-testid="BizHeaderCategory"><a>Gutter Services</a>,Â </span><span data-font-weight="semibold" data-testid="BizHeaderCategory"><a>Siding</a></span></span>
 <div>
 <div>
 <div>
@@ -3963,35 +3963,35 @@ You are an AI assistant tasked with extracting structured data from HTML content
 <div>
 <div><a data-activated="false" data-button="true">
 <div>
-<div> </div>
+<div>Â </div>
 <div><span>Write a review</span></div>
 </div>
 </a></div>
 <div><a data-activated="false" data-button="true">
 <div>
-<div> </div>
+<div>Â </div>
 <div><span>Add photo</span></div>
 </div>
 </a></div>
 <div>
 <div>
-<div> </div>
+<div>Â </div>
 <div><span>Share</span></div>
 </div>
 </div>
 <div>
 <div>
-<div> </div>
+<div>Â </div>
 <div><span>Save</span></div>
 </div>
 </div>
 <div>
 <div>
-<div> </div>
+<div>Â </div>
 <div><span>Follow</span></div>
 </div>
 </div>
-<div> </div>
+<div>Â </div>
 </div>
 <section aria-label="Updates From This Business">
 <div>
@@ -4016,7 +4016,7 @@ You are an AI assistant tasked with extracting structured data from HTML content
 <h5>James Hardie Siding in Alexandria!!</h5>
 </div>
 <div>
-<p>Looking to upgrade your home with a durable, Stylish…<span> read more</span></p>
+<p>Looking to upgrade your home with a durable, Stylishâ€¦<span>Â read more</span></p>
 </div>
 </div>
 </div>
@@ -4026,11 +4026,11 @@ You are an AI assistant tasked with extracting structured data from HTML content
 <div>
 <div>
 <div>
-<div data-testid="video-icon"> </div>
+<div data-testid="video-icon">Â </div>
 <div>
 <div><img alt="Certified TPO Flat Roof Replacement" draggable="true" height="130" loading="lazy" width="130"/></div>
 <div data-testid="overlay">
-<div> </div>
+<div>Â </div>
 </div>
 </div>
 </div>
@@ -4039,7 +4039,7 @@ You are an AI assistant tasked with extracting structured data from HTML content
 <h5>Certified TPO Flat Roof Replacement</h5>
 </div>
 <div>
-<p>Need a durable, energy-efficient flat roof? We…<span> read more</span></p>
+<p>Need a durable, energy-efficient flat roof? Weâ€¦<span>Â read more</span></p>
 </div>
 </div>
 </div>
@@ -4058,7 +4058,7 @@ You are an AI assistant tasked with extracting structured data from HTML content
 <h5>Top-Rated Shingle Roof Experts- Call Today!</h5>
 </div>
 <div>
-<p>We specialize in expert shingle roof replacement,…<span> read more</span></p>
+<p>We specialize in expert shingle roof replacement,â€¦<span>Â read more</span></p>
 </div>
 </div>
 </div>
@@ -4077,7 +4077,7 @@ You are an AI assistant tasked with extracting structured data from HTML content
 <h5>Emergency Roof Repairs!</h5>
 </div>
 <div>
-<p>Rain and snow are on the way! We’re offering…<span> read more</span></p>
+<p>Rain and snow are on the way! Weâ€™re offeringâ€¦<span>Â read more</span></p>
 </div>
 </div>
 </div>
@@ -4096,7 +4096,7 @@ You are an AI assistant tasked with extracting structured data from HTML content
 <h5>Stop Ice Dams Now- Free Inspection</h5>
 </div>
 <div>
-<p>Ice dams can cause costly roof damage, but we’re…<span> read more</span></p>
+<p>Ice dams can cause costly roof damage, but weâ€™reâ€¦<span>Â read more</span></p>
 </div>
 </div>
 </div>
@@ -4106,11 +4106,11 @@ You are an AI assistant tasked with extracting structured data from HTML content
 <div>
 <div>
 <div>
-<div data-testid="video-icon"> </div>
+<div data-testid="video-icon">Â </div>
 <div>
 <div><img alt="Get Your Roof Winter-Ready With Us!" draggable="true" height="130" loading="lazy" width="130"/></div>
 <div data-testid="overlay">
-<div> </div>
+<div>Â </div>
 </div>
 </div>
 </div>
@@ -4119,7 +4119,7 @@ You are an AI assistant tasked with extracting structured data from HTML content
 <h5>Get Your Roof Winter-Ready With Us!</h5>
 </div>
 <div>
-<p>Getting your roof ready before winter is crucial! By…<span> read more</span></p>
+<p>Getting your roof ready before winter is crucial! Byâ€¦<span>Â read more</span></p>
 </div>
 </div>
 </div>
@@ -4138,7 +4138,7 @@ You are an AI assistant tasked with extracting structured data from HTML content
 <h5>Looking for a commercial contractor?</h5>
 </div>
 <div>
-<p>We can help. We specialize in commercial roofing,…<span> read more</span></p>
+<p>We can help. We specialize in commercial roofing,â€¦<span>Â read more</span></p>
 </div>
 </div>
 </div>
@@ -4157,7 +4157,7 @@ You are an AI assistant tasked with extracting structured data from HTML content
 <h5>Boost Flat Roof Lifespan with Silicone Coating!</h5>
 </div>
 <div>
-<p>Add up to a decade to your flat roof's life with our…<span> read more</span></p>
+<p>Add up to a decade to your flat roof's life with ourâ€¦<span>Â read more</span></p>
 </div>
 </div>
 </div>
@@ -4167,11 +4167,11 @@ You are an AI assistant tasked with extracting structured data from HTML content
 <div>
 <div>
 <div>
-<div data-testid="video-icon"> </div>
+<div data-testid="video-icon">Â </div>
 <div>
 <div><img alt="Free Roof Inspection!" draggable="true" height="130" loading="lazy" width="130"/></div>
 <div data-testid="overlay">
-<div> </div>
+<div>Â </div>
 </div>
 </div>
 </div>
@@ -4180,7 +4180,7 @@ You are an AI assistant tasked with extracting structured data from HTML content
 <h5>Free Roof Inspection!</h5>
 </div>
 <div>
-<p>Our estimates are free! We are fully licensed…<span> read more</span></p>
+<p>Our estimates are free! We are fully licensedâ€¦<span>Â read more</span></p>
 </div>
 </div>
 </div>
@@ -4199,7 +4199,7 @@ You are an AI assistant tasked with extracting structured data from HTML content
 <h5>Eco-friendly Silicone Coating</h5>
 </div>
 <div>
-<p>Durability, UV resistance, Waterproof ponding water…<span> read more</span></p>
+<p>Durability, UV resistance, Waterproof ponding waterâ€¦<span>Â read more</span></p>
 </div>
 </div>
 </div>
@@ -4218,7 +4218,7 @@ You are an AI assistant tasked with extracting structured data from HTML content
 <h5>Local Experts For Commercial Roofing</h5>
 </div>
 <div>
-<p>Selecting the right roofing company is paramount.…<span> read more</span></p>
+<p>Selecting the right roofing company is paramount.â€¦<span>Â read more</span></p>
 </div>
 </div>
 </div>
@@ -4228,11 +4228,11 @@ You are an AI assistant tasked with extracting structured data from HTML content
 <div>
 <div>
 <div>
-<div data-testid="video-icon"> </div>
+<div data-testid="video-icon">Â </div>
 <div>
 <div><img alt="Top-Tier Roofing Solutions!" draggable="true" height="130" loading="lazy" width="130"/></div>
 <div data-testid="overlay">
-<div> </div>
+<div>Â </div>
 </div>
 </div>
 </div>
@@ -4241,7 +4241,7 @@ You are an AI assistant tasked with extracting structured data from HTML content
 <h5>Top-Tier Roofing Solutions!</h5>
 </div>
 <div>
-<p>At Impact Roofing &amp; Renovations, we know choosing…<span> read more</span></p>
+<p>At Impact Roofing &amp; Renovations, we know choosingâ€¦<span>Â read more</span></p>
 </div>
 </div>
 </div>
@@ -4260,7 +4260,7 @@ You are an AI assistant tasked with extracting structured data from HTML content
 <h5>Premium TPO Roofing Services!</h5>
 </div>
 <div>
-<p>Our team comprises skilled professionals with years…<span> read more</span></p>
+<p>Our team comprises skilled professionals with yearsâ€¦<span>Â read more</span></p>
 </div>
 </div>
 </div>
@@ -4271,15 +4271,15 @@ You are an AI assistant tasked with extracting structured data from HTML content
 <div>
 <div>
 <div>
-<div><img alt="Yesterday’s Hail: Replace Roof via Insurance" draggable="true" height="130" loading="lazy" width="130"/></div>
+<div><img alt="Yesterdayâ€™s Hail: Replace Roof via Insurance" draggable="true" height="130" loading="lazy" width="130"/></div>
 </div>
 </div>
 <div>
 <div>
-<h5>Yesterday’s Hail: Replace Roof via Insurance</h5>
+<h5>Yesterdayâ€™s Hail: Replace Roof via Insurance</h5>
 </div>
 <div>
-<p>If you or anyone you know experienced damage to your…<span> read more</span></p>
+<p>If you or anyone you know experienced damage to yourâ€¦<span>Â read more</span></p>
 </div>
 </div>
 </div>
@@ -4298,7 +4298,7 @@ You are an AI assistant tasked with extracting structured data from HTML content
 <h5>Unbeatable Deals on TPO Full Replacement</h5>
 </div>
 <div>
-<p>Get a fantastic $500.00 discount on TPO full…<span> read more</span></p>
+<p>Get a fantastic $500.00 discount on TPO fullâ€¦<span>Â read more</span></p>
 </div>
 </div>
 </div>
@@ -4308,11 +4308,11 @@ You are an AI assistant tasked with extracting structured data from HTML content
 <div>
 <div>
 <div>
-<div data-testid="video-icon"> </div>
+<div data-testid="video-icon">Â </div>
 <div>
 <div><img alt="Lifetime Warranty Roofing for Your Peace of Mind" draggable="true" height="130" loading="lazy" width="130"/></div>
 <div data-testid="overlay">
-<div> </div>
+<div>Â </div>
 </div>
 </div>
 </div>
@@ -4321,7 +4321,7 @@ You are an AI assistant tasked with extracting structured data from HTML content
 <h5>Lifetime Warranty Roofing for Your Peace of Mind</h5>
 </div>
 <div>
-<p>At Impact Roofing &amp; Renovations, we back our work…<span> read more</span></p>
+<p>At Impact Roofing &amp; Renovations, we back our workâ€¦<span>Â read more</span></p>
 </div>
 </div>
 </div>
@@ -4331,11 +4331,11 @@ You are an AI assistant tasked with extracting structured data from HTML content
 <div>
 <div>
 <div>
-<div data-testid="video-icon"> </div>
+<div data-testid="video-icon">Â </div>
 <div>
 <div><img alt="Get A Free Quote Today!" draggable="true" height="130" loading="lazy" width="130"/></div>
 <div data-testid="overlay">
-<div> </div>
+<div>Â </div>
 </div>
 </div>
 </div>
@@ -4344,7 +4344,7 @@ You are an AI assistant tasked with extracting structured data from HTML content
 <h5>Get A Free Quote Today!</h5>
 </div>
 <div>
-<p>Thank you to our brave men and women who have served…<span> read more</span></p>
+<p>Thank you to our brave men and women who have servedâ€¦<span>Â read more</span></p>
 </div>
 </div>
 </div>
@@ -4363,7 +4363,7 @@ You are an AI assistant tasked with extracting structured data from HTML content
 <h5>Limited-time offer!</h5>
 </div>
 <div>
-<p>Until July 4th you can get 10% off on a full home…<span> read more</span></p>
+<p>Until July 4th you can get 10% off on a full homeâ€¦<span>Â read more</span></p>
 </div>
 </div>
 </div>
@@ -4382,7 +4382,7 @@ You are an AI assistant tasked with extracting structured data from HTML content
 <h5>We specialize in exterior renovations and solar</h5>
 </div>
 <div>
-<p>Give us a call at (703) 329-2959 to book an…<span> read more</span></p>
+<p>Give us a call at (703) 329-2959 to book anâ€¦<span>Â read more</span></p>
 </div>
 </div>
 </div>
@@ -4401,7 +4401,7 @@ You are an AI assistant tasked with extracting structured data from HTML content
 <h5>10% off</h5>
 </div>
 <div>
-<p>Get 10% off on your purchase of $10000 or more.…<span> read more</span></p>
+<p>Get 10% off on your purchase of $10000 or more.â€¦<span>Â read more</span></p>
 </div>
 </div>
 </div>
@@ -4411,11 +4411,11 @@ You are an AI assistant tasked with extracting structured data from HTML content
 <div>
 <div>
 <div>
-<div data-testid="video-icon"> </div>
+<div data-testid="video-icon">Â </div>
 <div>
 <div><img alt="Make sure your roof is using the best equipment" draggable="true" height="130" loading="lazy" width="130"/></div>
 <div data-testid="overlay">
-<div> </div>
+<div>Â </div>
 </div>
 </div>
 </div>
@@ -4424,7 +4424,7 @@ You are an AI assistant tasked with extracting structured data from HTML content
 <h5>Make sure your roof is using the best equipment</h5>
 </div>
 <div>
-<p>During a roof replacement or large construction…<span> read more</span></p>
+<p>During a roof replacement or large constructionâ€¦<span>Â read more</span></p>
 </div>
 </div>
 </div>
@@ -4443,7 +4443,7 @@ You are an AI assistant tasked with extracting structured data from HTML content
 <h5>Kickstart Your Outdoor Projects This Summer!</h5>
 </div>
 <div>
-<p>Save $1000.00 on your New James Hardie Siding…<span> read more</span></p>
+<p>Save $1000.00 on your New James Hardie Sidingâ€¦<span>Â read more</span></p>
 </div>
 </div>
 </div>
@@ -4453,11 +4453,11 @@ You are an AI assistant tasked with extracting structured data from HTML content
 <div>
 <div>
 <div>
-<div data-testid="video-icon"> </div>
+<div data-testid="video-icon">Â </div>
 <div>
 <div><img alt="Summer Specials Now Available!" draggable="true" height="130" loading="lazy" width="130"/></div>
 <div data-testid="overlay">
-<div> </div>
+<div>Â </div>
 </div>
 </div>
 </div>
@@ -4466,7 +4466,7 @@ You are an AI assistant tasked with extracting structured data from HTML content
 <h5>Summer Specials Now Available!</h5>
 </div>
 <div>
-<p>Revitalize Your Roof and Gutters for a Refreshing…<span> read more</span></p>
+<p>Revitalize Your Roof and Gutters for a Refreshingâ€¦<span>Â read more</span></p>
 </div>
 </div>
 </div>
@@ -4476,11 +4476,11 @@ You are an AI assistant tasked with extracting structured data from HTML content
 <div>
 <div>
 <div>
-<div data-testid="video-icon"> </div>
+<div data-testid="video-icon">Â </div>
 <div>
 <div><img alt="Experience Top-Notch Roofing Services" draggable="true" height="130" loading="lazy" width="130"/></div>
 <div data-testid="overlay">
-<div> </div>
+<div>Â </div>
 </div>
 </div>
 </div>
@@ -4489,7 +4489,7 @@ You are an AI assistant tasked with extracting structured data from HTML content
 <h5>Experience Top-Notch Roofing Services</h5>
 </div>
 <div>
-<p>Hiring a good roofing company is essential for the…<span> read more</span></p>
+<p>Hiring a good roofing company is essential for theâ€¦<span>Â read more</span></p>
 </div>
 </div>
 </div>
@@ -4508,7 +4508,7 @@ You are an AI assistant tasked with extracting structured data from HTML content
 <h5>Need a manufacturers certified roof replacement?</h5>
 </div>
 <div>
-<p>We are certified with all of the major manufacturers…<span> read more</span></p>
+<p>We are certified with all of the major manufacturersâ€¦<span>Â read more</span></p>
 </div>
 </div>
 </div>
@@ -4527,7 +4527,7 @@ You are an AI assistant tasked with extracting structured data from HTML content
 <h5>We Are Here To Provide You Top-Notch Service!</h5>
 </div>
 <div>
-<p>At Impact Roofing we specialize in a wide range of…<span> read more</span></p>
+<p>At Impact Roofing we specialize in a wide range ofâ€¦<span>Â read more</span></p>
 </div>
 </div>
 </div>
@@ -4546,7 +4546,7 @@ You are an AI assistant tasked with extracting structured data from HTML content
 <h5>Call for a free roof replacement estimate!</h5>
 </div>
 <div>
-<p>We work with you to find the best roofing solution…<span> read more</span></p>
+<p>We work with you to find the best roofing solutionâ€¦<span>Â read more</span></p>
 </div>
 </div>
 </div>
@@ -4565,7 +4565,7 @@ You are an AI assistant tasked with extracting structured data from HTML content
 <h5>Our team has 15 years of experience</h5>
 </div>
 <div>
-<p>We can handle all your roofing needs. Call to…<span> read more</span></p>
+<p>We can handle all your roofing needs. Call toâ€¦<span>Â read more</span></p>
 </div>
 </div>
 </div>
@@ -4584,7 +4584,7 @@ You are an AI assistant tasked with extracting structured data from HTML content
 <h5>First-time customer special</h5>
 </div>
 <div>
-<p>New customers get free gutter guard inserts with a…<span> read more</span></p>
+<p>New customers get free gutter guard inserts with aâ€¦<span>Â read more</span></p>
 </div>
 </div>
 </div>
@@ -4603,7 +4603,7 @@ You are an AI assistant tasked with extracting structured data from HTML content
 <h5>Free estimate for Valentine's Day</h5>
 </div>
 <div>
-<p>Happy Valentine's Day! Get a free estimate now…<span> read more</span></p>
+<p>Happy Valentine's Day! Get a free estimate nowâ€¦<span>Â read more</span></p>
 </div>
 </div>
 </div>
@@ -4635,7 +4635,7 @@ You are an AI assistant tasked with extracting structured data from HTML content
 <h2>Portfolio from the Business</h2>
 <div>
 <div>
-<p data-font-weight="semibold">Sponsored </p>
+<p data-font-weight="semibold">SponsoredÂ </p>
 </div>
 </div>
 </div>
@@ -4696,7 +4696,7 @@ You are an AI assistant tasked with extracting structured data from HTML content
 </div>
 </div>
 <div>
-<p data-font-weight="semibold">More Projects </p>
+<p data-font-weight="semibold">More ProjectsÂ </p>
 </div>
 </div>
 </section>
@@ -4921,7 +4921,7 @@ You are an AI assistant tasked with extracting structured data from HTML content
 <h2>Services Offered</h2>
 <div>
 <div>
-<p data-font-weight="semibold">Verified by Business </p>
+<p data-font-weight="semibold">Verified by BusinessÂ </p>
 </div>
 </div>
 </div>
@@ -4940,7 +4940,7 @@ You are an AI assistant tasked with extracting structured data from HTML content
 <div><a data-testid="Service Offering" role="link">Siding installation</a></div>
 </div>
 </div>
-<button data-activated="false" data-button="true" type="submit" value="submit"><span>See 3 More </span></button></section>
+<button data-activated="false" data-button="true" type="submit" value="submit"><span>See 3 MoreÂ </span></button></section>
 <section aria-label="Review Highlights">
 <div>
 <div>
@@ -4954,7 +4954,7 @@ You are an AI assistant tasked with extracting structured data from HTML content
 <div><a target="_self"><img alt="Brittney A." draggable="true" height="60" loading="lazy" width="60"/></a></div>
 </div>
 <div>
-<p>“<span>I want to thank Jeff and </span><span data-font-weight="bold"><a role="button">Mason</a></span><span> for their help with a roof inspection that was required for my home owners insurance policy.</span>”<a role="button"> in 10 reviews</a></p>
+<p>â€œ<span>I want to thank Jeff andÂ </span><span data-font-weight="bold"><a role="button">Mason</a></span><span>Â for their help with a roof inspection that was required for my home owners insurance policy.</span>â€<a role="button">Â in 10 reviews</a></p>
 </div>
 </div>
 <div>
@@ -4962,7 +4962,7 @@ You are an AI assistant tasked with extracting structured data from HTML content
 <div><a target="_self"><img alt="Juliana C." draggable="true" height="60" loading="lazy" width="60"/></a></div>
 </div>
 <div>
-<p>“<span data-font-weight="bold"><a role="button">Ben</a></span><span> was our foreman and he was responsive to our questions and concerns.</span>”<a role="button"> in 3 reviews</a></p>
+<p>â€œ<span data-font-weight="bold"><a role="button">Ben</a></span><span>Â was our foreman and he was responsive to our questions and concerns.</span>â€<a role="button">Â in 3 reviews</a></p>
 </div>
 </div>
 <div>
@@ -4970,13 +4970,13 @@ You are an AI assistant tasked with extracting structured data from HTML content
 <div><a target="_self"><img alt="impact-roofing-and-renovations-alexandria-4 photo lGekAvoKq3tOF9bunMIDig" draggable="true" height="60" loading="lazy" width="60"/></a></div>
 </div>
 <div>
-<p>“<span>Very responsive, price beat everyone else's, left the house looking great , the </span><span data-font-weight="bold"><a role="button">new roof</a></span><span> and the surroundings!</span>”<a role="button"> in 7 reviews</a></p>
+<p>â€œ<span>Very responsive, price beat everyone else's, left the house looking great , theÂ </span><span data-font-weight="bold"><a role="button">new roof</a></span><span>Â and the surroundings!</span>â€<a role="button">Â in 7 reviews</a></p>
 </div>
 </div>
 </div>
 <div>
 <div>
-<p> </p>
+<p>Â </p>
 </div>
 </div>
 </div>
@@ -4989,7 +4989,7 @@ You are an AI assistant tasked with extracting structured data from HTML content
 </div>
 <div>
 <div>
-<p>Locally owned roofing contractor with expertise in traditional shingle roofs, as well as TPO, metal,<br/>slate and cedar. We have a goal to help reduce the 10 million tons of shingles that end up in land<br/>fills every year by educating homeowners on natural products and on the importance of a quality i…</p>
+<p>Locally owned roofing contractor with expertise in traditional shingle roofs, as well as TPO, metal,<br/>slate and cedar. We have a goal to help reduce the 10 million tons of shingles that end up in land<br/>fills every year by educating homeowners on natural products and on the importance of a quality iâ€¦</p>
 </div>
 <button aria-label="More information about the business. Opens a modal." data-activated="false" data-button="true" type="submit" value="submit"><span>Read more</span></button></div>
 </section>
@@ -5034,7 +5034,7 @@ You are an AI assistant tasked with extracting structured data from HTML content
 </li>
 </ul>
 </td>
-<td> </td>
+<td>Â </td>
 </tr>
 <tr></tr>
 <tr>
@@ -5048,7 +5048,7 @@ You are an AI assistant tasked with extracting structured data from HTML content
 </li>
 </ul>
 </td>
-<td> </td>
+<td>Â </td>
 </tr>
 <tr></tr>
 <tr>
@@ -5076,7 +5076,7 @@ You are an AI assistant tasked with extracting structured data from HTML content
 </li>
 </ul>
 </td>
-<td> </td>
+<td>Â </td>
 </tr>
 <tr></tr>
 <tr>
@@ -5090,7 +5090,7 @@ You are an AI assistant tasked with extracting structured data from HTML content
 </li>
 </ul>
 </td>
-<td> </td>
+<td>Â </td>
 </tr>
 <tr></tr>
 <tr>
@@ -5104,7 +5104,7 @@ You are an AI assistant tasked with extracting structured data from HTML content
 </li>
 </ul>
 </td>
-<td> </td>
+<td>Â </td>
 </tr>
 <tr></tr>
 <tr>
@@ -5118,7 +5118,7 @@ You are an AI assistant tasked with extracting structured data from HTML content
 </li>
 </ul>
 </td>
-<td> </td>
+<td>Â </td>
 </tr>
 </tbody>
 </table>
@@ -5140,25 +5140,25 @@ You are an AI assistant tasked with extracting structured data from HTML content
 <div>
 <div>
 <div>
-<div> </div>
+<div>Â </div>
 <div><span data-font-weight="semibold">ASL proficient</span></div>
 </div>
 </div>
 <div>
 <div>
-<div> </div>
+<div>Â </div>
 <div><span data-font-weight="semibold">Credit card processing fee</span></div>
 </div>
 </div>
 <div>
 <div>
-<div> </div>
+<div>Â </div>
 <div><span data-font-weight="semibold">Accepts Credit Cards</span></div>
 </div>
 </div>
 <div>
 <div>
-<div> </div>
+<div>Â </div>
 <div><span data-font-weight="semibold">Accepts Zelle</span></div>
 </div>
 </div>
@@ -5179,7 +5179,7 @@ You are an AI assistant tasked with extracting structured data from HTML content
 </div>
 <div>
 <div>
-<p>Got a question about <span>Impact Roofing &amp; Renovations</span>? Ask the Yelp community!</p>
+<p>Got a question aboutÂ <span>Impact Roofing &amp; Renovations</span>? Ask the Yelp community!</p>
 </div>
 </div>
 <div><a data-activated="false" data-button="true"><span>See 1 question</span></a></div>
@@ -5194,7 +5194,7 @@ You are an AI assistant tasked with extracting structured data from HTML content
 <div>
 <div>
 <div>
-<div> </div>
+<div>Â </div>
 </div>
 <div>
 <div>
@@ -5207,7 +5207,7 @@ You are an AI assistant tasked with extracting structured data from HTML content
 <div>
 <div>
 <div>
-<div> </div>
+<div>Â </div>
 </div>
 <div>
 <div>
@@ -5220,7 +5220,7 @@ You are an AI assistant tasked with extracting structured data from HTML content
 <div>
 <div>
 <div>
-<div> </div>
+<div>Â </div>
 </div>
 <div>
 <div>
@@ -5233,7 +5233,7 @@ You are an AI assistant tasked with extracting structured data from HTML content
 <div>
 <div>
 <div>
-<div> </div>
+<div>Â </div>
 </div>
 <div>
 <div>
@@ -5246,7 +5246,7 @@ You are an AI assistant tasked with extracting structured data from HTML content
 <div>
 <div>
 <div>
-<div> </div>
+<div>Â </div>
 </div>
 <div>
 <div>
@@ -5259,7 +5259,7 @@ You are an AI assistant tasked with extracting structured data from HTML content
 <div>
 <div>
 <div>
-<div> </div>
+<div>Â </div>
 </div>
 <div>
 <div>
@@ -5282,15 +5282,15 @@ You are an AI assistant tasked with extracting structured data from HTML content
 <div aria-label="Info" role="alert">
 <div>
 <div>
-<div> </div>
+<div>Â </div>
 </div>
 </div>
 <div>
 <div>
-<div><span><span data-font-weight="bold">Your trust is our top concern,</span> <span>so businesses can't pay to alter or remove their reviews. </span><a>Learn more about reviews.</a></span></div>
+<div><span><span data-font-weight="bold">Your trust is our top concern,</span>Â <span>so businesses can't pay to alter or remove their reviews.Â </span><a>Learn more about reviews.</a></span></div>
 </div>
 </div>
-<div> </div>
+<div>Â </div>
 </div>
 </div>
 <div>
@@ -5324,11 +5324,11 @@ You are an AI assistant tasked with extracting structured data from HTML content
 <div>
 <div>
 <div aria-label="(no rating)" role="img">
-<div> </div>
-<div> </div>
-<div> </div>
-<div> </div>
-<div> </div>
+<div>Â </div>
+<div>Â </div>
+<div>Â </div>
+<div>Â </div>
+<div>Â </div>
 </div>
 <ul aria-label="Rating">
 <li>
@@ -5353,7 +5353,7 @@ You are an AI assistant tasked with extracting structured data from HTML content
 </div>
 </div>
 </fieldset></div>
-<a>Start your review of <span>Impact Roofing &amp; Renovations</span></a></div>
+<a>Start your review ofÂ <span>Impact Roofing &amp; Renovations</span></a></div>
 </div>
 </div>
 </div>
@@ -5365,11 +5365,11 @@ You are an AI assistant tasked with extracting structured data from HTML content
 <div>
 <div>
 <div aria-label="4.5 star rating" role="img">
-<div> </div>
-<div> </div>
-<div> </div>
-<div> </div>
-<div> </div>
+<div>Â </div>
+<div>Â </div>
+<div>Â </div>
+<div>Â </div>
+<div>Â </div>
 </div>
 </div>
 <div>
@@ -5386,7 +5386,7 @@ You are an AI assistant tasked with extracting structured data from HTML content
 </div>
 <div>
 <div>
-<div> </div>
+<div>Â </div>
 </div>
 </div>
 </div>
@@ -5398,7 +5398,7 @@ You are an AI assistant tasked with extracting structured data from HTML content
 </div>
 <div>
 <div>
-<div> </div>
+<div>Â </div>
 </div>
 </div>
 </div>
@@ -5410,7 +5410,7 @@ You are an AI assistant tasked with extracting structured data from HTML content
 </div>
 <div>
 <div>
-<div> </div>
+<div>Â </div>
 </div>
 </div>
 </div>
@@ -5422,7 +5422,7 @@ You are an AI assistant tasked with extracting structured data from HTML content
 </div>
 <div>
 <div>
-<div> </div>
+<div>Â </div>
 </div>
 </div>
 </div>
@@ -5434,7 +5434,7 @@ You are an AI assistant tasked with extracting structured data from HTML content
 </div>
 <div>
 <div>
-<div> </div>
+<div>Â </div>
 </div>
 </div>
 </div>
@@ -5459,8 +5459,8 @@ You are an AI assistant tasked with extracting structured data from HTML content
 <div><label><input aria-labelledby="inline-search-:rm:" name="query" placeholder=" " type="text" value=""/><span>Search reviews</span></label></div>
 <div>
 <div>
-<div> </div>
-<div> </div>
+<div>Â </div>
+<div>Â </div>
 </div>
 </div>
 </div>
@@ -5483,7 +5483,7 @@ You are an AI assistant tasked with extracting structured data from HTML content
 <div data-testid="UserPassportInfoTextContainer"><span>Washington, DC</span></div>
 </div>
 <div>
-<div> </div>
+<div>Â </div>
 <a>8 Home Improvement reviews</a></div>
 </div>
 </div>
@@ -5492,7 +5492,7 @@ You are an AI assistant tasked with extracting structured data from HTML content
 <div>
 <div>
 <div role="presentation">
-<div> </div>
+<div>Â </div>
 </div>
 </div>
 </div>
@@ -5504,11 +5504,11 @@ You are an AI assistant tasked with extracting structured data from HTML content
 <div>
 <div>
 <div aria-label="5 star rating" role="img">
-<div> </div>
-<div> </div>
-<div> </div>
-<div> </div>
-<div> </div>
+<div>Â </div>
+<div>Â </div>
+<div>Â </div>
+<div>Â </div>
+<div>Â </div>
 </div>
 </div>
 </div>
@@ -5532,8 +5532,8 @@ You are an AI assistant tasked with extracting structured data from HTML content
 </div>
 <div>
 <div>
-<div><span>Helpful</span> <span>0</span></div>
-<div aria-hidden="true"> </div>
+<div><span>Helpful</span>Â <span>0</span></div>
+<div aria-hidden="true">Â </div>
 </div>
 </div>
 </div>
@@ -5549,8 +5549,8 @@ You are an AI assistant tasked with extracting structured data from HTML content
 </div>
 <div>
 <div>
-<div><span>Thanks</span> <span>0</span></div>
-<div aria-hidden="true"> </div>
+<div><span>Thanks</span>Â <span>0</span></div>
+<div aria-hidden="true">Â </div>
 </div>
 </div>
 </div>
@@ -5566,8 +5566,8 @@ You are an AI assistant tasked with extracting structured data from HTML content
 </div>
 <div>
 <div>
-<div><span>Love this</span> <span>0</span></div>
-<div aria-hidden="true"> </div>
+<div><span>Love this</span>Â <span>0</span></div>
+<div aria-hidden="true">Â </div>
 </div>
 </div>
 </div>
@@ -5583,8 +5583,8 @@ You are an AI assistant tasked with extracting structured data from HTML content
 </div>
 <div>
 <div>
-<div><span>Oh no</span> <span>0</span></div>
-<div aria-hidden="true"> </div>
+<div><span>Oh no</span>Â <span>0</span></div>
+<div aria-hidden="true">Â </div>
 </div>
 </div>
 </div>
@@ -5614,7 +5614,7 @@ You are an AI assistant tasked with extracting structured data from HTML content
 </div>
 </div>
 </div>
-<div> </div>
+<div>Â </div>
 </div>
 <div>
 <div aria-live="polite" id="expander-link-content-:rv:" role="region">
@@ -5665,7 +5665,7 @@ You are an AI assistant tasked with extracting structured data from HTML content
 <div>
 <div>
 <div role="presentation">
-<div> </div>
+<div>Â </div>
 </div>
 </div>
 </div>
@@ -5677,11 +5677,11 @@ You are an AI assistant tasked with extracting structured data from HTML content
 <div>
 <div>
 <div aria-label="4 star rating" role="img">
-<div> </div>
-<div> </div>
-<div> </div>
-<div> </div>
-<div> </div>
+<div>Â </div>
+<div>Â </div>
+<div>Â </div>
+<div>Â </div>
+<div>Â </div>
 </div>
 </div>
 </div>
@@ -5691,7 +5691,7 @@ You are an AI assistant tasked with extracting structured data from HTML content
 </div>
 <div>
 <div>
-<div> </div>
+<div>Â </div>
 <span data-font-weight="semibold"><a>1 photo</a></span></div>
 </div>
 <div>
@@ -5725,8 +5725,8 @@ You are an AI assistant tasked with extracting structured data from HTML content
 </div>
 <div>
 <div>
-<div><span>Helpful</span> <span>0</span></div>
-<div aria-hidden="true"> </div>
+<div><span>Helpful</span>Â <span>0</span></div>
+<div aria-hidden="true">Â </div>
 </div>
 </div>
 </div>
@@ -5742,8 +5742,8 @@ You are an AI assistant tasked with extracting structured data from HTML content
 </div>
 <div>
 <div>
-<div><span>Thanks</span> <span>0</span></div>
-<div aria-hidden="true"> </div>
+<div><span>Thanks</span>Â <span>0</span></div>
+<div aria-hidden="true">Â </div>
 </div>
 </div>
 </div>
@@ -5759,8 +5759,8 @@ You are an AI assistant tasked with extracting structured data from HTML content
 </div>
 <div>
 <div>
-<div><span>Love this</span> <span>0</span></div>
-<div aria-hidden="true"> </div>
+<div><span>Love this</span>Â <span>0</span></div>
+<div aria-hidden="true">Â </div>
 </div>
 </div>
 </div>
@@ -5776,8 +5776,8 @@ You are an AI assistant tasked with extracting structured data from HTML content
 </div>
 <div>
 <div>
-<div><span>Oh no</span> <span>0</span></div>
-<div aria-hidden="true"> </div>
+<div><span>Oh no</span>Â <span>0</span></div>
+<div aria-hidden="true">Â </div>
 </div>
 </div>
 </div>
@@ -5807,7 +5807,7 @@ You are an AI assistant tasked with extracting structured data from HTML content
 </div>
 </div>
 </div>
-<div> </div>
+<div>Â </div>
 </div>
 <div>
 <div aria-live="polite" id="expander-link-content-:r17:" role="region">
@@ -5815,7 +5815,7 @@ You are an AI assistant tasked with extracting structured data from HTML content
 <div>
 <p>Mar 18, 2024</p>
 </div>
-<p><span>Hello Rod. Thank you for taking the time to share your experience with us. We’re glad to hear that you found our response time prompt and our quote thorough. Providing transparent and reliable service is at the core of what we do so we are happy to know that you found us honest and dependable. We understand that price is an important factor, and we always strive to offer competitive pricing for the quality of service we provide. Your satisfaction is our priority and we are grateful for your trust and choosing Impact Roofing! We look forward to serving you again in the future. Should you ever need our services. Have a wonderful day!</span></p>
+<p><span>Hello Rod. Thank you for taking the time to share your experience with us. Weâ€™re glad to hear that you found our response time prompt and our quote thorough. Providing transparent and reliable service is at the core of what we do so we are happy to know that you found us honest and dependable. We understand that price is an important factor, and we always strive to offer competitive pricing for the quality of service we provide. Your satisfaction is our priority and we are grateful for your trust and choosing Impact Roofing! We look forward to serving you again in the future. Should you ever need our services. Have a wonderful day!</span></p>
 </div>
 </div>
 <div>
@@ -5858,7 +5858,7 @@ You are an AI assistant tasked with extracting structured data from HTML content
 <div>
 <div>
 <div role="presentation">
-<div> </div>
+<div>Â </div>
 </div>
 </div>
 </div>
@@ -5870,11 +5870,11 @@ You are an AI assistant tasked with extracting structured data from HTML content
 <div>
 <div>
 <div aria-label="5 star rating" role="img">
-<div> </div>
-<div> </div>
-<div> </div>
-<div> </div>
-<div> </div>
+<div>Â </div>
+<div>Â </div>
+<div>Â </div>
+<div>Â </div>
+<div>Â </div>
 </div>
 </div>
 </div>
@@ -5898,8 +5898,8 @@ You are an AI assistant tasked with extracting structured data from HTML content
 </div>
 <div>
 <div>
-<div><span>Helpful</span> <span>1</span></div>
-<div aria-hidden="true"> </div>
+<div><span>Helpful</span>Â <span>1</span></div>
+<div aria-hidden="true">Â </div>
 </div>
 </div>
 </div>
@@ -5915,8 +5915,8 @@ You are an AI assistant tasked with extracting structured data from HTML content
 </div>
 <div>
 <div>
-<div><span>Thanks</span> <span>1</span></div>
-<div aria-hidden="true"> </div>
+<div><span>Thanks</span>Â <span>1</span></div>
+<div aria-hidden="true">Â </div>
 </div>
 </div>
 </div>
@@ -5932,8 +5932,8 @@ You are an AI assistant tasked with extracting structured data from HTML content
 </div>
 <div>
 <div>
-<div><span>Love this</span> <span>0</span></div>
-<div aria-hidden="true"> </div>
+<div><span>Love this</span>Â <span>0</span></div>
+<div aria-hidden="true">Â </div>
 </div>
 </div>
 </div>
@@ -5949,8 +5949,8 @@ You are an AI assistant tasked with extracting structured data from HTML content
 </div>
 <div>
 <div>
-<div><span>Oh no</span> <span>0</span></div>
-<div aria-hidden="true"> </div>
+<div><span>Oh no</span>Â <span>0</span></div>
+<div aria-hidden="true">Â </div>
 </div>
 </div>
 </div>
@@ -5980,7 +5980,7 @@ You are an AI assistant tasked with extracting structured data from HTML content
 </div>
 </div>
 </div>
-<div> </div>
+<div>Â </div>
 </div>
 <div>
 <div>
@@ -6022,7 +6022,7 @@ You are an AI assistant tasked with extracting structured data from HTML content
 <div>
 <div>
 <div role="presentation">
-<div> </div>
+<div>Â </div>
 </div>
 </div>
 </div>
@@ -6034,11 +6034,11 @@ You are an AI assistant tasked with extracting structured data from HTML content
 <div>
 <div>
 <div aria-label="5 star rating" role="img">
-<div> </div>
-<div> </div>
-<div> </div>
-<div> </div>
-<div> </div>
+<div>Â </div>
+<div>Â </div>
+<div>Â </div>
+<div>Â </div>
+<div>Â </div>
 </div>
 </div>
 </div>
@@ -6062,8 +6062,8 @@ You are an AI assistant tasked with extracting structured data from HTML content
 </div>
 <div>
 <div>
-<div><span>Helpful</span> <span>0</span></div>
-<div aria-hidden="true"> </div>
+<div><span>Helpful</span>Â <span>0</span></div>
+<div aria-hidden="true">Â </div>
 </div>
 </div>
 </div>
@@ -6079,8 +6079,8 @@ You are an AI assistant tasked with extracting structured data from HTML content
 </div>
 <div>
 <div>
-<div><span>Thanks</span> <span>0</span></div>
-<div aria-hidden="true"> </div>
+<div><span>Thanks</span>Â <span>0</span></div>
+<div aria-hidden="true">Â </div>
 </div>
 </div>
 </div>
@@ -6096,8 +6096,8 @@ You are an AI assistant tasked with extracting structured data from HTML content
 </div>
 <div>
 <div>
-<div><span>Love this</span> <span>0</span></div>
-<div aria-hidden="true"> </div>
+<div><span>Love this</span>Â <span>0</span></div>
+<div aria-hidden="true">Â </div>
 </div>
 </div>
 </div>
@@ -6113,8 +6113,8 @@ You are an AI assistant tasked with extracting structured data from HTML content
 </div>
 <div>
 <div>
-<div><span>Oh no</span> <span>0</span></div>
-<div aria-hidden="true"> </div>
+<div><span>Oh no</span>Â <span>0</span></div>
+<div aria-hidden="true">Â </div>
 </div>
 </div>
 </div>
@@ -6144,7 +6144,7 @@ You are an AI assistant tasked with extracting structured data from HTML content
 </div>
 </div>
 </div>
-<div> </div>
+<div>Â </div>
 </div>
 <div>
 <div>
@@ -6186,7 +6186,7 @@ You are an AI assistant tasked with extracting structured data from HTML content
 <div>
 <div>
 <div role="presentation">
-<div> </div>
+<div>Â </div>
 </div>
 </div>
 </div>
@@ -6198,11 +6198,11 @@ You are an AI assistant tasked with extracting structured data from HTML content
 <div>
 <div>
 <div aria-label="5 star rating" role="img">
-<div> </div>
-<div> </div>
-<div> </div>
-<div> </div>
-<div> </div>
+<div>Â </div>
+<div>Â </div>
+<div>Â </div>
+<div>Â </div>
+<div>Â </div>
 </div>
 </div>
 </div>
@@ -6212,7 +6212,7 @@ You are an AI assistant tasked with extracting structured data from HTML content
 </div>
 <div>
 <div>
-<div> </div>
+<div>Â </div>
 <span data-font-weight="semibold"><a>6 photos</a></span></div>
 </div>
 <div>
@@ -6256,8 +6256,8 @@ You are an AI assistant tasked with extracting structured data from HTML content
 </div>
 <div>
 <div>
-<div><span>Helpful</span> <span>1</span></div>
-<div aria-hidden="true"> </div>
+<div><span>Helpful</span>Â <span>1</span></div>
+<div aria-hidden="true">Â </div>
 </div>
 </div>
 </div>
@@ -6273,8 +6273,8 @@ You are an AI assistant tasked with extracting structured data from HTML content
 </div>
 <div>
 <div>
-<div><span>Thanks</span> <span>1</span></div>
-<div aria-hidden="true"> </div>
+<div><span>Thanks</span>Â <span>1</span></div>
+<div aria-hidden="true">Â </div>
 </div>
 </div>
 </div>
@@ -6290,8 +6290,8 @@ You are an AI assistant tasked with extracting structured data from HTML content
 </div>
 <div>
 <div>
-<div><span>Love this</span> <span>1</span></div>
-<div aria-hidden="true"> </div>
+<div><span>Love this</span>Â <span>1</span></div>
+<div aria-hidden="true">Â </div>
 </div>
 </div>
 </div>
@@ -6307,8 +6307,8 @@ You are an AI assistant tasked with extracting structured data from HTML content
 </div>
 <div>
 <div>
-<div><span>Oh no</span> <span>0</span></div>
-<div aria-hidden="true"> </div>
+<div><span>Oh no</span>Â <span>0</span></div>
+<div aria-hidden="true">Â </div>
 </div>
 </div>
 </div>
@@ -6338,7 +6338,7 @@ You are an AI assistant tasked with extracting structured data from HTML content
 </div>
 </div>
 </div>
-<div> </div>
+<div>Â </div>
 </div>
 <div>
 <div aria-live="polite" id="expander-link-content-:r1t:" role="region">
@@ -6346,7 +6346,7 @@ You are an AI assistant tasked with extracting structured data from HTML content
 <div>
 <p>Jun 26, 2024</p>
 </div>
-<p><span>Thank you for the glowing review, Danielle! Thank you for noticing all of the effort the team puts in. Unfortunately builders cutting corners has become industry standard. It’s not the way we would have liked to meet you, but we are happy to have helped. Please reach out if you ever need anything in the future.</span></p>
+<p><span>Thank you for the glowing review, Danielle! Thank you for noticing all of the effort the team puts in. Unfortunately builders cutting corners has become industry standard. Itâ€™s not the way we would have liked to meet you, but we are happy to have helped. Please reach out if you ever need anything in the future.</span></p>
 </div>
 </div>
 <div>
@@ -6389,7 +6389,7 @@ You are an AI assistant tasked with extracting structured data from HTML content
 <div>
 <div>
 <div role="presentation">
-<div> </div>
+<div>Â </div>
 </div>
 </div>
 </div>
@@ -6401,11 +6401,11 @@ You are an AI assistant tasked with extracting structured data from HTML content
 <div>
 <div>
 <div aria-label="5 star rating" role="img">
-<div> </div>
-<div> </div>
-<div> </div>
-<div> </div>
-<div> </div>
+<div>Â </div>
+<div>Â </div>
+<div>Â </div>
+<div>Â </div>
+<div>Â </div>
 </div>
 </div>
 </div>
@@ -6429,8 +6429,8 @@ You are an AI assistant tasked with extracting structured data from HTML content
 </div>
 <div>
 <div>
-<div><span>Helpful</span> <span>1</span></div>
-<div aria-hidden="true"> </div>
+<div><span>Helpful</span>Â <span>1</span></div>
+<div aria-hidden="true">Â </div>
 </div>
 </div>
 </div>
@@ -6446,8 +6446,8 @@ You are an AI assistant tasked with extracting structured data from HTML content
 </div>
 <div>
 <div>
-<div><span>Thanks</span> <span>0</span></div>
-<div aria-hidden="true"> </div>
+<div><span>Thanks</span>Â <span>0</span></div>
+<div aria-hidden="true">Â </div>
 </div>
 </div>
 </div>
@@ -6463,8 +6463,8 @@ You are an AI assistant tasked with extracting structured data from HTML content
 </div>
 <div>
 <div>
-<div><span>Love this</span> <span>1</span></div>
-<div aria-hidden="true"> </div>
+<div><span>Love this</span>Â <span>1</span></div>
+<div aria-hidden="true">Â </div>
 </div>
 </div>
 </div>
@@ -6480,8 +6480,8 @@ You are an AI assistant tasked with extracting structured data from HTML content
 </div>
 <div>
 <div>
-<div><span>Oh no</span> <span>0</span></div>
-<div aria-hidden="true"> </div>
+<div><span>Oh no</span>Â <span>0</span></div>
+<div aria-hidden="true">Â </div>
 </div>
 </div>
 </div>
@@ -6511,7 +6511,7 @@ You are an AI assistant tasked with extracting structured data from HTML content
 </div>
 </div>
 </div>
-<div> </div>
+<div>Â </div>
 </div>
 <div>
 <div aria-live="polite" id="expander-link-content-:r25:" role="region">
@@ -6519,7 +6519,7 @@ You are an AI assistant tasked with extracting structured data from HTML content
 <div>
 <p>Nov 22, 2024</p>
 </div>
-<p><span>Thank you for the thoughtful review. It is our process to try to provide information and education. We want to make an impact on the communities we serve and we are happy we were able to do that today. We also don’t want to unnecessarily put shingles in a landfill if we can help prevent it. Thank you for noticing!</span></p>
+<p><span>Thank you for the thoughtful review. It is our process to try to provide information and education. We want to make an impact on the communities we serve and we are happy we were able to do that today. We also donâ€™t want to unnecessarily put shingles in a landfill if we can help prevent it. Thank you for noticing!</span></p>
 </div>
 </div>
 <div>
@@ -6562,7 +6562,7 @@ You are an AI assistant tasked with extracting structured data from HTML content
 <div>
 <div>
 <div role="presentation">
-<div> </div>
+<div>Â </div>
 </div>
 </div>
 </div>
@@ -6574,11 +6574,11 @@ You are an AI assistant tasked with extracting structured data from HTML content
 <div>
 <div>
 <div aria-label="1 star rating" role="img">
-<div> </div>
-<div> </div>
-<div> </div>
-<div> </div>
-<div> </div>
+<div>Â </div>
+<div>Â </div>
+<div>Â </div>
+<div>Â </div>
+<div>Â </div>
 </div>
 </div>
 </div>
@@ -6602,8 +6602,8 @@ You are an AI assistant tasked with extracting structured data from HTML content
 </div>
 <div>
 <div>
-<div><span>Helpful</span> <span>0</span></div>
-<div aria-hidden="true"> </div>
+<div><span>Helpful</span>Â <span>0</span></div>
+<div aria-hidden="true">Â </div>
 </div>
 </div>
 </div>
@@ -6619,8 +6619,8 @@ You are an AI assistant tasked with extracting structured data from HTML content
 </div>
 <div>
 <div>
-<div><span>Thanks</span> <span>0</span></div>
-<div aria-hidden="true"> </div>
+<div><span>Thanks</span>Â <span>0</span></div>
+<div aria-hidden="true">Â </div>
 </div>
 </div>
 </div>
@@ -6636,8 +6636,8 @@ You are an AI assistant tasked with extracting structured data from HTML content
 </div>
 <div>
 <div>
-<div><span>Love this</span> <span>0</span></div>
-<div aria-hidden="true"> </div>
+<div><span>Love this</span>Â <span>0</span></div>
+<div aria-hidden="true">Â </div>
 </div>
 </div>
 </div>
@@ -6653,8 +6653,8 @@ You are an AI assistant tasked with extracting structured data from HTML content
 </div>
 <div>
 <div>
-<div><span>Oh no</span> <span>0</span></div>
-<div aria-hidden="true"> </div>
+<div><span>Oh no</span>Â <span>0</span></div>
+<div aria-hidden="true">Â </div>
 </div>
 </div>
 </div>
@@ -6684,7 +6684,7 @@ You are an AI assistant tasked with extracting structured data from HTML content
 </div>
 </div>
 </div>
-<div> </div>
+<div>Â </div>
 </div>
 <div>
 <div aria-live="polite" id="expander-link-content-:r2d:" role="region">
@@ -6735,7 +6735,7 @@ You are an AI assistant tasked with extracting structured data from HTML content
 <div>
 <div>
 <div role="presentation">
-<div> </div>
+<div>Â </div>
 </div>
 </div>
 </div>
@@ -6747,11 +6747,11 @@ You are an AI assistant tasked with extracting structured data from HTML content
 <div>
 <div>
 <div aria-label="5 star rating" role="img">
-<div> </div>
-<div> </div>
-<div> </div>
-<div> </div>
-<div> </div>
+<div>Â </div>
+<div>Â </div>
+<div>Â </div>
+<div>Â </div>
+<div>Â </div>
 </div>
 </div>
 </div>
@@ -6775,8 +6775,8 @@ You are an AI assistant tasked with extracting structured data from HTML content
 </div>
 <div>
 <div>
-<div><span>Helpful</span> <span>0</span></div>
-<div aria-hidden="true"> </div>
+<div><span>Helpful</span>Â <span>0</span></div>
+<div aria-hidden="true">Â </div>
 </div>
 </div>
 </div>
@@ -6792,8 +6792,8 @@ You are an AI assistant tasked with extracting structured data from HTML content
 </div>
 <div>
 <div>
-<div><span>Thanks</span> <span>0</span></div>
-<div aria-hidden="true"> </div>
+<div><span>Thanks</span>Â <span>0</span></div>
+<div aria-hidden="true">Â </div>
 </div>
 </div>
 </div>
@@ -6809,8 +6809,8 @@ You are an AI assistant tasked with extracting structured data from HTML content
 </div>
 <div>
 <div>
-<div><span>Love this</span> <span>0</span></div>
-<div aria-hidden="true"> </div>
+<div><span>Love this</span>Â <span>0</span></div>
+<div aria-hidden="true">Â </div>
 </div>
 </div>
 </div>
@@ -6826,8 +6826,8 @@ You are an AI assistant tasked with extracting structured data from HTML content
 </div>
 <div>
 <div>
-<div><span>Oh no</span> <span>0</span></div>
-<div aria-hidden="true"> </div>
+<div><span>Oh no</span>Â <span>0</span></div>
+<div aria-hidden="true">Â </div>
 </div>
 </div>
 </div>
@@ -6857,7 +6857,7 @@ You are an AI assistant tasked with extracting structured data from HTML content
 </div>
 </div>
 </div>
-<div> </div>
+<div>Â </div>
 </div>
 <div>
 <div>
@@ -6899,7 +6899,7 @@ You are an AI assistant tasked with extracting structured data from HTML content
 <div>
 <div>
 <div role="presentation">
-<div> </div>
+<div>Â </div>
 </div>
 </div>
 </div>
@@ -6911,11 +6911,11 @@ You are an AI assistant tasked with extracting structured data from HTML content
 <div>
 <div>
 <div aria-label="5 star rating" role="img">
-<div> </div>
-<div> </div>
-<div> </div>
-<div> </div>
-<div> </div>
+<div>Â </div>
+<div>Â </div>
+<div>Â </div>
+<div>Â </div>
+<div>Â </div>
 </div>
 </div>
 </div>
@@ -6939,8 +6939,8 @@ You are an AI assistant tasked with extracting structured data from HTML content
 </div>
 <div>
 <div>
-<div><span>Helpful</span> <span>0</span></div>
-<div aria-hidden="true"> </div>
+<div><span>Helpful</span>Â <span>0</span></div>
+<div aria-hidden="true">Â </div>
 </div>
 </div>
 </div>
@@ -6956,8 +6956,8 @@ You are an AI assistant tasked with extracting structured data from HTML content
 </div>
 <div>
 <div>
-<div><span>Thanks</span> <span>0</span></div>
-<div aria-hidden="true"> </div>
+<div><span>Thanks</span>Â <span>0</span></div>
+<div aria-hidden="true">Â </div>
 </div>
 </div>
 </div>
@@ -6973,8 +6973,8 @@ You are an AI assistant tasked with extracting structured data from HTML content
 </div>
 <div>
 <div>
-<div><span>Love this</span> <span>0</span></div>
-<div aria-hidden="true"> </div>
+<div><span>Love this</span>Â <span>0</span></div>
+<div aria-hidden="true">Â </div>
 </div>
 </div>
 </div>
@@ -6990,8 +6990,8 @@ You are an AI assistant tasked with extracting structured data from HTML content
 </div>
 <div>
 <div>
-<div><span>Oh no</span> <span>0</span></div>
-<div aria-hidden="true"> </div>
+<div><span>Oh no</span>Â <span>0</span></div>
+<div aria-hidden="true">Â </div>
 </div>
 </div>
 </div>
@@ -7021,7 +7021,7 @@ You are an AI assistant tasked with extracting structured data from HTML content
 </div>
 </div>
 </div>
-<div> </div>
+<div>Â </div>
 </div>
 <div>
 <div>
@@ -7063,7 +7063,7 @@ You are an AI assistant tasked with extracting structured data from HTML content
 <div>
 <div>
 <div role="presentation">
-<div> </div>
+<div>Â </div>
 </div>
 </div>
 </div>
@@ -7075,11 +7075,11 @@ You are an AI assistant tasked with extracting structured data from HTML content
 <div>
 <div>
 <div aria-label="5 star rating" role="img">
-<div> </div>
-<div> </div>
-<div> </div>
-<div> </div>
-<div> </div>
+<div>Â </div>
+<div>Â </div>
+<div>Â </div>
+<div>Â </div>
+<div>Â </div>
 </div>
 </div>
 </div>
@@ -7089,7 +7089,7 @@ You are an AI assistant tasked with extracting structured data from HTML content
 </div>
 <div>
 <div>
-<div> </div>
+<div>Â </div>
 <span data-font-weight="semibold"><a>1 photo</a></span></div>
 </div>
 <div>
@@ -7117,8 +7117,8 @@ You are an AI assistant tasked with extracting structured data from HTML content
 </div>
 <div>
 <div>
-<div><span>Helpful</span> <span>0</span></div>
-<div aria-hidden="true"> </div>
+<div><span>Helpful</span>Â <span>0</span></div>
+<div aria-hidden="true">Â </div>
 </div>
 </div>
 </div>
@@ -7134,8 +7134,8 @@ You are an AI assistant tasked with extracting structured data from HTML content
 </div>
 <div>
 <div>
-<div><span>Thanks</span> <span>0</span></div>
-<div aria-hidden="true"> </div>
+<div><span>Thanks</span>Â <span>0</span></div>
+<div aria-hidden="true">Â </div>
 </div>
 </div>
 </div>
@@ -7151,8 +7151,8 @@ You are an AI assistant tasked with extracting structured data from HTML content
 </div>
 <div>
 <div>
-<div><span>Love this</span> <span>0</span></div>
-<div aria-hidden="true"> </div>
+<div><span>Love this</span>Â <span>0</span></div>
+<div aria-hidden="true">Â </div>
 </div>
 </div>
 </div>
@@ -7168,8 +7168,8 @@ You are an AI assistant tasked with extracting structured data from HTML content
 </div>
 <div>
 <div>
-<div><span>Oh no</span> <span>0</span></div>
-<div aria-hidden="true"> </div>
+<div><span>Oh no</span>Â <span>0</span></div>
+<div aria-hidden="true">Â </div>
 </div>
 </div>
 </div>
@@ -7199,7 +7199,7 @@ You are an AI assistant tasked with extracting structured data from HTML content
 </div>
 </div>
 </div>
-<div> </div>
+<div>Â </div>
 </div>
 <div>
 <div>
@@ -7211,12 +7211,12 @@ You are an AI assistant tasked with extracting structured data from HTML content
 </div>
 </div>
 </li>
-<li> </li>
+<li>Â </li>
 </ul>
 <div aria-label="Pagination navigation" role="navigation">
 <div>
 <div data-testid="pagination-links">
-<div> </div>
+<div>Â </div>
 <div>
 <div aria-label="Page: 1">1</div>
 </div>
@@ -7229,7 +7229,7 @@ You are an AI assistant tasked with extracting structured data from HTML content
 <div><span><a>
 <div aria-label="Page: 4">4</div>
 </a></span></div>
-<div> </div>
+<div>Â </div>
 </div>
 </div>
 <div><span>1 of 4</span></div>
@@ -7831,8 +7831,8 @@ You are an AI assistant tasked with extracting structured data from HTML content
 </div>
 <div>
 <div>
-<div><span>Helpful</span> <span>0</span></div>
-<div aria-hidden="true"> </div>
+<div><span>Helpful</span>Â <span>0</span></div>
+<div aria-hidden="true">Â </div>
 </div>
 </div>
 </div>
@@ -7848,8 +7848,8 @@ You are an AI assistant tasked with extracting structured data from HTML content
 </div>
 <div>
 <div>
-<div><span>Thanks</span> <span>0</span></div>
-<div aria-hidden="true"> </div>
+<div><span>Thanks</span>Â <span>0</span></div>
+<div aria-hidden="true">Â </div>
 </div>
 </div>
 </div>
@@ -7865,8 +7865,8 @@ You are an AI assistant tasked with extracting structured data from HTML content
 </div>
 <div>
 <div>
-<div><span>Love this</span> <span>0</span></div>
-<div aria-hidden="true"> </div>
+<div><span>Love this</span>Â <span>0</span></div>
+<div aria-hidden="true">Â </div>
 </div>
 </div>
 </div>
@@ -7882,8 +7882,8 @@ You are an AI assistant tasked with extracting structured data from HTML content
 </div>
 <div>
 <div>
-<div><span>Oh no</span> <span>0</span></div>
-<div aria-hidden="true"> </div>
+<div><span>Oh no</span>Â <span>0</span></div>
+<div aria-hidden="true">Â </div>
 </div>
 </div>
 </div>
@@ -7913,7 +7913,7 @@ You are an AI assistant tasked with extracting structured data from HTML content
 </div>
 </div>
 </div>
-<div> </div>
+<div>Â </div>
 </div>
 <div>
 <div>
@@ -7955,7 +7955,7 @@ You are an AI assistant tasked with extracting structured data from HTML content
 <div>
 <div>
 <div role="presentation">
-<div> </div>
+<div>Â </div>
 </div>
 </div>
 </div>
@@ -7967,11 +7967,11 @@ You are an AI assistant tasked with extracting structured data from HTML content
 <div>
 <div>
 <div aria-label="5 star rating" role="img">
-<div> </div>
-<div> </div>
-<div> </div>
-<div> </div>
-<div> </div>
+<div>Â </div>
+<div>Â </div>
+<div>Â </div>
+<div>Â </div>
+<div>Â </div>
 </div>
 </div>
 </div>
@@ -7981,7 +7981,7 @@ You are an AI assistant tasked with extracting structured data from HTML content
 </div>
 <div>
 <div>
-<div> </div>
+<div>Â </div>
 <span data-font-weight="semibold"><a>1 photo</a></span></div>
 </div>
 <div>
@@ -8009,8 +8009,8 @@ You are an AI assistant tasked with extracting structured data from HTML content
 </div>
 <div>
 <div>
-<div><span>Helpful</span> <span>0</span></div>
-<div aria-hidden="true"> </div>
+<div><span>Helpful</span>Â <span>0</span></div>
+<div aria-hidden="true">Â </div>
 </div>
 </div>
 </div>
@@ -8026,8 +8026,8 @@ You are an AI assistant tasked with extracting structured data from HTML content
 </div>
 <div>
 <div>
-<div><span>Thanks</span> <span>0</span></div>
-<div aria-hidden="true"> </div>
+<div><span>Thanks</span>Â <span>0</span></div>
+<div aria-hidden="true">Â </div>
 </div>
 </div>
 </div>
@@ -8043,8 +8043,8 @@ You are an AI assistant tasked with extracting structured data from HTML content
 </div>
 <div>
 <div>
-<div><span>Love this</span> <span>0</span></div>
-<div aria-hidden="true"> </div>
+<div><span>Love this</span>Â <span>0</span></div>
+<div aria-hidden="true">Â </div>
 </div>
 </div>
 </div>
@@ -8060,8 +8060,8 @@ You are an AI assistant tasked with extracting structured data from HTML content
 </div>
 <div>
 <div>
-<div><span>Oh no</span> <span>0</span></div>
-<div aria-hidden="true"> </div>
+<div><span>Oh no</span>Â <span>0</span></div>
+<div aria-hidden="true">Â </div>
 </div>
 </div>
 </div>
@@ -8091,7 +8091,7 @@ You are an AI assistant tasked with extracting structured data from HTML content
 </div>
 </div>
 </div>
-<div> </div>
+<div>Â </div>
 </div>
 <div>
 <div>
@@ -8103,12 +8103,12 @@ You are an AI assistant tasked with extracting structured data from HTML content
 </div>
 </div>
 </li>
-<li> </li>
+<li>Â </li>
 </ul>
 <div aria-label="Pagination navigation" role="navigation">
 <div>
 <div data-testid="pagination-links">
-<div> </div>
+<div>Â </div>
 <div>
 <div aria-label="Page: 1">1</div>
 </div>
@@ -8121,7 +8121,7 @@ You are an AI assistant tasked with extracting structured data from HTML content
 <div><span><a>
 <div aria-label="Page: 4">4</div>
 </a></span></div>
-<div> </div>
+<div>Â </div>
 </div>
 </div>
 <div><span>1 of 4</span></div>
@@ -8229,7 +8229,7 @@ You are an AI assistant tasked with extracting structured data from HTML content
 </div>
 <div>
 <div>
-<div> </div>
+<div>Â </div>
 <div>Show more suggestions</div>
 </div>
 </div>
@@ -8239,7 +8239,7 @@ You are an AI assistant tasked with extracting structured data from HTML content
 </main></div>
 <div data-testid="sidebar-content">
 <aside>
-<div> </div>
+<div>Â </div>
 <div>
 <section>
 <div id="raq-widget">
@@ -8300,7 +8300,7 @@ You are an AI assistant tasked with extracting structured data from HTML content
 <div>
 <div aria-hidden="false">
 <div>
-<p>Your project with this business is eligible for coverage up to $2,500 when you hire through 'Get a quote.' Terms apply. <a rel="noopener" target="_blank">Learn more</a></p>
+<p>Your project with this business is eligible for coverage up to $2,500 when you hire through 'Get a quote.' Terms apply.Â <a rel="noopener" target="_blank">Learn more</a></p>
 </div>
 </div>
 </div>
@@ -8326,7 +8326,7 @@ You are an AI assistant tasked with extracting structured data from HTML content
 <div data-testid="cookbook-island">
 <div>
 <div>
-<div> </div>
+<div>Â </div>
 <div>
 <p>Business website</p>
 <p data-font-weight="semibold"><a rel="noopener nofollow" target="_blank">impactroofing.solutions</a></p>
@@ -8335,7 +8335,7 @@ You are an AI assistant tasked with extracting structured data from HTML content
 </div>
 <div>
 <div>
-<div> </div>
+<div>Â </div>
 <div>
 <p>Phone number</p>
 <p data-font-weight="semibold">(703) 329-2959</p>
@@ -8344,7 +8344,7 @@ You are an AI assistant tasked with extracting structured data from HTML content
 </div>
 <div>
 <div>
-<div> </div>
+<div>Â </div>
 <div>
 <p data-font-weight="semibold"><a>View Service Area</a></p>
 </div>
@@ -8364,94 +8364,94 @@ Roofing, Gutter Services, Siding
 Open8:00 AM - 5:00 PM
 Updates From This Business
 James Hardie Siding in Alexandria!!
-Looking to upgrade your home with a durable, Stylish… read more
+Looking to upgrade your home with a durable, Stylishâ€¦ read more
 
 Certified TPO Flat Roof Replacement
-Need a durable, energy-efficient flat roof? We… read more
+Need a durable, energy-efficient flat roof? Weâ€¦ read more
 
 Top-Rated Shingle Roof Experts- Call Today!
-We specialize in expert shingle roof replacement,… read more
+We specialize in expert shingle roof replacement,â€¦ read more
 
 Emergency Roof Repairs!
-Rain and snow are on the way! We’re offering… read more
+Rain and snow are on the way! Weâ€™re offeringâ€¦ read more
 
 Stop Ice Dams Now- Free Inspection
-Ice dams can cause costly roof damage, but we’re… read more
+Ice dams can cause costly roof damage, but weâ€™reâ€¦ read more
 
 Get Your Roof Winter-Ready With Us!
-Getting your roof ready before winter is crucial! By… read more
+Getting your roof ready before winter is crucial! Byâ€¦ read more
 
 Looking for a commercial contractor?
-We can help. We specialize in commercial roofing,… read more
+We can help. We specialize in commercial roofing,â€¦ read more
 
 Boost Flat Roof Lifespan with Silicone Coating!
-Add up to a decade to your flat roof's life with our… read more
+Add up to a decade to your flat roof's life with ourâ€¦ read more
 
 Free Roof Inspection!
-Our estimates are free! We are fully licensed… read more
+Our estimates are free! We are fully licensedâ€¦ read more
 
 Eco-friendly Silicone Coating
-Durability, UV resistance, Waterproof ponding water… read more
+Durability, UV resistance, Waterproof ponding waterâ€¦ read more
 
 Local Experts For Commercial Roofing
-Selecting the right roofing company is paramount.… read more
+Selecting the right roofing company is paramount.â€¦ read more
 
 Top-Tier Roofing Solutions!
-At Impact Roofing & Renovations, we know choosing… read more
+At Impact Roofing & Renovations, we know choosingâ€¦ read more
 
 Premium TPO Roofing Services!
-Our team comprises skilled professionals with years… read more
+Our team comprises skilled professionals with yearsâ€¦ read more
 
-Yesterday’s Hail: Replace Roof via Insurance
-If you or anyone you know experienced damage to your… read more
+Yesterdayâ€™s Hail: Replace Roof via Insurance
+If you or anyone you know experienced damage to yourâ€¦ read more
 
 Unbeatable Deals on TPO Full Replacement
-Get a fantastic $500.00 discount on TPO full… read more
+Get a fantastic $500.00 discount on TPO fullâ€¦ read more
 
 Lifetime Warranty Roofing for Your Peace of Mind
-At Impact Roofing & Renovations, we back our work… read more
+At Impact Roofing & Renovations, we back our workâ€¦ read more
 
 Get A Free Quote Today!
-Thank you to our brave men and women who have served… read more
+Thank you to our brave men and women who have servedâ€¦ read more
 
 Limited-time offer!
-Until July 4th you can get 10% off on a full home… read more
+Until July 4th you can get 10% off on a full homeâ€¦ read more
 
 We specialize in exterior renovations and solar
-Give us a call at (703) 329-2959 to book an… read more
+Give us a call at (703) 329-2959 to book anâ€¦ read more
 
 10% off
-Get 10% off on your purchase of $10000 or more.… read more
+Get 10% off on your purchase of $10000 or more.â€¦ read more
 
 Make sure your roof is using the best equipment
-During a roof replacement or large construction… read more
+During a roof replacement or large constructionâ€¦ read more
 
 Kickstart Your Outdoor Projects This Summer!
-Save $1000.00 on your New James Hardie Siding… read more
+Save $1000.00 on your New James Hardie Sidingâ€¦ read more
 
 Summer Specials Now Available!
-Revitalize Your Roof and Gutters for a Refreshing… read more
+Revitalize Your Roof and Gutters for a Refreshingâ€¦ read more
 
 Experience Top-Notch Roofing Services
-Hiring a good roofing company is essential for the… read more
+Hiring a good roofing company is essential for theâ€¦ read more
 
 Need a manufacturers certified roof replacement?
-We are certified with all of the major manufacturers… read more
+We are certified with all of the major manufacturersâ€¦ read more
 
 We Are Here To Provide You Top-Notch Service!
-At Impact Roofing we specialize in a wide range of… read more
+At Impact Roofing we specialize in a wide range ofâ€¦ read more
 
 Call for a free roof replacement estimate!
-We work with you to find the best roofing solution… read more
+We work with you to find the best roofing solutionâ€¦ read more
 
 Our team has 15 years of experience
-We can handle all your roofing needs. Call to… read more
+We can handle all your roofing needs. Call toâ€¦ read more
 
 First-time customer special
-New customers get free gutter guard inserts with a… read more
+New customers get free gutter guard inserts with aâ€¦ read more
 
 Free estimate for Valentine's Day
-Happy Valentine's Day! Get a free estimate now… read more
+Happy Valentine's Day! Get a free estimate nowâ€¦ read more
 
 	
 Verified License
@@ -8534,17 +8534,17 @@ Restuccoing
 Roof replacement
 Siding installation
 Review Highlights
-“I want to thank Jeff and Mason for their help with a roof inspection that was required for my home owners insurance policy.” in 10 reviews
+â€œI want to thank Jeff and Mason for their help with a roof inspection that was required for my home owners insurance policy.â€ in 10 reviews
 
-“Ben was our foreman and he was responsive to our questions and concerns.” in 3 reviews
+â€œBen was our foreman and he was responsive to our questions and concerns.â€ in 3 reviews
 
-“Very responsive, price beat everyone else's, left the house looking great , the new roof and the surroundings!” in 7 reviews
+â€œVery responsive, price beat everyone else's, left the house looking great , the new roof and the surroundings!â€ in 7 reviews
 
 
 About the Business
 Locally owned roofing contractor with expertise in traditional shingle roofs, as well as TPO, metal,
 slate and cedar. We have a goal to help reduce the 10 million tons of shingles that end up in land
-fills every year by educating homeowners on natural products and on the importance of a quality i…
+fills every year by educating homeowners on natural products and on the importance of a quality iâ€¦
 
 Location & Hours	
 Suggest an edit
@@ -8670,7 +8670,7 @@ Business Owner
 
 Mar 18, 2024
 
-Hello Rod. Thank you for taking the time to share your experience with us. We’re glad to hear that you found our response time prompt and our quote thorough. Providing transparent and reliable service is at the core of what we do so we are happy to know that you found us honest and dependable. We understand that price is an important factor, and we always strive to offer competitive pricing for the quality of service we provide. Your satisfaction is our priority and we are grateful for your trust and choosing Impact Roofing! We look forward to serving you again in the future. Should you ever need our services. Have a wonderful day!
+Hello Rod. Thank you for taking the time to share your experience with us. Weâ€™re glad to hear that you found our response time prompt and our quote thorough. Providing transparent and reliable service is at the core of what we do so we are happy to know that you found us honest and dependable. We understand that price is an important factor, and we always strive to offer competitive pricing for the quality of service we provide. Your satisfaction is our priority and we are grateful for your trust and choosing Impact Roofing! We look forward to serving you again in the future. Should you ever need our services. Have a wonderful day!
 
 
 Read more
@@ -8733,7 +8733,7 @@ Business Owner
 
 Jun 26, 2024
 
-Thank you for the glowing review, Danielle! Thank you for noticing all of the effort the team puts in. Unfortunately builders cutting corners has become industry standard. It’s not the way we would have liked to meet you, but we are happy to have helped. Please reach out if you ever need anything in the future.
+Thank you for the glowing review, Danielle! Thank you for noticing all of the effort the team puts in. Unfortunately builders cutting corners has become industry standard. Itâ€™s not the way we would have liked to meet you, but we are happy to have helped. Please reach out if you ever need anything in the future.
 
 
 Read more
@@ -8751,7 +8751,7 @@ Business Owner
 
 Nov 22, 2024
 
-Thank you for the thoughtful review. It is our process to try to provide information and education. We want to make an impact on the communities we serve and we are happy we were able to do that today. We also don’t want to unnecessarily put shingles in a landfill if we can help prevent it. Thank you for noticing!
+Thank you for the thoughtful review. It is our process to try to provide information and education. We want to make an impact on the communities we serve and we are happy we were able to do that today. We also donâ€™t want to unnecessarily put shingles in a landfill if we can help prevent it. Thank you for noticing!
 
 
 Read more

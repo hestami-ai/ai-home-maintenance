@@ -1,0 +1,11 @@
+# Prevent "bytes are not valid utf8" failures in Git clients (e.g. VS Code's
+# commit-message generator) that decode `git diff` output as UTF-8.
+#
+# Line-delimited data/log dumps and certain generated artifacts can contain
+# non-UTF-8 bytes (e.g. Windows-1252). Marking them `-diff` makes Git emit
+# "Binary files ... differ" instead of the raw bytes, keeping every diff valid
+# UTF-8 without altering file contents.
+*.jsonl                          -diff
+*.ndjson                         -diff
+goose-releases.jsonl             -diff
+backend/html-chunker/output.txt  -diff
