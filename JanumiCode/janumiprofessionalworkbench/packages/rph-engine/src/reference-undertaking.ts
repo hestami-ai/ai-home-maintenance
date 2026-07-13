@@ -60,8 +60,12 @@ const LABELS: Record<string, { title: string; kind: string }> = {
 	}
 };
 
-/** Drive the Reference Undertaking end to end via live commands. Throws if any command is rejected (fail-loud). */
-export function driveReferenceUndertaking(handle: EngineHandle): void {
+/** Drive the Reference Undertaking end to end via live commands. Throws if any command is rejected (fail-loud).
+ * Pass `undertakingId` to stamp each proposed PWU with its owning Undertaking (CON-009 ownership binding). */
+export function driveReferenceUndertaking(
+	handle: EngineHandle,
+	opts: { readonly undertakingId?: string } = {}
+): void {
 	let n = 0;
 	const send = (
 		commandType: string,
@@ -126,6 +130,7 @@ export function driveReferenceUndertaking(handle: EngineHandle): void {
 			description: meta.title,
 			intentId: R.intentId,
 			...(parentWorkUnitId ? { parentWorkUnitId } : {}),
+			...(opts.undertakingId ? { undertakingId: opts.undertakingId, isLocalExtension: false } : {}),
 			boundaries: { inScope: [], outOfScope: [], permittedChanges: [], prohibitedChanges: [] },
 			obligationIds: [],
 			constraintIds: [],
