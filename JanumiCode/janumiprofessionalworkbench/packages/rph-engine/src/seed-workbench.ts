@@ -157,5 +157,7 @@ export function seedWorkbench(handle: EngineHandle): void {
 		objective: 'Enable trades businesses to manage customer work from request through invoice.',
 		intendedOutputProduct: 'Field Service Management SaaS'
 	});
-	driveReferenceUndertaking(handle, { undertakingId: SEED_UNDERTAKING });
+	const pwuTypeByKind: Record<string, string> = {};
+	for (const t of PWU_TYPES) pwuTypeByKind[t.kind] = t.id;
+	driveReferenceUndertaking(handle, { undertakingId: SEED_UNDERTAKING, pwuTypeByKind });
 }

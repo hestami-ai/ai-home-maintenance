@@ -64,7 +64,10 @@ const LABELS: Record<string, { title: string; kind: string }> = {
  * Pass `undertakingId` to stamp each proposed PWU with its owning Undertaking (CON-009 ownership binding). */
 export function driveReferenceUndertaking(
 	handle: EngineHandle,
-	opts: { readonly undertakingId?: string } = {}
+	opts: {
+		readonly undertakingId?: string;
+		readonly pwuTypeByKind?: Readonly<Record<string, string>>;
+	} = {}
 ): void {
 	let n = 0;
 	const send = (
@@ -131,6 +134,7 @@ export function driveReferenceUndertaking(
 			intentId: R.intentId,
 			...(parentWorkUnitId ? { parentWorkUnitId } : {}),
 			...(opts.undertakingId ? { undertakingId: opts.undertakingId, isLocalExtension: false } : {}),
+			...(opts.pwuTypeByKind?.[meta.kind] ? { pwuTypeId: opts.pwuTypeByKind[meta.kind] } : {}),
 			boundaries: { inScope: [], outOfScope: [], permittedChanges: [], prohibitedChanges: [] },
 			obligationIds: [],
 			constraintIds: [],
