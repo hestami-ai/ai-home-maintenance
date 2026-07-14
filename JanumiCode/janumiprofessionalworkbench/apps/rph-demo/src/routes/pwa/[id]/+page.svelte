@@ -179,6 +179,77 @@
 	let running = $state(false);
 	let log = $state<LogEntry[]>([]);
 
+	// Layer B (in-product): the faithfulness assessment surfaced beside the graph. `liveAssessment` is updated from the
+	// SSE stream during a run; otherwise the latest DURABLE assessment from the load feeds the panel. Reset on PWA change.
+	type AssessmentPanel = {
+		assessmentId: string;
+		iteration: number;
+		verdict: string;
+		overallScore: number;
+		criteria: { name: string; score: number; rationale?: string }[];
+		gaps: string[];
+		recommendation: string;
+		status: string;
+		reason?: string;
+		context?: string;
+		scoreDelta?: number;
+		converging?: boolean;
+	};
+	let liveAssessment = $state<AssessmentPanel | null>(null);
+	const assessment = $derived<AssessmentPanel | null>(
+		liveAssessment ??
+			(data.assessments && data.assessments.length
+				? (() => {
+						const v = data.assessments[data.assessments.length - 1];
+						return {
+							assessmentId: v.id,
+							iteration: v.iteration,
+							verdict: v.verdict,
+							overallScore: v.overallScore,
+							criteria: v.criteria,
+							gaps: v.gaps,
+							recommendation: v.recommendation,
+							status: v.status,
+							reason: v.reason,
+							context: v.context,
+							scoreDelta: v.scoreDelta,
+							converging: v.converging
+						};
+					})()
+				: null)
+	);
+	function assessmentFromEvent(
+		ev: {
+			assessmentId?: string;
+			iteration?: number;
+			verdict?: string;
+			overallScore?: number;
+			criteria?: { name: string; score: number; rationale?: string }[];
+			gaps?: string[];
+			recommendation?: string;
+			reason?: string;
+			context?: string;
+			scoreDelta?: number;
+			converging?: boolean;
+		},
+		status: string
+	): AssessmentPanel {
+		return {
+			assessmentId: ev.assessmentId ?? '',
+			iteration: ev.iteration ?? 1,
+			verdict: ev.verdict ?? 'PARTIAL',
+			overallScore: ev.overallScore ?? 0,
+			criteria: ev.criteria ?? [],
+			gaps: ev.gaps ?? [],
+			recommendation: ev.recommendation ?? '',
+			status,
+			reason: ev.reason,
+			context: ev.context,
+			scoreDelta: ev.scoreDelta,
+			converging: ev.converging
+		};
+	}
+
 	// Hydrate the log from the DURABLE, event-sourced conversation when the PWA loads or changes — the transcript
 	// survives reloads/navigation (it is domain state in the engine, not client memory). Guarded so a live run (and
 	// its invalidateAll graph refreshes) never clobbers the in-flight log.
@@ -186,6 +257,7 @@
 	$effect(() => {
 		if (data.pwa.id !== hydratedFor && !running) {
 			log = data.conversation ?? [];
+			liveAssessment = null;
 			hydratedFor = data.pwa.id;
 		}
 	});
@@ -253,6 +325,17 @@
 		ok?: boolean;
 		summary?: string;
 		message?: string;
+		iteration?: number;
+		assessmentId?: string;
+		verdict?: string;
+		overallScore?: number;
+		criteria?: { name: string; score: number; rationale?: string }[];
+		gaps?: string[];
+		recommendation?: string;
+		reason?: string;
+		context?: string;
+		scoreDelta?: number;
+		converging?: boolean;
 	}) {
 		switch (ev.kind) {
 			case 'status':
@@ -273,6 +356,29 @@
 				break;
 			case 'error':
 				push({ kind: 'error', text: ev.message ?? 'error' });
+				break;
+			case 'assessment_started':
+				push({ kind: 'status', text: `⚖ Assessing faithfulness (pass ${ev.iteration ?? 1})…` });
+				break;
+			case 'assessment_recorded':
+				push({
+					kind: 'status',
+					text: `⚖ Faithfulness: ${ev.verdict} · ${ev.overallScore}%${ev.converging === false ? ' · not converging' : ''}`
+				});
+				liveAssessment = assessmentFromEvent(ev, 'RECORDED');
+				break;
+			case 'revision_started':
+				push({
+					kind: 'status',
+					text: `↻ Auto-refinement (pass ${ev.iteration ?? 2}) — addressing reviewer gaps…`
+				});
+				break;
+			case 'assessment_escalated':
+				push({ kind: 'status', text: `⚠ Escalated for your review (${ev.reason ?? ''}).` });
+				liveAssessment = assessmentFromEvent(ev, 'ESCALATED');
+				break;
+			case 'assessment_error':
+				push({ kind: 'status', text: `⚖ Assessment skipped: ${ev.message ?? 'error'}` });
 				break;
 			default:
 				break;
@@ -318,6 +424,21 @@
 								? `⚠ ${graphIssues} note(s)`
 								: '✓ well-formed'
 							: `✗ ${graphIssues} issue(s)`}
+					</span>
+				{/if}
+				{#if assessment}
+					<span
+						class="pill assurechip"
+						class:v-faithful={assessment.verdict === 'FAITHFUL'}
+						class:v-partial={assessment.verdict === 'PARTIAL'}
+						class:v-poor={assessment.verdict === 'POOR'}
+						class:esc={assessment.status === 'ESCALATED'}
+						title="Faithfulness assessment (Layer B — a judge distinct from the authoring agent scores how well the graph interprets the prompt)"
+						data-testid="assurance-chip"
+					>
+						⚖ {assessment.verdict} · {assessment.overallScore}%{assessment.status === 'ESCALATED'
+							? ' ⚠'
+							: ''}
 					</span>
 				{/if}
 				{#if editable}
@@ -571,6 +692,70 @@
 					</div>
 				</Panel>
 			{/if}
+			{#if assessment}
+					<Panel position="bottom-right">
+						<div class="assurepanel" data-testid="assurance-panel">
+							<div class="assurehead">
+								<span
+									class="verdict"
+									class:v-faithful={assessment.verdict === 'FAITHFUL'}
+									class:v-partial={assessment.verdict === 'PARTIAL'}
+									class:v-poor={assessment.verdict === 'POOR'}
+									data-testid="assurance-verdict">{assessment.verdict}</span
+								>
+								<span class="ascore">{assessment.overallScore}%</span>
+								{#if assessment.iteration > 1}
+									<span class="aiter"
+										>pass {assessment.iteration}{assessment.converging === false
+											? ' · not converging'
+											: ''}</span
+									>
+								{/if}
+								{#if assessment.status === 'ESCALATED'}<span class="escbadge">needs your review</span
+									>{/if}
+								{#if assessment.status === 'RESOLVED'}<span class="resbadge">resolved</span>{/if}
+							</div>
+							<p class="ahint">
+								Faithfulness of the graph to the prompt — judged by an assessor distinct from the authoring
+								agent (exec ≠ assurance).
+							</p>
+							{#if assessment.gaps.length}
+								<ul class="agaps">
+									{#each assessment.gaps.slice(0, 5) as g}<li>{g}</li>{/each}
+								</ul>
+							{/if}
+							{#if assessment.status === 'ESCALATED'}
+								<form
+									method="POST"
+									action="?/resolveAssessment"
+									use:enhance={() =>
+										async ({ update }) => {
+											await update();
+											liveAssessment = null;
+										}}
+									class="resolveform"
+								>
+									<input type="hidden" name="assessmentId" value={assessment.assessmentId} />
+									<p class="rctx">
+										After one automatic refinement the draft is still {assessment.verdict}. How do you
+										want to resolve it?
+									</p>
+									<div class="rbtns">
+										<button class="primary small" name="resolution" value="ACCEPTED_AS_IS"
+											>Accept as-is</button
+										>
+										<button class="ghost small" name="resolution" value="REVISED"
+											>I'll revise manually</button
+										>
+										<button class="ghost small danger" name="resolution" value="ABANDONED"
+											>Abandon</button
+										>
+									</div>
+								</form>
+							{/if}
+						</div>
+					</Panel>
+				{/if}
 			</SvelteFlow>
 		</div>
 		{#if editable}
@@ -1043,5 +1228,118 @@
 	button.primary:disabled {
 		opacity: 0.5;
 		cursor: not-allowed;
+	}
+	/* Layer B — faithfulness assurance chip + panel */
+	.assurechip {
+		font-size: 10px;
+		font-weight: 700;
+		padding: 3px 8px;
+		border-radius: 5px;
+		white-space: nowrap;
+		background: rgba(159, 202, 255, 0.15);
+		color: var(--primary);
+		cursor: help;
+	}
+	.assurechip.v-faithful {
+		background: rgba(97, 218, 193, 0.15);
+		color: var(--tertiary);
+	}
+	.assurechip.v-partial {
+		background: rgba(230, 181, 102, 0.15);
+		color: var(--amber);
+	}
+	.assurechip.v-poor,
+	.assurechip.esc {
+		background: rgba(255, 180, 171, 0.15);
+		color: var(--error);
+	}
+	.assurepanel {
+		width: 300px;
+		max-width: 34vw;
+		max-height: calc(100vh - 320px);
+		overflow-y: auto;
+		padding: 12px 14px;
+		border: 1px solid var(--sc);
+		border-radius: 10px;
+		background: var(--surface);
+		box-shadow: 0 6px 20px rgba(0, 0, 0, 0.18);
+		font-size: 12px;
+	}
+	.assurehead {
+		display: flex;
+		align-items: center;
+		flex-wrap: wrap;
+		gap: 8px;
+	}
+	.verdict {
+		font-size: 11px;
+		font-weight: 800;
+		padding: 2px 8px;
+		border-radius: 5px;
+		letter-spacing: 0.03em;
+	}
+	.verdict.v-faithful {
+		background: rgba(97, 218, 193, 0.15);
+		color: var(--tertiary);
+	}
+	.verdict.v-partial {
+		background: rgba(230, 181, 102, 0.15);
+		color: var(--amber);
+	}
+	.verdict.v-poor {
+		background: rgba(255, 180, 171, 0.15);
+		color: var(--error);
+	}
+	.ascore {
+		font-weight: 800;
+		font-size: 13px;
+	}
+	.aiter {
+		font-size: 10px;
+		color: var(--outline);
+	}
+	.escbadge {
+		font-size: 10px;
+		font-weight: 700;
+		color: var(--amber);
+	}
+	.resbadge {
+		font-size: 10px;
+		font-weight: 700;
+		color: var(--tertiary);
+	}
+	.ahint {
+		margin: 8px 0 6px;
+		color: var(--on-variant);
+		font-size: 11px;
+		line-height: 1.4;
+	}
+	.agaps {
+		margin: 0;
+		padding-left: 16px;
+		display: flex;
+		flex-direction: column;
+		gap: 3px;
+	}
+	.agaps li {
+		line-height: 1.35;
+	}
+	.resolveform {
+		margin-top: 10px;
+		border-top: 1px solid var(--sc);
+		padding-top: 10px;
+	}
+	.rctx {
+		margin: 0 0 8px;
+		color: var(--on-variant);
+		line-height: 1.4;
+	}
+	.rbtns {
+		display: flex;
+		flex-wrap: wrap;
+		gap: 6px;
+	}
+	.rbtns .danger {
+		color: var(--error);
 	}
 </style>

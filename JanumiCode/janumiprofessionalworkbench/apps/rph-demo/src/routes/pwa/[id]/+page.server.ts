@@ -9,8 +9,10 @@ import { getObject, listPwuTypes, listUndertakings, SEED_UNDERTAKING } from '@ja
 import {
 	dispatch,
 	getEngine,
+	loadAssessments,
 	loadConversation,
 	mintUiId,
+	resolveAssessment,
 	type ConversationEntry
 } from '$lib/server/workbench';
 import type { Actions, PageServerLoad } from './$types';
@@ -79,7 +81,9 @@ export const load: PageServerLoad = ({ params }) => {
 		},
 		types,
 		fixtures,
-		conversation: loadConversation(params.id).map(toLogEntry)
+		conversation: loadConversation(params.id).map(toLogEntry),
+		// Layer B in-product: the durable faithfulness assessments for this PWA (chronological; the last is latest).
+		assessments: loadAssessments(params.id)
 	};
 };
 
@@ -211,5 +215,22 @@ export const actions: Actions = {
 	},
 	// Continue the publication FSM past PUBLISHED: PUBLISHED -> DEPRECATED -> RETIRED.
 	deprecate: ({ params }) => advancePwa('DeprecatePwa', params.id, {}),
-	retire: ({ params }) => advancePwa('RetirePwa', params.id, {})
+	retire: ({ params }) => advancePwa('RetirePwa', params.id, {}),
+
+	// Human-in-the-loop resolution of an escalated faithfulness assessment (Layer B iteration-2 gate).
+	resolveAssessment: async ({ request }) => {
+		const form = await request.formData();
+		const assessmentId = String(form.get('assessmentId') ?? '').trim();
+		const resolution = String(form.get('resolution') ?? '').trim();
+		if (!assessmentId || !['ACCEPTED_AS_IS', 'REVISED', 'ABANDONED'].includes(resolution))
+			return fail(400, { error: 'A valid assessment id and resolution are required.' });
+		const note = String(form.get('resolutionNote') ?? '').trim();
+		const r = resolveAssessment(
+			assessmentId,
+			resolution as 'ACCEPTED_AS_IS' | 'REVISED' | 'ABANDONED',
+			note || undefined
+		);
+		if (r.status !== 'ACCEPTED') return fail(400, { error: r.error?.message ?? r.status });
+		return { resolvedAssessment: assessmentId };
+	}
 };

@@ -13,7 +13,8 @@ import {
 	listObservations,
 	listDecisions,
 	listBaselines,
-	listConversations
+	listConversations,
+	listAuthoringAssessments
 } from '@janumipwb/rph-engine';
 import { getEngine, isTestMode } from '$lib/server/workbench';
 import type { RequestHandler } from './$types';
@@ -32,6 +33,7 @@ export const GET: RequestHandler = () => {
 		observations: listObservations(e),
 		decisions: listDecisions(e),
 		baselines: listBaselines(e),
-		conversations: listConversations(e)
+		conversations: listConversations(e),
+		authoringAssessments: listAuthoringAssessments(e)
 	});
 };

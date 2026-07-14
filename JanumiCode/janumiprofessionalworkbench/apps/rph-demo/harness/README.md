@@ -24,6 +24,21 @@ architect) that reads the export + the agent's own recorded plan and scores cove
 synthesizer produces a consensus verdict `{ verdict, meanScores, topGaps, recommendation }`. This answers
 the semantic question the invariants cannot (e.g. "is the V-model actually realized, or just name-checked?").
 
+### Layer B is now also an IN-PRODUCT capability (assurance-over-authoring)
+
+The judge role has been promoted into the product itself (`AUTHORING_ASSESSMENT` domain object + the bounded
+assess → auto-refine → escalate loop in the authoring SSE route). The **same role, two implementations**:
+
+- **Product runtime** — the `agy` (Google Antigravity / Gemini) assessor, a DIFFERENT vendor than the Pi/Codex
+  authoring executor (exec ≠ assurance; the judging vendor/model is recorded on the assessment's `assessor`).
+  It scores each authoring turn; a non-faithful result auto-refines once, then escalates to the human.
+- **Harness oracle** — this Claude judge panel stays the out-of-band, higher-power reviewer that grades the
+  product's own judge. The virtuous cycle is: the harness (Claude) validates that the in-product judge (agy)
+  is any good.
+
+Under E2E (`RPH_DEMO_MODE=test`) the in-product assessor is the deterministic **mock** (structural-only), so
+`e2e/faithfulness-assessment.e2e.ts` exercises the whole loop reproducibly in the gate.
+
 ## Running the whole loop
 
 ```
