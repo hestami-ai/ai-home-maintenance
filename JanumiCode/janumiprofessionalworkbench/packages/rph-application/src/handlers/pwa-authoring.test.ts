@@ -1,7 +1,7 @@
 // Drives the PWA Design context LIVE: author a PWA (DRAFT) -> define PWU Types -> submit -> validate -> publish,
 // then instantiate it as an Undertaking. Proves the guards: PWU Types can only be defined on a DRAFT PWA, and an
 // Undertaking can only instantiate a PUBLISHED PWA. Also proves the CON-009 ownership binding on ProposePwu.
-import type { DomainCommand } from '@janumipwb/rph-contracts';
+import type { ActorReference, DomainCommand } from '@janumipwb/rph-contracts';
 import { SqliteStorageAdapter } from '@janumipwb/rph-persistence';
 import { beforeEach, describe, expect, it } from 'vitest';
 import { Engine } from '../index.js';
@@ -416,5 +416,160 @@ describe('PWA-authoring handlers (live)', () => {
 		expect(batch.ok, JSON.stringify(batch.results.map((r) => r.error))).toBe(true);
 		expect(store.loadObject(A)).toBeDefined();
 		expect(store.loadObject(B)).toBeDefined();
+	});
+});
+
+describe('PublishPwa protected-transition gate — the de minimis assurance floor (§8.4)', () => {
+	const AGENT: ActorReference = {
+		actorId: 'agent-1',
+		actorType: 'AGENT',
+		displayName: 'Authoring Agent'
+	};
+	const SVC: ActorReference = {
+		actorId: 'assurance',
+		actorType: 'SERVICE',
+		displayName: 'Assurance'
+	};
+	const AI_PWA = 'pwa_01ARZ3NDEKTSV4RRFFQ69G5R00';
+	const AI_ROOT = 'pwut_01ARZ3NDEKTSV4RRFFQ69G5R10';
+	const SCHEMA = 'floor.schema-invariant';
+	const IDENTITY = 'floor.identity-provenance';
+	const REVIEW = 'floor.reasoning-review';
+
+	let store: SqliteStorageAdapter;
+	let engine: Engine;
+	let seq = 0;
+	let asmtSeq = 0;
+
+	beforeEach(() => {
+		store = new SqliteStorageAdapter({ now: () => TS });
+		seq = 0;
+		asmtSeq = 0;
+		engine = new Engine({ store, now: () => TS, newEventId: () => `e${++seq}` });
+	});
+
+	function d(
+		actor: ActorReference,
+		commandType: string,
+		payload: unknown,
+		id: string,
+		type: string
+	) {
+		const n = ++seq;
+		const command: DomainCommand = {
+			commandId: `c-${n}`,
+			commandType,
+			commandSchemaVersion: 1,
+			targetAggregateType: type,
+			targetAggregateId: id,
+			issuedAt: TS,
+			issuedBy: actor,
+			correlationId: 'gate',
+			idempotencyKey: `k-${n}`,
+			payload
+		};
+		return engine.dispatch(command);
+	}
+	const pub = () =>
+		(store.loadObject(AI_PWA)?.state as { publicationStatus: string }).publicationStatus;
+
+	// Author an AGENT-produced PWA and drive it to VALIDATED (the state PublishPwa transitions from).
+	function authorValidatedAiPwa() {
+		d(
+			AGENT,
+			'CreatePwa',
+			{
+				pwaId: AI_PWA,
+				name: 'Agent-authored',
+				description: 'd',
+				domain: 'software',
+				version: '1.0.0'
+			},
+			AI_PWA,
+			'PROFESSIONAL_WORK_ARCHITECTURE'
+		);
+		d(
+			AGENT,
+			'DefinePwuType',
+			{
+				pwuTypeId: AI_ROOT,
+				pwaId: AI_PWA,
+				pwuKind: 'PRODUCT_REALIZATION',
+				name: 'R',
+				purpose: 'root',
+				isRoot: true
+			},
+			AI_ROOT,
+			'PWU_TYPE'
+		);
+		d(AGENT, 'SubmitPwaForReview', {}, AI_PWA, 'PROFESSIONAL_WORK_ARCHITECTURE');
+		d(AGENT, 'ValidatePwa', {}, AI_PWA, 'PROFESSIONAL_WORK_ARCHITECTURE');
+	}
+
+	// A ULID-format id (prefix_<26 digits>; digits are valid Crockford base32).
+	const ulid = (prefix: string) => `${prefix}_${String(++asmtSeq).padStart(26, '0')}`;
+
+	// Record a floor assessment per policy at the given disposition (as the Assurance Service).
+	function recordFloor(dispositions: Record<string, string>) {
+		for (const [policyId, disposition] of Object.entries(dispositions)) {
+			const assessmentId = ulid('asmt');
+			d(
+				SVC,
+				'RequestAssuranceAssessment',
+				{
+					assessmentId,
+					assurancePolicyId: policyId,
+					policyVersion: '1.0.0',
+					subjectObjectIds: [AI_PWA],
+					subjectSemanticVersions: { [AI_PWA]: 1 },
+					claimIds: []
+				},
+				assessmentId,
+				'ASSURANCE_ASSESSMENT'
+			);
+			d(
+				SVC,
+				'CompleteAssuranceAssessment',
+				{ validatorResult: { dispositionRecommendation: disposition } },
+				assessmentId,
+				'ASSURANCE_ASSESSMENT'
+			);
+		}
+	}
+
+	const publish = () =>
+		d(AGENT, 'PublishPwa', { rootPwuTypeId: AI_ROOT }, AI_PWA, 'PROFESSIONAL_WORK_ARCHITECTURE');
+
+	it('blocks publishing an AI-produced PWA with no recorded floor', () => {
+		authorValidatedAiPwa();
+		const r = publish();
+		expect(r.status).toBe('REJECTED');
+		expect(r.error?.code).toBe('RPH_INVARIANT_VIOLATION');
+		expect(pub()).toBe('VALIDATED');
+	});
+
+	it('permits publish once all three floor policies are recorded SATISFIED', () => {
+		authorValidatedAiPwa();
+		recordFloor({ [SCHEMA]: 'SATISFIED', [IDENTITY]: 'SATISFIED', [REVIEW]: 'SATISFIED' });
+		const r = publish();
+		expect(r.status, JSON.stringify(r.error)).toBe('ACCEPTED');
+		expect(pub()).toBe('PUBLISHED');
+	});
+
+	it('keeps publish blocked when the Reasoning Review floor is REJECTED', () => {
+		authorValidatedAiPwa();
+		recordFloor({ [SCHEMA]: 'SATISFIED', [IDENTITY]: 'SATISFIED', [REVIEW]: 'REJECTED' });
+		const r = publish();
+		expect(r.status).toBe('REJECTED');
+		expect(r.error?.code).toBe('RPH_INVARIANT_VIOLATION');
+		expect(pub()).toBe('VALIDATED');
+	});
+
+	it('a partial floor (missing Reasoning Review) blocks publish', () => {
+		authorValidatedAiPwa();
+		recordFloor({ [SCHEMA]: 'SATISFIED', [IDENTITY]: 'SATISFIED' });
+		const r = publish();
+		expect(r.status).toBe('REJECTED');
+		expect(pub()).toBe('VALIDATED');
 	});
 });

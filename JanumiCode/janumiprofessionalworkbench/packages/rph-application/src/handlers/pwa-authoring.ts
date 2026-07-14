@@ -405,7 +405,77 @@ export const validatePwa: CommandHandler = (ctx, command) =>
 		eventType: 'PwaValidated'
 	});
 
-/** PublishPwa — VALIDATED -> PUBLISHED (the published version is immutable). */
+// ── Protected-transition gate: the de minimis assurance floor (guide §8.4 step 4) ────────────────────────────────
+// Canonical de minimis floor policy ids. Source of truth: @janumipwb/rph-assurance FLOOR_POLICY_IDS — duplicated as
+// literals here because the package DAG forbids rph-application -> rph-assurance; these are stable canonical ids.
+const FLOOR_POLICY_IDS_REQUIRED = [
+	'floor.schema-invariant',
+	'floor.identity-provenance',
+	'floor.reasoning-review'
+] as const;
+// A subject is AI-produced (floor-relevant) when its producing actor is an AGENT or MODEL. The floor's teeth —
+// independent Reasoning Review (§8.4 step 3) — target AI-produced work; human-authored PWAs are outside this gate.
+const AI_ACTOR_TYPES = new Set(['AGENT', 'MODEL']);
+
+/** Latest recorded assessmentState per assurance policy for `subjectId` (by updatedAt; ties: last seen). */
+function latestFloorDispositions(ctx: HandlerContext, subjectId: string): Map<string, string> {
+	const ids = new Set<string>();
+	for (const e of ctx.store.readAllEvents())
+		if (e.aggregateType === 'ASSURANCE_ASSESSMENT') ids.add(e.aggregateId);
+	const latest = new Map<string, { disposition: string; at: string }>();
+	for (const id of ids) {
+		const s = ctx.store.loadObject(id)?.state as
+			| {
+					assurancePolicyId?: string;
+					subjectObjectIds?: string[];
+					assessmentState?: string;
+					updatedAt?: string;
+			  }
+			| undefined;
+		if (!s || !Array.isArray(s.subjectObjectIds) || !s.subjectObjectIds.includes(subjectId))
+			continue;
+		const policyId = String(s.assurancePolicyId);
+		const at = String(s.updatedAt ?? '');
+		const prev = latest.get(policyId);
+		if (!prev || at >= prev.at)
+			latest.set(policyId, { disposition: String(s.assessmentState), at });
+	}
+	const out = new Map<string, string>();
+	for (const [policyId, v] of latest) out.set(policyId, v.disposition);
+	return out;
+}
+
+/** PublishPwa gate: an AI-produced PWA may not be PUBLISHED until its de minimis assurance floor is SATISFIED —
+ *  schema/invariant + identity/provenance + an independent Reasoning Review, each a recorded ASSURANCE_ASSESSMENT
+ *  completed SATISFIED (guide §8.4). Strictest-unresolved: a missing or non-SATISFIED required policy blocks. Human-
+ *  authored PWAs pass (the floor's independent-review teeth target AI work; exec != assurance). Version-binding the
+ *  floor to the exact PWA semanticVersion is a later refinement — the floor is currently matched by subject id. */
+function pwaFloorGate(
+	command: DomainCommand,
+	state: Record<string, unknown>,
+	ctx: HandlerContext
+): CommandResult | null {
+	const createdBy = state.createdBy as { actorType?: string } | undefined;
+	const aiProduced = createdBy ? AI_ACTOR_TYPES.has(String(createdBy.actorType)) : false;
+	if (!aiProduced) return null;
+	const pwaId = command.targetAggregateId;
+	const latest = latestFloorDispositions(ctx, pwaId);
+	const blocking = FLOOR_POLICY_IDS_REQUIRED.map((policyId) => ({
+		policyId,
+		disposition: latest.get(policyId) ?? 'MISSING'
+	})).filter((r) => r.disposition !== 'SATISFIED');
+	if (blocking.length === 0) return null;
+	const detail = blocking.map((b) => `${b.policyId}=${b.disposition}`).join(', ');
+	return reject(
+		command,
+		'RPH_INVARIANT_VIOLATION',
+		`PublishPwa blocked: the de minimis assurance floor is not SATISFIED for AI-produced PWA ${pwaId} (${detail}). Record a satisfied floor (schema/invariant, identity/provenance, independent reasoning review) before publishing.`,
+		[pwaId]
+	);
+}
+
+/** PublishPwa — VALIDATED -> PUBLISHED (the published version is immutable). Gated by the de minimis assurance
+ *  floor for AI-produced PWAs (pwaFloorGate). */
 export const publishPwa: CommandHandler = (ctx, command) =>
 	advanceStatus(ctx, command, {
 		objectType: PWA,
@@ -413,6 +483,7 @@ export const publishPwa: CommandHandler = (ctx, command) =>
 		machine: PWA_MACHINE,
 		target: 'PUBLISHED',
 		eventType: 'PwaPublished',
+		guard: (state, gctx) => pwaFloorGate(command, state, gctx),
 		mutate: (base) => {
 			const p = command.payload as PublishPwaPayload;
 			return p.rootPwuTypeId ? { ...base, rootPwuTypeId: p.rootPwuTypeId } : base;
