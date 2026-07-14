@@ -53,7 +53,6 @@ figcaption{font-size:12px;color:#c0c7d3;margin-top:6px}
 </style></head><body><h1>JPWB E2E gallery <small>${esc(new Date().toISOString())} · ${entries.length} shots · ${byTest.size} tests</small></h1>${body}</body></html>`;
 
 	writeFileSync(join(GALLERY_ROOT, 'index.html'), html);
-	// eslint-disable-next-line no-console
 	console.log(
 		`\n[gallery] ${entries.length} screenshots across ${byTest.size} test(s) → ${join(GALLERY_ROOT, 'index.html')}\n`
 	);

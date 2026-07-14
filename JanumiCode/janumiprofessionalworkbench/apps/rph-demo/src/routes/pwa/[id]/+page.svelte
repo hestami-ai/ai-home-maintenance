@@ -5,6 +5,7 @@
 	import '@xyflow/svelte/dist/style.css';
 	import type { Edge, Node } from '@xyflow/svelte';
 	import { toPwaFlow } from '$lib/pwaFlow';
+	import { analyzePwaGraph, buildPwaGraphExport } from '@janumipwb/rph-projections';
 	import { PWU_TYPE_CATALOG, PWU_TYPE_HELP } from '$lib/authoring/pwuType';
 	import type { PageData } from './$types';
 	let {
@@ -48,6 +49,40 @@
 	const flow = $derived(toPwaFlow(data.types, selected));
 	let nodes = $state<Node[]>([]);
 	let edges = $state<Edge[]>([]);
+
+	// Structural health of the graph — the same queryable report the harness asserts on (single root, acyclic,
+	// connected; advisory findings for dangling data-flow / fan-out). Surfaced as a chip so the author sees issues.
+	const graphReport = $derived(
+		analyzePwaGraph(
+			buildPwaGraphExport(
+				{
+					id: data.pwa.id,
+					name: data.pwa.name,
+					domain: data.pwa.domain,
+					version: data.pwa.version,
+					publicationStatus: data.pwa.publicationStatus
+				},
+				data.types.map((t) => ({
+					id: t.id,
+					name: t.name,
+					pwuKind: t.pwuKind,
+					isRoot: t.isRoot,
+					permittedChildTypeIds: t.permittedChildTypeIds,
+					requiredInputs: t.requiredInputs,
+					requiredOutputs: t.requiredOutputs
+				}))
+			)
+		)
+	);
+	const graphIssues = $derived(
+		graphReport.invariants.filter((i) => !i.ok).length + graphReport.findings.length
+	);
+	const graphHealthTitle = $derived(
+		[
+			...graphReport.invariants.map((i) => `${i.ok ? '✓' : '✗'} ${i.name}: ${i.detail}`),
+			...graphReport.findings.map((f) => `• ${f}`)
+		].join('\n')
+	);
 	$effect(() => {
 		nodes = flow.nodes;
 		edges = flow.edges;
@@ -270,6 +305,21 @@
 					>{data.pwa.publicationStatus}</span
 				>
 				<span class="tbmeta">v{data.pwa.version} · {data.pwa.domain}</span>
+				{#if data.types.length}
+					<span
+						class="health"
+						class:bad={!graphReport.valid}
+						class:warn={graphReport.valid && graphReport.findings.length > 0}
+						title={graphHealthTitle}
+						data-testid="graph-health"
+					>
+						{graphReport.valid
+							? graphReport.findings.length
+								? `⚠ ${graphIssues} note(s)`
+								: '✓ well-formed'
+							: `✗ ${graphIssues} issue(s)`}
+					</span>
+				{/if}
 				{#if editable}
 					<button class="ghost small" onclick={() => (showPwaEdit = !showPwaEdit)}>Edit details</button>
 				{/if}
@@ -593,6 +643,24 @@
 	.pill.pub {
 		background: rgba(97, 218, 193, 0.15);
 		color: var(--tertiary);
+	}
+	.health {
+		font-size: 10px;
+		font-weight: 700;
+		padding: 3px 8px;
+		border-radius: 5px;
+		background: rgba(97, 218, 193, 0.15);
+		color: var(--tertiary);
+		cursor: help;
+		white-space: nowrap;
+	}
+	.health.warn {
+		background: rgba(230, 181, 102, 0.15);
+		color: var(--amber);
+	}
+	.health.bad {
+		background: rgba(255, 180, 171, 0.15);
+		color: var(--error);
 	}
 	.detailform {
 		display: flex;

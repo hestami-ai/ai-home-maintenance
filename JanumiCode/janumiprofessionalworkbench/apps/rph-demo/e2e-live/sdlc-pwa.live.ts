@@ -1,6 +1,6 @@
 import { test, expect } from '@playwright/test';
 import { resetEngine, introspect, gotoHydrated } from '../e2e/support/harness';
-import { shot, snapshotTruth } from '../e2e/support/gallery';
+import { shot, snapshotTruth, snapshotPwaGraph } from '../e2e/support/gallery';
 
 // LIVE — the real Pi agent drafts a PWA from the sponsor's actual prompt. This is the realistic end-to-end run: it
 // captures reviewable screenshots + the engine ground truth into the gallery, and asserts the STRUCTURE the agent
@@ -46,30 +46,38 @@ test.describe('LIVE — Pi drafts an SDLC PWA from an NL prompt', () => {
 		await expect(page.locator('.svelte-flow__node').first()).toBeVisible({ timeout: 15_000 });
 		await shot(page, 'final graph');
 
-		// Ground truth for review + assertions.
+		// Ground truth for review + the canonical graph export + structural report — the harness validates AGAINST the
+		// report (queryable invariants), not the screenshot.
 		const snap = await snapshotTruth(request, 'engine-truth');
-		const types = snap.pwuTypes.filter((t) => t.state.status !== 'REMOVED');
-		const roots = types.filter((t) => t.state.isRoot === true);
-		const fanout = (t: (typeof types)[number]) =>
-			Array.isArray(t.state.permittedChildTypeIds) ? t.state.permittedChildTypeIds.length : 0;
-		const maxFanout = Math.max(0, ...types.map(fanout));
-		// eslint-disable-next-line no-console
+		const { export: graph, report } = await snapshotPwaGraph(request, 'graph');
 		console.log(
-			`[live] types=${types.length} roots=${roots.length} maxFanout=${maxFanout}\n` +
-				types
-					.map(
-						(t) => `  - ${String(t.state.name)} [${String(t.state.pwuKind)}] children=${fanout(t)}`
-					)
+			`[live] valid=${report.valid} ${JSON.stringify(report.metrics)}\n` +
+				report.invariants
+					.map((i) => `  [${i.ok ? 'OK' : 'FAIL'}] ${i.name}: ${i.detail}`)
+					.join('\n') +
+				(report.findings.length ? '\n  findings:\n    ' + report.findings.join('\n    ') : '') +
+				'\n  nodes:\n' +
+				graph.nodes
+					.map((n) => `    - ${n.name} [${n.pwuKind}]${n.isRoot ? ' (root)' : ''}`)
 					.join('\n')
 		);
+		test.info().annotations.push({
+			type: 'graph',
+			description: `valid=${report.valid} nodes=${report.metrics.nodeCount} depth=${report.metrics.maxDepth} maxFanout=${report.metrics.maxFanout}`
+		});
 
-		// Report the fan-out (the composition-hierarchy signal) as an annotation for review — not a hard gate, since
-		// the model is non-deterministic. A healthy hierarchy keeps this modest (the old "star" was 7).
-		test.info().annotations.push({ type: 'maxFanout', description: String(maxFanout) });
-
-		// Structural expectations (the steering should hold): several types, exactly one root, transcript recorded.
-		expect(types.length, 'the agent defined several PWU Types').toBeGreaterThan(2);
-		expect(roots.length, 'exactly one root').toBe(1);
+		// STRUCTURAL VALIDITY — the deterministic gate on "did the agent generate a well-formed PWA?".
+		expect(
+			report.valid,
+			`PWA graph well-formed (failing invariants: ${
+				report.invariants
+					.filter((i) => !i.ok)
+					.map((i) => i.name)
+					.join(', ') || 'none'
+			})`
+		).toBe(true);
+		expect(graph.nodes.length, 'the agent defined several PWU Types').toBeGreaterThan(2);
+		expect(report.metrics.rootCount, 'exactly one root').toBe(1);
 		expect(snap.conversations.length, 'the conversation is event-sourced').toBe(1);
 	});
 });

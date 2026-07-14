@@ -4,6 +4,13 @@
 // agent) can open one page and review the whole flow — the "screenshots of my end-to-end testing" the sponsor
 // asked for. The gallery is cleared per run by global-setup.
 import { test, type Page, type APIRequestContext } from '@playwright/test';
+import {
+	analyzePwaGraph,
+	buildPwaGraphExport,
+	type PwaGraphExport,
+	type PwaGraphNode,
+	type PwaGraphReport
+} from '@janumipwb/rph-projections';
 import { appendFileSync, mkdirSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { introspect } from './harness';
@@ -42,4 +49,47 @@ export async function snapshotTruth(request: APIRequestContext, label: string) {
 	const snap = await introspect(request);
 	writeFileSync(join(dir, `${slug(label)}.truth.json`), JSON.stringify(snap, null, 2));
 	return snap;
+}
+
+function strArr(v: unknown): string[] {
+	return Array.isArray(v) ? v.map(String) : [];
+}
+
+/** Build the canonical PWA graph export + the structural report from engine truth, write both to the gallery, and
+ *  return them. This is the queryable, diffable representation the harness (and the LLM judge) validate AGAINST —
+ *  not a screenshot. Defaults to the first PWA (test mode resets to one). */
+export async function snapshotPwaGraph(
+	request: APIRequestContext,
+	label: string,
+	pwaId?: string
+): Promise<{ export: PwaGraphExport; report: PwaGraphReport }> {
+	const title = test.info().title;
+	const dir = join(GALLERY_ROOT, slug(title));
+	mkdirSync(dir, { recursive: true });
+	const snap = await introspect(request);
+	const pwa = pwaId ? snap.pwas.find((p) => p.id === pwaId) : snap.pwas[0];
+	if (!pwa) throw new Error('snapshotPwaGraph: no PWA found in engine truth');
+	const meta = {
+		id: pwa.id,
+		name: String(pwa.state.name ?? pwa.id),
+		domain: String(pwa.state.domain ?? ''),
+		version: String(pwa.state.version ?? ''),
+		publicationStatus: String(pwa.state.publicationStatus ?? 'DRAFT')
+	};
+	const nodes: PwaGraphNode[] = snap.pwuTypes
+		.filter((t) => t.state.status !== 'REMOVED' && t.state.pwaId === pwa.id)
+		.map((t) => ({
+			id: t.id,
+			name: String(t.state.name ?? t.id),
+			pwuKind: String(t.state.pwuKind ?? ''),
+			isRoot: t.state.isRoot === true,
+			permittedChildTypeIds: strArr(t.state.permittedChildTypeIds),
+			requiredInputs: strArr(t.state.requiredInputs),
+			requiredOutputs: strArr(t.state.requiredOutputs)
+		}));
+	const exported = buildPwaGraphExport(meta, nodes);
+	const report = analyzePwaGraph(exported);
+	writeFileSync(join(dir, `${slug(label)}.export.json`), JSON.stringify(exported, null, 2));
+	writeFileSync(join(dir, `${slug(label)}.report.json`), JSON.stringify(report, null, 2));
+	return { export: exported, report };
 }
