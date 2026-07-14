@@ -4,6 +4,7 @@
 // context) AND a real Undertaking with a live graph (Undertaking context) to render — the RPH-DOC-010 separation,
 // demonstrated end to end. It is deterministic: it drives commands; no fixture event log is replayed.
 import type { ActorReference, DomainCommand } from '@janumipwb/rph-contracts';
+import { FLOOR_POLICY_DEFINITIONS } from '@janumipwb/rph-assurance';
 import type { EngineHandle } from './engine.js';
 import { driveReferenceUndertaking } from './reference-undertaking.js';
 
@@ -114,6 +115,30 @@ function sender(handle: EngineHandle, prefix: string) {
 	};
 }
 
+/** Create the 3 de minimis floor policies as canonical ASSURANCE_POLICY objects (guide §8.4/§8.9). These are
+ *  universal (every engine needs them for the floor gate), so this is safe to call on any engine. For the authoring
+ *  plane they are scoped to PROFESSIONAL_WORK_ARCHITECTURE (the single-value applicableObjectTypes limitation is
+ *  §16-unresolved; the plane-agnostic array is a later reconciliation). */
+export function seedFloorPolicies(handle: EngineHandle): void {
+	const send = sender(handle, 'seedpol');
+	for (const def of FLOOR_POLICY_DEFINITIONS) {
+		send('CreateAssurancePolicy', 'ASSURANCE_POLICY', def.policyId, {
+			policyId: def.policyId,
+			version: '1.0.0',
+			name: def.name,
+			purpose: def.purpose,
+			rationale: def.rationale,
+			applicableObjectTypes: 'PROFESSIONAL_WORK_ARCHITECTURE',
+			evaluatedClaimTypes: def.evaluatedClaimType,
+			criteria: def.criteria,
+			evaluatorRole: def.evaluatorRole,
+			independenceRequirement: def.independence,
+			findingDefinitions: def.findingDefinitions,
+			permittedControlActions: def.permittedControlAction
+		});
+	}
+}
+
 /** Author + publish the Product Realization PWA (idempotent-ish: safe to call once per engine). */
 export function authorProductRealizationPwa(handle: EngineHandle): void {
 	const send = sender(handle, 'seedpwa');
@@ -144,6 +169,7 @@ export function authorProductRealizationPwa(handle: EngineHandle): void {
 
 /** Author the PWA, instantiate the Field Service Management Undertaking under it, and drive its graph. */
 export function seedWorkbench(handle: EngineHandle): void {
+	seedFloorPolicies(handle);
 	authorProductRealizationPwa(handle);
 	const send = sender(handle, 'sedund');
 	send('CreateUndertaking', 'UNDERTAKING', SEED_UNDERTAKING, {

@@ -26,6 +26,7 @@
   },
   "dependencies": {
     "@janumipwb/rph-application": "workspace:*",
+    "@janumipwb/rph-assurance": "workspace:*",
     "@janumipwb/rph-contracts": "workspace:*",
     "@janumipwb/rph-domain": "workspace:*",
     "@janumipwb/rph-persistence": "workspace:*",

@@ -2135,6 +2135,75 @@
           "type": "ActorReference"
         }
       ]
+    },
+    {
+      "commandType": "CreateAssurancePolicy",
+      "targetAggregateType": "ASSURANCE_POLICY",
+      "emitsEvent": "AssurancePolicyCreated",
+      "schematized": false,
+      "sourceSection": "guide §8.9 / DOC-004/DOC-007 §17 — create a versioned Assurance Policy object; the de minimis floor policies (§8.4) are seeded through this command.",
+      "payloadFields": [
+        {
+          "field": "policyId",
+          "required": true,
+          "type": "string"
+        },
+        {
+          "field": "version",
+          "required": true,
+          "type": "string"
+        },
+        {
+          "field": "name",
+          "required": true,
+          "type": "string"
+        },
+        {
+          "field": "purpose",
+          "required": true,
+          "type": "string"
+        },
+        {
+          "field": "rationale",
+          "required": true,
+          "type": "string"
+        },
+        {
+          "field": "applicableObjectTypes",
+          "required": true,
+          "type": "string"
+        },
+        {
+          "field": "evaluatedClaimTypes",
+          "required": true,
+          "type": "string"
+        },
+        {
+          "field": "criteria",
+          "required": true,
+          "type": "AssessmentCriterion[]"
+        },
+        {
+          "field": "evaluatorRole",
+          "required": true,
+          "type": "string"
+        },
+        {
+          "field": "independenceRequirement",
+          "required": true,
+          "type": "string"
+        },
+        {
+          "field": "findingDefinitions",
+          "required": true,
+          "type": "FindingDefinition[]"
+        },
+        {
+          "field": "permittedControlActions",
+          "required": true,
+          "type": "string"
+        }
+      ]
     }
   ],
   "events": [
@@ -5425,6 +5494,72 @@
           "field": "resolvedBy",
           "required": true,
           "type": "ActorReference"
+        }
+      ]
+    },
+    {
+      "eventType": "AssurancePolicyCreated",
+      "aggregateType": "ASSURANCE_POLICY",
+      "payloadFields": [
+        {
+          "field": "policyId",
+          "required": true,
+          "type": "string"
+        },
+        {
+          "field": "version",
+          "required": true,
+          "type": "string"
+        },
+        {
+          "field": "name",
+          "required": true,
+          "type": "string"
+        },
+        {
+          "field": "purpose",
+          "required": true,
+          "type": "string"
+        },
+        {
+          "field": "rationale",
+          "required": true,
+          "type": "string"
+        },
+        {
+          "field": "applicableObjectTypes",
+          "required": true,
+          "type": "string"
+        },
+        {
+          "field": "evaluatedClaimTypes",
+          "required": true,
+          "type": "string"
+        },
+        {
+          "field": "criteria",
+          "required": true,
+          "type": "AssessmentCriterion[]"
+        },
+        {
+          "field": "evaluatorRole",
+          "required": true,
+          "type": "string"
+        },
+        {
+          "field": "independenceRequirement",
+          "required": true,
+          "type": "string"
+        },
+        {
+          "field": "findingDefinitions",
+          "required": true,
+          "type": "FindingDefinition[]"
+        },
+        {
+          "field": "permittedControlActions",
+          "required": true,
+          "type": "string"
         }
       ]
     }

@@ -6,12 +6,56 @@
 // independence / evidence-admissibility scoring lives in @janumipwb/rph-assurance (documented in RESUME-STATE).
 import type {
 	AssertClaimPayload,
+	CreateAssurancePolicyPayload,
 	DetectAssumptionPayload,
 	ProposeEvidencePayload,
 	RecordAssuranceObservationPayload,
 	RequestAssuranceAssessmentPayload
 } from '@janumipwb/rph-contracts';
 import { advanceStatus, createObject, newEnvelope, reject, type CommandHandler } from './kit.js';
+
+// ---- Assurance Policy ----
+const POLICY = 'ASSURANCE_POLICY';
+
+/** CreateAssurancePolicy — create a versioned ASSURANCE_POLICY object in ACTIVE (guide §8.9). The de minimis floor
+ *  policies (§8.4) are seeded through this. The rich rule arrays are §16.23-unresolved shapes, filled empty; the
+ *  meaningful content is criteria + independence + finding definitions. The enum-typed fields
+ *  (applicableObjectTypes / evaluatedClaimTypes / permittedControlActions) are validated by the object schema. */
+export const createAssurancePolicy: CommandHandler = (ctx, command, payload) => {
+	const p = payload as CreateAssurancePolicyPayload;
+	const state: Record<string, unknown> = {
+		...newEnvelope(command, POLICY, p.policyId, {
+			lifecycleStatus: 'ACTIVE',
+			originType: 'HUMAN_DECISION'
+		}),
+		version: p.version,
+		name: p.name,
+		purpose: p.purpose,
+		rationale: p.rationale,
+		applicableObjectTypes: p.applicableObjectTypes,
+		applicability: {},
+		evaluatedClaimTypes: p.evaluatedClaimTypes,
+		defaultClaimTemplates: [],
+		requiredEvidence: [],
+		optionalEvidence: [],
+		criteria: p.criteria,
+		evaluatorRole: p.evaluatorRole,
+		independenceRequirement: p.independenceRequirement,
+		findingDefinitions: p.findingDefinitions,
+		dispositionRules: [],
+		remediationRules: [],
+		escalationRules: [],
+		waiverRules: [],
+		permittedControlActions: p.permittedControlActions,
+		status: 'ACTIVE'
+	};
+	return createObject(ctx, command, {
+		objectType: POLICY,
+		aggregateId: p.policyId,
+		state,
+		eventType: 'AssurancePolicyCreated'
+	});
+};
 
 // ---- Evidence ----
 const EVIDENCE = 'EVIDENCE';

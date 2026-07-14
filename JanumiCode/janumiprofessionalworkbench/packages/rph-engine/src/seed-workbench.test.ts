@@ -5,6 +5,7 @@ import { ontology } from '@janumipwb/rph-product-realization-pwa';
 import { describe, expect, it } from 'vitest';
 import {
 	createEngine,
+	listByType,
 	listPwas,
 	listPwuTypes,
 	listPwus,
@@ -49,6 +50,21 @@ describe('seedWorkbench (live PWA + Undertaking + graph)', () => {
 		const pwus = listPwus(engine, SEED_UNDERTAKING);
 		expect(pwus).toHaveLength(13);
 		expect(pwus.every((p) => p.state.undertakingId === SEED_UNDERTAKING)).toBe(true);
+	});
+
+	it('seeds the 3 de minimis floor policies as canonical ASSURANCE_POLICY objects', () => {
+		const engine = build();
+		const policies = listByType(engine, 'ASSURANCE_POLICY');
+		expect(policies).toHaveLength(3);
+		expect(policies.map((p) => p.id).sort()).toEqual([
+			'floor.identity-provenance',
+			'floor.reasoning-review',
+			'floor.schema-invariant'
+		]);
+		const rr = policies.find((p) => p.id === 'floor.reasoning-review')!;
+		expect(rr.state.status).toBe('ACTIVE');
+		expect(rr.state.independenceRequirement).toBe('DIFFERENT_MODEL');
+		expect((rr.state.criteria as unknown[]).length).toBe(9);
 	});
 
 	it('drives the Undertaking to a graph that upholds INV-5', () => {

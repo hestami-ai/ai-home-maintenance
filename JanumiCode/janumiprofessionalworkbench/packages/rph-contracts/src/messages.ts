@@ -488,6 +488,21 @@ export const ResolveAuthoringAssessmentPayloadSchema = z.strictObject({
 export type ResolveAuthoringAssessmentPayload = z.infer<
 	typeof ResolveAuthoringAssessmentPayloadSchema
 >;
+export const CreateAssurancePolicyPayloadSchema = z.strictObject({
+	policyId: z.string(),
+	version: z.string(),
+	name: z.string(),
+	purpose: z.string(),
+	rationale: z.string(),
+	applicableObjectTypes: z.string(),
+	evaluatedClaimTypes: z.string(),
+	criteria: z.array(z.unknown()),
+	evaluatorRole: z.string(),
+	independenceRequirement: z.string(),
+	findingDefinitions: z.array(z.unknown()),
+	permittedControlActions: z.string()
+});
+export type CreateAssurancePolicyPayload = z.infer<typeof CreateAssurancePolicyPayloadSchema>;
 
 // ---- Event payload schemas ----
 export const AssumptionAcceptedPayloadSchema = z.strictObject({
@@ -1298,6 +1313,21 @@ export const AuthoringAssessmentResolvedPayloadSchema = z.strictObject({
 export type AuthoringAssessmentResolvedPayload = z.infer<
 	typeof AuthoringAssessmentResolvedPayloadSchema
 >;
+export const AssurancePolicyCreatedPayloadSchema = z.strictObject({
+	policyId: z.string(),
+	version: z.string(),
+	name: z.string(),
+	purpose: z.string(),
+	rationale: z.string(),
+	applicableObjectTypes: z.string(),
+	evaluatedClaimTypes: z.string(),
+	criteria: z.array(z.unknown()),
+	evaluatorRole: z.string(),
+	independenceRequirement: z.string(),
+	findingDefinitions: z.array(z.unknown()),
+	permittedControlActions: z.string()
+});
+export type AssurancePolicyCreatedPayload = z.infer<typeof AssurancePolicyCreatedPayloadSchema>;
 
 export const FIRST_SLICE_COMMANDS = [
 	'CaptureIntent',
@@ -1719,6 +1749,12 @@ export const COMMANDS = {
 		targetAggregateType: 'AUTHORING_ASSESSMENT',
 		emitsEvent: 'AuthoringAssessmentResolved',
 		firstSlice: false
+	},
+	CreateAssurancePolicy: {
+		payload: CreateAssurancePolicyPayloadSchema,
+		targetAggregateType: 'ASSURANCE_POLICY',
+		emitsEvent: 'AssurancePolicyCreated',
+		firstSlice: false
 	}
 } as const;
 
@@ -1998,6 +2034,10 @@ export const EVENTS = {
 	AuthoringAssessmentResolved: {
 		payload: AuthoringAssessmentResolvedPayloadSchema,
 		aggregateType: 'AUTHORING_ASSESSMENT'
+	},
+	AssurancePolicyCreated: {
+		payload: AssurancePolicyCreatedPayloadSchema,
+		aggregateType: 'ASSURANCE_POLICY'
 	}
 } as const;
 
