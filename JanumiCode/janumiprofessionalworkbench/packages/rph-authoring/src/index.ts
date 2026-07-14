@@ -5,3 +5,4 @@ export const RPH_AUTHORING_VERSION = '0.0.0';
 
 export * from './catalog.js';
 export * from './broker.js';
+export * from './lint.js';

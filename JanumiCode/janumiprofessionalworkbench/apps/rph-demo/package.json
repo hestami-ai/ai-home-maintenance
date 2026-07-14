@@ -11,7 +11,9 @@
     "check": "svelte-kit sync && svelte-check --tsconfig ./tsconfig.json",
     "prepare": "svelte-kit sync",
     "e2e": "playwright test",
-    "e2e:server": "svelte-kit sync && vite dev --host 127.0.0.1 --port 4319 --strictPort"
+    "e2e:server": "svelte-kit sync && vite dev --host 127.0.0.1 --port 4319 --strictPort",
+    "e2e:live": "playwright test --config playwright.live.config.ts",
+    "e2e:server:live": "svelte-kit sync && vite dev --host 127.0.0.1 --port 4321 --strictPort"
   },
   "dependencies": {
     "@earendil-works/pi-ai": "0.80.6",

@@ -144,11 +144,14 @@ export function loadConversation(pwaId: string): ConversationEntry[] {
 	return Array.isArray(entries) ? (entries as ConversationEntry[]) : [];
 }
 
-/** Which authoring agent the SSE route should use: the deterministic mock under E2E (RPH_DEMO_MODE=test), the live
- *  Pi agent otherwise — unless JPWB_AGENT explicitly overrides ('mock' to force the offline agent in dev). */
+/** Which authoring agent the SSE route should use. Explicit JPWB_AGENT wins ('pi' forces the live agent even under
+ *  the E2E harness, so a live-Pi test keeps reset/introspect/deterministic ids while exercising the real model;
+ *  'mock' forces the offline agent). Otherwise: the deterministic mock under E2E (RPH_DEMO_MODE=test), live Pi in
+ *  dev/prod. */
 export function agentMode(): 'mock' | 'pi' {
-	if (TEST_MODE) return 'mock';
-	return process.env.JPWB_AGENT === 'mock' ? 'mock' : 'pi';
+	if (process.env.JPWB_AGENT === 'pi') return 'pi';
+	if (process.env.JPWB_AGENT === 'mock') return 'mock';
+	return TEST_MODE ? 'mock' : 'pi';
 }
 
 /** A short, sortable id for new aggregates the UI creates (matches the RphId `<prefix>_<26-char>` format).

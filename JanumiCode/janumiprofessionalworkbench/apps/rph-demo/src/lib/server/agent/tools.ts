@@ -3,7 +3,11 @@
 // is the guardrail (an illegal proposal comes back as ok:false with the domain's message, which the agent sees and
 // can correct). Field descriptions are pulled from the broker's shared help (concern 1) so the form and the agent
 // explain the fields identically. The Pi adapter and the mock both consume these descriptors unchanged.
-import type { PwaAuthoringBroker, ProposalResult } from '@janumipwb/rph-authoring';
+import {
+	lintComposition,
+	type PwaAuthoringBroker,
+	type ProposalResult
+} from '@janumipwb/rph-authoring';
 import type { AuthoringToolDescriptor, ToolRunResult } from './types.js';
 
 function str(v: unknown): string {
@@ -89,6 +93,24 @@ export function buildAuthoringTools(broker: PwaAuthoringBroker): AuthoringToolDe
 					ok: true,
 					summary: cat.map((t) => `${t.key} — ${t.name} [${t.pwuKind}]`).join('\n'),
 					data: cat
+				};
+			}
+		},
+		{
+			name: 'review_composition',
+			description:
+				'Review the current graph STRUCTURE for problems: over-broad fan-out (a type permitting too many children — a flat "star" instead of a real decomposition hierarchy), types unreachable from the root, or a missing/duplicate root. Call this after building and FIX any findings before finishing.',
+			parameters: {},
+			mutates: false,
+			run: () => {
+				const findings = lintComposition(broker.listTypes());
+				return {
+					ok: true,
+					summary:
+						findings.length === 0
+							? 'No structural issues — the decomposition looks clean.'
+							: findings.map((f) => `- [${f.severity}] ${f.message}`).join('\n'),
+					data: findings
 				};
 			}
 		},

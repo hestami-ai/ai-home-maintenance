@@ -1,5 +1,6 @@
 import { test, expect } from '@playwright/test';
 import { resetEngine, introspect, gotoHydrated } from './support/harness';
+import { shot } from './support/gallery';
 
 // A3 — the agent chat (bottom) + reasoning log (left) on the node-graph, end to end IN THE BROWSER. A human types
 // an instruction; the page streams the agent's SSE run into the log and re-renders the graph live as each tool
@@ -27,6 +28,7 @@ test.describe('PWA Designer — authoring agent chat + live graph', () => {
 		// The agent rail + chat bar are present on a DRAFT.
 		await expect(page.getByTestId('agent-log')).toBeVisible();
 		await expect(page.getByTestId('agent-input')).toBeVisible();
+		await shot(page, 'empty designer');
 
 		// Drive a precise plan: define two catalog types whose artifacts connect (product-behavior OUTPUTS
 		// "approved-behavior", which architecture REQUIRES as input) — so a data-flow edge must appear.
@@ -47,6 +49,7 @@ test.describe('PWA Designer — authoring agent chat + live graph', () => {
 
 		// Concern 3: a data-flow (⤳) edge is drawn from the output→input artifact match.
 		await expect(page.locator('.svelte-flow')).toContainText('⤳');
+		await shot(page, 'graph built by agent');
 
 		// TRUTH: the engine recorded exactly the two types the agent proposed.
 		const snap = await introspect(request);

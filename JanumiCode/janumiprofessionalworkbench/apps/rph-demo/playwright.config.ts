@@ -26,6 +26,9 @@ export default defineConfig({
 	workers: 1,
 	reporter: [['list'], ['json', { outputFile: 'e2e-results/results.json' }]],
 	outputDir: 'e2e-results/artifacts',
+	// Review gallery: cleared per run, then built into e2e-results/gallery/index.html from the shots each spec takes.
+	globalSetup: './e2e/global-setup.ts',
+	globalTeardown: './e2e/global-teardown.ts',
 	timeout: 30_000,
 	expect: { timeout: 7_000 },
 	use: {
