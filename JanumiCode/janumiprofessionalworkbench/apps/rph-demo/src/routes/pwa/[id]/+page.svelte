@@ -33,6 +33,10 @@
 	);
 	const current = $derived(data.types.find((t) => t.id === selected));
 	const editable = $derived(data.pwa.publicationStatus === 'DRAFT');
+	// A floor waiver is a pre-publication override — offer it through the publish FSM up to (not incl.) PUBLISHED.
+	const canWaive = $derived(
+		['DRAFT', 'UNDER_REVIEW', 'VALIDATED'].includes(data.pwa.publicationStatus)
+	);
 	const hasRoot = $derived(data.types.some((t) => t.isRoot));
 	const RANK: Record<string, number> = {
 		DRAFT: 1,
@@ -624,7 +628,7 @@
 								Publishing is blocked until the floor is SATISFIED — revise the graph and re-run, or record a
 								waiver.
 							</p>
-							{#if editable}
+							{#if canWaive}
 								<form method="POST" action="?/recordWaiver" use:enhance class="floorwaiver">
 									<input
 										name="rationale"
