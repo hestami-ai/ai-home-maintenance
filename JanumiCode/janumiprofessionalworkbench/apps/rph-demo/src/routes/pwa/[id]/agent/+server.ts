@@ -6,6 +6,7 @@
 import { error, json } from '@sveltejs/kit';
 import { agentMode, makeAuthoringBroker, recordConversation } from '$lib/server/workbench';
 import { createAuthoringAgent, type AuthoringAgentEvent } from '$lib/server/agent';
+import { runPwaFloor, type FloorView } from '$lib/server/floor';
 import type { RequestHandler } from './$types';
 
 // A mutable transcript entry (text is accumulated as deltas stream); assignable to the readonly ConversationEntry.
@@ -17,6 +18,28 @@ function compactArgs(args: Record<string, unknown> | undefined): string {
 	return Object.entries(args)
 		.map(([k, v]) => `${k}=${typeof v === 'string' ? v : JSON.stringify(v)}`)
 		.join(', ');
+}
+
+/** A one-line status summary of a floor run for the agent log. */
+function floorStatus(f: FloorView): string {
+	return f.satisfied
+		? '⚖ Assurance floor SATISFIED — schema, provenance, and an independent reasoning review all pass.'
+		: `⚖ Assurance floor ${f.aggregate}${f.reasoningGaps.length ? ` · ${f.reasoningGaps.length} reasoning finding(s)` : ''}.`;
+}
+
+/** Turn the Reasoning Review's open findings into an auto-refinement directive for the executor. */
+function refineDirective(prompt: string, gaps: string[]): string {
+	const list = gaps
+		.slice(0, 6)
+		.map((g, i) => `${i + 1}. ${g}`)
+		.join('\n');
+	return [
+		'An independent assurance Reasoning Review flagged these gaps between your PWU-Type graph and the intent.',
+		'Revise the graph to genuinely address them (do not merely restate the intent):',
+		list,
+		'',
+		`Original intent: ${prompt}`
+	].join('\n');
 }
 
 export const POST: RequestHandler = async ({ params, request }) => {
@@ -83,6 +106,66 @@ export const POST: RequestHandler = async ({ params, request }) => {
 					record(ev);
 				};
 				await agent.run(instruction, onEvent, request.signal);
+
+				// After the turn: run the de minimis assurance floor (§8.4) over the DRAFT graph and RECORD it as
+				// canonical ASSURANCE_ASSESSMENT/OBSERVATION objects. If not SATISFIED, auto-refine ONCE against the
+				// Reasoning Review findings (non-mock only — the offline mock authoring agent would mutate the graph
+				// off the NL directive), then re-run the floor. A still-unsatisfied floor blocks PublishPwa (the gate)
+				// until the human revises the graph or records a waiver. Guarded so an agy hiccup never nukes a turn
+				// whose authoring already committed.
+				try {
+					const planText = () =>
+						transcript
+							.filter((e) => e.role === 'AGENT' && (e.kind === 'message' || e.kind === 'thinking'))
+							.map((e) => e.text)
+							.join('\n');
+					const noteFloor = (f: FloorView) => {
+						const t = floorStatus(f);
+						send({ kind: 'status', text: t });
+						transcript.push({ role: 'SYSTEM', kind: 'message', text: t });
+					};
+					send({
+						kind: 'status',
+						text: '⚖ Running the assurance floor (independent reasoning review)…'
+					});
+					let floor = await runPwaFloor(params.id, { prompt: instruction, planText: planText() });
+					if (floor) {
+						noteFloor(floor);
+						if (!floor.satisfied && mode !== 'mock') {
+							transcript.push({
+								role: 'SYSTEM',
+								kind: 'message',
+								text: '↻ Auto-refinement pass (addressing reviewer findings)'
+							});
+							send({
+								kind: 'status',
+								text: '↻ Auto-refinement pass (addressing reviewer findings)…'
+							});
+							await agent.run(
+								refineDirective(instruction, floor.reasoningGaps),
+								onEvent,
+								request.signal
+							);
+							floor = await runPwaFloor(params.id, {
+								prompt: instruction,
+								planText: planText(),
+								priorGaps: floor.reasoningGaps
+							});
+							if (floor) noteFloor(floor);
+						}
+						if (floor && !floor.satisfied) {
+							send({
+								kind: 'status',
+								text: '⚠ PublishPwa is blocked until you revise the graph or record a waiver.'
+							});
+						}
+					}
+				} catch (fe) {
+					send({
+						kind: 'status',
+						text: `⚖ Assurance floor skipped: ${fe instanceof Error ? fe.message : String(fe)}`
+					});
+				}
 			} catch (e) {
 				const message = e instanceof Error ? e.message : String(e);
 				send({ kind: 'error', message });

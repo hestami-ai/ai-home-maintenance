@@ -445,11 +445,13 @@ function latestFloorDispositions(ctx: HandlerContext, subjectId: string): Map<st
 	return out;
 }
 
-/** PublishPwa gate: an AI-produced PWA may not be PUBLISHED until its de minimis assurance floor is SATISFIED —
- *  schema/invariant + identity/provenance + an independent Reasoning Review, each a recorded ASSURANCE_ASSESSMENT
- *  completed SATISFIED (guide §8.4). Strictest-unresolved: a missing or non-SATISFIED required policy blocks. Human-
- *  authored PWAs pass (the floor's independent-review teeth target AI work; exec != assurance). Version-binding the
- *  floor to the exact PWA semanticVersion is a later refinement — the floor is currently matched by subject id. */
+/** PublishPwa gate: a PWA may not be PUBLISHED until its de minimis assurance floor is SATISFIED — schema/invariant +
+ *  identity/provenance + an independent Reasoning Review, each a recorded ASSURANCE_ASSESSMENT completed SATISFIED
+ *  (guide §8.4). Strictest-unresolved: a missing or non-SATISFIED required policy blocks. The floor applies to an
+ *  AI-produced subject (createdBy is an AGENT/MODEL) AND to any subject that HAS a recorded floor assessment — if it
+ *  was assessed (e.g. an agent shaped the graph and the host ran the floor over the human-created PWA shell), it must
+ *  pass. A purely human-authored, never-assessed PWA passes (the floor's independent-review teeth target AI work;
+ *  exec != assurance). Version-binding the floor to the exact PWA semanticVersion is a later refinement. */
 function pwaFloorGate(
 	command: DomainCommand,
 	state: Record<string, unknown>,
@@ -457,9 +459,9 @@ function pwaFloorGate(
 ): CommandResult | null {
 	const createdBy = state.createdBy as { actorType?: string } | undefined;
 	const aiProduced = createdBy ? AI_ACTOR_TYPES.has(String(createdBy.actorType)) : false;
-	if (!aiProduced) return null;
 	const pwaId = command.targetAggregateId;
 	const latest = latestFloorDispositions(ctx, pwaId);
+	if (!aiProduced && latest.size === 0) return null;
 	const blocking = FLOOR_POLICY_IDS_REQUIRED.map((policyId) => ({
 		policyId,
 		disposition: latest.get(policyId) ?? 'MISSING'

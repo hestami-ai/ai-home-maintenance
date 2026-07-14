@@ -48,6 +48,11 @@ function testNow(): string {
 	return new Date(TEST_EPOCH + clockTick * 1000).toISOString();
 }
 
+/** The host clock as an ISO string: the deterministic monotonic test clock under E2E, wall-clock otherwise. */
+export function hostNow(): string {
+	return TEST_MODE ? testNow() : new Date().toISOString();
+}
+
 function newEngine(): EngineHandle {
 	return createEngine(TEST_MODE ? { ontology, now: testNow } : { ontology });
 }
