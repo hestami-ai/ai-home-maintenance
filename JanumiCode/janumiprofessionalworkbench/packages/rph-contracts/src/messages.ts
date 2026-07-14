@@ -209,6 +209,7 @@ export type AssertClaimPayload = z.infer<typeof AssertClaimPayloadSchema>;
 export const RecordAssuranceObservationPayloadSchema = z.strictObject({
 	assessmentId: z.string(),
 	observationType: ObservationTypeSchema,
+	findingCode: z.string().optional(),
 	severity: z.string(),
 	statement: z.string(),
 	evidenceIds: z.array(z.string()).optional()

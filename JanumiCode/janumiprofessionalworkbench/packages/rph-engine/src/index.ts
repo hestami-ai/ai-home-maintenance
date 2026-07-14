@@ -8,4 +8,5 @@ export * from './professional-work-graph.js';
 export * from './reference-undertaking.js';
 export * from './pwa-ontology.js';
 export * from './seed-workbench.js';
+export * from './record-assurance.js';
 export * from './queries.js';

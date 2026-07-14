@@ -5,6 +5,7 @@
 // unresolved). Concrete model-backed Validators (e.g. agy/Gemini for Reasoning Review) live server-side and register
 // here; the deterministic floor Validators are pure and defined here.
 import type { Disposition, Identity, Severity } from './assurance-rules.js';
+import { assuranceRecordingPlan, type AssuranceRecordingPlan } from './recording.js';
 import {
 	composeAssuranceOutcome,
 	deMinimisFloorPlan,
@@ -226,11 +227,11 @@ function failedResult(
  * policy MISSING (compose blocks — never assume satisfied); a Validator that throws yields a VALIDATOR_FAILED result
  * (compose blocks, and it is never mistaken for REJECTED). The composed outcome + its transition gate are returned.
  */
-export async function runDeMinimisFloor(
+async function runFloorResults(
 	subject: AssuranceSubject,
 	ctx: ValidatorContext,
 	registry: ValidatorRegistry
-): Promise<AssuranceOutcome> {
+): Promise<{ plan: FloorPolicyRef[]; results: ValidatorResult[] }> {
 	const plan = deMinimisFloorPlan(subject);
 	const results: ValidatorResult[] = [];
 	for (const p of plan) {
@@ -244,5 +245,28 @@ export async function runDeMinimisFloor(
 			);
 		}
 	}
+	return { plan, results };
+}
+
+export async function runDeMinimisFloor(
+	subject: AssuranceSubject,
+	ctx: ValidatorContext,
+	registry: ValidatorRegistry
+): Promise<AssuranceOutcome> {
+	const { plan, results } = await runFloorResults(subject, ctx, registry);
 	return composeAssuranceOutcome(subject, plan, results);
+}
+
+/**
+ * Run the ordered de minimis floor and produce the Assurance-Service RECORDING plan — the canonical per-policy
+ * assessments + observations carrying the floor-computed dispositions (§8.9 layer 3). Same run + blocking semantics
+ * as runDeMinimisFloor; the composition layer turns the plan into live ASSURANCE_ASSESSMENT/OBSERVATION commands.
+ */
+export async function runFloorAndPlanRecording(
+	subject: AssuranceSubject,
+	ctx: ValidatorContext,
+	registry: ValidatorRegistry
+): Promise<AssuranceRecordingPlan> {
+	const { plan, results } = await runFloorResults(subject, ctx, registry);
+	return assuranceRecordingPlan(subject, plan, results);
 }

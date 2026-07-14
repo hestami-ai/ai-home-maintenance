@@ -242,7 +242,7 @@ export const recordAssuranceObservation: CommandHandler = (ctx, command, payload
 		assessmentId: p.assessmentId,
 		policyId: assessment.assurancePolicyId ?? p.assessmentId,
 		subjectObjectIds: assessment.subjectObjectIds ?? [],
-		findingCode: p.observationType,
+		findingCode: p.findingCode ?? p.observationType,
 		observationType: p.observationType,
 		severity: p.severity,
 		statement: p.statement,

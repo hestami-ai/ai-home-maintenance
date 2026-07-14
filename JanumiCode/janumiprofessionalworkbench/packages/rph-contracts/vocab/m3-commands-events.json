@@ -883,6 +883,12 @@
           "enumRef": "ObservationTypeSchema"
         },
         {
+          "field": "findingCode",
+          "required": false,
+          "type": "string",
+          "note": "the Validator's specific finding/criterion code (e.g. RR-01-no-problem-substitution); falls back to observationType when absent"
+        },
+        {
           "field": "severity",
           "required": true,
           "type": "ObservationSeverity",
