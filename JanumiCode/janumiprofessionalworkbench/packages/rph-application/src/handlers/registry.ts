@@ -83,11 +83,6 @@ import {
 	submitPwaForReview,
 	validatePwa
 } from './pwa-authoring.js';
-import {
-	escalateAuthoringAssessment,
-	recordAuthoringAssessment,
-	resolveAuthoringAssessment
-} from './pwa-assessment.js';
 
 export const HANDLERS: Readonly<Record<string, CommandHandler>> = {
 	// Intent lifecycle (DOC-002 §6)
@@ -161,9 +156,5 @@ export const HANDLERS: Readonly<Record<string, CommandHandler>> = {
 	PublishPwa: publishPwa,
 	DeprecatePwa: deprecatePwa,
 	RetirePwa: retirePwa,
-	CreateUndertaking: createUndertaking,
-	// Authoring-plane faithfulness assessment (RPH-DOC-010 — governed-stream precursor; exec != assurance)
-	RecordAuthoringAssessment: recordAuthoringAssessment,
-	EscalateAuthoringAssessment: escalateAuthoringAssessment,
-	ResolveAuthoringAssessment: resolveAuthoringAssessment
+	CreateUndertaking: createUndertaking
 };

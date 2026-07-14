@@ -24,11 +24,10 @@
         "PROFESSIONAL_WORK_ARCHITECTURE",
         "PWU_TYPE",
         "UNDERTAKING",
-        "AUTHORING_CONVERSATION",
-        "AUTHORING_ASSESSMENT"
+        "AUTHORING_CONVERSATION"
       ],
       "canonicalSource": "RPH-DOC-002 §4 (17 runtime) + 4 authoring objects (RPH-DOC-010)",
-      "note": "DOC-004/DOC-007 reference this type but do not re-enumerate it. DOC-006 fixture emits only a 10-value subset (display). ARTIFACT is in the union but has no dedicated interface. (PWA/PWU_TYPE/UNDERTAKING added for the RPH-DOC-010 PWA-authoring context.) AUTHORING_CONVERSATION added for the durable event-sourced authoring conversation (governed-stream precursor). AUTHORING_ASSESSMENT added for the authoring-plane faithfulness assessment (governed-stream precursor; exec != assurance)."
+      "note": "DOC-004/DOC-007 reference this type but do not re-enumerate it. DOC-006 fixture emits only a 10-value subset (display). ARTIFACT is in the union but has no dedicated interface. (PWA/PWU_TYPE/UNDERTAKING added for the RPH-DOC-010 PWA-authoring context.) AUTHORING_CONVERSATION added for the durable event-sourced authoring conversation (governed-stream precursor)."
     },
     {
       "name": "ActorType",

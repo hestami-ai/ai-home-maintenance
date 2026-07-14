@@ -22,8 +22,7 @@
     "PROFESSIONAL_WORK_ARCHITECTURE",
     "PWU_TYPE",
     "UNDERTAKING",
-    "AUTHORING_CONVERSATION",
-    "AUTHORING_ASSESSMENT"
+    "AUTHORING_CONVERSATION"
   ],
   "$id": "urn:janumi:rph:schema:enum:ProfessionalWorkObjectType:1"
 }

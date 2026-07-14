@@ -582,8 +582,7 @@ export const ProfessionalWorkObjectTypeSchema = z.enum([
 	'PROFESSIONAL_WORK_ARCHITECTURE',
 	'PWU_TYPE',
 	'UNDERTAKING',
-	'AUTHORING_CONVERSATION',
-	'AUTHORING_ASSESSMENT'
+	'AUTHORING_CONVERSATION'
 ]);
 export type ProfessionalWorkObjectType = z.infer<typeof ProfessionalWorkObjectTypeSchema>;
 

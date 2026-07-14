@@ -6,7 +6,6 @@
 import { error, json } from '@sveltejs/kit';
 import { agentMode, makeAuthoringBroker, recordConversation } from '$lib/server/workbench';
 import { createAuthoringAgent, type AuthoringAgentEvent } from '$lib/server/agent';
-import { runAssessmentLoop, type AssessmentStreamEvent } from '$lib/server/assess/loop';
 import type { RequestHandler } from './$types';
 
 // A mutable transcript entry (text is accumulated as deltas stream); assignable to the readonly ConversationEntry.
@@ -38,7 +37,7 @@ export const POST: RequestHandler = async ({ params, request }) => {
 	const stream = new ReadableStream<Uint8Array>({
 		async start(controller) {
 			let closed = false;
-			const send = (event: AuthoringAgentEvent | AssessmentStreamEvent) => {
+			const send = (event: AuthoringAgentEvent) => {
 				if (closed) return;
 				controller.enqueue(encoder.encode(`data: ${JSON.stringify(event)}\n\n`));
 			};
@@ -84,30 +83,6 @@ export const POST: RequestHandler = async ({ params, request }) => {
 					record(ev);
 				};
 				await agent.run(instruction, onEvent, request.signal);
-
-				// After the turn: the bounded assess -> auto-refine -> escalate loop (Layer B, in-product).
-				// A judge distinct from the executor scores faithfulness; one automatic refinement re-runs the
-				// executor against the gaps; a still-unfaithful result escalates to the human-in-the-loop.
-				await runAssessmentLoop({
-					pwaId: params.id,
-					prompt: instruction,
-					planText: () =>
-						transcript
-							.filter((e) => e.role === 'AGENT' && (e.kind === 'message' || e.kind === 'thinking'))
-							.map((e) => e.text)
-							.join('\n'),
-					runExecutor: async (directive) => {
-						transcript.push({
-							role: 'SYSTEM',
-							kind: 'message',
-							text: '↻ Auto-refinement pass (addressing reviewer gaps)'
-						});
-						await agent.run(directive, onEvent, request.signal);
-					},
-					autoRefine: mode !== 'mock',
-					emit: send,
-					signal: request.signal
-				});
 			} catch (e) {
 				const message = e instanceof Error ? e.message : String(e);
 				send({ kind: 'error', message });

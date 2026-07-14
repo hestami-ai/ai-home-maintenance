@@ -58,24 +58,6 @@ export function getConversation(h: EngineHandle, pwaId: string): ObjectRow | und
 	return byField(listByType(h, 'AUTHORING_CONVERSATION'), 'pwaId', pwaId)[0];
 }
 
-// Authoring-plane faithfulness assessments (distinct from the execution-plane ASSURANCE_ASSESSMENT / listAssessments).
-export const listAuthoringAssessments = (h: EngineHandle): ObjectRow[] =>
-	listByType(h, 'AUTHORING_ASSESSMENT');
-
-/** Every faithfulness assessment recorded for a PWA, in event-log (chronological) order. */
-export function listAuthoringAssessmentsForPwa(h: EngineHandle, pwaId: string): ObjectRow[] {
-	return byField(listByType(h, 'AUTHORING_ASSESSMENT'), 'pwaId', pwaId);
-}
-
-/** The most recently recorded faithfulness assessment for a PWA, or undefined. */
-export function getLatestAuthoringAssessment(
-	h: EngineHandle,
-	pwaId: string
-): ObjectRow | undefined {
-	const all = listAuthoringAssessmentsForPwa(h, pwaId);
-	return all.length > 0 ? all[all.length - 1] : undefined;
-}
-
 /** A single object's current state by id, or undefined. */
 export function getObject(handle: EngineHandle, id: string): Record<string, unknown> | undefined {
 	return handle.loadObject(id)?.state as Record<string, unknown> | undefined;

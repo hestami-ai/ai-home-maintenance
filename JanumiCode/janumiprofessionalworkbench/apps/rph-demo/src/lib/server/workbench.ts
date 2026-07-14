@@ -10,22 +10,15 @@
 import {
 	createEngine,
 	getConversation,
-	getLatestAuthoringAssessment,
 	getObject,
-	listAuthoringAssessmentsForPwa,
 	listPwuTypes,
 	seedWorkbench,
 	type EngineHandle
 } from '@janumipwb/rph-engine';
 import { ontology } from '@janumipwb/rph-product-realization-pwa';
 import { PwaAuthoringBroker } from '@janumipwb/rph-authoring';
-import { buildPwaGraphExport, toPercent, type PwaGraphExport } from '@janumipwb/rph-projections';
+import { buildPwaGraphExport, type PwaGraphExport } from '@janumipwb/rph-projections';
 import type { DomainCommand } from '@janumipwb/rph-contracts';
-import {
-	selectAssessor,
-	type AssessmentResult,
-	type FaithfulnessAssessor
-} from './assess/index.js';
 
 const TEST_MODE = process.env.RPH_DEMO_MODE === 'test';
 
@@ -184,9 +177,9 @@ export function mintUiId(prefix: string): string {
 	return `${prefix}_${s}`;
 }
 
-// ── Authoring-plane faithfulness assessment (Layer B, in-product) ───────────────────────────────────────────────
-// A judge distinct from the authoring executor (exec != assurance) scores whether the DRAFT PWA graph faithfully
-// interprets its prompt; the verdict is recorded as durable, event-sourced domain state (a governed-stream precursor).
+// ── Canonical PWA graph export ──────────────────────────────────────────────────────────────────────────────────
+// The DRAFT PWA's PWU-Type graph, serialized as the engine-truth export a de minimis assurance floor Reasoning
+// Review reads (exec != assurance — the reviewer is a validator distinct from the authoring executor).
 
 const arr = (v: unknown): string[] => (Array.isArray(v) ? (v as string[]) : []);
 
@@ -214,149 +207,4 @@ export function buildPwaExport(pwaId: string): PwaGraphExport | undefined {
 		},
 		nodes
 	);
-}
-
-/** The configured faithfulness assessor: agy (Gemini) in dev/prod, the deterministic mock under E2E. */
-export function makeAssessor(): FaithfulnessAssessor {
-	return selectAssessor({ testMode: TEST_MODE });
-}
-
-export interface RecordAssessmentArgs {
-	readonly pwaId: string;
-	readonly promptText: string;
-	readonly iteration: number;
-	readonly priorAssessmentId?: string;
-	readonly result: AssessmentResult;
-	/** The judging vendor/model — the separation-of-duties record. */
-	readonly assessor: {
-		readonly actorId: string;
-		readonly displayName: string;
-		readonly modelId?: string;
-		readonly providerId?: string;
-	};
-	/** Convergence (0..1 space) vs the prior assessment; persisted as integer percent points. */
-	readonly scoreDelta01?: number;
-	readonly converging?: boolean;
-}
-
-/** Persist a judge's faithfulness verdict (RecordAuthoringAssessment). Converts the assessor's 0..1 scores to the
- *  integer percents the domain stores (the canonical content-hash forbids non-integer numbers). Returns the id. */
-export function recordAssessment(a: RecordAssessmentArgs): string {
-	const id = mintUiId('aasm');
-	dispatch('RecordAuthoringAssessment', 'AUTHORING_ASSESSMENT', id, {
-		assessmentId: id,
-		pwaId: a.pwaId,
-		promptText: a.promptText,
-		iteration: a.iteration,
-		...(a.priorAssessmentId ? { priorAssessmentId: a.priorAssessmentId } : {}),
-		assessor: {
-			actorId: a.assessor.actorId,
-			actorType: 'AGENT',
-			displayName: a.assessor.displayName,
-			...(a.assessor.modelId ? { modelId: a.assessor.modelId } : {}),
-			...(a.assessor.providerId ? { providerId: a.assessor.providerId } : {})
-		},
-		verdict: a.result.verdict,
-		overallScore: toPercent(a.result.overallScore),
-		criteria: a.result.criteria.map((c) => ({
-			name: c.name,
-			score: toPercent(c.score),
-			...(c.rationale ? { rationale: c.rationale } : {})
-		})),
-		gaps: a.result.gaps,
-		recommendation: a.result.recommendation,
-		...(a.scoreDelta01 !== undefined ? { scoreDelta: Math.round(a.scoreDelta01 * 100) } : {}),
-		...(a.converging !== undefined ? { converging: a.converging } : {})
-	});
-	return id;
-}
-
-/** Escalate a recorded assessment to the human-in-the-loop (EscalateAuthoringAssessment). */
-export function escalateAssessment(assessmentId: string, reason: string, context: string): void {
-	dispatch('EscalateAuthoringAssessment', 'AUTHORING_ASSESSMENT', assessmentId, {
-		assessmentId,
-		reason,
-		context
-	});
-}
-
-/** Record the human's decision on an escalated assessment (ResolveAuthoringAssessment). */
-export function resolveAssessment(
-	assessmentId: string,
-	resolution: 'ACCEPTED_AS_IS' | 'REVISED' | 'ABANDONED',
-	resolutionNote?: string
-): ReturnType<typeof dispatch> {
-	return dispatch('ResolveAuthoringAssessment', 'AUTHORING_ASSESSMENT', assessmentId, {
-		assessmentId,
-		resolution,
-		...(resolutionNote ? { resolutionNote } : {}),
-		resolvedBy: { actorId: 'ui-user', actorType: 'HUMAN', displayName: 'Workbench User' }
-	});
-}
-
-/** A faithfulness assessment shaped for the designer UI. */
-export interface AssessmentView {
-	readonly id: string;
-	readonly iteration: number;
-	readonly verdict: string;
-	readonly overallScore: number;
-	readonly criteria: {
-		readonly name: string;
-		readonly score: number;
-		readonly rationale?: string;
-	}[];
-	readonly gaps: string[];
-	readonly recommendation: string;
-	readonly status: string;
-	readonly reason?: string;
-	readonly context?: string;
-	readonly resolution?: string;
-	readonly scoreDelta?: number;
-	readonly converging?: boolean;
-	readonly assessor: {
-		readonly displayName: string;
-		readonly modelId?: string;
-		readonly providerId?: string;
-	};
-}
-
-function toAssessmentView(row: { id: string; state: Record<string, unknown> }): AssessmentView {
-	const s = row.state;
-	const assessor = (s.assessor ?? {}) as Record<string, unknown>;
-	const criteria = Array.isArray(s.criteria) ? (s.criteria as Record<string, unknown>[]) : [];
-	return {
-		id: row.id,
-		iteration: Number(s.iteration ?? 1),
-		verdict: String(s.verdict ?? 'PARTIAL'),
-		overallScore: Number(s.overallScore ?? 0),
-		criteria: criteria.map((c) => ({
-			name: String(c.name ?? ''),
-			score: Number(c.score ?? 0),
-			...(typeof c.rationale === 'string' ? { rationale: c.rationale } : {})
-		})),
-		gaps: arr(s.gaps),
-		recommendation: String(s.recommendation ?? ''),
-		status: String(s.status ?? 'RECORDED'),
-		...(typeof s.reason === 'string' ? { reason: s.reason } : {}),
-		...(typeof s.context === 'string' ? { context: s.context } : {}),
-		...(typeof s.resolution === 'string' ? { resolution: s.resolution } : {}),
-		...(typeof s.scoreDelta === 'number' ? { scoreDelta: s.scoreDelta } : {}),
-		...(typeof s.converging === 'boolean' ? { converging: s.converging } : {}),
-		assessor: {
-			displayName: String(assessor.displayName ?? 'assessor'),
-			...(typeof assessor.modelId === 'string' ? { modelId: assessor.modelId } : {}),
-			...(typeof assessor.providerId === 'string' ? { providerId: assessor.providerId } : {})
-		}
-	};
-}
-
-/** Every faithfulness assessment for a PWA (chronological). */
-export function loadAssessments(pwaId: string): AssessmentView[] {
-	return listAuthoringAssessmentsForPwa(getEngine(), pwaId).map(toAssessmentView);
-}
-
-/** The most recent faithfulness assessment for a PWA, or undefined. */
-export function loadLatestAssessment(pwaId: string): AssessmentView | undefined {
-	const row = getLatestAuthoringAssessment(getEngine(), pwaId);
-	return row ? toAssessmentView(row) : undefined;
 }

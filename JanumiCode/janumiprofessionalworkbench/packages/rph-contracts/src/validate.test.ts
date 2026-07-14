@@ -39,15 +39,15 @@ describe('validate', () => {
 	});
 
 	it('registers envelope + enum + object + command + event schemas', () => {
-		// 8 envelope/primitive + 72 enums + 22 objects + 68 commands + 120 events = 290
+		// 8 envelope/primitive + 72 enums + 21 objects + 65 commands + 117 events = 283
 		// (+3 objects PROFESSIONAL_WORK_ARCHITECTURE / PWU_TYPE / UNDERTAKING; +8 PWA-authoring commands +8 events —
 		// the RPH-DOC-010 PWA-authoring context; then +3 DRAFT-authoring commands EditPwa/EditPwuType/RemovePwuType
 		// +3 events; then +1 DeletePwa command +1 PwaDeleted event — PWA discard/soft-delete; then +1
 		// AUTHORING_CONVERSATION object +1 AppendConversationEntries command +1 ConversationEntriesAppended event —
-		// the durable event-sourced authoring conversation, governed-stream precursor; then +1 AUTHORING_ASSESSMENT
-		// object +3 commands (Record/Escalate/Resolve AuthoringAssessment) +3 events — the authoring-plane
-		// faithfulness assessment (governed-stream precursor; exec != assurance); then +1 CreateAssurancePolicy command
-		// +1 AssurancePolicyCreated event — the assurance-floor policy create path (guide §8.9); see OPEN-QUESTIONS)
-		expect(buildContractRegistry().ids().length).toBe(290);
+		// the durable event-sourced authoring conversation, governed-stream precursor; then +1 CreateAssurancePolicy
+		// command +1 AssurancePolicyCreated event — the assurance-floor policy create path (guide §8.9). The
+		// authoring-plane AUTHORING_ASSESSMENT object + its 3 faithfulness commands/events were RETIRED in favor of
+		// the canonical de minimis assurance floor (recorded ASSURANCE_ASSESSMENT/OBSERVATION); see OPEN-QUESTIONS)
+		expect(buildContractRegistry().ids().length).toBe(283);
 	});
 });
