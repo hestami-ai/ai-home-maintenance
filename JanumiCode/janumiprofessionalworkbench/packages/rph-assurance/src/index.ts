@@ -4,3 +4,4 @@ export const RPH_ASSURANCE_VERSION = '0.0.0';
 
 export * from './applicability.js';
 export * from './assurance-rules.js';
+export * from './floor.js';
