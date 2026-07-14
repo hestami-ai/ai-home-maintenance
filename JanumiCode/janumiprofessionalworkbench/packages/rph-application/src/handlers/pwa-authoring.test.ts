@@ -572,4 +572,38 @@ describe('PublishPwa protected-transition gate — the de minimis assurance floo
 		expect(r.status).toBe('REJECTED');
 		expect(pub()).toBe('VALIDATED');
 	});
+
+	it('an EFFECTIVE governance waiver lets a non-SATISFIED floor publish', () => {
+		const HUMAN: ActorReference = { actorId: 'lead', actorType: 'HUMAN', displayName: 'Eng Lead' };
+		const WAIVER = 'dec_01ARZ3NDEKTSV4RRFFQ69G5R20';
+		authorValidatedAiPwa();
+		recordFloor({ [SCHEMA]: 'SATISFIED', [IDENTITY]: 'SATISFIED', [REVIEW]: 'REJECTED' });
+		expect(publish().status).toBe('REJECTED');
+		// Human records + grants an auditable waiver over the floor for this subject.
+		const req = d(
+			HUMAN,
+			'RequestWaiver',
+			{
+				subjectObjectIds: [AI_PWA],
+				scope: 'de minimis assurance floor',
+				rationale: 'Accepted residual risk for the pilot.',
+				duration: 'until superseded',
+				affectedObjectIds: [AI_PWA]
+			},
+			WAIVER,
+			'DECISION'
+		);
+		expect(req.status, JSON.stringify(req.error)).toBe('ACCEPTED');
+		const grant = d(
+			HUMAN,
+			'GrantWaiver',
+			{ waiverDecisionId: WAIVER, effectiveAt: TS, duration: 'until superseded' },
+			WAIVER,
+			'DECISION'
+		);
+		expect(grant.status, JSON.stringify(grant.error)).toBe('ACCEPTED');
+		const r = publish();
+		expect(r.status, JSON.stringify(r.error)).toBe('ACCEPTED');
+		expect(pub()).toBe('PUBLISHED');
+	});
 });

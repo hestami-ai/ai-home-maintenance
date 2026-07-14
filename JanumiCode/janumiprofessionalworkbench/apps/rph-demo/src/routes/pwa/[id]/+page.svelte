@@ -624,6 +624,16 @@
 								Publishing is blocked until the floor is SATISFIED — revise the graph and re-run, or record a
 								waiver.
 							</p>
+							{#if editable}
+								<form method="POST" action="?/recordWaiver" use:enhance class="floorwaiver">
+									<input
+										name="rationale"
+										placeholder="Waiver rationale — why publish despite the floor"
+										required
+									/>
+									<button class="ghost small danger" type="submit">Record waiver + allow publish</button>
+								</form>
+							{/if}
 						{/if}
 					</div>
 				</Panel>
@@ -1122,4 +1132,6 @@
 	.floorgaps { margin: 0; padding-left: 16px; display: flex; flex-direction: column; gap: 3px; }
 	.floorgaps li { line-height: 1.35; }
 	.floorhint { margin: 10px 0 0; color: var(--on-variant); line-height: 1.4; }
+	.floorwaiver { margin-top: 10px; display: flex; flex-direction: column; gap: 6px; border-top: 1px solid var(--sc); padding-top: 10px; }
+	.floorwaiver input { padding: 6px 8px; border: 1px solid var(--sc); border-radius: 6px; background: var(--surface); color: inherit; font-size: 11px; }
 </style>

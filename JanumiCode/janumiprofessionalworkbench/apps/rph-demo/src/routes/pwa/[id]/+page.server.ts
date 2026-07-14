@@ -9,6 +9,7 @@ import { getObject, listPwuTypes, listUndertakings, SEED_UNDERTAKING } from '@ja
 import {
 	dispatch,
 	getEngine,
+	hostNow,
 	loadConversation,
 	mintUiId,
 	type ConversationEntry
@@ -214,5 +215,29 @@ export const actions: Actions = {
 	},
 	// Continue the publication FSM past PUBLISHED: PUBLISHED -> DEPRECATED -> RETIRED.
 	deprecate: ({ params }) => advancePwa('DeprecatePwa', params.id, {}),
-	retire: ({ params }) => advancePwa('RetirePwa', params.id, {})
+	retire: ({ params }) => advancePwa('RetirePwa', params.id, {}),
+
+	// Human-in-the-loop resolution: record + grant an auditable governance WAIVER over the de minimis assurance
+	// floor so a non-SATISFIED PWA can PUBLISH — the alternative to revising the graph and re-running the floor.
+	recordWaiver: async ({ request, params }) => {
+		const rationale = String((await request.formData()).get('rationale') ?? '').trim();
+		if (!rationale) return fail(400, { error: 'A waiver rationale is required.' });
+		const waiverId = mintUiId('dec');
+		const req = dispatch('RequestWaiver', 'DECISION', waiverId, {
+			subjectObjectIds: [params.id],
+			scope: 'de minimis assurance floor',
+			rationale,
+			duration: 'until superseded',
+			affectedObjectIds: [params.id]
+		});
+		if (req.status !== 'ACCEPTED') return fail(400, { error: req.error?.message ?? req.status });
+		const grant = dispatch('GrantWaiver', 'DECISION', waiverId, {
+			waiverDecisionId: waiverId,
+			effectiveAt: hostNow(),
+			duration: 'until superseded'
+		});
+		if (grant.status !== 'ACCEPTED')
+			return fail(400, { error: grant.error?.message ?? grant.status });
+		return { waived: waiverId };
+	}
 };

@@ -417,6 +417,27 @@ const FLOOR_POLICY_IDS_REQUIRED = [
 // independent Reasoning Review (§8.4 step 3) — target AI-produced work; human-authored PWAs are outside this gate.
 const AI_ACTOR_TYPES = new Set(['AGENT', 'MODEL']);
 
+/** True iff an EFFECTIVE WAIVER Decision (governance) covers `subjectId` — a recorded, auditable human override
+ *  that lets a non-SATISFIED floor publish (guide §8: a Governance Decision, not the Validator, grants authority). */
+function hasEffectiveFloorWaiver(ctx: HandlerContext, subjectId: string): boolean {
+	const ids = new Set<string>();
+	for (const e of ctx.store.readAllEvents())
+		if (e.aggregateType === 'DECISION') ids.add(e.aggregateId);
+	for (const id of ids) {
+		const s = ctx.store.loadObject(id)?.state as
+			{ decisionType?: string; status?: string; subjectObjectIds?: string[] } | undefined;
+		if (
+			s &&
+			s.decisionType === 'WAIVER' &&
+			s.status === 'EFFECTIVE' &&
+			Array.isArray(s.subjectObjectIds) &&
+			s.subjectObjectIds.includes(subjectId)
+		)
+			return true;
+	}
+	return false;
+}
+
 /** Latest recorded assessmentState per assurance policy for `subjectId` (by updatedAt; ties: last seen). */
 function latestFloorDispositions(ctx: HandlerContext, subjectId: string): Map<string, string> {
 	const ids = new Set<string>();
@@ -467,6 +488,9 @@ function pwaFloorGate(
 		disposition: latest.get(policyId) ?? 'MISSING'
 	})).filter((r) => r.disposition !== 'SATISFIED');
 	if (blocking.length === 0) return null;
+	// An EFFECTIVE governance waiver is a recorded, auditable human override of the floor (§8 — a Governance
+	// Decision grants authority the Validator/Assurance Service cannot).
+	if (hasEffectiveFloorWaiver(ctx, pwaId)) return null;
 	const detail = blocking.map((b) => `${b.policyId}=${b.disposition}`).join(', ');
 	return reject(
 		command,
