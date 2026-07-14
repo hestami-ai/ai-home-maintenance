@@ -2,15 +2,12 @@
 // It is a DIFFERENT vendor than the Pi/Codex authoring executor — that is the whole point (exec != assurance).
 // No Python dependency, no sidecar: `agy` is already configured, and Node spawns it as a child process.
 //
-// Hermetic by construction: the graph export (+ the agent's own plan) is written to a throwaway temp dir and
-// handed to `agy` via `--add-dir`, so the inline prompt stays small (no Windows arg-length limit) and the judge
-// touches nothing else; `--sandbox` restricts the terminal. No `--json` flag exists, so we prompt for strict JSON
-// and parse defensively (fence-strip + brace-extract + one bounded retry). Model is `agy`'s configured default
-// unless JPWB_JUDGE_MODEL pins one; binary is `agy` unless JPWB_AGY_BIN overrides.
+// It matches the user's authorized invocation pattern exactly — a plain `agy --print "<prompt>"`. The graph export
+// (+ the agent's plan) is passed INLINE in the prompt, so this is a PURE-REASONING call: the judge needs no tools,
+// no workspace, and no permission bypass (no --add-dir / --sandbox / --dangerously-skip-permissions). No `--json`
+// flag exists, so we prompt for strict JSON and parse defensively (fence-strip + brace-extract + one bounded retry).
+// Model is `agy`'s configured default unless JPWB_JUDGE_MODEL pins one; binary is `agy` unless JPWB_AGY_BIN overrides.
 import { execFile } from 'node:child_process';
-import { mkdtemp, rm, writeFile } from 'node:fs/promises';
-import { tmpdir } from 'node:os';
-import { join } from 'node:path';
 import { promisify } from 'node:util';
 import type {
 	AssessmentInput,
@@ -27,14 +24,25 @@ const JUDGE_MODEL = process.env.JPWB_JUDGE_MODEL; // optional pin; omit → agy 
 const PRINT_TIMEOUT = '3m';
 const SPAWN_TIMEOUT_MS = 240_000;
 const MAX_BUFFER = 16 * 1024 * 1024;
+// Keep the whole inline prompt comfortably under the Windows CreateProcess command-line limit (~32k chars).
+const MAX_PROMPT_CHARS = 28_000;
 
 const VERDICTS: readonly FaithfulnessVerdict[] = ['FAITHFUL', 'PARTIAL', 'POOR'];
 
-/** The strict-JSON rubric. Criteria are GENERIC — the judge derives them from the prompt, not from hardcoded
- *  SDLC dimensions — so this works for any PWA, not just the V-model/UCD/JTBD example. */
-function judgePrompt(input: AssessmentInput, hasPlan: boolean): string {
+/** The strict-JSON rubric with the export inlined. Criteria are GENERIC — the judge derives them from the prompt,
+ *  not from hardcoded SDLC dimensions — so this works for any PWA, not just the V-model/UCD/JTBD example. */
+function judgePrompt(input: AssessmentInput): string {
+	let exportJson = JSON.stringify(input.graphExport);
+	// Belt-and-suspenders: if a very large graph would blow the command-line limit, truncate the raw JSON (the
+	// judge still gets the head of the structure). Typical PWAs are a few KB and never hit this.
+	if (exportJson.length > MAX_PROMPT_CHARS) {
+		exportJson = `${exportJson.slice(0, MAX_PROMPT_CHARS)} …(export truncated)`;
+	}
 	const priorLine = input.prior
 		? `\nThis is iteration ${input.iteration}. The PREVIOUS assessment scored ${input.prior.overallScore} overall with gaps: ${JSON.stringify(input.prior.gaps)}. Judge whether the graph has genuinely improved on those gaps, not just changed.`
+		: '';
+	const planLine = input.plan
+		? `\nThe generating agent's OWN recorded plan / narration (what it intended):\n"""${input.plan.slice(0, 4000)}"""`
 		: '';
 	return [
 		'You are an independent assurance reviewer. A PWA is a reusable software-engineering work architecture:',
@@ -44,16 +52,16 @@ function judgePrompt(input: AssessmentInput, hasPlan: boolean): string {
 		'',
 		`"""${input.prompt}"""`,
 		'',
-		`In your workspace, read "export.json" — the canonical graph export (nodes with pwuKind / requiredInputs /`,
-		'requiredOutputs, plus permits, dataFlow, artifacts, roots).',
-		hasPlan
-			? 'Also read "plan.md" — the generating agent\'s OWN recorded narration/plan (what it intended).'
-			: '',
+		'Here is the canonical graph export (JSON) to judge — nodes carry pwuKind / requiredInputs / requiredOutputs,',
+		'plus permits, dataFlow, artifacts, roots:',
+		'',
+		exportJson,
+		planLine,
+		priorLine,
 		'',
 		'Judge how well the GENERATED graph is a reasonable, faithful, and COMPLETE interpretation of the prompt —',
 		'not merely whether it is well-formed. Derive the judging criteria FROM THE PROMPT ITSELF (the specific',
 		'methodologies, frameworks, and requirements it names); do not assume a fixed rubric.',
-		priorLine,
 		'',
 		'Return ONLY a single-line, minified JSON object (no markdown fences, no prose) with EXACTLY these keys:',
 		'{"verdict":"FAITHFUL|PARTIAL|POOR",',
@@ -105,20 +113,16 @@ function coerce(parsed: unknown, model: string): AssessmentResult {
 	};
 }
 
-async function runAgy(prompt: string, dir: string): Promise<string> {
+/** One plain, non-interactive `agy --print` call — no tools, no workspace, no permission bypass. */
+async function runAgy(prompt: string): Promise<string> {
 	const args = [
 		'--print',
 		prompt,
-		'--add-dir',
-		dir,
-		'--sandbox',
-		'--dangerously-skip-permissions',
 		'--print-timeout',
 		PRINT_TIMEOUT,
 		...(JUDGE_MODEL ? ['--model', JUDGE_MODEL] : [])
 	];
 	const { stdout } = await execFileAsync(AGY_BIN, args, {
-		cwd: dir,
 		timeout: SPAWN_TIMEOUT_MS,
 		maxBuffer: MAX_BUFFER,
 		windowsHide: true
@@ -131,29 +135,16 @@ export function createAgyAssessor(): FaithfulnessAssessor {
 		kind: 'agy',
 		async assess(input: AssessmentInput): Promise<AssessmentResult> {
 			const model = JUDGE_MODEL ?? 'agy:default';
-			const dir = await mkdtemp(join(tmpdir(), 'jpwb-judge-'));
+			const prompt = judgePrompt(input);
+			let stdout = await runAgy(prompt);
 			try {
-				await writeFile(
-					join(dir, 'export.json'),
-					JSON.stringify(input.graphExport, null, 2),
-					'utf8'
+				return coerce(JSON.parse(extractJson(stdout)), model);
+			} catch {
+				// One bounded retry with a stricter instruction — the judge occasionally adds prose.
+				stdout = await runAgy(
+					`${prompt}\n\nIMPORTANT: your previous reply was not valid JSON. Reply with ONLY the minified JSON object.`
 				);
-				if (input.plan) await writeFile(join(dir, 'plan.md'), input.plan, 'utf8');
-
-				const prompt = judgePrompt(input, Boolean(input.plan));
-				let stdout = await runAgy(prompt, dir);
-				try {
-					return coerce(JSON.parse(extractJson(stdout)), model);
-				} catch {
-					// One bounded retry with a stricter instruction — the judge occasionally adds prose.
-					stdout = await runAgy(
-						`${prompt}\n\nIMPORTANT: your previous reply was not valid JSON. Reply with ONLY the minified JSON object.`,
-						dir
-					);
-					return coerce(JSON.parse(extractJson(stdout)), model);
-				}
-			} finally {
-				await rm(dir, { recursive: true, force: true }).catch(() => {});
+				return coerce(JSON.parse(extractJson(stdout)), model);
 			}
 		}
 	};
