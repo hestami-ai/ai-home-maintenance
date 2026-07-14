@@ -13,6 +13,7 @@ import {
 	mintUiId,
 	type ConversationEntry
 } from '$lib/server/workbench';
+import { loadPwaFloor } from '$lib/server/floor';
 import type { Actions, PageServerLoad } from './$types';
 
 /** The durable authoring transcript, mapped to the agent-log render shape the page consumes. */
@@ -79,7 +80,9 @@ export const load: PageServerLoad = ({ params }) => {
 		},
 		types,
 		fixtures,
-		conversation: loadConversation(params.id).map(toLogEntry)
+		conversation: loadConversation(params.id).map(toLogEntry),
+		// The latest recorded de minimis assurance floor for this PWA (canonical ASSURANCE_ASSESSMENT/OBSERVATION).
+		floor: loadPwaFloor(params.id)
 	};
 };
 

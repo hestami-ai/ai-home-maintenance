@@ -165,6 +165,13 @@
 		text: string;
 		ok?: boolean;
 	};
+	function policyLabel(id: string): string {
+		if (id === 'floor.schema-invariant') return 'Output contract & invariants';
+		if (id === 'floor.identity-provenance') return 'Identity & provenance';
+		if (id === 'floor.reasoning-review') return 'Independent reasoning review';
+		return id;
+	}
+
 	const MUTATING = new Set([
 		'set_pwa_details',
 		'define_pwu_type',
@@ -318,6 +325,19 @@
 								? `⚠ ${graphIssues} note(s)`
 								: '✓ well-formed'
 							: `✗ ${graphIssues} issue(s)`}
+					</span>
+				{/if}
+
+				{#if data.floor}
+					<span
+						class="floorchip"
+						class:bad={data.floor.aggregate === 'REJECTED'}
+						class:warn={!data.floor.satisfied && data.floor.aggregate !== 'REJECTED'}
+						class:ok={data.floor.satisfied}
+						title="De minimis assurance floor — schema, provenance, and an independent reasoning review (exec ≠ assurance)"
+						data-testid="assurance-chip"
+					>
+						⚖ {data.floor.satisfied ? 'floor satisfied' : `floor ${data.floor.aggregate.toLowerCase()}`}
 					</span>
 				{/if}
 				{#if editable}
@@ -568,6 +588,43 @@
 				<Panel position="top-center">
 					<div class="emptyhint">
 						No PWU Types yet — use “+ Define PWU Type”{#if editable}, or ask the agent below{/if}.
+					</div>
+				</Panel>
+			{/if}
+			{#if data.floor}
+				<Panel position="bottom-right">
+					<div class="floorpanel" data-testid="assurance-panel">
+						<div class="floorhead">
+							<span
+								class="floortag"
+								class:ok={data.floor.satisfied}
+								class:bad={data.floor.aggregate === 'REJECTED'}
+								data-testid="assurance-disposition">⚖ {data.floor.aggregate}</span
+							>
+							<span class="floorsub">de minimis assurance floor</span>
+						</div>
+						<ul class="floorpolicies">
+							{#each data.floor.policies as pol (pol.policyId)}
+								<li class:ok={pol.disposition === 'SATISFIED'} class:bad={pol.disposition === 'REJECTED'}>
+									<span class="pdisp"
+										>{pol.disposition === 'SATISFIED' ? '✓' : pol.disposition === 'REJECTED' ? '✗' : '•'}</span
+									>
+									{policyLabel(pol.policyId)}
+								</li>
+							{/each}
+						</ul>
+						{#if data.floor.reasoningGaps.length}
+							<p class="floorgapshdr">Reasoning-review findings</p>
+							<ul class="floorgaps">
+								{#each data.floor.reasoningGaps.slice(0, 5) as g}<li>{g}</li>{/each}
+							</ul>
+						{/if}
+						{#if !data.floor.satisfied}
+							<p class="floorhint">
+								Publishing is blocked until the floor is SATISFIED — revise the graph and re-run, or record a
+								waiver.
+							</p>
+						{/if}
 					</div>
 				</Panel>
 			{/if}
@@ -1044,4 +1101,25 @@
 		opacity: 0.5;
 		cursor: not-allowed;
 	}
+	/* De minimis assurance floor — chip + panel */
+	.floorchip { font-size: 11px; font-weight: 700; padding: 2px 8px; border-radius: 5px; border: 1px solid transparent; white-space: nowrap; cursor: help; }
+	.floorchip.ok { background: rgba(97, 218, 193, 0.15); color: var(--tertiary); }
+	.floorchip.warn { background: rgba(230, 181, 102, 0.15); color: var(--amber); }
+	.floorchip.bad { background: rgba(255, 180, 171, 0.15); color: var(--error); }
+	.floorpanel { width: 280px; max-width: 32vw; max-height: calc(100vh - 320px); overflow-y: auto; padding: 12px 14px; border: 1px solid var(--sc); border-radius: 10px; background: var(--surface); box-shadow: 0 6px 20px rgba(0, 0, 0, 0.18); font-size: 12px; }
+	.floorhead { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+	.floortag { font-size: 11px; font-weight: 800; padding: 2px 8px; border-radius: 5px; background: rgba(230, 181, 102, 0.15); color: var(--amber); }
+	.floortag.ok { background: rgba(97, 218, 193, 0.15); color: var(--tertiary); }
+	.floortag.bad { background: rgba(255, 180, 171, 0.15); color: var(--error); }
+	.floorsub { font-size: 10px; color: var(--outline); }
+	.floorpolicies { list-style: none; margin: 10px 0 0; padding: 0; display: flex; flex-direction: column; gap: 4px; }
+	.floorpolicies li { display: flex; gap: 6px; align-items: baseline; color: var(--on-variant); }
+	.floorpolicies li.ok { color: var(--on-surface); }
+	.floorpolicies .pdisp { color: var(--amber); font-weight: 800; }
+	.floorpolicies li.ok .pdisp { color: var(--tertiary); }
+	.floorpolicies li.bad .pdisp { color: var(--error); }
+	.floorgapshdr { margin: 10px 0 4px; font-weight: 700; color: var(--on-variant); }
+	.floorgaps { margin: 0; padding-left: 16px; display: flex; flex-direction: column; gap: 3px; }
+	.floorgaps li { line-height: 1.35; }
+	.floorhint { margin: 10px 0 0; color: var(--on-variant); line-height: 1.4; }
 </style>
