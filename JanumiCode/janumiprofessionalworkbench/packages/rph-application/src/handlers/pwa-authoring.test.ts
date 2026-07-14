@@ -509,8 +509,9 @@ describe('PublishPwa protected-transition gate — the de minimis assurance floo
 	// A ULID-format id (prefix_<26 digits>; digits are valid Crockford base32).
 	const ulid = (prefix: string) => `${prefix}_${String(++asmtSeq).padStart(26, '0')}`;
 
-	// Record a floor assessment per policy at the given disposition (as the Assurance Service).
-	function recordFloor(dispositions: Record<string, string>) {
+	// Record a floor assessment per policy at the given disposition (as the Assurance Service), against `version`
+	// (defaults to the PWA's initial semanticVersion of 1; pass a different value to exercise version-binding).
+	function recordFloor(dispositions: Record<string, string>, version = 1) {
 		for (const [policyId, disposition] of Object.entries(dispositions)) {
 			const assessmentId = ulid('asmt');
 			d(
@@ -521,7 +522,7 @@ describe('PublishPwa protected-transition gate — the de minimis assurance floo
 					assurancePolicyId: policyId,
 					policyVersion: '1.0.0',
 					subjectObjectIds: [AI_PWA],
-					subjectSemanticVersions: { [AI_PWA]: 1 },
+					subjectSemanticVersions: { [AI_PWA]: version },
 					claimIds: []
 				},
 				assessmentId,
@@ -570,6 +571,16 @@ describe('PublishPwa protected-transition gate — the de minimis assurance floo
 		recordFloor({ [SCHEMA]: 'SATISFIED', [IDENTITY]: 'SATISFIED' });
 		const r = publish();
 		expect(r.status).toBe('REJECTED');
+		expect(pub()).toBe('VALIDATED');
+	});
+
+	it('a floor recorded against a STALE PWA version does not authorize publish (version-binding)', () => {
+		authorValidatedAiPwa();
+		// All three policies SATISFIED, but recorded against v2 while the PWA is v1 — a stale floor must not count.
+		recordFloor({ [SCHEMA]: 'SATISFIED', [IDENTITY]: 'SATISFIED', [REVIEW]: 'SATISFIED' }, 2);
+		const r = publish();
+		expect(r.status).toBe('REJECTED');
+		expect(r.error?.code).toBe('RPH_INVARIANT_VIOLATION');
 		expect(pub()).toBe('VALIDATED');
 	});
 

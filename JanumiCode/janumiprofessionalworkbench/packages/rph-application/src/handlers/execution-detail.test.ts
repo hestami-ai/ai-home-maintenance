@@ -179,4 +179,78 @@ describe('ExecutionStep + RuntimeBinding handlers (live)', () => {
 			(store.loadObject(BIND)?.state as { authorizationStatus: string }).authorizationStatus
 		).toBe('AUTHORIZED');
 	});
+
+	it('a recorded non-SATISFIED floor over the step output blocks completion until waived (§8.4, INV-5)', () => {
+		dispatch('StartExecutionStep', { stepId: STEP }, PLAN, 'EXECUTION_PLAN');
+		expect(stepState()).toBe('RUNNING');
+
+		// Record a de minimis floor over the step's output whose independent reasoning review is REJECTED.
+		const FLOOR = ['floor.schema-invariant', 'floor.identity-provenance', 'floor.reasoning-review'];
+		let a = 0;
+		const recordFloor = (dispositions: Record<string, string>) => {
+			for (const [policyId, disposition] of Object.entries(dispositions)) {
+				const id = `asmt_${String(++a).padStart(26, '0')}`;
+				dispatch(
+					'RequestAssuranceAssessment',
+					{
+						assessmentId: id,
+						assurancePolicyId: policyId,
+						policyVersion: '1.0.0',
+						subjectObjectIds: [STEP],
+						subjectSemanticVersions: { [STEP]: 1 },
+						claimIds: []
+					},
+					id,
+					'ASSURANCE_ASSESSMENT'
+				);
+				dispatch(
+					'CompleteAssuranceAssessment',
+					{ validatorResult: { dispositionRecommendation: disposition } },
+					id,
+					'ASSURANCE_ASSESSMENT'
+				);
+			}
+		};
+		recordFloor({ [FLOOR[0]!]: 'SATISFIED', [FLOOR[1]!]: 'SATISFIED', [FLOOR[2]!]: 'REJECTED' });
+
+		const complete = {
+			executionStepId: STEP,
+			executionAttemptId: 'attempt_01ARZ3NDEKTSV4RRFFQ69G5FF0',
+			resultStatus: 'SUCCEEDED',
+			outputArtifactIds: ['art_01ARZ3NDEKTSV4RRFFQ69G5FG0'],
+			proposedEvidenceIds: [],
+			detectedAssumptionIds: [],
+			structuredResult: {},
+			executionProvenance: {}
+		};
+		// The floor gate blocks completion — step success does not imply assurance (INV-5).
+		const blocked = dispatch('CompleteExecutionStep', complete, PLAN, 'EXECUTION_PLAN');
+		expect(blocked.status).toBe('REJECTED');
+		expect(blocked.error?.code).toBe('RPH_INVARIANT_VIOLATION');
+		expect(stepState()).toBe('RUNNING');
+
+		// An EFFECTIVE governance waiver over the step's output lets it complete (auditable human override).
+		const WAIVER = 'dec_01ARZ3NDEKTSV4RRFFQ69G5FH0';
+		dispatch(
+			'RequestWaiver',
+			{
+				subjectObjectIds: [STEP],
+				scope: 'de minimis assurance floor',
+				rationale: 'Accepted residual risk.',
+				duration: 'until superseded',
+				affectedObjectIds: [STEP]
+			},
+			WAIVER,
+			'DECISION'
+		);
+		dispatch(
+			'GrantWaiver',
+			{ waiverDecisionId: WAIVER, effectiveAt: TS, duration: 'until superseded' },
+			WAIVER,
+			'DECISION'
+		);
+		const done = dispatch('CompleteExecutionStep', complete, PLAN, 'EXECUTION_PLAN');
+		expect(done.status, JSON.stringify(done.error)).toBe('ACCEPTED');
+		expect(stepState()).toBe('SUCCEEDED');
+	});
 });

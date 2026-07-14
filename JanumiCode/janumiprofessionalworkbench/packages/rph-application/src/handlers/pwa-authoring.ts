@@ -26,6 +26,7 @@ import {
 	type CommandHandler,
 	type HandlerContext
 } from './kit.js';
+import { AI_ACTOR_TYPES, floorGateBlock } from './floor-gate.js';
 
 const PWA = 'PROFESSIONAL_WORK_ARCHITECTURE';
 const PWU_TYPE = 'PWU_TYPE';
@@ -406,73 +407,13 @@ export const validatePwa: CommandHandler = (ctx, command) =>
 	});
 
 // ── Protected-transition gate: the de minimis assurance floor (guide §8.4 step 4) ────────────────────────────────
-// Canonical de minimis floor policy ids. Source of truth: @janumipwb/rph-assurance FLOOR_POLICY_IDS — duplicated as
-// literals here because the package DAG forbids rph-application -> rph-assurance; these are stable canonical ids.
-const FLOOR_POLICY_IDS_REQUIRED = [
-	'floor.schema-invariant',
-	'floor.identity-provenance',
-	'floor.reasoning-review'
-] as const;
-// A subject is AI-produced (floor-relevant) when its producing actor is an AGENT or MODEL. The floor's teeth —
-// independent Reasoning Review (§8.4 step 3) — target AI-produced work; human-authored PWAs are outside this gate.
-const AI_ACTOR_TYPES = new Set(['AGENT', 'MODEL']);
-
-/** True iff an EFFECTIVE WAIVER Decision (governance) covers `subjectId` — a recorded, auditable human override
- *  that lets a non-SATISFIED floor publish (guide §8: a Governance Decision, not the Validator, grants authority). */
-function hasEffectiveFloorWaiver(ctx: HandlerContext, subjectId: string): boolean {
-	const ids = new Set<string>();
-	for (const e of ctx.store.readAllEvents())
-		if (e.aggregateType === 'DECISION') ids.add(e.aggregateId);
-	for (const id of ids) {
-		const s = ctx.store.loadObject(id)?.state as
-			{ decisionType?: string; status?: string; subjectObjectIds?: string[] } | undefined;
-		if (
-			s &&
-			s.decisionType === 'WAIVER' &&
-			s.status === 'EFFECTIVE' &&
-			Array.isArray(s.subjectObjectIds) &&
-			s.subjectObjectIds.includes(subjectId)
-		)
-			return true;
-	}
-	return false;
-}
-
-/** Latest recorded assessmentState per assurance policy for `subjectId` (by updatedAt; ties: last seen). */
-function latestFloorDispositions(ctx: HandlerContext, subjectId: string): Map<string, string> {
-	const ids = new Set<string>();
-	for (const e of ctx.store.readAllEvents())
-		if (e.aggregateType === 'ASSURANCE_ASSESSMENT') ids.add(e.aggregateId);
-	const latest = new Map<string, { disposition: string; at: string }>();
-	for (const id of ids) {
-		const s = ctx.store.loadObject(id)?.state as
-			| {
-					assurancePolicyId?: string;
-					subjectObjectIds?: string[];
-					assessmentState?: string;
-					updatedAt?: string;
-			  }
-			| undefined;
-		if (!s || !Array.isArray(s.subjectObjectIds) || !s.subjectObjectIds.includes(subjectId))
-			continue;
-		const policyId = String(s.assurancePolicyId);
-		const at = String(s.updatedAt ?? '');
-		const prev = latest.get(policyId);
-		if (!prev || at >= prev.at)
-			latest.set(policyId, { disposition: String(s.assessmentState), at });
-	}
-	const out = new Map<string, string>();
-	for (const [policyId, v] of latest) out.set(policyId, v.disposition);
-	return out;
-}
-
 /** PublishPwa gate: a PWA may not be PUBLISHED until its de minimis assurance floor is SATISFIED — schema/invariant +
  *  identity/provenance + an independent Reasoning Review, each a recorded ASSURANCE_ASSESSMENT completed SATISFIED
- *  (guide §8.4). Strictest-unresolved: a missing or non-SATISFIED required policy blocks. The floor applies to an
- *  AI-produced subject (createdBy is an AGENT/MODEL) AND to any subject that HAS a recorded floor assessment — if it
- *  was assessed (e.g. an agent shaped the graph and the host ran the floor over the human-created PWA shell), it must
- *  pass. A purely human-authored, never-assessed PWA passes (the floor's independent-review teeth target AI work;
- *  exec != assurance). Version-binding the floor to the exact PWA semanticVersion is a later refinement. */
+ *  against the PWA's CURRENT semanticVersion (guide §8.4; version-bound, so a stale floor cannot authorize a
+ *  re-versioned PWA). The floor applies to an AI-produced PWA (createdBy AGENT/MODEL) AND to any PWA that HAS a
+ *  recorded floor — if it was assessed (e.g. an agent shaped the graph over the human-created shell), it must pass. A
+ *  purely human-authored, never-assessed PWA passes; an EFFECTIVE governance waiver overrides a block. The shared,
+ *  plane-agnostic decision lives in floorGateBlock (reused by the execution-plane gate). */
 function pwaFloorGate(
 	command: DomainCommand,
 	state: Record<string, unknown>,
@@ -481,21 +422,14 @@ function pwaFloorGate(
 	const createdBy = state.createdBy as { actorType?: string } | undefined;
 	const aiProduced = createdBy ? AI_ACTOR_TYPES.has(String(createdBy.actorType)) : false;
 	const pwaId = command.targetAggregateId;
-	const latest = latestFloorDispositions(ctx, pwaId);
-	if (!aiProduced && latest.size === 0) return null;
-	const blocking = FLOOR_POLICY_IDS_REQUIRED.map((policyId) => ({
-		policyId,
-		disposition: latest.get(policyId) ?? 'MISSING'
-	})).filter((r) => r.disposition !== 'SATISFIED');
-	if (blocking.length === 0) return null;
-	// An EFFECTIVE governance waiver is a recorded, auditable human override of the floor (§8 — a Governance
-	// Decision grants authority the Validator/Assurance Service cannot).
-	if (hasEffectiveFloorWaiver(ctx, pwaId)) return null;
+	const version = Number(state.semanticVersion ?? 1);
+	const blocking = floorGateBlock(ctx, pwaId, { aiProduced, subjectVersion: version });
+	if (!blocking) return null;
 	const detail = blocking.map((b) => `${b.policyId}=${b.disposition}`).join(', ');
 	return reject(
 		command,
 		'RPH_INVARIANT_VIOLATION',
-		`PublishPwa blocked: the de minimis assurance floor is not SATISFIED for AI-produced PWA ${pwaId} (${detail}). Record a satisfied floor (schema/invariant, identity/provenance, independent reasoning review) before publishing.`,
+		`PublishPwa blocked: the de minimis assurance floor is not SATISFIED for PWA ${pwaId} at v${version} (${detail}). Record a satisfied floor (schema/invariant, identity/provenance, independent reasoning review) for the current version, or a governance waiver, before publishing.`,
 		[pwaId]
 	);
 }
