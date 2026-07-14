@@ -14,7 +14,9 @@ export default tseslint.config(
 			'**/coverage/**',
 			'**/.turbo/**',
 			'**/.svelte-kit/**',
-			'**/build/**'
+			'**/build/**',
+			// Workflow scripts run in the Workflow tool's runtime (agent/parallel/phase/log/args globals), not Node.
+			'**/harness/**'
 		]
 	},
 	js.configs.recommended,
