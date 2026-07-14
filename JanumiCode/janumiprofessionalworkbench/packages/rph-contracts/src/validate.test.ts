@@ -39,12 +39,14 @@ describe('validate', () => {
 	});
 
 	it('registers envelope + enum + object + command + event schemas', () => {
-		// 8 envelope/primitive + 72 enums + 21 objects + 64 commands + 116 events = 281
+		// 8 envelope/primitive + 72 enums + 22 objects + 67 commands + 119 events = 288
 		// (+3 objects PROFESSIONAL_WORK_ARCHITECTURE / PWU_TYPE / UNDERTAKING; +8 PWA-authoring commands +8 events —
 		// the RPH-DOC-010 PWA-authoring context; then +3 DRAFT-authoring commands EditPwa/EditPwuType/RemovePwuType
 		// +3 events; then +1 DeletePwa command +1 PwaDeleted event — PWA discard/soft-delete; then +1
 		// AUTHORING_CONVERSATION object +1 AppendConversationEntries command +1 ConversationEntriesAppended event —
-		// the durable event-sourced authoring conversation, governed-stream precursor; see OPEN-QUESTIONS)
-		expect(buildContractRegistry().ids().length).toBe(281);
+		// the durable event-sourced authoring conversation, governed-stream precursor; then +1 AUTHORING_ASSESSMENT
+		// object +3 commands (Record/Escalate/Resolve AuthoringAssessment) +3 events — the authoring-plane
+		// faithfulness assessment (governed-stream precursor; exec != assurance); see OPEN-QUESTIONS)
+		expect(buildContractRegistry().ids().length).toBe(288);
 	});
 });

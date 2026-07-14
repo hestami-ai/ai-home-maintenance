@@ -6,3 +6,4 @@ export * from './projector.js';
 export * from './work-projection.js';
 export * from './graph-view.js';
 export * from './pwa-graph.js';
+export * from './assessment.js';

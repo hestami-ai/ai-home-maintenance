@@ -231,74 +231,174 @@
         "additionalProperties": false
       }
     },
-    "originatingExpression": {
+    "pwaId": {
       "type": "string"
     },
-    "formalizedObjective": {
+    "promptText": {
       "type": "string"
     },
-    "desiredOutcomes": {
-      "type": "array",
-      "items": {
-        "type": "object",
-        "propertyNames": {
+    "iteration": {
+      "type": "number"
+    },
+    "priorAssessmentId": {
+      "type": "string"
+    },
+    "assessor": {
+      "type": "object",
+      "properties": {
+        "actorId": {
+          "type": "string",
+          "minLength": 1
+        },
+        "actorType": {
+          "type": "string",
+          "enum": [
+            "HUMAN",
+            "AGENT",
+            "MODEL",
+            "SERVICE",
+            "POLICY_ENGINE",
+            "EXTERNAL_SYSTEM"
+          ]
+        },
+        "displayName": {
+          "type": "string",
+          "minLength": 1
+        },
+        "roleId": {
           "type": "string"
         },
-        "additionalProperties": {}
-      }
-    },
-    "successConditions": {
-      "type": "array",
-      "items": {
-        "type": "object",
-        "propertyNames": {
+        "modelId": {
           "type": "string"
         },
-        "additionalProperties": {}
-      }
+        "providerId": {
+          "type": "string"
+        },
+        "executionInstanceId": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "actorId",
+        "actorType",
+        "displayName"
+      ],
+      "additionalProperties": false
     },
-    "nonGoals": {
-      "type": "array",
-      "items": {
-        "type": "string"
-      }
-    },
-    "ambiguityIds": {
-      "type": "array",
-      "items": {
-        "type": "string"
-      }
-    },
-    "constraintIds": {
-      "type": "array",
-      "items": {
-        "type": "string"
-      }
-    },
-    "stakeholderIds": {
-      "type": "array",
-      "items": {
-        "type": "string"
-      }
-    },
-    "parentIntentId": {
-      "type": "string"
-    },
-    "supersedesIntentId": {
-      "type": "string"
-    },
-    "intentStatus": {
+    "verdict": {
       "type": "string",
       "enum": [
-        "RAW",
-        "UNDER_DISCOVERY",
-        "PROVISIONAL",
-        "FORMALIZED",
-        "APPROVED",
-        "REVISED",
-        "SUPERSEDED",
-        "WITHDRAWN"
+        "FAITHFUL",
+        "PARTIAL",
+        "POOR"
       ]
+    },
+    "overallScore": {
+      "type": "number"
+    },
+    "criteria": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "properties": {
+          "name": {
+            "type": "string"
+          },
+          "score": {
+            "type": "number"
+          },
+          "rationale": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "name",
+          "score"
+        ],
+        "additionalProperties": false
+      }
+    },
+    "gaps": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    },
+    "recommendation": {
+      "type": "string"
+    },
+    "scoreDelta": {
+      "type": "number"
+    },
+    "converging": {
+      "type": "boolean"
+    },
+    "status": {
+      "type": "string",
+      "enum": [
+        "RECORDED",
+        "ESCALATED",
+        "RESOLVED"
+      ]
+    },
+    "reason": {
+      "type": "string"
+    },
+    "context": {
+      "type": "string"
+    },
+    "resolution": {
+      "type": "string",
+      "enum": [
+        "ACCEPTED_AS_IS",
+        "REVISED",
+        "ABANDONED"
+      ]
+    },
+    "resolutionNote": {
+      "type": "string"
+    },
+    "resolvedBy": {
+      "type": "object",
+      "properties": {
+        "actorId": {
+          "type": "string",
+          "minLength": 1
+        },
+        "actorType": {
+          "type": "string",
+          "enum": [
+            "HUMAN",
+            "AGENT",
+            "MODEL",
+            "SERVICE",
+            "POLICY_ENGINE",
+            "EXTERNAL_SYSTEM"
+          ]
+        },
+        "displayName": {
+          "type": "string",
+          "minLength": 1
+        },
+        "roleId": {
+          "type": "string"
+        },
+        "modelId": {
+          "type": "string"
+        },
+        "providerId": {
+          "type": "string"
+        },
+        "executionInstanceId": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "actorId",
+        "actorType",
+        "displayName"
+      ],
+      "additionalProperties": false
     }
   },
   "required": [
@@ -315,15 +415,17 @@
     "provenance",
     "tags",
     "extensions",
-    "originatingExpression",
-    "desiredOutcomes",
-    "successConditions",
-    "nonGoals",
-    "ambiguityIds",
-    "constraintIds",
-    "stakeholderIds",
-    "intentStatus"
+    "pwaId",
+    "promptText",
+    "iteration",
+    "assessor",
+    "verdict",
+    "overallScore",
+    "criteria",
+    "gaps",
+    "recommendation",
+    "status"
   ],
   "additionalProperties": false,
-  "$id": "urn:janumi:rph:schema:object:IntentObject:1"
+  "$id": "urn:janumi:rph:schema:object:AuthoringAssessment:1"
 }

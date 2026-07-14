@@ -560,7 +560,7 @@ export type OriginType = z.infer<typeof OriginTypeSchema>;
 export const OutboxStatusSchema = z.enum(['PENDING', 'PUBLISHED', 'FAILED']);
 export type OutboxStatus = z.infer<typeof OutboxStatusSchema>;
 
-/** ObjectEnvelope.objectType (all Professional Work Objects); AssurancePolicyDefinition.applicableObjectTypes — RPH-DOC-002 §4 (17 runtime) + 3 authoring objects (RPH-DOC-010) */
+/** ObjectEnvelope.objectType (all Professional Work Objects); AssurancePolicyDefinition.applicableObjectTypes — RPH-DOC-002 §4 (17 runtime) + 4 authoring objects (RPH-DOC-010) */
 export const ProfessionalWorkObjectTypeSchema = z.enum([
 	'INTENT',
 	'PROFESSIONAL_WORK_UNIT',
@@ -582,7 +582,8 @@ export const ProfessionalWorkObjectTypeSchema = z.enum([
 	'PROFESSIONAL_WORK_ARCHITECTURE',
 	'PWU_TYPE',
 	'UNDERTAKING',
-	'AUTHORING_CONVERSATION'
+	'AUTHORING_CONVERSATION',
+	'AUTHORING_ASSESSMENT'
 ]);
 export type ProfessionalWorkObjectType = z.infer<typeof ProfessionalWorkObjectTypeSchema>;
 

@@ -2008,6 +2008,133 @@
           "type": "ConversationEntry[]"
         }
       ]
+    },
+    {
+      "commandType": "RecordAuthoringAssessment",
+      "targetAggregateType": "AUTHORING_ASSESSMENT",
+      "emitsEvent": "AuthoringAssessmentRecorded",
+      "schematized": false,
+      "sourceSection": "RPH-DOC-010 — authoring-plane faithfulness assessment (governed-stream precursor; exec != assurance)",
+      "payloadFields": [
+        {
+          "field": "assessmentId",
+          "required": true,
+          "type": "string"
+        },
+        {
+          "field": "pwaId",
+          "required": true,
+          "type": "string"
+        },
+        {
+          "field": "promptText",
+          "required": true,
+          "type": "string"
+        },
+        {
+          "field": "iteration",
+          "required": true,
+          "type": "number"
+        },
+        {
+          "field": "priorAssessmentId",
+          "required": false,
+          "type": "string"
+        },
+        {
+          "field": "assessor",
+          "required": true,
+          "type": "ActorReference"
+        },
+        {
+          "field": "verdict",
+          "required": true,
+          "type": "'FAITHFUL' | 'PARTIAL' | 'POOR'"
+        },
+        {
+          "field": "overallScore",
+          "required": true,
+          "type": "number"
+        },
+        {
+          "field": "criteria",
+          "required": true,
+          "type": "AssessmentCriterionScore[]"
+        },
+        {
+          "field": "gaps",
+          "required": true,
+          "type": "string[]"
+        },
+        {
+          "field": "recommendation",
+          "required": true,
+          "type": "string"
+        },
+        {
+          "field": "scoreDelta",
+          "required": false,
+          "type": "number"
+        },
+        {
+          "field": "converging",
+          "required": false,
+          "type": "boolean"
+        }
+      ]
+    },
+    {
+      "commandType": "EscalateAuthoringAssessment",
+      "targetAggregateType": "AUTHORING_ASSESSMENT",
+      "emitsEvent": "AuthoringAssessmentEscalated",
+      "schematized": false,
+      "sourceSection": "RPH-DOC-010 — assess/refine loop escalation to the human-in-the-loop (iteration-2 gate)",
+      "payloadFields": [
+        {
+          "field": "assessmentId",
+          "required": true,
+          "type": "string"
+        },
+        {
+          "field": "reason",
+          "required": true,
+          "type": "string"
+        },
+        {
+          "field": "context",
+          "required": true,
+          "type": "string"
+        }
+      ]
+    },
+    {
+      "commandType": "ResolveAuthoringAssessment",
+      "targetAggregateType": "AUTHORING_ASSESSMENT",
+      "emitsEvent": "AuthoringAssessmentResolved",
+      "schematized": false,
+      "sourceSection": "RPH-DOC-010 — human resolution of an escalated assessment",
+      "payloadFields": [
+        {
+          "field": "assessmentId",
+          "required": true,
+          "type": "string"
+        },
+        {
+          "field": "resolution",
+          "required": true,
+          "type": "'ACCEPTED_AS_IS' | 'REVISED' | 'ABANDONED'"
+        },
+        {
+          "field": "resolutionNote",
+          "required": false,
+          "type": "string"
+        },
+        {
+          "field": "resolvedBy",
+          "required": true,
+          "type": "ActorReference"
+        }
+      ]
     }
   ],
   "events": [
@@ -5180,6 +5307,124 @@
           "field": "entries",
           "required": true,
           "type": "ConversationEntry[]"
+        }
+      ]
+    },
+    {
+      "eventType": "AuthoringAssessmentRecorded",
+      "aggregateType": "AUTHORING_ASSESSMENT",
+      "payloadFields": [
+        {
+          "field": "assessmentId",
+          "required": true,
+          "type": "string"
+        },
+        {
+          "field": "pwaId",
+          "required": true,
+          "type": "string"
+        },
+        {
+          "field": "promptText",
+          "required": true,
+          "type": "string"
+        },
+        {
+          "field": "iteration",
+          "required": true,
+          "type": "number"
+        },
+        {
+          "field": "priorAssessmentId",
+          "required": false,
+          "type": "string"
+        },
+        {
+          "field": "assessor",
+          "required": true,
+          "type": "ActorReference"
+        },
+        {
+          "field": "verdict",
+          "required": true,
+          "type": "'FAITHFUL' | 'PARTIAL' | 'POOR'"
+        },
+        {
+          "field": "overallScore",
+          "required": true,
+          "type": "number"
+        },
+        {
+          "field": "criteria",
+          "required": true,
+          "type": "AssessmentCriterionScore[]"
+        },
+        {
+          "field": "gaps",
+          "required": true,
+          "type": "string[]"
+        },
+        {
+          "field": "recommendation",
+          "required": true,
+          "type": "string"
+        },
+        {
+          "field": "scoreDelta",
+          "required": false,
+          "type": "number"
+        },
+        {
+          "field": "converging",
+          "required": false,
+          "type": "boolean"
+        }
+      ]
+    },
+    {
+      "eventType": "AuthoringAssessmentEscalated",
+      "aggregateType": "AUTHORING_ASSESSMENT",
+      "payloadFields": [
+        {
+          "field": "assessmentId",
+          "required": true,
+          "type": "string"
+        },
+        {
+          "field": "reason",
+          "required": true,
+          "type": "string"
+        },
+        {
+          "field": "context",
+          "required": true,
+          "type": "string"
+        }
+      ]
+    },
+    {
+      "eventType": "AuthoringAssessmentResolved",
+      "aggregateType": "AUTHORING_ASSESSMENT",
+      "payloadFields": [
+        {
+          "field": "assessmentId",
+          "required": true,
+          "type": "string"
+        },
+        {
+          "field": "resolution",
+          "required": true,
+          "type": "'ACCEPTED_AS_IS' | 'REVISED' | 'ABANDONED'"
+        },
+        {
+          "field": "resolutionNote",
+          "required": false,
+          "type": "string"
+        },
+        {
+          "field": "resolvedBy",
+          "required": true,
+          "type": "ActorReference"
         }
       ]
     }

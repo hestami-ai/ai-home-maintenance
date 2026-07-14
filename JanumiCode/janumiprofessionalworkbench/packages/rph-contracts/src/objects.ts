@@ -125,6 +125,12 @@ export const AggregationRuleSchema = z.strictObject({
 	rule: z.string()
 });
 export type AggregationRule = z.infer<typeof AggregationRuleSchema>;
+export const AssessmentCriterionScoreSchema = z.strictObject({
+	name: z.string(),
+	score: z.number(),
+	rationale: z.string().optional()
+});
+export type AssessmentCriterionScore = z.infer<typeof AssessmentCriterionScoreSchema>;
 export const AssumptionPropagationSchema = z.strictObject({
 	assumptionId: z.string(),
 	childWorkUnitIds: z.array(z.string()),
@@ -583,6 +589,30 @@ export const AuthoringConversationSchema = z.strictObject({
 });
 export type AuthoringConversation = z.infer<typeof AuthoringConversationSchema>;
 
+/** AUTHORING_ASSESSMENT — id prefix: aasm */
+export const AuthoringAssessmentSchema = z.strictObject({
+	...objectEnvelopeShape,
+	pwaId: z.string(),
+	promptText: z.string(),
+	iteration: z.number(),
+	priorAssessmentId: z.string().optional(),
+	assessor: ActorReferenceSchema,
+	verdict: z.enum(['FAITHFUL', 'PARTIAL', 'POOR']),
+	overallScore: z.number(),
+	criteria: z.array(AssessmentCriterionScoreSchema),
+	gaps: z.array(z.string()),
+	recommendation: z.string(),
+	scoreDelta: z.number().optional(),
+	converging: z.boolean().optional(),
+	status: z.enum(['RECORDED', 'ESCALATED', 'RESOLVED']),
+	reason: z.string().optional(),
+	context: z.string().optional(),
+	resolution: z.enum(['ACCEPTED_AS_IS', 'REVISED', 'ABANDONED']).optional(),
+	resolutionNote: z.string().optional(),
+	resolvedBy: ActorReferenceSchema.optional()
+});
+export type AuthoringAssessment = z.infer<typeof AuthoringAssessmentSchema>;
+
 /** Registry: objectType literal -> { schema, idPrefixEntity, tsName }. */
 export const OBJECT_SCHEMAS = {
 	INTENT: { schema: IntentObjectSchema, idPrefixEntity: 'INTENT', tsName: 'IntentObject' },
@@ -657,5 +687,10 @@ export const OBJECT_SCHEMAS = {
 		schema: AuthoringConversationSchema,
 		idPrefixEntity: 'conv',
 		tsName: 'AuthoringConversation'
+	},
+	AUTHORING_ASSESSMENT: {
+		schema: AuthoringAssessmentSchema,
+		idPrefixEntity: 'aasm',
+		tsName: 'AuthoringAssessment'
 	}
 } as const;

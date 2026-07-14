@@ -453,6 +453,41 @@ export const AppendConversationEntriesPayloadSchema = z.strictObject({
 export type AppendConversationEntriesPayload = z.infer<
 	typeof AppendConversationEntriesPayloadSchema
 >;
+export const RecordAuthoringAssessmentPayloadSchema = z.strictObject({
+	assessmentId: z.string(),
+	pwaId: z.string(),
+	promptText: z.string(),
+	iteration: z.number(),
+	priorAssessmentId: z.string().optional(),
+	assessor: z.unknown(),
+	verdict: z.enum(['FAITHFUL', 'PARTIAL', 'POOR']),
+	overallScore: z.number(),
+	criteria: z.array(z.unknown()),
+	gaps: z.array(z.string()),
+	recommendation: z.string(),
+	scoreDelta: z.number().optional(),
+	converging: z.boolean().optional()
+});
+export type RecordAuthoringAssessmentPayload = z.infer<
+	typeof RecordAuthoringAssessmentPayloadSchema
+>;
+export const EscalateAuthoringAssessmentPayloadSchema = z.strictObject({
+	assessmentId: z.string(),
+	reason: z.string(),
+	context: z.string()
+});
+export type EscalateAuthoringAssessmentPayload = z.infer<
+	typeof EscalateAuthoringAssessmentPayloadSchema
+>;
+export const ResolveAuthoringAssessmentPayloadSchema = z.strictObject({
+	assessmentId: z.string(),
+	resolution: z.enum(['ACCEPTED_AS_IS', 'REVISED', 'ABANDONED']),
+	resolutionNote: z.string().optional(),
+	resolvedBy: z.unknown()
+});
+export type ResolveAuthoringAssessmentPayload = z.infer<
+	typeof ResolveAuthoringAssessmentPayloadSchema
+>;
 
 // ---- Event payload schemas ----
 export const AssumptionAcceptedPayloadSchema = z.strictObject({
@@ -1228,6 +1263,41 @@ export const ConversationEntriesAppendedPayloadSchema = z.strictObject({
 export type ConversationEntriesAppendedPayload = z.infer<
 	typeof ConversationEntriesAppendedPayloadSchema
 >;
+export const AuthoringAssessmentRecordedPayloadSchema = z.strictObject({
+	assessmentId: z.string(),
+	pwaId: z.string(),
+	promptText: z.string(),
+	iteration: z.number(),
+	priorAssessmentId: z.string().optional(),
+	assessor: z.unknown(),
+	verdict: z.enum(['FAITHFUL', 'PARTIAL', 'POOR']),
+	overallScore: z.number(),
+	criteria: z.array(z.unknown()),
+	gaps: z.array(z.string()),
+	recommendation: z.string(),
+	scoreDelta: z.number().optional(),
+	converging: z.boolean().optional()
+});
+export type AuthoringAssessmentRecordedPayload = z.infer<
+	typeof AuthoringAssessmentRecordedPayloadSchema
+>;
+export const AuthoringAssessmentEscalatedPayloadSchema = z.strictObject({
+	assessmentId: z.string(),
+	reason: z.string(),
+	context: z.string()
+});
+export type AuthoringAssessmentEscalatedPayload = z.infer<
+	typeof AuthoringAssessmentEscalatedPayloadSchema
+>;
+export const AuthoringAssessmentResolvedPayloadSchema = z.strictObject({
+	assessmentId: z.string(),
+	resolution: z.enum(['ACCEPTED_AS_IS', 'REVISED', 'ABANDONED']),
+	resolutionNote: z.string().optional(),
+	resolvedBy: z.unknown()
+});
+export type AuthoringAssessmentResolvedPayload = z.infer<
+	typeof AuthoringAssessmentResolvedPayloadSchema
+>;
 
 export const FIRST_SLICE_COMMANDS = [
 	'CaptureIntent',
@@ -1631,6 +1701,24 @@ export const COMMANDS = {
 		targetAggregateType: 'AUTHORING_CONVERSATION',
 		emitsEvent: 'ConversationEntriesAppended',
 		firstSlice: false
+	},
+	RecordAuthoringAssessment: {
+		payload: RecordAuthoringAssessmentPayloadSchema,
+		targetAggregateType: 'AUTHORING_ASSESSMENT',
+		emitsEvent: 'AuthoringAssessmentRecorded',
+		firstSlice: false
+	},
+	EscalateAuthoringAssessment: {
+		payload: EscalateAuthoringAssessmentPayloadSchema,
+		targetAggregateType: 'AUTHORING_ASSESSMENT',
+		emitsEvent: 'AuthoringAssessmentEscalated',
+		firstSlice: false
+	},
+	ResolveAuthoringAssessment: {
+		payload: ResolveAuthoringAssessmentPayloadSchema,
+		targetAggregateType: 'AUTHORING_ASSESSMENT',
+		emitsEvent: 'AuthoringAssessmentResolved',
+		firstSlice: false
 	}
 } as const;
 
@@ -1898,6 +1986,18 @@ export const EVENTS = {
 	ConversationEntriesAppended: {
 		payload: ConversationEntriesAppendedPayloadSchema,
 		aggregateType: 'AUTHORING_CONVERSATION'
+	},
+	AuthoringAssessmentRecorded: {
+		payload: AuthoringAssessmentRecordedPayloadSchema,
+		aggregateType: 'AUTHORING_ASSESSMENT'
+	},
+	AuthoringAssessmentEscalated: {
+		payload: AuthoringAssessmentEscalatedPayloadSchema,
+		aggregateType: 'AUTHORING_ASSESSMENT'
+	},
+	AuthoringAssessmentResolved: {
+		payload: AuthoringAssessmentResolvedPayloadSchema,
+		aggregateType: 'AUTHORING_ASSESSMENT'
 	}
 } as const;
 
