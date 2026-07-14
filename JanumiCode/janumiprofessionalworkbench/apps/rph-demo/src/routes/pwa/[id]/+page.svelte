@@ -606,6 +606,9 @@
 								data-testid="assurance-disposition">⚖ {data.floor.aggregate}</span
 							>
 							<span class="floorsub">de minimis assurance floor</span>
+							{#if data.floor.waived}
+								<span class="waivedbadge" data-testid="assurance-waived">waiver in force</span>
+							{/if}
 						</div>
 						<ul class="floorpolicies">
 							{#each data.floor.policies as pol (pol.policyId)}
@@ -623,7 +626,12 @@
 								{#each data.floor.reasoningGaps.slice(0, 5) as g}<li>{g}</li>{/each}
 							</ul>
 						{/if}
-						{#if !data.floor.satisfied}
+						{#if !data.floor.satisfied && data.floor.waived}
+							<p class="floorhint">
+								A governance waiver is in force — publishing is permitted despite the floor (an auditable,
+								recorded override).
+							</p>
+						{:else if !data.floor.satisfied}
 							<p class="floorhint">
 								Publishing is blocked until the floor is SATISFIED — revise the graph and re-run, or record a
 								waiver.
@@ -1138,4 +1146,5 @@
 	.floorhint { margin: 10px 0 0; color: var(--on-variant); line-height: 1.4; }
 	.floorwaiver { margin-top: 10px; display: flex; flex-direction: column; gap: 6px; border-top: 1px solid var(--sc); padding-top: 10px; }
 	.floorwaiver input { padding: 6px 8px; border: 1px solid var(--sc); border-radius: 6px; background: var(--surface); color: inherit; font-size: 11px; }
+	.waivedbadge { font-size: 10px; font-weight: 700; padding: 2px 6px; border-radius: 5px; background: rgba(97, 218, 193, 0.15); color: var(--tertiary); }
 </style>

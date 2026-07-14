@@ -14,8 +14,10 @@ import {
 import {
 	getObject,
 	listAssessments,
+	listDecisions,
 	listObservations,
-	recordAssuranceRecordingPlan
+	recordAssuranceRecordingPlan,
+	type EngineHandle
 } from '@janumipwb/rph-engine';
 import type { ActorReference } from '@janumipwb/rph-contracts';
 import { createFloorRegistry } from './assurance/index.js';
@@ -49,6 +51,8 @@ export interface FloorView {
 	readonly subjectId: string;
 	readonly aggregate: string;
 	readonly satisfied: boolean;
+	/** True iff an EFFECTIVE governance WAIVER covers the subject — publication is permitted despite the floor. */
+	readonly waived: boolean;
 	readonly policies: FloorPolicyView[];
 	/** Open Reasoning-Review finding statements — drive the auto-refine directive and the UI gap list. */
 	readonly reasoningGaps: string[];
@@ -58,6 +62,16 @@ const isFloorPolicy = (id: unknown): boolean =>
 	id === FLOOR_POLICY_IDS.SCHEMA_INVARIANT ||
 	id === FLOOR_POLICY_IDS.IDENTITY_PROVENANCE ||
 	id === FLOOR_POLICY_IDS.REASONING_REVIEW;
+
+/** True iff an EFFECTIVE governance WAIVER Decision covers `subjectId` (the auditable override of a blocking floor). */
+function hasEffectiveWaiver(engine: EngineHandle, subjectId: string): boolean {
+	return listDecisions(engine).some(
+		(d) =>
+			d.state.decisionType === 'WAIVER' &&
+			d.state.status === 'EFFECTIVE' &&
+			(d.state.subjectObjectIds as string[] | undefined)?.includes(subjectId)
+	);
+}
 
 /** Run the de minimis floor over the current DRAFT PWA graph and RECORD it as canonical assessments/observations.
  *  Returns the composed view (or undefined if the PWA/graph is unavailable). `priorGaps` are surfaced to the
@@ -114,6 +128,7 @@ export async function runPwaFloor(
 		subjectId: pwaId,
 		aggregate: plan.aggregate,
 		satisfied: plan.gatePermitsTransition,
+		waived: hasEffectiveWaiver(engine, pwaId),
 		policies: plan.assessments.map((a) => ({
 			policyId: a.policyId,
 			disposition: a.disposition,
@@ -188,6 +203,7 @@ export function loadPwaFloor(pwaId: string): FloorView | undefined {
 		subjectId: pwaId,
 		aggregate,
 		satisfied,
+		waived: hasEffectiveWaiver(engine, pwaId),
 		policies,
 		reasoningGaps: rr ? (obsByAssessment.get(rr.id) ?? []).map((o) => o.statement) : []
 	};

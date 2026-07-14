@@ -134,6 +134,9 @@ test.describe('Assurance floor (mock) — runs, records, gates, and can be waive
 			)
 			.toBe(1);
 
+		// The panel now shows the waiver-in-force indicator (a recorded, auditable override).
+		await expect(page.getByTestId('assurance-waived')).toBeVisible();
+
 		// With the waiver in force the gate permits publication.
 		await page.getByRole('button', { name: /^Publish$/ }).click();
 		await expect
