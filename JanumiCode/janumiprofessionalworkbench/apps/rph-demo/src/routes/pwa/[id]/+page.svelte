@@ -4,7 +4,7 @@
 	import { SvelteFlow, Background, Controls, Panel } from '@xyflow/svelte';
 	import '@xyflow/svelte/dist/style.css';
 	import type { Edge, Node } from '@xyflow/svelte';
-	import { toPwaFlow } from '$lib/pwaFlow';
+	import { toPwaFlow, type DataFlowEdgeData } from '$lib/pwaFlow';
 	import PwuTypeCard from '$lib/PwuTypeCard.svelte';
 	import { draggable } from '$lib/actions/draggable';
 	import { analyzePwaGraph, buildPwaGraphExport } from '@janumipwb/rph-projections';
@@ -74,6 +74,20 @@
 	);
 	let nodes = $state<Node[]>([]);
 	let edges = $state<Edge[]>([]);
+
+	// Clicking a data-flow edge (its ⤳ label or its line) selects it (xyflow native `selected`); the detail panel
+	// then reveals the configured hand-off it carries in `data` — which artifacts flow, and between which types.
+	// Driving off native selection (not just onedgeclick) means clicking the label chip works too.
+	const selectedFlow = $derived.by((): DataFlowEdgeData | null => {
+		const e = edges.find(
+			(x) => x.selected && typeof x.id === 'string' && x.id.startsWith('flow:')
+		);
+		const d = e?.data as DataFlowEdgeData | undefined;
+		return d && d.kind === 'dataflow' ? d : null;
+	});
+	function dismissFlow() {
+		edges = edges.map((e) => (e.selected ? { ...e, selected: false } : e));
+	}
 
 	// Structural health of the graph — the same queryable report the harness asserts on (single root, acyclic,
 	// connected; advisory findings for dangling data-flow / fan-out). Surfaced as a chip so the author sees issues.
@@ -451,15 +465,52 @@
 			<Background />
 			<Controls position="bottom-right" />
 
-			<Panel position="bottom-left">
-				<div class="overlaytoggle" data-testid="overlay-toggle">
-					<label class="ovlabel">
-						<input type="checkbox" bind:checked={showDataFlow} />
-						Data-flow overlay
-					</label>
-					{#if collapsed.size}
-						<button class="ghost small" onclick={() => (collapsed = new Set())}>Expand all</button>
+			<!-- Bottom-CENTER control cluster: overlay toggle + legend, and the data-flow hand-off detail. Kept out
+			     of the left/right columns so the tall, draggable agent/inspector/floor panels never cover it. -->
+			<Panel position="bottom-center">
+				<div class="controlcluster">
+					{#if selectedFlow}
+						<aside class="flowdetail" data-testid="dataflow-detail">
+							<header class="flowdetailhead">
+								<span class="itag">DATA FLOW</span>
+								<button
+									class="collapsebtn"
+									onclick={dismissFlow}
+									aria-label="Dismiss data-flow detail">✕</button
+								>
+							</header>
+							<p class="flowroute">
+								<strong>{selectedFlow.sourceName}</strong>
+								<span class="flowarrow">⤳</span>
+								<strong>{selectedFlow.targetName}</strong>
+							</p>
+							<span class="flabel">Artifacts configured to flow</span>
+							<ul class="flowartifacts">
+								{#each selectedFlow.artifacts as a (a)}
+									<li class="artifactchip">{a}</li>
+								{/each}
+							</ul>
+						</aside>
 					{/if}
+					<div class="overlaytoggle" data-testid="overlay-toggle">
+						<div class="ovrow">
+							<label class="ovlabel">
+								<input type="checkbox" bind:checked={showDataFlow} />
+								Data-flow overlay
+							</label>
+							{#if collapsed.size}
+								<button class="ghost small" onclick={() => (collapsed = new Set())}>Expand all</button>
+							{/if}
+						</div>
+						<div class="legend">
+							<span class="legitem"><span class="legline permits"></span> permits (composition)</span>
+							{#if showDataFlow}
+								<span class="legitem"
+									><span class="legline flow"></span> data-flow (hand-off · click a link)</span
+								>
+							{/if}
+						</div>
+					</div>
 				</div>
 			</Panel>
 
@@ -1007,6 +1058,38 @@
 	.canvas :global(.svelte-flow__node) {
 		cursor: pointer;
 	}
+	/* The zoom / fit / lock toolbar ships light-on-white and washes out on the dark canvas — retheme it. */
+	.canvas :global(.svelte-flow__controls) {
+		box-shadow: 0 6px 20px rgba(0, 0, 0, 0.4);
+		border-radius: 8px;
+		overflow: hidden;
+	}
+	.canvas :global(.svelte-flow__controls-button) {
+		background: #26282c;
+		border-bottom: 1px solid #35383d;
+		fill: #d7dde5;
+		color: #d7dde5;
+	}
+	.canvas :global(.svelte-flow__controls-button:hover) {
+		background: #34373c;
+	}
+	.canvas :global(.svelte-flow__controls-button svg) {
+		fill: #d7dde5;
+	}
+	/* Edge label chips render as HTML .svelte-flow__edge-label divs themed by CSS variables (the default white-bg /
+	   light-text washed out on the dark canvas). Give them a legible dark pill. */
+	.canvas :global(.svelte-flow) {
+		--xy-edge-label-background-color: #1b1c1f;
+		--xy-edge-label-color: #cdd6df;
+	}
+	.canvas :global(.svelte-flow__edge-label) {
+		padding: 2px 7px;
+		border-radius: 5px;
+		font-size: 10px;
+		font-weight: 600;
+		border: 1px solid #33383f;
+		box-shadow: 0 1px 4px rgba(0, 0, 0, 0.45);
+	}
 	/* Floating panels overlaid on the canvas (Svelte Flow <Panel>) */
 	.agentpanel,
 	.inspectorpanel {
@@ -1330,14 +1413,97 @@
 	.railadd {
 		padding: 2px 0 0 2px;
 	}
+	.controlcluster {
+		display: flex;
+		flex-direction: column;
+		align-items: center;
+		gap: 8px;
+	}
 	.overlaytoggle {
 		display: flex;
-		align-items: center;
-		gap: 10px;
+		flex-direction: column;
+		gap: 6px;
 		background: rgba(24, 24, 26, 0.85);
 		border: 1px solid var(--outline);
 		border-radius: 8px;
-		padding: 5px 9px;
+		padding: 6px 9px;
+	}
+	.ovrow {
+		display: flex;
+		align-items: center;
+		gap: 10px;
+	}
+	.legend {
+		display: flex;
+		flex-direction: column;
+		gap: 2px;
+	}
+	.legitem {
+		display: flex;
+		align-items: center;
+		gap: 6px;
+		font-size: 10px;
+		color: var(--outline);
+	}
+	.legline {
+		display: inline-block;
+		width: 18px;
+		height: 0;
+		border-top-width: 2px;
+		border-top-style: solid;
+		flex: 0 0 auto;
+	}
+	.legline.permits {
+		border-top-color: #6a717b;
+	}
+	.legline.flow {
+		border-top-style: dashed;
+		border-top-color: #61dac1;
+	}
+	/* Data-flow hand-off detail (opens on clicking a ⤳ link). */
+	.flowdetail {
+		background: rgba(20, 20, 21, 0.96);
+		border: 1px solid #2f5c53;
+		border-radius: 10px;
+		padding: 10px 12px 12px;
+		width: 300px;
+		max-width: 60vw;
+		box-shadow: 0 10px 30px rgba(0, 0, 0, 0.45);
+		user-select: text;
+	}
+	.flowdetailhead {
+		display: flex;
+		align-items: center;
+		justify-content: space-between;
+		margin-bottom: 6px;
+	}
+	.flowroute {
+		margin: 0 0 8px;
+		font-size: 12.5px;
+		color: var(--on);
+		line-height: 1.4;
+	}
+	.flowarrow {
+		color: #61dac1;
+		margin: 0 4px;
+		font-weight: 700;
+	}
+	.flowartifacts {
+		list-style: none;
+		margin: 4px 0 0;
+		padding: 0;
+		display: flex;
+		flex-wrap: wrap;
+		gap: 5px;
+	}
+	.artifactchip {
+		font-family: 'Source Code Pro', monospace;
+		font-size: 11px;
+		color: #061; /* fallback */
+		color: #06110d;
+		background: #61dac1;
+		border-radius: 5px;
+		padding: 2px 7px;
 	}
 	.ovlabel {
 		display: flex;

@@ -100,7 +100,39 @@ function visibleSet(
 	return visible;
 }
 
-/** dagre tidy top-down layout over the visible composition edges; returns xyflow top-left positions. */
+/** Pre-order (depth-first) sequence index per node, following authored child order from the roots. Drives the
+ *  LEFT-TO-RIGHT sibling ordering: the first-authored child sits leftmost. `visibleEdges` preserve authored order
+ *  (they are filtered from `permitPairs`, which walks each type's permittedChildTypeIds in order). */
+function preorderIndex(
+	visibleTypes: readonly PwuTypeNode[],
+	visibleEdges: readonly { from: string; to: string }[]
+): Map<string, number> {
+	const childrenOf = new Map<string, string[]>();
+	const hasParent = new Set<string>();
+	for (const e of visibleEdges) {
+		childrenOf.set(e.from, [...(childrenOf.get(e.from) ?? []), e.to]);
+		hasParent.add(e.to);
+	}
+	// Roots in authored (type-array) order — same top-level set visibleSet uses, so orphans are covered.
+	const roots = visibleTypes.filter((t) => t.isRoot || !hasParent.has(t.id)).map((t) => t.id);
+	const order = new Map<string, number>();
+	let next = 0;
+	const visit = (id: string) => {
+		if (order.has(id)) return;
+		order.set(id, next++);
+		for (const c of childrenOf.get(id) ?? []) visit(c);
+	};
+	for (const r of roots) visit(r);
+	// Any node the DFS somehow missed sorts last, stably.
+	for (const t of visibleTypes) if (!order.has(t.id)) order.set(t.id, next++);
+	return order;
+}
+
+/** dagre tidy top-down layout over the visible composition edges, then a stable within-rank re-order so siblings
+ *  read LEFT-TO-RIGHT in authored order (dagre's crossing-minimizer otherwise mirrors them). We keep dagre's x-slots
+ *  and y-rows and only permute which node occupies each slot within a rank — so subtree grouping and parent-centering
+ *  (a parent sits over the centroid of its children's slots, invariant under permutation) are preserved. Returns
+ *  xyflow top-left positions. */
 function layout(
 	visibleTypes: readonly PwuTypeNode[],
 	visibleEdges: readonly { from: string; to: string }[]
@@ -111,11 +143,32 @@ function layout(
 	for (const t of visibleTypes) g.setNode(t.id, { width: NODE_W, height: NODE_H });
 	for (const e of visibleEdges) g.setEdge(e.from, e.to);
 	dagre.layout(g);
-	const pos: Record<string, { x: number; y: number }> = {};
+
+	// dagre centers; collect them, then re-order each rank by authored pre-order index.
+	const centers = new Map<string, { x: number; y: number }>();
 	for (const t of visibleTypes) {
 		const n = g.node(t.id);
+		centers.set(t.id, n ? { x: n.x, y: n.y } : { x: 0, y: 0 });
+	}
+	const order = preorderIndex(visibleTypes, visibleEdges);
+	const ranks = new Map<number, string[]>();
+	for (const t of visibleTypes) {
+		const y = Math.round(centers.get(t.id)!.y);
+		ranks.set(y, [...(ranks.get(y) ?? []), t.id]);
+	}
+	const reassignedX = new Map<string, number>();
+	for (const ids of ranks.values()) {
+		const slots = ids.map((id) => centers.get(id)!.x).sort((a, b) => a - b);
+		const ordered = [...ids].sort((a, b) => (order.get(a) ?? 0) - (order.get(b) ?? 0));
+		ordered.forEach((id, i) => reassignedX.set(id, slots[i]!));
+	}
+
+	const pos: Record<string, { x: number; y: number }> = {};
+	for (const t of visibleTypes) {
+		const c = centers.get(t.id)!;
+		const cx = reassignedX.get(t.id) ?? c.x;
 		// dagre positions are node centers; xyflow wants the top-left corner.
-		pos[t.id] = n ? { x: n.x - NODE_W / 2, y: n.y - NODE_H / 2 } : { x: 0, y: 0 };
+		pos[t.id] = { x: cx - NODE_W / 2, y: c.y - NODE_H / 2 };
 	}
 	return pos;
 }
@@ -132,8 +185,21 @@ function cardinalitySummary(t: PwuTypeNode): string {
 	return [...counts.entries()].map(([code, n]) => `${n}×${code}`).join(' · ');
 }
 
-/** Data-flow (concern-3) edges: a producer's requiredOutputs feeding another type's requiredInputs. */
+/** What a data-flow edge carries so the inspector can show the configured hand-off (which artifacts flow, and
+ *  between which types) when the edge is clicked. */
+export interface DataFlowEdgeData {
+	readonly kind: 'dataflow';
+	readonly sourceName: string;
+	readonly targetName: string;
+	/** The artifact names configured to flow (producer.requiredOutputs ∩ consumer.requiredInputs). */
+	readonly artifacts: readonly string[];
+	[key: string]: unknown;
+}
+
+/** Data-flow (concern-3) edges: a producer's requiredOutputs feeding another type's requiredInputs. Each edge is
+ *  SELECTABLE and carries the flowing-artifact list in `data`, so clicking it reveals the configured hand-off. */
 function dataFlowEdges(types: readonly PwuTypeNode[], visible: ReadonlySet<string>): Edge[] {
+	const nameById = new Map(types.map((t) => [t.id, t.name]));
 	const edges: Edge[] = [];
 	for (const producer of types) {
 		if (!visible.has(producer.id)) continue;
@@ -143,14 +209,25 @@ function dataFlowEdges(types: readonly PwuTypeNode[], visible: ReadonlySet<strin
 			if (consumer.id === producer.id || !visible.has(consumer.id)) continue;
 			const shared = (consumer.requiredInputs ?? []).filter((i) => outputs.has(i));
 			if (shared.length === 0) continue;
+			const data: DataFlowEdgeData = {
+				kind: 'dataflow',
+				sourceName: nameById.get(producer.id) ?? producer.id,
+				targetName: nameById.get(consumer.id) ?? consumer.id,
+				artifacts: shared
+			};
 			edges.push({
 				id: `flow:${producer.id}->${consumer.id}`,
 				source: producer.id,
 				target: consumer.id,
 				label: `⤳ ${shared.join(', ')}`,
 				animated: true,
+				selectable: true,
+				class: 'dataflow-edge',
+				data,
 				style: 'stroke:#61dac1;stroke-dasharray:6 4;',
-				labelStyle: 'fill:#61dac1;font-size:10px;'
+				// Teal chip, dark text (HTML label div — `color`/`background`, not SVG `fill`). Signals "clickable".
+				labelStyle:
+					'color:#06110d;background:#61dac1;border-color:#61dac1;font-weight:700;cursor:pointer;'
 			});
 		}
 	}
@@ -194,7 +271,10 @@ export function toPwaFlow(types: readonly PwuTypeNode[], opts: PwaFlowOptions): 
 		source: e.from,
 		target: e.to,
 		label: 'permits',
-		animated: false
+		animated: false,
+		// Muted-but-visible stroke on the dark canvas. The label chip (an HTML .svelte-flow__edge-label) is themed
+		// via CSS variables in +page.svelte — the default white-bg/light-text washed out (§11.7 contrast fix).
+		style: 'stroke:#454b54;stroke-width:1.5;'
 	}));
 	const edges = opts.showDataFlow
 		? [...permitsEdges, ...dataFlowEdges(types, visible)]
