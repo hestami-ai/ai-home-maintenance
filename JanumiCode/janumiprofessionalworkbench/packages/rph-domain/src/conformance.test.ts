@@ -34,8 +34,8 @@ const catalog = JSON.parse(
 
 describe('M12 conformance catalog structure (§3 taxonomy)', () => {
 	it('defines the 7 test layers, 125 rules, 8 properties, and a mutation catalog', () => {
-		expect(catalog.layers.length).toBe(7);
-		expect(catalog.ruleCatalog.length).toBe(125);
+		expect(catalog.layers).toHaveLength(7);
+		expect(catalog.ruleCatalog).toHaveLength(125);
 		expect(catalog.properties.map((p) => p.id).sort()).toEqual([
 			'P1',
 			'P2',

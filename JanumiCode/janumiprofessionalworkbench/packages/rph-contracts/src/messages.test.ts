@@ -32,7 +32,7 @@ describe('M3 command/event registries + binding table', () => {
 
 	it('has all 14 first-slice commands, each flagged and bound to its emitted event', () => {
 		expect([...FIRST_SLICE_COMMANDS].sort()).toEqual([...vocab.firstSliceCommands].sort());
-		expect(FIRST_SLICE_COMMANDS.length).toBe(14);
+		expect(FIRST_SLICE_COMMANDS).toHaveLength(14);
 		for (const ct of FIRST_SLICE_COMMANDS) {
 			expect(cmd[ct], ct).toBeDefined();
 			expect(cmd[ct]!.firstSlice).toBe(true);

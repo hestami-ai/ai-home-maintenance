@@ -64,7 +64,7 @@ describe('seedWorkbench (live PWA + Undertaking + graph)', () => {
 		const rr = policies.find((p) => p.id === 'floor.reasoning-review')!;
 		expect(rr.state.status).toBe('ACTIVE');
 		expect(rr.state.independenceRequirement).toBe('DIFFERENT_MODEL');
-		expect((rr.state.criteria as unknown[]).length).toBe(9);
+		expect(rr.state.criteria as unknown[]).toHaveLength(9);
 	});
 
 	it('drives the Undertaking to a graph that upholds INV-5', () => {

@@ -68,7 +68,7 @@ describe('reasoningReviewResultFromJudgement — judgement → schema-conformant
 			],
 			recommendation: 'REJECTED'
 		});
-		expect(r.criteria.length).toBe(9); // all nine failure classes become criteria
+		expect(r.criteria).toHaveLength(9); // all nine failure classes become criteria
 		expect(
 			r.criteria.find((c) => c.criterionId === 'RR-05-no-premature-convergence')?.outcome
 		).toBe('NOT_MET');

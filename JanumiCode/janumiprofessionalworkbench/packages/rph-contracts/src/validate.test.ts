@@ -48,6 +48,6 @@ describe('validate', () => {
 		// command +1 AssurancePolicyCreated event — the assurance-floor policy create path (guide §8.9). The
 		// authoring-plane AUTHORING_ASSESSMENT object + its 3 faithfulness commands/events were RETIRED in favor of
 		// the canonical de minimis assurance floor (recorded ASSURANCE_ASSESSMENT/OBSERVATION); see OPEN-QUESTIONS)
-		expect(buildContractRegistry().ids().length).toBe(283);
+		expect(buildContractRegistry().ids()).toHaveLength(283);
 	});
 });
