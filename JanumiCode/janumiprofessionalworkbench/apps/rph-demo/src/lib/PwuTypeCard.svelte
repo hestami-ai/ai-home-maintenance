@@ -1,0 +1,175 @@
+<script lang="ts">
+	// The PWU Type custom node for the PWA Designer graph. Renders a rich card: header (name · ROOT · kind ·
+	// N/L badge · collapse chevron), a cardinality summary of its permitted children, and the §11.7.4 ASSURANCE
+	// RAIL — the locked de-minimis floor (always shown, even collapsed) plus any declared additive policies.
+	// Clicking the card body selects it (Svelte Flow's onnodeclick); the chevron toggles collapse without selecting.
+	import { Handle, Position } from '@xyflow/svelte';
+	import type { PwuCardData } from '$lib/pwaFlow';
+
+	// `selected` is Svelte Flow's native per-node selection flag — clicking a node sets it without re-laying-out.
+	let { data, selected = false }: { data: PwuCardData; selected?: boolean } = $props();
+
+	function onChevron(e: MouseEvent) {
+		e.stopPropagation(); // toggle collapse without selecting the node
+		data.onToggleCollapse();
+	}
+</script>
+
+<div class="card" class:selected class:root={data.isRoot}>
+	<Handle type="target" position={Position.Top} />
+	<header class="head">
+		<div class="titles">
+			<div class="name">
+				{data.name}{#if data.isRoot}<span class="rootbadge">ROOT</span>{/if}
+			</div>
+			<div class="kind">{data.pwuKind}</div>
+		</div>
+		<div class="marks">
+			<span class="nl" title={data.isLeaf ? 'Leaf PWU Type' : 'Non-leaf PWU Type'}
+				>{data.isLeaf ? 'L' : 'N'}</span
+			>
+			{#if !data.isLeaf}
+				<button
+					class="chevron"
+					onclick={onChevron}
+					aria-label={data.collapsed ? 'Expand subtree' : 'Collapse subtree'}
+					title={data.collapsed ? 'Expand subtree' : 'Collapse subtree'}
+				>{data.collapsed ? '▸' : '▾'}</button>
+			{/if}
+		</div>
+	</header>
+
+	<div class="meta">
+		{#if data.isLeaf}
+			<span>leaf</span>
+		{:else}
+			<span>{data.childCount} child{data.childCount === 1 ? '' : 'ren'}{#if data.collapsed} · collapsed{/if}</span>
+			{#if data.cardinalitySummary}<span class="cards">{data.cardinalitySummary}</span>{/if}
+		{/if}
+		{#if data.orphan}<span class="warn" title="No permitted parent">⚠ no parent</span>{/if}
+	</div>
+
+	<div class="rail">
+		<div class="locked">🔒 de minimis floor</div>
+		{#each data.floorLabels as label (label)}
+			<div class="floor">{label}</div>
+		{/each}
+		{#each data.policyLabels as label (label)}
+			<div class="plus">+ {label}</div>
+		{/each}
+	</div>
+
+	<Handle type="source" position={Position.Bottom} />
+</div>
+
+<style>
+	.card {
+		width: 220px;
+		box-sizing: border-box;
+		background: #1b1b1c;
+		color: #e5e2e1;
+		border: 1px solid #404751;
+		border-radius: 10px;
+		padding: 8px 10px;
+		font:
+			12px/1.4 'Inter',
+			system-ui,
+			sans-serif;
+		text-align: left;
+		cursor: pointer;
+	}
+	.card.root {
+		border-color: #007acc;
+	}
+	.card.selected {
+		border-color: #9fcaff;
+		box-shadow: 0 0 0 1px #9fcaff;
+	}
+	.head {
+		display: flex;
+		align-items: flex-start;
+		justify-content: space-between;
+		gap: 6px;
+	}
+	.name {
+		font-weight: 600;
+		font-size: 12.5px;
+		line-height: 1.25;
+	}
+	.rootbadge {
+		font-size: 8.5px;
+		font-weight: 700;
+		letter-spacing: 0.05em;
+		color: #9fcaff;
+		border: 1px solid #345;
+		border-radius: 4px;
+		padding: 0 3px;
+		margin-left: 5px;
+		vertical-align: middle;
+	}
+	.kind {
+		font-family: 'Source Code Pro', monospace;
+		font-size: 9.5px;
+		color: #8b9199;
+		margin-top: 2px;
+	}
+	.marks {
+		display: flex;
+		align-items: center;
+		gap: 4px;
+		flex: 0 0 auto;
+	}
+	.nl {
+		font-family: 'Source Code Pro', monospace;
+		font-size: 9.5px;
+		font-weight: 700;
+		color: #b8c0c8;
+		border: 1px solid #404751;
+		border-radius: 4px;
+		padding: 0 4px;
+	}
+	.chevron {
+		background: none;
+		border: none;
+		color: #b8c0c8;
+		font-size: 11px;
+		cursor: pointer;
+		padding: 0 2px;
+		line-height: 1;
+	}
+	.meta {
+		display: flex;
+		flex-wrap: wrap;
+		gap: 6px;
+		font-size: 10px;
+		color: #8b9199;
+		margin: 4px 0 6px;
+	}
+	.meta .cards {
+		font-family: 'Source Code Pro', monospace;
+		color: #9fcaff;
+	}
+	.meta .warn {
+		color: #e0a34b;
+	}
+	.rail {
+		border-top: 1px solid #333;
+		padding-top: 5px;
+	}
+	.locked {
+		font-size: 9.5px;
+		font-weight: 700;
+		color: #d8c56a;
+		margin-bottom: 2px;
+	}
+	.floor {
+		font-size: 10px;
+		color: #b8c0c8;
+		line-height: 1.45;
+	}
+	.plus {
+		font-size: 10px;
+		color: #61dac1;
+		line-height: 1.45;
+	}
+</style>

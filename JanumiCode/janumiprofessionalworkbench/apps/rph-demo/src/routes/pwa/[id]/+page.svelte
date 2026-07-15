@@ -5,6 +5,7 @@
 	import '@xyflow/svelte/dist/style.css';
 	import type { Edge, Node } from '@xyflow/svelte';
 	import { toPwaFlow } from '$lib/pwaFlow';
+	import PwuTypeCard from '$lib/PwuTypeCard.svelte';
 	import { analyzePwaGraph, buildPwaGraphExport } from '@janumipwb/rph-projections';
 	import {
 		PWU_TYPE_CATALOG,
@@ -54,9 +55,22 @@
 	};
 	const rank = $derived(RANK[data.pwa.publicationStatus] ?? 0);
 
-	// Node graph: PWU Types are nodes; permittedChildTypeIds are the composition ("permits") edges and matching
-	// requiredOutputs→requiredInputs are the data-flow edges. Recomputed when the DRAFT changes or the selection does.
-	const flow = $derived(toPwaFlow(data.types, selected));
+	// Node graph: PWU Types are nodes rendered by the PwuTypeCard custom node. The BASE view is the composition
+	// ("permits") tree, laid out top-down by dagre. Data-flow (requiredOutputs→requiredInputs) is a SEPARATE overlay,
+	// off by default (§11.7.2: composition ≠ order). Collapsing a non-leaf hides its subtree. Recomputed when the
+	// DRAFT, selection, collapse set, or overlay toggle changes.
+	const nodeTypes = { pwuType: PwuTypeCard };
+	let collapsed = $state<Set<string>>(new Set());
+	let showDataFlow = $state(false);
+	function toggleCollapse(id: string) {
+		const next = new Set(collapsed);
+		if (next.has(id)) next.delete(id);
+		else next.add(id);
+		collapsed = next;
+	}
+	const flow = $derived(
+		toPwaFlow(data.types, { collapsed, showDataFlow, onToggleCollapse: toggleCollapse })
+	);
 	let nodes = $state<Node[]>([]);
 	let edges = $state<Edge[]>([]);
 
@@ -426,12 +440,25 @@
 			<SvelteFlow
 			bind:nodes
 			bind:edges
+			{nodeTypes}
 			onnodeclick={(e) => (selectedOverride = e.node.id)}
 			fitView
 			fitViewOptions={{ padding: 0.22, minZoom: 0.25 }}
 		>
 			<Background />
 			<Controls position="bottom-right" />
+
+			<Panel position="bottom-left">
+				<div class="overlaytoggle" data-testid="overlay-toggle">
+					<label class="ovlabel">
+						<input type="checkbox" bind:checked={showDataFlow} />
+						Data-flow overlay
+					</label>
+					{#if collapsed.size}
+						<button class="ghost small" onclick={() => (collapsed = new Set())}>Expand all</button>
+					{/if}
+				</div>
+			</Panel>
 
 			{#if editable}
 				<Panel position="top-left">
@@ -1229,6 +1256,23 @@
 	}
 	.railadd {
 		padding: 2px 0 0 2px;
+	}
+	.overlaytoggle {
+		display: flex;
+		align-items: center;
+		gap: 10px;
+		background: rgba(24, 24, 26, 0.85);
+		border: 1px solid var(--outline);
+		border-radius: 8px;
+		padding: 5px 9px;
+	}
+	.ovlabel {
+		display: flex;
+		align-items: center;
+		gap: 6px;
+		font-size: 11px;
+		color: var(--on-variant);
+		cursor: pointer;
 	}
 	.formactions {
 		display: flex;

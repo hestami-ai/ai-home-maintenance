@@ -47,7 +47,9 @@ test.describe('PWA Designer — authoring agent chat + live graph', () => {
 		// The graph re-rendered live: two nodes now exist (no manual reload).
 		await expect(page.locator('.svelte-flow__node')).toHaveCount(2);
 
-		// Concern 3: a data-flow (⤳) edge is drawn from the output→input artifact match.
+		// Concern 3: data-flow is a SEPARATE overlay (off by default so the composition tree reads cleanly).
+		// Toggle it on, and a data-flow (⤳) edge is drawn from the output→input artifact match.
+		await page.getByRole('checkbox', { name: 'Data-flow overlay' }).check();
 		await expect(page.locator('.svelte-flow')).toContainText('⤳');
 		await shot(page, 'graph built by agent');
 

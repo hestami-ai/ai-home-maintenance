@@ -16,6 +16,7 @@
     "e2e:server:live": "svelte-kit sync && vite dev --host 127.0.0.1 --port 4321 --strictPort"
   },
   "dependencies": {
+    "@dagrejs/dagre": "3.0.0",
     "@earendil-works/pi-ai": "0.80.6",
     "@earendil-works/pi-coding-agent": "0.80.6",
     "@janumipwb/rph-authoring": "workspace:*",

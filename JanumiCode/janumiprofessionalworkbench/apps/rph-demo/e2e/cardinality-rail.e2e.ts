@@ -52,8 +52,8 @@ test.describe('PWA Designer — cardinality + assurance rail', () => {
 		);
 		expect(root.state.requiredAssurancePolicyIds).toContain('pol_intent_preservation');
 
-		// SEMANTIC: the inspector shows the cardinality badge, the locked floor, and the declared policy.
-		await page.locator('.svelte-flow__node').filter({ hasText: 'Realization Root' }).click();
+		// SEMANTIC: with the root still selected, the inspector (after the edit reloads) shows the cardinality
+		// badge, the locked de-minimis floor, and the declared policy — the §11.7.4 rail.
 		const inspector = page.locator('.inspectorpanel');
 		await expect(inspector.locator('.cardbadge', { hasText: 'M+' })).toBeVisible();
 		await expect(inspector.getByText('de minimis floor')).toBeVisible();
