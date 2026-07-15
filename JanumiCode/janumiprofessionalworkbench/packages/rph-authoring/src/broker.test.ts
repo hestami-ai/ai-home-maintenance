@@ -67,6 +67,22 @@ describe('PwaAuthoringBroker — the LLM-agnostic PWA-authoring capability layer
 		expect(broker.help().requiredOutputs).toMatch(/PRODUCES/);
 	});
 
+	it('creates an Assurance Policy (workbench-wide) and lists it in the library', () => {
+		const r = broker.createPolicy({
+			name: 'Tenant Isolation Review',
+			purpose: 'Every tenant boundary is enforced.',
+			criteria: ['Tenant data is isolated', 'Cross-tenant access is denied']
+		});
+		expect(r.ok, r.error).toBe(true);
+		const created = broker.listPolicies().find((p) => p.id === r.id);
+		expect(created).toMatchObject({
+			name: 'Tenant Isolation Review',
+			version: '1.0.0',
+			status: 'ACTIVE',
+			isFloor: false
+		});
+	});
+
 	// ---- PROPOSE: define / edit / remove ----
 
 	it('defines a PWU Type with the rich fields and returns its minted id', () => {

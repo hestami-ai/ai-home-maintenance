@@ -86,7 +86,8 @@ describe('Assurance Policy lifecycle handlers (live)', () => {
 			d('SupersedeAssurancePolicy', { policyId: P, supersededByPolicyId: SUCC }, P).status
 		).toBe('ACCEPTED');
 		expect(status(P)).toBe('SUPERSEDED');
-		expect((store.loadObject(P)!.state.tags as string[]).some((t) => t.includes(SUCC))).toBe(true);
+		const tags = (store.loadObject(P)!.state as { tags?: string[] }).tags ?? [];
+		expect(tags.some((t) => t.includes(SUCC))).toBe(true);
 
 		// A SUPERSEDED policy cannot be edited any further.
 		expect(d('EditAssurancePolicy', { policyId: P, name: 'nope' }, P).status).not.toBe('ACCEPTED');
@@ -102,6 +103,6 @@ describe('Assurance Policy lifecycle handlers (live)', () => {
 		expect(d('SupersedeAssurancePolicy', { policyId: FLOOR }, FLOOR).status).not.toBe('ACCEPTED');
 		// It stays ACTIVE and untouched.
 		expect(status(FLOOR)).toBe('ACTIVE');
-		expect(store.loadObject(FLOOR)!.state.name).toBe('Reasoning Review');
+		expect((store.loadObject(FLOOR)!.state as { name?: string }).name).toBe('Reasoning Review');
 	});
 });

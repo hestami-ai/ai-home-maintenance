@@ -104,6 +104,23 @@ export function buildAuthoringTools(broker: PwaAuthoringBroker): AuthoringToolDe
 			}
 		},
 		{
+			name: 'list_assurance_policies',
+			description:
+				'List the workbench Assurance Policies a PWU Type may require via requiredAssurancePolicyIds. Includes the LOCKED mandatory floor policies (schema/invariant, identity/provenance, reasoning review — these always apply, never declare them) and the additive ACTIVE policies you can reference. Use create_assurance_policy only for a genuinely new required treatment.',
+			parameters: {},
+			mutates: false,
+			run: () => {
+				const pols = broker.listPolicies();
+				return {
+					ok: true,
+					summary: pols
+						.map((p) => `${p.id} — ${p.name} [${p.isFloor ? 'MANDATORY/locked' : p.status}]`)
+						.join('\n'),
+					data: pols
+				};
+			}
+		},
+		{
 			name: 'review_composition',
 			description:
 				'Review the current graph STRUCTURE for problems: over-broad fan-out (a type permitting too many children — a flat "star" instead of a real decomposition hierarchy), types unreachable from the root, or a missing/duplicate root. Call this after building and FIX any findings before finishing.',
@@ -224,6 +241,51 @@ export function buildAuthoringTools(broker: PwaAuthoringBroker): AuthoringToolDe
 				if ('description' in a) patch.description = str(a.description);
 				if ('domain' in a) patch.domain = str(a.domain);
 				return fromProposal(broker.setPwaDetails(patch), 'Updated PWA details.');
+			}
+		},
+		{
+			name: 'create_assurance_policy',
+			description:
+				'Create a NEW authorable Assurance Policy in the workbench library (on top of the seeded ones), then reference its returned id from a PWU Type’s requiredAssurancePolicyIds. Only for a genuinely new required treatment not covered by an existing policy — prefer reusing what list_assurance_policies already offers. Never recreate the mandatory floor (schema/invariant, identity/provenance, reasoning review): it always applies.',
+			parameters: {
+				name: {
+					type: 'string',
+					required: true,
+					description: 'Human name (e.g. "Tenant Isolation Review").'
+				},
+				purpose: { type: 'string', description: 'What this policy assures.' },
+				rationale: { type: 'string', description: 'Why future instances must satisfy it.' },
+				evaluatedClaimType: {
+					type: 'string',
+					description:
+						'The claim type it evaluates: CORRECTNESS, COMPLETENESS, COVERAGE, PRESERVATION, CONSISTENCY, FITNESS, FEASIBILITY, COMPLIANCE, SECURITY, or PERFORMANCE.'
+				},
+				evaluatorRole: {
+					type: 'string',
+					description: 'The evaluator role (e.g. "security-reviewer").'
+				},
+				independenceRequirement: {
+					type: 'string',
+					description:
+						'Evaluator independence: NONE, DIFFERENT_INVOCATION, DIFFERENT_AGENT, DIFFERENT_MODEL, HUMAN, etc.'
+				},
+				criteria: {
+					type: 'string[]',
+					description: 'One statement per criterion (each becomes a mandatory assessment criterion).'
+				}
+			},
+			mutates: true,
+			run: (a) => {
+				const r = broker.createPolicy({
+					name: str(a.name),
+					purpose: str(a.purpose) || undefined,
+					rationale: str(a.rationale) || undefined,
+					evaluatedClaimType: str(a.evaluatedClaimType) || undefined,
+					evaluatorRole: str(a.evaluatorRole) || undefined,
+					independenceRequirement: str(a.independenceRequirement) || undefined,
+					criteria: strArr(a.criteria)
+				});
+				return fromProposal(r, `Created Assurance Policy "${str(a.name)}" as ${r.id}.`);
 			}
 		},
 		{

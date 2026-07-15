@@ -17,7 +17,12 @@ import type {
 // Re-export the PWU-Type authoring value types so every authoring surface (the agent tools, the UI) can name them
 // via @janumipwb/rph-authoring without reaching into the contracts package directly.
 export type { CardinalityCode, PermittedChildRule } from '@janumipwb/rph-contracts';
-import { getObject, listPwuTypes, type EngineHandle } from '@janumipwb/rph-engine';
+import {
+	getObject,
+	listAssurancePolicies,
+	listPwuTypes,
+	type EngineHandle
+} from '@janumipwb/rph-engine';
 import {
 	catalogTemplate,
 	PWU_TYPE_CATALOG,
@@ -92,6 +97,30 @@ export interface EditTypeInput {
 	readonly requiredAssurancePolicyIds?: readonly string[];
 }
 
+/** An Assurance Policy as the authoring surface sees it (definition summary; the 3 floor policies are flagged). */
+export interface AssurancePolicyView {
+	readonly id: string;
+	readonly name: string;
+	readonly purpose: string;
+	readonly version: string;
+	readonly status: string;
+	/** True for a locked de minimis floor policy (always-applies, non-editable). */
+	readonly isFloor: boolean;
+}
+
+/** Fields accepted when creating a new Assurance Policy (only name is required; the rest default sensibly). */
+export interface CreatePolicyInput {
+	readonly name: string;
+	readonly purpose?: string;
+	readonly rationale?: string;
+	readonly evaluatedClaimType?: string;
+	readonly evaluatorRole?: string;
+	readonly independenceRequirement?: string;
+	readonly permittedControlAction?: string;
+	/** Each string becomes a mandatory AssessmentCriterion (id generated). */
+	readonly criteria?: readonly string[];
+}
+
 /** One node in a scaffold: a type to define, optionally naming (by temp key) the child types it permits. */
 export interface ScaffoldSpec {
 	/** Caller-chosen handle used to wire permits edges within the batch (not persisted). */
@@ -131,6 +160,13 @@ export interface BrokerDeps {
 
 const PWA_TYPE = 'PROFESSIONAL_WORK_ARCHITECTURE';
 const PWU_TYPE = 'PWU_TYPE';
+const ASSURANCE_POLICY = 'ASSURANCE_POLICY';
+// The 3 de minimis floor policies (guide §8.4) are locked; the manager/agent surface them read-only.
+const FLOOR_POLICY_IDS: ReadonlySet<string> = new Set([
+	'floor.schema-invariant',
+	'floor.identity-provenance',
+	'floor.reasoning-review'
+]);
 
 function toTypeView(id: string, s: Record<string, unknown>): PwuTypeView {
 	const arr = (v: unknown): string[] => (Array.isArray(v) ? (v as string[]) : []);
@@ -204,6 +240,19 @@ export class PwaAuthoringBroker {
 		return PWU_TYPE_CATALOG;
 	}
 
+	/** The workbench Assurance Policy library (real ASSURANCE_POLICY objects). The 3 floor policies are flagged. A
+	 *  PWU Type may declare any ACTIVE non-floor policy via requiredAssurancePolicyIds. */
+	listPolicies(): AssurancePolicyView[] {
+		return listAssurancePolicies(this.engine).map((r) => ({
+			id: r.id,
+			name: String((r.state.name ?? r.id) as string),
+			purpose: String((r.state.purpose ?? '') as string),
+			version: String((r.state.version ?? '') as string),
+			status: String((r.state.status ?? 'ACTIVE') as string),
+			isFloor: FLOOR_POLICY_IDS.has(r.id)
+		}));
+	}
+
 	/** Per-field authoring help — the single source both the inspector form and the agent tool schemas surface. */
 	help(): typeof PWU_TYPE_HELP {
 		return PWU_TYPE_HELP;
@@ -220,6 +269,33 @@ export class PwaAuthoringBroker {
 			...(patch.name !== undefined ? { name: patch.name } : {}),
 			...(patch.description !== undefined ? { description: patch.description } : {}),
 			...(patch.domain !== undefined ? { domain: patch.domain } : {})
+		});
+	}
+
+	/** Create a new authorable Assurance Policy (ACTIVE) in the workbench library. NOT scoped to the DRAFT PWA —
+	 *  policies are workbench-wide objects a PWU Type then references. The 3 floor policies are seeded, not created
+	 *  here. Returns the minted policy id on success. */
+	createPolicy(input: CreatePolicyInput): ProposalResult {
+		if (!input.name?.trim()) return { ok: false, error: 'A policy name is required.' };
+		const id = this.mintId('pol');
+		const criteria = (input.criteria ?? []).map((statement, i) => ({
+			id: `C-${String(i + 1).padStart(2, '0')}`,
+			statement,
+			mandatory: true
+		}));
+		return this.one('CreateAssurancePolicy', ASSURANCE_POLICY, id, {
+			policyId: id,
+			version: '1.0.0',
+			name: input.name,
+			purpose: input.purpose || input.name,
+			rationale: input.rationale || 'Authored by the JPWB agent.',
+			applicableObjectTypes: 'PROFESSIONAL_WORK_UNIT',
+			evaluatedClaimTypes: input.evaluatedClaimType || 'CORRECTNESS',
+			criteria,
+			evaluatorRole: input.evaluatorRole || 'reviewer',
+			independenceRequirement: input.independenceRequirement || 'DIFFERENT_AGENT',
+			findingDefinitions: [],
+			permittedControlActions: input.permittedControlAction || 'ESCALATE'
 		});
 	}
 
