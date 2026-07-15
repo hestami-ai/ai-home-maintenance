@@ -153,14 +153,19 @@ export const ASSURANCE_FLOOR: readonly AssurancePolicyOption[] = [
 	{
 		id: 'floor.reasoning-review',
 		label: 'Reasoning Review',
-		blurb: 'Every material AI/agent output is independently reviewed for genuine obligation discharge.'
+		blurb:
+			'Every material AI/agent output is independently reviewed for genuine obligation discharge.'
 	}
 ];
 
 /** The declarable, ADDITIVE assurance policies a PWU Type may require of its future instances (§11.7.4 "required
  *  treatment"). These sit ON TOP of the locked floor. The Product Realization PWA's seed policies. */
 export const ASSURANCE_POLICY_CATALOG: readonly AssurancePolicyOption[] = [
-	{ id: 'pol_intent_fidelity', label: 'Intent Fidelity', blurb: 'Output stays faithful to approved Intent.' },
+	{
+		id: 'pol_intent_fidelity',
+		label: 'Intent Fidelity',
+		blurb: 'Output stays faithful to approved Intent.'
+	},
 	{
 		id: 'pol_intent_completeness',
 		label: 'Intent Completeness',

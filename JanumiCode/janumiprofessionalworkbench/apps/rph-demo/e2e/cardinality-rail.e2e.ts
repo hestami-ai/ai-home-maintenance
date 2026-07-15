@@ -39,7 +39,9 @@ test.describe('PWA Designer — cardinality + assurance rail', () => {
 		await page.locator('.svelte-flow__node').filter({ hasText: 'Realization Root' }).click();
 		await page.getByRole('button', { name: 'Edit', exact: true }).click();
 		await page.getByRole('checkbox', { name: 'Behavior Definition', exact: true }).check();
-		await page.getByRole('combobox', { name: 'Cardinality for Behavior Definition' }).selectOption('M+');
+		await page
+			.getByRole('combobox', { name: 'Cardinality for Behavior Definition' })
+			.selectOption('M+');
 		await page.getByRole('checkbox', { name: 'Intent Preservation', exact: true }).check();
 		await page.getByRole('button', { name: 'Save changes' }).click();
 

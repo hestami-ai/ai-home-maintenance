@@ -6,6 +6,7 @@
 	import type { Edge, Node } from '@xyflow/svelte';
 	import { toPwaFlow } from '$lib/pwaFlow';
 	import PwuTypeCard from '$lib/PwuTypeCard.svelte';
+	import { draggable } from '$lib/actions/draggable';
 	import { analyzePwaGraph, buildPwaGraphExport } from '@janumipwb/rph-projections';
 	import {
 		PWU_TYPE_CATALOG,
@@ -117,6 +118,8 @@
 	let formMode = $state<FormMode>(null);
 	let showPwaEdit = $state(false);
 	let agentCollapsed = $state(false);
+	let inspectorCollapsed = $state(false);
+	let floorCollapsed = $state(false);
 	const f = $state({
 		name: '',
 		pwuKind: '',
@@ -462,8 +465,13 @@
 
 			{#if editable}
 				<Panel position="top-left">
-					<section class="agentpanel" class:collapsed={agentCollapsed} data-testid="agent-panel">
-						<header class="ppanelhead">
+					<section
+						class="agentpanel"
+						class:collapsed={agentCollapsed}
+						data-testid="agent-panel"
+						use:draggable={{ handle: '.paneldrag' }}
+					>
+						<header class="ppanelhead paneldrag">
 							<span class="itag">AI AGENT</span>
 							<div class="pheadright">
 								{#if running}<span class="livedot">● working…</span>{/if}
@@ -502,8 +510,23 @@
 			{/if}
 
 			<Panel position="top-right">
-				<aside class="inspectorpanel">
-					{#if editable && formMode !== null}
+				<aside
+					class="inspectorpanel"
+					class:collapsed={inspectorCollapsed}
+					use:draggable={{ handle: '.paneldrag' }}
+				>
+					<header class="ppanelhead paneldrag">
+						<span class="itag">PWU TYPE</span>
+						<button
+							class="collapsebtn"
+							onclick={() => (inspectorCollapsed = !inspectorCollapsed)}
+							aria-label={inspectorCollapsed ? 'Expand inspector' : 'Collapse inspector'}
+							>{inspectorCollapsed ? '▸' : '▾'}</button
+						>
+					</header>
+					{#if !inspectorCollapsed}
+						<div class="panelbody">
+							{#if editable && formMode !== null}
 						{@const editing = editingId !== ''}
 						<div class="itag">{editing ? 'EDIT PWU TYPE' : 'NEW PWU TYPE'}</div>
 						<form
@@ -643,7 +666,6 @@
 							</div>
 						</form>
 					{:else if current}
-						<div class="itag">PWU TYPE</div>
 						<h3>{current.name}</h3>
 						<div class="field"><span class="flabel">Kind</span><p class="mono">{current.pwuKind}</p></div>
 						<div class="field"><span class="flabel">Purpose</span><p>{current.purpose}</p></div>
@@ -720,6 +742,8 @@
 							{/each}
 						</div>
 					{/if}
+						</div>
+					{/if}
 				</aside>
 			</Panel>
 
@@ -732,7 +756,23 @@
 			{/if}
 			{#if data.floor}
 				<Panel position="bottom-right">
-					<div class="floorpanel" data-testid="assurance-panel">
+					<div
+						class="floorpanel"
+						class:collapsed={floorCollapsed}
+						data-testid="assurance-panel"
+						use:draggable={{ handle: '.paneldrag' }}
+					>
+						<header class="ppanelhead paneldrag">
+							<span class="itag">ASSURANCE FLOOR</span>
+							<button
+								class="collapsebtn"
+								onclick={() => (floorCollapsed = !floorCollapsed)}
+								aria-label={floorCollapsed ? 'Expand floor' : 'Collapse floor'}
+								>{floorCollapsed ? '▸' : '▾'}</button
+							>
+						</header>
+						{#if !floorCollapsed}
+							<div class="panelbody">
 						<div class="floorhead">
 							<span
 								class="floortag"
@@ -781,6 +821,8 @@
 									<button class="ghost small danger" type="submit">Record waiver + allow publish</button>
 								</form>
 							{/if}
+						{/if}
+							</div>
 						{/if}
 					</div>
 				</Panel>
@@ -1011,6 +1053,30 @@
 		font-size: 11px;
 		cursor: pointer;
 	}
+	/* The header of each side panel is the drag handle: grab-to-move, and NOT text-selectable. */
+	.paneldrag {
+		cursor: grab;
+		user-select: none;
+		touch-action: none;
+	}
+	.paneldrag:active {
+		cursor: grabbing;
+	}
+	/* Svelte Flow disables text selection across the canvas; re-enable it on the side panels (their bodies), so a
+	   user can select + copy the content. Nodes deliberately stay non-selectable (they are drag-to-move). */
+	.agentpanel,
+	.inspectorpanel,
+	.floorpanel {
+		user-select: text;
+		display: flex;
+		flex-direction: column;
+		overflow: hidden;
+	}
+	.panelbody {
+		flex: 1;
+		min-height: 0;
+		overflow-y: auto;
+	}
 	.agentlog {
 		margin-top: 10px;
 		overflow-y: auto;
@@ -1064,9 +1130,16 @@
 	}
 	.inspectorpanel {
 		width: 320px;
-		max-height: calc(100vh - 235px);
-		overflow-y: auto;
-		padding: 14px 16px;
+		/* Capped to under half the flow area (≈100vh − topbar − chatbar) so the top-right inspector and the
+		   bottom-right floor never overlap by default; the body scrolls internally (.panelbody). */
+		max-height: calc(50vh - 96px);
+		padding: 0;
+	}
+	.inspectorpanel .panelbody {
+		padding: 4px 16px 14px;
+	}
+	.inspectorpanel .ppanelhead {
+		padding: 12px 12px 6px 16px;
 	}
 	.inspectorpanel h3 {
 		margin: 6px 0 14px;
@@ -1374,7 +1447,9 @@
 	.floorchip.ok { background: rgba(97, 218, 193, 0.15); color: var(--tertiary); }
 	.floorchip.warn { background: rgba(230, 181, 102, 0.15); color: var(--amber); }
 	.floorchip.bad { background: rgba(255, 180, 171, 0.15); color: var(--error); }
-	.floorpanel { width: 280px; max-width: 32vw; max-height: calc(100vh - 320px); overflow-y: auto; padding: 12px 14px; border: 1px solid var(--sc); border-radius: 10px; background: var(--surface); box-shadow: 0 6px 20px rgba(0, 0, 0, 0.18); font-size: 12px; }
+	.floorpanel { width: 280px; max-width: 32vw; max-height: calc(50vh - 96px); padding: 0; border: 1px solid var(--sc); border-radius: 10px; background: var(--surface); box-shadow: 0 6px 20px rgba(0, 0, 0, 0.18); font-size: 12px; }
+	.floorpanel .panelbody { padding: 4px 14px 12px; }
+	.floorpanel .ppanelhead { padding: 10px 12px 6px 14px; }
 	.floorhead { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
 	.floortag { font-size: 11px; font-weight: 800; padding: 2px 8px; border-radius: 5px; background: rgba(230, 181, 102, 0.15); color: var(--amber); }
 	.floortag.ok { background: rgba(97, 218, 193, 0.15); color: var(--tertiary); }

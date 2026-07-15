@@ -133,10 +133,7 @@ function cardinalitySummary(t: PwuTypeNode): string {
 }
 
 /** Data-flow (concern-3) edges: a producer's requiredOutputs feeding another type's requiredInputs. */
-function dataFlowEdges(
-	types: readonly PwuTypeNode[],
-	visible: ReadonlySet<string>
-): Edge[] {
+function dataFlowEdges(types: readonly PwuTypeNode[], visible: ReadonlySet<string>): Edge[] {
 	const edges: Edge[] = [];
 	for (const producer of types) {
 		if (!visible.has(producer.id)) continue;
