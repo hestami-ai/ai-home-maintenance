@@ -7,7 +7,12 @@
 // half-built DRAFT. Governance: this broker only ever authors a DRAFT (define/edit/remove/link PWU Types, edit the
 // PWA's own details); it deliberately does NOT expose the publication FSM — a human advances DRAFT -> ... ->
 // PUBLISHED. That is the "agent proposes, human publishes" seam.
-import type { CommandResult, DomainCommand } from '@janumipwb/rph-contracts';
+import type {
+	CardinalityCode,
+	CommandResult,
+	DomainCommand,
+	PermittedChildRule
+} from '@janumipwb/rph-contracts';
 import { getObject, listPwuTypes, type EngineHandle } from '@janumipwb/rph-engine';
 import {
 	catalogTemplate,
@@ -35,8 +40,12 @@ export interface PwuTypeView {
 	readonly isRoot: boolean;
 	readonly completionRule: string;
 	readonly permittedChildTypeIds: string[];
+	/** Per-child cardinality annotations (parallel to permittedChildTypeIds; children with no rule default to M1). */
+	readonly permittedChildren: PermittedChildRule[];
 	readonly requiredInputs: string[];
 	readonly requiredOutputs: string[];
+	/** Declared (required-treatment) assurance policy ids for future instances of this type (§11.7.4). */
+	readonly requiredAssurancePolicyIds: string[];
 }
 
 /** The outcome of a PROPOSE operation. `ok` mirrors the engine's acceptance; on failure `error` carries the
@@ -58,8 +67,11 @@ export interface DefineTypeInput {
 	readonly isRoot?: boolean;
 	readonly completionRule?: string;
 	readonly permittedChildTypeIds?: readonly string[];
+	/** Per-child cardinality rules; permittedChildTypeIds is derived from these when only the rules are given. */
+	readonly permittedChildren?: readonly PermittedChildRule[];
 	readonly requiredInputs?: readonly string[];
 	readonly requiredOutputs?: readonly string[];
+	readonly requiredAssurancePolicyIds?: readonly string[];
 }
 
 /** A patch to an existing PWU Type — only the present fields change (mirrors the EditPwuType field-patch). */
@@ -70,8 +82,10 @@ export interface EditTypeInput {
 	readonly isRoot?: boolean;
 	readonly completionRule?: string;
 	readonly permittedChildTypeIds?: readonly string[];
+	readonly permittedChildren?: readonly PermittedChildRule[];
 	readonly requiredInputs?: readonly string[];
 	readonly requiredOutputs?: readonly string[];
+	readonly requiredAssurancePolicyIds?: readonly string[];
 }
 
 /** One node in a scaffold: a type to define, optionally naming (by temp key) the child types it permits. */
@@ -85,8 +99,15 @@ export interface ScaffoldSpec {
 	readonly completionRule?: string;
 	readonly requiredInputs?: readonly string[];
 	readonly requiredOutputs?: readonly string[];
+	readonly requiredAssurancePolicyIds?: readonly string[];
 	/** Temp keys of other specs in THIS batch that this type permits as children. */
 	readonly childTempKeys?: readonly string[];
+	/** Per-child cardinality by temp key (each must appear in childTempKeys); missing entries default to M1. */
+	readonly childCardinalities?: readonly {
+		readonly tempKey: string;
+		readonly cardinality: CardinalityCode;
+		readonly applicabilityNote?: string;
+	}[];
 }
 
 export interface BrokerDeps {
@@ -117,8 +138,12 @@ function toTypeView(id: string, s: Record<string, unknown>): PwuTypeView {
 		isRoot: Boolean(s.isRoot),
 		completionRule: String((s.completionRule ?? '') as string),
 		permittedChildTypeIds: arr(s.permittedChildTypeIds),
+		permittedChildren: Array.isArray(s.permittedChildren)
+			? (s.permittedChildren as PermittedChildRule[])
+			: [],
 		requiredInputs: arr(s.requiredInputs),
-		requiredOutputs: arr(s.requiredOutputs)
+		requiredOutputs: arr(s.requiredOutputs),
+		requiredAssurancePolicyIds: arr(s.requiredAssurancePolicyIds)
 	};
 }
 
@@ -212,6 +237,8 @@ export class PwaAuthoringBroker {
 				permittedChildTypeIds: [...(input.permittedChildTypeIds ?? [])],
 				requiredInputs: [...(input.requiredInputs ?? [])],
 				requiredOutputs: [...(input.requiredOutputs ?? [])],
+				requiredAssurancePolicyIds: [...(input.requiredAssurancePolicyIds ?? [])],
+				...(input.permittedChildren ? { permittedChildren: [...input.permittedChildren] } : {}),
 				...(input.completionRule ? { completionRule: input.completionRule } : {})
 			})
 		);
@@ -250,11 +277,17 @@ export class PwaAuthoringBroker {
 				...(patch.permittedChildTypeIds !== undefined
 					? { permittedChildTypeIds: [...patch.permittedChildTypeIds] }
 					: {}),
+				...(patch.permittedChildren !== undefined
+					? { permittedChildren: [...patch.permittedChildren] }
+					: {}),
 				...(patch.requiredInputs !== undefined
 					? { requiredInputs: [...patch.requiredInputs] }
 					: {}),
 				...(patch.requiredOutputs !== undefined
 					? { requiredOutputs: [...patch.requiredOutputs] }
+					: {}),
+				...(patch.requiredAssurancePolicyIds !== undefined
+					? { requiredAssurancePolicyIds: [...patch.requiredAssurancePolicyIds] }
 					: {})
 			})
 		);
@@ -339,6 +372,7 @@ export class PwaAuthoringBroker {
 			if (!s.name?.trim() || !s.pwuKind?.trim())
 				return { error: { ok: false, error: `Type "${s.tempKey}" needs a name and kind.` } };
 			const childIds: string[] = [];
+			const childRules: PermittedChildRule[] = [];
 			for (const ck of s.childTempKeys ?? []) {
 				const cid = idFor.get(ck);
 				if (!cid)
@@ -346,6 +380,12 @@ export class PwaAuthoringBroker {
 						error: { ok: false, error: `Type "${s.tempKey}" names unknown child "${ck}".` }
 					};
 				childIds.push(cid);
+				const card = s.childCardinalities?.find((c) => c.tempKey === ck);
+				childRules.push({
+					typeId: cid,
+					cardinality: card?.cardinality ?? 'M1',
+					...(card?.applicabilityNote ? { applicabilityNote: card.applicabilityNote } : {})
+				});
 			}
 			const id = idFor.get(s.tempKey)!;
 			commands.push(
@@ -357,8 +397,10 @@ export class PwaAuthoringBroker {
 					purpose: s.purpose || s.name,
 					isRoot: s.isRoot ?? false,
 					permittedChildTypeIds: childIds,
+					permittedChildren: childRules,
 					requiredInputs: [...(s.requiredInputs ?? [])],
 					requiredOutputs: [...(s.requiredOutputs ?? [])],
+					requiredAssurancePolicyIds: [...(s.requiredAssurancePolicyIds ?? [])],
 					...(s.completionRule ? { completionRule: s.completionRule } : {})
 				})
 			);

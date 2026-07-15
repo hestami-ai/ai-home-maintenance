@@ -17,6 +17,10 @@ export const PWU_TYPE_HELP = {
 		'When an Instance of this type is DONE. Defaults to the RPH rule: execution succeeded AND required outputs exist AND assurance satisfied (no green without assurance).',
 	permittedChildTypeIds:
 		'Which PWU Types may be decomposed UNDER this type in the graph — the allowed composition.',
+	permittedChildren:
+		'Per-child composition cardinality (parallel to permittedChildTypeIds): each rule is {typeId, cardinality, applicabilityNote?}. cardinality is M1 (mandatory exactly one), M+ (mandatory one or more), C1 (conditional zero or one), or C+ (conditional zero or more). Use a free-text applicabilityNote to say WHEN a conditional (C*) child applies.',
+	requiredAssurancePolicyIds:
+		'Ids of the assurance policies future Instances of this type MUST satisfy (declared/required treatment, §11.7.4) — e.g. Requirement Coverage or Intent Preservation. This is required treatment, not a runtime assessment; the locked de-minimis floor always applies on top and is never listed here.',
 	requiredInputs:
 		'Named artifacts this type of work CONSUMES before it can start (e.g. "approved-behavior"). A data-flow edge is drawn from whichever type produces a matching output.',
 	requiredOutputs:

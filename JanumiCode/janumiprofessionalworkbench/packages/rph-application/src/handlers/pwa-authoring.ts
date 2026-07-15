@@ -132,6 +132,9 @@ export const definePwuType: CommandHandler = (ctx, command, payload) => {
 			[p.pwuTypeId]
 		);
 	}
+	// permittedChildTypeIds stays the authoritative flat edge list (render/projections consume it); permittedChildren
+	// is the parallel cardinality annotation. If only the rules are supplied, derive the flat list from them.
+	const childRules = (p.permittedChildren ?? []) as ReadonlyArray<{ typeId: string }>;
 	const state: Record<string, unknown> = {
 		...newEnvelope(command, PWU_TYPE, p.pwuTypeId, {
 			lifecycleStatus: 'DRAFT',
@@ -144,7 +147,8 @@ export const definePwuType: CommandHandler = (ctx, command, payload) => {
 		purpose: p.purpose,
 		isRoot: p.isRoot,
 		permittedParentTypeIds: p.permittedParentTypeIds ?? [],
-		permittedChildTypeIds: p.permittedChildTypeIds ?? [],
+		permittedChildTypeIds: p.permittedChildTypeIds ?? childRules.map((r) => r.typeId),
+		permittedChildren: p.permittedChildren ?? [],
 		requiredInputs: p.requiredInputs ?? [],
 		requiredOutputs: p.requiredOutputs ?? [],
 		requiredAssurancePolicyIds: p.requiredAssurancePolicyIds ?? [],
@@ -286,6 +290,15 @@ export const editPwuType: CommandHandler = (ctx, command, payload) => {
 	const guard = requireDraftOwner(ctx, command, loaded.state);
 	if (guard) return guard;
 	const newRevision = loaded.revision + 1;
+	// Keep the flat edge list authoritative: an explicit permittedChildTypeIds wins; otherwise, when only the
+	// cardinality rules are edited, re-derive the flat list from them so the two never drift.
+	const childRules = p.permittedChildren as ReadonlyArray<{ typeId: string }> | undefined;
+	let childTypeIdsPatch: Record<string, unknown> = {};
+	if (p.permittedChildTypeIds !== undefined) {
+		childTypeIdsPatch = { permittedChildTypeIds: p.permittedChildTypeIds };
+	} else if (childRules !== undefined) {
+		childTypeIdsPatch = { permittedChildTypeIds: childRules.map((r) => r.typeId) };
+	}
 	const next: Record<string, unknown> = {
 		...nextEnvelope(loaded.state, command, newRevision),
 		...(p.name !== undefined ? { name: p.name } : {}),
@@ -293,9 +306,8 @@ export const editPwuType: CommandHandler = (ctx, command, payload) => {
 		...(p.pwuKind !== undefined ? { pwuKind: p.pwuKind } : {}),
 		...(p.isRoot !== undefined ? { isRoot: p.isRoot } : {}),
 		...(p.completionRule !== undefined ? { completionRule: p.completionRule } : {}),
-		...(p.permittedChildTypeIds !== undefined
-			? { permittedChildTypeIds: p.permittedChildTypeIds }
-			: {}),
+		...childTypeIdsPatch,
+		...(p.permittedChildren !== undefined ? { permittedChildren: p.permittedChildren } : {}),
 		...(p.requiredInputs !== undefined ? { requiredInputs: p.requiredInputs } : {}),
 		...(p.requiredOutputs !== undefined ? { requiredOutputs: p.requiredOutputs } : {}),
 		...(p.requiredAssurancePolicyIds !== undefined
