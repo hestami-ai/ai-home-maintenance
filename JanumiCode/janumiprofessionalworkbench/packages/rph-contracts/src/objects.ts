@@ -12,6 +12,7 @@ import {
 	AuthorizationStatusSchema,
 	BaselineStatusSchema,
 	BaselineTypeSchema,
+	CardinalityCodeSchema,
 	ClaimStatusSchema,
 	ClaimTypeSchema,
 	ConstraintStatusSchema,
@@ -208,6 +209,12 @@ export const ObligationAllocationSchema = z.strictObject({
 	allocatedTo: z.array(z.string())
 });
 export type ObligationAllocation = z.infer<typeof ObligationAllocationSchema>;
+export const PermittedChildRuleSchema = z.strictObject({
+	typeId: z.string(),
+	cardinality: CardinalityCodeSchema,
+	applicabilityNote: z.string().optional()
+});
+export type PermittedChildRule = z.infer<typeof PermittedChildRuleSchema>;
 export const TraceLinkSchema = z.strictObject({
 	id: z.string(),
 	sourceObjectId: z.string(),
@@ -552,6 +559,7 @@ export const PwuTypeSchema = z.strictObject({
 	isRoot: z.boolean(),
 	permittedParentTypeIds: z.array(z.string()),
 	permittedChildTypeIds: z.array(z.string()),
+	permittedChildren: z.array(PermittedChildRuleSchema).optional(),
 	requiredInputs: z.array(z.string()),
 	requiredOutputs: z.array(z.string()),
 	requiredAssurancePolicyIds: z.array(z.string()),

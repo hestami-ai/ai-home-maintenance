@@ -257,6 +257,34 @@
         "type": "string"
       }
     },
+    "permittedChildren": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "properties": {
+          "typeId": {
+            "type": "string"
+          },
+          "cardinality": {
+            "type": "string",
+            "enum": [
+              "M1",
+              "M+",
+              "C1",
+              "C+"
+            ]
+          },
+          "applicabilityNote": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "typeId",
+          "cardinality"
+        ],
+        "additionalProperties": false
+      }
+    },
     "requiredInputs": {
       "type": "array",
       "items": {

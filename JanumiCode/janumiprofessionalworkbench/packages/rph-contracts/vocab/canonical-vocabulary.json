@@ -44,6 +44,18 @@
       "note": "DOC-006 fixture uses only HUMAN, AGENT."
     },
     {
+      "name": "CardinalityCode",
+      "appliesTo": "PermittedChildRule.cardinality — per-child composition cardinality in a PWA Work Architecture View",
+      "values": [
+        "M1",
+        "M+",
+        "C1",
+        "C+"
+      ],
+      "canonicalSource": "RPH-DOC-003 §7 / Coding-Agent-Guide §11.7.2",
+      "note": "M1 mandatory-exactly-one; M+ mandatory-one-or-more; C1 conditional-zero-or-one; C+ conditional-zero-or-more. Presentation shorthands with executable min/max semantics; the structured applicability predicate for C* is deferred (free-text note for now)."
+    },
+    {
       "name": "AuthorityType",
       "appliesTo": "AuthorityReference.authorityType",
       "values": [

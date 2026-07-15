@@ -48,6 +48,8 @@ describe('validate', () => {
 		// command +1 AssurancePolicyCreated event — the assurance-floor policy create path (guide §8.9). The
 		// authoring-plane AUTHORING_ASSESSMENT object + its 3 faithfulness commands/events were RETIRED in favor of
 		// the canonical de minimis assurance floor (recorded ASSURANCE_ASSESSMENT/OBSERVATION); see OPEN-QUESTIONS)
-		expect(buildContractRegistry().ids()).toHaveLength(283);
+		// then +1 CardinalityCode enum — per-child composition cardinality (M1/M+/C1/C+) for the PWA Work
+		// Architecture View (§11.7.2); the PermittedChildRule helper is a sub-type, not a registry entry.
+		expect(buildContractRegistry().ids()).toHaveLength(284);
 	});
 });

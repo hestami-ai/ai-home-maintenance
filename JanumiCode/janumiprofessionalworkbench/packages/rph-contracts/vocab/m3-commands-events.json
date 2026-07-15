@@ -1736,6 +1736,11 @@
           "type": "string[]"
         },
         {
+          "field": "permittedChildren",
+          "required": false,
+          "type": "PermittedChildRule[]"
+        },
+        {
           "field": "requiredInputs",
           "required": false,
           "type": "string[]"
@@ -1959,6 +1964,11 @@
           "field": "permittedChildTypeIds",
           "required": false,
           "type": "string[]"
+        },
+        {
+          "field": "permittedChildren",
+          "required": false,
+          "type": "PermittedChildRule[]"
         },
         {
           "field": "requiredInputs",

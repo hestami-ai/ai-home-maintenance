@@ -1,0 +1,11 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "type": "string",
+  "enum": [
+    "M1",
+    "M+",
+    "C1",
+    "C+"
+  ],
+  "$id": "urn:janumi:rph:schema:enum:CardinalityCode:1"
+}

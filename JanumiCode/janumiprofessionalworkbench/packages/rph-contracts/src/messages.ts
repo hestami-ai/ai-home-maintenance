@@ -388,6 +388,7 @@ export const DefinePwuTypePayloadSchema = z.strictObject({
 	isRoot: z.boolean(),
 	permittedParentTypeIds: z.array(z.string()).optional(),
 	permittedChildTypeIds: z.array(z.string()).optional(),
+	permittedChildren: z.array(z.unknown()).optional(),
 	requiredInputs: z.array(z.string()).optional(),
 	requiredOutputs: z.array(z.string()).optional(),
 	requiredAssurancePolicyIds: z.array(z.string()).optional(),
@@ -437,6 +438,7 @@ export const EditPwuTypePayloadSchema = z.strictObject({
 	isRoot: z.boolean().optional(),
 	completionRule: z.string().optional(),
 	permittedChildTypeIds: z.array(z.string()).optional(),
+	permittedChildren: z.array(z.unknown()).optional(),
 	requiredInputs: z.array(z.string()).optional(),
 	requiredOutputs: z.array(z.string()).optional(),
 	requiredAssurancePolicyIds: z.array(z.string()).optional()

@@ -1255,6 +1255,12 @@
           "required": true
         },
         {
+          "field": "permittedChildren",
+          "type": "PermittedChildRule[]",
+          "required": false,
+          "note": "Per-child composition rules (cardinality + optional applicability). permittedChildTypeIds is the flat id projection of these; a child with no rule defaults to M1. Optional/additive — a type may carry only the flat projection."
+        },
+        {
           "field": "requiredInputs",
           "type": "string[]",
           "required": true
@@ -2405,6 +2411,29 @@
           "type": "boolean",
           "required": false,
           "note": "For tool_result entries: whether the proposed command was accepted."
+        }
+      ]
+    },
+    {
+      "name": "PermittedChildRule",
+      "fields": [
+        {
+          "field": "typeId",
+          "type": "string",
+          "required": true,
+          "note": "The permitted child PWU Type id (matches an entry in the parent's permittedChildTypeIds projection)."
+        },
+        {
+          "field": "cardinality",
+          "type": "CardinalityCode",
+          "required": true,
+          "note": "M1 mandatory-exactly-one; M+ mandatory-one-or-more; C1 conditional-zero-or-one; C+ conditional-zero-or-more."
+        },
+        {
+          "field": "applicabilityNote",
+          "type": "string",
+          "required": false,
+          "note": "For conditional (C*) rules: free-text applicability condition. Structured predicate/resolver deferred (M7/M9/M11)."
         }
       ]
     }

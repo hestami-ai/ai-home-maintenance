@@ -194,6 +194,10 @@ export const BaselineTypeSchema = z.enum([
 ]);
 export type BaselineType = z.infer<typeof BaselineTypeSchema>;
 
+/** PermittedChildRule.cardinality — per-child composition cardinality in a PWA Work Architecture View — RPH-DOC-003 §7 / Coding-Agent-Guide §11.7.2 */
+export const CardinalityCodeSchema = z.enum(['M1', 'M+', 'C1', 'C+']);
+export type CardinalityCode = z.infer<typeof CardinalityCodeSchema>;
+
 /** ClaimObject.status — RPH-DOC-007 §13 / DOC-002 §15.1 (8 values) */
 export const ClaimStatusSchema = z.enum([
 	'OPEN',
@@ -796,6 +800,7 @@ export const CANONICAL_ENUM_SCHEMAS = {
 	AuthorizationStatus: AuthorizationStatusSchema,
 	BaselineStatus: BaselineStatusSchema,
 	BaselineType: BaselineTypeSchema,
+	CardinalityCode: CardinalityCodeSchema,
 	ClaimStatus: ClaimStatusSchema,
 	ClaimType: ClaimTypeSchema,
 	CommandReceiptStatus: CommandReceiptStatusSchema,
