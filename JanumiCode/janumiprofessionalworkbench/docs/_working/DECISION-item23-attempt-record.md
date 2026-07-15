@@ -1,6 +1,36 @@
 # §16 item 23 — the Execution Attempt record
 
-**Status: NOT RATIFIED. Recommendation: do not ratify a shape for the Attempt record.**
+> ## ⚠️ SUPERSEDED 2026-07-15 by `HARMONIZATION-LOG.md`. Three of its four blockers are FALSE.
+>
+> This file is retained because §9.4 keeps history and because the *manner* of its wrongness is the finding.
+> Do not act on it. Corrections, in descending importance:
+>
+> - **Blocker 1 (*"the field set exists in no ratified source"*) is FALSE.** I searched RPH-DOC-007 and never
+>   opened **RPH-DOC-009**, the rank-9 storage authority, which defines `create table execution_attempts (…)`
+>   in full at its §10.4 — id, step, attempt_number, state, timings, runtime_binding_id, idempotency_key,
+>   external_operation_id, reconciliation_state, result, error, `provenance jsonb not null`, plus both unique
+>   constraints. DOC-009 also already carries `producing_execution_attempt_id` / `security_classification` /
+>   `retention_class` on artifacts — §9.7's *"typed Artifact of its producing Attempt"* relation, ratified.
+> - **"The floor's independence requirement is NOT REPRESENTABLE" is FALSE** — this was the headline I gave the
+>   sponsor. `ActorReference` (`envelopes.ts:22-31`) carries `roleId`, `modelId`, `providerId`,
+>   `executionInstanceId`: all four §8.4 L851 axes. `RuntimeBinding` (`objects.ts:498-510`, from DOC-009 §10.5)
+>   carries `roleId`, `modelSelectionPolicy`, `contextAssemblyPolicyId`. What is actually wrong is narrow:
+>   `IndependenceRequirement` is a single-valued enum where L851 wants a conjunction, and `rph-assurance`'s
+>   hand-rolled `Identity` re-invented `ActorReference` and dropped `roleId`. **§8.4 L869 was invoked in error.**
+> - **Blocker 3 (*"no write path, and creating one is item 6 territory"*) is FALSE as stated.** Item 6's safe
+>   default is a recipe — *"Extend the versioned registry and mappings"* — not a prohibition. So is item 23's:
+>   *"Evolve policy registry, schemas, persistence, projections, fixtures, and conformance tests **together**
+>   before claiming support."* I read a construction spec as a wall.
+> - **Blocker 4 survives, but I created it.** DOC-002 §3.3 roots the Attempt in the Execution Aggregate, and
+>   PWA authoring has no Execution Plan. The rule that forces authoring to *be* an Attempt is a sentence **I
+>   wrote** in `991c510` ten hours before citing it as an obstacle. The over-reach is mine; see the log's C5.
+> - **The document's own authority claim is wrong.** This guide is not RPH-DOC-000 (§16 item 1: *"This guide is
+>   itself proposed"*; §17 L2538 binds RPH-DOC-000 to the Vocabulary Charter).
+>
+> **What stands:** the `rawOutput`-is-chain-of-thought hazard (below) — still a real trap for any future
+> Attempt design; item 14's staleness; and the `art`-prefix disclosure.
+
+**Status: SUPERSEDED — reached the right caution on a false premise.**
 Produced 2026-07-15 by a verified workflow (draft + four adversarial lenses: invention / structural-crux / deadlock / hollowness). All four returned REWORK on the draft; 13 blocking findings. Related: `PROPOSED-EDITS-recording-and-cot.md`, commits `991c510`, `2acbd86`, `5ff86c9`, `942b0a9`.
 
 ---
