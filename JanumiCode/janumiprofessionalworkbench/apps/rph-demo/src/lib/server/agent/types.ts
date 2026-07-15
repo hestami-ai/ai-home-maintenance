@@ -3,9 +3,18 @@
 // implementation just maps its richer event stream onto these same events. Swapping mock <-> Pi changes nothing
 // downstream.
 
+/** The ACTUAL producer of this run — the resolved model/provider, not a role label. §8.12 checks independence
+ *  against actual model/provider identity, so the floor cannot use a compile-time placeholder here. */
+export interface ProducerIdentity {
+	readonly agentId: string;
+	readonly modelId: string;
+	readonly providerId: string;
+}
+
 /** A normalized event streamed from an authoring agent run (mapped from Pi's event stream, or emitted by the mock). */
 export type AuthoringAgentEvent =
 	| { readonly kind: 'status'; readonly text: string }
+	| { readonly kind: 'producer'; readonly producer: ProducerIdentity }
 	| { readonly kind: 'text'; readonly text: string }
 	| { readonly kind: 'thinking'; readonly text: string }
 	| { readonly kind: 'tool_start'; readonly tool: string; readonly args: Record<string, unknown> }

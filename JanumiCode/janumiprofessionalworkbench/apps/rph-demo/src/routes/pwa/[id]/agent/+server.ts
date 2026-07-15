@@ -6,11 +6,16 @@
 import { error, json } from '@sveltejs/kit';
 import { agentMode, makeAuthoringBroker, recordConversation } from '$lib/server/workbench';
 import { createAuthoringAgent, type AuthoringAgentEvent } from '$lib/server/agent';
-import { runPwaFloor, type FloorView } from '$lib/server/floor';
+import {
+	isRecordable,
+	narrationOf,
+	TRANSCRIPT_KIND,
+	type TranscriptEntry
+} from '$lib/server/agent/transcript';
+import { runPwaFloor, type FloorProducer, type FloorView } from '$lib/server/floor';
 import type { RequestHandler } from './$types';
 
-// A mutable transcript entry (text is accumulated as deltas stream); assignable to the readonly ConversationEntry.
-type TurnEntry = { role: string; kind: string; text: string; success?: boolean };
+type TurnEntry = TranscriptEntry;
 
 /** Compact a tool's args for the transcript (mirrors the client log). */
 function compactArgs(args: Record<string, unknown> | undefined): string {
@@ -55,16 +60,23 @@ async function runFloorAfterTurn(ctx: {
 	transcript: TurnEntry[];
 	agent: Awaited<ReturnType<typeof createAuthoringAgent>>;
 	mode: 'mock' | 'pi';
+	/** The ACTUAL producer this run resolved to; undefined if the run never got that far. */
+	producer: FloorProducer | undefined;
 	onEvent: (ev: AuthoringAgentEvent) => void;
 	send: (ev: AuthoringAgentEvent) => void;
 	signal: AbortSignal;
 }): Promise<void> {
-	const { pwaId, instruction, transcript, agent, mode, onEvent, send, signal } = ctx;
-	const planText = () =>
-		transcript
-			.filter((e) => e.role === 'AGENT' && (e.kind === 'message' || e.kind === 'thinking'))
-			.map((e) => e.text)
-			.join('\n');
+	const { pwaId, instruction, transcript, agent, mode, producer, onEvent, send, signal } = ctx;
+	// Fail closed (§8.12): with no resolved model/provider the Reasoning Review's independence cannot be
+	// established, and an Assessment that cannot establish independence must not be recorded as if it had.
+	if (!producer) {
+		send({
+			kind: 'status',
+			text: '⚖ Assurance floor not run — the producing model/provider never resolved, so reviewer independence cannot be established.'
+		});
+		return;
+	}
+	const planText = () => narrationOf(transcript);
 	const noteFloor = (f: FloorView) => {
 		const t = floorStatus(f);
 		send({ kind: 'status', text: t });
@@ -72,7 +84,7 @@ async function runFloorAfterTurn(ctx: {
 	};
 	try {
 		send({ kind: 'status', text: '⚖ Running the assurance floor (independent reasoning review)…' });
-		let floor = await runPwaFloor(pwaId, { prompt: instruction, planText: planText() });
+		let floor = await runPwaFloor(pwaId, { prompt: instruction, producer, planText: planText() });
 		if (!floor) return;
 		noteFloor(floor);
 		if (!floor.satisfied && mode !== 'mock') {
@@ -85,6 +97,7 @@ async function runFloorAfterTurn(ctx: {
 			await agent.run(refineDirective(instruction, floor.reasoningGaps), onEvent, signal);
 			floor = await runPwaFloor(pwaId, {
 				prompt: instruction,
+				producer,
 				planText: planText(),
 				priorGaps: floor.reasoningGaps
 			});
@@ -129,12 +142,15 @@ export const POST: RequestHandler = async ({ params, request }) => {
 			// Build the durable transcript for this turn as the run streams. It opens with the user's instruction,
 			// then accumulates the agent's messages / tool calls / results — persisted to the engine on completion.
 			const transcript: TurnEntry[] = [{ role: 'USER', kind: 'message', text: instruction }];
+			// §9.7 write boundary: volunteered reasoning material is never admitted to the durable transcript.
+			// Events are immutable and permanent (§9.4), so anything recorded here could never be purged — the
+			// drop has to happen before the write, not after. See $lib/server/agent/transcript.
 			const record = (ev: AuthoringAgentEvent) => {
-				if (ev.kind === 'text' || ev.kind === 'thinking') {
-					const kind = ev.kind === 'text' ? 'message' : 'thinking';
+				if (!isRecordable(TRANSCRIPT_KIND[ev.kind] ?? '')) return;
+				if (ev.kind === 'text') {
 					const last = transcript.at(-1);
-					if (last?.role === 'AGENT' && last.kind === kind) last.text += ev.text;
-					else transcript.push({ role: 'AGENT', kind, text: ev.text });
+					if (last?.role === 'AGENT' && last.kind === 'message') last.text += ev.text;
+					else transcript.push({ role: 'AGENT', kind: 'message', text: ev.text });
 				} else if (ev.kind === 'tool_start') {
 					transcript.push({
 						role: 'AGENT',
@@ -163,7 +179,11 @@ export const POST: RequestHandler = async ({ params, request }) => {
 				}
 				const mode = agentMode();
 				const agent = await createAuthoringAgent(broker, mode);
+				// The run declares its ACTUAL resolved model/provider; the floor binds independence to that, never
+				// to a role label (§8.12).
+				let producer: FloorProducer | undefined;
 				const onEvent = (ev: AuthoringAgentEvent) => {
+					if (ev.kind === 'producer') producer = ev.producer;
 					send(ev);
 					record(ev);
 				};
@@ -176,6 +196,7 @@ export const POST: RequestHandler = async ({ params, request }) => {
 					transcript,
 					agent,
 					mode,
+					producer,
 					onEvent,
 					send,
 					signal: request.signal

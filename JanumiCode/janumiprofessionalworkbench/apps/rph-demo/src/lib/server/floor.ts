@@ -28,14 +28,15 @@ const FLOOR_ACTOR: ActorReference = {
 	actorType: 'SERVICE',
 	displayName: 'Assurance Service'
 };
-// The authoring executor's identity — the independence baseline the Reasoning Review evaluator must differ from
-// (a distinct model/provider from agy). The graph is produced/shaped by this agent (isAiProduced=true).
-const AUTHORING_EXECUTOR = {
-	actorType: 'AGENT' as const,
-	agentId: 'authoring-agent',
-	modelId: 'authoring-executor',
-	providerId: 'jpwb'
-};
+/** The ACTUAL producer of the graph under review. §8.12 checks independence against real model/provider identity —
+ *  "not a role label such as 'Verifier'" — so this is resolved per run and never a compile-time constant. It was
+ *  previously the literal `authoring-executor`, which made `checkIndependence(DIFFERENT_MODEL, …)` a comparison of
+ *  two constants: it could never fail, and certified independence on every run. */
+export interface FloorProducer {
+	readonly agentId: string;
+	readonly modelId: string;
+	readonly providerId: string;
+}
 
 export interface FloorPolicyView {
 	readonly policyId: string;
@@ -78,7 +79,14 @@ function hasEffectiveWaiver(engine: EngineHandle, subjectId: string): boolean {
  *  Reasoning Review so a re-run judges whether the previous findings are genuinely resolved. */
 export async function runPwaFloor(
 	pwaId: string,
-	opts: { prompt: string; planText?: string; priorGaps?: string[] }
+	opts: {
+		prompt: string;
+		/** REQUIRED: the actual resolved producer. An unresolved producer means §8.12 independence cannot be
+		 *  established, so there is no honest default — callers must supply it or not run the floor. */
+		producer: FloorProducer;
+		planText?: string;
+		priorGaps?: string[];
+	}
 ): Promise<FloorView | undefined> {
 	const engine = getEngine();
 	const pwa = getObject(engine, pwaId);
@@ -90,7 +98,7 @@ export async function runPwaFloor(
 		objectType: 'PROFESSIONAL_WORK_ARCHITECTURE',
 		semanticVersion: Number(pwa.semanticVersion ?? 1),
 		isAiProduced: true,
-		producer: AUTHORING_EXECUTOR
+		producer: { actorType: 'AGENT' as const, ...opts.producer }
 	};
 	const ctx: ValidatorContext = {
 		schemaInvariant: {
@@ -107,7 +115,9 @@ export async function runPwaFloor(
 		reasoningReview: {
 			prompt: opts.prompt,
 			content: JSON.stringify(graphExport),
-			...(opts.planText ? { plan: opts.planText } : {}),
+			// Always present, never conditional: §9.7 forbids treating the presence or absence of the producer's
+			// account as a signal, and a constant-shape input is what makes the §14.3 ablation a real test.
+			plan: opts.planText ?? '',
 			...(opts.priorGaps?.length ? { prior: { gaps: opts.priorGaps } } : {})
 		}
 	};

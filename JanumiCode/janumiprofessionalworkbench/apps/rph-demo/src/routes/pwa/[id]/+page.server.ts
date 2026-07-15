@@ -125,7 +125,11 @@ export const load: PageServerLoad = ({ params }) => {
 		types,
 		fixtures,
 		policies,
-		conversation: loadConversation(params.id).map(toLogEntry),
+		// §9.7: private chain-of-thought never enters a default or shared projection. New turns no longer record it
+		// (the agent route drops it at the write boundary), and this filter keeps any pre-rule row out of the view.
+		conversation: loadConversation(params.id)
+			.filter((e) => e.kind !== 'thinking')
+			.map(toLogEntry),
 		// The latest recorded assurance floor for this PWA (canonical ASSURANCE_ASSESSMENT/OBSERVATION).
 		floor: loadPwaFloor(params.id)
 	};

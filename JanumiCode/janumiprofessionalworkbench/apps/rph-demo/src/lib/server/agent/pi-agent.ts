@@ -98,6 +98,12 @@ export class PiAuthoringAgent implements AuthoringAgent {
 			// Read the user's REAL Pi settings (same agent dir the TUI uses) so we inherit their default model.
 			const settingsManager = SettingsManager.create(process.cwd(), getAgentDir());
 			const model = await resolveModel(modelRegistry, settingsManager);
+			// §8.12 checks independence against the ACTUAL model/provider, never a role label — so emit the
+			// resolved identity structurally rather than only as display text, and let the floor bind to it.
+			emit({
+				kind: 'producer',
+				producer: { agentId: 'authoring-agent', modelId: model.id, providerId: model.provider }
+			});
 			emit({ kind: 'status', text: `pi agent · ${model.provider}/${model.id}` });
 
 			const loader = new DefaultResourceLoader({
@@ -110,7 +116,9 @@ export class PiAuthoringAgent implements AuthoringAgent {
 
 			const created = await createAgentSession({
 				model,
-				thinkingLevel: 'low',
+				// §9.7: never solicit private chain-of-thought. Reasoning Review judges the agent's declared
+				// rationale and observable output, never the producer's interior — so we do not ask for it.
+				thinkingLevel: 'off',
 				noTools: 'builtin',
 				customTools: toPiTools(this.tools),
 				resourceLoader: loader,

@@ -37,6 +37,12 @@ export class MockAuthoringAgent implements AuthoringAgent {
 
 	async run(instruction: string, emit: EmitFn, signal?: AbortSignal): Promise<void> {
 		const steps = parsePlan(instruction) ?? this.cannedScript();
+		// The mock is a deterministic structural agent, not a model — but it still declares its ACTUAL producer
+		// identity so the floor never has to fall back to a placeholder (§8.12).
+		emit({
+			kind: 'producer',
+			producer: { agentId: 'authoring-agent', modelId: 'mock-structural', providerId: 'jpwb-mock' }
+		});
 		emit({ kind: 'status', text: 'mock agent' });
 		emit({
 			kind: 'text',

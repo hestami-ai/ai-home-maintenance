@@ -42,7 +42,7 @@ test.describe('PWA Designer — Assurance Policy manager', () => {
 		let snap = await introspect(request);
 		const findByName = (name: string) =>
 			snap.assurancePolicies.find((p: { state: { name?: string } }) => p.state.name === name);
-		let created = findByName('Tenant Isolation Review');
+		const created = findByName('Tenant Isolation Review');
 		expect(created, 'new policy exists').toBeTruthy();
 		expect(created.state.status).toBe('ACTIVE');
 		expect((created.state.criteria as unknown[]).length).toBe(2);

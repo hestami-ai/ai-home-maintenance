@@ -35,11 +35,19 @@ const SEVERITIES = new Set<Severity>([
 ]);
 const CRITERION_IDS = new Set<string>(REASONING_REVIEW_CRITERIA.map((c) => c.id));
 
+/** Render a bounded excerpt with truncation DECLARED (§9.7: any declared truncation is recorded, never silent). */
+function excerpt(text: string, limit: number): string {
+	return text.length > limit ? `${text.slice(0, limit)} …(truncated)` : text;
+}
+
 function judgePrompt(input: ReasoningReviewInput): string {
 	const rubric = REASONING_REVIEW_CRITERIA.map((c) => `- ${c.id}: ${c.label}`).join('\n');
 	const priorLine = input.prior?.gaps.length
 		? `\nA PREVIOUS review flagged: ${JSON.stringify(input.prior.gaps)}. Judge whether those are genuinely resolved.`
 		: '';
+	// Unconditional: the section is always rendered so the reviewer's input shape never encodes whether the
+	// producer said anything (§9.7 — presence or absence is never a signal).
+	const plan = excerpt(input.plan ?? '', 4000) || '(none recorded)';
 	return [
 		'You are an independent assurance reviewer performing a REASONING REVIEW of an AI-produced professional artifact.',
 		'You ask whether the artifact genuinely discharges its delegated professional obligation, or merely produces a',
@@ -51,10 +59,8 @@ function judgePrompt(input: ReasoningReviewInput): string {
 		'',
 		'The artifact (a canonical graph export / serialized subject) to review:',
 		'',
-		input.content.length > 24000 ? `${input.content.slice(0, 24000)} …(truncated)` : input.content,
-		input.plan
-			? `\nThe producing agent's OWN recorded plan/narration:\n"""${input.plan.slice(0, 4000)}"""`
-			: '',
+		excerpt(input.content, 24000),
+		`\nThe producing agent's OWN recorded narration — its observable output, never its private chain-of-thought:\n"""${plan}"""`,
 		priorLine,
 		'',
 		'Evaluate EACH derivational-integrity failure class below. For each, decide whether the FAILURE is PRESENT',
@@ -96,7 +102,14 @@ function coerceJudgement(parsed: unknown): ReasoningReviewJudgement {
 	return { findings, recommendation, residualUncertainty };
 }
 
-export function createAgyReasoningReviewValidator(): Validator {
+/** The impure backend seam. Injectable so the §14.3 conformance scenario can exercise the REAL Validator path —
+ *  judgePrompt → extractJson → coerceJudgement → reasoningReviewResultFromJudgement — hermetically, without a
+ *  subprocess. §14.3 requires the scenario exercise the real Validator: "a stub that ignores the input passes this
+ *  trivially", so the fake captures the materialized prompt and the test asserts over it. */
+export type AgyPrint = (prompt: string) => Promise<string>;
+
+export function createAgyReasoningReviewValidator(opts: { print?: AgyPrint } = {}): Validator {
+	const print = opts.print ?? agyPrint;
 	const evaluator: Identity = {
 		actorType: 'AGENT',
 		agentId: 'agy',
@@ -110,12 +123,12 @@ export function createAgyReasoningReviewValidator(): Validator {
 			const input = ctx.reasoningReview;
 			if (!input) throw new Error('reasoning-review context (prompt + content) is missing');
 			const prompt = judgePrompt(input);
-			let raw = await agyPrint(prompt);
+			let raw = await print(prompt);
 			let judgement: ReasoningReviewJudgement;
 			try {
 				judgement = coerceJudgement(JSON.parse(extractJson(raw)));
 			} catch {
-				raw = await agyPrint(`${prompt}\n\nIMPORTANT: reply with ONLY the minified JSON object.`);
+				raw = await print(`${prompt}\n\nIMPORTANT: reply with ONLY the minified JSON object.`);
 				judgement = coerceJudgement(JSON.parse(extractJson(raw)));
 			}
 			return reasoningReviewResultFromJudgement(

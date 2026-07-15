@@ -11,8 +11,12 @@ import { createAgyReasoningReviewValidator } from './reasoning-review-validator.
 import { createMockReasoningReviewValidator } from './mock-reasoning-review-validator.js';
 
 export function createFloorRegistry(opts: { testMode: boolean }): ValidatorRegistry {
-	const forced = process.env.JPWB_ASSESSOR;
-	const useMock = forced === 'mock' || (forced !== 'agy' && opts.testMode);
+	// Fail closed (§8.4): no local instruction, env var, or planner optimization may suppress the Reasoning
+	// Review floor. JPWB_ASSESSOR selects a backend only INSIDE test mode — outside it the real Validator is the
+	// only option. Previously `JPWB_ASSESSOR=mock` swapped in the content-blind mock in ANY environment while the
+	// floor still recorded SATISFIED.
+	const forced = opts.testMode ? process.env.JPWB_ASSESSOR : undefined;
+	const useMock = opts.testMode && forced !== 'agy';
 	const registry = createValidatorRegistry();
 	registry.register(schemaInvariantValidatorInstance);
 	registry.register(identityProvenanceValidatorInstance);
