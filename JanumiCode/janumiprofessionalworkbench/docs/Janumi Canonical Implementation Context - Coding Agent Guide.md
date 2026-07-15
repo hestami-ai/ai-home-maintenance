@@ -174,7 +174,7 @@ An agent produced output
 
 8. **One governed model, many projections.** Requirements, architecture, implementation, verification, decisions, and operations are views over connected professional state, not isolated modules with separate truth.
 
-9. **AI participation is visible.** Material AI contributions identify agent, role, model/version, execution context, tools, Evidence, Assumptions, limitations, and accepted/rejected disposition. Preserve professional rationale; do not require or store private chain-of-thought.
+9. **AI participation is visible.** Material AI contributions identify agent, role, model/version, execution context, tools, Evidence, Assumptions, limitations, and accepted/rejected disposition. Preserve professional rationale. Never require private chain-of-thought, rest a finding on it, place it in another agent's context, or build a dedicated store for it.
 
 10. **State and history are explicit.** Do not infer lifecycle, validity, approval, assurance, or authority from null fields, storage location, UI placement, or prose. Material revisions, supersession, reopening, corrections, and reconciliation remain reconstructable.
 
@@ -222,6 +222,8 @@ An agent produced output
 | **Assurance Policy** | Versioned professional rule defining applicability, claims, Evidence, criteria, independence, dispositions, remediation, escalation, and waiver. |
 | **Validator** | Replaceable deterministic, model-based, hybrid, human, or external evaluator implementing bounded Assurance Policy concerns. It may recommend policy-permitted control actions; it cannot authorize or select them for execution, decide, repair, or mutate professional state. |
 | **Reasoning Review** | Mandatory de minimis Assurance Policy/control for every material AI/agent-produced professional transformation. A conforming Validator independently evaluates the exact output and its observable derivation, provenance, assumptions, constraints, Evidence use, uncertainty, and completion claim; it does not require or expose private chain-of-thought. |
+| **Professional rationale summary** | The agent-authored account of its own professional reasoning returned under Section 9.7's execution contract, bound to the Evidence used, Assumptions, Claims, limitations, and residual uncertainty it declares. It is a contracted deliverable addressed to the governed system, not a byproduct of a provider's runtime. It is not private chain-of-thought. |
+| **Private chain-of-thought** | A model's interior deliberation and any rendering of it: raw reasoning tokens, inline reasoning volunteered by a local or open-weight model, or a summarized reasoning block returned by a hosted API. The term is fixed by origin, not by disclosure. It is not a professional rationale summary and is not observable trace data within Section 8.4's meaning. Section 9.7 governs its handling. |
 | **Material professional transformation** | Production or semantic revision of a professional object, Artifact, Claim, Evidence proposal, decomposition/recomposition result, Decision package, Baseline candidate, or other output that feeds another actor/agent, affects governed work, or supports a protected transition. Low-level rendering, retrieval, formatting, and retries are not material by themselves unless their result has one of those effects. |
 | **Finding Definition** | Policy-defined failure or concern type, identified by `findingCode`; it is not a detected instance. |
 | **Assurance Observation** | One concrete, version-bound detection. Current contracts represent a concrete finding as an `AssuranceObservation` with `observationType: FINDING`; there is no separate Finding entity. In prose, **finding** is shorthand for such an observation and its governed unresolved concern. |
@@ -453,7 +455,7 @@ Rejected, invalid, quarantined, superseded, revoked, and failed material remains
 
 Rollback, semantic supersession, correction, and compensation remain distinct. A material upstream change computes dependency/impact closure and invalidates or reopens affected Claims, Evidence, Assessments, Decisions, readiness, and Baseline candidacy as policy requires; it never deletes the historical approval or rewrites an authoritative Baseline.
 
-Quarantine means policy-governed isolation and non-admissibility, not a universal object field or lifecycle enum. Do not implement a universal `GovernedStreamRecord`, duplicate Event authority, store every Artifact body in one table, or capture private chain-of-thought. Preserve decision-relevant rationale, observable actions, tool inputs/outputs, self-reported limitations, and professional provenance subject to retention, security, and redaction policy. Section 10's typed persistence remains authoritative.
+Quarantine means policy-governed isolation and non-admissibility, not a universal object field or lifecycle enum. Do not implement a universal `GovernedStreamRecord`, duplicate Event authority, store every Artifact body in one table, or build a dedicated store for private chain-of-thought. Preserve decision-relevant rationale, observable actions, tool inputs/outputs, self-reported limitations, and professional provenance subject to retention, security, and redaction policy. Section 10's typed persistence remains authoritative.
 
 ---
 
@@ -1031,7 +1033,8 @@ Existence is not proof:
 - an architecture document does not prove completeness;
 - a citation proves a source made a statement, not that the statement is correct;
 - a Validator opinion is Evidence only when professional judgment is permitted;
-- generated prose remains an Artifact until admitted as Evidence.
+- generated prose remains an Artifact until admitted as Evidence;
+- a professional rationale summary proves an account was emitted, not that it drove the output.
 
 Evidence corrections create a new version. Invalidated or expired Evidence cannot support active satisfaction and triggers review of dependent Claims, Assessments, Decisions, and Baseline readiness. Contradicting Evidence remains visible.
 
@@ -1332,9 +1335,9 @@ Errors return a stable code/category, professional explanation, technical refere
 
 Every AI execution records objective, originating Intent, scope, authority, Constraints, context projection, Evidence, required outputs, validation/completion/termination/escalation conditions, tool permissions, and resource limits.
 
-It returns proposed entities/Commands, professional rationale summary, Evidence used, Assumptions, Claims, limitations, unresolved Questions, residual uncertainty, validation results, and provenance. Agent completion never completes a PWU.
+It returns proposed entities/Commands, professional rationale summary, Evidence used, Assumptions, Claims, limitations, unresolved Questions, residual uncertainty, validation results, and provenance. Agent completion never completes a PWU. A model may volunteer private chain-of-thought no control requested—raw inline reasoning from a local or open-weight model, or a summarized reasoning block returned by a hosted API. Never solicit it, never make a control depend on it, and never treat its presence or absence as a signal. Material that arrives is redacted at the boundary and then retained as a typed Artifact of its producing Attempt under retention, security, and access policy, so the prompt/reasoning/response exchange stays reconstructable. It is never admitted as Evidence, never supplies another agent's context, never reaches a log, never enters a default or shared projection, never supports a finding, and is never the professional rationale summary above. Retained reasoning material in an evaluator's context is a hidden-context independence violation under Section 8.12. It adds no dedicated reasoning store; Section 10's typed persistence remains authoritative. It participates in no execution, assurance, governance, Baseline, or traceability, so Section 10.1's no-hard-delete rule does not reach it; it is purgeable at retention expiry. Where accepted contracts cannot represent this losslessly, block the capability and resolve Section 16 item 23.
 
-Every tool/sandbox call records identity, authorization scope, input reference, start/end, result/error, resource use, and declared outputs. Model output is untrusted input. Malformed output creates no authoritative object.
+Every tool/sandbox call records identity, authorization scope, input reference, start/end, result/error, resource use, and declared outputs. Model output is untrusted input. Malformed output creates no authoritative object. Each bounded try of a model/agent invocation—including every retry, reformat, and repair request—is its own Execution Attempt and its own record. Record the materialized input presented to the model, the returned answer output before schema coercion or repair, the resolved provider/model/version actually invoked, any declared truncation or omission, and the parse/validation/repair outcome, subject to applicable redaction handling recorded as such. A prompt/template fingerprint identifies that record; it never substitutes for it. Volunteered reasoning material in that exchange is governed by the rule above, not by this record; where it arrives inline with the answer, separate it at retention so that only the answer span binds under Section 8.4. Where the spans cannot be separated losslessly, or accepted contracts cannot represent these records losslessly, block the capability and resolve Section 16 item 23.
 
 For uncertain external side effects, persist operation ID, provider, idempotency key, attempt status, and reconciliation method. Classify the operation as definitely not started, observably running, succeeded but unrecorded, failed, or uncertain. Never blindly retry an uncertain non-idempotent action; reconcile first. Compensation is a new recorded Action, not deletion of history.
 
@@ -2217,7 +2220,8 @@ Four principal kinds—human, machine, workload, and agent—resolve through one
 - Encrypt transport and stored sensitive data; keep secrets out of code, logs, Events, traces, fixtures, prompts, and Artifact metadata.
 - Use Vault-minted, narrowly scoped, short-lived credentials and rotate/revoke them without redeploying application code.
 - Treat provider keys as tenant-scoped BYOK secrets where the edition/profile requires it; never pool them implicitly.
-- Redact before logging or sending context to external models. Store the minimum necessary prompt/input/output content under explicit retention and access policy.
+- Redact before logging, persisting, or sending context to external models. Keep prompt/input/output content under explicit retention and access policy.
+- Minimize retained sensitive data. Minimization never excuses the absence of a record required by Sections 5.6, 8.4, 9.7, or 10.1.
 - Record security-relevant actions in a tamper-evident, hash-chained audit trail with tenant, principal, action, subject/version, outcome, correlation, time, and integrity linkage. Audit records complement but never replace semantic Events.
 - Preserve separation of duties for high-risk Decisions, Baseline promotion, waiver, security-policy change, and credential administration.
 - Fail closed on missing identity, tenant, policy, schema, or authority context. Availability fallbacks may not silently weaken professional or security invariants.
@@ -2234,7 +2238,7 @@ Assume compiler, agent, repository, dependency, prompt-supplied, and generated c
 - Never expose the host/container runtime socket, privileged mode, host namespaces, control-plane credentials, or unrestricted persistent volumes.
 - Meter CPU, memory, storage, network, model tokens, concurrency, and wall time; make quota exhaustion a typed, recoverable result.
 - Validate and classify outputs before they become Artifacts, Evidence, or executable inputs. Generation does not imply trust.
-- Terminate and clean up idempotently; retain only policy-approved provenance, logs, outputs, and failure Evidence.
+- Terminate and clean up idempotently; retain only policy-approved provenance, logs, outputs, and failure Evidence. Retention limits never excuse the absence of the Execution Attempt record required by Section 9.7.
 
 An external call uses the attempt/reconciliation protocol in Section 9. A timeout is uncertainty, not proof of failure. A successful process exit is an execution fact and potential evidence, not automatically admitted canonical Evidence or professional completion.
 
@@ -2248,7 +2252,7 @@ An external call uses the attempt/reconciliation protocol in Section 9. A timeou
 
 Maintain one codebase and shared contracts. Enterprise-only implementation belongs behind the governed open-core boundary (currently `ee/`) plus build-time inclusion and runtime entitlement checks. Do not fork the semantic model, schema package, migrations, or client code by edition. A missing license disables an entitled capability explicitly; it must not corrupt or reinterpret existing professional state.
 
-Customer-specific behavior is a PWA, profile, policy/configuration, or declared extension—not an edition fork. Mobile or other clients consume the same APIs and semantics; they are not alternate authorities.
+Customer-specific behavior is a PWA, profile, policy/configuration, or declared extension—not an edition fork. Mobile or other clients consume the same APIs and semantics; they are not alternate authorities. Editions differ in entitled capability, never in professional semantics or in what a profile means. Where an install cannot supply a required independence or separation capability, the protected transitions requiring it block rather than downgrade. No edition, entitlement, or deployment topology relaxes an invariant.
 
 ### 13.6 Status is not doctrine
 
@@ -2325,7 +2329,7 @@ Any slice claiming PWA Designer, PWA-authoring-agent, PWA instantiation, or gove
 - a material result cannot feed dependent context or another protected transition before its de minimis and additional applicable Assessments permit it;
 - missing context/Evidence, Validator unavailability/timeout/malformed output/failure, staleness, and independence violation fail closed without fabricating subject rejection or satisfaction; restart/replay resumes the barrier, and regeneration preserves prior Observations while requiring a new Assessment;
 - the PWA Work Architecture View shows policy and Validator capability assignments without runtime pass state, while the Professional Work Graph/Assurance context exposes actual Validator identity/version/invocation, Evidence, Assessment, Observations, disposition, and gate effect; and
-- conformance requires no private chain-of-thought and proves that UI, agent, worker, retry, direct-persistence, and projection paths cannot bypass server-side assurance enforcement.
+- conformance requires no private chain-of-thought—Reasoning Review reaches a valid Assessment with all volunteered reasoning material withheld, no retained reasoning Artifact appears in a Validator's context or a log, and the scenario exercises the real Validator, since a stub that ignores the input passes this trivially—and proves that UI, agent, worker, retry, direct-persistence, and projection paths cannot bypass server-side assurance enforcement.
 
 Additional repair, convergence, and meta-assurance scenarios apply after Section 16 items 24–25 are ratified or a slice explicitly adopts equivalent accepted contracts:
 
@@ -2366,7 +2370,7 @@ Emit structured logs and traces with timestamp, severity, service/component, env
 
 Errors are typed and separated into validation, authorization, conflict, invariant, dependency, timeout/unknown-outcome, quota, and internal categories. Preserve redacted failure Evidence and causal chains; never reduce them to a generic “failed.” Health and readiness distinguish process liveness from ability to uphold dependencies and invariants.
 
-For model/agent calls, record allowed provider/model/version, prompt/template/tool versions or fingerprints, relevant policy, token/time/cost metrics, response schema status, safety/redaction outcome, and resulting proposal/Artifact IDs. For assurance cycles supported by accepted contracts, correlate subject/input/output versions, policies/criteria, considered/rejected/missing Evidence, actual independence, finding codes/Observation IDs, control response, repair diff, invalidated dependencies, revalidation closure, and resulting unresolved Observations; add recurrence fingerprints only after Section 16 item 24 is decided. Do not log secrets, unrestricted professional content, or private chain-of-thought.
+For model/agent calls, record allowed and resolved provider/model/version, prompt/template/tool versions or fingerprints, relevant policy, token/time/cost metrics, response schema status, safety/redaction outcome, and resulting proposal/Artifact IDs. In logs and traces a fingerprint identifies the Attempt record Section 9.7 requires. For assurance cycles supported by accepted contracts, correlate subject/input/output versions, policies/criteria, considered/rejected/missing Evidence, actual independence, finding codes/Observation IDs, control response, repair diff, invalidated dependencies, revalidation closure, and resulting unresolved Observations; add recurrence fingerprints only after Section 16 item 24 is decided. Do not log secrets, unrestricted professional content, or private chain-of-thought.
 
 Alert on invariant violations, direct legacy writes after cutover, authorization/RLS mismatch, audit-chain break, Event/outbox lag, projection staleness, stuck durable attention, repeated unknown external outcomes, excessive reconciliation, quota abuse, and cross-tenant access attempts. Fail loudly on semantic corruption; degrade only through an explicit, safe operating mode.
 
