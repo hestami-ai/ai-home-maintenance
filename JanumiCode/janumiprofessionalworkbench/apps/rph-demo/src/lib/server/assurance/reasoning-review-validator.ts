@@ -18,7 +18,7 @@ import {
 	type ValidatorResult
 } from '@janumipwb/rph-assurance';
 import { renderRationale } from '../agent/rationale.js';
-import { AGY_MODEL_LABEL, agyPrint, extractJson } from './agy-cli.js';
+import { agyPrint, extractJson, judgeModel } from './agy-cli.js';
 
 const DISPOSITIONS = new Set<Disposition>([
 	'SATISFIED',
@@ -113,20 +113,24 @@ function coerceJudgement(parsed: unknown): ReasoningReviewJudgement {
  *  trivially", so the fake captures the materialized prompt and the test asserts over it. */
 export type AgyPrint = (prompt: string) => Promise<string>;
 
-export function createAgyReasoningReviewValidator(opts: { print?: AgyPrint } = {}): Validator {
+export function createAgyReasoningReviewValidator(
+	opts: { print?: AgyPrint; modelId?: string } = {}
+): Validator {
 	const print = opts.print ?? agyPrint;
-	const evaluator: Identity = {
-		actorType: 'AGENT',
-		agentId: 'agy',
-		modelId: AGY_MODEL_LABEL,
-		providerId: 'google'
-	};
 	return {
 		policyId: FLOOR_POLICY_IDS.REASONING_REVIEW,
 		validatorId: 'agy.reasoning-review',
 		async evaluate(subject, ctx): Promise<ValidatorResult> {
 			const input = ctx.reasoningReview;
 			if (!input) throw new Error('reasoning-review context (prompt + content) is missing');
+			// Resolved per call, never at module load: §8.4 requires the evaluator's ACTUAL identity be recorded,
+			// and §14.6 the "allowed and resolved" model. Throws when unpinned rather than record a placeholder.
+			const evaluator: Identity = {
+				actorType: 'AGENT',
+				agentId: 'agy',
+				modelId: opts.modelId ?? judgeModel(),
+				providerId: 'google'
+			};
 			const prompt = judgePrompt(input);
 			let raw = await print(prompt);
 			let judgement: ReasoningReviewJudgement;

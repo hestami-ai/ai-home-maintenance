@@ -35,6 +35,8 @@ const SUBJECT: AssuranceSubject = {
 	}
 };
 
+const JUDGE = 'gemini-judge-3';
+
 const CLEAN = JSON.stringify({ findings: [], recommendation: 'SATISFIED', residualUncertainty: [] });
 
 /** A capturing fake for the impure agy call: records every materialized prompt, replies with a fixed judgement. */
@@ -68,7 +70,7 @@ const ctx = (
 describe('Reasoning Review Validator — §14.3 conformance: no private chain-of-thought', () => {
 	it('reaches a VALID Assessment with all volunteered reasoning material withheld (the ablation)', async () => {
 		const { print } = capturing();
-		const result = await createAgyReasoningReviewValidator({ print }).evaluate(
+		const result = await createAgyReasoningReviewValidator({ print, modelId: JUDGE }).evaluate(
 			SUBJECT,
 			ctx({ rationale: RATIONALE })
 		);
@@ -87,11 +89,11 @@ describe('Reasoning Review Validator — §14.3 conformance: no private chain-of
 		const withAccount = capturing();
 		const withheld = capturing();
 
-		const a = await createAgyReasoningReviewValidator({ print: withAccount.print }).evaluate(
+		const a = await createAgyReasoningReviewValidator({ print: withAccount.print, modelId: JUDGE }).evaluate(
 			SUBJECT,
 			ctx({ rationale: RATIONALE, narration: 'I added a Realization root.' })
 		);
-		const b = await createAgyReasoningReviewValidator({ print: withheld.print }).evaluate(
+		const b = await createAgyReasoningReviewValidator({ print: withheld.print, modelId: JUDGE }).evaluate(
 			SUBJECT,
 			ctx()
 		);
@@ -108,7 +110,7 @@ describe('Reasoning Review Validator — §14.3 conformance: no private chain-of
 
 	it('renders the CONTRACTED account and its declared bindings — not scraped narration (§9.7 / §3)', async () => {
 		const { prompts, print } = capturing();
-		await createAgyReasoningReviewValidator({ print }).evaluate(
+		await createAgyReasoningReviewValidator({ print, modelId: JUDGE }).evaluate(
 			SUBJECT,
 			ctx({ rationale: RATIONALE, narration: 'I added a Realization root.' })
 		);
@@ -125,7 +127,7 @@ describe('Reasoning Review Validator — §14.3 conformance: no private chain-of
 
 	it('records a LIMITATION when the producer returned no rationale summary — never infers from silence', async () => {
 		const { prompts, print } = capturing();
-		const result = await createAgyReasoningReviewValidator({ print }).evaluate(SUBJECT, ctx());
+		const result = await createAgyReasoningReviewValidator({ print, modelId: JUDGE }).evaluate(SUBJECT, ctx());
 
 		// §9.7 requires the producer to return an account. It did not. The review still concludes (§8.4: it works
 		// without the producer's interior), but §8.9 requires a valid result to identify its limitations — so the
@@ -135,7 +137,7 @@ describe('Reasoning Review Validator — §14.3 conformance: no private chain-of
 		expect(prompts[0]).toContain('NOT DECLARED');
 
 		const declared = capturing();
-		const ok = await createAgyReasoningReviewValidator({ print: declared.print }).evaluate(
+		const ok = await createAgyReasoningReviewValidator({ print: declared.print, modelId: JUDGE }).evaluate(
 			SUBJECT,
 			ctx({ rationale: RATIONALE })
 		);
@@ -144,7 +146,7 @@ describe('Reasoning Review Validator — §14.3 conformance: no private chain-of
 
 	it('DECLARES truncation rather than silently cutting the subject or the account (§9.7)', async () => {
 		const { prompts, print } = capturing();
-		await createAgyReasoningReviewValidator({ print }).evaluate(
+		await createAgyReasoningReviewValidator({ print, modelId: JUDGE }).evaluate(
 			SUBJECT,
 			ctx({ narration: 'y'.repeat(5000), content: `{"pad":"${'x'.repeat(30000)}"}` })
 		);
@@ -155,12 +157,16 @@ describe('Reasoning Review Validator — §14.3 conformance: no private chain-of
 
 	it('records the ACTUAL evaluator identity so independence is checkable against the producer (§8.4)', async () => {
 		const { print } = capturing();
-		const result = await createAgyReasoningReviewValidator({ print }).evaluate(SUBJECT, ctx());
+		const result = await createAgyReasoningReviewValidator({ print, modelId: JUDGE }).evaluate(SUBJECT, ctx());
 		// §8.4 requires "actual identities and lineage are recorded". The producer is resolved per run; the
 		// evaluator is recorded here. A comparison is only meaningful if both sides are real.
 		expect(result.evaluator.agentId).toBe('agy');
 		expect(result.evaluator.providerId).toBe('google');
-		expect(result.evaluator.providerId).not.toBe(SUBJECT.producer.providerId);
+		// The recorded model is the model that ACTUALLY judged. It was the literal 'agy:default' — not the name of
+		// any model — so the floor's DIFFERENT_MODEL comparison was a real id against a placeholder and could never
+		// report sameness, which is the common-mode failure §8.8 names.
+		expect(result.evaluator.modelId).toBe(JUDGE);
+		expect(result.evaluator.modelId).not.toBe('agy:default');
 	});
 
 	it('exercises the real parse/repair path — a fenced, prose-wrapped reply still yields a schema-conformant result', async () => {
@@ -180,7 +186,7 @@ describe('Reasoning Review Validator — §14.3 conformance: no private chain-of
 				}) +
 				'\n```'
 		);
-		const result = await createAgyReasoningReviewValidator({ print }).evaluate(SUBJECT, ctx());
+		const result = await createAgyReasoningReviewValidator({ print, modelId: JUDGE }).evaluate(SUBJECT, ctx());
 
 		// The real coercion ran (not a stub echoing a verdict): a BLOCKING finding drives REJECTED, and the
 		// reviewer's own prompt shape is what produced it.
