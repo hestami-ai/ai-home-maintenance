@@ -2,10 +2,10 @@
 
 ## Compact constitution, architecture map, and coding-agent guide
 
-**Document ID:** `JANUMI-CIC-001`  
-**Status:** Proposed consolidated baseline  
-**Date:** 2026-07-13  
-**Audience:** Coding agents, architects, product engineers, UX engineers, validator authors, platform engineers, and reviewers  
+**Document ID:** `JANUMI-CIC-001`<br>
+**Status:** Proposed consolidated baseline<br>
+**Date:** 2026-07-14<br>
+**Audience:** Coding agents, architects, product engineers, UX engineers, validator authors, platform engineers, and reviewers<br>
 **Purpose:** Supply the smallest practical standalone context that preserves the intent, vocabulary, boundaries, invariants, contracts, and implementation discipline of the governing Janumi documentation corpus.
 
 ---
@@ -39,7 +39,8 @@ The corpus evolved through exploration. Route each question to the matching auth
 11. **Engineering practice:** the Engineering Constitution.
 12. **Orientation and current implementation architecture:** the Executive Overview and ratified repository Architecture Decisions.
 13. **Rationale and candidate future architecture:** the unratified normative drafts embedded in the Constitution Discussion.
-14. **Other examples:** illustrative schemas and conversational prose that are not part of the numbered contract.
+14. **Legacy design evidence:** the JanumiCode v2.3 specification, Validator Subsystem concept/roadmap, and Fusion Analogy. Their governed-stream and assurance-control ideas are informative; their phase model, schemas, storage, providers, and authority rules are not current contracts.
+15. **Other examples:** illustrative schemas and conversational prose that are not part of the numbered contract.
 
 Meaning, wire shape, persistence, and presentation are different kinds of authority. A later storage example does not redefine professional meaning; a UI label does not redefine a state; and a fixture convenience does not relax an invariant. Conflicts are surfaced, never silently “fixed” by changing a canonical term.
 
@@ -56,7 +57,7 @@ Projections                          expose derived, qualified views
 Artifacts/repositories/chat          provide content or provenance, not authority
 ```
 
-The Constitution Discussion proposes CPCO, JSDL, JEM, and a single-node runtime profile. They are valuable target designs, but their self-applied “Normative” labels were not user-ratified. Use their doctrine where it agrees with the numbered corpus. Do not let their example enums, routes, or runtime topology override ratified contracts or current code.
+The Constitution Discussion proposes CPCO, JSDL, JEM, and a single-node runtime profile. The legacy materials propose a monolithic Governed Stream, a Professional Wisdom Compiler, validation-convergence records, and a fusion/confinement model. These are valuable design inputs, but their self-applied authority or implementation detail is not ratified. Use compatible doctrine through the numbered model; do not import their enums, routes, lifecycle stages, schemas, storage topology, provider choices, or authority assumptions.
 
 ### 0.3 Agent stop rule
 
@@ -86,6 +87,24 @@ Intent
 
 This is not a mandatory sequence. Any Evidence, Decision, Action, Observation, contradiction, or failed Assumption may reopen earlier reasoning.
 
+Shape Engineering defines the intended professional trajectory—what work is, what transformations are permitted, what must survive, and what failure modes matter. **Assurance Engineering** designs and operates the evidence-bearing control system that determines whether the evolving work remains justified and may safely advance:
+
+```text
+professional knowledge + Intent + PWA/profile + risk + exact work version
+→ applicable policies and assurance coverage
+→ production/execution with diagnostic provenance
+→ intrinsic, derivational, and systemic assessment
+→ durable observations/findings
+→ governed repair, revalidation, tactic change, or escalation
+→ convergence and residual-uncertainty assessment
+→ authorized Decision and possible Baseline promotion
+→ outcome observation and governed policy learning
+```
+
+A Validator is one replaceable evaluator inside this system. It is not Assurance Engineering, the controller, or the authority.
+
+The controlling assurance invariant is: **every material professional transformation has an explicit coverage decision, and every control resolved as required is durably bound, executed, recorded, inspectable, and enforced before its protected downstream transition.** The non-removable floor includes Reasoning Review for every material AI/agent-produced transformation; risk-derived controls add to that floor.
+
 The product hierarchy is:
 
 ```text
@@ -104,7 +123,8 @@ The reusable-to-concrete work chain is:
 
 ```text
 PWA + immutable published version
-    defines PWU Types, rules, policies, roles, and baseline types
+    defines recursively composed PWU Types, typed child rules,
+    decomposition/recomposition, assurance, roles, and baseline types
         ↓ explicitly instantiated
 Undertaking bound to that exact PWA version/profile
         ↓ owns
@@ -168,6 +188,16 @@ An agent produced output
 
 15. **Implement narrowly.** Prefer the smallest mechanism that preserves approved semantics. Scope changes, architectural deviations, and new abstractions require explicit rationale and Decision.
 
+16. **Assurance is continuous trajectory control.** Assurance is co-designed at transformation boundaries and across dependency closures; it is not a final review, a generic score, or a pile of critics.
+
+17. **Findings are durable obligations.** Regeneration, repair, waiver, override, supersession, or later success never erases what was observed about an exact subject version. Every material finding remains accounted for through resolution, accepted risk, deferral, supersession, invalidation, or escalation.
+
+18. **Passing checks is not stability.** Criterion compliance, Assessment satisfaction, gate readiness, stability, convergence, authorized acceptance, and Baseline promotion are distinct. Corrections must be impact-analyzed and revalidated; oscillation and non-progress remain visible.
+
+19. **Assurance itself requires assurance.** Policies, Validators, rubrics, Evidence access, control selection, independence, and remediation pressure are versioned, observable, challengeable, tested, and governable.
+
+20. **De minimis assurance is non-optional.** Every material professional transformation receives the mandatory baseline controls defined in Section 8.4. Every material AI/agent-produced result receives Reasoning Review before it can become admissible professional state or support a protected downstream transition. Risk-derived planning adds controls; it never subtracts this floor.
+
 ---
 
 ## 3. Canonical vocabulary and non-equivalences
@@ -178,16 +208,23 @@ An agent produced output
 | **Janumi Platform** | Shared multi-tenant infrastructure, runtime, identity, commercial, integration, governance, and professional-work services. It supplies machinery, not domain semantics. |
 | **Janumi Professional Workbench (JPWB)** | General environment for designing/versioning PWAs and operating, executing, assuring, governing, tracing, and baselining Undertakings. |
 | **Recursive Professional Harness (RPH)** | Coordination/control architecture that frames, allocates, supervises, reconciles, synthesizes, and escalates recursive professional work. It may use workflow engines and agent orchestration but is not defined by them. |
-| **Professional Work Architecture (PWA)** | Reusable, versioned architecture for a class of professional work: PWU Types, relationships, obligations, constraints, artifacts, policies, roles, authorities, baselines, profiles, fixtures, and conformance. Not primarily a sequence. |
+| **Assurance Engineering** | Discipline that designs and operates the versioned evidence-and-control system by which professional knowledge becomes applicable policies and inspection methods; exact work versions are assessed, findings become durable obligations, repairs are revalidated, convergence and residual uncertainty are established, and the assurance machinery is itself tested and governed. |
+| **Professional Work Architecture (PWA)** | Reusable, versioned architecture for a class of professional work, rooted in PWU Types and recursively composed through explicit type-level child, decomposition, recomposition, obligation, assurance, governance, fixture, and conformance rules. It is not primarily a sequence. |
 | **Professional Work Unit (PWU)** | Bounded, identifiable, executable, assessable, traceable, and governable unit of professional work. |
-| **PWU Type** | Reusable definition owned by a PWA version. |
-| **PWU Instance** | Concrete PWU owned by one Undertaking. A local extension is explicitly marked and does not mutate its PWA. |
+| **PWU Type** | Reusable definition owned by a PWA version. Each instantiable type is explicitly a coherent leaf or a non-leaf with permitted, mandatory, and conditional child-type rules plus decomposition and recomposition semantics. |
+| **PWU Instance** | Concrete PWU owned by one Undertaking. It is a coherent leaf or recursively decomposes into child PWU Instances through explicit Decomposition and Recomposition Contracts. A local extension is explicitly marked and does not mutate its PWA. |
+| **Child PWU Type / Child PWU Instance** | Recursive composition at the reusable PWA-definition level versus concrete decomposition inside an Undertaking. “Sub-PWU” is explanatory shorthand, not another canonical object type. |
+| **PWA Work Architecture View** | Recursive View of a PWA version's PWU Types and permitted composition. It displays reusable definitions and type-level rules, not concrete state or temporal execution order. |
 | **Undertaking** | Concrete body of professional work instantiated under one or more compatible PWA versions. It owns actual state, Evidence, Decisions, and Baselines. |
 | **Professional Work Graph** | The typed semantic graph of PWU Instances and related objects belonging to an Undertaking. |
 | **Execution Plan** | Governed, versioned strategy for performing selected PWUs. |
 | **Execution Workflow** | Temporal machinery that carries out a plan: steps, branches, loops, waits, agents, humans, and tools. |
 | **Assurance Policy** | Versioned professional rule defining applicability, claims, Evidence, criteria, independence, dispositions, remediation, escalation, and waiver. |
-| **Validator** | Replaceable runtime implementation of an Assurance Policy. It recommends; it does not decide or mutate authority. |
+| **Validator** | Replaceable deterministic, model-based, hybrid, human, or external evaluator implementing bounded Assurance Policy concerns. It may recommend policy-permitted control actions; it cannot authorize or select them for execution, decide, repair, or mutate professional state. |
+| **Reasoning Review** | Mandatory de minimis Assurance Policy/control for every material AI/agent-produced professional transformation. A conforming Validator independently evaluates the exact output and its observable derivation, provenance, assumptions, constraints, Evidence use, uncertainty, and completion claim; it does not require or expose private chain-of-thought. |
+| **Material professional transformation** | Production or semantic revision of a professional object, Artifact, Claim, Evidence proposal, decomposition/recomposition result, Decision package, Baseline candidate, or other output that feeds another actor/agent, affects governed work, or supports a protected transition. Low-level rendering, retrieval, formatting, and retries are not material by themselves unless their result has one of those effects. |
+| **Finding Definition** | Policy-defined failure or concern type, identified by `findingCode`; it is not a detected instance. |
+| **Assurance Observation** | One concrete, version-bound detection. Current contracts represent a concrete finding as an `AssuranceObservation` with `observationType: FINDING`; there is no separate Finding entity. In prose, **finding** is shorthand for such an observation and its governed unresolved concern. |
 | **Decision** | Governed exercise of authority over approval, rejection, waiver, escalation, reshaping, replanning, risk acceptance, or promotion. A Decision is not truth. |
 | **Baseline** | Immutable, version-bound, authoritative accepted state produced by an effective promotion Decision. A commit may be included but is not a Baseline. |
 | **View** | User-facing representation of underlying professional-work or execution data. A View may use one or more Projections. It is presentation, not architecture or authority. |
@@ -210,7 +247,12 @@ Ownership ≠ Authority             Validation ≠ Approval
 Confidence ≠ Certainty             Accepted Assumption ≠ Verified Assumption
 PWU ≠ Task                         RPH ≠ Workflow Engine
 PWA ≠ Execution Workflow           Work Graph ≠ Execution Graph
+PWA Work Architecture View ≠ Professional Work Graph
+child-type composition ≠ instance decomposition ≠ dependency
+semantic progression ≠ temporal execution sequence
 Commit ≠ Baseline                  Product ≠ Undertaking
+Validator ≠ Assurance Engineering Finding ≠ Decision
+Assessment satisfaction ≠ convergence ≠ acceptance ≠ Baseline promotion
 Projection/chat/repository/memory ≠ authoritative semantic state
 ```
 
@@ -219,6 +261,7 @@ Projection/chat/repository/memory ≠ authoritative semantic state
 - `Product Lens` → **Product Realization PWA**.
 - `Lens Designer` / `Lens Library` → **PWA Designer** / **PWA Library**.
 - `workflow` for the whole professional structure → **PWA** or **Professional Work Graph**; reserve workflow for temporal execution.
+- `sub-PWU` → **child PWU Type** at PWA-definition boundaries or **child PWU Instance** in an Undertaking. Do not introduce a separate `SubPWU` entity or kind.
 - `phase` → derived compatibility milestone where legacy support requires it.
 - `dialogue` → interaction/provenance record, not the Undertaking or authoritative work root.
 - `REPLAN` → controller action, not a universal terminal phase.
@@ -275,18 +318,20 @@ Derived projections and user experiences
 
 The later draft architecture calls the technology-neutral execution layer **JEM**. Use that name only where the code or a ratified Decision has adopted it. The stable rule is the behavior, not the label or deployment topology.
 
-### 4.2 Six disciplines that must remain separate
+### 4.2 Engineering and authority boundaries
 
 | Discipline | Governs |
 |---|---|
 | **Prompt Engineering** | Invocation instructions, immediate objective, output contract, examples, and formatting. |
 | **Context Engineering** | Relevant artifacts, history, Decisions, Evidence, retrieval, prioritization, freshness, compression, and exclusion. |
 | **Harness Engineering** | Models, agents, tools, sandboxes, permissions, memory infrastructure, persistence, observability, and operational controls. |
-| **Loop Engineering** | Next action, branching, retries, tactic change, convergence, escalation, and termination. |
+| **Loop Engineering** | Next action, branching, retries, execution of corrective work, policy-permitted tactic change, escalation, and termination. |
 | **Shape Engineering** | Intent, boundaries, obligations, constraints, Assumptions, decomposition, recomposition, and semantic integrity. |
-| **Assurance Engineering** | Claims, Evidence, criteria, observations, independence, Decisions, waivers, residual uncertainty, and acceptance. |
+| **Assurance Engineering** | Professional-knowledge treatment, policy/applicability, risk-sensitive control coverage, Evidence and inquiry, Validator topology, durable findings, repair/revalidation requirements, convergence criteria/assessment, meta-assurance, residual uncertainty, and governance integration. |
 
 A prompt is not a role; a role is not a model binding; a plan is not a PWU; a validator is not a policy; runtime privilege is not domain permission.
+
+Shape Engineering defines the work, transformation graph, invariants, and failure envelope. Assurance Engineering defines how those claims are challenged and justified across the trajectory. Validator Engineering is an Assurance specialization that implements individual evaluators; Context supplies bounded material; Harness supplies execution machinery; Loop selects and performs policy-permitted operational responses. Assurance may record a `REJECTED` Assessment disposition under policy; Governance is an authority function outside the six engineering disciplines and alone authorizes waiver, risk acceptance, rejection or abandonment of governed work, and promotion. These boundaries must interoperate without collapsing ownership.
 
 ### 4.3 Logical responsibility boundaries
 
@@ -297,12 +342,12 @@ The canonical logical services are:
 - Execution planning and durable process/controller service;
 - Runtime authorization and harness-binding service;
 - Agent/tool/sandbox execution service;
-- Evidence and Assurance service;
+- Assurance Policy/profile/applicability, Evidence admission, Validator execution, Assessment, and result-canonicalization service;
 - Governance and Baseline service;
 - Traceability, impact, reconciliation, and Attention service;
 - Event, audit, artifact, projection, integration, and observability services.
 
-These are responsibility boundaries, not mandatory microservices. A modular monolith is valid when it preserves them. Runtime topology must not change professional meaning.
+These are responsibility boundaries, not mandatory microservices. A modular monolith is valid when it preserves them. Runtime topology must not change professional meaning. Section 8 identifies target knowledge-compilation, coverage-planning, repair-impact, revalidation, convergence, and meta-assurance responsibilities whose exact service and machine contracts remain unresolved under Section 16 items 22–25; do not invent parallel services, tables, or Events for them.
 
 ---
 
@@ -338,8 +383,8 @@ The numbered RPH model remains the implementation baseline. The table below also
 | **Claim** | Explicit assertion about completeness, correctness, compliance, consistency, fitness, preservation, feasibility, or performance. |
 | **Evidence** | Admitted, provenance-bearing support or contradiction for scoped Claims; includes limitations and validity. Generated output is not automatically Evidence. |
 | **Confidence Assessment** | Qualified assessment with basis and limitations. It cannot replace Evidence or become an unexplained aggregate score. |
-| **Assurance Assessment / Validation** | Evaluation of Claims/subjects under a policy and exact semantic versions. |
-| **Observation / Finding** | What was detected or measured and its professional implication. Observation, interpretation, and Claim remain separate. |
+| **Assurance Assessment** | Version-bound evaluation of Claims/subjects under an Assurance Policy. Validation is the activity, not a second object type. |
+| **Assurance Observation** | What was detected or measured and its professional implication. A finding-type Observation is distinct from its `FindingDefinition`; observation, interpretation, and Claim remain separate. |
 | **Decision** | Authorized selection/disposition with subject versions, alternatives, rationale, Evidence, observations, scope, effective time, and authority proof. |
 | **Action** | Authorized attempt to change reality or an operational system. Technical success does not prove Outcome success. |
 | **Dependency / Risk / Issue** | Required relationship, uncertain threat/opportunity, and realized problem; each links to affected work/outcomes and state. |
@@ -390,23 +435,62 @@ IMPACTS       REALIZES      DEFINES
 
 Generic unlabeled links are insufficient for authoritative reasoning. Trace corrections supersede prior links; they do not rewrite history.
 
+### 5.6 The governed professional stream
+
+The durable idea behind legacy JanumiCode's **Governed Stream** is one logical, queryable history of professional work—not its single SQLite table or its phase record taxonomy. In the current architecture the governed professional stream is the causally connected union of typed Commands/results, aggregate revisions, immutable Events, execution attempts/traces, Artifacts, Claims, Evidence, Assessments, Observations, Decisions, Baselines, and audit records. Rebuildable projections are views over that history, never constituents of its authoritative record.
+
+Every material proposal, transformation, validation input/output, finding, repair, control action, supersession, waiver, and acceptance must retain:
+
+- stable identity/type and schema/semantic version;
+- Undertaking/PWA/PWU/tenant scope;
+- producer/actor, runtime provenance, correlation and causation;
+- exact input, subject, context projection, policy, Validator, Evidence, and output references;
+- occurred/observed, recorded, valid, and effective time where distinct;
+- proposal/admission/authority status, current/superseded relation, and any applicable redaction or policy-governed isolation handling;
+- derivation, dependency, impact, and successor/predecessor relations.
+
+Rejected, invalid, quarantined, superseded, revoked, and failed material remains inspectable but cannot silently govern current work. Record exactly what an Assessment was permitted to see, including unavailable or rejected Evidence and declared truncation, so its conclusion can be reproduced and challenged. Partial retrieval is represented as partial; a summary never substitutes for the referenced source state.
+
+Rollback, semantic supersession, correction, and compensation remain distinct. A material upstream change computes dependency/impact closure and invalidates or reopens affected Claims, Evidence, Assessments, Decisions, readiness, and Baseline candidacy as policy requires; it never deletes the historical approval or rewrites an authoritative Baseline.
+
+Quarantine means policy-governed isolation and non-admissibility, not a universal object field or lifecycle enum. Do not implement a universal `GovernedStreamRecord`, duplicate Event authority, store every Artifact body in one table, or capture private chain-of-thought. Preserve decision-relevant rationale, observable actions, tool inputs/outputs, self-reported limitations, and professional provenance subject to retention, security, and redaction policy. Section 10's typed persistence remains authoritative.
+
 ---
 
 ## 6. PWU, decomposition, recomposition, and state
 
 ### 6.1 Readiness
 
-A PWU is ready only when it has:
+A PWU meets the canonical minimum readiness contract only when it has:
 
 - one clear professional objective and active/provisional Intent or explicit exploratory authority;
 - explicit in-scope and out-of-scope boundaries, or explicit unknowns;
 - mandatory Obligations, Constraints, material Assumptions, dependencies, and responsible authority;
-- required inputs, expected outputs, completion Claim/criteria, Evidence and assurance expectations;
-- a risk/assurance profile and applicable decomposition/recomposition rules.
+- required inputs, expected outputs, completion Claim/criteria, Evidence and assurance expectations, and applicable risk/assurance profile.
+
+The exact PWA/profile and risk may additionally require known failure dynamics, applicable policies and independence, intrinsic/derivational/systemic coverage, or decomposition/recomposition, repair-impact, revalidation, convergence, tactic-change, escalation, and stop rules. Express those requirements through currently ratified policy/profile contracts where possible; they are not new universal PWU fields or readiness axes. If an exact representation is required, follow Section 16 items 23–24.
 
 Do not create a PWU for prompt rendering, retrieval, an API call, formatting, a database write, a retry, or a UI click. Those are execution/runtime steps unless they independently carry professional meaning, obligation, Evidence, and lifecycle.
 
-### 6.2 Decomposition contract
+### 6.2 Recursive type composition and instance decomposition
+
+Recursion exists at two distinct levels and must not be collapsed:
+
+```text
+PWA version → root PWU Type → recursive child-type rules → explicit leaf PWU Types
+Undertaking → root PWU Instance → Decomposition Contracts → child PWU Instances → recomposition
+```
+
+“Sub-PWU” is not a separate entity. At PWA-design time, a PWU Type may permit, default, or conditionally require **child PWU Types**. In an Undertaking, a PWU Instance may decompose into **child PWU Instances**. Each child remains a full PWU with its own bounded objective, delegation contract, lifecycle, Evidence, assurance, and recomposition contribution.
+
+Every instantiable PWU Type is explicitly one of:
+
+- a coherent leaf that is assessable and governable without further professionally meaningful decomposition; or
+- a non-leaf with named permitted, mandatory, and conditional child PWU Types, cardinality/applicability, obligation and Constraint allocation, coverage expectations, and a recomposition rule.
+
+Every instantiable type is reachable from a root or declared extension point, and type-level composition is acyclic. An implicit leaf, opaque child count, generic `permits` edge without typed meaning, or non-leaf without recomposition is incomplete and blocks publication. Instantiation recursively materializes every applicable mandatory/default child; conditional children materialize when their applicability conditions hold, while governed optional/discovery decomposition remains explicit. A type-level `PERMITS_CHILD_TYPE` relation never proves that an instance child exists or is valid.
+
+Do not confuse composition with timing. A child PWU carries an independently meaningful professional obligation. A prerequisite, dependency, semantic progression, produced-input relationship, or temporal Execution Step is modeled as that relationship—not mislabeled as parent/child decomposition. Prompt rendering, model/API calls, tool calls, retries, and handoffs remain Steps/Attempts unless they independently satisfy the PWU boundary test.
 
 Decomposition is a Claim that children collectively cover their parent. It must record:
 
@@ -430,6 +514,17 @@ mandatory parent obligations
 ```
 
 High-risk decomposition requires independent validation. A revision changes semantic version and triggers impact analysis.
+
+| Relationship | Level | Meaning |
+|---|---|---|
+| `PERMITS_CHILD_TYPE` / child rule | PWA definition | Permitted, mandatory, or conditional reusable composition with applicability/cardinality. |
+| `PRECEDES_SEMANTICALLY` | PWA definition | Meaningful professional progression; not runtime order. |
+| `REQUIRES_INPUT_TYPE` / `PRODUCES_OUTPUT_TYPE` | PWA definition | Typed input/output compatibility; not containment or timing. |
+| `DECOMPOSES` | Undertaking instance | Concrete parent-child PWU structure under a Decomposition Contract. |
+| `DEPENDS_ON` | Undertaking instance | One professional object requires another; dependency is not containment. |
+| Execution Workflow transition | execution | Temporal steps, calls, branches, waits, retries, and tool/agent activity. |
+
+Do not infer one relationship from graph position or render these meanings as one generic edge.
 
 ### 6.3 Recomposition contract
 
@@ -567,6 +662,8 @@ Typical semantic children are:
 - **Integrated Product Validation:** Requirement and Journey Validation, Architecture Conformance, Integration, Regression, Security, Operational/Migration Validation, Fitness for Purpose, and Evidence Package Assembly.
 - **Product Baseline Promotion:** exact candidate manifest, required Evidence/assessments, residual-risk disposition, authorized promotion, and immutable Baseline.
 
+At the reusable level these are child PWU Types in the PWA Work Architecture; when instantiated they become child PWU Instances in the Undertaking's Professional Work Graph. Top-level Product Realization branches are normally siblings beneath the root, not a linear chain in which each branch “permits” the next. Semantic progression, dependencies, input/output traces, and execution order remain separately typed relationships.
+
 Not every possible child is instantiated. Applicability depends on the selected immutable PWA version, profile, risk, and Undertaking scope. Never create empty PWUs to make a diagram look complete.
 
 Older compatibility trees sometimes omit Product Behavior or shorten branch names. Retain those only in legacy projections; use the seven-branch structure for canonical Product Realization work.
@@ -676,15 +773,209 @@ Its acceptance tests include execution/assurance separation, Assumption persiste
 
 ---
 
-## 8. Assurance, governance, and Baselines
+## 8. Assurance Engineering, governance, and Baselines
 
-### 8.1 Policy, validator, service, and Decision
+### 8.1 System boundary and objective
+
+**Assurance Engineering** is the discipline of designing and operating the versioned evidence-and-control system that establishes justified confidence in professional work under uncertainty. It is concerned with the complete trajectory by which Intent is transformed—not only the latest Artifact or whether one check passed.
+
+It coherently designs and integrates the assurance treatment of:
+
+- authority-classified professional knowledge, hazards, quality models, failure ontologies, and inspection methods as assurance inputs;
+- versioned Assurance Policies, applicability, profiles, and control coverage;
+- Evidence requirements/admission, Claims, criteria, and required independence;
+- Validator selection, context/Evidence exposure, execution, and conformance;
+- structured Assessments, concrete Assurance Observations (including findings), composition, and disagreement;
+- impact analysis, invalidation, governed repair, and targeted revalidation;
+- stability, convergence, tactic-change, escalation, and stop conditions;
+- waiver, risk-acceptance, Decision, and Baseline eligibility packages supplied to Governance;
+- meta-assurance, runtime outcome learning, policy evolution, and control cost.
+
+These are logical responsibilities, not one required service or database. The Validator subsystem is the evaluator-execution arm of Assurance Engineering. RPH/Loop Engineering coordinates corrective work; Commands change canonical state; Governance exercises authority.
+
+The closed loop is summarized in Section 1 and operationalized in Section 9. Assurance operates recursively: a local loop governs one Attempt/output/repair, while a global loop composes assurance across PWUs, decomposition/recomposition, dependencies, Undertaking state, Decisions, and Baseline candidacy. Local satisfaction never substitutes for global coherence.
+
+### 8.2 Operating envelope and trajectory integrity
+
+The fusion analogy is an explanatory lens, not ontology. Generative actors are the energetic medium; the professional harness supplies the work system; Shape Engineering defines the transformation geometry; policies and Validators create diagnostic coverage; observability supplies diagnostics; RPH/Loop Engineering selects control responses; Commands/repair PWUs are actuators; Governance supplies operator authority. Validators detect and characterize conditions—they do not exert authority or edit the subject.
+
+The **authorized operating envelope** is a conceptual reasoning model—not a persisted object, scalar score, wire contract, or lifecycle enum. It is the contextual conjunction of Intent, hard invariants, legal states, applicable policies/criteria, admissible Evidence, required independence, permitted uncertainty, authority, and dynamic-control limits. It has four useful regions:
+
+1. **Never-cross boundary:** tenant isolation, authority, immutable history, strict Commands, legal transitions, version isolation, and non-waivable integrity always hold.
+2. **Provisional region:** incomplete or challenged proposals may exist when visibly provisional, bounded, and unable to create unauthorized effects.
+3. **Transition-ready region:** current Evidence, Assessments, independence, impact closure, and policy dispositions satisfy the requested transition.
+4. **Dynamic-control boundary:** retry/remediation count, recurrence, oscillation, unknown outcome, time/cost, and escalation limits remain inside policy.
+
+**Trajectory integrity** means every authoritative transition respected the never-cross boundary while provisional defects stayed visible and non-authoritative until resolved or dispositioned. A valid-looking final snapshot cannot repair an unauthorized or unobservable trajectory retroactively.
+
+### 8.3 Compiling professional knowledge into assurance controls
+
+The legacy **Professional Wisdom Compiler** is a useful candidate design-time capability, not a ratified runtime or object model. Its durable rule is: do not merely paste professional guidance into a prompt; transform it, with provenance and epistemic status intact, into reviewable control structures.
+
+```text
+source doctrine
+→ normalized candidate doctrine assertion and believed mechanism
+→ applicability, exceptions, hazard, and observable indicators
+→ invariant, Obligation, and prohibition
+→ Evidence requirement and inspection method
+→ policy criteria and Validator conformance contract
+→ remediation and revalidation rules
+→ convergence, tactic-change, escalation, and waiver rules
+→ conformance and meta-assurance tests
+```
+
+Sources include laws/regulations, standards, organizational policies, empirical regularities, principles, heuristics, smells, anti-patterns, incident patterns, inspection methods, lessons learned, and expert judgment. Formalization must not increase authority: a smell remains a signal, a heuristic remains defeasible, a correlation does not become causation, and an organizational preference does not become a universal invariant.
+
+A conceptual **assurance-control package** may contain concise doctrine, invariants, quality models, failure modes, Evidence requirements, inspection strategies, Assurance Policy definitions, Validator contracts/bindings, severity/disposition rules, repair/revalidation/impact rules, convergence controls, escalation/waiver rules, and fixtures. Compatible portions must be represented through existing versioned PWA policy/profile contracts rather than a new authoritative `ProfessionalWisdomIR`. There is no ratified compiler, package schema, or activation contract; Section 16 items 22–23 govern any implementation.
+
+Any future compilation pipeline must itself be assured: classify source authority/status; preserve provenance/version; detect conflict and dependency; validate generated controls for fidelity, overlap, gaming, contradictory remediation, proportional cost, and available Evidence; then govern activation, suspension, supersession, and retirement. Untrusted source text cannot become executable instructions through retrieval or compilation.
+
+### 8.4 De minimis assurance floor and control planning
+
+Risk proportionality governs assurance above a mandatory floor; it does not make the floor optional. Every material professional transformation must receive, in order:
+
+1. strict output-contract/schema validation plus applicable deterministic invariants;
+2. identity, semantic-version, provenance, authority, input/context/output, and trace completeness checks;
+3. a Reasoning Review Assessment when the transformation is produced by or materially shaped by an AI/agent; and
+4. canonical admission/disposition and enforcement of the protected downstream transition.
+
+Every AI/agent result that creates or materially changes professional content, supplies a downstream actor or agent, proposes a Claim or Evidence item, changes decomposition/recomposition, contributes to a Decision/Baseline package, or supports a governed transition necessarily triggers Reasoning Review. Such results are material by default. A result is nonmaterial only when a versioned rule establishes lossless semantic equivalence; the producer cannot exempt its own output, and ambiguity resolves to material. Each independently downstream-consumable result is its own transformation boundary unless an explicit grouping records every subject/version and its rationale.
+
+Reasoning Review is a versioned Assurance Policy concern implemented by a replaceable Validator—not an informal second prompt, one fixed provider, or a legacy review record. It must:
+
+- bind the exact subject/output, input and context versions, producing Attempt/invocation, policy/criterion versions, and available Evidence;
+- evaluate observable derivational integrity: unsupported Assumptions, invalid or circular inference, scope/authority confusion, contradiction, premature convergence, completeness shortcuts, unacknowledged uncertainty, and misuse or omission of relevant Evidence;
+- record considered/rejected/missing Evidence, findings, limitations, uncertainty, provenance, and a recommendation through the normal Validator-result and Assessment contracts;
+- prohibit same-invocation self-review and use at least a distinct evaluator invocation, role, and review context whose actual identities and lineage are recorded; the same base model is allowed only when the active profile permits its visible common-mode limitation, while stricter profiles may require a different model/provider or human/organizational independence;
+- review professional rationale summaries, outputs, tool-call records/results where authorized, and other observable trace data without requiring private chain-of-thought.
+
+No PWA profile, low-risk classification, planner optimization, or local agent instruction may suppress this Reasoning Review floor. Deterministic failure may short-circuit an obviously invalid candidate, but its repaired successor must still receive Reasoning Review before admission. A missing, stale, malformed, failed, unavailable, or independence-invalid required review cannot satisfy assurance or permit its protected transition. Validator failure does not prove the subject wrong; it leaves assurance incomplete and triggers retry, alternate evaluation, or escalation.
+
+Above that floor, every material transformation boundary has an explicit, risk-derived assurance-coverage decision. Required, inherited, deferred, waived, and inapplicable **additional** coverage are explainable; gaps are never silent. Do not run every possible Validator at every step or rely on one universal critic; always run the mandatory floor and add controls for the exact risk.
+
+Coverage planning considers:
+
+- exact PWA/profile/PWU Type and subject/semantic versions;
+- transformation, lifecycle point, semantic diff, dependency/consumer impact, and prior Decisions;
+- consequence, uncertainty, irreversibility, security/regulatory exposure, and risk profile;
+- applicable mandatory/advisory policies, known failure dynamics, and open/recurring Findings;
+- required Evidence, freshness, context completeness, and actual independence/diversity;
+- available deterministic/model/human/external methods, cost/latency budgets, and escalation path.
+
+A future logical plan would identify policy/criterion versions, assurance targets and dimensions, Validator bindings/order/parallelism, context/Evidence scope, transition gate, remediation locus, impact/revalidation closure, convergence/stop rules, and diagnostic observations. A planner may optimize optional controls but cannot weaken mandatory applicability or independence. When impact or Evidence sufficiency cannot be bounded confidently, broaden assessment or escalate.
+
+Coverage can occur before generation, after generation, after assessment, after repair, before/after a Decision, or continuously. These are conceptual lifecycle points, not a new legacy phase/state axis. The exact generalized plan/topology contract is unresolved; until Section 16 item 23 is decided, derive coverage through versioned PWA policies/profiles and preserve rationale only through existing contracted objects and Events. This unresolved extension does not defer the de minimis floor above. If even that floor cannot be represented and enforced losslessly, the PWA cannot be published and the protected runtime transition cannot proceed until the contract is corrected.
+
+### 8.5 Validation dimensions, targets, and inquiry strategies
+
+Assurance design analyzes every material concern across at least one orthogonal validation dimension:
+
+| Dimension | Governing question |
+|---|---|
+| **Intrinsic** | Is this exact subject well formed and professionally adequate on its own terms? |
+| **Derivational** | Was it legitimately derived from Intent, sources, Constraints, Evidence, and prior transformations? |
+| **Systemic** | Does it remain coherent with related work, dependencies, consumers, policy, history, and the larger evolving system? |
+
+These dimensions are coverage questions, not current wire enums, dispositions, or PWU state. Record them as policy/criterion rationale unless a ratified contract adds an explicit representation. A high-quality Artifact can be the wrong Artifact; individually valid parts can be jointly impossible.
+
+Assurance targets include the professional object/Artifact; source and derivation; context and Evidence assembly; execution/transformation process; repair/revalidation process; dependency neighborhood and trajectory; and Decision/gate process. Validators, planners, rubrics, the control system, and observed outcomes are conceptual meta-assurance targets until current subject discriminators and contracts support them. A concern against the assurance process does not automatically reject the professional subject.
+
+Useful inspection strategies provide structured cognitive diversity: smell detection, Assumption surfacing, counterexample search, traceability audit, completeness challenge, coherence check, dependency/change-impact analysis, second-order-effects analysis, reality grounding, proxy-integrity review, and stagnation/tactic-change detection. They are methods, not authority-bearing roles or necessarily separate Validators.
+
+Validation is professional inquiry:
+
+```text
+signal → investigate → acquire/test Evidence → assess applicability/context
+→ explain consequence and uncertainty → recommend governed action
+```
+
+A signal is not a defect; professional principles may conflict; `Rule violated → reject` is insufficient except for an explicit hard invariant.
+
+### 8.6 Durable Findings, repair, and revalidation
+
+Keep policy type and concrete detection distinct: `FindingDefinition`/`findingCode` defines a concern type; each `AssuranceObservation` with `observationType: FINDING` records one detection against exact subjects/versions and has its own `observationId`. In this section, **Finding** is shorthand for that finding-type Observation and its unresolved governed concern, not another entity. Adapt heterogeneous legacy outputs into current objects rather than creating a parallel `validator_finding_record`.
+
+Across the contracted Assessment, Validator result, Evidence, execution, audit, and Observation records, a material detection must be traceable to the exact subject/version, policy/criterion, target and conceptual dimension/lifecycle point, Validator/invocation/context versions, considered/rejected/missing Evidence, failure mode, severity, rationale, consequence, uncertainty, recommended action, provenance, and disposition. Do not pretend these are all fields on `AssuranceObservation`. Recurrence uses `findingCode` plus a candidate fingerprint/lineage relation; it never reuses an Observation identity. Exact recurrence and repair contracts remain Section 16 item 24 decisions.
+
+The core lifecycle invariant is:
+
+```text
+detected and admitted
+→ assigned to corrective work or authorized disposition
+→ repair attempted
+→ impact closure computed
+→ revalidation completed
+→ resolved | accepted risk | waived | deferred | superseded | escalated
+```
+
+This is semantic guidance, not a ratified wire enum. A finding-type Observation never disappears because an Artifact was regenerated, a Validator reran, a waiver was granted, or a successor version passed. Its statement about the assessed version remains immutable.
+
+Repair is governed professional work, never Validator mutation. Any adopted repair contract must preserve triggering Observation IDs, selected strategy/authority, root-cause hypothesis, exact pre/post versions and hashes where applicable, semantic/structural diff, changed identities/relations/traces/Constraints, remediation locus, revalidation set/rationale, outcomes, and residual findings. When the cause lies in Intent, representation, context, Evidence retrieval, decomposition, Plan, identity, policy, or authority, a superficial output patch is invalid.
+
+Any adopted impact/revalidation contract must treat targeted revalidation as a cost optimization, not permission to omit affected assurance. Ratified versioned impact rules map semantic change surfaces to required policies/inspection strategies; identity, parent-child, reference, trace, authority, policy, Evidence, or meaning changes require broad systemic closure where those rules apply. Unknown impact triggers conservative revalidation or escalation.
+
+Quarantine means preserved but non-admissible/non-governing. Validator failure, malformed result, missing Evidence, or independence failure remains diagnostic assurance-process state and never proves the subject wrong or satisfied.
+
+### 8.7 Stability, convergence, and advancement
+
+The distinctions below are conceptual assurance properties, not current state axes or wire fields. They become enforceable only through applicable ratified policies, guards, and Commands.
+
+| Property | Meaning |
+|---|---|
+| **Criterion compliance** | One criterion is met for one exact subject/Evidence set. |
+| **Assessment satisfaction** | One policy's current criteria and independence requirements are satisfied. |
+| **Gate readiness** | All required current Assessments for a requested transition are complete and non-blocking. |
+| **Stability** | Repair/impact closure is complete with no unresolved disallowed Finding, stale dependency, or detected recurrence/oscillation. |
+| **Convergence** | Successive repair cycles are moving toward a declared stable condition within tactic/time/cost limits. |
+| **Trajectory integrity** | Authoritative transitions stayed within hard boundaries; provisional defects remained bounded and visible. |
+| **Acceptance** | An authorized Decision accepts exact versions and residual risk. |
+| **Baseline promotion** | A separate effective Decision establishes immutable authoritative state. |
+
+None implies the next automatically.
+
+Convergence requires a known applicable policy set, complete current Assessments and Evidence, required independence, every material Finding accounted for, linked repairs revalidated, no unaccounted material regression, visible conflicts, current waivers/risk acceptance, and explicit residual uncertainty. It does not prove truth.
+
+Progress signals include declining unresolved severity, increasing Evidence/coverage, stable non-recurrence, bounded change, and narrowing independent disagreement. Stagnation/divergence signals include repeated failure classes, alternating repairs/findings, growing impact closure, increasing change without outcome progress, repeated unsupported Assumptions, validator disagreement that does not narrow, and budget exhaustion. These are Loop telemetry, not a numeric truth score.
+
+As a conceptual review checklist—not an executable guard, schema, or replacement for DOC-007/008 transitions:
+
+```text
+MayAdvance(subjectVersion, transition) :=
+  hard invariants hold
+  AND transition authority is valid
+  AND applicable assurance coverage is complete
+  AND required Evidence is admissible/current
+  AND required independence is satisfied
+  AND no disallowed blocking condition remains
+  AND impact/revalidation closure is complete
+  AND convergence/stop policy permits advancement
+```
+
+Only the applicable ratified subset of this checklist is enforced against authoritative state when a Command executes; the checklist does not itself implement or add a guard. A convergence projection cannot authorize change. Assurance determines eligibility/recommendation, not authority. A human may propose or make a Decision, but applicable policy, validated authority, and ratified Command/domain guards determine whether and how it takes effect: non-waivable integrity cannot be acknowledged away, and permitted residual risk requires an explicit scoped Decision/waiver that preserves findings.
+
+### 8.8 Meta-assurance and governed learning
+
+Policies, Validators, planners, rubrics, and the assurance system are conceptual meta-assurance targets. Evaluate whether a Validator tests the intended concern; its precision/recall and escaped consequential defects; Evidence availability; independence/context isolation; shared model/provider/prompt/premise common mode; prompt/rubric leakage; Goodhart susceptibility; stale knowledge/tooling; contradictory remediation pressure; calibration; and cost proportionality. Until Section 16 item 25 supplies subject and lifecycle contracts, capture this as isolated engineering diagnostics/Evidence rather than unsupported canonical Observations.
+
+Use known-good fixtures and deliberately corrupted, held-out canaries to test Validator conformance. An undetected canary creates candidate engineering Evidence against the Validator/control system and should trigger escalation or a governed proposal for alternate selection, rubric refresh, broader revalidation, or suspension. It does not create a canonical Observation or suspend a control until ratified contracts authorize that path, and it does not automatically reject unrelated professional work. Keep canaries isolated from production Evidence and begin in a harness.
+
+Runtime outcome and incident observations may propose new failure modes or policy revisions:
+
+```text
+outcome/incident → candidate recurrent dynamic → professional review
+→ draft wisdom/policy change → conflict + meta-validation
+→ authorized activation, suspension, supersession, or retirement
+```
+
+No telemetry correlation, model suggestion, or repeated local pattern self-promotes into authoritative professional knowledge. Missing required diagnostic history means trajectory integrity cannot be claimed; it does not justify assuming nothing went wrong.
+
+### 8.9 Policy, validator, service, and Decision
 
 The governing rule is:
 
-> A Validator is a replaceable implementation of a versioned Assurance Policy. It evaluates identified Claims using identified Evidence and returns schema-conformant proposed findings and a disposition recommendation. The Assurance Service validates the result, enforces policy, and records the authoritative disposition. Governance Decisions exercise authority.
+> A Validator is a replaceable implementation of a versioned Assurance Policy. It evaluates identified Claims using identified Evidence and returns schema-conformant proposed findings and recommendations. The Assurance Service validates the result, enforces policy, and records the canonical Assessment disposition. That disposition does not authorize acceptance, waiver, risk acceptance, or promotion; Governance Decisions do.
 
-A policy owns professional purpose, applicability, Claims, Evidence requirements, criteria, independence, severity, dispositions, remediation, escalation, waiver, and permitted control actions.
+A policy owns professional purpose, applicability, Claims, Evidence requirements, criteria, independence, severity, dispositions, remediation, escalation, waiver eligibility/rules, and permitted control actions.
 
 A Validator owns prompts, deterministic checks, models, tools, retrieval, algorithms, parsing, execution limits, and known limitations. A model, deterministic engine, hybrid, human procedure, or external service may implement the same policy. Validators never directly mutate professional state and never return only free-form prose, pass/fail, or unscoped confidence.
 
@@ -700,9 +991,17 @@ A valid Validator result identifies:
 
 `WAIVED` is not a Validator recommendation. It is a governance disposition.
 
-### 8.2 Core policy catalog
+Assurance binds at three distinct layers:
 
-The initial catalog ships these twelve policies. “Core” means present in the catalog; applicability decides whether an Assessment is required for a given object.
+1. **Definition-time policy assignment:** a PWA/PWU Type declares required, conditional, and inherited Assurance Policies, their applicability, Evidence/independence requirements, and protected outputs or transitions. The de minimis floor appears as locked inherited coverage and cannot be removed by a PWA.
+2. **Deployment-time capability binding:** an installed runtime identifies eligible/default conforming Validator implementations for each policy and independence profile. Availability is not execution.
+3. **Instance-time assurance:** applicability resolves for an exact PWU Instance, transformation, subject, and version; an Assessment is created; the actual Validator implementation/version/context is bound and invoked; results and Observations are recorded; and the Assurance Service records the disposition.
+
+A policy attachment proves required treatment; a configured Validator proves available capability; neither proves that assurance ran. A runtime guarantee exists only when durable coordination creates or resumes the required Assessment and the protected server-side transition revalidates its current disposition. An instance Assessment never mutates the reusable PWA definition.
+
+### 8.10 Core policy catalog
+
+In addition to Section 8.4's mandatory cross-cutting Reasoning Review concern, the initial catalog ships these twelve domain policies. “Core” means present in the catalog; applicability decides whether an Assessment is required for a given object. A production implementation must register and version Reasoning Review through the normal Assurance Policy, Validator, and Assessment contracts; it cannot substitute a prose-only prompt or silently count an uncontracted thirteenth catalog row. Section 16 item 23 governs the missing exact wire shape without weakening the mandate.
 
 | Policy | Governing purpose |
 |---|---|
@@ -721,7 +1020,7 @@ The initial catalog ships these twelve policies. “Core” means present in the
 
 Recommended subsequent policies include Requirement Quality, Journey Coverage, Architecture Consistency/Conformance, Implementation Scope Conformance, Evidence Sufficiency, Recomposition Integrity, Security Assurance, Migration Assurance, and Observability Sufficiency.
 
-### 8.3 Evidence admissibility
+### 8.11 Evidence admissibility
 
 Evidence is admissible only when identity is stable, provenance and content/reference are available, scope and limitations are explicit, relevance and freshness are adequate, and it is not invalidated.
 
@@ -736,7 +1035,7 @@ Existence is not proof:
 
 Evidence corrections create a new version. Invalidated or expired Evidence cannot support active satisfaction and triggers review of dependent Claims, Assessments, Decisions, and Baseline readiness. Contradicting Evidence remains visible.
 
-### 8.4 Criteria, independence, and observations
+### 8.12 Criteria, independence, and observations
 
 Criterion results are:
 
@@ -746,11 +1045,11 @@ MET | PARTIALLY_MET | NOT_MET | NOT_APPLICABLE | UNABLE_TO_DETERMINE
 
 `UNABLE_TO_DETERMINE` is never `MET`.
 
-Independence levels range from no separation through different invocation/context, agent, model, provider, human, or organizational independence. The runtime checks actual invocation, agent, model/provider, hidden context, prompt lineage, and organizational authority—not a role label such as “Verifier.” If required independence is missing, the Assessment cannot be satisfied; record an independence violation and use another evaluator or a valid scoped waiver.
+Independence levels range from no separation through different invocation/context, agent, model, provider, human, or organizational independence. The runtime checks actual invocation, agent, model/provider, hidden context, prompt lineage, and organizational authority—not a role label such as “Verifier.” If required independence is missing, the Assessment cannot be satisfied; record an independence violation and use another evaluator or, only when the applicable policy permits it, a valid scoped waiver.
 
 Every material observation identifies subject, policy, criterion, Evidence or explicit professional judgment, severity, precise deficiency, implications, and recommended action. Avoid vague findings such as “looks reasonable” or “could improve.”
 
-### 8.5 Dispositions and composition
+### 8.13 Dispositions and composition
 
 ```text
 SATISFIED               admissible Evidence supports all required criteria
@@ -773,28 +1072,34 @@ Multiple policies remain independently inspectable. Aggregate assurance preserve
 
 Assessment lifecycle includes `REQUESTED`, `EVIDENCE_PENDING`, `READY`, `ASSESSING`, the dispositions above, plus `INVALIDATED`, `VALIDATOR_FAILED`, `INDEPENDENCE_VIOLATION`, and `CANCELLED`. Validator failure is not rejection. Invalid output is retained for diagnostics but cannot create authoritative findings. Evidence access failure produces pending/inconclusive, never inferred content.
 
-### 8.6 Permitted control actions
+### 8.14 Conceptual control responses
 
-Assurance recommends; the controller selects under policy:
+The labels below are an explanatory response taxonomy, not wire enums or Command names. Assurance and Validators may recommend; the controller may select policy-permitted operational responses:
 
 ```text
 CONTINUE  WAIT  CLARIFY  GATHER_CONTEXT  GATHER_EVIDENCE
 REVISE_PROMPT  REVISE_CONTEXT  RETRY
 CHANGE_MODEL  CHANGE_TOOL  CHANGE_VALIDATOR  CHANGE_TACTIC
 RESHAPE_PWU  REVISE_DECOMPOSITION  REPLAN_EXECUTION
-INVALIDATE_DEPENDENTS  REQUEST_HUMAN_DECISION  REQUEST_WAIVER
-ESCALATE  REJECT  ABANDON  ACCEPT  PROMOTE_BASELINE
+INVALIDATE_DEPENDENTS  ESCALATE
 ```
 
-Record trigger, policy, Evidence/observations, actor, affected objects, rationale, and expected effect for every material control action.
+Authority-bearing outcomes are requested, not selected by the controller:
 
-### 8.7 Waivers
+```text
+REQUEST_DECISION  REQUEST_WAIVER  REQUEST_REJECTION_OR_ABANDONMENT
+REQUEST_BASELINE_PROMOTION
+```
+
+`REJECTED` as an Assessment disposition is recorded by Assurance under policy. Acceptance, rejection or abandonment of governed work, risk acceptance, waiver, and Baseline promotion require a valid Governance Decision and exact contracted Commands. Use Section 9.5's current registry; when the required semantic Command is absent, stop for a contract Decision rather than inventing one. Record trigger, policy, Evidence/observations, actor, affected objects, rationale, and expected effect for every material control response.
+
+### 8.15 Waivers
 
 A waiver records the exact policy, criterion, finding, object and semantic version, authority, rationale, duration/expiration, compensating controls, downstream impact, and review/revalidation triggers.
 
 A waiver does not erase a finding, make invalid Evidence valid, declare a rejected Claim true, or automatically apply to a future semantic version. Critical integrity failures may be non-waivable. Expiration triggers review and may block promotion.
 
-### 8.8 Decisions and Baselines
+### 8.16 Decisions and Baselines
 
 Every material Decision binds:
 
@@ -841,33 +1146,53 @@ RPH owns professional coordination rather than professional knowledge. PWUs own 
 - allocates bounded responsibility by capability, authority, availability, independence, cost, and risk;
 - coordinates dependencies, PWUs, subordinate RPHs, humans, agents, tools, and external parties;
 - observes professional progress—uncertainty reduction, Evidence, validation, synthesis—not merely activity;
-- detects incoherence and no-progress patterns;
 - changes tactic, reshapes, or replans under policy;
 - reconciles changed understanding;
 - synthesizes children into parent understanding;
 - escalates responsibly when evidence, authority, expertise, capability, or budget is insufficient.
 
+RPH always coordinates the de minimis floor: it resolves material transformation boundaries, supplies exact subject/context/Evidence versions to Assessments, and prevents protected downstream consumption until required assurance permits it. When an accepted implementation slice adopts Section 16 item 24's advanced repair/revalidation capabilities, RPH also routes material finding-type Observations into corrective work and detects recurrence, oscillation, and non-progress. These responsibilities do not authorize new objects or let Validators mutate subjects.
+
 Delegation always includes objective, scope, authority, inputs/outputs, Constraints, completion, validation, dependencies, and escalation conditions. Assignment without this bounded responsibility is not delegation.
 
-A simplified controller cycle is:
+A simplified target controller reasoning cycle is below. It is not a wire workflow; each step must map to already accepted objects, Commands, Events, and policies:
 
 ```text
-load current PWU + plan + assurance + shape + open findings
+load current PWU + plan + shape + assurance coverage + open finding-type Observations
     ↓
-adequately shaped? decomposition valid? plan approved? bindings authorized?
+adequately shaped? coverage/decomposition valid? plan approved? bindings authorized?
     ↓
 execute next eligible step
     ↓
-capture Artifacts, Evidence, observations, provenance, and telemetry
+capture candidate Artifacts, observations, provenance, and telemetry
     ↓
-evaluate applicable policies
+admit applicable Evidence; assess intrinsic, derivational, and systemic Claims
     ↓
-continue | retry | gather | change tactic | reshape | replan | escalate | reject
+canonicalize Assurance Observations; preserve disagreement, limitations, and residual uncertainty
     ↓
-recompose satisfied children
+continue | gather | create repair PWU/Action | retry | change tactic
+| reshape | replan | escalate | request governed rejection/disposition
     ↓
-assemble Evidence package and request Baseline promotion
+after change: compute impact closure → invalidate affected assurance → revalidate
+    ↓
+assess stability/convergence; recompose satisfied children
+    ↓
+assemble current assurance package and request Decision/Baseline promotion
 ```
+
+Every material output begins provisional. Before it may supply dependent professional work, be admitted as Evidence, support a Decision, satisfy/recompose a PWU, publish a PWA, trigger an irreversible external action, or enter a Baseline, durable coordination performs this barrier:
+
+```text
+persist exact candidate output + provenance
+→ resolve de minimis, PWA/profile, PWU Type, and contextual policy applicability
+→ create or resume idempotent Assessments
+→ bind conforming Validators and verify actual independence
+→ execute/reconcile; validate and persist results, Observations, and failures
+→ apply Assurance Service dispositions
+→ revalidate the protected transition against the exact current subject version
+```
+
+For a material AI/agent result, the resolved set always includes Reasoning Review. A required Assessment that is missing, pending, stale, invalidated, malformed, failed, unavailable, independence-invalid, or otherwise non-permitting blocks only the dependent/protected transition; it does not prove the subject wrong. Independent work may proceed only when it cannot consume or be governed by the provisional result. Restart, replay, and retry resume this barrier and never infer success. A visible attachment, configured Validator, in-memory call, or client-side badge is not the guarantee. If accepted contracts cannot represent the required binding losslessly, keep the output provisional and correct the contract rather than bypassing the floor.
 
 Technical retry repeats substantially the same tactic after a transient failure. Tactic change changes model, tool, context, decomposition, method, or search space after evidence of non-progress. Do not blur them or retry indefinitely.
 
@@ -885,6 +1210,9 @@ receive and parse
 → evaluate authority at execution time
 → normalize and structurally validate payload
 → semantically validate preconditions and invariants
+→ resolve applicable de minimis, PWA/profile, PWU Type, and contextual policy coverage for the exact subject/version
+→ require current Assessments, conforming actual Validator executions, admissible Evidence, required independence, and transition-permitting dispositions
+→ revalidate impact/revalidation closure and reject missing, failed, stale, invalidated, or bypassed assurance
 → apply transition and create Events
 → atomically persist state + version + Events + command result + idempotency + outbox
 → publish post-commit notifications
@@ -1025,11 +1353,23 @@ Use a PostgreSQL-compatible normalized relational current state plus:
 - immutable, content-hashed Artifact/Evidence/Baseline content;
 - JSONB only for declared versioned extensions, policy expressions, structured results, Events, and snapshots.
 
-This is a hybrid transactional model with Event history, not event-store-only sourcing. Do not hide core cross-object relationships in one generic JSON document or EAV. Do not hard-delete objects that have participated in execution, assurance, governance, a Baseline, or traceability.
+The de minimis assurance floor must preserve enough information to reconstruct:
+
+- versioned policy/profile/applicability and coverage decisions;
+- Assessment execution provenance and the exact subject/context/Evidence considered, Validator results, finding-type Observations, and disagreement;
+
+When Section 16 items 24–25 capabilities are adopted, accepted contracts also preserve enough information to reconstruct:
+
+- causal links from Observations to corrective PWUs/Actions/Attempts, semantic diffs, impact closure, invalidation, and revalidation;
+- isolated meta-assurance fixtures/results and derived convergence/Validator-health views.
+
+These are information requirements, not permission to add tables, fields, objects, or Events. Use existing DOC-007/009 records and relations only where lossless. If the mandatory floor cannot be reconstructed, block the capability and resolve Section 16 item 23; items 24–25 govern the advanced extensions.
+
+This is a hybrid transactional model with Event history, not event-store-only sourcing. The governed professional stream in Section 5.6 is a logical union over these typed stores, not a monolithic record table. Do not hide core cross-object relationships in one generic JSON document or EAV. Do not hard-delete objects that have participated in execution, assurance, governance, a Baseline, or traceability.
 
 Logical persistence domains separate core work, execution, assurance, governance, Events/outbox, projections, audit, integration, and legacy compatibility. They may initially share one database to preserve transaction boundaries. Commands never validate from projections.
 
-Critical data rules:
+Critical current data rules:
 
 - one active Plan per PWU;
 - unique aggregate revision, attempt number, and idempotency key;
@@ -1038,6 +1378,8 @@ Critical data rules:
 - non-local PWU Types must belong to the Undertaking’s immutable selected PWA version;
 - local extensions have no published `pwuTypeId` and never mutate the PWA;
 - Artifact/Evidence corrections create successors, not in-place content mutation.
+
+When the accepted slice implements Section 16 items 24–25, also enforce that material Observations trace to the exact assessed subject/policy/criterion and execution provenance; repair never rewrites the original Observation; resolution/revalidation is explicit over the affected closure; and convergence or assurance-health views never authorize Commands.
 
 ### 10.2 Transaction, outbox, projection, and replay
 
@@ -1068,7 +1410,7 @@ Recovery order is:
 4. replay outbox;
 5. rebuild/catch up projections;
 6. reconcile nonterminal external attempts;
-7. resume durable Process/RPH/Validator/human-wait state.
+7. resume durable Process/RPH/Assessment/Validator/human-wait state and, where accepted contracts exist, repair/revalidation state and affected convergence projections.
 
 Professional correctness must never depend on in-memory state. Projections need no independent authoritative backup once rebuild is proven. Backups and restore verification exist off the runtime host.
 
@@ -1166,15 +1508,37 @@ The JPWB presents five interoperating contexts over the same model:
 
 | Context | Primary concern | Must not become |
 |---|---|---|
-| **PWA Design** | author, validate, version, publish, and define migration contracts for a Professional Work Architecture | an untyped form builder |
+| **PWA Design** | recursively author, inspect, validate, version, publish, and define migration contracts for a Professional Work Architecture and its assurance assignments | an untyped form builder or flat sequence editor |
 | **Undertaking** | establish purpose, boundaries, Participants, Context, PWA/profile/version, and initial Baseline | a generic project record |
 | **Execution** | navigate PWUs, Plans, Steps, dependencies, attempts, outputs, and control actions | an opaque agent chat or task list |
-| **Assurance** | inspect Claims, criteria, Evidence, Validator results, exceptions, and coverage | a single pass/fail badge |
+| **Assurance** | inspect required/resolved coverage, Claims/criteria/Evidence, Assessments, actual Validator executions/results, durable finding-type Observations, gate effect, and uncertainty; add repair/revalidation, convergence, and control health when adopted | a pass/fail badge or Validator console |
 | **Governance** | make version-bound Decisions, manage waivers, promotion, change, and reconciliation | an informal approval screen |
 
-These contexts share canonical identifiers and deep links. A user can move from a displayed conclusion to its Claim, Evidence, generating Action/Step, governing policy, Decision, Artifact version, and Baseline membership.
+These contexts share canonical identifiers and deep links. A user can move from a displayed conclusion to its Claim, Evidence, generating Action/Step, governing policy, Validator execution/context, Assurance Observation, Decision, Artifact version, and Baseline membership; adopted repair/revalidation capabilities add their closure links.
+
+The Assurance context always explains applicable versus missing coverage, exact subject/policy/Validator versions and invocations, considered/rejected/unavailable Evidence, actual independence, protected-transition effect, open/resolved/dispositioned finding-type Observations, and residual uncertainty. When Section 16 items 24–25 capabilities are adopted, it also explains intrinsic/derivational/systemic analysis, repair lineage/affected closure, recurrence/oscillation, convergence, and control-system health. It never hides known Observations merely because a later snapshot passed.
 
 Every surface makes the user's level explicit: PWA definition/version versus Undertaking instance versus PWU Type versus PWU Instance. Show the exact PWA/profile/version binding and whether each value is inherited, profiled, locally extended, or instance-owned. Concrete execution and assurance state belongs to instances, not reusable definitions; PWA publication/review remains separately governable.
+
+The PWA Designer's primary structural projection is labeled **PWA Work Architecture View**. It recursively renders PWU Types from the PWA root through named child composition; it is not labeled a Professional Work Graph and layout never implies execution order. For each selected PWU Type it makes inspectable:
+
+- explicit leaf/non-leaf treatment and named permitted, mandatory, conditional, and default child PWU Types—not merely a count;
+- child cardinality/applicability, decomposition/default/extension rules, obligation and Constraint allocation, coverage expectations, and recomposition contribution;
+- composition, semantic progression, dependency, input/output, iteration, and temporal relationships as distinct typed relations;
+- required, conditional, inherited, and locked de minimis Assurance Policies, their triggers/protected boundaries, Evidence/independence requirements, coverage gaps, and eligible/default conforming Validator capabilities.
+
+Recursive navigation provides expand/collapse, parent/child traversal, depth/context orientation, and direct opening of referenced definitions. Progressive disclosure must not make a hidden descendant look like an absent child or a parent look like a leaf. Validators and policies are assurance attachments/overlays, not child PWUs. A configured/eligible Validator is labeled as capability, never as a completed execution.
+
+The Undertaking **Professional Work Graph** separately shows actual child PWU Instances, Decomposition/Recomposition Contracts, instance state, dependencies, outputs, and assurance. Its assurance drill-down shows exact subject/version, resolved policy, Assessment, selected Validator implementation/version and invocation attempts, considered/missing Evidence, actual independence, Observations, disposition/staleness, and the transition blocked or permitted. Every summary supports navigation through:
+
+```text
+PWA/PWU Type policy assignment
+→ resolved instance/transformation applicability
+→ Assessment → actual Validator invocation/result
+→ Assurance Service disposition → protected transition
+```
+
+An opaque `assurance satisfied` rule, decorative edge, child count, or green badge is nonconformant. One PWU-level badge cannot stand in for assurance of multiple material outputs inside that PWU.
 
 ### 11.3 Cognitive and operational projections
 
@@ -1202,7 +1566,7 @@ A useful workspace makes six kinds of state simultaneously legible:
 1. **Identity:** Undertaking, PWA/profile/version, current Baseline, user/role, tenant, and relevant boundary.
 2. **Orientation:** purpose, current focus, hierarchy/graph location, next admissible actions, and why they are admissible.
 3. **Professional content:** the canonical objects and relations being inspected or changed.
-4. **Assurance and authority:** policy coverage, Evidence status, Decisions, waivers, constraints, and promotion readiness.
+4. **Assurance and authority:** Evidence/independence, finding-type Observations, Decisions, waivers, constraints, residual uncertainty, and promotion readiness, plus adopted coverage/repair/convergence state.
 5. **Execution and provenance:** responsible actor, agent/runtime, attempt, timing, inputs, outputs, and trace links.
 6. **Uncertainty and change:** assumptions, unknowns, conflicts, staleness, divergence, pending proposals, and reconciliation.
 
@@ -1243,7 +1607,18 @@ Supporting operations include trace, compare, challenge, annotate/contribute, de
 
 ### 11.6 PWA authoring, versioning, and extension
 
-A PWA version is a governed semantic package, not a mutable collection of screens. Conceptually its versioned contents identify the PWA, compatible platform/contract versions, profiles, ontology modules, PWU Types, policies, Validators, projections, role/permission mappings, migration definitions, and extension points. The exact manifest/schema and bootstrap Commands remain an unresolved contract in Section 16; do not invent them from this conceptual inventory.
+A PWA version is a governed semantic package, not a mutable collection of screens. Conceptually its versioned contents identify the PWA, compatible platform/contract versions, profiles, ontology modules, root and recursively reachable PWU Types, typed child/dependency/progression/input-output rules, decomposition/recomposition contracts, policies and Validator capability requirements, projections, role/permission mappings, migration definitions, fixtures, and extension points. The exact manifest/schema and bootstrap Commands remain an unresolved contract in Section 16; do not invent them from this conceptual inventory.
+
+An AI-assisted PWA authoring result is incomplete if it stops at a root or linear list of major work areas. Before presenting a candidate as structurally valid, the authoring agent must propose and validate:
+
+1. root PWU Type(s) and recursive child-type composition down to explicitly justified coherent leaves;
+2. mandatory, conditional, optional, default, and extension child rules with obligation/Constraint allocation and coverage Claims;
+3. separately typed composition, semantic progression, dependency, input/output, and execution relationships;
+4. a recomposition rule and parent completion contribution for every non-leaf;
+5. required and conditional Assurance Policies, locked inherited de minimis coverage, protected material boundaries, Evidence/independence, and Validator capability requirements at every applicable level; and
+6. positive and negative conformance fixtures for publication, instantiation, assurance activation, and recomposition.
+
+The agent marks unresolved professional choices, Assumptions, unavailable capabilities, and coverage gaps instead of manufacturing detail. Its own material outputs remain provisional until required assurance completes. It may propose typed Draft operations but cannot publish, silently mutate a published version, declare its own graph valid, or grant authority. The Designer rejects or visibly marks incomplete a top-level sequence, undeclared implicit leaf, missing applicable child, absent recomposition, generic relationship, uncovered material boundary, or opaque assurance string.
 
 Lifecycle:
 
@@ -1258,11 +1633,432 @@ DRAFT → UNDER REVIEW → VALIDATED → PUBLISHED → DEPRECATED → RETIRED
 - If the candidate JSDL SemVer policy is adopted, breaking semantic changes require a major version and migration, additive compatible changes require at least a minor version, and corrections that do not alter meaning may be patch versions. Until then, follow the ratified PWA versioning contract and record compatibility explicitly.
 - Historical Undertakings remain interpretable against the package version under which their Events and Decisions occurred.
 
-### 11.7 UX conformance
+A Draft cannot become `VALIDATED` or `PUBLISHED` unless recursive-composition and assurance-assignment validation proves: explicit leaf/non-leaf treatment; coherent decomposition/recomposition; no missing/disallowed/cyclic child rules; the non-removable floor and all applicable policy references/triggers/Evidence/independence/protected transitions; and fixtures demonstrating activation and enforcement. A portable PWA may declare required Validator capabilities without hardwiring a provider, but target installation or Undertaking activation must prove conforming implementations are available. A missing policy assignment blocks PWA validation/publication; a missing target capability blocks target activation/execution. Neither may silently downgrade required assurance.
+
+### 11.7 Comprehensive authoring exemplar: outcome-centered V-model/UCD/JTBD software PWA
+
+This worked exemplar answers the prompt:
+
+> Draft a software engineering SDLC PWA that leverages aspects from V-model systems engineering approach, User-Centered Design and Jobs To Be Done methodologies.
+
+Its formalized Intent is: **define a reusable software Product Realization architecture that combines evidence-backed JTBD discovery, iterative UCD shaping/validation, and V-model definition-to-Evidence discipline without introducing phases or losing canonical RPH boundaries.**
+
+It demonstrates the minimum semantic and visual completeness expected from the PWA-authoring agent and Designer. The seven branches derive from Section 7/DOC-003; the nested method-specific refinements are candidate choices for this illustrative profile and do not replace that authority. Candidate IDs, version, cardinality notation, policy groupings, and statuses below are explanatory notation—not frozen wire contracts. The result remains a conceptual Draft until accepted registries, schemas, bindings, fixtures, and runtime conformance establish it.
+
+#### 11.7.1 Draft identity and method selection
+
+| Property | Exemplar value |
+|---|---|
+| Name | **Outcome-Centered V-Model Software Product Realization** |
+| Candidate identity | `sdlc-vmodel-ucd-jtbd@0.1.2-draft` |
+| Derivation | specialization of the canonical Product Realization PWA |
+| Domain | Software Engineering |
+| Status | `DRAFT`; narrative thought experiment only, not product-assessed, published, or instantiated |
+| Provisional assurance profile | Standard, subject to risk/context analysis and human confirmation |
+| Root completion Claim | The exact promoted software baseline preserves approved Product Intent, addresses evidence-supported jobs and outcomes, satisfies applicable behavior and requirements, conforms to its architecture, and is fit for its declared purpose within explicitly accepted residual uncertainty. |
+
+Method selection is explicit:
+
+| Method | Selected contribution | Explicit exclusion |
+|---|---|---|
+| **Jobs To Be Done** | job performers, circumstances, struggling moments, desired progress, forces, alternatives, and outcome measures | jobs are not features, Requirements, user stories, or workflow Tasks |
+| **User-Centered Design** | context-of-use research, user Evidence, journey/scenario design, prototyping, formative evaluation, usability/accessibility, and representative-user validation | personas or research findings are not fabricated facts or automatic product obligations |
+| **V-model systems engineering** | bidirectional definition-to-Evidence pairing across Intent, behavior, Requirements, architecture, implementation, verification, and validation | not waterfall scheduling, a phase axis, or certification to a specific V-model standard |
+
+The seven canonical branches are siblings beneath Product Realization. The tree below is a **PWA Work Architecture View** of reusable PWU Types—not an Undertaking Professional Work Graph, a collection of PWU Instances, or execution order. Graph position alone does not imply dependency, semantic progression, input/output flow, or timing beyond the explicitly shown type-composition relationship.
+
+#### 11.7.2 Recursive PWA Work Architecture View
+
+Legend:
+
+- `M1`: mandatory exactly one;
+- `M+`: mandatory one or more;
+- `C1` / `C+`: conditional one / one-or-more when applicable;
+- `N`: non-leaf PWU Type;
+- `L`: coherent leaf PWU Type at this PWA abstraction.
+
+These are presentation shorthands. Executable rules separately encode minimum/maximum cardinality, applicability predicate, and materialization behavior. Every conditional rule has an explicit applicability resolution. Before its predicate can be evaluated, applicability remains unresolved/pending and omission is not permitted; after resolution, required activation or reasoned inapplicability is durably recorded using the accepted contract vocabulary. Inability to obtain required Evidence does not make a child inapplicable. Every node below is a reusable PWU Type. Concrete studies, features, increments, and implementation slices become PWU Instances only in an Undertaking.
+
+```text
+Product Realization [N]
+├─ Intent and Product Definition [M1,N]
+│  ├─ Intent Discovery [M1,N]
+│  │  ├─ Originating Expression and Context Inquiry [M1,L]
+│  │  ├─ Stakeholder and Context-of-Use Research [M1,N]
+│  │  │  ├─ Research, Consent and Privacy Plan [M1,L]
+│  │  │  ├─ Existing Evidence Review [M1,L]
+│  │  │  ├─ Primary Research [C+,L]
+│  │  │  └─ Context/User Synthesis and Limitation Disclosure [M1,L]
+│  │  ├─ JTBD Inquiry [M1,N]
+│  │  │  ├─ Job Performer and Circumstance Definition [M1,L]
+│  │  │  ├─ Functional Job, Desired Progress and Outcome Discovery [M1,L]
+│  │  │  ├─ Struggling Moments, Forces and Current Alternatives [M1,L]
+│  │  │  └─ Emotional and Social Job Inquiry [C1,L]
+│  │  └─ Ambiguity and Assumption Elicitation [M1,L]
+│  ├─ Product Boundary and Domain Definition [M1,N]
+│  │  ├─ Boundary and Non-Goals [M1,L]
+│  │  ├─ Business/Operational Context and Constraints [M1,L]
+│  │  └─ Desired Product Outcomes and Success Conditions [M1,L]
+│  ├─ Intent/Outcome Validation Intent Definition [M1,L]
+│  └─ Intent Baseline Candidate Assembly [M1,L]
+│
+├─ Product Behavior Definition [M1,N]
+│  ├─ UCD Actor and Capability Synthesis [M1,N]
+│  │  ├─ Actor Definition [M1,L]
+│  │  └─ Job-to-Outcome-to-Capability Mapping [M1,L]
+│  ├─ Journey, Scenario and Interaction Definition [M1,N]
+│  │  ├─ Current Job Journey/Job Map [M1,L]
+│  │  ├─ Intended Product Experience Journey [M1,L]
+│  │  └─ Normal, Alternate, Failure, Permission and Interruption Scenarios [M+,L]
+│  ├─ Requirement and Acceptance Model [M1,N]
+│  │  ├─ Functional and Interaction Requirements [M+,L]
+│  │  ├─ Quality and Cross-Cutting Requirements [M1,N]
+│  │  │  ├─ Quality, Performance and Reliability Requirements [M+,L]
+│  │  │  ├─ Security and Privacy Requirements [M+,L]
+│  │  │  ├─ Accessibility and Usability Requirements [C+,L]
+│  │  │  └─ Operational, Deployment and Observability Requirements [C+,L]
+│  │  ├─ Interface and Integration Requirements [C+,L]
+│  │  ├─ Verification Method and Required-Evidence Definition [M1,L]
+│  │  └─ Acceptance Criteria and Bidirectional Trace Closure [M1,L]
+│  ├─ Domain Entity and Integration Model [C1,L]
+│  └─ Prototype and Formative Evaluation [C+,N]
+│     ├─ Prototype Definition [M1,L]
+│     ├─ Representative-User Evaluation [M+,L]
+│     └─ Findings and Behavior-Revision Proposal [M1,L]
+│
+├─ Architecture Definition [M1,N]
+│  ├─ System Context and Architecture Drivers [M1,N]
+│  │  ├─ System Boundary and External Context [M1,L]
+│  │  ├─ Quality, Human-System and Risk Drivers [M1,L]
+│  │  └─ Existing-System and Historical Constraints [C1,L]
+│  ├─ Technical Structure Definition [M1,N]
+│  │  ├─ Component and Responsibility Architecture [M1,L]
+│  │  ├─ Data Ownership and Lifecycle Architecture [M1,L]
+│  │  ├─ Security and Privacy Architecture [M1,L]
+│  │  └─ Integration and Interface Architecture [C+,L]
+│  ├─ Deployment and Operational Architecture [C1,N]
+│  │  ├─ Deployment Topology [M1,L]
+│  │  ├─ Observability Architecture [M1,L]
+│  │  └─ Resilience, Recovery and Continuity Architecture [M1,L]
+│  ├─ Architecture Verification and Validation Design [M1,N]
+│  │  ├─ Component Verification Design [M1,L]
+│  │  ├─ Architecture/Interface Conformance Design [M1,L]
+│  │  ├─ Testability, Environment and Evidence Design [M1,L]
+│  │  └─ Architecture-to-Verification Trace Closure [M1,L]
+│  └─ Architecture Decision and Baseline Candidate Assembly [M1,N]
+│     ├─ Material Architecture Decision Analysis [M+,L]
+│     └─ Architecture Baseline Candidate Assembly [M1,L]
+│
+├─ Implementation Planning [M1,N]
+│  ├─ Product Increment Definition [M+,N]
+│  │  ├─ Vertical-Slice Objective and Scope [M1,L]
+│  │  └─ Intent/Behavior/Architecture/V-Pair Allocation [M1,L]
+│  ├─ Work Decomposition [M1,N]
+│  │  ├─ Implementation PWU Shaping and Obligation Allocation [M+,L]
+│  │  └─ Dependency and Recomposition Contract [M1,L]
+│  ├─ Feasibility, Repository, Risk and Assumption Analysis [M1,N]
+│  │  ├─ Repository/Existing-System Impact [C1,L]
+│  │  ├─ Dependency and Capability Analysis [M1,L]
+│  │  └─ Risk and Assumption Analysis [M1,L]
+│  ├─ Verification, Validation and Evidence Plan [M1,N]
+│  │  ├─ Component/Unit Verification Plan [M1,L]
+│  │  ├─ Integration/System Verification Plan [M1,L]
+│  │  ├─ UCD/Journey/JTBD Validation Plan [M1,L]
+│  │  └─ Specialist Validation Planning [C+,N]
+│  │     ├─ Security Validation Plan [C1,L]
+│  │     ├─ Operational/Resilience Validation Plan [C1,L]
+│  │     └─ Migration Validation Plan [C1,L]
+│  └─ Execution, Migration and Rollback Strategy [M1,N]
+│     ├─ Execution Plan Definition [M1,L]
+│     ├─ Migration Strategy [C1,L]
+│     └─ Rollback and Recovery Strategy [C1,L]
+│
+├─ Product Implementation [M1,N]
+│  └─ Product Increment Implementation [M+,N]
+│     ├─ Implementation Contract Refinement [M1,L]
+│     ├─ Product Slice Implementation [M+,N]
+│     │  ├─ UI and Interaction Implementation [C+,L]
+│     │  ├─ Service/API Implementation [C+,L]
+│     │  ├─ Data/Schema Implementation [C+,L]
+│     │  ├─ Integration Adapter Implementation [C+,L]
+│     │  ├─ Security/Privacy Control Implementation [C+,L]
+│     │  ├─ Verification Artifact Implementation [M1,N]
+│     │  │  ├─ Automated Test Implementation [C+,L]
+│     │  │  ├─ Fixture, Simulation or Test-Data Implementation [C+,L]
+│     │  │  └─ Manual/Inspection Procedure Implementation [C+,L]
+│     │  ├─ Migration Implementation [C+,L]
+│     │  ├─ Documentation Implementation [C+,L]
+│     │  └─ Configuration/Deployment Implementation [C+,L]
+│     ├─ Local Component and Contract Verification [M1,L]
+│     ├─ Formative User Evaluation [C+,L]
+│     └─ Increment Integration and Evidence Capture [M1,L]
+│
+├─ Integrated Product Validation [M1,N]
+│  ├─ Component Verification [M+,L]
+│  ├─ Architecture and Interface Verification [M1,N]
+│  │  ├─ Architecture Conformance [M1,L]
+│  │  └─ Interface and Integration Verification [C+,L]
+│  ├─ Product/System Verification [M1,N]
+│  │  ├─ Requirement Verification [M1,L]
+│  │  ├─ Regression Validation [M1,L]
+│  │  ├─ Security Validation [C1,L]
+│  │  ├─ Operational/Resilience Validation [C1,L]
+│  │  └─ Migration/Rollback Validation [C1,L]
+│  ├─ User, Job and Purpose Validation [M1,N]
+│  │  ├─ Journey and Scenario Validation [M1,L]
+│  │  ├─ Usability and Accessibility Validation [C1,L]
+│  │  └─ JTBD Outcome and Fitness-for-Purpose Validation [M1,L]
+│  └─ Evidence and Residual-Uncertainty Package [M1,N]
+│     ├─ Evidence/Assessment Completeness Synthesis [M1,L]
+│     └─ Findings, Limitations and Residual-Uncertainty Synthesis [M1,L]
+│
+└─ Product Baseline Promotion [M1,N]
+   ├─ Exact Candidate Manifest Assembly [M1,L]
+   ├─ Promotion Evidence Package Assembly [M1,N]
+   │  ├─ Evidence and Assessment Manifest Preparation [M1,L]
+   │  ├─ Version and Trace Manifest Preparation [M1,L]
+   │  └─ Finding, Waiver and Residual-Risk Package Preparation [M1,L]
+   ├─ Promotion Recommendation and Decision-Package Assembly [M1,L]
+   └─ Post-Promotion Observation/Handoff Plan [M1,L]
+```
+
+The exact Governance Decision and the accepted `CreateBaseline`/`PromoteBaseline` Command flow it may authorize are outside PWU composition; aggregate/domain guards, not the Decision record itself, effect the state change. Promotion package preparation is professional work; Assurance Policies, Assessments, Validators, and authority are not child PWUs. The authoring agent, Validator, or graph cannot grant authority. A rejected Decision records rejection and may lead to governed reshaping, successor work, or abandonment; it never satisfies the root Claim.
+
+Default-instantiation and generation behavior is explicit rather than inferred from `M1`/`M+`:
+
+- the seven root children and their declared default shaping children materialize when a full-delivery Undertaking is instantiated;
+- repeatable research, increment, slice, verification, and validation Instances are generated from exact approved allocation/applicability sets, carry stable instance keys, and close cardinality against those sets rather than an unbounded “plus”;
+- implementation children activate from the approved Plan's obligation allocation; they are not concrete feature Instances embedded in the PWA;
+- `Verification Artifact Implementation` must activate at least one coherent method child required by the approved verification strategy; it does not fabricate an automated-test PWU for a non-code output;
+- every conditional rule identifies predicate, evaluation subject/version, resolver/authority, activation point, materialization behavior, and durable rationale. Later activation creates the child and reassesses affected parents.
+
+Primary-research unavailability leaves the affected empirical Claim provisional and blocks dependent fitness/promotion transitions; it does not automatically block unrelated exploratory work. Research Evidence preserves consent, privacy/redaction, provenance, representativeness, limitations, and admissibility. Composition is acyclic; iterative UCD/V-model feedback uses typed impact, invalidation, revision, and successor relations rather than child cycles or in-place mutation of satisfied/baselined work.
+
+#### 11.7.3 Contract behind each node and recomposition
+
+Every non-leaf inspector exposes exact child-type identities, stable instance-key and default-generation rules, min/max cardinalities, applicability and materialization, typed sibling dependencies and coordination, typed inputs/outputs, allocated/retained Obligations, inherited Constraints/Assumptions/policies, decomposition Claim, coverage state, recomposition rule, and protected transition. Every leaf exposes a bounded objective, explicit justification for stopping decomposition at this abstraction, inputs/outputs, completion Claim/criteria, required Evidence, assurance/independence, and escalation. An activity without that professional boundary remains an Execution Step/Attempt.
+
+| Parent | Recomposition requirement |
+|---|---|
+| Intent and Product Definition | Evidence-supported jobs, outcomes, context, boundary, Constraints, non-goals, success conditions, Assumptions, and ambiguity form one Intent candidate; human authority is required for approval. |
+| Product Behavior Definition | `job/outcome → capability → Journey/Scenario → Requirement → acceptance` coverage is complete without treating the concepts as equivalent. |
+| Architecture Definition | Requirements/Constraints are allocated, structure/interfaces are coherent, material Decisions/risks are explicit, and every applicable concern has a verification counterpart. |
+| Implementation Planning | Every increment obligation is allocated to bounded work; dependencies, Constraints, assurance, recomposition, and responsible Evidence sources are complete. |
+| Product Implementation | Activated slice obligations integrate into one exact candidate with tests/provenance and disclosed deviations/Assumptions. |
+| Integrated Product Validation | The exact candidate closes every applicable verification/validation pairing with admissible Evidence and supports product-level fitness Claims—not merely passing tests. |
+| Product Baseline Promotion | The exact reviewed manifest has complete current Assessments, valid finding/waiver/risk disposition, and a Decision package for valid Governance authority. |
+| Product Realization root | Applicable child obligations and assurance are complete, integrated validation supports the root Claim, and an exact Governance Decision authorizes the guarded Command flow that materializes the assured candidate as a Baseline. |
+
+For every parent, recomposition permits satisfaction only when every required activated child has a current assured result that may contribute, any omitted/waived/superseded obligation has a valid policy-permitted exact-scope disposition, the exact recomposed output and parent Claim have sufficient Evidence, sibling outputs are mutually compatible, and no blocking Assessment remains. `CONDITIONALLY_SATISFIED` does not contribute to recomposition or promotion, and no non-waivable control can be bypassed. “All children completed” never proves recomposition.
+
+V-model correspondence is a separately typed, exact-version assurance/trace overlay—not composition or order:
+
+| Definition-side subject | Corresponding inquiry |
+|---|---|
+| Product Intent, JTBD outcomes, circumstances, success conditions | representative-user/job validation and Fitness for Purpose |
+| Actors, capabilities, Journeys, Scenarios, acceptance criteria | Journey, Scenario, usability, and accessibility validation |
+| Functional and quality Requirements | system and Requirement verification using the method declared when authored |
+| Components, data, interfaces, security, operational architecture | component, integration, and architecture-conformance verification |
+| Implementation-detail obligations | static, unit, component, and contract verification |
+
+Each pairing binds subject/version, Claim, method, required Evidence, resulting Assessment, and affected consumers. A failed right-side inquiry computes impact and reopens or supersedes affected upstream work. Until accepted relationship codes exist, the Designer labels these edges conceptual and never persists invented wire codes.
+
+The professional verification/validation PWUs above perform inquiry and produce version-bound results and Evidence for product-level Claims. `Local Component and Contract Verification` supplies formative, implementation-scope Evidence; Integrated Product Validation's `Component Verification` separately checks its freshness, coverage, exact integrated subject, and any required rerun or augmentation with the independence demanded by policy. A local pass never auto-satisfies the integrated PWU. Assurance Assessments then separately determine whether Evidence supports a governed Claim under an applicable policy at a protected boundary. A passing test, successful usability session, or professional validation conclusion is therefore neither its own Assurance Assessment nor authority to promote.
+
+Semantic guardrails:
+
+```text
+job executor ≠ persona ≠ Actor
+job / desired progress ≠ Journey
+job step ≠ product-interaction step
+desired outcome ≠ Requirement
+research observation ≠ admitted Evidence ≠ approved fact
+prototype ≠ Requirement ≠ Architecture ≠ Baseline
+verification ≠ validation ≠ acceptance
+```
+
+A required derivation trace is:
+
+```text
+evidence-supported job hypothesis
+→ desired outcome → capability → Journey/Scenario
+→ Requirement → acceptance criterion + verification/validation method
+→ implementation allocation → verification Evidence
+→ job-progress / fitness Evidence
+```
+
+Leading usability signals remain distinct from actual job-progress/outcome Evidence.
+
+#### 11.7.4 Assurance Engineering is the visible control fabric
+
+No single node represents Assurance Engineering. Integrated Product Validation performs product-level professional validation, but the Assurance Engineering subsystem is orthogonal to every node, transformation, relationship, and protected transition:
+
+| Scale | Concern |
+|---|---|
+| **Local Transformation Assurance (“micro”)** | each material human, AI/agent, tool, import, or recomposition transformation and every independently downstream-consumable result |
+| **PWU/compositional assurance** | Claims/Evidence, child obligation and Constraint coverage, dependency coherence, and recomposition |
+| **Undertaking/product assurance (“macro”)** | cross-PWU coherence, integrated verification/validation, Intent preservation, fitness, residual uncertainty, and Baseline eligibility |
+| **Meta-assurance** | policy/Validator fidelity, Evidence access, independence/common mode, calibration, canaries, escaped defects, and control health |
+
+A PWU may contain many material calls. One PWU-level review cannot substitute for exact per-output Assessments:
+
+```text
+PWU Instance
+  ├─ Agent Attempt A → Candidate A → Reasoning Review A → admit/block
+  ├─ Agent Attempt B → Candidate B → Reasoning Review B → admit/block
+  └─ Agent Attempt C → Candidate C → Reasoning Review C → admit/block
+```
+
+The PWA Work Architecture View keeps an **assurance rail** visible on every PWU Type even when collapsed:
+
+```text
+┌────────────────────────────────────────────┐
+│ Product Behavior Definition [non-leaf]      │
+│ 5 named child rules · 0 unresolved gaps     │
+├────────────────────────────────────────────┤
+│ ASSURANCE RAIL                              │
+│ 🔒 de minimis floor · non-removable         │
+│    contract/invariant checks                │
+│    identity/provenance/trace                │
+│    Reasoning Review for material AI output  │
+│ +  Requirement Coverage                     │
+│ +  Intent Preservation                      │
+│ +  UCD/JTBD coverage                        │
+└────────────────────────────────────────────┘
+```
+
+The collapsed node always shows the locked floor, policy/capability counts, and coverage-gap/blocking status. Selection reveals policies, triggers, Claims/Evidence, independence, protected boundaries, and eligible Validator capabilities. Invocation drill-down reveals actual execution. An assurance-wide overlay shows coverage across the PWA/Undertaking. Assurance cannot live only in a modal, log, inspector, or generic green badge.
+
+The implementation preserves three distinct assurance rails:
+
+1. **Definition time:** the PWA declares the applicable Assurance Policy/version, trigger/materiality rule, subject and Claim, required Evidence, independence, protected boundary/transition, and required Validator capability contract. This is required treatment, not execution.
+2. **Deployment time:** an installation binds eligible/default conforming Validator implementations to declared capability requirements and proves compatibility, availability, authorization, and required independence can be supplied. This proves deployability, not that any Assessment ran or passed, and it does not imply a new canonical capability object.
+3. **Runtime:** the system creates the exact version-bound Assessment, selects and records the Validator/capability/version/invocation actually used, admits Evidence and Observations, verifies actual independence, records the Assurance Service disposition, and re-evaluates the protected transition through a server-side gate. Only this rail can establish current assurance satisfaction.
+
+PWA Design distinguishes:
+
+1. **Prospective treatment:** future instances of this PWU Type require identified policies and Validator capabilities.
+2. **Authoring assurance:** this exact AI-authored type definition/draft was itself assessed by identified Validator invocations.
+
+The following is an illustrative target projection, not a claim that this thought experiment produced a persisted Assessment:
+
+```text
+Required in future Undertakings
+  Reasoning Review — LOCKED
+  Requirement Coverage — REQUIRED
+
+Current PWA-authoring Draft after actual runtime assessment
+  subject: behavior-definition-type@draft-revision-7
+  Reasoning Review — satisfied only by persisted Assessment
+  Validator/version/invocation: exact runtime identities
+  findings: exact Observations and dispositions
+```
+
+A policy assignment proves required treatment; a configured capability proves availability; neither proves execution. Runtime state never contaminates the reusable PWA definition.
+
+#### 11.7.5 Micro-assurance and Reasoning Review
+
+Every material professional transformation has a persisted, inspectable coverage resolution. Every generative or interpretive LLM/agent result is material by default, including summaries/context supplied to another agent. The producer cannot self-exempt; ambiguity resolves to material; only a versioned rule proving lossless semantic equivalence permits nonmaterial classification. A timeout/no-output Attempt remains recorded but has no candidate output to review.
+
+Every material AI/agent output additionally receives the locked, non-waivable Reasoning Review floor. Reasoning Review asks whether the result genuinely discharges its delegated professional obligation or merely produces a plausible substitute that conceals the underlying problem. Candidate failure classes—not yet wire codes—include:
+
+- problem substitution or obligation elision;
+- unjustified scope reduction;
+- proxy satisfaction and surface repair;
+- premature closure/convergence;
+- unsupported Assumptions, circular support, invalid inference, or false equivalence;
+- contradiction with Intent, Constraints, inputs, or Evidence;
+- omitted inconvenient Evidence or hidden uncertainty;
+- declaring completeness from output existence or activity.
+
+The review binds exact input/context/output versions, producing Attempt, policy/criteria, producer/evaluator lineage, Claims, admitted/rejected/missing Evidence, tool results where authorized, limitations, uncertainty, and protected consumer. It reviews observable professional rationale and provenance—not private chain-of-thought. A distinct invocation/role is the minimum; stronger profiles add model/provider/human/organizational independence.
+
+Type-level assurance overlay:
+
+| Scope | Required treatment | Eligible capability examples | Protected transition |
+|---|---|---|---|
+| Every node/material output | contract/invariant, identity/version/provenance/context/trace; Reasoning Review for AI output | schema/invariant, provenance, Reasoning Review | canonical admission or dependent consumption |
+| Intent/JTBD | Intent Fidelity, Intent Completeness, Assumption Disclosure; registered JTBD/research coverage | trace plus independent JTBD/UCD/human review | Behavior shaping or Intent approval |
+| Behavior/UCD | Requirement Coverage, Intent Preservation, Assumption Disclosure; registered research/Journey/requirement/accessibility coverage | trace/coverage, requirement quality, UCD/human evaluation | Architecture or Planning |
+| Architecture | Architecture Coverage, Constraint Propagation, Historical Consistency, Intent Preservation, Assumption Disclosure | architecture/trace/security/operability plus independent architect | architecture candidacy or Planning |
+| Planning | Decomposition Coverage, Constraint Propagation, Test Adequacy, Assumption Disclosure, Intent Preservation | graph/dependency/recomposition/test/migration/rollback | implementation execution |
+| Implementation | Intent Preservation, Requirement Coverage, Test Adequacy, Assumption Disclosure, Constraint Propagation; registered scope/conformance policies | static/test/trace/scope/architecture/security/migration | integration or Integrated Validation |
+| Integrated Validation | Requirement Coverage, Test Adequacy, Fitness for Purpose, Intent Preservation | independent verifier, test/Evidence, representative-user, specialist/human | promotion review |
+| Promotion | Baseline Promotion plus exact-version/Evidence/open-finding/authority controls | manifest/trace/Assessment/authority | Governance Decision/Baseline |
+
+Specialized policies must be registered/versioned; they cannot exist only as hidden prompts. Design time shows assignments and capability requirements. Runtime shows actual Validator identity/version/invocation, Evidence, independence, result, Observations, Assessment freshness/disposition, and gate effect.
+
+#### 11.7.6 Durable barrier, freshness, and finite meta-assurance
+
+```text
+persist exact candidate output + provenance
+→ persist materiality/applicability resolutions
+→ run deterministic contract/invariant checks
+→ create or resume required Assessments
+→ bind, schedule, and invoke conforming Validators
+→ verify actual independence
+→ validate/persist results, failures, and Observations
+→ Assurance Service records dispositions
+→ revalidate exact protected transition
+```
+
+Missing, pending, stale, invalidated, malformed, failed, unavailable, independence-invalid, or otherwise non-permitting assurance blocks the dependent transition without proving the subject wrong. Restart resumes the barrier; idempotency prevents duplicate semantic effects. An Assessment becomes stale or superseded when its subject, producing Attempt, material input/context, Evidence, policy/criteria, Validator binding, or independence requirement changes; impact propagates to consumers.
+
+Governance cannot waive a non-waivable control, retroactively treat an absent review as passed, or fabricate satisfaction. It may reject/abandon work or waive only policy-declared waivable obligations through an exact version-bound Decision.
+
+Assurance must terminate without infinite “review of the review” recursion:
+
+- material AI/agent **subject-plane** output requires Reasoning Review;
+- Validator/Assessment results are **assurance-plane** outputs and always receive strict result-schema, identity, policy/version, provenance, subject/context/Evidence-binding, independence, and disposition validation plus risk-derived meta-assurance;
+- the control topology is finite and acyclic; no Validator reviews its own Attempt/result;
+- every assurance path terminates in a declared deterministic control, independently adjudicated human/organizational control, or explicit failure/escalation;
+- AI meta-review may occur only within that finite topology; decisive high-impact assurance uses an independent portfolio or human adjudication when policy requires.
+
+If accepted contracts cannot represent required meta-assurance losslessly, publication/activation remains blocked under Section 16 item 25.
+
+Illustrative failure/recovery:
+
+```text
+authoring agent produces Acceptance Model v7
+→ schema and trace checks pass
+→ Reasoning Review Validator times out
+→ Assessment records Validator failure; v7 remains provisional
+→ Architecture agent cannot consume v7
+→ restart resumes the Assessment
+→ alternate conforming Validator reviews exact v7
+→ Assurance Service records the new disposition
+→ protected consumer transition is re-evaluated
+```
+
+No retry, displayed badge, client state, or successful unrelated check infers satisfaction.
+
+#### 11.7.7 Authoring assurance and publication proof
+
+The authoring agent displays its own correction history rather than silently replacing drafts. A representative review loop is:
+
+1. `0.1.0-draft` exposes shallow/universal-coverage, durable-enforcement, or method-integration gaps.
+2. `0.1.1-draft` corrects them but exposes a potential infinite assurance-recursion flaw.
+3. `0.1.2-draft` adds finite assurance stratification and may be judged satisfactory **for narrative Draft purpose only** by a separate thought-experiment reviewer.
+
+That narrative finding is not a canonical Assurance Assessment or publication authority: no actual product Validator invocation, persisted Assessment, or server-side gate is claimed here. Provider/model independence and actual product persistence/enforcement must be proven independently.
+
+Minimum publication/conformance proof includes:
+
+- accepted identities and versions for PWU Types, Assurance Policies, Validator implementations/bindings, and relationships;
+- executable recursive child/decomposition/recomposition contracts;
+- an isolated, non-authoritative preview/conformance-instantiation fixture with at least three recursive type/instance levels, two planned increment/slice Instances, and exact definition-to-verification/validation pairings;
+- fixtures that activate human-facing, integration, and migration concerns, plus a genuinely low-scope case whose conditional omissions have durable, version-bound inapplicability rationales;
+- visible authoring-agent Attempts and exact Reasoning Review Assessments;
+- negative fixtures for flat graphs, implicit leaves, false inapplicability, unresolved applicability treated as omission, missing assignments, capability-visible-without-invocation, absent/failed review, review made stale by revision, self-review, cyclic meta-assurance, relationship conflation, restart recovery, and a rejected or bypassed promotion that must not satisfy the root;
+- deployed Validator availability/independence, Assessment persistence, recovery, invalidation, and server-side transition guards.
+
+Only a `PUBLISHED` PWA version may bind a production Undertaking. Section 11.7 is therefore the human-readable fixture specification, not the fixture itself; a separate versioned machine-readable golden fixture must provide explicit fixture-only identities, PWA/version bindings, expected Commands/Events/projections, and test oracles before publication. The UI may progressively disclose this information; the underlying work and assurance topology may not be omitted.
+
+### 11.8 UX conformance
 
 Required behaviors include keyboard access, visible focus, semantic markup, non-color-only status, readable provenance, timezone/locale clarity, and usable dense information at multiple viewport sizes. Loading, empty, partial, stale, denied, conflict, validation, and recovery states are first-class designs.
 
-Test the UI against stable semantic fixtures and contracts. Include role/redaction tests, stale-revision conflict, projection lag, AI proposal versus approved fact, Evidence drill-down, waiver expiry, Baseline promotion, failed/retried external execution, migration preview, keyboard navigation, and accessibility checks.
+Treat Section 11.7 as the minimum fixture specification for recursive and assurance rendering; execute UI tests against its separate machine-readable fixture and accepted contracts. Include recursive PWA type navigation, type-versus-instance separation, relationship-type discrimination, assurance assignment-to-execution drill-down, role/redaction, stale-revision conflict, projection lag, provisional AI proposal versus approved fact, Evidence drill-down, unavailable/failed Validator blocking, waiver expiry, Baseline promotion, failed/retried external execution, restart recovery, migration preview, keyboard navigation, and accessibility.
 
 Avoid chat-only operation, universal dashboards, giant undifferentiated graphs, phase wizards, unexplained scores, hidden provenance, unversioned approvals, and screens that merge execution completion with assurance satisfaction.
 
@@ -1307,6 +2103,8 @@ The draft handbook describes a ten-meta-phase lifecycle but expands it into the 
 13. encode the architecture in JSDL if and when JSDL is adopted;
 14. validate structurally, semantically, professionally, operationally, cognitively, governably, experientially, and against outcomes;
 15. operationalize, observe, reconcile, version, and evolve.
+
+Assurance is not deferred to stages 10 and 14. Observation discovers failure dynamics; Outcome/cognition/representation modeling defines Claims and Evidence; risk/invariant work defines hard boundaries; PWU/RPH design places control and feedback points; integration design establishes trust and diagnostic scope; validation tests the complete topology; operation supplies outcomes and control-health Evidence. Shape Engineering makes known failure modes and assurance needs part of the work's shape; Assurance Engineering translates them into and operates the versioned control treatment permitted by current contracts.
 
 Required outputs are compact but traceable: domain boundary and charter; vocabulary/ontology; outcome, cognition, Evidence, and Decision models; representation catalog; uncertainty/risk/invariant register; PWU and RPH model; assurance/governance matrix; projection/workspace contracts; integration/observation model; executable definition; conformance scenarios; evolution plan. Every normative element should trace to observation, principle, requirement, or Decision.
 
@@ -1472,6 +2270,8 @@ Tests generate executable engineering evidence for governance. They prove semant
 | persistence | atomic aggregate/Event/outbox writes, constraints, RLS, optimistic concurrency, idempotency |
 | replay/migration | state equivalence, upcasters, projection rebuild, legacy mapping, restart recovery |
 | integration/boundary | API, DBOS, Cerbos, Vault, object store, Compute Broker, provider/VCS adapters, failure modes |
+| mandatory assurance floor | material-boundary classification, policy activation, Validator conformance/execution, independence, Assessment persistence, protected-transition enforcement, and restart/bypass failure modes |
+| adopted repair/meta-assurance extensions | Observation repair/revalidation closure, convergence, canaries, and escaped defects where the slice has accepted contracts |
 | end-to-end conformance | professionally meaningful scenarios from intent through governed Baseline and reconciliation |
 
 Add state-machine, authorization, tenant-isolation, accessibility, performance, chaos/recovery, and production-observability tests where their risks live. Prompt and agent tests assess trajectory, tool use, provenance, schema compliance, adversarial input, uncertainty handling, and bounded authority—not exact prose.
@@ -1490,12 +2290,18 @@ Generate valid and invalid cases around these properties:
 | **P6** | Repeating an idempotent Command produces no duplicate semantic effect. |
 | **P7** | An authoritative Baseline is immutable; change creates and governs a new candidate/version. |
 | **P8** | Presentation or projection choice cannot change canonical professional meaning. |
+| **P9** | Every published instantiable PWU Type is reachable from a root/extension point and explicitly a coherent leaf or a non-leaf with acyclic child, decomposition, recomposition, and assurance rules. |
+| **P10** | Instantiation recursively creates every applicable mandatory/default child PWU Instance and no disallowed, orphaned, cross-Undertaking, or wrongly versioned child. |
+| **P11** | Composition permission, semantic progression, dependency, instance decomposition, input/output compatibility, and temporal execution remain distinct in every projection and layout. |
+| **P12** | Every material AI/agent transformation receives Reasoning Review and all other applicable coverage before dependent consumption or a protected transition; exact policy assignment, Validator eligibility, actual invocation, Assessment disposition, and Governance Decision remain distinct and traceable. |
 
 Also generate arbitrary acyclic PWU hierarchies/graphs, obligation/constraint distributions, partial Evidence sets, concurrent expected revisions, duplicate delivery, Event replays, projection interruption, expired waivers, failed external attempts, incompatible schema versions, and cross-tenant identifiers.
 
+P9–P12 are mandatory for every slice that authors/instantiates PWAs or executes material agent transformations; a missing lossless wire contract keeps that capability disabled or nonconformant rather than weakening the property. Additional repair, convergence, and meta-assurance properties become mandatory when Section 16 items 24–25 are ratified or a slice adopts equivalent accepted contracts: no material finding-type Observation disappears across regeneration or repair; repair of version `n` cannot reuse its satisfied Assessment for `n+1`; revalidation covers the complete declared impact closure; a required-independent Validator portfolio with common execution provenance fails independence; convergence/gate readiness never grants authority; and absent required diagnostics prevents a trajectory-integrity Claim.
+
 ### 14.3 Minimum conformance scenarios
 
-DOC-008's first-slice suite covers Intent through Architecture Baseline and explicitly defers distributed execution, SaaS isolation, arbitrary ontology and marketplace policy systems, numerical confidence, full release/deployment Baselines, and production deployment. Its stable core includes at least:
+The current numbered corpus's accepted conformance core—principally DOC-008, supplemented by DOC-009's persistence, recovery, and cutover behavior—covers Intent through Architecture Baseline and explicitly defers distributed execution, SaaS isolation, arbitrary ontology and marketplace policy systems, numerical confidence, full release/deployment Baselines, and production deployment. It includes at least:
 
 - accepted and rejected strict envelopes, unknown properties/codes, incompatible schema versions, and invalid IDs;
 - legal and illegal PWU transitions on every orthogonal state axis;
@@ -1510,9 +2316,32 @@ DOC-008's first-slice suite covers Intent through Architecture Baseline and expl
 - legacy shadow comparison, single-authority enforcement, compatibility projection, cohort rollback, and cutover write revocation;
 - the FSM reference Undertaking and first Product Realization architecture slice end to end.
 
+Any slice claiming PWA Designer, PWA-authoring-agent, PWA instantiation, or governed model-transformation support additionally proves:
+
+- a recursively navigable architecture of at least three PWU Type levels, including a valid justified leaf, whose applicable mandatory/default children instantiate and recompose correctly;
+- rejection of a top-level linear chain presented as complete composition, an implicit leaf, an opaque child count, a non-leaf without recomposition, a cycle, a missing/disallowed/applicability-invalid child, and a generic edge that conflates composition with progression/dependency/execution;
+- an authoring-agent result remains Draft when recursive structure, assurance assignments, protected boundaries, or conformance fixtures are unresolved, and PWA validation/publication rejects the specific gaps;
+- every material AI/agent output activates Reasoning Review even when a local PWA/profile omits it; the producer cannot self-exempt or self-review, ambiguity defaults to material, and review for version/Attempt `n/a` cannot satisfy `n+1/b`;
+- a material result cannot feed dependent context or another protected transition before its de minimis and additional applicable Assessments permit it;
+- missing context/Evidence, Validator unavailability/timeout/malformed output/failure, staleness, and independence violation fail closed without fabricating subject rejection or satisfaction; restart/replay resumes the barrier, and regeneration preserves prior Observations while requiring a new Assessment;
+- the PWA Work Architecture View shows policy and Validator capability assignments without runtime pass state, while the Professional Work Graph/Assurance context exposes actual Validator identity/version/invocation, Evidence, Assessment, Observations, disposition, and gate effect; and
+- conformance requires no private chain-of-thought and proves that UI, agent, worker, retry, direct-persistence, and projection paths cannot bypass server-side assurance enforcement.
+
+Additional repair, convergence, and meta-assurance scenarios apply after Section 16 items 24–25 are ratified or a slice explicitly adopts equivalent accepted contracts:
+
+- intrinsic success with invalid derivation, and locally valid work that fails systemic coherence;
+- a repair that resolves its triggering finding-type Observation but invalidates another Assessment or introduces a new blocking Observation;
+- `A → B → A` finding/remediation oscillation, repeated non-progress, budget exhaustion, and required tactic change/escalation;
+- semantic changes with incomplete impact/revalidation closure remaining ineligible to advance;
+- correlated “independent” Validators, preserved disagreement, Validator failure, and no fallback satisfaction when required independence is unavailable;
+- deterministic corruption canaries for identity, traceability, criteria, stale dependency, injection, and proxy-gaming defects, with missed canaries retained as engineering Evidence pending a meta-assurance subject contract;
+- a valid final Artifact reached through a prohibited authoritative transition remaining ineligible for trajectory-integrity or Baseline claims.
+
 The broader platform adds proportional tests when those deferred capabilities enter scope: application-plus-RLS cross-tenant denial, redaction and inference leakage, audit-chain verification, secret non-disclosure, PWA version pinning and migration, edition entitlement, sandbox isolation, distributed recovery, deployment behavior, and resource fairness.
 
 Each behavioral test asserts result/error, aggregate revision and semantic version, emitted Event type/payload/order, trace links, outbox/projection effects, and absence of prohibited side effects where applicable—not final state alone. Each defect in a semantic or boundary contract receives a deterministic regression test when feasible. Fixtures contain stable IDs/times/seeds and explicit expected Events, state, errors, projection outputs, and audit records. Keep positive and negative fixtures beside the versioned schema they prove.
+
+For an adopted Assurance Engineering slice, evaluate behavior with adjudicated consequential-defect interception/escape, derivation fidelity, recurrence, Validator precision/recall, remediation effectiveness and regression, convergence cycles, escalation appropriateness, actual independence/diversity, false-assurance incidents, and control latency/compute/reviewer burden. These measures diagnose the system; never average them into professional truth.
 
 ### 14.4 Mutation and coverage gates
 
@@ -1537,7 +2366,7 @@ Emit structured logs and traces with timestamp, severity, service/component, env
 
 Errors are typed and separated into validation, authorization, conflict, invariant, dependency, timeout/unknown-outcome, quota, and internal categories. Preserve redacted failure Evidence and causal chains; never reduce them to a generic “failed.” Health and readiness distinguish process liveness from ability to uphold dependencies and invariants.
 
-For model/agent calls, record allowed provider/model/version, prompt/template/tool versions or fingerprints, relevant policy, token/time/cost metrics, response schema status, safety/redaction outcome, and resulting proposal/Artifact IDs. Do not log secrets or unrestricted professional content.
+For model/agent calls, record allowed provider/model/version, prompt/template/tool versions or fingerprints, relevant policy, token/time/cost metrics, response schema status, safety/redaction outcome, and resulting proposal/Artifact IDs. For assurance cycles supported by accepted contracts, correlate subject/input/output versions, policies/criteria, considered/rejected/missing Evidence, actual independence, finding codes/Observation IDs, control response, repair diff, invalidated dependencies, revalidation closure, and resulting unresolved Observations; add recurrence fingerprints only after Section 16 item 24 is decided. Do not log secrets, unrestricted professional content, or private chain-of-thought.
 
 Alert on invariant violations, direct legacy writes after cutover, authorization/RLS mismatch, audit-chain break, Event/outbox lag, projection staleness, stuck durable attention, repeated unknown external outcomes, excessive reconciliation, quota abuse, and cross-tenant access attempts. Fail loudly on semantic corruption; degrade only through an explicit, safe operating mode.
 
@@ -1557,6 +2386,9 @@ affected PWA / Undertaking / PWU Type / aggregate / service
 authoritative source section and contract/schema versions
 tenant, identity, authorization, and trust boundary
 professional invariants and assurance policies at risk
+recursive type/instance composition, leaf treatment, and decomposition/recomposition when PWA/PWU structure is affected
+material transformation boundaries, mandatory de minimis floor, additional applicable coverage, protected transitions, and failure modes
+required Evidence/independence and existing finding-type Observations, repairs, or invalidated Assessments
 Event, persistence, projection, migration, audit, and compatibility effects
 acceptance Evidence and commands/tests that will prove completion
 unresolved decisions that block a safe choice
@@ -1573,9 +2405,11 @@ Trace the change vertically:
 ```text
 professional rule
 → canonical type/invariant
+→ accepted assurance policy/coverage, failure modes, Evidence, and independence
 → Command and authorization
 → domain transition
 → Event and audit
+→ finding-type Observations and, where contracted, corrective work/impact/revalidation
 → persistence/outbox
 → projection/API/UI
 → migration/compatibility
@@ -1594,6 +2428,11 @@ Before adding a field or type, ask: Is it authoritative or derived? Which aggreg
 - Make domain transitions atomic with Event/outbox persistence. Do not let UI, jobs, agents, Validators, or adapters write around Commands.
 - Keep external side effects behind authorized Runtime Bindings and the attempt/reconciliation protocol.
 - Treat AI and tool output as untrusted proposals. Validate structure, provenance, policy, and Evidence before authority.
+- Treat each material AI/agent output as provisional until its durable Reasoning Review and other applicable Assessments permit dependent consumption. Neither the producer nor a local profile may suppress the floor.
+- Do not represent assurance with a Boolean, completion-rule string, child count, decorative edge, or client-only badge. Implement type-level policy assignment, deployment capability binding, instance Assessment and actual Validator execution, durable scheduling/recovery, server-side transition guard, inspectable projection, and negative tests together.
+- For PWA Designer or authoring-agent work, implement recursive named child-type composition, explicit leaf treatment, typed relationship separation, decomposition/recomposition, assurance assignments, and publication rejection as one coherent vertical slice; a flat top-level graph is not a partial success described as complete.
+- Preserve every material finding-type Observation against its exact subject version; never delete it or edit around the policy. Where an accepted repair/revalidation contract applies, repair creates governed successor work and closes its required impact set.
+- When changing a Validator, policy, rubric, Evidence pipeline, or an adopted assurance planner, test the control itself with negative fixtures/canaries and inspect common-mode independence and downstream revalidation impact; keep meta-assurance output as engineering Evidence until a subject contract exists.
 - Add typed errors, structured telemetry, redaction, and recovery behavior with the feature—not afterward.
 - Create forward-safe migrations and upcasters before readers/writers depend on the new representation.
 - Update schemas, fixtures, tests, docs, and compatibility projections in the same coherent change.
@@ -1605,9 +2444,10 @@ Run the cheapest relevant proof first, then broaden:
 1. format, lint, type, schema, and deterministic-generation checks;
 2. focused domain, transition, invariant, authorization, and regression tests;
 3. property, contract, persistence, replay, RLS, and projection tests;
-4. integration and end-to-end conformance for changed boundaries;
-5. migration/rollback or recovery rehearsal when state changes;
-6. repository-wide gates affected by the change.
+4. the mandatory assurance floor and all applicable contracted coverage, including protected-transition failure/recovery; add Observation repair/revalidation and convergence/meta-assurance checks where adopted and affected;
+5. integration and end-to-end conformance for changed boundaries;
+6. migration/rollback or recovery rehearsal when state changes;
+7. repository-wide gates affected by the change.
 
 Inspect generated Events, stored rows, audit entries, projection output, negative authorization, restart/replay behavior, and the user-visible state—not only exit codes. If a required check cannot run, report exactly what was not verified and why; never imply it passed.
 
@@ -1632,6 +2472,10 @@ A change is done only when:
 - its professional meaning and owning aggregate are unambiguous;
 - Commands, Events, schemas, authorization, state transitions, and errors agree;
 - execution, assurance, governance, and Baseline effects remain separate;
+- the mandatory floor and all additional applicable contracted assurance coverage are explicit; material finding-type Observations are accounted for; adopted repair/revalidation obligations close without hidden recurrence or regression;
+- every material AI/agent transformation has durable de minimis Reasoning Review plus additional applicable controls before dependent consumption, including restart, retry, failure, staleness, and bypass cases;
+- PWA Designer/authoring-agent changes prove recursive type composition, explicit leaves, typed relationship separation, recursive instance creation, recomposition, assurance assignment/capability visibility, actual-execution drill-down, and positive/negative publication fixtures;
+- PWA definition-time policy requirements, deployment-time Validator capability, instance-time Assessment/execution, and Governance authority remain distinct and inspectably linked;
 - tenant isolation, secrets, audit, idempotency, concurrency, failure, and recovery are handled;
 - persistence, replay, projections, migration, and compatibility are coherent;
 - required Evidence is captured and all proportional tests pass;
@@ -1655,7 +2499,7 @@ These are implementation boundaries, not an invitation to solve the architecture
 | 6 | **Event vocabulary and granularity.** DOC-002 has granular satisfaction/approval Events; DOC-007's first slice uses `PwuStateChanged`, `AssuranceAssessmentCompleted`, and `DecisionEffective`, without fully modeling separate approval/effective time. | Emit the generated DOC-007 registry at current boundaries. Never emit generic and granular Events as independent facts. Extend the versioned registry and mappings before adding future-dated or separately effective Decisions. |
 | 7 | **`ChangePwuState`.** DOC-007 names a catch-all Command but does not define its payload, authority, or guard contract. | Do not expose a public state setter. Use semantic Commands. Any internal helper enforces the closed transition/guard table and emits the correct semantic Event. |
 | 8 | **Identifier generation.** DOC-002 permits prefixed ULID or UUIDv7; DOC-007 requires a registered prefix plus ULID but does not register every proposed object. Fixture IDs are intentionally readable. | Use registered DOC-007 prefix + ULID in production and fixture IDs only in fixtures. Extend the registry/schema/tests before adding an object prefix; do not casually accept multiple generators. |
-| 9 | **PWA/PWU Type/Undertaking bootstrap.** The initial contract begins with `CaptureIntent` against an existing Undertaking but defines no create/publish/instantiate/migrate Commands. DOC-010 demonstrates UX without freezing those wire shapes. | Bootstrap only through accepted seed/fixture or an existing API behind an explicit adapter. No generic CRUD into canonical tables. Keep published PWA versions immutable and Undertakings pinned until a governed migration contract exists. |
+| 9 | **PWA/PWU Type/Undertaking bootstrap.** The initial contract begins with `CaptureIntent` against an existing Undertaking but defines no create/publish/instantiate/migrate Commands. DOC-010 demonstrates UX without freezing those wire shapes. | Bootstrap only through an accepted seed/fixture or existing API behind an explicit adapter. Preserve roots, recursively reachable PWU Types, named child rules, explicit leaves, decomposition/recomposition, assurance assignments, and instantiation expectations; never reduce a PWA to a flat node list. No generic CRUD into canonical tables. The exact wire shape is unresolved—not the recursive composition requirement. Keep published versions immutable and Undertakings pinned until governed migration exists. |
 | 10 | **Assurance schema and profile activation.** DOC-004 and DOC-007 differ on applicability expression, required Evidence/waiver arrays, and `riskProfiles`; DOC-003 leaves mandatory policies by conformance/risk profile open. | Use DOC-007 serialization without dropping DOC-004 meaning. Pin the slice to a versioned matrix of PWA conformance profile, independent PWU risk profile, applicable policies, criteria, and independence. Missing mapping blocks promotion. |
 | 11 | **Composing Assessments into PWU state.** Individual Assessment state, PWU assurance state, aggregate projection, and lifecycle satisfaction are distinct; no exhaustive mapping covers multiple policies, waivers, and conflicting Validators. | Preserve all records/axes. Compose every applicable current-version policy using the strictest unresolved required result. A passing Assessment never advances assurance/lifecycle automatically; require a validated Command/Event. |
 | 12 | **Actor, role, authority, independence, and waiver proof.** Actor and Authority references differ; initial Decision payloads do not prove authority grants; PWA/UX role names drift; waiver lacks a complete instance/wire/storage contract. | Never equate login, Cerbos permission, role label, ownership, or capability with professional authority. Require scoped, time-valid proof; map role aliases explicitly; validate actual identities for independence. Never implement waiver as a Boolean—require a version-bound Decision with scope, expiry, rationale, controls, and preserved finding. |
@@ -1667,6 +2511,11 @@ These are implementation boundaries, not an invitation to solve the architecture
 | 18 | **Legacy parity and cutover.** DOC-005 is a semantic inventory, not proof of actual prompts, retries, roles, DB writes, failures, or side effects; the Executive Overview says migration is parked. | Inspect and instrument the implementation. Shadow with no Decisions/side effects, classify divergence, and keep one semantic authority. Documentation or fixture parity alone cannot justify cutover. |
 | 19 | **Authorized slice and roadmap.** DOC-001 is broad, DOC-007 exposes a large surface, DOC-005 recommends intent-to-Architecture-Baseline, and the Executive Overview status is dated. | Verify the assigned scope, tracker, repository, and ADRs. If RPH work is authorized without expansion, use the narrow architecture slice. Do not implement the eventual corpus or claim current completion from prose. |
 | 20 | **Confidence, memory, and automated acceptance.** Numeric confidence aggregation, historical-memory admissibility, and automatic low-risk Assumption acceptance are deferred or candidate ideas. | Use categorical dispositions, explicit basis/limitations, and residual uncertainty. Do not average professional truth. Dialogue/memory remains context until admitted as identified Evidence. No automatic acceptance without versioned policy and valid authority. |
+| 21 | **Governed professional stream representation.** Legacy v2.3 makes one SQLite record table authoritative for all Artifacts, traces, memory, validation, and Decisions and requires private reasoning capture; current RPH uses typed aggregates/Events/stores and forbids requiring private chain-of-thought. | Implement one logical causally linked history across current typed objects, Events, audit, Artifacts, and Evidence, and query it through rebuildable projections. Preserve observable actions/rationale and what an Assessment saw under retention/redaction policy. Do not add a universal stream record, competing Event authority, or raw-CoT store. |
+| 22 | **Professional-wisdom compilation and IR.** The legacy Validator paper proposes a Professional Wisdom Compiler/IR but leaves current ownership, schema, epistemic/authority status, PWA/JSDL relation, conflict model, activation, suspension, and retirement unratified. | Keep source wisdom as provenance-bearing Artifacts/Evidence and trace current Assurance Policies back to it. Generate only candidate policy packages; do not create canonical wisdom tables/types or activate compiled controls without a versioned professional/governance Decision and conformance evidence. |
+| 23 | **Mandatory assurance-floor representation and broader coverage/topology.** The invariant is settled: every material professional transformation receives explicit coverage; every material AI/agent transformation requires Reasoning Review; and every required control is durably bound, executed, recorded, inspectable, and enforced before its protected downstream transition. Current contracts do not fully freeze material-boundary identity/classification, locked inherited policy assignment, producing-Attempt/context and protected-transition binding, conjunctive independence, deployment capability/actual invocation projections, or a generalized `AssurancePlan` for dimensional coverage, selection, cost, and gaps. | Never interpret the missing wire shape as permission to omit or hide the floor. Preserve assignment/capability/Assessment/execution separation through accepted PWA policies, Validators, objects, and Events only where lossless; otherwise keep the PWA Draft or output provisional and block the transition. Evolve policy registry, schemas, persistence, projections, fixtures, and conformance tests together before claiming support. Do not invent a parallel planner, legacy review record, prose-only critic, Boolean/badge, or hidden runtime default; optional optimization may add controls but cannot weaken mandatory policy, Evidence, independence, or impact closure. |
+| 24 | **Finding, repair, revalidation, and convergence contracts.** Legacy finding/repair/convergence schemas and enums do not match `FindingDefinition`, `AssuranceObservation`, current Commands/Events, or service boundaries; exact subject-version binding, stable recurrence identity, repair representation, impact rules, resolution authority, and convergence composition remain incomplete. | Adapt outputs into existing Observations/Assessments; preserve finding-type Observations against exact versions; represent repair through governed PWUs/Actions/Attempts and existing trace relations only where lossless. Otherwise stop for a contract Decision. Treat convergence as a non-authoritative conceptual property until contracted; do not import legacy records/enums or create a parallel controller. |
+| 25 | **Meta-assurance and learning authority.** Current contracts do not define Validator-system subjects, canary isolation, health/suspension Commands, precision/recall adjudication, shared-premise independence, or promotion of outcome-derived wisdom. | Run held-out canaries and control-health analysis in an isolated/observe-first harness, record results as candidate engineering Evidence—not canonical Assurance Observations until the subject/lifecycle contract is ratified—and escalate material failure. Never auto-reject unrelated subjects or self-modify authoritative policies; activation/suspension/evolution requires explicit versioned governance. |
 
 ---
 
@@ -1677,6 +2526,9 @@ This guide is self-contained for orientation and bounded implementation, but exa
 | Source | Distilled contribution | Primary sections | Status in this guide |
 |---|---|---|---|
 | [Constitution Discussion](<Constitution Discussion/Janumi Constitution Discussion.md>) | first principles, cognition loop, CPCO, projections/workspaces, Shape Engineering, JSDL, JEM, JSRP | 1–2, 5, 11–13, 16 | compatible doctrine plus explicitly labeled candidate designs |
+| [Legacy JanumiCode v2.3 specification](<Legacy JanumiCode Source Materials/janumicode_spec_v2.3.md>) | logical governed history, layered validation, quarantine, exact review context, dependency invalidation, repair/gate composition | 0, 5, 8–10, 16 | legacy design evidence; phase/storage/authority mechanics are not adopted, and private-reasoning capture is rejected |
+| [Legacy Validator Subsystem](<Legacy JanumiCode Source Materials/Janumicode_v2 - Validator Subsystem.md>) | professional-wisdom compilation, three validation dimensions, control topology, durable Findings, repair/revalidation, convergence, meta-assurance | 0, 4, 8, 12, 14, 16 | candidate Assurance Engineering architecture; schemas/enums/roadmap are not current contracts |
+| [Fusion Analogy](<Legacy JanumiCode Source Materials/Fusion Analogy.md>) | trajectory control, operating envelope, interacting corrections, observability, stability versus passing | 1, 8, 14 | explanatory rationale only; no fusion vocabulary enters ontology or wire contracts |
 | [RPH document-set README](<Recursive Professional Harness/README.md>) | manifest, reading order, precedence, retired terms | 0, 3, 17 | corpus navigation authority |
 | [Executive Overview](<Recursive Professional Harness/Janumi Platform - Executive Overview.md>) | product family, current stack, planes/trust, editions, status | 1, 4, 13 | orientation/current baseline; status is dated |
 | [RPH-DOC-000 Vocabulary Charter](<Recursive Professional Harness/Janumi Product Architecture and Canonical Vocabulary Charter - Governing Product Ontology, Subsystem Boundaries, and Naming Authority.md>) | product ontology, canonical names, ownership and non-equivalence | 1, 3–4, 7, 13 | highest naming and product-boundary authority |
