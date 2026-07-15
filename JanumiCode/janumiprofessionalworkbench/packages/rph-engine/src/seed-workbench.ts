@@ -18,65 +18,103 @@ export const SEED_PWA = 'pwa_01ARZ3NDEKTSV4RRFFQ69G5Z00';
 export const SEED_PWA_VERSION = '1.3.0';
 export const SEED_UNDERTAKING = 'und_01ARZ3NDEKTSV4RRFFQ69G5Z10';
 
-/** The Product Realization PWA PWU Types (RPH-DOC-010 §7 work areas + a generic Architecture Concern type). */
+// Stable ids for the Product Realization PWA's PWU Types (referenced below to wire the composition tree).
+const PT_ROOT = 'pwut_01ARZ3NDEKTSV4RRFFQ69G5Z20';
+const PT_INTENT = 'pwut_01ARZ3NDEKTSV4RRFFQ69G5Z30';
+const PT_BEHAVIOR = 'pwut_01ARZ3NDEKTSV4RRFFQ69G5Z40';
+const PT_ARCH = 'pwut_01ARZ3NDEKTSV4RRFFQ69G5Z50';
+const PT_PLAN = 'pwut_01ARZ3NDEKTSV4RRFFQ69G5Z60';
+const PT_IMPL = 'pwut_01ARZ3NDEKTSV4RRFFQ69G5Z70';
+const PT_VALIDATE = 'pwut_01ARZ3NDEKTSV4RRFFQ69G5Z80';
+const PT_PROMOTE = 'pwut_01ARZ3NDEKTSV4RRFFQ69G5Z90';
+const PT_CONCERN = 'pwut_01ARZ3NDEKTSV4RRFFQ69G5ZA0';
+
+/** A permitted-child composition rule on a seeded type (cardinality per §11.7.2). */
+interface SeedChild {
+	id: string;
+	cardinality: string;
+	note?: string;
+}
+
+/** The Product Realization PWA PWU Types (RPH-DOC-010 §7 work areas + a generic Architecture Concern type). The
+ *  root permits the 7 canonical branches (each mandatory-exactly-one), Architecture Definition permits the generic
+ *  Architecture Concern (conditional one-or-more), and a few types declare required assurance policies (§11.7.4). */
 const PWU_TYPES: ReadonlyArray<{
 	id: string;
 	kind: string;
 	name: string;
 	purpose: string;
 	root?: boolean;
+	children?: readonly SeedChild[];
+	policies?: readonly string[];
 }> = [
 	{
-		id: 'pwut_01ARZ3NDEKTSV4RRFFQ69G5Z20',
+		id: PT_ROOT,
 		kind: 'PRODUCT_REALIZATION',
 		name: 'Product Realization',
 		purpose: 'Root: structure product work from intent to authoritative baselines',
-		root: true
+		root: true,
+		children: [
+			{ id: PT_INTENT, cardinality: 'M1' },
+			{ id: PT_BEHAVIOR, cardinality: 'M1' },
+			{ id: PT_ARCH, cardinality: 'M1' },
+			{ id: PT_PLAN, cardinality: 'M1' },
+			{ id: PT_IMPL, cardinality: 'M1' },
+			{ id: PT_VALIDATE, cardinality: 'M1' },
+			{ id: PT_PROMOTE, cardinality: 'M1' }
+		],
+		policies: ['pol_intent_preservation']
 	},
 	{
-		id: 'pwut_01ARZ3NDEKTSV4RRFFQ69G5Z30',
+		id: PT_INTENT,
 		kind: 'INTENT_DEFINITION',
 		name: 'Intent & Product Definition',
-		purpose: 'Originating intent, stakeholders, product boundary'
+		purpose: 'Originating intent, stakeholders, product boundary',
+		policies: ['pol_intent_fidelity', 'pol_intent_completeness', 'pol_assumption_disclosure']
 	},
 	{
-		id: 'pwut_01ARZ3NDEKTSV4RRFFQ69G5Z40',
+		id: PT_BEHAVIOR,
 		kind: 'PRODUCT_BEHAVIOR',
 		name: 'Product Behavior Definition',
 		purpose: 'Actors, capabilities, journeys, requirements'
 	},
 	{
-		id: 'pwut_01ARZ3NDEKTSV4RRFFQ69G5Z50',
+		id: PT_ARCH,
 		kind: 'ARCHITECTURE',
 		name: 'Architecture Definition',
-		purpose: 'A coherent technical structure realizing approved behavior'
+		purpose: 'A coherent technical structure realizing approved behavior',
+		children: [
+			{ id: PT_CONCERN, cardinality: 'C+', note: 'One per material architecture concern' }
+		],
+		policies: ['pol_architecture_coverage']
 	},
 	{
-		id: 'pwut_01ARZ3NDEKTSV4RRFFQ69G5Z60',
+		id: PT_PLAN,
 		kind: 'IMPLEMENTATION_PLANNING',
 		name: 'Implementation Planning',
-		purpose: 'Increments, decomposition, dependencies, test + migration planning'
+		purpose: 'Increments, decomposition, dependencies, test + migration planning',
+		policies: ['pol_decomposition_coverage']
 	},
 	{
-		id: 'pwut_01ARZ3NDEKTSV4RRFFQ69G5Z70',
+		id: PT_IMPL,
 		kind: 'PRODUCT_IMPLEMENTATION',
 		name: 'Product Implementation',
 		purpose: 'Realize the planned increments'
 	},
 	{
-		id: 'pwut_01ARZ3NDEKTSV4RRFFQ69G5Z80',
+		id: PT_VALIDATE,
 		kind: 'INTEGRATED_VALIDATION',
 		name: 'Integrated Product Validation',
 		purpose: 'Journey/requirement/architecture/fitness validation'
 	},
 	{
-		id: 'pwut_01ARZ3NDEKTSV4RRFFQ69G5Z90',
+		id: PT_PROMOTE,
 		kind: 'BASELINE_PROMOTION',
 		name: 'Product Baseline Promotion',
 		purpose: 'Evidence package, residual-risk + promotion decisions, authoritative baseline'
 	},
 	{
-		id: 'pwut_01ARZ3NDEKTSV4RRFFQ69G5ZA0',
+		id: PT_CONCERN,
 		kind: 'ARCHITECTURE_CONCERN',
 		name: 'Architecture Concern',
 		purpose: 'A generic architecture concern contributing to Architecture Definition'
@@ -151,13 +189,21 @@ export function authorProductRealizationPwa(handle: EngineHandle): void {
 		version: SEED_PWA_VERSION
 	});
 	for (const t of PWU_TYPES) {
+		const children = t.children ?? [];
 		send('DefinePwuType', 'PWU_TYPE', t.id, {
 			pwuTypeId: t.id,
 			pwaId: SEED_PWA,
 			pwuKind: t.kind,
 			name: t.name,
 			purpose: t.purpose,
-			isRoot: t.root ?? false
+			isRoot: t.root ?? false,
+			permittedChildTypeIds: children.map((c) => c.id),
+			permittedChildren: children.map((c) => ({
+				typeId: c.id,
+				cardinality: c.cardinality,
+				...(c.note ? { applicabilityNote: c.note } : {})
+			})),
+			requiredAssurancePolicyIds: [...(t.policies ?? [])]
 		});
 	}
 	send('SubmitPwaForReview', 'PROFESSIONAL_WORK_ARCHITECTURE', SEED_PWA, {});

@@ -15,6 +15,9 @@ export default tseslint.config(
 			'**/.turbo/**',
 			'**/.svelte-kit/**',
 			'**/build/**',
+			// docs/ is documentation + design prototypes (some are standalone Next.js/React sketches that use
+			// framework lint rules this engine config doesn't load) — never part of the engine lint gate.
+			'**/docs/**',
 			// Workflow scripts run in the Workflow tool's runtime (agent/parallel/phase/log/args globals), not Node.
 			'**/harness/**'
 		]
