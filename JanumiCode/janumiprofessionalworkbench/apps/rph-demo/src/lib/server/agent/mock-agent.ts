@@ -9,6 +9,8 @@
 //  • Otherwise the instruction is treated as free text and a small canned script builds a minimal Product
 //    Realization graph from the catalog (root + architecture + a permits edge), so free-text prompts still do
 //    something sensible against the mock.
+import type { ProfessionalRationaleSummary } from '@janumipwb/rph-assurance';
+import type { RationaleSink } from './rationale.js';
 import type { AuthoringToolDescriptor, AuthoringAgent, EmitFn, ToolRunResult } from './types.js';
 
 interface PlanStep {
@@ -31,8 +33,17 @@ function parsePlan(instruction: string): PlanStep[] | null {
 export class MockAuthoringAgent implements AuthoringAgent {
 	private readonly byName: Map<string, AuthoringToolDescriptor>;
 
-	constructor(private readonly tools: AuthoringToolDescriptor[]) {
+	constructor(
+		private readonly tools: AuthoringToolDescriptor[],
+		private readonly sink: RationaleSink
+	) {
 		this.byName = new Map(tools.map((t) => [t.name, t]));
+	}
+
+	/** §9.7: the run RETURNS whatever account it declared. The mock declares one in its canned script; a JSON plan
+	 *  that omits declare_rationale returns undefined — and that shortfall is recorded, never papered over. */
+	rationale(): ProfessionalRationaleSummary | undefined {
+		return this.sink.get();
 	}
 
 	async run(instruction: string, emit: EmitFn, signal?: AbortSignal): Promise<void> {
@@ -92,7 +103,26 @@ export class MockAuthoringAgent implements AuthoringAgent {
 				args: { templateKey: 'architecture' },
 				say: 'Adding Architecture Definition.'
 			},
-			{ tool: 'list_pwu_types', say: 'Confirming the two nodes exist so I can link them.' }
+			{ tool: 'list_pwu_types', say: 'Confirming the two nodes exist so I can link them.' },
+			{
+				// §9.7's other half: the producer RETURNS its account, it does not leave it to be inferred.
+				tool: 'declare_rationale',
+				say: 'Declaring my professional rationale for the independent review.',
+				args: {
+					rationale:
+						'Product Realization is the root obligation, so it is the root type; Architecture Definition is the one sub-area this minimal graph decomposes into, because architecture is the first place the intent becomes structurally binding. The graph is deliberately shallow — it demonstrates the decomposition relation rather than claiming coverage of the domain.',
+					assumptions: [
+						'Assumed the catalog blueprints are appropriate to this domain without re-deriving them.'
+					],
+					limitations: [
+						'Only two types are defined; the remaining product-realization areas are not modelled.',
+						'No data-flow inputs/outputs are declared, so the sequence between areas is unexpressed.'
+					],
+					residualUncertainty: [
+						'Whether Architecture Definition should permit further child types is not settled by the intent.'
+					]
+				}
+			}
 		];
 	}
 }

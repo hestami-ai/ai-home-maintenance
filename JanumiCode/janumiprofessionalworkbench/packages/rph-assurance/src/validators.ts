@@ -23,12 +23,40 @@ import {
 	type ValidatorResult
 } from './floor.js';
 
+/**
+ * The §9.7 PROFESSIONAL RATIONALE SUMMARY — the agent-authored account of its own professional reasoning, bound to
+ * the Assumptions, limitations, and residual uncertainty it declares. §9.7's execution contract requires the
+ * producer to RETURN this; §3 fixes what it is: "a contracted deliverable addressed to the governed system, not a
+ * byproduct of a provider's runtime. It is not private chain-of-thought."
+ *
+ * That distinction is the whole point. §8.4 makes this the FIRST thing Reasoning Review reviews, precisely so the
+ * control never depends on the producer's interior — the account is something the producer is accountable for
+ * having written, not something scraped out of its runtime.
+ */
+export interface ProfessionalRationaleSummary {
+	/** The account itself: how the subject discharges the delegated obligation. */
+	readonly rationale: string;
+	/** Typed Assumptions the producer relied on. §8.10 Assumption Disclosure: disclosure is not verification. */
+	readonly assumptions: readonly string[];
+	/** What the producer knows it did NOT do, or could not establish. */
+	readonly limitations: readonly string[];
+	/** What remains uncertain. §8.4 requires unacknowledged uncertainty to be an observable failure class. */
+	readonly residualUncertainty: readonly string[];
+}
+
 /** The inputs a Validator needs beyond the subject. Deterministic Validators read the fact bags; the Reasoning
  *  Review Validator reads the review input (the intent + the serialized subject content to review). */
 export interface ReasoningReviewInput {
 	readonly prompt: string;
 	readonly content: string;
-	readonly plan?: string;
+	/** The producer's contracted §9.7 deliverable. Undefined means the producer did not discharge that half of its
+	 *  execution contract — the Validator records that as a LIMITATION on its result and never infers anything
+	 *  from the absence. */
+	readonly rationale?: ProfessionalRationaleSummary;
+	/** The producer's OBSERVABLE narration. §8.4 lists "other observable trace data" among what Reasoning Review
+	 *  reviews, so this is admissible — but it is weaker than the contracted account and is never the producer's
+	 *  interior (§9.7). Formerly `plan`, which was scraped narration standing in for the deliverable above. */
+	readonly narration?: string;
 	readonly prior?: { readonly gaps: readonly string[] };
 }
 export interface ValidatorContext {

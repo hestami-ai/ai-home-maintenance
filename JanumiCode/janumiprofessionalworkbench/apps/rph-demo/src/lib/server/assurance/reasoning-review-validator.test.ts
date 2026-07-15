@@ -15,6 +15,7 @@
 import {
 	REASONING_REVIEW_CRITERIA,
 	type AssuranceSubject,
+	type ProfessionalRationaleSummary,
 	type ValidatorContext
 } from '@janumipwb/rph-assurance';
 import { describe, expect, it } from 'vitest';
@@ -46,14 +47,31 @@ function capturing(reply = CLEAN) {
 	return { prompts, print };
 }
 
-const ctx = (plan: string, content = '{"pwuTypes":[{"id":"t1"}]}'): ValidatorContext => ({
-	reasoningReview: { prompt: 'Author a product realization PWA', content, plan }
+const RATIONALE: ProfessionalRationaleSummary = {
+	rationale: 'Product Realization is the root obligation, so it is the root type.',
+	assumptions: ['Assumed the catalog blueprints suit this domain.'],
+	limitations: ['Only two types are defined.'],
+	residualUncertainty: ['Whether Architecture should permit children is unsettled.']
+};
+
+const ctx = (
+	over: Partial<{ rationale: ProfessionalRationaleSummary; narration: string; content: string }> = {}
+): ValidatorContext => ({
+	reasoningReview: {
+		prompt: 'Author a product realization PWA',
+		content: over.content ?? '{"pwuTypes":[{"id":"t1"}]}',
+		narration: over.narration ?? '',
+		...(over.rationale ? { rationale: over.rationale } : {})
+	}
 });
 
 describe('Reasoning Review Validator — §14.3 conformance: no private chain-of-thought', () => {
 	it('reaches a VALID Assessment with all volunteered reasoning material withheld (the ablation)', async () => {
 		const { print } = capturing();
-		const result = await createAgyReasoningReviewValidator({ print }).evaluate(SUBJECT, ctx(''));
+		const result = await createAgyReasoningReviewValidator({ print }).evaluate(
+			SUBJECT,
+			ctx({ rationale: RATIONALE })
+		);
 
 		// Valid means: it ran, every mandatory criterion resolved, and a real disposition was reached — not that
 		// it passed. A reviewer that needs the producer's interior to function would degrade here; this one does not.
@@ -68,40 +86,67 @@ describe('Reasoning Review Validator — §14.3 conformance: no private chain-of
 	it('never treats the presence or absence of the producer account as a signal (§9.7)', async () => {
 		const withAccount = capturing();
 		const withheld = capturing();
-		const V = createAgyReasoningReviewValidator({ print: withAccount.print });
-		const W = createAgyReasoningReviewValidator({ print: withheld.print });
 
-		const a = await V.evaluate(SUBJECT, ctx('I added a Realization root and three child types.'));
-		const b = await W.evaluate(SUBJECT, ctx(''));
+		const a = await createAgyReasoningReviewValidator({ print: withAccount.print }).evaluate(
+			SUBJECT,
+			ctx({ rationale: RATIONALE, narration: 'I added a Realization root.' })
+		);
+		const b = await createAgyReasoningReviewValidator({ print: withheld.print }).evaluate(
+			SUBJECT,
+			ctx()
+		);
 
-		// The section is rendered unconditionally, so the reviewer's input shape cannot encode whether an account
-		// exists. Previously the whole section was omitted when `plan` was empty — a presence signal by construction.
-		const SECTION = "The producing agent's OWN recorded narration";
-		expect(withAccount.prompts[0]).toContain(SECTION);
-		expect(withheld.prompts[0]).toContain(SECTION);
+		// Both sections render unconditionally, so the reviewer's input shape cannot encode whether an account
+		// exists. Previously the whole section vanished when empty — a presence signal by construction.
+		for (const p of [withAccount.prompts[0], withheld.prompts[0]]) {
+			expect(p).toContain('PROFESSIONAL RATIONALE SUMMARY');
+			expect(p).toContain('observable narration');
+		}
 		// And withholding cannot move the verdict — no control depends on the account being there.
 		expect(b.dispositionRecommendation).toBe(a.dispositionRecommendation);
 	});
 
-	it('renders exactly the account it is handed — which is why the boundary is upstream, not here', async () => {
+	it('renders the CONTRACTED account and its declared bindings — not scraped narration (§9.7 / §3)', async () => {
 		const { prompts, print } = capturing();
 		await createAgyReasoningReviewValidator({ print }).evaluate(
 			SUBJECT,
-			ctx('I added a Realization root.')
+			ctx({ rationale: RATIONALE, narration: 'I added a Realization root.' })
 		);
 
-		// The Validator cannot distinguish narration from reasoning: it renders whatever the caller supplies. So
-		// asserting "the prompt contains no reasoning" HERE would be a tautology — it would only restate the test's
-		// own input. The regression lock therefore lives where the decision is actually made, on narrationOf
-		// (agent/transcript.test.ts). This pins the pass-through so that lock has something to protect.
+		// §3: the summary is "bound to the Evidence used, Assumptions, Claims, limitations, and residual
+		// uncertainty it declares" — so the reviewer must actually SEE those bindings, not just the prose.
+		expect(prompts[0]).toContain(RATIONALE.rationale);
+		expect(prompts[0]).toContain(RATIONALE.assumptions[0]);
+		expect(prompts[0]).toContain(RATIONALE.limitations[0]);
+		expect(prompts[0]).toContain(RATIONALE.residualUncertainty[0]);
+		// Narration is admissible trace data (§8.4) but is a separate, weaker section.
 		expect(prompts[0]).toContain('I added a Realization root.');
+	});
+
+	it('records a LIMITATION when the producer returned no rationale summary — never infers from silence', async () => {
+		const { prompts, print } = capturing();
+		const result = await createAgyReasoningReviewValidator({ print }).evaluate(SUBJECT, ctx());
+
+		// §9.7 requires the producer to return an account. It did not. The review still concludes (§8.4: it works
+		// without the producer's interior), but §8.9 requires a valid result to identify its limitations — so the
+		// shortfall is on the record rather than silently absorbed.
+		expect(result.limitations.some((l) => l.includes('no professional rationale summary'))).toBe(true);
+		// And the reviewer is told plainly, so it can weigh the omission itself.
+		expect(prompts[0]).toContain('NOT DECLARED');
+
+		const declared = capturing();
+		const ok = await createAgyReasoningReviewValidator({ print: declared.print }).evaluate(
+			SUBJECT,
+			ctx({ rationale: RATIONALE })
+		);
+		expect(ok.limitations.some((l) => l.includes('no professional rationale summary'))).toBe(false);
 	});
 
 	it('DECLARES truncation rather than silently cutting the subject or the account (§9.7)', async () => {
 		const { prompts, print } = capturing();
 		await createAgyReasoningReviewValidator({ print }).evaluate(
 			SUBJECT,
-			ctx('y'.repeat(5000), `{"pad":"${'x'.repeat(30000)}"}`)
+			ctx({ narration: 'y'.repeat(5000), content: `{"pad":"${'x'.repeat(30000)}"}` })
 		);
 		// Two independent excerpts; both must announce themselves. Silent truncation makes an Assessment's record
 		// of what it saw false, and §5.6 requires that record so the conclusion "can be reproduced and challenged".
@@ -110,7 +155,7 @@ describe('Reasoning Review Validator — §14.3 conformance: no private chain-of
 
 	it('records the ACTUAL evaluator identity so independence is checkable against the producer (§8.4)', async () => {
 		const { print } = capturing();
-		const result = await createAgyReasoningReviewValidator({ print }).evaluate(SUBJECT, ctx(''));
+		const result = await createAgyReasoningReviewValidator({ print }).evaluate(SUBJECT, ctx());
 		// §8.4 requires "actual identities and lineage are recorded". The producer is resolved per run; the
 		// evaluator is recorded here. A comparison is only meaningful if both sides are real.
 		expect(result.evaluator.agentId).toBe('agy');
@@ -135,7 +180,7 @@ describe('Reasoning Review Validator — §14.3 conformance: no private chain-of
 				}) +
 				'\n```'
 		);
-		const result = await createAgyReasoningReviewValidator({ print }).evaluate(SUBJECT, ctx(''));
+		const result = await createAgyReasoningReviewValidator({ print }).evaluate(SUBJECT, ctx());
 
 		// The real coercion ran (not a stub echoing a verdict): a BLOCKING finding drives REJECTED, and the
 		// reviewer's own prompt shape is what produced it.

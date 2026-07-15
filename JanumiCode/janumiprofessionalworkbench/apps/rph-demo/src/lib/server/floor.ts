@@ -9,6 +9,7 @@ import {
 	FLOOR_POLICY_IDS,
 	runFloorAndPlanRecording,
 	type AssuranceSubject,
+	type ProfessionalRationaleSummary,
 	type ValidatorContext
 } from '@janumipwb/rph-assurance';
 import {
@@ -84,7 +85,11 @@ export async function runPwaFloor(
 		/** REQUIRED: the actual resolved producer. An unresolved producer means §8.12 independence cannot be
 		 *  established, so there is no honest default — callers must supply it or not run the floor. */
 		producer: FloorProducer;
-		planText?: string;
+		/** The §9.7 contracted account the producer RETURNED. Undefined = it declared none; the Validator records
+		 *  that shortfall rather than inferring anything from the silence. */
+		rationale?: ProfessionalRationaleSummary;
+		/** The producer's observable narration — §8.4 admits "other observable trace data". Never its interior. */
+		narration?: string;
 		priorGaps?: string[];
 	}
 ): Promise<FloorView | undefined> {
@@ -115,9 +120,12 @@ export async function runPwaFloor(
 		reasoningReview: {
 			prompt: opts.prompt,
 			content: JSON.stringify(graphExport),
-			// Always present, never conditional: §9.7 forbids treating the presence or absence of the producer's
-			// account as a signal, and a constant-shape input is what makes the §14.3 ablation a real test.
-			plan: opts.planText ?? '',
+			// §8.4 orders what Reasoning Review reviews: the contracted rationale summary FIRST, then outputs and
+			// tool records, then other observable trace data. Both are passed through unconditionally — §9.7
+			// forbids treating presence or absence as a signal, and a constant-shape input is also what makes the
+			// §14.3 ablation a real test rather than a null one.
+			...(opts.rationale ? { rationale: opts.rationale } : {}),
+			narration: opts.narration ?? '',
 			...(opts.priorGaps?.length ? { prior: { gaps: opts.priorGaps } } : {})
 		}
 	};

@@ -2,6 +2,7 @@
 // tool calls -> graph re-render) is exercised by a deterministic MockAuthoringAgent in the gate, and the live Pi
 // implementation just maps its richer event stream onto these same events. Swapping mock <-> Pi changes nothing
 // downstream.
+import type { ProfessionalRationaleSummary } from '@janumipwb/rph-assurance';
 
 /** The ACTUAL producer of this run — the resolved model/provider, not a role label. §8.12 checks independence
  *  against actual model/provider identity, so the floor cannot use a compile-time placeholder here. */
@@ -32,6 +33,10 @@ export type EmitFn = (event: AuthoringAgentEvent) => void;
 /** An authoring agent: given a natural-language instruction, drive the tools and stream normalized events. */
 export interface AuthoringAgent {
 	run(instruction: string, emit: EmitFn, signal?: AbortSignal): Promise<void>;
+	/** The §9.7 professional rationale summary this run RETURNED — the producer's own account of its work, which
+	 *  the execution contract requires alongside its proposals. Undefined when the producer never declared one;
+	 *  that is a contract shortfall to record, never an absence to infer from (§9.7). */
+	rationale(): ProfessionalRationaleSummary | undefined;
 }
 
 // ---- Pi-agnostic tool parameter DSL ----------------------------------------------------------------

@@ -9,6 +9,7 @@ import {
 	type PwaAuthoringBroker,
 	type ProposalResult
 } from '@janumipwb/rph-authoring';
+import type { RationaleSink } from './rationale.js';
 import type { AuthoringToolDescriptor, ToolRunResult } from './types.js';
 
 const CARDINALITY_CODES: ReadonlySet<CardinalityCode> = new Set(['M1', 'M+', 'C1', 'C+']);
@@ -39,11 +40,57 @@ function fromProposal(r: ProposalResult, okSummary: string): ToolRunResult {
 	return { ok: false, summary: `Rejected: ${r.error ?? r.status ?? 'unknown error'}` };
 }
 
-/** Build the tool descriptors for a broker scoped to one DRAFT PWA. */
-export function buildAuthoringTools(broker: PwaAuthoringBroker): AuthoringToolDescriptor[] {
+/** Build the tool descriptors for a broker scoped to one DRAFT PWA. `rationale` collects the §9.7 professional
+ *  rationale summary the producer returns — see ./rationale for why it is a tool and not scraped narration. */
+export function buildAuthoringTools(
+	broker: PwaAuthoringBroker,
+	rationale: RationaleSink
+): AuthoringToolDescriptor[] {
 	const help = broker.help();
 
 	return [
+		// ---- RETURN (§9.7 execution contract) ----
+		{
+			name: 'declare_rationale',
+			description:
+				'REQUIRED before you finish a turn, after your proposals are in. Return your professional rationale summary: your own account of HOW the graph you built discharges the professional obligation in the intent — not a list of what you did (the tool calls already record that), but WHY this decomposition is the right one, and where it is weak. An independent reviewer reads this and nothing else about your reasoning. State assumptions you relied on, limitations you know about, and what remains uncertain. Declaring a real limitation is not a failure; concealing one is. Call this exactly once, last.',
+			parameters: {
+				rationale: {
+					type: 'string',
+					required: true,
+					description:
+						'Your account of how the graph discharges the intent: the professional judgment behind the decomposition, in your own words.'
+				},
+				assumptions: {
+					type: 'string[]',
+					description:
+						'Assumptions you relied on that the intent did not settle (e.g. "assumed a regulated domain, so a Compliance area is warranted"). Disclosure is not verification — state them even when you think they are safe.'
+				},
+				limitations: {
+					type: 'string[]',
+					description:
+						'What you did NOT do, or could not establish (e.g. "did not model the data-flow between Validation and Promotion").'
+				},
+				residualUncertainty: {
+					type: 'string[]',
+					description:
+						'What remains genuinely uncertain after your work (e.g. "unsure whether Concern should be conditional rather than mandatory").'
+				}
+			},
+			mutates: false,
+			run: (args) => {
+				const account = str(args.rationale).trim();
+				if (!account) return { ok: false, summary: 'Rejected: rationale is required and must be non-empty.' };
+				rationale.declare({
+					rationale: account,
+					assumptions: strArr(args.assumptions),
+					limitations: strArr(args.limitations),
+					residualUncertainty: strArr(args.residualUncertainty)
+				});
+				return { ok: true, summary: 'Professional rationale summary recorded for the independent review.' };
+			}
+		},
+
 		// ---- READ ----
 		{
 			name: 'get_pwa',

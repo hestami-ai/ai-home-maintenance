@@ -84,7 +84,13 @@ async function runFloorAfterTurn(ctx: {
 	};
 	try {
 		send({ kind: 'status', text: '⚖ Running the assurance floor (independent reasoning review)…' });
-		let floor = await runPwaFloor(pwaId, { prompt: instruction, producer, planText: planText() });
+		// §9.7's two halves: the account the producer RETURNED, and its observable narration.
+		let floor = await runPwaFloor(pwaId, {
+			prompt: instruction,
+			producer,
+			rationale: agent.rationale(),
+			narration: planText()
+		});
 		if (!floor) return;
 		noteFloor(floor);
 		if (!floor.satisfied && mode !== 'mock') {
@@ -98,7 +104,9 @@ async function runFloorAfterTurn(ctx: {
 			floor = await runPwaFloor(pwaId, {
 				prompt: instruction,
 				producer,
-				planText: planText(),
+				// Re-read after the refinement pass: the producer may have declared a revised account.
+				rationale: agent.rationale(),
+				narration: planText(),
 				priorGaps: floor.reasoningGaps
 			});
 			if (floor) noteFloor(floor);

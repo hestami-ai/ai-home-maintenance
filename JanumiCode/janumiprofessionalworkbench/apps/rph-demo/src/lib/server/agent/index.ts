@@ -6,6 +6,7 @@ import type { PwaAuthoringBroker } from '@janumipwb/rph-authoring';
 import { buildAuthoringTools } from './tools.js';
 import { buildSystemPrompt } from './system-prompt.js';
 import { MockAuthoringAgent } from './mock-agent.js';
+import { createRationaleSink } from './rationale.js';
 import type { AuthoringAgent } from './types.js';
 
 export type AgentMode = 'mock' | 'pi';
@@ -14,8 +15,11 @@ export async function createAuthoringAgent(
 	broker: PwaAuthoringBroker,
 	mode: AgentMode
 ): Promise<AuthoringAgent> {
-	const tools = buildAuthoringTools(broker);
-	if (mode === 'mock') return new MockAuthoringAgent(tools);
+	// One sink per agent: the declare_rationale tool writes the §9.7 deliverable into it, and the agent RETURNS
+	// it from rationale(). Per-agent rather than per-module so concurrent runs cannot cross-contaminate.
+	const rationale = createRationaleSink();
+	const tools = buildAuthoringTools(broker, rationale);
+	if (mode === 'mock') return new MockAuthoringAgent(tools, rationale);
 
 	// Live path: load Pi lazily so its heavy Node deps never touch the mock/gate runtime.
 	const pwa = broker.getPwa();
@@ -26,7 +30,7 @@ export async function createAuthoringAgent(
 		publicationStatus: pwa?.publicationStatus ?? 'DRAFT'
 	});
 	const { PiAuthoringAgent } = await import('./pi-agent.js');
-	return new PiAuthoringAgent(tools, systemPrompt);
+	return new PiAuthoringAgent(tools, systemPrompt, rationale);
 }
 
 export type { AuthoringAgent, AuthoringAgentEvent, EmitFn } from './types.js';

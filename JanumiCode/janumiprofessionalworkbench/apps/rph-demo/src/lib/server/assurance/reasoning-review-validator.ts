@@ -17,6 +17,7 @@ import {
 	type Validator,
 	type ValidatorResult
 } from '@janumipwb/rph-assurance';
+import { renderRationale } from '../agent/rationale.js';
 import { AGY_MODEL_LABEL, agyPrint, extractJson } from './agy-cli.js';
 
 const DISPOSITIONS = new Set<Disposition>([
@@ -45,9 +46,10 @@ function judgePrompt(input: ReasoningReviewInput): string {
 	const priorLine = input.prior?.gaps.length
 		? `\nA PREVIOUS review flagged: ${JSON.stringify(input.prior.gaps)}. Judge whether those are genuinely resolved.`
 		: '';
-	// Unconditional: the section is always rendered so the reviewer's input shape never encodes whether the
-	// producer said anything (§9.7 — presence or absence is never a signal).
-	const plan = excerpt(input.plan ?? '', 4000) || '(none recorded)';
+	// Unconditional: both sections always render, so the reviewer's input shape never encodes whether the producer
+	// said anything (§9.7 — presence or absence is never a signal).
+	const rationale = excerpt(renderRationale(input.rationale), 4000);
+	const narration = excerpt(input.narration ?? '', 2000) || '(none recorded)';
 	return [
 		'You are an independent assurance reviewer performing a REASONING REVIEW of an AI-produced professional artifact.',
 		'You ask whether the artifact genuinely discharges its delegated professional obligation, or merely produces a',
@@ -60,7 +62,10 @@ function judgePrompt(input: ReasoningReviewInput): string {
 		'The artifact (a canonical graph export / serialized subject) to review:',
 		'',
 		excerpt(input.content, 24000),
-		`\nThe producing agent's OWN recorded narration — its observable output, never its private chain-of-thought:\n"""${plan}"""`,
+		// §8.4 puts the contracted account first: this is what the producer is accountable for having written.
+		`\nThe producing agent's PROFESSIONAL RATIONALE SUMMARY — its own contracted account of how the artifact discharges the obligation (Section 9.7). Judge whether it is candid and whether the artifact bears it out; an account that claims more than the artifact supports is itself a finding:\n"""${rationale}"""`,
+		// Then observable trace data. Never the producer's interior (Section 9.7).
+		`\nThe producing agent's observable narration during the turn (trace data, not its private chain-of-thought):\n"""${narration}"""`,
 		priorLine,
 		'',
 		'Evaluate EACH derivational-integrity failure class below. For each, decide whether the FAILURE is PRESENT',
@@ -131,12 +136,24 @@ export function createAgyReasoningReviewValidator(opts: { print?: AgyPrint } = {
 				raw = await print(`${prompt}\n\nIMPORTANT: reply with ONLY the minified JSON object.`);
 				judgement = coerceJudgement(JSON.parse(extractJson(raw)));
 			}
-			return reasoningReviewResultFromJudgement(
+			const result = reasoningReviewResultFromJudgement(
 				subject,
 				evaluator,
 				'agy.reasoning-review',
 				judgement
 			);
+			// §9.7 requires the producer to RETURN a professional rationale summary. When it did not, the review
+			// still reaches a conclusion — §8.4 is explicit that Reasoning Review works without the producer's
+			// interior — but it reached that conclusion on less than the contract promised, and §8.9 requires a
+			// valid result to identify its "residual uncertainty, limitations". Recorded, never inferred from.
+			if (input.rationale) return result;
+			return {
+				...result,
+				limitations: [
+					...result.limitations,
+					'The producer returned no professional rationale summary (Section 9.7); the review judged the artifact and observable trace data only.'
+				]
+			};
 		}
 	};
 }

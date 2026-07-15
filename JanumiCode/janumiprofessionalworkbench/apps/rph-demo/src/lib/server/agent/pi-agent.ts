@@ -15,6 +15,8 @@ import {
 	SettingsManager
 } from '@earendil-works/pi-coding-agent';
 import { Type, type TSchema } from 'typebox';
+import type { ProfessionalRationaleSummary } from '@janumipwb/rph-assurance';
+import type { RationaleSink } from './rationale.js';
 import type { AuthoringAgent, AuthoringToolDescriptor, EmitFn, ParamSpec } from './types.js';
 
 /** Map our flat param spec onto a TypeBox object schema (optional wrapper for non-required params). */
@@ -86,8 +88,15 @@ async function resolveModel(modelRegistry: ModelRegistry, settingsManager: Setti
 export class PiAuthoringAgent implements AuthoringAgent {
 	constructor(
 		private readonly tools: AuthoringToolDescriptor[],
-		private readonly systemPrompt: string
+		private readonly systemPrompt: string,
+		private readonly sink: RationaleSink
 	) {}
+
+	/** §9.7: the run RETURNS the account it declared through declare_rationale. Undefined when the producer never
+	 *  did — a contract shortfall the Validator records, never an absence to reason from. */
+	rationale(): ProfessionalRationaleSummary | undefined {
+		return this.sink.get();
+	}
 
 	async run(instruction: string, emit: EmitFn, signal?: AbortSignal): Promise<void> {
 		let session: Awaited<ReturnType<typeof createAgentSession>>['session'] | undefined;
