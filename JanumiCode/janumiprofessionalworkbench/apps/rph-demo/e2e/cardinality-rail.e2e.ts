@@ -56,10 +56,10 @@ test.describe('PWA Designer — cardinality + assurance rail', () => {
 		expect(root.state.requiredAssurancePolicyIds).toContain('pol_intent_preservation');
 
 		// SEMANTIC: with the root still selected, the inspector (after the edit reloads) shows the cardinality
-		// badge, the locked de-minimis floor, and the declared policy — the §11.7.4 rail.
+		// badge, the locked mandatory (required) assurance policies, and the declared policy — the §11.7.4 rail.
 		const inspector = page.locator('.inspectorpanel');
 		await expect(inspector.locator('.cardbadge', { hasText: 'M+' })).toBeVisible();
-		await expect(inspector.getByText('de minimis floor')).toBeVisible();
+		await expect(inspector.getByText(/Mandatory · always applies/)).toBeVisible();
 		await expect(inspector.getByText('+ Intent Preservation')).toBeVisible();
 
 		// Review gallery: the composition tree (cardinality on each card) + the §11.7.4 rail in the inspector.

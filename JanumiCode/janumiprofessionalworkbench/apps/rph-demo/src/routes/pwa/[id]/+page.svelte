@@ -12,7 +12,6 @@
 		PWU_TYPE_CATALOG,
 		PWU_TYPE_HELP,
 		ASSURANCE_FLOOR,
-		ASSURANCE_POLICY_CATALOG,
 		assurancePolicyLabel
 	} from '$lib/authoring/pwuType';
 	import type { PageData } from './$types';
@@ -28,6 +27,11 @@
 			removedType?: string;
 			editedPwa?: string;
 			advanced?: string;
+			createdPolicy?: string;
+			editedPolicy?: string;
+			newVersion?: string;
+			suspendedPolicy?: string;
+			activatedPolicy?: string;
 		} | null;
 	} = $props();
 
@@ -144,8 +148,8 @@
 		requiredOutputs: ''
 	});
 	let children = $state<string[]>([]);
-	// Selected declared assurance policy ids for the type being authored.
-	let policies = $state<string[]>([]);
+	// Selected declared assurance policy ids for the type being authored (distinct from data.policies, the library).
+	let selectedPolicyIds = $state<string[]>([]);
 	// Per-child cardinality being authored, keyed by child type id (only meaningful for checked children).
 	let childRules = $state<Record<string, { cardinality: string; note: string }>>({});
 	const editingId = $derived(typeof formMode === 'object' && formMode ? formMode.editId : '');
@@ -170,7 +174,7 @@
 			requiredOutputs: ''
 		});
 		children = [];
-		policies = [];
+		selectedPolicyIds = [];
 		childRules = {};
 		formMode = 'define';
 	}
@@ -187,7 +191,7 @@
 			requiredOutputs: t.requiredOutputs.join(', ')
 		});
 		children = [...t.permittedChildTypeIds];
-		policies = [...t.requiredAssurancePolicyIds];
+		selectedPolicyIds = [...t.requiredAssurancePolicyIds];
 		childRules = Object.fromEntries(
 			t.permittedChildren.map((r) => [
 				r.typeId,
@@ -213,8 +217,134 @@
 		if (on && !childRules[id]) childRules = { ...childRules, [id]: { cardinality: 'M1', note: '' } };
 	}
 	function togglePolicy(id: string, on: boolean) {
-		policies = on ? [...policies, id] : policies.filter((p) => p !== id);
+		selectedPolicyIds = on
+			? [...selectedPolicyIds, id]
+			: selectedPolicyIds.filter((p) => p !== id);
 	}
+
+	// ---- Assurance Policy library manager (engine-backed): list all policies, create / edit / version / suspend /
+	// activate. The 3 de minimis floor policies are shown LOCKED (read-only). Opened from the pub-action bar.
+	type PolicyView = PageData['policies'][number];
+	let showPolicyManager = $state(false);
+	let policyFormMode = $state<null | 'create' | { editId: string }>(null);
+	const pf = $state({
+		name: '',
+		purpose: '',
+		rationale: '',
+		evaluatedClaimTypes: 'CORRECTNESS',
+		evaluatorRole: '',
+		independenceRequirement: 'DIFFERENT_AGENT',
+		permittedControlActions: 'ESCALATE',
+		criteria: ''
+	});
+	const policyEditingId = $derived(
+		typeof policyFormMode === 'object' && policyFormMode ? policyFormMode.editId : ''
+	);
+	// Option lists for the policy form (subset of the ASSURANCE_POLICY object contract enums; the engine validates).
+	const CLAIM_TYPES = [
+		'CORRECTNESS',
+		'COMPLETENESS',
+		'COVERAGE',
+		'PRESERVATION',
+		'CONSISTENCY',
+		'FITNESS',
+		'FEASIBILITY',
+		'COMPLIANCE',
+		'SECURITY',
+		'PERFORMANCE'
+	];
+	const INDEPENDENCE = [
+		'NONE',
+		'DIFFERENT_INVOCATION',
+		'DIFFERENT_CONTEXT_INSTANCE',
+		'DIFFERENT_AGENT',
+		'DIFFERENT_MODEL',
+		'DIFFERENT_PROVIDER',
+		'HUMAN',
+		'ORGANIZATIONALLY_INDEPENDENT'
+	];
+	const CONTROL_ACTIONS = [
+		'CLARIFY',
+		'GATHER_CONTEXT',
+		'GATHER_EVIDENCE',
+		'REVISE_CONTEXT',
+		'RETRY',
+		'RESHAPE_PWU',
+		'REVISE_DECOMPOSITION',
+		'REPLAN_EXECUTION',
+		'REQUEST_HUMAN_DECISION',
+		'REQUEST_WAIVER',
+		'ESCALATE',
+		'REJECT'
+	];
+	// Sort: locked floor first, then ACTIVE, SUSPENDED, DRAFT, SUPERSEDED last; alphabetical within a group.
+	const POLICY_STATUS_ORDER: Record<string, number> = {
+		ACTIVE: 1,
+		SUSPENDED: 2,
+		DRAFT: 3,
+		SUPERSEDED: 4
+	};
+	const sortedPolicies = $derived(
+		[...data.policies].sort((a, b) => {
+			if (a.isFloor !== b.isFloor) return a.isFloor ? -1 : 1;
+			const s = (POLICY_STATUS_ORDER[a.status] ?? 9) - (POLICY_STATUS_ORDER[b.status] ?? 9);
+			return s !== 0 ? s : a.name.localeCompare(b.name);
+		})
+	);
+	// The policies a PWU Type may declare: ACTIVE and non-floor (the floor always applies and is never declared).
+	const pickablePolicies = $derived(
+		data.policies.filter((p) => p.status === 'ACTIVE' && !p.isFloor)
+	);
+	// Resolve a policy id to its human name: engine library first, then the locked-floor labels, then the id.
+	const policyNameById = $derived(new Map(data.policies.map((p) => [p.id, p.name])));
+	function policyDisplayName(id: string): string {
+		return policyNameById.get(id) ?? assurancePolicyLabel(id);
+	}
+	function openPolicyManager() {
+		showPolicyManager = true;
+		policyFormMode = null;
+	}
+	function resetPf() {
+		Object.assign(pf, {
+			name: '',
+			purpose: '',
+			rationale: '',
+			evaluatedClaimTypes: 'CORRECTNESS',
+			evaluatorRole: '',
+			independenceRequirement: 'DIFFERENT_AGENT',
+			permittedControlActions: 'ESCALATE',
+			criteria: ''
+		});
+	}
+	function openCreatePolicy() {
+		resetPf();
+		policyFormMode = 'create';
+	}
+	function openEditPolicy(p: PolicyView) {
+		Object.assign(pf, {
+			name: p.name,
+			purpose: p.purpose,
+			rationale: p.rationale,
+			evaluatedClaimTypes: p.evaluatedClaimTypes || 'CORRECTNESS',
+			evaluatorRole: p.evaluatorRole,
+			independenceRequirement: p.independenceRequirement || 'DIFFERENT_AGENT',
+			permittedControlActions: p.permittedControlActions || 'ESCALATE',
+			criteria: p.criteria.join('\n')
+		});
+		policyFormMode = { editId: p.id };
+	}
+	// After any policy mutation succeeds, return to the manager list (the graph reloaded via enhance/invalidateAll).
+	$effect(() => {
+		if (
+			form?.createdPolicy ||
+			form?.editedPolicy ||
+			form?.newVersion ||
+			form?.suspendedPolicy ||
+			form?.activatedPolicy
+		) {
+			policyFormMode = null;
+		}
+	});
 
 	// ---- The authoring agent: chat + reasoning log, driving the SAME engine via the SSE relay; the graph
 	// re-renders live as each tool call commits (invalidateAll re-runs load -> data.types -> flow).
@@ -224,7 +354,7 @@
 		ok?: boolean;
 	};
 	function policyLabel(id: string): string {
-		return assurancePolicyLabel(id);
+		return policyDisplayName(id);
 	}
 
 	const MUTATING = new Set([
@@ -389,7 +519,7 @@
 						class:bad={data.floor.aggregate === 'REJECTED'}
 						class:warn={!data.floor.satisfied && data.floor.aggregate !== 'REJECTED'}
 						class:ok={data.floor.satisfied}
-						title="De minimis assurance floor — schema, provenance, and an independent reasoning review (exec ≠ assurance)"
+						title="Required assurance policies (mandatory) — schema, provenance, and an independent reasoning review (exec ≠ assurance)"
 						data-testid="assurance-chip"
 					>
 						⚖ {data.floor.satisfied ? 'floor satisfied' : `floor ${data.floor.aggregate.toLowerCase()}`}
@@ -421,6 +551,7 @@
 				<li class:done={rank > 6} class:active={data.pwa.publicationStatus === 'RETIRED'}>Retired</li>
 			</ol>
 			<div class="pubact">
+				<button class="ghost small" onclick={openPolicyManager}>⚖ Policies</button>
 				{#if editable}
 					<button class="ghost small" onclick={openDefine}>+ Define PWU Type</button>
 				{/if}
@@ -567,7 +698,7 @@
 					use:draggable={{ handle: '.paneldrag' }}
 				>
 					<header class="ppanelhead paneldrag">
-						<span class="itag">PWU TYPE</span>
+						<span class="itag">{showPolicyManager ? 'ASSURANCE POLICIES' : 'PWU TYPE'}</span>
 						<button
 							class="collapsebtn"
 							onclick={() => (inspectorCollapsed = !inspectorCollapsed)}
@@ -577,7 +708,130 @@
 					</header>
 					{#if !inspectorCollapsed}
 						<div class="panelbody">
-							{#if editable && formMode !== null}
+							{#if showPolicyManager}
+								<div class="pmgrhead">
+									<span class="fhelp"
+										>Workbench assurance-policy library — the locked mandatory policies (always apply) plus your
+										declarable policies. Reference them on a PWU Type from the Declared assurance policies field.</span
+									>
+									<button
+										class="collapsebtn"
+										onclick={() => (showPolicyManager = false)}
+										aria-label="Close policy manager">✕</button
+									>
+								</div>
+								{#if policyFormMode !== null}
+									{@const pediting = policyEditingId !== ''}
+									<div class="itag">{pediting ? 'EDIT POLICY' : 'NEW POLICY'}</div>
+									<form
+										method="POST"
+										action={pediting ? '?/editPolicy' : '?/createPolicy'}
+										use:enhance
+										class="typeform"
+									>
+										{#if pediting}<input type="hidden" name="policyId" value={policyEditingId} />{/if}
+										<div class="ffield">
+											<span class="flabel">Name</span>
+											<input name="name" bind:value={pf.name} required />
+										</div>
+										<div class="ffield">
+											<span class="flabel">Purpose</span>
+											<textarea name="purpose" bind:value={pf.purpose} rows="2"></textarea>
+										</div>
+										<div class="ffield">
+											<span class="flabel">Rationale</span>
+											<textarea name="rationale" bind:value={pf.rationale} rows="2"></textarea>
+										</div>
+										<div class="ffield">
+											<span class="flabel">Evaluated claim type</span>
+											<select name="evaluatedClaimTypes" bind:value={pf.evaluatedClaimTypes}>
+												{#each CLAIM_TYPES as c (c)}<option value={c}>{c}</option>{/each}
+											</select>
+										</div>
+										<div class="ffield">
+											<span class="flabel">Evaluator role</span>
+											<input name="evaluatorRole" bind:value={pf.evaluatorRole} placeholder="reviewer" />
+										</div>
+										<div class="ffield">
+											<span class="flabel">Independence requirement</span>
+											<select name="independenceRequirement" bind:value={pf.independenceRequirement}>
+												{#each INDEPENDENCE as i (i)}<option value={i}>{i}</option>{/each}
+											</select>
+										</div>
+										<div class="ffield">
+											<span class="flabel">Permitted control action</span>
+											<select name="permittedControlActions" bind:value={pf.permittedControlActions}>
+												{#each CONTROL_ACTIONS as a (a)}<option value={a}>{a}</option>{/each}
+											</select>
+										</div>
+										<div class="ffield">
+											<span class="flabel">Criteria (one per line)</span>
+											<textarea
+												name="criteria"
+												bind:value={pf.criteria}
+												rows="4"
+												placeholder="Each non-empty line becomes a mandatory assessment criterion"
+											></textarea>
+										</div>
+										<div class="formactions">
+											<button class="primary small" type="submit"
+												>{pediting ? 'Save changes' : 'Create policy'}</button
+											>
+											<button type="button" class="ghost small" onclick={() => (policyFormMode = null)}
+												>Cancel</button
+											>
+										</div>
+									</form>
+								{:else}
+									<div class="pmgractions">
+										<button class="ghost small" onclick={openCreatePolicy}>＋ New policy</button>
+									</div>
+									<ul class="policylistmgr">
+										{#each sortedPolicies as p (p.id)}
+											<li
+												class="policycard"
+												class:floorcard={p.isFloor}
+												class:supersededcard={p.status === 'SUPERSEDED'}
+											>
+												<div class="pchead">
+													<span class="pcname">{p.name}</span>
+													{#if p.isFloor}
+														<span class="pclock" title="Mandatory — always applies, non-editable"
+															>🔒 mandatory</span
+														>
+													{:else}
+														<span class="pcstatus {p.status.toLowerCase()}">{p.status}</span>
+													{/if}
+												</div>
+												<div class="pcmeta">
+													v{p.version} · {p.evaluatedClaimTypes || '—'} · {p.criteria.length} criteria
+												</div>
+												<p class="pcpurpose">{p.purpose}</p>
+												{#if !p.isFloor && p.status !== 'SUPERSEDED'}
+													<div class="pcactions">
+														<button class="ghost xs" onclick={() => openEditPolicy(p)}>Edit</button>
+														<form method="POST" action="?/newPolicyVersion" use:enhance>
+															<input type="hidden" name="policyId" value={p.id} />
+															<button class="ghost xs" type="submit">New version</button>
+														</form>
+														{#if p.status === 'ACTIVE'}
+															<form method="POST" action="?/suspendPolicy" use:enhance>
+																<input type="hidden" name="policyId" value={p.id} />
+																<button class="ghost xs" type="submit">Suspend</button>
+															</form>
+														{:else if p.status === 'SUSPENDED'}
+															<form method="POST" action="?/activatePolicy" use:enhance>
+																<input type="hidden" name="policyId" value={p.id} />
+																<button class="ghost xs" type="submit">Activate</button>
+															</form>
+														{/if}
+													</div>
+												{/if}
+											</li>
+										{/each}
+									</ul>
+								{/if}
+							{:else if editable && formMode !== null}
 						{@const editing = editingId !== ''}
 						<div class="itag">{editing ? 'EDIT PWU TYPE' : 'NEW PWU TYPE'}</div>
 						<form
@@ -693,21 +947,25 @@
 							<div class="ffield">
 								{@render fhead('Declared assurance policies', PWU_TYPE_HELP.requiredAssurancePolicyIds)}
 								<div class="policylist">
-									<div class="floornote">
-										🔒 de minimis floor · always applies · not listed here
-									</div>
-									{#each ASSURANCE_POLICY_CATALOG as p (p.id)}
-										<label class="childopt" title={p.blurb}>
+									<div class="floornote">🔒 Mandatory policies always apply · not listed here</div>
+									{#each pickablePolicies as p (p.id)}
+										<label class="childopt" title={p.purpose}>
 											<input
 												type="checkbox"
 												name="requiredAssurancePolicyIds"
 												value={p.id}
-												checked={policies.includes(p.id)}
+												checked={selectedPolicyIds.includes(p.id)}
 												onchange={(e) => togglePolicy(p.id, e.currentTarget.checked)}
 											/>
-											{p.label}
+											{p.name}
 										</label>
 									{/each}
+									{#if pickablePolicies.length === 0}
+										<span class="fhelp">No active policies yet — add one in ⚖ Policies.</span>
+									{/if}
+									<button type="button" class="linkbtn" onclick={openPolicyManager}
+										>⚖ Manage policies…</button
+									>
 								</div>
 							</div>
 							<div class="formactions">
@@ -751,9 +1009,9 @@
 							{/if}
 						</div>
 						<div class="field assurancerail">
-							<span class="flabel">Assurance rail</span>
+							<span class="flabel">Required assurance policies</span>
 							<div class="railfloor">
-								<div class="raillocked">🔒 de minimis floor · non-removable</div>
+								<div class="raillocked">🔒 Mandatory · always applies · non-removable</div>
 								{#each ASSURANCE_FLOOR as p (p.id)}
 									<div class="railitem" title={p.blurb}>{p.label}</div>
 								{/each}
@@ -765,7 +1023,9 @@
 									{/each}
 								</div>
 							{:else}
-								<span class="fhelp">No additional policies declared (the floor still applies).</span>
+								<span class="fhelp"
+									>No additional policies declared (the mandatory policies still apply).</span
+								>
 							{/if}
 						</div>
 						{#if editable}
@@ -782,7 +1042,7 @@
 						<p class="hint">Select a node to inspect it{#if editable}, or “+ Define PWU Type”.{/if}</p>
 					{/if}
 
-					{#if data.fixtures.length}
+					{#if !showPolicyManager && data.fixtures.length}
 						<div class="fixtures">
 							<span class="flabel">Conformance fixtures</span>
 							{#each data.fixtures as fx (fx.id)}
@@ -814,7 +1074,7 @@
 						use:draggable={{ handle: '.paneldrag' }}
 					>
 						<header class="ppanelhead paneldrag">
-							<span class="itag">ASSURANCE FLOOR</span>
+							<span class="itag">REQUIRED ASSURANCE</span>
 							<button
 								class="collapsebtn"
 								onclick={() => (floorCollapsed = !floorCollapsed)}
@@ -831,7 +1091,7 @@
 								class:bad={data.floor.aggregate === 'REJECTED'}
 								data-testid="assurance-disposition">⚖ {data.floor.aggregate}</span
 							>
-							<span class="floorsub">de minimis assurance floor</span>
+							<span class="floorsub">mandatory assurance policies · always applies</span>
 							{#if data.floor.waived}
 								<span class="waivedbadge" data-testid="assurance-waived">waiver in force</span>
 							{/if}
@@ -1355,6 +1615,112 @@
 		font-size: 10.5px;
 		color: var(--outline);
 		padding-bottom: 2px;
+	}
+	.linkbtn {
+		align-self: flex-start;
+		background: none;
+		border: none;
+		color: var(--primary);
+		font-size: 11px;
+		cursor: pointer;
+		padding: 4px 0 0;
+	}
+	/* ── Assurance-policy manager ─────────────────────────────────────────────────────────────────────────── */
+	.pmgrhead {
+		display: flex;
+		align-items: flex-start;
+		justify-content: space-between;
+		gap: 8px;
+		margin-bottom: 10px;
+	}
+	.pmgractions {
+		margin-bottom: 8px;
+	}
+	.policylistmgr {
+		list-style: none;
+		margin: 0;
+		padding: 0;
+		display: flex;
+		flex-direction: column;
+		gap: 8px;
+	}
+	.policycard {
+		border: 1px solid var(--outline-faint);
+		border-radius: 8px;
+		padding: 8px 10px;
+		background: var(--sc);
+	}
+	.policycard.floorcard {
+		border-color: #4a4a2a;
+		background: #201f16;
+	}
+	.policycard.supersededcard {
+		opacity: 0.6;
+	}
+	.pchead {
+		display: flex;
+		align-items: center;
+		justify-content: space-between;
+		gap: 8px;
+	}
+	.pcname {
+		font-size: 12.5px;
+		font-weight: 600;
+		color: var(--on);
+	}
+	.pclock {
+		font-size: 9.5px;
+		font-weight: 700;
+		color: #d8c56a;
+		white-space: nowrap;
+	}
+	.pcstatus {
+		font-size: 9px;
+		font-weight: 700;
+		letter-spacing: 0.06em;
+		padding: 1px 6px;
+		border-radius: 4px;
+		background: var(--sc-highest);
+		color: var(--outline);
+		white-space: nowrap;
+	}
+	.pcstatus.active {
+		background: rgba(97, 218, 193, 0.15);
+		color: var(--tertiary);
+	}
+	.pcstatus.suspended {
+		background: rgba(230, 181, 102, 0.15);
+		color: var(--amber);
+	}
+	.pcstatus.superseded {
+		background: var(--sc-highest);
+		color: var(--outline);
+	}
+	.pcmeta {
+		font-size: 10px;
+		color: var(--outline);
+		margin-top: 2px;
+		font-family: 'Source Code Pro', monospace;
+	}
+	.pcpurpose {
+		font-size: 11.5px;
+		color: var(--on-variant);
+		line-height: 1.4;
+		margin: 5px 0 0;
+	}
+	.pcactions {
+		display: flex;
+		flex-wrap: wrap;
+		gap: 5px;
+		margin-top: 7px;
+	}
+	.pcactions form {
+		margin: 0;
+	}
+	button.ghost.xs {
+		padding: 3px 8px;
+		font-size: 10.5px;
+		border-radius: 6px;
 	}
 	.childcards {
 		list-style: none;
