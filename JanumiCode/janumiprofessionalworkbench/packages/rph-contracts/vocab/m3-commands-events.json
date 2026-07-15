@@ -2093,6 +2093,117 @@
           "type": "string"
         }
       ]
+    },
+    {
+      "commandType": "EditAssurancePolicy",
+      "targetAggregateType": "ASSURANCE_POLICY",
+      "emitsEvent": "AssurancePolicyEdited",
+      "schematized": false,
+      "sourceSection": "guide §8.9 / DOC-007 §17 — revise a non-floor, non-superseded Assurance Policy's content in place (same version, revision++). Only payload-present fields change; the locked de minimis floor policies are immutable and reject this.",
+      "payloadFields": [
+        {
+          "field": "policyId",
+          "required": true,
+          "type": "string"
+        },
+        {
+          "field": "name",
+          "required": false,
+          "type": "string"
+        },
+        {
+          "field": "purpose",
+          "required": false,
+          "type": "string"
+        },
+        {
+          "field": "rationale",
+          "required": false,
+          "type": "string"
+        },
+        {
+          "field": "applicableObjectTypes",
+          "required": false,
+          "type": "string"
+        },
+        {
+          "field": "evaluatedClaimTypes",
+          "required": false,
+          "type": "string"
+        },
+        {
+          "field": "criteria",
+          "required": false,
+          "type": "AssessmentCriterion[]"
+        },
+        {
+          "field": "evaluatorRole",
+          "required": false,
+          "type": "string"
+        },
+        {
+          "field": "independenceRequirement",
+          "required": false,
+          "type": "string"
+        },
+        {
+          "field": "findingDefinitions",
+          "required": false,
+          "type": "FindingDefinition[]"
+        },
+        {
+          "field": "permittedControlActions",
+          "required": false,
+          "type": "string"
+        }
+      ]
+    },
+    {
+      "commandType": "SupersedeAssurancePolicy",
+      "targetAggregateType": "ASSURANCE_POLICY",
+      "emitsEvent": "AssurancePolicySuperseded",
+      "schematized": false,
+      "sourceSection": "guide §8.9 / DOC-007 §17 + assurance §3.1 — retire a policy version (ACTIVE|SUSPENDED -> SUPERSEDED) when a successor replaces it; assessments pin policySemanticVersion (§18). Floor policies reject this.",
+      "payloadFields": [
+        {
+          "field": "policyId",
+          "required": true,
+          "type": "string"
+        },
+        {
+          "field": "supersededByPolicyId",
+          "required": false,
+          "type": "string"
+        }
+      ]
+    },
+    {
+      "commandType": "SuspendAssurancePolicy",
+      "targetAggregateType": "ASSURANCE_POLICY",
+      "emitsEvent": "AssurancePolicySuspended",
+      "schematized": false,
+      "sourceSection": "guide §8.9 / assurance §3.1 — temporarily disable a policy (ACTIVE -> SUSPENDED); it stops applying until resumed. Floor policies reject this.",
+      "payloadFields": [
+        {
+          "field": "policyId",
+          "required": true,
+          "type": "string"
+        }
+      ]
+    },
+    {
+      "commandType": "ActivateAssurancePolicy",
+      "targetAggregateType": "ASSURANCE_POLICY",
+      "emitsEvent": "AssurancePolicyActivated",
+      "schematized": false,
+      "sourceSection": "guide §8.9 / assurance §3.1 — put a policy into force (DRAFT|SUSPENDED -> ACTIVE).",
+      "payloadFields": [
+        {
+          "field": "policyId",
+          "required": true,
+          "type": "string"
+        }
+      ]
     }
   ],
   "events": [
@@ -5329,6 +5440,105 @@
         },
         {
           "field": "permittedControlActions",
+          "required": true,
+          "type": "string"
+        }
+      ]
+    },
+    {
+      "eventType": "AssurancePolicyEdited",
+      "aggregateType": "ASSURANCE_POLICY",
+      "payloadFields": [
+        {
+          "field": "policyId",
+          "required": true,
+          "type": "string"
+        },
+        {
+          "field": "name",
+          "required": false,
+          "type": "string"
+        },
+        {
+          "field": "purpose",
+          "required": false,
+          "type": "string"
+        },
+        {
+          "field": "rationale",
+          "required": false,
+          "type": "string"
+        },
+        {
+          "field": "applicableObjectTypes",
+          "required": false,
+          "type": "string"
+        },
+        {
+          "field": "evaluatedClaimTypes",
+          "required": false,
+          "type": "string"
+        },
+        {
+          "field": "criteria",
+          "required": false,
+          "type": "AssessmentCriterion[]"
+        },
+        {
+          "field": "evaluatorRole",
+          "required": false,
+          "type": "string"
+        },
+        {
+          "field": "independenceRequirement",
+          "required": false,
+          "type": "string"
+        },
+        {
+          "field": "findingDefinitions",
+          "required": false,
+          "type": "FindingDefinition[]"
+        },
+        {
+          "field": "permittedControlActions",
+          "required": false,
+          "type": "string"
+        }
+      ]
+    },
+    {
+      "eventType": "AssurancePolicySuperseded",
+      "aggregateType": "ASSURANCE_POLICY",
+      "payloadFields": [
+        {
+          "field": "policyId",
+          "required": true,
+          "type": "string"
+        },
+        {
+          "field": "supersededByPolicyId",
+          "required": false,
+          "type": "string"
+        }
+      ]
+    },
+    {
+      "eventType": "AssurancePolicySuspended",
+      "aggregateType": "ASSURANCE_POLICY",
+      "payloadFields": [
+        {
+          "field": "policyId",
+          "required": true,
+          "type": "string"
+        }
+      ]
+    },
+    {
+      "eventType": "AssurancePolicyActivated",
+      "aggregateType": "ASSURANCE_POLICY",
+      "payloadFields": [
+        {
+          "field": "policyId",
           "required": true,
           "type": "string"
         }

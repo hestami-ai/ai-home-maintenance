@@ -471,6 +471,33 @@ export const CreateAssurancePolicyPayloadSchema = z.strictObject({
 	permittedControlActions: z.string()
 });
 export type CreateAssurancePolicyPayload = z.infer<typeof CreateAssurancePolicyPayloadSchema>;
+export const EditAssurancePolicyPayloadSchema = z.strictObject({
+	policyId: z.string(),
+	name: z.string().optional(),
+	purpose: z.string().optional(),
+	rationale: z.string().optional(),
+	applicableObjectTypes: z.string().optional(),
+	evaluatedClaimTypes: z.string().optional(),
+	criteria: z.array(z.unknown()).optional(),
+	evaluatorRole: z.string().optional(),
+	independenceRequirement: z.string().optional(),
+	findingDefinitions: z.array(z.unknown()).optional(),
+	permittedControlActions: z.string().optional()
+});
+export type EditAssurancePolicyPayload = z.infer<typeof EditAssurancePolicyPayloadSchema>;
+export const SupersedeAssurancePolicyPayloadSchema = z.strictObject({
+	policyId: z.string(),
+	supersededByPolicyId: z.string().optional()
+});
+export type SupersedeAssurancePolicyPayload = z.infer<typeof SupersedeAssurancePolicyPayloadSchema>;
+export const SuspendAssurancePolicyPayloadSchema = z.strictObject({
+	policyId: z.string()
+});
+export type SuspendAssurancePolicyPayload = z.infer<typeof SuspendAssurancePolicyPayloadSchema>;
+export const ActivateAssurancePolicyPayloadSchema = z.strictObject({
+	policyId: z.string()
+});
+export type ActivateAssurancePolicyPayload = z.infer<typeof ActivateAssurancePolicyPayloadSchema>;
 
 // ---- Event payload schemas ----
 export const AssumptionAcceptedPayloadSchema = z.strictObject({
@@ -1261,6 +1288,35 @@ export const AssurancePolicyCreatedPayloadSchema = z.strictObject({
 	permittedControlActions: z.string()
 });
 export type AssurancePolicyCreatedPayload = z.infer<typeof AssurancePolicyCreatedPayloadSchema>;
+export const AssurancePolicyEditedPayloadSchema = z.strictObject({
+	policyId: z.string(),
+	name: z.string().optional(),
+	purpose: z.string().optional(),
+	rationale: z.string().optional(),
+	applicableObjectTypes: z.string().optional(),
+	evaluatedClaimTypes: z.string().optional(),
+	criteria: z.array(z.unknown()).optional(),
+	evaluatorRole: z.string().optional(),
+	independenceRequirement: z.string().optional(),
+	findingDefinitions: z.array(z.unknown()).optional(),
+	permittedControlActions: z.string().optional()
+});
+export type AssurancePolicyEditedPayload = z.infer<typeof AssurancePolicyEditedPayloadSchema>;
+export const AssurancePolicySupersededPayloadSchema = z.strictObject({
+	policyId: z.string(),
+	supersededByPolicyId: z.string().optional()
+});
+export type AssurancePolicySupersededPayload = z.infer<
+	typeof AssurancePolicySupersededPayloadSchema
+>;
+export const AssurancePolicySuspendedPayloadSchema = z.strictObject({
+	policyId: z.string()
+});
+export type AssurancePolicySuspendedPayload = z.infer<typeof AssurancePolicySuspendedPayloadSchema>;
+export const AssurancePolicyActivatedPayloadSchema = z.strictObject({
+	policyId: z.string()
+});
+export type AssurancePolicyActivatedPayload = z.infer<typeof AssurancePolicyActivatedPayloadSchema>;
 
 export const FIRST_SLICE_COMMANDS = [
 	'CaptureIntent',
@@ -1670,6 +1726,30 @@ export const COMMANDS = {
 		targetAggregateType: 'ASSURANCE_POLICY',
 		emitsEvent: 'AssurancePolicyCreated',
 		firstSlice: false
+	},
+	EditAssurancePolicy: {
+		payload: EditAssurancePolicyPayloadSchema,
+		targetAggregateType: 'ASSURANCE_POLICY',
+		emitsEvent: 'AssurancePolicyEdited',
+		firstSlice: false
+	},
+	SupersedeAssurancePolicy: {
+		payload: SupersedeAssurancePolicyPayloadSchema,
+		targetAggregateType: 'ASSURANCE_POLICY',
+		emitsEvent: 'AssurancePolicySuperseded',
+		firstSlice: false
+	},
+	SuspendAssurancePolicy: {
+		payload: SuspendAssurancePolicyPayloadSchema,
+		targetAggregateType: 'ASSURANCE_POLICY',
+		emitsEvent: 'AssurancePolicySuspended',
+		firstSlice: false
+	},
+	ActivateAssurancePolicy: {
+		payload: ActivateAssurancePolicyPayloadSchema,
+		targetAggregateType: 'ASSURANCE_POLICY',
+		emitsEvent: 'AssurancePolicyActivated',
+		firstSlice: false
 	}
 } as const;
 
@@ -1940,6 +2020,22 @@ export const EVENTS = {
 	},
 	AssurancePolicyCreated: {
 		payload: AssurancePolicyCreatedPayloadSchema,
+		aggregateType: 'ASSURANCE_POLICY'
+	},
+	AssurancePolicyEdited: {
+		payload: AssurancePolicyEditedPayloadSchema,
+		aggregateType: 'ASSURANCE_POLICY'
+	},
+	AssurancePolicySuperseded: {
+		payload: AssurancePolicySupersededPayloadSchema,
+		aggregateType: 'ASSURANCE_POLICY'
+	},
+	AssurancePolicySuspended: {
+		payload: AssurancePolicySuspendedPayloadSchema,
+		aggregateType: 'ASSURANCE_POLICY'
+	},
+	AssurancePolicyActivated: {
+		payload: AssurancePolicyActivatedPayloadSchema,
 		aggregateType: 'ASSURANCE_POLICY'
 	}
 } as const;

@@ -177,6 +177,175 @@ export function seedFloorPolicies(handle: EngineHandle): void {
 	}
 }
 
+/** The Product Realization PWA's additive assurance policies (DOC-004 §15-§21) as authorable ASSURANCE_POLICY
+ *  objects — the declarable policies a PWU Type may require ON TOP of the locked de minimis floor. Seeding them as
+ *  real objects makes the PWA Designer's policy manager + picker engine-backed (not a static catalog), and gives the
+ *  author a starting library to reference, edit, version, suspend, or supersede. Content is a faithful compact of the
+ *  ontology's seedPolicies (single-value enum fields per the ASSURANCE_POLICY object contract). */
+interface AdditivePolicySeed {
+	readonly policyId: string;
+	readonly name: string;
+	readonly purpose: string;
+	readonly rationale: string;
+	readonly evaluatedClaimType: string;
+	readonly evaluatorRole: string;
+	readonly independence: string;
+	readonly permittedControlAction: string;
+	readonly criteria: ReadonlyArray<{ id: string; statement: string; mandatory: boolean }>;
+	readonly findingDefinitions: ReadonlyArray<{ code: string; severity: string; statement: string }>;
+}
+
+const ADDITIVE_POLICY_SEEDS: readonly AdditivePolicySeed[] = [
+	{
+		policyId: 'pol_intent_fidelity',
+		name: 'Intent Fidelity',
+		purpose:
+			"The formalized objective represents the user's need rather than substituting a preferred solution; scope, constraints, and material ambiguity are preserved.",
+		rationale:
+			'Catalog §15 — unauthorized intent alteration cannot be silently introduced; inferred elements must be labelled, not presented as user fact.',
+		evaluatedClaimType: 'PRESERVATION',
+		evaluatorRole: 'intent-fidelity-reviewer',
+		independence: 'DIFFERENT_AGENT',
+		permittedControlAction: 'CLARIFY',
+		criteria: [
+			{ id: 'IF-01', statement: 'Objective fidelity: no solution substituted for the need.', mandatory: true },
+			{ id: 'IF-02', statement: 'Boundary fidelity: no unauthorized scope expansion.', mandatory: true },
+			{ id: 'IF-03', statement: 'Constraint fidelity: explicit user constraints preserved.', mandatory: true }
+		],
+		findingDefinitions: [
+			{ code: 'SOLUTION_SUBSTITUTION', severity: 'BLOCKING', statement: 'An inferred solution replaced the stated need.' },
+			{ code: 'MISSING_USER_CONSTRAINT', severity: 'BLOCKING', statement: 'A mandatory user constraint was omitted.' }
+		]
+	},
+	{
+		policyId: 'pol_intent_completeness',
+		name: 'Intent Completeness',
+		purpose:
+			'Desired outcomes, product boundary, mandatory constraints, and success conditions are sufficiently explicit for the next authorized activity.',
+		rationale: 'Catalog §16 — completeness is risk-relative sufficiency, not exhaustive specification.',
+		evaluatedClaimType: 'COMPLETENESS',
+		evaluatorRole: 'intent-completeness-reviewer',
+		independence: 'DIFFERENT_INVOCATION',
+		permittedControlAction: 'GATHER_CONTEXT',
+		criteria: [
+			{ id: 'IC-01', statement: 'Desired outcomes are explicit.', mandatory: true },
+			{ id: 'IC-04', statement: 'Mandatory constraints are recorded.', mandatory: true },
+			{ id: 'IC-05', statement: 'Success conditions exist, or the work is marked exploratory.', mandatory: true }
+		],
+		findingDefinitions: [
+			{ code: 'MISSING_MANDATORY_CONSTRAINT', severity: 'MATERIAL', statement: 'A mandatory constraint is missing.' },
+			{ code: 'NO_SUCCESS_CONDITION', severity: 'MATERIAL', statement: 'No success condition and not marked exploratory.' }
+		]
+	},
+	{
+		policyId: 'pol_assumption_disclosure',
+		name: 'Assumption Disclosure',
+		purpose:
+			'Material assumptions are surfaced as first-class Assumption Objects, distinguished from established fact, with materiality and verification needs identified.',
+		rationale: 'Catalog §17 — cross-cutting: applies to any model-produced professional artifact; SATISFIED means disclosed, not verified.',
+		evaluatedClaimType: 'COMPLETENESS',
+		evaluatorRole: 'assumption-disclosure-reviewer',
+		independence: 'DIFFERENT_INVOCATION',
+		permittedControlAction: 'GATHER_EVIDENCE',
+		criteria: [
+			{ id: 'AD-01', statement: 'Material assumptions surfaced as first-class objects (not prose).', mandatory: true },
+			{ id: 'AD-02', statement: 'Assumptions distinguished from established facts.', mandatory: true },
+			{ id: 'AD-04', statement: 'Materiality is classified (IMMATERIAL/MATERIAL/CRITICAL).', mandatory: true }
+		],
+		findingDefinitions: [
+			{ code: 'HIDDEN_MATERIAL_ASSUMPTION', severity: 'MATERIAL', statement: 'A material assumption was left undisclosed.' },
+			{ code: 'ASSUMPTION_PRESENTED_AS_FACT', severity: 'MATERIAL', statement: 'An assumption was presented as established fact.' }
+		]
+	},
+	{
+		policyId: 'pol_decomposition_coverage',
+		name: 'Decomposition Coverage',
+		purpose:
+			'No mandatory parent obligation silently disappears; applicable constraints propagate; a credible parent-level recomposition strategy exists.',
+		rationale: 'Catalog §19 — any missing mandatory obligation or child intent divergence is BLOCKING.',
+		evaluatedClaimType: 'COVERAGE',
+		evaluatorRole: 'decomposition-coverage-reviewer',
+		independence: 'DIFFERENT_AGENT',
+		permittedControlAction: 'REVISE_DECOMPOSITION',
+		criteria: [
+			{ id: 'DC-01', statement: 'Every mandatory parent obligation is allocated/retained/satisfied/waived.', mandatory: true },
+			{ id: 'DC-02', statement: 'Applicable constraints are propagated or explicitly retained.', mandatory: true },
+			{ id: 'DC-06', statement: 'A credible recomposition strategy exists.', mandatory: true }
+		],
+		findingDefinitions: [
+			{ code: 'MISSING_OBLIGATION_ALLOCATION', severity: 'BLOCKING', statement: 'A mandatory obligation was not allocated.' },
+			{ code: 'DROPPED_CONSTRAINT', severity: 'BLOCKING', statement: 'An applicable constraint was dropped.' }
+		]
+	},
+	{
+		policyId: 'pol_architecture_coverage',
+		name: 'Architecture Coverage',
+		purpose:
+			'Applicable requirements and constraints are allocated to structure with explicit boundaries, data ownership, and security; the architecture is feasible.',
+		rationale: 'Catalog §21 — critical security, tenant-isolation, data-integrity, or mandatory-constraint failures are BLOCKING.',
+		evaluatedClaimType: 'COVERAGE',
+		evaluatorRole: 'architecture-coverage-reviewer',
+		independence: 'DIFFERENT_AGENT',
+		permittedControlAction: 'RESHAPE_PWU',
+		criteria: [
+			{ id: 'AC-01', statement: 'Applicable requirements are allocated to architecture.', mandatory: true },
+			{ id: 'AC-05', statement: 'Data ownership is explicit (data-integrity boundary).', mandatory: true },
+			{ id: 'AC-08', statement: 'Mandatory constraints are preserved.', mandatory: true }
+		],
+		findingDefinitions: [
+			{ code: 'UNCOVERED_REQUIREMENT', severity: 'CRITICAL', statement: 'A requirement is not covered by the architecture.' },
+			{ code: 'ARCHITECTURE_CONSTRAINT_VIOLATION', severity: 'CRITICAL', statement: 'The architecture violates a mandatory constraint.' }
+		]
+	},
+	{
+		policyId: 'pol_intent_preservation',
+		name: 'Intent Preservation',
+		purpose:
+			'Each downstream transformation still preserves the approved Product Intent end-to-end — no silent change of product semantics.',
+		rationale: 'Catalog §20/§30 — the promoted result must still serve the originating Product Intent.',
+		evaluatedClaimType: 'PRESERVATION',
+		evaluatorRole: 'intent-preservation-reviewer',
+		independence: 'DIFFERENT_AGENT',
+		permittedControlAction: 'ESCALATE',
+		criteria: [
+			{ id: 'IP-01', statement: 'Approved intent is traced through this transformation.', mandatory: true },
+			{ id: 'IP-02', statement: 'No silent change to product semantics.', mandatory: true }
+		],
+		findingDefinitions: [
+			{ code: 'INTENT_EROSION', severity: 'BLOCKING', statement: 'The approved intent was eroded downstream.' }
+		]
+	}
+];
+
+/** Seed the additive Product Realization assurance policies as ACTIVE ASSURANCE_POLICY objects. */
+export function seedAdditivePolicies(handle: EngineHandle): void {
+	const send = sender(handle, 'seedaddpol');
+	for (const p of ADDITIVE_POLICY_SEEDS) {
+		send('CreateAssurancePolicy', 'ASSURANCE_POLICY', p.policyId, {
+			policyId: p.policyId,
+			version: '1.0.0',
+			name: p.name,
+			purpose: p.purpose,
+			rationale: p.rationale,
+			applicableObjectTypes: 'PROFESSIONAL_WORK_UNIT',
+			evaluatedClaimTypes: p.evaluatedClaimType,
+			criteria: p.criteria,
+			evaluatorRole: p.evaluatorRole,
+			independenceRequirement: p.independence,
+			findingDefinitions: p.findingDefinitions,
+			permittedControlActions: p.permittedControlAction
+		});
+	}
+}
+
+/** The full workbench policy library: the 3 locked de minimis floor policies + the additive Product Realization
+ *  policies. Seed this in EVERY engine (reference AND empty) so the PWA Designer's policy manager + picker are
+ *  always populated and the floor policies are present as (locked) real objects. */
+export function seedPolicyLibrary(handle: EngineHandle): void {
+	seedFloorPolicies(handle);
+	seedAdditivePolicies(handle);
+}
+
 /** Author + publish the Product Realization PWA (idempotent-ish: safe to call once per engine). */
 export function authorProductRealizationPwa(handle: EngineHandle): void {
 	const send = sender(handle, 'seedpwa');
@@ -215,7 +384,7 @@ export function authorProductRealizationPwa(handle: EngineHandle): void {
 
 /** Author the PWA, instantiate the Field Service Management Undertaking under it, and drive its graph. */
 export function seedWorkbench(handle: EngineHandle): void {
-	seedFloorPolicies(handle);
+	seedPolicyLibrary(handle);
 	authorProductRealizationPwa(handle);
 	const send = sender(handle, 'sedund');
 	send('CreateUndertaking', 'UNDERTAKING', SEED_UNDERTAKING, {

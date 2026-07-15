@@ -49,6 +49,10 @@ export const listObservations = (h: EngineHandle): ObjectRow[] =>
 	listByType(h, 'ASSURANCE_OBSERVATION');
 export const listDecisions = (h: EngineHandle): ObjectRow[] => listByType(h, 'DECISION');
 export const listBaselines = (h: EngineHandle): ObjectRow[] => listByType(h, 'BASELINE');
+/** Every ASSURANCE_POLICY definition (any status). The PWA Designer's policy manager lists these; the picker
+ *  offers the ACTIVE ones, and the 3 de minimis floor policies are shown locked (§8.4). */
+export const listAssurancePolicies = (h: EngineHandle): ObjectRow[] =>
+	listByType(h, 'ASSURANCE_POLICY');
 
 export const listConversations = (h: EngineHandle): ObjectRow[] =>
 	listByType(h, 'AUTHORING_CONVERSATION');

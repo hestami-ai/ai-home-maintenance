@@ -8,14 +8,49 @@ import type {
 	AssertClaimPayload,
 	CreateAssurancePolicyPayload,
 	DetectAssumptionPayload,
+	DomainCommand,
+	EditAssurancePolicyPayload,
 	ProposeEvidencePayload,
 	RecordAssuranceObservationPayload,
-	RequestAssuranceAssessmentPayload
+	RequestAssuranceAssessmentPayload,
+	SupersedeAssurancePolicyPayload
 } from '@janumipwb/rph-contracts';
-import { advanceStatus, createObject, newEnvelope, reject, type CommandHandler } from './kit.js';
+import {
+	advanceStatus,
+	commitState,
+	createObject,
+	loadOrReject,
+	makeEvent,
+	newEnvelope,
+	nextEnvelope,
+	reject,
+	type CommandHandler
+} from './kit.js';
 
 // ---- Assurance Policy ----
 const POLICY = 'ASSURANCE_POLICY';
+
+// The 3 de minimis floor policies (guide §8.4) are LOCKED: always-apply, non-waivable, non-editable — the
+// exec≠assurance floor (INV-5). Their ids mirror @janumipwb/rph-assurance FLOOR_POLICY_IDS (kept literal here to
+// avoid a cross-package dep). Edit / Supersede / Suspend / Activate all reject when targeting one.
+const FLOOR_POLICY_IDS: ReadonlySet<string> = new Set([
+	'floor.schema-invariant',
+	'floor.identity-provenance',
+	'floor.reasoning-review'
+]);
+
+/** A status-transition guard that rejects any lifecycle change to a locked de minimis floor policy. */
+function rejectIfFloorLocked(command: DomainCommand): () => ReturnType<typeof reject> | null {
+	return () =>
+		FLOOR_POLICY_IDS.has(command.targetAggregateId)
+			? reject(
+					command,
+					'RPH_INVARIANT_VIOLATION',
+					`The de minimis floor policy ${command.targetAggregateId} is locked (always-applies, non-waivable) and cannot be edited, suspended, or superseded`,
+					[command.targetAggregateId]
+				)
+			: null;
+}
 
 /** CreateAssurancePolicy — create a versioned ASSURANCE_POLICY object in ACTIVE (guide §8.9). The de minimis floor
  *  policies (§8.4) are seeded through this. The rich rule arrays are §16.23-unresolved shapes, filled empty; the
@@ -56,6 +91,106 @@ export const createAssurancePolicy: CommandHandler = (ctx, command, payload) => 
 		eventType: 'AssurancePolicyCreated'
 	});
 };
+
+/** EditAssurancePolicy — revise a non-floor, non-superseded policy's content in place (same version, revision++).
+ *  Only payload-present fields change (patch). Floor policies + SUPERSEDED policies reject. */
+export const editAssurancePolicy: CommandHandler = (ctx, command, payload) => {
+	const p = payload as EditAssurancePolicyPayload;
+	const id = command.targetAggregateId;
+	const floorBlock = rejectIfFloorLocked(command)();
+	if (floorBlock) return floorBlock;
+	const loaded = loadOrReject(ctx, command, id);
+	if (!loaded.ok) return loaded.result;
+	if (loaded.state.status === 'SUPERSEDED') {
+		return reject(
+			command,
+			'RPH_INVARIANT_VIOLATION',
+			`Policy ${id} is SUPERSEDED and cannot be edited — create a new version instead`,
+			[id]
+		);
+	}
+	const newRevision = loaded.revision + 1;
+	const next: Record<string, unknown> = {
+		...nextEnvelope(loaded.state, command, newRevision),
+		...(p.name !== undefined ? { name: p.name } : {}),
+		...(p.purpose !== undefined ? { purpose: p.purpose } : {}),
+		...(p.rationale !== undefined ? { rationale: p.rationale } : {}),
+		...(p.applicableObjectTypes !== undefined
+			? { applicableObjectTypes: p.applicableObjectTypes }
+			: {}),
+		...(p.evaluatedClaimTypes !== undefined ? { evaluatedClaimTypes: p.evaluatedClaimTypes } : {}),
+		...(p.criteria !== undefined ? { criteria: p.criteria } : {}),
+		...(p.evaluatorRole !== undefined ? { evaluatorRole: p.evaluatorRole } : {}),
+		...(p.independenceRequirement !== undefined
+			? { independenceRequirement: p.independenceRequirement }
+			: {}),
+		...(p.findingDefinitions !== undefined ? { findingDefinitions: p.findingDefinitions } : {}),
+		...(p.permittedControlActions !== undefined
+			? { permittedControlActions: p.permittedControlActions }
+			: {})
+	};
+	const event = makeEvent(ctx, command, {
+		eventType: 'AssurancePolicyEdited',
+		aggregateType: POLICY,
+		aggregateId: id,
+		aggregateRevision: newRevision,
+		payload
+	});
+	return commitState(ctx, command, {
+		objectType: POLICY,
+		aggregateId: id,
+		expectedRevision: loaded.revision,
+		newRevision,
+		newSemanticVersion: loaded.semanticVersion,
+		nextState: next,
+		event
+	});
+};
+
+/** SupersedeAssurancePolicy — retire a policy version (ACTIVE|SUSPENDED -> SUPERSEDED) when a successor replaces
+ *  it. The successor id (if given) is recorded as a `superseded-by:<id>` tag. Floor policies reject. */
+export const supersedeAssurancePolicy: CommandHandler = (ctx, command, payload) => {
+	const p = payload as SupersedeAssurancePolicyPayload;
+	return advanceStatus(ctx, command, {
+		objectType: POLICY,
+		statusField: 'status',
+		machine: 'AssurancePolicy.status',
+		target: 'SUPERSEDED',
+		eventType: 'AssurancePolicySuperseded',
+		guard: rejectIfFloorLocked(command),
+		mutate: p.supersededByPolicyId
+			? (base) => ({
+					...base,
+					tags: [
+						...(Array.isArray(base.tags) ? (base.tags as unknown[]) : []),
+						`superseded-by:${p.supersededByPolicyId}`
+					]
+				})
+			: undefined
+	});
+};
+
+/** SuspendAssurancePolicy — temporarily disable a policy (ACTIVE -> SUSPENDED). Floor policies reject. */
+export const suspendAssurancePolicy: CommandHandler = (ctx, command) =>
+	advanceStatus(ctx, command, {
+		objectType: POLICY,
+		statusField: 'status',
+		machine: 'AssurancePolicy.status',
+		target: 'SUSPENDED',
+		eventType: 'AssurancePolicySuspended',
+		guard: rejectIfFloorLocked(command)
+	});
+
+/** ActivateAssurancePolicy — put a policy into force (DRAFT|SUSPENDED -> ACTIVE). */
+export const activateAssurancePolicy: CommandHandler = (ctx, command) =>
+	advanceStatus(ctx, command, {
+		objectType: POLICY,
+		statusField: 'status',
+		machine: 'AssurancePolicy.status',
+		target: 'ACTIVE',
+		eventType: 'AssurancePolicyActivated',
+		guard: rejectIfFloorLocked(command)
+	});
 
 // ---- Evidence ----
 const EVIDENCE = 'EVIDENCE';

@@ -50,6 +50,8 @@ describe('validate', () => {
 		// the canonical de minimis assurance floor (recorded ASSURANCE_ASSESSMENT/OBSERVATION); see OPEN-QUESTIONS)
 		// then +1 CardinalityCode enum — per-child composition cardinality (M1/M+/C1/C+) for the PWA Work
 		// Architecture View (§11.7.2); the PermittedChildRule helper is a sub-type, not a registry entry.
-		expect(buildContractRegistry().ids()).toHaveLength(284);
+		// then +4 assurance-policy lifecycle commands (Edit/Supersede/Suspend/Activate AssurancePolicy) +4 events —
+		// full authorable policy lifecycle for the PWA Designer's policy manager (§8.9/§17; floor policies locked).
+		expect(buildContractRegistry().ids()).toHaveLength(292);
 	});
 });

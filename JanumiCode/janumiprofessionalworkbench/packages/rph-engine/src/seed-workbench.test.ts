@@ -52,19 +52,31 @@ describe('seedWorkbench (live PWA + Undertaking + graph)', () => {
 		expect(pwus.every((p) => p.state.undertakingId === SEED_UNDERTAKING)).toBe(true);
 	});
 
-	it('seeds the 3 de minimis floor policies as canonical ASSURANCE_POLICY objects', () => {
+	it('seeds the policy library: 3 locked de minimis floor policies + the additive policies as ASSURANCE_POLICY objects', () => {
 		const engine = build();
 		const policies = listByType(engine, 'ASSURANCE_POLICY');
-		expect(policies).toHaveLength(3);
-		expect(policies.map((p) => p.id).sort()).toEqual([
+		// 3 floor (locked) + 6 additive (Product Realization) = the full workbench policy library.
+		expect(policies).toHaveLength(9);
+		const ids = policies.map((p) => p.id).sort();
+		expect(ids).toEqual([
 			'floor.identity-provenance',
 			'floor.reasoning-review',
-			'floor.schema-invariant'
+			'floor.schema-invariant',
+			'pol_architecture_coverage',
+			'pol_assumption_disclosure',
+			'pol_decomposition_coverage',
+			'pol_intent_completeness',
+			'pol_intent_fidelity',
+			'pol_intent_preservation'
 		]);
 		const rr = policies.find((p) => p.id === 'floor.reasoning-review')!;
 		expect(rr.state.status).toBe('ACTIVE');
 		expect(rr.state.independenceRequirement).toBe('DIFFERENT_MODEL');
 		expect(rr.state.criteria as unknown[]).toHaveLength(9);
+		// Additive policies are also ACTIVE, versioned objects (engine-backed, not a static UI catalog).
+		const intentPreservation = policies.find((p) => p.id === 'pol_intent_preservation')!;
+		expect(intentPreservation.state.status).toBe('ACTIVE');
+		expect(intentPreservation.state.version).toBe('1.0.0');
 	});
 
 	it('drives the Undertaking to a graph that upholds INV-5', () => {

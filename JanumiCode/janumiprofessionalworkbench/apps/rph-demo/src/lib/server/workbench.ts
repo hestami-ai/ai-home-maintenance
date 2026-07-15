@@ -12,6 +12,7 @@ import {
 	getConversation,
 	getObject,
 	listPwuTypes,
+	seedPolicyLibrary,
 	seedWorkbench,
 	type EngineHandle
 } from '@janumipwb/rph-engine';
@@ -82,7 +83,10 @@ export function resetEngine(seed: 'reference' | 'empty'): void {
 	clockTick = 0;
 	undertakingIntent.clear();
 	handle = newEngine();
+	// Always seed the policy library (floor + additive) so the policy manager + picker are populated even in the
+	// authoring-from-scratch ('empty') flow; 'reference' additionally authors the published Product Realization PWA.
 	if (seed === 'reference') seedWorkbench(handle);
+	else seedPolicyLibrary(handle);
 }
 
 /** Dispatch a command into the shared engine with sensible envelope defaults. Returns the CommandResult. */

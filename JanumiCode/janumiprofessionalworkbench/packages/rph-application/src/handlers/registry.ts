@@ -39,14 +39,18 @@ import {
 } from './runtime-binding.js';
 import {
 	admitEvidence,
+	activateAssurancePolicy,
 	assertClaim,
 	completeAssuranceAssessment,
 	detectAssumption,
 	createAssurancePolicy,
+	editAssurancePolicy,
 	invalidateEvidence,
 	proposeEvidence,
 	recordAssuranceObservation,
-	requestAssuranceAssessment
+	requestAssuranceAssessment,
+	supersedeAssurancePolicy,
+	suspendAssurancePolicy
 } from './assurance.js';
 import {
 	approveBaseline,
@@ -122,6 +126,10 @@ export const HANDLERS: Readonly<Record<string, CommandHandler>> = {
 	AssertClaim: assertClaim,
 	DetectAssumption: detectAssumption,
 	CreateAssurancePolicy: createAssurancePolicy,
+	EditAssurancePolicy: editAssurancePolicy,
+	SupersedeAssurancePolicy: supersedeAssurancePolicy,
+	SuspendAssurancePolicy: suspendAssurancePolicy,
+	ActivateAssurancePolicy: activateAssurancePolicy,
 	RequestAssuranceAssessment: requestAssuranceAssessment,
 	CompleteAssuranceAssessment: completeAssuranceAssessment,
 	RecordAssuranceObservation: recordAssuranceObservation,
