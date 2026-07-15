@@ -1,5 +1,6 @@
 import { test, expect } from '@playwright/test';
 import { resetEngine, introspect, gotoHydrated } from './support/harness';
+import { shot } from './support/gallery';
 
 // §11.7.2 / §11.7.4 — authoring per-child cardinality (M1/M+/C1/C+) and declared assurance policies through the
 // inspector form, then seeing them render: a cardinality badge on each permitted child + the assurance rail (locked
@@ -58,5 +59,8 @@ test.describe('PWA Designer — cardinality + assurance rail', () => {
 		await expect(inspector.locator('.cardbadge', { hasText: 'M+' })).toBeVisible();
 		await expect(inspector.getByText('de minimis floor')).toBeVisible();
 		await expect(inspector.getByText('+ Intent Preservation')).toBeVisible();
+
+		// Review gallery: the composition tree (cardinality on each card) + the §11.7.4 rail in the inspector.
+		await shot(page, 'composition tree with cardinality + assurance rail');
 	});
 });
