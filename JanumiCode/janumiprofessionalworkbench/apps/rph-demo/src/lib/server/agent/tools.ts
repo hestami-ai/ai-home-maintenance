@@ -5,13 +5,20 @@
 // explain the fields identically. The Pi adapter and the mock both consume these descriptors unchanged.
 import {
 	lintComposition,
+	type CardinalityCode,
 	type PwaAuthoringBroker,
 	type ProposalResult
 } from '@janumipwb/rph-authoring';
 import type { AuthoringToolDescriptor, ToolRunResult } from './types.js';
 
+const CARDINALITY_CODES: readonly CardinalityCode[] = ['M1', 'M+', 'C1', 'C+'];
+
 function str(v: unknown): string {
 	return typeof v === 'string' ? v : '';
+}
+/** Coerce an agent-supplied cardinality string to a valid code, defaulting anything else to M1 (mandatory-one). */
+function asCardinality(v: unknown): CardinalityCode {
+	return CARDINALITY_CODES.includes(v as CardinalityCode) ? (v as CardinalityCode) : 'M1';
 }
 function bool(v: unknown): boolean {
 	return v === true || v === 'true';
@@ -139,10 +146,36 @@ export function buildAuthoringTools(broker: PwaAuthoringBroker): AuthoringToolDe
 						completionRule: { type: 'string', description: help.completionRule },
 						requiredInputs: { type: 'string[]', description: help.requiredInputs },
 						requiredOutputs: { type: 'string[]', description: help.requiredOutputs },
+						requiredAssurancePolicyIds: {
+							type: 'string[]',
+							description: help.requiredAssurancePolicyIds
+						},
 						childTempKeys: {
 							type: 'string[]',
 							description:
 								'tempKeys of other types in THIS batch that this type permits as children (composition edges).'
+						},
+						childCardinalities: {
+							type: 'object[]',
+							description:
+								'Optional per-child cardinality for childTempKeys. Children with no entry default to M1.',
+							items: {
+								tempKey: {
+									type: 'string',
+									required: true,
+									description: 'A tempKey that also appears in childTempKeys.'
+								},
+								cardinality: {
+									type: 'string',
+									required: true,
+									description:
+										'M1 mandatory-exactly-one, M+ mandatory-one-or-more, C1 conditional-zero-or-one, C+ conditional-zero-or-more.'
+								},
+								applicabilityNote: {
+									type: 'string',
+									description: 'For conditional (C*) children: free-text WHEN this child applies.'
+								}
+							}
 						}
 					}
 				}
@@ -159,7 +192,15 @@ export function buildAuthoringTools(broker: PwaAuthoringBroker): AuthoringToolDe
 					completionRule: str(o.completionRule) || undefined,
 					requiredInputs: strArr(o.requiredInputs),
 					requiredOutputs: strArr(o.requiredOutputs),
-					childTempKeys: strArr(o.childTempKeys)
+					requiredAssurancePolicyIds: strArr(o.requiredAssurancePolicyIds),
+					childTempKeys: strArr(o.childTempKeys),
+					childCardinalities: Array.isArray(o.childCardinalities)
+						? (o.childCardinalities as Record<string, unknown>[]).map((c) => ({
+								tempKey: str(c.tempKey),
+								cardinality: asCardinality(c.cardinality),
+								applicabilityNote: str(c.applicabilityNote) || undefined
+							}))
+						: undefined
 				}));
 				return fromProposal(
 					broker.scaffold(specs),
@@ -196,7 +237,11 @@ export function buildAuthoringTools(broker: PwaAuthoringBroker): AuthoringToolDe
 				isRoot: { type: 'boolean', description: help.isRoot },
 				completionRule: { type: 'string', description: help.completionRule },
 				requiredInputs: { type: 'string[]', description: help.requiredInputs },
-				requiredOutputs: { type: 'string[]', description: help.requiredOutputs }
+				requiredOutputs: { type: 'string[]', description: help.requiredOutputs },
+				requiredAssurancePolicyIds: {
+					type: 'string[]',
+					description: help.requiredAssurancePolicyIds
+				}
 			},
 			mutates: true,
 			run: (a) => {
@@ -207,7 +252,8 @@ export function buildAuthoringTools(broker: PwaAuthoringBroker): AuthoringToolDe
 					isRoot: bool(a.isRoot),
 					completionRule: str(a.completionRule) || undefined,
 					requiredInputs: strArr(a.requiredInputs),
-					requiredOutputs: strArr(a.requiredOutputs)
+					requiredOutputs: strArr(a.requiredOutputs),
+					requiredAssurancePolicyIds: strArr(a.requiredAssurancePolicyIds)
 				});
 				return fromProposal(r, `Defined PWU Type "${str(a.name)}" as ${r.id}.`);
 			}
@@ -250,7 +296,11 @@ export function buildAuthoringTools(broker: PwaAuthoringBroker): AuthoringToolDe
 				isRoot: { type: 'boolean', description: help.isRoot },
 				completionRule: { type: 'string', description: help.completionRule },
 				requiredInputs: { type: 'string[]', description: help.requiredInputs },
-				requiredOutputs: { type: 'string[]', description: help.requiredOutputs }
+				requiredOutputs: { type: 'string[]', description: help.requiredOutputs },
+				requiredAssurancePolicyIds: {
+					type: 'string[]',
+					description: help.requiredAssurancePolicyIds
+				}
 			},
 			mutates: true,
 			run: (a) => {
@@ -262,6 +312,8 @@ export function buildAuthoringTools(broker: PwaAuthoringBroker): AuthoringToolDe
 				if ('completionRule' in a) patch.completionRule = str(a.completionRule);
 				if ('requiredInputs' in a) patch.requiredInputs = strArr(a.requiredInputs);
 				if ('requiredOutputs' in a) patch.requiredOutputs = strArr(a.requiredOutputs);
+				if ('requiredAssurancePolicyIds' in a)
+					patch.requiredAssurancePolicyIds = strArr(a.requiredAssurancePolicyIds);
 				return fromProposal(
 					broker.editType(str(a.pwuTypeId), patch),
 					`Edited ${str(a.pwuTypeId)}.`

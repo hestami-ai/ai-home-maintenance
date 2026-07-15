@@ -13,6 +13,10 @@ import type {
 	DomainCommand,
 	PermittedChildRule
 } from '@janumipwb/rph-contracts';
+
+// Re-export the PWU-Type authoring value types so every authoring surface (the agent tools, the UI) can name them
+// via @janumipwb/rph-authoring without reaching into the contracts package directly.
+export type { CardinalityCode, PermittedChildRule } from '@janumipwb/rph-contracts';
 import { getObject, listPwuTypes, type EngineHandle } from '@janumipwb/rph-engine';
 import {
 	catalogTemplate,
