@@ -22,12 +22,12 @@ export const load: PageServerLoad = ({ params }) => {
 	const engine = getEngine();
 	const u = getObject(engine, params.id);
 	if (!u) throw error(404, 'Undertaking not found');
-	const pwa = getObject(engine, String(u.pwaId));
+	const pwa = getObject(engine, String(u.pwaId as string));
 	// The bound PWA's PWU Types are the instantiable options (§14 / §28: an instance realizes a type).
-	const pwuTypeOptions = listPwuTypes(engine, String(u.pwaId)).map((t) => ({
+	const pwuTypeOptions = listPwuTypes(engine, String(u.pwaId as string)).map((t) => ({
 		id: t.id,
-		name: String(t.state.name ?? t.id),
-		pwuKind: String(t.state.pwuKind ?? '')
+		name: String((t.state.name ?? t.id) as string),
+		pwuKind: String((t.state.pwuKind ?? '') as string)
 	}));
 
 	const graph = professionalWorkGraph(engine, {
@@ -38,67 +38,71 @@ export const load: PageServerLoad = ({ params }) => {
 	const pwus = listPwus(engine, params.id);
 	const rollup: Record<string, number> = {};
 	for (const p of pwus) {
-		const s = String(p.state.workLifecycleState ?? 'PROPOSED');
+		const s = String((p.state.workLifecycleState ?? 'PROPOSED') as string);
 		rollup[s] = (rollup[s] ?? 0) + 1;
 	}
 	// Instance -> Type navigation (§14 / §28): each PWU Instance links to its PWU Type definition (in its PWA).
 	const pwuList = pwus.map((p) => {
-		const typeId = p.state.pwuTypeId ? String(p.state.pwuTypeId) : '';
+		const typeId = p.state.pwuTypeId ? String(p.state.pwuTypeId as string) : '';
 		const type = typeId ? getObject(engine, typeId) : undefined;
+		let typeName: string;
+		if (type) {
+			typeName = String((type.name ?? typeId) as string);
+		} else if (p.state.isLocalExtension) {
+			typeName = 'Undertaking-local extension';
+		} else {
+			typeName = '—';
+		}
 		return {
 			id: p.id,
-			title: String(p.state.title ?? p.id),
-			workLifecycleState: String(p.state.workLifecycleState ?? ''),
-			executionState: String(p.state.executionState ?? ''),
-			assuranceState: String(p.state.assuranceState ?? ''),
-			typeName: type
-				? String(type.name ?? typeId)
-				: p.state.isLocalExtension
-					? 'Undertaking-local extension'
-					: '—',
-			typePwaId: type ? String(type.pwaId ?? '') : ''
+			title: String((p.state.title ?? p.id) as string),
+			workLifecycleState: String((p.state.workLifecycleState ?? '') as string),
+			executionState: String((p.state.executionState ?? '') as string),
+			assuranceState: String((p.state.assuranceState ?? '') as string),
+			typeName,
+			typePwaId: type ? String((type.pwaId ?? '') as string) : ''
 		};
 	});
 
 	const assessments = listAssessments(engine).map((a) => ({
 		id: a.id,
-		policy: String(a.state.assurancePolicyId ?? ''),
-		state: String(a.state.assessmentState ?? '')
+		policy: String((a.state.assurancePolicyId ?? '') as string),
+		state: String((a.state.assessmentState ?? '') as string)
 	}));
 	const observations = listObservations(engine).map((o) => ({
 		id: o.id,
-		severity: String(o.state.severity ?? ''),
-		statement: String(o.state.statement ?? ''),
-		disposition: String(o.state.disposition ?? '')
+		severity: String((o.state.severity ?? '') as string),
+		statement: String((o.state.statement ?? '') as string),
+		disposition: String((o.state.disposition ?? '') as string)
 	}));
 	const decisions = listDecisions(engine).map((dc) => ({
 		id: dc.id,
-		type: String(dc.state.decisionType ?? ''),
-		status: String(dc.state.status ?? ''),
-		rationale: String(dc.state.rationale ?? '')
+		type: String((dc.state.decisionType ?? '') as string),
+		status: String((dc.state.status ?? '') as string),
+		rationale: String((dc.state.rationale ?? '') as string)
 	}));
 	const baselines = listBaselines(engine).map((b) => ({
 		id: b.id,
-		type: String(b.state.baselineType ?? ''),
-		status: String(b.state.status ?? ''),
+		type: String((b.state.baselineType ?? '') as string),
+		status: String((b.state.status ?? '') as string),
 		items: Array.isArray(b.state.itemObjectVersions) ? b.state.itemObjectVersions.length : 0
 	}));
 	const plans = listExecutionPlans(engine).map((pl) => ({
 		id: pl.id,
-		workUnitId: String(pl.state.workUnitId ?? ''),
-		status: String(pl.state.status ?? ''),
+		workUnitId: String((pl.state.workUnitId ?? '') as string),
+		status: String((pl.state.status ?? '') as string),
 		steps: Array.isArray(pl.state.steps) ? pl.state.steps.length : 0
 	}));
 
 	return {
 		undertaking: {
 			id: params.id,
-			name: String(u.name ?? params.id),
-			objective: String(u.objective ?? ''),
-			intendedOutputProduct: String(u.intendedOutputProduct ?? ''),
-			status: String(u.status ?? ''),
-			pwaName: String(pwa?.name ?? u.pwaId ?? ''),
-			pwaVersion: String(u.pwaVersion ?? '')
+			name: String((u.name ?? params.id) as string),
+			objective: String((u.objective ?? '') as string),
+			intendedOutputProduct: String((u.intendedOutputProduct ?? '') as string),
+			status: String((u.status ?? '') as string),
+			pwaName: String((pwa?.name ?? u.pwaId ?? '') as string),
+			pwaVersion: String((u.pwaVersion ?? '') as string)
 		},
 		graph,
 		rollup,
@@ -119,7 +123,7 @@ function resolveIntentId(
 	undertakingId: string
 ): string | undefined {
 	const pwus = listPwus(engine, undertakingId);
-	if (pwus.length) return String(pwus[0].state.intentId);
+	if (pwus.length) return String(pwus[0].state.intentId as string);
 	return getRegisteredIntent(undertakingId);
 }
 
@@ -161,7 +165,7 @@ function runSteps(steps: Step[]): string | null {
 }
 
 async function pwuIdFrom(request: Request): Promise<string> {
-	return String((await request.formData()).get('pwuId') ?? '');
+	return String(((await request.formData()).get('pwuId') ?? '') as string);
 }
 
 export const actions: Actions = {
@@ -169,8 +173,8 @@ export const actions: Actions = {
 	proposePwu: async ({ request, params }) => {
 		const engine = getEngine();
 		const form = await request.formData();
-		const pwuTypeId = String(form.get('pwuTypeId') ?? '').trim();
-		const title = String(form.get('title') ?? '').trim();
+		const pwuTypeId = String((form.get('pwuTypeId') ?? '') as string).trim();
+		const title = String((form.get('title') ?? '') as string).trim();
 		if (!pwuTypeId) return fail(400, { error: 'Select a PWU Type to instantiate.' });
 		const type = getObject(engine, pwuTypeId);
 		if (!type) return fail(400, { error: 'Unknown PWU Type.' });
@@ -180,9 +184,9 @@ export const actions: Actions = {
 		const pwuId = mintUiId('pwu');
 		const r = dispatch('ProposePwu', 'PROFESSIONAL_WORK_UNIT', pwuId, {
 			pwuId,
-			pwuKind: String(type.pwuKind ?? 'PWU'),
-			title: title || String(type.name ?? 'PWU'),
-			description: title || String(type.name ?? ''),
+			pwuKind: String((type.pwuKind ?? 'PWU') as string),
+			title: title || String((type.name ?? 'PWU') as string),
+			description: title || String((type.name ?? '') as string),
 			intentId,
 			undertakingId: params.id,
 			isLocalExtension: false,

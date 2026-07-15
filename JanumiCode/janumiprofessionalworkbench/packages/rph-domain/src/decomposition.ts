@@ -547,6 +547,9 @@ export function validateDecomposition(
 		});
 
 	const hasBlocking = findings.some((f) => f.severity === 'BLOCKING');
-	const status = hasBlocking ? 'INVALID' : findings.length > 0 ? 'CONDITIONALLY_VALID' : 'VALID';
+	let status: DecompositionValidation['status'];
+	if (hasBlocking) status = 'INVALID';
+	else if (findings.length > 0) status = 'CONDITIONALLY_VALID';
+	else status = 'VALID';
 	return { status, findings, permitsParentPlanned: status !== 'INVALID' };
 }

@@ -76,7 +76,7 @@ async function resolveModel(modelRegistry: ModelRegistry, settingsManager: Setti
 			if (r.model) return r.model;
 		}
 	}
-	const available = await modelRegistry.getAvailable();
+	const available = modelRegistry.getAvailable();
 	if (available[0]) return available[0];
 	throw new Error(
 		'No Pi model available. Configure a model in Pi (run `pi` and log in, or the TUI), or set JPWB_AGENT_MODEL to a provider/id.'

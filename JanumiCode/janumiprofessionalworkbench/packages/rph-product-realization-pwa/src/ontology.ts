@@ -33,7 +33,7 @@ export interface ConformanceProfile {
 	readonly mandatoryPolicyIds?: readonly string[];
 }
 
-export const ontology = PRODUCT_REALIZATION_PWA_ONTOLOGY;
+export { PRODUCT_REALIZATION_PWA_ONTOLOGY as ontology } from './ontology.data.js';
 export const ontologyVersion: string = PRODUCT_REALIZATION_PWA_ONTOLOGY.version;
 
 export const pwuTemplates = PRODUCT_REALIZATION_PWA_ONTOLOGY.pwuTemplates as readonly PwuTemplate[];

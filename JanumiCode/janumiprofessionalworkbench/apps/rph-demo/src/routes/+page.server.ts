@@ -8,11 +8,11 @@ export const load: PageServerLoad = () => {
 	const engine = getEngine();
 	const pwas = listPwas(engine).map((p) => ({
 		id: p.id,
-		name: String(p.state.name ?? p.id),
-		description: String(p.state.description ?? ''),
-		domain: String(p.state.domain ?? ''),
-		version: String(p.state.version ?? ''),
-		publicationStatus: String(p.state.publicationStatus ?? 'DRAFT'),
+		name: String((p.state.name ?? p.id) as string),
+		description: String((p.state.description ?? '') as string),
+		domain: String((p.state.domain ?? '') as string),
+		version: String((p.state.version ?? '') as string),
+		publicationStatus: String((p.state.publicationStatus ?? 'DRAFT') as string),
 		typeCount: listPwuTypes(engine, p.id).length,
 		policyCount: Array.isArray(p.state.assurancePolicyIds) ? p.state.assurancePolicyIds.length : 0
 	}));
@@ -22,8 +22,8 @@ export const load: PageServerLoad = () => {
 export const actions: Actions = {
 	create: async ({ request }) => {
 		const form = await request.formData();
-		const name = String(form.get('name') ?? '').trim();
-		const domain = String(form.get('domain') ?? '').trim();
+		const name = String((form.get('name') ?? '') as string).trim();
+		const domain = String((form.get('domain') ?? '') as string).trim();
 		if (!name) return fail(400, { error: 'A PWA name is required.' });
 		const id = mintUiId('pwa');
 		const r = dispatch('CreatePwa', 'PROFESSIONAL_WORK_ARCHITECTURE', id, {
@@ -40,7 +40,7 @@ export const actions: Actions = {
 	// Delete (discard) a PWA. The engine rejects deletion of a PWA that is in use (has Undertakings) — that
 	// rejection is surfaced to the card. A published-but-unused PWA can still be deleted (the UI warns first).
 	delete: async ({ request }) => {
-		const pwaId = String((await request.formData()).get('pwaId') ?? '').trim();
+		const pwaId = String(((await request.formData()).get('pwaId') ?? '') as string).trim();
 		if (!pwaId) return fail(400, { error: 'Missing PWA.' });
 		const r = dispatch('DeletePwa', 'PROFESSIONAL_WORK_ARCHITECTURE', pwaId, { pwaId });
 		if (r.status !== 'ACCEPTED')

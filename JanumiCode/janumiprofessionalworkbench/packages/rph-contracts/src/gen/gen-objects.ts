@@ -85,7 +85,7 @@ function zodExpr(type: string | undefined, enumRef?: string): string {
 	let expr: string;
 	// Inline string-literal union, e.g. "'A' | 'B' | 'C'" -> z.enum(['A','B','C']). Lets a tightened helper
 	// pin a small closed value set without minting a named enum in the canonical vocabulary.
-	const literalUnion = t.match(/^'[^']*'(\s*\|\s*'[^']*')*$/);
+	const literalUnion = /^'[^']*'(\s*\|\s*'[^']*')*$/.exec(t);
 	if (literalUnion) {
 		const values = [...t.matchAll(/'([^']*)'/g)].map((m) => JSON.stringify(m[1]));
 		expr = `z.enum([${values.join(', ')}])`;
@@ -122,24 +122,25 @@ const fullHelpers = spec.helperSubTypes
 const body: string[] = [];
 
 body.push(
-	'// ---- Helper sub-types the specs reference but never fully define. Permissive structured'
-);
-body.push(
+	'// ---- Helper sub-types the specs reference but never fully define. Permissive structured',
 	'// placeholders (any object) — tightened in the milestone that defines them (M7/M9/M11). ----'
 );
 for (const h of placeholders.sort((a, b) => a.name.localeCompare(b.name))) {
-	body.push(`export const ${h.name}Schema = z.record(z.string(), z.unknown());`);
-	body.push(`export type ${h.name} = z.infer<typeof ${h.name}Schema>;`);
+	body.push(
+		`export const ${h.name}Schema = z.record(z.string(), z.unknown());`,
+		`export type ${h.name} = z.infer<typeof ${h.name}Schema>;`
+	);
 }
-body.push('');
-body.push('// ---- Well-specified helper sub-types. ----');
+body.push('', '// ---- Well-specified helper sub-types. ----');
 for (const h of fullHelpers.sort((a, b) => a.name.localeCompare(b.name))) {
 	const lines = h.fields.map(fieldLine).join(',\n');
-	body.push(`export const ${h.name}Schema = z.strictObject({\n${lines}\n});`);
-	body.push(`export type ${h.name} = z.infer<typeof ${h.name}Schema>;`);
+	body.push(
+		`export const ${h.name}Schema = z.strictObject({\n${lines}\n});`,
+		`export type ${h.name} = z.infer<typeof ${h.name}Schema>;`
+	);
 }
-body.push('');
 body.push(
+	'',
 	'// ---- The 17 Professional Work Object schemas (each composes objectEnvelopeShape). ----'
 );
 for (const o of spec.objects) {
@@ -147,13 +148,17 @@ for (const o of spec.objects) {
 	const shape = o.fields.length
 		? `z.strictObject({\n\t...objectEnvelopeShape,\n${fields}\n})`
 		: 'z.strictObject({ ...objectEnvelopeShape })';
-	body.push(`/** ${o.objectType} — id prefix: ${o.idPrefixEntity ?? '?'} */`);
-	body.push(`export const ${o.tsName}Schema = ${shape};`);
-	body.push(`export type ${o.tsName} = z.infer<typeof ${o.tsName}Schema>;`);
-	body.push('');
+	body.push(
+		`/** ${o.objectType} — id prefix: ${o.idPrefixEntity ?? '?'} */`,
+		`export const ${o.tsName}Schema = ${shape};`,
+		`export type ${o.tsName} = z.infer<typeof ${o.tsName}Schema>;`,
+		''
+	);
 }
-body.push('/** Registry: objectType literal -> { schema, idPrefixEntity, tsName }. */');
-body.push('export const OBJECT_SCHEMAS = {');
+body.push(
+	'/** Registry: objectType literal -> { schema, idPrefixEntity, tsName }. */',
+	'export const OBJECT_SCHEMAS = {'
+);
 for (const o of spec.objects) {
 	body.push(
 		`\t${JSON.stringify(o.objectType)}: { schema: ${o.tsName}Schema, idPrefixEntity: ${JSON.stringify(o.idPrefixEntity ?? o.objectType)}, tsName: ${JSON.stringify(o.tsName)} },`
@@ -162,14 +167,14 @@ for (const o of spec.objects) {
 body.push('} as const;');
 
 const enumImport = [...usedEnums]
-	.sort()
+	.sort((a, b) => Number(a > b) - Number(a < b))
 	.map((e) => `${e}Schema`)
 	.join(', ');
 const header = [
 	'// GENERATED FILE — do not edit by hand. Regenerate with `bun run gen:objects`.',
 	'// Source: vocab/m1-object-fields.json (grounded from DOC-002/007). See gen/gen-objects.ts.',
 	"import { z } from 'zod';",
-	`import { ${['objectEnvelopeShape', ...[...usedExternal].sort()].join(', ')} } from './envelopes.js';`,
+	`import { ${['objectEnvelopeShape', ...[...usedExternal].sort((a, b) => Number(a > b) - Number(a < b))].join(', ')} } from './envelopes.js';`,
 	`import { ${enumImport} } from './enums.js';`,
 	''
 ];

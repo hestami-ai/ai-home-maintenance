@@ -146,7 +146,7 @@ export const PROPERTY_COVERAGE: Readonly<Record<string, string>> = {
 
 /** The rule-id prefix, e.g. "RPH-DEC-003" -> "RPH-DEC", "RPH-E2E-001" -> "RPH-E2E" (prefix may contain a digit). */
 export function prefixOf(ruleId: string): string {
-	const m = ruleId.match(/^(RPH-[A-Z0-9]+)-\d+$/);
+	const m = /^(RPH-[A-Z0-9]+)-\d+$/.exec(ruleId);
 	return m ? m[1]! : ruleId;
 }
 
@@ -165,7 +165,7 @@ export function citedConcreteTestFiles(): string[] {
 	const files = new Set<string>();
 	for (const f of Object.values(COVERED_BY_ID)) files.add(f);
 	for (const c of Object.values(COVERAGE_BY_PREFIX))
-		if (c.testFile && /\.test\.ts$/.test(c.testFile) && !/[*{}]/.test(c.testFile))
+		if (c.testFile && c.testFile.endsWith('.test.ts') && !/[*{}]/.test(c.testFile))
 			files.add(c.testFile);
 	return [...files];
 }

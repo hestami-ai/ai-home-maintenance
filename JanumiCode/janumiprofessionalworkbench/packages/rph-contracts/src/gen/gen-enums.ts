@@ -69,23 +69,25 @@ const lines: string[] = [
 for (const e of enums) {
 	const id = identifier(e.name);
 	const values = e.values.map((v) => JSON.stringify(v)).join(', ');
-	const doc = `${e.appliesTo ?? e.name}${e.canonicalSource ? ` — ${e.canonicalSource}` : ''}`;
-	lines.push(`/** ${doc} */`);
-	lines.push(`export const ${id}Schema = z.enum([${values}]);`);
-	lines.push(`export type ${id} = z.infer<typeof ${id}Schema>;`);
-	lines.push('');
+	const sourceSuffix = e.canonicalSource ? ` — ${e.canonicalSource}` : '';
+	const doc = `${e.appliesTo ?? e.name}${sourceSuffix}`;
+	lines.push(
+		`/** ${doc} */`,
+		`export const ${id}Schema = z.enum([${values}]);`,
+		`export type ${id} = z.infer<typeof ${id}Schema>;`,
+		''
+	);
 }
 
 lines.push(
-	'/** Registry of every canonical enum schema, for introspection, JSON-Schema emission, and fidelity tests. */'
+	'/** Registry of every canonical enum schema, for introspection, JSON-Schema emission, and fidelity tests. */',
+	'export const CANONICAL_ENUM_SCHEMAS = {'
 );
-lines.push('export const CANONICAL_ENUM_SCHEMAS = {');
 for (const e of enums) {
 	const id = identifier(e.name);
 	lines.push(`\t'${e.name}': ${id}Schema,`);
 }
-lines.push('} as const;');
-lines.push('');
+lines.push('} as const;', '');
 
 writeFileSync(OUT_PATH, lines.join('\n'));
 console.log(`generated ${OUT_PATH} with ${enums.length} enums`);

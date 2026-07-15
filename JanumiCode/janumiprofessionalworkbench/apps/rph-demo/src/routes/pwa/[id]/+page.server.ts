@@ -47,16 +47,16 @@ export const load: PageServerLoad = ({ params }) => {
 		.filter((u) => u.state.pwaId === params.id)
 		.map((u) => ({
 			id: u.id,
-			name: String(u.state.name ?? u.id),
+			name: String((u.state.name ?? u.id) as string),
 			isReferenceFixture: u.id === SEED_UNDERTAKING
 		}));
 	const types = listPwuTypes(engine, params.id).map((t) => ({
 		id: t.id,
-		name: String(t.state.name ?? t.id),
-		pwuKind: String(t.state.pwuKind ?? ''),
-		purpose: String(t.state.purpose ?? ''),
+		name: String((t.state.name ?? t.id) as string),
+		pwuKind: String((t.state.pwuKind ?? '') as string),
+		purpose: String((t.state.purpose ?? '') as string),
 		isRoot: Boolean(t.state.isRoot),
-		completionRule: String(t.state.completionRule ?? ''),
+		completionRule: String((t.state.completionRule ?? '') as string),
 		permittedChildTypeIds: Array.isArray(t.state.permittedChildTypeIds)
 			? (t.state.permittedChildTypeIds as string[])
 			: [],
@@ -73,11 +73,11 @@ export const load: PageServerLoad = ({ params }) => {
 	return {
 		pwa: {
 			id: params.id,
-			name: String(pwa.name ?? params.id),
-			description: String(pwa.description ?? ''),
-			domain: String(pwa.domain ?? ''),
-			version: String(pwa.version ?? ''),
-			publicationStatus: String(pwa.publicationStatus ?? 'DRAFT')
+			name: String((pwa.name ?? params.id) as string),
+			description: String((pwa.description ?? '') as string),
+			domain: String((pwa.domain ?? '') as string),
+			version: String((pwa.version ?? '') as string),
+			publicationStatus: String((pwa.publicationStatus ?? 'DRAFT') as string)
 		},
 		types,
 		fixtures,
@@ -100,7 +100,7 @@ interface TypeFields {
 
 /** Split a comma/newline-separated artifact list from a form field into a clean string[]. */
 function csv(v: FormDataEntryValue | null): string[] {
-	return String(v ?? '')
+	return String((v ?? '') as string)
 		.split(/[\n,;]/)
 		.map((x) => x.trim())
 		.filter(Boolean);
@@ -109,18 +109,17 @@ function csv(v: FormDataEntryValue | null): string[] {
 /** Read the shared PWU-Type authoring fields from a form (used by both defineType and editType). */
 function readTypeFields(form: FormData): TypeFields {
 	return {
-		name: String(form.get('name') ?? '').trim(),
-		pwuKind: String(form.get('pwuKind') ?? '')
+		name: String((form.get('name') ?? '') as string).trim(),
+		pwuKind: String((form.get('pwuKind') ?? '') as string)
 			.trim()
 			.toUpperCase()
 			.replace(/[^A-Z0-9]+/g, '_')
-			.replace(/^_+|_+$/g, ''),
-		purpose: String(form.get('purpose') ?? '').trim(),
-		completionRule: String(form.get('completionRule') ?? '').trim(),
+			.replace(/^_|_$/g, ''),
+		purpose: String((form.get('purpose') ?? '') as string).trim(),
+		completionRule: String((form.get('completionRule') ?? '') as string).trim(),
 		isRoot: form.has('isRoot'),
-		permittedChildTypeIds: form
-			.getAll('permittedChildTypeIds')
-			.map((v) => String(v))
+		permittedChildTypeIds: (form.getAll('permittedChildTypeIds') as string[])
+			.map(String)
 			.filter(Boolean),
 		requiredInputs: csv(form.get('requiredInputs')),
 		requiredOutputs: csv(form.get('requiredOutputs'))
@@ -138,13 +137,13 @@ export const actions: Actions = {
 	// Edit the DRAFT PWA's own details (name/description/domain).
 	editDetails: async ({ request, params }) => {
 		const form = await request.formData();
-		const name = String(form.get('name') ?? '').trim();
+		const name = String((form.get('name') ?? '') as string).trim();
 		if (!name) return fail(400, { error: 'A PWA name is required.' });
 		const r = dispatch('EditPwa', 'PROFESSIONAL_WORK_ARCHITECTURE', params.id, {
 			pwaId: params.id,
 			name,
-			description: String(form.get('description') ?? '').trim(),
-			domain: String(form.get('domain') ?? '').trim()
+			description: String((form.get('description') ?? '') as string).trim(),
+			domain: String((form.get('domain') ?? '') as string).trim()
 		});
 		if (r.status !== 'ACCEPTED') return fail(400, { error: r.error?.message ?? r.status });
 		return { editedPwa: params.id };
@@ -175,7 +174,7 @@ export const actions: Actions = {
 	// Edit an existing PWU Type in place (DRAFT PWA only — the engine enforces this).
 	editType: async ({ request }) => {
 		const form = await request.formData();
-		const pwuTypeId = String(form.get('pwuTypeId') ?? '').trim();
+		const pwuTypeId = String((form.get('pwuTypeId') ?? '') as string).trim();
 		if (!pwuTypeId) return fail(400, { error: 'Missing PWU Type.' });
 		const f = readTypeFields(form);
 		if (!f.name || !f.pwuKind)
@@ -198,7 +197,7 @@ export const actions: Actions = {
 	// Remove a PWU Type (DRAFT only). Referential integrity + the DRAFT guard are enforced by the engine
 	// (RemovePwuType) — this just surfaces any rejection.
 	removeType: async ({ request }) => {
-		const pwuTypeId = String((await request.formData()).get('pwuTypeId') ?? '').trim();
+		const pwuTypeId = String(((await request.formData()).get('pwuTypeId') ?? '') as string).trim();
 		if (!pwuTypeId) return fail(400, { error: 'Missing PWU Type.' });
 		const r = dispatch('RemovePwuType', 'PWU_TYPE', pwuTypeId, { pwuTypeId });
 		if (r.status !== 'ACCEPTED') return fail(400, { error: r.error?.message ?? r.status });
@@ -220,7 +219,7 @@ export const actions: Actions = {
 	// Human-in-the-loop resolution: record + grant an auditable governance WAIVER over the de minimis assurance
 	// floor so a non-SATISFIED PWA can PUBLISH — the alternative to revising the graph and re-running the floor.
 	recordWaiver: async ({ request, params }) => {
-		const rationale = String((await request.formData()).get('rationale') ?? '').trim();
+		const rationale = String(((await request.formData()).get('rationale') ?? '') as string).trim();
 		if (!rationale) return fail(400, { error: 'A waiver rationale is required.' });
 		const waiverId = mintUiId('dec');
 		const req = dispatch('RequestWaiver', 'DECISION', waiverId, {

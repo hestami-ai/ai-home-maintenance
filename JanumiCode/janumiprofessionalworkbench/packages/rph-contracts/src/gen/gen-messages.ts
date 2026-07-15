@@ -119,52 +119,61 @@ const body: string[] = [];
 
 body.push('// ---- Command payload schemas ----');
 for (const c of spec.commands) {
-	body.push(`export const ${c.commandType}PayloadSchema = ${payloadLit(c.payloadFields)};`);
-	body.push(`export type ${c.commandType}Payload = z.infer<typeof ${c.commandType}PayloadSchema>;`);
+	body.push(
+		`export const ${c.commandType}PayloadSchema = ${payloadLit(c.payloadFields)};`,
+		`export type ${c.commandType}Payload = z.infer<typeof ${c.commandType}PayloadSchema>;`
+	);
 }
-body.push('');
-body.push('// ---- Event payload schemas ----');
+body.push('', '// ---- Event payload schemas ----');
 for (const e of spec.events) {
-	body.push(`export const ${e.eventType}PayloadSchema = ${payloadLit(e.payloadFields)};`);
-	body.push(`export type ${e.eventType}Payload = z.infer<typeof ${e.eventType}PayloadSchema>;`);
+	body.push(
+		`export const ${e.eventType}PayloadSchema = ${payloadLit(e.payloadFields)};`,
+		`export type ${e.eventType}Payload = z.infer<typeof ${e.eventType}PayloadSchema>;`
+	);
 }
 body.push('');
 const firstSlice = spec.firstSliceCommands ?? [];
-body.push(`export const FIRST_SLICE_COMMANDS = [${firstSlice.map(j).join(', ')}] as const;`);
-body.push('');
 body.push(
-	'/** Registry: commandType -> payload schema + target aggregate + emitted event + first-slice flag. */'
+	`export const FIRST_SLICE_COMMANDS = [${firstSlice.map(j).join(', ')}] as const;`,
+	'',
+	'/** Registry: commandType -> payload schema + target aggregate + emitted event + first-slice flag. */',
+	'export const COMMANDS = {'
 );
-body.push('export const COMMANDS = {');
 for (const c of spec.commands) {
 	body.push(
 		`\t${j(c.commandType)}: { payload: ${c.commandType}PayloadSchema, targetAggregateType: ${j(c.targetAggregateType ?? '')}, emitsEvent: ${j(c.emitsEvent ?? '')}, firstSlice: ${firstSlice.includes(c.commandType)} },`
 	);
 }
-body.push('} as const;');
-body.push('');
-body.push('/** Registry: eventType -> payload schema + aggregate type. */');
-body.push('export const EVENTS = {');
+body.push(
+	'} as const;',
+	'',
+	'/** Registry: eventType -> payload schema + aggregate type. */',
+	'export const EVENTS = {'
+);
 for (const e of spec.events) {
 	body.push(
 		`\t${j(e.eventType)}: { payload: ${e.eventType}PayloadSchema, aggregateType: ${j(e.aggregateType ?? '')} },`
 	);
 }
-body.push('} as const;');
-body.push('');
-body.push('export interface CommandEventBinding {');
-body.push('\treadonly commandType: string;');
-body.push('\treadonly eventType: string;');
-body.push('\treadonly machine?: string;');
-body.push('\treadonly from?: string;');
-body.push('\treadonly to?: string;');
-body.push('}');
+body.push(
+	'} as const;',
+	'',
+	'export interface CommandEventBinding {',
+	'\treadonly commandType: string;',
+	'\treadonly eventType: string;',
+	'\treadonly machine?: string;',
+	'\treadonly from?: string;',
+	'\treadonly to?: string;',
+	'}'
+);
 // A command is authoritative for WHICH event it emits (DOC-007). Align each binding's eventType to the
 // command's emitsEvent so the two never drift (e.g. MarkPwuReady -> PwuStateChanged, the event that carries
 // a payload schema; the semantic name PwuMarkedReady is a display alias — see OPEN-QUESTIONS).
 const emitsByCommand = new Map(spec.commands.map((c) => [c.commandType, c.emitsEvent ?? '']));
-body.push('/** The command -> event -> state-transition binding table. */');
-body.push('export const BINDINGS: readonly CommandEventBinding[] = [');
+body.push(
+	'/** The command -> event -> state-transition binding table. */',
+	'export const BINDINGS: readonly CommandEventBinding[] = ['
+);
 for (const b of spec.bindings) {
 	const eventType = emitsByCommand.get(b.commandType) || b.eventType;
 	body.push(
@@ -174,7 +183,9 @@ for (const b of spec.bindings) {
 body.push('];');
 
 const importLine = (names: Set<string>, mod: string) =>
-	names.size ? `import { ${[...names].sort().join(', ')} } from '${mod}';` : '';
+	names.size
+		? `import { ${[...names].sort((a, b) => Number(a > b) - Number(a < b)).join(', ')} } from '${mod}';`
+		: '';
 
 const header = [
 	'// GENERATED FILE — do not edit by hand. Regenerate with `bun run gen:messages`.',

@@ -21,9 +21,9 @@ const BASELINE_TYPES = [
 export const load: PageServerLoad = () => {
 	const baselines = listBaselines(getEngine()).map((b) => ({
 		id: b.id,
-		type: String(b.state.baselineType ?? ''),
-		status: String(b.state.status ?? ''),
-		purpose: String(b.state.purpose ?? ''),
+		type: String((b.state.baselineType ?? '') as string),
+		status: String((b.state.status ?? '') as string),
+		purpose: String((b.state.purpose ?? '') as string),
 		items: Array.isArray(b.state.itemObjectVersions) ? b.state.itemObjectVersions.length : 0
 	}));
 	return { baselines };
@@ -34,7 +34,7 @@ export const actions: Actions = {
 	// candidate is valid and the starting point of the authoring lifecycle.
 	create: async ({ request }) => {
 		const form = await request.formData();
-		const baselineType = String(form.get('baselineType') ?? '');
+		const baselineType = String((form.get('baselineType') ?? '') as string);
 		if (!(BASELINE_TYPES as readonly string[]).includes(baselineType)) {
 			return fail(400, { error: 'Choose a baseline type.' });
 		}
@@ -51,7 +51,7 @@ export const actions: Actions = {
 	// CANDIDATE -> UNDER_REVIEW.
 	submit: async ({ request }) => {
 		const form = await request.formData();
-		const id = String(form.get('id') ?? '').trim();
+		const id = String((form.get('id') ?? '') as string).trim();
 		if (!id) return fail(400, { error: 'A baseline id is required.' });
 		const r = dispatch('SubmitBaselineForReview', 'BASELINE', id, {});
 		if (r.status !== 'ACCEPTED') return fail(400, { error: r.error?.message ?? r.status });
@@ -61,7 +61,7 @@ export const actions: Actions = {
 	// UNDER_REVIEW -> APPROVED.
 	approve: async ({ request }) => {
 		const form = await request.formData();
-		const id = String(form.get('id') ?? '').trim();
+		const id = String((form.get('id') ?? '') as string).trim();
 		if (!id) return fail(400, { error: 'A baseline id is required.' });
 		const r = dispatch('ApproveBaseline', 'BASELINE', id, {});
 		if (r.status !== 'ACCEPTED') return fail(400, { error: r.error?.message ?? r.status });

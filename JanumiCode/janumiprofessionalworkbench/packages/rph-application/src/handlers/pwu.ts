@@ -145,7 +145,7 @@ function advancePwuLifecycle(
 		return reject(
 			command,
 			'RPH_ILLEGAL_STATE_TRANSITION',
-			`Cannot advance PWU ${id} ${axes.workLifecycleState} -> ${args.target}${advance.reason ? `: ${advance.reason}` : ''}`
+			`Cannot advance PWU ${id} ${axes.workLifecycleState} -> ${args.target}${advance.reason ? ': ' + advance.reason : ''}`
 		);
 	}
 	const newRevision = loaded.revision + 1;
@@ -247,7 +247,7 @@ export const changePwuState: CommandHandler = (ctx, command, payload) => {
 			return reject(
 				command,
 				'RPH_ILLEGAL_STATE_TRANSITION',
-				`Cannot advance PWU ${id} ${current.workLifecycleState} -> ${p.newState}${advance.reason ? `: ${advance.reason}` : ''}`
+				`Cannot advance PWU ${id} ${current.workLifecycleState} -> ${p.newState}${advance.reason ? ': ' + advance.reason : ''}`
 			);
 		}
 	}

@@ -98,10 +98,11 @@ export function checkTransition(
 ): CommandResult | null {
 	const c = classifyTransition(machine, from, to);
 	if (c.klass === 'LEGAL' || c.klass === 'NOOP') return null;
+	const reasonSuffix = c.reason ? `: ${c.reason}` : '';
 	return reject(
 		command,
 		'RPH_ILLEGAL_STATE_TRANSITION',
-		`Illegal transition on ${machine}: ${from} -> ${to} (${c.klass}${c.reason ? `: ${c.reason}` : ''})`
+		`Illegal transition on ${machine}: ${from} -> ${to} (${c.klass}${reasonSuffix})`
 	);
 }
 

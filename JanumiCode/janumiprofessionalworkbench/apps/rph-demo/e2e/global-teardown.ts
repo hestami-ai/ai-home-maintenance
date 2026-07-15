@@ -37,7 +37,7 @@ export default function globalTeardown(): void {
 	for (const [testTitle, shots] of byTest) {
 		body += `<section><h2>${esc(testTitle)}</h2><div class="row">`;
 		for (const s of shots) {
-			const rel = s.file.replace(/\\/g, '/').replace(new RegExp(`^${GALLERY_ROOT}/`), '');
+			const rel = s.file.replaceAll('\\', '/').replace(new RegExp(`^${GALLERY_ROOT}/`), '');
 			body += `<figure><a href="${rel}" target="_blank"><img src="${rel}" loading="lazy"></a><figcaption>${s.seq}. ${esc(s.label)}</figcaption></figure>`;
 		}
 		body += `</div></section>`;

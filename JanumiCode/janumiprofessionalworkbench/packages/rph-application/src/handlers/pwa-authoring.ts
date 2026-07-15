@@ -336,7 +336,7 @@ function referencingSiblings(ctx: HandlerContext, pwaId: string, pwuTypeId: stri
 					permittedParentTypeIds?: string[];
 			  }
 			| undefined;
-		if (!s || s.pwaId !== pwaId || s.status === 'REMOVED') continue;
+		if (s?.pwaId !== pwaId || s.status === 'REMOVED') continue;
 		const children = Array.isArray(s.permittedChildTypeIds) ? s.permittedChildTypeIds : [];
 		const parents = Array.isArray(s.permittedParentTypeIds) ? s.permittedParentTypeIds : [];
 		if (children.includes(pwuTypeId) || parents.includes(pwuTypeId)) refs.push(sid);

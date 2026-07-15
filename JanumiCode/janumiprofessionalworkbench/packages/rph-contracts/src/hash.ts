@@ -58,8 +58,14 @@ function serialize(v: unknown): string {
 		}
 		const keys = Object.keys(obj)
 			.filter((k) => obj[k] !== undefined)
-			.sort();
-		return `{${keys.map((k) => `${JSON.stringify(k)}:${serialize(obj[k])}`).join(',')}}`;
+			.sort((a, b) => Number(a > b) - Number(a < b));
+		const body = keys
+			.map((k) => {
+				const entry = `${JSON.stringify(k)}:${serialize(obj[k])}`;
+				return entry;
+			})
+			.join(',');
+		return `{${body}}`;
 	}
 	throw new CanonicalJsonError(`Unsupported type for canonicalization: ${t}`);
 }

@@ -10,16 +10,16 @@ import type { Actions, PageServerLoad } from './$types';
 export const load: PageServerLoad = () => {
 	const engine = getEngine();
 	const undertakings = listUndertakings(engine).map((u) => {
-		const pwa = getObject(engine, String(u.state.pwaId));
+		const pwa = getObject(engine, String(u.state.pwaId as string));
 		return {
 			id: u.id,
-			name: String(u.state.name ?? u.id),
-			objective: String(u.state.objective ?? ''),
-			intendedOutputProduct: String(u.state.intendedOutputProduct ?? ''),
-			status: String(u.state.status ?? ''),
-			pwaId: String(u.state.pwaId ?? ''),
-			pwaName: String(pwa?.name ?? u.state.pwaId ?? ''),
-			pwaVersion: String(u.state.pwaVersion ?? ''),
+			name: String((u.state.name ?? u.id) as string),
+			objective: String((u.state.objective ?? '') as string),
+			intendedOutputProduct: String((u.state.intendedOutputProduct ?? '') as string),
+			status: String((u.state.status ?? '') as string),
+			pwaId: String((u.state.pwaId ?? '') as string),
+			pwaName: String((pwa?.name ?? u.state.pwaId ?? '') as string),
+			pwaVersion: String((u.state.pwaVersion ?? '') as string),
 			pwuCount: listPwus(engine, u.id).length
 		};
 	});
@@ -28,8 +28,8 @@ export const load: PageServerLoad = () => {
 		.filter((p) => p.state.publicationStatus === 'PUBLISHED')
 		.map((p) => ({
 			id: p.id,
-			name: String(p.state.name ?? p.id),
-			version: String(p.state.version ?? '')
+			name: String((p.state.name ?? p.id) as string),
+			version: String((p.state.version ?? '') as string)
 		}));
 	return { undertakings, pwaOptions };
 };
@@ -51,15 +51,15 @@ export const actions: Actions = {
 	create: async ({ request }) => {
 		const engine = getEngine();
 		const form = await request.formData();
-		const name = String(form.get('name') ?? '').trim();
-		const objective = String(form.get('objective') ?? '').trim();
-		const product = String(form.get('product') ?? '').trim();
-		const pwaId = String(form.get('pwaId') ?? '').trim();
+		const name = String((form.get('name') ?? '') as string).trim();
+		const objective = String((form.get('objective') ?? '') as string).trim();
+		const product = String((form.get('product') ?? '') as string).trim();
+		const pwaId = String((form.get('pwaId') ?? '') as string).trim();
 		if (!name || !pwaId) return fail(400, { error: 'A name and a published PWA are required.' });
 		const pwa = getObject(engine, pwaId);
-		if (!pwa || pwa.publicationStatus !== 'PUBLISHED')
+		if (pwa?.publicationStatus !== 'PUBLISHED')
 			return fail(400, { error: 'Select a published PWA.' });
-		const pwaVersion = String(pwa.version ?? '');
+		const pwaVersion = String((pwa.version ?? '') as string);
 		const obj = objective || `Deliver ${name}`;
 
 		// 1. Establish + approve the originating Intent. Each step short-circuits on the first rejection (?? chain).

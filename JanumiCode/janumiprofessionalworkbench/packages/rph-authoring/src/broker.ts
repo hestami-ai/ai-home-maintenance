@@ -111,11 +111,11 @@ function toTypeView(id: string, s: Record<string, unknown>): PwuTypeView {
 	const arr = (v: unknown): string[] => (Array.isArray(v) ? (v as string[]) : []);
 	return {
 		id,
-		name: String(s.name ?? id),
-		pwuKind: String(s.pwuKind ?? ''),
-		purpose: String(s.purpose ?? ''),
+		name: String((s.name ?? id) as string),
+		pwuKind: String((s.pwuKind ?? '') as string),
+		purpose: String((s.purpose ?? '') as string),
 		isRoot: Boolean(s.isRoot),
-		completionRule: String(s.completionRule ?? ''),
+		completionRule: String((s.completionRule ?? '') as string),
 		permittedChildTypeIds: arr(s.permittedChildTypeIds),
 		requiredInputs: arr(s.requiredInputs),
 		requiredOutputs: arr(s.requiredOutputs)
@@ -152,11 +152,11 @@ export class PwaAuthoringBroker {
 		if (!s) return undefined;
 		return {
 			id: this.pwaId,
-			name: String(s.name ?? this.pwaId),
-			description: String(s.description ?? ''),
-			domain: String(s.domain ?? ''),
-			version: String(s.version ?? ''),
-			publicationStatus: String(s.publicationStatus ?? 'DRAFT')
+			name: String((s.name ?? this.pwaId) as string),
+			description: String((s.description ?? '') as string),
+			domain: String((s.domain ?? '') as string),
+			version: String((s.version ?? '') as string),
+			publicationStatus: String((s.publicationStatus ?? 'DRAFT') as string)
 		};
 	}
 

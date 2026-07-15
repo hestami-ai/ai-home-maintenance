@@ -103,11 +103,13 @@ export function buildPwaGraphExport(pwa: PwaMeta, nodes: readonly PwaGraphNode[]
 				if (consumer !== producer) dataFlow.push({ producer, consumer, artifact });
 
 	const artifactNames = new Set<string>([...producersOf.keys(), ...consumersOf.keys()]);
-	const artifacts: ArtifactFlow[] = [...artifactNames].sort().map((name) => ({
-		name,
-		producedBy: producersOf.get(name) ?? [],
-		consumedBy: consumersOf.get(name) ?? []
-	}));
+	const artifacts: ArtifactFlow[] = [...artifactNames]
+		.sort((a, b) => Number(a > b) - Number(a < b))
+		.map((name) => ({
+			name,
+			producedBy: producersOf.get(name) ?? [],
+			consumedBy: consumersOf.get(name) ?? []
+		}));
 
 	return {
 		pwa,

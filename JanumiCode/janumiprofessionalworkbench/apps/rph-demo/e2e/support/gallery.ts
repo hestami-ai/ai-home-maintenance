@@ -22,7 +22,7 @@ export function slug(s: string): string {
 	return s
 		.toLowerCase()
 		.replace(/[^a-z0-9]+/g, '-')
-		.replace(/^-+|-+$/g, '')
+		.replace(/^-|-$/g, '')
 		.slice(0, 60);
 }
 
@@ -71,17 +71,17 @@ export async function snapshotPwaGraph(
 	if (!pwa) throw new Error('snapshotPwaGraph: no PWA found in engine truth');
 	const meta = {
 		id: pwa.id,
-		name: String(pwa.state.name ?? pwa.id),
-		domain: String(pwa.state.domain ?? ''),
-		version: String(pwa.state.version ?? ''),
-		publicationStatus: String(pwa.state.publicationStatus ?? 'DRAFT')
+		name: String((pwa.state.name ?? pwa.id) as string),
+		domain: String((pwa.state.domain ?? '') as string),
+		version: String((pwa.state.version ?? '') as string),
+		publicationStatus: String((pwa.state.publicationStatus ?? 'DRAFT') as string)
 	};
 	const nodes: PwaGraphNode[] = snap.pwuTypes
 		.filter((t) => t.state.status !== 'REMOVED' && t.state.pwaId === pwa.id)
 		.map((t) => ({
 			id: t.id,
-			name: String(t.state.name ?? t.id),
-			pwuKind: String(t.state.pwuKind ?? ''),
+			name: String((t.state.name ?? t.id) as string),
+			pwuKind: String((t.state.pwuKind ?? '') as string),
 			isRoot: t.state.isRoot === true,
 			permittedChildTypeIds: strArr(t.state.permittedChildTypeIds),
 			requiredInputs: strArr(t.state.requiredInputs),

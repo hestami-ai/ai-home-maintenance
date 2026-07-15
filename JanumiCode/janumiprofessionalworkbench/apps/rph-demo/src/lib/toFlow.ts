@@ -42,16 +42,22 @@ function layout(g: DemoGraph): Record<string, { x: number; y: number }> {
  *  execution succeeded but assurance is not yet satisfied (the visible exec≠assurance gap); grey when not yet
  *  executed/incomplete. A baselined node gets a heavy indigo border (frozen/authoritative). */
 function styleFor(n: GraphNode): string {
-	const bg = n.qualifiedSuccess
-		? '#e6f4ea'
-		: n.axes.executionState === 'SUCCEEDED'
-			? '#fdf2e3'
-			: '#eef0f2';
-	const fg = n.qualifiedSuccess
-		? '#137333'
-		: n.axes.executionState === 'SUCCEEDED'
-			? '#8a5a00'
-			: '#5f6368';
+	let bg: string;
+	if (n.qualifiedSuccess) {
+		bg = '#e6f4ea';
+	} else if (n.axes.executionState === 'SUCCEEDED') {
+		bg = '#fdf2e3';
+	} else {
+		bg = '#eef0f2';
+	}
+	let fg: string;
+	if (n.qualifiedSuccess) {
+		fg = '#137333';
+	} else if (n.axes.executionState === 'SUCCEEDED') {
+		fg = '#8a5a00';
+	} else {
+		fg = '#5f6368';
+	}
 	const border = n.baselined ? '3px solid #3730a3' : '1px solid #c7ccd1';
 	return `background:${bg};color:${fg};border:${border};border-radius:10px;padding:8px 12px;width:180px;font:12px/1.35 system-ui,sans-serif;`;
 }

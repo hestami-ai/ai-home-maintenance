@@ -68,9 +68,10 @@ export function assertTransition(
 ): void {
 	const c = classifyTransition(machine, from, to);
 	if (c.klass === 'LEGAL' || c.klass === 'NOOP') return;
+	const reasonSuffix = c.reason ? ` (${c.reason})` : '';
 	throw new RphErrorException(
 		makeRphError('RPH_ILLEGAL_STATE_TRANSITION', {
-			message: `Illegal transition on ${machine}: ${from} -> ${to}${c.reason ? ` (${c.reason})` : ''}`,
+			message: `Illegal transition on ${machine}: ${from} -> ${to}${reasonSuffix}`,
 			correlationId: opts.correlationId,
 			targetObjectIds: opts.targetObjectIds ?? [],
 			details: { machine, from, to, classification: c.klass }
