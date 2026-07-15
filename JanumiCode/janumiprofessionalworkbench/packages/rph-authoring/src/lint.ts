@@ -18,12 +18,8 @@ export interface CompositionFinding {
 /** A type permitting this many or more children reads as a flat fan-out rather than a nested decomposition. */
 export const FANOUT_LIMIT = 5;
 
-/** Advisory structural findings for a PWU-Type graph (empty = clean). Never throws; order: root → fan-out → orphans. */
-export function lintComposition(types: readonly CompositionNode[]): CompositionFinding[] {
-	const findings: CompositionFinding[] = [];
-	if (types.length === 0) return findings;
-	const ids = new Set(types.map((t) => t.id));
-
+/** Root-count findings: zero roots or more than one both violate the "exactly one root" rule. */
+function checkRoot(types: readonly CompositionNode[], findings: CompositionFinding[]): void {
 	const roots = types.filter((t) => t.isRoot);
 	if (roots.length === 0)
 		findings.push({
@@ -37,7 +33,14 @@ export function lintComposition(types: readonly CompositionNode[]): CompositionF
 				.map((r) => r.name)
 				.join(', ')}) — exactly one is expected; unset isRoot on the others.`
 		});
+}
 
+/** Fan-out findings: a type permitting FANOUT_LIMIT+ live children reads as a star, not a decomposition. */
+function checkFanout(
+	types: readonly CompositionNode[],
+	ids: ReadonlySet<string>,
+	findings: CompositionFinding[]
+): void {
 	for (const t of types) {
 		const children = t.permittedChildTypeIds.filter((c) => ids.has(c));
 		if (children.length >= FANOUT_LIMIT)
@@ -46,8 +49,14 @@ export function lintComposition(types: readonly CompositionNode[]): CompositionF
 				message: `"${t.name}" permits ${children.length} children — that is a flat fan-out (a star), not a decomposition. Group them under 2–4 intermediate areas, and express phase ORDERING with data-flow (requiredOutputs → requiredInputs), not composition edges.`
 			});
 	}
+}
 
-	// Orphans: a non-root type that no live type permits as a child is unreachable from the root.
+/** Orphan findings: a non-root type that no live type permits as a child is unreachable from the root. */
+function checkOrphans(
+	types: readonly CompositionNode[],
+	ids: ReadonlySet<string>,
+	findings: CompositionFinding[]
+): void {
 	const permitted = new Set<string>();
 	for (const t of types) for (const c of t.permittedChildTypeIds) if (ids.has(c)) permitted.add(c);
 	for (const t of types)
@@ -56,6 +65,17 @@ export function lintComposition(types: readonly CompositionNode[]): CompositionF
 				severity: 'info',
 				message: `"${t.name}" is not reachable from the root (no type permits it as a child) — link it under a parent.`
 			});
+}
+
+/** Advisory structural findings for a PWU-Type graph (empty = clean). Never throws; order: root → fan-out → orphans. */
+export function lintComposition(types: readonly CompositionNode[]): CompositionFinding[] {
+	const findings: CompositionFinding[] = [];
+	if (types.length === 0) return findings;
+	const ids = new Set(types.map((t) => t.id));
+
+	checkRoot(types, findings);
+	checkFanout(types, ids, findings);
+	checkOrphans(types, ids, findings);
 
 	return findings;
 }

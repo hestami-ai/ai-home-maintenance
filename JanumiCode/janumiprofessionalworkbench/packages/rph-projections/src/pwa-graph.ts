@@ -81,26 +81,50 @@ export interface PwaGraphReport {
 
 const FANOUT_LIMIT = 5;
 
-/** Build the normalized export from a PWA's metadata + its live PWU-Type nodes. */
-export function buildPwaGraphExport(pwa: PwaMeta, nodes: readonly PwaGraphNode[]): PwaGraphExport {
-	const ids = new Set(nodes.map((n) => n.id));
+/** permits = COMPOSITION edges: for each node, each permitted child type that resolves to a known node. */
+function collectPermits(nodes: readonly PwaGraphNode[], ids: ReadonlySet<string>): PermitsEdge[] {
 	const permits: PermitsEdge[] = [];
 	for (const n of nodes)
 		for (const c of n.permittedChildTypeIds)
 			if (ids.has(c)) permits.push({ parent: n.id, child: c });
+	return permits;
+}
 
-	// Data-flow: producer.requiredOutputs ∩ consumer.requiredInputs.
+/** Index nodes by the artifacts they produce/consume (returned maps are reused by the caller). */
+function buildFlowMaps(nodes: readonly PwaGraphNode[]): {
+	producersOf: Map<string, string[]>;
+	consumersOf: Map<string, string[]>;
+} {
 	const producersOf = new Map<string, string[]>();
 	const consumersOf = new Map<string, string[]>();
 	for (const n of nodes) {
 		for (const o of n.requiredOutputs) producersOf.set(o, [...(producersOf.get(o) ?? []), n.id]);
 		for (const i of n.requiredInputs) consumersOf.set(i, [...(consumersOf.get(i) ?? []), n.id]);
 	}
+	return { producersOf, consumersOf };
+}
+
+/** dataFlow = ORDERING edges: producer.requiredOutputs ∩ consumer.requiredInputs (self-edges excluded). */
+function collectDataFlow(
+	producersOf: ReadonlyMap<string, string[]>,
+	consumersOf: ReadonlyMap<string, string[]>
+): DataFlowEdge[] {
 	const dataFlow: DataFlowEdge[] = [];
 	for (const [artifact, producers] of producersOf)
 		for (const producer of producers)
 			for (const consumer of consumersOf.get(artifact) ?? [])
 				if (consumer !== producer) dataFlow.push({ producer, consumer, artifact });
+	return dataFlow;
+}
+
+/** Build the normalized export from a PWA's metadata + its live PWU-Type nodes. */
+export function buildPwaGraphExport(pwa: PwaMeta, nodes: readonly PwaGraphNode[]): PwaGraphExport {
+	const ids = new Set(nodes.map((n) => n.id));
+	const permits = collectPermits(nodes, ids);
+
+	// Data-flow: producer.requiredOutputs ∩ consumer.requiredInputs.
+	const { producersOf, consumersOf } = buildFlowMaps(nodes);
+	const dataFlow = collectDataFlow(producersOf, consumersOf);
 
 	const artifactNames = new Set<string>([...producersOf.keys(), ...consumersOf.keys()]);
 	const artifacts: ArtifactFlow[] = [...artifactNames]

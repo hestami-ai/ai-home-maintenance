@@ -251,6 +251,100 @@ export interface BaselinePromotionResult {
  *  residual (§39 Scenario 4). CONDITIONALLY_SATISFIED still has unmet conditions → not promotable on its own. */
 const PROMOTABLE_DISPOSITIONS = new Set(['SATISFIED', 'WAIVED']);
 
+/** RPH-BAS-001: every candidate item must pin a semantic version. */
+function findMissingItemVersions(
+	candidateItems: readonly BaselineItemVersionView[]
+): BaselinePromotionFinding[] {
+	const findings: BaselinePromotionFinding[] = [];
+	for (const item of candidateItems)
+		if (item.semanticVersion === undefined || item.semanticVersion === null)
+			findings.push({
+				code: 'MISSING_ITEM_VERSION',
+				detail: `item ${item.objectId} has no semantic version`
+			});
+	return findings;
+}
+
+/** RPH-BAS-002: candidate item versions+hashes must match the reviewed set exactly. */
+function findVersionMismatches(
+	candidateItems: readonly BaselineItemVersionView[],
+	reviewedItems: readonly BaselineItemVersionView[]
+): BaselinePromotionFinding[] {
+	const findings: BaselinePromotionFinding[] = [];
+	const reviewed = new Map(reviewedItems.map((i) => [i.objectId, i]));
+	for (const item of candidateItems) {
+		const r = reviewed.get(item.objectId);
+		if (!r || r.semanticVersion !== item.semanticVersion || r.contentHash !== item.contentHash)
+			findings.push({
+				code: 'BASELINE_VERSION_MISMATCH',
+				detail: `item ${item.objectId} promoted version/hash does not match the reviewed version/hash`
+			});
+	}
+	return findings;
+}
+
+/** RPH-BAS-003: no unwaived open blocking observation. */
+function findOpenBlockingObservations(
+	openObservations: readonly OpenObservationView[]
+): BaselinePromotionFinding[] {
+	const findings: BaselinePromotionFinding[] = [];
+	for (const o of openObservations)
+		if (o.blocking && !o.waived)
+			findings.push({
+				code: 'OPEN_BLOCKING_FINDING',
+				detail: `open blocking observation ${o.observationId}`
+			});
+	return findings;
+}
+
+/** §15.2: no contested claim. */
+function findContestedClaims(
+	contestedClaims: readonly ContestedClaimView[] | undefined
+): BaselinePromotionFinding[] {
+	const findings: BaselinePromotionFinding[] = [];
+	for (const c of contestedClaims ?? [])
+		if (c.contested)
+			findings.push({
+				code: 'CONTESTED_CLAIM',
+				detail: `contested claim ${c.claimId} cannot authorize promotion`
+			});
+	return findings;
+}
+
+/** RPH-BAS-004 + no-green-without-assurance: every required assessment complete AND satisfied/waived. */
+function findAssessmentDefects(
+	requiredAssessments: readonly RequiredAssessmentView[]
+): BaselinePromotionFinding[] {
+	const findings: BaselinePromotionFinding[] = [];
+	for (const a of requiredAssessments) {
+		if (!a.complete)
+			findings.push({
+				code: 'REQUIRED_ASSESSMENT_INCOMPLETE',
+				detail: `required assessment ${a.assessmentId} incomplete`
+			});
+		else if (!PROMOTABLE_DISPOSITIONS.has(a.disposition))
+			findings.push({
+				code: 'REQUIRED_ASSESSMENT_NOT_SATISFIED',
+				detail: `required assessment ${a.assessmentId} is ${a.disposition}, not SATISFIED/WAIVED`
+			});
+	}
+	return findings;
+}
+
+/** RPH-GOV-006 / RPH-CNS-004: no expired required waiver. */
+function findExpiredWaivers(
+	requiredWaivers: readonly WaiverView[] | undefined
+): BaselinePromotionFinding[] {
+	const findings: BaselinePromotionFinding[] = [];
+	for (const w of requiredWaivers ?? [])
+		if (w.expired)
+			findings.push({
+				code: 'EXPIRED_REQUIRED_WAIVER',
+				detail: `required waiver ${w.decisionId} has expired`
+			});
+	return findings;
+}
+
 /**
  * The baseline promotion gate (RPH-BAS-001..004, RPH-GOV-006, §24.2). A baseline may become AUTHORITATIVE only
  * when EVERY precondition holds — each violation is an independent finding (all reported, not short-circuited):
@@ -285,62 +379,14 @@ export function canPromoteBaseline(input: BaselinePromotionInput): BaselinePromo
 			detail: `baseline in ${input.baselineStatus} cannot be promoted to AUTHORITATIVE`
 		});
 
-	// RPH-BAS-001: every item pins a semantic version.
-	for (const item of input.candidateItems)
-		if (item.semanticVersion === undefined || item.semanticVersion === null)
-			findings.push({
-				code: 'MISSING_ITEM_VERSION',
-				detail: `item ${item.objectId} has no semantic version`
-			});
-
-	// RPH-BAS-002: candidate item versions+hashes must match the reviewed set exactly.
-	const reviewed = new Map(input.reviewedItems.map((i) => [i.objectId, i]));
-	for (const item of input.candidateItems) {
-		const r = reviewed.get(item.objectId);
-		if (!r || r.semanticVersion !== item.semanticVersion || r.contentHash !== item.contentHash)
-			findings.push({
-				code: 'BASELINE_VERSION_MISMATCH',
-				detail: `item ${item.objectId} promoted version/hash does not match the reviewed version/hash`
-			});
-	}
-
-	// RPH-BAS-003: no unwaived open blocking observation.
-	for (const o of input.openObservations)
-		if (o.blocking && !o.waived)
-			findings.push({
-				code: 'OPEN_BLOCKING_FINDING',
-				detail: `open blocking observation ${o.observationId}`
-			});
-
-	// §15.2: no contested claim.
-	for (const c of input.contestedClaims ?? [])
-		if (c.contested)
-			findings.push({
-				code: 'CONTESTED_CLAIM',
-				detail: `contested claim ${c.claimId} cannot authorize promotion`
-			});
-
-	// RPH-BAS-004 + no-green-without-assurance: every required assessment complete AND satisfied/waived.
-	for (const a of input.requiredAssessments) {
-		if (!a.complete)
-			findings.push({
-				code: 'REQUIRED_ASSESSMENT_INCOMPLETE',
-				detail: `required assessment ${a.assessmentId} incomplete`
-			});
-		else if (!PROMOTABLE_DISPOSITIONS.has(a.disposition))
-			findings.push({
-				code: 'REQUIRED_ASSESSMENT_NOT_SATISFIED',
-				detail: `required assessment ${a.assessmentId} is ${a.disposition}, not SATISFIED/WAIVED`
-			});
-	}
-
-	// RPH-GOV-006 / RPH-CNS-004: no expired required waiver.
-	for (const w of input.requiredWaivers ?? [])
-		if (w.expired)
-			findings.push({
-				code: 'EXPIRED_REQUIRED_WAIVER',
-				detail: `required waiver ${w.decisionId} has expired`
-			});
+	findings.push(
+		...findMissingItemVersions(input.candidateItems),
+		...findVersionMismatches(input.candidateItems, input.reviewedItems),
+		...findOpenBlockingObservations(input.openObservations),
+		...findContestedClaims(input.contestedClaims),
+		...findAssessmentDefects(input.requiredAssessments),
+		...findExpiredWaivers(input.requiredWaivers)
+	);
 
 	return { ok: findings.length === 0, findings };
 }

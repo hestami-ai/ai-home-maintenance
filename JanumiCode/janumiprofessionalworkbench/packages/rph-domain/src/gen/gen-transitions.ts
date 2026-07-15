@@ -92,10 +92,12 @@ function expandFrom(from: string, states: string[], terminal: string[]): string[
 	return [from];
 }
 
-function emitMachine(m: RawMachine): string {
-	const stateSet = new Set(m.states);
-	const terminal = m.terminalStates ?? [];
-
+/** Expand + filter the raw transitions to concrete same-axis legal edges, then dedupe by `from->to`. */
+function buildLegalTransitions(
+	m: RawMachine,
+	stateSet: Set<string>,
+	terminal: string[]
+): RawTransition[] {
 	const legal: RawTransition[] = [];
 	for (const t of m.transitions) {
 		if (!stateSet.has(t.to)) continue; // cross-axis / malformed target
@@ -104,14 +106,23 @@ function emitMachine(m: RawMachine): string {
 		}
 	}
 	const seen = new Set<string>();
-	const dedupedLegal = legal.filter((t) => {
+	return legal.filter((t) => {
 		const k = `${t.from}->${t.to}`;
 		if (seen.has(k)) return false;
 		seen.add(k);
 		return true;
 	});
-	const legalKeys = new Set(dedupedLegal.map((t) => `${t.from}->${t.to}`));
+}
 
+/**
+ * Partition the raw illegal entries: cross-axis ones are lifted out into the module-level `crossAxis`
+ * accumulator, self-loops are dropped, edges that also appear legal become `guarded`, the rest `illegal`.
+ */
+function classifyIllegal(
+	m: RawMachine,
+	stateSet: Set<string>,
+	legalKeys: Set<string>
+): { illegal: RawIllegal[]; guarded: RawIllegal[] } {
 	const illegal: RawIllegal[] = [];
 	const guarded: RawIllegal[] = [];
 	for (const i of m.illegal ?? []) {
@@ -123,6 +134,16 @@ function emitMachine(m: RawMachine): string {
 		if (legalKeys.has(`${i.from}->${i.to}`)) guarded.push(i);
 		else illegal.push(i);
 	}
+	return { illegal, guarded };
+}
+
+function emitMachine(m: RawMachine): string {
+	const stateSet = new Set(m.states);
+	const terminal = m.terminalStates ?? [];
+
+	const dedupedLegal = buildLegalTransitions(m, stateSet, terminal);
+	const legalKeys = new Set(dedupedLegal.map((t) => `${t.from}->${t.to}`));
+	const { illegal, guarded } = classifyIllegal(m, stateSet, legalKeys);
 
 	return [
 		`\t${j(m.name)}: {`,

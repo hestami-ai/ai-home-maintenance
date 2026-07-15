@@ -62,19 +62,18 @@ export interface OntologyIssue {
 	readonly detail: string;
 }
 
-/** Ontology validation (DOC-003 OVR-1..10). Structural integrity the engine relies on before loading a PWA. */
-export function validateOntology(): OntologyIssue[] {
-	const issues: OntologyIssue[] = [];
-
-	// OVR: exactly one root PWU template.
+// OVR: exactly one root PWU template.
+function checkRootCardinality(issues: OntologyIssue[]): void {
 	const roots = pwuTemplates.filter((t) => t.isRoot);
 	if (roots.length !== 1)
 		issues.push({
 			kind: 'ROOT_CARDINALITY',
 			detail: `expected exactly 1 root template, found ${roots.length}`
 		});
+}
 
-	// OVR: every seed policy has criteria + an independence requirement + a failure severity.
+// OVR: every seed policy has criteria + an independence requirement + a failure severity.
+function checkSeedPolicies(issues: OntologyIssue[]): void {
 	for (const p of seedPolicies) {
 		if (!p.criteria || p.criteria.length === 0)
 			issues.push({ kind: 'POLICY_NO_CRITERIA', detail: p.policyId });
@@ -82,22 +81,34 @@ export function validateOntology(): OntologyIssue[] {
 			issues.push({ kind: 'POLICY_NO_INDEPENDENCE', detail: p.policyId });
 		if (!p.failureSeverity) issues.push({ kind: 'POLICY_NO_SEVERITY', detail: p.policyId });
 	}
+}
 
-	// OVR: every template default policy resolves to a known seed policy.
+// OVR: every template default policy resolves to a known seed policy.
+function checkTemplatePolicies(issues: OntologyIssue[]): void {
 	for (const t of pwuTemplates) {
 		for (const pid of t.defaultPolicyIds ?? []) {
 			if (!getSeedPolicy(pid))
 				issues.push({ kind: 'TEMPLATE_UNKNOWN_POLICY', detail: `${t.pwuKind} -> ${pid}` });
 		}
 	}
+}
 
-	// OVR: every conformance-profile mandatory policy resolves.
+// OVR: every conformance-profile mandatory policy resolves.
+function checkProfilePolicies(issues: OntologyIssue[]): void {
 	for (const c of conformanceProfiles) {
 		for (const pid of c.mandatoryPolicyIds ?? []) {
 			if (!getSeedPolicy(pid))
 				issues.push({ kind: 'PROFILE_UNKNOWN_POLICY', detail: `${c.profile} -> ${pid}` });
 		}
 	}
+}
 
+/** Ontology validation (DOC-003 OVR-1..10). Structural integrity the engine relies on before loading a PWA. */
+export function validateOntology(): OntologyIssue[] {
+	const issues: OntologyIssue[] = [];
+	checkRootCardinality(issues);
+	checkSeedPolicies(issues);
+	checkTemplatePolicies(issues);
+	checkProfilePolicies(issues);
 	return issues;
 }

@@ -312,14 +312,39 @@ export class PwaAuthoringBroker {
 		const idFor = new Map<string, string>();
 		for (const s of specs) idFor.set(s.tempKey, this.mintId('pwut'));
 
+		const built = this.buildScaffoldCommands(specs, idFor);
+		if ('error' in built) return built.error;
+
+		const batch = this.engine.dispatchBatch(built.commands);
+		if (!batch.ok) {
+			const failed = batch.failedIndex !== undefined ? batch.results[batch.failedIndex] : undefined;
+			return {
+				ok: false,
+				status: failed?.status,
+				error: failed?.error?.message ?? 'scaffold batch was rejected (rolled back).'
+			};
+		}
+		return { ok: true, ids: Object.fromEntries(idFor) };
+	}
+
+	/** Build the DefinePwuType command per spec (validating each + resolving child temp keys via the pre-minted
+	 *  `idFor`), preserving spec order so `this.cmd`'s seq numbering is identical. Returns the first validation
+	 *  failure as an `error` ProposalResult, otherwise the built commands. */
+	private buildScaffoldCommands(
+		specs: readonly ScaffoldSpec[],
+		idFor: Map<string, string>
+	): { commands: DomainCommand[] } | { error: ProposalResult } {
 		const commands: DomainCommand[] = [];
 		for (const s of specs) {
 			if (!s.name?.trim() || !s.pwuKind?.trim())
-				return { ok: false, error: `Type "${s.tempKey}" needs a name and kind.` };
+				return { error: { ok: false, error: `Type "${s.tempKey}" needs a name and kind.` } };
 			const childIds: string[] = [];
 			for (const ck of s.childTempKeys ?? []) {
 				const cid = idFor.get(ck);
-				if (!cid) return { ok: false, error: `Type "${s.tempKey}" names unknown child "${ck}".` };
+				if (!cid)
+					return {
+						error: { ok: false, error: `Type "${s.tempKey}" names unknown child "${ck}".` }
+					};
 				childIds.push(cid);
 			}
 			const id = idFor.get(s.tempKey)!;
@@ -338,17 +363,7 @@ export class PwaAuthoringBroker {
 				})
 			);
 		}
-
-		const batch = this.engine.dispatchBatch(commands);
-		if (!batch.ok) {
-			const failed = batch.failedIndex !== undefined ? batch.results[batch.failedIndex] : undefined;
-			return {
-				ok: false,
-				status: failed?.status,
-				error: failed?.error?.message ?? 'scaffold batch was rejected (rolled back).'
-			};
-		}
-		return { ok: true, ids: Object.fromEntries(idFor) };
+		return { commands };
 	}
 
 	// ---- internals ---------------------------------------------------------------------------------

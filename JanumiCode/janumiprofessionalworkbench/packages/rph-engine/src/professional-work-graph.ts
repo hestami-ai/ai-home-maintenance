@@ -22,6 +22,35 @@ interface PwuState {
 	readonly shapeIntegrityState?: string;
 }
 
+/** Collect a PwuProposed event's PWU id (de-duplicated) and any parent link into the shared accumulators.
+ * Mutates `seen`, `pwuIds` and `edges` in place — behaviour-identical to the inline branch it replaces. */
+function collectPwuProposed(
+	payload: unknown,
+	seen: Set<string>,
+	pwuIds: string[],
+	edges: GraphEdge[]
+): void {
+	const p = payload as { pwuId?: string; parentWorkUnitId?: string };
+	if (p.pwuId && !seen.has(p.pwuId)) {
+		seen.add(p.pwuId);
+		pwuIds.push(p.pwuId);
+	}
+	if (p.pwuId && p.parentWorkUnitId) {
+		edges.push({ from: p.parentWorkUnitId, to: p.pwuId, relation: 'DECOMPOSES_TO' });
+	}
+}
+
+/** Collect a DecompositionProposed event's parent→children edges into the shared accumulator. Mutates
+ * `edges` in place — behaviour-identical to the inline branch it replaces. */
+function collectDecompositionProposed(payload: unknown, edges: GraphEdge[]): void {
+	const p = payload as { parentWorkUnitId?: string; childWorkUnitIds?: string[] };
+	for (const child of p.childWorkUnitIds ?? []) {
+		if (p.parentWorkUnitId) {
+			edges.push({ from: p.parentWorkUnitId, to: child, relation: 'DECOMPOSES_TO' });
+		}
+	}
+}
+
 /** Build the Professional Work Graph View for an Undertaking's current state from the live engine. Pass
  * `undertakingId` to scope the graph to one Undertaking's PWUs (CON-009 ownership). */
 export function professionalWorkGraph(
@@ -35,21 +64,9 @@ export function professionalWorkGraph(
 
 	for (const e of events) {
 		if (e.eventType === 'PwuProposed') {
-			const p = e.payload as { pwuId?: string; parentWorkUnitId?: string };
-			if (p.pwuId && !seen.has(p.pwuId)) {
-				seen.add(p.pwuId);
-				pwuIds.push(p.pwuId);
-			}
-			if (p.pwuId && p.parentWorkUnitId) {
-				edges.push({ from: p.parentWorkUnitId, to: p.pwuId, relation: 'DECOMPOSES_TO' });
-			}
+			collectPwuProposed(e.payload, seen, pwuIds, edges);
 		} else if (e.eventType === 'DecompositionProposed') {
-			const p = e.payload as { parentWorkUnitId?: string; childWorkUnitIds?: string[] };
-			for (const child of p.childWorkUnitIds ?? []) {
-				if (p.parentWorkUnitId) {
-					edges.push({ from: p.parentWorkUnitId, to: child, relation: 'DECOMPOSES_TO' });
-				}
-			}
+			collectDecompositionProposed(e.payload, edges);
 		}
 	}
 

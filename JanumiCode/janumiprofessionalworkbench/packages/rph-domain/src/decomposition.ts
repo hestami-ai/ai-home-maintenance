@@ -174,26 +174,39 @@ export function validateConstraintPropagation(
 
 	const findings: ConstraintPropagationFinding[] = [];
 	for (const c of input.parentConstraints) {
-		if (c.strength !== 'MANDATORY' || !c.applicable) continue;
-		const records = byConstraint.get(c.constraintId) ?? [];
-
-		// Per-relevant-child coverage (§11.2 / Property P3): every relevant child must be dispositioned.
-		const covered = new Set<string>();
-		for (const r of records) for (const child of r.childWorkUnitIds) covered.add(child);
-		for (const child of c.relevantChildWorkUnitIds)
-			if (!covered.has(child))
-				findings.push({
-					code: 'SILENT_CONSTRAINT_DROP',
-					constraintId: c.constraintId,
-					childWorkUnitId: child
-				});
-
-		// A mandatory constraint with relevant children but no disposition record at all is also a drop
-		// (covered by the loop above); a constraint relevant to NO child (relevantChildWorkUnitIds = []) is
-		// retained wholly at the parent and needs no record.
-		for (const r of records) findings.push(...checkConstraintDisposition(c.constraintId, r));
+		findings.push(...collectConstraintFindings(c, byConstraint));
 	}
 	return { ok: findings.length === 0, findings };
+}
+
+/** Per-constraint gate for {@link validateConstraintPropagation}: findings for one MANDATORY applicable parent
+ *  constraint (per-relevant-child coverage §11.2/P3 + each record's well-formedness). A non-gated constraint
+ *  (not MANDATORY or not applicable) yields none. Order: SILENT_CONSTRAINT_DROP findings first, then per-record
+ *  disposition findings — identical to the original inlined loop body. */
+function collectConstraintFindings(
+	c: ParentConstraint,
+	byConstraint: Map<string, ConstraintDispositionRecord[]>
+): ConstraintPropagationFinding[] {
+	if (c.strength !== 'MANDATORY' || !c.applicable) return [];
+	const records = byConstraint.get(c.constraintId) ?? [];
+	const findings: ConstraintPropagationFinding[] = [];
+
+	// Per-relevant-child coverage (§11.2 / Property P3): every relevant child must be dispositioned.
+	const covered = new Set<string>();
+	for (const r of records) for (const child of r.childWorkUnitIds) covered.add(child);
+	for (const child of c.relevantChildWorkUnitIds)
+		if (!covered.has(child))
+			findings.push({
+				code: 'SILENT_CONSTRAINT_DROP',
+				constraintId: c.constraintId,
+				childWorkUnitId: child
+			});
+
+	// A mandatory constraint with relevant children but no disposition record at all is also a drop
+	// (covered by the loop above); a constraint relevant to NO child (relevantChildWorkUnitIds = []) is
+	// retained wholly at the parent and needs no record.
+	for (const r of records) findings.push(...checkConstraintDisposition(c.constraintId, r));
+	return findings;
 }
 
 function checkConstraintDisposition(

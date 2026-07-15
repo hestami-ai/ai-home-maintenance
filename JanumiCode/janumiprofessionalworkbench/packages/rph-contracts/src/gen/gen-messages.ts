@@ -57,53 +57,66 @@ const spec = JSON.parse(readFileSync(SPEC_PATH, 'utf8')) as Spec;
 const used = { enums: new Set<string>(), obj: new Set<string>(), env: new Set<string>() };
 const j = (v: unknown): string => JSON.stringify(v);
 
+function zodEnumRefExpr(enumRef: string): string {
+	const nm = enumRef.replace(/Schema$/, '');
+	if (ENUM.has(nm)) {
+		used.enums.add(nm);
+		return `${nm}Schema`;
+	}
+	return 'z.string()'; // enumRef not in the ratified enum set -> permissive, never invent values
+}
+
+// String literal(s): 'X' -> z.literal('X'); 'A' | 'B' -> z.enum([...]). Returns undefined when `t`
+// carries no string literal (caller falls through to base-type resolution) — same as the original fall-through.
+function zodLiteralExpr(t: string): string | undefined {
+	if (!t.includes("'")) return undefined;
+	const lits = [...t.matchAll(/'([^']*)'/g)].map((m) => m[1]!);
+	if (lits.length === 1) return `z.literal(${j(lits[0])})`;
+	if (lits.length > 1) return `z.enum([${lits.map((l) => j(l)).join(', ')}])`;
+	return undefined;
+}
+
+function zodBaseExpr(t: string): string {
+	if (t === 'string') return 'z.string()';
+	if (t === 'number') return 'z.number()';
+	if (t === 'boolean') return 'z.boolean()';
+	if (t === 'true') return 'z.literal(true)';
+	if (t === 'false') return 'z.literal(false)';
+	if (t === 'unknown') return 'z.unknown()';
+	if (t === 'enum') return 'z.string()';
+	if (t === '(string | number)') return 'z.union([z.string(), z.number()])';
+	if (t.startsWith('Record<string'))
+		return t.includes('number')
+			? 'z.record(z.string(), z.number())'
+			: 'z.record(z.string(), z.unknown())';
+	if (t.startsWith('Array<{'))
+		return 'z.array(z.strictObject({ objectId: z.string(), semanticVersion: z.number(), contentHash: z.string().optional() }))';
+	if (ENUM.has(t)) {
+		used.enums.add(t);
+		return `${t}Schema`;
+	}
+	if (ENV.has(`${t}Schema`)) {
+		used.env.add(`${t}Schema`);
+		return `${t}Schema`;
+	}
+	if (OBJ.has(`${t}Schema`)) {
+		used.obj.add(`${t}Schema`);
+		return `${t}Schema`;
+	}
+	return 'z.unknown()';
+}
+
 function zodExpr(type: string | undefined, enumRef?: string): string {
-	if (enumRef) {
-		const nm = enumRef.replace(/Schema$/, '');
-		if (ENUM.has(nm)) {
-			used.enums.add(nm);
-			return `${nm}Schema`;
-		}
-		return 'z.string()'; // enumRef not in the ratified enum set -> permissive, never invent values
-	}
+	if (enumRef) return zodEnumRefExpr(enumRef);
 	let t = (type ?? 'unknown').trim();
-	// String literal(s): 'X' -> z.literal('X'); 'A' | 'B' -> z.enum([...])
-	if (t.includes("'")) {
-		const lits = [...t.matchAll(/'([^']*)'/g)].map((m) => m[1]!);
-		if (lits.length === 1) return `z.literal(${j(lits[0])})`;
-		if (lits.length > 1) return `z.enum([${lits.map((l) => j(l)).join(', ')}])`;
-	}
+	const lit = zodLiteralExpr(t);
+	if (lit !== undefined) return lit;
 	let arr = false;
 	if (t.endsWith('[]')) {
 		arr = true;
 		t = t.slice(0, -2).trim();
 	}
-	let expr: string;
-	if (t === 'string') expr = 'z.string()';
-	else if (t === 'number') expr = 'z.number()';
-	else if (t === 'boolean') expr = 'z.boolean()';
-	else if (t === 'true') expr = 'z.literal(true)';
-	else if (t === 'false') expr = 'z.literal(false)';
-	else if (t === 'unknown') expr = 'z.unknown()';
-	else if (t === 'enum') expr = 'z.string()';
-	else if (t === '(string | number)') expr = 'z.union([z.string(), z.number()])';
-	else if (t.startsWith('Record<string'))
-		expr = t.includes('number')
-			? 'z.record(z.string(), z.number())'
-			: 'z.record(z.string(), z.unknown())';
-	else if (t.startsWith('Array<{'))
-		expr =
-			'z.array(z.strictObject({ objectId: z.string(), semanticVersion: z.number(), contentHash: z.string().optional() }))';
-	else if (ENUM.has(t)) {
-		used.enums.add(t);
-		expr = `${t}Schema`;
-	} else if (ENV.has(`${t}Schema`)) {
-		used.env.add(`${t}Schema`);
-		expr = `${t}Schema`;
-	} else if (OBJ.has(`${t}Schema`)) {
-		used.obj.add(`${t}Schema`);
-		expr = `${t}Schema`;
-	} else expr = 'z.unknown()';
+	const expr = zodBaseExpr(t);
 	return arr ? `z.array(${expr})` : expr;
 }
 

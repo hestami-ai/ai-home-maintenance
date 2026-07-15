@@ -22,24 +22,44 @@ export function canonicalJson(value: unknown): string {
 	return serialize(value);
 }
 
+function serializeNumber(n: number): string {
+	if (!Number.isFinite(n)) {
+		throw new CanonicalJsonError(`Non-finite number cannot be canonicalized: ${String(n)}`);
+	}
+	if (!Number.isInteger(n)) {
+		throw new CanonicalJsonError(
+			`Non-integer number cannot be canonicalized (model as integer or string): ${String(n)}`
+		);
+	}
+	return String(n);
+}
+
+function serializeObject(obj: Record<string, unknown>): string {
+	const proto = Object.getPrototypeOf(obj);
+	if (proto !== Object.prototype && proto !== null) {
+		throw new CanonicalJsonError(
+			'Only plain objects (and arrays) are hashable; got a non-plain object (e.g. Date/Map/class instance). Convert to a plain JSON value first.'
+		);
+	}
+	const keys = Object.keys(obj)
+		.filter((k) => obj[k] !== undefined)
+		.sort((a, b) => Number(a > b) - Number(a < b));
+	const body = keys
+		.map((k) => {
+			const entry = `${JSON.stringify(k)}:${serialize(obj[k])}`;
+			return entry;
+		})
+		.join(',');
+	return `{${body}}`;
+}
+
 function serialize(v: unknown): string {
 	if (v === null) return 'null';
 	const t = typeof v;
 	if (t === 'string') return JSON.stringify(v);
 	if (t === 'boolean') return v ? 'true' : 'false';
 	if (t === 'bigint') return (v as bigint).toString();
-	if (t === 'number') {
-		const n = v as number;
-		if (!Number.isFinite(n)) {
-			throw new CanonicalJsonError(`Non-finite number cannot be canonicalized: ${String(n)}`);
-		}
-		if (!Number.isInteger(n)) {
-			throw new CanonicalJsonError(
-				`Non-integer number cannot be canonicalized (model as integer or string): ${String(n)}`
-			);
-		}
-		return String(n);
-	}
+	if (t === 'number') return serializeNumber(v as number);
 	if (t === 'undefined') {
 		throw new CanonicalJsonError(
 			'undefined cannot be canonicalized at the top level; use null or omit'
@@ -49,23 +69,7 @@ function serialize(v: unknown): string {
 		return `[${v.map((el) => serialize(el === undefined ? null : el)).join(',')}]`;
 	}
 	if (t === 'object') {
-		const obj = v as Record<string, unknown>;
-		const proto = Object.getPrototypeOf(obj);
-		if (proto !== Object.prototype && proto !== null) {
-			throw new CanonicalJsonError(
-				'Only plain objects (and arrays) are hashable; got a non-plain object (e.g. Date/Map/class instance). Convert to a plain JSON value first.'
-			);
-		}
-		const keys = Object.keys(obj)
-			.filter((k) => obj[k] !== undefined)
-			.sort((a, b) => Number(a > b) - Number(a < b));
-		const body = keys
-			.map((k) => {
-				const entry = `${JSON.stringify(k)}:${serialize(obj[k])}`;
-				return entry;
-			})
-			.join(',');
-		return `{${body}}`;
+		return serializeObject(v as Record<string, unknown>);
 	}
 	throw new CanonicalJsonError(`Unsupported type for canonicalization: ${t}`);
 }
