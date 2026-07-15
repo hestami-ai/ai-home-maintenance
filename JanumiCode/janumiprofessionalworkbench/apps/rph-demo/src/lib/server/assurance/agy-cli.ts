@@ -29,7 +29,7 @@ export async function agyPrint(prompt: string): Promise<string> {
 /** Strip markdown fences and extract the outermost JSON object from a model reply. */
 export function extractJson(raw: string): string {
 	let s = raw.trim();
-	const fence = /```(?:json)?\s*([\s\S]*?)```/i.exec(s);
+	const fence = /```(?:json)?([\s\S]*?)```/i.exec(s);
 	if (fence) s = fence[1].trim();
 	const first = s.indexOf('{');
 	const last = s.lastIndexOf('}');

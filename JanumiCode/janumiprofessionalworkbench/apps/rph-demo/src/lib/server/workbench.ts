@@ -195,8 +195,8 @@ export function buildPwaExport(pwaId: string): PwaGraphExport | undefined {
 	if (!pwa) return undefined;
 	const nodes = listPwuTypes(engine, pwaId).map((t) => ({
 		id: t.id,
-		name: String(t.state.name ?? t.id),
-		pwuKind: String(t.state.pwuKind ?? ''),
+		name: String((t.state.name ?? t.id) as string),
+		pwuKind: String((t.state.pwuKind ?? '') as string),
 		isRoot: Boolean(t.state.isRoot),
 		permittedChildTypeIds: arr(t.state.permittedChildTypeIds),
 		requiredInputs: arr(t.state.requiredInputs),
@@ -205,10 +205,10 @@ export function buildPwaExport(pwaId: string): PwaGraphExport | undefined {
 	return buildPwaGraphExport(
 		{
 			id: pwaId,
-			name: String(pwa.name ?? pwaId),
-			domain: String(pwa.domain ?? ''),
-			version: String(pwa.version ?? ''),
-			publicationStatus: String(pwa.publicationStatus ?? 'DRAFT')
+			name: String((pwa.name ?? pwaId) as string),
+			domain: String((pwa.domain ?? '') as string),
+			version: String((pwa.version ?? '') as string),
+			publicationStatus: String((pwa.publicationStatus ?? 'DRAFT') as string)
 		},
 		nodes
 	);

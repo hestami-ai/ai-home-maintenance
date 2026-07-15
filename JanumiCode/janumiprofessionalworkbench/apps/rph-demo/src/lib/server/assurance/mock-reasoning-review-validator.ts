@@ -43,11 +43,9 @@ function judge(content: string): ReasoningReviewJudgement {
 			statement: `${report.metrics.unusedOutputs} produced output(s) feed no consumer (dead-end).`,
 			severity: 'MATERIAL'
 		});
-	const recommendation = !report.valid
-		? 'REJECTED'
-		: findings.length > 0
-			? 'CONDITIONALLY_SATISFIED'
-			: 'SATISFIED';
+	let recommendation: ReasoningReviewJudgement['recommendation'] = 'SATISFIED';
+	if (!report.valid) recommendation = 'REJECTED';
+	else if (findings.length > 0) recommendation = 'CONDITIONALLY_SATISFIED';
 	return { findings, recommendation };
 }
 

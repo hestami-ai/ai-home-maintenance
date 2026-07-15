@@ -61,8 +61,7 @@ export function hasEffectiveFloorWaiver(ctx: HandlerContext, subjectId: string):
 		const s = ctx.store.loadObject(id)?.state as
 			{ decisionType?: string; status?: string; subjectObjectIds?: string[] } | undefined;
 		if (
-			s &&
-			s.decisionType === 'WAIVER' &&
+			s?.decisionType === 'WAIVER' &&
 			s.status === 'EFFECTIVE' &&
 			Array.isArray(s.subjectObjectIds) &&
 			s.subjectObjectIds.includes(subjectId)

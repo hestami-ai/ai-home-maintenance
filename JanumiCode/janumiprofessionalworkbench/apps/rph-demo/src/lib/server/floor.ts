@@ -108,7 +108,7 @@ export async function runPwaFloor(
 			prompt: opts.prompt,
 			content: JSON.stringify(graphExport),
 			...(opts.planText ? { plan: opts.planText } : {}),
-			...(opts.priorGaps && opts.priorGaps.length ? { prior: { gaps: opts.priorGaps } } : {})
+			...(opts.priorGaps?.length ? { prior: { gaps: opts.priorGaps } } : {})
 		}
 	};
 	const plan = await runFloorAndPlanRecording(
@@ -143,39 +143,67 @@ export async function runPwaFloor(
 	};
 }
 
+const includesSubject = (state: Record<string, unknown>, pwaId: string): boolean => {
+	const s = state.subjectObjectIds;
+	return Array.isArray(s) && (s as string[]).includes(pwaId);
+};
+
+interface LatestAssessment {
+	readonly id: string;
+	readonly state: Record<string, unknown>;
+	readonly at: string;
+}
+
+/** Latest recorded floor assessment per policy for the subject (by updatedAt; ties → last seen). */
+function latestFloorAssessments(
+	engine: EngineHandle,
+	pwaId: string
+): Map<string, LatestAssessment> {
+	const latest = new Map<string, LatestAssessment>();
+	for (const a of listAssessments(engine)) {
+		if (!includesSubject(a.state, pwaId) || !isFloorPolicy(a.state.assurancePolicyId)) continue;
+		const policyId = String(a.state.assurancePolicyId as string);
+		const at = String((a.state.updatedAt ?? '') as string);
+		const prev = latest.get(policyId);
+		if (!prev || at >= prev.at) latest.set(policyId, { id: a.id, state: a.state, at });
+	}
+	return latest;
+}
+
+/** Floor observations for the subject, grouped by their assessment id. */
+function observationsByAssessment(
+	engine: EngineHandle,
+	pwaId: string
+): Map<string, { code: string; severity: string; statement: string }[]> {
+	const byId = new Map<string, { code: string; severity: string; statement: string }[]>();
+	for (const o of listObservations(engine)) {
+		if (!includesSubject(o.state, pwaId)) continue;
+		const aid = String((o.state.assessmentId ?? '') as string);
+		const list = byId.get(aid) ?? [];
+		list.push({
+			code: String((o.state.findingCode ?? o.state.observationType ?? '') as string),
+			severity: String((o.state.severity ?? '') as string),
+			statement: String((o.state.statement ?? '') as string)
+		});
+		byId.set(aid, list);
+	}
+	return byId;
+}
+
+/** The panel's display aggregate from the per-policy dispositions. */
+function floorAggregate(satisfied: boolean, policies: FloorPolicyView[]): string {
+	if (satisfied) return 'SATISFIED';
+	if (policies.some((p) => p.disposition === 'REJECTED')) return 'REJECTED';
+	return 'UNASSESSED';
+}
+
 /** The latest recorded floor outcome for a PWA, read back from the canonical ASSURANCE_ASSESSMENT/OBSERVATION
  *  objects (the read surface the UI renders). Undefined if no floor has been recorded for the subject yet. */
 export function loadPwaFloor(pwaId: string): FloorView | undefined {
 	const engine = getEngine();
-	const forSubject = (row: { state: Record<string, unknown> }): boolean => {
-		const s = row.state.subjectObjectIds;
-		return Array.isArray(s) && (s as string[]).includes(pwaId);
-	};
-	// Latest assessment per floor policy (by updatedAt; ties → last seen).
-	const latest = new Map<string, { id: string; state: Record<string, unknown>; at: string }>();
-	for (const a of listAssessments(engine)) {
-		if (!forSubject(a) || !isFloorPolicy(a.state.assurancePolicyId)) continue;
-		const policyId = String(a.state.assurancePolicyId);
-		const at = String(a.state.updatedAt ?? '');
-		const prev = latest.get(policyId);
-		if (!prev || at >= prev.at) latest.set(policyId, { id: a.id, state: a.state, at });
-	}
+	const latest = latestFloorAssessments(engine, pwaId);
 	if (latest.size === 0) return undefined;
-	const obsByAssessment = new Map<
-		string,
-		{ code: string; severity: string; statement: string }[]
-	>();
-	for (const o of listObservations(engine)) {
-		if (!forSubject(o)) continue;
-		const aid = String(o.state.assessmentId ?? '');
-		const list = obsByAssessment.get(aid) ?? [];
-		list.push({
-			code: String(o.state.findingCode ?? o.state.observationType ?? ''),
-			severity: String(o.state.severity ?? ''),
-			statement: String(o.state.statement ?? '')
-		});
-		obsByAssessment.set(aid, list);
-	}
+	const obsByAssessment = observationsByAssessment(engine, pwaId);
 	const order = [
 		FLOOR_POLICY_IDS.SCHEMA_INVARIANT,
 		FLOOR_POLICY_IDS.IDENTITY_PROVENANCE,
@@ -187,21 +215,16 @@ export function loadPwaFloor(pwaId: string): FloorView | undefined {
 		if (!a) continue;
 		policies.push({
 			policyId,
-			disposition: String(a.state.assessmentState ?? 'INCONCLUSIVE'),
+			disposition: String((a.state.assessmentState ?? 'INCONCLUSIVE') as string),
 			independenceOk: true,
 			observations: obsByAssessment.get(a.id) ?? []
 		});
 	}
 	const satisfied = order.every((p) => latest.get(p)?.state.assessmentState === 'SATISFIED');
 	const rr = latest.get(FLOOR_POLICY_IDS.REASONING_REVIEW);
-	const aggregate = satisfied
-		? 'SATISFIED'
-		: policies.some((p) => p.disposition === 'REJECTED')
-			? 'REJECTED'
-			: 'UNASSESSED';
 	return {
 		subjectId: pwaId,
-		aggregate,
+		aggregate: floorAggregate(satisfied, policies),
 		satisfied,
 		waived: hasEffectiveWaiver(engine, pwaId),
 		policies,

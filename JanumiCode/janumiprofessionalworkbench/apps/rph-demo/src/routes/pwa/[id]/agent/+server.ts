@@ -15,16 +15,19 @@ type TurnEntry = { role: string; kind: string; text: string; success?: boolean }
 /** Compact a tool's args for the transcript (mirrors the client log). */
 function compactArgs(args: Record<string, unknown> | undefined): string {
 	if (!args) return '';
+	const fmt = (v: unknown): string => (typeof v === 'string' ? v : JSON.stringify(v));
 	return Object.entries(args)
-		.map(([k, v]) => `${k}=${typeof v === 'string' ? v : JSON.stringify(v)}`)
+		.map(([k, v]) => `${k}=${fmt(v)}`)
 		.join(', ');
 }
 
 /** A one-line status summary of a floor run for the agent log. */
 function floorStatus(f: FloorView): string {
-	return f.satisfied
-		? '⚖ Assurance floor SATISFIED — schema, provenance, and an independent reasoning review all pass.'
-		: `⚖ Assurance floor ${f.aggregate}${f.reasoningGaps.length ? ` · ${f.reasoningGaps.length} reasoning finding(s)` : ''}.`;
+	if (f.satisfied) {
+		return '⚖ Assurance floor SATISFIED — schema, provenance, and an independent reasoning review all pass.';
+	}
+	const gaps = f.reasoningGaps.length ? ` · ${f.reasoningGaps.length} reasoning finding(s)` : '';
+	return `⚖ Assurance floor ${f.aggregate}${gaps}.`;
 }
 
 /** Turn the Reasoning Review's open findings into an auto-refinement directive for the executor. */
@@ -40,6 +43,65 @@ function refineDirective(prompt: string, gaps: string[]): string {
 		'',
 		`Original intent: ${prompt}`
 	].join('\n');
+}
+
+/** After an authoring turn: run + RECORD the de minimis assurance floor (§8.4) over the DRAFT graph, and — non-mock
+ *  only (the offline mock would mutate the graph off the NL directive) — auto-refine ONCE against the Reasoning
+ *  Review findings and re-run. A still-unsatisfied floor blocks PublishPwa (the gate) until the human revises the
+ *  graph or records a waiver. Guarded so an agy hiccup never nukes a turn whose authoring already committed. */
+async function runFloorAfterTurn(ctx: {
+	pwaId: string;
+	instruction: string;
+	transcript: TurnEntry[];
+	agent: Awaited<ReturnType<typeof createAuthoringAgent>>;
+	mode: 'mock' | 'pi';
+	onEvent: (ev: AuthoringAgentEvent) => void;
+	send: (ev: AuthoringAgentEvent) => void;
+	signal: AbortSignal;
+}): Promise<void> {
+	const { pwaId, instruction, transcript, agent, mode, onEvent, send, signal } = ctx;
+	const planText = () =>
+		transcript
+			.filter((e) => e.role === 'AGENT' && (e.kind === 'message' || e.kind === 'thinking'))
+			.map((e) => e.text)
+			.join('\n');
+	const noteFloor = (f: FloorView) => {
+		const t = floorStatus(f);
+		send({ kind: 'status', text: t });
+		transcript.push({ role: 'SYSTEM', kind: 'message', text: t });
+	};
+	try {
+		send({ kind: 'status', text: '⚖ Running the assurance floor (independent reasoning review)…' });
+		let floor = await runPwaFloor(pwaId, { prompt: instruction, planText: planText() });
+		if (!floor) return;
+		noteFloor(floor);
+		if (!floor.satisfied && mode !== 'mock') {
+			transcript.push({
+				role: 'SYSTEM',
+				kind: 'message',
+				text: '↻ Auto-refinement pass (addressing reviewer findings)'
+			});
+			send({ kind: 'status', text: '↻ Auto-refinement pass (addressing reviewer findings)…' });
+			await agent.run(refineDirective(instruction, floor.reasoningGaps), onEvent, signal);
+			floor = await runPwaFloor(pwaId, {
+				prompt: instruction,
+				planText: planText(),
+				priorGaps: floor.reasoningGaps
+			});
+			if (floor) noteFloor(floor);
+		}
+		if (floor && !floor.satisfied) {
+			send({
+				kind: 'status',
+				text: '⚠ PublishPwa is blocked until you revise the graph or record a waiver.'
+			});
+		}
+	} catch (error_) {
+		send({
+			kind: 'status',
+			text: `⚖ Assurance floor skipped: ${error_ instanceof Error ? error_.message : String(error_)}`
+		});
+	}
 }
 
 export const POST: RequestHandler = async ({ params, request }) => {
@@ -70,8 +132,8 @@ export const POST: RequestHandler = async ({ params, request }) => {
 			const record = (ev: AuthoringAgentEvent) => {
 				if (ev.kind === 'text' || ev.kind === 'thinking') {
 					const kind = ev.kind === 'text' ? 'message' : 'thinking';
-					const last = transcript[transcript.length - 1];
-					if (last && last.role === 'AGENT' && last.kind === kind) last.text += ev.text;
+					const last = transcript.at(-1);
+					if (last?.role === 'AGENT' && last.kind === kind) last.text += ev.text;
 					else transcript.push({ role: 'AGENT', kind, text: ev.text });
 				} else if (ev.kind === 'tool_start') {
 					transcript.push({
@@ -107,65 +169,17 @@ export const POST: RequestHandler = async ({ params, request }) => {
 				};
 				await agent.run(instruction, onEvent, request.signal);
 
-				// After the turn: run the de minimis assurance floor (§8.4) over the DRAFT graph and RECORD it as
-				// canonical ASSURANCE_ASSESSMENT/OBSERVATION objects. If not SATISFIED, auto-refine ONCE against the
-				// Reasoning Review findings (non-mock only — the offline mock authoring agent would mutate the graph
-				// off the NL directive), then re-run the floor. A still-unsatisfied floor blocks PublishPwa (the gate)
-				// until the human revises the graph or records a waiver. Guarded so an agy hiccup never nukes a turn
-				// whose authoring already committed.
-				try {
-					const planText = () =>
-						transcript
-							.filter((e) => e.role === 'AGENT' && (e.kind === 'message' || e.kind === 'thinking'))
-							.map((e) => e.text)
-							.join('\n');
-					const noteFloor = (f: FloorView) => {
-						const t = floorStatus(f);
-						send({ kind: 'status', text: t });
-						transcript.push({ role: 'SYSTEM', kind: 'message', text: t });
-					};
-					send({
-						kind: 'status',
-						text: '⚖ Running the assurance floor (independent reasoning review)…'
-					});
-					let floor = await runPwaFloor(params.id, { prompt: instruction, planText: planText() });
-					if (floor) {
-						noteFloor(floor);
-						if (!floor.satisfied && mode !== 'mock') {
-							transcript.push({
-								role: 'SYSTEM',
-								kind: 'message',
-								text: '↻ Auto-refinement pass (addressing reviewer findings)'
-							});
-							send({
-								kind: 'status',
-								text: '↻ Auto-refinement pass (addressing reviewer findings)…'
-							});
-							await agent.run(
-								refineDirective(instruction, floor.reasoningGaps),
-								onEvent,
-								request.signal
-							);
-							floor = await runPwaFloor(params.id, {
-								prompt: instruction,
-								planText: planText(),
-								priorGaps: floor.reasoningGaps
-							});
-							if (floor) noteFloor(floor);
-						}
-						if (floor && !floor.satisfied) {
-							send({
-								kind: 'status',
-								text: '⚠ PublishPwa is blocked until you revise the graph or record a waiver.'
-							});
-						}
-					}
-				} catch (fe) {
-					send({
-						kind: 'status',
-						text: `⚖ Assurance floor skipped: ${fe instanceof Error ? fe.message : String(fe)}`
-					});
-				}
+				// After the turn: run + record the de minimis assurance floor, and (non-mock) auto-refine once.
+				await runFloorAfterTurn({
+					pwaId: params.id,
+					instruction,
+					transcript,
+					agent,
+					mode,
+					onEvent,
+					send,
+					signal: request.signal
+				});
 			} catch (e) {
 				const message = e instanceof Error ? e.message : String(e);
 				send({ kind: 'error', message });
