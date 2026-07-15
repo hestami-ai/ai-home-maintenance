@@ -52,11 +52,10 @@ function layout(
 }
 
 function nodeStyle(t: PwuTypeNode, selected: boolean): string {
-	const border = selected
-		? '2px solid #9fcaff'
-		: t.isRoot
-			? '2px solid #007acc'
-			: '1px solid #404751';
+	let border: string;
+	if (selected) border = '2px solid #9fcaff';
+	else if (t.isRoot) border = '2px solid #007acc';
+	else border = '1px solid #404751';
 	return `background:#1b1b1c;color:#e5e2e1;border:${border};border-radius:10px;padding:10px 12px;width:200px;font:12px/1.4 'Inter',system-ui,sans-serif;white-space:pre-line;text-align:left;`;
 }
 
