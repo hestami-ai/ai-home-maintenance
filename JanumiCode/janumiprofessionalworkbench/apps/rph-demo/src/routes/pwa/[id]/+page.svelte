@@ -6,7 +6,13 @@
 	import type { Edge, Node } from '@xyflow/svelte';
 	import { toPwaFlow } from '$lib/pwaFlow';
 	import { analyzePwaGraph, buildPwaGraphExport } from '@janumipwb/rph-projections';
-	import { PWU_TYPE_CATALOG, PWU_TYPE_HELP } from '$lib/authoring/pwuType';
+	import {
+		PWU_TYPE_CATALOG,
+		PWU_TYPE_HELP,
+		ASSURANCE_FLOOR,
+		ASSURANCE_POLICY_CATALOG,
+		assurancePolicyLabel
+	} from '$lib/authoring/pwuType';
 	import type { PageData } from './$types';
 	let {
 		data,
@@ -107,6 +113,10 @@
 		requiredOutputs: ''
 	});
 	let children = $state<string[]>([]);
+	// Selected declared assurance policy ids for the type being authored.
+	let policies = $state<string[]>([]);
+	// Per-child cardinality being authored, keyed by child type id (only meaningful for checked children).
+	let childRules = $state<Record<string, { cardinality: string; note: string }>>({});
 	const editingId = $derived(typeof formMode === 'object' && formMode ? formMode.editId : '');
 
 	$effect(() => {
@@ -129,6 +139,8 @@
 			requiredOutputs: ''
 		});
 		children = [];
+		policies = [];
+		childRules = {};
 		formMode = 'define';
 	}
 	function openEdit(id: string) {
@@ -144,6 +156,13 @@
 			requiredOutputs: t.requiredOutputs.join(', ')
 		});
 		children = [...t.permittedChildTypeIds];
+		policies = [...t.requiredAssurancePolicyIds];
+		childRules = Object.fromEntries(
+			t.permittedChildren.map((r) => [
+				r.typeId,
+				{ cardinality: r.cardinality, note: r.applicabilityNote ?? '' }
+			])
+		);
 		formMode = { editId: id };
 	}
 	function applyTemplate(key: string) {
@@ -160,6 +179,10 @@
 	}
 	function toggleChild(id: string, on: boolean) {
 		children = on ? [...children, id] : children.filter((c) => c !== id);
+		if (on && !childRules[id]) childRules = { ...childRules, [id]: { cardinality: 'M1', note: '' } };
+	}
+	function togglePolicy(id: string, on: boolean) {
+		policies = on ? [...policies, id] : policies.filter((p) => p !== id);
 	}
 
 	// ---- The authoring agent: chat + reasoning log, driving the SAME engine via the SSE relay; the graph
@@ -170,10 +193,7 @@
 		ok?: boolean;
 	};
 	function policyLabel(id: string): string {
-		if (id === 'floor.schema-invariant') return 'Output contract & invariants';
-		if (id === 'floor.identity-provenance') return 'Identity & provenance';
-		if (id === 'floor.reasoning-review') return 'Independent reasoning review';
-		return id;
+		return assurancePolicyLabel(id);
 	}
 
 	const MUTATING = new Set([
@@ -515,23 +535,78 @@
 								<span class="fhelp">{PWU_TYPE_HELP.isRoot}</span>
 							</div>
 							<div class="ffield">
-								{@render fhead('Permitted child types', PWU_TYPE_HELP.permittedChildTypeIds)}
+								{@render fhead('Permitted child types + cardinality', PWU_TYPE_HELP.permittedChildren)}
 								<div class="childlist">
 									{#each data.types.filter((t) => t.id !== editingId) as t (t.id)}
-										<label class="childopt">
-											<input
-												type="checkbox"
-												name="permittedChildTypeIds"
-												value={t.id}
-												checked={children.includes(t.id)}
-												onchange={(e) => toggleChild(t.id, e.currentTarget.checked)}
-											/>
-											{t.name}
-										</label>
+										{@const rule = childRules[t.id] ?? { cardinality: 'M1', note: '' }}
+										<div class="childrow">
+											<label class="childopt">
+												<input
+													type="checkbox"
+													name="permittedChildTypeIds"
+													value={t.id}
+													checked={children.includes(t.id)}
+													onchange={(e) => toggleChild(t.id, e.currentTarget.checked)}
+												/>
+												{t.name}
+											</label>
+											{#if children.includes(t.id)}
+												<select
+													class="cardsel"
+													name={`cardinality:${t.id}`}
+													value={rule.cardinality}
+													onchange={(e) =>
+														(childRules = {
+															...childRules,
+															[t.id]: { ...rule, cardinality: e.currentTarget.value }
+														})}
+													aria-label={`Cardinality for ${t.name}`}
+												>
+													<option value="M1">M1 · exactly one</option>
+													<option value="M+">M+ · one or more</option>
+													<option value="C1">C1 · conditional, 0 or 1</option>
+													<option value="C+">C+ · conditional, 0 or more</option>
+												</select>
+												{#if rule.cardinality === 'C1' || rule.cardinality === 'C+'}
+													<input
+														class="cardnote"
+														name={`applicability:${t.id}`}
+														value={rule.note}
+														oninput={(e) =>
+															(childRules = {
+																...childRules,
+																[t.id]: { ...rule, note: e.currentTarget.value }
+															})}
+														placeholder="when does this child apply?"
+														aria-label={`Applicability for ${t.name}`}
+													/>
+												{/if}
+											{/if}
+										</div>
 									{/each}
 									{#if data.types.filter((t) => t.id !== editingId).length === 0}
 										<span class="fhelp">Define more types to allow composition.</span>
 									{/if}
+								</div>
+							</div>
+							<div class="ffield">
+								{@render fhead('Declared assurance policies', PWU_TYPE_HELP.requiredAssurancePolicyIds)}
+								<div class="policylist">
+									<div class="floornote">
+										🔒 de minimis floor · always applies · not listed here
+									</div>
+									{#each ASSURANCE_POLICY_CATALOG as p (p.id)}
+										<label class="childopt" title={p.blurb}>
+											<input
+												type="checkbox"
+												name="requiredAssurancePolicyIds"
+												value={p.id}
+												checked={policies.includes(p.id)}
+												onchange={(e) => togglePolicy(p.id, e.currentTarget.checked)}
+											/>
+											{p.label}
+										</label>
+									{/each}
 								</div>
 							</div>
 							<div class="formactions">
@@ -558,7 +633,40 @@
 						</div>
 						<div class="field">
 							<span class="flabel">Permitted children</span>
-							<p>{current.permittedChildTypeIds.length} type(s)</p>
+							{#if current.permittedChildTypeIds.length === 0}
+								<p>— (leaf)</p>
+							{:else}
+								<ul class="childcards">
+									{#each current.permittedChildTypeIds as cid (cid)}
+										{@const rule = current.permittedChildren.find((r) => r.typeId === cid)}
+										{@const child = data.types.find((t) => t.id === cid)}
+										<li>
+											<span class="cardbadge">{rule?.cardinality ?? 'M1'}</span>
+											{child?.name ?? cid}
+											{#if rule?.applicabilityNote}<em class="applic">· {rule.applicabilityNote}</em
+												>{/if}
+										</li>
+									{/each}
+								</ul>
+							{/if}
+						</div>
+						<div class="field assurancerail">
+							<span class="flabel">Assurance rail</span>
+							<div class="railfloor">
+								<div class="raillocked">🔒 de minimis floor · non-removable</div>
+								{#each ASSURANCE_FLOOR as p (p.id)}
+									<div class="railitem" title={p.blurb}>{p.label}</div>
+								{/each}
+							</div>
+							{#if current.requiredAssurancePolicyIds.length}
+								<div class="railadd">
+									{#each current.requiredAssurancePolicyIds as pid (pid)}
+										<div class="railitem plus">+ {policyLabel(pid)}</div>
+									{/each}
+								</div>
+							{:else}
+								<span class="fhelp">No additional policies declared (the floor still applies).</span>
+							{/if}
 						</div>
 						{#if editable}
 							<div class="inspactions">
@@ -1027,6 +1135,100 @@
 		gap: 6px;
 		font-size: 12px;
 		color: var(--on-variant);
+	}
+	.childrow {
+		display: flex;
+		align-items: center;
+		gap: 6px;
+		flex-wrap: wrap;
+	}
+	.childrow .childopt {
+		flex: 1 1 auto;
+		min-width: 90px;
+	}
+	.cardsel {
+		font-size: 10px;
+		padding: 1px 2px;
+		background: #232324;
+		color: var(--on-variant);
+		border: 1px solid var(--outline);
+		border-radius: 4px;
+	}
+	.cardnote {
+		flex: 1 1 100%;
+		font-size: 11px;
+		padding: 2px 5px;
+		background: #232324;
+		color: var(--on-variant);
+		border: 1px solid var(--outline);
+		border-radius: 4px;
+	}
+	.policylist {
+		display: flex;
+		flex-direction: column;
+		gap: 4px;
+	}
+	.floornote {
+		font-size: 10.5px;
+		color: var(--outline);
+		padding-bottom: 2px;
+	}
+	.childcards {
+		list-style: none;
+		margin: 0;
+		padding: 0;
+		display: flex;
+		flex-direction: column;
+		gap: 3px;
+	}
+	.childcards li {
+		font-size: 12.5px;
+		color: var(--on-variant);
+		display: flex;
+		align-items: baseline;
+		gap: 6px;
+	}
+	.cardbadge {
+		font-family: 'Source Code Pro', monospace;
+		font-size: 10px;
+		font-weight: 600;
+		color: #9fcaff;
+		border: 1px solid #345;
+		border-radius: 4px;
+		padding: 0 4px;
+		flex: 0 0 auto;
+	}
+	.applic {
+		color: var(--outline);
+		font-size: 11px;
+	}
+	.assurancerail {
+		border-left: 2px solid #4a4a2a;
+		padding-left: 8px;
+	}
+	.railfloor {
+		border-radius: 6px;
+		background: #201f16;
+		border: 1px solid #4a4a2a;
+		padding: 6px 8px;
+		margin-bottom: 4px;
+	}
+	.raillocked {
+		font-size: 10.5px;
+		font-weight: 600;
+		color: #d8c56a;
+		margin-bottom: 3px;
+	}
+	.railitem {
+		font-size: 11.5px;
+		color: var(--on-variant);
+		line-height: 1.5;
+	}
+	.railitem.plus {
+		color: #61dac1;
+	}
+	.railadd {
+		padding: 2px 0 0 2px;
 	}
 	.formactions {
 		display: flex;

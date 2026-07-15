@@ -129,3 +129,70 @@ export const PWU_TYPE_CATALOG: readonly PwuTypeTemplate[] = [
 export function catalogTemplate(key: string): PwuTypeTemplate | undefined {
 	return PWU_TYPE_CATALOG.find((t) => t.key === key);
 }
+
+/** One assurance policy as the authoring surfaces present it (id + human label + one-line blurb). */
+export interface AssurancePolicyOption {
+	readonly id: string;
+	readonly label: string;
+	readonly blurb: string;
+}
+
+/** The locked, non-removable de-minimis assurance floor (§11.7.4). Every PWU Type carries it implicitly — it is
+ *  NEVER listed in requiredAssurancePolicyIds and cannot be waived. Shown as the rail's locked section. */
+export const ASSURANCE_FLOOR: readonly AssurancePolicyOption[] = [
+	{
+		id: 'floor.schema-invariant',
+		label: 'Output Contract & Invariant Integrity',
+		blurb: 'Every material output satisfies its contract + the domain invariants.'
+	},
+	{
+		id: 'floor.identity-provenance',
+		label: 'Identity, Provenance & Trace Completeness',
+		blurb: 'Every material transformation is identity/provenance/trace-complete.'
+	},
+	{
+		id: 'floor.reasoning-review',
+		label: 'Reasoning Review',
+		blurb: 'Every material AI/agent output is independently reviewed for genuine obligation discharge.'
+	}
+];
+
+/** The declarable, ADDITIVE assurance policies a PWU Type may require of its future instances (§11.7.4 "required
+ *  treatment"). These sit ON TOP of the locked floor. The Product Realization PWA's seed policies. */
+export const ASSURANCE_POLICY_CATALOG: readonly AssurancePolicyOption[] = [
+	{ id: 'pol_intent_fidelity', label: 'Intent Fidelity', blurb: 'Output stays faithful to approved Intent.' },
+	{
+		id: 'pol_intent_completeness',
+		label: 'Intent Completeness',
+		blurb: 'Intent covers jobs, outcomes, boundary, constraints, and success conditions.'
+	},
+	{
+		id: 'pol_assumption_disclosure',
+		label: 'Assumption Disclosure',
+		blurb: 'Assumptions and residual uncertainty are surfaced, not hidden.'
+	},
+	{
+		id: 'pol_decomposition_coverage',
+		label: 'Decomposition Coverage',
+		blurb: 'Every required child obligation is allocated and covered.'
+	},
+	{
+		id: 'pol_architecture_coverage',
+		label: 'Architecture Coverage',
+		blurb: 'Requirements/constraints are allocated to structure with verification counterparts.'
+	},
+	{
+		id: 'pol_intent_preservation',
+		label: 'Intent Preservation',
+		blurb: 'The promoted result still preserves the approved Intent end-to-end.'
+	}
+];
+
+/** Resolve an assurance-policy id to its human label (floor or additive), falling back to the raw id. */
+export function assurancePolicyLabel(id: string): string {
+	return (
+		ASSURANCE_POLICY_CATALOG.find((p) => p.id === id)?.label ??
+		ASSURANCE_FLOOR.find((p) => p.id === id)?.label ??
+		id
+	);
+}

@@ -11,14 +11,14 @@ import {
 } from '@janumipwb/rph-authoring';
 import type { AuthoringToolDescriptor, ToolRunResult } from './types.js';
 
-const CARDINALITY_CODES: readonly CardinalityCode[] = ['M1', 'M+', 'C1', 'C+'];
+const CARDINALITY_CODES: ReadonlySet<CardinalityCode> = new Set(['M1', 'M+', 'C1', 'C+']);
 
 function str(v: unknown): string {
 	return typeof v === 'string' ? v : '';
 }
 /** Coerce an agent-supplied cardinality string to a valid code, defaulting anything else to M1 (mandatory-one). */
 function asCardinality(v: unknown): CardinalityCode {
-	return CARDINALITY_CODES.includes(v as CardinalityCode) ? (v as CardinalityCode) : 'M1';
+	return CARDINALITY_CODES.has(v as CardinalityCode) ? (v as CardinalityCode) : 'M1';
 }
 function bool(v: unknown): boolean {
 	return v === true || v === 'true';

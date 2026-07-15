@@ -6,6 +6,13 @@
 // (§11), so every authoring control disappears (and the engine rejects the command) once it is no longer DRAFT.
 import { error, fail } from '@sveltejs/kit';
 import { getObject, listPwuTypes, listUndertakings, SEED_UNDERTAKING } from '@janumipwb/rph-engine';
+import type { CardinalityCode, PermittedChildRule } from '@janumipwb/rph-authoring';
+
+const CARDINALITY_CODES: ReadonlySet<CardinalityCode> = new Set(['M1', 'M+', 'C1', 'C+']);
+/** Clamp a form-supplied cardinality to a valid code (anything else -> M1, mandatory exactly one). */
+function asCardinality(v: string): CardinalityCode {
+	return CARDINALITY_CODES.has(v as CardinalityCode) ? (v as CardinalityCode) : 'M1';
+}
 import {
 	dispatch,
 	getEngine,
@@ -60,6 +67,9 @@ export const load: PageServerLoad = ({ params }) => {
 		permittedChildTypeIds: Array.isArray(t.state.permittedChildTypeIds)
 			? (t.state.permittedChildTypeIds as string[])
 			: [],
+		permittedChildren: Array.isArray(t.state.permittedChildren)
+			? (t.state.permittedChildren as PermittedChildRule[])
+			: [],
 		requiredInputs: Array.isArray(t.state.requiredInputs)
 			? (t.state.requiredInputs as string[])
 			: [],
@@ -94,8 +104,10 @@ interface TypeFields {
 	completionRule: string;
 	isRoot: boolean;
 	permittedChildTypeIds: string[];
+	permittedChildren: PermittedChildRule[];
 	requiredInputs: string[];
 	requiredOutputs: string[];
+	requiredAssurancePolicyIds: string[];
 }
 
 /** Split a comma/newline-separated artifact list from a form field into a clean string[]. */
@@ -106,8 +118,17 @@ function csv(v: FormDataEntryValue | null): string[] {
 		.filter(Boolean);
 }
 
-/** Read the shared PWU-Type authoring fields from a form (used by both defineType and editType). */
+/** Read the shared PWU-Type authoring fields from a form (used by both defineType and editType). Per-child
+ *  cardinality is posted as `cardinality:<childId>` / `applicability:<childId>` alongside the child checkbox. */
 function readTypeFields(form: FormData): TypeFields {
+	const permittedChildTypeIds = (form.getAll('permittedChildTypeIds') as string[])
+		.map(String)
+		.filter(Boolean);
+	const permittedChildren: PermittedChildRule[] = permittedChildTypeIds.map((typeId) => {
+		const cardinality = asCardinality(String((form.get(`cardinality:${typeId}`) ?? '') as string));
+		const note = String((form.get(`applicability:${typeId}`) ?? '') as string).trim();
+		return { typeId, cardinality, ...(note ? { applicabilityNote: note } : {}) };
+	});
 	return {
 		name: String((form.get('name') ?? '') as string).trim(),
 		pwuKind: String((form.get('pwuKind') ?? '') as string)
@@ -118,11 +139,13 @@ function readTypeFields(form: FormData): TypeFields {
 		purpose: String((form.get('purpose') ?? '') as string).trim(),
 		completionRule: String((form.get('completionRule') ?? '') as string).trim(),
 		isRoot: form.has('isRoot'),
-		permittedChildTypeIds: (form.getAll('permittedChildTypeIds') as string[])
-			.map(String)
-			.filter(Boolean),
+		permittedChildTypeIds,
+		permittedChildren,
 		requiredInputs: csv(form.get('requiredInputs')),
-		requiredOutputs: csv(form.get('requiredOutputs'))
+		requiredOutputs: csv(form.get('requiredOutputs')),
+		requiredAssurancePolicyIds: (form.getAll('requiredAssurancePolicyIds') as string[])
+			.map(String)
+			.filter(Boolean)
 	};
 }
 
@@ -164,8 +187,10 @@ export const actions: Actions = {
 			isRoot: f.isRoot,
 			...(f.completionRule ? { completionRule: f.completionRule } : {}),
 			permittedChildTypeIds: f.permittedChildTypeIds,
+			permittedChildren: f.permittedChildren,
 			requiredInputs: f.requiredInputs,
-			requiredOutputs: f.requiredOutputs
+			requiredOutputs: f.requiredOutputs,
+			requiredAssurancePolicyIds: f.requiredAssurancePolicyIds
 		});
 		if (r.status !== 'ACCEPTED') return fail(400, { error: r.error?.message ?? r.status });
 		return { definedType: id };
@@ -187,8 +212,10 @@ export const actions: Actions = {
 			isRoot: f.isRoot,
 			...(f.completionRule ? { completionRule: f.completionRule } : {}),
 			permittedChildTypeIds: f.permittedChildTypeIds,
+			permittedChildren: f.permittedChildren,
 			requiredInputs: f.requiredInputs,
-			requiredOutputs: f.requiredOutputs
+			requiredOutputs: f.requiredOutputs,
+			requiredAssurancePolicyIds: f.requiredAssurancePolicyIds
 		});
 		if (r.status !== 'ACCEPTED') return fail(400, { error: r.error?.message ?? r.status });
 		return { editedType: pwuTypeId };

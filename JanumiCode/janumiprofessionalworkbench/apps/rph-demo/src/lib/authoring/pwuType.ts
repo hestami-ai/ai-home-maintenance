@@ -6,5 +6,9 @@ export {
 	PWU_TYPE_HELP,
 	PWU_TYPE_CATALOG,
 	catalogTemplate,
-	type PwuTypeTemplate
+	type PwuTypeTemplate,
+	ASSURANCE_FLOOR,
+	ASSURANCE_POLICY_CATALOG,
+	assurancePolicyLabel,
+	type AssurancePolicyOption
 } from '@janumipwb/rph-authoring/catalog';
