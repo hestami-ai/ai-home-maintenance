@@ -66,7 +66,18 @@ describe('Assurance Policy lifecycle handlers (live)', () => {
 				],
 				evaluatorRole: 'reviewer',
 				independenceRequirement: 'DIFFERENT_AGENT',
-				findingDefinitions: [{ code: 'F-01', severity: 'MATERIAL', statement: 's' }],
+				// A DOC-004 §9.1 FindingDefinition. Was `{ code: 'F-01', severity: 'MATERIAL', statement: 's' }` —
+				// a shape no document defines, accepted because FindingDefinitionSchema was z.record(...) = any object.
+				findingDefinitions: [
+					{
+						code: 'F-01',
+						name: 'F 01',
+						description: 's',
+						defaultSeverity: 'MATERIAL',
+						affectedClaimTypes: ['CORRECTNESS'],
+						defaultControlActions: ['CLARIFY']
+					}
+				],
 				permittedControlActions: ['CLARIFY']
 			},
 			id

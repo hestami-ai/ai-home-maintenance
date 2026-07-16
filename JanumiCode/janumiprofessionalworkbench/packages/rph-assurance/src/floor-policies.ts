@@ -3,7 +3,7 @@
 // mandates all three; §8.10 treats Reasoning Review as a versioned Assurance Policy. The rich rule arrays of the
 // AssurancePolicyDefinition object (disposition/remediation/escalation/waiver rules) are §16.23-unresolved shapes, so
 // the seed fills them empty; the meaningful content is criteria + independence + finding definitions.
-import type { AssessmentCriterion } from '@janumipwb/rph-contracts';
+import type { AssessmentCriterion, FindingDefinition } from '@janumipwb/rph-contracts';
 import type { IndependenceRequirement, Severity } from './assurance-rules.js';
 import { FLOOR_POLICY_IDS, type FloorPolicyId } from './floor.js';
 import { REASONING_REVIEW_CRITERIA } from './validators.js';
@@ -39,10 +39,67 @@ import { REASONING_REVIEW_CRITERIA } from './validators.js';
  * the list to review.
  */
 export type FloorPolicyCriterion = AssessmentCriterion;
-export interface FloorFindingDefinition {
-	readonly code: string;
-	readonly severity: Severity;
-	readonly statement: string;
+/**
+ * A floor finding definition IS a DOC-004 §9.1 `FindingDefinition` — no local restatement, same as the criterion.
+ *
+ * It was `{ code, severity, statement }`: a shape no ratified document defines. §9.1 ratifies
+ * `{ code, name, description, defaultSeverity, affectedClaimTypes, defaultControlActions }`. Migration:
+ *   statement -> description
+ *   severity  -> defaultSeverity   (identical closed union; values preserved exactly)
+ *   name      -> humanizeCode(code) — MECHANICAL, see below
+ *   affectedClaimTypes / defaultControlActions -> the owning policy's own sets (AUTHORED; see findingsFor)
+ */
+export type FloorFindingDefinition = FindingDefinition;
+
+/**
+ * A finding code humanized into §9.1's `name`. MECHANICAL, not authored: a finding code IS its name in
+ * SCREAMING_SNAKE (`SOLUTION_SUBSTITUTION` -> "Solution substitution"), so this is a formatting of existing
+ * content. Contrast `AssessmentCriterion.name`, where the ids ('FS-01-schema') carry no usable name and I
+ * authored 7 — disclosed above. Reasoning Review's finding codes are criterion ids rather than SCREAMING_SNAKE,
+ * so they take the same dash-stripping rule the RR criterion names do.
+ */
+export function humanizeCode(code: string): string {
+	const words = /^[A-Z][A-Z0-9_]*$/.test(code)
+		? code.toLowerCase().replaceAll('_', ' ')
+		: code.replace(/^[A-Z]{2}-\d+-/, '').replaceAll('-', ' ');
+	return words.charAt(0).toUpperCase() + words.slice(1);
+}
+
+/**
+ * Build a policy's §9.1 finding definitions from `{code, severity, statement}` triples plus the POLICY'S OWN
+ * claim types and control actions.
+ *
+ * ⚠️ `affectedClaimTypes` and `defaultControlActions` are AUTHORED. DOC-004 ratifies each policy's finding CODES
+ * (§15.7 etc.) but NEVER which claim types a given finding affects or which actions it should default to. The
+ * owning policy's own sets are the widest reading the ratified model permits and the only non-invented values
+ * available — a narrower per-finding subset would be authored judgment with no source at all. Nothing reads
+ * either field today (zero readers repo-wide), so the risk is not wrong behaviour; it is a future reader
+ * believing a relationship that was inferred. Ratifying per-finding values is a sponsor decision.
+ */
+export function findingsFor(
+	policy: { evaluatedClaimTypes: readonly string[]; permittedControlActions: readonly string[] },
+	raw: readonly { code: string; severity: Severity; statement: string }[]
+): FindingDefinition[] {
+	return raw.map((f) => ({
+		code: f.code,
+		name: humanizeCode(f.code),
+		description: f.statement,
+		defaultSeverity: f.severity,
+		affectedClaimTypes: [...policy.evaluatedClaimTypes] as FindingDefinition['affectedClaimTypes'],
+		defaultControlActions: [
+			...policy.permittedControlActions
+		] as FindingDefinition['defaultControlActions']
+	}));
+}
+
+/** Assemble a floor policy, deriving its findings' claim types + control actions from the policy ITSELF. Doing
+ *  it structurally (rather than repeating the sets at each finding) is what makes it impossible for a finding to
+ *  claim an action its own policy does not permit. */
+function floorPolicy(
+	base: Omit<FloorPolicyDefinition, 'findingDefinitions'>,
+	raw: readonly { code: string; severity: Severity; statement: string }[]
+): FloorPolicyDefinition {
+	return { ...base, findingDefinitions: findingsFor(base, raw) };
 }
 export interface FloorPolicyDefinition {
 	readonly policyId: FloorPolicyId;
@@ -76,75 +133,79 @@ export interface FloorPolicyDefinition {
 	readonly findingDefinitions: readonly FloorFindingDefinition[];
 }
 
-const REASONING_REVIEW: FloorPolicyDefinition = {
-	policyId: FLOOR_POLICY_IDS.REASONING_REVIEW,
-	name: 'Reasoning Review',
-	purpose:
-		'Every material AI/agent output genuinely discharges its delegated professional obligation rather than producing a plausible substitute that conceals the underlying problem.',
-	rationale:
-		'The mandatory, non-suppressible floor for AI-produced work (§8.4). No profile, low-risk classification, or planner may waive it; it requires evaluator independence.',
-	evaluatedClaimTypes: ['CORRECTNESS'],
-	evaluatorRole: 'reasoning-reviewer',
-	independence: 'DIFFERENT_MODEL',
-	permittedControlActions: ['RETRY'],
-	// The ONLY floor policy whose evaluationMethod is MODEL_JUDGMENT: §8.4 step 3's Reasoning Review is a
-	// judgment about whether an AI result genuinely discharged its obligation — it cannot be a deterministic
-	// check, which is exactly why §8.4 requires evaluator independence for it and not for steps 1-2.
-	// `name` is the id's descriptive tail ('RR-01-no-problem-substitution' -> 'no problem substitution') —
-	// existing content, not authored: these ids already carry the criterion's short label.
-	criteria: REASONING_REVIEW_CRITERIA.map((c) => ({
-		id: c.id,
-		name: c.id.replace(/^RR-\d+-/, '').replaceAll('-', ' '),
-		description: c.label,
-		criterionType: 'BOOLEAN' as const,
-		evaluationMethod: 'MODEL_JUDGMENT' as const,
-		requiredEvidenceIds: [],
-		severityIfNotMet: 'BLOCKING' as const,
-		mayBeNotApplicable: false
-	})),
-	findingDefinitions: REASONING_REVIEW_CRITERIA.map((c) => ({
+const REASONING_REVIEW: FloorPolicyDefinition = floorPolicy(
+	{
+		policyId: FLOOR_POLICY_IDS.REASONING_REVIEW,
+		name: 'Reasoning Review',
+		purpose:
+			'Every material AI/agent output genuinely discharges its delegated professional obligation rather than producing a plausible substitute that conceals the underlying problem.',
+		rationale:
+			'The mandatory, non-suppressible floor for AI-produced work (§8.4). No profile, low-risk classification, or planner may waive it; it requires evaluator independence.',
+		evaluatedClaimTypes: ['CORRECTNESS'],
+		evaluatorRole: 'reasoning-reviewer',
+		independence: 'DIFFERENT_MODEL',
+		permittedControlActions: ['RETRY'],
+		// The ONLY floor policy whose evaluationMethod is MODEL_JUDGMENT: §8.4 step 3's Reasoning Review is a
+		// judgment about whether an AI result genuinely discharged its obligation — it cannot be a deterministic
+		// check, which is exactly why §8.4 requires evaluator independence for it and not for steps 1-2.
+		// `name` is the id's descriptive tail ('RR-01-no-problem-substitution' -> 'no problem substitution') —
+		// existing content, not authored: these ids already carry the criterion's short label.
+		criteria: REASONING_REVIEW_CRITERIA.map((c) => ({
+			id: c.id,
+			name: c.id.replace(/^RR-\d+-/, '').replaceAll('-', ' '),
+			description: c.label,
+			criterionType: 'BOOLEAN' as const,
+			evaluationMethod: 'MODEL_JUDGMENT' as const,
+			requiredEvidenceIds: [],
+			severityIfNotMet: 'BLOCKING' as const,
+			mayBeNotApplicable: false
+		}))
+	},
+	REASONING_REVIEW_CRITERIA.map((c) => ({
 		code: c.id,
 		severity: 'MATERIAL' as const,
 		statement: `Reasoning-review failure: ${c.label}`
 	}))
-};
+);
 
-const SCHEMA_INVARIANT: FloorPolicyDefinition = {
-	policyId: FLOOR_POLICY_IDS.SCHEMA_INVARIANT,
-	name: 'Output Contract & Invariant Integrity',
-	purpose:
-		'Every material output conforms to its object contract/schema and all applicable deterministic invariants.',
-	rationale: 'Floor step 1 (§8.4): a candidate that fails its contract cannot be admitted.',
-	evaluatedClaimTypes: ['CORRECTNESS'],
-	evaluatorRole: 'deterministic-schema-validator',
-	independence: 'NONE',
-	permittedControlActions: ['ESCALATE'],
-	// evaluationMethod DETERMINISTIC: this floor's evaluator is `deterministic-schema-validator` — a contract
-	// check, not a judgment. severityIfNotMet BLOCKING: §8.4 step 1, "a candidate that fails its contract cannot
-	// be admitted." mayBeNotApplicable false: the floor always applies to a material transformation.
-	criteria: [
-		{
-			id: 'FS-01-schema',
-			name: 'Schema conformance',
-			description: 'The output conforms to its object contract / schema.',
-			criterionType: 'BOOLEAN',
-			evaluationMethod: 'DETERMINISTIC',
-			requiredEvidenceIds: [],
-			severityIfNotMet: 'BLOCKING',
-			mayBeNotApplicable: false
-		},
-		{
-			id: 'FS-02-invariants',
-			name: 'Invariant integrity',
-			description: 'All applicable deterministic invariants hold.',
-			criterionType: 'BOOLEAN',
-			evaluationMethod: 'DETERMINISTIC',
-			requiredEvidenceIds: [],
-			severityIfNotMet: 'BLOCKING',
-			mayBeNotApplicable: false
-		}
-	],
-	findingDefinitions: [
+const SCHEMA_INVARIANT: FloorPolicyDefinition = floorPolicy(
+	{
+		policyId: FLOOR_POLICY_IDS.SCHEMA_INVARIANT,
+		name: 'Output Contract & Invariant Integrity',
+		purpose:
+			'Every material output conforms to its object contract/schema and all applicable deterministic invariants.',
+		rationale: 'Floor step 1 (§8.4): a candidate that fails its contract cannot be admitted.',
+		evaluatedClaimTypes: ['CORRECTNESS'],
+		evaluatorRole: 'deterministic-schema-validator',
+		independence: 'NONE',
+		permittedControlActions: ['ESCALATE'],
+		// evaluationMethod DETERMINISTIC: this floor's evaluator is `deterministic-schema-validator` — a contract
+		// check, not a judgment. severityIfNotMet BLOCKING: §8.4 step 1, "a candidate that fails its contract cannot
+		// be admitted." mayBeNotApplicable false: the floor always applies to a material transformation.
+		criteria: [
+			{
+				id: 'FS-01-schema',
+				name: 'Schema conformance',
+				description: 'The output conforms to its object contract / schema.',
+				criterionType: 'BOOLEAN',
+				evaluationMethod: 'DETERMINISTIC',
+				requiredEvidenceIds: [],
+				severityIfNotMet: 'BLOCKING',
+				mayBeNotApplicable: false
+			},
+			{
+				id: 'FS-02-invariants',
+				name: 'Invariant integrity',
+				description: 'All applicable deterministic invariants hold.',
+				criterionType: 'BOOLEAN',
+				evaluationMethod: 'DETERMINISTIC',
+				requiredEvidenceIds: [],
+				severityIfNotMet: 'BLOCKING',
+				mayBeNotApplicable: false
+			}
+		]
+	},
+	[
 		{
 			code: 'SCHEMA_INVALID',
 			severity: 'CRITICAL',
@@ -156,80 +217,82 @@ const SCHEMA_INVARIANT: FloorPolicyDefinition = {
 			statement: 'A deterministic invariant was violated.'
 		}
 	]
-};
+);
 
-const IDENTITY_PROVENANCE: FloorPolicyDefinition = {
-	policyId: FLOOR_POLICY_IDS.IDENTITY_PROVENANCE,
-	name: 'Identity, Provenance & Trace Completeness',
-	purpose:
-		'Every material output carries a stable identity, semantic version, provenance, producing actor, and complete trace.',
-	rationale: 'Floor step 2 (§8.4): an untraceable output cannot be admitted or later assessed.',
-	evaluatedClaimTypes: ['CONSISTENCY'],
-	evaluatorRole: 'deterministic-provenance-validator',
-	independence: 'NONE',
-	permittedControlActions: ['ESCALATE'],
-	// All DETERMINISTIC (evaluator: `deterministic-provenance-validator`) and BLOCKING — §8.4 step 2: "an
-	// untraceable output cannot be admitted or later assessed."
-	criteria: [
-		{
-			id: 'IP-01-identity',
-			name: 'Stable identity',
-			description: 'The subject has a stable identity.',
-			criterionType: 'BOOLEAN',
-			evaluationMethod: 'DETERMINISTIC',
-			requiredEvidenceIds: [],
-			severityIfNotMet: 'BLOCKING',
-			mayBeNotApplicable: false
-		},
-		{
-			id: 'IP-02-version',
-			name: 'Semantic version',
-			description: 'The subject carries a semantic version.',
-			criterionType: 'BOOLEAN',
-			evaluationMethod: 'DETERMINISTIC',
-			requiredEvidenceIds: [],
-			severityIfNotMet: 'BLOCKING',
-			mayBeNotApplicable: false
-		},
-		{
-			id: 'IP-03-provenance',
-			name: 'Provenance recorded',
-			description: 'The subject records its provenance.',
-			criterionType: 'BOOLEAN',
-			evaluationMethod: 'DETERMINISTIC',
-			requiredEvidenceIds: [],
-			severityIfNotMet: 'BLOCKING',
-			mayBeNotApplicable: false
-		},
-		{
-			id: 'IP-04-producer',
-			name: 'Producing actor recorded',
-			description: 'The producing actor is recorded.',
-			criterionType: 'BOOLEAN',
-			evaluationMethod: 'DETERMINISTIC',
-			requiredEvidenceIds: [],
-			severityIfNotMet: 'BLOCKING',
-			mayBeNotApplicable: false
-		},
-		{
-			id: 'IP-05-trace',
-			name: 'Trace completeness',
-			description: 'Input/context/output trace is complete.',
-			criterionType: 'BOOLEAN',
-			evaluationMethod: 'DETERMINISTIC',
-			requiredEvidenceIds: [],
-			severityIfNotMet: 'BLOCKING',
-			mayBeNotApplicable: false
-		}
-	],
-	findingDefinitions: [
+const IDENTITY_PROVENANCE: FloorPolicyDefinition = floorPolicy(
+	{
+		policyId: FLOOR_POLICY_IDS.IDENTITY_PROVENANCE,
+		name: 'Identity, Provenance & Trace Completeness',
+		purpose:
+			'Every material output carries a stable identity, semantic version, provenance, producing actor, and complete trace.',
+		rationale: 'Floor step 2 (§8.4): an untraceable output cannot be admitted or later assessed.',
+		evaluatedClaimTypes: ['CONSISTENCY'],
+		evaluatorRole: 'deterministic-provenance-validator',
+		independence: 'NONE',
+		permittedControlActions: ['ESCALATE'],
+		// All DETERMINISTIC (evaluator: `deterministic-provenance-validator`) and BLOCKING — §8.4 step 2: "an
+		// untraceable output cannot be admitted or later assessed."
+		criteria: [
+			{
+				id: 'IP-01-identity',
+				name: 'Stable identity',
+				description: 'The subject has a stable identity.',
+				criterionType: 'BOOLEAN',
+				evaluationMethod: 'DETERMINISTIC',
+				requiredEvidenceIds: [],
+				severityIfNotMet: 'BLOCKING',
+				mayBeNotApplicable: false
+			},
+			{
+				id: 'IP-02-version',
+				name: 'Semantic version',
+				description: 'The subject carries a semantic version.',
+				criterionType: 'BOOLEAN',
+				evaluationMethod: 'DETERMINISTIC',
+				requiredEvidenceIds: [],
+				severityIfNotMet: 'BLOCKING',
+				mayBeNotApplicable: false
+			},
+			{
+				id: 'IP-03-provenance',
+				name: 'Provenance recorded',
+				description: 'The subject records its provenance.',
+				criterionType: 'BOOLEAN',
+				evaluationMethod: 'DETERMINISTIC',
+				requiredEvidenceIds: [],
+				severityIfNotMet: 'BLOCKING',
+				mayBeNotApplicable: false
+			},
+			{
+				id: 'IP-04-producer',
+				name: 'Producing actor recorded',
+				description: 'The producing actor is recorded.',
+				criterionType: 'BOOLEAN',
+				evaluationMethod: 'DETERMINISTIC',
+				requiredEvidenceIds: [],
+				severityIfNotMet: 'BLOCKING',
+				mayBeNotApplicable: false
+			},
+			{
+				id: 'IP-05-trace',
+				name: 'Trace completeness',
+				description: 'Input/context/output trace is complete.',
+				criterionType: 'BOOLEAN',
+				evaluationMethod: 'DETERMINISTIC',
+				requiredEvidenceIds: [],
+				severityIfNotMet: 'BLOCKING',
+				mayBeNotApplicable: false
+			}
+		]
+	},
+	[
 		{ code: 'IP-01-identity', severity: 'BLOCKING', statement: 'Missing/unstable identity.' },
 		{ code: 'IP-02-version', severity: 'BLOCKING', statement: 'Missing semantic version.' },
 		{ code: 'IP-03-provenance', severity: 'BLOCKING', statement: 'Missing provenance.' },
 		{ code: 'IP-04-producer', severity: 'BLOCKING', statement: 'Missing producing actor.' },
 		{ code: 'IP-05-trace', severity: 'BLOCKING', statement: 'Incomplete trace.' }
 	]
-};
+);
 
 /**
  * The Reasoning Review policy's criteria AS SEEDED — i.e. what the store holds until someone revises the policy.

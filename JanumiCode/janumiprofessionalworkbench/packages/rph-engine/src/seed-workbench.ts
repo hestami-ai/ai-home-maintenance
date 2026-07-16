@@ -5,7 +5,7 @@
 // demonstrated end to end. It is deterministic: it drives commands; no fixture event log is replayed.
 import type { ActorReference, DomainCommand } from '@janumipwb/rph-contracts';
 import type { AssessmentCriterion } from '@janumipwb/rph-contracts';
-import { FLOOR_POLICY_DEFINITIONS } from '@janumipwb/rph-assurance';
+import { FLOOR_POLICY_DEFINITIONS, findingsFor, type Severity } from '@janumipwb/rph-assurance';
 import type { EngineHandle } from './engine.js';
 import { driveReferenceUndertaking } from './reference-undertaking.js';
 
@@ -199,7 +199,14 @@ interface AdditivePolicySeed {
 	 *  and ontology.ts. It survived because AssurancePolicy.criteria was an array of ANY OBJECT
 	 *  (AUDIT-placeholder-helpers.md). Aliasing means the next divergence fails the build. */
 	readonly criteria: readonly AssessmentCriterion[];
-	readonly findingDefinitions: ReadonlyArray<{ code: string; severity: string; statement: string }>;
+	/** RAW triples. Converted to DOC-004 §9.1 FindingDefinitions at the seeding call by rph-assurance's
+	 *  `findingsFor`, which derives each finding's affectedClaimTypes/defaultControlActions from THIS policy's
+	 *  own sets — structurally, so a finding cannot claim an action its own policy does not permit. */
+	readonly findingDefinitions: ReadonlyArray<{
+		code: string;
+		severity: Severity;
+		statement: string;
+	}>;
 }
 
 const ADDITIVE_POLICY_SEEDS: readonly AdditivePolicySeed[] = [
@@ -573,7 +580,7 @@ export function seedAdditivePolicies(handle: EngineHandle): void {
 			criteria: p.criteria,
 			evaluatorRole: p.evaluatorRole,
 			independenceRequirement: p.independence,
-			findingDefinitions: p.findingDefinitions,
+			findingDefinitions: findingsFor(p, p.findingDefinitions),
 			permittedControlActions: p.permittedControlActions
 		});
 	}

@@ -90,8 +90,6 @@ export const ExecutionProvenanceSchema = z.record(z.string(), z.unknown());
 export type ExecutionProvenance = z.infer<typeof ExecutionProvenanceSchema>;
 export const ExecutionTransitionSchema = z.record(z.string(), z.unknown());
 export type ExecutionTransition = z.infer<typeof ExecutionTransitionSchema>;
-export const FindingDefinitionSchema = z.record(z.string(), z.unknown());
-export type FindingDefinition = z.infer<typeof FindingDefinitionSchema>;
 export const InputBindingSchema = z.record(z.string(), z.unknown());
 export type InputBinding = z.infer<typeof InputBindingSchema>;
 export const ModelSelectionPolicySchema = z.record(z.string(), z.unknown());
@@ -207,6 +205,15 @@ export const ExecutionStepSchema = z.strictObject({
 	stepState: StepStateSchema
 });
 export type ExecutionStep = z.infer<typeof ExecutionStepSchema>;
+export const FindingDefinitionSchema = z.strictObject({
+	code: z.string(),
+	name: z.string(),
+	description: z.string(),
+	defaultSeverity: AssuranceSeveritySchema,
+	affectedClaimTypes: z.array(ClaimTypeSchema),
+	defaultControlActions: z.array(ControlActionSchema)
+});
+export type FindingDefinition = z.infer<typeof FindingDefinitionSchema>;
 export const IntentMappingSchema = z.strictObject({
 	childWorkUnitId: z.string(),
 	servesParentIntentOrObligationId: z.string(),

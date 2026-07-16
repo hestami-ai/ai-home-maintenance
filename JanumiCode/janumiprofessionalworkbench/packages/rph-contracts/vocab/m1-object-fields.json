@@ -2394,14 +2394,47 @@
       "name": "FindingDefinition",
       "fields": [
         {
-          "field": "(undefined)",
-          "type": "—",
-          "required": false,
-          "note": "Referenced by AssurancePolicyDefinition.findingDefinitions. NOT field-defined; DOC-004 §9.1 supplies defaultSeverity (AssuranceSeveritySchema) + defaultControlActions (ControlActionSchema) + affectedClaimTypes (ClaimTypeSchema). Source TBD."
+          "field": "code",
+          "type": "string",
+          "required": true,
+          "note": "DOC-004 §9.1. The finding code. RATIFIED PER POLICY as well: each policy's Findings section (§15.7, §16.5, §17.5, §18.5, §19.6, §20.4, §21.5, §22.5, §23.5, §24.5, §25.5, §26.5) lists its codes — 100 in total. Referenced at runtime by the floor gate's openFindingCodes and by a waiver's WaiverDetail.waivedCriterionId path."
+        },
+        {
+          "field": "name",
+          "type": "string",
+          "required": true,
+          "note": "DOC-004 §9.1. DERIVED MECHANICALLY from `code`, not authored: the finding codes ARE the names in SCREAMING_SNAKE (SOLUTION_SUBSTITUTION -> 'Solution substitution'). This is unlike AssessmentCriterion.name, where the ids ('FS-01-schema') carry no usable name and I authored 7 — disclosed in floor-policies.ts. Here the humanization is a formatting of existing content."
+        },
+        {
+          "field": "description",
+          "type": "string",
+          "required": true,
+          "note": "DOC-004 §9.1. Where the invented `statement` field's content goes."
+        },
+        {
+          "field": "defaultSeverity",
+          "type": "AssuranceSeverity",
+          "required": true,
+          "enumRef": "AssuranceSeveritySchema",
+          "note": "DOC-004 §9.1: INFORMATIONAL|ADVISORY|MATERIAL|BLOCKING|CRITICAL — the same closed union as AssessmentCriterion.severityIfNotMet (§7). Direct rename of the invented `severity` field; values preserved exactly."
+        },
+        {
+          "field": "affectedClaimTypes",
+          "type": "ClaimType[]",
+          "required": true,
+          "enumRef": "ClaimTypeSchema",
+          "note": "DOC-004 §9.1. ⚠️ AUTHORED, and the only genuinely judged field here. DOC-004 ratifies each policy's finding CODES but NEVER which claim types a given finding affects. Set to the finding's OWN POLICY's `evaluatedClaimTypes` — the widest reading the ratified model permits, and the only non-invented value available: a narrower per-finding subset would be authored judgment with no source at all. Nothing reads this field today (verified: zero readers repo-wide), so the risk is not wrong behaviour — it is a future reader believing a relationship that was inferred. Ratifying per-finding claim types is a sponsor decision."
+        },
+        {
+          "field": "defaultControlActions",
+          "type": "ControlAction[]",
+          "required": true,
+          "enumRef": "ControlActionSchema",
+          "note": "DOC-004 §9.1. ⚠️ AUTHORED, same reasoning as affectedClaimTypes. Set to the finding's OWN POLICY's `permittedControlActions` — which for 4 of the 6 additive policies is now DOC-004's ratified set (§15.10/§17.8/§19.8/§23.7), so the value is structurally constrained by the model even though the per-finding default is not ratified. Nothing reads it today."
         }
       ],
-      "sourceSection": "DOC-004 §9.1 (L474)",
-      "note": "RATIFIED AFTER ALL — audit 2026-07-16 (AUDIT-placeholder-helpers.md). DOC-004 §9.1 (L474) contains `interface FindingDefinition { ... }` defining: code, name, description, defaultSeverity, affectedClaimTypes, defaultControlActions. The previous note said 'NOT field-defined ... Source TBD' WHILE CITING THIS SECTION — the harvest pass reached inside this very interface, took its enums, and recorded its fields as nonexistent. A pass that extracts one kind of thing reports the absence of every other kind. STILL A PLACEHOLDER IN CODE: the single '(undefined)' field below keeps gen-objects.ts emitting z.record(z.string(), z.unknown()) — 'any object'. TRANSCRIPTION CAVEAT: All 6 resolvable — ControlAction (DOC-004) and ClaimType both exist. NOT fixed here: tightening this breaks live literals and needs an explicit migration, not a sweep."
+      "sourceSection": "DOC-004 §9.1 (L474) — RATIFIED shape, field-complete, transcribed",
+      "note": "TRANSCRIBED from DOC-004 §9.1 on 2026-07-16. The previous entry was a single '(undefined)' field noted 'Referenced by AssurancePolicyDefinition.findingDefinitions. NOT field-defined; DOC-004 §9.1 supplies defaultSeverity + defaultControlActions + affectedClaimTypes. Source TBD.' — CITING THE SECTION THAT DEFINES IT, exactly like AssessmentCriterion (§7): the harvest pass took the enums out of the interface and recorded its fields as nonexistent. HONEST SPLIT of the 6 fields: 3 are TRANSCRIPTION (code; description<-statement; defaultSeverity<-severity), 1 is MECHANICAL (name, humanized from code), and 2 are AUTHORED (affectedClaimTypes, defaultControlActions — set to the owning policy's own sets; see their notes). findingDefinitions has ZERO readers repo-wide, so this is documentation-grade, not behaviour-grade. SEPARATE AND UNRESOLVED: the seed ships 11 of DOC-004's 100 ratified finding codes (6 policies ship zero of theirs). Whether the seeded library is a deliberate demo subset or is meant to be the catalog is a product question, not a schema one — surfaced, not decided."
     },
     {
       "name": "DispositionRule",
