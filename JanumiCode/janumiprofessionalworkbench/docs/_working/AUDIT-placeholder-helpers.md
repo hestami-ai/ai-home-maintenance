@@ -161,6 +161,48 @@ a **correct** break (they encode a shape no document ratifies), but it is a migr
 it: `statement` → `description`, `mandatory: true` → `severityIfNotMet: 'BLOCKING'`, and four fields that have
 no current value at all. Doing that as a silent tail-end sweep is how you ship confidently-wrong architecture.
 
+## ⏸ WIP PARKED 2026-07-16 — `git stash@{0}`, step 1 started and INCOMPLETE
+
+Step 1 (`AssessmentCriterion`) was begun and **stashed unfinished at a session pause**, tests RED. It is **not**
+on any branch and **HEAD (`c62e464`) is green** — the stash is optional history, not a dependency. Recovering it
+is a convenience; **re-doing it from this document is equally safe** and probably cleaner.
+
+```
+git stash list       # stash@{0} "WIP AssessmentCriterion tightening (INCOMPLETE, tests RED)"
+git stash pop        # to resume; expect RED until the writers below are migrated
+```
+
+**Done in the stash:** vocab `AssessmentCriterion` → the 8 DOC-004 §7 fields (codegen emits a real
+`z.strictObject`, verified); `Create/EditAssurancePolicy.criteria` `unknown[]` → `AssessmentCriterion[]`;
+`m8-ontology.json`'s 41 seed criteria migrated; `ontology.ts`'s `Criterion` re-derived from the contract as a
+deep-readonly mapped type (the dataset is `as const`); `floor-policies.ts`'s 3 floor policies migrated by hand.
+`check-types` passed.
+
+**NOT done — the remaining writers (this is why it is RED):**
+1. `seed-workbench.ts` — `AdditivePolicySeed.criteria` is a **third inline restatement** of `{id, statement,
+   mandatory}`; retype to `readonly AssessmentCriterion[]` and migrate ~20 literals. **Do NOT touch
+   `findingDefinitions`** — its `{code, severity, statement}` is a *different* invented shape (DOC-004 §9.1) and
+   belongs to step 2.
+2. `apps/rph-demo/src/routes/pwa/[id]/+page.server.ts` — `readPolicyFields` mints `{id, statement, mandatory:
+   true}` (~L193) and the read-back maps `c.statement` (~L112). Both → `description`.
+3. `broker.test.ts`, `assurance-policy.test.ts` — fixture premise.
+
+**The migration rule, already applied and to be continued (no invention):**
+`statement`→`description`; `mandatory:true`→`severityIfNotMet:'BLOCKING'`, `false`→`'ADVISORY'`;
+`criterionType:'BOOLEAN'`; `evaluationMethod` DETERMINISTIC for the two deterministic floors, MODEL_JUDGMENT
+for Reasoning Review and the 6 additive policies; `requiredEvidenceIds:[]`; `mayBeNotApplicable:false`.
+`name` = **the author's own label** where the statement reads `"Label: sentence"` (12 of 41), else **the id**
+(29 of 41) — existing content only; authoring 29 real criterion names is *content*, not schema transcription,
+and is deliberately not done.
+
+**Proof it works:** with the schema tightened, the engine now REJECTS the seed with
+`Unrecognized keys: "statement", "mandatory"` — the contract catching the invented shape for the first time.
+
+**A finding surfaced while doing it, not yet written up:** the 6 additive policies exist **twice** —
+`m8-ontology.json`'s `seedPolicies` *and* `seed-workbench.ts`'s `ADDITIVE_POLICY_SEEDS`, same ids
+(`pol_intent_fidelity`), independently maintained. That is the "parallel unsynchronized restatement" pattern
+again, and it doubled this migration's literal count.
+
 ## Recommended sequencing
 
 1. **`AssessmentCriterion`** (8/8 clean) — with the floor/seed/validator migration done explicitly, not implied.
