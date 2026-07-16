@@ -154,6 +154,47 @@ undefined-typed fields permissive and labeled — which is still strictly better
 **`AssessmentCriterion` is the highest-value, lowest-risk fix in the repo right now**: zero undefined
 dependencies, and it is the type the entire assurance floor is expressed in.
 
+> ### ⚠️ CORRECTION 2026-07-16 — "clean" in the table above means the WRONG thing, and it misled my own sequencing
+>
+> That column counts **fields whose TYPE resolves** (no undefined dependent helper). It does **not** mean *the
+> content exists to fill them*. Those are different questions and I conflated them — then sequenced off the
+> conflation.
+>
+> | helper | types resolve | **content exists** |
+> |---|---:|---|
+> | `AssessmentCriterion` | 8/8 | **5 of 8** — `name`, `criterionType`, `evaluationMethod` had no source. I authored `name` and got caught claiming otherwise (Increment 11a). |
+> | `FindingDefinition` | 6/6 | **3 of 6** — `code`, `description`(←`statement`), `defaultSeverity`(←`severity`) exist. **`name`, `affectedClaimTypes`, `defaultControlActions` have no source at all.** |
+>
+> DOC-004 ratifies `FindingDefinition`'s **shape** (§9.1) and each policy's **finding CODES** (§15.7, §16.5, …)
+> — but the per-code *name*, *affected claim types* and *default control actions* **are ratified nowhere**.
+> Transcribing the shape therefore forces authoring **33 values across the 11 existing findings**, 22 of them
+> *semantics* rather than labels. `affectedClaimTypes: []` would assert "this finding affects no claims" —
+> false. Filling it from the policy's own `evaluatedClaimTypes` is an **inference**, not a transcription.
+>
+> **That is a materially different proposition from `AssessmentCriterion`, and the table above hides it.** The
+> "recommended sequencing" below is corrected accordingly: `FindingDefinition` is *not* the cheap second step.
+
+### MEASURED 2026-07-16 — the seeded policy library is 11% of DOC-004's ratified findings
+
+Counting every `` * `CODE` `` under each policy's Findings section:
+
+| | |
+|---|---:|
+| ratified finding codes in DOC-004 (§15.7 … §26.5, 12 policies) | **100** |
+| present in the seed | **11** |
+| **absent** | **89** |
+
+Every one of the seed's 11 **is** ratified (no invented codes), and the floor's own 2 (`SCHEMA_INVALID`,
+`INVARIANT_VIOLATION`) are guide-only — consistent, since the de minimis floor is not in DOC-004's catalog at
+all. Per policy: POL-INTENT-FIDELITY 2 of 7, POL-DECOMPOSITION-COVERAGE 2 of 10, POL-ARCHITECTURE-COVERAGE 2 of
+12; POL-REQUIREMENT-COVERAGE, POL-CONSTRAINT-PROPAGATION, POL-HISTORICAL-CONSISTENCY, POL-TEST-ADEQUACY,
+POL-FITNESS-FOR-PURPOSE and POL-BASELINE-PROMOTION ship **zero** of theirs.
+
+**This is not necessarily a defect** — the seed is a demonstration fixture and may be a deliberate subset. It
+*is* a fact worth knowing before anyone treats the seeded library as the catalog: the ratified codes are pure
+transcription (89 of them), but each needs the three unratified fields above to become a `FindingDefinition`.
+**Whether to populate the catalog is a sponsor decision, not a schema one.**
+
 **Blast radius, stated up front, because it is the reason this is not being done inside this audit:** tightening
 `AssessmentCriterion` breaks every `{id, statement, mandatory}` literal — the 3 floor policies, the 6 seed
 policies, the mock Reasoning-Review Validator, and the PWA Designer's policy-manager authoring surface. That is
@@ -195,9 +236,23 @@ literal count. Not fixed — dedup is its own decision.
 
 ## Recommended sequencing
 
-1. **`AssessmentCriterion`** (8/8 clean) — with the floor/seed/validator migration done explicitly, not implied.
-2. **`FindingDefinition`** (6/6 clean) — same shape of change, smaller blast radius.
-3. **`WaiverRule`** (7/8) — retires the hand-rolled floor content-lock in favour of the ratified `waiverAllowed`.
+> **RE-ORDERED 2026-07-16.** The original order ranked by "types resolve" and put `FindingDefinition` second as
+> "same shape of change, smaller blast radius". **Both halves of that were wrong**: it needs 3 of 6 fields
+> authored (22 of the 33 values being semantics, not labels), which makes it the *most* inventive of the three,
+> not the cheapest. Rank by **content available**, not by types resolving.
+
+1. **`AssessmentCriterion`** (5 of 8 fields had content) — **DONE**, `9035a37` + `581be51`.
+2. **`WaiverRule`** (§12.1) — **now second.** Its instances are `waiverRules: []` everywhere ("the seed fills
+   them empty"), so tightening the shape migrates *nothing* — the cheapest of the three by a wide margin. It
+   also ratifies `waiverAllowed` + `requiredAuthorityType`: the real home for the floor content-lock that
+   `rejectIfFloorLocked` hand-rolls today (recorded as my own invention, with an INV-5 misattribution).
+   ⚠️ Shape only. **Retiring the lock needs the store→runtime content path to be real first** — an edited
+   criterion that changes the UI card and nothing in the evaluation is "a policy that lies about what it
+   checks", which is worse than the lock.
+3. **`FindingDefinition`** (§9.1) — **now last of the three, and it is a CONTENT decision, not a schema one.**
+   Sponsor call: (a) author `name`/`affectedClaimTypes`/`defaultControlActions` for the existing 11 and disclose
+   it, (b) leave it a placeholder until DOC-004 ratifies the per-code fields, or (c) fold it into a catalog pass
+   that also transcribes the 89 absent ratified codes.
 4. **`ValidatorResult`** — delete it from `FORCE_PLACEHOLDER`; the vocab already carries its fields.
    ⚠️ **A ratified conflict must be resolved first** (§17: surface, don't silently choose): **DOC-007 §20**
    defines 16 fields **including `subjectSemanticVersions`**; **DOC-004 §4.2** defines 15, **omitting it**.
