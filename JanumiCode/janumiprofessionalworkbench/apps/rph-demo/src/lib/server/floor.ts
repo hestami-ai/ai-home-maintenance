@@ -9,6 +9,7 @@ import {
 	FLOOR_POLICY_IDS,
 	runFloorAndPlanRecording,
 	type AssuranceSubject,
+	type IdentityProvenanceFacts,
 	type ProfessionalRationaleSummary,
 	type ValidatorContext
 } from '@janumipwb/rph-assurance';
@@ -58,6 +59,34 @@ export interface FloorView {
 	readonly policies: FloorPolicyView[];
 	/** Open Reasoning-Review finding statements — drive the auto-refine directive and the UI gap list. */
 	readonly reasoningGaps: string[];
+}
+
+/**
+ * The identity/provenance/trace facts (§8.4 step 2) DERIVED from the real PWA object under review, not asserted.
+ * These were five literal `true`s — a floor step that certifies itself and can never fail (findings 18/67; the
+ * vacuity audit). Four are now computed: a PWA missing a stable id, a semantic version, a provenance record, or
+ * an identified producer now fails IP-01/02/03/04 and blocks, as §8.4 step 2's checks require. "The engine
+ * always adds provenance" is exactly the complacency the floor exists to counter — it re-checks rather than trusts.
+ *
+ * `traceComplete` (IP-05) stays asserted and is DISCLOSED as withheld: §8.4 step 2 names a "trace completeness"
+ * check, but no ratified definition of trace-completeness exists as a computable predicate (the causal chain §5.6
+ * describes is not contracted as one condition), and §0.3 forbids an agent inventing one. It becomes real the
+ * moment that definition lands — the same posture as the readiness guard's withheld limbs and the waiver.
+ */
+export function identityProvenanceFactsOf(
+	pwa: Record<string, unknown>,
+	producer: FloorProducer
+): IdentityProvenanceFacts {
+	const id = pwa.id;
+	const prov = pwa.provenance as { originType?: unknown } | undefined;
+	return {
+		hasStableId: typeof id === 'string' && id.length > 0,
+		hasSemanticVersion: Number(pwa.semanticVersion) >= 1,
+		hasProvenance: !!prov && typeof prov.originType === 'string' && prov.originType.length > 0,
+		hasProducer:
+			producer.agentId.length > 0 && (producer.modelId.length > 0 || producer.providerId.length > 0),
+		traceComplete: true // WITHHELD — no ratified trace-completeness definition; see the doc comment.
+	};
 }
 
 const isFloorPolicy = (id: unknown): boolean =>
@@ -110,13 +139,7 @@ export async function runPwaFloor(
 			schemaValid: true, // the PWA + PWU Types are engine-validated on creation
 			invariantViolations: report.valid ? [] : ['PWA_GRAPH_NOT_WELL_FORMED']
 		},
-		identityProvenance: {
-			hasStableId: true,
-			hasSemanticVersion: true,
-			hasProvenance: true,
-			hasProducer: true,
-			traceComplete: true
-		},
+		identityProvenance: identityProvenanceFactsOf(pwa, opts.producer),
 		reasoningReview: {
 			prompt: opts.prompt,
 			content: JSON.stringify(graphExport),

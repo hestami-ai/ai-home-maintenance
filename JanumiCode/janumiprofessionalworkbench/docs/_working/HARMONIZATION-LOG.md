@@ -825,6 +825,41 @@ wiring increment, red-test-first, not part of this read-only audit.
 
 ---
 
+## INCREMENT 8a — LANDED. The authoring floor's identity/provenance step CHECKS instead of asserting.
+
+The concrete fix the vacuity audit localized (findings 18/67). The de minimis floor's step 2 (§8.4:
+"identity, semantic-version, provenance, authority, input/context/output, and trace completeness **checks**")
+was fed **five literal `true`s** at the rph-demo authoring call site (`floor.ts:114-118`) — a mandatory floor
+step that certified itself and could never fail, the same "structurally incapable of failing" shape the wiring
+program removed on the *execution* plane in Increment 2, still live on the *authoring* plane.
+
+`identityProvenanceFactsOf(pwa, producer)` now **derives four of the five** from the real PWA object under
+review: `hasStableId` (a non-empty id), `hasSemanticVersion` (≥1), `hasProvenance` (a provenance record with an
+`originType`), `hasProducer` (a resolved agent + model/provider). A PWA missing any of these now fails
+IP-01/02/03/04 and blocks. "The engine always adds provenance" is exactly the complacency the floor exists to
+counter — it re-checks rather than trusts, so corruption / a bad migration / a future bypass is caught.
+
+Red/mutation-proven (`floor.test.ts`, new): a PWA with no provenance → `hasProvenance:false` (IP-03 NOT_MET);
+reverting the derivation to a literal `true` turns that case red, confirming the lock catches the exact defect.
+
+**`traceComplete` (IP-05) stays asserted and is DISCLOSED as withheld** — §8.4 step 2 names a "trace
+completeness" check, but no ratified definition of trace-completeness exists as a computable predicate (the
+causal chain §5.6 describes is not contracted as one condition), and §0.3 forbids an agent inventing one. Same
+posture as the readiness guard's withheld limbs and the waiver: enforce what the contract supports, disclose
+what it doesn't, never fake. Un-withhold when trace-completeness is defined.
+
+**Still asserted, smaller, disclosed:** `schemaInvariant.schemaValid: true` (`floor.ts:110`) — the object was
+engine-validated at creation, a more defensible assertion than the content facts, but still an assertion the
+floor's step 1 should ideally re-check. Left as a smaller follow-on; the `invariantViolations` half is already
+real (from `analyzePwaGraph`).
+
+### Gate (full, incl. Playwright)
+
+`check-types` 21/21 · `lint` clean · `boundary` clean · vitest **506 passed / 4 skipped** · Playwright **21
+passed / 2 render-timing flakes** (both pass on retry). Only red: the pre-existing docs empty-file.
+
+---
+
 ## PART 4 — Open questions genuinely for the sponsor
 
 *(kept deliberately short — under the 2026-07-15 mandate, a tension is work, not a question, unless it
