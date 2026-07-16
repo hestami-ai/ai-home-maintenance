@@ -18,8 +18,16 @@ import { beforeEach, describe, expect, it } from 'vitest';
 import { Engine } from '../index.js';
 
 const TS = '2026-07-12T00:00:00Z';
-const AGENT: ActorReference = { actorId: 'agent-1', actorType: 'AGENT', displayName: 'Authoring Agent' };
-const SVC: ActorReference = { actorId: 'assurance', actorType: 'SERVICE', displayName: 'Assurance' };
+const AGENT: ActorReference = {
+	actorId: 'agent-1',
+	actorType: 'AGENT',
+	displayName: 'Authoring Agent'
+};
+const SVC: ActorReference = {
+	actorId: 'assurance',
+	actorType: 'SERVICE',
+	displayName: 'Assurance'
+};
 
 const PWA = 'pwa_01ARZ3NDEKTSV4RRFFQ69G5S00';
 const ROOT = 'pwut_01ARZ3NDEKTSV4RRFFQ69G5S10';
@@ -39,7 +47,13 @@ describe('PublishPwa: a floor satisfied BEFORE a graph edit must not authorize t
 		engine = new Engine({ store, now: () => TS, newEventId: () => `e${++seq}` });
 	});
 
-	function d(actor: ActorReference, commandType: string, payload: unknown, id: string, type: string) {
+	function d(
+		actor: ActorReference,
+		commandType: string,
+		payload: unknown,
+		id: string,
+		type: string
+	) {
 		const n = ++seq;
 		const command: DomainCommand = {
 			commandId: `c-${n}`,
@@ -122,7 +136,8 @@ describe('PublishPwa: a floor satisfied BEFORE a graph edit must not authorize t
 
 	function livePwuTypeIds(): string[] {
 		const ids = new Set<string>();
-		for (const e of store.readAllEvents()) if (e.aggregateType === 'PWU_TYPE') ids.add(e.aggregateId);
+		for (const e of store.readAllEvents())
+			if (e.aggregateType === 'PWU_TYPE') ids.add(e.aggregateId);
 		return [...ids].filter((id) => {
 			const s = store.loadObject(id)?.state as { pwaId?: string; status?: string } | undefined;
 			return s?.pwaId === PWA && s.status !== 'REMOVED';
@@ -133,7 +148,13 @@ describe('PublishPwa: a floor satisfied BEFORE a graph edit must not authorize t
 		d(
 			AGENT,
 			'CreatePwa',
-			{ pwaId: PWA, name: 'Agent-authored', description: 'd', domain: 'software', version: '1.0.0' },
+			{
+				pwaId: PWA,
+				name: 'Agent-authored',
+				description: 'd',
+				domain: 'software',
+				version: '1.0.0'
+			},
 			PWA,
 			'PROFESSIONAL_WORK_ARCHITECTURE'
 		);
@@ -153,7 +174,13 @@ describe('PublishPwa: a floor satisfied BEFORE a graph edit must not authorize t
 		// graph now being published, so per §8.4 L854 it cannot permit this protected transition.
 		d(AGENT, 'SubmitPwaForReview', {}, PWA, 'PROFESSIONAL_WORK_ARCHITECTURE');
 		d(AGENT, 'ValidatePwa', {}, PWA, 'PROFESSIONAL_WORK_ARCHITECTURE');
-		const r = d(AGENT, 'PublishPwa', { rootPwuTypeId: ROOT }, PWA, 'PROFESSIONAL_WORK_ARCHITECTURE');
+		const r = d(
+			AGENT,
+			'PublishPwa',
+			{ rootPwuTypeId: ROOT },
+			PWA,
+			'PROFESSIONAL_WORK_ARCHITECTURE'
+		);
 
 		expect(r.status).toBe('REJECTED');
 		expect(r.error?.code).toBe('RPH_INVARIANT_VIOLATION');
@@ -169,7 +196,13 @@ describe('PublishPwa: a floor satisfied BEFORE a graph edit must not authorize t
 		d(
 			AGENT,
 			'CreatePwa',
-			{ pwaId: PWA, name: 'Agent-authored', description: 'd', domain: 'software', version: '1.0.0' },
+			{
+				pwaId: PWA,
+				name: 'Agent-authored',
+				description: 'd',
+				domain: 'software',
+				version: '1.0.0'
+			},
 			PWA,
 			'PROFESSIONAL_WORK_ARCHITECTURE'
 		);

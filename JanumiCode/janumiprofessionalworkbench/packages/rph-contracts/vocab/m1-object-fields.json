@@ -2037,7 +2037,9 @@
           "required": false,
           "note": "Referenced by Constraint.applicability (DOC-002 §11.1). NOT field-defined. OPEN ITEM: planned to unify with ApplicabilityExpression (§18) as one DSL (ratify sheet C / M7)."
         }
-      ]
+      ],
+      "sourceSection": "DOC-004 §5.1 (L267)",
+      "note": "RATIFIED AFTER ALL — audit 2026-07-16 (AUDIT-placeholder-helpers.md). DOC-004 §5.1 (L267) contains `interface ApplicabilityRule { ... }` defining: objectTypeConditions, pwuKindConditions, lifecycleTriggers, eventTriggers, riskConditions, semanticChangeConditions, requiredTags, excludedTags, expression. The previous note said 'NOT field-defined ... Source TBD' WHILE CITING THIS SECTION — the harvest pass reached inside this very interface, took its enums, and recorded its fields as nonexistent. A pass that extracts one kind of thing reports the absence of every other kind. STILL A PLACEHOLDER IN CODE: the single '(undefined)' field below keeps gen-objects.ts emitting z.record(z.string(), z.unknown()) — 'any object'. TRANSCRIPTION CAVEAT: 4 of 9 resolvable; ObjectTypeCondition/RiskCondition/SemanticChangeCondition/PolicyExpression all undefined. NOT fixed here: tightening this breaks live literals and needs an explicit migration, not a sweep."
     },
     {
       "name": "IntentMapping",
@@ -2326,7 +2328,9 @@
           "required": false,
           "note": "Referenced by AssurancePolicyDefinition.requiredEvidence/optionalEvidence. policies/evidence-requirement.schema.json listed in DOC-007 §3; not field-defined in prose. DOC-004 §6.1 supplies cardinality (EvidenceCardinalitySchema) + requiredForDispositions (RequiredForDispositionsSchema) enums. Source from schema file."
         }
-      ]
+      ],
+      "sourceSection": "DOC-004 §6.1 (L317)",
+      "note": "RATIFIED AFTER ALL — audit 2026-07-16 (AUDIT-placeholder-helpers.md). DOC-004 §6.1 (L317) contains `interface EvidenceRequirement { ... }` defining: id, evidenceType, description, purpose, cardinality, admissibilityRules, freshnessRule, requiredForDispositions, mayBeWaived. The previous note said 'NOT field-defined ... Source TBD' WHILE CITING THIS SECTION — the harvest pass reached inside this very interface, took its enums, and recorded its fields as nonexistent. A pass that extracts one kind of thing reports the absence of every other kind. STILL A PLACEHOLDER IN CODE: the single '(undefined)' field below keeps gen-objects.ts emitting z.record(z.string(), z.unknown()) — 'any object'. TRANSCRIPTION CAVEAT: 7 of 9 resolvable; AdmissibilityRule + FreshnessRule are undefined. NOT fixed here: tightening this breaks live literals and needs an explicit migration, not a sweep."
     },
     {
       "name": "AssessmentCriterion",
@@ -2337,7 +2341,9 @@
           "required": false,
           "note": "Referenced by AssurancePolicyDefinition.criteria; results are CriterionResult (§20.1). NOT field-defined; DOC-004 §7 supplies criterionType/evaluationMethod/severityIfNotMet enums. Source TBD."
         }
-      ]
+      ],
+      "sourceSection": "DOC-004 §7 (L371)",
+      "note": "RATIFIED AFTER ALL — audit 2026-07-16 (AUDIT-placeholder-helpers.md). DOC-004 §7 (L371) contains `interface AssessmentCriterion { ... }` defining: id, name, description, criterionType, evaluationMethod, requiredEvidenceIds, severityIfNotMet, mayBeNotApplicable. The previous note said 'NOT field-defined ... Source TBD' WHILE CITING THIS SECTION — the harvest pass reached inside this very interface, took its enums, and recorded its fields as nonexistent. A pass that extracts one kind of thing reports the absence of every other kind. STILL A PLACEHOLDER IN CODE: the single '(undefined)' field below keeps gen-objects.ts emitting z.record(z.string(), z.unknown()) — 'any object'. TRANSCRIPTION CAVEAT: ALL 8 fields are primitives or enums — ZERO undefined dependencies. This is the type the entire de minimis floor is expressed in, and floor-policies.ts currently writes {id, statement, mandatory}: NO overlap beyond id, and severityIfNotMet (5 levels) collapsed to a boolean. NOT fixed here: tightening this breaks live literals and needs an explicit migration, not a sweep."
     },
     {
       "name": "FindingDefinition",
@@ -2348,7 +2354,9 @@
           "required": false,
           "note": "Referenced by AssurancePolicyDefinition.findingDefinitions. NOT field-defined; DOC-004 §9.1 supplies defaultSeverity (AssuranceSeveritySchema) + defaultControlActions (ControlActionSchema) + affectedClaimTypes (ClaimTypeSchema). Source TBD."
         }
-      ]
+      ],
+      "sourceSection": "DOC-004 §9.1 (L474)",
+      "note": "RATIFIED AFTER ALL — audit 2026-07-16 (AUDIT-placeholder-helpers.md). DOC-004 §9.1 (L474) contains `interface FindingDefinition { ... }` defining: code, name, description, defaultSeverity, affectedClaimTypes, defaultControlActions. The previous note said 'NOT field-defined ... Source TBD' WHILE CITING THIS SECTION — the harvest pass reached inside this very interface, took its enums, and recorded its fields as nonexistent. A pass that extracts one kind of thing reports the absence of every other kind. STILL A PLACEHOLDER IN CODE: the single '(undefined)' field below keeps gen-objects.ts emitting z.record(z.string(), z.unknown()) — 'any object'. TRANSCRIPTION CAVEAT: All 6 resolvable — ControlAction (DOC-004) and ClaimType both exist. NOT fixed here: tightening this breaks live literals and needs an explicit migration, not a sweep."
     },
     {
       "name": "DispositionRule",
@@ -2359,7 +2367,9 @@
           "required": false,
           "note": "Referenced by AssurancePolicyDefinition.dispositionRules. policies/disposition-rule.schema.json listed in DOC-007 §3; not field-defined in prose. DOC-004 §10.2 supplies disposition (AssuranceDispositionRecommendationSchema) + requiredIndependence (IndependenceRequirementSchema). Source from schema file."
         }
-      ]
+      ],
+      "sourceSection": "DOC-004 §10.2 (L547)",
+      "note": "RATIFIED AFTER ALL — audit 2026-07-16 (AUDIT-placeholder-helpers.md). DOC-004 §10.2 (L547) contains `interface DispositionRule { ... }` defining: disposition, condition, requiredEvidenceIds, forbiddenOpenSeverities, requiredIndependence. The previous note said 'NOT field-defined ... Source TBD' WHILE CITING THIS SECTION — the harvest pass reached inside this very interface, took its enums, and recorded its fields as nonexistent. A pass that extracts one kind of thing reports the absence of every other kind. STILL A PLACEHOLDER IN CODE: the single '(undefined)' field below keeps gen-objects.ts emitting z.record(z.string(), z.unknown()) — 'any object'. TRANSCRIPTION CAVEAT: 4 of 5 resolvable; `condition` is PolicyExpression (undefined in the corpus). NOT fixed here: tightening this breaks live literals and needs an explicit migration, not a sweep."
     },
     {
       "name": "RemediationRule",
@@ -2381,7 +2391,9 @@
           "required": false,
           "note": "Referenced by AssurancePolicyDefinition.escalationRules. NOT field-defined; DOC-004 §13 supplies escalationTarget (EscalationTargetSchema) + timeoutAction (ControlActionSchema). Distinct from ExecutionPlan.escalationPolicy. Source TBD."
         }
-      ]
+      ],
+      "sourceSection": "DOC-004 §13 (L668)",
+      "note": "RATIFIED AFTER ALL — audit 2026-07-16 (AUDIT-placeholder-helpers.md). DOC-004 §13 (L668) contains `interface EscalationRule { ... }` defining: trigger, escalationTarget, requiredPackage, timeoutAction. The previous note said 'NOT field-defined ... Source TBD' WHILE CITING THIS SECTION — the harvest pass reached inside this very interface, took its enums, and recorded its fields as nonexistent. A pass that extracts one kind of thing reports the absence of every other kind. STILL A PLACEHOLDER IN CODE: the single '(undefined)' field below keeps gen-objects.ts emitting z.record(z.string(), z.unknown()) — 'any object'. TRANSCRIPTION CAVEAT: 3 of 4 resolvable; `trigger` is PolicyExpression (undefined). NOT fixed here: tightening this breaks live literals and needs an explicit migration, not a sweep."
     },
     {
       "name": "WaiverRule",
@@ -2392,7 +2404,9 @@
           "required": false,
           "note": "Referenced by AssurancePolicyDefinition.waiverRules. NOT field-defined. Source TBD."
         }
-      ]
+      ],
+      "sourceSection": "DOC-004 §12.1 (L626)",
+      "note": "RATIFIED AFTER ALL — audit 2026-07-16 (AUDIT-placeholder-helpers.md). DOC-004 §12.1 (L626) contains `interface WaiverRule { ... }` defining: waiverAllowed, eligibleCriteriaIds, prohibitedFindingSeverities, requiredAuthorityType, maximumDuration, requiredRationaleFields, requiredCompensatingControls, revalidationTrigger. The previous note said 'NOT field-defined ... Source TBD' WHILE CITING THIS SECTION — the harvest pass reached inside this very interface, took its enums, and recorded its fields as nonexistent. A pass that extracts one kind of thing reports the absence of every other kind. STILL A PLACEHOLDER IN CODE: the single '(undefined)' field below keeps gen-objects.ts emitting z.record(z.string(), z.unknown()) — 'any object'. TRANSCRIPTION CAVEAT: 7 of 8 resolvable. NOTE: `waiverAllowed`/`requiredAuthorityType` are the RATIFIED home for the floor content-lock now hand-rolled as rejectIfFloorLocked. NOT fixed here: tightening this breaks live literals and needs an explicit migration, not a sweep."
     },
     {
       "name": "RejectedEvidenceReference",
@@ -2624,8 +2638,8 @@
       "why": "AMENDED 2026-07-16: ARTIFACT is no longer sourceless — DOC-009 §18.1 defines it (see the resolved item above). It still lacks a DOC-007 SERIALIZED contract, so it stays in this list, but the gap is now wire-only, not total. The other five remain DOC-002-prose-only; each should be re-checked against DOC-009's storage schema before being called unspecified. ORIGINAL: OBLIGATION, CONSTRAINT, DECOMPOSITION_CONTRACT, RECOMPOSITION_CONTRACT, RUNTIME_BINDING (and ARTIFACT) have no field-level definition in the latest serialized contract (DOC-007). CONSTRAINT + RUNTIME_BINDING have schema FILES listed in DOC-007 §3 but no prose; the others have neither. All are sourced from DOC-002 prose and need serialization before codegen. Their enums (ObligationType/Strength/Status, ConstraintType/Strength/Status, CoverageType, DecompositionContractStatus, RecompositionContractStatus, AuthorizationStatus, StepType/State) exist but have no wired consumer field yet."
     },
     {
-      "item": "~40 helper sub-types are referenced but not field-defined",
-      "why": "Only 12 helpers are field-defined (ActorReference, AuthorityReference, ProvenanceRecord, WorkRiskProfile, WorkBoundary, CoverageClaim, ExecutionStep, ApplicabilityExpression, BaselineItemVersion, ValidatorResult, CriterionResult, TraceLink). The rest (DesiredOutcome, SuccessCondition, ArtifactRequirement, OutputDefinition, ArtifactReference, ApplicabilityRule, decomposition/recomposition rule+propagation+allocation types, execution-plan policy types, runtime-binding policy/capability types, execution-step bindings/conditions, and all AssurancePolicyDefinition helper arrays) need field definitions. Several have JSON-schema files listed in DOC-007 §3 (evidence-requirement, disposition-rule, control-action-recommendation, artifact-reference) that should be read for their shapes."
+      "item": "CORRECTED 2026-07-16 — ~34 helpers are placeholders, but 9 of them ARE ratified and field-complete",
+      "why": "The original read: '~40 helper sub-types are referenced but not field-defined. Only 12 helpers are field-defined (... ApplicabilityExpression ... ValidatorResult ...)'. FALSE for 9 of 34, verified by a 34-way audit of the FULL 14-file corpus with adversarial refutation of every positive, then re-checked by hand (AUDIT-placeholder-helpers.md). DOC-004 defines SEVEN: AssessmentCriterion §7, FindingDefinition §9.1, DispositionRule §10.2, WaiverRule §12.1, EscalationRule §13, EvidenceRequirement §6.1, ApplicabilityRule §5.1 — all cited by the old notes as 'Source TBD'. DOC-007 defines TWO: ApplicabilityExpression §18, ValidatorResult §20 — and this list ALREADY names those two as field-defined; they are placeholders anyway because gen-objects.ts hardcodes FORCE_PLACEHOLDER for them, an M1 deferral in a repo past M14. CONSEQUENCE: every field that makes an AssurancePolicy mean anything (criteria, findingDefinitions, waiverRules, dispositionRules, escalationRules, requiredEvidence, applicability) is typed 'any object' — which is the MECHANISM behind the hollow governed layer, not a symptom of it. Proof: floor-policies.ts writes {id, statement, mandatory}; DOC-004 §7 ratifies neither 'statement' nor 'mandatory'. The 25 genuine negatives (incl. ExecutionProvenance) are now evidence-backed."
     },
     {
       "item": "ApplicabilityRule (Constraint) vs ApplicabilityExpression (AssurancePolicy)",

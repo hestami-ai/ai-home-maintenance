@@ -86,7 +86,12 @@ describe('ActivateExecutionPlan — one active plan per PWU (live pipeline)', ()
 	}
 
 	const activate = (planId: string) =>
-		dispatch('ActivateExecutionPlan', { authorizedRuntimeBindingIds: [] }, planId, 'EXECUTION_PLAN');
+		dispatch(
+			'ActivateExecutionPlan',
+			{ authorizedRuntimeBindingIds: [] },
+			planId,
+			'EXECUTION_PLAN'
+		);
 
 	beforeEach(() => {
 		store = new SqliteStorageAdapter({ now: () => TS });

@@ -208,13 +208,33 @@ const ADDITIVE_POLICY_SEEDS: readonly AdditivePolicySeed[] = [
 		independence: 'DIFFERENT_AGENT',
 		permittedControlAction: 'CLARIFY',
 		criteria: [
-			{ id: 'IF-01', statement: 'Objective fidelity: no solution substituted for the need.', mandatory: true },
-			{ id: 'IF-02', statement: 'Boundary fidelity: no unauthorized scope expansion.', mandatory: true },
-			{ id: 'IF-03', statement: 'Constraint fidelity: explicit user constraints preserved.', mandatory: true }
+			{
+				id: 'IF-01',
+				statement: 'Objective fidelity: no solution substituted for the need.',
+				mandatory: true
+			},
+			{
+				id: 'IF-02',
+				statement: 'Boundary fidelity: no unauthorized scope expansion.',
+				mandatory: true
+			},
+			{
+				id: 'IF-03',
+				statement: 'Constraint fidelity: explicit user constraints preserved.',
+				mandatory: true
+			}
 		],
 		findingDefinitions: [
-			{ code: 'SOLUTION_SUBSTITUTION', severity: 'BLOCKING', statement: 'An inferred solution replaced the stated need.' },
-			{ code: 'MISSING_USER_CONSTRAINT', severity: 'BLOCKING', statement: 'A mandatory user constraint was omitted.' }
+			{
+				code: 'SOLUTION_SUBSTITUTION',
+				severity: 'BLOCKING',
+				statement: 'An inferred solution replaced the stated need.'
+			},
+			{
+				code: 'MISSING_USER_CONSTRAINT',
+				severity: 'BLOCKING',
+				statement: 'A mandatory user constraint was omitted.'
+			}
 		]
 	},
 	{
@@ -222,7 +242,8 @@ const ADDITIVE_POLICY_SEEDS: readonly AdditivePolicySeed[] = [
 		name: 'Intent Completeness',
 		purpose:
 			'Desired outcomes, product boundary, mandatory constraints, and success conditions are sufficiently explicit for the next authorized activity.',
-		rationale: 'Catalog §16 — completeness is risk-relative sufficiency, not exhaustive specification.',
+		rationale:
+			'Catalog §16 — completeness is risk-relative sufficiency, not exhaustive specification.',
 		evaluatedClaimType: 'COMPLETENESS',
 		evaluatorRole: 'intent-completeness-reviewer',
 		independence: 'DIFFERENT_INVOCATION',
@@ -230,11 +251,23 @@ const ADDITIVE_POLICY_SEEDS: readonly AdditivePolicySeed[] = [
 		criteria: [
 			{ id: 'IC-01', statement: 'Desired outcomes are explicit.', mandatory: true },
 			{ id: 'IC-04', statement: 'Mandatory constraints are recorded.', mandatory: true },
-			{ id: 'IC-05', statement: 'Success conditions exist, or the work is marked exploratory.', mandatory: true }
+			{
+				id: 'IC-05',
+				statement: 'Success conditions exist, or the work is marked exploratory.',
+				mandatory: true
+			}
 		],
 		findingDefinitions: [
-			{ code: 'MISSING_MANDATORY_CONSTRAINT', severity: 'MATERIAL', statement: 'A mandatory constraint is missing.' },
-			{ code: 'NO_SUCCESS_CONDITION', severity: 'MATERIAL', statement: 'No success condition and not marked exploratory.' }
+			{
+				code: 'MISSING_MANDATORY_CONSTRAINT',
+				severity: 'MATERIAL',
+				statement: 'A mandatory constraint is missing.'
+			},
+			{
+				code: 'NO_SUCCESS_CONDITION',
+				severity: 'MATERIAL',
+				statement: 'No success condition and not marked exploratory.'
+			}
 		]
 	},
 	{
@@ -242,19 +275,40 @@ const ADDITIVE_POLICY_SEEDS: readonly AdditivePolicySeed[] = [
 		name: 'Assumption Disclosure',
 		purpose:
 			'Material assumptions are surfaced as first-class Assumption Objects, distinguished from established fact, with materiality and verification needs identified.',
-		rationale: 'Catalog §17 — cross-cutting: applies to any model-produced professional artifact; SATISFIED means disclosed, not verified.',
+		rationale:
+			'Catalog §17 — cross-cutting: applies to any model-produced professional artifact; SATISFIED means disclosed, not verified.',
 		evaluatedClaimType: 'COMPLETENESS',
 		evaluatorRole: 'assumption-disclosure-reviewer',
 		independence: 'DIFFERENT_INVOCATION',
 		permittedControlAction: 'GATHER_EVIDENCE',
 		criteria: [
-			{ id: 'AD-01', statement: 'Material assumptions surfaced as first-class objects (not prose).', mandatory: true },
-			{ id: 'AD-02', statement: 'Assumptions distinguished from established facts.', mandatory: true },
-			{ id: 'AD-04', statement: 'Materiality is classified (IMMATERIAL/MATERIAL/CRITICAL).', mandatory: true }
+			{
+				id: 'AD-01',
+				statement: 'Material assumptions surfaced as first-class objects (not prose).',
+				mandatory: true
+			},
+			{
+				id: 'AD-02',
+				statement: 'Assumptions distinguished from established facts.',
+				mandatory: true
+			},
+			{
+				id: 'AD-04',
+				statement: 'Materiality is classified (IMMATERIAL/MATERIAL/CRITICAL).',
+				mandatory: true
+			}
 		],
 		findingDefinitions: [
-			{ code: 'HIDDEN_MATERIAL_ASSUMPTION', severity: 'MATERIAL', statement: 'A material assumption was left undisclosed.' },
-			{ code: 'ASSUMPTION_PRESENTED_AS_FACT', severity: 'MATERIAL', statement: 'An assumption was presented as established fact.' }
+			{
+				code: 'HIDDEN_MATERIAL_ASSUMPTION',
+				severity: 'MATERIAL',
+				statement: 'A material assumption was left undisclosed.'
+			},
+			{
+				code: 'ASSUMPTION_PRESENTED_AS_FACT',
+				severity: 'MATERIAL',
+				statement: 'An assumption was presented as established fact.'
+			}
 		]
 	},
 	{
@@ -262,19 +316,36 @@ const ADDITIVE_POLICY_SEEDS: readonly AdditivePolicySeed[] = [
 		name: 'Decomposition Coverage',
 		purpose:
 			'No mandatory parent obligation silently disappears; applicable constraints propagate; a credible parent-level recomposition strategy exists.',
-		rationale: 'Catalog §19 — any missing mandatory obligation or child intent divergence is BLOCKING.',
+		rationale:
+			'Catalog §19 — any missing mandatory obligation or child intent divergence is BLOCKING.',
 		evaluatedClaimType: 'COVERAGE',
 		evaluatorRole: 'decomposition-coverage-reviewer',
 		independence: 'DIFFERENT_AGENT',
 		permittedControlAction: 'REVISE_DECOMPOSITION',
 		criteria: [
-			{ id: 'DC-01', statement: 'Every mandatory parent obligation is allocated/retained/satisfied/waived.', mandatory: true },
-			{ id: 'DC-02', statement: 'Applicable constraints are propagated or explicitly retained.', mandatory: true },
+			{
+				id: 'DC-01',
+				statement: 'Every mandatory parent obligation is allocated/retained/satisfied/waived.',
+				mandatory: true
+			},
+			{
+				id: 'DC-02',
+				statement: 'Applicable constraints are propagated or explicitly retained.',
+				mandatory: true
+			},
 			{ id: 'DC-06', statement: 'A credible recomposition strategy exists.', mandatory: true }
 		],
 		findingDefinitions: [
-			{ code: 'MISSING_OBLIGATION_ALLOCATION', severity: 'BLOCKING', statement: 'A mandatory obligation was not allocated.' },
-			{ code: 'DROPPED_CONSTRAINT', severity: 'BLOCKING', statement: 'An applicable constraint was dropped.' }
+			{
+				code: 'MISSING_OBLIGATION_ALLOCATION',
+				severity: 'BLOCKING',
+				statement: 'A mandatory obligation was not allocated.'
+			},
+			{
+				code: 'DROPPED_CONSTRAINT',
+				severity: 'BLOCKING',
+				statement: 'An applicable constraint was dropped.'
+			}
 		]
 	},
 	{
@@ -282,19 +353,36 @@ const ADDITIVE_POLICY_SEEDS: readonly AdditivePolicySeed[] = [
 		name: 'Architecture Coverage',
 		purpose:
 			'Applicable requirements and constraints are allocated to structure with explicit boundaries, data ownership, and security; the architecture is feasible.',
-		rationale: 'Catalog §21 — critical security, tenant-isolation, data-integrity, or mandatory-constraint failures are BLOCKING.',
+		rationale:
+			'Catalog §21 — critical security, tenant-isolation, data-integrity, or mandatory-constraint failures are BLOCKING.',
 		evaluatedClaimType: 'COVERAGE',
 		evaluatorRole: 'architecture-coverage-reviewer',
 		independence: 'DIFFERENT_AGENT',
 		permittedControlAction: 'RESHAPE_PWU',
 		criteria: [
-			{ id: 'AC-01', statement: 'Applicable requirements are allocated to architecture.', mandatory: true },
-			{ id: 'AC-05', statement: 'Data ownership is explicit (data-integrity boundary).', mandatory: true },
+			{
+				id: 'AC-01',
+				statement: 'Applicable requirements are allocated to architecture.',
+				mandatory: true
+			},
+			{
+				id: 'AC-05',
+				statement: 'Data ownership is explicit (data-integrity boundary).',
+				mandatory: true
+			},
 			{ id: 'AC-08', statement: 'Mandatory constraints are preserved.', mandatory: true }
 		],
 		findingDefinitions: [
-			{ code: 'UNCOVERED_REQUIREMENT', severity: 'CRITICAL', statement: 'A requirement is not covered by the architecture.' },
-			{ code: 'ARCHITECTURE_CONSTRAINT_VIOLATION', severity: 'CRITICAL', statement: 'The architecture violates a mandatory constraint.' }
+			{
+				code: 'UNCOVERED_REQUIREMENT',
+				severity: 'CRITICAL',
+				statement: 'A requirement is not covered by the architecture.'
+			},
+			{
+				code: 'ARCHITECTURE_CONSTRAINT_VIOLATION',
+				severity: 'CRITICAL',
+				statement: 'The architecture violates a mandatory constraint.'
+			}
 		]
 	},
 	{
@@ -302,17 +390,26 @@ const ADDITIVE_POLICY_SEEDS: readonly AdditivePolicySeed[] = [
 		name: 'Intent Preservation',
 		purpose:
 			'Each downstream transformation still preserves the approved Product Intent end-to-end — no silent change of product semantics.',
-		rationale: 'Catalog §20/§30 — the promoted result must still serve the originating Product Intent.',
+		rationale:
+			'Catalog §20/§30 — the promoted result must still serve the originating Product Intent.',
 		evaluatedClaimType: 'PRESERVATION',
 		evaluatorRole: 'intent-preservation-reviewer',
 		independence: 'DIFFERENT_AGENT',
 		permittedControlAction: 'ESCALATE',
 		criteria: [
-			{ id: 'IP-01', statement: 'Approved intent is traced through this transformation.', mandatory: true },
+			{
+				id: 'IP-01',
+				statement: 'Approved intent is traced through this transformation.',
+				mandatory: true
+			},
 			{ id: 'IP-02', statement: 'No silent change to product semantics.', mandatory: true }
 		],
 		findingDefinitions: [
-			{ code: 'INTENT_EROSION', severity: 'BLOCKING', statement: 'The approved intent was eroded downstream.' }
+			{
+				code: 'INTENT_EROSION',
+				severity: 'BLOCKING',
+				statement: 'The approved intent was eroded downstream.'
+			}
 		]
 	}
 ];

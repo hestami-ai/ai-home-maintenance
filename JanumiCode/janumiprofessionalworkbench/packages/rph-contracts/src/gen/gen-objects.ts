@@ -2,8 +2,25 @@
 // grounded field extraction vocab/m1-object-fields.json (DOC-002 prose reconciled with DOC-007 serialized).
 // Run via `bun run gen:objects`. Each object composes objectEnvelopeShape; enum fields reference the
 // generated enum schemas; id-reference fields are strings (id validity is enforced when the referenced
-// object is created, per docs §5). Helpers the specs REFERENCE-BUT-NEVER-DEFINE are emitted as permissive
-// structured placeholders (z.record) and tightened in the milestone that defines them (M7/M9/M11).
+// object is created, per docs §5). Helpers with an untyped field are emitted as permissive structured
+// placeholders (z.record) — "any object".
+//
+// ⚠️ THE OLD VERSION OF THIS COMMENT WAS FALSE, and it is worth knowing why. It read: "Helpers the specs
+// REFERENCE-BUT-NEVER-DEFINE are emitted as permissive structured placeholders (z.record) and tightened in
+// the milestone that defines them (M7/M9/M11)." Both halves are wrong. The 2026-07-16 audit
+// (docs/_working/AUDIT-placeholder-helpers.md) checked all 34 placeholders against the full 14-file ratified
+// corpus: NINE are defined, field-complete, right now. DOC-004 defines seven (AssessmentCriterion §7,
+// FindingDefinition §9.1, DispositionRule §10.2, WaiverRule §12.1, EscalationRule §13, EvidenceRequirement
+// §6.1, ApplicabilityRule §5.1); DOC-007 defines two (§18, §20). And the milestones that were going to
+// tighten them (M7/M9/M11) have all passed — this repo is beyond M14.
+//
+// This is not cosmetic. AssurancePolicy composes these helpers, so `criteria`, `findingDefinitions`,
+// `waiverRules`, `dispositionRules`, `escalationRules`, `requiredEvidence` and `applicability` are every one
+// of them `any object` — which is the MECHANISM behind the governed layer being a projection of the code
+// rather than its source: nothing can read a policy, because its types say nothing. Proof: floor-policies.ts
+// writes `{id, statement, mandatory}` and DOC-004 §7 ratifies neither `statement` nor `mandatory`.
+// Tightening them breaks live literals and needs an explicit migration, so the audit sequences it rather
+// than sweeping it.
 import { readFileSync, writeFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -46,6 +63,17 @@ const EXTERNAL_HELPERS: Record<string, string> = {
 	ProvenanceRecord: 'ProvenanceRecordSchema'
 };
 // Complex helpers whose faithful shape belongs to a later milestone — placeholder for M1 even if >=2 fields.
+//
+// ⚠️ STALE DEFERRAL, kept only because retiring it is a real change and not a comment fix. This is an M1
+// decision still in force at M14+. BOTH of these are field-defined in the vocab AND ratified in DOC-007
+// (§18 ApplicabilityExpression, §20 ValidatorResult) — so they are the only placeholders here that the
+// generator could emit faithfully today and simply declines to. ValidatorResult matters most: it is the
+// assurance verdict shape, and forcing it to `any object` is why completeAssuranceAssessment accepts an
+// unvalidated `{ validatorResult: { dispositionRecommendation } }`.
+// BEFORE REMOVING ValidatorResult FROM THIS SET, resolve a RATIFIED CONFLICT (§17 — surface, never silently
+// choose): DOC-007 §20 defines 16 fields INCLUDING `subjectSemanticVersions`; DOC-004 §4.2 defines 15 and
+// OMITS it. DOC-007 is the wire authority and its shape is also the safer one — it binds the verdict to the
+// subject version, which Increment 10b showed the floor cannot do without.
 const FORCE_PLACEHOLDER = new Set(['ApplicabilityExpression', 'ValidatorResult']);
 // Helpers a later milestone tightened to a real strictObject — emit as a full helper even with a single field
 // (still requires every field to be typed). M9 defines the decomposition/recomposition sub-shapes.

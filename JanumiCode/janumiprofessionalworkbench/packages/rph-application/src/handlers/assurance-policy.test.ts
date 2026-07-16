@@ -66,9 +66,9 @@ describe('Assurance Policy lifecycle handlers (live)', () => {
 		expect(status(P)).toBe('ACTIVE');
 
 		// Edit only the payload-present fields; revision bumps, version (content version string) is unchanged.
-		expect(d('EditAssurancePolicy', { policyId: P, name: 'Renamed', purpose: 'p2' }, P).status).toBe(
-			'ACCEPTED'
-		);
+		expect(
+			d('EditAssurancePolicy', { policyId: P, name: 'Renamed', purpose: 'p2' }, P).status
+		).toBe('ACCEPTED');
 		const edited = store.loadObject(P)!.state as Record<string, unknown>;
 		expect(edited.name).toBe('Renamed');
 		expect(edited.purpose).toBe('p2');

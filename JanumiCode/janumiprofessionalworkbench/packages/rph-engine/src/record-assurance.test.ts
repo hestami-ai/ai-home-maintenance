@@ -129,7 +129,10 @@ describe('recordAssuranceRecordingPlan — floor outcome → canonical assessmen
 		// optional `evaluator: ActorReference` all along — the recorder simply dropped it, sending only the
 		// disposition. The judge that actually reviewed the artifact was recorded nowhere.
 		const evaluator = review.state.evaluator as ActorReference | undefined;
-		expect(evaluator, 'the judge identity must be recorded, not dropped at persistence').toBeDefined();
+		expect(
+			evaluator,
+			'the judge identity must be recorded, not dropped at persistence'
+		).toBeDefined();
 		expect(evaluator?.modelId).toBe('gemini');
 		expect(evaluator?.providerId).toBe('google');
 		expect(evaluator?.actorId).toBe('judge');

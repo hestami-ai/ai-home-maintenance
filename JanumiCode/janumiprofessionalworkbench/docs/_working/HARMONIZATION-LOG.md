@@ -936,6 +936,17 @@ unverifiable and the gate fails closed. That is the same hole flagged in Increme
 accepts a stale floor for it. Un-skip when a step's floor subject gets a version binding; the contract, gate,
 and kernel are all already in place.
 
+> ### ⚠️ SUPERSEDED BY INCREMENT 10 — the paragraph above is WRONG, and instructively so.
+>
+> "Un-skip when a step's floor subject gets a version binding" asks for something **the corpus forbids**. An
+> ExecutionStep can never carry a `semanticVersion`: DOC-002 §21's interface does not extend `ObjectEnvelope`,
+> `EXECUTION_STEP` is absent from §4's `ProfessionalWorkObjectType` union, and DOC-009 §10.2's `execution_steps`
+> is the one execution table whose id does **not** `reference professional_work_objects(id)`. Had I implemented
+> my own note, I'd have **minted a version for a non-object to make a check pass** — the ceremony trap, one
+> increment after I congratulated myself for avoiding it on conjunctive independence.
+>
+> I diagnosed a **missing binding**. The actual defect was a **wrong subject**. See Increment 10.
+
 ### Gate (full, incl. Playwright)
 
 `check-types` 21/21 · `lint` · `boundary` · vitest **508 passed / 3 skipped** · Playwright **22 passed / 1 known
@@ -948,6 +959,168 @@ is committed unformatted at HEAD. **The gate has no format check**, so this drif
 it is mine (I've been committing unformatted code all session while eslint passed). Separately, a concurrent
 edit from the sponsor's parallel thread is present (a typo fix in the Constitution Discussion doc). **Neither was
 committed** — this increment used explicit paths only, never `git add -A`.
+
+> ### ⚠️ CORRECTED 2026-07-16 — "the gate has no format check" is FALSE, and the truth is worse.
+>
+> `.github/workflows/ci.yml` **line 27 runs `bun run format:check`**. The check exists. What I actually found,
+> once I opened the CI file instead of inferring from the commands I habitually run:
+>
+> - **HEAD fails it on 15 files.** So this gate has been **RED on `main`** and nobody noticed — a gate that
+>   does not gate.
+> - **My "full gate" was never CI's gate.** I ran check-types / test / lint / boundary / svelte-check /
+>   Playwright. CI runs build / check-types / lint / boundary / **format:check** / test. I asserted "the gate
+>   has no format check" from *the set of commands I happened to run*, which is the **identical error** to the
+>   Playwright discipline failure in Increment 3 — and the identical error to the vocab's "UNSPECIFIED in BOTH
+>   DOC-002 and DOC-007", which reported the limits of a search as a fact about the world. Three instances now,
+>   one shape: **absence of evidence recorded as evidence of absence.**
+>
+> Fixed: the tree is formatted, `format:check` passes, and CI's format gate should now be green. **The finding
+> that replaces it** — *are CI failures on `main` being observed at all?* — is real and NOT something I can
+> answer from inside the repo. Flagged for the sponsor.
+
+---
+
+## INCREMENT 10 — LANDED (`0f20fd3`, `f72c4da`). The Artifact exists; the floor judges the RESULT.
+
+**This increment began by disproving the task I had queued.** Both halves are downstream of one discovery, and
+the discovery is about *how I read*, not about the code.
+
+### 10a — The Artifact exists. DOC-009 defined it all along; nobody opened DOC-009.
+
+`ARTIFACT` was a member of DOC-002 §4's ratified object union — and in code, `z.strictObject({
+...objectEnvelopeShape })`: **a bare envelope with zero fields**. No command could create one. Meanwhile
+DOC-007 §16.1/§16.2 give **both** `CompleteExecutionStep` and `ExecutionStepSucceeded` an
+`outputArtifactIds: string[]`. A dangling reference spanning three ratified documents: the wire doc points at an
+object the meaning doc never defines and no command can mint.
+
+The vocab explained why, in two places, and its explanation was **true in every clause and false in its
+conclusion**:
+
+> "UNSPECIFIED in BOTH DOC-002 and DOC-007 — 'ARTIFACT' exists only as a ProfessionalWorkObjectType member (and
+> an EvidenceType value). No interface/schema anywhere. Fields to-be-designed; **do not fabricate. OPEN ITEM.**"
+
+It searched the **meaning** doc and the **wire** doc. It never opened the **storage** doc. **DOC-009 §18.1
+`create table artifacts`** defines all 11 columns, and its primary key `references professional_work_objects(id)`
+— so *at the ratified persistence plane the Artifact IS a Professional Work Object*, carrying the envelope's
+`semanticVersion`, which §18.3 then versions under supersession ("corrections create: new artifact; new semantic
+version; supersession link").
+
+So the fields were **transcribed, column-for-column. Nothing was designed** — which is precisely why the
+original note's instruction ("do not fabricate") is *honored*, not overridden, by filling them in.
+
+**Authored, and labeled as such:** the `RecordArtifact`/`ArtifactRecorded` names and the `art` id prefix
+(DOC-007 §5.2's 21-entry prefix registry has no artifact entry; DOC-004 writes `artifact_01J...` — two
+unratified spellings). **Not authored, deliberately:** any value domain. DOC-009 types `artifactType`, `status`,
+`securityClassification`, `retentionClass` as bare `text not null`, no CHECK constraint, no enum anywhere in the
+corpus → `string`. **A test locks that absence**, so a future narrowing to an invented enum fails and sends the
+author to the corpus first. No state machine is declared and `Evidence.status` is **not** borrowed — DOC-002
+defines no Artifact machine, and a lifecycle lifted from another object would be a rule nobody ratified wearing
+a citation that doesn't cover it. §18.3's supersession link is disclosed as **not built**.
+
+### 10b — The floor judges the RESULT, not the step.
+
+**The subject was the defect.** §8.4 records the floor over the "material professional transformation" — "bind
+the exact **subject/output**" — and L844: "Each independently downstream-consumable **result** is its own
+transformation boundary." §8.4 says **neither "step" nor "artifact"**; it says result/output. The gate's own
+comment said *"a step whose OUTPUT has a recorded floor"* while the code passed `p.executionStepId`, and
+`stepOutputIsAiProduced` is named for the output too. **The naming knew; the subject didn't.**
+
+A step is not merely an inconvenient subject — it is an **illegal** one. DOC-004 assessment invariant 2: "Every
+assessment identifies its subject semantic version." DOC-009 §11.7 `assurance_assessment_subjects`:
+`subject_object_id` **references professional_work_objects(id)**, `subject_semantic_version integer **not
+null**`. A step satisfies neither. A step-subject waiver can never satisfy DOC-004 §12.2's "exact object and
+semantic version". The Artifact satisfies all of it — which is why 10a had to come first.
+
+**Three things closed:**
+
+1. **The stale floor** (disclosed as open since Increment 2). With no version, floor-gate's
+   `opts.subjectVersion === undefined || rec?.version === opts.subjectVersion` was **unconditionally true** —
+   any floor authorized any state of the output, which §8.4 L854 forbids ("A missing, **stale**, malformed,
+   failed, unavailable, or independence-invalid required review cannot satisfy assurance or permit its protected
+   transition"). **Mutation-tested**: removing the version binding makes the stale case `ACCEPTED`. I watched
+   the lock fail before trusting it — and caught a false-green on the first attempt, when my mutation silently
+   didn't apply and 4/4 "passed".
+2. **The unrecorded-output bypass.** A step naming a result that is not a recorded object now fails closed.
+   Without it, re-subjecting would have *opened* a hole: name a nonexistent artifact → zero subjects → sail
+   through.
+3. **The waiver, un-skipped.** It passes with the waiver naming the **Artifact**. The waiver was never the
+   blocker.
+
+Versions are **derived from the store**, never payload-read. (`RequestAssuranceAssessment` still *trusts* payload
+`subjectSemanticVersions` — a logged vacuity finding, untouched here; a lie there buys nothing, because the
+**gate** derives.)
+
+**Fixture premise defects fixed, not worked around:** both execution tests named artifact ids no command could
+create. One literally commented *"A real output artifact"* over a dangling id. They passed only because the gate
+never resolved the output.
+
+### THE META-FINDING — DOC-009 is the forgotten ratified source
+
+This is the part that outlives the increment. **The same reflex has now produced two false blockers:**
+
+| | The claim | The reality |
+|---|---|---|
+| §16 item 23 (mine, C2) | "no Execution Attempt contract exists" | DOC-009 **§10.4** defines `execution_attempts` in full |
+| ARTIFACT (the vocab's) | "UNSPECIFIED in BOTH DOC-002 and DOC-007 … do not fabricate" | DOC-009 **§18.1** defines `artifacts` in full |
+
+Both stopped at DOC-002 + DOC-007. Both concluded *"nothing defines this"* from *"the two docs I opened don't."*
+Both were **load-bearing**: one I escalated to the sponsor as proof the contracts were inadequate; the other
+left a ratified object hollow and its consumers dangling for the life of the codebase.
+
+The mechanism is worth naming: **DOC-002 is "meaning" and DOC-007 is "wire", so they feel like the whole
+contract.** DOC-009 is filed as "Persistence, Migration, Dual-Run, and Cutover" — it reads like an
+implementation detail. It is not. It is **the most field-complete document in the corpus**, and for at least two
+objects it is the *only* place the fields exist. A search that stops at meaning+wire will keep producing
+confident, false "unspecified" verdicts.
+
+Both vocab openItems now say this, and say it generally.
+
+### THE AUDIT CAME BACK: ARTIFACT was the first one found, not the last
+
+Full write-up: **`AUDIT-placeholder-helpers.md`**. All 34 helper types emitted as
+`z.record(z.string(), z.unknown())` — "any object" — were checked against the **full 14-file corpus**, every
+positive attacked by 2 adversarial refuters, then re-verified by hand. **9 of 34 are ratified and
+field-complete.** 25 are genuinely undefined (that restraint was correct — including `ExecutionProvenance`,
+which vindicates §16 item 23 and the `floor-gate.ts` disclosure, now on evidence rather than assumption).
+
+And the mechanism turned out to be **three different failures**, not one:
+
+1. **A doc nobody opened** — ARTIFACT (DOC-009 §18.1), and my item-23 blocker (DOC-009 §10.4).
+2. **A harvest pass that only looked for enums** — 7 helpers, all in **DOC-004**. This is the worse one,
+   because the citation *looks* diligent. The note for `AssessmentCriterion` reads: *"NOT field-defined;
+   **DOC-004 §7** supplies criterionType/evaluationMethod/severityIfNotMet enums. Source TBD."* — and DOC-004
+   §7 **IS** `interface AssessmentCriterion { … }`. The author reached inside the interface, took its enums,
+   and recorded its fields as nonexistent. **A pass that extracts one kind of thing reports the absence of
+   every other kind.**
+3. **A deferral that outlived its milestone** — `ApplicabilityExpression` and `ValidatorResult` are
+   field-defined in the vocab *and* DOC-007 (§18, §20), and are placeholders anyway because `gen-objects.ts`
+   hardcodes `FORCE_PLACEHOLDER` "for M1". The repo is past **M14**.
+
+**This is the mechanism of the hollow governed layer, not a symptom of it.** `AssurancePolicy` composes these:
+`criteria`, `findingDefinitions`, `waiverRules`, `dispositionRules`, `escalationRules`, `requiredEvidence`,
+`applicability` — **every field that makes a policy mean anything is `any object`.** The runtime cannot read a
+policy even in principle. The cause was never lazy handlers; **the types said nothing, so nothing could be
+read.**
+
+The proof is one line. DOC-004 §7 ratifies `{id, name, description, criterionType, evaluationMethod,
+requiredEvidenceIds, severityIfNotMet, mayBeNotApplicable}`. `floor-policies.ts` ships `{id, statement,
+mandatory}` — **no overlap beyond `id`**, and a **five-level** `severityIfNotMet` collapsed into a boolean,
+which is the exact disease §16 item 12 names for waivers. Nothing caught it because the type accepts anything.
+
+**Not fixed here, and why:** these are not clean transcriptions like ARTIFACT. Most reference further types
+(`PolicyExpression`, `RiskCondition`, `AdmissibilityRule`, …) that are genuinely undefined, so each is a
+*partial* tightening needing a per-field judgment. And tightening `AssessmentCriterion` — the highest-value fix
+in the repo, 8/8 fields clean — **breaks the 3 floor policies, 6 seed policies, the mock validator, and the
+policy-manager UI**. That break is *correct*, but it is a migration with real decisions in it (`statement` →
+`description`; `mandatory: true` → `severityIfNotMet: 'BLOCKING'`; four fields with no current value). Doing
+that as a tail-end sweep is how confidently-wrong architecture ships. Sequenced in the audit; **the sponsor's
+call on when.**
+
+### Gate (full, incl. Playwright — both commits)
+
+`check-types` 21/21 · `test` 21/21 (contracts 146, +6 new artifact, +4 new floor-subject) · `lint` · `boundary`
+136 modules / 337 deps / 0 violations · svelte-check **0 errors** · Playwright **22 passed** (1 known
+render-timing flake, retried green).
 
 ---
 

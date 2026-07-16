@@ -662,7 +662,11 @@ describe('PublishPwa protected-transition gate — the de minimis assurance floo
 	 */
 	it('an EFFECTIVE waiver naming the exact failed criterion discharges that policy and lets the PWA publish', () => {
 		authorValidatedAiPwa();
-		const ids = recordFloor({ [SCHEMA]: 'SATISFIED', [IDENTITY]: 'SATISFIED', [REVIEW]: 'REJECTED' });
+		const ids = recordFloor({
+			[SCHEMA]: 'SATISFIED',
+			[IDENTITY]: 'SATISFIED',
+			[REVIEW]: 'REJECTED'
+		});
 		const findingId = recordFinding(ids[REVIEW]!, 'RR-04-completeness-shortcut');
 		expect(publish().status).toBe('REJECTED');
 
@@ -685,7 +689,11 @@ describe('PublishPwa protected-transition gate — the de minimis assurance floo
 	 */
 	it('a waiver naming a DIFFERENT criterion does NOT discharge the failed one (RPH-GOV-005: no bleeding)', () => {
 		authorValidatedAiPwa();
-		const ids = recordFloor({ [SCHEMA]: 'SATISFIED', [IDENTITY]: 'SATISFIED', [REVIEW]: 'REJECTED' });
+		const ids = recordFloor({
+			[SCHEMA]: 'SATISFIED',
+			[IDENTITY]: 'SATISFIED',
+			[REVIEW]: 'REJECTED'
+		});
 		const findingId = recordFinding(ids[REVIEW]!, 'RR-04-completeness-shortcut');
 		expect(publish().status).toBe('REJECTED');
 

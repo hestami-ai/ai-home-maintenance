@@ -2,15 +2,11 @@
 // the pre-amendment behaviour is reintroduced, which is the whole point — §14.3 warns that a scenario which cannot
 // fail "passes this trivially". Asserted over data, not model prose (§14.1), so nothing here rots.
 import { describe, expect, it } from 'vitest';
-import {
-	isRecordable,
-	narrationOf,
-	TRANSCRIPT_KIND,
-	type TranscriptEntry
-} from './transcript.js';
+import { isRecordable, narrationOf, TRANSCRIPT_KIND, type TranscriptEntry } from './transcript.js';
 
 /** Reasoning-shaped text of the kind a local/open-weight model volunteers inline, or a hosted API summarizes. */
-const REASONING = 'Let me think. The user probably wants X, but I am unsure, so I will guess and move on.';
+const REASONING =
+	'Let me think. The user probably wants X, but I am unsure, so I will guess and move on.';
 
 const TURN: TranscriptEntry[] = [
 	{ role: 'USER', kind: 'message', text: 'Author a product realization PWA.' },
@@ -31,7 +27,9 @@ describe('narrationOf — what the independent reviewer is allowed to see (§9.7
 	});
 
 	it('keeps the agent OBSERVABLE narration, in order', () => {
-		expect(narrationOf(TURN)).toBe('I added a Realization root.\nThen three child types beneath it.');
+		expect(narrationOf(TURN)).toBe(
+			'I added a Realization root.\nThen three child types beneath it.'
+		);
 	});
 
 	it('excludes the user, the system, and tool traffic — the reviewer judges the producer, not the harness', () => {

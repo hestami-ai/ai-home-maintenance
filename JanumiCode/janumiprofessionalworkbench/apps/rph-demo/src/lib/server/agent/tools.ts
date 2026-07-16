@@ -80,14 +80,18 @@ export function buildAuthoringTools(
 			mutates: false,
 			run: (args) => {
 				const account = str(args.rationale).trim();
-				if (!account) return { ok: false, summary: 'Rejected: rationale is required and must be non-empty.' };
+				if (!account)
+					return { ok: false, summary: 'Rejected: rationale is required and must be non-empty.' };
 				rationale.declare({
 					rationale: account,
 					assumptions: strArr(args.assumptions),
 					limitations: strArr(args.limitations),
 					residualUncertainty: strArr(args.residualUncertainty)
 				});
-				return { ok: true, summary: 'Professional rationale summary recorded for the independent review.' };
+				return {
+					ok: true,
+					summary: 'Professional rationale summary recorded for the independent review.'
+				};
 			}
 		},
 
@@ -318,7 +322,8 @@ export function buildAuthoringTools(
 				},
 				criteria: {
 					type: 'string[]',
-					description: 'One statement per criterion (each becomes a mandatory assessment criterion).'
+					description:
+						'One statement per criterion (each becomes a mandatory assessment criterion).'
 				}
 			},
 			mutates: true,

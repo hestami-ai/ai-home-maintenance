@@ -6,7 +6,11 @@ import { describe, expect, it } from 'vitest';
 import { identityProvenanceFactsOf } from './floor.js';
 import type { FloorProducer } from './floor.js';
 
-const PRODUCER: FloorProducer = { agentId: 'authoring-agent', modelId: 'gpt-5.4', providerId: 'openai' };
+const PRODUCER: FloorProducer = {
+	agentId: 'authoring-agent',
+	modelId: 'gpt-5.4',
+	providerId: 'openai'
+};
 const GOOD_PWA: Record<string, unknown> = {
 	id: 'pwa_01ARZ3NDEKTSV4RRFFQ69G5P00',
 	semanticVersion: 2,

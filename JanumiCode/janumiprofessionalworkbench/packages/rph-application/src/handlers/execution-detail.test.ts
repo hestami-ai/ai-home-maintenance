@@ -85,7 +85,10 @@ describe('ExecutionStep + RuntimeBinding handlers (live)', () => {
 	 *  logged vacuity finding. The GATE, however, derives the version from the store, so a lie here would not
 	 *  buy a pass. */
 	let asmt = 0;
-	function recordFloor(dispositions: Record<string, string>, subject = ART): Record<string, string> {
+	function recordFloor(
+		dispositions: Record<string, string>,
+		subject = ART
+	): Record<string, string> {
 		const ids: Record<string, string> = {};
 		for (const [policyId, disposition] of Object.entries(dispositions)) {
 			const id = `asmt_${String(++asmt).padStart(26, '0')}`;

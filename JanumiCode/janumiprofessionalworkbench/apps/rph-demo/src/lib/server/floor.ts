@@ -84,7 +84,8 @@ export function identityProvenanceFactsOf(
 		hasSemanticVersion: Number(pwa.semanticVersion) >= 1,
 		hasProvenance: !!prov && typeof prov.originType === 'string' && prov.originType.length > 0,
 		hasProducer:
-			producer.agentId.length > 0 && (producer.modelId.length > 0 || producer.providerId.length > 0),
+			producer.agentId.length > 0 &&
+			(producer.modelId.length > 0 || producer.providerId.length > 0),
 		traceComplete: true // WITHHELD — no ratified trace-completeness definition; see the doc comment.
 	};
 }

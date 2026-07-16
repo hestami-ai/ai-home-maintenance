@@ -95,7 +95,10 @@ describe('RecordArtifact — DOC-009 §18.1 transcribed; the Artifact is a versi
 		expect(s.producingExecutionAttemptId).toBe(ATTEMPT);
 		expect(s.byteSize).toBe(2048);
 		expect(s.provenance).toBeDefined();
-		expect((s.provenance as { sourceObjectIds?: string[] }).sourceObjectIds).toEqual([PWU, ATTEMPT]);
+		expect((s.provenance as { sourceObjectIds?: string[] }).sourceObjectIds).toEqual([
+			PWU,
+			ATTEMPT
+		]);
 	});
 
 	it("omits DOC-009's three nullable columns when absent rather than writing nulls", () => {

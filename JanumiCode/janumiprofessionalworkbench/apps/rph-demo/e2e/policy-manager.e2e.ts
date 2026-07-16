@@ -32,7 +32,9 @@ test.describe('PWA Designer — Assurance Policy manager', () => {
 		// Create a new policy.
 		await page.getByRole('button', { name: '＋ New policy' }).click();
 		await page.locator('input[name="name"]').fill('Tenant Isolation Review');
-		await page.locator('textarea[name="purpose"]').fill('Every tenant boundary is enforced and tested.');
+		await page
+			.locator('textarea[name="purpose"]')
+			.fill('Every tenant boundary is enforced and tested.');
 		await page
 			.locator('textarea[name="criteria"]')
 			.fill('Tenant data is isolated\nCross-tenant access is denied');
@@ -79,9 +81,7 @@ test.describe('PWA Designer — Assurance Policy manager', () => {
 		// Version it: a successor copy is created and the predecessor is SUPERSEDED.
 		await card.getByRole('button', { name: 'New version' }).click();
 		snap = await introspect(request);
-		const predecessor = snap.assurancePolicies.find(
-			(p: { id: string }) => p.id === createdId
-		);
+		const predecessor = snap.assurancePolicies.find((p: { id: string }) => p.id === createdId);
 		expect(predecessor.state.status).toBe('SUPERSEDED');
 		const successors = snap.assurancePolicies.filter(
 			(p: { id: string; state: { name?: string } }) =>

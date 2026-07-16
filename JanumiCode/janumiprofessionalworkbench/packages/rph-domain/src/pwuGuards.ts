@@ -125,7 +125,8 @@ export interface ReadinessCheck {
 export function checkPwuShapeReadiness(facts: PwuReadinessFacts): ReadinessCheck {
 	const unmet: string[] = [];
 	if (facts.intentId.trim() === '') unmet.push('explicit intent reference (DOC-002 §9.1)');
-	if (facts.title.trim() === '') unmet.push('title (DOC-002 §9.1 "title and professional purpose")');
+	if (facts.title.trim() === '')
+		unmet.push('title (DOC-002 §9.1 "title and professional purpose")');
 	if (facts.description.trim() === '') {
 		unmet.push('professional purpose (DOC-002 §9.1 "title and professional purpose")');
 	}
