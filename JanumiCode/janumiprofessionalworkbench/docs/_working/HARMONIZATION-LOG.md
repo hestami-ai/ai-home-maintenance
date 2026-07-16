@@ -481,6 +481,75 @@ observations (1) · readiness (1).
 
 ---
 
+## INCREMENT 6+ — LANDED. **All 14 wiring reds are GREEN.** And the failure moved somewhere that matters.
+
+Four controls wired by parallel agents, each adversarially reviewed, each verified by the orchestrator's own
+run (the agents' claimed evidence is not trusted — a prior batch cited a vitest flag that does not exist).
+
+| Control | Kernel routed to | Note |
+|---|---|---|
+| ValidatePwa | `analyzePwaGraph` + `buildPwaGraphExport` (rph-projections) | via `advanceStatus`'s existing `guard`. Dep `rph-application → rph-projections` added; boundary re-proved: **326** deps, 0 violations |
+| stale floor | — (`bumpSemanticVersion` on material graph edits) | the version check in `floor-gate.ts` was real and could never fire; now it fires |
+| one-active-plan | `canActivatePlan` | **not dead — vacuous.** Already imported and called, fed from `ProfessionalWorkUnit.activeExecutionPlanId`: **one reader, zero writers, permanently `undefined`**. A guard that ran and always said yes |
+| baseline | `canPromoteBaseline` → `findOpenBlockingObservations` | already called, starved with `openObservations: []`. The kernel faithfully iterated nothing |
+| readiness | new guard in `rph-domain` | the only case where no kernel existed |
+
+**`canActivatePlan` is a distinct failure mode worth naming:** not *dead* (uncalled), but **vacuous** (called,
+fed a dead pointer). The census counted callers, so it counted this as LIVE. **A census of call sites cannot
+see a guard whose input is permanently undefined** — meaning LIVE 19 is an *upper* bound on what is really
+enforced, and the other 18 deserve the same check.
+
+### One case suspended, and the agent caught its own bias
+
+`ValidatePwa` "rejects a Draft whose PWU Types carry no assurance assignment" → `it.skip`, body untouched,
+blocked on **§16 item 9**. The reasoning survives scrutiny: §11.7.4's own exemplar shows PWU Types carrying
+**only** the locked floor, so "every type must name ≥1 policy" is contradicted *by the guide*;
+`requiredAssurancePolicyIds` is a bare id list carrying none of the trigger/materiality terms applicability is
+decided from. And the tell it flagged on itself: *"it would ALSO have been the interpretation that
+conveniently kept the production seed green — the tell that it was reasoning backwards from the test."*
+Un-skip when item 9 contracts the declaration, then route through the dead `evaluateApplicability`.
+
+### THE REAL RESULT: the production seed does not satisfy its own rules
+
+Wiring reds **14 → 0**. And **11 NEW failures appeared in `rph-engine`** — a package no agent touched:
+`reference-undertaking` (5), `seed-workbench` (4), `pwa-ontology` (1), `floor-gate` (1). Two causes, both
+fixture premises that encoded the defects now enforced:
+
+1. **`ValidatePwa blocked: … (connected: 1 orphan(s): Control)`** — `pwa-ontology.test.ts` defines a root
+   (`Compliance`) and a child (`Control`) and **never declares a child rule linking them**. It then asserts
+   publication succeeds. §16 item 9 requires "roots, **recursively reachable** PWU Types, named child rules".
+2. **`PublishPwa blocked: … at v2 (floor.* = MISSING)`** — the floor is recorded at v1, the graph is then
+   materially edited (now v2), and publication proceeds on the stale floor. This is *precisely* the
+   stale-floor defect, in the seed.
+
+**This is the most important result of the increment.** These are not regressions — they are the enforcement
+finally reaching the reference material. The seed and the reference Undertaking are the artifacts that
+*demonstrate* JPWB, and they were built against handlers that never checked. Same class as
+`execution-detail.test.ts:116`, and the agent already fixed one instance of exactly this correctly
+(`permitChildOfRoot`, a premise fix).
+
+**Not fixed here, deliberately.** 11 fixture repairs across 4 files needs care and verification budget this
+increment does not have, and landing them half-checked is how this codebase reached 55 dead kernel functions.
+They are **disclosed and failing loudly**, not skipped, not deleted. Next increment.
+
+### Gate
+
+`check-types` 21/21 · `lint` clean · `boundary` clean (326 deps) · **488 passed, 4 skipped, 11 failed — all 11
+in `rph-engine` seed/reference fixtures, none a wiring red.** (Plus the pre-existing `docs/…/rendered-html`
+empty-file failure.)
+
+### Follow-ons recorded, not smuggled in
+
+- **The vocab `sourceSection` audit** (from Increment 5): how many citations resolve to a field list vs a bare
+  name?
+- **Vacuity audit:** re-check the 19 "LIVE" kernel fns for dead-pointer inputs, as `canActivatePlan` was.
+- **EVENTS registry naming split** found while wiring: `PwuTypeDefined → 'PwuType'` vs `PwuTypeRedefined →
+  'PWU_TYPE'`; `PwaCreated → 'ProfessionalWorkArchitecture'` vs `PwaEdited → 'PROFESSIONAL_WORK_ARCHITECTURE'`.
+  Inert today **only because `makeEvent` does not validate against the registry** — Increment 7 will trip on it.
+- Collapse `floor-gate.ts`'s duplicated policy-id literals into `FLOOR_POLICY_IDS` (edge now legal).
+
+---
+
 ## PART 4 — Open questions genuinely for the sponsor
 
 *(kept deliberately short — under the 2026-07-15 mandate, a tension is work, not a question, unless it

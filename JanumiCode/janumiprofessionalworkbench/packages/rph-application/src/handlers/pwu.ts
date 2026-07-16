@@ -11,7 +11,12 @@ import type {
 	DomainCommand,
 	ProposePwuPayload
 } from '@janumipwb/rph-contracts';
-import { canAdvanceWorkLifecycle, satisfiesP1 } from '@janumipwb/rph-domain';
+import {
+	canAdvanceWorkLifecycle,
+	checkPwuShapeReadiness,
+	satisfiesP1,
+	type PwuReadinessFacts
+} from '@janumipwb/rph-domain';
 import {
 	checkTransition,
 	commitState,
@@ -174,9 +179,50 @@ function advancePwuLifecycle(
 export const beginPwuShaping: CommandHandler = (ctx, command) =>
 	advancePwuLifecycle(ctx, command, { target: 'SHAPING', eventType: 'PwuShapingStarted' });
 
-/** MarkPwuReady — SHAPING -> READY (emits the generic PwuStateChanged, DOC-007 §11.5). */
-export const markPwuReady: CommandHandler = (ctx, command) =>
-	advancePwuLifecycle(ctx, command, { target: 'READY', eventType: 'PwuStateChanged' });
+/** Reads the §9.1 / §6.3 readiness facts off the stored PWU (and its Intent). The Intent load is the reason
+ * this lives at the call site and not in the pure kernel: rph-domain does no I/O. A root PWU whose Intent row
+ * is missing entirely yields intentStatus '' — which satisfies no branch of INTENT_AT_LEAST_PROVISIONAL, so
+ * the guard fails closed rather than assuming maturity it cannot read. */
+function readinessFactsOf(ctx: HandlerContext, state: Record<string, unknown>): PwuReadinessFacts {
+	const boundaries = (state.boundaries ?? {}) as { inScope?: string[]; outOfScope?: string[] };
+	const intentId = typeof state.intentId === 'string' ? state.intentId : '';
+	const intentState = intentId
+		? (ctx.store.loadObject(intentId)?.state as { intentStatus?: string } | undefined)
+		: undefined;
+	return {
+		intentId,
+		title: typeof state.title === 'string' ? state.title : '',
+		description: typeof state.description === 'string' ? state.description : '',
+		inScope: boundaries.inScope ?? [],
+		outOfScope: boundaries.outOfScope ?? [],
+		expectedOutputs: (state.expectedOutputs as unknown[]) ?? [],
+		hasRiskProfile: state.riskProfile !== undefined && state.riskProfile !== null,
+		// DOC-002 §7.1: `parentWorkUnitId?` — its absence IS rootness.
+		isRoot: typeof state.parentWorkUnitId !== 'string' || state.parentWorkUnitId === '',
+		intentStatus: intentState?.intentStatus ?? ''
+	};
+}
+
+/** MarkPwuReady — SHAPING -> READY (emits the generic PwuStateChanged, DOC-007 §11.5).
+ *
+ * DOC-002 §9 L661: "A PWU may enter `READY` only if its Shape Readiness Profile is satisfied." — so this is
+ * NOT a bare legality check. canAdvanceWorkLifecycle answers only "is SHAPING -> READY an arrow on the
+ * machine"; it has no `SHAPING->READY` cross-axis entry, and readiness is not a state-axis fact anyway. The
+ * §9.1 field contract and the §6.3 L472 root-Intent invariant are checked by the kernel guard, and every
+ * unmet limb is named in the rejection (§8.4 L856: gaps are never silent). */
+export const markPwuReady: CommandHandler = (ctx, command) => {
+	const loaded = loadOrReject(ctx, command, command.targetAggregateId);
+	if (!loaded.ok) return loaded.result;
+	const readiness = checkPwuShapeReadiness(readinessFactsOf(ctx, loaded.state));
+	if (!readiness.ok) {
+		return reject(
+			command,
+			'RPH_VALIDATION_SEMANTIC_FAILED',
+			`MarkPwuReady: PWU ${command.targetAggregateId} does not satisfy the shape readiness contract (DOC-002 §9): ${readiness.unmet.join('; ')}`
+		);
+	}
+	return advancePwuLifecycle(ctx, command, { target: 'READY', eventType: 'PwuStateChanged' });
+};
 
 /** ChallengePwu — READY -> CHALLENGED. */
 export const challengePwu: CommandHandler = (ctx, command) =>

@@ -44,21 +44,33 @@ describe('PWU lifecycle handlers (live command drive)', () => {
 		};
 	}
 
+	// Matures the Intent to PROVISIONAL along the ratified DOC-002 §6.2 path (RAW -> UNDER_DISCOVERY ->
+	// PROVISIONAL). This is fixture PREMISE, not subject: DOC-002 §6.3 L472 — "A root PWU cannot enter
+	// `READY` unless its intent is at least `PROVISIONAL`" — so a fixture that drove a root PWU to READY
+	// behind a RAW intent was asserting something the ratified model forbids. The subjects below (the
+	// authored PROPOSED -> SHAPING -> READY path, and the ChangePwuState guards) are unchanged.
 	function seedIntent(): void {
+		const intent = (commandType: string, payload: unknown): DomainCommand =>
+			cmd(commandType, payload, {
+				targetAggregateId: INTENT_ID,
+				targetAggregateType: 'INTENT'
+			});
 		engine.dispatch(
-			cmd(
-				'CaptureIntent',
-				{
-					intentId: INTENT_ID,
-					originatingExpression: 'Build a field service management SaaS',
-					ontologyId: 'product-realization-pwa',
-					ontologyVersion: '1.3.0'
-				},
-				{ targetAggregateId: INTENT_ID, targetAggregateType: 'INTENT' }
-			)
+			intent('CaptureIntent', {
+				intentId: INTENT_ID,
+				originatingExpression: 'Build a field service management SaaS',
+				ontologyId: 'product-realization-pwa',
+				ontologyVersion: '1.3.0'
+			})
 		);
+		engine.dispatch(intent('BeginIntentDiscovery', {}));
+		engine.dispatch(intent('ProvisionIntent', { ambiguityIds: [] }));
 	}
 
+	// A PWU shaped well enough to be marked READY: DOC-002 §9.1 requires an in-scope statement, an
+	// out-of-scope statement (or an explicit "not yet known"), and an expected output. The empty
+	// boundaries/outputs this fixture used to carry made it unready by the ratified §9 contract, so
+	// marking it READY was a false premise rather than a property of the lifecycle under test.
 	function proposePayload() {
 		return {
 			pwuId: PWU_ID,
@@ -66,11 +78,16 @@ describe('PWU lifecycle handlers (live command drive)', () => {
 			title: 'Architecture Definition',
 			description: 'Define a coherent technical structure',
 			intentId: INTENT_ID,
-			boundaries: { inScope: [], outOfScope: [], permittedChanges: [], prohibitedChanges: [] },
+			boundaries: {
+				inScope: ['service architecture and module boundaries'],
+				outOfScope: ['vendor selection'],
+				permittedChanges: [],
+				prohibitedChanges: []
+			},
 			obligationIds: [],
 			constraintIds: [],
 			assumptionIds: [],
-			expectedOutputs: [],
+			expectedOutputs: [{ outputId: 'out_architecture_definition', kind: 'DOCUMENT' }],
 			assurancePolicyIds: [],
 			riskProfile: {
 				consequence: 'MEDIUM',

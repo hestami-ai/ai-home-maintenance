@@ -15,6 +15,12 @@ import type {
 	PublishPwaPayload
 } from '@janumipwb/rph-contracts';
 import {
+	analyzePwaGraph,
+	buildPwaGraphExport,
+	type PwaGraphExport,
+	type PwaGraphNode
+} from '@janumipwb/rph-projections';
+import {
 	advanceStatus,
 	commitState,
 	createObject,
@@ -87,6 +93,91 @@ export const appendConversationEntries: CommandHandler = (ctx, command, payload)
 	});
 };
 
+// ── Material graph edits raise the PWA's semantic version (guide §10.1 L1379, §8.4 L854) ─────────────────────────
+/** Rolls back the whole (PWU-Type write + PWA version bump) pair when the bump cannot be committed. */
+class BumpAbort extends Error {}
+
+/**
+ * Raise the PWA's semanticVersion because its PWU-Type graph was materially edited.
+ *
+ * WHY: §10.1 L1379 — "Claims, Assessments, Decisions, and waivers bind exact subject semantic versions;" — and
+ * §8.4 L854 — "A missing, stale, malformed, failed, unavailable, or independence-invalid required review cannot
+ * satisfy assurance or permit its protected transition." `floor-gate.ts`'s `versionOk` check (`rec?.version ===
+ * opts.subjectVersion`) is a REAL check of exactly that, and it was inert: no authoring command ever moved the
+ * PWA's semanticVersion, so a floor satisfied over a 1-type graph silently authorized publication of a graph a
+ * PWU Type had been smuggled into afterwards. The subject of the floor is the PWA (its graph), so the version the
+ * floor binds must move when the graph does.
+ *
+ * WHY HERE: DefinePwuType/EditPwuType/RemovePwuType target the PWU_TYPE aggregate, but the reviewed subject is the
+ * PWA — and a `CommitInput` carries the state of ONE aggregate, so raising the PWA's version needs its own commit.
+ * The pair is wrapped in `ctx.store.transaction` (the port's existing all-or-nothing seam, as `dispatchBatch` uses)
+ * so a graph edit can never land with the version left behind — which would silently re-create this defect.
+ *
+ * NO NEW EVENT IS INVENTED: this emits the generated-registry event `PwaEdited` on the PROFESSIONAL_WORK_ARCHITECTURE
+ * aggregate with `{ pwaId }` (its schema requires only `pwaId`; name/description/domain/version are optional). That
+ * is literally what happened — the PWA changed — and it keeps the version history of the PWA readable as its own
+ * event stream. The second commit needs its own receipt (`idempotency_key` is a PRIMARY KEY), so the key/commandId
+ * are DERIVED deterministically from the originating command; a genuine replay never reaches here because the bus
+ * short-circuits on the original key first.
+ */
+function bumpPwaSemanticVersion(
+	ctx: HandlerContext,
+	command: DomainCommand,
+	pwaId: string
+): CommandResult | null {
+	const loaded = loadOrReject(ctx, command, pwaId);
+	if (!loaded.ok) return loaded.result;
+	const bumpCommand: DomainCommand = {
+		...command,
+		commandId: `${command.commandId}#pwa-version`,
+		idempotencyKey: `${command.idempotencyKey}#pwa-version`
+	};
+	const newRevision = loaded.revision + 1;
+	const newSemanticVersion = loaded.semanticVersion + 1;
+	const next = nextEnvelope(loaded.state, bumpCommand, newRevision, newSemanticVersion);
+	const event = makeEvent(ctx, bumpCommand, {
+		eventType: 'PwaEdited',
+		aggregateType: PWA,
+		aggregateId: pwaId,
+		aggregateRevision: newRevision,
+		payload: { pwaId }
+	});
+	const result = commitState(ctx, bumpCommand, {
+		objectType: PWA,
+		aggregateId: pwaId,
+		expectedRevision: loaded.revision,
+		newRevision,
+		newSemanticVersion,
+		nextState: next,
+		event
+	});
+	return result.status === 'ACCEPTED' ? null : result;
+}
+
+/** Commit a material PWU-Type edit AND the owning PWA's version bump atomically (see bumpPwaSemanticVersion). */
+function withPwaVersionBump(
+	ctx: HandlerContext,
+	command: DomainCommand,
+	pwaId: string,
+	commitEdit: () => CommandResult
+): CommandResult {
+	let outcome: CommandResult | undefined;
+	try {
+		ctx.store.transaction(() => {
+			outcome = commitEdit();
+			if (outcome.status !== 'ACCEPTED') throw new BumpAbort();
+			const failure = bumpPwaSemanticVersion(ctx, command, pwaId);
+			if (failure) {
+				outcome = failure;
+				throw new BumpAbort();
+			}
+		});
+	} catch (e) {
+		if (!(e instanceof BumpAbort)) throw e;
+	}
+	return outcome!;
+}
+
 /** CreatePwa — create a Professional Work Architecture in DRAFT. */
 export const createPwa: CommandHandler = (ctx, command, payload) => {
 	const p = payload as CreatePwaPayload;
@@ -156,12 +247,16 @@ export const definePwuType: CommandHandler = (ctx, command, payload) => {
 			p.completionRule ?? 'Execution succeeded AND required outputs exist AND assurance satisfied',
 		status: 'DRAFT'
 	};
-	return createObject(ctx, command, {
-		objectType: PWU_TYPE,
-		aggregateId: p.pwuTypeId,
-		state,
-		eventType: 'PwuTypeDefined'
-	});
+	// Adding a PWU Type materially edits the PWA's graph: raise the PWA's semanticVersion with it, so a floor
+	// satisfied over the previous graph cannot authorize this one (§10.1 L1379).
+	return withPwaVersionBump(ctx, command, p.pwaId, () =>
+		createObject(ctx, command, {
+			objectType: PWU_TYPE,
+			aggregateId: p.pwuTypeId,
+			state,
+			eventType: 'PwuTypeDefined'
+		})
+	);
 };
 
 /** EditPwa — update a DRAFT PWA's metadata in place. A PUBLISHED version is immutable (§11), so this rejects
@@ -321,15 +416,18 @@ export const editPwuType: CommandHandler = (ctx, command, payload) => {
 		aggregateRevision: newRevision,
 		payload
 	});
-	return commitState(ctx, command, {
-		objectType: PWU_TYPE,
-		aggregateId: id,
-		expectedRevision: loaded.revision,
-		newRevision,
-		newSemanticVersion: loaded.semanticVersion,
-		nextState: next,
-		event
-	});
+	// Redefining a PWU Type materially edits the PWA's graph — raise the PWA's semanticVersion with it (§10.1 L1379).
+	return withPwaVersionBump(ctx, command, String(loaded.state.pwaId), () =>
+		commitState(ctx, command, {
+			objectType: PWU_TYPE,
+			aggregateId: id,
+			expectedRevision: loaded.revision,
+			newRevision,
+			newSemanticVersion: loaded.semanticVersion,
+			nextState: next,
+			event
+		})
+	);
 };
 
 /** Ids of sibling PWU Types (same PWA, still live) that reference `pwuTypeId` as a permitted parent/child. */
@@ -387,15 +485,18 @@ export const removePwuType: CommandHandler = (ctx, command) => {
 		aggregateRevision: newRevision,
 		payload: command.payload
 	});
-	return commitState(ctx, command, {
-		objectType: PWU_TYPE,
-		aggregateId: id,
-		expectedRevision: loaded.revision,
-		newRevision,
-		newSemanticVersion: loaded.semanticVersion,
-		nextState: next,
-		event
-	});
+	// Removing a PWU Type materially edits the PWA's graph — raise the PWA's semanticVersion with it (§10.1 L1379).
+	return withPwaVersionBump(ctx, command, String(loaded.state.pwaId), () =>
+		commitState(ctx, command, {
+			objectType: PWU_TYPE,
+			aggregateId: id,
+			expectedRevision: loaded.revision,
+			newRevision,
+			newSemanticVersion: loaded.semanticVersion,
+			nextState: next,
+			event
+		})
+	);
 };
 
 /** SubmitPwaForReview — DRAFT -> UNDER_REVIEW. */
@@ -408,14 +509,91 @@ export const submitPwaForReview: CommandHandler = (ctx, command) =>
 		eventType: 'PwaSubmittedForReview'
 	});
 
-/** ValidatePwa — UNDER_REVIEW -> VALIDATED. */
+// ── ValidatePwa gate: recursive-composition validation (guide §11.6 L1639) ───────────────────────────────────────
+/** The live (non-REMOVED) PWU Types of `pwaId`, as the projection layer's graph nodes. */
+function pwuTypeNodesOf(ctx: HandlerContext, pwaId: string): PwaGraphNode[] {
+	const arr = (v: unknown): string[] => (Array.isArray(v) ? (v as string[]) : []);
+	const ids = new Set<string>();
+	for (const e of ctx.store.readAllEvents())
+		if (e.aggregateType === PWU_TYPE) ids.add(e.aggregateId);
+	const nodes: PwaGraphNode[] = [];
+	for (const id of ids) {
+		const s = ctx.store.loadObject(id)?.state as Record<string, unknown> | undefined;
+		if (!s || s.pwaId !== pwaId || s.status === 'REMOVED') continue;
+		nodes.push({
+			id,
+			name: String(s.name ?? id),
+			pwuKind: String(s.pwuKind ?? ''),
+			isRoot: Boolean(s.isRoot),
+			permittedChildTypeIds: arr(s.permittedChildTypeIds),
+			requiredInputs: arr(s.requiredInputs),
+			requiredOutputs: arr(s.requiredOutputs)
+		});
+	}
+	return nodes;
+}
+
+/** The PWA's PWU-Type graph as the canonical projections export (the same shape the demo's Reasoning Review reads). */
+function pwaGraphExport(ctx: HandlerContext, pwaId: string, state: Record<string, unknown>): PwaGraphExport {
+	return buildPwaGraphExport(
+		{
+			id: pwaId,
+			name: String(state.name ?? pwaId),
+			domain: String(state.domain ?? ''),
+			version: String(state.version ?? ''),
+			publicationStatus: String(state.publicationStatus ?? 'DRAFT')
+		},
+		pwuTypeNodesOf(ctx, pwaId)
+	);
+}
+
+/**
+ * ValidatePwa gate: the PWA's recursive composition must actually hold (guide §11.6 L1639 — "A Draft cannot become
+ * `VALIDATED` or `PUBLISHED` unless recursive-composition and assurance-assignment validation proves: explicit
+ * leaf/non-leaf treatment; coherent decomposition/recomposition; no missing/disallowed/cyclic child rules; …").
+ *
+ * The verdict is NOT computed here: `analyzePwaGraph` (rph-projections) already decides exactly these HARD
+ * invariants — `single-root`, `acyclic-permits`, `connected` — and is unit-proven at `pwa-graph.test.ts`. It was
+ * called by the demo's floor, the PWA route, and the Reasoning Review validator, but NOT by the handler that gates
+ * the transition, so VALIDATED was a pure status label: the structural verdict was computed everywhere except the
+ * one call site that could act on it. This routes the call site through it.
+ *
+ * NOT enforced here, deliberately — the assurance-assignment limb of L1639: see `pwa-validation-gate.test.ts`'s
+ * skipped case. §11.7.4 makes the floor "🔒 de minimis floor · non-removable" on EVERY PWU Type (so it is never an
+ * assignment that can go *missing*) and shows additive policies varying per type; L1639's "A missing policy
+ * assignment blocks PWA validation/publication" is therefore relative to APPLICABILITY, and `requiredAssurancePolicyIds`
+ * is a bare id list carrying none of §11.7.4 rail 1's "trigger/materiality rule, subject and Claim, required
+ * Evidence, independence, protected boundary/transition". Deciding applicability without that is choosing a
+ * convenient interpretation and encoding it as architecture — §0.3 forbids it. Un-skip when the declaration is
+ * contracted (§16 item 9) and route through `evaluateApplicability`.
+ */
+function pwaCompositionGate(
+	command: DomainCommand,
+	state: Record<string, unknown>,
+	ctx: HandlerContext
+): CommandResult | null {
+	const pwaId = command.targetAggregateId;
+	const report = analyzePwaGraph(pwaGraphExport(ctx, pwaId, state));
+	if (report.valid) return null;
+	const failed = report.invariants.filter((i) => !i.ok);
+	const detail = failed.map((i) => `${i.name}: ${i.detail}`).join('; ');
+	return reject(
+		command,
+		'RPH_INVARIANT_VIOLATION',
+		`ValidatePwa blocked: the PWU-Type composition of PWA ${pwaId} is not a valid recursive decomposition (${detail}). Fix the child rules so the graph has exactly one root, no composition cycle, and every type reachable from that root (§11.6).`,
+		[pwaId]
+	);
+}
+
+/** ValidatePwa — UNDER_REVIEW -> VALIDATED. Gated by recursive-composition validation (pwaCompositionGate). */
 export const validatePwa: CommandHandler = (ctx, command) =>
 	advanceStatus(ctx, command, {
 		objectType: PWA,
 		statusField: 'publicationStatus',
 		machine: PWA_MACHINE,
 		target: 'VALIDATED',
-		eventType: 'PwaValidated'
+		eventType: 'PwaValidated',
+		guard: (state, gctx) => pwaCompositionGate(command, state, gctx)
 	});
 
 // ── Protected-transition gate: the de minimis assurance floor (guide §8.4 step 4) ────────────────────────────────

@@ -509,9 +509,15 @@ describe('PublishPwa protected-transition gate — the de minimis assurance floo
 	// A ULID-format id (prefix_<26 digits>; digits are valid Crockford base32).
 	const ulid = (prefix: string) => `${prefix}_${String(++asmtSeq).padStart(26, '0')}`;
 
-	// Record a floor assessment per policy at the given disposition (as the Assurance Service), against `version`
-	// (defaults to the PWA's initial semanticVersion of 1; pass a different value to exercise version-binding).
-	function recordFloor(dispositions: Record<string, string>, version = 1) {
+	/** The PWA's CURRENT semanticVersion, read from engine state — never assumed. Authoring commands that materially
+	 *  edit the graph now raise it (§10.1 L1379), so "1" is no longer a safe literal for an authored PWA. */
+	const pwaVersion = () =>
+		Number((store.loadObject(AI_PWA)?.state as { semanticVersion?: number }).semanticVersion ?? 1);
+
+	// Record a floor assessment per policy at the given disposition (as the Assurance Service), against `version` —
+	// defaulting to whatever version the PWA is ACTUALLY at, i.e. the assurance run reviews the graph as it stands.
+	// Pass a different value to exercise version-binding.
+	function recordFloor(dispositions: Record<string, string>, version = pwaVersion()) {
 		for (const [policyId, disposition] of Object.entries(dispositions)) {
 			const assessmentId = ulid('asmt');
 			d(
@@ -576,8 +582,11 @@ describe('PublishPwa protected-transition gate — the de minimis assurance floo
 
 	it('a floor recorded against a STALE PWA version does not authorize publish (version-binding)', () => {
 		authorValidatedAiPwa();
-		// All three policies SATISFIED, but recorded against v2 while the PWA is v1 — a stale floor must not count.
-		recordFloor({ [SCHEMA]: 'SATISFIED', [IDENTITY]: 'SATISFIED', [REVIEW]: 'SATISFIED' }, 2);
+		// All three policies SATISFIED, but recorded against the version BEFORE the one the PWA is actually at — a
+		// stale floor must not count. The staleness is derived from live state, not a literal: this previously read
+		// "recorded against v2 while the PWA is v1", which pinned BOTH sides to constants and (since a floor ahead of
+		// its subject is not stale at all) inverted the drift it names. Now the PWA really is a version past this one.
+		recordFloor({ [SCHEMA]: 'SATISFIED', [IDENTITY]: 'SATISFIED', [REVIEW]: 'SATISFIED' }, pwaVersion() - 1);
 		const r = publish();
 		expect(r.status).toBe('REJECTED');
 		expect(r.error?.code).toBe('RPH_INVARIANT_VIOLATION');

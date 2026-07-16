@@ -71,6 +71,42 @@ export const approveExecutionPlan: CommandHandler = (ctx, command) =>
 		eventType: 'ExecutionPlanApproved'
 	});
 
+/**
+ * Does `workUnitId` already own an ACTIVE plan other than `thisPlanId`? (RPH-EXE-001 / DOC-002 §20.2 "A PWU may
+ * have only one active plan at a time.")
+ *
+ * This is DERIVED from authoritative plan state, never read from a denormalized pointer. The guard previously
+ * read `ProfessionalWorkUnit.activeExecutionPlanId` — a field that IS ratified (objects.ts / DOC-002 §19) but
+ * that NO handler has ever written. It was therefore permanently `undefined`, making `otherActivePlanExists`
+ * permanently `false`: canActivatePlan was called, but its one-active-plan limb was unreachable. The kernel was
+ * wired; the fact it decides on was not.
+ *
+ * Writing that pointer instead was rejected: it hangs off the PWU aggregate while this command targets the
+ * Execution aggregate (DOC-002 §3.3, "Aggregate root: Execution Plan"), so maintaining it would mean a
+ * cross-aggregate write plus a PWU event type no contract defines — inventing a shape to satisfy a guard.
+ * Deriving needs nothing new: `readAllEvents` indexes the candidate plan ids and `loadObject` supplies each
+ * plan's authoritative current status, so a SUPERSEDED/CANCELLED/COMPLETED plan drops out on its own status
+ * rather than on a pointer somebody remembered to clear.
+ */
+function otherActivePlanExistsForPwu(
+	ctx: HandlerContext,
+	workUnitId: string,
+	thisPlanId: string
+): boolean {
+	const candidateIds = new Set<string>();
+	for (const event of ctx.store.readAllEvents()) {
+		if (event.aggregateType === PLAN && event.aggregateId !== thisPlanId)
+			candidateIds.add(event.aggregateId);
+	}
+	for (const planId of candidateIds) {
+		const plan = ctx.store.loadObject(planId)?.state as
+			| { workUnitId?: string; status?: string }
+			| undefined;
+		if (plan?.workUnitId === workUnitId && plan.status === 'ACTIVE') return true;
+	}
+	return false;
+}
+
 /** ActivateExecutionPlan — APPROVED -> ACTIVE, gated by canActivatePlan (one ACTIVE plan per PWU, RPH-EXE-001). */
 export const activateExecutionPlan: CommandHandler = (ctx, command) =>
 	advanceStatus(ctx, command, {
@@ -80,11 +116,10 @@ export const activateExecutionPlan: CommandHandler = (ctx, command) =>
 		target: 'ACTIVE',
 		eventType: 'ExecutionPlanActivated',
 		guard: (state, hctx) => {
-			const workUnitId = String(state.workUnitId);
-			const pwu = hctx.store.loadObject(workUnitId)?.state as
-				{ activeExecutionPlanId?: string } | undefined;
-			const otherActivePlanExists = Boolean(
-				pwu?.activeExecutionPlanId && pwu.activeExecutionPlanId !== command.targetAggregateId
+			const otherActivePlanExists = otherActivePlanExistsForPwu(
+				hctx,
+				String(state.workUnitId),
+				command.targetAggregateId
 			);
 			const check = canActivatePlan({ planStatus: String(state.status), otherActivePlanExists });
 			if (!check.ok) {

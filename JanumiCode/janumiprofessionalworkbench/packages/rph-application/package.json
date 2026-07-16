@@ -28,6 +28,7 @@
     "@janumipwb/rph-contracts": "workspace:*",
     "@janumipwb/rph-domain": "workspace:*",
     "@janumipwb/rph-ports": "workspace:*",
+    "@janumipwb/rph-projections": "workspace:*",
     "zod": "^4.4.3"
   },
   "devDependencies": {

@@ -24,6 +24,68 @@ import {
 
 const DECISION = 'DECISION';
 const BASELINE = 'BASELINE';
+const OBSERVATION = 'ASSURANCE_OBSERVATION';
+
+/** The severities §8.16 L1122 makes promotion-blocking: "no unresolved blocking/critical finding except a
+ *  policy-permitted scoped waiver". MATERIAL and below do not block a baseline. */
+const BLOCKING_SEVERITIES = new Set(['BLOCKING', 'CRITICAL']);
+
+/** AssuranceObservation.disposition values that leave a finding UNRESOLVED (`OPEN`) or resolved by waiver
+ *  (`WAIVED`) — the only two §8.16 L1122 speaks to. ACCEPTED / REMEDIATED / REJECTED / SUPERSEDED are
+ *  resolutions the ratified `AssuranceObservation.disposition` machine treats as terminal-and-settled, so they
+ *  are not findings the promotion gate re-adjudicates. */
+const UNSETTLED_DISPOSITIONS = new Set(['OPEN', 'WAIVED']);
+
+/**
+ * The observations recorded against the items this Baseline freezes, projected onto the kernel's
+ * `OpenObservationView`. `promoteBaseline` passed `openObservations: []` — a hard-coded empty list — so
+ * `canPromoteBaseline`'s RPH-BAS-003 arm iterated nothing and no observation a professional recorded could
+ * ever block a promotion. The rule was never missing; it is `findOpenBlockingObservations` in rph-domain,
+ * unit-proven at `governance.test.ts:189` and reachable only through `canPromoteBaseline`. This function
+ * supplies its input; it decides nothing itself.
+ *
+ * Every field is READ from the accepted contract, none asserted:
+ *   - `subjectObjectIds` (`AssuranceObservationSchema`, objects.ts:421) — inherited from the observation's
+ *     Assessment by `recordAssuranceObservation`; an observation is in scope when it names any item the
+ *     Baseline freezes. Scoped to the Baseline's OWN `itemObjectVersions` (written at CreateBaseline), not to
+ *     the promoting command's `expectedItemObjectVersions`, so a narrowed payload cannot shrink the set of
+ *     findings that get to speak.
+ *   - `severity` (`AssuranceSeveritySchema`) → `blocking`, per §8.16 L1122's "blocking/critical".
+ *   - `disposition` (`ObservationDispositionSchema`) → `waived`. WAIVED is a distinct terminal state from
+ *     OPEN on the ratified `AssuranceObservation.disposition` machine, reached only by the `WaiverGranted`
+ *     trigger, so the mapping is the contract's own and not a re-scoping of the waiver.
+ *
+ * DELIBERATELY NOT CLAIMED: whether a WAIVED observation's waiver was "policy-permitted [and] scoped" (§8.16
+ * L1122) is NOT decided here. That is the §16 item 12 gap — a waiver has no criterion wire home — which
+ * `floor-gate.ts`'s `waiverDischargesFloorPolicy` fails closed on. This function does not re-open it: it
+ * reports the disposition the machine recorded and lets the kernel apply RPH-BAS-003. Passing a waived
+ * finding as still-blocking would be inventing a rule §8.16 L1122 contradicts; adjudicating the waiver's
+ * scope here would be inventing the shape item 12 withholds.
+ */
+function observationsAgainstBaselineItems(
+	ctx: HandlerContext,
+	itemObjectIds: ReadonlySet<string>
+): { readonly observationId: string; readonly blocking: boolean; readonly waived: boolean }[] {
+	const ids = new Set<string>();
+	for (const e of ctx.store.readAllEvents())
+		if (e.aggregateType === OBSERVATION) ids.add(e.aggregateId);
+	const out: { observationId: string; blocking: boolean; waived: boolean }[] = [];
+	for (const id of ids) {
+		const s = ctx.store.loadObject(id)?.state as
+			| { subjectObjectIds?: string[]; severity?: string; disposition?: string }
+			| undefined;
+		if (!s || !Array.isArray(s.subjectObjectIds)) continue;
+		if (!s.subjectObjectIds.some((subjectId) => itemObjectIds.has(subjectId))) continue;
+		const disposition = String(s.disposition);
+		if (!UNSETTLED_DISPOSITIONS.has(disposition)) continue;
+		out.push({
+			observationId: id,
+			blocking: BLOCKING_SEVERITIES.has(String(s.severity)),
+			waived: disposition === 'WAIVED'
+		});
+	}
+	return out;
+}
 
 /** Current semantic versions of the given subject objects (best-effort; absent subjects are omitted). */
 function subjectVersions(ctx: HandlerContext, ids: readonly string[]): Record<string, number> {
@@ -270,13 +332,20 @@ export const promoteBaseline: CommandHandler = (ctx, command, payload) => {
 				const complete = disposition !== 'ASSESSING' && disposition !== 'REQUESTED';
 				return { assessmentId, complete, disposition };
 			});
+			// The item set the Baseline itself froze at CreateBaseline — the subjects whose findings §8.16 L1122
+			// requires resolved. Read from the object, not the promoting payload.
+			const baselineItemIds = new Set(
+				((state.itemObjectVersions as { objectId: string }[] | undefined) ?? []).map(
+					(i) => i.objectId
+				)
+			);
 			const result = canPromoteBaseline({
 				baselineStatus: String(state.status),
 				promotionDecision,
 				candidateItems,
 				reviewedItems: candidateItems,
 				requiredAssessments,
-				openObservations: []
+				openObservations: observationsAgainstBaselineItems(hctx, baselineItemIds)
 			});
 			if (!result.ok) {
 				const codes = result.findings.map((f) => f.code).join(', ');

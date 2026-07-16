@@ -71,6 +71,22 @@ describe('PublishPwa: a floor satisfied BEFORE a graph edit must not authorize t
 		expect(r.status, JSON.stringify(r.error)).toBe('ACCEPTED');
 	}
 
+	/** Attach `childId` under ROOT so the graph stays a valid recursive decomposition (every type reachable from the
+	 *  one root). Without this the added type is an ORPHAN, and ValidatePwa now rejects an orphaned graph outright
+	 *  (§11.6 L1639, "no missing/disallowed/cyclic child rules") — which would block this test's subject (the STALE
+	 *  FLOOR) behind an unrelated structural failure it is not trying to test. This is a material graph edit in its
+	 *  own right, so it raises the PWA's semanticVersion again; that only widens the drift being asserted. */
+	function permitChildOfRoot(childId: string) {
+		const r = d(
+			AGENT,
+			'EditPwuType',
+			{ pwuTypeId: ROOT, permittedChildTypeIds: [childId] },
+			ROOT,
+			'PWU_TYPE'
+		);
+		expect(r.status, JSON.stringify(r.error)).toBe('ACCEPTED');
+	}
+
 	// The assurance run over the graph AS IT STANDS: all three floor policies SATISFIED, bound to the PWA's version
 	// at the moment of review (read from state, not assumed — the binding must track whatever the engine reports).
 	function recordSatisfiedFloorAtCurrentVersion() {
@@ -130,6 +146,7 @@ describe('PublishPwa: a floor satisfied BEFORE a graph edit must not authorize t
 		// Step 2 — the graph is then MATERIALLY edited: a PWU Type the review never saw is added. Every artifact the
 		// floor's Reasoning Review reasoned about is now out of date.
 		definePwuType(SMUGGLED, 'Never Reviewed', false);
+		permitChildOfRoot(SMUGGLED);
 		expect(livePwuTypeIds()).toHaveLength(2);
 
 		// Step 3 — publish. The recorded floor binds `reviewedVersion` (§10.1 L1379). It is stale with respect to the
