@@ -6,9 +6,48 @@
 // assuranceRecordingPlan, and the AssuranceAssessment.state machine independently rejects any illegal transition.
 // This is validator-AGNOSTIC and plane-AGNOSTIC: authoring- and execution-plane hosts hand it the same plan shape.
 // exec≠assurance (INV-5) is upheld structurally — nothing here reads executionState.
-import type { AssuranceRecordingPlan } from '@janumipwb/rph-assurance';
+import type { AssuranceRecordingPlan, Identity } from '@janumipwb/rph-assurance';
 import type { ActorReference, DomainCommand } from '@janumipwb/rph-contracts';
 import type { EngineHandle } from './engine.js';
+
+/** The ratified DOC-007 ActorType enum. The assurance-island `Identity.actorType` is a free string by design
+ *  (the island is plane-agnostic), so the seam below must coerce it to a valid contract value. */
+const CONTRACT_ACTOR_TYPES = new Set<ActorReference['actorType']>([
+	'HUMAN',
+	'AGENT',
+	'MODEL',
+	'SERVICE',
+	'POLICY_ENGINE',
+	'EXTERNAL_SYSTEM'
+]);
+
+/** Coerce an assurance-island actorType to a valid contract ActorType. The deterministic floor validators run
+ *  as the island's internal `SYSTEM` evaluator, which is not a DOC-007 ActorType — a deterministic policy check
+ *  is a `POLICY_ENGINE`. Anything else unexpected falls back to `SERVICE` (an assurance-service action). */
+function toContractActorType(t: string | undefined): ActorReference['actorType'] {
+	if (t && CONTRACT_ACTOR_TYPES.has(t as ActorReference['actorType']))
+		return t as ActorReference['actorType'];
+	return t === 'SYSTEM' ? 'POLICY_ENGINE' : 'SERVICE';
+}
+
+/**
+ * Map an assurance-island `Identity` (the shape checkIndependence reasons over) onto the ratified DOC-007
+ * `ActorReference` the Assessment object persists. The two are different by design — `Identity` is the
+ * independence-check view, `ActorReference` the wire/storage view — so this is the single translation seam.
+ * `invocationId` lands on `executionInstanceId` (§8.12's "actual invocation"); `roleId` is intentionally NOT
+ * synthesized from a label — §8.12 forbids resting independence on a role label, and `Identity` carries none.
+ */
+function identityToActorReference(e: Identity): ActorReference {
+	const label = e.agentId ?? e.modelId ?? 'evaluator';
+	return {
+		actorId: e.agentId ?? label,
+		actorType: toContractActorType(e.actorType),
+		displayName: e.modelId ? `${label} (${e.modelId})` : label,
+		...(e.modelId ? { modelId: e.modelId } : {}),
+		...(e.providerId ? { providerId: e.providerId } : {}),
+		...(e.invocationId ? { executionInstanceId: e.invocationId } : {})
+	};
+}
 
 export interface RecordAssuranceOptions {
 	/** The actor recording the assessments (the Assurance Service acting on behalf of the host). */
@@ -92,8 +131,13 @@ export function recordAssuranceRecordingPlan(
 			});
 		});
 		// Complete to the floor-computed disposition; the state machine rejects any illegal ASSESSING→disposition.
+		// Carry the evaluator identity through validatorResult (an open channel) so the handler records WHO judged —
+		// §9.7 "the resolved provider/model/version actually invoked", §8.4 "actual identities and lineage recorded".
 		send('CompleteAssuranceAssessment', 'ASSURANCE_ASSESSMENT', assessmentId, {
-			validatorResult: { dispositionRecommendation: a.disposition }
+			validatorResult: {
+				dispositionRecommendation: a.disposition,
+				...(a.evaluator ? { evaluator: identityToActorReference(a.evaluator) } : {})
+			}
 		});
 	});
 

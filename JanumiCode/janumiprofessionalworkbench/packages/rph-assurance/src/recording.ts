@@ -7,7 +7,7 @@
 // assessment — there is nothing to record, and the aggregate already blocks the gate. This module stays PURE and
 // plane-agnostic (no contracts import, no dispatch); the recorder that turns the plan into live commands lives in the
 // composition layer, so authoring- and execution-plane hosts share one recording shape.
-import type { AggregateDisposition, Disposition, Severity } from './assurance-rules.js';
+import type { AggregateDisposition, Disposition, Identity, Severity } from './assurance-rules.js';
 import {
 	composeAssuranceOutcome,
 	type AssuranceSubject,
@@ -33,6 +33,10 @@ export interface RecordablePolicyAssessment {
 	readonly disposition: Disposition;
 	/** Whether the policy's independence requirement was met by the evaluator (recorded for transparency). */
 	readonly independenceOk: boolean;
+	/** The evaluator that actually produced this Validator result — §8.4 L851 requires its "actual identities and
+	 *  lineage are recorded", and §9.7 the "resolved provider/model/version actually invoked". Deterministic floor
+	 *  validators run as SYSTEM; the Reasoning Review carries the real judge (model/provider). */
+	readonly evaluator?: Identity;
 	readonly observations: readonly RecordableObservation[];
 	readonly residualUncertainty: readonly string[];
 }
@@ -96,6 +100,7 @@ export function assuranceRecordingPlan(
 			policyVersion: r?.policyVersion ?? '1',
 			disposition: toRecordable(po.disposition),
 			independenceOk: po.independenceOk,
+			...(r?.evaluator ? { evaluator: r.evaluator } : {}),
 			observations,
 			residualUncertainty: r?.residualUncertainty ?? []
 		});

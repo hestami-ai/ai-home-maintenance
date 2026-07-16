@@ -7,6 +7,7 @@
 // called, not a copy of it. Validator-independence scoring still lives there uncalled; that is the next increment.
 import { evidenceAdmissibility } from '@janumipwb/rph-assurance';
 import type {
+	ActorReference,
 	AssertClaimPayload,
 	CreateAssurancePolicyPayload,
 	DetectAssumptionPayload,
@@ -367,7 +368,9 @@ export const requestAssuranceAssessment: CommandHandler = (ctx, command, payload
  * (validatorResult.dispositionRecommendation). The AssuranceAssessment.state machine rejects the illegal
  * disposition transitions (INV-8/INV-9/INV-10). */
 export const completeAssuranceAssessment: CommandHandler = (ctx, command, payload) => {
-	const p = payload as { validatorResult?: { dispositionRecommendation?: string } };
+	const p = payload as {
+		validatorResult?: { dispositionRecommendation?: string; evaluator?: ActorReference };
+	};
 	const disposition = p.validatorResult?.dispositionRecommendation;
 	if (!disposition || !DISPOSITIONS.has(disposition)) {
 		return reject(
@@ -376,6 +379,11 @@ export const completeAssuranceAssessment: CommandHandler = (ctx, command, payloa
 			`CompleteAssuranceAssessment requires validatorResult.dispositionRecommendation in ${[...DISPOSITIONS].join('|')}`
 		);
 	}
+	// Record WHO judged. The Assessment object has always carried an optional `evaluator: ActorReference`; the
+	// completion path simply never wrote it, so the model/provider that actually reviewed the artifact was
+	// persisted nowhere (§9.7 "resolved provider/model/version actually invoked"; §8.4 L851 "actual identities and
+	// lineage are recorded"). Validated against the ratified schema at the aggregate boundary like any field.
+	const evaluator = p.validatorResult?.evaluator;
 	return advanceStatus(ctx, command, {
 		objectType: ASSESSMENT,
 		statusField: 'assessmentState',
@@ -383,7 +391,11 @@ export const completeAssuranceAssessment: CommandHandler = (ctx, command, payloa
 		target: disposition,
 		eventType: 'AssuranceAssessmentCompleted',
 		setLifecycleStatus: true,
-		mutate: (base) => ({ ...base, completedAt: command.issuedAt })
+		mutate: (base) => ({
+			...base,
+			completedAt: command.issuedAt,
+			...(evaluator ? { evaluator } : {})
+		})
 	});
 };
 

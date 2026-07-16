@@ -119,6 +119,22 @@ describe('recordAssuranceRecordingPlan — floor outcome → canonical assessmen
 		expect(listByType(eng, 'ASSURANCE_OBSERVATION')).toHaveLength(0);
 	});
 
+	it('persists the reasoning-review evaluator identity on the Assessment (§9.7 resolved model/provider; §8.4 recorded identities)', async () => {
+		const { eng } = await runAndRecord(goodCtx);
+		const review = listByType(eng, 'ASSURANCE_ASSESSMENT').find(
+			(a) => a.state.assurancePolicyId === 'floor.reasoning-review'
+		)!;
+		// §9.7 requires "the resolved provider/model/version actually invoked" be recorded; §8.4 L851 requires the
+		// evaluator's "actual identities and lineage are recorded". The AssuranceAssessment object has carried an
+		// optional `evaluator: ActorReference` all along — the recorder simply dropped it, sending only the
+		// disposition. The judge that actually reviewed the artifact was recorded nowhere.
+		const evaluator = review.state.evaluator as ActorReference | undefined;
+		expect(evaluator, 'the judge identity must be recorded, not dropped at persistence').toBeDefined();
+		expect(evaluator?.modelId).toBe('gemini');
+		expect(evaluator?.providerId).toBe('google');
+		expect(evaluator?.actorId).toBe('judge');
+	});
+
 	it('a schema failure records a REJECTED assessment + an observation carrying the specific finding code', async () => {
 		const { eng, plan } = await runAndRecord({
 			...goodCtx,
