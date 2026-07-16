@@ -700,6 +700,39 @@ passed / 1 known flake**. Only red: the pre-existing docs empty-file.
 
 ---
 
+## Conjunctive independence beyond DIFFERENT_MODEL — WITHHELD, and why forcing it is the disease
+
+§8.4 L851's mandatory floor is conjunctive: distinct **invocation** AND **review context** AND (model, since
+no profile permits sameness). Only the model axis is enforced today (`deMinimisFloorPlan`:
+`independence: 'DIFFERENT_MODEL'`), and it is a REAL check — producer gpt vs judge gemini differ, and a
+same-model configuration fails it (proven by `recording.test.ts`'s same-model case). The other two are
+**deliberately not added yet**, and this is a discipline call, not an oversight:
+
+`checkIndependence`'s `DIFFERENT_INVOCATION` / `DIFFERENT_CONTEXT_INSTANCE` compare `invocationId` /
+`contextInstanceId` on the two Identities. **For those to be real checks, the ids must reflect ACTUAL call
+identity** — §8.12's concern is "same-invocation self-review" and shared "hidden context". In JPWB the
+Reasoning Review is a structurally separate `agy` subprocess, so a self-review is architecturally prevented,
+not check-prevented. If I minted a fresh `invocationId` per Identity construction, `DIFFERENT_INVOCATION` would
+**always pass** — a control structurally incapable of failing, which is the exact defect this entire program
+exists to remove. Binding those axes to real per-call invocation/context identity (so a collision is possible
+and therefore detectable) is the §9.7 Execution-Attempt / DOC-002 §3.3 Execution-Aggregate plumbing that
+§16 item 23 withholds by name ("producing-Attempt/context ... conjunctive independence").
+
+So: enforce the representable, meaningful axis (model); record the evaluator's `executionInstanceId` when it
+exists (Increment 4a already persists it); and withhold the invocation/context axes until real invocation
+identity exists — rather than ship ceremony. **Un-withhold when a model call is stamped with a real
+invocation/context id at its call site** (the same work that records the materialized prompt/answer, findings
+1/12/13). This is the honest boundary of the independence thread; 3a + 4a are its representable slices.
+
+## FOLLOW-ON DONE: floor-gate.ts policy-id literals collapsed into FLOOR_POLICY_IDS
+
+The duplicated `['floor.schema-invariant', …]` string literals in `floor-gate.ts` — defended by the phantom
+DAG rule debunked in Increment 2 — now reference the canonical `FLOOR_POLICY_IDS` from `@janumipwb/rph-assurance`
+(the edge is legal and already taken). One fewer place for a floor-policy id to drift. Value-identical refactor;
+full gate incl. Playwright green (500 vitest / 22 E2E).
+
+---
+
 ## PART 4 — Open questions genuinely for the sponsor
 
 *(kept deliberately short — under the 2026-07-15 mandate, a tension is work, not a question, unless it

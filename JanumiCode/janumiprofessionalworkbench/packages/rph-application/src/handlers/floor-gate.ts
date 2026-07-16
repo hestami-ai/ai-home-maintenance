@@ -2,18 +2,18 @@
 // recorded assurance floor SATISFIED (or waived)? Reused by the authoring-plane PublishPwa gate (pwa-authoring) and
 // the execution-plane completeExecutionStep gate (execution).
 //
-// The floor policy ids below were duplicated as literals here, justified in this comment by "the package DAG forbids
-// rph-application -> rph-assurance". No such rule exists: .dependency-cruiser.cjs forbids circularity,
-// contracts-as-foundation, domain/ports purity, projections browser-safety, and app-in-core — and rph-assurance
-// imports only contracts/domain/ports, so the edge is acyclic and legal. The copy was defended by a constraint
-// nobody checked. The edge is now taken (see assurance.ts), and these literals should collapse into
-// FLOOR_POLICY_IDS; that is a follow-on, tracked in HARMONIZATION-LOG.md, not smuggled into this increment.
+// The three required floor policy ids come from the single canonical source, @janumipwb/rph-assurance's
+// FLOOR_POLICY_IDS. They were previously duplicated as string literals here, justified by "the package DAG forbids
+// rph-application -> rph-assurance" — a rule that does not exist (.dependency-cruiser.cjs forbids only circularity,
+// contracts-as-foundation, domain/ports purity, projections browser-safety, and app-in-core; rph-assurance imports
+// only contracts/domain/ports, so the edge is acyclic). The edge is taken (see assurance.ts), so the copy is gone.
+import { FLOOR_POLICY_IDS } from '@janumipwb/rph-assurance';
 import type { HandlerContext } from './kit.js';
 
 export const FLOOR_POLICY_IDS_REQUIRED = [
-	'floor.schema-invariant',
-	'floor.identity-provenance',
-	'floor.reasoning-review'
+	FLOOR_POLICY_IDS.SCHEMA_INVARIANT,
+	FLOOR_POLICY_IDS.IDENTITY_PROVENANCE,
+	FLOOR_POLICY_IDS.REASONING_REVIEW
 ] as const;
 /** A subject is AI-produced (floor-relevant) when its producing actor is an AGENT or MODEL. */
 export const AI_ACTOR_TYPES = new Set(['AGENT', 'MODEL']);
