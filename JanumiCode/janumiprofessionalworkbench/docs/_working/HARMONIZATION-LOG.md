@@ -767,6 +767,25 @@ passed / 1 known flake**. Only red: the pre-existing docs empty-file.
 
 ---
 
+## AUDIT — vocab `sourceSection` provenance (full write-up: `AUDIT-vocab-sourceSection.md`)
+
+The waiver's hollow citation was not an outlier — it is the **median**. Of 168 field-bearing vocab entries
+(628 authored fields), **136 (81%) cite a source that names the thing but does not define its fields** — 425
+fields (68%) rest on a name-list or an unschematized registry. 112 cite DOC-002 §26.x/§34.x (verified bare
+`text` name-lists); 12 cite the RPH-DOC-010 UX doc (§16 item 9: "demonstrates UX without freezing wire
+shapes"); 9 cite DOC-007 §32/§33 (the vocab's own notes call it "unschema[tized]"). The 32 honest citations
+point at real DOC-007 §10–23 interfaces (spot-verified: DOC-007 §10.2 defines `CaptureIntentPayload` exactly).
+
+**It does not mean the 425 fields are wrong.** It means `sourceSection` is **not evidence of ratification** —
+it reads as provenance while the cited section carries no fields. Trusting it as proof a shape is contracted
+misleads 81% of the time. Same class as the hollow governed layer, one layer down: the contract's own
+provenance metadata is theater. This is *why* the waiver stayed unresolved despite a citation, and the standing
+rule it yields: **a `sourceSection` may never be treated as proof; open the cited section.** Not fixed —
+repointing 136 citations requires a per-entry contract decision (item 6 / item 9, §0.3 forbids an agent
+choosing). Surfaced as drift per §17.
+
+---
+
 ## PART 4 — Open questions genuinely for the sponsor
 
 *(kept deliberately short — under the 2026-07-15 mandate, a tension is work, not a question, unless it
