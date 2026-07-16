@@ -100,8 +100,7 @@ function otherActivePlanExistsForPwu(
 	}
 	for (const planId of candidateIds) {
 		const plan = ctx.store.loadObject(planId)?.state as
-			| { workUnitId?: string; status?: string }
-			| undefined;
+			{ workUnitId?: string; status?: string } | undefined;
 		if (plan?.workUnitId === workUnitId && plan.status === 'ACTIVE') return true;
 	}
 	return false;
@@ -266,7 +265,8 @@ export const completeExecutionStep: CommandHandler = (ctx, command) => {
 			// permit its protected transition." A never-recorded floor over an AI step is that missing review.
 			// The authoring plane already derived this honestly (pwa-authoring.ts); the two planes disagreed.
 			const blocking = floorGateBlock(ctx, p.executionStepId, {
-				aiProduced: stepOutputIsAiProduced(ctx, step, command)
+				aiProduced: stepOutputIsAiProduced(ctx, step, command),
+				now: command.issuedAt
 			});
 			if (blocking) {
 				const detail = blocking.map((b) => `${b.policyId}=${b.disposition}`).join(', ');

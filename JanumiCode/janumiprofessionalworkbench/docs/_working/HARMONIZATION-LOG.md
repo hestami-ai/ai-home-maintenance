@@ -892,6 +892,65 @@ Guide line count unchanged (2551) — all three are within-line edits.
 
 ---
 
+## INCREMENT 9 — LANDED (FIRST UNDER THE SPONSOR GRANT). The waiver contract exists; the CRITICAL defect is dead.
+
+**Sponsor grant, 2026-07-16:** for this scoped work I may author into the §0.3-category gaps — fill
+underspecified schemas/content — with the **git commit as the ratification boundary** and NO-PUSH as a second
+safety layer. Discipline held: **every authored change is labeled authored-vs-derived**, in the vocab notes, the
+code, and here. This is the first use of it, and deliberately the **least-invention** case available.
+
+**Why this one first: DOC-004 §12.2 already ratifies the field list.** A waiver "must record: exact policy and
+criterion; exact object and semantic version; finding being waived; authority; rationale; duration or
+expiration; compensating controls; downstream impact; review conditions." The *semantics were ratified all
+along* — only the **wire shape** was missing (DOC-007 mentions "waiver" twice and schematizes no instance;
+§16 item 12). So this serializes ratified meaning rather than inventing it.
+
+**What was authored (labeled everywhere):** a `WaiverDetail` helper sub-type (the `ConversationEntry` pattern)
+carrying the five things not already on the Decision envelope — `waivedPolicyId`, `waivedCriterionId`,
+`waivedFindingIds`, `expiresAt`, `compensatingControls`, `downstreamImpactObjectIds`, `reviewConditions` —
+optional on `DECISION`, plus the matching `RequestWaiver` payload fields. Vocab → `bun run gen` → `format`.
+`RequestWaiver`'s `sourceSection` **repointed** off the hollow `DOC-002 §34.2` (a bare command-name list — the
+audit's exemplar) onto DOC-004 §12.2, annotated as authored-under-grant.
+
+**The gate is CRITERION-EXACT, not policy-broad.** `requestWaiver` now persists the detail it used to drop;
+`waiverDischargesFloorPolicy` routes through `rph-domain`'s `waiverCovers` + `waiverStillDischarges` — written
+and unit-proven since long before anything could call them. A policy discharges only when **every open finding
+recorded against it** is individually covered, because RPH-GOV-005 says a waiver "does not bleed to another
+criterion, another object, or another version." Expiry resolves against the **command's `issuedAt`**, never a
+wall clock — the gate must replay deterministically (§10.2). Fail-closed branches kept and documented: no open
+findings (a MISSING review cannot be waived into existence — §8.4 L854), unknown subject version, or a WAIVER
+Decision carrying no detail.
+
+**The capability is restored AND the defect is dead — both proven:**
+- `an EFFECTIVE waiver naming the exact failed criterion discharges that policy and lets the PWA publish` ✓
+- `a waiver naming a DIFFERENT criterion does NOT discharge the failed one (RPH-GOV-005: no bleeding)` ✓ ← the
+  discriminator. Restoring a capability proves nothing unless the unscoped waiver still fails.
+- The two Increment-1 wiring tests stay green with **expectations byte-unchanged** — only their payload premise
+  was updated (rule 1). The demo E2E now demonstrates a properly scoped waiver end-to-end; its panel derives the
+  policy+criterion from the recorded floor instead of sending free text.
+
+**A real gap surfaced, disclosed not hacked:** the execution-plane twin is **still skipped, for a NEW and
+narrower reason**. Item 12 no longer blocks it; what does is that the execution plane binds **no subject
+semantic version** (an ExecutionStep is a sub-object with no `semanticVersion`), so version-exactness is
+unverifiable and the gate fails closed. That is the same hole flagged in Increment 2 — the execution plane also
+accepts a stale floor for it. Un-skip when a step's floor subject gets a version binding; the contract, gate,
+and kernel are all already in place.
+
+### Gate (full, incl. Playwright)
+
+`check-types` 21/21 · `lint` · `boundary` · vitest **508 passed / 3 skipped** · Playwright **22 passed / 1 known
+flake**. Only red: the pre-existing docs empty-file.
+
+### Working-tree note (not mine, not committed)
+
+`bun run format` (which `gen` requires) swept ~20 files of **pre-existing** drift — verified: `seed-workbench.ts`
+is committed unformatted at HEAD. **The gate has no format check**, so this drift is invisible to it, and some of
+it is mine (I've been committing unformatted code all session while eslint passed). Separately, a concurrent
+edit from the sponsor's parallel thread is present (a typo fix in the Constitution Discussion doc). **Neither was
+committed** — this increment used explicit paths only, never `git add -A`.
+
+---
+
 ## PART 4 — Open questions genuinely for the sponsor
 
 *(kept deliberately short — under the 2026-07-15 mandate, a tension is work, not a question, unless it

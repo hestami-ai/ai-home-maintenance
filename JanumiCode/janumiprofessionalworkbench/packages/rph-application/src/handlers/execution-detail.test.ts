@@ -50,9 +50,11 @@ describe('ExecutionStep + RuntimeBinding handlers (live)', () => {
 	 *  Reasoning Review mandatory and L854 blocks its protected transition without one — every completion
 	 *  below therefore needs a floor, not just the one that asserts blocking. */
 	let asmt = 0;
-	function recordFloor(dispositions: Record<string, string>) {
+	function recordFloor(dispositions: Record<string, string>): Record<string, string> {
+		const ids: Record<string, string> = {};
 		for (const [policyId, disposition] of Object.entries(dispositions)) {
 			const id = `asmt_${String(++asmt).padStart(26, '0')}`;
+			ids[policyId] = id;
 			dispatch(
 				'RequestAssuranceAssessment',
 				{
@@ -73,6 +75,25 @@ describe('ExecutionStep + RuntimeBinding handlers (live)', () => {
 				'ASSURANCE_ASSESSMENT'
 			);
 		}
+		return ids;
+	}
+
+	/** Record an OPEN finding against an assessment — what a waiver must name to discharge (DOC-004 §12.2). */
+	function recordFinding(assessmentId: string, findingCode: string): string {
+		const id = `obs_${String(++asmt).padStart(26, '0')}`;
+		dispatch(
+			'RecordAssuranceObservation',
+			{
+				assessmentId,
+				observationType: 'FINDING',
+				findingCode,
+				severity: 'BLOCKING',
+				statement: `${findingCode} not satisfied.`
+			},
+			id,
+			'ASSURANCE_OBSERVATION'
+		);
+		return id;
 	}
 	const SATISFIED_FLOOR = {
 		'floor.schema-invariant': 'SATISFIED',
@@ -246,23 +267,26 @@ describe('ExecutionStep + RuntimeBinding handlers (live)', () => {
 	});
 
 	/**
-	 * BLOCKED ON §16 item 12 — a real capability, deliberately unreachable, NOT a deleted assertion.
+	 * STILL BLOCKED — but the reason CHANGED, and the new one is narrower and concrete.
 	 *
-	 * §8.15 permits a governance waiver over the floor; the floor is not among the four things §8.4 L854 says
-	 * may never suppress Reasoning Review. So this test's EXPECTATION is legitimate. What is missing is the
-	 * contract: §8.15 L1101 / DOC-004 §12.2 require a waiver to record "the exact policy, criterion, finding,
-	 * object and semantic version", and the Decision object has no criterion field, DOC-007 defines no waiver
-	 * instance shape, and the vocab's citation for `scope` points at DOC-002 §34.2 — a bare list of command
-	 * names. §16 item 12 names it exactly: "waiver lacks a complete instance/wire/storage contract."
+	 * §16 item 12 is no longer the blocker: `WaiverDetail` now gives the waiver its policy/criterion/expiry, and the
+	 * authoring-plane twin (pwa-authoring.test.ts) proves the capability works there — an exactly-scoped waiver
+	 * discharges its policy, and a waiver naming a different criterion does not.
 	 *
-	 * Until then the gate fails closed, because the alternative was the Boolean item 12 forbids by name: this
-	 * very waiver — scoped in its own payload to "de minimis assurance floor" — used to discharge a REJECTED
-	 * independent Reasoning Review. Un-skip when item 12 lands a criterion binding; `waiverCovers` and
-	 * `waiverStillDischarges` (rph-domain) are already written and already unit-proven.
+	 * What blocks it HERE is the execution plane's missing subject-version binding. DOC-004 §12.2 requires a waiver
+	 * to name "exact object and semantic version" and RPH-GOV-005 forbids bleeding "to another version", so
+	 * `waiverCovers` is version-exact. The execution-plane gate passes no `subjectVersion` (an ExecutionStep is a
+	 * sub-object of the plan and carries no `semanticVersion`), so version-exactness is unverifiable and
+	 * `waiverDischargesFloorPolicy` fails closed. This is the same hole flagged in Increment 2: the execution plane
+	 * also accepts a STALE floor for the same reason, which §8.4 L854 forbids.
+	 *
+	 * UN-SKIP WHEN: the execution plane binds a semantic version to a step's floor subject. Then this passes
+	 * unchanged — the gate, the contract, and the kernel are all already in place.
 	 */
-	it.skip('an EFFECTIVE waiver scoped to the floor lets a blocked step complete (§8.15; needs §16 item 12)', () => {
+	it.skip('an EFFECTIVE waiver naming the exact failed criterion lets a blocked step complete (needs execution-plane subject-version binding)', () => {
 		dispatch('StartExecutionStep', { stepId: STEP }, PLAN, 'EXECUTION_PLAN');
-		recordFloor({ ...SATISFIED_FLOOR, 'floor.reasoning-review': 'REJECTED' });
+		const ids = recordFloor({ ...SATISFIED_FLOOR, 'floor.reasoning-review': 'REJECTED' });
+		const findingId = recordFinding(ids['floor.reasoning-review']!, 'RR-04-completeness-shortcut');
 		const complete = {
 			executionStepId: STEP,
 			executionAttemptId: 'attempt_01ARZ3NDEKTSV4RRFFQ69G5FF0',
@@ -273,6 +297,9 @@ describe('ExecutionStep + RuntimeBinding handlers (live)', () => {
 			structuredResult: {},
 			executionProvenance: {}
 		};
+		expect(dispatch('CompleteExecutionStep', complete, PLAN, 'EXECUTION_PLAN').status).toBe(
+			'REJECTED'
+		);
 		const WAIVER = 'dec_01ARZ3NDEKTSV4RRFFQ69G5FH0';
 		dispatch(
 			'RequestWaiver',
@@ -281,7 +308,12 @@ describe('ExecutionStep + RuntimeBinding handlers (live)', () => {
 				scope: 'floor.reasoning-review',
 				rationale: 'Accepted residual risk.',
 				duration: 'until superseded',
-				affectedObjectIds: [STEP]
+				affectedObjectIds: [STEP],
+				waivedPolicyId: 'floor.reasoning-review',
+				waivedCriterionId: 'RR-04-completeness-shortcut',
+				waivedFindingIds: [findingId],
+				compensatingControls: ['Manual review before release.'],
+				reviewConditions: ['Revisit next attempt.']
 			},
 			WAIVER,
 			'DECISION'

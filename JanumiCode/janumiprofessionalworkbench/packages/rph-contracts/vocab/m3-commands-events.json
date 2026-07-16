@@ -1315,7 +1315,7 @@
       "drivesFrom": "(initial)",
       "drivesTo": "PROPOSED",
       "schematized": false,
-      "sourceSection": "DOC-002 §34.2 (requestWaiver)",
+      "sourceSection": "DOC-004 §12.2 (waiver invariants) — AUTHORED under sponsor grant 2026-07-16. The prior sourceSection (DOC-002 §34.2) is a bare list of command NAMES defining no fields, and DOC-007 never schematized the waiver instance (§16 item 12: 'waiver lacks a complete instance/wire/storage contract'). These serialize DOC-004 §12.2's RATIFIED waiver invariants so rph-domain's waiverCovers/waiverStillDischarges can be honored instead of a Boolean bypass.",
       "payloadFields": [
         {
           "field": "subjectObjectIds",
@@ -1343,6 +1343,42 @@
           "required": true,
           "type": "string[]",
           "note": "id-ref[]"
+        },
+        {
+          "field": "waivedPolicyId",
+          "type": "string",
+          "required": true,
+          "note": "id-ref — the EXACT policy waived (DOC-004 §12.2)."
+        },
+        {
+          "field": "waivedCriterionId",
+          "type": "string",
+          "required": true,
+          "note": "The EXACT criterion waived. RPH-GOV-005: no bleeding to another criterion/object/version."
+        },
+        {
+          "field": "waivedFindingIds",
+          "type": "string[]",
+          "required": true,
+          "note": "id-ref[] — the finding(s) waived; §8.15 keeps them visible."
+        },
+        {
+          "field": "expiresAt",
+          "type": "string",
+          "required": false,
+          "note": "RFC3339. Absent = no expiry (§8.15: expiry triggers review)."
+        },
+        {
+          "field": "compensatingControls",
+          "type": "string[]",
+          "required": true,
+          "note": "DOC-004 §12.2. Empty = explicitly none."
+        },
+        {
+          "field": "reviewConditions",
+          "type": "string[]",
+          "required": true,
+          "note": "DOC-004 §12.2."
         }
       ]
     },

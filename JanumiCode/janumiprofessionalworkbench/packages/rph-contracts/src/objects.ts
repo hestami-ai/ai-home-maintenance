@@ -227,6 +227,16 @@ export const TraceLinkSchema = z.strictObject({
 	createdBy: ActorReferenceSchema
 });
 export type TraceLink = z.infer<typeof TraceLinkSchema>;
+export const WaiverDetailSchema = z.strictObject({
+	waivedPolicyId: z.string(),
+	waivedCriterionId: z.string(),
+	waivedFindingIds: z.array(z.string()),
+	expiresAt: z.string().optional(),
+	compensatingControls: z.array(z.string()),
+	downstreamImpactObjectIds: z.array(z.string()),
+	reviewConditions: z.array(z.string())
+});
+export type WaiverDetail = z.infer<typeof WaiverDetailSchema>;
 export const WorkBoundarySchema = z.strictObject({
 	inScope: z.array(z.string()),
 	outOfScope: z.array(z.string()),
@@ -441,7 +451,8 @@ export const DecisionObjectSchema = z.strictObject({
 	consideredEvidenceIds: z.array(z.string()),
 	consideredObservationIds: z.array(z.string()),
 	effectiveAt: z.string().optional(),
-	status: DecisionStatusSchema
+	status: DecisionStatusSchema,
+	waiver: WaiverDetailSchema.optional()
 });
 export type DecisionObject = z.infer<typeof DecisionObjectSchema>;
 

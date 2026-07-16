@@ -84,7 +84,7 @@ test.describe('Assurance floor (mock) — runs, records, gates, and can be waive
 			.toBe('PUBLISHED');
 	});
 
-	test('a dead-end output blocks publish; a waiver is recorded but does not yet discharge the floor (§16 item 12)', async ({
+	test('a dead-end output blocks publish until a waiver naming the exact failed criterion is recorded', async ({
 		page,
 		request
 	}) => {
@@ -138,18 +138,13 @@ test.describe('Assurance floor (mock) — runs, records, gates, and can be waive
 		// auditable override that exists — what changed is that it no longer DISCHARGES the floor (see below).
 		await expect(page.getByTestId('assurance-waived')).toBeVisible();
 
-		// CURRENT TRUTH — the waiver does NOT discharge the floor; publish stays blocked (§16 item 12).
-		// A waiver must record "the exact policy, criterion, finding, object and semantic version" (§8.15 L1101,
-		// DOC-004 §12.2), but the Decision object has no criterion field and DOC-007 defines no waiver instance
-		// shape, so an unscoped waiver cannot be honored without becoming the Boolean item 12 forbids by name.
-		// The floor therefore fails closed. See waiverDischargesFloorPolicy (floor-gate.ts) and the twin unit skips
-		// in pwa-authoring.test.ts / execution-detail.test.ts.
+		// The waiver now names the EXACT policy + criterion it discharges (DOC-004 §12.2) — derived by the panel
+		// from the recorded floor's blocking policy and its open finding — so the gate honors it via rph-domain's
+		// waiverCovers/waiverStillDischarges and publication proceeds. It is NOT a blanket bypass: a waiver naming a
+		// different criterion leaves the floor blocking (proven in floor-waiver-scope.test.ts / pwa-authoring.test.ts).
 		await page.getByRole('button', { name: /^Publish$/ }).click();
 		await expect
 			.poll(async () => (await introspect(request)).pwas[0]!.state.publicationStatus)
-			.toBe('VALIDATED');
-		// Intended once §16 item 12 contracts a scoped waiver (criterion+object+version): the floor-scoped waiver
-		// discharges the floor and publication proceeds, via waiverDischargesFloorPolicy → rph-domain's
-		// waiverCovers/waiverStillDischarges (already written). Tracked by the twin unit skips.
+			.toBe('PUBLISHED');
 	});
 });

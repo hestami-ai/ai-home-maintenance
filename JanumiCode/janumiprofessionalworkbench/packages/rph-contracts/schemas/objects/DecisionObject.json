@@ -330,6 +330,53 @@
         "REVOKED",
         "SUPERSEDED"
       ]
+    },
+    "waiver": {
+      "type": "object",
+      "properties": {
+        "waivedPolicyId": {
+          "type": "string"
+        },
+        "waivedCriterionId": {
+          "type": "string"
+        },
+        "waivedFindingIds": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "expiresAt": {
+          "type": "string"
+        },
+        "compensatingControls": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "downstreamImpactObjectIds": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "reviewConditions": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        }
+      },
+      "required": [
+        "waivedPolicyId",
+        "waivedCriterionId",
+        "waivedFindingIds",
+        "compensatingControls",
+        "downstreamImpactObjectIds",
+        "reviewConditions"
+      ],
+      "additionalProperties": false
     }
   },
   "required": [

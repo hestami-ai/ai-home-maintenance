@@ -534,7 +534,11 @@ function pwuTypeNodesOf(ctx: HandlerContext, pwaId: string): PwaGraphNode[] {
 }
 
 /** The PWA's PWU-Type graph as the canonical projections export (the same shape the demo's Reasoning Review reads). */
-function pwaGraphExport(ctx: HandlerContext, pwaId: string, state: Record<string, unknown>): PwaGraphExport {
+function pwaGraphExport(
+	ctx: HandlerContext,
+	pwaId: string,
+	state: Record<string, unknown>
+): PwaGraphExport {
 	return buildPwaGraphExport(
 		{
 			id: pwaId,
@@ -613,7 +617,11 @@ function pwaFloorGate(
 	const aiProduced = createdBy ? AI_ACTOR_TYPES.has(String(createdBy.actorType)) : false;
 	const pwaId = command.targetAggregateId;
 	const version = Number(state.semanticVersion ?? 1);
-	const blocking = floorGateBlock(ctx, pwaId, { aiProduced, subjectVersion: version });
+	const blocking = floorGateBlock(ctx, pwaId, {
+		aiProduced,
+		subjectVersion: version,
+		now: command.issuedAt
+	});
 	if (!blocking) return null;
 	const detail = blocking.map((b) => `${b.policyId}=${b.disposition}`).join(', ');
 	return reject(

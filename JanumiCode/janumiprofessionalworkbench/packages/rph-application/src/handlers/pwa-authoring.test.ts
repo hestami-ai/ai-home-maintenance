@@ -517,9 +517,14 @@ describe('PublishPwa protected-transition gate — the de minimis assurance floo
 	// Record a floor assessment per policy at the given disposition (as the Assurance Service), against `version` —
 	// defaulting to whatever version the PWA is ACTUALLY at, i.e. the assurance run reviews the graph as it stands.
 	// Pass a different value to exercise version-binding.
-	function recordFloor(dispositions: Record<string, string>, version = pwaVersion()) {
+	function recordFloor(
+		dispositions: Record<string, string>,
+		version = pwaVersion()
+	): Record<string, string> {
+		const assessmentIds: Record<string, string> = {};
 		for (const [policyId, disposition] of Object.entries(dispositions)) {
 			const assessmentId = ulid('asmt');
+			assessmentIds[policyId] = assessmentId;
 			d(
 				SVC,
 				'RequestAssuranceAssessment',
@@ -542,6 +547,26 @@ describe('PublishPwa protected-transition gate — the de minimis assurance floo
 				'ASSURANCE_ASSESSMENT'
 			);
 		}
+		return assessmentIds;
+	}
+
+	/** Record an OPEN finding against an assessment — the thing a waiver must name to discharge (DOC-004 §12.2). */
+	function recordFinding(assessmentId: string, findingCode: string): string {
+		const observationId = ulid('obs');
+		d(
+			SVC,
+			'RecordAssuranceObservation',
+			{
+				assessmentId,
+				observationType: 'FINDING',
+				findingCode,
+				severity: 'BLOCKING',
+				statement: `${findingCode} not satisfied.`
+			},
+			observationId,
+			'ASSURANCE_OBSERVATION'
+		);
+		return observationId;
 	}
 
 	const publish = () =>
@@ -586,34 +611,21 @@ describe('PublishPwa protected-transition gate — the de minimis assurance floo
 		// stale floor must not count. The staleness is derived from live state, not a literal: this previously read
 		// "recorded against v2 while the PWA is v1", which pinned BOTH sides to constants and (since a floor ahead of
 		// its subject is not stale at all) inverted the drift it names. Now the PWA really is a version past this one.
-		recordFloor({ [SCHEMA]: 'SATISFIED', [IDENTITY]: 'SATISFIED', [REVIEW]: 'SATISFIED' }, pwaVersion() - 1);
+		recordFloor(
+			{ [SCHEMA]: 'SATISFIED', [IDENTITY]: 'SATISFIED', [REVIEW]: 'SATISFIED' },
+			pwaVersion() - 1
+		);
 		const r = publish();
 		expect(r.status).toBe('REJECTED');
 		expect(r.error?.code).toBe('RPH_INVARIANT_VIOLATION');
 		expect(pub()).toBe('VALIDATED');
 	});
 
-	/**
-	 * BLOCKED ON §16 item 12 — the authoring-plane twin of the execution-plane case in execution-detail.test.ts.
-	 *
-	 * This test is the CRITICAL defect in its purest form: a waiver whose own payload scope reads "de minimis
-	 * assurance floor" discharges a REJECTED independent Reasoning Review. §8.15 L1101 / DOC-004 §12.2 require a
-	 * waiver to record "the exact policy, criterion, finding, object and semantic version"; the Decision object has
-	 * no criterion field and DOC-007 defines no waiver instance shape, so nothing distinguishes this waiver from
-	 * one granted for a typo. §16 item 12: "waiver lacks a complete instance/wire/storage contract" — and its safe
-	 * default forbids exactly what made this pass: "Never implement waiver as a Boolean".
-	 *
-	 * The capability is legitimate (§8.15 permits waiving the floor) and returns the moment item 12 lands a
-	 * criterion binding; `waiverCovers` + `waiverStillDischarges` are already written. Until then the gate fails
-	 * closed rather than honor an unscoped bypass.
-	 */
-	it.skip('an EFFECTIVE governance waiver scoped to the floor lets a non-SATISFIED floor publish (needs §16 item 12)', () => {
-		const HUMAN: ActorReference = { actorId: 'lead', actorType: 'HUMAN', displayName: 'Eng Lead' };
-		const WAIVER = 'dec_01ARZ3NDEKTSV4RRFFQ69G5R20';
-		authorValidatedAiPwa();
-		recordFloor({ [SCHEMA]: 'SATISFIED', [IDENTITY]: 'SATISFIED', [REVIEW]: 'REJECTED' });
-		expect(publish().status).toBe('REJECTED');
-		// Human records + grants an auditable waiver over the floor for this subject.
+	const HUMAN: ActorReference = { actorId: 'lead', actorType: 'HUMAN', displayName: 'Eng Lead' };
+	const WAIVER = 'dec_01ARZ3NDEKTSV4RRFFQ69G5R20';
+
+	/** Request + grant an EFFECTIVE waiver naming an exact (policy, criterion) per DOC-004 §12.2. */
+	function grantWaiver(over: { policyId: string; criterionId: string; findingIds: string[] }) {
 		const req = d(
 			HUMAN,
 			'RequestWaiver',
@@ -622,7 +634,12 @@ describe('PublishPwa protected-transition gate — the de minimis assurance floo
 				scope: 'de minimis assurance floor',
 				rationale: 'Accepted residual risk for the pilot.',
 				duration: 'until superseded',
-				affectedObjectIds: [AI_PWA]
+				affectedObjectIds: [AI_PWA],
+				waivedPolicyId: over.policyId,
+				waivedCriterionId: over.criterionId,
+				waivedFindingIds: over.findingIds,
+				compensatingControls: ['Manual architecture review before pilot rollout.'],
+				reviewConditions: ['Revisit at the next PWA version.']
 			},
 			WAIVER,
 			'DECISION'
@@ -636,8 +653,50 @@ describe('PublishPwa protected-transition gate — the de minimis assurance floo
 			'DECISION'
 		);
 		expect(grant.status, JSON.stringify(grant.error)).toBe('ACCEPTED');
+	}
+
+	/**
+	 * §8.15 permits a governance waiver over the floor. It is honored ONLY when it names the exact policy +
+	 * criterion + object + version DOC-004 §12.2 requires — routed through rph-domain's waiverCovers /
+	 * waiverStillDischarges, which were written and unit-proven long before anything could call them.
+	 */
+	it('an EFFECTIVE waiver naming the exact failed criterion discharges that policy and lets the PWA publish', () => {
+		authorValidatedAiPwa();
+		const ids = recordFloor({ [SCHEMA]: 'SATISFIED', [IDENTITY]: 'SATISFIED', [REVIEW]: 'REJECTED' });
+		const findingId = recordFinding(ids[REVIEW]!, 'RR-04-completeness-shortcut');
+		expect(publish().status).toBe('REJECTED');
+
+		grantWaiver({
+			policyId: REVIEW,
+			criterionId: 'RR-04-completeness-shortcut',
+			findingIds: [findingId]
+		});
 		const r = publish();
 		expect(r.status, JSON.stringify(r.error)).toBe('ACCEPTED');
 		expect(pub()).toBe('PUBLISHED');
+	});
+
+	/**
+	 * The discriminator — and the CRITICAL defect this whole contract exists to kill. RPH-GOV-005: a waiver "does
+	 * not bleed to another criterion, another object, or another version." A waiver naming a DIFFERENT criterion
+	 * of the same policy must leave the floor blocking. Before the WaiverDetail contract, ANY effective waiver
+	 * naming the subject discharged the ENTIRE floor — a waiver for a naming-convention nit silently discharged a
+	 * REJECTED independent Reasoning Review.
+	 */
+	it('a waiver naming a DIFFERENT criterion does NOT discharge the failed one (RPH-GOV-005: no bleeding)', () => {
+		authorValidatedAiPwa();
+		const ids = recordFloor({ [SCHEMA]: 'SATISFIED', [IDENTITY]: 'SATISFIED', [REVIEW]: 'REJECTED' });
+		const findingId = recordFinding(ids[REVIEW]!, 'RR-04-completeness-shortcut');
+		expect(publish().status).toBe('REJECTED');
+
+		// Waives RR-01, but RR-04 is what actually failed.
+		grantWaiver({
+			policyId: REVIEW,
+			criterionId: 'RR-01-no-problem-substitution',
+			findingIds: [findingId]
+		});
+		const r = publish();
+		expect(r.status).toBe('REJECTED');
+		expect(pub()).toBe('VALIDATED');
 	});
 });

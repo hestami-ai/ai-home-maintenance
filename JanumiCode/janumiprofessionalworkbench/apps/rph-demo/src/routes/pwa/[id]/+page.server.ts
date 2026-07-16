@@ -194,7 +194,11 @@ function readPolicyFields(form: FormData) {
 		.split(/\r?\n/)
 		.map((s) => s.trim())
 		.filter(Boolean)
-		.map((statement, i) => ({ id: `C-${String(i + 1).padStart(2, '0')}`, statement, mandatory: true }));
+		.map((statement, i) => ({
+			id: `C-${String(i + 1).padStart(2, '0')}`,
+			statement,
+			mandatory: true
+		}));
 	return {
 		name: String((form.get('name') ?? '') as string).trim(),
 		purpose: String((form.get('purpose') ?? '') as string).trim(),
@@ -316,13 +320,32 @@ export const actions: Actions = {
 	recordWaiver: async ({ request, params }) => {
 		const rationale = String(((await request.formData()).get('rationale') ?? '') as string).trim();
 		if (!rationale) return fail(400, { error: 'A waiver rationale is required.' });
+		// A waiver must name the EXACT policy and criterion it discharges (DOC-004 §12.2; RPH-GOV-005 forbids
+		// bleeding to another criterion). It used to send a free-text scope of "de minimis assurance floor", which
+		// the gate honored as a blanket bypass of the WHOLE floor — including a REJECTED independent review. So we
+		// derive the target from the RECORDED floor: the blocking policy and the open finding it actually failed on.
+		const floor = loadPwaFloor(params.id);
+		const blocking = floor?.policies.find((p) => p.disposition !== 'SATISFIED');
+		if (!blocking) return fail(400, { error: 'Nothing to waive: the floor is not blocking.' });
+		const finding = blocking.observations[0];
+		if (!finding)
+			return fail(400, {
+				error: `Cannot waive ${blocking.policyId}: no open finding is recorded for it, and a waiver must name the finding it waives (DOC-004 §12.2).`
+			});
 		const waiverId = mintUiId('dec');
 		const req = dispatch('RequestWaiver', 'DECISION', waiverId, {
 			subjectObjectIds: [params.id],
-			scope: 'de minimis assurance floor',
+			scope: finding.code,
 			rationale,
 			duration: 'until superseded',
-			affectedObjectIds: [params.id]
+			affectedObjectIds: [params.id],
+			waivedPolicyId: blocking.policyId,
+			waivedCriterionId: finding.code,
+			// FloorView surfaces an observation's code/severity/statement but not its id — so the finding is named
+			// by criterion, not by id, here. Surfacing observation ids through the view is a follow-on.
+			waivedFindingIds: [],
+			compensatingControls: [],
+			reviewConditions: []
 		});
 		if (req.status !== 'ACCEPTED') return fail(400, { error: req.error?.message ?? req.status });
 		const grant = dispatch('GrantWaiver', 'DECISION', waiverId, {
@@ -399,11 +422,15 @@ export const actions: Actions = {
 			name: String((prev.name ?? 'Policy') as string),
 			purpose: String((prev.purpose ?? '') as string),
 			rationale: String((prev.rationale ?? '') as string),
-			applicableObjectTypes: String((prev.applicableObjectTypes ?? 'PROFESSIONAL_WORK_UNIT') as string),
+			applicableObjectTypes: String(
+				(prev.applicableObjectTypes ?? 'PROFESSIONAL_WORK_UNIT') as string
+			),
 			evaluatedClaimTypes: String((prev.evaluatedClaimTypes ?? 'CORRECTNESS') as string),
 			criteria: Array.isArray(prev.criteria) ? prev.criteria : [],
 			evaluatorRole: String((prev.evaluatorRole ?? 'reviewer') as string),
-			independenceRequirement: String((prev.independenceRequirement ?? 'DIFFERENT_AGENT') as string),
+			independenceRequirement: String(
+				(prev.independenceRequirement ?? 'DIFFERENT_AGENT') as string
+			),
 			findingDefinitions: Array.isArray(prev.findingDefinitions) ? prev.findingDefinitions : [],
 			permittedControlActions: String((prev.permittedControlActions ?? 'ESCALATE') as string)
 		});

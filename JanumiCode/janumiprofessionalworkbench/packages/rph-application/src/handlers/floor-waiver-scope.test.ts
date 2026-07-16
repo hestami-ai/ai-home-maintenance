@@ -136,16 +136,25 @@ describe('de minimis floor waiver SCOPE at the PublishPwa call site', () => {
 	}
 
 	// Grant an EFFECTIVE WAIVER naming AI_PWA as its subject, scoped to `scope`.
-	function grantWaiverScopedTo(scope: string) {
+	/** Grant an EFFECTIVE waiver naming an exact (policy, criterion) — DOC-004 §12.2's "exact policy and criterion".
+	 *  The payload previously carried only a free-text `scope`, which the Decision could not even hold; the
+	 *  WaiverDetail contract now requires the waiver to say precisely what it waives. Premise fix only — every
+	 *  expectation below is unchanged, because the behavior they assert is exactly what the contract now enforces. */
+	function grantWaiverScopedTo(policyId: string, criterionId: string) {
 		const req = d(
 			HUMAN,
 			'RequestWaiver',
 			{
 				subjectObjectIds: [AI_PWA],
-				scope,
+				scope: criterionId,
 				rationale: 'Accepted residual risk for the pilot.',
 				duration: 'until superseded',
-				affectedObjectIds: [AI_PWA]
+				affectedObjectIds: [AI_PWA],
+				waivedPolicyId: policyId,
+				waivedCriterionId: criterionId,
+				waivedFindingIds: [],
+				compensatingControls: [],
+				reviewConditions: []
 			},
 			WAIVER,
 			'DECISION'
@@ -170,7 +179,7 @@ describe('de minimis floor waiver SCOPE at the PublishPwa call site', () => {
 		expect(publish().status).toBe('REJECTED');
 
 		// The waiver names the subject but waives a naming-convention criterion — it says nothing about the floor.
-		grantWaiverScopedTo('naming-convention style guide deviation');
+		grantWaiverScopedTo('style.naming-convention', 'naming-convention style guide deviation');
 
 		const r = publish();
 		expect(r.status, JSON.stringify(r.error)).toBe('REJECTED');
@@ -183,7 +192,7 @@ describe('de minimis floor waiver SCOPE at the PublishPwa call site', () => {
 		// Only the schema/invariant criterion is unmet AND waived; the Reasoning Review is independently REJECTED,
 		// so the transition must stay blocked on the review regardless of the schema waiver.
 		recordFloor({ [SCHEMA]: 'REJECTED', [IDENTITY]: 'SATISFIED', [REVIEW]: 'REJECTED' });
-		grantWaiverScopedTo(SCHEMA);
+		grantWaiverScopedTo(SCHEMA, 'SCHEMA_INVALID');
 
 		const r = publish();
 		expect(r.status, JSON.stringify(r.error)).toBe('REJECTED');

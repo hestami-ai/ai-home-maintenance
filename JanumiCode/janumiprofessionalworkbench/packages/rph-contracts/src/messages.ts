@@ -303,7 +303,13 @@ export const RequestWaiverPayloadSchema = z.strictObject({
 	scope: z.string(),
 	rationale: z.string(),
 	duration: z.string(),
-	affectedObjectIds: z.array(z.string())
+	affectedObjectIds: z.array(z.string()),
+	waivedPolicyId: z.string(),
+	waivedCriterionId: z.string(),
+	waivedFindingIds: z.array(z.string()),
+	expiresAt: z.string().optional(),
+	compensatingControls: z.array(z.string()),
+	reviewConditions: z.array(z.string())
 });
 export type RequestWaiverPayload = z.infer<typeof RequestWaiverPayloadSchema>;
 export const GrantWaiverPayloadSchema = z.strictObject({

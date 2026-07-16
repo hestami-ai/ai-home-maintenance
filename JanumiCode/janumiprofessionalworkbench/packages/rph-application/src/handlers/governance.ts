@@ -72,8 +72,7 @@ function observationsAgainstBaselineItems(
 	const out: { observationId: string; blocking: boolean; waived: boolean }[] = [];
 	for (const id of ids) {
 		const s = ctx.store.loadObject(id)?.state as
-			| { subjectObjectIds?: string[]; severity?: string; disposition?: string }
-			| undefined;
+			{ subjectObjectIds?: string[]; severity?: string; disposition?: string } | undefined;
 		if (!s || !Array.isArray(s.subjectObjectIds)) continue;
 		if (!s.subjectObjectIds.some((subjectId) => itemObjectIds.has(subjectId))) continue;
 		const disposition = String(s.disposition);
@@ -196,7 +195,23 @@ export const revokeDecision: CommandHandler = (ctx, command) =>
 
 // ---- Waivers (a Decision of decisionType WAIVER) ----
 
-/** RequestWaiver — create a WAIVER Decision in PROPOSED (scope + rationale + duration + affected objects). */
+/**
+ * RequestWaiver — create a WAIVER Decision in PROPOSED, carrying the scope DOC-004 §12.2 requires.
+ *
+ * A waiver "must record: exact policy and criterion; exact object and semantic version; finding being waived;
+ * authority; rationale; duration or expiration; compensating controls; downstream impact; review conditions"
+ * (DOC-004 §12.2; guide §8.15 L1101). Object/version/authority/rationale already lived on the Decision
+ * envelope; the rest had NO WIRE HOME, so `scope` and `duration` were collected by the payload and silently
+ * dropped here — the Decision could not hold them. That is why any waiver naming the subject discharged the
+ * ENTIRE floor: nothing distinguished a waiver of "naming-convention style guide deviation" from a waiver of a
+ * REJECTED independent Reasoning Review. §16 item 12 names it: "waiver lacks a complete instance/wire/storage
+ * contract", and forbids the consequence by name — "Never implement waiver as a Boolean".
+ *
+ * `waiver: WaiverDetail` is AUTHORED under the sponsor's 2026-07-16 grant to serialize DOC-004 §12.2's RATIFIED
+ * field list, which DOC-007 never schematized. The semantics are ratified; only the wire shape was missing.
+ * It is what lets `waiverCovers` / `waiverStillDischarges` (rph-domain — already written, already unit-proven,
+ * previously uncallable) be honored at the floor gate instead of a Boolean bypass.
+ */
 export const requestWaiver: CommandHandler = (ctx, command, payload) => {
 	const p = payload as RequestWaiverPayload;
 	const id = command.targetAggregateId;
@@ -214,6 +229,16 @@ export const requestWaiver: CommandHandler = (ctx, command, payload) => {
 		authority: command.issuedBy,
 		consideredEvidenceIds: [],
 		consideredObservationIds: [],
+		waiver: {
+			waivedPolicyId: p.waivedPolicyId,
+			waivedCriterionId: p.waivedCriterionId,
+			waivedFindingIds: p.waivedFindingIds,
+			...(p.expiresAt ? { expiresAt: p.expiresAt } : {}),
+			compensatingControls: p.compensatingControls,
+			// DOC-004 §12.2 "downstream impact" — the payload's long-standing `affectedObjectIds`.
+			downstreamImpactObjectIds: p.affectedObjectIds,
+			reviewConditions: p.reviewConditions
+		},
 		status: 'PROPOSED'
 	};
 	return createObject(ctx, command, {

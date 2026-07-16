@@ -848,6 +848,12 @@
           "type": "DecisionStatus",
           "required": true,
           "enumRef": "DecisionStatusSchema"
+        },
+        {
+          "field": "waiver",
+          "type": "WaiverDetail",
+          "required": false,
+          "note": "Present iff decisionType is WAIVER; requestWaiver enforces it. AUTHORED under sponsor grant 2026-07-16 (not derived from a DOC-007 interface). Serializes DOC-004 §12.2's RATIFIED waiver invariants, which DOC-007 never schematized (§16 item 12: 'waiver lacks a complete instance/wire/storage contract'). Object+version+authority+rationale already live on the Decision envelope; these are the remainder."
         }
       ]
     },
@@ -2434,6 +2440,54 @@
           "type": "string",
           "required": false,
           "note": "For conditional (C*) rules: free-text applicability condition. Structured predicate/resolver deferred (M7/M9/M11)."
+        }
+      ]
+    },
+    {
+      "name": "WaiverDetail",
+      "note": "AUTHORED under sponsor grant 2026-07-16 (not derived from a DOC-007 interface). Serializes DOC-004 §12.2's RATIFIED waiver invariants, which DOC-007 never schematized (§16 item 12: 'waiver lacks a complete instance/wire/storage contract'). Object+version+authority+rationale already live on the Decision envelope; these are the remainder.",
+      "fields": [
+        {
+          "field": "waivedPolicyId",
+          "type": "string",
+          "required": true,
+          "note": "id-ref — the EXACT policy waived (DOC-004 §12.2 'exact policy and criterion')."
+        },
+        {
+          "field": "waivedCriterionId",
+          "type": "string",
+          "required": true,
+          "note": "The EXACT criterion waived. RPH-GOV-005: a waiver does not bleed to another criterion, object, or version."
+        },
+        {
+          "field": "waivedFindingIds",
+          "type": "string[]",
+          "required": true,
+          "note": "id-ref[] — the finding(s)/observation(s) waived. §8.15: a waiver does not erase a finding; it remains visible."
+        },
+        {
+          "field": "expiresAt",
+          "type": "string",
+          "required": false,
+          "note": "RFC3339. Absent = no expiry. §8.15: expiration triggers review and may block promotion."
+        },
+        {
+          "field": "compensatingControls",
+          "type": "string[]",
+          "required": true,
+          "note": "DOC-004 §12.2 'compensating controls'. Empty array = explicitly none."
+        },
+        {
+          "field": "downstreamImpactObjectIds",
+          "type": "string[]",
+          "required": true,
+          "note": "id-ref[] — DOC-004 §12.2 'downstream impact'."
+        },
+        {
+          "field": "reviewConditions",
+          "type": "string[]",
+          "required": true,
+          "note": "DOC-004 §12.2 'review conditions'."
         }
       ]
     }
