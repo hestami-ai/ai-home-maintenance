@@ -229,6 +229,39 @@
         ],
         "additionalProperties": false
       }
+    },
+    "artifactType": {
+      "type": "string"
+    },
+    "mediaType": {
+      "type": "string"
+    },
+    "storageProvider": {
+      "type": "string"
+    },
+    "storageKey": {
+      "type": "string"
+    },
+    "contentHash": {
+      "type": "string"
+    },
+    "byteSize": {
+      "type": "number"
+    },
+    "producingPwuId": {
+      "type": "string"
+    },
+    "producingExecutionAttemptId": {
+      "type": "string"
+    },
+    "securityClassification": {
+      "type": "string"
+    },
+    "retentionClass": {
+      "type": "string"
+    },
+    "status": {
+      "type": "string"
     }
   },
   "required": [
@@ -244,7 +277,15 @@
     "updatedBy",
     "provenance",
     "tags",
-    "extensions"
+    "extensions",
+    "artifactType",
+    "mediaType",
+    "storageProvider",
+    "storageKey",
+    "contentHash",
+    "securityClassification",
+    "retentionClass",
+    "status"
   ],
   "additionalProperties": false,
   "$id": "urn:janumi:rph:schema:object:ArtifactObject:1"

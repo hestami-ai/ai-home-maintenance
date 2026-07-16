@@ -52,6 +52,10 @@ describe('validate', () => {
 		// Architecture View (§11.7.2); the PermittedChildRule helper is a sub-type, not a registry entry.
 		// then +4 assurance-policy lifecycle commands (Edit/Supersede/Suspend/Activate AssurancePolicy) +4 events —
 		// full authorable policy lifecycle for the PWA Designer's policy manager (§8.9/§17; floor policies locked).
-		expect(buildContractRegistry().ids()).toHaveLength(292);
+		// then +1 RecordArtifact command +1 ArtifactRecorded event — the Artifact lifecycle. ARTIFACT was already
+		// one of the 21 registered objects, but as a bare envelope with zero fields, and NOTHING could create one
+		// while DOC-007 §16.1/§16.2 both carry `outputArtifactIds`. Fields transcribed from DOC-009 §18.1 (the
+		// ratified `create table artifacts`); the command/event are authored under the 2026-07-16 grant.
+		expect(buildContractRegistry().ids()).toHaveLength(294);
 	});
 });

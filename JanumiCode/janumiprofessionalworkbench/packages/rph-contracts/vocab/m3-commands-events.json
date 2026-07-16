@@ -342,6 +342,87 @@
       ]
     },
     {
+      "commandType": "RecordArtifact",
+      "targetAggregateType": "ARTIFACT",
+      "emitsEvent": "ArtifactRecorded",
+      "schematized": false,
+      "sourceSection": "PAYLOAD FIELDS: DOC-009 §18.1 (create table artifacts) — RATIFIED and field-complete; transcribed column-for-column, not authored. THE COMMAND ITSELF: UNRATIFIED-AUTHORED under sponsor grant 2026-07-16. DOC-002 §34.3's execution command list and DOC-007 §32's first-slice command list BOTH omit any artifact command, and DOC-002 §26.4 / DOC-007 §33 omit any artifact event — yet CompleteExecutionStepPayload.outputArtifactIds (DOC-007 §16.1) and ExecutionStepSucceededPayload.outputArtifactIds (§16.2) both point at Artifacts, and DOC-009 §18.1 persists them as Professional Work Objects. Nothing in the ratified corpus could bring an Artifact into existence: a dangling reference across three documents. This command closes it (§16 item 6, first-slice). NO state machine is declared because the corpus defines none for the Artifact — DOC-002 has no Artifact interface, no invariant section, and no state machine; `status` is therefore recorded, not driven. Do not borrow Evidence.status.",
+      "payloadFields": [
+        {
+          "field": "artifactId",
+          "required": true,
+          "type": "string",
+          "note": "id-ref. Prefix 'art' is AUTHORED — DOC-007 §5.2's 21-entry prefix registry has no artifact entry, while DOC-004 writes 'artifact_01J...' in a Validator-result example. Two unratified spellings; 'art' matches this repo's existing ids.ts registry and test fixtures."
+        },
+        {
+          "field": "artifactType",
+          "required": true,
+          "type": "string",
+          "note": "DOC-009 §18.1 'artifact_type text not null'. Open value domain — not an enum."
+        },
+        {
+          "field": "mediaType",
+          "required": true,
+          "type": "string",
+          "note": "DOC-009 §18.1 'media_type text not null'."
+        },
+        {
+          "field": "storageProvider",
+          "required": true,
+          "type": "string",
+          "note": "DOC-009 §18.1 'storage_provider text not null'."
+        },
+        {
+          "field": "storageKey",
+          "required": true,
+          "type": "string",
+          "note": "DOC-009 §18.1 'storage_key text not null'."
+        },
+        {
+          "field": "contentHash",
+          "required": true,
+          "type": "string",
+          "note": "DOC-009 §18.1 'content_hash text not null'. With storageProvider+storageKey this forms uq_artifact_content, and it is what makes §18.3 immutability ('corrections create a new artifact + new semantic version + supersession link') checkable rather than asserted."
+        },
+        {
+          "field": "byteSize",
+          "required": false,
+          "type": "number",
+          "note": "DOC-009 §18.1 'byte_size bigint' — nullable in the ratified table."
+        },
+        {
+          "field": "producingPwuId",
+          "required": false,
+          "type": "string",
+          "note": "id-ref, nullable per DOC-009 §18.1."
+        },
+        {
+          "field": "producingExecutionAttemptId",
+          "required": false,
+          "type": "string",
+          "note": "id-ref, nullable per DOC-009 §18.1. Guide §8.4's 'producing Attempt/invocation'. CompleteExecutionStepPayload already carries executionAttemptId on the wire, so this is bindable today even though no Execution Attempt OBJECT exists yet (§16 item 23; DOC-009 §10.4 defines that table in full too)."
+        },
+        {
+          "field": "securityClassification",
+          "required": true,
+          "type": "string",
+          "note": "DOC-009 §18.1 'security_classification text not null'; §18.4 requires access to enforce it. Open value domain."
+        },
+        {
+          "field": "retentionClass",
+          "required": true,
+          "type": "string",
+          "note": "DOC-009 §18.1 'retention_class text not null'; §18.4. Open value domain."
+        },
+        {
+          "field": "status",
+          "required": true,
+          "type": "string",
+          "note": "DOC-009 §18.1 'status text not null'. Open value domain; no ratified Artifact state machine."
+        }
+      ]
+    },
+    {
       "commandType": "CompleteExecutionStep",
       "targetAggregateType": "EXECUTION_PLAN",
       "emitsEvent": "ExecutionStepSucceeded",
@@ -3984,6 +4065,68 @@
           "type": "enum",
           "enumRef": "StepStateSchema",
           "note": "{READY,QUEUED}->RUNNING"
+        }
+      ]
+    },
+    {
+      "eventType": "ArtifactRecorded",
+      "aggregateType": "ARTIFACT",
+      "sourceSection": "PAYLOAD FIELDS: DOC-009 §18.1 — RATIFIED, transcribed column-for-column. THE EVENT ITSELF: UNRATIFIED-AUTHORED under sponsor grant 2026-07-16 — DOC-002 §26.4's execution event list and DOC-007 §33's first-slice event registry both omit any artifact event. Mirrors RecordArtifact (see the command for the full dangling-reference finding).",
+      "payloadFields": [
+        {
+          "field": "artifactType",
+          "required": true,
+          "type": "string"
+        },
+        {
+          "field": "mediaType",
+          "required": true,
+          "type": "string"
+        },
+        {
+          "field": "storageProvider",
+          "required": true,
+          "type": "string"
+        },
+        {
+          "field": "storageKey",
+          "required": true,
+          "type": "string"
+        },
+        {
+          "field": "contentHash",
+          "required": true,
+          "type": "string"
+        },
+        {
+          "field": "byteSize",
+          "required": false,
+          "type": "number"
+        },
+        {
+          "field": "producingPwuId",
+          "required": false,
+          "type": "string"
+        },
+        {
+          "field": "producingExecutionAttemptId",
+          "required": false,
+          "type": "string"
+        },
+        {
+          "field": "securityClassification",
+          "required": true,
+          "type": "string"
+        },
+        {
+          "field": "retentionClass",
+          "required": true,
+          "type": "string"
+        },
+        {
+          "field": "status",
+          "required": true,
+          "type": "string"
         }
       ]
     },

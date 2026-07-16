@@ -861,8 +861,76 @@
       "objectType": "ARTIFACT",
       "tsName": "ArtifactObject",
       "idPrefixEntity": "ARTIFACT",
-      "note": "UNSPECIFIED in BOTH DOC-002 and DOC-007 — 'ARTIFACT' exists only as a ProfessionalWorkObjectType member (and an EvidenceType value). No interface/schema anywhere. Fields to-be-designed; do not fabricate. OPEN ITEM.",
-      "fields": []
+      "sourceSection": "DOC-009 §18.1 (create table artifacts) — a RATIFIED, field-complete source. Corroborated by DOC-009 §18.3 (artifact corrections create 'new artifact; new semantic version; supersession link') and DOC-002 §4 (ARTIFACT is a member of the ratified ProfessionalWorkObjectType union).",
+      "note": "TRANSCRIBED from DOC-009 §18.1 on 2026-07-16, replacing 'UNSPECIFIED in BOTH DOC-002 and DOC-007 ... do not fabricate. OPEN ITEM.' That note was TRUE about DOC-002/DOC-007 and WRONG as a conclusion: it searched the meaning doc and the wire doc, never the STORAGE doc. DOC-009 §18.1 defines the artifacts table in full, and its primary key is 'references professional_work_objects(id)' — so at the ratified persistence plane the Artifact IS a Professional Work Object, carrying the envelope's semanticVersion. These 11 fields are that table, column-for-column; nothing here is designed. NOT ratified at the WIRE boundary: DOC-007 gives ARTIFACT no interface, no §5.2 id prefix, no command and no event, while THREE of its field types (outputArtifactIds, ArtifactReference, ArtifactRequirement) point at it — a dangling reference DOC-009 resolves and DOC-007 has not caught up to (§16 item 6, first-slice). Value domains deliberately left as string: DOC-009 types artifactType/status/securityClassification/retentionClass as bare 'text not null' with no CHECK constraint and no enum anywhere in the corpus. Inventing enum members here would be the fabrication the original note rightly forbade.",
+      "fields": [
+        {
+          "field": "artifactType",
+          "type": "string",
+          "required": true,
+          "note": "DOC-009 §18.1 'artifact_type text not null'. NOT an enum — no value domain is ratified anywhere; do not invent one."
+        },
+        {
+          "field": "mediaType",
+          "type": "string",
+          "required": true,
+          "note": "DOC-009 §18.1 'media_type text not null'. IANA media type."
+        },
+        {
+          "field": "storageProvider",
+          "type": "string",
+          "required": true,
+          "note": "DOC-009 §18.1 'storage_provider text not null'. §18.2 names candidates (workspace-local, object storage, S3-compatible, Azure Blob, GCS) as deployment choices, NOT as a closed enum."
+        },
+        {
+          "field": "storageKey",
+          "type": "string",
+          "required": true,
+          "note": "DOC-009 §18.1 'storage_key text not null'. Part of uq_artifact_content (storage_provider, storage_key, content_hash)."
+        },
+        {
+          "field": "contentHash",
+          "type": "string",
+          "required": true,
+          "note": "DOC-009 §18.1 'content_hash text not null'. DOC-002 §31.1: 'Preserve content hashes for evidence and artifacts.' This is what makes §18.3 immutability checkable."
+        },
+        {
+          "field": "byteSize",
+          "type": "number",
+          "required": false,
+          "note": "DOC-009 §18.1 'byte_size bigint' — the ONLY nullable non-FK column, so optional here."
+        },
+        {
+          "field": "producingPwuId",
+          "type": "string",
+          "required": false,
+          "note": "DOC-009 §18.1 'producing_pwu_id text references professional_work_units(id)' — nullable. The §29.2 traceability chain's 'PWU → produces → Artifact' edge."
+        },
+        {
+          "field": "producingExecutionAttemptId",
+          "type": "string",
+          "required": false,
+          "note": "DOC-009 §18.1 'producing_execution_attempt_id text references execution_attempts(id)' — nullable. This is guide §8.4's 'producing Attempt/invocation' binding. NOTE: the corpus attributes an artifact to the PWU and the ATTEMPT — never to the Execution Step."
+        },
+        {
+          "field": "securityClassification",
+          "type": "string",
+          "required": true,
+          "note": "DOC-009 §18.1 'security_classification text not null'; enforced by §18.4. NOT an enum — no value domain ratified."
+        },
+        {
+          "field": "retentionClass",
+          "type": "string",
+          "required": true,
+          "note": "DOC-009 §18.1 'retention_class text not null'; enforced by §18.4. NOT an enum — no value domain ratified."
+        },
+        {
+          "field": "status",
+          "type": "string",
+          "required": true,
+          "note": "DOC-009 §18.1 'status text not null'. NOT an enum and NOT reused from EvidenceStatus — no artifact status machine exists in the corpus (DOC-002 defines no Artifact state machine). Do not borrow another object's lifecycle."
+        }
+      ]
     },
     {
       "objectType": "DECOMPOSITION_CONTRACT",
@@ -2548,12 +2616,12 @@
   ],
   "openItems": [
     {
-      "item": "ARTIFACT object has no field definition anywhere",
-      "why": "ARTIFACT is one of the 17 ProfessionalWorkObjectType values but neither DOC-002 nor DOC-007 defines an ArtifactObject interface/schema (only the ArtifactReference helper and ARTIFACT EvidenceType value exist). Fields are to-be-designed; do not fabricate."
+      "item": "RESOLVED 2026-07-16 — ARTIFACT's fields were defined all along, in DOC-009 §18.1",
+      "why": "This item read: 'ARTIFACT is one of the 17 ProfessionalWorkObjectType values but neither DOC-002 nor DOC-007 defines an ArtifactObject interface/schema ... Fields are to-be-designed; do not fabricate.' Every clause about DOC-002 and DOC-007 is true. The conclusion was false: the search stopped at the meaning doc and the wire doc and never opened the STORAGE doc. DOC-009 §18.1 'create table artifacts' defines all 11 columns, and its PK 'references professional_work_objects(id)' makes the Artifact a Professional Work Object with an envelope semanticVersion — which §18.3 then versions under supersession. The fields are now TRANSCRIBED from that table, not designed. WHAT REMAINS OPEN is narrower and belongs to DOC-007, not to the object: no ARTIFACT interface, no §5.2 id prefix ('art' is authored here; DOC-004 §… writes 'artifact_01J...'), no command, no event — even though outputArtifactIds/ArtifactReference/ArtifactRequirement all point at it. GENERALIZE THIS: 'unspecified — do not fabricate' notes in this vocab were written against DOC-002+DOC-007 only. DOC-009 is a ratified source and must be checked before any such note is trusted; the same blind spot produced a false blocker on §16 item 23 (execution_attempts, which DOC-009 §10.4 likewise defines in full)."
     },
     {
       "item": "6 objects lack a DOC-007 serialized field contract",
-      "why": "OBLIGATION, CONSTRAINT, DECOMPOSITION_CONTRACT, RECOMPOSITION_CONTRACT, RUNTIME_BINDING (and ARTIFACT) have no field-level definition in the latest serialized contract (DOC-007). CONSTRAINT + RUNTIME_BINDING have schema FILES listed in DOC-007 §3 but no prose; the others have neither. All are sourced from DOC-002 prose and need serialization before codegen. Their enums (ObligationType/Strength/Status, ConstraintType/Strength/Status, CoverageType, DecompositionContractStatus, RecompositionContractStatus, AuthorizationStatus, StepType/State) exist but have no wired consumer field yet."
+      "why": "AMENDED 2026-07-16: ARTIFACT is no longer sourceless — DOC-009 §18.1 defines it (see the resolved item above). It still lacks a DOC-007 SERIALIZED contract, so it stays in this list, but the gap is now wire-only, not total. The other five remain DOC-002-prose-only; each should be re-checked against DOC-009's storage schema before being called unspecified. ORIGINAL: OBLIGATION, CONSTRAINT, DECOMPOSITION_CONTRACT, RECOMPOSITION_CONTRACT, RUNTIME_BINDING (and ARTIFACT) have no field-level definition in the latest serialized contract (DOC-007). CONSTRAINT + RUNTIME_BINDING have schema FILES listed in DOC-007 §3 but no prose; the others have neither. All are sourced from DOC-002 prose and need serialization before codegen. Their enums (ObligationType/Strength/Status, ConstraintType/Strength/Status, CoverageType, DecompositionContractStatus, RecompositionContractStatus, AuthorizationStatus, StepType/State) exist but have no wired consumer field yet."
     },
     {
       "item": "~40 helper sub-types are referenced but not field-defined",

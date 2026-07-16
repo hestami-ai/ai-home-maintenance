@@ -457,7 +457,20 @@ export const DecisionObjectSchema = z.strictObject({
 export type DecisionObject = z.infer<typeof DecisionObjectSchema>;
 
 /** ARTIFACT — id prefix: ARTIFACT */
-export const ArtifactObjectSchema = z.strictObject({ ...objectEnvelopeShape });
+export const ArtifactObjectSchema = z.strictObject({
+	...objectEnvelopeShape,
+	artifactType: z.string(),
+	mediaType: z.string(),
+	storageProvider: z.string(),
+	storageKey: z.string(),
+	contentHash: z.string(),
+	byteSize: z.number().optional(),
+	producingPwuId: z.string().optional(),
+	producingExecutionAttemptId: z.string().optional(),
+	securityClassification: z.string(),
+	retentionClass: z.string(),
+	status: z.string()
+});
 export type ArtifactObject = z.infer<typeof ArtifactObjectSchema>;
 
 /** DECOMPOSITION_CONTRACT — id prefix: DECOMPOSITION_CONTRACT */

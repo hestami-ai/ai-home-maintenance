@@ -95,6 +95,21 @@ export const ActivateExecutionPlanPayloadSchema = z.strictObject({
 	authorizedRuntimeBindingIds: z.array(z.string())
 });
 export type ActivateExecutionPlanPayload = z.infer<typeof ActivateExecutionPlanPayloadSchema>;
+export const RecordArtifactPayloadSchema = z.strictObject({
+	artifactId: z.string(),
+	artifactType: z.string(),
+	mediaType: z.string(),
+	storageProvider: z.string(),
+	storageKey: z.string(),
+	contentHash: z.string(),
+	byteSize: z.number().optional(),
+	producingPwuId: z.string().optional(),
+	producingExecutionAttemptId: z.string().optional(),
+	securityClassification: z.string(),
+	retentionClass: z.string(),
+	status: z.string()
+});
+export type RecordArtifactPayload = z.infer<typeof RecordArtifactPayloadSchema>;
 export const CompleteExecutionStepPayloadSchema = z.strictObject({
 	executionStepId: z.string(),
 	executionAttemptId: z.string(),
@@ -932,6 +947,20 @@ export const ExecutionStepStartedPayloadSchema = z.strictObject({
 	stepState: StepStateSchema
 });
 export type ExecutionStepStartedPayload = z.infer<typeof ExecutionStepStartedPayloadSchema>;
+export const ArtifactRecordedPayloadSchema = z.strictObject({
+	artifactType: z.string(),
+	mediaType: z.string(),
+	storageProvider: z.string(),
+	storageKey: z.string(),
+	contentHash: z.string(),
+	byteSize: z.number().optional(),
+	producingPwuId: z.string().optional(),
+	producingExecutionAttemptId: z.string().optional(),
+	securityClassification: z.string(),
+	retentionClass: z.string(),
+	status: z.string()
+});
+export type ArtifactRecordedPayload = z.infer<typeof ArtifactRecordedPayloadSchema>;
 export const ExecutionStepSucceededPayloadSchema = z.strictObject({
 	executionStepId: z.string(),
 	executionAttemptId: z.string(),
@@ -1384,6 +1413,12 @@ export const COMMANDS = {
 		targetAggregateType: 'EXECUTION_PLAN',
 		emitsEvent: 'ExecutionPlanActivated',
 		firstSlice: true
+	},
+	RecordArtifact: {
+		payload: RecordArtifactPayloadSchema,
+		targetAggregateType: 'ARTIFACT',
+		emitsEvent: 'ArtifactRecorded',
+		firstSlice: false
 	},
 	CompleteExecutionStep: {
 		payload: CompleteExecutionStepPayloadSchema,
@@ -1901,6 +1936,7 @@ export const EVENTS = {
 		payload: ExecutionStepStartedPayloadSchema,
 		aggregateType: 'ExecutionPlan'
 	},
+	ArtifactRecorded: { payload: ArtifactRecordedPayloadSchema, aggregateType: 'ARTIFACT' },
 	ExecutionStepSucceeded: {
 		payload: ExecutionStepSucceededPayloadSchema,
 		aggregateType: 'ExecutionPlan'
