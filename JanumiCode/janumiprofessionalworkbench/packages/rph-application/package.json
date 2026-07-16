@@ -24,6 +24,7 @@
     "test": "vitest run --passWithNoTests"
   },
   "dependencies": {
+    "@janumipwb/rph-assurance": "workspace:*",
     "@janumipwb/rph-contracts": "workspace:*",
     "@janumipwb/rph-domain": "workspace:*",
     "@janumipwb/rph-ports": "workspace:*",

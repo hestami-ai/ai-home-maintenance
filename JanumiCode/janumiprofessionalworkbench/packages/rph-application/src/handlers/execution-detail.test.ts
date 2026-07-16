@@ -46,6 +46,40 @@ describe('ExecutionStep + RuntimeBinding handlers (live)', () => {
 		return plan.steps[0]!.stepState;
 	}
 
+	/** Record a de minimis floor over the STEP's output. The step is a MODEL_INVOCATION, so §8.4 L841 makes
+	 *  Reasoning Review mandatory and L854 blocks its protected transition without one — every completion
+	 *  below therefore needs a floor, not just the one that asserts blocking. */
+	let asmt = 0;
+	function recordFloor(dispositions: Record<string, string>) {
+		for (const [policyId, disposition] of Object.entries(dispositions)) {
+			const id = `asmt_${String(++asmt).padStart(26, '0')}`;
+			dispatch(
+				'RequestAssuranceAssessment',
+				{
+					assessmentId: id,
+					assurancePolicyId: policyId,
+					policyVersion: '1.0.0',
+					subjectObjectIds: [STEP],
+					subjectSemanticVersions: { [STEP]: 1 },
+					claimIds: []
+				},
+				id,
+				'ASSURANCE_ASSESSMENT'
+			);
+			dispatch(
+				'CompleteAssuranceAssessment',
+				{ validatorResult: { dispositionRecommendation: disposition } },
+				id,
+				'ASSURANCE_ASSESSMENT'
+			);
+		}
+	}
+	const SATISFIED_FLOOR = {
+		'floor.schema-invariant': 'SATISFIED',
+		'floor.identity-provenance': 'SATISFIED',
+		'floor.reasoning-review': 'SATISFIED'
+	};
+
 	beforeEach(() => {
 		store = new SqliteStorageAdapter({ now: () => TS });
 		seq = 0;
@@ -119,6 +153,11 @@ describe('ExecutionStep + RuntimeBinding handlers (live)', () => {
 			'ACCEPTED'
 		);
 		expect(stepState()).toBe('RUNNING');
+		// This step is a MODEL_INVOCATION. Until the floor gate derived `aiProduced` honestly it completed with
+		// NO Reasoning Review at all, and this test passed — it encoded the defect rather than the contract.
+		// The floor is the step's premise, not this test's subject: the subject is still "a started step with a
+		// recorded result completes".
+		recordFloor(SATISFIED_FLOOR);
 		const done = dispatch(
 			'CompleteExecutionStep',
 			{
@@ -185,33 +224,7 @@ describe('ExecutionStep + RuntimeBinding handlers (live)', () => {
 		expect(stepState()).toBe('RUNNING');
 
 		// Record a de minimis floor over the step's output whose independent reasoning review is REJECTED.
-		const FLOOR = ['floor.schema-invariant', 'floor.identity-provenance', 'floor.reasoning-review'];
-		let a = 0;
-		const recordFloor = (dispositions: Record<string, string>) => {
-			for (const [policyId, disposition] of Object.entries(dispositions)) {
-				const id = `asmt_${String(++a).padStart(26, '0')}`;
-				dispatch(
-					'RequestAssuranceAssessment',
-					{
-						assessmentId: id,
-						assurancePolicyId: policyId,
-						policyVersion: '1.0.0',
-						subjectObjectIds: [STEP],
-						subjectSemanticVersions: { [STEP]: 1 },
-						claimIds: []
-					},
-					id,
-					'ASSURANCE_ASSESSMENT'
-				);
-				dispatch(
-					'CompleteAssuranceAssessment',
-					{ validatorResult: { dispositionRecommendation: disposition } },
-					id,
-					'ASSURANCE_ASSESSMENT'
-				);
-			}
-		};
-		recordFloor({ [FLOOR[0]!]: 'SATISFIED', [FLOOR[1]!]: 'SATISFIED', [FLOOR[2]!]: 'REJECTED' });
+		recordFloor({ ...SATISFIED_FLOOR, 'floor.reasoning-review': 'REJECTED' });
 
 		const complete = {
 			executionStepId: STEP,

@@ -21,7 +21,7 @@ import {
 	type CommandHandler,
 	type HandlerContext
 } from './kit.js';
-import { floorGateBlock } from './floor-gate.js';
+import { floorGateBlock, stepOutputIsAiProduced } from './floor-gate.js';
 
 const PLAN = 'EXECUTION_PLAN';
 const MACHINE = 'ExecutionPlan.status';
@@ -212,7 +212,7 @@ export const completeExecutionStep: CommandHandler = (ctx, command) => {
 		stepId: p.executionStepId,
 		target: 'SUCCEEDED',
 		eventType: 'ExecutionStepSucceeded',
-		precheck: () => {
+		precheck: (step) => {
 			const hasOutput =
 				(p.outputArtifactIds?.length ?? 0) > 0 || (p.proposedEvidenceIds?.length ?? 0) > 0;
 			const check = validateStepCompletion({ hasOutput, explicitNoOutput: !hasOutput });
@@ -220,9 +220,19 @@ export const completeExecutionStep: CommandHandler = (ctx, command) => {
 				return reject(command, 'RPH_INVARIANT_VIOLATION', check.reason ?? 'step result missing');
 			// Floor gate (§8.4 step 4), plane-agnostic: a step whose OUTPUT has a recorded de minimis assurance floor
 			// must have it SATISFIED (or waived) before the step may SUCCEED — exec != assurance (INV-5); step
-			// success drives the EXECUTION dimension only and never grants assurance. Steps with no recorded floor
-			// pass (the floor applies once the output is assessed).
-			const blocking = floorGateBlock(ctx, p.executionStepId, { aiProduced: false });
+			// success drives the EXECUTION dimension only and never grants assurance.
+			//
+			// `aiProduced` is DERIVED from the step, never asserted. It was the literal `false`, which — with
+			// floor-gate's "not AI-produced and never assessed ⇒ permitted" rule — made this gate unreachable for
+			// exactly the population it exists to catch: an AI step nobody ever assessed. An AI step was blocked
+			// only once someone had already assessed it. §8.4 L841 makes Reasoning Review mandatory "when the
+			// transformation is produced by or materially shaped by an AI/agent", and L854: "A missing, stale,
+			// malformed, failed, unavailable, or independence-invalid required review cannot satisfy assurance or
+			// permit its protected transition." A never-recorded floor over an AI step is that missing review.
+			// The authoring plane already derived this honestly (pwa-authoring.ts); the two planes disagreed.
+			const blocking = floorGateBlock(ctx, p.executionStepId, {
+				aiProduced: stepOutputIsAiProduced(ctx, step, command)
+			});
 			if (blocking) {
 				const detail = blocking.map((b) => `${b.policyId}=${b.disposition}`).join(', ');
 				return reject(

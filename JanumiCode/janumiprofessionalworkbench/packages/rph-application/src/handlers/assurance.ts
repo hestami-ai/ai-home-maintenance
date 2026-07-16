@@ -2,8 +2,10 @@
 // Assessment (request/complete), Assurance Observation (record). The exec≠assurance separation (INV-5) is upheld
 // structurally — nothing here is driven by executionState; a satisfied assessment is a separate, explicit act
 // whose disposition comes from the validator recommendation and is gated by the AssuranceAssessment.state machine
-// (which makes VALIDATOR_FAILED→REJECTED and INDEPENDENCE_VIOLATION→SATISFIED illegal). Deeper validator
-// independence / evidence-admissibility scoring lives in @janumipwb/rph-assurance (documented in RESUME-STATE).
+// (which makes VALIDATOR_FAILED→REJECTED and INDEPENDENCE_VIOLATION→SATISFIED illegal). Evidence admissibility
+// (§8.11) is enforced at AdmitEvidence by @janumipwb/rph-assurance's evidenceAdmissibility — the kernel rule,
+// called, not a copy of it. Validator-independence scoring still lives there uncalled; that is the next increment.
+import { evidenceAdmissibility } from '@janumipwb/rph-assurance';
 import type {
 	AssertClaimPayload,
 	CreateAssurancePolicyPayload,
@@ -218,14 +220,45 @@ export const proposeEvidence: CommandHandler = (ctx, command, payload) => {
 	});
 };
 
-/** AdmitEvidence — PROPOSED -> ADMISSIBLE. */
+/**
+ * AdmitEvidence — PROPOSED -> ADMISSIBLE, and ONLY if the Evidence is admissible.
+ *
+ * This was a bare status advance: admission was a label anyone could apply to anything. §8.11 L1027 makes
+ * admissibility a precondition, and the kernel has evaluated it correctly all along —
+ * `evidenceAdmissibility` (rph-assurance) implements all 8 conditions and is unit-proven. Nothing called it.
+ * The gap was never the rule; it was the wiring.
+ *
+ * `sufficientlyCurrent` and `claimId` are deliberately NOT passed: freshness needs a policy-supplied horizon
+ * and relevance needs the target Claim, and neither is on this Command. Passing a guess would re-create the
+ * defect this fixes. The 6 conditions the accepted contract can answer are enforced; the 2 it cannot are left
+ * to the floor, which has the policy context.
+ */
 export const admitEvidence: CommandHandler = (ctx, command) =>
 	advanceStatus(ctx, command, {
 		objectType: EVIDENCE,
 		statusField: 'status',
 		machine: 'Evidence.status',
 		target: 'ADMISSIBLE',
-		eventType: 'EvidenceAdmitted'
+		eventType: 'EvidenceAdmitted',
+		guard: (state) => {
+			const verdict = evidenceAdmissibility({
+				id: String(state.id ?? ''),
+				provenance: state.provenance,
+				contentReference: state.contentReference,
+				scope: state.scope as string | undefined,
+				limitations: state.limitations as readonly string[] | undefined,
+				status: state.status as string | undefined,
+				supportsClaimIds: state.supportsClaimIds as readonly string[] | undefined
+			});
+			return verdict.admissible
+				? null
+				: reject(
+						command,
+						'RPH_VALIDATION_SEMANTIC_FAILED',
+						`AdmitEvidence blocked: ${command.targetAggregateId} is inadmissible (§8.11) — failed ${verdict.failed.join(', ')}.`,
+						[command.targetAggregateId]
+					);
+		}
 	});
 
 /** InvalidateEvidence — ADMISSIBLE -> INVALIDATED (P4: dependent claims are re-contested by the controller). */

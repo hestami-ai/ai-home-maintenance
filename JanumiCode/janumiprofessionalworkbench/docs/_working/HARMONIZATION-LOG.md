@@ -341,6 +341,74 @@ is the one move this whole effort exists to prevent.
 
 ---
 
+## INCREMENT 2 — LANDED. Burndown **14 → 11**. Zero collateral damage.
+
+Two call sites routed through kernel rules that already existed. No rule was written; both were already
+written, tested, and uncalled.
+
+**2a — the execution floor gate can block.** `execution.ts` passed the literal `{ aiProduced: false }`. With
+`floor-gate.ts:92`'s "not AI-produced and never assessed ⇒ permitted", the gate was unreachable **for exactly
+the population it exists to catch**: an AI step nobody assessed. An AI step was blocked only once someone had
+already assessed it. Now `stepOutputIsAiProduced(ctx, step, command)` derives it from three positive signals
+the contract actually carries — `stepType === 'MODEL_INVOCATION'`, an AGENT/MODEL completing actor, or a
+Runtime Binding (which per DOC-009 §10.5 carries `model_selection_policy`).
+
+*Disclosed gap, not papered over:* none of the three is the **producer of the output**. `issuedBy` names who
+*completed* the step. The field that would answer it — `CompleteExecutionStepPayload.executionProvenance` —
+is `z.unknown()`, so it cannot be read without inventing a shape (§16 item 23 withholds
+"producing-Attempt/context binding" by name). Signal 1 covers the case that matters. When
+`executionProvenance` is contracted this stops inferring.
+
+*Citation discipline:* I did **not** rest this on §8.4 L844's *"ambiguity resolves to material"* — that clause
+is about the materiality of a **known** AI result, not about whether producership is known. Two different
+inferences; using L844 here would be a construction wearing a citation, which is this project's signature
+failure. The authority used is L841 (Reasoning Review applies "when the transformation is produced by or
+materially shaped by an AI/agent") and L854 ("A missing … required review cannot … permit its protected
+transition").
+
+**2b — `AdmitEvidence` admits only admissible Evidence.** It was a bare status advance: admission was a label
+anyone could apply to anything. `evidenceAdmissibility` (rph-assurance) implements all 8 §8.11 conditions and
+is unit-proven at `assurance-rules.test.ts:85`. Nothing called it. Now `advanceStatus`'s **already-existing**
+`guard` hook calls it. Six of the 8 conditions are enforced; `sufficientlyCurrent` and `claimId` are
+deliberately **not** passed — freshness needs a policy horizon and relevance needs the target Claim, neither
+of which is on this Command, and passing a guess would re-create the defect being fixed.
+
+### The finding inside the fix: a boundary that does not exist
+
+`floor-gate.ts:1-5` justified duplicating the floor policy ids as literals with: *"the package DAG forbids
+rph-application -> rph-assurance."* **There is no such rule.** `.dependency-cruiser.cjs` forbids circularity,
+contracts-as-foundation, domain/ports purity, projections browser-safety, and app-in-core — nothing else. And
+`rph-assurance` imports only contracts/domain/ports, so the edge is acyclic. I added it and ran the gate:
+
+```
+✔ no dependency violations found (133 modules, 325 dependencies cruised)
+```
+
+**The copy was defended by a constraint nobody checked.** This is the disease one level up — and it is the
+third time the codebase documented its own hollowness in a comment (`decomposition.ts:1-5` "a further wiring
+increment"; `assurance.ts:5-6` "evidence-admissibility scoring lives in @janumipwb/rph-assurance"; this).
+Follow-on, tracked not smuggled: those literals should now collapse into `FLOOR_POLICY_IDS`.
+
+### A test that encoded the defect
+
+`execution-detail.test.ts:116` completed a **`stepType: 'MODEL_INVOCATION'`** step with **no Reasoning Review
+at all**, and passed. It encoded the defect rather than the contract. Fixed by correcting its *premise*
+(record a floor) while leaving its *subject* untouched ("a started step with a recorded result completes").
+**This is the one move that needs watching for the rest of the program:** the difference between fixing a
+test's false premise and weakening its assertion to get green. The rule I am holding myself to — a test may be
+changed only where its *fixture* asserted something the guide forbids, never where its *expectation* did.
+
+### Gate
+
+`check-types` 21/21 · `lint` clean · `boundary` clean · full suite **51 passed, 11 wiring reds remaining**,
+no non-wiring test broken. (`docs/…/rendered-html.test.mjs` fails as "No test suite found" — **pre-existing**,
+verified by stashing to `92e7d62`; an empty file in a docs prototype, out of scope.)
+
+**Remaining reds (11):** waiver scope (2) → Increment 5 · ValidatePwa (3) + stale floor (2) → Increment 6 ·
+one-active-plan (2) · baseline observations (1) · readiness (1).
+
+---
+
 ## PART 4 — Open questions genuinely for the sponsor
 
 *(kept deliberately short — under the 2026-07-15 mandate, a tension is work, not a question, unless it

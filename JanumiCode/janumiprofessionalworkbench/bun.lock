@@ -47,6 +47,7 @@
       "name": "@janumipwb/rph-application",
       "version": "0.0.0",
       "dependencies": {
+        "@janumipwb/rph-assurance": "workspace:*",
         "@janumipwb/rph-contracts": "workspace:*",
         "@janumipwb/rph-domain": "workspace:*",
         "@janumipwb/rph-ports": "workspace:*",

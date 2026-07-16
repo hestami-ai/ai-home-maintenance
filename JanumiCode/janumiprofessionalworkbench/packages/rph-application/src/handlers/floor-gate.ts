@@ -1,8 +1,13 @@
 // Shared de minimis floor protected-transition logic (guide §8.4 step 4), PLANE-AGNOSTIC: given a subject, is its
 // recorded assurance floor SATISFIED (or waived)? Reused by the authoring-plane PublishPwa gate (pwa-authoring) and
-// the execution-plane completeExecutionStep gate (execution). Canonical floor policy ids are duplicated as literals
-// (source of truth: @janumipwb/rph-assurance FLOOR_POLICY_IDS) because the package DAG forbids rph-application ->
-// rph-assurance; they are stable canonical ids.
+// the execution-plane completeExecutionStep gate (execution).
+//
+// The floor policy ids below were duplicated as literals here, justified in this comment by "the package DAG forbids
+// rph-application -> rph-assurance". No such rule exists: .dependency-cruiser.cjs forbids circularity,
+// contracts-as-foundation, domain/ports purity, projections browser-safety, and app-in-core — and rph-assurance
+// imports only contracts/domain/ports, so the edge is acyclic and legal. The copy was defended by a constraint
+// nobody checked. The edge is now taken (see assurance.ts), and these literals should collapse into
+// FLOOR_POLICY_IDS; that is a follow-on, tracked in HARMONIZATION-LOG.md, not smuggled into this increment.
 import type { HandlerContext } from './kit.js';
 
 export const FLOOR_POLICY_IDS_REQUIRED = [
@@ -12,6 +17,44 @@ export const FLOOR_POLICY_IDS_REQUIRED = [
 ] as const;
 /** A subject is AI-produced (floor-relevant) when its producing actor is an AGENT or MODEL. */
 export const AI_ACTOR_TYPES = new Set(['AGENT', 'MODEL']);
+
+/** Step types whose output is AI-shaped by construction — §8.4 step 3 applies "when the transformation is
+ *  produced by or materially shaped by an AI/agent", and a MODEL_INVOCATION is that by definition. */
+const AI_STEP_TYPES = new Set(['MODEL_INVOCATION']);
+
+/**
+ * Is this execution step's output produced or materially shaped by an AI/agent (§8.4 L841 floor step 3)?
+ *
+ * Derived from the signals the accepted contract actually carries, never asserted. Three POSITIVE signals,
+ * any of which is sufficient:
+ *   1. `stepType` is a MODEL_INVOCATION — AI-shaped by construction;
+ *   2. the completing actor is an AGENT/MODEL (`AI_ACTOR_TYPES`);
+ *   3. the step runs under a Runtime Binding — which per DOC-009 §10.5 carries `model_selection_policy`, so a
+ *      bound step is one that selects and invokes a model.
+ *
+ * KNOWN GAP, disclosed rather than papered over: none of these is the *producer of the output*. `issuedBy`
+ * names who COMPLETED the step, which is not the same actor — `execution-detail.test.ts` completes an
+ * agent's MODEL_INVOCATION under a HUMAN. The field that would answer this directly is
+ * `CompleteExecutionStepPayload.executionProvenance`, and it is `z.unknown()` (`messages.ts`), so it cannot
+ * be read without inventing a shape (§16 item 23 withholds "producing-Attempt/context binding" by name).
+ * Signal 1 covers the case that matters — a model call is a MODEL_INVOCATION — and signals 2/3 catch the
+ * agent-completes and bound-runtime cases. When `executionProvenance` is contracted, it becomes signal 0 and
+ * this function stops inferring.
+ *
+ * Deliberately NOT claimed: §8.4 L844's "ambiguity resolves to material" is about the materiality of a known
+ * AI result, not about whether producership is known. Using it here would be a different inference wearing
+ * its citation.
+ */
+export function stepOutputIsAiProduced(
+	ctx: HandlerContext,
+	step: Record<string, unknown>,
+	command: { readonly issuedBy: { readonly actorType: string } }
+): boolean {
+	if (AI_STEP_TYPES.has(String(step.stepType))) return true;
+	if (AI_ACTOR_TYPES.has(String(command.issuedBy.actorType))) return true;
+	const bindingId = step.runtimeBindingId;
+	return typeof bindingId === 'string' && bindingId !== '' && !!ctx.store.loadObject(bindingId);
+}
 
 interface FloorRecord {
 	readonly disposition: string;
