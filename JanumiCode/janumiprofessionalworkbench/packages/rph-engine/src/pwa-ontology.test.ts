@@ -48,7 +48,11 @@ describe('published-PWA -> EngineOntology seam', () => {
 				pwuKind: 'COMPLIANCE_ROOT',
 				name: 'Compliance',
 				purpose: 'root',
-				isRoot: true
+				isRoot: true,
+				// Link the root to its child so the graph is a valid recursive decomposition — every non-root type
+				// reachable from the one root (§11.6, §16 item 9). Without this rule Control is an orphan, which
+				// ValidatePwa now rejects. The premise was "define two types"; the contract is "define a composition".
+				permittedChildTypeIds: [CHILD]
 			},
 			ROOT,
 			'PWU_TYPE'

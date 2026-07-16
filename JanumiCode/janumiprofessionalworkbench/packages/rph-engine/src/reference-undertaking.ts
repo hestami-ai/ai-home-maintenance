@@ -145,6 +145,12 @@ export function driveReferenceUndertaking(
 	});
 
 	// --- Propose the Professional Work Graph nodes ---
+	// Each node is SHAPED at proposal: an in-scope statement, an out-of-scope status, and an expected output.
+	// This was previously left empty, and every node was then marked READY — which DOC-002 §9.1's shape-readiness
+	// contract forbids (a PWU may enter READY only once its minimum shape fields are present). The demonstration
+	// must model a shaped PWU, not an unshaped one; the readiness guard (rph-domain checkPwuShapeReadiness) now
+	// enforces it. `outOfScope` uses §9.1's explicitly-permitted "not yet known" status — a real exercise of that
+	// branch — since a per-node out-of-scope is not meaningful to derive generically.
 	const propose = (pwuId: string, parentWorkUnitId?: string): void => {
 		const meta = LABELS[pwuId] ?? { title: pwuId, kind: 'PWU' };
 		send('ProposePwu', 'PROFESSIONAL_WORK_UNIT', pwuId, {
@@ -156,11 +162,16 @@ export function driveReferenceUndertaking(
 			...(parentWorkUnitId ? { parentWorkUnitId } : {}),
 			...(opts.undertakingId ? { undertakingId: opts.undertakingId, isLocalExtension: false } : {}),
 			...(opts.pwuTypeByKind?.[meta.kind] ? { pwuTypeId: opts.pwuTypeByKind[meta.kind] } : {}),
-			boundaries: { inScope: [], outOfScope: [], permittedChanges: [], prohibitedChanges: [] },
+			boundaries: {
+				inScope: [`${meta.title} for the field service management SaaS`],
+				outOfScope: ['not yet known'],
+				permittedChanges: [],
+				prohibitedChanges: []
+			},
 			obligationIds: [],
 			constraintIds: [],
 			assumptionIds: [],
-			expectedOutputs: [],
+			expectedOutputs: [{ outputId: `out_${pwuId}`, kind: 'DOCUMENT' }],
 			assurancePolicyIds: [],
 			riskProfile: {
 				consequence: 'HIGH',

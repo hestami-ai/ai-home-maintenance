@@ -550,6 +550,48 @@ empty-file failure.)
 
 ---
 
+## INCREMENT 6b — LANDED. The seed satisfies its own rules. **Suite green** (bar the pre-existing empty file).
+
+The 11 `rph-engine` failures resolved to **three** premises, each verified before it was touched:
+
+1. **Readiness (9 failures, all one root cause).** The reference-Undertaking drive proposed every PWU with
+   empty `inScope`/`outOfScope`/`expectedOutputs`, then marked it READY — which DOC-002 §9.1 forbids. **Before
+   touching the fixture I verified the new readiness guard is faithful**, because it was the case most likely
+   to have invented a rule. It is not: `checkPwuShapeReadiness` quotes §9.1's ten limbs byte-exact (verified
+   against the source at L665), enforces the six the ratified PWU shape can carry, and **withholds four with
+   disclosed reasoning** — "identified authority" (no authority field exists on the ratified PWU, DOC-002
+   §7.1), "completion claim / verification criterion" (`verificationCriterionIds` has no ratified write path,
+   so enforcing it would make SHAPING→READY permanently unsatisfiable), and the two unbounded-cardinality
+   limbs. That withholding mirrors Increment 2's evidence-admissibility discipline exactly. **The guard is
+   right; the seed was demonstrating an unshaped PWU.** Fixed at the one `propose` helper: every node now
+   carries a real in-scope statement and expected output, with `outOfScope` exercising §9.1's explicitly
+   permitted "not yet known" status.
+2. **Orphan (1).** `pwa-ontology.test.ts` defined a root and a `Control` child and never linked them. Added
+   the `permittedChildTypeIds` rule — premise "define two types" corrected to the contract "define a
+   composition". Assertions (2 templates, 1 root) untouched.
+3. **Stale floor (1).** `floor-gate.test.ts` recorded the floor at a hardcoded `semanticVersion: 1` while
+   `DefinePwuType` now takes the PWA to v2. Fixed to record against the PWA's **actual** current version — the
+   robust fix, not a hardcoded `2`.
+
+All three are rule-1 premise fixes: a fixture asserted a workflow the guide forbids (an unshaped PWU, an
+orphaned graph, a floor bound to a dead version). No expectation was weakened; no subject changed.
+
+**One correction to my Increment-6 census claim, worth stating:** I wrote that the readiness guard was "the
+only case where no kernel existed." That is right — but note the guard the agent wrote is *itself* now a
+LIVE-and-substantive kernel function, unlike the 55 dead ones. The program's net effect on the census: dead
+kernel routed into service **and** the one genuine gap filled with a faithful, cited implementation.
+
+### Gate
+
+`check-types` 21/21 · `lint` clean · `boundary` clean · **499 passed, 4 skipped, 0 JPWB failures.** The sole
+red is `docs/…/rendered-html.test.mjs` ("No test suite found" — an empty file in a docs prototype, failing
+identically since before this work; verified by stashing to `92e7d62`).
+
+**The wiring program is complete: 14 wiring reds → 0, and the reference material it exposed → 0.** What
+remains (Increments 3, 4, 7, 8 and the audits) is new enforcement and recording, not burndown.
+
+---
+
 ## PART 4 — Open questions genuinely for the sponsor
 
 *(kept deliberately short — under the 2026-07-15 mandate, a tension is work, not a question, unless it

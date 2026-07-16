@@ -124,11 +124,18 @@ describe('floor gate + recorder compose (3b + 3c)', () => {
 			'VALIDATED'
 		);
 
-		// Run the REAL floor and persist it via the recorder.
+		// Run the REAL floor and persist it via the recorder — against the PWA's ACTUAL current version. Defining
+		// the root PWU Type materially edits the graph and raises the PWA's semanticVersion (from 1 to 2), so the
+		// floor must bind that version, not a hardcoded 1: §10.1 L1379 binds Assessments to exact semantic
+		// versions, and floor-gate's version check now enforces it. This is the very stale-floor defect the check
+		// exists to catch, so the fixture must record the floor for the version it is actually publishing.
+		const currentVersion = Number(
+			(eng.loadObject(PWA)?.state as { semanticVersion: number }).semanticVersion
+		);
 		const subject: AssuranceSubject = {
 			subjectId: PWA,
 			objectType: 'PROFESSIONAL_WORK_ARCHITECTURE',
-			semanticVersion: 1,
+			semanticVersion: currentVersion,
 			isAiProduced: true,
 			producer: PRODUCER
 		};
