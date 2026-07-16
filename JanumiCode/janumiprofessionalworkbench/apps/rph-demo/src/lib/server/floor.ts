@@ -231,11 +231,16 @@ export function loadPwaFloor(pwaId: string): FloorView | undefined {
 	for (const policyId of order) {
 		const a = latest.get(policyId);
 		if (!a) continue;
+		const obs = obsByAssessment.get(a.id) ?? [];
 		policies.push({
 			policyId,
 			disposition: String((a.state.assessmentState ?? 'INCONCLUSIVE') as string),
-			independenceOk: true,
-			observations: obsByAssessment.get(a.id) ?? []
+			// Derived from the RECORDED violation, never asserted. This read-back path hardcoded `true`, so every
+			// reader — the UI, any caller of loadPwaFloor — saw independence certified regardless of what actually
+			// happened, while the run-path (runPwaFloor) carried the real value and dropped it at persistence. The
+			// composer now persists an INDEPENDENCE_VIOLATION observation (§8.12), so its absence is a real signal.
+			independenceOk: !obs.some((o) => o.code === 'INDEPENDENCE_VIOLATION'),
+			observations: obs
 		});
 	}
 	const satisfied = order.every((p) => latest.get(p)?.state.assessmentState === 'SATISFIED');

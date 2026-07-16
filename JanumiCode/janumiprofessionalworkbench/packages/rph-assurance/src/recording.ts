@@ -77,6 +77,20 @@ export function assuranceRecordingPlan(
 			severity: o.severity,
 			statement: o.statement
 		}));
+		// A required-but-failed independence check must leave a DURABLE, inspectable observation, not only the
+		// transient `independenceOk` flag. Persistence records observations, never the flag (recordAssuranceRecordingPlan),
+		// so without this the violation would vanish at the boundary and the read-back would report independence as
+		// satisfied. §8.12: "If required independence is missing, the Assessment cannot be satisfied; record an
+		// independence violation." (This is why an Assessment could never reach a durable INDEPENDENCE_VIOLATION.)
+		if (!po.independenceOk) {
+			observations.push({
+				code: 'INDEPENDENCE_VIOLATION',
+				severity: 'BLOCKING',
+				statement:
+					po.boundaryReason ??
+					'The Reasoning Review evaluator is not independent of the producer (§8.4, §8.12).'
+			});
+		}
 		assessments.push({
 			policyId: po.policyId,
 			policyVersion: r?.policyVersion ?? '1',

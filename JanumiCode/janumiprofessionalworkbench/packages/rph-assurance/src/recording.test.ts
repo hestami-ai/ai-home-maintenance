@@ -141,6 +141,14 @@ describe('assuranceRecordingPlan — floor run → canonical per-policy recordin
 		expect(review.disposition).toBe('INCONCLUSIVE');
 		expect(review.independenceOk).toBe(false);
 		expect(plan.gatePermitsTransition).toBe(false);
+		// The violation must be a DURABLE OBSERVATION, not only the transient independenceOk flag: the recorder
+		// persists observations, never the flag, so without this the violation vanishes at persistence and the
+		// read-back fabricates independenceOk:true (§8.12 "record an independence violation"; finding 46 — an
+		// Assessment can otherwise never reach a durable INDEPENDENCE_VIOLATION).
+		expect(review.observations.map((o) => o.code)).toContain('INDEPENDENCE_VIOLATION');
+		expect(review.observations.find((o) => o.code === 'INDEPENDENCE_VIOLATION')?.severity).toBe(
+			'BLOCKING'
+		);
 	});
 
 	it('a non-AI subject records only the two deterministic policies', () => {
