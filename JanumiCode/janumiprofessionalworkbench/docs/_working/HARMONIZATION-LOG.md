@@ -860,6 +860,38 @@ passed / 2 render-timing flakes** (both pass on retry). Only red: the pre-existi
 
 ---
 
+## INCREMENT 8b — LANDED. Three guide corrections, including reverting my own over-reach.
+
+The two GUIDE_IS_WRONG findings plus my own self-manufactured blocker (C5). Edits to the Coding Agent Guide,
+which is itself proposed (§16 item 1) — the mandate permits updating it, and one of these corrects my own prior
+edit. No code changed; the guide is referenced by no build.
+
+1. **C5 — my §9.7 over-reach, reverted.** My `991c510` sentence said *"Each bounded try of a model/agent
+   invocation … **is its own Execution Attempt** and its own record."* DOC-002 §3.3 roots the Execution Attempt
+   in the Execution Aggregate (an Execution Plan), which PWA authoring has no. So declaring *every* model call an
+   Execution Attempt forced authoring into a structure the meaning authority doesn't put it in — and I then cited
+   that sentence to the sponsor as an item-23 blocker. Now: *"is its own record. On the execution plane that
+   record is an Execution Attempt bound to its Execution Plan; the Execution Aggregate owns attempts (DOC-002
+   §3.3). Where no Execution Plan exists—PWA authoring is the current example—the identical recording obligation
+   binds to the plane's own governed-stream record, not to an Execution Attempt."* The recording obligation stays
+   universal (the substance the sponsor wants); the Attempt *identity* is scoped to the execution plane. This
+   removes the manufactured blocker: on the execution plane DOC-009 §10.4 already defines `execution_attempts`
+   (my C2 correction), and on the authoring plane the target is the governed-stream record, not an Attempt.
+
+2. **#75 — the `UNDER REVIEW` enum typo.** §11.6 L1629 wrote `DRAFT → UNDER REVIEW → …` (space), while §9.4
+   mandates *"uppercase snake-case enums"* and the code's PWA machine uses `UNDER_REVIEW`. Fixed to `UNDER_REVIEW`.
+
+3. **#72 — Shape Engineering, ratified-vs-candidate.** §12 L2072 lumped bare "Shape Engineering" in with
+   JSDL/JEM/JSRP as *"candidate designs, not yet ratified,"* while §4.2–4.3 call it one of *"the six engineering
+   disciplines"* and §6.4 gives it a canonical persisted **Shape-integrity state** axis. Interpretive but
+   well-supported: the discipline is operative; only the *specific staged formalization and the JSDL/JEM/JSRP
+   encodings* are candidate. Rewrote L2072 to say exactly that, cross-referencing §4.2–4.3 and §6.4. Flagged as
+   the one interpretive edit here for sponsor review; C5 and #75 are a self-revert and a typo.
+
+Guide line count unchanged (2551) — all three are within-line edits.
+
+---
+
 ## PART 4 — Open questions genuinely for the sponsor
 
 *(kept deliberately short — under the 2026-07-15 mandate, a tension is work, not a question, unless it
