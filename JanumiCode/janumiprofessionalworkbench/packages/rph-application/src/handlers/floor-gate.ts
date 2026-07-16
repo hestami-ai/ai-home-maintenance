@@ -94,23 +94,81 @@ function latestFloorDispositions(ctx: HandlerContext, subjectId: string): Map<st
 	return latest;
 }
 
-/** True iff an EFFECTIVE WAIVER Decision (governance) covers `subjectId` — a recorded, auditable human override that
- *  lets a non-SATISFIED floor proceed (guide §8: a Governance Decision, not the Validator, grants authority). */
-export function hasEffectiveFloorWaiver(ctx: HandlerContext, subjectId: string): boolean {
+/**
+ * Every EFFECTIVE WAIVER Decision naming `subjectId`. Deliberately NOT a Boolean: §16 item 12's safe default is
+ * "Never implement waiver as a Boolean—require a version-bound Decision with scope, expiry, rationale, controls,
+ * and preserved finding." Callers must decide per policy, and must be able to see WHY a waiver was insufficient.
+ */
+export function effectiveFloorWaivers(
+	ctx: HandlerContext,
+	subjectId: string
+): { readonly decisionId: string; readonly subjectSemanticVersions: Record<string, number> }[] {
 	const ids = new Set<string>();
 	for (const e of ctx.store.readAllEvents())
 		if (e.aggregateType === 'DECISION') ids.add(e.aggregateId);
+	const out: { decisionId: string; subjectSemanticVersions: Record<string, number> }[] = [];
 	for (const id of ids) {
 		const s = ctx.store.loadObject(id)?.state as
-			{ decisionType?: string; status?: string; subjectObjectIds?: string[] } | undefined;
+			| {
+					decisionType?: string;
+					status?: string;
+					subjectObjectIds?: string[];
+					subjectSemanticVersions?: Record<string, number>;
+			  }
+			| undefined;
 		if (
 			s?.decisionType === 'WAIVER' &&
 			s.status === 'EFFECTIVE' &&
 			Array.isArray(s.subjectObjectIds) &&
 			s.subjectObjectIds.includes(subjectId)
 		)
-			return true;
+			out.push({ decisionId: id, subjectSemanticVersions: s.subjectSemanticVersions ?? {} });
 	}
+	return out;
+}
+
+/**
+ * Does an EFFECTIVE waiver discharge floor policy `policyId` over this subject/version?
+ *
+ * **It cannot, today, for any waiver — and that is deliberate. BLOCKED ON §16 item 12.**
+ *
+ * §8.15 L1101 and DOC-004 §12.2 (the ratified authority) both require a waiver to record "exact policy and
+ * criterion; exact object and semantic version; finding being waived; authority; rationale; duration or
+ * expiration; compensating controls; downstream impact; review conditions." `rph-domain`'s `waiverCovers`
+ * implements exactly that scoping — a waiver discharges ONLY its (criterion, object, version) triple — and is
+ * called by nothing.
+ *
+ * It cannot be called here, because the criterion has NO WIRE HOME:
+ *   - `DecisionObjectSchema` is a strictObject with no criterion/policy/expiry field;
+ *   - `RequestWaiverPayload.scope` IS collected — and `requestWaiver` silently drops it, because the Decision
+ *     could not hold it even if it tried;
+ *   - RPH-DOC-007 mentions "waiver" twice in the whole document: `waiverRules: WaiverRule[]` (the policy-side
+ *     rule) and the `'WAIVER'` DecisionType enum value. It defines no waiver instance shape. DOC-009 has no
+ *     waivers table;
+ *   - the vocab's own citation for `scope` is `"sourceSection": "DOC-002 §34.2 (requestWaiver)"`, and DOC-002
+ *     §34.2 is a bare LIST OF COMMAND NAMES. The field was authored, and the citation points at a name.
+ *
+ * §16 item 12 states this precisely — "waiver lacks a complete instance/wire/storage contract" — and §0.3 is
+ * unambiguous about what an agent may do here: "It must not choose a convenient interpretation and encode it
+ * as architecture." Designing the criterion binding IS that choice, so it is not made here.
+ *
+ * What was here instead: any EFFECTIVE waiver naming the subject discharged the ENTIRE floor — including the
+ * Reasoning Review that §8.4 L854 says a governance Decision must scope, not blanket. A waiver granted for
+ * "naming-convention style guide deviation" silently discharged an AI transformation's mandatory independent
+ * review. That is the Boolean item 12 forbids by name, and it is a CRITICAL defect, so it does not stay while
+ * the contract is decided.
+ *
+ * Fail closed, per §13.3 L2227 ("Fail closed on missing identity, tenant, policy, schema, or authority
+ * context") and §16 item 23's parallel default ("otherwise keep the PWA Draft or output provisional and block
+ * the transition"). This is REVERSIBLE and one line: when item 12 lands a criterion binding, map the Decision
+ * to a `WaiverView` and call `waiverCovers` + `waiverStillDischarges`. The kernel is already written.
+ */
+function waiverDischargesFloorPolicy(
+	_ctx: HandlerContext,
+	_subjectId: string,
+	_policyId: string,
+	_subjectVersion: number | undefined
+): boolean {
 	return false;
 }
 
@@ -122,9 +180,14 @@ export interface FloorBlock {
 /**
  * The de minimis floor decision for `subjectId` at a protected transition (guide §8.4 step 4). Returns null when the
  * transition is PERMITTED: the floor does not apply (not AI-produced AND never assessed), OR every required policy is
- * SATISFIED at the bound version, OR an EFFECTIVE governance waiver covers the subject. Otherwise returns the blocking
- * policies (a missing or non-SATISFIED required policy). When `subjectVersion` is provided, a floor recorded against a
- * DIFFERENT subject semanticVersion does NOT count — a stale floor cannot authorize a re-versioned subject.
+ * SATISFIED at the bound version, OR each non-SATISFIED policy is INDIVIDUALLY discharged by a waiver scoped to it.
+ * Otherwise returns the blocking policies (a missing or non-SATISFIED required policy). When `subjectVersion` is
+ * provided, a floor recorded against a DIFFERENT subject semanticVersion does NOT count — a stale floor cannot
+ * authorize a re-versioned subject.
+ *
+ * The waiver decision is PER POLICY, never one bypass for the whole floor: §8.15 L1101 requires a waiver to record
+ * "the exact policy, criterion, finding, object and semantic version", so one waiver discharging everything is not a
+ * broad waiver — it is an unscoped one. See `waiverDischargesFloorPolicy` (currently fail-closed, blocked on item 12).
  */
 export function floorGateBlock(
 	ctx: HandlerContext,
@@ -137,8 +200,8 @@ export function floorGateBlock(
 		const rec = latest.get(policyId);
 		const versionOk = opts.subjectVersion === undefined || rec?.version === opts.subjectVersion;
 		return { policyId, disposition: rec && versionOk ? rec.disposition : 'MISSING' };
-	}).filter((r) => r.disposition !== 'SATISFIED');
-	if (blocking.length === 0) return null;
-	if (hasEffectiveFloorWaiver(ctx, subjectId)) return null;
-	return blocking;
+	})
+		.filter((r) => r.disposition !== 'SATISFIED')
+		.filter((r) => !waiverDischargesFloorPolicy(ctx, subjectId, r.policyId, opts.subjectVersion));
+	return blocking.length === 0 ? null : blocking;
 }

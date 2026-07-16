@@ -219,7 +219,7 @@ describe('ExecutionStep + RuntimeBinding handlers (live)', () => {
 		).toBe('AUTHORIZED');
 	});
 
-	it('a recorded non-SATISFIED floor over the step output blocks completion until waived (§8.4, INV-5)', () => {
+	it('a recorded non-SATISFIED floor over the step output blocks completion (§8.4, INV-5)', () => {
 		dispatch('StartExecutionStep', { stepId: STEP }, PLAN, 'EXECUTION_PLAN');
 		expect(stepState()).toBe('RUNNING');
 
@@ -241,14 +241,44 @@ describe('ExecutionStep + RuntimeBinding handlers (live)', () => {
 		expect(blocked.status).toBe('REJECTED');
 		expect(blocked.error?.code).toBe('RPH_INVARIANT_VIOLATION');
 		expect(stepState()).toBe('RUNNING');
+		// Only the failed policy blocks; the two SATISFIED ones do not appear.
+		expect(blocked.error?.message).toContain('floor.reasoning-review=REJECTED');
+	});
 
-		// An EFFECTIVE governance waiver over the step's output lets it complete (auditable human override).
+	/**
+	 * BLOCKED ON §16 item 12 — a real capability, deliberately unreachable, NOT a deleted assertion.
+	 *
+	 * §8.15 permits a governance waiver over the floor; the floor is not among the four things §8.4 L854 says
+	 * may never suppress Reasoning Review. So this test's EXPECTATION is legitimate. What is missing is the
+	 * contract: §8.15 L1101 / DOC-004 §12.2 require a waiver to record "the exact policy, criterion, finding,
+	 * object and semantic version", and the Decision object has no criterion field, DOC-007 defines no waiver
+	 * instance shape, and the vocab's citation for `scope` points at DOC-002 §34.2 — a bare list of command
+	 * names. §16 item 12 names it exactly: "waiver lacks a complete instance/wire/storage contract."
+	 *
+	 * Until then the gate fails closed, because the alternative was the Boolean item 12 forbids by name: this
+	 * very waiver — scoped in its own payload to "de minimis assurance floor" — used to discharge a REJECTED
+	 * independent Reasoning Review. Un-skip when item 12 lands a criterion binding; `waiverCovers` and
+	 * `waiverStillDischarges` (rph-domain) are already written and already unit-proven.
+	 */
+	it.skip('an EFFECTIVE waiver scoped to the floor lets a blocked step complete (§8.15; needs §16 item 12)', () => {
+		dispatch('StartExecutionStep', { stepId: STEP }, PLAN, 'EXECUTION_PLAN');
+		recordFloor({ ...SATISFIED_FLOOR, 'floor.reasoning-review': 'REJECTED' });
+		const complete = {
+			executionStepId: STEP,
+			executionAttemptId: 'attempt_01ARZ3NDEKTSV4RRFFQ69G5FF0',
+			resultStatus: 'SUCCEEDED',
+			outputArtifactIds: ['art_01ARZ3NDEKTSV4RRFFQ69G5FG0'],
+			proposedEvidenceIds: [],
+			detectedAssumptionIds: [],
+			structuredResult: {},
+			executionProvenance: {}
+		};
 		const WAIVER = 'dec_01ARZ3NDEKTSV4RRFFQ69G5FH0';
 		dispatch(
 			'RequestWaiver',
 			{
 				subjectObjectIds: [STEP],
-				scope: 'de minimis assurance floor',
+				scope: 'floor.reasoning-review',
 				rationale: 'Accepted residual risk.',
 				duration: 'until superseded',
 				affectedObjectIds: [STEP]

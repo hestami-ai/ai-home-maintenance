@@ -584,7 +584,21 @@ describe('PublishPwa protected-transition gate — the de minimis assurance floo
 		expect(pub()).toBe('VALIDATED');
 	});
 
-	it('an EFFECTIVE governance waiver lets a non-SATISFIED floor publish', () => {
+	/**
+	 * BLOCKED ON §16 item 12 — the authoring-plane twin of the execution-plane case in execution-detail.test.ts.
+	 *
+	 * This test is the CRITICAL defect in its purest form: a waiver whose own payload scope reads "de minimis
+	 * assurance floor" discharges a REJECTED independent Reasoning Review. §8.15 L1101 / DOC-004 §12.2 require a
+	 * waiver to record "the exact policy, criterion, finding, object and semantic version"; the Decision object has
+	 * no criterion field and DOC-007 defines no waiver instance shape, so nothing distinguishes this waiver from
+	 * one granted for a typo. §16 item 12: "waiver lacks a complete instance/wire/storage contract" — and its safe
+	 * default forbids exactly what made this pass: "Never implement waiver as a Boolean".
+	 *
+	 * The capability is legitimate (§8.15 permits waiving the floor) and returns the moment item 12 lands a
+	 * criterion binding; `waiverCovers` + `waiverStillDischarges` are already written. Until then the gate fails
+	 * closed rather than honor an unscoped bypass.
+	 */
+	it.skip('an EFFECTIVE governance waiver scoped to the floor lets a non-SATISFIED floor publish (needs §16 item 12)', () => {
 		const HUMAN: ActorReference = { actorId: 'lead', actorType: 'HUMAN', displayName: 'Eng Lead' };
 		const WAIVER = 'dec_01ARZ3NDEKTSV4RRFFQ69G5R20';
 		authorValidatedAiPwa();

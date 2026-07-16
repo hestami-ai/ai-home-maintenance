@@ -409,6 +409,78 @@ one-active-plan (2) · baseline observations (1) · readiness (1).
 
 ---
 
+## INCREMENT 5 — LANDED. Burndown **11 → 9**. The one increment that removed a capability.
+
+**The defect (CRITICAL).** Any EFFECTIVE WAIVER Decision naming the subject discharged the **entire** floor,
+including the mandatory Reasoning Review. Two tests in the repo *asserted* this: a waiver whose own payload
+scope read `'de minimis assurance floor'` discharged a **REJECTED** independent review, on both planes.
+
+**Why the obvious fix was not available.** `waiverCovers` (rph-domain) already scopes a waiver to its exact
+(criterion, object, version) triple, is unit-proven, and is called by nothing — the familiar shape. But it
+**cannot be called**, because the criterion has no wire home. Chasing that down through the corpus, in order:
+
+1. `DecisionObjectSchema` is a `strictObject` with no criterion/policy/expiry field.
+2. `RequestWaiverPayload.scope` **is** collected — and `requestWaiver` silently drops it. It had to: the
+   Decision could not hold it.
+3. **RPH-DOC-007 mentions "waiver" twice in the entire document**: `waiverRules: WaiverRule[]` (the
+   *policy-side* rule) and the `'WAIVER'` DecisionType enum value. No instance shape. DOC-009 has no waivers
+   table.
+4. The vocab's own citation for `scope` is `"sourceSection": "DOC-002 §34.2 (requestWaiver)"`. **DOC-002 §34.2
+   is a bare list of command names** — `requestWaiver` / `grantWaiver` / `denyWaiver`. The five payload fields
+   were authored on top of it, and the citation points at a name in a list.
+
+That last one deserves its own line, because it generalizes: **a vocab `sourceSection` can cite a section that
+contains only the command's name.** The vocab *looks* ratified because it cites; the citation is to a name.
+This is the codebase's signature move (a weaker thing wearing the appearance of the real one) at the level of
+the contract's own provenance — and it is worth an audit of its own: how many of the vocab's `sourceSection`
+claims resolve to a field list, and how many to a name?
+
+**§16 item 12 is exactly right** — *"waiver lacks a complete instance/wire/storage contract"* — so designing
+the criterion binding is choosing an unresolved shape, and **§0.3 forbids it**: *"It must not choose a
+convenient interpretation and encode it as architecture."*
+
+### Tradeoff taken: fail closed, and remove a real capability
+
+- **Rejected: design the criterion binding.** §0.3 stop rule. Item 12 territory.
+- **Rejected: treat `scope` (free text) as a criterion id.** That is precisely "a convenient interpretation
+  encoded as architecture", on a field whose own citation is hollow.
+- **Rejected: leave it.** It is CRITICAL and it is the Boolean item 12 forbids **by name**.
+- **Taken: fail closed.** No waiver discharges any floor policy. Authority: item 12's safe default ("Never
+  implement waiver as a Boolean"), §13.3 L2227 ("Fail closed on missing … policy … context"), item 23's
+  parallel ("otherwise keep the PWA Draft or output provisional and block the transition").
+
+`hasEffectiveFloorWaiver` (Boolean) → `effectiveFloorWaivers` (list) + a **per-policy** decision, because
+§8.15 L1101 requires "the exact policy, criterion, …": one waiver discharging everything is not a *broad*
+waiver, it is an *unscoped* one. Reversal is one function body: map the Decision to a `WaiverView`, call
+`waiverCovers` + `waiverStillDischarges`. The kernel is written and waiting.
+
+**Honest note on shape:** `waiverDischargesFloorPolicy` currently `return false` — a constant, the very shape
+this program exists to remove. The difference is direction and disclosure: it fails **closed** with the full
+reasoning and the reversal recorded, where the disease fails **open** while asserting success. It is still a
+constant, and it should not survive item 12.
+
+### Two capability tests: skipped, not deleted
+
+`execution-detail.test.ts` and `pwa-authoring.test.ts` each asserted the waiver path. This is the case my
+Increment-2 rule does **not** cover — their **expectation**, not their fixture, is now unreachable. And the
+expectation is *legitimate*: §8.15 permits waiving the floor, and the floor is not among the four things §8.4
+L854 says may never suppress Reasoning Review. So they are `it.skip` with the full item-12 reasoning and an
+un-skip condition — **visible debt, not a vanished assertion**. The blocking halves stay green and one gained
+an assertion (only the failed policy appears in the block).
+
+**Rule extended:** a test's *expectation* may be suspended only when a ratified contract gap makes it
+unreachable, and only as a visible skip carrying the reason and the un-skip condition. It may never be
+deleted, and it may never be weakened into passing.
+
+### Gate
+
+`check-types` 21/21 · `lint` clean · full suite **473 passed, 9 wiring reds, 2 skipped**.
+
+**Remaining reds (9):** ValidatePwa (3) + stale floor (2) → Increment 6 · one-active-plan (2) · baseline
+observations (1) · readiness (1).
+
+---
+
 ## PART 4 — Open questions genuinely for the sponsor
 
 *(kept deliberately short — under the 2026-07-15 mandate, a tension is work, not a question, unless it
