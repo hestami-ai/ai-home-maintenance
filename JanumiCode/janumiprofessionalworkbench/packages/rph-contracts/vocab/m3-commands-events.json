@@ -648,7 +648,7 @@
       "drivesFrom": "(any)",
       "drivesTo": "(any)",
       "schematized": false,
-      "sourceSection": "DOC-007 §32 (no DOC-002 counterpart)",
+      "sourceSection": "UNRATIFIED-AUTHORED (annotated 2026-07-16 under sponsor grant): DOC-007 schematizes NO interface for this, so these fields were AUTHORED, not derived. The citation below NAMES this command/event but defines no fields (DOC-002 §26.x/§34.x are bare name lists; §16 item 6: DOC-007's first slice deliberately leaves the granular vocabulary unschematized). Do NOT treat this sourceSection as proof the shape is ratified. Ratification pending. Cited: DOC-007 §32 (no DOC-002 counterpart)",
       "payloadFields": [
         {
           "field": "previousState",
@@ -702,7 +702,7 @@
       "drivesFrom": "UNDER_REVIEW",
       "drivesTo": "APPROVED",
       "schematized": false,
-      "sourceSection": "DOC-007 §32/§33 (payload from DOC-002 §34.3)",
+      "sourceSection": "UNRATIFIED-AUTHORED (annotated 2026-07-16 under sponsor grant): DOC-007 schematizes NO interface for this, so these fields were AUTHORED, not derived. The citation below NAMES this command/event but defines no fields (DOC-002 §26.x/§34.x are bare name lists; §16 item 6: DOC-007's first slice deliberately leaves the granular vocabulary unschematized). Do NOT treat this sourceSection as proof the shape is ratified. Ratification pending. Cited: DOC-007 §32/§33 (payload from DOC-002 §34.3)",
       "payloadFields": [
         {
           "field": "approvalDecisionId",
@@ -720,7 +720,7 @@
       "drivesFrom": "READY|QUEUED",
       "drivesTo": "RUNNING",
       "schematized": false,
-      "sourceSection": "DOC-007 §32/§33 (payload from DOC-002 §34.3; DOC-007 from=PENDING)",
+      "sourceSection": "UNRATIFIED-AUTHORED (annotated 2026-07-16 under sponsor grant): DOC-007 schematizes NO interface for this, so these fields were AUTHORED, not derived. The citation below NAMES this command/event but defines no fields (DOC-002 §26.x/§34.x are bare name lists; §16 item 6: DOC-007's first slice deliberately leaves the granular vocabulary unschematized). Do NOT treat this sourceSection as proof the shape is ratified. Ratification pending. Cited: DOC-007 §32/§33 (payload from DOC-002 §34.3; DOC-007 from=PENDING)",
       "payloadFields": [
         {
           "field": "stepId",
@@ -738,7 +738,7 @@
       "drivesFrom": "RUNNING",
       "drivesTo": "FAILED",
       "schematized": false,
-      "sourceSection": "DOC-007 §32/§33 (payload from DOC-002 §34.3)",
+      "sourceSection": "UNRATIFIED-AUTHORED (annotated 2026-07-16 under sponsor grant): DOC-007 schematizes NO interface for this, so these fields were AUTHORED, not derived. The citation below NAMES this command/event but defines no fields (DOC-002 §26.x/§34.x are bare name lists; §16 item 6: DOC-007's first slice deliberately leaves the granular vocabulary unschematized). Do NOT treat this sourceSection as proof the shape is ratified. Ratification pending. Cited: DOC-007 §32/§33 (payload from DOC-002 §34.3)",
       "payloadFields": [
         {
           "field": "stepId",
@@ -768,7 +768,7 @@
       "drivesFrom": "(initial)",
       "drivesTo": "PROPOSED",
       "schematized": false,
-      "sourceSection": "DOC-007 §32 (drivesTo=DISCLOSED in DOC-007; DOC-002 §26.3 uses PROPOSED)",
+      "sourceSection": "UNRATIFIED-AUTHORED (annotated 2026-07-16 under sponsor grant): DOC-007 schematizes NO interface for this, so these fields were AUTHORED, not derived. The citation below NAMES this command/event but defines no fields (DOC-002 §26.x/§34.x are bare name lists; §16 item 6: DOC-007's first slice deliberately leaves the granular vocabulary unschematized). Do NOT treat this sourceSection as proof the shape is ratified. Ratification pending. Cited: DOC-007 §32 (drivesTo=DISCLOSED in DOC-007; DOC-002 §26.3 uses PROPOSED)",
       "payloadFields": [
         {
           "field": "assumptionId",
@@ -827,7 +827,7 @@
       "drivesFrom": "(initial)",
       "drivesTo": "OPEN",
       "schematized": false,
-      "sourceSection": "DOC-007 §32 (payload from DOC-002 §34.2)",
+      "sourceSection": "UNRATIFIED-AUTHORED (annotated 2026-07-16 under sponsor grant): DOC-007 schematizes NO interface for this, so these fields were AUTHORED, not derived. The citation below NAMES this command/event but defines no fields (DOC-002 §26.x/§34.x are bare name lists; §16 item 6: DOC-007's first slice deliberately leaves the granular vocabulary unschematized). Do NOT treat this sourceSection as proof the shape is ratified. Ratification pending. Cited: DOC-007 §32 (payload from DOC-002 §34.2)",
       "payloadFields": [
         {
           "field": "statement",
@@ -868,7 +868,7 @@
       "drivesFrom": "(initial)",
       "drivesTo": "OPEN",
       "schematized": false,
-      "sourceSection": "DOC-007 §32 (payload from DOC-002 §34.2; DOC-002 targetAggregate=AssuranceAssessment)",
+      "sourceSection": "UNRATIFIED-AUTHORED (annotated 2026-07-16 under sponsor grant): DOC-007 schematizes NO interface for this, so these fields were AUTHORED, not derived. The citation below NAMES this command/event but defines no fields (DOC-002 §26.x/§34.x are bare name lists; §16 item 6: DOC-007's first slice deliberately leaves the granular vocabulary unschematized). Do NOT treat this sourceSection as proof the shape is ratified. Ratification pending. Cited: DOC-007 §32 (payload from DOC-002 §34.2; DOC-002 targetAggregate=AssuranceAssessment)",
       "payloadFields": [
         {
           "field": "assessmentId",
@@ -915,7 +915,7 @@
       "drivesFrom": "(initial)",
       "drivesTo": "PROPOSED",
       "schematized": false,
-      "sourceSection": "DOC-007 §32/§33 (payload from DOC-002 §34.4)",
+      "sourceSection": "UNRATIFIED-AUTHORED (annotated 2026-07-16 under sponsor grant): DOC-007 schematizes NO interface for this, so these fields were AUTHORED, not derived. The citation below NAMES this command/event but defines no fields (DOC-002 §26.x/§34.x are bare name lists; §16 item 6: DOC-007's first slice deliberately leaves the granular vocabulary unschematized). Do NOT treat this sourceSection as proof the shape is ratified. Ratification pending. Cited: DOC-007 §32/§33 (payload from DOC-002 §34.4)",
       "payloadFields": [
         {
           "field": "decisionType",
@@ -972,7 +972,7 @@
       "drivesFrom": "(initial)",
       "drivesTo": "DRAFT",
       "schematized": false,
-      "sourceSection": "DOC-007 §32/§33 (no createBaseline in DOC-002 §34; event DOC-002 §26.6)",
+      "sourceSection": "UNRATIFIED-AUTHORED (annotated 2026-07-16 under sponsor grant): DOC-007 schematizes NO interface for this, so these fields were AUTHORED, not derived. The citation below NAMES this command/event but defines no fields (DOC-002 §26.x/§34.x are bare name lists; §16 item 6: DOC-007's first slice deliberately leaves the granular vocabulary unschematized). Do NOT treat this sourceSection as proof the shape is ratified. Ratification pending. Cited: DOC-007 §32/§33 (no createBaseline in DOC-002 §34; event DOC-002 §26.6)",
       "payloadFields": [
         {
           "field": "baselineType",
@@ -1003,7 +1003,7 @@
       "drivesFrom": "APPROVED",
       "drivesTo": "REVISED",
       "schematized": false,
-      "sourceSection": "DOC-002 §34.1 (reviseIntent)",
+      "sourceSection": "UNRATIFIED-AUTHORED (annotated 2026-07-16 under sponsor grant): DOC-007 schematizes NO interface for this, so these fields were AUTHORED, not derived. The citation below NAMES this command/event but defines no fields (DOC-002 §26.x/§34.x are bare name lists; §16 item 6: DOC-007's first slice deliberately leaves the granular vocabulary unschematized). Do NOT treat this sourceSection as proof the shape is ratified. Ratification pending. Cited: DOC-002 §34.1 (reviseIntent)",
       "payloadFields": [
         {
           "field": "changeRationale",
@@ -1026,7 +1026,7 @@
       "drivesFrom": "READY",
       "drivesTo": "CHALLENGED",
       "schematized": false,
-      "sourceSection": "DOC-002 §34.1 (challengePwu)",
+      "sourceSection": "UNRATIFIED-AUTHORED (annotated 2026-07-16 under sponsor grant): DOC-007 schematizes NO interface for this, so these fields were AUTHORED, not derived. The citation below NAMES this command/event but defines no fields (DOC-002 §26.x/§34.x are bare name lists; §16 item 6: DOC-007's first slice deliberately leaves the granular vocabulary unschematized). Do NOT treat this sourceSection as proof the shape is ratified. Ratification pending. Cited: DOC-002 §34.1 (challengePwu)",
       "payloadFields": [
         {
           "field": "challengeReason",
@@ -1049,7 +1049,7 @@
       "drivesFrom": "EXECUTING",
       "drivesTo": "RESHAPING",
       "schematized": false,
-      "sourceSection": "DOC-002 §34.1 (reshapePwu)",
+      "sourceSection": "UNRATIFIED-AUTHORED (annotated 2026-07-16 under sponsor grant): DOC-007 schematizes NO interface for this, so these fields were AUTHORED, not derived. The citation below NAMES this command/event but defines no fields (DOC-002 §26.x/§34.x are bare name lists; §16 item 6: DOC-007's first slice deliberately leaves the granular vocabulary unschematized). Do NOT treat this sourceSection as proof the shape is ratified. Ratification pending. Cited: DOC-002 §34.1 (reshapePwu)",
       "payloadFields": [
         {
           "field": "reason",
@@ -1072,7 +1072,7 @@
       "drivesFrom": "SATISFIED|CONDITIONALLY_SATISFIED|RECOMPOSED",
       "drivesTo": "INVALIDATED",
       "schematized": false,
-      "sourceSection": "DOC-002 §34.1 (invalidatePwu)",
+      "sourceSection": "UNRATIFIED-AUTHORED (annotated 2026-07-16 under sponsor grant): DOC-007 schematizes NO interface for this, so these fields were AUTHORED, not derived. The citation below NAMES this command/event but defines no fields (DOC-002 §26.x/§34.x are bare name lists; §16 item 6: DOC-007's first slice deliberately leaves the granular vocabulary unschematized). Do NOT treat this sourceSection as proof the shape is ratified. Ratification pending. Cited: DOC-002 §34.1 (invalidatePwu)",
       "payloadFields": [
         {
           "field": "invalidationReason",
@@ -1095,7 +1095,7 @@
       "drivesFrom": "(any non-baselined)",
       "drivesTo": "SUPERSEDED",
       "schematized": false,
-      "sourceSection": "DOC-002 §34.1 (supersedePwu)",
+      "sourceSection": "UNRATIFIED-AUTHORED (annotated 2026-07-16 under sponsor grant): DOC-007 schematizes NO interface for this, so these fields were AUTHORED, not derived. The citation below NAMES this command/event but defines no fields (DOC-002 §26.x/§34.x are bare name lists; §16 item 6: DOC-007's first slice deliberately leaves the granular vocabulary unschematized). Do NOT treat this sourceSection as proof the shape is ratified. Ratification pending. Cited: DOC-002 §34.1 (supersedePwu)",
       "payloadFields": [
         {
           "field": "supersedingWorkUnitId",
@@ -1113,7 +1113,7 @@
       "drivesFrom": "(initial)",
       "drivesTo": "DRAFT",
       "schematized": false,
-      "sourceSection": "DOC-002 §34.1 (proposeDecomposition)",
+      "sourceSection": "UNRATIFIED-AUTHORED (annotated 2026-07-16 under sponsor grant): DOC-007 schematizes NO interface for this, so these fields were AUTHORED, not derived. The citation below NAMES this command/event but defines no fields (DOC-002 §26.x/§34.x are bare name lists; §16 item 6: DOC-007's first slice deliberately leaves the granular vocabulary unschematized). Do NOT treat this sourceSection as proof the shape is ratified. Ratification pending. Cited: DOC-002 §34.1 (proposeDecomposition)",
       "payloadFields": [
         {
           "field": "parentWorkUnitId",
@@ -1190,7 +1190,7 @@
       "drivesFrom": "UNDER_REVIEW",
       "drivesTo": "VALID | CONDITIONALLY_VALID",
       "schematized": false,
-      "sourceSection": "DOC-002 §34.1 (validateDecomposition)",
+      "sourceSection": "UNRATIFIED-AUTHORED (annotated 2026-07-16 under sponsor grant): DOC-007 schematizes NO interface for this, so these fields were AUTHORED, not derived. The citation below NAMES this command/event but defines no fields (DOC-002 §26.x/§34.x are bare name lists; §16 item 6: DOC-007's first slice deliberately leaves the granular vocabulary unschematized). Do NOT treat this sourceSection as proof the shape is ratified. Ratification pending. Cited: DOC-002 §34.1 (validateDecomposition)",
       "payloadFields": [
         {
           "field": "disposition",
@@ -1220,7 +1220,7 @@
       "drivesFrom": "(prior)",
       "drivesTo": "SUPERSEDED",
       "schematized": false,
-      "sourceSection": "DOC-002 §34.1 (reviseDecomposition)",
+      "sourceSection": "UNRATIFIED-AUTHORED (annotated 2026-07-16 under sponsor grant): DOC-007 schematizes NO interface for this, so these fields were AUTHORED, not derived. The citation below NAMES this command/event but defines no fields (DOC-002 §26.x/§34.x are bare name lists; §16 item 6: DOC-007's first slice deliberately leaves the granular vocabulary unschematized). Do NOT treat this sourceSection as proof the shape is ratified. Ratification pending. Cited: DOC-002 §34.1 (reviseDecomposition)",
       "payloadFields": [
         {
           "field": "rationale",
@@ -1256,7 +1256,7 @@
       "drivesFrom": "SATISFIED",
       "drivesTo": "RECOMPOSING",
       "schematized": false,
-      "sourceSection": "DOC-002 §34.1 (beginRecomposition)",
+      "sourceSection": "UNRATIFIED-AUTHORED (annotated 2026-07-16 under sponsor grant): DOC-007 schematizes NO interface for this, so these fields were AUTHORED, not derived. The citation below NAMES this command/event but defines no fields (DOC-002 §26.x/§34.x are bare name lists; §16 item 6: DOC-007's first slice deliberately leaves the granular vocabulary unschematized). Do NOT treat this sourceSection as proof the shape is ratified. Ratification pending. Cited: DOC-002 §34.1 (beginRecomposition)",
       "payloadFields": [
         {
           "field": "recompositionContractId",
@@ -1274,7 +1274,7 @@
       "drivesFrom": "RECOMPOSING",
       "drivesTo": "RECOMPOSED",
       "schematized": false,
-      "sourceSection": "DOC-002 §34.1 (completeRecomposition)",
+      "sourceSection": "UNRATIFIED-AUTHORED (annotated 2026-07-16 under sponsor grant): DOC-007 schematizes NO interface for this, so these fields were AUTHORED, not derived. The citation below NAMES this command/event but defines no fields (DOC-002 §26.x/§34.x are bare name lists; §16 item 6: DOC-007's first slice deliberately leaves the granular vocabulary unschematized). Do NOT treat this sourceSection as proof the shape is ratified. Ratification pending. Cited: DOC-002 §34.1 (completeRecomposition)",
       "payloadFields": [
         {
           "field": "parentCompletionClaimId",
@@ -1292,7 +1292,7 @@
       "drivesFrom": "ADMISSIBLE",
       "drivesTo": "INVALIDATED",
       "schematized": false,
-      "sourceSection": "DOC-002 §34.2 (invalidateEvidence)",
+      "sourceSection": "UNRATIFIED-AUTHORED (annotated 2026-07-16 under sponsor grant): DOC-007 schematizes NO interface for this, so these fields were AUTHORED, not derived. The citation below NAMES this command/event but defines no fields (DOC-002 §26.x/§34.x are bare name lists; §16 item 6: DOC-007's first slice deliberately leaves the granular vocabulary unschematized). Do NOT treat this sourceSection as proof the shape is ratified. Ratification pending. Cited: DOC-002 §34.2 (invalidateEvidence)",
       "payloadFields": [
         {
           "field": "invalidationReason",
@@ -1390,7 +1390,7 @@
       "drivesFrom": "PROPOSED",
       "drivesTo": "EFFECTIVE",
       "schematized": false,
-      "sourceSection": "DOC-002 §34.2 (grantWaiver)",
+      "sourceSection": "UNRATIFIED-AUTHORED (annotated 2026-07-16 under sponsor grant): DOC-007 schematizes NO interface for this, so these fields were AUTHORED, not derived. The citation below NAMES this command/event but defines no fields (DOC-002 §26.x/§34.x are bare name lists; §16 item 6: DOC-007's first slice deliberately leaves the granular vocabulary unschematized). Do NOT treat this sourceSection as proof the shape is ratified. Ratification pending. Cited: DOC-002 §34.2 (grantWaiver)",
       "payloadFields": [
         {
           "field": "waiverDecisionId",
@@ -1418,7 +1418,7 @@
       "drivesFrom": "PROPOSED",
       "drivesTo": "(denied — no status value; §23.1 gap)",
       "schematized": false,
-      "sourceSection": "DOC-002 §34.2 (denyWaiver)",
+      "sourceSection": "UNRATIFIED-AUTHORED (annotated 2026-07-16 under sponsor grant): DOC-007 schematizes NO interface for this, so these fields were AUTHORED, not derived. The citation below NAMES this command/event but defines no fields (DOC-002 §26.x/§34.x are bare name lists; §16 item 6: DOC-007's first slice deliberately leaves the granular vocabulary unschematized). Do NOT treat this sourceSection as proof the shape is ratified. Ratification pending. Cited: DOC-002 §34.2 (denyWaiver)",
       "payloadFields": [
         {
           "field": "rationale",
@@ -1435,7 +1435,7 @@
       "drivesFrom": "FAILED",
       "drivesTo": "QUEUED",
       "schematized": false,
-      "sourceSection": "DOC-002 §34.3 (retryExecutionStep)",
+      "sourceSection": "UNRATIFIED-AUTHORED (annotated 2026-07-16 under sponsor grant): DOC-007 schematizes NO interface for this, so these fields were AUTHORED, not derived. The citation below NAMES this command/event but defines no fields (DOC-002 §26.x/§34.x are bare name lists; §16 item 6: DOC-007's first slice deliberately leaves the granular vocabulary unschematized). Do NOT treat this sourceSection as proof the shape is ratified. Ratification pending. Cited: DOC-002 §34.3 (retryExecutionStep)",
       "payloadFields": [
         {
           "field": "stepId",
@@ -1459,7 +1459,7 @@
       "drivesFrom": "ACTIVE",
       "drivesTo": "ACTIVE",
       "schematized": false,
-      "sourceSection": "DOC-002 §34.3 (applyTacticalChange)",
+      "sourceSection": "UNRATIFIED-AUTHORED (annotated 2026-07-16 under sponsor grant): DOC-007 schematizes NO interface for this, so these fields were AUTHORED, not derived. The citation below NAMES this command/event but defines no fields (DOC-002 §26.x/§34.x are bare name lists; §16 item 6: DOC-007's first slice deliberately leaves the granular vocabulary unschematized). Do NOT treat this sourceSection as proof the shape is ratified. Ratification pending. Cited: DOC-002 §34.3 (applyTacticalChange)",
       "payloadFields": [
         {
           "field": "stepId",
@@ -1493,7 +1493,7 @@
       "drivesFrom": "ACTIVE",
       "drivesTo": "CANCELLED",
       "schematized": false,
-      "sourceSection": "DOC-002 §34.3 (cancelExecutionPlan)",
+      "sourceSection": "UNRATIFIED-AUTHORED (annotated 2026-07-16 under sponsor grant): DOC-007 schematizes NO interface for this, so these fields were AUTHORED, not derived. The citation below NAMES this command/event but defines no fields (DOC-002 §26.x/§34.x are bare name lists; §16 item 6: DOC-007's first slice deliberately leaves the granular vocabulary unschematized). Do NOT treat this sourceSection as proof the shape is ratified. Ratification pending. Cited: DOC-002 §34.3 (cancelExecutionPlan)",
       "payloadFields": [
         {
           "field": "reason",
@@ -1511,7 +1511,7 @@
       "drivesFrom": "EFFECTIVE",
       "drivesTo": "REVOKED",
       "schematized": false,
-      "sourceSection": "DOC-002 §34.4 (revokeDecision)",
+      "sourceSection": "UNRATIFIED-AUTHORED (annotated 2026-07-16 under sponsor grant): DOC-007 schematizes NO interface for this, so these fields were AUTHORED, not derived. The citation below NAMES this command/event but defines no fields (DOC-002 §26.x/§34.x are bare name lists; §16 item 6: DOC-007's first slice deliberately leaves the granular vocabulary unschematized). Do NOT treat this sourceSection as proof the shape is ratified. Ratification pending. Cited: DOC-002 §34.4 (revokeDecision)",
       "payloadFields": [
         {
           "field": "revocationRationale",
@@ -1529,7 +1529,7 @@
       "drivesFrom": "AUTHORITATIVE",
       "drivesTo": "SUPERSEDED",
       "schematized": false,
-      "sourceSection": "DOC-002 §34.4 (supersedeBaseline)",
+      "sourceSection": "UNRATIFIED-AUTHORED (annotated 2026-07-16 under sponsor grant): DOC-007 schematizes NO interface for this, so these fields were AUTHORED, not derived. The citation below NAMES this command/event but defines no fields (DOC-002 §26.x/§34.x are bare name lists; §16 item 6: DOC-007's first slice deliberately leaves the granular vocabulary unschematized). Do NOT treat this sourceSection as proof the shape is ratified. Ratification pending. Cited: DOC-002 §34.4 (supersedeBaseline)",
       "payloadFields": [
         {
           "field": "supersedingBaselineId",
@@ -1558,7 +1558,7 @@
       "drivesFrom": "UNDER_DISCOVERY",
       "drivesTo": "PROVISIONAL",
       "schematized": false,
-      "sourceSection": "DOC-002 §6.1 (create provisional intent); event IntentProvisioned added (no §26.2 name) — see OPEN-QUESTIONS",
+      "sourceSection": "UNRATIFIED-AUTHORED (annotated 2026-07-16 under sponsor grant): DOC-007 schematizes NO interface for this, so these fields were AUTHORED, not derived. The citation below NAMES this command/event but defines no fields (DOC-002 §26.x/§34.x are bare name lists; §16 item 6: DOC-007's first slice deliberately leaves the granular vocabulary unschematized). Do NOT treat this sourceSection as proof the shape is ratified. Ratification pending. Cited: DOC-002 §6.1 (create provisional intent); event IntentProvisioned added (no §26.2 name) — see OPEN-QUESTIONS",
       "payloadFields": [
         {
           "field": "ambiguityIds",
@@ -1587,7 +1587,7 @@
       "drivesFrom": "UNDER_REVIEW",
       "drivesTo": "APPROVED",
       "schematized": false,
-      "sourceSection": "DOC-002 §24.1 (event exists §26.6); command added for live command-drive",
+      "sourceSection": "UNRATIFIED-AUTHORED (annotated 2026-07-16 under sponsor grant): DOC-007 schematizes NO interface for this, so these fields were AUTHORED, not derived. The citation below NAMES this command/event but defines no fields (DOC-002 §26.x/§34.x are bare name lists; §16 item 6: DOC-007's first slice deliberately leaves the granular vocabulary unschematized). Do NOT treat this sourceSection as proof the shape is ratified. Ratification pending. Cited: DOC-002 §24.1 (event exists §26.6); command added for live command-drive",
       "payloadFields": [
         {
           "field": "approvalDecisionId",
@@ -1605,7 +1605,7 @@
       "drivesFrom": "(initial)",
       "drivesTo": "REQUESTED",
       "schematized": false,
-      "sourceSection": "DOC-002 §22 (event §26.4); command added for live command-drive",
+      "sourceSection": "UNRATIFIED-AUTHORED (annotated 2026-07-16 under sponsor grant): DOC-007 schematizes NO interface for this, so these fields were AUTHORED, not derived. The citation below NAMES this command/event but defines no fields (DOC-002 §26.x/§34.x are bare name lists; §16 item 6: DOC-007's first slice deliberately leaves the granular vocabulary unschematized). Do NOT treat this sourceSection as proof the shape is ratified. Ratification pending. Cited: DOC-002 §22 (event §26.4); command added for live command-drive",
       "payloadFields": [
         {
           "field": "runtimeBindingId",
@@ -1640,7 +1640,7 @@
       "drivesFrom": "REQUESTED",
       "drivesTo": "AUTHORIZED",
       "schematized": false,
-      "sourceSection": "DOC-002 §22 (event §26.4)",
+      "sourceSection": "UNRATIFIED-AUTHORED (annotated 2026-07-16 under sponsor grant): DOC-007 schematizes NO interface for this, so these fields were AUTHORED, not derived. The citation below NAMES this command/event but defines no fields (DOC-002 §26.x/§34.x are bare name lists; §16 item 6: DOC-007's first slice deliberately leaves the granular vocabulary unschematized). Do NOT treat this sourceSection as proof the shape is ratified. Ratification pending. Cited: DOC-002 §22 (event §26.4)",
       "payloadFields": [
         {
           "field": "grantedCapabilities",
@@ -1658,7 +1658,7 @@
       "drivesFrom": "REQUESTED",
       "drivesTo": "DENIED",
       "schematized": false,
-      "sourceSection": "DOC-002 §22 (event §26.4)",
+      "sourceSection": "UNRATIFIED-AUTHORED (annotated 2026-07-16 under sponsor grant): DOC-007 schematizes NO interface for this, so these fields were AUTHORED, not derived. The citation below NAMES this command/event but defines no fields (DOC-002 §26.x/§34.x are bare name lists; §16 item 6: DOC-007's first slice deliberately leaves the granular vocabulary unschematized). Do NOT treat this sourceSection as proof the shape is ratified. Ratification pending. Cited: DOC-002 §22 (event §26.4)",
       "payloadFields": [
         {
           "field": "reason",
@@ -1675,7 +1675,7 @@
       "drivesFrom": "AUTHORIZED",
       "drivesTo": "REVOKED",
       "schematized": false,
-      "sourceSection": "DOC-002 §22 (event §26.4)",
+      "sourceSection": "UNRATIFIED-AUTHORED (annotated 2026-07-16 under sponsor grant): DOC-007 schematizes NO interface for this, so these fields were AUTHORED, not derived. The citation below NAMES this command/event but defines no fields (DOC-002 §26.x/§34.x are bare name lists; §16 item 6: DOC-007's first slice deliberately leaves the granular vocabulary unschematized). Do NOT treat this sourceSection as proof the shape is ratified. Ratification pending. Cited: DOC-002 §22 (event §26.4)",
       "payloadFields": [
         {
           "field": "reason",
@@ -1692,7 +1692,7 @@
       "drivesFrom": "(initial)",
       "drivesTo": "DRAFT",
       "schematized": false,
-      "sourceSection": "RPH-DOC-010 §4.1/§20",
+      "sourceSection": "UNRATIFIED-AUTHORED (annotated 2026-07-16 under sponsor grant): DOC-007 schematizes NO interface for this, so these fields were AUTHORED, not derived. The citation below NAMES this command/event but defines no fields (DOC-002 §26.x/§34.x are bare name lists; §16 item 6: DOC-007's first slice deliberately leaves the granular vocabulary unschematized). Do NOT treat this sourceSection as proof the shape is ratified. Ratification pending. Cited: RPH-DOC-010 §4.1/§20",
       "payloadFields": [
         {
           "field": "pwaId",
@@ -1729,7 +1729,7 @@
       "drivesFrom": "(initial)",
       "drivesTo": "DRAFT",
       "schematized": false,
-      "sourceSection": "RPH-DOC-010 §11/§12",
+      "sourceSection": "UNRATIFIED-AUTHORED (annotated 2026-07-16 under sponsor grant): DOC-007 schematizes NO interface for this, so these fields were AUTHORED, not derived. The citation below NAMES this command/event but defines no fields (DOC-002 §26.x/§34.x are bare name lists; §16 item 6: DOC-007's first slice deliberately leaves the granular vocabulary unschematized). Do NOT treat this sourceSection as proof the shape is ratified. Ratification pending. Cited: RPH-DOC-010 §11/§12",
       "payloadFields": [
         {
           "field": "pwuTypeId",
@@ -1828,7 +1828,7 @@
       "drivesFrom": "VALIDATED",
       "drivesTo": "PUBLISHED",
       "schematized": false,
-      "sourceSection": "RPH-DOC-010 §20",
+      "sourceSection": "UNRATIFIED-AUTHORED (annotated 2026-07-16 under sponsor grant): DOC-007 schematizes NO interface for this, so these fields were AUTHORED, not derived. The citation below NAMES this command/event but defines no fields (DOC-002 §26.x/§34.x are bare name lists; §16 item 6: DOC-007's first slice deliberately leaves the granular vocabulary unschematized). Do NOT treat this sourceSection as proof the shape is ratified. Ratification pending. Cited: RPH-DOC-010 §20",
       "payloadFields": [
         {
           "field": "rootPwuTypeId",
@@ -1864,7 +1864,7 @@
       "targetAggregateType": "PROFESSIONAL_WORK_ARCHITECTURE",
       "emitsEvent": "PwaDeleted",
       "schematized": false,
-      "sourceSection": "RPH-DOC-010 §20 — discard/soft-delete a PWA that is not in use",
+      "sourceSection": "UNRATIFIED-AUTHORED (annotated 2026-07-16 under sponsor grant): DOC-007 schematizes NO interface for this, so these fields were AUTHORED, not derived. The citation below NAMES this command/event but defines no fields (DOC-002 §26.x/§34.x are bare name lists; §16 item 6: DOC-007's first slice deliberately leaves the granular vocabulary unschematized). Do NOT treat this sourceSection as proof the shape is ratified. Ratification pending. Cited: RPH-DOC-010 §20 — discard/soft-delete a PWA that is not in use",
       "payloadFields": [
         {
           "field": "pwaId",
@@ -1881,7 +1881,7 @@
       "drivesFrom": "(initial)",
       "drivesTo": "ACTIVE",
       "schematized": false,
-      "sourceSection": "RPH-DOC-010 §22/§42",
+      "sourceSection": "UNRATIFIED-AUTHORED (annotated 2026-07-16 under sponsor grant): DOC-007 schematizes NO interface for this, so these fields were AUTHORED, not derived. The citation below NAMES this command/event but defines no fields (DOC-002 §26.x/§34.x are bare name lists; §16 item 6: DOC-007's first slice deliberately leaves the granular vocabulary unschematized). Do NOT treat this sourceSection as proof the shape is ratified. Ratification pending. Cited: RPH-DOC-010 §22/§42",
       "payloadFields": [
         {
           "field": "undertakingId",
@@ -1930,7 +1930,7 @@
       "targetAggregateType": "PROFESSIONAL_WORK_ARCHITECTURE",
       "emitsEvent": "PwaEdited",
       "schematized": false,
-      "sourceSection": "RPH-DOC-010 §11/§20 — DRAFT-only metadata edit",
+      "sourceSection": "UNRATIFIED-AUTHORED (annotated 2026-07-16 under sponsor grant): DOC-007 schematizes NO interface for this, so these fields were AUTHORED, not derived. The citation below NAMES this command/event but defines no fields (DOC-002 §26.x/§34.x are bare name lists; §16 item 6: DOC-007's first slice deliberately leaves the granular vocabulary unschematized). Do NOT treat this sourceSection as proof the shape is ratified. Ratification pending. Cited: RPH-DOC-010 §11/§20 — DRAFT-only metadata edit",
       "payloadFields": [
         {
           "field": "pwaId",
@@ -1964,7 +1964,7 @@
       "targetAggregateType": "PWU_TYPE",
       "emitsEvent": "PwuTypeRedefined",
       "schematized": false,
-      "sourceSection": "RPH-DOC-010 §11/§39 — DRAFT-only PWU Type edit",
+      "sourceSection": "UNRATIFIED-AUTHORED (annotated 2026-07-16 under sponsor grant): DOC-007 schematizes NO interface for this, so these fields were AUTHORED, not derived. The citation below NAMES this command/event but defines no fields (DOC-002 §26.x/§34.x are bare name lists; §16 item 6: DOC-007's first slice deliberately leaves the granular vocabulary unschematized). Do NOT treat this sourceSection as proof the shape is ratified. Ratification pending. Cited: RPH-DOC-010 §11/§39 — DRAFT-only PWU Type edit",
       "payloadFields": [
         {
           "field": "pwuTypeId",
@@ -2028,7 +2028,7 @@
       "targetAggregateType": "PWU_TYPE",
       "emitsEvent": "PwuTypeRemoved",
       "schematized": false,
-      "sourceSection": "RPH-DOC-010 §11/§39 — DRAFT-only PWU Type removal (tombstone)",
+      "sourceSection": "UNRATIFIED-AUTHORED (annotated 2026-07-16 under sponsor grant): DOC-007 schematizes NO interface for this, so these fields were AUTHORED, not derived. The citation below NAMES this command/event but defines no fields (DOC-002 §26.x/§34.x are bare name lists; §16 item 6: DOC-007's first slice deliberately leaves the granular vocabulary unschematized). Do NOT treat this sourceSection as proof the shape is ratified. Ratification pending. Cited: RPH-DOC-010 §11/§39 — DRAFT-only PWU Type removal (tombstone)",
       "payloadFields": [
         {
           "field": "pwuTypeId",
@@ -2042,7 +2042,7 @@
       "targetAggregateType": "AUTHORING_CONVERSATION",
       "emitsEvent": "ConversationEntriesAppended",
       "schematized": false,
-      "sourceSection": "RPH-DOC-010 — authoring conversation transcript (governed-stream precursor)",
+      "sourceSection": "UNRATIFIED-AUTHORED (annotated 2026-07-16 under sponsor grant): DOC-007 schematizes NO interface for this, so these fields were AUTHORED, not derived. The citation below NAMES this command/event but defines no fields (DOC-002 §26.x/§34.x are bare name lists; §16 item 6: DOC-007's first slice deliberately leaves the granular vocabulary unschematized). Do NOT treat this sourceSection as proof the shape is ratified. Ratification pending. Cited: RPH-DOC-010 — authoring conversation transcript (governed-stream precursor)",
       "payloadFields": [
         {
           "field": "conversationId",
@@ -2218,7 +2218,7 @@
       "targetAggregateType": "ASSURANCE_POLICY",
       "emitsEvent": "AssurancePolicySuspended",
       "schematized": false,
-      "sourceSection": "guide §8.9 / assurance §3.1 — temporarily disable a policy (ACTIVE -> SUSPENDED); it stops applying until resumed. Floor policies reject this.",
+      "sourceSection": "UNRATIFIED-AUTHORED (annotated 2026-07-16 under sponsor grant): DOC-007 schematizes NO interface for this, so these fields were AUTHORED, not derived. The citation below NAMES this command/event but defines no fields (DOC-002 §26.x/§34.x are bare name lists; §16 item 6: DOC-007's first slice deliberately leaves the granular vocabulary unschematized). Do NOT treat this sourceSection as proof the shape is ratified. Ratification pending. Cited: guide §8.9 / assurance §3.1 — temporarily disable a policy (ACTIVE -> SUSPENDED); it stops applying until resumed. Floor policies reject this.",
       "payloadFields": [
         {
           "field": "policyId",
@@ -2232,7 +2232,7 @@
       "targetAggregateType": "ASSURANCE_POLICY",
       "emitsEvent": "AssurancePolicyActivated",
       "schematized": false,
-      "sourceSection": "guide §8.9 / assurance §3.1 — put a policy into force (DRAFT|SUSPENDED -> ACTIVE).",
+      "sourceSection": "UNRATIFIED-AUTHORED (annotated 2026-07-16 under sponsor grant): DOC-007 schematizes NO interface for this, so these fields were AUTHORED, not derived. The citation below NAMES this command/event but defines no fields (DOC-002 §26.x/§34.x are bare name lists; §16 item 6: DOC-007's first slice deliberately leaves the granular vocabulary unschematized). Do NOT treat this sourceSection as proof the shape is ratified. Ratification pending. Cited: guide §8.9 / assurance §3.1 — put a policy into force (DRAFT|SUSPENDED -> ACTIVE).",
       "payloadFields": [
         {
           "field": "policyId",
@@ -2246,7 +2246,7 @@
     {
       "eventType": "AssumptionAccepted",
       "aggregateType": "Assumption",
-      "sourceSection": "DOC-002 §26.3",
+      "sourceSection": "UNRATIFIED-AUTHORED (annotated 2026-07-16 under sponsor grant): DOC-007 schematizes NO interface for this, so these fields were AUTHORED, not derived. The citation below NAMES this command/event but defines no fields (DOC-002 §26.x/§34.x are bare name lists; §16 item 6: DOC-007's first slice deliberately leaves the granular vocabulary unschematized). Do NOT treat this sourceSection as proof the shape is ratified. Ratification pending. Cited: DOC-002 §26.3",
       "payloadFields": [
         {
           "field": "acceptanceDecisionId",
@@ -2327,7 +2327,7 @@
     {
       "eventType": "AssumptionDisclosed",
       "aggregateType": "Assumption",
-      "sourceSection": "DOC-002 §26.3",
+      "sourceSection": "UNRATIFIED-AUTHORED (annotated 2026-07-16 under sponsor grant): DOC-007 schematizes NO interface for this, so these fields were AUTHORED, not derived. The citation below NAMES this command/event but defines no fields (DOC-002 §26.x/§34.x are bare name lists; §16 item 6: DOC-007's first slice deliberately leaves the granular vocabulary unschematized). Do NOT treat this sourceSection as proof the shape is ratified. Ratification pending. Cited: DOC-002 §26.3",
       "payloadFields": [
         {
           "field": "status",
@@ -2341,7 +2341,7 @@
     {
       "eventType": "AssumptionExpired",
       "aggregateType": "Assumption",
-      "sourceSection": "DOC-002 §26.3",
+      "sourceSection": "UNRATIFIED-AUTHORED (annotated 2026-07-16 under sponsor grant): DOC-007 schematizes NO interface for this, so these fields were AUTHORED, not derived. The citation below NAMES this command/event but defines no fields (DOC-002 §26.x/§34.x are bare name lists; §16 item 6: DOC-007's first slice deliberately leaves the granular vocabulary unschematized). Do NOT treat this sourceSection as proof the shape is ratified. Ratification pending. Cited: DOC-002 §26.3",
       "payloadFields": [
         {
           "field": "expirationCondition",
@@ -2405,7 +2405,7 @@
     {
       "eventType": "AssumptionVerificationStarted",
       "aggregateType": "Assumption",
-      "sourceSection": "DOC-002 §26.3",
+      "sourceSection": "UNRATIFIED-AUTHORED (annotated 2026-07-16 under sponsor grant): DOC-007 schematizes NO interface for this, so these fields were AUTHORED, not derived. The citation below NAMES this command/event but defines no fields (DOC-002 §26.x/§34.x are bare name lists; §16 item 6: DOC-007's first slice deliberately leaves the granular vocabulary unschematized). Do NOT treat this sourceSection as proof the shape is ratified. Ratification pending. Cited: DOC-002 §26.3",
       "payloadFields": [
         {
           "field": "verificationMethod",
@@ -2424,7 +2424,7 @@
     {
       "eventType": "AssumptionVerified",
       "aggregateType": "Assumption",
-      "sourceSection": "DOC-002 §26.3",
+      "sourceSection": "UNRATIFIED-AUTHORED (annotated 2026-07-16 under sponsor grant): DOC-007 schematizes NO interface for this, so these fields were AUTHORED, not derived. The citation below NAMES this command/event but defines no fields (DOC-002 §26.x/§34.x are bare name lists; §16 item 6: DOC-007's first slice deliberately leaves the granular vocabulary unschematized). Do NOT treat this sourceSection as proof the shape is ratified. Ratification pending. Cited: DOC-002 §26.3",
       "payloadFields": [
         {
           "field": "evidenceIds",
@@ -2509,7 +2509,7 @@
     {
       "eventType": "AssuranceAssessmentConditionallySatisfied",
       "aggregateType": "AssuranceAssessment",
-      "sourceSection": "DOC-002 §26.5",
+      "sourceSection": "UNRATIFIED-AUTHORED (annotated 2026-07-16 under sponsor grant): DOC-007 schematizes NO interface for this, so these fields were AUTHORED, not derived. The citation below NAMES this command/event but defines no fields (DOC-002 §26.x/§34.x are bare name lists; §16 item 6: DOC-007's first slice deliberately leaves the granular vocabulary unschematized). Do NOT treat this sourceSection as proof the shape is ratified. Ratification pending. Cited: DOC-002 §26.5",
       "payloadFields": [
         {
           "field": "conditions",
@@ -2533,7 +2533,7 @@
     {
       "eventType": "AssuranceAssessmentEscalated",
       "aggregateType": "AssuranceAssessment",
-      "sourceSection": "DOC-002 §26.5",
+      "sourceSection": "UNRATIFIED-AUTHORED (annotated 2026-07-16 under sponsor grant): DOC-007 schematizes NO interface for this, so these fields were AUTHORED, not derived. The citation below NAMES this command/event but defines no fields (DOC-002 §26.x/§34.x are bare name lists; §16 item 6: DOC-007's first slice deliberately leaves the granular vocabulary unschematized). Do NOT treat this sourceSection as proof the shape is ratified. Ratification pending. Cited: DOC-002 §26.5",
       "payloadFields": [
         {
           "field": "escalationReason",
@@ -2552,7 +2552,7 @@
     {
       "eventType": "AssuranceAssessmentInconclusive",
       "aggregateType": "AssuranceAssessment",
-      "sourceSection": "DOC-002 §26.5",
+      "sourceSection": "UNRATIFIED-AUTHORED (annotated 2026-07-16 under sponsor grant): DOC-007 schematizes NO interface for this, so these fields were AUTHORED, not derived. The citation below NAMES this command/event but defines no fields (DOC-002 §26.x/§34.x are bare name lists; §16 item 6: DOC-007's first slice deliberately leaves the granular vocabulary unschematized). Do NOT treat this sourceSection as proof the shape is ratified. Ratification pending. Cited: DOC-002 §26.5",
       "payloadFields": [
         {
           "field": "residualUncertainty",
@@ -2571,7 +2571,7 @@
     {
       "eventType": "AssuranceAssessmentRejected",
       "aggregateType": "AssuranceAssessment",
-      "sourceSection": "DOC-002 §26.5",
+      "sourceSection": "UNRATIFIED-AUTHORED (annotated 2026-07-16 under sponsor grant): DOC-007 schematizes NO interface for this, so these fields were AUTHORED, not derived. The citation below NAMES this command/event but defines no fields (DOC-002 §26.x/§34.x are bare name lists; §16 item 6: DOC-007's first slice deliberately leaves the granular vocabulary unschematized). Do NOT treat this sourceSection as proof the shape is ratified. Ratification pending. Cited: DOC-002 §26.5",
       "payloadFields": [
         {
           "field": "blockingObservationIds",
@@ -2597,7 +2597,7 @@
     {
       "eventType": "AssuranceAssessmentRequested",
       "aggregateType": "AssuranceAssessment",
-      "sourceSection": "DOC-002 §26.5 (DOC-007 §33 lists it unschematized — author payload)",
+      "sourceSection": "UNRATIFIED-AUTHORED (annotated 2026-07-16 under sponsor grant): DOC-007 schematizes NO interface for this, so these fields were AUTHORED, not derived. The citation below NAMES this command/event but defines no fields (DOC-002 §26.x/§34.x are bare name lists; §16 item 6: DOC-007's first slice deliberately leaves the granular vocabulary unschematized). Do NOT treat this sourceSection as proof the shape is ratified. Ratification pending. Cited: DOC-002 §26.5 (DOC-007 §33 lists it unschematized — author payload)",
       "payloadFields": [
         {
           "field": "assurancePolicyId",
@@ -2641,7 +2641,7 @@
     {
       "eventType": "AssuranceAssessmentSatisfied",
       "aggregateType": "AssuranceAssessment",
-      "sourceSection": "DOC-002 §26.5",
+      "sourceSection": "UNRATIFIED-AUTHORED (annotated 2026-07-16 under sponsor grant): DOC-007 schematizes NO interface for this, so these fields were AUTHORED, not derived. The citation below NAMES this command/event but defines no fields (DOC-002 §26.x/§34.x are bare name lists; §16 item 6: DOC-007's first slice deliberately leaves the granular vocabulary unschematized). Do NOT treat this sourceSection as proof the shape is ratified. Ratification pending. Cited: DOC-002 §26.5",
       "payloadFields": [
         {
           "field": "evidenceConsideredIds",
@@ -2673,7 +2673,7 @@
     {
       "eventType": "AssuranceAssessmentStarted",
       "aggregateType": "AssuranceAssessment",
-      "sourceSection": "DOC-002 §26.5",
+      "sourceSection": "UNRATIFIED-AUTHORED (annotated 2026-07-16 under sponsor grant): DOC-007 schematizes NO interface for this, so these fields were AUTHORED, not derived. The citation below NAMES this command/event but defines no fields (DOC-002 §26.x/§34.x are bare name lists; §16 item 6: DOC-007's first slice deliberately leaves the granular vocabulary unschematized). Do NOT treat this sourceSection as proof the shape is ratified. Ratification pending. Cited: DOC-002 §26.5",
       "payloadFields": [
         {
           "field": "disposition",
@@ -2752,7 +2752,7 @@
     {
       "eventType": "BaselineApproved",
       "aggregateType": "Baseline",
-      "sourceSection": "DOC-002 §26.6",
+      "sourceSection": "UNRATIFIED-AUTHORED (annotated 2026-07-16 under sponsor grant): DOC-007 schematizes NO interface for this, so these fields were AUTHORED, not derived. The citation below NAMES this command/event but defines no fields (DOC-002 §26.x/§34.x are bare name lists; §16 item 6: DOC-007's first slice deliberately leaves the granular vocabulary unschematized). Do NOT treat this sourceSection as proof the shape is ratified. Ratification pending. Cited: DOC-002 §26.6",
       "payloadFields": [
         {
           "field": "status",
@@ -2766,7 +2766,7 @@
     {
       "eventType": "BaselineCreated",
       "aggregateType": "Baseline",
-      "sourceSection": "DOC-002 §26.6 (DOC-007 §33 lists it unschematized)",
+      "sourceSection": "UNRATIFIED-AUTHORED (annotated 2026-07-16 under sponsor grant): DOC-007 schematizes NO interface for this, so these fields were AUTHORED, not derived. The citation below NAMES this command/event but defines no fields (DOC-002 §26.x/§34.x are bare name lists; §16 item 6: DOC-007's first slice deliberately leaves the granular vocabulary unschematized). Do NOT treat this sourceSection as proof the shape is ratified. Ratification pending. Cited: DOC-002 §26.6 (DOC-007 §33 lists it unschematized)",
       "payloadFields": [
         {
           "field": "baselineType",
@@ -2843,7 +2843,7 @@
     {
       "eventType": "BaselineRevoked",
       "aggregateType": "Baseline",
-      "sourceSection": "DOC-002 §26.6",
+      "sourceSection": "UNRATIFIED-AUTHORED (annotated 2026-07-16 under sponsor grant): DOC-007 schematizes NO interface for this, so these fields were AUTHORED, not derived. The citation below NAMES this command/event but defines no fields (DOC-002 §26.x/§34.x are bare name lists; §16 item 6: DOC-007's first slice deliberately leaves the granular vocabulary unschematized). Do NOT treat this sourceSection as proof the shape is ratified. Ratification pending. Cited: DOC-002 §26.6",
       "payloadFields": [
         {
           "field": "revocationDecisionId",
@@ -2863,7 +2863,7 @@
     {
       "eventType": "BaselineSubmittedForReview",
       "aggregateType": "Baseline",
-      "sourceSection": "DOC-002 §26.6",
+      "sourceSection": "UNRATIFIED-AUTHORED (annotated 2026-07-16 under sponsor grant): DOC-007 schematizes NO interface for this, so these fields were AUTHORED, not derived. The citation below NAMES this command/event but defines no fields (DOC-002 §26.x/§34.x are bare name lists; §16 item 6: DOC-007's first slice deliberately leaves the granular vocabulary unschematized). Do NOT treat this sourceSection as proof the shape is ratified. Ratification pending. Cited: DOC-002 §26.6",
       "payloadFields": [
         {
           "field": "status",
@@ -2877,7 +2877,7 @@
     {
       "eventType": "BaselineSuperseded",
       "aggregateType": "Baseline",
-      "sourceSection": "DOC-002 §26.6",
+      "sourceSection": "UNRATIFIED-AUTHORED (annotated 2026-07-16 under sponsor grant): DOC-007 schematizes NO interface for this, so these fields were AUTHORED, not derived. The citation below NAMES this command/event but defines no fields (DOC-002 §26.x/§34.x are bare name lists; §16 item 6: DOC-007's first slice deliberately leaves the granular vocabulary unschematized). Do NOT treat this sourceSection as proof the shape is ratified. Ratification pending. Cited: DOC-002 §26.6",
       "payloadFields": [
         {
           "field": "supersedingBaselineId",
@@ -2940,7 +2940,7 @@
     {
       "eventType": "ClaimContested",
       "aggregateType": "Claim",
-      "sourceSection": "DOC-002 §26.5",
+      "sourceSection": "UNRATIFIED-AUTHORED (annotated 2026-07-16 under sponsor grant): DOC-007 schematizes NO interface for this, so these fields were AUTHORED, not derived. The citation below NAMES this command/event but defines no fields (DOC-002 §26.x/§34.x are bare name lists; §16 item 6: DOC-007's first slice deliberately leaves the granular vocabulary unschematized). Do NOT treat this sourceSection as proof the shape is ratified. Ratification pending. Cited: DOC-002 §26.5",
       "payloadFields": [
         {
           "field": "contradictingEvidenceIds",
@@ -2960,7 +2960,7 @@
     {
       "eventType": "ClaimRejected",
       "aggregateType": "Claim",
-      "sourceSection": "DOC-002 §26.5",
+      "sourceSection": "UNRATIFIED-AUTHORED (annotated 2026-07-16 under sponsor grant): DOC-007 schematizes NO interface for this, so these fields were AUTHORED, not derived. The citation below NAMES this command/event but defines no fields (DOC-002 §26.x/§34.x are bare name lists; §16 item 6: DOC-007's first slice deliberately leaves the granular vocabulary unschematized). Do NOT treat this sourceSection as proof the shape is ratified. Ratification pending. Cited: DOC-002 §26.5",
       "payloadFields": [
         {
           "field": "assessmentId",
@@ -2985,7 +2985,7 @@
     {
       "eventType": "ClaimSupported",
       "aggregateType": "Claim",
-      "sourceSection": "DOC-002 §26.5",
+      "sourceSection": "UNRATIFIED-AUTHORED (annotated 2026-07-16 under sponsor grant): DOC-007 schematizes NO interface for this, so these fields were AUTHORED, not derived. The citation below NAMES this command/event but defines no fields (DOC-002 §26.x/§34.x are bare name lists; §16 item 6: DOC-007's first slice deliberately leaves the granular vocabulary unschematized). Do NOT treat this sourceSection as proof the shape is ratified. Ratification pending. Cited: DOC-002 §26.5",
       "payloadFields": [
         {
           "field": "supportingEvidenceIds",
@@ -3011,7 +3011,7 @@
     {
       "eventType": "ClarificationRequested",
       "aggregateType": "ProfessionalWorkUnit",
-      "sourceSection": "DOC-002 §21 / fixture §26 step 52 (controller clarification)",
+      "sourceSection": "UNRATIFIED-AUTHORED (annotated 2026-07-16 under sponsor grant): DOC-007 schematizes NO interface for this, so these fields were AUTHORED, not derived. The citation below NAMES this command/event but defines no fields (DOC-002 §26.x/§34.x are bare name lists; §16 item 6: DOC-007's first slice deliberately leaves the granular vocabulary unschematized). Do NOT treat this sourceSection as proof the shape is ratified. Ratification pending. Cited: DOC-002 §21 / fixture §26 step 52 (controller clarification)",
       "payloadFields": [
         {
           "field": "pwuId",
@@ -3029,7 +3029,7 @@
     {
       "eventType": "ConstraintAdded",
       "aggregateType": "Constraint",
-      "sourceSection": "DOC-002 §26.3",
+      "sourceSection": "UNRATIFIED-AUTHORED (annotated 2026-07-16 under sponsor grant): DOC-007 schematizes NO interface for this, so these fields were AUTHORED, not derived. The citation below NAMES this command/event but defines no fields (DOC-002 §26.x/§34.x are bare name lists; §16 item 6: DOC-007's first slice deliberately leaves the granular vocabulary unschematized). Do NOT treat this sourceSection as proof the shape is ratified. Ratification pending. Cited: DOC-002 §26.3",
       "payloadFields": [
         {
           "field": "statement",
@@ -3072,7 +3072,7 @@
     {
       "eventType": "ConstraintDeclaredInapplicable",
       "aggregateType": "Constraint",
-      "sourceSection": "DOC-002 §26.3",
+      "sourceSection": "UNRATIFIED-AUTHORED (annotated 2026-07-16 under sponsor grant): DOC-007 schematizes NO interface for this, so these fields were AUTHORED, not derived. The citation below NAMES this command/event but defines no fields (DOC-002 §26.x/§34.x are bare name lists; §16 item 6: DOC-007's first slice deliberately leaves the granular vocabulary unschematized). Do NOT treat this sourceSection as proof the shape is ratified. Ratification pending. Cited: DOC-002 §26.3",
       "payloadFields": [
         {
           "field": "rationale",
@@ -3091,7 +3091,7 @@
     {
       "eventType": "ConstraintPropagated",
       "aggregateType": "Constraint",
-      "sourceSection": "DOC-002 §26.3",
+      "sourceSection": "UNRATIFIED-AUTHORED (annotated 2026-07-16 under sponsor grant): DOC-007 schematizes NO interface for this, so these fields were AUTHORED, not derived. The citation below NAMES this command/event but defines no fields (DOC-002 §26.x/§34.x are bare name lists; §16 item 6: DOC-007's first slice deliberately leaves the granular vocabulary unschematized). Do NOT treat this sourceSection as proof the shape is ratified. Ratification pending. Cited: DOC-002 §26.3",
       "payloadFields": [
         {
           "field": "parentConstraintId",
@@ -3117,7 +3117,7 @@
     {
       "eventType": "ConstraintSuperseded",
       "aggregateType": "Constraint",
-      "sourceSection": "DOC-002 §26.3",
+      "sourceSection": "UNRATIFIED-AUTHORED (annotated 2026-07-16 under sponsor grant): DOC-007 schematizes NO interface for this, so these fields were AUTHORED, not derived. The citation below NAMES this command/event but defines no fields (DOC-002 §26.x/§34.x are bare name lists; §16 item 6: DOC-007's first slice deliberately leaves the granular vocabulary unschematized). Do NOT treat this sourceSection as proof the shape is ratified. Ratification pending. Cited: DOC-002 §26.3",
       "payloadFields": [
         {
           "field": "supersedingConstraintId",
@@ -3137,7 +3137,7 @@
     {
       "eventType": "ConstraintViolated",
       "aggregateType": "Constraint",
-      "sourceSection": "DOC-002 §26.3",
+      "sourceSection": "UNRATIFIED-AUTHORED (annotated 2026-07-16 under sponsor grant): DOC-007 schematizes NO interface for this, so these fields were AUTHORED, not derived. The citation below NAMES this command/event but defines no fields (DOC-002 §26.x/§34.x are bare name lists; §16 item 6: DOC-007's first slice deliberately leaves the granular vocabulary unschematized). Do NOT treat this sourceSection as proof the shape is ratified. Ratification pending. Cited: DOC-002 §26.3",
       "payloadFields": [
         {
           "field": "observationId",
@@ -3157,7 +3157,7 @@
     {
       "eventType": "ConstraintWaived",
       "aggregateType": "Constraint",
-      "sourceSection": "DOC-002 §26.3",
+      "sourceSection": "UNRATIFIED-AUTHORED (annotated 2026-07-16 under sponsor grant): DOC-007 schematizes NO interface for this, so these fields were AUTHORED, not derived. The citation below NAMES this command/event but defines no fields (DOC-002 §26.x/§34.x are bare name lists; §16 item 6: DOC-007's first slice deliberately leaves the granular vocabulary unschematized). Do NOT treat this sourceSection as proof the shape is ratified. Ratification pending. Cited: DOC-002 §26.3",
       "payloadFields": [
         {
           "field": "waiverDecisionId",
@@ -3177,7 +3177,7 @@
     {
       "eventType": "DecisionApproved",
       "aggregateType": "Decision",
-      "sourceSection": "DOC-002 §26.6",
+      "sourceSection": "UNRATIFIED-AUTHORED (annotated 2026-07-16 under sponsor grant): DOC-007 schematizes NO interface for this, so these fields were AUTHORED, not derived. The citation below NAMES this command/event but defines no fields (DOC-002 §26.x/§34.x are bare name lists; §16 item 6: DOC-007's first slice deliberately leaves the granular vocabulary unschematized). Do NOT treat this sourceSection as proof the shape is ratified. Ratification pending. Cited: DOC-002 §26.6",
       "payloadFields": [
         {
           "field": "approvalAuthority",
@@ -3245,7 +3245,7 @@
     {
       "eventType": "DecisionProposed",
       "aggregateType": "Decision",
-      "sourceSection": "DOC-002 §26.6 (DOC-007 §33 lists it unschematized)",
+      "sourceSection": "UNRATIFIED-AUTHORED (annotated 2026-07-16 under sponsor grant): DOC-007 schematizes NO interface for this, so these fields were AUTHORED, not derived. The citation below NAMES this command/event but defines no fields (DOC-002 §26.x/§34.x are bare name lists; §16 item 6: DOC-007's first slice deliberately leaves the granular vocabulary unschematized). Do NOT treat this sourceSection as proof the shape is ratified. Ratification pending. Cited: DOC-002 §26.6 (DOC-007 §33 lists it unschematized)",
       "payloadFields": [
         {
           "field": "decisionType",
@@ -3304,7 +3304,7 @@
     {
       "eventType": "DecisionRejected",
       "aggregateType": "Decision",
-      "sourceSection": "DOC-002 §26.6",
+      "sourceSection": "UNRATIFIED-AUTHORED (annotated 2026-07-16 under sponsor grant): DOC-007 schematizes NO interface for this, so these fields were AUTHORED, not derived. The citation below NAMES this command/event but defines no fields (DOC-002 §26.x/§34.x are bare name lists; §16 item 6: DOC-007's first slice deliberately leaves the granular vocabulary unschematized). Do NOT treat this sourceSection as proof the shape is ratified. Ratification pending. Cited: DOC-002 §26.6",
       "payloadFields": [
         {
           "field": "rationale",
@@ -3317,7 +3317,7 @@
     {
       "eventType": "DecisionRevoked",
       "aggregateType": "Decision",
-      "sourceSection": "DOC-002 §26.6",
+      "sourceSection": "UNRATIFIED-AUTHORED (annotated 2026-07-16 under sponsor grant): DOC-007 schematizes NO interface for this, so these fields were AUTHORED, not derived. The citation below NAMES this command/event but defines no fields (DOC-002 §26.x/§34.x are bare name lists; §16 item 6: DOC-007's first slice deliberately leaves the granular vocabulary unschematized). Do NOT treat this sourceSection as proof the shape is ratified. Ratification pending. Cited: DOC-002 §26.6",
       "payloadFields": [
         {
           "field": "revocationRationale",
@@ -3336,7 +3336,7 @@
     {
       "eventType": "DecompositionProposed",
       "aggregateType": "DecompositionContract",
-      "sourceSection": "DOC-002 §26.2",
+      "sourceSection": "UNRATIFIED-AUTHORED (annotated 2026-07-16 under sponsor grant): DOC-007 schematizes NO interface for this, so these fields were AUTHORED, not derived. The citation below NAMES this command/event but defines no fields (DOC-002 §26.x/§34.x are bare name lists; §16 item 6: DOC-007's first slice deliberately leaves the granular vocabulary unschematized). Do NOT treat this sourceSection as proof the shape is ratified. Ratification pending. Cited: DOC-002 §26.2",
       "payloadFields": [
         {
           "field": "parentWorkUnitId",
@@ -3415,7 +3415,7 @@
     {
       "eventType": "DecompositionRejected",
       "aggregateType": "DecompositionContract",
-      "sourceSection": "DOC-002 §26.2",
+      "sourceSection": "UNRATIFIED-AUTHORED (annotated 2026-07-16 under sponsor grant): DOC-007 schematizes NO interface for this, so these fields were AUTHORED, not derived. The citation below NAMES this command/event but defines no fields (DOC-002 §26.x/§34.x are bare name lists; §16 item 6: DOC-007's first slice deliberately leaves the granular vocabulary unschematized). Do NOT treat this sourceSection as proof the shape is ratified. Ratification pending. Cited: DOC-002 §26.2",
       "payloadFields": [
         {
           "field": "blockingObservationIds",
@@ -3435,7 +3435,7 @@
     {
       "eventType": "DecompositionRevised",
       "aggregateType": "DecompositionContract",
-      "sourceSection": "DOC-002 §26.2",
+      "sourceSection": "UNRATIFIED-AUTHORED (annotated 2026-07-16 under sponsor grant): DOC-007 schematizes NO interface for this, so these fields were AUTHORED, not derived. The citation below NAMES this command/event but defines no fields (DOC-002 §26.x/§34.x are bare name lists; §16 item 6: DOC-007's first slice deliberately leaves the granular vocabulary unschematized). Do NOT treat this sourceSection as proof the shape is ratified. Ratification pending. Cited: DOC-002 §26.2",
       "payloadFields": [
         {
           "field": "supersedesDecompositionContractId",
@@ -3465,7 +3465,7 @@
     {
       "eventType": "DecompositionValidated",
       "aggregateType": "DecompositionContract",
-      "sourceSection": "DOC-002 §26.2",
+      "sourceSection": "UNRATIFIED-AUTHORED (annotated 2026-07-16 under sponsor grant): DOC-007 schematizes NO interface for this, so these fields were AUTHORED, not derived. The citation below NAMES this command/event but defines no fields (DOC-002 §26.x/§34.x are bare name lists; §16 item 6: DOC-007's first slice deliberately leaves the granular vocabulary unschematized). Do NOT treat this sourceSection as proof the shape is ratified. Ratification pending. Cited: DOC-002 §26.2",
       "payloadFields": [
         {
           "field": "validatorRole",
@@ -3527,7 +3527,7 @@
     {
       "eventType": "EvidenceExpired",
       "aggregateType": "Evidence",
-      "sourceSection": "DOC-002 §26.5",
+      "sourceSection": "UNRATIFIED-AUTHORED (annotated 2026-07-16 under sponsor grant): DOC-007 schematizes NO interface for this, so these fields were AUTHORED, not derived. The citation below NAMES this command/event but defines no fields (DOC-002 §26.x/§34.x are bare name lists; §16 item 6: DOC-007's first slice deliberately leaves the granular vocabulary unschematized). Do NOT treat this sourceSection as proof the shape is ratified. Ratification pending. Cited: DOC-002 §26.5",
       "payloadFields": [
         {
           "field": "status",
@@ -3541,7 +3541,7 @@
     {
       "eventType": "EvidenceInvalidated",
       "aggregateType": "Evidence",
-      "sourceSection": "DOC-002 §26.5",
+      "sourceSection": "UNRATIFIED-AUTHORED (annotated 2026-07-16 under sponsor grant): DOC-007 schematizes NO interface for this, so these fields were AUTHORED, not derived. The citation below NAMES this command/event but defines no fields (DOC-002 §26.x/§34.x are bare name lists; §16 item 6: DOC-007's first slice deliberately leaves the granular vocabulary unschematized). Do NOT treat this sourceSection as proof the shape is ratified. Ratification pending. Cited: DOC-002 §26.5",
       "payloadFields": [
         {
           "field": "invalidationReason",
@@ -3566,7 +3566,7 @@
     {
       "eventType": "EvidenceProposed",
       "aggregateType": "Evidence",
-      "sourceSection": "DOC-002 §26.5 (DOC-007 §33 lists it unschematized — author payload)",
+      "sourceSection": "UNRATIFIED-AUTHORED (annotated 2026-07-16 under sponsor grant): DOC-007 schematizes NO interface for this, so these fields were AUTHORED, not derived. The citation below NAMES this command/event but defines no fields (DOC-002 §26.x/§34.x are bare name lists; §16 item 6: DOC-007's first slice deliberately leaves the granular vocabulary unschematized). Do NOT treat this sourceSection as proof the shape is ratified. Ratification pending. Cited: DOC-002 §26.5 (DOC-007 §33 lists it unschematized — author payload)",
       "payloadFields": [
         {
           "field": "evidenceType",
@@ -3635,7 +3635,7 @@
     {
       "eventType": "EvidenceRejected",
       "aggregateType": "Evidence",
-      "sourceSection": "DOC-002 §26.5",
+      "sourceSection": "UNRATIFIED-AUTHORED (annotated 2026-07-16 under sponsor grant): DOC-007 schematizes NO interface for this, so these fields were AUTHORED, not derived. The citation below NAMES this command/event but defines no fields (DOC-002 §26.x/§34.x are bare name lists; §16 item 6: DOC-007's first slice deliberately leaves the granular vocabulary unschematized). Do NOT treat this sourceSection as proof the shape is ratified. Ratification pending. Cited: DOC-002 §26.5",
       "payloadFields": [
         {
           "field": "rationale",
@@ -3654,7 +3654,7 @@
     {
       "eventType": "ExecutionEscalated",
       "aggregateType": "ExecutionPlan",
-      "sourceSection": "DOC-002 §26.4",
+      "sourceSection": "UNRATIFIED-AUTHORED (annotated 2026-07-16 under sponsor grant): DOC-007 schematizes NO interface for this, so these fields were AUTHORED, not derived. The citation below NAMES this command/event but defines no fields (DOC-002 §26.x/§34.x are bare name lists; §16 item 6: DOC-007's first slice deliberately leaves the granular vocabulary unschematized). Do NOT treat this sourceSection as proof the shape is ratified. Ratification pending. Cited: DOC-002 §26.4",
       "payloadFields": [
         {
           "field": "reason",
@@ -3716,7 +3716,7 @@
     {
       "eventType": "ExecutionPlanApproved",
       "aggregateType": "ExecutionPlan",
-      "sourceSection": "DOC-002 §26.4 (DOC-007 §33 lists it unschematized)",
+      "sourceSection": "UNRATIFIED-AUTHORED (annotated 2026-07-16 under sponsor grant): DOC-007 schematizes NO interface for this, so these fields were AUTHORED, not derived. The citation below NAMES this command/event but defines no fields (DOC-002 §26.x/§34.x are bare name lists; §16 item 6: DOC-007's first slice deliberately leaves the granular vocabulary unschematized). Do NOT treat this sourceSection as proof the shape is ratified. Ratification pending. Cited: DOC-002 §26.4 (DOC-007 §33 lists it unschematized)",
       "payloadFields": [
         {
           "field": "approvalDecisionId",
@@ -3736,7 +3736,7 @@
     {
       "eventType": "ExecutionPlanProposed",
       "aggregateType": "ExecutionPlan",
-      "sourceSection": "DOC-002 §26.4 (DOC-007 §33 lists it unschematized — author payload)",
+      "sourceSection": "UNRATIFIED-AUTHORED (annotated 2026-07-16 under sponsor grant): DOC-007 schematizes NO interface for this, so these fields were AUTHORED, not derived. The citation below NAMES this command/event but defines no fields (DOC-002 §26.x/§34.x are bare name lists; §16 item 6: DOC-007's first slice deliberately leaves the granular vocabulary unschematized). Do NOT treat this sourceSection as proof the shape is ratified. Ratification pending. Cited: DOC-002 §26.4 (DOC-007 §33 lists it unschematized — author payload)",
       "payloadFields": [
         {
           "field": "workUnitId",
@@ -3797,7 +3797,7 @@
     {
       "eventType": "ExecutionPlanRevised",
       "aggregateType": "ExecutionPlan",
-      "sourceSection": "DOC-002 §20.2 / fixture §26 step 54 (revise architecture plan)",
+      "sourceSection": "UNRATIFIED-AUTHORED (annotated 2026-07-16 under sponsor grant): DOC-007 schematizes NO interface for this, so these fields were AUTHORED, not derived. The citation below NAMES this command/event but defines no fields (DOC-002 §26.x/§34.x are bare name lists; §16 item 6: DOC-007's first slice deliberately leaves the granular vocabulary unschematized). Do NOT treat this sourceSection as proof the shape is ratified. Ratification pending. Cited: DOC-002 §20.2 / fixture §26 step 54 (revise architecture plan)",
       "payloadFields": [
         {
           "field": "executionPlanId",
@@ -3821,7 +3821,7 @@
     {
       "eventType": "ExecutionPlanSuperseded",
       "aggregateType": "ExecutionPlan",
-      "sourceSection": "DOC-002 §26.4",
+      "sourceSection": "UNRATIFIED-AUTHORED (annotated 2026-07-16 under sponsor grant): DOC-007 schematizes NO interface for this, so these fields were AUTHORED, not derived. The citation below NAMES this command/event but defines no fields (DOC-002 §26.x/§34.x are bare name lists; §16 item 6: DOC-007's first slice deliberately leaves the granular vocabulary unschematized). Do NOT treat this sourceSection as proof the shape is ratified. Ratification pending. Cited: DOC-002 §26.4",
       "payloadFields": [
         {
           "field": "supersedingExecutionPlanId",
@@ -3841,7 +3841,7 @@
     {
       "eventType": "ExecutionStepCancelled",
       "aggregateType": "ExecutionPlan",
-      "sourceSection": "DOC-002 §26.4",
+      "sourceSection": "UNRATIFIED-AUTHORED (annotated 2026-07-16 under sponsor grant): DOC-007 schematizes NO interface for this, so these fields were AUTHORED, not derived. The citation below NAMES this command/event but defines no fields (DOC-002 §26.x/§34.x are bare name lists; §16 item 6: DOC-007's first slice deliberately leaves the granular vocabulary unschematized). Do NOT treat this sourceSection as proof the shape is ratified. Ratification pending. Cited: DOC-002 §26.4",
       "payloadFields": [
         {
           "field": "stepId",
@@ -3861,7 +3861,7 @@
     {
       "eventType": "ExecutionStepFailed",
       "aggregateType": "ExecutionPlan",
-      "sourceSection": "DOC-002 §26.4 (DOC-007 §33 lists it unschematized)",
+      "sourceSection": "UNRATIFIED-AUTHORED (annotated 2026-07-16 under sponsor grant): DOC-007 schematizes NO interface for this, so these fields were AUTHORED, not derived. The citation below NAMES this command/event but defines no fields (DOC-002 §26.x/§34.x are bare name lists; §16 item 6: DOC-007's first slice deliberately leaves the granular vocabulary unschematized). Do NOT treat this sourceSection as proof the shape is ratified. Ratification pending. Cited: DOC-002 §26.4 (DOC-007 §33 lists it unschematized)",
       "payloadFields": [
         {
           "field": "stepId",
@@ -3893,7 +3893,7 @@
     {
       "eventType": "ExecutionStepReady",
       "aggregateType": "ExecutionPlan",
-      "sourceSection": "DOC-002 §26.4",
+      "sourceSection": "UNRATIFIED-AUTHORED (annotated 2026-07-16 under sponsor grant): DOC-007 schematizes NO interface for this, so these fields were AUTHORED, not derived. The citation below NAMES this command/event but defines no fields (DOC-002 §26.x/§34.x are bare name lists; §16 item 6: DOC-007's first slice deliberately leaves the granular vocabulary unschematized). Do NOT treat this sourceSection as proof the shape is ratified. Ratification pending. Cited: DOC-002 §26.4",
       "payloadFields": [
         {
           "field": "stepId",
@@ -3913,7 +3913,7 @@
     {
       "eventType": "ExecutionStepRetried",
       "aggregateType": "ExecutionPlan",
-      "sourceSection": "DOC-002 §26.4",
+      "sourceSection": "UNRATIFIED-AUTHORED (annotated 2026-07-16 under sponsor grant): DOC-007 schematizes NO interface for this, so these fields were AUTHORED, not derived. The citation below NAMES this command/event but defines no fields (DOC-002 §26.x/§34.x are bare name lists; §16 item 6: DOC-007's first slice deliberately leaves the granular vocabulary unschematized). Do NOT treat this sourceSection as proof the shape is ratified. Ratification pending. Cited: DOC-002 §26.4",
       "payloadFields": [
         {
           "field": "stepId",
@@ -3938,7 +3938,7 @@
     {
       "eventType": "ExecutionStepSkipped",
       "aggregateType": "ExecutionPlan",
-      "sourceSection": "DOC-002 §26.4",
+      "sourceSection": "UNRATIFIED-AUTHORED (annotated 2026-07-16 under sponsor grant): DOC-007 schematizes NO interface for this, so these fields were AUTHORED, not derived. The citation below NAMES this command/event but defines no fields (DOC-002 §26.x/§34.x are bare name lists; §16 item 6: DOC-007's first slice deliberately leaves the granular vocabulary unschematized). Do NOT treat this sourceSection as proof the shape is ratified. Ratification pending. Cited: DOC-002 §26.4",
       "payloadFields": [
         {
           "field": "stepId",
@@ -3964,7 +3964,7 @@
     {
       "eventType": "ExecutionStepStarted",
       "aggregateType": "ExecutionPlan",
-      "sourceSection": "DOC-002 §26.4 (DOC-007 §33 lists it unschematized)",
+      "sourceSection": "UNRATIFIED-AUTHORED (annotated 2026-07-16 under sponsor grant): DOC-007 schematizes NO interface for this, so these fields were AUTHORED, not derived. The citation below NAMES this command/event but defines no fields (DOC-002 §26.x/§34.x are bare name lists; §16 item 6: DOC-007's first slice deliberately leaves the granular vocabulary unschematized). Do NOT treat this sourceSection as proof the shape is ratified. Ratification pending. Cited: DOC-002 §26.4 (DOC-007 §33 lists it unschematized)",
       "payloadFields": [
         {
           "field": "stepId",
@@ -4034,7 +4034,7 @@
     {
       "eventType": "ExecutionStepWaiting",
       "aggregateType": "ExecutionPlan",
-      "sourceSection": "DOC-002 §26.4",
+      "sourceSection": "UNRATIFIED-AUTHORED (annotated 2026-07-16 under sponsor grant): DOC-007 schematizes NO interface for this, so these fields were AUTHORED, not derived. The citation below NAMES this command/event but defines no fields (DOC-002 §26.x/§34.x are bare name lists; §16 item 6: DOC-007's first slice deliberately leaves the granular vocabulary unschematized). Do NOT treat this sourceSection as proof the shape is ratified. Ratification pending. Cited: DOC-002 §26.4",
       "payloadFields": [
         {
           "field": "stepId",
@@ -4059,7 +4059,7 @@
     {
       "eventType": "ExecutionTerminated",
       "aggregateType": "ExecutionPlan",
-      "sourceSection": "DOC-002 §26.4",
+      "sourceSection": "UNRATIFIED-AUTHORED (annotated 2026-07-16 under sponsor grant): DOC-007 schematizes NO interface for this, so these fields were AUTHORED, not derived. The citation below NAMES this command/event but defines no fields (DOC-002 §26.x/§34.x are bare name lists; §16 item 6: DOC-007's first slice deliberately leaves the granular vocabulary unschematized). Do NOT treat this sourceSection as proof the shape is ratified. Ratification pending. Cited: DOC-002 §26.4",
       "payloadFields": [
         {
           "field": "reason",
@@ -4145,7 +4145,7 @@
     {
       "eventType": "IntentConstraintRefined",
       "aggregateType": "Intent",
-      "sourceSection": "DOC-002 §33 / fixture §26 step 53 (offline scope refinement)",
+      "sourceSection": "UNRATIFIED-AUTHORED (annotated 2026-07-16 under sponsor grant): DOC-007 schematizes NO interface for this, so these fields were AUTHORED, not derived. The citation below NAMES this command/event but defines no fields (DOC-002 §26.x/§34.x are bare name lists; §16 item 6: DOC-007's first slice deliberately leaves the granular vocabulary unschematized). Do NOT treat this sourceSection as proof the shape is ratified. Ratification pending. Cited: DOC-002 §33 / fixture §26 step 53 (offline scope refinement)",
       "payloadFields": [
         {
           "field": "intentId",
@@ -4170,7 +4170,7 @@
     {
       "eventType": "IntentDiscoveryStarted",
       "aggregateType": "Intent",
-      "sourceSection": "DOC-002 §26.2",
+      "sourceSection": "UNRATIFIED-AUTHORED (annotated 2026-07-16 under sponsor grant): DOC-007 schematizes NO interface for this, so these fields were AUTHORED, not derived. The citation below NAMES this command/event but defines no fields (DOC-002 §26.x/§34.x are bare name lists; §16 item 6: DOC-007's first slice deliberately leaves the granular vocabulary unschematized). Do NOT treat this sourceSection as proof the shape is ratified. Ratification pending. Cited: DOC-002 §26.2",
       "payloadFields": [
         {
           "field": "intentStatus",
@@ -4236,7 +4236,7 @@
     {
       "eventType": "IntentRevised",
       "aggregateType": "Intent",
-      "sourceSection": "DOC-002 §26.2",
+      "sourceSection": "UNRATIFIED-AUTHORED (annotated 2026-07-16 under sponsor grant): DOC-007 schematizes NO interface for this, so these fields were AUTHORED, not derived. The citation below NAMES this command/event but defines no fields (DOC-002 §26.x/§34.x are bare name lists; §16 item 6: DOC-007's first slice deliberately leaves the granular vocabulary unschematized). Do NOT treat this sourceSection as proof the shape is ratified. Ratification pending. Cited: DOC-002 §26.2",
       "payloadFields": [
         {
           "field": "changeRationale",
@@ -4266,7 +4266,7 @@
     {
       "eventType": "IntentSuperseded",
       "aggregateType": "Intent",
-      "sourceSection": "DOC-002 §26.2",
+      "sourceSection": "UNRATIFIED-AUTHORED (annotated 2026-07-16 under sponsor grant): DOC-007 schematizes NO interface for this, so these fields were AUTHORED, not derived. The citation below NAMES this command/event but defines no fields (DOC-002 §26.x/§34.x are bare name lists; §16 item 6: DOC-007's first slice deliberately leaves the granular vocabulary unschematized). Do NOT treat this sourceSection as proof the shape is ratified. Ratification pending. Cited: DOC-002 §26.2",
       "payloadFields": [
         {
           "field": "supersedingIntentId",
@@ -4286,7 +4286,7 @@
     {
       "eventType": "ObligationAllocated",
       "aggregateType": "Obligation",
-      "sourceSection": "DOC-002 §26.3",
+      "sourceSection": "UNRATIFIED-AUTHORED (annotated 2026-07-16 under sponsor grant): DOC-007 schematizes NO interface for this, so these fields were AUTHORED, not derived. The citation below NAMES this command/event but defines no fields (DOC-002 §26.x/§34.x are bare name lists; §16 item 6: DOC-007's first slice deliberately leaves the granular vocabulary unschematized). Do NOT treat this sourceSection as proof the shape is ratified. Ratification pending. Cited: DOC-002 §26.3",
       "payloadFields": [
         {
           "field": "allocatedToWorkUnitIds",
@@ -4312,7 +4312,7 @@
     {
       "eventType": "ObligationRetained",
       "aggregateType": "Obligation",
-      "sourceSection": "DOC-002 §26.3",
+      "sourceSection": "UNRATIFIED-AUTHORED (annotated 2026-07-16 under sponsor grant): DOC-007 schematizes NO interface for this, so these fields were AUTHORED, not derived. The citation below NAMES this command/event but defines no fields (DOC-002 §26.x/§34.x are bare name lists; §16 item 6: DOC-007's first slice deliberately leaves the granular vocabulary unschematized). Do NOT treat this sourceSection as proof the shape is ratified. Ratification pending. Cited: DOC-002 §26.3",
       "payloadFields": [
         {
           "field": "parentWorkUnitId",
@@ -4338,7 +4338,7 @@
     {
       "eventType": "ObligationSatisfied",
       "aggregateType": "Obligation",
-      "sourceSection": "DOC-002 §26.3",
+      "sourceSection": "UNRATIFIED-AUTHORED (annotated 2026-07-16 under sponsor grant): DOC-007 schematizes NO interface for this, so these fields were AUTHORED, not derived. The citation below NAMES this command/event but defines no fields (DOC-002 §26.x/§34.x are bare name lists; §16 item 6: DOC-007's first slice deliberately leaves the granular vocabulary unschematized). Do NOT treat this sourceSection as proof the shape is ratified. Ratification pending. Cited: DOC-002 §26.3",
       "payloadFields": [
         {
           "field": "supportingClaimId",
@@ -4358,7 +4358,7 @@
     {
       "eventType": "ObligationViolated",
       "aggregateType": "Obligation",
-      "sourceSection": "DOC-002 §26.3",
+      "sourceSection": "UNRATIFIED-AUTHORED (annotated 2026-07-16 under sponsor grant): DOC-007 schematizes NO interface for this, so these fields were AUTHORED, not derived. The citation below NAMES this command/event but defines no fields (DOC-002 §26.x/§34.x are bare name lists; §16 item 6: DOC-007's first slice deliberately leaves the granular vocabulary unschematized). Do NOT treat this sourceSection as proof the shape is ratified. Ratification pending. Cited: DOC-002 §26.3",
       "payloadFields": [
         {
           "field": "observationId",
@@ -4378,7 +4378,7 @@
     {
       "eventType": "ObligationWaived",
       "aggregateType": "Obligation",
-      "sourceSection": "DOC-002 §26.3",
+      "sourceSection": "UNRATIFIED-AUTHORED (annotated 2026-07-16 under sponsor grant): DOC-007 schematizes NO interface for this, so these fields were AUTHORED, not derived. The citation below NAMES this command/event but defines no fields (DOC-002 §26.x/§34.x are bare name lists; §16 item 6: DOC-007's first slice deliberately leaves the granular vocabulary unschematized). Do NOT treat this sourceSection as proof the shape is ratified. Ratification pending. Cited: DOC-002 §26.3",
       "payloadFields": [
         {
           "field": "waiverDecisionId",
@@ -4398,7 +4398,7 @@
     {
       "eventType": "PwuAbandoned",
       "aggregateType": "ProfessionalWorkUnit",
-      "sourceSection": "DOC-002 §26.2",
+      "sourceSection": "UNRATIFIED-AUTHORED (annotated 2026-07-16 under sponsor grant): DOC-007 schematizes NO interface for this, so these fields were AUTHORED, not derived. The citation below NAMES this command/event but defines no fields (DOC-002 §26.x/§34.x are bare name lists; §16 item 6: DOC-007's first slice deliberately leaves the granular vocabulary unschematized). Do NOT treat this sourceSection as proof the shape is ratified. Ratification pending. Cited: DOC-002 §26.2",
       "payloadFields": [
         {
           "field": "abandonmentDecisionId",
@@ -4418,7 +4418,7 @@
     {
       "eventType": "PwuBaselined",
       "aggregateType": "ProfessionalWorkUnit",
-      "sourceSection": "DOC-002 §26.2 / §8.3 (M13 fixture trace step 72)",
+      "sourceSection": "UNRATIFIED-AUTHORED (annotated 2026-07-16 under sponsor grant): DOC-007 schematizes NO interface for this, so these fields were AUTHORED, not derived. The citation below NAMES this command/event but defines no fields (DOC-002 §26.x/§34.x are bare name lists; §16 item 6: DOC-007's first slice deliberately leaves the granular vocabulary unschematized). Do NOT treat this sourceSection as proof the shape is ratified. Ratification pending. Cited: DOC-002 §26.2 / §8.3 (M13 fixture trace step 72)",
       "payloadFields": [
         {
           "field": "pwuId",
@@ -4443,7 +4443,7 @@
     {
       "eventType": "PwuBlocked",
       "aggregateType": "ProfessionalWorkUnit",
-      "sourceSection": "DOC-002 §26.2",
+      "sourceSection": "UNRATIFIED-AUTHORED (annotated 2026-07-16 under sponsor grant): DOC-007 schematizes NO interface for this, so these fields were AUTHORED, not derived. The citation below NAMES this command/event but defines no fields (DOC-002 §26.x/§34.x are bare name lists; §16 item 6: DOC-007's first slice deliberately leaves the granular vocabulary unschematized). Do NOT treat this sourceSection as proof the shape is ratified. Ratification pending. Cited: DOC-002 §26.2",
       "payloadFields": [
         {
           "field": "blockReason",
@@ -4468,7 +4468,7 @@
     {
       "eventType": "PwuChallenged",
       "aggregateType": "ProfessionalWorkUnit",
-      "sourceSection": "DOC-002 §26.2",
+      "sourceSection": "UNRATIFIED-AUTHORED (annotated 2026-07-16 under sponsor grant): DOC-007 schematizes NO interface for this, so these fields were AUTHORED, not derived. The citation below NAMES this command/event but defines no fields (DOC-002 §26.x/§34.x are bare name lists; §16 item 6: DOC-007's first slice deliberately leaves the granular vocabulary unschematized). Do NOT treat this sourceSection as proof the shape is ratified. Ratification pending. Cited: DOC-002 §26.2",
       "payloadFields": [
         {
           "field": "challengeReason",
@@ -4493,7 +4493,7 @@
     {
       "eventType": "PwuConditionallySatisfied",
       "aggregateType": "ProfessionalWorkUnit",
-      "sourceSection": "DOC-002 §26.2",
+      "sourceSection": "UNRATIFIED-AUTHORED (annotated 2026-07-16 under sponsor grant): DOC-007 schematizes NO interface for this, so these fields were AUTHORED, not derived. The citation below NAMES this command/event but defines no fields (DOC-002 §26.x/§34.x are bare name lists; §16 item 6: DOC-007's first slice deliberately leaves the granular vocabulary unschematized). Do NOT treat this sourceSection as proof the shape is ratified. Ratification pending. Cited: DOC-002 §26.2",
       "payloadFields": [
         {
           "field": "conditionStatement",
@@ -4525,7 +4525,7 @@
     {
       "eventType": "PwuInvalidated",
       "aggregateType": "ProfessionalWorkUnit",
-      "sourceSection": "DOC-002 §26.2",
+      "sourceSection": "UNRATIFIED-AUTHORED (annotated 2026-07-16 under sponsor grant): DOC-007 schematizes NO interface for this, so these fields were AUTHORED, not derived. The citation below NAMES this command/event but defines no fields (DOC-002 §26.x/§34.x are bare name lists; §16 item 6: DOC-007's first slice deliberately leaves the granular vocabulary unschematized). Do NOT treat this sourceSection as proof the shape is ratified. Ratification pending. Cited: DOC-002 §26.2",
       "payloadFields": [
         {
           "field": "invalidationReason",
@@ -4550,7 +4550,7 @@
     {
       "eventType": "PwuMarkedReady",
       "aggregateType": "ProfessionalWorkUnit",
-      "sourceSection": "DOC-002 §26.2 (DOC-007 §33 lists it; DOC-007 realizes MarkPwuReady via PwuStateChanged)",
+      "sourceSection": "UNRATIFIED-AUTHORED (annotated 2026-07-16 under sponsor grant): DOC-007 schematizes NO interface for this, so these fields were AUTHORED, not derived. The citation below NAMES this command/event but defines no fields (DOC-002 §26.x/§34.x are bare name lists; §16 item 6: DOC-007's first slice deliberately leaves the granular vocabulary unschematized). Do NOT treat this sourceSection as proof the shape is ratified. Ratification pending. Cited: DOC-002 §26.2 (DOC-007 §33 lists it; DOC-007 realizes MarkPwuReady via PwuStateChanged)",
       "payloadFields": [
         {
           "field": "shapeReadinessAttestationId",
@@ -4640,7 +4640,7 @@
     {
       "eventType": "PwuRejected",
       "aggregateType": "ProfessionalWorkUnit",
-      "sourceSection": "DOC-002 §26.2",
+      "sourceSection": "UNRATIFIED-AUTHORED (annotated 2026-07-16 under sponsor grant): DOC-007 schematizes NO interface for this, so these fields were AUTHORED, not derived. The citation below NAMES this command/event but defines no fields (DOC-002 §26.x/§34.x are bare name lists; §16 item 6: DOC-007's first slice deliberately leaves the granular vocabulary unschematized). Do NOT treat this sourceSection as proof the shape is ratified. Ratification pending. Cited: DOC-002 §26.2",
       "payloadFields": [
         {
           "field": "blockingObservationIds",
@@ -4667,7 +4667,7 @@
     {
       "eventType": "PwuReshapingStarted",
       "aggregateType": "ProfessionalWorkUnit",
-      "sourceSection": "DOC-002 §26.2",
+      "sourceSection": "UNRATIFIED-AUTHORED (annotated 2026-07-16 under sponsor grant): DOC-007 schematizes NO interface for this, so these fields were AUTHORED, not derived. The citation below NAMES this command/event but defines no fields (DOC-002 §26.x/§34.x are bare name lists; §16 item 6: DOC-007's first slice deliberately leaves the granular vocabulary unschematized). Do NOT treat this sourceSection as proof the shape is ratified. Ratification pending. Cited: DOC-002 §26.2",
       "payloadFields": [
         {
           "field": "reason",
@@ -4699,7 +4699,7 @@
     {
       "eventType": "PwuSatisfied",
       "aggregateType": "ProfessionalWorkUnit",
-      "sourceSection": "DOC-002 §26.2",
+      "sourceSection": "UNRATIFIED-AUTHORED (annotated 2026-07-16 under sponsor grant): DOC-007 schematizes NO interface for this, so these fields were AUTHORED, not derived. The citation below NAMES this command/event but defines no fields (DOC-002 §26.x/§34.x are bare name lists; §16 item 6: DOC-007's first slice deliberately leaves the granular vocabulary unschematized). Do NOT treat this sourceSection as proof the shape is ratified. Ratification pending. Cited: DOC-002 §26.2",
       "payloadFields": [
         {
           "field": "assuranceAssessmentId",
@@ -4726,7 +4726,7 @@
     {
       "eventType": "PwuShapingStarted",
       "aggregateType": "ProfessionalWorkUnit",
-      "sourceSection": "DOC-002 §26.2 (DOC-007 §33 lists it unschematized)",
+      "sourceSection": "UNRATIFIED-AUTHORED (annotated 2026-07-16 under sponsor grant): DOC-007 schematizes NO interface for this, so these fields were AUTHORED, not derived. The citation below NAMES this command/event but defines no fields (DOC-002 §26.x/§34.x are bare name lists; §16 item 6: DOC-007's first slice deliberately leaves the granular vocabulary unschematized). Do NOT treat this sourceSection as proof the shape is ratified. Ratification pending. Cited: DOC-002 §26.2 (DOC-007 §33 lists it unschematized)",
       "payloadFields": [
         {
           "field": "workLifecycleState",
@@ -4788,7 +4788,7 @@
     {
       "eventType": "PwuSuperseded",
       "aggregateType": "ProfessionalWorkUnit",
-      "sourceSection": "DOC-002 §26.2",
+      "sourceSection": "UNRATIFIED-AUTHORED (annotated 2026-07-16 under sponsor grant): DOC-007 schematizes NO interface for this, so these fields were AUTHORED, not derived. The citation below NAMES this command/event but defines no fields (DOC-002 §26.x/§34.x are bare name lists; §16 item 6: DOC-007's first slice deliberately leaves the granular vocabulary unschematized). Do NOT treat this sourceSection as proof the shape is ratified. Ratification pending. Cited: DOC-002 §26.2",
       "payloadFields": [
         {
           "field": "supersedingWorkUnitId",
@@ -4808,7 +4808,7 @@
     {
       "eventType": "RecompositionCompleted",
       "aggregateType": "RecompositionContract",
-      "sourceSection": "DOC-002 §26.2",
+      "sourceSection": "UNRATIFIED-AUTHORED (annotated 2026-07-16 under sponsor grant): DOC-007 schematizes NO interface for this, so these fields were AUTHORED, not derived. The citation below NAMES this command/event but defines no fields (DOC-002 §26.x/§34.x are bare name lists; §16 item 6: DOC-007's first slice deliberately leaves the granular vocabulary unschematized). Do NOT treat this sourceSection as proof the shape is ratified. Ratification pending. Cited: DOC-002 §26.2",
       "payloadFields": [
         {
           "field": "parentCompletionClaimId",
@@ -4835,7 +4835,7 @@
     {
       "eventType": "RecompositionConflictDetected",
       "aggregateType": "RecompositionContract",
-      "sourceSection": "DOC-002 §26.2",
+      "sourceSection": "UNRATIFIED-AUTHORED (annotated 2026-07-16 under sponsor grant): DOC-007 schematizes NO interface for this, so these fields were AUTHORED, not derived. The citation below NAMES this command/event but defines no fields (DOC-002 §26.x/§34.x are bare name lists; §16 item 6: DOC-007's first slice deliberately leaves the granular vocabulary unschematized). Do NOT treat this sourceSection as proof the shape is ratified. Ratification pending. Cited: DOC-002 §26.2",
       "payloadFields": [
         {
           "field": "conflictingChildWorkUnitIds",
@@ -4860,7 +4860,7 @@
     {
       "eventType": "RecompositionFailed",
       "aggregateType": "RecompositionContract",
-      "sourceSection": "DOC-002 §26.2",
+      "sourceSection": "UNRATIFIED-AUTHORED (annotated 2026-07-16 under sponsor grant): DOC-007 schematizes NO interface for this, so these fields were AUTHORED, not derived. The citation below NAMES this command/event but defines no fields (DOC-002 §26.x/§34.x are bare name lists; §16 item 6: DOC-007's first slice deliberately leaves the granular vocabulary unschematized). Do NOT treat this sourceSection as proof the shape is ratified. Ratification pending. Cited: DOC-002 §26.2",
       "payloadFields": [
         {
           "field": "reason",
@@ -4885,7 +4885,7 @@
     {
       "eventType": "RecompositionStarted",
       "aggregateType": "RecompositionContract",
-      "sourceSection": "DOC-002 §26.2",
+      "sourceSection": "UNRATIFIED-AUTHORED (annotated 2026-07-16 under sponsor grant): DOC-007 schematizes NO interface for this, so these fields were AUTHORED, not derived. The citation below NAMES this command/event but defines no fields (DOC-002 §26.x/§34.x are bare name lists; §16 item 6: DOC-007's first slice deliberately leaves the granular vocabulary unschematized). Do NOT treat this sourceSection as proof the shape is ratified. Ratification pending. Cited: DOC-002 §26.2",
       "payloadFields": [
         {
           "field": "parentWorkUnitId",
@@ -4918,7 +4918,7 @@
     {
       "eventType": "RuntimeBindingAuthorized",
       "aggregateType": "RuntimeBinding",
-      "sourceSection": "DOC-002 §26.4",
+      "sourceSection": "UNRATIFIED-AUTHORED (annotated 2026-07-16 under sponsor grant): DOC-007 schematizes NO interface for this, so these fields were AUTHORED, not derived. The citation below NAMES this command/event but defines no fields (DOC-002 §26.x/§34.x are bare name lists; §16 item 6: DOC-007's first slice deliberately leaves the granular vocabulary unschematized). Do NOT treat this sourceSection as proof the shape is ratified. Ratification pending. Cited: DOC-002 §26.4",
       "payloadFields": [
         {
           "field": "grantedCapabilities",
@@ -4938,7 +4938,7 @@
     {
       "eventType": "RuntimeBindingDenied",
       "aggregateType": "RuntimeBinding",
-      "sourceSection": "DOC-002 §26.4",
+      "sourceSection": "UNRATIFIED-AUTHORED (annotated 2026-07-16 under sponsor grant): DOC-007 schematizes NO interface for this, so these fields were AUTHORED, not derived. The citation below NAMES this command/event but defines no fields (DOC-002 §26.x/§34.x are bare name lists; §16 item 6: DOC-007's first slice deliberately leaves the granular vocabulary unschematized). Do NOT treat this sourceSection as proof the shape is ratified. Ratification pending. Cited: DOC-002 §26.4",
       "payloadFields": [
         {
           "field": "denialReason",
@@ -4957,7 +4957,7 @@
     {
       "eventType": "RuntimeBindingRequested",
       "aggregateType": "RuntimeBinding",
-      "sourceSection": "DOC-002 §26.4",
+      "sourceSection": "UNRATIFIED-AUTHORED (annotated 2026-07-16 under sponsor grant): DOC-007 schematizes NO interface for this, so these fields were AUTHORED, not derived. The citation below NAMES this command/event but defines no fields (DOC-002 §26.x/§34.x are bare name lists; §16 item 6: DOC-007's first slice deliberately leaves the granular vocabulary unschematized). Do NOT treat this sourceSection as proof the shape is ratified. Ratification pending. Cited: DOC-002 §26.4",
       "payloadFields": [
         {
           "field": "executionStepId",
@@ -5001,7 +5001,7 @@
     {
       "eventType": "RuntimeCapabilityRevoked",
       "aggregateType": "RuntimeBinding",
-      "sourceSection": "DOC-002 §26.4",
+      "sourceSection": "UNRATIFIED-AUTHORED (annotated 2026-07-16 under sponsor grant): DOC-007 schematizes NO interface for this, so these fields were AUTHORED, not derived. The citation below NAMES this command/event but defines no fields (DOC-002 §26.x/§34.x are bare name lists; §16 item 6: DOC-007's first slice deliberately leaves the granular vocabulary unschematized). Do NOT treat this sourceSection as proof the shape is ratified. Ratification pending. Cited: DOC-002 §26.4",
       "payloadFields": [
         {
           "field": "revocationReason",
@@ -5026,7 +5026,7 @@
     {
       "eventType": "TacticalChangeApplied",
       "aggregateType": "ExecutionPlan",
-      "sourceSection": "DOC-002 §26.4",
+      "sourceSection": "UNRATIFIED-AUTHORED (annotated 2026-07-16 under sponsor grant): DOC-007 schematizes NO interface for this, so these fields were AUTHORED, not derived. The citation below NAMES this command/event but defines no fields (DOC-002 §26.x/§34.x are bare name lists; §16 item 6: DOC-007's first slice deliberately leaves the granular vocabulary unschematized). Do NOT treat this sourceSection as proof the shape is ratified. Ratification pending. Cited: DOC-002 §26.4",
       "payloadFields": [
         {
           "field": "executionPlanId",
@@ -5056,7 +5056,7 @@
     {
       "eventType": "TacticalChangeRequested",
       "aggregateType": "ExecutionPlan",
-      "sourceSection": "DOC-002 §26.4",
+      "sourceSection": "UNRATIFIED-AUTHORED (annotated 2026-07-16 under sponsor grant): DOC-007 schematizes NO interface for this, so these fields were AUTHORED, not derived. The citation below NAMES this command/event but defines no fields (DOC-002 §26.x/§34.x are bare name lists; §16 item 6: DOC-007's first slice deliberately leaves the granular vocabulary unschematized). Do NOT treat this sourceSection as proof the shape is ratified. Ratification pending. Cited: DOC-002 §26.4",
       "payloadFields": [
         {
           "field": "executionPlanId",
@@ -5085,7 +5085,7 @@
     {
       "eventType": "WaiverDenied",
       "aggregateType": "Decision",
-      "sourceSection": "DOC-002 §26.5",
+      "sourceSection": "UNRATIFIED-AUTHORED (annotated 2026-07-16 under sponsor grant): DOC-007 schematizes NO interface for this, so these fields were AUTHORED, not derived. The citation below NAMES this command/event but defines no fields (DOC-002 §26.x/§34.x are bare name lists; §16 item 6: DOC-007's first slice deliberately leaves the granular vocabulary unschematized). Do NOT treat this sourceSection as proof the shape is ratified. Ratification pending. Cited: DOC-002 §26.5",
       "payloadFields": [
         {
           "field": "rationale",
@@ -5098,7 +5098,7 @@
     {
       "eventType": "WaiverExpired",
       "aggregateType": "Decision",
-      "sourceSection": "DOC-002 §26.5",
+      "sourceSection": "UNRATIFIED-AUTHORED (annotated 2026-07-16 under sponsor grant): DOC-007 schematizes NO interface for this, so these fields were AUTHORED, not derived. The citation below NAMES this command/event but defines no fields (DOC-002 §26.x/§34.x are bare name lists; §16 item 6: DOC-007's first slice deliberately leaves the granular vocabulary unschematized). Do NOT treat this sourceSection as proof the shape is ratified. Ratification pending. Cited: DOC-002 §26.5",
       "payloadFields": [
         {
           "field": "waiverDecisionId",
@@ -5111,7 +5111,7 @@
     {
       "eventType": "WaiverGranted",
       "aggregateType": "Decision",
-      "sourceSection": "DOC-002 §26.5",
+      "sourceSection": "UNRATIFIED-AUTHORED (annotated 2026-07-16 under sponsor grant): DOC-007 schematizes NO interface for this, so these fields were AUTHORED, not derived. The citation below NAMES this command/event but defines no fields (DOC-002 §26.x/§34.x are bare name lists; §16 item 6: DOC-007's first slice deliberately leaves the granular vocabulary unschematized). Do NOT treat this sourceSection as proof the shape is ratified. Ratification pending. Cited: DOC-002 §26.5",
       "payloadFields": [
         {
           "field": "waiverDecisionId",
@@ -5141,7 +5141,7 @@
     {
       "eventType": "WaiverRequested",
       "aggregateType": "Decision",
-      "sourceSection": "DOC-002 §26.5",
+      "sourceSection": "UNRATIFIED-AUTHORED (annotated 2026-07-16 under sponsor grant): DOC-007 schematizes NO interface for this, so these fields were AUTHORED, not derived. The citation below NAMES this command/event but defines no fields (DOC-002 §26.x/§34.x are bare name lists; §16 item 6: DOC-007's first slice deliberately leaves the granular vocabulary unschematized). Do NOT treat this sourceSection as proof the shape is ratified. Ratification pending. Cited: DOC-002 §26.5",
       "payloadFields": [
         {
           "field": "subjectObjectIds",
@@ -5189,7 +5189,7 @@
     {
       "eventType": "IntentProvisioned",
       "aggregateType": "Intent",
-      "sourceSection": "added (DOC-002 §6.1 provisional transition has no §26.2 event) — see OPEN-QUESTIONS",
+      "sourceSection": "UNRATIFIED-AUTHORED (annotated 2026-07-16 under sponsor grant): DOC-007 schematizes NO interface for this, so these fields were AUTHORED, not derived. The citation below NAMES this command/event but defines no fields (DOC-002 §26.x/§34.x are bare name lists; §16 item 6: DOC-007's first slice deliberately leaves the granular vocabulary unschematized). Do NOT treat this sourceSection as proof the shape is ratified. Ratification pending. Cited: added (DOC-002 §6.1 provisional transition has no §26.2 event) — see OPEN-QUESTIONS",
       "payloadFields": [
         {
           "field": "ambiguityIds",
@@ -5202,7 +5202,7 @@
     {
       "eventType": "PwaCreated",
       "aggregateType": "ProfessionalWorkArchitecture",
-      "sourceSection": "RPH-DOC-010 (PWA authoring)",
+      "sourceSection": "UNRATIFIED-AUTHORED (annotated 2026-07-16 under sponsor grant): DOC-007 schematizes NO interface for this, so these fields were AUTHORED, not derived. The citation below NAMES this command/event but defines no fields (DOC-002 §26.x/§34.x are bare name lists; §16 item 6: DOC-007's first slice deliberately leaves the granular vocabulary unschematized). Do NOT treat this sourceSection as proof the shape is ratified. Ratification pending. Cited: RPH-DOC-010 (PWA authoring)",
       "payloadFields": [
         {
           "field": "pwaId",
@@ -5224,7 +5224,7 @@
     {
       "eventType": "PwuTypeDefined",
       "aggregateType": "PwuType",
-      "sourceSection": "RPH-DOC-010 (PWA authoring)",
+      "sourceSection": "UNRATIFIED-AUTHORED (annotated 2026-07-16 under sponsor grant): DOC-007 schematizes NO interface for this, so these fields were AUTHORED, not derived. The citation below NAMES this command/event but defines no fields (DOC-002 §26.x/§34.x are bare name lists; §16 item 6: DOC-007's first slice deliberately leaves the granular vocabulary unschematized). Do NOT treat this sourceSection as proof the shape is ratified. Ratification pending. Cited: RPH-DOC-010 (PWA authoring)",
       "payloadFields": [
         {
           "field": "pwuTypeId",
@@ -5276,7 +5276,7 @@
     {
       "eventType": "UndertakingCreated",
       "aggregateType": "Undertaking",
-      "sourceSection": "RPH-DOC-010 (PWA authoring)",
+      "sourceSection": "UNRATIFIED-AUTHORED (annotated 2026-07-16 under sponsor grant): DOC-007 schematizes NO interface for this, so these fields were AUTHORED, not derived. The citation below NAMES this command/event but defines no fields (DOC-002 §26.x/§34.x are bare name lists; §16 item 6: DOC-007's first slice deliberately leaves the granular vocabulary unschematized). Do NOT treat this sourceSection as proof the shape is ratified. Ratification pending. Cited: RPH-DOC-010 (PWA authoring)",
       "payloadFields": [
         {
           "field": "undertakingId",

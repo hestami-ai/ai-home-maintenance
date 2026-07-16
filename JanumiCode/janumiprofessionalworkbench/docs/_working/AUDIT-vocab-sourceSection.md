@@ -60,6 +60,50 @@ Whenever an increment leans on a vocab field's provenance, it must verify the ci
 field-defining source (DOC-007 §10–23), not a name-list. Four of the increments in this effort already hit a
 hollow citation (waiver `scope`, and the `art`/`conv` prefixes).
 
+---
+
+## FOLLOW-UP 2026-07-16 — the partition, and a correction to my own offer
+
+I told the sponsor the 136 split into "ones I can repoint" and "ones only you can ratify," and offered to do the
+first half. **That half does not exist.** Mechanically partitioning every hollow entry by "does DOC-007 define
+an `interface <Name>Payload` for it?":
+
+| | |
+|---|---:|
+| DOC-007 interfaces in the entire document | **64** |
+| Hollow field-bearing entries | 135 |
+| → **REPOINTABLE** (a real DOC-007 interface exists) | **0** |
+| → **UNRATIFIED** (DOC-007 defines nothing) | **135** (420 fields) |
+
+Verified sound, because zero is exactly the result a buggy script fabricates: the extraction finds 64
+interfaces and `CaptureIntentPayload` **is** among them (so the regex works and the honest bucket is real), while
+`AssertClaimPayload`, `DetectAssumptionPayload`, `RecordAssuranceObservationPayload`, `ProposeDecisionPayload`
+each return **zero** hits.
+
+**This sharpens the finding rather than softening it.** The vocab is *not* mis-citing. It cites DOC-002
+§26.x/§34.x precisely because that is the only place these commands/events are named **at all** — DOC-007
+deliberately schematized a subset (§16 item 6: "DOC-007's first slice uses `PwuStateChanged`,
+`AssuranceAssessmentCompleted`, and `DecisionEffective`, without fully modeling separate approval/effective
+time"). So the real shape of it is:
+
+> **DOC-007 ratifies a 64-interface wire surface. The vocab implements 135 more commands/events on 420 authored
+> fields, ratified nowhere — and the system runs on them.**
+
+That is the codebase running ahead of its own ratified contract, which is this whole harmonization's recurring
+shape, now measured at the contract layer.
+
+## DONE 2026-07-16 — the vocab no longer presents authored fields as sourced
+
+Under the sponsor's grant, all **135** hollow entries' `sourceSection` are annotated `UNRATIFIED-AUTHORED`,
+preserving the original citation and stating plainly: DOC-007 schematizes no interface for this, the cited
+section names it but defines no fields, do not treat this as proof the shape is ratified, ratification pending.
+
+**This ratifies nothing.** `sourceSection` is pure vocab metadata — not emitted to generated code, not read by
+the generator — so this is documentation only (verified: generated code untouched, check-types 21/21, contracts
+146/146). It converts silent provenance theater into visible disclosure, which is the honest state until the
+ratification pass happens. The 33 untouched entries are the 32 genuine DOC-007 citations plus `RequestWaiver`,
+already marked authored-under-grant in Increment 9.
+
 ## NOT fixed here, and why
 
 Repointing 136 citations is not a mechanical edit. For each, the honest source either **exists** (DOC-007
