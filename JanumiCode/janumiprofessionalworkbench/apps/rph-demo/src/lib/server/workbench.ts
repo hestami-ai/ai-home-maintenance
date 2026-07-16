@@ -16,7 +16,7 @@ import {
 	seedWorkbench,
 	type EngineHandle
 } from '@janumipwb/rph-engine';
-import { ontology } from '@janumipwb/rph-product-realization-pwa';
+import { ontology, validateOntology } from '@janumipwb/rph-product-realization-pwa';
 import { PwaAuthoringBroker } from '@janumipwb/rph-authoring';
 import { buildPwaGraphExport, type PwaGraphExport } from '@janumipwb/rph-projections';
 import type { DomainCommand } from '@janumipwb/rph-contracts';
@@ -54,8 +54,24 @@ export function hostNow(): string {
 	return TEST_MODE ? testNow() : new Date().toISOString();
 }
 
+/**
+ * The engine, with the PWA's OWN ontology validator (OVR) WIRED.
+ *
+ * `createEngine` has always thrown on any issue `validateOntology` reports — but nothing ever supplied it, so
+ * the check was a dead seam. It could not be wired, either: it reported **21** unresolved references, because
+ * the ratified conformance profiles and PWU templates name **12** policies and the ontology shipped **6**.
+ * HIGH_ASSURANCE — the profile for security-sensitive, regulated, hard-to-reverse work — listed 12 mandatory
+ * policies of which half did not exist, so the profile intended for high-consequence work was unsatisfiable.
+ * A test pinned that as a known gap ("references to the not-yet-authored core policies").
+ *
+ * The catalog is now complete (DOC-004 §18/§20/§22/§24/§25/§26 seeded), the OVR reports 0, and the seam is
+ * live. That is what makes the completion permanent instead of a snapshot: deleting a policy, or adding a
+ * profile/template reference to one that does not exist, now fails engine construction rather than silently
+ * producing an unsatisfiable profile.
+ */
 function newEngine(): EngineHandle {
-	return createEngine(TEST_MODE ? { ontology, now: testNow } : { ontology });
+	const base = { ontology, validateOntology };
+	return createEngine(TEST_MODE ? { ...base, now: testNow } : base);
 }
 
 /** The shared, seeded engine (created + seeded once per server process). */

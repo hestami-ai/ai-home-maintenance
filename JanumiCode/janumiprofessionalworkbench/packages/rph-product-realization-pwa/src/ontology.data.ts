@@ -544,363 +544,6 @@ export const PRODUCT_REALIZATION_PWA_ONTOLOGY = {
 	],
 	seedPolicies: [
 		{
-			policyId: 'pol_intent_fidelity',
-			name: 'Intent Fidelity',
-			evaluatedClaimTypes: ['PRESERVATION', 'CORRECTNESS', 'COMPLETENESS'],
-			appliesToPwuKinds: [
-				'INTENT_AND_PRODUCT_DEFINITION',
-				'INTENT_DISCOVERY',
-				'PRODUCT_BOUNDARY',
-				'PRODUCT_REALIZATION'
-			],
-			requiredEvidenceTypes: ['SOURCE', 'ARTIFACT', 'TRACE'],
-			criteria: [
-				{
-					id: 'IF-01',
-					name: 'Objective fidelity',
-					description:
-						"the formalized objective represents the user's need rather than substituting a preferred solution.",
-					criterionType: 'BOOLEAN',
-					evaluationMethod: 'MODEL_JUDGMENT',
-					requiredEvidenceIds: [],
-					severityIfNotMet: 'BLOCKING',
-					mayBeNotApplicable: false
-				},
-				{
-					id: 'IF-02',
-					name: 'Boundary fidelity',
-					description:
-						'in-scope and out-of-scope statements are consistent with user authority (no unauthorized scope expansion).',
-					criterionType: 'BOOLEAN',
-					evaluationMethod: 'MODEL_JUDGMENT',
-					requiredEvidenceIds: [],
-					severityIfNotMet: 'BLOCKING',
-					mayBeNotApplicable: false
-				},
-				{
-					id: 'IF-03',
-					name: 'Constraint fidelity',
-					description: 'explicit user constraints are preserved (not omitted or weakened).',
-					criterionType: 'BOOLEAN',
-					evaluationMethod: 'MODEL_JUDGMENT',
-					requiredEvidenceIds: [],
-					severityIfNotMet: 'BLOCKING',
-					mayBeNotApplicable: false
-				},
-				{
-					id: 'IF-04',
-					name: 'Interpretation disclosure',
-					description:
-						'inferred elements are labeled as inferred or proposed, not presented as user fact/requirement.',
-					criterionType: 'BOOLEAN',
-					evaluationMethod: 'MODEL_JUDGMENT',
-					requiredEvidenceIds: [],
-					severityIfNotMet: 'BLOCKING',
-					mayBeNotApplicable: false
-				},
-				{
-					id: 'IF-05',
-					name: 'Ambiguity visibility',
-					description: 'materially unresolved interpretations remain explicit.',
-					criterionType: 'BOOLEAN',
-					evaluationMethod: 'MODEL_JUDGMENT',
-					requiredEvidenceIds: [],
-					severityIfNotMet: 'BLOCKING',
-					mayBeNotApplicable: false
-				}
-			],
-			findingTypes: [
-				'SOLUTION_SUBSTITUTION',
-				'UNAUTHORIZED_SCOPE_EXPANSION',
-				'MISSING_USER_CONSTRAINT',
-				'FALSELY_CLOSED_AMBIGUITY',
-				'INFERRED_NEED_PRESENTED_AS_FACT',
-				'OUTCOME_EROSION',
-				'NON_GOAL_CONFLICT'
-			],
-			independenceRequirement: 'DIFFERENT_AGENT',
-			failureSeverity: 'BLOCKING',
-			sourceSection:
-				"CANONICAL id pol_intent_fidelity (Catalog/DOC-004 §15.1, v1.0.0); ALIAS = fixture pol_intent_fidelity_v1 (Reference §18.1, attached to pwu_fsm_intent + Product Intent Baseline). Spec/DOC-003 §25. Criteria IF-01..IF-05 EXPLICIT in §15.6. Required-evidence prose (§15.5): originating expression, clarification dialogue, supplied documents, proposed Product Intent, constraints, recorded user corrections, prior intent version. Blocking (§25): objective contradicts user expression / mandatory constraint omitted / major ambiguity hidden / inferred solution presented as user requirement. Unauthorized intent alteration CANNOT be waived (§15.11); a user-approved revised intent is a governed intent revision. Control actions: CLARIFY, REVISE_CONTEXT, RESHAPE_PWU, REQUEST_HUMAN_DECISION, REJECT. RECONCILED: evaluatedClaimTypes CORRECTNESS (DOC-003/004) over CONSISTENCY (DOC-006); independence DIFFERENT_AGENT (DOC-004/006, = §15.8 Standard 'different invocation + agent role') over DOC-003 DIFFERENT_INVOCATION baseline — profile-escalates to DIFFERENT_MODEL+HUMAN at High-Assurance."
-		},
-		{
-			policyId: 'pol_intent_completeness',
-			name: 'Intent Completeness',
-			evaluatedClaimTypes: ['COMPLETENESS', 'COVERAGE'],
-			appliesToPwuKinds: ['INTENT_AND_PRODUCT_DEFINITION', 'PRODUCT_BOUNDARY'],
-			requiredEvidenceTypes: ['ARTIFACT', 'ANALYSIS'],
-			criteria: [
-				{
-					id: 'IC-01',
-					name: 'IC-01',
-					description:
-						'Desired outcomes are sufficiently explicit for the next authorized activity.',
-					criterionType: 'BOOLEAN',
-					evaluationMethod: 'MODEL_JUDGMENT',
-					requiredEvidenceIds: [],
-					severityIfNotMet: 'BLOCKING',
-					mayBeNotApplicable: false
-				},
-				{
-					id: 'IC-02',
-					name: 'IC-02',
-					description: 'Product boundaries are sufficient for the next authorized activity.',
-					criterionType: 'BOOLEAN',
-					evaluationMethod: 'MODEL_JUDGMENT',
-					requiredEvidenceIds: [],
-					severityIfNotMet: 'BLOCKING',
-					mayBeNotApplicable: false
-				},
-				{
-					id: 'IC-03',
-					name: 'IC-03',
-					description: 'Known stakeholders and actors are represented proportionally to risk.',
-					criterionType: 'BOOLEAN',
-					evaluationMethod: 'MODEL_JUDGMENT',
-					requiredEvidenceIds: [],
-					severityIfNotMet: 'ADVISORY',
-					mayBeNotApplicable: false
-				},
-				{
-					id: 'IC-04',
-					name: 'IC-04',
-					description: 'Mandatory constraints are recorded.',
-					criterionType: 'BOOLEAN',
-					evaluationMethod: 'MODEL_JUDGMENT',
-					requiredEvidenceIds: [],
-					severityIfNotMet: 'BLOCKING',
-					mayBeNotApplicable: false
-				},
-				{
-					id: 'IC-05',
-					name: 'IC-05',
-					description: 'Success conditions exist, or the work is explicitly marked exploratory.',
-					criterionType: 'BOOLEAN',
-					evaluationMethod: 'MODEL_JUDGMENT',
-					requiredEvidenceIds: [],
-					severityIfNotMet: 'BLOCKING',
-					mayBeNotApplicable: false
-				},
-				{
-					id: 'IC-06',
-					name: 'IC-06',
-					description: 'Major ambiguities have explicit dispositions.',
-					criterionType: 'BOOLEAN',
-					evaluationMethod: 'MODEL_JUDGMENT',
-					requiredEvidenceIds: [],
-					severityIfNotMet: 'BLOCKING',
-					mayBeNotApplicable: false
-				}
-			],
-			findingTypes: [
-				'MISSING_DESIRED_OUTCOME',
-				'UNBOUNDED_PRODUCT_SCOPE',
-				'MISSING_MANDATORY_CONSTRAINT',
-				'UNRESOLVED_CRITICAL_AMBIGUITY',
-				'NO_SUCCESS_CONDITION',
-				'PREMATURE_DOWNSTREAM_SHAPING',
-				'FALSE_COMPLETENESS'
-			],
-			independenceRequirement: 'DIFFERENT_INVOCATION',
-			failureSeverity: 'MATERIAL',
-			sourceSection:
-				'CANONICAL id pol_intent_completeness (Catalog §16); ALIAS = fixture pol_intent_complete_v1 (Reference §18.2, applied before architecture). Spec §26. Criteria SYNTHESIZED 1:1 from the §16.3 claim list (source has no lettered criteria). Required-evidence prose (§16.4): Product Intent, ambiguity catalog, constraint catalog, stakeholder/actor catalog, non-goals, risk profile. Completeness is RISK-RELATIVE (§16.1) — sufficiency for the next authorized activity, not exhaustive spec. Applicability (§16.2): REQUIRED before Product Behavior Definition, Architecture Definition, high-impact implementation planning (encode via ApplicabilityExpression, NOT via appliesToPwuKinds). Dispositions: SATISFIED/CONDITIONALLY_SATISFIED (exploratory when uncertainty explicit + downstream reversible)/INCONCLUSIVE/REJECTED. PREMATURE_DOWNSTREAM_SHAPING of irreversible/high-impact work escalates to BLOCKING. RECONCILED: evaluatedClaimTypes COVERAGE (DOC-003/004) over FITNESS (DOC-006); appliesToPwuKinds restricted to intent+boundary (DOC-004/006) — DOC-003 also listed behavior+architecture (that is its GATE relationship, modeled as applicability); IC-05 mandatory=true (DOC-003/006) over DOC-004 false; IC-03 mandatory=false (DOC-003/004) over DOC-006 true.'
-		},
-		{
-			policyId: 'pol_assumption_disclosure',
-			name: 'Assumption Disclosure',
-			evaluatedClaimTypes: ['COMPLETENESS', 'CORRECTNESS'],
-			appliesToPwuKinds: [
-				'INTENT_AND_PRODUCT_DEFINITION',
-				'PRODUCT_BEHAVIOR_DEFINITION',
-				'ARCHITECTURE_DEFINITION',
-				'ARCHITECTURE_DECISION',
-				'IMPLEMENTATION_PLANNING',
-				'WORK_DECOMPOSITION',
-				'PRODUCT_IMPLEMENTATION',
-				'INTEGRATED_PRODUCT_VALIDATION'
-			],
-			requiredEvidenceTypes: ['ARTIFACT', 'SOURCE', 'ANALYSIS'],
-			criteria: [
-				{
-					id: 'AD-01',
-					name: 'AD-01',
-					description:
-						'Material assumptions have been surfaced as first-class Assumption Objects (not left in prose).',
-					criterionType: 'BOOLEAN',
-					evaluationMethod: 'MODEL_JUDGMENT',
-					requiredEvidenceIds: [],
-					severityIfNotMet: 'BLOCKING',
-					mayBeNotApplicable: false
-				},
-				{
-					id: 'AD-02',
-					name: 'AD-02',
-					description: 'Assumptions are distinguished from established facts.',
-					criterionType: 'BOOLEAN',
-					evaluationMethod: 'MODEL_JUDGMENT',
-					requiredEvidenceIds: [],
-					severityIfNotMet: 'BLOCKING',
-					mayBeNotApplicable: false
-				},
-				{
-					id: 'AD-03',
-					name: 'AD-03',
-					description: 'Affected objects are identified for each assumption.',
-					criterionType: 'BOOLEAN',
-					evaluationMethod: 'MODEL_JUDGMENT',
-					requiredEvidenceIds: [],
-					severityIfNotMet: 'BLOCKING',
-					mayBeNotApplicable: false
-				},
-				{
-					id: 'AD-04',
-					name: 'AD-04',
-					description: 'Materiality is classified (IMMATERIAL / MATERIAL / CRITICAL).',
-					criterionType: 'BOOLEAN',
-					evaluationMethod: 'MODEL_JUDGMENT',
-					requiredEvidenceIds: [],
-					severityIfNotMet: 'BLOCKING',
-					mayBeNotApplicable: false
-				},
-				{
-					id: 'AD-05',
-					name: 'AD-05',
-					description: 'Verification or authorized-acceptance needs are identified.',
-					criterionType: 'BOOLEAN',
-					evaluationMethod: 'MODEL_JUDGMENT',
-					requiredEvidenceIds: [],
-					severityIfNotMet: 'BLOCKING',
-					mayBeNotApplicable: false
-				},
-				{
-					id: 'AD-06',
-					name: 'AD-06',
-					description:
-						'No critical assumption silently authorizes irreversible or high-impact work without verification or authorized acceptance.',
-					criterionType: 'BOOLEAN',
-					evaluationMethod: 'MODEL_JUDGMENT',
-					requiredEvidenceIds: [],
-					severityIfNotMet: 'BLOCKING',
-					mayBeNotApplicable: false
-				}
-			],
-			findingTypes: [
-				'HIDDEN_MATERIAL_ASSUMPTION',
-				'ASSUMPTION_PRESENTED_AS_FACT',
-				'UNBOUNDED_ASSUMPTION_SCOPE',
-				'MISSING_ASSUMPTION_BASIS',
-				'UNASSESSED_CRITICAL_ASSUMPTION',
-				'EXPIRED_ASSUMPTION',
-				'CONFLICTING_ASSUMPTIONS'
-			],
-			independenceRequirement: 'DIFFERENT_INVOCATION',
-			failureSeverity: 'MATERIAL',
-			sourceSection:
-				"CANONICAL id pol_assumption_disclosure (Catalog §17); ALIAS = fixture pol_assumption_disclosure_v1 (Reference §18.3). Spec §27. CROSS-CUTTING: applies to ALL model-produced professional artifacts (§17.2, §29.4) — the ONE policy attached to BOTH pwu_fsm_intent (§10) and pwu_fsm_arch (§12) in the fixture. Criteria SYNTHESIZED from §17.3. Required-evidence prose (§17.4): artifact under assessment, execution rationale, prompt/context provenance, known facts, constraints, decisions, external sources. Required output (§17.6): each material assumption becomes an Assumption Object (statement/basis/materiality/affectedObjects/status/verificationMethod). SATISFIED means disclosed, NOT verified (§17.7). Control actions: GATHER_EVIDENCE, CLARIFY, RESHAPE_PWU, INVALIDATE_DEPENDENTS, REQUEST_HUMAN_DECISION, ESCALATE. RECONCILED: appliesToPwuKinds = UNION (DOC-003's 8; includes ARCHITECTURE_DECISION + WORK_DECOMPOSITION dropped by DOC-004/006) per 'any model-produced artifact'; failureSeverity MATERIAL base (DOC-003/006) over DOC-004 BLOCKING — a critical unresolved assumption governing irreversible work ESCALATES to BLOCKING/CRITICAL (per-finding), yielding CONDITIONALLY_SATISFIED/REJECTED/ESCALATED; AD-05 mandatory=true (DOC-003/006)."
-		},
-		{
-			policyId: 'pol_decomposition_coverage',
-			name: 'Decomposition Coverage',
-			evaluatedClaimTypes: ['COVERAGE', 'PRESERVATION', 'FEASIBILITY'],
-			appliesToPwuKinds: [
-				'ARCHITECTURE_DEFINITION',
-				'IMPLEMENTATION_PLANNING',
-				'WORK_DECOMPOSITION',
-				'PRODUCT_REALIZATION'
-			],
-			requiredEvidenceTypes: ['ARTIFACT', 'TRACE', 'ANALYSIS'],
-			criteria: [
-				{
-					id: 'DC-01',
-					name: 'Obligation coverage',
-					description:
-						'no mandatory parent obligation silently disappears (every one is allocated, retained, satisfied, or waived).',
-					criterionType: 'BOOLEAN',
-					evaluationMethod: 'MODEL_JUDGMENT',
-					requiredEvidenceIds: [],
-					severityIfNotMet: 'BLOCKING',
-					mayBeNotApplicable: false
-				},
-				{
-					id: 'DC-02',
-					name: 'Constraint preservation',
-					description: 'applicable constraints are propagated or explicitly retained.',
-					criterionType: 'BOOLEAN',
-					evaluationMethod: 'MODEL_JUDGMENT',
-					requiredEvidenceIds: [],
-					severityIfNotMet: 'BLOCKING',
-					mayBeNotApplicable: false
-				},
-				{
-					id: 'DC-03',
-					name: 'Cohesion',
-					description: 'each child represents coherent professional work.',
-					criterionType: 'BOOLEAN',
-					evaluationMethod: 'MODEL_JUDGMENT',
-					requiredEvidenceIds: [],
-					severityIfNotMet: 'ADVISORY',
-					mayBeNotApplicable: false
-				},
-				{
-					id: 'DC-04',
-					name: 'Boundary clarity',
-					description: 'child responsibilities are distinguishable.',
-					criterionType: 'BOOLEAN',
-					evaluationMethod: 'MODEL_JUDGMENT',
-					requiredEvidenceIds: [],
-					severityIfNotMet: 'ADVISORY',
-					mayBeNotApplicable: false
-				},
-				{
-					id: 'DC-05',
-					name: 'Dependency completeness',
-					description: 'material sibling dependencies are explicit.',
-					criterionType: 'BOOLEAN',
-					evaluationMethod: 'MODEL_JUDGMENT',
-					requiredEvidenceIds: [],
-					severityIfNotMet: 'BLOCKING',
-					mayBeNotApplicable: false
-				},
-				{
-					id: 'DC-06',
-					name: 'Recomposition feasibility',
-					description: 'a credible parent-level integration strategy exists.',
-					criterionType: 'BOOLEAN',
-					evaluationMethod: 'MODEL_JUDGMENT',
-					requiredEvidenceIds: [],
-					severityIfNotMet: 'BLOCKING',
-					mayBeNotApplicable: false
-				},
-				{
-					id: 'DC-07',
-					name: 'Intent continuity',
-					description: 'child objectives remain subordinate to parent intent.',
-					criterionType: 'BOOLEAN',
-					evaluationMethod: 'MODEL_JUDGMENT',
-					requiredEvidenceIds: [],
-					severityIfNotMet: 'BLOCKING',
-					mayBeNotApplicable: false
-				}
-			],
-			findingTypes: [
-				'MISSING_OBLIGATION_ALLOCATION',
-				'DROPPED_CONSTRAINT',
-				'ORPHAN_CHILD_PWU',
-				'OVERLAPPING_CHILD_SCOPE',
-				'EXCESSIVE_CHILD_COUPLING',
-				'INVALID_GRANULARITY',
-				'MISSING_SIBLING_DEPENDENCY',
-				'MISSING_RECOMPOSITION_STRATEGY',
-				'CHILD_INTENT_DIVERGENCE',
-				'FALSE_COMPLETE_COVERAGE'
-			],
-			independenceRequirement: 'DIFFERENT_AGENT',
-			failureSeverity: 'BLOCKING',
-			sourceSection:
-				'CANONICAL id pol_decomposition_coverage (Catalog §19); ALIAS = fixture pol_decomposition_coverage_v1 (Reference §18.4, applied to DECOMPOSITION_CONTRACT dcp_fsm_arch_001; DecompositionValidated event 32 gates child execution). Spec §29. Criteria DC-01..DC-07 EXPLICIT/VERBATIM in §19.5. Required-evidence prose (§19.4): parent PWU/intent/obligations, constraints, assumptions, child PWUs, allocation map, dependency graph, recomposition contract. Applicability (§19.2): Decomposition Contract submitted / decomposition changes semantically / child removed / parent obligation changes. Disposition (§19.7): any missing mandatory obligation OR child intent divergence (OR no recomposition strategy / invalid authority) is BLOCKING. Control actions: REVISE_DECOMPOSITION, RESHAPE_PWU, CLARIFY, REQUEST_HUMAN_DECISION, REJECT. RECONCILED: evaluatedClaimTypes = [COVERAGE,PRESERVATION,FEASIBILITY] (FEASIBILITY in DOC-003/006); DOC-003 also had CONSISTENCY, DOC-004 had COMPLETENESS (divergent tail, see conflicts). Independence DIFFERENT_AGENT (DOC-004/006) over DOC-003 DIFFERENT_INVOCATION baseline; DC-05 mandatory=true (DOC-003/006).'
-		},
-		{
 			policyId: 'pol_architecture_coverage',
 			name: 'Architecture Coverage',
 			evaluatedClaimTypes: ['COVERAGE', 'SECURITY', 'FEASIBILITY', 'CONSISTENCY'],
@@ -1028,6 +671,721 @@ export const PRODUCT_REALIZATION_PWA_ONTOLOGY = {
 				"CANONICAL id pol_architecture_coverage (Catalog §21); ALIAS = fixture pol_arch_coverage_v1 (Reference §18.5, §19). Spec §30. Criteria SYNTHESIZED from the ten §21.3 claims. Required-evidence prose (§21.4): approved intent, requirements, journeys, architecture artifacts, decision records, interface definitions, data model, deployment model, security analysis, traceability, assumption catalog. Applicability (§21.2): architecture PWU completes execution / architecture materially revised / implementation planning begins / baseline promotion requested. Disposition (§21.6): critical security, tenant-isolation, data-integrity, or mandatory-constraint failures are BLOCKING (drives failureSeverity CRITICAL; escalate finding severity to CRITICAL for security/isolation). FIXTURE: assess_fsm_arch_coverage_001 evaluated claims FSM-ARCH-001..006, evaluator agent_verifier_001 (distinct executionInstanceId => DIFFERENT_AGENT), disposition CONDITIONALLY_SATISFIED with 2 OPEN MATERIAL observations obs_fsm_arch_001 (offline ambiguity, EVIDENCE_DEFICIT) + obs_fsm_arch_002 (tenant-isolation, RECOMMENDATION) — proving EXECUTION!=ASSURANCE (INV-5). RECONCILED: failureSeverity CRITICAL (DOC-004/006) over DOC-003 BLOCKING; appliesToPwuKinds ARCHITECTURE_DEFINITION only (DOC-004/006) — DOC-003 also listed ARCHITECTURE_DECISION; evaluatedClaimTypes = agreed core 4 (DOC-003 added PRESERVATION, DOC-004 added CORRECTNESS); AC-03 mandatory=false (DOC-003/006). CRITERION-ID NOTE: kept AC- prefix (DOC-003/004) but DOC-006 used ARC- to avoid collision with Acceptance-Criterion 'AC-*' ids used elsewhere in the codebase — see conflicts/openItems."
 		},
 		{
+			policyId: 'pol_assumption_disclosure',
+			name: 'Assumption Disclosure',
+			evaluatedClaimTypes: ['COMPLETENESS', 'CORRECTNESS'],
+			appliesToPwuKinds: [
+				'INTENT_AND_PRODUCT_DEFINITION',
+				'PRODUCT_BEHAVIOR_DEFINITION',
+				'ARCHITECTURE_DEFINITION',
+				'ARCHITECTURE_DECISION',
+				'IMPLEMENTATION_PLANNING',
+				'WORK_DECOMPOSITION',
+				'PRODUCT_IMPLEMENTATION',
+				'INTEGRATED_PRODUCT_VALIDATION'
+			],
+			requiredEvidenceTypes: ['ARTIFACT', 'SOURCE', 'ANALYSIS'],
+			criteria: [
+				{
+					id: 'AD-01',
+					name: 'AD-01',
+					description:
+						'Material assumptions have been surfaced as first-class Assumption Objects (not left in prose).',
+					criterionType: 'BOOLEAN',
+					evaluationMethod: 'MODEL_JUDGMENT',
+					requiredEvidenceIds: [],
+					severityIfNotMet: 'BLOCKING',
+					mayBeNotApplicable: false
+				},
+				{
+					id: 'AD-02',
+					name: 'AD-02',
+					description: 'Assumptions are distinguished from established facts.',
+					criterionType: 'BOOLEAN',
+					evaluationMethod: 'MODEL_JUDGMENT',
+					requiredEvidenceIds: [],
+					severityIfNotMet: 'BLOCKING',
+					mayBeNotApplicable: false
+				},
+				{
+					id: 'AD-03',
+					name: 'AD-03',
+					description: 'Affected objects are identified for each assumption.',
+					criterionType: 'BOOLEAN',
+					evaluationMethod: 'MODEL_JUDGMENT',
+					requiredEvidenceIds: [],
+					severityIfNotMet: 'BLOCKING',
+					mayBeNotApplicable: false
+				},
+				{
+					id: 'AD-04',
+					name: 'AD-04',
+					description: 'Materiality is classified (IMMATERIAL / MATERIAL / CRITICAL).',
+					criterionType: 'BOOLEAN',
+					evaluationMethod: 'MODEL_JUDGMENT',
+					requiredEvidenceIds: [],
+					severityIfNotMet: 'BLOCKING',
+					mayBeNotApplicable: false
+				},
+				{
+					id: 'AD-05',
+					name: 'AD-05',
+					description: 'Verification or authorized-acceptance needs are identified.',
+					criterionType: 'BOOLEAN',
+					evaluationMethod: 'MODEL_JUDGMENT',
+					requiredEvidenceIds: [],
+					severityIfNotMet: 'BLOCKING',
+					mayBeNotApplicable: false
+				},
+				{
+					id: 'AD-06',
+					name: 'AD-06',
+					description:
+						'No critical assumption silently authorizes irreversible or high-impact work without verification or authorized acceptance.',
+					criterionType: 'BOOLEAN',
+					evaluationMethod: 'MODEL_JUDGMENT',
+					requiredEvidenceIds: [],
+					severityIfNotMet: 'BLOCKING',
+					mayBeNotApplicable: false
+				}
+			],
+			findingTypes: [
+				'HIDDEN_MATERIAL_ASSUMPTION',
+				'ASSUMPTION_PRESENTED_AS_FACT',
+				'UNBOUNDED_ASSUMPTION_SCOPE',
+				'MISSING_ASSUMPTION_BASIS',
+				'UNASSESSED_CRITICAL_ASSUMPTION',
+				'EXPIRED_ASSUMPTION',
+				'CONFLICTING_ASSUMPTIONS'
+			],
+			independenceRequirement: 'DIFFERENT_INVOCATION',
+			failureSeverity: 'MATERIAL',
+			sourceSection:
+				"CANONICAL id pol_assumption_disclosure (Catalog §17); ALIAS = fixture pol_assumption_disclosure_v1 (Reference §18.3). Spec §27. CROSS-CUTTING: applies to ALL model-produced professional artifacts (§17.2, §29.4) — the ONE policy attached to BOTH pwu_fsm_intent (§10) and pwu_fsm_arch (§12) in the fixture. Criteria SYNTHESIZED from §17.3. Required-evidence prose (§17.4): artifact under assessment, execution rationale, prompt/context provenance, known facts, constraints, decisions, external sources. Required output (§17.6): each material assumption becomes an Assumption Object (statement/basis/materiality/affectedObjects/status/verificationMethod). SATISFIED means disclosed, NOT verified (§17.7). Control actions: GATHER_EVIDENCE, CLARIFY, RESHAPE_PWU, INVALIDATE_DEPENDENTS, REQUEST_HUMAN_DECISION, ESCALATE. RECONCILED: appliesToPwuKinds = UNION (DOC-003's 8; includes ARCHITECTURE_DECISION + WORK_DECOMPOSITION dropped by DOC-004/006) per 'any model-produced artifact'; failureSeverity MATERIAL base (DOC-003/006) over DOC-004 BLOCKING — a critical unresolved assumption governing irreversible work ESCALATES to BLOCKING/CRITICAL (per-finding), yielding CONDITIONALLY_SATISFIED/REJECTED/ESCALATED; AD-05 mandatory=true (DOC-003/006)."
+		},
+		{
+			policyId: 'pol_baseline_promotion',
+			name: 'Baseline Promotion',
+			evaluatedClaimTypes: ['COMPLIANCE', 'CORRECTNESS'],
+			appliesToPwuKinds: ['PRODUCT_BASELINE_PROMOTION'],
+			requiredEvidenceTypes: ['APPROVAL', 'ARTIFACT', 'TRACE'],
+			criteria: [
+				{
+					id: 'BP-01',
+					name: 'BP-01',
+					description: 'candidate artifacts are exactly identified.',
+					criterionType: 'BOOLEAN',
+					evaluationMethod: 'MODEL_JUDGMENT',
+					requiredEvidenceIds: [],
+					severityIfNotMet: 'CRITICAL',
+					mayBeNotApplicable: false
+				},
+				{
+					id: 'BP-02',
+					name: 'BP-02',
+					description: 'reviewed and promoted versions match.',
+					criterionType: 'BOOLEAN',
+					evaluationMethod: 'MODEL_JUDGMENT',
+					requiredEvidenceIds: [],
+					severityIfNotMet: 'CRITICAL',
+					mayBeNotApplicable: false
+				},
+				{
+					id: 'BP-03',
+					name: 'BP-03',
+					description: 'required assessments are complete.',
+					criterionType: 'BOOLEAN',
+					evaluationMethod: 'MODEL_JUDGMENT',
+					requiredEvidenceIds: [],
+					severityIfNotMet: 'CRITICAL',
+					mayBeNotApplicable: false
+				},
+				{
+					id: 'BP-04',
+					name: 'BP-04',
+					description: 'blocking findings are resolved or validly waived.',
+					criterionType: 'BOOLEAN',
+					evaluationMethod: 'MODEL_JUDGMENT',
+					requiredEvidenceIds: [],
+					severityIfNotMet: 'CRITICAL',
+					mayBeNotApplicable: false
+				},
+				{
+					id: 'BP-05',
+					name: 'BP-05',
+					description: 'evidence remains valid.',
+					criterionType: 'BOOLEAN',
+					evaluationMethod: 'MODEL_JUDGMENT',
+					requiredEvidenceIds: [],
+					severityIfNotMet: 'CRITICAL',
+					mayBeNotApplicable: false
+				},
+				{
+					id: 'BP-06',
+					name: 'BP-06',
+					description: 'decision authority is valid.',
+					criterionType: 'BOOLEAN',
+					evaluationMethod: 'MODEL_JUDGMENT',
+					requiredEvidenceIds: [],
+					severityIfNotMet: 'CRITICAL',
+					mayBeNotApplicable: false
+				},
+				{
+					id: 'BP-07',
+					name: 'BP-07',
+					description: 'residual risk is disclosed and accepted.',
+					criterionType: 'BOOLEAN',
+					evaluationMethod: 'MODEL_JUDGMENT',
+					requiredEvidenceIds: [],
+					severityIfNotMet: 'CRITICAL',
+					mayBeNotApplicable: false
+				},
+				{
+					id: 'BP-08',
+					name: 'BP-08',
+					description: 'rollback or recovery exists where required.',
+					criterionType: 'BOOLEAN',
+					evaluationMethod: 'MODEL_JUDGMENT',
+					requiredEvidenceIds: [],
+					severityIfNotMet: 'CRITICAL',
+					mayBeNotApplicable: false
+				},
+				{
+					id: 'BP-09',
+					name: 'BP-09',
+					description: 'the baseline has a declared purpose and scope.',
+					criterionType: 'BOOLEAN',
+					evaluationMethod: 'MODEL_JUDGMENT',
+					requiredEvidenceIds: [],
+					severityIfNotMet: 'CRITICAL',
+					mayBeNotApplicable: false
+				}
+			],
+			findingTypes: [
+				'CANDIDATE_VERSION_MISMATCH',
+				'MISSING_REQUIRED_ASSESSMENT',
+				'OPEN_BLOCKING_FINDING',
+				'INVALID_OR_EXPIRED_WAIVER',
+				'INVALIDATED_EVIDENCE',
+				'MISSING_DECISION_AUTHORITY',
+				'UNACCEPTED_RESIDUAL_RISK',
+				'MISSING_RECOVERY_PLAN',
+				'AMBIGUOUS_BASELINE_SCOPE'
+			],
+			independenceRequirement: 'HUMAN',
+			failureSeverity: 'CRITICAL',
+			sourceSection:
+				'DOC-004 §26 (POL-BASELINE-PROMOTION) — seeded 2026-07-16 to complete the catalog: the ratified conformance profiles and PWU templates reference 12 policies and the ontology shipped 6, so validateOntology() reported 21 unresolved references and HIGH_ASSURANCE was unsatisfiable. RATIFIED: purpose (§26.1); the 9 criteria descriptions are §26.3\'s "Claims evaluated" items 1:1 verbatim; the 9 finding codes are §26.5 verbatim. PRECEDENTED DERIVATION: criterion ids minted BP-0N against §26.3\'s ordering — the same rule that produced the existing IC-01..IC-05 from §16.3; criterion `name` = the id, because §26 has no Criteria section (only §15.6/§19.5 ratify names). INDEPENDENCE: AUTHORED — §26 has NO Independence subsection (verified: only 26.1-26.7 exist). HUMAN chosen because §26.3 claim 6 ratifies "decision authority is valid" and §26.7 ratifies "Critical integrity failures cannot be waived by ordinary product authority" — a baseline promotion is a human governance act by the doc\'s own text. AUTHORED (no ratified source): evaluatedClaimTypes, appliesToPwuKinds, requiredEvidenceTypes, evaluatorRole, failureSeverity, and each criterion\'s criterionType/evaluationMethod. Extraction adversarially verified against the doc (6/6 faithful).',
+			evaluatorRole: 'baseline-promotion-reviewer'
+		},
+		{
+			policyId: 'pol_constraint_propagation',
+			name: 'Constraint Propagation',
+			evaluatedClaimTypes: ['PRESERVATION', 'CONSISTENCY'],
+			appliesToPwuKinds: ['IMPLEMENTATION_PLANNING', 'WORK_DECOMPOSITION'],
+			requiredEvidenceTypes: ['SOURCE', 'TRACE'],
+			criteria: [
+				{
+					id: 'CP-01',
+					name: 'CP-01',
+					description: 'Every mandatory applicable parent constraint has an explicit disposition.',
+					criterionType: 'BOOLEAN',
+					evaluationMethod: 'MODEL_JUDGMENT',
+					requiredEvidenceIds: [],
+					severityIfNotMet: 'BLOCKING',
+					mayBeNotApplicable: false
+				},
+				{
+					id: 'CP-02',
+					name: 'CP-02',
+					description: 'propagated constraints retain authority and strength.',
+					criterionType: 'BOOLEAN',
+					evaluationMethod: 'MODEL_JUDGMENT',
+					requiredEvidenceIds: [],
+					severityIfNotMet: 'BLOCKING',
+					mayBeNotApplicable: false
+				},
+				{
+					id: 'CP-03',
+					name: 'CP-03',
+					description: 'inapplicability decisions have rationale.',
+					criterionType: 'BOOLEAN',
+					evaluationMethod: 'MODEL_JUDGMENT',
+					requiredEvidenceIds: [],
+					severityIfNotMet: 'BLOCKING',
+					mayBeNotApplicable: false
+				},
+				{
+					id: 'CP-04',
+					name: 'CP-04',
+					description: 'waivers are authorized and scoped.',
+					criterionType: 'BOOLEAN',
+					evaluationMethod: 'MODEL_JUDGMENT',
+					requiredEvidenceIds: [],
+					severityIfNotMet: 'BLOCKING',
+					mayBeNotApplicable: false
+				},
+				{
+					id: 'CP-05',
+					name: 'CP-05',
+					description: 'child artifacts do not contradict inherited constraints.',
+					criterionType: 'BOOLEAN',
+					evaluationMethod: 'MODEL_JUDGMENT',
+					requiredEvidenceIds: [],
+					severityIfNotMet: 'BLOCKING',
+					mayBeNotApplicable: false
+				}
+			],
+			findingTypes: [
+				'SILENT_CONSTRAINT_DROP',
+				'WEAKENED_CONSTRAINT',
+				'UNAUTHORIZED_INAPPLICABILITY',
+				'EXPIRED_CONSTRAINT_WAIVER',
+				'CONSTRAINT_CONTRADICTION',
+				'MISSING_CONSTRAINT_TRACE',
+				'CONSTRAINT_SCOPE_ERROR'
+			],
+			independenceRequirement: 'DIFFERENT_AGENT',
+			failureSeverity: 'BLOCKING',
+			sourceSection:
+				"DOC-004 §20 (POL-CONSTRAINT-PROPAGATION) — seeded 2026-07-16 to complete the catalog: the ratified conformance profiles and PWU templates reference 12 policies and the ontology shipped 6, so validateOntology() reported 21 unresolved references and HIGH_ASSURANCE was unsatisfiable. RATIFIED: purpose (§20.1); the 5 criteria descriptions are §20.3's \"Claims evaluated\" items 1:1 verbatim; the 7 finding codes are §20.5 verbatim. PRECEDENTED DERIVATION: criterion ids minted CP-0N against §20.3's ordering — the same rule that produced the existing IC-01..IC-05 from §16.3; criterion `name` = the id, because §20 has no Criteria section (only §15.6/§19.5 ratify names). INDEPENDENCE: AUTHORED — §20 has NO Independence subsection (verified: only 20.1-20.5 exist). Falls back to the STANDARD conformance profile minIndependence, which is the profile this policy is mandatory for. AUTHORED (no ratified source): evaluatedClaimTypes, appliesToPwuKinds, requiredEvidenceTypes, evaluatorRole, failureSeverity, and each criterion's criterionType/evaluationMethod. Extraction adversarially verified against the doc (6/6 faithful).",
+			evaluatorRole: 'constraint-propagation-reviewer'
+		},
+		{
+			policyId: 'pol_decomposition_coverage',
+			name: 'Decomposition Coverage',
+			evaluatedClaimTypes: ['COVERAGE', 'PRESERVATION', 'FEASIBILITY'],
+			appliesToPwuKinds: [
+				'ARCHITECTURE_DEFINITION',
+				'IMPLEMENTATION_PLANNING',
+				'WORK_DECOMPOSITION',
+				'PRODUCT_REALIZATION'
+			],
+			requiredEvidenceTypes: ['ARTIFACT', 'TRACE', 'ANALYSIS'],
+			criteria: [
+				{
+					id: 'DC-01',
+					name: 'Obligation coverage',
+					description:
+						'no mandatory parent obligation silently disappears (every one is allocated, retained, satisfied, or waived).',
+					criterionType: 'BOOLEAN',
+					evaluationMethod: 'MODEL_JUDGMENT',
+					requiredEvidenceIds: [],
+					severityIfNotMet: 'BLOCKING',
+					mayBeNotApplicable: false
+				},
+				{
+					id: 'DC-02',
+					name: 'Constraint preservation',
+					description: 'applicable constraints are propagated or explicitly retained.',
+					criterionType: 'BOOLEAN',
+					evaluationMethod: 'MODEL_JUDGMENT',
+					requiredEvidenceIds: [],
+					severityIfNotMet: 'BLOCKING',
+					mayBeNotApplicable: false
+				},
+				{
+					id: 'DC-03',
+					name: 'Cohesion',
+					description: 'each child represents coherent professional work.',
+					criterionType: 'BOOLEAN',
+					evaluationMethod: 'MODEL_JUDGMENT',
+					requiredEvidenceIds: [],
+					severityIfNotMet: 'ADVISORY',
+					mayBeNotApplicable: false
+				},
+				{
+					id: 'DC-04',
+					name: 'Boundary clarity',
+					description: 'child responsibilities are distinguishable.',
+					criterionType: 'BOOLEAN',
+					evaluationMethod: 'MODEL_JUDGMENT',
+					requiredEvidenceIds: [],
+					severityIfNotMet: 'ADVISORY',
+					mayBeNotApplicable: false
+				},
+				{
+					id: 'DC-05',
+					name: 'Dependency completeness',
+					description: 'material sibling dependencies are explicit.',
+					criterionType: 'BOOLEAN',
+					evaluationMethod: 'MODEL_JUDGMENT',
+					requiredEvidenceIds: [],
+					severityIfNotMet: 'BLOCKING',
+					mayBeNotApplicable: false
+				},
+				{
+					id: 'DC-06',
+					name: 'Recomposition feasibility',
+					description: 'a credible parent-level integration strategy exists.',
+					criterionType: 'BOOLEAN',
+					evaluationMethod: 'MODEL_JUDGMENT',
+					requiredEvidenceIds: [],
+					severityIfNotMet: 'BLOCKING',
+					mayBeNotApplicable: false
+				},
+				{
+					id: 'DC-07',
+					name: 'Intent continuity',
+					description: 'child objectives remain subordinate to parent intent.',
+					criterionType: 'BOOLEAN',
+					evaluationMethod: 'MODEL_JUDGMENT',
+					requiredEvidenceIds: [],
+					severityIfNotMet: 'BLOCKING',
+					mayBeNotApplicable: false
+				}
+			],
+			findingTypes: [
+				'MISSING_OBLIGATION_ALLOCATION',
+				'DROPPED_CONSTRAINT',
+				'ORPHAN_CHILD_PWU',
+				'OVERLAPPING_CHILD_SCOPE',
+				'EXCESSIVE_CHILD_COUPLING',
+				'INVALID_GRANULARITY',
+				'MISSING_SIBLING_DEPENDENCY',
+				'MISSING_RECOMPOSITION_STRATEGY',
+				'CHILD_INTENT_DIVERGENCE',
+				'FALSE_COMPLETE_COVERAGE'
+			],
+			independenceRequirement: 'DIFFERENT_AGENT',
+			failureSeverity: 'BLOCKING',
+			sourceSection:
+				'CANONICAL id pol_decomposition_coverage (Catalog §19); ALIAS = fixture pol_decomposition_coverage_v1 (Reference §18.4, applied to DECOMPOSITION_CONTRACT dcp_fsm_arch_001; DecompositionValidated event 32 gates child execution). Spec §29. Criteria DC-01..DC-07 EXPLICIT/VERBATIM in §19.5. Required-evidence prose (§19.4): parent PWU/intent/obligations, constraints, assumptions, child PWUs, allocation map, dependency graph, recomposition contract. Applicability (§19.2): Decomposition Contract submitted / decomposition changes semantically / child removed / parent obligation changes. Disposition (§19.7): any missing mandatory obligation OR child intent divergence (OR no recomposition strategy / invalid authority) is BLOCKING. Control actions: REVISE_DECOMPOSITION, RESHAPE_PWU, CLARIFY, REQUEST_HUMAN_DECISION, REJECT. RECONCILED: evaluatedClaimTypes = [COVERAGE,PRESERVATION,FEASIBILITY] (FEASIBILITY in DOC-003/006); DOC-003 also had CONSISTENCY, DOC-004 had COMPLETENESS (divergent tail, see conflicts). Independence DIFFERENT_AGENT (DOC-004/006) over DOC-003 DIFFERENT_INVOCATION baseline; DC-05 mandatory=true (DOC-003/006).'
+		},
+		{
+			policyId: 'pol_fitness_for_purpose',
+			name: 'Fitness For Purpose',
+			evaluatedClaimTypes: ['FITNESS'],
+			appliesToPwuKinds: [
+				'INTEGRATED_PRODUCT_VALIDATION',
+				'PRODUCT_REALIZATION',
+				'PRODUCT_BASELINE_PROMOTION'
+			],
+			requiredEvidenceTypes: ['OBSERVATION', 'REVIEW', 'TEST_RESULT'],
+			criteria: [
+				{
+					id: 'FP-01',
+					name: 'FP-01',
+					description: 'intended actors can achieve critical outcomes.',
+					criterionType: 'BOOLEAN',
+					evaluationMethod: 'MODEL_JUDGMENT',
+					requiredEvidenceIds: [],
+					severityIfNotMet: 'BLOCKING',
+					mayBeNotApplicable: false
+				},
+				{
+					id: 'FP-02',
+					name: 'FP-02',
+					description: 'major journeys function coherently.',
+					criterionType: 'BOOLEAN',
+					evaluationMethod: 'MODEL_JUDGMENT',
+					requiredEvidenceIds: [],
+					severityIfNotMet: 'BLOCKING',
+					mayBeNotApplicable: false
+				},
+				{
+					id: 'FP-03',
+					name: 'FP-03',
+					description: 'the product addresses the originating problem.',
+					criterionType: 'BOOLEAN',
+					evaluationMethod: 'MODEL_JUDGMENT',
+					requiredEvidenceIds: [],
+					severityIfNotMet: 'BLOCKING',
+					mayBeNotApplicable: false
+				},
+				{
+					id: 'FP-04',
+					name: 'FP-04',
+					description: 'technical correctness has not obscured product failure.',
+					criterionType: 'BOOLEAN',
+					evaluationMethod: 'MODEL_JUDGMENT',
+					requiredEvidenceIds: [],
+					severityIfNotMet: 'BLOCKING',
+					mayBeNotApplicable: false
+				},
+				{
+					id: 'FP-05',
+					name: 'FP-05',
+					description: 'known limitations are compatible with declared use.',
+					criterionType: 'BOOLEAN',
+					evaluationMethod: 'MODEL_JUDGMENT',
+					requiredEvidenceIds: [],
+					severityIfNotMet: 'BLOCKING',
+					mayBeNotApplicable: false
+				},
+				{
+					id: 'FP-06',
+					name: 'FP-06',
+					description: 'residual uncertainty is acceptable.',
+					criterionType: 'BOOLEAN',
+					evaluationMethod: 'MODEL_JUDGMENT',
+					requiredEvidenceIds: [],
+					severityIfNotMet: 'BLOCKING',
+					mayBeNotApplicable: false
+				},
+				{
+					id: 'FP-07',
+					name: 'FP-07',
+					description: 'critical operational conditions are represented.',
+					criterionType: 'BOOLEAN',
+					evaluationMethod: 'MODEL_JUDGMENT',
+					requiredEvidenceIds: [],
+					severityIfNotMet: 'BLOCKING',
+					mayBeNotApplicable: false
+				}
+			],
+			findingTypes: [
+				'PRODUCT_OUTCOME_NOT_ACHIEVABLE',
+				'CRITICAL_JOURNEY_FAILURE',
+				'TECHNICALLY_CORRECT_PRODUCT_FAILURE',
+				'MISSING_OPERATIONAL_REALITY',
+				'UNACCEPTABLE_LIMITATION',
+				'UNRESOLVED_USER_VALUE_GAP',
+				'FITNESS_EVIDENCE_INSUFFICIENT'
+			],
+			independenceRequirement: 'HUMAN',
+			failureSeverity: 'BLOCKING',
+			sourceSection:
+				'DOC-004 §25 (POL-FITNESS-FOR-PURPOSE) — seeded 2026-07-16 to complete the catalog: the ratified conformance profiles and PWU templates reference 12 policies and the ontology shipped 6, so validateOntology() reported 21 unresolved references and HIGH_ASSURANCE was unsatisfiable. RATIFIED: purpose (§25.1); the 7 criteria descriptions are §25.3\'s "Claims evaluated" items 1:1 verbatim; the 7 finding codes are §25.5 verbatim. PRECEDENTED DERIVATION: criterion ids minted FP-0N against §25.3\'s ordering — the same rule that produced the existing IC-01..IC-05 from §16.3; criterion `name` = the id, because §25 has no Criteria section (only §15.6/§19.5 ratify names). INDEPENDENCE: RATIFIED §25.6 "Standard: independent validator implementation plus human product decision. High assurance: independent validation team or organizational authority." -> HUMAN (the Standard rung; the High-Assurance rung ORGANIZATIONALLY_INDEPENDENT is profile-escalated, not the policy default). AUTHORED (no ratified source): evaluatedClaimTypes, appliesToPwuKinds, requiredEvidenceTypes, evaluatorRole, failureSeverity, and each criterion\'s criterionType/evaluationMethod. Extraction adversarially verified against the doc (6/6 faithful).',
+			evaluatorRole: 'fitness-for-purpose-reviewer'
+		},
+		{
+			policyId: 'pol_historical_consistency',
+			name: 'Historical Consistency',
+			evaluatedClaimTypes: ['CONSISTENCY'],
+			appliesToPwuKinds: ['ARCHITECTURE_DECISION'],
+			requiredEvidenceTypes: ['SOURCE', 'TRACE', 'ANALYSIS'],
+			criteria: [
+				{
+					id: 'HC-01',
+					name: 'HC-01',
+					description: 'relevant historical records were considered.',
+					criterionType: 'BOOLEAN',
+					evaluationMethod: 'MODEL_JUDGMENT',
+					requiredEvidenceIds: [],
+					severityIfNotMet: 'MATERIAL',
+					mayBeNotApplicable: false
+				},
+				{
+					id: 'HC-02',
+					name: 'HC-02',
+					description: 'known failure patterns are not repeated without justification.',
+					criterionType: 'BOOLEAN',
+					evaluationMethod: 'MODEL_JUDGMENT',
+					requiredEvidenceIds: [],
+					severityIfNotMet: 'MATERIAL',
+					mayBeNotApplicable: false
+				},
+				{
+					id: 'HC-03',
+					name: 'HC-03',
+					description: 'active decisions are not silently contradicted.',
+					criterionType: 'BOOLEAN',
+					evaluationMethod: 'MODEL_JUDGMENT',
+					requiredEvidenceIds: [],
+					severityIfNotMet: 'MATERIAL',
+					mayBeNotApplicable: false
+				},
+				{
+					id: 'HC-04',
+					name: 'HC-04',
+					description: 'recorded rationale is not ignored.',
+					criterionType: 'BOOLEAN',
+					evaluationMethod: 'MODEL_JUDGMENT',
+					requiredEvidenceIds: [],
+					severityIfNotMet: 'MATERIAL',
+					mayBeNotApplicable: false
+				},
+				{
+					id: 'HC-05',
+					name: 'HC-05',
+					description: 'divergence from precedent is explicit and justified.',
+					criterionType: 'BOOLEAN',
+					evaluationMethod: 'MODEL_JUDGMENT',
+					requiredEvidenceIds: [],
+					severityIfNotMet: 'MATERIAL',
+					mayBeNotApplicable: false
+				}
+			],
+			findingTypes: [
+				'KNOWN_FAILURE_RECURRENCE',
+				'ACTIVE_DECISION_CONFLICT',
+				'UNEXPLAINED_PRECEDENT_DIVERGENCE',
+				'STALE_PRECEDENT_APPLIED',
+				'MISSING_DESIGN_RATIONALE',
+				'HISTORICAL_CONTEXT_INSUFFICIENT',
+				'CHESTERTONS_FENCE_RISK'
+			],
+			independenceRequirement: 'DIFFERENT_AGENT',
+			failureSeverity: 'MATERIAL',
+			sourceSection:
+				'DOC-004 §22 (POL-HISTORICAL-CONSISTENCY) — seeded 2026-07-16 to complete the catalog: the ratified conformance profiles and PWU templates reference 12 policies and the ontology shipped 6, so validateOntology() reported 21 unresolved references and HIGH_ASSURANCE was unsatisfiable. RATIFIED: purpose (§22.1); the 5 criteria descriptions are §22.3\'s "Claims evaluated" items 1:1 verbatim; the 7 finding codes are §22.5 verbatim. PRECEDENTED DERIVATION: criterion ids minted HC-0N against §22.3\'s ordering — the same rule that produced the existing IC-01..IC-05 from §16.3; criterion `name` = the id, because §22 has no Criteria section (only §15.6/§19.5 ratify names). INDEPENDENCE: AUTHORED — §22 has NO Independence subsection (verified: only 22.1-22.6 exist). Falls back to the HIGH_ASSURANCE profile minIndependence floor of DIFFERENT_AGENT; §22.2 marks the policy "Recommended", not Required. AUTHORED (no ratified source): evaluatedClaimTypes, appliesToPwuKinds, requiredEvidenceTypes, evaluatorRole, failureSeverity, and each criterion\'s criterionType/evaluationMethod. Extraction adversarially verified against the doc (6/6 faithful).',
+			evaluatorRole: 'historical-consistency-reviewer'
+		},
+		{
+			policyId: 'pol_intent_completeness',
+			name: 'Intent Completeness',
+			evaluatedClaimTypes: ['COMPLETENESS', 'COVERAGE'],
+			appliesToPwuKinds: ['INTENT_AND_PRODUCT_DEFINITION', 'PRODUCT_BOUNDARY'],
+			requiredEvidenceTypes: ['ARTIFACT', 'ANALYSIS'],
+			criteria: [
+				{
+					id: 'IC-01',
+					name: 'IC-01',
+					description:
+						'Desired outcomes are sufficiently explicit for the next authorized activity.',
+					criterionType: 'BOOLEAN',
+					evaluationMethod: 'MODEL_JUDGMENT',
+					requiredEvidenceIds: [],
+					severityIfNotMet: 'BLOCKING',
+					mayBeNotApplicable: false
+				},
+				{
+					id: 'IC-02',
+					name: 'IC-02',
+					description: 'Product boundaries are sufficient for the next authorized activity.',
+					criterionType: 'BOOLEAN',
+					evaluationMethod: 'MODEL_JUDGMENT',
+					requiredEvidenceIds: [],
+					severityIfNotMet: 'BLOCKING',
+					mayBeNotApplicable: false
+				},
+				{
+					id: 'IC-03',
+					name: 'IC-03',
+					description: 'Known stakeholders and actors are represented proportionally to risk.',
+					criterionType: 'BOOLEAN',
+					evaluationMethod: 'MODEL_JUDGMENT',
+					requiredEvidenceIds: [],
+					severityIfNotMet: 'ADVISORY',
+					mayBeNotApplicable: false
+				},
+				{
+					id: 'IC-04',
+					name: 'IC-04',
+					description: 'Mandatory constraints are recorded.',
+					criterionType: 'BOOLEAN',
+					evaluationMethod: 'MODEL_JUDGMENT',
+					requiredEvidenceIds: [],
+					severityIfNotMet: 'BLOCKING',
+					mayBeNotApplicable: false
+				},
+				{
+					id: 'IC-05',
+					name: 'IC-05',
+					description: 'Success conditions exist, or the work is explicitly marked exploratory.',
+					criterionType: 'BOOLEAN',
+					evaluationMethod: 'MODEL_JUDGMENT',
+					requiredEvidenceIds: [],
+					severityIfNotMet: 'BLOCKING',
+					mayBeNotApplicable: false
+				},
+				{
+					id: 'IC-06',
+					name: 'IC-06',
+					description: 'Major ambiguities have explicit dispositions.',
+					criterionType: 'BOOLEAN',
+					evaluationMethod: 'MODEL_JUDGMENT',
+					requiredEvidenceIds: [],
+					severityIfNotMet: 'BLOCKING',
+					mayBeNotApplicable: false
+				}
+			],
+			findingTypes: [
+				'MISSING_DESIRED_OUTCOME',
+				'UNBOUNDED_PRODUCT_SCOPE',
+				'MISSING_MANDATORY_CONSTRAINT',
+				'UNRESOLVED_CRITICAL_AMBIGUITY',
+				'NO_SUCCESS_CONDITION',
+				'PREMATURE_DOWNSTREAM_SHAPING',
+				'FALSE_COMPLETENESS'
+			],
+			independenceRequirement: 'DIFFERENT_INVOCATION',
+			failureSeverity: 'MATERIAL',
+			sourceSection:
+				'CANONICAL id pol_intent_completeness (Catalog §16); ALIAS = fixture pol_intent_complete_v1 (Reference §18.2, applied before architecture). Spec §26. Criteria SYNTHESIZED 1:1 from the §16.3 claim list (source has no lettered criteria). Required-evidence prose (§16.4): Product Intent, ambiguity catalog, constraint catalog, stakeholder/actor catalog, non-goals, risk profile. Completeness is RISK-RELATIVE (§16.1) — sufficiency for the next authorized activity, not exhaustive spec. Applicability (§16.2): REQUIRED before Product Behavior Definition, Architecture Definition, high-impact implementation planning (encode via ApplicabilityExpression, NOT via appliesToPwuKinds). Dispositions: SATISFIED/CONDITIONALLY_SATISFIED (exploratory when uncertainty explicit + downstream reversible)/INCONCLUSIVE/REJECTED. PREMATURE_DOWNSTREAM_SHAPING of irreversible/high-impact work escalates to BLOCKING. RECONCILED: evaluatedClaimTypes COVERAGE (DOC-003/004) over FITNESS (DOC-006); appliesToPwuKinds restricted to intent+boundary (DOC-004/006) — DOC-003 also listed behavior+architecture (that is its GATE relationship, modeled as applicability); IC-05 mandatory=true (DOC-003/006) over DOC-004 false; IC-03 mandatory=false (DOC-003/004) over DOC-006 true.'
+		},
+		{
+			policyId: 'pol_intent_fidelity',
+			name: 'Intent Fidelity',
+			evaluatedClaimTypes: ['PRESERVATION', 'CORRECTNESS', 'COMPLETENESS'],
+			appliesToPwuKinds: [
+				'INTENT_AND_PRODUCT_DEFINITION',
+				'INTENT_DISCOVERY',
+				'PRODUCT_BOUNDARY',
+				'PRODUCT_REALIZATION'
+			],
+			requiredEvidenceTypes: ['SOURCE', 'ARTIFACT', 'TRACE'],
+			criteria: [
+				{
+					id: 'IF-01',
+					name: 'Objective fidelity',
+					description:
+						"the formalized objective represents the user's need rather than substituting a preferred solution.",
+					criterionType: 'BOOLEAN',
+					evaluationMethod: 'MODEL_JUDGMENT',
+					requiredEvidenceIds: [],
+					severityIfNotMet: 'BLOCKING',
+					mayBeNotApplicable: false
+				},
+				{
+					id: 'IF-02',
+					name: 'Boundary fidelity',
+					description:
+						'in-scope and out-of-scope statements are consistent with user authority (no unauthorized scope expansion).',
+					criterionType: 'BOOLEAN',
+					evaluationMethod: 'MODEL_JUDGMENT',
+					requiredEvidenceIds: [],
+					severityIfNotMet: 'BLOCKING',
+					mayBeNotApplicable: false
+				},
+				{
+					id: 'IF-03',
+					name: 'Constraint fidelity',
+					description: 'explicit user constraints are preserved (not omitted or weakened).',
+					criterionType: 'BOOLEAN',
+					evaluationMethod: 'MODEL_JUDGMENT',
+					requiredEvidenceIds: [],
+					severityIfNotMet: 'BLOCKING',
+					mayBeNotApplicable: false
+				},
+				{
+					id: 'IF-04',
+					name: 'Interpretation disclosure',
+					description:
+						'inferred elements are labeled as inferred or proposed, not presented as user fact/requirement.',
+					criterionType: 'BOOLEAN',
+					evaluationMethod: 'MODEL_JUDGMENT',
+					requiredEvidenceIds: [],
+					severityIfNotMet: 'BLOCKING',
+					mayBeNotApplicable: false
+				},
+				{
+					id: 'IF-05',
+					name: 'Ambiguity visibility',
+					description: 'materially unresolved interpretations remain explicit.',
+					criterionType: 'BOOLEAN',
+					evaluationMethod: 'MODEL_JUDGMENT',
+					requiredEvidenceIds: [],
+					severityIfNotMet: 'BLOCKING',
+					mayBeNotApplicable: false
+				}
+			],
+			findingTypes: [
+				'SOLUTION_SUBSTITUTION',
+				'UNAUTHORIZED_SCOPE_EXPANSION',
+				'MISSING_USER_CONSTRAINT',
+				'FALSELY_CLOSED_AMBIGUITY',
+				'INFERRED_NEED_PRESENTED_AS_FACT',
+				'OUTCOME_EROSION',
+				'NON_GOAL_CONFLICT'
+			],
+			independenceRequirement: 'DIFFERENT_AGENT',
+			failureSeverity: 'BLOCKING',
+			sourceSection:
+				"CANONICAL id pol_intent_fidelity (Catalog/DOC-004 §15.1, v1.0.0); ALIAS = fixture pol_intent_fidelity_v1 (Reference §18.1, attached to pwu_fsm_intent + Product Intent Baseline). Spec/DOC-003 §25. Criteria IF-01..IF-05 EXPLICIT in §15.6. Required-evidence prose (§15.5): originating expression, clarification dialogue, supplied documents, proposed Product Intent, constraints, recorded user corrections, prior intent version. Blocking (§25): objective contradicts user expression / mandatory constraint omitted / major ambiguity hidden / inferred solution presented as user requirement. Unauthorized intent alteration CANNOT be waived (§15.11); a user-approved revised intent is a governed intent revision. Control actions: CLARIFY, REVISE_CONTEXT, RESHAPE_PWU, REQUEST_HUMAN_DECISION, REJECT. RECONCILED: evaluatedClaimTypes CORRECTNESS (DOC-003/004) over CONSISTENCY (DOC-006); independence DIFFERENT_AGENT (DOC-004/006, = §15.8 Standard 'different invocation + agent role') over DOC-003 DIFFERENT_INVOCATION baseline — profile-escalates to DIFFERENT_MODEL+HUMAN at High-Assurance."
+		},
+		{
 			policyId: 'pol_intent_preservation',
 			name: 'Intent Preservation',
 			evaluatedClaimTypes: ['PRESERVATION', 'FITNESS', 'CONSISTENCY'],
@@ -1128,6 +1486,200 @@ export const PRODUCT_REALIZATION_PWA_ONTOLOGY = {
 			failureSeverity: 'BLOCKING',
 			sourceSection:
 				"CANONICAL id pol_intent_preservation (Catalog §23); ALIAS = fixture pol_intent_preservation_v1 (Reference §18.6, attached to pwu_fsm_arch; AssuranceAssessmentSatisfied: Intent Preservation event 62 compares originating expression -> approved intent -> product behavior -> architecture). Spec §32. Criteria SYNTHESIZED from §23.3; IP-01 (MET) and IP-04 (NOT_MET -> claim CONTESTED) corroborated as criterion IDs by the §33 ValidatorResult example. Required-evidence prose (§23.4): originating expression, approved intent, parent/child PWUs, constraints, transformation artifacts, decisions, trace links, completion claims. Applicability (§23.2): REQUIRED after decomposition, product behavior definition, architecture, implementation planning, implementation, integrated validation, and major semantic revision. Blocking (§23.6): any material unauthorized divergence from approved intent. Control actions: RESHAPE_PWU, REVISE_DECOMPOSITION, INVALIDATE_DEPENDENTS, REQUEST_HUMAN_DECISION, REJECT, ABANDON. RECONCILED: appliesToPwuKinds = UNION incl WORK_DECOMPOSITION (DOC-003/006; DOC-004 omitted it though §23.2 says 'after decomposition'); IP-06 mandatory=false (DOC-003/004) over DOC-006 true; 3rd evaluatedClaimType is a 3-WAY SPLIT (COMPLIANCE DOC-003 / CONSISTENCY DOC-004 / COVERAGE DOC-006) — resolved to CONSISTENCY via DOC-004 canonical-catalog tiebreak (see conflicts)."
+		},
+		{
+			policyId: 'pol_requirement_coverage',
+			name: 'Requirement Coverage',
+			evaluatedClaimTypes: ['COVERAGE', 'COMPLETENESS'],
+			appliesToPwuKinds: [
+				'PRODUCT_BEHAVIOR_DEFINITION',
+				'USER_JOURNEY_DEFINITION',
+				'REQUIREMENT_DEFINITION'
+			],
+			requiredEvidenceTypes: ['SOURCE', 'ARTIFACT', 'TRACE'],
+			criteria: [
+				{
+					id: 'RC-01',
+					name: 'RC-01',
+					description: 'Each mandatory outcome is represented.',
+					criterionType: 'BOOLEAN',
+					evaluationMethod: 'MODEL_JUDGMENT',
+					requiredEvidenceIds: [],
+					severityIfNotMet: 'BLOCKING',
+					mayBeNotApplicable: false
+				},
+				{
+					id: 'RC-02',
+					name: 'RC-02',
+					description: 'Each critical journey has applicable requirements.',
+					criterionType: 'BOOLEAN',
+					evaluationMethod: 'MODEL_JUDGMENT',
+					requiredEvidenceIds: [],
+					severityIfNotMet: 'BLOCKING',
+					mayBeNotApplicable: false
+				},
+				{
+					id: 'RC-03',
+					name: 'RC-03',
+					description: 'each mandatory constraint creates enforceable obligations.',
+					criterionType: 'BOOLEAN',
+					evaluationMethod: 'MODEL_JUDGMENT',
+					requiredEvidenceIds: [],
+					severityIfNotMet: 'BLOCKING',
+					mayBeNotApplicable: false
+				},
+				{
+					id: 'RC-04',
+					name: 'RC-04',
+					description: 'important failure paths are addressed.',
+					criterionType: 'BOOLEAN',
+					evaluationMethod: 'MODEL_JUDGMENT',
+					requiredEvidenceIds: [],
+					severityIfNotMet: 'BLOCKING',
+					mayBeNotApplicable: false
+				},
+				{
+					id: 'RC-05',
+					name: 'RC-05',
+					description: 'requirements without an authoritative source are identified.',
+					criterionType: 'BOOLEAN',
+					evaluationMethod: 'MODEL_JUDGMENT',
+					requiredEvidenceIds: [],
+					severityIfNotMet: 'BLOCKING',
+					mayBeNotApplicable: false
+				},
+				{
+					id: 'RC-06',
+					name: 'RC-06',
+					description: 'explicit exclusions are recorded.',
+					criterionType: 'BOOLEAN',
+					evaluationMethod: 'MODEL_JUDGMENT',
+					requiredEvidenceIds: [],
+					severityIfNotMet: 'BLOCKING',
+					mayBeNotApplicable: false
+				}
+			],
+			findingTypes: [
+				'UNCOVERED_OUTCOME',
+				'UNCOVERED_CAPABILITY',
+				'UNCOVERED_JOURNEY_STEP',
+				'MISSING_FAILURE_REQUIREMENT',
+				'ORPHAN_REQUIREMENT',
+				'CONSTRAINT_WITHOUT_OBLIGATION',
+				'UNAUTHORIZED_REQUIREMENT',
+				'DUPLICATE_REQUIREMENT'
+			],
+			independenceRequirement: 'DIFFERENT_AGENT',
+			failureSeverity: 'BLOCKING',
+			sourceSection:
+				'DOC-004 §18 (POL-REQUIREMENT-COVERAGE) — seeded 2026-07-16 to complete the catalog: the ratified conformance profiles and PWU templates reference 12 policies and the ontology shipped 6, so validateOntology() reported 21 unresolved references and HIGH_ASSURANCE was unsatisfiable. RATIFIED: purpose (§18.1); the 6 criteria descriptions are §18.3\'s "Claims evaluated" items 1:1 verbatim; the 8 finding codes are §18.5 verbatim. PRECEDENTED DERIVATION: criterion ids minted RC-0N against §18.3\'s ordering — the same rule that produced the existing IC-01..IC-05 from §16.3; criterion `name` = the id, because §18 has no Criteria section (only §15.6/§19.5 ratify names). INDEPENDENCE: RATIFIED §18.6 "Different role from primary requirement author for Standard and High-Assurance profiles." -> DIFFERENT_AGENT AUTHORED (no ratified source): evaluatedClaimTypes, appliesToPwuKinds, requiredEvidenceTypes, evaluatorRole, failureSeverity, and each criterion\'s criterionType/evaluationMethod. Extraction adversarially verified against the doc (6/6 faithful).',
+			evaluatorRole: 'requirement-coverage-reviewer'
+		},
+		{
+			policyId: 'pol_test_adequacy',
+			name: 'Test Adequacy',
+			evaluatedClaimTypes: ['COVERAGE', 'CORRECTNESS'],
+			appliesToPwuKinds: ['PRODUCT_IMPLEMENTATION', 'INTEGRATED_PRODUCT_VALIDATION'],
+			requiredEvidenceTypes: ['TEST_RESULT', 'TRACE', 'MEASUREMENT'],
+			criteria: [
+				{
+					id: 'TA-01',
+					name: 'TA-01',
+					description: 'tests trace to requirements or risks.',
+					criterionType: 'BOOLEAN',
+					evaluationMethod: 'MODEL_JUDGMENT',
+					requiredEvidenceIds: [],
+					severityIfNotMet: 'BLOCKING',
+					mayBeNotApplicable: false
+				},
+				{
+					id: 'TA-02',
+					name: 'TA-02',
+					description: 'critical journeys are covered.',
+					criterionType: 'BOOLEAN',
+					evaluationMethod: 'MODEL_JUDGMENT',
+					requiredEvidenceIds: [],
+					severityIfNotMet: 'BLOCKING',
+					mayBeNotApplicable: false
+				},
+				{
+					id: 'TA-03',
+					name: 'TA-03',
+					description: 'failure and alternate paths are proportionately covered.',
+					criterionType: 'BOOLEAN',
+					evaluationMethod: 'MODEL_JUDGMENT',
+					requiredEvidenceIds: [],
+					severityIfNotMet: 'BLOCKING',
+					mayBeNotApplicable: false
+				},
+				{
+					id: 'TA-04',
+					name: 'TA-04',
+					description: 'integrations are tested at appropriate boundaries.',
+					criterionType: 'BOOLEAN',
+					evaluationMethod: 'MODEL_JUDGMENT',
+					requiredEvidenceIds: [],
+					severityIfNotMet: 'BLOCKING',
+					mayBeNotApplicable: false
+				},
+				{
+					id: 'TA-05',
+					name: 'TA-05',
+					description: 'regression scope is justified.',
+					criterionType: 'BOOLEAN',
+					evaluationMethod: 'MODEL_JUDGMENT',
+					requiredEvidenceIds: [],
+					severityIfNotMet: 'BLOCKING',
+					mayBeNotApplicable: false
+				},
+				{
+					id: 'TA-06',
+					name: 'TA-06',
+					description: 'test environments are sufficiently representative.',
+					criterionType: 'BOOLEAN',
+					evaluationMethod: 'MODEL_JUDGMENT',
+					requiredEvidenceIds: [],
+					severityIfNotMet: 'BLOCKING',
+					mayBeNotApplicable: false
+				},
+				{
+					id: 'TA-07',
+					name: 'TA-07',
+					description: 'results are current and reproducible where required.',
+					criterionType: 'BOOLEAN',
+					evaluationMethod: 'MODEL_JUDGMENT',
+					requiredEvidenceIds: [],
+					severityIfNotMet: 'BLOCKING',
+					mayBeNotApplicable: false
+				},
+				{
+					id: 'TA-08',
+					name: 'TA-08',
+					description: 'passing tests are not overclaimed.',
+					criterionType: 'BOOLEAN',
+					evaluationMethod: 'MODEL_JUDGMENT',
+					requiredEvidenceIds: [],
+					severityIfNotMet: 'BLOCKING',
+					mayBeNotApplicable: false
+				}
+			],
+			findingTypes: [
+				'UNTESTED_REQUIREMENT',
+				'UNTESTED_CRITICAL_JOURNEY',
+				'MISSING_FAILURE_PATH_TEST',
+				'INADEQUATE_INTEGRATION_TEST',
+				'UNJUSTIFIED_REGRESSION_SCOPE',
+				'NONREPRESENTATIVE_TEST_ENVIRONMENT',
+				'FLAKY_TEST_EVIDENCE',
+				'STALE_TEST_RESULT',
+				'TEST_CLAIM_OVERREACH',
+				'TEST_ORACLE_WEAKNESS'
+			],
+			independenceRequirement: 'DIFFERENT_AGENT',
+			failureSeverity: 'BLOCKING',
+			sourceSection:
+				'DOC-004 §24 (POL-TEST-ADEQUACY) — seeded 2026-07-16 to complete the catalog: the ratified conformance profiles and PWU templates reference 12 policies and the ontology shipped 6, so validateOntology() reported 21 unresolved references and HIGH_ASSURANCE was unsatisfiable. RATIFIED: purpose (§24.1); the 8 criteria descriptions are §24.3\'s "Claims evaluated" items 1:1 verbatim; the 10 finding codes are §24.5 verbatim. PRECEDENTED DERIVATION: criterion ids minted TA-0N against §24.3\'s ordering — the same rule that produced the existing IC-01..IC-05 from §16.3; criterion `name` = the id, because §24 has no Criteria section (only §15.6/§19.5 ratify names). INDEPENDENCE: AUTHORED — §24 has NO Independence subsection (verified: only 24.1-24.6 exist; 24.6 is "Important rule"). Falls back to the STANDARD profile minIndependence. AUTHORED (no ratified source): evaluatedClaimTypes, appliesToPwuKinds, requiredEvidenceTypes, evaluatorRole, failureSeverity, and each criterion\'s criterionType/evaluationMethod. Extraction adversarially verified against the doc (6/6 faithful).',
+			evaluatorRole: 'test-adequacy-reviewer'
 		}
 	],
 	conformanceProfiles: [

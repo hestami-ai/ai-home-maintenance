@@ -46,9 +46,15 @@ export interface SeedPolicy {
 	readonly appliesToPwuKinds?: readonly string[];
 	readonly requiredEvidenceTypes?: readonly string[];
 	readonly criteria?: readonly Criterion[];
+	/** The policy's ratified finding CODES (DOC-004 §N.5). Codes only — §N.5 ratifies no per-code description
+	 *  or severity; the seeded FindingDefinition objects supply those (see seed-workbench / findingsFor). */
 	readonly findingTypes?: readonly string[];
 	readonly independenceRequirement?: string;
 	readonly failureSeverity?: string;
+	/** The evaluator role. AUTHORED — DOC-004 names no evaluator role for any policy. Declared here because the
+	 *  `as const satisfies OntologyData` check at the literal caught it as an excess property the moment the six
+	 *  §18/§20/§22/§24/§25/§26 policies were added: exactly the drift the assertion used to hide (Increment 11a). */
+	readonly evaluatorRole?: string;
 	/** Provenance for the policy's canonical id (DOC-004 §15.x). Carried by the dataset; previously undeclared,
 	 *  which the `as readonly SeedPolicy[]` assertion silently tolerated. */
 	readonly sourceSection?: string;
