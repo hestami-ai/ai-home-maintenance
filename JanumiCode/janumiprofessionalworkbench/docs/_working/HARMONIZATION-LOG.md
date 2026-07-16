@@ -786,6 +786,45 @@ choosing). Surfaced as drift per §17.
 
 ---
 
+## AUDIT — vacuity re-check of the LIVE kernel functions
+
+`canActivatePlan` proved a call-site census counts a guard as LIVE even when its discriminating input is a
+dead pointer (a field no handler writes), so LIVE was an upper bound. This audit re-checked all **21** LIVE
+functions (the set grew from 19 as Increments 2/6/6+ wired `evidenceAdmissibility`, `canPromoteBaseline`,
+`checkPwuShapeReadiness` into genuine service): does each function's *discriminating* input come from real
+state, or a literal / payload-trusted / dead-pointer value that makes its branch unable to fire?
+
+**Result: 4 of 21 have a vacuous or degraded discriminating input — and they cluster in the assurance floor
+and the authority check, exactly where it matters most.** Vacuity is real but NOT pervasive like the 81%
+citation hollowness; it is concentrated.
+
+| Function | Fed at its call site | Verdict |
+|---|---|---|
+| `identityProvenanceValidator` | `{hasStableId:true, hasSemanticVersion:true, hasProvenance:true, hasProducer:true, traceComplete:true}` — five literals (`floor.ts:114-118`) | **FULLY VACUOUS** — cannot fail (findings 18, 67) |
+| `classifyValidatorResult` | `schemaValid:true, evidenceExists:true, evidenceInvalidated:false` literals (`floor.ts:318,322,323`) | **PARTIAL** — its `RPH_VALIDATOR_OUTPUT_INVALID` / `RPH_EVIDENCE_MISSING` / `RPH_EVIDENCE_INVALIDATED` branches are dead here (findings 47, 48) |
+| `schemaInvariantValidator` | `schemaValid:true` literal; `invariantViolations` IS real (from `analyzePwaGraph`) | **PARTIAL** — invariant check live, schema-validity check dead |
+| `authorizeDecisionEffective` | `authorityHeld = state.authority.actorType === 'HUMAN'\|'SYSTEM'` — a payload-asserted role label (`governance.ts:146`) | **PAYLOAD-TRUSTED** — §16 item 12: "Never equate … role label … with professional authority" (finding #9) |
+
+The other 17 are fed real inputs: `canActivatePlan` (fixed in 6+), `canPromoteBaseline`, `checkPwuShapeReadiness`,
+`evidenceAdmissibility` (all wired this session), `canAdvanceWorkLifecycle`/`validateStepCompletion` (real
+axes/payload), the pure composers (`dispositionFromFindings`, `aggregateDisposition`, `composeAssuranceOutcome`,
+`assuranceRecordingPlan`, `deMinimisFloorPlan`), the state machine (`canTransition`, `classifyTransition`),
+`checkIndependence` (model axis real, per 3a), and the registry/mock builders.
+
+**The pattern:** the deterministic half of the de minimis floor — schema validity and identity/provenance/trace
+— is fed literal `true` at the rph-demo authoring call site, so those validators run and certify themselves.
+This is the same "structurally incapable of failing" shape the wiring program removed on the execution plane
+(Increment 2), still present on the **authoring** plane's deterministic floor. The kernel is correct; the
+call site feeds it constants.
+
+**The concrete next fix (findings 18/67):** derive the identity/provenance facts from the real PWA state —
+`getObject(engine, pwaId)` already carries `id`, `provenance`, `createdBy`, `semanticVersion`, so `hasStableId`
+/ `hasProvenance` / `hasProducer` / `hasSemanticVersion` are computable, not assertable. `traceComplete` needs
+a real definition of trace-completeness (what must be present) before it can stop being `true`. That is a
+wiring increment, red-test-first, not part of this read-only audit.
+
+---
+
 ## PART 4 — Open questions genuinely for the sponsor
 
 *(kept deliberately short — under the 2026-07-15 mandate, a tension is work, not a question, unless it
