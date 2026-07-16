@@ -2177,12 +2177,16 @@
         {
           "field": "applicableObjectTypes",
           "required": true,
-          "type": "string"
+          "type": "ProfessionalWorkObjectType[]",
+          "enumRef": "ProfessionalWorkObjectTypeSchema",
+          "note": "DOC-004 §3.1 / DOC-007 / DOC-002 §17.1 ALL declare `applicableObjectTypes: ProfessionalWorkObjectType[]`. Was `string` — a single value. TIGHTENED 2026-07-16."
         },
         {
           "field": "evaluatedClaimTypes",
           "required": true,
-          "type": "string"
+          "type": "ClaimType[]",
+          "enumRef": "ClaimTypeSchema",
+          "note": "DOC-004 §3.1 / DOC-007 / DOC-002 §17.1 ALL declare `evaluatedClaimTypes: ClaimType[]`. Was `string` — a single value, so a policy evaluating {PRESERVATION, CORRECTNESS, COMPLETENESS} (m8-ontology's own data for pol_intent_fidelity!) was unrepresentable on the wire. TIGHTENED 2026-07-16."
         },
         {
           "field": "criteria",
@@ -2208,7 +2212,9 @@
         {
           "field": "permittedControlActions",
           "required": true,
-          "type": "string"
+          "type": "ControlAction[]",
+          "enumRef": "ControlActionSchema",
+          "note": "DOC-004 §3.1 / DOC-007 declare `permittedControlActions: ControlAction[]` (the 23-value enum of §11). Was `string` — ONE action. DOC-004 ratifies a SET per policy (§15.10 five for POL-INTENT-FIDELITY, §17.8 six, §19.8 five, §23.7 six); the seed collapsed each to a single value. TIGHTENED 2026-07-16."
         }
       ]
     },
@@ -2242,12 +2248,16 @@
         {
           "field": "applicableObjectTypes",
           "required": false,
-          "type": "string"
+          "type": "ProfessionalWorkObjectType[]",
+          "enumRef": "ProfessionalWorkObjectTypeSchema",
+          "note": "DOC-004 §3.1 / DOC-007 / DOC-002 §17.1 ALL declare `applicableObjectTypes: ProfessionalWorkObjectType[]`. Was `string` — a single value. TIGHTENED 2026-07-16."
         },
         {
           "field": "evaluatedClaimTypes",
           "required": false,
-          "type": "string"
+          "type": "ClaimType[]",
+          "enumRef": "ClaimTypeSchema",
+          "note": "DOC-004 §3.1 / DOC-007 / DOC-002 §17.1 ALL declare `evaluatedClaimTypes: ClaimType[]`. Was `string` — a single value, so a policy evaluating {PRESERVATION, CORRECTNESS, COMPLETENESS} (m8-ontology's own data for pol_intent_fidelity!) was unrepresentable on the wire. TIGHTENED 2026-07-16."
         },
         {
           "field": "criteria",
@@ -2273,7 +2283,9 @@
         {
           "field": "permittedControlActions",
           "required": false,
-          "type": "string"
+          "type": "ControlAction[]",
+          "enumRef": "ControlActionSchema",
+          "note": "DOC-004 §3.1 / DOC-007 declare `permittedControlActions: ControlAction[]` (the 23-value enum of §11). Was `string` — ONE action. DOC-004 ratifies a SET per policy (§15.10 five for POL-INTENT-FIDELITY, §17.8 six, §19.8 five, §23.7 six); the seed collapsed each to a single value. TIGHTENED 2026-07-16."
         }
       ]
     },
@@ -5592,12 +5604,16 @@
         {
           "field": "applicableObjectTypes",
           "required": true,
-          "type": "string"
+          "type": "ProfessionalWorkObjectType[]",
+          "enumRef": "ProfessionalWorkObjectTypeSchema",
+          "note": "DOC-004 §3.1 / DOC-007 / DOC-002 §17.1 ALL declare `applicableObjectTypes: ProfessionalWorkObjectType[]`. Was `string` — a single value. TIGHTENED 2026-07-16."
         },
         {
           "field": "evaluatedClaimTypes",
           "required": true,
-          "type": "string"
+          "type": "ClaimType[]",
+          "enumRef": "ClaimTypeSchema",
+          "note": "DOC-004 §3.1 / DOC-007 / DOC-002 §17.1 ALL declare `evaluatedClaimTypes: ClaimType[]`. Was `string` — a single value, so a policy evaluating {PRESERVATION, CORRECTNESS, COMPLETENESS} (m8-ontology's own data for pol_intent_fidelity!) was unrepresentable on the wire. TIGHTENED 2026-07-16."
         },
         {
           "field": "criteria",
@@ -5623,7 +5639,9 @@
         {
           "field": "permittedControlActions",
           "required": true,
-          "type": "string"
+          "type": "ControlAction[]",
+          "enumRef": "ControlActionSchema",
+          "note": "DOC-004 §3.1 / DOC-007 declare `permittedControlActions: ControlAction[]` (the 23-value enum of §11). Was `string` — ONE action. DOC-004 ratifies a SET per policy (§15.10 five for POL-INTENT-FIDELITY, §17.8 six, §19.8 five, §23.7 six); the seed collapsed each to a single value. TIGHTENED 2026-07-16."
         }
       ]
     },
@@ -5654,12 +5672,16 @@
         {
           "field": "applicableObjectTypes",
           "required": false,
-          "type": "string"
+          "type": "ProfessionalWorkObjectType[]",
+          "enumRef": "ProfessionalWorkObjectTypeSchema",
+          "note": "DOC-004 §3.1 / DOC-007 / DOC-002 §17.1 ALL declare `applicableObjectTypes: ProfessionalWorkObjectType[]`. Was `string` — a single value. TIGHTENED 2026-07-16."
         },
         {
           "field": "evaluatedClaimTypes",
           "required": false,
-          "type": "string"
+          "type": "ClaimType[]",
+          "enumRef": "ClaimTypeSchema",
+          "note": "DOC-004 §3.1 / DOC-007 / DOC-002 §17.1 ALL declare `evaluatedClaimTypes: ClaimType[]`. Was `string` — a single value, so a policy evaluating {PRESERVATION, CORRECTNESS, COMPLETENESS} (m8-ontology's own data for pol_intent_fidelity!) was unrepresentable on the wire. TIGHTENED 2026-07-16."
         },
         {
           "field": "criteria",
@@ -5685,7 +5707,9 @@
         {
           "field": "permittedControlActions",
           "required": false,
-          "type": "string"
+          "type": "ControlAction[]",
+          "enumRef": "ControlActionSchema",
+          "note": "DOC-004 §3.1 / DOC-007 declare `permittedControlActions: ControlAction[]` (the 23-value enum of §11). Was `string` — ONE action. DOC-004 ratifies a SET per policy (§15.10 five for POL-INTENT-FIDELITY, §17.8 six, §19.8 five, §23.7 six); the seed collapsed each to a single value. TIGHTENED 2026-07-16."
         }
       ]
     },

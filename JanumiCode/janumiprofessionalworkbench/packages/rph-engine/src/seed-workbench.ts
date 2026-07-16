@@ -167,13 +167,13 @@ export function seedFloorPolicies(handle: EngineHandle): void {
 			name: def.name,
 			purpose: def.purpose,
 			rationale: def.rationale,
-			applicableObjectTypes: 'PROFESSIONAL_WORK_ARCHITECTURE',
-			evaluatedClaimTypes: def.evaluatedClaimType,
+			applicableObjectTypes: ['PROFESSIONAL_WORK_ARCHITECTURE'],
+			evaluatedClaimTypes: def.evaluatedClaimTypes,
 			criteria: def.criteria,
 			evaluatorRole: def.evaluatorRole,
 			independenceRequirement: def.independence,
 			findingDefinitions: def.findingDefinitions,
-			permittedControlActions: def.permittedControlAction
+			permittedControlActions: def.permittedControlActions
 		});
 	}
 }
@@ -188,10 +188,12 @@ interface AdditivePolicySeed {
 	readonly name: string;
 	readonly purpose: string;
 	readonly rationale: string;
-	readonly evaluatedClaimType: string;
+	/** DOC-004 §3.1 / DOC-007 / DOC-002 §17.1: `evaluatedClaimTypes: ClaimType[]`. Was singular. */
+	readonly evaluatedClaimTypes: readonly string[];
 	readonly evaluatorRole: string;
 	readonly independence: string;
-	readonly permittedControlAction: string;
+	/** DOC-004 §3.1 / DOC-007: `permittedControlActions: ControlAction[]` — a SET per policy. Was ONE. */
+	readonly permittedControlActions: readonly string[];
 	/** The RATIFIED DOC-004 §7 shape, aliased from the generated contract. This was a THIRD inline
 	 *  restatement of `{id, statement, mandatory}` — a shape no document defines — after floor-policies.ts
 	 *  and ontology.ts. It survived because AssurancePolicy.criteria was an array of ANY OBJECT
@@ -208,10 +210,17 @@ const ADDITIVE_POLICY_SEEDS: readonly AdditivePolicySeed[] = [
 			"The formalized objective represents the user's need rather than substituting a preferred solution; scope, constraints, and material ambiguity are preserved.",
 		rationale:
 			'Catalog §15 — unauthorized intent alteration cannot be silently introduced; inferred elements must be labelled, not presented as user fact.',
-		evaluatedClaimType: 'PRESERVATION',
+		evaluatedClaimTypes: ['PRESERVATION'],
 		evaluatorRole: 'intent-fidelity-reviewer',
 		independence: 'DIFFERENT_AGENT',
-		permittedControlAction: 'CLARIFY',
+		// DOC-004 §15.10 (POL-INTENT-FIDELITY) — transcribed, was just 'CLARIFY'
+		permittedControlActions: [
+			'CLARIFY',
+			'REVISE_CONTEXT',
+			'RESHAPE_PWU',
+			'REQUEST_HUMAN_DECISION',
+			'REJECT'
+		],
 		criteria: [
 			{
 				id: 'IF-01',
@@ -264,10 +273,11 @@ const ADDITIVE_POLICY_SEEDS: readonly AdditivePolicySeed[] = [
 			'Desired outcomes, product boundary, mandatory constraints, and success conditions are sufficiently explicit for the next authorized activity.',
 		rationale:
 			'Catalog §16 — completeness is risk-relative sufficiency, not exhaustive specification.',
-		evaluatedClaimType: 'COMPLETENESS',
+		evaluatedClaimTypes: ['COMPLETENESS'],
 		evaluatorRole: 'intent-completeness-reviewer',
 		independence: 'DIFFERENT_INVOCATION',
-		permittedControlAction: 'GATHER_CONTEXT',
+		// UNRATIFIED: §16 (POL-INTENT-COMPLETENESS) has NO control-actions subsection — verified by direct search of §16.1-16.6. Value preserved as a 1-element array; shape fixed, content untouched.
+		permittedControlActions: ['GATHER_CONTEXT'],
 		criteria: [
 			{
 				id: 'IC-01',
@@ -320,10 +330,18 @@ const ADDITIVE_POLICY_SEEDS: readonly AdditivePolicySeed[] = [
 			'Material assumptions are surfaced as first-class Assumption Objects, distinguished from established fact, with materiality and verification needs identified.',
 		rationale:
 			'Catalog §17 — cross-cutting: applies to any model-produced professional artifact; SATISFIED means disclosed, not verified.',
-		evaluatedClaimType: 'COMPLETENESS',
+		evaluatedClaimTypes: ['COMPLETENESS'],
 		evaluatorRole: 'assumption-disclosure-reviewer',
 		independence: 'DIFFERENT_INVOCATION',
-		permittedControlAction: 'GATHER_EVIDENCE',
+		// DOC-004 §17.8 (POL-ASSUMPTION-DISCLOSURE) — transcribed, was just 'GATHER_EVIDENCE'
+		permittedControlActions: [
+			'GATHER_EVIDENCE',
+			'CLARIFY',
+			'RESHAPE_PWU',
+			'INVALIDATE_DEPENDENTS',
+			'REQUEST_HUMAN_DECISION',
+			'ESCALATE'
+		],
 		criteria: [
 			{
 				id: 'AD-01',
@@ -376,10 +394,17 @@ const ADDITIVE_POLICY_SEEDS: readonly AdditivePolicySeed[] = [
 			'No mandatory parent obligation silently disappears; applicable constraints propagate; a credible parent-level recomposition strategy exists.',
 		rationale:
 			'Catalog §19 — any missing mandatory obligation or child intent divergence is BLOCKING.',
-		evaluatedClaimType: 'COVERAGE',
+		evaluatedClaimTypes: ['COVERAGE'],
 		evaluatorRole: 'decomposition-coverage-reviewer',
 		independence: 'DIFFERENT_AGENT',
-		permittedControlAction: 'REVISE_DECOMPOSITION',
+		// DOC-004 §19.8 (POL-DECOMPOSITION-COVERAGE) — transcribed, was just 'REVISE_DECOMPOSITION'
+		permittedControlActions: [
+			'REVISE_DECOMPOSITION',
+			'RESHAPE_PWU',
+			'CLARIFY',
+			'REQUEST_HUMAN_DECISION',
+			'REJECT'
+		],
 		criteria: [
 			{
 				id: 'DC-01',
@@ -432,10 +457,11 @@ const ADDITIVE_POLICY_SEEDS: readonly AdditivePolicySeed[] = [
 			'Applicable requirements and constraints are allocated to structure with explicit boundaries, data ownership, and security; the architecture is feasible.',
 		rationale:
 			'Catalog §21 — critical security, tenant-isolation, data-integrity, or mandatory-constraint failures are BLOCKING.',
-		evaluatedClaimType: 'COVERAGE',
+		evaluatedClaimTypes: ['COVERAGE'],
 		evaluatorRole: 'architecture-coverage-reviewer',
 		independence: 'DIFFERENT_AGENT',
-		permittedControlAction: 'RESHAPE_PWU',
+		// UNRATIFIED: §21 (POL-ARCHITECTURE-COVERAGE) has NO control-actions subsection — verified by direct search of §21.1-21.6. Value preserved as a 1-element array; shape fixed, content untouched.
+		permittedControlActions: ['RESHAPE_PWU'],
 		criteria: [
 			{
 				id: 'AC-01',
@@ -488,10 +514,18 @@ const ADDITIVE_POLICY_SEEDS: readonly AdditivePolicySeed[] = [
 			'Each downstream transformation still preserves the approved Product Intent end-to-end — no silent change of product semantics.',
 		rationale:
 			'Catalog §20/§30 — the promoted result must still serve the originating Product Intent.',
-		evaluatedClaimType: 'PRESERVATION',
+		evaluatedClaimTypes: ['PRESERVATION'],
 		evaluatorRole: 'intent-preservation-reviewer',
 		independence: 'DIFFERENT_AGENT',
-		permittedControlAction: 'ESCALATE',
+		// DOC-004 §23.7 (POL-INTENT-PRESERVATION) — transcribed. NOTE: the previous value 'ESCALATE' is NOT a member of §23.7's ratified set; the code permitted an action the ratified policy does not list. Removing it is the ratified truth, and a real behaviour change.
+		permittedControlActions: [
+			'RESHAPE_PWU',
+			'REVISE_DECOMPOSITION',
+			'INVALIDATE_DEPENDENTS',
+			'REQUEST_HUMAN_DECISION',
+			'REJECT',
+			'ABANDON'
+		],
 		criteria: [
 			{
 				id: 'IP-01',
@@ -534,13 +568,13 @@ export function seedAdditivePolicies(handle: EngineHandle): void {
 			name: p.name,
 			purpose: p.purpose,
 			rationale: p.rationale,
-			applicableObjectTypes: 'PROFESSIONAL_WORK_UNIT',
-			evaluatedClaimTypes: p.evaluatedClaimType,
+			applicableObjectTypes: ['PROFESSIONAL_WORK_UNIT'],
+			evaluatedClaimTypes: p.evaluatedClaimTypes,
 			criteria: p.criteria,
 			evaluatorRole: p.evaluatorRole,
 			independenceRequirement: p.independence,
 			findingDefinitions: p.findingDefinitions,
-			permittedControlActions: p.permittedControlAction
+			permittedControlActions: p.permittedControlActions
 		});
 	}
 }

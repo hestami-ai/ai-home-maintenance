@@ -66,13 +66,13 @@ describe('AssessmentCriterion (DOC-004 §7) is enforced, not merely documented',
 				name: 'Tenant Isolation Review',
 				purpose: 'p',
 				rationale: 'r',
-				applicableObjectTypes: 'PROFESSIONAL_WORK_UNIT',
-				evaluatedClaimTypes: 'CORRECTNESS',
+				applicableObjectTypes: ['PROFESSIONAL_WORK_UNIT'],
+				evaluatedClaimTypes: ['CORRECTNESS'],
 				criteria,
 				evaluatorRole: 'reviewer',
 				independenceRequirement: 'DIFFERENT_AGENT',
 				findingDefinitions: [],
-				permittedControlActions: 'ESCALATE'
+				permittedControlActions: ['ESCALATE']
 			}
 		};
 		return engine.dispatch(command);

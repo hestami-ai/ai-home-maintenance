@@ -306,10 +306,14 @@ export function buildAuthoringTools(
 				},
 				purpose: { type: 'string', description: 'What this policy assures.' },
 				rationale: { type: 'string', description: 'Why future instances must satisfy it.' },
-				evaluatedClaimType: {
-					type: 'string',
+				// DOC-004 §3.1 ratifies `evaluatedClaimTypes: ClaimType[]`. This was `evaluatedClaimType: string` —
+				// singular — so an agent could only ever declare ONE, and a policy evaluating {PRESERVATION,
+				// CORRECTNESS, COMPLETENESS} (the seeded Intent Fidelity's own claim set!) was unsayable through
+				// this tool. The array was unrepresentable because both codegens dropped `[]` from enumRef fields.
+				evaluatedClaimTypes: {
+					type: 'string[]',
 					description:
-						'The claim type it evaluates: CORRECTNESS, COMPLETENESS, COVERAGE, PRESERVATION, CONSISTENCY, FITNESS, FEASIBILITY, COMPLIANCE, SECURITY, or PERFORMANCE.'
+						'The claim types it evaluates (one or more): CORRECTNESS, COMPLETENESS, COVERAGE, PRESERVATION, CONSISTENCY, FITNESS, FEASIBILITY, COMPLIANCE, SECURITY, PERFORMANCE.'
 				},
 				evaluatorRole: {
 					type: 'string',
@@ -332,7 +336,7 @@ export function buildAuthoringTools(
 					name: str(a.name),
 					purpose: str(a.purpose) || undefined,
 					rationale: str(a.rationale) || undefined,
-					evaluatedClaimType: str(a.evaluatedClaimType) || undefined,
+					evaluatedClaimTypes: strArr(a.evaluatedClaimTypes),
 					evaluatorRole: str(a.evaluatorRole) || undefined,
 					independenceRequirement: str(a.independenceRequirement) || undefined,
 					criteria: strArr(a.criteria)

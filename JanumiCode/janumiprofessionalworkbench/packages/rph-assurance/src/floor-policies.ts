@@ -49,12 +49,29 @@ export interface FloorPolicyDefinition {
 	readonly name: string;
 	readonly purpose: string;
 	readonly rationale: string;
-	/** Single ClaimType value (the object schema takes a single enum, not an array). */
-	readonly evaluatedClaimType: string;
+	/**
+	 * The ClaimTypes this policy evaluates. DOC-004 §3.1, DOC-007 and DOC-002 §17.1 all declare
+	 * `evaluatedClaimTypes: ClaimType[]`.
+	 *
+	 * This was `evaluatedClaimType: string` — singular — justified by the comment "Single ClaimType value (the
+	 * object schema takes a single enum, not an array)". That comment was TRUE about the schema and FALSE about
+	 * the contract: the schema said scalar only because BOTH generators dropped the `[]` from any field carrying
+	 * an enumRef (gen-objects.ts / gen-messages.ts, fixed 2026-07-16). The code documented the bug as if it were
+	 * the model, and the vocab was right all along (`"type": "ClaimType[]"`).
+	 */
+	readonly evaluatedClaimTypes: readonly string[];
 	readonly evaluatorRole: string;
 	readonly independence: IndependenceRequirement;
-	/** Single ControlAction value the policy may recommend. */
-	readonly permittedControlAction: string;
+	/**
+	 * The ControlActions this policy may recommend (DOC-004 §11's 23-value enum). Same story as above: was a
+	 * single `permittedControlAction: string`.
+	 *
+	 * AUTHORED, not transcribed — and disclosed as such: the de minimis floor is a GUIDE-only construct ("de
+	 * minimis", "floor" and "Reasoning Review" have ZERO occurrences in the entire 14-file ratified corpus), so
+	 * DOC-004's per-policy control-action sets (§15.10, §17.8, §19.8, §23.7) cover the ADDITIVE catalog policies
+	 * and say nothing about these three. The single values below are preserved exactly as they were.
+	 */
+	readonly permittedControlActions: readonly string[];
 	readonly criteria: readonly FloorPolicyCriterion[];
 	readonly findingDefinitions: readonly FloorFindingDefinition[];
 }
@@ -66,10 +83,10 @@ const REASONING_REVIEW: FloorPolicyDefinition = {
 		'Every material AI/agent output genuinely discharges its delegated professional obligation rather than producing a plausible substitute that conceals the underlying problem.',
 	rationale:
 		'The mandatory, non-suppressible floor for AI-produced work (§8.4). No profile, low-risk classification, or planner may waive it; it requires evaluator independence.',
-	evaluatedClaimType: 'CORRECTNESS',
+	evaluatedClaimTypes: ['CORRECTNESS'],
 	evaluatorRole: 'reasoning-reviewer',
 	independence: 'DIFFERENT_MODEL',
-	permittedControlAction: 'RETRY',
+	permittedControlActions: ['RETRY'],
 	// The ONLY floor policy whose evaluationMethod is MODEL_JUDGMENT: §8.4 step 3's Reasoning Review is a
 	// judgment about whether an AI result genuinely discharged its obligation — it cannot be a deterministic
 	// check, which is exactly why §8.4 requires evaluator independence for it and not for steps 1-2.
@@ -98,10 +115,10 @@ const SCHEMA_INVARIANT: FloorPolicyDefinition = {
 	purpose:
 		'Every material output conforms to its object contract/schema and all applicable deterministic invariants.',
 	rationale: 'Floor step 1 (§8.4): a candidate that fails its contract cannot be admitted.',
-	evaluatedClaimType: 'CORRECTNESS',
+	evaluatedClaimTypes: ['CORRECTNESS'],
 	evaluatorRole: 'deterministic-schema-validator',
 	independence: 'NONE',
-	permittedControlAction: 'ESCALATE',
+	permittedControlActions: ['ESCALATE'],
 	// evaluationMethod DETERMINISTIC: this floor's evaluator is `deterministic-schema-validator` — a contract
 	// check, not a judgment. severityIfNotMet BLOCKING: §8.4 step 1, "a candidate that fails its contract cannot
 	// be admitted." mayBeNotApplicable false: the floor always applies to a material transformation.
@@ -147,10 +164,10 @@ const IDENTITY_PROVENANCE: FloorPolicyDefinition = {
 	purpose:
 		'Every material output carries a stable identity, semantic version, provenance, producing actor, and complete trace.',
 	rationale: 'Floor step 2 (§8.4): an untraceable output cannot be admitted or later assessed.',
-	evaluatedClaimType: 'CONSISTENCY',
+	evaluatedClaimTypes: ['CONSISTENCY'],
 	evaluatorRole: 'deterministic-provenance-validator',
 	independence: 'NONE',
-	permittedControlAction: 'ESCALATE',
+	permittedControlActions: ['ESCALATE'],
 	// All DETERMINISTIC (evaluator: `deterministic-provenance-validator`) and BLOCKING — §8.4 step 2: "an
 	// untraceable output cannot be admitted or later assessed."
 	criteria: [

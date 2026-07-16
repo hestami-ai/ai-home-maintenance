@@ -240,30 +240,33 @@
       "type": "string"
     },
     "applicableObjectTypes": {
-      "type": "string",
-      "enum": [
-        "INTENT",
-        "PROFESSIONAL_WORK_UNIT",
-        "OBLIGATION",
-        "CONSTRAINT",
-        "ASSUMPTION",
-        "CLAIM",
-        "EVIDENCE",
-        "ASSURANCE_POLICY",
-        "ASSURANCE_ASSESSMENT",
-        "ASSURANCE_OBSERVATION",
-        "DECISION",
-        "ARTIFACT",
-        "DECOMPOSITION_CONTRACT",
-        "RECOMPOSITION_CONTRACT",
-        "EXECUTION_PLAN",
-        "RUNTIME_BINDING",
-        "BASELINE",
-        "PROFESSIONAL_WORK_ARCHITECTURE",
-        "PWU_TYPE",
-        "UNDERTAKING",
-        "AUTHORING_CONVERSATION"
-      ]
+      "type": "array",
+      "items": {
+        "type": "string",
+        "enum": [
+          "INTENT",
+          "PROFESSIONAL_WORK_UNIT",
+          "OBLIGATION",
+          "CONSTRAINT",
+          "ASSUMPTION",
+          "CLAIM",
+          "EVIDENCE",
+          "ASSURANCE_POLICY",
+          "ASSURANCE_ASSESSMENT",
+          "ASSURANCE_OBSERVATION",
+          "DECISION",
+          "ARTIFACT",
+          "DECOMPOSITION_CONTRACT",
+          "RECOMPOSITION_CONTRACT",
+          "EXECUTION_PLAN",
+          "RUNTIME_BINDING",
+          "BASELINE",
+          "PROFESSIONAL_WORK_ARCHITECTURE",
+          "PWU_TYPE",
+          "UNDERTAKING",
+          "AUTHORING_CONVERSATION"
+        ]
+      }
     },
     "applicability": {
       "type": "object",
@@ -273,19 +276,22 @@
       "additionalProperties": {}
     },
     "evaluatedClaimTypes": {
-      "type": "string",
-      "enum": [
-        "COMPLETENESS",
-        "CORRECTNESS",
-        "COMPLIANCE",
-        "CONSISTENCY",
-        "FITNESS",
-        "PRESERVATION",
-        "FEASIBILITY",
-        "PERFORMANCE",
-        "SECURITY",
-        "COVERAGE"
-      ]
+      "type": "array",
+      "items": {
+        "type": "string",
+        "enum": [
+          "COMPLETENESS",
+          "CORRECTNESS",
+          "COMPLIANCE",
+          "CONSISTENCY",
+          "FITNESS",
+          "PRESERVATION",
+          "FEASIBILITY",
+          "PERFORMANCE",
+          "SECURITY",
+          "COVERAGE"
+        ]
+      }
     },
     "defaultClaimTemplates": {
       "type": "array",
@@ -420,32 +426,35 @@
       }
     },
     "permittedControlActions": {
-      "type": "string",
-      "enum": [
-        "CONTINUE",
-        "WAIT",
-        "CLARIFY",
-        "GATHER_CONTEXT",
-        "GATHER_EVIDENCE",
-        "REVISE_PROMPT",
-        "REVISE_CONTEXT",
-        "RETRY",
-        "CHANGE_MODEL",
-        "CHANGE_TOOL",
-        "CHANGE_VALIDATOR",
-        "CHANGE_TACTIC",
-        "RESHAPE_PWU",
-        "REVISE_DECOMPOSITION",
-        "REPLAN_EXECUTION",
-        "INVALIDATE_DEPENDENTS",
-        "REQUEST_HUMAN_DECISION",
-        "REQUEST_WAIVER",
-        "ESCALATE",
-        "REJECT",
-        "ABANDON",
-        "ACCEPT",
-        "PROMOTE_BASELINE"
-      ]
+      "type": "array",
+      "items": {
+        "type": "string",
+        "enum": [
+          "CONTINUE",
+          "WAIT",
+          "CLARIFY",
+          "GATHER_CONTEXT",
+          "GATHER_EVIDENCE",
+          "REVISE_PROMPT",
+          "REVISE_CONTEXT",
+          "RETRY",
+          "CHANGE_MODEL",
+          "CHANGE_TOOL",
+          "CHANGE_VALIDATOR",
+          "CHANGE_TACTIC",
+          "RESHAPE_PWU",
+          "REVISE_DECOMPOSITION",
+          "REPLAN_EXECUTION",
+          "INVALIDATE_DEPENDENTS",
+          "REQUEST_HUMAN_DECISION",
+          "REQUEST_WAIVER",
+          "ESCALATE",
+          "REJECT",
+          "ABANDON",
+          "ACCEPT",
+          "PROMOTE_BASELINE"
+        ]
+      }
     },
     "remediationRules": {
       "type": "array",

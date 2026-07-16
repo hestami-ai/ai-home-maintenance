@@ -128,9 +128,18 @@ function zodBaseExpr(t: string): string {
 	return 'z.unknown()';
 }
 
+/**
+ * ARRAY DETECTION MUST COME FIRST — the same bug lived here as in gen-objects.ts, and was found only because
+ * fixing that one left these payloads still scalar. `if (enumRef) return zodEnumRefExpr(enumRef)` sat above the
+ * `t.endsWith('[]')` check, so any field with both an enumRef and an array type silently lost its array. The
+ * two generators had independently made the identical mistake; a fix to one is not a fix to the other.
+ */
 function zodExpr(type: string | undefined, enumRef?: string): string {
-	if (enumRef) return zodEnumRefExpr(enumRef);
 	let t = (type ?? 'unknown').trim();
+	if (enumRef) {
+		const base = zodEnumRefExpr(enumRef);
+		return t.endsWith('[]') ? `z.array(${base})` : base;
+	}
 	const lit = zodLiteralExpr(t);
 	if (lit !== undefined) return lit;
 	let arr = false;

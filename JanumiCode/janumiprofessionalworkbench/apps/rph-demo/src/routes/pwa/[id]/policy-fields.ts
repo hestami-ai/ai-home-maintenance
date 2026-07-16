@@ -52,11 +52,27 @@ export function readPolicyFields(form: FormData, prior: readonly AssessmentCrite
 		name: String((form.get('name') ?? '') as string).trim(),
 		purpose: String((form.get('purpose') ?? '') as string).trim(),
 		rationale: String((form.get('rationale') ?? '') as string).trim(),
-		evaluatedClaimTypes: String((form.get('evaluatedClaimTypes') ?? '') as string).trim(),
 		evaluatorRole: String((form.get('evaluatorRole') ?? '') as string).trim(),
 		independenceRequirement: String((form.get('independenceRequirement') ?? '') as string).trim(),
-		applicableObjectTypes: String((form.get('applicableObjectTypes') ?? '') as string).trim(),
-		permittedControlActions: String((form.get('permittedControlActions') ?? '') as string).trim(),
+		// The three ratified ARRAYS (DOC-004 §3.1, DOC-007, DOC-002 §17.1: ProfessionalWorkObjectType[],
+		// ClaimType[], ControlAction[]). Each was read as a single trimmed string, because both generators
+		// dropped the `[]` from any enumRef field and the schema therefore said scalar. The form still posts one
+		// comma-separated text input per field, so it is split here — a multi-select is the natural follow-up.
+		evaluatedClaimTypes: csvList(form.get('evaluatedClaimTypes')),
+		applicableObjectTypes: csvList(form.get('applicableObjectTypes')),
+		permittedControlActions: csvList(form.get('permittedControlActions')),
 		criteria
 	};
+}
+
+/** Split a comma/newline/semicolon-separated form field into a clean, de-duplicated string[]. */
+function csvList(v: FormDataEntryValue | null): string[] {
+	return [
+		...new Set(
+			String((v ?? '') as string)
+				.split(/[\n,;]/)
+				.map((x) => x.trim())
+				.filter(Boolean)
+		)
+	];
 }

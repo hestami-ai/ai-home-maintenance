@@ -98,17 +98,31 @@ function isPlaceholder(h: HelperSpec): boolean {
 const usedEnums = new Set<string>();
 const usedExternal = new Set<string>();
 
-/** Map a spec field type -> a Zod expression string. */
+/**
+ * Map a spec field type -> a Zod expression string.
+ *
+ * ARRAY DETECTION MUST COME FIRST. The `enumRef` branch used to sit at the top and `return enumRef` outright,
+ * BEFORE the `t.endsWith('[]')` check below — so any field carrying both an enumRef and an array type silently
+ * lost its array. Three ratified arrays on AssurancePolicyDefinition emitted as SCALARS:
+ * `applicableObjectTypes`, `evaluatedClaimTypes`, `permittedControlActions`. DOC-004 §3.1, DOC-007 and DOC-002
+ * §17.1 ALL declare them `[]` — there is no §17 conflict to excuse it — and the vocab was right too
+ * (`{"type": "ControlAction[]", "enumRef": "ControlActionSchema"}`); the generator threw the `[]` away.
+ *
+ * The harm was concrete, not cosmetic: a policy permitting {CLARIFY, REJECT} was UNREPRESENTABLE. The bug was
+ * self-evident from a contrast inside the same schema — every object-array field kept its array
+ * (`defaultClaimTemplates: z.array(ClaimTemplateSchema)`) because those carry no enumRef.
+ * Found by adversarial review of Increment 11, 2026-07-16.
+ */
 function zodExpr(type: string | undefined, enumRef?: string): string {
-	if (enumRef) {
-		usedEnums.add(enumRef.replace(/Schema$/, ''));
-		return enumRef;
-	}
 	let t = (type ?? 'string').trim();
 	let arr = false;
 	if (t.endsWith('[]')) {
 		arr = true;
 		t = t.slice(0, -2).trim();
+	}
+	if (enumRef) {
+		usedEnums.add(enumRef.replace(/Schema$/, ''));
+		return arr ? `z.array(${enumRef})` : enumRef;
 	}
 	let expr: string;
 	// Inline string-literal union, e.g. "'A' | 'B' | 'C'" -> z.enum(['A','B','C']). Lets a tightened helper

@@ -105,11 +105,14 @@ export const load: PageServerLoad = ({ params }) => {
 		rationale: String((p.state.rationale ?? '') as string),
 		version: String((p.state.version ?? '') as string),
 		status: String((p.state.status ?? 'ACTIVE') as string),
-		evaluatedClaimTypes: String((p.state.evaluatedClaimTypes ?? '') as string),
+		// The three ratified ARRAYS, rendered for a comma-separated text input and split back by `csvList` on save.
+		// Joined EXPLICITLY: `String(['A','B'])` also yields 'A, B'-ish, but only by accident of Array.toString —
+		// it silently produces 'A,B' with no space and would quietly do something else for any non-array value.
+		evaluatedClaimTypes: joinList(p.state.evaluatedClaimTypes),
 		evaluatorRole: String((p.state.evaluatorRole ?? '') as string),
 		independenceRequirement: String((p.state.independenceRequirement ?? '') as string),
-		applicableObjectTypes: String((p.state.applicableObjectTypes ?? '') as string),
-		permittedControlActions: String((p.state.permittedControlActions ?? '') as string),
+		applicableObjectTypes: joinList(p.state.applicableObjectTypes),
+		permittedControlActions: joinList(p.state.permittedControlActions),
 		// `description` per DOC-004 §7 — this read `c.statement`, the invented field's name.
 		//
 		// This projection is LOSSY BY CONSTRUCTION and that is now handled, not claimed away: the textarea shows
@@ -158,6 +161,17 @@ interface TypeFields {
 	requiredInputs: string[];
 	requiredOutputs: string[];
 	requiredAssurancePolicyIds: string[];
+}
+
+/** Copy a stored ratified-array field through verbatim, falling back to a single-value array. Never String():
+ *  that stringifies an array into 'A,B' and the strictly-typed payload then rejects it. */
+function strList(v: unknown, fallback: string): string[] {
+	return Array.isArray(v) && v.length ? (v as string[]).map(String) : [fallback];
+}
+
+/** Render a stored ratified-array field into the comma-separated text input the policy form uses. */
+function joinList(v: unknown): string {
+	return Array.isArray(v) ? (v as unknown[]).map(String).join(', ') : String(v ?? '');
 }
 
 /** Split a comma/newline-separated artifact list from a form field into a clean string[]. */
@@ -415,17 +429,19 @@ export const actions: Actions = {
 			name: String((prev.name ?? 'Policy') as string),
 			purpose: String((prev.purpose ?? '') as string),
 			rationale: String((prev.rationale ?? '') as string),
-			applicableObjectTypes: String(
-				(prev.applicableObjectTypes ?? 'PROFESSIONAL_WORK_UNIT') as string
-			),
-			evaluatedClaimTypes: String((prev.evaluatedClaimTypes ?? 'CORRECTNESS') as string),
+			// The three ratified ARRAYS, copied through as arrays. These read `String(prev.x ?? 'DEFAULT')`, which
+			// turns ['CLARIFY','REJECT'] into the STRING 'CLARIFY,REJECT' — so versioning a policy silently
+			// rejected the successor and the supersede never happened. Caught by the policy-manager E2E, not by
+			// any unit test: this path only exists in the UI action.
+			applicableObjectTypes: strList(prev.applicableObjectTypes, 'PROFESSIONAL_WORK_UNIT'),
+			evaluatedClaimTypes: strList(prev.evaluatedClaimTypes, 'CORRECTNESS'),
 			criteria: Array.isArray(prev.criteria) ? prev.criteria : [],
 			evaluatorRole: String((prev.evaluatorRole ?? 'reviewer') as string),
 			independenceRequirement: String(
 				(prev.independenceRequirement ?? 'DIFFERENT_AGENT') as string
 			),
 			findingDefinitions: Array.isArray(prev.findingDefinitions) ? prev.findingDefinitions : [],
-			permittedControlActions: String((prev.permittedControlActions ?? 'ESCALATE') as string)
+			permittedControlActions: strList(prev.permittedControlActions, 'ESCALATE')
 		});
 		if (create.status !== 'ACCEPTED')
 			return fail(400, { error: create.error?.message ?? create.status });

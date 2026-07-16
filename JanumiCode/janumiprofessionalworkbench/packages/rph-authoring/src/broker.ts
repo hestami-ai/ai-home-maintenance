@@ -114,10 +114,13 @@ export interface CreatePolicyInput {
 	readonly name: string;
 	readonly purpose?: string;
 	readonly rationale?: string;
-	readonly evaluatedClaimType?: string;
+	/** DOC-004 §3.1: `evaluatedClaimTypes: ClaimType[]`. Was a single value — the array was unrepresentable
+	 *  because both generators dropped `[]` from enumRef fields (fixed 2026-07-16). */
+	readonly evaluatedClaimTypes?: readonly string[];
 	readonly evaluatorRole?: string;
 	readonly independenceRequirement?: string;
-	readonly permittedControlAction?: string;
+	/** DOC-004 §3.1 / §11: `permittedControlActions: ControlAction[]` — a SET. Was ONE action. */
+	readonly permittedControlActions?: readonly string[];
 	/** Each string becomes a DOC-004 §7 `AssessmentCriterion` (id generated; see `createPolicy`). */
 	readonly criteria?: readonly string[];
 }
@@ -303,13 +306,17 @@ export class PwaAuthoringBroker {
 			name: input.name,
 			purpose: input.purpose || input.name,
 			rationale: input.rationale || 'Authored by the JPWB agent.',
-			applicableObjectTypes: 'PROFESSIONAL_WORK_UNIT',
-			evaluatedClaimTypes: input.evaluatedClaimType || 'CORRECTNESS',
+			applicableObjectTypes: ['PROFESSIONAL_WORK_UNIT'],
+			evaluatedClaimTypes: input.evaluatedClaimTypes?.length
+				? input.evaluatedClaimTypes
+				: ['CORRECTNESS'],
 			criteria,
 			evaluatorRole: input.evaluatorRole || 'reviewer',
 			independenceRequirement: input.independenceRequirement || 'DIFFERENT_AGENT',
 			findingDefinitions: [],
-			permittedControlActions: input.permittedControlAction || 'ESCALATE'
+			permittedControlActions: input.permittedControlActions?.length
+				? input.permittedControlActions
+				: ['ESCALATE']
 		});
 	}
 

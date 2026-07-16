@@ -1298,6 +1298,85 @@ the new `ontology.types.ts`) · `format:check` clean · svelte-check **0 errors*
 
 ---
 
+## INCREMENT 12 — LANDED. The policy's ratified SETS exist; a policy could hold exactly one of each.
+
+Both HIGHs the Increment-11 review surfaced, and they turned out to be **one defect and its consequence**.
+
+### The defect: the same bug, in BOTH generators, independently
+
+`zodExpr` in `gen-objects.ts` had `if (enumRef) { … return enumRef }` sitting **above** the `t.endsWith('[]')`
+check — so any field carrying **both** an enumRef and an array type silently lost its array. Three ratified
+arrays on `AssurancePolicyDefinition` emitted as **scalars**:
+
+| field | DOC-004 §3.1 · DOC-007 · DOC-002 §17.1 | emitted |
+|---|---|---|
+| `applicableObjectTypes` | `ProfessionalWorkObjectType[]` | `ProfessionalWorkObjectTypeSchema` |
+| `evaluatedClaimTypes` | `ClaimType[]` | `ClaimTypeSchema` |
+| `permittedControlActions` | `ControlAction[]` | `ControlActionSchema` |
+
+**All three ratified docs agree they are arrays** — there is no §17 conflict to hide behind — and **the vocab
+was right too** (`{"type": "ControlAction[]", "enumRef": "ControlActionSchema"}`). The generator threw the `[]`
+away. The bug was self-evident from a contrast inside the same schema: every object-array field kept its array
+(`defaultClaimTemplates: z.array(ClaimTemplateSchema)`) because those carry no enumRef.
+
+**And `gen-messages.ts` had the identical bug** — found only because fixing `gen-objects` left the payloads
+still scalar. Two generators had independently made the same mistake; a fix to one was not a fix to the other.
+
+### The consequence: the code documented the bug as if it were the contract
+
+`floor-policies.ts` declared `evaluatedClaimType: string` — singular — justified by the comment:
+
+> *"Single ClaimType value (the object schema takes a single enum, not an array)."*
+
+**True about the schema. False about the contract.** The schema said scalar only because the generator dropped
+the array. That comment is the whole disease in one line: a defect, observed, and written down as the rule.
+
+**Seven writers** had collapsed to a single value — `floor-policies.ts`, `seed-workbench.ts`, `broker.ts`, the
+agent tools (an agent could declare only ONE claim type, so the seeded Intent Fidelity's own
+`{PRESERVATION, CORRECTNESS, COMPLETENESS}` was **unsayable** through the tool), `policy-fields.ts`,
+`+page.server.ts`'s `load`, and `newPolicyVersion`.
+
+### What DOC-004 actually ratifies, transcribed
+
+| seeded policy | DOC-004 | actions |
+|---|---|---:|
+| `pol_intent_fidelity` | **§15.10** | 5 (was `'CLARIFY'`) |
+| `pol_assumption_disclosure` | **§17.8** | 6 (was `'GATHER_EVIDENCE'`) |
+| `pol_decomposition_coverage` | **§19.8** | 5 (was `'REVISE_DECOMPOSITION'`) |
+| `pol_intent_preservation` | **§23.7** | 6 (was `'ESCALATE'`) |
+| `pol_intent_completeness` | §16 — **no such subsection** | 1, unratified, preserved |
+| `pol_architecture_coverage` | §21 — **no such subsection** | 1, unratified, preserved |
+
+The two silences were **verified by direct search** of §16.1–16.6 and §21.1–21.6, not inferred from a grep
+miss — this program's standing failure mode. Inventing sets for them would be authoring content; a 1-element
+array is the shape fix with the content untouched.
+
+> ### ⚠️ A REAL BEHAVIOUR CHANGE, surfaced not buried
+> **`pol_intent_preservation` permitted `ESCALATE` — which DOC-004 §23.7 does not list.** The code permitted a
+> control action the ratified policy forbids. Transcribing §23.7 **removes** it. That is the ratified truth and
+> a genuine change to what the policy allows; it is pinned by a test that asserts `ESCALATE` is absent.
+
+### What the E2E caught that no unit test could
+
+`newPolicyVersion` copied the arrays with `String(prev.applicableObjectTypes ?? …)` — turning `['A','B']` into
+the **string** `'A,B'`. So versioning a policy silently rejected the successor and the supersede never
+happened. That path exists only in the UI action; **only Playwright saw it.** A standing argument for why "the
+gate" means CI's gate, not the subset I like running.
+
+### Mutation-tested
+
+Reverting either generator's lookup collapses the arrays and the seed **throws**, citing
+`permittedControlActions`; restored, 6/6 pass. The lock reads the **seeded objects out of a live engine**, not
+the source literals — so it proves the sets survive the wire payload *and* the object schema, which is exactly
+where the collapse happened.
+
+### Gate (CI's, in full)
+
+build · `check-types` 21/21 · `test` 21/21 · `lint` · `boundary` · `format:check` clean · svelte-check
+**0 errors** · Playwright **all green** (2 known render-timing flakes, retried).
+
+---
+
 ## PART 4 — Open questions genuinely for the sponsor
 
 *(kept deliberately short — under the 2026-07-15 mandate, a tension is work, not a question, unless it
