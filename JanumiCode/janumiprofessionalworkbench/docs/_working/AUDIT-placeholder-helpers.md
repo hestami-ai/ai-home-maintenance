@@ -262,6 +262,36 @@ literal count. Not fixed — dedup is its own decision.
 5. **`ApplicabilityExpression`** — likewise `FORCE_PLACEHOLDER`; DOC-007 §18's 8-arm union.
 6. The remaining 3 (partial), then the 25 genuinely-undefined stay `any` **and correctly so**.
 
+## MEASURED 2026-07-16 — SEVEN of the policy's ratified rule arrays are UNREACHABLE
+
+Found while transcribing `WaiverRule`: the test could not set `waiverRules` at all —
+`Unrecognized key: "waiverRules"`. Checking every command and event payload in the vocab:
+
+| `AssurancePolicyDefinition` field | ratified in | any command/event carries it? |
+|---|---|---|
+| `waiverRules` | DOC-004 §12.1 | **NO** → hardcoded `[]` |
+| `dispositionRules` | DOC-004 §10.2 | **NO** → hardcoded `[]` |
+| `escalationRules` | DOC-004 §13 | **NO** → hardcoded `[]` |
+| `remediationRules` | DOC-004 §11 | **NO** → hardcoded `[]` |
+| `requiredEvidence` | DOC-004 §6.1 | **NO** |
+| `optionalEvidence` | DOC-004 §6.1 | **NO** |
+| `riskProfiles` | DOC-004 §3.1 | **NO** |
+
+The object schema **requires** them; no command can set them; so `assurance.ts` fills four with a constant.
+**This is ARTIFACT's dangling reference again** (Increment 10a): the object demands a field, the wire has
+nowhere to put it, and a constant plugs the hole.
+
+**The consequence is the sharpest statement of the hollow governed layer yet.** A policy — seeded or authored,
+by a human or an agent — can declare **none** of the rules that make it a policy: not what makes it SATISFIED
+vs REJECTED (§10.2), not when it escalates (§13), not what evidence it needs (§6.1), not whether it may be
+waived (§12.1). The placeholder types were only half the story: **even fully typed, nothing could set them.**
+
+**`waiverRules` is now reachable** (§12.1 transcribed; the payload field authored under the grant; the handler
+persists rather than blanks it) — so a policy can finally declare `waiverAllowed: false`. **The other six
+remain unreachable**, deliberately: each needs its helper transcribed first, and `dispositionRules` (§10.2)
+and `escalationRules` (§13) both depend on `PolicyExpression`, **which the corpus references and never
+defines**.
+
 ## The durable correction
 
 The vocab's `openItems` and helper notes are **not trustworthy as-is**: they were written by passes that

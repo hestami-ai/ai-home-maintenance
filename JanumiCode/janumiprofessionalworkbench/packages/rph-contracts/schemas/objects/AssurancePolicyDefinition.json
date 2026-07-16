@@ -480,10 +480,50 @@
       "type": "array",
       "items": {
         "type": "object",
-        "propertyNames": {
-          "type": "string"
+        "properties": {
+          "waiverAllowed": {
+            "type": "boolean"
+          },
+          "eligibleCriteriaIds": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "prohibitedFindingSeverities": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "requiredAuthorityType": {
+            "type": "string"
+          },
+          "maximumDuration": {
+            "type": "string"
+          },
+          "requiredRationaleFields": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "requiredCompensatingControls": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "revalidationTrigger": {}
         },
-        "additionalProperties": {}
+        "required": [
+          "waiverAllowed",
+          "eligibleCriteriaIds",
+          "prohibitedFindingSeverities",
+          "requiredAuthorityType",
+          "requiredRationaleFields"
+        ],
+        "additionalProperties": false
       }
     },
     "status": {

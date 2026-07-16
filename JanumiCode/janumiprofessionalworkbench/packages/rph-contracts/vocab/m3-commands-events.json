@@ -2210,6 +2210,12 @@
           "type": "FindingDefinition[]"
         },
         {
+          "field": "waiverRules",
+          "required": false,
+          "type": "WaiverRule[]",
+          "note": "AUTHORED under the sponsor's 2026-07-16 grant. FIELD TYPE is ratified — DOC-004 §12.1 defines WaiverRule in full — but no ratified command carries it: DOC-004 describes the policy CATALOG, not its authoring commands, and DOC-007 schematizes no CreateAssurancePolicy. WHY IT IS ADDED: AssurancePolicyDefinition.waiverRules is REQUIRED by the object schema and NO command or event could set it, so assurance.ts hardcoded `waiverRules: []` — the field was write-only-empty and a policy could never declare whether it may be waived. Same dangling-reference shape as ARTIFACT's outputArtifactIds (Increment 10a). Optional on the command so every existing caller stays valid. STILL UNREACHABLE, measured and surfaced, NOT fixed here: dispositionRules, escalationRules, remediationRules, requiredEvidence, optionalEvidence, riskProfiles — six more ratified rule arrays no command carries."
+        },
+        {
           "field": "permittedControlActions",
           "required": true,
           "type": "ControlAction[]",
@@ -2279,6 +2285,12 @@
           "field": "findingDefinitions",
           "required": false,
           "type": "FindingDefinition[]"
+        },
+        {
+          "field": "waiverRules",
+          "required": false,
+          "type": "WaiverRule[]",
+          "note": "AUTHORED under the sponsor's 2026-07-16 grant. FIELD TYPE is ratified — DOC-004 §12.1 defines WaiverRule in full — but no ratified command carries it: DOC-004 describes the policy CATALOG, not its authoring commands, and DOC-007 schematizes no CreateAssurancePolicy. WHY IT IS ADDED: AssurancePolicyDefinition.waiverRules is REQUIRED by the object schema and NO command or event could set it, so assurance.ts hardcoded `waiverRules: []` — the field was write-only-empty and a policy could never declare whether it may be waived. Same dangling-reference shape as ARTIFACT's outputArtifactIds (Increment 10a). Optional on the command so every existing caller stays valid. STILL UNREACHABLE, measured and surfaced, NOT fixed here: dispositionRules, escalationRules, remediationRules, requiredEvidence, optionalEvidence, riskProfiles — six more ratified rule arrays no command carries."
         },
         {
           "field": "permittedControlActions",
@@ -5637,6 +5649,12 @@
           "type": "FindingDefinition[]"
         },
         {
+          "field": "waiverRules",
+          "required": false,
+          "type": "WaiverRule[]",
+          "note": "AUTHORED under the sponsor's 2026-07-16 grant. FIELD TYPE is ratified — DOC-004 §12.1 defines WaiverRule in full — but no ratified command carries it: DOC-004 describes the policy CATALOG, not its authoring commands, and DOC-007 schematizes no CreateAssurancePolicy. WHY IT IS ADDED: AssurancePolicyDefinition.waiverRules is REQUIRED by the object schema and NO command or event could set it, so assurance.ts hardcoded `waiverRules: []` — the field was write-only-empty and a policy could never declare whether it may be waived. Same dangling-reference shape as ARTIFACT's outputArtifactIds (Increment 10a). Optional on the command so every existing caller stays valid. STILL UNREACHABLE, measured and surfaced, NOT fixed here: dispositionRules, escalationRules, remediationRules, requiredEvidence, optionalEvidence, riskProfiles — six more ratified rule arrays no command carries."
+        },
+        {
           "field": "permittedControlActions",
           "required": true,
           "type": "ControlAction[]",
@@ -5703,6 +5721,12 @@
           "field": "findingDefinitions",
           "required": false,
           "type": "FindingDefinition[]"
+        },
+        {
+          "field": "waiverRules",
+          "required": false,
+          "type": "WaiverRule[]",
+          "note": "AUTHORED under the sponsor's 2026-07-16 grant. FIELD TYPE is ratified — DOC-004 §12.1 defines WaiverRule in full — but no ratified command carries it: DOC-004 describes the policy CATALOG, not its authoring commands, and DOC-007 schematizes no CreateAssurancePolicy. WHY IT IS ADDED: AssurancePolicyDefinition.waiverRules is REQUIRED by the object schema and NO command or event could set it, so assurance.ts hardcoded `waiverRules: []` — the field was write-only-empty and a policy could never declare whether it may be waived. Same dangling-reference shape as ARTIFACT's outputArtifactIds (Increment 10a). Optional on the command so every existing caller stays valid. STILL UNREACHABLE, measured and surfaced, NOT fixed here: dispositionRules, escalationRules, remediationRules, requiredEvidence, optionalEvidence, riskProfiles — six more ratified rule arrays no command carries."
         },
         {
           "field": "permittedControlActions",

@@ -118,8 +118,6 @@ export const TerminationPolicySchema = z.record(z.string(), z.unknown());
 export type TerminationPolicy = z.infer<typeof TerminationPolicySchema>;
 export const ValidatorResultSchema = z.record(z.string(), z.unknown());
 export type ValidatorResult = z.infer<typeof ValidatorResultSchema>;
-export const WaiverRuleSchema = z.record(z.string(), z.unknown());
-export type WaiverRule = z.infer<typeof WaiverRuleSchema>;
 
 // ---- Well-specified helper sub-types. ----
 export const AggregationRuleSchema = z.strictObject({
@@ -248,6 +246,17 @@ export const WaiverDetailSchema = z.strictObject({
 	reviewConditions: z.array(z.string())
 });
 export type WaiverDetail = z.infer<typeof WaiverDetailSchema>;
+export const WaiverRuleSchema = z.strictObject({
+	waiverAllowed: z.boolean(),
+	eligibleCriteriaIds: z.array(z.string()),
+	prohibitedFindingSeverities: z.array(z.string()),
+	requiredAuthorityType: z.string(),
+	maximumDuration: z.string().optional(),
+	requiredRationaleFields: z.array(z.string()),
+	requiredCompensatingControls: z.array(z.string()).optional(),
+	revalidationTrigger: z.unknown().optional()
+});
+export type WaiverRule = z.infer<typeof WaiverRuleSchema>;
 export const WorkBoundarySchema = z.strictObject({
 	inScope: z.array(z.string()),
 	outOfScope: z.array(z.string()),

@@ -63,6 +63,7 @@ import {
 	TacticalChangePolicySchema,
 	TerminationPolicySchema,
 	ValidatorResultSchema,
+	WaiverRuleSchema,
 	WorkBoundarySchema,
 	WorkRiskProfileSchema
 } from './objects.js';
@@ -525,6 +526,7 @@ export const CreateAssurancePolicyPayloadSchema = z.strictObject({
 	evaluatorRole: z.string(),
 	independenceRequirement: z.string(),
 	findingDefinitions: z.array(FindingDefinitionSchema),
+	waiverRules: z.array(WaiverRuleSchema).optional(),
 	permittedControlActions: z.array(ControlActionSchema)
 });
 export type CreateAssurancePolicyPayload = z.infer<typeof CreateAssurancePolicyPayloadSchema>;
@@ -539,6 +541,7 @@ export const EditAssurancePolicyPayloadSchema = z.strictObject({
 	evaluatorRole: z.string().optional(),
 	independenceRequirement: z.string().optional(),
 	findingDefinitions: z.array(FindingDefinitionSchema).optional(),
+	waiverRules: z.array(WaiverRuleSchema).optional(),
 	permittedControlActions: z.array(ControlActionSchema).optional()
 });
 export type EditAssurancePolicyPayload = z.infer<typeof EditAssurancePolicyPayloadSchema>;
@@ -1356,6 +1359,7 @@ export const AssurancePolicyCreatedPayloadSchema = z.strictObject({
 	evaluatorRole: z.string(),
 	independenceRequirement: z.string(),
 	findingDefinitions: z.array(FindingDefinitionSchema),
+	waiverRules: z.array(WaiverRuleSchema).optional(),
 	permittedControlActions: z.array(ControlActionSchema)
 });
 export type AssurancePolicyCreatedPayload = z.infer<typeof AssurancePolicyCreatedPayloadSchema>;
@@ -1370,6 +1374,7 @@ export const AssurancePolicyEditedPayloadSchema = z.strictObject({
 	evaluatorRole: z.string().optional(),
 	independenceRequirement: z.string().optional(),
 	findingDefinitions: z.array(FindingDefinitionSchema).optional(),
+	waiverRules: z.array(WaiverRuleSchema).optional(),
 	permittedControlActions: z.array(ControlActionSchema).optional()
 });
 export type AssurancePolicyEditedPayload = z.infer<typeof AssurancePolicyEditedPayloadSchema>;

@@ -2444,14 +2444,56 @@
       "name": "WaiverRule",
       "fields": [
         {
-          "field": "(undefined)",
-          "type": "—",
+          "field": "waiverAllowed",
+          "type": "boolean",
+          "required": true,
+          "note": "DOC-004 §12.1. THE RATIFIED HOME FOR THE FLOOR CONTENT-LOCK. `rejectIfFloorLocked` (assurance.ts) hand-rolls this today as a guard keyed to three hardcoded policy ids, citing INV-5 — a misattribution: INV-5 is `executionState=SUCCEEDED` MUST NOT imply `assuranceState=SATISFIED` (axis separation), nothing about waivability. A policy declaring `waiverAllowed: false` is the model's own way to say it. Wiring the guard to READ this is NOT done here (see the note on this helper)."
+        },
+        {
+          "field": "eligibleCriteriaIds",
+          "type": "string[]",
+          "required": true,
+          "note": "DOC-004 §12.1. id-ref[] into this policy's own AssessmentCriterion ids (§7). The criterion-exactness the floor gate already enforces at runtime via WaiverDetail.waivedCriterionId (§12.2 'exact policy and criterion') — this is its POLICY-side declaration: which criteria may be waived at all."
+        },
+        {
+          "field": "prohibitedFindingSeverities",
+          "type": "string[]",
+          "required": true,
+          "note": "DOC-004 §12.1. Transcribed as `string[]`, NOT AssuranceSeverity[] — §12.1 types it `string[]` and I am not 'improving' a ratified declaration. (§9.1's defaultSeverity IS a closed union; §12.1's is not. That asymmetry is the doc's, not a transcription error.)"
+        },
+        {
+          "field": "requiredAuthorityType",
+          "type": "string",
+          "required": true,
+          "note": "DOC-004 §12.1. Pairs with §12.2's ratified 'authority' requirement, which the Decision envelope already carries. Typed `string`: §12.1 does not name AuthorityType, and DOC-002's AuthorityType enum is a different (adjacent) thing — binding them is a judgment, not a transcription."
+        },
+        {
+          "field": "maximumDuration",
+          "type": "string",
           "required": false,
-          "note": "Referenced by AssurancePolicyDefinition.waiverRules. NOT field-defined. Source TBD."
+          "note": "DOC-004 §12.1 `maximumDuration?: string` — OPTIONAL. Bounds §12.2's 'duration or expiration', which WaiverDetail.expiresAt records per-waiver; this is the policy-side cap."
+        },
+        {
+          "field": "requiredRationaleFields",
+          "type": "string[]",
+          "required": true,
+          "note": "DOC-004 §12.1. §12.2 requires a waiver to record a rationale; this declares which fields of it a given policy demands."
+        },
+        {
+          "field": "requiredCompensatingControls",
+          "type": "string[]",
+          "required": false,
+          "note": "DOC-004 §12.1 — OPTIONAL. §12.2's 'compensating controls', already carried per-waiver by WaiverDetail.compensatingControls (authored under the 2026-07-16 grant)."
+        },
+        {
+          "field": "revalidationTrigger",
+          "type": "PolicyExpression",
+          "required": false,
+          "note": "DOC-004 §12.1 `revalidationTrigger?: PolicyExpression` — OPTIONAL, and its type is the ONE undefined dependency: `PolicyExpression` is referenced 4x by DOC-004 and DEFINED NOWHERE in the 14-file corpus. It therefore emits as a permissive placeholder, which is correct and disclosed — inventing a predicate language here would be exactly the fabrication this audit exists to stop. 7 of 8 fields are real; this one waits for ratification."
         }
       ],
-      "sourceSection": "DOC-004 §12.1 (L626)",
-      "note": "RATIFIED AFTER ALL — audit 2026-07-16 (AUDIT-placeholder-helpers.md). DOC-004 §12.1 (L626) contains `interface WaiverRule { ... }` defining: waiverAllowed, eligibleCriteriaIds, prohibitedFindingSeverities, requiredAuthorityType, maximumDuration, requiredRationaleFields, requiredCompensatingControls, revalidationTrigger. The previous note said 'NOT field-defined ... Source TBD' WHILE CITING THIS SECTION — the harvest pass reached inside this very interface, took its enums, and recorded its fields as nonexistent. A pass that extracts one kind of thing reports the absence of every other kind. STILL A PLACEHOLDER IN CODE: the single '(undefined)' field below keeps gen-objects.ts emitting z.record(z.string(), z.unknown()) — 'any object'. TRANSCRIPTION CAVEAT: 7 of 8 resolvable. NOTE: `waiverAllowed`/`requiredAuthorityType` are the RATIFIED home for the floor content-lock now hand-rolled as rejectIfFloorLocked. NOT fixed here: tightening this breaks live literals and needs an explicit migration, not a sweep."
+      "sourceSection": "DOC-004 §12.1 (L626) — RATIFIED, field-complete, transcribed",
+      "note": "TRANSCRIBED from DOC-004 §12.1 on 2026-07-16 (AUDIT-placeholder-helpers.md). The previous entry was a single '(undefined)' field noted 'Referenced by AssurancePolicyDefinition.waiverRules. NOT field-defined. Source TBD.' — DOC-004 §12.1 defines it in full. FREE TO TIGHTEN: `waiverRules: []` has exactly ONE writer (assurance.ts), so there are no instances to migrate; an empty array satisfies any element type. ⚠️ SHAPE ONLY — this does NOT retire `rejectIfFloorLocked`. Making the guard read `waiverAllowed` requires the store->runtime content path to be real first: today the seeded policy objects are never read (floor.ts hardcodes the plan), so a policy declaring waiverAllowed:false would be a field nothing consults — swapping a working hardcoded guard for a decorative one. The ratified home now EXISTS; occupying it is the next step, not this one."
     },
     {
       "name": "RejectedEvidenceReference",

@@ -80,10 +80,20 @@ export const createAssurancePolicy: CommandHandler = (ctx, command, payload) => 
 		evaluatorRole: p.evaluatorRole,
 		independenceRequirement: p.independenceRequirement,
 		findingDefinitions: p.findingDefinitions,
+		// SEVEN of AssurancePolicyDefinition's ratified rule arrays are REQUIRED by the object schema and carried
+		// by NO command or event, so they are hardcoded empty here. That is not laziness — until 2026-07-16 the
+		// wire had no field to put them in, exactly like ARTIFACT's outputArtifactIds (Increment 10a): the object
+		// demands it, nothing can set it, so a constant fills the hole. The consequence is that a seeded policy
+		// can declare NONE of the rules that make it a policy — what makes it SATISFIED vs REJECTED
+		// (dispositionRules, DOC-004 §10.2), when it escalates (§13), what evidence it needs (§6.1).
+		//
+		// `waiverRules` is now settable (DOC-004 §12.1 transcribed; the payload field authored under the grant),
+		// so it is persisted rather than blanked — a policy can finally declare whether it may be waived at all.
+		// The other six remain unreachable, measured and surfaced in AUDIT-placeholder-helpers.md, not fixed here.
 		dispositionRules: [],
 		remediationRules: [],
 		escalationRules: [],
-		waiverRules: [],
+		waiverRules: p.waiverRules ?? [],
 		permittedControlActions: p.permittedControlActions,
 		status: 'ACTIVE'
 	};
