@@ -21,9 +21,44 @@ import {
 	recordAssuranceRecordingPlan,
 	type EngineHandle
 } from '@janumipwb/rph-engine';
-import type { ActorReference } from '@janumipwb/rph-contracts';
+import type { ActorReference, AssessmentCriterion } from '@janumipwb/rph-contracts';
 import { createFloorRegistry } from './assurance/index.js';
 import { buildPwaExport, getEngine, hostNow, isTestMode, mintUiId } from './workbench.js';
+
+/**
+ * Read the ACTIVE `floor.reasoning-review` policy's criteria FROM THE STORE — the store→runtime content path.
+ *
+ * THIS FUNCTION IS THE INCREMENT. Until now the rubric and the scored criterion set both keyed off the
+ * `REASONING_REVIEW_CRITERIA` constant in `rph-assurance`, so the seeded ASSURANCE_POLICY object was a
+ * PROJECTION of the code: written once at seed time and never read again. Editing it would have changed the UI
+ * card and nothing in the evaluation — "a policy that lies about what it checks". The constant is now only the
+ * SEED; the policy object is the source.
+ *
+ * This lives in the composition root, not in `rph-assurance`, on purpose: that package may not import the
+ * engine (the package DAG forbids it, and `boundary` enforces it), so the app reads the store and passes plain
+ * data in. That is what keeps the Validator subsystem store-free while still letting the policy govern it.
+ *
+ * FAIL-CLOSED, and §13.3 L2227 names this case literally — "Fail closed on missing identity, tenant, POLICY,
+ * schema, or authority context". A missing or empty policy must NOT silently fall back to the constant: that
+ * would restore the projection at the exact moment the policy stopped being readable, which is the worst
+ * possible moment. §8.4 L854 agrees — a required review that is unavailable "cannot satisfy assurance or permit
+ * its protected transition".
+ */
+function reasoningReviewCriteria(engine: EngineHandle): readonly AssessmentCriterion[] {
+	const policy = getObject(engine, FLOOR_POLICY_IDS.REASONING_REVIEW);
+	if (!policy) {
+		throw new Error(
+			`Fail-closed (§13.3): the ${FLOOR_POLICY_IDS.REASONING_REVIEW} ASSURANCE_POLICY is not in the store, so its criteria cannot govern the review. Seed the floor policies before running the floor.`
+		);
+	}
+	const criteria = policy.criteria;
+	if (!Array.isArray(criteria) || criteria.length === 0) {
+		throw new Error(
+			`Fail-closed (§13.3): the ${FLOOR_POLICY_IDS.REASONING_REVIEW} policy records no criteria, so a Reasoning Review over it would assert a rubric no policy declares.`
+		);
+	}
+	return criteria as AssessmentCriterion[];
+}
 
 const FLOOR_ACTOR: ActorReference = {
 	actorId: 'assurance-svc',
@@ -142,6 +177,8 @@ export async function runPwaFloor(
 		},
 		identityProvenance: identityProvenanceFactsOf(pwa, opts.producer),
 		reasoningReview: {
+			// The POLICY's criteria, read from the store — not a constant. See reasoningReviewCriteria().
+			criteria: reasoningReviewCriteria(getEngine()),
 			prompt: opts.prompt,
 			content: JSON.stringify(graphExport),
 			// §8.4 orders what Reasoning Review reviews: the contracted rationale summary FIRST, then outputs and

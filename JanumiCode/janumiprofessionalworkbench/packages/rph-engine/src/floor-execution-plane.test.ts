@@ -4,6 +4,7 @@
 // (A concrete execution-plane protected-transition gate, e.g. on completeExecutionStep RUNNING→SUCCEEDED, is a
 // follow-up for when a live execution flow exists to exercise it — the recording/composition proven here is reused.)
 import {
+	SEEDED_REASONING_REVIEW_CRITERIA,
 	createValidatorRegistry,
 	FLOOR_POLICY_IDS,
 	identityProvenanceValidatorInstance,
@@ -47,20 +48,27 @@ function rr(recommendation: 'SATISFIED' | 'REJECTED'): Validator {
 		validatorId: 'test.reasoning-review',
 		evaluate: (subject) =>
 			Promise.resolve(
-				reasoningReviewResultFromJudgement(subject, JUDGE, 'test.reasoning-review', {
-					findings:
-						recommendation === 'REJECTED'
-							? [
-									{
-										criterionId: 'RR-04-no-proxy-satisfaction',
-										failed: true,
-										statement: 'The execution output is a plausible stub, not the delegated work.',
-										severity: 'BLOCKING'
-									}
-								]
-							: [],
-					recommendation
-				})
+				reasoningReviewResultFromJudgement(
+					subject,
+					JUDGE,
+					'test.reasoning-review',
+					{
+						findings:
+							recommendation === 'REJECTED'
+								? [
+										{
+											criterionId: 'RR-04-no-proxy-satisfaction',
+											failed: true,
+											statement:
+												'The execution output is a plausible stub, not the delegated work.',
+											severity: 'BLOCKING'
+										}
+									]
+								: [],
+						recommendation
+					},
+					SEEDED_REASONING_REVIEW_CRITERIA
+				)
 			)
 	};
 }

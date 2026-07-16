@@ -11,6 +11,7 @@ import {
 	type Validator,
 	type ValidatorContext
 } from './validators.js';
+import { SEEDED_REASONING_REVIEW_CRITERIA } from './floor-policies.js';
 
 const CODEX: Identity = {
 	actorType: 'AGENT',
@@ -50,24 +51,38 @@ function mockReasoningReview(j: ReasoningReviewJudgement, evaluator: Identity = 
 		policyId: FLOOR_POLICY_IDS.REASONING_REVIEW,
 		validatorId: 'mock.reasoning-review',
 		evaluate: (s) =>
-			Promise.resolve(reasoningReviewResultFromJudgement(s, evaluator, 'mock.reasoning-review', j))
+			Promise.resolve(
+				reasoningReviewResultFromJudgement(
+					s,
+					evaluator,
+					'mock.reasoning-review',
+					j,
+					SEEDED_REASONING_REVIEW_CRITERIA
+				)
+			)
 	};
 }
 const CLEAN: ReasoningReviewJudgement = { findings: [], recommendation: 'SATISFIED' };
 
 describe('reasoningReviewResultFromJudgement — judgement → schema-conformant ValidatorResult', () => {
 	it('maps each failure class to a mandatory criterion (MET iff absent) + open observations', () => {
-		const r = reasoningReviewResultFromJudgement(subject, GEMINI, 'v1', {
-			findings: [
-				{
-					criterionId: 'RR-05-no-premature-convergence',
-					failed: true,
-					statement: 'stopped after one pass',
-					severity: 'BLOCKING'
-				}
-			],
-			recommendation: 'REJECTED'
-		});
+		const r = reasoningReviewResultFromJudgement(
+			subject,
+			GEMINI,
+			'v1',
+			{
+				findings: [
+					{
+						criterionId: 'RR-05-no-premature-convergence',
+						failed: true,
+						statement: 'stopped after one pass',
+						severity: 'BLOCKING'
+					}
+				],
+				recommendation: 'REJECTED'
+			},
+			SEEDED_REASONING_REVIEW_CRITERIA
+		);
 		expect(r.criteria).toHaveLength(9); // all nine failure classes become criteria
 		expect(
 			r.criteria.find((c) => c.criterionId === 'RR-05-no-premature-convergence')?.outcome

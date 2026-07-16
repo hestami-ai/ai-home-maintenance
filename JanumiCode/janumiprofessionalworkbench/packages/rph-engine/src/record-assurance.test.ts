@@ -2,6 +2,7 @@
 // result as canonical ASSURANCE_ASSESSMENT + ASSURANCE_OBSERVATION objects via live commands — one assessment per
 // floor policy, completed to the floor-computed disposition, observations carrying the Validator's finding code.
 import {
+	SEEDED_REASONING_REVIEW_CRITERIA,
 	createValidatorRegistry,
 	FLOOR_POLICY_IDS,
 	identityProvenanceValidatorInstance,
@@ -49,10 +50,16 @@ const rrSatisfied: Validator = {
 	validatorId: 'test.reasoning-review',
 	evaluate: (subject) =>
 		Promise.resolve(
-			reasoningReviewResultFromJudgement(subject, JUDGE, 'test.reasoning-review', {
-				findings: [],
-				recommendation: 'SATISFIED'
-			})
+			reasoningReviewResultFromJudgement(
+				subject,
+				JUDGE,
+				'test.reasoning-review',
+				{
+					findings: [],
+					recommendation: 'SATISFIED'
+				},
+				SEEDED_REASONING_REVIEW_CRITERIA
+			)
 		)
 };
 

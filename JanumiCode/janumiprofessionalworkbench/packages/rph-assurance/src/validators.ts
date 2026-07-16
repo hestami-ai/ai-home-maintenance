@@ -4,7 +4,13 @@
 // mapper. The registry is a RUNTIME seam (not a persisted contract — §16.23 leaves deployment-capability projections
 // unresolved). Concrete model-backed Validators (e.g. agy/Gemini for Reasoning Review) live server-side and register
 // here; the deterministic floor Validators are pure and defined here.
-import type { Disposition, Identity, Severity } from './assurance-rules.js';
+import type { AssessmentCriterion } from '@janumipwb/rph-contracts';
+import {
+	BLOCKING_SEVERITIES,
+	type Disposition,
+	type Identity,
+	type Severity
+} from './assurance-rules.js';
 import { assuranceRecordingPlan, type AssuranceRecordingPlan } from './recording.js';
 import {
 	composeAssuranceOutcome,
@@ -47,6 +53,23 @@ export interface ProfessionalRationaleSummary {
 /** The inputs a Validator needs beyond the subject. Deterministic Validators read the fact bags; the Reasoning
  *  Review Validator reads the review input (the intent + the serialized subject content to review). */
 export interface ReasoningReviewInput {
+	/**
+	 * The criteria this review judges — READ FROM THE SEEDED `floor.reasoning-review` ASSURANCE_POLICY OBJECT
+	 * by the composition root, NOT from a constant in this file.
+	 *
+	 * THIS FIELD IS THE POINT OF THE INCREMENT. The rubric and the scored criterion set both keyed off the
+	 * `REASONING_REVIEW_CRITERIA` constant, so the seeded policy object was a PROJECTION of the code: it was
+	 * written at seed time and never read again. Editing it would have changed the UI card and nothing in the
+	 * evaluation — "a policy that lies about what it checks". Now the policy is the source and the constant is
+	 * only its seed.
+	 *
+	 * REQUIRED, deliberately: an optional field with a constant fallback is how this regresses silently. A caller
+	 * that cannot supply criteria should fail the build, not quietly re-hardcode the rubric.
+	 *
+	 * `rph-assurance` stays STORE-FREE — the app reads the ACTIVE policy and passes its criteria in, which is
+	 * what keeps the package DAG intact (this package may not import the engine).
+	 */
+	readonly criteria: readonly AssessmentCriterion[];
 	readonly prompt: string;
 	readonly content: string;
 	/** The producer's contracted §9.7 deliverable. Undefined means the producer did not discharge that half of its
@@ -177,21 +200,33 @@ export interface ReasoningReviewJudgement {
 
 /**
  * Map a Reasoning Review judgement (from any backend — model, deterministic, hybrid, human) to the schema-conformant
- * ValidatorResult. Each failure class becomes a mandatory criterion (MET iff absent); present failures become open
- * observations. Pure + backend-agnostic, so the agy/Gemini adapter and any future Validator share one mapping.
+ * ValidatorResult. Each criterion becomes a scored result (MET iff its failure class is absent); present failures
+ * become open observations. Pure + backend-agnostic, so the agy/Gemini adapter and any future Validator share one
+ * mapping.
+ *
+ * `policyCriteria` IS THE POLICY'S OWN, threaded in from the seeded ASSURANCE_POLICY object. This mapped over the
+ * `REASONING_REVIEW_CRITERIA` constant, which made the SCORED criterion set a fact about this file rather than
+ * about the policy — the other half of the projection (the prompt rubric was the first half). Both now read the
+ * policy, so an edited criterion reaches the rubric AND the score, and the two cannot silently diverge.
+ *
+ * `mandatory` is DERIVED from the ratified `severityIfNotMet` (DOC-004 §7) rather than hardcoded `true`: a
+ * criterion blocks iff its severity does. It was `true` for every criterion, which was correct only because every
+ * floor criterion happens to be BLOCKING — a coincidence, not a rule, and it would have silently promoted any
+ * ADVISORY criterion the moment one existed.
  */
 export function reasoningReviewResultFromJudgement(
 	subject: AssuranceSubject,
 	evaluator: Identity,
 	validatorId: string,
-	j: ReasoningReviewJudgement
+	j: ReasoningReviewJudgement,
+	policyCriteria: readonly AssessmentCriterion[]
 ): ValidatorResult {
 	const byId = new Map(j.findings.map((f) => [f.criterionId, f]));
-	const criteria: FloorCriterion[] = REASONING_REVIEW_CRITERIA.map((c) => {
+	const criteria: FloorCriterion[] = policyCriteria.map((c) => {
 		const f = byId.get(c.id);
 		return {
 			criterionId: c.id,
-			mandatory: true,
+			mandatory: BLOCKING_SEVERITIES.has(c.severityIfNotMet),
 			outcome: f?.failed ? 'NOT_MET' : 'MET',
 			...(f?.statement ? { rationale: f.statement } : {})
 		};

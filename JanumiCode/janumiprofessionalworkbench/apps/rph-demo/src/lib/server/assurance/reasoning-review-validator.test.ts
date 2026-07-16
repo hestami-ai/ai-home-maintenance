@@ -13,6 +13,7 @@
 // model prose: §14.1 requires prompt and agent tests assess "trajectory, tool use, provenance, schema compliance,
 // adversarial input, uncertainty handling, and bounded authority—not exact prose". That is also why this cannot rot.
 import {
+	SEEDED_REASONING_REVIEW_CRITERIA,
 	REASONING_REVIEW_CRITERIA,
 	type AssuranceSubject,
 	type ProfessionalRationaleSummary,
@@ -68,6 +69,9 @@ const ctx = (
 	}> = {}
 ): ValidatorContext => ({
 	reasoningReview: {
+		// The policy's criteria AS SEEDED — what the store holds, which is what the composition root reads and
+		// threads in. Not the `REASONING_REVIEW_CRITERIA` constant: the rubric and the score are the POLICY's now.
+		criteria: SEEDED_REASONING_REVIEW_CRITERIA,
 		prompt: 'Author a product realization PWA',
 		content: over.content ?? '{"pwuTypes":[{"id":"t1"}]}',
 		narration: over.narration ?? '',

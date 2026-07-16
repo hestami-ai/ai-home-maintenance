@@ -2,6 +2,7 @@
 // until the REAL de minimis floor — run by the actual Validators and persisted by recordAssuranceRecordingPlan — is
 // recorded SATISFIED. This closes the loop the two package-local suites test in isolation.
 import {
+	SEEDED_REASONING_REVIEW_CRITERIA,
 	createValidatorRegistry,
 	FLOOR_POLICY_IDS,
 	identityProvenanceValidatorInstance,
@@ -50,10 +51,16 @@ const rrSatisfied: Validator = {
 	validatorId: 'test.reasoning-review',
 	evaluate: (subject) =>
 		Promise.resolve(
-			reasoningReviewResultFromJudgement(subject, JUDGE, 'test.reasoning-review', {
-				findings: [],
-				recommendation: 'SATISFIED'
-			})
+			reasoningReviewResultFromJudgement(
+				subject,
+				JUDGE,
+				'test.reasoning-review',
+				{
+					findings: [],
+					recommendation: 'SATISFIED'
+				},
+				SEEDED_REASONING_REVIEW_CRITERIA
+			)
 		)
 };
 

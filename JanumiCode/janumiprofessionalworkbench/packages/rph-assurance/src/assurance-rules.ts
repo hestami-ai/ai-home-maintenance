@@ -17,6 +17,19 @@ export type CriterionOutcome =
 	'MET' | 'PARTIALLY_MET' | 'NOT_MET' | 'NOT_APPLICABLE' | 'UNABLE_TO_DETERMINE';
 export type Severity = 'INFORMATIONAL' | 'ADVISORY' | 'MATERIAL' | 'BLOCKING' | 'CRITICAL';
 
+/**
+ * The severities that BLOCK — i.e. whose presence forces REJECTED, per the disposition ladder below (an open
+ * CRITICAL or BLOCKING finding rejects; MATERIAL only conditionally-satisfies).
+ *
+ * Exported so a criterion's ratified `severityIfNotMet` (DOC-004 §7) can be asked "does this block?" with the
+ * SAME answer the disposition ladder gives, instead of each caller re-deciding. This set is the ladder's own
+ * top two rungs; if they change, this must change with them.
+ */
+export const BLOCKING_SEVERITIES: ReadonlySet<Severity> = new Set<Severity>([
+	'BLOCKING',
+	'CRITICAL'
+]);
+
 export interface Finding {
 	readonly severity: Severity;
 	readonly open: boolean;

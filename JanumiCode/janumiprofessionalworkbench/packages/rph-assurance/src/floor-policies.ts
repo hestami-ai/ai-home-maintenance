@@ -231,6 +231,18 @@ const IDENTITY_PROVENANCE: FloorPolicyDefinition = {
 	]
 };
 
+/**
+ * The Reasoning Review policy's criteria AS SEEDED — i.e. what the store holds until someone revises the policy.
+ *
+ * This is the SEED, not the source. At runtime the criteria are read from the seeded ASSURANCE_POLICY object by
+ * the composition root and threaded into `ReasoningReviewInput.criteria`; nothing in the evaluation path reads
+ * this constant. Exported only so tests can build a realistic input without hand-rolling the shape — and so the
+ * distinction has a name, because conflating "the seed" with "the source" is precisely what made the governed
+ * layer a projection of the code.
+ */
+export const SEEDED_REASONING_REVIEW_CRITERIA: readonly FloorPolicyCriterion[] =
+	REASONING_REVIEW.criteria;
+
 /** The de minimis floor policies, in floor order. Reasoning Review last (it applies only to AI-produced subjects). */
 export const FLOOR_POLICY_DEFINITIONS: readonly FloorPolicyDefinition[] = [
 	SCHEMA_INVARIANT,

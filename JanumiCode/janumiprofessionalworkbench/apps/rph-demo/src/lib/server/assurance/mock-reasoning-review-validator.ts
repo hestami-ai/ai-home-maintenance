@@ -53,14 +53,22 @@ export function createMockReasoningReviewValidator(): Validator {
 	return {
 		policyId: FLOOR_POLICY_IDS.REASONING_REVIEW,
 		validatorId: 'mock.reasoning-review',
-		evaluate: (subject, ctx) =>
-			Promise.resolve(
+		evaluate: (subject, ctx) => {
+			const input = ctx.reasoningReview;
+			// Fail-closed, and NOT `?? REASONING_REVIEW_CRITERIA`: the mock scores against the POLICY's criteria
+			// like the real Validator does, so the E2E exercises the store->runtime content path rather than a
+			// path that only the production adapter takes. A mock that quietly kept the constant would make the
+			// whole increment untested end-to-end (§13.3: fail closed on missing policy).
+			if (!input) throw new Error('reasoning-review context is missing');
+			return Promise.resolve(
 				reasoningReviewResultFromJudgement(
 					subject,
 					EVALUATOR,
 					'mock.reasoning-review',
-					judge(ctx.reasoningReview?.content ?? '')
+					judge(input.content),
+					input.criteria
 				)
-			)
+			);
+		}
 	};
 }

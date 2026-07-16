@@ -6,7 +6,6 @@
 // tested in rph-assurance (reasoningReviewResultFromJudgement); this adapter is the impure agy backend + prompt.
 import {
 	FLOOR_POLICY_IDS,
-	REASONING_REVIEW_CRITERIA,
 	reasoningReviewResultFromJudgement,
 	type Disposition,
 	type Identity,
@@ -34,7 +33,11 @@ const SEVERITIES = new Set<Severity>([
 	'BLOCKING',
 	'CRITICAL'
 ]);
-const CRITERION_IDS = new Set<string>(REASONING_REVIEW_CRITERIA.map((c) => c.id));
+/** The admissible criterion ids for a judgement — derived PER REVIEW from the POLICY's own criteria. This was a
+ *  module-level Set built from the `REASONING_REVIEW_CRITERIA` constant, so any policy criterion the constant did
+ *  not know about would have had its findings silently discarded at line ~92. */
+const criterionIds = (input: ReasoningReviewInput): ReadonlySet<string> =>
+	new Set(input.criteria.map((c) => c.id));
 
 /** Render a bounded excerpt with truncation DECLARED (§9.7: any declared truncation is recorded, never silent). */
 function excerpt(text: string, limit: number): string {
@@ -42,7 +45,10 @@ function excerpt(text: string, limit: number): string {
 }
 
 function judgePrompt(input: ReasoningReviewInput): string {
-	const rubric = REASONING_REVIEW_CRITERIA.map((c) => `- ${c.id}: ${c.label}`).join('\n');
+	// THE RUBRIC IS THE POLICY'S OWN. This rendered from the REASONING_REVIEW_CRITERIA constant, which is what made
+	// the seeded ASSURANCE_POLICY object a projection of this file — written at seed time and never read again.
+	// `description` is DOC-004 §7's field (the constant called it `label`).
+	const rubric = input.criteria.map((c) => `- ${c.id}: ${c.description}`).join('\n');
 	const priorLine = input.prior?.gaps.length
 		? `\nA PREVIOUS review flagged: ${JSON.stringify(input.prior.gaps)}. Judge whether those are genuinely resolved.`
 		: '';
@@ -77,19 +83,27 @@ function judgePrompt(input: ReasoningReviewInput): string {
 		'(only minor/advisory failures), REJECTED (a BLOCKING/CRITICAL failure), INCONCLUSIVE, or ESCALATED.',
 		'',
 		'Return ONLY a single-line minified JSON object (no markdown, no prose) shaped EXACTLY as:',
-		'{"findings":[{"criterionId":"RR-01-no-problem-substitution","failed":false,"statement":"...","severity":"MATERIAL"}],',
+		// The example id comes from the POLICY too. It was hardcoded to 'RR-01-no-problem-substitution' — a
+		// constant leaking back into the prompt through the output example, which would have told the reviewer to
+		// name a criterion the policy does not declare, and `coerceJudgement` would then have dropped that finding
+		// as unrecognised. Caught by policy-governs-review.test.ts on its first run.
+		`{"findings":[{"criterionId":"${input.criteria[0]?.id ?? 'CRITERION-ID'}","failed":false,"statement":"...","severity":"MATERIAL"}],`,
 		'"recommendation":"SATISFIED","residualUncertainty":["..."]}'
 	]
 		.filter(Boolean)
 		.join('\n');
 }
 
-function coerceJudgement(parsed: unknown): ReasoningReviewJudgement {
+/** `input` is threaded in for its POLICY CRITERIA: the admissible criterion ids are the policy's, not a
+ *  constant's. A finding naming an id outside the policy is dropped — which is only correct if the id set
+ *  comes from the same place the rubric did. */
+function coerceJudgement(parsed: unknown, input: ReasoningReviewInput): ReasoningReviewJudgement {
 	const o = (parsed ?? {}) as Record<string, unknown>;
 	const findings: ReasoningReviewFinding[] = Array.isArray(o.findings)
 		? (o.findings as Record<string, unknown>[])
 				.filter(
-					(f) => typeof f?.criterionId === 'string' && CRITERION_IDS.has(f.criterionId as string)
+					(f) =>
+						typeof f?.criterionId === 'string' && criterionIds(input).has(f.criterionId as string)
 				)
 				.map((f) => ({
 					criterionId: f.criterionId as string,
@@ -135,16 +149,20 @@ export function createAgyReasoningReviewValidator(
 			let raw = await print(prompt);
 			let judgement: ReasoningReviewJudgement;
 			try {
-				judgement = coerceJudgement(JSON.parse(extractJson(raw)));
+				judgement = coerceJudgement(JSON.parse(extractJson(raw)), input);
 			} catch {
 				raw = await print(`${prompt}\n\nIMPORTANT: reply with ONLY the minified JSON object.`);
-				judgement = coerceJudgement(JSON.parse(extractJson(raw)));
+				judgement = coerceJudgement(JSON.parse(extractJson(raw)), input);
 			}
+			// The policy's criteria score the result, exactly as they rendered the rubric. Passing the same
+			// `input.criteria` to both is what makes the two unable to diverge — the rubric asking about one set
+			// while the score reported another was the shape of the old projection.
 			const result = reasoningReviewResultFromJudgement(
 				subject,
 				evaluator,
 				'agy.reasoning-review',
-				judgement
+				judgement,
+				input.criteria
 			);
 			// §9.7 requires the producer to RETURN a professional rationale summary. When it did not, the review
 			// still reaches a conclusion — §8.4 is explicit that Reasoning Review works without the producer's
