@@ -218,7 +218,8 @@ export function seedAdditivePolicies(handle: EngineHandle): void {
  * DOC-004 §9.1 FindingDefinitions (which derives each finding's affectedClaimTypes/defaultControlActions from the
  * policy itself, so a finding cannot claim an action its own policy forbids).
  *
- * The two fields §9.1 mandates and DOC-004 ratifies for NONE of its 99 codes are resolved without inventing them:
+ * The two fields §9.1 mandates and DOC-004 ratifies for almost none of its 99 codes (it binds `INTENT_EXPANSION`
+ * to MATERIAL in §33's worked example; the corrected count is in ontology.types.ts) are resolved without inventing them:
  * an authored annotation if the ontology carries one (11 codes do), otherwise the policy's OWN `failureSeverity`
  * and the humanized code. So an unannotated finding inherits its policy's declared severity rather than a severity
  * someone made up — the same structural rule `findingsFor` already applies to claims and control actions.

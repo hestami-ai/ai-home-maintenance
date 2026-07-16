@@ -13,9 +13,51 @@ and incorrect behavior from units to live end-to-end runs. Recording is load-bea
 
 ## PART 0 — Corrections to my own prior record (read this first)
 
-Five things I told the sponsor in this effort were **wrong**. They are corrected here, and the artifacts that
+Six things I told the sponsor in this effort were **wrong**. They are corrected here, and the artifacts that
 carry them are corrected in place. C1–C4 were each a case of reasoning from a document I had not read. **C5 is
-worse: a fidelity claim I asserted about a document I *had* read, and shipped, and called verified.**
+worse: a fidelity claim I asserted about a document I *had* read, and shipped, and called verified. C6 is the
+same disease as C1–C4, committed one increment after I invoked the rule against it.**
+
+### C6 — "DOC-004 ratifies no severity for ANY of its 99 finding codes" (`b023438`) is **FALSE**.
+
+I wrote this in the commit, in PART 4 below, and said it to the sponsor — with the words *"verified
+corpus-wide, not assumed"*. It is not true, and the way it failed is worth more than the fact:
+
+**What I actually verified.** That `defaultSeverity` — *the field name* — occurs exactly once in the corpus (in
+the §9.1 interface). True. And that three finding codes I sampled (`SOLUTION_SUBSTITUTION`,
+`UNTESTED_REQUIREMENT`, `INTENT_EROSION`) each occur exactly once. Also true.
+
+**What I claimed.** That *no severity is ratified for any of the 99 codes*, and that *every* code occurs exactly
+once. I generalized from a **3-code sample to 99** and called it corpus-wide. Checking all 99 properly: **96
+occur once, 3 occur twice** — and the three exceptions are precisely the informative ones.
+
+**What is actually ratified** — found only because a round-1 refuter cited a section I had never opened:
+
+- **DOC-004 §33, "Validator Implementation Output Schema Example"** — a worked validator output for
+  `pol_intent_preservation`, binding a code to a severity outright:
+  `{"findingCode": "INTENT_EXPANSION", "severity": "MATERIAL", "statement": "The implementation adds an
+  enterprise approval hierarchy not present in the approved Product Intent.", "recommendedControlActions":
+  ["RESHAPE_PWU", "REQUEST_HUMAN_DECISION"]}`, with `"dispositionRecommendation": "CONDITIONALLY_SATISFIED"`.
+  So the doc's own worked case of unauthorized scope expansion is **MATERIAL and not rejected**.
+- **The Executable Invariant and Conformance Test Specification** (a *different ratified document*) ratifies
+  blocking behaviour for three cases: RPH-DEC-002 `MISSING_OBLIGATION_ALLOCATION` → *"decomposition is INVALID;
+  child execution is blocked"*; RPH-DEC-003 *"Silent constraint drop"* → *"decomposition is rejected"*;
+  RPH-DEC-004 `CHILD_INTENT_DIVERGENCE` → *"decomposition is rejected or requires human decision"*.
+- The FSM Reference Undertaking carries two worked `ASSURANCE_OBSERVATION`s, both `"severity": "MATERIAL"`.
+
+**The mechanism of the error.** I searched for the **schema field** (`defaultSeverity`) and concluded the
+**content** was absent. The content exists under a different key (`severity`), in a worked example, in a section
+and a document I never opened. *An absence found by searching for a field name is a claim about the field name.*
+That is [[feedback_absence_of_evidence]] — the rule I invoked **in this same session**, one increment earlier, to
+justify re-checking §15.7 before trusting it. I applied it where it was cheap and skipped it where it mattered.
+
+**What survives.** The gap is real but far narrower than I said: **3 of 99 codes** have ratified severity-bearing
+text; **96 do not**, and no finding registry exists. §9.1 still mandates `description` + `defaultSeverity` and
+the catalog still supplies them for almost nothing.
+
+**An unexpected corroboration.** §33's `recommendedControlActions` for that finding are **exactly
+`["RESHAPE_PWU", "REQUEST_HUMAN_DECISION"]`** — the identical pair Increment 17 derived, independently, as the
+intersection of the four ratified control-action sets. The derivation reproduced the doc's own worked answer.
 
 ### C5 — "6/6 adversarially verified faithful" (Increment 16, `7fa20c5`) was **FALSE for §22**.
 
@@ -1496,22 +1538,101 @@ from 9 options to 15, so "known flake" was a claim worth re-testing rather than 
 
 ---
 
+## PART 3c — Increment 18, ABANDONED ON PURPOSE: the catalog is ratified twice
+
+Authorized to author the 99 `FindingDefinition` descriptions and severities "with rigor within your scoped
+flexibility", I ran three adversarial rounds and then **stopped without shipping any of it**, because the third
+round found the ground it was all standing on.
+
+### The rounds (worth recording — the process found the defect the content could not)
+
+| round | result | what the refuters caught |
+|---|---|---|
+| 1 | **0 of 12 clean**, 87 objections | Systematic **laundered authority**: 20 severities claimed `RATIFIED_*` on quotes that gate SATISFIED. §10.3 has an open MATERIAL finding foreclose SATISFIED *too*, so such a quote cannot select BLOCKING over MATERIAL. Plus severity derived from waivability (orthogonal axes), and invented terms ("green results"). |
+| 2 | 5 of 12 clean, 32 objections | Over-correction into **under-blocking**; a misread of §10.3 ("REJECTED requires BLOCKING" — false, REJECTED is inside MATERIAL's own range); a ratified object **miscited by id**. |
+| 3 | 9 of 12 clean | The finding below. |
+
+### Why it stopped
+
+A round-3 refuter cited **RPH-DOC-003 §29 "Assurance Policy: Decomposition Coverage"** — a document I had not
+consulted for policy content. **RPH-DOC-003 §25–§35 independently ratifies eleven of DOC-004's twelve policies.**
+Not as a summary — with content DOC-004 does not have:
+
+| | RPH-DOC-003 §25 | DOC-004 §15 |
+|---|---|---|
+| Blocking conditions | **four** — "formalized objective contradicts user expression"; "mandatory constraint omitted"; "major ambiguity hidden"; "inferred solution presented as user requirement" | **none** |
+| Findings | prose, incl. **"false precision"**, **"conflicting interpretation"** (no DOC-004 code) | codes, incl. **`OUTCOME_EROSION`**, **`NON_GOAL_CONFLICT`** (no DOC-003 counterpart) |
+| Control actions | "reshape intent"; "reject intent baseline" | `RESHAPE_PWU`; `REJECT` |
+
+Also: DOC-003 §29 blocks on "no recomposition strategy" where DOC-004 §19.7 does not; DOC-003 §35 ratifies seven
+blocking conditions for Baseline Promotion; and **only DOC-004 has POL-CONSTRAINT-PROPAGATION at all**.
+
+**This invalidates the authoring rather than refining it.** My round-2 §15 output — which a refuter passed
+**clean** — set all seven codes to MATERIAL on the explicit argument that *"§15 declares no blocking condition
+for any code."* DOC-003 §25 declares four. Author and refuter were both scoped to DOC-004, by me. Shipping those
+severities would have encoded my unilateral choice of which ratified document governs, inside the governed layer,
+under an `AUTHORED` label that would have looked scrupulous.
+
+### The finding, which is worth more than the 99 severities
+
+**The corpus double-ratifies its own assurance catalog, and nothing ratified says which copy governs.** This is
+the exact defect Increment 17 spent itself fixing — parallel unsynchronized restatement of governance content —
+one layer up, in the ratified documents, where I cannot fix it.
+
+And it lands on Increment 17: `doc004-conformance.test.ts` makes the ontology conform to **DOC-004**, so a
+DOC-003 divergence passes silently. The mechanism is right (one source in code) but the *choice of source* is a
+governance act I performed by default. It is now stated in `SeedPolicy` and in the test header rather than
+implied.
+
+**Why I cannot settle it.** The only tiebreaker on disk is the Coding Agent Guide's §17 source map
+("RPH-DOC-004 … assurance meaning/validator authority" vs "RPH-DOC-003 … domain specialization authority"). That
+map is in the document whose §16 item 1 reads *"This guide is itself proposed."* Using a proposed distillation to
+adjudicate between two ratified documents is **precisely the borrowed authority C1 corrected**. The reading is
+plausible — DOC-004 says "twelve policies" and is the better-specified source — but it is the guide's reading,
+not a ratified one.
+
+### What is parked
+
+Three rounds of authored content (99 codes × description/severity/basis/rationale, 9 of 12 policies
+adversarially clean **against DOC-004 alone**) are **not committed**. They are re-derivable from this log and the
+workflow transcripts. They should be re-authored against the *union* of DOC-003 + DOC-004 + the Executable
+Invariant spec once the sponsor rules — at which point much of round 1's over-blocking instinct may turn out to
+have been closer to right than round 2's correction, since DOC-003 supplies exactly the blocking conditions whose
+absence drove the swing to MATERIAL.
+
+---
+
 ## PART 4 — Open questions genuinely for the sponsor
 
 *(kept deliberately short — under the 2026-07-15 mandate, a tension is work, not a question, unless it
 requires knowing something only the sponsor knows)*
 
-0. **DOC-004 §9.1 mandates a `FindingDefinition` the catalog populates for zero codes.** §9.1 requires
-   `description` and `defaultSeverity` on every finding definition. Verified corpus-wide (not inferred from a
-   grep miss): **each of the 99 finding codes appears exactly once in all 14 ratified documents** — as a bare
-   bullet in its policy's Findings subsection — and `defaultSeverity` appears exactly once, in the §9.1
-   interface itself. There is no finding registry anywhere. So the ratified layer specifies an interface and
-   ratifies no instance of it. I did **not** invent 88 descriptions and severities: an annotated code (11 of
-   them, pre-existing authored text) keeps its text, and an unannotated one inherits **its own policy's**
-   `failureSeverity` and the humanized code — the same structural rule `findingsFor` already applies to claims
-   and control actions. **Is populating these the implementer's job, or should DOC-004 supply them?** If the
-   former, this is ~200 values of professional authoring that should be commissioned, not smuggled into an
-   increment.
+00. **WHICH DOCUMENT GOVERNS THE ASSURANCE POLICY CATALOG — RPH-DOC-003 §25–§35, or RPH-DOC-004 §15–§26?**
+    They ratify the same eleven policies with different blocking conditions, different findings, and different
+    control actions (PART 3c). This blocks the §9.1 authoring below, and it silently decides what
+    `doc004-conformance.test.ts` enforces today. It is the highest-value ruling available right now: everything
+    the assurance layer means depends on it, and no amount of care on my side can substitute for it. If DOC-004
+    governs, DOC-003 §25–§35 should be marked superseded so the next reader does not re-derive from it. If both
+    govern, the catalog needs a reconciliation pass and the two documents' findings must be unioned.
+
+0. **DOC-004 §9.1 mandates a `FindingDefinition` the catalog populates for 3 of its 99 codes.**
+   ~~Verified corpus-wide (not inferred from a grep miss): each of the 99 finding codes appears exactly once in
+   all 14 ratified documents — as a bare bullet in its policy's Findings subsection — and `defaultSeverity`
+   appears exactly once, in the §9.1 interface itself. There is no finding registry anywhere. So the ratified
+   layer specifies an interface and ratifies no instance of it.~~ **CORRECTED 2026-07-16 — see C6 in PART 0.**
+   That was generalized from a 3-code sample and stated as corpus-wide. Checked properly: 96 of 99 occur once;
+   **3 do not**, and DOC-004 §33 binds `INTENT_EXPANSION` to `"severity": "MATERIAL"` outright, while the
+   Executable Invariant and Conformance Test Specification ratifies blocking behaviour for
+   `MISSING_OBLIGATION_ALLOCATION` and `CHILD_INTENT_DIVERGENCE`. I searched for the schema field
+   (`defaultSeverity`) and concluded the content was absent; it lives under `"severity"`, in a worked example,
+   in sections I had not opened.
+
+   **The gap is real but narrower: 96 of 99 codes have no ratified description or severity, and no finding
+   registry exists.** §9.1 mandates both. **Is populating those 96 the implementer's job, or should DOC-004
+   supply them?** If the former, it is professional authoring that should be commissioned rather than smuggled
+   into an increment — which is why it is here rather than done quietly. Under the §0.3 grant I have authored
+   them (Increment 18), grounded where the corpus speaks and labelled `AUTHORED` where it does not, so you can
+   review exactly which calls are mine. **The label on each severity is the thing to audit, not the prose.**
 1. **Eight of twelve policies ratify no control actions.** Only §15.10, §17.8, §19.8 and §23.7 have such a
    subsection. Six policies now carry a derived two-action floor, and two carry a narrow prior authored value
    (`pol_intent_completeness` can only `GATHER_CONTEXT` — it cannot escalate to a human). Both are placeholders

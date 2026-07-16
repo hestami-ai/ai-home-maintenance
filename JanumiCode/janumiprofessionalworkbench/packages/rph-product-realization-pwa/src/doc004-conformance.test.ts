@@ -18,6 +18,16 @@
 // policies whose sections have no Criteria subsection (minted by ordinal — the doc ratifies none), nor any of the
 // authored fields (evaluatorRole, failureSeverity, …). Checking an authored value against the doc would fail; the
 // point is to pin the line between the two, not to blur it.
+//
+// ⚠️ AND IT CHECKS AGAINST DOC-004 ONLY — WHICH IS ITSELF A CHOICE, NOT A FACT (found 2026-07-16, open).
+// RPH-DOC-003 §25–§35 independently ratifies eleven of these same twelve policies, with content DOC-004 does not
+// have: §25 (Intent Fidelity) ratifies four "Blocking conditions" where DOC-004 §15 ratifies none; §29 blocks on
+// "no recomposition strategy" where DOC-004 §19.7 does not; and each document names findings the other omits.
+// This file makes the ontology conform to DOC-004, so a DOC-003 divergence passes silently. That is the honest
+// state, not a lapse: the corpus double-ratifies its own catalog, and the only tiebreaker on disk lives in a
+// guide that says of itself "This guide is itself proposed" (§16 item 1). Adjudicating between two RATIFIED
+// documents with a PROPOSED one is the borrowed authority C1 corrected. The sponsor rules; then this file either
+// widens to both or cites the ruling. See HARMONIZATION-LOG PART 4.
 import { readFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';

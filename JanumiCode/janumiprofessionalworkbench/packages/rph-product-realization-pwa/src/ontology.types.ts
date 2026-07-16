@@ -34,15 +34,22 @@ export type Criterion = Frozen<AssessmentCriterion>;
 /**
  * AUTHORED per-finding detail, keyed by ratified finding code.
  *
- * DOC-004 §9.1 mandates `FindingDefinition.description` and `defaultSeverity` — and ratifies NEITHER, for ANY of
- * its 99 codes. Verified corpus-wide, not assumed: each code occurs EXACTLY ONCE in all 14 ratified documents, as
- * a bare bullet in its policy's Findings subsection, and `defaultSeverity` occurs exactly once, in the §9.1
- * interface itself. There is no finding registry. So the ratified layer specifies an interface it populates for
- * zero codes — an open gap for the sponsor (docs/_working/HARMONIZATION-LOG.md).
+ * DOC-004 §9.1 mandates `FindingDefinition.description` and `defaultSeverity`; the catalog supplies them for
+ * almost nothing, so the 11 codes that carry authored text are annotated here and the rest fall back to the
+ * humanized code and their policy's own `failureSeverity` (see seedAdditivePolicies) rather than to invented
+ * values. Annotating a code its policy does not list is a build error — see seed-policy-arrays.test.ts.
  *
- * Only the 11 codes that already carried authored text are annotated. The other 88 are NOT invented: they fall
- * back to the humanized code and their policy's own `failureSeverity` (see seedAdditivePolicies). Annotating a
- * code that its policy does not list is a build error — see seed-policy-arrays.test.ts.
+ * CORRECTED 2026-07-16. This said: "ratifies NEITHER, for ANY of its 99 codes. Verified corpus-wide, not
+ * assumed: each code occurs EXACTLY ONCE in all 14 ratified documents." Both halves were false, and the way they
+ * were false is the point (HARMONIZATION-LOG C6):
+ *   - I checked that the FIELD NAME `defaultSeverity` occurs once, and sampled THREE codes — then wrote "99".
+ *     96 of 99 occur once; three do not.
+ *   - DOC-004 §33's worked validator output binds `INTENT_EXPANSION` to `"severity": "MATERIAL"` outright, with
+ *     a model statement and `dispositionRecommendation: "CONDITIONALLY_SATISFIED"`. The Executable Invariant and
+ *     Conformance Test Specification ratifies blocking behaviour for several more cases. The content was there
+ *     under a different key, in sections I had not opened.
+ * An absence found by grepping a field name is a claim about the field name. Populating these remains open for
+ * the sponsor — and is now blocked on a prior question: the catalog is ratified TWICE (see `SeedPolicy`).
  */
 export interface FindingAnnotation {
 	readonly defaultSeverity: string;
@@ -58,6 +65,22 @@ export interface FindingAnnotation {
  * the seeded objects — the ones the app, the agent and the UI actually read — carried 17 of the catalog's 81
  * criteria and 11 of its 99 findings, in paraphrase, and bound `IP-01`/`IP-02` to different criteria than this
  * dataset does. Same id, different meaning, in the layer that keys the audit trail.
+ *
+ * ⚠️ THE CATALOG IS RATIFIED TWICE, AND THIS DATASET SILENTLY PICKS ONE (found 2026-07-16; open for the sponsor).
+ * DOC-004 §15–§26 defines twelve policies. RPH-DOC-003 §25–§35 ("Assurance Policy: <Name>") defines ELEVEN of
+ * the same policies — independently, with different content. They are not a superset and a subset:
+ *   - DOC-003 §25 (Intent Fidelity) ratifies FOUR "Blocking conditions" ("mandatory constraint omitted"; "major
+ *     ambiguity hidden"; …). DOC-004 §15 ratifies NONE.
+ *   - DOC-003 §25's findings are prose and include "false precision" and "conflicting interpretation", which
+ *     have no DOC-004 code; DOC-004 §15.7 has `OUTCOME_EROSION` and `NON_GOAL_CONFLICT`, which DOC-003 lacks.
+ *   - DOC-003 §29 blocks on "no recomposition strategy"; DOC-004 §19.7 does not.
+ *   - Only DOC-004 has POL-CONSTRAINT-PROPAGATION (§20) at all.
+ * This dataset transcribes DOC-004 — the better-specified source (codes, criterion ids, twelve policies) — and
+ * `doc004-conformance.test.ts` enforces that. But enforcing DOC-004 IS choosing DOC-004 over another ratified
+ * document, and that choice is not mine to make: the only tiebreaker on disk is the Coding Agent Guide's §17
+ * source map, and §16 item 1 says of that guide "This guide is itself proposed". Using a proposed distillation
+ * to adjudicate between two ratified documents is precisely the borrowed authority this program corrected in C1.
+ * Recorded, not resolved — see HARMONIZATION-LOG PART 4.
  */
 export interface SeedPolicy {
 	readonly policyId: string;
