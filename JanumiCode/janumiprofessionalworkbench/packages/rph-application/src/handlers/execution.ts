@@ -21,7 +21,7 @@ import {
 	type CommandHandler,
 	type HandlerContext
 } from './kit.js';
-import { floorGateBlock, stepOutputIsAiProduced } from './floor-gate.js';
+import { floorGateBlock, stepOutputIsAiProduced, stepResultSubjects } from './floor-gate.js';
 
 const PLAN = 'EXECUTION_PLAN';
 const MACHINE = 'ExecutionPlan.status';
@@ -264,18 +264,44 @@ export const completeExecutionStep: CommandHandler = (ctx, command) => {
 			// malformed, failed, unavailable, or independence-invalid required review cannot satisfy assurance or
 			// permit its protected transition." A never-recorded floor over an AI step is that missing review.
 			// The authoring plane already derived this honestly (pwa-authoring.ts); the two planes disagreed.
-			const blocking = floorGateBlock(ctx, p.executionStepId, {
-				aiProduced: stepOutputIsAiProduced(ctx, step, command),
-				now: command.issuedAt
-			});
-			if (blocking) {
-				const detail = blocking.map((b) => `${b.policyId}=${b.disposition}`).join(', ');
+			//
+			// THE SUBJECT IS THE RESULT, NOT THE STEP. This comment has always said "the step's OUTPUT" while the
+			// code passed `p.executionStepId` — and `stepOutputIsAiProduced` is likewise named for the output. The
+			// naming was right; the subject was wrong. A step can never be a legal subject: DOC-004 invariant 2
+			// requires every assessment to identify its subject semantic version, and an ExecutionStep has no
+			// envelope, no registry row, and no version to identify (see `stepResultSubjects`). So the floor is
+			// judged per downstream-consumable result (§8.4 L844), each at its own store-derived version — which
+			// also closes the execution plane's stale-floor hole: a floor recorded against v1 no longer authorizes
+			// a v2 output.
+			const aiProduced = stepOutputIsAiProduced(ctx, step, command);
+			const resultIds = [...(p.outputArtifactIds ?? []), ...(p.proposedEvidenceIds ?? [])];
+			const { subjects, unresolved } = stepResultSubjects(ctx, resultIds);
+			// An output naming no recorded object cannot have been assessed, and §8.4 L854 forbids a missing
+			// required review from permitting a protected transition. Failing closed here also stops the obvious
+			// bypass: naming a nonexistent artifact id would otherwise yield zero subjects and sail through.
+			if (unresolved.length > 0) {
 				return reject(
 					command,
-					'RPH_INVARIANT_VIOLATION',
-					`CompleteExecutionStep blocked: the de minimis assurance floor is not SATISFIED for step ${p.executionStepId} (${detail}). Satisfy or record a waiver over the floor of the step's output before completing.`,
-					[p.executionStepId]
+					'RPH_VALIDATION_SEMANTIC_FAILED',
+					`CompleteExecutionStep blocked: step ${p.executionStepId} names result(s) that are not recorded objects (${unresolved.join(', ')}). Record them (RecordArtifact / ProposeEvidence) before completing — an unrecorded output cannot be assured.`,
+					[p.executionStepId, ...unresolved]
 				);
+			}
+			for (const subject of subjects) {
+				const blocking = floorGateBlock(ctx, subject.subjectId, {
+					aiProduced,
+					subjectVersion: subject.version,
+					now: command.issuedAt
+				});
+				if (blocking) {
+					const detail = blocking.map((b) => `${b.policyId}=${b.disposition}`).join(', ');
+					return reject(
+						command,
+						'RPH_INVARIANT_VIOLATION',
+						`CompleteExecutionStep blocked: the de minimis assurance floor is not SATISFIED for result ${subject.subjectId} at v${subject.version}, produced by step ${p.executionStepId} (${detail}). Satisfy or record a waiver over the floor of that result before completing.`,
+						[p.executionStepId, subject.subjectId]
+					);
+				}
 			}
 			return null;
 		}

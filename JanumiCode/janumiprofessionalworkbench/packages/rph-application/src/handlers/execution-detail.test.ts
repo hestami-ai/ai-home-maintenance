@@ -13,6 +13,11 @@ const PWU = 'pwu_01ARZ3NDEKTSV4RRFFQ69G5FB0';
 const PLAN = 'plan_01ARZ3NDEKTSV4RRFFQ69G5FC0';
 const STEP = 'step_01ARZ3NDEKTSV4RRFFQ69G5FD0';
 const BIND = 'bind_01ARZ3NDEKTSV4RRFFQ69G5FE0';
+const ATTEMPT = 'attempt_01ARZ3NDEKTSV4RRFFQ69G5FF0';
+/** The step's OUTPUT — and therefore the floor's subject. Recorded as a real Artifact (DOC-009 §18.1), not a
+ *  dangling id: until RecordArtifact existed, this fixture named an object that was never created, and the gate
+ *  only tolerated it because it subjected over the STEP instead of the result. */
+const ART = 'art_01ARZ3NDEKTSV4RRFFQ69G5FG0';
 
 describe('ExecutionStep + RuntimeBinding handlers (live)', () => {
 	let store: SqliteStorageAdapter;
@@ -46,11 +51,41 @@ describe('ExecutionStep + RuntimeBinding handlers (live)', () => {
 		return plan.steps[0]!.stepState;
 	}
 
-	/** Record a de minimis floor over the STEP's output. The step is a MODEL_INVOCATION, so §8.4 L841 makes
-	 *  Reasoning Review mandatory and L854 blocks its protected transition without one — every completion
-	 *  below therefore needs a floor, not just the one that asserts blocking. */
+	/** Record the step's OUTPUT as a real Artifact — the floor's subject, and the only thing here that can BE one:
+	 *  DOC-004 invariant 2 requires an assessment to identify its subject semantic version, and an ExecutionStep
+	 *  has no envelope to carry one. Fields per DOC-009 §18.1. */
+	function recordArtifact(id = ART) {
+		dispatch(
+			'RecordArtifact',
+			{
+				artifactId: id,
+				artifactType: 'ARCHITECTURE_BASELINE',
+				mediaType: 'text/markdown',
+				storageProvider: 'workspace-local',
+				storageKey: `artifacts/${id}.md`,
+				contentHash: `sha256:${id}`,
+				producingPwuId: PWU,
+				producingExecutionAttemptId: ATTEMPT,
+				securityClassification: 'INTERNAL',
+				retentionClass: 'PROJECT_LIFETIME',
+				status: 'RECORDED'
+			},
+			id,
+			'ARTIFACT'
+		);
+	}
+
+	/** Record a de minimis floor over the step's OUTPUT (the Artifact). The step is a MODEL_INVOCATION, so §8.4
+	 *  L841 makes Reasoning Review mandatory and L854 blocks its protected transition without one — every
+	 *  completion below therefore needs a floor, not just the one that asserts blocking.
+	 *
+	 *  The subject moved from STEP to ART: the floor gate now judges the result, per §8.4 L844 ("Each
+	 *  independently downstream-consumable result is its own transformation boundary"). `subjectSemanticVersions`
+	 *  is still asserted by the caller here because RequestAssuranceAssessment trusts the payload — a separate,
+	 *  logged vacuity finding. The GATE, however, derives the version from the store, so a lie here would not
+	 *  buy a pass. */
 	let asmt = 0;
-	function recordFloor(dispositions: Record<string, string>): Record<string, string> {
+	function recordFloor(dispositions: Record<string, string>, subject = ART): Record<string, string> {
 		const ids: Record<string, string> = {};
 		for (const [policyId, disposition] of Object.entries(dispositions)) {
 			const id = `asmt_${String(++asmt).padStart(26, '0')}`;
@@ -61,8 +96,8 @@ describe('ExecutionStep + RuntimeBinding handlers (live)', () => {
 					assessmentId: id,
 					assurancePolicyId: policyId,
 					policyVersion: '1.0.0',
-					subjectObjectIds: [STEP],
-					subjectSemanticVersions: { [STEP]: 1 },
+					subjectObjectIds: [subject],
+					subjectSemanticVersions: { [subject]: 1 },
 					claimIds: []
 				},
 				id,
@@ -177,15 +212,17 @@ describe('ExecutionStep + RuntimeBinding handlers (live)', () => {
 		// This step is a MODEL_INVOCATION. Until the floor gate derived `aiProduced` honestly it completed with
 		// NO Reasoning Review at all, and this test passed — it encoded the defect rather than the contract.
 		// The floor is the step's premise, not this test's subject: the subject is still "a started step with a
-		// recorded result completes".
+		// recorded result completes". Recording the output is likewise premise: this fixture used to name an
+		// artifact id that no command could create, which only worked while the gate looked at the step instead.
+		recordArtifact();
 		recordFloor(SATISFIED_FLOOR);
 		const done = dispatch(
 			'CompleteExecutionStep',
 			{
 				executionStepId: STEP,
-				executionAttemptId: 'attempt_01ARZ3NDEKTSV4RRFFQ69G5FF0',
+				executionAttemptId: ATTEMPT,
 				resultStatus: 'SUCCEEDED',
-				outputArtifactIds: ['art_01ARZ3NDEKTSV4RRFFQ69G5FG0'],
+				outputArtifactIds: [ART],
 				proposedEvidenceIds: [],
 				detectedAssumptionIds: [],
 				structuredResult: {},
@@ -194,7 +231,7 @@ describe('ExecutionStep + RuntimeBinding handlers (live)', () => {
 			PLAN,
 			'EXECUTION_PLAN'
 		);
-		expect(done.status).toBe('ACCEPTED');
+		expect(done.status, JSON.stringify(done.error)).toBe('ACCEPTED');
 		expect(stepState()).toBe('SUCCEEDED');
 	});
 
@@ -245,13 +282,14 @@ describe('ExecutionStep + RuntimeBinding handlers (live)', () => {
 		expect(stepState()).toBe('RUNNING');
 
 		// Record a de minimis floor over the step's output whose independent reasoning review is REJECTED.
+		recordArtifact();
 		recordFloor({ ...SATISFIED_FLOOR, 'floor.reasoning-review': 'REJECTED' });
 
 		const complete = {
 			executionStepId: STEP,
-			executionAttemptId: 'attempt_01ARZ3NDEKTSV4RRFFQ69G5FF0',
+			executionAttemptId: ATTEMPT,
 			resultStatus: 'SUCCEEDED',
-			outputArtifactIds: ['art_01ARZ3NDEKTSV4RRFFQ69G5FG0'],
+			outputArtifactIds: [ART],
 			proposedEvidenceIds: [],
 			detectedAssumptionIds: [],
 			structuredResult: {},
@@ -267,31 +305,37 @@ describe('ExecutionStep + RuntimeBinding handlers (live)', () => {
 	});
 
 	/**
-	 * STILL BLOCKED — but the reason CHANGED, and the new one is narrower and concrete.
+	 * UN-SKIPPED 2026-07-16 — and the reason it was skipped was MY OWN ERROR, recorded here because the error is
+	 * more instructive than the fix.
 	 *
-	 * §16 item 12 is no longer the blocker: `WaiverDetail` now gives the waiver its policy/criterion/expiry, and the
-	 * authoring-plane twin (pwa-authoring.test.ts) proves the capability works there — an exactly-scoped waiver
-	 * discharges its policy, and a waiver naming a different criterion does not.
+	 * This test previously read: "UN-SKIP WHEN: the execution plane binds a semantic version to a step's floor
+	 * subject." That was wrong, and wrong in a dangerous direction: it framed the blocker as a small piece of
+	 * missing wiring, when the corpus in fact FORBIDS what it asked for. An ExecutionStep can never carry a
+	 * semanticVersion — DOC-002 §21's interface does not extend ObjectEnvelope, EXECUTION_STEP is absent from
+	 * §4's ProfessionalWorkObjectType union, and DOC-009 §10.2's `execution_steps` is the one execution table
+	 * whose id does NOT reference `professional_work_objects`. Had I "un-skipped" it as written, I would have
+	 * minted a version for a non-object to satisfy a check — ceremony that makes the gate report success.
 	 *
-	 * What blocks it HERE is the execution plane's missing subject-version binding. DOC-004 §12.2 requires a waiver
-	 * to name "exact object and semantic version" and RPH-GOV-005 forbids bleeding "to another version", so
-	 * `waiverCovers` is version-exact. The execution-plane gate passes no `subjectVersion` (an ExecutionStep is a
-	 * sub-object of the plan and carries no `semanticVersion`), so version-exactness is unverifiable and
-	 * `waiverDischargesFloorPolicy` fails closed. This is the same hole flagged in Increment 2: the execution plane
-	 * also accepts a STALE floor for the same reason, which §8.4 L854 forbids.
+	 * The real defect was the SUBJECT. §8.4 records the floor over the "material professional transformation" —
+	 * "bind the exact subject/output" — and L844: "Each independently downstream-consumable result is its own
+	 * transformation boundary." Never the step. The gate's own comment said "the step's OUTPUT" all along while
+	 * the code passed the step id.
 	 *
-	 * UN-SKIP WHEN: the execution plane binds a semantic version to a step's floor subject. Then this passes
-	 * unchanged — the gate, the contract, and the kernel are all already in place.
+	 * So the floor now subjects over the Artifact, which CAN satisfy DOC-004 invariant 2 ("Every assessment
+	 * identifies its subject semantic version") and DOC-004 §12.2's "exact object and semantic version" — because
+	 * DOC-009 §18.1 makes it a Professional Work Object with an envelope. The waiver was never the blocker; the
+	 * subject was.
 	 */
-	it.skip('an EFFECTIVE waiver naming the exact failed criterion lets a blocked step complete (needs execution-plane subject-version binding)', () => {
+	it('an EFFECTIVE waiver naming the exact failed criterion lets a blocked step complete', () => {
 		dispatch('StartExecutionStep', { stepId: STEP }, PLAN, 'EXECUTION_PLAN');
+		recordArtifact();
 		const ids = recordFloor({ ...SATISFIED_FLOOR, 'floor.reasoning-review': 'REJECTED' });
 		const findingId = recordFinding(ids['floor.reasoning-review']!, 'RR-04-completeness-shortcut');
 		const complete = {
 			executionStepId: STEP,
-			executionAttemptId: 'attempt_01ARZ3NDEKTSV4RRFFQ69G5FF0',
+			executionAttemptId: ATTEMPT,
 			resultStatus: 'SUCCEEDED',
-			outputArtifactIds: ['art_01ARZ3NDEKTSV4RRFFQ69G5FG0'],
+			outputArtifactIds: [ART],
 			proposedEvidenceIds: [],
 			detectedAssumptionIds: [],
 			structuredResult: {},
@@ -301,14 +345,17 @@ describe('ExecutionStep + RuntimeBinding handlers (live)', () => {
 			'REJECTED'
 		);
 		const WAIVER = 'dec_01ARZ3NDEKTSV4RRFFQ69G5FH0';
+		// The waiver names the ARTIFACT — the assessed object — not the step. That is what makes it a legal
+		// waiver under DOC-004 §12.2, and it is version-bound because governance pins subjectSemanticVersions
+		// from the store.
 		dispatch(
 			'RequestWaiver',
 			{
-				subjectObjectIds: [STEP],
+				subjectObjectIds: [ART],
 				scope: 'floor.reasoning-review',
 				rationale: 'Accepted residual risk.',
 				duration: 'until superseded',
-				affectedObjectIds: [STEP],
+				affectedObjectIds: [ART],
 				waivedPolicyId: 'floor.reasoning-review',
 				waivedCriterionId: 'RR-04-completeness-shortcut',
 				waivedFindingIds: [findingId],

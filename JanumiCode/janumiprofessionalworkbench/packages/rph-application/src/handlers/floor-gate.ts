@@ -57,6 +57,62 @@ export function stepOutputIsAiProduced(
 	return typeof bindingId === 'string' && bindingId !== '' && !!ctx.store.loadObject(bindingId);
 }
 
+/** A floor subject: a Professional Work Object id bound to the exact semanticVersion the floor is judged at. */
+export interface FloorSubject {
+	readonly subjectId: string;
+	readonly version: number;
+}
+
+export interface StepResultSubjects {
+	/** Results that resolve to a stored Professional Work Object, each with its CURRENT semanticVersion. */
+	readonly subjects: FloorSubject[];
+	/** Result ids naming no stored object — an output that cannot be assessed because it was never recorded. */
+	readonly unresolved: string[];
+}
+
+/**
+ * The floor subjects for a completing execution step: its downstream-consumable RESULTS, never the step.
+ *
+ * THE STEP IS NOT A LEGAL SUBJECT, and this is not a preference. DOC-004 assessment invariant 2 requires
+ * "Every assessment identifies its subject semantic version", and DOC-009 §11.7's
+ * `assurance_assessment_subjects` requires `subject_object_id references professional_work_objects(id)` with a
+ * NOT NULL `subject_semantic_version`. An ExecutionStep has no envelope (DOC-002 §21's interface does not
+ * extend ObjectEnvelope), is absent from DOC-002 §4's ProfessionalWorkObjectType union, and DOC-009 §10.2's
+ * `execution_steps` is the one execution table whose id does NOT reference `professional_work_objects`. So a
+ * step can never carry a semanticVersion, and a step-subject waiver can never satisfy DOC-004 §12.2's "exact
+ * object and semantic version". Binding a version to a step would have meant inventing one for a non-object.
+ *
+ * WHAT THE SUBJECT IS, per guide §8.4: "Every material professional transformation…"; "bind the exact
+ * subject/output…"; and the individuation rule at L844 — "Each independently downstream-consumable result is
+ * its own transformation boundary unless an explicit grouping records every subject/version and its
+ * rationale." So: one subject PER RESULT, not one per step. §8.4 never says "step" and never says "artifact";
+ * it says result/output — Artifacts and Evidence are the two the contract carries, and §8.4 names Evidence
+ * explicitly ("proposes a Claim or Evidence item … necessarily triggers Reasoning Review").
+ *
+ * Versions are DERIVED from the store, never read from the payload — a caller that could assert its own
+ * subject version could assert a floor was current when it was stale.
+ *
+ * NOT grouped: §8.4 L844 permits an "explicit grouping" only when it "records every subject/version and its
+ * rationale". No such grouping record exists in the contract, so each result is judged on its own.
+ *
+ * DISCLOSED GAP: `structuredResult` is `z.unknown()`, so a step could in principle carry professional content
+ * that is neither an Artifact nor Evidence and therefore attracts no subject here. That is the same
+ * unschematized-payload gap as `executionProvenance` (§16 item 23); it is not closed by inventing a shape.
+ */
+export function stepResultSubjects(
+	ctx: HandlerContext,
+	resultIds: readonly string[]
+): StepResultSubjects {
+	const subjects: FloorSubject[] = [];
+	const unresolved: string[] = [];
+	for (const id of resultIds) {
+		const obj = ctx.store.loadObject(id);
+		if (obj) subjects.push({ subjectId: id, version: obj.semanticVersion });
+		else unresolved.push(id);
+	}
+	return { subjects, unresolved };
+}
+
 interface FloorRecord {
 	readonly disposition: string;
 	readonly version: number | undefined;
@@ -107,8 +163,7 @@ function openFindingCodes(ctx: HandlerContext, assessmentId: string): string[] {
 	const codes: string[] = [];
 	for (const id of ids) {
 		const s = ctx.store.loadObject(id)?.state as
-			| { assessmentId?: string; findingCode?: string; disposition?: string }
-			| undefined;
+			{ assessmentId?: string; findingCode?: string; disposition?: string } | undefined;
 		if (s?.assessmentId !== assessmentId) continue;
 		if (s.disposition && s.disposition !== 'OPEN') continue; // already resolved/waived elsewhere
 		if (s.findingCode) codes.push(String(s.findingCode));
