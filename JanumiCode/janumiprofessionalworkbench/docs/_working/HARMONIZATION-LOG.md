@@ -285,6 +285,62 @@ with no production data. It must not ship to any multi-tenant edition unresolved
 
 ---
 
+## INCREMENT 1 — LANDED. The thesis is now a failing test suite.
+
+8 wiring conformance tests, one per confirmed finding, written by 8 parallel agents and adversarially
+reviewed by 8 more. Tests only — `git status` confirms no production file was touched.
+
+**Result, run by the orchestrator (not taken on the agents' word):**
+
+```
+Test Files  8 failed (8)
+     Tests  14 failed | 2 passed (16)
+```
+
+**Every one of the 14 failures is `expected 'ACCEPTED' to be 'REJECTED'.`** Not one TypeError, import error,
+or bad fixture. Each is the genuine article: the real `engine.dispatch` pipeline **accepted a command the
+guide requires it to reject**.
+
+| Control | The command that should have been rejected | Dead kernel that already knows |
+|---|---|---|
+| execution floor gate | `CompleteExecutionStep` on an AI-produced step with **no floor ever recorded** | `deMinimisFloorPlan` (`isAiProduced` branch) |
+| waiver scope | `PublishPwa` with `floor.reasoning-review` **REJECTED**, waived by a waiver scoped to *"naming-convention style guide deviation"* | `waiverCovers` (criterion+object+version) |
+| readiness | `MarkPwuReady` on a root PWU meeting **no limb** of §6.1 | — (guard is prose-only) |
+| validate PWA | `ValidatePwa` on a **cyclic** graph, a **two-root** graph, and a graph with **no assurance assignment** | `analyzePwaGraph` |
+| stale floor | `PublishPwa` after adding a PWU Type **post-review**; and semanticVersion never bumps | `decisionAuthorizesVersions` |
+| baseline | `PromoteBaseline` with an **OPEN BLOCKING** observation (`TENANT_ISOLATION_BREACH`) | `findOpenBlockingObservations` |
+| one active plan | `ActivateExecutionPlan` **twice** on the same PWU — both accepted | `canActivatePlan` |
+| evidence | `AdmitEvidence` with **scope unstated** — accepted, and advanced to ADMISSIBLE | `evidenceAdmissibility` |
+
+**The 2 passing tests are the positive controls, and they are the proof the fixtures discriminate:**
+
+- *"the kernel already knows this Evidence is inadmissible — **nothing in the pipeline asks it**"* — the
+  thesis in a single assertion.
+- *"promotes the same baseline when no blocking observation exists (the control must discriminate)"*.
+
+Negative controls red, positive controls green. These are correct tests of broken code, not broken tests.
+
+### Tradeoff taken: **commit RED**
+
+These 14 turn the repository gate red, against the standing instruction to keep it green every commit.
+
+- **Rejected: `it.fails()`.** Vitest supports it, it would keep the gate green, and it would mark each defect
+  as known. It is also **exactly the disease** — a green suite concealing non-enforcement. Adopting it here
+  would reproduce the pathology in the act of documenting it.
+- **Rejected: a separate `test:wiring` suite** excluded from the gate. Same objection, one indirection away.
+- **Taken: land them red.** The gate was green because it measured the *kernel*. Red is the first time it has
+  measured *enforcement*. A red gate that tells the truth beats a green one that measures nothing.
+
+**Consequence, accepted deliberately:** `bun run test` is red from this commit until the wiring program
+completes. This is a **burndown: 14 → 0.** Each increment must turn some red green by routing a call site
+through the kernel that already exists. No increment may turn one green by weakening its assertion — that
+is the one move this whole effort exists to prevent.
+
+**Ratchet property:** these tests cannot be satisfied by writing another literal. `expected 'ACCEPTED' to be
+'REJECTED'` goes green only when the call site actually rejects.
+
+---
+
 ## PART 4 — Open questions genuinely for the sponsor
 
 *(kept deliberately short — under the 2026-07-15 mandate, a tension is work, not a question, unless it
