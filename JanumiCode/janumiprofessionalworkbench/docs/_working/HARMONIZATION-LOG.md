@@ -13,8 +13,43 @@ and incorrect behavior from units to live end-to-end runs. Recording is load-bea
 
 ## PART 0 — Corrections to my own prior record (read this first)
 
-Four things I told the sponsor in this effort were **wrong**. They are corrected here, and the artifacts that
-carry them are corrected in place. Each was a case of reasoning from a document I had not read.
+Five things I told the sponsor in this effort were **wrong**. They are corrected here, and the artifacts that
+carry them are corrected in place. C1–C4 were each a case of reasoning from a document I had not read. **C5 is
+worse: a fidelity claim I asserted about a document I *had* read, and shipped, and called verified.**
+
+### C5 — "6/6 adversarially verified faithful" (Increment 16, `7fa20c5`) was **FALSE for §22**.
+
+I reported that the six newly-catalogued policies were each adversarially re-read and found faithful. Five were.
+`pol_historical_consistency` was not, and its own `sourceSection` — which I wrote — asserted:
+
+> *"the 5 criteria descriptions are §22.3's 'Claims evaluated' items 1:1 verbatim"*
+
+**One of the five was verbatim.** What actually shipped, against DOC-004 §22.3:
+
+| id | what §22.3 ratifies | what `7fa20c5` shipped |
+|---|---|---|
+| HC-01 | *relevant historical records were considered.* | ✅ verbatim |
+| HC-02 | *current work does not unknowingly repeat a known failure.* | ❌ *known failure patterns are not repeated without justification.* |
+| HC-03 | *active prior decisions are respected or formally superseded.* | ❌ *active decisions are not silently contradicted.* |
+| HC-04 | *divergence is intentional and justified.* | ❌ *recorded rationale is not ignored.* |
+| HC-05 | *stale or inapplicable precedent is not treated as binding.* | ❌ *divergence from precedent is explicit and justified.* |
+
+This is not paraphrase drift. **Ratified claim §22.3.5 was dropped entirely** and HC-05 restated §22.3.4 in its
+place: a governed policy that silently lost a ratified claim and gained one nobody ratified — while carrying an
+annotation swearing it was verbatim. It is the exact disease this whole program is about, authored by the person
+diagnosing it, in the commit announcing the cure.
+
+**Why the adversarial verifier passed it.** It was asked whether the extraction was *faithful*. A competent
+paraphrase **is** faithful, in the ordinary sense of the word — so "faithful" was the wrong bar and the reviewer
+answered the question it was actually asked. The Increment-17 sweep caught it because it asked a different
+question: *is this string the doc's string — added words, dropped words, question marks and all?* A second
+reviewer is not the fix.
+
+**The fix.** Prose fidelity claims do not fail a build, so they are not claims — they are hopes. The ratified
+corpus is *in this repository*. `doc004-conformance.test.ts` now reads DOC-004 itself and compares all 81
+criteria and all 99 finding codes against it. Mutation-proven, including a faithful replay of this defect:
+re-introducing the HC-02 paraphrase fails with *"pol_historical_consistency/HC-02 is not §22's ratified text"*.
+The `sourceSection` transcription claims are now exactly the claims that test enforces.
 
 ### C1 — The Coding Agent Guide is **not** RPH-DOC-000. It is *proposed*.
 
@@ -1377,10 +1412,110 @@ build · `check-types` 21/21 · `test` 21/21 · `lint` · `boundary` · `format:
 
 ---
 
+## PART 3b — Increment 17: one catalog, checked against the document
+
+### What I went looking for, and what was actually there
+
+Increment 16 left a loose end I flagged myself: the additive policies existed **twice** — `m8-ontology.json`
+`seedPolicies` (12, drives the OVR and the conformance profiles) and `seed-workbench.ts`
+`ADDITIVE_POLICY_SEEDS` (6, drives the actual `CreateAssurancePolicy`). I expected a mechanical dedup. Comparing
+the two **live** — seeding an engine and diffing the resulting objects against the ontology — showed the
+duplication had already cost far more than a stale count:
+
+| | the ontology (nothing seeded it) | the seeded objects (what the system reads) |
+|---|---|---|
+| policies | 12 | **6** |
+| criteria | 81 | **17** |
+| finding codes | 99 | **11** |
+| criterion text | ratified-ish | paraphrase |
+| `IP-01` | *desired outcomes remain represented* | *approved intent is traced through this transformation* |
+
+**The divergence ran one way: the faithful copy was the one nothing seeded.** The `ASSURANCE_POLICY` objects the
+app, the agent and the UI actually read were a demo-grade compact of the ratified catalog — and `IP-01`/`IP-02`
+were bound to *different criteria* than the ontology binds them to. Same id, different meaning, in the layer that
+keys the audit trail. An assessment citing `IP-01` meant one thing in the store and another in the ontology.
+
+Then both copies turned out to drift from **DOC-004 itself**: 26 of 81 criteria were embellished paraphrases
+(`DC-01` shipped *"no mandatory **parent** obligation silently disappears (every one is allocated, retained,
+satisfied, or waived)"* where §19.5 ratifies *"No mandatory obligation silently disappears."*), and §22 had lost
+a ratified claim outright (**C5** above).
+
+### The agent-facing consequence — the reason this wasn't cosmetic
+
+`list_assurance_policies` shows the authoring agent what it may require. It showed **6 of 12**. The agent's
+instructions say to reuse an existing policy and to call `create_assurance_policy` only for a treatment *"not
+already offered"*. So six ratified policies — Requirement Coverage, Constraint Propagation, Historical
+Consistency, Test Adequacy, Fitness for Purpose, Baseline Promotion — were invisible to the one actor told to
+look for them. **The catalog's incompleteness was, operationally, an instruction to fabricate duplicates of
+ratified policies.**
+
+### What changed
+
+- **One source.** `seedAdditivePolicies` reads `handle.ontology.seedPolicies`. `ADDITIVE_POLICY_SEEDS` (387
+  lines) is deleted. 15 policy objects seed (3 locked floor + 12 catalog), carrying **81/81** criteria and
+  **99/99** finding codes.
+- **`EngineOntology.seedPolicies: readonly unknown[]` → a real shape.** The port declared that seed policies
+  *exist* and nothing about what they are — which is *why* seeding kept its own copy: the port was unusable, so
+  nobody used it. An `unknown` in a port is not a deferral, it is a fork.
+- **81/81 criteria repaired to the ratified text** (26 substantive, 37 case-only), machine-checked against the
+  markdown. `Frozen<T>` moved to `rph-contracts` — one definition, two consumers, no restatement.
+- **A false citation fixed:** `pol_intent_preservation`'s rationale cited *"Catalog §20/§30"*. It is **§23**;
+  §20 is POL-CONSTRAINT-PROPAGATION and there is no §30.
+
+### The line between transcribed and authored, held explicitly
+
+- **RATIFIED, transcribed + machine-checked:** purpose, all 81 criterion texts, all 99 finding codes, the 12
+  criterion ids/names §15.6 and §19.5 ratify, and 4 control-action sets (§15.10, §17.8, §19.8, §23.7).
+- **DERIVED, by a stated rule:** criterion ids minted by ordinal where the doc ratifies none (10 of 12 policies
+  have no Criteria subsection at all); the control-action **floor** for the 6 policies that had neither a
+  ratified set nor a prior value — the *intersection* of the four ratified sets (`RESHAPE_PWU`,
+  `REQUEST_HUMAN_DECISION`), computed from the doc by the test, not hardcoded.
+- **AUTHORED, carried forward untouched:** the 2 prior control-action values (`GATHER_CONTEXT`, `RESHAPE_PWU`).
+  I first *widened* these to include the derived floor and backed it out: an existing test says *"inventing a set
+  for them would be authoring professional content"* and it is right. **A prior authored judgement outranks my
+  derivation.** Derive only where nothing exists.
+
+### Mutation-proven, both locks
+
+Eight mutations, each anchored with `assert count == 1` **before** mutating — which earned its keep immediately:
+the first four all missed their anchor (prettier had reformatted the generated file) and the script reported
+*"result meaningless"* instead of four false CAUGHTs.
+
+- vs the doc lock: paraphrase a criterion → *caught, by name*; drop a finding code → caught; drop a ratified
+  criterion name → caught; add an unratified qualifier → caught; annotate an unlisted code → caught.
+- vs the one-catalog lock: re-introduce a private copy → caught; re-compact the findings → caught; skip the six
+  new policies → caught.
+
+### Gate (CI's, in full)
+
+build · `check-types` 21/21 · `test` 21/21 · `lint` · `boundary` · `format:check` clean · svelte-check
+**0 errors** · Playwright **23/23**, with the 2 known first-attempt render-timing flakes retried
+(`pwa-node-graph`, `cardinality-rail` — `retries: 1` is configured). Both were re-run **3/3 green in
+isolation** rather than waved through: `cardinality-rail` drives the policy picker, which this increment takes
+from 9 options to 15, so "known flake" was a claim worth re-testing rather than assuming.
+
+---
+
 ## PART 4 — Open questions genuinely for the sponsor
 
 *(kept deliberately short — under the 2026-07-15 mandate, a tension is work, not a question, unless it
 requires knowing something only the sponsor knows)*
+
+0. **DOC-004 §9.1 mandates a `FindingDefinition` the catalog populates for zero codes.** §9.1 requires
+   `description` and `defaultSeverity` on every finding definition. Verified corpus-wide (not inferred from a
+   grep miss): **each of the 99 finding codes appears exactly once in all 14 ratified documents** — as a bare
+   bullet in its policy's Findings subsection — and `defaultSeverity` appears exactly once, in the §9.1
+   interface itself. There is no finding registry anywhere. So the ratified layer specifies an interface and
+   ratifies no instance of it. I did **not** invent 88 descriptions and severities: an annotated code (11 of
+   them, pre-existing authored text) keeps its text, and an unannotated one inherits **its own policy's**
+   `failureSeverity` and the humanized code — the same structural rule `findingsFor` already applies to claims
+   and control actions. **Is populating these the implementer's job, or should DOC-004 supply them?** If the
+   former, this is ~200 values of professional authoring that should be commissioned, not smuggled into an
+   increment.
+1. **Eight of twelve policies ratify no control actions.** Only §15.10, §17.8, §19.8 and §23.7 have such a
+   subsection. Six policies now carry a derived two-action floor, and two carry a narrow prior authored value
+   (`pol_intent_completeness` can only `GATHER_CONTEXT` — it cannot escalate to a human). Both are placeholders
+   for a decision only you can make.
 
 1. **Does the authoring plane get an Execution Plan?** DOC-002 §3.3 roots the Execution Attempt in the
    Execution Aggregate. PWA authoring is design-time and has no Plan. Either authoring model calls are

@@ -104,7 +104,57 @@ describe("seeded policies carry DOC-004's ratified sets", () => {
 	it('the two policies DOC-004 leaves silent keep their single value — shape fixed, content untouched', () => {
 		// §16 / §21 have no control-actions subsection. Inventing a set for them would be authoring professional
 		// content; a 1-element array is the shape fix with the content preserved exactly.
+		//
+		// Still true after the six §18/§20/§22/§24/§25/§26 policies joined the seed with no prior value and no
+		// ratified set. They take a DERIVED floor (the intersection of the four ratified sets) because the field is
+		// required and an empty set would mean a policy that can find a problem and recommend nothing. These two
+		// are NOT widened to match: a prior authored judgement outranks a derivation.
 		expect(load('pol_intent_completeness')!.permittedControlActions).toEqual(['GATHER_CONTEXT']);
 		expect(load('pol_architecture_coverage')!.permittedControlActions).toEqual(['RESHAPE_PWU']);
+	});
+});
+
+describe('the seeded policy objects ARE the ontology — one catalog, not two', () => {
+	const load = seeded();
+
+	// THE LOCK. seedAdditivePolicies used to iterate its own copy of the catalog; validateOntology and the
+	// conformance profiles read ontology.seedPolicies. Nothing compared them, so nothing noticed that the copy
+	// being seeded — the one the app, the agent and the UI read — held 17 of the catalog's 81 criteria and 11 of
+	// its 99 findings, in paraphrase, with IP-01/IP-02 bound to different claims than the ontology binds them to.
+	// Deduping fixed today's divergence; this is what stops tomorrow's, by failing the moment the seeded object
+	// stops being the ontology's own content.
+	it('every ratified policy in the ontology is seeded as an ACTIVE object', () => {
+		expect(ontology.seedPolicies.length).toBe(12);
+		for (const p of ontology.seedPolicies) {
+			const seededObject = load(p.policyId);
+			expect(seededObject, `${p.policyId} is in the ontology but is NOT seeded`).toBeDefined();
+			expect(seededObject!.status).toBe('ACTIVE');
+		}
+	});
+
+	it('carries the ontology’s criteria verbatim — every id, name and description', () => {
+		for (const p of ontology.seedPolicies) {
+			expect(load(p.policyId)!.criteria).toEqual(p.criteria);
+		}
+	});
+
+	it('carries the ontology’s finding codes verbatim, in order', () => {
+		for (const p of ontology.seedPolicies) {
+			const codes = (load(p.policyId)!.findingDefinitions as { code: string }[]).map((f) => f.code);
+			expect(codes, p.policyId).toEqual([...p.findingTypes]);
+		}
+	});
+
+	it('seeds all 81 ratified criteria and all 99 ratified finding codes', () => {
+		// The headline number, asserted on the OBJECTS rather than the source data: 17/81 and 11/99 was the state
+		// of the store, not of the ontology, and the store is what the system reads.
+		const ids = ontology.seedPolicies.map((p) => p.policyId);
+		const criteria = ids.reduce((n, id) => n + (load(id)!.criteria as unknown[]).length, 0);
+		const findings = ids.reduce(
+			(n, id) => n + (load(id)!.findingDefinitions as unknown[]).length,
+			0
+		);
+		expect(criteria).toBe(81);
+		expect(findings).toBe(99);
 	});
 });

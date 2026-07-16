@@ -5,7 +5,13 @@
 // the composition root — the engine does not import or default to any specific PWA. Downstream surfaces consume
 // ONLY this seam; they never reach into the individual packages.
 import { Engine, type BatchResult, type EventSubscriber } from '@janumipwb/rph-application';
-import type { CommandResult, DomainCommand, DomainEvent } from '@janumipwb/rph-contracts';
+import type {
+	AssessmentCriterion,
+	CommandResult,
+	DomainCommand,
+	DomainEvent,
+	Frozen
+} from '@janumipwb/rph-contracts';
 import { SqliteStorageAdapter } from '@janumipwb/rph-persistence';
 import type { Logger, StorageAdapter, StoredObject } from '@janumipwb/rph-ports';
 
@@ -20,10 +26,38 @@ export interface OntologyIssue {
  * engine depends on this contract, NOT on any concrete PWA package — so any PWA's versioned ontology data
  * satisfies it. (The concrete Product Realization PWA ontology is a superset of this.)
  */
+/**
+ * ONE of a loaded PWA ontology's seed policies — everything needed to stand it up as a real ASSURANCE_POLICY
+ * object, and nothing else. Structural, so any PWA's dataset satisfies it without importing this package.
+ *
+ * This was `readonly unknown[]`: the port declared that seed policies EXIST and NOTHING about what they are. That
+ * is not a small omission — it is why `seedAdditivePolicies` kept a hand-maintained second copy of the DOC-004
+ * catalog instead of reading the one the ontology already held. Nothing could have read this port usefully, so
+ * nothing did, and the two copies drifted for as long as both existed (see SeedPolicy in the PWA package for what
+ * that cost). An `unknown` in a port is not a deferral; it is a fork.
+ */
+export interface EngineSeedPolicy {
+	readonly policyId: string;
+	readonly name: string;
+	readonly purpose: string;
+	readonly rationale: string;
+	readonly evaluatedClaimTypes: readonly string[];
+	readonly criteria: readonly Frozen<AssessmentCriterion>[];
+	/** RATIFIED finding codes. The per-code detail DOC-004 §9.1 mandates but never ratifies is optional. */
+	readonly findingTypes: readonly string[];
+	readonly findingAnnotations?: Readonly<
+		Record<string, { readonly defaultSeverity: string; readonly description: string }>
+	>;
+	readonly evaluatorRole: string;
+	readonly independenceRequirement: string;
+	readonly failureSeverity: string;
+	readonly permittedControlActions: readonly string[];
+}
+
 export interface EngineOntology {
 	readonly version: string;
 	readonly pwuTemplates: readonly { readonly pwuKind: string; readonly isRoot?: boolean }[];
-	readonly seedPolicies: readonly unknown[];
+	readonly seedPolicies: readonly EngineSeedPolicy[];
 	readonly conformanceProfiles: readonly unknown[];
 }
 

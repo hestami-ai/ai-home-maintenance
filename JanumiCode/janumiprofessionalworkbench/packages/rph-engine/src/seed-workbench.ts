@@ -4,9 +4,13 @@
 // context) AND a real Undertaking with a live graph (Undertaking context) to render — the RPH-DOC-010 separation,
 // demonstrated end to end. It is deterministic: it drives commands; no fixture event log is replayed.
 import type { ActorReference, DomainCommand } from '@janumipwb/rph-contracts';
-import type { AssessmentCriterion } from '@janumipwb/rph-contracts';
-import { FLOOR_POLICY_DEFINITIONS, findingsFor, type Severity } from '@janumipwb/rph-assurance';
-import type { EngineHandle } from './engine.js';
+import {
+	FLOOR_POLICY_DEFINITIONS,
+	findingsFor,
+	humanizeCode,
+	type Severity
+} from '@janumipwb/rph-assurance';
+import type { EngineHandle, EngineSeedPolicy } from './engine.js';
 import { driveReferenceUndertaking } from './reference-undertaking.js';
 
 const ACTOR: ActorReference = {
@@ -178,397 +182,20 @@ export function seedFloorPolicies(handle: EngineHandle): void {
 	}
 }
 
-/** The Product Realization PWA's additive assurance policies (DOC-004 §15-§21) as authorable ASSURANCE_POLICY
- *  objects — the declarable policies a PWU Type may require ON TOP of the locked de minimis floor. Seeding them as
- *  real objects makes the PWA Designer's policy manager + picker engine-backed (not a static catalog), and gives the
- *  author a starting library to reference, edit, version, suspend, or supersede. Content is a faithful compact of the
- *  ontology's seedPolicies (single-value enum fields per the ASSURANCE_POLICY object contract). */
-interface AdditivePolicySeed {
-	readonly policyId: string;
-	readonly name: string;
-	readonly purpose: string;
-	readonly rationale: string;
-	/** DOC-004 §3.1 / DOC-007 / DOC-002 §17.1: `evaluatedClaimTypes: ClaimType[]`. Was singular. */
-	readonly evaluatedClaimTypes: readonly string[];
-	readonly evaluatorRole: string;
-	readonly independence: string;
-	/** DOC-004 §3.1 / DOC-007: `permittedControlActions: ControlAction[]` — a SET per policy. Was ONE. */
-	readonly permittedControlActions: readonly string[];
-	/** The RATIFIED DOC-004 §7 shape, aliased from the generated contract. This was a THIRD inline
-	 *  restatement of `{id, statement, mandatory}` — a shape no document defines — after floor-policies.ts
-	 *  and ontology.ts. It survived because AssurancePolicy.criteria was an array of ANY OBJECT
-	 *  (AUDIT-placeholder-helpers.md). Aliasing means the next divergence fails the build. */
-	readonly criteria: readonly AssessmentCriterion[];
-	/** RAW triples. Converted to DOC-004 §9.1 FindingDefinitions at the seeding call by rph-assurance's
-	 *  `findingsFor`, which derives each finding's affectedClaimTypes/defaultControlActions from THIS policy's
-	 *  own sets — structurally, so a finding cannot claim an action its own policy does not permit. */
-	readonly findingDefinitions: ReadonlyArray<{
-		code: string;
-		severity: Severity;
-		statement: string;
-	}>;
-}
-
-const ADDITIVE_POLICY_SEEDS: readonly AdditivePolicySeed[] = [
-	{
-		policyId: 'pol_intent_fidelity',
-		name: 'Intent Fidelity',
-		purpose:
-			"The formalized objective represents the user's need rather than substituting a preferred solution; scope, constraints, and material ambiguity are preserved.",
-		rationale:
-			'Catalog §15 — unauthorized intent alteration cannot be silently introduced; inferred elements must be labelled, not presented as user fact.',
-		evaluatedClaimTypes: ['PRESERVATION'],
-		evaluatorRole: 'intent-fidelity-reviewer',
-		independence: 'DIFFERENT_AGENT',
-		// DOC-004 §15.10 (POL-INTENT-FIDELITY) — transcribed, was just 'CLARIFY'
-		permittedControlActions: [
-			'CLARIFY',
-			'REVISE_CONTEXT',
-			'RESHAPE_PWU',
-			'REQUEST_HUMAN_DECISION',
-			'REJECT'
-		],
-		criteria: [
-			{
-				id: 'IF-01',
-				name: 'Objective fidelity',
-				description: 'no solution substituted for the need.',
-				criterionType: 'BOOLEAN',
-				evaluationMethod: 'MODEL_JUDGMENT',
-				requiredEvidenceIds: [],
-				severityIfNotMet: 'BLOCKING',
-				mayBeNotApplicable: false
-			},
-			{
-				id: 'IF-02',
-				name: 'Boundary fidelity',
-				description: 'no unauthorized scope expansion.',
-				criterionType: 'BOOLEAN',
-				evaluationMethod: 'MODEL_JUDGMENT',
-				requiredEvidenceIds: [],
-				severityIfNotMet: 'BLOCKING',
-				mayBeNotApplicable: false
-			},
-			{
-				id: 'IF-03',
-				name: 'Constraint fidelity',
-				description: 'explicit user constraints preserved.',
-				criterionType: 'BOOLEAN',
-				evaluationMethod: 'MODEL_JUDGMENT',
-				requiredEvidenceIds: [],
-				severityIfNotMet: 'BLOCKING',
-				mayBeNotApplicable: false
-			}
-		],
-		findingDefinitions: [
-			{
-				code: 'SOLUTION_SUBSTITUTION',
-				severity: 'BLOCKING',
-				statement: 'An inferred solution replaced the stated need.'
-			},
-			{
-				code: 'MISSING_USER_CONSTRAINT',
-				severity: 'BLOCKING',
-				statement: 'A mandatory user constraint was omitted.'
-			}
-		]
-	},
-	{
-		policyId: 'pol_intent_completeness',
-		name: 'Intent Completeness',
-		purpose:
-			'Desired outcomes, product boundary, mandatory constraints, and success conditions are sufficiently explicit for the next authorized activity.',
-		rationale:
-			'Catalog §16 — completeness is risk-relative sufficiency, not exhaustive specification.',
-		evaluatedClaimTypes: ['COMPLETENESS'],
-		evaluatorRole: 'intent-completeness-reviewer',
-		independence: 'DIFFERENT_INVOCATION',
-		// UNRATIFIED: §16 (POL-INTENT-COMPLETENESS) has NO control-actions subsection — verified by direct search of §16.1-16.6. Value preserved as a 1-element array; shape fixed, content untouched.
-		permittedControlActions: ['GATHER_CONTEXT'],
-		criteria: [
-			{
-				id: 'IC-01',
-				name: 'IC-01',
-				description: 'Desired outcomes are explicit.',
-				criterionType: 'BOOLEAN',
-				evaluationMethod: 'MODEL_JUDGMENT',
-				requiredEvidenceIds: [],
-				severityIfNotMet: 'BLOCKING',
-				mayBeNotApplicable: false
-			},
-			{
-				id: 'IC-04',
-				name: 'IC-04',
-				description: 'Mandatory constraints are recorded.',
-				criterionType: 'BOOLEAN',
-				evaluationMethod: 'MODEL_JUDGMENT',
-				requiredEvidenceIds: [],
-				severityIfNotMet: 'BLOCKING',
-				mayBeNotApplicable: false
-			},
-			{
-				id: 'IC-05',
-				name: 'IC-05',
-				description: 'Success conditions exist, or the work is marked exploratory.',
-				criterionType: 'BOOLEAN',
-				evaluationMethod: 'MODEL_JUDGMENT',
-				requiredEvidenceIds: [],
-				severityIfNotMet: 'BLOCKING',
-				mayBeNotApplicable: false
-			}
-		],
-		findingDefinitions: [
-			{
-				code: 'MISSING_MANDATORY_CONSTRAINT',
-				severity: 'MATERIAL',
-				statement: 'A mandatory constraint is missing.'
-			},
-			{
-				code: 'NO_SUCCESS_CONDITION',
-				severity: 'MATERIAL',
-				statement: 'No success condition and not marked exploratory.'
-			}
-		]
-	},
-	{
-		policyId: 'pol_assumption_disclosure',
-		name: 'Assumption Disclosure',
-		purpose:
-			'Material assumptions are surfaced as first-class Assumption Objects, distinguished from established fact, with materiality and verification needs identified.',
-		rationale:
-			'Catalog §17 — cross-cutting: applies to any model-produced professional artifact; SATISFIED means disclosed, not verified.',
-		evaluatedClaimTypes: ['COMPLETENESS'],
-		evaluatorRole: 'assumption-disclosure-reviewer',
-		independence: 'DIFFERENT_INVOCATION',
-		// DOC-004 §17.8 (POL-ASSUMPTION-DISCLOSURE) — transcribed, was just 'GATHER_EVIDENCE'
-		permittedControlActions: [
-			'GATHER_EVIDENCE',
-			'CLARIFY',
-			'RESHAPE_PWU',
-			'INVALIDATE_DEPENDENTS',
-			'REQUEST_HUMAN_DECISION',
-			'ESCALATE'
-		],
-		criteria: [
-			{
-				id: 'AD-01',
-				name: 'AD-01',
-				description: 'Material assumptions surfaced as first-class objects (not prose).',
-				criterionType: 'BOOLEAN',
-				evaluationMethod: 'MODEL_JUDGMENT',
-				requiredEvidenceIds: [],
-				severityIfNotMet: 'BLOCKING',
-				mayBeNotApplicable: false
-			},
-			{
-				id: 'AD-02',
-				name: 'AD-02',
-				description: 'Assumptions distinguished from established facts.',
-				criterionType: 'BOOLEAN',
-				evaluationMethod: 'MODEL_JUDGMENT',
-				requiredEvidenceIds: [],
-				severityIfNotMet: 'BLOCKING',
-				mayBeNotApplicable: false
-			},
-			{
-				id: 'AD-04',
-				name: 'AD-04',
-				description: 'Materiality is classified (IMMATERIAL/MATERIAL/CRITICAL).',
-				criterionType: 'BOOLEAN',
-				evaluationMethod: 'MODEL_JUDGMENT',
-				requiredEvidenceIds: [],
-				severityIfNotMet: 'BLOCKING',
-				mayBeNotApplicable: false
-			}
-		],
-		findingDefinitions: [
-			{
-				code: 'HIDDEN_MATERIAL_ASSUMPTION',
-				severity: 'MATERIAL',
-				statement: 'A material assumption was left undisclosed.'
-			},
-			{
-				code: 'ASSUMPTION_PRESENTED_AS_FACT',
-				severity: 'MATERIAL',
-				statement: 'An assumption was presented as established fact.'
-			}
-		]
-	},
-	{
-		policyId: 'pol_decomposition_coverage',
-		name: 'Decomposition Coverage',
-		purpose:
-			'No mandatory parent obligation silently disappears; applicable constraints propagate; a credible parent-level recomposition strategy exists.',
-		rationale:
-			'Catalog §19 — any missing mandatory obligation or child intent divergence is BLOCKING.',
-		evaluatedClaimTypes: ['COVERAGE'],
-		evaluatorRole: 'decomposition-coverage-reviewer',
-		independence: 'DIFFERENT_AGENT',
-		// DOC-004 §19.8 (POL-DECOMPOSITION-COVERAGE) — transcribed, was just 'REVISE_DECOMPOSITION'
-		permittedControlActions: [
-			'REVISE_DECOMPOSITION',
-			'RESHAPE_PWU',
-			'CLARIFY',
-			'REQUEST_HUMAN_DECISION',
-			'REJECT'
-		],
-		criteria: [
-			{
-				id: 'DC-01',
-				name: 'DC-01',
-				description: 'Every mandatory parent obligation is allocated/retained/satisfied/waived.',
-				criterionType: 'BOOLEAN',
-				evaluationMethod: 'MODEL_JUDGMENT',
-				requiredEvidenceIds: [],
-				severityIfNotMet: 'BLOCKING',
-				mayBeNotApplicable: false
-			},
-			{
-				id: 'DC-02',
-				name: 'DC-02',
-				description: 'Applicable constraints are propagated or explicitly retained.',
-				criterionType: 'BOOLEAN',
-				evaluationMethod: 'MODEL_JUDGMENT',
-				requiredEvidenceIds: [],
-				severityIfNotMet: 'BLOCKING',
-				mayBeNotApplicable: false
-			},
-			{
-				id: 'DC-06',
-				name: 'DC-06',
-				description: 'A credible recomposition strategy exists.',
-				criterionType: 'BOOLEAN',
-				evaluationMethod: 'MODEL_JUDGMENT',
-				requiredEvidenceIds: [],
-				severityIfNotMet: 'BLOCKING',
-				mayBeNotApplicable: false
-			}
-		],
-		findingDefinitions: [
-			{
-				code: 'MISSING_OBLIGATION_ALLOCATION',
-				severity: 'BLOCKING',
-				statement: 'A mandatory obligation was not allocated.'
-			},
-			{
-				code: 'DROPPED_CONSTRAINT',
-				severity: 'BLOCKING',
-				statement: 'An applicable constraint was dropped.'
-			}
-		]
-	},
-	{
-		policyId: 'pol_architecture_coverage',
-		name: 'Architecture Coverage',
-		purpose:
-			'Applicable requirements and constraints are allocated to structure with explicit boundaries, data ownership, and security; the architecture is feasible.',
-		rationale:
-			'Catalog §21 — critical security, tenant-isolation, data-integrity, or mandatory-constraint failures are BLOCKING.',
-		evaluatedClaimTypes: ['COVERAGE'],
-		evaluatorRole: 'architecture-coverage-reviewer',
-		independence: 'DIFFERENT_AGENT',
-		// UNRATIFIED: §21 (POL-ARCHITECTURE-COVERAGE) has NO control-actions subsection — verified by direct search of §21.1-21.6. Value preserved as a 1-element array; shape fixed, content untouched.
-		permittedControlActions: ['RESHAPE_PWU'],
-		criteria: [
-			{
-				id: 'AC-01',
-				name: 'AC-01',
-				description: 'Applicable requirements are allocated to architecture.',
-				criterionType: 'BOOLEAN',
-				evaluationMethod: 'MODEL_JUDGMENT',
-				requiredEvidenceIds: [],
-				severityIfNotMet: 'BLOCKING',
-				mayBeNotApplicable: false
-			},
-			{
-				id: 'AC-05',
-				name: 'AC-05',
-				description: 'Data ownership is explicit (data-integrity boundary).',
-				criterionType: 'BOOLEAN',
-				evaluationMethod: 'MODEL_JUDGMENT',
-				requiredEvidenceIds: [],
-				severityIfNotMet: 'BLOCKING',
-				mayBeNotApplicable: false
-			},
-			{
-				id: 'AC-08',
-				name: 'AC-08',
-				description: 'Mandatory constraints are preserved.',
-				criterionType: 'BOOLEAN',
-				evaluationMethod: 'MODEL_JUDGMENT',
-				requiredEvidenceIds: [],
-				severityIfNotMet: 'BLOCKING',
-				mayBeNotApplicable: false
-			}
-		],
-		findingDefinitions: [
-			{
-				code: 'UNCOVERED_REQUIREMENT',
-				severity: 'CRITICAL',
-				statement: 'A requirement is not covered by the architecture.'
-			},
-			{
-				code: 'ARCHITECTURE_CONSTRAINT_VIOLATION',
-				severity: 'CRITICAL',
-				statement: 'The architecture violates a mandatory constraint.'
-			}
-		]
-	},
-	{
-		policyId: 'pol_intent_preservation',
-		name: 'Intent Preservation',
-		purpose:
-			'Each downstream transformation still preserves the approved Product Intent end-to-end — no silent change of product semantics.',
-		rationale:
-			'Catalog §20/§30 — the promoted result must still serve the originating Product Intent.',
-		evaluatedClaimTypes: ['PRESERVATION'],
-		evaluatorRole: 'intent-preservation-reviewer',
-		independence: 'DIFFERENT_AGENT',
-		// DOC-004 §23.7 (POL-INTENT-PRESERVATION) — transcribed. NOTE: the previous value 'ESCALATE' is NOT a member of §23.7's ratified set; the code permitted an action the ratified policy does not list. Removing it is the ratified truth, and a real behaviour change.
-		permittedControlActions: [
-			'RESHAPE_PWU',
-			'REVISE_DECOMPOSITION',
-			'INVALIDATE_DEPENDENTS',
-			'REQUEST_HUMAN_DECISION',
-			'REJECT',
-			'ABANDON'
-		],
-		criteria: [
-			{
-				id: 'IP-01',
-				name: 'IP-01',
-				description: 'Approved intent is traced through this transformation.',
-				criterionType: 'BOOLEAN',
-				evaluationMethod: 'MODEL_JUDGMENT',
-				requiredEvidenceIds: [],
-				severityIfNotMet: 'BLOCKING',
-				mayBeNotApplicable: false
-			},
-			{
-				id: 'IP-02',
-				name: 'IP-02',
-				description: 'No silent change to product semantics.',
-				criterionType: 'BOOLEAN',
-				evaluationMethod: 'MODEL_JUDGMENT',
-				requiredEvidenceIds: [],
-				severityIfNotMet: 'BLOCKING',
-				mayBeNotApplicable: false
-			}
-		],
-		findingDefinitions: [
-			{
-				code: 'INTENT_EROSION',
-				severity: 'BLOCKING',
-				statement: 'The approved intent was eroded downstream.'
-			}
-		]
-	}
-];
-
-/** Seed the additive Product Realization assurance policies as ACTIVE ASSURANCE_POLICY objects. */
+/**
+ * Seed the loaded PWA's additive assurance policies as ACTIVE ASSURANCE_POLICY objects — READ FROM THE ONTOLOGY
+ * the engine was composed with, which is the single source for the DOC-004 catalog.
+ *
+ * It used to iterate a hand-maintained `ADDITIVE_POLICY_SEEDS` const in this file while `validateOntology` and the
+ * conformance profiles read `ontology.seedPolicies`. Two copies of the same governance content, no test that they
+ * agreed, and the divergence ran exactly one way: the copy the app/agent/UI actually read held 17 of the catalog's
+ * 81 criteria and 11 of its 99 findings, in paraphrase, and bound `IP-01`/`IP-02` to claims the ontology binds
+ * elsewhere. The FAITHFUL copy was the one nothing seeded. Reading the ontology here is what makes the catalog
+ * one thing; `seed-policy-arrays.test.ts` is what keeps it one.
+ */
 export function seedAdditivePolicies(handle: EngineHandle): void {
 	const send = sender(handle, 'seedaddpol');
-	for (const p of ADDITIVE_POLICY_SEEDS) {
+	for (const p of handle.ontology.seedPolicies) {
 		send('CreateAssurancePolicy', 'ASSURANCE_POLICY', p.policyId, {
 			policyId: p.policyId,
 			version: '1.0.0',
@@ -579,11 +206,34 @@ export function seedAdditivePolicies(handle: EngineHandle): void {
 			evaluatedClaimTypes: p.evaluatedClaimTypes,
 			criteria: p.criteria,
 			evaluatorRole: p.evaluatorRole,
-			independenceRequirement: p.independence,
-			findingDefinitions: findingsFor(p, p.findingDefinitions),
+			independenceRequirement: p.independenceRequirement,
+			findingDefinitions: findingsFor(p, rawFindings(p)),
 			permittedControlActions: p.permittedControlActions
 		});
 	}
+}
+
+/**
+ * The policy's ratified finding codes as the `{code, severity, statement}` triples `findingsFor` converts into
+ * DOC-004 §9.1 FindingDefinitions (which derives each finding's affectedClaimTypes/defaultControlActions from the
+ * policy itself, so a finding cannot claim an action its own policy forbids).
+ *
+ * The two fields §9.1 mandates and DOC-004 ratifies for NONE of its 99 codes are resolved without inventing them:
+ * an authored annotation if the ontology carries one (11 codes do), otherwise the policy's OWN `failureSeverity`
+ * and the humanized code. So an unannotated finding inherits its policy's declared severity rather than a severity
+ * someone made up — the same structural rule `findingsFor` already applies to claims and control actions.
+ */
+function rawFindings(
+	p: EngineSeedPolicy
+): { code: string; severity: Severity; statement: string }[] {
+	return p.findingTypes.map((code) => {
+		const annotation = p.findingAnnotations?.[code];
+		return {
+			code,
+			severity: (annotation?.defaultSeverity ?? p.failureSeverity) as Severity,
+			statement: annotation?.description ?? humanizeCode(code)
+		};
+	});
 }
 
 /** The full workbench policy library: the 3 locked de minimis floor policies + the additive Product Realization

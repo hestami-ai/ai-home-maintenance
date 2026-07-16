@@ -232,7 +232,22 @@ did not before. Every "the payload validates X" belief in this repo predating `9
 **A finding surfaced while doing it:** the 6 additive policies exist **twice** — `m8-ontology.json`'s
 `seedPolicies` *and* `seed-workbench.ts`'s `ADDITIVE_POLICY_SEEDS`, same ids (`pol_intent_fidelity`),
 independently maintained. The "parallel unsynchronized restatement" pattern again; it doubled this migration's
-literal count. Not fixed — dedup is its own decision.
+literal count. ~~Not fixed — dedup is its own decision.~~
+
+> **RESOLVED 2026-07-16 (Increment 17) — and this note badly under-called it.** "Its own decision" framed the
+> duplication as tidiness. Diffing the two **live** (seed an engine, compare the objects to the ontology) showed
+> the copies had already diverged, in the direction that matters: the seeded objects — *the ones the app, the
+> agent and the UI read* — carried **17 of the catalog's 81 criteria and 11 of its 99 findings**, in paraphrase,
+> with `IP-01`/`IP-02` bound to **different criteria** than the ontology binds them to. Same id, different
+> meaning, in the layer that keys the audit trail. **The faithful copy was the one nothing seeded.**
+>
+> The mechanism is this audit's own thesis, one level up. `EngineOntology.seedPolicies` was typed
+> **`readonly unknown[]`** — the ontology port declared that seed policies *exist* and nothing about what they
+> are. So the port was unusable, so seeding kept a private copy, so the copies drifted. **An `unknown` in a port
+> is not a deferral; it is a fork.** Fixed: the port has a real shape, `seedAdditivePolicies` reads
+> `handle.ontology.seedPolicies`, the 387-line copy is deleted, and 15 objects seed carrying 81/81 criteria and
+> 99/99 codes — locked by `seed-policy-arrays.test.ts` (seeded ≡ ontology) and `doc004-conformance.test.ts`
+> (ontology ≡ **the ratified markdown itself**). Both mutation-proven. See HARMONIZATION-LOG PART 3b.
 
 ## Recommended sequencing
 

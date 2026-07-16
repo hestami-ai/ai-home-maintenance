@@ -121,12 +121,35 @@ describe('seeded finding definitions are DOC-004 §9.1', () => {
 		expect(fs.find((f) => f.code === 'INVARIANT_VIOLATION')?.defaultSeverity).toBe('BLOCKING');
 	});
 
-	it('keeps every seeded finding code unchanged — all 11 additive codes ARE ratified by DOC-004', () => {
-		// The codes were never the problem: each of the seed's 11 appears in a DOC-004 Findings section. (What the
-		// seed does NOT ship is the other 89 — a demo-subset question, surfaced, not decided here.)
+	it('seeds ALL of a policy’s ratified finding codes, in document order — not a two-code sample', () => {
+		// This asserted exactly the two codes the old hand-maintained seed happened to carry, and called the other
+		// 89 "a demo-subset question, surfaced, not decided here". It was not a demo subset: the seed's copy of the
+		// catalog was simply shorter than the ratified one, and this test pinned the short version as correct.
+		// Seeding now reads the ontology, so the codes ARE DOC-004 §15.7 — all seven, in the doc's order.
 		expect(load('pol_intent_fidelity')!.findingDefinitions.map((f) => f.code)).toEqual([
 			'SOLUTION_SUBSTITUTION',
-			'MISSING_USER_CONSTRAINT'
+			'UNAUTHORIZED_SCOPE_EXPANSION',
+			'MISSING_USER_CONSTRAINT',
+			'FALSELY_CLOSED_AMBIGUITY',
+			'INFERRED_NEED_PRESENTED_AS_FACT',
+			'OUTCOME_EROSION',
+			'NON_GOAL_CONFLICT'
 		]);
+	});
+
+	it('resolves the two fields §9.1 mandates and DOC-004 never ratifies — WITHOUT inventing them', () => {
+		// §9.1 requires description + defaultSeverity per FindingDefinition. DOC-004 ratifies neither, for any of
+		// its 99 codes (each occurs exactly once corpus-wide, as a bare bullet). An ANNOTATED code keeps its
+		// authored text; an UNANNOTATED one inherits its policy's own failureSeverity and the humanized code,
+		// rather than a severity someone made up.
+		const fidelity = load('pol_intent_fidelity')!.findingDefinitions;
+		const annotated = fidelity.find((f) => f.code === 'SOLUTION_SUBSTITUTION')!;
+		expect(annotated.description).toBe('An inferred solution replaced the stated need.');
+		expect(annotated.defaultSeverity).toBe('BLOCKING');
+
+		const fallback = fidelity.find((f) => f.code === 'FALSELY_CLOSED_AMBIGUITY')!;
+		expect(fallback.description).toBe('Falsely closed ambiguity');
+		// pol_intent_fidelity.failureSeverity — the policy's own declared severity, not a per-finding invention.
+		expect(fallback.defaultSeverity).toBe('BLOCKING');
 	});
 });

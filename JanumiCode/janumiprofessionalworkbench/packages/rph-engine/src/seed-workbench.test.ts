@@ -52,11 +52,18 @@ describe('seedWorkbench (live PWA + Undertaking + graph)', () => {
 		expect(pwus.every((p) => p.state.undertakingId === SEED_UNDERTAKING)).toBe(true);
 	});
 
-	it('seeds the policy library: 3 locked de minimis floor policies + the additive policies as ASSURANCE_POLICY objects', () => {
+	it('seeds the policy library: 3 locked de minimis floor policies + ALL 12 catalog policies as ASSURANCE_POLICY objects', () => {
 		const engine = build();
 		const policies = listByType(engine, 'ASSURANCE_POLICY');
-		// 3 floor (locked) + 6 additive (Product Realization) = the full workbench policy library.
-		expect(policies).toHaveLength(9);
+		// 3 floor (locked) + 12 additive = the full workbench policy library.
+		//
+		// This asserted 9 — 3 floor + SIX additive — because seeding read a hand-maintained copy of the catalog in
+		// seed-workbench.ts while the ontology (and validateOntology, and the conformance profiles) read all 12.
+		// So half of DOC-004's ratified catalog existed as ontology data and as NO object: not in the policy
+		// manager, not in the picker, and not in what `list_assurance_policies` shows the authoring agent. The
+		// agent is told to reuse an existing policy and to create one only for a treatment "not already offered" —
+		// so the six invisible policies were an instruction to fabricate duplicates of ratified ones.
+		expect(policies).toHaveLength(15);
 		const ids = policies.map((p) => p.id).sort();
 		expect(ids).toEqual([
 			'floor.identity-provenance',
@@ -64,10 +71,16 @@ describe('seedWorkbench (live PWA + Undertaking + graph)', () => {
 			'floor.schema-invariant',
 			'pol_architecture_coverage',
 			'pol_assumption_disclosure',
+			'pol_baseline_promotion',
+			'pol_constraint_propagation',
 			'pol_decomposition_coverage',
+			'pol_fitness_for_purpose',
+			'pol_historical_consistency',
 			'pol_intent_completeness',
 			'pol_intent_fidelity',
-			'pol_intent_preservation'
+			'pol_intent_preservation',
+			'pol_requirement_coverage',
+			'pol_test_adequacy'
 		]);
 		const rr = policies.find((p) => p.id === 'floor.reasoning-review')!;
 		expect(rr.state.status).toBe('ACTIVE');
