@@ -191,11 +191,19 @@ export const actions: Actions = {
 			undertakingId: params.id,
 			isLocalExtension: false,
 			pwuTypeId,
-			boundaries: { inScope: [], outOfScope: [], permittedChanges: [], prohibitedChanges: [] },
+			// Shape the PWU at instantiation: DOC-002 §9.1 requires an in-scope statement, an out-of-scope status,
+			// and an expected output before it can be marked READY (enforced by the readiness guard in beginExecute
+			// below). Left empty, MarkPwuReady rightly rejects. `outOfScope` uses §9.1's permitted "not yet known".
+			boundaries: {
+				inScope: [`${title || String((type.name ?? 'PWU') as string)} for this Undertaking`],
+				outOfScope: ['not yet known'],
+				permittedChanges: [],
+				prohibitedChanges: []
+			},
 			obligationIds: [],
 			constraintIds: [],
 			assumptionIds: [],
-			expectedOutputs: [],
+			expectedOutputs: [{ outputId: `out_${pwuId}`, kind: 'DOCUMENT' }],
 			assurancePolicyIds: [],
 			riskProfile: {
 				consequence: 'MEDIUM',
