@@ -100,8 +100,23 @@ function zodBaseExpr(t: string): string {
 	// could NEVER hit: both branches were dead, and every payload field typed as an object or envelope schema
 	// fell silently through to `z.unknown()`. Proof it was never reachable: the generated messages.ts imported
 	// only from './enums.js' — never once from './objects.js' or './envelopes.js', across 70 commands and 122
-	// events. Fixed 2026-07-16; this newly resolves 66 payload fields across 32 types, incl. ActorReference on
-	// 9 payloads (the actor on a command was accepted unvalidated) and CapabilityGrant on 3.
+	// events. Fixed 2026-07-16.
+	//
+	// WHAT THE FIX ACTUALLY BUYS — corrected after adversarial review caught the first accounting overstating
+	// it (it counted each schema's IMPORT line as a reference). The honest figures, recomputed from the vocab:
+	//
+	//   66 payload fields now resolve to a named schema. Of those:
+	//     34 -> a REAL z.strictObject   (18 on COMMAND payloads, 16 on EVENT payloads)
+	//     32 -> a placeholder z.record  (15 command, 17 event) — still permissive, but see the caveat below
+	//
+	//   Only 18 are ACTUALLY ENFORCED. The write path has exactly two validateAgainst call sites:
+	//   command-bus.ts (the COMMAND payload) and kit.ts (the resulting OBJECT STATE). No event payload is ever
+	//   validated, so the 16 real schemas on event payloads are inert — a separate, pre-existing defect
+	//   (the events registry is generated and unchecked), not something this fix creates or cures.
+	//
+	// CAVEAT, also missed the first time: `z.unknown()` -> `z.record(z.string(), z.unknown())` is NOT a no-op.
+	// z.unknown() accepts a string, a number, null — anything. z.record requires an OBJECT. So the 32
+	// "placeholder" fields did get a real (if weak) tightening: they now reject non-object values.
 	if (ENV.has(t)) {
 		used.env.add(`${t}Schema`);
 		return `${t}Schema`;

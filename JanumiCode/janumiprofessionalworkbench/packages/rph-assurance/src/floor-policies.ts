@@ -16,12 +16,27 @@ import { REASONING_REVIEW_CRITERIA } from './validators.js';
  * detect the divergence (AUDIT-placeholder-helpers.md). Aliasing the generated type rather than redeclaring
  * it means the next divergence fails the build instead of shipping.
  *
- * MIGRATION (2026-07-16), faithful to the live runtime, no invention:
+ * MIGRATION (2026-07-16), faithful to the live runtime:
  *   statement       -> description
  *   mandatory: true -> severityIfNotMet: 'BLOCKING'  (assurance-rules already maps a mandatory NOT_MET
  *                      criterion and an open BLOCKING finding to the same REJECTED disposition)
- *   name            -> taken from the id's own descriptive tail ('FS-01-schema' -> 'Schema conformance'),
- *                      which is existing content: these ids already encode the criterion's short label.
+ *
+ * ⚠️ `name` — CORRECTED 2026-07-16 after adversarial review caught the claim below being false.
+ *
+ * This comment previously read: "name -> taken from the id's own descriptive tail ('FS-01-schema' ->
+ * 'Schema conformance'), which is existing content". **That rule is falsified by its own example, 7 times out
+ * of 7.** Mechanically applying it gives 'schema', not 'Schema conformance'; 'invariants', not 'Invariant
+ * integrity'; 'producer', not 'Producing actor recorded'. The two are not the same operation and never were.
+ *
+ * The truth: the 7 FS/IP names below are AUTHORED — I wrote them, reading each criterion's own description
+ * and its policy's purpose. That is authoring professional content, which is exactly what the increment claimed
+ * not to do. It is disclosed here rather than dressed as derivation, and it is the smallest such authoring I
+ * could find (a short label for a criterion whose full statement is right beside it, in a policy nobody reads
+ * at runtime), but the honest name for it is authored, not transcribed.
+ *
+ * The RR-* names ARE mechanically derived — see the `.replace(...).replaceAll(...)` below, which is the rule
+ * this comment described. If the sponsor wants the floor's names ratified rather than authored, these 7 are
+ * the list to review.
  */
 export type FloorPolicyCriterion = AssessmentCriterion;
 export interface FloorFindingDefinition {

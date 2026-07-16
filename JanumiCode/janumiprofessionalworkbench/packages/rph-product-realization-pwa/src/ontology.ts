@@ -4,55 +4,30 @@
 // resolver normalizes the `_vN` suffix.
 import { PRODUCT_REALIZATION_PWA_ONTOLOGY } from './ontology.data.js';
 
-/**
- * An assessment criterion, per the RATIFIED DOC-004 §7 `interface AssessmentCriterion`.
- *
- * This used to be `{ id, statement, mandatory? }` — a shape no document ratifies, with no overlap beyond `id`.
- * It survived because `AssurancePolicy.criteria` was typed `z.array(z.record(z.string(), z.unknown()))` — an
- * array of ANY OBJECT — so nothing could catch the divergence (AUDIT-placeholder-helpers.md).
- *
- * Note what `mandatory: boolean` was standing in for: `severityIfNotMet`, a FIVE-level ratified severity,
- * collapsed to a Boolean — the same disease §16 item 12 names for waivers.
- */
-type RatifiedCriterion = import('@janumipwb/rph-contracts').AssessmentCriterion;
-/** Deep-readonly view of the ratified type — DERIVED from it, never restated, because the generated dataset is
- *  `as const` and its arrays are readonly. A drift in DOC-004 §7 now fails this build. */
-export type Criterion = {
-	readonly [K in keyof RatifiedCriterion]: RatifiedCriterion[K] extends readonly (infer E)[]
-		? readonly E[]
-		: RatifiedCriterion[K];
-};
-export interface SeedPolicy {
-	readonly policyId: string;
-	readonly name?: string;
-	readonly evaluatedClaimTypes?: readonly string[];
-	readonly appliesToPwuKinds?: readonly string[];
-	readonly requiredEvidenceTypes?: readonly string[];
-	readonly criteria?: readonly Criterion[];
-	readonly findingTypes?: readonly string[];
-	readonly independenceRequirement?: string;
-	readonly failureSeverity?: string;
-}
-export interface PwuTemplate {
-	readonly pwuKind: string;
-	readonly isRoot?: boolean;
-	readonly purpose?: string;
-	readonly candidateChildren?: readonly string[];
-	readonly defaultPolicyIds?: readonly string[];
-}
-export interface ConformanceProfile {
-	readonly profile: string;
-	readonly minIndependence?: string;
-	readonly mandatoryPolicyIds?: readonly string[];
-}
+// The dataset's shape lives in ontology.types.ts and is enforced AT THE LITERAL in ontology.data.ts
+// (`as const satisfies OntologyData`). Re-exported here so consumers still import it all from `ontology`.
+export type {
+	Criterion,
+	SeedPolicy,
+	PwuTemplate,
+	ConformanceProfile,
+	CompatibilityPhase,
+	OntologyData
+} from './ontology.types.js';
+import type { SeedPolicy, PwuTemplate, ConformanceProfile } from './ontology.types.js';
 
 export { PRODUCT_REALIZATION_PWA_ONTOLOGY as ontology } from './ontology.data.js';
 export const ontologyVersion: string = PRODUCT_REALIZATION_PWA_ONTOLOGY.version;
 
-export const pwuTemplates = PRODUCT_REALIZATION_PWA_ONTOLOGY.pwuTemplates as readonly PwuTemplate[];
-export const seedPolicies = PRODUCT_REALIZATION_PWA_ONTOLOGY.seedPolicies as readonly SeedPolicy[];
-export const conformanceProfiles =
-	PRODUCT_REALIZATION_PWA_ONTOLOGY.conformanceProfiles as readonly ConformanceProfile[];
+// NO `as readonly X[]` ASSERTIONS. These read `... as readonly SeedPolicy[]`, and that assertion is precisely
+// why the dataset was unchecked: an assertion only requires comparability and verifies nothing structurally.
+// Mutation-proven 2026-07-16 — re-adding the invented `statement` field to a criterion passed check-types AND
+// the full 21/21 gate. The literal is now `satisfies`-checked at its source, so these are plain reads and the
+// drift fails the build for real. Do NOT reintroduce an assertion here: it would re-hide exactly what it hid.
+export const pwuTemplates: readonly PwuTemplate[] = PRODUCT_REALIZATION_PWA_ONTOLOGY.pwuTemplates;
+export const seedPolicies: readonly SeedPolicy[] = PRODUCT_REALIZATION_PWA_ONTOLOGY.seedPolicies;
+export const conformanceProfiles: readonly ConformanceProfile[] =
+	PRODUCT_REALIZATION_PWA_ONTOLOGY.conformanceProfiles;
 
 const stripVersion = (id: string): string => id.replace(/_v\d+$/, '');
 

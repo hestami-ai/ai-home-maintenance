@@ -1,5 +1,11 @@
 // GENERATED FILE — do not edit by hand. Regenerate with `bun run gen:ontology`.
 // Source: vocab/m8-ontology.json (grounded from DOC-003 + DOC-004 + DOC-006, reconciled).
+//
+// Checked at this literal with `satisfies OntologyData` — a drift in the ratified DOC-004 §7 criterion shape,
+// or an extra/missing field anywhere in the dataset, fails THIS build. Do not weaken this to a bare `as const`
+// or move the check to a type assertion in ontology.ts: an assertion verifies nothing (see gen-ontology.ts).
+import type { OntologyData } from './ontology.types.js';
+
 export const PRODUCT_REALIZATION_PWA_ONTOLOGY = {
 	version: '1.0.0',
 	pwuTemplates: [
@@ -1248,4 +1254,4 @@ export const PRODUCT_REALIZATION_PWA_ONTOLOGY = {
 			note: "Ontology interpretation: a controller ACTION that revises shape or execution strategy (Spec §41, §43; DOC-005 §5.11) — NOT an authoritative/terminal work phase; a loop-control/reshaping response. Absent from the §27 event-range table but EXERCISED by the fixture's conditional-satisfaction remediation loop (Reference §21, §26). Present as the 11th CompatibilityMilestone enum value; DERIVED, never authoritative state."
 		}
 	]
-} as const;
+} as const satisfies OntologyData;

@@ -14,6 +14,7 @@ import {
 } from '@janumipwb/rph-engine';
 import type { CardinalityCode, PermittedChildRule } from '@janumipwb/rph-authoring';
 import type { AssessmentCriterion } from '@janumipwb/rph-contracts';
+import { readPolicyFields } from './policy-fields';
 
 const CARDINALITY_CODES: ReadonlySet<CardinalityCode> = new Set(['M1', 'M+', 'C1', 'C+']);
 /** Clamp a form-supplied cardinality to a valid code (anything else -> M1, mandatory exactly one). */
@@ -109,8 +110,14 @@ export const load: PageServerLoad = ({ params }) => {
 		independenceRequirement: String((p.state.independenceRequirement ?? '') as string),
 		applicableObjectTypes: String((p.state.applicableObjectTypes ?? '') as string),
 		permittedControlActions: String((p.state.permittedControlActions ?? '') as string),
-		// `description` per DOC-004 §7 — this read `c.statement`, the invented field's name. The textarea round-trip
-		// stays lossless: readPolicyFields writes the author's line to both `name` and `description`.
+		// `description` per DOC-004 §7 — this read `c.statement`, the invented field's name.
+		//
+		// This projection is LOSSY BY CONSTRUCTION and that is now handled, not claimed away: the textarea shows
+		// one line per criterion, so §7's other seven fields (name, severity, criterionType, …) never reach the
+		// form. `editPolicy` therefore hands the STORED criteria back to `readPolicyFields`, which reuses any
+		// whose description is unchanged — otherwise a save silently destroyed the seeded `name` and reset every
+		// `severityIfNotMet` to BLOCKING. (An earlier version of this comment called the round-trip "lossless";
+		// adversarial review proved it was not — see policy-fields.ts / policy-round-trip.test.ts.)
 		criteria: Array.isArray(p.state.criteria)
 			? (p.state.criteria as Array<{ description?: unknown }>).map((c) =>
 					String(c.description ?? '')
@@ -189,52 +196,6 @@ function readTypeFields(form: FormData): TypeFields {
 		requiredAssurancePolicyIds: (form.getAll('requiredAssurancePolicyIds') as string[])
 			.map(String)
 			.filter(Boolean)
-	};
-}
-
-/**
- * Read the Assurance Policy authoring fields from a form. `criteria` is a textarea, one criterion per line.
- *
- * Each line becomes a RATIFIED DOC-004 §7 `AssessmentCriterion`. This used to mint `{id, statement,
- * mandatory: true}` — a shape no document defines — while its own comment called the result an
- * "AssessmentCriterion". The engine accepted it because `CreateAssurancePolicy.criteria` was
- * `z.array(z.unknown())`: literally anything (AUDIT-placeholder-helpers.md).
- *
- * `name` and `description` both take the line: a one-line authoring surface supplies ONE string, and DOC-004
- * §7 requires both. Duplicating the author's own words is lossless; inventing a separate short name would be
- * authoring professional content on their behalf. Splitting them needs a richer surface — deliberately not
- * built here.
- *
- * `severityIfNotMet: 'BLOCKING'` preserves the previous `mandatory: true` exactly (assurance-rules maps a
- * mandatory NOT_MET criterion and an open BLOCKING finding to the same REJECTED disposition). The other four
- * levels — INFORMATIONAL / ADVISORY / MATERIAL / CRITICAL — are unreachable from this textarea, which is the
- * cost of the Boolean this replaces and the reason a per-criterion severity control is the natural follow-up.
- */
-function readPolicyFields(form: FormData) {
-	const criteria: AssessmentCriterion[] = String((form.get('criteria') ?? '') as string)
-		.split(/\r?\n/)
-		.map((s) => s.trim())
-		.filter(Boolean)
-		.map((line, i) => ({
-			id: `C-${String(i + 1).padStart(2, '0')}`,
-			name: line,
-			description: line,
-			criterionType: 'BOOLEAN',
-			evaluationMethod: 'MODEL_JUDGMENT',
-			requiredEvidenceIds: [],
-			severityIfNotMet: 'BLOCKING',
-			mayBeNotApplicable: false
-		}));
-	return {
-		name: String((form.get('name') ?? '') as string).trim(),
-		purpose: String((form.get('purpose') ?? '') as string).trim(),
-		rationale: String((form.get('rationale') ?? '') as string).trim(),
-		evaluatedClaimTypes: String((form.get('evaluatedClaimTypes') ?? '') as string).trim(),
-		evaluatorRole: String((form.get('evaluatorRole') ?? '') as string).trim(),
-		independenceRequirement: String((form.get('independenceRequirement') ?? '') as string).trim(),
-		applicableObjectTypes: String((form.get('applicableObjectTypes') ?? '') as string).trim(),
-		permittedControlActions: String((form.get('permittedControlActions') ?? '') as string).trim(),
-		criteria
 	};
 }
 
@@ -414,7 +375,13 @@ export const actions: Actions = {
 		const form = await request.formData();
 		const policyId = String((form.get('policyId') ?? '') as string).trim();
 		if (!policyId) return fail(400, { error: 'Missing policy.' });
-		const f = readPolicyFields(form);
+		// Pass the STORED criteria so an unchanged line keeps its id, name and severity. Without this the edit
+		// re-mints every criterion from its description and silently destroys both — see readPolicyFields.
+		const stored = getObject(getEngine(), policyId);
+		const priorCriteria = Array.isArray(stored?.criteria)
+			? (stored.criteria as AssessmentCriterion[])
+			: [];
+		const f = readPolicyFields(form, priorCriteria);
 		const r = dispatch('EditAssurancePolicy', 'ASSURANCE_POLICY', policyId, {
 			policyId,
 			...(f.name ? { name: f.name } : {}),

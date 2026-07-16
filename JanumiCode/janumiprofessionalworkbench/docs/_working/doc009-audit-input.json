@@ -1,0 +1,1076 @@
+[
+ {
+  "file": "m1-object-fields.json",
+  "subject": "/objects[1]/fields[14]",
+  "key": "note",
+  "text": "DOC-002 §7.1 only; ABSENT from DOC-007 §11.1 serialized. Retained (optional) per union rule — OPEN ITEM."
+ },
+ {
+  "file": "m1-object-fields.json",
+  "subject": "/objects[1]/fields[15]",
+  "key": "note",
+  "text": "DOC-002 §7.1 only; ABSENT from DOC-007 §11.1. Retained (optional) — OPEN ITEM."
+ },
+ {
+  "file": "m1-object-fields.json",
+  "subject": "/objects[1]/fields[23]",
+  "key": "note",
+  "text": "DOC-002 §7.1 only; ABSENT from DOC-007 §11.1. Retained (optional) — OPEN ITEM."
+ },
+ {
+  "file": "m1-object-fields.json",
+  "subject": "/objects[3]/fields[3]",
+  "key": "note",
+  "text": "Helper undefined. OPEN ITEM: planned to unify with DOC-007 §18 ApplicabilityExpression (one DSL, ratify sheet C / M7)."
+ },
+ {
+  "file": "m1-object-fields.json",
+  "subject": "/objects[6]/fields[1]",
+  "key": "note",
+  "text": "Helper undefined in prose; common/artifact-reference.schema.json listed in DOC-007 §3."
+ },
+ {
+  "file": "m1-object-fields.json",
+  "subject": "/objects[8]/fields[10]",
+  "key": "note",
+  "text": "DOC-002 §18 only; ABSENT from DOC-007 §19 (likely superseded by event-envelope timestamps). OPEN ITEM: keep or drop."
+ },
+ {
+  "file": "m1-object-fields.json",
+  "subject": "/objects[8]/fields[11]",
+  "key": "note",
+  "text": "DOC-002 §18 only; ABSENT from DOC-007 §19. OPEN ITEM."
+ },
+ {
+  "file": "m1-object-fields.json",
+  "subject": "/objects[8]/fields[13]",
+  "key": "note",
+  "text": "DOC-002 §18 only; ABSENT from DOC-007 §19. Helper undefined. OPEN ITEM."
+ },
+ {
+  "file": "m1-object-fields.json",
+  "subject": "ARTIFACT",
+  "key": "note",
+  "text": "TRANSCRIBED from DOC-009 §18.1 on 2026-07-16, replacing 'UNSPECIFIED in BOTH DOC-002 and DOC-007 ... do not fabricate. OPEN ITEM.' That note was TRUE about DOC-002/DOC-007 and WRONG as a conclusion: it searched the meaning doc and the wire doc, never the STORAGE doc. DOC-009 §18.1 defines the artifacts table in full, and its primary key is 'references professional_work_objects(id)' — so at the ratified persistence plane the Artifact IS a Professional Work Object, carrying the envelope's semanticVersion. These 11 fields are that table, column-for-column; nothing here is designed. NOT ratified at the WIRE boundary: DOC-007 gives ARTIFACT no interface, no §5.2 id prefix, no command and no event, while THREE of its field types (outputArtifactIds, ArtifactReference, ArtifactRequirement) point at it — a dangling reference DOC-009 resolves and DOC-007 has not caught up to (§16 item 6, first-slice). Value domains deliberately left as string: DOC-009 types artifactType/status/securityClassification/retentionClass as bare 'text not null' with no CHECK constraint and no enum anywhere in the corpus. Inventing enum members here would be the fabrication the original note rightly forbade."
+ },
+ {
+  "file": "m1-object-fields.json",
+  "subject": "/helperSubTypes[12]/fields[0]",
+  "key": "note",
+  "text": "Referenced by Intent.desiredOutcomes; NOT field-defined in DOC-002 or DOC-007. Source TBD."
+ },
+ {
+  "file": "m1-object-fields.json",
+  "subject": "/helperSubTypes[13]/fields[0]",
+  "key": "note",
+  "text": "Referenced by Intent.successConditions; NOT field-defined in either doc. Source TBD."
+ },
+ {
+  "file": "m1-object-fields.json",
+  "subject": "/helperSubTypes[14]/fields[0]",
+  "key": "note",
+  "text": "Referenced by PWU.inputRequirements; NOT field-defined in either doc. Source TBD."
+ },
+ {
+  "file": "m1-object-fields.json",
+  "subject": "/helperSubTypes[15]/fields[0]",
+  "key": "note",
+  "text": "Referenced by PWU.expectedOutputs; NOT field-defined in either doc. Source TBD."
+ },
+ {
+  "file": "m1-object-fields.json",
+  "subject": "/helperSubTypes[16]/fields[0]",
+  "key": "note",
+  "text": "Referenced by Evidence.contentReference. common/artifact-reference.schema.json listed in DOC-007 §3 but not field-defined in prose; DOC-007 §39 requires allowlisted schemes. Source from schema file."
+ },
+ {
+  "file": "m1-object-fields.json",
+  "subject": "/helperSubTypes[17]/fields[0]",
+  "key": "note",
+  "text": "Referenced by Constraint.applicability (DOC-002 §11.1). NOT field-defined. OPEN ITEM: planned to unify with ApplicabilityExpression (§18) as one DSL (ratify sheet C / M7)."
+ },
+ {
+  "file": "m1-object-fields.json",
+  "subject": "/helperSubTypes[24]/fields[0]",
+  "key": "note",
+  "text": "Referenced by ExecutionPlan.retryPolicy (DOC-002 §20.1 / DOC-007 §15). NOT field-defined. Source TBD."
+ },
+ {
+  "file": "m1-object-fields.json",
+  "subject": "/helperSubTypes[25]/fields[0]",
+  "key": "note",
+  "text": "Referenced by ExecutionPlan.tacticalChangePolicy. NOT field-defined. Source TBD."
+ },
+ {
+  "file": "m1-object-fields.json",
+  "subject": "/helperSubTypes[26]/fields[0]",
+  "key": "note",
+  "text": "Referenced by ExecutionPlan.escalationPolicy (and DOC-002 AssurancePolicy §17.1). NOT field-defined. Distinct from AssurancePolicyDefinition.escalationRules (EscalationRule). Source TBD."
+ },
+ {
+  "file": "m1-object-fields.json",
+  "subject": "/helperSubTypes[27]/fields[0]",
+  "key": "note",
+  "text": "Referenced by ExecutionPlan.terminationPolicy. NOT field-defined. Source TBD."
+ },
+ {
+  "file": "m1-object-fields.json",
+  "subject": "/helperSubTypes[28]/fields[0]",
+  "key": "note",
+  "text": "Referenced by ExecutionPlan.transitions (embedded per DOC-007 §15) / transitionIds (DOC-002 §20.1). NOT field-defined (persistence: execution_transitions §31). Source TBD."
+ },
+ {
+  "file": "m1-object-fields.json",
+  "subject": "/helperSubTypes[29]/fields[0]",
+  "key": "note",
+  "text": "Referenced by RuntimeBinding.modelSelectionPolicy (DOC-002 §22). NOT field-defined. Source TBD."
+ },
+ {
+  "file": "m1-object-fields.json",
+  "subject": "/helperSubTypes[30]/fields[0]",
+  "key": "note",
+  "text": "Referenced by RuntimeBinding.requestedCapabilities. NOT field-defined (persistence: capability_requests §31). Source TBD."
+ },
+ {
+  "file": "m1-object-fields.json",
+  "subject": "/helperSubTypes[31]/fields[0]",
+  "key": "note",
+  "text": "Referenced by RuntimeBinding.grantedCapabilities. NOT field-defined (persistence: capability_grants §31). Source TBD."
+ },
+ {
+  "file": "m1-object-fields.json",
+  "subject": "/helperSubTypes[32]/fields[0]",
+  "key": "note",
+  "text": "Referenced by RuntimeBinding.sandboxPolicy. NOT field-defined. Source TBD."
+ },
+ {
+  "file": "m1-object-fields.json",
+  "subject": "/helperSubTypes[33]/fields[0]",
+  "key": "note",
+  "text": "Referenced by ExecutionStep.inputBindings (DOC-002 §21). NOT field-defined. Source TBD."
+ },
+ {
+  "file": "m1-object-fields.json",
+  "subject": "/helperSubTypes[34]/fields[0]",
+  "key": "note",
+  "text": "Referenced by ExecutionStep.outputBindings. NOT field-defined. Source TBD."
+ },
+ {
+  "file": "m1-object-fields.json",
+  "subject": "/helperSubTypes[35]/fields[0]",
+  "key": "note",
+  "text": "Referenced by ExecutionStep.preconditions/postconditions. NOT field-defined. Source TBD."
+ },
+ {
+  "file": "m1-object-fields.json",
+  "subject": "/helperSubTypes[36]/fields[0]",
+  "key": "note",
+  "text": "Referenced by AssurancePolicyDefinition.defaultClaimTemplates (DOC-007 §17). NOT field-defined. Source TBD."
+ },
+ {
+  "file": "m1-object-fields.json",
+  "subject": "/helperSubTypes[37]/fields[0]",
+  "key": "note",
+  "text": "Referenced by AssurancePolicyDefinition.requiredEvidence/optionalEvidence. policies/evidence-requirement.schema.json listed in DOC-007 §3; not field-defined in prose. DOC-004 §6.1 supplies cardinality (EvidenceCardinalitySchema) + requiredForDispositions (RequiredForDispositionsSchema) enums. Source from schema file."
+ },
+ {
+  "file": "m1-object-fields.json",
+  "subject": "/helperSubTypes[38]/fields[0]",
+  "key": "note",
+  "text": "Referenced by AssurancePolicyDefinition.criteria; results are CriterionResult (§20.1). NOT field-defined; DOC-004 §7 supplies criterionType/evaluationMethod/severityIfNotMet enums. Source TBD."
+ },
+ {
+  "file": "m1-object-fields.json",
+  "subject": "/helperSubTypes[39]/fields[0]",
+  "key": "note",
+  "text": "Referenced by AssurancePolicyDefinition.findingDefinitions. NOT field-defined; DOC-004 §9.1 supplies defaultSeverity (AssuranceSeveritySchema) + defaultControlActions (ControlActionSchema) + affectedClaimTypes (ClaimTypeSchema). Source TBD."
+ },
+ {
+  "file": "m1-object-fields.json",
+  "subject": "/helperSubTypes[40]/fields[0]",
+  "key": "note",
+  "text": "Referenced by AssurancePolicyDefinition.dispositionRules. policies/disposition-rule.schema.json listed in DOC-007 §3; not field-defined in prose. DOC-004 §10.2 supplies disposition (AssuranceDispositionRecommendationSchema) + requiredIndependence (IndependenceRequirementSchema). Source from schema file."
+ },
+ {
+  "file": "m1-object-fields.json",
+  "subject": "/helperSubTypes[41]/fields[0]",
+  "key": "note",
+  "text": "Referenced by AssurancePolicyDefinition.remediationRules. NOT field-defined. Source TBD."
+ },
+ {
+  "file": "m1-object-fields.json",
+  "subject": "/helperSubTypes[42]/fields[0]",
+  "key": "note",
+  "text": "Referenced by AssurancePolicyDefinition.escalationRules. NOT field-defined; DOC-004 §13 supplies escalationTarget (EscalationTargetSchema) + timeoutAction (ControlActionSchema). Distinct from ExecutionPlan.escalationPolicy. Source TBD."
+ },
+ {
+  "file": "m1-object-fields.json",
+  "subject": "/helperSubTypes[43]/fields[0]",
+  "key": "note",
+  "text": "Referenced by AssurancePolicyDefinition.waiverRules. NOT field-defined. Source TBD."
+ },
+ {
+  "file": "m1-object-fields.json",
+  "subject": "/helperSubTypes[44]/fields[0]",
+  "key": "note",
+  "text": "Referenced by AssuranceAssessment.rejectedEvidence (DOC-007 §19) and ValidatorResult.evidenceRejected (§20). NOT field-defined. Source TBD."
+ },
+ {
+  "file": "m1-object-fields.json",
+  "subject": "/helperSubTypes[46]/fields[0]",
+  "key": "note",
+  "text": "Referenced by AssuranceAssessment.confidence (DOC-002 §18 ONLY; absent from DOC-007 §19). NOT field-defined. OPEN ITEM (retain or drop)."
+ },
+ {
+  "file": "m1-object-fields.json",
+  "subject": "/helperSubTypes[47]/fields[0]",
+  "key": "note",
+  "text": "Referenced by ValidatorResult.executionProvenance (§20) and CompleteExecutionStep (§16.1). NOT field-defined; distinct from ProvenanceRecord (§7.1). Source TBD."
+ },
+ {
+  "file": "m1-object-fields.json",
+  "subject": "/helperSubTypes[48]/fields[0]",
+  "key": "note",
+  "text": "Referenced by ValidatorResult.claimResults (§20). NOT field-defined; likely related to CriterionResult (§20.1). Source TBD. (Validator-payload type, not referenced by any of the 17 objects.)"
+ },
+ {
+  "file": "m1-object-fields.json",
+  "subject": "/helperSubTypes[49]/fields[0]",
+  "key": "note",
+  "text": "Referenced by ValidatorResult.observations (§20). NOT field-defined; pre-persistence form of AssuranceObservation (§21). Source TBD. (Validator-payload type, not referenced by any of the 17 objects.)"
+ },
+ {
+  "file": "m1-object-fields.json",
+  "subject": "RESOLVED 2026-07-16 — ARTIFACT's fields were defined all along, in DOC-009 §18.1",
+  "key": "why",
+  "text": "This item read: 'ARTIFACT is one of the 17 ProfessionalWorkObjectType values but neither DOC-002 nor DOC-007 defines an ArtifactObject interface/schema ... Fields are to-be-designed; do not fabricate.' Every clause about DOC-002 and DOC-007 is true. The conclusion was false: the search stopped at the meaning doc and the wire doc and never opened the STORAGE doc. DOC-009 §18.1 'create table artifacts' defines all 11 columns, and its PK 'references professional_work_objects(id)' makes the Artifact a Professional Work Object with an envelope semanticVersion — which §18.3 then versions under supersession. The fields are now TRANSCRIBED from that table, not designed. WHAT REMAINS OPEN is narrower and belongs to DOC-007, not to the object: no ARTIFACT interface, no §5.2 id prefix ('art' is authored here; DOC-004 §… writes 'artifact_01J...'), no command, no event — even though outputArtifactIds/ArtifactReference/ArtifactRequirement all point at it. GENERALIZE THIS: 'unspecified — do not fabricate' notes in this vocab were written against DOC-002+DOC-007 only. DOC-009 is a ratified source and must be checked before any such note is trusted; the same blind spot produced a false blocker on §16 item 23 (execution_attempts, which DOC-009 §10.4 likewise defines in full)."
+ },
+ {
+  "file": "m1-object-fields.json",
+  "subject": "6 objects lack a DOC-007 serialized field contract",
+  "key": "why",
+  "text": "AMENDED 2026-07-16: ARTIFACT is no longer sourceless — DOC-009 §18.1 defines it (see the resolved item above). It still lacks a DOC-007 SERIALIZED contract, so it stays in this list, but the gap is now wire-only, not total. The other five remain DOC-002-prose-only; each should be re-checked against DOC-009's storage schema before being called unspecified. ORIGINAL: OBLIGATION, CONSTRAINT, DECOMPOSITION_CONTRACT, RECOMPOSITION_CONTRACT, RUNTIME_BINDING (and ARTIFACT) have no field-level definition in the latest serialized contract (DOC-007). CONSTRAINT + RUNTIME_BINDING have schema FILES listed in DOC-007 §3 but no prose; the others have neither. All are sourced from DOC-002 prose and need serialization before codegen. Their enums (ObligationType/Strength/Status, ConstraintType/Strength/Status, CoverageType, DecompositionContractStatus, RecompositionContractStatus, AuthorizationStatus, StepType/State) exist but have no wired consumer field yet."
+ },
+ {
+  "file": "m1-object-fields.json",
+  "subject": "~40 helper sub-types are referenced but not field-defined",
+  "key": "item",
+  "text": "~40 helper sub-types are referenced but not field-defined"
+ },
+ {
+  "file": "m3-commands-events.json",
+  "subject": "ChangePwuState",
+  "key": "sourceSection",
+  "text": "UNRATIFIED-AUTHORED (annotated 2026-07-16 under sponsor grant): DOC-007 schematizes NO interface for this, so these fields were AUTHORED, not derived. The citation below NAMES this command/event but defines no fields (DOC-002 §26.x/§34.x are bare name lists; §16 item 6: DOC-007's first slice deliberately leaves the granular vocabulary unschematized). Do NOT treat this sourceSection as proof the shape is ratified. Ratification pending. Cited: DOC-007 §32 (no DOC-002 counterpart)"
+ },
+ {
+  "file": "m3-commands-events.json",
+  "subject": "ApproveExecutionPlan",
+  "key": "sourceSection",
+  "text": "UNRATIFIED-AUTHORED (annotated 2026-07-16 under sponsor grant): DOC-007 schematizes NO interface for this, so these fields were AUTHORED, not derived. The citation below NAMES this command/event but defines no fields (DOC-002 §26.x/§34.x are bare name lists; §16 item 6: DOC-007's first slice deliberately leaves the granular vocabulary unschematized). Do NOT treat this sourceSection as proof the shape is ratified. Ratification pending. Cited: DOC-007 §32/§33 (payload from DOC-002 §34.3)"
+ },
+ {
+  "file": "m3-commands-events.json",
+  "subject": "StartExecutionStep",
+  "key": "sourceSection",
+  "text": "UNRATIFIED-AUTHORED (annotated 2026-07-16 under sponsor grant): DOC-007 schematizes NO interface for this, so these fields were AUTHORED, not derived. The citation below NAMES this command/event but defines no fields (DOC-002 §26.x/§34.x are bare name lists; §16 item 6: DOC-007's first slice deliberately leaves the granular vocabulary unschematized). Do NOT treat this sourceSection as proof the shape is ratified. Ratification pending. Cited: DOC-007 §32/§33 (payload from DOC-002 §34.3; DOC-007 from=PENDING)"
+ },
+ {
+  "file": "m3-commands-events.json",
+  "subject": "FailExecutionStep",
+  "key": "sourceSection",
+  "text": "UNRATIFIED-AUTHORED (annotated 2026-07-16 under sponsor grant): DOC-007 schematizes NO interface for this, so these fields were AUTHORED, not derived. The citation below NAMES this command/event but defines no fields (DOC-002 §26.x/§34.x are bare name lists; §16 item 6: DOC-007's first slice deliberately leaves the granular vocabulary unschematized). Do NOT treat this sourceSection as proof the shape is ratified. Ratification pending. Cited: DOC-007 §32/§33 (payload from DOC-002 §34.3)"
+ },
+ {
+  "file": "m3-commands-events.json",
+  "subject": "DetectAssumption",
+  "key": "sourceSection",
+  "text": "UNRATIFIED-AUTHORED (annotated 2026-07-16 under sponsor grant): DOC-007 schematizes NO interface for this, so these fields were AUTHORED, not derived. The citation below NAMES this command/event but defines no fields (DOC-002 §26.x/§34.x are bare name lists; §16 item 6: DOC-007's first slice deliberately leaves the granular vocabulary unschematized). Do NOT treat this sourceSection as proof the shape is ratified. Ratification pending. Cited: DOC-007 §32 (drivesTo=DISCLOSED in DOC-007; DOC-002 §26.3 uses PROPOSED)"
+ },
+ {
+  "file": "m3-commands-events.json",
+  "subject": "AssertClaim",
+  "key": "sourceSection",
+  "text": "UNRATIFIED-AUTHORED (annotated 2026-07-16 under sponsor grant): DOC-007 schematizes NO interface for this, so these fields were AUTHORED, not derived. The citation below NAMES this command/event but defines no fields (DOC-002 §26.x/§34.x are bare name lists; §16 item 6: DOC-007's first slice deliberately leaves the granular vocabulary unschematized). Do NOT treat this sourceSection as proof the shape is ratified. Ratification pending. Cited: DOC-007 §32 (payload from DOC-002 §34.2)"
+ },
+ {
+  "file": "m3-commands-events.json",
+  "subject": "RecordAssuranceObservation",
+  "key": "sourceSection",
+  "text": "UNRATIFIED-AUTHORED (annotated 2026-07-16 under sponsor grant): DOC-007 schematizes NO interface for this, so these fields were AUTHORED, not derived. The citation below NAMES this command/event but defines no fields (DOC-002 §26.x/§34.x are bare name lists; §16 item 6: DOC-007's first slice deliberately leaves the granular vocabulary unschematized). Do NOT treat this sourceSection as proof the shape is ratified. Ratification pending. Cited: DOC-007 §32 (payload from DOC-002 §34.2; DOC-002 targetAggregate=AssuranceAssessment)"
+ },
+ {
+  "file": "m3-commands-events.json",
+  "subject": "ProposeDecision",
+  "key": "sourceSection",
+  "text": "UNRATIFIED-AUTHORED (annotated 2026-07-16 under sponsor grant): DOC-007 schematizes NO interface for this, so these fields were AUTHORED, not derived. The citation below NAMES this command/event but defines no fields (DOC-002 §26.x/§34.x are bare name lists; §16 item 6: DOC-007's first slice deliberately leaves the granular vocabulary unschematized). Do NOT treat this sourceSection as proof the shape is ratified. Ratification pending. Cited: DOC-007 §32/§33 (payload from DOC-002 §34.4)"
+ },
+ {
+  "file": "m3-commands-events.json",
+  "subject": "CreateBaseline",
+  "key": "sourceSection",
+  "text": "UNRATIFIED-AUTHORED (annotated 2026-07-16 under sponsor grant): DOC-007 schematizes NO interface for this, so these fields were AUTHORED, not derived. The citation below NAMES this command/event but defines no fields (DOC-002 §26.x/§34.x are bare name lists; §16 item 6: DOC-007's first slice deliberately leaves the granular vocabulary unschematized). Do NOT treat this sourceSection as proof the shape is ratified. Ratification pending. Cited: DOC-007 §32/§33 (no createBaseline in DOC-002 §34; event DOC-002 §26.6)"
+ },
+ {
+  "file": "m3-commands-events.json",
+  "subject": "ReviseIntent",
+  "key": "sourceSection",
+  "text": "UNRATIFIED-AUTHORED (annotated 2026-07-16 under sponsor grant): DOC-007 schematizes NO interface for this, so these fields were AUTHORED, not derived. The citation below NAMES this command/event but defines no fields (DOC-002 §26.x/§34.x are bare name lists; §16 item 6: DOC-007's first slice deliberately leaves the granular vocabulary unschematized). Do NOT treat this sourceSection as proof the shape is ratified. Ratification pending. Cited: DOC-002 §34.1 (reviseIntent)"
+ },
+ {
+  "file": "m3-commands-events.json",
+  "subject": "ChallengePwu",
+  "key": "sourceSection",
+  "text": "UNRATIFIED-AUTHORED (annotated 2026-07-16 under sponsor grant): DOC-007 schematizes NO interface for this, so these fields were AUTHORED, not derived. The citation below NAMES this command/event but defines no fields (DOC-002 §26.x/§34.x are bare name lists; §16 item 6: DOC-007's first slice deliberately leaves the granular vocabulary unschematized). Do NOT treat this sourceSection as proof the shape is ratified. Ratification pending. Cited: DOC-002 §34.1 (challengePwu)"
+ },
+ {
+  "file": "m3-commands-events.json",
+  "subject": "ReshapePwu",
+  "key": "sourceSection",
+  "text": "UNRATIFIED-AUTHORED (annotated 2026-07-16 under sponsor grant): DOC-007 schematizes NO interface for this, so these fields were AUTHORED, not derived. The citation below NAMES this command/event but defines no fields (DOC-002 §26.x/§34.x are bare name lists; §16 item 6: DOC-007's first slice deliberately leaves the granular vocabulary unschematized). Do NOT treat this sourceSection as proof the shape is ratified. Ratification pending. Cited: DOC-002 §34.1 (reshapePwu)"
+ },
+ {
+  "file": "m3-commands-events.json",
+  "subject": "InvalidatePwu",
+  "key": "sourceSection",
+  "text": "UNRATIFIED-AUTHORED (annotated 2026-07-16 under sponsor grant): DOC-007 schematizes NO interface for this, so these fields were AUTHORED, not derived. The citation below NAMES this command/event but defines no fields (DOC-002 §26.x/§34.x are bare name lists; §16 item 6: DOC-007's first slice deliberately leaves the granular vocabulary unschematized). Do NOT treat this sourceSection as proof the shape is ratified. Ratification pending. Cited: DOC-002 §34.1 (invalidatePwu)"
+ },
+ {
+  "file": "m3-commands-events.json",
+  "subject": "SupersedePwu",
+  "key": "sourceSection",
+  "text": "UNRATIFIED-AUTHORED (annotated 2026-07-16 under sponsor grant): DOC-007 schematizes NO interface for this, so these fields were AUTHORED, not derived. The citation below NAMES this command/event but defines no fields (DOC-002 §26.x/§34.x are bare name lists; §16 item 6: DOC-007's first slice deliberately leaves the granular vocabulary unschematized). Do NOT treat this sourceSection as proof the shape is ratified. Ratification pending. Cited: DOC-002 §34.1 (supersedePwu)"
+ },
+ {
+  "file": "m3-commands-events.json",
+  "subject": "ProposeDecomposition",
+  "key": "sourceSection",
+  "text": "UNRATIFIED-AUTHORED (annotated 2026-07-16 under sponsor grant): DOC-007 schematizes NO interface for this, so these fields were AUTHORED, not derived. The citation below NAMES this command/event but defines no fields (DOC-002 §26.x/§34.x are bare name lists; §16 item 6: DOC-007's first slice deliberately leaves the granular vocabulary unschematized). Do NOT treat this sourceSection as proof the shape is ratified. Ratification pending. Cited: DOC-002 §34.1 (proposeDecomposition)"
+ },
+ {
+  "file": "m3-commands-events.json",
+  "subject": "ValidateDecomposition",
+  "key": "sourceSection",
+  "text": "UNRATIFIED-AUTHORED (annotated 2026-07-16 under sponsor grant): DOC-007 schematizes NO interface for this, so these fields were AUTHORED, not derived. The citation below NAMES this command/event but defines no fields (DOC-002 §26.x/§34.x are bare name lists; §16 item 6: DOC-007's first slice deliberately leaves the granular vocabulary unschematized). Do NOT treat this sourceSection as proof the shape is ratified. Ratification pending. Cited: DOC-002 §34.1 (validateDecomposition)"
+ },
+ {
+  "file": "m3-commands-events.json",
+  "subject": "ReviseDecomposition",
+  "key": "sourceSection",
+  "text": "UNRATIFIED-AUTHORED (annotated 2026-07-16 under sponsor grant): DOC-007 schematizes NO interface for this, so these fields were AUTHORED, not derived. The citation below NAMES this command/event but defines no fields (DOC-002 §26.x/§34.x are bare name lists; §16 item 6: DOC-007's first slice deliberately leaves the granular vocabulary unschematized). Do NOT treat this sourceSection as proof the shape is ratified. Ratification pending. Cited: DOC-002 §34.1 (reviseDecomposition)"
+ },
+ {
+  "file": "m3-commands-events.json",
+  "subject": "BeginRecomposition",
+  "key": "sourceSection",
+  "text": "UNRATIFIED-AUTHORED (annotated 2026-07-16 under sponsor grant): DOC-007 schematizes NO interface for this, so these fields were AUTHORED, not derived. The citation below NAMES this command/event but defines no fields (DOC-002 §26.x/§34.x are bare name lists; §16 item 6: DOC-007's first slice deliberately leaves the granular vocabulary unschematized). Do NOT treat this sourceSection as proof the shape is ratified. Ratification pending. Cited: DOC-002 §34.1 (beginRecomposition)"
+ },
+ {
+  "file": "m3-commands-events.json",
+  "subject": "CompleteRecomposition",
+  "key": "sourceSection",
+  "text": "UNRATIFIED-AUTHORED (annotated 2026-07-16 under sponsor grant): DOC-007 schematizes NO interface for this, so these fields were AUTHORED, not derived. The citation below NAMES this command/event but defines no fields (DOC-002 §26.x/§34.x are bare name lists; §16 item 6: DOC-007's first slice deliberately leaves the granular vocabulary unschematized). Do NOT treat this sourceSection as proof the shape is ratified. Ratification pending. Cited: DOC-002 §34.1 (completeRecomposition)"
+ },
+ {
+  "file": "m3-commands-events.json",
+  "subject": "InvalidateEvidence",
+  "key": "sourceSection",
+  "text": "UNRATIFIED-AUTHORED (annotated 2026-07-16 under sponsor grant): DOC-007 schematizes NO interface for this, so these fields were AUTHORED, not derived. The citation below NAMES this command/event but defines no fields (DOC-002 §26.x/§34.x are bare name lists; §16 item 6: DOC-007's first slice deliberately leaves the granular vocabulary unschematized). Do NOT treat this sourceSection as proof the shape is ratified. Ratification pending. Cited: DOC-002 §34.2 (invalidateEvidence)"
+ },
+ {
+  "file": "m3-commands-events.json",
+  "subject": "GrantWaiver",
+  "key": "sourceSection",
+  "text": "UNRATIFIED-AUTHORED (annotated 2026-07-16 under sponsor grant): DOC-007 schematizes NO interface for this, so these fields were AUTHORED, not derived. The citation below NAMES this command/event but defines no fields (DOC-002 §26.x/§34.x are bare name lists; §16 item 6: DOC-007's first slice deliberately leaves the granular vocabulary unschematized). Do NOT treat this sourceSection as proof the shape is ratified. Ratification pending. Cited: DOC-002 §34.2 (grantWaiver)"
+ },
+ {
+  "file": "m3-commands-events.json",
+  "subject": "DenyWaiver",
+  "key": "sourceSection",
+  "text": "UNRATIFIED-AUTHORED (annotated 2026-07-16 under sponsor grant): DOC-007 schematizes NO interface for this, so these fields were AUTHORED, not derived. The citation below NAMES this command/event but defines no fields (DOC-002 §26.x/§34.x are bare name lists; §16 item 6: DOC-007's first slice deliberately leaves the granular vocabulary unschematized). Do NOT treat this sourceSection as proof the shape is ratified. Ratification pending. Cited: DOC-002 §34.2 (denyWaiver)"
+ },
+ {
+  "file": "m3-commands-events.json",
+  "subject": "RetryExecutionStep",
+  "key": "sourceSection",
+  "text": "UNRATIFIED-AUTHORED (annotated 2026-07-16 under sponsor grant): DOC-007 schematizes NO interface for this, so these fields were AUTHORED, not derived. The citation below NAMES this command/event but defines no fields (DOC-002 §26.x/§34.x are bare name lists; §16 item 6: DOC-007's first slice deliberately leaves the granular vocabulary unschematized). Do NOT treat this sourceSection as proof the shape is ratified. Ratification pending. Cited: DOC-002 §34.3 (retryExecutionStep)"
+ },
+ {
+  "file": "m3-commands-events.json",
+  "subject": "ApplyTacticalChange",
+  "key": "sourceSection",
+  "text": "UNRATIFIED-AUTHORED (annotated 2026-07-16 under sponsor grant): DOC-007 schematizes NO interface for this, so these fields were AUTHORED, not derived. The citation below NAMES this command/event but defines no fields (DOC-002 §26.x/§34.x are bare name lists; §16 item 6: DOC-007's first slice deliberately leaves the granular vocabulary unschematized). Do NOT treat this sourceSection as proof the shape is ratified. Ratification pending. Cited: DOC-002 §34.3 (applyTacticalChange)"
+ },
+ {
+  "file": "m3-commands-events.json",
+  "subject": "CancelExecutionPlan",
+  "key": "sourceSection",
+  "text": "UNRATIFIED-AUTHORED (annotated 2026-07-16 under sponsor grant): DOC-007 schematizes NO interface for this, so these fields were AUTHORED, not derived. The citation below NAMES this command/event but defines no fields (DOC-002 §26.x/§34.x are bare name lists; §16 item 6: DOC-007's first slice deliberately leaves the granular vocabulary unschematized). Do NOT treat this sourceSection as proof the shape is ratified. Ratification pending. Cited: DOC-002 §34.3 (cancelExecutionPlan)"
+ },
+ {
+  "file": "m3-commands-events.json",
+  "subject": "RevokeDecision",
+  "key": "sourceSection",
+  "text": "UNRATIFIED-AUTHORED (annotated 2026-07-16 under sponsor grant): DOC-007 schematizes NO interface for this, so these fields were AUTHORED, not derived. The citation below NAMES this command/event but defines no fields (DOC-002 §26.x/§34.x are bare name lists; §16 item 6: DOC-007's first slice deliberately leaves the granular vocabulary unschematized). Do NOT treat this sourceSection as proof the shape is ratified. Ratification pending. Cited: DOC-002 §34.4 (revokeDecision)"
+ },
+ {
+  "file": "m3-commands-events.json",
+  "subject": "SupersedeBaseline",
+  "key": "sourceSection",
+  "text": "UNRATIFIED-AUTHORED (annotated 2026-07-16 under sponsor grant): DOC-007 schematizes NO interface for this, so these fields were AUTHORED, not derived. The citation below NAMES this command/event but defines no fields (DOC-002 §26.x/§34.x are bare name lists; §16 item 6: DOC-007's first slice deliberately leaves the granular vocabulary unschematized). Do NOT treat this sourceSection as proof the shape is ratified. Ratification pending. Cited: DOC-002 §34.4 (supersedeBaseline)"
+ },
+ {
+  "file": "m3-commands-events.json",
+  "subject": "ProvisionIntent",
+  "key": "sourceSection",
+  "text": "UNRATIFIED-AUTHORED (annotated 2026-07-16 under sponsor grant): DOC-007 schematizes NO interface for this, so these fields were AUTHORED, not derived. The citation below NAMES this command/event but defines no fields (DOC-002 §26.x/§34.x are bare name lists; §16 item 6: DOC-007's first slice deliberately leaves the granular vocabulary unschematized). Do NOT treat this sourceSection as proof the shape is ratified. Ratification pending. Cited: DOC-002 §6.1 (create provisional intent); event IntentProvisioned added (no §26.2 name) — see OPEN-QUESTIONS"
+ },
+ {
+  "file": "m3-commands-events.json",
+  "subject": "ApproveBaseline",
+  "key": "sourceSection",
+  "text": "UNRATIFIED-AUTHORED (annotated 2026-07-16 under sponsor grant): DOC-007 schematizes NO interface for this, so these fields were AUTHORED, not derived. The citation below NAMES this command/event but defines no fields (DOC-002 §26.x/§34.x are bare name lists; §16 item 6: DOC-007's first slice deliberately leaves the granular vocabulary unschematized). Do NOT treat this sourceSection as proof the shape is ratified. Ratification pending. Cited: DOC-002 §24.1 (event exists §26.6); command added for live command-drive"
+ },
+ {
+  "file": "m3-commands-events.json",
+  "subject": "RequestRuntimeBinding",
+  "key": "sourceSection",
+  "text": "UNRATIFIED-AUTHORED (annotated 2026-07-16 under sponsor grant): DOC-007 schematizes NO interface for this, so these fields were AUTHORED, not derived. The citation below NAMES this command/event but defines no fields (DOC-002 §26.x/§34.x are bare name lists; §16 item 6: DOC-007's first slice deliberately leaves the granular vocabulary unschematized). Do NOT treat this sourceSection as proof the shape is ratified. Ratification pending. Cited: DOC-002 §22 (event §26.4); command added for live command-drive"
+ },
+ {
+  "file": "m3-commands-events.json",
+  "subject": "AuthorizeRuntimeBinding",
+  "key": "sourceSection",
+  "text": "UNRATIFIED-AUTHORED (annotated 2026-07-16 under sponsor grant): DOC-007 schematizes NO interface for this, so these fields were AUTHORED, not derived. The citation below NAMES this command/event but defines no fields (DOC-002 §26.x/§34.x are bare name lists; §16 item 6: DOC-007's first slice deliberately leaves the granular vocabulary unschematized). Do NOT treat this sourceSection as proof the shape is ratified. Ratification pending. Cited: DOC-002 §22 (event §26.4)"
+ },
+ {
+  "file": "m3-commands-events.json",
+  "subject": "DenyRuntimeBinding",
+  "key": "sourceSection",
+  "text": "UNRATIFIED-AUTHORED (annotated 2026-07-16 under sponsor grant): DOC-007 schematizes NO interface for this, so these fields were AUTHORED, not derived. The citation below NAMES this command/event but defines no fields (DOC-002 §26.x/§34.x are bare name lists; §16 item 6: DOC-007's first slice deliberately leaves the granular vocabulary unschematized). Do NOT treat this sourceSection as proof the shape is ratified. Ratification pending. Cited: DOC-002 §22 (event §26.4)"
+ },
+ {
+  "file": "m3-commands-events.json",
+  "subject": "RevokeRuntimeCapability",
+  "key": "sourceSection",
+  "text": "UNRATIFIED-AUTHORED (annotated 2026-07-16 under sponsor grant): DOC-007 schematizes NO interface for this, so these fields were AUTHORED, not derived. The citation below NAMES this command/event but defines no fields (DOC-002 §26.x/§34.x are bare name lists; §16 item 6: DOC-007's first slice deliberately leaves the granular vocabulary unschematized). Do NOT treat this sourceSection as proof the shape is ratified. Ratification pending. Cited: DOC-002 §22 (event §26.4)"
+ },
+ {
+  "file": "m3-commands-events.json",
+  "subject": "CreatePwa",
+  "key": "sourceSection",
+  "text": "UNRATIFIED-AUTHORED (annotated 2026-07-16 under sponsor grant): DOC-007 schematizes NO interface for this, so these fields were AUTHORED, not derived. The citation below NAMES this command/event but defines no fields (DOC-002 §26.x/§34.x are bare name lists; §16 item 6: DOC-007's first slice deliberately leaves the granular vocabulary unschematized). Do NOT treat this sourceSection as proof the shape is ratified. Ratification pending. Cited: RPH-DOC-010 §4.1/§20"
+ },
+ {
+  "file": "m3-commands-events.json",
+  "subject": "DefinePwuType",
+  "key": "sourceSection",
+  "text": "UNRATIFIED-AUTHORED (annotated 2026-07-16 under sponsor grant): DOC-007 schematizes NO interface for this, so these fields were AUTHORED, not derived. The citation below NAMES this command/event but defines no fields (DOC-002 §26.x/§34.x are bare name lists; §16 item 6: DOC-007's first slice deliberately leaves the granular vocabulary unschematized). Do NOT treat this sourceSection as proof the shape is ratified. Ratification pending. Cited: RPH-DOC-010 §11/§12"
+ },
+ {
+  "file": "m3-commands-events.json",
+  "subject": "PublishPwa",
+  "key": "sourceSection",
+  "text": "UNRATIFIED-AUTHORED (annotated 2026-07-16 under sponsor grant): DOC-007 schematizes NO interface for this, so these fields were AUTHORED, not derived. The citation below NAMES this command/event but defines no fields (DOC-002 §26.x/§34.x are bare name lists; §16 item 6: DOC-007's first slice deliberately leaves the granular vocabulary unschematized). Do NOT treat this sourceSection as proof the shape is ratified. Ratification pending. Cited: RPH-DOC-010 §20"
+ },
+ {
+  "file": "m3-commands-events.json",
+  "subject": "DeletePwa",
+  "key": "sourceSection",
+  "text": "UNRATIFIED-AUTHORED (annotated 2026-07-16 under sponsor grant): DOC-007 schematizes NO interface for this, so these fields were AUTHORED, not derived. The citation below NAMES this command/event but defines no fields (DOC-002 §26.x/§34.x are bare name lists; §16 item 6: DOC-007's first slice deliberately leaves the granular vocabulary unschematized). Do NOT treat this sourceSection as proof the shape is ratified. Ratification pending. Cited: RPH-DOC-010 §20 — discard/soft-delete a PWA that is not in use"
+ },
+ {
+  "file": "m3-commands-events.json",
+  "subject": "CreateUndertaking",
+  "key": "sourceSection",
+  "text": "UNRATIFIED-AUTHORED (annotated 2026-07-16 under sponsor grant): DOC-007 schematizes NO interface for this, so these fields were AUTHORED, not derived. The citation below NAMES this command/event but defines no fields (DOC-002 §26.x/§34.x are bare name lists; §16 item 6: DOC-007's first slice deliberately leaves the granular vocabulary unschematized). Do NOT treat this sourceSection as proof the shape is ratified. Ratification pending. Cited: RPH-DOC-010 §22/§42"
+ },
+ {
+  "file": "m3-commands-events.json",
+  "subject": "EditPwa",
+  "key": "sourceSection",
+  "text": "UNRATIFIED-AUTHORED (annotated 2026-07-16 under sponsor grant): DOC-007 schematizes NO interface for this, so these fields were AUTHORED, not derived. The citation below NAMES this command/event but defines no fields (DOC-002 §26.x/§34.x are bare name lists; §16 item 6: DOC-007's first slice deliberately leaves the granular vocabulary unschematized). Do NOT treat this sourceSection as proof the shape is ratified. Ratification pending. Cited: RPH-DOC-010 §11/§20 — DRAFT-only metadata edit"
+ },
+ {
+  "file": "m3-commands-events.json",
+  "subject": "EditPwuType",
+  "key": "sourceSection",
+  "text": "UNRATIFIED-AUTHORED (annotated 2026-07-16 under sponsor grant): DOC-007 schematizes NO interface for this, so these fields were AUTHORED, not derived. The citation below NAMES this command/event but defines no fields (DOC-002 §26.x/§34.x are bare name lists; §16 item 6: DOC-007's first slice deliberately leaves the granular vocabulary unschematized). Do NOT treat this sourceSection as proof the shape is ratified. Ratification pending. Cited: RPH-DOC-010 §11/§39 — DRAFT-only PWU Type edit"
+ },
+ {
+  "file": "m3-commands-events.json",
+  "subject": "RemovePwuType",
+  "key": "sourceSection",
+  "text": "UNRATIFIED-AUTHORED (annotated 2026-07-16 under sponsor grant): DOC-007 schematizes NO interface for this, so these fields were AUTHORED, not derived. The citation below NAMES this command/event but defines no fields (DOC-002 §26.x/§34.x are bare name lists; §16 item 6: DOC-007's first slice deliberately leaves the granular vocabulary unschematized). Do NOT treat this sourceSection as proof the shape is ratified. Ratification pending. Cited: RPH-DOC-010 §11/§39 — DRAFT-only PWU Type removal (tombstone)"
+ },
+ {
+  "file": "m3-commands-events.json",
+  "subject": "AppendConversationEntries",
+  "key": "sourceSection",
+  "text": "UNRATIFIED-AUTHORED (annotated 2026-07-16 under sponsor grant): DOC-007 schematizes NO interface for this, so these fields were AUTHORED, not derived. The citation below NAMES this command/event but defines no fields (DOC-002 §26.x/§34.x are bare name lists; §16 item 6: DOC-007's first slice deliberately leaves the granular vocabulary unschematized). Do NOT treat this sourceSection as proof the shape is ratified. Ratification pending. Cited: RPH-DOC-010 — authoring conversation transcript (governed-stream precursor)"
+ },
+ {
+  "file": "m3-commands-events.json",
+  "subject": "SuspendAssurancePolicy",
+  "key": "sourceSection",
+  "text": "UNRATIFIED-AUTHORED (annotated 2026-07-16 under sponsor grant): DOC-007 schematizes NO interface for this, so these fields were AUTHORED, not derived. The citation below NAMES this command/event but defines no fields (DOC-002 §26.x/§34.x are bare name lists; §16 item 6: DOC-007's first slice deliberately leaves the granular vocabulary unschematized). Do NOT treat this sourceSection as proof the shape is ratified. Ratification pending. Cited: guide §8.9 / assurance §3.1 — temporarily disable a policy (ACTIVE -> SUSPENDED); it stops applying until resumed. Floor policies reject this."
+ },
+ {
+  "file": "m3-commands-events.json",
+  "subject": "ActivateAssurancePolicy",
+  "key": "sourceSection",
+  "text": "UNRATIFIED-AUTHORED (annotated 2026-07-16 under sponsor grant): DOC-007 schematizes NO interface for this, so these fields were AUTHORED, not derived. The citation below NAMES this command/event but defines no fields (DOC-002 §26.x/§34.x are bare name lists; §16 item 6: DOC-007's first slice deliberately leaves the granular vocabulary unschematized). Do NOT treat this sourceSection as proof the shape is ratified. Ratification pending. Cited: guide §8.9 / assurance §3.1 — put a policy into force (DRAFT|SUSPENDED -> ACTIVE)."
+ },
+ {
+  "file": "m3-commands-events.json",
+  "subject": "AssumptionAccepted",
+  "key": "sourceSection",
+  "text": "UNRATIFIED-AUTHORED (annotated 2026-07-16 under sponsor grant): DOC-007 schematizes NO interface for this, so these fields were AUTHORED, not derived. The citation below NAMES this command/event but defines no fields (DOC-002 §26.x/§34.x are bare name lists; §16 item 6: DOC-007's first slice deliberately leaves the granular vocabulary unschematized). Do NOT treat this sourceSection as proof the shape is ratified. Ratification pending. Cited: DOC-002 §26.3"
+ },
+ {
+  "file": "m3-commands-events.json",
+  "subject": "AssumptionDisclosed",
+  "key": "sourceSection",
+  "text": "UNRATIFIED-AUTHORED (annotated 2026-07-16 under sponsor grant): DOC-007 schematizes NO interface for this, so these fields were AUTHORED, not derived. The citation below NAMES this command/event but defines no fields (DOC-002 §26.x/§34.x are bare name lists; §16 item 6: DOC-007's first slice deliberately leaves the granular vocabulary unschematized). Do NOT treat this sourceSection as proof the shape is ratified. Ratification pending. Cited: DOC-002 §26.3"
+ },
+ {
+  "file": "m3-commands-events.json",
+  "subject": "AssumptionExpired",
+  "key": "sourceSection",
+  "text": "UNRATIFIED-AUTHORED (annotated 2026-07-16 under sponsor grant): DOC-007 schematizes NO interface for this, so these fields were AUTHORED, not derived. The citation below NAMES this command/event but defines no fields (DOC-002 §26.x/§34.x are bare name lists; §16 item 6: DOC-007's first slice deliberately leaves the granular vocabulary unschematized). Do NOT treat this sourceSection as proof the shape is ratified. Ratification pending. Cited: DOC-002 §26.3"
+ },
+ {
+  "file": "m3-commands-events.json",
+  "subject": "AssumptionVerificationStarted",
+  "key": "sourceSection",
+  "text": "UNRATIFIED-AUTHORED (annotated 2026-07-16 under sponsor grant): DOC-007 schematizes NO interface for this, so these fields were AUTHORED, not derived. The citation below NAMES this command/event but defines no fields (DOC-002 §26.x/§34.x are bare name lists; §16 item 6: DOC-007's first slice deliberately leaves the granular vocabulary unschematized). Do NOT treat this sourceSection as proof the shape is ratified. Ratification pending. Cited: DOC-002 §26.3"
+ },
+ {
+  "file": "m3-commands-events.json",
+  "subject": "AssumptionVerified",
+  "key": "sourceSection",
+  "text": "UNRATIFIED-AUTHORED (annotated 2026-07-16 under sponsor grant): DOC-007 schematizes NO interface for this, so these fields were AUTHORED, not derived. The citation below NAMES this command/event but defines no fields (DOC-002 §26.x/§34.x are bare name lists; §16 item 6: DOC-007's first slice deliberately leaves the granular vocabulary unschematized). Do NOT treat this sourceSection as proof the shape is ratified. Ratification pending. Cited: DOC-002 §26.3"
+ },
+ {
+  "file": "m3-commands-events.json",
+  "subject": "AssuranceAssessmentConditionallySatisfied",
+  "key": "sourceSection",
+  "text": "UNRATIFIED-AUTHORED (annotated 2026-07-16 under sponsor grant): DOC-007 schematizes NO interface for this, so these fields were AUTHORED, not derived. The citation below NAMES this command/event but defines no fields (DOC-002 §26.x/§34.x are bare name lists; §16 item 6: DOC-007's first slice deliberately leaves the granular vocabulary unschematized). Do NOT treat this sourceSection as proof the shape is ratified. Ratification pending. Cited: DOC-002 §26.5"
+ },
+ {
+  "file": "m3-commands-events.json",
+  "subject": "AssuranceAssessmentEscalated",
+  "key": "sourceSection",
+  "text": "UNRATIFIED-AUTHORED (annotated 2026-07-16 under sponsor grant): DOC-007 schematizes NO interface for this, so these fields were AUTHORED, not derived. The citation below NAMES this command/event but defines no fields (DOC-002 §26.x/§34.x are bare name lists; §16 item 6: DOC-007's first slice deliberately leaves the granular vocabulary unschematized). Do NOT treat this sourceSection as proof the shape is ratified. Ratification pending. Cited: DOC-002 §26.5"
+ },
+ {
+  "file": "m3-commands-events.json",
+  "subject": "AssuranceAssessmentInconclusive",
+  "key": "sourceSection",
+  "text": "UNRATIFIED-AUTHORED (annotated 2026-07-16 under sponsor grant): DOC-007 schematizes NO interface for this, so these fields were AUTHORED, not derived. The citation below NAMES this command/event but defines no fields (DOC-002 §26.x/§34.x are bare name lists; §16 item 6: DOC-007's first slice deliberately leaves the granular vocabulary unschematized). Do NOT treat this sourceSection as proof the shape is ratified. Ratification pending. Cited: DOC-002 §26.5"
+ },
+ {
+  "file": "m3-commands-events.json",
+  "subject": "AssuranceAssessmentRejected",
+  "key": "sourceSection",
+  "text": "UNRATIFIED-AUTHORED (annotated 2026-07-16 under sponsor grant): DOC-007 schematizes NO interface for this, so these fields were AUTHORED, not derived. The citation below NAMES this command/event but defines no fields (DOC-002 §26.x/§34.x are bare name lists; §16 item 6: DOC-007's first slice deliberately leaves the granular vocabulary unschematized). Do NOT treat this sourceSection as proof the shape is ratified. Ratification pending. Cited: DOC-002 §26.5"
+ },
+ {
+  "file": "m3-commands-events.json",
+  "subject": "AssuranceAssessmentRequested",
+  "key": "sourceSection",
+  "text": "UNRATIFIED-AUTHORED (annotated 2026-07-16 under sponsor grant): DOC-007 schematizes NO interface for this, so these fields were AUTHORED, not derived. The citation below NAMES this command/event but defines no fields (DOC-002 §26.x/§34.x are bare name lists; §16 item 6: DOC-007's first slice deliberately leaves the granular vocabulary unschematized). Do NOT treat this sourceSection as proof the shape is ratified. Ratification pending. Cited: DOC-002 §26.5 (DOC-007 §33 lists it unschematized — author payload)"
+ },
+ {
+  "file": "m3-commands-events.json",
+  "subject": "AssuranceAssessmentSatisfied",
+  "key": "sourceSection",
+  "text": "UNRATIFIED-AUTHORED (annotated 2026-07-16 under sponsor grant): DOC-007 schematizes NO interface for this, so these fields were AUTHORED, not derived. The citation below NAMES this command/event but defines no fields (DOC-002 §26.x/§34.x are bare name lists; §16 item 6: DOC-007's first slice deliberately leaves the granular vocabulary unschematized). Do NOT treat this sourceSection as proof the shape is ratified. Ratification pending. Cited: DOC-002 §26.5"
+ },
+ {
+  "file": "m3-commands-events.json",
+  "subject": "AssuranceAssessmentStarted",
+  "key": "sourceSection",
+  "text": "UNRATIFIED-AUTHORED (annotated 2026-07-16 under sponsor grant): DOC-007 schematizes NO interface for this, so these fields were AUTHORED, not derived. The citation below NAMES this command/event but defines no fields (DOC-002 §26.x/§34.x are bare name lists; §16 item 6: DOC-007's first slice deliberately leaves the granular vocabulary unschematized). Do NOT treat this sourceSection as proof the shape is ratified. Ratification pending. Cited: DOC-002 §26.5"
+ },
+ {
+  "file": "m3-commands-events.json",
+  "subject": "BaselineApproved",
+  "key": "sourceSection",
+  "text": "UNRATIFIED-AUTHORED (annotated 2026-07-16 under sponsor grant): DOC-007 schematizes NO interface for this, so these fields were AUTHORED, not derived. The citation below NAMES this command/event but defines no fields (DOC-002 §26.x/§34.x are bare name lists; §16 item 6: DOC-007's first slice deliberately leaves the granular vocabulary unschematized). Do NOT treat this sourceSection as proof the shape is ratified. Ratification pending. Cited: DOC-002 §26.6"
+ },
+ {
+  "file": "m3-commands-events.json",
+  "subject": "BaselineCreated",
+  "key": "sourceSection",
+  "text": "UNRATIFIED-AUTHORED (annotated 2026-07-16 under sponsor grant): DOC-007 schematizes NO interface for this, so these fields were AUTHORED, not derived. The citation below NAMES this command/event but defines no fields (DOC-002 §26.x/§34.x are bare name lists; §16 item 6: DOC-007's first slice deliberately leaves the granular vocabulary unschematized). Do NOT treat this sourceSection as proof the shape is ratified. Ratification pending. Cited: DOC-002 §26.6 (DOC-007 §33 lists it unschematized)"
+ },
+ {
+  "file": "m3-commands-events.json",
+  "subject": "BaselineRevoked",
+  "key": "sourceSection",
+  "text": "UNRATIFIED-AUTHORED (annotated 2026-07-16 under sponsor grant): DOC-007 schematizes NO interface for this, so these fields were AUTHORED, not derived. The citation below NAMES this command/event but defines no fields (DOC-002 §26.x/§34.x are bare name lists; §16 item 6: DOC-007's first slice deliberately leaves the granular vocabulary unschematized). Do NOT treat this sourceSection as proof the shape is ratified. Ratification pending. Cited: DOC-002 §26.6"
+ },
+ {
+  "file": "m3-commands-events.json",
+  "subject": "BaselineSubmittedForReview",
+  "key": "sourceSection",
+  "text": "UNRATIFIED-AUTHORED (annotated 2026-07-16 under sponsor grant): DOC-007 schematizes NO interface for this, so these fields were AUTHORED, not derived. The citation below NAMES this command/event but defines no fields (DOC-002 §26.x/§34.x are bare name lists; §16 item 6: DOC-007's first slice deliberately leaves the granular vocabulary unschematized). Do NOT treat this sourceSection as proof the shape is ratified. Ratification pending. Cited: DOC-002 §26.6"
+ },
+ {
+  "file": "m3-commands-events.json",
+  "subject": "BaselineSuperseded",
+  "key": "sourceSection",
+  "text": "UNRATIFIED-AUTHORED (annotated 2026-07-16 under sponsor grant): DOC-007 schematizes NO interface for this, so these fields were AUTHORED, not derived. The citation below NAMES this command/event but defines no fields (DOC-002 §26.x/§34.x are bare name lists; §16 item 6: DOC-007's first slice deliberately leaves the granular vocabulary unschematized). Do NOT treat this sourceSection as proof the shape is ratified. Ratification pending. Cited: DOC-002 §26.6"
+ },
+ {
+  "file": "m3-commands-events.json",
+  "subject": "ClaimContested",
+  "key": "sourceSection",
+  "text": "UNRATIFIED-AUTHORED (annotated 2026-07-16 under sponsor grant): DOC-007 schematizes NO interface for this, so these fields were AUTHORED, not derived. The citation below NAMES this command/event but defines no fields (DOC-002 §26.x/§34.x are bare name lists; §16 item 6: DOC-007's first slice deliberately leaves the granular vocabulary unschematized). Do NOT treat this sourceSection as proof the shape is ratified. Ratification pending. Cited: DOC-002 §26.5"
+ },
+ {
+  "file": "m3-commands-events.json",
+  "subject": "ClaimRejected",
+  "key": "sourceSection",
+  "text": "UNRATIFIED-AUTHORED (annotated 2026-07-16 under sponsor grant): DOC-007 schematizes NO interface for this, so these fields were AUTHORED, not derived. The citation below NAMES this command/event but defines no fields (DOC-002 §26.x/§34.x are bare name lists; §16 item 6: DOC-007's first slice deliberately leaves the granular vocabulary unschematized). Do NOT treat this sourceSection as proof the shape is ratified. Ratification pending. Cited: DOC-002 §26.5"
+ },
+ {
+  "file": "m3-commands-events.json",
+  "subject": "ClaimSupported",
+  "key": "sourceSection",
+  "text": "UNRATIFIED-AUTHORED (annotated 2026-07-16 under sponsor grant): DOC-007 schematizes NO interface for this, so these fields were AUTHORED, not derived. The citation below NAMES this command/event but defines no fields (DOC-002 §26.x/§34.x are bare name lists; §16 item 6: DOC-007's first slice deliberately leaves the granular vocabulary unschematized). Do NOT treat this sourceSection as proof the shape is ratified. Ratification pending. Cited: DOC-002 §26.5"
+ },
+ {
+  "file": "m3-commands-events.json",
+  "subject": "ClarificationRequested",
+  "key": "sourceSection",
+  "text": "UNRATIFIED-AUTHORED (annotated 2026-07-16 under sponsor grant): DOC-007 schematizes NO interface for this, so these fields were AUTHORED, not derived. The citation below NAMES this command/event but defines no fields (DOC-002 §26.x/§34.x are bare name lists; §16 item 6: DOC-007's first slice deliberately leaves the granular vocabulary unschematized). Do NOT treat this sourceSection as proof the shape is ratified. Ratification pending. Cited: DOC-002 §21 / fixture §26 step 52 (controller clarification)"
+ },
+ {
+  "file": "m3-commands-events.json",
+  "subject": "ConstraintAdded",
+  "key": "sourceSection",
+  "text": "UNRATIFIED-AUTHORED (annotated 2026-07-16 under sponsor grant): DOC-007 schematizes NO interface for this, so these fields were AUTHORED, not derived. The citation below NAMES this command/event but defines no fields (DOC-002 §26.x/§34.x are bare name lists; §16 item 6: DOC-007's first slice deliberately leaves the granular vocabulary unschematized). Do NOT treat this sourceSection as proof the shape is ratified. Ratification pending. Cited: DOC-002 §26.3"
+ },
+ {
+  "file": "m3-commands-events.json",
+  "subject": "ConstraintDeclaredInapplicable",
+  "key": "sourceSection",
+  "text": "UNRATIFIED-AUTHORED (annotated 2026-07-16 under sponsor grant): DOC-007 schematizes NO interface for this, so these fields were AUTHORED, not derived. The citation below NAMES this command/event but defines no fields (DOC-002 §26.x/§34.x are bare name lists; §16 item 6: DOC-007's first slice deliberately leaves the granular vocabulary unschematized). Do NOT treat this sourceSection as proof the shape is ratified. Ratification pending. Cited: DOC-002 §26.3"
+ },
+ {
+  "file": "m3-commands-events.json",
+  "subject": "ConstraintPropagated",
+  "key": "sourceSection",
+  "text": "UNRATIFIED-AUTHORED (annotated 2026-07-16 under sponsor grant): DOC-007 schematizes NO interface for this, so these fields were AUTHORED, not derived. The citation below NAMES this command/event but defines no fields (DOC-002 §26.x/§34.x are bare name lists; §16 item 6: DOC-007's first slice deliberately leaves the granular vocabulary unschematized). Do NOT treat this sourceSection as proof the shape is ratified. Ratification pending. Cited: DOC-002 §26.3"
+ },
+ {
+  "file": "m3-commands-events.json",
+  "subject": "ConstraintSuperseded",
+  "key": "sourceSection",
+  "text": "UNRATIFIED-AUTHORED (annotated 2026-07-16 under sponsor grant): DOC-007 schematizes NO interface for this, so these fields were AUTHORED, not derived. The citation below NAMES this command/event but defines no fields (DOC-002 §26.x/§34.x are bare name lists; §16 item 6: DOC-007's first slice deliberately leaves the granular vocabulary unschematized). Do NOT treat this sourceSection as proof the shape is ratified. Ratification pending. Cited: DOC-002 §26.3"
+ },
+ {
+  "file": "m3-commands-events.json",
+  "subject": "ConstraintViolated",
+  "key": "sourceSection",
+  "text": "UNRATIFIED-AUTHORED (annotated 2026-07-16 under sponsor grant): DOC-007 schematizes NO interface for this, so these fields were AUTHORED, not derived. The citation below NAMES this command/event but defines no fields (DOC-002 §26.x/§34.x are bare name lists; §16 item 6: DOC-007's first slice deliberately leaves the granular vocabulary unschematized). Do NOT treat this sourceSection as proof the shape is ratified. Ratification pending. Cited: DOC-002 §26.3"
+ },
+ {
+  "file": "m3-commands-events.json",
+  "subject": "ConstraintWaived",
+  "key": "sourceSection",
+  "text": "UNRATIFIED-AUTHORED (annotated 2026-07-16 under sponsor grant): DOC-007 schematizes NO interface for this, so these fields were AUTHORED, not derived. The citation below NAMES this command/event but defines no fields (DOC-002 §26.x/§34.x are bare name lists; §16 item 6: DOC-007's first slice deliberately leaves the granular vocabulary unschematized). Do NOT treat this sourceSection as proof the shape is ratified. Ratification pending. Cited: DOC-002 §26.3"
+ },
+ {
+  "file": "m3-commands-events.json",
+  "subject": "DecisionApproved",
+  "key": "sourceSection",
+  "text": "UNRATIFIED-AUTHORED (annotated 2026-07-16 under sponsor grant): DOC-007 schematizes NO interface for this, so these fields were AUTHORED, not derived. The citation below NAMES this command/event but defines no fields (DOC-002 §26.x/§34.x are bare name lists; §16 item 6: DOC-007's first slice deliberately leaves the granular vocabulary unschematized). Do NOT treat this sourceSection as proof the shape is ratified. Ratification pending. Cited: DOC-002 §26.6"
+ },
+ {
+  "file": "m3-commands-events.json",
+  "subject": "DecisionProposed",
+  "key": "sourceSection",
+  "text": "UNRATIFIED-AUTHORED (annotated 2026-07-16 under sponsor grant): DOC-007 schematizes NO interface for this, so these fields were AUTHORED, not derived. The citation below NAMES this command/event but defines no fields (DOC-002 §26.x/§34.x are bare name lists; §16 item 6: DOC-007's first slice deliberately leaves the granular vocabulary unschematized). Do NOT treat this sourceSection as proof the shape is ratified. Ratification pending. Cited: DOC-002 §26.6 (DOC-007 §33 lists it unschematized)"
+ },
+ {
+  "file": "m3-commands-events.json",
+  "subject": "DecisionRejected",
+  "key": "sourceSection",
+  "text": "UNRATIFIED-AUTHORED (annotated 2026-07-16 under sponsor grant): DOC-007 schematizes NO interface for this, so these fields were AUTHORED, not derived. The citation below NAMES this command/event but defines no fields (DOC-002 §26.x/§34.x are bare name lists; §16 item 6: DOC-007's first slice deliberately leaves the granular vocabulary unschematized). Do NOT treat this sourceSection as proof the shape is ratified. Ratification pending. Cited: DOC-002 §26.6"
+ },
+ {
+  "file": "m3-commands-events.json",
+  "subject": "DecisionRevoked",
+  "key": "sourceSection",
+  "text": "UNRATIFIED-AUTHORED (annotated 2026-07-16 under sponsor grant): DOC-007 schematizes NO interface for this, so these fields were AUTHORED, not derived. The citation below NAMES this command/event but defines no fields (DOC-002 §26.x/§34.x are bare name lists; §16 item 6: DOC-007's first slice deliberately leaves the granular vocabulary unschematized). Do NOT treat this sourceSection as proof the shape is ratified. Ratification pending. Cited: DOC-002 §26.6"
+ },
+ {
+  "file": "m3-commands-events.json",
+  "subject": "DecompositionProposed",
+  "key": "sourceSection",
+  "text": "UNRATIFIED-AUTHORED (annotated 2026-07-16 under sponsor grant): DOC-007 schematizes NO interface for this, so these fields were AUTHORED, not derived. The citation below NAMES this command/event but defines no fields (DOC-002 §26.x/§34.x are bare name lists; §16 item 6: DOC-007's first slice deliberately leaves the granular vocabulary unschematized). Do NOT treat this sourceSection as proof the shape is ratified. Ratification pending. Cited: DOC-002 §26.2"
+ },
+ {
+  "file": "m3-commands-events.json",
+  "subject": "DecompositionRejected",
+  "key": "sourceSection",
+  "text": "UNRATIFIED-AUTHORED (annotated 2026-07-16 under sponsor grant): DOC-007 schematizes NO interface for this, so these fields were AUTHORED, not derived. The citation below NAMES this command/event but defines no fields (DOC-002 §26.x/§34.x are bare name lists; §16 item 6: DOC-007's first slice deliberately leaves the granular vocabulary unschematized). Do NOT treat this sourceSection as proof the shape is ratified. Ratification pending. Cited: DOC-002 §26.2"
+ },
+ {
+  "file": "m3-commands-events.json",
+  "subject": "DecompositionRevised",
+  "key": "sourceSection",
+  "text": "UNRATIFIED-AUTHORED (annotated 2026-07-16 under sponsor grant): DOC-007 schematizes NO interface for this, so these fields were AUTHORED, not derived. The citation below NAMES this command/event but defines no fields (DOC-002 §26.x/§34.x are bare name lists; §16 item 6: DOC-007's first slice deliberately leaves the granular vocabulary unschematized). Do NOT treat this sourceSection as proof the shape is ratified. Ratification pending. Cited: DOC-002 §26.2"
+ },
+ {
+  "file": "m3-commands-events.json",
+  "subject": "DecompositionValidated",
+  "key": "sourceSection",
+  "text": "UNRATIFIED-AUTHORED (annotated 2026-07-16 under sponsor grant): DOC-007 schematizes NO interface for this, so these fields were AUTHORED, not derived. The citation below NAMES this command/event but defines no fields (DOC-002 §26.x/§34.x are bare name lists; §16 item 6: DOC-007's first slice deliberately leaves the granular vocabulary unschematized). Do NOT treat this sourceSection as proof the shape is ratified. Ratification pending. Cited: DOC-002 §26.2"
+ },
+ {
+  "file": "m3-commands-events.json",
+  "subject": "EvidenceExpired",
+  "key": "sourceSection",
+  "text": "UNRATIFIED-AUTHORED (annotated 2026-07-16 under sponsor grant): DOC-007 schematizes NO interface for this, so these fields were AUTHORED, not derived. The citation below NAMES this command/event but defines no fields (DOC-002 §26.x/§34.x are bare name lists; §16 item 6: DOC-007's first slice deliberately leaves the granular vocabulary unschematized). Do NOT treat this sourceSection as proof the shape is ratified. Ratification pending. Cited: DOC-002 §26.5"
+ },
+ {
+  "file": "m3-commands-events.json",
+  "subject": "EvidenceInvalidated",
+  "key": "sourceSection",
+  "text": "UNRATIFIED-AUTHORED (annotated 2026-07-16 under sponsor grant): DOC-007 schematizes NO interface for this, so these fields were AUTHORED, not derived. The citation below NAMES this command/event but defines no fields (DOC-002 §26.x/§34.x are bare name lists; §16 item 6: DOC-007's first slice deliberately leaves the granular vocabulary unschematized). Do NOT treat this sourceSection as proof the shape is ratified. Ratification pending. Cited: DOC-002 §26.5"
+ },
+ {
+  "file": "m3-commands-events.json",
+  "subject": "EvidenceProposed",
+  "key": "sourceSection",
+  "text": "UNRATIFIED-AUTHORED (annotated 2026-07-16 under sponsor grant): DOC-007 schematizes NO interface for this, so these fields were AUTHORED, not derived. The citation below NAMES this command/event but defines no fields (DOC-002 §26.x/§34.x are bare name lists; §16 item 6: DOC-007's first slice deliberately leaves the granular vocabulary unschematized). Do NOT treat this sourceSection as proof the shape is ratified. Ratification pending. Cited: DOC-002 §26.5 (DOC-007 §33 lists it unschematized — author payload)"
+ },
+ {
+  "file": "m3-commands-events.json",
+  "subject": "EvidenceRejected",
+  "key": "sourceSection",
+  "text": "UNRATIFIED-AUTHORED (annotated 2026-07-16 under sponsor grant): DOC-007 schematizes NO interface for this, so these fields were AUTHORED, not derived. The citation below NAMES this command/event but defines no fields (DOC-002 §26.x/§34.x are bare name lists; §16 item 6: DOC-007's first slice deliberately leaves the granular vocabulary unschematized). Do NOT treat this sourceSection as proof the shape is ratified. Ratification pending. Cited: DOC-002 §26.5"
+ },
+ {
+  "file": "m3-commands-events.json",
+  "subject": "ExecutionEscalated",
+  "key": "sourceSection",
+  "text": "UNRATIFIED-AUTHORED (annotated 2026-07-16 under sponsor grant): DOC-007 schematizes NO interface for this, so these fields were AUTHORED, not derived. The citation below NAMES this command/event but defines no fields (DOC-002 §26.x/§34.x are bare name lists; §16 item 6: DOC-007's first slice deliberately leaves the granular vocabulary unschematized). Do NOT treat this sourceSection as proof the shape is ratified. Ratification pending. Cited: DOC-002 §26.4"
+ },
+ {
+  "file": "m3-commands-events.json",
+  "subject": "ExecutionPlanApproved",
+  "key": "sourceSection",
+  "text": "UNRATIFIED-AUTHORED (annotated 2026-07-16 under sponsor grant): DOC-007 schematizes NO interface for this, so these fields were AUTHORED, not derived. The citation below NAMES this command/event but defines no fields (DOC-002 §26.x/§34.x are bare name lists; §16 item 6: DOC-007's first slice deliberately leaves the granular vocabulary unschematized). Do NOT treat this sourceSection as proof the shape is ratified. Ratification pending. Cited: DOC-002 §26.4 (DOC-007 §33 lists it unschematized)"
+ },
+ {
+  "file": "m3-commands-events.json",
+  "subject": "ExecutionPlanProposed",
+  "key": "sourceSection",
+  "text": "UNRATIFIED-AUTHORED (annotated 2026-07-16 under sponsor grant): DOC-007 schematizes NO interface for this, so these fields were AUTHORED, not derived. The citation below NAMES this command/event but defines no fields (DOC-002 §26.x/§34.x are bare name lists; §16 item 6: DOC-007's first slice deliberately leaves the granular vocabulary unschematized). Do NOT treat this sourceSection as proof the shape is ratified. Ratification pending. Cited: DOC-002 §26.4 (DOC-007 §33 lists it unschematized — author payload)"
+ },
+ {
+  "file": "m3-commands-events.json",
+  "subject": "ExecutionPlanRevised",
+  "key": "sourceSection",
+  "text": "UNRATIFIED-AUTHORED (annotated 2026-07-16 under sponsor grant): DOC-007 schematizes NO interface for this, so these fields were AUTHORED, not derived. The citation below NAMES this command/event but defines no fields (DOC-002 §26.x/§34.x are bare name lists; §16 item 6: DOC-007's first slice deliberately leaves the granular vocabulary unschematized). Do NOT treat this sourceSection as proof the shape is ratified. Ratification pending. Cited: DOC-002 §20.2 / fixture §26 step 54 (revise architecture plan)"
+ },
+ {
+  "file": "m3-commands-events.json",
+  "subject": "ExecutionPlanSuperseded",
+  "key": "sourceSection",
+  "text": "UNRATIFIED-AUTHORED (annotated 2026-07-16 under sponsor grant): DOC-007 schematizes NO interface for this, so these fields were AUTHORED, not derived. The citation below NAMES this command/event but defines no fields (DOC-002 §26.x/§34.x are bare name lists; §16 item 6: DOC-007's first slice deliberately leaves the granular vocabulary unschematized). Do NOT treat this sourceSection as proof the shape is ratified. Ratification pending. Cited: DOC-002 §26.4"
+ },
+ {
+  "file": "m3-commands-events.json",
+  "subject": "ExecutionStepCancelled",
+  "key": "sourceSection",
+  "text": "UNRATIFIED-AUTHORED (annotated 2026-07-16 under sponsor grant): DOC-007 schematizes NO interface for this, so these fields were AUTHORED, not derived. The citation below NAMES this command/event but defines no fields (DOC-002 §26.x/§34.x are bare name lists; §16 item 6: DOC-007's first slice deliberately leaves the granular vocabulary unschematized). Do NOT treat this sourceSection as proof the shape is ratified. Ratification pending. Cited: DOC-002 §26.4"
+ },
+ {
+  "file": "m3-commands-events.json",
+  "subject": "ExecutionStepFailed",
+  "key": "sourceSection",
+  "text": "UNRATIFIED-AUTHORED (annotated 2026-07-16 under sponsor grant): DOC-007 schematizes NO interface for this, so these fields were AUTHORED, not derived. The citation below NAMES this command/event but defines no fields (DOC-002 §26.x/§34.x are bare name lists; §16 item 6: DOC-007's first slice deliberately leaves the granular vocabulary unschematized). Do NOT treat this sourceSection as proof the shape is ratified. Ratification pending. Cited: DOC-002 §26.4 (DOC-007 §33 lists it unschematized)"
+ },
+ {
+  "file": "m3-commands-events.json",
+  "subject": "ExecutionStepReady",
+  "key": "sourceSection",
+  "text": "UNRATIFIED-AUTHORED (annotated 2026-07-16 under sponsor grant): DOC-007 schematizes NO interface for this, so these fields were AUTHORED, not derived. The citation below NAMES this command/event but defines no fields (DOC-002 §26.x/§34.x are bare name lists; §16 item 6: DOC-007's first slice deliberately leaves the granular vocabulary unschematized). Do NOT treat this sourceSection as proof the shape is ratified. Ratification pending. Cited: DOC-002 §26.4"
+ },
+ {
+  "file": "m3-commands-events.json",
+  "subject": "ExecutionStepRetried",
+  "key": "sourceSection",
+  "text": "UNRATIFIED-AUTHORED (annotated 2026-07-16 under sponsor grant): DOC-007 schematizes NO interface for this, so these fields were AUTHORED, not derived. The citation below NAMES this command/event but defines no fields (DOC-002 §26.x/§34.x are bare name lists; §16 item 6: DOC-007's first slice deliberately leaves the granular vocabulary unschematized). Do NOT treat this sourceSection as proof the shape is ratified. Ratification pending. Cited: DOC-002 §26.4"
+ },
+ {
+  "file": "m3-commands-events.json",
+  "subject": "ExecutionStepSkipped",
+  "key": "sourceSection",
+  "text": "UNRATIFIED-AUTHORED (annotated 2026-07-16 under sponsor grant): DOC-007 schematizes NO interface for this, so these fields were AUTHORED, not derived. The citation below NAMES this command/event but defines no fields (DOC-002 §26.x/§34.x are bare name lists; §16 item 6: DOC-007's first slice deliberately leaves the granular vocabulary unschematized). Do NOT treat this sourceSection as proof the shape is ratified. Ratification pending. Cited: DOC-002 §26.4"
+ },
+ {
+  "file": "m3-commands-events.json",
+  "subject": "ExecutionStepStarted",
+  "key": "sourceSection",
+  "text": "UNRATIFIED-AUTHORED (annotated 2026-07-16 under sponsor grant): DOC-007 schematizes NO interface for this, so these fields were AUTHORED, not derived. The citation below NAMES this command/event but defines no fields (DOC-002 §26.x/§34.x are bare name lists; §16 item 6: DOC-007's first slice deliberately leaves the granular vocabulary unschematized). Do NOT treat this sourceSection as proof the shape is ratified. Ratification pending. Cited: DOC-002 §26.4 (DOC-007 §33 lists it unschematized)"
+ },
+ {
+  "file": "m3-commands-events.json",
+  "subject": "ExecutionStepWaiting",
+  "key": "sourceSection",
+  "text": "UNRATIFIED-AUTHORED (annotated 2026-07-16 under sponsor grant): DOC-007 schematizes NO interface for this, so these fields were AUTHORED, not derived. The citation below NAMES this command/event but defines no fields (DOC-002 §26.x/§34.x are bare name lists; §16 item 6: DOC-007's first slice deliberately leaves the granular vocabulary unschematized). Do NOT treat this sourceSection as proof the shape is ratified. Ratification pending. Cited: DOC-002 §26.4"
+ },
+ {
+  "file": "m3-commands-events.json",
+  "subject": "ExecutionTerminated",
+  "key": "sourceSection",
+  "text": "UNRATIFIED-AUTHORED (annotated 2026-07-16 under sponsor grant): DOC-007 schematizes NO interface for this, so these fields were AUTHORED, not derived. The citation below NAMES this command/event but defines no fields (DOC-002 §26.x/§34.x are bare name lists; §16 item 6: DOC-007's first slice deliberately leaves the granular vocabulary unschematized). Do NOT treat this sourceSection as proof the shape is ratified. Ratification pending. Cited: DOC-002 §26.4"
+ },
+ {
+  "file": "m3-commands-events.json",
+  "subject": "IntentConstraintRefined",
+  "key": "sourceSection",
+  "text": "UNRATIFIED-AUTHORED (annotated 2026-07-16 under sponsor grant): DOC-007 schematizes NO interface for this, so these fields were AUTHORED, not derived. The citation below NAMES this command/event but defines no fields (DOC-002 §26.x/§34.x are bare name lists; §16 item 6: DOC-007's first slice deliberately leaves the granular vocabulary unschematized). Do NOT treat this sourceSection as proof the shape is ratified. Ratification pending. Cited: DOC-002 §33 / fixture §26 step 53 (offline scope refinement)"
+ },
+ {
+  "file": "m3-commands-events.json",
+  "subject": "IntentDiscoveryStarted",
+  "key": "sourceSection",
+  "text": "UNRATIFIED-AUTHORED (annotated 2026-07-16 under sponsor grant): DOC-007 schematizes NO interface for this, so these fields were AUTHORED, not derived. The citation below NAMES this command/event but defines no fields (DOC-002 §26.x/§34.x are bare name lists; §16 item 6: DOC-007's first slice deliberately leaves the granular vocabulary unschematized). Do NOT treat this sourceSection as proof the shape is ratified. Ratification pending. Cited: DOC-002 §26.2"
+ },
+ {
+  "file": "m3-commands-events.json",
+  "subject": "IntentRevised",
+  "key": "sourceSection",
+  "text": "UNRATIFIED-AUTHORED (annotated 2026-07-16 under sponsor grant): DOC-007 schematizes NO interface for this, so these fields were AUTHORED, not derived. The citation below NAMES this command/event but defines no fields (DOC-002 §26.x/§34.x are bare name lists; §16 item 6: DOC-007's first slice deliberately leaves the granular vocabulary unschematized). Do NOT treat this sourceSection as proof the shape is ratified. Ratification pending. Cited: DOC-002 §26.2"
+ },
+ {
+  "file": "m3-commands-events.json",
+  "subject": "IntentSuperseded",
+  "key": "sourceSection",
+  "text": "UNRATIFIED-AUTHORED (annotated 2026-07-16 under sponsor grant): DOC-007 schematizes NO interface for this, so these fields were AUTHORED, not derived. The citation below NAMES this command/event but defines no fields (DOC-002 §26.x/§34.x are bare name lists; §16 item 6: DOC-007's first slice deliberately leaves the granular vocabulary unschematized). Do NOT treat this sourceSection as proof the shape is ratified. Ratification pending. Cited: DOC-002 §26.2"
+ },
+ {
+  "file": "m3-commands-events.json",
+  "subject": "ObligationAllocated",
+  "key": "sourceSection",
+  "text": "UNRATIFIED-AUTHORED (annotated 2026-07-16 under sponsor grant): DOC-007 schematizes NO interface for this, so these fields were AUTHORED, not derived. The citation below NAMES this command/event but defines no fields (DOC-002 §26.x/§34.x are bare name lists; §16 item 6: DOC-007's first slice deliberately leaves the granular vocabulary unschematized). Do NOT treat this sourceSection as proof the shape is ratified. Ratification pending. Cited: DOC-002 §26.3"
+ },
+ {
+  "file": "m3-commands-events.json",
+  "subject": "ObligationRetained",
+  "key": "sourceSection",
+  "text": "UNRATIFIED-AUTHORED (annotated 2026-07-16 under sponsor grant): DOC-007 schematizes NO interface for this, so these fields were AUTHORED, not derived. The citation below NAMES this command/event but defines no fields (DOC-002 §26.x/§34.x are bare name lists; §16 item 6: DOC-007's first slice deliberately leaves the granular vocabulary unschematized). Do NOT treat this sourceSection as proof the shape is ratified. Ratification pending. Cited: DOC-002 §26.3"
+ },
+ {
+  "file": "m3-commands-events.json",
+  "subject": "ObligationSatisfied",
+  "key": "sourceSection",
+  "text": "UNRATIFIED-AUTHORED (annotated 2026-07-16 under sponsor grant): DOC-007 schematizes NO interface for this, so these fields were AUTHORED, not derived. The citation below NAMES this command/event but defines no fields (DOC-002 §26.x/§34.x are bare name lists; §16 item 6: DOC-007's first slice deliberately leaves the granular vocabulary unschematized). Do NOT treat this sourceSection as proof the shape is ratified. Ratification pending. Cited: DOC-002 §26.3"
+ },
+ {
+  "file": "m3-commands-events.json",
+  "subject": "ObligationViolated",
+  "key": "sourceSection",
+  "text": "UNRATIFIED-AUTHORED (annotated 2026-07-16 under sponsor grant): DOC-007 schematizes NO interface for this, so these fields were AUTHORED, not derived. The citation below NAMES this command/event but defines no fields (DOC-002 §26.x/§34.x are bare name lists; §16 item 6: DOC-007's first slice deliberately leaves the granular vocabulary unschematized). Do NOT treat this sourceSection as proof the shape is ratified. Ratification pending. Cited: DOC-002 §26.3"
+ },
+ {
+  "file": "m3-commands-events.json",
+  "subject": "ObligationWaived",
+  "key": "sourceSection",
+  "text": "UNRATIFIED-AUTHORED (annotated 2026-07-16 under sponsor grant): DOC-007 schematizes NO interface for this, so these fields were AUTHORED, not derived. The citation below NAMES this command/event but defines no fields (DOC-002 §26.x/§34.x are bare name lists; §16 item 6: DOC-007's first slice deliberately leaves the granular vocabulary unschematized). Do NOT treat this sourceSection as proof the shape is ratified. Ratification pending. Cited: DOC-002 §26.3"
+ },
+ {
+  "file": "m3-commands-events.json",
+  "subject": "PwuAbandoned",
+  "key": "sourceSection",
+  "text": "UNRATIFIED-AUTHORED (annotated 2026-07-16 under sponsor grant): DOC-007 schematizes NO interface for this, so these fields were AUTHORED, not derived. The citation below NAMES this command/event but defines no fields (DOC-002 §26.x/§34.x are bare name lists; §16 item 6: DOC-007's first slice deliberately leaves the granular vocabulary unschematized). Do NOT treat this sourceSection as proof the shape is ratified. Ratification pending. Cited: DOC-002 §26.2"
+ },
+ {
+  "file": "m3-commands-events.json",
+  "subject": "PwuBaselined",
+  "key": "sourceSection",
+  "text": "UNRATIFIED-AUTHORED (annotated 2026-07-16 under sponsor grant): DOC-007 schematizes NO interface for this, so these fields were AUTHORED, not derived. The citation below NAMES this command/event but defines no fields (DOC-002 §26.x/§34.x are bare name lists; §16 item 6: DOC-007's first slice deliberately leaves the granular vocabulary unschematized). Do NOT treat this sourceSection as proof the shape is ratified. Ratification pending. Cited: DOC-002 §26.2 / §8.3 (M13 fixture trace step 72)"
+ },
+ {
+  "file": "m3-commands-events.json",
+  "subject": "PwuBlocked",
+  "key": "sourceSection",
+  "text": "UNRATIFIED-AUTHORED (annotated 2026-07-16 under sponsor grant): DOC-007 schematizes NO interface for this, so these fields were AUTHORED, not derived. The citation below NAMES this command/event but defines no fields (DOC-002 §26.x/§34.x are bare name lists; §16 item 6: DOC-007's first slice deliberately leaves the granular vocabulary unschematized). Do NOT treat this sourceSection as proof the shape is ratified. Ratification pending. Cited: DOC-002 §26.2"
+ },
+ {
+  "file": "m3-commands-events.json",
+  "subject": "PwuChallenged",
+  "key": "sourceSection",
+  "text": "UNRATIFIED-AUTHORED (annotated 2026-07-16 under sponsor grant): DOC-007 schematizes NO interface for this, so these fields were AUTHORED, not derived. The citation below NAMES this command/event but defines no fields (DOC-002 §26.x/§34.x are bare name lists; §16 item 6: DOC-007's first slice deliberately leaves the granular vocabulary unschematized). Do NOT treat this sourceSection as proof the shape is ratified. Ratification pending. Cited: DOC-002 §26.2"
+ },
+ {
+  "file": "m3-commands-events.json",
+  "subject": "PwuConditionallySatisfied",
+  "key": "sourceSection",
+  "text": "UNRATIFIED-AUTHORED (annotated 2026-07-16 under sponsor grant): DOC-007 schematizes NO interface for this, so these fields were AUTHORED, not derived. The citation below NAMES this command/event but defines no fields (DOC-002 §26.x/§34.x are bare name lists; §16 item 6: DOC-007's first slice deliberately leaves the granular vocabulary unschematized). Do NOT treat this sourceSection as proof the shape is ratified. Ratification pending. Cited: DOC-002 §26.2"
+ },
+ {
+  "file": "m3-commands-events.json",
+  "subject": "PwuInvalidated",
+  "key": "sourceSection",
+  "text": "UNRATIFIED-AUTHORED (annotated 2026-07-16 under sponsor grant): DOC-007 schematizes NO interface for this, so these fields were AUTHORED, not derived. The citation below NAMES this command/event but defines no fields (DOC-002 §26.x/§34.x are bare name lists; §16 item 6: DOC-007's first slice deliberately leaves the granular vocabulary unschematized). Do NOT treat this sourceSection as proof the shape is ratified. Ratification pending. Cited: DOC-002 §26.2"
+ },
+ {
+  "file": "m3-commands-events.json",
+  "subject": "PwuMarkedReady",
+  "key": "sourceSection",
+  "text": "UNRATIFIED-AUTHORED (annotated 2026-07-16 under sponsor grant): DOC-007 schematizes NO interface for this, so these fields were AUTHORED, not derived. The citation below NAMES this command/event but defines no fields (DOC-002 §26.x/§34.x are bare name lists; §16 item 6: DOC-007's first slice deliberately leaves the granular vocabulary unschematized). Do NOT treat this sourceSection as proof the shape is ratified. Ratification pending. Cited: DOC-002 §26.2 (DOC-007 §33 lists it; DOC-007 realizes MarkPwuReady via PwuStateChanged)"
+ },
+ {
+  "file": "m3-commands-events.json",
+  "subject": "PwuRejected",
+  "key": "sourceSection",
+  "text": "UNRATIFIED-AUTHORED (annotated 2026-07-16 under sponsor grant): DOC-007 schematizes NO interface for this, so these fields were AUTHORED, not derived. The citation below NAMES this command/event but defines no fields (DOC-002 §26.x/§34.x are bare name lists; §16 item 6: DOC-007's first slice deliberately leaves the granular vocabulary unschematized). Do NOT treat this sourceSection as proof the shape is ratified. Ratification pending. Cited: DOC-002 §26.2"
+ },
+ {
+  "file": "m3-commands-events.json",
+  "subject": "PwuReshapingStarted",
+  "key": "sourceSection",
+  "text": "UNRATIFIED-AUTHORED (annotated 2026-07-16 under sponsor grant): DOC-007 schematizes NO interface for this, so these fields were AUTHORED, not derived. The citation below NAMES this command/event but defines no fields (DOC-002 §26.x/§34.x are bare name lists; §16 item 6: DOC-007's first slice deliberately leaves the granular vocabulary unschematized). Do NOT treat this sourceSection as proof the shape is ratified. Ratification pending. Cited: DOC-002 §26.2"
+ },
+ {
+  "file": "m3-commands-events.json",
+  "subject": "PwuSatisfied",
+  "key": "sourceSection",
+  "text": "UNRATIFIED-AUTHORED (annotated 2026-07-16 under sponsor grant): DOC-007 schematizes NO interface for this, so these fields were AUTHORED, not derived. The citation below NAMES this command/event but defines no fields (DOC-002 §26.x/§34.x are bare name lists; §16 item 6: DOC-007's first slice deliberately leaves the granular vocabulary unschematized). Do NOT treat this sourceSection as proof the shape is ratified. Ratification pending. Cited: DOC-002 §26.2"
+ },
+ {
+  "file": "m3-commands-events.json",
+  "subject": "PwuShapingStarted",
+  "key": "sourceSection",
+  "text": "UNRATIFIED-AUTHORED (annotated 2026-07-16 under sponsor grant): DOC-007 schematizes NO interface for this, so these fields were AUTHORED, not derived. The citation below NAMES this command/event but defines no fields (DOC-002 §26.x/§34.x are bare name lists; §16 item 6: DOC-007's first slice deliberately leaves the granular vocabulary unschematized). Do NOT treat this sourceSection as proof the shape is ratified. Ratification pending. Cited: DOC-002 §26.2 (DOC-007 §33 lists it unschematized)"
+ },
+ {
+  "file": "m3-commands-events.json",
+  "subject": "PwuSuperseded",
+  "key": "sourceSection",
+  "text": "UNRATIFIED-AUTHORED (annotated 2026-07-16 under sponsor grant): DOC-007 schematizes NO interface for this, so these fields were AUTHORED, not derived. The citation below NAMES this command/event but defines no fields (DOC-002 §26.x/§34.x are bare name lists; §16 item 6: DOC-007's first slice deliberately leaves the granular vocabulary unschematized). Do NOT treat this sourceSection as proof the shape is ratified. Ratification pending. Cited: DOC-002 §26.2"
+ },
+ {
+  "file": "m3-commands-events.json",
+  "subject": "RecompositionCompleted",
+  "key": "sourceSection",
+  "text": "UNRATIFIED-AUTHORED (annotated 2026-07-16 under sponsor grant): DOC-007 schematizes NO interface for this, so these fields were AUTHORED, not derived. The citation below NAMES this command/event but defines no fields (DOC-002 §26.x/§34.x are bare name lists; §16 item 6: DOC-007's first slice deliberately leaves the granular vocabulary unschematized). Do NOT treat this sourceSection as proof the shape is ratified. Ratification pending. Cited: DOC-002 §26.2"
+ },
+ {
+  "file": "m3-commands-events.json",
+  "subject": "RecompositionConflictDetected",
+  "key": "sourceSection",
+  "text": "UNRATIFIED-AUTHORED (annotated 2026-07-16 under sponsor grant): DOC-007 schematizes NO interface for this, so these fields were AUTHORED, not derived. The citation below NAMES this command/event but defines no fields (DOC-002 §26.x/§34.x are bare name lists; §16 item 6: DOC-007's first slice deliberately leaves the granular vocabulary unschematized). Do NOT treat this sourceSection as proof the shape is ratified. Ratification pending. Cited: DOC-002 §26.2"
+ },
+ {
+  "file": "m3-commands-events.json",
+  "subject": "RecompositionFailed",
+  "key": "sourceSection",
+  "text": "UNRATIFIED-AUTHORED (annotated 2026-07-16 under sponsor grant): DOC-007 schematizes NO interface for this, so these fields were AUTHORED, not derived. The citation below NAMES this command/event but defines no fields (DOC-002 §26.x/§34.x are bare name lists; §16 item 6: DOC-007's first slice deliberately leaves the granular vocabulary unschematized). Do NOT treat this sourceSection as proof the shape is ratified. Ratification pending. Cited: DOC-002 §26.2"
+ },
+ {
+  "file": "m3-commands-events.json",
+  "subject": "RecompositionStarted",
+  "key": "sourceSection",
+  "text": "UNRATIFIED-AUTHORED (annotated 2026-07-16 under sponsor grant): DOC-007 schematizes NO interface for this, so these fields were AUTHORED, not derived. The citation below NAMES this command/event but defines no fields (DOC-002 §26.x/§34.x are bare name lists; §16 item 6: DOC-007's first slice deliberately leaves the granular vocabulary unschematized). Do NOT treat this sourceSection as proof the shape is ratified. Ratification pending. Cited: DOC-002 §26.2"
+ },
+ {
+  "file": "m3-commands-events.json",
+  "subject": "RuntimeBindingAuthorized",
+  "key": "sourceSection",
+  "text": "UNRATIFIED-AUTHORED (annotated 2026-07-16 under sponsor grant): DOC-007 schematizes NO interface for this, so these fields were AUTHORED, not derived. The citation below NAMES this command/event but defines no fields (DOC-002 §26.x/§34.x are bare name lists; §16 item 6: DOC-007's first slice deliberately leaves the granular vocabulary unschematized). Do NOT treat this sourceSection as proof the shape is ratified. Ratification pending. Cited: DOC-002 §26.4"
+ },
+ {
+  "file": "m3-commands-events.json",
+  "subject": "RuntimeBindingDenied",
+  "key": "sourceSection",
+  "text": "UNRATIFIED-AUTHORED (annotated 2026-07-16 under sponsor grant): DOC-007 schematizes NO interface for this, so these fields were AUTHORED, not derived. The citation below NAMES this command/event but defines no fields (DOC-002 §26.x/§34.x are bare name lists; §16 item 6: DOC-007's first slice deliberately leaves the granular vocabulary unschematized). Do NOT treat this sourceSection as proof the shape is ratified. Ratification pending. Cited: DOC-002 §26.4"
+ },
+ {
+  "file": "m3-commands-events.json",
+  "subject": "RuntimeBindingRequested",
+  "key": "sourceSection",
+  "text": "UNRATIFIED-AUTHORED (annotated 2026-07-16 under sponsor grant): DOC-007 schematizes NO interface for this, so these fields were AUTHORED, not derived. The citation below NAMES this command/event but defines no fields (DOC-002 §26.x/§34.x are bare name lists; §16 item 6: DOC-007's first slice deliberately leaves the granular vocabulary unschematized). Do NOT treat this sourceSection as proof the shape is ratified. Ratification pending. Cited: DOC-002 §26.4"
+ },
+ {
+  "file": "m3-commands-events.json",
+  "subject": "RuntimeCapabilityRevoked",
+  "key": "sourceSection",
+  "text": "UNRATIFIED-AUTHORED (annotated 2026-07-16 under sponsor grant): DOC-007 schematizes NO interface for this, so these fields were AUTHORED, not derived. The citation below NAMES this command/event but defines no fields (DOC-002 §26.x/§34.x are bare name lists; §16 item 6: DOC-007's first slice deliberately leaves the granular vocabulary unschematized). Do NOT treat this sourceSection as proof the shape is ratified. Ratification pending. Cited: DOC-002 §26.4"
+ },
+ {
+  "file": "m3-commands-events.json",
+  "subject": "TacticalChangeApplied",
+  "key": "sourceSection",
+  "text": "UNRATIFIED-AUTHORED (annotated 2026-07-16 under sponsor grant): DOC-007 schematizes NO interface for this, so these fields were AUTHORED, not derived. The citation below NAMES this command/event but defines no fields (DOC-002 §26.x/§34.x are bare name lists; §16 item 6: DOC-007's first slice deliberately leaves the granular vocabulary unschematized). Do NOT treat this sourceSection as proof the shape is ratified. Ratification pending. Cited: DOC-002 §26.4"
+ },
+ {
+  "file": "m3-commands-events.json",
+  "subject": "TacticalChangeRequested",
+  "key": "sourceSection",
+  "text": "UNRATIFIED-AUTHORED (annotated 2026-07-16 under sponsor grant): DOC-007 schematizes NO interface for this, so these fields were AUTHORED, not derived. The citation below NAMES this command/event but defines no fields (DOC-002 §26.x/§34.x are bare name lists; §16 item 6: DOC-007's first slice deliberately leaves the granular vocabulary unschematized). Do NOT treat this sourceSection as proof the shape is ratified. Ratification pending. Cited: DOC-002 §26.4"
+ },
+ {
+  "file": "m3-commands-events.json",
+  "subject": "WaiverDenied",
+  "key": "sourceSection",
+  "text": "UNRATIFIED-AUTHORED (annotated 2026-07-16 under sponsor grant): DOC-007 schematizes NO interface for this, so these fields were AUTHORED, not derived. The citation below NAMES this command/event but defines no fields (DOC-002 §26.x/§34.x are bare name lists; §16 item 6: DOC-007's first slice deliberately leaves the granular vocabulary unschematized). Do NOT treat this sourceSection as proof the shape is ratified. Ratification pending. Cited: DOC-002 §26.5"
+ },
+ {
+  "file": "m3-commands-events.json",
+  "subject": "WaiverExpired",
+  "key": "sourceSection",
+  "text": "UNRATIFIED-AUTHORED (annotated 2026-07-16 under sponsor grant): DOC-007 schematizes NO interface for this, so these fields were AUTHORED, not derived. The citation below NAMES this command/event but defines no fields (DOC-002 §26.x/§34.x are bare name lists; §16 item 6: DOC-007's first slice deliberately leaves the granular vocabulary unschematized). Do NOT treat this sourceSection as proof the shape is ratified. Ratification pending. Cited: DOC-002 §26.5"
+ },
+ {
+  "file": "m3-commands-events.json",
+  "subject": "WaiverGranted",
+  "key": "sourceSection",
+  "text": "UNRATIFIED-AUTHORED (annotated 2026-07-16 under sponsor grant): DOC-007 schematizes NO interface for this, so these fields were AUTHORED, not derived. The citation below NAMES this command/event but defines no fields (DOC-002 §26.x/§34.x are bare name lists; §16 item 6: DOC-007's first slice deliberately leaves the granular vocabulary unschematized). Do NOT treat this sourceSection as proof the shape is ratified. Ratification pending. Cited: DOC-002 §26.5"
+ },
+ {
+  "file": "m3-commands-events.json",
+  "subject": "WaiverRequested",
+  "key": "sourceSection",
+  "text": "UNRATIFIED-AUTHORED (annotated 2026-07-16 under sponsor grant): DOC-007 schematizes NO interface for this, so these fields were AUTHORED, not derived. The citation below NAMES this command/event but defines no fields (DOC-002 §26.x/§34.x are bare name lists; §16 item 6: DOC-007's first slice deliberately leaves the granular vocabulary unschematized). Do NOT treat this sourceSection as proof the shape is ratified. Ratification pending. Cited: DOC-002 §26.5"
+ },
+ {
+  "file": "m3-commands-events.json",
+  "subject": "IntentProvisioned",
+  "key": "sourceSection",
+  "text": "UNRATIFIED-AUTHORED (annotated 2026-07-16 under sponsor grant): DOC-007 schematizes NO interface for this, so these fields were AUTHORED, not derived. The citation below NAMES this command/event but defines no fields (DOC-002 §26.x/§34.x are bare name lists; §16 item 6: DOC-007's first slice deliberately leaves the granular vocabulary unschematized). Do NOT treat this sourceSection as proof the shape is ratified. Ratification pending. Cited: added (DOC-002 §6.1 provisional transition has no §26.2 event) — see OPEN-QUESTIONS"
+ },
+ {
+  "file": "m3-commands-events.json",
+  "subject": "PwaCreated",
+  "key": "sourceSection",
+  "text": "UNRATIFIED-AUTHORED (annotated 2026-07-16 under sponsor grant): DOC-007 schematizes NO interface for this, so these fields were AUTHORED, not derived. The citation below NAMES this command/event but defines no fields (DOC-002 §26.x/§34.x are bare name lists; §16 item 6: DOC-007's first slice deliberately leaves the granular vocabulary unschematized). Do NOT treat this sourceSection as proof the shape is ratified. Ratification pending. Cited: RPH-DOC-010 (PWA authoring)"
+ },
+ {
+  "file": "m3-commands-events.json",
+  "subject": "PwuTypeDefined",
+  "key": "sourceSection",
+  "text": "UNRATIFIED-AUTHORED (annotated 2026-07-16 under sponsor grant): DOC-007 schematizes NO interface for this, so these fields were AUTHORED, not derived. The citation below NAMES this command/event but defines no fields (DOC-002 §26.x/§34.x are bare name lists; §16 item 6: DOC-007's first slice deliberately leaves the granular vocabulary unschematized). Do NOT treat this sourceSection as proof the shape is ratified. Ratification pending. Cited: RPH-DOC-010 (PWA authoring)"
+ },
+ {
+  "file": "m3-commands-events.json",
+  "subject": "UndertakingCreated",
+  "key": "sourceSection",
+  "text": "UNRATIFIED-AUTHORED (annotated 2026-07-16 under sponsor grant): DOC-007 schematizes NO interface for this, so these fields were AUTHORED, not derived. The citation below NAMES this command/event but defines no fields (DOC-002 §26.x/§34.x are bare name lists; §16 item 6: DOC-007's first slice deliberately leaves the granular vocabulary unschematized). Do NOT treat this sourceSection as proof the shape is ratified. Ratification pending. Cited: RPH-DOC-010 (PWA authoring)"
+ },
+ {
+  "file": "m3-commands-events.json",
+  "subject": "Define the ~15 complex nested types referenced but schematized in neither doc",
+  "key": "why",
+  "text": "DesiredOutcome, SuccessCondition, WorkBoundary, OutputDefinition, WorkRiskProfile, ExecutionStep, ExecutionTransition, RetryPolicy/TacticalChangePolicy/EscalationPolicy/TerminationPolicy, ArtifactReference, ExecutionProvenance, ValidatorResult, ControlActionRecommendation, ActorReference, ConfidenceAssessment, OutputBinding, CapabilityRequest/Grant, ModelSelectionPolicy, SandboxPolicy, AuthorityReference, ApplicabilityRule, IntentMapping, ObligationAllocation, ConstraintPropagation, AssumptionPropagation, CoverageClaim, itemObjectVersions entry — all block payload code-gen."
+ }
+]

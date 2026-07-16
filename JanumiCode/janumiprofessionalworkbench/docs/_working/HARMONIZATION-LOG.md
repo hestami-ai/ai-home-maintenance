@@ -1124,6 +1124,180 @@ render-timing flake, retried green).
 
 ---
 
+## INCREMENT 11 — LANDED (`9035a37`). The criterion is ratified content; the wire contract can finally see it.
+
+Step 1 of the audit's sequencing. It found a **second, larger defect on the way**, and that one is the reason
+the increment is worth more than its size suggests.
+
+### Part A — `AssessmentCriterion` is DOC-004 §7, transcribed
+
+`AssurancePolicy.criteria` was `z.array(z.record(z.string(), z.unknown()))` — **an array of any object**. So
+the codebase invented `{id, statement, mandatory}` across **four** independent restatements:
+`floor-policies.ts`, `ontology.ts`, `seed-workbench.ts`, and `broker.ts` — **the last being the agent-facing
+path, so an agent's authored policy became the invented shape.** No overlap with the ratified type beyond
+`id`; a five-level `severityIfNotMet` collapsed into a Boolean, the disease §16 item 12 names for waivers.
+
+All 8 fields are primitives or enums — and **the three enums were already generated**, harvested out of the
+very interface the vocab recorded as *"NOT field-defined … Source TBD"* while citing DOC-004 §7.
+
+**The migration rule, and the one place it could have gone wrong.** `name` is the field the old content could
+not supply: one string per criterion, two required fields. The rule takes **the author's own label** where
+they wrote `"Label: sentence"` (15 of 58) and **the criterion id** otherwise (43 of 58). Both are existing
+content. **Authoring 43 real criterion names is professional content, not schema transcription** — the grant
+covers schemas, and I declined to cross that line. The output is inconsistent (`name: 'Objective fidelity'`
+next to `name: 'IC-04'`) because *the source is inconsistent*; that is information, not noise, and it is
+disclosed rather than smoothed over.
+
+`mandatory:false → 'ADVISORY'`, deliberately **not** `'MATERIAL'`: `assurance-rules` maps an open MATERIAL
+finding to CONDITIONALLY_SATISFIED, whereas a non-mandatory criterion was filtered out of the disposition
+**entirely**. ADVISORY is the level that preserves "does not affect the disposition". Getting this wrong would
+have silently changed every additive policy's verdict.
+
+The four restatements are now **aliases of the generated type**, so the next divergence fails the build rather
+than shipping.
+
+### Part B — the wire contract was blind, and this is the bigger finding
+
+Tightening the payload **silently did nothing**: `CreateAssurancePolicy.criteria` stayed `z.array(z.unknown())`.
+`gen-messages.ts` builds its schema sets with `/export const (\w+)Schema =/` — capturing the name **before**
+`Schema`, so the set holds `'ActorReference'`. Both lookups then asked for `` `${t}Schema` ``:
+
+```
+OBJ.has('ActorReference')        -> true
+OBJ.has('ActorReferenceSchema')  -> false   <- what the code actually asked
+```
+
+**Both branches were dead.** Every payload field typed as an object or envelope schema fell silently through to
+`z.unknown()`. The proof it was never reachable, and the reason nobody noticed: **the generated `messages.ts`
+imported only from `./enums.js` — never once from `./objects.js` or `./envelopes.js`, across 70 commands and
+122 events.**
+
+`z.unknown()` in `messages.ts`: **67 → 1**.
+
+> ### ⚠️ THE ACCOUNTING BELOW WAS WRONG — corrected 2026-07-16 (see Increment 11a). I wrote **47 / 51**; the
+> real figures are **34 / 32**, and only **18** are actually enforced. I counted each schema's *import line* as
+> a reference. The corrected table:
+
+| | |
+|---|---:|
+| payload fields resolving to a **real `strictObject`** | **34** (18 command · 16 event) |
+| payload fields resolving to a **placeholder `z.record`** | **32** (15 command · 17 event) |
+| …of which **ACTUALLY ENFORCED** | **18** |
+
+**Only 18, because event payloads are never validated at all.** The write path has exactly two
+`validateAgainst` call sites: `command-bus.ts` (the command payload) and `kit.ts` (the resulting object state).
+The 16 real schemas on event payloads are **inert** — a separate, pre-existing defect (the events registry is
+generated and unchecked; it is Increment 7's open item #6, now confirmed) that this fix neither creates nor
+cures.
+
+The 18 include **`ActorReference` — the actor on a command was accepted unvalidated** — plus
+`AssessmentCriterion`, `CoverageClaim`, `ExecutionStep`, `WorkRiskProfile`, `WorkBoundary`,
+`ObligationAllocation`, `ConstraintPropagation`, `IntentMapping`, `AssumptionPropagation`,
+`AuthorityReference`, `ConversationEntry`, `PermittedChildRule`. **Zero typecheck errors and 21/21 suites green
+under the fix**: the code was already writing valid shapes — the contract simply could not check.
+
+> **And "the other 51 still accept anything — no change" was also wrong.** `z.unknown()` →
+> `z.record(z.string(), z.unknown())` is **not** a no-op: `z.unknown()` accepts a string, a number, `null` —
+> anything at all; `z.record` requires an **object**. So those 32 fields did get a real, if weak, tightening,
+> and I disclosed the opposite.
+
+### Mutation-tested, and one honest correction it surfaced
+
+Reverting the lookup restores `z.unknown()` to 67 and fails 5 of 7 locks. But under the mutant the invented
+criterion is **still REJECTED** — by the object-state check in `kit.ts`. So the payload was never the only line
+of defence, and saying "the invented shape was accepted" without qualification would be wrong: it was accepted
+*at the payload boundary* and caught downstream at the state boundary, with a different status
+(`REJECTED`/`RPH_VALIDATION_SCHEMA_FAILED` rather than `VALIDATION_FAILED`). **The fix moves enforcement to the
+right layer instead of relying on a backstop** — which also means any payload field not copied into object
+state had no check at all.
+
+The regression lock is written from the attacker's side: its first test dispatches **the exact
+`{id, statement, mandatory}` payload this codebase shipped for its whole life** and requires
+`VALIDATION_FAILED`. `strictObject` also blocks re-adding the invented fields *alongside* the ratified ones —
+the way a divergence would otherwise creep back without failing anything.
+
+### Not done, deliberately
+
+`FindingDefinition` (`{code, severity, statement}`, DOC-004 §9.1) is a **different** invented shape → step 2.
+The 51 placeholder refs stay permissive until their helpers are transcribed.
+
+### Gate (CI's, in full)
+
+build · `check-types` 21/21 · `lint` · `boundary` · **`format:check` clean** · `test` 21/21 · svelte-check
+**0 errors** · Playwright **22 passed** (1 known render-timing flake).
+
+---
+
+## INCREMENT 11a — the verification turned on me, and it was right
+
+Increment 11 was adversarially verified: 5 independent lenses over the diff, **every finding attacked by a
+separate refuter instructed to default to "refuted"**. 18 survived. The sharpest were aimed at my own commit
+message — and the pattern is *exactly* the one this whole program keeps finding, now in my own work: **I wrote
+confident claims about things nothing was checking, and the green gate agreed with me.**
+
+| I claimed | The truth |
+|---|---|
+| "the next divergence **fails the build**" | **False for the largest of the restatements.** |
+| "**MUTATION-TESTED, both parts**" | I mutation-tested the generator lookup. **I never mutated this.** |
+| "47 refs / 51 placeholder" | **34 / 32**, of which only **18** enforced. I counted import lines. |
+| "the other 51 … **no change**" | `z.unknown()`→`z.record()` **is** a tightening (object vs anything). |
+| "the round-trip stays **lossless**" | **Lossy** — it destroyed the seeded `name` *and* every `severityIfNotMet`. |
+| "**no invention** … name = the id's tail" | **Falsified by its own example, 0 for 7.** |
+| "**FOUR** restatements" | **Five.** |
+
+### 1. The durability claim was false, and the obvious fix does not work
+
+`ontology.data.ts` — **58 criteria, the largest of the five restatements** — ended `} as const;` and was
+surfaced through a type **assertion** (`...seedPolicies as readonly SeedPolicy[]`). **An assertion only
+requires comparability; it verifies nothing structurally.** Proven by mutation: re-adding the invented
+`statement` field passed `check-types` **and the full 21/21 gate**; deleting the ratified `severityIfNotMet`
+passed too. The type layer, the runtime layer (`engine.ts` types `seedPolicies` as `readonly unknown[]`) and
+the test layer (`ontology.test.ts` asserts only `criteria.length > 0`) were **all** blind. The exact disease
+the increment existed to cure — *"nothing could detect the divergence, because the type said nothing"* — was
+still fully present in the biggest instance.
+
+The **intuitive fix does not work**, which is worth recording: annotating the accessor
+(`export const seedPolicies: readonly SeedPolicy[] = …`) catches a *missing* field but **not an extra one** —
+excess-property checking fires only on fresh object literals. It would have missed the exact drift it was for.
+
+What works is `as const satisfies OntologyData` **at the literal site**, emitted by the generator. Both halves
+now fail the build (`TS2353` for the invented field, `TS2741` for the missing one), and the assertions in
+`ontology.ts` are gone. The types had to be completed first — `SeedPolicy` omitted `sourceSection` and
+`PwuTemplate` omitted five fields, **which is what the assertion was hiding.**
+
+### 2. The 7 floor criterion names ARE authored — I crossed the line I said I wouldn't
+
+I documented the rule as *"name → the id's own descriptive tail ('FS-01-schema' → 'Schema conformance'), which
+is existing content"*. Mechanically applying it yields `'schema'`. **7 of 7 mismatch:** `'invariants'` vs
+`'Invariant integrity'`, `'producer'` vs `'Producing actor recorded'`. I wrote those names by reading each
+criterion's description and its policy's purpose. That is **authoring professional content** — the precise
+thing I claimed not to do, one paragraph after claiming it. Now disclosed as authored in `floor-policies.ts`,
+with the 7 listed for ratification. (The RR-* names *are* mechanically derived; that code is the rule my
+comment described.)
+
+### 3. The round-trip destroyed more than a name
+
+Editing any policy re-minted every criterion from its textarea line. That killed the seeded `name` — and, far
+worse, **reset every `severityIfNotMet` to BLOCKING, silently PROMOTING the ADVISORY criteria of all six
+additive policies to blocking.** Nothing about editing a policy's wording should make it stricter; that is a
+change to what those policies *mean*. Fixed by handing the stored criteria back to the reader, which reuses any
+whose description is unchanged (matched on description, so reordering survives). Extracted to `policy-fields.ts`
+so it is testable at all — it wasn't — and locked with a mutation-tested suite.
+
+### The lesson, stated plainly
+
+This is [[feedback_absence_of_evidence]] again, in the mirror. Four times I recorded the limits of a check as a
+fact about the world; the fifth time I recorded a claim I had simply *not checked* — inside a commit whose whole
+subject was code that lied because nothing checked it. **A green gate is evidence about the gate.** The fix for
+that is not more care; it is the mutation, every time, on the specific claim being made.
+
+### Gate (11a)
+
+build · `check-types` 21/21 · `test` 21/21 · `lint` · `boundary` **138 modules / 0 violations** (no cycle from
+the new `ontology.types.ts`) · `format:check` clean · svelte-check **0 errors**.
+
+---
+
 ## PART 4 — Open questions genuinely for the sponsor
 
 *(kept deliberately short — under the 2026-07-15 mandate, a tension is work, not a question, unless it
