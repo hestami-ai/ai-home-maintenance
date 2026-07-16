@@ -733,6 +733,40 @@ full gate incl. Playwright green (500 vitest / 22 E2E).
 
 ---
 
+## INCREMENT 7a — LANDED. Optimistic concurrency exists now.
+
+Finding #4 (CRITICAL): the Command envelope carries `expectedRevision` (DOC-007 §8, ratified), and the engine
+**never read it**. Every `expectedRevision: …` in the handlers was the *store-level* lock passing
+`loaded.revision` — the just-read value — which can only catch a race between one handler's own load and commit,
+never a client that read v5 and issued a command after v6 landed. So a stale client command was silently applied
+to whatever version happened to be current: last-write-wins, exactly what `expectedRevision` exists to prevent.
+
+Fixed at the single update chokepoint, `loadOrReject` (used by `advanceStatus` and `advanceStep`, so both
+planes): when the command carries `expectedRevision`, it must match the aggregate's current revision, else
+`RPH_REVISION_CONFLICT` (the ratified §9.6 code, category CONCURRENCY — it existed and was correctly wired for
+the store lock; this adds the client-intent case). Red-test-first (`intent.test.ts`, mutation-proven: a stale
+`expectedRevision:2` against a v0 aggregate returned ACCEPTED, now returns CONFLICT; the correct
+`expectedRevision:0` still proceeds — the guard discriminates).
+
+**Honest boundary:** this HONORS a sent `expectedRevision`. The envelope doc also says the handler "enforces its
+*presence* for updates to existing aggregates (RPH-CON-003)" — the stricter reading. Enforcing presence is a
+separate migration: every update caller (handlers, demo actions, tests) must send `expectedRevision`, a large
+blast radius. Deferred and disclosed; the additive honor-when-present fix closes the "never read" defect without
+it. Low blast radius confirmed: **no production code currently sends `command.expectedRevision`**, so honoring it
+breaks nothing and is opt-in until the presence migration.
+
+Remaining Increment 7 slices (each its own commit): EVENTS registry never validated (finding #6, incl. the
+`aggregateType` naming split `PwuTypeDefined→'PwuType'` vs `PwuTypeRedefined→'PWU_TYPE'`); Command payloads
+copied verbatim into permanent Events (finding #5); idempotency-key reuse with a *different* payload returns the
+prior result instead of failing (finding #23); the typed error omits two of §9.6's six fields (#52).
+
+### Gate (full, incl. Playwright)
+
+`check-types` 21/21 · `lint` clean · `boundary` clean · vitest **501 passed / 4 skipped** · Playwright **22
+passed / 1 known flake**. Only red: the pre-existing docs empty-file.
+
+---
+
 ## PART 4 — Open questions genuinely for the sponsor
 
 *(kept deliberately short — under the 2026-07-15 mandate, a tension is work, not a question, unless it

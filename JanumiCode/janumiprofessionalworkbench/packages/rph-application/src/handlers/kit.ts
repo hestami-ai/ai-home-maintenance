@@ -81,6 +81,24 @@ export function loadOrReject(ctx: HandlerContext, command: DomainCommand, id: st
 			])
 		};
 	}
+	// Optimistic concurrency against the CLIENT's expected version (RPH-CON-003; DOC-007 §8 puts `expectedRevision`
+	// on the Command envelope for exactly this). When the client sends it, it must match the aggregate's current
+	// revision — otherwise the client acted on a stale read and applying the update would be silent last-write-wins.
+	// It was never read: a stale command was applied to whatever version happened to be current. The store's own
+	// lock (commitState) compares the just-loaded revision, which cannot catch a client that read v5 before v6 landed.
+	// NOTE: this HONORS a sent expectedRevision; ENFORCING its presence on every update (the stricter RPH-CON-003
+	// reading in the envelope doc) is a separate migration — every update caller must send it — tracked in the log.
+	if (command.expectedRevision !== undefined && command.expectedRevision !== existing.revision) {
+		return {
+			ok: false,
+			result: reject(
+				command,
+				'RPH_REVISION_CONFLICT',
+				`Revision conflict on ${id}: command expected revision ${command.expectedRevision}, actual is ${existing.revision}`,
+				[id]
+			)
+		};
+	}
 	return {
 		ok: true,
 		state: existing.state as Record<string, unknown>,

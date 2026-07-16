@@ -126,6 +126,21 @@ describe('Intent lifecycle handlers (live command drive)', () => {
 		expect(status()).toBe('APPROVED');
 	});
 
+	it('rejects an update whose expectedRevision does not match the current revision (RPH-CON-003 optimistic concurrency)', () => {
+		expect(engine.dispatch(capture()).status).toBe('ACCEPTED'); // INTENT created at revision 0
+		// A client that read a STALE revision (2) tries to advance; the aggregate is actually at revision 0. The
+		// Command envelope carries `expectedRevision` (DOC-007 §8) precisely so the engine can reject this instead
+		// of applying the update to a version the client never saw. It was ignored — silent last-write-wins.
+		const stale = engine.dispatch(cmd('BeginIntentDiscovery', {}, { expectedRevision: 2 }));
+		expect(stale.status).toBe('CONFLICT');
+		expect(stale.error?.code).toBe('RPH_REVISION_CONFLICT');
+		expect(status()).toBe('RAW'); // did NOT advance
+		// The SAME update with the CORRECT expected revision proceeds — the guard discriminates, it doesn't just block.
+		const ok = engine.dispatch(cmd('BeginIntentDiscovery', {}, { expectedRevision: 0 }));
+		expect(ok.status).toBe('ACCEPTED');
+		expect(status()).toBe('UNDER_DISCOVERY');
+	});
+
 	it('rejects an illegal transition (FormalizeIntent from RAW) with RPH_ILLEGAL_STATE_TRANSITION', () => {
 		expect(engine.dispatch(capture()).status).toBe('ACCEPTED');
 		const r = engine.dispatch(formalize([{ description: 'x' }]));
