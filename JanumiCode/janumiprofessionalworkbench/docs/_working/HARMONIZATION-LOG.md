@@ -1602,18 +1602,81 @@ absence drove the swing to MATERIAL.
 
 ---
 
+## PART 3d — Increment 19: the ruling, and the 99 finding definitions it unblocked
+
+Increment 18 stopped and asked the sponsor which document governs. The sponsor's answer was to **direct me to
+synthesize and author a solution**. Doing that dissolved the question rather than answering it.
+
+### The question was wrong
+
+I had asked "which of the two catalogs wins?" — and never checked the premise that they *compete*. They do not.
+**Across twelve policies there is not one contradiction.** What there is instead is a near-exact
+complementarity, recorded in full at `RULING-doc003-doc004-compose.md`:
+
+- **DOC-004 dangles a term only DOC-003 defines.** DOC-004 §15.9 requires *"no blocking fidelity finding
+  remains"* and §15 never says which findings block; §26 uses "blocking" **nine times** and never defines it.
+  DOC-003 §25/§27/§29/§32/§35 supply **17 blocking conditions**.
+- **Where both speak, they agree.** The only policy for which both state blocking conditions is Intent
+  Preservation: DOC-004 §23.6 *"Any material unauthorized divergence from approved intent."* / DOC-003 §32
+  *"Material divergence without authorized intent revision."* Same rule. For Decomposition Coverage, DOC-004
+  §19.7 is a strict **subset** of DOC-003 §29.
+- **The exception proves it.** POL-CONSTRAINT-PROPAGATION is the **only** policy DOC-004 gives its own
+  `Blocking conditions` subsection (§20.5) — and the **only** policy DOC-003 has no section for. DOC-004 added a
+  twelfth policy, so it had to supply what DOC-003 could not.
+- **Their finding lists are different kinds.** DOC-003: *"Common findings"* / *"Common shape failures"* — its own
+  word, illustrative prose. DOC-004: `Findings`, enumerated backticked CODEs.
+
+**DOC-003 specifies; DOC-004 contracts.** Nothing ratified is discarded, and no document needs editing — which
+matters, because "DOC-004 supersedes" would have deleted 17 ratified blocking conditions and left §15.9 and §26's
+nine "blocking"s pointing at nothing.
+
+**This is derived from the two documents, not borrowed from the proposed guide** — so it does not repeat C1.
+
+### What it unblocked
+
+Severity is substantially ratified after all. The 99 definitions are authored and **12/12 adversarially clean**:
+
+| | round 1 | round 2 | round 3 | **composed** |
+|---|---|---|---|---|
+| clean | **0/12** | 5/12 | 9/12 | **12/12** |
+| objections | 87 | 32 | ~10 | 0 |
+| footing | DOC-004 only | DOC-004 only | DOC-004 only | **DOC-003 + DOC-004 + conformance spec** |
+
+**19 of 99 severities are RATIFIED** (18 blocking conditions + §33's worked `INTENT_EXPANSION` = MATERIAL);
+**80 are AUTHORED** and labelled as such. Distribution: 78 MATERIAL, 18 BLOCKING, 3 ADVISORY.
+
+The rounds are worth recording because the *process* found what the content could not. Round 1 laundered 20
+severities by quoting SATISFIED-gates as if they decided BLOCKING (§10.3 has an open MATERIAL finding foreclose
+SATISFIED too). Round 2 over-corrected into under-blocking on the false ground that *"§15 declares no blocking
+condition for any code"* — and a refuter passed it **clean**, because both were scoped to DOC-004 **by me**.
+Round 3's refuter cited DOC-003 §29 and broke the frame open.
+
+### The lock that makes 80 authored values auditable
+
+`severityBasis: RATIFIED_*` is a claim about the corpus, so it is **checked**: `severityQuote` must occur in the
+ratified documents. Mutation-proven ×4 — inventing a quote, **altering one word of a real quote**
+("major"→"minor"), using §9.2's banned language, and an AUTHORED entry claiming a quote are all caught by name.
+The prose rationale is for your audit; the **label** is enforced.
+
+### Gate
+
+build · `check-types` 21/21 · `test` 21/21 · `lint` · `boundary` · `format:check` clean · svelte-check 0 errors
+· Playwright 23/23 (2 known render-timing flakes retried).
+
+---
+
 ## PART 4 — Open questions genuinely for the sponsor
 
 *(kept deliberately short — under the 2026-07-15 mandate, a tension is work, not a question, unless it
 requires knowing something only the sponsor knows)*
 
-00. **WHICH DOCUMENT GOVERNS THE ASSURANCE POLICY CATALOG — RPH-DOC-003 §25–§35, or RPH-DOC-004 §15–§26?**
-    They ratify the same eleven policies with different blocking conditions, different findings, and different
-    control actions (PART 3c). This blocks the §9.1 authoring below, and it silently decides what
-    `doc004-conformance.test.ts` enforces today. It is the highest-value ruling available right now: everything
-    the assurance layer means depends on it, and no amount of care on my side can substitute for it. If DOC-004
-    governs, DOC-003 §25–§35 should be marked superseded so the next reader does not re-derive from it. If both
-    govern, the catalog needs a reconciliation pass and the two documents' findings must be unioned.
+00. ~~**WHICH DOCUMENT GOVERNS THE ASSURANCE POLICY CATALOG — RPH-DOC-003 §25–§35, or RPH-DOC-004 §15–§26?**~~
+    **ANSWERED 2026-07-16 by looking harder, at the sponsor's direction — see PART 3d and
+    `RULING-doc003-doc004-compose.md`. The question was wrong: they do not compete, they COMPOSE. Zero
+    contradictions across twelve policies; DOC-004 dangles "blocking finding" language that only DOC-003
+    defines; the one policy DOC-004 gives its own blocking conditions is the one policy DOC-003 lacks. Nothing
+    ratified is discarded and no document needs editing.** What remains for the sponsor is smaller and stated in
+    PART 3d: whether to record the composition in the corpus itself, so the next reader does not re-derive it.
 
 0. **DOC-004 §9.1 mandates a `FindingDefinition` the catalog populates for 3 of its 99 codes.**
    ~~Verified corpus-wide (not inferred from a grep miss): each of the 99 finding codes appears exactly once in

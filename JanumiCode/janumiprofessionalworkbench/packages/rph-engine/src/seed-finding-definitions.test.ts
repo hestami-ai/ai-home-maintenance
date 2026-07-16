@@ -137,19 +137,27 @@ describe('seeded finding definitions are DOC-004 §9.1', () => {
 		]);
 	});
 
-	it('resolves the two fields §9.1 mandates and DOC-004 never ratifies — WITHOUT inventing them', () => {
-		// §9.1 requires description + defaultSeverity per FindingDefinition. DOC-004 ratifies neither, for any of
-		// its 99 codes (each occurs exactly once corpus-wide, as a bare bullet). An ANNOTATED code keeps its
-		// authored text; an UNANNOTATED one inherits its policy's own failureSeverity and the humanized code,
-		// rather than a severity someone made up.
+	it('carries the ontology’s authored §9.1 detail onto the seeded object — all 99, no fallback', () => {
+		// §9.1 requires description + defaultSeverity per FindingDefinition. The corpus ratifies a severity for
+		// only 19 of the 99 codes, so the other 80 are authored under the §0.3 grant — each labelled with its
+		// `severityBasis` and, where it claims the corpus decided it, a quote that must actually occur in the
+		// ratified documents (doc004-conformance.test.ts enforces both).
+		//
+		// This test asserted the FALLBACK — that `FALSELY_CLOSED_AMBIGUITY` resolved to the humanized code and
+		// its policy's failureSeverity. That was correct when 88 codes were unannotated. All 99 are annotated
+		// now, so the fallback is dead code in practice (kept only so a newly ratified code cannot break the
+		// seed), and this asserts what the seeded object actually carries instead.
 		const fidelity = load('pol_intent_fidelity')!.findingDefinitions;
-		const annotated = fidelity.find((f) => f.code === 'SOLUTION_SUBSTITUTION')!;
-		expect(annotated.description).toBe('An inferred solution replaced the stated need.');
-		expect(annotated.defaultSeverity).toBe('BLOCKING');
 
-		const fallback = fidelity.find((f) => f.code === 'FALSELY_CLOSED_AMBIGUITY')!;
-		expect(fallback.description).toBe('Falsely closed ambiguity');
-		// pol_intent_fidelity.failureSeverity — the policy's own declared severity, not a per-finding invention.
-		expect(fallback.defaultSeverity).toBe('BLOCKING');
+		// RATIFIED severity: DOC-003 §25 Blocking conditions — "major ambiguity hidden".
+		const ratified = fidelity.find((f) => f.code === 'FALSELY_CLOSED_AMBIGUITY')!;
+		expect(ratified.defaultSeverity).toBe('BLOCKING');
+		expect(ratified.description).not.toBe('Falsely closed ambiguity');
+		expect(ratified.description.length).toBeGreaterThan(40);
+
+		// AUTHORED severity: no ratified text reaches scope expansion under this policy (DOC-003 §25 lists
+		// "scope expansion" only under "Common findings", which is illustrative and decides nothing).
+		const authored = fidelity.find((f) => f.code === 'UNAUTHORIZED_SCOPE_EXPANSION')!;
+		expect(authored.defaultSeverity).toBe('MATERIAL');
 	});
 });

@@ -635,11 +635,62 @@ export const PRODUCT_REALIZATION_PWA_ONTOLOGY = {
 			findingAnnotations: {
 				SOLUTION_SUBSTITUTION: {
 					defaultSeverity: 'BLOCKING',
-					description: 'An inferred solution replaced the stated need.'
+					description:
+						'The formalized objective states a solution the intent synthesizer preferred rather than the need the user expressed, so every descendant decomposes against an approach the user never chose and the work can complete correctly while the need goes unmet.',
+					severityBasis: 'RATIFIED_BLOCKING_CONDITION',
+					severityRationale:
+						'BLOCKING, not MATERIAL: DOC-003 §25 Blocking conditions names this case. IF-01\'s "preferred solution" is intent-synthesizer-originated, and §15.4 claim 5 is the policy\'s own label for intent-synthesizer-originated solutions ("Inferred solutions"); the substituted solution occupies the formalized objective, which is the statement of what the user requires — hence an inferred solution presented as user requirement, near word-for-word. This code carries that condition; the adjacent INFERRED_NEED_PRESENTED_AS_FACT does not, because its object is a need.',
+					severityQuote: 'inferred solution presented as user requirement'
+				},
+				UNAUTHORIZED_SCOPE_EXPANSION: {
+					defaultSeverity: 'MATERIAL',
+					description:
+						'The formalized intent includes scope the user did not authorize, so the intent baseline commits the undertaking to work the user never accepted and that work thereafter carries the authority of approved intent.',
+					severityBasis: 'AUTHORED',
+					severityRationale:
+						'MATERIAL by default, not BLOCKING. None of DOC-003 §25\'s four blocking conditions reaches scope expansion: they key to the objective contradicting user expression, an omitted mandatory constraint, hidden ambiguity, and an inferred solution presented as a requirement. DOC-003 §25 does list "scope expansion", but under "Common findings" — the document\'s own word for its illustrative prose, which does not decide severity. The default also matches the only severity the corpus scores directly: DOC-004 §33 binds the sibling expansion code INTENT_EXPANSION to MATERIAL. §15.11\'s non-waivability is a rule about waiver, not a severity input.'
 				},
 				MISSING_USER_CONSTRAINT: {
 					defaultSeverity: 'BLOCKING',
-					description: 'A mandatory user constraint was omitted.'
+					description:
+						'An explicit user constraint is absent from the formalized intent, so no descendant artifact is ever bound by it and the omission surfaces only when completed work violates a limit the user actually set.',
+					severityBasis: 'RATIFIED_BLOCKING_CONDITION',
+					severityRationale:
+						'BLOCKING, not MATERIAL: DOC-003 §25 Blocking conditions states the code\'s central case almost verbatim. That the code says "user constraint" where the condition says "mandatory constraint" is not a gap — DOC-004 §15.4 claim 3 ("Mandatory constraints were not omitted or weakened") and §15.9 ("all mandatory constraints trace into the intent") are this policy\'s treatment of the user constraints IF-03 asks it to preserve.',
+					severityQuote: 'mandatory constraint omitted'
+				},
+				FALSELY_CLOSED_AMBIGUITY: {
+					defaultSeverity: 'BLOCKING',
+					description:
+						'A materially unresolved interpretation is presented as settled, so the intent reads as approvable and the user is never asked the question whose answer the formalization silently assumed.',
+					severityBasis: 'RATIFIED_BLOCKING_CONDITION',
+					severityRationale:
+						'BLOCKING, not MATERIAL: DOC-003 §25 Blocking conditions names this case — closing an ambiguity that is not actually resolved is the act by which it becomes hidden, since a disclosed ambiguity is by definition not closed. The condition\'s "major" qualifier is met by the code as written rather than by narrowing it: IF-05 already scopes the code to "materially unresolved" interpretations.',
+					severityQuote: 'major ambiguity hidden'
+				},
+				INFERRED_NEED_PRESENTED_AS_FACT: {
+					defaultSeverity: 'MATERIAL',
+					description:
+						'A need the intent synthesizer inferred appears in the intent unlabeled, so nothing distinguishes it from what the user actually expressed and it is approved carrying the authority of a user statement.',
+					severityBasis: 'AUTHORED',
+					severityRationale:
+						'MATERIAL by default, not BLOCKING. The nearest ratified condition, DOC-003 §25\'s "inferred solution presented as user requirement", keys to an inferred solution, and DOC-004 §15.4 claim 5 ("Inferred solutions are distinguished from user needs") keeps solutions and needs as distinct objects in this policy\'s own vocabulary — so that condition is carried by SOLUTION_SUBSTITUTION and does not reach an unlabeled inferred need. Reading "solution" to cover "need" would collapse a distinction the policy draws deliberately. Nothing ratified decides this code; the default stands.'
+				},
+				OUTCOME_EROSION: {
+					defaultSeverity: 'MATERIAL',
+					description:
+						"The formalized objective retains the user's desired outcome in name but in a weakened form, so the intent passes as faithful while descendants are held to a lower bar than the user expressed and the shortfall is invisible at approval.",
+					severityBasis: 'AUTHORED',
+					severityRationale:
+						'MATERIAL by default, not BLOCKING. The closest ratified condition is DOC-003 §25\'s "formalized objective contradicts user expression", but erosion degrades an outcome rather than contradicting it; reading contradiction to cover degradation, or restricting the code to total erosion, would narrow the code to reach BLOCKING. DOC-004 §23.6\'s "Any material unauthorized divergence from approved intent." would block the sibling INTENT_EROSION, but that condition belongs to pol_intent_preservation and keys to approved intent — not to this policy\'s pre-approval formalization. Consistent with DOC-004 §33 scoring the mirror-image INTENT_EXPANSION MATERIAL.'
+				},
+				NON_GOAL_CONFLICT: {
+					defaultSeverity: 'MATERIAL',
+					description:
+						'A proposed non-goal excludes an outcome the user requires, so the intent affirmatively licenses descendants to omit that outcome and its absence later reads as conformance rather than as a gap.',
+					severityBasis: 'AUTHORED',
+					severityRationale:
+						'MATERIAL by default, not BLOCKING. DOC-003 §25\'s blocking conditions key to the formalized objective, mandatory constraints, ambiguity, and inferred solutions. The one that might reach this code is "formalized objective contradicts user expression", but DOC-004 §15.6 separates IF-01 objective fidelity from IF-02 boundary fidelity, where in-scope and out-of-scope statements live — so a non-goal is not the formalized objective, and the condition does not reach it. Nothing ratified decides this code; the default stands.'
 				}
 			}
 		},
@@ -731,13 +782,61 @@ export const PRODUCT_REALIZATION_PWA_ONTOLOGY = {
 			sourceSection:
 				'DOC-004 §16 (POL-INTENT-COMPLETENESS). TRANSCRIBED from the ratified doc and machine-checked against it by doc004-conformance.test.ts: purpose (§16.1); the 6 criterion descriptions are "16.3 Claims evaluated" verbatim (leading character sentence-cased — the doc\'s numbered lists are inconsistently cased; no word added, removed, or reordered); the 7 finding codes are §16.5 verbatim in document order. PRECEDENTED DERIVATION: "16.3 Claims evaluated" ratifies neither ids nor names, so ids are minted by ordinal and name = the id. Only §15.6 and §19.5 have a Criteria subsection; the other 10 policies fall back this way. AUTHORED permittedControlActions: this section ratifies NO control actions (only §15.10, §17.8, §19.8 and §23.7 do). The pre-existing authored value is carried forward UNCHANGED — widening it would be authoring professional content over a judgement already made. Open for the sponsor. AUTHORED (no ratified source): rationale, evaluatorRole, evaluatedClaimTypes, appliesToPwuKinds, requiredEvidenceTypes, failureSeverity, independenceRequirement where the section has no Independence subsection, each criterion\'s criterionType/evaluationMethod/severityIfNotMet/mayBeNotApplicable, and findingAnnotations (DOC-004 §9.1 mandates FindingDefinition.description + defaultSeverity and ratifies neither for ANY of its 99 codes — an open corpus gap; unannotated codes fall back to the policy\'s failureSeverity and the humanized code).',
 			findingAnnotations: {
+				MISSING_DESIRED_OUTCOME: {
+					defaultSeverity: 'MATERIAL',
+					description:
+						'The Product Intent states no outcome the product is meant to achieve, leaving Product Behavior Definition and Architecture Definition to infer one and leaving later assessment nothing recorded to test the delivered product against.',
+					severityBasis: 'AUTHORED',
+					severityRationale:
+						"Neither DOC-004 §16 nor DOC-003 §26 states a blocking condition for this policy, so the default stands and the basis is mine. Not BLOCKING: DOC-003 §26 makes completeness 'risk-relative' and denies that the policy requires exhaustive specification before useful work begins, so an absent outcome is judged against the next authorized activity rather than being fatal on its face; under DOC-004 §10.3 a MATERIAL open finding already forecloses SATISFIED and keeps REJECTED available for the high-risk case. Not ADVISORY: it falsifies §16.3 claim 1, and §16.2 requires this policy before Architecture Definition, so it obliges rather than informs."
+				},
+				UNBOUNDED_PRODUCT_SCOPE: {
+					defaultSeverity: 'MATERIAL',
+					description:
+						'The Product Intent fixes no boundary or non-goals limiting what the product includes, so downstream decomposition can widen without any recorded limit an expansion could be tested against.',
+					severityBasis: 'AUTHORED',
+					severityRationale:
+						"No ratified blocking condition exists for this policy in either document. Not BLOCKING: §16.3 claim 2 is itself relative — boundaries need only be 'sufficient for the next activity' — so the bar moves with the activity, and DOC-004 §16.6 lists CONDITIONALLY_SATISFIED and INCONCLUSIVE for this policy, which §10.3 would make unreachable if the code forced REJECTED. Not ADVISORY: an absent boundary falsifies claim 2 of a policy §16.2 requires before Architecture Definition and high-impact implementation planning."
+				},
 				MISSING_MANDATORY_CONSTRAINT: {
 					defaultSeverity: 'MATERIAL',
-					description: 'A mandatory constraint is missing.'
+					description:
+						'A constraint binding on the work is absent from the constraint catalog, so architecture and planning commit against a requirement they never received and the omission surfaces only as rework once the constraint is asserted.',
+					severityBasis: 'AUTHORED',
+					severityRationale:
+						"No ratified blocking condition names this code in either document. Not CRITICAL: the code names no constraint class, and a mandatory constraint may or may not be safety- or security-bearing — narrowing the code to the safety case to reach CRITICAL would score a case the code does not state. Not ADVISORY: it falsifies §16.3 claim 4 ('mandatory constraints are recorded') and §16.4 names the constraint catalog as required evidence, so the finding obliges correction."
+				},
+				UNRESOLVED_CRITICAL_AMBIGUITY: {
+					defaultSeverity: 'MATERIAL',
+					description:
+						'An ambiguity recorded as critical carries no disposition, so the next activity resolves it implicitly by whichever choice it happens to make and that choice becomes de facto intent without ever being authorized.',
+					severityBasis: 'AUTHORED',
+					severityRationale:
+						"The word 'critical' in the code names the ambiguity's materiality, not the finding's severity. DOC-003 §27's blocking condition on a critical assumption governs Assumption Disclosure and cannot be borrowed for pol_intent_completeness, which DOC-003 §26 leaves without any blocking condition. §16.1 makes completeness proportional to 'irreversibility', but that scales the bar the validator applies before emitting the code, not the severity the code carries once emitted. Not ADVISORY: it falsifies §16.3 claim 6, and §16.4 names the ambiguity catalog as required evidence."
 				},
 				NO_SUCCESS_CONDITION: {
 					defaultSeverity: 'MATERIAL',
-					description: 'No success condition and not marked exploratory.'
+					description:
+						'The Product Intent records neither a success condition nor an explicit exploratory declaration, leaving no recorded basis against which any later activity can judge whether the product achieved what it was built to achieve.',
+					severityBasis: 'AUTHORED',
+					severityRationale:
+						"No ratified blocking condition exists for this policy. Not BLOCKING: §16.3 claim 5 is disjunctive ('success conditions exist or the work is explicitly exploratory') and §16.6 grants exploratory work conditional satisfaction when uncertainty is explicit and downstream execution remains reversible — the policy's own tolerance for absent success conditions shows their absence is not fatal by construction, even though this code fires only when neither limb holds. Not ADVISORY: with both limbs failed, the policy's sufficiency test for the next activity is unmet."
+				},
+				PREMATURE_DOWNSTREAM_SHAPING: {
+					defaultSeverity: 'MATERIAL',
+					description:
+						'The Product Intent already fixes behavior or architecture choices belonging to a later activity, so those choices enter downstream work as authorized intent and the activity that owns them never evaluates them under its own policy.',
+					severityBasis: 'AUTHORED',
+					severityRationale:
+						'This is the closest call in the section, since the code falsifies none of the six §16.3 claims — all of which test sufficiency rather than excess — which argues for ADVISORY. It obliges nonetheless: §16.2 requires this policy before Product Behavior Definition and Architecture Definition, and shaping already fixed in the intent pre-empts those very activities, so the finding demands reclassification rather than merely informing. Not BLOCKING: nothing ratified names it, and the defect is misplaced authority over content that exists, not structure that is missing.'
+				},
+				FALSE_COMPLETENESS: {
+					defaultSeverity: 'MATERIAL',
+					description:
+						'The Product Intent presents as complete in form while its outcomes, boundaries, or constraints are not decidable, so the completeness gate reports sufficiency and authorizes the next activity on structure that cannot support it.',
+					severityBasis: 'AUTHORED',
+					severityRationale:
+						"This code pulls hardest toward BLOCKING, since it defeats the policy's own gate, but MATERIAL is sufficient to that job: under DOC-004 §10.3 a MATERIAL open finding already forecloses SATISFIED, so emitting it at MATERIAL prevents the very authorization it warns of, and REJECTED remains in range for the severe case. BLOCKING would additionally strip CONDITIONALLY_SATISFIED and INCONCLUSIVE — both listed in §16.6 for this policy — leaving the policy's own headline failure unable to reach two of its four ratified dispositions. No blocking condition in either document names it."
 				}
 			}
 		},
@@ -847,11 +946,61 @@ export const PRODUCT_REALIZATION_PWA_ONTOLOGY = {
 			findingAnnotations: {
 				HIDDEN_MATERIAL_ASSUMPTION: {
 					defaultSeverity: 'MATERIAL',
-					description: 'A material assumption was left undisclosed.'
+					description:
+						'A premise that materially affects the validity of the work was never surfaced as an Assumption Object and remains embedded in prose, so it carries no materiality classification, no verification need, and no affected-object list to invalidate dependents against when it later proves false.',
+					severityBasis: 'AUTHORED',
+					severityRationale:
+						"MATERIAL, not BLOCKING: DOC-003 §27's condition requires a CRITICAL assumption, and the corpus types materiality as a three-value enum ('IMMATERIAL' | 'MATERIAL' | 'CRITICAL') that holds MATERIAL distinct from CRITICAL, so a code scoped to materiality is not the condition's case. Not ADVISORY: §17.3 claim 1 makes surfacing a claim the policy evaluates, and an unsurfaced premise defeats the policy's stated purpose of identifying premises not established as facts, constraints, or authorized decisions."
 				},
 				ASSUMPTION_PRESENTED_AS_FACT: {
 					defaultSeverity: 'MATERIAL',
-					description: 'An assumption was presented as established fact.'
+					description:
+						'An unestablished premise is stated as a fact, constraint, or authorized decision, so downstream work consumes it as settled evidence and reviewers who would challenge an assumption are never shown one to challenge.',
+					severityBasis: 'AUTHORED',
+					severityRationale:
+						"Nothing ratified decides this code. DOC-003 §27's blocking condition is conjunctive on a critical assumption governing irreversible or high-impact work; this code asserts neither criticality nor the class of work governed, so the condition does not reach it. Not ADVISORY: §17.3 claim 2 ('Assumptions are distinguished from facts') is a claim the policy evaluates, and a premise laundered into the fact base is read as established by every policy downstream that consumes evidence."
+				},
+				UNBOUNDED_ASSUMPTION_SCOPE: {
+					defaultSeverity: 'MATERIAL',
+					description:
+						'A disclosed assumption does not delimit the objects it affects, so on falsification the impact analysis has no bounded set to work from and INVALIDATE_DEPENDENTS cannot be aimed at anything.',
+					severityBasis: 'AUTHORED',
+					severityRationale:
+						'MATERIAL, not ADVISORY: §17.6 makes affected objects a required field of every Assumption Object and §17.3 claim 3 makes their identification a claim evaluated, so absence is a missing mandatory output rather than a suggestion. Not BLOCKING: DOC-003 §27 is keyed to criticality plus irreversible or high-impact work, neither of which this code asserts.'
+				},
+				MISSING_ASSUMPTION_BASIS: {
+					defaultSeverity: 'MATERIAL',
+					description:
+						'A disclosed assumption records no basis, so its materiality cannot be judged and no verification method can be chosen for it — the assumption is visible but undischargeable.',
+					severityBasis: 'AUTHORED',
+					severityRationale:
+						'MATERIAL, not ADVISORY: §17.6 lists basis among the required outputs, and its absence starves the materiality classification (§17.3 claim 4) and verification-need identification (claim 5) that the rest of the policy runs on. Not BLOCKING: DOC-003 §27 names criticality and irreversible or high-impact work, and this code asserts neither; the AssumptionObject schema itself types basis as optional, so absence is a policy-output gap rather than a bar to proceeding.'
+				},
+				UNASSESSED_CRITICAL_ASSUMPTION: {
+					defaultSeverity: 'BLOCKING',
+					description:
+						'An assumption classified CRITICAL has neither verification nor authorized acceptance, so irreversible or high-impact work proceeds on it and, if it fails, that work cannot be rolled back and dependents must be invalidated after the fact rather than before commitment.',
+					severityBasis: 'RATIFIED_BLOCKING_CONDITION',
+					severityRationale:
+						"BLOCKING per the sole blocking condition of RPH-DOC-003 §27, which names this case in its own terms: a critical assumption without verification or authorized acceptance. It is the only code in DOC-004 §17.5 asserting criticality together with absent assessment, so it is the only site the condition can attach to. Not CRITICAL: DOC-003 files the rule under the heading 'Blocking conditions' and calls it blocking. The condition adds the qualifier 'governs irreversible or high-impact work', which scopes where the block bites and permits adjudication to downgrade an instance governing neither; that same distinction is why §17.7 can let a disclosed-but-unresolved critical assumption reach CONDITIONALLY_SATISFIED without contradicting this default, since §17.7 opens by stating disclosure — not verification — is what SATISFIED requires.",
+					severityQuote:
+						'A critical assumption governs irreversible or high-impact work without verification or authorized acceptance.'
+				},
+				EXPIRED_ASSUMPTION: {
+					defaultSeverity: 'MATERIAL',
+					description:
+						'An assumption whose expiration condition has been met is still cited as the basis for new work, so plans that RPH-ASM-006 would reject on sight are approved instead, and no dependent object is re-verified against whatever superseded the premise.',
+					severityBasis: 'AUTHORED',
+					severityRationale:
+						"MATERIAL, not BLOCKING. RPH-ASM-006 rejects plan approval when a new plan depends on an EXPIRED assumption, but §10.3 places REJECTED inside the MATERIAL range, so that outcome does not lift severity; RPH-ASM-006 also never names this code, making the identification mine rather than the document's. DOC-003 §27 does not reach it either: expiry is a status value, not a materiality class, and an expired assumption may be of any materiality."
+				},
+				CONFLICTING_ASSUMPTIONS: {
+					defaultSeverity: 'MATERIAL',
+					description:
+						'Two or more disclosed assumptions governing overlapping work cannot both hold, so some dependent work already rests on a false premise and neither assumption can be verified in isolation until the conflict is resolved.',
+					severityBasis: 'AUTHORED',
+					severityRationale:
+						"No ratified condition names contradiction between assumptions; DOC-003 §27 is keyed to a single critical assumption's lack of assessment, not to consistency across a set. Not ADVISORY: an inconsistent set guarantees at least one false premise beneath work already performed, which the policy answers with CLARIFY and REQUEST_HUMAN_DECISION (§17.8) rather than with a note."
 				}
 			}
 		},
@@ -946,7 +1095,77 @@ export const PRODUCT_REALIZATION_PWA_ONTOLOGY = {
 			failureSeverity: 'BLOCKING',
 			permittedControlActions: ['REQUEST_HUMAN_DECISION', 'RESHAPE_PWU'],
 			sourceSection:
-				'DOC-004 §18 (POL-REQUIREMENT-COVERAGE). TRANSCRIBED from the ratified doc and machine-checked against it by doc004-conformance.test.ts: purpose (§18.1); the 6 criterion descriptions are "18.3 Claims evaluated" verbatim (leading character sentence-cased — the doc\'s numbered lists are inconsistently cased; no word added, removed, or reordered); the 8 finding codes are §18.5 verbatim in document order. PRECEDENTED DERIVATION: "18.3 Claims evaluated" ratifies neither ids nor names, so ids are minted by ordinal and name = the id. Only §15.6 and §19.5 have a Criteria subsection; the other 10 policies fall back this way. AUTHORED permittedControlActions: this section ratifies NO control actions (only §15.10, §17.8, §19.8 and §23.7 do). The value is the DERIVED FLOOR — the intersection of those four ratified sets (RESHAPE_PWU, REQUEST_HUMAN_DECISION), i.e. the actions every ratified set permits. Applied ONLY because this policy had no prior authored value and the field is required — an empty set is not honest-by-omission, it would mean a policy that can find a problem and recommend nothing. Narrow by construction: widening it is a policy-authoring decision for the sponsor. AUTHORED (no ratified source): rationale, evaluatorRole, evaluatedClaimTypes, appliesToPwuKinds, requiredEvidenceTypes, failureSeverity, independenceRequirement where the section has no Independence subsection, each criterion\'s criterionType/evaluationMethod/severityIfNotMet/mayBeNotApplicable, and findingAnnotations (DOC-004 §9.1 mandates FindingDefinition.description + defaultSeverity and ratifies neither for ANY of its 99 codes — an open corpus gap; unannotated codes fall back to the policy\'s failureSeverity and the humanized code).'
+				'DOC-004 §18 (POL-REQUIREMENT-COVERAGE). TRANSCRIBED from the ratified doc and machine-checked against it by doc004-conformance.test.ts: purpose (§18.1); the 6 criterion descriptions are "18.3 Claims evaluated" verbatim (leading character sentence-cased — the doc\'s numbered lists are inconsistently cased; no word added, removed, or reordered); the 8 finding codes are §18.5 verbatim in document order. PRECEDENTED DERIVATION: "18.3 Claims evaluated" ratifies neither ids nor names, so ids are minted by ordinal and name = the id. Only §15.6 and §19.5 have a Criteria subsection; the other 10 policies fall back this way. AUTHORED permittedControlActions: this section ratifies NO control actions (only §15.10, §17.8, §19.8 and §23.7 do). The value is the DERIVED FLOOR — the intersection of those four ratified sets (RESHAPE_PWU, REQUEST_HUMAN_DECISION), i.e. the actions every ratified set permits. Applied ONLY because this policy had no prior authored value and the field is required — an empty set is not honest-by-omission, it would mean a policy that can find a problem and recommend nothing. Narrow by construction: widening it is a policy-authoring decision for the sponsor. AUTHORED (no ratified source): rationale, evaluatorRole, evaluatedClaimTypes, appliesToPwuKinds, requiredEvidenceTypes, failureSeverity, independenceRequirement where the section has no Independence subsection, each criterion\'s criterionType/evaluationMethod/severityIfNotMet/mayBeNotApplicable, and findingAnnotations (DOC-004 §9.1 mandates FindingDefinition.description + defaultSeverity and ratifies neither for ANY of its 99 codes — an open corpus gap; unannotated codes fall back to the policy\'s failureSeverity and the humanized code).',
+			findingAnnotations: {
+				UNCOVERED_OUTCOME: {
+					defaultSeverity: 'BLOCKING',
+					description:
+						'An approved mandatory outcome has no requirement representing it and no recorded governed exclusion, so the product can satisfy every requirement it has and still fail to deliver an outcome the user approved.',
+					severityBasis: 'RATIFIED_BLOCKING_CONDITION',
+					severityRationale:
+						"DOC-004 §18.7 names this code's case on its 'outcome' branch, and §18.3's only outcome claim ('Each mandatory outcome is represented.') is the claim this code falsifies, so the code's evaluated case is the mandatory one the condition names — that is what lifts it off the MATERIAL default. Not CRITICAL: nothing in §18 classes an uncovered outcome as safety, security, or irreversibility failure. Honest scope note: an instance raised against a non-mandatory approved outcome under §18.1 would not meet §18.7 and would be adjudicated down; the default tracks the mandatory claim the code exists to test. DOC-003 §28 states no blocking conditions and so does not disturb this.",
+					severityQuote:
+						'Blocking when a mandatory user outcome or constraint has no requirement or governed exclusion.'
+				},
+				UNCOVERED_CAPABILITY: {
+					defaultSeverity: 'MATERIAL',
+					description:
+						'An approved capability in the capability map has no applicable requirements, leaving downstream architecture and decomposition with no obligation to allocate any work to it.',
+					severityBasis: 'AUTHORED',
+					severityRationale:
+						"Nothing ratified decides this code. DOC-004 §18.7 names only 'a mandatory user outcome or constraint'; a capability is neither, and §18.3 states no capability-specific claim, so there is no ratified footing to reach BLOCKING — reading capabilities into the outcome branch would be the laundering the prior rounds performed. MATERIAL is the default and holds: §18.1 puts capabilities among the approved items that must be represented or excluded, so the finding obliges resolution rather than merely informing, which keeps it above ADVISORY."
+				},
+				UNCOVERED_JOURNEY_STEP: {
+					defaultSeverity: 'MATERIAL',
+					description:
+						'A step in a critical user journey has no applicable requirement, so the journey breaks at that step even when every traced requirement is met.',
+					severityBasis: 'AUTHORED',
+					severityRationale:
+						"Nothing ratified decides this code. DOC-004 §18.7 blocks only on an outcome or constraint; a journey step is neither, and although §18.3 claim 2 ('Each critical journey has applicable requirements.') carries a criticality qualifier, criticality of a journey is not the mandatoriness of an outcome and §18.7 does not reach it — the adjacent BLOCKING call would require that substitution, which the text does not license. MATERIAL is the default and fits; above ADVISORY because a gap in a critical journey obliges a fix, not a note."
+				},
+				MISSING_FAILURE_REQUIREMENT: {
+					defaultSeverity: 'MATERIAL',
+					description:
+						"An important failure path identified in the scenarios has no requirement defining the product's behavior for it, leaving that behavior to be invented downstream rather than derived from approved intent.",
+					severityBasis: 'AUTHORED',
+					severityRationale:
+						"Nothing ratified decides this code. DOC-004 §18.7 names neither failure paths nor scenarios. Not CRITICAL: §18.3 claim 4 scopes this to 'important failure paths' generally, and neither §18 nor DOC-003 §28 classes them as safety, security, or irreversibility failures — reading a safety class into 'failure' would invent a class the documents do not state. MATERIAL is the default and holds; above ADVISORY because unspecified failure behavior obliges resolution before dependent work is committed."
+				},
+				ORPHAN_REQUIREMENT: {
+					defaultSeverity: 'MATERIAL',
+					description:
+						'A requirement has no authoritative source in approved intent, so when intent is revised the requirement cannot be re-derived or retired with it and survives changes that should have removed it.',
+					severityBasis: 'AUTHORED',
+					severityRationale:
+						"Nothing ratified decides this code. DOC-004 §18.7 names only uncovered mandatory outcomes and constraints; an unsourced requirement is neither. There is a genuine pull toward ADVISORY, since §18.3 claim 5 obliges only that such requirements 'are identified' rather than eliminated — but the finding still obliges an outcome (source it, remove it, or waive it) and propagates unsourced obligations into decomposition if left open, so it obliges rather than informs and MATERIAL stands. I do not derive severity from DOC-003 §28's 'waive with authority' control action, since waivability is orthogonal to §10.3."
+				},
+				CONSTRAINT_WITHOUT_OBLIGATION: {
+					defaultSeverity: 'BLOCKING',
+					description:
+						'A mandatory constraint creates no enforceable requirement-level obligation, so no downstream work is accountable for honoring it and conformance to it can never be evidenced.',
+					severityBasis: 'RATIFIED_BLOCKING_CONDITION',
+					severityRationale:
+						"DOC-004 §18.7 names this code's case on its 'constraint' branch — a constraint with no implementing obligation is a constraint with no requirement — and §18.3 claim 3 ('each mandatory constraint creates enforceable obligations.') is mandatory-scoped, matching the condition's scope. Not MATERIAL, because a ratified condition decides it; not CRITICAL, because §18 attaches no safety or irreversibility class to constraint coverage. DOC-003 §28 lists 'constraint without implementing obligation' only as an observation and states no blocking conditions, so it neither adds to nor contradicts §18.7.",
+					severityQuote:
+						'Blocking when a mandatory user outcome or constraint has no requirement or governed exclusion.'
+				},
+				UNAUTHORIZED_REQUIREMENT: {
+					defaultSeverity: 'MATERIAL',
+					description:
+						'A requirement introduces scope that approved intent does not authorize, committing downstream decomposition and architecture to build work the user never approved.',
+					severityBasis: 'AUTHORED',
+					severityRationale:
+						'Nothing ratified decides this code. DOC-004 §18.7 blocks only on a mandatory outcome or constraint lacking coverage; unauthorized scope is the opposite direction (excess, not absence) and the condition does not name it. MATERIAL is the default and it fits: under §10.3 a MATERIAL open finding already reaches CONDITIONALLY_SATISFIED, INCONCLUSIVE, or REJECTED, which spans every disposition this case needs. I decline to import POL-INTENT-FIDELITY §15.11 non-waivability, which is orthogonal to severity. Consistency check only, not a citation: the §33 worked example scores the nearest analogue, INTENT_EXPANSION, at MATERIAL — it names that code, not this one, so the basis stays AUTHORED. Above ADVISORY because unauthorized scope obliges resolution rather than informing.'
+				},
+				DUPLICATE_REQUIREMENT: {
+					defaultSeverity: 'ADVISORY',
+					description:
+						'The same obligation is expressed by more than one requirement, so trace links and later revisions split across the copies and the duplicates drift into conflicting versions of one obligation.',
+					severityBasis: 'AUTHORED',
+					severityRationale:
+						"Nothing ratified decides this code, and it is the one §18.5 code that falsifies none of §18.3's six claims — duplication defeats neither representation nor exclusion, so §18.1's purpose is still met with a duplicate present and the policy's claims stand. That is the positive reason to drop below the MATERIAL default rather than an appeal to the finding being minor. DOC-003 §28 lists 'duplicate requirement' among Observations only, its own word for the illustrative tier. ADVISORY not INFORMATIONAL because the finding still directs a control action (consolidation) rather than only recording a fact; ADVISORY not MATERIAL because no claim this policy evaluates is open while it stands."
+				}
+			}
 		},
 		{
 			policyId: 'pol_decomposition_coverage',
@@ -1062,11 +1281,86 @@ export const PRODUCT_REALIZATION_PWA_ONTOLOGY = {
 			findingAnnotations: {
 				MISSING_OBLIGATION_ALLOCATION: {
 					defaultSeverity: 'BLOCKING',
-					description: 'A mandatory obligation was not allocated.'
+					description:
+						"A mandatory parent obligation is neither allocated to a child, retained by the parent, satisfied, nor waived, so the obligation leaves the assurance chain entirely — no child's completion is ever assessed against it and the parent can be reported complete with it unmet.",
+					severityBasis: 'RATIFIED_BLOCKING_CONDITION',
+					severityRationale:
+						"BLOCKING, not MATERIAL: DOC-004 §19.7 names this code's case in its own words and declares it blocking, and DOC-003 §29 independently lists 'missing mandatory obligation' among its blocking conditions — the two agree. RPH-DEC-002 corroborates by name ('finding `MISSING_OBLIGATION_ALLOCATION` is emitted', 'child execution is blocked'), but the blocking condition, not the test, decides the severity. Not CRITICAL: a lost obligation is not itself a safety, security, or irreversibility-class failure.",
+					severityQuote: 'Any missing mandatory obligation or child intent divergence is blocking.'
 				},
 				DROPPED_CONSTRAINT: {
+					defaultSeverity: 'MATERIAL',
+					description:
+						"An applicable parent constraint is neither propagated to the children nor explicitly retained at the parent, so child execution proceeds unbounded and can produce work that the parent's own rules would have rejected.",
+					severityBasis: 'AUTHORED',
+					severityRationale:
+						"MATERIAL is the default and nothing ratified lifts it. DOC-004 §19.7 makes only missing obligation and intent divergence blocking, and DOC-003 §29 likewise omits constraint drop from its blocking conditions even though its own Critical checks list 'no mandatory constraint silently drops' — the omission is deliberate, because the blocking treatment of an omitted constraint is carried by the sibling policy POL-CONSTRAINT-PROPAGATION, whose §20.5 blocking conditions include 'mandatory applicable constraint omitted' and whose §20.4 supplies its own code SILENT_CONSTRAINT_DROP for it. Under §19 this code records the decomposition-side loss. RPH-DEC-003 says the decomposition 'is rejected' but does not name this code, and REJECTED sits inside the MATERIAL range under §10.3, so it is not evidence of BLOCKING. Not ADVISORY: a dropped constraint obliges revision of the decomposition rather than merely informing."
+				},
+				ORPHAN_CHILD_PWU: {
+					defaultSeverity: 'MATERIAL',
+					description:
+						'A child PWU carries no allocated parent obligation and cannot explain why it exists, so execution and assurance capacity is spent on work whose satisfaction moves the parent no closer to discharging its obligations.',
+					severityBasis: 'AUTHORED',
+					severityRationale:
+						"MATERIAL by default; no ratified blocking condition names an untraceable child. It engages DOC-004 §19.5 DC-03 and DOC-003 §29's critical check 'each child has a clear purpose', but critical checks are not the blocking-conditions list, which is enumerated separately in the same section. Where the orphan work also contradicts parent intent, CHILD_INTENT_DIVERGENCE fires and blocks on its own footing. Not ADVISORY: an untraceable child obliges either allocation or removal."
+				},
+				OVERLAPPING_CHILD_SCOPE: {
+					defaultSeverity: 'MATERIAL',
+					description:
+						'Two or more children claim responsibility for the same work without an explicit boundary or exclusion, so each may proceed assuming the other covered it and the overlap resolves into a gap rather than into duplication.',
+					severityBasis: 'AUTHORED',
+					severityRationale:
+						"MATERIAL by default; no blocking condition names it. DOC-003 §29's 'invalid authority or scope' concerns a child holding authority or scope it does not validly have, not two validly scoped children whose boundaries overlap — DOC-004 §19.6 enumerates no code for that condition, and stretching this one onto it would be a miscitation. This code sits under DC-04 Boundary clarity. Not ADVISORY: an unresolved overlap obliges boundary revision."
+				},
+				EXCESSIVE_CHILD_COUPLING: {
+					defaultSeverity: 'MATERIAL',
+					description:
+						"Children depend on one another beyond what the parent's work requires, so no child can be executed, assured, or revised on its own and the decomposition yields none of the isolation it was performed to create.",
+					severityBasis: 'AUTHORED',
+					severityRationale:
+						"MATERIAL by default; no blocking condition names coupling. DOC-003 §29 lists 'excessively coupled' as a possible outcome — a terminal characterization of the decomposition, not an advisory note — and DOC-003 §17 names Excessive Coupling as an assurance policy of the Work Decomposition PWU type, so the finding obliges rather than informs, which rules out ADVISORY. Nothing lifts it to BLOCKING."
+				},
+				INVALID_GRANULARITY: {
+					defaultSeverity: 'MATERIAL',
+					description:
+						'A child is too large to execute and assure, or too small to carry a meaningful professional purpose, so assurance either cannot reach inside the child or is spent on fragments whose individual satisfaction says nothing about the parent obligation.',
+					severityBasis: 'AUTHORED',
+					severityRationale:
+						"MATERIAL by default; no blocking condition names granularity. Grounded in DOC-003 §17 Granularity ('Is each child small enough to execute and assure but large enough to remain meaningful?') and the possible outcome 'over-fragmented' in §29. Not ADVISORY: 'over-fragmented' is a terminal outcome of the policy and Granularity Fitness is a named assurance policy, so the finding obliges reshaping of the decomposition."
+				},
+				MISSING_SIBLING_DEPENDENCY: {
+					defaultSeverity: 'MATERIAL',
+					description:
+						'A material dependency between children is not represented in the dependency graph, so the children are planned and executed as if independent and the dependent child proceeds on work its sibling has not yet produced.',
+					severityBasis: 'AUTHORED',
+					severityRationale:
+						"MATERIAL by default; no ratified blocking condition names it. It engages DOC-004 §19.5 DC-05 and DOC-003 §29's critical check 'sibling dependencies are represented', but that check is listed separately from the same section's blocking conditions and does not appear among them. The word 'Material' in DC-05 qualifies which dependencies must be explicit, not the severity, and is not relied on here. Not ADVISORY: an unrepresented dependency obliges correction of the dependency graph."
+				},
+				MISSING_RECOMPOSITION_STRATEGY: {
 					defaultSeverity: 'BLOCKING',
-					description: 'An applicable constraint was dropped.'
+					description:
+						'No credible parent-level integration strategy exists for reassembling the assured child outputs, so every child can reach satisfaction while the parent obligation the decomposition was performed to discharge has no path to a parent result.',
+					severityBasis: 'RATIFIED_BLOCKING_CONDITION',
+					severityRationale:
+						"BLOCKING, not MATERIAL: DOC-003 §29 lists 'no recomposition strategy' among its blocking conditions and that ratified text decides this code. DOC-004 §19.7 is silent on it, but §19.7 is a strict subset of DOC-003 §29 — agreement, not conflict — so the DOC-003 condition stands. RPH-DEC-005 corroborates the case ('the decomposition cannot become valid') but does not name the code, so it is not the basis. Not CRITICAL: no safety, security, or irreversibility class is engaged.",
+					severityQuote: 'no recomposition strategy'
+				},
+				CHILD_INTENT_DIVERGENCE: {
+					defaultSeverity: 'BLOCKING',
+					description:
+						"A child's objectives depart from or contradict the parent's intent, so the decomposition delivers work the parent's intent never called for while every child reports as satisfied.",
+					severityBasis: 'RATIFIED_BLOCKING_CONDITION',
+					severityRationale:
+						"BLOCKING, not MATERIAL: DOC-004 §19.7 names 'child intent divergence' verbatim as blocking, and DOC-003 §29 agrees via 'child work contradicts parent intent'. RPH-DEC-004 names this code directly. This does not contradict the §33 worked example that scores INTENT_EXPANSION as MATERIAL: that is a different code under a different policy (§23 Intent Preservation), and no blocking condition names its case. Not CRITICAL: divergence is a scope and authority failure, not a safety or irreversibility-class one.",
+					severityQuote: 'Any missing mandatory obligation or child intent divergence is blocking.'
+				},
+				FALSE_COMPLETE_COVERAGE: {
+					defaultSeverity: 'MATERIAL',
+					description:
+						'The coverage claim asserts that every parent obligation is discharged while the allocations behind it do not support that assertion, so the decomposition can reach a disposition on the strength of a self-report that its own allocation map contradicts.',
+					severityBasis: 'AUTHORED',
+					severityRationale:
+						"MATERIAL by default; no blocking condition names a false coverage claim. The nearest condition, 'missing mandatory obligation' (DOC-003 §29, DOC-004 §19.7), names the absence of an obligation from the map — that is MISSING_OBLIGATION_ALLOCATION's case and blocks there. This code fires where mandatory obligations do carry allocation entries but the completeness assertion is unsupported: the obligation is not missing, the claim is false. Where a false claim conceals an actually-missing mandatory obligation, MISSING_OBLIGATION_ALLOCATION fires alongside and blocks on its own footing, so MATERIAL here does not let that case through. Not ADVISORY: an unsupported coverage claim obliges correction of the claim."
 				}
 			}
 		},
@@ -1146,7 +1440,67 @@ export const PRODUCT_REALIZATION_PWA_ONTOLOGY = {
 			failureSeverity: 'BLOCKING',
 			permittedControlActions: ['REQUEST_HUMAN_DECISION', 'RESHAPE_PWU'],
 			sourceSection:
-				'DOC-004 §20 (POL-CONSTRAINT-PROPAGATION). TRANSCRIBED from the ratified doc and machine-checked against it by doc004-conformance.test.ts: purpose (§20.1); the 5 criterion descriptions are "20.3 Claims evaluated" verbatim (leading character sentence-cased — the doc\'s numbered lists are inconsistently cased; no word added, removed, or reordered); the 7 finding codes are §20.4 verbatim in document order. PRECEDENTED DERIVATION: "20.3 Claims evaluated" ratifies neither ids nor names, so ids are minted by ordinal and name = the id. Only §15.6 and §19.5 have a Criteria subsection; the other 10 policies fall back this way. AUTHORED permittedControlActions: this section ratifies NO control actions (only §15.10, §17.8, §19.8 and §23.7 do). The value is the DERIVED FLOOR — the intersection of those four ratified sets (RESHAPE_PWU, REQUEST_HUMAN_DECISION), i.e. the actions every ratified set permits. Applied ONLY because this policy had no prior authored value and the field is required — an empty set is not honest-by-omission, it would mean a policy that can find a problem and recommend nothing. Narrow by construction: widening it is a policy-authoring decision for the sponsor. AUTHORED (no ratified source): rationale, evaluatorRole, evaluatedClaimTypes, appliesToPwuKinds, requiredEvidenceTypes, failureSeverity, independenceRequirement where the section has no Independence subsection, each criterion\'s criterionType/evaluationMethod/severityIfNotMet/mayBeNotApplicable, and findingAnnotations (DOC-004 §9.1 mandates FindingDefinition.description + defaultSeverity and ratifies neither for ANY of its 99 codes — an open corpus gap; unannotated codes fall back to the policy\'s failureSeverity and the humanized code).'
+				'DOC-004 §20 (POL-CONSTRAINT-PROPAGATION). TRANSCRIBED from the ratified doc and machine-checked against it by doc004-conformance.test.ts: purpose (§20.1); the 5 criterion descriptions are "20.3 Claims evaluated" verbatim (leading character sentence-cased — the doc\'s numbered lists are inconsistently cased; no word added, removed, or reordered); the 7 finding codes are §20.4 verbatim in document order. PRECEDENTED DERIVATION: "20.3 Claims evaluated" ratifies neither ids nor names, so ids are minted by ordinal and name = the id. Only §15.6 and §19.5 have a Criteria subsection; the other 10 policies fall back this way. AUTHORED permittedControlActions: this section ratifies NO control actions (only §15.10, §17.8, §19.8 and §23.7 do). The value is the DERIVED FLOOR — the intersection of those four ratified sets (RESHAPE_PWU, REQUEST_HUMAN_DECISION), i.e. the actions every ratified set permits. Applied ONLY because this policy had no prior authored value and the field is required — an empty set is not honest-by-omission, it would mean a policy that can find a problem and recommend nothing. Narrow by construction: widening it is a policy-authoring decision for the sponsor. AUTHORED (no ratified source): rationale, evaluatorRole, evaluatedClaimTypes, appliesToPwuKinds, requiredEvidenceTypes, failureSeverity, independenceRequirement where the section has no Independence subsection, each criterion\'s criterionType/evaluationMethod/severityIfNotMet/mayBeNotApplicable, and findingAnnotations (DOC-004 §9.1 mandates FindingDefinition.description + defaultSeverity and ratifies neither for ANY of its 99 codes — an open corpus gap; unannotated codes fall back to the policy\'s failureSeverity and the humanized code).',
+			findingAnnotations: {
+				SILENT_CONSTRAINT_DROP: {
+					defaultSeverity: 'BLOCKING',
+					description:
+						'A mandatory applicable parent constraint reaches a relevant child with no explicit disposition — not inherited, not waived, not declared inapplicable — so the child is planned, executed and assessed as though the constraint had never applied to it.',
+					severityBasis: 'RATIFIED_BLOCKING_CONDITION',
+					severityRationale:
+						"BLOCKING rather than MATERIAL because DOC-004 §20.5, this policy's own ratified blocking conditions, states the case outright; and it covers the whole code rather than a subset, since claim 20.3.1 already scopes the code to mandatory applicable parent constraints ('Every mandatory applicable parent constraint has an explicit disposition'). Nothing is inferred — the condition and the code have the same extension.",
+					severityQuote: 'mandatory applicable constraint omitted'
+				},
+				WEAKENED_CONSTRAINT: {
+					defaultSeverity: 'BLOCKING',
+					description:
+						"A propagated constraint arrives at the child with reduced strength or authority — a mandatory constraint recorded as advisory — with no authorized decision behind the change, so the child is later assessed as compliant against a weaker bar than the parent's constraint actually sets.",
+					severityBasis: 'RATIFIED_BLOCKING_CONDITION',
+					severityRationale:
+						"BLOCKING rather than MATERIAL because DOC-004 §20.5 states this case directly. Neither qualifier narrows the code below its own extension: weakening *with* authority is an authorized change and not a finding at all, and the corpus's strength axis is mandatory-to-advisory (RPH-CNS-002, 'a model proposes changing it to advisory'), so the mandatory case is the weakening case rather than a slice of it. RPH-CNS-001/002 corroborate but do not name the code; the blocking condition alone carries the severity.",
+					severityQuote: 'mandatory constraint weakened without authority'
+				},
+				UNAUTHORIZED_INAPPLICABILITY: {
+					defaultSeverity: 'MATERIAL',
+					description:
+						"A child declares a mandatory parent constraint inapplicable without the rationale and authority or policy basis such a decision requires, so a live obligation is retired from the child's scope on an assertion that no accountable actor stands behind.",
+					severityBasis: 'AUTHORED',
+					severityRationale:
+						"MATERIAL rather than BLOCKING because none of DOC-004 §20.5's three conditions reach this code: the constraint is not 'omitted' (a disposition is recorded — an unauthorized one), and reading a bad inapplicability call as 'weakened without authority' would collapse two claims DOC-004 §20.3 keeps separate, claim 3 (inapplicability rationale) into claim 2 (authority and strength). RPH-CNS-003 requires 'a rationale and authority or policy basis' but never names this code, so the identification is mine, not the document's. Not ADVISORY, because claim 20.3.3 obliges rather than informs; MATERIAL still reaches REJECTED under §10.3, and if the constraint is in fact absent from a relevant child or a critical artifact then violates it, §20.5's own conditions fire independently."
+				},
+				EXPIRED_CONSTRAINT_WAIVER: {
+					defaultSeverity: 'MATERIAL',
+					description:
+						'The disposition of a mandatory constraint rests on a waiver whose expiration has passed, so work the lapse should have returned to review instead keeps moving downstream on a disposition that no longer holds, and reaches the promotion gate carrying a constraint that is neither complied with nor currently authorized.',
+					severityBasis: 'AUTHORED',
+					severityRationale:
+						"MATERIAL rather than BLOCKING because DOC-004 §20.5 names omission, unauthorized weakening, and critical-artifact violation — not lapse. The corpus does block expired waivers, but in a different policy that carries its own code for exactly that: DOC-004 §26.5 'INVALID_OR_EXPIRED_WAIVER' under Baseline Promotion, whose blocking conditions in RPH-DOC-003 §35 ('Assurance Policy: Baseline Promotion') list 'expired waiver'. A waiver is recorded against 'exact policy and criterion' and 'exact object and semantic version' (DOC-004 §12.2, 'Waiver invariants'), so a block attached to the promotion policy is not by itself a block in this one — that inference is mine, hence AUTHORED. RPH-CNS-004 states the division outright and assigns this policy the milder half: on expiry 'affected work becomes review-required', while 'baseline promotion is blocked if the constraint remains applicable' — review-required here, blocked at the gate. MATERIAL matches, supporting CONDITIONALLY_SATISFIED pending renewal or compliance (§10.3)."
+				},
+				CONSTRAINT_CONTRADICTION: {
+					defaultSeverity: 'MATERIAL',
+					description:
+						'A child artifact contradicts an active inherited constraint, leaving artifact and constraint simultaneously in force with no recorded decision as to which one governs the work built on top of them.',
+					severityBasis: 'AUTHORED',
+					severityRationale:
+						"MATERIAL rather than BLOCKING because DOC-004 §20.5's third condition is qualified — 'critical artifact violates an active constraint' — and names only a subset of this code's instances, while its home claim 20.3.5 ('child artifacts do not contradict inherited constraints') carries no criticality qualifier. DOC-004 uses artifact and claim criticality as a live distinction elsewhere (§8.3, §21.6, §26.6), so the qualifier is deliberate: the document could have blocked every contradiction and chose not to. A RATIFIED_BLOCKING_CONDITION label here would rest on a quote that does not hold for the non-critical case. The default costs nothing at the critical end, since §20.5 is a policy-level condition that fires on a critical artifact regardless of this field, and MATERIAL still reaches REJECTED under §10.3."
+				},
+				MISSING_CONSTRAINT_TRACE: {
+					defaultSeverity: 'MATERIAL',
+					description:
+						'No trace links a mandatory constraint to the relevant child PWUs and artifacts, so a constraint that was never propagated is indistinguishable in the record from one that was, and the propagation claims cannot be evaluated at all.',
+					severityBasis: 'AUTHORED',
+					severityRationale:
+						"MATERIAL rather than ADVISORY. §20.5 does not reach it — a trace gap is not an omitted constraint, since the constraint may well have propagated — so no ratified condition decides this code and the call is mine. It is not merely informational: RPH-TRC-002 requires that for each mandatory architecture constraint 'a trace must exist to relevant child PWUs and artifacts', and without it claims 20.3.1, 20.3.2 and 20.3.5 are unassessable, which §7 refuses to treat as passing ('\"Unable to determine\" is not equivalent to \"met.\"'). RPH-TRC-002 does not name the code, so the basis is AUTHORED. §10.3's 'Evidence deficit → INCONCLUSIVE' does not lower the severity — it is keyed to the deficit, not to a severity."
+				},
+				CONSTRAINT_SCOPE_ERROR: {
+					defaultSeverity: 'MATERIAL',
+					description:
+						"A constraint or its waiver carries a recorded scope that does not match where it is enforced — binding children it does not govern, or excluding children it does — so the recorded scope cannot be relied on to establish any child's actual obligations.",
+					severityBasis: 'AUTHORED',
+					severityRationale:
+						"MATERIAL rather than BLOCKING because DOC-004 §20.5 states no mis-scoping condition. Where a scope error actually strips a mandatory constraint from a relevant child, that instance is SILENT_CONSTRAINT_DROP and blocks on its own ratified condition; what remains to this code is the mis-declaration itself, which is repairable by restating the scope. Not ADVISORY, because claim 20.3.4 obliges that 'waivers are authorized and scoped' and §12.2 requires a waiver to record its exact policy, criterion, object and semantic version; MATERIAL keeps REJECTED available under §10.3."
+				}
+			}
 		},
 		{
 			policyId: 'pol_architecture_coverage',
@@ -1282,12 +1636,100 @@ export const PRODUCT_REALIZATION_PWA_ONTOLOGY = {
 				'DOC-004 §21 (POL-ARCHITECTURE-COVERAGE). TRANSCRIBED from the ratified doc and machine-checked against it by doc004-conformance.test.ts: purpose (§21.1); the 10 criterion descriptions are "21.3 Claims evaluated" verbatim (leading character sentence-cased — the doc\'s numbered lists are inconsistently cased; no word added, removed, or reordered); the 12 finding codes are §21.5 verbatim in document order. PRECEDENTED DERIVATION: "21.3 Claims evaluated" ratifies neither ids nor names, so ids are minted by ordinal and name = the id. Only §15.6 and §19.5 have a Criteria subsection; the other 10 policies fall back this way. AUTHORED permittedControlActions: this section ratifies NO control actions (only §15.10, §17.8, §19.8 and §23.7 do). The pre-existing authored value is carried forward UNCHANGED — widening it would be authoring professional content over a judgement already made. Open for the sponsor. AUTHORED (no ratified source): rationale, evaluatorRole, evaluatedClaimTypes, appliesToPwuKinds, requiredEvidenceTypes, failureSeverity, independenceRequirement where the section has no Independence subsection, each criterion\'s criterionType/evaluationMethod/severityIfNotMet/mayBeNotApplicable, and findingAnnotations (DOC-004 §9.1 mandates FindingDefinition.description + defaultSeverity and ratifies neither for ANY of its 99 codes — an open corpus gap; unannotated codes fall back to the policy\'s failureSeverity and the humanized code).',
 			findingAnnotations: {
 				UNCOVERED_REQUIREMENT: {
-					defaultSeverity: 'CRITICAL',
-					description: 'A requirement is not covered by the architecture.'
+					defaultSeverity: 'MATERIAL',
+					description:
+						'An applicable requirement has no allocation to any architecture element, leaving no component accountable for satisfying it when implementation planning begins, so the obligation is discovered as missing only once the product is built or assured against it.',
+					severityBasis: 'AUTHORED',
+					severityRationale:
+						"Nothing ratified decides this code. DOC-004 §21.6 is the policy's only blocking condition and its four subject classes (security, tenant-isolation, data-integrity, mandatory-constraint) do not include requirement allocation; DOC-003 §30 lists 'requirement with no architecture allocation' only under 'Common findings', which is illustrative prose and states no severity. MATERIAL is the default and this defeats claim §21.3.1 ('Applicable requirements are allocated'). Not BLOCKING: no ratified condition names it, and REJECTED remains reachable from MATERIAL under §10.3 where an instance warrants it."
+				},
+				UNCLEAR_SYSTEM_BOUNDARY: {
+					defaultSeverity: 'MATERIAL',
+					description:
+						'The architecture does not make explicit what lies inside the system and what lies outside it, so obligations at the edge are allocated to neither side, and interface, security, and deployment work is scoped against a boundary that can still move after baseline promotion.',
+					severityBasis: 'AUTHORED',
+					severityRationale:
+						"No ratified text decides this code. Defeats claim §21.3.2 ('system boundaries are explicit'), which is the MATERIAL default case. Not BLOCKING: §21.6's four classes do not include system boundary, and where the boundary left unclear is specifically a security boundary that is absent, MISSING_SECURITY_BOUNDARY is the code that fits — reading this general code up to BLOCKING would both make that distinct code redundant and take §21.6 past the 'Critical' qualifier that governs its list."
+				},
+				UNCLEAR_COMPONENT_RESPONSIBILITY: {
+					defaultSeverity: 'MATERIAL',
+					description:
+						"A major component's responsibilities are not coherent or not stated, so requirements allocated to it cannot be traced to a definite scope of work and the same obligation is implemented twice or not at all across neighbouring components.",
+					severityBasis: 'AUTHORED',
+					severityRationale:
+						"No ratified text decides this code. Defeats claim §21.3.3 ('major components have coherent responsibilities'); DOC-003 §30 independently recognises 'architecture element with unclear responsibility' but only as a Common finding with no severity attached. MATERIAL is the default and nothing in §21.6 raises it. Not ADVISORY: the finding obliges correction rather than informing a judgment, because an allocation to a component with no coherent scope does not survive into implementation."
+				},
+				MISSING_INTERFACE_DEFINITION: {
+					defaultSeverity: 'MATERIAL',
+					description:
+						'An interface between architecture elements is not sufficiently defined, so the components on either side are planned and built against incompatible assumptions that surface as integration defects only when the two are assembled.',
+					severityBasis: 'AUTHORED',
+					severityRationale:
+						"No ratified text decides this code. Defeats claim §21.3.4 ('interfaces are sufficiently defined'), against evidence §21.4 lists as 'interface definitions'. MATERIAL is the default; §21.6's four subject classes do not include interface definition. Not BLOCKING: absent a ratified condition, the default holds, and §10.3 still permits REJECTED for an instance severe enough to warrant it."
+				},
+				AMBIGUOUS_DATA_OWNERSHIP: {
+					defaultSeverity: 'MATERIAL',
+					description:
+						"No single architecture element is accountable for a data element's correctness and lifecycle, so multiple components write it on divergent assumptions with no owner empowered to arbitrate the resulting conflicts.",
+					severityBasis: 'AUTHORED',
+					severityRationale:
+						"No ratified text decides this code. DOC-004 §21.6 names data-integrity failures, but 'Critical' governs its whole coordinated list, so it blocks critical data-integrity failures — a subset of this code's instances, not the code itself. The same qualifier that leaves MISSING_SECURITY_BOUNDARY at its default leaves this one at its default: DOC-003 §30 lists 'data ownership ambiguous' and 'security responsibility absent' side by side as undifferentiated Common findings, supplying no basis to split them, and no basis is needed once §21.6 is read with its qualifier intact. MATERIAL is the default and this defeats claim §21.3.5 ('data ownership is explicit'). Not ADVISORY: unstated ownership leaves no element accountable for the data's correctness, which obliges correction rather than informing a judgment. BLOCKING remains available at instance level where the ambiguity is itself a critical data-integrity failure — which is precisely what §21.6 decides."
+				},
+				MISSING_SECURITY_BOUNDARY: {
+					defaultSeverity: 'MATERIAL',
+					description:
+						'The architecture does not represent a security boundary that its obligations require, so no component is charged with enforcing the separation and enforcement devolves to whatever each implementer happens to build at the point of use.',
+					severityBasis: 'AUTHORED',
+					severityRationale:
+						"No ratified text decides this code. DOC-004 §21.6 names security failures, but 'Critical' governs its whole coordinated list, so it blocks critical security failures — a subset of this code's instances, not the code. 'Critical' is a live instance qualifier in this corpus, not a class label: DOC-003 §27, 'A critical assumption governs irreversible or high-impact work without verification or authorized acceptance'; DOC-003 §35, 'unresolved critical observation'; DOC-004 §20.5, 'critical artifact violates an active constraint'. That tenant-isolation — one of §21.6's four classes — has no code in §21.5 at all confirms §21.6 is not a per-code assignment table: it is a test applied to the failure an instance reports, under whichever code fits. The corpus scores this pattern directly: §23.6 blocks 'Any material unauthorized divergence from approved intent', yet §33 records INTENT_EXPANSION — a divergence from approved intent — at \"severity\": \"MATERIAL\", so a qualified blocking condition does not raise a code's default; the instance must meet the qualifier. MATERIAL is the default and this defeats claim §21.3.6 ('security boundaries are represented'). Not ADVISORY: an unrepresented boundary leaves an obligation with no component charged to enforce it, which obliges correction. BLOCKING remains available at instance level where the missing boundary is itself a critical security failure."
+				},
+				MISSING_OPERATIONAL_CONCERN: {
+					defaultSeverity: 'MATERIAL',
+					description:
+						'An operational or deployment concern the architecture must address is absent from it, so the system is structured without the means to deploy and observe it and that structure must be reopened after implementation planning has already relied on the baseline.',
+					severityBasis: 'AUTHORED',
+					severityRationale:
+						"No ratified text decides this code. Defeats claim §21.3.7 ('operational and deployment concerns are proportionate'), against evidence §21.4 lists as 'deployment model'; DOC-003 §30 recognises the same subject as Common findings ('deployment assumption hidden', 'observability omitted') with no severity attached. MATERIAL is the default and §21.6's four classes do not include operational concerns. Not ADVISORY: the omission leaves an obligation with no structure to carry it, which obliges correction rather than informing a judgment."
 				},
 				ARCHITECTURE_CONSTRAINT_VIOLATION: {
-					defaultSeverity: 'CRITICAL',
-					description: 'The architecture violates a mandatory constraint.'
+					defaultSeverity: 'MATERIAL',
+					description:
+						'The architecture violates a mandatory constraint it is required to preserve, so every component planned and built from the baseline inherits the violation and the constraint can be restored only by reopening the architecture itself.',
+					severityBasis: 'AUTHORED',
+					severityRationale:
+						"No ratified text decides this code. DOC-004 §21.6 names mandatory-constraint failures, but 'Critical' governs its whole coordinated list, so it blocks critical mandatory-constraint failures — a subset of this code's instances, not the code. 'Mandatory' is not the corpus's criticality marker for constraints: §21.6 writes both 'Critical' and 'mandatory-constraint' in the same clause, where a criticality-bearing 'mandatory' would make 'Critical' redundant for that class, and §20.5 uses the two as separate discriminators inside one three-item list — 'mandatory applicable constraint omitted' and 'mandatory constraint weakened without authority' against 'critical artifact violates an active constraint'. That third condition is the only one of the three about a violation, this code's exact subject, and it is the one carrying the criticality qualifier; read whole, §20.5 shows the corpus qualifying constraint-violation blocking by criticality exactly as §21.6 does here. The corpus scores this pattern directly: §23.6 blocks 'Any material unauthorized divergence from approved intent', yet §33 records INTENT_EXPANSION — a divergence from approved intent — at \"severity\": \"MATERIAL\". Contrast the unqualified form at §19.7, 'Any missing mandatory obligation or child intent divergence is blocking', which does decide its code outright; §21.6 is of the qualified kind and sets no default. MATERIAL is the default and this defeats claim §21.3.8 ('mandatory constraints are preserved'). BLOCKING remains available at instance level where the violation is itself critical."
+				},
+				UNRESOLVED_ARCHITECTURE_CONFLICT: {
+					defaultSeverity: 'MATERIAL',
+					description:
+						'Two architecture positions contradict one another and no decision record settles which governs, so each downstream component is planned against whichever side its implementer reads as authoritative and the contradiction is resolved differently in every place it lands.',
+					severityBasis: 'AUTHORED',
+					severityRationale:
+						"No ratified text decides this code. MATERIAL is the default; the finding defeats the §21.1 purpose of a 'coherent structure' and is assessed against the 'decision records' §21.4 admits as evidence. Not BLOCKING: conflict as such is not one of §21.6's four subject classes, and where the conflict is over one of them — a mandatory constraint, for instance — ARCHITECTURE_CONSTRAINT_VIOLATION is the code that fits, at its own MATERIAL default, with §21.6 reaching the instance only where that instance is critical."
+				},
+				UNSUPPORTED_FEASIBILITY_CLAIM: {
+					defaultSeverity: 'MATERIAL',
+					description:
+						'The architecture asserts that a structure is feasible without admissible evidence supporting the assertion, so implementation planning commits to an approach whose viability is first tested by attempting to build it.',
+					severityBasis: 'AUTHORED',
+					severityRationale:
+						"No ratified text decides this code. Defeats claim §21.3.10 ('architecture is feasible'), which is the MATERIAL default case, and §21.6's four classes do not include feasibility. Deliberately not derived from §10.3's 'Evidence deficit → INCONCLUSIVE': that line is a disposition rule keyed to the deficit itself and assigns no severity to any code, so it neither raises nor lowers this one. Not ADVISORY: the assertion is load-bearing for the baseline, so it obliges evidence rather than inviting a judgment."
+				},
+				ARCHITECTURE_OVERFIT: {
+					defaultSeverity: 'ADVISORY',
+					description:
+						'The architecture carries structure, indirection, or capability that no applicable obligation requires, so the cost of building, operating, and maintaining it recurs in every downstream component that must carry it.',
+					severityBasis: 'AUTHORED',
+					severityRationale:
+						"Argued, and the one place I depart from the MATERIAL default. Every claim in §21.3 survives an overfit architecture: requirements are still allocated, boundaries still explicit, constraints still preserved — the obligations are covered, at excess cost. The finding therefore informs a proportionality judgment rather than obliging a correction, which is the ADVISORY case. The contrary reading rests on §21.3.7's word 'proportionate', but that claim is scoped to 'operational and deployment concerns', not to the architecture at large, so it does not carry this code to MATERIAL. Not BLOCKING: §21.6 names nothing resembling it. Asymmetric with ARCHITECTURE_UNDERFIT by design — underfit leaves obligations without sufficient structure, overfit leaves them covered."
+				},
+				ARCHITECTURE_UNDERFIT: {
+					defaultSeverity: 'MATERIAL',
+					description:
+						'The architecture is too thin to carry the obligations allocated to it, so the structure needed to satisfy them is improvised during implementation by practitioners who cannot see the whole obligation set.',
+					severityBasis: 'AUTHORED',
+					severityRationale:
+						"No ratified text decides this code. It defeats the §21.1 purpose directly — 'a coherent structure for satisfying applicable product obligations' — which is the MATERIAL default case. Not ADVISORY, unlike its ARCHITECTURE_OVERFIT counterpart: underfit leaves obligations without structure sufficient to satisfy them, so it obliges correction rather than informing a judgment. Not BLOCKING: §21.6's four subject classes do not name it, and where the missing structure is specifically a security boundary or a violated mandatory constraint, the codes for those subjects fit and carry their own defaults."
 				}
 			}
 		},
@@ -1367,7 +1809,65 @@ export const PRODUCT_REALIZATION_PWA_ONTOLOGY = {
 			failureSeverity: 'MATERIAL',
 			permittedControlActions: ['REQUEST_HUMAN_DECISION', 'RESHAPE_PWU'],
 			sourceSection:
-				'DOC-004 §22 (POL-HISTORICAL-CONSISTENCY). TRANSCRIBED from the ratified doc and machine-checked against it by doc004-conformance.test.ts: purpose (§22.1); the 5 criterion descriptions are "22.3 Claims evaluated" verbatim (leading character sentence-cased — the doc\'s numbered lists are inconsistently cased; no word added, removed, or reordered); the 7 finding codes are §22.5 verbatim in document order. PRECEDENTED DERIVATION: "22.3 Claims evaluated" ratifies neither ids nor names, so ids are minted by ordinal and name = the id. Only §15.6 and §19.5 have a Criteria subsection; the other 10 policies fall back this way. AUTHORED permittedControlActions: this section ratifies NO control actions (only §15.10, §17.8, §19.8 and §23.7 do). The value is the DERIVED FLOOR — the intersection of those four ratified sets (RESHAPE_PWU, REQUEST_HUMAN_DECISION), i.e. the actions every ratified set permits. Applied ONLY because this policy had no prior authored value and the field is required — an empty set is not honest-by-omission, it would mean a policy that can find a problem and recommend nothing. Narrow by construction: widening it is a policy-authoring decision for the sponsor. AUTHORED (no ratified source): rationale, evaluatorRole, evaluatedClaimTypes, appliesToPwuKinds, requiredEvidenceTypes, failureSeverity, independenceRequirement where the section has no Independence subsection, each criterion\'s criterionType/evaluationMethod/severityIfNotMet/mayBeNotApplicable, and findingAnnotations (DOC-004 §9.1 mandates FindingDefinition.description + defaultSeverity and ratifies neither for ANY of its 99 codes — an open corpus gap; unannotated codes fall back to the policy\'s failureSeverity and the humanized code).'
+				'DOC-004 §22 (POL-HISTORICAL-CONSISTENCY). TRANSCRIBED from the ratified doc and machine-checked against it by doc004-conformance.test.ts: purpose (§22.1); the 5 criterion descriptions are "22.3 Claims evaluated" verbatim (leading character sentence-cased — the doc\'s numbered lists are inconsistently cased; no word added, removed, or reordered); the 7 finding codes are §22.5 verbatim in document order. PRECEDENTED DERIVATION: "22.3 Claims evaluated" ratifies neither ids nor names, so ids are minted by ordinal and name = the id. Only §15.6 and §19.5 have a Criteria subsection; the other 10 policies fall back this way. AUTHORED permittedControlActions: this section ratifies NO control actions (only §15.10, §17.8, §19.8 and §23.7 do). The value is the DERIVED FLOOR — the intersection of those four ratified sets (RESHAPE_PWU, REQUEST_HUMAN_DECISION), i.e. the actions every ratified set permits. Applied ONLY because this policy had no prior authored value and the field is required — an empty set is not honest-by-omission, it would mean a policy that can find a problem and recommend nothing. Narrow by construction: widening it is a policy-authoring decision for the sponsor. AUTHORED (no ratified source): rationale, evaluatorRole, evaluatedClaimTypes, appliesToPwuKinds, requiredEvidenceTypes, failureSeverity, independenceRequirement where the section has no Independence subsection, each criterion\'s criterionType/evaluationMethod/severityIfNotMet/mayBeNotApplicable, and findingAnnotations (DOC-004 §9.1 mandates FindingDefinition.description + defaultSeverity and ratifies neither for ANY of its 99 codes — an open corpus gap; unannotated codes fall back to the policy\'s failureSeverity and the humanized code).',
+			findingAnnotations: {
+				KNOWN_FAILURE_RECURRENCE: {
+					defaultSeverity: 'MATERIAL',
+					description:
+						'Current work reproduces an approach that incident records or prior assurance findings show has already failed, so the failure is incurred a second time and the historical record retained to prevent exactly this is shown to have no effect on what gets built.',
+					severityBasis: 'AUTHORED',
+					severityRationale:
+						"Neither DOC-004 §22 nor DOC-003 §31 states a blocking condition, so BLOCKING has no ratified footing and cannot be reached by inference. Not CRITICAL: the recurring failure is of unbounded kind and nothing in the policy ties it to safety, security, or irreversibility. Above ADVISORY because this is the one code in the policy that asserts sameness with a recorded failure rather than difference from precedent, so DOC-004 §22.6 'Historical difference is not failure' does not shelter it; it contradicts §22.3 claim 2 ('current work does not unknowingly repeat a known failure') outright."
+				},
+				ACTIVE_DECISION_CONFLICT: {
+					defaultSeverity: 'MATERIAL',
+					description:
+						'Current work contradicts a prior decision that is still active and has not been formally superseded, leaving two incompatible decisions simultaneously in force so that later work reading the decision record is directed against what was actually built.',
+					severityBasis: 'AUTHORED',
+					severityRationale:
+						"No blocking condition exists in either document for this policy, so BLOCKING is unavailable. Above ADVISORY because DOC-004 §22.3 claim 3 admits exactly one escape — 'active prior decisions are respected or formally superseded' — and this code names the state where neither holds. The conflict is with a decision still in force rather than with mere precedent, so §22.6's 'Historical difference is not failure' does not reach it. Not CRITICAL: no safety, security, or irreversibility class is implicated by the conflict as such."
+				},
+				UNEXPLAINED_PRECEDENT_DIVERGENCE: {
+					defaultSeverity: 'MATERIAL',
+					description:
+						"Current work departs from established precedent without recording a reason, so a deliberate improvement cannot be distinguished from an oversight and the precedent's standing for subsequent work is left undetermined.",
+					severityBasis: 'AUTHORED',
+					severityRationale:
+						"DOC-003 §31's rule that 'Unexplained or uninformed difference may be' a defect fits this code more directly than any other text in the corpus, but it is an Important rule rather than a blocking condition and 'may be' does not decide — the call is therefore mine and the basis is AUTHORED, not RATIFIED_BLOCKING_CONDITION. MATERIAL rather than ADVISORY because DOC-004 §22.3 claim 4 ('divergence is intentional and justified') is a claim the policy evaluates and this code names its negation, and §22.6 conditions satisfaction on divergence being 'explicit and adequately justified'. Not BLOCKING: neither document supplies the condition that would license it."
+				},
+				STALE_PRECEDENT_APPLIED: {
+					defaultSeverity: 'MATERIAL',
+					description:
+						'A precedent whose originating context no longer holds is treated as binding on current work, so the decision is grounded in conditions that have since changed and the design optimizes for a situation that no longer exists.',
+					severityBasis: 'AUTHORED',
+					severityRationale:
+						"No blocking condition in either document, so BLOCKING is unavailable. MATERIAL rather than ADVISORY because DOC-004 §22.3 claim 5 ('stale or inapplicable precedent is not treated as binding') is an evaluated claim and this code is its direct negation; DOC-003 §31's evaluation questions ('Is a previous constraint still applicable?', 'Is the precedent stale or contextually different?') confirm that over-deference to history is a first-class concern of this policy and not an aside. Not CRITICAL: nothing here is of the safety, security, or irreversibility class."
+				},
+				MISSING_DESIGN_RATIONALE: {
+					defaultSeverity: 'MATERIAL',
+					description:
+						"A decision within the policy's scope is recorded without the reasoning that produced it, so later work cannot judge whether it still applies and must choose between preserving it blindly and discarding it blindly.",
+					severityBasis: 'AUTHORED',
+					severityRationale:
+						"AUTHORED because no ratified text scores this code: DOC-004 §22.4 lists 'design rationale' only as evidence and §22.1 only as something that can be ignored. MATERIAL rather than ADVISORY because §22.2 scopes the policy to 'material architecture decisions' and 'baseline changes', and an unrecorded reason for a decision of that class is a durable defect in the record that obliges correction rather than merely informing. Distinguished from HISTORICAL_CONTEXT_INSUFFICIENT: the object here is a decision whose reason was never captured, not a limit on what the assessment could search. Not BLOCKING: no ratified condition, and §22.6 points the opposite way."
+				},
+				HISTORICAL_CONTEXT_INSUFFICIENT: {
+					defaultSeverity: 'ADVISORY',
+					description:
+						"The historical record reachable by the assessment is too sparse to evaluate the policy's claims, so a reported absence of conflict or recurrence describes what was searched rather than what exists.",
+					severityBasis: 'AUTHORED',
+					severityRationale:
+						"AUTHORED; no ratified text scores this code. ADVISORY rather than MATERIAL because the finding asserts no defect in the work — it reports that the record reachable by the assessment was too thin to evaluate DOC-004 §22.3's claims, and none of those claims is thereby contradicted. Its disposition effect does not depend on its severity: §10.3 routes 'Evidence deficit → INCONCLUSIVE' on the deficit itself, so MATERIAL would attach an obligation the finding has not earned. Not INFORMATIONAL because it qualifies every other result reported under the policy."
+				},
+				CHESTERTONS_FENCE_RISK: {
+					defaultSeverity: 'MATERIAL',
+					description:
+						'Established structure is being replaced or removed without its original purpose having been established, so any constraint it silently enforced is discarded without anyone having decided that the constraint is no longer needed.',
+					severityBasis: 'AUTHORED',
+					severityRationale:
+						"AUTHORED; no ratified text scores this code. The '_RISK' suffix — the only one among the policy's seven codes — pulls toward ADVISORY, but MATERIAL wins because DOC-004 §22.3 claim 2 protects against repeating a known failure 'unknowingly', and this code names precisely that unknowing state at the moment §22.2's 'replacement of established structures' is underway; DOC-003 §31 places 'uninformed difference' on the defect side of its rule. Not BLOCKING: neither document states a blocking condition, and the code asserts an unestablished purpose rather than an established harm."
+				}
+			}
 		},
 		{
 			policyId: 'pol_intent_preservation',
@@ -1485,8 +1985,70 @@ export const PRODUCT_REALIZATION_PWA_ONTOLOGY = {
 				'DOC-004 §23 (POL-INTENT-PRESERVATION). TRANSCRIBED from the ratified doc and machine-checked against it by doc004-conformance.test.ts: purpose (§23.1); the 7 criterion descriptions are "23.3 Claims evaluated" verbatim (leading character sentence-cased — the doc\'s numbered lists are inconsistently cased; no word added, removed, or reordered); the 8 finding codes are §23.5 verbatim in document order. PRECEDENTED DERIVATION: "23.3 Claims evaluated" ratifies neither ids nor names, so ids are minted by ordinal and name = the id. Only §15.6 and §19.5 have a Criteria subsection; the other 10 policies fall back this way. permittedControlActions transcribed from §23.7. AUTHORED (no ratified source): rationale, evaluatorRole, evaluatedClaimTypes, appliesToPwuKinds, requiredEvidenceTypes, failureSeverity, independenceRequirement where the section has no Independence subsection, each criterion\'s criterionType/evaluationMethod/severityIfNotMet/mayBeNotApplicable, and findingAnnotations (DOC-004 §9.1 mandates FindingDefinition.description + defaultSeverity and ratifies neither for ANY of its 99 codes — an open corpus gap; unannotated codes fall back to the policy\'s failureSeverity and the humanized code).',
 			findingAnnotations: {
 				INTENT_EROSION: {
+					defaultSeverity: 'MATERIAL',
+					description:
+						'Desired outcomes or mandatory constraints carried by the approved intent survive in the transformed work but in weakened form — narrowed, softened, or reduced in strength — so descendant PWUs and baseline promotion proceed against a diminished intent that no authority agreed to reduce.',
+					severityBasis: 'AUTHORED',
+					severityRationale:
+						"AUTHORED: no ratified text names erosion. The mirror-image code INTENT_EXPANSION is scored MATERIAL by the DOC-004 §33 worked example on facts that example itself calls a material scope change 'not authorized by the approved scope'; erosion is the same genus (approved intent no longer matched by the work) with the §23.3(7) authorization route still open through REQUEST_HUMAN_DECISION. Not BLOCKING, the adjacent option: §23.6 conditions blocking on the divergence being material, which this code does not settle — weakening ranges from a softened nuance to a mandatory constraint downgraded to advisory, and §23.6 escalates the material instance. Not ADVISORY: it forecloses the §23.3 claim that mandatory constraints remain active."
+				},
+				INTENT_EXPANSION: {
+					defaultSeverity: 'MATERIAL',
+					description:
+						'The transformed work covers scope beyond the approved intent, so dependents, completion claims, and validation effort attach to functionality the user never approved and that the product baseline will carry forward.',
+					severityBasis: 'RATIFIED_WORKED_EXAMPLE',
+					severityRationale:
+						"RATIFIED: the DOC-004 §33 worked example scores this exact code MATERIAL — the only code the corpus scores directly — on facts it describes as 'a material scope change' that was 'not authorized by the approved scope', and recommends dispositionRecommendation 'CONDITIONALLY_SATISFIED'. Not BLOCKING, the adjacent option: §10.3 maps a BLOCKING open finding to REJECTED and reserves CONDITIONALLY_SATISFIED to the MATERIAL range, so BLOCKING would contradict both the example's severity field and its disposition.",
+					severityQuote: '"findingCode": "INTENT_EXPANSION",\n      "severity": "MATERIAL",'
+				},
+				CHILD_OBJECTIVE_DRIFT: {
+					defaultSeverity: 'MATERIAL',
+					description:
+						"A descendant PWU pursues an objective that no longer serves its parent objective, so satisfying the child advances work that cannot be recomposed into the parent's result.",
+					severityBasis: 'AUTHORED',
+					severityRationale:
+						"AUTHORED: DOC-003 §29's blocking condition 'child work contradicts parent intent' is Decomposition Coverage's, and names contradiction, deciding that policy's CHILD_INTENT_DIVERGENCE (DOC-004 §19.7) — not drift under this policy; it is therefore not cited. Under this policy only §23.6/§32 applies, and drift is a matter of degree its materiality limb leaves to the instance. MATERIAL rather than ADVISORY because the finding obliges REVISE_DECOMPOSITION or RESHAPE_PWU and forecloses the §23.3 claim that descendant work continues to serve the parent objective; BLOCKING remains available per instance under §23.6."
+				},
+				IMPLEMENTATION_SUBSTITUTION: {
+					defaultSeverity: 'MATERIAL',
+					description:
+						'An implementation choice has taken the place of the product need it was meant to serve, so subsequent PWUs and integrated validation evaluate the chosen mechanism instead of the outcome the approved intent requires.',
+					severityBasis: 'AUTHORED',
+					severityRationale:
+						"AUTHORED: DOC-003 §25's 'inferred solution presented as user requirement' is Intent Fidelity's blocking condition, deciding that policy's codes at intent formalization, not this one, and is not cited. §23.6 blocks material unauthorized divergence, but materiality is a per-instance judgment this code does not settle: substitution ranges from one mechanism standing in for one aspect of a need to wholesale displacement of it. The corpus's one directly scored unauthorized divergence (§33) is MATERIAL, so MATERIAL is the default and §23.6 escalates the material instance. Not CRITICAL: the code implicates no safety, security, or irreversibility class."
+				},
+				LOCAL_SUCCESS_GLOBAL_FAILURE: {
+					defaultSeverity: 'MATERIAL',
+					description:
+						'The work satisfies its local completion claims while failing to contribute to the originating Product Intent, so passing execution and test evidence accumulate behind a result that delivers no user value.',
+					severityBasis: 'AUTHORED',
+					severityRationale:
+						"AUTHORED: no ratified text names this code. MATERIAL because the finding forecloses the §23.3 claim that local success contributes to global success and obliges RESHAPE_PWU or REVISE_DECOMPOSITION, consistent with DOC-004's rule that 'A successful execution trace proves execution occurred, not that the outcome satisfies intent.' Not BLOCKING: §23.6 turns on material unauthorized divergence, and this code also covers the locally correct result whose contribution is weak rather than absent — DOC-003 §32 lists it among shape failures ('locally correct but globally irrelevant result'), not among blocking conditions. Not ADVISORY: it obliges control action rather than informing."
+				},
+				LOST_USER_OUTCOME: {
+					defaultSeverity: 'MATERIAL',
+					description:
+						'A desired user outcome carried by the approved intent is absent from the transformed work, so the product can reach baseline promotion without delivering an outcome its approved intent exists to produce.',
+					severityBasis: 'AUTHORED',
+					severityRationale:
+						"AUTHORED, and the closest call in this policy. §23.6/§32 conditions blocking on materiality, which this code does not settle: an approved intent carries outcomes of differing weight, and the corpus's only directly scored unauthorized divergence (INTENT_EXPANSION, §33) is MATERIAL with the primary user outcome intact. Defaulting to BLOCKING would decide materiality in advance of the instance, which is precisely what §23.6 reserves to itself — it escalates when the lost outcome is material. Not ADVISORY: an absent approved outcome forecloses the §23.3 claim that desired outcomes remain represented."
+				},
+				UNAUTHORIZED_INTENT_REVISION: {
 					defaultSeverity: 'BLOCKING',
-					description: 'The approved intent was eroded downstream.'
+					description:
+						'The approved intent has been altered without a recorded authorized revision, so every downstream conformance check measures the work against an intent baseline no authority approved.',
+					severityBasis: 'RATIFIED_BLOCKING_CONDITION',
+					severityRationale:
+						"RATIFIED: DOC-003 §32 states the blocking condition in this code's own terms — blocking turns on divergence 'without authorized intent revision', and this code is exactly the case where intent was revised and the authorization was not obtained, defeating the §23.3(7) claim that authorized intent revisions are properly recorded. DOC-004 §23.6 states the same rule ('Any material unauthorized divergence from approved intent'). Materiality is entailed, not assumed: the divergence is of the approved intent rather than within it. Not MATERIAL, the adjacent option: the §33 worked example holds work that exceeds intent at MATERIAL because the authorization route stays open — REQUEST_HUMAN_DECISION can still yield an authorized revision — whereas here that route was bypassed. Not CRITICAL: no safety, security, or irreversibility class is implicated.",
+					severityQuote: 'Material divergence without authorized intent revision.'
+				},
+				TRACEABILITY_BREAK: {
+					defaultSeverity: 'MATERIAL',
+					description:
+						'Trace links between the approved intent and the current artifact are broken, so preservation cannot be evaluated on the evidence this policy requires and divergence can persist undetected through later transformations.',
+					severityBasis: 'AUTHORED',
+					severityRationale:
+						"AUTHORED: §23.6/§32 blocks material unauthorized divergence, and a broken trace link does not establish divergence — it prevents the policy from evaluating whether any exists — so the condition does not name this case and BLOCKING is unfounded. MATERIAL rather than ADVISORY because §23.4 lists trace links among required evidence and the break forecloses the §23.3 claims outright rather than informing them. The §10.3 rule 'Evidence deficit → INCONCLUSIVE' is keyed to the deficit itself, not to a severity, and is not the ground of this call."
 				}
 			}
 		},
@@ -1599,7 +2161,89 @@ export const PRODUCT_REALIZATION_PWA_ONTOLOGY = {
 			failureSeverity: 'BLOCKING',
 			permittedControlActions: ['REQUEST_HUMAN_DECISION', 'RESHAPE_PWU'],
 			sourceSection:
-				'DOC-004 §24 (POL-TEST-ADEQUACY). TRANSCRIBED from the ratified doc and machine-checked against it by doc004-conformance.test.ts: purpose (§24.1); the 8 criterion descriptions are "24.3 Claims evaluated" verbatim (leading character sentence-cased — the doc\'s numbered lists are inconsistently cased; no word added, removed, or reordered); the 10 finding codes are §24.5 verbatim in document order. PRECEDENTED DERIVATION: "24.3 Claims evaluated" ratifies neither ids nor names, so ids are minted by ordinal and name = the id. Only §15.6 and §19.5 have a Criteria subsection; the other 10 policies fall back this way. AUTHORED permittedControlActions: this section ratifies NO control actions (only §15.10, §17.8, §19.8 and §23.7 do). The value is the DERIVED FLOOR — the intersection of those four ratified sets (RESHAPE_PWU, REQUEST_HUMAN_DECISION), i.e. the actions every ratified set permits. Applied ONLY because this policy had no prior authored value and the field is required — an empty set is not honest-by-omission, it would mean a policy that can find a problem and recommend nothing. Narrow by construction: widening it is a policy-authoring decision for the sponsor. AUTHORED (no ratified source): rationale, evaluatorRole, evaluatedClaimTypes, appliesToPwuKinds, requiredEvidenceTypes, failureSeverity, independenceRequirement where the section has no Independence subsection, each criterion\'s criterionType/evaluationMethod/severityIfNotMet/mayBeNotApplicable, and findingAnnotations (DOC-004 §9.1 mandates FindingDefinition.description + defaultSeverity and ratifies neither for ANY of its 99 codes — an open corpus gap; unannotated codes fall back to the policy\'s failureSeverity and the humanized code).'
+				'DOC-004 §24 (POL-TEST-ADEQUACY). TRANSCRIBED from the ratified doc and machine-checked against it by doc004-conformance.test.ts: purpose (§24.1); the 8 criterion descriptions are "24.3 Claims evaluated" verbatim (leading character sentence-cased — the doc\'s numbered lists are inconsistently cased; no word added, removed, or reordered); the 10 finding codes are §24.5 verbatim in document order. PRECEDENTED DERIVATION: "24.3 Claims evaluated" ratifies neither ids nor names, so ids are minted by ordinal and name = the id. Only §15.6 and §19.5 have a Criteria subsection; the other 10 policies fall back this way. AUTHORED permittedControlActions: this section ratifies NO control actions (only §15.10, §17.8, §19.8 and §23.7 do). The value is the DERIVED FLOOR — the intersection of those four ratified sets (RESHAPE_PWU, REQUEST_HUMAN_DECISION), i.e. the actions every ratified set permits. Applied ONLY because this policy had no prior authored value and the field is required — an empty set is not honest-by-omission, it would mean a policy that can find a problem and recommend nothing. Narrow by construction: widening it is a policy-authoring decision for the sponsor. AUTHORED (no ratified source): rationale, evaluatorRole, evaluatedClaimTypes, appliesToPwuKinds, requiredEvidenceTypes, failureSeverity, independenceRequirement where the section has no Independence subsection, each criterion\'s criterionType/evaluationMethod/severityIfNotMet/mayBeNotApplicable, and findingAnnotations (DOC-004 §9.1 mandates FindingDefinition.description + defaultSeverity and ratifies neither for ANY of its 99 codes — an open corpus gap; unannotated codes fall back to the policy\'s failureSeverity and the humanized code).',
+			findingAnnotations: {
+				UNTESTED_REQUIREMENT: {
+					defaultSeverity: 'MATERIAL',
+					description:
+						'A requirement in scope has no test tracing to it, leaving its behavior free to regress or be dropped by a later change without any test failing.',
+					severityBasis: 'AUTHORED',
+					severityRationale:
+						"Neither DOC-004 §24 nor DOC-003 §33 states a blocking condition for this policy, and no conformance test names this code, so BLOCKING has no ratified footing. Not ADVISORY: DOC-004 §24.3.1 makes 'tests trace to requirements or risks' a claim evaluated, so an untraced requirement obliges action rather than informing. MATERIAL already reaches REJECTED under §10.3 where the untraced requirement is load-bearing, so nothing is lost by declining to inflate."
+				},
+				UNTESTED_CRITICAL_JOURNEY: {
+					defaultSeverity: 'MATERIAL',
+					description:
+						'A journey identified as critical has no test exercising it, leaving its failure to be discovered by users rather than by the test evidence offered for promotion.',
+					severityBasis: 'AUTHORED',
+					severityRationale:
+						'The most severity-tempting code in the policy, and the temptation must be refused: DOC-003 §33 states no blocking condition and DOC-004 §24 states none either, so BLOCKING would be my invention. Not CRITICAL: criticality here describes the journey, not a safety, security, or irreversibility class in the finding itself — an absent test is recoverable by writing it. MATERIAL spans CONDITIONALLY_SATISFIED through REJECTED under §10.3, which carries an uncovered critical journey at baseline promotion without a fabricated blocking condition.'
+				},
+				MISSING_FAILURE_PATH_TEST: {
+					defaultSeverity: 'MATERIAL',
+					description:
+						'Failure and alternate paths have no tests while the success path does, letting aggregate coverage read as adequate when the paths that determine behavior under fault are unevidenced.',
+					severityBasis: 'AUTHORED',
+					severityRationale:
+						'No blocking condition exists in either document for this policy. Not ADVISORY: DOC-004 §24.3.3 makes proportionate coverage of failure and alternate paths a claim evaluated, and DOC-003 §33 lists failure-path coverage as an evaluation dimension, so a gap here obliges action. Not CRITICAL, as the finding reports absent evidence rather than a demonstrated unsafe behavior.'
+				},
+				INADEQUATE_INTEGRATION_TEST: {
+					defaultSeverity: 'MATERIAL',
+					description:
+						'An integration is exercised at a boundary other than the one where the components actually join, leaving the interaction that fails in composition to surface during integrated validation rather than in the test evidence.',
+					severityBasis: 'AUTHORED',
+					severityRationale:
+						"Neither document states a blocking condition for this policy, so BLOCKING is unfounded. DOC-004 §24.3.4 ('integrations are tested at appropriate boundaries') makes this a claim evaluated rather than an informational note, ruling out ADVISORY. MATERIAL, not CRITICAL: the deficit is misplaced verification, which the §10.3 MATERIAL range can carry to REJECTED where the integration is load-bearing."
+				},
+				UNJUSTIFIED_REGRESSION_SCOPE: {
+					defaultSeverity: 'MATERIAL',
+					description:
+						"The regression suite's scope carries no justification tying it to what the change could affect, so a reviewer cannot tell whether the areas the change puts at risk were re-run or simply omitted.",
+					severityBasis: 'AUTHORED',
+					severityRationale:
+						"No ratified blocking condition exists for this policy in either document. Not ADVISORY despite naming a missing rationale rather than a missing test: DOC-004 §24.3.5 makes 'regression scope is justified' a claim evaluated, and an unjustified scope is an evidence deficit that §10.3 routes to INCONCLUSIVE — a disposition reachable from MATERIAL and foreclosed to a merely informing finding. Not CRITICAL, no safety or irreversibility class."
+				},
+				NONREPRESENTATIVE_TEST_ENVIRONMENT: {
+					defaultSeverity: 'MATERIAL',
+					description:
+						"The environment the tests ran in differs from the one the claim is about in ways that bear on the result, so passing results evidence the environment's behavior rather than the product's.",
+					severityBasis: 'AUTHORED',
+					severityRationale:
+						'Neither DOC-004 §24 nor DOC-003 §33 states a blocking condition, so BLOCKING has no footing. DOC-004 §24.3.6 makes representativeness a claim evaluated and DOC-003 §33 lists environment fidelity as an evaluation dimension, so this obliges rather than informs — not ADVISORY. MATERIAL, not CRITICAL: the finding voids the transfer of evidence, which §10.3 lets a validator carry to REJECTED, without asserting a safety or security failure.'
+				},
+				FLAKY_TEST_EVIDENCE: {
+					defaultSeverity: 'MATERIAL',
+					description:
+						'Tests produce different outcomes across runs on the same subject, so neither a pass nor a fail carries evidentiary weight and genuine regressions are dismissed as noise.',
+					severityBasis: 'AUTHORED',
+					severityRationale:
+						"No blocking condition for this policy in either document. DOC-004 §24.3.7 conditions the claim as 'results are current and reproducible where required' — that qualifier scopes when the finding is raised at all, not how severely it lands once it is, so it does not deflate to ADVISORY. Where reproducibility is required and absent, the result set is an evidence deficit, and MATERIAL is the severity from which §10.3's INCONCLUSIVE and REJECTED are both reachable."
+				},
+				STALE_TEST_RESULT: {
+					defaultSeverity: 'MATERIAL',
+					description:
+						'The cited results were produced against an earlier state of the subject, so every change made since carries a green result it was never run against.',
+					severityBasis: 'AUTHORED',
+					severityRationale:
+						"Neither document states a blocking condition for this policy. DOC-004 §24.3.7 requires results be current 'where required' and DOC-003 §33 lists evidence freshness as an evaluation dimension; as with flakiness, the qualifier governs applicability, not severity, so ADVISORY would understate a raised finding. Not CRITICAL: stale evidence is refreshable by re-running, carrying no irreversibility class."
+				},
+				TEST_CLAIM_OVERREACH: {
+					defaultSeverity: 'MATERIAL',
+					description:
+						'A claim is asserted broader than the scope of the tests offered for it, so the disposition rests on coverage the evidence does not actually reach.',
+					severityBasis: 'AUTHORED',
+					severityRationale:
+						"This code instantiates the policy's Important rules — DOC-004 §24.6 and DOC-003 §33 both hold that passing tests support only the claims within their scope — but both state the rule without attaching a severity or a blocking condition to its breach, so the basis is AUTHORED and not RATIFIED_BLOCKING_CONDITION. Not ADVISORY: DOC-004 §24.3.8 makes 'passing tests are not overclaimed' a claim evaluated. MATERIAL is sufficient because an open MATERIAL finding already forecloses SATISFIED under §10.3, which is precisely what an overreaching claim must not obtain."
+				},
+				TEST_ORACLE_WEAKNESS: {
+					defaultSeverity: 'MATERIAL',
+					description:
+						"A test's oracle cannot distinguish correct behavior from incorrect, so the test passes whatever the subject does while counting toward the coverage the claim rests on.",
+					severityBasis: 'AUTHORED',
+					severityRationale:
+						"No blocking condition for this policy in either document, and no conformance test names this code. Not ADVISORY: DOC-003 §33's rule that 'Test count is not test adequacy' is exactly the failure this code reports, making it an evidence defect that obliges action rather than an observation. MATERIAL, not BLOCKING: a weak oracle undermines the evidence's weight, and §10.3 lets a validator carry that to REJECTED where the affected claim is load-bearing without a ratified blocking condition to license the higher severity."
+				}
+			}
 		},
 		{
 			policyId: 'pol_fitness_for_purpose',
@@ -1701,7 +2345,65 @@ export const PRODUCT_REALIZATION_PWA_ONTOLOGY = {
 			failureSeverity: 'BLOCKING',
 			permittedControlActions: ['REQUEST_HUMAN_DECISION', 'RESHAPE_PWU'],
 			sourceSection:
-				'DOC-004 §25 (POL-FITNESS-FOR-PURPOSE). TRANSCRIBED from the ratified doc and machine-checked against it by doc004-conformance.test.ts: purpose (§25.1); the 7 criterion descriptions are "25.3 Claims evaluated" verbatim (leading character sentence-cased — the doc\'s numbered lists are inconsistently cased; no word added, removed, or reordered); the 7 finding codes are §25.5 verbatim in document order. PRECEDENTED DERIVATION: "25.3 Claims evaluated" ratifies neither ids nor names, so ids are minted by ordinal and name = the id. Only §15.6 and §19.5 have a Criteria subsection; the other 10 policies fall back this way. AUTHORED permittedControlActions: this section ratifies NO control actions (only §15.10, §17.8, §19.8 and §23.7 do). The value is the DERIVED FLOOR — the intersection of those four ratified sets (RESHAPE_PWU, REQUEST_HUMAN_DECISION), i.e. the actions every ratified set permits. Applied ONLY because this policy had no prior authored value and the field is required — an empty set is not honest-by-omission, it would mean a policy that can find a problem and recommend nothing. Narrow by construction: widening it is a policy-authoring decision for the sponsor. AUTHORED (no ratified source): rationale, evaluatorRole, evaluatedClaimTypes, appliesToPwuKinds, requiredEvidenceTypes, failureSeverity, independenceRequirement where the section has no Independence subsection, each criterion\'s criterionType/evaluationMethod/severityIfNotMet/mayBeNotApplicable, and findingAnnotations (DOC-004 §9.1 mandates FindingDefinition.description + defaultSeverity and ratifies neither for ANY of its 99 codes — an open corpus gap; unannotated codes fall back to the policy\'s failureSeverity and the humanized code).'
+				'DOC-004 §25 (POL-FITNESS-FOR-PURPOSE). TRANSCRIBED from the ratified doc and machine-checked against it by doc004-conformance.test.ts: purpose (§25.1); the 7 criterion descriptions are "25.3 Claims evaluated" verbatim (leading character sentence-cased — the doc\'s numbered lists are inconsistently cased; no word added, removed, or reordered); the 7 finding codes are §25.5 verbatim in document order. PRECEDENTED DERIVATION: "25.3 Claims evaluated" ratifies neither ids nor names, so ids are minted by ordinal and name = the id. Only §15.6 and §19.5 have a Criteria subsection; the other 10 policies fall back this way. AUTHORED permittedControlActions: this section ratifies NO control actions (only §15.10, §17.8, §19.8 and §23.7 do). The value is the DERIVED FLOOR — the intersection of those four ratified sets (RESHAPE_PWU, REQUEST_HUMAN_DECISION), i.e. the actions every ratified set permits. Applied ONLY because this policy had no prior authored value and the field is required — an empty set is not honest-by-omission, it would mean a policy that can find a problem and recommend nothing. Narrow by construction: widening it is a policy-authoring decision for the sponsor. AUTHORED (no ratified source): rationale, evaluatorRole, evaluatedClaimTypes, appliesToPwuKinds, requiredEvidenceTypes, failureSeverity, independenceRequirement where the section has no Independence subsection, each criterion\'s criterionType/evaluationMethod/severityIfNotMet/mayBeNotApplicable, and findingAnnotations (DOC-004 §9.1 mandates FindingDefinition.description + defaultSeverity and ratifies neither for ANY of its 99 codes — an open corpus gap; unannotated codes fall back to the policy\'s failureSeverity and the humanized code).',
+			findingAnnotations: {
+				PRODUCT_OUTCOME_NOT_ACHIEVABLE: {
+					defaultSeverity: 'MATERIAL',
+					description:
+						'Intended actors cannot achieve a critical outcome with the working product, and because this policy gates baseline promotion, the shortfall would otherwise be carried into an authoritative baseline as an accepted product state.',
+					severityBasis: 'AUTHORED',
+					severityRationale:
+						"BLOCKING is the tempting call because the code defeats the policy's first claim, but nothing ratified elevates it: DOC-003 §34 carries no 'Blocking conditions' section (contrast §35 Baseline Promotion, which lists seven), and DOC-004 §25 states no blocking criteria. Nor is BLOCKING needed for the finding to bite -- under DOC-004 §10.3 a MATERIAL open finding already ranges over 'CONDITIONALLY_SATISFIED, INCONCLUSIVE, or REJECTED', so rejection is available without promotion. Not CRITICAL: an unreachable outcome is not a safety, security, or irreversibility-class failure."
+				},
+				CRITICAL_JOURNEY_FAILURE: {
+					defaultSeverity: 'MATERIAL',
+					description:
+						"A critical journey does not function coherently across its steps, which withdraws the end-to-end evidence that this policy's outcome claims for that journey depend on.",
+					severityBasis: 'AUTHORED',
+					severityRationale:
+						"CRITICAL is the trap here, reached by laundering the word 'critical' out of the code name into the severity class. In DOC-004 §25.3 and DOC-003 §34 'critical' qualifies the journey, not the severity; CRITICAL is reserved for safety, security, or irreversibility-class failure, which a broken journey is not on its face. BLOCKING is unavailable because neither DOC-004 §25 nor DOC-003 §34 states a blocking condition for this policy. MATERIAL, whose §10.3 range already includes REJECTED."
+				},
+				TECHNICALLY_CORRECT_PRODUCT_FAILURE: {
+					defaultSeverity: 'MATERIAL',
+					description:
+						'The product satisfies its technical assessments while failing the actual user need, so a passing technical record is read as evidence of fitness that it cannot supply.',
+					severityBasis: 'AUTHORED',
+					severityRationale:
+						"This is the signature failure the policy exists to catch (DOC-004 §25.1, §25.3 claim 4), and DOC-004 §24.6 independently affirms the case is real: 'Passing tests do not establish fitness for purpose unless their scope supports that claim.' But that rule speaks to what tests prove, not to severity, and importance-to-the-policy's-purpose is not a ratified basis. Severity follows ratified text, and both DOC-004 §25 and DOC-003 §34 are silent on blocking. MATERIAL, not BLOCKING."
+				},
+				MISSING_OPERATIONAL_REALITY: {
+					defaultSeverity: 'MATERIAL',
+					description:
+						'Critical operational conditions are not represented in the evidence, so the fitness conclusion covers a narrower set of conditions than the declared use it is taken to authorize.',
+					severityBasis: 'AUTHORED',
+					severityRationale:
+						"ADVISORY is the tempting call, since an unrepresented condition reads as a coverage gap rather than a defect in the product. It is not: DOC-004 §25.3 evaluates 'critical operational conditions are represented' as a claim in its own right, and §25.4 lists 'operational evidence' as required evidence, so the gap defeats an assessed claim and obliges rather than informs. BLOCKING is unavailable -- neither document states a blocking condition for this policy."
+				},
+				UNACCEPTABLE_LIMITATION: {
+					defaultSeverity: 'MATERIAL',
+					description:
+						'A known limitation is incompatible with the declared use, so it would otherwise pass as one of the recorded limitations that a SATISFIED disposition tolerates rather than as a defeat of the fitness claim.',
+					severityBasis: 'AUTHORED',
+					severityRationale:
+						"The temptation is to reason from waivability or from the word 'unacceptable' to BLOCKING; both are non sequiturs, and neither DOC-004 §25 nor DOC-003 §34 states a blocking condition for this policy. What the code must do is foreclose SATISFIED, which DOC-004 §10.1 defines as support 'subject to recorded limitations' -- an open MATERIAL finding forecloses SATISFIED under §10.3 just as a BLOCKING one would, so MATERIAL is sufficient and is the default. Not CRITICAL absent a safety, security, or irreversibility class."
+				},
+				UNRESOLVED_USER_VALUE_GAP: {
+					defaultSeverity: 'MATERIAL',
+					description:
+						'The product does not address the originating problem that the approved intent exists to solve, so met requirements are taken as delivered value for a need that remains open.',
+					severityBasis: 'AUTHORED',
+					severityRationale:
+						"ADVISORY would suit a finding that merely flags unrealized value, but DOC-004 §25.3 makes 'the product addresses the originating problem' a claim the policy evaluates, so its failure obliges a disposition rather than informing one. BLOCKING has no ratified footing: DOC-003 §34 omits the 'Blocking conditions' section its neighbours carry, and DOC-004 §25 supplies none. MATERIAL."
+				},
+				FITNESS_EVIDENCE_INSUFFICIENT: {
+					defaultSeverity: 'MATERIAL',
+					description:
+						'The available evidence is insufficient to support or reject the fitness claims, so absence of contrary evidence is read as fitness instead of being routed to INCONCLUSIVE.',
+					severityBasis: 'AUTHORED',
+					severityRationale:
+						"DOC-004 §10.3's 'Evidence deficit -> INCONCLUSIVE' is keyed to the deficit, not to a severity, so it does not set this code's severity -- and it does not conflict with MATERIAL either, whose §10.3 range already includes INCONCLUSIVE. Against ADVISORY: §25.2 makes this assessment 'Required during integrated product validation and before product baseline promotion', so a required claim that cannot be assessed obliges evidence gathering. Against BLOCKING: no ratified blocking condition exists in either document for this policy."
+				}
+			}
 		},
 		{
 			policyId: 'pol_baseline_promotion',
@@ -1820,7 +2522,87 @@ export const PRODUCT_REALIZATION_PWA_ONTOLOGY = {
 			failureSeverity: 'CRITICAL',
 			permittedControlActions: ['REQUEST_HUMAN_DECISION', 'RESHAPE_PWU'],
 			sourceSection:
-				'DOC-004 §26 (POL-BASELINE-PROMOTION). TRANSCRIBED from the ratified doc and machine-checked against it by doc004-conformance.test.ts: purpose (§26.1); the 9 criterion descriptions are "26.3 Claims evaluated" verbatim (leading character sentence-cased — the doc\'s numbered lists are inconsistently cased; no word added, removed, or reordered); the 9 finding codes are §26.5 verbatim in document order. PRECEDENTED DERIVATION: "26.3 Claims evaluated" ratifies neither ids nor names, so ids are minted by ordinal and name = the id. Only §15.6 and §19.5 have a Criteria subsection; the other 10 policies fall back this way. AUTHORED permittedControlActions: this section ratifies NO control actions (only §15.10, §17.8, §19.8 and §23.7 do). The value is the DERIVED FLOOR — the intersection of those four ratified sets (RESHAPE_PWU, REQUEST_HUMAN_DECISION), i.e. the actions every ratified set permits. Applied ONLY because this policy had no prior authored value and the field is required — an empty set is not honest-by-omission, it would mean a policy that can find a problem and recommend nothing. Narrow by construction: widening it is a policy-authoring decision for the sponsor. AUTHORED (no ratified source): rationale, evaluatorRole, evaluatedClaimTypes, appliesToPwuKinds, requiredEvidenceTypes, failureSeverity, independenceRequirement where the section has no Independence subsection, each criterion\'s criterionType/evaluationMethod/severityIfNotMet/mayBeNotApplicable, and findingAnnotations (DOC-004 §9.1 mandates FindingDefinition.description + defaultSeverity and ratifies neither for ANY of its 99 codes — an open corpus gap; unannotated codes fall back to the policy\'s failureSeverity and the humanized code).'
+				'DOC-004 §26 (POL-BASELINE-PROMOTION). TRANSCRIBED from the ratified doc and machine-checked against it by doc004-conformance.test.ts: purpose (§26.1); the 9 criterion descriptions are "26.3 Claims evaluated" verbatim (leading character sentence-cased — the doc\'s numbered lists are inconsistently cased; no word added, removed, or reordered); the 9 finding codes are §26.5 verbatim in document order. PRECEDENTED DERIVATION: "26.3 Claims evaluated" ratifies neither ids nor names, so ids are minted by ordinal and name = the id. Only §15.6 and §19.5 have a Criteria subsection; the other 10 policies fall back this way. AUTHORED permittedControlActions: this section ratifies NO control actions (only §15.10, §17.8, §19.8 and §23.7 do). The value is the DERIVED FLOOR — the intersection of those four ratified sets (RESHAPE_PWU, REQUEST_HUMAN_DECISION), i.e. the actions every ratified set permits. Applied ONLY because this policy had no prior authored value and the field is required — an empty set is not honest-by-omission, it would mean a policy that can find a problem and recommend nothing. Narrow by construction: widening it is a policy-authoring decision for the sponsor. AUTHORED (no ratified source): rationale, evaluatorRole, evaluatedClaimTypes, appliesToPwuKinds, requiredEvidenceTypes, failureSeverity, independenceRequirement where the section has no Independence subsection, each criterion\'s criterionType/evaluationMethod/severityIfNotMet/mayBeNotApplicable, and findingAnnotations (DOC-004 §9.1 mandates FindingDefinition.description + defaultSeverity and ratifies neither for ANY of its 99 codes — an open corpus gap; unannotated codes fall back to the policy\'s failureSeverity and the humanized code).',
+			findingAnnotations: {
+				CANDIDATE_VERSION_MISMATCH: {
+					defaultSeverity: 'BLOCKING',
+					description:
+						'The artifacts presented for promotion are not the version that was reviewed and assessed, so the baseline would carry the authority of an assessment never performed on its actual contents.',
+					severityBasis: 'RATIFIED_BLOCKING_CONDITION',
+					severityRationale:
+						"RPH-DOC-003 §35 Blocking conditions names this code's case in near-identical words to DOC-004 §26.3 claim 2 ('reviewed and promoted versions match'). Not MATERIAL: a ratified blocking condition decides it, and MATERIAL would leave CONDITIONALLY_SATISFIED open under §10.3 for a candidate nobody assessed. Not CRITICAL: this is an integrity failure of the promotion record, not a safety, security, or irreversibility-class failure — and §26.7's non-waivability of critical integrity failures is waivability, not severity, so nothing is derived from it.",
+					severityQuote: 'candidate differs from reviewed version'
+				},
+				MISSING_REQUIRED_ASSESSMENT: {
+					defaultSeverity: 'MATERIAL',
+					description:
+						'A required assurance assessment has not been completed for the candidate, leaving the promotion decision resting on claims that no policy ever evaluated.',
+					severityBasis: 'AUTHORED',
+					severityRationale:
+						"Nothing ratified decides this code. RPH-DOC-003 §35 lists the 'validation package' under Required evidence but omits assessment completeness from its seven Blocking conditions, while listing six other §26.3 claims there — the omission is meaningful given how closely the other codes track that list, so I will not read a blocking condition in. Default MATERIAL therefore holds. Not BLOCKING: no ratified condition names it. §10.3's 'Evidence deficit → INCONCLUSIVE' is a disposition rule keyed to the deficit, not a severity, but INCONCLUSIVE sits inside MATERIAL's §10.3 range, so MATERIAL leaves the fitting dispositions reachable. Not ADVISORY: an unperformed required assessment obliges action rather than merely informing."
+				},
+				OPEN_BLOCKING_FINDING: {
+					defaultSeverity: 'BLOCKING',
+					description:
+						'A finding of blocking severity remains unresolved and unwaived at the promotion gate, so the defect it records would be inherited by every downstream work unit that treats the baseline as authoritative.',
+					severityBasis: 'RATIFIED_BLOCKING_CONDITION',
+					severityRationale:
+						"RPH-DOC-003 §35 Blocking conditions. This code is the sole carrier of that condition: §26.5 has no OPEN_CRITICAL_FINDING code, so an unresolved critical observation at promotion can only be reported through OPEN_BLOCKING_FINDING — the condition therefore names this code's case. It is also the failure of §26.3 claim 4 ('blocking findings are resolved or validly waived'), the referent DOC-004 §26 leaves dangling. DOC-004 §26.6 ('No conditional baseline promotion for unresolved critical findings') corroborates but is not the basis, since foreclosing CONDITIONALLY_SATISFIED does not by itself separate BLOCKING from MATERIAL. Not CRITICAL: the underlying finding's own severity varies and is not this code's to assert.",
+					severityQuote: 'unresolved critical observation'
+				},
+				INVALID_OR_EXPIRED_WAIVER: {
+					defaultSeverity: 'BLOCKING',
+					description:
+						'The waiver relied on to clear a finding is expired or otherwise invalid, so the finding it was meant to excuse is in fact open and the promotion rests on a permission that no longer exists.',
+					severityBasis: 'RATIFIED_BLOCKING_CONDITION',
+					severityRationale:
+						"RPH-DOC-003 §35 Blocking conditions names the expired half of this code's case explicitly; the invalid half (wrong authority or scope) is no less severe than expiry, so the condition decides the whole code. Not MATERIAL: the ratified condition governs. Not CRITICAL: no safety, security, or irreversibility class is engaged.",
+					severityQuote: 'expired waiver'
+				},
+				INVALIDATED_EVIDENCE: {
+					defaultSeverity: 'BLOCKING',
+					description:
+						'Evidence in the promotion package is no longer valid, so the assessments that depended on it no longer support the conclusions the promotion decision cites them for.',
+					severityBasis: 'RATIFIED_BLOCKING_CONDITION',
+					severityRationale:
+						"RPH-DOC-003 §35 Blocking conditions states this code's case byte-for-byte. Not MATERIAL despite the neighbouring §10.3 rule 'Evidence deficit → INCONCLUSIVE' — that rule is keyed to the deficit and fixes a disposition, not a severity, and here a ratified blocking condition speaks directly. Not CRITICAL: no safety, security, or irreversibility-class failure.",
+					severityQuote: 'invalidated evidence'
+				},
+				MISSING_DECISION_AUTHORITY: {
+					defaultSeverity: 'BLOCKING',
+					description:
+						'The promotion decision lacks a valid decision authority, so the baseline would become authoritative on the strength of a decision no one was entitled to make.',
+					severityBasis: 'RATIFIED_BLOCKING_CONDITION',
+					severityRationale:
+						"RPH-DOC-003 §35 Blocking conditions; §35 also lists 'authority' under Required evidence, and §26.3 claim 6 states the same claim ('decision authority is valid'). Not MATERIAL: the ratified condition decides it. Not CRITICAL: this is a governance defect in who decided, not a safety, security, or irreversibility-class failure.",
+					severityQuote: 'missing authority'
+				},
+				UNACCEPTED_RESIDUAL_RISK: {
+					defaultSeverity: 'BLOCKING',
+					description:
+						'Residual risk carried by the candidate has not been disclosed and accepted, so the baseline would transfer risk to downstream consumers that no authority has agreed to bear.',
+					severityBasis: 'RATIFIED_BLOCKING_CONDITION',
+					severityRationale:
+						"RPH-DOC-003 §35 Blocking conditions. DOC-004 §26.3 claim 7 bundles disclosure and acceptance into one claim ('residual risk is disclosed and accepted') and §26.5 gives it exactly one code, so the §35 residual-risk condition can only be reported through UNACCEPTED_RESIDUAL_RISK — it names this code's case. The wording differs ('unacknowledged' vs 'unaccepted'), but acceptance is the acknowledging act by authority, which §35 pairs with its 'authority' evidence. Not MATERIAL: the ratified condition governs. Not CRITICAL: the risk's own class is not fixed by this code.",
+					severityQuote: 'unacknowledged residual risk'
+				},
+				MISSING_RECOVERY_PLAN: {
+					defaultSeverity: 'MATERIAL',
+					description:
+						'No rollback or recovery plan exists where one is required, so a defect discovered after promotion would have no defined route back to the superseded baseline.',
+					severityBasis: 'AUTHORED',
+					severityRationale:
+						"Nothing ratified decides this code. RPH-DOC-003 §35 places 'rollback or recovery where required' under Required evidence and pointedly not under Blocking conditions — it had the concept in front of it and declined to make it blocking, so BLOCKING would overreach the ratified list's own restraint. Not CRITICAL on an irreversibility argument: this code reports an absent plan, a preparedness deficit, and the claim is conditional ('where required' — §26.3 claim 8), so the code fires in cases where nothing irreversible is at stake. Not ADVISORY: §26.4 lists a rollback plan as promotion evidence, so its absence obliges action."
+				},
+				AMBIGUOUS_BASELINE_SCOPE: {
+					defaultSeverity: 'MATERIAL',
+					description:
+						"The baseline's declared purpose and scope are ambiguous, so later work cannot determine which artifacts it governs or what a subsequent baseline would supersede.",
+					severityBasis: 'AUTHORED',
+					severityRationale:
+						"Nothing ratified decides this code; RPH-DOC-003 §35's Blocking conditions do not reach §26.3 claim 9 ('the baseline has a declared purpose and scope'), so the MATERIAL default holds. Not BLOCKING: no ratified condition names it. Not ADVISORY: §26.1 makes the policy's object an 'authoritative baseline' and §26.4 lists 'superseded baseline' as evidence, so baselines are the referent for later comparison and supersession — an undeclared scope defeats that use rather than merely informing about it."
+				}
+			}
 		}
 	],
 	conformanceProfiles: [

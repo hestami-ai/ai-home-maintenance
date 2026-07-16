@@ -19,15 +19,21 @@
 // authored fields (evaluatorRole, failureSeverity, …). Checking an authored value against the doc would fail; the
 // point is to pin the line between the two, not to blur it.
 //
-// ⚠️ AND IT CHECKS AGAINST DOC-004 ONLY — WHICH IS ITSELF A CHOICE, NOT A FACT (found 2026-07-16, open).
-// RPH-DOC-003 §25–§35 independently ratifies eleven of these same twelve policies, with content DOC-004 does not
-// have: §25 (Intent Fidelity) ratifies four "Blocking conditions" where DOC-004 §15 ratifies none; §29 blocks on
-// "no recomposition strategy" where DOC-004 §19.7 does not; and each document names findings the other omits.
-// This file makes the ontology conform to DOC-004, so a DOC-003 divergence passes silently. That is the honest
-// state, not a lapse: the corpus double-ratifies its own catalog, and the only tiebreaker on disk lives in a
-// guide that says of itself "This guide is itself proposed" (§16 item 1). Adjudicating between two RATIFIED
-// documents with a PROPOSED one is the borrowed authority C1 corrected. The sponsor rules; then this file either
-// widens to both or cites the ruling. See HARMONIZATION-LOG PART 4.
+// WHY DOC-004 GOVERNS THE STRUCTURE CHECKED HERE, AND DOC-003 STILL GOVERNS SEVERITY.
+// RPH-DOC-003 §25–§35 covers eleven of these same twelve policies. It was briefly recorded as an unresolvable
+// conflict ("which document governs?"). It is not a conflict — the two compose, and the documents say so
+// themselves (docs/_working/RULING-doc003-doc004-compose.md):
+//   - They never contradict. The ONLY policy where both state blocking conditions is Intent Preservation, and
+//     they state the same rule (DOC-004 §23.6 / DOC-003 §32). For Decomposition Coverage DOC-004 §19.7 is a
+//     strict SUBSET of DOC-003 §29.
+//   - DOC-004 DANGLES what DOC-003 DEFINES: it says "no blocking fidelity finding remains" (§15.9) and uses
+//     "blocking" nine times in §26 without ever saying which findings block. DOC-003 supplies 17 such conditions.
+//   - The one policy DOC-004 gives its own Blocking conditions (§20.5, Constraint Propagation) is the one policy
+//     DOC-003 has no section for. DOC-004 added it, so it had to.
+//   - DOC-003's finding lists are "Common findings" — its own word, illustrative. DOC-004's are enumerated CODEs.
+// So: this file checks the STRUCTURE (criteria text, ids/names, codes) against DOC-004, which is the document
+// that states them; and the authored-layer tests below check severity quotes against ALL THREE ratified sources,
+// because that is where the severity text actually lives. Nothing ratified is discarded by either choice.
 import { readFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -35,15 +41,34 @@ import { describe, expect, it } from 'vitest';
 import { ontology } from './index.js';
 import type { SeedPolicy } from './ontology.types.js';
 
-const DOC = join(
+const CORPUS = join(
 	dirname(fileURLToPath(import.meta.url)),
 	'..',
 	'..',
 	'..',
 	'docs',
-	'Recursive Professional Harness',
+	'Recursive Professional Harness'
+);
+const DOC = join(
+	CORPUS,
 	'Janumi Professional Workbench Product Realization PWA - Assurance Policy Catalog and Validator Contract.md'
 );
+/** RPH-DOC-003 — the SPECIFICATION half of the same catalog. Its `Blocking conditions` are the referent of
+ *  DOC-004's dangling "blocking finding" language, so they decide severity. See RULING-doc003-doc004-compose.md. */
+const DOC003 = join(
+	CORPUS,
+	'Janumi Professional Workbench Product Realization PWA - Professional Ontology and Assurance Policy Specification.md'
+);
+/** The third ratified source of severity-bearing text: its Given/When/Then tests ratify blocking behaviour. */
+const TEST_SPEC = join(
+	CORPUS,
+	'Janumi Professional Workbench Recursive Professional Harness - Executable Invariant and Conformance Test Specification.md'
+);
+
+/** Collapse whitespace. A quote lifted from a JSON block or a bulleted list reflows; its WORDS must not change. */
+function normalize(s: string): string {
+	return s.replace(/\s+/g, ' ').trim();
+}
 
 /** section number -> policyId. The catalog's twelve ratified policies (DOC-004 §15-§26). */
 const SECTIONS: ReadonlyArray<readonly [string, string]> = [
@@ -193,6 +218,110 @@ describe('the seeded catalog conforms to DOC-004 itself', () => {
 			for (const code of Object.keys(policy.findingAnnotations ?? {})) {
 				expect(policy.findingTypes, `${policyId} annotates unlisted code ${code}`).toContain(code);
 			}
+		});
+	});
+
+	// ── The authored layer: what §9.1 mandates and the catalog supplies for only 19 of 99 codes ───────────────
+	//
+	// These tests are the whole defence of 80 authored severities. They cannot check that a judgement is GOOD —
+	// no test can. They check the two things that CAN be checked, which are exactly the two ways this content
+	// could lie to a reader: a description that fails §9.2 (which the doc states literally), and a severity that
+	// claims the corpus decided it when the corpus did not.
+	//
+	// The second is the important one, and it is not hypothetical. Authoring took four adversarial rounds. In
+	// round 1, 20 severities claimed ratified authority and a refuter demolished essentially all of it — the
+	// standard error being to quote a clause that gates SATISFIED as if it decided BLOCKING, when §10.3 has an
+	// open MATERIAL finding foreclose SATISFIED too. Prose provenance could not have caught that. This can.
+	describe('the authored FindingDefinition layer', () => {
+		const annotated = SECTIONS.flatMap(([section, policyId]) => {
+			const policy = policies.get(policyId);
+			return Object.entries(policy?.findingAnnotations ?? {}).map(
+				([code, a]) => [section, policyId, code, a] as const
+			);
+		});
+
+		it('annotates EVERY ratified finding code — the fallback is a safety net, not the norm', () => {
+			// seedAdditivePolicies falls back to the policy's failureSeverity + the humanized code for an
+			// unannotated code. That fallback stays (a newly ratified code must not break the seed) but it must
+			// never fire in practice: adding a code should force a deliberate authoring decision, not a default.
+			for (const [, policyId] of SECTIONS) {
+				const policy = policies.get(policyId);
+				expect(
+					Object.keys(policy?.findingAnnotations ?? {}).sort(),
+					`${policyId} has unannotated finding codes`
+				).toEqual([...(policy?.findingTypes ?? [])].sort());
+			}
+			expect(annotated).toHaveLength(99);
+		});
+
+		it('every description meets §9.2 — the doc bans this language literally', () => {
+			// §9.2 verbatim: "Observations must avoid vague language such as: 'could be improved'; 'looks
+			// reasonable'; 'probably acceptable'; 'consider reviewing.' The finding must explain what is deficient
+			// and why it matters."
+			const BANNED = [
+				'could be improved',
+				'looks reasonable',
+				'probably acceptable',
+				'consider reviewing'
+			];
+			for (const [, policyId, code, a] of annotated) {
+				for (const phrase of BANNED) {
+					expect(
+						a.description.toLowerCase(),
+						`${policyId}/${code} uses §9.2-banned language: "${phrase}"`
+					).not.toContain(phrase);
+				}
+				// "what is deficient AND why it matters" — a humanization of the code does neither.
+				expect(a.description.length, `${policyId}/${code}: too thin for §9.2`).toBeGreaterThan(40);
+				expect(a.description.toLowerCase()).not.toBe(code.toLowerCase().replaceAll('_', ' '));
+			}
+		});
+
+		it('A RATIFIED SEVERITY CLAIM MUST BE IN THE RATIFIED DOCUMENTS — the anti-laundering lock', () => {
+			// `severityBasis: RATIFIED_*` says "the corpus decided this, not me". That is checkable, so it is
+			// checked against all three ratified sources. Whitespace-normalized, because a quote lifted from a
+			// JSON block or a bulleted list reflows — but not word-normalized, so no word may be added or dropped.
+			const corpus = normalize(
+				[DOC, DOC003, TEST_SPEC].map((f) => readFileSync(f, 'utf8')).join('\n')
+			);
+			for (const [, policyId, code, a] of annotated) {
+				if (a.severityBasis === 'AUTHORED') {
+					expect(a.severityQuote ?? '', `${policyId}/${code} is AUTHORED but claims a quote`).toBe(
+						''
+					);
+					continue;
+				}
+				const quote = normalize(a.severityQuote ?? '');
+				expect(
+					quote.length,
+					`${policyId}/${code} claims ${a.severityBasis} with no quote`
+				).toBeGreaterThan(0);
+				expect(
+					corpus.includes(quote),
+					`${policyId}/${code} claims ${a.severityBasis} on words that are NOT in the ratified corpus:\n  ${quote}`
+				).toBe(true);
+			}
+		});
+
+		it('records a rationale and a legal severity for every code — the sponsor audits the call', () => {
+			for (const [, policyId, code, a] of annotated) {
+				expect(
+					a.severityRationale.length,
+					`${policyId}/${code}: no severity rationale`
+				).toBeGreaterThan(30);
+				expect(['INFORMATIONAL', 'ADVISORY', 'MATERIAL', 'BLOCKING', 'CRITICAL']).toContain(
+					a.defaultSeverity
+				);
+			}
+		});
+
+		it('19 of 99 severities are ratified and 80 are authored — the split, stated as a number', () => {
+			// Pinned so the honest ratio cannot drift upward unnoticed. It moved 0 -> 19 only by finding DOC-003's
+			// blocking conditions; if a later change claims more ratified authority, the anti-laundering lock
+			// above has to pass first, and this number has to be updated deliberately.
+			const ratified = annotated.filter(([, , , a]) => a.severityBasis !== 'AUTHORED');
+			expect(ratified).toHaveLength(19);
+			expect(annotated.filter(([, , , a]) => a.severityBasis === 'AUTHORED')).toHaveLength(80);
 		});
 	});
 

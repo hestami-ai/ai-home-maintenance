@@ -51,9 +51,23 @@ export type Criterion = Frozen<AssessmentCriterion>;
  * An absence found by grepping a field name is a claim about the field name. Populating these remains open for
  * the sponsor — and is now blocked on a prior question: the catalog is ratified TWICE (see `SeedPolicy`).
  */
+export type SeverityBasis =
+	| 'RATIFIED_BLOCKING_CONDITION'
+	| 'RATIFIED_CONFORMANCE_TEST'
+	| 'RATIFIED_WORKED_EXAMPLE'
+	| 'AUTHORED';
+
 export interface FindingAnnotation {
 	readonly defaultSeverity: string;
 	readonly description: string;
+	/** Where the severity came from. `RATIFIED_*` is a claim about the corpus and is CHECKED — see
+	 *  doc004-conformance.test.ts, which requires `severityQuote` to occur in the ratified documents. `AUTHORED`
+	 *  is the honest label for a judgement, including a well-grounded one. The label is what the sponsor audits. */
+	readonly severityBasis: SeverityBasis;
+	/** The corpus words that DECIDE this severity. Required iff basis is `RATIFIED_*`; must be in the documents. */
+	readonly severityQuote?: string;
+	/** Why this severity and not the adjacent one. Prose for audit; not machine-checked. */
+	readonly severityRationale: string;
 }
 
 /**
