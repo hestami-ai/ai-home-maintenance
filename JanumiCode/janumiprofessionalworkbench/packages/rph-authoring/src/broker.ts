@@ -8,6 +8,7 @@
 // PWA's own details); it deliberately does NOT expose the publication FSM — a human advances DRAFT -> ... ->
 // PUBLISHED. That is the "agent proposes, human publishes" seam.
 import type {
+	AssessmentCriterion,
 	CardinalityCode,
 	CommandResult,
 	DomainCommand,
@@ -117,7 +118,7 @@ export interface CreatePolicyInput {
 	readonly evaluatorRole?: string;
 	readonly independenceRequirement?: string;
 	readonly permittedControlAction?: string;
-	/** Each string becomes a mandatory AssessmentCriterion (id generated). */
+	/** Each string becomes a DOC-004 §7 `AssessmentCriterion` (id generated; see `createPolicy`). */
 	readonly criteria?: readonly string[];
 }
 
@@ -278,10 +279,23 @@ export class PwaAuthoringBroker {
 	createPolicy(input: CreatePolicyInput): ProposalResult {
 		if (!input.name?.trim()) return { ok: false, error: 'A policy name is required.' };
 		const id = this.mintId('pol');
-		const criteria = (input.criteria ?? []).map((statement, i) => ({
+		// Each line becomes a RATIFIED DOC-004 §7 AssessmentCriterion. This minted `{id, statement, mandatory}` —
+		// a shape no document defines — and the engine took it, because `CreateAssurancePolicy.criteria` was
+		// `z.array(z.unknown())`. This is the AGENT-facing path, so the invented shape was what an agent's
+		// authored policy actually became (AUDIT-placeholder-helpers.md).
+		//
+		// `name` and `description` both take the line: this input carries ONE string per criterion and §7
+		// requires both. Duplicating the author's words is lossless; inventing a short name would be authoring
+		// professional content. `severityIfNotMet: 'BLOCKING'` preserves the old `mandatory: true` exactly.
+		const criteria: AssessmentCriterion[] = (input.criteria ?? []).map((line, i) => ({
 			id: `C-${String(i + 1).padStart(2, '0')}`,
-			statement,
-			mandatory: true
+			name: line,
+			description: line,
+			criterionType: 'BOOLEAN',
+			evaluationMethod: 'MODEL_JUDGMENT',
+			requiredEvidenceIds: [],
+			severityIfNotMet: 'BLOCKING',
+			mayBeNotApplicable: false
 		}));
 		return this.one('CreateAssurancePolicy', ASSURANCE_POLICY, id, {
 			policyId: id,

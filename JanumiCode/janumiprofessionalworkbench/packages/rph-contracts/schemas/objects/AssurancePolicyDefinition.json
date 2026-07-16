@@ -321,10 +321,66 @@
       "type": "array",
       "items": {
         "type": "object",
-        "propertyNames": {
-          "type": "string"
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "name": {
+            "type": "string"
+          },
+          "description": {
+            "type": "string"
+          },
+          "criterionType": {
+            "type": "string",
+            "enum": [
+              "BOOLEAN",
+              "ENUMERATED",
+              "QUALITATIVE",
+              "QUANTITATIVE",
+              "COMPOSITE"
+            ]
+          },
+          "evaluationMethod": {
+            "type": "string",
+            "enum": [
+              "DETERMINISTIC",
+              "MODEL_JUDGMENT",
+              "HUMAN_JUDGMENT",
+              "HYBRID"
+            ]
+          },
+          "requiredEvidenceIds": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "severityIfNotMet": {
+            "type": "string",
+            "enum": [
+              "INFORMATIONAL",
+              "ADVISORY",
+              "MATERIAL",
+              "BLOCKING",
+              "CRITICAL"
+            ]
+          },
+          "mayBeNotApplicable": {
+            "type": "boolean"
+          }
         },
-        "additionalProperties": {}
+        "required": [
+          "id",
+          "name",
+          "description",
+          "criterionType",
+          "evaluationMethod",
+          "requiredEvidenceIds",
+          "severityIfNotMet",
+          "mayBeNotApplicable"
+        ],
+        "additionalProperties": false
       }
     },
     "evaluatorRole": {

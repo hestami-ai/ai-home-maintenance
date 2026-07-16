@@ -551,32 +551,56 @@ export const PRODUCT_REALIZATION_PWA_ONTOLOGY = {
 			criteria: [
 				{
 					id: 'IF-01',
-					statement:
-						"Objective fidelity: the formalized objective represents the user's need rather than substituting a preferred solution.",
-					mandatory: true
+					name: 'Objective fidelity',
+					description:
+						"the formalized objective represents the user's need rather than substituting a preferred solution.",
+					criterionType: 'BOOLEAN',
+					evaluationMethod: 'MODEL_JUDGMENT',
+					requiredEvidenceIds: [],
+					severityIfNotMet: 'BLOCKING',
+					mayBeNotApplicable: false
 				},
 				{
 					id: 'IF-02',
-					statement:
-						'Boundary fidelity: in-scope and out-of-scope statements are consistent with user authority (no unauthorized scope expansion).',
-					mandatory: true
+					name: 'Boundary fidelity',
+					description:
+						'in-scope and out-of-scope statements are consistent with user authority (no unauthorized scope expansion).',
+					criterionType: 'BOOLEAN',
+					evaluationMethod: 'MODEL_JUDGMENT',
+					requiredEvidenceIds: [],
+					severityIfNotMet: 'BLOCKING',
+					mayBeNotApplicable: false
 				},
 				{
 					id: 'IF-03',
-					statement:
-						'Constraint fidelity: explicit user constraints are preserved (not omitted or weakened).',
-					mandatory: true
+					name: 'Constraint fidelity',
+					description: 'explicit user constraints are preserved (not omitted or weakened).',
+					criterionType: 'BOOLEAN',
+					evaluationMethod: 'MODEL_JUDGMENT',
+					requiredEvidenceIds: [],
+					severityIfNotMet: 'BLOCKING',
+					mayBeNotApplicable: false
 				},
 				{
 					id: 'IF-04',
-					statement:
-						'Interpretation disclosure: inferred elements are labeled as inferred or proposed, not presented as user fact/requirement.',
-					mandatory: true
+					name: 'Interpretation disclosure',
+					description:
+						'inferred elements are labeled as inferred or proposed, not presented as user fact/requirement.',
+					criterionType: 'BOOLEAN',
+					evaluationMethod: 'MODEL_JUDGMENT',
+					requiredEvidenceIds: [],
+					severityIfNotMet: 'BLOCKING',
+					mayBeNotApplicable: false
 				},
 				{
 					id: 'IF-05',
-					statement: 'Ambiguity visibility: materially unresolved interpretations remain explicit.',
-					mandatory: true
+					name: 'Ambiguity visibility',
+					description: 'materially unresolved interpretations remain explicit.',
+					criterionType: 'BOOLEAN',
+					evaluationMethod: 'MODEL_JUDGMENT',
+					requiredEvidenceIds: [],
+					severityIfNotMet: 'BLOCKING',
+					mayBeNotApplicable: false
 				}
 			],
 			findingTypes: [
@@ -602,33 +626,64 @@ export const PRODUCT_REALIZATION_PWA_ONTOLOGY = {
 			criteria: [
 				{
 					id: 'IC-01',
-					statement: 'Desired outcomes are sufficiently explicit for the next authorized activity.',
-					mandatory: true
+					name: 'IC-01',
+					description:
+						'Desired outcomes are sufficiently explicit for the next authorized activity.',
+					criterionType: 'BOOLEAN',
+					evaluationMethod: 'MODEL_JUDGMENT',
+					requiredEvidenceIds: [],
+					severityIfNotMet: 'BLOCKING',
+					mayBeNotApplicable: false
 				},
 				{
 					id: 'IC-02',
-					statement: 'Product boundaries are sufficient for the next authorized activity.',
-					mandatory: true
+					name: 'IC-02',
+					description: 'Product boundaries are sufficient for the next authorized activity.',
+					criterionType: 'BOOLEAN',
+					evaluationMethod: 'MODEL_JUDGMENT',
+					requiredEvidenceIds: [],
+					severityIfNotMet: 'BLOCKING',
+					mayBeNotApplicable: false
 				},
 				{
 					id: 'IC-03',
-					statement: 'Known stakeholders and actors are represented proportionally to risk.',
-					mandatory: false
+					name: 'IC-03',
+					description: 'Known stakeholders and actors are represented proportionally to risk.',
+					criterionType: 'BOOLEAN',
+					evaluationMethod: 'MODEL_JUDGMENT',
+					requiredEvidenceIds: [],
+					severityIfNotMet: 'ADVISORY',
+					mayBeNotApplicable: false
 				},
 				{
 					id: 'IC-04',
-					statement: 'Mandatory constraints are recorded.',
-					mandatory: true
+					name: 'IC-04',
+					description: 'Mandatory constraints are recorded.',
+					criterionType: 'BOOLEAN',
+					evaluationMethod: 'MODEL_JUDGMENT',
+					requiredEvidenceIds: [],
+					severityIfNotMet: 'BLOCKING',
+					mayBeNotApplicable: false
 				},
 				{
 					id: 'IC-05',
-					statement: 'Success conditions exist, or the work is explicitly marked exploratory.',
-					mandatory: true
+					name: 'IC-05',
+					description: 'Success conditions exist, or the work is explicitly marked exploratory.',
+					criterionType: 'BOOLEAN',
+					evaluationMethod: 'MODEL_JUDGMENT',
+					requiredEvidenceIds: [],
+					severityIfNotMet: 'BLOCKING',
+					mayBeNotApplicable: false
 				},
 				{
 					id: 'IC-06',
-					statement: 'Major ambiguities have explicit dispositions.',
-					mandatory: true
+					name: 'IC-06',
+					description: 'Major ambiguities have explicit dispositions.',
+					criterionType: 'BOOLEAN',
+					evaluationMethod: 'MODEL_JUDGMENT',
+					requiredEvidenceIds: [],
+					severityIfNotMet: 'BLOCKING',
+					mayBeNotApplicable: false
 				}
 			],
 			findingTypes: [
@@ -663,35 +718,65 @@ export const PRODUCT_REALIZATION_PWA_ONTOLOGY = {
 			criteria: [
 				{
 					id: 'AD-01',
-					statement:
+					name: 'AD-01',
+					description:
 						'Material assumptions have been surfaced as first-class Assumption Objects (not left in prose).',
-					mandatory: true
+					criterionType: 'BOOLEAN',
+					evaluationMethod: 'MODEL_JUDGMENT',
+					requiredEvidenceIds: [],
+					severityIfNotMet: 'BLOCKING',
+					mayBeNotApplicable: false
 				},
 				{
 					id: 'AD-02',
-					statement: 'Assumptions are distinguished from established facts.',
-					mandatory: true
+					name: 'AD-02',
+					description: 'Assumptions are distinguished from established facts.',
+					criterionType: 'BOOLEAN',
+					evaluationMethod: 'MODEL_JUDGMENT',
+					requiredEvidenceIds: [],
+					severityIfNotMet: 'BLOCKING',
+					mayBeNotApplicable: false
 				},
 				{
 					id: 'AD-03',
-					statement: 'Affected objects are identified for each assumption.',
-					mandatory: true
+					name: 'AD-03',
+					description: 'Affected objects are identified for each assumption.',
+					criterionType: 'BOOLEAN',
+					evaluationMethod: 'MODEL_JUDGMENT',
+					requiredEvidenceIds: [],
+					severityIfNotMet: 'BLOCKING',
+					mayBeNotApplicable: false
 				},
 				{
 					id: 'AD-04',
-					statement: 'Materiality is classified (IMMATERIAL / MATERIAL / CRITICAL).',
-					mandatory: true
+					name: 'AD-04',
+					description: 'Materiality is classified (IMMATERIAL / MATERIAL / CRITICAL).',
+					criterionType: 'BOOLEAN',
+					evaluationMethod: 'MODEL_JUDGMENT',
+					requiredEvidenceIds: [],
+					severityIfNotMet: 'BLOCKING',
+					mayBeNotApplicable: false
 				},
 				{
 					id: 'AD-05',
-					statement: 'Verification or authorized-acceptance needs are identified.',
-					mandatory: true
+					name: 'AD-05',
+					description: 'Verification or authorized-acceptance needs are identified.',
+					criterionType: 'BOOLEAN',
+					evaluationMethod: 'MODEL_JUDGMENT',
+					requiredEvidenceIds: [],
+					severityIfNotMet: 'BLOCKING',
+					mayBeNotApplicable: false
 				},
 				{
 					id: 'AD-06',
-					statement:
+					name: 'AD-06',
+					description:
 						'No critical assumption silently authorizes irreversible or high-impact work without verification or authorized acceptance.',
-					mandatory: true
+					criterionType: 'BOOLEAN',
+					evaluationMethod: 'MODEL_JUDGMENT',
+					requiredEvidenceIds: [],
+					severityIfNotMet: 'BLOCKING',
+					mayBeNotApplicable: false
 				}
 			],
 			findingTypes: [
@@ -722,41 +807,74 @@ export const PRODUCT_REALIZATION_PWA_ONTOLOGY = {
 			criteria: [
 				{
 					id: 'DC-01',
-					statement:
-						'Obligation coverage: no mandatory parent obligation silently disappears (every one is allocated, retained, satisfied, or waived).',
-					mandatory: true
+					name: 'Obligation coverage',
+					description:
+						'no mandatory parent obligation silently disappears (every one is allocated, retained, satisfied, or waived).',
+					criterionType: 'BOOLEAN',
+					evaluationMethod: 'MODEL_JUDGMENT',
+					requiredEvidenceIds: [],
+					severityIfNotMet: 'BLOCKING',
+					mayBeNotApplicable: false
 				},
 				{
 					id: 'DC-02',
-					statement:
-						'Constraint preservation: applicable constraints are propagated or explicitly retained.',
-					mandatory: true
+					name: 'Constraint preservation',
+					description: 'applicable constraints are propagated or explicitly retained.',
+					criterionType: 'BOOLEAN',
+					evaluationMethod: 'MODEL_JUDGMENT',
+					requiredEvidenceIds: [],
+					severityIfNotMet: 'BLOCKING',
+					mayBeNotApplicable: false
 				},
 				{
 					id: 'DC-03',
-					statement: 'Cohesion: each child represents coherent professional work.',
-					mandatory: false
+					name: 'Cohesion',
+					description: 'each child represents coherent professional work.',
+					criterionType: 'BOOLEAN',
+					evaluationMethod: 'MODEL_JUDGMENT',
+					requiredEvidenceIds: [],
+					severityIfNotMet: 'ADVISORY',
+					mayBeNotApplicable: false
 				},
 				{
 					id: 'DC-04',
-					statement: 'Boundary clarity: child responsibilities are distinguishable.',
-					mandatory: false
+					name: 'Boundary clarity',
+					description: 'child responsibilities are distinguishable.',
+					criterionType: 'BOOLEAN',
+					evaluationMethod: 'MODEL_JUDGMENT',
+					requiredEvidenceIds: [],
+					severityIfNotMet: 'ADVISORY',
+					mayBeNotApplicable: false
 				},
 				{
 					id: 'DC-05',
-					statement: 'Dependency completeness: material sibling dependencies are explicit.',
-					mandatory: true
+					name: 'Dependency completeness',
+					description: 'material sibling dependencies are explicit.',
+					criterionType: 'BOOLEAN',
+					evaluationMethod: 'MODEL_JUDGMENT',
+					requiredEvidenceIds: [],
+					severityIfNotMet: 'BLOCKING',
+					mayBeNotApplicable: false
 				},
 				{
 					id: 'DC-06',
-					statement:
-						'Recomposition feasibility: a credible parent-level integration strategy exists.',
-					mandatory: true
+					name: 'Recomposition feasibility',
+					description: 'a credible parent-level integration strategy exists.',
+					criterionType: 'BOOLEAN',
+					evaluationMethod: 'MODEL_JUDGMENT',
+					requiredEvidenceIds: [],
+					severityIfNotMet: 'BLOCKING',
+					mayBeNotApplicable: false
 				},
 				{
 					id: 'DC-07',
-					statement: 'Intent continuity: child objectives remain subordinate to parent intent.',
-					mandatory: true
+					name: 'Intent continuity',
+					description: 'child objectives remain subordinate to parent intent.',
+					criterionType: 'BOOLEAN',
+					evaluationMethod: 'MODEL_JUDGMENT',
+					requiredEvidenceIds: [],
+					severityIfNotMet: 'BLOCKING',
+					mayBeNotApplicable: false
 				}
 			],
 			findingTypes: [
@@ -785,53 +903,103 @@ export const PRODUCT_REALIZATION_PWA_ONTOLOGY = {
 			criteria: [
 				{
 					id: 'AC-01',
-					statement: 'Applicable requirements are allocated to architecture.',
-					mandatory: true
+					name: 'AC-01',
+					description: 'Applicable requirements are allocated to architecture.',
+					criterionType: 'BOOLEAN',
+					evaluationMethod: 'MODEL_JUDGMENT',
+					requiredEvidenceIds: [],
+					severityIfNotMet: 'BLOCKING',
+					mayBeNotApplicable: false
 				},
 				{
 					id: 'AC-02',
-					statement: 'System boundaries are explicit.',
-					mandatory: true
+					name: 'AC-02',
+					description: 'System boundaries are explicit.',
+					criterionType: 'BOOLEAN',
+					evaluationMethod: 'MODEL_JUDGMENT',
+					requiredEvidenceIds: [],
+					severityIfNotMet: 'BLOCKING',
+					mayBeNotApplicable: false
 				},
 				{
 					id: 'AC-03',
-					statement: 'Major components have coherent responsibilities.',
-					mandatory: false
+					name: 'AC-03',
+					description: 'Major components have coherent responsibilities.',
+					criterionType: 'BOOLEAN',
+					evaluationMethod: 'MODEL_JUDGMENT',
+					requiredEvidenceIds: [],
+					severityIfNotMet: 'ADVISORY',
+					mayBeNotApplicable: false
 				},
 				{
 					id: 'AC-04',
-					statement: 'Interfaces are sufficiently defined.',
-					mandatory: false
+					name: 'AC-04',
+					description: 'Interfaces are sufficiently defined.',
+					criterionType: 'BOOLEAN',
+					evaluationMethod: 'MODEL_JUDGMENT',
+					requiredEvidenceIds: [],
+					severityIfNotMet: 'ADVISORY',
+					mayBeNotApplicable: false
 				},
 				{
 					id: 'AC-05',
-					statement: 'Data ownership is explicit (data-integrity boundary).',
-					mandatory: true
+					name: 'AC-05',
+					description: 'Data ownership is explicit (data-integrity boundary).',
+					criterionType: 'BOOLEAN',
+					evaluationMethod: 'MODEL_JUDGMENT',
+					requiredEvidenceIds: [],
+					severityIfNotMet: 'BLOCKING',
+					mayBeNotApplicable: false
 				},
 				{
 					id: 'AC-06',
-					statement: 'Security boundaries (incl. tenant isolation) are represented.',
-					mandatory: true
+					name: 'AC-06',
+					description: 'Security boundaries (incl. tenant isolation) are represented.',
+					criterionType: 'BOOLEAN',
+					evaluationMethod: 'MODEL_JUDGMENT',
+					requiredEvidenceIds: [],
+					severityIfNotMet: 'BLOCKING',
+					mayBeNotApplicable: false
 				},
 				{
 					id: 'AC-07',
-					statement: 'Operational and deployment concerns are proportionate.',
-					mandatory: false
+					name: 'AC-07',
+					description: 'Operational and deployment concerns are proportionate.',
+					criterionType: 'BOOLEAN',
+					evaluationMethod: 'MODEL_JUDGMENT',
+					requiredEvidenceIds: [],
+					severityIfNotMet: 'ADVISORY',
+					mayBeNotApplicable: false
 				},
 				{
 					id: 'AC-08',
-					statement: 'Mandatory constraints are preserved.',
-					mandatory: true
+					name: 'AC-08',
+					description: 'Mandatory constraints are preserved.',
+					criterionType: 'BOOLEAN',
+					evaluationMethod: 'MODEL_JUDGMENT',
+					requiredEvidenceIds: [],
+					severityIfNotMet: 'BLOCKING',
+					mayBeNotApplicable: false
 				},
 				{
 					id: 'AC-09',
-					statement: 'Known architecture risks and assumptions are explicit.',
-					mandatory: false
+					name: 'AC-09',
+					description: 'Known architecture risks and assumptions are explicit.',
+					criterionType: 'BOOLEAN',
+					evaluationMethod: 'MODEL_JUDGMENT',
+					requiredEvidenceIds: [],
+					severityIfNotMet: 'ADVISORY',
+					mayBeNotApplicable: false
 				},
 				{
 					id: 'AC-10',
-					statement: 'Architecture is feasible.',
-					mandatory: true
+					name: 'AC-10',
+					description: 'Architecture is feasible.',
+					criterionType: 'BOOLEAN',
+					evaluationMethod: 'MODEL_JUDGMENT',
+					requiredEvidenceIds: [],
+					severityIfNotMet: 'BLOCKING',
+					mayBeNotApplicable: false
 				}
 			],
 			findingTypes: [
@@ -871,38 +1039,73 @@ export const PRODUCT_REALIZATION_PWA_ONTOLOGY = {
 			criteria: [
 				{
 					id: 'IP-01',
-					statement: 'Desired outcomes remain represented.',
-					mandatory: true
+					name: 'IP-01',
+					description: 'Desired outcomes remain represented.',
+					criterionType: 'BOOLEAN',
+					evaluationMethod: 'MODEL_JUDGMENT',
+					requiredEvidenceIds: [],
+					severityIfNotMet: 'BLOCKING',
+					mayBeNotApplicable: false
 				},
 				{
 					id: 'IP-02',
-					statement: 'Scope has not expanded or contracted without authority.',
-					mandatory: true
+					name: 'IP-02',
+					description: 'Scope has not expanded or contracted without authority.',
+					criterionType: 'BOOLEAN',
+					evaluationMethod: 'MODEL_JUDGMENT',
+					requiredEvidenceIds: [],
+					severityIfNotMet: 'BLOCKING',
+					mayBeNotApplicable: false
 				},
 				{
 					id: 'IP-03',
-					statement: 'Mandatory constraints remain active.',
-					mandatory: true
+					name: 'IP-03',
+					description: 'Mandatory constraints remain active.',
+					criterionType: 'BOOLEAN',
+					evaluationMethod: 'MODEL_JUDGMENT',
+					requiredEvidenceIds: [],
+					severityIfNotMet: 'BLOCKING',
+					mayBeNotApplicable: false
 				},
 				{
 					id: 'IP-04',
-					statement: 'Descendant work continues to serve the parent objective.',
-					mandatory: true
+					name: 'IP-04',
+					description: 'Descendant work continues to serve the parent objective.',
+					criterionType: 'BOOLEAN',
+					evaluationMethod: 'MODEL_JUDGMENT',
+					requiredEvidenceIds: [],
+					severityIfNotMet: 'BLOCKING',
+					mayBeNotApplicable: false
 				},
 				{
 					id: 'IP-05',
-					statement: 'Implementation choices have not replaced product need.',
-					mandatory: true
+					name: 'IP-05',
+					description: 'Implementation choices have not replaced product need.',
+					criterionType: 'BOOLEAN',
+					evaluationMethod: 'MODEL_JUDGMENT',
+					requiredEvidenceIds: [],
+					severityIfNotMet: 'BLOCKING',
+					mayBeNotApplicable: false
 				},
 				{
 					id: 'IP-06',
-					statement: 'Local success contributes to global success.',
-					mandatory: false
+					name: 'IP-06',
+					description: 'Local success contributes to global success.',
+					criterionType: 'BOOLEAN',
+					evaluationMethod: 'MODEL_JUDGMENT',
+					requiredEvidenceIds: [],
+					severityIfNotMet: 'ADVISORY',
+					mayBeNotApplicable: false
 				},
 				{
 					id: 'IP-07',
-					statement: 'Authorized intent revisions are properly recorded.',
-					mandatory: true
+					name: 'IP-07',
+					description: 'Authorized intent revisions are properly recorded.',
+					criterionType: 'BOOLEAN',
+					evaluationMethod: 'MODEL_JUDGMENT',
+					requiredEvidenceIds: [],
+					severityIfNotMet: 'BLOCKING',
+					mayBeNotApplicable: false
 				}
 			],
 			findingTypes: [

@@ -95,11 +95,18 @@ function zodBaseExpr(t: string): string {
 		used.enums.add(t);
 		return `${t}Schema`;
 	}
-	if (ENV.has(`${t}Schema`)) {
+	// ENV/OBJ hold the BARE names — the regexes above capture `(\w+)` before the literal `Schema`, so the set
+	// contains 'ActorReference', not 'ActorReferenceSchema'. These two lookups appended 'Schema' and therefore
+	// could NEVER hit: both branches were dead, and every payload field typed as an object or envelope schema
+	// fell silently through to `z.unknown()`. Proof it was never reachable: the generated messages.ts imported
+	// only from './enums.js' — never once from './objects.js' or './envelopes.js', across 70 commands and 122
+	// events. Fixed 2026-07-16; this newly resolves 66 payload fields across 32 types, incl. ActorReference on
+	// 9 payloads (the actor on a command was accepted unvalidated) and CapabilityGrant on 3.
+	if (ENV.has(t)) {
 		used.env.add(`${t}Schema`);
 		return `${t}Schema`;
 	}
-	if (OBJ.has(`${t}Schema`)) {
+	if (OBJ.has(t)) {
 		used.obj.add(`${t}Schema`);
 		return `${t}Schema`;
 	}

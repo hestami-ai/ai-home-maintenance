@@ -4,11 +4,24 @@
 // resolver normalizes the `_vN` suffix.
 import { PRODUCT_REALIZATION_PWA_ONTOLOGY } from './ontology.data.js';
 
-export interface Criterion {
-	readonly id: string;
-	readonly statement: string;
-	readonly mandatory?: boolean;
-}
+/**
+ * An assessment criterion, per the RATIFIED DOC-004 §7 `interface AssessmentCriterion`.
+ *
+ * This used to be `{ id, statement, mandatory? }` — a shape no document ratifies, with no overlap beyond `id`.
+ * It survived because `AssurancePolicy.criteria` was typed `z.array(z.record(z.string(), z.unknown()))` — an
+ * array of ANY OBJECT — so nothing could catch the divergence (AUDIT-placeholder-helpers.md).
+ *
+ * Note what `mandatory: boolean` was standing in for: `severityIfNotMet`, a FIVE-level ratified severity,
+ * collapsed to a Boolean — the same disease §16 item 12 names for waivers.
+ */
+type RatifiedCriterion = import('@janumipwb/rph-contracts').AssessmentCriterion;
+/** Deep-readonly view of the ratified type — DERIVED from it, never restated, because the generated dataset is
+ *  `as const` and its arrays are readonly. A drift in DOC-004 §7 now fails this build. */
+export type Criterion = {
+	readonly [K in keyof RatifiedCriterion]: RatifiedCriterion[K] extends readonly (infer E)[]
+		? readonly E[]
+		: RatifiedCriterion[K];
+};
 export interface SeedPolicy {
 	readonly policyId: string;
 	readonly name?: string;

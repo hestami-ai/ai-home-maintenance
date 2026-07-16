@@ -2336,14 +2336,59 @@
       "name": "AssessmentCriterion",
       "fields": [
         {
-          "field": "(undefined)",
-          "type": "—",
-          "required": false,
-          "note": "Referenced by AssurancePolicyDefinition.criteria; results are CriterionResult (§20.1). NOT field-defined; DOC-004 §7 supplies criterionType/evaluationMethod/severityIfNotMet enums. Source TBD."
+          "field": "id",
+          "type": "string",
+          "required": true,
+          "note": "DOC-004 §7. Stable criterion id (FS-01-schema, RR-04-..., IC-05). Referenced by CriterionResult.criterionId (DOC-007 §20.1) and by a waiver's waivedCriterionId (DOC-004 §12.2)."
+        },
+        {
+          "field": "name",
+          "type": "string",
+          "required": true,
+          "note": "DOC-004 §7 — REQUIRED, and the one field the pre-existing content could not supply: the invented {id, statement, mandatory} shape carried a single string. MIGRATION RULE (2026-07-16), no invention: where the author wrote a 'Label: sentence' statement (12 of 41 seed criteria) the label becomes the name; otherwise the name is the id. A richer authoring surface should supply real names — that is content authoring, not schema transcription, and is NOT done here."
+        },
+        {
+          "field": "description",
+          "type": "string",
+          "required": true,
+          "note": "DOC-004 §7. The criterion statement. This is where the invented `statement` field's content goes."
+        },
+        {
+          "field": "criterionType",
+          "type": "CriterionType",
+          "required": true,
+          "enumRef": "CriterionTypeSchema",
+          "note": "DOC-004 §7: BOOLEAN|ENUMERATED|QUALITATIVE|QUANTITATIVE|COMPOSITE. The enum was ALREADY harvested out of this very interface — while the interface was recorded as 'NOT field-defined'."
+        },
+        {
+          "field": "evaluationMethod",
+          "type": "EvaluationMethod",
+          "required": true,
+          "enumRef": "EvaluationMethodSchema",
+          "note": "DOC-004 §7: DETERMINISTIC|MODEL_JUDGMENT|HUMAN_JUDGMENT|HYBRID. Derivable from the policy's evaluator: the schema-invariant and identity-provenance floors are DETERMINISTIC; Reasoning Review is MODEL_JUDGMENT."
+        },
+        {
+          "field": "requiredEvidenceIds",
+          "type": "string[]",
+          "required": true,
+          "note": "DOC-004 §7. id-ref[] into the policy's EvidenceRequirement list (§6.1). Empty where a policy declares no evidence requirements."
+        },
+        {
+          "field": "severityIfNotMet",
+          "type": "AssuranceSeverity",
+          "required": true,
+          "enumRef": "AssuranceSeveritySchema",
+          "note": "DOC-004 §7: INFORMATIONAL|ADVISORY|MATERIAL|BLOCKING|CRITICAL. THIS REPLACES THE INVENTED `mandatory: boolean` — a five-level ratified severity that had been collapsed to a Boolean, the same disease §16 item 12 names for waivers. MIGRATION, faithful to the live runtime: mandatory:true -> BLOCKING (assurance-rules.ts already maps both an open BLOCKING finding AND a mandatory NOT_MET criterion to REJECTED); mandatory:false -> ADVISORY (non-mandatory criteria are filtered out of the disposition entirely, so they must NOT be MATERIAL, which conditionally-satisfies)."
+        },
+        {
+          "field": "mayBeNotApplicable",
+          "type": "boolean",
+          "required": true,
+          "note": "DOC-004 §7. Pairs with CriterionResultOutcome's NOT_APPLICABLE (DOC-007 §20.1). False for the floor: §8.4's floor always applies to a material AI transformation."
         }
       ],
-      "sourceSection": "DOC-004 §7 (L371)",
-      "note": "RATIFIED AFTER ALL — audit 2026-07-16 (AUDIT-placeholder-helpers.md). DOC-004 §7 (L371) contains `interface AssessmentCriterion { ... }` defining: id, name, description, criterionType, evaluationMethod, requiredEvidenceIds, severityIfNotMet, mayBeNotApplicable. The previous note said 'NOT field-defined ... Source TBD' WHILE CITING THIS SECTION — the harvest pass reached inside this very interface, took its enums, and recorded its fields as nonexistent. A pass that extracts one kind of thing reports the absence of every other kind. STILL A PLACEHOLDER IN CODE: the single '(undefined)' field below keeps gen-objects.ts emitting z.record(z.string(), z.unknown()) — 'any object'. TRANSCRIPTION CAVEAT: ALL 8 fields are primitives or enums — ZERO undefined dependencies. This is the type the entire de minimis floor is expressed in, and floor-policies.ts currently writes {id, statement, mandatory}: NO overlap beyond id, and severityIfNotMet (5 levels) collapsed to a boolean. NOT fixed here: tightening this breaks live literals and needs an explicit migration, not a sweep."
+      "sourceSection": "DOC-004 §7 (L371) — RATIFIED, field-complete, transcribed",
+      "note": "TRANSCRIBED from DOC-004 §7 on 2026-07-16 (AUDIT-placeholder-helpers.md). The previous entry was a single '(undefined)' field noted 'NOT field-defined; DOC-004 §7 supplies criterionType/evaluationMethod/severityIfNotMet enums. Source TBD.' — CITING THE SECTION THAT DEFINES IT. Those three enums are MEMBERS of `interface AssessmentCriterion`; the harvest pass reached inside the interface, took its enums, and recorded its fields as nonexistent. All 8 fields are primitives or already-generated enums: ZERO undefined dependencies, the cleanest transcription of the nine ratified-but-placeholder helpers. WHY IT MATTERED: AssurancePolicy.criteria was z.array(z.record(z.string(), z.unknown())) = an array of ANY OBJECT, so the code invented {id, statement, mandatory} — no overlap with the ratified shape beyond `id` — and nothing could catch it. This is the mechanism of the hollow governed layer, closed at its highest-value point."
     },
     {
       "name": "FindingDefinition",

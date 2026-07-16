@@ -21,9 +21,11 @@ import {
 	ControlActionSchema,
 	CoverageTypeSchema,
 	CriterionResultOutcomeSchema,
+	CriterionTypeSchema,
 	DecisionStatusSchema,
 	DecisionTypeSchema,
 	DecompositionContractStatusSchema,
+	EvaluationMethodSchema,
 	EvidenceStatusSchema,
 	EvidenceTypeSchema,
 	ExecutionPlanStatusSchema,
@@ -60,8 +62,6 @@ export const ArtifactReferenceSchema = z.record(z.string(), z.unknown());
 export type ArtifactReference = z.infer<typeof ArtifactReferenceSchema>;
 export const ArtifactRequirementSchema = z.record(z.string(), z.unknown());
 export type ArtifactRequirement = z.infer<typeof ArtifactRequirementSchema>;
-export const AssessmentCriterionSchema = z.record(z.string(), z.unknown());
-export type AssessmentCriterion = z.infer<typeof AssessmentCriterionSchema>;
 export const CapabilityGrantSchema = z.record(z.string(), z.unknown());
 export type CapabilityGrant = z.infer<typeof CapabilityGrantSchema>;
 export const CapabilityRequestSchema = z.record(z.string(), z.unknown());
@@ -126,6 +126,17 @@ export const AggregationRuleSchema = z.strictObject({
 	rule: z.string()
 });
 export type AggregationRule = z.infer<typeof AggregationRuleSchema>;
+export const AssessmentCriterionSchema = z.strictObject({
+	id: z.string(),
+	name: z.string(),
+	description: z.string(),
+	criterionType: CriterionTypeSchema,
+	evaluationMethod: EvaluationMethodSchema,
+	requiredEvidenceIds: z.array(z.string()),
+	severityIfNotMet: AssuranceSeveritySchema,
+	mayBeNotApplicable: z.boolean()
+});
+export type AssessmentCriterion = z.infer<typeof AssessmentCriterionSchema>;
 export const AssumptionPropagationSchema = z.strictObject({
 	assumptionId: z.string(),
 	childWorkUnitIds: z.array(z.string()),

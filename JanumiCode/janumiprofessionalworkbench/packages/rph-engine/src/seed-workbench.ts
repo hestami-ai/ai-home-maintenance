@@ -4,6 +4,7 @@
 // context) AND a real Undertaking with a live graph (Undertaking context) to render — the RPH-DOC-010 separation,
 // demonstrated end to end. It is deterministic: it drives commands; no fixture event log is replayed.
 import type { ActorReference, DomainCommand } from '@janumipwb/rph-contracts';
+import type { AssessmentCriterion } from '@janumipwb/rph-contracts';
 import { FLOOR_POLICY_DEFINITIONS } from '@janumipwb/rph-assurance';
 import type { EngineHandle } from './engine.js';
 import { driveReferenceUndertaking } from './reference-undertaking.js';
@@ -191,7 +192,11 @@ interface AdditivePolicySeed {
 	readonly evaluatorRole: string;
 	readonly independence: string;
 	readonly permittedControlAction: string;
-	readonly criteria: ReadonlyArray<{ id: string; statement: string; mandatory: boolean }>;
+	/** The RATIFIED DOC-004 §7 shape, aliased from the generated contract. This was a THIRD inline
+	 *  restatement of `{id, statement, mandatory}` — a shape no document defines — after floor-policies.ts
+	 *  and ontology.ts. It survived because AssurancePolicy.criteria was an array of ANY OBJECT
+	 *  (AUDIT-placeholder-helpers.md). Aliasing means the next divergence fails the build. */
+	readonly criteria: readonly AssessmentCriterion[];
 	readonly findingDefinitions: ReadonlyArray<{ code: string; severity: string; statement: string }>;
 }
 
@@ -210,18 +215,33 @@ const ADDITIVE_POLICY_SEEDS: readonly AdditivePolicySeed[] = [
 		criteria: [
 			{
 				id: 'IF-01',
-				statement: 'Objective fidelity: no solution substituted for the need.',
-				mandatory: true
+				name: 'Objective fidelity',
+				description: 'no solution substituted for the need.',
+				criterionType: 'BOOLEAN',
+				evaluationMethod: 'MODEL_JUDGMENT',
+				requiredEvidenceIds: [],
+				severityIfNotMet: 'BLOCKING',
+				mayBeNotApplicable: false
 			},
 			{
 				id: 'IF-02',
-				statement: 'Boundary fidelity: no unauthorized scope expansion.',
-				mandatory: true
+				name: 'Boundary fidelity',
+				description: 'no unauthorized scope expansion.',
+				criterionType: 'BOOLEAN',
+				evaluationMethod: 'MODEL_JUDGMENT',
+				requiredEvidenceIds: [],
+				severityIfNotMet: 'BLOCKING',
+				mayBeNotApplicable: false
 			},
 			{
 				id: 'IF-03',
-				statement: 'Constraint fidelity: explicit user constraints preserved.',
-				mandatory: true
+				name: 'Constraint fidelity',
+				description: 'explicit user constraints preserved.',
+				criterionType: 'BOOLEAN',
+				evaluationMethod: 'MODEL_JUDGMENT',
+				requiredEvidenceIds: [],
+				severityIfNotMet: 'BLOCKING',
+				mayBeNotApplicable: false
 			}
 		],
 		findingDefinitions: [
@@ -249,12 +269,35 @@ const ADDITIVE_POLICY_SEEDS: readonly AdditivePolicySeed[] = [
 		independence: 'DIFFERENT_INVOCATION',
 		permittedControlAction: 'GATHER_CONTEXT',
 		criteria: [
-			{ id: 'IC-01', statement: 'Desired outcomes are explicit.', mandatory: true },
-			{ id: 'IC-04', statement: 'Mandatory constraints are recorded.', mandatory: true },
+			{
+				id: 'IC-01',
+				name: 'IC-01',
+				description: 'Desired outcomes are explicit.',
+				criterionType: 'BOOLEAN',
+				evaluationMethod: 'MODEL_JUDGMENT',
+				requiredEvidenceIds: [],
+				severityIfNotMet: 'BLOCKING',
+				mayBeNotApplicable: false
+			},
+			{
+				id: 'IC-04',
+				name: 'IC-04',
+				description: 'Mandatory constraints are recorded.',
+				criterionType: 'BOOLEAN',
+				evaluationMethod: 'MODEL_JUDGMENT',
+				requiredEvidenceIds: [],
+				severityIfNotMet: 'BLOCKING',
+				mayBeNotApplicable: false
+			},
 			{
 				id: 'IC-05',
-				statement: 'Success conditions exist, or the work is marked exploratory.',
-				mandatory: true
+				name: 'IC-05',
+				description: 'Success conditions exist, or the work is marked exploratory.',
+				criterionType: 'BOOLEAN',
+				evaluationMethod: 'MODEL_JUDGMENT',
+				requiredEvidenceIds: [],
+				severityIfNotMet: 'BLOCKING',
+				mayBeNotApplicable: false
 			}
 		],
 		findingDefinitions: [
@@ -284,18 +327,33 @@ const ADDITIVE_POLICY_SEEDS: readonly AdditivePolicySeed[] = [
 		criteria: [
 			{
 				id: 'AD-01',
-				statement: 'Material assumptions surfaced as first-class objects (not prose).',
-				mandatory: true
+				name: 'AD-01',
+				description: 'Material assumptions surfaced as first-class objects (not prose).',
+				criterionType: 'BOOLEAN',
+				evaluationMethod: 'MODEL_JUDGMENT',
+				requiredEvidenceIds: [],
+				severityIfNotMet: 'BLOCKING',
+				mayBeNotApplicable: false
 			},
 			{
 				id: 'AD-02',
-				statement: 'Assumptions distinguished from established facts.',
-				mandatory: true
+				name: 'AD-02',
+				description: 'Assumptions distinguished from established facts.',
+				criterionType: 'BOOLEAN',
+				evaluationMethod: 'MODEL_JUDGMENT',
+				requiredEvidenceIds: [],
+				severityIfNotMet: 'BLOCKING',
+				mayBeNotApplicable: false
 			},
 			{
 				id: 'AD-04',
-				statement: 'Materiality is classified (IMMATERIAL/MATERIAL/CRITICAL).',
-				mandatory: true
+				name: 'AD-04',
+				description: 'Materiality is classified (IMMATERIAL/MATERIAL/CRITICAL).',
+				criterionType: 'BOOLEAN',
+				evaluationMethod: 'MODEL_JUDGMENT',
+				requiredEvidenceIds: [],
+				severityIfNotMet: 'BLOCKING',
+				mayBeNotApplicable: false
 			}
 		],
 		findingDefinitions: [
@@ -325,15 +383,34 @@ const ADDITIVE_POLICY_SEEDS: readonly AdditivePolicySeed[] = [
 		criteria: [
 			{
 				id: 'DC-01',
-				statement: 'Every mandatory parent obligation is allocated/retained/satisfied/waived.',
-				mandatory: true
+				name: 'DC-01',
+				description: 'Every mandatory parent obligation is allocated/retained/satisfied/waived.',
+				criterionType: 'BOOLEAN',
+				evaluationMethod: 'MODEL_JUDGMENT',
+				requiredEvidenceIds: [],
+				severityIfNotMet: 'BLOCKING',
+				mayBeNotApplicable: false
 			},
 			{
 				id: 'DC-02',
-				statement: 'Applicable constraints are propagated or explicitly retained.',
-				mandatory: true
+				name: 'DC-02',
+				description: 'Applicable constraints are propagated or explicitly retained.',
+				criterionType: 'BOOLEAN',
+				evaluationMethod: 'MODEL_JUDGMENT',
+				requiredEvidenceIds: [],
+				severityIfNotMet: 'BLOCKING',
+				mayBeNotApplicable: false
 			},
-			{ id: 'DC-06', statement: 'A credible recomposition strategy exists.', mandatory: true }
+			{
+				id: 'DC-06',
+				name: 'DC-06',
+				description: 'A credible recomposition strategy exists.',
+				criterionType: 'BOOLEAN',
+				evaluationMethod: 'MODEL_JUDGMENT',
+				requiredEvidenceIds: [],
+				severityIfNotMet: 'BLOCKING',
+				mayBeNotApplicable: false
+			}
 		],
 		findingDefinitions: [
 			{
@@ -362,15 +439,34 @@ const ADDITIVE_POLICY_SEEDS: readonly AdditivePolicySeed[] = [
 		criteria: [
 			{
 				id: 'AC-01',
-				statement: 'Applicable requirements are allocated to architecture.',
-				mandatory: true
+				name: 'AC-01',
+				description: 'Applicable requirements are allocated to architecture.',
+				criterionType: 'BOOLEAN',
+				evaluationMethod: 'MODEL_JUDGMENT',
+				requiredEvidenceIds: [],
+				severityIfNotMet: 'BLOCKING',
+				mayBeNotApplicable: false
 			},
 			{
 				id: 'AC-05',
-				statement: 'Data ownership is explicit (data-integrity boundary).',
-				mandatory: true
+				name: 'AC-05',
+				description: 'Data ownership is explicit (data-integrity boundary).',
+				criterionType: 'BOOLEAN',
+				evaluationMethod: 'MODEL_JUDGMENT',
+				requiredEvidenceIds: [],
+				severityIfNotMet: 'BLOCKING',
+				mayBeNotApplicable: false
 			},
-			{ id: 'AC-08', statement: 'Mandatory constraints are preserved.', mandatory: true }
+			{
+				id: 'AC-08',
+				name: 'AC-08',
+				description: 'Mandatory constraints are preserved.',
+				criterionType: 'BOOLEAN',
+				evaluationMethod: 'MODEL_JUDGMENT',
+				requiredEvidenceIds: [],
+				severityIfNotMet: 'BLOCKING',
+				mayBeNotApplicable: false
+			}
 		],
 		findingDefinitions: [
 			{
@@ -399,10 +495,24 @@ const ADDITIVE_POLICY_SEEDS: readonly AdditivePolicySeed[] = [
 		criteria: [
 			{
 				id: 'IP-01',
-				statement: 'Approved intent is traced through this transformation.',
-				mandatory: true
+				name: 'IP-01',
+				description: 'Approved intent is traced through this transformation.',
+				criterionType: 'BOOLEAN',
+				evaluationMethod: 'MODEL_JUDGMENT',
+				requiredEvidenceIds: [],
+				severityIfNotMet: 'BLOCKING',
+				mayBeNotApplicable: false
 			},
-			{ id: 'IP-02', statement: 'No silent change to product semantics.', mandatory: true }
+			{
+				id: 'IP-02',
+				name: 'IP-02',
+				description: 'No silent change to product semantics.',
+				criterionType: 'BOOLEAN',
+				evaluationMethod: 'MODEL_JUDGMENT',
+				requiredEvidenceIds: [],
+				severityIfNotMet: 'BLOCKING',
+				mayBeNotApplicable: false
+			}
 		],
 		findingDefinitions: [
 			{

@@ -2187,7 +2187,8 @@
         {
           "field": "criteria",
           "required": true,
-          "type": "AssessmentCriterion[]"
+          "type": "AssessmentCriterion[]",
+          "note": "TIGHTENED 2026-07-16: was type 'unknown[]' = z.array(z.unknown()), accepting literally anything — weaker even than the AssessmentCriterion placeholder. Now AssessmentCriterion[] (DOC-004 §7, transcribed). This is the payload the PWA Designer's policy manager authors criteria through; until now it could send any shape at all and the engine would persist it."
         },
         {
           "field": "evaluatorRole",
@@ -2251,7 +2252,8 @@
         {
           "field": "criteria",
           "required": false,
-          "type": "AssessmentCriterion[]"
+          "type": "AssessmentCriterion[]",
+          "note": "TIGHTENED 2026-07-16: was type 'unknown[]' = z.array(z.unknown()), accepting literally anything — weaker even than the AssessmentCriterion placeholder. Now AssessmentCriterion[] (DOC-004 §7, transcribed). This is the payload the PWA Designer's policy manager authors criteria through; until now it could send any shape at all and the engine would persist it."
         },
         {
           "field": "evaluatorRole",
@@ -5600,7 +5602,8 @@
         {
           "field": "criteria",
           "required": true,
-          "type": "AssessmentCriterion[]"
+          "type": "AssessmentCriterion[]",
+          "note": "TIGHTENED 2026-07-16: was type 'unknown[]' = z.array(z.unknown()), accepting literally anything — weaker even than the AssessmentCriterion placeholder. Now AssessmentCriterion[] (DOC-004 §7, transcribed). This is the payload the PWA Designer's policy manager authors criteria through; until now it could send any shape at all and the engine would persist it."
         },
         {
           "field": "evaluatorRole",
@@ -5661,7 +5664,8 @@
         {
           "field": "criteria",
           "required": false,
-          "type": "AssessmentCriterion[]"
+          "type": "AssessmentCriterion[]",
+          "note": "TIGHTENED 2026-07-16: was type 'unknown[]' = z.array(z.unknown()), accepting literally anything — weaker even than the AssessmentCriterion placeholder. Now AssessmentCriterion[] (DOC-004 §7, transcribed). This is the payload the PWA Designer's policy manager authors criteria through; until now it could send any shape at all and the engine would persist it."
         },
         {
           "field": "evaluatorRole",

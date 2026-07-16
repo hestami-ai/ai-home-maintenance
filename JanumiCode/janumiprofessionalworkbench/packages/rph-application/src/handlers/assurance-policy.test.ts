@@ -50,7 +50,20 @@ describe('Assurance Policy lifecycle handlers (live)', () => {
 				rationale: 'r',
 				applicableObjectTypes: 'PROFESSIONAL_WORK_UNIT',
 				evaluatedClaimTypes: 'CORRECTNESS',
-				criteria: [{ id: 'C-01', statement: 's', mandatory: true }],
+				// A DOC-004 §7 AssessmentCriterion. Was `{ id: 'C-01', statement: 's', mandatory: true }` — a shape no
+				// document defines, accepted only because the payload was `z.array(z.unknown())`.
+				criteria: [
+					{
+						id: 'C-01',
+						name: 'n',
+						description: 's',
+						criterionType: 'BOOLEAN',
+						evaluationMethod: 'MODEL_JUDGMENT',
+						requiredEvidenceIds: [],
+						severityIfNotMet: 'BLOCKING',
+						mayBeNotApplicable: false
+					}
+				],
 				evaluatorRole: 'reviewer',
 				independenceRequirement: 'DIFFERENT_AGENT',
 				findingDefinitions: [{ code: 'F-01', severity: 'MATERIAL', statement: 's' }],

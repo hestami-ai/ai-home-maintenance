@@ -30,6 +30,40 @@ import {
 	StepStateSchema,
 	WorkLifecycleStateSchema
 } from './enums.js';
+import { ActorReferenceSchema } from './envelopes.js';
+import {
+	ApplicabilityRuleSchema,
+	ArtifactReferenceSchema,
+	AssessmentCriterionSchema,
+	AssumptionPropagationSchema,
+	AuthorityReferenceSchema,
+	CapabilityGrantSchema,
+	CapabilityRequestSchema,
+	ConfidenceAssessmentSchema,
+	ConstraintPropagationSchema,
+	ControlActionRecommendationSchema,
+	ConversationEntrySchema,
+	CoverageClaimSchema,
+	DesiredOutcomeSchema,
+	EscalationPolicySchema,
+	ExecutionProvenanceSchema,
+	ExecutionStepSchema,
+	ExecutionTransitionSchema,
+	FindingDefinitionSchema,
+	IntentMappingSchema,
+	ModelSelectionPolicySchema,
+	ObligationAllocationSchema,
+	OutputDefinitionSchema,
+	PermittedChildRuleSchema,
+	RetryPolicySchema,
+	SandboxPolicySchema,
+	SuccessConditionSchema,
+	TacticalChangePolicySchema,
+	TerminationPolicySchema,
+	ValidatorResultSchema,
+	WorkBoundarySchema,
+	WorkRiskProfileSchema
+} from './objects.js';
 
 // ---- Command payload schemas ----
 export const CaptureIntentPayloadSchema = z.strictObject({
@@ -41,8 +75,8 @@ export const CaptureIntentPayloadSchema = z.strictObject({
 export type CaptureIntentPayload = z.infer<typeof CaptureIntentPayloadSchema>;
 export const FormalizeIntentPayloadSchema = z.strictObject({
 	formalizedObjective: z.string(),
-	desiredOutcomes: z.array(z.unknown()),
-	successConditions: z.array(z.unknown()),
+	desiredOutcomes: z.array(DesiredOutcomeSchema),
+	successConditions: z.array(SuccessConditionSchema),
 	nonGoals: z.array(z.string()),
 	ambiguityIds: z.array(z.string()),
 	constraintIds: z.array(z.string()),
@@ -62,13 +96,13 @@ export const ProposePwuPayloadSchema = z.strictObject({
 	description: z.string(),
 	intentId: z.string(),
 	parentWorkUnitId: z.string().optional(),
-	boundaries: z.unknown(),
+	boundaries: WorkBoundarySchema,
 	obligationIds: z.array(z.string()),
 	constraintIds: z.array(z.string()),
 	assumptionIds: z.array(z.string()),
-	expectedOutputs: z.array(z.unknown()),
+	expectedOutputs: z.array(OutputDefinitionSchema),
 	assurancePolicyIds: z.array(z.string()),
-	riskProfile: z.unknown(),
+	riskProfile: WorkRiskProfileSchema,
 	undertakingId: z.string().optional(),
 	pwuTypeId: z.string().optional(),
 	isLocalExtension: z.boolean().optional()
@@ -82,12 +116,12 @@ export type MarkPwuReadyPayload = z.infer<typeof MarkPwuReadyPayloadSchema>;
 export const ProposeExecutionPlanPayloadSchema = z.strictObject({
 	executionPlanId: z.string(),
 	workUnitId: z.string(),
-	steps: z.array(z.unknown()),
-	transitions: z.array(z.unknown()),
-	retryPolicy: z.unknown(),
-	tacticalChangePolicy: z.unknown(),
-	escalationPolicy: z.unknown(),
-	terminationPolicy: z.unknown()
+	steps: z.array(ExecutionStepSchema),
+	transitions: z.array(ExecutionTransitionSchema),
+	retryPolicy: RetryPolicySchema,
+	tacticalChangePolicy: TacticalChangePolicySchema,
+	escalationPolicy: EscalationPolicySchema,
+	terminationPolicy: TerminationPolicySchema
 });
 export type ProposeExecutionPlanPayload = z.infer<typeof ProposeExecutionPlanPayloadSchema>;
 export const ActivateExecutionPlanPayloadSchema = z.strictObject({
@@ -118,14 +152,14 @@ export const CompleteExecutionStepPayloadSchema = z.strictObject({
 	proposedEvidenceIds: z.array(z.string()),
 	detectedAssumptionIds: z.array(z.string()),
 	structuredResult: z.unknown(),
-	executionProvenance: z.unknown()
+	executionProvenance: ExecutionProvenanceSchema
 });
 export type CompleteExecutionStepPayload = z.infer<typeof CompleteExecutionStepPayloadSchema>;
 export const ProposeEvidencePayloadSchema = z.strictObject({
 	evidenceId: z.string(),
 	evidenceType: EvidenceTypeSchema,
-	contentReference: z.unknown(),
-	producedBy: z.unknown(),
+	contentReference: ArtifactReferenceSchema,
+	producedBy: ActorReferenceSchema,
 	supportsClaimIds: z.array(z.string()),
 	contradictsClaimIds: z.array(z.string()),
 	scope: z.string(),
@@ -151,7 +185,7 @@ export type RequestAssuranceAssessmentPayload = z.infer<
 	typeof RequestAssuranceAssessmentPayloadSchema
 >;
 export const CompleteAssuranceAssessmentPayloadSchema = z.strictObject({
-	validatorResult: z.unknown()
+	validatorResult: ValidatorResultSchema
 });
 export type CompleteAssuranceAssessmentPayload = z.infer<
 	typeof CompleteAssuranceAssessmentPayloadSchema
@@ -206,7 +240,7 @@ export const DetectAssumptionPayloadSchema = z.strictObject({
 	assumptionId: z.string(),
 	statement: z.string(),
 	basis: z.string().optional(),
-	introducedBy: z.unknown(),
+	introducedBy: ActorReferenceSchema,
 	affectedObjectIds: z.array(z.string()),
 	materiality: MaterialitySchema,
 	sourceArtifactId: z.string().optional(),
@@ -237,7 +271,7 @@ export const ProposeDecisionPayloadSchema = z.strictObject({
 	subjectObjectIds: z.array(z.string()),
 	selectedOption: z.string(),
 	rationale: z.string(),
-	authority: z.unknown(),
+	authority: ActorReferenceSchema,
 	consideredEvidenceIds: z.array(z.string()).optional(),
 	consideredObservationIds: z.array(z.string()).optional(),
 	effectiveAt: z.string().optional()
@@ -277,12 +311,12 @@ export const ProposeDecompositionPayloadSchema = z.strictObject({
 	parentWorkUnitId: z.string(),
 	childWorkUnitIds: z.array(z.string()),
 	rationale: z.string(),
-	intentMappings: z.array(z.unknown()).optional(),
-	obligationAllocations: z.array(z.unknown()).optional(),
-	constraintPropagations: z.array(z.unknown()).optional(),
-	assumptionPropagations: z.array(z.unknown()).optional(),
+	intentMappings: z.array(IntentMappingSchema).optional(),
+	obligationAllocations: z.array(ObligationAllocationSchema).optional(),
+	constraintPropagations: z.array(ConstraintPropagationSchema).optional(),
+	assumptionPropagations: z.array(AssumptionPropagationSchema).optional(),
 	retainedParentObligationIds: z.array(z.string()).optional(),
-	coverageClaims: z.array(z.unknown()).optional(),
+	coverageClaims: z.array(CoverageClaimSchema).optional(),
 	siblingDependencyIds: z.array(z.string()).optional(),
 	recompositionContractId: z.string().optional()
 });
@@ -296,8 +330,8 @@ export type ValidateDecompositionPayload = z.infer<typeof ValidateDecompositionP
 export const ReviseDecompositionPayloadSchema = z.strictObject({
 	rationale: z.string(),
 	childWorkUnitIds: z.array(z.string()).optional(),
-	obligationAllocations: z.array(z.unknown()).optional(),
-	constraintPropagations: z.array(z.unknown()).optional()
+	obligationAllocations: z.array(ObligationAllocationSchema).optional(),
+	constraintPropagations: z.array(ConstraintPropagationSchema).optional()
 });
 export type ReviseDecompositionPayload = z.infer<typeof ReviseDecompositionPayloadSchema>;
 export const BeginRecompositionPayloadSchema = z.strictObject({
@@ -377,11 +411,11 @@ export const RequestRuntimeBindingPayloadSchema = z.strictObject({
 	runtimeBindingId: z.string(),
 	executionStepId: z.string(),
 	roleId: z.string(),
-	requestedCapabilities: z.array(z.unknown())
+	requestedCapabilities: z.array(CapabilityRequestSchema)
 });
 export type RequestRuntimeBindingPayload = z.infer<typeof RequestRuntimeBindingPayloadSchema>;
 export const AuthorizeRuntimeBindingPayloadSchema = z.strictObject({
-	grantedCapabilities: z.array(z.unknown())
+	grantedCapabilities: z.array(CapabilityGrantSchema)
 });
 export type AuthorizeRuntimeBindingPayload = z.infer<typeof AuthorizeRuntimeBindingPayloadSchema>;
 export const DenyRuntimeBindingPayloadSchema = z.strictObject({
@@ -409,7 +443,7 @@ export const DefinePwuTypePayloadSchema = z.strictObject({
 	isRoot: z.boolean(),
 	permittedParentTypeIds: z.array(z.string()).optional(),
 	permittedChildTypeIds: z.array(z.string()).optional(),
-	permittedChildren: z.array(z.unknown()).optional(),
+	permittedChildren: z.array(PermittedChildRuleSchema).optional(),
 	requiredInputs: z.array(z.string()).optional(),
 	requiredOutputs: z.array(z.string()).optional(),
 	requiredAssurancePolicyIds: z.array(z.string()).optional(),
@@ -459,7 +493,7 @@ export const EditPwuTypePayloadSchema = z.strictObject({
 	isRoot: z.boolean().optional(),
 	completionRule: z.string().optional(),
 	permittedChildTypeIds: z.array(z.string()).optional(),
-	permittedChildren: z.array(z.unknown()).optional(),
+	permittedChildren: z.array(PermittedChildRuleSchema).optional(),
 	requiredInputs: z.array(z.string()).optional(),
 	requiredOutputs: z.array(z.string()).optional(),
 	requiredAssurancePolicyIds: z.array(z.string()).optional()
@@ -472,7 +506,7 @@ export type RemovePwuTypePayload = z.infer<typeof RemovePwuTypePayloadSchema>;
 export const AppendConversationEntriesPayloadSchema = z.strictObject({
 	conversationId: z.string(),
 	pwaId: z.string(),
-	entries: z.array(z.unknown())
+	entries: z.array(ConversationEntrySchema)
 });
 export type AppendConversationEntriesPayload = z.infer<
 	typeof AppendConversationEntriesPayloadSchema
@@ -485,10 +519,10 @@ export const CreateAssurancePolicyPayloadSchema = z.strictObject({
 	rationale: z.string(),
 	applicableObjectTypes: z.string(),
 	evaluatedClaimTypes: z.string(),
-	criteria: z.array(z.unknown()),
+	criteria: z.array(AssessmentCriterionSchema),
 	evaluatorRole: z.string(),
 	independenceRequirement: z.string(),
-	findingDefinitions: z.array(z.unknown()),
+	findingDefinitions: z.array(FindingDefinitionSchema),
 	permittedControlActions: z.string()
 });
 export type CreateAssurancePolicyPayload = z.infer<typeof CreateAssurancePolicyPayloadSchema>;
@@ -499,10 +533,10 @@ export const EditAssurancePolicyPayloadSchema = z.strictObject({
 	rationale: z.string().optional(),
 	applicableObjectTypes: z.string().optional(),
 	evaluatedClaimTypes: z.string().optional(),
-	criteria: z.array(z.unknown()).optional(),
+	criteria: z.array(AssessmentCriterionSchema).optional(),
 	evaluatorRole: z.string().optional(),
 	independenceRequirement: z.string().optional(),
-	findingDefinitions: z.array(z.unknown()).optional(),
+	findingDefinitions: z.array(FindingDefinitionSchema).optional(),
 	permittedControlActions: z.string().optional()
 });
 export type EditAssurancePolicyPayload = z.infer<typeof EditAssurancePolicyPayloadSchema>;
@@ -530,7 +564,7 @@ export const AssumptionDetectedPayloadSchema = z.strictObject({
 	assumptionId: z.string(),
 	statement: z.string(),
 	basis: z.string().optional(),
-	introducedBy: z.unknown(),
+	introducedBy: ActorReferenceSchema,
 	affectedObjectIds: z.array(z.string()),
 	materiality: MaterialitySchema,
 	status: AssumptionStatusSchema,
@@ -578,7 +612,7 @@ export const AssuranceAssessmentCompletedPayloadSchema = z.strictObject({
 	evidenceConsideredIds: z.array(z.string()),
 	observationIds: z.array(z.string()),
 	residualUncertainty: z.array(z.string()),
-	recommendedControlActions: z.array(z.unknown())
+	recommendedControlActions: z.array(ControlActionRecommendationSchema)
 });
 export type AssuranceAssessmentCompletedPayload = z.infer<
 	typeof AssuranceAssessmentCompletedPayloadSchema
@@ -618,7 +652,7 @@ export const AssuranceAssessmentRequestedPayloadSchema = z.strictObject({
 	policySemanticVersion: z.number(),
 	subjectObjectIds: z.array(z.string()),
 	claimIds: z.array(z.string()),
-	evaluator: z.unknown(),
+	evaluator: ActorReferenceSchema,
 	disposition: AssuranceDispositionSchema
 });
 export type AssuranceAssessmentRequestedPayload = z.infer<
@@ -627,7 +661,7 @@ export type AssuranceAssessmentRequestedPayload = z.infer<
 export const AssuranceAssessmentSatisfiedPayloadSchema = z.strictObject({
 	evidenceConsideredIds: z.array(z.string()),
 	criteriaMetIds: z.array(z.string()).optional(),
-	confidence: z.unknown().optional(),
+	confidence: ConfidenceAssessmentSchema.optional(),
 	disposition: AssuranceDispositionSchema
 });
 export type AssuranceAssessmentSatisfiedPayload = z.infer<
@@ -701,7 +735,7 @@ export const ClaimAssertedPayloadSchema = z.strictObject({
 	statement: z.string(),
 	claimType: ClaimTypeSchema,
 	subjectObjectIds: z.array(z.string()),
-	assertedBy: z.unknown(),
+	assertedBy: ActorReferenceSchema,
 	status: ClaimStatusSchema
 });
 export type ClaimAssertedPayload = z.infer<typeof ClaimAssertedPayloadSchema>;
@@ -730,8 +764,8 @@ export type ClarificationRequestedPayload = z.infer<typeof ClarificationRequeste
 export const ConstraintAddedPayloadSchema = z.strictObject({
 	statement: z.string(),
 	constraintType: ConstraintTypeSchema,
-	authority: z.unknown(),
-	applicability: z.unknown().optional(),
+	authority: AuthorityReferenceSchema,
+	applicability: ApplicabilityRuleSchema.optional(),
 	strength: ConstraintStrengthSchema,
 	status: ConstraintStatusSchema
 });
@@ -765,7 +799,7 @@ export const ConstraintWaivedPayloadSchema = z.strictObject({
 });
 export type ConstraintWaivedPayload = z.infer<typeof ConstraintWaivedPayloadSchema>;
 export const DecisionApprovedPayloadSchema = z.strictObject({
-	approvalAuthority: z.unknown(),
+	approvalAuthority: ActorReferenceSchema,
 	status: DecisionStatusSchema
 });
 export type DecisionApprovedPayload = z.infer<typeof DecisionApprovedPayloadSchema>;
@@ -784,7 +818,7 @@ export const DecisionProposedPayloadSchema = z.strictObject({
 	subjectObjectIds: z.array(z.string()),
 	selectedOption: z.string(),
 	rationale: z.string(),
-	authority: z.unknown(),
+	authority: ActorReferenceSchema,
 	consideredEvidenceIds: z.array(z.string()).optional(),
 	consideredObservationIds: z.array(z.string()).optional(),
 	effectiveAt: z.string().optional(),
@@ -804,12 +838,12 @@ export const DecompositionProposedPayloadSchema = z.strictObject({
 	parentWorkUnitId: z.string(),
 	childWorkUnitIds: z.array(z.string()),
 	rationale: z.string(),
-	intentMappings: z.array(z.unknown()).optional(),
-	obligationAllocations: z.array(z.unknown()).optional(),
-	constraintPropagations: z.array(z.unknown()).optional(),
-	assumptionPropagations: z.array(z.unknown()).optional(),
+	intentMappings: z.array(IntentMappingSchema).optional(),
+	obligationAllocations: z.array(ObligationAllocationSchema).optional(),
+	constraintPropagations: z.array(ConstraintPropagationSchema).optional(),
+	assumptionPropagations: z.array(AssumptionPropagationSchema).optional(),
 	retainedParentObligationIds: z.array(z.string()).optional(),
-	coverageClaims: z.array(z.unknown()).optional(),
+	coverageClaims: z.array(CoverageClaimSchema).optional(),
 	siblingDependencyIds: z.array(z.string()).optional(),
 	recompositionContractId: z.string().optional(),
 	status: DecompositionContractStatusSchema
@@ -829,7 +863,7 @@ export const DecompositionRevisedPayloadSchema = z.strictObject({
 export type DecompositionRevisedPayload = z.infer<typeof DecompositionRevisedPayloadSchema>;
 export const DecompositionValidatedPayloadSchema = z.strictObject({
 	validatorRole: z.string().optional(),
-	coverageClaims: z.array(z.unknown()).optional(),
+	coverageClaims: z.array(CoverageClaimSchema).optional(),
 	status: DecompositionContractStatusSchema
 });
 export type DecompositionValidatedPayload = z.infer<typeof DecompositionValidatedPayloadSchema>;
@@ -853,8 +887,8 @@ export const EvidenceInvalidatedPayloadSchema = z.strictObject({
 export type EvidenceInvalidatedPayload = z.infer<typeof EvidenceInvalidatedPayloadSchema>;
 export const EvidenceProposedPayloadSchema = z.strictObject({
 	evidenceType: EvidenceTypeSchema,
-	contentReference: z.unknown(),
-	producedBy: z.unknown(),
+	contentReference: ArtifactReferenceSchema,
+	producedBy: ActorReferenceSchema,
 	supportsClaimIds: z.array(z.string()).optional(),
 	contradictsClaimIds: z.array(z.string()).optional(),
 	scope: z.string(),
@@ -894,10 +928,10 @@ export const ExecutionPlanProposedPayloadSchema = z.strictObject({
 	planVersion: z.number(),
 	stepIds: z.array(z.string()).optional(),
 	transitionIds: z.array(z.string()).optional(),
-	retryPolicy: z.unknown().optional(),
-	tacticalChangePolicy: z.unknown().optional(),
-	escalationPolicy: z.unknown().optional(),
-	terminationPolicy: z.unknown().optional(),
+	retryPolicy: RetryPolicySchema.optional(),
+	tacticalChangePolicy: TacticalChangePolicySchema.optional(),
+	escalationPolicy: EscalationPolicySchema.optional(),
+	terminationPolicy: TerminationPolicySchema.optional(),
 	status: ExecutionPlanStatusSchema
 });
 export type ExecutionPlanProposedPayload = z.infer<typeof ExecutionPlanProposedPayloadSchema>;
@@ -1011,8 +1045,8 @@ export const IntentFormalizedPayloadSchema = z.strictObject({
 	priorSemanticVersion: z.number(),
 	newSemanticVersion: z.number(),
 	formalizedObjective: z.string(),
-	desiredOutcomes: z.array(z.unknown()),
-	successConditions: z.array(z.unknown()),
+	desiredOutcomes: z.array(DesiredOutcomeSchema),
+	successConditions: z.array(SuccessConditionSchema),
 	nonGoals: z.array(z.string()),
 	intentStatus: IntentStatusSchema
 });
@@ -1178,7 +1212,7 @@ export const RecompositionStartedPayloadSchema = z.strictObject({
 });
 export type RecompositionStartedPayload = z.infer<typeof RecompositionStartedPayloadSchema>;
 export const RuntimeBindingAuthorizedPayloadSchema = z.strictObject({
-	grantedCapabilities: z.array(z.unknown()),
+	grantedCapabilities: z.array(CapabilityGrantSchema),
 	authorizationStatus: AuthorizationStatusSchema
 });
 export type RuntimeBindingAuthorizedPayload = z.infer<typeof RuntimeBindingAuthorizedPayloadSchema>;
@@ -1190,15 +1224,15 @@ export type RuntimeBindingDeniedPayload = z.infer<typeof RuntimeBindingDeniedPay
 export const RuntimeBindingRequestedPayloadSchema = z.strictObject({
 	executionStepId: z.string(),
 	roleId: z.string(),
-	modelSelectionPolicy: z.unknown().optional(),
-	requestedCapabilities: z.array(z.unknown()),
-	sandboxPolicy: z.unknown().optional(),
+	modelSelectionPolicy: ModelSelectionPolicySchema.optional(),
+	requestedCapabilities: z.array(CapabilityRequestSchema),
+	sandboxPolicy: SandboxPolicySchema.optional(),
 	authorizationStatus: AuthorizationStatusSchema
 });
 export type RuntimeBindingRequestedPayload = z.infer<typeof RuntimeBindingRequestedPayloadSchema>;
 export const RuntimeCapabilityRevokedPayloadSchema = z.strictObject({
 	revocationReason: z.string(),
-	revokedCapabilities: z.array(z.unknown()).optional(),
+	revokedCapabilities: z.array(CapabilityGrantSchema).optional(),
 	authorizationStatus: AuthorizationStatusSchema
 });
 export type RuntimeCapabilityRevokedPayload = z.infer<typeof RuntimeCapabilityRevokedPayloadSchema>;
@@ -1303,7 +1337,7 @@ export type PwuTypeRemovedPayload = z.infer<typeof PwuTypeRemovedPayloadSchema>;
 export const ConversationEntriesAppendedPayloadSchema = z.strictObject({
 	conversationId: z.string(),
 	pwaId: z.string(),
-	entries: z.array(z.unknown())
+	entries: z.array(ConversationEntrySchema)
 });
 export type ConversationEntriesAppendedPayload = z.infer<
 	typeof ConversationEntriesAppendedPayloadSchema
@@ -1316,10 +1350,10 @@ export const AssurancePolicyCreatedPayloadSchema = z.strictObject({
 	rationale: z.string(),
 	applicableObjectTypes: z.string(),
 	evaluatedClaimTypes: z.string(),
-	criteria: z.array(z.unknown()),
+	criteria: z.array(AssessmentCriterionSchema),
 	evaluatorRole: z.string(),
 	independenceRequirement: z.string(),
-	findingDefinitions: z.array(z.unknown()),
+	findingDefinitions: z.array(FindingDefinitionSchema),
 	permittedControlActions: z.string()
 });
 export type AssurancePolicyCreatedPayload = z.infer<typeof AssurancePolicyCreatedPayloadSchema>;
@@ -1330,10 +1364,10 @@ export const AssurancePolicyEditedPayloadSchema = z.strictObject({
 	rationale: z.string().optional(),
 	applicableObjectTypes: z.string().optional(),
 	evaluatedClaimTypes: z.string().optional(),
-	criteria: z.array(z.unknown()).optional(),
+	criteria: z.array(AssessmentCriterionSchema).optional(),
 	evaluatorRole: z.string().optional(),
 	independenceRequirement: z.string().optional(),
-	findingDefinitions: z.array(z.unknown()).optional(),
+	findingDefinitions: z.array(FindingDefinitionSchema).optional(),
 	permittedControlActions: z.string().optional()
 });
 export type AssurancePolicyEditedPayload = z.infer<typeof AssurancePolicyEditedPayloadSchema>;
