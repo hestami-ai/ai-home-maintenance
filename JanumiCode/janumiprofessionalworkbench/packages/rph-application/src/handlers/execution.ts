@@ -64,7 +64,29 @@ export const proposeExecutionPlan: CommandHandler = (ctx, command, payload) => {
 		objectType: PLAN,
 		aggregateId: p.executionPlanId,
 		state,
-		eventType: 'ExecutionPlanProposed'
+		eventType: 'ExecutionPlanProposed',
+		// The event records the RESULTING state. ExecutionPlanProposed declares the plan's identity + `status`
+		// (UNDER_REVIEW), and references its steps/transitions by ID (not the full embedded objects the command
+		// carries) — so the event is a PROJECTION of the command, plus the created status the command omits. The
+		// policies ride when non-empty (the reference undertaking supplies `{}`, so they are omitted — not specified,
+		// not a fabricated empty). (Pinned defect in emitted-event-conformance; now conforms.)
+		eventPayload: {
+			workUnitId: p.workUnitId,
+			planVersion: 1,
+			status: 'UNDER_REVIEW',
+			stepIds: p.steps.map((s) => s.id),
+			transitionIds: p.transitions.map((t) => (t as { id?: string }).id ?? ''),
+			...(p.retryPolicy && Object.keys(p.retryPolicy).length ? { retryPolicy: p.retryPolicy } : {}),
+			...(p.tacticalChangePolicy && Object.keys(p.tacticalChangePolicy).length
+				? { tacticalChangePolicy: p.tacticalChangePolicy }
+				: {}),
+			...(p.escalationPolicy && Object.keys(p.escalationPolicy).length
+				? { escalationPolicy: p.escalationPolicy }
+				: {}),
+			...(p.terminationPolicy && Object.keys(p.terminationPolicy).length
+				? { terminationPolicy: p.terminationPolicy }
+				: {})
+		}
 	});
 };
 

@@ -233,7 +233,22 @@ export const proposeEvidence: CommandHandler = (ctx, command, payload) => {
 		objectType: EVIDENCE,
 		aggregateId: p.evidenceId,
 		state,
-		eventType: 'EvidenceProposed'
+		eventType: 'EvidenceProposed',
+		// The event records the RESULTING state. EvidenceProposed declares the evidence + the created `status`
+		// (PROPOSED); the raw command payload omits `status`. Emit the declared shape — the required evidence fields
+		// (contentReference passes through as-is) + status, plus the optional claim links / limitations when
+		// supplied (absent = not specified, never a fabricated empty). (Pinned defect; now conforms.)
+		eventPayload: {
+			evidenceType: p.evidenceType,
+			contentReference: p.contentReference,
+			producedBy: p.producedBy,
+			scope: p.scope,
+			capturedAt: p.capturedAt,
+			status: 'PROPOSED',
+			...(p.supportsClaimIds?.length ? { supportsClaimIds: p.supportsClaimIds } : {}),
+			...(p.contradictsClaimIds?.length ? { contradictsClaimIds: p.contradictsClaimIds } : {}),
+			...(p.limitations?.length ? { limitations: p.limitations } : {})
+		}
 	});
 };
 

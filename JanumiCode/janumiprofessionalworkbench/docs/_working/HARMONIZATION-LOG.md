@@ -3067,8 +3067,9 @@ the three floor-policy-creation events) and the I1 evaluator lock now admits the
 ## PART 3x — Pinned event-shape defects closed: events now record the STATUS they transitioned into
 
 The emitted-event-conformance register (PART 3p) pinned events whose emitted payload their own declared shape
-rejects — "the event that records *this became RUNNING* does not contain RUNNING." Three closed here, all cases where
-the HANDLER was the wrong side (it emitted the command payload; the event exists to record the resulting status):
+rejects — "the event that records *this became RUNNING* does not contain RUNNING." **The register is now fully
+cleared (11 → 0)** over this session, every case the HANDLER's wrong side (it emitted the command payload; the event
+exists to record the resulting status):
 
 - **`ExecutionStepStarted`** — `startExecutionStep` emitted `{ stepId }`; the event declares `stepState`. `advanceStep`
   already supports an `eventPayload` override, so it now supplies `{ stepId, runtimeBindingId?, stepState: 'RUNNING' }`.
@@ -3089,13 +3090,17 @@ the HANDLER was the wrong side (it emitted the command payload; the event exists
   the command payload, which omits the created `status`. Each now emits the declared shape via `createObject`'s
   `eventPayload` override: the required fields + the created `status` (`UNDER_REVIEW` / `CANDIDATE` / `PROPOSED`) +
   any optionals the command actually supplied (absent = not specified, never a fabricated empty).
+- **`EvidenceProposed` / `ExecutionPlanProposed`** — the last two CREATE events. `EvidenceProposed` emits its evidence
+  fields (`contentReference` passing through) + `status: 'PROPOSED'`. `ExecutionPlanProposed` is a **projection**: the
+  event references its steps/transitions by ID (`steps → stepIds`, `transitions → transitionIds`), not the full
+  embedded objects the command carries, plus `status: 'UNDER_REVIEW'`; empty policies are omitted, not emitted as `{}`.
 
-A projection reading any of these to learn what happened now finds the state, not silence. Register **11 → 2**; all
-nine added to the must-conform spine so they cannot regress. Each mutation-verified (break the `eventPayload` → both
-the register count and the spine fail). Gate: `check-types` 21/21 · `test` 21/21 · lint · boundary · format. The
-remaining two are CREATE events too (`EvidenceProposed` — a complex `contentReference`; `ExecutionPlanProposed` —
-projecting steps → stepIds / transitions → transitionIds); each needs its own deliberate judgement, one at a time,
-never a bulk edit.
+A projection reading any event to learn what happened now finds the state, not silence. **Register 11 → 0 —
+CLEARED: every event this system emits conforms to its own declared shape.** All eleven are on the must-conform
+spine, and the register assertion stays as an empty-array PIN so a regression re-adds an entry and fails — it cannot
+silently grow back. Each fix was judged and mutation-verified one at a time (break the `eventPayload` → the register
+count / empty PIN and the spine both fail); never a bulk edit, which would have been the fabrication this effort
+exists to prevent. Gate (each): `check-types` 21/21 · `test` 21/21 · lint · boundary · format.
 
 ---
 

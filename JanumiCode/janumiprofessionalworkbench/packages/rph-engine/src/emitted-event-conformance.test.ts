@@ -69,7 +69,7 @@ describe('emitted events vs their declared shapes', () => {
 		expect(checked).toBeGreaterThan(200);
 	});
 
-	it('DEFECT REGISTER: 2 event types emit a payload their own declared shape rejects', () => {
+	it('DEFECT REGISTER: 0 event types emit a payload their own declared shape rejects (register CLEARED)', () => {
 		const { violations } = driveAndCheck();
 		// PIN — a defect register, not a specification. It must only ever SHRINK. An entry here means an event
 		// and its declared contract disagree, and BOTH are ours: either the handler emits the wrong thing, or the
@@ -81,22 +81,19 @@ describe('emitted events vs their declared shapes', () => {
 		// several also carry keys the strict schema rejects outright. These are precisely the events a projection
 		// must read to know what happened, which is how the Work view came to report every PWU as PROPOSED.
 		//
-		// AssuranceAssessmentStarted was the twelfth (fixed earlier — the SCHEMA was the wrong side there). Fixed
-		// since, all HANDLER-was-the-wrong-side (it emitted the command payload; the event exists to record the
-		// RESULTING status it transitioned INTO): ExecutionStepStarted (`stepState: RUNNING`), IntentDiscoveryStarted
-		// (`intentStatus: UNDER_DISCOVERY`), DecompositionValidated (`status: VALID`), and the three status-only
-		// transition events ExecutionPlanApproved / BaselineSubmittedForReview / BaselineApproved (each `status: <target>`).
-		// Each now supplies its declared shape. The CREATE events DecompositionProposed, BaselineCreated, and
-		// DecisionProposed are fixed: createObject emitted the command payload (which omits the created `status`);
-		// each now emits the declared shape (the required fields + the created `status` + any optionals the command
-		// supplied). The remaining TWO are CREATE events too (EvidenceProposed — with a complex `contentReference`;
-		// ExecutionPlanProposed — projecting steps → stepIds / transitions → transitionIds); each needs the same
-		// judgement made deliberately, one at a time. A bulk edit would be the fabrication this effort exists to
-		// prevent.
-		expect(violations.map((v) => v.eventType).sort()).toEqual([
-			'EvidenceProposed',
-			'ExecutionPlanProposed'
-		]);
+		// THE REGISTER IS NOW CLEARED — every event this system emits conforms to its own declared shape. It began at
+		// twelve (AssuranceAssessmentStarted was fixed on the SCHEMA side; the rest all handler-side, each emitting
+		// the command payload while the event exists to record the RESULTING status it transitioned INTO). The
+		// status-transition events — ExecutionStepStarted (`stepState: RUNNING`), IntentDiscoveryStarted
+		// (`intentStatus: UNDER_DISCOVERY`), DecompositionValidated (`status: VALID`), ExecutionPlanApproved /
+		// BaselineSubmittedForReview / BaselineApproved (each `status: <target>`) — now supply the declared status.
+		// The CREATE events — DecompositionProposed, BaselineCreated, DecisionProposed, EvidenceProposed, and
+		// ExecutionPlanProposed (a projection: steps → stepIds, transitions → transitionIds) — now emit the declared
+		// shape (required fields + created status + any optionals the command supplied), never the raw command payload.
+		// Each was judged and fixed deliberately, one at a time — never a bulk edit, which would have been the
+		// fabrication this effort exists to prevent. The assertion stays as an empty-array PIN: a regression re-adds
+		// an entry and fails here, so the register cannot silently grow back.
+		expect(violations.map((v) => v.eventType).sort()).toEqual([]);
 	});
 
 	it('the events a projection most depends on DO conform (the ones already fixed stay fixed)', () => {
@@ -122,7 +119,9 @@ describe('emitted events vs their declared shapes', () => {
 			'BaselineApproved',
 			'DecompositionProposed',
 			'BaselineCreated',
-			'DecisionProposed'
+			'DecisionProposed',
+			'EvidenceProposed',
+			'ExecutionPlanProposed'
 		]) {
 			expect(broken.has(eventType), `${eventType} regressed`).toBe(false);
 		}
