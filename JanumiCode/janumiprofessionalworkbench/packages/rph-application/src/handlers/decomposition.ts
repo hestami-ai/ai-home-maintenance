@@ -46,7 +46,33 @@ export const proposeDecomposition: CommandHandler = (ctx, command, payload) => {
 		objectType: DECOMP,
 		aggregateId: id,
 		state,
-		eventType: 'DecompositionProposed'
+		eventType: 'DecompositionProposed',
+		// The event records the RESULTING state. DecompositionProposed declares the decomposition + the created
+		// `status` (UNDER_REVIEW); the raw command payload omits `status` (a required field). Emit the declared
+		// shape — the required decomposition fields + status, plus any optional propagation fields the command
+		// actually supplied (absent = not specified, never a fabricated empty). (Pinned defect; now conforms.)
+		eventPayload: {
+			parentWorkUnitId: p.parentWorkUnitId,
+			childWorkUnitIds: p.childWorkUnitIds,
+			rationale: p.rationale,
+			status: 'UNDER_REVIEW',
+			...(p.intentMappings?.length ? { intentMappings: p.intentMappings } : {}),
+			...(p.obligationAllocations?.length
+				? { obligationAllocations: p.obligationAllocations }
+				: {}),
+			...(p.constraintPropagations?.length
+				? { constraintPropagations: p.constraintPropagations }
+				: {}),
+			...(p.assumptionPropagations?.length
+				? { assumptionPropagations: p.assumptionPropagations }
+				: {}),
+			...(p.retainedParentObligationIds?.length
+				? { retainedParentObligationIds: p.retainedParentObligationIds }
+				: {}),
+			...(p.coverageClaims?.length ? { coverageClaims: p.coverageClaims } : {}),
+			...(p.siblingDependencyIds?.length ? { siblingDependencyIds: p.siblingDependencyIds } : {}),
+			...(p.recompositionContractId ? { recompositionContractId: p.recompositionContractId } : {})
+		}
 	});
 };
 
