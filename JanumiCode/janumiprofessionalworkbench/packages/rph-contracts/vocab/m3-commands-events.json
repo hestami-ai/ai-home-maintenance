@@ -3589,6 +3589,12 @@
           "note": "id-ref[]"
         },
         {
+          "field": "observationIds",
+          "required": false,
+          "type": "string[]",
+          "note": "id-ref[]; the assurance observations the validator CONSIDERED in reaching this disposition (the validation basis). AUTHORED optional field. Distinct from DecompositionRejected.blockingObservationIds (the blocking subset). Contract-drift fix: ValidateDecomposition carried observationIds but both validation events dropped it, so nothing could say what the verdict was based on."
+        },
+        {
           "field": "status",
           "required": true,
           "type": "enum",
@@ -3642,6 +3648,12 @@
           "required": false,
           "type": "CoverageClaim[]",
           "note": "complex type"
+        },
+        {
+          "field": "observationIds",
+          "required": false,
+          "type": "string[]",
+          "note": "id-ref[]; the assurance observations the validator CONSIDERED in reaching this disposition (the validation basis). AUTHORED optional field. Distinct from DecompositionRejected.blockingObservationIds (the blocking subset). Contract-drift fix: ValidateDecomposition carried observationIds but both validation events dropped it, so nothing could say what the verdict was based on."
         },
         {
           "field": "status",

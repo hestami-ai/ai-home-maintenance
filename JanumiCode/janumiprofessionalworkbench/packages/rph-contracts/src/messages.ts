@@ -867,6 +867,7 @@ export const DecompositionProposedPayloadSchema = z.strictObject({
 export type DecompositionProposedPayload = z.infer<typeof DecompositionProposedPayloadSchema>;
 export const DecompositionRejectedPayloadSchema = z.strictObject({
 	blockingObservationIds: z.array(z.string()),
+	observationIds: z.array(z.string()).optional(),
 	status: DecompositionContractStatusSchema
 });
 export type DecompositionRejectedPayload = z.infer<typeof DecompositionRejectedPayloadSchema>;
@@ -880,6 +881,7 @@ export type DecompositionRevisedPayload = z.infer<typeof DecompositionRevisedPay
 export const DecompositionValidatedPayloadSchema = z.strictObject({
 	validatorRole: z.string().optional(),
 	coverageClaims: z.array(CoverageClaimSchema).optional(),
+	observationIds: z.array(z.string()).optional(),
 	status: DecompositionContractStatusSchema
 });
 export type DecompositionValidatedPayload = z.infer<typeof DecompositionValidatedPayloadSchema>;

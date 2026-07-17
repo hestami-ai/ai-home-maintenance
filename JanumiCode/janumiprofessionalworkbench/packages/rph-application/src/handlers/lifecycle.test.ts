@@ -403,4 +403,28 @@ describe('Execution / assurance / governance / decomposition handlers (live)', (
 		).toBe('ACCEPTED');
 		expect(statusOf(DC)).toBe('VALID');
 	});
+
+	it('records observationIds — the validation basis — on the DecompositionValidated event (contract-drift)', () => {
+		const DC = 'dcp_01ARZ3NDEKTSV4RRFFQ69G5FJ7';
+		const OBS = ['obs_01ARZ3NDEKTSV4RRFFQ69G5FK7', 'obs_01ARZ3NDEKTSV4RRFFQ69G5FK8'];
+		dispatch(
+			'ProposeDecomposition',
+			{ parentWorkUnitId: PWU_ID, childWorkUnitIds: [], rationale: 'split by concern' },
+			{ targetAggregateId: DC, targetAggregateType: 'DECOMPOSITION_CONTRACT' }
+		);
+		expect(
+			dispatch(
+				'ValidateDecomposition',
+				{ disposition: 'CONDITIONALLY_VALID', observationIds: OBS },
+				{ targetAggregateId: DC }
+			).status
+		).toBe('ACCEPTED');
+		const validated = store
+			.readAllEvents()
+			.find((e) => e.eventType === 'DecompositionValidated' && e.aggregateId === DC);
+		// WHAT the validator considered in reaching the verdict is now on the governed stream.
+		expect((validated?.payload as Record<string, unknown> | undefined)?.observationIds).toEqual(
+			OBS
+		);
+	});
 });
