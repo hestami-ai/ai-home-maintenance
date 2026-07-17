@@ -2602,7 +2602,18 @@ it**:
 | **validator implementation identity** | **NO** | `AssuranceAssessmentCompleted` carries no `validatorId` — the field the ValidatorResult has and the event drops |
 | **independence status** | **NO** | only `AssurancePolicyCreated.independenceRequirement` (the *requirement*), never a *verified* status |
 | **invalidation status** | PARTIAL/NO | invalidation **does not propagate** — invalidating evidence left its dependent claim OPEN, violating ratified DOC-002 §28 and DOC-004 Test 4 |
-| missing evidence | (agent hit a 529; unmapped) | — |
+| **missing evidence** | **NO** — and a ratification conflict under it | the required-evidence set never reaches the log (every criterion emits `requiredEvidenceIds: []`; `AssurancePolicyCreated` drops the object's `requiredEvidence`); no evidence-required event exists; **DOC-004 §31 names `AssuranceEvidenceRequired`/`Received` that DOC-002 §26.5 does not — the projection has no single ratified source to fold** |
+
+The retried agent (the 529 above) closed the table at 14/14 and surfaced the sharpest ratification gap in the set:
+**"missing evidence" is a *derived difference* — required minus admitted — and the *required* side is structurally
+reachable but semantically empty everywhere.** Every one of the ~90 `requiredEvidenceIds` in the entire repo is
+literally `[]` (AUTHORED, corpus-wide, not a sample), and the ratified `AssuranceEvidenceRequired` event that a
+fold would subtract admissions from **does not exist** — DOC-004 §31 names it, DOC-002 §26.5 (the Event Contract
+the engine follows) never defined it. So before this field can be built, the canon has to say whether "missing
+evidence" is *policy `requiredEvidenceRequirements` minus `EvidenceAdmitted`* or *`AssuranceEvidenceRequired` minus
+`AssuranceEvidenceReceived`*. That is a sponsor/ratification decision, not a wiring task — which puts **three of
+the fourteen §38 fields (control-action selection, this, and — implicitly — applicability-as-determination) behind
+ratification gaps rather than code.**
 
 Three findings from that sweep are worth surfacing on their own:
 
