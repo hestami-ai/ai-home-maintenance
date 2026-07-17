@@ -931,7 +931,8 @@ export const ExecutionPlanActivatedPayloadSchema = z.strictObject({
 	workUnitId: z.string(),
 	planVersion: z.number(),
 	status: ExecutionPlanStatusSchema,
-	authorizedRuntimeBindingIds: z.array(z.string())
+	authorizedRuntimeBindingIds: z.array(z.string()),
+	approvalDecisionId: z.string().optional()
 });
 export type ExecutionPlanActivatedPayload = z.infer<typeof ExecutionPlanActivatedPayloadSchema>;
 export const ExecutionPlanApprovedPayloadSchema = z.strictObject({

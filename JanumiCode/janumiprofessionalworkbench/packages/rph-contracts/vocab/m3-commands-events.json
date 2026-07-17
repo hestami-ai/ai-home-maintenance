@@ -3875,6 +3875,12 @@
           "required": true,
           "type": "string[]",
           "note": "id-ref[]; DOC-002 names runtimeBindingIds (optional)"
+        },
+        {
+          "field": "approvalDecisionId",
+          "required": false,
+          "type": "string",
+          "note": "id-ref; the Decision that authorized this activation (the gate to runtime execution). AUTHORED optional field atop the ratified DOC-007 §15.3 shape (which omits it): §15.2 puts approvalDecisionId on the ActivateExecutionPlan COMMAND but §15.3 dropped it from the event, so the governed stream could not name the activation authorization. Optional (mirrors the command field); the event stays ratified/gated. Sibling ExecutionPlanApproved carries approvalDecisionId at event level. Contract-drift fix."
         }
       ]
     },

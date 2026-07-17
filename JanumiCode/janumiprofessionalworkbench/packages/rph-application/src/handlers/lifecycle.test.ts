@@ -116,6 +116,40 @@ describe('Execution / assurance / governance / decomposition handlers (live)', (
 		expect(statusOf(PLAN)).toBe('ACTIVE');
 	});
 
+	it('records approvalDecisionId on the ExecutionPlanActivated event (contract-drift: the §15.2 command field §15.3 dropped)', () => {
+		const PLAN = 'plan_01ARZ3NDEKTSV4RRFFQ69G5FC7';
+		const APPROVAL_DEC = 'dec_01ARZ3NDEKTSV4RRFFQ69G5FC8';
+		dispatch(
+			'ProposeExecutionPlan',
+			{
+				executionPlanId: PLAN,
+				workUnitId: PWU_ID,
+				steps: [],
+				transitions: [],
+				retryPolicy: {},
+				tacticalChangePolicy: {},
+				escalationPolicy: {},
+				terminationPolicy: {}
+			},
+			{ targetAggregateId: PLAN, targetAggregateType: 'EXECUTION_PLAN' }
+		);
+		dispatch('ApproveExecutionPlan', {}, { targetAggregateId: PLAN });
+		expect(
+			dispatch(
+				'ActivateExecutionPlan',
+				{ authorizedRuntimeBindingIds: [], approvalDecisionId: APPROVAL_DEC },
+				{ targetAggregateId: PLAN }
+			).status
+		).toBe('ACCEPTED');
+		const activated = store
+			.readAllEvents()
+			.find((e) => e.eventType === 'ExecutionPlanActivated' && e.aggregateId === PLAN);
+		// The activation authorization — WHICH decision opened the gate to runtime execution — is on the governed stream.
+		expect((activated?.payload as Record<string, unknown> | undefined)?.approvalDecisionId).toBe(
+			APPROVAL_DEC
+		);
+	});
+
 	it('drives evidence PROPOSED -> ADMISSIBLE and an assessment to SATISFIED', () => {
 		const EV = 'evd_01ARZ3NDEKTSV4RRFFQ69G5FD0';
 		dispatch(

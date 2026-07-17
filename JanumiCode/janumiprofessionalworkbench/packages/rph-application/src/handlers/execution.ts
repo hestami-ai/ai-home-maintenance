@@ -148,17 +148,22 @@ export const activateExecutionPlan: CommandHandler = (ctx, command) =>
 		eventType: 'ExecutionPlanActivated',
 		// DOC-007 §15.3 ExecutionPlanActivatedPayload. This emitted the raw ActivateExecutionPlan command payload
 		// (§15.2: { approvalDecisionId?, authorizedRuntimeBindingIds }) — three ratified fields missing
-		// (executionPlanId, workUnitId, planVersion), `status` missing, and approvalDecisionId extra: §15.3 does not
-		// define it, and the schema is strict. Every field derives: the ids/version from the plan aggregate the
-		// transition just produced, the bindings from the command, `status` is §15.3's const (= this call's target).
-		eventPayload: (next): ExecutionPlanActivatedPayload => ({
-			executionPlanId: command.targetAggregateId,
-			workUnitId: String(next.workUnitId),
-			planVersion: Number(next.planVersion),
-			status: 'ACTIVE',
-			authorizedRuntimeBindingIds: (command.payload as ActivateExecutionPlanPayload)
-				.authorizedRuntimeBindingIds
-		}),
+		// (executionPlanId, workUnitId, planVersion), `status` missing. Every field derives: the ids/version from the
+		// plan aggregate the transition just produced, the bindings from the command, `status` is §15.3's const (= this
+		// call's target). Contract-drift fix: approvalDecisionId (WHICH decision authorized this activation — the gate
+		// to runtime execution) is §15.2's command field but §15.3 dropped it, so it was validated then discarded; now
+		// carried on the event (optional, authored atop the ratified shape) so the governed stream names the authorization.
+		eventPayload: (next): ExecutionPlanActivatedPayload => {
+			const cmd = command.payload as ActivateExecutionPlanPayload;
+			return {
+				executionPlanId: command.targetAggregateId,
+				workUnitId: String(next.workUnitId),
+				planVersion: Number(next.planVersion),
+				status: 'ACTIVE',
+				authorizedRuntimeBindingIds: cmd.authorizedRuntimeBindingIds,
+				...(cmd.approvalDecisionId ? { approvalDecisionId: cmd.approvalDecisionId } : {})
+			};
+		},
 		guard: (state, hctx) => {
 			const otherActivePlanExists = otherActivePlanExistsForPwu(
 				hctx,
