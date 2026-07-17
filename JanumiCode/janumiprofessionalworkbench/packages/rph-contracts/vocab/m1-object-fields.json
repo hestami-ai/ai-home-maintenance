@@ -1212,6 +1212,12 @@
           "required": true
         },
         {
+          "field": "approvalDecisionId",
+          "type": "string",
+          "required": false,
+          "note": "id-ref; the Decision that authorized APPROVED (UNDER_REVIEW->APPROVED). Sibling of promotionDecisionId (which records the APPROVED->AUTHORITATIVE authorization). Optional: set only when the approval cites a decision. Contract-drift fix (ApproveBaseline.approvalDecisionId was validated then discarded into neither store)."
+        },
+        {
           "field": "status",
           "type": "BaselineStatus",
           "required": true,

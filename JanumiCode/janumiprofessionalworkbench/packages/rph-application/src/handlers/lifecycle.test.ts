@@ -239,6 +239,49 @@ describe('Execution / assurance / governance / decomposition handlers (live)', (
 		dispatch('ApproveBaseline', {}, { targetAggregateId: id });
 	}
 
+	it('records approvalDecisionId on BOTH the BaselineApproved event and the Baseline object (contract-drift provenance hole closed)', () => {
+		const ASSESS = 'assess_01ARZ3NDEKTSV4RRFFQ69G5FF7';
+		const BASE = 'base_01ARZ3NDEKTSV4RRFFQ69G5FH7';
+		const APPROVAL_DEC = 'dec_01ARZ3NDEKTSV4RRFFQ69G5FA7';
+		makeSatisfiedAssessment(ASSESS);
+		dispatch(
+			'CreateBaseline',
+			{ baselineType: 'ARCHITECTURE', itemObjectIds: [PWU_ID], assuranceAssessmentIds: [ASSESS] },
+			{ targetAggregateId: BASE, targetAggregateType: 'BASELINE' }
+		);
+		dispatch('SubmitBaselineForReview', {}, { targetAggregateId: BASE });
+		expect(
+			dispatch('ApproveBaseline', { approvalDecisionId: APPROVAL_DEC }, { targetAggregateId: BASE })
+				.status
+		).toBe('ACCEPTED');
+		// (a) the governed stream: the BaselineApproved event now records WHICH decision approved it.
+		const approved = store
+			.readAllEvents()
+			.find((e) => e.eventType === 'BaselineApproved' && e.aggregateId === BASE);
+		expect((approved?.payload as Record<string, unknown> | undefined)?.approvalDecisionId).toBe(
+			APPROVAL_DEC
+		);
+		// (b) current state: the Baseline object records it — the optional sibling of promotionDecisionId.
+		expect(
+			(store.loadObject(BASE)?.state as Record<string, unknown> | undefined)?.approvalDecisionId
+		).toBe(APPROVAL_DEC);
+	});
+
+	it('omits approvalDecisionId cleanly when the approval cites no decision (optional-by-design)', () => {
+		const ASSESS = 'assess_01ARZ3NDEKTSV4RRFFQ69G5FF8';
+		const BASE = 'base_01ARZ3NDEKTSV4RRFFQ69G5FH8';
+		makeSatisfiedAssessment(ASSESS);
+		createApprovedBaseline(BASE, ASSESS);
+		expect(statusOf(BASE)).toBe('APPROVED');
+		const approved = store
+			.readAllEvents()
+			.find((e) => e.eventType === 'BaselineApproved' && e.aggregateId === BASE);
+		expect((approved?.payload as Record<string, unknown>)?.approvalDecisionId).toBeUndefined();
+		expect(
+			(store.loadObject(BASE)?.state as Record<string, unknown>)?.approvalDecisionId
+		).toBeUndefined();
+	});
+
 	it('promotes a baseline to AUTHORITATIVE through the full gate (satisfied assessment + effective decision)', () => {
 		const ASSESS = 'assess_01ARZ3NDEKTSV4RRFFQ69G5FF0';
 		const DEC = 'dec_01ARZ3NDEKTSV4RRFFQ69G5FG0';

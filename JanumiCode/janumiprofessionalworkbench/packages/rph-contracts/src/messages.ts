@@ -704,7 +704,8 @@ export type AssuranceObservationRecordedPayload = z.infer<
 	typeof AssuranceObservationRecordedPayloadSchema
 >;
 export const BaselineApprovedPayloadSchema = z.strictObject({
-	status: BaselineStatusSchema
+	status: BaselineStatusSchema,
+	approvalDecisionId: z.string().optional()
 });
 export type BaselineApprovedPayload = z.infer<typeof BaselineApprovedPayloadSchema>;
 export const BaselineCreatedPayloadSchema = z.strictObject({

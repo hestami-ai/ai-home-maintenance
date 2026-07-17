@@ -2919,6 +2919,12 @@
           "type": "enum",
           "enumRef": "BaselineStatusSchema",
           "note": "UNDER_REVIEW->APPROVED"
+        },
+        {
+          "field": "approvalDecisionId",
+          "required": false,
+          "type": "string",
+          "note": "id-ref; the Decision that authorized this approval. Optional. Contract-drift fix: the ApproveBaseline command carried it but the event (and object) dropped it, so the governed stream could not say WHICH decision approved the baseline."
         }
       ]
     },

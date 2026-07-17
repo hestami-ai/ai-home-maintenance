@@ -5,6 +5,7 @@
 // (effective promotion decision + required assessments satisfied/waived + no open blocking + version pinning —
 // "no green without assurance", INV-20 / P7 immutability afterwards).
 import type {
+	ApproveBaselinePayload,
 	ApproveDecisionPayload,
 	BaselineObject,
 	BaselinePromotedPayload,
@@ -367,21 +368,27 @@ export const submitBaselineForReview: CommandHandler = (ctx, command) =>
 		eventPayload: () => ({ status: 'UNDER_REVIEW' })
 	});
 
-/** ApproveBaseline — UNDER_REVIEW -> APPROVED. */
-export const approveBaseline: CommandHandler = (ctx, command) =>
-	advanceStatus(ctx, command, {
+/** ApproveBaseline — UNDER_REVIEW -> APPROVED. Records the authorizing decision (approvalDecisionId) in BOTH the
+ *  governed stream (BaselineApproved event) and the Baseline object (the optional sibling of promotionDecisionId)
+ *  when the approval cites one. Contract-drift fix: the command validated approvalDecisionId then discarded it
+ *  into neither store, so nothing could answer WHICH decision approved the baseline — an authorization id-ref in a
+ *  "no green without assurance" flow. Optional by design (mirrors the command field); absent when uncited. */
+export const approveBaseline: CommandHandler = (ctx, command, payload) => {
+	const p = payload as ApproveBaselinePayload;
+	return advanceStatus(ctx, command, {
 		objectType: BASELINE,
 		statusField: 'status',
 		machine: 'Baseline.status',
 		target: 'APPROVED',
 		eventType: 'BaselineApproved',
-		// BaselineApproved declares only `status` (APPROVED). The ApproveBaseline command also carries
-		// `approvalDecisionId` — which the event does NOT declare (unlike ExecutionPlanApproved, whose shape has it
-		// optionally). Emitting the declared shape drops it rather than writing an undeclared key to the governed
-		// stream; recording WHICH decision approved the baseline is a worthwhile shape enrichment, left for the §32
-		// governance-traceability pass. (Pinned defect; now conforms.)
-		eventPayload: () => ({ status: 'APPROVED' })
+		mutate: (base) =>
+			p.approvalDecisionId ? { ...base, approvalDecisionId: p.approvalDecisionId } : base,
+		eventPayload: () => ({
+			status: 'APPROVED',
+			...(p.approvalDecisionId ? { approvalDecisionId: p.approvalDecisionId } : {})
+		})
 	});
+};
 
 /** PromoteBaseline — APPROVED -> AUTHORITATIVE, gated by canPromoteBaseline (effective promotion decision +
  * required assessments satisfied/waived + no open blocking + item versions pinned). "No green without assurance." */

@@ -278,6 +278,9 @@
     "promotionDecisionId": {
       "type": "string"
     },
+    "approvalDecisionId": {
+      "type": "string"
+    },
     "status": {
       "type": "string",
       "enum": [

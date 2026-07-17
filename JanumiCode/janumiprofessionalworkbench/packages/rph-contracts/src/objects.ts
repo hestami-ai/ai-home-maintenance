@@ -588,6 +588,7 @@ export const BaselineObjectSchema = z.strictObject({
 	itemObjectVersions: z.array(BaselineItemVersionSchema),
 	assuranceAssessmentIds: z.array(z.string()),
 	promotionDecisionId: z.string(),
+	approvalDecisionId: z.string().optional(),
 	status: BaselineStatusSchema
 });
 export type BaselineObject = z.infer<typeof BaselineObjectSchema>;
