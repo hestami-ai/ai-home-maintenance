@@ -19,6 +19,7 @@ import { ontology } from '@janumipwb/rph-product-realization-pwa';
 import type { ActorReference } from '@janumipwb/rph-contracts';
 import { describe, expect, it } from 'vitest';
 import { createEngine, listByType, recordAssuranceRecordingPlan } from './index.js';
+import { seedFloorPolicies } from './seed-workbench.js';
 
 const PRODUCER: Identity = {
 	actorType: 'AGENT',
@@ -96,6 +97,7 @@ const goodCtx: ValidatorContext = {
 
 async function runAndRecord(ctx: ValidatorContext) {
 	const eng = engine();
+	seedFloorPolicies(eng); // the recorder cites floor.* policies — RequestAssuranceAssessment now requires them to exist
 	const plan = await runFloorAndPlanRecording(subject, ctx, registry());
 	const recorded = recordAssuranceRecordingPlan(eng, plan, {
 		actor: ACTOR,

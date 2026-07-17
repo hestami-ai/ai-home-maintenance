@@ -140,6 +140,24 @@ describe('completeAssuranceAssessment — independence enforcement (Increment I2
 		engine = new Engine({ store, now: () => TS, newEventId: () => `evt_${++seq}` });
 	});
 
+	it('rejects RequestAssuranceAssessment citing a policy that does not exist (fail-closed, independence follow-up B)', () => {
+		// No createPolicy(...) — the cited policy was never created. The command must fail closed: an assessment
+		// against a phantom policy assesses nothing and leaves the independence requirement unresolvable.
+		const r = engine.dispatch(
+			cmd('RequestAssuranceAssessment', 'asm_01ARZ3NDEKTSV4RRFFQ69G5A00', 'ASSURANCE_ASSESSMENT', {
+				assessmentId: 'asm_01ARZ3NDEKTSV4RRFFQ69G5A00',
+				assurancePolicyId: 'pol_does_not_exist',
+				policyVersion: '1.0.0',
+				subjectObjectIds: [SUBJECT],
+				subjectSemanticVersions: { [SUBJECT]: 1 },
+				claimIds: []
+			})
+		);
+		expect(r.status).toBe('REJECTED');
+		expect(r.error?.code).toBe('RPH_VALIDATION_SEMANTIC_FAILED');
+		expect(store.loadObject('asm_01ARZ3NDEKTSV4RRFFQ69G5A00')).toBeUndefined();
+	});
+
 	it('a DIFFERENT_AGENT policy where producer === evaluator drives ASSESSING -> INDEPENDENCE_VIOLATION', () => {
 		createPolicy('DIFFERENT_AGENT');
 		const assessmentId = 'asm_01ARZ3NDEKTSV4RRFFQ69G5A01';

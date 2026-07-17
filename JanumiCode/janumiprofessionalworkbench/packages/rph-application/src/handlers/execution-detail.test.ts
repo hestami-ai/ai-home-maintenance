@@ -5,7 +5,7 @@ import type { DomainCommand } from '@janumipwb/rph-contracts';
 import { SqliteStorageAdapter } from '@janumipwb/rph-persistence';
 import { beforeEach, describe, expect, it } from 'vitest';
 import { Engine } from '../index.js';
-import { floorValidatorResult } from './__tests__/floor-fixtures.js';
+import { floorValidatorResult, seedFloorPolicies } from './__tests__/floor-fixtures.js';
 import type { AssuranceDispositionRecommendation } from '@janumipwb/rph-contracts';
 
 const TS = '2026-07-12T00:00:00Z';
@@ -153,6 +153,7 @@ describe('ExecutionStep + RuntimeBinding handlers (live)', () => {
 		store = new SqliteStorageAdapter({ now: () => TS });
 		seq = 0;
 		engine = new Engine({ store, now: () => TS, newEventId: () => `e${++seq}` });
+		seedFloorPolicies(engine); // floor assessments below cite floor.* policies — now they must exist
 		dispatch(
 			'CaptureIntent',
 			{ intentId: INTENT, originatingExpression: 'x', ontologyId: 'o', ontologyVersion: '1' },

@@ -13,7 +13,128 @@
 //
 // Not in `kit.ts`: that is production. `__tests__/` is excluded from tsconfig.build and does not match vitest's
 // `*.test.ts` include, so this compiles with the tests and ships nowhere.
-import type { AssuranceDispositionRecommendation } from '@janumipwb/rph-contracts';
+import type { AssuranceDispositionRecommendation, DomainCommand } from '@janumipwb/rph-contracts';
+import { FLOOR_POLICY_DEFINITIONS } from '@janumipwb/rph-assurance';
+
+/** Just enough of the Engine for the seed helpers to drive the bus. */
+interface DispatchLike {
+	dispatch(command: DomainCommand): { readonly status: string; readonly error?: unknown };
+}
+
+const SEED_ACTOR = { actorId: 'seed-1', actorType: 'HUMAN' as const, displayName: 'Policy Seeder' };
+const SEED_TS = '2026-07-12T00:00:00Z';
+
+function createPolicyCommand(
+	policyId: string,
+	payload: Record<string, unknown>,
+	now: string
+): DomainCommand {
+	return {
+		commandId: `seedpol-${policyId}`,
+		commandType: 'CreateAssurancePolicy',
+		commandSchemaVersion: 1,
+		targetAggregateType: 'ASSURANCE_POLICY',
+		targetAggregateId: policyId,
+		issuedAt: now,
+		issuedBy: SEED_ACTOR,
+		correlationId: 'seed',
+		idempotencyKey: `seedpol-${policyId}`,
+		payload
+	};
+}
+
+/**
+ * Seed the three de minimis floor policies as ASSURANCE_POLICY objects, from the canonical
+ * `FLOOR_POLICY_DEFINITIONS` (the same source `seed-workbench.ts::seedFloorPolicies` uses). Any test that records a
+ * floor assessment must call this first: `requestAssuranceAssessment` now fails closed when the cited policy does
+ * not exist (independence follow-up B), and a floor assessment citing an unseeded `floor.*` policy is exactly that.
+ */
+export function seedFloorPolicies(engine: DispatchLike, now: string = SEED_TS): void {
+	for (const def of FLOOR_POLICY_DEFINITIONS) {
+		const r = engine.dispatch(
+			createPolicyCommand(
+				def.policyId,
+				{
+					policyId: def.policyId,
+					version: '1.0.0',
+					name: def.name,
+					purpose: def.purpose,
+					rationale: def.rationale,
+					applicableObjectTypes: [
+						'PROFESSIONAL_WORK_ARCHITECTURE',
+						'PROFESSIONAL_WORK_UNIT',
+						'ARTIFACT'
+					],
+					evaluatedClaimTypes: def.evaluatedClaimTypes,
+					criteria: def.criteria,
+					evaluatorRole: def.evaluatorRole,
+					independenceRequirement: def.independence,
+					findingDefinitions: def.findingDefinitions,
+					permittedControlActions: def.permittedControlActions
+				},
+				now
+			)
+		);
+		if (r.status !== 'ACCEPTED') {
+			throw new Error(`seedFloorPolicies: ${def.policyId} -> ${JSON.stringify(r.error)}`);
+		}
+	}
+}
+
+/**
+ * Seed a minimal, schema-valid ASSURANCE_POLICY for tests that cite a named policy (e.g. `pol_arch`). Independence
+ * requirement defaults to NONE; pass one to exercise the gate. Same reason as `seedFloorPolicies`: an assessment
+ * against a policy the store has never seen is now rejected.
+ */
+export function seedPolicy(
+	engine: DispatchLike,
+	policyId: string,
+	opts: { independenceRequirement?: string; now?: string } = {}
+): void {
+	const r = engine.dispatch(
+		createPolicyCommand(
+			policyId,
+			{
+				policyId,
+				version: '1.0.0',
+				name: `Policy ${policyId}`,
+				purpose: 'Assess the subject against its approved need.',
+				rationale: 'Seeded for a live command-drive test.',
+				applicableObjectTypes: ['PROFESSIONAL_WORK_UNIT'],
+				evaluatedClaimTypes: ['FITNESS'],
+				criteria: [
+					{
+						id: 'C1',
+						name: 'Fit',
+						description: 'The subject is fit for its approved need.',
+						criterionType: 'QUALITATIVE',
+						evaluationMethod: 'HUMAN_JUDGMENT',
+						requiredEvidenceIds: [],
+						severityIfNotMet: 'MATERIAL',
+						mayBeNotApplicable: false
+					}
+				],
+				evaluatorRole: 'REVIEWER',
+				independenceRequirement: opts.independenceRequirement ?? 'NONE',
+				findingDefinitions: [
+					{
+						code: 'UNFIT',
+						name: 'Unfit',
+						description: 'Not fit for the approved need.',
+						defaultSeverity: 'MATERIAL',
+						affectedClaimTypes: ['FITNESS'],
+						defaultControlActions: ['CONTINUE']
+					}
+				],
+				permittedControlActions: ['CONTINUE']
+			},
+			opts.now ?? SEED_TS
+		)
+	);
+	if (r.status !== 'ACCEPTED') {
+		throw new Error(`seedPolicy: ${policyId} -> ${JSON.stringify(r.error)}`);
+	}
+}
 
 export interface FloorObservationFixture {
 	readonly findingCode: string;

@@ -415,6 +415,21 @@ const DISPOSITIONS = new Set([
  * pending/ready prep states are a deeper increment — see RESUME-STATE). */
 export const requestAssuranceAssessment: CommandHandler = (ctx, command, payload) => {
 	const p = payload as RequestAssuranceAssessmentPayload;
+	// FAIL CLOSED on policy existence (independence follow-up B). The assessment's policy is what defines its
+	// criteria AND its independenceRequirement; the I2 independence gate skips silently when the cited policy id
+	// does not resolve (documented there as a boundary hole). Before this, the handler stored assurancePolicyId
+	// blindly, so an assessment could cite a phantom policy — assessing against nothing, and disarming the
+	// independence check by making its requirement unresolvable. An assessment against a policy that does not exist
+	// is not a valid request. (Existence, not activeness — whether a DRAFT/SUPERSEDED policy may be cited is a
+	// separate policy-lifecycle tightening, recorded in the log; this closes the unresolvable-requirement hole.)
+	if (!ctx.store.loadObject(p.assurancePolicyId)) {
+		return reject(
+			command,
+			'RPH_VALIDATION_SEMANTIC_FAILED',
+			`RequestAssuranceAssessment: assurance policy ${p.assurancePolicyId} does not exist — an assessment cannot be requested against a policy that was never created (its criteria and independence requirement are unresolvable).`,
+			[p.assessmentId, p.assurancePolicyId]
+		);
+	}
 	const state: Record<string, unknown> = {
 		...newEnvelope(command, ASSESSMENT, p.assessmentId, {
 			lifecycleStatus: 'ASSESSING',

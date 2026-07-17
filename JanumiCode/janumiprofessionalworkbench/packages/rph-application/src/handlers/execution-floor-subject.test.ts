@@ -14,7 +14,7 @@ import type { ActorReference, DomainCommand } from '@janumipwb/rph-contracts';
 import { SqliteStorageAdapter } from '@janumipwb/rph-persistence';
 import { beforeEach, describe, expect, it } from 'vitest';
 import { Engine } from '../index.js';
-import { floorValidatorResult } from './__tests__/floor-fixtures.js';
+import { floorValidatorResult, seedFloorPolicies } from './__tests__/floor-fixtures.js';
 
 const TS = '2026-07-16T00:00:00Z';
 const AGENT: ActorReference = { actorId: 'agent-9', actorType: 'AGENT', displayName: 'Executor' };
@@ -128,6 +128,7 @@ describe('Execution floor subject: the result, at its exact version — not the 
 		seq = 0;
 		asmt = 0;
 		engine = new Engine({ store, now: () => TS, newEventId: () => `e${++seq}` });
+		seedFloorPolicies(engine); // the floor assessments below cite floor.* policies — now they must exist
 		d(
 			'CaptureIntent',
 			{ intentId: INTENT, originatingExpression: 'x', ontologyId: 'o', ontologyVersion: '1' },

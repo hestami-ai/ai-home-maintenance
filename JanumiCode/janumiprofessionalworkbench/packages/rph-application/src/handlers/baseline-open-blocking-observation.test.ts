@@ -21,7 +21,7 @@ import type { DomainCommand } from '@janumipwb/rph-contracts';
 import { SqliteStorageAdapter } from '@janumipwb/rph-persistence';
 import { beforeEach, describe, expect, it } from 'vitest';
 import { Engine } from '../index.js';
-import { floorValidatorResult } from './__tests__/floor-fixtures.js';
+import { floorValidatorResult, seedPolicy } from './__tests__/floor-fixtures.js';
 
 const TS = '2026-07-15T00:00:00Z';
 const human = { actorId: 'gov-1', actorType: 'HUMAN' as const, displayName: 'Governor' };
@@ -63,6 +63,7 @@ describe('PromoteBaseline call site: open blocking observation (RPH-BAS-003, liv
 		store = new SqliteStorageAdapter({ now: () => TS });
 		seq = 0;
 		engine = new Engine({ store, now: () => TS, newEventId: () => `evt_${++seq}` });
+		seedPolicy(engine, 'pol_arch'); // the assessment below cites pol_arch — now it must exist
 		dispatch(
 			'CaptureIntent',
 			{

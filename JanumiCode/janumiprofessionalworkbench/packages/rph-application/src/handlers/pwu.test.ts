@@ -6,6 +6,7 @@ import type { DomainCommand } from '@janumipwb/rph-contracts';
 import { SqliteStorageAdapter } from '@janumipwb/rph-persistence';
 import { beforeEach, describe, expect, it } from 'vitest';
 import { Engine } from '../index.js';
+import { seedPolicy } from './__tests__/floor-fixtures.js';
 
 const TS = '2026-07-12T00:00:00Z';
 const actor = { actorId: 'user-1', actorType: 'HUMAN' as const, displayName: 'Alice' };
@@ -21,6 +22,7 @@ describe('PWU lifecycle handlers (live command drive)', () => {
 		store = new SqliteStorageAdapter({ now: () => TS });
 		seq = 0;
 		engine = new Engine({ store, now: () => TS, newEventId: () => `evt_${++seq}` });
+		seedPolicy(engine, 'pol_fitness_for_purpose'); // assessments below cite pol_fitness_for_purpose — now it must exist
 	});
 
 	function cmd(

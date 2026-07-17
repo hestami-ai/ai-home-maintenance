@@ -21,6 +21,7 @@ import { ontology } from '@janumipwb/rph-product-realization-pwa';
 import { describe, expect, it } from 'vitest';
 import type { EngineHandle } from './engine.js';
 import { createEngine, listByType, recordAssuranceRecordingPlan } from './index.js';
+import { seedFloorPolicies } from './seed-workbench.js';
 
 const TS = '2026-07-14T00:00:00Z';
 const SVC: ActorReference = {
@@ -100,6 +101,7 @@ function engine(): EngineHandle {
 describe('de minimis floor is plane-agnostic (authoring + execution)', () => {
 	it('records the same floor over an EXECUTION-plane work product as over a PWA', async () => {
 		const eng = engine();
+		seedFloorPolicies(eng); // the recorder cites floor.* policies — they must exist for RequestAssuranceAssessment
 		let n = 0;
 		const mint = (p: string) => `${p}_${String(++n).padStart(26, '0')}`;
 

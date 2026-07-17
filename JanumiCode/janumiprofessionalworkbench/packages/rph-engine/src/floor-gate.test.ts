@@ -19,6 +19,7 @@ import { ontology } from '@janumipwb/rph-product-realization-pwa';
 import { describe, expect, it } from 'vitest';
 import type { EngineHandle } from './engine.js';
 import { createEngine, recordAssuranceRecordingPlan } from './index.js';
+import { seedFloorPolicies } from './seed-workbench.js';
 
 const TS = '2026-07-14T00:00:00Z';
 const AGENT: ActorReference = {
@@ -123,6 +124,7 @@ const publish = (eng: EngineHandle) =>
 describe('floor gate + recorder compose (3b + 3c)', () => {
 	it('an AGENT PWA is blocked until the real recorded floor is SATISFIED, then publishes', async () => {
 		const eng = build();
+		seedFloorPolicies(eng); // the recorder cites floor.* policies — they must exist for RequestAssuranceAssessment
 		authorValidated(eng);
 
 		// Gate blocks: no floor recorded yet.

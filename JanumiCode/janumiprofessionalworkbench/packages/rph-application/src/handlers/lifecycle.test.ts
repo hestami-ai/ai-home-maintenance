@@ -7,7 +7,7 @@ import type { DomainCommand } from '@janumipwb/rph-contracts';
 import { SqliteStorageAdapter } from '@janumipwb/rph-persistence';
 import { beforeEach, describe, expect, it } from 'vitest';
 import { Engine } from '../index.js';
-import { floorValidatorResult } from './__tests__/floor-fixtures.js';
+import { floorValidatorResult, seedPolicy } from './__tests__/floor-fixtures.js';
 
 const TS = '2026-07-12T00:00:00Z';
 const human = { actorId: 'gov-1', actorType: 'HUMAN' as const, displayName: 'Governor' };
@@ -24,6 +24,7 @@ describe('Execution / assurance / governance / decomposition handlers (live)', (
 		store = new SqliteStorageAdapter({ now: () => TS });
 		seq = 0;
 		engine = new Engine({ store, now: () => TS, newEventId: () => `evt_${++seq}` });
+		seedPolicy(engine, 'pol_arch'); // makeSatisfiedAssessment cites pol_arch — now it must exist
 		// Seed an intent + PWU (the PWU is the assessment subject + baseline item).
 		dispatch(
 			'CaptureIntent',
