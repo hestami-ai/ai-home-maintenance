@@ -5,13 +5,13 @@ import { isQualifiedSuccess, workProjector } from './work-projection.js';
 
 const actor = { actorId: 'u1', actorType: 'HUMAN' as const, displayName: 'A' };
 
-function evt(seq: number, eventType: string, payload: unknown): DomainEvent {
+function evt(seq: number, eventType: string, payload: unknown, aggregateId?: string): DomainEvent {
 	return {
 		eventId: `evt_${seq}`,
 		eventType,
 		eventSchemaVersion: 1,
 		aggregateType: 'INTENT',
-		aggregateId: `agg_${seq}`,
+		aggregateId: aggregateId ?? `agg_${seq}`,
 		aggregateRevision: 0,
 		occurredAt: '2026-07-11T00:00:00Z',
 		recordedAt: '2026-07-11T00:00:00Z',
@@ -21,9 +21,27 @@ function evt(seq: number, eventType: string, payload: unknown): DomainEvent {
 	};
 }
 
+// The PwuProposed payload here was `{ pwuId, title }` — missing the four axes DOC-007 §11.3 REQUIRES and that
+// the real event has carried since Increment 22. It passed because workProjector hardcoded the seeded axes
+// instead of reading them; the fixture and the fold were wrong in exactly compensating ways, which is what a
+// hand-authored fixture buys you. Now that the fold reads §11.3, the fixture has to be a §11.3 event.
 const stream: DomainEvent[] = [
 	evt(1, 'IntentCaptured', { intentId: 'int_1', originatingExpression: 'Build X' }),
-	evt(2, 'PwuProposed', { pwuId: 'pwu_1', title: 'Architecture' })
+	evt(
+		2,
+		'PwuProposed',
+		{
+			pwuId: 'pwu_1',
+			pwuKind: 'ARCHITECTURE',
+			title: 'Architecture',
+			intentId: 'int_1',
+			workLifecycleState: 'PROPOSED',
+			executionState: 'NOT_PLANNED',
+			assuranceState: 'UNASSESSED',
+			shapeIntegrityState: 'UNKNOWN'
+		},
+		'pwu_1'
+	)
 ];
 
 describe('no-green-without-assurance rule (isQualifiedSuccess)', () => {
@@ -56,7 +74,17 @@ describe('Work projection', () => {
 		expect(n?.qualifiedSuccess).toBe(false);
 	});
 
-	it('RPH-PER-007: rebuild-from-empty is deterministic (identical view every time)', () => {
+	// RETITLED 2026-07-17. This claimed RPH-PER-007 and asserted the fold equals ITSELF over a hand-authored
+	// two-event stream. Ratified PER-007 wants "all domain events" rebuilt and matched against something
+	// independent; this compared a thing to itself, which is true of any pure function and of any broken one.
+	//
+	// It was actively CONCEALING a defect: workProjector defaulted on every event but IntentCaptured and
+	// PwuProposed, so over a real stream it reported every PWU as PROPOSED while the objects were BASELINED.
+	// A broken fold equals a broken fold. RPH-PER-007 is now proved for real in rph-engine's
+	// projection-rebuild.test.ts, against the live 251-event reference undertaking and the materialized objects.
+	//
+	// What survives here is the honest, narrow claim: the fold is pure.
+	it('the fold is pure (identical view every time) — NOT RPH-PER-007; see projection-rebuild.test.ts', () => {
 		expect(rebuildProjection(workProjector, stream)).toEqual(
 			rebuildProjection(workProjector, stream)
 		);

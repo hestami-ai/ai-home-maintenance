@@ -3,6 +3,7 @@
 // exposes `qualifiedSuccess`: the no-green-without-assurance rule (property P1 at the projection level).
 import type { DomainEvent } from '@janumipwb/rph-contracts';
 import type { Projector } from './projector.js';
+import { applyPwuAxisEvent } from './pwu-replay.js';
 
 /**
  * The load-bearing green-node rule: a node may show an UNQUALIFIED success indicator ONLY when execution
@@ -59,22 +60,49 @@ export const workProjector: Projector<WorkView> = {
 			}
 			case 'PwuProposed': {
 				const p = event.payload as { pwuId: string; title?: string };
+				// The axes are READ FROM THE EVENT by applyPwuAxisEvent, not assumed here. They used to be
+				// hardcoded PROPOSED/NOT_PLANNED/UNASSESSED/UNKNOWN — right for a freshly proposed PWU, and a
+				// lie the moment §11.3's payload says anything else.
+				const axes = applyPwuAxisEvent(undefined, event);
+				if (!axes) break;
 				nodes[p.pwuId] = node({
 					id: p.pwuId,
 					objectType: 'PROFESSIONAL_WORK_UNIT',
 					title: p.title,
-					workLifecycleState: 'PROPOSED',
-					executionState: 'NOT_PLANNED',
-					assuranceState: 'UNASSESSED',
-					shapeIntegrityState: 'UNKNOWN',
+					...axes,
 					openObservationCounts: {}
 				});
 				break;
 			}
-			// Further events (state changes, observations) update the axes / counts here as later milestones
-			// add their commands — the fold stays pure and extensible.
-			default:
+			// EVERY OTHER PWU EVENT. This used to be `default: break` with a comment promising that "further
+			// events (state changes, observations) update the axes / counts here as later milestones add their
+			// commands". The milestones came; the fold never followed. Rebuilt over the reference undertaking's
+			// 251 events this view reported every PWU as PROPOSED/NOT_PLANNED/UNASSESSED while the objects were
+			// BASELINED/SUCCEEDED/SATISFIED — a read model that surfaces render, wrong for every PWU that had
+			// ever done anything. Its RPH-PER-007 test was green throughout, because it compared the fold to
+			// ITSELF: a broken fold equals a broken fold.
+			default: {
+				const existing = nodes[event.aggregateId];
+				if (!existing || existing.objectType !== 'PROFESSIONAL_WORK_UNIT') break;
+				const next = applyPwuAxisEvent(
+					{
+						workLifecycleState: existing.workLifecycleState ?? '',
+						executionState: existing.executionState ?? '',
+						assuranceState: existing.assuranceState ?? '',
+						shapeIntegrityState: existing.shapeIntegrityState ?? ''
+					},
+					event
+				);
+				if (!next) break;
+				nodes[event.aggregateId] = node({
+					id: existing.id,
+					objectType: existing.objectType,
+					...(existing.title === undefined ? {} : { title: existing.title }),
+					...next,
+					openObservationCounts: existing.openObservationCounts
+				});
 				break;
+			}
 		}
 		return { nodes };
 	}

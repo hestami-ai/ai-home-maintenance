@@ -48,55 +48,71 @@ const str = (v: unknown): string | undefined => (typeof v === 'string' ? v : und
  */
 export function replayPwuAxes(events: readonly DomainEvent[]): ReplayedPwuAxes | undefined {
 	let axes: ReplayedPwuAxes | undefined;
-	for (const event of events) {
-		const p = (event.payload ?? {}) as Payload;
-		switch (event.eventType) {
-			case 'PwuProposed': {
-				// The only event that CREATES state; §11.3 carries all four seeded axes.
-				const w = str(p.workLifecycleState);
-				const e = str(p.executionState);
-				const a = str(p.assuranceState);
-				const s = str(p.shapeIntegrityState);
-				if (w && e && a && s) {
-					axes = {
-						workLifecycleState: w,
-						executionState: e,
-						assuranceState: a,
-						shapeIntegrityState: s
-					};
-				}
-				break;
-			}
-			case 'PwuStateChanged': {
-				// The generic multi-axis event (§11.5): every axis, every time.
-				if (!axes) break;
-				axes = {
-					workLifecycleState: str(p.newState) ?? axes.workLifecycleState,
-					executionState: str(p.executionState) ?? axes.executionState,
-					assuranceState: str(p.assuranceState) ?? axes.assuranceState,
-					shapeIntegrityState: str(p.shapeIntegrityState) ?? axes.shapeIntegrityState
-				};
-				break;
-			}
-			case 'PwuMarkedReady':
-			case 'PwuShapingStarted':
-			case 'PwuChallenged':
-			case 'PwuReshapingStarted':
-			case 'PwuInvalidated':
-			case 'PwuSuperseded': {
-				// The named single-axis events. Each declares `workLifecycleState`; two also carry
-				// shapeIntegrityState. Absent axes carry forward — they were not part of this transition.
-				if (!axes) break;
-				axes = {
-					...axes,
-					workLifecycleState: str(p.workLifecycleState) ?? axes.workLifecycleState,
-					shapeIntegrityState: str(p.shapeIntegrityState) ?? axes.shapeIntegrityState
-				};
-				break;
-			}
-			default:
-				break; // Events of other aggregates, or PWU events that carry no axis.
-		}
-	}
+	for (const event of events) axes = applyPwuAxisEvent(axes, event);
 	return axes;
+}
+
+/**
+ * ONE PWU event -> the next axes. THE single place that knows how a PWU event moves the four axes.
+ *
+ * It is exported and shared because the alternative is what this codebase actually had: the aggregate reducer and
+ * the Work view projector each folding PWU events their own way, and drifting. `workProjector` handled exactly
+ * `IntentCaptured` and `PwuProposed`, defaulted on everything else, and HARDCODED the seeded axes instead of
+ * reading them — so folded over the reference undertaking's 251 events it reported every PWU as
+ * PROPOSED/NOT_PLANNED/UNASSESSED while the objects were BASELINED/SUCCEEDED/SATISFIED. Its comment said
+ * "Further events (state changes, observations) update the axes / counts here as later milestones add their
+ * commands". The milestones came; the fold never followed. Two folds is one fold too many.
+ *
+ * Returns `undefined` until the aggregate is CREATED — an event stream that never proposed the PWU yields no
+ * state, and defaulting one into existence would fabricate an object out of nothing.
+ */
+export function applyPwuAxisEvent(
+	axes: ReplayedPwuAxes | undefined,
+	event: DomainEvent
+): ReplayedPwuAxes | undefined {
+	const p = (event.payload ?? {}) as Payload;
+	switch (event.eventType) {
+		case 'PwuProposed': {
+			// The only event that CREATES state; §11.3 carries all four seeded axes. Read them — do not assume
+			// them. The seeded values are a fact of the event, not of this function.
+			const w = str(p.workLifecycleState);
+			const e = str(p.executionState);
+			const a = str(p.assuranceState);
+			const s = str(p.shapeIntegrityState);
+			if (!(w && e && a && s)) return axes;
+			return {
+				workLifecycleState: w,
+				executionState: e,
+				assuranceState: a,
+				shapeIntegrityState: s
+			};
+		}
+		case 'PwuStateChanged': {
+			// The generic multi-axis event (§11.5): every axis, every time.
+			if (!axes) return axes;
+			return {
+				workLifecycleState: str(p.newState) ?? axes.workLifecycleState,
+				executionState: str(p.executionState) ?? axes.executionState,
+				assuranceState: str(p.assuranceState) ?? axes.assuranceState,
+				shapeIntegrityState: str(p.shapeIntegrityState) ?? axes.shapeIntegrityState
+			};
+		}
+		case 'PwuMarkedReady':
+		case 'PwuShapingStarted':
+		case 'PwuChallenged':
+		case 'PwuReshapingStarted':
+		case 'PwuInvalidated':
+		case 'PwuSuperseded': {
+			// The named single-axis events. Each declares `workLifecycleState`; two also carry
+			// shapeIntegrityState. Absent axes carry forward — they were not part of this transition.
+			if (!axes) return axes;
+			return {
+				...axes,
+				workLifecycleState: str(p.workLifecycleState) ?? axes.workLifecycleState,
+				shapeIntegrityState: str(p.shapeIntegrityState) ?? axes.shapeIntegrityState
+			};
+		}
+		default:
+			return axes; // Events of other aggregates, or PWU events that carry no axis.
+	}
 }

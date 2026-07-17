@@ -2421,6 +2421,75 @@ Intent **or** PWU", and the Intent side has no reducer.
 
 ---
 
+## PART 3o — Increment 30: the self-comparison was hiding a broken view
+
+**The Work view was wrong for every PWU that had ever done anything, and its ratified-property test was green.**
+
+### The anti-pattern, third instance, and this time it concealed a defect
+
+The test claiming ratified **RPH-PER-007** asserted:
+
+```ts
+expect(rebuildProjection(workProjector, stream)).toEqual(rebuildProjection(workProjector, stream));
+```
+
+The fold compared to **itself**, over a hand-authored **two-event** stream, with no fixture anywhere. Ratified
+PER-007 asks for *"all domain events"* rebuilt and matched against *"the expected fixture projections"*. Neither
+was present.
+
+**And `workProjector` was broken.** It handled `IntentCaptured` and `PwuProposed` and hit `default: break` on
+everything else — its own comment promising that *"further events (state changes, observations) update the axes
+here as later milestones add their commands."* **The milestones came; the fold never followed.** Rebuilt over the
+reference undertaking's real 251-event stream it reported:
+
+```
+WORK VIEW:    { work: PROPOSED,  exec: NOT_PLANNED, assurance: UNASSESSED }
+MATERIALIZED: { work: BASELINED, exec: SUCCEEDED,   assurance: SATISFIED  }
+```
+
+**A read model that surfaces render, wrong on every axis.** The self-comparison test could never see it: **a
+broken fold equals a broken fold.** That is the third instance of this shape in this codebase —
+`professionalWorkGraph` twice on one engine; PER-006's "rebuild equivalence" that never rebuilt; this. **A test
+that compares a thing to itself and reports coverage.**
+
+### It also hardcoded what the event says
+
+`PwuProposed` set `workLifecycleState: 'PROPOSED'` literally, rather than reading §11.3's payload — the exact
+defect I had just avoided in `replayPwuAxes`, sitting one file away. `applyPwuAxisEvent` is now the **single**
+place that knows how a PWU event moves the axes, shared by the aggregate reducer and the view. **Two folds was
+one fold too many.**
+
+### The fixture and the fold were wrong in compensating ways
+
+Fixing the fold broke the projections unit test: its `PwuProposed` payload was `{ pwuId, title }` — **missing the
+four axes §11.3 requires and the real event has carried since Increment 22**. It passed only because the fold
+hardcoded what the fixture omitted. **A hand-authored fixture and a fold that agree with each other prove
+nothing about the system.** The fixture is now a real §11.3 event.
+
+### What "expected fixture projections" honestly means here
+
+A golden file generated from current behaviour pins my own output and proves stability, not correctness. The
+stronger oracle was already in the system: **the MATERIALIZED state**, produced by a completely different path
+(command handlers writing objects) from the same events. If the fold and the write-side disagree, one is wrong —
+a real finding either way. RPH-PER-007 now rebuilds from all 251 events and matches the objects, checks
+`qualifiedSuccess` **at the render boundary** (where a false green would actually appear), and — the guard the old
+test lacked — proves the fold is **non-trivial**, since `apply: () => view` would satisfy determinism alone.
+
+Mutation: revert the projector and **all three** new tests fail.
+
+### Gate
+
+build · `check-types` 21/21 · `test` 21/21 · `lint` · `boundary` · `format:check` clean · Playwright 22 (1 known
+flake, retried green).
+
+### Still open
+
+**Two of the three ratified PER-007 views do not exist.** The property names "Work, **Assurance**, and
+**Compatibility** views"; `workProjector` is the only `Projector` in the codebase. And RPH-PER-006 is proved for
+the PWU only — the ratified text says "an Intent **or** PWU", and the Intent side has no reducer.
+
+---
+
 ## PART 4 — Open questions genuinely for the sponsor
 
 *(kept deliberately short — under the 2026-07-15 mandate, a tension is work, not a question, unless it
