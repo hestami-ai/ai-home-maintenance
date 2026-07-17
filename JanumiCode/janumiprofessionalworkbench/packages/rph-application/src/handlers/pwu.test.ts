@@ -296,6 +296,20 @@ describe('PWU lifecycle handlers (live command drive)', () => {
 		expect(axes.executionState).toBe('PLANNED');
 	});
 
+	it('MarkPwuReady rejects a STALE expectedSemanticVersion — the dead staleness guard now fires (contract-drift correctness)', () => {
+		seedIntent();
+		expect(engine.dispatch(cmd('ProposePwu', proposePayload())).status).toBe('ACCEPTED');
+		expect(engine.dispatch(cmd('BeginPwuShaping', {})).status).toBe('ACCEPTED');
+		// The PWU is at semantic version 1; a caller attesting readiness of version 2 reviewed a shape that does not
+		// exist. Before the fix this was silently ACCEPTED (the field was validated then ignored).
+		const r = engine.dispatch(
+			cmd('MarkPwuReady', { shapeReadinessAssessmentId: 'assess_x', expectedSemanticVersion: 2 })
+		);
+		expect(r.status).toBe('CONFLICT');
+		expect(r.error?.code).toBe('RPH_REVISION_CONFLICT');
+		expect(lifecycle()).toBe('SHAPING'); // unchanged — the stale attestation did not advance the PWU
+	});
+
 	// RETITLED 2026-07-17. This was 'ChangePwuState rejects an illegal lifecycle jump PROPOSED -> SATISFIED
 	// (guard wired)'. The "(guard wired)" was an overclaim: PROPOSED -> SATISFIED is not an arrow on the machine
 	// at all (DOC-002 §8.1 has no such row), so it is rejected by the LEGALITY check and would be rejected with

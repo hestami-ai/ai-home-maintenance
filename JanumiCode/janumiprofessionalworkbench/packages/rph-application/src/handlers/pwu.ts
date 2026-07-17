@@ -297,6 +297,20 @@ function readinessFactsOf(ctx: HandlerContext, state: Record<string, unknown>): 
 export const markPwuReady: CommandHandler = (ctx, command) => {
 	const loaded = loadOrReject(ctx, command, command.targetAggregateId);
 	if (!loaded.ok) return loaded.result;
+	const p = command.payload as MarkPwuReadyPayload;
+	// Optimistic-concurrency precondition on the SEMANTIC version — distinct from the envelope's expectedRevision
+	// (loadOrReject checks that). MarkPwuReady attests readiness of a SPECIFIC shape; expectedSemanticVersion is the
+	// caller's assertion of WHICH shape version it reviewed. If the PWU was materially reshaped since (semanticVersion
+	// moved), the attestation is stale and must not silently apply to a shape the caller never saw. Contract-drift
+	// fix: the command REQUIRED this field yet the handler never compared it, so the intended staleness guard was
+	// dead — a caller believed MarkPwuReady was version-guarded when it was not.
+	if (p.expectedSemanticVersion !== loaded.semanticVersion) {
+		return reject(
+			command,
+			'RPH_REVISION_CONFLICT',
+			`MarkPwuReady: expected semantic version ${p.expectedSemanticVersion}, but PWU ${command.targetAggregateId} is at semantic version ${loaded.semanticVersion} — the shape changed since readiness was attested (stale attestation).`
+		);
+	}
 	const readiness = checkPwuShapeReadiness(readinessFactsOf(ctx, loaded.state));
 	if (!readiness.ok) {
 		return reject(
@@ -305,7 +319,6 @@ export const markPwuReady: CommandHandler = (ctx, command) => {
 			`MarkPwuReady: PWU ${command.targetAggregateId} does not satisfy the shape readiness contract (DOC-002 §9): ${readiness.unmet.join('; ')}`
 		);
 	}
-	const p = command.payload as MarkPwuReadyPayload;
 	return advancePwuLifecycle(ctx, command, {
 		target: 'READY',
 		eventType: 'PwuMarkedReady',
