@@ -299,5 +299,14 @@ export function seedWorkbench(handle: EngineHandle): void {
 	});
 	const pwuTypeByKind: Record<string, string> = {};
 	for (const t of PWU_TYPES) pwuTypeByKind[t.kind] = t.id;
-	driveReferenceUndertaking(handle, { undertakingId: SEED_UNDERTAKING, pwuTypeByKind });
+	// The undertaking's assessments are judged under the RATIFIED catalog's Fitness For Purpose policy
+	// ("Determine whether the completed product is suitable for the actual approved user need") — seeded just
+	// above from the DOC-004 catalog. Passing it means the demo EXERCISES the catalog rather than growing it:
+	// the drive creates its own policy only when run standalone, and a 16th policy duplicating a ratified one is
+	// exactly what the seeded-library test guards against.
+	driveReferenceUndertaking(handle, {
+		undertakingId: SEED_UNDERTAKING,
+		pwuTypeByKind,
+		assurancePolicyId: 'pol_fitness_for_purpose'
+	});
 }

@@ -2103,6 +2103,82 @@ open item in this log.
 
 ---
 
+## PART 3j — Increment 25: the loop was never missing; the seed bypassed it
+
+### C10 — I called the largest open item a program, and it was a bypass
+
+PART 3i ended by telling the sponsor that closing the assurance gap "means building the assurance loop… a
+program, not an increment". **The loop was already built.** `HANDLERS` registers `ProposeEvidence`,
+`AdmitEvidence`, `AssertClaim`, `DetectAssumption`, `RequestAssuranceAssessment`, `CompleteAssuranceAssessment`,
+`RecordAssuranceObservation`, `ProposeDecision`, `ApproveDecision`, `CreateBaseline`, `PromoteBaseline`,
+`StartExecutionStep`, `CompleteExecutionStep` — every one of them, wired, emitting nothing, because **the seed
+never called them.** I wrote "the professional loop is not implemented" into a test the previous day, having
+never opened `registry.ts`. Same error family as the other nine: absence asserted from outside a thing I had not
+looked in. The cost was proportionate — I proposed a program to the sponsor when the work was one file.
+
+**Located precisely**: `completeAssuranceAssessment` advances the ASSESSMENT aggregate and never touches the
+subject PWU's `assuranceState`. `assurance.ts` does not appear among the files that write that field at all —
+the only writer is `pwu.ts` via the generic `ChangePwuState`. So completing an assessment does not move the
+thing it judged, and the seed had no other way to make the graph green.
+
+### The ratified bridge, which reframes the fix
+
+**RPH-PWU-006**: *"Given execution succeeded; required evidence is admitted; all mandatory assurance assessments
+are satisfied. When the controller evaluates the PWU. Then the PWU may transition to SATISFIED."*
+
+So `ChangePwuState` as the controller's lever is **sanctioned** — the "When" IS the controller evaluating the
+PWU. The fix was never to delete the hops. **The defect was the empty Given**, and `supportingObjectIds` — `[]`
+on all 67 hops, sitting beside `reasonCode` in §11.5 — is exactly where the Given belongs.
+
+### What landed
+
+For each assured PWU the drive now asserts a FITNESS claim, proposes and **ADMITS** evidence, starts an
+assessment against a policy that **exists** at a version and is bound to the subject's semantic version (DOC-004
+invariant 2), records observations, and returns a full §20 verdict. Each assurance hop follows its declared
+trigger and **cites the object that caused it**.
+
+**The pins moved the right way — the only evidence they work rather than calcify.** Missing event types **28 →
+23**; the assurance chain **0 → 5 links**; 110 → 153 events. Three entries that look like absence are **modeling
+drift** and will not yield to more seed code: `AssuranceAssessmentRequested` (the handler fuses request-and-begin)
+and `AssuranceAssessmentSatisfied`/`...ConditionallySatisfied` (one `AssuranceAssessmentCompleted` carries the
+disposition per DOC-007; DOC-002 names five outcome events — the vocab's `conflicts[]` says "pick one modeling"
+and it is unpicked).
+
+**The seed-workbench test caught me committing the sin it was written to catch.** I created a 16th assurance
+policy; its comment records that six invisible catalog policies had been "an instruction to fabricate duplicates
+of ratified ones". `pol_fitness_for_purpose` — *"Determine whether the completed product is suitable for the
+actual approved user need"* — is the ratified policy for exactly what I was asserting. The demo now **exercises
+the catalog** (`assurancePolicyId` passed in, following the existing `pwuTypeByKind` pattern); the drive creates
+its own only when standalone, because a stand-in wearing a ratified id would be a fake with a real name.
+
+**Surfaced by driving it**: `CreateAssurancePolicyPayload` types `independenceRequirement` as `z.string()` while
+the AssurancePolicy OBJECT types it an enum — the command bus accepted a prose sentence and the (d1) object check
+rejected it. **The command contract is looser than the object it creates.** Not fixed here.
+
+### Proven, not assumed
+
+`reference-undertaking.test.ts` gained "an assured PWU's assurance is EARNED and CITED, not assigned": claim →
+admitted evidence → assessment against an **existing** policy at the right version → verdict naming the evidence
+it considered → the hop citing the assessment. **Two mutations, both caught, and only by that test.** The second
+is the one that matters: with the assurance loop **removed entirely** and the axes assigned by fiat, the other
+five tests — graph, axes, baseline, residual — **all still pass.** That is the blindness this file lived with for
+its whole existence, demonstrated rather than argued.
+
+### Gate
+
+build · `check-types` 21/21 · `test` 21/21 · `lint` · `boundary` · `format:check` clean · Playwright 22 passed
+(1 flake, retried green).
+
+### Still open
+
+The **governance half**: no decision proposes or takes effect, no baseline is created or promoted, no assumption
+is detected — so Architecture still reaches BASELINED with no Baseline object, contra **RPH-BAS-004**. And the
+**engine still enforces none of it**: `classifyTransition` reads only from/to and ignores each transition's
+declared `trigger`/`guard`, so the seed now tells the truth by construction, not because it is prevented from
+lying. That enforcement is the next increment, and it is the one that would make this structural.
+
+---
+
 ## PART 4 — Open questions genuinely for the sponsor
 
 *(kept deliberately short — under the 2026-07-15 mandate, a tension is work, not a question, unless it

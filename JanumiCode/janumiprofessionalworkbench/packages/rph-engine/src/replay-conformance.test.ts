@@ -18,6 +18,16 @@
 // statement of a DEFICIENCY, and each one must only ever shrink. When someone implements the assurance loop,
 // these go red and the correct fix is to delete entries — never to add them.
 //
+// AND THAT IS WHAT HAPPENED, one increment later. Increment 25 made the seed drive the real assurance loop and
+// these pins went red by SHRINKING: 28 missing event types -> 23, and the assurance chain went from zero links to
+// five. Recorded here because it is the only evidence that the pins work as intended rather than calcifying.
+//
+// It also corrected the sharper error in this file's first version, which said "the professional loop is not
+// implemented". It WAS implemented — every one of those commands was registered in HANDLERS and emitting nothing
+// because the seed never called them. The loop was built and bypassed, which is a different defect with a much
+// cheaper fix, and I asserted the expensive one without checking the registry. Same error family as the rest of
+// this effort: absence claimed from the outside of a thing I had not opened.
+//
 // Note the §26 trace is "representative rather than exhaustive" (its own words), so exact sequence equality is
 // NOT the right bar and is not attempted. The bar here is coverage of event TYPES: the engine should eventually
 // be able to emit every kind of event the corpus's worked example says this undertaking produces.
@@ -68,10 +78,14 @@ describe('the §26 oracle pointed at the live engine', () => {
 		const expected = loadExpectedEvents();
 		expect(expected).toHaveLength(72);
 		expect(expected[0]!.event).toBe('IntentCaptured');
-		expect(driveLive()[0]).toBe('IntentCaptured');
+		// The engine's FIRST event is AssurancePolicyCreated, not IntentCaptured: as of Increment 25 the drive
+		// stands up the policy its assessments are judged under before doing the work. The §26 trace omits that
+		// setup, which is a fair thing for a "representative" trace to do. So the premise is co-reference, not
+		// alignment at index 0.
+		expect(driveLive()).toContain('IntentCaptured');
 	});
 
-	it('DEFICIENCY: the engine emits none of the 28 §26 event types below — the professional loop is not implemented', () => {
+	it('DEFICIENCY: the engine emits none of these 23 §26 event types (was 28 before the assurance loop)', () => {
 		const actual = new Set(driveLive());
 		const expected = [...new Set(loadExpectedEvents().map((e) => e.event))];
 		const missing = expected.filter((n) => !actual.has(n)).sort();
@@ -79,23 +93,27 @@ describe('the §26 oracle pointed at the live engine', () => {
 		// PIN. This list is a defect register, not a specification. It must only ever SHRINK. If a change makes
 		// this red by ADDING a name, the engine has REGRESSED — an event type it used to emit, the corpus's own
 		// worked example expects, and it no longer produces.
+		//
+		// 28 -> 23 in Increment 25 (claim/evidence/assessment/observation now fire for real). Three entries below
+		// are MODELING DRIFT rather than absence, and will not go away by writing more seed code — they need the
+		// vocab conflicts resolved:
+		//   AssuranceAssessmentRequested — requestAssuranceAssessment emits AssuranceAssessmentStarted (it fuses
+		//     request-and-begin; DOC-004 §32's separate `beginAssuranceAssessment` does not exist here).
+		//   AssuranceAssessmentSatisfied / ...ConditionallySatisfied — completeAssuranceAssessment emits ONE
+		//     AssuranceAssessmentCompleted carrying the disposition, per DOC-007; DOC-002 names five outcome
+		//     events. The vocab's conflicts[] records the choice and says "pick one modeling" — it is unpicked.
 		expect(missing).toEqual([
 			'AssumptionDetected',
 			'AssuranceAssessmentConditionallySatisfied',
 			'AssuranceAssessmentRequested',
 			'AssuranceAssessmentSatisfied',
-			'AssuranceAssessmentStarted',
-			'AssuranceObservationRecorded',
 			'BaselineApproved',
 			'BaselineCreated',
 			'BaselinePromoted',
 			'BaselineSubmittedForReview',
-			'ClaimAsserted',
 			'ClarificationRequested',
 			'DecisionEffective',
 			'DecisionProposed',
-			'EvidenceAdmitted',
-			'EvidenceProposed',
 			'ExecutionPlanRevised',
 			'ExecutionStepStarted',
 			'ExecutionStepSucceeded',
@@ -111,37 +129,50 @@ describe('the §26 oracle pointed at the live engine', () => {
 		]);
 	});
 
-	it('DEFICIENCY: the ENTIRE assurance chain of custody is absent from the live engine', () => {
+	it('PROGRESS: 5 links of the assurance chain of custody now fire — the rest do not', () => {
 		const actual = new Set(driveLive());
 		const emitted = ASSURANCE_CHAIN.filter((n) => actual.has(n));
-		// Not one link of claim -> evidence -> assessment -> decision -> baseline is exercised. Every assurance
-		// FACT in the reference undertaking's terminal graph is therefore asserted, not earned. This is the
-		// finding that matters most in this file: the seed demonstrates the SHAPE of a professional result
-		// without the process that would make it trustworthy.
-		expect(emitted, 'any link emitted here is progress — update the pin').toEqual([]);
+		// Was []. Every assurance fact in the terminal graph used to be asserted; a claim is now asserted,
+		// evidence proposed and ADMITTED, an assessment started against a real policy at a real subject version,
+		// observations recorded, and a full §20 verdict returned (as AssuranceAssessmentCompleted, which is not
+		// in this list because the list uses the §26 trace's five-outcome-event spelling — see the pin above).
+		//
+		// This must only ever GROW. Still absent: the governance half — no decision proposes or takes effect, no
+		// baseline is created or promoted, and no assumption is ever detected. So the Architecture PWU still
+		// reaches BASELINED with no Baseline object, which ratified RPH-BAS-004 forbids.
+		expect(emitted, 'this list must only grow — update the pin when it does').toEqual([
+			'ClaimAsserted',
+			'EvidenceProposed',
+			'EvidenceAdmitted',
+			'AssuranceAssessmentStarted',
+			'AssuranceObservationRecorded'
+		]);
 	});
 
-	it('DEFICIENCY: 67 generic PwuStateChanged stand in for the loop the trace expects zero of', () => {
+	it('DEFICIENCY: 67 generic PwuStateChanged still carry the axes the trace expects zero of', () => {
 		const actual = driveLive();
 		const generic = actual.filter((n) => n === 'PwuStateChanged').length;
 		const expectedGeneric = loadExpectedEvents().filter(
 			(e) => e.event === 'PwuStateChanged'
 		).length;
 
-		// The corpus's worked example reaches its terminal state through NAMED events (PwuSatisfied, PwuBaselined,
-		// AssuranceAssessmentSatisfied...). This engine reaches the same terminal AXES by having a controller
-		// command write them directly. The axes match; the history does not. A governed stream that records
-		// "the state became SATISFIED" without recording WHY cannot be reasoned over after the fact — which is
-		// the entire purpose of having one.
+		// UNCHANGED at 67 by Increment 25, deliberately. The corpus's worked example reaches its terminal state
+		// through NAMED events (PwuSatisfied, PwuBaselined...); this engine reaches the same terminal axes via the
+		// controller lever. That lever is not itself wrong — ratified RPH-PWU-006's "When" IS "the controller
+		// evaluates the PWU" — so the fix was never to delete these hops. It was to make them TRUE: each
+		// assurance hop now follows its declared trigger and cites the object that caused it in
+		// supportingObjectIds, instead of passing [] and asserting the outcome.
+		//
+		// What remains is the naming: the trace would spell the arrival at SATISFIED `PwuSatisfied`. That is the
+		// same primary-vs-generic question Increment 23 settled for markPwuReady, unresolved for the rest.
 		expect(expectedGeneric, 'the §26 trace never emits the generic event').toBe(0);
 		expect(generic).toBe(67);
 	});
 
-	it("DEFICIENCY: the engine emits 110 events to the trace's 72, and is not a superset", () => {
+	it("CHARACTERIZATION: the engine emits 153 events to the trace's 72, and is still not a superset", () => {
 		const actual = driveLive();
-		expect(actual).toHaveLength(110);
-		// More events, less loop: the count is inflated by the generic setter while 28 named types are missing.
-		// Volume is not coverage.
-		expect(actual.length).toBeGreaterThan(loadExpectedEvents().length);
+		// 110 -> 153: +43 real assurance events. The count was never the point — at 110 it was inflated by the
+		// generic setter while 28 named types were missing. Volume is not coverage; the pins above are.
+		expect(actual).toHaveLength(153);
 	});
 });

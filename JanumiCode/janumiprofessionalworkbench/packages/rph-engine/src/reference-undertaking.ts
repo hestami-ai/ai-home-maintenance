@@ -5,45 +5,47 @@
 // terminal condition. This REPLACES the hand-authored terminal graph — the resulting Professional Work Graph is a
 // projection of real events produced by real handlers.
 //
-// ⚠️ WHAT THIS DOES *NOT* DEMONSTRATE (corrected 2026-07-17, after an adversarial audit). This header used to
-// end: "...so it demonstrably upholds INV-5 (no green without assurance)". That was false, and it mattered,
-// because it is the system's headline claim about itself.
+// ⚠️ WHAT THIS DOES AND DOES NOT DEMONSTRATE. Read this before citing the demo graph as evidence of anything.
 //
-// This script never performs any assurance. Driven live it emits 110 events of just 14 types (of 59 the BINDINGS
-// table can emit) and ZERO of: ClaimAsserted, EvidenceProposed, EvidenceAdmitted, AssuranceAssessmentRequested,
-// AssuranceAssessmentCompleted, AssuranceObservationRecorded, AssumptionDetected, DecisionProposed,
-// DecisionEffective, BaselineCreated, BaselinePromoted, ExecutionStepStarted, ExecutionStepSucceeded — 28 event
-// types the corpus's own §26 worked trace expects (replay-conformance.test.ts pins the gap). Every assurance FACT
-// below is written directly onto the axes by ChangePwuState, with `supportingObjectIds: []` every time. Mobile &
-// Offline passes THROUGH EVIDENCE_PENDING with no evidence and ASSESSING with no assessment; its
-// CONDITIONALLY_SATISFIED is an assignment, not a verdict. The Architecture PWU reaches BASELINED with no
-// Baseline object — which collides with the ratified RPH-BAS-004 ("Missing required assessment prevents
-// promotion"). The `shapeReadinessAssessmentId: 'assess_shape'` and decision ids cited in payloads below resolve
-// to UNDEFINED: they name objects that were never created.
+// HISTORY, because it is the instructive part. Until 2026-07-17 this header ended "...so it demonstrably upholds
+// INV-5 (no green without assurance)". That was false: the script performed NO assurance at all. It emitted 110
+// events of 14 types, zero of them from the claim -> evidence -> assessment -> decision -> baseline chain, and
+// wrote every assurance fact directly onto the axes via ChangePwuState with `supportingObjectIds: []`. Mobile &
+// Offline passed THROUGH EVIDENCE_PENDING with no evidence and ASSESSING with no assessment. A comment turned a
+// fixture into evidence, and five tests over this file stayed green throughout.
 //
-// So the terminal graph has the SHAPE of an assured result without the process that would earn it. The guard is
-// real where it is checked — canAdvanceWorkLifecycle refuses SATISFIED unless assuranceState says SATISFIED, and
-// that is tested end-to-end (rph-application pwu.test.ts, "Property P1 (call site)") — but BOTH fields arrive in
-// the same command, so the guard checks the caller against itself. The lock on the door is real; this script
-// carries a key.
+// WHAT INCREMENT 25 CHANGED. The assurance loop was never missing — every command below was already registered
+// and emitting nothing because this script never called them. It calls them now. For each assured PWU: a FITNESS
+// claim is asserted, evidence is proposed and ADMITTED, an assessment is started against a policy that EXISTS at
+// a version and is bound to the subject's semantic version (DOC-004 invariant 2), observations are recorded, and
+// a full DOC-007 §20 verdict is returned. Each assurance axis hop now follows its declared trigger and CITES the
+// object that caused it in `supportingObjectIds`. The facts are earned and traceable.
 //
-// PRECISION, because the sloppy version of this criticism is wrong. Ratified Property P1 says executionState =
-// SUCCEEDED "must never ALONE cause" assuranceState = SATISFIED. Here it does not: an explicit command causes it.
-// So the seed does not VIOLATE P1 — it simply never demonstrates it. What the seed does contradict is a
-// convergent set of other ratified rules: §8.1's Command column contains NO command that changes assuranceState
-// (it is a precondition CONSUMED by the lifecycle transition, not produced by one); §34.2 and DOC-004 §32
-// enumerate the assurance mutators and include no generic setter; §18.1 requires every disposition to identify
-// evidence considered and criteria met; §37 requires every control action to record the evidence considered and
-// the authorizing policy — this one records `reasonCode: 'CONTROLLER'` and nothing else.
+// WHAT IS STILL NOT DEMONSTRATED, precisely:
+//  * The GOVERNANCE half is still absent — no decision is proposed or takes effect, no baseline is created or
+//    promoted, no assumption is detected. So the Architecture PWU still reaches BASELINED with no Baseline
+//    object, which ratified RPH-BAS-004 ("Missing required assessment prevents promotion") forbids.
+//  * The ENGINE still does not enforce any of this. classifyTransition reads only from/to and ignores each
+//    transition's declared `trigger`/`guard`, so a caller can still walk the assurance axis to SATISFIED one
+//    legal hop at a time with no assessment. This script now tells the truth by construction, not because it is
+//    prevented from lying. reference-undertaking.test.ts's "EARNED and CITED" test is what holds it honest.
+//  * `shapeReadinessAssessmentId: 'assess_shape'` still resolves to UNDEFINED — it names an object never created.
+//  * openResiduals is still NOT PROJECTED: professional-work-graph.ts returns `opts.openResiduals ?? []` from
+//    the const below, derived from no event. An auditor injecting an arbitrary string gets it rendered verbatim.
+//    The residual IS now also a recorded MATERIAL observation on a real assessment — but the view does not read
+//    it from there.
 //
-// That is defensible for a SEED whose job is to populate a demo graph, and it is not a demonstration of P1 — a
-// comment claiming otherwise turned a fixture into evidence. The real proof needs the assurance loop (DOC-004
-// §32's commands, four still absent) driving these axes instead.
+// PRECISION, because the sloppy version of the old criticism is wrong. Ratified Property P1 says executionState =
+// SUCCEEDED "must never ALONE cause" assuranceState = SATISFIED. Even before Increment 25 it did not: an explicit
+// command caused it. So the seed never VIOLATED P1; it failed to DEMONSTRATE it. What it contradicted was a
+// convergent set: §8.1's Command column contains NO command that changes assuranceState (it is a precondition
+// CONSUMED by the lifecycle transition, not produced by one); §34.2 and DOC-004 §32 enumerate the assurance
+// mutators and include no generic setter; §18.1 requires every disposition to identify evidence considered;
+// §37 requires every control action to record the evidence considered and the authorizing policy.
 //
-// ALSO NOT PROJECTED: openResiduals. professional-work-graph.ts returns `opts.openResiduals ?? []` — the residual
-// comes from the REFERENCE_OPEN_RESIDUALS const below, not from any event. An auditor injecting an arbitrary
-// string gets it rendered verbatim. So "REPLACES the hand-authored terminal graph" is imprecise too: the open
-// residual stayed hand-authored, and it is the exact limb the old header offered as evidence.
+// The controller lever itself is NOT the defect: ratified RPH-PWU-006's "When" is "the controller evaluates the
+// PWU". Its Given — "execution succeeded; required evidence is admitted; all mandatory assurance assessments are
+// satisfied" — is what was missing, and is what now holds.
 import type { ActorReference, DomainCommand } from '@janumipwb/rph-contracts';
 import type { EngineHandle } from './engine.js';
 
@@ -75,6 +77,13 @@ export const REFERENCE_UNDERTAKING = {
 export const REFERENCE_OPEN_RESIDUALS = [
 	'Offline behavior deferred from the first implementation increment'
 ] as const;
+
+/** The policy the Reference Undertaking's assessments are judged under. It is CREATED and ACTIVATED by the drive
+ *  (below) rather than merely cited: `requestAssuranceAssessment` does not check that its `assurancePolicyId`
+ *  resolves, so a cited-but-absent policy would be accepted — a governance fact pointing at nothing, which is the
+ *  same defect as the `shapeReadinessAssessmentId: 'assess_shape'` that resolves to UNDEFINED. (That the handler
+ *  does not check is itself a hole; recorded in HARMONIZATION-LOG, not fixed here.) */
+export const REFERENCE_ASSURANCE_POLICY = 'pol_01ARZ3NDEKTSV4RRFFQ69G5P00';
 
 const LABELS: Record<string, { title: string; kind: string }> = {
 	[REFERENCE_UNDERTAKING.root]: { title: 'Product Realization', kind: 'PRODUCT_REALIZATION' },
@@ -126,6 +135,16 @@ export function driveReferenceUndertaking(
 	opts: {
 		readonly undertakingId?: string;
 		readonly pwuTypeByKind?: Readonly<Record<string, string>>;
+		/** The policy this undertaking's assessments are judged under. The workbench seed passes the RATIFIED
+		 *  catalog's `pol_fitness_for_purpose` ("Determine whether the completed product is suitable for the
+		 *  actual approved user need"), so the demo exercises the catalog rather than growing it — the system
+		 *  tells its own authoring agent to reuse an existing policy and create one only for a treatment not
+		 *  already offered, and a 16th policy duplicating a ratified one is exactly what seed-workbench.test.ts
+		 *  exists to catch.
+		 *
+		 *  Omitted (standalone drives, e.g. rph-engine's own tests) the drive CREATES its own policy below,
+		 *  rather than minting a stand-in under a ratified id — that would be a fake wearing a real name. */
+		readonly assurancePolicyId?: string;
 	} = {}
 ): void {
 	let n = 0;
@@ -157,6 +176,58 @@ export function driveReferenceUndertaking(
 	};
 
 	const R = REFERENCE_UNDERTAKING;
+
+	// --- The assurance policy the undertaking's assessments are judged under ---
+	// Reuse the caller's (the workbench seed passes the ratified catalog's pol_fitness_for_purpose); otherwise
+	// create and ACTIVATE our own, so that every assessment below cites a policy that EXISTS at a version rather
+	// than a dangling id. One criterion and one finding definition: the smallest policy that is a real policy.
+	// It mirrors pol_fitness_for_purpose's shape (FITNESS claims) so both paths assess the same kind of thing.
+	const policyId = opts.assurancePolicyId ?? REFERENCE_ASSURANCE_POLICY;
+	if (!opts.assurancePolicyId) {
+		send('CreateAssurancePolicy', 'ASSURANCE_POLICY', policyId, {
+			policyId,
+			version: '1.0.0',
+			name: 'Reference Undertaking Fitness Review',
+			purpose:
+				'Determine whether the completed work is suitable for the approved need it was decomposed to serve',
+			rationale:
+				'Execution success reports that work ran, not that it was right. This policy is the assessment that decides the latter (Property P1).',
+			applicableObjectTypes: ['PROFESSIONAL_WORK_UNIT'],
+			evaluatedClaimTypes: ['FITNESS'],
+			criteria: [
+				{
+					id: 'RUC-01',
+					name: 'Expected output present and attributable',
+					description:
+						'The PWU has produced its declared expected output, and admitted evidence attributes that output to this PWU at the assessed semantic version.',
+					criterionType: 'QUALITATIVE',
+					evaluationMethod: 'HUMAN_JUDGMENT',
+					requiredEvidenceIds: [],
+					severityIfNotMet: 'MATERIAL',
+					mayBeNotApplicable: false
+				}
+			],
+			evaluatorRole: 'REVIEWER',
+			// NOTE (contract drift, surfaced by driving this): CreateAssurancePolicyPayload types this
+			// `z.string()` while the AssurancePolicy OBJECT types it an enum — so the command bus accepted the
+			// prose sentence that was here and the (d1) object check rejected it. The command contract is looser
+			// than the object it creates. Logged in HARMONIZATION-LOG; not fixed here.
+			independenceRequirement: 'DIFFERENT_AGENT',
+			findingDefinitions: [
+				{
+					code: 'UNFIT_OUTPUT',
+					name: 'Output not fit for the approved need',
+					description:
+						'The declared expected output is absent, partial, or does not serve the approved need this PWU was decomposed to meet — so the fitness claim cannot be sustained on the admitted evidence.',
+					defaultSeverity: 'MATERIAL',
+					affectedClaimTypes: ['FITNESS'],
+					defaultControlActions: ['GATHER_CONTEXT', 'REQUEST_HUMAN_DECISION']
+				}
+			],
+			permittedControlActions: ['CONTINUE', 'GATHER_CONTEXT', 'REQUEST_HUMAN_DECISION']
+		});
+		send('ActivateAssurancePolicy', 'ASSURANCE_POLICY', policyId, { policyId });
+	}
 
 	// --- Intent lifecycle: RAW -> ... -> APPROVED ---
 	send('CaptureIntent', 'INTENT', R.intentId, {
@@ -301,7 +372,13 @@ export function driveReferenceUndertaking(
 		newState: string,
 		executionState: string,
 		assuranceState: string,
-		shapeIntegrityState: string
+		shapeIntegrityState: string,
+		// DOC-007 §11.5 pairs `reasonCode` with `supportingObjectIds` — the reason, and what backs it. Every hop
+		// used to pass []. An assurance hop now names the claim/evidence/assessment that caused it, so the
+		// governed stream records not just that the state moved but what moved it. Non-assurance hops (planning,
+		// execution scheduling) still pass none: there is nothing yet to cite, and inventing a citation would be
+		// worse than an honest absence.
+		supportingObjectIds: readonly string[] = []
 	): void =>
 		send('ChangePwuState', 'PROFESSIONAL_WORK_UNIT', pwuId, {
 			previousState,
@@ -310,7 +387,7 @@ export function driveReferenceUndertaking(
 			assuranceState,
 			shapeIntegrityState,
 			reasonCode: 'CONTROLLER',
-			supportingObjectIds: []
+			supportingObjectIds
 		});
 
 	const shapeToExecutedSuccess = (pwuId: string): void => {
@@ -325,35 +402,169 @@ export function driveReferenceUndertaking(
 		chg(pwuId, 'EXECUTING', 'EXECUTING', 'SUCCEEDED', 'UNASSESSED', 'PRESERVED');
 	};
 
-	const toUnderAssurance = (pwuId: string): void => {
-		chg(pwuId, 'EXECUTING', 'EVIDENCE_PENDING', 'SUCCEEDED', 'EVIDENCE_REQUIRED', 'PRESERVED');
+	// --- THE ASSURANCE LOOP (Increment 25) ---
+	//
+	// Ratified RPH-PWU-006 sanctions the controller moving a PWU to SATISFIED, but only on a GIVEN:
+	//   "Given execution succeeded; required evidence is admitted; all mandatory assurance assessments are
+	//    satisfied.  When the controller evaluates the PWU.  Then the PWU may transition to SATISFIED."
+	// This seed used to skip the Given entirely: it walked the assurance axis EVIDENCE_REQUIRED ->
+	// READY_FOR_ASSESSMENT -> ASSESSING -> SATISFIED with no evidence and no assessment, every hop carrying
+	// `supportingObjectIds: []`. The axes were assigned, not earned.
+	//
+	// Nothing had to be built to fix that — every command below was already registered and emitting nothing,
+	// because the seed simply never called them. What is new here is that each axis hop now happens only AFTER
+	// its declared trigger has actually fired (PWU.assuranceState's own matrix: EVIDENCE_REQUIRED ->
+	// READY_FOR_ASSESSMENT is triggered by "EvidenceAdmitted", -> ASSESSING by "AssuranceAssessmentStarted",
+	// -> SATISFIED by "AssuranceAssessmentSatisfied"), and CITES the object that fired it in
+	// `supportingObjectIds` — the field DOC-007 §11.5 puts beside `reasonCode` for exactly this purpose, and
+	// which was empty on all 67 previous hops.
+	//
+	// The controller lever is still ChangePwuState, which is correct: RPH-PWU-006's "When" is the controller
+	// evaluating the PWU. The engine does NOT yet enforce the Given — classifyTransition reads only from/to and
+	// ignores each transition's declared `trigger`/`guard` — so this seed now tells the truth by construction,
+	// not because it is prevented from lying. That enforcement is the next increment.
+	let seq = 0;
+	/** Crockford-base32 ULID-shaped ids — the format the object schemas enforce:
+	 *  /^([a-z]+)_([0-9A-HJKMNP-TV-Z]{26})$/ (26 chars, no I/L/O/U). Deterministic, because the seed must
+	 *  produce a byte-identical graph on every run. */
+	const mintId = (prefix: string): string => {
+		seq += 1;
+		return `${prefix}_01ARZ3NDEKTSV4RRFFQ69G${String(seq).padStart(4, '0')}`;
+	};
+
+	interface EarnedObservation {
+		readonly severity: string;
+		readonly statement: string;
+	}
+
+	/** Establish RPH-PWU-006's GIVEN for `pwuId` and return the assessment id that evidences it. */
+	const earnAssurance = (
+		pwuId: string,
+		disposition: 'SATISFIED' | 'CONDITIONALLY_SATISFIED',
+		observations: readonly EarnedObservation[] = []
+	): string => {
+		const label = LABELS[pwuId]?.title ?? pwuId;
+		const claimId = mintId('clm');
+		const evidenceId = mintId('evd');
+		const assessmentId = mintId('asm');
+
+		// 1. The CLAIM. Assurance assesses a claim about the work; without one there is nothing to be right about.
+		send('AssertClaim', 'CLAIM', claimId, {
+			statement: `${label} is fit for the approved need it was decomposed to serve`,
+			claimType: 'FITNESS',
+			subjectObjectIds: [pwuId]
+		});
+
+		// 2. The EVIDENCE, proposed then ADMITTED. Admission is the ratified trigger for the assurance axis
+		//    leaving EVIDENCE_REQUIRED, so the hop below is now caused rather than asserted.
+		send('ProposeEvidence', 'EVIDENCE', evidenceId, {
+			evidenceId,
+			evidenceType: 'ARTIFACT',
+			contentReference: {
+				kind: 'INLINE',
+				note: `${label} — recorded output of the execution step`
+			},
+			producedBy: ACTOR,
+			supportsClaimIds: [claimId],
+			contradictsClaimIds: [],
+			scope: label,
+			limitations: [],
+			capturedAt: '2026-07-12T00:00:00Z'
+		});
+		send('AdmitEvidence', 'EVIDENCE', evidenceId, {
+			admissibilityAssessmentId: assessmentId,
+			admittedScope: label,
+			admittedClaimIds: [claimId]
+		});
+		chg(pwuId, 'EXECUTING', 'EVIDENCE_PENDING', 'SUCCEEDED', 'EVIDENCE_REQUIRED', 'PRESERVED', [
+			claimId
+		]);
 		chg(
 			pwuId,
 			'EVIDENCE_PENDING',
 			'UNDER_ASSURANCE',
 			'SUCCEEDED',
 			'READY_FOR_ASSESSMENT',
-			'PRESERVED'
+			'PRESERVED',
+			[evidenceId]
 		);
-		chg(pwuId, 'UNDER_ASSURANCE', 'UNDER_ASSURANCE', 'SUCCEEDED', 'ASSESSING', 'PRESERVED');
+
+		// 3. The ASSESSMENT, bound to the policy version AND the subject's semantic version (DOC-004 invariant 2).
+		send('RequestAssuranceAssessment', 'ASSURANCE_ASSESSMENT', assessmentId, {
+			assessmentId,
+			assurancePolicyId: policyId,
+			policyVersion: '1.0.0',
+			subjectObjectIds: [pwuId],
+			subjectSemanticVersions: { [pwuId]: 1 },
+			claimIds: [claimId]
+		});
+		chg(pwuId, 'UNDER_ASSURANCE', 'UNDER_ASSURANCE', 'SUCCEEDED', 'ASSESSING', 'PRESERVED', [
+			assessmentId
+		]);
+
+		// 4. The OBSERVATIONS. The conditional case's residual is now a recorded finding on a real assessment,
+		//    not a string handed to the view.
+		for (const o of observations) {
+			send('RecordAssuranceObservation', 'ASSURANCE_OBSERVATION', mintId('obs'), {
+				assessmentId,
+				observationType: 'FINDING',
+				severity: o.severity,
+				statement: o.statement,
+				evidenceIds: [evidenceId]
+			});
+		}
+
+		// 5. The VERDICT — a full DOC-007 §20 ValidatorResult naming what was judged, at which version, on which
+		//    evidence, and how it came out. The (d2) event gate validates the event this produces.
+		send('CompleteAssuranceAssessment', 'ASSURANCE_ASSESSMENT', assessmentId, {
+			validatorResult: {
+				validatorId: 'reference-undertaking.reviewer',
+				validatorVersion: '1',
+				policyId,
+				policyVersion: '1.0.0',
+				assessmentId,
+				subjectObjectIds: [pwuId],
+				subjectSemanticVersions: { [pwuId]: 1 },
+				claimResults: [],
+				evidenceConsideredIds: [evidenceId],
+				evidenceRejected: [],
+				observations: observations.map((o) => ({
+					severity: o.severity,
+					statement: o.statement,
+					subjectObjectIds: [pwuId]
+				})),
+				dispositionRecommendation: disposition,
+				recommendedControlActions: [],
+				residualUncertainty: observations.map((o) => o.statement),
+				limitations: [],
+				executionProvenance: { evaluator: ACTOR }
+			}
+		});
+		return assessmentId;
 	};
 
 	const driveToSatisfied = (pwuId: string): void => {
 		shapeToExecutedSuccess(pwuId);
-		toUnderAssurance(pwuId);
-		chg(pwuId, 'UNDER_ASSURANCE', 'SATISFIED', 'SUCCEEDED', 'SATISFIED', 'PRESERVED');
+		const assessmentId = earnAssurance(pwuId, 'SATISFIED');
+		// The Given now holds and is CITED: this hop names the satisfied assessment that permits it.
+		chg(pwuId, 'UNDER_ASSURANCE', 'SATISFIED', 'SUCCEEDED', 'SATISFIED', 'PRESERVED', [
+			assessmentId
+		]);
 	};
 
 	const driveToConditional = (pwuId: string): void => {
 		shapeToExecutedSuccess(pwuId);
-		toUnderAssurance(pwuId);
+		const assessmentId = earnAssurance(pwuId, 'CONDITIONALLY_SATISFIED', [
+			{ severity: 'MATERIAL', statement: REFERENCE_OPEN_RESIDUALS[0] }
+		]);
 		chg(
 			pwuId,
 			'UNDER_ASSURANCE',
 			'CONDITIONALLY_SATISFIED',
 			'SUCCEEDED',
 			'CONDITIONALLY_SATISFIED',
-			'AT_RISK'
+			'AT_RISK',
+			[assessmentId]
 		);
 	};
 

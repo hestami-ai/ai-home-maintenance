@@ -69,6 +69,88 @@ describe('Reference Undertaking driven live', () => {
 		expect(mobile?.qualifiedSuccess).toBe(false);
 	});
 
+	// THE POINT OF INCREMENT 25. Above, the graph's axes are asserted; here, that they were EARNED. Without this
+	// the seed could go back to assigning assuranceState and every other test in this file would stay green —
+	// which is exactly what happened for the whole life of the file before it.
+	//
+	// Ratified RPH-PWU-006: "Given execution succeeded; required evidence is admitted; all mandatory assurance
+	// assessments are satisfied. When the controller evaluates the PWU. Then the PWU may transition to SATISFIED."
+	// This test asserts the GIVEN exists for the PWU the graph reports as assured, and that the controller's hop
+	// CITES it. The engine does not yet enforce the Given (classifyTransition ignores declared triggers/guards),
+	// so this test is the only thing standing between the demo and a fabricated verdict.
+	it("Increment 25: an assured PWU's assurance is EARNED and CITED, not assigned", () => {
+		const { engine } = build();
+		const events = engine.readAllEvents();
+		const subject = REFERENCE_UNDERTAKING.mobileOffline;
+
+		// 1. A claim was asserted ABOUT this PWU.
+		const claim = events.find(
+			(e) =>
+				e.eventType === 'ClaimAsserted' &&
+				(e.payload as { subjectObjectIds?: string[] }).subjectObjectIds?.includes(subject)
+		);
+		expect(claim, 'no claim was asserted about the subject').toBeDefined();
+
+		// 2. Evidence was ADMITTED (not merely proposed) for that claim — the ratified trigger for the assurance
+		//    axis leaving EVIDENCE_REQUIRED.
+		const admitted = events.find(
+			(e) =>
+				e.eventType === 'EvidenceAdmitted' &&
+				(e.payload as { admittedClaimIds?: string[] }).admittedClaimIds?.includes(
+					claim!.aggregateId
+				)
+		);
+		expect(admitted, 'no evidence was admitted for the claim').toBeDefined();
+
+		// 3. An assessment ran against a policy that EXISTS, bound to the subject's semantic version.
+		const started = events.find(
+			(e) =>
+				e.eventType === 'AssuranceAssessmentStarted' &&
+				(e.payload as { subjectObjectIds?: string[] }).subjectObjectIds?.includes(subject)
+		);
+		expect(started, 'no assessment was started for the subject').toBeDefined();
+		const policyId = (started!.payload as { assurancePolicyId?: string }).assurancePolicyId;
+		expect(
+			engine.loadObject(policyId!),
+			'the assessment cites a policy that does not exist — a governance fact pointing at nothing'
+		).toBeDefined();
+		expect(
+			(started!.payload as { subjectSemanticVersions?: Record<string, number> })
+				.subjectSemanticVersions?.[subject],
+			'DOC-004 invariant 2: the assessment must name its subject semantic version'
+		).toBe(1);
+
+		// 4. A verdict was returned, and it considered the admitted evidence.
+		const completed = events.find(
+			(e) =>
+				e.eventType === 'AssuranceAssessmentCompleted' && e.aggregateId === started!.aggregateId
+		);
+		expect(completed, 'the assessment never completed').toBeDefined();
+		const verdict = completed!.payload as {
+			disposition?: string;
+			evidenceConsideredIds?: string[];
+		};
+		expect(verdict.disposition).toBe('CONDITIONALLY_SATISFIED');
+		expect(
+			verdict.evidenceConsideredIds,
+			'the verdict must name the evidence it considered (§18.1)'
+		).toContain(admitted!.aggregateId);
+
+		// 5. THE HOP CITES THE ASSESSMENT. This is the field that was [] on all 67 previous hops: the controller
+		//    now records what its decision rests on, so the governed stream says WHY the state moved.
+		const hop = events.find(
+			(e) =>
+				e.eventType === 'PwuStateChanged' &&
+				e.aggregateId === subject &&
+				(e.payload as { newState?: string }).newState === 'CONDITIONALLY_SATISFIED'
+		);
+		expect(hop, 'the subject never reached CONDITIONALLY_SATISFIED').toBeDefined();
+		expect(
+			(hop!.payload as { supportingObjectIds?: string[] }).supportingObjectIds,
+			'the controller hop must cite the assessment that permits it (RPH-PWU-006 / DOC-007 §11.5)'
+		).toEqual([started!.aggregateId]);
+	});
+
 	it('freezes the Architecture PWU into an authoritative baseline', () => {
 		const { graph } = build();
 		const arch = graph.nodes.find((n) => n.id === REFERENCE_UNDERTAKING.architecture);
