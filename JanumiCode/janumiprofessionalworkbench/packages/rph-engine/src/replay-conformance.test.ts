@@ -167,12 +167,13 @@ describe('the §26 oracle pointed at the live engine', () => {
 		expect(generic).toBe(67);
 	});
 
-	it("CHARACTERIZATION: the engine emits 251 events to the trace's 72, and is still not a superset", () => {
+	it("CHARACTERIZATION: the engine emits 254 events to the trace's 72, and is still not a superset", () => {
 		const actual = driveLive();
-		// 110 -> 153 -> 166 -> 251. The count was never the point — at 110 it was inflated by the generic setter
-		// while 28 named types were missing. Volume is not coverage; the pins above are. The jump to 251 is mostly
-		// the de minimis FLOOR: three assessments over every AI-produced result, which is what the workbench is
-		// for. An assurance system's event log SHOULD be dominated by assurance.
-		expect(actual).toHaveLength(251);
+		// 110 -> 153 -> 166 -> 251 -> 254. The count was never the point — at 110 it was inflated by the generic
+		// setter while 28 named types were missing. Volume is not coverage; the pins above are. The jump to 251 is
+		// mostly the de minimis FLOOR: three assessments over every AI-produced result, which is what the workbench
+		// is for; +3 to 254 is Increment I5 creating the three floor policies the standalone drive had only cited.
+		// An assurance system's event log SHOULD be dominated by assurance.
+		expect(actual).toHaveLength(254);
 	});
 });

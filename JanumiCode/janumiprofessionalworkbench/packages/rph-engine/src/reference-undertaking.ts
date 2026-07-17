@@ -70,6 +70,7 @@
 // The controller lever itself is NOT the defect: ratified RPH-PWU-006's "When" is "the controller evaluates the
 // PWU". Its Given — "execution succeeded; required evidence is admitted; all mandatory assurance assessments are
 // satisfied" — is what was missing, and is what now holds.
+import { FLOOR_POLICY_DEFINITIONS } from '@janumipwb/rph-assurance';
 import type { ActorReference, DomainCommand } from '@janumipwb/rph-contracts';
 import type { EngineHandle } from './engine.js';
 
@@ -90,6 +91,24 @@ const EVALUATOR: ActorReference = {
 	actorId: 'evaluator-1',
 	actorType: 'HUMAN',
 	displayName: 'Independent Assurance Reviewer'
+};
+
+// The Reasoning Review floor (§8.4) is the AI-review floor: an AI produced the work, and a DIFFERENT model must
+// review it (its ratified independence requirement is DIFFERENT_MODEL). These are the two model identities that
+// make that real — checkIndependence compares their `modelId`, so distinct models is what the floor demands and
+// what these supply. The other two floor policies are deterministic checks with independence NONE, so their
+// evaluator identity is immaterial to the check.
+const PRODUCER_MODEL: ActorReference = {
+	actorId: 'producer-agent-1',
+	actorType: 'MODEL',
+	displayName: 'Producing Model',
+	modelId: 'producer-model-1'
+};
+const REVIEWER_MODEL: ActorReference = {
+	actorId: 'reviewer-agent-1',
+	actorType: 'MODEL',
+	displayName: 'Independent Reasoning Reviewer',
+	modelId: 'reviewer-model-1'
 };
 
 /** Stable ids for the Reference Undertaking objects (valid Crockford-base32 ULIDs). */
@@ -264,6 +283,30 @@ export function driveReferenceUndertaking(
 			permittedControlActions: ['CONTINUE', 'GATHER_CONTEXT', 'REQUEST_HUMAN_DECISION']
 		});
 		send('ActivateAssurancePolicy', 'ASSURANCE_POLICY', policyId, { policyId });
+
+		// The three de minimis floor policies (rph-assurance §8.4) must EXIST as objects for the completion handler
+		// to resolve their independence requirement — the Reasoning Review floor requires DIFFERENT_MODEL.
+		// `satisfyFloor` below cited these ids without creating them, so the floor's independence went UNVERIFIED
+		// (policy unresolved → the handler's gate skips). Created here (ACTIVE on create; §8.4/§8.9) — but ONLY on
+		// this standalone path: when the caller supplies its own fitness policy (the workbench seed) it ALSO seeds
+		// the floor policies, and `CreateAssurancePolicy` on an existing object CONFLICTS (createObject requires
+		// absence), so re-creating them would break that path.
+		for (const def of FLOOR_POLICY_DEFINITIONS) {
+			send('CreateAssurancePolicy', 'ASSURANCE_POLICY', def.policyId, {
+				policyId: def.policyId,
+				version: '1.0.0',
+				name: def.name,
+				purpose: def.purpose,
+				rationale: def.rationale,
+				applicableObjectTypes: ['PROFESSIONAL_WORK_ARCHITECTURE'],
+				evaluatedClaimTypes: def.evaluatedClaimTypes,
+				criteria: def.criteria,
+				evaluatorRole: def.evaluatorRole,
+				independenceRequirement: def.independence,
+				findingDefinitions: def.findingDefinitions,
+				permittedControlActions: def.permittedControlActions
+			});
+		}
 	}
 
 	// --- Intent lifecycle: RAW -> ... -> APPROVED ---
@@ -435,6 +478,12 @@ export function driveReferenceUndertaking(
 	const satisfyFloor = (subjectId: string): void => {
 		for (const floorPolicyId of FLOOR_POLICIES) {
 			const assessmentId = mintId('asm');
+			// Reasoning Review is the AI-review floor and REQUIRES model independence (DIFFERENT_MODEL): a DIFFERENT
+			// model must review the producing model's output. So it is reviewed by REVIEWER_MODEL and cites the
+			// PRODUCER_MODEL that made the subject — distinct models, which the handler's independence gate now
+			// verifies. The other two floors are deterministic checks (independence NONE); their evaluator is
+			// immaterial to the check, so they keep the human reviewer and supply no producer.
+			const isReasoningReview = floorPolicyId === 'floor.reasoning-review';
 			send('RequestAssuranceAssessment', 'ASSURANCE_ASSESSMENT', assessmentId, {
 				assessmentId,
 				assurancePolicyId: floorPolicyId,
@@ -460,8 +509,9 @@ export function driveReferenceUndertaking(
 					recommendedControlActions: [],
 					residualUncertainty: [],
 					limitations: [],
-					executionProvenance: { evaluator: EVALUATOR }
-				}
+					executionProvenance: { evaluator: isReasoningReview ? REVIEWER_MODEL : EVALUATOR }
+				},
+				...(isReasoningReview ? { producer: PRODUCER_MODEL } : {})
 			});
 		}
 	};

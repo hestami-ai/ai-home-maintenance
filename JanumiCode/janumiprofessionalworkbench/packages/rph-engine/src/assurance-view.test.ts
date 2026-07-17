@@ -86,7 +86,7 @@ describe('Assurance View (DOC-004 §38) over the live log', () => {
 		).toBe(true);
 	});
 
-	it('§38 independence status: fitness assessments are VERIFIED (a real DIFFERENT_AGENT pass); floor assessments are unknown (check skipped)', () => {
+	it('§38 independence status: fitness (DIFFERENT_AGENT) and the Reasoning Review floor (DIFFERENT_MODEL) are VERIFIED; the deterministic NONE floors are unknown', () => {
 		const view = build();
 		const assessments = Object.values(view.assessments);
 		// Increments I1/I2/I4: the fitness assessments run under the DIFFERENT_AGENT policy with a producer supplied
@@ -97,10 +97,23 @@ describe('Assurance View (DOC-004 §38) over the live log', () => {
 				a.subjectObjectIds.includes(REFERENCE_UNDERTAKING.mobileOffline)
 		);
 		expect(conditional!.independenceStatus).toBe('VERIFIED');
-		expect(assessments.some((a) => a.independenceStatus === 'VERIFIED')).toBe(true);
-		// The floor assessments supply no producer, so the check is SKIPPED — independence stays undefined (unknown),
-		// never a fabricated pass. The log therefore genuinely distinguishes VERIFIED from unknown.
-		expect(assessments.some((a) => a.independenceStatus === undefined)).toBe(true);
+		// Increment I5: the Reasoning Review floor requires DIFFERENT_MODEL, its policy now EXISTS, and a distinct
+		// model reviewed the producing model's output — so the AI-review independence is genuinely VERIFIED, not
+		// skipped. (Its validator identity names it.)
+		const reasoningReview = assessments.filter(
+			(a) => a.validatorImplementationIdentity === 'deterministic.reasoning-review'
+		);
+		expect(reasoningReview.length).toBeGreaterThan(0);
+		expect(reasoningReview.every((a) => a.independenceStatus === 'VERIFIED')).toBe(true);
+		// The other two floors are deterministic checks with independence NONE — the gate does not run, so they stay
+		// undefined (unknown), never a fabricated pass. The log therefore genuinely distinguishes VERIFIED from unknown.
+		const deterministicFloors = assessments.filter(
+			(a) =>
+				a.validatorImplementationIdentity === 'deterministic.schema-invariant' ||
+				a.validatorImplementationIdentity === 'deterministic.identity-provenance'
+		);
+		expect(deterministicFloors.length).toBeGreaterThan(0);
+		expect(deterministicFloors.every((a) => a.independenceStatus === undefined)).toBe(true);
 		// And nothing is a fabricated VIOLATION — the seed's independence genuinely holds.
 		expect(assessments.every((a) => a.independenceStatus !== 'VIOLATED')).toBe(true);
 	});

@@ -3035,6 +3035,33 @@ Gate: vocab +1 field (no new registry entry), gen localized, `check-types` 21/21
 format. **The independence project (§38 "independence status") is complete; two follow-ups remain (floor-path
 producer threading for `DIFFERENT_MODEL`; the `requestAssuranceAssessment` policy-existence fail-closed).**
 
+### I5 — the Reasoning Review floor now proves AI-review independence (DIFFERENT_MODEL), not just DIFFERENT_AGENT
+
+The first follow-up, done. I2/I4 enforced+verified the *fitness* independence (`DIFFERENT_AGENT`); the floor's
+`DIFFERENT_MODEL` — an AI's work reviewed by a **different model**, the most consequential dimension for an
+agent-built system — was still skipped, because `satisfyFloor` cited the floor policies without creating them (so
+the handler couldn't resolve the requirement) and supplied no producer.
+
+Two coupled changes make it real:
+- **The standalone drive now CREATES its three floor policies** (importing `FLOOR_POLICY_DEFINITIONS` from
+  rph-assurance — no circular dep; the workbench seed already seeds them, so this is guarded to the standalone path,
+  since `CreateAssurancePolicy` on an existing object CONFLICTs). The floor's independence requirement now resolves;
+  the dangling-citation half of follow-up B is closed for the floor.
+- **`satisfyFloor`'s Reasoning Review completion supplies a distinct producing model and reviewing model** (their
+  `modelId` is what `checkIndependence` compares). The two deterministic floors (independence `NONE`) keep the human
+  reviewer and supply no producer — the gate correctly skips them.
+
+Result, over the live log: the fitness assessments read `VERIFIED` (`DIFFERENT_AGENT`), the Reasoning Review floor
+reads `VERIFIED` (`DIFFERENT_MODEL`), the two `NONE` floors read `undefined` (unknown) — the view genuinely
+distinguishes an enforced pass from an un-run check. Mutation-verified the sharp way: making the reviewer model
+equal the producer model doesn't just fail the view test — it **fails the whole workbench seed**, because the
+Reasoning Review floor then violates, and the execution floor gate (which requires that floor SATISFIED for
+AI-produced work) blocks. The independence is load-bearing on the seed's own success. A dedicated `DIFFERENT_MODEL`
+handler test pins the model dimension directly (same model → `INDEPENDENCE_VIOLATION`; distinct → `VERIFIED`).
+
+Gate: `check-types` 21/21 · `test` 21/21 · lint · boundary · format. One characterization count moved (251 → 254:
+the three floor-policy-creation events) and the I1 evaluator lock now admits the model reviewer — both updated.
+
 ---
 
 ## PART 4 — Open questions genuinely for the sponsor

@@ -192,7 +192,8 @@ describe('Reference Undertaking driven live', () => {
 		const actorId = (v: unknown): string | undefined =>
 			(v as { actorId?: string } | undefined)?.actorId;
 
-		// Every completed assessment's recorded evaluator is the independent reviewer, never the owner.
+		// Every completed assessment's recorded evaluator is an INDEPENDENT reviewer — the human reviewer, or the
+		// distinct MODEL reviewer for the Reasoning Review floor (Increment I5, DIFFERENT_MODEL) — and never the owner.
 		const assessmentIds = [
 			...new Set(
 				events
@@ -204,7 +205,9 @@ describe('Reference Undertaking driven live', () => {
 			.map((id) => actorId(stateOf(id)?.evaluator))
 			.filter((x): x is string => x !== undefined);
 		expect(evaluatorIds.length).toBeGreaterThan(10);
-		expect(evaluatorIds.every((id) => id === 'evaluator-1')).toBe(true);
+		expect(evaluatorIds.every((id) => id === 'evaluator-1' || id === 'reviewer-agent-1')).toBe(
+			true
+		);
 
 		// Every piece of evidence was produced by the owner (the work producer).
 		const evidenceIds = [

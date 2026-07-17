@@ -222,4 +222,51 @@ describe('completeAssuranceAssessment — independence enforcement (Increment I2
 			(completedEvt!.payload as { independenceResult?: string }).independenceResult
 		).toBeUndefined();
 	});
+
+	it('a DIFFERENT_MODEL policy compares the MODEL dimension: same model -> INDEPENDENCE_VIOLATION, distinct model -> VERIFIED', () => {
+		// The AI-review independence the Reasoning Review floor requires. The handler is generic over the requirement;
+		// this pins the model dimension specifically (Increment I5 exercises it live in the reference undertaking).
+		createPolicy('DIFFERENT_MODEL');
+
+		const modelEvaluator = (actorId: string, modelId: string) => ({
+			actorId,
+			actorType: 'MODEL',
+			displayName: 'Reviewing model',
+			modelId
+		});
+
+		// Same model for producer and reviewer — DIFFERENT_MODEL cannot be satisfied.
+		const same = 'asm_01ARZ3NDEKTSV4RRFFQ69G5A04';
+		requestAssessment(same);
+		engine.dispatch(
+			cmd('CompleteAssuranceAssessment', same, 'ASSURANCE_ASSESSMENT', {
+				validatorResult: {
+					...verdict(same, 'reviewer-model'),
+					executionProvenance: { evaluator: modelEvaluator('reviewer-model', 'm-shared') }
+				},
+				producer: modelEvaluator('producer-model', 'm-shared')
+			})
+		);
+		expect(stateOf(same)?.assessmentState).toBe('INDEPENDENCE_VIOLATION');
+
+		// Distinct models — verified.
+		const distinct = 'asm_01ARZ3NDEKTSV4RRFFQ69G5A05';
+		requestAssessment(distinct);
+		engine.dispatch(
+			cmd('CompleteAssuranceAssessment', distinct, 'ASSURANCE_ASSESSMENT', {
+				validatorResult: {
+					...verdict(distinct, 'reviewer-model'),
+					executionProvenance: { evaluator: modelEvaluator('reviewer-model', 'm-reviewer') }
+				},
+				producer: modelEvaluator('producer-model', 'm-producer')
+			})
+		);
+		expect(stateOf(distinct)?.assessmentState).toBe('SATISFIED');
+		const completedEvt = store
+			.readAllEvents()
+			.find((e) => e.eventType === 'AssuranceAssessmentCompleted' && e.aggregateId === distinct);
+		expect((completedEvt!.payload as { independenceResult?: string }).independenceResult).toBe(
+			'VERIFIED'
+		);
+	});
 });
