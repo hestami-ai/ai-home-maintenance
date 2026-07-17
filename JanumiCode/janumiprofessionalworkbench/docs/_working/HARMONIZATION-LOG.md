@@ -2598,7 +2598,7 @@ it**:
 | open conditions | PARTIAL | `disposition==CONDITIONALLY_SATISFIED` + `residualUncertainty` |
 | **applicable policies** | PARTIAL — **and affirmatively wrong** | the best fold yields "assessed policies"; **empty for 5 of 13 PWUs incl. the root** — a false "no applicable policies", which vacuously satisfies the green rule |
 | waivers | PARTIAL | no waiver is exercised in the reference run |
-| control actions | PARTIAL | `recommendedControlActions` is a required field wired to a hardcoded `[]`; **selection has no event at all** |
+| control actions | PARTIAL (conformance, not ratification — see Inc 34) | recommend side has a carrier (wired to `[]`); the **select/execute** side's six-field record (§37) is ratified but its carriers (`Decision`/`ApplyTacticalChange`) under-record it — code, not canon |
 | **validator implementation identity** | **NO** | `AssuranceAssessmentCompleted` carries no `validatorId` — the field the ValidatorResult has and the event drops |
 | **independence status** | **NO** | only `AssurancePolicyCreated.independenceRequirement` (the *requirement*), never a *verified* status |
 | **invalidation status** | PARTIAL/NO | invalidation **does not propagate** — invalidating evidence left its dependent claim OPEN, violating ratified DOC-002 §28 and DOC-004 Test 4 |
@@ -2622,9 +2622,9 @@ contradiction.
 **So "missing evidence" is ratified and sourceable in principle** (`AssuranceEvidenceRequired` minus
 `AssuranceEvidenceReceived`/`EvidenceAdmitted`), just not yet **built**: the two events are ratified names
 schematized nowhere, and the §32 commands that emit them are absent. Code-and-schema, not canon. That drops the
-"three fields behind ratification gaps" count — control-action *selection* is a genuine gap (§37 presupposes an
-event the corpus never names anywhere), but *this* one and possibly applicability-as-determination deserve the same
-read-it-yourself treatment before being called ratification decisions.
+"three fields behind ratification gaps" count. I flagged control-action selection and applicability for the same
+read-it-yourself treatment — **and Increment 34 did it: neither is a ratification gap either.** All three were
+conformance gaps mis-read as canon voids.
 
 **The authoring grant, used with restraint.** The warranted edit turned out **not** to be resolving a conflict
 (there is none) but curing the **underspecification** that made two documents read as contradictory. I added a
@@ -2693,6 +2693,63 @@ Documentation only (`docs/Recursive Professional Harness/...Assurance Policy Cat
 edited under the §0.3 grant — and `docs/_working/HARMONIZATION-LOG.md`). No code, vocab, or generated files
 touched; the build/test gate is unaffected. Committed locally, NO PUSH; the sponsor's parallel-thread paths
 untouched.
+
+---
+
+## PART 3s — Increment 34: none of the three "ratification gaps" was one
+
+Increment 33 corrected the missing-evidence "conflict" by reading the corpus, and flagged the §38 map's other two
+claimed ratification gaps — control-action selection and applicability — for the same treatment. Doing it settled
+all three: **the map reported three §38 fields as blocked on sponsor/ratification decisions; zero of them are.**
+
+### The read, per field (all grounded in ratified sections)
+
+**Control-action selection.** The agent said "§37 presupposes a carrier event the corpus never names — a
+ratification gap." Reading DOC-002 §37 and DOC-004 §11: §37 **ratifies the requirement** — "Every control action
+must record: triggering condition; evidence or observations considered; policy authorizing the action; actor;
+affected objects; expected outcome" — and §11 ratifies the pipeline ("A validator implementation recommends control
+actions. The controller selects and executes them under policy."). What's missing is a *carrier that records the
+six fields*, and the corpus already has candidate carriers: the control-action values are decision-shaped
+(`PROMOTE_BASELINE`, `REQUEST_WAIVER`, `REJECT`, `ABANDON`, `ESCALATE`, `ACCEPT`) → `Decision`, or tactical
+(`RETRY`, `CHANGE_MODEL`, `REPLAN_EXECUTION`) → `ApplyTacticalChange`. `Decision`'s payload structurally carries
+**3 of §37's 6** (evidence/observations considered, actor, affected objects) and lacks the other three. So it is a
+**conformance/schema gap** — implement §37's ratified six-field record on the existing carriers — not a canon void.
+
+**Applicability-as-determination.** DOC-004 **§5 fully ratifies the model**: §5.1 the `ApplicabilityRule` (nine
+typed condition fields), §5.2 the five `ApplicabilityOutcome` values, §5.3 the ten activation triggers. The blocker
+is entirely in code: `ApplicabilityRule` is stubbed as a hollow `z.record(z.string(), z.unknown())` (the last
+`FORCE_PLACEHOLDER`), and `AssurancePolicyCreated` drops the object's `applicability` field so the rule never
+reaches the log. **Conformance again** — implement §5.1's real shape, emit it, compute/record the outcome.
+
+### The meta-finding
+
+**A rigorous, refutation-oriented adversarial agent systematically over-classified conformance gaps as ratification
+gaps.** In every one of the three, the corpus *did* ratify the model or requirement (§31 events + §6.1 for
+evidence; §37 six-field record + §11 pipeline for control actions; §5 for applicability) and only the code
+under-implements it — but the agent read "the corpus doesn't name a carrier *event*" as "the corpus hasn't
+*decided* this," and defaulted to "sponsor must rule." That is the exact error family the whole session keeps
+finding — silence read as a harder problem than it is — now visible in the auditor, not just the code. **The lesson
+generalizes: "it's a sponsor/ratification decision" is itself a claim to verify against §N, not a place to stop.**
+
+### The one genuine cross-doc residual (recorded, not edited)
+
+DOC-002 §37 lists an **18-value** `ControlAction`; DOC-004 §11 lists a **23-value** one. §11 is a near-superset
+(adds `CLARIFY`, `GATHER_CONTEXT`, `CHANGE_VALIDATOR`, `INVALIDATE_DEPENDENTS`, `REQUEST_HUMAN_DECISION`,
+`REQUEST_WAIVER`), and the one true naming conflict is **§37 `WAIVE` vs §11 `REQUEST_WAIVER`** — same action, two
+names. **The code already resolved it toward §11** (verified: `ControlActionSchema` is §11's list verbatim, uses
+`REQUEST_WAIVER`), which is also the more-refined reading (a control action *requests* a waiver; the waiver process
+then decides). So it is a genuine discrepancy but not a blocking one — recommendation: **§11 is canonical.** Left as
+a recorded finding rather than a corpus edit, applying Increment 33's test: the §26.5/§31 annotation was warranted
+because the underspecification *actively misled* (I nearly damaged the corpus); here the code already disambiguated
+correctly and nothing is poised to act wrongly, so recording is proportionate and editing two more ratified docs is
+not.
+
+### Net effect on the §38 map
+
+Three YES, **all three former "ratification gaps" reclassified to buildable code/schema**, two `NO`-on-code
+(validator-identity dropped from `AssuranceAssessmentCompleted`; independence logs only the requirement), rest
+PARTIAL. **The Assurance View is a code-and-schema program, not a canon-decision program** — the opposite of the
+map's original headline. Documentation only; gate unaffected.
 
 ---
 
