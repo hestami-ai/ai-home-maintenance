@@ -3,9 +3,47 @@
 // Realization root + its Intent/Behavior/Architecture children + the architecture concerns, records the
 // decomposition contracts, and advances each PWU's four axes with the controller lever (ChangePwuState) to its
 // terminal condition. This REPLACES the hand-authored terminal graph — the resulting Professional Work Graph is a
-// projection of real events produced by real handlers, so it demonstrably upholds INV-5 (no green without
-// assurance): the Mobile & Offline concern ends CONDITIONALLY_SATISFIED (not qualified-green) with an open
-// residual, while the assured concerns end SATISFIED and the Architecture PWU is BASELINED.
+// projection of real events produced by real handlers.
+//
+// ⚠️ WHAT THIS DOES *NOT* DEMONSTRATE (corrected 2026-07-17, after an adversarial audit). This header used to
+// end: "...so it demonstrably upholds INV-5 (no green without assurance)". That was false, and it mattered,
+// because it is the system's headline claim about itself.
+//
+// This script never performs any assurance. Driven live it emits 110 events of just 14 types (of 59 the BINDINGS
+// table can emit) and ZERO of: ClaimAsserted, EvidenceProposed, EvidenceAdmitted, AssuranceAssessmentRequested,
+// AssuranceAssessmentCompleted, AssuranceObservationRecorded, AssumptionDetected, DecisionProposed,
+// DecisionEffective, BaselineCreated, BaselinePromoted, ExecutionStepStarted, ExecutionStepSucceeded — 28 event
+// types the corpus's own §26 worked trace expects (replay-conformance.test.ts pins the gap). Every assurance FACT
+// below is written directly onto the axes by ChangePwuState, with `supportingObjectIds: []` every time. Mobile &
+// Offline passes THROUGH EVIDENCE_PENDING with no evidence and ASSESSING with no assessment; its
+// CONDITIONALLY_SATISFIED is an assignment, not a verdict. The Architecture PWU reaches BASELINED with no
+// Baseline object — which collides with the ratified RPH-BAS-004 ("Missing required assessment prevents
+// promotion"). The `shapeReadinessAssessmentId: 'assess_shape'` and decision ids cited in payloads below resolve
+// to UNDEFINED: they name objects that were never created.
+//
+// So the terminal graph has the SHAPE of an assured result without the process that would earn it. The guard is
+// real where it is checked — canAdvanceWorkLifecycle refuses SATISFIED unless assuranceState says SATISFIED, and
+// that is tested end-to-end (rph-application pwu.test.ts, "Property P1 (call site)") — but BOTH fields arrive in
+// the same command, so the guard checks the caller against itself. The lock on the door is real; this script
+// carries a key.
+//
+// PRECISION, because the sloppy version of this criticism is wrong. Ratified Property P1 says executionState =
+// SUCCEEDED "must never ALONE cause" assuranceState = SATISFIED. Here it does not: an explicit command causes it.
+// So the seed does not VIOLATE P1 — it simply never demonstrates it. What the seed does contradict is a
+// convergent set of other ratified rules: §8.1's Command column contains NO command that changes assuranceState
+// (it is a precondition CONSUMED by the lifecycle transition, not produced by one); §34.2 and DOC-004 §32
+// enumerate the assurance mutators and include no generic setter; §18.1 requires every disposition to identify
+// evidence considered and criteria met; §37 requires every control action to record the evidence considered and
+// the authorizing policy — this one records `reasonCode: 'CONTROLLER'` and nothing else.
+//
+// That is defensible for a SEED whose job is to populate a demo graph, and it is not a demonstration of P1 — a
+// comment claiming otherwise turned a fixture into evidence. The real proof needs the assurance loop (DOC-004
+// §32's commands, four still absent) driving these axes instead.
+//
+// ALSO NOT PROJECTED: openResiduals. professional-work-graph.ts returns `opts.openResiduals ?? []` — the residual
+// comes from the REFERENCE_OPEN_RESIDUALS const below, not from any event. An auditor injecting an arbitrary
+// string gets it rendered verbatim. So "REPLACES the hand-authored terminal graph" is imprecise too: the open
+// residual stayed hand-authored, and it is the exact limb the old header offered as evidence.
 import type { ActorReference, DomainCommand } from '@janumipwb/rph-contracts';
 import type { EngineHandle } from './engine.js';
 

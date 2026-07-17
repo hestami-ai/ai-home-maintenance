@@ -1,7 +1,15 @@
-// M13 Reference Undertaking replay conformance — the headline end-to-end proof. Replaying the fixture's §26
-// expected event trace (72 steps) must exhibit the full professional loop: approved Intent Baseline, satisfied-
-// but-unbaselined Behavior PWU, AUTHORITATIVE Architecture Baseline, visible open offline residual, with
-// execution success NEVER implying assurance (RPH-FIX-001..006, P1, P5, P6).
+// M13 Reference Undertaking replay conformance. Replaying the fixture's §26 expected event trace (72 steps) must
+// exhibit the full professional loop: approved Intent Baseline, satisfied-but-unbaselined Behavior PWU,
+// AUTHORITATIVE Architecture Baseline, visible open offline residual, with execution success NEVER implying
+// assurance (RPH-FIX-001..006, P1, P5, P6).
+//
+// SCOPE (corrected 2026-07-17 — this file called itself "the headline end-to-end proof"). The subject here is
+// fixtures/expected-events.jsonl, a HAND-AUTHORED transcription of §26. The engine is not involved in any
+// assertion below. These tests are worth keeping — they prove the ORACLE ARTIFACT is internally coherent and
+// well-formed against the event catalog, which is a precondition for it being usable as an oracle — but they
+// prove nothing about the system. Calling that end-to-end let a real drift hide in a green suite for the file's
+// entire existence (the fixture said PwuMarkedReady at seq 20/33; the engine said PwuStateChanged; nothing
+// compared them). The engine-facing counterpart is replay-conformance.test.ts.
 import { describe, expect, it } from 'vitest';
 import { foldTerminalStates, loadExpectedEvents, runConformance, runReplay } from './index.js';
 

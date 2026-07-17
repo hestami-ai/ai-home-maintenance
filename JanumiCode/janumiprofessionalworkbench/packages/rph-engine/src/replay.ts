@@ -4,11 +4,22 @@
 // offline residual — with execution success NEVER implying assurance. Three modes (roadmap): seed (the terminal
 // canonical graph), replay (feed the event history and rebuild from it), conformance (replay + assert).
 //
-// NOTE: full stateful replay via the live command pipeline needs the command handlers deferred from M9/M10/M11
-// (a handler registry + ~20 handlers + the 8 missing commands). This harness proves the trace's END-STATE and
-// invariants directly against the authored event history + the contract event catalog — the spec's own
-// definition of replay mode (feed events, rebuild, assert), and RPH-PER-006 aggregate-replay-equivalence in
-// spirit. Driving the real commands is the remaining M13 depth (see OPEN-QUESTIONS).
+// ⚠️ READ THIS BEFORE TRUSTING ANYTHING BELOW (2026-07-17). Everything here operates on
+// fixtures/expected-events.jsonl — a HAND-AUTHORED transcription of §26. The engine is never involved. So
+// `runConformance` asserts that the fixture is consistent with itself, and replay.test.ts calling itself "the
+// headline end-to-end proof" is not accurate: no end of the system is attached to the other.
+//
+// This is not hypothetical. The fixture has said `PwuMarkedReady` at seq 20/33 since it was written; the engine
+// emitted `PwuStateChanged` there instead. The fixture agreed with the corpus, the engine disagreed with both,
+// and because nothing compared them the drift survived every green run until it was found by hand (Increment 23).
+// An oracle that cannot disagree with the system is not observing it.
+//
+// The old note here said full replay "needs the command handlers deferred from M9/M10/M11 (a handler registry +
+// ~20 handlers + the 8 missing commands)". THAT BLOCKER IS STALE — the registry and handlers exist, and
+// driveReferenceUndertaking drives the real pipeline today. The actual gap is different and larger: the engine
+// emits none of 28 event types this trace expects (the whole claim -> evidence -> assessment -> decision ->
+// baseline chain), so it CANNOT yet produce this trace. replay-conformance.test.ts points the oracle at the live
+// engine and pins that distance as a number, so it can only shrink.
 import { readFileSync } from 'node:fs';
 import { EVENTS } from '@janumipwb/rph-contracts';
 

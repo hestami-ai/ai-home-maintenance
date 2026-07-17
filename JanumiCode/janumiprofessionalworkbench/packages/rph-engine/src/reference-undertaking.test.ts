@@ -40,7 +40,20 @@ describe('Reference Undertaking driven live', () => {
 		);
 	});
 
-	it('upholds INV-5: assured PWUs are qualified-green; Mobile & Offline (conditional) is NOT', () => {
+	// RENAMED 2026-07-17. This was titled "upholds INV-5: assured PWUs are qualified-green; Mobile & Offline
+	// (conditional) is NOT". Two faults. (1) It overstated: nothing in this fixture is ASSURED — the seed assigns
+	// assuranceState via ChangePwuState with no assessment, evidence, or claim (see reference-undertaking.ts's
+	// header). A PWU whose assuranceState was ASSIGNED CONDITIONALLY_SATISFIED being reported not-qualified shows
+	// only that the projection reads the field it was handed. (2) "INV-5" is not a ratified identifier — it
+	// appears ZERO times in the corpus, which carries no numbered invariant ids at all. The ratified name is
+	// "Property P1 — Execution never implies assurance".
+	//
+	// What it DOES prove is worth keeping: qualifiedSuccess is a function of BOTH axes, so execution success alone
+	// never reads as green — the projection half, and it is real. The ENFORCEMENT half is proved end-to-end
+	// against the guard in rph-application's pwu.test.ts ("Property P1 (call site)"), added the same day, because
+	// nothing proved it before: the test that claimed to exercised an illegal arrow, which fails for a different
+	// reason and stays green with the guard deleted.
+	it('projection half of Property P1: qualifiedSuccess needs BOTH axes — execution success alone is never green', () => {
 		const { graph } = build();
 		const byId = new Map(graph.nodes.map((n) => [n.id, n]));
 
@@ -50,9 +63,9 @@ describe('Reference Undertaking driven live', () => {
 		expect(intentDef?.qualifiedSuccess).toBe(true);
 
 		const mobile = byId.get(REFERENCE_UNDERTAKING.mobileOffline);
+		// Same executionState as the node above; only the assurance axis differs — which is the whole point.
 		expect(mobile?.axes.executionState).toBe('SUCCEEDED');
 		expect(mobile?.axes.assuranceState).toBe('CONDITIONALLY_SATISFIED');
-		// Execution SUCCEEDED but assurance not SATISFIED -> not qualified-green (INV-5).
 		expect(mobile?.qualifiedSuccess).toBe(false);
 	});
 
@@ -71,9 +84,14 @@ describe('Reference Undertaking driven live', () => {
 		expect(root?.qualifiedSuccess).toBe(false);
 	});
 
-	it('is reproducible from the event log (rebuild equivalence)', () => {
+	// RENAMED 2026-07-17. This was titled "is reproducible from the event log (rebuild equivalence)". It does not
+	// touch the event log: it calls the projection twice against the SAME live engine. That is determinism, which
+	// is worth having and is what the test actually checks — but it is not rebuild equivalence, and the old title
+	// claimed the ratified property RPH-PER-006 (aggregate-replay-equivalence) was covered when nothing covers it.
+	// A real one drops the state tables, replays domain_events from seq 0, and asserts the rebuilt graph equals
+	// this one. Nothing in the repo does that today.
+	it('the projection is deterministic (NOT rebuild equivalence — see comment; RPH-PER-006 is untested)', () => {
 		const { engine, graph } = build();
-		// Rebuilding the graph from the same live engine yields the identical view.
 		const again = professionalWorkGraph(engine, { openResiduals: REFERENCE_OPEN_RESIDUALS });
 		expect(again).toEqual(graph);
 	});

@@ -2004,6 +2004,105 @@ clean · Playwright 22 passed (1 known render-timing flake, retried green).
 
 ---
 
+## PART 3i — Increment 24: the oracle could not disagree, so it never did
+
+Increment 23 ended with a loose thread: `expected-events.jsonl` had said `PwuMarkedReady` at seq 20/33 since it
+was written, the engine emitted `PwuStateChanged`, and nothing compared them. Pulling that thread found something
+much larger than a naming drift.
+
+### The engine cannot produce the corpus's own worked example
+
+Driven live, `driveReferenceUndertaking` emits **110 events of 14 types** (of 59 the BINDINGS table can emit).
+The §26 trace expects 72 events across 42 types. **28 of those types the engine never emits at all** — the whole
+of `ClaimAsserted`, `EvidenceProposed`/`Admitted`, `AssuranceAssessmentRequested`/`Completed`,
+`AssuranceObservationRecorded`, `AssumptionDetected`, `DecisionProposed`/`Effective`, `BaselineCreated`/
+`Promoted`, `ExecutionStepStarted`/`Succeeded`. In their place: **67 generic `PwuStateChanged`**, which the trace
+emits **zero** of. More events, less loop. **Volume is not coverage.**
+
+**Every assurance fact in the demo graph is assigned, not earned.** `ChangePwuState` writes `assuranceState`
+directly, `supportingObjectIds: []` every time. Mobile & Offline passes **through `EVIDENCE_PENDING` with no
+evidence and `ASSESSING` with no assessment**. Architecture reaches `BASELINED` with no Baseline object —
+colliding with ratified **RPH-BAS-004** ("Missing required assessment prevents promotion"). The
+`shapeReadinessAssessmentId: 'assess_shape'` cited in payloads resolves to **UNDEFINED**: it names an object
+never created.
+
+### C9 — I misattributed the invariant while correcting a misattribution
+
+An adversarial audit (5 agents, all CONFIRMED/MAJOR, each proving its case by running the engine) established
+something my own memory already recorded and I did anyway: **"INV-5" is not a ratified identifier. It appears
+ZERO times in the corpus, which carries no numbered invariant ids at all.** The ratified name is the Conformance
+Spec's **"## Property P1 — Execution never implies assurance"**. I wrote "INV-5" into the very test I authored to
+fix an overclaim. It is ~10 files wide in this repo; today's files are corrected, the sweep is a follow-up.
+
+**And the audit sharpened the criticism against me.** P1 says `executionState = SUCCEEDED` "must never **alone**
+cause" `assuranceState = SATISFIED`, over "**any generated legal command sequence**". Here it does not — an
+explicit command causes it. So the seed does **not violate P1**; it never demonstrates it. The sloppy version of
+this finding would have been wrong. What the seed actually contradicts is a convergent set: §8.1's Command column
+contains **no command that changes assuranceState** (it is a precondition *consumed* by the lifecycle transition,
+never produced by one); §34.2 and DOC-004 §32 enumerate the assurance mutators and include no generic setter;
+§18.1 requires every disposition to identify evidence considered and criteria met; §37 requires every control
+action to record the evidence considered and the authorizing policy — this one records `reasonCode: 'CONTROLLER'`
+and nothing else.
+
+### The hole is in the engine, not just the seed
+
+`transitions.data.ts` declares `{ from: 'ASSESSING', to: 'SATISFIED', trigger: 'AssuranceAssessmentSatisfied',
+guard: '...§18.1...' }`. **`classifyTransition` reads only `from`/`to`. The triggers and guards are decorative.**
+Any caller can walk the assurance axis to SATISFIED one legal hop at a time with no assessment. Only a *direct*
+`UNASSESSED -> SATISFIED` jump is refused.
+
+### Property P1 had no end-to-end test, and the test that claimed it was testing something else
+
+`pwu.test.ts` carried `'...PROPOSED -> SATISFIED (guard wired)'`. **`PROPOSED -> SATISFIED` is not an arrow on the
+machine at all**, so it is refused by the LEGALITY check and would be refused with the cross-axis guard deleted
+entirely. Both paths return `RPH_ILLEGAL_STATE_TRANSITION`, so the test could not tell them apart — **it proved
+legality and took credit for P1.**
+
+Added the isolating case: `UNDER_ASSURANCE -> SATISFIED` **is** legal (§8.1) with execution SUCCEEDED, so only
+the guard stands in the way. **Proven by mutation** — delete the guard, rebuild the dist, and **exactly one test
+fails: the new one.** The first mutation attempt reported the guard was *not* load-bearing; that was false —
+`rph-application` imports `rph-domain`'s **built dist**, so I had mutated a file the test never reads. Rebuilding
+is what made the mutation real.
+
+### Also corrected
+
+- **`openResiduals` is not projected at all.** `professional-work-graph.ts` returns `opts.openResiduals ?? []` —
+  a hardcoded const, derived from no event. An auditor injecting an arbitrary string gets it rendered verbatim.
+  So "REPLACES the hand-authored terminal graph" was imprecise too: the residual stayed hand-authored, and it is
+  the exact limb the old header offered as evidence.
+- **"is reproducible from the event log (rebuild equivalence)"** rebuilds nothing — it calls the projection twice
+  on the same engine. Worse than it looks: the compared axes come from `loadObject` (materialized state), so the
+  event log is not the source of the values at all. Ratified **RPH-PER-006** is untested — and it is **TRUE**: an
+  honest fold over the engine's own log reproduces all 13 PWUs' axes, 52/52, zero mismatches. It is ~15 lines
+  away. (`RPH-PER-007`'s coverage is weak by the same pattern: it asserts `rebuildProjection(stream)` equals
+  `rebuildProjection(stream)`.)
+- **`replay.ts`'s stale blocker.** It said full replay "needs the command handlers deferred from M9/M10/M11 (a
+  handler registry + ~20 handlers)". That registry exists; the note had rotted into a reason not to look.
+
+### What landed
+
+`replay-conformance.test.ts` points the oracle at the **live engine** and pins the distance: the 28 missing types,
+the absent assurance chain, the 67-vs-0 generic events, 110-vs-72. These are **characterization tests — every
+expectation is a statement of a DEFICIENCY and must only ever shrink.** Asserting conformance would have meant
+weakening the oracle until it passed, which is how the last one became decorative. Plus the P1 call-site test, and
+corrections to four false claims in comments and test names.
+
+### Gate
+
+build · `check-types` 21/21 · `test` 21/21 (rph-engine 11 files, rph-application 20) · `lint` · `boundary` ·
+`format:check` clean · Playwright 22 passed (1 known flake, retried green).
+
+### For the sponsor — the honest state of the headline claim
+
+The workbench's demonstration of "no green without assurance" is a seed that produces green with **zero assurance
+objects**. The guard is real and now genuinely tested; the loop that should feed it is not built. That is a
+defensible position for a demo — it was not a defensible thing to have written in a comment as proof, and the
+comment is what I found first. **Closing it means building the assurance loop (DOC-004 §32's commands, four still
+absent) so the axes are earned rather than assigned.** That is a program, not an increment, and it is the largest
+open item in this log.
+
+---
+
 ## PART 4 — Open questions genuinely for the sponsor
 
 *(kept deliberately short — under the 2026-07-15 mandate, a tension is work, not a question, unless it

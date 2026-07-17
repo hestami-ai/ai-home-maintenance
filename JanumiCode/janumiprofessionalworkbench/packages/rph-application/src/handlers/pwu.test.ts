@@ -140,7 +140,12 @@ describe('PWU lifecycle handlers (live command drive)', () => {
 		expect(axes.executionState).toBe('PLANNED');
 	});
 
-	it('ChangePwuState rejects an illegal lifecycle jump PROPOSED -> SATISFIED (guard wired)', () => {
+	// RETITLED 2026-07-17. This was 'ChangePwuState rejects an illegal lifecycle jump PROPOSED -> SATISFIED
+	// (guard wired)'. The "(guard wired)" was an overclaim: PROPOSED -> SATISFIED is not an arrow on the machine
+	// at all (DOC-002 §8.1 has no such row), so it is rejected by the LEGALITY check and would be rejected with
+	// the cross-axis guard deleted entirely. Both failures return RPH_ILLEGAL_STATE_TRANSITION, so this test
+	// cannot tell them apart — it proved legality and took credit for INV-5. The real thing is below.
+	it('ChangePwuState rejects a lifecycle jump that is not an arrow on the machine (PROPOSED -> SATISFIED)', () => {
 		seedIntent();
 		engine.dispatch(cmd('ProposePwu', proposePayload()));
 		const r = engine.dispatch(
@@ -153,6 +158,89 @@ describe('PWU lifecycle handlers (live command drive)', () => {
 		);
 		expect(r.status).toBe('REJECTED');
 		expect(r.error?.code).toBe('RPH_ILLEGAL_STATE_TRANSITION');
+	});
+
+	// PROPERTY P1 — the headline property, end-to-end through the live pipeline. Added 2026-07-17: the cross-axis
+	// guard was unit-tested in rph-domain (pwuGuards.test.ts) but NOTHING proved it was wired at the call site.
+	// The one test that claimed to (above) exercised a different rejection path — verified by mutation: delete
+	// the guard and rebuild, and ONLY this test goes red.
+	//
+	// NAMING (this codebase says "INV-5" ~10 files wide; it is not a ratified identifier — "INV-5" appears ZERO
+	// times in the corpus, which carries no numbered invariant ids at all). The ratified name is the Executable
+	// Invariant and Conformance Test Specification's "## Property P1 — Execution never implies assurance":
+	//     "For any generated legal command sequence:  executionState = SUCCEEDED  must never alone cause:
+	//      assuranceState = SATISFIED"
+	//
+	// Read P1 exactly: "must never ALONE cause", over "ANY generated legal command sequence". So this test does
+	// not discharge P1 — one scripted path cannot discharge a property quantified over all sequences; that wants
+	// a generator. What it does prove is the specific guard at the specific call site, which is the thing that
+	// had no coverage.
+	//
+	// UNDER_ASSURANCE -> SATISFIED IS a legal arrow (DOC-002 §8.1: "UNDER_ASSURANCE | Satisfy | SATISFIED |
+	// Assurance state is SATISFIED") and execution has SUCCEEDED, so only the cross-axis guard stands between
+	// this command and a PWU that reads green unassured. That is what makes it the isolating case.
+	it('Property P1 (call site): a LEGAL arrow to SATISFIED is refused when assurance has not satisfied, despite execution success', () => {
+		seedIntent();
+		engine.dispatch(cmd('ProposePwu', proposePayload()));
+		engine.dispatch(cmd('BeginPwuShaping', {}));
+		engine.dispatch(
+			cmd('MarkPwuReady', { shapeReadinessAssessmentId: 'assess_x', expectedSemanticVersion: 1 })
+		);
+		// Walk the ratified §8.1 path to the edge of the decision: READY -> PLANNED -> EXECUTING ->
+		// EVIDENCE_PENDING -> UNDER_ASSURANCE, with execution genuinely SUCCEEDED.
+		const step = (over: Record<string, unknown>): void => {
+			const r = engine.dispatch(change(over));
+			expect(r.status, `setup step failed: ${r.error?.message}`).toBe('ACCEPTED');
+		};
+		step({ previousState: 'READY', newState: 'PLANNED', executionState: 'PLANNED' });
+		step({ previousState: 'PLANNED', newState: 'EXECUTING', executionState: 'QUEUED' });
+		step({ previousState: 'EXECUTING', newState: 'EXECUTING', executionState: 'RUNNING' });
+		step({
+			previousState: 'EXECUTING',
+			newState: 'EVIDENCE_PENDING',
+			executionState: 'SUCCEEDED',
+			assuranceState: 'EVIDENCE_REQUIRED'
+		});
+		step({
+			previousState: 'EVIDENCE_PENDING',
+			newState: 'UNDER_ASSURANCE',
+			executionState: 'SUCCEEDED',
+			assuranceState: 'READY_FOR_ASSESSMENT'
+		});
+		step({
+			previousState: 'UNDER_ASSURANCE',
+			newState: 'UNDER_ASSURANCE',
+			executionState: 'SUCCEEDED',
+			assuranceState: 'ASSESSING'
+		});
+
+		// The attempt: claim SATISFIED while the assessment is still ASSESSING. Execution succeeded — the work is
+		// "done". INV-5 says done is not assured.
+		const r = engine.dispatch(
+			change({
+				previousState: 'UNDER_ASSURANCE',
+				newState: 'SATISFIED',
+				executionState: 'SUCCEEDED',
+				assuranceState: 'ASSESSING'
+			})
+		);
+		expect(r.status, 'execution success must never imply assurance').toBe('REJECTED');
+		expect(r.error?.code).toBe('RPH_ILLEGAL_STATE_TRANSITION');
+		expect(r.error?.message).toContain('cross-axis guard');
+		expect(lifecycle(), 'the PWU must not have moved').toBe('UNDER_ASSURANCE');
+
+		// And the same arrow IS permitted once assurance actually satisfies — otherwise the test above could pass
+		// because the arrow is simply unreachable, which would prove nothing.
+		const ok = engine.dispatch(
+			change({
+				previousState: 'UNDER_ASSURANCE',
+				newState: 'SATISFIED',
+				executionState: 'SUCCEEDED',
+				assuranceState: 'SATISFIED'
+			})
+		);
+		expect(ok.status, ok.error?.message).toBe('ACCEPTED');
+		expect(lifecycle()).toBe('SATISFIED');
 	});
 
 	it('ChangePwuState rejects a stale previousState', () => {
