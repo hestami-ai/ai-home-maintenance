@@ -199,8 +199,38 @@ for (const e of spec.events) {
 		`\t${j(e.eventType)}: { payload: ${e.eventType}PayloadSchema, aggregateType: ${j(e.aggregateType ?? '')} },`
 	);
 }
+body.push('} as const;', '');
+
+// RATIFIED_EVENT_PAYLOADS — the events whose payload the CORPUS actually schematizes.
+//
+// DERIVED FROM PROVENANCE, never hand-kept. An event is in iff BOTH hold:
+//   (1) its vocab `sourceSection` exists and is NOT marked UNRATIFIED-AUTHORED. 92 of the 122 carry that marker
+//       verbatim — "DOC-007 schematizes NO interface for this, so these fields were AUTHORED, not derived ... Do
+//       NOT treat this sourceSection as proof the shape is ratified" (§16 item 6: the first slice deliberately
+//       leaves the granular vocabulary unschematized); and
+//   (2) it has at least one `payloadFields` entry. A CITATION IS NOT AN INTERFACE: the five PWA-authoring events
+//       cite "RPH-DOC-010 (PWA authoring)", but that section ("# 20. PWA publication flow") is a state diagram —
+//       it names no field. Their `payloadFields: []` emits `z.strictObject({})`, which means "nobody specified
+//       this", NOT "this payload is empty". Condition (1) alone would let them in and the gate would then reject
+//       PublishPwa for the extra key `rootPwuTypeId` — forcing a handler to STRIP a real field, recorded in the
+//       object state, to satisfy the absence of a spec. That is the inverse of the defect this gate exists for.
+//
+// A hand-kept list would rot into exactly that. This one cannot: annotating a vocab entry UNRATIFIED-AUTHORED,
+// or an entry having no payloadFields, removes it from enforcement on the next `bun run gen`.
 body.push(
-	'} as const;',
+	'/** Payload schemas for the events the corpus actually SCHEMATIZES (vocab sourceSection present and not',
+	' *  UNRATIFIED-AUTHORED). Derived from provenance by gen-messages — the kit gate enforces exactly these, so',
+	' *  that marking an entry UNRATIFIED-AUTHORED in the vocab removes it from enforcement on the next gen. */',
+	'export const RATIFIED_EVENT_PAYLOADS: Record<string, z.ZodType | undefined> = {'
+);
+for (const e of spec.events) {
+	const src = (e as { sourceSection?: string }).sourceSection ?? '';
+	if (!src || src.includes('UNRATIFIED-AUTHORED')) continue;
+	if ((e.payloadFields ?? []).length === 0) continue; // a citation is not an interface — see above
+	body.push(`\t${j(e.eventType)}: ${e.eventType}PayloadSchema,`);
+}
+body.push(
+	'};',
 	'',
 	'export interface CommandEventBinding {',
 	'\treadonly commandType: string;',

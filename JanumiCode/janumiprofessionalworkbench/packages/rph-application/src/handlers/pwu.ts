@@ -9,7 +9,9 @@
 import type {
 	ChangePwuStatePayload,
 	DomainCommand,
-	ProposePwuPayload
+	ProposePwuPayload,
+	PwuProposedPayload,
+	PwuStateChangedPayload
 } from '@janumipwb/rph-contracts';
 import {
 	canAdvanceWorkLifecycle,
@@ -70,6 +72,13 @@ export const proposePwu: CommandHandler = (ctx, command, payload) => {
 	}
 	const ts = command.issuedAt;
 	const actor = command.issuedBy;
+	// PWU-001 seeded axes — one source for both the object state and the §11.3 event payload, so they cannot drift.
+	const seededAxes = {
+		workLifecycleState: 'PROPOSED',
+		executionState: 'NOT_PLANNED',
+		assuranceState: 'UNASSESSED',
+		shapeIntegrityState: 'UNKNOWN'
+	} as const;
 	const pwu: Record<string, unknown> = {
 		id: p.pwuId,
 		objectType: PWU,
@@ -106,18 +115,28 @@ export const proposePwu: CommandHandler = (ctx, command, payload) => {
 		evidenceRequirementIds: [],
 		verificationCriterionIds: [],
 		assurancePolicyIds: p.assurancePolicyIds,
-		workLifecycleState: 'PROPOSED',
-		executionState: 'NOT_PLANNED',
-		assuranceState: 'UNASSESSED',
-		shapeIntegrityState: 'UNKNOWN',
+		...seededAxes,
 		riskProfile: p.riskProfile
+	};
+	// DOC-007 §11.3: the event payload is the identity + seeded-axes projection, not the ProposePwu command payload
+	// (which is what this emitted: it carried description/boundaries/obligationIds/constraintIds/assumptionIds/
+	// expectedOutputs/assurancePolicyIds/riskProfile and no axes at all — every one an unrecognized key against the
+	// strictObject). §11.3's prose also lists undertakingId/pwuTypeId/isLocalExtension, but the generated
+	// PwuProposedPayloadSchema omits all three, and the schema is what runs: emitting them would fail as extra keys.
+	const proposedPayload: PwuProposedPayload = {
+		pwuId: p.pwuId,
+		pwuKind: p.pwuKind,
+		title: p.title,
+		intentId: p.intentId,
+		...(p.parentWorkUnitId ? { parentWorkUnitId: p.parentWorkUnitId } : {}),
+		...seededAxes
 	};
 	const event = makeEvent(ctx, command, {
 		eventType: 'PwuProposed',
 		aggregateType: PWU,
 		aggregateId: p.pwuId,
 		aggregateRevision: 0,
-		payload
+		payload: proposedPayload
 	});
 	return commitState(ctx, command, {
 		objectType: PWU,
@@ -306,12 +325,16 @@ export const changePwuState: CommandHandler = (ctx, command, payload) => {
 		assuranceState: p.assuranceState,
 		shapeIntegrityState: p.shapeIntegrityState
 	};
+	// DOC-007 §11.5: passthrough is conformant HERE and only here — ChangePwuStatePayload is field-identical to
+	// PwuStateChangedPayload (the same 7 fields, same enums), so the command payload already satisfies the event
+	// schema. It is NOT conformant at the other PwuStateChanged site: markPwuReady emits this event carrying a
+	// MarkPwuReadyPayload, which shares none of the 7 fields — unfixed, as reasonCode is not derivable there.
 	const event = makeEvent(ctx, command, {
 		eventType: 'PwuStateChanged',
 		aggregateType: PWU,
 		aggregateId: id,
 		aggregateRevision: newRevision,
-		payload
+		payload: p satisfies PwuStateChangedPayload
 	});
 	return commitState(ctx, command, {
 		objectType: PWU,

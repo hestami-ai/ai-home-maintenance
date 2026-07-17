@@ -6,7 +6,14 @@
 // (start/complete/fail/retry) mutate the embedded steps[] array on the plan aggregate, each gated by the
 // ExecutionStep.stepState machine + the execution kernel (a succeeded step must record a result, RPH-EXE-006;
 // step success ≠ PWU success, §21.1).
-import type { DomainCommand, ProposeExecutionPlanPayload } from '@janumipwb/rph-contracts';
+import type {
+	ActivateExecutionPlanPayload,
+	CompleteExecutionStepPayload,
+	DomainCommand,
+	ExecutionPlanActivatedPayload,
+	ExecutionStepSucceededPayload,
+	ProposeExecutionPlanPayload
+} from '@janumipwb/rph-contracts';
 import { canActivatePlan, validateStepCompletion } from '@janumipwb/rph-domain';
 import {
 	advanceStatus,
@@ -114,6 +121,19 @@ export const activateExecutionPlan: CommandHandler = (ctx, command) =>
 		machine: MACHINE,
 		target: 'ACTIVE',
 		eventType: 'ExecutionPlanActivated',
+		// DOC-007 §15.3 ExecutionPlanActivatedPayload. This emitted the raw ActivateExecutionPlan command payload
+		// (§15.2: { approvalDecisionId?, authorizedRuntimeBindingIds }) — three ratified fields missing
+		// (executionPlanId, workUnitId, planVersion), `status` missing, and approvalDecisionId extra: §15.3 does not
+		// define it, and the schema is strict. Every field derives: the ids/version from the plan aggregate the
+		// transition just produced, the bindings from the command, `status` is §15.3's const (= this call's target).
+		eventPayload: (next): ExecutionPlanActivatedPayload => ({
+			executionPlanId: command.targetAggregateId,
+			workUnitId: String(next.workUnitId),
+			planVersion: Number(next.planVersion),
+			status: 'ACTIVE',
+			authorizedRuntimeBindingIds: (command.payload as ActivateExecutionPlanPayload)
+				.authorizedRuntimeBindingIds
+		}),
 		guard: (state, hctx) => {
 			const otherActivePlanExists = otherActivePlanExistsForPwu(
 				hctx,
@@ -174,6 +194,9 @@ function advanceStep(
 			plan: Record<string, unknown>
 		) => ReturnType<typeof reject> | null;
 		readonly mutateStep?: (step: Record<string, unknown>) => Record<string, unknown>;
+		/** The EVENT payload. Omitted → the raw command payload (the default for the step events DOC-007 leaves
+		 * unschematized). Mirrors kit.advanceStatus's `eventPayload`: the command shape is not the event shape. */
+		readonly eventPayload?: unknown;
 	}
 ) {
 	const planId = command.targetAggregateId;
@@ -203,7 +226,7 @@ function advanceStep(
 		aggregateType: PLAN,
 		aggregateId: planId,
 		aggregateRevision: newRevision,
-		payload: command.payload
+		payload: args.eventPayload !== undefined ? args.eventPayload : command.payload
 	});
 	return commitState(ctx, command, {
 		objectType: PLAN,
@@ -237,15 +260,28 @@ export const startExecutionStep: CommandHandler = (ctx, command) => {
 /** CompleteExecutionStep — a step RUNNING -> SUCCEEDED. Must record an output or an explicit no-output result
  * (RPH-EXE-006); step success drives the EXECUTION dimension only — never assurance (INV-5). */
 export const completeExecutionStep: CommandHandler = (ctx, command) => {
-	const p = command.payload as {
-		executionStepId: string;
-		outputArtifactIds?: string[];
-		proposedEvidenceIds?: string[];
-	};
+	// The ratified §16.1 command type, not a local structural guess: the bus validates the payload against
+	// CompleteExecutionStepPayloadSchema before this runs, so executionAttemptId/detectedAssumptionIds (which the
+	// old cast omitted) and the two id arrays (which it wrongly made optional) are all guaranteed present.
+	const p = command.payload as CompleteExecutionStepPayload;
 	return advanceStep(ctx, command, {
 		stepId: p.executionStepId,
 		target: 'SUCCEEDED',
 		eventType: 'ExecutionStepSucceeded',
+		// DOC-007 §16.2 ExecutionStepSucceededPayload. This emitted the raw CompleteExecutionStep command payload
+		// (§16.1), which carries three keys §16.2 does not define — resultStatus, structuredResult,
+		// executionProvenance — and lacked resultingExecutionState; the schema is strict, so the extras fail too.
+		// The five id/ref fields are the command's own (§16.1 and §16.2 share them verbatim);
+		// resultingExecutionState is §16.2's const, and is the EXECUTION dimension only — §16.2 L1244 / INV-5:
+		// step success never implies assuranceState=SATISFIED.
+		eventPayload: {
+			executionStepId: p.executionStepId,
+			executionAttemptId: p.executionAttemptId,
+			outputArtifactIds: p.outputArtifactIds,
+			proposedEvidenceIds: p.proposedEvidenceIds,
+			detectedAssumptionIds: p.detectedAssumptionIds,
+			resultingExecutionState: 'SUCCEEDED'
+		} satisfies ExecutionStepSucceededPayload,
 		precheck: (step) => {
 			const hasOutput =
 				(p.outputArtifactIds?.length ?? 0) > 0 || (p.proposedEvidenceIds?.length ?? 0) > 0;

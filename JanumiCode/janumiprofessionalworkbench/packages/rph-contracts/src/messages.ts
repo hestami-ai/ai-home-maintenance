@@ -2123,6 +2123,27 @@ export const EVENTS = {
 	}
 } as const;
 
+/** Payload schemas for the events the corpus actually SCHEMATIZES (vocab sourceSection present and not
+ *  UNRATIFIED-AUTHORED). Derived from provenance by gen-messages — the kit gate enforces exactly these, so
+ *  that marking an entry UNRATIFIED-AUTHORED in the vocab removes it from enforcement on the next gen. */
+export const RATIFIED_EVENT_PAYLOADS: Record<string, z.ZodType | undefined> = {
+	AssumptionDetected: AssumptionDetectedPayloadSchema,
+	AssumptionFalsified: AssumptionFalsifiedPayloadSchema,
+	AssuranceAssessmentCompleted: AssuranceAssessmentCompletedPayloadSchema,
+	AssuranceObservationRecorded: AssuranceObservationRecordedPayloadSchema,
+	BaselinePromoted: BaselinePromotedPayloadSchema,
+	ClaimAsserted: ClaimAssertedPayloadSchema,
+	DecisionEffective: DecisionEffectivePayloadSchema,
+	EvidenceAdmitted: EvidenceAdmittedPayloadSchema,
+	ExecutionPlanActivated: ExecutionPlanActivatedPayloadSchema,
+	ExecutionStepSucceeded: ExecutionStepSucceededPayloadSchema,
+	IntentApproved: IntentApprovedPayloadSchema,
+	IntentCaptured: IntentCapturedPayloadSchema,
+	IntentFormalized: IntentFormalizedPayloadSchema,
+	PwuProposed: PwuProposedPayloadSchema,
+	PwuStateChanged: PwuStateChangedPayloadSchema
+};
+
 export interface CommandEventBinding {
 	readonly commandType: string;
 	readonly eventType: string;

@@ -6,7 +6,11 @@
 // "no green without assurance", INV-20 / P7 immutability afterwards).
 import type {
 	ApproveDecisionPayload,
+	BaselineObject,
+	BaselinePromotedPayload,
 	CreateBaselinePayload,
+	DecisionEffectivePayload,
+	DecisionObject,
 	DomainCommand,
 	ProposeDecisionPayload,
 	PromoteBaselinePayload,
@@ -161,7 +165,28 @@ function makeDecisionEffective(
 				}
 				return null;
 			},
-			mutate: (base) => (extraMutate ? extraMutate(base, command) : base)
+			mutate: (base) => (extraMutate ? extraMutate(base, command) : base),
+			// DOC-007 §22.2 "Decision effective event". This emitted the raw ApproveDecision COMMAND payload —
+			// {selectedOption, rationale, consideredEvidenceIds, consideredObservationIds, subjectSemanticVersions} —
+			// which fails §22.2 with FOUR missing fields (decisionId, decisionType, subjectObjectIds, effectiveAt)
+			// and two unrecognized keys. That is load-bearing, not cosmetic: replay.ts asserts DecisionEffective
+			// precedes the authoritative BaselinePromoted (RPH-GOV-003 / property P5), so the governance approval's
+			// audit record was missing the very fields that bind the approval to the subject objects and versions it
+			// approved. Every value is read from the committed next state, which commitState validates against
+			// DecisionObjectSchema before anything is emitted.
+			eventPayload: (next) => {
+				const d = next as unknown as DecisionObject;
+				const event: DecisionEffectivePayload = {
+					decisionId: d.id,
+					decisionType: d.decisionType,
+					subjectObjectIds: d.subjectObjectIds,
+					subjectSemanticVersions: d.subjectSemanticVersions,
+					selectedOption: d.selectedOption ?? '',
+					rationale: d.rationale ?? '',
+					effectiveAt: d.effectiveAt ?? command.issuedAt
+				};
+				return event;
+			}
 		});
 }
 
@@ -382,7 +407,27 @@ export const promoteBaseline: CommandHandler = (ctx, command, payload) => {
 			}
 			return null;
 		},
-		mutate: (base) => ({ ...base, promotionDecisionId: p.promotionDecisionId })
+		mutate: (base) => ({ ...base, promotionDecisionId: p.promotionDecisionId }),
+		// DOC-007 §23.2 BaselinePromotedPayload. Emitted the raw COMMAND payload
+		// ({promotionDecisionId, expectedItemObjectVersions, requiredAssessmentIds}) — three of its keys are not in
+		// the ratified interface and five of the interface's six fields were absent. Read from the promoted state,
+		// already validated against BaselineObjectSchema: `itemObjectVersions` is what the Baseline FROZE at
+		// CreateBaseline, not the promoting command's `expectedItemObjectVersions` (a narrowed payload must not
+		// narrow what the log records as baselined) — same object-over-payload rule the guard applies above.
+		eventPayload: (next) => {
+			// `next` is about to be validated against BaselineObjectSchema by commitState — it does not commit, and
+			// so never emits, if these reads are not a valid Baseline.
+			const b = next as unknown as BaselineObject;
+			const event: BaselinePromotedPayload = {
+				baselineId: b.id,
+				baselineType: b.baselineType,
+				promotionDecisionId: b.promotionDecisionId,
+				itemObjectVersions: b.itemObjectVersions,
+				assuranceAssessmentIds: b.assuranceAssessmentIds,
+				status: b.status
+			};
+			return event;
+		}
 	});
 };
 

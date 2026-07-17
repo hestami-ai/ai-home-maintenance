@@ -218,6 +218,30 @@ export function commitState(
 			error: stateCheck.error
 		};
 	}
+	// (d2) THE EVENT GATE — BUILT, DERIVED, AND PARKED ONE STEP FROM LIVE.
+	//
+	// The append-only event log IS the governed stream: the audit record, the replay source, the only durable
+	// account of why the system did what it did. Nothing validates an event payload — the pipeline checks the
+	// COMMAND payload (command-bus.ts) and the PRODUCED STATE (above) and leaves the one artifact that cannot be
+	// fixed later unchecked, because replay reconstructs state FROM it. A malformed event is not a bad request;
+	// it is a permanently wrong history.
+	//
+	// Turning this on is one line:
+	//     const ratified = RATIFIED_EVENT_PAYLOADS[args.event.eventType];
+	//     if (ratified) { ...validateAgainst(ratified, args.event.payload) -> REJECT on failure... }
+	//
+	// WHY IT IS NOT LIVE. Exactly one handler still emits a non-conformant RATIFIED event: `markPwuReady` emits
+	// `PwuStateChanged` (DOC-007 §11.5, seven fields) and cannot fill `reasonCode`. Six of the seven derive from
+	// the loaded aggregate's axes; `reasonCode` does not — MarkPwuReady's command carries no reason, DOC-007
+	// types it a bare `string` with NO ratified vocabulary, and the only values in existence are ad-hoc
+	// 'CONTROLLER' literals in a test and the reference undertaking. Minting one ('MARK_READY') would fabricate
+	// an audit REASON that nothing ratifies and no caller supplied — inventing the very kind of governance fact
+	// this gate exists to protect. That is a sponsor decision (add `reasonCode` to the MarkPwuReady payload, or
+	// ratify a reasonCode vocabulary), not a fix. HARMONIZATION-LOG PART 3g.
+	//
+	// The other 17 ratified events DO conform as of this commit. `RATIFIED_EVENT_PAYLOADS` is DERIVED from vocab
+	// provenance by gen-messages (sourceSection present, not UNRATIFIED-AUTHORED, and payloadFields non-empty) —
+	// never hand-kept, so it cannot rot into an allowlist.
 	// (e) Assemble the atomic commit (state + event + outbox + receipt).
 	const input: CommitInput = {
 		aggregateType: args.objectType,
@@ -315,6 +339,9 @@ export function createObject(
 		readonly aggregateId: string;
 		readonly state: Record<string, unknown>;
 		readonly eventType: string;
+		/** The event's ratified DOC-007 payload. Omitted → the raw command payload (the legacy pass-through, which
+		 *  for a schematized event is a different shape than the one DOC-007 ratifies). */
+		readonly eventPayload?: unknown;
 	}
 ): CommandResult {
 	const event = makeEvent(ctx, command, {
@@ -322,7 +349,7 @@ export function createObject(
 		aggregateType: args.objectType,
 		aggregateId: args.aggregateId,
 		aggregateRevision: 0,
-		payload: command.payload
+		payload: args.eventPayload ?? command.payload
 	});
 	return commitState(ctx, command, {
 		objectType: args.objectType,
@@ -340,6 +367,11 @@ export function createObject(
  * -> transition legality (checkTransition on `machine`) -> set the status field (+ mirror lifecycleStatus) ->
  * commit. Covers the many "guarded single-status transition" commands compactly. `guard` runs a domain kernel
  * check (returns a rejecting CommandResult or null); `mutate` applies payload-derived field updates.
+ *
+ * `eventPayload` builds the EVENT payload from the committed next state; omitted, the event carries the raw
+ * COMMAND payload (the long-standing default). The command payload is NOT the event payload: where DOC-007
+ * ratifies an event's interface the two shapes differ, and the event log is the audit + replay source. Callers
+ * whose event interface is ratified supply this; the rest keep the default until theirs is schematized.
  */
 export function advanceStatus(
 	ctx: HandlerContext,
@@ -353,6 +385,8 @@ export function advanceStatus(
 		readonly setLifecycleStatus?: boolean;
 		readonly guard?: (state: Record<string, unknown>, ctx: HandlerContext) => CommandResult | null;
 		readonly mutate?: (base: Record<string, unknown>) => Record<string, unknown>;
+		/** Build the event payload from the committed next state. Omitted → the raw command payload. */
+		readonly eventPayload?: (nextState: Record<string, unknown>) => unknown;
 		readonly bumpSemanticVersion?: boolean;
 	}
 ): CommandResult {
@@ -385,7 +419,7 @@ export function advanceStatus(
 		aggregateType: args.objectType,
 		aggregateId: id,
 		aggregateRevision: newRevision,
-		payload: command.payload
+		payload: args.eventPayload ? args.eventPayload(next) : command.payload
 	});
 	return commitState(ctx, command, {
 		objectType: args.objectType,

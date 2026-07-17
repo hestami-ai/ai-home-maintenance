@@ -3,6 +3,7 @@
 // each gated by the state machine (checkTransition) and, for approval, the INT-004 invariant (an approved intent
 // must carry at least one desired outcome — DOC-008 INT-004 / DOC-002 §6.3).
 import type {
+	ApproveIntentPayload,
 	CaptureIntentPayload,
 	DomainCommand,
 	FormalizeIntentPayload,
@@ -52,12 +53,20 @@ export const captureIntent: CommandHandler = (ctx, command, payload) => {
 		stakeholderIds: [],
 		intentStatus: 'RAW'
 	};
+	// Event payload per DOC-007 §10.3 (IntentCapturedPayload) — was the raw CaptureIntent command payload, which
+	// lacks intentStatus. The command's four fields carry over; intentStatus is the 'RAW' the transition lands on.
 	const event = makeEvent(ctx, command, {
 		eventType: 'IntentCaptured',
 		aggregateType: INTENT,
 		aggregateId: p.intentId,
 		aggregateRevision: 0,
-		payload
+		payload: {
+			intentId: p.intentId,
+			originatingExpression: p.originatingExpression,
+			intentStatus: 'RAW',
+			ontologyId: p.ontologyId,
+			ontologyVersion: p.ontologyVersion
+		}
 	});
 	return commitState(ctx, command, {
 		objectType: INTENT,
@@ -80,6 +89,12 @@ function advanceIntent(
 		readonly mutate?: (current: Record<string, unknown>) => Record<string, unknown>;
 		readonly precheck?: (current: Record<string, unknown>) => CommandHandlerReject | null;
 		readonly bumpSemanticVersion?: boolean;
+		/** Build the EVENT payload from the loaded semantic versions. Omitted = pass the command payload through
+		 * (correct only where DOC-007 schematizes no event interface — the caller must have checked). */
+		readonly eventPayload?: (versions: {
+			readonly prior: number;
+			readonly next: number;
+		}) => unknown;
 	}
 ) {
 	const id = command.targetAggregateId;
@@ -107,7 +122,9 @@ function advanceIntent(
 		aggregateType: INTENT,
 		aggregateId: id,
 		aggregateRevision: newRevision,
-		payload: command.payload
+		payload: args.eventPayload
+			? args.eventPayload({ prior: loaded.semanticVersion, next: newSemanticVersion })
+			: command.payload
 	});
 	return commitState(ctx, command, {
 		objectType: INTENT,
@@ -139,30 +156,51 @@ export const provisionIntent: CommandHandler = (ctx, command, payload) =>
 	});
 
 /** FormalizeIntent — PROVISIONAL -> FORMALIZED (records objective, outcomes, conditions, non-goals). */
-export const formalizeIntent: CommandHandler = (ctx, command, payload) =>
-	advanceIntent(ctx, command, {
+export const formalizeIntent: CommandHandler = (ctx, command, payload) => {
+	const p = payload as FormalizeIntentPayload;
+	return advanceIntent(ctx, command, {
 		target: 'FORMALIZED',
 		eventType: 'IntentFormalized',
-		mutate: (c) => {
-			const p = payload as FormalizeIntentPayload;
-			return {
-				...c,
-				formalizedObjective: p.formalizedObjective,
-				desiredOutcomes: p.desiredOutcomes,
-				successConditions: p.successConditions,
-				nonGoals: p.nonGoals,
-				ambiguityIds: p.ambiguityIds,
-				constraintIds: p.constraintIds,
-				stakeholderIds: p.stakeholderIds
-			};
-		}
+		mutate: (c) => ({
+			...c,
+			formalizedObjective: p.formalizedObjective,
+			desiredOutcomes: p.desiredOutcomes,
+			successConditions: p.successConditions,
+			nonGoals: p.nonGoals,
+			ambiguityIds: p.ambiguityIds,
+			constraintIds: p.constraintIds,
+			stakeholderIds: p.stakeholderIds
+		}),
+		// Event payload per DOC-007 §10.5 (IntentFormalizedPayload) — was the raw FormalizeIntent command payload,
+		// which lacks the two semanticVersion fields + intentStatus and carries three ids the event does not
+		// schematize (ambiguityIds/constraintIds/stakeholderIds — they land on the OBJECT via mutate, not the event).
+		// prior === next here: FORMALIZED is not a material change, so this command does not bump (no
+		// bumpSemanticVersion), and the event reports the versions the handler actually has.
+		eventPayload: (v) => ({
+			priorSemanticVersion: v.prior,
+			newSemanticVersion: v.next,
+			formalizedObjective: p.formalizedObjective,
+			desiredOutcomes: p.desiredOutcomes,
+			successConditions: p.successConditions,
+			nonGoals: p.nonGoals,
+			intentStatus: 'FORMALIZED'
+		})
 	});
+};
 
 /** ApproveIntent — FORMALIZED|REVISED -> APPROVED. Enforces INT-004: an approved intent needs a desired outcome. */
-export const approveIntent: CommandHandler = (ctx, command) =>
-	advanceIntent(ctx, command, {
+export const approveIntent: CommandHandler = (ctx, command, payload) => {
+	const p = payload as ApproveIntentPayload;
+	return advanceIntent(ctx, command, {
 		target: 'APPROVED',
 		eventType: 'IntentApproved',
+		// Event payload per DOC-007 §10.7 (IntentApprovedPayload) — was the raw ApproveIntent command payload, which
+		// lacks intentStatus and carries approvalScope, a command-only field the event does not schematize.
+		eventPayload: () => ({
+			decisionId: p.decisionId,
+			approvedSemanticVersion: p.approvedSemanticVersion,
+			intentStatus: 'APPROVED'
+		}),
 		precheck: (current) => {
 			const outcomes = current.desiredOutcomes;
 			if (!Array.isArray(outcomes) || outcomes.length === 0) {
@@ -175,6 +213,7 @@ export const approveIntent: CommandHandler = (ctx, command) =>
 			return null;
 		}
 	});
+};
 
 /** ReviseIntent — APPROVED -> REVISED (a material change: increments the semantic version, DOC-002 §6.3). */
 export const reviseIntent: CommandHandler = (ctx, command) =>

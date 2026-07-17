@@ -8,6 +8,7 @@
 import { evidenceAdmissibility } from '@janumipwb/rph-assurance';
 import type {
 	ActorReference,
+	AdmitEvidencePayload,
 	AssertClaimPayload,
 	CreateAssurancePolicyPayload,
 	DetectAssumptionPayload,
@@ -244,13 +245,24 @@ export const proposeEvidence: CommandHandler = (ctx, command, payload) => {
  * defect this fixes. The 6 conditions the accepted contract can answer are enforced; the 2 it cannot are left
  * to the floor, which has the policy context.
  */
-export const admitEvidence: CommandHandler = (ctx, command) =>
-	advanceStatus(ctx, command, {
+export const admitEvidence: CommandHandler = (ctx, command, payload) => {
+	const p = payload as AdmitEvidencePayload;
+	return advanceStatus(ctx, command, {
 		objectType: EVIDENCE,
 		statusField: 'status',
 		machine: 'Evidence.status',
 		target: 'ADMISSIBLE',
 		eventType: 'EvidenceAdmitted',
+		// §14.3 EvidenceAdmittedPayload — was the raw AdmitEvidence command payload (admissibilityAssessmentId /
+		// admittedScope / admittedClaimIds, which §14.3 does want, verbatim). Delta: + evidenceId (the target
+		// aggregate id), + status ('ADMISSIBLE' — the transition this handler just proved legal and admissible).
+		eventPayload: () => ({
+			evidenceId: command.targetAggregateId,
+			status: 'ADMISSIBLE',
+			admissibilityAssessmentId: p.admissibilityAssessmentId,
+			admittedScope: p.admittedScope,
+			admittedClaimIds: p.admittedClaimIds
+		}),
 		guard: (state) => {
 			const verdict = evidenceAdmissibility({
 				id: String(state.id ?? ''),
@@ -271,6 +283,7 @@ export const admitEvidence: CommandHandler = (ctx, command) =>
 					);
 		}
 	});
+};
 
 /** InvalidateEvidence — ADMISSIBLE -> INVALIDATED (P4: dependent claims are re-contested by the controller). */
 export const invalidateEvidence: CommandHandler = (ctx, command) =>
@@ -299,11 +312,24 @@ export const assertClaim: CommandHandler = (ctx, command, payload) => {
 		contradictingEvidenceIds: p.contradictingEvidenceIds ?? [],
 		status: 'OPEN'
 	};
+	// §13.1 ClaimAssertedPayload — was the raw AssertClaim command payload. Delta: + claimId (the command's target
+	// aggregate id — the command carries the claim id in the envelope, not the payload), + assertedBy
+	// (command.issuedBy, the same value the state records), + status ('OPEN'); - supportingEvidenceIds /
+	// - contradictingEvidenceIds (accepted by the command, not defined by §13.1 — a strictObject rejects them as
+	// extra keys; they persist on the object state, which is where the claim's evidence links live).
 	return createObject(ctx, command, {
 		objectType: CLAIM,
 		aggregateId: id,
 		state,
-		eventType: 'ClaimAsserted'
+		eventType: 'ClaimAsserted',
+		eventPayload: {
+			claimId: id,
+			statement: p.statement,
+			claimType: p.claimType,
+			subjectObjectIds: p.subjectObjectIds,
+			assertedBy: command.issuedBy,
+			status: 'OPEN'
+		}
 	});
 };
 
@@ -325,11 +351,33 @@ export const detectAssumption: CommandHandler = (ctx, command, payload) => {
 		materiality: p.materiality,
 		status: 'PROPOSED'
 	};
+	// §12.2 AssumptionDetectedPayload — was the raw DetectAssumption command payload, which carries every §12.2
+	// field EXCEPT `status`. Delta: + status only; the other eight are the command's, 1:1.
+	//
+	// The value is the object's own (PROPOSED), not §12.2's literal `status: 'DISCLOSED'`. §12.2 writes that
+	// literal, but this command creates the Assumption in PROPOSED and the generated schema is the
+	// AssumptionStatus enum, not a literal — so PROPOSED satisfies it. This is the DOC-007-§12.2-vs-DOC-002-§26.3
+	// VALUE DRIFT already recorded in the vocab (DOC-002 makes DISCLOSED a separate AssumptionDisclosed
+	// transition). Emitting 'DISCLOSED' would make the event contradict the object it describes; the event reports
+	// the status the object actually has. Resolving the drift is a vocab act, not a handler one.
 	return createObject(ctx, command, {
 		objectType: ASSUMPTION,
 		aggregateId: p.assumptionId,
 		state,
-		eventType: 'AssumptionDetected'
+		eventType: 'AssumptionDetected',
+		eventPayload: {
+			assumptionId: p.assumptionId,
+			statement: p.statement,
+			...(p.basis ? { basis: p.basis } : {}),
+			introducedBy: p.introducedBy,
+			affectedObjectIds: p.affectedObjectIds,
+			materiality: p.materiality,
+			status: state.status,
+			...(p.sourceArtifactId ? { sourceArtifactId: p.sourceArtifactId } : {}),
+			...(p.sourceExecutionAttemptId
+				? { sourceExecutionAttemptId: p.sourceExecutionAttemptId }
+				: {})
+		}
 	});
 };
 
@@ -383,6 +431,9 @@ export const completeAssuranceAssessment: CommandHandler = (ctx, command, payloa
 			dispositionRecommendation?: string;
 			subjectObjectIds?: string[];
 			subjectSemanticVersions?: Record<string, number>;
+			evidenceConsideredIds?: string[];
+			residualUncertainty?: string[];
+			recommendedControlActions?: Record<string, unknown>[];
 			executionProvenance?: { evaluator?: ActorReference };
 		};
 	};
@@ -437,6 +488,36 @@ export const completeAssuranceAssessment: CommandHandler = (ctx, command, payloa
 		target: disposition,
 		eventType: 'AssuranceAssessmentCompleted',
 		setLifecycleStatus: true,
+		// §19.3 AssuranceAssessmentCompletedPayload — was the raw CompleteAssuranceAssessment command payload,
+		// i.e. `{ validatorResult }`: a single key §19.3 does not define, and NINE of its ten fields absent. The
+		// verdict — what was judged, at which version, and how it came out — was never in the event; the audit log
+		// recorded the validator's raw return and nothing about the assessment it completed. Delta: + assessmentId,
+		// + assurancePolicyId, + policyVersion, + subjectObjectIds, + subjectSemanticVersions, + disposition,
+		// + evidenceConsideredIds, + observationIds, + residualUncertainty, + recommendedControlActions;
+		// - validatorResult (not a §19.3 field; a strictObject rejects it).
+		//
+		// Identity + policy come from the aggregate (`next`); subjects + versions from the validatorResult the
+		// invariant-2 gate above just proved complete; disposition is the transition target.
+		//
+		// evidenceConsideredIds / residualUncertainty / recommendedControlActions are read from the validatorResult
+		// and NOT from the object, which reports [] for all three: requestAssuranceAssessment hardcodes them empty
+		// and no completion path ever writes them (the §32 commands that own those facts do not exist — see the
+		// evaluator note above). So the object's [] is silence, not a finding of "none". The validator's values are
+		// the real ones, they are on the validated command, and §19.3 asks the event for exactly them — emitting []
+		// would put a known-false record in the audit log. The event therefore carries more than the object does;
+		// reconciling the object is the §32 increment, not this one.
+		eventPayload: (next) => ({
+			assessmentId: command.targetAggregateId,
+			assurancePolicyId: next.assurancePolicyId,
+			policyVersion: next.policyVersion,
+			subjectObjectIds: subjectIds,
+			subjectSemanticVersions: versions,
+			disposition,
+			evidenceConsideredIds: p.validatorResult?.evidenceConsideredIds ?? [],
+			observationIds: next.observationIds ?? [],
+			residualUncertainty: p.validatorResult?.residualUncertainty ?? [],
+			recommendedControlActions: p.validatorResult?.recommendedControlActions ?? []
+		}),
 		mutate: (base) => ({
 			...base,
 			completedAt: command.issuedAt,
@@ -476,10 +557,34 @@ export const recordAssuranceObservation: CommandHandler = (ctx, command, payload
 		evidenceIds: p.evidenceIds ?? [],
 		disposition: 'OPEN'
 	};
+	// §21.1 AssuranceObservationRecordedPayload — was the raw RecordAssuranceObservation command payload, which
+	// defines neither the observation's id nor the policy/subjects it is against. Delta: + observationId (target
+	// aggregate id), + policyId / + subjectObjectIds (inherited from the assessment, exactly as the state does),
+	// + implication, + disposition ('OPEN'); findingCode and evidenceIds are optional on the command but REQUIRED
+	// by §21.1, so both carry the state's resolved value (findingCode defaults to observationType, evidenceIds to
+	// []); - observationType (on the command, undefined by §21.1 — a strictObject rejects it; DOC-002 §26.5 is the
+	// variant that keeps it, and the object state does too).
+	//
+	// Every value is read off `state`, so the event reports the object as persisted. That includes `implication`,
+	// which the object sets to a copy of `statement` — §21.1 wants the observation's consequence and no command
+	// field carries one. That placeholder is pre-existing object state and out of scope here; the event inherits
+	// it rather than inventing a second, differently-wrong value.
 	return createObject(ctx, command, {
 		objectType: OBSERVATION,
 		aggregateId: id,
 		state,
-		eventType: 'AssuranceObservationRecorded'
+		eventType: 'AssuranceObservationRecorded',
+		eventPayload: {
+			observationId: id,
+			assessmentId: p.assessmentId,
+			policyId: state.policyId,
+			subjectObjectIds: state.subjectObjectIds,
+			findingCode: state.findingCode,
+			severity: p.severity,
+			statement: p.statement,
+			implication: state.implication,
+			evidenceIds: state.evidenceIds,
+			disposition: 'OPEN'
+		}
 	});
 };

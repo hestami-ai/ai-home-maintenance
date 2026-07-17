@@ -18,6 +18,41 @@ carry them are corrected in place. C1–C4 were each a case of reasoning from a 
 worse: a fidelity claim I asserted about a document I *had* read, and shipped, and called verified. C6 is the
 same disease as C1–C4, committed one increment after I invoked the rule against it.**
 
+### C7 — "the RATIFIED event contract" (`d1be74d0`, Increment 21) is **FALSE for 92 of 122 events**.
+
+I wrote, in the commit and in PART 3f: *"the event log has never conformed to the ratified event contract"*, and
+illustrated it with `AssuranceAssessmentRequested (event) **ratifies** { …, evaluator, disposition }`.
+
+**That event's payload is not ratified.** Its vocab entry is marked, verbatim:
+
+> *"**UNRATIFIED-AUTHORED** … DOC-007 schematizes **NO interface** for this, so these fields were **AUTHORED, not
+> derived**. … §16 item 6: DOC-007's first slice deliberately leaves the granular vocabulary unschematized. **Do
+> NOT treat this sourceSection as proof the shape is ratified.**"*
+
+**92 of 122 event payloads carry that annotation. I wrote it myself** (`391a9a7`, the provenance pass), in the
+file I was reading, in capitals, for exactly this purpose — and cited the schema as ratified anyway. This is the
+fourth instance of [[feedback_absence_of_evidence]]'s error shape in one day, and the worst-formed: not a search
+that missed, but **a warning I authored and then walked past.** It also explains the oddity I noticed and shrugged
+off — an `evaluator` and a `disposition` on a *request* event is strange because **nobody ratified it**; a pass
+authored it, probably from the object's field list.
+
+**What survives, and it is sharper than what I claimed.** Splitting the 122 by provenance:
+
+| | count | what non-conformance means |
+|---|---|---|
+| cites a real DOC-007 §N interface | **20** (18 emitted) | a **real defect** — the handler contradicts the corpus |
+| `UNRATIFIED-AUTHORED` | **92** (48 emitted) | **not a defect** — two authored guesses disagreeing, with nothing to adjudicate |
+| no provenance at all | 10 | unknown |
+
+So "the event log has never conformed" is TRUE and serious for **18 events** — `IntentCaptured` (DOC-007 §10.3)
+among them, and its whole failure is one missing field (`intentStatus: 'RAW'`). For the other 48 emitted, the
+handler is the *better* evidence: it runs, it is tested, and projections read it, while the vocab payload is
+paper nothing ever executed. **Conforming those to the vocab would enforce a guess.**
+
+**Consequence for the gate.** It is not all-or-nothing. Validate where the corpus speaks; surface where it does
+not — the same rule as the DOC-003/DOC-004 ruling. That makes the migration bounded (18 events) instead of
+open-ended (66), and it stops the gate from ossifying 48 authored guesses into enforced contract.
+
 ### C6 — "DOC-004 ratifies no severity for ANY of its 99 finding codes" (`b023438`) is **FALSE**.
 
 I wrote this in the commit, in PART 4 below, and said it to the sponsor — with the words *"verified
@@ -1811,6 +1846,73 @@ its numbers.
 
 **The next increment is the migration, and it should be scoped as one:** 122 event schemas, 66 emitted, 24 test
 files, one gate at `kit.ts` step (d2) that goes in last and stays.
+
+---
+
+## PART 3g — Increment 22: the events the corpus actually schematizes now conform (17 of 18)
+
+Increment 21 measured the gap and reverted. This closes the part of it that is a **conformance defect**, and
+leaves alone the part that is not.
+
+### The split that made it tractable — and the trap in it
+
+Increment 21's headline ("the event log has never conformed to the **ratified** event contract") was **false for
+92 of 122 events** (C7 in PART 0). Splitting by provenance turns an open-ended 66-event migration into a bounded
+one, and the boundary itself needs care:
+
+| | count | enforce? |
+|---|---|---|
+| `sourceSection` cites a real DOC-007 §N **and** has `payloadFields` | **15** | **yes — the corpus states the shape** |
+| cites RPH-DOC-010 but `payloadFields: []` | 5 | **no — a citation is not an interface** |
+| `UNRATIFIED-AUTHORED` | 92 | no — enforcing would ossify a guess |
+| no provenance at all | 10 | no |
+
+**The five PWA events are the trap, and an agent caught it.** They cite "RPH-DOC-010 (PWA authoring)", so a
+provenance rule based on the citation alone lets them in — but that section (*"# 20. PWA publication flow"*) is
+a state diagram naming no field. Their `payloadFields: []` emits `z.strictObject({})`, which means **"nobody
+specified this", not "this payload is empty"**. Enforcing it would have rejected `PublishPwa` for the *extra*
+key `rootPwuTypeId` — forcing a handler to **strip a real field, recorded in object state, to satisfy the
+absence of a spec**. That is the inverse of the defect the gate exists for. The rule is now: ratified citation
+**AND** non-empty `payloadFields`.
+
+`RATIFIED_EVENT_PAYLOADS` is **derived from provenance by gen-messages**, never hand-kept — annotating a vocab
+entry `UNRATIFIED-AUTHORED`, or leaving it fieldless, removes it from enforcement on the next `bun run gen`. A
+hand-kept list would rot into the allowlist-of-shame this is designed not to be.
+
+### What changed — 17 of 18, adversarially reviewed per file
+
+Every handler emitted the **COMMAND** payload as the **EVENT** payload. Now each builds the ratified payload
+from the committed next state (`commitState` validates that state first, so nothing emits from an invalid
+object). Six agents, one per file; five clean, one refuted — and the refutation was earned: **`DecisionEffective`
+(DOC-007 §22.2) was missed entirely**, and the refuter proved it by driving the real Engine end-to-end. It is
+load-bearing: `replay.ts` asserts `DecisionEffective` precedes the authoritative `BaselinePromoted`
+(RPH-GOV-003 / property P5), so the governance approval's audit record was missing the four fields binding the
+approval to the subjects and versions it approved.
+
+**Three judgements worth keeping** (all agent-made, all refusing the easy path):
+- **`IntentCaptured`**: DOC-007 §10.3 ratifies `undertakingId` — **the generated schema omits it**, and so do
+  the vocab entry and the command. A vocab→schema generator drift that drops a ratified field. Surfaced, not
+  papered: conforming to the generated schema, since emitting the field would fail the strictObject.
+- **`AssumptionDetected`**: §12.2 writes `status: 'DISCLOSED'` as a literal, but this command creates the object
+  **PROPOSED**. Emitted the object's actual value rather than a literal that would make the event contradict the
+  object it describes. The drift is a vocab act, not a handler one.
+- **`markPwuReady`**: **BLOCKED**, and rightly. See below.
+
+### The one that did not conform, and why the gate is parked
+
+`markPwuReady` emits `PwuStateChanged` (§11.5, seven fields). Six derive from the aggregate's axes.
+**`reasonCode` does not**: the MarkPwuReady command carries no reason, DOC-007 types it a bare `string` with **no
+ratified vocabulary**, and the only values in existence are ad-hoc `'CONTROLLER'` literals in a test and the
+reference undertaking. Minting `'MARK_READY'` would fabricate an **audit reason** nothing ratifies and no caller
+supplied — inventing exactly the class of governance fact the gate exists to protect.
+
+So the gate is **built, derived, and parked one line from live** in `kit.ts` step (d2), with that reason at the
+call site. It goes live the moment this is decided: **add `reasonCode` to the MarkPwuReady payload, or ratify a
+reasonCode vocabulary.** Everything else is ready.
+
+### Gate
+
+build · `check-types` 21/21 · `test` 21/21 · `lint` · `boundary` · `format:check` clean.
 
 ---
 
