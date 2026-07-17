@@ -2602,18 +2602,37 @@ it**:
 | **validator implementation identity** | **NO** | `AssuranceAssessmentCompleted` carries no `validatorId` — the field the ValidatorResult has and the event drops |
 | **independence status** | **NO** | only `AssurancePolicyCreated.independenceRequirement` (the *requirement*), never a *verified* status |
 | **invalidation status** | PARTIAL/NO | invalidation **does not propagate** — invalidating evidence left its dependent claim OPEN, violating ratified DOC-002 §28 and DOC-004 Test 4 |
-| **missing evidence** | **NO** — and a ratification conflict under it | the required-evidence set never reaches the log (every criterion emits `requiredEvidenceIds: []`; `AssurancePolicyCreated` drops the object's `requiredEvidence`); no evidence-required event exists; **DOC-004 §31 names `AssuranceEvidenceRequired`/`Received` that DOC-002 §26.5 does not — the projection has no single ratified source to fold** |
+| **missing evidence** | **NO today; RATIFIED and buildable** (was mis-called a ratification conflict — see below) | required-evidence set never reaches the log (every criterion emits `requiredEvidenceIds: []`); the events that carry it (`AssuranceEvidenceRequired`/`Received`, DOC-004 §31) are ratified NAMES, unschematized, unbuilt — a schema-and-wiring task, **not** a ratification decision |
 
-The retried agent (the 529 above) closed the table at 14/14 and surfaced the sharpest ratification gap in the set:
-**"missing evidence" is a *derived difference* — required minus admitted — and the *required* side is structurally
-reachable but semantically empty everywhere.** Every one of the ~90 `requiredEvidenceIds` in the entire repo is
-literally `[]` (AUTHORED, corpus-wide, not a sample), and the ratified `AssuranceEvidenceRequired` event that a
-fold would subtract admissions from **does not exist** — DOC-004 §31 names it, DOC-002 §26.5 (the Event Contract
-the engine follows) never defined it. So before this field can be built, the canon has to say whether "missing
-evidence" is *policy `requiredEvidenceRequirements` minus `EvidenceAdmitted`* or *`AssuranceEvidenceRequired` minus
-`AssuranceEvidenceReceived`*. That is a sponsor/ratification decision, not a wiring task — which puts **three of
-the fourteen §38 fields (control-action selection, this, and — implicitly — applicability-as-determination) behind
-ratification gaps rather than code.**
+The retried agent (the 529 above) closed the table at 14/14, and I nearly acted on its framing without reading the
+corpus — which would have been the session's costliest mistake, because I had just been handed the §0.3 authoring
+grant and was about to edit a ratified document to "resolve" the conflict.
+
+**C11 — "ratification conflict" was silence-read-as-conflict, and I caught it by reading (Increment 33).** The
+agent reported, and this log recorded, that "missing evidence" is blocked by a conflict: *DOC-004 §31 names
+`AssuranceEvidenceRequired`/`Received` that DOC-002 §26.5 does not.* **There is no conflict.** Reading both
+sections: DOC-002 §26.5 is the coarse **cross-domain object-lifecycle** event set (claims, evidence objects,
+assessment outcomes, waivers); DOC-004 §31 adds the fine **assurance-assessment-internal lifecycle** events that
+drive its own §30 state machine and are produced by its own §32 commands. They **share identically** on the
+assessment-outcome + waiver core, contradict nowhere, and DOC-002 §26 makes no exhaustiveness claim. It is the
+**third instance of the DOC-003/DOC-004 composition pattern** — refinement by scope, not contradiction — the exact
+error the whole session keeps finding, and the agent (like the audit before it) read a granularity difference as a
+contradiction.
+
+**So "missing evidence" is ratified and sourceable in principle** (`AssuranceEvidenceRequired` minus
+`AssuranceEvidenceReceived`/`EvidenceAdmitted`), just not yet **built**: the two events are ratified names
+schematized nowhere, and the §32 commands that emit them are absent. Code-and-schema, not canon. That drops the
+"three fields behind ratification gaps" count — control-action *selection* is a genuine gap (§37 presupposes an
+event the corpus never names anywhere), but *this* one and possibly applicability-as-determination deserve the same
+read-it-yourself treatment before being called ratification decisions.
+
+**The authoring grant, used with restraint.** The warranted edit turned out **not** to be resolving a conflict
+(there is none) but curing the **underspecification** that made two documents read as contradictory. I added a
+composition annotation to DOC-004 §31 (marked authored, §0.3 grant, dated) stating the relationship explicitly, so
+no future reader — or agent — re-derives the phantom conflict. That is the smaller, correct edit in place of the
+larger, wrong one; the restraint is the point. (It also discharges the long-standing open item "record the
+DOC-003/DOC-004 composition in the corpus," one composition over.) **Canon-effort note:** `docs/_canon_draft/` may
+supersede these docs; the annotation is surgical and clearly marked, so it carries forward or drops cleanly.
 
 Three findings from that sweep are worth surfacing on their own:
 
@@ -2634,6 +2653,46 @@ Three findings from that sweep are worth surfacing on their own:
 
 build · `check-types` 21/21 · `test` 21/21 · `lint` · `boundary` · `format:check` clean · Playwright 22 (1 known
 flake, retried green).
+
+---
+
+## PART 3r — Increment 33: the authoring grant, and the edit I did NOT make
+
+The sponsor invoked the §0.3 grant — "use your authoring ability" — the authority to edit ratified documents to
+cover gaps, committed to the repo. I had one target ready: the "missing evidence" ratification conflict from the
+§38 map, which I was about to resolve by editing the corpus to make DOC-002 §26.5 and DOC-004 §31 agree.
+
+**Then I read the two sections, and there was no conflict to resolve.** DOC-002 §26.5 (cross-domain
+object-lifecycle events) and DOC-004 §31 (assurance-assessment-internal lifecycle events) **compose by scope** —
+they share the assessment-outcome + waiver core identically, contradict nowhere, and DOC-002 §26 claims no
+exhaustiveness. It is the DOC-003/DOC-004 composition pattern, third instance. **The single most valuable thing
+the grant produced was the edit I did not make:** had I trusted the agent's "conflict" framing, I would have used
+a just-granted power to damage a ratified document to fix a problem that does not exist.
+
+**What the grant WAS for here:** the real defect is not a conflict but the **underspecification** that made two
+documents read as contradictory — enough to fool an adversarial agent and nearly fool me. So the warranted edit is
+a clarifying annotation, not a resolution. I added a composition note to DOC-004 §31 (marked authored, §0.3 grant,
+dated) stating the relationship, so no future reader re-derives the phantom conflict. Surgical, reversible, and it
+discharges the standing open item "record the DOC-003/DOC-004 composition in the corpus."
+
+**Reclassification:** "missing evidence" moves from *behind a ratification decision* to *ratified and buildable* —
+`AssuranceEvidenceRequired` minus `AssuranceEvidenceReceived`/`EvidenceAdmitted`, needing the §32 commands built
+(code) and the two events schematized (schema), not a canon ruling. C11 recorded above.
+
+**Why I stopped at the annotation and did NOT author the event schemas or build the commands:** emitting these
+events means un-fusing `requestAssuranceAssessment`'s request-and-begin — a real modeling change that ripples
+through the seed's assurance path and every assessment-driving test, and one of the still-open modeling-drift
+items. Authoring the schemas without building the emitters would create exactly the declared-but-dead contract
+this whole effort keeps finding. So the emission build is the honest follow-on, flagged, not rushed under the
+momentum of a new grant. **Restraint in using a powerful authorization is the same discipline as not fabricating a
+finding — the grant widens what I may write, not what is true.**
+
+### Gate
+
+Documentation only (`docs/Recursive Professional Harness/...Assurance Policy Catalog...md` — a ratified corpus doc,
+edited under the §0.3 grant — and `docs/_working/HARMONIZATION-LOG.md`). No code, vocab, or generated files
+touched; the build/test gate is unaffected. Committed locally, NO PUSH; the sponsor's parallel-thread paths
+untouched.
 
 ---
 

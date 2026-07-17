@@ -1744,6 +1744,37 @@ WaiverDenied
 WaiverExpired
 ```
 
+> **Relationship to the Canonical Domain Model §26.5 (authored clarification, §0.3 grant, 2026-07-17).**
+> This list **refines, and does not contradict,** the assurance events in DOC-002 (Canonical Domain Model,
+> Invariant Catalog, State Machines, and Event Contract) §26.5. The two compose by scope, each contributing the
+> events in its domain of authority:
+>
+> * §26.5 is the **cross-domain object-lifecycle** catalog: the claim events (`ClaimAsserted`, `ClaimContested`,
+>   `ClaimSupported`, `ClaimRejected`) and the evidence-**object** events (`EvidenceProposed`, `EvidenceAdmitted`,
+>   `EvidenceRejected`, `EvidenceInvalidated`, `EvidenceExpired`) — which belong to the domain model, not to this
+>   policy catalog, and are therefore absent here.
+> * This §31 list adds the **assurance-assessment-internal lifecycle** events — `AssuranceEvidenceRequired`,
+>   `AssuranceEvidenceReceived`, `AssuranceEvaluatorSelected`, `AssuranceIndependenceVerified` /
+>   `AssuranceIndependenceViolated`, `AssuranceCriterionEvaluated`, `AssuranceAssessmentInvalidated` — the fine
+>   steps that drive the §30 state machine (`REQUESTED → EVIDENCE_PENDING → READY → ASSESSING`) and are produced
+>   by the §32 commands (`submitEvidenceForAssessment`, `selectAssuranceEvaluator`, `beginAssuranceAssessment`,
+>   `recordCriterionResult`). §26.5, being the coarser cross-domain set, spans `AssuranceAssessmentRequested →
+>   AssuranceAssessmentStarted` without naming these intermediate steps.
+>
+> The two lists **share identically** on the assessment-outcome and waiver core (`AssuranceAssessmentRequested`,
+> `AssuranceAssessmentStarted`, `AssuranceObservationRecorded`, the five outcome events, the four waiver events) —
+> no event appears in both with a different meaning. DOC-002 §26 does not claim its lists are exhaustive ("The
+> runtime should use domain events for all material changes."), so the finer events here **compose** with §26.5
+> rather than conflicting.
+>
+> Consequence for the Assurance View (§38, "missing evidence"): that field is **ratified and sourceable in
+> principle** — `AssuranceEvidenceRequired` names the required set and `AssuranceEvidenceReceived` /
+> `EvidenceAdmitted` name the satisfied set, so "missing evidence" is their difference. Both events are ratified
+> **names** here but **schematized nowhere** in the corpus (DOC-007 omits them), and the §32 commands that would
+> emit them are **not yet built**. So it is a schema-and-wiring task, **not** a ratification decision. (Same
+> composition relationship as the DOC-003/DOC-004 assurance-catalog ruling; recorded so no reader re-derives a
+> conflict from a granularity difference.)
+
 ---
 
 # 32. Assurance Commands
