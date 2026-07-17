@@ -3104,6 +3104,99 @@ exists to prevent. Gate (each): `check-types` 21/21 · `test` 21/21 · lint · b
 
 ---
 
+## PART 3y — The contract-drift sweep: eight command fields the system validated, then threw away
+
+The pinned-event work (3x) closed the events that recorded the *wrong* thing. This sweep asks the adjacent
+question: which command fields does the system accept and validate at the boundary, then **silently discard into
+no store at all** — so nothing, ever, can answer the who/why/what they encode? For an agent system building an
+agent system, a field the governed stream never records is exactly the observability hole the mandate exists to
+close: you cannot reason over correct *or* incorrect behavior from a datum that was thrown away.
+
+### The mechanical pass over-counted, and the persistence model is why
+
+A detector diffing every command's `payloadFields` against the event it emits flagged **80** candidates. Two whole
+classes evaporated before a single agent ran:
+- **5 "type mismatches"** (`ProposeEvidence.evidenceType`, etc.) — codegen false positives. The vocab writes
+  `type: "EvidenceType"` on the command and `type: "enum", enumRef: "EvidenceTypeSchema"` on the event; both
+  generate to the *same* `EvidenceTypeSchema`. Notation drift, not schema drift.
+- **`CMD_LOOSER_THAN_OBJECT` = 0** — de-scoping the half-remembered "CreateAssurancePolicy enums-as-string."
+
+That left 75 "field-drops." But **"absent from the event" ≠ "lost"** — and conflating them would have been the
+absence-of-evidence trap at scale. DOC-009's store is an *event-sourced-WITH-current-state hybrid*
+(`schema.ts`): `commitState` step (d) validates and persists the **full** object `state` to
+`professional_work_objects` (versioned), independent of the event payload. A field absent from an event is only a
+provenance hole if it is *also* absent from the persisted state the handler writes. And a *third* subtlety: a
+handler that emits the DEFAULT (`command.payload`, no `eventPayload` override) puts **every** command field on the
+event at runtime, even when the vocab event declaration lists fewer — so the vocab under-declares but the datum is
+not lost.
+
+### 17 agents, per handler, adversarially verified
+
+A workflow fanned one agent over each of the 9 handler files (read the actual handler — its `eventPayload` arg
+AND its persisted `state` — never trust the vocab declaration), then adversarially verified every "LOST" claim
+(prompted to REFUTE, default to present). Result over 75 fields, **0 disputed**:
+
+| class | n | meaning |
+|---|---|---|
+| **LOST** | 8 | in neither the emitted event nor the persisted state — a genuine provenance hole |
+| STATE_ONLY | 19 | in object state, event thin — recoverable, benign |
+| EVENT_VIA_PASSTHROUGH | 37 | handler emits `command.payload`, so the field IS on the event at runtime; only the vocab under-declares |
+| FALSE_POSITIVE | 11 | recorded some other way / detector error |
+
+### Fix-home policy (not one-size)
+
+The governed **event** is the default home — it is the audit record of the *act*, and the mandate's priority. Two
+adjustments: (a) where the object already carries a **sibling** field, mirror it in state too (queryable current
+state without folding events); (b) enriching a **RATIFIED** event's payload is done as an *optional* field with a
+per-field note marking authored-atop-ratified provenance, leaving the event's DOC-007 `sourceSection` intact so it
+stays in the (d2) gate — the same §0.3 pattern used for `AssuranceAssessmentCompleted` in 3v.
+
+### The eight, each red-first + two-directional mutation verified, each its own gated commit
+
+1. **`ApproveBaseline.approvalDecisionId`** (HIGH) — WHICH decision approved this baseline, in a "no green without
+   assurance" flow. → BASELINE object (optional sibling of the existing `promotionDecisionId`) **and**
+   BaselineApproved event. Both authored. The reference undertaking already passed a real id here that was being
+   dropped. `89c1c945`.
+2. **`ActivateExecutionPlan.approvalDecisionId`** (HIGH) — WHICH decision opened the gate to runtime execution. A
+   command/event asymmetry in the ratified spec itself (§15.2 command has it, §15.3 event dropped it; sibling
+   `ExecutionPlanApproved` carries it). → ExecutionPlanActivated event (optional atop ratified §15.3). `bcf03e75`.
+3. **`ValidateDecomposition.observationIds`** (HIGH) — the observations the validator CONSIDERED (the verdict's
+   basis). → both validation events the shared handler emits (DecompositionValidated + DecompositionRejected),
+   distinct from the existing `blockingObservationIds` (the blocking subset). `41ad39b5`.
+4. **`CompleteExecutionStep.executionProvenance` (HIGH) + `structuredResult` (MED)** — WHO/WHAT produced a
+   high-consequence step (resolved provider/model/version) and WHAT it returned. → ExecutionStepSucceeded event
+   (optional atop ratified §16.2). This is the trace over non-deterministic agent work the mandate is about.
+   `5a962b1f`.
+5. **`CompleteAssuranceAssessment.producer`** (MED) — the INV-8 independence counterparty. Completes the I2/I4
+   independence work: the RESULT was recorded but not the OPERAND, so a violation could not name "producer X vs
+   evaluator Y." → ASSURANCE_ASSESSMENT object (optional sibling of `evaluator`); the violation path, which wrote
+   *neither* identity, now writes both. `a2858891`.
+6. **`ApproveIntent.approvalScope`** (MED) — WHAT the approval authorized (its extent). → IntentApproved event
+   (optional atop ratified §10.7). `199de345`.
+7. **`MarkPwuReady.expectedSemanticVersion`** (LOW as provenance, but a real **correctness** bug) — the command
+   REQUIRED an optimistic-concurrency version guard the handler never compared, so a caller believed MarkPwuReady
+   was version-guarded when it was dead. Unlike 1–6 (which RECORD), this one ENFORCES: reject with
+   `RPH_REVISION_CONFLICT` when the attested semantic version is stale. All 12 call sites pass v1 against a v1 PWU,
+   so they stay green; only a genuinely stale attestation is now blocked. `46bb9f44`.
+
+### Follow-ups this surfaced (each its own future increment, none silently assumed done)
+
+- **The floor gate re-derives `aiProduced` heuristically** (`stepOutputIsAiProduced`) precisely because
+  `executionProvenance` was dropped. Now that D4 records the resolved provider/model on the event, a follow-up
+  could let the gate READ it authoritatively — an INV-5 correctness improvement, not just audit. It also wants
+  persisting `executionProvenance` on the ExecutionStep object (advanceStep supports `mutateStep`).
+- **`ExecutionProvenance` is a `FORCE_PLACEHOLDER` `z.record(string, unknown)`** — part of the hollow-helper layer
+  (PART 0 C6): recorded now, but not yet field-defined, so "resolved provider/model/version" is a convention, not
+  a schema.
+- **The 37 EVENT_VIA_PASSTHROUGH events under-declare their own payloads** — they carry `command.payload` fields
+  their declared shape omits. Not data loss (the datum is on the wire), but a contract-integrity gap: the event's
+  declared schema lies about what it contains. Low priority; a declaration-tightening pass, not a behavior fix.
+
+Gate (each of the 7 commits): `check-types` 21/21 · `test` 21/21 · lint · boundary · format. Adjudication
+workflow: `wf_3f02ce65-787` (17 agents, 0 errors, 0 disputed).
+
+---
+
 ## PART 4 — Open questions genuinely for the sponsor
 
 *(kept deliberately short — under the 2026-07-15 mandate, a tension is work, not a question, unless it
