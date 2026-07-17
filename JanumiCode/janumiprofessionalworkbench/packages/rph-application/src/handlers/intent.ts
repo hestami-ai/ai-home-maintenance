@@ -142,7 +142,14 @@ type CommandHandlerReject = ReturnType<typeof reject>;
 
 /** BeginIntentDiscovery — RAW -> UNDER_DISCOVERY. */
 export const beginIntentDiscovery: CommandHandler = (ctx, command) =>
-	advanceIntent(ctx, command, { target: 'UNDER_DISCOVERY', eventType: 'IntentDiscoveryStarted' });
+	advanceIntent(ctx, command, {
+		target: 'UNDER_DISCOVERY',
+		eventType: 'IntentDiscoveryStarted',
+		// The event records the RESULTING status. IntentDiscoveryStarted declares `intentStatus`, which the
+		// BeginIntentDiscovery command payload ({}) does not carry — so the default emitted `{}` recorded nothing of
+		// the transition it exists to announce. Ambiguities are discovered later (ProvisionIntent), so none here.
+		eventPayload: () => ({ intentStatus: 'UNDER_DISCOVERY' })
+	});
 
 /** ProvisionIntent — UNDER_DISCOVERY -> PROVISIONAL (records objective + known ambiguities, DOC-002 §6.1). */
 export const provisionIntent: CommandHandler = (ctx, command, payload) =>
