@@ -5,7 +5,12 @@
 // (which makes VALIDATOR_FAILED→REJECTED and INDEPENDENCE_VIOLATION→SATISFIED illegal). Evidence admissibility
 // (§8.11) is enforced at AdmitEvidence by @janumipwb/rph-assurance's evidenceAdmissibility — the kernel rule,
 // called, not a copy of it. Validator-independence scoring still lives there uncalled; that is the next increment.
-import { evidenceAdmissibility } from '@janumipwb/rph-assurance';
+import {
+	checkIndependence,
+	evidenceAdmissibility,
+	type Identity,
+	type IndependenceRequirement
+} from '@janumipwb/rph-assurance';
 import type {
 	ActorReference,
 	AdmitEvidencePayload,
@@ -422,6 +427,22 @@ export const requestAssuranceAssessment: CommandHandler = (ctx, command, payload
 	});
 };
 
+/** The reverse of record-assurance.ts's `identityToActorReference`: map the ratified wire `ActorReference` back
+ *  onto the assurance-island `Identity` that `checkIndependence` reasons over. Symmetric with the forward seam —
+ *  `actorId`↔`agentId`, `modelId`, `providerId`, `executionInstanceId`↔`invocationId`, `actorType`.
+ *  `contextInstanceId`/`orgId` have no `ActorReference` source and stay undefined; an independence dimension keyed on
+ *  one of those is then unprovable from a bare `ActorReference`, which `differs()` treats as NOT independent — a
+ *  fail-closed absence, never a fabricated pass. */
+function actorReferenceToIdentity(a: ActorReference): Identity {
+	return {
+		agentId: a.actorId,
+		...(a.modelId ? { modelId: a.modelId } : {}),
+		...(a.providerId ? { providerId: a.providerId } : {}),
+		...(a.executionInstanceId ? { invocationId: a.executionInstanceId } : {}),
+		actorType: a.actorType
+	};
+}
+
 /** CompleteAssuranceAssessment — ASSESSING -> a terminal disposition read from the validator recommendation
  * (validatorResult.dispositionRecommendation). The AssuranceAssessment.state machine rejects the illegal
  * disposition transitions (INV-8/INV-9/INV-10). */
@@ -438,6 +459,8 @@ export const completeAssuranceAssessment: CommandHandler = (ctx, command, payloa
 			recommendedControlActions?: Record<string, unknown>[];
 			executionProvenance?: { evaluator?: ActorReference };
 		};
+		/** Increment I2: the identity that PRODUCED the subject, for the independence check against the evaluator. */
+		producer?: ActorReference;
 	};
 	const disposition = p.validatorResult?.dispositionRecommendation;
 	if (!disposition || !DISPOSITIONS.has(disposition)) {
@@ -483,6 +506,58 @@ export const completeAssuranceAssessment: CommandHandler = (ctx, command, payloa
 	// through the verdict and why criterion results and evidence are dropped at the boundary: the commands that
 	// own those facts were never built. Surfaced in HARMONIZATION-LOG PART 4, not fixed here.
 	const evaluator = p.validatorResult?.executionProvenance?.evaluator;
+
+	// INDEPENDENCE (Increment I2). §39 invariant 8 ("Required independence must be verified"), §8.4, §20.2: a
+	// required independence must be verified before an assessment may be satisfied. `checkIndependence` is the kernel
+	// rule (@janumipwb/rph-assurance), called here the same way `admitEvidence` calls `evidenceAdmissibility` — the
+	// rule, invoked, not a copy of it. On a real violation the assessment does NOT complete to a disposition; it
+	// transitions ASSESSING -> INDEPENDENCE_VIOLATION (the ratified §30 arrow, which INV-8 forbids from ever reaching
+	// SATISFIED), recording `AssuranceIndependenceViolated`.
+	//
+	// GATED, and honest about the gate. The check runs only when the policy's requirement RESOLVES, is not `NONE`,
+	// and BOTH operands are present. When it cannot — the policy id does not resolve (a known boundary hole:
+	// `requestAssuranceAssessment` never checked policy existence either, so the standalone drive's floor assessments
+	// cite absent policies), the requirement is `NONE`, or this caller did not supply the subject's producer (the
+	// floor recording path does not yet) — the assessment proceeds WITHOUT a check rather than fabricate a pass or a
+	// violation. Those paths leave independence unverified; recorded in HARMONIZATION-LOG, closed incrementally,
+	// never papered over with a defaulted identity. The positive `AssuranceIndependenceVerified` signal is Increment I4.
+	const producer = p.producer;
+	const assessmentState = ctx.store.loadObject(command.targetAggregateId)?.state as
+		{ assurancePolicyId?: string } | undefined;
+	const independenceRequirement = assessmentState?.assurancePolicyId
+		? (
+				ctx.store.loadObject(assessmentState.assurancePolicyId)?.state as
+					{ independenceRequirement?: string } | undefined
+			)?.independenceRequirement
+		: undefined;
+	if (independenceRequirement && independenceRequirement !== 'NONE' && producer && evaluator) {
+		const verdict = checkIndependence(
+			independenceRequirement as IndependenceRequirement,
+			actorReferenceToIdentity(producer),
+			actorReferenceToIdentity(evaluator)
+		);
+		if (!verdict.independent) {
+			return advanceStatus(ctx, command, {
+				objectType: ASSESSMENT,
+				statusField: 'assessmentState',
+				machine: 'AssuranceAssessment.state',
+				target: 'INDEPENDENCE_VIOLATION',
+				eventType: 'AssuranceIndependenceViolated',
+				setLifecycleStatus: true,
+				eventPayload: (next) => ({
+					assessmentId: command.targetAggregateId,
+					assurancePolicyId: next.assurancePolicyId,
+					policyVersion: next.policyVersion,
+					subjectObjectIds: subjectIds,
+					subjectSemanticVersions: versions,
+					independenceRequirement,
+					reason: verdict.reason ?? 'required independence not satisfied'
+				}),
+				mutate: (base) => ({ ...base, completedAt: command.issuedAt })
+			});
+		}
+	}
+
 	return advanceStatus(ctx, command, {
 		objectType: ASSESSMENT,
 		statusField: 'assessmentState',

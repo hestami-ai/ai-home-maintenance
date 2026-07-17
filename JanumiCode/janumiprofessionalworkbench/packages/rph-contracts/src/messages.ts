@@ -21,6 +21,7 @@ import {
 	EvidenceTypeSchema,
 	ExecutionPlanStatusSchema,
 	ExecutionStateSchema,
+	IndependenceRequirementSchema,
 	IntentStatusSchema,
 	MaterialitySchema,
 	ObligationStatusSchema,
@@ -188,7 +189,8 @@ export type RequestAssuranceAssessmentPayload = z.infer<
 	typeof RequestAssuranceAssessmentPayloadSchema
 >;
 export const CompleteAssuranceAssessmentPayloadSchema = z.strictObject({
-	validatorResult: ValidatorResultSchema
+	validatorResult: ValidatorResultSchema,
+	producer: ActorReferenceSchema.optional()
 });
 export type CompleteAssuranceAssessmentPayload = z.infer<
 	typeof CompleteAssuranceAssessmentPayloadSchema
@@ -1402,6 +1404,18 @@ export const AssurancePolicyActivatedPayloadSchema = z.strictObject({
 	policyId: z.string()
 });
 export type AssurancePolicyActivatedPayload = z.infer<typeof AssurancePolicyActivatedPayloadSchema>;
+export const AssuranceIndependenceViolatedPayloadSchema = z.strictObject({
+	assessmentId: z.string(),
+	assurancePolicyId: z.string(),
+	policyVersion: z.string(),
+	subjectObjectIds: z.array(z.string()),
+	subjectSemanticVersions: z.record(z.string(), z.number()),
+	independenceRequirement: IndependenceRequirementSchema,
+	reason: z.string()
+});
+export type AssuranceIndependenceViolatedPayload = z.infer<
+	typeof AssuranceIndependenceViolatedPayloadSchema
+>;
 
 export const FIRST_SLICE_COMMANDS = [
 	'CaptureIntent',
@@ -2129,6 +2143,10 @@ export const EVENTS = {
 	AssurancePolicyActivated: {
 		payload: AssurancePolicyActivatedPayloadSchema,
 		aggregateType: 'ASSURANCE_POLICY'
+	},
+	AssuranceIndependenceViolated: {
+		payload: AssuranceIndependenceViolatedPayloadSchema,
+		aggregateType: 'AssuranceAssessment'
 	}
 } as const;
 

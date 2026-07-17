@@ -56,6 +56,9 @@ describe('validate', () => {
 		// one of the 21 registered objects, but as a bare envelope with zero fields, and NOTHING could create one
 		// while DOC-007 §16.1/§16.2 both carry `outputArtifactIds`. Fields transcribed from DOC-009 §18.1 (the
 		// ratified `create table artifacts`); the command/event are authored under the 2026-07-16 grant.
-		expect(buildContractRegistry().ids()).toHaveLength(294);
+		// then +1 AssuranceIndependenceViolated event (Increment I2) — the ratified §30 ASSESSING→INDEPENDENCE_VIOLATION
+		// arrow made reachable when completeAssuranceAssessment's independence check fails; payload authored under §0.3
+		// (CompleteAssuranceAssessment gained a `producer` FIELD, not a new command, so no command was added).
+		expect(buildContractRegistry().ids()).toHaveLength(295);
 	});
 });

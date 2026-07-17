@@ -637,6 +637,12 @@
           "required": true,
           "type": "ValidatorResult",
           "note": "complex type §20; disposition/target-state derived from validatorResult.dispositionRecommendation. DOC-002 flattens to disposition + evidenceConsideredIds + criteriaMetIds? + confidence? + residualUncertainty? + recommendedControlAction?"
+        },
+        {
+          "field": "producer",
+          "required": false,
+          "type": "ActorReference",
+          "note": "Increment I2 (under §0.3 grant): the identity that PRODUCED the subject of this assessment. checkIndependence (§8.4, §39 inv 8, §20.2) compares it against the validator's evaluator. Optional: supplied only when the caller knows the producer; when absent the handler cannot verify independence and proceeds without a check (a recorded boundary hole, not a fabricated pass). §19.2 schematizes only validatorResult; this is authored."
         }
       ]
     },
@@ -5824,6 +5830,55 @@
           "field": "policyId",
           "required": true,
           "type": "string"
+        }
+      ]
+    },
+    {
+      "eventType": "AssuranceIndependenceViolated",
+      "aggregateType": "AssuranceAssessment",
+      "sourceSection": "UNRATIFIED-AUTHORED (Increment I2, under §0.3 grant): the EVENT NAME and the ASSESSING→INDEPENDENCE_VIOLATION transition ARE ratified (DOC-004 §31 assurance-assessment-internal lifecycle events; DOC-002/assurance-service §30 FSM; m2-transitions.json AssuranceAssessment.state trigger 'AssuranceIndependenceViolated'), but DOC-007 schematizes NO payload for it. These fields are AUTHORED to carry the independence verdict the §30 transition implies. NOT in the (d2) ratified gate set. Cited: DOC-004 §31, §8.4; DOC-002 §30.",
+      "payloadFields": [
+        {
+          "field": "assessmentId",
+          "required": true,
+          "type": "string",
+          "note": "id-ref"
+        },
+        {
+          "field": "assurancePolicyId",
+          "required": true,
+          "type": "string",
+          "note": "id-ref"
+        },
+        {
+          "field": "policyVersion",
+          "required": true,
+          "type": "string"
+        },
+        {
+          "field": "subjectObjectIds",
+          "required": true,
+          "type": "string[]",
+          "note": "id-ref[]"
+        },
+        {
+          "field": "subjectSemanticVersions",
+          "required": true,
+          "type": "Record<string,number>",
+          "note": "map objectId->semanticVersion; §35.1"
+        },
+        {
+          "field": "independenceRequirement",
+          "required": true,
+          "type": "IndependenceRequirement",
+          "enumRef": "IndependenceRequirementSchema",
+          "note": "the policy requirement that was not satisfied (§8.2)"
+        },
+        {
+          "field": "reason",
+          "required": true,
+          "type": "string",
+          "note": "checkIndependence's reason, e.g. 'same agent identity'"
         }
       ]
     }

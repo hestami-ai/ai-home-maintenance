@@ -685,7 +685,8 @@ export function driveReferenceUndertaking(
 				residualUncertainty: observations.map((o) => o.statement),
 				limitations: [],
 				executionProvenance: { evaluator: EVALUATOR }
-			}
+			},
+			producer: ACTOR
 		});
 		return assessmentId;
 	};

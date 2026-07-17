@@ -2973,6 +2973,38 @@ synthesis) reframed it, and the author ruled on the three forks it surfaced.
 
 `check-types` 21/21 · `test` 21/21 (incl. the new live-store lock, mutation-verified) · lint · boundary · format.
 
+### I2 — independence is now ENFORCED at completion, and a violation is a reachable state
+
+`completeAssuranceAssessment` now calls the kernel rule `checkIndependence` (@janumipwb/rph-assurance) — the same
+shape as `admitEvidence` calling `evidenceAdmissibility`, the rule invoked, not a copy. On a real violation the
+assessment does **not** complete to a disposition: it transitions `ASSESSING → INDEPENDENCE_VIOLATION` — the
+**already-ratified** §30 arrow (m2-transitions.json: trigger `AssuranceIndependenceViolated`, guard "producer and
+evaluator share …in violation of policy's IndependenceRequirement"), which INV-8 forbids from ever reaching
+SATISFIED — recording the new `AssuranceIndependenceViolated` event. Until now that state was **unreachable** (the
+violation lived only as a floor observation; recording.ts: "an Assessment could never reach a durable
+INDEPENDENCE_VIOLATION").
+
+Threaded, not fabricated: a `producer` `ActorReference` field on the `CompleteAssuranceAssessment` command (the
+identity that made the subject), converted to the island `Identity` by the **reverse seam**
+`actorReferenceToIdentity` (symmetric with record-assurance.ts's forward seam). The reference undertaking supplies
+`producer: ACTOR` on the fitness completion, so its `DIFFERENT_AGENT` policy is now genuinely satisfied by the
+distinct evaluator I1 introduced — a **real independence pass**, not a mechanism stub.
+
+**The gate is conditional, and honest about it.** The check runs only when the policy resolves, its requirement is
+not `NONE`, and BOTH operands are present. When it cannot — the policy id doesn't resolve (a pre-existing boundary
+hole: `requestAssuranceAssessment` never checked policy existence, so the standalone drive's floor assessments cite
+absent policies), the requirement is `NONE`, or the caller supplied no producer (the floor recording path doesn't
+yet) — the assessment proceeds **without** a check rather than fabricate a pass or a violation. A dedicated test
+pins that skip as a *chosen* behavior so it cannot silently flip. Threading the producer through the floor recording
+path (with distinct model identities for `DIFFERENT_MODEL`) and closing the policy-existence hole are follow-ups.
+
+New event marked **UNRATIFIED-AUTHORED** (name + transition ratified; payload authored under §0.3) → stays out of
+the (d2) ratified gate set, still schema-checked by the emitted-event conformance sweep.
+
+Red-test-first, mutation-verified (disable the violation branch → the same-identity test drops to `SATISFIED`).
+Gate: vocab +1 field +1 event (CRLF-clean), gen localized, `check-types` 21/21 · `test` 21/21 · lint · boundary ·
+format. **I4 (the positive `AssuranceIndependenceVerified` event + §38 view fold) is the remaining slice.**
+
 ---
 
 ## PART 4 — Open questions genuinely for the sponsor
