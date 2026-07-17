@@ -2807,6 +2807,55 @@ flakes, retried green).
 
 ---
 
+## PART 3u — Increment 36: the Assurance View, and my own vacuous test
+
+The payoff of the whole §38 arc. Increments 25–28 made the seed emit real assurance events; 32–35 mapped and
+unblocked what §38 needs; this folds it into the read model **DOC-004 §38 describes** — a per-assessment view of
+what was assessed, under which policy, on what evidence, with what findings, and how it came out.
+
+### Chosen deliberately over the undertaking bootstrap
+
+The `undertakingId` follow-on (Increment 35's deferral) turned out, on measurement, to be **eleven `ProposePwu`
+test sites plus a gate-heavy published-PWA bootstrap** — a project, not a "Proceed" increment. The Assurance View
+is the actual deliverable the mapping was for, and it is clean and self-contained. I built it instead, and said so.
+
+### Honest about its scope, by construction
+
+`buildAssuranceView` folds ONLY what the log genuinely sources and leaves the rest **visibly `undefined`**, never
+faked. Populated (§38): applicable policy, assessment state, disposition, evidence considered, findings + severity,
+open conditions. **Absent-by-source, left `undefined`:** validator implementation identity (the event drops
+`validatorId`) and independence status (only the requirement is logged). The distinction between **"unknown"
+(no source)** and **"none" (a real empty)** is the whole point — rendering an unsourced field as "none" is the
+false-negative that lets a node look assured when it was never checked.
+
+### The mutation caught MY test
+
+I proved the view over the live reference log — four tests green — and mutation-tested the fold. **Disabling the
+"open conditions only while `CONDITIONALLY_SATISFIED`" guard changed nothing**: every SATISFIED assessment the
+reference undertaking emits carries an *empty* `residualUncertainty`, so a fold that ignored the disposition and
+just copied residuals passed the live-log test too. **My test proved less than it claimed** — the exact
+vacuous-assertion trap this session keeps finding in others' tests, now in my own, one increment after finding it
+in the Work view.
+
+Fixed the right way: a projections **unit test** exercising the case the live log cannot make — a SATISFIED
+disposition *with* residuals present, which must still yield zero open conditions. That test fails under the
+mutation; the guard is now genuinely load-bearing. And I **removed the overclaiming live-log test** and annotated
+why, so no test in the tree claims more than it demonstrates. A satisfied node with a phantom caveat is a
+false-reassurance defect in the same family as a false green — worth a real lock.
+
+### Gate
+
+build · `check-types` 21/21 · `test` 21/21 · `lint` · `boundary` · `format:check` clean.
+
+### What the view still cannot show (the honest remainder)
+
+The `NO`/PARTIAL §38 fields, each with its recorded reason: validator identity + independence (add `validatorId`
+to `AssuranceAssessmentCompleted`; log a *verified* independence status); missing evidence (the §31/§32
+build, Inc 33); control actions, waivers, invalidation status (the §37 six-field record + cascade, Inc 34). None
+blocked on the sponsor — all code/schema against ratified sections.
+
+---
+
 ## PART 4 — Open questions genuinely for the sponsor
 
 *(kept deliberately short — under the 2026-07-15 mandate, a tension is work, not a question, unless it
