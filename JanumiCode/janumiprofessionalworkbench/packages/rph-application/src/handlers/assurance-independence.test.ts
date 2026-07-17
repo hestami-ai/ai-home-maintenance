@@ -52,8 +52,9 @@ describe('completeAssuranceAssessment — independence enforcement (Increment I2
 		}
 	}
 
-	/** Create + activate a policy at version 1.0.0 with a given independence requirement. */
-	function createPolicy(independenceRequirement: string): void {
+	/** Create + activate a policy at version 1.0.0 with a given independence requirement. Pass activate:false to
+	 *  leave it DRAFT (regular policies are born DRAFT; assessments require ACTIVE). */
+	function createPolicy(independenceRequirement: string, opts: { activate?: boolean } = {}): void {
 		dispatchOk(
 			cmd('CreateAssurancePolicy', POLICY, 'ASSURANCE_POLICY', {
 				policyId: POLICY,
@@ -90,7 +91,9 @@ describe('completeAssuranceAssessment — independence enforcement (Increment I2
 				permittedControlActions: ['CONTINUE']
 			})
 		);
-		dispatchOk(cmd('ActivateAssurancePolicy', POLICY, 'ASSURANCE_POLICY', { policyId: POLICY }));
+		if (opts.activate !== false) {
+			dispatchOk(cmd('ActivateAssurancePolicy', POLICY, 'ASSURANCE_POLICY', { policyId: POLICY }));
+		}
 	}
 
 	/** Request an assessment (created directly in ASSESSING) against the policy. */
@@ -156,6 +159,43 @@ describe('completeAssuranceAssessment — independence enforcement (Increment I2
 		expect(r.status).toBe('REJECTED');
 		expect(r.error?.code).toBe('RPH_VALIDATION_SEMANTIC_FAILED');
 		expect(store.loadObject('asm_01ARZ3NDEKTSV4RRFFQ69G5A00')).toBeUndefined();
+	});
+
+	it('rejects RequestAssuranceAssessment against a DRAFT (created-but-not-activated) policy — a policy governs only while ACTIVE (DOC-002 §18)', () => {
+		createPolicy('NONE', { activate: false }); // regular policy, left DRAFT
+		expect((store.loadObject(POLICY)?.state as { status?: string })?.status).toBe('DRAFT');
+		const r = engine.dispatch(
+			cmd('RequestAssuranceAssessment', 'asm_01ARZ3NDEKTSV4RRFFQ69G5A08', 'ASSURANCE_ASSESSMENT', {
+				assessmentId: 'asm_01ARZ3NDEKTSV4RRFFQ69G5A08',
+				assurancePolicyId: POLICY,
+				policyVersion: '1.0.0',
+				subjectObjectIds: [SUBJECT],
+				subjectSemanticVersions: { [SUBJECT]: 1 },
+				claimIds: []
+			})
+		);
+		expect(r.status).toBe('REJECTED');
+		expect(r.error?.code).toBe('RPH_VALIDATION_SEMANTIC_FAILED');
+		expect(store.loadObject('asm_01ARZ3NDEKTSV4RRFFQ69G5A08')).toBeUndefined();
+		// And once activated, the same assessment is accepted — the gate is on governance state, not existence.
+		dispatchOk(cmd('ActivateAssurancePolicy', POLICY, 'ASSURANCE_POLICY', { policyId: POLICY }));
+		expect(
+			engine.dispatch(
+				cmd(
+					'RequestAssuranceAssessment',
+					'asm_01ARZ3NDEKTSV4RRFFQ69G5A09',
+					'ASSURANCE_ASSESSMENT',
+					{
+						assessmentId: 'asm_01ARZ3NDEKTSV4RRFFQ69G5A09',
+						assurancePolicyId: POLICY,
+						policyVersion: '1.0.0',
+						subjectObjectIds: [SUBJECT],
+						subjectSemanticVersions: { [SUBJECT]: 1 },
+						claimIds: []
+					}
+				)
+			).status
+		).toBe('ACCEPTED');
 	});
 
 	it('a DIFFERENT_AGENT policy where producer === evaluator drives ASSESSING -> INDEPENDENCE_VIOLATION', () => {

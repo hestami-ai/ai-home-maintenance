@@ -84,9 +84,13 @@ describe('Assurance Policy lifecycle handlers (live)', () => {
 		);
 	}
 
-	it('create -> edit in place -> suspend -> activate -> supersede', () => {
+	it('create(DRAFT) -> activate -> edit in place -> suspend -> activate -> supersede', () => {
 		const P = 'pol_test_01';
 		expect(create(P).status).toBe('ACCEPTED');
+		// A regular (non-floor) policy is born DRAFT — the ratified AssurancePolicy.status initial state (DOC-002
+		// §18) — and governs only once deliberately activated. (It used to be born ACTIVE, bypassing the lifecycle.)
+		expect(status(P)).toBe('DRAFT');
+		expect(d('ActivateAssurancePolicy', { policyId: P }, P).status).toBe('ACCEPTED');
 		expect(status(P)).toBe('ACTIVE');
 
 		// Edit only the payload-present fields; revision bumps, version (content version string) is unchanged.
@@ -96,7 +100,7 @@ describe('Assurance Policy lifecycle handlers (live)', () => {
 		const edited = store.loadObject(P)!.state as Record<string, unknown>;
 		expect(edited.name).toBe('Renamed');
 		expect(edited.purpose).toBe('p2');
-		expect(edited.revision).toBe(1);
+		expect(edited.revision).toBe(2); // create (rev 0) -> activate (rev 1) -> edit (rev 2)
 
 		expect(d('SuspendAssurancePolicy', { policyId: P }, P).status).toBe('ACCEPTED');
 		expect(status(P)).toBe('SUSPENDED');
@@ -120,6 +124,9 @@ describe('Assurance Policy lifecycle handlers (live)', () => {
 	it('locks the de minimis floor policies: they reject edit / suspend / supersede', () => {
 		const FLOOR = 'floor.reasoning-review';
 		expect(create(FLOOR, 'Reasoning Review').status).toBe('ACCEPTED');
+		// Floor policies are born ACTIVE (locked, always-apply) — the exception to the DRAFT-initial lifecycle,
+		// because they can never be activated (Activate is one of the transitions the lock rejects).
+		expect(status(FLOOR)).toBe('ACTIVE');
 		expect(d('EditAssurancePolicy', { policyId: FLOOR, name: 'x' }, FLOOR).status).not.toBe(
 			'ACCEPTED'
 		);

@@ -24,23 +24,57 @@ interface DispatchLike {
 const SEED_ACTOR = { actorId: 'seed-1', actorType: 'HUMAN' as const, displayName: 'Policy Seeder' };
 const SEED_TS = '2026-07-12T00:00:00Z';
 
-function createPolicyCommand(
+function policyCommand(
+	commandType: string,
 	policyId: string,
 	payload: Record<string, unknown>,
-	now: string
+	now: string,
+	tag: string
 ): DomainCommand {
 	return {
-		commandId: `seedpol-${policyId}`,
-		commandType: 'CreateAssurancePolicy',
+		commandId: `${tag}-${policyId}`,
+		commandType,
 		commandSchemaVersion: 1,
 		targetAggregateType: 'ASSURANCE_POLICY',
 		targetAggregateId: policyId,
 		issuedAt: now,
 		issuedBy: SEED_ACTOR,
 		correlationId: 'seed',
-		idempotencyKey: `seedpol-${policyId}`,
+		idempotencyKey: `${tag}-${policyId}`,
 		payload
 	};
+}
+
+function createOnly(
+	engine: DispatchLike,
+	policyId: string,
+	createPayload: Record<string, unknown>,
+	now: string
+): void {
+	const created = engine.dispatch(
+		policyCommand('CreateAssurancePolicy', policyId, createPayload, now, 'seedpol')
+	);
+	if (created.status !== 'ACCEPTED') {
+		throw new Error(`seed policy create: ${policyId} -> ${JSON.stringify(created.error)}`);
+	}
+}
+
+/** Create + ACTIVATE a REGULAR policy: createAssurancePolicy produces the ratified DRAFT initial state for
+ *  non-floor policies (DOC-002 §18), so a regular policy must be activated before an assessment may cite it. Floor
+ *  policies are born ACTIVE and locked (Activate rejects on them) — use createOnly for those. */
+function createAndActivate(
+	engine: DispatchLike,
+	policyId: string,
+	createPayload: Record<string, unknown>,
+	now: string
+): void {
+	createOnly(engine, policyId, createPayload, now);
+	const activated = engine.dispatch(
+		policyCommand('ActivateAssurancePolicy', policyId, { policyId }, now, 'seedact')
+	);
+	if (activated.status !== 'ACCEPTED') {
+		throw new Error(`seed policy activate: ${policyId} -> ${JSON.stringify(activated.error)}`);
+	}
 }
 
 /**
@@ -51,33 +85,29 @@ function createPolicyCommand(
  */
 export function seedFloorPolicies(engine: DispatchLike, now: string = SEED_TS): void {
 	for (const def of FLOOR_POLICY_DEFINITIONS) {
-		const r = engine.dispatch(
-			createPolicyCommand(
-				def.policyId,
-				{
-					policyId: def.policyId,
-					version: '1.0.0',
-					name: def.name,
-					purpose: def.purpose,
-					rationale: def.rationale,
-					applicableObjectTypes: [
-						'PROFESSIONAL_WORK_ARCHITECTURE',
-						'PROFESSIONAL_WORK_UNIT',
-						'ARTIFACT'
-					],
-					evaluatedClaimTypes: def.evaluatedClaimTypes,
-					criteria: def.criteria,
-					evaluatorRole: def.evaluatorRole,
-					independenceRequirement: def.independence,
-					findingDefinitions: def.findingDefinitions,
-					permittedControlActions: def.permittedControlActions
-				},
-				now
-			)
+		createOnly(
+			engine,
+			def.policyId,
+			{
+				policyId: def.policyId,
+				version: '1.0.0',
+				name: def.name,
+				purpose: def.purpose,
+				rationale: def.rationale,
+				applicableObjectTypes: [
+					'PROFESSIONAL_WORK_ARCHITECTURE',
+					'PROFESSIONAL_WORK_UNIT',
+					'ARTIFACT'
+				],
+				evaluatedClaimTypes: def.evaluatedClaimTypes,
+				criteria: def.criteria,
+				evaluatorRole: def.evaluatorRole,
+				independenceRequirement: def.independence,
+				findingDefinitions: def.findingDefinitions,
+				permittedControlActions: def.permittedControlActions
+			},
+			now
 		);
-		if (r.status !== 'ACCEPTED') {
-			throw new Error(`seedFloorPolicies: ${def.policyId} -> ${JSON.stringify(r.error)}`);
-		}
 	}
 }
 
@@ -91,49 +121,45 @@ export function seedPolicy(
 	policyId: string,
 	opts: { independenceRequirement?: string; now?: string } = {}
 ): void {
-	const r = engine.dispatch(
-		createPolicyCommand(
+	createAndActivate(
+		engine,
+		policyId,
+		{
 			policyId,
-			{
-				policyId,
-				version: '1.0.0',
-				name: `Policy ${policyId}`,
-				purpose: 'Assess the subject against its approved need.',
-				rationale: 'Seeded for a live command-drive test.',
-				applicableObjectTypes: ['PROFESSIONAL_WORK_UNIT'],
-				evaluatedClaimTypes: ['FITNESS'],
-				criteria: [
-					{
-						id: 'C1',
-						name: 'Fit',
-						description: 'The subject is fit for its approved need.',
-						criterionType: 'QUALITATIVE',
-						evaluationMethod: 'HUMAN_JUDGMENT',
-						requiredEvidenceIds: [],
-						severityIfNotMet: 'MATERIAL',
-						mayBeNotApplicable: false
-					}
-				],
-				evaluatorRole: 'REVIEWER',
-				independenceRequirement: opts.independenceRequirement ?? 'NONE',
-				findingDefinitions: [
-					{
-						code: 'UNFIT',
-						name: 'Unfit',
-						description: 'Not fit for the approved need.',
-						defaultSeverity: 'MATERIAL',
-						affectedClaimTypes: ['FITNESS'],
-						defaultControlActions: ['CONTINUE']
-					}
-				],
-				permittedControlActions: ['CONTINUE']
-			},
-			opts.now ?? SEED_TS
-		)
+			version: '1.0.0',
+			name: `Policy ${policyId}`,
+			purpose: 'Assess the subject against its approved need.',
+			rationale: 'Seeded for a live command-drive test.',
+			applicableObjectTypes: ['PROFESSIONAL_WORK_UNIT'],
+			evaluatedClaimTypes: ['FITNESS'],
+			criteria: [
+				{
+					id: 'C1',
+					name: 'Fit',
+					description: 'The subject is fit for its approved need.',
+					criterionType: 'QUALITATIVE',
+					evaluationMethod: 'HUMAN_JUDGMENT',
+					requiredEvidenceIds: [],
+					severityIfNotMet: 'MATERIAL',
+					mayBeNotApplicable: false
+				}
+			],
+			evaluatorRole: 'REVIEWER',
+			independenceRequirement: opts.independenceRequirement ?? 'NONE',
+			findingDefinitions: [
+				{
+					code: 'UNFIT',
+					name: 'Unfit',
+					description: 'Not fit for the approved need.',
+					defaultSeverity: 'MATERIAL',
+					affectedClaimTypes: ['FITNESS'],
+					defaultControlActions: ['CONTINUE']
+				}
+			],
+			permittedControlActions: ['CONTINUE']
+		},
+		opts.now ?? SEED_TS
 	);
-	if (r.status !== 'ACCEPTED') {
-		throw new Error(`seedPolicy: ${policyId} -> ${JSON.stringify(r.error)}`);
-	}
 }
 
 export interface FloorObservationFixture {

@@ -78,7 +78,9 @@ describe('PwaAuthoringBroker — the LLM-agnostic PWA-authoring capability layer
 		expect(created).toMatchObject({
 			name: 'Tenant Isolation Review',
 			version: '1.0.0',
-			status: 'ACTIVE',
+			// A newly authored (non-floor) policy is born DRAFT — the ratified AssurancePolicy.status initial state
+			// (DOC-002 §18). Activation to put it in force is a separate, deliberate governance step.
+			status: 'DRAFT',
 			isFloor: false
 		});
 	});

@@ -210,6 +210,10 @@ export function seedAdditivePolicies(handle: EngineHandle): void {
 			findingDefinitions: findingsFor(p, rawFindings(p)),
 			permittedControlActions: p.permittedControlActions
 		});
+		// The ratified catalog is in force by definition, so the bootstrap activates it (DRAFT -> ACTIVE). Regular
+		// policies are now born DRAFT (DOC-002 §18); the deliberate DRAFT->ACTIVE control is for user-authored policies,
+		// not the seeded ratified catalog. Floor policies (seedFloorPolicies) are born ACTIVE + locked, so not here.
+		send('ActivateAssurancePolicy', 'ASSURANCE_POLICY', p.policyId, { policyId: p.policyId });
 	}
 }
 

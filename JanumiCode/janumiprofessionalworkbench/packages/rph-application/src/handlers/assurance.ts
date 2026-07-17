@@ -61,15 +61,26 @@ function rejectIfFloorLocked(command: DomainCommand): () => ReturnType<typeof re
 			: null;
 }
 
-/** CreateAssurancePolicy — create a versioned ASSURANCE_POLICY object in ACTIVE (guide §8.9). The de minimis floor
- *  policies (§8.4) are seeded through this. The rich rule arrays are §16.23-unresolved shapes, filled empty; the
- *  meaningful content is criteria + independence + finding definitions. The enum-typed fields
- *  (applicableObjectTypes / evaluatedClaimTypes / permittedControlActions) are validated by the object schema. */
+/** CreateAssurancePolicy — create a versioned ASSURANCE_POLICY object. Regular (catalog) policies are born DRAFT
+ *  (the ratified DOC-002 §18 initial state) and must be activated to govern; the de minimis floor policies (§8.4)
+ *  are seeded through this too but are born ACTIVE (locked, always-apply — they cannot be activated). See bornStatus
+ *  below. The rich rule arrays are §16.23-unresolved shapes, filled empty; the meaningful content is criteria +
+ *  independence + finding definitions. The enum-typed fields are validated by the object schema. */
 export const createAssurancePolicy: CommandHandler = (ctx, command, payload) => {
 	const p = payload as CreateAssurancePolicyPayload;
+	// The initial governance state, split by policy kind:
+	//   - REGULAR (ratified DOC-004 catalog) policies are born DRAFT — the RATIFIED AssurancePolicy.status initial
+	//     state (DOC-002 §18: initialState DRAFT, with a guarded DRAFT -> ACTIVE "policy activated" transition). The
+	//     handler used to write 'ACTIVE' for ALL policies, bypassing that lifecycle — which is why the reference
+	//     undertaking's ActivateAssurancePolicy call was a meaningless ACTIVE->ACTIVE no-op. A regular policy now
+	//     governs only once deliberately activated (requestAssuranceAssessment requires ACTIVE).
+	//   - The three de minimis FLOOR policies (§8.4, a guide construct) are LOCKED and always-apply: rejectIfFloorLocked
+	//     rejects Activate/Suspend/Supersede/Edit on them, so they CANNOT be activated and MUST be born ACTIVE. The
+	//     ratified §18 lifecycle governs the ratified catalog; the authored floor overlay is exempt by construction.
+	const bornStatus = FLOOR_POLICY_IDS.has(p.policyId) ? 'ACTIVE' : 'DRAFT';
 	const state: Record<string, unknown> = {
 		...newEnvelope(command, POLICY, p.policyId, {
-			lifecycleStatus: 'ACTIVE',
+			lifecycleStatus: bornStatus,
 			originType: 'HUMAN_DECISION'
 		}),
 		version: p.version,
@@ -101,7 +112,7 @@ export const createAssurancePolicy: CommandHandler = (ctx, command, payload) => 
 		escalationRules: [],
 		waiverRules: p.waiverRules ?? [],
 		permittedControlActions: p.permittedControlActions,
-		status: 'ACTIVE'
+		status: bornStatus
 	};
 	return createObject(ctx, command, {
 		objectType: POLICY,
@@ -415,18 +426,29 @@ const DISPOSITIONS = new Set([
  * pending/ready prep states are a deeper increment — see RESUME-STATE). */
 export const requestAssuranceAssessment: CommandHandler = (ctx, command, payload) => {
 	const p = payload as RequestAssuranceAssessmentPayload;
-	// FAIL CLOSED on policy existence (independence follow-up B). The assessment's policy is what defines its
-	// criteria AND its independenceRequirement; the I2 independence gate skips silently when the cited policy id
-	// does not resolve (documented there as a boundary hole). Before this, the handler stored assurancePolicyId
-	// blindly, so an assessment could cite a phantom policy — assessing against nothing, and disarming the
-	// independence check by making its requirement unresolvable. An assessment against a policy that does not exist
-	// is not a valid request. (Existence, not activeness — whether a DRAFT/SUPERSEDED policy may be cited is a
-	// separate policy-lifecycle tightening, recorded in the log; this closes the unresolvable-requirement hole.)
-	if (!ctx.store.loadObject(p.assurancePolicyId)) {
+	// FAIL CLOSED on policy governance state (independence follow-up B + the DOC-002 §18 lifecycle). The assessment's
+	// policy is what defines its criteria AND its independenceRequirement; the I2 independence gate skips silently
+	// when the cited policy id does not resolve. Before this, the handler stored assurancePolicyId blindly, so an
+	// assessment could cite a phantom policy — assessing against nothing, and disarming the independence check by
+	// making its requirement unresolvable. And a policy governs an assessment only while IN FORCE: the §18 machine is
+	// DRAFT -> ACTIVE -> (SUSPENDED) -> SUPERSEDED, so a new assessment must cite an ACTIVE policy — not a DRAFT one
+	// (not yet activated), a SUSPENDED one (out of force), or a SUPERSEDED version (a new assessment pins the current
+	// version, §18). Two distinct rejections so the audit says which.
+	const policy = ctx.store.loadObject(p.assurancePolicyId)?.state as
+		{ status?: string } | undefined;
+	if (!policy) {
 		return reject(
 			command,
 			'RPH_VALIDATION_SEMANTIC_FAILED',
 			`RequestAssuranceAssessment: assurance policy ${p.assurancePolicyId} does not exist — an assessment cannot be requested against a policy that was never created (its criteria and independence requirement are unresolvable).`,
+			[p.assessmentId, p.assurancePolicyId]
+		);
+	}
+	if (policy.status !== 'ACTIVE') {
+		return reject(
+			command,
+			'RPH_VALIDATION_SEMANTIC_FAILED',
+			`RequestAssuranceAssessment: assurance policy ${p.assurancePolicyId} is ${String(policy.status)}, not ACTIVE — a policy governs an assessment only while in force (DOC-002 §18). Activate it (or cite the current active version) before assessing against it.`,
 			[p.assessmentId, p.assurancePolicyId]
 		);
 	}
