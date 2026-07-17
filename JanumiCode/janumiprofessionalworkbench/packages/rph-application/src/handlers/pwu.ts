@@ -130,13 +130,24 @@ export const proposePwu: CommandHandler = (ctx, command, payload) => {
 		...seededAxes,
 		riskProfile: p.riskProfile
 	};
-	// DOC-007 §11.3: the event payload is the identity + seeded-axes projection, not the ProposePwu command payload
-	// (which is what this emitted: it carried description/boundaries/obligationIds/constraintIds/assumptionIds/
-	// expectedOutputs/assurancePolicyIds/riskProfile and no axes at all — every one an unrecognized key against the
-	// strictObject). §11.3's prose also lists undertakingId/pwuTypeId/isLocalExtension, but the generated
-	// PwuProposedPayloadSchema omits all three, and the schema is what runs: emitting them would fail as extra keys.
+	// DOC-007 §11.3: the event payload is the identity + ownership + seeded-axes projection, not the ProposePwu
+	// command payload (which is what this once emitted: description/boundaries/obligationIds/... — every one an
+	// unrecognized key against the strictObject, and no axes at all).
+	//
+	// §11.3 mandates three ownership fields the handler used to drop: undertakingId, pwuTypeId?, isLocalExtension.
+	// Two are added here. pwuTypeId is the JOIN KEY the Assurance View's "applicable policies" (§38) needs
+	// (pwuTypeId -> PwuType.requiredAssurancePolicyIds), so the drop folded that field to a false empty.
+	// isLocalExtension is derived per §11.3's own rule — "an Undertaking-local PWU Instance has no published
+	// pwuTypeId" — so a PWU with no type IS a local extension, unless the command states otherwise.
+	//
+	// undertakingId (§11.3's third field, REQUIRED) is deliberately NOT emitted yet: createUndertaking requires a
+	// PUBLISHED PWA, so giving the standalone reference drive a real undertakingId means bootstrapping the whole
+	// PWA+Undertaking (seed-workbench already does). Emitting the command's optional undertakingId when absent
+	// would write a dangling reference — the exact defect the assurance guards reject elsewhere. Its own increment.
 	const proposedPayload: PwuProposedPayload = {
 		pwuId: p.pwuId,
+		...(p.pwuTypeId ? { pwuTypeId: p.pwuTypeId } : {}),
+		isLocalExtension: p.isLocalExtension ?? p.pwuTypeId === undefined,
 		pwuKind: p.pwuKind,
 		title: p.title,
 		intentId: p.intentId,

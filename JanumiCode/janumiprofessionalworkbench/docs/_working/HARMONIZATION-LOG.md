@@ -2753,6 +2753,60 @@ map's original headline. Documentation only; gate unaffected.
 
 ---
 
+## PART 3t — Increment 35: PwuProposed conforms to §11.3 (two of three fields), and the third is honestly deferred
+
+The `PwuProposed` event dropped all three of §11.3's ratified ownership fields — `undertakingId` (required),
+`pwuTypeId?`, `isLocalExtension` (required) — emitting only identity + seeded axes. The handler comment even
+conceded it: *"§11.3's prose also lists undertakingId/pwuTypeId/isLocalExtension, but the generated schema omits
+all three... emitting them would fail as extra keys."* The generated schema omitted them because the vocab did.
+
+### I mis-pitched this as a clean field-add; reading the code corrected me
+
+I called it "the clean code item." It is not: **`undertakingId` is coupled to bootstrapping a real Undertaking.**
+Verified — `createUndertaking` *rejects* unless its `pwaId` names a **PUBLISHED** PWA, so a real `undertakingId`
+in the standalone reference drive requires replicating seed-workbench's whole CreatePwa → Publish →
+CreateUndertaking sequence. Emitting the command's optional `undertakingId` when it is absent would write a
+**dangling reference** — the exact governance-fact-pointing-at-nothing the assurance guards reject elsewhere. So
+forcing `undertakingId` now would either break the standalone drive or make it lie.
+
+### What landed: the two fields that are clean, one of which is the actual unblock
+
+`pwuTypeId` (optional) and `isLocalExtension` (required) are both derivable without an Undertaking, and
+**`pwuTypeId` is the field the map actually needed** — it is the join key for the Assurance View's "applicable
+policies" (§38): `pwuTypeId → PwuType.requiredAssurancePolicyIds`. Its absence is why that field folded to a false
+"none". `isLocalExtension` is derived from §11.3's own rule — *"an Undertaking-local PWU Instance has no published
+`pwuTypeId`"* — so `isLocalExtension := (pwuTypeId absent)` unless the command states otherwise.
+
+**Proven where it matters:** the seed-workbench path (whose PWUs realize published PWU Types) now emits `pwuTypeId`
+on every `PwuProposed`, `isLocalExtension: false`, and **the join resolves** — every emitted `pwuTypeId` is a PWU
+Type that exists in the published PWA. The standalone reference drive's PWUs correctly derive
+`isLocalExtension: true` (no type = local extension) and conform.
+
+**Triple-locked** (mutation: revert the handler emission): with `isLocalExtension` now *required* in the ratified
+schema, dropping it fails at **compile time** (the typed payload), **runtime** (the d2 gate rejects the ratified
+`PwuProposed`), and **test time** (the new §11.3 test). A required field on a gated ratified event cannot silently
+go missing.
+
+### `undertakingId` — deferred, with the reason
+
+It goes live the moment the standalone reference drive becomes a real Undertaking (its own increment: bootstrap a
+minimal published PWA + Undertaking, mirroring seed-workbench, then make `undertakingId`/`isLocalExtension`
+*required* on the ProposePwu **command** too — fixing the §11.2 contract-drift in the same pass). Recorded, not
+rushed: a dangling `undertakingId` to claim full §11.3 conformance would be worse than an honest two-of-three.
+
+### The trap held this time
+
+Same edit shape as Increment 31 (vocab + `bun run gen`), where I re-entered two recorded traps — CRLF and
+gen-without-format. This time both were applied deliberately: the vocab written back as CRLF, `bun run format`
+after `bun run gen`, and the diff verified at **15 lines** before proceeding.
+
+### Gate
+
+build · `check-types` 21/21 · `test` 21/21 · `lint` · `boundary` · `format:check` clean · Playwright 22 (2 known
+flakes, retried green).
+
+---
+
 ## PART 4 — Open questions genuinely for the sponsor
 
 *(kept deliberately short — under the 2026-07-15 mandate, a tension is work, not a question, unless it

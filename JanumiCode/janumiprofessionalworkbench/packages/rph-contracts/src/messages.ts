@@ -1146,6 +1146,8 @@ export const PwuMarkedReadyPayloadSchema = z.strictObject({
 export type PwuMarkedReadyPayload = z.infer<typeof PwuMarkedReadyPayloadSchema>;
 export const PwuProposedPayloadSchema = z.strictObject({
 	pwuId: z.string(),
+	pwuTypeId: z.string().optional(),
+	isLocalExtension: z.boolean(),
 	pwuKind: z.string(),
 	title: z.string(),
 	intentId: z.string(),

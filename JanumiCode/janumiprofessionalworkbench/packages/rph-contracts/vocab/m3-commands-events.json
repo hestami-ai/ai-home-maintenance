@@ -4774,13 +4774,25 @@
     {
       "eventType": "PwuProposed",
       "aggregateType": "ProfessionalWorkUnit",
-      "sourceSection": "DOC-007 §11.3 (wins) / DOC-002 §26.2",
+      "sourceSection": "DOC-007 §11.3 (wins) / DOC-002 §26.2 || §11.3 CONFORMANCE 2026-07-17 (partial): added pwuTypeId + isLocalExtension, which the handler dropped (it emitted only identity + seeded axes). undertakingId — §11.3's third missing field, REQUIRED — is DEFERRED: createUndertaking requires a PUBLISHED PWA, so a real undertakingId in the standalone reference drive needs the full PWA+Undertaking bootstrap (seed-workbench already does it); emitting a dangling id would be the governance-fact-pointing-at-nothing this effort exists to prevent. Tracked as its own increment.",
       "payloadFields": [
         {
           "field": "pwuId",
           "required": true,
           "type": "string",
           "note": "id-ref"
+        },
+        {
+          "field": "pwuTypeId",
+          "required": false,
+          "type": "string",
+          "note": "id-ref; DOC-007 §11.3 — the PWU Type this instance realizes (absent for an Undertaking-local extension). The JOIN KEY for the Assurance View's 'applicable policies' (§38): pwuTypeId -> PwuType.requiredAssurancePolicyIds."
+        },
+        {
+          "field": "isLocalExtension",
+          "required": true,
+          "type": "boolean",
+          "note": "DOC-007 §11.3 (required). §11.3 prose: 'an Undertaking-local PWU Instance has no published pwuTypeId' -> derived isLocalExtension := (pwuTypeId absent) when the command does not state it."
         },
         {
           "field": "pwuKind",

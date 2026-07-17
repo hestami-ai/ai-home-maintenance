@@ -32,6 +32,7 @@ const stream: DomainEvent[] = [
 		'PwuProposed',
 		{
 			pwuId: 'pwu_1',
+			isLocalExtension: true,
 			pwuKind: 'ARCHITECTURE',
 			title: 'Architecture',
 			intentId: 'int_1',

@@ -39,6 +39,31 @@ describe('seedWorkbench (live PWA + Undertaking + graph)', () => {
 		expect(types.filter((t) => t.state.isRoot)).toHaveLength(1);
 	});
 
+	it('§11.3: PwuProposed carries pwuTypeId (the join key the Assurance View needs) and isLocalExtension', () => {
+		// The event dropped both fields until Increment 35. pwuTypeId is what "applicable policies" (§38) folds
+		// on: pwuTypeId -> PwuType.requiredAssurancePolicyIds. Without it that field rendered a false "none".
+		// Only the seed-workbench path exercises this — its PWUs realize published PWU Types (non-local); the
+		// standalone reference drive's PWUs are local extensions (no type), covered by emitted-event-conformance.
+		const engine = build();
+		const proposed = engine
+			.readAllEvents()
+			.filter((e) => e.eventType === 'PwuProposed')
+			.map(
+				(e) => e.payload as { pwuTypeId?: string; isLocalExtension?: boolean; pwuKind?: string }
+			);
+		expect(proposed.length).toBeGreaterThanOrEqual(8);
+		const typed = proposed.filter((p) => typeof p.pwuTypeId === 'string');
+		expect(
+			typed.length,
+			'the seeded PWUs realize published PWU Types, so pwuTypeId must be present'
+		).toBe(proposed.length);
+		// A typed PWU is not a local extension (§11.3: a local extension has no published pwuTypeId).
+		expect(proposed.every((p) => p.isLocalExtension === false)).toBe(true);
+		// The join actually resolves: every emitted pwuTypeId is a PWU Type that exists in the published PWA.
+		const typeIds = new Set(listPwuTypes(engine, SEED_PWA).map((t) => t.id));
+		expect(proposed.every((p) => typeIds.has(p.pwuTypeId!))).toBe(true);
+	});
+
 	it('instantiates one Undertaking bound to the published PWA and owns its PWUs (CON-009)', () => {
 		const engine = build();
 		const unds = listUndertakings(engine);
