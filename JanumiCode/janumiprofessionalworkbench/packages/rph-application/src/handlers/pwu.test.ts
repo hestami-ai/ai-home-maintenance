@@ -103,6 +103,23 @@ describe('PWU lifecycle handlers (live command drive)', () => {
 		return (store.loadObject(PWU_ID)?.state as { workLifecycleState: string }).workLifecycleState;
 	}
 
+	/** Walk the assurance axis UNASSESSED -> EVIDENCE_REQUIRED -> READY_FOR_ASSESSMENT -> ASSESSING while the
+	 *  workLifecycle axis HOLDS at READY. Every hop is a legal arrow on PWU.assuranceState — which is precisely
+	 *  why legality alone never protected anything. */
+	function walkAssuranceToAssessing(): void {
+		for (const assuranceState of ['EVIDENCE_REQUIRED', 'READY_FOR_ASSESSMENT', 'ASSESSING']) {
+			const r = engine.dispatch(
+				change({
+					previousState: 'READY',
+					newState: 'READY',
+					executionState: 'NOT_PLANNED',
+					assuranceState
+				})
+			);
+			expect(r.status, `walk to ${assuranceState} failed: ${r.error?.message}`).toBe('ACCEPTED');
+		}
+	}
+
 	function change(over: Record<string, unknown>): DomainCommand {
 		return cmd('ChangePwuState', {
 			previousState: 'READY',
@@ -231,16 +248,155 @@ describe('PWU lifecycle handlers (live command drive)', () => {
 
 		// And the same arrow IS permitted once assurance actually satisfies — otherwise the test above could pass
 		// because the arrow is simply unreachable, which would prove nothing.
+		//
+		// This half USED TO fabricate the verdict: it set assuranceState: 'SATISFIED' directly, with nothing
+		// behind it. The rejectUnbackedDisposition guard (added the same day) caught it — a test written to
+		// prove the system refuses fabricated verdicts, itself fabricating one. So satisfy it honestly: run a
+		// real assessment over this PWU and cite it.
+		const assessmentId = 'asm_01ARZ3NDEKTSV4RRFFQ69G5X00';
+		const assess = (t: string, payload: unknown): DomainCommand =>
+			cmd(t, payload, {
+				targetAggregateId: assessmentId,
+				targetAggregateType: 'ASSURANCE_ASSESSMENT'
+			});
+		expect(
+			engine.dispatch(
+				assess('RequestAssuranceAssessment', {
+					assessmentId,
+					assurancePolicyId: 'pol_fitness_for_purpose',
+					policyVersion: '1.0.0',
+					subjectObjectIds: [PWU_ID],
+					subjectSemanticVersions: { [PWU_ID]: 1 },
+					claimIds: []
+				})
+			).status
+		).toBe('ACCEPTED');
+		expect(
+			engine.dispatch(
+				assess('CompleteAssuranceAssessment', {
+					validatorResult: {
+						validatorId: 'test.reviewer',
+						validatorVersion: '1',
+						policyId: 'pol_fitness_for_purpose',
+						policyVersion: '1.0.0',
+						assessmentId,
+						subjectObjectIds: [PWU_ID],
+						subjectSemanticVersions: { [PWU_ID]: 1 },
+						claimResults: [],
+						evidenceConsideredIds: [],
+						evidenceRejected: [],
+						observations: [],
+						dispositionRecommendation: 'SATISFIED',
+						recommendedControlActions: [],
+						residualUncertainty: [],
+						limitations: [],
+						executionProvenance: {}
+					}
+				})
+			).status
+		).toBe('ACCEPTED');
+
 		const ok = engine.dispatch(
 			change({
 				previousState: 'UNDER_ASSURANCE',
 				newState: 'SATISFIED',
 				executionState: 'SUCCEEDED',
-				assuranceState: 'SATISFIED'
+				assuranceState: 'SATISFIED',
+				supportingObjectIds: [assessmentId]
 			})
 		);
 		expect(ok.status, ok.error?.message).toBe('ACCEPTED');
 		expect(lifecycle()).toBe('SATISFIED');
+	});
+
+	// The guard that makes Increment 25 structural rather than conventional. Before it, the seed told the truth
+	// only because it chose to; a caller could assert any disposition and the engine would take its word.
+	it('a disposition may not be ASSERTED: SATISFIED with no assessment behind it is refused', () => {
+		seedIntent();
+		engine.dispatch(cmd('ProposePwu', proposePayload()));
+		engine.dispatch(cmd('BeginPwuShaping', {}));
+		engine.dispatch(
+			cmd('MarkPwuReady', { shapeReadinessAssessmentId: 'assess_x', expectedSemanticVersion: 1 })
+		);
+		// THE ACTUAL ATTACK, which is why a naive version of this test proves nothing: a DIRECT
+		// UNASSESSED -> SATISFIED jump is refused by the LEGALITY check (no such arrow), so it never reaches the
+		// guard. The hole was always "one legal hop at a time" — walk the assurance axis to ASSESSING, each hop
+		// a real arrow on the machine, then claim the verdict. Legality was never the obstacle.
+		walkAssuranceToAssessing();
+		const r = engine.dispatch(
+			change({
+				previousState: 'READY',
+				newState: 'READY',
+				executionState: 'NOT_PLANNED',
+				assuranceState: 'SATISFIED'
+			})
+		);
+		expect(r.status, 'the controller may not assign itself a verdict').toBe('REJECTED');
+		expect(r.error?.code).toBe('RPH_EVIDENCE_MISSING');
+		expect(r.error?.message).toContain('nothing to back it');
+	});
+
+	it('a disposition may not be BORROWED: an assessment of a DIFFERENT subject does not back this PWU', () => {
+		seedIntent();
+		engine.dispatch(cmd('ProposePwu', proposePayload()));
+		engine.dispatch(cmd('BeginPwuShaping', {}));
+		engine.dispatch(
+			cmd('MarkPwuReady', { shapeReadinessAssessmentId: 'assess_x', expectedSemanticVersion: 1 })
+		);
+		// A real, genuinely SATISFIED assessment — of somebody else. Citing it must not launder this PWU green.
+		const other = 'pwu_01ARZ3NDEKTSV4RRFFQ69G5Z00';
+		const assessmentId = 'asm_01ARZ3NDEKTSV4RRFFQ69G5Y00';
+		const assess = (t: string, payload: unknown): DomainCommand =>
+			cmd(t, payload, {
+				targetAggregateId: assessmentId,
+				targetAggregateType: 'ASSURANCE_ASSESSMENT'
+			});
+		engine.dispatch(
+			assess('RequestAssuranceAssessment', {
+				assessmentId,
+				assurancePolicyId: 'pol_fitness_for_purpose',
+				policyVersion: '1.0.0',
+				subjectObjectIds: [other],
+				subjectSemanticVersions: { [other]: 1 },
+				claimIds: []
+			})
+		);
+		engine.dispatch(
+			assess('CompleteAssuranceAssessment', {
+				validatorResult: {
+					validatorId: 'test.reviewer',
+					validatorVersion: '1',
+					policyId: 'pol_fitness_for_purpose',
+					policyVersion: '1.0.0',
+					assessmentId,
+					subjectObjectIds: [other],
+					subjectSemanticVersions: { [other]: 1 },
+					claimResults: [],
+					evidenceConsideredIds: [],
+					evidenceRejected: [],
+					observations: [],
+					dispositionRecommendation: 'SATISFIED',
+					recommendedControlActions: [],
+					residualUncertainty: [],
+					limitations: [],
+					executionProvenance: {}
+				}
+			})
+		);
+		walkAssuranceToAssessing();
+		const r = engine.dispatch(
+			change({
+				previousState: 'READY',
+				newState: 'READY',
+				executionState: 'NOT_PLANNED',
+				assuranceState: 'SATISFIED',
+				supportingObjectIds: [assessmentId]
+			})
+		);
+		expect(r.status, "another PWU's verdict is not this PWU's verdict (§37 affected objects)").toBe(
+			'REJECTED'
+		);
+		expect(r.error?.code).toBe('RPH_EVIDENCE_MISSING');
 	});
 
 	it('ChangePwuState rejects a stale previousState', () => {

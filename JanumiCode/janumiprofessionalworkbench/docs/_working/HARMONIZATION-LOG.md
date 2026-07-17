@@ -2179,6 +2179,75 @@ lying. That enforcement is the next increment, and it is the one that would make
 
 ---
 
+## PART 3k — Increment 26: a disposition may not be asserted
+
+Increment 25 made the seed tell the truth. This makes the engine *require* it.
+
+### What I did NOT do, and why it matters most
+
+The obvious increment was "enforce the declared triggers" — `transitions.data.ts` annotates each assurance arrow
+with `trigger: 'AssuranceAssessmentSatisfied'` and §18.1 guards, and `classifyTransition` ignores them. **That
+would have been wrong**, and the machine says so itself:
+
+> `sourceSection`: "core-model doc §7.4 enum (VERBATIM). **NO from→to matrix; transitions RECONSTRUCTED** from
+> §18 dispositions + §26.5 events + Scenario 3 (§39)."
+
+**The enum is ratified; the transitions and their triggers are my own reconstruction.** Two of those trigger
+strings name events this system does not emit. Enforcing a reconstruction as though the corpus said it is the
+error this entire effort keeps finding — and it would have been my eleventh.
+
+### What is ratified underneath it
+
+- **§18** ratifies the disposition vocabulary. Four values (`SATISFIED`, `CONDITIONALLY_SATISFIED`, `REJECTED`,
+  `ESCALATED`) are the ones only an assessment produces.
+- **§18.1**: *"Every disposition must identify evidence considered."*
+- **§37 Controller Decision Contract** — and `ChangePwuState` **is** a control action: *"Every control action must
+  record: triggering condition; evidence or observations considered; policy authorizing the action; actor;
+  affected objects; expected outcome."* It recorded `reasonCode: 'CONTROLLER'` and an empty
+  `supportingObjectIds` — **none of the six**.
+- **RPH-PWU-006's Given**: *"required evidence is admitted; all mandatory assurance assessments are satisfied."*
+
+So the guard enforces the requirement, not my reconstruction of the mechanism: **claiming one of those four
+dispositions requires citing an `ASSURANCE_ASSESSMENT` whose `assessmentState` matches and whose
+`subjectObjectIds` include this PWU.** Deliberately excluded: `WAIVED` (authorized by a waiver, not an
+assessment — §18.1 requires separately-defined waiver authority) and `INVALIDATED` (§29.1 upstream change). An
+honest gap beats an over-reaching guard.
+
+### The guard caught me first
+
+Turning it on produced **exactly one failure across the whole suite: my own Property P1 test** — written the
+previous day to prove the system refuses fabricated verdicts, and itself fabricating one (`assuranceState:
+'SATISFIED'` with nothing behind it) to show the arrow was reachable. It now runs a real assessment and cites it.
+
+**The seed was untouched** — Increment 25 had already made it cite real assessments. The two increments compose:
+25 made the demo honest, 26 makes honesty compulsory.
+
+### The naive test would have proved nothing
+
+My first version claimed a verdict via a direct `UNASSESSED -> SATISFIED` jump. It failed with
+`RPH_ILLEGAL_STATE_TRANSITION` — **the legality check refuses that arrow, so it never reaches the guard.** The
+real hole was always *one legal hop at a time*: walk `UNASSESSED -> EVIDENCE_REQUIRED -> READY_FOR_ASSESSMENT ->
+ASSESSING`, every hop a genuine arrow, then claim the verdict. The tests now do that. **Legality was never the
+obstacle**, which is the entire point of the increment.
+
+Two tests, both mutation-proven (disable the guard → exactly these two fail):
+- **a disposition may not be ASSERTED** — the one-legal-hop-at-a-time attack.
+- **a disposition may not be BORROWED** — a real, genuinely SATISFIED assessment *of a different subject* does
+  not launder this PWU green (§37 "affected objects").
+
+### Gate
+
+build · `check-types` 21/21 · `test` 21/21 · `lint` · `boundary` · `format:check` clean · Playwright 22 (2 known
+render-timing flakes, retried green).
+
+### Recorded, not resolved
+
+**`INCONCLUSIVE` is a ratified §18 assessment disposition that is not a value of the PWU's assurance axis at
+all** — so an inconclusive assessment leaves the PWU nowhere to go. §18.1 says *"An inconclusive disposition
+cannot be treated as satisfied"*; the axis has no way to say it happened.
+
+---
+
 ## PART 4 — Open questions genuinely for the sponsor
 
 *(kept deliberately short — under the 2026-07-15 mandate, a tension is work, not a question, unless it

@@ -8,6 +8,7 @@
 // the independently-commanded sub-axes (DOC-002 §5, §7).
 import type {
 	ChangePwuStatePayload,
+	CommandResult,
 	DomainCommand,
 	MarkPwuReadyPayload,
 	ProposePwuPayload,
@@ -300,6 +301,82 @@ export const supersedePwu: CommandHandler = (ctx, command) =>
 	advancePwuLifecycle(ctx, command, { target: 'SUPERSEDED', eventType: 'PwuSuperseded' });
 
 /**
+ * The four `assuranceState` values that ONLY a completed assessment can produce (DOC-002 §18 ratifies the
+ * disposition vocabulary: PENDING | ASSESSING | SATISFIED | CONDITIONALLY_SATISFIED | REJECTED | INCONCLUSIVE |
+ * WAIVED | ESCALATED).
+ *
+ * NOT here, deliberately: WAIVED is authorized by a WAIVER, not an assessment (§18.1: "A policy cannot waive its
+ * own blocking finding unless waiver authority is separately defined"), and INVALIDATED comes from upstream
+ * change / evidence invalidation (§29.1). Both need their own citation and their own guard; an honest gap beats
+ * an over-reaching one. INCONCLUSIVE is a ratified §18 assessment disposition that is NOT a value of the PWU's
+ * assurance axis at all — so an inconclusive assessment leaves the PWU nowhere to go. Recorded, not resolved.
+ */
+const ASSESSMENT_BACKED_DISPOSITIONS = new Set([
+	'SATISFIED',
+	'CONDITIONALLY_SATISFIED',
+	'REJECTED',
+	'ESCALATED'
+]);
+
+/**
+ * A DISPOSITION MAY NOT BE ASSERTED — it must be backed by an assessment that says so.
+ *
+ * `checkTransition` is a LEGALITY check: it asks only whether from->to is an arrow on the machine. It is not a
+ * substance check, and until this guard there was none — so a caller could walk the assurance axis UNASSESSED ->
+ * EVIDENCE_REQUIRED -> READY_FOR_ASSESSMENT -> ASSESSING -> SATISFIED one legal hop at a time with no evidence
+ * and no assessment, and the PWU would read green. The workbench's own demo seed did exactly that for its entire
+ * existence, and every test over it stayed green.
+ *
+ * WHY NOT ENFORCE THE DECLARED TRIGGERS. `transitions.data.ts` annotates each of these arrows with a `trigger`
+ * (e.g. 'AssuranceAssessmentSatisfied'), and enforcing THOSE is tempting and wrong: that machine's own
+ * sourceSection says the enum is "VERBATIM" but the "transitions RECONSTRUCTED" — the trigger strings are
+ * AUTHORED, and two of them name events this system does not emit (it emits one AssuranceAssessmentCompleted
+ * carrying a disposition; DOC-002 names five outcome events; the vocab's conflicts[] says "pick one modeling"
+ * and it is unpicked). Enforcing a reconstruction as though it were ratified is the exact error this effort
+ * keeps finding.
+ *
+ * So this enforces the RATIFIED requirement underneath it instead:
+ *   §18.1 — "Every disposition must identify evidence considered."
+ *   §37 Controller Decision Contract, and ChangePwuState IS a control action — "Every control action must
+ *        record: triggering condition; evidence or observations considered; policy authorizing the action;
+ *        actor; affected objects; expected outcome." This command recorded `reasonCode: 'CONTROLLER'` and an
+ *        empty `supportingObjectIds`: none of those six.
+ *   RPH-PWU-006's Given — "required evidence is admitted; all mandatory assurance assessments are satisfied."
+ *
+ * DOC-007 §11.5 puts `supportingObjectIds` beside `reasonCode` for exactly this: the reason, and what backs it.
+ * The controller lever is NOT the defect — RPH-PWU-006's "When" IS the controller evaluating the PWU. The empty
+ * Given was.
+ */
+function rejectUnbackedDisposition(
+	ctx: HandlerContext,
+	command: DomainCommand,
+	id: string,
+	p: ChangePwuStatePayload,
+	currentAssuranceState: string
+): CommandResult | undefined {
+	if (p.assuranceState === currentAssuranceState) return undefined;
+	if (!ASSESSMENT_BACKED_DISPOSITIONS.has(p.assuranceState)) return undefined;
+	const cited = p.supportingObjectIds ?? [];
+	const backed = cited.some((oid) => {
+		const obj = ctx.store.loadObject(oid);
+		if (obj?.objectType !== 'ASSURANCE_ASSESSMENT') return false;
+		const s = obj.state as { assessmentState?: string; subjectObjectIds?: string[] };
+		return s.assessmentState === p.assuranceState && (s.subjectObjectIds ?? []).includes(id);
+	});
+	if (backed) return undefined;
+	return reject(
+		command,
+		'RPH_EVIDENCE_MISSING',
+		`ChangePwuState would set PWU ${id} assuranceState=${p.assuranceState} with nothing to back it. A ` +
+			`disposition is the verdict of an assessment, not a property the controller may assign (§37: every ` +
+			`control action must record the evidence considered and the objects affected; RPH-PWU-006 permits the ` +
+			`controller to satisfy a PWU only GIVEN its mandatory assessments are satisfied). Cite an ` +
+			`ASSURANCE_ASSESSMENT in supportingObjectIds whose assessmentState is ${p.assuranceState} and whose ` +
+			`subjectObjectIds include ${id}. Supplied: [${cited.join(', ') || 'nothing'}].`
+	);
+}
+
+/**
  * ChangePwuState — the controller's authoritative multi-axis setter. It moves the workLifecycle axis to
  * `newState` (validated by canAdvanceWorkLifecycle against the NEW sub-axis values, so the cross-axis guards
  * still hold — e.g. only reaching SATISFIED when assuranceState=SATISFIED) AND moves each sub-axis, each of which
@@ -335,6 +412,8 @@ export const changePwuState: CommandHandler = (ctx, command, payload) => {
 		const illegal = checkTransition(command, machine, from, to);
 		if (illegal) return illegal;
 	}
+	const unbacked = rejectUnbackedDisposition(ctx, command, id, p, current.assuranceState);
+	if (unbacked) return unbacked;
 	// The workLifecycle axis either advances (legal transition + cross-axis guard against the NEW sub-axes) or
 	// holds (a no-op move that only advances the orthogonal sub-axes) — and a hold must still not park the PWU in
 	// a SATISFIED-without-assurance state (property P1 / INV-5).
