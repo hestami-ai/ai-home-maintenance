@@ -85,7 +85,7 @@ describe('the §26 oracle pointed at the live engine', () => {
 		expect(driveLive()).toContain('IntentCaptured');
 	});
 
-	it('DEFICIENCY: the engine emits none of these 23 §26 event types (was 28 before the assurance loop)', () => {
+	it('DEFICIENCY: the engine emits none of these 16 §26 event types (28 -> 23 -> 16 as the loops were wired)', () => {
 		const actual = new Set(driveLive());
 		const expected = [...new Set(loadExpectedEvents().map((e) => e.event))];
 		const missing = expected.filter((n) => !actual.has(n)).sort();
@@ -103,17 +103,10 @@ describe('the §26 oracle pointed at the live engine', () => {
 		//     AssuranceAssessmentCompleted carrying the disposition, per DOC-007; DOC-002 names five outcome
 		//     events. The vocab's conflicts[] records the choice and says "pick one modeling" — it is unpicked.
 		expect(missing).toEqual([
-			'AssumptionDetected',
 			'AssuranceAssessmentConditionallySatisfied',
 			'AssuranceAssessmentRequested',
 			'AssuranceAssessmentSatisfied',
-			'BaselineApproved',
-			'BaselineCreated',
-			'BaselinePromoted',
-			'BaselineSubmittedForReview',
 			'ClarificationRequested',
-			'DecisionEffective',
-			'DecisionProposed',
 			'ExecutionPlanRevised',
 			'ExecutionStepStarted',
 			'ExecutionStepSucceeded',
@@ -129,7 +122,7 @@ describe('the §26 oracle pointed at the live engine', () => {
 		]);
 	});
 
-	it('PROGRESS: 5 links of the assurance chain of custody now fire — the rest do not', () => {
+	it('PROGRESS: 12 of the 17 chain-of-custody links now fire — claim to evidence to assessment to decision to baseline', () => {
 		const actual = new Set(driveLive());
 		const emitted = ASSURANCE_CHAIN.filter((n) => actual.has(n));
 		// Was []. Every assurance fact in the terminal graph used to be asserted; a claim is now asserted,
@@ -141,11 +134,18 @@ describe('the §26 oracle pointed at the live engine', () => {
 		// baseline is created or promoted, and no assumption is ever detected. So the Architecture PWU still
 		// reaches BASELINED with no Baseline object, which ratified RPH-BAS-004 forbids.
 		expect(emitted, 'this list must only grow — update the pin when it does').toEqual([
+			'AssumptionDetected',
 			'ClaimAsserted',
 			'EvidenceProposed',
 			'EvidenceAdmitted',
 			'AssuranceAssessmentStarted',
-			'AssuranceObservationRecorded'
+			'AssuranceObservationRecorded',
+			'DecisionProposed',
+			'DecisionEffective',
+			'BaselineCreated',
+			'BaselineSubmittedForReview',
+			'BaselineApproved',
+			'BaselinePromoted'
 		]);
 	});
 
@@ -169,10 +169,10 @@ describe('the §26 oracle pointed at the live engine', () => {
 		expect(generic).toBe(67);
 	});
 
-	it("CHARACTERIZATION: the engine emits 153 events to the trace's 72, and is still not a superset", () => {
+	it("CHARACTERIZATION: the engine emits 166 events to the trace's 72, and is still not a superset", () => {
 		const actual = driveLive();
 		// 110 -> 153: +43 real assurance events. The count was never the point — at 110 it was inflated by the
 		// generic setter while 28 named types were missing. Volume is not coverage; the pins above are.
-		expect(actual).toHaveLength(153);
+		expect(actual).toHaveLength(166);
 	});
 });

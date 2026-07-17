@@ -21,19 +21,26 @@
 // a full DOC-007 §20 verdict is returned. Each assurance axis hop now follows its declared trigger and CITES the
 // object that caused it in `supportingObjectIds`. The facts are earned and traceable.
 //
+// WHAT INCREMENT 26 CHANGED. The governance half, the same way: DetectAssumption records the offline residual as
+// a real Assumption object linked to the PWUs it affects (ratified §28 Test 2 — "the assumption cannot remain
+// only in prose"); the Intent and Architecture baselines are CREATED, submitted for review, authorized by a
+// PROMOTE_BASELINE decision made effective, approved, and PROMOTED — and only then does the controller move the
+// PWU to BASELINED, citing the promoted baseline and the decision. §8.1's Given for that arrow is "Authorized
+// promotion decision"; it used to be nothing at all.
+//
+// AND THE ENGINE NOW ENFORCES BOTH. `rejectUnbackedDisposition` and `rejectUnbackedBaselining` (pwu.ts) refuse a
+// disposition with no assessment behind it and a BASELINED with no promoted baseline behind it. So this script no
+// longer tells the truth merely by choosing to — it could not lie in these two ways if it tried.
+//
 // WHAT IS STILL NOT DEMONSTRATED, precisely:
-//  * The GOVERNANCE half is still absent — no decision is proposed or takes effect, no baseline is created or
-//    promoted, no assumption is detected. So the Architecture PWU still reaches BASELINED with no Baseline
-//    object, which ratified RPH-BAS-004 ("Missing required assessment prevents promotion") forbids.
-//  * The ENGINE still does not enforce any of this. classifyTransition reads only from/to and ignores each
-//    transition's declared `trigger`/`guard`, so a caller can still walk the assurance axis to SATISFIED one
-//    legal hop at a time with no assessment. This script now tells the truth by construction, not because it is
-//    prevented from lying. reference-undertaking.test.ts's "EARNED and CITED" test is what holds it honest.
+//  * Execution is still notional: no ExecutionStepStarted/Succeeded, so `executionState: SUCCEEDED` is still an
+//    assignment. It is the same defect as the assurance axis had, on the axis nobody has done yet, and it has no
+//    guard.
 //  * `shapeReadinessAssessmentId: 'assess_shape'` still resolves to UNDEFINED — it names an object never created.
 //  * openResiduals is still NOT PROJECTED: professional-work-graph.ts returns `opts.openResiduals ?? []` from
 //    the const below, derived from no event. An auditor injecting an arbitrary string gets it rendered verbatim.
-//    The residual IS now also a recorded MATERIAL observation on a real assessment — but the view does not read
-//    it from there.
+//    The residual IS now a recorded MATERIAL observation AND an Assumption object — the view just does not read
+//    it from either.
 //
 // PRECISION, because the sloppy version of the old criticism is wrong. Ratified Property P1 says executionState =
 // SUCCEEDED "must never ALONE cause" assuranceState = SATISFIED. Even before Increment 25 it did not: an explicit
@@ -543,13 +550,72 @@ export function driveReferenceUndertaking(
 		return assessmentId;
 	};
 
-	const driveToSatisfied = (pwuId: string): void => {
+	// --- THE GOVERNANCE LOOP (Increment 26b) ---
+	//
+	// DOC-002 §8.1: "SATISFIED/RECOMPOSED | Promote baseline | BASELINED | Authorized promotion decision".
+	// The seed used to assert BASELINED outright — no Baseline object, no decision, no promotion — which
+	// collides with ratified RPH-BAS-004 ("Missing required assessment prevents promotion"). As with the
+	// assurance loop, none of this had to be built: CreateBaseline / SubmitBaselineForReview / ApproveBaseline /
+	// PromoteBaseline / ProposeDecision / ApproveDecision were all registered and emitting nothing because this
+	// script never called them.
+	//
+	// Note PromoteBaselinePayload was ALREADY governance-shaped: it demands a promotionDecisionId, the exact
+	// expected semantic version of every item, and the requiredAssessmentIds. The contract has always asked for
+	// the Given; nobody was answering it.
+	/** Baseline a satisfied PWU through the ratified chain, returning [baselineId, decisionId] to cite. */
+	const baseline = (
+		pwuId: string,
+		baselineType: 'INTENT' | 'ARCHITECTURE',
+		label: string,
+		assessmentIds: readonly string[]
+	): readonly string[] => {
+		const baselineId = mintId('bsl');
+		const decisionId = mintId('dec');
+
+		send('CreateBaseline', 'BASELINE', baselineId, {
+			baselineType,
+			itemObjectIds: [pwuId],
+			assuranceAssessmentIds: [...assessmentIds]
+		});
+		send('SubmitBaselineForReview', 'BASELINE', baselineId, {});
+
+		// The authorizing decision — §37 requires a control action to record the evidence considered and the
+		// policy authorizing it; DecisionType.PROMOTE_BASELINE is the ratified vocabulary for this act.
+		send('ProposeDecision', 'DECISION', decisionId, {
+			decisionType: 'PROMOTE_BASELINE',
+			subjectObjectIds: [pwuId, baselineId],
+			selectedOption: `Promote the ${label}`,
+			rationale: `${label}'s assessments are satisfied and its evidence admitted; promotion freezes it as authoritative.`,
+			authority: ACTOR,
+			consideredObservationIds: []
+		});
+		send('ApproveDecision', 'DECISION', decisionId, {
+			selectedOption: `Promote the ${label}`,
+			rationale: `${label}'s assessments are satisfied and its evidence admitted; promotion freezes it as authoritative.`,
+			consideredEvidenceIds: [],
+			consideredObservationIds: [],
+			subjectSemanticVersions: { [pwuId]: 1, [baselineId]: 1 }
+		});
+
+		send('ApproveBaseline', 'BASELINE', baselineId, { approvalDecisionId: decisionId });
+		send('PromoteBaseline', 'BASELINE', baselineId, {
+			promotionDecisionId: decisionId,
+			expectedItemObjectVersions: [{ objectId: pwuId, semanticVersion: 1 }],
+			requiredAssessmentIds: [...assessmentIds]
+		});
+		return [baselineId, decisionId];
+	};
+
+	/** Returns the satisfied assessment's id, so a caller that goes on to baseline this PWU can cite the very
+	 *  assessment that permitted its satisfaction (PromoteBaseline's `requiredAssessmentIds`). */
+	const driveToSatisfied = (pwuId: string): string => {
 		shapeToExecutedSuccess(pwuId);
 		const assessmentId = earnAssurance(pwuId, 'SATISFIED');
 		// The Given now holds and is CITED: this hop names the satisfied assessment that permits it.
 		chg(pwuId, 'UNDER_ASSURANCE', 'SATISFIED', 'SUCCEEDED', 'SATISFIED', 'PRESERVED', [
 			assessmentId
 		]);
+		return assessmentId;
 	};
 
 	const driveToConditional = (pwuId: string): void => {
@@ -577,15 +643,45 @@ export function driveReferenceUndertaking(
 	chg(R.root, 'READY', 'PLANNED', 'PLANNED', 'UNASSESSED', 'PRESERVED');
 	chg(R.root, 'PLANNED', 'EXECUTING', 'QUEUED', 'UNASSESSED', 'PRESERVED');
 
-	driveToSatisfied(R.intentDef);
+	// Intent & Product Definition: satisfied, then frozen as the authoritative Intent Baseline (§26 trace steps
+	// 15-16). The Behavior PWU is satisfied and deliberately NOT baselined — the reference undertaking's point is
+	// that satisfied and baselined are different things.
+	const intentDefAssessment = driveToSatisfied(R.intentDef);
+	baseline(R.intentDef, 'INTENT', 'Intent Baseline', [intentDefAssessment]);
+
 	driveToSatisfied(R.behavior);
 
-	// Architecture: satisfied, then BASELINED (an authoritative Architecture Baseline).
-	driveToSatisfied(R.architecture);
-	chg(R.architecture, 'SATISFIED', 'BASELINED', 'SUCCEEDED', 'SATISFIED', 'PRESERVED');
+	// The material assumption that produced the offline residual. Ratified Reference Undertaking §28 Test 2
+	// ("Material assumptions persist") requires an Assumption OBJECT linked to the affected PWUs — "the
+	// assumption cannot remain only in prose". It was prose: a hardcoded string handed to the view.
+	const assumptionId = mintId('asu');
+	send('DetectAssumption', 'ASSUMPTION', assumptionId, {
+		assumptionId,
+		statement: REFERENCE_OPEN_RESIDUALS[0],
+		basis: 'First-increment scope decision: connectivity assumed at job start and sync deferred.',
+		introducedBy: ACTOR,
+		affectedObjectIds: [R.mobileOffline, R.behavior],
+		materiality: 'MATERIAL'
+	});
+
+	// Architecture: satisfied, then BASELINED through the ratified chain — create, submit for review, an
+	// authorizing PROMOTE_BASELINE decision made effective, approve, promote — and only then the controller's
+	// hop, citing the baseline and the decision that authorized it. DOC-002 §8.1's Given for this arrow is
+	// "Authorized promotion decision"; it used to be nothing at all.
+	const archAssessment = driveToSatisfied(R.architecture);
+	const [archBaseline, archDecision] = baseline(
+		R.architecture,
+		'ARCHITECTURE',
+		'Architecture Baseline',
+		[archAssessment]
+	);
+	chg(R.architecture, 'SATISFIED', 'BASELINED', 'SUCCEEDED', 'SATISFIED', 'PRESERVED', [
+		archBaseline!,
+		archDecision!
+	]);
 
 	// Architecture concerns: all satisfied except Mobile & Offline, which is only CONDITIONALLY satisfied
-	// (the offline residual is deferred) — so it is NOT qualified-green (INV-5 made visible).
+	// (the offline residual is deferred) — so it is NOT qualified-green (Property P1 made visible).
 	driveToSatisfied(R.systemContext);
 	driveToSatisfied(R.multiTenancy);
 	driveToSatisfied(R.dataArch);

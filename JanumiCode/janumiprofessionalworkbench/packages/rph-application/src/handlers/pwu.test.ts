@@ -103,6 +103,53 @@ describe('PWU lifecycle handlers (live command drive)', () => {
 		return (store.loadObject(PWU_ID)?.state as { workLifecycleState: string }).workLifecycleState;
 	}
 
+	/** Run a real assessment over `subject` and complete it SATISFIED; returns its id, ready to cite. Since
+	 *  Increment 26 a disposition may not be asserted, so any test that needs an assured PWU has to produce one. */
+	function satisfiedAssessmentFor(subject: string, assessmentId: string): string {
+		const assess = (t: string, payload: unknown): DomainCommand =>
+			cmd(t, payload, {
+				targetAggregateId: assessmentId,
+				targetAggregateType: 'ASSURANCE_ASSESSMENT'
+			});
+		expect(
+			engine.dispatch(
+				assess('RequestAssuranceAssessment', {
+					assessmentId,
+					assurancePolicyId: 'pol_fitness_for_purpose',
+					policyVersion: '1.0.0',
+					subjectObjectIds: [subject],
+					subjectSemanticVersions: { [subject]: 1 },
+					claimIds: []
+				})
+			).status
+		).toBe('ACCEPTED');
+		expect(
+			engine.dispatch(
+				assess('CompleteAssuranceAssessment', {
+					validatorResult: {
+						validatorId: 'test.reviewer',
+						validatorVersion: '1',
+						policyId: 'pol_fitness_for_purpose',
+						policyVersion: '1.0.0',
+						assessmentId,
+						subjectObjectIds: [subject],
+						subjectSemanticVersions: { [subject]: 1 },
+						claimResults: [],
+						evidenceConsideredIds: [],
+						evidenceRejected: [],
+						observations: [],
+						dispositionRecommendation: 'SATISFIED',
+						recommendedControlActions: [],
+						residualUncertainty: [],
+						limitations: [],
+						executionProvenance: {}
+					}
+				})
+			).status
+		).toBe('ACCEPTED');
+		return assessmentId;
+	}
+
 	/** Walk the assurance axis UNASSESSED -> EVIDENCE_REQUIRED -> READY_FOR_ASSESSMENT -> ASSESSING while the
 	 *  workLifecycle axis HOLDS at READY. Every hop is a legal arrow on PWU.assuranceState — which is precisely
 	 *  why legality alone never protected anything. */
@@ -253,48 +300,7 @@ describe('PWU lifecycle handlers (live command drive)', () => {
 		// behind it. The rejectUnbackedDisposition guard (added the same day) caught it — a test written to
 		// prove the system refuses fabricated verdicts, itself fabricating one. So satisfy it honestly: run a
 		// real assessment over this PWU and cite it.
-		const assessmentId = 'asm_01ARZ3NDEKTSV4RRFFQ69G5X00';
-		const assess = (t: string, payload: unknown): DomainCommand =>
-			cmd(t, payload, {
-				targetAggregateId: assessmentId,
-				targetAggregateType: 'ASSURANCE_ASSESSMENT'
-			});
-		expect(
-			engine.dispatch(
-				assess('RequestAssuranceAssessment', {
-					assessmentId,
-					assurancePolicyId: 'pol_fitness_for_purpose',
-					policyVersion: '1.0.0',
-					subjectObjectIds: [PWU_ID],
-					subjectSemanticVersions: { [PWU_ID]: 1 },
-					claimIds: []
-				})
-			).status
-		).toBe('ACCEPTED');
-		expect(
-			engine.dispatch(
-				assess('CompleteAssuranceAssessment', {
-					validatorResult: {
-						validatorId: 'test.reviewer',
-						validatorVersion: '1',
-						policyId: 'pol_fitness_for_purpose',
-						policyVersion: '1.0.0',
-						assessmentId,
-						subjectObjectIds: [PWU_ID],
-						subjectSemanticVersions: { [PWU_ID]: 1 },
-						claimResults: [],
-						evidenceConsideredIds: [],
-						evidenceRejected: [],
-						observations: [],
-						dispositionRecommendation: 'SATISFIED',
-						recommendedControlActions: [],
-						residualUncertainty: [],
-						limitations: [],
-						executionProvenance: {}
-					}
-				})
-			).status
-		).toBe('ACCEPTED');
+		const assessmentId = satisfiedAssessmentFor(PWU_ID, 'asm_01ARZ3NDEKTSV4RRFFQ69G5X00');
 
 		const ok = engine.dispatch(
 			change({
@@ -397,6 +403,73 @@ describe('PWU lifecycle handlers (live command drive)', () => {
 			'REJECTED'
 		);
 		expect(r.error?.code).toBe('RPH_EVIDENCE_MISSING');
+	});
+
+	// DOC-002 §8.1: "SATISFIED/RECOMPOSED | Promote baseline | BASELINED | Authorized promotion decision".
+	// The demo seed drove its Architecture PWU to BASELINED with no Baseline object at all, while a test named
+	// "freezes the Architecture PWU into an authoritative baseline" stayed green — the same asserted-fact defect
+	// as the assurance axis, one axis over, and contra ratified RPH-BAS-004.
+	it('BASELINED may not be asserted: a genuinely SATISFIED PWU still cannot freeze itself', () => {
+		// The PWU must first reach SATISFIED **for real** — with an assessment behind it, since Increment 26 —
+		// because SATISFIED -> BASELINED is the only arrow into BASELINED. A test that tried it from READY would
+		// be answered by the LEGALITY check and would never reach this guard, proving nothing (the same trap the
+		// disposition tests above had to avoid).
+		seedIntent();
+		engine.dispatch(cmd('ProposePwu', proposePayload()));
+		engine.dispatch(cmd('BeginPwuShaping', {}));
+		engine.dispatch(
+			cmd('MarkPwuReady', { shapeReadinessAssessmentId: 'assess_x', expectedSemanticVersion: 1 })
+		);
+		const assessmentId = satisfiedAssessmentFor(PWU_ID, 'asm_01ARZ3NDEKTSV4RRFFQ69G5W00');
+		const step = (over: Record<string, unknown>): void => {
+			const r = engine.dispatch(change(over));
+			expect(r.status, `setup failed: ${r.error?.message}`).toBe('ACCEPTED');
+		};
+		step({ previousState: 'READY', newState: 'PLANNED', executionState: 'PLANNED' });
+		step({ previousState: 'PLANNED', newState: 'EXECUTING', executionState: 'QUEUED' });
+		step({ previousState: 'EXECUTING', newState: 'EXECUTING', executionState: 'RUNNING' });
+		step({
+			previousState: 'EXECUTING',
+			newState: 'EVIDENCE_PENDING',
+			executionState: 'SUCCEEDED',
+			assuranceState: 'EVIDENCE_REQUIRED'
+		});
+		step({
+			previousState: 'EVIDENCE_PENDING',
+			newState: 'UNDER_ASSURANCE',
+			executionState: 'SUCCEEDED',
+			assuranceState: 'READY_FOR_ASSESSMENT'
+		});
+		step({
+			previousState: 'UNDER_ASSURANCE',
+			newState: 'UNDER_ASSURANCE',
+			executionState: 'SUCCEEDED',
+			assuranceState: 'ASSESSING'
+		});
+		step({
+			previousState: 'UNDER_ASSURANCE',
+			newState: 'SATISFIED',
+			executionState: 'SUCCEEDED',
+			assuranceState: 'SATISFIED',
+			supportingObjectIds: [assessmentId]
+		});
+		expect(lifecycle()).toBe('SATISFIED');
+
+		// Fully assured, evidence admitted, verdict cited — and STILL not entitled to call itself authoritative.
+		// Baselining is a governance act (§8.1: "Authorized promotion decision"), not a reward for being assured.
+		const r = engine.dispatch(
+			change({
+				previousState: 'SATISFIED',
+				newState: 'BASELINED',
+				executionState: 'SUCCEEDED',
+				assuranceState: 'SATISFIED',
+				supportingObjectIds: [assessmentId]
+			})
+		);
+		expect(r.status, 'assurance is not authority; a PWU may not baseline itself').toBe('REJECTED');
+		expect(r.error?.code).toBe('RPH_EVIDENCE_MISSING');
+		expect(r.error?.message).toContain('no promoted baseline');
+		expect(lifecycle(), 'the PWU must not have moved').toBe('SATISFIED');
 	});
 
 	it('ChangePwuState rejects a stale previousState', () => {

@@ -2248,6 +2248,64 @@ cannot be treated as satisfied"*; the axis has no way to say it happened.
 
 ---
 
+## PART 3l — Increment 27: the governance half, and the second guard
+
+Same shape as Increment 25, third time confirmed: **registered, not called.** `DetectAssumption`,
+`CreateBaseline`, `SubmitBaselineForReview`, `ApproveBaseline`, `PromoteBaseline`, `ProposeDecision`,
+`ApproveDecision` were all wired and emitting nothing.
+
+**The contract had been asking the whole time.** `PromoteBaselinePayload` already demanded a
+`promotionDecisionId`, the exact `expectedItemObjectVersions` of every item, and `requiredAssessmentIds` — and
+`promoteBaseline` was **already guarded** by `canPromoteBaseline` (effective promotion decision + required
+assessments satisfied/waived + no open blocking + item versions pinned). The governance machinery was not just
+built, it was *defended*. **Nobody was calling it**, so the PWU's own BASELINED axis — the one thing nothing
+guarded — carried the whole lie.
+
+### What landed
+
+The Intent and Architecture baselines now go through the ratified chain: create → submit for review →
+`PROPOSE_BASELINE`… (a `PROMOTE_BASELINE` decision, the ratified `DecisionType`) → made effective → approve →
+promote → and only then the controller's hop, citing the promoted baseline and the authorizing decision. The
+offline residual is a real **Assumption object** linked to the PWUs it affects, satisfying ratified §28 Test 2
+("the assumption cannot remain only in prose") — it had been prose: a hardcoded string handed to the view.
+
+**`rejectUnbackedBaselining`**: DOC-002 §8.1 permits `SATISFIED → BASELINED` only on an *"Authorized promotion
+decision"*, so reaching BASELINED now requires citing a BASELINE that is **AUTHORITATIVE** and whose
+`itemObjectVersions` include this PWU. **Assurance is not authority** — a fully assured PWU with an admitted
+verdict still cannot freeze itself.
+
+**Pins: 23 → 16 missing; chain 5 → 12 links; 153 → 166 events.** Third consecutive increment where the pins moved
+by shrinking.
+
+### Two self-corrections worth recording
+
+**I guessed two field names in one function and was wrong both times** — `baselineStatus` (it is `status`) and
+`itemObjectIds` (it is `itemObjectVersions`). The fail-loud drive caught both. *A field name is a fact to look
+up, not to infer — even in one's own codebase.* The real shape was better than the guess: `itemObjectVersions`
+pins the version each item was frozen at, so the guard checks the baseline froze **this PWU**, not merely
+mentioned it.
+
+**My first baseline test would have proved nothing** — it attempted `READY → BASELINED`, which is not an arrow,
+so the LEGALITY check answers first and the guard never runs. **The identical trap as the disposition tests an
+hour earlier**, fallen into again. The test now drives the PWU to a genuinely assured SATISFIED (which since
+Increment 26 requires a real assessment) and only then attempts to freeze it.
+
+Both guards mutation-proven **independently**: disable `rejectUnbackedDisposition` → exactly its 2 tests fail;
+disable `rejectUnbackedBaselining` → exactly its 1 test fails. No overlap, each test isolates its own guard.
+
+### Gate
+
+build · `check-types` 21/21 · `test` 21/21 · `lint` · `boundary` · `format:check` clean · Playwright 22 (2 known
+render-timing flakes, retried green).
+
+### Still open
+
+**Execution is still notional** — no `ExecutionStepStarted`/`Succeeded`, so `executionState: SUCCEEDED` remains
+an assignment. It is the same defect the assurance axis had, on the axis nobody has done yet, and **it has no
+guard**. That is the next one, and it completes the pattern: nothing green that was not earned.
+
+---
+
 ## PART 4 — Open questions genuinely for the sponsor
 
 *(kept deliberately short — under the 2026-07-15 mandate, a tension is work, not a question, unless it

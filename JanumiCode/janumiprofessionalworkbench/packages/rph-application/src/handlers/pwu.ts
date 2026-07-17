@@ -377,6 +377,55 @@ function rejectUnbackedDisposition(
 }
 
 /**
+ * BASELINED MAY NOT BE ASSERTED EITHER — the same defect as an asserted disposition, one axis over.
+ *
+ * DOC-002 §8.1: "SATISFIED/RECOMPOSED | Promote baseline | BASELINED | **Authorized promotion decision**". That
+ * Required condition is the Given, and until this guard nothing checked it: the demo seed drove its Architecture
+ * PWU to BASELINED with no Baseline object, no decision, and no promotion — colliding with ratified RPH-BAS-004
+ * ("Missing required assessment prevents promotion"), while the test asserting "freezes the Architecture PWU
+ * into an authoritative baseline" stayed green throughout.
+ *
+ * So: reaching BASELINED requires citing a BASELINE that has actually been PROMOTED and that contains this PWU
+ * among its items. PromoteBaseline's own payload already demanded the promotionDecisionId, the exact expected
+ * semantic version of every item, and the requiredAssessmentIds — the contract always asked for the Given;
+ * nobody was answering it. Citing the promoted baseline is what connects the two.
+ */
+function rejectUnbackedBaselining(
+	ctx: HandlerContext,
+	command: DomainCommand,
+	id: string,
+	p: ChangePwuStatePayload,
+	currentWorkLifecycleState: string
+): CommandResult | undefined {
+	if (p.newState !== 'BASELINED' || currentWorkLifecycleState === 'BASELINED') return undefined;
+	const cited = p.supportingObjectIds ?? [];
+	const backed = cited.some((oid) => {
+		const obj = ctx.store.loadObject(oid);
+		if (obj?.objectType !== 'BASELINE') return false;
+		// Both field names below were GUESSED WRONG on the first attempt (`baselineStatus`, `itemObjectIds`) and
+		// the drive caught it. A field name is a fact to look up, not to infer — even in one's own codebase.
+		// The real shape is better than the guess: `itemObjectVersions` pins the exact semanticVersion each item
+		// was frozen AT, so this checks the baseline froze THIS PWU rather than merely mentioning it.
+		const s = obj.state as {
+			status?: string;
+			itemObjectVersions?: { objectId?: string }[];
+		};
+		return (
+			s.status === 'AUTHORITATIVE' && (s.itemObjectVersions ?? []).some((v) => v.objectId === id)
+		);
+	});
+	if (backed) return undefined;
+	return reject(
+		command,
+		'RPH_EVIDENCE_MISSING',
+		`ChangePwuState would baseline PWU ${id} with no promoted baseline to back it. DOC-002 §8.1 permits ` +
+			`SATISFIED -> BASELINED only on an "Authorized promotion decision", and RPH-BAS-004 rejects promotion ` +
+			`with a missing required assessment. Cite a BASELINE in supportingObjectIds that is AUTHORITATIVE and ` +
+			`whose itemObjectVersions include ${id}. Supplied: [${cited.join(', ') || 'nothing'}].`
+	);
+}
+
+/**
  * ChangePwuState — the controller's authoritative multi-axis setter. It moves the workLifecycle axis to
  * `newState` (validated by canAdvanceWorkLifecycle against the NEW sub-axis values, so the cross-axis guards
  * still hold — e.g. only reaching SATISFIED when assuranceState=SATISFIED) AND moves each sub-axis, each of which
@@ -414,6 +463,8 @@ export const changePwuState: CommandHandler = (ctx, command, payload) => {
 	}
 	const unbacked = rejectUnbackedDisposition(ctx, command, id, p, current.assuranceState);
 	if (unbacked) return unbacked;
+	const unpromoted = rejectUnbackedBaselining(ctx, command, id, p, current.workLifecycleState);
+	if (unpromoted) return unpromoted;
 	// The workLifecycle axis either advances (legal transition + cross-axis guard against the NEW sub-axes) or
 	// holds (a no-op move that only advances the orthogonal sub-axes) — and a hold must still not park the PWU in
 	// a SATISFIED-without-assurance state (property P1 / INV-5).
