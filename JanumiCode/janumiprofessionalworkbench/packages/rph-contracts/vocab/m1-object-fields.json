@@ -663,6 +663,12 @@
           "note": "CONFLICT: DOC-002 §18 required; DOC-007 §19 optional (evaluator?). DOC-007 wins → optional."
         },
         {
+          "field": "producer",
+          "type": "ActorReference",
+          "required": false,
+          "note": "The identity that PRODUCED the subject of this assessment -- the INV-8 (§39 inv 8, §8.4, §20.2) independence counterparty checkIndependence compares against evaluator. Optional sibling of evaluator. Contract-drift fix: CompleteAssuranceAssessment.producer was read to compute the verdict then discarded, so neither a VERIFIED completion nor an INDEPENDENCE_VIOLATION could name the producer operand it was checked against."
+        },
+        {
           "field": "evidenceConsideredIds",
           "type": "string[]",
           "required": true

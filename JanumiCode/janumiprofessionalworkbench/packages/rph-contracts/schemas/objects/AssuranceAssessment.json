@@ -302,6 +302,48 @@
       ],
       "additionalProperties": false
     },
+    "producer": {
+      "type": "object",
+      "properties": {
+        "actorId": {
+          "type": "string",
+          "minLength": 1
+        },
+        "actorType": {
+          "type": "string",
+          "enum": [
+            "HUMAN",
+            "AGENT",
+            "MODEL",
+            "SERVICE",
+            "POLICY_ENGINE",
+            "EXTERNAL_SYSTEM"
+          ]
+        },
+        "displayName": {
+          "type": "string",
+          "minLength": 1
+        },
+        "roleId": {
+          "type": "string"
+        },
+        "modelId": {
+          "type": "string"
+        },
+        "providerId": {
+          "type": "string"
+        },
+        "executionInstanceId": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "actorId",
+        "actorType",
+        "displayName"
+      ],
+      "additionalProperties": false
+    },
     "evidenceConsideredIds": {
       "type": "array",
       "items": {

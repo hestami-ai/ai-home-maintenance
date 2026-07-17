@@ -269,4 +269,38 @@ describe('completeAssuranceAssessment — independence enforcement (Increment I2
 			'VERIFIED'
 		);
 	});
+
+	it('records BOTH independence operands (producer + evaluator) in object state — a VERIFIED completion and a VIOLATION both name the pair compared (contract-drift)', () => {
+		createPolicy('DIFFERENT_AGENT');
+		const identities = (id: string) =>
+			store.loadObject(id)?.state as
+				{ producer?: { actorId?: string }; evaluator?: { actorId?: string } } | undefined;
+
+		// VERIFIED: producer !== evaluator. Both operands must be recorded, not just the outcome.
+		const verified = 'asm_01ARZ3NDEKTSV4RRFFQ69G5A06';
+		requestAssessment(verified);
+		dispatchOk(
+			cmd('CompleteAssuranceAssessment', verified, 'ASSURANCE_ASSESSMENT', {
+				validatorResult: verdict(verified, 'evaluator-1'),
+				producer: { actorId: 'producer-1', actorType: 'HUMAN', displayName: 'Producer' }
+			})
+		);
+		expect(stateOf(verified)?.assessmentState).toBe('SATISFIED');
+		expect(identities(verified)?.producer?.actorId).toBe('producer-1');
+		expect(identities(verified)?.evaluator?.actorId).toBe('evaluator-1');
+
+		// VIOLATION: producer === evaluator. The violation path (which previously wrote neither) must name the pair
+		// that failed independence, or the INV-8 audit cannot say "producer X vs evaluator Y".
+		const violated = 'asm_01ARZ3NDEKTSV4RRFFQ69G5A07';
+		requestAssessment(violated);
+		dispatchOk(
+			cmd('CompleteAssuranceAssessment', violated, 'ASSURANCE_ASSESSMENT', {
+				validatorResult: verdict(violated, 'same-1'),
+				producer: { actorId: 'same-1', actorType: 'HUMAN', displayName: 'Same' }
+			})
+		);
+		expect(stateOf(violated)?.assessmentState).toBe('INDEPENDENCE_VIOLATION');
+		expect(identities(violated)?.producer?.actorId).toBe('same-1');
+		expect(identities(violated)?.evaluator?.actorId).toBe('same-1');
+	});
 });

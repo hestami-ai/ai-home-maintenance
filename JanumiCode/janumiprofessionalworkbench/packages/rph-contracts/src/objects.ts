@@ -455,6 +455,7 @@ export const AssuranceAssessmentSchema = z.strictObject({
 	subjectSemanticVersions: z.record(z.string(), z.number()),
 	claimIds: z.array(z.string()),
 	evaluator: ActorReferenceSchema.optional(),
+	producer: ActorReferenceSchema.optional(),
 	evidenceConsideredIds: z.array(z.string()),
 	rejectedEvidence: z.array(RejectedEvidenceReferenceSchema),
 	observationIds: z.array(z.string()),

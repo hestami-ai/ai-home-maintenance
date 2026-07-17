@@ -571,7 +571,15 @@ export const completeAssuranceAssessment: CommandHandler = (ctx, command, payloa
 					independenceRequirement,
 					reason: verdict.reason ?? 'required independence not satisfied'
 				}),
-				mutate: (base) => ({ ...base, completedAt: command.issuedAt })
+				// Record BOTH identities the check compared (contract-drift fix): an INV-8 violation whose object
+				// state names neither operand cannot answer "producer X vs evaluator Y" — the very pair that failed.
+				// The violation path previously wrote neither; both are recorded now.
+				mutate: (base) => ({
+					...base,
+					completedAt: command.issuedAt,
+					...(producer ? { producer } : {}),
+					...(evaluator ? { evaluator } : {})
+				})
 			});
 		}
 		independenceResult = 'VERIFIED';
@@ -634,7 +642,11 @@ export const completeAssuranceAssessment: CommandHandler = (ctx, command, payloa
 		mutate: (base) => ({
 			...base,
 			completedAt: command.issuedAt,
-			...(evaluator ? { evaluator } : {})
+			...(evaluator ? { evaluator } : {}),
+			// producer: the INV-8 counterparty checkIndependence compared evaluator against. Contract-drift fix —
+			// it was read to compute independenceResult then discarded; now recorded beside evaluator so a VERIFIED
+			// completion names both operands of the independence determination, not just its outcome.
+			...(producer ? { producer } : {})
 		})
 	});
 };
