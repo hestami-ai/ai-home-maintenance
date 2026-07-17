@@ -1754,6 +1754,66 @@ build · `check-types` 21/21 · `test` 21/21 · `lint` · `boundary` · `format:
 
 ---
 
+## PART 3f — Increment 21, NOT LANDED: the event log has never conformed to the event contract
+
+I wired event-payload validation, ran it, and **reverted it**. The gate is right; what it exposed is a migration,
+not an increment. The measurement is the deliverable — it is the first time the size of this has been known.
+
+### Verified first (the claim was mine, and I have been wrong three times today)
+
+Exactly **two** `validateAgainst` call sites exist:
+
+| what | where | validated? |
+|---|---|---|
+| COMMAND payload | `command-bus.ts:102` | ✅ |
+| PRODUCED OBJECT state | `kit.ts:204` | ✅ |
+| **EVENT payload** | — | ❌ **nothing** |
+
+The append-only event log **is** the governed stream: the audit record, the replay source, the only durable
+account of why the system did what it did. It is the one artifact that cannot be fixed later, because replay
+reconstructs state *from* it — a malformed event is not a bad request, it is a permanently wrong history. And it
+was the only one of the three left unchecked.
+
+### The contract was never missing — it is complete and dead
+
+`EVENTS` carries a real payload schema for **all 122 events**, and **not one is `z.unknown()`**. Generated,
+complete, called by nothing. The third dead seam of this kind, after `validateOntology` (Increment 16) and
+`EngineOntology.seedPolicies` (Increment 17): **the check existed and simply was not wired.**
+
+### What turning it on showed
+
+**24 test files fail.** Not an edge: `IntentCaptured` — the walking skeleton's first event — is invalid.
+The failures are systematic and of one kind: **handlers emit the COMMAND payload as the EVENT payload.**
+
+```
+RequestAssuranceAssessment (command) → emits { assessmentId, assurancePolicyId, policyVersion,
+                                               subjectObjectIds, subjectSemanticVersions, claimIds }
+AssuranceAssessmentRequested (event)  → ratifies { assurancePolicyId, policySemanticVersion,
+                                                  subjectObjectIds, claimIds, evaluator, disposition }
+```
+
+Different shapes entirely. The event schema rejects six keys and misses two of its own required fields.
+**The event log has never carried what the ratified event contract says it carries, and nothing said so.**
+
+One convergence worth recording: of 66 handler-emitted event types, **65** match a declared `emitsEvent`
+binding. The single orphan is `AssuranceAssessmentStarted` — emitted because `requestAssuranceAssessment` fuses
+request-and-begin, **because §32's `beginAssuranceAssessment` was never built** (PART 3e). The same four missing
+commands explain it.
+
+### Why it is not landed
+
+Landing the gate requires ~66 event payloads to be brought to their ratified shape across every handler. That is
+a program with real design questions in it (each event's payload is a governance decision about what the audit
+record must carry — `AssuranceAssessmentRequested` wants an `evaluator` and a `disposition` at REQUEST time,
+which is itself a question). Doing it quickly would be shipping something that *looks* conformant — precisely
+the failure this whole effort keeps finding. The gate is reverted; the tree is green; the finding is here with
+its numbers.
+
+**The next increment is the migration, and it should be scoped as one:** 122 event schemas, 66 emitted, 24 test
+files, one gate at `kit.ts` step (d2) that goes in last and stays.
+
+---
+
 ## PART 4 — Open questions genuinely for the sponsor
 
 *(kept deliberately short — under the 2026-07-15 mandate, a tension is work, not a question, unless it
