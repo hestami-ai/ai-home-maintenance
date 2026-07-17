@@ -2780,14 +2780,42 @@
     {
       "eventType": "AssuranceAssessmentStarted",
       "aggregateType": "AssuranceAssessment",
-      "sourceSection": "UNRATIFIED-AUTHORED (annotated 2026-07-16 under sponsor grant): DOC-007 schematizes NO interface for this, so these fields were AUTHORED, not derived. The citation below NAMES this command/event but defines no fields (DOC-002 §26.x/§34.x are bare name lists; §16 item 6: DOC-007's first slice deliberately leaves the granular vocabulary unschematized). Do NOT treat this sourceSection as proof the shape is ratified. Ratification pending. Cited: DOC-002 §26.5",
+      "sourceSection": "UNRATIFIED-AUTHORED (annotated 2026-07-16 under sponsor grant): DOC-007 schematizes NO interface for this, so these fields were AUTHORED, not derived. The citation below NAMES this command/event but defines no fields (DOC-002 §26.x/§34.x are bare name lists; §16 item 6: DOC-007's first slice deliberately leaves the granular vocabulary unschematized). Do NOT treat this sourceSection as proof the shape is ratified. Ratification pending. Cited: DOC-002 §26.5 || FIELDS CORRECTED 2026-07-17: this declared a single `disposition` field, which the handler never emitted and which described nothing this event is for -- an assessment-STARTED event whose payload cannot say WHAT is being assessed, under WHICH policy, at WHICH subject version, evaluating WHICH claims, is unreadable by any projection (DOC-004 SS38's Assurance View needs every one of those). The handler emitted the six fields below all along; the AUTHORED schema was the wrong side, not the code. Found by emitted-event-conformance.test.ts, which sweeps every emitted event against its declared shape -- eleven others remain and are pinned there.",
       "payloadFields": [
         {
-          "field": "disposition",
+          "field": "assessmentId",
           "required": true,
-          "type": "enum",
-          "enumRef": "AssuranceDispositionSchema",
-          "note": "PENDING->ASSESSING; independence checked before start; PWU.assuranceState ->ASSESSING"
+          "type": "string",
+          "note": "id-ref"
+        },
+        {
+          "field": "assurancePolicyId",
+          "required": true,
+          "type": "string",
+          "note": "id-ref; the policy this assessment is judged under"
+        },
+        {
+          "field": "policyVersion",
+          "required": true,
+          "type": "string"
+        },
+        {
+          "field": "subjectObjectIds",
+          "required": true,
+          "type": "string[]",
+          "note": "id-ref[]; WHAT is being assessed"
+        },
+        {
+          "field": "subjectSemanticVersions",
+          "required": true,
+          "type": "Record<string,number>",
+          "note": "DOC-004 invariant 2: every assessment identifies its subject semantic version"
+        },
+        {
+          "field": "claimIds",
+          "required": true,
+          "type": "string[]",
+          "note": "id-ref[]; the claims this assessment evaluates"
         }
       ]
     },

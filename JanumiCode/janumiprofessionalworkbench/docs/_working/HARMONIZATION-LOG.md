@@ -2490,6 +2490,66 @@ the PWU only — the ratified text says "an Intent **or** PWU", and the Intent s
 
 ---
 
+## PART 3p — Increment 31: twelve events emit payloads their own contracts reject
+
+Two increments in a row found the same defect **by accident, while looking for something else**:
+
+- Increment 29: all five PWU lifecycle events DECLARED `workLifecycleState` and emitted `command.payload`.
+- Here: `AssuranceAssessmentStarted` DECLARES `{ disposition }` and emits six entirely different fields —
+  **sharing ZERO with its schema** — found while trying to build the Assurance View on top of it.
+
+Twice is a class. So instead of fixing the second one, **sweep the whole log**: drive the reference undertaking
+and validate every emitted event against the shape its own vocab entry declares. **Twelve event types fail.**
+
+### Why nothing caught them
+
+The (d2) gate enforces **ratified** payloads — the 15 DOC-007 actually schematizes. That scope is right and it
+stays. But **every** event has a declared shape, and the other ~107 were never checked against reality. This test
+does not widen the gate (enforcement scope is a governance question); it **measures**, which is what catches the
+class.
+
+### The shape of the class
+
+Every one of the twelve emits `command.payload` (or the created object's state) while its vocab entry declares
+the **resulting status** as a const — `status`, `stepState`, `intentStatus`, `disposition`. **So the event
+recording "this became APPROVED" does not contain the word APPROVED**, and several carry keys the strict schema
+rejects outright. These are exactly the events a projection must read to know what happened — which is precisely
+how the Work view came to report every PWU as PROPOSED (PART 3o).
+
+`AssuranceAssessmentStarted` is fixed here, and the **SCHEMA was the wrong side**: an authored `{disposition}`
+that described nothing the event is for. An assessment-*started* event whose payload cannot say **what** is being
+assessed, under **which** policy, at **which** subject version, evaluating **which** claims is unreadable by any
+projection — and DOC-004 §38's Assurance View needs every one of those. The handler had emitted the right six
+fields all along.
+
+**The other eleven are pinned, not bulk-fixed.** Each needs the same judgement made deliberately — handler or
+schema? — and several interact with the unresolved request-and-begin / five-outcome-events modeling drift. A bulk
+edit would be the fabrication this effort exists to prevent.
+
+### The trap I walked into anyway
+
+My vocab rewrite produced a **12,696-line diff for a 33-line change**: the file is CRLF and I wrote LF. That exact
+trap is recorded in my own memory from `m8-ontology.json`. I had even run `file` on it earlier, got "JSON text
+data", and treated a weak signal as a check. Then `bun run gen` without `bun run format` after it inflated the
+generated diff by another ~4,500 lines — also in my notes. **Two recorded traps, both re-entered on the same
+edit.** Real diff: 2 files, 39 insertions.
+
+### Gate
+
+build · `check-types` 21/21 · `test` 21/21 · `lint` · `boundary` · `format:check` clean · Playwright 22.
+
+### Also found (not fixed)
+
+**DOC-004 §38 "Assurance Workbench Requirements" ratifies the Assurance View in detail** — 14 things it must show
+(applicable policies; assessment state; validator implementation identity; independence status; claims evaluated;
+evidence considered; missing evidence; findings; severity; disposition; open conditions; waivers; control actions;
+invalidation status) plus a green-node rule. **It does not exist.** `AssuranceViewAggregateDisposition` exists as
+an enum, so it was started. It **could not** have been built before this week: until Increments 25–28 the system
+emitted no assurance events to project. It can be now — and `AssuranceAssessmentCompleted` carries no
+`validatorId`, so §38's "validator implementation identity" has no source yet.
+
+---
+
 ## PART 4 — Open questions genuinely for the sponsor
 
 *(kept deliberately short — under the 2026-07-15 mandate, a tension is work, not a question, unless it

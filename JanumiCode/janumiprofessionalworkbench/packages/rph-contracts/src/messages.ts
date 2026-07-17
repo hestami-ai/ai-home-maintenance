@@ -673,7 +673,12 @@ export type AssuranceAssessmentSatisfiedPayload = z.infer<
 	typeof AssuranceAssessmentSatisfiedPayloadSchema
 >;
 export const AssuranceAssessmentStartedPayloadSchema = z.strictObject({
-	disposition: AssuranceDispositionSchema
+	assessmentId: z.string(),
+	assurancePolicyId: z.string(),
+	policyVersion: z.string(),
+	subjectObjectIds: z.array(z.string()),
+	subjectSemanticVersions: z.record(z.string(), z.number()),
+	claimIds: z.array(z.string())
 });
 export type AssuranceAssessmentStartedPayload = z.infer<
 	typeof AssuranceAssessmentStartedPayloadSchema
