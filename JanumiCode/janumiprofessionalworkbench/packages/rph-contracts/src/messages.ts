@@ -1020,7 +1020,9 @@ export const ExecutionStepSucceededPayloadSchema = z.strictObject({
 	outputArtifactIds: z.array(z.string()),
 	proposedEvidenceIds: z.array(z.string()),
 	detectedAssumptionIds: z.array(z.string()),
-	resultingExecutionState: ExecutionStateSchema
+	resultingExecutionState: ExecutionStateSchema,
+	executionProvenance: ExecutionProvenanceSchema.optional(),
+	structuredResult: z.unknown().optional()
 });
 export type ExecutionStepSucceededPayload = z.infer<typeof ExecutionStepSucceededPayloadSchema>;
 export const ExecutionStepWaitingPayloadSchema = z.strictObject({

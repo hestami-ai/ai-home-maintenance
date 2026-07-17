@@ -248,6 +248,41 @@ describe('ExecutionStep + RuntimeBinding handlers (live)', () => {
 		expect(stepState()).toBe('SUCCEEDED');
 	});
 
+	it('records executionProvenance (WHO/WHAT produced) + structuredResult on the ExecutionStepSucceeded event (contract-drift)', () => {
+		dispatch('StartExecutionStep', { stepId: STEP }, PLAN, 'EXECUTION_PLAN');
+		recordArtifact();
+		recordFloor(SATISFIED_FLOOR);
+		const provenance = {
+			provider: 'ollama',
+			model: 'gemma4:31b-it-qat',
+			modelVersion: 'qat',
+			environment: 'sandbox-1'
+		};
+		const structuredResult = { summary: 'wrote the module', metrics: { linesChanged: 42 } };
+		expect(
+			dispatch(
+				'CompleteExecutionStep',
+				{
+					executionStepId: STEP,
+					executionAttemptId: ATTEMPT,
+					resultStatus: 'SUCCEEDED',
+					outputArtifactIds: [ART],
+					proposedEvidenceIds: [],
+					detectedAssumptionIds: [],
+					structuredResult,
+					executionProvenance: provenance
+				},
+				PLAN,
+				'EXECUTION_PLAN'
+			).status
+		).toBe('ACCEPTED');
+		const succeeded = store.readAllEvents().find((e) => e.eventType === 'ExecutionStepSucceeded');
+		const payload = succeeded?.payload as Record<string, unknown> | undefined;
+		// The governed stream now names WHO/WHAT produced the step and WHAT it returned — the trace over agent work.
+		expect(payload?.executionProvenance).toEqual(provenance);
+		expect(payload?.structuredResult).toEqual(structuredResult);
+	});
+
 	it('fails a running step (RUNNING -> FAILED) and retries it (FAILED -> QUEUED)', () => {
 		dispatch('StartExecutionStep', { stepId: STEP }, PLAN, 'EXECUTION_PLAN');
 		const r = dispatch(

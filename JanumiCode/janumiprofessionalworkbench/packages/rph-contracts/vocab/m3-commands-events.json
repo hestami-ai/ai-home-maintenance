@@ -4273,6 +4273,18 @@
           "type": "'SUCCEEDED'",
           "enumRef": "ExecutionStateSchema",
           "note": "literal const; §35.2 forbids producing assuranceState=SATISFIED; DOC-002 names stepState (machine=ExecutionStep.stepState) + outputBindings"
+        },
+        {
+          "field": "executionProvenance",
+          "required": false,
+          "type": "ExecutionProvenance",
+          "note": "WHO/WHAT produced this step result (resolved provider/model/version/environment). AUTHORED optional field atop the ratified DOC-007 §16.2 shape (which omits it): §16.1 puts executionProvenance on the CompleteExecutionStep COMMAND but §16.2 dropped it, so the identity that produced a high-consequence step was validated then discarded. Contract-drift fix -- the governed stream is the trace over non-deterministic agent work. (Follow-up: the floor gate still re-derives aiProduced heuristically; it could read this authoritatively.)"
+        },
+        {
+          "field": "structuredResult",
+          "required": false,
+          "type": "unknown",
+          "note": "the inline machine-readable result of the step (WHAT it produced). AUTHORED optional field atop §16.2. §16.1 requires it on the command but §16.2 dropped it; durable outputs are captured by reference (outputArtifactIds/proposedEvidenceIds) but the inline structured result itself was discarded. Contract-drift fix."
         }
       ]
     },

@@ -307,19 +307,25 @@ export const completeExecutionStep: CommandHandler = (ctx, command) => {
 		stepId: p.executionStepId,
 		target: 'SUCCEEDED',
 		eventType: 'ExecutionStepSucceeded',
-		// DOC-007 §16.2 ExecutionStepSucceededPayload. This emitted the raw CompleteExecutionStep command payload
-		// (§16.1), which carries three keys §16.2 does not define — resultStatus, structuredResult,
-		// executionProvenance — and lacked resultingExecutionState; the schema is strict, so the extras fail too.
-		// The five id/ref fields are the command's own (§16.1 and §16.2 share them verbatim);
-		// resultingExecutionState is §16.2's const, and is the EXECUTION dimension only — §16.2 L1244 / INV-5:
-		// step success never implies assuranceState=SATISFIED.
+		// DOC-007 §16.2 ExecutionStepSucceededPayload. The five id/ref fields are the command's own (§16.1 and §16.2
+		// share them verbatim); resultingExecutionState is §16.2's const, and is the EXECUTION dimension only —
+		// §16.2 L1244 / INV-5: step success never implies assuranceState=SATISFIED.
+		// Contract-drift fix: §16.1's executionProvenance (WHO/WHAT produced this step) and structuredResult (the
+		// inline result content) were §16.2-undeclared and so validated then discarded into neither store — the
+		// governed stream could not name who produced a high-consequence step nor what it returned. Both now carried
+		// (optional, authored atop the ratified §16.2 shape); this is the trace over non-deterministic agent work the
+		// system exists to make reasoning-about. resultStatus stays dropped: it is redundant with the const
+		// resultingExecutionState. (Follow-up: the floor gate still re-derives aiProduced heuristically —
+		// stepOutputIsAiProduced — where it could read executionProvenance's resolved provider/model authoritatively.)
 		eventPayload: {
 			executionStepId: p.executionStepId,
 			executionAttemptId: p.executionAttemptId,
 			outputArtifactIds: p.outputArtifactIds,
 			proposedEvidenceIds: p.proposedEvidenceIds,
 			detectedAssumptionIds: p.detectedAssumptionIds,
-			resultingExecutionState: 'SUCCEEDED'
+			resultingExecutionState: 'SUCCEEDED',
+			executionProvenance: p.executionProvenance,
+			...(p.structuredResult !== undefined ? { structuredResult: p.structuredResult } : {})
 		} satisfies ExecutionStepSucceededPayload,
 		precheck: (step) => {
 			const hasOutput =
