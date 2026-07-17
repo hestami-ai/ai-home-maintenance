@@ -75,7 +75,10 @@ export const approveExecutionPlan: CommandHandler = (ctx, command) =>
 		statusField: 'status',
 		machine: MACHINE,
 		target: 'APPROVED',
-		eventType: 'ExecutionPlanApproved'
+		eventType: 'ExecutionPlanApproved',
+		// The event records the RESULTING status. ExecutionPlanApproved declares `status` (APPROVED), which the
+		// empty command payload does not carry — so the default emit recorded nothing of the transition. (Pinned.)
+		eventPayload: () => ({ status: 'APPROVED' })
 	});
 
 /**

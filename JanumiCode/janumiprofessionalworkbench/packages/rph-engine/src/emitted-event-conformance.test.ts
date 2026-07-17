@@ -69,7 +69,7 @@ describe('emitted events vs their declared shapes', () => {
 		expect(checked).toBeGreaterThan(200);
 	});
 
-	it('DEFECT REGISTER: 8 event types emit a payload their own declared shape rejects', () => {
+	it('DEFECT REGISTER: 5 event types emit a payload their own declared shape rejects', () => {
 		const { violations } = driveAndCheck();
 		// PIN — a defect register, not a specification. It must only ever SHRINK. An entry here means an event
 		// and its declared contract disagree, and BOTH are ours: either the handler emits the wrong thing, or the
@@ -81,22 +81,21 @@ describe('emitted events vs their declared shapes', () => {
 		// several also carry keys the strict schema rejects outright. These are precisely the events a projection
 		// must read to know what happened, which is how the Work view came to report every PWU as PROPOSED.
 		//
-		// AssuranceAssessmentStarted was the twelfth (fixed earlier — the SCHEMA was the wrong side there).
-		// ExecutionStepStarted (13th), IntentDiscoveryStarted (14th), and DecompositionValidated (15th) are fixed:
-		// the HANDLER was the wrong side in each — it emitted the command payload while the event exists to record
-		// the RESULTING status (`stepState: RUNNING`, `intentStatus: UNDER_DISCOVERY`, `status: VALID`) it
-		// transitioned INTO, so each now supplies the declared shape. The remaining eight each need the same
-		// judgement made deliberately, one at a time, and several interact with the unresolved request-and-begin /
-		// five-outcome-events modeling drift. Papering them over with a bulk edit would be the fabrication this
-		// effort exists to prevent.
+		// AssuranceAssessmentStarted was the twelfth (fixed earlier — the SCHEMA was the wrong side there). Fixed
+		// since, all HANDLER-was-the-wrong-side (it emitted the command payload; the event exists to record the
+		// RESULTING status it transitioned INTO): ExecutionStepStarted (`stepState: RUNNING`), IntentDiscoveryStarted
+		// (`intentStatus: UNDER_DISCOVERY`), DecompositionValidated (`status: VALID`), and the three status-only
+		// transition events ExecutionPlanApproved / BaselineSubmittedForReview / BaselineApproved (each `status: <target>`).
+		// Each now supplies its declared shape. The remaining FIVE are all CREATE events (createObject emitting the
+		// created-object state or command payload while the declared shape wants a richer `{ …, status }`); they need
+		// the same judgement made deliberately, one at a time, and several interact with the unresolved
+		// request-and-begin / five-outcome-events modeling drift. Papering them over with a bulk edit would be the
+		// fabrication this effort exists to prevent.
 		expect(violations.map((v) => v.eventType).sort()).toEqual([
-			'BaselineApproved',
 			'BaselineCreated',
-			'BaselineSubmittedForReview',
 			'DecisionProposed',
 			'DecompositionProposed',
 			'EvidenceProposed',
-			'ExecutionPlanApproved',
 			'ExecutionPlanProposed'
 		]);
 	});
@@ -118,7 +117,10 @@ describe('emitted events vs their declared shapes', () => {
 			'BaselinePromoted',
 			'ExecutionStepStarted',
 			'IntentDiscoveryStarted',
-			'DecompositionValidated'
+			'DecompositionValidated',
+			'ExecutionPlanApproved',
+			'BaselineSubmittedForReview',
+			'BaselineApproved'
 		]) {
 			expect(broken.has(eventType), `${eventType} regressed`).toBe(false);
 		}

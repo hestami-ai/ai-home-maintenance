@@ -332,7 +332,10 @@ export const submitBaselineForReview: CommandHandler = (ctx, command) =>
 		statusField: 'status',
 		machine: 'Baseline.status',
 		target: 'UNDER_REVIEW',
-		eventType: 'BaselineSubmittedForReview'
+		eventType: 'BaselineSubmittedForReview',
+		// The event records the RESULTING status. BaselineSubmittedForReview declares `status` (UNDER_REVIEW), which
+		// the empty command payload does not carry. (Pinned defect in emitted-event-conformance; now conforms.)
+		eventPayload: () => ({ status: 'UNDER_REVIEW' })
 	});
 
 /** ApproveBaseline — UNDER_REVIEW -> APPROVED. */
@@ -342,7 +345,13 @@ export const approveBaseline: CommandHandler = (ctx, command) =>
 		statusField: 'status',
 		machine: 'Baseline.status',
 		target: 'APPROVED',
-		eventType: 'BaselineApproved'
+		eventType: 'BaselineApproved',
+		// BaselineApproved declares only `status` (APPROVED). The ApproveBaseline command also carries
+		// `approvalDecisionId` — which the event does NOT declare (unlike ExecutionPlanApproved, whose shape has it
+		// optionally). Emitting the declared shape drops it rather than writing an undeclared key to the governed
+		// stream; recording WHICH decision approved the baseline is a worthwhile shape enrichment, left for the §32
+		// governance-traceability pass. (Pinned defect; now conforms.)
+		eventPayload: () => ({ status: 'APPROVED' })
 	});
 
 /** PromoteBaseline — APPROVED -> AUTHORITATIVE, gated by canPromoteBaseline (effective promotion decision +

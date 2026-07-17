@@ -3079,12 +3079,18 @@ the HANDLER was the wrong side (it emitted the command payload; the event exists
   declares `status` (the `VALID`/`CONDITIONALLY_VALID` it transitioned to) and rejects the undeclared `disposition`.
   Now supplies `{ status: <target>, validatorRole? }`. (The command's `observationIds` is not a declared field of
   this event — left for the §32 pass rather than written to the governed stream as an undeclared key.)
+- **`ExecutionPlanApproved` / `BaselineSubmittedForReview` / `BaselineApproved`** — three status-only transition
+  events, each emitting the empty/command payload while declaring only `status`. Each now supplies `{ status: <target> }`
+  (`APPROVED` / `UNDER_REVIEW` / `APPROVED`). `BaselineApproved`'s command also carries `approvalDecisionId`, which its
+  event does not declare (unlike `ExecutionPlanApproved`, whose shape has it optionally) — dropped rather than written
+  as an undeclared key; recording *which* decision approved a baseline is a worthwhile shape enrichment left for the
+  §32 governance-traceability pass.
 
-A projection reading any of these to learn what happened now finds the state, not silence. Register **11 → 8**; all
-three added to the must-conform spine so they cannot regress. Each mutation-verified (break the `eventPayload` → both
-the register count and the spine fail). Gate (each): `check-types` 21/21 · `test` 21/21 · lint · boundary · format.
-The remaining eight each need their own deliberate judgement (several tangle with the request-and-begin /
-five-outcome-events modeling drift), one at a time — never a bulk edit.
+A projection reading any of these to learn what happened now finds the state, not silence. Register **11 → 5**; all
+six added to the must-conform spine so they cannot regress. Each mutation-verified (break the `eventPayload` → both
+the register count and the spine fail). Gate: `check-types` 21/21 · `test` 21/21 · lint · boundary · format. The
+remaining five are all CREATE events (a richer `{ …, status }` shape); each needs its own deliberate judgement,
+several tangling with the request-and-begin / five-outcome-events modeling drift — one at a time, never a bulk edit.
 
 ---
 
