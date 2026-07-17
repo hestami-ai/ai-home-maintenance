@@ -69,7 +69,7 @@ describe('emitted events vs their declared shapes', () => {
 		expect(checked).toBeGreaterThan(200);
 	});
 
-	it('DEFECT REGISTER: 11 event types emit a payload their own declared shape rejects', () => {
+	it('DEFECT REGISTER: 10 event types emit a payload their own declared shape rejects', () => {
 		const { violations } = driveAndCheck();
 		// PIN — a defect register, not a specification. It must only ever SHRINK. An entry here means an event
 		// and its declared contract disagree, and BOTH are ours: either the handler emits the wrong thing, or the
@@ -81,12 +81,12 @@ describe('emitted events vs their declared shapes', () => {
 		// several also carry keys the strict schema rejects outright. These are precisely the events a projection
 		// must read to know what happened, which is how the Work view came to report every PWU as PROPOSED.
 		//
-		// AssuranceAssessmentStarted was the twelfth and is fixed in this increment — the SCHEMA was the wrong
-		// side there (an authored `{disposition}` that described nothing the event is for, while the handler
-		// emitted the six fields an assessment-started event actually needs). The other eleven each need the same
-		// judgement made deliberately, one at a time, and several interact with the unresolved
-		// request-and-begin / five-outcome-events modeling drift. Papering them over with a bulk edit would be
-		// the fabrication this effort exists to prevent.
+		// AssuranceAssessmentStarted was the twelfth (fixed earlier — the SCHEMA was the wrong side there).
+		// ExecutionStepStarted is the thirteenth, fixed now: the handler was the wrong side — it emitted
+		// `{ stepId }` while the event exists to record the `stepState` (RUNNING) the step transitioned INTO, so it
+		// now supplies the declared shape. The remaining ten each need the same judgement made deliberately, one at
+		// a time, and several interact with the unresolved request-and-begin / five-outcome-events modeling drift.
+		// Papering them over with a bulk edit would be the fabrication this effort exists to prevent.
 		expect(violations.map((v) => v.eventType).sort()).toEqual([
 			'BaselineApproved',
 			'BaselineCreated',
@@ -97,7 +97,6 @@ describe('emitted events vs their declared shapes', () => {
 			'EvidenceProposed',
 			'ExecutionPlanApproved',
 			'ExecutionPlanProposed',
-			'ExecutionStepStarted',
 			'IntentDiscoveryStarted'
 		]);
 	});
@@ -116,7 +115,8 @@ describe('emitted events vs their declared shapes', () => {
 			'AssuranceObservationRecorded',
 			'ClaimAsserted',
 			'DecisionEffective',
-			'BaselinePromoted'
+			'BaselinePromoted',
+			'ExecutionStepStarted'
 		]) {
 			expect(broken.has(eventType), `${eventType} regressed`).toBe(false);
 		}

@@ -3064,6 +3064,22 @@ the three floor-policy-creation events) and the I1 evaluator lock now admits the
 
 ---
 
+## PART 3x — One of the pinned event-shape defects closed: ExecutionStepStarted now records the state it started INTO
+
+The emitted-event-conformance register (PART 3p) pinned events whose emitted payload their own declared shape
+rejects — "the event that records *this became RUNNING* does not contain RUNNING." `startExecutionStep` emitted
+`command.payload` (`{ stepId }`) while `ExecutionStepStarted` declares `stepState` (the `RUNNING` it transitions
+into). The handler was the wrong side: `advanceStep` already supports an `eventPayload` override, so it now supplies
+the declared shape (`{ stepId, runtimeBindingId?, stepState: 'RUNNING' }`). A projection reading this event to learn
+a step started now finds the state it started into, not silence.
+
+Register **11 → 10**; `ExecutionStepStarted` added to the must-conform spine so it cannot regress. Mutation-verified
+(remove the `eventPayload` → both the register count and the spine fail). Gate: `check-types` 21/21 · `test` 21/21 ·
+lint · boundary · format. The remaining ten each need their own deliberate judgement (several tangle with the
+request-and-begin / five-outcome-events modeling drift), one at a time — never a bulk edit.
+
+---
+
 ## PART 4 — Open questions genuinely for the sponsor
 
 *(kept deliberately short — under the 2026-07-15 mandate, a tension is work, not a question, unless it

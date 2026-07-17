@@ -241,11 +241,20 @@ function advanceStep(
 
 /** StartExecutionStep — a step READY|QUEUED -> RUNNING (only under an ACTIVE plan). */
 export const startExecutionStep: CommandHandler = (ctx, command) => {
-	const p = command.payload as { stepId: string };
+	const p = command.payload as { stepId: string; runtimeBindingId?: string };
 	return advanceStep(ctx, command, {
 		stepId: p.stepId,
 		target: 'RUNNING',
 		eventType: 'ExecutionStepStarted',
+		// The event records the RESULTING state, not the command input: ExecutionStepStarted declares `stepState`
+		// (the RUNNING it transitioned to), which `command.payload` ({ stepId }) does not carry — so the default
+		// emitted `{ stepId }` was missing the one field the event exists to record. The event that says "this step
+		// started" now contains the state it started INTO. (Pinned defect in emitted-event-conformance; now conforms.)
+		eventPayload: {
+			stepId: p.stepId,
+			...(p.runtimeBindingId ? { runtimeBindingId: p.runtimeBindingId } : {}),
+			stepState: 'RUNNING'
+		},
 		precheck: (_step, plan) =>
 			plan.status === 'ACTIVE'
 				? null
