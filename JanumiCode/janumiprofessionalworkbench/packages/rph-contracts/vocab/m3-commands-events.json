@@ -2628,6 +2628,12 @@
           "required": true,
           "type": "string",
           "note": "DOC-007 §20 ValidatorResult.validatorVersion — the version half of §22's 'validator/version'. See validatorId."
+        },
+        {
+          "field": "independenceResult",
+          "required": false,
+          "type": "string",
+          "note": "Increment I4 (authored under §0.3): 'VERIFIED' when completeAssuranceAssessment RAN the independence check (§8.4/§39 inv 8/§20.2) and it passed — the §22 'independence result' the audit log requires, and the source the §38 view shows as 'independence status'. ABSENT when the check did not run (policy unresolved / requirement NONE / no producer supplied): unknown, never a fabricated 'verified'. The NEGATIVE branch is the separate AssuranceIndependenceViolated event + INDEPENDENCE_VIOLATION state (I2) — a distinct terminal state warrants its own event; verification is a PROPERTY of a normal completion, so it rides the completion (one event per revision)."
         }
       ]
     },

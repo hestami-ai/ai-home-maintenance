@@ -3003,7 +3003,37 @@ the (d2) ratified gate set, still schema-checked by the emitted-event conformanc
 
 Red-test-first, mutation-verified (disable the violation branch → the same-identity test drops to `SATISFIED`).
 Gate: vocab +1 field +1 event (CRLF-clean), gen localized, `check-types` 21/21 · `test` 21/21 · lint · boundary ·
-format. **I4 (the positive `AssuranceIndependenceVerified` event + §38 view fold) is the remaining slice.**
+format.
+
+### I4 — the positive verdict recorded, the §38 field complete — and why it is a FIELD, not an event
+
+The §38 view now sources **independence status** as a tri-state: `VERIFIED` / `VIOLATED` / `undefined` (unknown).
+This closes the field the Assurance View has left blank since Increment 36.
+
+**A decision reasoned, not defaulted — and a reversal of the original ruling, on new evidence.** The sponsor chose
+"distinct `AssuranceIndependenceVerified` event." Building it surfaced a constraint that ruling was made without:
+the event store enforces `UNIQUE (aggregate_type, aggregate_id, aggregate_revision)` — **one event per revision**.
+The pass path already emits `AssuranceAssessmentCompleted` at the completing revision, so a *separate* verified event
+would need its own revision (a second commit + a state-unchanged annotation), trading atomicity for a distinct row.
+The store's rule is a modeling signal, not just an obstacle: `AssuranceIndependenceViolated` earns its own event
+because it is a distinct **terminal state** (`INDEPENDENCE_VIOLATION`); verification is **not** a state change — the
+assessment completes normally, and independence-verified is a **property of that completion**. So the principled,
+atomic shape is asymmetric: violation = its own event + state (I2); verification = `independenceResult: 'VERIFIED'`
+**on the completion event** it accompanies. Under the standing mandate I made this call under §0.3 rather than
+re-asking, and recorded the reversal here.
+
+Honest by construction: `independenceResult` is set only when the check RAN and PASSED; a completion where the check
+did not run **omits** it, and the view reads absence as "unknown", never a fabricated pass. The view folds the new
+`AssuranceIndependenceViolated` event too (→ `VIOLATED` + the `INDEPENDENCE_VIOLATION` state). Over the live
+reference undertaking the fitness assessments now read `VERIFIED` (the real `DIFFERENT_AGENT` pass), the floor
+assessments read `undefined` (no producer → check skipped), and nothing reads a fabricated `VIOLATED`.
+
+`applyAssuranceEvent` was refactored from an inline four-case switch into per-event fold helpers (cognitive
+complexity 17 → within limit; behaviour identical). Mutation-verified twice: blank the view's `independenceResult`
+source → the tri-state test fails; disable the handler's `= 'VERIFIED'` → the live `VERIFIED` assertion fails.
+Gate: vocab +1 field (no new registry entry), gen localized, `check-types` 21/21 · `test` 21/21 · lint · boundary ·
+format. **The independence project (§38 "independence status") is complete; two follow-ups remain (floor-path
+producer threading for `DIFFERENT_MODEL`; the `requestAssuranceAssessment` policy-existence fail-closed).**
 
 ---
 

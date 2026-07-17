@@ -530,6 +530,9 @@ export const completeAssuranceAssessment: CommandHandler = (ctx, command, payloa
 					{ independenceRequirement?: string } | undefined
 			)?.independenceRequirement
 		: undefined;
+	// 'VERIFIED' only when the check RAN and PASSED; left undefined when it did not run (see the gate note above) so
+	// the §38 view reads that as "unknown", never a fabricated pass. The negative branch returns early below.
+	let independenceResult: string | undefined;
 	if (independenceRequirement && independenceRequirement !== 'NONE' && producer && evaluator) {
 		const verdict = checkIndependence(
 			independenceRequirement as IndependenceRequirement,
@@ -556,6 +559,7 @@ export const completeAssuranceAssessment: CommandHandler = (ctx, command, payloa
 				mutate: (base) => ({ ...base, completedAt: command.issuedAt })
 			});
 		}
+		independenceResult = 'VERIFIED';
 	}
 
 	return advanceStatus(ctx, command, {
@@ -590,10 +594,13 @@ export const completeAssuranceAssessment: CommandHandler = (ctx, command, payloa
 		// every validator call, yet §19.3's first-slice payload (§16 item 6) omitted it, so the completion event
 		// recorded the outcome and erased the author of it. The value is REQUIRED on the §20 ValidatorResult the
 		// command boundary already validated, so it is threaded through, never invented; the `?? ''` is an
-		// unreachable TS guard (a rejected command never reaches here). Independence — §38's neighbouring field and
-		// §39 invariant 8 — is NOT added here: the §20 ValidatorResult carries no independence result, and the
-		// independence scorer that would produce one is built but uncalled (top of this file). That is its own
-		// increment, not a field to fabricate onto this event.
+		// unreachable TS guard (a rejected command never reaches here).
+		//
+		// INDEPENDENCE RESULT (Increment I4). `independenceResult: 'VERIFIED'` rides the completion when the check
+		// above RAN and PASSED — the §22 "independence result" the audit log requires and the §38 view's "independence
+		// status" source. It is a PROPERTY of this completion, not a state change (the violation IS a state change, so
+		// it earns its own AssuranceIndependenceViolated event + INDEPENDENCE_VIOLATION state instead). Spread only
+		// when set: an unverified completion omits it, and the view reads absence as "unknown", never a fabricated pass.
 		eventPayload: (next) => ({
 			assessmentId: command.targetAggregateId,
 			assurancePolicyId: next.assurancePolicyId,
@@ -606,7 +613,8 @@ export const completeAssuranceAssessment: CommandHandler = (ctx, command, payloa
 			residualUncertainty: p.validatorResult?.residualUncertainty ?? [],
 			recommendedControlActions: p.validatorResult?.recommendedControlActions ?? [],
 			validatorId: p.validatorResult?.validatorId ?? '',
-			validatorVersion: p.validatorResult?.validatorVersion ?? ''
+			validatorVersion: p.validatorResult?.validatorVersion ?? '',
+			...(independenceResult ? { independenceResult } : {})
 		}),
 		mutate: (base) => ({
 			...base,

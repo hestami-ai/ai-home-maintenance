@@ -621,7 +621,8 @@ export const AssuranceAssessmentCompletedPayloadSchema = z.strictObject({
 	residualUncertainty: z.array(z.string()),
 	recommendedControlActions: z.array(ControlActionRecommendationSchema),
 	validatorId: z.string(),
-	validatorVersion: z.string()
+	validatorVersion: z.string(),
+	independenceResult: z.string().optional()
 });
 export type AssuranceAssessmentCompletedPayload = z.infer<
 	typeof AssuranceAssessmentCompletedPayloadSchema

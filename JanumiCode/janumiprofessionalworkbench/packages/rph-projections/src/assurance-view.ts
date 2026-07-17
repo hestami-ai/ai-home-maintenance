@@ -19,11 +19,12 @@
 //                                       onto the event in Increment 37 — the §20 ValidatorResult always carried it, the
 //                                       §19.3 first-slice event had dropped it. Now sourced; `undefined` only on a
 //                                       (pre-Increment-37 / malformed) event that lacks the field — unknown, not "none".
+//     independenceStatus              — 'VERIFIED' from AssuranceAssessmentCompleted.independenceResult (the check RAN and
+//                                       passed, Increment I4); 'VIOLATED' from the AssuranceIndependenceViolated event
+//                                       (Increment I2, a distinct terminal state); `undefined` when the check did not run
+//                                       — unknown, never a fabricated pass. §38 field + §39 invariant 8 + §22 "independence result".
 //
 //   NOT POPULATED, and WHY — recorded, never faked (a blank the view must render as "unknown", not "none"):
-//     independenceStatus              — the §20 ValidatorResult carries NO independence result, only the policy's
-//                                       REQUIREMENT is logged; the independence scorer is built but uncalled. §38 field
-//                                       + §39 invariant 8 + §22 "independence result" with no source yet. `undefined`.
 //     missingEvidence                 — required-evidence set never reaches the log (AssuranceEvidenceRequired is a
 //                                       ratified name, unbuilt — Increment 33). Empty, meaning UNKNOWN not NONE.
 //     controlActions / waivers / invalidationStatus — see the §32/§37 conformance items; not folded here yet.
@@ -58,7 +59,8 @@ export interface AssuranceAssessmentView {
 	readonly validatorImplementationIdentity?: string;
 	/** The version half of the validator's identity (Completed.validatorVersion; §22 "validator/version"). */
 	readonly validatorImplementationVersion?: string;
-	/** §38 "independence status" — NO SOURCE today (only the requirement is logged). undefined = unknown. */
+	/** §38 "independence status" — 'VERIFIED' (Completed.independenceResult) / 'VIOLATED' (AssuranceIndependenceViolated
+	 *  event) / undefined when the check did not run = unknown, never a fabricated pass. */
 	readonly independenceStatus?: string;
 }
 
@@ -71,77 +73,98 @@ const str = (v: unknown): string | undefined => (typeof v === 'string' ? v : und
 const strArr = (v: unknown): string[] =>
 	Array.isArray(v) ? v.filter((x): x is string => typeof x === 'string') : [];
 
+/** Upsert one assessment into the view — the shared shape every fold below returns. */
+function withAssessment(
+	view: AssuranceView,
+	id: string,
+	assessment: AssuranceAssessmentView
+): AssuranceView {
+	return { assessments: { ...view.assessments, [id]: assessment } };
+}
+
+function foldStarted(view: AssuranceView, p: Payload): AssuranceView {
+	const assessmentId = str(p.assessmentId);
+	const policyId = str(p.assurancePolicyId);
+	if (!assessmentId || !policyId) return view;
+	return withAssessment(view, assessmentId, {
+		assessmentId,
+		policyId,
+		policyVersion: str(p.policyVersion) ?? '',
+		subjectObjectIds: strArr(p.subjectObjectIds),
+		assessmentState: 'ASSESSING',
+		evidenceConsideredIds: [],
+		observations: [],
+		openConditions: []
+	});
+}
+
+function foldObservation(view: AssuranceView, p: Payload): AssuranceView {
+	const assessmentId = str(p.assessmentId);
+	if (!assessmentId) return view;
+	const existing = view.assessments[assessmentId];
+	if (!existing) return view; // an observation with no started assessment has nothing to attach to
+	const observation: AssuranceObservationView = {
+		observationId: str(p.observationId) ?? '',
+		findingCode: str(p.findingCode) ?? '',
+		severity: str(p.severity) ?? '',
+		statement: str(p.statement) ?? '',
+		disposition: str(p.disposition) ?? ''
+	};
+	return withAssessment(view, assessmentId, {
+		...existing,
+		observations: [...existing.observations, observation]
+	});
+}
+
+function foldCompleted(view: AssuranceView, p: Payload): AssuranceView {
+	const assessmentId = str(p.assessmentId);
+	if (!assessmentId) return view;
+	const existing = view.assessments[assessmentId];
+	if (!existing) return view;
+	const disposition = str(p.disposition) ?? existing.assessmentState;
+	return withAssessment(view, assessmentId, {
+		...existing,
+		assessmentState: disposition,
+		disposition,
+		evidenceConsideredIds: strArr(p.evidenceConsideredIds),
+		// §38 "open conditions": residuals are conditions only while the disposition is conditional.
+		openConditions: disposition === 'CONDITIONALLY_SATISFIED' ? strArr(p.residualUncertainty) : [],
+		// §38 "validator implementation identity" — WHO/WHAT judged. `str()` leaves it undefined on an event
+		// without the field (pre-Increment-37 / malformed): unknown, never a fabricated identity.
+		validatorImplementationIdentity: str(p.validatorId),
+		validatorImplementationVersion: str(p.validatorVersion),
+		// §38 "independence status": 'VERIFIED' only when the check ran and passed (I4); absent = unknown.
+		independenceStatus: str(p.independenceResult)
+	});
+}
+
+function foldViolated(view: AssuranceView, p: Payload): AssuranceView {
+	// The ratified §30 terminal state: the assessment did NOT complete to a disposition — required independence
+	// failed. Distinct from a normal completion, so it is its own event (Increment I2); the view reads it as the
+	// negative half of §38 "independence status".
+	const assessmentId = str(p.assessmentId);
+	if (!assessmentId) return view;
+	const existing = view.assessments[assessmentId];
+	if (!existing) return view;
+	return withAssessment(view, assessmentId, {
+		...existing,
+		assessmentState: 'INDEPENDENCE_VIOLATION',
+		independenceStatus: 'VIOLATED'
+	});
+}
+
 /** One assurance event -> the next view. Every field is READ FROM THE EVENT; nothing is inferred from a name. */
 export function applyAssuranceEvent(view: AssuranceView, event: DomainEvent): AssuranceView {
 	const p = (event.payload ?? {}) as Payload;
 	switch (event.eventType) {
-		case 'AssuranceAssessmentStarted': {
-			const assessmentId = str(p.assessmentId);
-			const policyId = str(p.assurancePolicyId);
-			if (!assessmentId || !policyId) return view;
-			return {
-				assessments: {
-					...view.assessments,
-					[assessmentId]: {
-						assessmentId,
-						policyId,
-						policyVersion: str(p.policyVersion) ?? '',
-						subjectObjectIds: strArr(p.subjectObjectIds),
-						assessmentState: 'ASSESSING',
-						evidenceConsideredIds: [],
-						observations: [],
-						openConditions: []
-					}
-				}
-			};
-		}
-		case 'AssuranceObservationRecorded': {
-			const assessmentId = str(p.assessmentId);
-			if (!assessmentId) return view;
-			const existing = view.assessments[assessmentId];
-			if (!existing) return view; // an observation with no started assessment has nothing to attach to
-			const observation: AssuranceObservationView = {
-				observationId: str(p.observationId) ?? '',
-				findingCode: str(p.findingCode) ?? '',
-				severity: str(p.severity) ?? '',
-				statement: str(p.statement) ?? '',
-				disposition: str(p.disposition) ?? ''
-			};
-			return {
-				assessments: {
-					...view.assessments,
-					[assessmentId]: {
-						...existing,
-						observations: [...existing.observations, observation]
-					}
-				}
-			};
-		}
-		case 'AssuranceAssessmentCompleted': {
-			const assessmentId = str(p.assessmentId);
-			if (!assessmentId) return view;
-			const existing = view.assessments[assessmentId];
-			if (!existing) return view;
-			const disposition = str(p.disposition) ?? existing.assessmentState;
-			return {
-				assessments: {
-					...view.assessments,
-					[assessmentId]: {
-						...existing,
-						assessmentState: disposition,
-						disposition,
-						evidenceConsideredIds: strArr(p.evidenceConsideredIds),
-						// §38 "open conditions": residuals are conditions only while the disposition is conditional.
-						openConditions:
-							disposition === 'CONDITIONALLY_SATISFIED' ? strArr(p.residualUncertainty) : [],
-						// §38 "validator implementation identity" — WHO/WHAT judged. `str()` leaves it undefined on an
-						// event without the field (pre-Increment-37 / malformed): unknown, never a fabricated identity.
-						validatorImplementationIdentity: str(p.validatorId),
-						validatorImplementationVersion: str(p.validatorVersion)
-					}
-				}
-			};
-		}
+		case 'AssuranceAssessmentStarted':
+			return foldStarted(view, p);
+		case 'AssuranceObservationRecorded':
+			return foldObservation(view, p);
+		case 'AssuranceAssessmentCompleted':
+			return foldCompleted(view, p);
+		case 'AssuranceIndependenceViolated':
+			return foldViolated(view, p);
 		default:
 			return view;
 	}

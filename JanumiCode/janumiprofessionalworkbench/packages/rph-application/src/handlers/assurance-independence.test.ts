@@ -184,6 +184,15 @@ describe('completeAssuranceAssessment — independence enforcement (Increment I2
 		expect(store.readAllEvents().some((e) => e.eventType === 'AssuranceIndependenceViolated')).toBe(
 			false
 		);
+		// Increment I4: the check RAN and PASSED, so the completion records the positive result.
+		const completedEvt = store
+			.readAllEvents()
+			.find(
+				(e) => e.eventType === 'AssuranceAssessmentCompleted' && e.aggregateId === assessmentId
+			);
+		expect((completedEvt!.payload as { independenceResult?: string }).independenceResult).toBe(
+			'VERIFIED'
+		);
 	});
 
 	it('the check is SKIPPED (proceeds, not violated) when the caller supplies no producer — the chosen gate', () => {
@@ -202,5 +211,15 @@ describe('completeAssuranceAssessment — independence enforcement (Increment I2
 		);
 		expect(result.status).toBe('ACCEPTED');
 		expect(stateOf(assessmentId)?.assessmentState).toBe('SATISFIED');
+		// The check did NOT run (no producer), so the completion records NO independence result — unknown, not a
+		// fabricated 'VERIFIED'.
+		const completedEvt = store
+			.readAllEvents()
+			.find(
+				(e) => e.eventType === 'AssuranceAssessmentCompleted' && e.aggregateId === assessmentId
+			);
+		expect(
+			(completedEvt!.payload as { independenceResult?: string }).independenceResult
+		).toBeUndefined();
 	});
 });

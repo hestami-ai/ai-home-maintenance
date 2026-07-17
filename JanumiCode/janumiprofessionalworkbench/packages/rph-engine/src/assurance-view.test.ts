@@ -86,14 +86,23 @@ describe('Assurance View (DOC-004 §38) over the live log', () => {
 		).toBe(true);
 	});
 
-	it('§38 ABSENT-BY-SOURCE: independence status is undefined, not faked', () => {
+	it('§38 independence status: fitness assessments are VERIFIED (a real DIFFERENT_AGENT pass); floor assessments are unknown (check skipped)', () => {
 		const view = build();
 		const assessments = Object.values(view.assessments);
-		// Independence is the one §38 field the log still does not source: the §20 ValidatorResult carries no
-		// independence result (only the policy's REQUIREMENT is logged), and the independence scorer is built but
-		// uncalled. The view must leave it undefined — a concrete value would be a fabricated assurance fact.
-		// (Contrast validator identity, which IS now sourced — see the POPULATED test above.)
-		expect(assessments.every((a) => a.independenceStatus === undefined)).toBe(true);
+		// Increments I1/I2/I4: the fitness assessments run under the DIFFERENT_AGENT policy with a producer supplied
+		// and the distinct evaluator, so the check RAN and PASSED — independence is VERIFIED, not merely asserted.
+		const conditional = assessments.find(
+			(a) =>
+				a.disposition === 'CONDITIONALLY_SATISFIED' &&
+				a.subjectObjectIds.includes(REFERENCE_UNDERTAKING.mobileOffline)
+		);
+		expect(conditional!.independenceStatus).toBe('VERIFIED');
+		expect(assessments.some((a) => a.independenceStatus === 'VERIFIED')).toBe(true);
+		// The floor assessments supply no producer, so the check is SKIPPED — independence stays undefined (unknown),
+		// never a fabricated pass. The log therefore genuinely distinguishes VERIFIED from unknown.
+		expect(assessments.some((a) => a.independenceStatus === undefined)).toBe(true);
+		// And nothing is a fabricated VIOLATION — the seed's independence genuinely holds.
+		expect(assessments.every((a) => a.independenceStatus !== 'VIOLATED')).toBe(true);
 	});
 
 	// NOTE: the "open conditions ONLY while conditional" GUARD is NOT provable over this log — every SATISFIED

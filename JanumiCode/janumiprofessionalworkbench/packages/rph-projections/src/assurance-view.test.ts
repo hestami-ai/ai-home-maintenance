@@ -40,7 +40,12 @@ const started = (assessmentId: string, subject: string) =>
 		claimIds: []
 	});
 
-const completed = (assessmentId: string, disposition: string, residuals: string[]) =>
+const completed = (
+	assessmentId: string,
+	disposition: string,
+	residuals: string[],
+	independenceResult?: string
+) =>
 	evt(2, 'AssuranceAssessmentCompleted', {
 		assessmentId,
 		assurancePolicyId: 'pol_x',
@@ -53,7 +58,19 @@ const completed = (assessmentId: string, disposition: string, residuals: string[
 		residualUncertainty: residuals,
 		recommendedControlActions: [],
 		validatorId: 'acme.fitness-reviewer',
-		validatorVersion: '2.1.0'
+		validatorVersion: '2.1.0',
+		...(independenceResult ? { independenceResult } : {})
+	});
+
+const violated = (assessmentId: string) =>
+	evt(4, 'AssuranceIndependenceViolated', {
+		assessmentId,
+		assurancePolicyId: 'pol_x',
+		policyVersion: '1.0.0',
+		subjectObjectIds: ['pwu_1'],
+		subjectSemanticVersions: { pwu_1: 1 },
+		independenceRequirement: 'DIFFERENT_AGENT',
+		reason: 'same agent identity'
 	});
 
 describe('Assurance View fold — open-conditions guard (the case the live log cannot make)', () => {
@@ -110,9 +127,9 @@ describe('Assurance View fold — open-conditions guard (the case the live log c
 		expect(twice).toEqual(once);
 	});
 
-	it('§38 sources validator implementation identity (id + version) from the completion event; independence stays absent', () => {
+	it('§38 sources validator implementation identity (id + version) from the completion event', () => {
 		// Increment 37: validatorId/validatorVersion are on the §20 ValidatorResult and now threaded onto the event,
-		// so the view shows WHO/WHAT judged. Independence has no source in the ValidatorResult — it stays undefined.
+		// so the view shows WHO/WHAT judged.
 		const view = buildAssuranceView([
 			started('asm_d', 'pwu_1'),
 			completed('asm_d', 'SATISFIED', [])
@@ -120,7 +137,27 @@ describe('Assurance View fold — open-conditions guard (the case the live log c
 		const a = view.assessments['asm_d']!;
 		expect(a.validatorImplementationIdentity).toBe('acme.fitness-reviewer');
 		expect(a.validatorImplementationVersion).toBe('2.1.0');
-		expect(a.independenceStatus).toBeUndefined();
+	});
+
+	it('§38 "independence status" — VERIFIED from the completion, VIOLATED from the event, undefined when the check did not run', () => {
+		// Increment I4: the tri-state. VERIFIED rides the completion event (the check ran and passed); a completion
+		// with no independenceResult means the check did not run — unknown, never a fabricated pass; and the negative
+		// branch is the distinct AssuranceIndependenceViolated event (Increment I2), which also lands the assessment
+		// in the ratified INDEPENDENCE_VIOLATION state.
+		const view = buildAssuranceView([
+			started('asm_v', 'pwu_1'),
+			completed('asm_v', 'SATISFIED', [], 'VERIFIED'),
+			started('asm_u', 'pwu_1'),
+			completed('asm_u', 'SATISFIED', []), // no independenceResult — check did not run
+			started('asm_x', 'pwu_1'),
+			violated('asm_x')
+		]);
+		expect(view.assessments['asm_v']!.independenceStatus).toBe('VERIFIED');
+		expect(view.assessments['asm_u']!.independenceStatus).toBeUndefined();
+		const x = view.assessments['asm_x']!;
+		expect(x.independenceStatus).toBe('VIOLATED');
+		// A violated assessment never reached a disposition — it is in the ratified terminal violation state.
+		expect(x.assessmentState).toBe('INDEPENDENCE_VIOLATION');
 	});
 
 	it('unknown-vs-none: an event WITHOUT validatorId leaves the identity undefined, never a faked value', () => {
