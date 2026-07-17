@@ -79,6 +79,19 @@ const ACTOR: ActorReference = {
 	displayName: 'Undertaking Owner'
 };
 
+// The assurance EVALUATOR is a DISTINCT party from the work producer (ACTOR) — the whole point of independence
+// (DOC-004 §39 invariant 8, §8.4). Until now the reference undertaking stamped `owner-1` as BOTH the producer of
+// every artifact AND the evaluator of every assessment, so a real independence check (DIFFERENT_AGENT on the
+// fitness policy; the evaluator≠producer the Assurance Service must verify) would have had to REJECT the canonical
+// drive or be defeated to pass. A separate reviewer identity makes the seed's independence genuine rather than an
+// accident of one actor wearing both hats. `actorId` distinct from `owner-1` satisfies DIFFERENT_AGENT (the seam
+// maps actorId→agentId); `HUMAN` satisfies the workbench fitness policy's HUMAN requirement.
+const EVALUATOR: ActorReference = {
+	actorId: 'evaluator-1',
+	actorType: 'HUMAN',
+	displayName: 'Independent Assurance Reviewer'
+};
+
 /** Stable ids for the Reference Undertaking objects (valid Crockford-base32 ULIDs). */
 export const REFERENCE_UNDERTAKING = {
 	intentId: 'int_01ARZ3NDEKTSV4RRFFQ69G5AAA',
@@ -447,7 +460,7 @@ export function driveReferenceUndertaking(
 					recommendedControlActions: [],
 					residualUncertainty: [],
 					limitations: [],
-					executionProvenance: { evaluator: ACTOR }
+					executionProvenance: { evaluator: EVALUATOR }
 				}
 			});
 		}
@@ -671,7 +684,7 @@ export function driveReferenceUndertaking(
 				recommendedControlActions: [],
 				residualUncertainty: observations.map((o) => o.statement),
 				limitations: [],
-				executionProvenance: { evaluator: ACTOR }
+				executionProvenance: { evaluator: EVALUATOR }
 			}
 		});
 		return assessmentId;

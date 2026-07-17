@@ -2919,6 +2919,62 @@ layer, no UI — no Playwright run.
 
 ---
 
+## PART 3w — The independence project (§38 "independence status"): understand first, then four increments
+
+The §38 remainder's next field — independence — was **not** the "one code/schema step" the earlier notes assumed.
+An understand-phase workflow (4 parallel read-only maps of corpus + code + the live stream, one adversarial
+synthesis) reframed it, and the author ruled on the three forks it surfaced.
+
+### What the mapping found
+
+- **The corpus ratifies independence as a *check*, not a stored fact.** A policy requirement
+  (`IndependenceRequirement`, 8 values), an acceptance rule (§20.2: reject a result if independence isn't
+  satisfied), and a failure state (`INDEPENDENCE_VIOLATION`). There is **no ratified "verified" status field** — the
+  positive outcome is *implied* by a completed disposition, never recorded. Names for a positive signal exist
+  (`AssuranceIndependenceVerified` event §31, the "independence status" view field §38) but none has a ratified
+  shape. So enforcing the check is **conformance**; recording a positive status is a **narrow ratification gap**.
+- **A synthesis premise was wrong, and reading the code corrected it.** The synthesis (echoing assurance.ts's own
+  head comment) said the independence scorer is "built but uncalled." It is not: the **floor island already calls
+  `checkIndependence`** (floor.ts:314), `floor.reasoning-review` requires `DIFFERENT_MODEL` (floor-policies.ts),
+  and a same-model review is already boundary-rejected and recorded as an `INDEPENDENCE_VIOLATION` **observation**
+  (recording.ts, tested). The real gap is narrower: the *general* `completeAssuranceAssessment` handler doesn't
+  check independence, and the assessment **state** `INDEPENDENCE_VIOLATION` is unreachable — the violation lives
+  only as an observation (recording.ts: "an Assessment could never reach a durable INDEPENDENCE_VIOLATION"). Verify
+  before building: had I taken "uncalled" at face value I'd have re-implemented what the floor already does.
+- **The make-or-break fact:** the reference undertaking used **one identity (`owner-1`) for both the work-producer
+  and the assurance-evaluator** (reference-undertaking.ts). A real `DIFFERENT_AGENT` / evaluator≠producer check
+  would therefore **reject our own canonical drive** unless the seed is made honest first.
+
+### The author's three rulings (each the fullest-fidelity option)
+
+1. Record the positive signal as a **distinct `AssuranceIndependenceVerified` event** (not a computed field, not
+   derive-from-completion — which would fabricate "verified" for every completed assessment).
+2. Demonstrate a **real `DIFFERENT_AGENT` pass** (distinct evaluator identity), not just the mechanism.
+3. Make `INDEPENDENCE_VIOLATION` a **reachable state** via a governed transition, not a boundary rejection.
+
+### The sequence, each fabrication-free and independently landable
+
+- **I1 (this commit) — seed identity.** A second `ActorReference` `EVALUATOR` (`evaluator-1`, HUMAN) now stamps the
+  assurance evaluator on both assurance-completion sites; the producer (`owner-1`) stays on evidence + the executor.
+  Locked with a live-store test: every completed assessment's recorded evaluator is `evaluator-1`, every evidence
+  producer is `owner-1`, and **no assessment is evaluated by the identity that produced the work**. Mutation-checked
+  (revert the fitness evaluator → the lock fails). No schema change. Fully forward-compatible with either policy
+  requirement (distinct `actorId` satisfies `DIFFERENT_AGENT` via the seam; `HUMAN` satisfies the workbench policy).
+- **I2 — thread the operands.** Add a producer `Identity` onto `CompleteAssuranceAssessment`'s ValidatorResult
+  (schema + handler) and the reverse `ActorReference→Identity` seam, so the handler holds requirement + producer +
+  evaluator truthfully.
+- **I3 — enforce, reachable state.** Call `checkIndependence` in `completeAssuranceAssessment`; on failure drive
+  `ASSESSING→INDEPENDENCE_VIOLATION` (governed transition + violated event), red-test-first.
+- **I4 — record the positive.** Schematize + emit `AssuranceIndependenceVerified` (authored under §0.3) at the
+  verification point; fold into the Assurance View so §38 `independenceStatus` sources the scorer's real verdict —
+  `undefined` when an operand is missing, **never** derived from completion.
+
+### Gate (I1)
+
+`check-types` 21/21 · `test` 21/21 (incl. the new live-store lock, mutation-verified) · lint · boundary · format.
+
+---
+
 ## PART 4 — Open questions genuinely for the sponsor
 
 *(kept deliberately short — under the 2026-07-15 mandate, a tension is work, not a question, unless it

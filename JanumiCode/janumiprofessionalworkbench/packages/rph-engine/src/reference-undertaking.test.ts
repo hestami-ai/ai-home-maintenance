@@ -178,4 +178,46 @@ describe('Reference Undertaking driven live', () => {
 		const again = professionalWorkGraph(engine, { openResiduals: REFERENCE_OPEN_RESIDUALS });
 		expect(again).toEqual(graph);
 	});
+
+	// INCREMENT I1 — the prerequisite for enforcing independence (DOC-004 §39 invariant 8, §8.4). An assurance
+	// assessment records WHO evaluated it; evidence records WHO produced the work. Independence is only real if
+	// those are DIFFERENT parties. Until now the seed stamped `owner-1` as both, so a real DIFFERENT_AGENT /
+	// evaluator≠producer check would have had to reject the canonical drive or be defeated to pass. This test locks
+	// the two identities apart, over the live store, so the later enforcement increment has honest operands to check.
+	it('Increment I1: the assurance evaluator is a DISTINCT identity from the work producer', () => {
+		const { engine } = build();
+		const events = engine.readAllEvents();
+		const stateOf = (id: string) =>
+			engine.loadObject(id)?.state as Record<string, unknown> | undefined;
+		const actorId = (v: unknown): string | undefined =>
+			(v as { actorId?: string } | undefined)?.actorId;
+
+		// Every completed assessment's recorded evaluator is the independent reviewer, never the owner.
+		const assessmentIds = [
+			...new Set(
+				events
+					.filter((e) => e.eventType === 'AssuranceAssessmentCompleted')
+					.map((e) => e.aggregateId)
+			)
+		];
+		const evaluatorIds = assessmentIds
+			.map((id) => actorId(stateOf(id)?.evaluator))
+			.filter((x): x is string => x !== undefined);
+		expect(evaluatorIds.length).toBeGreaterThan(10);
+		expect(evaluatorIds.every((id) => id === 'evaluator-1')).toBe(true);
+
+		// Every piece of evidence was produced by the owner (the work producer).
+		const evidenceIds = [
+			...new Set(events.filter((e) => e.eventType === 'EvidenceProposed').map((e) => e.aggregateId))
+		];
+		const producerIds = evidenceIds
+			.map((id) => actorId(stateOf(id)?.producedBy))
+			.filter((x): x is string => x !== undefined);
+		expect(producerIds.length).toBeGreaterThan(0);
+		expect(producerIds.every((id) => id === 'owner-1')).toBe(true);
+
+		// THE LOAD-BEARING ASSERTION: no assessment is evaluated by the identity that produced the work.
+		const producers = new Set(producerIds);
+		expect(evaluatorIds.every((id) => !producers.has(id))).toBe(true);
+	});
 });
