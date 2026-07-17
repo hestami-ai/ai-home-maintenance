@@ -82,6 +82,56 @@ export const proposePwu: CommandHandler = (ctx, command, payload) => {
 			[p.pwuId]
 		);
 	}
+	// RPH-CON-009 — PWU Instance ownership binding, ENFORCED (it was recorded but never validated). Applies when the
+	// instance claims an owning Undertaking; a standalone PWU with no undertakingId is exempt (ownership is exactly
+	// what CON-009 governs, and createUndertaking requires a published PWA the standalone drive has not stood up).
+	// The four ratified rules (RPH spec §6): undertakingId identifies that Undertaking; a non-local instance's
+	// pwuTypeId resolves to a PWU Type in the Undertaking's bound PWA; a local instance sets isLocalExtension=true and
+	// claims no published pwuTypeId; a pwuKind string alone is insufficient to establish either binding.
+	if (p.undertakingId) {
+		const undertaking = ctx.store.loadObject(p.undertakingId)?.state as
+			{ objectType?: string; pwaId?: string } | undefined;
+		if (!undertaking || undertaking.objectType !== 'UNDERTAKING') {
+			return reject(
+				command,
+				'RPH_VALIDATION_SEMANTIC_FAILED',
+				`ProposePwu: undertakingId ${p.undertakingId} does not identify an Undertaking (RPH-CON-009 ownership binding).`,
+				[p.pwuId, p.undertakingId]
+			);
+		}
+		if (p.isLocalExtension === true) {
+			// A local extension is Undertaking-scoped and MUST NOT claim a published PWU Type.
+			if (p.pwuTypeId) {
+				return reject(
+					command,
+					'RPH_VALIDATION_SEMANTIC_FAILED',
+					`ProposePwu: an Undertaking-local extension (isLocalExtension=true) must not claim a published pwuTypeId (RPH-CON-009); got ${p.pwuTypeId}.`,
+					[p.pwuId, p.pwuTypeId]
+				);
+			}
+		} else {
+			// A non-local instance realizes a published PWU Type — pwuKind alone is insufficient (RPH-CON-009 rule 4),
+			// and the type must live in the Undertaking's bound PWA.
+			if (!p.pwuTypeId) {
+				return reject(
+					command,
+					'RPH_VALIDATION_SEMANTIC_FAILED',
+					`ProposePwu: a non-local PWU Instance must name a pwuTypeId that resolves to a PWU Type in the Undertaking's bound PWA — pwuKind alone is insufficient (RPH-CON-009). Set isLocalExtension=true for an Undertaking-local extension.`,
+					[p.pwuId]
+				);
+			}
+			const pwuType = ctx.store.loadObject(p.pwuTypeId)?.state as
+				{ objectType?: string; pwaId?: string } | undefined;
+			if (!pwuType || pwuType.objectType !== 'PWU_TYPE' || pwuType.pwaId !== undertaking.pwaId) {
+				return reject(
+					command,
+					'RPH_VALIDATION_SEMANTIC_FAILED',
+					`ProposePwu: pwuTypeId ${p.pwuTypeId} does not resolve to a PWU Type in the Undertaking's bound PWA ${String(undertaking.pwaId)} (RPH-CON-009).`,
+					[p.pwuId, p.pwuTypeId]
+				);
+			}
+		}
+	}
 	const ts = command.issuedAt;
 	const actor = command.issuedBy;
 	// PWU-001 seeded axes — one source for both the object state and the §11.3 event payload, so they cannot drift.

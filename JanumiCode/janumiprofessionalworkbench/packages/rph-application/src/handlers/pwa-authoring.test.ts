@@ -283,6 +283,97 @@ describe('PWA-authoring handlers (live)', () => {
 		expect(pwu.pwuTypeId).toBe(ROOT_TYPE);
 	});
 
+	it('CON-009 is ENFORCED: rejects unknown Undertaking, non-resolving type, local-claims-type, and kind-alone', () => {
+		createDraftPwa();
+		defineRoot();
+		publish();
+		d(
+			'CreateUndertaking',
+			{
+				undertakingId: UND,
+				name: 'U',
+				description: 'd',
+				pwaId: PWA,
+				pwaVersion: '1.0.0',
+				instantiationProfile: 'Standard',
+				objective: 'o',
+				intendedOutputProduct: 'p'
+			},
+			UND,
+			'UNDERTAKING'
+		);
+		const INTENT = 'int_01ARZ3NDEKTSV4RRFFQ69G5P70';
+		d(
+			'CaptureIntent',
+			{ intentId: INTENT, originatingExpression: 'x', ontologyId: 'o', ontologyVersion: '1' },
+			INTENT,
+			'INTENT'
+		);
+		const propose = (pwuId: string, over: Record<string, unknown>) =>
+			d(
+				'ProposePwu',
+				{
+					pwuId,
+					pwuKind: 'PRODUCT_REALIZATION',
+					title: 'T',
+					description: 'd',
+					intentId: INTENT,
+					boundaries: { inScope: [], outOfScope: [], permittedChanges: [], prohibitedChanges: [] },
+					obligationIds: [],
+					constraintIds: [],
+					assumptionIds: [],
+					expectedOutputs: [],
+					assurancePolicyIds: [],
+					riskProfile: {
+						consequence: 'LOW',
+						uncertainty: 'LOW',
+						irreversibility: 'LOW',
+						securitySensitivity: 'LOW',
+						regulatoryExposure: 'NONE'
+					},
+					...over
+				},
+				pwuId,
+				'PROFESSIONAL_WORK_UNIT'
+			);
+		// 1. undertakingId names no Undertaking.
+		expect(
+			propose('pwu_01ARZ3NDEKTSV4RRFFQ69G5P71', {
+				undertakingId: 'und_does_not_exist',
+				pwuTypeId: ROOT_TYPE,
+				isLocalExtension: false
+			}).status
+		).toBe('REJECTED');
+		// 2. non-local pwuTypeId does not resolve to a PWU Type in the bound PWA.
+		expect(
+			propose('pwu_01ARZ3NDEKTSV4RRFFQ69G5P72', {
+				undertakingId: UND,
+				pwuTypeId: 'pwut_not_in_this_pwa',
+				isLocalExtension: false
+			}).status
+		).toBe('REJECTED');
+		// 3. a local extension must not claim a published pwuTypeId.
+		expect(
+			propose('pwu_01ARZ3NDEKTSV4RRFFQ69G5P73', {
+				undertakingId: UND,
+				pwuTypeId: ROOT_TYPE,
+				isLocalExtension: true
+			}).status
+		).toBe('REJECTED');
+		// 4. pwuKind alone is insufficient — a non-local instance names no type.
+		expect(
+			propose('pwu_01ARZ3NDEKTSV4RRFFQ69G5P74', {
+				undertakingId: UND,
+				isLocalExtension: false
+			}).status
+		).toBe('REJECTED');
+		// Control: a valid Undertaking-local extension (isLocalExtension=true, no type) IS accepted.
+		expect(
+			propose('pwu_01ARZ3NDEKTSV4RRFFQ69G5P75', { undertakingId: UND, isLocalExtension: true })
+				.status
+		).toBe('ACCEPTED');
+	});
+
 	it('EditPwuType updates a DRAFT type in place (untouched fields preserved); EditPwa updates PWA metadata', () => {
 		createDraftPwa();
 		defineRoot();
