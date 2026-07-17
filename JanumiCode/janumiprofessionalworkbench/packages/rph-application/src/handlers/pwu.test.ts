@@ -641,6 +641,30 @@ describe('PWU lifecycle handlers (live command drive)', () => {
 		expect(r.error?.code).toBe('RPH_EVIDENCE_MISSING');
 	});
 
+	// Increment 29. All five authored PWU lifecycle events DECLARE `workLifecycleState` in their payload schema
+	// and every one emitted `command.payload` instead — so PwuShapingStarted, whose command payload is `{}`,
+	// recorded literally nothing about the transition it exists to record. They pass the (d2) event gate because
+	// it enforces RATIFIED payloads only and these are UNRATIFIED-AUTHORED: correct scope, and this is its cost.
+	//
+	// This test is here because RPH-PER-006 does NOT catch it — verified by mutation: revert the fix and
+	// replay-equivalence still passes, because that property compares the CURRENT state and later events
+	// overwrite the axis. So the two are not connected, and it would have been easy to imply they were. An
+	// intermediate state that the log fails to record is invisible to a current-state property, and visible only
+	// to a test that looks at the event itself.
+	it('the authored lifecycle events carry the state they declare (the log must not need a reducer to guess)', () => {
+		seedIntent();
+		engine.dispatch(cmd('ProposePwu', proposePayload()));
+		engine.dispatch(cmd('BeginPwuShaping', {}));
+		const started = store
+			.readAggregateEvents('PROFESSIONAL_WORK_UNIT', PWU_ID)
+			.find((e) => e.eventType === 'PwuShapingStarted');
+		expect(started, 'BeginPwuShaping emitted no PwuShapingStarted').toBeDefined();
+		expect(
+			(started!.payload as { workLifecycleState?: string }).workLifecycleState,
+			'PwuShapingStarted declares workLifecycleState; an event that declares a field and ships nothing is a hole in the governed stream'
+		).toBe('SHAPING');
+	});
+
 	it('ChangePwuState rejects a stale previousState', () => {
 		seedIntent();
 		engine.dispatch(cmd('ProposePwu', proposePayload()));

@@ -7,14 +7,23 @@
 // SATISFIED, ...) are set by the controller via ChangePwuState, keeping workLifecycleState a computed rollup of
 // the independently-commanded sub-axes (DOC-002 §5, §7).
 import type {
+	ChallengePwuPayload,
 	ChangePwuStatePayload,
 	CommandResult,
 	DomainCommand,
+	InvalidatePwuPayload,
 	MarkPwuReadyPayload,
 	ProposePwuPayload,
+	PwuChallengedPayload,
+	PwuInvalidatedPayload,
 	PwuMarkedReadyPayload,
 	PwuProposedPayload,
-	PwuStateChangedPayload
+	PwuReshapingStartedPayload,
+	PwuShapingStartedPayload,
+	PwuStateChangedPayload,
+	PwuSupersededPayload,
+	ReshapePwuPayload,
+	SupersedePwuPayload
 } from '@janumipwb/rph-contracts';
 import {
 	canAdvanceWorkLifecycle,
@@ -201,9 +210,29 @@ function advancePwuLifecycle(
 	});
 }
 
+// THE FIVE AUTHORED LIFECYCLE EVENTS, CONFORMED (Increment 29).
+//
+// Each of these declares `workLifecycleState` in its payload schema — and every one of them emitted
+// `command.payload` instead, so the field was simply absent from the log. PwuShapingStarted was the starkest:
+// its command payload is `{}`, so the event that records "this PWU began shaping" recorded NOTHING. The state
+// was in the object and nowhere in the stream.
+//
+// They got away with it because the (d2) event gate only enforces RATIFIED payloads, and these five are
+// UNRATIFIED-AUTHORED — outside its scope by design (we do not enforce our own inventions as though the corpus
+// had ratified them). That scope is right, and this is its cost: an authored event can violate its own declared
+// shape and nothing complains. The answer is not to widen the gate — it is to conform, and to prove the log
+// rebuilds the aggregate (RPH-PER-006), which is what actually catches this class.
 /** BeginPwuShaping — PROPOSED -> SHAPING. */
 export const beginPwuShaping: CommandHandler = (ctx, command) =>
-	advancePwuLifecycle(ctx, command, { target: 'SHAPING', eventType: 'PwuShapingStarted' });
+	advancePwuLifecycle(ctx, command, {
+		target: 'SHAPING',
+		eventType: 'PwuShapingStarted',
+		eventPayload: (next) =>
+			({
+				workLifecycleState:
+					next.workLifecycleState as PwuShapingStartedPayload['workLifecycleState']
+			}) satisfies PwuShapingStartedPayload
+	});
 
 /** Reads the §9.1 / §6.3 readiness facts off the stored PWU (and its Intent). The Intent load is the reason
  * this lives at the call site and not in the pure kernel: rph-domain does no I/O. A root PWU whose Intent row
@@ -285,20 +314,70 @@ export const markPwuReady: CommandHandler = (ctx, command) => {
 };
 
 /** ChallengePwu — READY -> CHALLENGED. */
-export const challengePwu: CommandHandler = (ctx, command) =>
-	advancePwuLifecycle(ctx, command, { target: 'CHALLENGED', eventType: 'PwuChallenged' });
+export const challengePwu: CommandHandler = (ctx, command) => {
+	const p = command.payload as ChallengePwuPayload;
+	return advancePwuLifecycle(ctx, command, {
+		target: 'CHALLENGED',
+		eventType: 'PwuChallenged',
+		eventPayload: (next) =>
+			({
+				challengeReason: p.challengeReason,
+				...(p.observationIds ? { observationIds: p.observationIds } : {}),
+				workLifecycleState: next.workLifecycleState as PwuChallengedPayload['workLifecycleState']
+			}) satisfies PwuChallengedPayload
+	});
+};
 
 /** ReshapePwu — EXECUTING|UNDER_ASSURANCE -> RESHAPING (material assumption falsified / blocking finding). */
-export const reshapePwu: CommandHandler = (ctx, command) =>
-	advancePwuLifecycle(ctx, command, { target: 'RESHAPING', eventType: 'PwuReshapingStarted' });
+export const reshapePwu: CommandHandler = (ctx, command) => {
+	const p = command.payload as ReshapePwuPayload;
+	return advancePwuLifecycle(ctx, command, {
+		target: 'RESHAPING',
+		eventType: 'PwuReshapingStarted',
+		eventPayload: (next) =>
+			({
+				reason: p.reason,
+				...(p.triggeringObjectId ? { triggeringObjectId: p.triggeringObjectId } : {}),
+				workLifecycleState:
+					next.workLifecycleState as PwuReshapingStartedPayload['workLifecycleState'],
+				shapeIntegrityState:
+					next.shapeIntegrityState as PwuReshapingStartedPayload['shapeIntegrityState']
+			}) satisfies PwuReshapingStartedPayload
+	});
+};
 
 /** InvalidatePwu — SATISFIED|CONDITIONALLY_SATISFIED|RECOMPOSED -> INVALIDATED. */
-export const invalidatePwu: CommandHandler = (ctx, command) =>
-	advancePwuLifecycle(ctx, command, { target: 'INVALIDATED', eventType: 'PwuInvalidated' });
+export const invalidatePwu: CommandHandler = (ctx, command) => {
+	const p = command.payload as InvalidatePwuPayload;
+	return advancePwuLifecycle(ctx, command, {
+		target: 'INVALIDATED',
+		eventType: 'PwuInvalidated',
+		// The event types `triggeringObjectId` REQUIRED while the command types it optional — so a command that
+		// omits it cannot produce a conformant event. Defaulting to '' would fabricate a reference to nothing;
+		// omitting the key fails the strictObject. Recorded rather than papered: the command/event contracts
+		// disagree, and the command is the looser one (the same drift as CreateAssurancePolicy's enums).
+		eventPayload: (next) =>
+			({
+				invalidationReason: p.invalidationReason,
+				triggeringObjectId: p.triggeringObjectId ?? '',
+				workLifecycleState: next.workLifecycleState as PwuInvalidatedPayload['workLifecycleState']
+			}) satisfies PwuInvalidatedPayload
+	});
+};
 
 /** SupersedePwu — any non-baselined state -> SUPERSEDED. */
-export const supersedePwu: CommandHandler = (ctx, command) =>
-	advancePwuLifecycle(ctx, command, { target: 'SUPERSEDED', eventType: 'PwuSuperseded' });
+export const supersedePwu: CommandHandler = (ctx, command) => {
+	const p = command.payload as SupersedePwuPayload;
+	return advancePwuLifecycle(ctx, command, {
+		target: 'SUPERSEDED',
+		eventType: 'PwuSuperseded',
+		eventPayload: (next) =>
+			({
+				supersedingWorkUnitId: p.supersedingWorkUnitId,
+				workLifecycleState: next.workLifecycleState as PwuSupersededPayload['workLifecycleState']
+			}) satisfies PwuSupersededPayload
+	});
+};
 
 /**
  * The four `assuranceState` values that ONLY a completed assessment can produce (DOC-002 §18 ratifies the

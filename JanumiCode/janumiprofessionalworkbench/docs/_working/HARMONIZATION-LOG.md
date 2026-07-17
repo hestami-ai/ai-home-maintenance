@@ -2365,6 +2365,62 @@ assurance is SATISFIED", which now passes against a seed that means it.
 
 ---
 
+## PART 3n — Increment 29: the log can rebuild the aggregate, and now we know it
+
+**RPH-PER-006 — "Given an event stream for an Intent or PWU. When the aggregate is reconstructed. Then its state
+matches the materialized current state."** Ratified. Untested. It is the durability promise underneath every
+claim this workbench makes about its governed stream: **if state cannot be rebuilt from events, the log is a diary
+kept beside the truth rather than the truth itself**, and "we can reason over what the system did" is false.
+
+### The log could not do it
+
+All five authored PWU lifecycle events — `PwuShapingStarted`, `PwuChallenged`, `PwuReshapingStarted`,
+`PwuInvalidated`, `PwuSuperseded` — **DECLARE `workLifecycleState` in their payload schema and emitted
+`command.payload` instead.** The starkest: `BeginPwuShaping`'s command payload is `{}`, so **the event that exists
+to record "this PWU began shaping" recorded nothing at all.** The state was in the object and nowhere in the
+stream.
+
+They pass the (d2) gate because it enforces **ratified** payloads only and these are UNRATIFIED-AUTHORED. That
+scope is correct — we do not enforce our own inventions as though the corpus ratified them — and **this is its
+cost**: an authored event can violate its own declared shape and nothing complains. The answer is not to widen
+the gate. It is to conform, and to prove the log rebuilds the aggregate, which is what actually catches the class.
+
+### The reducer had to be honest, and that was the hard part
+
+`replayPwuAxes` reads every value **from the event**, and carries an axis forward unchanged where the event does
+not mention it — **never inferring an axis from the event's name.** A reducer that hardcoded "PwuShapingStarted
+means SHAPING" would have passed RPH-PER-006 while concealing that the stream never said so: **encoding in code
+what the log failed to record is precisely how a replay test comes to prove nothing.** That is the same defect as
+the old "rebuild equivalence" test, one level down.
+
+**RPH-PER-006 holds: 52/52 axes across 13 PWUs.** Plus: the fold is pure (a doubled stream lands in the same
+place — events are facts, not increments); an empty stream rebuilds to **undefined**, never to a default (a
+reducer that invented a starting state would report a PWU that was never proposed as PROPOSED); and the terminal
+states are genuinely distinct, so the equality is not satisfiable by a constant.
+
+### The mutation cost me a claim
+
+I was about to present the conformance fix and RPH-PER-006 as connected. **They are not.** Reverting
+`PwuShapingStarted` to emit `{}` leaves replay-equivalence **passing** — because the property compares the
+CURRENT state, and later events overwrite the axis. An intermediate state the log fails to record is invisible to
+a current-state property.
+
+So the conformance fix got its own lock, which mutation proves is the only thing holding it: a test that reads the
+emitted `PwuShapingStarted` and asserts it carries the `workLifecycleState` it declares.
+
+### Gate
+
+build · `check-types` 21/21 · `test` 21/21 · `lint` · `boundary` · `format:check` clean.
+
+### Still open
+
+**RPH-PER-007's coverage is weak by the same pattern** — its test asserts `rebuildProjection(stream)` equals
+`rebuildProjection(stream)`, the identical self-comparison anti-pattern, while ratified PER-007 requires views to
+"match the expected fixture projections". And RPH-PER-006 is proved for the **PWU**; the ratified text says "an
+Intent **or** PWU", and the Intent side has no reducer.
+
+---
+
 ## PART 4 — Open questions genuinely for the sponsor
 
 *(kept deliberately short — under the 2026-07-15 mandate, a tension is work, not a question, unless it

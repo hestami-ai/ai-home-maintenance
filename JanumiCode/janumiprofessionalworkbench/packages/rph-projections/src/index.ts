@@ -3,6 +3,7 @@
 export const RPH_PROJECTIONS_VERSION = '0.0.0';
 
 export * from './projector.js';
+export * from './pwu-replay.js';
 export * from './work-projection.js';
 export * from './graph-view.js';
 export * from './pwa-graph.js';

@@ -169,10 +169,11 @@ describe('Reference Undertaking driven live', () => {
 	// RENAMED 2026-07-17. This was titled "is reproducible from the event log (rebuild equivalence)". It does not
 	// touch the event log: it calls the projection twice against the SAME live engine. That is determinism, which
 	// is worth having and is what the test actually checks — but it is not rebuild equivalence, and the old title
-	// claimed the ratified property RPH-PER-006 (aggregate-replay-equivalence) was covered when nothing covers it.
-	// A real one drops the state tables, replays domain_events from seq 0, and asserts the rebuilt graph equals
-	// this one. Nothing in the repo does that today.
-	it('the projection is deterministic (NOT rebuild equivalence — see comment; RPH-PER-006 is untested)', () => {
+	// claimed the ratified property RPH-PER-006 (aggregate-replay-equivalence) was covered when nothing did.
+	//
+	// RPH-PER-006 IS NOW COVERED, in replay-equivalence.test.ts: every PWU's four axes are folded back out of its
+	// own event stream and compared to the materialized state (52/52). This test keeps its narrower, honest job.
+	it('the projection is deterministic (NOT rebuild equivalence — that is replay-equivalence.test.ts)', () => {
 		const { engine, graph } = build();
 		const again = professionalWorkGraph(engine, { openResiduals: REFERENCE_OPEN_RESIDUALS });
 		expect(again).toEqual(graph);
