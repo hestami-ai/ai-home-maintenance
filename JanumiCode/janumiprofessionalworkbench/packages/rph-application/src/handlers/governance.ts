@@ -127,7 +127,25 @@ export const proposeDecision: CommandHandler = (ctx, command, payload) => {
 		objectType: DECISION,
 		aggregateId: id,
 		state,
-		eventType: 'DecisionProposed'
+		eventType: 'DecisionProposed',
+		// The event records the RESULTING state. DecisionProposed declares the decision + the created `status`
+		// (PROPOSED); the raw command payload omits `status`. Emit the declared shape — the required decision fields
+		// + status, plus the optional considered-evidence/observation ids and effectiveAt when supplied. (Pinned.)
+		eventPayload: {
+			decisionType: p.decisionType,
+			subjectObjectIds: p.subjectObjectIds,
+			selectedOption: p.selectedOption,
+			rationale: p.rationale,
+			authority: p.authority,
+			status: 'PROPOSED',
+			...(p.consideredEvidenceIds?.length
+				? { consideredEvidenceIds: p.consideredEvidenceIds }
+				: {}),
+			...(p.consideredObservationIds?.length
+				? { consideredObservationIds: p.consideredObservationIds }
+				: {}),
+			...(p.effectiveAt ? { effectiveAt: p.effectiveAt } : {})
+		}
 	});
 };
 
