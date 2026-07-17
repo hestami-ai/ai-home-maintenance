@@ -1916,6 +1916,94 @@ build · `check-types` 21/21 · `test` 21/21 · `lint` · `boundary` · `format:
 
 ---
 
+## PART 3h — Increment 23: the gate is LIVE, and the blocker was mine
+
+**The sponsor decision I escalated did not exist.** PART 3g parked the event gate pending a ruling on
+`markPwuReady`/`reasonCode`. The sponsor asked what the two options actually differed on. Answering that
+question honestly destroyed the question.
+
+### C8 — the eighth correction, and the fifth of one family
+
+I told the sponsor three things. All three were false.
+
+1. **"No command carries a `reasonCode`."** `ChangePwuState` carries one. It is in the reference undertaking
+   **three lines above** the `MarkPwuReady` call I was reading.
+2. **"DOC-007 types it a bare `string` with no ratified vocabulary."** The type is right; the conclusion was not.
+   **DOC-002 §8.2 Exception transitions** enumerates eleven `Trigger` values. And the §8.1/§8.2 split *is* the
+   design: **§8.1 primary transitions are keyed by a `Command` column** — the reason IS the command name —
+   **§8.2 exceptions are keyed by a `Trigger` column** with no command, so the reason must be *carried*. That is
+   what `reasonCode` is for. (That §8.2 is its referent is my inference; the corpus never links them.)
+3. **"A+B is substantive because a transition can have multiple legitimate reasons."** §8.1 gives SHAPING→READY
+   exactly one command and one condition; §9 closes it: *"A PWU may enter `READY` only if its Shape Readiness
+   Profile is satisfied."* No waiver path. No override path. The premise I offered the sponsor for my own
+   recommendation was refuted by the ratified text.
+
+**And the blocker itself was an authored artifact contradicting itself.** The vocab bound `MarkPwuReady →
+PwuStateChanged` in its command entry while its **own transitions table** bound `MarkPwuReady → PwuMarkedReady`.
+The generator silently resolved the disagreement — `emitsByCommand` overwrites the table with the command entry —
+so the generated output was self-consistent and the contradiction never surfaced. A comment I wrote rationalized
+the overwrite by calling `PwuMarkedReady` "a display alias": **a theory invented to explain away the drift the
+line was erasing.** *A resolver that cannot dissent launders whichever side it was pointed at.*
+
+**The corpus settles it 8–2.** Decisive: the Reference Undertaking **"# 26. Expected Event Trace"** — the corpus's
+own 72-step worked example — emits **`PwuMarkedReady` at steps 20 and 33**, and **`PwuStateChanged` appears in no
+worked trace anywhere in the corpus**. Structural: §11.5 declares `previousState`/`newState` as **required payload
+fields**, meaningless for a mark-ready event (they would be the constants SHAPING/READY) and necessary only for a
+*generic* one; §11.3 "PWU proposed event" mirrors §11.2 "Propose PWU command" while §11.5 "PWU state changed event"
+does not mirror §11.4; **§33 requires both events**, so they were never alternatives. Against: §11 adjacency —
+which proves nothing, since §11 schematizes 2 of ~11 PWU commands (a first-slice sampler, §16 item 6).
+
+**I had used that adjacency to "refute" my own escape hypothesis and reported the blocker as confirmed.** The
+weakest argument available, presented as decisive, because it agreed with what I had already shipped.
+
+### What landed
+
+`MarkPwuReady → PwuMarkedReady`, with a real payload (all three fields derive; nothing minted). The withdrawn
+`conflicts[]` ruling is preserved *in situ* with its three false claims named. `PwuStateChanged` reverts to
+`ChangePwuState`, which already carried `reasonCode`. **The gate is LIVE.**
+
+**It fails closed on the ratified set only.** `PwuMarkedReady`'s payload is AUTHORED, so it stays outside
+`RATIFIED_EVENT_PAYLOADS` and is not enforced — we do not enforce our own inventions as though the corpus had
+ratified them. That scope is now a test, so widening the map silently will go red.
+
+**Near-miss:** I reached for a new error code, `RPH_EVENT_PAYLOAD_INVALID` — *while building the gate whose
+purpose is to stop invented governance facts*. DOC-007 §25.1 fixes **fifteen**. The ratified
+`RPH_VALIDATION_SCHEMA_FAILED` fits as written: *"Structural (JSON Schema) validation of the payload failed"* — it
+does not say COMMAND payload.
+
+### The gate proved, not assumed
+
+**Turning it on made zero tests fail.** That is the shape of a dead lock, not a clean system. `event-gate.test.ts`
+drives `commitState` against a real store and asserts both sides: a ratified event with a bad payload is refused
+**and the store is re-read to prove nothing was written** (a rejected result looks identical if the commit
+happened anyway); an authored event with equally bad payload is admitted.
+
+Two of those tests **caught my own fixture**: the ADMITS cases failed, proving the rejections were coming from the
+(d1) object check, not the gate. Without them I would have watched three REFUSES tests pass and declared the gate
+working while it was never reached. **Then the mutation:** anchor verified unique, gate disabled — exactly the
+three REFUSES tests fail, PREMISE and both ADMITS unmoved. The gate is load-bearing.
+
+### Gate
+
+build · `check-types` 21/21 · `test` 21/21 (rph-application 20 files) · `lint` · `boundary` · `format:check`
+clean · Playwright 22 passed (1 known render-timing flake, retried green).
+
+### Still open, none blocking
+
+- **`reasonCode`'s vocabulary** — wire §8.2's eleven Triggers to it rather than invent an enum. Cheap and
+  ratified-founded now. Sponsor's call; my §8.2 reading is inference.
+- **A real ratified cross-doc conflict**: §11.5 types `reasonCode` **required**; DOC-009 §17 declares
+  `reason_code text` — **nullable** — while its own sibling `supporting_object_ids jsonb not null` is not, and the
+  parallel `finding_code text not null` is not.
+- **`'CONTROLLER'` is not one of the eleven Triggers.** The reference undertaking fabricates a reasonCode today.
+- **The replay oracle is decorative.** `expected-events.jsonl` already said `PwuMarkedReady` at seq 20/33 — it has
+  agreed with the corpus and disagreed with the engine this whole time, and nothing compared them. `replay.test.ts`
+  replays the **hand-authored fixture**, never the engine's actual output. The headline "end-to-end proof" proves
+  the fixture is self-consistent. This increment brings the engine into agreement with it; **nothing yet checks
+  that it stays there.**
+
+---
+
 ## PART 4 — Open questions genuinely for the sponsor
 
 *(kept deliberately short — under the 2026-07-15 mandate, a tension is work, not a question, unless it

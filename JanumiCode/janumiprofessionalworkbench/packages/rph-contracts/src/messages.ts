@@ -1440,7 +1440,7 @@ export const COMMANDS = {
 	MarkPwuReady: {
 		payload: MarkPwuReadyPayloadSchema,
 		targetAggregateType: 'PROFESSIONAL_WORK_UNIT',
-		emitsEvent: 'PwuStateChanged',
+		emitsEvent: 'PwuMarkedReady',
 		firstSlice: true
 	},
 	ProposeExecutionPlan: {
@@ -2183,7 +2183,7 @@ export const BINDINGS: readonly CommandEventBinding[] = [
 	},
 	{
 		commandType: 'MarkPwuReady',
-		eventType: 'PwuStateChanged',
+		eventType: 'PwuMarkedReady',
 		machine: 'PWU.workLifecycleState',
 		from: 'SHAPING',
 		to: 'READY'

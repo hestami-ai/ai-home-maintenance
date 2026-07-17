@@ -9,7 +9,9 @@
 import type {
 	ChangePwuStatePayload,
 	DomainCommand,
+	MarkPwuReadyPayload,
 	ProposePwuPayload,
+	PwuMarkedReadyPayload,
 	PwuProposedPayload,
 	PwuStateChangedPayload
 } from '@janumipwb/rph-contracts';
@@ -158,6 +160,10 @@ function advancePwuLifecycle(
 		readonly target: string;
 		readonly eventType: string;
 		readonly mutate?: (current: Record<string, unknown>) => Record<string, unknown>;
+		/** Build the EVENT payload from the committed next state. Without this the event carries
+		 * `command.payload` — a command payload masquerading as an event payload, which is the defect
+		 * Increment 22 fixed elsewhere. Supply it for any event whose payload is actually specified. */
+		readonly eventPayload?: (nextState: Record<string, unknown>) => unknown;
 	}
 ) {
 	const id = command.targetAggregateId;
@@ -181,7 +187,7 @@ function advancePwuLifecycle(
 		aggregateType: PWU,
 		aggregateId: id,
 		aggregateRevision: newRevision,
-		payload: command.payload
+		payload: args.eventPayload ? args.eventPayload(next) : command.payload
 	});
 	return commitState(ctx, command, {
 		objectType: PWU,
@@ -222,7 +228,25 @@ function readinessFactsOf(ctx: HandlerContext, state: Record<string, unknown>): 
 	};
 }
 
-/** MarkPwuReady — SHAPING -> READY (emits the generic PwuStateChanged, DOC-007 §11.5).
+/** MarkPwuReady — SHAPING -> READY. Emits the semantic `PwuMarkedReady`.
+ *
+ * EVENT BINDING CORRECTED 2026-07-17. This emitted the GENERIC `PwuStateChanged` (DOC-007 §11.5) and could not
+ * fill that event's required `reasonCode`, which parked the (d2) event gate on a "sponsor decision" that turned
+ * out not to exist. The binding came from §11.4/§11.5 ADJACENCY, and it was wrong. The corpus's own worked
+ * example settles it: the Reference Undertaking "# 26. Expected Event Trace" — 72 steps of a real undertaking —
+ * emits `PwuMarkedReady` at steps 20 and 33, and `PwuStateChanged` appears in NO worked trace in the corpus.
+ * Structurally: §11.5 declares previousState/newState as REQUIRED payload fields, which are meaningless here
+ * (they would be the constants SHAPING/READY) and needed only by a generic event; and DOC-007 §33 requires BOTH
+ * events, so they were never alternatives. §11 schematizes 2 of ~11 PWU commands — a first-slice sampler
+ * (§16 item 6), not an exhaustive pairing.
+ *
+ * `PwuStateChanged` belongs to `ChangePwuState` (below), which already carries `reasonCode` — the reason a
+ * §8.2 EXCEPTION transition needs, because §8.2 is keyed by a Trigger column with no command name to recover
+ * it from. §8.1 PRIMARY transitions like this one are keyed by Command: the reason IS "Mark ready".
+ *
+ * All three PwuMarkedReady fields derive; nothing is minted. (The payload is AUTHORED, not ratified — no corpus
+ * doc schematizes it — so this event is outside RATIFIED_EVENT_PAYLOADS and the (d2) gate does not check it.
+ * Conforming to our own authored shape is still worth doing; it is just not a ratified claim.)
  *
  * DOC-002 §9 L661: "A PWU may enter `READY` only if its Shape Readiness Profile is satisfied." — so this is
  * NOT a bare legality check. canAdvanceWorkLifecycle answers only "is SHAPING -> READY an arrow on the
@@ -240,7 +264,23 @@ export const markPwuReady: CommandHandler = (ctx, command) => {
 			`MarkPwuReady: PWU ${command.targetAggregateId} does not satisfy the shape readiness contract (DOC-002 §9): ${readiness.unmet.join('; ')}`
 		);
 	}
-	return advancePwuLifecycle(ctx, command, { target: 'READY', eventType: 'PwuStateChanged' });
+	const p = command.payload as MarkPwuReadyPayload;
+	return advancePwuLifecycle(ctx, command, {
+		target: 'READY',
+		eventType: 'PwuMarkedReady',
+		// DOC-007 §11.4 names it shapeReadinessAssessmentId; DOC-002 §34.1 names it shapeReadinessAttestationId.
+		// The field-name drift is recorded in the vocab's conflicts[] and is NOT resolved here — this maps the
+		// one we receive onto the one the event declares, and does not pretend the two docs agree.
+		eventPayload: (next) =>
+			({
+				...(p.shapeReadinessAssessmentId
+					? { shapeReadinessAttestationId: p.shapeReadinessAssessmentId }
+					: {}),
+				workLifecycleState: next.workLifecycleState as PwuMarkedReadyPayload['workLifecycleState'],
+				shapeIntegrityState:
+					next.shapeIntegrityState as PwuMarkedReadyPayload['shapeIntegrityState']
+			}) satisfies PwuMarkedReadyPayload
+	});
 };
 
 /** ChallengePwu — READY -> CHALLENGED. */
@@ -325,10 +365,12 @@ export const changePwuState: CommandHandler = (ctx, command, payload) => {
 		assuranceState: p.assuranceState,
 		shapeIntegrityState: p.shapeIntegrityState
 	};
-	// DOC-007 §11.5: passthrough is conformant HERE and only here — ChangePwuStatePayload is field-identical to
+	// DOC-007 §11.5: passthrough is conformant here — ChangePwuStatePayload is field-identical to
 	// PwuStateChangedPayload (the same 7 fields, same enums), so the command payload already satisfies the event
-	// schema. It is NOT conformant at the other PwuStateChanged site: markPwuReady emits this event carrying a
-	// MarkPwuReadyPayload, which shares none of the 7 fields — unfixed, as reasonCode is not derivable there.
+	// schema. As of 2026-07-17 this is the ONLY site emitting PwuStateChanged: markPwuReady used to emit it too,
+	// carrying a MarkPwuReadyPayload that shares none of the 7 fields, and that mis-binding is what made
+	// `reasonCode` look underivable. It is derivable nowhere — it is SUPPLIED, here, by the caller of the generic
+	// setter, which is the only command the corpus gives a reason to. See markPwuReady's note above.
 	const event = makeEvent(ctx, command, {
 		eventType: 'PwuStateChanged',
 		aggregateType: PWU,

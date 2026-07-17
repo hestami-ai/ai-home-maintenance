@@ -6,6 +6,7 @@
 import {
 	makeRphError,
 	OBJECT_SCHEMAS,
+	RATIFIED_EVENT_PAYLOADS,
 	validateAgainst,
 	type CommandResult,
 	type DomainCommand,
@@ -218,30 +219,54 @@ export function commitState(
 			error: stateCheck.error
 		};
 	}
-	// (d2) THE EVENT GATE — BUILT, DERIVED, AND PARKED ONE STEP FROM LIVE.
+	// (d2) THE EVENT GATE — LIVE as of 2026-07-17.
 	//
 	// The append-only event log IS the governed stream: the audit record, the replay source, the only durable
-	// account of why the system did what it did. Nothing validates an event payload — the pipeline checks the
-	// COMMAND payload (command-bus.ts) and the PRODUCED STATE (above) and leaves the one artifact that cannot be
-	// fixed later unchecked, because replay reconstructs state FROM it. A malformed event is not a bad request;
-	// it is a permanently wrong history.
+	// account of why the system did what it did. Before this gate, nothing validated an event payload — the
+	// pipeline checked the COMMAND payload (command-bus.ts) and the PRODUCED STATE (above) and left the one
+	// artifact that cannot be fixed later unchecked, because replay reconstructs state FROM it. A malformed
+	// event is not a bad request; it is a permanently wrong history.
 	//
-	// Turning this on is one line:
-	//     const ratified = RATIFIED_EVENT_PAYLOADS[args.event.eventType];
-	//     if (ratified) { ...validateAgainst(ratified, args.event.payload) -> REJECT on failure... }
+	// SCOPE, and why it fails closed on exactly the right set. `RATIFIED_EVENT_PAYLOADS` is DERIVED from vocab
+	// provenance by gen-messages (a DOC-007 §N citation, not UNRATIFIED-AUTHORED, AND payloadFields non-empty) —
+	// never hand-kept, so it cannot rot into an allowlist. The non-empty requirement is load-bearing: an event
+	// that cites a section but declares no fields would generate `z.strictObject({})`, which means "nobody
+	// specified this", NOT "this payload is empty" — enforcing it would strip real fields off real events. A
+	// citation is not an interface. Events outside the map pass unchecked BY DESIGN: we do not enforce shapes we
+	// authored ourselves as though the corpus had ratified them.
 	//
-	// WHY IT IS NOT LIVE. Exactly one handler still emits a non-conformant RATIFIED event: `markPwuReady` emits
-	// `PwuStateChanged` (DOC-007 §11.5, seven fields) and cannot fill `reasonCode`. Six of the seven derive from
-	// the loaded aggregate's axes; `reasonCode` does not — MarkPwuReady's command carries no reason, DOC-007
-	// types it a bare `string` with NO ratified vocabulary, and the only values in existence are ad-hoc
-	// 'CONTROLLER' literals in a test and the reference undertaking. Minting one ('MARK_READY') would fabricate
-	// an audit REASON that nothing ratifies and no caller supplied — inventing the very kind of governance fact
-	// this gate exists to protect. That is a sponsor decision (add `reasonCode` to the MarkPwuReady payload, or
-	// ratify a reasonCode vocabulary), not a fix. HARMONIZATION-LOG PART 3g.
-	//
-	// The other 17 ratified events DO conform as of this commit. `RATIFIED_EVENT_PAYLOADS` is DERIVED from vocab
-	// provenance by gen-messages (sourceSection present, not UNRATIFIED-AUTHORED, and payloadFields non-empty) —
-	// never hand-kept, so it cannot rot into an allowlist.
+	// This was parked for one commit on a "sponsor decision" about `markPwuReady`/`reasonCode` that did not
+	// exist. The blocker was an authored vocab entry binding MarkPwuReady to the generic PwuStateChanged, which
+	// contradicted the vocab's own transitions table and the corpus's own §26 worked trace. See pwu.ts
+	// markPwuReady. HARMONIZATION-LOG PART 3h.
+	const ratifiedEventPayload = RATIFIED_EVENT_PAYLOADS[args.event.eventType];
+	if (ratifiedEventPayload) {
+		const eventCheck = ratifiedEventPayload.safeParse(args.event.payload);
+		if (!eventCheck.success) {
+			const detail = eventCheck.error.issues
+				.map((i) => `${i.path.join('.') || '(root)'}: ${i.message}`)
+				.join('; ');
+			ctx.logger.warn('event.payload_invalid', {
+				correlationId: command.correlationId,
+				aggregateId: args.aggregateId,
+				commandType: command.commandType,
+				eventType: args.event.eventType,
+				detail
+			});
+			// The ratified code, not a new one. DOC-007 §25.1 fixes FIFTEEN canonical error codes; a 16th
+			// ('RPH_EVENT_PAYLOAD_INVALID') was the obvious reach and would have been an invented governance
+			// fact, minted while building the gate that exists to stop invented governance facts. §25.1's
+			// meaning fits as written: "Structural (JSON Schema) validation of the payload failed" — it does
+			// not say COMMAND payload. Routed through reject() so STATUS_FOR_CODE maps the status (this code
+			// is VALIDATION_FAILED, not REJECTED — hand-rolling the return got that wrong).
+			return reject(
+				command,
+				'RPH_VALIDATION_SCHEMA_FAILED',
+				`${command.commandType} would emit a ${args.event.eventType} event whose payload violates its ratified contract — refusing to write it to the governed stream. ${detail}`,
+				[args.aggregateId]
+			);
+		}
+	}
 	// (e) Assemble the atomic commit (state + event + outbox + receipt).
 	const input: CommitInput = {
 		aggregateType: args.objectType,

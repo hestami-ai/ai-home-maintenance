@@ -241,8 +241,16 @@ body.push(
 	'}'
 );
 // A command is authoritative for WHICH event it emits (DOC-007). Align each binding's eventType to the
-// command's emitsEvent so the two never drift (e.g. MarkPwuReady -> PwuStateChanged, the event that carries
-// a payload schema; the semantic name PwuMarkedReady is a display alias — see OPEN-QUESTIONS).
+// command's emitsEvent so the two never drift.
+//
+// This alignment is right, but note what it does: it SILENTLY RESOLVES a disagreement rather than reporting one.
+// Until 2026-07-17 the vocab's command entry said MarkPwuReady -> PwuStateChanged while its own transitions table
+// said MarkPwuReady -> PwuMarkedReady; this line overwrote the table with the command entry, so the generated
+// output was self-consistent and the contradiction never surfaced. The command entry was the wrong side (the
+// Reference Undertaking §26 worked trace emits PwuMarkedReady; PwuStateChanged appears in no trace), and the
+// comment here previously rationalized the overwrite by calling PwuMarkedReady "a display alias" — a theory
+// invented to explain away the very drift this line was erasing. A resolver that cannot dissent is a resolver
+// that launders whichever side it was pointed at.
 const emitsByCommand = new Map(spec.commands.map((c) => [c.commandType, c.emitsEvent ?? '']));
 body.push(
 	'/** The command -> event -> state-transition binding table. */',

@@ -237,12 +237,12 @@
     {
       "commandType": "MarkPwuReady",
       "targetAggregateType": "PROFESSIONAL_WORK_UNIT",
-      "emitsEvent": "PwuStateChanged",
+      "emitsEvent": "PwuMarkedReady",
       "drivesMachine": "PWU.workLifecycleState",
       "drivesFrom": "SHAPING",
       "drivesTo": "READY",
       "schematized": true,
-      "sourceSection": "DOC-007 §11.4 / §11.5",
+      "sourceSection": "DOC-007 §11.4 (command payload, RATIFIED). EVENT BINDING CORRECTED 2026-07-17: this entry read emitsEvent=PwuStateChanged, contradicting this same file's own transitions table (MarkPwuReady -> PwuMarkedReady). The PwuStateChanged binding was inferred from §11.4/§11.5 ADJACENCY and is refuted: (a) the Reference Undertaking §26 Expected Event Trace — the corpus's own 72-step worked example — emits PwuMarkedReady at steps 20 and 33 and NEVER emits PwuStateChanged anywhere; (b) §11.5 declares previousState/newState as REQUIRED payload fields, which are meaningless for a mark-ready event (they would be the constants SHAPING/READY) and necessary only for a GENERIC event; (c) §11.3 'PWU proposed event' mirrors §11.2 'Propose PWU command' by name — §11.5 'PWU state changed event' does not mirror §11.4 'Mark PWU ready command'; (d) DOC-007 §33 requires BOTH PwuMarkedReady and PwuStateChanged as first-slice events, so they are not alternatives; (e) §11 schematizes only 2 of the ~11 PWU commands — it is a first-slice sampler (§16 item 6), not an exhaustive command->event pairing, so adjacency proves nothing. PwuStateChanged belongs to the generic ChangePwuState, which already carries reasonCode. See DOC-002 §8.1 (primary transitions keyed by COMMAND) vs §8.2 (exception transitions keyed by TRIGGER).",
       "payloadFields": [
         {
           "field": "shapeReadinessAssessmentId",
@@ -4719,7 +4719,7 @@
     {
       "eventType": "PwuMarkedReady",
       "aggregateType": "ProfessionalWorkUnit",
-      "sourceSection": "UNRATIFIED-AUTHORED (annotated 2026-07-16 under sponsor grant): DOC-007 schematizes NO interface for this, so these fields were AUTHORED, not derived. The citation below NAMES this command/event but defines no fields (DOC-002 §26.x/§34.x are bare name lists; §16 item 6: DOC-007's first slice deliberately leaves the granular vocabulary unschematized). Do NOT treat this sourceSection as proof the shape is ratified. Ratification pending. Cited: DOC-002 §26.2 (DOC-007 §33 lists it; DOC-007 realizes MarkPwuReady via PwuStateChanged)",
+      "sourceSection": "UNRATIFIED-AUTHORED (annotated 2026-07-16 under sponsor grant): DOC-007 schematizes NO interface for this, so these fields were AUTHORED, not derived. The citation below NAMES this command/event but defines no fields (DOC-002 §26.x/§34.x are bare name lists; §16 item 6: DOC-007's first slice deliberately leaves the granular vocabulary unschematized). Do NOT treat this sourceSection as proof the shape is ratified. Ratification pending. Cited: DOC-002 §26.2 (bare name list); DOC-007 §33 Required First-Slice Events (bare name list); Reference Undertaking §26 Expected Event Trace steps 20 and 33 (worked example — emits this event by name for the mark-ready act). NAME vs FIELDS: the event NAME is ratified in three places and is the event MarkPwuReady emits (corrected 2026-07-17 — the prior text here claimed 'DOC-007 realizes MarkPwuReady via PwuStateChanged', which is refuted by the §26 trace, in which PwuStateChanged never appears). The FIELDS below remain AUTHORED — no ratified doc schematizes them — which is why this stays UNRATIFIED-AUTHORED and therefore outside RATIFIED_EVENT_PAYLOADS. A ratified name does not make an authored payload ratified.",
       "payloadFields": [
         {
           "field": "shapeReadinessAttestationId",
@@ -5815,7 +5815,7 @@
       "machine": "PWU.workLifecycleState",
       "from": "SHAPING",
       "to": "READY",
-      "note": "NAME DRIFT: DOC-007 emits generic PwuStateChanged (§11.5); DOC-002 emits semantic PwuMarkedReady (§26.2). Realize PwuMarkedReady carrying the PwuStateChanged payload shape"
+      "note": "NOT name drift (corrected 2026-07-17). PwuMarkedReady and PwuStateChanged are DIFFERENT events and DOC-007 §33 requires BOTH: PwuMarkedReady is the named event of a §8.1 PRIMARY transition (keyed by Command — the reason IS the command name); PwuStateChanged is the generic event of ChangePwuState, carrying reasonCode because a §8.2 EXCEPTION transition is keyed by Trigger and has no command name to recover the reason from. The Reference Undertaking §26 worked trace emits PwuMarkedReady (steps 20, 33) and never emits PwuStateChanged. This entry was always right; the command entry above disagreed with it and has been corrected to match."
     },
     {
       "commandType": "ProposeExecutionPlan",
@@ -6237,8 +6237,8 @@
       "resolution": "DOC-007 names commands in PascalCase (CaptureIntent, MarkPwuReady, ProposePwu); DOC-002 §34 names them camelCase (captureIntent, markPwuReady, proposePwu). Canonicalized commandType to PascalCase (DOC-007 wins); the camelCase form is the §34 API method name. Applies to all 21 overlapping commands."
     },
     {
-      "topic": "MarkPwuReady -> PwuMarkedReady vs PwuStateChanged (event name drift)",
-      "resolution": "DOC-007 emits generic PwuStateChanged (§11.5, previousState->newState); DOC-002 §26.2 emits semantic PwuMarkedReady with the same SHAPING->READY transition. Recommend emitting the semantic PwuMarkedReady but structurally realizing it with the PwuStateChanged payload (carry the 5 state fields + reasonCode). Do not ship both."
+      "topic": "MarkPwuReady -> PwuMarkedReady vs PwuStateChanged (RESOLVED 2026-07-17 — this was never a conflict)",
+      "resolution": "WITHDRAWN AND REVERSED. The prior ruling here read: 'DOC-007 emits generic PwuStateChanged (§11.5...); DOC-002 §26.2 emits semantic PwuMarkedReady with the same SHAPING->READY transition. Recommend emitting the semantic PwuMarkedReady but structurally realizing it with the PwuStateChanged payload... Do not ship both.' Three of its claims are false. (1) 'DOC-002 §26.2 emits PwuMarkedReady with the same transition' — §26.2 is a BARE LIST OF EVENT NAMES. It emits nothing and binds no transition; the transition was supplied by this ruling and attributed to the doc. (2) 'Do not ship both' — DOC-007 §33 Required First-Slice Events lists BOTH PwuMarkedReady and PwuStateChanged, adjacently, as required. The corpus requires exactly what this ruling forbade. (3) The framing 'name drift' presumed one event wearing two names; they are two events. DOC-002 §8 gives the real structure: §8.1 PRIMARY transitions are keyed by a Command column (each has a named event; the reason IS the command), §8.2 EXCEPTION transitions are keyed by a Trigger column with NO command (hence a generic event that must CARRY the reason — that is what reasonCode is for, and the 11 §8.2 Triggers are its natural referent, though the corpus never links them explicitly). The decisive evidence is the Reference Undertaking §26 Expected Event Trace, the corpus's own 72-step worked example: it emits PwuMarkedReady at steps 20 and 33, and PwuStateChanged appears in NO worked trace anywhere in the corpus. CONSEQUENCE: this authored ruling, not the corpus, created the 'markPwuReady cannot fill reasonCode' blocker that parked the event gate. Error shape: silence read as conflict, then a winner picked (cf. the DOC-003/DOC-004 'two catalogs' error, same family)."
     },
     {
       "topic": "CompleteAssuranceAssessment: one event vs five outcome events",
