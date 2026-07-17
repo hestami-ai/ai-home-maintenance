@@ -3067,7 +3067,7 @@ the three floor-policy-creation events) and the I1 evaluator lock now admits the
 ## PART 3x — Pinned event-shape defects closed: events now record the STATUS they transitioned into
 
 The emitted-event-conformance register (PART 3p) pinned events whose emitted payload their own declared shape
-rejects — "the event that records *this became RUNNING* does not contain RUNNING." Two closed here, both cases where
+rejects — "the event that records *this became RUNNING* does not contain RUNNING." Three closed here, all cases where
 the HANDLER was the wrong side (it emitted the command payload; the event exists to record the resulting status):
 
 - **`ExecutionStepStarted`** — `startExecutionStep` emitted `{ stepId }`; the event declares `stepState`. `advanceStep`
@@ -3075,12 +3075,16 @@ the HANDLER was the wrong side (it emitted the command payload; the event exists
 - **`IntentDiscoveryStarted`** — `beginIntentDiscovery` emitted `{}` (the empty command payload); the event declares
   `intentStatus`. `advanceIntent` supports the same override, so it now supplies `{ intentStatus: 'UNDER_DISCOVERY' }`
   (ambiguities are discovered later, at ProvisionIntent, so none here).
+- **`DecompositionValidated`** — `validateDecomposition` emitted `command.payload` (`{ disposition, … }`); the event
+  declares `status` (the `VALID`/`CONDITIONALLY_VALID` it transitioned to) and rejects the undeclared `disposition`.
+  Now supplies `{ status: <target>, validatorRole? }`. (The command's `observationIds` is not a declared field of
+  this event — left for the §32 pass rather than written to the governed stream as an undeclared key.)
 
-A projection reading either event to learn what happened now finds the state, not silence. Register **11 → 9**; both
-added to the must-conform spine so they cannot regress. Each mutation-verified (remove the `eventPayload` → both the
-register count and the spine fail). Gate (each): `check-types` 21/21 · `test` 21/21 · lint · boundary · format. The
-remaining nine each need their own deliberate judgement (several tangle with the request-and-begin / five-outcome-
-events modeling drift), one at a time — never a bulk edit.
+A projection reading any of these to learn what happened now finds the state, not silence. Register **11 → 8**; all
+three added to the must-conform spine so they cannot regress. Each mutation-verified (break the `eventPayload` → both
+the register count and the spine fail). Gate (each): `check-types` 21/21 · `test` 21/21 · lint · boundary · format.
+The remaining eight each need their own deliberate judgement (several tangle with the request-and-begin /
+five-outcome-events modeling drift), one at a time — never a bulk edit.
 
 ---
 

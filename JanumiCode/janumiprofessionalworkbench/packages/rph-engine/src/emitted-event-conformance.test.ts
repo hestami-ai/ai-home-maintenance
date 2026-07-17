@@ -82,12 +82,13 @@ describe('emitted events vs their declared shapes', () => {
 		// must read to know what happened, which is how the Work view came to report every PWU as PROPOSED.
 		//
 		// AssuranceAssessmentStarted was the twelfth (fixed earlier — the SCHEMA was the wrong side there).
-		// ExecutionStepStarted (thirteenth) and IntentDiscoveryStarted (fourteenth) are fixed: the HANDLER was the
-		// wrong side in both — each emitted the command payload while the event exists to record the RESULTING status
-		// (`stepState: RUNNING`, `intentStatus: UNDER_DISCOVERY`) it transitioned INTO, so each now supplies the
-		// declared shape. The remaining nine each need the same judgement made deliberately, one at a time, and
-		// several interact with the unresolved request-and-begin / five-outcome-events modeling drift. Papering them
-		// over with a bulk edit would be the fabrication this effort exists to prevent.
+		// ExecutionStepStarted (13th), IntentDiscoveryStarted (14th), and DecompositionValidated (15th) are fixed:
+		// the HANDLER was the wrong side in each — it emitted the command payload while the event exists to record
+		// the RESULTING status (`stepState: RUNNING`, `intentStatus: UNDER_DISCOVERY`, `status: VALID`) it
+		// transitioned INTO, so each now supplies the declared shape. The remaining eight each need the same
+		// judgement made deliberately, one at a time, and several interact with the unresolved request-and-begin /
+		// five-outcome-events modeling drift. Papering them over with a bulk edit would be the fabrication this
+		// effort exists to prevent.
 		expect(violations.map((v) => v.eventType).sort()).toEqual([
 			'BaselineApproved',
 			'BaselineCreated',
@@ -116,7 +117,8 @@ describe('emitted events vs their declared shapes', () => {
 			'DecisionEffective',
 			'BaselinePromoted',
 			'ExecutionStepStarted',
-			'IntentDiscoveryStarted'
+			'IntentDiscoveryStarted',
+			'DecompositionValidated'
 		]) {
 			expect(broken.has(eventType), `${eventType} regressed`).toBe(false);
 		}
