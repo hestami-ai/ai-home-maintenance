@@ -49,6 +49,61 @@ Residual uses of `Product Lens`, `Lens`, `phase`, or `dialogue` are valid only w
 
 Read [Janumi Platform — Executive Overview](Janumi%20Platform%20-%20Executive%20Overview.md) for a concise product-family narrative. It is an orientation aid, not a substitute for the charter or the numbered specifications.
 
+# Cross-cutting engineering governance
+
+The following engineering-governance documents are co-located with the RPH corpus because they govern work performed on the Janumi Professional Workbench. They are not additional RPH semantic specifications, do not extend the `RPH-DOC-*` sequence, and do not displace `RPH-DOC-000` as the naming and product-boundary authority.
+
+The intended post-adoption authority ladder is:
+
+```text
+JAN-ENGC-001 — Engineering Constitution
+Binding commitments and boundaries
+        ↓ interpreted by
+JAN-ENGD-001 — Engineering Doctrine
+Applied principles and engineering judgment
+        ↓ operationalized by
+JPWB-DOC-004 — Agent Operating Protocol
+Actor-specific procedure and reporting
+        ↓ made concrete by
+Repository standards, playbooks, gates, and tooling
+```
+
+## JAN-ENGC-001 — Engineering Constitution
+
+**Document:** [Janumi Professional Workbench Engineering Constitution](<Janumi Professional Workbench - Engineering Constitution.md>)
+
+**Version:** `1.0.1`
+
+**Status:** Normative
+
+**Authority:** Binding engineering-practice commitments, non-waivable boundaries, deviation governance, and change control.
+
+This Constitution governs engineering practice and evidence. It does not define Janumi ontology, RPH runtime semantics, PWA/PWU meaning, exact contracts, or product behavior.
+
+## JAN-ENGD-001 — Engineering Doctrine
+
+**Document:** [Janumi Professional Workbench Engineering Doctrine](<Janumi Professional Workbench - Engineering Doctrine.md>)
+
+**Version:** `0.1.0`
+
+**Status:** Draft
+
+**Role:** Candidate applied doctrine for interpreting `JAN-ENGC-001` across engineering contexts.
+
+The Doctrine explains how to reason about clarity, decision memory, reconstructability, evidence, trust boundaries, micro-assurance, failure learning, proportionality, quality debt, and honest completion. It deliberately leaves ordered procedures, report schemas, filing rules, commands, thresholds, and tool configuration to downstream artifacts.
+
+## Relationship to the Agent Operating Protocol
+
+The emerging [JPWB-DOC-004 Agent Operating Protocol](<../_canon_draft/JPWB-DOC-004 Agent Operating Protocol.md>) is Draft and pending ratification. It currently carries substantial engineering-practice material from the retired source corpus.
+
+Before that Protocol is ratified, its engineering-practice sections must be reconciled with this ladder: the Constitution owns binding commitments; an adopted Doctrine owns interpretation and judgment; the Protocol owns agent conduct and procedure; repository standards own exact mechanics. Neither this README nor the Draft Doctrine silently amends `JPWB-DOC-004`.
+
+The emerging `JPWB-CON-000` draft currently recognizes a closed six-artifact canon. `JAN-ENGD-001` therefore remains supporting Draft doctrine unless that registry explicitly admits it as an applied-doctrine specialization or records it as supporting material outside the canon.
+
+## Retired engineering source
+
+The pre-control source is preserved byte-for-byte under [`retired/`](<retired/README.md>) as historical evidence. It has no controlled document identifier or current authority. `JAN-ENGC-001` is the governing replacement for engineering-practice use.
+
 # Canonical manifest and reading order
 
 ## RPH-DOC-000 — Product architecture and canonical vocabulary
@@ -140,6 +195,8 @@ This follows the semantic contracts because persistence must implement those dec
 This demonstrates how users author and publish a PWA, instantiate it as an Undertaking, operate its Professional Work Graph, execute PWU Instances, review assurance, govern Baselines, migrate an Undertaking to a new PWA version, and propose PWA improvements from Undertaking learning.
 
 # Coding-agent reading sequence
+
+For implementation work, read `JAN-ENGC-001` first. Consult `JAN-ENGD-001` as non-binding Draft interpretation. Apply `JPWB-DOC-004` only according to its current governance status and, before ratification, surface rather than silently resolve any overlap among the three.
 
 ```text
 0. Vocabulary Charter

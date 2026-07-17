@@ -72,7 +72,17 @@ export const validateDecomposition: CommandHandler = (ctx, command, payload) => 
 		statusField: 'status',
 		machine: 'DecompositionContract.status',
 		target: mapping.target,
-		eventType: mapping.event
+		eventType: mapping.event,
+		// The event records the RESULTING status. DecompositionValidated declares `status` (the VALID /
+		// CONDITIONALLY_VALID it transitioned to), which `command.payload` carries as `disposition` (a field the
+		// event does not declare — a strict schema rejects it) while omitting `status` entirely. Emit the declared
+		// shape: the target status, plus the optional validatorRole when the command supplied it. (`observationIds`
+		// is on the command but not this event's declared shape — a contract-drift note for the §32 pass, not fixed
+		// here; folding it in would put an undeclared key on the governed stream.)
+		eventPayload: () => ({
+			status: mapping.target,
+			...(p.validatorRole ? { validatorRole: p.validatorRole } : {})
+		})
 	});
 };
 

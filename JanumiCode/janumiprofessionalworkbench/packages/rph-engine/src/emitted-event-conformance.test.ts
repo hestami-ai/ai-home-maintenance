@@ -69,7 +69,7 @@ describe('emitted events vs their declared shapes', () => {
 		expect(checked).toBeGreaterThan(200);
 	});
 
-	it('DEFECT REGISTER: 9 event types emit a payload their own declared shape rejects', () => {
+	it('DEFECT REGISTER: 8 event types emit a payload their own declared shape rejects', () => {
 		const { violations } = driveAndCheck();
 		// PIN — a defect register, not a specification. It must only ever SHRINK. An entry here means an event
 		// and its declared contract disagree, and BOTH are ours: either the handler emits the wrong thing, or the
@@ -94,7 +94,6 @@ describe('emitted events vs their declared shapes', () => {
 			'BaselineSubmittedForReview',
 			'DecisionProposed',
 			'DecompositionProposed',
-			'DecompositionValidated',
 			'EvidenceProposed',
 			'ExecutionPlanApproved',
 			'ExecutionPlanProposed'

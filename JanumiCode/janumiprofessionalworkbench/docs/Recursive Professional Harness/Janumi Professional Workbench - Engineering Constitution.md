@@ -1,1254 +1,642 @@
-# **Source Code Commenting Best Practices for AI Coding Agents**
+# Janumi Professional Workbench Engineering Constitution
 
-## **Primary Principle**
-
-Write comments for **future maintainers and future AI agents**, not to restate what the code already says.
-
-Good comments explain:
-
-* **Why** this exists  
-* **Why this approach was chosen**  
-* **What constraints shaped the implementation**  
-* **What must not be changed casually**  
-* **What external contract, user story, acceptance criterion, or historical decision this code satisfies**
-
-Bad comments merely narrate obvious code behavior.
-
----
-
-## **1\. Prefer Self-Documenting Code First**
-
-Before adding a comment, improve the code itself:
-
-* Use clear names.  
-* Extract meaningful functions.  
-* Use explicit types.  
-* Represent state clearly.  
-* Avoid cleverness unless necessary.  
-* Make illegal states hard or impossible to represent.
-
-Do not use comments to compensate for confusing code unless the complexity is unavoidable.
+**Document ID:** `JAN-ENGC-001`
+**Version:** `1.0.1`
+**Status:** Normative
+**Effective date:** 2026-07-17
+**Role:** Binding engineering-practice constitution
+**Authority:** Engineering practice for the Janumi Professional Workbench
+**Scope:** Commenting, observability, debugging, testing-as-evidence, quality gates, and engineering completion
+**Applies to:** Human contributors, AI coding agents, agent operators, reviewers, and maintainers
+**Derived from:** [Retired non-normative Engineering Constitution source](<retired/Janumi Professional Workbench - Engineering Constitution.md>)
+**Supersedes:** Uncontrolled source guidance for engineering-governance use
+**Source disposition:** Original source preserved byte-for-byte under `retired/`; it carries no current authority
+**Approval basis:** User direction to create a normative variant, 2026-07-17
+**Normative keywords:** SHALL, SHALL NOT, SHOULD, SHOULD NOT, MAY
 
 ---
 
-## **2\. Comment the “Why,” Not the “What”**
+## 1. Purpose and Constitutional Force
 
-Avoid comments like:
+This Constitution establishes the binding engineering practices for changes to the Janumi Professional Workbench and its governed implementation artifacts.
 
-// Loop through users  
-for (const user of users) { ... }
+It governs:
 
-Prefer comments like:
+* source-code clarity and comments;
+* debugging and failure analysis;
+* logs, traces, metrics, and other observability evidence;
+* testing and assurance evidence;
+* AI-, model-, and tool-call engineering practices;
+* code-quality gates;
+* engineering completion and reporting;
+* exceptions to these practices.
 
-// We preserve the original ordering because downstream reconciliation expects  
-// user-facing results to match the order returned by the vendor API.
+This Constitution applies to source code, tests, prompts, agent definitions, tool contracts, configuration, infrastructure code, migrations, telemetry, generated artifacts, and engineering documentation when they are created or changed as part of Janumi Professional Workbench work.
 
-The source code usually explains **what** happens. Comments should explain **why it must happen that way**.
+### 1.1 Scope Boundary
+
+This document governs engineering practice. It does not define Janumi's professional ontology, Professional Work Architecture semantics, runtime invariants, serialized contracts, or product behavior.
+
+The document that owns a semantic or architectural concern remains authoritative for that concern. This Constitution governs how an implementation change is designed, evidenced, reviewed, and completed; it SHALL NOT be used to redefine the meaning of a canonical Janumi term or object.
+
+Repository-local instructions and accepted architecture decisions MAY impose stricter requirements. They SHALL NOT silently weaken this Constitution. If two requirements cannot be reconciled within their declared scopes, the conflict SHALL be surfaced to the responsible authority before an unsafe or semantically irreversible change proceeds.
+
+### 1.2 Source Lineage
+
+This document is the controlled normative variant of the retired, unversioned source named in the metadata above. It preserves that source's four substantive pillars:
+
+1. comments preserve decision context;
+2. observability makes behavior reconstructable;
+3. testing constructs evidence of correctness;
+4. quality gates and completion duties prevent silent engineering debt.
+
+The source remains historical input. Within the scope of this Constitution, this controlled variant governs when the two differ.
+
+### 1.3 Normative Language
+
+The keywords SHALL, SHALL NOT, SHOULD, SHOULD NOT, and MAY have the binding meanings below in this document. `JAN-DOCS-001` defines the general document-control vocabulary; the RPH README registers this document in its current location. Neither is required to interpret these terms.
+
+* SHALL and SHALL NOT state mandatory requirements.
+* SHOULD and SHOULD NOT state strong defaults that require recorded justification when not followed.
+* MAY states a permitted option.
+
+Examples are non-normative: they illustrate a rule but do not narrow it.
+
+Normative clause locators use the form `JAN-ENGC-001 § 3.2`. Within a major version, a published clause number SHALL NOT be reassigned to an unrelated requirement.
+
+### 1.4 Applicability Terms
+
+For this Constitution:
+
+* a **material** change or action can affect externally visible behavior, governed state, authority, security, privacy, a contractual interface, a professional outcome, an irreversible external effect, assurance, or operational reliability;
+* an **applicable** rule has a causal, contractual, or risk-bearing relationship to the changed behavior; a contributor SHALL consider the rule and SHALL record the reason when applicability is uncertain and the rule is omitted;
+* **sufficient evidence** directly supports the governing requirement, is inspectable or reproducible as appropriate, and covers the material success and failure conditions affected by the change;
+* **feasible** means possible within authorized scope and tooling without creating disproportionate risk; inconvenience, effort, or schedule pressure alone does not establish infeasibility;
+* a **trust boundary** is a point at which information changes owner, authority, validation state, or protection domain.
 
 ---
 
-## **3\. Include Business Context When It Affects Design**
+## 2. Foundational Engineering Principles
 
-It is acceptable to reference user stories, tasks, or acceptance criteria when they explain a non-obvious design decision.
+All work governed by this Constitution SHALL preserve the following principles.
 
-Use this when the code encodes product intent, compliance logic, workflow semantics, or a user-visible guarantee.
+### 2.1 Clarity Before Commentary
+
+Code SHALL explain its ordinary behavior through clear names, explicit types, cohesive functions, visible state, and well-defined boundaries before comments are used to compensate for complexity.
+
+Comments SHALL preserve decision context that is not reliably recoverable from code alone. They SHALL NOT narrate syntax or restate an implementation that is already clear.
+
+### 2.2 Evidence Before Confidence
+
+Engineering confidence SHALL be supported by inspectable evidence. A successful command, a generated artifact, a model response, a completed workflow step, or a high coverage percentage is not sufficient by itself to prove that intended behavior occurred.
+
+Evidence produced by an AI agent MAY support review, but it is not governance approval and SHALL NOT be presented as independent human or policy authority.
+
+Tests, telemetry, replay artifacts, model evaluations, and Validator output MAY provide evidence or assessment. They do not by themselves authorize a state change, make a governance Decision, or establish a Baseline; those effects remain governed by the concern-owning Janumi specification and authority model.
+
+### 2.3 Reconstructable Behavior
+
+A material system action SHALL leave enough safe, structured evidence for an authorized maintainer to determine what happened, where it happened, why it happened, which state or dependency influenced it, and whether the condition is isolated or systemic.
+
+### 2.4 Explicit Trust Boundaries
+
+Input that crosses an ownership or trust boundary SHALL be treated as untrusted until it is validated under the applicable contract. This includes user input, external APIs, files, database records from another authority boundary, messages, browser automation, model output, agent output, and tool output.
+
+### 2.5 Permanent Learning From Failure
+
+A material defect SHALL produce durable learning proportional to its risk. When feasible, that learning SHALL include a regression test or replay fixture and improved observability sufficient to detect the same failure mode earlier.
+
+### 2.6 Safe Information Handling
+
+Engineering artifacts SHALL NOT expose secrets, credentials, tokens, private customer data, unnecessary personal information, protected prompts or outputs, or security-bypass instructions.
+
+### 2.7 No Invented Rationale
+
+A contributor or agent SHALL NOT present inferred business or architectural rationale as known fact. When inference is necessary, it SHALL be labeled as inference and validated against the owning requirement or authority before it becomes a durable design constraint.
+
+### 2.8 Proportional but Complete Practice
+
+Verification and observability SHALL be proportional to change risk, but proportionality SHALL NOT be used to leave an affected layer incomplete. A small coherent change is preferred to a broad change; an incoherent partial change is prohibited even when its diff is smaller.
+
+---
+
+## 3. Source-Code Clarity and Commenting
+
+### 3.1 Self-Documenting Code
+
+Before adding an explanatory comment, the contributor SHALL consider whether the implementation can be clarified by:
+
+* choosing a more precise name;
+* extracting a cohesive function or type;
+* making state and control flow explicit;
+* replacing a magic value with a named concept;
+* using an explicit contract or type;
+* making an illegal state difficult or impossible to represent;
+* removing unnecessary cleverness.
+
+Comments SHALL NOT be used as a routine substitute for such improvements.
+
+### 3.2 What Comments Shall Explain
+
+A comment is warranted when a future maintainer could otherwise misunderstand:
+
+* why the code exists;
+* why this approach was selected;
+* which requirement, decision, or acceptance criterion it satisfies;
+* which constraint or tradeoff shaped it;
+* which invariant must remain true;
+* which external contract is being relied upon;
+* why an error is retried, downgraded, escalated, or allowed to fail;
+* why an apparently redundant step is necessary;
+* what must not be changed without coordinated work elsewhere.
+
+A comment SHALL explain the smallest durable context necessary. Entire user stories, long requirements, or task transcripts SHALL NOT be copied into source files when a stable identifier and a concise rationale are sufficient.
+
+### 3.3 Required Boundary and Invariant Comments
+
+Non-obvious dependencies on behavior outside the local source file SHALL be documented at the relevant boundary. The comment SHOULD identify the assumption, normalization rule, failure behavior, and owning contract when those facts are not obvious from types or generated documentation.
+
+An invariant whose violation could authorize an invalid transition, corrupt governed state, duplicate an external effect, weaken security, or misrepresent assurance SHALL be explicit in code, tests, or a nearby comment. A comment alone does not enforce an invariant.
 
 Example:
 
-// Supports US-142 AC-3: homeowners must see only contractors licensed  
-// for the selected jurisdiction. Do not broaden this query without updating  
-// the authorization and licensing rules.
+```text
+// Boundary: Model output is an untrusted proposal. Normalize missing and null
+// fields, then validate the declared output schema before constructing a Command.
+```
 
-Do not paste entire user stories or acceptance criteria into source files. Reference the smallest useful fragment.
+```text
+// Invariant: This transition occurs only after authority and expected revision
+// checks succeed. Bypassing either check would make the committed state invalid.
+```
 
----
+### 3.4 Structured Comment Forms
 
-## **4\. Use Structured Context Comments for Important Decisions**
+The following labels MAY be used when they make a high-risk comment easier to scan:
 
-For non-obvious or high-risk code, use a compact structured comment:
+* `Intent:` — why the code exists;
+* `Context:` — durable historical, product, or domain background;
+* `Boundary:` — assumptions about external input or output;
+* `Invariant:` — a condition that must always remain true;
+* `Tradeoff:` — why one acceptable approach was selected over another;
+* `WARNING:` — a real hazard or fragile contract;
+* `Inferred rationale:` — a hypothesis that has not been confirmed by an owning authority.
 
-// Context:  
-// \- Requirement: US-142 AC-3 requires jurisdiction-specific contractor filtering.  
-// \- Reason: Licensing validity differs by state/county.  
-// \- Constraint: Vendor records may have missing or stale license metadata.  
-// \- Do not change: Do not fallback to "unverified" contractors unless the  
-//   caller explicitly opts into unverified search results.
+Labels SHALL NOT substitute for a precise explanation.
 
-Use this sparingly, near the code where the decision matters.
+### 3.5 TODOs and Warnings
 
----
+A TODO SHALL include:
 
-## **5\. Document External Contracts at Boundaries**
+* an owner or stable issue/reference;
+* the reason the work remains;
+* the current risk or limitation;
+* the expected resolution or removal condition.
 
-Always comment when code depends on behavior outside the local source file:
+Ambiguous TODOs such as `fix later` are prohibited.
 
-* APIs  
-* databases  
-* queues  
-* LLM outputs  
-* browser automation  
-* file formats  
-* third-party services  
-* authentication/session behavior  
-* workflow engine semantics
+A warning comment SHALL be reserved for a material hazard. Warning language SHALL NOT be applied so broadly that it loses diagnostic value.
 
-Example:
+### 3.6 Comment Placement and Drift
 
-// Boundary contract:  
-// The LLM may omit fields or return null, empty strings, or unexpected casing.  
-// Normalize before validation; never treat missing values as negative intent.
+Comments SHALL be placed as close as practical to the behavior they govern:
 
----
+* module-level comments for durable architectural context;
+* function- or type-level comments for contracts and invariants;
+* local comments for unusual decisions;
+* file-level comments only when the entire file has a special role.
 
-## **6\. Mark Invariants Explicitly**
+When behavior changes, affected comments, examples, TODOs, warnings, and requirement references SHALL be updated or removed in the same change. A stale comment that contradicts behavior is a defect.
 
-Use comments to document conditions that must remain true.
+### 3.7 AI Coding Agent Duties for Comments
 
-Example:
+An AI coding agent SHALL:
 
-// Invariant:  
-// A WorkOrder can only enter SCHEDULED after providerId, scheduledWindow,  
-// and homeownerConfirmation are all present. This prevents downstream  
-// dispatch workflows from inferring readiness from partial state.
-
-This is especially important for state machines, workflows, authorization, payments, retries, and agent orchestration.
-
----
-
-## **7\. Explain Non-Obvious Error Handling**
-
-Comment why errors are handled, retried, downgraded, escalated, or intentionally allowed to fail.
-
-Example:
-
-// We retry only idempotent provider lookups. Creating a bid request is not  
-// retried here because the vendor API may create duplicate external records.
+1. preserve meaningful comments unless evidence shows they are wrong or obsolete;
+2. update or remove stale comments when changing nearby behavior;
+3. add decision context where future agents could plausibly misread a boundary, invariant, tradeoff, or failure policy;
+4. avoid over-commenting obvious code;
+5. distinguish known rationale from inferred rationale;
+6. treat comments as part of the implementation contract during review.
 
 ---
 
-## **8\. Explain Observability Decisions**
+## 4. Observability and Operational Evidence
 
-When adding logs, traces, metrics, or spans, explain the diagnostic purpose if it is not obvious.
+### 4.1 Observability Standard
 
-Example:
+Observability is the ability to reconstruct system behavior from emitted evidence. It includes logs, traces, metrics, Events, audit records, health signals, and controlled diagnostic artifacts.
 
-// Trace this decision boundary because shallow agent audits often appear  
-// successful unless we capture the evaluated criteria and rejected options.
+If the system makes a material decision, crosses a trust boundary, changes governed state, retries, suppresses or deduplicates data, calls a model or tool, or handles an error, it SHALL emit evidence proportional to the consequence of that action.
 
-Comments should help future agents understand what signals are needed to debug the system.
+### 4.2 Instrument Boundaries First
 
----
+Every material boundary SHOULD capture, where applicable:
 
-## **9\. Do Not Leave Ambiguous TODOs**
+* a trace or correlation identifier;
+* a safe operation, actor, Undertaking, PWU, or aggregate reference;
+* the input shape and schema version rather than sensitive raw content;
+* validation and authorization outcomes;
+* the dependency or provider involved;
+* latency and timeout policy;
+* outcome and stable error classification;
+* retry, deduplication, or idempotency context.
 
-Avoid:
+Identifiers that do not exist in the governing domain SHALL NOT be fabricated merely to satisfy a logging template.
 
-// TODO: fix this later
+### 4.3 Structured Decision Evidence
 
-Prefer:
+Material branches based on professional rules, eligibility, authority, lifecycle state, ranking, retry policy, or agent/tool selection SHALL produce structured decision evidence when the decision would otherwise be difficult to reconstruct.
 
-// TODO(JANUMI-231):  
-// Replace this temporary county lookup with the normalized jurisdiction table.  
-// Current limitation: Fairfax and Loudoun are handled, but Maryland counties  
-// are not yet canonicalized.
+The record SHOULD state the evaluated rule or policy, relevant safe inputs, selected disposition, and reason. It SHALL NOT expose private chain-of-thought. A concise rationale, criteria result, or provenance-linked evidence summary is sufficient.
 
-Every TODO should include:
+### 4.4 Structured Logs and Correlation
 
-* Owner or ticket/reference  
-* Reason  
-* Risk or limitation  
-* Expected resolution
+Machine-consumable structured logs SHALL be preferred over prose-only messages for operational events.
 
----
+Correlation context SHALL propagate across requests, jobs, messages, workflows, model calls, tool calls, and external requests where the platform supports propagation. A log that cannot be associated with the operation that caused it SHOULD be treated as incomplete evidence.
 
-## **10\. Use Warning Comments Carefully**
+Normal control flow SHALL NOT be logged at warning or error severity.
 
-Use strong warnings only for real hazards.
+### 4.5 Typed and Classified Errors
 
-Example:
+Errors that cross a component or trust boundary SHALL have:
 
-// WARNING:  
-// Do not remove this deduplication step. Provider search can return the same  
-// business from Google, Yelp, and BBB. Without canonicalization, the contact  
-// agent may message the same vendor multiple times.
+* a stable error code or category;
+* a safe human-readable message;
+* machine-readable context;
+* the originating operation and correlation context;
+* a remediation hint when one is safe and useful.
 
-Avoid excessive warning comments; they lose force if everything is marked dangerous.
+Generic catch-and-ignore behavior is prohibited. An error MAY be translated, retried, downgraded, or suppressed only under an explicit policy whose effect remains observable.
 
----
+### 4.6 Failure Evidence
 
-## **11\. Avoid Comment Drift**
+Failure records SHOULD preserve the safe evidence needed to diagnose:
 
-When modifying code, update nearby comments in the same change.
+* schema and contract versions;
+* redacted input characteristics;
+* expected and observed state;
+* dependency and timeout information;
+* validation findings;
+* retry count and policy;
+* decision path or failed guard;
+* recovery or compensation outcome.
 
-A stale comment is worse than no comment because future AI agents may treat it as authoritative.
+Secrets, raw credentials, unnecessary personal data, and sensitive prompts or outputs SHALL NOT be logged.
 
-Before completing a task, verify:
+### 4.7 Model, Agent, and Tool Calls
 
-* Comments still match behavior.  
-* Referenced acceptance criteria are still valid.  
-* Warnings still apply.  
-* TODOs are still accurate.  
-* No obsolete rationale remains.
+Each material model, agent, or tool call SHALL be treated as an observed trust boundary. The call record SHALL capture, where available and applicable:
 
----
+* agent role and invocation purpose;
+* prompt or template identifier and version;
+* model, provider, and tool identifiers;
+* input and output schema versions;
+* provenance and correlation context;
+* validation, policy, guardrail, and assurance results;
+* retry count, latency, token or resource use, and finish reason;
+* accepted, rejected, escalated, or provisional disposition.
 
-## **12\. Do Not Encode Secrets or Sensitive Details**
+Full prompts, private reasoning, and raw outputs SHALL NOT be logged by default. Controlled diagnostic artifacts MAY retain redacted content when authorized, access-controlled, retention-bounded, and necessary for replay or assurance.
 
-Never place these in comments:
+The absence of an emitted model error SHALL NOT be treated as evidence that the output was correct. Material output SHALL be validated before it acquires authority or drives a protected transition.
 
-* API keys  
-* credentials  
-* tokens  
-* private customer data  
-* personal information  
-* internal-only URLs unless approved  
-* security bypass instructions
+### 4.8 State Transitions
 
-Use comments to describe the contract, not expose sensitive implementation material.
+Every material governed state transition SHALL be observable. Transition evidence SHOULD include:
 
----
+* object identity and revision;
+* prior and resulting state;
+* initiating Command or equivalent governed action;
+* actor and authority outcome;
+* guards and invariants evaluated;
+* emitted Event or audit reference;
+* correlation context.
 
-## **13\. Recommended Comment Types**
+Rejected transitions SHALL also be observable at an appropriate severity.
 
-Use these categories consistently:
+### 4.9 Retries, Idempotency, and Deduplication
 
-### **Intent Comment**
+Retry, idempotency, and deduplication behavior SHALL record the policy and final disposition. The evidence SHOULD include the idempotency key or safe derivative, attempt number, backoff, retry safety, duplicate-match reason, and outcome.
 
-Explains why the code exists.
+A non-idempotent external action SHALL NOT be retried automatically unless the owning contract provides a mechanism that prevents duplicate effects.
 
-// Intent: prevent homeowners from seeing contractors that failed jurisdiction validation.
+### 4.10 Metrics and Health Signals
 
-### **Context Comment**
+Metrics SHOULD cover both technical health and meaningful product or work behavior. Metrics SHALL have bounded, non-sensitive dimensions and SHALL NOT create unbounded-cardinality or privacy hazards.
 
-Explains historical, product, or domain background.
+Services SHALL expose machine-readable liveness and readiness signals appropriate to their deployment. A service SHALL NOT report ready when it cannot safely perform the operations for which it receives traffic. Degraded states SHOULD distinguish unavailable critical dependencies from unavailable noncritical capabilities.
 
-// Context: Some county licensing records lag state records by several days,  
- // so we treat state verification as authoritative when county data is missing.
+### 4.11 Invariant Violations
 
-### **Boundary Comment**
+An invariant violation SHALL emit high-severity evidence and prevent the unsafe action. State SHALL NOT be silently repaired unless the repair mechanism is explicitly designed, authorized, observable, and tested.
 
-Explains assumptions about external input/output.
+### 4.12 Observability Anti-Patterns
 
-// Boundary: This endpoint receives model-generated JSON. Validate strictly  
-// before converting it into workflow state.
+The following are prohibited:
 
-### **Invariant Comment**
-
-Explains what must always remain true.
-
-// Invariant: A bid cannot be accepted after the request has expired.
-
-### **Tradeoff Comment**
-
-Explains why one approach was chosen over another.
-
-// Tradeoff: We use synchronous validation here instead of queueing because  
-// the homeowner must receive immediate feedback before submitting the request.
-
-### **Warning Comment**
-
-Explains dangerous or fragile behavior.
-
-// WARNING: Changing this retry policy may duplicate outbound vendor messages.
-
----
-
-## **14\. Comment Placement Rules**
-
-Place comments as close as possible to the code they explain.
-
-Use:
-
-* Function-level comments for behavior, contracts, and invariants.  
-* Inline comments for unusual local decisions.  
-* Module-level comments for architectural context.  
-* File-level comments only when the whole file has a special role.
-
-Avoid large comment blocks at the top of files unless they explain durable architecture.
+* console-only debugging as the sole durable evidence;
+* generic failure messages without classification;
+* catch-and-ignore blocks;
+* logs without usable correlation where correlation is available;
+* raw secret or sensitive-payload logging;
+* retrying non-idempotent effects without protection;
+* metrics with unsafe or unbounded dimensions;
+* treating model or tool output as trusted;
+* treating absence of evidence as evidence of absence.
 
 ---
 
-## **15\. AI-Agent-Specific Guidance**
+## 5. Debugging Discipline
 
-When generating or editing code, the AI agent must:
+### 5.1 Required Workflow
 
-1. Preserve existing meaningful comments unless they are wrong.  
-2. Delete or update stale comments.  
-3. Add comments where future agents may misunderstand intent.  
-4. Reference user stories or acceptance criteria only when they explain design.  
-5. Avoid over-commenting obvious code.  
-6. Treat comments as part of the implementation contract.  
-7. Never invent business rationale. If rationale is inferred, say so explicitly.
+When diagnosing a defect, the contributor or agent SHALL:
 
-Example:
+1. reproduce, replay, or safely simulate the failure when feasible;
+2. identify the expected behavior and its governing requirement;
+3. locate the boundary where observed behavior diverges;
+4. inspect available logs, traces, Events, state, and dependency evidence before changing code;
+5. state a specific, falsifiable hypothesis;
+6. make the smallest coherent corrective change;
+7. add or update evidence that prevents regression;
+8. improve observability when the existing evidence was insufficient;
+9. verify that comments, logs, metrics, and documentation still describe the resulting behavior accurately.
 
-// Inferred rationale:  
-// The explicit null check appears to distinguish "not provided" from "provided  
-// but empty." Preserve this distinction unless the product requirement changes.
+A contributor SHALL NOT patch symptoms through random changes or weaken an invariant merely to make a failing test pass.
 
----
+### 5.2 Debugging Completion Report
 
-## **16\. Final Review Checklist**
+A completed debugging change SHALL report:
 
-Before finishing a code change, verify:
+* root cause;
+* broken assumption;
+* behavior and code changed;
+* tests or replay evidence added or updated;
+* observability added or updated;
+* residual risk;
+* deferred follow-up work.
 
-* Does the code explain itself where possible?  
-* Are comments focused on why, constraints, invariants, and contracts?  
-* Are user story or acceptance criteria references minimal and useful?  
-* Are comments close to the relevant code?  
-* Are stale comments removed?  
-* Are TODOs actionable?  
-* Are boundary assumptions documented?  
-* Are dangerous changes clearly warned about?  
-* Would a future AI coding agent understand the intent without reading the entire task history?
+If root cause remains unknown, the work SHALL be reported as an investigation or containment, not as a completed root-cause fix.
 
 ---
 
-## **Commenting Standard**
+## 6. Testing as Evidence
 
-Use comments to preserve **decision context** that is not reliably recoverable from code alone.
+### 6.1 Testing Principle
 
-The goal is not more comments.
+Testing is the systematic construction of evidence that an implementation satisfies intended behavior. It is continuous engineering work, not a terminal phase.
 
-The goal is fewer surprises.
+Every material requirement or behavioral change SHALL have evidence proportional to its risk. Evidence SHOULD include deterministic implementation checks, automated tests, observable runtime behavior, and explicit contracts where those forms apply.
 
-\================
+Tests SHALL favor professional outcomes, contracts, invariants, state transitions, and externally visible behavior over private implementation details. Refactoring a conforming implementation SHOULD NOT routinely require rewriting behavior-level tests.
 
-# **Debugging and Observability Best Practices for AI Coding Agents**
+### 6.2 Evidence Ladder
 
-## **Primary Principle**
+The following layers provide different kinds of confidence. A change SHALL use every applicable layer; inapplicable layers MAY be omitted when the reason is evident or recorded.
 
-Build code so future humans and AI agents can answer:
+| Layer | Required purpose when applicable |
+| --- | --- |
+| Unit | Verify deterministic logic in isolation. |
+| Property, invariant, and metamorphic | Verify rules that must remain true across broad input spaces. |
+| Integration | Verify collaborating components, persistence, transactions, serialization, and dependency wiring. |
+| Contract | Verify assumptions at APIs, Events, messages, files, model outputs, and other external interfaces. |
+| Boundary | Verify malformed, missing, null, duplicate, oversized, unauthorized, and unexpected input. |
+| State transition | Verify every affected legal transition, illegal transition, guard, retry, compensation, and rollback rule. |
+| End-to-end | Verify complete affected user or professional journeys and their outcomes. |
+| Replay | Reconstruct significant field failures or production behavior from sanitized evidence. |
+| Chaos and resilience | Verify predictable behavior under dependency failure, delay, duplication, and partial execution. |
+| Production validation | Verify telemetry, health, alerting, canary behavior, and real operational outcomes. |
 
-1. What happened?  
-2. Where did it happen?  
-3. Why did it happen?  
-4. What input, state, dependency, or decision caused it?  
-5. Is this a one-off failure or a systemic pattern?
+The cheapest relevant proof SHOULD run first, followed by broader proofs as risk requires.
 
-Observability is not just logging. It is the ability to reconstruct system behavior from emitted evidence.
+### 6.3 Trust-Boundary and Contract Testing
 
----
+Every changed trust boundary SHALL have explicit validation evidence. Tests SHOULD cover:
 
-## **1\. Instrument Boundaries First**
+* missing and null fields;
+* incorrect types and casing;
+* malformed, oversized, duplicate, stale, or adversarial input;
+* authorization failures;
+* schema-version and compatibility behavior;
+* dependency timeouts and bad responses;
+* idempotency and duplicate delivery;
+* safe redaction and error classification.
 
-Add observability at every boundary where information changes trust level or ownership:
+External systems SHALL NOT be assumed to behave correctly.
 
-* User input  
-* API request/response  
-* Database read/write  
-* Queue publish/consume  
-* Workflow transition  
-* LLM/tool call  
-* File parse/import/export  
-* Auth/session check  
-* Third-party service call
+### 6.4 State and Workflow Testing
 
-At each boundary capture:
+For every affected state machine, tests SHALL cover all changed legal transitions, relevant illegal transitions, guards, retries, compensation, recovery, and rollback behavior.
 
-* Correlation/request ID  
-* Input shape, not sensitive raw payloads  
-* Validation result  
-* External system name  
-* Latency  
-* Outcome  
-* Error classification
+A happy-path test alone is insufficient when the change affects authority, state, money, security, external side effects, agent action, or professional assurance.
 
----
+### 6.5 Production Defects and Replay
 
-## **2\. Trace Decisions, Not Just Failures**
+A confirmed production defect SHALL result in a regression test or replay fixture when feasible. If such evidence cannot be created, the completion report SHALL state why and identify the compensating detection or prevention mechanism.
 
-For code that branches on business rules, agent reasoning, workflow state, ranking, eligibility, permissions, or retries, emit structured decision traces.
+Sanitized replay artifacts SHOULD preserve normalized inputs, governing versions, event or workflow history, dependency summaries, and the observed failure without exposing protected information.
 
-Example:
+### 6.6 AI-Specific Tests
 
-logger.info("contractor.filtered", {  
-  contractorId,  
-  reason: "license\_jurisdiction\_mismatch",  
-  requiredJurisdiction,  
-  observedJurisdiction,  
-  story: "US-142",  
-  acceptanceCriterion: "AC-3"  
-});
+Material prompt, model, agent, or tool changes SHALL be evaluated beyond ordinary deterministic unit tests.
 
-Future AI agents need to know not only that a result was excluded, but why.
+Applicable evidence includes:
 
----
+* prompt regression evaluation against a stable, versioned dataset;
+* output-schema and boundary validation;
+* tool-selection and permission tests;
+* agent trajectory tests for required process behavior;
+* adversarial and malformed-output cases;
+* provenance, guardrail, and assurance checks;
+* observability tests proving required telemetry is emitted;
+* accepted/rejected/escalated disposition tests.
 
-## **3\. Use Structured Logs**
+Final output alone is insufficient when the required trajectory, evidence collection, tool use, or protected-transition handling is part of correctness.
 
-Prefer structured logs over prose strings.
+### 6.7 Test Data and Assertions
 
-Good:
+Test data SHOULD use builders, fixtures, factories, generated values, and deterministic seeds that communicate intent. Tests SHOULD avoid unexplained magic values, mutable shared state, hidden dependencies, and duplicated fixtures.
 
-logger.warn("bid\_request.retry\_skipped", {  
-  reason: "non\_idempotent\_operation",  
-  providerId,  
-  workOrderId,  
-  attempt  
-});
+Assertions SHALL target stable behavior and semantics. An assertion that only verifies a private method call is insufficient when the actual requirement concerns an external outcome or invariant.
 
-Bad:
+### 6.8 Coverage
 
-logger.warn("Skipping retry because this might duplicate stuff");
+Coverage measurements are diagnostics, not proof of correctness. Required repository thresholds SHALL be met, but a numerical threshold SHALL NOT replace evidence that each affected rule, boundary, invariant, transition, contract, and known defect is tested.
 
-Structured logs allow search, aggregation, replay analysis, and agent-assisted debugging.
+One hundred percent line coverage does not, by itself, establish conformance.
 
----
+### 6.9 Documentation and Observability Tests
 
-## **4\. Propagate Correlation IDs Everywhere**
-
-Every request, workflow, background job, queue message, LLM call, and outbound API call should carry a correlation ID.
-
-Minimum IDs:
-
-* `requestId`  
-* `traceId`  
-* `userId` or safe subject reference  
-* `workflowId`  
-* `taskId`  
-* `externalRequestId` where applicable
-
-Never create isolated logs that cannot be tied back to a user action or workflow.
+Public contracts, generated reference material, boundary documentation, and invariant comments SHOULD be tested or validated where tooling permits. Required runtime telemetry SHALL be testable; observability is itself a requirement, not an unverified aspiration.
 
 ---
 
-## **5\. Make Errors Typed and Classified**
+## 7. Quality Gates
 
-Do not throw or log generic errors without classification.
+### 7.1 Repository-Local Procedure
 
-Use categories such as:
+The repository's checked-in tooling, configuration, scripts, and accepted operations documentation define how quality gates are executed. An out-of-repository guide MAY be consulted as background, but it SHALL NOT silently control a repository whose own configuration differs.
 
-* `VALIDATION_ERROR`  
-* `AUTHORIZATION_ERROR`  
-* `EXTERNAL_SERVICE_TIMEOUT`  
-* `EXTERNAL_SERVICE_BAD_RESPONSE`  
-* `STATE_TRANSITION_DENIED`  
-* `IDEMPOTENCY_CONFLICT`  
-* `MODEL_OUTPUT_INVALID`  
-* `RETRY_EXHAUSTED`  
-* `INVARIANT_VIOLATION`
+### 7.2 Required Gates
 
-Each error should include:
+Every change SHALL run the applicable format, lint, type, schema, generation, test, security, and static-analysis checks defined by the affected repository or package.
 
-* Stable error code  
-* Human-readable message  
-* Machine-readable metadata  
-* Safe remediation hint where useful
+The contributor SHALL inspect the findings, not merely the process exit code. A gate that could not run SHALL be reported as not run, together with the reason and residual risk.
 
----
+### 7.3 Findings and Complexity
 
-## **6\. Preserve Failure Evidence**
+Quality findings SHALL be remediated fully by default. Complexity findings in changed code SHALL be addressed through clearer decomposition, simpler control flow, or a better domain representation whenever a safe coherent remedy exists.
 
-When something fails, capture enough safe evidence to diagnose it later.
+Effort, schedule pressure, or the fact that a finding predates the current change is not by itself sufficient justification to ignore a finding introduced or materially worsened by the change.
 
-Include:
+### 7.4 Recorded Exceptions
 
-* Input schema/version  
-* Redacted input summary  
-* State before failure  
-* Expected state  
-* Actual state  
-* Dependency called  
-* Retry count  
-* Timeout value  
-* Validation errors  
-* Decision path
+A finding MAY remain only under an explicit, reviewable exception. The exception SHALL record:
 
-Do not log secrets, tokens, credentials, raw PII, or sensitive customer content.
+* the tool, rule, finding, and affected location;
+* why remediation is inapplicable, unsafe, or more harmful at this time;
+* the risk of leaving the finding;
+* compensating evidence or controls;
+* the approving authority;
+* an owner and a removal condition, review date, or expiry when the exception is temporary.
+
+False positives, generated or vendor-controlled code, and a demonstrated conflict with a higher-order requirement MAY justify an exception. Convenience and silence SHALL NOT.
+
+An exception to a quality finding does not waive a semantic invariant, security boundary, authorization rule, or legal obligation.
 
 ---
 
-## **7\. Add Observability Around LLM and Agent Calls**
+## 8. AI Coding Agent Responsibilities
 
-For every model/tool/agent call, capture:
+### 8.1 Before Implementation
 
-* Agent role  
-* Prompt/template version  
-* Model name  
-* Tool name  
-* Input schema version  
-* Output schema version  
-* Validation result  
-* Retry count  
-* Token usage if available  
-* Latency  
-* Finish reason  
-* Confidence/uncertainty signal if available  
-* Guardrail result  
-* Final accepted/rejected status
+An AI coding agent SHALL:
 
-Do not log full prompts or outputs by default if they may contain sensitive information. Store redacted summaries or controlled debug artifacts.
+1. identify the requested outcome, scope, and non-goals;
+2. read the applicable repository instructions and governing documents;
+3. inspect the actual code, contracts, tests, migrations, and generated-artifact boundaries;
+4. identify affected trust boundaries, invariants, state transitions, and external effects;
+5. determine the evidence required to prove completion;
+6. surface a material authority conflict or unresolved requirement rather than inventing a durable answer.
 
----
+### 8.2 During Implementation
 
-## **8\. Validate and Log State Transitions**
+An AI coding agent SHALL:
 
-State machines and workflows must log every transition.
+* preserve unrelated user changes;
+* make the smallest coherent change;
+* avoid hand-editing generated artifacts when a source generator exists;
+* validate model, tool, and external input before authoritative use;
+* maintain comments, tests, telemetry, and documentation with the behavior they describe;
+* protect secrets and sensitive data;
+* avoid bypass paths around governed commands, validation, authority, assurance, or persistence contracts;
+* distinguish verified facts from inference.
 
-Example:
+### 8.3 Before Completion
 
-logger.info("work\_order.transition", {  
-  workOrderId,  
-  fromState: "BID\_REVIEW",  
-  toState: "SCHEDULED",  
-  actorType: "homeowner",  
-  guardPassed: true,  
-  requiredFieldsPresent: \[  
-    "providerId",  
-    "scheduledWindow",  
-    "homeownerConfirmation"  
-  \]  
-});
+An AI coding agent SHALL verify and report, as applicable:
 
-Rejected transitions should also be observable.
+* requirements implemented;
+* unit and focused regression tests;
+* property or invariant tests;
+* integration, contract, and boundary tests;
+* state-transition and end-to-end evidence;
+* replay evidence for defect remediation;
+* prompt or trajectory evaluation for AI behavior changes;
+* observability and redaction behavior;
+* comment and documentation accuracy;
+* quality-gate and static-analysis results;
+* exceptions, residual risk, and deferred work.
 
----
-
-## **9\. Instrument Retries, Idempotency, and Deduplication**
-
-Whenever code retries, suppresses duplicates, or uses idempotency keys, log the reason.
-
-Capture:
-
-* Idempotency key  
-* Attempt number  
-* Retry policy  
-* Backoff duration  
-* Whether operation is safe to retry  
-* Deduplication match reason  
-* Final outcome
-
-This prevents future agents from accidentally introducing duplicate external actions.
+The agent SHALL NOT claim that a check passed when it did not run.
 
 ---
 
-## **10\. Metrics Should Track System Health and Product Semantics**
+## 9. Definition of Done
 
-Add metrics for both technical and domain behavior.
+A change is complete only when:
 
-Technical metrics:
+1. the requested behavior is implemented within the agreed scope;
+2. affected contracts, invariants, and authority boundaries remain satisfied;
+3. applicable evidence demonstrates the intended behavior and material failure modes;
+4. required observability makes the behavior reconstructable;
+5. comments and documentation accurately preserve decision context;
+6. applicable quality gates pass or each remaining finding has an approved recorded exception;
+7. migration, compatibility, rollback, and recovery effects are addressed where applicable;
+8. residual risks and deliberately deferred work are disclosed.
 
-* Request latency  
-* Error rate  
-* Queue depth  
-* Retry rate  
-* Timeout rate  
-* Dependency latency  
-* Database query duration
+The final evidence SHALL allow a future human or AI agent to answer:
 
-Product/workflow metrics:
+* What is this supposed to do?
+* Why does it exist?
+* How do we know it works?
+* Which assumptions and contracts does it depend on?
+* What happens when those assumptions fail?
+* How would a regression be detected?
+* How would a production failure be diagnosed?
 
-* Intake clarification rate  
-* Contractor search empty-result rate  
-* Bid request acceptance rate  
-* Vendor decline rate  
-* LLM output validation failure rate  
-* Manual escalation rate  
-* Workflow abandonment rate
-
-Good observability shows whether the system is technically working and whether the product behavior is healthy.
-
----
-
-## **11\. Make Debugging Reproducible**
-
-When practical, create debug artifacts that allow replay or reconstruction.
-
-Useful artifacts:
-
-* Sanitized request fixture  
-* Normalized input object  
-* Workflow event history  
-* Model output validation report  
-* External response summary  
-* State transition log  
-* Test case generated from failure
-
-Every significant production bug should become a regression test or replay fixture when feasible.
+Completion is not established merely because code compiles, a test command exits successfully, or an agent states that the task is done.
 
 ---
 
-## **12\. Use Log Levels Consistently**
+## 10. Deviations, Waivers, and Escalation
 
-Recommended standard:
+### 10.1 Deviation Record
 
-* `debug`: high-detail diagnostics, disabled or sampled in production  
-* `info`: meaningful business or system events  
-* `warn`: unexpected but recoverable condition  
-* `error`: failed operation requiring attention  
-* `fatal`: process or system cannot continue safely
+Any deviation from a SHALL or SHALL NOT requirement in this Constitution requires an explicit record linked to the change. The record SHALL include:
 
-Do not log normal control flow as warnings or errors.
+* the clause being deviated from;
+* the reason and responsible owner;
+* affected scope and duration;
+* risk and compensating controls;
+* approving authority;
+* resolution, review, or expiry condition.
 
----
+The approving authority is the person or governance body identified by the affected repository, policy, or concern-owning document. An AI agent or the author of a deviation SHALL NOT self-approve it. If no approving authority can be identified, the deviation remains unapproved and the stricter rule applies until a repository owner or other duly authorized maintainer decides it.
 
-## **13\. Add Health Checks and Readiness Checks**
+### 10.2 Non-Waivable Concerns
 
-Services should expose:
+This Constitution cannot be used to waive a legal obligation, security boundary, authorization requirement, canonical semantic invariant, data-protection duty, or a stricter requirement owned by another governing document.
 
-* Liveness: process is running  
-* Readiness: service can safely receive traffic  
-* Dependency health: database, queue, cache, workflow engine, model server  
-* Degraded mode: service is alive but missing noncritical dependencies
+### 10.3 Conservative Escalation
 
-Health checks should be machine-readable and safe to expose only to authorized infrastructure.
+When a contributor cannot determine whether a proposed deviation is safe, the contributor SHALL preserve the stricter interpretation, complete all safely separable work, and escalate the unresolved decision with concrete evidence.
 
 ---
 
-## **14\. Fail Loudly on Invariants**
+## 11. Change Control
 
-If an invariant is violated, emit a high-severity event and stop the unsafe operation.
+This Constitution SHALL change only through an explicit governed revision.
 
-Example:
+A revision proposal SHALL identify:
 
-logger.error("invariant.violation", {  
-  invariant: "scheduled\_work\_order\_requires\_confirmed\_provider",  
-  workOrderId,  
-  currentState,  
-  missingFields  
-});
+* the clauses changed;
+* the engineering problem or evidence motivating the change;
+* compatibility and enforcement effects;
+* downstream tooling, prompt, test, or documentation changes;
+* the approving authority and effective date.
 
-Do not silently repair state unless the repair itself is explicitly designed, logged, and tested.
-
----
-
-## **15\. Debugging Workflow for AI Coding Agents**
-
-When debugging, the agent must:
-
-1. Reproduce or simulate the failure.  
-2. Identify the expected behavior.  
-3. Locate the boundary where actual behavior diverges.  
-4. Inspect logs/traces/state before changing code.  
-5. Form a specific hypothesis.  
-6. Make the smallest corrective change.  
-7. Add or update tests.  
-8. Add or update observability so the failure is easier to diagnose next time.  
-9. Verify no comments, logs, or metrics now misrepresent behavior.
-
-Do not patch symptoms without identifying the broken assumption.
+The document identifier `JAN-ENGC-001` is permanent. Versions SHALL follow the semantic-version policy in `JAN-DOCS-001`, and the RPH README SHALL record the current version and status. The `ENGC` family distinguishes this engineering-practice constitution from a future platform-wide Janumi Constitution. A materially distinct replacement document, if ever created, SHALL receive a new permanent identifier, and this document SHALL remain registered with an appropriate Deprecated or Superseded status.
 
 ---
 
-## **16\. Required Debugging Output From the Agent**
-
-When completing a debugging task, the agent should report:
-
-* Root cause  
-* Broken assumption  
-* Code changed  
-* Tests added or updated  
-* Observability added or updated  
-* Residual risk  
-* Follow-up work, if any
-
-Example:
-
-Root cause:  
-The intake parser treated missing contractorPreference as "budget-first".
-
-Broken assumption:  
-Missing preference is not equivalent to budget preference.
-
-Fix:  
-Added explicit UNKNOWN preference state.
-
-Tests:  
-Added regression coverage for missing, null, empty, and explicit budget preference.
-
-Observability:  
-Added model\_output.preference\_classification log with validation outcome.
-
-Residual risk:  
-Older saved intake records may still contain inferred budget preference.
-
----
-
-## **17\. Anti-Patterns to Avoid**
-
-Avoid:
-
-* Console-only debugging with no durable instrumentation  
-* Generic “Something went wrong” errors  
-* Catch-and-ignore blocks  
-* Logging raw secrets or sensitive payloads  
-* Retrying non-idempotent external actions  
-* Metrics without dimensions  
-* Logs without correlation IDs  
-* Debugging by randomly changing code  
-* Treating model output as trusted  
-* Treating absence of evidence as evidence of absence
-
----
-
-## **Final Standard**
-
-Every meaningful feature should be shipped with enough observability for a future human or AI agent to understand its behavior without reconstructing the entire implementation from scratch.
-
-If the system makes a decision, crosses a boundary, changes state, retries, suppresses data, calls an LLM, or handles an error, it should leave structured evidence.
-
-\============
-
-# **AI-Native Testing Best Practices for AI Coding Agents**
-
-## **Philosophy**
-
-Testing is not a phase of development.
-
-Testing is the systematic generation of **evidence** that an implementation satisfies its intended behavior.
-
-Every feature, bug fix, refactor, prompt change, workflow modification, or infrastructure change should increase or preserve the amount of trustworthy evidence about system correctness.
-
-The objective is **confidence**, not coverage percentages.
-
----
-
-# **Core Principles**
-
-## **Principle 1: Every Requirement Produces Evidence**
-
-Every requirement should result in:
-
-* deterministic implementation  
-* automated tests  
-* observable runtime behavior  
-* documented intent  
-* explicit contracts
-
-No feature is complete until there is evidence that it behaves correctly.
-
----
-
-## **Principle 2: Test Behavior, Not Implementation**
-
-Tests should verify:
-
-* business outcomes  
-* contracts  
-* invariants  
-* state transitions  
-* externally visible behavior
-
-Avoid coupling tests to internal implementation details whenever possible.
-
-Refactoring should rarely require rewriting tests.
-
----
-
-## **Principle 3: Every Bug Becomes a Permanent Test**
-
-A production failure should result in:
-
-* root cause identification  
-* regression test  
-* improved observability  
-* improved comments or documentation if appropriate
-
-The same bug should never occur twice for the same reason.
-
----
-
-## **Principle 4: Trust Boundaries Must Be Tested**
-
-Every boundary where information changes ownership or trust level deserves explicit tests.
-
-Examples:
-
-* user input  
-* REST APIs  
-* databases  
-* queues  
-* LLM outputs  
-* browser automation  
-* workflow engines  
-* third-party integrations
-
-Never assume external systems behave correctly.
-
----
-
-# **AI-Native Evidence Pyramid**
-
-                   Production Validation  
-                 Chaos / Resilience / Replay  
-             End-to-End / Workflow Validation  
-          Contract / Boundary / State Validation  
-       Integration / Component Collaboration Tests  
-         Property / Invariant / Metamorphic Tests  
-              Unit Tests (Deterministic Logic)
-
-Every layer exists to provide a different type of confidence.
-
----
-
-# **Layer 1: Unit Tests**
-
-## **Purpose**
-
-Verify deterministic logic in isolation.
-
-## **Characteristics**
-
-* extremely fast  
-* deterministic  
-* independent  
-* exhaustive where practical
-
-## **Test**
-
-* parsing  
-* transformations  
-* calculations  
-* formatting  
-* validation  
-* sorting  
-* utility functions
-
-## **Avoid**
-
-* databases  
-* network access  
-* filesystem dependencies  
-* timing assumptions
-
----
-
-# **Layer 2: Property and Invariant Tests**
-
-## **Purpose**
-
-Verify rules that must always remain true.
-
-Examples:
-
-normalize(normalize(x)) \== normalize(x)
-
-total \>= subtotal
-
-workflow cannot skip approval
-
-duplicate import does not increase unique record count
-
-Property tests often discover bugs that example-based tests never find.
-
----
-
-# **Layer 3: Integration Tests**
-
-## **Purpose**
-
-Verify collaborating components work together correctly.
-
-Examples:
-
-API  
-↓
-
-Business Logic  
-↓
-
-Repository  
-↓
-
-Database
-
-Test:
-
-* serialization  
-* persistence  
-* dependency injection  
-* transactions  
-* message passing  
-* authentication
-
-Prefer real infrastructure over mocks whenever practical.
-
----
-
-# **Layer 4: Contract Tests**
-
-## **Purpose**
-
-Verify assumptions about external interfaces.
-
-Examples:
-
-* REST APIs  
-* GraphQL  
-* LLM JSON output  
-* event schemas  
-* queue messages  
-* file formats
-
-Every external dependency should have explicit contract validation.
-
-Changes to external contracts should fail tests immediately.
-
----
-
-# **Layer 5: Boundary Tests**
-
-## **Purpose**
-
-Verify all trust boundaries.
-
-Test:
-
-* malformed input  
-* missing fields  
-* null values  
-* duplicate values  
-* incorrect casing  
-* oversized payloads  
-* unexpected types  
-* injection attempts
-
-Never trust external input.
-
----
-
-# **Layer 6: State Transition Tests**
-
-## **Purpose**
-
-Verify workflow correctness.
-
-For every state machine:
-
-Test
-
-* every legal transition  
-* every illegal transition  
-* guard conditions  
-* retry behavior  
-* compensation behavior  
-* rollback behavior
-
-Coverage should ensure:
-
-* every state reached  
-* every transition exercised  
-* every invalid transition rejected
-
----
-
-# **Layer 7: End-to-End Tests**
-
-## **Purpose**
-
-Verify complete user journeys.
-
-Example:
-
-User submits request
-
-↓
-
-Clarification
-
-↓
-
-Research
-
-↓
-
-Ranking
-
-↓
-
-Selection
-
-↓
-
-Scheduling
-
-↓
-
-Completion
-
-Validate business outcomes rather than implementation details.
-
----
-
-# **Layer 8: Replay Tests**
-
-## **Purpose**
-
-Reproduce real production behavior.
-
-Capture:
-
-* sanitized requests  
-* normalized inputs  
-* workflow history  
-* dependency responses
-
-Replay them automatically.
-
-Every significant production bug should become a replay test.
-
-Replay tests preserve institutional knowledge.
-
----
-
-# **Layer 9: Chaos and Resilience Tests**
-
-## **Purpose**
-
-Verify graceful degradation.
-
-Simulate:
-
-* database failures  
-* queue failures  
-* LLM timeouts  
-* malformed responses  
-* duplicate events  
-* partial workflow execution  
-* dependency latency  
-* network failures
-
-The system should fail predictably and safely.
-
----
-
-# **Layer 10: Production Validation**
-
-Production is the final testing environment.
-
-Validate:
-
-* traces  
-* logs  
-* metrics  
-* health endpoints  
-* feature flags  
-* dashboards  
-* alerts  
-* canary deployments
-
-If behavior cannot be observed, it cannot be trusted.
-
----
-
-# **AI-Specific Testing**
-
-## **Prompt Regression Tests**
-
-Prompt changes must be evaluated against stable datasets.
-
-Verify:
-
-* structured output  
-* reasoning quality  
-* business decisions  
-* tool selection  
-* consistency
-
-Prompt modifications should not silently degrade behavior.
-
----
-
-## **Agent Trajectory Tests**
-
-Do not verify only the final answer.
-
-Verify the process.
-
-Example:
-
-Research agent should:
-
-* search  
-* expand radius if necessary  
-* verify licenses  
-* rank providers  
-* explain ranking
-
-Trajectory quality is part of correctness.
-
----
-
-## **Observability Tests**
-
-Verify that important runtime events emit telemetry.
-
-Example:
-
-Invalid state transition
-
-↓
-
-Error log emitted
-
-↓
-
-Trace recorded
-
-↓
-
-Metric incremented
-
-↓
-
-Correlation ID propagated
-
-Observability is a testable requirement.
-
----
-
-## **Comment and Documentation Tests**
-
-Verify:
-
-* public interfaces document contracts  
-* boundaries are documented  
-* invariants are documented  
-* warnings remain accurate  
-* TODOs include references  
-* comments do not contradict implementation
-
-Comments are executable knowledge for future maintainers and AI agents.
-
----
-
-# **Test Data Best Practices**
-
-Prefer:
-
-* builders  
-* fixtures  
-* factories  
-* generated data  
-* deterministic seeds
-
-Avoid:
-
-* magic values  
-* duplicated fixtures  
-* hidden dependencies  
-* mutable shared state
-
-Test data should communicate intent.
-
----
-
-# **Assertions**
-
-Assert behavior rather than implementation.
-
-Prefer:
-
-Homeowner receives only licensed contractors.
-
-Over:
-
-Method getLicensedContractors() was called once.
-
-Business semantics are more stable than implementation details.
-
----
-
-# **Coverage Philosophy**
-
-Coverage percentages are diagnostics, not goals.
-
-Prefer evidence that demonstrates:
-
-* every business rule verified  
-* every boundary validated  
-* every invariant enforced  
-* every state transition tested  
-* every external contract verified  
-* every production bug reproduced
-
-100% line coverage does not imply correctness.
-
----
-
-# **Testing Requirements for Every Pull Request**
-
-Every change should answer:
-
-* What behavior changed?  
-* What evidence proves correctness?  
-* What regression tests were added?  
-* What contracts changed?  
-* What observability changed?  
-* What replay artifacts should be created?  
-* What comments or documentation changed?
-
----
-
-# **AI Coding Agent Source Code Quality Guide**
-
-Review "JanumiCode\janumicode_v2\docs\sonarqube-headless-remediation-guide.md" for details on how to run the SonarQube setup. 
-
-NOTA BENE: Complexity findings almost always (if not always) should be addressed fully.
-
----
-
-# **AI Coding Agent Responsibilities**
-
-Before completing any implementation, verify:
-
-✓ Requirements implemented
-
-✓ Unit tests added
-
-✓ Property/invariant tests considered
-
-✓ Integration tests updated
-
-✓ Contract tests updated
-
-✓ Boundary tests updated
-
-✓ State transition tests updated
-
-✓ End-to-end workflows validated
-
-✓ Replay test added for bug fixes
-
-✓ Observability verified
-
-✓ Comments updated
-
-✓ Documentation updated
-
-✓ SonarQube scans run and findings fully addressed (or documented exceptions where required or strongly recommended)
-
----
-
-# **Anti-Patterns**
-
-Avoid:
-
-* testing private methods  
-* brittle implementation-coupled tests  
-* excessive mocking  
-* happy-path-only testing  
-* console debugging instead of automated evidence  
-* coverage-driven development  
-* skipping regression tests  
-* trusting LLM output without validation  
-* silent failures  
-* manual verification as the only evidence
-
----
-
-# **Definition of Done**
-
-A feature is complete only when there is sufficient evidence that future humans and future AI agents can confidently answer:
-
-* What is this supposed to do?  
-* Why does it exist?  
-* How do we know it works?  
-* What assumptions does it depend on?  
-* What happens when those assumptions fail?  
-* How would we detect regressions?  
-* How would we debug failures in production?
-
-**Testing is therefore not the validation of code—it is the continuous construction of evidence that the system still satisfies its intended behavior.**
-
+## 12. Compact Review Checklist
+
+Before approving a governed change, the reviewer SHALL be able to answer yes, not applicable with reason, or exception recorded for each relevant question:
+
+* Is the implementation clearer than the comments needed to explain it?
+* Do comments preserve why, constraints, boundaries, invariants, and tradeoffs without narrating syntax?
+* Are TODOs actionable and warnings reserved for real hazards?
+* Are trust boundaries validated and safely observable?
+* Are decisions, state transitions, retries, model/tool calls, and errors reconstructable?
+* Are logs structured, correlated, classified, and redacted?
+* Does the test evidence cover affected behavior, boundaries, invariants, transitions, contracts, and failure modes?
+* Did each material defect produce durable regression evidence where feasible?
+* Were AI prompt, output, tool-use, trajectory, and assurance risks evaluated where applicable?
+* Were repository quality gates run and their findings inspected?
+* Is every remaining exception explicit, approved, and bounded?
+* Can a future maintainer understand what changed, why, how it was proved, and what risk remains?
+
+The constitutional standard is not more comments, logs, tests, or ceremony. It is fewer hidden assumptions and stronger, safer evidence.
