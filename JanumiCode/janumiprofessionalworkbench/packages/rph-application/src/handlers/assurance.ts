@@ -428,6 +428,8 @@ export const requestAssuranceAssessment: CommandHandler = (ctx, command, payload
 export const completeAssuranceAssessment: CommandHandler = (ctx, command, payload) => {
 	const p = payload as {
 		validatorResult?: {
+			validatorId?: string;
+			validatorVersion?: string;
 			dispositionRecommendation?: string;
 			subjectObjectIds?: string[];
 			subjectSemanticVersions?: Record<string, number>;
@@ -506,6 +508,17 @@ export const completeAssuranceAssessment: CommandHandler = (ctx, command, payloa
 		// the real ones, they are on the validated command, and §19.3 asks the event for exactly them — emitting []
 		// would put a known-false record in the audit log. The event therefore carries more than the object does;
 		// reconciling the object is the §32 increment, not this one.
+		//
+		// WHO/WHAT VALIDATED (Increment 37). validatorId + validatorVersion are the §20 ValidatorResult's
+		// "validator implementation identity" — WHICH validator, at WHICH version, produced this verdict. §38
+		// REQUIRES the Assurance View to show it and §22 REQUIRES the audit log to record "validator/version" for
+		// every validator call, yet §19.3's first-slice payload (§16 item 6) omitted it, so the completion event
+		// recorded the outcome and erased the author of it. The value is REQUIRED on the §20 ValidatorResult the
+		// command boundary already validated, so it is threaded through, never invented; the `?? ''` is an
+		// unreachable TS guard (a rejected command never reaches here). Independence — §38's neighbouring field and
+		// §39 invariant 8 — is NOT added here: the §20 ValidatorResult carries no independence result, and the
+		// independence scorer that would produce one is built but uncalled (top of this file). That is its own
+		// increment, not a field to fabricate onto this event.
 		eventPayload: (next) => ({
 			assessmentId: command.targetAggregateId,
 			assurancePolicyId: next.assurancePolicyId,
@@ -516,7 +529,9 @@ export const completeAssuranceAssessment: CommandHandler = (ctx, command, payloa
 			evidenceConsideredIds: p.validatorResult?.evidenceConsideredIds ?? [],
 			observationIds: next.observationIds ?? [],
 			residualUncertainty: p.validatorResult?.residualUncertainty ?? [],
-			recommendedControlActions: p.validatorResult?.recommendedControlActions ?? []
+			recommendedControlActions: p.validatorResult?.recommendedControlActions ?? [],
+			validatorId: p.validatorResult?.validatorId ?? '',
+			validatorVersion: p.validatorResult?.validatorVersion ?? ''
 		}),
 		mutate: (base) => ({
 			...base,

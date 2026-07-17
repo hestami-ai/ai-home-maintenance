@@ -51,7 +51,9 @@ const completed = (assessmentId: string, disposition: string, residuals: string[
 		evidenceConsideredIds: ['evd_1'],
 		observationIds: [],
 		residualUncertainty: residuals,
-		recommendedControlActions: []
+		recommendedControlActions: [],
+		validatorId: 'acme.fitness-reviewer',
+		validatorVersion: '2.1.0'
 	});
 
 describe('Assurance View fold — open-conditions guard (the case the live log cannot make)', () => {
@@ -108,13 +110,38 @@ describe('Assurance View fold — open-conditions guard (the case the live log c
 		expect(twice).toEqual(once);
 	});
 
-	it('§38 absent-by-source: validator identity and independence are undefined on every assessment', () => {
+	it('§38 sources validator implementation identity (id + version) from the completion event; independence stays absent', () => {
+		// Increment 37: validatorId/validatorVersion are on the §20 ValidatorResult and now threaded onto the event,
+		// so the view shows WHO/WHAT judged. Independence has no source in the ValidatorResult — it stays undefined.
 		const view = buildAssuranceView([
 			started('asm_d', 'pwu_1'),
 			completed('asm_d', 'SATISFIED', [])
 		]);
 		const a = view.assessments['asm_d']!;
-		expect(a.validatorImplementationIdentity).toBeUndefined();
+		expect(a.validatorImplementationIdentity).toBe('acme.fitness-reviewer');
+		expect(a.validatorImplementationVersion).toBe('2.1.0');
 		expect(a.independenceStatus).toBeUndefined();
+	});
+
+	it('unknown-vs-none: an event WITHOUT validatorId leaves the identity undefined, never a faked value', () => {
+		// A completion event missing the field (a pre-Increment-37 or malformed record) must read as "unknown", not
+		// as some stand-in identity. The fold uses str(), which yields undefined rather than '' or a placeholder.
+		const bare = evt(2, 'AssuranceAssessmentCompleted', {
+			assessmentId: 'asm_e',
+			assurancePolicyId: 'pol_x',
+			policyVersion: '1.0.0',
+			subjectObjectIds: ['pwu_1'],
+			subjectSemanticVersions: { pwu_1: 1 },
+			disposition: 'SATISFIED',
+			evidenceConsideredIds: [],
+			observationIds: [],
+			residualUncertainty: [],
+			recommendedControlActions: []
+			// validatorId / validatorVersion deliberately absent
+		});
+		const view = buildAssuranceView([started('asm_e', 'pwu_1'), bare]);
+		const a = view.assessments['asm_e']!;
+		expect(a.validatorImplementationIdentity).toBeUndefined();
+		expect(a.validatorImplementationVersion).toBeUndefined();
 	});
 });

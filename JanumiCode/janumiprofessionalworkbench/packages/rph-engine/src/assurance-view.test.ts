@@ -67,15 +67,32 @@ describe('Assurance View (DOC-004 §38) over the live log', () => {
 		// findings + severity: the Mobile & Offline assessment recorded a MATERIAL observation.
 		expect(conditional!.observations.length).toBeGreaterThan(0);
 		expect(conditional!.observations.some((o) => o.severity === 'MATERIAL')).toBe(true);
+
+		// validator implementation identity (Increment 37): the conditionally-satisfied fitness assessment names
+		// the validator that judged it, at its version — §38 "validator implementation identity", §22 "validator/
+		// version". Threaded from the §20 ValidatorResult the completion command already carried.
+		expect(conditional!.validatorImplementationIdentity).toBe('reference-undertaking.reviewer');
+		expect(conditional!.validatorImplementationVersion).toBe('1');
+		// EVERY completed assessment records who/what judged it — the floor assessments carry their own
+		// deterministic validator identity too. None is left blank: a completed assessment with no recorded author
+		// is exactly the §22 audit gap this increment closed.
+		const completedAssessments = assessments.filter((a) => a.disposition);
+		expect(completedAssessments.length).toBeGreaterThan(10);
+		expect(
+			completedAssessments.every((a) => (a.validatorImplementationIdentity ?? '').length > 0)
+		).toBe(true);
+		expect(
+			assessments.some((a) => a.validatorImplementationIdentity?.startsWith('deterministic.'))
+		).toBe(true);
 	});
 
-	it('§38 ABSENT-BY-SOURCE: validator identity and independence are undefined, not faked', () => {
+	it('§38 ABSENT-BY-SOURCE: independence status is undefined, not faked', () => {
 		const view = build();
 		const assessments = Object.values(view.assessments);
-		// These two §38 fields have NO source in the log today (the event drops validatorId; only the
-		// independence REQUIREMENT is logged, never a verified status). The view must leave them undefined —
-		// rendering them as anything concrete would be a fabricated assurance fact.
-		expect(assessments.every((a) => a.validatorImplementationIdentity === undefined)).toBe(true);
+		// Independence is the one §38 field the log still does not source: the §20 ValidatorResult carries no
+		// independence result (only the policy's REQUIREMENT is logged), and the independence scorer is built but
+		// uncalled. The view must leave it undefined — a concrete value would be a fabricated assurance fact.
+		// (Contrast validator identity, which IS now sourced — see the POPULATED test above.)
 		expect(assessments.every((a) => a.independenceStatus === undefined)).toBe(true);
 	});
 

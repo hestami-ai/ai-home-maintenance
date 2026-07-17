@@ -2856,6 +2856,69 @@ blocked on the sponsor — all code/schema against ratified sections.
 
 ---
 
+## PART 3v — Increment 37: who validated it — the completion event recorded the verdict and erased the author
+
+The first of PART 3u's honest-remainder fields, closed. The Assurance View can now show **§38 "validator
+implementation identity"**: which validator, at which version, produced each verdict.
+
+### One missing datum, two ratified requirements pointing at it
+
+- **§38** (Assurance Workbench Requirements): the view *must show* "validator implementation identity."
+- **§22** (observability): *for every validator call*, the audit log must record "validator/version."
+
+Both demand the same fact, and the governed stream had no place to put it. `AssuranceAssessmentCompleted`
+(DOC-007 **§19.3**) carried the outcome — disposition, evidence, residuals — and nothing about *who judged*. So the
+event that records "this assessment was satisfied" did not record what satisfied it. For a workbench built for
+high-consequence work, "a validator said so" with no recorded validator is precisely the audit hole this effort
+exists to close.
+
+### A correction to my own PART 3u note — threaded, not "un-dropped"
+
+PART 3u said "the event drops `validatorId`," which reads as if §19.3 once had the field and the vocab lost it. The
+precise account: **§19.3 never listed it.** The validator identity lives on the **§20 `ValidatorResult`** — the
+object the `CompleteAssuranceAssessment` *command* carries and the command boundary already validates against §20
+(where `validatorId` + `validatorVersion` are both REQUIRED). The handler read that result for disposition,
+subjects, evidence, and residuals, and threw the identity away when it built the event. This increment threads the
+two fields the command already proved present onto the event. **No value is fabricated** — the source is a field a
+rejected command could never have reached the handler without.
+
+### Why extending a ratified event's shape is in-bounds here
+
+§19.3 is a **deliberately thin first slice** — §16 item 6 says DOC-007's first pass "leaves the granular vocabulary
+unschematized." Adding the two fields (vocab → `bun run gen` → `format`, the recorded CRLF + gen-then-format traps
+navigated deliberately) makes the persisted event carry what §38 and §22 both require. Made them **REQUIRED**: a
+completed assessment without a recorded validator is not a valid audit record, and every emit path already supplies
+both (the §20 command guarantee — verified across the reference undertaking's fitness path, its floor path, and the
+one inline test verdict, none of which can lack them). `AssuranceAssessmentCompleted` stays on the
+emitted-event-conformance **must-conform** list; the 11-event pin only ever shrinks.
+
+### Independence deliberately NOT done in the same breath
+
+§38's neighbouring field — "independence status" (also §22 "independence result", §39 invariant 8 "Required
+independence must be verified") — looks adjacent but is **not** a thread-through. The §20 `ValidatorResult` carries
+**no independence result**; §20.2 makes independence an *acceptance rule* ("reject when independence requirements
+are not satisfied"), not a recorded field; and the independence scorer that would produce a status is **built but
+uncalled** (assurance.ts head comment). Recording a verified independence status is a real modeling+wiring
+increment, not a field to copy. I left `independenceStatus` `undefined` and said why — the same unknown-vs-none
+discipline, held one field further.
+
+### The tests lock it (mutation-verified, both ends)
+
+- **View copy** (`str(p.validatorId)`) → forced `undefined`: the projections "sources validator identity" test
+  fails; the "unknown-vs-none" test (asserts `undefined` when the field is absent) correctly still passes. The
+  positive and negative cases assert *opposite* outcomes for *different* inputs — non-vacuous by construction.
+- **Handler threading** (`?? ''`) → forced `''`, dist rebuilt: the rph-engine **live-log** POPULATED test fails.
+  That is the end-to-end lock — handler emits → event carries → view sources → assertion reads the real
+  `reference-undertaking.reviewer`. The independence ABSENT-BY-SOURCE test correctly held throughout.
+
+### Gate
+
+vocab diff 12 lines CRLF-clean · gen diff localized (+2 fields on `AssuranceAssessmentCompletedPayloadSchema`) ·
+`check-types` 21/21 (incl. svelte-check) · `test` 21/21 · lint · boundary · format. Projection/schema/handler
+layer, no UI — no Playwright run.
+
+---
+
 ## PART 4 — Open questions genuinely for the sponsor
 
 *(kept deliberately short — under the 2026-07-15 mandate, a tension is work, not a question, unless it

@@ -14,11 +14,16 @@
 //     observations[].findingCode  — AssuranceObservationRecorded                   (§38 "findings")
 //     observations[].severity     — AssuranceObservationRecorded                   (§38 "severity")
 //     openConditions              — Completed.residualUncertainty when disposition CONDITIONALLY_SATISFIED (§38 "open conditions")
+//     validatorImplementationIdentity / ...Version — AssuranceAssessmentCompleted.validatorId / .validatorVersion
+//                                       (§38 "validator implementation identity"; §22 audit "validator/version"). Threaded
+//                                       onto the event in Increment 37 — the §20 ValidatorResult always carried it, the
+//                                       §19.3 first-slice event had dropped it. Now sourced; `undefined` only on a
+//                                       (pre-Increment-37 / malformed) event that lacks the field — unknown, not "none".
 //
 //   NOT POPULATED, and WHY — recorded, never faked (a blank the view must render as "unknown", not "none"):
-//     validatorImplementationIdentity — AssuranceAssessmentCompleted carries NO validatorId (the ValidatorResult
-//                                       has one; the event drops it). §38 field with no source. `undefined` here.
-//     independenceStatus              — only the policy's REQUIREMENT is logged, never a VERIFIED status. `undefined`.
+//     independenceStatus              — the §20 ValidatorResult carries NO independence result, only the policy's
+//                                       REQUIREMENT is logged; the independence scorer is built but uncalled. §38 field
+//                                       + §39 invariant 8 + §22 "independence result" with no source yet. `undefined`.
 //     missingEvidence                 — required-evidence set never reaches the log (AssuranceEvidenceRequired is a
 //                                       ratified name, unbuilt — Increment 33). Empty, meaning UNKNOWN not NONE.
 //     controlActions / waivers / invalidationStatus — see the §32/§37 conformance items; not folded here yet.
@@ -48,8 +53,11 @@ export interface AssuranceAssessmentView {
 	readonly observations: readonly AssuranceObservationView[];
 	/** §38 "open conditions" — the residual statements a CONDITIONALLY_SATISFIED disposition leaves open. */
 	readonly openConditions: readonly string[];
-	/** §38 "validator implementation identity" — NO SOURCE today (the event drops validatorId). undefined = unknown. */
+	/** §38 "validator implementation identity" — WHICH validator produced this verdict (Completed.validatorId).
+	 *  undefined only on an event that predates Increment 37 or lacks the field = unknown, never "none". */
 	readonly validatorImplementationIdentity?: string;
+	/** The version half of the validator's identity (Completed.validatorVersion; §22 "validator/version"). */
+	readonly validatorImplementationVersion?: string;
 	/** §38 "independence status" — NO SOURCE today (only the requirement is logged). undefined = unknown. */
 	readonly independenceStatus?: string;
 }
@@ -125,7 +133,11 @@ export function applyAssuranceEvent(view: AssuranceView, event: DomainEvent): As
 						evidenceConsideredIds: strArr(p.evidenceConsideredIds),
 						// §38 "open conditions": residuals are conditions only while the disposition is conditional.
 						openConditions:
-							disposition === 'CONDITIONALLY_SATISFIED' ? strArr(p.residualUncertainty) : []
+							disposition === 'CONDITIONALLY_SATISFIED' ? strArr(p.residualUncertainty) : [],
+						// §38 "validator implementation identity" — WHO/WHAT judged. `str()` leaves it undefined on an
+						// event without the field (pre-Increment-37 / malformed): unknown, never a fabricated identity.
+						validatorImplementationIdentity: str(p.validatorId),
+						validatorImplementationVersion: str(p.validatorVersion)
 					}
 				}
 			};

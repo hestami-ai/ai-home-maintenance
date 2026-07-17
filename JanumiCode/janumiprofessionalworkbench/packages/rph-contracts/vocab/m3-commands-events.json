@@ -2610,6 +2610,18 @@
           "required": true,
           "type": "ControlActionRecommendation[]",
           "note": "complex type"
+        },
+        {
+          "field": "validatorId",
+          "required": true,
+          "type": "string",
+          "note": "DOC-007 §20 ValidatorResult.validatorId, threaded onto the §19.3 event so the §38 Assurance View can show 'validator implementation identity' and §22 observability can log 'validator/version'. Not in §19.3's first-slice payload (§16 item 6 leaves the granular vocabulary unschematized); added under the §0.3 authoring grant. The value already arrives on the command's §20 ValidatorResult — threaded, not fabricated."
+        },
+        {
+          "field": "validatorVersion",
+          "required": true,
+          "type": "string",
+          "note": "DOC-007 §20 ValidatorResult.validatorVersion — the version half of §22's 'validator/version'. See validatorId."
         }
       ]
     },
