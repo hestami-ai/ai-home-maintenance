@@ -5,6 +5,8 @@ import type { DomainCommand } from '@janumipwb/rph-contracts';
 import { SqliteStorageAdapter } from '@janumipwb/rph-persistence';
 import { beforeEach, describe, expect, it } from 'vitest';
 import { Engine } from '../index.js';
+import { floorValidatorResult } from './__tests__/floor-fixtures.js';
+import type { AssuranceDispositionRecommendation } from '@janumipwb/rph-contracts';
 
 const TS = '2026-07-12T00:00:00Z';
 const actor = { actorId: 'u1', actorType: 'HUMAN' as const, displayName: 'A' };
@@ -86,7 +88,7 @@ describe('ExecutionStep + RuntimeBinding handlers (live)', () => {
 	 *  buy a pass. */
 	let asmt = 0;
 	function recordFloor(
-		dispositions: Record<string, string>,
+		dispositions: Record<string, AssuranceDispositionRecommendation>,
 		subject = ART
 	): Record<string, string> {
 		const ids: Record<string, string> = {};
@@ -108,7 +110,15 @@ describe('ExecutionStep + RuntimeBinding handlers (live)', () => {
 			);
 			dispatch(
 				'CompleteAssuranceAssessment',
-				{ validatorResult: { dispositionRecommendation: disposition } },
+				{
+					validatorResult: floorValidatorResult({
+						assessmentId: id,
+						policyId,
+						subjectId: subject,
+						subjectSemanticVersion: 1,
+						disposition
+					})
+				},
 				id,
 				'ASSURANCE_ASSESSMENT'
 			);
@@ -137,7 +147,7 @@ describe('ExecutionStep + RuntimeBinding handlers (live)', () => {
 		'floor.schema-invariant': 'SATISFIED',
 		'floor.identity-provenance': 'SATISFIED',
 		'floor.reasoning-review': 'SATISFIED'
-	};
+	} as const satisfies Record<string, AssuranceDispositionRecommendation>;
 
 	beforeEach(() => {
 		store = new SqliteStorageAdapter({ now: () => TS });

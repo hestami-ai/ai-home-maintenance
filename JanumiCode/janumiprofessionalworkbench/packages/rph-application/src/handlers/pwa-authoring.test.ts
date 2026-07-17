@@ -5,6 +5,8 @@ import type { ActorReference, DomainCommand } from '@janumipwb/rph-contracts';
 import { SqliteStorageAdapter } from '@janumipwb/rph-persistence';
 import { beforeEach, describe, expect, it } from 'vitest';
 import { Engine } from '../index.js';
+import { floorValidatorResult } from './__tests__/floor-fixtures.js';
+import type { AssuranceDispositionRecommendation } from '@janumipwb/rph-contracts';
 
 const TS = '2026-07-12T00:00:00Z';
 const actor = { actorId: 'des-1', actorType: 'HUMAN' as const, displayName: 'Designer' };
@@ -518,7 +520,7 @@ describe('PublishPwa protected-transition gate — the de minimis assurance floo
 	// defaulting to whatever version the PWA is ACTUALLY at, i.e. the assurance run reviews the graph as it stands.
 	// Pass a different value to exercise version-binding.
 	function recordFloor(
-		dispositions: Record<string, string>,
+		dispositions: Record<string, AssuranceDispositionRecommendation>,
 		version = pwaVersion()
 	): Record<string, string> {
 		const assessmentIds: Record<string, string> = {};
@@ -542,7 +544,15 @@ describe('PublishPwa protected-transition gate — the de minimis assurance floo
 			d(
 				SVC,
 				'CompleteAssuranceAssessment',
-				{ validatorResult: { dispositionRecommendation: disposition } },
+				{
+					validatorResult: floorValidatorResult({
+						assessmentId,
+						policyId,
+						subjectId: AI_PWA,
+						subjectSemanticVersion: version,
+						disposition
+					})
+				},
 				assessmentId,
 				'ASSURANCE_ASSESSMENT'
 			);

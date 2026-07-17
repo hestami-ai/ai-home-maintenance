@@ -5,6 +5,7 @@ import { objectEnvelopeShape, ActorReferenceSchema } from './envelopes.js';
 import {
 	AssumptionStatusSchema,
 	AssuranceAssessmentStateSchema,
+	AssuranceDispositionRecommendationSchema,
 	AssurancePolicyStatusSchema,
 	AssuranceSeveritySchema,
 	AssuranceStateSchema,
@@ -114,8 +115,6 @@ export const TacticalChangePolicySchema = z.record(z.string(), z.unknown());
 export type TacticalChangePolicy = z.infer<typeof TacticalChangePolicySchema>;
 export const TerminationPolicySchema = z.record(z.string(), z.unknown());
 export type TerminationPolicy = z.infer<typeof TerminationPolicySchema>;
-export const ValidatorResultSchema = z.record(z.string(), z.unknown());
-export type ValidatorResult = z.infer<typeof ValidatorResultSchema>;
 
 // ---- Well-specified helper sub-types. ----
 export const AggregationRuleSchema = z.strictObject({
@@ -243,6 +242,25 @@ export const TraceLinkSchema = z.strictObject({
 	createdBy: ActorReferenceSchema
 });
 export type TraceLink = z.infer<typeof TraceLinkSchema>;
+export const ValidatorResultSchema = z.strictObject({
+	validatorId: z.string(),
+	validatorVersion: z.string(),
+	policyId: z.string(),
+	policyVersion: z.string(),
+	assessmentId: z.string(),
+	subjectObjectIds: z.array(z.string()),
+	subjectSemanticVersions: z.record(z.string(), z.number()),
+	claimResults: z.array(ClaimAssessmentResultSchema),
+	evidenceConsideredIds: z.array(z.string()),
+	evidenceRejected: z.array(RejectedEvidenceReferenceSchema),
+	observations: z.array(ProposedAssuranceObservationSchema),
+	dispositionRecommendation: AssuranceDispositionRecommendationSchema,
+	recommendedControlActions: z.array(ControlActionRecommendationSchema),
+	residualUncertainty: z.array(z.string()),
+	limitations: z.array(z.string()),
+	executionProvenance: ExecutionProvenanceSchema
+});
+export type ValidatorResult = z.infer<typeof ValidatorResultSchema>;
 export const WaiverDetailSchema = z.strictObject({
 	waivedPolicyId: z.string(),
 	waivedCriterionId: z.string(),

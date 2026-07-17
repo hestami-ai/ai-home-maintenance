@@ -16,6 +16,7 @@ import type { ActorReference, DomainCommand } from '@janumipwb/rph-contracts';
 import { SqliteStorageAdapter } from '@janumipwb/rph-persistence';
 import { beforeEach, describe, expect, it } from 'vitest';
 import { Engine } from '../index.js';
+import { floorValidatorResult } from './__tests__/floor-fixtures.js';
 
 const TS = '2026-07-12T00:00:00Z';
 const AGENT: ActorReference = {
@@ -125,7 +126,15 @@ describe('PublishPwa: a floor satisfied BEFORE a graph edit must not authorize t
 			const done = d(
 				SVC,
 				'CompleteAssuranceAssessment',
-				{ validatorResult: { dispositionRecommendation: 'SATISFIED' } },
+				{
+					validatorResult: floorValidatorResult({
+						assessmentId,
+						policyId,
+						subjectId: PWA,
+						subjectSemanticVersion: version,
+						disposition: 'SATISFIED'
+					})
+				},
 				assessmentId,
 				'ASSURANCE_ASSESSMENT'
 			);

@@ -131,12 +131,57 @@ export function recordAssuranceRecordingPlan(
 			});
 		});
 		// Complete to the floor-computed disposition; the state machine rejects any illegal ASSESSING→disposition.
-		// Carry the evaluator identity through validatorResult (an open channel) so the handler records WHO judged —
-		// §9.7 "the resolved provider/model/version actually invoked", §8.4 "actual identities and lineage recorded".
+		//
+		// THE VALIDATOR RESULT IS THE VERDICT. It is now the ratified DOC-007 §20 shape — sixteen fields, checked.
+		// It used to be `{ dispositionRecommendation, evaluator }`: two fields, one of which §20 does not define,
+		// and none of §20's sixteen. The comment here called validatorResult "an open channel" and used it to
+		// smuggle the evaluator through — which was true only because `ValidatorResultSchema` was
+		// `z.record(z.string(), z.unknown())`. Every field below was already computed by the island and thrown
+		// away at this line. The starkest: `subjectSemanticVersions` — RequestAssuranceAssessment twenty lines
+		// above already binds the assessment to the subject's semantic version, and the VERDICT named neither the
+		// subject nor its version, which is exactly the binding Increment 10b established the floor cannot do
+		// without (DOC-004 invariant 2: "Every assessment identifies its subject semantic version").
 		send('CompleteAssuranceAssessment', 'ASSURANCE_ASSESSMENT', assessmentId, {
 			validatorResult: {
+				validatorId: a.validatorId,
+				validatorVersion: a.validatorVersion,
+				policyId: a.policyId,
+				policyVersion: a.policyVersion,
+				assessmentId,
+				subjectObjectIds: [plan.subjectId],
+				subjectSemanticVersions: { [plan.subjectId]: plan.subjectSemanticVersion },
+				// EMPTY, AND NOT BECAUSE THE FLOOR HAS NOTHING TO SAY — a surfaced gap, not a silent drop.
+				// §20 routes per-criterion results ONLY through `claimResults: ClaimAssessmentResult[]`, and §33's
+				// worked example nests them under a `claimId`. The floor's assessments carry `claimIds: []` (see
+				// RequestAssuranceAssessment above): it evaluates CRITERIA against a subject, not claims. So its
+				// criterion results have no ratified home in §20 without inventing a claim id, and inventing one
+				// is the disease this whole program is treating. The verdict loses nothing — each criterion's
+				// outcome already drives the disposition, and its failures already ride as observations below —
+				// but the per-criterion detail the island computes (`a.criteria`) stops here. Recorded in
+				// HARMONIZATION-LOG PART 4 rather than papered over.
+				claimResults: [],
+				evidenceConsideredIds: [...a.consideredEvidenceIds],
+				evidenceRejected: [...a.rejectedEvidenceIds],
+				// Shaped per §33's worked observation: `{findingCode, severity, statement, subjectObjectIds, …}`.
+				// `ProposedAssuranceObservation` is referenced by §20 and defined nowhere in the corpus, so its
+				// schema is a placeholder; §33 is the only ratified statement of its shape, so it is the model.
+				observations: a.observations.map((o) => ({
+					findingCode: o.code,
+					severity: o.severity,
+					statement: o.statement,
+					subjectObjectIds: [plan.subjectId]
+				})),
 				dispositionRecommendation: a.disposition,
-				...(a.evaluator ? { evaluator: identityToActorReference(a.evaluator) } : {})
+				// The floor recommends none: it reports whether the floor is met. Choosing control actions is the
+				// controller's under §11 ("The controller selects and executes them under policy").
+				recommendedControlActions: [],
+				residualUncertainty: [...a.residualUncertainty],
+				limitations: [...a.limitations],
+				// WHERE THE EVALUATOR IDENTITY BELONGS. §9.7 asks for "the resolved provider/model/version actually
+				// invoked" and §8.4 L851 for "actual identities and lineage recorded" — that is execution
+				// provenance, not a field invented next to it. `ExecutionProvenance` is referenced by §20 and
+				// defined nowhere, so its schema is a placeholder and this is the honest shape available.
+				executionProvenance: a.evaluator ? { evaluator: identityToActorReference(a.evaluator) } : {}
 			}
 		});
 	});

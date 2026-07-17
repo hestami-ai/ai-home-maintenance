@@ -1665,6 +1665,95 @@ build · `check-types` 21/21 · `test` 21/21 · `lint` · `boundary` · `format:
 
 ---
 
+## PART 3e — Increment 20: the floor's verdict was fabricated
+
+I went to retire a stale `FORCE_PLACEHOLDER` flag. What was behind it is the sharpest instance of this
+program's thesis so far.
+
+### The "conflict" that kept it there was not one
+
+`ValidatorResult` was force-placeholdered — emitted as `z.record(z.string(), z.unknown())`, **any object** —
+behind this note, which I wrote:
+
+> *"BEFORE REMOVING ValidatorResult FROM THIS SET, resolve a RATIFIED CONFLICT (§17 — surface, never silently
+> choose): DOC-007 §20 defines 16 fields INCLUDING `subjectSemanticVersions`; DOC-004 §4.2 defines 15 and OMITS
+> it. **DOC-007 is the wire authority and its shape is also the safer one.**"*
+
+Read side by side, **DOC-004 §4.2 is DOC-007 §20 minus one field** — same fields, same order, same types. A
+strict subset is **silence**, not contradiction. The titles even say it: §20 is "Validator Result **Contract**";
+§4.2 is "Validator implementation **output**" — the spec/contract pair from PART 3d, composing again. Three
+documents converge on the extra field (DOC-007 §20 states it, DOC-004 invariant 2 requires it, DOC-009 §11.7
+persists it); only §4.2 is silent. **The note had already reached the right answer and blocked anyway, because
+calling it a *conflict* made it someone else's decision.** That is the third time today one error shape — silence
+read as conflict, absence-of-my-search read as absence — cost real work.
+
+### What `any object` was hiding
+
+**The floor's verdict had ZERO of DOC-007 §20's sixteen fields.** It recorded:
+
+```ts
+validatorResult: { dispositionRecommendation: a.disposition, evaluator: … }
+```
+
+Two fields — and `evaluator` **is not a field of §20 at all**. The comment beside it called `validatorResult`
+*"an open channel"*. The hollow layer was not merely tolerated here; it was **used as a feature**.
+
+And the data was all there. `rph-assurance/src/floor.ts` has its own `ValidatorResult` — 15 fields, computed in
+full: `validatorId`, `validatorVersion`, `subjectId`, `subjectSemanticVersion`, `evaluator`, `criteria`,
+`observations`, `consideredEvidenceIds`, `rejectedEvidenceIds`, `residualUncertainty`, `limitations`. **The
+island computes a complete, faithful result and the recorder discarded thirteen of its fields on the way into
+the governed stream.** The starkest: `RequestAssuranceAssessment` binds the assessment to the subject's semantic
+version *twenty lines above* — and the VERDICT named neither the subject nor its version, which is exactly the
+binding Increment 10b established the floor cannot do without.
+
+**Every test rehearsed the same fake.** Eight call sites across seven files completed assessments with
+`{ validatorResult: { dispositionRecommendation: 'SATISFIED' } }` — a one-field verdict that could never exist
+on the wire, indistinguishable from a real one while the schema was `any object`.
+
+### What the mutation caught that the contract could not
+
+Three mutations against the new §20 contract: regressing to the two-field fake → caught; smuggling a non-§20
+field back in → caught; **emptying `subjectSemanticVersions` to `{}` → MISSED, every test green.**
+
+`Record<string, number>` is satisfied by `{}`. So a verdict naming a subject with **no version for it** is
+schema-valid and meaningless — the precise defect I was claiming to have fixed, surviving inside the fix. **A
+shape check is not an invariant check.** DOC-004 invariant 2 ("Every assessment identifies its subject semantic
+version") now fails closed in `completeAssuranceAssessment` (§13.3), with a red test, and the mutation that
+missed is now caught by name. Mutation testing has now caught a false claim of mine three times today.
+
+### Surfaced, not fixed: four ratified commands do not exist
+
+DOC-004 §32 ratifies thirteen assurance commands. **Four are absent from the codebase** —
+`selectAssuranceEvaluator`, `recordCriterionResult`, `submitEvidenceForAssessment`, `beginAssuranceAssessment`.
+They are exactly the homes for what the verdict was smuggling or dropping:
+
+| what happened | why | the ratified home |
+|---|---|---|
+| `evaluator` smuggled inside the verdict | no payload field for it | **`selectAssuranceEvaluator`** |
+| criterion results dropped (`claimResults: []`) | §20 routes them only via a `claimId`, and floor assessments carry `claimIds: []` | **`recordCriterionResult`** |
+| evidence dropped (`evidenceConsideredIds: []`) | nothing submits it | **`submitEvidenceForAssessment`** |
+| "request-and-begin" fused into one command | — | **`beginAssuranceAssessment`** |
+
+**The smuggling and the dropping have one root cause: the commands that own those facts were never built.**
+
+### Now
+
+The verdict is the ratified §20 shape, sixteen fields, checked — carrying `validatorId`, the policy and its
+version, the subject **and its semantic version**, the observations (shaped per §33's worked example),
+`residualUncertainty` and `limitations` the plan already computed and the recorder used to drop. The evaluator
+moved to `executionProvenance`, which is where §9.7's "resolved provider/model/version actually invoked" belongs
+until `selectAssuranceEvaluator` exists.
+
+`ApplicabilityExpression` remains force-placeholdered — field-defined in the vocab and ratified at DOC-007 §18,
+so the generator could emit it today and simply declines to. It is not blocked on anything; it is just not done.
+
+### Gate
+
+build · `check-types` 21/21 · `test` 21/21 · `lint` · `boundary` · `format:check` clean · svelte-check 0 errors
+· Playwright 23/23 (1 known render-timing flake retried).
+
+---
+
 ## PART 4 — Open questions genuinely for the sponsor
 
 *(kept deliberately short — under the 2026-07-15 mandate, a tension is work, not a question, unless it

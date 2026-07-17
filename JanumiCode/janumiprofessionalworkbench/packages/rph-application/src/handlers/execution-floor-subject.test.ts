@@ -14,6 +14,7 @@ import type { ActorReference, DomainCommand } from '@janumipwb/rph-contracts';
 import { SqliteStorageAdapter } from '@janumipwb/rph-persistence';
 import { beforeEach, describe, expect, it } from 'vitest';
 import { Engine } from '../index.js';
+import { floorValidatorResult } from './__tests__/floor-fixtures.js';
 
 const TS = '2026-07-16T00:00:00Z';
 const AGENT: ActorReference = { actorId: 'agent-9', actorType: 'AGENT', displayName: 'Executor' };
@@ -96,7 +97,15 @@ describe('Execution floor subject: the result, at its exact version — not the 
 			);
 			d(
 				'CompleteAssuranceAssessment',
-				{ validatorResult: { dispositionRecommendation: 'SATISFIED' } },
+				{
+					validatorResult: floorValidatorResult({
+						assessmentId: id,
+						policyId,
+						subjectId: subject,
+						subjectSemanticVersion: atVersion,
+						disposition: 'SATISFIED'
+					})
+				},
 				id,
 				'ASSURANCE_ASSESSMENT'
 			);
@@ -215,6 +224,48 @@ describe('Execution floor subject: the result, at its exact version — not the 
 		expect(r.error?.code).toBe('RPH_VALIDATION_SEMANTIC_FAILED');
 		expect(r.error?.message).toContain(GHOST);
 		expect(stepState()).toBe('RUNNING');
+	});
+
+	it('a verdict that names a subject but no version for it is REJECTED — DOC-004 invariant 2', () => {
+		// FOUND BY MUTATION, and it is the hole the §20 strictObject could not close. `subjectSemanticVersions:
+		// Record<string, number>` is satisfied by `{}`, so a verdict naming a subject with NO version for it is
+		// schema-valid — and meaningless: nothing downstream can tell whether the judgement still applies to the
+		// object as it now stands, which is the entire premise of the version-bound floor (Increment 10b).
+		//
+		// Emptying that record in the recorder left every test green. Making ValidatorResult a real contract
+		// bought the SHAPE; only this buys the INVARIANT. DOC-004 invariant 2: "Every assessment identifies its
+		// subject semantic version."
+		recordArtifact(ART);
+		const id = `asmt_${String(++asmt).padStart(26, '0')}`;
+		d(
+			'RequestAssuranceAssessment',
+			{
+				assessmentId: id,
+				assurancePolicyId: 'floor.schema-invariant',
+				policyVersion: '1.0.0',
+				subjectObjectIds: [ART],
+				subjectSemanticVersions: { [ART]: 1 },
+				claimIds: []
+			},
+			id,
+			'ASSURANCE_ASSESSMENT'
+		);
+		const verdict = floorValidatorResult({
+			assessmentId: id,
+			policyId: 'floor.schema-invariant',
+			subjectId: ART,
+			subjectSemanticVersion: 1,
+			disposition: 'SATISFIED'
+		});
+		const r = d(
+			'CompleteAssuranceAssessment',
+			{ validatorResult: { ...verdict, subjectSemanticVersions: {} } },
+			id,
+			'ASSURANCE_ASSESSMENT'
+		);
+		expect(r.status).toBe('REJECTED');
+		expect(r.error?.code).toBe('RPH_VALIDATOR_OUTPUT_INVALID');
+		expect(r.error?.message).toContain(ART);
 	});
 
 	it('EVERY result is judged, not just the first — §8.4 L844 individuates per result', () => {

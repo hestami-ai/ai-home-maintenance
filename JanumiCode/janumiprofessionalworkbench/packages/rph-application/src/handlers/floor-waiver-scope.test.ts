@@ -15,6 +15,8 @@ import type { ActorReference, DomainCommand } from '@janumipwb/rph-contracts';
 import { SqliteStorageAdapter } from '@janumipwb/rph-persistence';
 import { beforeEach, describe, expect, it } from 'vitest';
 import { Engine } from '../index.js';
+import { floorValidatorResult } from './__tests__/floor-fixtures.js';
+import type { AssuranceDispositionRecommendation } from '@janumipwb/rph-contracts';
 
 const TS = '2026-07-15T00:00:00Z';
 const AGENT: ActorReference = {
@@ -108,7 +110,10 @@ describe('de minimis floor waiver SCOPE at the PublishPwa call site', () => {
 
 	const ulid = (prefix: string) => `${prefix}_${String(++asmtSeq).padStart(26, '0')}`;
 
-	function recordFloor(dispositions: Record<string, string>, version = 1) {
+	function recordFloor(
+		dispositions: Record<string, AssuranceDispositionRecommendation>,
+		version = 1
+	) {
 		for (const [policyId, disposition] of Object.entries(dispositions)) {
 			const assessmentId = ulid('asmt');
 			d(
@@ -128,7 +133,15 @@ describe('de minimis floor waiver SCOPE at the PublishPwa call site', () => {
 			d(
 				SVC,
 				'CompleteAssuranceAssessment',
-				{ validatorResult: { dispositionRecommendation: disposition } },
+				{
+					validatorResult: floorValidatorResult({
+						assessmentId,
+						policyId,
+						subjectId: AI_PWA,
+						subjectSemanticVersion: version,
+						disposition
+					})
+				},
 				assessmentId,
 				'ASSURANCE_ASSESSMENT'
 			);

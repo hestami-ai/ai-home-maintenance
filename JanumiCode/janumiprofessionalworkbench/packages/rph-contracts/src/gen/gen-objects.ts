@@ -64,17 +64,33 @@ const EXTERNAL_HELPERS: Record<string, string> = {
 };
 // Complex helpers whose faithful shape belongs to a later milestone — placeholder for M1 even if >=2 fields.
 //
-// ⚠️ STALE DEFERRAL, kept only because retiring it is a real change and not a comment fix. This is an M1
-// decision still in force at M14+. BOTH of these are field-defined in the vocab AND ratified in DOC-007
-// (§18 ApplicabilityExpression, §20 ValidatorResult) — so they are the only placeholders here that the
-// generator could emit faithfully today and simply declines to. ValidatorResult matters most: it is the
-// assurance verdict shape, and forcing it to `any object` is why completeAssuranceAssessment accepts an
-// unvalidated `{ validatorResult: { dispositionRecommendation } }`.
-// BEFORE REMOVING ValidatorResult FROM THIS SET, resolve a RATIFIED CONFLICT (§17 — surface, never silently
-// choose): DOC-007 §20 defines 16 fields INCLUDING `subjectSemanticVersions`; DOC-004 §4.2 defines 15 and
-// OMITS it. DOC-007 is the wire authority and its shape is also the safer one — it binds the verdict to the
-// subject version, which Increment 10b showed the floor cannot do without.
-const FORCE_PLACEHOLDER = new Set(['ApplicabilityExpression', 'ValidatorResult']);
+// `ValidatorResult` LEFT THIS SET on 2026-07-16. The note that kept it here read: "BEFORE REMOVING
+// ValidatorResult FROM THIS SET, resolve a RATIFIED CONFLICT (§17 — surface, never silently choose): DOC-007
+// §20 defines 16 fields INCLUDING `subjectSemanticVersions`; DOC-004 §4.2 defines 15 and OMITS it."
+//
+// THERE IS NO CONFLICT. Read side by side, DOC-004 §4.2 is DOC-007 §20 **minus one field** — same fields, same
+// order, same types, with DOC-007 adding `subjectSemanticVersions`. A strict subset is SILENCE, not
+// contradiction, and §17 asks me to surface conflicts, not to invent them. The same misreading had just been
+// corrected one layer up for the policy catalog (docs/_working/RULING-doc003-doc004-compose.md): DOC-004 §4.2
+// is titled "Validator implementation output" and DOC-007 §20 is titled "Validator Result **Contract**" — the
+// spec/contract pair again, composing rather than competing.
+//
+// The old note even reached the right answer — "DOC-007 is the wire authority and its shape is also the safer
+// one — it binds the verdict to the subject version, which Increment 10b showed the floor cannot do without" —
+// and blocked anyway, because calling it a *conflict* made it someone else's decision. Three ratified documents
+// converge on that field: DOC-007 §20 states it, DOC-004 invariant 2 requires it ("Every assessment identifies
+// its subject semantic version"), and DOC-009 §11.7 persists it (`subject_semantic_version integer not null`).
+// Only DOC-004 §4.2 is silent. 16 fields.
+//
+// What this cost while it stood: `ValidatorResult` is the assurance VERDICT shape, and forcing it to `any
+// object` is why completeAssuranceAssessment accepted an unvalidated `{ validatorResult: {
+// dispositionRecommendation } }` — the verdict that decides whether professional work passes was the least
+// checked payload in the system.
+//
+// `ApplicabilityExpression` remains: it is field-defined in the vocab and ratified at DOC-007 §18, so the
+// generator could emit it today and simply declines to — the same stale M1 deferral, still live at M14+, but a
+// separate change with its own blast radius. It is not blocked on anything; it is just not done.
+const FORCE_PLACEHOLDER = new Set(['ApplicabilityExpression']);
 // Helpers a later milestone tightened to a real strictObject — emit as a full helper even with a single field
 // (still requires every field to be typed). M9 defines the decomposition/recomposition sub-shapes.
 const FORCE_FULL = new Set([

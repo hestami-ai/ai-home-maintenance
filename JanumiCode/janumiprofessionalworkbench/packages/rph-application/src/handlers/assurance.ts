@@ -379,7 +379,12 @@ export const requestAssuranceAssessment: CommandHandler = (ctx, command, payload
  * disposition transitions (INV-8/INV-9/INV-10). */
 export const completeAssuranceAssessment: CommandHandler = (ctx, command, payload) => {
 	const p = payload as {
-		validatorResult?: { dispositionRecommendation?: string; evaluator?: ActorReference };
+		validatorResult?: {
+			dispositionRecommendation?: string;
+			subjectObjectIds?: string[];
+			subjectSemanticVersions?: Record<string, number>;
+			executionProvenance?: { evaluator?: ActorReference };
+		};
 	};
 	const disposition = p.validatorResult?.dispositionRecommendation;
 	if (!disposition || !DISPOSITIONS.has(disposition)) {
@@ -389,11 +394,42 @@ export const completeAssuranceAssessment: CommandHandler = (ctx, command, payloa
 			`CompleteAssuranceAssessment requires validatorResult.dispositionRecommendation in ${[...DISPOSITIONS].join('|')}`
 		);
 	}
+	// DOC-004 INVARIANT 2 — "Every assessment identifies its subject semantic version." THE SCHEMA CANNOT SAY
+	// THIS. `subjectSemanticVersions: Record<string, number>` is satisfied by `{}`, so a verdict that names a
+	// subject and no version for it is schema-valid and meaningless: nothing downstream can tell whether the
+	// judgement still applies to the object as it now stands. Found by mutation — emptying the record left the
+	// §20 strictObject perfectly happy and every test green, which is precisely the class of hole this whole
+	// effort exists to close. A shape check is not an invariant check.
+	//
+	// §13.3: "Fail closed on missing identity, tenant, policy, schema, or authority context."
+	const subjectIds = p.validatorResult?.subjectObjectIds ?? [];
+	const versions = p.validatorResult?.subjectSemanticVersions ?? {};
+	const unversioned = subjectIds.filter((id) => typeof versions[id] !== 'number');
+	if (unversioned.length > 0) {
+		return reject(
+			command,
+			'RPH_VALIDATOR_OUTPUT_INVALID',
+			`CompleteAssuranceAssessment: validatorResult.subjectSemanticVersions must name a version for every subject (DOC-004 invariant 2 — "Every assessment identifies its subject semantic version"). Missing: ${unversioned.join(', ')}`,
+			unversioned
+		);
+	}
 	// Record WHO judged. The Assessment object has always carried an optional `evaluator: ActorReference`; the
 	// completion path simply never wrote it, so the model/provider that actually reviewed the artifact was
 	// persisted nowhere (§9.7 "resolved provider/model/version actually invoked"; §8.4 L851 "actual identities and
 	// lineage are recorded"). Validated against the ratified schema at the aggregate boundary like any field.
-	const evaluator = p.validatorResult?.evaluator;
+	//
+	// IT MOVED, from `validatorResult.evaluator` to `validatorResult.executionProvenance.evaluator`, because
+	// DOC-007 §20 has no `evaluator` field — the old path only type-checked while ValidatorResultSchema was
+	// `z.record(z.string(), z.unknown())`, and a §20 strictObject rejects it outright. `executionProvenance` is
+	// where §9.7's "resolved provider/model/version actually invoked" belongs.
+	//
+	// AND THIS IS STILL NOT THE RATIFIED HOME. DOC-004 §32 ratifies `selectAssuranceEvaluator` as its own
+	// command — choosing the evaluator is a governed act, not a rider on the verdict. That command does not exist
+	// in this codebase (nor do §32's `recordCriterionResult`, `submitEvidenceForAssessment`, or
+	// `beginAssuranceAssessment` — 4 of §32's 13). Their absence is exactly why the evaluator was smuggled
+	// through the verdict and why criterion results and evidence are dropped at the boundary: the commands that
+	// own those facts were never built. Surfaced in HARMONIZATION-LOG PART 4, not fixed here.
+	const evaluator = p.validatorResult?.executionProvenance?.evaluator;
 	return advanceStatus(ctx, command, {
 		objectType: ASSESSMENT,
 		statusField: 'assessmentState',

@@ -11,6 +11,7 @@ import type { AggregateDisposition, Disposition, Identity, Severity } from './as
 import {
 	composeAssuranceOutcome,
 	type AssuranceSubject,
+	type FloorCriterion,
 	type FloorPolicyId,
 	type FloorPolicyOutcome,
 	type FloorPolicyRef,
@@ -25,10 +26,28 @@ export interface RecordableObservation {
 	readonly statement: string;
 }
 
-/** One policy's outcome to record as a canonical ASSURANCE_ASSESSMENT plus its observations. */
+/**
+ * One policy's outcome to record as a canonical ASSURANCE_ASSESSMENT plus its observations.
+ *
+ * THIS CARRIES THE WHOLE VALIDATOR RESULT, not a summary of it. It used to carry seven fields, and
+ * `recordAssuranceRecordingPlan` then completed the assessment with a `validatorResult` of exactly TWO:
+ * `{ dispositionRecommendation, evaluator }` — where `evaluator` is not a field of the ratified DOC-007 §20
+ * ValidatorResult at all, and every one of §20's sixteen was absent. The island computes a full, faithful
+ * result (floor.ts `ValidatorResult`); this seam discarded thirteen of its fields on the way into the governed
+ * stream, and `ValidatorResultSchema` was `z.record(z.string(), z.unknown())` — any object — so nothing said so
+ * for the codebase's life. The verdict that decides whether AI-produced professional work may be published was
+ * the least-checked payload in the system.
+ *
+ * The fields below exist so the recorder can build a real §20 ValidatorResult. Every one is already computed
+ * upstream: this is transcription of a mapping that should always have existed, not new information.
+ */
 export interface RecordablePolicyAssessment {
 	readonly policyId: FloorPolicyId;
 	readonly policyVersion: string;
+	/** DOC-007 §20 — the validator IMPLEMENTATION that produced this result (e.g. `deterministic.schema-invariant`),
+	 *  distinct from the `evaluator` identity that ran it. The island had it all along; the record never carried it. */
+	readonly validatorId: string;
+	readonly validatorVersion: string;
 	/** The canonical disposition to complete the assessment on (one of the 5; boundary pseudo-values → INCONCLUSIVE). */
 	readonly disposition: Disposition;
 	/** Whether the policy's independence requirement was met by the evaluator (recorded for transparency). */
@@ -37,8 +56,14 @@ export interface RecordablePolicyAssessment {
 	 *  lineage are recorded", and §9.7 the "resolved provider/model/version actually invoked". Deterministic floor
 	 *  validators run as SYSTEM; the Reasoning Review carries the real judge (model/provider). */
 	readonly evaluator?: Identity;
+	/** The per-criterion results. §20 routes these through `claimResults` — see recordAssuranceRecordingPlan for
+	 *  why the floor cannot use that route and what is surfaced instead. */
+	readonly criteria: readonly FloorCriterion[];
 	readonly observations: readonly RecordableObservation[];
+	readonly consideredEvidenceIds: readonly string[];
+	readonly rejectedEvidenceIds: readonly string[];
 	readonly residualUncertainty: readonly string[];
+	readonly limitations: readonly string[];
 }
 
 /** The full recording plan for a subject's floor run — a superset of what the transition gate needs. */
@@ -98,11 +123,19 @@ export function assuranceRecordingPlan(
 		assessments.push({
 			policyId: po.policyId,
 			policyVersion: r?.policyVersion ?? '1',
+			// `unknown.<policyId>` only if a policy produced a non-MISSING outcome with no result at all, which
+			// composeAssuranceOutcome should make impossible — it is a loud placeholder, not a silent default.
+			validatorId: r?.validatorId ?? `unknown.${po.policyId}`,
+			validatorVersion: r?.validatorVersion ?? '1',
 			disposition: toRecordable(po.disposition),
 			independenceOk: po.independenceOk,
 			...(r?.evaluator ? { evaluator: r.evaluator } : {}),
+			criteria: r?.criteria ?? [],
 			observations,
-			residualUncertainty: r?.residualUncertainty ?? []
+			consideredEvidenceIds: r?.consideredEvidenceIds ?? [],
+			rejectedEvidenceIds: r?.rejectedEvidenceIds ?? [],
+			residualUncertainty: r?.residualUncertainty ?? [],
+			limitations: r?.limitations ?? []
 		});
 	}
 	return {
