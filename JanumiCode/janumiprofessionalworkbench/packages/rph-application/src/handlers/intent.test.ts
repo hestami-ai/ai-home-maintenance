@@ -104,6 +104,11 @@ describe('Intent lifecycle handlers (live command drive)', () => {
 		expect(
 			(store.loadObject(INTENT_ID)?.state as { semanticVersion: number }).semanticVersion
 		).toBe(1);
+		// Contract-drift: WHAT the approval authorized (approvalScope) is on the governed stream, not discarded.
+		const approvedEvt = store.readAllEvents().find((e) => e.eventType === 'IntentApproved');
+		expect((approvedEvt?.payload as Record<string, unknown> | undefined)?.approvalScope).toBe(
+			'full'
+		);
 
 		expect(engine.dispatch(cmd('ReviseIntent', { changeRationale: 'add scheduling' })).status).toBe(
 			'ACCEPTED'

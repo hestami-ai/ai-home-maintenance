@@ -1040,7 +1040,8 @@ export type ExecutionTerminatedPayload = z.infer<typeof ExecutionTerminatedPaylo
 export const IntentApprovedPayloadSchema = z.strictObject({
 	decisionId: z.string(),
 	approvedSemanticVersion: z.number(),
-	intentStatus: IntentStatusSchema
+	intentStatus: IntentStatusSchema,
+	approvalScope: z.string().optional()
 });
 export type IntentApprovedPayload = z.infer<typeof IntentApprovedPayloadSchema>;
 export const IntentCapturedPayloadSchema = z.strictObject({

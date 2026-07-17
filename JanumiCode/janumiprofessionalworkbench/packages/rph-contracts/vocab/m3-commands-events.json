@@ -4360,6 +4360,12 @@
           "type": "'APPROVED'",
           "enumRef": "IntentStatusSchema",
           "note": "literal const; FORMALIZED->APPROVED, also REVISED->APPROVED"
+        },
+        {
+          "field": "approvalScope",
+          "required": false,
+          "type": "string",
+          "note": "What the approval authorized -- the extent/conditions of this governance act. AUTHORED optional field atop the ratified DOC-007 §10.7 shape (which omits it): ApproveIntent requires approvalScope on the COMMAND but §10.7 dropped it, so the governed stream recorded that the intent was approved and by which decision, but not the SCOPE the approval covered. Contract-drift fix."
         }
       ]
     },

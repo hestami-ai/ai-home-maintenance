@@ -202,11 +202,15 @@ export const approveIntent: CommandHandler = (ctx, command, payload) => {
 		target: 'APPROVED',
 		eventType: 'IntentApproved',
 		// Event payload per DOC-007 §10.7 (IntentApprovedPayload) — was the raw ApproveIntent command payload, which
-		// lacks intentStatus and carries approvalScope, a command-only field the event does not schematize.
+		// lacks intentStatus. Contract-drift fix: approvalScope (WHAT the approval authorized) is required on the
+		// command but §10.7 dropped it, so it was validated then discarded — the governed stream recorded that the
+		// intent was approved and by which decision, but not the scope the approval covered. Now carried (optional
+		// atop the ratified §10.7 shape, authored under §0.3; the event stays ratified/gated).
 		eventPayload: () => ({
 			decisionId: p.decisionId,
 			approvedSemanticVersion: p.approvedSemanticVersion,
-			intentStatus: 'APPROVED'
+			intentStatus: 'APPROVED',
+			...(p.approvalScope ? { approvalScope: p.approvalScope } : {})
 		}),
 		precheck: (current) => {
 			const outcomes = current.desiredOutcomes;
