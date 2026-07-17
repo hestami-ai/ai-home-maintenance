@@ -321,7 +321,18 @@ export const createBaseline: CommandHandler = (ctx, command, payload) => {
 		objectType: BASELINE,
 		aggregateId: id,
 		state,
-		eventType: 'BaselineCreated'
+		eventType: 'BaselineCreated',
+		// The event records the RESULTING state. BaselineCreated declares `{ baselineType, itemObjectIds, status }`
+		// (+ optional assuranceAssessmentIds); the raw command payload omits the created `status: 'CANDIDATE'`. Emit
+		// the declared shape. (Pinned defect in emitted-event-conformance; now conforms.)
+		eventPayload: {
+			baselineType: p.baselineType,
+			itemObjectIds: p.itemObjectIds,
+			status: 'CANDIDATE',
+			...(p.assuranceAssessmentIds?.length
+				? { assuranceAssessmentIds: p.assuranceAssessmentIds }
+				: {})
+		}
 	});
 };
 

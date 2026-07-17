@@ -69,7 +69,7 @@ describe('emitted events vs their declared shapes', () => {
 		expect(checked).toBeGreaterThan(200);
 	});
 
-	it('DEFECT REGISTER: 4 event types emit a payload their own declared shape rejects', () => {
+	it('DEFECT REGISTER: 3 event types emit a payload their own declared shape rejects', () => {
 		const { violations } = driveAndCheck();
 		// PIN — a defect register, not a specification. It must only ever SHRINK. An entry here means an event
 		// and its declared contract disagree, and BOTH are ours: either the handler emits the wrong thing, or the
@@ -86,16 +86,14 @@ describe('emitted events vs their declared shapes', () => {
 		// RESULTING status it transitioned INTO): ExecutionStepStarted (`stepState: RUNNING`), IntentDiscoveryStarted
 		// (`intentStatus: UNDER_DISCOVERY`), DecompositionValidated (`status: VALID`), and the three status-only
 		// transition events ExecutionPlanApproved / BaselineSubmittedForReview / BaselineApproved (each `status: <target>`).
-		// Each now supplies its declared shape. DecompositionProposed is the first CREATE event fixed: createObject
-		// emitted the command payload (which omits the created `status`); it now emits the declared shape (the
-		// required decomposition fields + `status: UNDER_REVIEW` + any optional propagations the command supplied).
-		// The remaining FOUR are CREATE events too (BaselineCreated / DecisionProposed / EvidenceProposed /
-		// ExecutionPlanProposed — a richer `{ …, status }` shape, ExecutionPlanProposed also projecting steps →
-		// stepIds); each needs the same judgement made deliberately, one at a time, several interacting with the
-		// unresolved request-and-begin / five-outcome-events modeling drift. A bulk edit would be the fabrication
-		// this effort exists to prevent.
+		// Each now supplies its declared shape. The CREATE events DecompositionProposed and BaselineCreated are fixed:
+		// createObject emitted the command payload (which omits the created `status`); each now emits the declared
+		// shape (the required fields + the created `status` + any optionals the command supplied). The remaining
+		// THREE are CREATE events too (DecisionProposed / EvidenceProposed / ExecutionPlanProposed — the last also
+		// projecting steps → stepIds); each needs the same judgement made deliberately, one at a time, several
+		// interacting with the unresolved request-and-begin / five-outcome-events modeling drift. A bulk edit would
+		// be the fabrication this effort exists to prevent.
 		expect(violations.map((v) => v.eventType).sort()).toEqual([
-			'BaselineCreated',
 			'DecisionProposed',
 			'EvidenceProposed',
 			'ExecutionPlanProposed'
@@ -123,7 +121,8 @@ describe('emitted events vs their declared shapes', () => {
 			'ExecutionPlanApproved',
 			'BaselineSubmittedForReview',
 			'BaselineApproved',
-			'DecompositionProposed'
+			'DecompositionProposed',
+			'BaselineCreated'
 		]) {
 			expect(broken.has(eventType), `${eventType} regressed`).toBe(false);
 		}

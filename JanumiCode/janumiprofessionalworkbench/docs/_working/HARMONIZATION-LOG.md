@@ -3085,17 +3085,17 @@ the HANDLER was the wrong side (it emitted the command payload; the event exists
   event does not declare (unlike `ExecutionPlanApproved`, whose shape has it optionally) — dropped rather than written
   as an undeclared key; recording *which* decision approved a baseline is a worthwhile shape enrichment left for the
   §32 governance-traceability pass.
-- **`DecompositionProposed`** — the first CREATE event. `proposeDecomposition`'s `createObject` emitted the command
-  payload, which omits the created `status`. Now emits the declared shape via `createObject`'s `eventPayload` override:
-  the required decomposition fields + `status: 'UNDER_REVIEW'` + any optional propagation fields the command actually
+- **`DecompositionProposed` / `BaselineCreated`** — two CREATE events. `createObject` emitted the command payload,
+  which omits the created `status`. Each now emits the declared shape via `createObject`'s `eventPayload` override:
+  the required fields + the created `status` (`UNDER_REVIEW` / `CANDIDATE`) + any optionals the command actually
   supplied (absent = not specified, never a fabricated empty).
 
-A projection reading any of these to learn what happened now finds the state, not silence. Register **11 → 4**; all
-seven added to the must-conform spine so they cannot regress. Each mutation-verified (break the `eventPayload` → both
+A projection reading any of these to learn what happened now finds the state, not silence. Register **11 → 3**; all
+eight added to the must-conform spine so they cannot regress. Each mutation-verified (break the `eventPayload` → both
 the register count and the spine fail). Gate: `check-types` 21/21 · `test` 21/21 · lint · boundary · format. The
-remaining four are CREATE events too (`BaselineCreated` / `DecisionProposed` / `EvidenceProposed` /
-`ExecutionPlanProposed`, the last also projecting steps → stepIds); each needs its own deliberate judgement, several
-tangling with the request-and-begin / five-outcome-events modeling drift — one at a time, never a bulk edit.
+remaining three are CREATE events too (`DecisionProposed` / `EvidenceProposed` / `ExecutionPlanProposed`, the last
+also projecting steps → stepIds); each needs its own deliberate judgement, several tangling with the
+request-and-begin / five-outcome-events modeling drift — one at a time, never a bulk edit.
 
 ---
 
