@@ -1,7 +1,8 @@
 // The UI-ready graph View seam — the pure, browser-safe read-model a client surface (e.g. the M14 Svelte Flow
 // demo) renders. It turns an RPH PWU decomposition into nodes (each carrying the FOUR independent state axes +
 // the no-green-without-assurance flag) and typed edges, using the same isQualifiedSuccess rule the Work
-// projection uses (a node is "green" ONLY when execution SUCCEEDED AND assurance SATISFIED — INV-5 made visible).
+// projection uses — DOC-004 §38: green ONLY when execution SUCCEEDED, assurance SATISFIED, and no blocking
+// finding remains. That last limb was absent from this seam and from the rule itself until Increment 32.
 // This is the REUSABLE seam; concrete Undertaking-instance graphs (e.g. the field-service Reference Undertaking)
 // are built BY the surface via pwuGraphNode() — a specific undertaking's instance data does NOT live here (it is
 // not reusable-package material). Lives in rph-projections (never the Node engine facade), so a browser client
@@ -21,8 +22,12 @@ export interface GraphNode {
 	readonly label: string;
 	readonly pwuKind: string;
 	readonly axes: PwuAxesView;
-	/** true ONLY when execution SUCCEEDED and assurance SATISFIED — the UI shows unqualified green only here. */
+	/** DOC-004 §38: true ONLY when execution SUCCEEDED, assurance SATISFIED, **and no blocking finding remains**.
+	 *  The third limb used to be missing entirely — an OPEN BLOCKING observation could not stop a green node. */
 	readonly qualifiedSuccess: boolean;
+	/** Open observations against this PWU by severity — what limb 2 of §38's green rule is computed from, and
+	 *  what a surface shows the reviewer instead of a bare colour. */
+	readonly openObservationCounts: Readonly<Record<string, number>>;
 	/** whether this PWU has been frozen into an authoritative baseline. */
 	readonly baselined: boolean;
 }
@@ -50,7 +55,12 @@ export function pwuGraphNode(
 	label: string,
 	pwuKind: string,
 	axes: PwuAxesView,
-	baselined = false
+	baselined = false,
+	/** Open observations against this PWU, by severity. REQUIRED-in-spirit: DOC-004 §38 permits green only when
+	 *  "no blocking finding remains", so a caller that does not supply findings cannot know whether green is
+	 *  legal. It defaults to `{}` = "no blocking findings" only because that matches the pre-Increment-32
+	 *  behaviour of every existing caller; supply the real counts. `professional-work-graph.ts` does. */
+	openObservationCounts: Readonly<Record<string, number>> = {}
 ): GraphNode {
 	return {
 		id,
@@ -58,6 +68,11 @@ export function pwuGraphNode(
 		pwuKind,
 		axes,
 		baselined,
-		qualifiedSuccess: isQualifiedSuccess(axes.executionState, axes.assuranceState)
+		openObservationCounts,
+		qualifiedSuccess: isQualifiedSuccess(
+			axes.executionState,
+			axes.assuranceState,
+			openObservationCounts
+		)
 	};
 }

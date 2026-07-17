@@ -108,3 +108,111 @@ describe('Work projection', () => {
 		expect(inc.current()).toEqual(rebuildProjection(workProjector, stream));
 	});
 });
+
+// DOC-004 §38's green-node rule has THREE limbs: "required assurance is satisfied; no blocking finding remains;
+// required conditions are explicit." The code implemented the FIRST ONLY — execution SUCCEEDED && assurance
+// SATISFIED — and never consulted findings at all. `WorkNode.openObservationCounts` existed for exactly this
+// check and was ALWAYS `{}`, because nothing folded AssuranceObservationRecorded. The data structure anticipated
+// the ratified rule; the fold and the rule both ignored it.
+//
+// A false green is the one output this system must never produce, so these are the tests that matter most in
+// this file.
+describe('DOC-004 §38 green-node rule — limb 2, "no blocking finding remains"', () => {
+	const green = { executionState: 'SUCCEEDED', assuranceState: 'SATISFIED' } as const;
+
+	it('an OPEN BLOCKING finding denies green to an otherwise fully satisfied node', () => {
+		expect(isQualifiedSuccess(green.executionState, green.assuranceState, {})).toBe(true);
+		expect(isQualifiedSuccess(green.executionState, green.assuranceState, { BLOCKING: 1 })).toBe(
+			false
+		);
+	});
+
+	it('CRITICAL blocks too — a severity above BLOCKING cannot be less disqualifying', () => {
+		expect(isQualifiedSuccess(green.executionState, green.assuranceState, { CRITICAL: 1 })).toBe(
+			false
+		);
+	});
+
+	it('non-blocking severities do NOT deny green — the rule is "no BLOCKING finding", not "no finding"', () => {
+		// Over-reaching here would be its own defect: a workbench that renders everything amber teaches nobody
+		// anything. §38 names blocking findings specifically.
+		for (const severity of ['INFORMATIONAL', 'ADVISORY', 'MATERIAL']) {
+			expect(
+				isQualifiedSuccess(green.executionState, green.assuranceState, { [severity]: 3 }),
+				`${severity} must not deny green`
+			).toBe(true);
+		}
+	});
+
+	it('folds AssuranceObservationRecorded into the subject’s counts and denies green', () => {
+		const withFinding = [
+			...stream,
+			evt(
+				3,
+				'AssuranceObservationRecorded',
+				{
+					observationId: 'obs_1',
+					assessmentId: 'asm_1',
+					policyId: 'pol_1',
+					subjectObjectIds: ['pwu_1'],
+					findingCode: 'INCOMPLETE_OUTPUT',
+					severity: 'BLOCKING',
+					statement: 'The expected output is absent.',
+					implication: 'The completeness claim cannot be sustained.',
+					evidenceIds: [],
+					disposition: 'OPEN'
+				},
+				'obs_1'
+			),
+			// ...and the PWU is then driven to fully satisfied. Execution succeeded, assurance satisfied — and a
+			// blocking finding is still open. Before Increment 32 this rendered GREEN.
+			evt(
+				4,
+				'PwuStateChanged',
+				{
+					previousState: 'PROPOSED',
+					newState: 'SATISFIED',
+					executionState: 'SUCCEEDED',
+					assuranceState: 'SATISFIED',
+					shapeIntegrityState: 'PRESERVED',
+					reasonCode: 'CONTROLLER',
+					supportingObjectIds: []
+				},
+				'pwu_1'
+			)
+		];
+		const n = rebuildProjection(workProjector, withFinding).nodes['pwu_1'];
+		expect(n?.assuranceState).toBe('SATISFIED');
+		expect(n?.executionState).toBe('SUCCEEDED');
+		expect(n?.openObservationCounts, 'the counts were always {} before').toEqual({ BLOCKING: 1 });
+		expect(n?.qualifiedSuccess, 'satisfied on both axes, but a blocking finding is open').toBe(
+			false
+		);
+	});
+
+	it('a REMEDIATED finding stops blocking but stays in the log (§18.1)', () => {
+		// §18.1: "Assurance observations must remain visible after remediation." Visible, but not open.
+		const remediated = [
+			...stream,
+			evt(
+				3,
+				'AssuranceObservationRecorded',
+				{
+					observationId: 'obs_2',
+					assessmentId: 'asm_1',
+					policyId: 'pol_1',
+					subjectObjectIds: ['pwu_1'],
+					findingCode: 'INCOMPLETE_OUTPUT',
+					severity: 'BLOCKING',
+					statement: 'Was absent; since produced.',
+					implication: 'None once remediated.',
+					evidenceIds: [],
+					disposition: 'REMEDIATED'
+				},
+				'obs_2'
+			)
+		];
+		const n = rebuildProjection(workProjector, remediated).nodes['pwu_1'];
+		expect(n?.openObservationCounts).toEqual({});
+	});
+});

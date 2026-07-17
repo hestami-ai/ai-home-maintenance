@@ -2550,6 +2550,82 @@ emitted no assurance events to project. It can be now — and `AssuranceAssessme
 
 ---
 
+## PART 3q — Increment 32: the green-node rule was missing two of its three limbs
+
+DOC-004 §38 ratifies the green-node rule in three parts:
+
+> "A green node may be displayed only when: **required assurance is satisfied; no blocking finding remains;
+> required conditions are explicit.**"
+
+`isQualifiedSuccess` implemented the **first limb only** — `executionState === 'SUCCEEDED' && assuranceState ===
+'SATISFIED'` — and **never consulted findings at all**. So a PWU with an OPEN BLOCKING observation rendered green
+if its assurance axis said SATISFIED. **A false green is the one output this system exists to prevent, and the
+rule that prevents it was two-thirds absent.**
+
+### The field was there, waiting
+
+`WorkNode.openObservationCounts` exists for exactly this check — and was **always `{}`**, because nothing folded
+`AssuranceObservationRecorded`. The data structure anticipated the ratified rule; the fold and the rule both
+ignored it. Same shape as the Work view's axes in PART 3o: the scaffolding was laid for a milestone that arrived
+and was never wired.
+
+Now `AssuranceObservationRecorded` folds into per-subject counts (an OPEN observation counts against every
+subject it names; §18.1 — observations "must remain visible after remediation" — so REMEDIATED stays in the log
+but stops blocking), `isQualifiedSuccess` denies green while any OPEN BLOCKING/CRITICAL count is positive, and
+**both** call sites (the Work projector and the `graph-view` seam) get the complete rule. `professional-work-graph`
+sources the findings from the log it already reads. Mutation-proven twice (revert the rule → 3 fail; revert the
+fold → 1 fails). The rule is deliberately **not** over-reaching: MATERIAL/ADVISORY/INFORMATIONAL do not deny green
+— §38 names *blocking* findings, and a workbench that renders everything amber teaches nobody anything.
+
+The **third limb** ("required conditions are explicit") is left unimplemented on purpose: green already requires
+SATISFIED, so it cannot currently admit a false green, and "explicit" is a modelling judgement I will not invent.
+
+### The §38 map — the honest scope of the Assurance View, from a 14-agent sweep
+
+Before building the view I had 14 agents map each ratified §38 field to the live log, each **proving its answer by
+running the engine** (a declared schema is not evidence when twelve events emit payloads their schemas reject).
+The result reframes "build the Assurance View" from an increment into a **program with ratification decisions in
+it**:
+
+| §38 field | sourceable today? | the gap |
+|---|---|---|
+| evidence considered | **YES** | `AssuranceAssessmentCompleted.evidenceConsideredIds` |
+| severity | **YES** | `AssuranceObservationRecorded.severity` |
+| disposition | **YES** | `AssuranceAssessmentCompleted.disposition` |
+| findings | PARTIAL | folds, but only one observation is emitted in the whole run |
+| claims evaluated | PARTIAL | `AssuranceAssessmentStarted.claimIds` ⋈ `ClaimAsserted` |
+| assessment state | PARTIAL | start/complete events, but no intermediate states |
+| open conditions | PARTIAL | `disposition==CONDITIONALLY_SATISFIED` + `residualUncertainty` |
+| **applicable policies** | PARTIAL — **and affirmatively wrong** | the best fold yields "assessed policies"; **empty for 5 of 13 PWUs incl. the root** — a false "no applicable policies", which vacuously satisfies the green rule |
+| waivers | PARTIAL | no waiver is exercised in the reference run |
+| control actions | PARTIAL | `recommendedControlActions` is a required field wired to a hardcoded `[]`; **selection has no event at all** |
+| **validator implementation identity** | **NO** | `AssuranceAssessmentCompleted` carries no `validatorId` — the field the ValidatorResult has and the event drops |
+| **independence status** | **NO** | only `AssurancePolicyCreated.independenceRequirement` (the *requirement*), never a *verified* status |
+| **invalidation status** | PARTIAL/NO | invalidation **does not propagate** — invalidating evidence left its dependent claim OPEN, violating ratified DOC-002 §28 and DOC-004 Test 4 |
+| missing evidence | (agent hit a 529; unmapped) | — |
+
+Three findings from that sweep are worth surfacing on their own:
+
+- **"applicable policies" would render a false claim, not a blank.** The log carries *assessed* policies, not
+  *applicable* ones (§5.2 makes applicability a five-outcome determination). The best possible fold is empty for
+  the **root PWU** — so the view would say "no applicable policies" and §38's own green rule ("required assurance
+  is satisfied") is then met **by vacuity**. The binding exists on the PWU object (`assurancePolicyIds`) and is
+  **dropped from the `PwuProposed` event** — the same object-not-event gap, on a field that gates green.
+- **Control-action *selection* has no carrier event in the ratified corpus.** §37 says "every control action must
+  record..." six fields; `selectControlAction()` is implemented and unit-tested with **zero production callers**;
+  no `ControlActionSelected` event exists in code, vocab, **or the corpus**. §37 presupposes an event the corpus
+  never names. That is a ratification gap, not a wiring gap.
+- **Invalidation does not cascade.** A probe invalidated admitted evidence and its dependent claim stayed OPEN,
+  emitting zero consequence events — a live violation of ratified DOC-002 §28 ("every dependent supported claim
+  must become contested, under review, or invalidated").
+
+### Gate
+
+build · `check-types` 21/21 · `test` 21/21 · `lint` · `boundary` · `format:check` clean · Playwright 22 (1 known
+flake, retried green).
+
+---
+
 ## PART 4 — Open questions genuinely for the sponsor
 
 *(kept deliberately short — under the 2026-07-15 mandate, a tension is work, not a question, unless it

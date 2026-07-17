@@ -85,6 +85,26 @@ export function professionalWorkGraph(
 		? uniqueEdges.filter((e) => keep.has(e.from) && keep.has(e.to))
 		: uniqueEdges;
 
+	// DOC-004 §38 permits a green node only when "no blocking finding remains", so the graph has to KNOW the
+	// findings. It never did: pwuGraphNode was called without them and the rule never consulted them, so an OPEN
+	// BLOCKING observation could not stop a node rendering green. The events were here all along — this function
+	// already reads the whole log for its edges.
+	const openBySubject = new Map<string, Record<string, number>>();
+	for (const event of events) {
+		if (event.eventType !== 'AssuranceObservationRecorded') continue;
+		const p = event.payload as {
+			subjectObjectIds?: string[];
+			severity?: string;
+			disposition?: string;
+		};
+		if (p.disposition !== 'OPEN' || !p.severity) continue;
+		for (const subjectId of p.subjectObjectIds ?? []) {
+			const counts = openBySubject.get(subjectId) ?? {};
+			counts[p.severity] = (counts[p.severity] ?? 0) + 1;
+			openBySubject.set(subjectId, counts);
+		}
+	}
+
 	const nodes: GraphNode[] = scopedPwuIds.map((id) => {
 		const s = (handle.loadObject(id)?.state ?? {}) as PwuState;
 		return pwuGraphNode(
@@ -97,7 +117,8 @@ export function professionalWorkGraph(
 				assuranceState: s.assuranceState ?? 'UNASSESSED',
 				shapeIntegrityState: s.shapeIntegrityState ?? 'UNKNOWN'
 			},
-			s.workLifecycleState === 'BASELINED'
+			s.workLifecycleState === 'BASELINED',
+			openBySubject.get(id) ?? {}
 		);
 	});
 

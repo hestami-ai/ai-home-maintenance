@@ -5,15 +5,47 @@ import type { DomainEvent } from '@janumipwb/rph-contracts';
 import type { Projector } from './projector.js';
 import { applyPwuAxisEvent } from './pwu-replay.js';
 
+/** Severities that BLOCK a green node while an observation carrying them is still open. DOC-004 §9 severity
+ *  vocabulary; CRITICAL is included because a severity above BLOCKING cannot be less disqualifying than it. */
+const BLOCKING_SEVERITIES: ReadonlySet<string> = new Set(['BLOCKING', 'CRITICAL']);
+
+/** Observation dispositions that mean the finding is STILL OPEN. §18.1: "Assurance observations must remain
+ *  visible after remediation" — so REMEDIATED is visible but no longer open; only OPEN blocks. */
+const OPEN_DISPOSITIONS: ReadonlySet<string> = new Set(['OPEN']);
+
 /**
- * The load-bearing green-node rule: a node may show an UNQUALIFIED success indicator ONLY when execution
- * SUCCEEDED **and** assurance SATISFIED. A SUCCEEDED execution alone is never "green" (property P1 / INV-5).
+ * THE GREEN-NODE RULE, as DOC-004 §38 ratifies it:
+ *
+ *   "A green node may be displayed only when:
+ *      * required assurance is satisfied;
+ *      * no blocking finding remains;
+ *      * required conditions are explicit."
+ *
+ * This function used to implement the FIRST LIMB ONLY — `executionState === 'SUCCEEDED' && assuranceState ===
+ * 'SATISFIED'` — and nothing else. It never consulted findings at all, so a PWU carrying an OPEN BLOCKING
+ * observation rendered green if its assurance axis said SATISFIED. And `WorkNode.openObservationCounts`, the
+ * field whose entire purpose is this check, was ALWAYS `{}`: nothing folded AssuranceObservationRecorded. The
+ * data structure anticipated the ratified rule; the fold and the rule both ignored it.
+ *
+ * A false green is the one thing this system must never produce. Both callers (this view and graph-view) get
+ * the complete rule now.
+ *
+ * THE THIRD LIMB IS NOT IMPLEMENTED, deliberately. "Required conditions are explicit" governs the
+ * CONDITIONALLY_SATISFIED case, and green already requires SATISFIED — so it cannot currently admit a false
+ * green here. Implementing it would mean deciding what "explicit" means, which is a modelling judgement and not
+ * mine to invent. Recorded in HARMONIZATION-LOG rather than guessed at.
  */
 export function isQualifiedSuccess(
 	executionState: string | undefined,
-	assuranceState: string | undefined
+	assuranceState: string | undefined,
+	openObservationCounts: Readonly<Record<string, number>> = {}
 ): boolean {
-	return executionState === 'SUCCEEDED' && assuranceState === 'SATISFIED';
+	if (executionState !== 'SUCCEEDED' || assuranceState !== 'SATISFIED') return false;
+	// Limb 2 — "no blocking finding remains".
+	for (const severity of BLOCKING_SEVERITIES) {
+		if ((openObservationCounts[severity] ?? 0) > 0) return false;
+	}
+	return true;
 }
 
 export interface WorkNode {
@@ -36,7 +68,11 @@ export interface WorkView {
 function node(partial: Omit<WorkNode, 'qualifiedSuccess'>): WorkNode {
 	return {
 		...partial,
-		qualifiedSuccess: isQualifiedSuccess(partial.executionState, partial.assuranceState)
+		qualifiedSuccess: isQualifiedSuccess(
+			partial.executionState,
+			partial.assuranceState,
+			partial.openObservationCounts
+		)
 	};
 }
 
@@ -81,9 +117,35 @@ export const workProjector: Projector<WorkView> = {
 			// BASELINED/SUCCEEDED/SATISFIED — a read model that surfaces render, wrong for every PWU that had
 			// ever done anything. Its RPH-PER-007 test was green throughout, because it compared the fold to
 			// ITSELF: a broken fold equals a broken fold.
+			// THE FINDINGS. DOC-004 §38 permits a green node only when "no blocking finding remains", and
+			// WorkNode.openObservationCounts exists for exactly that check — and was ALWAYS `{}`, because nothing
+			// folded this event. The field anticipated the ratified rule; the fold never arrived. An observation
+			// is counted against every subject it names, by severity, while its disposition is OPEN (§18.1:
+			// observations "must remain visible after remediation", so REMEDIATED stays in the log but stops
+			// blocking).
+			case 'AssuranceObservationRecorded': {
+				const p = event.payload as {
+					subjectObjectIds?: string[];
+					severity?: string;
+					disposition?: string;
+				};
+				if (!OPEN_DISPOSITIONS.has(p.disposition ?? '')) break;
+				const severity = p.severity;
+				if (!severity) break;
+				for (const subjectId of p.subjectObjectIds ?? []) {
+					const subject = nodes[subjectId];
+					if (!subject) continue;
+					const counts = {
+						...subject.openObservationCounts,
+						[severity]: (subject.openObservationCounts[severity] ?? 0) + 1
+					};
+					nodes[subjectId] = node({ ...subject, openObservationCounts: counts });
+				}
+				break;
+			}
 			default: {
 				const existing = nodes[event.aggregateId];
-				if (!existing || existing.objectType !== 'PROFESSIONAL_WORK_UNIT') break;
+				if (existing?.objectType !== 'PROFESSIONAL_WORK_UNIT') break;
 				const next = applyPwuAxisEvent(
 					{
 						workLifecycleState: existing.workLifecycleState ?? '',
