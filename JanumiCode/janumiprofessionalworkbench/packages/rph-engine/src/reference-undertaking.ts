@@ -32,11 +32,28 @@
 // disposition with no assessment behind it and a BASELINED with no promoted baseline behind it. So this script no
 // longer tells the truth merely by choosing to — it could not lie in these two ways if it tried.
 //
+// WHAT INCREMENT 28 CHANGED. The last assigned axis. Execution was notional: ONE hand-written plan for thirteen
+// PWUs, never started, never completed, and `executionState: SUCCEEDED` simply written on all of them. Now every
+// PWU has a plan it actually runs — propose, approve, activate, start the step, produce a real output, complete
+// it — and the step's output IS the evidence the assessment later admits (`proposedEvidenceIds` is the join).
+// Before, `earnAssurance` conjured evidence no work had made.
+//
+// THE FLOOR GATE BLOCKED THIS INCREMENT, WHICH IS THE POINT. The steps are MODEL_INVOCATION — an AI produced
+// these outputs — and completeExecutionStep derives `aiProduced` FROM THE STEP and refused: "floor.schema-
+// invariant=MISSING, floor.identity-provenance=MISSING, floor.reasoning-review=MISSING". §8.4 L841 makes
+// Reasoning Review mandatory for AI-produced work; L854 says a missing review "cannot satisfy assurance or
+// permit its protected transition". The workbench's sharpest guard had been live and never once exercised —
+// because its own demo never completed a step. It caught the author of this comment claiming AI authorship with
+// no review attached. The floor is now recorded over every AI-produced result, which is the demonstration this
+// product exists to make.
+//
+// ALL THREE AXES ARE NOW GUARDED (pwu.ts): a disposition needs an assessment, a baselining needs a promoted
+// baseline, an execution success needs a succeeded step. This script no longer tells the truth by choosing to.
+//
 // WHAT IS STILL NOT DEMONSTRATED, precisely:
-//  * Execution is still notional: no ExecutionStepStarted/Succeeded, so `executionState: SUCCEEDED` is still an
-//    assignment. It is the same defect as the assurance axis had, on the axis nobody has done yet, and it has no
-//    guard.
 //  * `shapeReadinessAssessmentId: 'assess_shape'` still resolves to UNDEFINED — it names an object never created.
+//    (markPwuReady does not check it; completeExecutionStep DOES check its own result ids, and rejects unrecorded
+//    outputs — so the two boundaries disagree about whether a cited id must exist.)
 //  * openResiduals is still NOT PROJECTED: professional-work-graph.ts returns `opts.openResiduals ?? []` from
 //    the const below, derived from no event. An auditor injecting an arbitrary string gets it rendered verbatim.
 //    The residual IS now a recorded MATERIAL observation AND an Assumption object — the view just does not read
@@ -344,33 +361,11 @@ export function driveReferenceUndertaking(
 		R.mobileOffline
 	]);
 
-	// One Execution Plan for the Architecture PWU. An Execution Plan is a DISTINCT object that PERFORMS a PWU
-	// Instance through temporal steps — it is NOT the Professional Work Graph (§35.3 / criterion 16).
-	const archPlan = 'plan_01ARZ3NDEKTSV4RRFFQ69G5C00';
-	send('ProposeExecutionPlan', 'EXECUTION_PLAN', archPlan, {
-		executionPlanId: archPlan,
-		workUnitId: R.architecture,
-		steps: [
-			{
-				id: 'step_01ARZ3NDEKTSV4RRFFQ69G5C10',
-				executionPlanId: archPlan,
-				stepType: 'MODEL_INVOCATION',
-				purpose: 'Generate the architecture description',
-				inputBindings: [],
-				outputBindings: [],
-				preconditions: [],
-				postconditions: [],
-				stepState: 'QUEUED'
-			}
-		],
-		transitions: [],
-		retryPolicy: {},
-		tacticalChangePolicy: {},
-		escalationPolicy: {},
-		terminationPolicy: {}
-	});
-	send('ApproveExecutionPlan', 'EXECUTION_PLAN', archPlan, {});
-	send('ActivateExecutionPlan', 'EXECUTION_PLAN', archPlan, { authorizedRuntimeBindingIds: [] });
+	// An Execution Plan is a DISTINCT object that PERFORMS a PWU Instance through temporal steps — it is NOT the
+	// Professional Work Graph (§35.3 / criterion 16). There used to be exactly ONE, hand-written here for the
+	// Architecture PWU, and even it was never executed: no step was started or completed, and all thirteen PWUs
+	// were then simply assigned `executionState: SUCCEEDED`. Every PWU now gets a plan it actually runs, minted
+	// inside `shapeAndExecute` (Increment 28), so this standalone block is gone rather than duplicated.
 
 	// --- Advance each PWU's four axes via the controller lever (ChangePwuState) ---
 	const chg = (
@@ -397,16 +392,165 @@ export function driveReferenceUndertaking(
 			supportingObjectIds
 		});
 
-	const shapeToExecutedSuccess = (pwuId: string): void => {
+	// --- THE EXECUTION LOOP (Increment 28) ---
+	//
+	// The last axis that was assigned rather than earned. This used to be four bare `chg` hops ending in
+	// `executionState: SUCCEEDED` — no plan, no step, no attempt, no output. Fourth confirmation of the same
+	// pattern: StartExecutionStep / CompleteExecutionStep were registered all along, and completeExecutionStep is
+	// thoroughly built — it validates the ratified §16.1 payload, emits the §16.2 event, REQUIRES real output
+	// (`hasOutput`), and carries a de minimis floor gate. Built, guarded, uncalled.
+	//
+	// The order follows the ratified §26 trace: the CLAIM is asserted while shaping (step 19), before the PWU is
+	// marked ready (20) — a claim is what the work is trying to make true, not a description of it afterwards —
+	// then plan/approve/activate (21-23), the step runs (24-25), and its output becomes the evidence (26) the
+	// assurance loop then admits (27).
+	//
+	// THIS IS WHERE THE CHAIN CLOSES. `CompleteExecutionStepPayload.proposedEvidenceIds` is the join: the step's
+	// output IS the evidence the assessment later considers. Before this, `earnAssurance` conjured evidence from
+	// nowhere — an artifact of no work. Now the work produces it.
+	/** The three locked de minimis floor policies every AI-produced result must clear (rph-assurance floor.*).
+	 *  Their ids are the ones the execution floor gate looks for by name. */
+	const FLOOR_POLICIES = [
+		'floor.schema-invariant',
+		'floor.identity-provenance',
+		'floor.reasoning-review'
+	] as const;
+
+	/** Record the de minimis floor over an AI-produced RESULT, SATISFIED, at the version it was judged at.
+	 *  The subject is the RESULT, never the step: DOC-004 invariant 2 requires every assessment to identify its
+	 *  subject semantic version, and an ExecutionStep has none. */
+	const satisfyFloor = (subjectId: string): void => {
+		for (const floorPolicyId of FLOOR_POLICIES) {
+			const assessmentId = mintId('asm');
+			send('RequestAssuranceAssessment', 'ASSURANCE_ASSESSMENT', assessmentId, {
+				assessmentId,
+				assurancePolicyId: floorPolicyId,
+				policyVersion: '1.0.0',
+				subjectObjectIds: [subjectId],
+				subjectSemanticVersions: { [subjectId]: 1 },
+				claimIds: []
+			});
+			send('CompleteAssuranceAssessment', 'ASSURANCE_ASSESSMENT', assessmentId, {
+				validatorResult: {
+					validatorId: `deterministic.${floorPolicyId.replace(/^floor\./, '')}`,
+					validatorVersion: '1',
+					policyId: floorPolicyId,
+					policyVersion: '1.0.0',
+					assessmentId,
+					subjectObjectIds: [subjectId],
+					subjectSemanticVersions: { [subjectId]: 1 },
+					claimResults: [],
+					evidenceConsideredIds: [subjectId],
+					evidenceRejected: [],
+					observations: [],
+					dispositionRecommendation: 'SATISFIED',
+					recommendedControlActions: [],
+					residualUncertainty: [],
+					limitations: [],
+					executionProvenance: { evaluator: ACTOR }
+				}
+			});
+		}
+	};
+
+	/** Shape a PWU, assert its claim, and EXECUTE it for real. Returns the claim and the evidence the work made. */
+	const shapeAndExecute = (pwuId: string): { claimId: string; evidenceId: string } => {
+		const label = LABELS[pwuId]?.title ?? pwuId;
+		const claimId = mintId('clm');
+		const planId = mintId('exp');
+		const stepId = mintId('stp');
+		const attemptId = mintId('ata');
+		const evidenceId = mintId('evd');
+
 		send('BeginPwuShaping', 'PROFESSIONAL_WORK_UNIT', pwuId, {});
+		// §26 step 19: the claim is asserted during shaping — the thing this work must make true.
+		send('AssertClaim', 'CLAIM', claimId, {
+			statement: `${label} is fit for the approved need it was decomposed to serve`,
+			claimType: 'FITNESS',
+			subjectObjectIds: [pwuId]
+		});
 		send('MarkPwuReady', 'PROFESSIONAL_WORK_UNIT', pwuId, {
 			shapeReadinessAssessmentId: 'assess_shape',
 			expectedSemanticVersion: 1
 		});
-		chg(pwuId, 'READY', 'PLANNED', 'PLANNED', 'UNASSESSED', 'PRESERVED');
-		chg(pwuId, 'PLANNED', 'EXECUTING', 'QUEUED', 'UNASSESSED', 'PRESERVED');
-		chg(pwuId, 'EXECUTING', 'EXECUTING', 'RUNNING', 'UNASSESSED', 'PRESERVED');
-		chg(pwuId, 'EXECUTING', 'EXECUTING', 'SUCCEEDED', 'UNASSESSED', 'PRESERVED');
+
+		send('ProposeExecutionPlan', 'EXECUTION_PLAN', planId, {
+			executionPlanId: planId,
+			workUnitId: pwuId,
+			steps: [
+				{
+					id: stepId,
+					executionPlanId: planId,
+					stepType: 'MODEL_INVOCATION',
+					purpose: `Produce ${label}'s expected output`,
+					inputBindings: [],
+					outputBindings: [],
+					preconditions: [],
+					postconditions: [],
+					stepState: 'QUEUED'
+				}
+			],
+			transitions: [],
+			retryPolicy: {},
+			tacticalChangePolicy: {},
+			escalationPolicy: {},
+			terminationPolicy: {}
+		});
+		send('ApproveExecutionPlan', 'EXECUTION_PLAN', planId, {});
+		send('ActivateExecutionPlan', 'EXECUTION_PLAN', planId, { authorizedRuntimeBindingIds: [] });
+		chg(pwuId, 'READY', 'PLANNED', 'PLANNED', 'UNASSESSED', 'PRESERVED', [planId]);
+		chg(pwuId, 'PLANNED', 'EXECUTING', 'QUEUED', 'UNASSESSED', 'PRESERVED', [planId]);
+
+		send('StartExecutionStep', 'EXECUTION_PLAN', planId, { stepId });
+		chg(pwuId, 'EXECUTING', 'EXECUTING', 'RUNNING', 'UNASSESSED', 'PRESERVED', [planId]);
+
+		// The output of the work, recorded as evidence for the claim the work was meant to make true. This is
+		// the honest source of the evidence the assessment will consider — it exists because a step produced it.
+		send('ProposeEvidence', 'EVIDENCE', evidenceId, {
+			evidenceId,
+			evidenceType: 'ARTIFACT',
+			contentReference: {
+				kind: 'INLINE',
+				note: `${label} — recorded output of execution step ${stepId}`
+			},
+			producedBy: ACTOR,
+			supportsClaimIds: [claimId],
+			contradictsClaimIds: [],
+			scope: label,
+			limitations: [],
+			capturedAt: '2026-07-12T00:00:00Z'
+		});
+		// THE DE MINIMIS FLOOR — and this is the most important thing in the file.
+		//
+		// The step above is a MODEL_INVOCATION: an AI produced this output. §8.4 L841 makes Reasoning Review
+		// mandatory "when the transformation is produced by or materially shaped by an AI/agent", and L854: "A
+		// missing, stale, malformed, failed, unavailable, or independence-invalid required review cannot satisfy
+		// assurance or permit its protected transition." completeExecutionStep enforces exactly that, deriving
+		// aiProduced from the step rather than taking anyone's word.
+		//
+		// It BLOCKED this increment on first run — "floor.schema-invariant=MISSING, floor.identity-provenance=
+		// MISSING, floor.reasoning-review=MISSING" — which is the gate working, against me, correctly: I had
+		// claimed AI authorship and supplied no review. The seed never met this gate in its whole existence
+		// because it never completed a step; it just assigned SUCCEEDED. So the workbench's sharpest guard has
+		// been live and unexercised, and its own demo was the thing routing around it.
+		//
+		// This is the demonstration the product exists to make: an AI made this, and here is the floor that lets
+		// it count.
+		satisfyFloor(evidenceId);
+
+		send('CompleteExecutionStep', 'EXECUTION_PLAN', planId, {
+			executionStepId: stepId,
+			executionAttemptId: attemptId,
+			resultStatus: 'SUCCEEDED',
+			outputArtifactIds: [],
+			proposedEvidenceIds: [evidenceId],
+			detectedAssumptionIds: [],
+			structuredResult: {},
+			executionProvenance: { evaluator: ACTOR }
+		});
+		// Earned, and cited: the plan whose step actually succeeded.
+		chg(pwuId, 'EXECUTING', 'EXECUTING', 'SUCCEEDED', 'UNASSESSED', 'PRESERVED', [planId]);
+		return { claimId, evidenceId };
 	};
 
 	// --- THE ASSURANCE LOOP (Increment 25) ---
@@ -444,40 +588,23 @@ export function driveReferenceUndertaking(
 		readonly statement: string;
 	}
 
-	/** Establish RPH-PWU-006's GIVEN for `pwuId` and return the assessment id that evidences it. */
+	/** Establish RPH-PWU-006's GIVEN for `pwuId` and return the assessment id that evidences it.
+	 *
+	 *  Takes the claim and evidence the EXECUTION produced (Increment 28). It used to mint both itself — asserting
+	 *  a claim and conjuring "evidence" that no work had made, an artifact of nothing. Assurance does not
+	 *  manufacture its own evidence; it admits and assesses what execution actually produced. */
 	const earnAssurance = (
 		pwuId: string,
+		produced: { readonly claimId: string; readonly evidenceId: string },
 		disposition: 'SATISFIED' | 'CONDITIONALLY_SATISFIED',
 		observations: readonly EarnedObservation[] = []
 	): string => {
 		const label = LABELS[pwuId]?.title ?? pwuId;
-		const claimId = mintId('clm');
-		const evidenceId = mintId('evd');
+		const { claimId, evidenceId } = produced;
 		const assessmentId = mintId('asm');
 
-		// 1. The CLAIM. Assurance assesses a claim about the work; without one there is nothing to be right about.
-		send('AssertClaim', 'CLAIM', claimId, {
-			statement: `${label} is fit for the approved need it was decomposed to serve`,
-			claimType: 'FITNESS',
-			subjectObjectIds: [pwuId]
-		});
-
-		// 2. The EVIDENCE, proposed then ADMITTED. Admission is the ratified trigger for the assurance axis
-		//    leaving EVIDENCE_REQUIRED, so the hop below is now caused rather than asserted.
-		send('ProposeEvidence', 'EVIDENCE', evidenceId, {
-			evidenceId,
-			evidenceType: 'ARTIFACT',
-			contentReference: {
-				kind: 'INLINE',
-				note: `${label} — recorded output of the execution step`
-			},
-			producedBy: ACTOR,
-			supportsClaimIds: [claimId],
-			contradictsClaimIds: [],
-			scope: label,
-			limitations: [],
-			capturedAt: '2026-07-12T00:00:00Z'
-		});
+		// The evidence execution proposed is now ADMITTED. Admission is the ratified trigger for the assurance
+		// axis leaving EVIDENCE_REQUIRED, so the hop below is caused rather than asserted.
 		send('AdmitEvidence', 'EVIDENCE', evidenceId, {
 			admissibilityAssessmentId: assessmentId,
 			admittedScope: label,
@@ -609,8 +736,8 @@ export function driveReferenceUndertaking(
 	/** Returns the satisfied assessment's id, so a caller that goes on to baseline this PWU can cite the very
 	 *  assessment that permitted its satisfaction (PromoteBaseline's `requiredAssessmentIds`). */
 	const driveToSatisfied = (pwuId: string): string => {
-		shapeToExecutedSuccess(pwuId);
-		const assessmentId = earnAssurance(pwuId, 'SATISFIED');
+		const produced = shapeAndExecute(pwuId);
+		const assessmentId = earnAssurance(pwuId, produced, 'SATISFIED');
 		// The Given now holds and is CITED: this hop names the satisfied assessment that permits it.
 		chg(pwuId, 'UNDER_ASSURANCE', 'SATISFIED', 'SUCCEEDED', 'SATISFIED', 'PRESERVED', [
 			assessmentId
@@ -619,8 +746,8 @@ export function driveReferenceUndertaking(
 	};
 
 	const driveToConditional = (pwuId: string): void => {
-		shapeToExecutedSuccess(pwuId);
-		const assessmentId = earnAssurance(pwuId, 'CONDITIONALLY_SATISFIED', [
+		const produced = shapeAndExecute(pwuId);
+		const assessmentId = earnAssurance(pwuId, produced, 'CONDITIONALLY_SATISFIED', [
 			{ severity: 'MATERIAL', statement: REFERENCE_OPEN_RESIDUALS[0] }
 		]);
 		chg(

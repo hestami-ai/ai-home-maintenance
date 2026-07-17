@@ -85,7 +85,7 @@ describe('the §26 oracle pointed at the live engine', () => {
 		expect(driveLive()).toContain('IntentCaptured');
 	});
 
-	it('DEFICIENCY: the engine emits none of these 16 §26 event types (28 -> 23 -> 16 as the loops were wired)', () => {
+	it('DEFICIENCY: the engine emits none of these 14 §26 event types (28 -> 23 -> 16 -> 14 as the loops were wired)', () => {
 		const actual = new Set(driveLive());
 		const expected = [...new Set(loadExpectedEvents().map((e) => e.event))];
 		const missing = expected.filter((n) => !actual.has(n)).sort();
@@ -108,8 +108,6 @@ describe('the §26 oracle pointed at the live engine', () => {
 			'AssuranceAssessmentSatisfied',
 			'ClarificationRequested',
 			'ExecutionPlanRevised',
-			'ExecutionStepStarted',
-			'ExecutionStepSucceeded',
 			'IntentConstraintRefined',
 			'PwuBaselined',
 			'PwuChallenged',
@@ -169,10 +167,12 @@ describe('the §26 oracle pointed at the live engine', () => {
 		expect(generic).toBe(67);
 	});
 
-	it("CHARACTERIZATION: the engine emits 166 events to the trace's 72, and is still not a superset", () => {
+	it("CHARACTERIZATION: the engine emits 251 events to the trace's 72, and is still not a superset", () => {
 		const actual = driveLive();
-		// 110 -> 153: +43 real assurance events. The count was never the point — at 110 it was inflated by the
-		// generic setter while 28 named types were missing. Volume is not coverage; the pins above are.
-		expect(actual).toHaveLength(166);
+		// 110 -> 153 -> 166 -> 251. The count was never the point — at 110 it was inflated by the generic setter
+		// while 28 named types were missing. Volume is not coverage; the pins above are. The jump to 251 is mostly
+		// the de minimis FLOOR: three assessments over every AI-produced result, which is what the workbench is
+		// for. An assurance system's event log SHOULD be dominated by assurance.
+		expect(actual).toHaveLength(251);
 	});
 });

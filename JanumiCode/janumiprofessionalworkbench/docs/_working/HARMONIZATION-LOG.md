@@ -2306,6 +2306,65 @@ guard**. That is the next one, and it completes the pattern: nothing green that 
 
 ---
 
+## PART 3m — Increment 28: the floor gate blocked me, which is the point
+
+The last assigned axis. Execution was notional: **one** hand-written Execution Plan for thirteen PWUs, never
+started, never completed, and `executionState: SUCCEEDED` simply written onto all of them. Fourth confirmation of
+"registered, not called" — and `completeExecutionStep` was the most thoroughly built of the lot: ratified §16.1
+payload validation, proper §16.2 event, a real-output precheck, and a de minimis floor gate.
+
+### The finding that matters
+
+**The floor gate blocked this increment on first run.** The steps are `MODEL_INVOCATION` — an AI produced these
+outputs — and `completeExecutionStep` derives `aiProduced` **from the step**, not from anyone's assertion:
+
+> `CompleteExecutionStep blocked: the de minimis assurance floor is not SATISFIED for result evd_… at v1 …
+> (floor.schema-invariant=MISSING, floor.identity-provenance=MISSING, floor.reasoning-review=MISSING)`
+
+§8.4 L841 makes Reasoning Review mandatory "when the transformation is produced by or materially shaped by an
+AI/agent"; L854: a missing review "cannot satisfy assurance or permit its protected transition." **The
+workbench's sharpest guard has been live and never once exercised** — because its own demo never completed a
+step. It caught me claiming AI authorship with no review attached. The floor is now recorded over every
+AI-produced result: **three assessments per output**, which is most of the jump from 166 to 251 events. An
+assurance system's log *should* be dominated by assurance.
+
+**A second guard caught an invented id**: "step names result(s) that are not recorded objects … an unrecorded
+output cannot be assured." The dangling-reference defect I have been cataloguing elsewhere **is already enforced
+at this boundary** — and it caught my fabricated artifact id immediately. (Which sharpens an open item:
+`markPwuReady` does *not* check `shapeReadinessAssessmentId`, so the two boundaries disagree about whether a
+cited id must exist.)
+
+**The chain now closes.** `CompleteExecutionStepPayload.proposedEvidenceIds` is the join: the step's output IS
+the evidence the assessment admits. Before, `earnAssurance` conjured evidence no work had made — an artifact of
+nothing.
+
+### The mutation that saved the increment
+
+`rejectUnbackedExecutionSuccess` landed, all tests green — **and the mutation was NOT caught.** Deleting the
+guard left all ten tests passing, because the two tests it had caught now cite a real plan and would pass either
+way. **I had no test that isolated the third guard, and without the mutation I would have shipped it believing it
+was proven.** Added the isolating pair (asserted, and borrowed-from-another-PWU); disable the guard now and
+exactly those two fail.
+
+**The guard caught my own tests for the third increment running** — P1 and BASELINED both walked to
+`executionState: SUCCEEDED` with no plan behind them.
+
+### All three axes are now guarded
+
+A disposition needs an assessment. A baselining needs a promoted baseline. An execution success needs a succeeded
+step. Only `SUCCEEDED` is guarded on the execution axis — `FAILED` in particular must never need permission to
+record; **a system that makes failure harder to report than success is worse than one that checks neither.**
+
+**Pins: 16 → 14 missing; 166 → 251 events.** Fourth consecutive increment where they moved by shrinking.
+
+### Gate
+
+build · `check-types` 21/21 · `test` 21/21 · `lint` · `boundary` · `format:check` clean · Playwright 22 (1 known
+flake, retried green) — including the demo's own `pwu-lifecycle` E2E, "a PWU only becomes SATISFIED after its
+assurance is SATISFIED", which now passes against a seed that means it.
+
+---
+
 ## PART 4 — Open questions genuinely for the sponsor
 
 *(kept deliberately short — under the 2026-07-15 mandate, a tension is work, not a question, unless it

@@ -426,6 +426,53 @@ function rejectUnbackedBaselining(
 }
 
 /**
+ * EXECUTION SUCCESS MAY NOT BE ASSERTED — the third and last axis that was assigned rather than earned.
+ *
+ * `executionState: SUCCEEDED` is the premise of everything downstream: RPH-PWU-006's Given opens with "execution
+ * succeeded", and §8.1 gates EXECUTING -> EVIDENCE_PENDING on "Execution state is SUCCEEDED". Until this guard,
+ * that premise was a string the controller could type. The demo seed drove all thirteen PWUs to SUCCEEDED with
+ * one hand-written Execution Plan between them, and never started or completed a single step.
+ *
+ * So: claiming SUCCEEDED requires citing an EXECUTION_PLAN that is FOR this PWU (`workUnitId`) and that has a
+ * step which actually reached SUCCEEDED. That step's own completion is separately and independently guarded —
+ * completeExecutionStep requires real output AND, for AI-produced results, a satisfied de minimis floor. Citing
+ * the plan is what connects the PWU's claim to that already-defended fact.
+ *
+ * Only SUCCEEDED is guarded. The other executionState values (PLANNED/QUEUED/RUNNING/WAITING/FAILED) are
+ * scheduling facts the controller legitimately owns, and FAILED in particular must never need permission to
+ * record — a system that makes failure harder to report than success is worse than one that checks neither.
+ */
+function rejectUnbackedExecutionSuccess(
+	ctx: HandlerContext,
+	command: DomainCommand,
+	id: string,
+	p: ChangePwuStatePayload,
+	currentExecutionState: string
+): CommandResult | undefined {
+	if (p.executionState !== 'SUCCEEDED' || currentExecutionState === 'SUCCEEDED') return undefined;
+	const cited = p.supportingObjectIds ?? [];
+	const backed = cited.some((oid) => {
+		const obj = ctx.store.loadObject(oid);
+		if (obj?.objectType !== 'EXECUTION_PLAN') return false;
+		const s = obj.state as {
+			workUnitId?: string;
+			steps?: { stepState?: string }[];
+		};
+		return s.workUnitId === id && (s.steps ?? []).some((step) => step.stepState === 'SUCCEEDED');
+	});
+	if (backed) return undefined;
+	return reject(
+		command,
+		'RPH_EVIDENCE_MISSING',
+		`ChangePwuState would set PWU ${id} executionState=SUCCEEDED with no succeeded execution step to back ` +
+			`it. "Execution succeeded" is the premise the whole assurance chain rests on (RPH-PWU-006's Given; ` +
+			`§8.1's EXECUTING -> EVIDENCE_PENDING condition), not a status the controller may declare. Cite an ` +
+			`EXECUTION_PLAN in supportingObjectIds whose workUnitId is ${id} and which has a SUCCEEDED step. ` +
+			`Supplied: [${cited.join(', ') || 'nothing'}].`
+	);
+}
+
+/**
  * ChangePwuState — the controller's authoritative multi-axis setter. It moves the workLifecycle axis to
  * `newState` (validated by canAdvanceWorkLifecycle against the NEW sub-axis values, so the cross-axis guards
  * still hold — e.g. only reaching SATISFIED when assuranceState=SATISFIED) AND moves each sub-axis, each of which
@@ -461,10 +508,15 @@ export const changePwuState: CommandHandler = (ctx, command, payload) => {
 		const illegal = checkTransition(command, machine, from, to);
 		if (illegal) return illegal;
 	}
-	const unbacked = rejectUnbackedDisposition(ctx, command, id, p, current.assuranceState);
-	if (unbacked) return unbacked;
-	const unpromoted = rejectUnbackedBaselining(ctx, command, id, p, current.workLifecycleState);
-	if (unpromoted) return unpromoted;
+	// THE THREE "MAY NOT BE ASSERTED" GUARDS. checkTransition above answers only "is this an arrow on the
+	// machine". These answer "is the fact true": a disposition needs an assessment, a baselining needs a promoted
+	// baseline, an execution success needs a succeeded step. Together they are the difference between a demo that
+	// tells the truth because it chooses to and one that could not lie if it tried.
+	const unearned =
+		rejectUnbackedDisposition(ctx, command, id, p, current.assuranceState) ??
+		rejectUnbackedBaselining(ctx, command, id, p, current.workLifecycleState) ??
+		rejectUnbackedExecutionSuccess(ctx, command, id, p, current.executionState);
+	if (unearned) return unearned;
 	// The workLifecycle axis either advances (legal transition + cross-axis guard against the NEW sub-axes) or
 	// holds (a no-op move that only advances the orthogonal sub-axes) — and a hold must still not park the PWU in
 	// a SATISFIED-without-assurance state (property P1 / INV-5).

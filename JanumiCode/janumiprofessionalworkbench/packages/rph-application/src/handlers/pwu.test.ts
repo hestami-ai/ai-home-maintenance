@@ -150,6 +150,98 @@ describe('PWU lifecycle handlers (live command drive)', () => {
 		return assessmentId;
 	}
 
+	/** Run a real execution plan for `subject` and complete its step; returns the plan id, ready to cite. Since
+	 *  Increment 28 `executionState: SUCCEEDED` may not be asserted, so any test that needs executed work has to
+	 *  actually execute it.
+	 *
+	 *  The step is HUMAN_INTERACTION, and that is a substantive choice rather than a convenience: the de minimis
+	 *  floor gate in completeExecutionStep derives `aiProduced` FROM THE STEP, and a MODEL_INVOCATION would
+	 *  (correctly) require a satisfied Reasoning Review over its output before it could succeed. This fixture's
+	 *  actor is a human, so claiming a model invocation here would be a lie told to dodge a real guard. The
+	 *  AI-produced path with its floor is exercised for real in rph-engine's reference undertaking. */
+	function succeededPlanFor(subject: string, planId: string): string {
+		const stepId = 'stp_01ARZ3NDEKTSV4RRFFQ69G5V00';
+		const plan = (t: string, payload: unknown): DomainCommand =>
+			cmd(t, payload, { targetAggregateId: planId, targetAggregateType: 'EXECUTION_PLAN' });
+		const ok = (r: { status: string; error?: { message?: string } }, what: string): void => {
+			expect(r.status, `${what}: ${r.error?.message}`).toBe('ACCEPTED');
+		};
+		ok(
+			engine.dispatch(
+				plan('ProposeExecutionPlan', {
+					executionPlanId: planId,
+					workUnitId: subject,
+					steps: [
+						{
+							id: stepId,
+							executionPlanId: planId,
+							stepType: 'HUMAN_INTERACTION',
+							purpose: 'Produce the expected output',
+							inputBindings: [],
+							outputBindings: [],
+							preconditions: [],
+							postconditions: [],
+							stepState: 'QUEUED'
+						}
+					],
+					transitions: [],
+					retryPolicy: {},
+					tacticalChangePolicy: {},
+					escalationPolicy: {},
+					terminationPolicy: {}
+				})
+			),
+			'ProposeExecutionPlan'
+		);
+		ok(engine.dispatch(plan('ApproveExecutionPlan', {})), 'ApproveExecutionPlan');
+		ok(
+			engine.dispatch(plan('ActivateExecutionPlan', { authorizedRuntimeBindingIds: [] })),
+			'ActivateExecutionPlan'
+		);
+		ok(engine.dispatch(plan('StartExecutionStep', { stepId })), 'StartExecutionStep');
+		// The step's output must be a RECORDED object, not an id: completeExecutionStep rejects a step that
+		// "names result(s) that are not recorded objects ... an unrecorded output cannot be assured". An invented
+		// artifact id was the first thing tried here, and the guard caught it — the same dangling-reference
+		// defect this effort has been cataloguing elsewhere is already enforced at this boundary.
+		const evidenceId = 'evd_01ARZ3NDEKTSV4RRFFQ69G5V20';
+		ok(
+			engine.dispatch(
+				cmd(
+					'ProposeEvidence',
+					{
+						evidenceId,
+						evidenceType: 'ARTIFACT',
+						contentReference: { kind: 'INLINE', note: 'the produced output' },
+						producedBy: actor,
+						supportsClaimIds: [],
+						contradictsClaimIds: [],
+						scope: 'test',
+						limitations: [],
+						capturedAt: TS
+					},
+					{ targetAggregateId: evidenceId, targetAggregateType: 'EVIDENCE' }
+				)
+			),
+			'ProposeEvidence'
+		);
+		ok(
+			engine.dispatch(
+				plan('CompleteExecutionStep', {
+					executionStepId: stepId,
+					executionAttemptId: 'ata_01ARZ3NDEKTSV4RRFFQ69G5V10',
+					resultStatus: 'SUCCEEDED',
+					outputArtifactIds: [],
+					proposedEvidenceIds: [evidenceId],
+					detectedAssumptionIds: [],
+					structuredResult: {},
+					executionProvenance: {}
+				})
+			),
+			'CompleteExecutionStep'
+		);
+		return planId;
+	}
+
 	/** Walk the assurance axis UNASSESSED -> EVIDENCE_REQUIRED -> READY_FOR_ASSESSMENT -> ASSESSING while the
 	 *  workLifecycle axis HOLDS at READY. Every hop is a legal arrow on PWU.assuranceState — which is precisely
 	 *  why legality alone never protected anything. */
@@ -256,6 +348,7 @@ describe('PWU lifecycle handlers (live command drive)', () => {
 			const r = engine.dispatch(change(over));
 			expect(r.status, `setup step failed: ${r.error?.message}`).toBe('ACCEPTED');
 		};
+		const planId = succeededPlanFor(PWU_ID, 'exp_01ARZ3NDEKTSV4RRFFQ69G5V30');
 		step({ previousState: 'READY', newState: 'PLANNED', executionState: 'PLANNED' });
 		step({ previousState: 'PLANNED', newState: 'EXECUTING', executionState: 'QUEUED' });
 		step({ previousState: 'EXECUTING', newState: 'EXECUTING', executionState: 'RUNNING' });
@@ -263,7 +356,8 @@ describe('PWU lifecycle handlers (live command drive)', () => {
 			previousState: 'EXECUTING',
 			newState: 'EVIDENCE_PENDING',
 			executionState: 'SUCCEEDED',
-			assuranceState: 'EVIDENCE_REQUIRED'
+			assuranceState: 'EVIDENCE_REQUIRED',
+			supportingObjectIds: [planId]
 		});
 		step({
 			previousState: 'EVIDENCE_PENDING',
@@ -425,6 +519,7 @@ describe('PWU lifecycle handlers (live command drive)', () => {
 			const r = engine.dispatch(change(over));
 			expect(r.status, `setup failed: ${r.error?.message}`).toBe('ACCEPTED');
 		};
+		const planId = succeededPlanFor(PWU_ID, 'exp_01ARZ3NDEKTSV4RRFFQ69G5V40');
 		step({ previousState: 'READY', newState: 'PLANNED', executionState: 'PLANNED' });
 		step({ previousState: 'PLANNED', newState: 'EXECUTING', executionState: 'QUEUED' });
 		step({ previousState: 'EXECUTING', newState: 'EXECUTING', executionState: 'RUNNING' });
@@ -432,7 +527,8 @@ describe('PWU lifecycle handlers (live command drive)', () => {
 			previousState: 'EXECUTING',
 			newState: 'EVIDENCE_PENDING',
 			executionState: 'SUCCEEDED',
-			assuranceState: 'EVIDENCE_REQUIRED'
+			assuranceState: 'EVIDENCE_REQUIRED',
+			supportingObjectIds: [planId]
 		});
 		step({
 			previousState: 'EVIDENCE_PENDING',
@@ -470,6 +566,79 @@ describe('PWU lifecycle handlers (live command drive)', () => {
 		expect(r.error?.code).toBe('RPH_EVIDENCE_MISSING');
 		expect(r.error?.message).toContain('no promoted baseline');
 		expect(lifecycle(), 'the PWU must not have moved').toBe('SATISFIED');
+	});
+
+	// The isolating case for the third guard. The two tests above now cite a real plan, so they pass with the
+	// guard deleted — mutation proved they prove nothing about it. This one asserts SUCCEEDED with nothing behind
+	// it, and RUNNING -> SUCCEEDED IS a legal arrow on PWU.executionState, so only the guard stands in the way.
+	it('execution success may not be asserted: SUCCEEDED with no succeeded step is refused', () => {
+		seedIntent();
+		engine.dispatch(cmd('ProposePwu', proposePayload()));
+		engine.dispatch(cmd('BeginPwuShaping', {}));
+		engine.dispatch(
+			cmd('MarkPwuReady', { shapeReadinessAssessmentId: 'assess_x', expectedSemanticVersion: 1 })
+		);
+		const step = (over: Record<string, unknown>): void => {
+			const r = engine.dispatch(change(over));
+			expect(r.status, `setup failed: ${r.error?.message}`).toBe('ACCEPTED');
+		};
+		// Scheduling facts the controller legitimately owns — no plan needed, and none demanded.
+		step({ previousState: 'READY', newState: 'PLANNED', executionState: 'PLANNED' });
+		step({ previousState: 'PLANNED', newState: 'EXECUTING', executionState: 'QUEUED' });
+		step({ previousState: 'EXECUTING', newState: 'EXECUTING', executionState: 'RUNNING' });
+
+		// The claim that the work SUCCEEDED — the premise RPH-PWU-006's Given opens with. No plan, no step, no
+		// output, nothing to point at.
+		const r = engine.dispatch(
+			change({
+				previousState: 'EXECUTING',
+				newState: 'EXECUTING',
+				executionState: 'SUCCEEDED'
+			})
+		);
+		expect(r.status, 'the controller may not declare work successful').toBe('REJECTED');
+		expect(r.error?.code).toBe('RPH_EVIDENCE_MISSING');
+		expect(r.error?.message).toContain('no succeeded execution step');
+		const axes = store.loadObject(PWU_ID)?.state as { executionState: string };
+		expect(axes.executionState, 'the axis must not have moved').toBe('RUNNING');
+	});
+
+	it("execution success may not be BORROWED: another PWU's succeeded plan does not back this one", () => {
+		seedIntent();
+		engine.dispatch(cmd('ProposePwu', proposePayload()));
+		engine.dispatch(cmd('BeginPwuShaping', {}));
+		engine.dispatch(
+			cmd('MarkPwuReady', { shapeReadinessAssessmentId: 'assess_x', expectedSemanticVersion: 1 })
+		);
+		// A genuinely succeeded plan — for somebody else's work unit. The other PWU has to be real:
+		// ProposeExecutionPlan already refuses to plan work that does not exist.
+		const other = 'pwu_01ARZ3NDEKTSV4RRFFQ69G5T00';
+		expect(
+			engine.dispatch(
+				cmd(
+					'ProposePwu',
+					{ ...proposePayload(), pwuId: other, title: 'Someone Else' },
+					{ targetAggregateId: other }
+				)
+			).status
+		).toBe('ACCEPTED');
+		const planId = succeededPlanFor(other, 'exp_01ARZ3NDEKTSV4RRFFQ69G5T10');
+		const step = (over: Record<string, unknown>): void => {
+			expect(engine.dispatch(change(over)).status).toBe('ACCEPTED');
+		};
+		step({ previousState: 'READY', newState: 'PLANNED', executionState: 'PLANNED' });
+		step({ previousState: 'PLANNED', newState: 'EXECUTING', executionState: 'QUEUED' });
+		step({ previousState: 'EXECUTING', newState: 'EXECUTING', executionState: 'RUNNING' });
+		const r = engine.dispatch(
+			change({
+				previousState: 'EXECUTING',
+				newState: 'EXECUTING',
+				executionState: 'SUCCEEDED',
+				supportingObjectIds: [planId]
+			})
+		);
+		expect(r.status, "another PWU's work is not this PWU's work").toBe('REJECTED');
+		expect(r.error?.code).toBe('RPH_EVIDENCE_MISSING');
 	});
 
 	it('ChangePwuState rejects a stale previousState', () => {
