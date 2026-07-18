@@ -352,6 +352,46 @@ describe('Assurance View fold — §38 claims evaluated + control actions (asses
 		const none = buildAssuranceView([started('asm_none', 'pwu_1')]);
 		expect(none.assessments['asm_none']!.missingEvidence).toEqual([]);
 	});
+
+	it('§38 "missing evidence" is required MINUS received: AssuranceEvidenceReceived drops the satisfied requirement', () => {
+		const req = (assessmentId: string, ids: string[]) =>
+			evt(1, 'AssuranceAssessmentStarted', {
+				assessmentId,
+				assurancePolicyId: 'pol_x',
+				policyVersion: '1.0.0',
+				subjectObjectIds: ['pwu_1'],
+				subjectSemanticVersions: { pwu_1: 1 },
+				claimIds: [],
+				requiredEvidenceIds: ids
+			});
+		const received = (assessmentId: string, evidenceId: string, satisfiesRequirementId: string) =>
+			evt(2, 'AssuranceEvidenceReceived', { assessmentId, evidenceId, satisfiesRequirementId });
+
+		// One of three requirements satisfied -> the other two remain, in order.
+		const one = buildAssuranceView([
+			req('asm_r', ['EV-01', 'EV-02', 'EV-03']),
+			received('asm_r', 'evd_1', 'EV-02')
+		]);
+		expect(one.assessments['asm_r']!.missingEvidence).toEqual(['EV-01', 'EV-03']);
+
+		// Idempotent (same requirement twice) AND a submission naming a requirement the policy never declared both
+		// leave the set unchanged — no negative "missing", no spurious removal.
+		const robust = buildAssuranceView([
+			req('asm_r2', ['EV-01', 'EV-02']),
+			received('asm_r2', 'e1', 'EV-02'),
+			received('asm_r2', 'e2', 'EV-02'),
+			received('asm_r2', 'e3', 'EV-NOT-REQUIRED')
+		]);
+		expect(robust.assessments['asm_r2']!.missingEvidence).toEqual(['EV-01']);
+
+		// Every requirement satisfied -> a real, sourced empty (none missing), not "unknown".
+		const all = buildAssuranceView([req('asm_r3', ['EV-01']), received('asm_r3', 'e1', 'EV-01')]);
+		expect(all.assessments['asm_r3']!.missingEvidence).toEqual([]);
+
+		// Received for an assessment that never started attaches to nothing — no crash, no phantom assessment.
+		const orphan = buildAssuranceView([received('asm_ghost', 'e', 'EV-01')]);
+		expect(orphan.assessments['asm_ghost']).toBeUndefined();
+	});
 });
 
 describe('§38 "applicable policies" — the required-but-unassessed join (object state x assessment view)', () => {

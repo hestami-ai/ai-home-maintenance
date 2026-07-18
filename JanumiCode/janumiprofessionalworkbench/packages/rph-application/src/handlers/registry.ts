@@ -50,6 +50,7 @@ import {
 	proposeEvidence,
 	recordAssuranceObservation,
 	requestAssuranceAssessment,
+	submitEvidenceForAssessment,
 	supersedeAssurancePolicy,
 	suspendAssurancePolicy
 } from './assurance.js';
@@ -135,6 +136,7 @@ export const HANDLERS: Readonly<Record<string, CommandHandler>> = {
 	SuspendAssurancePolicy: suspendAssurancePolicy,
 	ActivateAssurancePolicy: activateAssurancePolicy,
 	RequestAssuranceAssessment: requestAssuranceAssessment,
+	SubmitEvidenceForAssessment: submitEvidenceForAssessment,
 	CompleteAssuranceAssessment: completeAssuranceAssessment,
 	RecordAssuranceObservation: recordAssuranceObservation,
 	// Governance: decisions / waivers / baselines (DOC-002 §23, §24)

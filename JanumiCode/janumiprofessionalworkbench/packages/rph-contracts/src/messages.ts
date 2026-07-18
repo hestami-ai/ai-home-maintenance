@@ -191,6 +191,14 @@ export const RequestAssuranceAssessmentPayloadSchema = z.strictObject({
 export type RequestAssuranceAssessmentPayload = z.infer<
 	typeof RequestAssuranceAssessmentPayloadSchema
 >;
+export const SubmitEvidenceForAssessmentPayloadSchema = z.strictObject({
+	evidenceId: z.string(),
+	satisfiesRequirementId: z.string(),
+	evidenceType: z.string().optional()
+});
+export type SubmitEvidenceForAssessmentPayload = z.infer<
+	typeof SubmitEvidenceForAssessmentPayloadSchema
+>;
 export const CompleteAssuranceAssessmentPayloadSchema = z.strictObject({
 	validatorResult: ValidatorResultSchema,
 	producer: ActorReferenceSchema.optional()
@@ -687,6 +695,15 @@ export const AssuranceAssessmentSatisfiedPayloadSchema = z.strictObject({
 });
 export type AssuranceAssessmentSatisfiedPayload = z.infer<
 	typeof AssuranceAssessmentSatisfiedPayloadSchema
+>;
+export const AssuranceEvidenceReceivedPayloadSchema = z.strictObject({
+	assessmentId: z.string(),
+	evidenceId: z.string(),
+	satisfiesRequirementId: z.string(),
+	evidenceType: z.string().optional()
+});
+export type AssuranceEvidenceReceivedPayload = z.infer<
+	typeof AssuranceEvidenceReceivedPayloadSchema
 >;
 export const AssuranceAssessmentStartedPayloadSchema = z.strictObject({
 	assessmentId: z.string(),
@@ -1536,6 +1553,12 @@ export const COMMANDS = {
 		emitsEvent: 'AssuranceAssessmentRequested',
 		firstSlice: true
 	},
+	SubmitEvidenceForAssessment: {
+		payload: SubmitEvidenceForAssessmentPayloadSchema,
+		targetAggregateType: 'ASSURANCE_ASSESSMENT',
+		emitsEvent: 'AssuranceEvidenceReceived',
+		firstSlice: false
+	},
 	CompleteAssuranceAssessment: {
 		payload: CompleteAssuranceAssessmentPayloadSchema,
 		targetAggregateType: 'ASSURANCE_ASSESSMENT',
@@ -1924,6 +1947,10 @@ export const EVENTS = {
 	},
 	AssuranceAssessmentSatisfied: {
 		payload: AssuranceAssessmentSatisfiedPayloadSchema,
+		aggregateType: 'AssuranceAssessment'
+	},
+	AssuranceEvidenceReceived: {
+		payload: AssuranceEvidenceReceivedPayloadSchema,
 		aggregateType: 'AssuranceAssessment'
 	},
 	AssuranceAssessmentStarted: {

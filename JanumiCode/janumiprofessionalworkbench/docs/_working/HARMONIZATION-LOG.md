@@ -3766,3 +3766,41 @@ its fields would fabricate a contract from nothing, which the grant to "author W
 until a DOC-004/DOC-007 interface is ratified. The honest answer here is to author nothing.
 
 **Gate:** none needed (no code/contract change). Footprint: this log. Committed.
+
+### Increment Q — the §32 evidence sub-lifecycle: "missing evidence" is now required MINUS received (#2)
+
+Increment K sourced the §38 "missing evidence" REQUIRED side (`AssuranceAssessmentStarted.requiredEvidenceIds`,
+from the policy's §6.1 `requiredEvidence`), but left the SATISFACTION side unbuilt — so `missingEvidence`
+equalled the whole required set. This builds it, as the ratified corpus itself frames it: DOC-004 §32 ratifies
+the command NAME `submitEvidenceForAssessment` and §31 the event NAME `AssuranceEvidenceReceived`, and §31
+(L1770) says outright that these are "ratified names here but schematized nowhere ... a **schema-and-wiring
+task, NOT a ratification decision**" and that missing = required − (received). So the shapes are AUTHORED under
+the standing grant; the names and the semantics are ratified.
+
+**Wiring (single-writer on the shared vocab, GIT-POL-016 — the other agent had finished):**
+- **Vocab** `m3-commands-events.json`: `SubmitEvidenceForAssessment` command (→ `AssuranceEvidenceReceived`) +
+  the event, both labelled `UNRATIFIED-AUTHORED` citing DOC-004 §32/§31 for the NAME only (so the event gate
+  does not enforce an authored shape as if ratified). Regenerated (`gen`) + prettier-formatted (the 2537-line
+  pseudo-diff collapsed to +27 real lines in `messages.ts`); dist rebuilt.
+- **Handler** `submitEvidenceForAssessment` (assurance.ts): loads the assessment, **fails closed** if it is not
+  ASSESSING or if `satisfiesRequirementId` is not a requirement the assessment's policy declares (§6.1), then
+  emits `AssuranceEvidenceReceived` carrying the (evidence, requirement) binding. Registered in `registry.ts`.
+- **Projection** (assurance-view.ts): a `foldEvidenceReceived` that drops the satisfied requirement id from
+  `missingEvidence` — an idempotent, order-preserving filter. `missingEvidence` is now `required − received`.
+
+**The namespace subtlety Increment K flagged is handled, not hand-waved:** the required set is
+`EvidenceRequirement` ids while the submitted `evidenceId` is an Evidence OBJECT id — different namespaces — so
+the binding to the requirement is **explicit** on the command (`satisfiesRequirementId`), never inferred from an
+evidence object's proximity, and a submission naming an undeclared requirement is rejected (else "missing" could
+be reduced by evidence that satisfies nothing asked for). The received fact lives on the EVENT, not the
+assessment snapshot — symmetric with the required side (Increment K).
+
+Red-first: a projection unit test (received drops the requirement; idempotent; undeclared-requirement no-op;
+all-satisfied → real empty; orphan received attaches to nothing) + a live handler test (submit → the event
+carries the binding; undeclared requirement → REJECTED).
+
+**Gate:** `check-types` 21/21 · full `test` 21/21 (rph-projections 22, rph-application handler test 9,
+rph-contracts registry count 295→297) · lint · boundary (no violations) · **Playwright E2E 25/25** (the §38 view
+and reference seed are unchanged — no reference policy declares `requiredEvidence`, so the rendered "missing"
+stays a real 'none'). Single-writer vocab increment; footprint: `m3-commands-events.json` + `messages.ts`
+(regenerated) + assurance.ts + registry.ts + assurance-view.ts + 2 tests + validate.test.ts count. Committed.

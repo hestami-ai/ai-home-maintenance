@@ -22,6 +22,7 @@ import type {
 	ProposeEvidencePayload,
 	RecordAssuranceObservationPayload,
 	RequestAssuranceAssessmentPayload,
+	SubmitEvidenceForAssessmentPayload,
 	SupersedeAssurancePolicyPayload
 } from '@janumipwb/rph-contracts';
 import {
@@ -500,6 +501,79 @@ export const requestAssuranceAssessment: CommandHandler = (ctx, command, payload
 		state,
 		eventType: 'AssuranceAssessmentStarted',
 		eventPayload: { ...p, requiredEvidenceIds }
+	});
+};
+
+/** SubmitEvidenceForAssessment (DOC-004 §32) — the SATISFACTION side of "missing evidence". Records that an
+ *  Evidence object satisfying one of the assessment's declared EvidenceRequirements (§6.1) was received, emitting
+ *  AssuranceEvidenceReceived (§31). The §38 view folds `missingEvidence = requiredEvidenceIds` (from the Started
+ *  event, Increment K) MINUS the requirement ids received here — so it flips from "the whole required set" to a
+ *  faithful required-minus-received. Ratified NAMES, AUTHORED schema (§31 L1770: "ratified names here but
+ *  schematized nowhere ... a schema-and-wiring task, NOT a ratification decision"). The received fact lives on the
+ *  EVENT, not the assessment snapshot — symmetric with requiredEvidenceIds living on AssuranceAssessmentStarted,
+ *  and the read model is the fold's consumer. */
+export const submitEvidenceForAssessment: CommandHandler = (ctx, command, payload) => {
+	const p = payload as SubmitEvidenceForAssessmentPayload;
+	const id = command.targetAggregateId; // the assessment aggregate
+	const loaded = loadOrReject(ctx, command, id);
+	if (!loaded.ok) return loaded.result;
+	// Evidence may only be submitted while the assessment is OPEN. requestAssuranceAssessment creates it in
+	// ASSESSING and completeAssuranceAssessment moves it to a terminal disposition; recording evidence against a
+	// completed assessment would silently shrink its "missing" set after the verdict was already reached.
+	const assessmentState = loaded.state.assessmentState;
+	if (assessmentState !== 'ASSESSING') {
+		return reject(
+			command,
+			'RPH_VALIDATION_SEMANTIC_FAILED',
+			`SubmitEvidenceForAssessment: assessment ${id} is ${String(assessmentState)}, not ASSESSING — evidence may only be submitted while the assessment is open.`,
+			[id]
+		);
+	}
+	// A submission must satisfy a requirement the assessment's policy actually DECLARES (§6.1). The required set is
+	// EvidenceRequirement ids while evidenceId is an Evidence OBJECT id — different namespaces, so the binding is
+	// explicit (satisfiesRequirementId), never inferred from proximity. Fail closed when the requirement is not
+	// declared: otherwise "missing evidence" could be reduced by evidence that satisfies nothing the policy asked
+	// for. (This is exactly the namespace subtlety Increment K flagged as why this was not a trivial fold.)
+	const policyId = loaded.state.assurancePolicyId as string | undefined;
+	const policy = policyId
+		? (ctx.store.loadObject(policyId)?.state as { requiredEvidence?: Array<{ id?: string }> } | undefined)
+		: undefined;
+	const declared = new Set(
+		(policy?.requiredEvidence ?? [])
+			.map((r) => r?.id)
+			.filter((x): x is string => typeof x === 'string')
+	);
+	if (!declared.has(p.satisfiesRequirementId)) {
+		return reject(
+			command,
+			'RPH_VALIDATION_SEMANTIC_FAILED',
+			`SubmitEvidenceForAssessment: '${p.satisfiesRequirementId}' is not an evidence requirement the assessment's policy declares (DOC-004 §6.1) — evidence can only be submitted against a declared requirement.`,
+			[id, p.satisfiesRequirementId]
+		);
+	}
+	const newRevision = loaded.revision + 1;
+	// The assessment SNAPSHOT is unchanged beyond the envelope bump — the received-evidence fact lives on the EVENT.
+	const next = nextEnvelope(loaded.state, command, newRevision);
+	const event = makeEvent(ctx, command, {
+		eventType: 'AssuranceEvidenceReceived',
+		aggregateType: ASSESSMENT,
+		aggregateId: id,
+		aggregateRevision: newRevision,
+		payload: {
+			assessmentId: id,
+			evidenceId: p.evidenceId,
+			satisfiesRequirementId: p.satisfiesRequirementId,
+			...(p.evidenceType !== undefined ? { evidenceType: p.evidenceType } : {})
+		}
+	});
+	return commitState(ctx, command, {
+		objectType: ASSESSMENT,
+		aggregateId: id,
+		expectedRevision: loaded.revision,
+		newRevision,
+		newSemanticVersion: loaded.semanticVersion,
+		nextState: next,
+		event
 	});
 };
 

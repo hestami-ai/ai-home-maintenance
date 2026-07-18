@@ -59,6 +59,9 @@ describe('validate', () => {
 		// then +1 AssuranceIndependenceViolated event (Increment I2) — the ratified §30 ASSESSING→INDEPENDENCE_VIOLATION
 		// arrow made reachable when completeAssuranceAssessment's independence check fails; payload authored under §0.3
 		// (CompleteAssuranceAssessment gained a `producer` FIELD, not a new command, so no command was added).
-		expect(buildContractRegistry().ids()).toHaveLength(295);
+		// then +1 SubmitEvidenceForAssessment command +1 AssuranceEvidenceReceived event (Increment Q) — the §32
+		// evidence sub-lifecycle that makes §38 "missing evidence" a real required−received fold. Ratified NAMES
+		// (DOC-004 §32/§31); schemas authored under §0.3 (§31 L1770: "ratified names ... schematized nowhere").
+		expect(buildContractRegistry().ids()).toHaveLength(297);
 	});
 });

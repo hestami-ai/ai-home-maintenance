@@ -426,4 +426,91 @@ describe('completeAssuranceAssessment — independence enforcement (Increment I2
 			(startedEvt!.payload as { requiredEvidenceIds?: string[] }).requiredEvidenceIds
 		).toEqual(['EV-01', 'EV-02']);
 	});
+
+	it('§32 submitEvidenceForAssessment emits AssuranceEvidenceReceived with the (evidence, requirement) binding', () => {
+		// The SATISFACTION side, live. A policy declaring EV-01 + EV-02; an assessment; then a submission satisfying
+		// EV-01. The event must carry which requirement the evidence satisfies — that binding is what makes the §38
+		// "missing = required − received" fold well-defined across the two id namespaces (the projection unit test
+		// exercises the fold itself; here we prove the handler emits the datum it needs and fails closed).
+		const ev = (id: string) => ({
+			id,
+			evidenceType: 'TEST_RESULT',
+			description: 'd',
+			purpose: 'p',
+			cardinality: 'AT_LEAST_ONE',
+			admissibilityRules: [],
+			requiredForDispositions: 'ALL',
+			mayBeWaived: false
+		});
+		dispatchOk(
+			cmd('CreateAssurancePolicy', POLICY, 'ASSURANCE_POLICY', {
+				policyId: POLICY,
+				version: '1.0.0',
+				name: 'Evidence-requiring policy',
+				purpose: 'Assess fitness with required evidence',
+				rationale: 'r',
+				applicableObjectTypes: ['PROFESSIONAL_WORK_UNIT'],
+				evaluatedClaimTypes: ['FITNESS'],
+				criteria: [
+					{
+						id: 'C1',
+						name: 'Fit',
+						description: 'd',
+						criterionType: 'QUALITATIVE',
+						evaluationMethod: 'HUMAN_JUDGMENT',
+						requiredEvidenceIds: [],
+						severityIfNotMet: 'MATERIAL',
+						mayBeNotApplicable: false
+					}
+				],
+				evaluatorRole: 'REVIEWER',
+				independenceRequirement: 'NONE',
+				requiredEvidence: [ev('EV-01'), ev('EV-02')],
+				findingDefinitions: [
+					{
+						code: 'UNFIT',
+						name: 'Unfit',
+						description: 'd',
+						defaultSeverity: 'MATERIAL',
+						affectedClaimTypes: ['FITNESS'],
+						defaultControlActions: ['CONTINUE']
+					}
+				],
+				permittedControlActions: ['CONTINUE']
+			})
+		);
+		dispatchOk(cmd('ActivateAssurancePolicy', POLICY, 'ASSURANCE_POLICY', { policyId: POLICY }));
+		const A = 'asm_01ARZ3NDEKTSV4RRFFQ69G5A30';
+		requestAssessment(A);
+
+		dispatchOk(
+			cmd('SubmitEvidenceForAssessment', A, 'ASSURANCE_ASSESSMENT', {
+				evidenceId: 'evd_01ARZ3NDEKTSV4RRFFQ69G5EV1',
+				satisfiesRequirementId: 'EV-01'
+			})
+		);
+		const received = store
+			.readAllEvents()
+			.find(
+				(e) =>
+					e.eventType === 'AssuranceEvidenceReceived' &&
+					(e.payload as { assessmentId?: string }).assessmentId === A
+			);
+		expect(received).toBeDefined();
+		expect(received!.payload).toMatchObject({
+			assessmentId: A,
+			evidenceId: 'evd_01ARZ3NDEKTSV4RRFFQ69G5EV1',
+			satisfiesRequirementId: 'EV-01'
+		});
+
+		// FAIL CLOSED: a submission naming a requirement the policy does not declare is rejected — otherwise
+		// "missing evidence" could be reduced by evidence that satisfies nothing the policy asked for.
+		const bad = engine.dispatch(
+			cmd('SubmitEvidenceForAssessment', A, 'ASSURANCE_ASSESSMENT', {
+				evidenceId: 'evd_x',
+				satisfiesRequirementId: 'EV-NOT-DECLARED'
+			})
+		);
+		expect(bad.status).toBe('REJECTED');
+	});
 });

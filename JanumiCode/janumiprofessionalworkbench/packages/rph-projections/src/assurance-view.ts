@@ -38,20 +38,22 @@
 //                                       CORRECTION (Increment F): an earlier note here filed this UNSOURCED as "no
 //                                       control-action event exists" — that grepped for an event TYPE and missed the
 //                                       FIELD on the completion event. The datum was on the wire all along.
-//     missingEvidence (§38 "missing evidence") — the required-evidence-requirement ids the assessment's policy
-//                                       declares (AssuranceAssessmentStarted.requiredEvidenceIds, resolved from the
-//                                       policy's requiredEvidence, §6.1). Empty = the policy requires no evidence — a
-//                                       real sourced "none". PARTIAL, disclosed: "missing" is "required − received",
-//                                       but the per-requirement SATISFACTION side (§32 submitEvidenceForAssessment ->
-//                                       AssuranceEvidenceReceived) is not built, so `missingEvidence` currently equals
-//                                       the full required set — a policy that DOES declare requiredEvidence reads all
-//                                       of it as missing until that sub-lifecycle lands (DOC-004 §31 L1770). For all
-//                                       current data (no policy declares requiredEvidence) it is [] = sourced none.
+//     missingEvidence (§38 "missing evidence") — required MINUS received. The required side is the
+//                                       evidence-requirement ids the policy declares
+//                                       (AssuranceAssessmentStarted.requiredEvidenceIds, resolved from §6.1,
+//                                       Increment K); the received side removes each requirement satisfied by a
+//                                       submitted evidence (AssuranceEvidenceReceived.satisfiesRequirementId — the
+//                                       §32 submitEvidenceForAssessment sub-lifecycle, Increment Q). Empty = the
+//                                       policy requires no evidence OR every requirement has been satisfied. FAITHFUL
+//                                       now, not partial: it is a real difference-fold (DOC-004 §31 L1770 — the
+//                                       schema-and-wiring task, done). The one honest limit is the namespace: the
+//                                       satisfied set is keyed by EvidenceRequirement id (which the submit command
+//                                       binds explicitly), never inferred from an Evidence object's proximity.
 //
 // The distinction between "unknown" (no source) and "none" (a real empty) is load-bearing: rendering an unsourced
 // field as "none" is the false-negative that lets a node look assured when it was never checked. Every §38 field is
-// now at least sourced; `missingEvidence` alone is PARTIAL (required sourced, satisfaction-tracking deferred), and
-// its empties are real (a policy requiring no evidence has none missing).
+// sourced; `missingEvidence` is a real required-minus-received fold, and its empties are real (a policy requiring no
+// evidence, or one whose requirements are all satisfied, has none missing).
 import type { DomainEvent } from '@janumipwb/rph-contracts';
 
 export interface AssuranceObservationView {
@@ -115,9 +117,10 @@ export interface AssuranceAssessmentView {
 	/** §38 "control actions" — the control actions the validator recommended for this result
 	 *  (AssuranceAssessmentCompleted.recommendedControlActions). Empty until completion, then a real set. */
 	readonly controlActions: readonly string[];
-	/** §38 "missing evidence" — the required-evidence-requirement ids the policy declares, not yet received. Sourced
-	 *  from AssuranceAssessmentStarted.requiredEvidenceIds; equals the full required set until per-requirement
-	 *  satisfaction tracking (§32 submitEvidenceForAssessment) is built. Empty = the policy requires no evidence. */
+	/** §38 "missing evidence" — required MINUS received: the evidence-requirement ids the policy declares
+	 *  (AssuranceAssessmentStarted.requiredEvidenceIds, Increment K) with the ones satisfied by a submitted evidence
+	 *  (AssuranceEvidenceReceived.satisfiesRequirementId, §32, Increment Q) removed. Empty = the policy requires no
+	 *  evidence OR every requirement has been satisfied — a real answer either way, no longer the whole required set. */
 	readonly missingEvidence: readonly string[];
 }
 
@@ -178,6 +181,21 @@ function foldObservation(view: AssuranceView, p: Payload): AssuranceView {
 	return withAssessment(view, assessmentId, {
 		...existing,
 		observations: [...existing.observations, observation]
+	});
+}
+
+function foldEvidenceReceived(view: AssuranceView, p: Payload): AssuranceView {
+	const assessmentId = str(p.assessmentId);
+	const satisfied = str(p.satisfiesRequirementId);
+	if (!assessmentId || !satisfied) return view;
+	const existing = view.assessments[assessmentId];
+	if (!existing) return view; // received evidence for an unstarted assessment attaches to nothing
+	// §38 "missing evidence" is required MINUS received: drop the satisfied requirement id. A filter (not a Set
+	// subtraction) keeps it idempotent and order-preserving — re-submitting the same requirement leaves it unchanged,
+	// and a requirement the policy never declared (already absent from missingEvidence) is a no-op here too.
+	return withAssessment(view, assessmentId, {
+		...existing,
+		missingEvidence: existing.missingEvidence.filter((reqId) => reqId !== satisfied)
 	});
 }
 
@@ -313,6 +331,8 @@ export function applyAssuranceEvent(view: AssuranceView, event: DomainEvent): As
 			return foldStarted(view, p);
 		case 'AssuranceObservationRecorded':
 			return foldObservation(view, p);
+		case 'AssuranceEvidenceReceived':
+			return foldEvidenceReceived(view, p);
 		case 'AssuranceAssessmentCompleted':
 			return foldCompleted(view, p);
 		case 'AssuranceIndependenceViolated':

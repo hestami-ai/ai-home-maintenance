@@ -623,6 +623,32 @@
       ]
     },
     {
+      "commandType": "SubmitEvidenceForAssessment",
+      "targetAggregateType": "ASSURANCE_ASSESSMENT",
+      "emitsEvent": "AssuranceEvidenceReceived",
+      "schematized": false,
+      "sourceSection": "UNRATIFIED-AUTHORED (2026-07-18, sponsor grant): DOC-004 §32 ratifies the command NAME 'submitEvidenceForAssessment' and §31 the event NAME 'AssuranceEvidenceReceived', but DOC-007 schematizes NO interface for either — §31 (L1770) states they are 'ratified names here but schematized nowhere ... a schema-and-wiring task, NOT a ratification decision'. These fields are therefore AUTHORED, not derived; do NOT treat this sourceSection as proof the shape is ratified. Cited for the NAME only: DOC-004 §32 (command), §31 (event).",
+      "payloadFields": [
+        {
+          "field": "evidenceId",
+          "required": true,
+          "type": "string",
+          "note": "id-ref — the Evidence OBJECT submitted (distinct namespace from the requirement it satisfies)"
+        },
+        {
+          "field": "satisfiesRequirementId",
+          "required": true,
+          "type": "string",
+          "note": "id-ref — the EvidenceRequirement (DOC-004 §6.1) this evidence satisfies; must be one the assessment's policy declares"
+        },
+        {
+          "field": "evidenceType",
+          "required": false,
+          "type": "string"
+        }
+      ]
+    },
+    {
       "commandType": "CompleteAssuranceAssessment",
       "targetAggregateType": "ASSURANCE_ASSESSMENT",
       "emitsEvent": "AssuranceAssessmentCompleted",
@@ -2846,6 +2872,36 @@
           "type": "enum",
           "enumRef": "AssuranceDispositionSchema",
           "note": "ASSESSING->SATISFIED; drives PWU.assuranceState SATISFIED + workLifecycleState UNDER_ASSURANCE->SATISFIED"
+        }
+      ]
+    },
+    {
+      "eventType": "AssuranceEvidenceReceived",
+      "aggregateType": "AssuranceAssessment",
+      "sourceSection": "UNRATIFIED-AUTHORED (2026-07-18, sponsor grant): DOC-004 §31 ratifies this event NAME; DOC-007 schematizes no interface for it (§31 L1770 'ratified names here but schematized nowhere'). Fields AUTHORED to source the §38 'missing evidence' satisfaction side (missing = AssuranceAssessmentStarted.requiredEvidenceIds minus the received requirement ids). Cited for the NAME only: DOC-004 §31.",
+      "payloadFields": [
+        {
+          "field": "assessmentId",
+          "required": true,
+          "type": "string",
+          "note": "id-ref"
+        },
+        {
+          "field": "evidenceId",
+          "required": true,
+          "type": "string",
+          "note": "id-ref"
+        },
+        {
+          "field": "satisfiesRequirementId",
+          "required": true,
+          "type": "string",
+          "note": "id-ref — the EvidenceRequirement satisfied"
+        },
+        {
+          "field": "evidenceType",
+          "required": false,
+          "type": "string"
         }
       ]
     },
