@@ -3395,6 +3395,9 @@ tidy — recorded so the next session inherits the finding rather than re-derivi
   (Inc D). The broader ~29 command→event pairs with omitted fields are NOT all bugs (`PwuProposed` and
   `ExecutionStepSucceeded` are deliberate DOC-conformant subsets); separating accidental from intended is a
   per-event adjudication. Left as a bounded declaration-tightening task, not swept blindly.
+  **ADJUDICATED 2026-07-18 (Increment T): NOT a tightening task — the 27 pairs are dominated by DOC-007-ratified
+  event shapes (tightening `DecisionEffective` would VIOLATE §22.2), field renames, id-on-envelope, and
+  deliberate transformations. Nothing accidental to fix; no code change is the correct action.**
 
 **Consequence:** the clean, unblocked, high-value harmonization backlog is complete through Increment D. What
 remains is deferred to the UI phase (§38 read-model + applicable-policies, shared `rph-projections` zone), blocked
@@ -3875,3 +3878,43 @@ unchanged — a field is not a new schema) · lint · boundary · **Playwright E
 drives bind `pwa.version`, so both gates pass). Footprint: `m1-object-fields.json` (+`pwaVersion`) + `objects.ts`
 + `schemas/objects/PwuType.json` (regenerated) + `pwa-authoring.ts` (derive + validate) + `pwu.ts` (gate) +
 `pwa-authoring.test.ts`. Committed.
+
+### Increment T — the "passthrough under-declaration remainder" adjudicated: NOT a set of bugs (#6)
+
+The last backlog item: "~29 command→event pairs with omitted fields — a bounded declaration-tightening task."
+Adjudicated it properly, and the finding overturns the framing: **it is not a tightening task, because the pairs
+are not bugs.** A field-by-name diff (command payload minus event payload) reports 27 pairs, but the diff is a
+poor signal — it flags four things that are all correct-by-design:
+
+1. **DOC-007-RATIFIED event shapes** deliberately narrower than the command. `DecisionEffective` is "DOC-007
+   §22.2 (wins)" and ratifies exactly seven fields; the command's `consideredEvidenceIds`/`consideredObservationIds`
+   are NOT among them (the handler already carries them opportunistically as an extension, but the vocab stays
+   faithful to §22.2). **Adding them to the event contract would VIOLATE DOC-007**, not tidy it. Same for the
+   other ratified events in the list.
+2. **Field RENAMES.** `DenyRuntimeBinding.reason` → `RuntimeBindingDenied.denialReason`;
+   `RevokeRuntimeCapability.reason` → `RuntimeCapabilityRevoked.revocationReason`; `ValidateDecomposition.disposition`
+   → `DecompositionValidated.status`. The datum is on the event under a clearer name — the diff only sees the
+   name change.
+3. **ID-on-envelope.** `ProposeEvidence.evidenceId`, `RecordArtifact.artifactId`, `RequestAssuranceAssessment.assessmentId`,
+   `ProposeExecutionPlan.executionPlanId`, `BeginRecomposition.recompositionContractId`, `RequestRuntimeBinding.runtimeBindingId`
+   are the aggregate's own id — on the event ENVELOPE (`aggregateId`), never duplicated in the payload.
+4. **Deliberate transformations & DOC-conformant subsets** (already flagged pre-Increment-D): `IntentFormalized`
+   carries the formalized RESULT (objective/outcomes/nonGoals), not the input resolution ids; `ProposePwu`→`PwuProposed`
+   and `CompleteExecutionStep`→`ExecutionStepSucceeded` are deliberate subsets; `CompleteAssuranceAssessment`→
+   `AssuranceAssessmentCompleted` decomposes `validatorResult` into audit fields (Increment 19.3);
+   `PwuTypeDefined` is a thin marker over the rich `PWU_TYPE` snapshot (the DOC-009 hybrid).
+
+What is left after removing those four categories is a **handful of debatable design preferences** on
+UNRATIFIED-AUTHORED events (e.g. `ExecutionStepRetried` without `retryReason`, `TacticalChangeApplied` without a
+free-text `rationale`) — where the WHY is already anchored by a structured field on the event (`authorizingPolicyId`)
+and the full context lives in the plan/step snapshot. Enriching those is a taste call, not a defect, and adding
+speculative fields to the governed contract for marginal audit-completeness is exactly the "sweep blindly" the
+prior note warned against.
+
+**Resolution: adjudicated, no code change — and that is the correct action.** The item asked to separate
+accidental from intended; the separation shows there is nothing accidental to fix, and the one change the diff
+most suggested (`DecisionEffective`) would have broken DOC-007 conformance. Recorded here so "~29 unadjudicated
+pairs" is now "27 pairs, adjudicated: DOC-007-ratified / renamed / id-on-envelope / deliberately transformed."
+
+**Gate:** none needed (no code/contract change — the finding is that a change would be wrong). Footprint: this
+log. Committed.
