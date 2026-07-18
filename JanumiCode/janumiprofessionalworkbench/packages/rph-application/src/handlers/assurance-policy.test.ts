@@ -39,7 +39,7 @@ describe('Assurance Policy lifecycle handlers (live)', () => {
 	}
 	const status = (id: string) => (store.loadObject(id)?.state as { status: string }).status;
 
-	function create(id: string, name = 'Test Policy') {
+	function create(id: string, name = 'Test Policy', over: Record<string, unknown> = {}) {
 		return d(
 			'CreateAssurancePolicy',
 			{
@@ -66,6 +66,7 @@ describe('Assurance Policy lifecycle handlers (live)', () => {
 				],
 				evaluatorRole: 'reviewer',
 				independenceRequirement: 'DIFFERENT_AGENT',
+				...over,
 				// A DOC-004 §9.1 FindingDefinition. Was `{ code: 'F-01', severity: 'MATERIAL', statement: 's' }` —
 				// a shape no document defines, accepted because FindingDefinitionSchema was z.record(...) = any object.
 				findingDefinitions: [
@@ -135,5 +136,51 @@ describe('Assurance Policy lifecycle handlers (live)', () => {
 		// It stays ACTIVE and untouched.
 		expect(status(FLOOR)).toBe('ACTIVE');
 		expect((store.loadObject(FLOOR)!.state as { name?: string }).name).toBe('Reasoning Review');
+	});
+
+	it('threads requiredEvidence + optionalEvidence (DOC-004 §6.1) through create and patches them on edit', () => {
+		// Before Inc B, createAssurancePolicy hardcoded requiredEvidence/optionalEvidence to [] and the command schema
+		// had no field to carry them — a policy could declare NONE of the evidence its dispositions/criteria reference.
+		// A fully-specified EvidenceRequirement: 7 concrete fields + admissibilityRules (undefined helper, permissive []).
+		const P = 'pol_evidence_01';
+		const req = {
+			id: 'EV-01',
+			evidenceType: 'TEST_RESULT',
+			description: 'unit tests pass',
+			purpose: 'demonstrate correctness',
+			cardinality: 'AT_LEAST_ONE',
+			admissibilityRules: [],
+			requiredForDispositions: 'SATISFIED_ONLY',
+			mayBeWaived: false
+		};
+		const opt = {
+			id: 'EV-02',
+			evidenceType: 'REVIEW',
+			description: 'peer review',
+			purpose: 'catch design flaws',
+			cardinality: 'ZERO_OR_MORE',
+			admissibilityRules: [],
+			requiredForDispositions: 'ALL',
+			mayBeWaived: true
+		};
+		expect(create(P, 'Evidence Policy', { requiredEvidence: [req], optionalEvidence: [opt] }).status).toBe(
+			'ACCEPTED'
+		);
+		const created = store.loadObject(P)!.state as {
+			requiredEvidence: unknown[];
+			optionalEvidence: unknown[];
+		};
+		expect(created.requiredEvidence).toEqual([req]);
+		expect(created.optionalEvidence).toEqual([opt]);
+
+		// Edit patches requiredEvidence only; optionalEvidence is absent from the patch and must survive untouched.
+		const req2 = { ...req, id: 'EV-01b', description: 'unit + integration tests pass' };
+		expect(d('EditAssurancePolicy', { policyId: P, requiredEvidence: [req2] }, P).status).toBe('ACCEPTED');
+		const edited = store.loadObject(P)!.state as {
+			requiredEvidence: unknown[];
+			optionalEvidence: unknown[];
+		};
+		expect(edited.requiredEvidence).toEqual([req2]);
+		expect(edited.optionalEvidence).toEqual([opt]);
 	});
 });

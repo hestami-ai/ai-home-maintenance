@@ -3263,6 +3263,25 @@ Gate: `check-types` 19/19 · `test` 19/19 · lint · boundary · format (package
 another agent's active edit, so its E2E is deferred to that agent's zone — Increment A touches no UI). Footprint:
 `vocab/m1-object-fields.json`, regenerated `objects.ts`, regenerated `schemas/objects/AssurancePolicyDefinition.json`.
 
+### Increment B — the evidence a policy requires is now settable
+
+Added `requiredEvidence` and `optionalEvidence` (`EvidenceRequirement[]`, `required: false`) to **both**
+`CreateAssurancePolicy` and `EditAssurancePolicy` payloads (`m3-commands-events.json`), regenerated, and stopped
+blanking them in `assurance.ts`: create reads `p.requiredEvidence ?? []`, edit patches them like every other
+present field. Before this, `AssurancePolicyDefinition.requiredEvidence` was **required by the object schema and
+carried by no command** — the write-only-empty shape — so a policy could declare none of the evidence its own
+`DispositionRule.requiredEvidenceIds` (§10.2) and `AssessmentCriterion.requiredEvidenceIds` (§7) are id-refs into.
+
+**Red-first, proven both directions.** A live test creates a policy with a fully-specified `EvidenceRequirement`
+in each array and asserts both persist; then edits `requiredEvidence` alone and asserts `optionalEvidence`
+survives the patch untouched. With the handler reverted (arrays still hardcoded `[]`) the test fails on the
+create assertion — confirming the fields flow through the handler, not just the schema. `required: false` keeps
+every existing `CreateAssurancePolicy`/`EditAssurancePolicy` caller valid (mirrors the shipped optional
+`waiverRules`); the `waiverRules` disclosure note updated its "still unreachable" tally from six to four.
+
+Gate: `check-types` 19/19 · `test` 19/19 (124 incl. the new one) · lint · boundary · format. Footprint:
+`vocab/m3-commands-events.json`, regenerated `messages.ts`, `handlers/assurance.ts`, `handlers/assurance-policy.test.ts`.
+
 ---
 
 ## PART 4 — Open questions genuinely for the sponsor
