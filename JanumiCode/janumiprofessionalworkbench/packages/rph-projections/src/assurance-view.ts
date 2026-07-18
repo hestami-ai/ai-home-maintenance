@@ -32,18 +32,23 @@
 //                                       include the invalidated evidence; PwuInvalidated marks one whose subject it is
 //                                       (§39 invariants 15/16). The events ARE folded, so an empty list is a real
 //                                       "not invalidated", not "unknown".
+//     claimsEvaluated (§38 "claims evaluated") — AssuranceAssessmentStarted.claimIds.
+//     controlActions  (§38 "control actions")  — AssuranceAssessmentCompleted.recommendedControlActions (the validator's
+//                                       recommended actions; the 23-value ControlAction enum). Empty before completion.
+//                                       CORRECTION (Increment F): an earlier note here filed this UNSOURCED as "no
+//                                       control-action event exists" — that grepped for an event TYPE and missed the
+//                                       FIELD on the completion event. The datum was on the wire all along.
 //
 //   NOT POPULATED, and WHY — recorded, never faked (a blank the view must render as "unknown", not "none"):
 //     missingEvidence                 — the required-evidence set never reaches the log: AssuranceEvidenceRequired /
 //                                       AssuranceEvidenceReceived are ratified NAMES but schematized nowhere, and the
 //                                       §32 submitEvidenceForAssessment command that would emit them is unbuilt — a
 //                                       schema-and-wiring task, not a fold (DOC-004 §31 L1770). Empty = UNKNOWN, not NONE.
-//     controlActions                  — no control-action event is defined or emitted in the governed stream today.
-//                                       Empty = UNKNOWN, not NONE.
+//                                       This is now the ONLY §38 field this view cannot source.
 //
 // The distinction between "unknown" (no source) and "none" (a real empty) is load-bearing: rendering an
-// unsourced field as "none" is the false-negative that lets a node look assured when it was never checked. waivers
-// and invalidations moved from unknown to sourced-none here: their events exist, so their empties are now real.
+// unsourced field as "none" is the false-negative that lets a node look assured when it was never checked. Only
+// missingEvidence remains unknown; every other §38 field is sourced, so their empties are real.
 import type { DomainEvent } from '@janumipwb/rph-contracts';
 
 export interface AssuranceObservationView {
@@ -102,6 +107,11 @@ export interface AssuranceAssessmentView {
 	readonly waivers: readonly AssuranceWaiverView[];
 	/** §38 "invalidation status" — invalidation causes affecting this assessment. Empty = not invalidated. */
 	readonly invalidations: readonly AssuranceInvalidationView[];
+	/** §38 "claims evaluated" — the claim ids the assessment evaluated (AssuranceAssessmentStarted.claimIds). */
+	readonly claimsEvaluated: readonly string[];
+	/** §38 "control actions" — the control actions the validator recommended for this result
+	 *  (AssuranceAssessmentCompleted.recommendedControlActions). Empty until completion, then a real set. */
+	readonly controlActions: readonly string[];
 }
 
 export interface AssuranceView {
@@ -136,7 +146,10 @@ function foldStarted(view: AssuranceView, p: Payload): AssuranceView {
 		observations: [],
 		openConditions: [],
 		waivers: [],
-		invalidations: []
+		invalidations: [],
+		// §38 "claims evaluated" rides the Started event; "control actions" are recommended only at completion.
+		claimsEvaluated: strArr(p.claimIds),
+		controlActions: []
 	});
 }
 
@@ -176,7 +189,10 @@ function foldCompleted(view: AssuranceView, p: Payload): AssuranceView {
 		validatorImplementationIdentity: str(p.validatorId),
 		validatorImplementationVersion: str(p.validatorVersion),
 		// §38 "independence status": 'VERIFIED' only when the check ran and passed (I4); absent = unknown.
-		independenceStatus: str(p.independenceResult)
+		independenceStatus: str(p.independenceResult),
+		// §38 "control actions": the validator's recommended actions for this disposition (the 23-value ControlAction
+		// enum, §11). Sourced from the completion event; absent before completion.
+		controlActions: strArr(p.recommendedControlActions)
 	});
 }
 

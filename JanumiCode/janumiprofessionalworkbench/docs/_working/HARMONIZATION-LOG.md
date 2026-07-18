@@ -3429,6 +3429,28 @@ Gate: `check-types` 21/21 (incl. the app consuming the new fields) · `test` 21/
 `rph-projections/src/assurance-view.ts` + its test. (The other agent's PWA-Designer work is complete but still
 UNCOMMITTED in the shared tree; I continue to stage only my own files.)
 
+### Increment F — §38 read-model: claims evaluated + control actions (and a self-correction)
+
+Two more §38 fields turned out sourceable from the existing assessment events — found by re-reading the event
+payloads rather than trusting the earlier note:
+
+- **claimsEvaluated** (§38 "claims evaluated") ← `AssuranceAssessmentStarted.claimIds`.
+- **controlActions** (§38 "control actions") ← `AssuranceAssessmentCompleted.recommendedControlActions` (the
+  validator's recommended actions, the 23-value ControlAction enum).
+
+**Self-correction.** The §38 investigation (Increment E's triage, `e7932944`) filed `controlActions` as UNSOURCED
+— "no control-action event is defined or emitted." That grepped for an event *type* and missed the *field* on the
+completion event; the datum was on the wire all along. This is the "absence of evidence is a claim about my
+search, not the world" trap, caught by re-checking the actual payloads. `controlActions` moves to POPULATED and the
+header comment records the correction in place.
+
+With this, **`missingEvidence` is the ONLY §38 field the view cannot source** — genuinely blocked, since the
+`AssuranceEvidenceRequired`/`Received` events and their §32 command are unbuilt. Red-first: two unit tests (claims
+from Started; control actions from completion, and empty-before-completion never fabricated).
+
+Gate: `check-types` 21/21 · `test` 21/21 (39 in rph-projections) · lint · boundary. Footprint:
+`rph-projections/src/assurance-view.ts` + its test.
+
 ---
 
 ## PART 4 — Open questions genuinely for the sponsor

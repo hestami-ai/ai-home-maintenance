@@ -281,3 +281,51 @@ describe('Assurance View fold — §38 waivers and invalidation status (cross-ob
 		expect(a.invalidations).toEqual([]);
 	});
 });
+
+describe('Assurance View fold — §38 claims evaluated + control actions (assessment-event fields)', () => {
+	it('"claims evaluated" comes from the Started event; "control actions" from the completion (recommendedControlActions)', () => {
+		const view = buildAssuranceView([
+			evt(1, 'AssuranceAssessmentStarted', {
+				assessmentId: 'asm_cc',
+				assurancePolicyId: 'pol_x',
+				policyVersion: '1.0.0',
+				subjectObjectIds: ['pwu_1'],
+				subjectSemanticVersions: { pwu_1: 1 },
+				claimIds: ['clm_1', 'clm_2']
+			}),
+			evt(2, 'AssuranceAssessmentCompleted', {
+				assessmentId: 'asm_cc',
+				assurancePolicyId: 'pol_x',
+				policyVersion: '1.0.0',
+				subjectObjectIds: ['pwu_1'],
+				subjectSemanticVersions: { pwu_1: 1 },
+				disposition: 'CONDITIONALLY_SATISFIED',
+				evidenceConsideredIds: [],
+				observationIds: [],
+				residualUncertainty: ['r'],
+				recommendedControlActions: ['GATHER_EVIDENCE', 'REQUEST_HUMAN_DECISION'],
+				validatorId: 'v',
+				validatorVersion: '1'
+			})
+		]);
+		const a = view.assessments['asm_cc']!;
+		expect(a.claimsEvaluated).toEqual(['clm_1', 'clm_2']);
+		expect(a.controlActions).toEqual(['GATHER_EVIDENCE', 'REQUEST_HUMAN_DECISION']);
+	});
+
+	it('control actions are empty before completion (recommended only at completion), never fabricated', () => {
+		const view = buildAssuranceView([
+			evt(1, 'AssuranceAssessmentStarted', {
+				assessmentId: 'asm_pre',
+				assurancePolicyId: 'pol_x',
+				policyVersion: '1.0.0',
+				subjectObjectIds: ['pwu_1'],
+				subjectSemanticVersions: { pwu_1: 1 },
+				claimIds: ['clm_9']
+			})
+		]);
+		const a = view.assessments['asm_pre']!;
+		expect(a.claimsEvaluated).toEqual(['clm_9']); // known at Started
+		expect(a.controlActions).toEqual([]); // not recommended until completion
+	});
+});
