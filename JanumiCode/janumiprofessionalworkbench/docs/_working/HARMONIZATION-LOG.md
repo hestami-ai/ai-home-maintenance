@@ -3314,6 +3314,33 @@ handler comment, not implied away.
 Gate: `check-types` 19/19 · `test` 19/19 (125, +1 new) · lint · boundary · format. Footprint:
 `vocab/m3-commands-events.json`, regenerated `messages.ts`, `handlers/assurance.ts`, `handlers/assurance-policy.test.ts`.
 
+### §38 read-model completeness — investigated, deferred to the UI phase (its consumer, and its zone)
+
+The four still-unsourced §38 Assurance-View fields split cleanly by whether a live source exists in the log
+today. Investigated read-only (no code changed); recorded so the next reader inherits the finding, not the search:
+
+- **missingEvidence** — DEFER-BLOCKED. It is the required-evidence set minus the satisfied set. DOC-004 §31's own
+  note (L1770) confirms the field is "ratified and sourceable **in principle**": `AssuranceEvidenceRequired` names
+  the required set, `AssuranceEvidenceReceived` / `EvidenceAdmitted` the satisfied set. But both required-side
+  events are schematized **nowhere** (DOC-007 omits them) and the §32 commands that would emit them
+  (`submitEvidenceForAssessment`) are **unbuilt**. So it is a schema-and-wiring task (new events + commands), not a
+  fold. (Increment B made the *policy's* `requiredEvidence` settable — the required half now has a home on the
+  object, but the assessment-time event recording "*this* assessment required X" still does not exist.)
+- **controlActions** — DEFER. No control-action event is defined or emitted anywhere; §38 "control actions"
+  (actions taken in response to findings) has no source in the governed stream today.
+- **waivers** — SOURCEABLE from existing events, but a cross-object *correlation* fold: `WaiverRequested` carries
+  `subjectObjectIds` + `waivedPolicyId`, while `WaiverGranted` / `WaiverDenied` reference the Decision by
+  `aggregateId` only — so the fold must track waivers by decision id and join to assessments by (policy, subject).
+- **invalidationStatus** — SOURCEABLE from existing events: `EvidenceInvalidated` (evidenceId) and `PwuInvalidated`
+  (pwuId) can mark an assessment whose `evidenceConsideredIds` / `subjectObjectIds` include them (§39 invariants
+  15/16). Event ordering is favorable — invalidation follows the assessment it invalidates.
+
+All four live in `rph-projections/assurance-view.ts` and feed the deferred Assurance Workbench UI, whose zone
+another agent's work currently overlaps. **Deferred as a unit to the UI phase** so the read model and its consumer
+are built together; `missingEvidence` + `controlActions` are additionally gated behind a separate new-event
+increment. The two sourceable folds (`waivers`, `invalidationStatus`) are ready to build the moment that zone is
+clear.
+
 ---
 
 ## PART 4 — Open questions genuinely for the sponsor
