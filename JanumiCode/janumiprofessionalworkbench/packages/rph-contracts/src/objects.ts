@@ -654,6 +654,7 @@ export type ProfessionalWorkArchitecture = z.infer<typeof ProfessionalWorkArchit
 export const PwuTypeSchema = z.strictObject({
 	...objectEnvelopeShape,
 	pwaId: z.string(),
+	pwaVersion: z.string(),
 	pwuKind: z.string(),
 	name: z.string(),
 	purpose: z.string(),

@@ -1311,6 +1311,12 @@
           "required": true
         },
         {
+          "field": "pwaVersion",
+          "type": "string",
+          "required": true,
+          "note": "RPH-CON-009 (DOC-008 L402-417): type identity binds to a VERSIONED PWA, not a bare pwaId. Derived by definePwuType from the owning PWA's `version` (stable DRAFT->PUBLISHED; publishPwa does not change it). The ProposePwu CON-009 gate matches this against the Undertaking's bound pwaVersion, so a type from a DIFFERENT version of the same PWA cannot realize into this Undertaking. AUTHORED 2026-07-18 under the sponsor grant."
+        },
+        {
           "field": "pwuKind",
           "type": "string",
           "required": true

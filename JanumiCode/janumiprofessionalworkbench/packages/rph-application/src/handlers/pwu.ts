@@ -90,7 +90,7 @@ export const proposePwu: CommandHandler = (ctx, command, payload) => {
 	// claims no published pwuTypeId; a pwuKind string alone is insufficient to establish either binding.
 	if (p.undertakingId) {
 		const undertaking = ctx.store.loadObject(p.undertakingId)?.state as
-			{ objectType?: string; pwaId?: string } | undefined;
+			{ objectType?: string; pwaId?: string; pwaVersion?: string } | undefined;
 		if (!undertaking || undertaking.objectType !== 'UNDERTAKING') {
 			return reject(
 				command,
@@ -121,12 +121,20 @@ export const proposePwu: CommandHandler = (ctx, command, payload) => {
 				);
 			}
 			const pwuType = ctx.store.loadObject(p.pwuTypeId)?.state as
-				{ objectType?: string; pwaId?: string } | undefined;
-			if (!pwuType || pwuType.objectType !== 'PWU_TYPE' || pwuType.pwaId !== undertaking.pwaId) {
+				{ objectType?: string; pwaId?: string; pwaVersion?: string } | undefined;
+			// RPH-CON-009: the type must resolve to a PWU Type in the Undertaking's bound PWA — matched on
+			// (pwaId, pwaVersion), not pwaId alone. pwaVersion is derived onto every type by definePwuType, so a
+			// type from a DIFFERENT VERSION of the same PWA (same pwaId) can no longer realize into this Undertaking.
+			if (
+				!pwuType ||
+				pwuType.objectType !== 'PWU_TYPE' ||
+				pwuType.pwaId !== undertaking.pwaId ||
+				pwuType.pwaVersion !== undertaking.pwaVersion
+			) {
 				return reject(
 					command,
 					'RPH_VALIDATION_SEMANTIC_FAILED',
-					`ProposePwu: pwuTypeId ${p.pwuTypeId} does not resolve to a PWU Type in the Undertaking's bound PWA ${String(undertaking.pwaId)} (RPH-CON-009).`,
+					`ProposePwu: pwuTypeId ${p.pwuTypeId} does not resolve to a PWU Type in the Undertaking's bound PWA ${String(undertaking.pwaId)} @ ${String(undertaking.pwaVersion)} (RPH-CON-009).`,
 					[p.pwuId, p.pwuTypeId]
 				);
 			}

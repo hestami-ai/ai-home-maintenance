@@ -209,7 +209,9 @@ export const createPwa: CommandHandler = (ctx, command, payload) => {
 /** DefinePwuType — create a PWU Type under a DRAFT PWA (types are edited draft-only, §39). */
 export const definePwuType: CommandHandler = (ctx, command, payload) => {
 	const p = payload as DefinePwuTypePayload;
-	const pwa = ctx.store.loadObject(p.pwaId)?.state as { publicationStatus?: string } | undefined;
+	const pwa = ctx.store.loadObject(p.pwaId)?.state as
+		| { publicationStatus?: string; version?: string }
+		| undefined;
 	if (!pwa) {
 		return reject(command, 'RPH_VALIDATION_SEMANTIC_FAILED', `PWA ${p.pwaId} does not exist`, [
 			p.pwuTypeId
@@ -233,6 +235,11 @@ export const definePwuType: CommandHandler = (ctx, command, payload) => {
 			sourceObjectIds: [p.pwaId]
 		}),
 		pwaId: p.pwaId,
+		// RPH-CON-009: a PWU Type's identity binds to a VERSIONED PWA, not a bare pwaId. DERIVED from the owning
+		// PWA's `version` — not caller-supplied, so the broker/agent/UI need not thread it — and stable across
+		// publish (publishPwa flips publicationStatus only, never `version`). If the PWA somehow lacks a version,
+		// the required-string schema rejects at commit (fail-loud) rather than persist a versionless type.
+		pwaVersion: pwa.version,
 		pwuKind: p.pwuKind,
 		name: p.name,
 		purpose: p.purpose,
@@ -684,6 +691,18 @@ export const createUndertaking: CommandHandler = (ctx, command, payload) => {
 			command,
 			'RPH_INVARIANT_VIOLATION',
 			`An Undertaking can only instantiate a PUBLISHED PWA (${p.pwaId} is ${String(pwa.publicationStatus)})`,
+			[p.undertakingId]
+		);
+	}
+	// RPH-CON-009: an Undertaking binds a specific PWA VERSION. The bound pwaVersion must be the PWA's actual
+	// `version`, else the CON-009 gate (ProposePwu: a PWU Type's pwaVersion must equal the Undertaking's) would
+	// reject correct types. Callers already pass `pwa.version` (seed + demo derive it); this makes the binding
+	// fail-closed instead of trusting the caller's literal.
+	if (p.pwaVersion !== pwa.version) {
+		return reject(
+			command,
+			'RPH_VALIDATION_SEMANTIC_FAILED',
+			`CreateUndertaking: pwaVersion '${String(p.pwaVersion)}' does not match published PWA ${p.pwaId}'s version '${String(pwa.version)}' (RPH-CON-009 — an Undertaking binds a specific PWA version).`,
 			[p.undertakingId]
 		);
 	}

@@ -233,6 +233,9 @@
     "pwaId": {
       "type": "string"
     },
+    "pwaVersion": {
+      "type": "string"
+    },
     "pwuKind": {
       "type": "string"
     },
@@ -331,6 +334,7 @@
     "tags",
     "extensions",
     "pwaId",
+    "pwaVersion",
     "pwuKind",
     "name",
     "purpose",

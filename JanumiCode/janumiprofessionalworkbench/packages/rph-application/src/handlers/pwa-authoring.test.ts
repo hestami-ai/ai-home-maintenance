@@ -283,6 +283,95 @@ describe('PWA-authoring handlers (live)', () => {
 		expect(pwu.pwuTypeId).toBe(ROOT_TYPE);
 	});
 
+	it('RPH-CON-009: a PWU Type carries the PWA VERSION (derived), and CreateUndertaking rejects a mismatched version', () => {
+		createDraftPwa(); // version 1.0.0
+		defineRoot();
+		// A type's identity binds to a VERSIONED PWA — pwaVersion is derived from the owning PWA, not a bare pwaId.
+		expect((store.loadObject(ROOT_TYPE)?.state as { pwaVersion?: string }).pwaVersion).toBe('1.0.0');
+		publish();
+		// The Undertaking's bound pwaVersion must be the PWA's actual version (fail-closed, not caller-trusted).
+		const bad = d(
+			'CreateUndertaking',
+			{
+				undertakingId: UND,
+				name: 'U',
+				description: 'd',
+				pwaId: PWA,
+				pwaVersion: '9.9.9',
+				instantiationProfile: 'Standard',
+				objective: 'o',
+				intendedOutputProduct: 'p'
+			},
+			UND,
+			'UNDERTAKING'
+		);
+		expect(bad.status).toBe('REJECTED');
+	});
+
+	it('RPH-CON-009 version precision: a type defined against an OLD PWA version cannot realize into a NEW-version Undertaking', () => {
+		createDraftPwa(); // version 1.0.0
+		defineRoot(); // ROOT_TYPE.pwaVersion = 1.0.0 (derived)
+		// The PWA evolves to 2.0.0 while still DRAFT; ROOT_TYPE keeps its 1.0.0 binding (a now-stale type).
+		d('EditPwa', { pwaId: PWA, version: '2.0.0' }, PWA, 'PROFESSIONAL_WORK_ARCHITECTURE');
+		publish();
+		// The Undertaking binds the PUBLISHED 2.0.0 version.
+		expect(
+			d(
+				'CreateUndertaking',
+				{
+					undertakingId: UND,
+					name: 'U',
+					description: 'd',
+					pwaId: PWA,
+					pwaVersion: '2.0.0',
+					instantiationProfile: 'Standard',
+					objective: 'o',
+					intendedOutputProduct: 'p'
+				},
+				UND,
+				'UNDERTAKING'
+			).status
+		).toBe('ACCEPTED');
+		const INTENT = 'int_01ARZ3NDEKTSV4RRFFQ69G5P51';
+		const PWU = 'pwu_01ARZ3NDEKTSV4RRFFQ69G5P61';
+		d(
+			'CaptureIntent',
+			{ intentId: INTENT, originatingExpression: 'x', ontologyId: 'o', ontologyVersion: '1' },
+			INTENT,
+			'INTENT'
+		);
+		// The stale 1.0.0 type (same pwaId) must NOT resolve into the 2.0.0 Undertaking — the version gate fires.
+		const r = d(
+			'ProposePwu',
+			{
+				pwuId: PWU,
+				pwuKind: 'PRODUCT_REALIZATION',
+				title: 'Root',
+				description: 'd',
+				intentId: INTENT,
+				undertakingId: UND,
+				pwuTypeId: ROOT_TYPE,
+				isLocalExtension: false,
+				boundaries: { inScope: [], outOfScope: [], permittedChanges: [], prohibitedChanges: [] },
+				obligationIds: [],
+				constraintIds: [],
+				assumptionIds: [],
+				expectedOutputs: [],
+				assurancePolicyIds: [],
+				riskProfile: {
+					consequence: 'HIGH',
+					uncertainty: 'MEDIUM',
+					irreversibility: 'MEDIUM',
+					securitySensitivity: 'HIGH',
+					regulatoryExposure: 'LOW'
+				}
+			},
+			PWU,
+			'PROFESSIONAL_WORK_UNIT'
+		);
+		expect(r.status).toBe('REJECTED');
+	});
+
 	it('CON-009 is ENFORCED: rejects unknown Undertaking, non-resolving type, local-claims-type, and kind-alone', () => {
 		createDraftPwa();
 		defineRoot();

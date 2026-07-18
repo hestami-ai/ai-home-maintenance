@@ -3846,3 +3846,32 @@ disposition with the same unmet evidence is NOT gated).
 **Gate:** `check-types` 21/21 · full `test` 21/21 (rph-application assurance handler 11, +2) · lint · boundary ·
 **Playwright E2E 25/25** (the reference drive + demo drive are unaffected — no `requiredEvidence`, no
 non-permitted recommendation). Footprint: `assurance.ts` + `assurance-independence.test.ts`. Committed.
+
+### Increment S — CON-009 pwaVersion precision: type identity binds to a VERSIONED PWA (#3)
+
+RPH-CON-009 (DOC-008 L402-417): "type identity is resolved binding to a versioned PWA, never a bare kind label."
+The ProposePwu gate matched `pwuType.pwaId === undertaking.pwaId` — pwaId ONLY — because `PwuType` carried no
+`pwaVersion`, while the Undertaking binds `(pwaId, pwaVersion)`. So a type from a DIFFERENT VERSION of the same
+PWA would pass. Closed, with a **derived** design that keeps the footprint tiny:
+
+- **`PwuType.pwaVersion`** added to the vocab (required). **DERIVED** by `definePwuType` from the owning PWA's
+  `version` — NOT caller-supplied, so the broker, agent, and UI need no change. Sound because `publishPwa` flips
+  `publicationStatus` only and never `version`, so a type's `pwaVersion` set at define-time equals the version
+  the Undertaking later binds. (Every PwuType is created through `definePwuType` — the seed dispatches it, there
+  are zero direct constructions — so a required field has no fixture ripple.)
+- **The ProposePwu CON-009 gate** now matches `(pwaId, pwaVersion)`, so a stale type (defined against v1.0.0)
+  cannot realize into an Undertaking bound to v2.0.0.
+- **A second latent hole closed:** `createUndertaking` bound a caller-supplied `pwaVersion` without checking it
+  matched the published PWA's `version`. It now fails closed on a mismatch — otherwise the gate could reject a
+  CORRECT type against a wrongly-bound Undertaking. Non-breaking: the seed and demo already pass `pwa.version`.
+
+Red-first: a type carries the derived `pwaVersion` + `CreateUndertaking` rejects a mismatched version; and the
+version-precision case driven end to end — define a type against v1.0.0, `EditPwa` the PWA to v2.0.0, publish,
+bind an Undertaking to v2.0.0, and the stale v1.0.0 type is REJECTED at `ProposePwu` (same pwaId, different
+version). This is the multi-version scenario the pwaId-only gate silently admitted.
+
+**Gate:** `check-types` 21/21 · full `test` 21/21 (rph-application pwa-authoring 23, +2; registry count
+unchanged — a field is not a new schema) · lint · boundary · **Playwright E2E 25/25** (the reference + demo
+drives bind `pwa.version`, so both gates pass). Footprint: `m1-object-fields.json` (+`pwaVersion`) + `objects.ts`
++ `schemas/objects/PwuType.json` (regenerated) + `pwa-authoring.ts` (derive + validate) + `pwu.ts` (gate) +
+`pwa-authoring.test.ts`. Committed.
