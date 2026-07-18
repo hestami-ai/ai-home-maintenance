@@ -8,6 +8,7 @@
 // contracts-as-foundation, domain/ports purity, projections browser-safety, and app-in-core; rph-assurance imports
 // only contracts/domain/ports, so the edge is acyclic). The edge is taken (see assurance.ts), so the copy is gone.
 import { FLOOR_POLICY_IDS } from '@janumipwb/rph-assurance';
+import type { ExecutionProvenance } from '@janumipwb/rph-contracts';
 import { waiverCovers, waiverStillDischarges, type WaiverView } from '@janumipwb/rph-domain';
 import type { HandlerContext } from './kit.js';
 
@@ -23,24 +24,39 @@ export const AI_ACTOR_TYPES = new Set(['AGENT', 'MODEL']);
  *  produced by or materially shaped by an AI/agent", and a MODEL_INVOCATION is that by definition. */
 const AI_STEP_TYPES = new Set(['MODEL_INVOCATION']);
 
+/** ExecutionProvenance.originType values that ARE AI/agent-produced — the ratified §7.1 OriginType enum's
+ *  machine-authored classes. USER_INPUT / HUMAN_DECISION are human; MIGRATION / DERIVED / IMPORTED are neither
+ *  direct-human nor direct-AI (not treated as AI-produced here). */
+const AI_ORIGIN_TYPES = new Set(['MODEL_GENERATION', 'TOOL_OUTPUT']);
+
+/**
+ * Signal 0 (authoritative): does the recorded ExecutionProvenance itself say the result was AI/agent-produced?
+ * Positive-only by contract — it may only RETURN TRUE. A human, empty, or absent provenance yields false so the
+ * caller falls through to the heuristics; provenance can raise aiProduced but never lower it. The two positive
+ * facts, either sufficient: the origin class is machine-authored (originType ∈ {MODEL_GENERATION, TOOL_OUTPUT}),
+ * or the recorded producer is an AGENT/MODEL (executedBy.actorType).
+ */
+function provenanceIndicatesAiProduced(prov: ExecutionProvenance | undefined): boolean {
+	if (!prov) return false;
+	if (prov.executedBy && AI_ACTOR_TYPES.has(prov.executedBy.actorType)) return true;
+	return prov.originType !== undefined && AI_ORIGIN_TYPES.has(prov.originType);
+}
+
 /**
  * Is this execution step's output produced or materially shaped by an AI/agent (§8.4 L841 floor step 3)?
  *
- * Derived from the signals the accepted contract actually carries, never asserted. Three POSITIVE signals,
- * any of which is sufficient:
+ * Signal 0 — AUTHORITATIVE — is the recorded ExecutionProvenance (now a contracted shape, §16 item 23 filled
+ * under §0.3): its originType (the ratified §7.1 class) or executedBy directly names the producer. When it says
+ * AI, that is the answer. When it is absent or human, we FALL THROUGH to three heuristic signals (unchanged),
+ * any of which is still sufficient — the derivation the system used before provenance was contracted:
  *   1. `stepType` is a MODEL_INVOCATION — AI-shaped by construction;
- *   2. the completing actor is an AGENT/MODEL (`AI_ACTOR_TYPES`);
+ *   2. the completing actor is an AGENT/MODEL (`AI_ACTOR_TYPES`) — note `issuedBy` names who COMPLETED the step,
+ *      not necessarily who produced it (execution-detail.test.ts completes an agent's step under a HUMAN), which
+ *      is exactly the gap signal 0 closes when provenance is supplied;
  *   3. the step runs under a Runtime Binding — which per DOC-009 §10.5 carries `model_selection_policy`, so a
  *      bound step is one that selects and invokes a model.
- *
- * KNOWN GAP, disclosed rather than papered over: none of these is the *producer of the output*. `issuedBy`
- * names who COMPLETED the step, which is not the same actor — `execution-detail.test.ts` completes an
- * agent's MODEL_INVOCATION under a HUMAN. The field that would answer this directly is
- * `CompleteExecutionStepPayload.executionProvenance`, and it is `z.unknown()` (`messages.ts`), so it cannot
- * be read without inventing a shape (§16 item 23 withholds "producing-Attempt/context binding" by name).
- * Signal 1 covers the case that matters — a model call is a MODEL_INVOCATION — and signals 2/3 catch the
- * agent-completes and bound-runtime cases. When `executionProvenance` is contracted, it becomes signal 0 and
- * this function stops inferring.
+ * aiProduced = signal0 OR signal1 OR signal2 OR signal3 — monotonic: provenance can only RAISE it, never clear a
+ * heuristic that already fired, so a caller omitting provenance keeps the prior (fail-toward-review) behavior.
  *
  * Deliberately NOT claimed: §8.4 L844's "ambiguity resolves to material" is about the materiality of a known
  * AI result, not about whether producership is known. Using it here would be a different inference wearing
@@ -49,8 +65,10 @@ const AI_STEP_TYPES = new Set(['MODEL_INVOCATION']);
 export function stepOutputIsAiProduced(
 	ctx: HandlerContext,
 	step: Record<string, unknown>,
-	command: { readonly issuedBy: { readonly actorType: string } }
+	command: { readonly issuedBy: { readonly actorType: string } },
+	provenance?: ExecutionProvenance
 ): boolean {
+	if (provenanceIndicatesAiProduced(provenance)) return true; // signal 0 — authoritative, OR-only
 	if (AI_STEP_TYPES.has(String(step.stepType))) return true;
 	if (AI_ACTOR_TYPES.has(String(command.issuedBy.actorType))) return true;
 	const bindingId = step.runtimeBindingId;

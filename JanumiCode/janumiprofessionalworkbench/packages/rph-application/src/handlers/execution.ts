@@ -315,8 +315,8 @@ export const completeExecutionStep: CommandHandler = (ctx, command) => {
 		// governed stream could not name who produced a high-consequence step nor what it returned. Both now carried
 		// (optional, authored atop the ratified §16.2 shape); this is the trace over non-deterministic agent work the
 		// system exists to make reasoning-about. resultStatus stays dropped: it is redundant with the const
-		// resultingExecutionState. (Follow-up: the floor gate still re-derives aiProduced heuristically —
-		// stepOutputIsAiProduced — where it could read executionProvenance's resolved provider/model authoritatively.)
+		// resultingExecutionState. ExecutionProvenance is now a contracted shape (§7.1-grounded, §16 item 23 filled under §0.3), and the
+		// floor gate reads it as an authoritative aiProduced signal-0 (see the precheck below).
 		eventPayload: {
 			executionStepId: p.executionStepId,
 			executionAttemptId: p.executionAttemptId,
@@ -354,7 +354,7 @@ export const completeExecutionStep: CommandHandler = (ctx, command) => {
 			// judged per downstream-consumable result (§8.4 L844), each at its own store-derived version — which
 			// also closes the execution plane's stale-floor hole: a floor recorded against v1 no longer authorizes
 			// a v2 output.
-			const aiProduced = stepOutputIsAiProduced(ctx, step, command);
+			const aiProduced = stepOutputIsAiProduced(ctx, step, command, p.executionProvenance);
 			const resultIds = [...(p.outputArtifactIds ?? []), ...(p.proposedEvidenceIds ?? [])];
 			const { subjects, unresolved } = stepResultSubjects(ctx, resultIds);
 			// An output naming no recorded object cannot have been assessed, and §8.4 L854 forbids a missing
