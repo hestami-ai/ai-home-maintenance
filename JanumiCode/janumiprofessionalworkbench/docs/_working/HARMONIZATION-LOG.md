@@ -3598,6 +3598,11 @@ requires knowing something only the sponsor knows)*
    into an increment — which is why it is here rather than done quietly. Under the §0.3 grant I have authored
    them (Increment 18), grounded where the corpus speaks and labelled `AUTHORED` where it does not, so you can
    review exactly which calls are mine. **The label on each severity is the thing to audit, not the prose.**
+   **UPDATE 2026-07-18 (Increment O): the sponsor's Draft `Constitution Discussion` corpus was mined for
+   severity grounding and provides NONE — it defines no enumerated severity scale at all (severity is a free
+   property there; disposition gates on `fail`/`inconclusive` result values and `mandatory` constraint
+   enforcement, not a severity threshold). So the 19-ratified/80-authored split stands unchanged, and the
+   residual is purely the sponsor audit the machine-check makes tractable — nothing to relabel.**
 1. ~~**Eight of twelve policies ratify no control actions.** Only §15.10, §17.8, §19.8 and §23.7 have such a
    subsection. Six policies now carry a derived two-action floor, and two carry a narrow prior authored value
    (`pol_intent_completeness` can only `GATHER_CONTEXT` — it cannot escalate to a human). Both are placeholders
@@ -3712,3 +3717,25 @@ seed-array test) · lint clean. `check-types` is green for every package **I** t
 `correlationId?` vs `index` — unrelated to this change and not staged by me). Footprint (mine, staged by path):
 `vocab/m8-ontology.json`, `ontology.data.ts`, `doc004-conformance.test.ts`, `seed-policy-arrays.test.ts`, this
 log. Committed.
+
+### Increment O — the finding-code severity split stands; stale "unresolved" comments refreshed (sponsor #8)
+
+Sponsor #8 is the audit of the 96-of-99 authored finding severities (Increment 18: all 99 codes annotated;
+`doc004-conformance.test.ts` pins 19 `RATIFIED_*` / 80 `AUTHORED`, an anti-laundering lock requiring every
+`RATIFIED_*` quote to occur in the ratified corpus, and a §9.2 language check). Two things closed here:
+
+1. **Confirmed no relabeling.** The sponsor's Draft `Constitution Discussion` corpus was mined (this session)
+   for severity grounding and provides none: it defines **no enumerated severity scale** — severity is a free
+   property (JAN-CPCO §5.7/§5.22, JAN-JEM §13.2), and disposition there gates on validator result values
+   (`fail`/`inconclusive`, JEM §13.3–13.4) and `mandatory` constraint enforcement (CPCO §5.10) plus Completion
+   Prohibitions (PWU §29.4), not a severity threshold. Being both non-binding AND scale-less, it cannot move
+   any of the 80 `AUTHORED` to `RATIFIED_*`. The split is unchanged; the residual is the sponsor's own label
+   audit, which the machine-check makes tractable.
+2. **Refreshed the now-stale comments.** After #7 (Increment L) resolved the double-ratification, the
+   `ontology.types.ts` header still called it "open for the sponsor" / "Recorded, not resolved" and the
+   `FindingAnnotation` doc still said populating the codes was "blocked on" that question. All three refreshed
+   to record the composition resolution (DOC-003's Blocking conditions decide severity; 19 `RATIFIED_*`; the
+   rest `AUTHORED`, labelled, machine-checked) and to point at the ruling.
+
+**Gate:** `check-types` green for rph-product-realization-pwa (comment-only edit) · `doc004-conformance.test.ts`
+59. Footprint: `ontology.types.ts` (3 comment edits) + this log. Committed.

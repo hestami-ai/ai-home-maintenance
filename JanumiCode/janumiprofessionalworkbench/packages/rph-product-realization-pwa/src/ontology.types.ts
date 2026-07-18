@@ -48,8 +48,10 @@ export type Criterion = Frozen<AssessmentCriterion>;
  *     a model statement and `dispositionRecommendation: "CONDITIONALLY_SATISFIED"`. The Executable Invariant and
  *     Conformance Test Specification ratifies blocking behaviour for several more cases. The content was there
  *     under a different key, in sections I had not opened.
- * An absence found by grepping a field name is a claim about the field name. Populating these remains open for
- * the sponsor — and is now blocked on a prior question: the catalog is ratified TWICE (see `SeedPolicy`).
+ * An absence found by grepping a field name is a claim about the field name. The double-ratification that once
+ * blocked this is RESOLVED (2026-07-18, HARMONIZATION-LOG PART 5): the two documents COMPOSE, so DOC-003's
+ * Blocking conditions decide severity — 19 of 99 codes are `RATIFIED_*` — and the remaining 80 stay `AUTHORED`
+ * with a labelled, machine-checked severity. The sponsor audits the label, not the prose. See `SeedPolicy`.
  */
 export type SeverityBasis =
 	| 'RATIFIED_BLOCKING_CONDITION'
@@ -80,7 +82,7 @@ export interface FindingAnnotation {
  * criteria and 11 of its 99 findings, in paraphrase, and bound `IP-01`/`IP-02` to different criteria than this
  * dataset does. Same id, different meaning, in the layer that keys the audit trail.
  *
- * ⚠️ THE CATALOG IS RATIFIED TWICE, AND THIS DATASET SILENTLY PICKS ONE (found 2026-07-16; open for the sponsor).
+ * ⚠️ THE CATALOG IS RATIFIED TWICE, AND THE TWO DOCUMENTS COMPOSE (found 2026-07-16; RESOLVED 2026-07-18).
  * DOC-004 §15–§26 defines twelve policies. RPH-DOC-003 §25–§35 ("Assurance Policy: <Name>") defines ELEVEN of
  * the same policies — independently, with different content. They are not a superset and a subset:
  *   - DOC-003 §25 (Intent Fidelity) ratifies FOUR "Blocking conditions" ("mandatory constraint omitted"; "major
@@ -90,11 +92,13 @@ export interface FindingAnnotation {
  *   - DOC-003 §29 blocks on "no recomposition strategy"; DOC-004 §19.7 does not.
  *   - Only DOC-004 has POL-CONSTRAINT-PROPAGATION (§20) at all.
  * This dataset transcribes DOC-004 — the better-specified source (codes, criterion ids, twelve policies) — and
- * `doc004-conformance.test.ts` enforces that. But enforcing DOC-004 IS choosing DOC-004 over another ratified
- * document, and that choice is not mine to make: the only tiebreaker on disk is the Coding Agent Guide's §17
- * source map, and §16 item 1 says of that guide "This guide is itself proposed". Using a proposed distillation
- * to adjudicate between two ratified documents is precisely the borrowed authority this program corrected in C1.
- * Recorded, not resolved — see HARMONIZATION-LOG PART 4.
+ * `doc004-conformance.test.ts` enforces that. This is NOT choosing DOC-004 over another ratified document: the
+ * two COMPOSE. DOC-004 governs machine structure (codes, criterion ids, the twelfth policy) while DOC-003's
+ * `Blocking conditions` decide severity — they are the referent of DOC-004's otherwise-dangling "blocking
+ * finding" language, and where both state a rule they agree. Recorded in the corpus itself (RPH-DOC-004 §14.1,
+ * RPH-DOC-003 §24.1) and machine-checked in `doc004-conformance.test.ts` (the single blocking-overlap is Intent
+ * Preservation; Constraint Propagation is DOC-004's one addition). See `RULING-doc003-doc004-compose.md` and
+ * HARMONIZATION-LOG PART 5. RESOLVED 2026-07-18.
  */
 export interface SeedPolicy {
 	readonly policyId: string;
