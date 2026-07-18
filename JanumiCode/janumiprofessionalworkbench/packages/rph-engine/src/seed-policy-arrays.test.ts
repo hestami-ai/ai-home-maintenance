@@ -53,7 +53,8 @@ describe("seeded policies carry DOC-004's ratified sets", () => {
 
 	// The four policies whose control actions DOC-004 ratifies, transcribed byte-for-byte from the doc.
 	// §16 (POL-INTENT-COMPLETENESS) and §21 (POL-ARCHITECTURE-COVERAGE) have NO control-actions subsection —
-	// verified by direct search of §16.1-16.6 and §21.1-21.6 — so their single values stay, unratified.
+	// verified by direct search of §16.1-16.6 and §21.1-21.6 — so their sets are AUTHORED, not ratified; both
+	// were raised to the control-action floor on 2026-07-18 (see the dedicated test below).
 	it('pol_intent_fidelity permits DOC-004 §15.10’s five actions, not one', () => {
 		expect(load('pol_intent_fidelity')!.permittedControlActions).toEqual([
 			'CLARIFY',
@@ -101,16 +102,23 @@ describe("seeded policies carry DOC-004's ratified sets", () => {
 		expect(actions, '§23.7 does not list ESCALATE').not.toContain('ESCALATE');
 	});
 
-	it('the two policies DOC-004 leaves silent keep their single value — shape fixed, content untouched', () => {
-		// §16 / §21 have no control-actions subsection. Inventing a set for them would be authoring professional
-		// content; a 1-element array is the shape fix with the content preserved exactly.
-		//
-		// Still true after the six §18/§20/§22/§24/§25/§26 policies joined the seed with no prior value and no
-		// ratified set. They take a DERIVED floor (the intersection of the four ratified sets) because the field is
-		// required and an empty set would mean a policy that can find a problem and recommend nothing. These two
-		// are NOT widened to match: a prior authored judgement outranks a derivation.
-		expect(load('pol_intent_completeness')!.permittedControlActions).toEqual(['GATHER_CONTEXT']);
-		expect(load('pol_architecture_coverage')!.permittedControlActions).toEqual(['RESHAPE_PWU']);
+	it('the two once-silent policies now include the control-action floor — the escalate-and-reshape minimum', () => {
+		// §16 / §21 have no control-actions subsection. They once kept a single authored value (GATHER_CONTEXT /
+		// RESHAPE_PWU) on the stance that a prior authored judgement outranked a derivation. But GATHER_CONTEXT
+		// alone is a policy that can raise a blocking finding yet cannot escalate to a human — incoherent against
+		// the "escalate rather than invent" minimum. Raised on 2026-07-18 under the sponsor's grant to include the
+		// floor {REQUEST_HUMAN_DECISION, RESHAPE_PWU}, prior value RETAINED. (The other six silent policies —
+		// §18/§20/§22/§24/§25/§26 — already carried the derived floor; the conformance test pins the universal
+		// minimum now.)
+		expect(load('pol_intent_completeness')!.permittedControlActions).toEqual([
+			'GATHER_CONTEXT',
+			'RESHAPE_PWU',
+			'REQUEST_HUMAN_DECISION'
+		]);
+		expect(load('pol_architecture_coverage')!.permittedControlActions).toEqual([
+			'RESHAPE_PWU',
+			'REQUEST_HUMAN_DECISION'
+		]);
 	});
 });
 

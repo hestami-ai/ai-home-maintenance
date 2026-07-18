@@ -351,6 +351,22 @@ describe('the seeded catalog conforms to DOC-004 itself', () => {
 		const testAdequacy = policies.get('pol_test_adequacy');
 		expect([...(testAdequacy?.permittedControlActions ?? [])].sort()).toEqual(intersection);
 	});
+
+	it('every policy grants the control-action floor — the escalate-and-reshape universal minimum', () => {
+		// The floor is not just test_adequacy's value; it is the minimum EVERY policy must grant. A policy that can
+		// raise a blocking finding must be able to escalate to a human rather than invent a resolution
+		// (REQUEST_HUMAN_DECISION — the "escalate rather than invent" minimum) and to take the minimal governed
+		// corrective action (RESHAPE_PWU). Two policies once under-declared it — pol_intent_completeness could only
+		// GATHER_CONTEXT (it could not escalate at all), pol_architecture_coverage only RESHAPE_PWU — and both were
+		// raised to the floor on 2026-07-18 under the sponsor's grant. This pins that none can drop below it again.
+		const FLOOR = ['REQUEST_HUMAN_DECISION', 'RESHAPE_PWU']; // the intersection pinned by the test above
+		for (const [, policyId] of SECTIONS) {
+			const actions = policies.get(policyId)?.permittedControlActions ?? [];
+			for (const action of FLOOR) {
+				expect(actions, `${policyId} cannot ${action} — below the control-action floor`).toContain(action);
+			}
+		}
+	});
 });
 
 // ── The RULING's premise, machine-checked: DOC-003 and DOC-004 COMPOSE without contradiction ─────────────────

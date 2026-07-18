@@ -3598,10 +3598,12 @@ requires knowing something only the sponsor knows)*
    into an increment — which is why it is here rather than done quietly. Under the §0.3 grant I have authored
    them (Increment 18), grounded where the corpus speaks and labelled `AUTHORED` where it does not, so you can
    review exactly which calls are mine. **The label on each severity is the thing to audit, not the prose.**
-1. **Eight of twelve policies ratify no control actions.** Only §15.10, §17.8, §19.8 and §23.7 have such a
+1. ~~**Eight of twelve policies ratify no control actions.** Only §15.10, §17.8, §19.8 and §23.7 have such a
    subsection. Six policies now carry a derived two-action floor, and two carry a narrow prior authored value
    (`pol_intent_completeness` can only `GATHER_CONTEXT` — it cannot escalate to a human). Both are placeholders
-   for a decision only you can make.
+   for a decision only you can make.~~ **RESOLVED 2026-07-18 (Increment N): the two under-declaring policies
+   raised to the control-action floor {REQUEST_HUMAN_DECISION, RESHAPE_PWU}; the floor is now machine-checked as
+   a universal minimum every policy must grant (the "escalate rather than invent" rule). Still AUTHORED.**
 
 1. ~~**Does the authoring plane get an Execution Plan?** DOC-002 §3.3 roots the Execution Attempt in the
    Execution Aggregate. PWA authoring is design-time and has no Plan. Either authoring model calls are
@@ -3677,3 +3679,36 @@ sponsor #4: for AUTHORED artifacts `producingExecutionAttemptId` is now resolved
 the EXECUTION-plane Attempt record (the large item from `DECISION-item23-attempt-record.md`) stays deferred.
 
 **Gate:** `check-types` 21/21. Footprint: DOC-002 (§3.6) + this log. Committed.
+
+### Increment N — every policy can escalate: the control-action floor is a universal minimum (sponsor #9)
+
+Eight of twelve policies ratify no control actions (only DOC-004 §15.10/§17.8/§19.8/§23.7 have the subsection).
+Six carried a derived two-action floor already; two under-declared it — `pol_intent_completeness` could only
+`GATHER_CONTEXT` (a policy that can raise a blocking finding yet cannot escalate to a human) and
+`pol_architecture_coverage` only `RESHAPE_PWU`. Both were left narrow on the stance that "a prior authored
+judgement outranks a derivation," flagged as a decision only the sponsor could make. **Made, under the standing
+grant.**
+
+**Both raised to the floor `{REQUEST_HUMAN_DECISION, RESHAPE_PWU}`, prior value RETAINED** (intent_completeness
+→ `GATHER_CONTEXT` + floor; architecture_coverage → `RESHAPE_PWU` + `REQUEST_HUMAN_DECISION`). The floor is now
+grounded in a **principle**, not only the intersection derivation: it is the universal minimum every policy that
+can raise a blocking finding must grant — escalate to a human rather than invent a resolution
+(`REQUEST_HUMAN_DECISION`) and take the minimal governed corrective action (`RESHAPE_PWU`). That principle is
+independently confirmed by the sponsor's own Draft corpus (mined this session): JEM-INV-014 "insufficient
+authority or capability SHALL trigger escalation rather than invented resolution", plus deny-by-default for
+privileged actions (JSDL §21.2) and the rule that a waiver must carry a compensating control (JCPWA §36.4 — a
+policy may never drop a control to nothing). Still labelled AUTHORED: the floor is derived, not ratified for
+these sections.
+
+**Machine-checked.** `doc004-conformance.test.ts` gains a test that EVERY policy grants the floor — so no future
+edit can drop one below the escalate-and-reshape minimum. Source edited in `vocab/m8-ontology.json`, regenerated
+(`gen:ontology`) and prettier-formatted (the generator emits unformatted — a 2537-line pseudo-diff collapses to
+4 real lines). `seed-policy-arrays.test.ts` updated: its "keep their single value" test pinned the pre-decision
+state and now asserts the raised values.
+
+**Gate:** `doc004-conformance.test.ts` 59 (was 58; +1) · full `test` 21/21 (rph-engine 62, incl. the updated
+seed-array test) · lint clean. `check-types` is green for every package **I** touched; the one red is
+`apps/rph-demo` on the OTHER agent's uncommitted `workbench.ts:151` (a `.map()` arg-signature bug,
+`correlationId?` vs `index` — unrelated to this change and not staged by me). Footprint (mine, staged by path):
+`vocab/m8-ontology.json`, `ontology.data.ts`, `doc004-conformance.test.ts`, `seed-policy-arrays.test.ts`, this
+log. Committed.
