@@ -183,4 +183,60 @@ describe('Assurance Policy lifecycle handlers (live)', () => {
 		expect(edited.requiredEvidence).toEqual([req2]);
 		expect(edited.optionalEvidence).toEqual([opt]);
 	});
+
+	it('threads dispositionRules + escalationRules through create, keeps remediationRules deferred, and patches waiverRules on edit', () => {
+		// DOC-004 §10.2 DispositionRule (5 fields; condition is the permissive PolicyExpression) + §13 EscalationRule
+		// (4 fields; trigger permissive). These are what make a policy GOVERN — its outcome and its escalation.
+		const P = 'pol_govern_01';
+		const disp = {
+			disposition: 'SATISFIED',
+			condition: { allOf: ['C-01'] },
+			requiredEvidenceIds: ['EV-01'],
+			forbiddenOpenSeverities: ['BLOCKING'],
+			requiredIndependence: 'DIFFERENT_MODEL'
+		};
+		const esc = {
+			trigger: { onOpenFinding: 'F-01' },
+			escalationTarget: 'SECURITY_REVIEWER',
+			requiredPackage: ['decision', 'subject', 'evidence'],
+			timeoutAction: 'ESCALATE'
+		};
+		const waiver = {
+			waiverAllowed: true,
+			eligibleCriteriaIds: ['C-01'],
+			prohibitedFindingSeverities: ['CRITICAL'],
+			requiredAuthorityType: 'PRODUCT_OWNER',
+			requiredRationaleFields: ['justification']
+		};
+		expect(
+			create(P, 'Governing Policy', {
+				dispositionRules: [disp],
+				escalationRules: [esc],
+				waiverRules: [waiver]
+			}).status
+		).toBe('ACCEPTED');
+		const created = store.loadObject(P)!.state as {
+			dispositionRules: unknown[];
+			escalationRules: unknown[];
+			remediationRules: unknown[];
+			waiverRules: unknown[];
+		};
+		expect(created.dispositionRules).toEqual([disp]);
+		expect(created.escalationRules).toEqual([esc]);
+		expect(created.waiverRules).toEqual([waiver]);
+		// remediationRules is the one array still deferred (RemediationRule undefined in the corpus): always empty.
+		expect(created.remediationRules).toEqual([]);
+
+		// The Edit payload has carried waiverRules since Inc 13, but the handler never applied it — a policy's
+		// waivability could be set at birth and never revised. Inc C closes that: the waiver-only patch takes effect
+		// and leaves dispositionRules untouched.
+		const waiver2 = { ...waiver, waiverAllowed: false };
+		expect(d('EditAssurancePolicy', { policyId: P, waiverRules: [waiver2] }, P).status).toBe('ACCEPTED');
+		const edited = store.loadObject(P)!.state as {
+			waiverRules: unknown[];
+			dispositionRules: unknown[];
+		};
+		expect(edited.waiverRules).toEqual([waiver2]);
+		expect(edited.dispositionRules).toEqual([disp]);
+	});
 });

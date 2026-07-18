@@ -3282,6 +3282,38 @@ every existing `CreateAssurancePolicy`/`EditAssurancePolicy` caller valid (mirro
 Gate: `check-types` 19/19 · `test` 19/19 (124 incl. the new one) · lint · boundary · format. Footprint:
 `vocab/m3-commands-events.json`, regenerated `messages.ts`, `handlers/assurance.ts`, `handlers/assurance-policy.test.ts`.
 
+### Increment C — the rules that make a policy govern are settable, and a miscount corrected
+
+Added `dispositionRules` (`DispositionRule[]`, §10.2 — the rule that decides SATISFIED vs
+CONDITIONALLY_SATISFIED vs REJECTED/INCONCLUSIVE/ESCALATED) and `escalationRules` (`EscalationRule[]`, §13 —
+when a policy escalates and to whom) to **both** command payloads; threaded them in `createAssurancePolicy`
+(`p.<field> ?? []`) and `editAssurancePolicy` (patch spreads). `remediationRules` stays hardcoded `[]` —
+**deferred**, because `RemediationRule` is undefined across the corpus (the `ExecutionProvenance` situation);
+inventing its shape is the fabrication the audit exists to prevent.
+
+**A miscount corrected, by checking the object rather than the note.** Every prior note and the design
+reviewer said "5 of 7 settable." Reading `AssurancePolicyDefinition`'s actual field list, there is **no
+`riskProfiles` field** — it belongs to the PWU risk model, not the policy. The object has **six** governing rule
+arrays (`requiredEvidence`, `optionalEvidence`, `dispositionRules`, `escalationRules`, `remediationRules`,
+`waiverRules`); after this increment **five are settable and `remediationRules` alone is deferred**. The handler
+comment and the `waiverRules` disclosure note now say so, and name the phantom seventh explicitly so the next
+reader doesn't re-inherit it.
+
+**A pre-existing gap closed in passing.** `editAssurancePolicy` had never applied `waiverRules` even though the
+Edit payload has carried it since Increment 13 — a policy's waivability could be set at birth but never revised.
+The adversarial reviewer flagged it; the same pass that added the two new Edit spreads added the missing
+`waiverRules` one. The new test asserts a waiver-only edit takes effect and leaves `dispositionRules` untouched,
+and that `remediationRules` stays `[]` — red before the handler change on the `dispositionRules` create
+assertion.
+
+**Still settable, not enforced.** Occupying these homes remains documentation-grade: the assurance loop derives
+disposition from the validator recommendation and `floor.ts` hardcodes the plan, so nothing *reads* these
+declared rules at runtime yet. A store→runtime read path is the deeper, separate follow-up — stated in the
+handler comment, not implied away.
+
+Gate: `check-types` 19/19 · `test` 19/19 (125, +1 new) · lint · boundary · format. Footprint:
+`vocab/m3-commands-events.json`, regenerated `messages.ts`, `handlers/assurance.ts`, `handlers/assurance-policy.test.ts`.
+
 ---
 
 ## PART 4 — Open questions genuinely for the sponsor

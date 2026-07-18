@@ -48,7 +48,9 @@ import {
 	ConversationEntrySchema,
 	CoverageClaimSchema,
 	DesiredOutcomeSchema,
+	DispositionRuleSchema,
 	EscalationPolicySchema,
+	EscalationRuleSchema,
 	EvidenceRequirementSchema,
 	ExecutionProvenanceSchema,
 	ExecutionStepSchema,
@@ -532,6 +534,8 @@ export const CreateAssurancePolicyPayloadSchema = z.strictObject({
 	waiverRules: z.array(WaiverRuleSchema).optional(),
 	requiredEvidence: z.array(EvidenceRequirementSchema).optional(),
 	optionalEvidence: z.array(EvidenceRequirementSchema).optional(),
+	dispositionRules: z.array(DispositionRuleSchema).optional(),
+	escalationRules: z.array(EscalationRuleSchema).optional(),
 	permittedControlActions: z.array(ControlActionSchema)
 });
 export type CreateAssurancePolicyPayload = z.infer<typeof CreateAssurancePolicyPayloadSchema>;
@@ -549,6 +553,8 @@ export const EditAssurancePolicyPayloadSchema = z.strictObject({
 	waiverRules: z.array(WaiverRuleSchema).optional(),
 	requiredEvidence: z.array(EvidenceRequirementSchema).optional(),
 	optionalEvidence: z.array(EvidenceRequirementSchema).optional(),
+	dispositionRules: z.array(DispositionRuleSchema).optional(),
+	escalationRules: z.array(EscalationRuleSchema).optional(),
 	permittedControlActions: z.array(ControlActionSchema).optional()
 });
 export type EditAssurancePolicyPayload = z.infer<typeof EditAssurancePolicyPayloadSchema>;

@@ -64,8 +64,9 @@ function rejectIfFloorLocked(command: DomainCommand): () => ReturnType<typeof re
 /** CreateAssurancePolicy — create a versioned ASSURANCE_POLICY object. Regular (catalog) policies are born DRAFT
  *  (the ratified DOC-002 §18 initial state) and must be activated to govern; the de minimis floor policies (§8.4)
  *  are seeded through this too but are born ACTIVE (locked, always-apply — they cannot be activated). See bornStatus
- *  below. The rich rule arrays are §16.23-unresolved shapes, filled empty; the meaningful content is criteria +
- *  independence + finding definitions. The enum-typed fields are validated by the object schema. */
+ *  below. Five of the six governing rule arrays are now settable from the payload (evidence, disposition, escalation,
+ *  waiver — DOC-004 §6.1/§10.2/§13/§12.1); remediationRules alone stays empty (its element type is undefined in the
+ *  corpus). The enum-typed fields are validated by the object schema. */
 export const createAssurancePolicy: CommandHandler = (ctx, command, payload) => {
 	const p = payload as CreateAssurancePolicyPayload;
 	// The initial governance state, split by policy kind:
@@ -97,19 +98,23 @@ export const createAssurancePolicy: CommandHandler = (ctx, command, payload) => 
 		evaluatorRole: p.evaluatorRole,
 		independenceRequirement: p.independenceRequirement,
 		findingDefinitions: p.findingDefinitions,
-		// AssurancePolicyDefinition's rule arrays are REQUIRED by the object schema. Until 2026-07-16 NO command or
-		// event carried them, so they were hardcoded empty here — exactly like ARTIFACT's outputArtifactIds
-		// (Increment 10a): the object demands it, nothing can set it, so a constant fills the hole, and a seeded
-		// policy could declare NONE of the rules that make it a policy (what makes it SATISFIED vs REJECTED, when it
-		// escalates, what evidence it needs).
+		// AssurancePolicyDefinition has SIX governing rule arrays that were REQUIRED by the object schema but carried
+		// by NO command — hardcoded empty here, exactly like ARTIFACT's outputArtifactIds (Increment 10a): the object
+		// demands it, nothing could set it, so a seeded policy could declare NONE of the rules that make it a policy
+		// (its outcome, its escalation, its evidence, its waivability).
 		//
-		// SETTABLE now (payload fields authored under the §0.3 grant; element shapes transcribed from DOC-004, Inc A):
-		// requiredEvidence + optionalEvidence (§6.1, set above) and waiverRules (§12.1, below). STILL hardcoded empty,
-		// unreachable and surfaced in AUDIT-placeholder-helpers.md, NOT fixed here: dispositionRules (§10.2),
-		// escalationRules (§13), remediationRules (undefined in the corpus — deferred), riskProfiles.
-		dispositionRules: [],
+		// FIVE are now SETTABLE (payload fields authored under the §0.3 grant; element shapes transcribed from DOC-004,
+		// Inc A): requiredEvidence + optionalEvidence (§6.1, set above), dispositionRules (§10.2), escalationRules
+		// (§13), and waiverRules (§12.1). remediationRules ALONE stays hardcoded [] — DEFERRED because RemediationRule
+		// is undefined across the corpus (the ExecutionProvenance situation), so invent nothing. (An earlier note
+		// counted a seventh array, riskProfiles; it is NOT an AssurancePolicyDefinition field — the '6/7' miscounted.)
+		//
+		// SETTABLE, NOT YET ENFORCED: occupying these ratified homes is documentation-grade — the assurance loop
+		// derives disposition from the validator recommendation and floor.ts hardcodes the plan, so nothing READS
+		// these declared rules at runtime yet. Wiring a store→runtime read is the deeper follow-up.
+		dispositionRules: p.dispositionRules ?? [],
 		remediationRules: [],
-		escalationRules: [],
+		escalationRules: p.escalationRules ?? [],
 		waiverRules: p.waiverRules ?? [],
 		permittedControlActions: p.permittedControlActions,
 		status: bornStatus
@@ -157,6 +162,12 @@ export const editAssurancePolicy: CommandHandler = (ctx, command, payload) => {
 		...(p.findingDefinitions !== undefined ? { findingDefinitions: p.findingDefinitions } : {}),
 		...(p.requiredEvidence !== undefined ? { requiredEvidence: p.requiredEvidence } : {}),
 		...(p.optionalEvidence !== undefined ? { optionalEvidence: p.optionalEvidence } : {}),
+		...(p.dispositionRules !== undefined ? { dispositionRules: p.dispositionRules } : {}),
+		...(p.escalationRules !== undefined ? { escalationRules: p.escalationRules } : {}),
+		// waiverRules has been on the Edit payload since Inc 13 but was never applied here — the create side threaded
+		// it, the edit side silently dropped it, so a policy's waivability could be set at birth but never revised.
+		// Closing that pre-existing gap (adversarial review, Inc C).
+		...(p.waiverRules !== undefined ? { waiverRules: p.waiverRules } : {}),
 		...(p.permittedControlActions !== undefined
 			? { permittedControlActions: p.permittedControlActions }
 			: {})

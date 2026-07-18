@@ -2219,7 +2219,7 @@
           "field": "waiverRules",
           "required": false,
           "type": "WaiverRule[]",
-          "note": "AUTHORED under the sponsor's 2026-07-16 grant. FIELD TYPE is ratified — DOC-004 §12.1 defines WaiverRule in full — but no ratified command carries it: DOC-004 describes the policy CATALOG, not its authoring commands, and DOC-007 schematizes no CreateAssurancePolicy. WHY IT IS ADDED: AssurancePolicyDefinition.waiverRules is REQUIRED by the object schema and NO command or event could set it, so assurance.ts hardcoded `waiverRules: []` — the field was write-only-empty and a policy could never declare whether it may be waived. Same dangling-reference shape as ARTIFACT's outputArtifactIds (Increment 10a). Optional on the command so every existing caller stays valid. STILL UNREACHABLE, measured and surfaced, NOT fixed here: dispositionRules, escalationRules, remediationRules, riskProfiles — four more ratified rule arrays no command carries (requiredEvidence + optionalEvidence became settable 2026-07-17, Inc B)."
+          "note": "AUTHORED under the sponsor's 2026-07-16 grant. FIELD TYPE is ratified — DOC-004 §12.1 defines WaiverRule in full — but no ratified command carries it: DOC-004 describes the policy CATALOG, not its authoring commands, and DOC-007 schematizes no CreateAssurancePolicy. WHY IT IS ADDED: AssurancePolicyDefinition.waiverRules is REQUIRED by the object schema and NO command or event could set it, so assurance.ts hardcoded `waiverRules: []` — the field was write-only-empty and a policy could never declare whether it may be waived. Same dangling-reference shape as ARTIFACT's outputArtifactIds (Increment 10a). Optional on the command so every existing caller stays valid. STILL UNREACHABLE, measured and surfaced, NOT fixed here: remediationRules ALONE now remains unreachable — DEFERRED because RemediationRule is undefined across the corpus (dispositionRules + escalationRules became settable 2026-07-17, Inc C; requiredEvidence + optionalEvidence, Inc B). So 5 of the object's 6 governing rule arrays are settable. NB: riskProfiles, named in earlier versions of this note, is NOT an AssurancePolicyDefinition field — it belongs to the PWU risk model, not the policy; the earlier '6/7' framing miscounted it."
         },
         {
           "field": "requiredEvidence",
@@ -2232,6 +2232,18 @@
           "required": false,
           "type": "EvidenceRequirement[]",
           "note": "AUTHORED under the §0.3 grant; same EvidenceRequirement[] shape (DOC-004 §6.1). DOC-002 split the single `requiredEvidenceRequirements` into requiredEvidence + optionalEvidence (see the EvidenceRequirement helper note). Optional on the command; hardcoded [] before."
+        },
+        {
+          "field": "dispositionRules",
+          "required": false,
+          "type": "DispositionRule[]",
+          "note": "AUTHORED under the sponsor's 2026-07-16 §0.3 grant. FIELD TYPE is ratified — DOC-004 §10.2 defines DispositionRule (transcribed Inc A). AssurancePolicyDefinition.dispositionRules is REQUIRED by the object schema and carried by no command, so assurance.ts hardcoded `dispositionRules: []` — write-only-empty. This is the rule that decides a policy's OUTCOME: SATISFIED vs CONDITIONALLY_SATISFIED vs REJECTED/INCONCLUSIVE/ESCALATED (DOC-004 §10). Optional on the command so every existing caller stays valid. SETTABLE, NOT YET ENFORCED: the assurance loop today derives disposition from the validator recommendation, not from these declared rules; wiring a store→runtime read is a separate follow-up."
+        },
+        {
+          "field": "escalationRules",
+          "required": false,
+          "type": "EscalationRule[]",
+          "note": "AUTHORED under the §0.3 grant. FIELD TYPE ratified — DOC-004 §13 defines EscalationRule (transcribed Inc A). Was REQUIRED by the object schema, carried by no command, hardcoded []. Declares WHEN a policy escalates and to WHOM (§13, escalationTarget: the 7-value EscalationTargetSchema). Optional; settable-not-enforced, same caveat as dispositionRules."
         },
         {
           "field": "permittedControlActions",
@@ -2308,7 +2320,7 @@
           "field": "waiverRules",
           "required": false,
           "type": "WaiverRule[]",
-          "note": "AUTHORED under the sponsor's 2026-07-16 grant. FIELD TYPE is ratified — DOC-004 §12.1 defines WaiverRule in full — but no ratified command carries it: DOC-004 describes the policy CATALOG, not its authoring commands, and DOC-007 schematizes no CreateAssurancePolicy. WHY IT IS ADDED: AssurancePolicyDefinition.waiverRules is REQUIRED by the object schema and NO command or event could set it, so assurance.ts hardcoded `waiverRules: []` — the field was write-only-empty and a policy could never declare whether it may be waived. Same dangling-reference shape as ARTIFACT's outputArtifactIds (Increment 10a). Optional on the command so every existing caller stays valid. STILL UNREACHABLE, measured and surfaced, NOT fixed here: dispositionRules, escalationRules, remediationRules, riskProfiles — four more ratified rule arrays no command carries (requiredEvidence + optionalEvidence became settable 2026-07-17, Inc B)."
+          "note": "AUTHORED under the sponsor's 2026-07-16 grant. FIELD TYPE is ratified — DOC-004 §12.1 defines WaiverRule in full — but no ratified command carries it: DOC-004 describes the policy CATALOG, not its authoring commands, and DOC-007 schematizes no CreateAssurancePolicy. WHY IT IS ADDED: AssurancePolicyDefinition.waiverRules is REQUIRED by the object schema and NO command or event could set it, so assurance.ts hardcoded `waiverRules: []` — the field was write-only-empty and a policy could never declare whether it may be waived. Same dangling-reference shape as ARTIFACT's outputArtifactIds (Increment 10a). Optional on the command so every existing caller stays valid. STILL UNREACHABLE, measured and surfaced, NOT fixed here: remediationRules ALONE now remains unreachable — DEFERRED because RemediationRule is undefined across the corpus (dispositionRules + escalationRules became settable 2026-07-17, Inc C; requiredEvidence + optionalEvidence, Inc B). So 5 of the object's 6 governing rule arrays are settable. NB: riskProfiles, named in earlier versions of this note, is NOT an AssurancePolicyDefinition field — it belongs to the PWU risk model, not the policy; the earlier '6/7' framing miscounted it."
         },
         {
           "field": "requiredEvidence",
@@ -2321,6 +2333,18 @@
           "required": false,
           "type": "EvidenceRequirement[]",
           "note": "AUTHORED under the §0.3 grant; same EvidenceRequirement[] shape (DOC-004 §6.1). DOC-002 split the single `requiredEvidenceRequirements` into requiredEvidence + optionalEvidence (see the EvidenceRequirement helper note). Optional on the command; hardcoded [] before."
+        },
+        {
+          "field": "dispositionRules",
+          "required": false,
+          "type": "DispositionRule[]",
+          "note": "AUTHORED under the sponsor's 2026-07-16 §0.3 grant. FIELD TYPE is ratified — DOC-004 §10.2 defines DispositionRule (transcribed Inc A). AssurancePolicyDefinition.dispositionRules is REQUIRED by the object schema and carried by no command, so assurance.ts hardcoded `dispositionRules: []` — write-only-empty. This is the rule that decides a policy's OUTCOME: SATISFIED vs CONDITIONALLY_SATISFIED vs REJECTED/INCONCLUSIVE/ESCALATED (DOC-004 §10). Optional on the command so every existing caller stays valid. SETTABLE, NOT YET ENFORCED: the assurance loop today derives disposition from the validator recommendation, not from these declared rules; wiring a store→runtime read is a separate follow-up."
+        },
+        {
+          "field": "escalationRules",
+          "required": false,
+          "type": "EscalationRule[]",
+          "note": "AUTHORED under the §0.3 grant. FIELD TYPE ratified — DOC-004 §13 defines EscalationRule (transcribed Inc A). Was REQUIRED by the object schema, carried by no command, hardcoded []. Declares WHEN a policy escalates and to WHOM (§13, escalationTarget: the 7-value EscalationTargetSchema). Optional; settable-not-enforced, same caveat as dispositionRules."
         },
         {
           "field": "permittedControlActions",
