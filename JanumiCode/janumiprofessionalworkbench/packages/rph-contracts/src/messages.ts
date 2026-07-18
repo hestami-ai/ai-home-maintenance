@@ -1390,6 +1390,10 @@ export const AssurancePolicyCreatedPayloadSchema = z.strictObject({
 	independenceRequirement: z.string(),
 	findingDefinitions: z.array(FindingDefinitionSchema),
 	waiverRules: z.array(WaiverRuleSchema).optional(),
+	requiredEvidence: z.array(EvidenceRequirementSchema).optional(),
+	optionalEvidence: z.array(EvidenceRequirementSchema).optional(),
+	dispositionRules: z.array(DispositionRuleSchema).optional(),
+	escalationRules: z.array(EscalationRuleSchema).optional(),
 	permittedControlActions: z.array(ControlActionSchema)
 });
 export type AssurancePolicyCreatedPayload = z.infer<typeof AssurancePolicyCreatedPayloadSchema>;
@@ -1405,6 +1409,10 @@ export const AssurancePolicyEditedPayloadSchema = z.strictObject({
 	independenceRequirement: z.string().optional(),
 	findingDefinitions: z.array(FindingDefinitionSchema).optional(),
 	waiverRules: z.array(WaiverRuleSchema).optional(),
+	requiredEvidence: z.array(EvidenceRequirementSchema).optional(),
+	optionalEvidence: z.array(EvidenceRequirementSchema).optional(),
+	dispositionRules: z.array(DispositionRuleSchema).optional(),
+	escalationRules: z.array(EscalationRuleSchema).optional(),
 	permittedControlActions: z.array(ControlActionSchema).optional()
 });
 export type AssurancePolicyEditedPayload = z.infer<typeof AssurancePolicyEditedPayloadSchema>;

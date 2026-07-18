@@ -3314,6 +3314,36 @@ handler comment, not implied away.
 Gate: `check-types` 19/19 · `test` 19/19 (125, +1 new) · lint · boundary · format. Footprint:
 `vocab/m3-commands-events.json`, regenerated `messages.ts`, `handlers/assurance.ts`, `handlers/assurance-policy.test.ts`.
 
+### Increment D — the policy-authoring events declare the rule arrays they carry (B/C completion)
+
+A detection pass (every command's `payloadFields` vs its emitting event's) surfaced that `AssurancePolicyCreated`
+and `AssurancePolicyEdited` — emitted via **passthrough** of the command payload (`createObject` / `makeEvent`, no
+`eventPayload` override) — *carried* the four Inc-B/C rule arrays on the wire but did **not declare** them: the
+governed stream declared **less than it carried**. Both events are UNRATIFIED-AUTHORED, so the event-payload
+validation gate (`kit.ts`) does not enforce their schema and the extra keys passed silently — the declaration just
+lied. This was a gap I introduced in B/C: I threaded the fields onto the command but not onto the mirror event
+(Increment 13 had correctly done both for `waiverRules`).
+
+Added `requiredEvidence` / `optionalEvidence` / `dispositionRules` / `escalationRules` to both events' declared
+`payloadFields`, regenerated. The event schemas now declare what they carry, so reasoning over the event log — the
+whole point of the governed stream, reconstructing correct *and* incorrect agent behaviour — can see the rules a
+policy declared, not only the current-state snapshot.
+
+Red-first: a live test reads the emitted `AssurancePolicyCreated` event and asserts (a) it carries
+`requiredEvidence` / `dispositionRules` / `escalationRules` and (b) its payload now PARSES against the strict
+declared schema. With the event declaration reverted, (b) fails on the extra keys while (a) still passes —
+isolating the fix as declaration-honesty, not a behaviour change (passthrough carried the fields either way).
+
+Scope note: the broader passthrough register (~29 command→event pairs whose event omits ≥1 command field) is **not
+all a bug**. Many are DELIBERATE DOC-conformant subsets — `PwuProposed` records only §11.3's three ownership
+fields; `ExecutionStepSucceeded` deliberately drops `resultStatus`. Separating accidental under-declaration from
+intended subset is a per-event adjudication (the PART 3y sweep did it but did not persist the list). The
+assurance-policy events are the subset verifiable *now* as pure passthrough tied to freshly-authored fields; the
+rest stay a bounded, low-priority declaration-tightening task, explicitly not swept blindly.
+
+Gate: `check-types` 19/19 · `test` 19/19 (126, +1) · lint · boundary · format. Footprint:
+`vocab/m3-commands-events.json`, regenerated `messages.ts`, `handlers/assurance-policy.test.ts`.
+
 ### §38 read-model completeness — investigated, deferred to the UI phase (its consumer, and its zone)
 
 The four still-unsourced §38 Assurance-View fields split cleanly by whether a live source exists in the log

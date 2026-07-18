@@ -1,7 +1,7 @@
 // The full authorable Assurance Policy lifecycle (guide §8.9 / §17): create -> edit-in-place -> suspend/activate ->
 // supersede, plus the LOCK on the de minimis floor policies (§8.4 / INV-5) — they can be created (seed) but never
 // edited, suspended, or superseded. Drives the handlers LIVE through the engine.
-import type { DomainCommand } from '@janumipwb/rph-contracts';
+import { AssurancePolicyCreatedPayloadSchema, type DomainCommand } from '@janumipwb/rph-contracts';
 import { SqliteStorageAdapter } from '@janumipwb/rph-persistence';
 import { beforeEach, describe, expect, it } from 'vitest';
 import { Engine } from '../index.js';
@@ -238,5 +238,51 @@ describe('Assurance Policy lifecycle handlers (live)', () => {
 		};
 		expect(edited.waiverRules).toEqual([waiver2]);
 		expect(edited.dispositionRules).toEqual([disp]);
+	});
+
+	it('records the rule arrays on the AssurancePolicyCreated EVENT, not only the object state (governed-stream honesty)', () => {
+		// The event is emitted via passthrough of the command payload, so it already carried these fields — but its
+		// declared schema omitted the four Inc-B/C additions, so the governed stream *declared* less than it *carried*.
+		// This asserts the event log records what the policy declared: reasoning over the stream must see the rules.
+		const P = 'pol_stream_01';
+		const req = {
+			id: 'EV-1',
+			evidenceType: 'TEST_RESULT',
+			description: 'd',
+			purpose: 'p',
+			cardinality: 'AT_LEAST_ONE',
+			admissibilityRules: [],
+			requiredForDispositions: 'ALL',
+			mayBeWaived: false
+		};
+		const disp = { disposition: 'SATISFIED', condition: {}, requiredEvidenceIds: ['EV-1'] };
+		const esc = {
+			trigger: {},
+			escalationTarget: 'ARCHITECT',
+			requiredPackage: ['x'],
+			timeoutAction: 'ESCALATE'
+		};
+		expect(
+			create(P, 'Stream Policy', {
+				requiredEvidence: [req],
+				dispositionRules: [disp],
+				escalationRules: [esc]
+			}).status
+		).toBe('ACCEPTED');
+		const created = store
+			.readAllEvents()
+			.find((e) => e.eventType === 'AssurancePolicyCreated' && (e.payload as { policyId?: string }).policyId === P);
+		expect(created, 'AssurancePolicyCreated event must be in the log').toBeTruthy();
+		const ep = created!.payload as {
+			requiredEvidence?: unknown[];
+			dispositionRules?: unknown[];
+			escalationRules?: unknown[];
+		};
+		expect(ep.requiredEvidence).toEqual([req]);
+		expect(ep.dispositionRules).toEqual([disp]);
+		expect(ep.escalationRules).toEqual([esc]);
+		// The DECLARED event schema now ACCEPTS what the event CARRIES. Before Inc D the strict schema omitted these
+		// four fields, so this passthrough payload's extra keys would have failed the parse: declared < carried.
+		expect(AssurancePolicyCreatedPayloadSchema.safeParse(created!.payload).success).toBe(true);
 	});
 });

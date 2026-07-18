@@ -5806,7 +5806,31 @@
           "field": "waiverRules",
           "required": false,
           "type": "WaiverRule[]",
-          "note": "AUTHORED under the sponsor's 2026-07-16 grant. FIELD TYPE is ratified — DOC-004 §12.1 defines WaiverRule in full — but no ratified command carries it: DOC-004 describes the policy CATALOG, not its authoring commands, and DOC-007 schematizes no CreateAssurancePolicy. WHY IT IS ADDED: AssurancePolicyDefinition.waiverRules is REQUIRED by the object schema and NO command or event could set it, so assurance.ts hardcoded `waiverRules: []` — the field was write-only-empty and a policy could never declare whether it may be waived. Same dangling-reference shape as ARTIFACT's outputArtifactIds (Increment 10a). Optional on the command so every existing caller stays valid. STILL UNREACHABLE, measured and surfaced, NOT fixed here: dispositionRules, escalationRules, remediationRules, requiredEvidence, optionalEvidence, riskProfiles — six more ratified rule arrays no command carries."
+          "note": "AUTHORED under the sponsor's 2026-07-16 grant. FIELD TYPE is ratified — DOC-004 §12.1 defines WaiverRule in full — but no ratified command carries it: DOC-004 describes the policy CATALOG, not its authoring commands, and DOC-007 schematizes no CreateAssurancePolicy. WHY IT IS ADDED: AssurancePolicyDefinition.waiverRules is REQUIRED by the object schema and NO command or event could set it, so assurance.ts hardcoded `waiverRules: []` — the field was write-only-empty and a policy could never declare whether it may be waived. Same dangling-reference shape as ARTIFACT's outputArtifactIds (Increment 10a). Optional on the command so every existing caller stays valid. STILL UNREACHABLE, measured and surfaced, NOT fixed here: remediationRules — the one rule array still uncarried (RemediationRule is undefined corpus-wide; riskProfiles, named earlier, is not an AssurancePolicyDefinition field). requiredEvidence, optionalEvidence, dispositionRules, escalationRules are now carried AND declared on this event (Inc B/C)."
+        },
+        {
+          "field": "requiredEvidence",
+          "required": false,
+          "type": "EvidenceRequirement[]",
+          "note": "Mirrors CreateAssurancePolicy.requiredEvidence (EvidenceRequirement[], DOC-004 §6.1, Inc B). AssurancePolicyCreated/Edited are emitted via passthrough of the command payload (createObject/makeEvent, no eventPayload override), so the event ALREADY carries this field — declared here so the governed stream (the event log) records what the policy declared, not only the object-state snapshot. Inc B added it to the command but not this event; closed as governed-stream honesty."
+        },
+        {
+          "field": "optionalEvidence",
+          "required": false,
+          "type": "EvidenceRequirement[]",
+          "note": "Mirrors CreateAssurancePolicy.optionalEvidence (EvidenceRequirement[], DOC-004 §6.1, Inc B). AssurancePolicyCreated/Edited are emitted via passthrough of the command payload (createObject/makeEvent, no eventPayload override), so the event ALREADY carries this field — declared here so the governed stream (the event log) records what the policy declared, not only the object-state snapshot. Inc B added it to the command but not this event; closed as governed-stream honesty."
+        },
+        {
+          "field": "dispositionRules",
+          "required": false,
+          "type": "DispositionRule[]",
+          "note": "Mirrors CreateAssurancePolicy.dispositionRules (DispositionRule[], DOC-004 §10.2, Inc C). AssurancePolicyCreated/Edited are emitted via passthrough of the command payload (createObject/makeEvent, no eventPayload override), so the event ALREADY carries this field — declared here so the governed stream (the event log) records what the policy declared, not only the object-state snapshot. Inc C added it to the command but not this event; closed as governed-stream honesty."
+        },
+        {
+          "field": "escalationRules",
+          "required": false,
+          "type": "EscalationRule[]",
+          "note": "Mirrors CreateAssurancePolicy.escalationRules (EscalationRule[], DOC-004 §13, Inc C). AssurancePolicyCreated/Edited are emitted via passthrough of the command payload (createObject/makeEvent, no eventPayload override), so the event ALREADY carries this field — declared here so the governed stream (the event log) records what the policy declared, not only the object-state snapshot. Inc C added it to the command but not this event; closed as governed-stream honesty."
         },
         {
           "field": "permittedControlActions",
@@ -5880,7 +5904,31 @@
           "field": "waiverRules",
           "required": false,
           "type": "WaiverRule[]",
-          "note": "AUTHORED under the sponsor's 2026-07-16 grant. FIELD TYPE is ratified — DOC-004 §12.1 defines WaiverRule in full — but no ratified command carries it: DOC-004 describes the policy CATALOG, not its authoring commands, and DOC-007 schematizes no CreateAssurancePolicy. WHY IT IS ADDED: AssurancePolicyDefinition.waiverRules is REQUIRED by the object schema and NO command or event could set it, so assurance.ts hardcoded `waiverRules: []` — the field was write-only-empty and a policy could never declare whether it may be waived. Same dangling-reference shape as ARTIFACT's outputArtifactIds (Increment 10a). Optional on the command so every existing caller stays valid. STILL UNREACHABLE, measured and surfaced, NOT fixed here: dispositionRules, escalationRules, remediationRules, requiredEvidence, optionalEvidence, riskProfiles — six more ratified rule arrays no command carries."
+          "note": "AUTHORED under the sponsor's 2026-07-16 grant. FIELD TYPE is ratified — DOC-004 §12.1 defines WaiverRule in full — but no ratified command carries it: DOC-004 describes the policy CATALOG, not its authoring commands, and DOC-007 schematizes no CreateAssurancePolicy. WHY IT IS ADDED: AssurancePolicyDefinition.waiverRules is REQUIRED by the object schema and NO command or event could set it, so assurance.ts hardcoded `waiverRules: []` — the field was write-only-empty and a policy could never declare whether it may be waived. Same dangling-reference shape as ARTIFACT's outputArtifactIds (Increment 10a). Optional on the command so every existing caller stays valid. STILL UNREACHABLE, measured and surfaced, NOT fixed here: remediationRules — the one rule array still uncarried (RemediationRule is undefined corpus-wide; riskProfiles, named earlier, is not an AssurancePolicyDefinition field). requiredEvidence, optionalEvidence, dispositionRules, escalationRules are now carried AND declared on this event (Inc B/C)."
+        },
+        {
+          "field": "requiredEvidence",
+          "required": false,
+          "type": "EvidenceRequirement[]",
+          "note": "Mirrors CreateAssurancePolicy.requiredEvidence (EvidenceRequirement[], DOC-004 §6.1, Inc B). AssurancePolicyCreated/Edited are emitted via passthrough of the command payload (createObject/makeEvent, no eventPayload override), so the event ALREADY carries this field — declared here so the governed stream (the event log) records what the policy declared, not only the object-state snapshot. Inc B added it to the command but not this event; closed as governed-stream honesty."
+        },
+        {
+          "field": "optionalEvidence",
+          "required": false,
+          "type": "EvidenceRequirement[]",
+          "note": "Mirrors CreateAssurancePolicy.optionalEvidence (EvidenceRequirement[], DOC-004 §6.1, Inc B). AssurancePolicyCreated/Edited are emitted via passthrough of the command payload (createObject/makeEvent, no eventPayload override), so the event ALREADY carries this field — declared here so the governed stream (the event log) records what the policy declared, not only the object-state snapshot. Inc B added it to the command but not this event; closed as governed-stream honesty."
+        },
+        {
+          "field": "dispositionRules",
+          "required": false,
+          "type": "DispositionRule[]",
+          "note": "Mirrors CreateAssurancePolicy.dispositionRules (DispositionRule[], DOC-004 §10.2, Inc C). AssurancePolicyCreated/Edited are emitted via passthrough of the command payload (createObject/makeEvent, no eventPayload override), so the event ALREADY carries this field — declared here so the governed stream (the event log) records what the policy declared, not only the object-state snapshot. Inc C added it to the command but not this event; closed as governed-stream honesty."
+        },
+        {
+          "field": "escalationRules",
+          "required": false,
+          "type": "EscalationRule[]",
+          "note": "Mirrors CreateAssurancePolicy.escalationRules (EscalationRule[], DOC-004 §13, Inc C). AssurancePolicyCreated/Edited are emitted via passthrough of the command payload (createObject/makeEvent, no eventPayload override), so the event ALREADY carries this field — declared here so the governed stream (the event log) records what the policy declared, not only the object-state snapshot. Inc C added it to the command but not this event; closed as governed-stream honesty."
         },
         {
           "field": "permittedControlActions",
