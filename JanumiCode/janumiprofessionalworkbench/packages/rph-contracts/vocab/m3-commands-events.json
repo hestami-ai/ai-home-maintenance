@@ -4278,7 +4278,7 @@
           "field": "executionProvenance",
           "required": false,
           "type": "ExecutionProvenance",
-          "note": "WHO/WHAT produced this step result (resolved provider/model/version/environment). AUTHORED optional field atop the ratified DOC-007 §16.2 shape (which omits it): §16.1 puts executionProvenance on the CompleteExecutionStep COMMAND but §16.2 dropped it, so the identity that produced a high-consequence step was validated then discarded. Contract-drift fix -- the governed stream is the trace over non-deterministic agent work. (Follow-up: the floor gate still re-derives aiProduced heuristically; it could read this authoritatively.)"
+          "note": "WHO/WHAT produced this step result. AUTHORED optional field atop the ratified DOC-007 §16.2 shape (which omits it): §16.1 puts executionProvenance on the CompleteExecutionStep COMMAND but §16.2 dropped it. ExecutionProvenance is now a CONTRACTED shape (§0.3, grounded in the ratified §7.1 ProvenanceRecord vocabulary): originType (the §7.1 origin enum), producingExecutionAttemptId (the §16 item 23 producing-Attempt binding, by name), executedBy (ActorReference), evaluator (ActorReference). REINTERPRETATION SURFACED (§17): the first-slice draft of this field said resolved provider/model/version/environment; those runtime descriptors belong to the Attempt, so they are now carried by reference (producingExecutionAttemptId) and the resolved actor (executedBy incl. ActorReference.modelId/providerId), not as ungoverned inline strings. The floor gate now reads originType/executedBy.actorType as an authoritative aiProduced signal-0 (§8.4 L841)."
         },
         {
           "field": "structuredResult",

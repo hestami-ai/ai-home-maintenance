@@ -2577,10 +2577,29 @@
       "name": "ExecutionProvenance",
       "fields": [
         {
-          "field": "(undefined)",
-          "type": "—",
+          "field": "originType",
+          "type": "OriginType",
           "required": false,
-          "note": "Referenced by ValidatorResult.executionProvenance (§20) and CompleteExecutionStep (§16.1). NOT field-defined; distinct from ProvenanceRecord (§7.1). Source TBD."
+          "enumRef": "OriginTypeSchema",
+          "note": "The origin class of the execution result, reusing the RATIFIED DOC-007 §7.1 ProvenanceRecord.originType enum verbatim (USER_INPUT|MODEL_GENERATION|TOOL_OUTPUT|HUMAN_DECISION|MIGRATION|DERIVED|IMPORTED). MODEL_GENERATION/TOOL_OUTPUT are AI/agent-produced — the authoritative signal §8.4 L841 needs and the floor gate reads as signal 0 (aiProduced). OPTIONAL (not required as on §7.1) so it is additive over existing {} construction sites; the gate falls through to its heuristics when absent. AUTHORED under §0.3 to fill the §16 item 23 withholding, grounded in §7.1 rather than invented."
+        },
+        {
+          "field": "producingExecutionAttemptId",
+          "type": "string",
+          "required": false,
+          "note": "The Execution Attempt that produced this result — the 'producing-Attempt/context binding' DOC-007 §16 item 23 withholds by name. Reuses the §7.1 ProvenanceRecord field name verbatim; keyed to DOC-009 §10.4 execution_attempts(id) (also the FK target of §18.1 artifacts.producing_execution_attempt_id). Optional. AUTHORED under §0.3."
+        },
+        {
+          "field": "executedBy",
+          "type": "ActorReference",
+          "required": false,
+          "note": "The actor that PRODUCED this execution result (a step producer), typed by the ratified DOC-002 ActorReference (which already carries actorType HUMAN|AGENT|MODEL|... and modelId). A secondary aiProduced signal behind originType (actorType in {AGENT,MODEL}). Optional. Absorbs the de-facto {executedBy, modelId} step site — modelId lives inside ActorReference."
+        },
+        {
+          "field": "evaluator",
+          "type": "ActorReference",
+          "required": false,
+          "note": "The actor that EVALUATED (a ValidatorResult.executionProvenance, DOC-007 §20). LOAD-BEARING: the only field READ today (assurance.ts, the INV-8 §39-inv-8 independence check compares it against the producer). Typed by the ratified ActorReference. Optional — spread only when present, so a strictObject must permit its absence."
         }
       ]
     },

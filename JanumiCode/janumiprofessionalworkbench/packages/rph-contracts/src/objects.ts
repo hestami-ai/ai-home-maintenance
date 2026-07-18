@@ -39,6 +39,7 @@ import {
 	ObligationTypeSchema,
 	ObservationDispositionSchema,
 	ObservationTypeSchema,
+	OriginTypeSchema,
 	ProfessionalWorkObjectTypeSchema,
 	RecompositionContractStatusSchema,
 	RiskConsequenceSchema,
@@ -87,8 +88,6 @@ export const EscalationRuleSchema = z.record(z.string(), z.unknown());
 export type EscalationRule = z.infer<typeof EscalationRuleSchema>;
 export const EvidenceRequirementSchema = z.record(z.string(), z.unknown());
 export type EvidenceRequirement = z.infer<typeof EvidenceRequirementSchema>;
-export const ExecutionProvenanceSchema = z.record(z.string(), z.unknown());
-export type ExecutionProvenance = z.infer<typeof ExecutionProvenanceSchema>;
 export const ExecutionTransitionSchema = z.record(z.string(), z.unknown());
 export type ExecutionTransition = z.infer<typeof ExecutionTransitionSchema>;
 export const InputBindingSchema = z.record(z.string(), z.unknown());
@@ -191,6 +190,13 @@ export const CriterionResultSchema = z.strictObject({
 	evidenceIds: z.array(z.string())
 });
 export type CriterionResult = z.infer<typeof CriterionResultSchema>;
+export const ExecutionProvenanceSchema = z.strictObject({
+	originType: OriginTypeSchema.optional(),
+	producingExecutionAttemptId: z.string().optional(),
+	executedBy: ActorReferenceSchema.optional(),
+	evaluator: ActorReferenceSchema.optional()
+});
+export type ExecutionProvenance = z.infer<typeof ExecutionProvenanceSchema>;
 export const ExecutionStepSchema = z.strictObject({
 	id: z.string(),
 	executionPlanId: z.string(),

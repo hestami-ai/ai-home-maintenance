@@ -253,12 +253,9 @@ describe('ExecutionStep + RuntimeBinding handlers (live)', () => {
 		dispatch('StartExecutionStep', { stepId: STEP }, PLAN, 'EXECUTION_PLAN');
 		recordArtifact();
 		recordFloor(SATISFIED_FLOOR);
-		const provenance = {
-			provider: 'ollama',
-			model: 'gemma4:31b-it-qat',
-			modelVersion: 'qat',
-			environment: 'sandbox-1'
-		};
+		// ExecutionProvenance is now a contracted shape (§0.3, grounded in §7.1): the WHO/WHAT is the origin class
+		// plus the producing Execution Attempt (§16.23's binding), not ungoverned provider/model/version strings.
+		const provenance = { originType: 'MODEL_GENERATION', producingExecutionAttemptId: ATTEMPT };
 		const structuredResult = { summary: 'wrote the module', metrics: { linesChanged: 42 } };
 		expect(
 			dispatch(
