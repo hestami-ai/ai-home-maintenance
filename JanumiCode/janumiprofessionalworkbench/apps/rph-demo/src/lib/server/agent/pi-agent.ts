@@ -18,6 +18,7 @@ import { Type, type TSchema } from 'typebox';
 import type { ProfessionalRationaleSummary } from '@janumipwb/rph-assurance';
 import type { RationaleSink } from './rationale.js';
 import type { AuthoringAgent, AuthoringToolDescriptor, EmitFn, ParamSpec } from './types.js';
+import { piToolExecutionSucceeded, toPiToolResult } from './pi-tool-result.js';
 
 /** Map our flat param spec onto a TypeBox object schema (optional wrapper for non-required params). */
 function toTypeBox(spec: ParamSpec): TSchema {
@@ -35,7 +36,7 @@ function toTypeBox(spec: ParamSpec): TSchema {
 	return Type.Object(props);
 }
 
-/** Wrap our descriptors as Pi custom tools. Each returns the tool's human summary as the model-visible content. */
+/** Wrap our descriptors as Pi custom tools. Structured descriptor data is included in model-visible content. */
 function toPiTools(descriptors: AuthoringToolDescriptor[]) {
 	return descriptors.map((d) =>
 		defineTool({
@@ -44,11 +45,7 @@ function toPiTools(descriptors: AuthoringToolDescriptor[]) {
 			description: d.description,
 			parameters: toTypeBox(d.parameters),
 			execute: async (_toolCallId: string, params: Record<string, unknown>) => {
-				const result = d.run(params ?? {});
-				return {
-					content: [{ type: 'text' as const, text: result.summary }],
-					details: { ok: result.ok, data: result.data }
-				};
+				return toPiToolResult(d.run(params ?? {}));
 			}
 		})
 	);
@@ -151,7 +148,12 @@ export class PiAuthoringAgent implements AuthoringAgent {
 						break;
 					case 'tool_execution_end': {
 						const text = summarize(event.result);
-						emit({ kind: 'tool_end', tool: event.toolName, ok: !event.isError, summary: text });
+						emit({
+							kind: 'tool_end',
+							tool: event.toolName,
+							ok: piToolExecutionSucceeded(event.result, event.isError),
+							summary: text
+						});
 						break;
 					}
 					default:

@@ -3,7 +3,7 @@
   "version": "0.0.0",
   "private": true,
   "type": "module",
-  "description": "Rebuildable read-model projections built from the event stream. Data only — never a write target, never renders. Work/Execution/Assurance/Traceability/Change-Impact + the derived non-authoritative Compatibility view.",
+  "description": "Rebuildable read-model and derived-topology projections built from the event stream or canonical domain definitions. Data only — never a write target, never renders.",
   "license": "AGPL-3.0-only",
   "exports": {
     ".": {
@@ -25,6 +25,7 @@
   },
   "dependencies": {
     "@janumipwb/rph-contracts": "workspace:*",
+    "@janumipwb/rph-domain": "workspace:*",
     "@janumipwb/rph-ports": "workspace:*"
   },
   "devDependencies": {

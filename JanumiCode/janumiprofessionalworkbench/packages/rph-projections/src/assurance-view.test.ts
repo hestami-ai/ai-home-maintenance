@@ -333,6 +333,25 @@ describe('Assurance View fold — §38 claims evaluated + control actions (asses
 		expect(a.claimsEvaluated).toEqual(['clm_9']); // known at Started
 		expect(a.controlActions).toEqual([]); // not recommended until completion
 	});
+
+	it('§38 "missing evidence" is the policy-declared required set (Started.requiredEvidenceIds); absent = sourced none', () => {
+		const withReq = buildAssuranceView([
+			evt(1, 'AssuranceAssessmentStarted', {
+				assessmentId: 'asm_me',
+				assurancePolicyId: 'pol_x',
+				policyVersion: '1.0.0',
+				subjectObjectIds: ['pwu_1'],
+				subjectSemanticVersions: { pwu_1: 1 },
+				claimIds: [],
+				requiredEvidenceIds: ['EV-01', 'EV-02']
+			})
+		]);
+		expect(withReq.assessments['asm_me']!.missingEvidence).toEqual(['EV-01', 'EV-02']);
+		// A Started event WITHOUT requiredEvidenceIds (the policy requires no evidence) reads as a real sourced 'none',
+		// not 'unknown' — the field is now populated from the event, never fabricated.
+		const none = buildAssuranceView([started('asm_none', 'pwu_1')]);
+		expect(none.assessments['asm_none']!.missingEvidence).toEqual([]);
+	});
 });
 
 describe('§38 "applicable policies" — the required-but-unassessed join (object state x assessment view)', () => {

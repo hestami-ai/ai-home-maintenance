@@ -22,12 +22,15 @@ test.describe('PWA Designer — rich PWU Type authoring (fields, help, template,
 		await expect(card).toBeVisible();
 		await gotoHydrated(page, (await card.getAttribute('href'))!);
 
-		// Open the define form. The field HELP is present (the guidance the create flow was missing).
+		// Open the define form from a collapsed inspector. Define is an explicit mode transition, so it must expand the
+		// inspector and expose the field HELP (the guidance the create flow was missing).
+		await page.getByRole('button', { name: 'Collapse inspector' }).click();
 		await page.getByRole('button', { name: '+ Define PWU Type' }).click();
+		await expect(page.locator('#pwu-type-form-heading')).toBeFocused();
 		await expect(page.getByText(/SCREAMING_SNAKE token classifying the work/)).toBeVisible();
 
 		// FROM A TEMPLATE (the copy-on-use PWU library) + a custom completion rule + mark root (rich fields).
-		await page.getByRole('combobox').selectOption({ label: 'Architecture Definition' });
+		await page.getByLabel('Start from template').selectOption({ label: 'Architecture Definition' });
 		await page.locator('input[name="completionRule"]').fill('architecture done rule');
 		await page.getByLabel(/Root type/).check();
 		await page.getByRole('button', { name: 'Add type' }).click();
@@ -45,6 +48,7 @@ test.describe('PWA Designer — rich PWU Type authoring (fields, help, template,
 		await page.getByRole('button', { name: 'Edit', exact: true }).click();
 		await page.locator('textarea[name="purpose"]').fill('the revised architecture purpose');
 		await page.getByRole('button', { name: 'Save changes' }).click();
+		await expect(page.getByRole('button', { name: 'Edit', exact: true })).toBeVisible();
 		snap = await introspect(request);
 		t = snap.pwuTypes.find((x) => x.state.name === 'Architecture Definition');
 		expect(t!.state.purpose).toBe('the revised architecture purpose');
@@ -52,6 +56,7 @@ test.describe('PWA Designer — rich PWU Type authoring (fields, help, template,
 
 		// REMOVE the type — it disappears from the Work Architecture (tombstoned).
 		await page.getByRole('button', { name: 'Remove', exact: true }).click();
+		await expect(page.locator('.svelte-flow__node')).toHaveCount(0);
 		snap = await introspect(request);
 		expect(snap.pwuTypes.some((x) => x.state.name === 'Architecture Definition')).toBe(false);
 

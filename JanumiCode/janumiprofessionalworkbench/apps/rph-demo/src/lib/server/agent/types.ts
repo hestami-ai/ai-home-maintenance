@@ -69,7 +69,7 @@ export interface AuthoringToolDescriptor {
 	readonly name: string;
 	readonly description: string;
 	readonly parameters: ParamSpec;
-	/** Whether this tool mutates the DRAFT (PROPOSE) or only reads it (READ) — surfaced to the log/UI. */
+	/** Whether this tool mutates governed workbench state (usually the DRAFT; see shared policy creation). */
 	readonly mutates: boolean;
 	run(args: Record<string, unknown>): ToolRunResult;
 }

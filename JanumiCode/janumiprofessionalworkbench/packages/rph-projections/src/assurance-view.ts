@@ -38,17 +38,20 @@
 //                                       CORRECTION (Increment F): an earlier note here filed this UNSOURCED as "no
 //                                       control-action event exists" — that grepped for an event TYPE and missed the
 //                                       FIELD on the completion event. The datum was on the wire all along.
+//     missingEvidence (§38 "missing evidence") — the required-evidence-requirement ids the assessment's policy
+//                                       declares (AssuranceAssessmentStarted.requiredEvidenceIds, resolved from the
+//                                       policy's requiredEvidence, §6.1). Empty = the policy requires no evidence — a
+//                                       real sourced "none". PARTIAL, disclosed: "missing" is "required − received",
+//                                       but the per-requirement SATISFACTION side (§32 submitEvidenceForAssessment ->
+//                                       AssuranceEvidenceReceived) is not built, so `missingEvidence` currently equals
+//                                       the full required set — a policy that DOES declare requiredEvidence reads all
+//                                       of it as missing until that sub-lifecycle lands (DOC-004 §31 L1770). For all
+//                                       current data (no policy declares requiredEvidence) it is [] = sourced none.
 //
-//   NOT POPULATED, and WHY — recorded, never faked (a blank the view must render as "unknown", not "none"):
-//     missingEvidence                 — the required-evidence set never reaches the log: AssuranceEvidenceRequired /
-//                                       AssuranceEvidenceReceived are ratified NAMES but schematized nowhere, and the
-//                                       §32 submitEvidenceForAssessment command that would emit them is unbuilt — a
-//                                       schema-and-wiring task, not a fold (DOC-004 §31 L1770). Empty = UNKNOWN, not NONE.
-//                                       This is now the ONLY §38 field this view cannot source.
-//
-// The distinction between "unknown" (no source) and "none" (a real empty) is load-bearing: rendering an
-// unsourced field as "none" is the false-negative that lets a node look assured when it was never checked. Only
-// missingEvidence remains unknown; every other §38 field is sourced, so their empties are real.
+// The distinction between "unknown" (no source) and "none" (a real empty) is load-bearing: rendering an unsourced
+// field as "none" is the false-negative that lets a node look assured when it was never checked. Every §38 field is
+// now at least sourced; `missingEvidence` alone is PARTIAL (required sourced, satisfaction-tracking deferred), and
+// its empties are real (a policy requiring no evidence has none missing).
 import type { DomainEvent } from '@janumipwb/rph-contracts';
 
 export interface AssuranceObservationView {
@@ -112,6 +115,10 @@ export interface AssuranceAssessmentView {
 	/** §38 "control actions" — the control actions the validator recommended for this result
 	 *  (AssuranceAssessmentCompleted.recommendedControlActions). Empty until completion, then a real set. */
 	readonly controlActions: readonly string[];
+	/** §38 "missing evidence" — the required-evidence-requirement ids the policy declares, not yet received. Sourced
+	 *  from AssuranceAssessmentStarted.requiredEvidenceIds; equals the full required set until per-requirement
+	 *  satisfaction tracking (§32 submitEvidenceForAssessment) is built. Empty = the policy requires no evidence. */
+	readonly missingEvidence: readonly string[];
 }
 
 export interface AssuranceView {
@@ -149,7 +156,10 @@ function foldStarted(view: AssuranceView, p: Payload): AssuranceView {
 		invalidations: [],
 		// §38 "claims evaluated" rides the Started event; "control actions" are recommended only at completion.
 		claimsEvaluated: strArr(p.claimIds),
-		controlActions: []
+		controlActions: [],
+		// §38 "missing evidence": the policy's required-evidence-requirement ids, resolved onto the Started event. It
+		// is the full required set until §32 submitEvidenceForAssessment tracks per-requirement satisfaction.
+		missingEvidence: strArr(p.requiredEvidenceIds)
 	});
 }
 

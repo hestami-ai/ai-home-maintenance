@@ -9,6 +9,7 @@ import {
 	type PwaAuthoringBroker,
 	type ProposalResult
 } from '@janumipwb/rph-authoring';
+import { buildPwuBehaviorProjection } from '@janumipwb/rph-projections';
 import type { RationaleSink } from './rationale.js';
 import type { AuthoringToolDescriptor, ToolRunResult } from './types.js';
 
@@ -40,7 +41,27 @@ function fromProposal(r: ProposalResult, okSummary: string): ToolRunResult {
 	return { ok: false, summary: `Rejected: ${r.error ?? r.status ?? 'unknown error'}` };
 }
 
-/** Build the tool descriptors for a broker scoped to one DRAFT PWA. `rationale` collects the §9.7 professional
+/** Build the broker-independent READ descriptor for the derived PWU lifecycle projection. */
+export function buildPwuLifecycleTopologyTool(): AuthoringToolDescriptor {
+	return {
+		name: 'get_pwu_lifecycle_topology',
+		description:
+			'Read the derived, non-authoritative generic PWU work-lifecycle topology: states, initial/terminal markers, transitions, and explanatory trigger/guard prose. This is simulation-only: SIMULATE.PWU.* events are browser-local, and this tool never evaluates current-instance eligibility, dispatches a domain Command, mutates or persists PWA/PWU state, authors PwuBehavior, or provides undo/redo.',
+		parameters: {},
+		mutates: false,
+		run: () => {
+			const topology = buildPwuBehaviorProjection();
+			return {
+				ok: true,
+				summary: `Derived non-authoritative PWU lifecycle topology: ${topology.states.length} state(s), ${topology.transitions.length} transition(s). Simulation only; no domain Command was dispatched and no professional state was mutated.`,
+				data: topology
+			};
+		}
+	};
+}
+
+/** Build the tool descriptors for a broker primarily scoped to one DRAFT PWA. Assurance-policy creation is the
+ *  explicit exception: it mutates the shared workbench library. `rationale` collects the §9.7 professional
  *  rationale summary the producer returns — see ./rationale for why it is a tool and not scraped narration. */
 export function buildAuthoringTools(
 	broker: PwaAuthoringBroker,
@@ -99,7 +120,7 @@ export function buildAuthoringTools(
 		{
 			name: 'get_pwa',
 			description:
-				'Read the DRAFT Professional Work Architecture (PWA) being authored: its name, description, domain, and publication status. Call this first to orient yourself.',
+				'Read the current Professional Work Architecture (PWA): its name, description, domain, and publication status. Call this first to orient yourself and determine whether PWA/PWU Type authoring is still open.',
 			parameters: {},
 			mutates: false,
 			run: () => {
@@ -115,7 +136,7 @@ export function buildAuthoringTools(
 		{
 			name: 'list_pwu_types',
 			description:
-				'List the PWU Types already defined on this PWA (the nodes of the Work Architecture graph), with their kind, whether each is the root, and the permitted child links + data-flow inputs/outputs.',
+				'List the PWU Types already defined on this PWA (the nodes of the Work Architecture graph), with their kind, whether each is the root, and the permitted child links + data-flow inputs/outputs. Returns authored semantic fields only; canvas positions, layout direction, collapse/selection, and other presentation state are excluded.',
 			parameters: {},
 			mutates: false,
 			run: () => {
@@ -139,6 +160,7 @@ export function buildAuthoringTools(
 				};
 			}
 		},
+		buildPwuLifecycleTopologyTool(),
 		{
 			name: 'get_catalog',
 			description:
@@ -157,7 +179,7 @@ export function buildAuthoringTools(
 		{
 			name: 'list_assurance_policies',
 			description:
-				'List the workbench Assurance Policies a PWU Type may require via requiredAssurancePolicyIds. Includes the LOCKED mandatory floor policies (schema/invariant, identity/provenance, reasoning review — these always apply, never declare them) and the additive ACTIVE policies you can reference. Use create_assurance_policy only for a genuinely new required treatment.',
+				'List the workbench Assurance Policy library and each policy status. The LOCKED mandatory floor policies always apply and must never be declared. Only additive ACTIVE policies may be referenced via requiredAssurancePolicyIds; DRAFT policies require human activation first. Use create_assurance_policy only for a genuinely new required treatment.',
 			parameters: {},
 			mutates: false,
 			run: () => {
@@ -174,7 +196,7 @@ export function buildAuthoringTools(
 		{
 			name: 'review_composition',
 			description:
-				'Review the current graph STRUCTURE for problems: over-broad fan-out (a type permitting too many children — a flat "star" instead of a real decomposition hierarchy), types unreachable from the root, or a missing/duplicate root. Call this after building and FIX any findings before finishing.',
+				'Review the current authored graph STRUCTURE for problems: over-broad fan-out (a type permitting too many children — a flat "star" instead of a real decomposition hierarchy), types unreachable from the root, or a missing/duplicate root. Call this after building and FIX any findings before finishing. Findings concern semantic composition and cannot be fixed by moving or re-laying out nodes.',
 			parameters: {},
 			mutates: false,
 			run: () => {
@@ -194,7 +216,7 @@ export function buildAuthoringTools(
 		{
 			name: 'scaffold_graph',
 			description:
-				'Build a WHOLE PWU Type graph in ONE atomic step: define several types and wire their permitted-child (composition) edges together. All are created or none are (a single failure rolls back the batch — no half-built graph). Give each type a short `tempKey` and reference children by their tempKeys. Prefer this when creating a multi-node architecture at once; use define_pwu_type + link_types for incremental edits.',
+				'Build a WHOLE PWU Type graph in ONE atomic tool invocation: define several types and wire their permitted-child (composition) edges together. Within this invocation, all are created or none are (a single failure rolls back this batch — no half-built batch). This atomicity does not extend to the full agent turn and supplies no whole-turn undo or rollback. Give each type a short `tempKey` and reference children by their tempKeys. Prefer this when creating a multi-node architecture at once; use define_pwu_type + link_types for incremental edits.',
 			parameters: {
 				types: {
 					type: 'object[]',
@@ -272,7 +294,7 @@ export function buildAuthoringTools(
 				}));
 				return fromProposal(
 					broker.scaffold(specs),
-					`Scaffolded ${specs.length} PWU Type(s) atomically.`
+					`Scaffolded ${specs.length} PWU Type(s) atomically within this tool invocation.`
 				);
 			}
 		},
@@ -297,7 +319,7 @@ export function buildAuthoringTools(
 		{
 			name: 'create_assurance_policy',
 			description:
-				'Create a NEW authorable Assurance Policy in the workbench library (on top of the seeded ones), then reference its returned id from a PWU Type’s requiredAssurancePolicyIds. Only for a genuinely new required treatment not covered by an existing policy — prefer reusing what list_assurance_policies already offers. Never recreate the mandatory floor (schema/invariant, identity/provenance, reasoning review): it always applies.',
+				'Create a NEW DRAFT Assurance Policy in the SHARED workbench-wide library. It cannot be referenced from a PWU Type until a human reviews and activates it in the policy manager; this agent has no policy-activation tool. This mutation is NOT scoped to the current PWA DRAFT and has no undo/rollback in this authoring session. Call it only when the user explicitly authorizes a genuinely new shared treatment not covered by an existing policy; otherwise reuse an ACTIVE policy from list_assurance_policies or ask. Never recreate the mandatory floor: it always applies.',
 			parameters: {
 				name: {
 					type: 'string',
@@ -341,7 +363,10 @@ export function buildAuthoringTools(
 					independenceRequirement: str(a.independenceRequirement) || undefined,
 					criteria: strArr(a.criteria)
 				});
-				return fromProposal(r, `Created Assurance Policy "${str(a.name)}" as ${r.id}.`);
+				return fromProposal(
+					r,
+					`Created workbench-wide Assurance Policy "${str(a.name)}" as ${r.id} in DRAFT. A human must review and activate it in the policy manager before any PWU Type may reference it. This shared-library mutation is not scoped to the current PWA DRAFT and is not reversible in this session.`
+				);
 			}
 		},
 		{

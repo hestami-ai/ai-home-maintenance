@@ -111,6 +111,62 @@ describe('PwaAuthoringBroker — the LLM-agnostic PWA-authoring capability layer
 		expect(broker.listTypes()).toEqual([]);
 	});
 
+	it('allows only ACTIVE non-floor policies as new declarations while preserving an existing inactive reference', () => {
+		const policy = broker.createPolicy({ name: 'Tenant Review' });
+		expect(policy.ok).toBe(true);
+		expect(
+			broker.defineType({
+				name: 'Rejected Draft Reference',
+				pwuKind: 'REJECTED',
+				requiredAssurancePolicyIds: [policy.id!]
+			}).error
+		).toMatch(/is DRAFT/);
+		expect(
+			broker.defineType({
+				name: 'Rejected Floor Reference',
+				pwuKind: 'REJECTED',
+				requiredAssurancePolicyIds: ['floor.reasoning-review']
+			}).error
+		).toMatch(/must not be referenced explicitly/);
+		expect(
+			broker.defineType({
+				name: 'Rejected Missing Reference',
+				pwuKind: 'REJECTED',
+				requiredAssurancePolicyIds: ['pol_missing']
+			}).error
+		).toMatch(/does not exist/);
+
+		expect(
+			raw('ActivateAssurancePolicy', policy.id!, 'ASSURANCE_POLICY', { policyId: policy.id! })
+				.status
+		).toBe('ACCEPTED');
+		const type = broker.defineType({
+			name: 'Governed Work',
+			pwuKind: 'GOVERNED',
+			requiredAssurancePolicyIds: [policy.id!]
+		});
+		expect(type.ok, type.error).toBe(true);
+		expect(
+			raw('SuspendAssurancePolicy', policy.id!, 'ASSURANCE_POLICY', { policyId: policy.id! }).status
+		).toBe('ACCEPTED');
+
+		// An edit can retain or remove the declaration after suspension; it just cannot newly add one.
+		expect(
+			broker.editType(type.id!, {
+				purpose: 'Updated without erasing its prior declaration.',
+				requiredAssurancePolicyIds: [policy.id!]
+			}).ok
+		).toBe(true);
+		expect(broker.getType(type.id!)!.requiredAssurancePolicyIds).toEqual([policy.id]);
+
+		const draft = broker.createPolicy({ name: 'Still Draft' });
+		expect(
+			broker.editType(type.id!, {
+				requiredAssurancePolicyIds: [policy.id!, draft.id!]
+			}).error
+		).toMatch(/is DRAFT/);
+	});
+
 	it('defines from a catalog template, carrying the blueprint fields (copy-on-use)', () => {
 		const r = broker.defineFromTemplate('architecture');
 		expect(r.ok).toBe(true);
@@ -206,6 +262,20 @@ describe('PwaAuthoringBroker — the LLM-agnostic PWA-authoring capability layer
 			{ tempKey: 'root', name: 'Root', pwuKind: 'ROOT', childTempKeys: ['ghost'] }
 		]);
 		expect(r.ok).toBe(false);
+		expect(broker.listTypes()).toEqual([]);
+	});
+
+	it('scaffold rejects a DRAFT policy reference before committing any type', () => {
+		const policy = broker.createPolicy({ name: 'Draft Treatment' });
+		const r = broker.scaffold([
+			{
+				tempKey: 'root',
+				name: 'Root',
+				pwuKind: 'ROOT',
+				requiredAssurancePolicyIds: [policy.id!]
+			}
+		]);
+		expect(r.error).toMatch(/is DRAFT/);
 		expect(broker.listTypes()).toEqual([]);
 	});
 

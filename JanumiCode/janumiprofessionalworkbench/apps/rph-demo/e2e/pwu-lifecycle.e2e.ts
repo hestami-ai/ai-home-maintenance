@@ -9,17 +9,12 @@ test.describe('Undertaking Workbench — PWU lifecycle enforces no-green-without
 		await resetEngine(request, 'reference');
 	});
 
-	// PRE-EXISTING FAILURE, scoped as a separate increment (not §38 read-model/UI work). The demo's interactive
-	// drive (beginExecute / recordAssurance) sets executionState=SUCCEEDED and assuranceState=SATISFIED via the
-	// controller shortcut (ChangePwuState with empty supportingObjectIds). Since Increment 28, the engine enforces
-	// RPH-PWU-006's Given: SUCCEEDED must cite an EXECUTION_PLAN with a succeeded step, and SATISFIED must cite a
-	// SATISFIED ASSURANCE_ASSESSMENT — the reference SEED was updated to earn both, the demo drive was not. Making
-	// the interactive drive earn its states (execution step + create/activate policy + evidence + a real assessment
-	// with a distinct evaluator for independence) is a bounded harmonization, tracked in the HARMONIZATION-LOG.
-	test.fixme('a PWU only becomes SATISFIED after its assurance is SATISFIED', async ({
-		page,
-		request
-	}) => {
+	// The demo's interactive drive now EARNS its states against the RPH-PWU-006 Given guards (Increment 28+): the
+	// controller can no longer declare executionState=SUCCEEDED or assuranceState=SATISFIED. beginExecute runs a real
+	// EXECUTION_PLAN with a succeeded TRANSFORMATION step (cited on the SUCCEEDED hop); recordAssurance requests +
+	// completes a SATISFIED ASSURANCE_ASSESSMENT under a NONE-independence demo policy (cited on the SATISFIED hop).
+	// This test drives that whole path end to end through the UI and still proves INV-5 (no green without assurance).
+	test('a PWU only becomes SATISFIED after its assurance is SATISFIED', async ({ page, request }) => {
 		// Arrange: a fresh Undertaking with one PROPOSED PWU.
 		await gotoHydrated(page, '/undertakings');
 		await page.getByRole('button', { name: '+ New Undertaking' }).click();
@@ -89,7 +84,9 @@ test.describe('Undertaking Workbench — PWU lifecycle enforces no-green-without
 		await expect(page.getByText('Claims evaluated').first()).toBeVisible();
 		await expect(page.getByText('Control actions').first()).toBeVisible();
 		await expect(page.getByText('Missing evidence').first()).toBeVisible();
-		await expect(page.getByText('unknown (source event unbuilt)').first()).toBeVisible();
+		// missing evidence is now SOURCED from the policy's requiredEvidence (the reference policies require none, so
+		// it reads a real 'none') — the old "unknown (source event unbuilt)" placeholder must be gone.
+		await expect(page.getByText('unknown (source event unbuilt)')).toHaveCount(0);
 		// §38 "applicable policies": the reference PWUs realize types carrying requiredAssurancePolicyIds, so the
 		// per-PWU applicable-policies join renders — surfacing required-but-unassessed where no assessment covers one.
 		await expect(page.getByRole('heading', { name: /Applicable policies/i }).first()).toBeVisible();

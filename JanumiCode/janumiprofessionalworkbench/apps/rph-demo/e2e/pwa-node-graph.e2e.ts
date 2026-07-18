@@ -28,11 +28,17 @@ test.describe('PWA Designer — node graph', () => {
 		await page.locator('input[name="pwuKind"]').fill('ALPHA_ROOT');
 		await page.getByLabel(/Root type/).check();
 		await page.getByRole('button', { name: 'Add type' }).click();
+		await expect(
+			page.locator('.svelte-flow__node').filter({ hasText: 'Alpha Root' })
+		).toBeVisible();
 
 		await page.getByRole('button', { name: '+ Define PWU Type' }).click();
 		await page.locator('input[name="name"]').fill('Beta Child');
 		await page.locator('input[name="pwuKind"]').fill('BETA_CHILD');
 		await page.getByRole('button', { name: 'Add type' }).click();
+		await expect(
+			page.locator('.svelte-flow__node').filter({ hasText: 'Beta Child' })
+		).toBeVisible();
 
 		// Two nodes render on the canvas.
 		await expect(page.locator('.svelte-flow__node')).toHaveCount(2);
@@ -40,8 +46,9 @@ test.describe('PWA Designer — node graph', () => {
 		// Link Alpha Root -> Beta Child (permitted child) by clicking the Alpha node and editing it.
 		await page.locator('.svelte-flow__node').filter({ hasText: 'Alpha Root' }).click();
 		await page.getByRole('button', { name: 'Edit', exact: true }).click();
-		await page.getByLabel('Beta Child').check();
+		await page.getByRole('checkbox', { name: 'Beta Child', exact: true }).check();
 		await page.getByRole('button', { name: 'Save changes' }).click();
+		await expect(page.locator('.svelte-flow__edge')).toHaveCount(1);
 
 		// TRUTH: the engine recorded the composition link.
 		const snap = await introspect(request);
@@ -50,7 +57,6 @@ test.describe('PWA Designer — node graph', () => {
 		expect(alpha.state.permittedChildTypeIds).toContain(beta.id);
 
 		// SEMANTIC: a composition edge now renders.
-		await expect(page.locator('.svelte-flow__edge')).toHaveCount(1);
 		await page.screenshot({ path: 'e2e-results/pwa-node-graph.png', fullPage: true });
 	});
 });

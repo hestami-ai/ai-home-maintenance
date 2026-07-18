@@ -1,13 +1,31 @@
 <script lang="ts">
 	import { enhance } from '$app/forms';
 	import { invalidateAll } from '$app/navigation';
+	import type { SubmitFunction } from '@sveltejs/kit';
 	import { SvelteFlow, Background, Controls, Panel } from '@xyflow/svelte';
 	import '@xyflow/svelte/dist/style.css';
-	import type { Edge, Node } from '@xyflow/svelte';
-	import { toPwaFlow, type DataFlowEdgeData } from '$lib/pwaFlow';
+	import type { Edge, FitViewOptions, Node } from '@xyflow/svelte';
+	import { tick } from 'svelte';
+	import {
+		toPwaFlow,
+		type DataFlowEdgeData,
+		type PwaLayoutDirection
+	} from '$lib/pwaFlow';
 	import PwuTypeCard from '$lib/PwuTypeCard.svelte';
+	import PwuBehaviorPanel from '$lib/behavior/PwuBehaviorPanel.svelte';
+	import {
+		EMPTY_CANVAS_HISTORY,
+		recordCanvasMove,
+		redoCanvasMove,
+		undoCanvasMove,
+		type CanvasHistory
+	} from '$lib/canvasHistory';
 	import { draggable } from '$lib/actions/draggable';
-	import { analyzePwaGraph, buildPwaGraphExport } from '@janumipwb/rph-projections';
+	import {
+		analyzePwaGraph,
+		buildPwaGraphExport,
+		buildPwuBehaviorProjection
+	} from '@janumipwb/rph-projections';
 	import {
 		PWU_TYPE_CATALOG,
 		PWU_TYPE_HELP,
@@ -38,6 +56,12 @@
 	// Selection = an explicit user/agent override, falling back to the root (or first) type. Deriving it from `data`
 	// keeps it correct when the graph changes and self-heals when the selected type is removed.
 	let selectedOverride = $state<string | null>(null);
+	let selectionRevision = 0;
+	let mutationSelectionRevision = 0;
+	function selectNode(id: string) {
+		selectionRevision += 1;
+		selectedOverride = id;
+	}
 	const selected = $derived(
 		selectedOverride && data.types.some((t) => t.id === selectedOverride)
 			? selectedOverride
@@ -45,6 +69,15 @@
 	);
 	const current = $derived(data.types.find((t) => t.id === selected));
 	const editable = $derived(data.pwa.publicationStatus === 'DRAFT');
+	const panelAwareFitViewOptions: FitViewOptions = $derived({
+		padding: {
+			top: '24px',
+			right: '360px',
+			bottom: '150px',
+			left: editable ? '328px' : '24px'
+		},
+		minZoom: 0.2
+	});
 	// A floor waiver is a pre-publication override — offer it through the publish FSM up to (not incl.) PUBLISHED.
 	const canWaive = $derived(
 		['DRAFT', 'UNDER_REVIEW', 'VALIDATED'].includes(data.pwa.publicationStatus)
@@ -61,23 +94,82 @@
 	const rank = $derived(RANK[data.pwa.publicationStatus] ?? 0);
 
 	// Node graph: PWU Types are nodes rendered by the PwuTypeCard custom node. The BASE view is the composition
-	// ("permits") tree, laid out top-down by dagre. Data-flow (requiredOutputs→requiredInputs) is a SEPARATE overlay,
-	// off by default (§11.7.2: composition ≠ order). Collapsing a non-leaf hides its subtree. Recomputed when the
-	// DRAFT, selection, collapse set, or overlay toggle changes.
+	// ("permits") tree, projected through @statelyai/graph and laid out by ELK. Data-flow
+	// (requiredOutputs→requiredInputs) is a SEPARATE overlay, off by default (§11.7.2: composition ≠ order).
+	// Collapsing a non-leaf hides its subtree. Canvas position history is presentation-only and never reverses a
+	// Command, PWU Type edit, deletion, or agent turn.
 	const nodeTypes = { pwuType: PwuTypeCard };
 	let collapsed = $state<Set<string>>(new Set());
 	let showDataFlow = $state(false);
+	let layoutDirection = $state<PwaLayoutDirection>('RIGHT');
+	let layoutPending = $state(true);
+	let layoutError = $state('');
+	let layoutEngine = $state<'ELK' | 'DAGRE' | null>(null);
 	function toggleCollapse(id: string) {
 		const next = new Set(collapsed);
 		if (next.has(id)) next.delete(id);
 		else next.add(id);
 		collapsed = next;
 	}
-	const flow = $derived(
-		toPwaFlow(data.types, { collapsed, showDataFlow, onToggleCollapse: toggleCollapse })
-	);
 	let nodes = $state<Node[]>([]);
 	let edges = $state<Edge[]>([]);
+	let canvasHistory = $state<CanvasHistory>(EMPTY_CANVAS_HISTORY);
+	let dragStartNodes: Node[] | null = null;
+	let keyboardStartNodes: Node[] | null = null;
+	let layoutRequest = 0;
+	let appliedLayoutKey = '';
+	let behaviorRun = $state(0);
+	const behaviorTopology = buildPwuBehaviorProjection();
+
+	type NodeDragEvent = { readonly targetNode: Node | null; readonly nodes: Node[] };
+	function copyNodePositions(source: readonly Node[]): Node[] {
+		return source.map((node) => ({ ...node, position: { ...node.position } }));
+	}
+	function beginCanvasMove() {
+		dragStartNodes = copyNodePositions(nodes);
+	}
+	function finishCanvasMove(event: NodeDragEvent) {
+		if (!dragStartNodes) return;
+		const movedPositions = new Map(event.nodes.map((node) => [node.id, node.position]));
+		const after = nodes.map((node) => {
+			const position = movedPositions.get(node.id);
+			return position ? { ...node, position: { ...position } } : node;
+		});
+		canvasHistory = recordCanvasMove(canvasHistory, dragStartNodes, after);
+		nodes = after;
+		dragStartNodes = null;
+	}
+	const CANVAS_MOVE_KEYS = new Set(['ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight']);
+	function isCanvasKeyboardMove(event: KeyboardEvent): boolean {
+		if (!CANVAS_MOVE_KEYS.has(event.key) || !nodes.some((node) => node.selected)) return false;
+		const target = event.target;
+		return !(
+			target instanceof HTMLElement &&
+			target.closest(
+				'input, textarea, select, button, [contenteditable="true"], [data-canvas-move-ignore]'
+			)
+		);
+	}
+	// Svelte Flow moves selected nodes in its own keydown handler. Capture the pre-keydown state, then record the
+	// bound post-keydown positions during bubbling so keyboard accessibility shares the same chronological history.
+	function beginKeyboardCanvasMove(event: KeyboardEvent) {
+		keyboardStartNodes = isCanvasKeyboardMove(event) ? copyNodePositions(nodes) : null;
+	}
+	function finishKeyboardCanvasMove(event: KeyboardEvent) {
+		if (!keyboardStartNodes || !CANVAS_MOVE_KEYS.has(event.key)) return;
+		canvasHistory = recordCanvasMove(canvasHistory, keyboardStartNodes, nodes);
+		keyboardStartNodes = null;
+	}
+	function undoCanvasPosition() {
+		const result = undoCanvasMove(canvasHistory, nodes);
+		canvasHistory = result.history;
+		nodes = result.nodes;
+	}
+	function redoCanvasPosition() {
+		const result = redoCanvasMove(canvasHistory, nodes);
+		canvasHistory = result.history;
+		nodes = result.nodes;
+	}
 
 	// Clicking a data-flow edge (its ⤳ label or its line) selects it (xyflow native `selected`); the detail panel
 	// then reveals the configured hand-off it carries in `data` — which artifacts flow, and between which types.
@@ -127,13 +219,65 @@
 		].join('\n')
 	);
 	$effect(() => {
-		nodes = flow.nodes;
-		edges = flow.edges;
+		// Capture every reactive input synchronously. ELK resolves asynchronously, so a generation token prevents an
+		// older layout from overwriting a newer structure, collapse state, overlay, or lens selection.
+		const types = data.types;
+		const collapsedSnapshot = new Set(collapsed);
+		const overlay = showDataFlow;
+		const direction = layoutDirection;
+		const layoutKey = JSON.stringify({
+			direction,
+			collapsed: [...collapsedSnapshot].sort(),
+			composition: types.map((type) => [type.id, ...type.permittedChildTypeIds])
+		});
+		const request = ++layoutRequest;
+		layoutPending = true;
+		layoutError = '';
+
+		void toPwaFlow(types, {
+			collapsed: collapsedSnapshot,
+			showDataFlow: overlay,
+			layoutDirection: direction,
+			onToggleCollapse: toggleCollapse
+		})
+			.then((flow) => {
+				if (request !== layoutRequest) return;
+
+				// Toggling a non-layout overlay must not erase a user's manual arrangement or its history.
+				const prior = new Map(nodes.map((node) => [node.id, node]));
+				const preservePresentation = appliedLayoutKey === layoutKey;
+				nodes = preservePresentation
+					? flow.nodes.map((node) => {
+							const previous = prior.get(node.id);
+							return previous
+								? { ...node, position: previous.position, selected: previous.selected }
+								: node;
+						})
+					: flow.nodes;
+				edges = flow.edges;
+				layoutEngine = flow.layoutEngine;
+				if (!preservePresentation) {
+					canvasHistory = EMPTY_CANVAS_HISTORY;
+					dragStartNodes = null;
+				}
+				appliedLayoutKey = layoutKey;
+				layoutPending = false;
+			})
+			.catch((error) => {
+				if (request !== layoutRequest) return;
+				layoutPending = false;
+				layoutError = error instanceof Error ? error.message : String(error);
+			});
+
+		return () => {
+			if (request === layoutRequest) layoutRequest += 1;
+		};
 	});
 
 	// Shared define/edit PWU Type form: formMode is null (inspector shows the selected node) | 'define' | { editId }.
 	type FormMode = null | 'define' | { editId: string };
 	let formMode = $state<FormMode>(null);
+	let typeMutationPending = $state(false);
 	let showPwaEdit = $state(false);
 	let agentCollapsed = $state(false);
 	let inspectorCollapsed = $state(false);
@@ -156,14 +300,34 @@
 
 	$effect(() => {
 		if (form?.definedType) {
-			selectedOverride = form.definedType;
+			// Auto-select the new type only if the human did not make a newer selection while the action was in
+			// flight. A late invalidation must not overwrite an intentional node click.
+			if (selectionRevision === mutationSelectionRevision) selectedOverride = form.definedType;
 			formMode = null;
 		} else if (form?.editedType || form?.removedType) {
 			formMode = null;
 		}
 	});
 
+	// Keep another Define/Edit transition from overtaking an enhanced form action that is still invalidating page
+	// data. Otherwise a fast second click can open a fresh form just before the first action result closes it.
+	const enhanceTypeMutation: SubmitFunction = () => {
+		typeMutationPending = true;
+		mutationSelectionRevision = selectionRevision;
+		return async ({ update }) => {
+			try {
+				await update();
+				await tick();
+			} finally {
+				typeMutationPending = false;
+			}
+		};
+	};
+
 	function openDefine() {
+		if (typeMutationPending) return;
+		showPolicyManager = false;
+		inspectorCollapsed = false;
 		Object.assign(f, {
 			name: '',
 			pwuKind: '',
@@ -177,10 +341,14 @@
 		selectedPolicyIds = [];
 		childRules = {};
 		formMode = 'define';
+		focusTypeForm();
 	}
 	function openEdit(id: string) {
+		if (typeMutationPending) return;
 		const t = data.types.find((x) => x.id === id);
 		if (!t) return;
+		showPolicyManager = false;
+		inspectorCollapsed = false;
 		Object.assign(f, {
 			name: t.name,
 			pwuKind: t.pwuKind,
@@ -199,6 +367,7 @@
 			])
 		);
 		formMode = { editId: id };
+		focusTypeForm();
 	}
 	function applyTemplate(key: string) {
 		const t = PWU_TYPE_CATALOG.find((x) => x.key === key);
@@ -295,13 +464,22 @@
 	const pickablePolicies = $derived(
 		data.policies.filter((p) => p.status === 'ACTIVE' && !p.isFloor)
 	);
+	// Existing references can outlive a policy's ACTIVE state. Keep them visible and explicitly removable during an
+	// unrelated edit instead of silently dropping them because they are absent from the ACTIVE-only picker.
+	const inactiveSelectedPolicyIds = $derived(
+		selectedPolicyIds.filter((id) => !pickablePolicies.some((policy) => policy.id === id))
+	);
 	// Resolve a policy id to its human name: engine library first, then the locked-floor labels, then the id.
 	const policyNameById = $derived(new Map(data.policies.map((p) => [p.id, p.name])));
 	function policyDisplayName(id: string): string {
 		return policyNameById.get(id) ?? assurancePolicyLabel(id);
 	}
+	function focusTypeForm() {
+		void tick().then(() => document.getElementById('pwu-type-form-heading')?.focus());
+	}
 	function openPolicyManager() {
 		showPolicyManager = true;
+		inspectorCollapsed = false;
 		policyFormMode = null;
 	}
 	function resetPf() {
@@ -478,9 +656,11 @@
 	}
 </script>
 
-{#snippet fhead(label: string, help: string)}
+{#snippet fhead(label: string, help: string, forId?: string)}
 	<div class="fld">
-		<span class="flabel">{label}</span>
+		{#if forId}<label class="flabel" for={forId}>{label}</label>{:else}<span class="flabel"
+				>{label}</span
+			>{/if}
 		<span class="fhelp">{help}</span>
 	</div>
 {/snippet}
@@ -553,7 +733,9 @@
 			<div class="pubact">
 				<button class="ghost small" onclick={openPolicyManager}>⚖ Policies</button>
 				{#if editable}
-					<button class="ghost small" onclick={openDefine}>+ Define PWU Type</button>
+					<button class="ghost small" onclick={openDefine} disabled={typeMutationPending}
+						>+ Define PWU Type</button
+					>
 				{/if}
 				{#if data.pwa.publicationStatus === 'DRAFT'}
 					<form method="POST" action="?/submitForReview" use:enhance>
@@ -586,15 +768,20 @@
 	<div class="canvas">
 		<div class="flowarea">
 			<SvelteFlow
-			bind:nodes
-			bind:edges
-			{nodeTypes}
-			onnodeclick={(e) => (selectedOverride = e.node.id)}
-			fitView
-			fitViewOptions={{ padding: 0.22, minZoom: 0.25 }}
-		>
+				bind:nodes
+				bind:edges
+				{nodeTypes}
+				onnodeclick={(e) => selectNode(e.node.id)}
+				onnodedragstart={beginCanvasMove}
+				onnodedragstop={finishCanvasMove}
+				onkeydowncapture={beginKeyboardCanvasMove}
+				onkeydown={finishKeyboardCanvasMove}
+				deleteKey={null}
+				fitView
+				fitViewOptions={panelAwareFitViewOptions}
+			>
 			<Background />
-			<Controls position="bottom-right" />
+			<Controls position="bottom-right" fitViewOptions={panelAwareFitViewOptions} />
 
 			<!-- Bottom-CENTER control cluster: overlay toggle + legend, and the data-flow hand-off detail. Kept out
 			     of the left/right columns so the tall, draggable agent/inspector/floor panels never cover it. -->
@@ -624,6 +811,43 @@
 						</aside>
 					{/if}
 					<div class="overlaytoggle" data-testid="overlay-toggle">
+						<div class="viewrow">
+							<label class="viewlabel">
+								<span>Composition lens</span>
+								<select bind:value={layoutDirection} aria-label="PWA composition layout">
+									<option value="RIGHT">Left to right</option>
+									<option value="DOWN">Top down</option>
+								</select>
+							</label>
+							<div class="canvasundo" aria-label="Canvas position history">
+								<button
+									class="ghost xs"
+									type="button"
+									disabled={canvasHistory.past.length === 0}
+									onclick={undoCanvasPosition}
+									aria-label="Undo canvas move"
+									title="Undo the last node move (canvas layout only)">↶ Position</button
+								>
+								<button
+									class="ghost xs"
+									type="button"
+									disabled={canvasHistory.future.length === 0}
+									onclick={redoCanvasPosition}
+									aria-label="Redo canvas move"
+									title="Redo the last node move (canvas layout only)">↷ Position</button
+								>
+							</div>
+						</div>
+						<p class="layoutscope">
+							<span data-testid="layout-engine"
+								>{layoutPending ? 'Arranging…' : `Layout: ${layoutEngine ?? 'unavailable'}`}</span
+							>
+							· Position is local presentation, never execution order or professional state.
+						</p>
+						{#if layoutEngine === 'DAGRE' && !layoutPending}
+							<p class="layoutfallback">ELK was unavailable; showing the explicit Dagre fallback.</p>
+						{/if}
+						{#if layoutError}<p class="layouterror">Layout failed: {layoutError}</p>{/if}
 						<div class="ovrow">
 							<label class="ovlabel">
 								<input type="checkbox" bind:checked={showDataFlow} />
@@ -695,6 +919,7 @@
 				<aside
 					class="inspectorpanel"
 					class:collapsed={inspectorCollapsed}
+					data-testid="inspector-panel"
 					use:draggable={{ handle: '.paneldrag' }}
 				>
 					<header class="ppanelhead paneldrag">
@@ -712,7 +937,8 @@
 								<div class="pmgrhead">
 									<span class="fhelp"
 										>Workbench assurance-policy library — the locked mandatory policies (always apply) plus your
-										declarable policies. Reference them on a PWU Type from the Declared assurance policies field.</span
+										declarable policies. New shared policies start DRAFT and become declarable only after activation.
+										Reference them on a PWU Type from the Declared assurance policies field.</span
 									>
 									<button
 										class="collapsebtn"
@@ -792,6 +1018,8 @@
 												class="policycard"
 												class:floorcard={p.isFloor}
 												class:supersededcard={p.status === 'SUPERSEDED'}
+												data-policy-id={p.id}
+												data-policy-status={p.status}
 											>
 												<div class="pchead">
 													<span class="pcname">{p.name}</span>
@@ -810,16 +1038,18 @@
 												{#if !p.isFloor && p.status !== 'SUPERSEDED'}
 													<div class="pcactions">
 														<button class="ghost xs" onclick={() => openEditPolicy(p)}>Edit</button>
-														<form method="POST" action="?/newPolicyVersion" use:enhance>
-															<input type="hidden" name="policyId" value={p.id} />
-															<button class="ghost xs" type="submit">New version</button>
-														</form>
+														{#if p.status === 'ACTIVE' || p.status === 'SUSPENDED'}
+															<form method="POST" action="?/newPolicyVersion" use:enhance>
+																<input type="hidden" name="policyId" value={p.id} />
+																<button class="ghost xs" type="submit">Create & activate version</button>
+															</form>
+														{/if}
 														{#if p.status === 'ACTIVE'}
 															<form method="POST" action="?/suspendPolicy" use:enhance>
 																<input type="hidden" name="policyId" value={p.id} />
 																<button class="ghost xs" type="submit">Suspend</button>
 															</form>
-														{:else if p.status === 'SUSPENDED'}
+														{:else if p.status === 'SUSPENDED' || p.status === 'DRAFT'}
 															<form method="POST" action="?/activatePolicy" use:enhance>
 																<input type="hidden" name="policyId" value={p.id} />
 																<button class="ghost xs" type="submit">Activate</button>
@@ -833,51 +1063,74 @@
 								{/if}
 							{:else if editable && formMode !== null}
 						{@const editing = editingId !== ''}
-						<div class="itag">{editing ? 'EDIT PWU TYPE' : 'NEW PWU TYPE'}</div>
+						<div class="itag" id="pwu-type-form-heading" tabindex="-1">
+							{editing ? 'EDIT PWU TYPE' : 'NEW PWU TYPE'}
+						</div>
 						<form
 							method="POST"
 							action={editing ? '?/editType' : '?/defineType'}
-							use:enhance
+							use:enhance={enhanceTypeMutation}
 							class="typeform"
 						>
 							{#if editing}<input type="hidden" name="pwuTypeId" value={editingId} />{/if}
 							{#if !editing}
 								<div class="ffield">
-									<span class="flabel">Start from template</span>
+									<label class="flabel" for="pwu-type-template">Start from template</label>
 									<span class="fhelp">Copy a reusable blueprint from the catalog, then edit it freely.</span>
-									<select class="tplsel" onchange={(e) => applyTemplate(e.currentTarget.value)}>
+									<select
+										id="pwu-type-template"
+										class="tplsel"
+										onchange={(e) => applyTemplate(e.currentTarget.value)}
+									>
 										<option value="">— blank —</option>
 										{#each PWU_TYPE_CATALOG as t (t.key)}<option value={t.key}>{t.name}</option>{/each}
 									</select>
 								</div>
 							{/if}
 							<div class="ffield">
-								{@render fhead('Name', PWU_TYPE_HELP.name)}
-								<input name="name" bind:value={f.name} required />
+								{@render fhead('Name', PWU_TYPE_HELP.name, 'pwu-type-name')}
+								<input id="pwu-type-name" name="name" bind:value={f.name} required />
 							</div>
 							<div class="ffield">
-								{@render fhead('Kind', PWU_TYPE_HELP.pwuKind)}
-								<input name="pwuKind" bind:value={f.pwuKind} placeholder="ARCHITECTURE" required />
-							</div>
-							<div class="ffield">
-								{@render fhead('Purpose', PWU_TYPE_HELP.purpose)}
-								<textarea name="purpose" bind:value={f.purpose} rows="2"></textarea>
-							</div>
-							<div class="ffield">
-								{@render fhead('Completion rule', PWU_TYPE_HELP.completionRule)}
+								{@render fhead('Kind', PWU_TYPE_HELP.pwuKind, 'pwu-type-kind')}
 								<input
+									id="pwu-type-kind"
+									name="pwuKind"
+									bind:value={f.pwuKind}
+									placeholder="ARCHITECTURE"
+									required
+								/>
+							</div>
+							<div class="ffield">
+								{@render fhead('Purpose', PWU_TYPE_HELP.purpose, 'pwu-type-purpose')}
+								<textarea id="pwu-type-purpose" name="purpose" bind:value={f.purpose} rows="2"></textarea>
+							</div>
+							<div class="ffield">
+								{@render fhead(
+									'Completion rule',
+									PWU_TYPE_HELP.completionRule,
+									'pwu-type-completion-rule'
+								)}
+								<input
+									id="pwu-type-completion-rule"
 									name="completionRule"
 									bind:value={f.completionRule}
 									placeholder="(defaults to the RPH rule)"
 								/>
 							</div>
 							<div class="ffield">
-								{@render fhead('Required inputs', PWU_TYPE_HELP.requiredInputs)}
-								<input name="requiredInputs" bind:value={f.requiredInputs} placeholder="approved-behavior" />
+								{@render fhead('Required inputs', PWU_TYPE_HELP.requiredInputs, 'pwu-type-inputs')}
+								<input
+									id="pwu-type-inputs"
+									name="requiredInputs"
+									bind:value={f.requiredInputs}
+									placeholder="approved-behavior"
+								/>
 							</div>
 							<div class="ffield">
-								{@render fhead('Required outputs', PWU_TYPE_HELP.requiredOutputs)}
+								{@render fhead('Required outputs', PWU_TYPE_HELP.requiredOutputs, 'pwu-type-outputs')}
 								<input
+									id="pwu-type-outputs"
 									name="requiredOutputs"
 									bind:value={f.requiredOutputs}
 									placeholder="architecture-baseline"
@@ -960,8 +1213,27 @@
 											{p.name}
 										</label>
 									{/each}
+									{#each inactiveSelectedPolicyIds as policyId (policyId)}
+										{@const retained = data.policies.find((policy) => policy.id === policyId)}
+										<label
+											class="childopt inactivepolicy"
+											title="Existing inactive reference — retained unless you uncheck it"
+										>
+											<input
+												type="checkbox"
+												name="requiredAssurancePolicyIds"
+												value={policyId}
+												checked={selectedPolicyIds.includes(policyId)}
+												onchange={(e) => togglePolicy(policyId, e.currentTarget.checked)}
+											/>
+											{policyDisplayName(policyId)}
+											<span class="policyrefstatus"
+												>{retained?.isFloor ? 'LOCKED FLOOR' : (retained?.status ?? 'MISSING')}</span
+											>
+										</label>
+									{/each}
 									{#if pickablePolicies.length === 0}
-										<span class="fhelp">No active policies yet — add one in ⚖ Policies.</span>
+										<span class="fhelp">No active policies yet — create and activate one in ⚖ Policies.</span>
 									{/if}
 									<button type="button" class="linkbtn" onclick={openPolicyManager}
 										>⚖ Manage policies…</button
@@ -969,8 +1241,14 @@
 								</div>
 							</div>
 							<div class="formactions">
-								<button class="primary small" type="submit">{editing ? 'Save changes' : 'Add type'}</button>
-								<button type="button" class="ghost small" onclick={() => (formMode = null)}>Cancel</button
+								<button class="primary small" type="submit" disabled={typeMutationPending}
+									>{typeMutationPending ? 'Saving…' : editing ? 'Save changes' : 'Add type'}</button
+								>
+								<button
+									type="button"
+									class="ghost small"
+									onclick={() => (formMode = null)}
+									disabled={typeMutationPending}>Cancel</button
 								>
 							</div>
 						</form>
@@ -1030,13 +1308,39 @@
 						</div>
 						{#if editable}
 							<div class="inspactions">
-								<button class="ghost small" onclick={() => openEdit(current.id)}>Edit</button>
-								<form method="POST" action="?/removeType" use:enhance>
+								<button
+									class="ghost small"
+									onclick={() => openEdit(current.id)}
+									disabled={typeMutationPending}>Edit</button
+								>
+								<form method="POST" action="?/removeType" use:enhance={enhanceTypeMutation}>
 									<input type="hidden" name="pwuTypeId" value={current.id} />
-									<button class="ghost small danger" type="submit">Remove</button>
+									<button class="ghost small danger" type="submit" disabled={typeMutationPending}
+										>{typeMutationPending ? 'Removing…' : 'Remove'}</button
+									>
 								</form>
 							</div>
 						{/if}
+						<div class="behaviorlens">
+							<div class="behaviorlenshead">
+								<span class="flabel">PWU work-lifecycle axis</span>
+								<button class="ghost xs" type="button" onclick={() => (behaviorRun += 1)}
+									>Restart simulation</button
+								>
+							</div>
+							<p class="fhelp">
+								This explores only the declared <code>PWU.workLifecycleState</code> topology for future
+								instances of {current.name}. It does not assign state to this reusable PWU Type.
+								<code>executionState</code>, <code>assuranceState</code>, and
+								<code>shapeIntegrityState</code> remain independent and are not simulated.
+							</p>
+							{#key `${current.id}:${behaviorRun}`}
+								<PwuBehaviorPanel
+									behavior={behaviorTopology}
+									title="Declared PWU work-lifecycle topology"
+								/>
+							{/key}
+						</div>
 					{:else}
 						<div class="itag">INSPECTOR</div>
 						<p class="hint">Select a node to inspect it{#if editable}, or “+ Define PWU Type”.{/if}</p>
@@ -1579,6 +1883,15 @@
 		font-size: 12px;
 		color: var(--on-variant);
 	}
+	.inactivepolicy {
+		color: var(--amber);
+	}
+	.policyrefstatus {
+		margin-left: auto;
+		font-size: 9px;
+		font-weight: 700;
+		letter-spacing: 0.04em;
+	}
 	.childrow {
 		display: flex;
 		align-items: center;
@@ -1789,10 +2102,59 @@
 		display: flex;
 		flex-direction: column;
 		gap: 6px;
+		min-width: 330px;
 		background: rgba(24, 24, 26, 0.85);
 		border: 1px solid var(--outline);
 		border-radius: 8px;
 		padding: 6px 9px;
+	}
+	.viewrow {
+		display: flex;
+		align-items: flex-end;
+		justify-content: space-between;
+		gap: 12px;
+	}
+	.viewlabel {
+		display: grid;
+		gap: 2px;
+		font-size: 9px;
+		font-weight: 700;
+		letter-spacing: 0.06em;
+		text-transform: uppercase;
+		color: var(--outline);
+	}
+	.viewlabel select {
+		min-width: 128px;
+		padding: 3px 6px;
+		border: 1px solid var(--outline-faint);
+		border-radius: 5px;
+		background: var(--sc-highest);
+		color: var(--on-variant);
+		font-size: 10.5px;
+		text-transform: none;
+		letter-spacing: normal;
+	}
+	.canvasundo {
+		display: flex;
+		gap: 5px;
+	}
+	.canvasundo button:disabled {
+		opacity: 0.45;
+		cursor: not-allowed;
+	}
+	.layoutscope,
+	.layoutfallback,
+	.layouterror {
+		margin: 0;
+		font-size: 9.5px;
+		line-height: 1.35;
+		color: var(--outline);
+	}
+	.layouterror {
+		color: var(--error);
+	}
+	.layoutfallback {
+		color: var(--amber);
 	}
 	.ovrow {
 		display: flex;
@@ -1910,6 +2272,26 @@
 		gap: 8px;
 		align-items: center;
 		margin-top: 4px;
+	}
+	.behaviorlens {
+		display: grid;
+		gap: 7px;
+		margin-top: 16px;
+		padding-top: 12px;
+		border-top: 1px solid var(--sc);
+	}
+	.behaviorlens > .fhelp {
+		margin: 0;
+		line-height: 1.4;
+	}
+	.behaviorlenshead {
+		display: flex;
+		align-items: center;
+		justify-content: space-between;
+		gap: 8px;
+	}
+	.behaviorlenshead .flabel {
+		margin: 0;
 	}
 	.fixtures {
 		margin-top: 18px;

@@ -31,11 +31,13 @@ const FLOOR_POLICY_IDS: ReadonlySet<string> = new Set([
 ]);
 import {
 	dispatch,
+	dispatchBatch,
 	getEngine,
 	hostNow,
 	loadConversation,
 	mintUiId,
-	type ConversationEntry
+	type ConversationEntry,
+	type UiCommandInput
 } from '$lib/server/workbench';
 import { loadPwaFloor } from '$lib/server/floor';
 import type { Actions, PageServerLoad } from './$types';
@@ -104,7 +106,7 @@ export const load: PageServerLoad = ({ params }) => {
 		purpose: String((p.state.purpose ?? '') as string),
 		rationale: String((p.state.rationale ?? '') as string),
 		version: String((p.state.version ?? '') as string),
-		status: String((p.state.status ?? 'ACTIVE') as string),
+		status: String((p.state.status ?? 'DRAFT') as string),
 		// The three ratified ARRAYS, rendered for a comma-separated text input and split back by `csvList` on save.
 		// Joined EXPLICITLY: `String(['A','B'])` also yields 'A, B'-ish, but only by accident of Array.toString —
 		// it silently produces 'A,B' with no space and would quietly do something else for any non-array value.
@@ -213,6 +215,30 @@ function readTypeFields(form: FormData): TypeFields {
 	};
 }
 
+/** Validate only policy references newly introduced by an authoring operation. Existing references may be retained
+ *  or explicitly removed even when a policy later becomes SUSPENDED/SUPERSEDED; otherwise an unrelated edit would
+ *  silently strip the historical declaration. */
+function policyReferenceError(
+	requestedPolicyIds: readonly string[],
+	existingPolicyIds: readonly string[] = []
+): string | undefined {
+	const existing = new Set(existingPolicyIds);
+	const policies = new Map(listAssurancePolicies(getEngine()).map((p) => [p.id, p.state]));
+	for (const policyId of requestedPolicyIds) {
+		if (existing.has(policyId)) continue;
+		if (FLOOR_POLICY_IDS.has(policyId)) {
+			return `The locked floor policy ${policyId} always applies and must not be referenced explicitly.`;
+		}
+		const policy = policies.get(policyId);
+		if (!policy) return `Assurance Policy ${policyId} does not exist.`;
+		const status = String((policy.status ?? 'DRAFT') as string);
+		if (status !== 'ACTIVE') {
+			return `Assurance Policy ${String((policy.name ?? policyId) as string)} is ${status}; only ACTIVE policies may be newly referenced.`;
+		}
+	}
+	return undefined;
+}
+
 /** Bump a semantic version string's minor (1.2.3 -> 1.3.0); falls back to a `-v2` suffix for non-semver. */
 function bumpVersion(v: string): string {
 	const parts = v.split('.').map((n) => Number.parseInt(n, 10));
@@ -250,6 +276,8 @@ export const actions: Actions = {
 		const f = readTypeFields(await request.formData());
 		if (!f.name || !f.pwuKind)
 			return fail(400, { error: 'A PWU Type name and kind are required.' });
+		const policyError = policyReferenceError(f.requiredAssurancePolicyIds);
+		if (policyError) return fail(400, { error: policyError });
 		const id = mintUiId('pwut');
 		const r = dispatch('DefinePwuType', 'PWU_TYPE', id, {
 			pwuTypeId: id,
@@ -270,13 +298,21 @@ export const actions: Actions = {
 	},
 
 	// Edit an existing PWU Type in place (DRAFT PWA only — the engine enforces this).
-	editType: async ({ request }) => {
+	editType: async ({ request, params }) => {
 		const form = await request.formData();
 		const pwuTypeId = String((form.get('pwuTypeId') ?? '') as string).trim();
 		if (!pwuTypeId) return fail(400, { error: 'Missing PWU Type.' });
+		const stored = getObject(getEngine(), pwuTypeId);
+		if (!stored || stored.pwaId !== params.id)
+			return fail(400, { error: 'PWU Type not found on this PWA.' });
 		const f = readTypeFields(form);
 		if (!f.name || !f.pwuKind)
 			return fail(400, { error: 'A PWU Type name and kind are required.' });
+		const existingPolicyIds = Array.isArray(stored.requiredAssurancePolicyIds)
+			? (stored.requiredAssurancePolicyIds as string[])
+			: [];
+		const policyError = policyReferenceError(f.requiredAssurancePolicyIds, existingPolicyIds);
+		if (policyError) return fail(400, { error: policyError });
 		const r = dispatch('EditPwuType', 'PWU_TYPE', pwuTypeId, {
 			pwuTypeId,
 			name: f.name,
@@ -360,8 +396,8 @@ export const actions: Actions = {
 	},
 
 	// ── Assurance Policy library management (workbench-wide; not gated by this PWA's draft status) ──────────────
-	// Create a new authorable Assurance Policy (ACTIVE). The 3 de minimis floor policies are locked and seeded, not
-	// created here.
+	// Create a new authorable Assurance Policy (DRAFT). The 3 de minimis floor policies are locked and seeded, not
+	// created here; a regular policy must be deliberately activated before a PWU Type can declare it.
 	createPolicy: async ({ request }) => {
 		const f = readPolicyFields(await request.formData());
 		if (!f.name) return fail(400, { error: 'A policy name is required.' });
@@ -412,45 +448,98 @@ export const actions: Actions = {
 		return { editedPolicy: policyId };
 	},
 
-	// Version a policy: create a successor copy with a bumped version (ACTIVE), then supersede the predecessor
-	// pointing to it. Downstream references keep working; the successor is then independently editable.
+	// Promote a new version atomically: create + activate a content-preserving successor, migrate references owned by
+	// DRAFT PWAs, then supersede the predecessor. Immutable published definitions remain pinned to the historical
+	// policy id; changing them here would rewrite a published PWA, while blocking on them would deadlock policy
+	// evolution because their references can never be edited away. Plain policy creation remains DRAFT-first.
 	newPolicyVersion: async ({ request }) => {
 		const form = await request.formData();
 		const policyId = String((form.get('policyId') ?? '') as string).trim();
 		if (!policyId) return fail(400, { error: 'Missing policy.' });
 		const prev = getObject(getEngine(), policyId);
 		if (!prev) return fail(400, { error: 'Policy not found.' });
+		if (FLOOR_POLICY_IDS.has(policyId))
+			return fail(400, { error: 'Floor policies cannot be versioned.' });
+		const previousStatus = String((prev.status ?? '') as string);
+		if (previousStatus !== 'ACTIVE' && previousStatus !== 'SUSPENDED')
+			return fail(400, { error: 'Only active or suspended policies can be versioned.' });
 		const requested = String((form.get('version') ?? '') as string).trim();
 		const newVersion = requested || bumpVersion(String((prev.version ?? '1.0.0') as string));
+		const referencingTypes = listPwuTypes(getEngine()).filter(
+			(t) =>
+				Array.isArray(t.state.requiredAssurancePolicyIds) &&
+				(t.state.requiredAssurancePolicyIds as string[]).includes(policyId)
+		);
+		const draftReferences = referencingTypes.filter((type) => {
+			const ownerId = String((type.state.pwaId ?? '') as string);
+			const owner = ownerId ? getObject(getEngine(), ownerId) : undefined;
+			return owner?.publicationStatus === 'DRAFT';
+		});
 		const successorId = mintUiId('pol');
-		const create = dispatch('CreateAssurancePolicy', 'ASSURANCE_POLICY', successorId, {
-			policyId: successorId,
-			version: newVersion,
-			name: String((prev.name ?? 'Policy') as string),
-			purpose: String((prev.purpose ?? '') as string),
-			rationale: String((prev.rationale ?? '') as string),
-			// The three ratified ARRAYS, copied through as arrays. These read `String(prev.x ?? 'DEFAULT')`, which
-			// turns ['CLARIFY','REJECT'] into the STRING 'CLARIFY,REJECT' — so versioning a policy silently
-			// rejected the successor and the supersede never happened. Caught by the policy-manager E2E, not by
-			// any unit test: this path only exists in the UI action.
-			applicableObjectTypes: strList(prev.applicableObjectTypes, 'PROFESSIONAL_WORK_UNIT'),
-			evaluatedClaimTypes: strList(prev.evaluatedClaimTypes, 'CORRECTNESS'),
-			criteria: Array.isArray(prev.criteria) ? prev.criteria : [],
-			evaluatorRole: String((prev.evaluatorRole ?? 'reviewer') as string),
-			independenceRequirement: String(
-				(prev.independenceRequirement ?? 'DIFFERENT_AGENT') as string
-			),
-			findingDefinitions: Array.isArray(prev.findingDefinitions) ? prev.findingDefinitions : [],
-			permittedControlActions: strList(prev.permittedControlActions, 'ESCALATE')
-		});
-		if (create.status !== 'ACCEPTED')
-			return fail(400, { error: create.error?.message ?? create.status });
-		const sup = dispatch('SupersedeAssurancePolicy', 'ASSURANCE_POLICY', policyId, {
-			policyId,
-			supersededByPolicyId: successorId
-		});
-		if (sup.status !== 'ACCEPTED') return fail(400, { error: sup.error?.message ?? sup.status });
-		return { newVersion: successorId };
+		const commands: UiCommandInput[] = [
+			{
+				commandType: 'CreateAssurancePolicy',
+				targetAggregateType: 'ASSURANCE_POLICY',
+				targetAggregateId: successorId,
+				payload: {
+					policyId: successorId,
+					version: newVersion,
+					name: String((prev.name ?? 'Policy') as string),
+					purpose: String((prev.purpose ?? '') as string),
+					rationale: String((prev.rationale ?? '') as string),
+					applicableObjectTypes: strList(prev.applicableObjectTypes, 'PROFESSIONAL_WORK_UNIT'),
+					evaluatedClaimTypes: strList(prev.evaluatedClaimTypes, 'CORRECTNESS'),
+					criteria: Array.isArray(prev.criteria) ? prev.criteria : [],
+					evaluatorRole: String((prev.evaluatorRole ?? 'reviewer') as string),
+					independenceRequirement: String(
+						(prev.independenceRequirement ?? 'DIFFERENT_AGENT') as string
+					),
+					findingDefinitions: Array.isArray(prev.findingDefinitions) ? prev.findingDefinitions : [],
+					waiverRules: Array.isArray(prev.waiverRules) ? prev.waiverRules : [],
+					requiredEvidence: Array.isArray(prev.requiredEvidence) ? prev.requiredEvidence : [],
+					optionalEvidence: Array.isArray(prev.optionalEvidence) ? prev.optionalEvidence : [],
+					dispositionRules: Array.isArray(prev.dispositionRules) ? prev.dispositionRules : [],
+					escalationRules: Array.isArray(prev.escalationRules) ? prev.escalationRules : [],
+					permittedControlActions: strList(prev.permittedControlActions, 'ESCALATE')
+				}
+			},
+			{
+				commandType: 'ActivateAssurancePolicy',
+				targetAggregateType: 'ASSURANCE_POLICY',
+				targetAggregateId: successorId,
+				payload: { policyId: successorId }
+			},
+			...draftReferences.map((type): UiCommandInput => ({
+				commandType: 'EditPwuType',
+				targetAggregateType: 'PWU_TYPE',
+				targetAggregateId: type.id,
+				payload: {
+					pwuTypeId: type.id,
+					requiredAssurancePolicyIds: (type.state.requiredAssurancePolicyIds as string[]).map(
+						(id) => (id === policyId ? successorId : id)
+					)
+				}
+			})),
+			{
+				commandType: 'SupersedeAssurancePolicy',
+				targetAggregateType: 'ASSURANCE_POLICY',
+				targetAggregateId: policyId,
+				payload: { policyId, supersededByPolicyId: successorId }
+			}
+		];
+		const batch = dispatchBatch(commands);
+		if (!batch.ok) {
+			const rejected =
+				batch.failedIndex === undefined ? undefined : batch.results[batch.failedIndex];
+			return fail(400, {
+				error: rejected?.error?.message ?? 'Policy versioning was rejected and rolled back.'
+			});
+		}
+		return {
+			newVersion: successorId,
+			migratedReferences: draftReferences.length,
+			pinnedHistoricalReferences: referencingTypes.length - draftReferences.length
+		};
 	},
 
 	suspendPolicy: async ({ request }) => {

@@ -214,7 +214,11 @@
 							<div class="kv">
 								<span>Evidence considered</span><b>{a.evidenceConsidered.join(', ') || 'none'}</b>
 							</div>
-							<div class="kv"><span>Missing evidence</span><b class="unk">unknown (source event unbuilt)</b></div>
+							<div class="kv">
+								<span>Missing evidence</span><b
+									>{a.missingEvidence.length ? a.missingEvidence.join(', ') : 'none'}</b
+								>
+							</div>
 							<div class="kv"><span>Control actions</span><b>{a.controlActions.join(', ') || 'none'}</b></div>
 							<div class="kv">
 								<span>Findings</span><b
@@ -563,11 +567,6 @@
 	.kv b {
 		color: var(--on-variant);
 		font-weight: 600;
-	}
-	.kv b.unk {
-		color: var(--outline);
-		font-weight: 400;
-		font-style: italic;
 	}
 	.req {
 		color: var(--error, #ff6b6b);

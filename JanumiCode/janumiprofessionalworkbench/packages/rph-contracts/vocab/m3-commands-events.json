@@ -2888,6 +2888,12 @@
           "required": true,
           "type": "string[]",
           "note": "id-ref[]; the claims this assessment evaluates"
+        },
+        {
+          "field": "requiredEvidenceIds",
+          "required": false,
+          "type": "string[]",
+          "note": "The evidence-requirement ids (EvidenceRequirement.id, DOC-004 §6.1) the assessment's policy declares as required, RESOLVED from the policy's requiredEvidence at request time and recorded here so the §38 Assurance View can source 'missing evidence' (§38) as the required set. Not on the RequestAssuranceAssessment command (the operator does not choose it — the policy does); requestAssuranceAssessment reads policy.requiredEvidence and constructs this. Empty when the policy requires no evidence (a real sourced 'none', not 'unknown'). NOTE: the per-requirement SATISFACTION side (§32 submitEvidenceForAssessment -> AssuranceEvidenceReceived) is not built, so 'missing' currently equals 'required'; once a policy declares requiredEvidence, all of it reads missing until that sub-lifecycle lands (DOC-004 §31 L1770)."
         }
       ]
     },

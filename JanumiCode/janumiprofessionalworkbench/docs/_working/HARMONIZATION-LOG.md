@@ -3521,6 +3521,48 @@ their states the way the reference seed does. Template: `reference-undertaking.t
 `earnAssurance` (~L659-742). Cascade to handle: an ACTIVE policy (create + activate, idempotent), evidence + claim
 from execution, and a SATISFIED assessment with a distinct evaluator for the independence check.
 
+### Increment J — the demo interactive drive now earns its states (follow-up A, completed)
+
+Increment I's scoped harmonization, done. `beginExecute` runs a real `EXECUTION_PLAN` with a succeeded
+`TRANSFORMATION` step (cited on the `executionState=SUCCEEDED` hop). `recordAssurance` creates + activates a
+lightweight **NONE-independence** "operator sign-off" demo policy (once, idempotent — `CreateAssurancePolicy` on an
+existing object conflicts, so it is guarded by an existence check) and requests + completes a SATISFIED
+`ASSURANCE_ASSESSMENT` under it, cited on the guarded `assuranceState=SATISFIED` hop. **NONE independence sidesteps
+the distinct-evaluator cascade** — `completeAssuranceAssessment` skips the independence check when the requirement
+is `NONE` (assurance.ts) — so no separate reviewer identity is needed. That is simpler than the reference seed's
+`DIFFERENT_AGENT` path and honest: the demo shows the *lifecycle*, not the AI-floor/independence apparatus (the
+reference seed demonstrates those). Only the two guarded hops need citations; the intermediate assurance hops
+(`EVIDENCE_REQUIRED`/`READY_FOR_ASSESSMENT`/`ASSESSING`) are unguarded. The `pwu-lifecycle` first test is
+**un-`fixme`'d and passes end to end through the UI**, still proving INV-5 (Mark Satisfied before Record Assurance
+is rejected). `runSteps` names the failing command (kept from Inc I — it located the twin guards).
+
+### Increment K — §38 "missing evidence" is sourced (follow-up B, the last field)
+
+The one §38 field the read model could not source. Now sourced **from the policy**: `requestAssuranceAssessment`
+resolves the assessment's `policy.requiredEvidence` (§6.1, settable since Increment B) to its requirement ids and
+records them on the `AssuranceAssessmentStarted` event — a new `requiredEvidenceIds` field, carried via a
+constructed `eventPayload` (it is resolved from the policy, not the command, so passthrough would omit it) and kept
+**off** the object state (the `ASSURANCE_ASSESSMENT` schema does not carry it; the event is the fold's source). The
+read model folds `missingEvidence` from it, and the UI renders it (the `"unknown (source event unbuilt)"`
+placeholder is gone).
+
+**Honest partial, disclosed.** "Missing" is "required − received", but the per-requirement SATISFACTION side (§32
+`submitEvidenceForAssessment` → `AssuranceEvidenceReceived` — the §30 evidence sub-lifecycle) is a distinct
+increment; until it lands, `missingEvidence` equals the full required set. The subtlety that makes this **not** a
+trivial difference-fold: the required set is `EvidenceRequirement` ids while `evidenceConsideredIds` are Evidence
+*object* ids — different namespaces, so a naive difference is invalid; the satisfaction side must record which
+requirement each evidence satisfies, which is exactly the deferred sub-lifecycle. For all current data (no policy
+declares `requiredEvidence`) `missingEvidence` is `[]` — a real sourced **none**, flipping the field from
+"unknown" to a real answer. **Every §38 field is now at least sourced.**
+
+Red-first: a fold unit test (`Started.requiredEvidenceIds` → `missingEvidence`; absent → sourced none) + a live
+handler test (a policy declaring `requiredEvidence` → the Started event carries the requirement ids).
+
+**Gate (both follow-ups):** `check-types` 21/21 · `test` 21/21 (rph-projections 45, rph-application 127) · lint ·
+boundary · `svelte-check` 0 · **full Playwright E2E 25/25** — the other agent's PWA-Designer corrections and both my
+drive + missing-evidence tests all green (the 3 previously-failing PWA Designer tests now pass). Left uncommitted
+for the sponsor's full commit.
+
 ---
 
 ## PART 4 — Open questions genuinely for the sponsor

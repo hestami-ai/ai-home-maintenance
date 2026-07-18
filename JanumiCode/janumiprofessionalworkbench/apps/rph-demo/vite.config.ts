@@ -1,5 +1,9 @@
 import { sveltekit } from '@sveltejs/kit/vite';
 import { defineConfig } from 'vite';
+import { createRequire } from 'node:module';
+
+const require = createRequire(import.meta.url);
+const elkBrowserEntry = require.resolve('elkjs/lib/elk.bundled.js');
 
 export default defineConfig({
 	plugins: [sveltekit()],
@@ -9,6 +13,10 @@ export default defineConfig({
 	// still works from source too. "source" is listed FIRST but the defaults are preserved so non-workspace deps
 	// resolve normally.
 	resolve: {
+		// elkjs 0.11 exposes only a Node-oriented `main` entry, which imports the optional `web-worker` shim. The
+		// Stately ELK adapter imports the package root, so pin that exact root request to ELK's in-process browser
+		// bundle. The RegExp is intentionally exact: elkjs/lib/elk-api type/runtime subpaths must remain untouched.
+		alias: [{ find: /^elkjs$/, replacement: elkBrowserEntry }],
 		conditions: ['source', 'module', 'browser', 'development|production']
 	},
 	ssr: {

@@ -8,3 +8,4 @@ export * from './pwu-replay.js';
 export * from './work-projection.js';
 export * from './graph-view.js';
 export * from './pwa-graph.js';
+export * from './pwu-behavior.js';

@@ -13,10 +13,16 @@
 		e.stopPropagation(); // toggle collapse without selecting the node
 		data.onToggleCollapse();
 	}
+
+	function onRailKeyDown(event: KeyboardEvent) {
+		if (['ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight'].includes(event.key)) {
+			event.stopPropagation();
+		}
+	}
 </script>
 
 <div class="card" class:selected class:root={data.isRoot}>
-	<Handle type="target" position={Position.Top} />
+	<Handle type="target" position={data.layoutDirection === 'RIGHT' ? Position.Left : Position.Top} />
 	<header class="head">
 		<div class="titles">
 			<div class="name">
@@ -49,7 +55,15 @@
 		{#if data.orphan}<span class="warn" title="No permitted parent">⚠ no parent</span>{/if}
 	</div>
 
-	<div class="rail">
+	<!-- svelte-ignore a11y_no_noninteractive_tabindex, a11y_no_noninteractive_element_interactions (A labelled focusable scroll region keeps long assurance lists keyboard-readable without clipping graph handles.) -->
+	<div
+		class="rail"
+		role="region"
+		tabindex="0"
+		aria-label={`Assurance policies for ${data.name}`}
+		data-canvas-move-ignore
+		onkeydown={onRailKeyDown}
+	>
 		<div class="locked">🔒 de minimis floor</div>
 		{#each data.floorLabels as label (label)}
 			<div class="floor">{label}</div>
@@ -59,13 +73,20 @@
 		{/each}
 	</div>
 
-	<Handle type="source" position={Position.Bottom} />
+	<Handle
+		type="source"
+		position={data.layoutDirection === 'RIGHT' ? Position.Right : Position.Bottom}
+	/>
 </div>
 
 <style>
 	.card {
-		width: 220px;
+		width: 100%;
+		height: 100%;
 		box-sizing: border-box;
+		display: flex;
+		flex-direction: column;
+		overflow: visible;
 		background: #1b1b1c;
 		color: #e5e2e1;
 		border: 1px solid #404751;
@@ -87,6 +108,7 @@
 	}
 	.head {
 		display: flex;
+		flex: 0 0 auto;
 		align-items: flex-start;
 		justify-content: space-between;
 		gap: 6px;
@@ -139,6 +161,7 @@
 	}
 	.meta {
 		display: flex;
+		flex: 0 0 auto;
 		flex-wrap: wrap;
 		gap: 6px;
 		font-size: 10px;
@@ -153,8 +176,15 @@
 		color: #e0a34b;
 	}
 	.rail {
+		flex: 1 1 auto;
+		min-height: 0;
 		border-top: 1px solid #333;
 		padding-top: 5px;
+		overflow-y: auto;
+	}
+	.rail:focus-visible {
+		outline: 2px solid #2970ff;
+		outline-offset: 1px;
 	}
 	.locked {
 		font-size: 9.5px;

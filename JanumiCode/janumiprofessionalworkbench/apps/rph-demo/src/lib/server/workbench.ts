@@ -105,6 +105,33 @@ export function resetEngine(seed: 'reference' | 'empty'): void {
 	else seedPolicyLibrary(handle);
 }
 
+/** The command fields a UI action supplies; this host owns the common command envelope. */
+export interface UiCommandInput {
+	readonly commandType: string;
+	readonly targetAggregateType: string;
+	readonly targetAggregateId: string;
+	readonly payload: unknown;
+}
+
+/** Build one UI-authored command with the same envelope policy used by single and atomic dispatch. */
+function uiCommand(input: UiCommandInput): DomainCommand {
+	cmdSeq += 1;
+	return {
+		commandId: `ui-${cmdSeq}`,
+		commandType: input.commandType,
+		commandSchemaVersion: 1,
+		targetAggregateType: input.targetAggregateType,
+		targetAggregateId: input.targetAggregateId,
+		issuedAt: TEST_MODE ? testNow() : new Date().toISOString(),
+		issuedBy: { actorId: 'ui-user', actorType: 'HUMAN', displayName: 'Workbench User' },
+		correlationId: 'ui',
+		idempotencyKey: TEST_MODE
+			? `ui-idem-${cmdSeq}`
+			: `ui-idem-${cmdSeq}-${Math.floor(performance.now())}`,
+		payload: input.payload
+	};
+}
+
 /** Dispatch a command into the shared engine with sensible envelope defaults. Returns the CommandResult. */
 export function dispatch(
 	commandType: string,
@@ -112,22 +139,14 @@ export function dispatch(
 	targetAggregateId: string,
 	payload: unknown
 ) {
-	cmdSeq += 1;
-	const command: DomainCommand = {
-		commandId: `ui-${cmdSeq}`,
-		commandType,
-		commandSchemaVersion: 1,
-		targetAggregateType,
-		targetAggregateId,
-		issuedAt: TEST_MODE ? testNow() : new Date().toISOString(),
-		issuedBy: { actorId: 'ui-user', actorType: 'HUMAN', displayName: 'Workbench User' },
-		correlationId: 'ui',
-		idempotencyKey: TEST_MODE
-			? `ui-idem-${cmdSeq}`
-			: `ui-idem-${cmdSeq}-${Math.floor(performance.now())}`,
-		payload
-	};
-	return getEngine().dispatch(command);
+	return getEngine().dispatch(
+		uiCommand({ commandType, targetAggregateType, targetAggregateId, payload })
+	);
+}
+
+/** Dispatch a multi-command UI operation atomically. A rejection rolls the entire operation back. */
+export function dispatchBatch(commands: readonly UiCommandInput[]) {
+	return getEngine().dispatchBatch(commands.map(uiCommand));
 }
 
 /** A PwaAuthoringBroker scoped to one DRAFT PWA, wired to the shared engine + this host's id/clock policy. Both the

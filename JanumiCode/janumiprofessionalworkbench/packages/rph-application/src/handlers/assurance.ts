@@ -448,7 +448,7 @@ export const requestAssuranceAssessment: CommandHandler = (ctx, command, payload
 	// (not yet activated), a SUSPENDED one (out of force), or a SUPERSEDED version (a new assessment pins the current
 	// version, §18). Two distinct rejections so the audit says which.
 	const policy = ctx.store.loadObject(p.assurancePolicyId)?.state as
-		{ status?: string } | undefined;
+		{ status?: string; requiredEvidence?: Array<{ id?: string }> } | undefined;
 	if (!policy) {
 		return reject(
 			command,
@@ -465,6 +465,16 @@ export const requestAssuranceAssessment: CommandHandler = (ctx, command, payload
 			[p.assessmentId, p.assurancePolicyId]
 		);
 	}
+	// §38 "missing evidence" is sourced here. The policy's requiredEvidence (DOC-004 §6.1) names the required
+	// evidence-requirement ids; resolved from the (now loaded) policy and carried on the Started EVENT so the read
+	// model can report what this assessment requires — NOT on the command payload (the operator does not choose it,
+	// the policy does), and NOT on the object state (the ASSURANCE_ASSESSMENT schema does not carry it; the event is
+	// the fold's source). Empty when the policy requires no evidence = a real sourced "none", not "unknown". The
+	// per-requirement SATISFACTION side (§32 submitEvidenceForAssessment -> AssuranceEvidenceReceived) is a separate
+	// increment; until it lands, the read model reports the full required set as missing (DOC-004 §31 L1770).
+	const requiredEvidenceIds = (policy.requiredEvidence ?? [])
+		.map((r) => r?.id)
+		.filter((id): id is string => typeof id === 'string');
 	const state: Record<string, unknown> = {
 		...newEnvelope(command, ASSESSMENT, p.assessmentId, {
 			lifecycleStatus: 'ASSESSING',
@@ -488,7 +498,8 @@ export const requestAssuranceAssessment: CommandHandler = (ctx, command, payload
 		objectType: ASSESSMENT,
 		aggregateId: p.assessmentId,
 		state,
-		eventType: 'AssuranceAssessmentStarted'
+		eventType: 'AssuranceAssessmentStarted',
+		eventPayload: { ...p, requiredEvidenceIds }
 	});
 };
 

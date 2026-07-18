@@ -34,6 +34,9 @@ test.describe('PWA Designer — cardinality + assurance rail', () => {
 		await page.locator('input[name="name"]').fill('Behavior Definition');
 		await page.locator('input[name="pwuKind"]').fill('BEHAVIOR');
 		await page.getByRole('button', { name: 'Add type' }).click();
+		await expect(
+			page.locator('.svelte-flow__node').filter({ hasText: 'Behavior Definition' })
+		).toBeVisible();
 
 		// Edit the root: permit the child with M+ cardinality, and declare the Intent Preservation policy.
 		await page.locator('.svelte-flow__node').filter({ hasText: 'Realization Root' }).click();

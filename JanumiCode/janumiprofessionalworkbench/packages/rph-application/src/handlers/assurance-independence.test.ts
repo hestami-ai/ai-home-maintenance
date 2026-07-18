@@ -361,4 +361,69 @@ describe('completeAssuranceAssessment — independence enforcement (Increment I2
 		expect(identities(violated)?.producer?.actorId).toBe('same-1');
 		expect(identities(violated)?.evaluator?.actorId).toBe('same-1');
 	});
+
+	it('§38 missing-evidence source: requestAssuranceAssessment resolves the policy requiredEvidence onto the Started event', () => {
+		// A policy that DECLARES required evidence (§6.1). The assessment's Started event must carry those requirement
+		// ids so the §38 read model can source "missing evidence" — the operator does not supply them, the policy does.
+		const ev = (id: string, mayBeWaived: boolean) => ({
+			id,
+			evidenceType: 'TEST_RESULT',
+			description: 'd',
+			purpose: 'p',
+			cardinality: 'AT_LEAST_ONE',
+			admissibilityRules: [],
+			requiredForDispositions: 'ALL',
+			mayBeWaived
+		});
+		dispatchOk(
+			cmd('CreateAssurancePolicy', POLICY, 'ASSURANCE_POLICY', {
+				policyId: POLICY,
+				version: '1.0.0',
+				name: 'Evidence-requiring policy',
+				purpose: 'Assess fitness with required evidence',
+				rationale: 'r',
+				applicableObjectTypes: ['PROFESSIONAL_WORK_UNIT'],
+				evaluatedClaimTypes: ['FITNESS'],
+				criteria: [
+					{
+						id: 'C1',
+						name: 'Fit',
+						description: 'd',
+						criterionType: 'QUALITATIVE',
+						evaluationMethod: 'HUMAN_JUDGMENT',
+						requiredEvidenceIds: ['EV-01'],
+						severityIfNotMet: 'MATERIAL',
+						mayBeNotApplicable: false
+					}
+				],
+				evaluatorRole: 'REVIEWER',
+				independenceRequirement: 'NONE',
+				requiredEvidence: [ev('EV-01', false), ev('EV-02', true)],
+				findingDefinitions: [
+					{
+						code: 'UNFIT',
+						name: 'Unfit',
+						description: 'd',
+						defaultSeverity: 'MATERIAL',
+						affectedClaimTypes: ['FITNESS'],
+						defaultControlActions: ['CONTINUE']
+					}
+				],
+				permittedControlActions: ['CONTINUE']
+			})
+		);
+		dispatchOk(cmd('ActivateAssurancePolicy', POLICY, 'ASSURANCE_POLICY', { policyId: POLICY }));
+		const A = 'asm_01ARZ3NDEKTSV4RRFFQ69G5A20';
+		requestAssessment(A);
+		const startedEvt = store
+			.readAllEvents()
+			.find(
+				(e) =>
+					e.eventType === 'AssuranceAssessmentStarted' &&
+					(e.payload as { assessmentId?: string }).assessmentId === A
+			);
+		expect(
+			(startedEvt!.payload as { requiredEvidenceIds?: string[] }).requiredEvidenceIds
+		).toEqual(['EV-01', 'EV-02']);
+	});
 });

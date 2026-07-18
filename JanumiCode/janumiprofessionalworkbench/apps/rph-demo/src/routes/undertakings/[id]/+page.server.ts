@@ -84,11 +84,12 @@ export const load: PageServerLoad = ({ params }) => {
 			validatorIdentity: v?.validatorImplementationIdentity ?? '',
 			validatorVersion: v?.validatorImplementationVersion ?? '',
 			openConditions: v?.openConditions ?? [],
-			// The rest of §38, now sourced (Increments E/F). `missingEvidence` is the one field with no source yet,
-			// so it is NOT here — the UI shows it as 'unknown', never a fabricated empty.
+			// The rest of §38, now sourced (Increments E/F + missingEvidence follow-up). `missingEvidence` is the
+			// policy's required-evidence set not yet received (empty = the policy requires none — a real sourced none).
 			claimsEvaluated: v?.claimsEvaluated ?? [],
 			evidenceConsidered: v?.evidenceConsideredIds ?? [],
 			controlActions: v?.controlActions ?? [],
+			missingEvidence: v?.missingEvidence ?? [],
 			findings: (v?.observations ?? []).map((o) => ({
 				code: o.findingCode,
 				severity: o.severity,
@@ -191,14 +192,25 @@ function resolveIntentId(
 const PWU = 'PROFESSIONAL_WORK_UNIT';
 type Step = [command: string, aggType: string, aggId: string, payload: unknown];
 
-/** A ChangePwuState step (the controller lever) that moves the four PWU axes together. */
+// A lightweight NONE-independence "operator sign-off" policy the interactive demo assesses under. The reference
+// SEED (reference-undertaking.ts) uses a DIFFERENT_AGENT fitness policy and a distinct evaluator; the demo keeps
+// it minimal — independence NONE, so completeAssuranceAssessment skips the independence check (assurance.ts) and a
+// SATISFIED disposition backs the PWU's assuranceState=SATISFIED hop without a separate reviewer identity. Created
+// + activated once, lazily (below), then reused.
+const DEMO_POLICY_ID = 'pol_01ARZ3NDEKTSV4RRFFQ69GDEM0';
+
+/** A ChangePwuState step (the controller lever) that moves the four PWU axes together. `supportingObjectIds` cites
+ *  the objects that BACK the transition (DOC-007 §11.5) — the EXECUTION_PLAN whose step succeeded for
+ *  executionState=SUCCEEDED, and the SATISFIED ASSURANCE_ASSESSMENT for assuranceState=SATISFIED — which the
+ *  RPH-PWU-006 Given guards (pwu.ts) now require. */
 function chg(
 	pwuId: string,
 	previousState: string,
 	newState: string,
 	executionState: string,
 	assuranceState: string,
-	shapeIntegrityState: string
+	shapeIntegrityState: string,
+	supportingObjectIds: readonly string[] = []
 ): Step {
 	return [
 		'ChangePwuState',
@@ -211,7 +223,7 @@ function chg(
 			assuranceState,
 			shapeIntegrityState,
 			reasonCode: 'CONTROLLER',
-			supportingObjectIds: []
+			supportingObjectIds
 		}
 	];
 }
@@ -280,10 +292,16 @@ export const actions: Actions = {
 		return { proposed: pwuId };
 	},
 
-	// Drive a PWU through shaping + execution to EXECUTED/SUCCEEDED — still UNASSESSED, so amber (not green).
+	// Drive a PWU through shaping + a REAL execution step to executionState=SUCCEEDED — still UNASSESSED, so amber
+	// (not green). The controller may NOT declare SUCCEEDED: RPH-PWU-006 / §8.1 require an EXECUTION_PLAN whose step
+	// actually succeeded. A TRANSFORMATION step completed by the operator is not AI-produced, so the §8.4 floor gate
+	// admits the completion without a Reasoning Review (the reference seed demonstrates the AI-floor path).
 	beginExecute: async ({ request }) => {
 		const pwuId = await pwuIdFrom(request);
 		if (!pwuId) return fail(400, { error: 'Missing PWU.' });
+		const planId = mintUiId('plan');
+		const stepId = mintUiId('step');
+		const attemptId = mintUiId('attempt');
 		const err = runSteps([
 			['BeginPwuShaping', PWU, pwuId, {}],
 			[
@@ -292,24 +310,164 @@ export const actions: Actions = {
 				pwuId,
 				{ shapeReadinessAssessmentId: 'assess_shape', expectedSemanticVersion: 1 }
 			],
-			chg(pwuId, 'READY', 'PLANNED', 'PLANNED', 'UNASSESSED', 'PRESERVED'),
-			chg(pwuId, 'PLANNED', 'EXECUTING', 'QUEUED', 'UNASSESSED', 'PRESERVED'),
-			chg(pwuId, 'EXECUTING', 'EXECUTING', 'RUNNING', 'UNASSESSED', 'PRESERVED'),
-			chg(pwuId, 'EXECUTING', 'EXECUTING', 'SUCCEEDED', 'UNASSESSED', 'PRESERVED')
+			[
+				'ProposeExecutionPlan',
+				'EXECUTION_PLAN',
+				planId,
+				{
+					executionPlanId: planId,
+					workUnitId: pwuId,
+					steps: [
+						{
+							id: stepId,
+							executionPlanId: planId,
+							stepType: 'TRANSFORMATION',
+							purpose: 'Produce the PWU output',
+							inputBindings: [],
+							outputBindings: [],
+							preconditions: [],
+							postconditions: [],
+							stepState: 'QUEUED'
+						}
+					],
+					transitions: [],
+					retryPolicy: {},
+					tacticalChangePolicy: {},
+					escalationPolicy: {},
+					terminationPolicy: {}
+				}
+			],
+			['ApproveExecutionPlan', 'EXECUTION_PLAN', planId, {}],
+			['ActivateExecutionPlan', 'EXECUTION_PLAN', planId, { authorizedRuntimeBindingIds: [] }],
+			chg(pwuId, 'READY', 'PLANNED', 'PLANNED', 'UNASSESSED', 'PRESERVED', [planId]),
+			chg(pwuId, 'PLANNED', 'EXECUTING', 'QUEUED', 'UNASSESSED', 'PRESERVED', [planId]),
+			['StartExecutionStep', 'EXECUTION_PLAN', planId, { stepId }],
+			chg(pwuId, 'EXECUTING', 'EXECUTING', 'RUNNING', 'UNASSESSED', 'PRESERVED', [planId]),
+			// Explicit no-output completion (RPH-EXE-006 permits it) — the demo shows the lifecycle, not artifact
+			// authoring. Non-AI (TRANSFORMATION + HUMAN operator), so the floor gate admits it. executionProvenance is
+			// required (§16.1); recording the human operator keeps the step non-AI.
+			[
+				'CompleteExecutionStep',
+				'EXECUTION_PLAN',
+				planId,
+				{
+					executionStepId: stepId,
+					executionAttemptId: attemptId,
+					resultStatus: 'SUCCEEDED',
+					outputArtifactIds: [],
+					proposedEvidenceIds: [],
+					detectedAssumptionIds: [],
+					structuredResult: {},
+					executionProvenance: {
+						executedBy: { actorId: 'ui-user', actorType: 'HUMAN', displayName: 'Workbench User' }
+					}
+				}
+			],
+			// Earned, and cited: the plan whose step actually succeeded now backs executionState=SUCCEEDED.
+			chg(pwuId, 'EXECUTING', 'EXECUTING', 'SUCCEEDED', 'UNASSESSED', 'PRESERVED', [planId])
 		]);
 		if (err) return fail(400, { error: `Execution failed: ${err}` });
 		return { advanced: 'executed' };
 	},
 
-	// Move the PWU into assurance and set assuranceState -> SATISFIED via the controller lever (exactly as the
-	// reference undertaking does). The PWU is NOT yet green: workLifecycle stays UNDER_ASSURANCE until Mark
-	// Satisfied — execution success and assurance stay separate (INV-5). NOTE: authoring first-class assurance
-	// ASSESSMENT / OBSERVATION / EVIDENCE / CLAIM artifacts (with the full ValidatorResult) is a distinct flow and
-	// a documented follow-up; here we drive the assurance AXIS, which is what gates the green state.
+	// Earn assuranceState=SATISFIED with a REAL assessment. The controller may NOT declare a disposition: RPH-PWU-006
+	// / §37 require the SATISFIED hop to cite a SATISFIED ASSURANCE_ASSESSMENT covering the PWU. So we request +
+	// complete an assessment under a lightweight NONE-independence demo policy (created + activated once), then cite
+	// it. The PWU is NOT yet green: workLifecycle stays UNDER_ASSURANCE until Mark Satisfied — exec != assurance
+	// (INV-5). This mirrors the reference seed's earnAssurance, minus the evidence/claim/independence apparatus.
 	recordAssurance: async ({ request }) => {
+		const engine = getEngine();
 		const pwuId = await pwuIdFrom(request);
 		if (!pwuId) return fail(400, { error: 'Missing PWU.' });
+		const assessmentId = mintUiId('asm');
+		const evaluator = { actorId: 'ui-user', actorType: 'HUMAN', displayName: 'Workbench User' };
+		// Create + activate the demo policy only once; CreateAssurancePolicy on an existing object CONFLICTS.
+		const policySteps: Step[] = getObject(engine, DEMO_POLICY_ID)
+			? []
+			: [
+					[
+						'CreateAssurancePolicy',
+						'ASSURANCE_POLICY',
+						DEMO_POLICY_ID,
+						{
+							policyId: DEMO_POLICY_ID,
+							version: '1.0.0',
+							name: 'Workbench Demo Sign-off',
+							purpose: 'Operator sign-off that the demo PWU produced its expected output.',
+							rationale:
+								'The interactive demo drives the assurance axis; this assessment backs a SATISFIED disposition. Independence NONE — the operator is the reviewer.',
+							applicableObjectTypes: ['PROFESSIONAL_WORK_UNIT'],
+							evaluatedClaimTypes: ['FITNESS'],
+							criteria: [
+								{
+									id: 'DEMO-01',
+									name: 'Expected output present',
+									description: 'The PWU has produced its declared expected output.',
+									criterionType: 'QUALITATIVE',
+									evaluationMethod: 'HUMAN_JUDGMENT',
+									requiredEvidenceIds: [],
+									severityIfNotMet: 'MATERIAL',
+									mayBeNotApplicable: false
+								}
+							],
+							evaluatorRole: 'REVIEWER',
+							independenceRequirement: 'NONE',
+							findingDefinitions: [
+								{
+									code: 'DEMO_UNFIT',
+									name: 'Output not fit for the approved need',
+									description: 'The declared expected output is absent or does not serve the need.',
+									defaultSeverity: 'MATERIAL',
+									affectedClaimTypes: ['FITNESS'],
+									defaultControlActions: ['GATHER_CONTEXT']
+								}
+							],
+							permittedControlActions: ['CONTINUE', 'GATHER_CONTEXT']
+						}
+					],
+					['ActivateAssurancePolicy', 'ASSURANCE_POLICY', DEMO_POLICY_ID, { policyId: DEMO_POLICY_ID }]
+				];
 		const err = runSteps([
+			...policySteps,
+			[
+				'RequestAssuranceAssessment',
+				'ASSURANCE_ASSESSMENT',
+				assessmentId,
+				{
+					assessmentId,
+					assurancePolicyId: DEMO_POLICY_ID,
+					policyVersion: '1.0.0',
+					subjectObjectIds: [pwuId],
+					subjectSemanticVersions: { [pwuId]: 1 },
+					claimIds: []
+				}
+			],
+			[
+				'CompleteAssuranceAssessment',
+				'ASSURANCE_ASSESSMENT',
+				assessmentId,
+				{
+					validatorResult: {
+						validatorId: 'workbench.demo-signoff',
+						validatorVersion: '1',
+						policyId: DEMO_POLICY_ID,
+						policyVersion: '1.0.0',
+						assessmentId,
+						subjectObjectIds: [pwuId],
+						subjectSemanticVersions: { [pwuId]: 1 },
+						claimResults: [],
+						evidenceConsideredIds: [],
+						evidenceRejected: [],
+						observations: [],
+						dispositionRecommendation: 'SATISFIED',
+						recommendedControlActions: [],
+						residualUncertainty: [],
+						limitations: [],
+						executionProvenance: { evaluator }
+					},
+					producer: evaluator
+				}
+			],
 			chg(pwuId, 'EXECUTING', 'EVIDENCE_PENDING', 'SUCCEEDED', 'EVIDENCE_REQUIRED', 'PRESERVED'),
 			chg(
 				pwuId,
@@ -319,8 +477,13 @@ export const actions: Actions = {
 				'READY_FOR_ASSESSMENT',
 				'PRESERVED'
 			),
-			chg(pwuId, 'UNDER_ASSURANCE', 'UNDER_ASSURANCE', 'SUCCEEDED', 'ASSESSING', 'PRESERVED'),
-			chg(pwuId, 'UNDER_ASSURANCE', 'UNDER_ASSURANCE', 'SUCCEEDED', 'SATISFIED', 'PRESERVED')
+			chg(pwuId, 'UNDER_ASSURANCE', 'UNDER_ASSURANCE', 'SUCCEEDED', 'ASSESSING', 'PRESERVED', [
+				assessmentId
+			]),
+			// The only guarded hop: assuranceState=SATISFIED must cite the SATISFIED assessment covering this PWU.
+			chg(pwuId, 'UNDER_ASSURANCE', 'UNDER_ASSURANCE', 'SUCCEEDED', 'SATISFIED', 'PRESERVED', [
+				assessmentId
+			])
 		]);
 		if (err) return fail(400, { error: `Assurance failed: ${err}` });
 		return { advanced: 'assured' };

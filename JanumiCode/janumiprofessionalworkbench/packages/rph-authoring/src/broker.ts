@@ -1,12 +1,12 @@
 // The PWA-authoring CapabilityBroker — an LLM-agnostic layer of READ + PROPOSE operations over the rph-engine
-// public seam, scoped to a single DRAFT PWA. It is the shared execute-surface that BOTH the node-graph UI actions
-// and the Pi agent's tools call: the agent never touches SQL or events, it calls these methods, and every PROPOSE
-// issues a real domain command (as an AGENT actor) so the engine's fail-loud validation IS the guardrail — a
-// malformed or illegal proposal is REJECTED by the domain, not silently applied. Multi-step "generate a whole
-// graph and wire it" is one atomic dispatchBatch (all-or-nothing) so a mid-sequence failure can't strand a
-// half-built DRAFT. Governance: this broker only ever authors a DRAFT (define/edit/remove/link PWU Types, edit the
-// PWA's own details); it deliberately does NOT expose the publication FSM — a human advances DRAFT -> ... ->
-// PUBLISHED. That is the "agent proposes, human publishes" seam.
+// public seam, scoped to a single DRAFT PWA. The Pi agent's tools call this layer; current node-graph form actions
+// dispatch the same domain commands through their route actions and apply parallel authoring checks. The agent never
+// touches SQL or events. Broker pre-checks provide actionable authoring feedback, then every PROPOSE issues a real
+// domain command (as an AGENT actor) so malformed or illegal domain operations are rejected rather than silently
+// applied. Multi-step "generate a whole graph and wire it" is one atomic dispatchBatch (all-or-nothing) so a
+// mid-sequence failure cannot strand a half-built DRAFT. Governance: this broker authors only a DRAFT
+// (define/edit/remove/link PWU Types, edit the PWA's own details); it deliberately does NOT expose the publication
+// FSM — a human advances DRAFT -> ... -> PUBLISHED. That is the "agent proposes, human publishes" seam.
 import type {
 	AssessmentCriterion,
 	CardinalityCode,
@@ -252,7 +252,7 @@ export class PwaAuthoringBroker {
 			name: String((r.state.name ?? r.id) as string),
 			purpose: String((r.state.purpose ?? '') as string),
 			version: String((r.state.version ?? '') as string),
-			status: String((r.state.status ?? 'ACTIVE') as string),
+			status: String((r.state.status ?? 'DRAFT') as string),
 			isFloor: FLOOR_POLICY_IDS.has(r.id)
 		}));
 	}
@@ -276,9 +276,9 @@ export class PwaAuthoringBroker {
 		});
 	}
 
-	/** Create a new authorable Assurance Policy (ACTIVE) in the workbench library. NOT scoped to the DRAFT PWA —
-	 *  policies are workbench-wide objects a PWU Type then references. The 3 floor policies are seeded, not created
-	 *  here. Returns the minted policy id on success. */
+	/** Create a new authorable Assurance Policy (DRAFT) in the workbench library. NOT scoped to the current PWA —
+	 *  policies are workbench-wide objects, and only an ACTIVE non-floor policy may then be referenced by a PWU Type.
+	 *  Activation is a separate human governance step. The 3 floor policies are seeded, not created here. */
 	createPolicy(input: CreatePolicyInput): ProposalResult {
 		if (!input.name?.trim()) return { ok: false, error: 'A policy name is required.' };
 		const id = this.mintId('pol');
@@ -326,6 +326,8 @@ export class PwaAuthoringBroker {
 		if (guard) return guard;
 		if (!input.name?.trim() || !input.pwuKind?.trim())
 			return { ok: false, error: 'A PWU Type name and kind are required.' };
+		const policyGuard = this.validatePolicyReferences(input.requiredAssurancePolicyIds ?? []);
+		if (policyGuard) return policyGuard;
 		const id = this.mintId('pwut');
 		const r = this.dispatch(
 			this.cmd('DefinePwuType', PWU_TYPE, id, {
@@ -365,8 +367,15 @@ export class PwaAuthoringBroker {
 	editType(pwuTypeId: string, patch: EditTypeInput): ProposalResult {
 		const guard = this.requireDraft();
 		if (guard) return guard;
-		if (!this.getType(pwuTypeId))
-			return { ok: false, error: `PWU Type ${pwuTypeId} does not exist on this PWA.` };
+		const existing = this.getType(pwuTypeId);
+		if (!existing) return { ok: false, error: `PWU Type ${pwuTypeId} does not exist on this PWA.` };
+		if (patch.requiredAssurancePolicyIds !== undefined) {
+			const policyGuard = this.validatePolicyReferences(
+				patch.requiredAssurancePolicyIds,
+				existing.requiredAssurancePolicyIds
+			);
+			if (policyGuard) return policyGuard;
+		}
 		const r = this.dispatch(
 			this.cmd('EditPwuType', PWU_TYPE, pwuTypeId, {
 				pwuTypeId,
@@ -441,6 +450,15 @@ export class PwaAuthoringBroker {
 		const keys = new Set(specs.map((s) => s.tempKey));
 		if (keys.size !== specs.length)
 			return { ok: false, error: 'scaffold temp keys must be unique.' };
+		for (const spec of specs) {
+			const policyGuard = this.validatePolicyReferences(spec.requiredAssurancePolicyIds ?? []);
+			if (policyGuard) {
+				return {
+					...policyGuard,
+					error: `Type "${spec.tempKey}": ${policyGuard.error}`
+				};
+			}
+		}
 
 		// Mint real ids for every temp key first, so child references resolve within the batch.
 		const idFor = new Map<string, string>();
@@ -521,6 +539,34 @@ export class PwaAuthoringBroker {
 				ok: false,
 				error: `PWA ${this.pwaId} is ${pwa.publicationStatus}, not DRAFT — authoring is closed (a PUBLISHED version is immutable).`
 			};
+		return null;
+	}
+
+	/** Only ACTIVE, non-floor policies may be newly declared. Existing declarations may be retained or removed after
+	 *  the policy changes status, so an unrelated edit never erases historical intent. */
+	private validatePolicyReferences(
+		requestedPolicyIds: readonly string[],
+		existingPolicyIds: readonly string[] = []
+	): ProposalResult | null {
+		const existing = new Set(existingPolicyIds);
+		const policies = new Map(this.listPolicies().map((policy) => [policy.id, policy]));
+		for (const policyId of requestedPolicyIds) {
+			if (existing.has(policyId)) continue;
+			if (FLOOR_POLICY_IDS.has(policyId)) {
+				return {
+					ok: false,
+					error: `The locked floor policy ${policyId} always applies and must not be referenced explicitly.`
+				};
+			}
+			const policy = policies.get(policyId);
+			if (!policy) return { ok: false, error: `Assurance Policy ${policyId} does not exist.` };
+			if (policy.status !== 'ACTIVE') {
+				return {
+					ok: false,
+					error: `Assurance Policy ${policy.name} is ${policy.status}; only ACTIVE policies may be newly referenced.`
+				};
+			}
+		}
 		return null;
 	}
 

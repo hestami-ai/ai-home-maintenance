@@ -694,7 +694,8 @@ export const AssuranceAssessmentStartedPayloadSchema = z.strictObject({
 	policyVersion: z.string(),
 	subjectObjectIds: z.array(z.string()),
 	subjectSemanticVersions: z.record(z.string(), z.number()),
-	claimIds: z.array(z.string())
+	claimIds: z.array(z.string()),
+	requiredEvidenceIds: z.array(z.string()).optional()
 });
 export type AssuranceAssessmentStartedPayload = z.infer<
 	typeof AssuranceAssessmentStartedPayloadSchema

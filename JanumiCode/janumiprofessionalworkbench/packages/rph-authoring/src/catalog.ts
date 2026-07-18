@@ -20,11 +20,11 @@ export const PWU_TYPE_HELP = {
 	permittedChildren:
 		'Per-child composition cardinality (parallel to permittedChildTypeIds): each rule is {typeId, cardinality, applicabilityNote?}. cardinality is M1 (mandatory exactly one), M+ (mandatory one or more), C1 (conditional zero or one), or C+ (conditional zero or more). Use a free-text applicabilityNote to say WHEN a conditional (C*) child applies.',
 	requiredAssurancePolicyIds:
-		'Ids of the assurance policies future Instances of this type MUST satisfy (declared/required treatment, §11.7.4) — e.g. Requirement Coverage or Intent Preservation. This is required treatment, not a runtime assessment; the locked de-minimis floor always applies on top and is never listed here.',
+		'Ids of ACTIVE non-floor assurance policies future Instances of this type MUST satisfy (declared/required treatment, §11.7.4) — e.g. Requirement Coverage or Intent Preservation. DRAFT, SUSPENDED, SUPERSEDED, missing, and locked-floor ids are rejected when newly added. This is required treatment, not a runtime assessment; the locked de-minimis floor always applies on top and is never listed here.',
 	requiredInputs:
-		'Named artifacts this type of work CONSUMES before it can start (e.g. "approved-behavior"). A data-flow edge is drawn from whichever type produces a matching output.',
+		'Named artifacts this type of work CONSUMES (e.g. "approved-behavior"). A matching output declares a compatible artifact hand-off; it does not establish execution order.',
 	requiredOutputs:
-		'Named artifacts this type of work PRODUCES when done (e.g. "architecture-baseline"). Downstream types that require a matching input consume it — the data-flow that threads the graph.'
+		'Named artifacts this type of work PRODUCES (e.g. "architecture-baseline"). A type with a matching required input can consume that artifact; this compatibility does not establish temporal order.'
 } as const;
 
 export interface PwuTypeTemplate {

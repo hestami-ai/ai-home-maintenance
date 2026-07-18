@@ -47,7 +47,7 @@ module.exports = {
 		{
 			name: 'projections-browser-safe',
 			comment:
-				'rph-projections is the browser-safe pure View/read-model seam a UI consumes DIRECTLY (the M14 demo imports it, not the engine). It must not import Node-only engine packages or the PWA data package — that would drag better-sqlite3 / node:crypto into a browser bundle. It may depend only on rph-contracts (type-only) and rph-ports.',
+				'rph-projections is the browser-safe pure View/read-model seam a UI consumes DIRECTLY (the M14 demo imports it, not the engine). It must not import Node-only engine packages or the PWA data package — that would drag better-sqlite3 / node:crypto into a browser bundle. It may depend only on the browser-safe rph-contracts, rph-domain, and rph-ports APIs.',
 			severity: 'error',
 			from: { path: '^packages/rph-projections/src' },
 			to: {

@@ -1,9 +1,10 @@
 // Adapter: a PWA's PWU Types -> Svelte Flow nodes/edges for the node-graph PWA Designer. Nodes are the reusable
 // PWU Types, rendered by the PwuTypeCard custom node (name/kind/N-L/cardinality + the §11.7.4 assurance rail).
 // The BASE view is the COMPOSITION tree only ("permits" edges — "this type may be decomposed into that one"),
-// laid out top-down as a tidy tree by dagre. Data-flow (requiredOutputs->requiredInputs) is a SEPARATE overlay,
-// off by default, so the composition tree reads cleanly instead of being crossed by hand-off edges (§11.7.2:
-// graph position shows type-composition only, not order/flow). Collapsing a non-leaf hides its subtree.
+// laid out by ELK through a serializable @statelyai/graph projection (with Dagre as an explicit fallback). Data-flow
+// (requiredOutputs->requiredInputs) is a SEPARATE overlay, off by default, so the composition tree reads cleanly
+// instead of being crossed by hand-off edges (§11.7.2: graph position shows type-composition only, not order/flow).
+// Collapsing a non-leaf hides its subtree.
 import dagre from '@dagrejs/dagre';
 import type { Edge, Node } from '@xyflow/svelte';
 import { assurancePolicyLabel, ASSURANCE_FLOOR } from '$lib/authoring/pwuType';
@@ -43,26 +44,34 @@ export interface PwuCardData {
 	readonly floorLabels: readonly string[];
 	/** Declared additive assurance policy labels (from requiredAssurancePolicyIds). */
 	readonly policyLabels: readonly string[];
+	/** Keeps connection handles aligned with the active ELK/Dagre lens. */
+	readonly layoutDirection: PwaLayoutDirection;
 	readonly onToggleCollapse: () => void;
 	[key: string]: unknown;
 }
 
 // Selection is intentionally NOT an input here: it is handled by Svelte Flow's native node `selected` prop, so
-// clicking a node never re-runs the dagre layout — the flow only recomputes on structural change (types / collapse
+// clicking a node never re-runs layout — the flow only recomputes on structural change (types / collapse
 // / overlay). The card reads `selected` from NodeProps for its highlight.
 export interface PwaFlowOptions {
 	readonly collapsed: ReadonlySet<string>;
 	readonly showDataFlow: boolean;
 	readonly onToggleCollapse: (id: string) => void;
+	/** DOWN is the composition-tree lens; RIGHT supports a phase-map lens without changing graph semantics. */
+	readonly layoutDirection?: PwaLayoutDirection;
 }
+
+export type PwaLayoutDirection = 'DOWN' | 'RIGHT';
 
 export interface PwaFlow {
 	readonly nodes: Node[];
 	readonly edges: Edge[];
+	/** Visible diagnostic so a browser-side ELK failure never silently masquerades as the intended layout path. */
+	readonly layoutEngine: 'ELK' | 'DAGRE';
 }
 
 const NODE_W = 240;
-const NODE_H = 132;
+const NODE_H = 160;
 const FLOOR_LABELS = ASSURANCE_FLOOR.map((p) => p.label);
 
 /** The permits (composition) edges among known types. */
@@ -88,14 +97,41 @@ function visibleSet(
 		hasParent.add(e.to);
 	}
 	// Top-level = explicit roots + anything with no incoming permits edge (so nothing is silently orphaned away).
-	const queue = types.filter((t) => t.isRoot || !hasParent.has(t.id)).map((t) => t.id);
 	const visible = new Set<string>();
-	while (queue.length) {
-		const id = queue.shift()!;
-		if (visible.has(id)) continue;
-		visible.add(id);
-		if (collapsed.has(id)) continue; // a collapsed node's subtree stays hidden
-		for (const c of childrenOf.get(id) ?? []) queue.push(c);
+	const hiddenByCollapse = new Set<string>();
+
+	// Expand all seeds in one pass before marking collapsed descendants. That preserves a shared child reached
+	// through another uncollapsed parent, matching the previous multi-parent behavior.
+	const expand = (seeds: readonly string[]) => {
+		const queue = [...seeds];
+		const newlyVisibleCollapsed: string[] = [];
+		while (queue.length) {
+			const id = queue.shift()!;
+			if (visible.has(id) || hiddenByCollapse.has(id)) continue;
+			visible.add(id);
+			if (collapsed.has(id)) {
+				newlyVisibleCollapsed.push(id);
+				continue;
+			}
+			for (const child of childrenOf.get(id) ?? []) queue.push(child);
+		}
+
+		// Do not later resurrect a subtree merely because its invalid shape contains a source-less cycle. Already
+		// visible nodes stay visible when another uncollapsed path reached them.
+		const hiddenQueue = newlyVisibleCollapsed.flatMap((id) => childrenOf.get(id) ?? []);
+		while (hiddenQueue.length) {
+			const id = hiddenQueue.shift()!;
+			if (visible.has(id) || hiddenByCollapse.has(id)) continue;
+			hiddenByCollapse.add(id);
+			for (const child of childrenOf.get(id) ?? []) hiddenQueue.push(child);
+		}
+	};
+
+	expand(types.filter((t) => t.isRoot || !hasParent.has(t.id)).map((t) => t.id));
+	// An invalid disconnected closed cycle has no root/no-incoming seed. Show one authored seed per otherwise
+	// unvisited component so the designer's health report can be acted on instead of the bad component vanishing.
+	for (const type of types) {
+		if (!visible.has(type.id) && !hiddenByCollapse.has(type.id)) expand([type.id]);
 	}
 	return visible;
 }
@@ -128,23 +164,27 @@ function preorderIndex(
 	return order;
 }
 
-/** dagre tidy top-down layout over the visible composition edges, then a stable within-rank re-order so siblings
- *  read LEFT-TO-RIGHT in authored order (dagre's crossing-minimizer otherwise mirrors them). We keep dagre's x-slots
- *  and y-rows and only permute which node occupies each slot within a rank — so subtree grouping and parent-centering
- *  (a parent sits over the centroid of its children's slots, invariant under permutation) are preserved. Returns
- *  xyflow top-left positions. */
-function layout(
+/** Dagre fallback over the visible composition edges. Within each rank, authored order is restored along the
+ *  cross-axis (left-to-right for DOWN, top-to-bottom for RIGHT). Returns xyflow top-left positions. */
+function dagreLayout(
 	visibleTypes: readonly PwuTypeNode[],
-	visibleEdges: readonly { from: string; to: string }[]
+	visibleEdges: readonly { from: string; to: string }[],
+	direction: PwaLayoutDirection
 ): Record<string, { x: number; y: number }> {
 	const g = new dagre.graphlib.Graph();
-	g.setGraph({ rankdir: 'TB', nodesep: 36, ranksep: 64, marginx: 24, marginy: 24 });
+	g.setGraph({
+		rankdir: direction === 'DOWN' ? 'TB' : 'LR',
+		nodesep: 36,
+		ranksep: 64,
+		marginx: 24,
+		marginy: 24
+	});
 	g.setDefaultEdgeLabel(() => ({}));
 	for (const t of visibleTypes) g.setNode(t.id, { width: NODE_W, height: NODE_H });
 	for (const e of visibleEdges) g.setEdge(e.from, e.to);
 	dagre.layout(g);
 
-	// dagre centers; collect them, then re-order each rank by authored pre-order index.
+	// Dagre centers nodes; collect them, then re-order each rank by authored pre-order index.
 	const centers = new Map<string, { x: number; y: number }>();
 	for (const t of visibleTypes) {
 		const n = g.node(t.id);
@@ -153,24 +193,109 @@ function layout(
 	const order = preorderIndex(visibleTypes, visibleEdges);
 	const ranks = new Map<number, string[]>();
 	for (const t of visibleTypes) {
-		const y = Math.round(centers.get(t.id)!.y);
-		ranks.set(y, [...(ranks.get(y) ?? []), t.id]);
+		const center = centers.get(t.id)!;
+		const rank = Math.round(direction === 'DOWN' ? center.y : center.x);
+		ranks.set(rank, [...(ranks.get(rank) ?? []), t.id]);
 	}
-	const reassignedX = new Map<string, number>();
+	const reassignedCrossAxis = new Map<string, number>();
 	for (const ids of ranks.values()) {
-		const slots = ids.map((id) => centers.get(id)!.x).sort((a, b) => a - b);
+		const slots = ids
+			.map((id) => {
+				const center = centers.get(id)!;
+				return direction === 'DOWN' ? center.x : center.y;
+			})
+			.sort((a, b) => a - b);
 		const ordered = [...ids].sort((a, b) => (order.get(a) ?? 0) - (order.get(b) ?? 0));
-		ordered.forEach((id, i) => reassignedX.set(id, slots[i]!));
+		ordered.forEach((id, i) => reassignedCrossAxis.set(id, slots[i]!));
 	}
 
 	const pos: Record<string, { x: number; y: number }> = {};
 	for (const t of visibleTypes) {
 		const c = centers.get(t.id)!;
-		const cx = reassignedX.get(t.id) ?? c.x;
+		const cross = reassignedCrossAxis.get(t.id);
+		const cx = direction === 'DOWN' ? (cross ?? c.x) : c.x;
+		const cy = direction === 'RIGHT' ? (cross ?? c.y) : c.y;
 		// dagre positions are node centers; xyflow wants the top-left corner.
-		pos[t.id] = { x: cx - NODE_W / 2, y: c.y - NODE_H / 2 };
+		pos[t.id] = { x: cx - NODE_W / 2, y: cy - NODE_H / 2 };
 	}
 	return pos;
+}
+
+function compositionEdgeId(from: string, to: string): string {
+	return `${from}->${to}`;
+}
+
+/** Keep the fallback explicit while ELK is being introduced; it preserves the previous Dagre behavior. */
+function dagreCompositionFlow(
+	visibleTypes: readonly PwuTypeNode[],
+	visibleEdges: readonly { from: string; to: string }[],
+	direction: PwaLayoutDirection
+): PwaFlow {
+	const positions = dagreLayout(visibleTypes, visibleEdges, direction);
+	return {
+		nodes: visibleTypes.map((type) => ({
+			id: type.id,
+			position: positions[type.id] ?? { x: 0, y: 0 },
+			data: {}
+		})),
+		edges: visibleEdges.map((edge) => ({
+			id: compositionEdgeId(edge.from, edge.to),
+			source: edge.from,
+			target: edge.to,
+			label: 'permits'
+		})),
+		layoutEngine: 'DAGRE'
+	};
+}
+
+/** Serializable structural graph -> ELK visual graph -> xyflow render model. Only composition edges participate in
+ *  layout; app callbacks and the optional data-flow overlay are deliberately added after this boundary. */
+async function layoutComposition(
+	visibleTypes: readonly PwuTypeNode[],
+	visibleEdges: readonly { from: string; to: string }[],
+	direction: PwaLayoutDirection
+): Promise<PwaFlow> {
+	try {
+		// ELK is substantially larger than the surrounding designer shell. Load the Stately layout pipeline only when
+		// this projection actually needs layout, leaving Vite free to split the engine into an on-demand browser chunk.
+		// Import failures belong inside this boundary too: an offline/stale chunk must take the same explicit fallback
+		// path as an ELK execution failure instead of leaving the canvas blank.
+		const [{ createGraph }, { getElkLayout }, { toXYFlow }] = await Promise.all([
+			import('@statelyai/graph'),
+			import('@statelyai/graph/layout/elk'),
+			import('@statelyai/graph/xyflow')
+		]);
+		const graph = createGraph({
+			id: 'pwa-composition',
+			direction: direction === 'DOWN' ? 'down' : 'right',
+			nodes: visibleTypes.map((type) => ({
+				id: type.id,
+				label: type.name,
+				width: NODE_W,
+				height: NODE_H
+			})),
+			edges: visibleEdges.map((edge) => ({
+				id: compositionEdgeId(edge.from, edge.to),
+				sourceId: edge.from,
+				targetId: edge.to,
+				label: 'permits'
+			}))
+		});
+		const laidOut = await getElkLayout(graph, {
+			algorithm: 'layered',
+			direction: direction === 'DOWN' ? 'down' : 'right',
+			spacing: { node: 36, layer: 64 },
+			layoutOptions: {
+				'elk.layered.considerModelOrder.strategy': 'NODES_AND_EDGES',
+				'elk.layered.crossingMinimization.forceNodeModelOrder': 'true'
+			}
+		});
+		const flow = toXYFlow(laidOut);
+		return { nodes: flow.nodes as Node[], edges: flow.edges as Edge[], layoutEngine: 'ELK' };
+	} catch (error) {
+		console.warn('ELK layout failed; falling back to Dagre for this PWA projection.', error);
+		return dagreCompositionFlow(visibleTypes, visibleEdges, direction);
+	}
 }
 
 /** Compact cardinality summary of a type's permitted children (falls back to M1 for children with no rule). */
@@ -234,17 +359,28 @@ function dataFlowEdges(types: readonly PwuTypeNode[], visible: ReadonlySet<strin
 	return edges;
 }
 
-export function toPwaFlow(types: readonly PwuTypeNode[], opts: PwaFlowOptions): PwaFlow {
+export async function toPwaFlow(
+	types: readonly PwuTypeNode[],
+	opts: PwaFlowOptions
+): Promise<PwaFlow> {
 	const ids = new Set(types.map((t) => t.id));
 	const pairs = permitPairs(types, ids);
 	const hasParent = new Set(pairs.map((e) => e.to));
 	const visible = visibleSet(types, pairs, opts.collapsed);
 	const visibleTypes = types.filter((t) => visible.has(t.id));
 	const visiblePairs = pairs.filter((e) => visible.has(e.from) && visible.has(e.to));
-	const pos = layout(visibleTypes, visiblePairs);
+	const composition = await layoutComposition(
+		visibleTypes,
+		visiblePairs,
+		opts.layoutDirection ?? 'DOWN'
+	);
+	const layoutNodeById = new Map(composition.nodes.map((node) => [node.id, node]));
+	const layoutEdgeById = new Map(composition.edges.map((edge) => [edge.id, edge]));
 
 	const nodes: Node[] = visibleTypes.map((t) => {
+		const layoutNode = layoutNodeById.get(t.id);
 		const data: PwuCardData = {
+			...(layoutNode?.data ?? {}),
 			id: t.id,
 			name: t.name,
 			pwuKind: t.pwuKind,
@@ -256,28 +392,38 @@ export function toPwaFlow(types: readonly PwuTypeNode[], opts: PwaFlowOptions): 
 			cardinalitySummary: cardinalitySummary(t),
 			floorLabels: FLOOR_LABELS,
 			policyLabels: (t.requiredAssurancePolicyIds ?? []).map(assurancePolicyLabel),
+			layoutDirection: opts.layoutDirection ?? 'DOWN',
 			onToggleCollapse: () => opts.onToggleCollapse(t.id)
 		};
 		return {
+			...layoutNode,
 			id: t.id,
 			type: 'pwuType',
-			position: pos[t.id] ?? { x: 0, y: 0 },
+			position: layoutNode?.position ?? { x: 0, y: 0 },
+			// Keep renderer geometry identical to the dimensions supplied to ELK/Dagre. The card scrolls its assurance
+			// rail within this box, so an unusually long policy list cannot overlap a neighboring layer.
+			width: NODE_W,
+			height: NODE_H,
 			data
 		};
 	});
 
-	const permitsEdges: Edge[] = visiblePairs.map((e) => ({
-		id: `${e.from}->${e.to}`,
-		source: e.from,
-		target: e.to,
-		label: 'permits',
-		animated: false,
-		// Muted-but-visible stroke on the dark canvas. The label chip (an HTML .svelte-flow__edge-label) is themed
-		// via CSS variables in +page.svelte — the default white-bg/light-text washed out (§11.7 contrast fix).
-		style: 'stroke:#454b54;stroke-width:1.5;'
-	}));
+	const permitsEdges: Edge[] = visiblePairs.map((e) => {
+		const id = compositionEdgeId(e.from, e.to);
+		return {
+			...layoutEdgeById.get(id),
+			id,
+			source: e.from,
+			target: e.to,
+			label: 'permits',
+			animated: false,
+			// Muted-but-visible stroke on the dark canvas. The label chip (an HTML .svelte-flow__edge-label) is themed
+			// via CSS variables in +page.svelte — the default white-bg/light-text washed out (§11.7 contrast fix).
+			style: 'stroke:#454b54;stroke-width:1.5;'
+		};
+	});
 	const edges = opts.showDataFlow
 		? [...permitsEdges, ...dataFlowEdges(types, visible)]
 		: permitsEdges;
-	return { nodes, edges };
+	return { nodes, edges, layoutEngine: composition.layoutEngine };
 }
