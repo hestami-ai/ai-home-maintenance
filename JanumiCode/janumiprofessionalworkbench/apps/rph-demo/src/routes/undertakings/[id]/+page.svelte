@@ -183,14 +183,35 @@
 {:else if tab === 'assurance'}
 	<div class="panel">
 		<h2>Assurance — assessments &amp; observations</h2>
+		<p class="hint">
+			The §38 Assurance View — folded from the governed event stream, not the object store. Independence and
+			validator identity read <b>unknown</b> (never a false “none”) when the source event did not carry them.
+		</p>
 		<table>
-			<thead><tr><th>Assessment</th><th>Policy</th><th>State</th></tr></thead>
+			<thead
+				><tr
+					><th>Assessment</th><th>Policy</th><th>State</th><th>Disposition</th><th>Independence</th><th
+						>Validator</th
+					></tr
+				></thead
+			>
 			<tbody>
-				{#each data.assessments as a (a.id)}<tr><td class="mono">{a.id.slice(0, 14)}…</td><td
-							>{a.policy}</td
-						><td><span class="tag">{a.state}</span></td></tr
-					>{/each}
-				{#if !data.assessments.length}<tr><td colspan="3" class="none">No assessments.</td></tr>{/if}
+				{#each data.assessments as a (a.id)}
+					<tr
+						><td class="mono">{a.id.slice(0, 14)}…</td><td>{a.policy}</td><td
+							><span class="tag">{a.state}</span></td
+						><td>{a.disposition || '—'}</td><td
+							><span class="tag">{a.independenceStatus || 'unknown'}</span></td
+						><td class="mono"
+							>{a.validatorIdentity ? `${a.validatorIdentity}@${a.validatorVersion}` : 'unknown'}</td
+						></tr
+					>
+					{#if a.openConditions.length}<tr
+							><td></td><td colspan="5" class="none">Open conditions: {a.openConditions.join('; ')}</td
+							></tr
+						>{/if}
+				{/each}
+				{#if !data.assessments.length}<tr><td colspan="6" class="none">No assessments.</td></tr>{/if}
 			</tbody>
 		</table>
 		{#if data.observations.length}

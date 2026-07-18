@@ -15,6 +15,7 @@ import {
 	REFERENCE_OPEN_RESIDUALS,
 	SEED_UNDERTAKING
 } from '@janumipwb/rph-engine';
+import { buildAssuranceView } from '@janumipwb/rph-projections';
 import { dispatch, getEngine, getRegisteredIntent, mintUiId } from '$lib/server/workbench';
 import type { Actions, PageServerLoad } from './$types';
 
@@ -64,11 +65,27 @@ export const load: PageServerLoad = ({ params }) => {
 		};
 	});
 
-	const assessments = listAssessments(engine).map((a) => ({
-		id: a.id,
-		policy: String((a.state.assurancePolicyId ?? '') as string),
-		state: String((a.state.assessmentState ?? '') as string)
-	}));
+	// The §38 Assurance View (DOC-004 §38 "Assurance Workbench Requirements") — a fold over the assurance events,
+	// NOT the raw object store. This surfaces what the object store cannot: the validator implementation identity
+	// (Increment 37), the INDEPENDENCE STATUS (Increments I2/I4 — 'VERIFIED' when the §39-inv-8 check ran and
+	// passed, 'VIOLATED' on an AssuranceIndependenceViolated, undefined = unknown, never a fabricated pass), the
+	// disposition, and the open conditions a CONDITIONALLY_SATISFIED verdict leaves. Joined by assessment id onto
+	// the working set. This is the read model's FIRST live consumer; before, §38 was folded but never rendered.
+	const view = buildAssuranceView(engine.readAllEvents());
+	const assessments = listAssessments(engine).map((a) => {
+		const v = view.assessments[a.id];
+		return {
+			id: a.id,
+			policy: String((a.state.assurancePolicyId ?? '') as string),
+			state: String((a.state.assessmentState ?? '') as string),
+			// §38 fields — undefined renders as 'unknown', never as a false 'none' (the load-bearing distinction).
+			disposition: v?.disposition ?? '',
+			independenceStatus: v?.independenceStatus ?? '',
+			validatorIdentity: v?.validatorImplementationIdentity ?? '',
+			validatorVersion: v?.validatorImplementationVersion ?? '',
+			openConditions: v?.openConditions ?? []
+		};
+	});
 	const observations = listObservations(engine).map((o) => ({
 		id: o.id,
 		severity: String((o.state.severity ?? '') as string),

@@ -59,4 +59,21 @@ test.describe('Undertaking Workbench — PWU lifecycle enforces no-green-without
 
 		await page.screenshot({ path: 'e2e-results/pwu-lifecycle-satisfied.png', fullPage: true });
 	});
+
+	test('the §38 Assurance View renders live: the reference undertaking shows folded independence status + validator identity', async ({
+		page
+	}) => {
+		// The §38 Assurance View (buildAssuranceView) is a fold over the governed event stream. It was built but never
+		// rendered — the assurance tab showed only raw policy + state from the object store. Now the tab consumes the
+		// folded view, surfacing what only the events carry: the INDEPENDENCE STATUS (I2/I4 — the reference drive's
+		// Reasoning Review is DIFFERENT_MODEL and passes, so an assessment reads VERIFIED) and the VALIDATOR
+		// IMPLEMENTATION IDENTITY (Increment 37). This is the read model's first live consumer.
+		await gotoHydrated(page, '/undertakings');
+		const link = page.getByRole('link', { name: /Field Service Management/i });
+		await expect(link).toBeVisible();
+		await gotoHydrated(page, (await link.getAttribute('href'))!);
+		await page.getByRole('button', { name: 'assurance' }).click();
+		await expect(page.getByText('VERIFIED').first()).toBeVisible();
+		await expect(page.getByText('deterministic.reasoning-review').first()).toBeVisible();
+	});
 });
