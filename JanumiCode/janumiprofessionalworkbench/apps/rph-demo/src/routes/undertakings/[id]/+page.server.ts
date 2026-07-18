@@ -216,11 +216,13 @@ function chg(
 	];
 }
 
-/** Run a command sequence, returning the first rejection message (DUPLICATE is fine) or null on success. */
+/** Run a command sequence, returning the first rejection (naming the command that failed; DUPLICATE is fine) or
+ *  null on success. Prefixing the command type turns an opaque "Schema validation failed" into a locatable one. */
 function runSteps(steps: Step[]): string | null {
 	for (const [ct, agg, id, pl] of steps) {
 		const r = dispatch(ct, agg, id, pl);
-		if (r.status !== 'ACCEPTED' && r.status !== 'DUPLICATE') return r.error?.message ?? r.status;
+		if (r.status !== 'ACCEPTED' && r.status !== 'DUPLICATE')
+			return `${ct}: ${r.error?.message ?? r.status}`;
 	}
 	return null;
 }
