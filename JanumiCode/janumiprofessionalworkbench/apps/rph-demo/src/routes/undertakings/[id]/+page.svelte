@@ -182,10 +182,11 @@
 	</div>
 {:else if tab === 'assurance'}
 	<div class="panel">
-		<h2>Assurance — assessments &amp; observations</h2>
+		<h2>Assurance — §38 Assurance Workbench</h2>
 		<p class="hint">
-			The §38 Assurance View — folded from the governed event stream, not the object store. Independence and
-			validator identity read <b>unknown</b> (never a false “none”) when the source event did not carry them.
+			The §38 Assurance View — folded from the governed event stream, not the object store. Every §38 field is
+			sourced except <b>missing evidence</b> (its events are unbuilt); unsourced fields read <b>unknown</b>,
+			never a false “none”.
 		</p>
 		<table>
 			<thead
@@ -206,14 +207,60 @@
 							>{a.validatorIdentity ? `${a.validatorIdentity}@${a.validatorVersion}` : 'unknown'}</td
 						></tr
 					>
-					{#if a.openConditions.length}<tr
-							><td></td><td colspan="5" class="none">Open conditions: {a.openConditions.join('; ')}</td
-							></tr
-						>{/if}
+					<tr class="detail">
+						<td></td>
+						<td colspan="5">
+							<div class="kv"><span>Claims evaluated</span><b>{a.claimsEvaluated.join(', ') || 'none'}</b></div>
+							<div class="kv">
+								<span>Evidence considered</span><b>{a.evidenceConsidered.join(', ') || 'none'}</b>
+							</div>
+							<div class="kv"><span>Missing evidence</span><b class="unk">unknown (source event unbuilt)</b></div>
+							<div class="kv"><span>Control actions</span><b>{a.controlActions.join(', ') || 'none'}</b></div>
+							<div class="kv">
+								<span>Findings</span><b
+									>{a.findings.length
+										? a.findings.map((f) => `${f.code} [${f.severity}]`).join('; ')
+										: 'none'}</b
+								>
+							</div>
+							<div class="kv">
+								<span>Waivers</span><b
+									>{a.waivers.length ? a.waivers.map((w) => w.status).join('; ') : 'none'}</b
+								>
+							</div>
+							<div class="kv">
+								<span>Invalidation</span><b
+									>{a.invalidations.length ? a.invalidations.map((i) => i.status).join('; ') : 'valid'}</b
+								>
+							</div>
+							{#if a.openConditions.length}
+								<div class="kv"><span>Open conditions</span><b>{a.openConditions.join('; ')}</b></div>
+							{/if}
+						</td>
+					</tr>
 				{/each}
 				{#if !data.assessments.length}<tr><td colspan="6" class="none">No assessments.</td></tr>{/if}
 			</tbody>
 		</table>
+
+		{#each data.applicablePolicies as ap (ap.pwuId)}
+			<h3>Applicable policies — {ap.pwuTitle}</h3>
+			<table>
+				<thead><tr><th>Policy</th><th>Applies via</th><th>Assessment</th></tr></thead>
+				<tbody>
+					{#each ap.rows as r (r.policyId)}
+						<tr
+							><td class="mono">{r.policyId}</td><td><span class="tag">{r.source}</span></td><td
+								>{#if r.assessed}{r.disposition || 'ASSESSING'}{:else}<span class="req"
+										>REQUIRED — UNASSESSED</span
+									>{/if}</td
+							></tr
+						>
+					{/each}
+				</tbody>
+			</table>
+		{/each}
+
 		{#if data.observations.length}
 			<h3>Observations</h3>
 			{#each data.observations as o (o.id)}<div class="obs">
@@ -498,5 +545,33 @@
 	}
 	.disp {
 		color: var(--outline);
+	}
+	tr.detail td {
+		padding-top: 2px;
+		padding-bottom: 8px;
+	}
+	.kv {
+		display: flex;
+		gap: 8px;
+		font-size: 11.5px;
+		line-height: 1.7;
+	}
+	.kv span {
+		color: var(--outline);
+		min-width: 132px;
+	}
+	.kv b {
+		color: var(--on-variant);
+		font-weight: 600;
+	}
+	.kv b.unk {
+		color: var(--outline);
+		font-weight: 400;
+		font-style: italic;
+	}
+	.req {
+		color: var(--error, #ff6b6b);
+		font-weight: 700;
+		font-size: 11px;
 	}
 </style>

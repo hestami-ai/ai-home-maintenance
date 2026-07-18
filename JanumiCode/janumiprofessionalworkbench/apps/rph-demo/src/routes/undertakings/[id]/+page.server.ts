@@ -15,7 +15,7 @@ import {
 	REFERENCE_OPEN_RESIDUALS,
 	SEED_UNDERTAKING
 } from '@janumipwb/rph-engine';
-import { buildAssuranceView } from '@janumipwb/rph-projections';
+import { buildApplicablePolicies, buildAssuranceView } from '@janumipwb/rph-projections';
 import { dispatch, getEngine, getRegisteredIntent, mintUiId } from '$lib/server/workbench';
 import type { Actions, PageServerLoad } from './$types';
 
@@ -83,9 +83,52 @@ export const load: PageServerLoad = ({ params }) => {
 			independenceStatus: v?.independenceStatus ?? '',
 			validatorIdentity: v?.validatorImplementationIdentity ?? '',
 			validatorVersion: v?.validatorImplementationVersion ?? '',
-			openConditions: v?.openConditions ?? []
+			openConditions: v?.openConditions ?? [],
+			// The rest of §38, now sourced (Increments E/F). `missingEvidence` is the one field with no source yet,
+			// so it is NOT here — the UI shows it as 'unknown', never a fabricated empty.
+			claimsEvaluated: v?.claimsEvaluated ?? [],
+			evidenceConsidered: v?.evidenceConsideredIds ?? [],
+			controlActions: v?.controlActions ?? [],
+			findings: (v?.observations ?? []).map((o) => ({
+				code: o.findingCode,
+				severity: o.severity,
+				statement: o.statement,
+				disposition: o.disposition
+			})),
+			waivers: (v?.waivers ?? []).map((w) => ({
+				id: w.waiverDecisionId,
+				status: w.status,
+				findings: w.waivedFindingIds
+			})),
+			invalidations: (v?.invalidations ?? []).map((i) => ({
+				status: i.status,
+				objectId: i.invalidatedObjectId,
+				reason: i.reason ?? ''
+			}))
 		};
 	});
+
+	// §38 "applicable policies" per PWU — the required-but-unassessed join. A PWU's applicable set is its own
+	// assurancePolicyIds plus its PwuType's requiredAssurancePolicyIds (object state, not events); buildApplicablePolicies
+	// marks each assessed or not. Only PWUs that actually have applicable policies are surfaced.
+	const applicablePolicies = pwus
+		.map((p) => {
+			const typeId = p.state.pwuTypeId ? String(p.state.pwuTypeId as string) : '';
+			const type = typeId ? getObject(engine, typeId) : undefined;
+			const asStrings = (v: unknown): string[] => (Array.isArray(v) ? v.map(String) : []);
+			const rows = buildApplicablePolicies({
+				pwuId: p.id,
+				directPolicyIds: asStrings(p.state.assurancePolicyIds),
+				typeRequiredPolicyIds: asStrings(type?.requiredAssurancePolicyIds),
+				view
+			});
+			return {
+				pwuId: p.id,
+				pwuTitle: String((p.state.title ?? p.id) as string),
+				rows
+			};
+		})
+		.filter((x) => x.rows.length > 0);
 	const observations = listObservations(engine).map((o) => ({
 		id: o.id,
 		severity: String((o.state.severity ?? '') as string),
@@ -126,6 +169,7 @@ export const load: PageServerLoad = ({ params }) => {
 		pwuList,
 		plans,
 		assessments,
+		applicablePolicies,
 		observations,
 		decisions,
 		baselines,

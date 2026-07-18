@@ -75,5 +75,16 @@ test.describe('Undertaking Workbench — PWU lifecycle enforces no-green-without
 		await page.getByRole('button', { name: 'assurance' }).click();
 		await expect(page.getByText('VERIFIED').first()).toBeVisible();
 		await expect(page.getByText('deterministic.reasoning-review').first()).toBeVisible();
+
+		// §38 completeness (Increments E–H): the full field set now renders per assessment. The detail block labels
+		// every §38 field; missing evidence is the one unsourced field and reads 'unknown', never a false empty.
+		await expect(page.getByText('§38 Assurance Workbench')).toBeVisible();
+		await expect(page.getByText('Claims evaluated').first()).toBeVisible();
+		await expect(page.getByText('Control actions').first()).toBeVisible();
+		await expect(page.getByText('Missing evidence').first()).toBeVisible();
+		await expect(page.getByText('unknown (source event unbuilt)').first()).toBeVisible();
+		// §38 "applicable policies": the reference PWUs realize types carrying requiredAssurancePolicyIds, so the
+		// per-PWU applicable-policies join renders — surfacing required-but-unassessed where no assessment covers one.
+		await expect(page.getByRole('heading', { name: /Applicable policies/i }).first()).toBeVisible();
 	});
 });

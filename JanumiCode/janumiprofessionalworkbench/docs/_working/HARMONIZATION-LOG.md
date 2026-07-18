@@ -3469,6 +3469,28 @@ Red-first: 5 unit tests (direct+assessed, type-required-unassessed, source BOTH,
 carries no disposition). Gate: `check-types` 21/21 · `test` 44 (rph-projections) · lint · boundary. Footprint:
 `rph-projections/src/assurance-view.ts` + its test.
 
+### Increment H — the full §38 Assurance Workbench renders
+
+The `undertakings/[id]` Assurance tab now renders all **thirteen sourced §38 fields** per assessment (a detail
+block below each row: claims evaluated, evidence considered, control actions, findings + severity, waivers,
+invalidation status, open conditions) plus a per-PWU **"Applicable policies"** section — the required-but-unassessed
+join from Increment G, which surfaces `REQUIRED — UNASSESSED` where no assessment covers an applicable policy. The
+one unsourced field, **missing evidence**, renders explicitly as *"unknown (source event unbuilt)"* — the
+"unknown vs none" distinction made visible on screen, never a fabricated empty. The server `load` folds the view,
+maps the fields, and computes `buildApplicablePolicies` per PWU from `PWU.assurancePolicyIds` +
+`PwuType.requiredAssurancePolicyIds`.
+
+The §38 E2E (reference undertaking) asserts the new field labels, the "unknown" missing-evidence text, and the
+applicable-policies heading render — and **passes**. `svelte-check` 0 errors; `check-types` 21/21; `test` 21/21.
+
+**Pre-existing failure discovered (NOT this increment, NOT the other agent):** `pwu-lifecycle`'s *first* test (the
+demo lifecycle drive) fails at "Record Assurance" because the demo UI's `beginExecute` action declares
+`executionState=SUCCEEDED` via the controller shortcut (`ChangePwuState` with empty `supportingObjectIds`) — which
+the SUCCEEDED-must-be-backed guard (RPH-PWU-006 / §8.1, added in Increment 28 `09d2a4ab`) rejects. The reference
+*seed* was updated to earn SUCCEEDED via a real execution step; the demo UI was not. It fails identically with my UI
+changes stashed, so it is independent of Increment H. Fixed next (Increment I). Footprint:
+`undertakings/[id]/+page.server.ts`, `+page.svelte`, `e2e/pwu-lifecycle.e2e.ts`.
+
 ---
 
 ## PART 4 — Open questions genuinely for the sponsor
