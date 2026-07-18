@@ -3739,3 +3739,30 @@ Sponsor #8 is the audit of the 96-of-99 authored finding severities (Increment 1
 
 **Gate:** `check-types` green for rph-product-realization-pwa (comment-only edit) · `doc004-conformance.test.ts`
 59. Footprint: `ontology.types.ts` (3 comment edits) + this log. Committed.
+
+### Increment P — the two blocked backlog items, re-examined under the grant (#4, #5)
+
+Both were flagged BLOCKED. Re-examined with the new authoring authorization AND the Constitution Discussion
+corpus; both correctly stay where they are, for opposite reasons.
+
+**#4 `producingExecutionAttemptId` — resolved as far as it can go.** The field exists on artifacts, is nullable
+(DOC-009 §18.1, `z.string().optional()`), and is guide §8.4's "producing Attempt/invocation" binding. **#10
+resolved the authoring-plane half**: an authored artifact legitimately carries none — its provenance is its
+creation context, not an Attempt (the Draft corpus confirms: a producing invocation binds only for AI-generated
+artifacts — CPCO §4.4, JEM §49). The execution-plane half — actually constructing Execution Attempt records so
+a runtime-produced artifact can cite one — remains blocked on the full Attempt design (unrepresentable field
+set, undefined `ExecutionProvenance`, no write path; `DECISION-item23-attempt-record.md`). There is no bounded
+code fix; the field is already correct. Nothing to change.
+
+**#5 RemediationRule — confirmed genuinely undefined; NOT authored.** `RemediationRule` is referenced by
+`AssurancePolicyDefinition.remediationRules` (DOC-004 §3.1 L126, DOC-007 L1278) but **defined nowhere** in the
+14-file ratified corpus — no interface, no field list, no table (the `ExecutionProvenance` situation). Its three
+siblings were transcribed because DOC-004 defines their fields (EvidenceRequirement §6.1, DispositionRule §10.2,
+EscalationRule §13); RemediationRule has no such section, and DOC-003 §1374 "Remediation options" is a bare
+concept name. The Draft corpus adds only loose remediation *concepts* (CPCO §5.17 `remediation` action type,
+JCPWA §24.2 `implementation_correction`, CPCO §5.24 Reconciliation) — **no field-defined shape**. So authoring
+its fields would fabricate a contract from nothing, which the grant to "author WITH RIGOR" does not license
+(rigor needs grounding). It stays a disclosed `FORCE_PLACEHOLDER`, un-threaded from `CreateAssurancePolicy`,
+until a DOC-004/DOC-007 interface is ratified. The honest answer here is to author nothing.
+
+**Gate:** none needed (no code/contract change). Footprint: this log. Committed.
