@@ -328,3 +328,61 @@ export function buildAssuranceView(events: readonly DomainEvent[]): AssuranceVie
 	for (const event of events) view = applyAssuranceEvent(view, event);
 	return view;
 }
+
+// ---- §38 "applicable policies" (per-PWU) ----------------------------------------------------------------------
+//
+// §38's FIRST field is "applicable policies", and §38's green-node rule requires "required assurance is satisfied".
+// The Assurance View above is assessment-keyed — it shows the policies that WERE assessed. The missing half is the
+// policy that APPLIES but was never assessed: the required-but-unassessed gap that §39 invariant 20 ("a baseline
+// cannot be promoted solely because all execution steps completed") exists to catch. That set is NOT in the event
+// stream — a PWU's applicable policies live on OBJECT STATE (PWU.assurancePolicyIds, and its PwuType's
+// requiredAssurancePolicyIds; PwuProposed deliberately drops assurancePolicyIds per §11.3), so this is a JOIN over
+// object snapshots the caller reads, not a fold. Kept pure: the caller passes the id arrays; this never touches a
+// store.
+
+/** One policy that applies to a PWU, and whether an assessment covers it. */
+export interface ApplicablePolicyView {
+	readonly policyId: string;
+	/** Where the policy applies from: the PWU's own assurancePolicyIds, its PwuType's required set, or both. */
+	readonly source: 'DIRECT' | 'TYPE' | 'BOTH';
+	/** True when at least one assessment names this policy AND this PWU as a subject. */
+	readonly assessed: boolean;
+	/** The disposition of the covering assessment, once it has completed (undefined while merely ASSESSING). */
+	readonly disposition?: string;
+	readonly assessmentId?: string;
+}
+
+function policySource(isDirect: boolean, isTypeRequired: boolean): ApplicablePolicyView['source'] {
+	if (isDirect && isTypeRequired) return 'BOTH';
+	return isDirect ? 'DIRECT' : 'TYPE';
+}
+
+/** Join a PWU's applicable-policy set (direct + PwuType-required) against the assessment view to surface, per
+ *  policy, whether it is assessed and how it came out — and, by `assessed: false`, the required-but-unassessed
+ *  policies §38's green-node rule forbids ignoring. Pure: the caller supplies the object-state id arrays. */
+export function buildApplicablePolicies(args: {
+	pwuId: string;
+	directPolicyIds: readonly string[];
+	typeRequiredPolicyIds: readonly string[];
+	view: AssuranceView;
+}): ApplicablePolicyView[] {
+	const direct = new Set(args.directPolicyIds);
+	const typeReq = new Set(args.typeRequiredPolicyIds);
+	const assessments = Object.values(args.view.assessments);
+	return [...new Set([...direct, ...typeReq])].map((policyId) => {
+		const source = policySource(direct.has(policyId), typeReq.has(policyId));
+		const covering = assessments.filter(
+			(a) => a.policyId === policyId && a.subjectObjectIds.includes(args.pwuId)
+		);
+		// Prefer a COMPLETED assessment (one carrying a disposition) for the reported outcome; else the last match.
+		const completed = covering.filter((a) => a.disposition !== undefined);
+		const chosen = completed.at(-1) ?? covering.at(-1);
+		return {
+			policyId,
+			source,
+			assessed: covering.length > 0,
+			...(chosen?.disposition !== undefined ? { disposition: chosen.disposition } : {}),
+			...(chosen ? { assessmentId: chosen.assessmentId } : {})
+		};
+	});
+}

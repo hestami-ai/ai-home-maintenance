@@ -3451,6 +3451,24 @@ from Started; control actions from completion, and empty-before-completion never
 Gate: `check-types` 21/21 · `test` 21/21 (39 in rph-projections) · lint · boundary. Footprint:
 `rph-projections/src/assurance-view.ts` + its test.
 
+### Increment G — §38 "applicable policies": the required-but-unassessed join
+
+§38's *first* field is "applicable policies," and its green-node rule requires "required assurance is satisfied" —
+so the view must show not just the policies that WERE assessed (the assessment-keyed fold) but the ones that
+APPLY and were NOT. That set is not in the event stream: a PWU's applicable policies live on **object state**
+(`PWU.assurancePolicyIds` + its `PwuType.requiredAssurancePolicyIds`; `PwuProposed` drops `assurancePolicyIds` per
+§11.3, so it never reaches an event). `buildApplicablePolicies` is a **pure join** — the caller passes the id
+arrays it read from the store plus the `AssuranceView`, and the function reports, per applicable policy, its
+`source` (DIRECT / TYPE / BOTH), whether it is `assessed`, and the covering assessment's disposition. `assessed:
+false` is the required-but-unassessed gap §39 invariant 20 ("a baseline cannot be promoted solely because all
+execution steps completed") exists to catch. Subject-scoped: an assessment of the same policy on a *different* PWU
+is not coverage. It lives in `assurance-view.ts` (exported via `export *`) rather than a new file, to avoid
+touching the other agent's uncommitted `index.ts`.
+
+Red-first: 5 unit tests (direct+assessed, type-required-unassessed, source BOTH, subject-scoping, ASSESSING
+carries no disposition). Gate: `check-types` 21/21 · `test` 44 (rph-projections) · lint · boundary. Footprint:
+`rph-projections/src/assurance-view.ts` + its test.
+
 ---
 
 ## PART 4 — Open questions genuinely for the sponsor

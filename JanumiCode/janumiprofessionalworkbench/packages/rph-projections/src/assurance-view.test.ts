@@ -10,7 +10,12 @@
 // SATISFIED disposition WITH residuals present.
 import type { DomainEvent } from '@janumipwb/rph-contracts';
 import { describe, expect, it } from 'vitest';
-import { applyAssuranceEvent, buildAssuranceView, type AssuranceView } from './assurance-view.js';
+import {
+	applyAssuranceEvent,
+	buildApplicablePolicies,
+	buildAssuranceView,
+	type AssuranceView
+} from './assurance-view.js';
 
 const actor = { actorId: 'u1', actorType: 'HUMAN' as const, displayName: 'A' };
 
@@ -327,5 +332,69 @@ describe('Assurance View fold — §38 claims evaluated + control actions (asses
 		const a = view.assessments['asm_pre']!;
 		expect(a.claimsEvaluated).toEqual(['clm_9']); // known at Started
 		expect(a.controlActions).toEqual([]); // not recommended until completion
+	});
+});
+
+describe('§38 "applicable policies" — the required-but-unassessed join (object state x assessment view)', () => {
+	it('a directly-attached policy with a completed assessment for THIS PWU reads assessed + disposition; source DIRECT', () => {
+		const view = buildAssuranceView([started('asm_1', 'pwu_1'), completed('asm_1', 'SATISFIED', [])]);
+		const rows = buildApplicablePolicies({
+			pwuId: 'pwu_1',
+			directPolicyIds: ['pol_x'],
+			typeRequiredPolicyIds: [],
+			view
+		});
+		expect(rows).toHaveLength(1);
+		expect(rows[0]).toMatchObject({
+			policyId: 'pol_x',
+			source: 'DIRECT',
+			assessed: true,
+			disposition: 'SATISFIED',
+			assessmentId: 'asm_1'
+		});
+	});
+
+	it('a PwuType-required policy with NO assessment is required-but-unassessed (assessed:false); source TYPE', () => {
+		const rows = buildApplicablePolicies({
+			pwuId: 'pwu_1',
+			directPolicyIds: [],
+			typeRequiredPolicyIds: ['pol_req'],
+			view: buildAssuranceView([])
+		});
+		expect(rows).toEqual([{ policyId: 'pol_req', source: 'TYPE', assessed: false }]);
+	});
+
+	it('a policy both directly attached AND type-required reports source BOTH, exactly once', () => {
+		const rows = buildApplicablePolicies({
+			pwuId: 'pwu_1',
+			directPolicyIds: ['pol_x'],
+			typeRequiredPolicyIds: ['pol_x'],
+			view: buildAssuranceView([])
+		});
+		expect(rows).toEqual([{ policyId: 'pol_x', source: 'BOTH', assessed: false }]);
+	});
+
+	it('subject-scoped: an assessment of the same policy but a DIFFERENT PWU is not coverage for this one', () => {
+		// asm_o is started with subject pwu_OTHER; completed() does not change the subject, so it stays pwu_OTHER.
+		const view = buildAssuranceView([started('asm_o', 'pwu_OTHER'), completed('asm_o', 'SATISFIED', [])]);
+		const rows = buildApplicablePolicies({
+			pwuId: 'pwu_1',
+			directPolicyIds: ['pol_x'],
+			typeRequiredPolicyIds: [],
+			view
+		});
+		expect(rows[0]!.assessed).toBe(false);
+	});
+
+	it('an ASSESSING (started, not yet completed) assessment counts as assessed but carries no disposition', () => {
+		const view = buildAssuranceView([started('asm_a', 'pwu_1')]);
+		const rows = buildApplicablePolicies({
+			pwuId: 'pwu_1',
+			directPolicyIds: ['pol_x'],
+			typeRequiredPolicyIds: [],
+			view
+		});
+		expect(rows[0]!.assessed).toBe(true);
+		expect(rows[0]!.disposition).toBeUndefined();
 	});
 });
