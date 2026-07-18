@@ -1379,6 +1379,17 @@ Permitted controller actions
 
 Validator prompts and deterministic validator implementations are runtime assets of the policy. They are not the policy itself.
 
+## 24.1 Relationship to RPH-DOC-004 (composition, not conflict)
+
+RPH-DOC-004 §15–§26 contracts twelve policies: the eleven specified in §25–§35 below, plus Constraint Propagation. That contract and this specification are one catalog expressed at two levels: they compose, and they never contradict.
+
+* The `Blocking conditions` stated in §25–§35 below stand and decide severity. They are the referent of RPH-DOC-004's "blocking finding" language, which that contract uses without enumerating (for example its §15.9, and repeatedly in its §26).
+* RPH-DOC-004 governs machine structure — the finding `CODE`s, criterion ids and names, and the twelfth policy, Constraint Propagation (its §20), for which it states its own blocking conditions because this specification has no section for it.
+* The `Common findings` and `Common shape failures` in §25–§35 are illustrative and do not extend RPH-DOC-004's ratified `CODE` list.
+* Where both documents state a rule, they agree (Intent Preservation: §32 below / §23.6 there). A future edit that makes them disagree is a corpus defect and must fail the conformance build.
+
+— Recorded 2026-07-18 under the sponsor's authoring grant (§0.3 stop-rule gaps; labelled and committed). Derivation and evidence: `docs/_working/RULING-doc003-doc004-compose.md`.
+
 ---
 
 # 25. Assurance Policy: Intent Fidelity

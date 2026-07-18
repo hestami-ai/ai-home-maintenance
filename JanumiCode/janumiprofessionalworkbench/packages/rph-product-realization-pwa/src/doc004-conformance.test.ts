@@ -352,3 +352,111 @@ describe('the seeded catalog conforms to DOC-004 itself', () => {
 		expect([...(testAdequacy?.permittedControlActions ?? [])].sort()).toEqual(intersection);
 	});
 });
+
+// ── The RULING's premise, machine-checked: DOC-003 and DOC-004 COMPOSE without contradiction ─────────────────
+//
+// docs/_working/RULING-doc003-doc004-compose.md concludes the two catalog documents are one catalog at two
+// levels. That conclusion rests on a structural claim about their `Blocking conditions`, and a prose claim does
+// not fail a build (the lesson at the top of this file). So the claim is pinned here, read from the corpus:
+//
+//   - The ONLY policy for which BOTH documents state blocking conditions is Intent Preservation, and there the
+//     two rules AGREE (both: material divergence, without authorization). That single overlap is the whole
+//     non-contradiction argument — if a future edit adds a second both-blocked policy, this fails, because a
+//     second overlap is exactly where a contradiction could hide.
+//   - The one policy DOC-004 blocks that DOC-003 has NO section for is Constraint Propagation — the twelfth
+//     policy DOC-004 adds. That is why DOC-004 states its own blocking conditions there and nowhere DOC-003
+//     already did.
+//
+// This is a structural guard, not a semantic one: it cannot prove two rules mean the same thing. It pins the
+// shape the ruling depends on, so the corpus cannot drift out from under the composition reading unnoticed.
+describe('RPH-DOC-003 and RPH-DOC-004 compose without contradiction (the ruling premise)', () => {
+	const doc003Lines = readFileSync(DOC003, 'utf8').split(/\r?\n/);
+
+	/** DOC-003's eleven policy section names -> policyId. Constraint Propagation is deliberately ABSENT — the
+	 *  point of one assertion below is that DOC-003 has no section for it. */
+	const DOC003_POLICY_IDS: Readonly<Record<string, string>> = {
+		'Intent Fidelity': 'pol_intent_fidelity',
+		'Intent Completeness': 'pol_intent_completeness',
+		'Assumption Disclosure': 'pol_assumption_disclosure',
+		'Requirement Coverage': 'pol_requirement_coverage',
+		'Decomposition Coverage': 'pol_decomposition_coverage',
+		'Architecture Coverage': 'pol_architecture_coverage',
+		'Historical Consistency': 'pol_historical_consistency',
+		'Intent Preservation': 'pol_intent_preservation',
+		'Test Adequacy': 'pol_test_adequacy',
+		'Fitness for Purpose': 'pol_fitness_for_purpose',
+		'Baseline Promotion': 'pol_baseline_promotion'
+	};
+
+	/** Each DOC-003 `# N. Assurance Policy: <name>` section, with its body up to the next top-level heading. */
+	function doc003PolicySections(): { name: string; body: string[] }[] {
+		const out: { name: string; body: string[] }[] = [];
+		for (let i = 0; i < doc003Lines.length; i += 1) {
+			const m = /^# \d+\. Assurance Policy: (.+)$/.exec(doc003Lines[i] ?? '');
+			if (!m?.[1]) continue;
+			const rest = doc003Lines.slice(i + 1);
+			const end = rest.findIndex((l) => /^# \d+\. /.test(l));
+			out.push({ name: m[1].trim(), body: end < 0 ? rest : rest.slice(0, end) });
+		}
+		return out;
+	}
+
+	/** DOC-003 subsections are unnumbered (`## Blocking conditions`), unlike DOC-004's `## N.M Blocking …`. */
+	function doc003BlockingPolicyIds(): Set<string> {
+		const ids = new Set<string>();
+		for (const { name, body } of doc003PolicySections()) {
+			if (body.some((l) => /^## Blocking conditions$/.test(l))) {
+				const id = DOC003_POLICY_IDS[name];
+				if (id) ids.add(id);
+			}
+		}
+		return ids;
+	}
+
+	const SECTION_TO_POLICY = new Map<string, string>(SECTIONS.map(([s, id]) => [s, id]));
+
+	/** DOC-004's own `## N.M Blocking conditions` subsections, mapped to policyId. */
+	function doc004BlockingPolicyIds(): Set<string> {
+		const ids = new Set<string>();
+		for (const l of lines) {
+			const m = /^## (\d+)\.\d+ Blocking conditions$/.exec(l);
+			const id = m?.[1] ? SECTION_TO_POLICY.get(m[1]) : undefined;
+			if (id) ids.add(id);
+		}
+		return ids;
+	}
+
+	function firstNonEmptyAfter(body: string[], headerRe: RegExp): string {
+		const idx = body.findIndex((l) => headerRe.test(l));
+		return idx < 0 ? '' : (body.slice(idx + 1).find((l) => l.trim() !== '')?.trim() ?? '');
+	}
+
+	it('the only policy both documents block is Intent Preservation — the single overlap', () => {
+		const d003 = doc003BlockingPolicyIds();
+		const d004 = doc004BlockingPolicyIds();
+		const overlap = [...d004].filter((id) => d003.has(id)).sort();
+		expect(overlap).toEqual(['pol_intent_preservation']);
+	});
+
+	it('the one policy DOC-004 blocks that DOC-003 has no section for is Constraint Propagation', () => {
+		const d003 = doc003BlockingPolicyIds();
+		const doc004Only = [...doc004BlockingPolicyIds()].filter((id) => !d003.has(id)).sort();
+		expect(doc004Only).toEqual(['pol_constraint_propagation']);
+		// …and DOC-003 genuinely has no section for it: none of its policy sections name Constraint Propagation.
+		expect(doc003PolicySections().map((s) => s.name)).not.toContain('Constraint Propagation');
+	});
+
+	it('where both block Intent Preservation, the two rules agree — material divergence, unauthorized', () => {
+		// DOC-003 §32: "Material divergence without authorized intent revision."
+		// DOC-004 §23.6: "Any material unauthorized divergence from approved intent."
+		const ip = doc003PolicySections().find((s) => s.name === 'Intent Preservation');
+		if (!ip) throw new Error('DOC-003 has no Intent Preservation section');
+		const d003Rule = firstNonEmptyAfter(ip.body, /^## Blocking conditions$/).toLowerCase();
+		const d004Rule = firstNonEmptyAfter(sectionLines('23'), /^## 23\.6 Blocking conditions$/).toLowerCase();
+		for (const rule of [d003Rule, d004Rule]) {
+			expect(rule).toContain('material');
+			expect(rule).toContain('diverg');
+			expect(rule).toContain('authoriz');
+		}
+	});
+});

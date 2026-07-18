@@ -3575,8 +3575,10 @@ requires knowing something only the sponsor knows)*
     `RULING-doc003-doc004-compose.md`. The question was wrong: they do not compete, they COMPOSE. Zero
     contradictions across twelve policies; DOC-004 dangles "blocking finding" language that only DOC-003
     defines; the one policy DOC-004 gives its own blocking conditions is the one policy DOC-003 lacks. Nothing
-    ratified is discarded and no document needs editing.** What remains for the sponsor is smaller and stated in
-    PART 3d: whether to record the composition in the corpus itself, so the next reader does not re-derive it.
+    ratified is discarded and no document needs editing.** ~~What remains for the sponsor is smaller and stated in
+    PART 3d: whether to record the composition in the corpus itself, so the next reader does not re-derive it.~~
+    **RECORDED 2026-07-18 (Increment L, PART 5): RPH-DOC-004 §14.1 and RPH-DOC-003 §24.1 now carry the
+    composition at the point of use, and `doc004-conformance.test.ts` machine-checks its premise.**
 
 0. **DOC-004 §9.1 mandates a `FindingDefinition` the catalog populates for 3 of its 99 codes.**
    ~~Verified corpus-wide (not inferred from a grep miss): each of the 99 finding codes appears exactly once in
@@ -3606,3 +3608,41 @@ requires knowing something only the sponsor knows)*
    recorded as something *other than* an Attempt (my C5 correction assumes this), or authoring acquires a
    Plan. I am proceeding on the former — it follows DOC-002 — but it is a genuine ontology choice and I want
    it seen rather than buried in an increment.
+
+---
+
+## PART 5 — Sponsor items, authored under the standing grant (2026-07-18)
+
+The sponsor authorized working the PART 4 queue directly: *"you may author solutions with rigor using the
+scoped flexibility you have been authorized"* (the standing grant to author into §0.3 stop-rule gaps, labelled
+and committed). These increments discharge the PART 4 items in place. Each one that touches the ratified corpus
+adds text rather than changing a ratified rule, labels itself as authored-and-recorded, and is committed — the
+grant's condition.
+
+### Increment L — the DOC-003/004 composition is recorded in the corpus (PART 4 item 00, sponsor #7)
+
+The composition ruling (`RULING-doc003-doc004-compose.md`) lived only in `_working/`; PART 4 item 00 asked
+whether to record it in the corpus so the next reader does not re-derive it. Now recorded, additively, at the
+point of use in **both** ratified documents:
+
+- **RPH-DOC-004 §14.1** ("Relationship to RPH-DOC-003") — in the Assurance Policy Catalog Overview, before the
+  twelve policy sections a reader is about to enter.
+- **RPH-DOC-003 §24.1** ("Relationship to RPH-DOC-004") — in Assurance Policy Structure, before its §25–§35.
+
+Each note states the composition from its own document's side: DOC-004 contracts machine structure and defers
+"blocking finding" to DOC-003's `Blocking conditions`; DOC-003's blocking conditions stand and decide severity;
+"Common findings" are illustrative, not code extensions; where both state a rule they agree; a future
+disagreement is a corpus defect that must fail the build. No ratified rule is edited — the notes are additive
+cross-references (11 inserted lines each, 0 deletions), CRLF preserved.
+
+**The premise is now machine-checked, not just asserted.** The ruling rests on a structural claim ("the only
+policy both documents block is Intent Preservation, and there they agree; Constraint Propagation is the one
+DOC-004 adds"). A prose claim does not fail a build — the founding lesson of `doc004-conformance.test.ts`. So a
+new `describe` block reads both corpus documents and pins exactly that: the single blocking-overlap is Intent
+Preservation, DOC-004's one extra blocked policy is Constraint Propagation (and DOC-003 genuinely has no section
+for it), and the two Intent Preservation rules share their load-bearing tokens (material · divergence ·
+unauthorized). If a future edit adds a second both-blocked policy — the one place a contradiction could hide —
+the build fails.
+
+**Gate:** `doc004-conformance.test.ts` 58 (was 55; +3) · `check-types` 21/21 · `test` 21/21 · lint clean.
+Footprint: the two RPH-DOC files + `doc004-conformance.test.ts`. Committed.

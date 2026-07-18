@@ -719,6 +719,17 @@ The initial Product Realization PWA catalog contains twelve mandatory core polic
 
 Additional recommended policies are included later.
 
+## 14.1 Relationship to RPH-DOC-003 (composition, not conflict)
+
+RPH-DOC-003 §25–§35 specifies eleven of these twelve policies at the ontology level. That specification and this contract are one catalog expressed at two levels: they compose, and they never contradict.
+
+* This contract governs machine structure and every field it states — the twelve policies, the finding `CODE`s, criterion ids and names where a `Criteria` subsection ratifies them, claims, evidence, dispositions, control actions, and its own blocking conditions (§20.5, §23.6).
+* RPH-DOC-003's `Blocking conditions` stand and decide severity. Where this contract refers to a "blocking finding" without enumerating one — §15.9 ("no blocking fidelity finding remains") and the uses of "blocking" in §26 — the referent is RPH-DOC-003's `Blocking conditions` for that policy (Intent Fidelity §25, Assumption Disclosure §27, Decomposition Coverage §29, Intent Preservation §32, Baseline Promotion §35).
+* RPH-DOC-003's `Common findings` and `Common shape failures` are illustrative (its own words) and do not extend the finding `CODE` list ratified here.
+* Where both documents state a rule, they agree. The only policy for which both state blocking conditions is Intent Preservation (§23.6 here / §32 there — the same rule); Constraint Propagation (§20.5) is the one policy this contract blocks that RPH-DOC-003 has no section for, because this contract adds it as the twelfth. A future edit that makes the two documents disagree is a corpus defect and must fail the conformance build (`packages/rph-product-realization-pwa/src/doc004-conformance.test.ts`), not be silently reconciled.
+
+— Recorded 2026-07-18 under the sponsor's authoring grant (§0.3 stop-rule gaps; labelled and committed). Derivation and evidence: `docs/_working/RULING-doc003-doc004-compose.md`.
+
 ---
 
 # 15. Policy POL-INTENT-FIDELITY
