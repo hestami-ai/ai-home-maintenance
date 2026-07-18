@@ -267,6 +267,15 @@ Aggregate root:
 
 > Baseline
 
+## 3.6 Design-time PWA authoring is not an Undertaking aggregate
+
+The five aggregates above own the runtime of an *Undertaking* (RPH-DOC-000: PWA → Undertaking → Professional Work Graph). Defining a PWA — authoring PWU Types, composition, and assurance-policy assignments — is design-time work that yields a PWA version, not an Undertaking runtime object. It is therefore outside all five aggregates. Two consequences, both of which the Execution Aggregate already implies:
+
+* Authoring creates **no Execution Plan, Execution Step, or Execution Attempt.** The Execution Aggregate (§3.3) is rooted at an Execution Plan and governs the runtime execution of PWU Instances; a design-time authoring model call is not the execution of a PWU Instance and has no Plan for an Attempt to be rooted in. Authoring is still governed — it is carried by its own Commands and Events (`DefinePwuType` → `PwuTypeDefined`) and its authored objects (the `PWU_TYPE`s and the `PROFESSIONAL_WORK_ARCHITECTURE`), with the `AUTHORING_CONVERSATION` as the event-sourced record of the authoring interaction — but never as an Attempt.
+* An **authored artifact therefore has no producing Execution Attempt.** The artifact provenance field that names one (`producingExecutionAttemptId`, RPH-DOC-009 §18.1 — a nullable reference to `execution_attempts(id)`) is legitimately absent on the authoring plane: an authored artifact's provenance is its own creation context, and only a runtime-produced artifact binds a producing Attempt. Absence there is the model, not an omission.
+
+This records, as an ontology decision under the standing authoring grant (2026-07-18), the boundary the Execution Aggregate already implies: RPH-DOC-002 roots every Attempt in an Execution Plan, and the authoring plane has none. The code already conforms — the authoring path constructs no Execution Plan or Attempt. Full reasoning: `docs/_working/DECISION-item23-attempt-record.md`; HARMONIZATION-LOG PART 5.
+
 Cross-aggregate updates must occur through commands and events rather than direct mutation of another aggregate’s internal state.
 
 ---

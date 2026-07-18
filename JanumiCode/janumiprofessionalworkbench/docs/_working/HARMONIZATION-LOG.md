@@ -3603,11 +3603,14 @@ requires knowing something only the sponsor knows)*
    (`pol_intent_completeness` can only `GATHER_CONTEXT` — it cannot escalate to a human). Both are placeholders
    for a decision only you can make.
 
-1. **Does the authoring plane get an Execution Plan?** DOC-002 §3.3 roots the Execution Attempt in the
+1. ~~**Does the authoring plane get an Execution Plan?** DOC-002 §3.3 roots the Execution Attempt in the
    Execution Aggregate. PWA authoring is design-time and has no Plan. Either authoring model calls are
    recorded as something *other than* an Attempt (my C5 correction assumes this), or authoring acquires a
    Plan. I am proceeding on the former — it follows DOC-002 — but it is a genuine ontology choice and I want
-   it seen rather than buried in an increment.
+   it seen rather than buried in an increment.~~ **RESOLVED 2026-07-18 (Increment M): recorded as DOC-002
+   §3.6 — authoring is not an Undertaking aggregate and instantiates no Execution Plan/Attempt. Checked
+   against the sponsor's own Constitution Discussion corpus first (it uses "Execution Plan/Attempt" zero
+   times; a PWU is "not a unit of computational execution", JAN-PWU-001 §1).**
 
 ---
 
@@ -3646,3 +3649,31 @@ the build fails.
 
 **Gate:** `doc004-conformance.test.ts` 58 (was 55; +3) · `check-types` 21/21 · `test` 21/21 · lint clean.
 Footprint: the two RPH-DOC files + `doc004-conformance.test.ts`. Committed.
+
+### Increment M — the authoring plane is not an Execution aggregate (PART 4 "authoring plane", sponsor #10)
+
+DOC-002 §3 defines five Undertaking-runtime aggregates (Work, Assurance, Execution, Governance, Baseline) and
+none for authoring; §3.3 roots the Execution Attempt in the Execution Aggregate, whose root is the Execution
+Plan. Design-time PWA authoring has no Execution Plan, so it can root no Attempt. Recorded as new **DOC-002
+§3.6** ("Design-time PWA authoring is not an Undertaking aggregate"): authoring creates no Execution
+Plan/Step/Attempt; it is still governed (its own Commands/Events `DefinePwuType`→`PwuTypeDefined`, its authored
+objects, the `AUTHORING_CONVERSATION` interaction record); and an authored artifact has no producing Execution
+Attempt, so `producingExecutionAttemptId` (DOC-009 §18.1, already nullable) is legitimately absent for it.
+
+**Checked against the sponsor's own thinking before recording** (the `docs/Constitution Discussion` corpus,
+Draft/non-binding, which the sponsor pointed to mid-session). Findings: it uses the terms "Execution
+Plan/Step/Attempt" ZERO times — that vocabulary is exclusive to RPH-DOC-002 — so nothing there contradicts the
+decision (JAN-PWU-001 §1: a PWU is "not a unit of computational execution"). It confirmed the
+artifact-provenance half (provenance = `createdBy`/`creationContext`/`sourceType`; a producing invocation binds
+only for AI-generated artifacts — CPCO §4.4, JEM §49, PWU-INV-006). It CORRECTED one thing: that corpus treats
+conversation as non-authoritative (RIWS §35.4, CPM §24.4) and requires material outputs promoted to governed
+entities — so §3.6 does NOT call the `AUTHORING_CONVERSATION` the authoritative record; it names the authored
+objects and the governed Commands/Events as the record, with the conversation as the interaction log. The
+decision reduces to "authoring does not instantiate the Execution Aggregate," which that corpus is fully
+consistent with.
+
+The code already conforms (the authoring path constructs no Execution Plan or Attempt). This also NARROWS
+sponsor #4: for AUTHORED artifacts `producingExecutionAttemptId` is now resolved — legitimately absent; only
+the EXECUTION-plane Attempt record (the large item from `DECISION-item23-attempt-record.md`) stays deferred.
+
+**Gate:** `check-types` 21/21. Footprint: DOC-002 (§3.6) + this log. Committed.
