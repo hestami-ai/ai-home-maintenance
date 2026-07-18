@@ -2335,14 +2335,65 @@
       "name": "EvidenceRequirement",
       "fields": [
         {
-          "field": "(undefined)",
-          "type": "—",
+          "field": "id",
+          "type": "string",
+          "required": true,
+          "note": "DOC-004 §6.1 (L318)."
+        },
+        {
+          "field": "evidenceType",
+          "type": "EvidenceType",
+          "required": true,
+          "enumRef": "EvidenceTypeSchema",
+          "note": "DOC-004 §6.1 (L319). 9-value EvidenceTypeSchema (already generated)."
+        },
+        {
+          "field": "description",
+          "type": "string",
+          "required": true,
+          "note": "DOC-004 §6.1 (L321)."
+        },
+        {
+          "field": "purpose",
+          "type": "string",
+          "required": true,
+          "note": "DOC-004 §6.1 (L322)."
+        },
+        {
+          "field": "cardinality",
+          "type": "EvidenceCardinality",
+          "required": true,
+          "enumRef": "EvidenceCardinalitySchema",
+          "note": "DOC-004 §6.1 (L324-329). The inline union byte-matches the 5-value EvidenceCardinalitySchema, which was already harvested out of THIS interface."
+        },
+        {
+          "field": "admissibilityRules",
+          "type": "AdmissibilityRule[]",
+          "required": true,
+          "note": "DOC-004 §6.1 (L331). AdmissibilityRule is UNDEFINED in the whole corpus → gen-objects emits z.array(z.unknown()). DISCLOSED, not invented: §6.2's 8 prose bullets (L345-354) read like the intended CONTENT of an AdmissibilityRule but are prose, not a typed interface, so they are the likely author-intent anchor for a future ratification, NOT a field source."
+        },
+        {
+          "field": "freshnessRule",
+          "type": "FreshnessRule",
           "required": false,
-          "note": "Referenced by AssurancePolicyDefinition.requiredEvidence/optionalEvidence. policies/evidence-requirement.schema.json listed in DOC-007 §3; not field-defined in prose. DOC-004 §6.1 supplies cardinality (EvidenceCardinalitySchema) + requiredForDispositions (RequiredForDispositionsSchema) enums. Source from schema file."
+          "note": "DOC-004 §6.1 (L332). The ONLY optional field (trailing `?`). FreshnessRule is UNDEFINED in the corpus → z.unknown().optional(). DISCLOSED, not invented."
+        },
+        {
+          "field": "requiredForDispositions",
+          "type": "RequiredForDispositions",
+          "required": true,
+          "enumRef": "RequiredForDispositionsSchema",
+          "note": "DOC-004 §6.1 (L334-337). The inline union byte-matches the 3-value RequiredForDispositionsSchema."
+        },
+        {
+          "field": "mayBeWaived",
+          "type": "boolean",
+          "required": true,
+          "note": "DOC-004 §6.1 (L339)."
         }
       ],
-      "sourceSection": "DOC-004 §6.1 (L317)",
-      "note": "RATIFIED AFTER ALL — audit 2026-07-16 (AUDIT-placeholder-helpers.md). DOC-004 §6.1 (L317) contains `interface EvidenceRequirement { ... }` defining: id, evidenceType, description, purpose, cardinality, admissibilityRules, freshnessRule, requiredForDispositions, mayBeWaived. The previous note said 'NOT field-defined ... Source TBD' WHILE CITING THIS SECTION — the harvest pass reached inside this very interface, took its enums, and recorded its fields as nonexistent. A pass that extracts one kind of thing reports the absence of every other kind. STILL A PLACEHOLDER IN CODE: the single '(undefined)' field below keeps gen-objects.ts emitting z.record(z.string(), z.unknown()) — 'any object'. TRANSCRIPTION CAVEAT: 7 of 9 resolvable; AdmissibilityRule + FreshnessRule are undefined. NOT fixed here: tightening this breaks live literals and needs an explicit migration, not a sweep."
+      "sourceSection": "DOC-004 §6.1 (L317) — RATIFIED shape, transcribed",
+      "note": "TRANSCRIBED from DOC-004 §6.1 (L317-340) on 2026-07-17. The previous entry was a single '(undefined)' field that kept gen-objects.ts emitting z.record(z.string(), z.unknown()) — 'any object' — WHILE its own note cited §6.1: the harvest pass reached inside this very interface, took its two enums (EvidenceCardinality, RequiredForDispositions), and recorded its fields as nonexistent. All 9 fields are now byte-exact. HONEST SPLIT: 7 of 9 resolve to concrete shapes (id, evidenceType, description, purpose, cardinality, requiredForDispositions, mayBeWaived); 2 nested helpers are UNDEFINED and stay permissive — admissibilityRules (AdmissibilityRule[]) and freshnessRule (FreshnessRule). Both DISCLOSED, neither invented; they emit z.array(z.unknown()) / z.unknown().optional() exactly like the shipped WaiverRule.revalidationTrigger:'PolicyExpression'. Tightening this helper only constrains ELEMENTS of requiredEvidence/optionalEvidence, both hardcoded [] today, so it is non-breaking."
     },
     {
       "name": "AssessmentCriterion",
@@ -2452,14 +2503,40 @@
       "name": "DispositionRule",
       "fields": [
         {
-          "field": "(undefined)",
-          "type": "—",
+          "field": "disposition",
+          "type": "AssuranceDispositionRecommendation",
+          "required": true,
+          "enumRef": "AssuranceDispositionRecommendationSchema",
+          "note": "DOC-004 §10.2 (L548-553). The 5-value Recommendation enum (SATISFIED|CONDITIONALLY_SATISFIED|REJECTED|INCONCLUSIVE|ESCALATED) — deliberately NOT the 6-value AssuranceDisposition: a DispositionRule cannot itself yield WAIVED, which arrives only via the §12 waiver path."
+        },
+        {
+          "field": "condition",
+          "type": "PolicyExpression",
+          "required": true,
+          "note": "DOC-004 §10.2 (L555). PolicyExpression is referenced 4× in DOC-004 (here, §6.1, §12.1, §13) but DEFINED NOWHERE in the corpus → z.unknown(). DISCLOSED, not invented — inventing a predicate grammar is the fabrication this audit exists to prevent."
+        },
+        {
+          "field": "requiredEvidenceIds",
+          "type": "string[]",
           "required": false,
-          "note": "Referenced by AssurancePolicyDefinition.dispositionRules. policies/disposition-rule.schema.json listed in DOC-007 §3; not field-defined in prose. DOC-004 §10.2 supplies disposition (AssuranceDispositionRecommendationSchema) + requiredIndependence (IndependenceRequirementSchema). Source from schema file."
+          "note": "DOC-004 §10.2 (L557). Optional. id-ref[] into the policy's EvidenceRequirement list (§6.1)."
+        },
+        {
+          "field": "forbiddenOpenSeverities",
+          "type": "string[]",
+          "required": false,
+          "note": "DOC-004 §10.2 (L558). Optional. Verbatim string[], NOT a closed AssuranceSeverity[] — the doc's own asymmetry (cf WaiverRule.prohibitedFindingSeverities); preserved, not 'improved'."
+        },
+        {
+          "field": "requiredIndependence",
+          "type": "IndependenceRequirement",
+          "required": false,
+          "enumRef": "IndependenceRequirementSchema",
+          "note": "DOC-004 §10.2 (L559). Optional. 8-value IndependenceRequirementSchema (§8.1)."
         }
       ],
-      "sourceSection": "DOC-004 §10.2 (L547)",
-      "note": "RATIFIED AFTER ALL — audit 2026-07-16 (AUDIT-placeholder-helpers.md). DOC-004 §10.2 (L547) contains `interface DispositionRule { ... }` defining: disposition, condition, requiredEvidenceIds, forbiddenOpenSeverities, requiredIndependence. The previous note said 'NOT field-defined ... Source TBD' WHILE CITING THIS SECTION — the harvest pass reached inside this very interface, took its enums, and recorded its fields as nonexistent. A pass that extracts one kind of thing reports the absence of every other kind. STILL A PLACEHOLDER IN CODE: the single '(undefined)' field below keeps gen-objects.ts emitting z.record(z.string(), z.unknown()) — 'any object'. TRANSCRIPTION CAVEAT: 4 of 5 resolvable; `condition` is PolicyExpression (undefined in the corpus). NOT fixed here: tightening this breaks live literals and needs an explicit migration, not a sweep."
+      "sourceSection": "DOC-004 §10.2 (L547) — RATIFIED shape, transcribed",
+      "note": "TRANSCRIBED from DOC-004 §10.2 (L547-560) on 2026-07-17. The previous single '(undefined)' field kept z.record while its own note cited §10.2 — the harvest pass took the two enums (AssuranceDispositionRecommendation, IndependenceRequirement) and recorded the fields as nonexistent. All 5 fields transcribed byte-exact; optionality is the doc's (disposition + condition required; the other three optional). 4 of 5 resolve to concrete shapes; `condition: PolicyExpression` is UNDEFINED in the corpus (referenced 4×, defined nowhere) and stays permissive z.unknown() — DISCLOSED, not invented. Two deliberate fidelity choices preserved: `disposition` is the 5-value Recommendation enum (WAIVED excluded — it arrives via the §12 waiver path), and `forbiddenOpenSeverities` stays verbatim string[], not AssuranceSeverity[]. Tightening only constrains ELEMENTS of dispositionRules, hardcoded [] today — non-breaking."
     },
     {
       "name": "RemediationRule",
@@ -2468,7 +2545,7 @@
           "field": "(undefined)",
           "type": "—",
           "required": false,
-          "note": "Referenced by AssurancePolicyDefinition.remediationRules. NOT field-defined. Source TBD."
+          "note": "Referenced by AssurancePolicyDefinition.remediationRules (DOC-004 §3.1 L126) and the Command/Event/Schema Contract Package (L1278), but DEFINED NOWHERE in the 14-file corpus — no `interface RemediationRule`, no prose field list, no table. Investigated 2026-07-17: this is the ExecutionProvenance situation (AUDIT-placeholder-helpers.md L45 files it in the 'Genuinely undefined, confirmed' bucket). Distractors ruled out: RemediationPolicy (Canonical Domain Model L1092 / Migration L1251) is a different, also-undefined type; the Ontology 'Remediation options' bullet (L1374) is a concept name with no fields. DEFER: kept a FORCE_PLACEHOLDER (z.record) and NOT threaded from CreateAssurancePolicy; invent nothing until a DOC-004/DOC-007 interface is ratified as a separate step. Contrast the 3 siblings (EvidenceRequirement §6.1, DispositionRule §10.2, EscalationRule §13) which WERE defined and are now transcribed."
         }
       ]
     },
@@ -2476,14 +2553,34 @@
       "name": "EscalationRule",
       "fields": [
         {
-          "field": "(undefined)",
-          "type": "—",
+          "field": "trigger",
+          "type": "PolicyExpression",
+          "required": true,
+          "note": "DOC-004 §13 (L669). PolicyExpression is UNDEFINED in the corpus → z.unknown(). DISCLOSED, not invented — the same dependency as DispositionRule.condition and WaiverRule.revalidationTrigger."
+        },
+        {
+          "field": "escalationTarget",
+          "type": "EscalationTarget",
+          "required": true,
+          "enumRef": "EscalationTargetSchema",
+          "note": "DOC-004 §13 (L671-678). The inline union byte-matches the 7-value EscalationTargetSchema (HUMAN_USER|PRODUCT_OWNER|ARCHITECT|SECURITY_REVIEWER|LEGAL_REVIEWER|SYSTEM_OWNER|INDEPENDENT_VALIDATOR)."
+        },
+        {
+          "field": "requiredPackage",
+          "type": "string[]",
+          "required": true,
+          "note": "DOC-004 §13 (L680). Verbatim string[]. The prose L685-697 ('the package should include: decision requested; subject; ...') describes package CONTENT as guidance, NOT a typed schema, so it is NOT upgraded to a helper."
+        },
+        {
+          "field": "timeoutAction",
+          "type": "ControlAction",
           "required": false,
-          "note": "Referenced by AssurancePolicyDefinition.escalationRules. NOT field-defined; DOC-004 §13 supplies escalationTarget (EscalationTargetSchema) + timeoutAction (ControlActionSchema). Distinct from ExecutionPlan.escalationPolicy. Source TBD."
+          "enumRef": "ControlActionSchema",
+          "note": "DOC-004 §13 (L681). Optional. 23-value ControlActionSchema (§11)."
         }
       ],
-      "sourceSection": "DOC-004 §13 (L668)",
-      "note": "RATIFIED AFTER ALL — audit 2026-07-16 (AUDIT-placeholder-helpers.md). DOC-004 §13 (L668) contains `interface EscalationRule { ... }` defining: trigger, escalationTarget, requiredPackage, timeoutAction. The previous note said 'NOT field-defined ... Source TBD' WHILE CITING THIS SECTION — the harvest pass reached inside this very interface, took its enums, and recorded its fields as nonexistent. A pass that extracts one kind of thing reports the absence of every other kind. STILL A PLACEHOLDER IN CODE: the single '(undefined)' field below keeps gen-objects.ts emitting z.record(z.string(), z.unknown()) — 'any object'. TRANSCRIPTION CAVEAT: 3 of 4 resolvable; `trigger` is PolicyExpression (undefined). NOT fixed here: tightening this breaks live literals and needs an explicit migration, not a sweep."
+      "sourceSection": "DOC-004 §13 (L668) — RATIFIED shape, transcribed",
+      "note": "TRANSCRIBED from DOC-004 §13 (L668-682) on 2026-07-17. The previous single '(undefined)' field kept z.record while citing §13 — the harvest pass took the two enums (EscalationTarget, ControlAction) and recorded the fields as nonexistent. All 4 fields transcribed byte-exact. 3 of 4 resolve to concrete shapes; `trigger: PolicyExpression` is UNDEFINED in the corpus and stays permissive z.unknown() — DISCLOSED, the same dependency as DispositionRule.condition / WaiverRule.revalidationTrigger; not invented. requiredPackage stays verbatim string[]: the prose L685-697 ('should include ...') is guidance for package content, not a typed shape. Tightening only constrains ELEMENTS of escalationRules, hardcoded [] today — non-breaking."
     },
     {
       "name": "WaiverRule",

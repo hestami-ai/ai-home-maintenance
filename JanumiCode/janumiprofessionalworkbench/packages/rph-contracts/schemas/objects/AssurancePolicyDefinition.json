@@ -307,20 +307,136 @@
       "type": "array",
       "items": {
         "type": "object",
-        "propertyNames": {
-          "type": "string"
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "evidenceType": {
+            "type": "string",
+            "enum": [
+              "ARTIFACT",
+              "TEST_RESULT",
+              "SOURCE",
+              "TRACE",
+              "OBSERVATION",
+              "ANALYSIS",
+              "MEASUREMENT",
+              "APPROVAL",
+              "REVIEW"
+            ]
+          },
+          "description": {
+            "type": "string"
+          },
+          "purpose": {
+            "type": "string"
+          },
+          "cardinality": {
+            "type": "string",
+            "enum": [
+              "EXACTLY_ONE",
+              "AT_LEAST_ONE",
+              "ZERO_OR_MORE",
+              "ONE_PER_SUBJECT",
+              "ONE_PER_OBLIGATION"
+            ]
+          },
+          "admissibilityRules": {
+            "type": "array",
+            "items": {}
+          },
+          "freshnessRule": {},
+          "requiredForDispositions": {
+            "type": "string",
+            "enum": [
+              "ALL",
+              "SATISFIED_ONLY",
+              "CONDITIONAL_OR_SATISFIED"
+            ]
+          },
+          "mayBeWaived": {
+            "type": "boolean"
+          }
         },
-        "additionalProperties": {}
+        "required": [
+          "id",
+          "evidenceType",
+          "description",
+          "purpose",
+          "cardinality",
+          "admissibilityRules",
+          "requiredForDispositions",
+          "mayBeWaived"
+        ],
+        "additionalProperties": false
       }
     },
     "optionalEvidence": {
       "type": "array",
       "items": {
         "type": "object",
-        "propertyNames": {
-          "type": "string"
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "evidenceType": {
+            "type": "string",
+            "enum": [
+              "ARTIFACT",
+              "TEST_RESULT",
+              "SOURCE",
+              "TRACE",
+              "OBSERVATION",
+              "ANALYSIS",
+              "MEASUREMENT",
+              "APPROVAL",
+              "REVIEW"
+            ]
+          },
+          "description": {
+            "type": "string"
+          },
+          "purpose": {
+            "type": "string"
+          },
+          "cardinality": {
+            "type": "string",
+            "enum": [
+              "EXACTLY_ONE",
+              "AT_LEAST_ONE",
+              "ZERO_OR_MORE",
+              "ONE_PER_SUBJECT",
+              "ONE_PER_OBLIGATION"
+            ]
+          },
+          "admissibilityRules": {
+            "type": "array",
+            "items": {}
+          },
+          "freshnessRule": {},
+          "requiredForDispositions": {
+            "type": "string",
+            "enum": [
+              "ALL",
+              "SATISFIED_ONLY",
+              "CONDITIONAL_OR_SATISFIED"
+            ]
+          },
+          "mayBeWaived": {
+            "type": "boolean"
+          }
         },
-        "additionalProperties": {}
+        "required": [
+          "id",
+          "evidenceType",
+          "description",
+          "purpose",
+          "cardinality",
+          "admissibilityRules",
+          "requiredForDispositions",
+          "mayBeWaived"
+        ],
+        "additionalProperties": false
       }
     },
     "criteria": {
@@ -494,10 +610,49 @@
       "type": "array",
       "items": {
         "type": "object",
-        "propertyNames": {
-          "type": "string"
+        "properties": {
+          "disposition": {
+            "type": "string",
+            "enum": [
+              "SATISFIED",
+              "CONDITIONALLY_SATISFIED",
+              "REJECTED",
+              "INCONCLUSIVE",
+              "ESCALATED"
+            ]
+          },
+          "condition": {},
+          "requiredEvidenceIds": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "forbiddenOpenSeverities": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "requiredIndependence": {
+            "type": "string",
+            "enum": [
+              "NONE",
+              "DIFFERENT_INVOCATION",
+              "DIFFERENT_CONTEXT_INSTANCE",
+              "DIFFERENT_AGENT",
+              "DIFFERENT_MODEL",
+              "DIFFERENT_PROVIDER",
+              "HUMAN",
+              "ORGANIZATIONALLY_INDEPENDENT"
+            ]
+          }
         },
-        "additionalProperties": {}
+        "required": [
+          "disposition",
+          "condition"
+        ],
+        "additionalProperties": false
       }
     },
     "permittedControlActions": {
@@ -545,10 +700,61 @@
       "type": "array",
       "items": {
         "type": "object",
-        "propertyNames": {
-          "type": "string"
+        "properties": {
+          "trigger": {},
+          "escalationTarget": {
+            "type": "string",
+            "enum": [
+              "HUMAN_USER",
+              "PRODUCT_OWNER",
+              "ARCHITECT",
+              "SECURITY_REVIEWER",
+              "LEGAL_REVIEWER",
+              "SYSTEM_OWNER",
+              "INDEPENDENT_VALIDATOR"
+            ]
+          },
+          "requiredPackage": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "timeoutAction": {
+            "type": "string",
+            "enum": [
+              "CONTINUE",
+              "WAIT",
+              "CLARIFY",
+              "GATHER_CONTEXT",
+              "GATHER_EVIDENCE",
+              "REVISE_PROMPT",
+              "REVISE_CONTEXT",
+              "RETRY",
+              "CHANGE_MODEL",
+              "CHANGE_TOOL",
+              "CHANGE_VALIDATOR",
+              "CHANGE_TACTIC",
+              "RESHAPE_PWU",
+              "REVISE_DECOMPOSITION",
+              "REPLAN_EXECUTION",
+              "INVALIDATE_DEPENDENTS",
+              "REQUEST_HUMAN_DECISION",
+              "REQUEST_WAIVER",
+              "ESCALATE",
+              "REJECT",
+              "ABANDON",
+              "ACCEPT",
+              "PROMOTE_BASELINE"
+            ]
+          }
         },
-        "additionalProperties": {}
+        "required": [
+          "trigger",
+          "escalationTarget",
+          "requiredPackage"
+        ],
+        "additionalProperties": false
       }
     },
     "waiverRules": {

@@ -26,7 +26,9 @@ import {
 	DecisionStatusSchema,
 	DecisionTypeSchema,
 	DecompositionContractStatusSchema,
+	EscalationTargetSchema,
 	EvaluationMethodSchema,
+	EvidenceCardinalitySchema,
 	EvidenceStatusSchema,
 	EvidenceTypeSchema,
 	ExecutionPlanStatusSchema,
@@ -42,6 +44,7 @@ import {
 	OriginTypeSchema,
 	ProfessionalWorkObjectTypeSchema,
 	RecompositionContractStatusSchema,
+	RequiredForDispositionsSchema,
 	RiskConsequenceSchema,
 	RiskIrreversibilitySchema,
 	RiskRegulatoryExposureSchema,
@@ -80,14 +83,8 @@ export const ControlActionRecommendationSchema = z.record(z.string(), z.unknown(
 export type ControlActionRecommendation = z.infer<typeof ControlActionRecommendationSchema>;
 export const DesiredOutcomeSchema = z.record(z.string(), z.unknown());
 export type DesiredOutcome = z.infer<typeof DesiredOutcomeSchema>;
-export const DispositionRuleSchema = z.record(z.string(), z.unknown());
-export type DispositionRule = z.infer<typeof DispositionRuleSchema>;
 export const EscalationPolicySchema = z.record(z.string(), z.unknown());
 export type EscalationPolicy = z.infer<typeof EscalationPolicySchema>;
-export const EscalationRuleSchema = z.record(z.string(), z.unknown());
-export type EscalationRule = z.infer<typeof EscalationRuleSchema>;
-export const EvidenceRequirementSchema = z.record(z.string(), z.unknown());
-export type EvidenceRequirement = z.infer<typeof EvidenceRequirementSchema>;
 export const ExecutionTransitionSchema = z.record(z.string(), z.unknown());
 export type ExecutionTransition = z.infer<typeof ExecutionTransitionSchema>;
 export const InputBindingSchema = z.record(z.string(), z.unknown());
@@ -190,6 +187,33 @@ export const CriterionResultSchema = z.strictObject({
 	evidenceIds: z.array(z.string())
 });
 export type CriterionResult = z.infer<typeof CriterionResultSchema>;
+export const DispositionRuleSchema = z.strictObject({
+	disposition: AssuranceDispositionRecommendationSchema,
+	condition: z.unknown(),
+	requiredEvidenceIds: z.array(z.string()).optional(),
+	forbiddenOpenSeverities: z.array(z.string()).optional(),
+	requiredIndependence: IndependenceRequirementSchema.optional()
+});
+export type DispositionRule = z.infer<typeof DispositionRuleSchema>;
+export const EscalationRuleSchema = z.strictObject({
+	trigger: z.unknown(),
+	escalationTarget: EscalationTargetSchema,
+	requiredPackage: z.array(z.string()),
+	timeoutAction: ControlActionSchema.optional()
+});
+export type EscalationRule = z.infer<typeof EscalationRuleSchema>;
+export const EvidenceRequirementSchema = z.strictObject({
+	id: z.string(),
+	evidenceType: EvidenceTypeSchema,
+	description: z.string(),
+	purpose: z.string(),
+	cardinality: EvidenceCardinalitySchema,
+	admissibilityRules: z.array(z.unknown()),
+	freshnessRule: z.unknown().optional(),
+	requiredForDispositions: RequiredForDispositionsSchema,
+	mayBeWaived: z.boolean()
+});
+export type EvidenceRequirement = z.infer<typeof EvidenceRequirementSchema>;
 export const ExecutionProvenanceSchema = z.strictObject({
 	originType: OriginTypeSchema.optional(),
 	producingExecutionAttemptId: z.string().optional(),

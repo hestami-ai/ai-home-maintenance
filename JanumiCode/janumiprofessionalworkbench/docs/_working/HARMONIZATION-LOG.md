@@ -3195,6 +3195,74 @@ stays in the (d2) gate — the same §0.3 pattern used for `AssuranceAssessmentC
 Gate (each of the 7 commits): `check-types` 21/21 · `test` 21/21 · lint · boundary · format. Adjudication
 workflow: `wf_3f02ce65-787` (17 agents, 0 errors, 0 disputed).
 
+## PART 3z — The hollow governed layer, closed at three more of its placeholders
+
+PART 0 (C6) named the mechanism: `AssurancePolicyDefinition` **requires** rule arrays
+(`requiredEvidence`, `optionalEvidence`, `dispositionRules`, `escalationRules`, `remediationRules`) whose
+element helpers are `FORCE_PLACEHOLDER` — `z.record(z.string(), z.unknown())`, "any object" — so the schema
+that is supposed to make a policy *govern* accepts a blob and checks nothing. `createAssurancePolicy` therefore
+hardcodes every one of them to `[]`, because no command could carry a real value and no shape would have
+validated it. A seeded policy can declare **none** of the rules that give it force. This is the same disease
+AssessmentCriterion / FindingDefinition / WaiverRule already had (Increments 11/13, PART 3r/3s): a ratified
+interface, projected as `z.record`, so the code invented its own shape with nothing to catch the drift.
+
+A design workflow (`wf_ea5e790d-998`, 6 agents, 0 errors) transcribed the three that DOC-004 actually defines,
+investigated the two it does not, and had an adversarial reviewer re-verify every field against the source
+before any edit. Verdict **SOUND**; its three corrections are folded in below.
+
+### Increment A — the three shapes exist (transcription only, no threading)
+
+Replaced the single `(undefined)` placeholder field in each of three `helperSubTypes` with the **byte-exact**
+DOC-004 interface. Nothing invented; every enum the transcription needs already existed in `enums.ts` and was
+already registered — the harvest pass that first recorded these interfaces as "NOT field-defined" had reached
+*inside* each interface, taken its enums, and reported its fields as nonexistent. The same pattern, three more
+times:
+
+- **`EvidenceRequirement`** — DOC-004 §6.1 (L317–340), 9 fields. `evidenceType`→EvidenceTypeSchema,
+  `cardinality`→EvidenceCardinalitySchema (the inline union byte-matches the 5-value enum),
+  `requiredForDispositions`→RequiredForDispositionsSchema. 7 of 9 resolve to concrete shapes.
+- **`DispositionRule`** — DOC-004 §10.2 (L547–560), 5 fields. `disposition` is the **5-value**
+  AssuranceDispositionRecommendation, deliberately **not** the 6-value AssuranceDisposition — a DispositionRule
+  cannot itself yield WAIVED (that arrives only via the §12 waiver path). `forbiddenOpenSeverities` kept verbatim
+  `string[]`, not a closed `AssuranceSeverity[]` — the doc's own asymmetry, preserved, not "improved."
+- **`EscalationRule`** — DOC-004 §13 (L668–682), 4 fields. `escalationTarget`→EscalationTargetSchema (7-value),
+  `timeoutAction`→ControlActionSchema (23-value). `requiredPackage` kept verbatim `string[]`: the prose L685–697
+  ("the package should include: decision requested; subject; …") is guidance for package *content*, not a typed
+  schema, so it is **not** upgraded to a helper.
+
+**What is honestly still permissive, disclosed not fabricated.** Four nested references are undefined **anywhere
+in the 14-file corpus**, so they emit `z.unknown()` / `z.array(z.unknown())`, exactly like the shipped
+`WaiverRule.revalidationTrigger`: `PolicyExpression` (referenced 4×, defined nowhere — inventing a predicate
+grammar would be the fabrication this whole audit exists to stop), `AdmissibilityRule` and `FreshnessRule` (the
+two `EvidenceRequirement` sub-objects; §6.2's 8 prose bullets read like the intended *content* of an
+`AdmissibilityRule` but are prose, not an interface, so they are an author-intent anchor for a future
+ratification, not a field source).
+
+**`RemediationRule` was investigated and DEFERRED.** It is genuinely referenced-but-undefined — every corpus
+occurrence (`AssurancePolicyDefinition.remediationRules` DOC-004 §3.1 L126, the Contract Package L1278, the
+existing placeholder) is a *use*, never a definition; the audit already files it beside `ExecutionProvenance` in
+the "genuinely undefined" bucket. Distractors ruled out (`RemediationPolicy` is a different, also-undefined
+type; the Ontology "Remediation options" bullet is a concept with no fields). It keeps its `z.record`
+placeholder and is **not** threaded; its note was upgraded to the disclosed-defer language, no schema effect.
+
+**Non-breaking, proven.** Tightening a helper from `z.record` to `z.strictObject` only constrains the
+*elements* of the arrays — and every one of those arrays is hardcoded `[]` today (grep across `packages/`,
+`ee/`, `apps/` found **zero** non-empty literals). An empty array satisfies `z.array` of any element schema, so
+no seed can break. The generated JSON-schema (`schemas/objects/AssurancePolicyDefinition.json`) regenerated in
+step, so the inlined element schemas now carry real `properties` + `required` (correctly omitting the one
+optional field, `freshnessRule`) instead of `additionalProperties: {}` — it was in the emit pipeline after all.
+
+**Boundary stated honestly (the reviewer's hollow-layer check).** This is genuine **write-side** capability
+restoration — the fields were write-only-empty — but it adds **no enforcement**: `floor.ts` hardcodes the plan
+and seeded policy objects are not read at runtime, so occupying these shapes is *documentation-grade*, exactly
+like the shipped `waiverRules`/`criteria`. It fills the ratified home; it does not yet make the policy govern.
+Increments B and C thread the four defined fields through `CreateAssurancePolicy`/`EditAssurancePolicy` so they
+become *settable*; a store→runtime read path is the separate, deeper follow-up.
+
+Gate: `check-types` 19/19 · `test` 19/19 · lint · boundary · format (package scope; the `rph-demo` app is under
+another agent's active edit, so its E2E is deferred to that agent's zone — Increment A touches no UI). Footprint:
+`vocab/m1-object-fields.json`, regenerated `objects.ts`, regenerated `schemas/objects/AssurancePolicyDefinition.json`.
+
 ---
 
 ## PART 4 — Open questions genuinely for the sponsor
