@@ -3804,3 +3804,45 @@ rph-contracts registry count 295→297) · lint · boundary (no violations) · *
 and reference seed are unchanged — no reference policy declares `requiredEvidence`, so the rendered "missing"
 stays a real 'none'). Single-writer vocab increment; footprint: `m3-commands-events.json` + `messages.ts`
 (regenerated) + assurance.ts + registry.ts + assurance-view.ts + 2 tests + validate.test.ts count. Committed.
+
+### Increment R — SETTABLE → ENFORCED: two policy rule arrays now GOVERN at completion (#1)
+
+The hollow governed layer, closed for the two highest-value, most-bounded arrays. A design pass (adversarial map
+of every rule array's readers) found: `criteria` is the ONE array that governs (floor path, reads from the
+store); everything else — `dispositionRules`, `escalationRules`, `permittedControlActions`, `waiverRules`,
+`requiredEvidence` — is written by Create/Edit and **read by nobody** to decide. `completeAssuranceAssessment`
+took the disposition straight from `validatorResult.dispositionRecommendation` and copied
+`recommendedControlActions` onto the event unchecked. Both fixed, in the one handler that already loads the
+policy:
+
+- **Gate B — `permittedControlActions` ENFORCED (§11).** A validator may only recommend a control action the
+  policy permits; a recommendation outside the permitted set is a policy violation, so the completion fails
+  closed. Builds on Increment N: every policy now carries a coherent permitted set (the escalate-and-reshape
+  floor), so "permitted" means something for all twelve.
+- **Gate A — `requiredEvidence` ENFORCED (§6.1 / §10.3).** A POSITIVE disposition (SATISFIED /
+  CONDITIONALLY_SATISFIED) may not stand while its mandatory evidence is unmet. The gate reads the SAME
+  required-minus-received the §38 view folds — the required side from the policy's `requiredEvidence`
+  (respecting `requiredForDispositions`: ALL / SATISFIED_ONLY / CONDITIONAL_OR_SATISFIED), the received side from
+  the §32 `AssuranceEvidenceReceived` events (Increment Q). So the gate and the view agree, and a SATISFIED
+  verdict can no longer certify past its own evidence gaps. **Negative dispositions (REJECTED / ESCALATED /
+  INCONCLUSIVE) are deliberately NOT gated** — rejecting or escalating *because* evidence is insufficient is the
+  correct response, not a blocked one.
+
+This is where Increments N (control-action floor) and Q (evidence sub-lifecycle) pay off: each made a rule array
+coherent and sourceable; this makes them DECIDE. Existing completions are unaffected (reference seed + demo
+drive declare no `requiredEvidence` and recommend no non-permitted action — verified: engine 64 green, demo
+policy `requiredEvidence` absent + `recommendedControlActions` empty).
+
+**Scoped, and the rest disclosed.** `dispositionRules` / `escalationRules` / `waiverRules` stay
+settable-but-ignored: enforcing them requires INTERPRETING each rule element's shape, and those shapes are
+thinly authored (the `WaiverRule` / `RemediationRule` situation — see #5). Wiring them is a larger design that
+should follow a shape decision, not be smuggled in. The floor path's hardcoded `evidenceExists: true`
+(floor.ts) is also out of scope: floor policies declare no `requiredEvidence`, so it changes nothing today.
+
+Red-first: Gate B (a non-permitted `ESCALATE` recommendation → REJECTED, a permitted `CONTINUE` → SATISFIED) +
+Gate A (SATISFIED with `EV-01` unmet → REJECTED and still ASSESSING; submit → SATISFIED stands; a REJECTED
+disposition with the same unmet evidence is NOT gated).
+
+**Gate:** `check-types` 21/21 · full `test` 21/21 (rph-application assurance handler 11, +2) · lint · boundary ·
+**Playwright E2E 25/25** (the reference drive + demo drive are unaffected — no `requiredEvidence`, no
+non-permitted recommendation). Footprint: `assurance.ts` + `assurance-independence.test.ts`. Committed.

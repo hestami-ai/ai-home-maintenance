@@ -513,4 +513,112 @@ describe('completeAssuranceAssessment — independence enforcement (Increment I2
 		);
 		expect(bad.status).toBe('REJECTED');
 	});
+
+	it('§11 permittedControlActions ENFORCED: a validator recommending a non-permitted action is rejected (Gate B)', () => {
+		createPolicy('NONE'); // permittedControlActions: ['CONTINUE']
+		const A = 'asm_01ARZ3NDEKTSV4RRFFQ69G5A40';
+		requestAssessment(A);
+		const v = verdict(A, 'reviewer-x');
+		// The policy permits only CONTINUE; ESCALATE is a real ControlAction but not permitted by THIS policy.
+		const rejected = engine.dispatch(
+			cmd('CompleteAssuranceAssessment', A, 'ASSURANCE_ASSESSMENT', {
+				validatorResult: { ...v, recommendedControlActions: [{ action: 'ESCALATE' }] }
+			})
+		);
+		expect(rejected.status).toBe('REJECTED');
+		expect(stateOf(A)?.assessmentState).toBe('ASSESSING'); // not completed past the policy
+		// A permitted action completes.
+		dispatchOk(
+			cmd('CompleteAssuranceAssessment', A, 'ASSURANCE_ASSESSMENT', {
+				validatorResult: { ...v, recommendedControlActions: [{ action: 'CONTINUE' }] }
+			})
+		);
+		expect(stateOf(A)?.assessmentState).toBe('SATISFIED');
+	});
+
+	it('§6.1 requiredEvidence ENFORCED: SATISFIED is rejected while mandatory evidence is unmet, then stands once submitted (Gate A)', () => {
+		const ev = (id: string) => ({
+			id,
+			evidenceType: 'TEST_RESULT',
+			description: 'd',
+			purpose: 'p',
+			cardinality: 'AT_LEAST_ONE',
+			admissibilityRules: [],
+			requiredForDispositions: 'ALL',
+			mayBeWaived: false
+		});
+		dispatchOk(
+			cmd('CreateAssurancePolicy', POLICY, 'ASSURANCE_POLICY', {
+				policyId: POLICY,
+				version: '1.0.0',
+				name: 'Evidence-gated policy',
+				purpose: 'p',
+				rationale: 'r',
+				applicableObjectTypes: ['PROFESSIONAL_WORK_UNIT'],
+				evaluatedClaimTypes: ['FITNESS'],
+				criteria: [
+					{
+						id: 'C1',
+						name: 'Fit',
+						description: 'd',
+						criterionType: 'QUALITATIVE',
+						evaluationMethod: 'HUMAN_JUDGMENT',
+						requiredEvidenceIds: [],
+						severityIfNotMet: 'MATERIAL',
+						mayBeNotApplicable: false
+					}
+				],
+				evaluatorRole: 'REVIEWER',
+				independenceRequirement: 'NONE',
+				requiredEvidence: [ev('EV-01')],
+				findingDefinitions: [
+					{
+						code: 'UNFIT',
+						name: 'Unfit',
+						description: 'd',
+						defaultSeverity: 'MATERIAL',
+						affectedClaimTypes: ['FITNESS'],
+						defaultControlActions: ['CONTINUE']
+					}
+				],
+				permittedControlActions: ['CONTINUE']
+			})
+		);
+		dispatchOk(cmd('ActivateAssurancePolicy', POLICY, 'ASSURANCE_POLICY', { policyId: POLICY }));
+		const A = 'asm_01ARZ3NDEKTSV4RRFFQ69G5A50';
+		requestAssessment(A);
+
+		// SATISFIED with EV-01 unmet -> fail closed; the assessment stays ASSESSING.
+		const early = engine.dispatch(
+			cmd('CompleteAssuranceAssessment', A, 'ASSURANCE_ASSESSMENT', {
+				validatorResult: verdict(A, 'reviewer-y')
+			})
+		);
+		expect(early.status).toBe('REJECTED');
+		expect(stateOf(A)?.assessmentState).toBe('ASSESSING');
+
+		// Submit the required evidence, then the SATISFIED verdict stands.
+		dispatchOk(
+			cmd('SubmitEvidenceForAssessment', A, 'ASSURANCE_ASSESSMENT', {
+				evidenceId: 'evd_01ARZ3NDEKTSV4RRFFQ69G5E01',
+				satisfiesRequirementId: 'EV-01'
+			})
+		);
+		dispatchOk(
+			cmd('CompleteAssuranceAssessment', A, 'ASSURANCE_ASSESSMENT', {
+				validatorResult: verdict(A, 'reviewer-y')
+			})
+		);
+		expect(stateOf(A)?.assessmentState).toBe('SATISFIED');
+
+		// A NEGATIVE disposition is NOT gated on evidence: rejecting BECAUSE evidence is insufficient is correct.
+		const B = 'asm_01ARZ3NDEKTSV4RRFFQ69G5A51';
+		requestAssessment(B);
+		dispatchOk(
+			cmd('CompleteAssuranceAssessment', B, 'ASSURANCE_ASSESSMENT', {
+				validatorResult: { ...verdict(B, 'reviewer-z'), dispositionRecommendation: 'REJECTED' }
+			})
+		);
+		expect(stateOf(B)?.assessmentState).toBe('REJECTED');
+	});
 });

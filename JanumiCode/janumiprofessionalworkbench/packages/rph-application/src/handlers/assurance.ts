@@ -674,12 +674,78 @@ export const completeAssuranceAssessment: CommandHandler = (ctx, command, payloa
 	const producer = p.producer;
 	const assessmentState = ctx.store.loadObject(command.targetAggregateId)?.state as
 		{ assurancePolicyId?: string } | undefined;
-	const independenceRequirement = assessmentState?.assurancePolicyId
-		? (
-				ctx.store.loadObject(assessmentState.assurancePolicyId)?.state as
-					{ independenceRequirement?: string } | undefined
-			)?.independenceRequirement
+	// Load the governing policy ONCE — its rule arrays must actually decide, not sit settable-and-ignored (the
+	// "hollow governed layer"). Three fields govern here: independenceRequirement (the §39-inv-8 check below,
+	// Increment I2), permittedControlActions (Gate B), and requiredEvidence (Gate A).
+	const policyState = assessmentState?.assurancePolicyId
+		? (ctx.store.loadObject(assessmentState.assurancePolicyId)?.state as
+				| {
+						independenceRequirement?: string;
+						permittedControlActions?: readonly string[];
+						requiredEvidence?: ReadonlyArray<{ id?: string; requiredForDispositions?: string }>;
+				  }
+				| undefined)
 		: undefined;
+
+	// GATE B (Increment R) — permittedControlActions ENFORCED, not merely displayed. A validator may only recommend
+	// a control action the policy permits (§11); an action outside the permitted set is a policy violation, so the
+	// completion fails closed rather than record an ungoverned recommendation. permittedControlActions is now a
+	// coherent per-policy set with a universal escalate-and-reshape floor (Increment N), so "permitted" means
+	// something for every policy. Empty permitted set → skip (a policy that declares none constrains nothing).
+	const permitted = new Set(policyState?.permittedControlActions ?? []);
+	if (permitted.size > 0) {
+		const offending = (p.validatorResult?.recommendedControlActions ?? [])
+			.map((r) => (r as { action?: unknown }).action)
+			.filter((a): a is string => typeof a === 'string' && !permitted.has(a));
+		if (offending.length > 0) {
+			return reject(
+				command,
+				'RPH_VALIDATION_SEMANTIC_FAILED',
+				`CompleteAssuranceAssessment: the validator recommended control action(s) [${offending.join(', ')}] that this policy does not permit (§11). Permitted: [${[...permitted].join(', ')}].`,
+				[command.targetAggregateId]
+			);
+		}
+	}
+
+	// GATE A (Increment R) — a POSITIVE disposition may not stand while its own mandatory evidence is unmet. §6.1's
+	// requiredForDispositions declares which dispositions each requirement gates; a SATISFIED verdict that ignores
+	// its required evidence certifies past its own gaps (§10.3). The received set is folded from the §32
+	// AssuranceEvidenceReceived events (Increment Q) — the SAME required-minus-received the §38 view shows — so the
+	// gate and the view agree. Negative dispositions (REJECTED / ESCALATED / INCONCLUSIVE) are deliberately NOT
+	// gated: escalating or rejecting BECAUSE evidence is insufficient is the correct response, not a blocked one.
+	if (disposition === 'SATISFIED' || disposition === 'CONDITIONALLY_SATISFIED') {
+		const received = new Set(
+			ctx.store
+				.readAllEvents()
+				.filter(
+					(e) =>
+						e.eventType === 'AssuranceEvidenceReceived' &&
+						(e.payload as { assessmentId?: string }).assessmentId === command.targetAggregateId
+				)
+				.map((e) => (e.payload as { satisfiesRequirementId?: string }).satisfiesRequirementId)
+				.filter((x): x is string => typeof x === 'string')
+		);
+		// requiredForDispositions: ALL gates every disposition; SATISFIED_ONLY only SATISFIED; CONDITIONAL_OR_SATISFIED
+		// gates both positive dispositions (and we are already inside the positive branch).
+		const gates = (rfd: string | undefined): boolean =>
+			rfd === 'ALL' ||
+			rfd === 'CONDITIONAL_OR_SATISFIED' ||
+			(rfd === 'SATISFIED_ONLY' && disposition === 'SATISFIED');
+		const unmet = (policyState?.requiredEvidence ?? [])
+			.filter((r) => gates(r?.requiredForDispositions))
+			.map((r) => r?.id)
+			.filter((id): id is string => typeof id === 'string' && !received.has(id));
+		if (unmet.length > 0) {
+			return reject(
+				command,
+				'RPH_VALIDATION_SEMANTIC_FAILED',
+				`CompleteAssuranceAssessment: a ${disposition} disposition requires evidence for [${unmet.join(', ')}] (§6.1 requiredForDispositions) but none was submitted for those requirements — a positive disposition cannot stand with unmet mandatory evidence (§10.3). Submit it (SubmitEvidenceForAssessment) first, or return a non-satisfied disposition.`,
+				[command.targetAggregateId, ...unmet]
+			);
+		}
+	}
+
+	const independenceRequirement = policyState?.independenceRequirement;
 	// 'VERIFIED' only when the check RAN and PASSED; left undefined when it did not run (see the gate note above) so
 	// the §38 view reads that as "unknown", never a fabricated pass. The negative branch returns early below.
 	let independenceResult: string | undefined;
