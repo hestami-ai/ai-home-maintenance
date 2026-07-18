@@ -17,14 +17,16 @@ import {
 	listConversations
 } from '@janumipwb/rph-engine';
 import { getEngine, isTestMode } from '$lib/server/workbench';
+import { getPendingAuthoringTurn, summarizeAuthoringTurn } from '$lib/server/authoring-turn';
 import type { RequestHandler } from './$types';
 
 export const GET: RequestHandler = () => {
 	if (!isTestMode()) throw error(404, 'Not found');
 	const e = getEngine();
+	const pwas = listPwas(e);
 	return json({
 		events: e.readAllEvents(),
-		pwas: listPwas(e),
+		pwas,
 		pwuTypes: listPwuTypes(e),
 		undertakings: listUndertakings(e),
 		pwus: listPwus(e),
@@ -34,6 +36,22 @@ export const GET: RequestHandler = () => {
 		observations: listObservations(e),
 		decisions: listDecisions(e),
 		baselines: listBaselines(e),
-		conversations: listConversations(e)
+		conversations: listConversations(e),
+		// Explicitly separate process-local PREVIEW truth from canonical truth so E2E cannot accidentally conflate
+		// them. This endpoint remains test-mode-only.
+		authoringCandidates: pwas.flatMap((pwa) => {
+			const turn = getPendingAuthoringTurn(pwa.id);
+			return turn
+				? [
+						{
+							pwaId: pwa.id,
+							summary: summarizeAuthoringTurn(turn),
+							pwuTypes: listPwuTypes(turn.engine, pwa.id),
+							assessments: listAssessments(turn.engine),
+							conversations: listConversations(turn.engine)
+						}
+					]
+				: [];
+		})
 	});
 };

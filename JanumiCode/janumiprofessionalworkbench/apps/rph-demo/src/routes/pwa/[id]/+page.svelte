@@ -50,6 +50,9 @@
 			newVersion?: string;
 			suspendedPolicy?: string;
 			activatedPolicy?: string;
+			acceptedCandidate?: string;
+			discardedCandidate?: boolean;
+			candidateStatus?: string;
 		} | null;
 	} = $props();
 
@@ -68,7 +71,12 @@
 			: (data.types.find((t) => t.isRoot)?.id ?? data.types[0]?.id ?? '')
 	);
 	const current = $derived(data.types.find((t) => t.id === selected));
-	const editable = $derived(data.pwa.publicationStatus === 'DRAFT');
+	let running = $state(false);
+	const isDraft = $derived(data.pwa.publicationStatus === 'DRAFT');
+	const hasStagedCandidate = $derived(Boolean(data.authoringTurn));
+	// A live run needs its candidate preview to stay visible as tool invalidations arrive. Once the run finishes,
+	// canonical/manual controls lock until the exact candidate is accepted or discarded.
+	const editable = $derived(isDraft && (!hasStagedCandidate || running));
 	const panelAwareFitViewOptions: FitViewOptions = $derived({
 		padding: {
 			top: '24px',
@@ -524,8 +532,8 @@
 		}
 	});
 
-	// ---- The authoring agent: chat + reasoning log, driving the SAME engine via the SSE relay; the graph
-	// re-renders live as each tool call commits (invalidateAll re-runs load -> data.types -> flow).
+	// ---- The authoring agent: chat + reasoning log over an isolated engine fork. The graph re-renders the staged
+	// preview as tools land; canonical state changes only through the explicit accept action below.
 	type LogEntry = {
 		kind: 'status' | 'text' | 'thinking' | 'tool' | 'toolend' | 'error';
 		text: string;
@@ -546,17 +554,18 @@
 		'scaffold_graph'
 	]);
 	let chatInput = $state('');
-	let running = $state(false);
 	let log = $state<LogEntry[]>([]);
 
-	// Hydrate the log from the DURABLE, event-sourced conversation when the PWA loads or changes — the transcript
-	// survives reloads/navigation (it is domain state in the engine, not client memory). Guarded so a live run (and
-	// its invalidateAll graph refreshes) never clobbers the in-flight log.
+	// Hydrate from whichever authority the load explicitly selected: canonical conversation, or an in-process staged
+	// candidate. A staged transcript becomes durable only if that exact candidate is accepted.
 	let hydratedFor = $state('');
 	$effect(() => {
-		if (data.pwa.id !== hydratedFor && !running) {
+		const source = data.authoringTurn
+			? `${data.pwa.id}:${data.authoringTurn.id}:${data.authoringTurn.status}:${data.authoringTurn.commandCount}`
+			: `${data.pwa.id}:canonical`;
+		if (source !== hydratedFor && !running) {
 			log = data.conversation ?? [];
-			hydratedFor = data.pwa.id;
+			hydratedFor = source;
 		}
 	});
 
@@ -610,8 +619,13 @@
 		} catch (err) {
 			push({ kind: 'error', text: err instanceof Error ? err.message : String(err) });
 		} finally {
-			running = false;
-			await invalidateAll();
+			// Keep hydration suppressed until the final candidate load (including transcript/floor/hash) has landed.
+			// Flipping `running` first lets the effect hydrate an earlier tool-time snapshot with no transcript.
+			try {
+				await invalidateAll();
+			} finally {
+				running = false;
+			}
 		}
 	}
 
@@ -684,6 +698,11 @@
 						class:warn={graphReport.valid && graphReport.findings.length > 0}
 						title={graphHealthTitle}
 						data-testid="graph-health"
+						data-graph-valid={String(graphReport.valid)}
+						data-root-count={String(graphReport.metrics.rootCount)}
+						data-orphan-count={String(graphReport.metrics.orphanCount)}
+						data-cycle-count={String(graphReport.metrics.cycleCount)}
+						data-max-depth={String(graphReport.metrics.maxDepth)}
 					>
 						{graphReport.valid
 							? graphReport.findings.length
@@ -739,7 +758,9 @@
 				{/if}
 				{#if data.pwa.publicationStatus === 'DRAFT'}
 					<form method="POST" action="?/submitForReview" use:enhance>
-						<button class="ghost small" type="submit" disabled={!hasRoot}>Submit for Review →</button>
+						<button class="ghost small" type="submit" disabled={!hasRoot || hasStagedCandidate}
+							>Submit for Review →</button
+						>
 					</form>
 				{:else if data.pwa.publicationStatus === 'UNDER_REVIEW'}
 					<form method="POST" action="?/validate" use:enhance>
@@ -764,6 +785,33 @@
 			</div>
 		</div>
 	</header>
+	{#if data.authoringTurn}
+		<section class="candidatebanner" data-testid="authoring-candidate-banner" aria-live="polite">
+			<div class="candidatecopy">
+				<strong>Staged agent candidate — canonical DRAFT unchanged</strong>
+				<span class="candidatemeta">
+					{data.authoringTurn.status} · {data.authoringTurn.commandCount} accepted command{data
+						.authoringTurn.commandCount === 1
+						? ''
+						: 's'}
+				</span>
+				{#if data.authoringTurn.candidateHash}
+					<code title={data.authoringTurn.candidateHash}>{data.authoringTurn.candidateHash}</code>
+				{/if}
+			</div>
+			<div class="candidateactions">
+				{#if data.authoringTurn.status === 'READY_TO_COMMIT' && data.authoringTurn.candidateHash}
+					<form method="POST" action="?/acceptAgentCandidate" use:enhance>
+						<input type="hidden" name="candidateHash" value={data.authoringTurn.candidateHash} />
+						<button class="primary small" type="submit" disabled={running}>Accept exact candidate</button>
+					</form>
+				{/if}
+				<form method="POST" action="?/discardAgentCandidate" use:enhance>
+					<button class="ghost small danger" type="submit" disabled={running}>Discard candidate</button>
+				</form>
+			</div>
+		</section>
+	{/if}
 
 	<div class="canvas">
 		<div class="flowarea">
@@ -869,7 +917,7 @@
 				</div>
 			</Panel>
 
-			{#if editable}
+			{#if isDraft}
 				<Panel position="top-left">
 					<section
 						class="agentpanel"
@@ -1469,6 +1517,40 @@
 		display: flex;
 		flex-direction: column;
 		overflow: hidden;
+	}
+	.candidatebanner {
+		display: flex;
+		align-items: center;
+		justify-content: space-between;
+		gap: 1rem;
+		padding: 0.55rem 0.9rem;
+		border-bottom: 1px solid rgba(250, 204, 21, 0.42);
+		background: rgba(113, 63, 18, 0.36);
+		color: #fef3c7;
+	}
+	.candidatecopy {
+		display: flex;
+		min-width: 0;
+		align-items: baseline;
+		gap: 0.7rem;
+	}
+	.candidatemeta {
+		color: #fde68a;
+		font-size: 0.78rem;
+		white-space: nowrap;
+	}
+	.candidatecopy code {
+		overflow: hidden;
+		max-width: 21rem;
+		color: #fef9c3;
+		font-size: 0.7rem;
+		text-overflow: ellipsis;
+		white-space: nowrap;
+	}
+	.candidateactions {
+		display: flex;
+		flex: none;
+		gap: 0.45rem;
 	}
 	.topbar {
 		flex: 0 0 auto;

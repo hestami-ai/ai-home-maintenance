@@ -4,7 +4,13 @@
 // PWA-AGNOSTIC mechanism: the Product Realization PWA (or any PWA) is loaded as versioned DATA and INJECTED by
 // the composition root — the engine does not import or default to any specific PWA. Downstream surfaces consume
 // ONLY this seam; they never reach into the individual packages.
-import { Engine, type BatchResult, type EventSubscriber } from '@janumipwb/rph-application';
+import {
+	Engine,
+	type BatchResult,
+	type EventSubscriber,
+	type ObjectPostcondition,
+	type RevisionPrecondition
+} from '@janumipwb/rph-application';
 import type {
 	AssessmentCriterion,
 	CommandResult,
@@ -12,7 +18,7 @@ import type {
 	DomainEvent,
 	Frozen
 } from '@janumipwb/rph-contracts';
-import { SqliteStorageAdapter } from '@janumipwb/rph-persistence';
+import { SnapshotOverlayStorageAdapter, SqliteStorageAdapter } from '@janumipwb/rph-persistence';
 import type { Logger, StorageAdapter, StoredObject } from '@janumipwb/rph-ports';
 
 /** A structural issue found while validating a loaded PWA ontology (mirrors the PWA package's OntologyIssue). */
@@ -83,12 +89,24 @@ export interface EngineHandle {
 	dispatch(command: DomainCommand): CommandResult;
 	/** Dispatch several commands atomically (all-or-nothing) — for multi-step authoring / agent proposals. */
 	dispatchBatch(commands: readonly DomainCommand[]): BatchResult;
+	/** Atomically verify a captured revision vector and replay the complete command batch. */
+	dispatchBatchGuarded(
+		commands: readonly DomainCommand[],
+		preconditions: readonly RevisionPrecondition[],
+		expectedEventCount?: number,
+		postconditions?: readonly ObjectPostcondition[]
+	): BatchResult;
 	subscribe(handler: EventSubscriber): void;
 	drainOutbox(): number;
 	/** Read the current materialized state of an object by id (undefined if absent). */
 	loadObject(id: string): StoredObject | undefined;
 	/** The full append-only event log (for rebuildable projections / replay-equivalence checks). */
 	readAllEvents(): DomainEvent[];
+	/**
+	 * Create a point-in-time, isolated engine fork. Commands exercise the same handlers and invariants but write only
+	 * to an overlay; closing or abandoning the fork cannot mutate this engine's canonical state.
+	 */
+	fork(): EngineHandle;
 	readonly ontology: EngineOntology;
 	/** Release the underlying storage (closes the sqlite connection). */
 	close(): void;
@@ -128,10 +146,17 @@ export function createEngine(deps: CreateEngineDeps): EngineHandle {
 	return {
 		dispatch: (command) => engine.dispatch(command),
 		dispatchBatch: (commands) => engine.dispatchBatch(commands),
+		dispatchBatchGuarded: (commands, preconditions, expectedEventCount, postconditions) =>
+			engine.dispatchBatchGuarded(commands, preconditions, expectedEventCount, postconditions),
 		subscribe: (handler) => engine.subscribe(handler),
 		drainOutbox: () => engine.drainOutbox(),
 		loadObject: (id) => store.loadObject(id),
 		readAllEvents: () => store.readAllEvents(),
+		fork: () =>
+			createEngine({
+				...deps,
+				store: new SnapshotOverlayStorageAdapter(store)
+			}),
 		ontology,
 		close: () => store.close()
 	};

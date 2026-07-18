@@ -40,6 +40,12 @@ import {
 	type UiCommandInput
 } from '$lib/server/workbench';
 import { loadPwaFloor } from '$lib/server/floor';
+import {
+	commitAuthoringTurn,
+	discardAuthoringTurn,
+	getPendingAuthoringTurn,
+	summarizeAuthoringTurn
+} from '$lib/server/authoring-turn';
 import type { Actions, PageServerLoad } from './$types';
 
 /** The durable authoring transcript, mapped to the agent-log render shape the page consumes. */
@@ -64,11 +70,13 @@ function toLogEntry(e: ConversationEntry): LogEntry {
 }
 
 export const load: PageServerLoad = ({ params }) => {
-	const engine = getEngine();
+	const canonicalEngine = getEngine();
+	const candidate = getPendingAuthoringTurn(params.id);
+	const engine = candidate?.engine ?? canonicalEngine;
 	const pwa = getObject(engine, params.id);
 	if (!pwa) throw error(404, 'PWA not found');
 	// Conformance fixtures (§13/§21): Undertakings instantiated from this PWA that serve as reference fixtures.
-	const fixtures = listUndertakings(engine)
+	const fixtures = listUndertakings(canonicalEngine)
 		.filter((u) => u.state.pwaId === params.id)
 		.map((u) => ({
 			id: u.id,
@@ -100,7 +108,7 @@ export const load: PageServerLoad = ({ params }) => {
 	}));
 	// The engine's Assurance Policy library (real ASSURANCE_POLICY objects): the manager lists these, the PWU-type
 	// picker offers the ACTIVE non-floor ones, and the rail resolves ids to names. Floor policies are flagged locked.
-	const policies = listAssurancePolicies(getEngine()).map((p) => ({
+	const policies = listAssurancePolicies(engine).map((p) => ({
 		id: p.id,
 		name: String((p.state.name ?? p.id) as string),
 		purpose: String((p.state.purpose ?? '') as string),
@@ -144,11 +152,14 @@ export const load: PageServerLoad = ({ params }) => {
 		policies,
 		// §9.7: private chain-of-thought never enters a default or shared projection. New turns no longer record it
 		// (the agent route drops it at the write boundary), and this filter keeps any pre-rule row out of the view.
-		conversation: loadConversation(params.id)
+		conversation: loadConversation(params.id, engine)
 			.filter((e) => e.kind !== 'thinking')
 			.map(toLogEntry),
 		// The latest recorded assurance floor for this PWA (canonical ASSURANCE_ASSESSMENT/OBSERVATION).
-		floor: loadPwaFloor(params.id)
+		floor: loadPwaFloor(params.id, engine),
+		// A pending fork is a PREVIEW. The graph/transcript/floor above read it, while this flag makes the authority
+		// boundary explicit to the browser and supplies the exact hash required by the accept action.
+		authoringTurn: candidate ? summarizeAuthoringTurn(candidate) : undefined
 	};
 };
 
@@ -256,6 +267,39 @@ function advancePwa(commandType: string, pwaId: string, payload: Record<string, 
 }
 
 export const actions: Actions = {
+	// Explicit human acceptance of the exact assured preview. The manager performs the revision/event-position guard,
+	// command replay, and resultant-state postconditions in one canonical transaction.
+	acceptAgentCandidate: async ({ request, params }) => {
+		const turn = getPendingAuthoringTurn(params.id);
+		if (!turn) return fail(404, { error: 'No staged agent candidate exists.' });
+		const acceptedHash = String(
+			((await request.formData()).get('candidateHash') ?? '') as string
+		).trim();
+		try {
+			const result = commitAuthoringTurn(turn, acceptedHash);
+			if (!result.ok) return fail(409, { error: result.detail, candidateStatus: result.status });
+			return { acceptedCandidate: result.candidateHash };
+		} catch (error_) {
+			return fail(409, {
+				error: error_ instanceof Error ? error_.message : String(error_)
+			});
+		}
+	},
+
+	// Pre-commit rollback is discard of the overlay, not Event deletion or semantic compensation.
+	discardAgentCandidate: ({ params }) => {
+		try {
+			if (!discardAuthoringTurn(params.id)) {
+				return fail(404, { error: 'No staged agent candidate exists.' });
+			}
+			return { discardedCandidate: true };
+		} catch (error_) {
+			return fail(409, {
+				error: error_ instanceof Error ? error_.message : String(error_)
+			});
+		}
+	},
+
 	// Edit the DRAFT PWA's own details (name/description/domain).
 	editDetails: async ({ request, params }) => {
 		const form = await request.formData();

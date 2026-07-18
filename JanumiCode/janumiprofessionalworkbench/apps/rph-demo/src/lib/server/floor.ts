@@ -75,15 +75,17 @@ export interface FloorProducer {
 	readonly providerId: string;
 }
 
+export interface FloorObservationView {
+	readonly code: string;
+	readonly severity: string;
+	readonly statement: string;
+}
+
 export interface FloorPolicyView {
 	readonly policyId: string;
 	readonly disposition: string;
 	readonly independenceOk: boolean;
-	readonly observations: {
-		readonly code: string;
-		readonly severity: string;
-		readonly statement: string;
-	}[];
+	readonly observations: FloorObservationView[];
 }
 export interface FloorView {
 	readonly subjectId: string;
@@ -92,8 +94,121 @@ export interface FloorView {
 	/** True iff an EFFECTIVE governance WAIVER covers the subject — publication is permitted despite the floor. */
 	readonly waived: boolean;
 	readonly policies: FloorPolicyView[];
-	/** Open Reasoning-Review finding statements — drive the auto-refine directive and the UI gap list. */
+	/** Open Reasoning-Review observation statements for display. Remediation decisions MUST use the structured
+	 *  policy/observation fields above: this list also contains operational findings when review execution fails. */
 	readonly reasoningGaps: string[];
+}
+
+/** The authoring-plane response to an unsatisfied floor. Only a valid Reasoning Review finding about the reviewed
+ *  subject may be sent back to the producing agent. Validator availability, execution, output-boundary, and
+ *  independence failures are assurance-control failures; asking the producer to edit the graph in response would
+ *  hide the failed control behind unrelated semantic mutation. */
+export type FloorRemediationAction =
+	| 'NONE'
+	| 'REFINE_SUBJECT'
+	| 'RETRY_OR_CONFIGURE_REVIEWER'
+	| 'CHANGE_REVIEWER'
+	| 'ESCALATE_REVIEW'
+	| 'RESOLVE_OTHER_FLOOR_FINDINGS';
+
+export interface FloorRemediation {
+	readonly action: FloorRemediationAction;
+	readonly autoRefine: boolean;
+	/** Structured, valid subject findings that may be given to the authoring agent. Never operational failures. */
+	readonly findings: readonly FloorObservationView[];
+	/** Human/operator guidance. The route emits this verbatim after the fail-closed floor result. */
+	readonly guidance: string;
+}
+
+const OPERATIONAL_REVIEW_CODES = new Set(['VALIDATOR_EXECUTION_FAILED', 'INDEPENDENCE_VIOLATION']);
+
+/** Classify remediation from policy identity, disposition, independence, and observation CODES — never prose.
+ *
+ * `VALIDATOR_EXECUTION_FAILED` covers missing host configuration and external process/provider failures alike. The
+ * exact operational diagnosis remains in the recorded observation, but all such cases have the same safe authoring
+ * response: preserve the subject, repair/retry/change the independent Validator, and keep publication blocked.
+ */
+export function classifyFloorRemediation(floor: FloorView): FloorRemediation {
+	if (floor.satisfied) {
+		return { action: 'NONE', autoRefine: false, findings: [], guidance: '' };
+	}
+
+	const review = floor.policies.find((p) => p.policyId === FLOOR_POLICY_IDS.REASONING_REVIEW);
+	if (!review) {
+		return {
+			action: 'RETRY_OR_CONFIGURE_REVIEWER',
+			autoRefine: false,
+			findings: [],
+			guidance:
+				'PublishPwa remains blocked because the mandatory Reasoning Review did not produce a policy result. Configure or register a permitted independent reviewer, then rerun assurance. Do not revise the PWA or record a waiver in response to the missing review.'
+		};
+	}
+
+	const executionFailure = review.observations.some((o) => o.code === 'VALIDATOR_EXECUTION_FAILED');
+	if (executionFailure) {
+		return {
+			action: 'RETRY_OR_CONFIGURE_REVIEWER',
+			autoRefine: false,
+			findings: [],
+			guidance:
+				'PublishPwa remains blocked because the mandatory Reasoning Review did not execute. Configure or retry the reviewer; if it remains unavailable, change to a permitted independent validator and rerun assurance. Do not revise the PWA or record a waiver in response to this execution failure.'
+		};
+	}
+
+	if (
+		!review.independenceOk ||
+		review.observations.some((o) => o.code === 'INDEPENDENCE_VIOLATION')
+	) {
+		return {
+			action: 'CHANGE_REVIEWER',
+			autoRefine: false,
+			findings: [],
+			guidance:
+				'PublishPwa remains blocked because the mandatory Reasoning Review was not independent of the producer. Select a permitted reviewer/model/provider that satisfies the policy independence rule, then rerun assurance. Do not revise the PWA or record a waiver in response to this independence failure.'
+		};
+	}
+
+	if (review.disposition === 'ESCALATED') {
+		return {
+			action: 'ESCALATE_REVIEW',
+			autoRefine: false,
+			findings: [],
+			guidance:
+				'PublishPwa remains blocked because the mandatory Reasoning Review was escalated. Route the recorded review to the governed human or alternate independent-review path, then rerun assurance; an automatic subject edit cannot substitute for the escalation.'
+		};
+	}
+
+	const subjectFindings = review.observations.filter((o) => !OPERATIONAL_REVIEW_CODES.has(o.code));
+	if (review.disposition !== 'SATISFIED' && subjectFindings.length > 0) {
+		return {
+			action: 'REFINE_SUBJECT',
+			autoRefine: true,
+			findings: subjectFindings,
+			guidance:
+				'PublishPwa remains blocked while valid Reasoning Review findings are open. Revise the reviewed PWA graph and/or its recorded professional rationale as the coded findings require, then rerun assurance.'
+		};
+	}
+
+	// An unsatisfied/rejected/inconclusive review with no valid subject observations is not an instruction to mutate
+	// the subject. It can arise from a missing or boundary-rejected Validator result whose prose is deliberately not
+	// interpreted here. Treat it as an assurance-control problem and keep the gate closed.
+	if (review.disposition !== 'SATISFIED') {
+		return {
+			action: 'RETRY_OR_CONFIGURE_REVIEWER',
+			autoRefine: false,
+			findings: [],
+			guidance:
+				'PublishPwa remains blocked because the mandatory Reasoning Review is incomplete but produced no valid subject finding. Inspect the recorded policy result, configure or change the reviewer as needed, and rerun assurance. Do not revise the PWA or record a waiver merely to clear an incomplete review.'
+		};
+	}
+
+	return {
+		action: 'RESOLVE_OTHER_FLOOR_FINDINGS',
+		autoRefine: false,
+		findings: [],
+		guidance:
+			'PublishPwa remains blocked by non-review assurance findings. Resolve the coded schema, invariant, identity, or provenance findings and rerun the assurance floor.'
+	};
 }
 
 /**
@@ -153,14 +268,16 @@ export async function runPwaFloor(
 		/** The §9.7 contracted account the producer RETURNED. Undefined = it declared none; the Validator records
 		 *  that shortfall rather than inferring anything from the silence. */
 		rationale?: ProfessionalRationaleSummary;
+		/** Exact app-local semantic hash of the PWA/PWU-Type candidate reviewed in this run. */
+		candidateSubjectHash?: string;
 		/** The producer's observable narration — §8.4 admits "other observable trace data". Never its interior. */
 		narration?: string;
 		priorGaps?: string[];
-	}
+	},
+	engine: EngineHandle = getEngine()
 ): Promise<FloorView | undefined> {
-	const engine = getEngine();
 	const pwa = getObject(engine, pwaId);
-	const graphExport = buildPwaExport(pwaId);
+	const graphExport = buildPwaExport(pwaId, engine);
 	if (!pwa || !graphExport) return undefined;
 	const report = analyzePwaGraph(graphExport);
 	const subject: AssuranceSubject = {
@@ -178,9 +295,12 @@ export async function runPwaFloor(
 		identityProvenance: identityProvenanceFactsOf(pwa, opts.producer),
 		reasoningReview: {
 			// The POLICY's criteria, read from the store — not a constant. See reasoningReviewCriteria().
-			criteria: reasoningReviewCriteria(getEngine()),
+			criteria: reasoningReviewCriteria(engine),
 			prompt: opts.prompt,
-			content: JSON.stringify(graphExport),
+			content: JSON.stringify({
+				...graphExport,
+				...(opts.candidateSubjectHash ? { candidateSubjectHash: opts.candidateSubjectHash } : {})
+			}),
 			// §8.4 orders what Reasoning Review reviews: the contracted rationale summary FIRST, then outputs and
 			// tool records, then other observable trace data. Both are passed through unconditionally — §9.7
 			// forbids treating presence or absence as a signal, and a constant-shape input is also what makes the
@@ -198,7 +318,9 @@ export async function runPwaFloor(
 	recordAssuranceRecordingPlan(engine, plan, {
 		actor: FLOOR_ACTOR,
 		issuedAt: hostNow(),
-		correlationId: 'authoring-floor',
+		correlationId: opts.candidateSubjectHash
+			? `authoring-floor:${opts.candidateSubjectHash}`
+			: 'authoring-floor',
 		idPrefix: mintUiId('floorrun'),
 		newId: (prefix) => mintUiId(prefix)
 	});
@@ -278,8 +400,10 @@ function floorAggregate(satisfied: boolean, policies: FloorPolicyView[]): string
 
 /** The latest recorded floor outcome for a PWA, read back from the canonical ASSURANCE_ASSESSMENT/OBSERVATION
  *  objects (the read surface the UI renders). Undefined if no floor has been recorded for the subject yet. */
-export function loadPwaFloor(pwaId: string): FloorView | undefined {
-	const engine = getEngine();
+export function loadPwaFloor(
+	pwaId: string,
+	engine: EngineHandle = getEngine()
+): FloorView | undefined {
 	const latest = latestFloorAssessments(engine, pwaId);
 	if (latest.size === 0) return undefined;
 	const obsByAssessment = observationsByAssessment(engine, pwaId);

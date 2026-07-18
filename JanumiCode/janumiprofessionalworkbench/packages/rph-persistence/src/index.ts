@@ -7,3 +7,4 @@ export { createSqliteDriver } from './sql-driver.js';
 export type { SqlDriver, SqlStatement, SqlRunResult } from './sql-driver.js';
 export { SCHEMA_SQL } from './schema.js';
 export { SqliteStorageAdapter } from './sqlite-storage-adapter.js';
+export { SnapshotOverlayStorageAdapter } from './snapshot-overlay-storage-adapter.js';

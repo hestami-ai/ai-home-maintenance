@@ -6,6 +6,7 @@
 import {
 	lintComposition,
 	type CardinalityCode,
+	type LinkTypesInput,
 	type PwaAuthoringBroker,
 	type ProposalResult
 } from '@janumipwb/rph-authoring';
@@ -18,9 +19,12 @@ const CARDINALITY_CODES: ReadonlySet<CardinalityCode> = new Set(['M1', 'M+', 'C1
 function str(v: unknown): string {
 	return typeof v === 'string' ? v : '';
 }
-/** Coerce an agent-supplied cardinality string to a valid code, defaulting anything else to M1 (mandatory-one). */
+/** Convert a cardinality after the user-facing tool has validated it. */
 function asCardinality(v: unknown): CardinalityCode {
-	return CARDINALITY_CODES.has(v as CardinalityCode) ? (v as CardinalityCode) : 'M1';
+	if (!CARDINALITY_CODES.has(v as CardinalityCode)) {
+		throw new Error(`Invalid cardinality ${String(v)}.`);
+	}
+	return v as CardinalityCode;
 }
 function bool(v: unknown): boolean {
 	return v === true || v === 'true';
@@ -273,6 +277,19 @@ export function buildAuthoringTools(
 			mutates: true,
 			run: (a) => {
 				const rawTypes = Array.isArray(a.types) ? (a.types as Record<string, unknown>[]) : [];
+				for (const [typeIndex, rawType] of rawTypes.entries()) {
+					const childCardinalities = Array.isArray(rawType.childCardinalities)
+						? (rawType.childCardinalities as Record<string, unknown>[])
+						: [];
+					for (const [ruleIndex, rule] of childCardinalities.entries()) {
+						if (!CARDINALITY_CODES.has(rule.cardinality as CardinalityCode)) {
+							return {
+								ok: false,
+								summary: `Rejected: types[${typeIndex}].childCardinalities[${ruleIndex}].cardinality must be one of M1, M+, C1, or C+.`
+							};
+						}
+					}
+				}
 				const specs = rawTypes.map((o) => ({
 					tempKey: str(o.tempKey),
 					name: str(o.name),
@@ -480,17 +497,40 @@ export function buildAuthoringTools(
 		{
 			name: 'link_types',
 			description:
-				'Add a "permits" (composition) edge parent → child: declare that the child type may be decomposed UNDER the parent in the graph. Idempotent.',
+				'Add or update a "permits" (composition) edge parent → child: declare that the child type may be decomposed UNDER the parent in the graph, with its cardinality and conditional applicability. Updating one edge preserves every other child rule. Idempotent when the effective rule is unchanged.',
 			parameters: {
 				parentPwuTypeId: { type: 'string', description: 'The parent type id.', required: true },
-				childPwuTypeId: { type: 'string', description: 'The child type id.', required: true }
+				childPwuTypeId: { type: 'string', description: 'The child type id.', required: true },
+				cardinality: {
+					type: 'string',
+					description:
+						'M1 mandatory-exactly-one, M+ mandatory-one-or-more, C1 conditional-zero-or-one, C+ conditional-zero-or-more. A new edge defaults to M1; omission on an existing edge preserves its current cardinality.'
+				},
+				applicabilityNote: {
+					type: 'string',
+					description:
+						'For conditional (C*) children: free-text WHEN this child applies. Omission preserves an existing note; an empty string clears it.'
+				}
 			},
 			mutates: true,
-			run: (a) =>
-				fromProposal(
-					broker.linkTypes(str(a.parentPwuTypeId), str(a.childPwuTypeId)),
+			run: (a) => {
+				if ('cardinality' in a && !CARDINALITY_CODES.has(a.cardinality as CardinalityCode)) {
+					return {
+						ok: false,
+						summary: 'Rejected: cardinality must be one of M1, M+, C1, or C+.'
+					};
+				}
+				const input: LinkTypesInput = {
+					...('cardinality' in a ? { cardinality: asCardinality(a.cardinality) } : {}),
+					...('applicabilityNote' in a
+						? { applicabilityNote: str(a.applicabilityNote).trim() }
+						: {})
+				};
+				return fromProposal(
+					broker.linkTypes(str(a.parentPwuTypeId), str(a.childPwuTypeId), input),
 					`Linked ${str(a.parentPwuTypeId)} → ${str(a.childPwuTypeId)}.`
-				)
+				);
+			}
 		},
 		{
 			name: 'unlink_types',

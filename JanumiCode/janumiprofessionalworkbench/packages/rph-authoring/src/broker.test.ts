@@ -4,7 +4,8 @@
 import type { DomainCommand } from '@janumipwb/rph-contracts';
 import { createEngine, type EngineHandle } from '@janumipwb/rph-engine';
 import { ontology } from '@janumipwb/rph-product-realization-pwa';
-import { beforeEach, describe, expect, it } from 'vitest';
+import { monotonicFactory } from 'ulid';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { PwaAuthoringBroker } from './broker.js';
 
 const TS = '2026-07-12T00:00:00Z';
@@ -208,6 +209,59 @@ describe('PwaAuthoringBroker — the LLM-agnostic PWA-authoring capability layer
 		expect(broker.getType(parent)!.permittedChildTypeIds).toEqual([]);
 	});
 
+	it('adds and updates link cardinality/applicability without dropping sibling child rules', () => {
+		const parent = broker.defineType({ name: 'Root', pwuKind: 'ROOT', isRoot: true }).id!;
+		const delivery = broker.defineType({ name: 'Delivery', pwuKind: 'DELIVERY' }).id!;
+		const compliance = broker.defineType({ name: 'Compliance', pwuKind: 'COMPLIANCE' }).id!;
+
+		expect(broker.linkTypes(parent, delivery, { cardinality: 'M+' }).ok).toBe(true);
+		expect(
+			broker.linkTypes(parent, compliance, {
+				cardinality: 'C1',
+				applicabilityNote: 'Only for regulated products.'
+			}).ok
+		).toBe(true);
+		expect(
+			broker.linkTypes(parent, delivery, {
+				cardinality: 'C+',
+				applicabilityNote: 'When more than one deployment train is required.'
+			}).ok
+		).toBe(true);
+
+		const updated = broker.getType(parent)!;
+		expect(updated.permittedChildTypeIds).toEqual([delivery, compliance]);
+		expect(updated.permittedChildren).toEqual([
+			{
+				typeId: delivery,
+				cardinality: 'C+',
+				applicabilityNote: 'When more than one deployment train is required.'
+			},
+			{
+				typeId: compliance,
+				cardinality: 'C1',
+				applicabilityNote: 'Only for regulated products.'
+			}
+		]);
+
+		// Omission preserves an existing rule; an unchanged explicit update is also a no-op.
+		expect(broker.linkTypes(parent, delivery).status).toBe('DUPLICATE');
+		expect(
+			broker.linkTypes(parent, compliance, {
+				cardinality: 'C1',
+				applicabilityNote: 'Only for regulated products.'
+			}).status
+		).toBe('DUPLICATE');
+
+		expect(broker.unlinkTypes(parent, delivery).ok).toBe(true);
+		expect(broker.getType(parent)!.permittedChildren).toEqual([
+			{
+				typeId: compliance,
+				cardinality: 'C1',
+				applicabilityNote: 'Only for regulated products.'
+			}
+		]);
+	});
+
 	it('refuses to link unknown types or a type to itself', () => {
 		const a = broker.defineType({ name: 'A', pwuKind: 'A' }).id!;
 		expect(broker.linkTypes(a, a).ok).toBe(false);
@@ -248,6 +302,128 @@ describe('PwaAuthoringBroker — the LLM-agnostic PWA-authoring capability layer
 		expect(root.permittedChildTypeIds).toEqual([r.ids!.arch!]);
 	});
 
+	it('atomically scaffolds a full SDLC graph with unique ULIDs during a same-millisecond burst', () => {
+		const frozenTime = Date.parse(TS);
+		const sameMillisecondUlid = monotonicFactory();
+		const fullBroker = new PwaAuthoringBroker({
+			engine,
+			pwaId: PWA,
+			mintId: (prefix) => `${prefix}_${sameMillisecondUlid(frozenTime)}`,
+			now: () => TS,
+			sessionId: 'full-sdlc-scaffold'
+		});
+		const dispatchBatch = vi.spyOn(engine, 'dispatchBatch');
+
+		const r = fullBroker.scaffold([
+			{
+				tempKey: 'sdlc',
+				name: 'Full Software Development Lifecycle',
+				pwuKind: 'SDLC',
+				isRoot: true,
+				childTempKeys: [
+					'discovery',
+					'planning',
+					'requirements',
+					'architecture',
+					'implementation',
+					'verification',
+					'release',
+					'operations'
+				],
+				childCardinalities: [
+					{ tempKey: 'implementation', cardinality: 'M+' },
+					{ tempKey: 'operations', cardinality: 'M+' }
+				]
+			},
+			{
+				tempKey: 'discovery',
+				name: 'Product Discovery',
+				pwuKind: 'DISCOVERY',
+				childTempKeys: ['feasibility'],
+				childCardinalities: [
+					{
+						tempKey: 'feasibility',
+						cardinality: 'C1',
+						applicabilityNote: 'Required when material technical or commercial uncertainty exists.'
+					}
+				]
+			},
+			{ tempKey: 'feasibility', name: 'Feasibility Assessment', pwuKind: 'FEASIBILITY' },
+			{ tempKey: 'planning', name: 'Delivery Planning', pwuKind: 'PLANNING' },
+			{
+				tempKey: 'requirements',
+				name: 'Requirements Definition',
+				pwuKind: 'REQUIREMENTS',
+				childTempKeys: ['ux']
+			},
+			{ tempKey: 'ux', name: 'User Experience Definition', pwuKind: 'UX_DEFINITION' },
+			{
+				tempKey: 'architecture',
+				name: 'Architecture Definition',
+				pwuKind: 'ARCHITECTURE',
+				childTempKeys: ['security']
+			},
+			{ tempKey: 'security', name: 'Security Design', pwuKind: 'SECURITY_DESIGN' },
+			{
+				tempKey: 'implementation',
+				name: 'Product Implementation',
+				pwuKind: 'IMPLEMENTATION',
+				childTempKeys: ['integration']
+			},
+			{ tempKey: 'integration', name: 'Continuous Integration', pwuKind: 'INTEGRATION' },
+			{ tempKey: 'verification', name: 'Verification and Validation', pwuKind: 'VERIFICATION' },
+			{ tempKey: 'release', name: 'Release and Deployment', pwuKind: 'RELEASE' },
+			{
+				tempKey: 'operations',
+				name: 'Operations and Maintenance',
+				pwuKind: 'OPERATIONS',
+				childTempKeys: ['improvement']
+			},
+			{ tempKey: 'improvement', name: 'Continuous Improvement', pwuKind: 'IMPROVEMENT' }
+		]);
+
+		expect(r.ok, r.error).toBe(true);
+		expect(dispatchBatch).toHaveBeenCalledTimes(1);
+		expect(dispatchBatch.mock.calls[0]![0]).toHaveLength(14);
+
+		const ids = Object.values(r.ids!);
+		expect(ids).toHaveLength(14);
+		expect(new Set(ids).size).toBe(14);
+		for (const id of ids) expect(id).toMatch(/^pwut_[0-9A-HJKMNP-TV-Z]{26}$/);
+
+		const types = fullBroker.listTypes();
+		expect(types).toHaveLength(14);
+		expect(new Set(types.map((type) => type.id))).toEqual(new Set(ids));
+		expect(types.reduce((count, type) => count + type.permittedChildTypeIds.length, 0)).toBe(13);
+
+		const root = fullBroker.getType(r.ids!.sdlc!)!;
+		expect(root.permittedChildTypeIds).toEqual([
+			r.ids!.discovery,
+			r.ids!.planning,
+			r.ids!.requirements,
+			r.ids!.architecture,
+			r.ids!.implementation,
+			r.ids!.verification,
+			r.ids!.release,
+			r.ids!.operations
+		]);
+		expect(
+			root.permittedChildren.find((rule) => rule.typeId === r.ids!.implementation)
+		).toMatchObject({
+			cardinality: 'M+'
+		});
+		expect(fullBroker.getType(r.ids!.discovery!)!.permittedChildren).toEqual([
+			{
+				typeId: r.ids!.feasibility,
+				cardinality: 'C1',
+				applicabilityNote: 'Required when material technical or commercial uncertainty exists.'
+			}
+		]);
+		expect(fullBroker.getType(r.ids!.operations!)!.permittedChildTypeIds).toEqual([
+			r.ids!.improvement
+		]);
+	});
+
 	it('scaffold is all-or-nothing: one bad spec rolls back the whole batch', () => {
 		const r = broker.scaffold([
 			{ tempKey: 'ok', name: 'Fine', pwuKind: 'FINE' },
@@ -255,6 +431,28 @@ describe('PwaAuthoringBroker — the LLM-agnostic PWA-authoring capability layer
 		]);
 		expect(r.ok).toBe(false);
 		expect(broker.listTypes()).toEqual([]); // nothing committed
+	});
+
+	it('scaffold rejects duplicate host-minted ids before dispatching any command', () => {
+		const duplicateId = 'pwut_00000000000000000000000000';
+		const dispatchBatch = vi.spyOn(engine, 'dispatchBatch');
+		const collisionBroker = new PwaAuthoringBroker({
+			engine,
+			pwaId: PWA,
+			mintId: () => duplicateId,
+			now: () => TS,
+			sessionId: 'collision-test'
+		});
+		const r = collisionBroker.scaffold([
+			{ tempKey: 'root', name: 'Root', pwuKind: 'ROOT', isRoot: true },
+			{ tempKey: 'child', name: 'Child', pwuKind: 'CHILD' }
+		]);
+
+		expect(r).toMatchObject({ ok: false, status: 'ID_COLLISION' });
+		expect(r.error).toContain(duplicateId);
+		expect(r.error).toMatch(/No commands were dispatched/);
+		expect(dispatchBatch).not.toHaveBeenCalled();
+		expect(collisionBroker.listTypes()).toEqual([]);
 	});
 
 	it('scaffold rejects an unknown child temp key without committing', () => {

@@ -35,6 +35,7 @@
   },
   "devDependencies": {
     "@janumipwb/rph-product-realization-pwa": "workspace:*",
-    "@janumipwb/typescript-config": "workspace:*"
+    "@janumipwb/typescript-config": "workspace:*",
+    "ulid": "^2.3.0"
   }
 }

@@ -58,6 +58,8 @@ test.describe('PWA graph — structural validity report', () => {
 				}
 			]
 		});
+		await expect(page.getByTestId('authoring-candidate-banner')).toContainText('READY_TO_COMMIT');
+		await page.getByRole('button', { name: 'Accept exact candidate' }).click();
 
 		const { report } = await snapshotPwaGraph(request, 'valid-graph');
 		expect(report.valid, JSON.stringify(report.invariants)).toBe(true);
@@ -67,10 +69,7 @@ test.describe('PWA graph — structural validity report', () => {
 		expect(report.metrics.maxDepth).toBeGreaterThanOrEqual(2);
 	});
 
-	test('an unlinked type is caught as an orphan (connected invariant fails)', async ({
-		page,
-		request
-	}) => {
+	test('an unlinked type is caught as an orphan (connected invariant fails)', async ({ page }) => {
 		await openDraft(page, 'Orphan Graph PWA');
 		await runPlan(page, {
 			plan: [
@@ -86,9 +85,12 @@ test.describe('PWA graph — structural validity report', () => {
 			]
 		});
 
-		const { report } = await snapshotPwaGraph(request, 'orphan-graph');
-		expect(report.valid).toBe(false);
-		expect(report.invariants.find((i) => i.name === 'connected')!.ok).toBe(false);
-		expect(report.metrics.orphanCount).toBe(1);
+		// An invalid candidate is intentionally not commit-eligible, so assert the structured preview report rather
+		// than blurring it into canonical introspection.
+		const health = page.getByTestId('graph-health');
+		await expect(health).toHaveAttribute('data-graph-valid', 'false');
+		await expect(health).toHaveAttribute('data-orphan-count', '1');
+		await expect(health).toHaveAttribute('title', /connected/i);
+		await expect(page.getByTestId('authoring-candidate-banner')).toContainText('REVISION_REQUIRED');
 	});
 });

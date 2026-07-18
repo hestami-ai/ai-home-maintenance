@@ -3,8 +3,8 @@ import { resetEngine, introspect, gotoHydrated } from './support/harness';
 import { shot } from './support/gallery';
 
 // A3 — the agent chat (bottom) + reasoning log (left) on the node-graph, end to end IN THE BROWSER. A human types
-// an instruction; the page streams the agent's SSE run into the log and re-renders the graph live as each tool
-// commits. Test mode forces the deterministic mock agent, so a JSON plan drives an exact, reproducible run. Also
+// an instruction; the page streams the agent's SSE run into the log and re-renders the isolated preview as each tool
+// lands. Test mode forces the deterministic mock agent, so a JSON plan drives an exact, reproducible run. Also
 // proves concern 3: two types whose output/input artifact names match render a dashed data-flow (⤳) edge with no
 // explicit link.
 test.describe('PWA Designer — authoring agent chat + live graph', () => {
@@ -34,15 +34,34 @@ test.describe('PWA Designer — authoring agent chat + live graph', () => {
 		// "approved-behavior", which architecture REQUIRES as input) — so a data-flow edge must appear.
 		const plan = {
 			plan: [
-				{ tool: 'define_from_template', args: { templateKey: 'product-behavior', isRoot: true } },
-				{ tool: 'define_from_template', args: { templateKey: 'architecture' } }
+				{
+					tool: 'scaffold_graph',
+					args: {
+						types: [
+							{
+								tempKey: 'behavior',
+								name: 'Product Behavior Definition',
+								pwuKind: 'PRODUCT_BEHAVIOR',
+								isRoot: true,
+								requiredOutputs: ['approved-behavior'],
+								childTempKeys: ['architecture']
+							},
+							{
+								tempKey: 'architecture',
+								name: 'Architecture Definition',
+								pwuKind: 'ARCHITECTURE',
+								requiredInputs: ['approved-behavior']
+							}
+						]
+					}
+				}
 			]
 		};
 		await page.getByTestId('agent-input').fill(JSON.stringify(plan));
 		await page.getByRole('button', { name: 'Send' }).click();
 
 		// The reasoning log records the agent's tool activity.
-		await expect(page.getByTestId('agent-log')).toContainText('define_from_template');
+		await expect(page.getByTestId('agent-log')).toContainText('scaffold_graph');
 
 		// The graph re-rendered live: two nodes now exist (no manual reload).
 		await expect(page.locator('.svelte-flow__node')).toHaveCount(2);
@@ -53,7 +72,15 @@ test.describe('PWA Designer — authoring agent chat + live graph', () => {
 		await expect(page.locator('.svelte-flow')).toContainText('⤳');
 		await shot(page, 'graph built by agent');
 
-		// TRUTH: the engine recorded exactly the two types the agent proposed.
+		// The preview is clearly non-authoritative and canonical remains unchanged until exact acceptance.
+		const banner = page.getByTestId('authoring-candidate-banner');
+		await expect(banner).toContainText('READY_TO_COMMIT');
+		await expect(banner).toContainText('canonical DRAFT unchanged');
+		expect((await introspect(request)).pwuTypes).toEqual([]);
+		await page.getByRole('button', { name: 'Accept exact candidate' }).click();
+		await expect(banner).toBeHidden();
+
+		// TRUTH: one guarded commit recorded exactly the two accepted types.
 		const snap = await introspect(request);
 		const names = snap.pwuTypes.map((t) => String(t.state.name));
 		expect(names).toEqual(

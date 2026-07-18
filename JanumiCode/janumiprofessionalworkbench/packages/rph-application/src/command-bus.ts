@@ -16,6 +16,7 @@ import {
 	type DomainCommand,
 	type DomainEvent
 } from '@janumipwb/rph-contracts';
+import { contentHash } from '@janumipwb/rph-contracts/hash';
 import type { Logger, StorageAdapter } from '@janumipwb/rph-ports';
 import { NoopLogger } from '@janumipwb/rph-ports';
 import type { ZodType } from 'zod';
@@ -41,7 +42,37 @@ export interface BatchResult {
 	readonly ok: boolean;
 	readonly results: CommandResult[];
 	readonly failedIndex?: number;
+	/** Present when a guarded batch observed canonical state different from its captured revision vector. */
+	readonly guardConflict?: RevisionGuardConflict;
+	/** Present when replay succeeded but did not produce the exact candidate object state; the transaction rolled back. */
+	readonly postconditionConflict?: ObjectPostconditionConflict;
 }
+
+/** One serializable object precondition captured when an isolated candidate began. */
+export type RevisionPrecondition =
+	| { readonly aggregateId: string; readonly expectedRevision: number }
+	| { readonly aggregateId: string; readonly mustNotExist: true };
+
+export interface RevisionGuardConflict {
+	readonly aggregateId: string;
+	readonly expectedRevision: number | undefined;
+	readonly actualRevision: number | undefined;
+}
+
+/** Exact materialized-state expectation for an aggregate after candidate replay. */
+export interface ObjectPostcondition {
+	readonly aggregateId: string;
+	readonly expectedContentHash: string;
+}
+
+export interface ObjectPostconditionConflict {
+	readonly aggregateId: string;
+	readonly expectedContentHash: string;
+	readonly actualContentHash: string | undefined;
+}
+
+/** Internal marker to roll back a guarded batch whose deterministic replay diverged from its candidate. */
+class PostconditionAbort extends Error {}
 
 export class Engine {
 	private readonly store: StorageAdapter;
@@ -154,6 +185,71 @@ export class Engine {
 			return { ok: false, results, failedIndex };
 		}
 		return { ok: true, results };
+	}
+
+	/**
+	 * Verify a candidate's entire read/dependency revision vector and replay its commands in the SAME storage
+	 * transaction. This closes the check/commit race that an application-level preflight followed by
+	 * `dispatchBatch` would leave open. The command batch retains the ordinary all-or-nothing semantics.
+	 */
+	dispatchBatchGuarded(
+		commands: readonly DomainCommand[],
+		preconditions: readonly RevisionPrecondition[],
+		expectedEventCount?: number,
+		postconditions: readonly ObjectPostcondition[] = []
+	): BatchResult {
+		let conflict: RevisionGuardConflict | undefined;
+		let postconditionConflict: ObjectPostconditionConflict | undefined;
+		let result: BatchResult | undefined;
+		try {
+			this.store.transaction(() => {
+				if (expectedEventCount !== undefined) {
+					const actualEventCount = this.store.readAllEvents().length;
+					if (actualEventCount !== expectedEventCount) {
+						conflict = {
+							aggregateId: '@event-log',
+							expectedRevision: expectedEventCount,
+							actualRevision: actualEventCount
+						};
+						return;
+					}
+				}
+				for (const precondition of preconditions) {
+					const expectedRevision =
+						'mustNotExist' in precondition ? undefined : precondition.expectedRevision;
+					const actualRevision = this.store.loadObject(precondition.aggregateId)?.revision;
+					if (actualRevision !== expectedRevision) {
+						conflict = {
+							aggregateId: precondition.aggregateId,
+							expectedRevision,
+							actualRevision
+						};
+						return;
+					}
+				}
+				result = this.dispatchBatch(commands);
+				if (!result.ok) return;
+				for (const postcondition of postconditions) {
+					const actual = this.store.loadObject(postcondition.aggregateId);
+					const actualContentHash = actual ? contentHash(actual) : undefined;
+					if (actualContentHash !== postcondition.expectedContentHash) {
+						postconditionConflict = { ...postcondition, actualContentHash };
+						throw new PostconditionAbort();
+					}
+				}
+			});
+		} catch (error) {
+			if (!(error instanceof PostconditionAbort)) throw error;
+		}
+		if (conflict) return { ok: false, results: [], guardConflict: conflict };
+		if (postconditionConflict) {
+			return {
+				ok: false,
+				results: result?.results ?? [],
+				postconditionConflict
+			};
+		}
+		return result!;
 	}
 
 	/** Deliver pending outbox events to subscribers and mark them published. Returns the count drained. */

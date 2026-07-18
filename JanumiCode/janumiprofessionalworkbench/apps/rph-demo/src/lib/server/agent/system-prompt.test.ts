@@ -30,6 +30,10 @@ describe('buildSystemPrompt authoring-backbone boundaries', () => {
 		expect(prompt).toMatch(/reviews the resulting DRAFT after the fact/);
 		expect(prompt).toMatch(/not through a per-tool preview\/accept step/);
 		expect(prompt).toMatch(/scaffold_graph is atomic only within that one invocation/);
+		expect(prompt).toMatch(/link_types cardinality/);
+		expect(prompt).toMatch(/ID_COLLISION.*not a stale-read conflict/);
+		expect(prompt).toMatch(/do not refresh and retry the same unchanged create\/scaffold/);
+		expect(prompt).toMatch(/obtain the user's explicit acceptance first/);
 		expect(prompt).toContain(
 			'There is no staged preview, whole-turn transaction, semantic undo, or rollback'
 		);

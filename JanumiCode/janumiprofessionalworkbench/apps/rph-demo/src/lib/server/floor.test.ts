@@ -3,8 +3,8 @@
 // provenance, or an identified producer must fail its mandatory criterion. Mutation proof: revert any derived fact
 // below to a literal `true` and the matching case here goes red.
 import { describe, expect, it } from 'vitest';
-import { identityProvenanceFactsOf } from './floor.js';
-import type { FloorProducer } from './floor.js';
+import { classifyFloorRemediation, identityProvenanceFactsOf } from './floor.js';
+import type { FloorProducer, FloorView } from './floor.js';
 
 const PRODUCER: FloorProducer = {
 	agentId: 'authoring-agent',
@@ -43,5 +43,195 @@ describe('identityProvenanceFactsOf — §8.4 step 2 CHECKS the subject, never a
 	it('an unidentified producer (no agent id) fails IP-04', () => {
 		const anon: FloorProducer = { agentId: '', modelId: '', providerId: '' };
 		expect(identityProvenanceFactsOf(GOOD_PWA, anon).hasProducer).toBe(false);
+	});
+});
+
+const floorView = (overrides: Partial<FloorView> = {}): FloorView => ({
+	subjectId: 'pwa_01ARZ3NDEKTSV4RRFFQ69G5P00',
+	aggregate: 'INCONCLUSIVE',
+	satisfied: false,
+	waived: false,
+	policies: [],
+	reasoningGaps: [],
+	...overrides
+});
+
+const reviewPolicy = (
+	overrides: Partial<FloorView['policies'][number]> = {}
+): FloorView['policies'][number] => ({
+	policyId: 'floor.reasoning-review',
+	disposition: 'INCONCLUSIVE',
+	independenceOk: true,
+	observations: [],
+	...overrides
+});
+
+describe('classifyFloorRemediation — operational assurance failures never become graph edits', () => {
+	it('auto-refines a valid coded Reasoning Review subject finding', () => {
+		const finding = {
+			code: 'RR-02-no-obligation-elision',
+			severity: 'BLOCKING',
+			statement: 'A delegated deployment obligation is absent.'
+		};
+		const result = classifyFloorRemediation(
+			floorView({ policies: [reviewPolicy({ disposition: 'REJECTED', observations: [finding] })] })
+		);
+
+		expect(result.action).toBe('REFINE_SUBJECT');
+		expect(result.autoRefine).toBe(true);
+		expect(result.findings).toEqual([finding]);
+	});
+
+	it('uses VALIDATOR_EXECUTION_FAILED, not its graph-like statement, to require reviewer remediation', () => {
+		const result = classifyFloorRemediation(
+			floorView({
+				policies: [
+					reviewPolicy({
+						observations: [
+							{
+								code: 'VALIDATOR_EXECUTION_FAILED',
+								severity: 'MATERIAL',
+								statement: 'The graph omits deployment; set JPWB_JUDGE_MODEL.'
+							},
+							{
+								code: 'RR-02-no-obligation-elision',
+								severity: 'BLOCKING',
+								statement: 'This must not escape the failed review boundary.'
+							}
+						]
+					})
+				]
+			})
+		);
+
+		expect(result.action).toBe('RETRY_OR_CONFIGURE_REVIEWER');
+		expect(result.autoRefine).toBe(false);
+		expect(result.findings).toEqual([]);
+		expect(result.guidance).toMatch(/configure or retry the reviewer/i);
+		expect(result.guidance).toMatch(/do not revise the PWA or record a waiver/i);
+	});
+
+	it('requires a different reviewer for a structured independence violation', () => {
+		const result = classifyFloorRemediation(
+			floorView({
+				policies: [
+					reviewPolicy({
+						independenceOk: false,
+						observations: [
+							{
+								code: 'INDEPENDENCE_VIOLATION',
+								severity: 'BLOCKING',
+								statement: 'Producer and reviewer resolve to the same model.'
+							}
+						]
+					})
+				]
+			})
+		);
+
+		expect(result.action).toBe('CHANGE_REVIEWER');
+		expect(result.autoRefine).toBe(false);
+		expect(result.guidance).toMatch(/reviewer\/model\/provider/i);
+	});
+
+	it('treats a missing Reasoning Review policy result as fail-closed reviewer configuration work', () => {
+		const result = classifyFloorRemediation(
+			floorView({
+				policies: [
+					{
+						policyId: 'floor.schema-invariant',
+						disposition: 'SATISFIED',
+						independenceOk: true,
+						observations: []
+					}
+				]
+			})
+		);
+
+		expect(result.action).toBe('RETRY_OR_CONFIGURE_REVIEWER');
+		expect(result.autoRefine).toBe(false);
+		expect(result.guidance).toMatch(/did not produce a policy result/i);
+	});
+
+	it('does not invent a subject edit when an inconclusive review has no coded subject finding', () => {
+		const result = classifyFloorRemediation(
+			floorView({ policies: [reviewPolicy({ disposition: 'INCONCLUSIVE' })] })
+		);
+
+		expect(result.action).toBe('RETRY_OR_CONFIGURE_REVIEWER');
+		expect(result.autoRefine).toBe(false);
+	});
+
+	it('does not auto-refine an escalated review even when it carries a subject observation', () => {
+		const result = classifyFloorRemediation(
+			floorView({
+				policies: [
+					reviewPolicy({
+						disposition: 'ESCALATED',
+						observations: [
+							{
+								code: 'RR-06-sound-inference',
+								severity: 'BLOCKING',
+								statement: 'A governed human determination is required.'
+							}
+						]
+					})
+				]
+			})
+		);
+
+		expect(result.action).toBe('ESCALATE_REVIEW');
+		expect(result.autoRefine).toBe(false);
+		expect(result.findings).toEqual([]);
+	});
+
+	it('does not auto-refine advisory observations from a satisfied review', () => {
+		const result = classifyFloorRemediation(
+			floorView({
+				policies: [
+					reviewPolicy({
+						disposition: 'SATISFIED',
+						observations: [
+							{
+								code: 'RR-ADVISORY',
+								severity: 'ADVISORY',
+								statement: 'Optional clarification.'
+							}
+						]
+					})
+				]
+			})
+		);
+
+		expect(result.action).toBe('RESOLVE_OTHER_FLOOR_FINDINGS');
+		expect(result.autoRefine).toBe(false);
+	});
+
+	it('leaves non-review floor findings to their own remediation path', () => {
+		const result = classifyFloorRemediation(
+			floorView({
+				policies: [
+					reviewPolicy({ disposition: 'SATISFIED' }),
+					{
+						policyId: 'floor.identity-provenance',
+						disposition: 'REJECTED',
+						independenceOk: true,
+						observations: [
+							{ code: 'IP-03-provenance', severity: 'BLOCKING', statement: 'Missing provenance.' }
+						]
+					}
+				]
+			})
+		);
+
+		expect(result.action).toBe('RESOLVE_OTHER_FLOOR_FINDINGS');
+		expect(result.autoRefine).toBe(false);
+	});
+
+	it('requires no remediation after a satisfied floor', () => {
+		const result = classifyFloorRemediation(
+			floorView({ aggregate: 'SATISFIED', satisfied: true, policies: [reviewPolicy()] })
+		);
+		expect(result).toEqual({ action: 'NONE', autoRefine: false, findings: [], guidance: '' });
 	});
 });

@@ -14,12 +14,17 @@ additions to Janumi's canonical vocabulary.
 
 ## Scope and runtime boundary
 
-This increment is a PWA Designer and browser-projection increment. Its scope is deliberately limited to:
+This is an app-local PWA Designer, agent-authoring, and browser-projection increment. Its implemented scope now
+includes:
 
 - deriving a structural graph representation from server-provided PWA/PWU Type data;
 - laying out and rendering that representation through app-local adapters;
 - displaying a derived PWU work-lifecycle topology in a local simulator; and
-- maintaining presentation-only canvas interaction history.
+- maintaining presentation-only canvas interaction history;
+- hardening agent authoring against host-id collisions and semantic degradation during recovery;
+- preserving composition cardinality and conditional-applicability semantics across scaffold and incremental tools;
+- routing assurance execution/configuration failures separately from valid subject findings; and
+- providing an in-process foundation for isolated, previewable agent-turn candidates and guarded atomic replay.
 
 It does **not** introduce Temporal, a scheduler, a durable workflow engine, or a second execution authority. The
 platform runtime choice remains governed by accepted ADRs and the guide's current safe default (DBOS unless an
@@ -43,7 +48,35 @@ restart recreates the in-memory workbench. Nothing in this note upgrades that ho
 | Lifecycle topology | Projection of the canonical `PWU.workLifecycleState` transition table | Read-only topology; it cannot authorize a transition |
 | Lifecycle simulation | Local XState actor compiled from the topology projection | Ephemeral exploration, not PWU execution or persisted state |
 | Canvas undo/redo | Position-only graph diffs and inverse patches | Presentation history only |
-| Semantic mutation/rollback | Future accepted Commands, revision checks, durable staging, assurance, and provenance | Deliberately not supplied by canvas history or XState |
+| Agent-turn candidate | Point-in-time `EngineHandle.fork()` over a snapshot/overlay adapter | Isolated, in-process proposal context; not canonical state and not durable |
+| Candidate lifecycle | App-local XState machine plus `@statelyai/graph` inspection/path coverage | Governs the host workflow only; creates no canonical state vocabulary |
+| Candidate commit | Base-revision/event-position guard plus one canonical `dispatchBatchGuarded` replay | Reuses accepted Commands and engine authority; no new semantic authority |
+| Semantic mutation/rollback | Accepted Commands, exact revision checks, assurance, provenance, and future restore/compensation rules | Not supplied by canvas history, an engine fork, or XState |
+
+## Delivered authoring reliability controls
+
+The following fixes address concrete failures observed during a large natural-language PWA authoring turn:
+
+- `mintUiId` now uses one process-wide monotonic ULID factory in production. The deterministic E2E sequence remains
+  separate so tests stay reproducible. The broker also rejects duplicate or already-existing ids during scaffold
+  preflight with `ID_COLLISION` before it dispatches any Command.
+- `scaffold_graph` remains atomic within its single batch. `link_types` now accepts `M1`, `M+`, `C1`, or `C+` plus an
+  optional applicability note, and updating one relationship preserves sibling child rules. An incremental recovery
+  therefore has the vocabulary needed to preserve the scaffold's relationship semantics.
+- The agent instructions distinguish an id collision from a stale-revision conflict, forbid unchanged retry, and
+  require explicit user acceptance before replacing a failed atomic scaffold with semantically or transactionally
+  degraded live mutations.
+- Assurance remediation uses policy identity, disposition, independence, and observation codes. Only valid
+  Reasoning Review subject findings may trigger auto-refinement. `VALIDATOR_EXECUTION_FAILED`,
+  `INDEPENDENCE_VIOLATION`, missing results, escalation, and configuration/external failures remain fail-closed and
+  produce retry/configure/change-reviewer guidance rather than graph edits or waiver advice.
+- Before a host configuration that uses the real reviewer starts an isolated agent candidate, an app-local preflight
+  checks that `JPWB_JUDGE_MODEL` is pinned. This preflight does not invoke the reviewer or claim it is healthy; it only
+  avoids starting work when the mandatory review is already known to be unexecutable.
+
+These controls improve correctness and recovery behavior. The staged-turn layer below now prevents individual agent
+tools from becoming live canonical mutations, but it still does not provide a durable or post-commit reversible
+whole-turn transaction.
 
 ## Structural graph, layout, and rendering
 
@@ -125,11 +158,13 @@ Canvas undo/redo therefore does **not**:
 The controls and accessibility labels should say “Undo canvas move” and “Redo canvas move,” not unqualified
 “Undo” and “Redo.”
 
-## Semantic undo and whole-agent-turn rollback remain gated
+## Pre-commit discard is implemented; semantic undo remains gated
 
 Deleting a semantic node and moving a rendered card are different operations. Likewise, a broker `sessionId` that
-names command IDs is not a durable authoring session or a reversible transaction. The demo must not market semantic
-delete undo or whole-agent-turn rollback until accepted contracts cover all of the following:
+names command IDs is not, by itself, a durable authoring session or a reversible transaction. The app-local staged
+turn described below can discard an **uncommitted** overlay without compensation and can atomically replay a guarded
+candidate. That is pre-commit isolation, not post-commit undo. The demo must not market semantic delete undo,
+post-commit whole-turn rollback, or durable authoring recovery until accepted contracts cover all of the following:
 
 1. **Revision discipline.** Reads expose the relevant aggregate revisions; proposed edits carry accepted
    `expectedRevision` semantics; a cross-aggregate operation has a ratified version-vector contract rather than
@@ -139,7 +174,8 @@ delete undo or whole-agent-turn rollback until accepted contracts cover all of t
    never deleted or rewritten.
 3. **Durable staging and preview.** Proposed edits are isolated from canonical state, survive/reconcile restart as
    required, and produce an exact candidate preview and diff. Abort, disconnect, or a rejected proposal cannot leave
-   a half-applied turn.
+   a half-applied turn. The current overlay provides isolation and an app-local preview, but it is intentionally
+   process-local and does not satisfy the durability limb.
 4. **Atomic guarded commit.** The complete proposal is revalidated against current authority, DRAFT status,
    revisions, graph invariants, and idempotency, then state, versions, Events, receipts, and outbox effects commit
    atomically or not at all.
@@ -156,33 +192,87 @@ These requirements need a coordinated contract, persistence, application, projec
 slice. An app-local convenience must not invent public `Restore`, `Undo`, change-set, or version-vector Commands to
 make the controls appear complete.
 
-## Proposed preview-first agent lifecycle
+The current increment supplies useful implementation evidence for revision capture, candidate isolation, conflict
+detection, and atomic batch replay. It does **not** settle restore-versus-compensation, durable change-set identity,
+restart recovery, downstream impact reconciliation, or post-commit reversal.
 
-The following is a conceptual target for investigation. The labels are intentionally lowercase and neutral; they
-do not name canonical objects, states, Commands, or Events:
+## App-local staged agent-turn foundation
+
+The staging foundation uses the existing engine and accepted authoring Commands rather than creating a second
+authority:
 
 ```text
-read current state and capture base versions
-  -> collect proposed edits in an isolated working context
-  -> build a candidate graph and human-readable diff
-  -> run deterministic validation over that exact candidate
-  -> obtain required independent review for the exact material output
-  -> ask the human to accept, revise, or discard
-  -> recheck current versions and authority
-  -> atomically apply the accepted candidate, or leave canonical state unchanged
-  -> record provenance and refresh rebuildable projections
+canonical EngineHandle
+  -> point-in-time EngineHandle.fork()
+  -> SnapshotOverlayStorageAdapter
+  -> normal broker + normal Command handlers against the isolated candidate
+  -> validation and assurance over that candidate
+  -> base-revision-vector recheck
+  -> one canonical dispatchBatchGuarded replay, or no canonical mutation
 ```
 
-The preview must identify itself as non-authoritative and must never be consumed as an approved fact. Agent text
-must distinguish “proposed in preview,” “accepted and applied,” “rejected/conflicted,” and “assurance incomplete.”
-Auto-refinement, if retained, operates on the isolated candidate and causes a new exact review subject; it does not
-quietly mutate canonical state between reviews.
+`SnapshotOverlayStorageAdapter` consults the canonical adapter only while the fork's base snapshot is constructed.
+Candidate objects, Events, receipts, and outbox effects then live only in the overlay. Its transaction checkpoint
+preserves all-or-nothing behavior inside the candidate, and closing or discarding it never deletes or rewrites
+canonical Events.
 
-This is not the demo's current authoring behavior. Today, accepted agent tool calls dispatch through the broker as
-they land, and the multi-node scaffold tool is atomic only within that one tool call. Most mutation tools change the
-current DRAFT, but `create_assurance_policy` is an explicit wider-scope exception: it creates a shared workbench
-library entry, requires explicit user authorization in the agent prompt, and has no session undo. Implementing the
-conceptual flow above requires the ratified boundaries listed in the previous section.
+The staged-turn layer records only accepted top-level Commands; a rejected command and every Command in a rolled-back
+batch are excluded from replay. A complete PWA/PWU-Type subject hash binds assurance to the semantic candidate. The
+candidate hash then binds the base revision/event position, accepted Command sequence, affected aggregate content
+hashes, and assured subject hash. Accepted mutation invalidates cached bindings, and mutation is closed after the
+turn reaches commit readiness. Before commit, the app recomputes both hashes and requires the caller to supply the
+exact candidate hash it accepted. This is a technical preview-token check, not a ratified human approval protocol.
+
+The commit path compares a conservative base revision vector, PWU-Type and policy revisions, new-target absence, and
+the captured event-log position against canonical state. Those guards, replay, and expected resultant aggregate
+content hashes execute inside one `dispatchBatchGuarded` transaction, closing the check-versus-commit race and
+detecting replay divergence. A guard or command-level revision mismatch enters `CONFLICTED`; Command rejection,
+postcondition divergence, or an exception enters `COMMIT_FAILED`, with the canonical batch rolled back.
+
+XState models the app-local lifecycle:
+
+```text
+COLLECTING -> VALIDATING -> ASSURING -> READY_TO_COMMIT -> COMMITTING -> COMMITTED
+
+VALIDATING -> REVISION_REQUIRED
+ASSURING   -> REVISION_REQUIRED | BLOCKED_EXTERNAL
+COMMITTING -> CONFLICTED | COMMIT_FAILED
+
+Any pre-commit working state may also end as DISCARDED where the machine declares that transition.
+```
+
+The companion serializable `@statelyai/graph` representation is checked for structural issues and path reachability;
+`xstate/graph` generates executable machine-state coverage. These state names belong to this host workflow. They are
+not canonical Janumi objects, Commands, Events, dispositions, or additions to the controlled vocabulary.
+
+The staged preview must identify itself as non-authoritative and must never be consumed as an approved fact. It may
+show lifecycle status, candidate hash, Command count, and the candidate graph while canonical state remains
+unchanged. `READY_TO_COMMIT` means that the app-local validation/assurance path reached commit eligibility; it does
+**not** claim that a general human accept/revise protocol or a ratified approval authority has been implemented. The
+guarded commit API's exact-hash argument prevents committing a different preview; it does not, by itself, establish
+who is authorized to accept or how that acceptance becomes a durable governed record.
+
+Valid reviewer subject findings may revise the isolated candidate and create a new candidate hash. External reviewer
+execution, configuration, or independence failures enter `BLOCKED_EXTERNAL` instead of mutating the graph.
+
+### Explicit limits of this foundation
+
+- The active-turn registry and overlay are **in-process and non-durable**. Process restart loses the candidate; this
+  is not restart-safe staging or a production authoring-session store.
+- Pre-commit discard needs no compensating Command because canonical state was never changed. After a successful
+  commit, however, this layer provides **no semantic undo or redo**, restore, successor creation, or compensation.
+- There is no claim that tombstoned PWU Types can be restored, that published/version-bound state can be rewound, or
+  that prior assurance/approval can be resurrected.
+- The revision vector and candidate lifecycle are app-local implementation structures, not ratified public objects or
+  wire contracts.
+- The captured event-log position is deliberately conservative: any unrelated canonical Event in the process causes
+  the candidate commit to conflict. Narrower multi-PWA concurrency requires a ratified/scoped dependency-vector rule;
+  this demo chooses a safe false conflict rather than an undetected new-aggregate race.
+- The canonical engine remains authoritative. Candidate commit reuses its typed Commands, handlers, invariants,
+  idempotency, Events, and transaction boundary; the fork, XState, `@statelyai/graph`, and Svelte Flow do not acquire
+  domain authority.
+- Temporal remains outside this UI-level solution. No scheduler, durable workflow runtime, or replacement execution
+  authority is introduced.
 
 ## Verification expectations
 
@@ -196,5 +286,19 @@ Changes within this app-local backbone should keep deterministic tests for:
 - position-only undo/redo; and
 - negative assertions that layout, simulation, and canvas history cannot mutate canonical engine state.
 
-Future semantic staging or rollback work additionally needs concurrency-conflict, atomicity, restart, assurance,
-provenance, tombstone restoration/compensation, and agent-abort tests before any capability claim is made.
+The authoring reliability and staged-turn slice additionally keeps tests for:
+
+- production-like same-millisecond ULID bursts and large full-SDLC scaffolds;
+- broker collision preflight with zero Command dispatch;
+- scaffold/incremental cardinality and applicability-note equivalence;
+- recovery instructions that refuse unchanged collision retry and silent atomicity/semantic degradation;
+- code-based assurance routing and reviewer-configuration preflight;
+- point-in-time fork isolation and overlay transaction rollback;
+- XState lifecycle and `@statelyai/graph`/`xstate/graph` reachability;
+- subject/candidate hashing, revision/event-position conflict detection, replay postconditions, and atomic canonical
+  replay; and
+- staged preview/discard behavior with canonical state unchanged before commit.
+
+Further work still needs restart/durable-session, multi-process concurrency, exact assurance/provenance rebinding,
+downstream impact, tombstone restore-versus-successor/compensation, and post-commit reversal tests before any durable
+semantic undo/redo or rollback capability claim is made.

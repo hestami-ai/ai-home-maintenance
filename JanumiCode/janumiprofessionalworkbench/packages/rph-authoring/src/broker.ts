@@ -98,6 +98,13 @@ export interface EditTypeInput {
 	readonly requiredAssurancePolicyIds?: readonly string[];
 }
 
+/** Semantic attributes for one parent -> child composition edge. Omitted attributes preserve an existing rule;
+ *  a newly added edge defaults to M1. Passing an empty applicabilityNote deliberately clears the note. */
+export interface LinkTypesInput {
+	readonly cardinality?: CardinalityCode;
+	readonly applicabilityNote?: string;
+}
+
 /** An Assurance Policy as the authoring surface sees it (definition summary; the 3 floor policies are flagged). */
 export interface AssurancePolicyView {
 	readonly id: string;
@@ -412,17 +419,54 @@ export class PwaAuthoringBroker {
 		return accepted(r) ? { ok: true, id: pwuTypeId, status: r.status } : rejected(r);
 	}
 
-	/** Add a "permits" (composition) edge parent -> child. Idempotent: a link that already exists succeeds no-op. */
-	linkTypes(parentId: string, childId: string): ProposalResult {
+	/** Add or semantically update a "permits" (composition) edge parent -> child. The complete parallel rule list is
+	 *  rewritten so changing one edge cannot discard another child's cardinality/applicability. Idempotent when the
+	 *  effective edge is already identical. */
+	linkTypes(parentId: string, childId: string, input: LinkTypesInput = {}): ProposalResult {
 		if (parentId === childId) return { ok: false, error: 'A PWU Type cannot permit itself.' };
 		const parent = this.getType(parentId);
 		if (!parent) return { ok: false, error: `Parent PWU Type ${parentId} does not exist.` };
 		if (!this.getType(childId))
 			return { ok: false, error: `Child PWU Type ${childId} does not exist.` };
-		if (parent.permittedChildTypeIds.includes(childId))
+
+		const existing = parent.permittedChildren.find((rule) => rule.typeId === childId);
+		const hasApplicabilityNote = Object.prototype.hasOwnProperty.call(input, 'applicabilityNote');
+		const applicabilityNote = hasApplicabilityNote
+			? input.applicabilityNote?.trim() || undefined
+			: existing?.applicabilityNote;
+		const desired: PermittedChildRule = {
+			typeId: childId,
+			cardinality: input.cardinality ?? existing?.cardinality ?? 'M1',
+			...(applicabilityNote ? { applicabilityNote } : {})
+		};
+		const alreadyLinked = parent.permittedChildTypeIds.includes(childId);
+		const effectiveExisting: PermittedChildRule = existing ?? {
+			typeId: childId,
+			cardinality: 'M1'
+		};
+		if (
+			alreadyLinked &&
+			effectiveExisting.cardinality === desired.cardinality &&
+			effectiveExisting.applicabilityNote === desired.applicabilityNote
+		) {
 			return { ok: true, id: parentId, status: 'DUPLICATE' };
+		}
+
+		const permittedChildTypeIds = alreadyLinked
+			? parent.permittedChildTypeIds
+			: [...parent.permittedChildTypeIds, childId];
+		const permittedChildren = permittedChildTypeIds.map((typeId) => {
+			if (typeId === childId) return desired;
+			return (
+				parent.permittedChildren.find((rule) => rule.typeId === typeId) ?? {
+					typeId,
+					cardinality: 'M1' as const
+				}
+			);
+		});
 		return this.editType(parentId, {
-			permittedChildTypeIds: [...parent.permittedChildTypeIds, childId]
+			permittedChildTypeIds,
+			permittedChildren
 		});
 	}
 
@@ -432,8 +476,16 @@ export class PwaAuthoringBroker {
 		if (!parent) return { ok: false, error: `Parent PWU Type ${parentId} does not exist.` };
 		if (!parent.permittedChildTypeIds.includes(childId))
 			return { ok: true, id: parentId, status: 'DUPLICATE' };
+		const permittedChildTypeIds = parent.permittedChildTypeIds.filter((c) => c !== childId);
 		return this.editType(parentId, {
-			permittedChildTypeIds: parent.permittedChildTypeIds.filter((c) => c !== childId)
+			permittedChildTypeIds,
+			permittedChildren: permittedChildTypeIds.map(
+				(typeId) =>
+					parent.permittedChildren.find((rule) => rule.typeId === typeId) ?? {
+						typeId,
+						cardinality: 'M1' as const
+					}
+			)
 		});
 	}
 
@@ -463,6 +515,23 @@ export class PwaAuthoringBroker {
 		// Mint real ids for every temp key first, so child references resolve within the batch.
 		const idFor = new Map<string, string>();
 		for (const s of specs) idFor.set(s.tempKey, this.mintId('pwut'));
+		const mintedIds = [...idFor.values()];
+		const duplicateId = mintedIds.find((id, index) => mintedIds.indexOf(id) !== index);
+		if (duplicateId) {
+			return {
+				ok: false,
+				status: 'ID_COLLISION',
+				error: `ID_COLLISION: the host minted duplicate PWU Type id ${duplicateId} inside one scaffold. No commands were dispatched; correct the id generator before retrying.`
+			};
+		}
+		const existingId = mintedIds.find((id) => getObject(this.engine, id) !== undefined);
+		if (existingId) {
+			return {
+				ok: false,
+				status: 'ID_COLLISION',
+				error: `ID_COLLISION: the host minted PWU Type id ${existingId}, which already exists. No commands were dispatched; correct the id generator before retrying.`
+			};
+		}
 
 		const built = this.buildScaffoldCommands(specs, idFor);
 		if ('error' in built) return built.error;

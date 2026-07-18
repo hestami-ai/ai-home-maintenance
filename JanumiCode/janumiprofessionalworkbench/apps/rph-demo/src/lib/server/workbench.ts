@@ -20,8 +20,10 @@ import { ontology, validateOntology } from '@janumipwb/rph-product-realization-p
 import { PwaAuthoringBroker } from '@janumipwb/rph-authoring';
 import { buildPwaGraphExport, type PwaGraphExport } from '@janumipwb/rph-projections';
 import type { DomainCommand } from '@janumipwb/rph-contracts';
+import { monotonicFactory } from 'ulid';
 
 const TEST_MODE = process.env.RPH_DEMO_MODE === 'test';
+const productionUlid = monotonicFactory();
 
 let handle: EngineHandle | null = null;
 let cmdSeq = 0;
@@ -114,7 +116,7 @@ export interface UiCommandInput {
 }
 
 /** Build one UI-authored command with the same envelope policy used by single and atomic dispatch. */
-function uiCommand(input: UiCommandInput): DomainCommand {
+function uiCommand(input: UiCommandInput, correlationId = 'ui'): DomainCommand {
 	cmdSeq += 1;
 	return {
 		commandId: `ui-${cmdSeq}`,
@@ -124,7 +126,7 @@ function uiCommand(input: UiCommandInput): DomainCommand {
 		targetAggregateId: input.targetAggregateId,
 		issuedAt: TEST_MODE ? testNow() : new Date().toISOString(),
 		issuedBy: { actorId: 'ui-user', actorType: 'HUMAN', displayName: 'Workbench User' },
-		correlationId: 'ui',
+		correlationId,
 		idempotencyKey: TEST_MODE
 			? `ui-idem-${cmdSeq}`
 			: `ui-idem-${cmdSeq}-${Math.floor(performance.now())}`,
@@ -146,19 +148,23 @@ export function dispatch(
 
 /** Dispatch a multi-command UI operation atomically. A rejection rolls the entire operation back. */
 export function dispatchBatch(commands: readonly UiCommandInput[]) {
-	return getEngine().dispatchBatch(commands.map(uiCommand));
+	return getEngine().dispatchBatch(commands.map((command) => uiCommand(command)));
 }
 
 /** A PwaAuthoringBroker scoped to one DRAFT PWA, wired to the shared engine + this host's id/clock policy. Both the
  *  agent tools and (future) UI "scaffold" actions go through it. The sessionId namespaces its command/idempotency
  *  keys so concurrent authoring runs never collide. */
-export function makeAuthoringBroker(pwaId: string): PwaAuthoringBroker {
+export function makeAuthoringBroker(
+	pwaId: string,
+	engine: EngineHandle = getEngine(),
+	sessionId: string = mintUiId('sess')
+): PwaAuthoringBroker {
 	return new PwaAuthoringBroker({
-		engine: getEngine(),
+		engine,
 		pwaId,
 		mintId: mintUiId,
 		now: TEST_MODE ? testNow : undefined,
-		sessionId: mintUiId('sess')
+		sessionId
 	});
 }
 
@@ -174,20 +180,37 @@ export interface ConversationEntry {
 /** Append entries to a DRAFT PWA's durable authoring conversation (through the engine — critical domain state, a
  *  precursor to the governed stream, NOT a side store). One conversation per PWA: its id is minted once and reused,
  *  so the transcript survives reloads (and, when the engine is backed by a durable store, restarts). */
-export function recordConversation(pwaId: string, entries: ConversationEntry[]): void {
+export function recordConversation(
+	pwaId: string,
+	entries: ConversationEntry[],
+	engine: EngineHandle = getEngine(),
+	correlationId = 'ui'
+): void {
 	if (entries.length === 0) return;
-	const existing = getConversation(getEngine(), pwaId);
+	const existing = getConversation(engine, pwaId);
 	const conversationId = existing?.id ?? mintUiId('conv');
-	dispatch('AppendConversationEntries', 'AUTHORING_CONVERSATION', conversationId, {
-		conversationId,
-		pwaId,
-		entries
-	});
+	const result = engine.dispatch(
+		uiCommand(
+			{
+				commandType: 'AppendConversationEntries',
+				targetAggregateType: 'AUTHORING_CONVERSATION',
+				targetAggregateId: conversationId,
+				payload: { conversationId, pwaId, entries }
+			},
+			correlationId
+		)
+	);
+	if (result.status !== 'ACCEPTED' && result.status !== 'DUPLICATE') {
+		throw new Error(result.error?.message ?? `AppendConversationEntries ${result.status}`);
+	}
 }
 
 /** The DRAFT PWA's persisted authoring conversation entries (empty if none yet). */
-export function loadConversation(pwaId: string): ConversationEntry[] {
-	const entries = getConversation(getEngine(), pwaId)?.state.entries;
+export function loadConversation(
+	pwaId: string,
+	engine: EngineHandle = getEngine()
+): ConversationEntry[] {
+	const entries = getConversation(engine, pwaId)?.state.entries;
 	return Array.isArray(entries) ? (entries as ConversationEntry[]) : [];
 }
 
@@ -201,8 +224,9 @@ export function agentMode(): 'mock' | 'pi' {
 	return TEST_MODE ? 'mock' : 'pi';
 }
 
-/** A short, sortable id for new aggregates the UI creates (matches the RphId `<prefix>_<26-char>` format).
- *  Deterministic in test mode (a padded base32 sequence) so authored ids are stable across E2E runs. */
+/** A sortable id for new aggregates the UI creates (matches the RphId `<prefix>_<26-char>` format).
+ *  Production uses one process-wide monotonic ULID factory, which remains unique and ordered during same-millisecond
+ *  bursts. Test mode retains the padded base32 sequence so authored ids are stable across E2E runs. */
 export function mintUiId(prefix: string): string {
 	const alphabet = '0123456789ABCDEFGHJKMNPQRSTVWXYZ';
 	idSeq += 1;
@@ -215,10 +239,7 @@ export function mintUiId(prefix: string): string {
 		}
 		return `${prefix}_${s.padStart(26, '0')}`;
 	}
-	let s = '';
-	const t = Date.now() + idSeq;
-	for (let i = 0; i < 26; i += 1) s += alphabet[(t + idSeq * 7 + i * 13) % 32];
-	return `${prefix}_${s}`;
+	return `${prefix}_${productionUlid()}`;
 }
 
 // ── Canonical PWA graph export ──────────────────────────────────────────────────────────────────────────────────
@@ -228,8 +249,10 @@ export function mintUiId(prefix: string): string {
 const arr = (v: unknown): string[] => (Array.isArray(v) ? (v as string[]) : []);
 
 /** The current PWA's PWU-Type graph as the canonical export a judge reads (engine truth, not the render model). */
-export function buildPwaExport(pwaId: string): PwaGraphExport | undefined {
-	const engine = getEngine();
+export function buildPwaExport(
+	pwaId: string,
+	engine: EngineHandle = getEngine()
+): PwaGraphExport | undefined {
 	const pwa = getObject(engine, pwaId);
 	if (!pwa) return undefined;
 	const nodes = listPwuTypes(engine, pwaId).map((t) => ({

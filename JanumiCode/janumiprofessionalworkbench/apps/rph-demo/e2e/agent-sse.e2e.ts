@@ -1,10 +1,10 @@
 import { test, expect } from '@playwright/test';
-import { resetEngine, introspect, gotoHydrated } from './support/harness';
+import { acceptAgentCandidate, resetEngine, introspect, gotoHydrated } from './support/harness';
 
 // A2 — the authoring agent loop over the SSE relay, driven by the DETERMINISTIC mock agent (RPH_DEMO_MODE=test
 // forces 'mock', so the gate never hits the network). Proves the whole server path: POST an instruction ->
-// createAuthoringAgent -> the agent calls the broker's tools -> real DefinePwuType commands commit -> normalized
-// events stream back as SSE. The engine's ground truth confirms the graph the agent built. A JSON "plan" makes the
+// createAuthoringAgent -> the agent calls the broker's tools on an isolated candidate -> normalized events stream
+// back as SSE -> a human accepts its exact assured hash -> one guarded canonical commit. A JSON "plan" makes the
 // run precise and reproducible; this is the exact contract the Pi agent maps onto live.
 test.describe('PWA Designer — authoring agent (mock) over SSE', () => {
 	test.beforeEach(async ({ request }) => {
@@ -26,15 +26,29 @@ test.describe('PWA Designer — authoring agent (mock) over SSE', () => {
 		expect(before.pwas).toHaveLength(1);
 		const pwaId = before.pwas[0]!.id;
 
-		// Drive the agent with a precise plan: root from template + a child + wire the permits edge.
+		// Drive the agent with one complete, linked, assurance-satisfiable candidate.
 		const plan = {
 			plan: [
 				{ tool: 'get_pwa' },
 				{
-					tool: 'define_from_template',
-					args: { templateKey: 'product-realization', isRoot: true }
+					tool: 'scaffold_graph',
+					args: {
+						types: [
+							{
+								tempKey: 'root',
+								name: 'Product Realization',
+								pwuKind: 'PRODUCT_REALIZATION',
+								isRoot: true,
+								childTempKeys: ['arch']
+							},
+							{
+								tempKey: 'arch',
+								name: 'Architecture Definition',
+								pwuKind: 'ARCHITECTURE'
+							}
+						]
+					}
 				},
-				{ tool: 'define_from_template', args: { templateKey: 'architecture' } },
 				{ tool: 'list_pwu_types' }
 			]
 		};
@@ -51,7 +65,11 @@ test.describe('PWA Designer — authoring agent (mock) over SSE', () => {
 		expect(body).toContain('"ok":true');
 		expect(body).toContain('"kind":"done"');
 
-		// TRUTH: the engine actually recorded the two PWU Types the agent proposed (not just streamed text).
+		// Before acceptance the canonical engine is byte-for-byte unchanged by agent tools/floor/transcript.
+		expect((await introspect(request)).pwuTypes).toEqual([]);
+		await acceptAgentCandidate(request, pwaId, body);
+
+		// TRUTH after explicit acceptance: the guarded batch recorded exactly the proposed types.
 		const after = introspectNames(await introspect(request));
 		expect(after).toContain('Product Realization');
 		expect(after).toContain('Architecture Definition');
@@ -126,9 +144,7 @@ test.describe('PWA Designer — authoring agent (mock) over SSE', () => {
 							{
 								tempKey: 'arch',
 								name: 'Architecture Definition',
-								pwuKind: 'ARCHITECTURE',
-								requiredInputs: ['approved-behavior'],
-								requiredOutputs: ['architecture-baseline']
+								pwuKind: 'ARCHITECTURE'
 							}
 						]
 					}
@@ -141,8 +157,10 @@ test.describe('PWA Designer — authoring agent (mock) over SSE', () => {
 		const body = await res.text();
 		expect(body).toContain('scaffold_graph');
 		expect(body).toContain('"ok":true');
+		expect((await introspect(request)).pwuTypes).toEqual([]);
+		await acceptAgentCandidate(request, pwaId, body);
 
-		// TRUTH: both types exist and the root permits the child (the whole batch committed atomically).
+		// TRUTH: both types and their edge commit together after exact-candidate acceptance.
 		const snap = await introspect(request);
 		const live = snap.pwuTypes.filter((t) => t.state.status !== 'REMOVED');
 		expect(live).toHaveLength(2);

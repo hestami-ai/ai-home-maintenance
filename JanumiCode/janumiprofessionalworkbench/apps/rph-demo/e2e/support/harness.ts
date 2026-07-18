@@ -20,6 +20,17 @@ export interface EngineSnapshot {
 	readonly decisions: ObjectRow[];
 	readonly baselines: ObjectRow[];
 	readonly conversations: ObjectRow[];
+	readonly authoringCandidates: ReadonlyArray<{
+		readonly pwaId: string;
+		readonly summary: {
+			readonly status: string;
+			readonly candidateHash?: string;
+			readonly commandCount: number;
+		};
+		readonly pwuTypes: ObjectRow[];
+		readonly assessments: ObjectRow[];
+		readonly conversations: ObjectRow[];
+	}>;
 }
 
 /** Reset the engine to a known state between specs (test mode only): 'empty' for authoring-from-scratch flows,
@@ -44,4 +55,19 @@ export async function introspect(request: APIRequestContext): Promise<EngineSnap
 	const res = await request.get('/test-api/introspect');
 	expect(res.ok(), 'introspect should succeed').toBeTruthy();
 	return (await res.json()) as EngineSnapshot;
+}
+
+/** Accept the exact assured hash emitted by the staged agent SSE turn through the real SvelteKit form action. */
+export async function acceptAgentCandidate(
+	request: APIRequestContext,
+	pwaId: string,
+	sseBody: string
+): Promise<string> {
+	const candidateHash = sseBody.match(/sha256:[0-9a-f]{64}/)?.[0];
+	expect(candidateHash, 'agent SSE should expose the exact assured candidate hash').toBeTruthy();
+	const res = await request.post(`/pwa/${pwaId}?/acceptAgentCandidate`, {
+		form: { candidateHash: candidateHash! }
+	});
+	expect(res.ok(), 'exact candidate acceptance should succeed').toBeTruthy();
+	return candidateHash!;
 }
