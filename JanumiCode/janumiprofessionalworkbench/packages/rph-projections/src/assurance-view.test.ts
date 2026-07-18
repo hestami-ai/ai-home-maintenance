@@ -30,6 +30,12 @@ function evt(seq: number, eventType: string, payload: unknown): DomainEvent {
 	};
 }
 
+// Waiver + invalidation events are keyed by the event's OWN aggregate id (the Decision / evidence / PWU), not by an
+// assessmentId in the payload — so these tests must set aggregateId explicitly.
+function evtOn(seq: number, eventType: string, aggregateId: string, payload: unknown): DomainEvent {
+	return { ...evt(seq, eventType, payload), aggregateId };
+}
+
 const started = (assessmentId: string, subject: string) =>
 	evt(1, 'AssuranceAssessmentStarted', {
 		assessmentId,
@@ -180,5 +186,98 @@ describe('Assurance View fold — open-conditions guard (the case the live log c
 		const a = view.assessments['asm_e']!;
 		expect(a.validatorImplementationIdentity).toBeUndefined();
 		expect(a.validatorImplementationVersion).toBeUndefined();
+	});
+});
+
+describe('Assurance View fold — §38 waivers and invalidation status (cross-object folds)', () => {
+	it('a waiver naming the assessment (policy + subject) attaches PROPOSED, then advances to EFFECTIVE on grant', () => {
+		const DEC = 'dec_waiver_1';
+		const requested = evtOn(5, 'WaiverRequested', DEC, {
+			subjectObjectIds: ['pwu_1'],
+			waivedPolicyId: 'pol_x',
+			waivedCriterionId: 'C-01',
+			waivedFindingIds: ['F-01'],
+			rationale: 'accepted risk'
+		});
+		const view = buildAssuranceView([started('asm_w', 'pwu_1'), requested]);
+		const w = view.assessments['asm_w']!.waivers;
+		expect(w).toHaveLength(1);
+		expect(w[0]!.status).toBe('PROPOSED');
+		expect(w[0]!.waiverDecisionId).toBe(DEC);
+		expect(w[0]!.waivedFindingIds).toEqual(['F-01']);
+
+		const granted = buildAssuranceView([
+			started('asm_w', 'pwu_1'),
+			requested,
+			evtOn(6, 'WaiverGranted', DEC, { waiverDecisionId: DEC, effectiveAt: '2026-07-18T00:00:00Z' })
+		]);
+		const g = granted.assessments['asm_w']!.waivers[0]!;
+		expect(g.status).toBe('EFFECTIVE');
+		expect(g.effectiveAt).toBe('2026-07-18T00:00:00Z');
+	});
+
+	it('deny advances the attached waiver to DENIED', () => {
+		const view = buildAssuranceView([
+			started('asm_w', 'pwu_1'),
+			evtOn(5, 'WaiverRequested', 'dec_d', {
+				subjectObjectIds: ['pwu_1'],
+				waivedPolicyId: 'pol_x',
+				waivedFindingIds: []
+			}),
+			evtOn(6, 'WaiverDenied', 'dec_d', { rationale: 'insufficient' })
+		]);
+		expect(view.assessments['asm_w']!.waivers[0]!.status).toBe('DENIED');
+	});
+
+	it('a waiver for a DIFFERENT policy or a DIFFERENT subject does NOT attach — no over-reach', () => {
+		const view = buildAssuranceView([
+			started('asm_w', 'pwu_1'),
+			// right subject, wrong policy
+			evtOn(5, 'WaiverRequested', 'dec_a', {
+				subjectObjectIds: ['pwu_1'],
+				waivedPolicyId: 'pol_OTHER',
+				waivedFindingIds: []
+			}),
+			// right policy, wrong subject
+			evtOn(6, 'WaiverRequested', 'dec_b', {
+				subjectObjectIds: ['pwu_OTHER'],
+				waivedPolicyId: 'pol_x',
+				waivedFindingIds: []
+			})
+		]);
+		expect(view.assessments['asm_w']!.waivers).toEqual([]);
+	});
+
+	it('EvidenceInvalidated marks the assessment that considered the evidence; PwuInvalidated marks the one whose subject it is (§39 inv 15/16)', () => {
+		const view = buildAssuranceView([
+			started('asm_iv', 'pwu_1'),
+			completed('asm_iv', 'SATISFIED', []), // sets evidenceConsideredIds: ['evd_1']; subject stays pwu_1
+			evtOn(7, 'EvidenceInvalidated', 'evd_1', { invalidationReason: 'stale', affectedClaimIds: [] }),
+			evtOn(8, 'PwuInvalidated', 'pwu_1', { invalidationReason: 'subject changed', triggeringObjectId: 'x' })
+		]);
+		const inv = view.assessments['asm_iv']!.invalidations;
+		expect(inv.map((i) => i.status).sort()).toEqual(['EVIDENCE_INVALIDATED', 'SUBJECT_INVALIDATED']);
+		const byEvidence = inv.find((i) => i.status === 'EVIDENCE_INVALIDATED')!;
+		expect(byEvidence.invalidatedObjectId).toBe('evd_1');
+		expect(byEvidence.reason).toBe('stale');
+	});
+
+	it('an invalidation of an unrelated evidence/subject touches no assessment', () => {
+		const view = buildAssuranceView([
+			started('asm_iv', 'pwu_1'),
+			completed('asm_iv', 'SATISFIED', []),
+			evtOn(7, 'EvidenceInvalidated', 'evd_UNRELATED', { invalidationReason: 'r', affectedClaimIds: [] }),
+			evtOn(8, 'PwuInvalidated', 'pwu_UNRELATED', { invalidationReason: 'r', triggeringObjectId: 'x' })
+		]);
+		expect(view.assessments['asm_iv']!.invalidations).toEqual([]);
+	});
+
+	it('sourced-none, not unknown: an assessment with no waiver/invalidation event keeps real-empty arrays', () => {
+		// The waiver and invalidation events ARE folded, so an empty array here is a real "none", not "unknown" —
+		// the distinction the header comment makes load-bearing.
+		const view = buildAssuranceView([started('asm_clean', 'pwu_1'), completed('asm_clean', 'SATISFIED', [])]);
+		const a = view.assessments['asm_clean']!;
+		expect(a.waivers).toEqual([]);
+		expect(a.invalidations).toEqual([]);
 	});
 });

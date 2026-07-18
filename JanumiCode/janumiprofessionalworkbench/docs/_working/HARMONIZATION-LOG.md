@@ -3400,6 +3400,35 @@ tidy — recorded so the next session inherits the finding rather than re-derivi
 remains is deferred to the UI phase (§38 read-model + applicable-policies, shared `rph-projections` zone), blocked
 on prerequisites (attempt tracking, `PwuType.pwaVersion`), or a bounded low-priority tidy.
 
+### Increment E — §38 read-model: waivers and invalidation status are now sourced (UI phase begins)
+
+The other agent's PWA-Designer work landed, unblocking the deferred §38 read model. Two of its four still-blank
+fields had live sources (per the triage above); both are now folded into `buildAssuranceView`, keeping the file's
+"unknown vs none" discipline:
+
+- **waivers** (§38) — `WaiverRequested` carries the waiver's subject + `waivedPolicyId` on the RequestWaiver
+  passthrough; `WaiverGranted`/`WaiverDenied` carry only the Decision aggregate id. The fold attaches a PROPOSED
+  waiver at request time to every assessment the waiver names by (policy, subject), then advances that waiver's
+  status in place (EFFECTIVE / DENIED) by the Decision aggregate id. A waiver naming a different policy or subject
+  attaches to nothing — mutation-proven (an over-reach mutation fails the no-over-reach test).
+- **invalidations** (§38 "invalidation status") — `EvidenceInvalidated` (aggregate id = the evidence) marks every
+  assessment whose `evidenceConsideredIds` include it; `PwuInvalidated` (aggregate id = the PWU) marks every
+  assessment whose subject it is (§39 invariants 15/16).
+
+Because both events are now folded, an empty `waivers` / `invalidations` array is a real sourced "none," not
+"unknown" — the header comment moves both fields from the NOT-POPULATED to the POPULATED column and says so.
+`applyAssuranceEvent` stays a single-pass incremental fold (the cross-object folds map over all assessments per
+event). The two still-blank §38 fields stay honestly absent with sharpened notes: `missingEvidence` (needs the
+unbuilt `AssuranceEvidenceRequired`/`Received` events and their §32 command) and `controlActions` (no
+control-action event exists in the stream).
+
+Red-first: six unit tests (attach-on-match, advance-on-grant/deny, no-over-reach, evidence+subject invalidation,
+unrelated-touches-nothing, sourced-none), with a mutation confirming the (policy, subject) match is load-bearing.
+
+Gate: `check-types` 21/21 (incl. the app consuming the new fields) · `test` 21/21 · lint · boundary. Footprint:
+`rph-projections/src/assurance-view.ts` + its test. (The other agent's PWA-Designer work is complete but still
+UNCOMMITTED in the shared tree; I continue to stage only my own files.)
+
 ---
 
 ## PART 4 — Open questions genuinely for the sponsor
