@@ -3371,6 +3371,35 @@ are built together; `missingEvidence` + `controlActions` are additionally gated 
 increment. The two sourceable folds (`waivers`, `invalidationStatus`) are ready to build the moment that zone is
 clear.
 
+### Backlog triage (2026-07-17): the remaining non-UI items are blocked or bounded-low-priority
+
+After the hollow-layer increments (A–D), the rest of the harmonization queue was triaged. Each remaining non-UI
+item is blocked on an unbuilt prerequisite, entangled with the active PWA-Designer zone, or a bounded low-priority
+tidy — recorded so the next session inherits the finding rather than re-deriving it:
+
+- **`producingExecutionAttemptId` resolution — BLOCKED on attempt tracking.** The field is recorded on ARTIFACT
+  (`RecordArtifact`) and on `ExecutionProvenance` (`CompleteExecutionStep`) as a free string with the `attempt`
+  id-prefix, but there is nothing to resolve it *against*: `EXECUTION_ATTEMPT` is not a `ProfessionalWorkObjectType`
+  (no store row), there is no `ExecutionAttempt` helper, and neither `EXECUTION_PLAN` nor its `ExecutionStep[]`
+  tracks attempt records. Attempt tracking is itself deferred — the same prerequisite `RetryExecutionStep`'s
+  retry-cap counting waits on (RESUME-STATE). A within-command equality check
+  (`provenance.producingExecutionAttemptId === command.executionAttemptId`) is possible but semantically debatable
+  for a retry (an output carried from a prior attempt) and enforces a convention the spec does not mandate.
+  Deferred behind attempt tracking.
+- **CON-009 `pwaVersion` precision — BLOCKED/entangled.** The gate matches `pwuType.pwaId === undertaking.pwaId`,
+  not the version. The Undertaking binds `(pwaId, pwaVersion)`, but `PwuType` carries only `pwaId` — there is no
+  `pwaVersion` field to compare, so the gate cannot check the type belongs to the Undertaking's bound PWA *version*.
+  Closing it needs a new `PwuType.pwaVersion` threaded through `DefinePwuType` / `EditPwuType` — the PWA-authoring
+  path, which is the PWA Designer's active zone. Deferred to that zone.
+- **Passthrough under-declaration remainder — bounded, low-priority.** The assurance-policy events were tightened
+  (Inc D). The broader ~29 command→event pairs with omitted fields are NOT all bugs (`PwuProposed` and
+  `ExecutionStepSucceeded` are deliberate DOC-conformant subsets); separating accidental from intended is a
+  per-event adjudication. Left as a bounded declaration-tightening task, not swept blindly.
+
+**Consequence:** the clean, unblocked, high-value harmonization backlog is complete through Increment D. What
+remains is deferred to the UI phase (§38 read-model + applicable-policies, shared `rph-projections` zone), blocked
+on prerequisites (attempt tracking, `PwuType.pwaVersion`), or a bounded low-priority tidy.
+
 ---
 
 ## PART 4 — Open questions genuinely for the sponsor
