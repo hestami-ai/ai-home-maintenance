@@ -184,7 +184,7 @@ describe('Assurance Policy lifecycle handlers (live)', () => {
 		expect(edited.optionalEvidence).toEqual([opt]);
 	});
 
-	it('threads dispositionRules + escalationRules through create, keeps remediationRules deferred, and patches waiverRules on edit', () => {
+	it('threads dispositionRules + escalationRules through create, defaults remediationRules to [] when none supplied, and patches waiverRules on edit', () => {
 		// DOC-004 §10.2 DispositionRule (5 fields; condition is the permissive PolicyExpression) + §13 EscalationRule
 		// (4 fields; trigger permissive). These are what make a policy GOVERN — its outcome and its escalation.
 		const P = 'pol_govern_01';
@@ -224,7 +224,9 @@ describe('Assurance Policy lifecycle handlers (live)', () => {
 		expect(created.dispositionRules).toEqual([disp]);
 		expect(created.escalationRules).toEqual([esc]);
 		expect(created.waiverRules).toEqual([waiver]);
-		// remediationRules is the one array still deferred (RemediationRule undefined in the corpus): always empty.
+		// remediationRules defaults to [] here because THIS create supplied none — #5 made it settable (its shape is
+		// AUTHORED, grounded in ControlAction §11); this asserts the default, not an always-empty invariant. A non-empty
+		// round-trip + the subset-validation reject are covered in assurance-independence.test.ts.
 		expect(created.remediationRules).toEqual([]);
 
 		// The Edit payload has carried waiverRules since Inc 13, but the handler never applied it — a policy's

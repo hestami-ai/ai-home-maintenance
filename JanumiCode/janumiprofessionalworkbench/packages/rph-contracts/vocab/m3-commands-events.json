@@ -2272,6 +2272,12 @@
           "note": "AUTHORED under the §0.3 grant. FIELD TYPE ratified — DOC-004 §13 defines EscalationRule (transcribed Inc A). Was REQUIRED by the object schema, carried by no command, hardcoded []. Declares WHEN a policy escalates and to WHOM (§13, escalationTarget: the 7-value EscalationTargetSchema). Optional; settable-not-enforced, same caveat as dispositionRules."
         },
         {
+          "field": "remediationRules",
+          "required": false,
+          "type": "RemediationRule[]",
+          "note": "AUTHORED 2026-07-19 under the sponsor grant. FIELD TYPE now defined — RemediationRule is a structured helper (was a FORCE_PLACEHOLDER z.record 'defined nowhere in the corpus'; authored, grounded in ControlActionSchema §11 + the sibling family). AssurancePolicyDefinition.remediationRules was REQUIRED by the object schema and carried by NO command, so assurance.ts hardcoded remediationRules: [] — write-only-empty. Now settable like the other 5 rule arrays (optional → every existing caller stays valid). SETTABLE, EVALUATION STAGED: no runtime remediation trigger point exists yet. On the Created/Edited events this mirrors the passthrough so the governed stream records what the policy declared."
+        },
+        {
           "field": "permittedControlActions",
           "required": true,
           "type": "ControlAction[]",
@@ -2371,6 +2377,12 @@
           "required": false,
           "type": "EscalationRule[]",
           "note": "AUTHORED under the §0.3 grant. FIELD TYPE ratified — DOC-004 §13 defines EscalationRule (transcribed Inc A). Was REQUIRED by the object schema, carried by no command, hardcoded []. Declares WHEN a policy escalates and to WHOM (§13, escalationTarget: the 7-value EscalationTargetSchema). Optional; settable-not-enforced, same caveat as dispositionRules."
+        },
+        {
+          "field": "remediationRules",
+          "required": false,
+          "type": "RemediationRule[]",
+          "note": "AUTHORED 2026-07-19 under the sponsor grant. FIELD TYPE now defined — RemediationRule is a structured helper (was a FORCE_PLACEHOLDER z.record 'defined nowhere in the corpus'; authored, grounded in ControlActionSchema §11 + the sibling family). AssurancePolicyDefinition.remediationRules was REQUIRED by the object schema and carried by NO command, so assurance.ts hardcoded remediationRules: [] — write-only-empty. Now settable like the other 5 rule arrays (optional → every existing caller stays valid). SETTABLE, EVALUATION STAGED: no runtime remediation trigger point exists yet. On the Created/Edited events this mirrors the passthrough so the governed stream records what the policy declared."
         },
         {
           "field": "permittedControlActions",
@@ -5895,6 +5907,12 @@
           "note": "Mirrors CreateAssurancePolicy.escalationRules (EscalationRule[], DOC-004 §13, Inc C). AssurancePolicyCreated/Edited are emitted via passthrough of the command payload (createObject/makeEvent, no eventPayload override), so the event ALREADY carries this field — declared here so the governed stream (the event log) records what the policy declared, not only the object-state snapshot. Inc C added it to the command but not this event; closed as governed-stream honesty."
         },
         {
+          "field": "remediationRules",
+          "required": false,
+          "type": "RemediationRule[]",
+          "note": "AUTHORED 2026-07-19 under the sponsor grant. FIELD TYPE now defined — RemediationRule is a structured helper (was a FORCE_PLACEHOLDER z.record 'defined nowhere in the corpus'; authored, grounded in ControlActionSchema §11 + the sibling family). AssurancePolicyDefinition.remediationRules was REQUIRED by the object schema and carried by NO command, so assurance.ts hardcoded remediationRules: [] — write-only-empty. Now settable like the other 5 rule arrays (optional → every existing caller stays valid). SETTABLE, EVALUATION STAGED: no runtime remediation trigger point exists yet. On the Created/Edited events this mirrors the passthrough so the governed stream records what the policy declared."
+        },
+        {
           "field": "permittedControlActions",
           "required": true,
           "type": "ControlAction[]",
@@ -5991,6 +6009,12 @@
           "required": false,
           "type": "EscalationRule[]",
           "note": "Mirrors CreateAssurancePolicy.escalationRules (EscalationRule[], DOC-004 §13, Inc C). AssurancePolicyCreated/Edited are emitted via passthrough of the command payload (createObject/makeEvent, no eventPayload override), so the event ALREADY carries this field — declared here so the governed stream (the event log) records what the policy declared, not only the object-state snapshot. Inc C added it to the command but not this event; closed as governed-stream honesty."
+        },
+        {
+          "field": "remediationRules",
+          "required": false,
+          "type": "RemediationRule[]",
+          "note": "AUTHORED 2026-07-19 under the sponsor grant. FIELD TYPE now defined — RemediationRule is a structured helper (was a FORCE_PLACEHOLDER z.record 'defined nowhere in the corpus'; authored, grounded in ControlActionSchema §11 + the sibling family). AssurancePolicyDefinition.remediationRules was REQUIRED by the object schema and carried by NO command, so assurance.ts hardcoded remediationRules: [] — write-only-empty. Now settable like the other 5 rule arrays (optional → every existing caller stays valid). SETTABLE, EVALUATION STAGED: no runtime remediation trigger point exists yet. On the Created/Edited events this mirrors the passthrough so the governed stream records what the policy declared."
         },
         {
           "field": "permittedControlActions",

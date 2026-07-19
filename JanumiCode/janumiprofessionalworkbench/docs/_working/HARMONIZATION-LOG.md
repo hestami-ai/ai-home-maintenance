@@ -3966,3 +3966,149 @@ fabricating trigger semantics; it needs a trigger-shape ratification, like `Reme
 
 **Gate:** `check-types` 21/21 · full `test` 21/21 (assurance handler 12) · lint · boundary · **Playwright E2E
 25/25**. Footprint: `assurance.ts` + `assurance-independence.test.ts`. Committed.
+
+### Increment W — escalationRules ENFORCED: the §10.3 CRITICAL escalation (#1b, Gate D)
+
+Increment V closed by calling `escalationRules` (#1b) "genuinely blocked — `EscalationRule.trigger` is
+`z.unknown()`, so auto-escalation cannot be wired without fabricating trigger semantics." Under the authoring
+grant this is **overturned exactly as #1a overturned it for `dispositionRules`**: the general `trigger` stays
+free-form, but a new machine-evaluable field is authored alongside it — the same pattern as `DispositionRule`
+keeping `forbiddenOpenSeverities` beside its opaque `condition`.
+
+**`EscalationRule.escalateOnOpenSeverities`** (authored) names the open-observation severities that fire the
+policy's escalation to its `escalationTarget`. It is **RESTRICTED to CRITICAL** — and the framing here matters,
+because the adversarial review (below) caught an over-claim in an earlier draft of this very shape. §10.3 is a
+**default precedence** — its own words, "Unless a policy overrides it:" (DOC-004 L565) — under which CRITICAL is
+the *only* severity paired with ESCALATED ("CRITICAL open finding → REJECTED or ESCALATED"; BLOCKING → REJECTED;
+MATERIAL → CONDITIONALLY_SATISFIED / INCONCLUSIVE / REJECTED). So this authored shortcut covers exactly that one
+unambiguous ESCALATED case. It is **not** a claim that the corpus forbids escalating another severity: §10.3
+explicitly permits a policy to *override* the default, but that override is the province of the ratified
+`EscalationRule.trigger` (PolicyExpression, §13) — the general residual predicate — **not** this severity
+shortcut. Keeping the shortcut CRITICAL-only makes it **fail closed** (an ambiguous BLOCKING/MATERIAL use is
+refused and directed to `trigger`), narrowing the *shortcut*, never the policy's ratified escalation power. The
+restriction is enforced twice: `createAssurancePolicy` / `editAssurancePolicy` **reject** any
+`escalateOnOpenSeverities` value that is not CRITICAL (rather than persist a silently-inert rule), and Gate D
+intersects with `ESCALATABLE_SEVERITIES = {CRITICAL}` as defense in depth.
+
+**Gate D** (in `completeAssuranceAssessment`) makes the ratified escalation trigger fire for the first time. When
+a policy declares an escalation rule and a still-**OPEN** observation matches its escalatable severity, the
+assessment transitions **ASSESSING → ESCALATED** (the ratified §30 arrow in `transitions.data.ts`) and emits
+`AssuranceAssessmentEscalated` — an event whose emission point was previously unreachable — **instead of**
+completing to the validator-recommended disposition. It runs **after the INV-8 independence precondition** (see
+the review fix below) but **before** the reject/satisfy gates (A/C), so a declared escalation takes precedence
+over an outcome while a broken-independence evaluation still fails first. It reads each observation's **current**
+disposition through the shared memoized
+`openObservationSeverities()` (the same per-object `loadObject` scan Gate C's §10.3 foreclosure uses, extracted
+and reused here) — so a finding later resolved or **WAIVED** no longer escalates, composing cleanly with the
+waiver machinery. Only fires when the policy declares `escalationRules` (unseeded today), so the floor, reference,
+and demo drives are untouched.
+
+Red-first: a policy escalating on open CRITICAL — an assessment with an open CRITICAL observation transitions to
+**ESCALATED** and emits `AssuranceAssessmentEscalated`; a sibling whose only open observation is MATERIAL (not
+escalatable) completes SATISFIED, not escalated; and authoring a rule with a non-CRITICAL
+`escalateOnOpenSeverities` (e.g. `['BLOCKING']`) is **REJECTED**.
+
+**This brings the "settable → ENFORCED" tally to FIVE of six rule arrays** (requiredEvidence + permittedControlActions
+from Increment R; dispositionRules + waiverRules from U/V; now escalationRules). The sixth, `remediationRules`,
+is settable in Increment X below; its runtime FIRING is the only piece that stays staged.
+
+*(W and X ship as one commit — they co-edit `m1-object-fields.json`, `objects.ts`, `assurance.ts`, and the test
+file — and shared one adversarial review; the review narrative and the combined **Gate** line are recorded at the
+end of Increment X.)*
+
+### Increment X — RemediationRule AUTHORED + settable; remediationActions ⊆ permitted (#5)
+
+**This supersedes Increment P's #5 disposition.** Increment P concluded "RemediationRule — confirmed genuinely
+undefined; NOT authored … the honest answer here is to author nothing," reasoning that authoring its fields "would
+fabricate a contract from nothing, which the grant to author WITH RIGOR does not license (rigor needs grounding)."
+That disposition was correct **under the authorization then in force**. It is reversed now under the sponsor's
+**subsequent, explicit** instruction to use authoring privileges to "rigorously ascertain how to bridge the gap
+(design and develop those shapes) consistent with the larger corpus … and then implement." The reversal is not a
+licence to fabricate: P's own bar — *rigor needs grounding* — is met here, because the authored shape invents no
+governed semantics. Its one required field is the **ratified** `ControlAction[]` (§11); its predicate `trigger`
+stays `z.unknown()` (disclosed, not invented); its scoping fields are plain string projections of the same
+severity-as-string family the siblings already use. What P declined to do was author a shape from nothing; what is
+done here is compose a shape from parts the corpus already ratifies, and label the seam AUTHORED. Increment V
+likewise grouped `RemediationRule` (#5) with #1b as blocked ("it needs a trigger-shape ratification, like
+`RemediationRule` (#5)"); that too is resolved here — but on a **different footing** from its three siblings. `DispositionRule` / `EscalationRule` / `WaiverRule` were transcribed from ratified DOC-004
+interfaces; **`RemediationRule` is defined NOWHERE in the 14 ratified docs** (grep-confirmed across the corpus),
+so its shape is **AUTHORED, not transcribed** — grounded where the corpus speaks and labelled AUTHORED where it
+is silent. It replaces the `FORCE_PLACEHOLDER` `z.record`: `AssurancePolicyDefinition.remediationRules` was
+**required** by the object schema yet carried by no command, so `assurance.ts` hardcoded `remediationRules: []`
+— a write-only-empty ratified home.
+
+The authored shape:
+- **`remediationActions: ControlAction[]`** (required) — the one ratified building block, drawn from §11's
+  23-value `ControlActionSchema`; DOC-003 §24 lists "Remediation options" as a policy element and the per-policy
+  §25–§35 subsections name these actions. Deliberately **not** named `recommendedControlActions`: that name is
+  already taken by `ValidatorResult.recommendedControlActions` (a `ControlActionRecommendation[]` wrapper) — a
+  collision avoided.
+- **`trigger?`** — the opaque residual predicate, exactly the family pattern of `DispositionRule.condition` /
+  `EscalationRule.trigger` / `WaiverRule.revalidationTrigger`. `PolicyExpression` is undefined in the corpus, so
+  it stays `z.unknown()` — **disclosed, not invented**.
+- **`appliesToFindingCodes?` / `appliesToSeverities?`** — optional machine-evaluable scoping (the finding codes /
+  observation severities the remediation applies to), the same severity-as-string family as
+  `DispositionRule.forbiddenOpenSeverities` / `WaiverRule.prohibitedFindingSeverities`.
+
+It is now **settable** through `CreateAssurancePolicy` / `EditAssurancePolicy` and mirrored onto the
+`AssurancePolicyCreated` / `AssurancePolicyEdited` events — threaded exactly like the other five rule arrays, and
+**optional**, so every existing caller stays valid. The **authoring invariant** is enforced: a remediation rule
+may only prescribe control actions the policy **permits** — `remediationActions ⊆ permittedControlActions` (§11)
+— checked on create and on edit, where the **effective** rules are validated against the **effective** permitted
+set (so an edit that narrows `permittedControlActions` *or* revises `remediationRules` cannot leave an ungoverned
+action behind). ABSENT and EMPTY are distinguished (a review fix, below): an `undefined` permitted set has nothing
+to subset-check and is skipped, but an explicit `[]` means the policy permits **no** control action, so any
+remediation action fails closed — `X ⊆ []` holds only for empty `X`. A settable remediation that names an
+ungoverned action fails closed.
+
+**SETTABLE, EVALUATION STAGED:** no runtime remediation trigger point exists in the assurance loop yet (a
+remediation fires at a governed repair/decision step not built), so the rule is recorded and subset-validated but
+does not yet *fire* — the same honest boundary the log has drawn throughout. The DOC-002 §17.1 singular
+`remediationPolicy` vs DOC-004/DOC-007 plural `remediationRules[]` whole-object divergence is **inherited** (the
+code already binds the plural definition form), not introduced here.
+
+Red-first: a structured `remediationRules` survives a create round-trip on the policy state; and a rule whose
+`remediationActions` include an action the policy does not permit (e.g. `['ABANDON']` under permitted
+`['RESHAPE_PWU']`) is **REJECTED**.
+
+With #5 settable, **all six rule arrays now leave their write-only-empty state** — five ENFORCED at completion /
+waiver time, the sixth settable-and-subset-validated with only its runtime firing staged.
+
+**Adversarial review (covers W + X, one commit).** A 20-agent workflow — four lenses (corpus-fidelity /
+logic-correctness / fail-closed / contract-integrity), each finding independently put to a refute-first skeptic
+panel, then synthesized — returned **SHIP**: no CRITICAL/HIGH/MEDIUM survived, no governance bypass, no ratified
+test broke, and every major corpus probe passed (§10.3's {CRITICAL} ESCALATED pairing, the ASSESSING → ESCALATED
+arrow ratified across `transitions.data.ts` + §30 + the DOC-002 event catalog, and `RemediationRule` genuinely
+corpus-undefined so the authored shape contradicts nothing). Six **LOW** issues were folded into this same commit
+rather than carried as debt:
+
+1. **The one behavioral regression.** Gate D returned early *before* the pre-existing INV-8 independence check, so
+   an open-CRITICAL assessment with an independence violation would ESCALATE and never record
+   `AssuranceIndependenceViolated` (the §30 ASSESSING → INDEPENDENCE_VIOLATION arrow INV-8 forbids from reaching
+   SATISFIED). Fixed by moving `checkIndependence` **above** Gate D — order is now **B → Independence → D → A → C**
+   — so a precondition failure decides before any outcome gate, while escalation still precedes reject/satisfy.
+2. **Empty-permitted fail-open (#5).** The subset guard skipped whenever `permittedControlActions` was empty,
+   collapsing ABSENT with explicit `[]`; now `undefined` skips and `[]` rejects any remediation action (above).
+3. **§10.3 over-claim (#1b).** An earlier draft called CRITICAL "the only severity §10.3 makes escalatable";
+   §10.3 is a *default* precedence ("Unless a policy overrides it") — corrected in the code, the vocab note, and
+   Increment W above: the shortcut is CRITICAL-only, overrides route through `EscalationRule.trigger`.
+4. **Edit-path coverage.** Added tests: narrowing `permittedControlActions` to orphan an existing remediation
+   action → REJECT (the effective-merge); a valid edit-add round-trip; a non-CRITICAL escalation reject on edit;
+   and an ordering test (editing a nonexistent policy reports non-existence, not the content error).
+5. **`riskProfiles` inversion.** A carried-forward comment denied `riskProfiles` is an `AssurancePolicyDefinition`
+   field; it **is** (DOC-004 §3.1 L130 `riskProfiles: AssuranceProfileRule[]`), just not one of the six *rule*
+   arrays — corrected to say so, not to deny it.
+6. **Comment/ordering drift.** The m1 note ("enforced when the runtime trigger is built") and a stale test title
+   ("remediationRules … always empty") now read "enforced at authoring; only FIRING staged" and "defaults to []
+   when none supplied"; and `editAssurancePolicy`'s escalation validation now runs *after* the existence/SUPERSEDED
+   checks (a lifecycle rejection precedes a content rejection).
+
+**Gate (W + X):** `check-types` 21/21 · full `test` 21/21 tasks — `rph-application` 145 (+1 pre-existing skip),
+`assurance-independence` **21** (+5 edit-path/fail-closed), `assurance-policy` unchanged · lint · boundary (159
+modules, 0 violations) · **Playwright E2E 25/25** (no seeded policy declares `escalationRules` or
+`remediationRules`, so Gates D and the authoring/subset validations are inert on the reference + demo drives).
+Footprint (one commit): `m1-object-fields.json` (+`escalateOnOpenSeverities`, RemediationRule helper, note
+corrections) + `m3-commands-events.json` (`remediationRules` on 2 commands + 2 events) + `objects.ts` +
+`messages.ts` + `schemas/objects/AssurancePolicyDefinition.json` (regenerated) + `assurance.ts` (Gates + authoring
+validation + independence reorder + comment fixes) + `assurance-independence.test.ts` + `assurance-policy.test.ts`.
+Committed.

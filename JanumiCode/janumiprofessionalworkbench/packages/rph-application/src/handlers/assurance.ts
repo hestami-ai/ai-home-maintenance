@@ -62,14 +62,84 @@ function rejectIfFloorLocked(command: DomainCommand): () => ReturnType<typeof re
 			: null;
 }
 
+/** The severities the AUTHORED `escalateOnOpenSeverities` shortcut accepts. §10.3 is a *default precedence* — its
+ *  own words, "Unless a policy overrides it:" — and CRITICAL is the ONLY severity that default pairs with ESCALATED
+ *  ("CRITICAL open finding → REJECTED or ESCALATED"; BLOCKING → REJECTED; MATERIAL → CONDITIONALLY_SATISFIED /
+ *  INCONCLUSIVE / REJECTED). So this shortcut deliberately covers exactly that one unambiguous ESCALATED case. It is
+ *  NOT a claim that the corpus forbids escalating another severity: §10.3 explicitly permits a policy to override the
+ *  default, but that override is expressed through the ratified `EscalationRule.trigger` (PolicyExpression, §13) — the
+ *  general residual predicate — NOT through this authored severity shortcut. Keeping the shortcut CRITICAL-only makes
+ *  it fail closed (an ambiguous BLOCKING/MATERIAL use is refused and directed to `trigger`) rather than authoring an
+ *  override the corpus routes through a different, ratified mechanism. Widen ONLY if a machine-evaluable multi-severity
+ *  escalation mapping is later ratified. */
+const ESCALATABLE_SEVERITIES: ReadonlySet<string> = new Set(['CRITICAL']);
+
+/** Reject a policy whose escalationRules use the `escalateOnOpenSeverities` shortcut for a severity outside
+ *  ESCALATABLE_SEVERITIES — fail closed at authoring rather than persist a silently-inert rule (Gate D would never act
+ *  on it), and direct any deliberate override to the ratified `EscalationRule.trigger` (§13). */
+function rejectUnratifiedEscalationSeverities(
+	command: DomainCommand,
+	escalationRules: ReadonlyArray<{ escalateOnOpenSeverities?: readonly string[] }> | undefined
+): ReturnType<typeof reject> | null {
+	const bad = [
+		...new Set(
+			(escalationRules ?? [])
+				.flatMap((r) => r?.escalateOnOpenSeverities ?? [])
+				.filter((s) => !ESCALATABLE_SEVERITIES.has(s))
+		)
+	];
+	return bad.length === 0
+		? null
+		: reject(
+				command,
+				'RPH_VALIDATION_SEMANTIC_FAILED',
+				`escalationRules.escalateOnOpenSeverities accepts only ${[...ESCALATABLE_SEVERITIES].join(', ')} — the single severity §10.3's default precedence pairs with ESCALATED; got [${bad.join(', ')}]. This authored shortcut covers that one unambiguous case; to override the default and escalate another severity (§10.3 "Unless a policy overrides it"), express it through the ratified EscalationRule.trigger (§13), not this field.`,
+				[command.targetAggregateId]
+			);
+}
+
+/** #5 — the RemediationRule invariant, checked at authoring: a remediation rule may only prescribe control actions
+ *  the policy PERMITS (§11). Runtime remediation FIRING is staged (no trigger point yet), but a settable remediation
+ *  that names an ungoverned action is incoherent, so it fails closed here. ABSENT vs EMPTY are distinct: `undefined`
+ *  (no permitted set declared at all) can't be subset-checked, so skip; an explicit `[]` means the policy permits NO
+ *  control action, so ANY non-empty remediationAction is ungoverned and must reject (set-theoretically X ⊆ [] holds
+ *  only for empty X — collapsing `[]` into "unconstrained" would fail OPEN, the exact state this guard forecloses). */
+function rejectRemediationActionsNotPermitted(
+	command: DomainCommand,
+	remediationRules: ReadonlyArray<{ remediationActions?: readonly string[] }> | undefined,
+	permittedControlActions: readonly string[] | undefined
+): ReturnType<typeof reject> | null {
+	if (permittedControlActions === undefined) return null;
+	const permitted = new Set(permittedControlActions);
+	const bad = [
+		...new Set(
+			(remediationRules ?? []).flatMap((r) => r?.remediationActions ?? []).filter((a) => !permitted.has(a))
+		)
+	];
+	return bad.length === 0
+		? null
+		: reject(
+				command,
+				'RPH_VALIDATION_SEMANTIC_FAILED',
+				`remediationRules prescribe control action(s) [${bad.join(', ')}] the policy does not permit (§11) — a remediation may only use the policy's permittedControlActions.`,
+				[command.targetAggregateId]
+			);
+}
+
 /** CreateAssurancePolicy — create a versioned ASSURANCE_POLICY object. Regular (catalog) policies are born DRAFT
  *  (the ratified DOC-002 §18 initial state) and must be activated to govern; the de minimis floor policies (§8.4)
  *  are seeded through this too but are born ACTIVE (locked, always-apply — they cannot be activated). See bornStatus
- *  below. Five of the six governing rule arrays are now settable from the payload (evidence, disposition, escalation,
- *  waiver — DOC-004 §6.1/§10.2/§13/§12.1); remediationRules alone stays empty (its element type is undefined in the
- *  corpus). The enum-typed fields are validated by the object schema. */
+ *  below. ALL SIX governing rule arrays are now settable from the payload (evidence, disposition, escalation, waiver
+ *  — DOC-004 §6.1/§10.2/§13/§12.1 — and remediationRules, whose element shape was AUTHORED 2026-07-19 since the
+ *  corpus defines none). The enum-typed fields are validated by the object schema. */
 export const createAssurancePolicy: CommandHandler = (ctx, command, payload) => {
 	const p = payload as CreateAssurancePolicyPayload;
+	// #1b — escalationRules may only escalate on §10.3's ratified escalatable severity (CRITICAL). Fail closed here.
+	const escBlock = rejectUnratifiedEscalationSeverities(command, p.escalationRules);
+	if (escBlock) return escBlock;
+	// #5 — remediationRules may only prescribe permitted control actions (§11).
+	const remBlock = rejectRemediationActionsNotPermitted(command, p.remediationRules, p.permittedControlActions);
+	if (remBlock) return remBlock;
 	// The initial governance state, split by policy kind:
 	//   - REGULAR (ratified DOC-004 catalog) policies are born DRAFT — the RATIFIED AssurancePolicy.status initial
 	//     state (DOC-002 §18: initialState DRAFT, with a guarded DRAFT -> ACTIVE "policy activated" transition). The
@@ -104,17 +174,25 @@ export const createAssurancePolicy: CommandHandler = (ctx, command, payload) => 
 		// demands it, nothing could set it, so a seeded policy could declare NONE of the rules that make it a policy
 		// (its outcome, its escalation, its evidence, its waivability).
 		//
-		// FIVE are now SETTABLE (payload fields authored under the §0.3 grant; element shapes transcribed from DOC-004,
-		// Inc A): requiredEvidence + optionalEvidence (§6.1, set above), dispositionRules (§10.2), escalationRules
-		// (§13), and waiverRules (§12.1). remediationRules ALONE stays hardcoded [] — DEFERRED because RemediationRule
-		// is undefined across the corpus (the ExecutionProvenance situation), so invent nothing. (An earlier note
-		// counted a seventh array, riskProfiles; it is NOT an AssurancePolicyDefinition field — the '6/7' miscounted.)
+		// ALL SIX are now SETTABLE (payload fields authored under the §0.3 grant; element shapes transcribed from
+		// DOC-004 where it defines them, AUTHORED where it does not): requiredEvidence + optionalEvidence (§6.1),
+		// dispositionRules (§10.2), escalationRules (§13), waiverRules (§12.1), and remediationRules (AUTHORED
+		// 2026-07-19 — the corpus defines no RemediationRule, so its shape is grounded in ControlAction §11 + the
+		// sibling family, labelled AUTHORED). (riskProfiles IS a seventh AssurancePolicyDefinition array — DOC-004 §3.1
+		// L130 `riskProfiles: AssuranceProfileRule[]` — but it is NOT one of these six evidence/disposition/escalation/
+		// waiver/remediation RULE arrays; it is a distinct profile-rule array, not yet threaded (an open settable gap,
+		// tracked; the M0 Ratify Sheet retains it as optional). Do not read the "six" as denying it exists.)
 		//
-		// SETTABLE, NOT YET ENFORCED: occupying these ratified homes is documentation-grade — the assurance loop
-		// derives disposition from the validator recommendation and floor.ts hardcodes the plan, so nothing READS
-		// these declared rules at runtime yet. Wiring a store→runtime read is the deeper follow-up.
+		// FIVE now GOVERN, not just occupy their homes: requiredEvidence (Gate A), permittedControlActions (Gate B),
+		// dispositionRules' forbiddenOpenSeverities (Gate C, §10.3 foreclosure), escalationRules'
+		// escalateOnOpenSeverities (Gate D, §10.3 CRITICAL escalation) — all at completeAssuranceAssessment — and
+		// waiverRules at requestWaiver (§12/§36.4). remediationRules is settable + subset-validated (its actions ⊆
+		// permittedControlActions, above), but its runtime FIRING is STAGED: no remediation trigger point exists in
+		// the assurance loop yet (a remediation fires at a governed repair/decision step not built).
 		dispositionRules: p.dispositionRules ?? [],
-		remediationRules: [],
+		// #5 — now SETTABLE (was hardcoded [] while RemediationRule was an undefined FORCE_PLACEHOLDER). The shape is
+		// authored + threaded; its remediationActions are subset-validated against permittedControlActions above.
+		remediationRules: p.remediationRules ?? [],
 		escalationRules: p.escalationRules ?? [],
 		waiverRules: p.waiverRules ?? [],
 		permittedControlActions: p.permittedControlActions,
@@ -145,6 +223,22 @@ export const editAssurancePolicy: CommandHandler = (ctx, command, payload) => {
 			[id]
 		);
 	}
+	// #1b — a revised escalationRules must also honor §10.3's escalatable severity (CRITICAL only). Content validation
+	// runs AFTER the existence/SUPERSEDED checks (mirroring remBlock) so a lifecycle rejection takes precedence over a
+	// payload-shape rejection.
+	const escBlock = rejectUnratifiedEscalationSeverities(command, p.escalationRules);
+	if (escBlock) return escBlock;
+	// #5 — the effective remediationRules (new or existing) must keep remediationActions ⊆ the effective permitted
+	// set, so an edit that narrows permittedControlActions or revises remediationRules cannot leave an ungoverned
+	// remediation action behind.
+	const remBlock = rejectRemediationActionsNotPermitted(
+		command,
+		(p.remediationRules ?? loaded.state.remediationRules) as
+			| ReadonlyArray<{ remediationActions?: readonly string[] }>
+			| undefined,
+		(p.permittedControlActions ?? loaded.state.permittedControlActions) as readonly string[] | undefined
+	);
+	if (remBlock) return remBlock;
 	const newRevision = loaded.revision + 1;
 	const next: Record<string, unknown> = {
 		...nextEnvelope(loaded.state, command, newRevision),
@@ -169,6 +263,9 @@ export const editAssurancePolicy: CommandHandler = (ctx, command, payload) => {
 		// it, the edit side silently dropped it, so a policy's waivability could be set at birth but never revised.
 		// Closing that pre-existing gap (adversarial review, Inc C).
 		...(p.waiverRules !== undefined ? { waiverRules: p.waiverRules } : {}),
+		// #5 — remediationRules now revisable too (was never applied here — it was hardcoded [] at create and had no
+		// element shape). Subset-validated above.
+		...(p.remediationRules !== undefined ? { remediationRules: p.remediationRules } : {}),
 		...(p.permittedControlActions !== undefined
 			? { permittedControlActions: p.permittedControlActions }
 			: {})
@@ -687,9 +784,36 @@ export const completeAssuranceAssessment: CommandHandler = (ctx, command, payloa
 							disposition?: string;
 							forbiddenOpenSeverities?: readonly string[];
 						}>;
+						escalationRules?: ReadonlyArray<{
+							escalateOnOpenSeverities?: readonly string[];
+							escalationTarget?: string;
+						}>;
 				  }
 				| undefined)
 		: undefined;
+
+	// Shared by Gate D (escalation) and Gate C (foreclosure): the CURRENT severities of this assessment's still-OPEN
+	// observations. Loaded per-object from the store (not read off the recording event) so a resolved or WAIVED
+	// finding no longer counts. Memoized — computed at most once per completion, and only if a gate needs it.
+	let openSevMemo: Set<string> | undefined;
+	const openObservationSeverities = (): Set<string> =>
+		(openSevMemo ??= new Set(
+			ctx.store
+				.readAllEvents()
+				.filter(
+					(e) =>
+						e.eventType === 'AssuranceObservationRecorded' &&
+						(e.payload as { assessmentId?: string }).assessmentId === command.targetAggregateId
+				)
+				.map((e) => (e.payload as { observationId?: string }).observationId)
+				.filter((oid): oid is string => typeof oid === 'string')
+				.map(
+					(oid) =>
+						ctx.store.loadObject(oid)?.state as { severity?: string; disposition?: string } | undefined
+				)
+				.filter((o) => o?.disposition === 'OPEN' && typeof o.severity === 'string')
+				.map((o) => o!.severity as string)
+		));
 
 	// GATE B (Increment R) — permittedControlActions ENFORCED, not merely displayed. A validator may only recommend
 	// a control action the policy permits (§11); an action outside the permitted set is a policy violation, so the
@@ -708,6 +832,91 @@ export const completeAssuranceAssessment: CommandHandler = (ctx, command, payloa
 				`CompleteAssuranceAssessment: the validator recommended control action(s) [${offending.join(', ')}] that this policy does not permit (§11). Permitted: [${[...permitted].join(', ')}].`,
 				[command.targetAggregateId]
 			);
+		}
+	}
+
+	// INV-8 INDEPENDENCE (precedes Gate D — adversarial-review fix). A required-independence VIOLATION is a
+	// PRECONDITION failure that invalidates the evaluation itself, so it must decide BEFORE the outcome gates —
+	// including Gate D escalation. Were it left after Gate D, an open-CRITICAL + escalation-rule assessment would
+	// escalate and the ratified AssuranceIndependenceViolated event (the §30 ASSESSING -> INDEPENDENCE_VIOLATION
+	// arrow, which INV-8 forbids from ever reaching SATISFIED) would never be recorded. Runs only when the
+	// requirement resolves, is not NONE, and both operands are present; else falls through unverified (recorded,
+	// never a fabricated pass).
+	const independenceRequirement = policyState?.independenceRequirement;
+	// 'VERIFIED' only when the check RAN and PASSED; left undefined when it did not run (see the gate note above) so
+	// the §38 view reads that as "unknown", never a fabricated pass. The negative branch returns early below.
+	let independenceResult: string | undefined;
+	if (independenceRequirement && independenceRequirement !== 'NONE' && producer && evaluator) {
+		const verdict = checkIndependence(
+			independenceRequirement as IndependenceRequirement,
+			actorReferenceToIdentity(producer),
+			actorReferenceToIdentity(evaluator)
+		);
+		if (!verdict.independent) {
+			return advanceStatus(ctx, command, {
+				objectType: ASSESSMENT,
+				statusField: 'assessmentState',
+				machine: 'AssuranceAssessment.state',
+				target: 'INDEPENDENCE_VIOLATION',
+				eventType: 'AssuranceIndependenceViolated',
+				setLifecycleStatus: true,
+				eventPayload: (next) => ({
+					assessmentId: command.targetAggregateId,
+					assurancePolicyId: next.assurancePolicyId,
+					policyVersion: next.policyVersion,
+					subjectObjectIds: subjectIds,
+					subjectSemanticVersions: versions,
+					independenceRequirement,
+					reason: verdict.reason ?? 'required independence not satisfied'
+				}),
+				// Record BOTH identities the check compared (contract-drift fix): an INV-8 violation whose object
+				// state names neither operand cannot answer "producer X vs evaluator Y" — the very pair that failed.
+				// The violation path previously wrote neither; both are recorded now.
+				mutate: (base) => ({
+					...base,
+					completedAt: command.issuedAt,
+					...(producer ? { producer } : {}),
+					...(evaluator ? { evaluator } : {})
+				})
+			});
+		}
+		independenceResult = 'VERIFIED';
+	}
+
+	// GATE D (#1b) — escalationRules ENFORCED: the ratified escalation trigger fires. §10.3's DEFAULT precedence pairs
+	// ESCALATED with a CRITICAL open finding ("CRITICAL open finding → REJECTED or ESCALATED"); a policy declares, via
+	// an escalationRule's escalateOnOpenSeverities, that it takes the ESCALATE branch for that case. When such a
+	// CRITICAL observation is still OPEN, the assessment transitions ASSESSING → ESCALATED (the ratified §30 arrow,
+	// transitions.data.ts) and emits AssuranceAssessmentEscalated — REACHABLE for the first time — instead of completing
+	// to the recommended disposition. Runs AFTER the independence gate (a precondition) but BEFORE the reject/satisfy
+	// gates (A/C), so a declared escalation takes precedence over an outcome. RESTRICTED to ESCALATABLE_SEVERITIES
+	// (= {CRITICAL}); authoring already refused any other value here, and intersecting is defense-in-depth so the
+	// shortcut only ever fires for the one severity §10.3's default escalates — a policy overriding the default for
+	// another severity does so through EscalationRule.trigger (§13), not this field. Empty escalationRules → skip.
+	const escalationRules = policyState?.escalationRules ?? [];
+	if (escalationRules.length > 0) {
+		const openSev = openObservationSeverities();
+		const matchable = (r: { escalateOnOpenSeverities?: readonly string[] }): string[] => [
+			...new Set(
+				(r.escalateOnOpenSeverities ?? []).filter((s) => ESCALATABLE_SEVERITIES.has(s) && openSev.has(s))
+			)
+		];
+		const rule = escalationRules.find((r) => matchable(r).length > 0);
+		if (rule) {
+			const matched = matchable(rule);
+			const target = String(rule.escalationTarget ?? 'the policy escalation target');
+			return advanceStatus(ctx, command, {
+				objectType: ASSESSMENT,
+				statusField: 'assessmentState',
+				machine: 'AssuranceAssessment.state',
+				target: 'ESCALATED',
+				eventType: 'AssuranceAssessmentEscalated',
+				setLifecycleStatus: true,
+				eventPayload: () => ({
+					escalationReason: `open observation(s) of severity [${matched.join(', ')}] → escalation to ${target} per policy escalationRules (§10.3/§13)`,
+					disposition: 'ESCALATED'
+				})
+			});
 		}
 	}
 
@@ -758,21 +967,7 @@ export const completeAssuranceAssessment: CommandHandler = (ctx, command, payloa
 	const dispositionRule = (policyState?.dispositionRules ?? []).find((r) => r?.disposition === disposition);
 	const forbidden = new Set(dispositionRule?.forbiddenOpenSeverities ?? []);
 	if (forbidden.size > 0) {
-		const openForbiddenSeverities = ctx.store
-			.readAllEvents()
-			.filter(
-				(e) =>
-					e.eventType === 'AssuranceObservationRecorded' &&
-					(e.payload as { assessmentId?: string }).assessmentId === command.targetAggregateId
-			)
-			.map((e) => (e.payload as { observationId?: string }).observationId)
-			.filter((oid): oid is string => typeof oid === 'string')
-			.map(
-				(oid) =>
-					ctx.store.loadObject(oid)?.state as { severity?: string; disposition?: string } | undefined
-			)
-			.filter((o) => o?.disposition === 'OPEN' && typeof o.severity === 'string' && forbidden.has(o.severity))
-			.map((o) => o!.severity as string);
+		const openForbiddenSeverities = [...openObservationSeverities()].filter((s) => forbidden.has(s));
 		if (openForbiddenSeverities.length > 0) {
 			return reject(
 				command,
@@ -781,47 +976,6 @@ export const completeAssuranceAssessment: CommandHandler = (ctx, command, payloa
 				[command.targetAggregateId]
 			);
 		}
-	}
-
-	const independenceRequirement = policyState?.independenceRequirement;
-	// 'VERIFIED' only when the check RAN and PASSED; left undefined when it did not run (see the gate note above) so
-	// the §38 view reads that as "unknown", never a fabricated pass. The negative branch returns early below.
-	let independenceResult: string | undefined;
-	if (independenceRequirement && independenceRequirement !== 'NONE' && producer && evaluator) {
-		const verdict = checkIndependence(
-			independenceRequirement as IndependenceRequirement,
-			actorReferenceToIdentity(producer),
-			actorReferenceToIdentity(evaluator)
-		);
-		if (!verdict.independent) {
-			return advanceStatus(ctx, command, {
-				objectType: ASSESSMENT,
-				statusField: 'assessmentState',
-				machine: 'AssuranceAssessment.state',
-				target: 'INDEPENDENCE_VIOLATION',
-				eventType: 'AssuranceIndependenceViolated',
-				setLifecycleStatus: true,
-				eventPayload: (next) => ({
-					assessmentId: command.targetAggregateId,
-					assurancePolicyId: next.assurancePolicyId,
-					policyVersion: next.policyVersion,
-					subjectObjectIds: subjectIds,
-					subjectSemanticVersions: versions,
-					independenceRequirement,
-					reason: verdict.reason ?? 'required independence not satisfied'
-				}),
-				// Record BOTH identities the check compared (contract-drift fix): an INV-8 violation whose object
-				// state names neither operand cannot answer "producer X vs evaluator Y" — the very pair that failed.
-				// The violation path previously wrote neither; both are recorded now.
-				mutate: (base) => ({
-					...base,
-					completedAt: command.issuedAt,
-					...(producer ? { producer } : {}),
-					...(evaluator ? { evaluator } : {})
-				})
-			});
-		}
-		independenceResult = 'VERIFIED';
 	}
 
 	return advanceStatus(ctx, command, {

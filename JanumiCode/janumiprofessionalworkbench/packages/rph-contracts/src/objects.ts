@@ -99,8 +99,6 @@ export const ProposedAssuranceObservationSchema = z.record(z.string(), z.unknown
 export type ProposedAssuranceObservation = z.infer<typeof ProposedAssuranceObservationSchema>;
 export const RejectedEvidenceReferenceSchema = z.record(z.string(), z.unknown());
 export type RejectedEvidenceReference = z.infer<typeof RejectedEvidenceReferenceSchema>;
-export const RemediationRuleSchema = z.record(z.string(), z.unknown());
-export type RemediationRule = z.infer<typeof RemediationRuleSchema>;
 export const RetryPolicySchema = z.record(z.string(), z.unknown());
 export type RetryPolicy = z.infer<typeof RetryPolicySchema>;
 export const SandboxPolicySchema = z.record(z.string(), z.unknown());
@@ -199,7 +197,8 @@ export const EscalationRuleSchema = z.strictObject({
 	trigger: z.unknown(),
 	escalationTarget: EscalationTargetSchema,
 	requiredPackage: z.array(z.string()),
-	timeoutAction: ControlActionSchema.optional()
+	timeoutAction: ControlActionSchema.optional(),
+	escalateOnOpenSeverities: z.array(z.string()).optional()
 });
 export type EscalationRule = z.infer<typeof EscalationRuleSchema>;
 export const EvidenceRequirementSchema = z.strictObject({
@@ -260,6 +259,13 @@ export const PermittedChildRuleSchema = z.strictObject({
 	applicabilityNote: z.string().optional()
 });
 export type PermittedChildRule = z.infer<typeof PermittedChildRuleSchema>;
+export const RemediationRuleSchema = z.strictObject({
+	trigger: z.unknown().optional(),
+	remediationActions: z.array(ControlActionSchema),
+	appliesToFindingCodes: z.array(z.string()).optional(),
+	appliesToSeverities: z.array(z.string()).optional()
+});
+export type RemediationRule = z.infer<typeof RemediationRuleSchema>;
 export const TraceLinkSchema = z.strictObject({
 	id: z.string(),
 	sourceObjectId: z.string(),

@@ -690,10 +690,56 @@
       "type": "array",
       "items": {
         "type": "object",
-        "propertyNames": {
-          "type": "string"
+        "properties": {
+          "trigger": {},
+          "remediationActions": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "enum": [
+                "CONTINUE",
+                "WAIT",
+                "CLARIFY",
+                "GATHER_CONTEXT",
+                "GATHER_EVIDENCE",
+                "REVISE_PROMPT",
+                "REVISE_CONTEXT",
+                "RETRY",
+                "CHANGE_MODEL",
+                "CHANGE_TOOL",
+                "CHANGE_VALIDATOR",
+                "CHANGE_TACTIC",
+                "RESHAPE_PWU",
+                "REVISE_DECOMPOSITION",
+                "REPLAN_EXECUTION",
+                "INVALIDATE_DEPENDENTS",
+                "REQUEST_HUMAN_DECISION",
+                "REQUEST_WAIVER",
+                "ESCALATE",
+                "REJECT",
+                "ABANDON",
+                "ACCEPT",
+                "PROMOTE_BASELINE"
+              ]
+            }
+          },
+          "appliesToFindingCodes": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "appliesToSeverities": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          }
         },
-        "additionalProperties": {}
+        "required": [
+          "remediationActions"
+        ],
+        "additionalProperties": false
       }
     },
     "escalationRules": {
@@ -747,6 +793,12 @@
               "ACCEPT",
               "PROMOTE_BASELINE"
             ]
+          },
+          "escalateOnOpenSeverities": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
           }
         },
         "required": [

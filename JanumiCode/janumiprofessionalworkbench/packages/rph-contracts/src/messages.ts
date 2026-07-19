@@ -61,6 +61,7 @@ import {
 	ObligationAllocationSchema,
 	OutputDefinitionSchema,
 	PermittedChildRuleSchema,
+	RemediationRuleSchema,
 	RetryPolicySchema,
 	SandboxPolicySchema,
 	SuccessConditionSchema,
@@ -544,6 +545,7 @@ export const CreateAssurancePolicyPayloadSchema = z.strictObject({
 	optionalEvidence: z.array(EvidenceRequirementSchema).optional(),
 	dispositionRules: z.array(DispositionRuleSchema).optional(),
 	escalationRules: z.array(EscalationRuleSchema).optional(),
+	remediationRules: z.array(RemediationRuleSchema).optional(),
 	permittedControlActions: z.array(ControlActionSchema)
 });
 export type CreateAssurancePolicyPayload = z.infer<typeof CreateAssurancePolicyPayloadSchema>;
@@ -563,6 +565,7 @@ export const EditAssurancePolicyPayloadSchema = z.strictObject({
 	optionalEvidence: z.array(EvidenceRequirementSchema).optional(),
 	dispositionRules: z.array(DispositionRuleSchema).optional(),
 	escalationRules: z.array(EscalationRuleSchema).optional(),
+	remediationRules: z.array(RemediationRuleSchema).optional(),
 	permittedControlActions: z.array(ControlActionSchema).optional()
 });
 export type EditAssurancePolicyPayload = z.infer<typeof EditAssurancePolicyPayloadSchema>;
@@ -1412,6 +1415,7 @@ export const AssurancePolicyCreatedPayloadSchema = z.strictObject({
 	optionalEvidence: z.array(EvidenceRequirementSchema).optional(),
 	dispositionRules: z.array(DispositionRuleSchema).optional(),
 	escalationRules: z.array(EscalationRuleSchema).optional(),
+	remediationRules: z.array(RemediationRuleSchema).optional(),
 	permittedControlActions: z.array(ControlActionSchema)
 });
 export type AssurancePolicyCreatedPayload = z.infer<typeof AssurancePolicyCreatedPayloadSchema>;
@@ -1431,6 +1435,7 @@ export const AssurancePolicyEditedPayloadSchema = z.strictObject({
 	optionalEvidence: z.array(EvidenceRequirementSchema).optional(),
 	dispositionRules: z.array(DispositionRuleSchema).optional(),
 	escalationRules: z.array(EscalationRuleSchema).optional(),
+	remediationRules: z.array(RemediationRuleSchema).optional(),
 	permittedControlActions: z.array(ControlActionSchema).optional()
 });
 export type AssurancePolicyEditedPayload = z.infer<typeof AssurancePolicyEditedPayloadSchema>;

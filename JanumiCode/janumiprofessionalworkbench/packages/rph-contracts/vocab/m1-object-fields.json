@@ -2548,12 +2548,33 @@
       "name": "RemediationRule",
       "fields": [
         {
-          "field": "(undefined)",
-          "type": "—",
+          "field": "trigger",
+          "type": "PolicyExpression",
           "required": false,
-          "note": "Referenced by AssurancePolicyDefinition.remediationRules (DOC-004 §3.1 L126) and the Command/Event/Schema Contract Package (L1278), but DEFINED NOWHERE in the 14-file corpus — no `interface RemediationRule`, no prose field list, no table. Investigated 2026-07-17: this is the ExecutionProvenance situation (AUDIT-placeholder-helpers.md L45 files it in the 'Genuinely undefined, confirmed' bucket). Distractors ruled out: RemediationPolicy (Canonical Domain Model L1092 / Migration L1251) is a different, also-undefined type; the Ontology 'Remediation options' bullet (L1374) is a concept name with no fields. DEFER: kept a FORCE_PLACEHOLDER (z.record) and NOT threaded from CreateAssurancePolicy; invent nothing until a DOC-004/DOC-007 interface is ratified as a separate step. Contrast the 3 siblings (EvidenceRequirement §6.1, DispositionRule §10.2, EscalationRule §13) which WERE defined and are now transcribed."
+          "note": "AUTHORED 2026-07-19 under the sponsor grant. The opaque residual predicate — exactly the family pattern of DispositionRule.condition / EscalationRule.trigger / WaiverRule.revalidationTrigger. PolicyExpression is UNDEFINED in the corpus, so it stays z.unknown() (DISCLOSED, not invented). The machine-evaluable scoping is appliesToFindingCodes / appliesToSeverities below."
+        },
+        {
+          "field": "remediationActions",
+          "type": "ControlAction[]",
+          "required": true,
+          "enumRef": "ControlActionSchema",
+          "note": "AUTHORED 2026-07-19. The one RATIFIED building block — the remediation actions this rule prescribes, drawn from the §11 ControlActionSchema (23 values); DOC-003 §24 lists 'Remediation options' as a policy element and the per-policy §25-§35 'Control actions' subsections name these. Deliberately NOT called recommendedControlActions: that name is already taken by ValidatorResult.recommendedControlActions (a ControlActionRecommendation[] wrapper) — a collision. INVARIANT (§11), enforced NOW at AUTHORING — createAssurancePolicy / editAssurancePolicy reject a rule whose remediationActions are not ⊆ the policy's permittedControlActions (an explicit empty permitted set permits none, so any action rejects). Only remediation FIRING is staged, not this subset check."
+        },
+        {
+          "field": "appliesToFindingCodes",
+          "type": "string[]",
+          "required": false,
+          "note": "AUTHORED 2026-07-19. Optional scope — the finding CODES this remediation applies to (absent = the policy's findings generally). Machine-evaluable against a recorded observation's findingCode."
+        },
+        {
+          "field": "appliesToSeverities",
+          "type": "string[]",
+          "required": false,
+          "note": "AUTHORED 2026-07-19. Optional scope — the observation severities this remediation applies to. Verbatim string[], the same severity-as-string family asymmetry as DispositionRule.forbiddenOpenSeverities / WaiverRule.prohibitedFindingSeverities."
         }
-      ]
+      ],
+      "sourceSection": "AUTHORED 2026-07-19 under the sponsor grant — the corpus defines no RemediationRule interface; grounded in ControlActionSchema (§11) + DOC-003 §24 'Remediation options' + the DispositionRule/EscalationRule/WaiverRule family pattern.",
+      "note": "Replaces the FORCE_PLACEHOLDER z.record. The 14 ratified docs define RemediationRule NOWHERE, so unlike its 3 siblings (transcribed from a ratified interface) this shape is AUTHORED — grounded where the corpus speaks (ControlAction §11; the family pattern) and labelled AUTHORED where it is silent. SETTABLE via Create/EditAssurancePolicy (threaded like the other 5 rule arrays); runtime EVALUATION is STAGED — no remediation trigger point exists in the assurance loop yet (a remediation fires at a governed repair/decision step not built). The DOC-002 §17.1 (singular remediationPolicy on AssurancePolicy) vs DOC-004/DOC-007 (plural remediationRules[] on AssurancePolicyDefinition) whole-object divergence is INHERITED (the code already binds the plural definition form), not introduced here."
     },
     {
       "name": "EscalationRule",
@@ -2583,6 +2604,12 @@
           "required": false,
           "enumRef": "ControlActionSchema",
           "note": "DOC-004 §13 (L681). Optional. 23-value ControlActionSchema (§11)."
+        },
+        {
+          "field": "escalateOnOpenSeverities",
+          "type": "string[]",
+          "required": false,
+          "note": "AUTHORED 2026-07-19 under the sponsor grant — the machine-evaluable escalation trigger, mirroring how DispositionRule keeps forbiddenOpenSeverities alongside its opaque `condition`. §10.3 (L568-569) pairs the ESCALATED disposition with a CRITICAL open finding ('CRITICAL open finding → REJECTED or ESCALATED'); this names the open-observation severities that fire the escalation to escalationTarget. §10.3 is a DEFAULT precedence ('Unless a policy overrides it:'), and CRITICAL is the only severity that default pairs with ESCALATED (BLOCKING → REJECTED; MATERIAL → CONDITIONALLY_SATISFIED / INCONCLUSIVE / REJECTED). This authored shortcut is RESTRICTED to that one case: createAssurancePolicy rejects any other value and Gate D (completeAssuranceAssessment) only acts on CRITICAL. It is NOT a claim the corpus forbids escalating another severity — §10.3 permits a policy to OVERRIDE the default, but that override is expressed through the ratified EscalationRule.trigger (§13), not this severity shortcut. Verbatim string[], the same severity-as-string family as DispositionRule.forbiddenOpenSeverities / WaiverRule.prohibitedFindingSeverities. Optional → escalationRules stays non-breaking; `trigger` remains the free-form residual for predicates not evaluable from assessment state."
         }
       ],
       "sourceSection": "DOC-004 §13 (L668) — RATIFIED shape, transcribed",

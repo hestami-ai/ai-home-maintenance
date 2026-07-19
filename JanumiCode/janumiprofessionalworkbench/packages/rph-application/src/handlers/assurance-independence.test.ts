@@ -702,4 +702,382 @@ describe('completeAssuranceAssessment — independence enforcement (Increment I2
 		);
 		expect(stateOf(B)?.assessmentState).toBe('SATISFIED');
 	});
+
+	it('§13/§10.3 escalationRules ENFORCED (Gate D): an open CRITICAL finding escalates ASSESSING → ESCALATED', () => {
+		dispatchOk(
+			cmd('CreateAssurancePolicy', POLICY, 'ASSURANCE_POLICY', {
+				policyId: POLICY,
+				version: '1.0.0',
+				name: 'Escalating policy',
+				purpose: 'p',
+				rationale: 'r',
+				applicableObjectTypes: ['PROFESSIONAL_WORK_UNIT'],
+				evaluatedClaimTypes: ['FITNESS'],
+				criteria: [
+					{
+						id: 'C1',
+						name: 'Fit',
+						description: 'd',
+						criterionType: 'QUALITATIVE',
+						evaluationMethod: 'HUMAN_JUDGMENT',
+						requiredEvidenceIds: [],
+						severityIfNotMet: 'MATERIAL',
+						mayBeNotApplicable: false
+					}
+				],
+				evaluatorRole: 'REVIEWER',
+				independenceRequirement: 'NONE',
+				escalationRules: [
+					{
+						trigger: 'critical open finding',
+						escalationTarget: 'SECURITY_REVIEWER',
+						requiredPackage: ['subject', 'finding'],
+						escalateOnOpenSeverities: ['CRITICAL']
+					}
+				],
+				findingDefinitions: [
+					{
+						code: 'UNFIT',
+						name: 'Unfit',
+						description: 'd',
+						defaultSeverity: 'MATERIAL',
+						affectedClaimTypes: ['FITNESS'],
+						defaultControlActions: ['CONTINUE']
+					}
+				],
+				permittedControlActions: ['CONTINUE']
+			})
+		);
+		dispatchOk(cmd('ActivateAssurancePolicy', POLICY, 'ASSURANCE_POLICY', { policyId: POLICY }));
+
+		// An open CRITICAL observation -> even a SATISFIED recommendation escalates (Gate D precedes the disposition
+		// gates), and the ratified-but-previously-dead AssuranceAssessmentEscalated event fires.
+		const A = 'asm_01ARZ3NDEKTSV4RRFFQ69G5A70';
+		requestAssessment(A);
+		dispatchOk(
+			cmd('RecordAssuranceObservation', 'obs_01ARZ3NDEKTSV4RRFFQ69G5B70', 'ASSURANCE_OBSERVATION', {
+				assessmentId: A,
+				observationType: 'FINDING',
+				severity: 'CRITICAL',
+				statement: 'a critical, unresolved gap'
+			})
+		);
+		dispatchOk(
+			cmd('CompleteAssuranceAssessment', A, 'ASSURANCE_ASSESSMENT', {
+				validatorResult: verdict(A, 'reviewer-e')
+			})
+		);
+		expect(stateOf(A)?.assessmentState).toBe('ESCALATED');
+		expect(
+			store.readAllEvents().some((e) => e.eventType === 'AssuranceAssessmentEscalated' && e.aggregateId === A)
+		).toBe(true);
+
+		// A MATERIAL-only open observation does NOT escalate (§10.3 CRITICAL restriction) -> completes to SATISFIED.
+		const B = 'asm_01ARZ3NDEKTSV4RRFFQ69G5A71';
+		requestAssessment(B);
+		dispatchOk(
+			cmd('RecordAssuranceObservation', 'obs_01ARZ3NDEKTSV4RRFFQ69G5B71', 'ASSURANCE_OBSERVATION', {
+				assessmentId: B,
+				observationType: 'FINDING',
+				severity: 'MATERIAL',
+				statement: 'material, not escalatable'
+			})
+		);
+		dispatchOk(
+			cmd('CompleteAssuranceAssessment', B, 'ASSURANCE_ASSESSMENT', {
+				validatorResult: verdict(B, 'reviewer-e')
+			})
+		);
+		expect(stateOf(B)?.assessmentState).toBe('SATISFIED');
+	});
+
+	it('§10.3 escalation is CRITICAL-only: authoring a non-CRITICAL escalateOnOpenSeverities is rejected', () => {
+		const r = engine.dispatch(
+			cmd('CreateAssurancePolicy', POLICY, 'ASSURANCE_POLICY', {
+				policyId: POLICY,
+				version: '1.0.0',
+				name: 'Bad-escalation policy',
+				purpose: 'p',
+				rationale: 'r',
+				applicableObjectTypes: ['PROFESSIONAL_WORK_UNIT'],
+				evaluatedClaimTypes: ['FITNESS'],
+				criteria: [
+					{
+						id: 'C1',
+						name: 'Fit',
+						description: 'd',
+						criterionType: 'QUALITATIVE',
+						evaluationMethod: 'HUMAN_JUDGMENT',
+						requiredEvidenceIds: [],
+						severityIfNotMet: 'MATERIAL',
+						mayBeNotApplicable: false
+					}
+				],
+				evaluatorRole: 'REVIEWER',
+				independenceRequirement: 'NONE',
+				escalationRules: [
+					{
+						trigger: 'x',
+						escalationTarget: 'SECURITY_REVIEWER',
+						requiredPackage: [],
+						escalateOnOpenSeverities: ['BLOCKING'] // §10.3 routes BLOCKING to REJECTED, not escalation
+					}
+				],
+				findingDefinitions: [
+					{
+						code: 'UNFIT',
+						name: 'Unfit',
+						description: 'd',
+						defaultSeverity: 'MATERIAL',
+						affectedClaimTypes: ['FITNESS'],
+						defaultControlActions: ['CONTINUE']
+					}
+				],
+				permittedControlActions: ['CONTINUE']
+			})
+		);
+		expect(r.status).toBe('REJECTED');
+		expect(store.loadObject(POLICY)).toBeUndefined();
+	});
+
+	it('#5 remediationRules: a structured rule round-trips (settable), replacing the old z.record placeholder', () => {
+		dispatchOk(
+			cmd('CreateAssurancePolicy', POLICY, 'ASSURANCE_POLICY', {
+				policyId: POLICY,
+				version: '1.0.0',
+				name: 'Remediating policy',
+				purpose: 'p',
+				rationale: 'r',
+				applicableObjectTypes: ['PROFESSIONAL_WORK_UNIT'],
+				evaluatedClaimTypes: ['FITNESS'],
+				criteria: [
+					{
+						id: 'C1',
+						name: 'Fit',
+						description: 'd',
+						criterionType: 'QUALITATIVE',
+						evaluationMethod: 'HUMAN_JUDGMENT',
+						requiredEvidenceIds: [],
+						severityIfNotMet: 'MATERIAL',
+						mayBeNotApplicable: false
+					}
+				],
+				evaluatorRole: 'REVIEWER',
+				independenceRequirement: 'NONE',
+				permittedControlActions: ['RESHAPE_PWU', 'REQUEST_HUMAN_DECISION'],
+				remediationRules: [
+					{
+						trigger: 'unfit finding present',
+						remediationActions: ['RESHAPE_PWU'],
+						appliesToFindingCodes: ['UNFIT'],
+						appliesToSeverities: ['MATERIAL']
+					}
+				],
+				findingDefinitions: [
+					{
+						code: 'UNFIT',
+						name: 'Unfit',
+						description: 'd',
+						defaultSeverity: 'MATERIAL',
+						affectedClaimTypes: ['FITNESS'],
+						defaultControlActions: ['RESHAPE_PWU']
+					}
+				]
+			})
+		);
+		const state = store.loadObject(POLICY)?.state as {
+			remediationRules?: Array<{ remediationActions?: string[]; appliesToFindingCodes?: string[] }>;
+		};
+		expect(state.remediationRules).toHaveLength(1);
+		expect(state.remediationRules?.[0]?.remediationActions).toEqual(['RESHAPE_PWU']);
+		expect(state.remediationRules?.[0]?.appliesToFindingCodes).toEqual(['UNFIT']);
+	});
+
+	it('#5 remediationRules: a remediation action outside permittedControlActions is rejected (§11)', () => {
+		const r = engine.dispatch(
+			cmd('CreateAssurancePolicy', POLICY, 'ASSURANCE_POLICY', {
+				policyId: POLICY,
+				version: '1.0.0',
+				name: 'Bad-remediation policy',
+				purpose: 'p',
+				rationale: 'r',
+				applicableObjectTypes: ['PROFESSIONAL_WORK_UNIT'],
+				evaluatedClaimTypes: ['FITNESS'],
+				criteria: [
+					{
+						id: 'C1',
+						name: 'Fit',
+						description: 'd',
+						criterionType: 'QUALITATIVE',
+						evaluationMethod: 'HUMAN_JUDGMENT',
+						requiredEvidenceIds: [],
+						severityIfNotMet: 'MATERIAL',
+						mayBeNotApplicable: false
+					}
+				],
+				evaluatorRole: 'REVIEWER',
+				independenceRequirement: 'NONE',
+				permittedControlActions: ['RESHAPE_PWU'],
+				remediationRules: [{ trigger: 'x', remediationActions: ['ABANDON'] }], // ABANDON is not permitted
+				findingDefinitions: [
+					{
+						code: 'UNFIT',
+						name: 'Unfit',
+						description: 'd',
+						defaultSeverity: 'MATERIAL',
+						affectedClaimTypes: ['FITNESS'],
+						defaultControlActions: ['RESHAPE_PWU']
+					}
+				]
+			})
+		);
+		expect(r.status).toBe('REJECTED');
+		expect(store.loadObject(POLICY)).toBeUndefined();
+	});
+
+	// --- #1b + #5 EDIT-PATH + fail-closed edges (adversarial-review fixes). The effective-merge on edit is the
+	// subtlest new logic; the empty-permitted case is the fail-open the review caught; the ordering test pins that
+	// content validation runs AFTER existence/lifecycle checks. ---
+	const basePolicy = (extra: Record<string, unknown>): Record<string, unknown> => ({
+		policyId: POLICY,
+		version: '1.0.0',
+		name: 'Edit-path policy',
+		purpose: 'p',
+		rationale: 'r',
+		applicableObjectTypes: ['PROFESSIONAL_WORK_UNIT'],
+		evaluatedClaimTypes: ['FITNESS'],
+		criteria: [
+			{
+				id: 'C1',
+				name: 'Fit',
+				description: 'd',
+				criterionType: 'QUALITATIVE',
+				evaluationMethod: 'HUMAN_JUDGMENT',
+				requiredEvidenceIds: [],
+				severityIfNotMet: 'MATERIAL',
+				mayBeNotApplicable: false
+			}
+		],
+		evaluatorRole: 'REVIEWER',
+		independenceRequirement: 'NONE',
+		findingDefinitions: [
+			{
+				code: 'UNFIT',
+				name: 'Unfit',
+				description: 'd',
+				defaultSeverity: 'MATERIAL',
+				affectedClaimTypes: ['FITNESS'],
+				defaultControlActions: ['RESHAPE_PWU']
+			}
+		],
+		...extra
+	});
+
+	it('#5 remediationRules: an explicit EMPTY permittedControlActions rejects any remediation action (fail-CLOSED, not the empty-set fail-open)', () => {
+		// permittedControlActions: [] means the policy permits NO control action, so a remediation naming one is
+		// ungoverned — set-theoretically X ⊆ [] holds only for empty X. (The prior guard skipped on size===0 = fail-open.)
+		const r = engine.dispatch(
+			cmd(
+				'CreateAssurancePolicy',
+				POLICY,
+				'ASSURANCE_POLICY',
+				basePolicy({ permittedControlActions: [], remediationRules: [{ remediationActions: ['RESHAPE_PWU'] }] })
+			)
+		);
+		expect(r.status).toBe('REJECTED');
+		expect(store.loadObject(POLICY)).toBeUndefined();
+	});
+
+	it('#5 remediationRules EDIT-PATH: narrowing permittedControlActions to orphan an EXISTING remediation action is rejected (effective-set re-check)', () => {
+		dispatchOk(
+			cmd(
+				'CreateAssurancePolicy',
+				POLICY,
+				'ASSURANCE_POLICY',
+				basePolicy({
+					permittedControlActions: ['RESHAPE_PWU', 'REQUEST_HUMAN_DECISION'],
+					remediationRules: [{ remediationActions: ['REQUEST_HUMAN_DECISION'] }]
+				})
+			)
+		);
+		// Narrow permitted to RESHAPE_PWU only, WITHOUT resupplying remediationRules — the existing rule's
+		// REQUEST_HUMAN_DECISION is now ungoverned, so the edit must fail closed against the EFFECTIVE (existing) rules.
+		const r = engine.dispatch(
+			cmd('EditAssurancePolicy', POLICY, 'ASSURANCE_POLICY', {
+				policyId: POLICY,
+				permittedControlActions: ['RESHAPE_PWU']
+			})
+		);
+		expect(r.status).toBe('REJECTED');
+		const state = store.loadObject(POLICY)?.state as { permittedControlActions?: string[] };
+		expect(state.permittedControlActions).toEqual(['RESHAPE_PWU', 'REQUEST_HUMAN_DECISION']);
+	});
+
+	it('#5 remediationRules EDIT-PATH: adding a valid remediation rule round-trips (settable on edit)', () => {
+		dispatchOk(
+			cmd(
+				'CreateAssurancePolicy',
+				POLICY,
+				'ASSURANCE_POLICY',
+				basePolicy({ permittedControlActions: ['RESHAPE_PWU'] })
+			)
+		);
+		dispatchOk(
+			cmd('EditAssurancePolicy', POLICY, 'ASSURANCE_POLICY', {
+				policyId: POLICY,
+				remediationRules: [
+					{ trigger: 't', remediationActions: ['RESHAPE_PWU'], appliesToFindingCodes: ['UNFIT'] }
+				]
+			})
+		);
+		const state = store.loadObject(POLICY)?.state as {
+			remediationRules?: Array<{ remediationActions?: string[] }>;
+		};
+		expect(state.remediationRules).toHaveLength(1);
+		expect(state.remediationRules?.[0]?.remediationActions).toEqual(['RESHAPE_PWU']);
+	});
+
+	it('#1b escalationRules EDIT-PATH: a non-CRITICAL escalateOnOpenSeverities is rejected on edit too', () => {
+		dispatchOk(
+			cmd(
+				'CreateAssurancePolicy',
+				POLICY,
+				'ASSURANCE_POLICY',
+				basePolicy({ permittedControlActions: ['RESHAPE_PWU'] })
+			)
+		);
+		const r = engine.dispatch(
+			cmd('EditAssurancePolicy', POLICY, 'ASSURANCE_POLICY', {
+				policyId: POLICY,
+				escalationRules: [
+					{
+						trigger: 'x',
+						escalationTarget: 'SECURITY_REVIEWER',
+						requiredPackage: ['decision', 'subject', 'evidence'],
+						escalateOnOpenSeverities: ['MATERIAL'] // not CRITICAL — the shortcut refuses it
+					}
+				]
+			})
+		);
+		expect(r.status).toBe('REJECTED');
+	});
+
+	it('#1b EDIT-PATH ordering: editing a NONEXISTENT policy fails on existence, not on a bad escalation payload (content validation runs after loadOrReject)', () => {
+		const ABSENT = 'pol_01ARZ3NDEKTSV4RRFFQ69G5ABS';
+		const r = engine.dispatch(
+			cmd('EditAssurancePolicy', ABSENT, 'ASSURANCE_POLICY', {
+				policyId: ABSENT,
+				escalationRules: [
+					{
+						trigger: 'x',
+						escalationTarget: 'SECURITY_REVIEWER',
+						requiredPackage: ['decision', 'subject', 'evidence'],
+						escalateOnOpenSeverities: ['BLOCKING'] // also invalid — but existence must be reported first
+					}
+				]
+			})
+		);
+		expect(r.status).toBe('REJECTED');
+		expect(r.error?.message).toContain('does not exist');
+	});
 });
