@@ -25,6 +25,8 @@ import {
 	IntentStatusSchema,
 	MaterialitySchema,
 	ObligationStatusSchema,
+	ObligationStrengthSchema,
+	ObligationTypeSchema,
 	ObservationDispositionSchema,
 	ObservationTypeSchema,
 	ProfessionalWorkObjectTypeSchema,
@@ -272,6 +274,23 @@ export const AssertClaimPayloadSchema = z.strictObject({
 	contradictingEvidenceIds: z.array(z.string()).optional()
 });
 export type AssertClaimPayload = z.infer<typeof AssertClaimPayloadSchema>;
+export const AssertObligationPayloadSchema = z.strictObject({
+	statement: z.string(),
+	obligationType: ObligationTypeSchema,
+	sourceObjectId: z.string(),
+	authority: AuthorityReferenceSchema,
+	strength: ObligationStrengthSchema
+});
+export type AssertObligationPayload = z.infer<typeof AssertObligationPayloadSchema>;
+export const AssertConstraintPayloadSchema = z.strictObject({
+	statement: z.string(),
+	constraintType: ConstraintTypeSchema,
+	sourceObjectId: z.string(),
+	authority: AuthorityReferenceSchema,
+	applicability: ApplicabilityRuleSchema,
+	strength: ConstraintStrengthSchema
+});
+export type AssertConstraintPayload = z.infer<typeof AssertConstraintPayloadSchema>;
 export const RecordAssuranceObservationPayloadSchema = z.strictObject({
 	assessmentId: z.string(),
 	observationType: ObservationTypeSchema,
@@ -787,6 +806,26 @@ export const ClaimAssertedPayloadSchema = z.strictObject({
 	status: ClaimStatusSchema
 });
 export type ClaimAssertedPayload = z.infer<typeof ClaimAssertedPayloadSchema>;
+export const ObligationAssertedPayloadSchema = z.strictObject({
+	obligationId: z.string(),
+	statement: z.string(),
+	obligationType: ObligationTypeSchema,
+	sourceObjectId: z.string(),
+	authority: AuthorityReferenceSchema,
+	strength: ObligationStrengthSchema,
+	status: ObligationStatusSchema
+});
+export type ObligationAssertedPayload = z.infer<typeof ObligationAssertedPayloadSchema>;
+export const ConstraintAssertedPayloadSchema = z.strictObject({
+	constraintId: z.string(),
+	statement: z.string(),
+	constraintType: ConstraintTypeSchema,
+	authority: AuthorityReferenceSchema,
+	applicability: ApplicabilityRuleSchema,
+	strength: ConstraintStrengthSchema,
+	status: ConstraintStatusSchema
+});
+export type ConstraintAssertedPayload = z.infer<typeof ConstraintAssertedPayloadSchema>;
 export const ClaimContestedPayloadSchema = z.strictObject({
 	contradictingEvidenceIds: z.array(z.string()),
 	status: ClaimStatusSchema
@@ -1624,6 +1663,18 @@ export const COMMANDS = {
 		emitsEvent: 'ClaimAsserted',
 		firstSlice: false
 	},
+	AssertObligation: {
+		payload: AssertObligationPayloadSchema,
+		targetAggregateType: 'OBLIGATION',
+		emitsEvent: 'ObligationAsserted',
+		firstSlice: false
+	},
+	AssertConstraint: {
+		payload: AssertConstraintPayloadSchema,
+		targetAggregateType: 'CONSTRAINT',
+		emitsEvent: 'ConstraintAsserted',
+		firstSlice: false
+	},
 	RecordAssuranceObservation: {
 		payload: RecordAssuranceObservationPayloadSchema,
 		targetAggregateType: 'ASSURANCE_OBSERVATION',
@@ -1976,6 +2027,8 @@ export const EVENTS = {
 	},
 	BaselineSuperseded: { payload: BaselineSupersededPayloadSchema, aggregateType: 'Baseline' },
 	ClaimAsserted: { payload: ClaimAssertedPayloadSchema, aggregateType: 'Claim' },
+	ObligationAsserted: { payload: ObligationAssertedPayloadSchema, aggregateType: 'Obligation' },
+	ConstraintAsserted: { payload: ConstraintAssertedPayloadSchema, aggregateType: 'Constraint' },
 	ClaimContested: { payload: ClaimContestedPayloadSchema, aggregateType: 'Claim' },
 	ClaimRejected: { payload: ClaimRejectedPayloadSchema, aggregateType: 'Claim' },
 	ClaimSupported: { payload: ClaimSupportedPayloadSchema, aggregateType: 'Claim' },
@@ -2386,6 +2439,20 @@ export const BINDINGS: readonly CommandEventBinding[] = [
 		machine: 'Claim.status',
 		from: '(initial)',
 		to: 'OPEN'
+	},
+	{
+		commandType: 'AssertObligation',
+		eventType: 'ObligationAsserted',
+		machine: 'Obligation.status',
+		from: '(initial)',
+		to: 'PROPOSED'
+	},
+	{
+		commandType: 'AssertConstraint',
+		eventType: 'ConstraintAsserted',
+		machine: 'Constraint.status',
+		from: '(initial)',
+		to: 'PROPOSED'
 	},
 	{
 		commandType: 'RecordAssuranceObservation',

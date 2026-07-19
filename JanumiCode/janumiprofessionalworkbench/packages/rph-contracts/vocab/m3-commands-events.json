@@ -974,6 +974,96 @@
       ]
     },
     {
+      "commandType": "AssertObligation",
+      "targetAggregateType": "OBLIGATION",
+      "emitsEvent": "ObligationAsserted",
+      "drivesMachine": "Obligation.status",
+      "drivesFrom": "(initial)",
+      "drivesTo": "PROPOSED",
+      "schematized": false,
+      "sourceSection": "UNRATIFIED-AUTHORED (2026-07-19, sponsor delegated authority / JAN-ROADMAP-001 W1 gate G1 condition C1): DOC-002 §10.1 defines the ObligationObject fields, but DOC-007 schematizes NO command interface for minting one (§16 item 6: the first slice deliberately leaves the granular vocabulary unschematized). These payload fields are AUTHORED to instantiate the first-class Obligation object plane that master WP-1-005 mandates ('material obligations SHALL become first-class traceable objects'), so obligation conservation (Property P2 / RPH-DEC-002/007 / §35.1 'no obligation disappears') can be enforced non-vacuously at ValidateDecomposition. Do NOT treat this sourceSection as proof the shape is ratified. Cited: DOC-002 §10.1.",
+      "payloadFields": [
+        {
+          "field": "statement",
+          "required": true,
+          "type": "string"
+        },
+        {
+          "field": "obligationType",
+          "required": true,
+          "type": "ObligationType",
+          "enumRef": "ObligationTypeSchema"
+        },
+        {
+          "field": "sourceObjectId",
+          "required": true,
+          "type": "string",
+          "note": "id-ref; the PWU/intent this obligation derives from (§10.1)"
+        },
+        {
+          "field": "authority",
+          "required": true,
+          "type": "AuthorityReference",
+          "note": "complex type §5"
+        },
+        {
+          "field": "strength",
+          "required": true,
+          "type": "ObligationStrength",
+          "enumRef": "ObligationStrengthSchema",
+          "note": "MANDATORY|CONDITIONAL|ADVISORY — only MANDATORY is conservation-gated (§13.2)"
+        }
+      ]
+    },
+    {
+      "commandType": "AssertConstraint",
+      "targetAggregateType": "CONSTRAINT",
+      "emitsEvent": "ConstraintAsserted",
+      "drivesMachine": "Constraint.status",
+      "drivesFrom": "(initial)",
+      "drivesTo": "PROPOSED",
+      "schematized": false,
+      "sourceSection": "UNRATIFIED-AUTHORED (2026-07-19, sponsor delegated authority / JAN-ROADMAP-001 W1 gate G1 condition C1): DOC-002 §11.1 defines the ConstraintObject fields, but DOC-007 schematizes NO command interface for minting one (§16 item 6). AUTHORED to instantiate the first-class Constraint object plane that master WP-1-005/006 need, so constraint propagation (Property P3 / RPH-CNS-001..004 / RPH-DEC-003 / §35.1 'no constraint silently drops') can be enforced non-vacuously at ValidateDecomposition. Do NOT treat this sourceSection as ratification. Cited: DOC-002 §11.1.",
+      "payloadFields": [
+        {
+          "field": "statement",
+          "required": true,
+          "type": "string"
+        },
+        {
+          "field": "constraintType",
+          "required": true,
+          "type": "ConstraintType",
+          "enumRef": "ConstraintTypeSchema"
+        },
+        {
+          "field": "sourceObjectId",
+          "required": true,
+          "type": "string",
+          "note": "id-ref; the PWU/intent this constraint derives from (§11.1) — carried on provenance, not a ConstraintObject field"
+        },
+        {
+          "field": "authority",
+          "required": true,
+          "type": "AuthorityReference",
+          "note": "complex type §5"
+        },
+        {
+          "field": "applicability",
+          "required": true,
+          "type": "ApplicabilityRule",
+          "note": "helper §18 ApplicabilityRule (z.record); {} = applies unconditionally"
+        },
+        {
+          "field": "strength",
+          "required": true,
+          "type": "ConstraintStrength",
+          "enumRef": "ConstraintStrengthSchema",
+          "note": "MANDATORY|PREFERRED|ADVISORY — only MANDATORY+applicable is propagation-gated (§11.2)"
+        }
+      ]
+    },
+    {
       "commandType": "RecordAssuranceObservation",
       "targetAggregateType": "ASSURANCE_OBSERVATION",
       "emitsEvent": "AssuranceObservationRecorded",
@@ -3221,6 +3311,102 @@
           "type": "'OPEN'",
           "enumRef": "ClaimStatusSchema",
           "note": "literal const; DOC-002 adds optional supporting/contradicting evidence ids"
+        }
+      ]
+    },
+    {
+      "eventType": "ObligationAsserted",
+      "aggregateType": "Obligation",
+      "sourceSection": "UNRATIFIED-AUTHORED (2026-07-19, sponsor delegated authority / JAN-ROADMAP-001 W1 gate G1 condition C1): DOC-002 §10.1 names the Obligation object; DOC-007 schematizes no event interface. AUTHORED to record the minting of a first-class Obligation object. Do NOT treat as ratification. Cited: DOC-002 §10.1.",
+      "payloadFields": [
+        {
+          "field": "obligationId",
+          "required": true,
+          "type": "string",
+          "note": "id-ref"
+        },
+        {
+          "field": "statement",
+          "required": true,
+          "type": "string"
+        },
+        {
+          "field": "obligationType",
+          "required": true,
+          "type": "ObligationType",
+          "enumRef": "ObligationTypeSchema"
+        },
+        {
+          "field": "sourceObjectId",
+          "required": true,
+          "type": "string",
+          "note": "id-ref"
+        },
+        {
+          "field": "authority",
+          "required": true,
+          "type": "AuthorityReference",
+          "note": "complex type §5"
+        },
+        {
+          "field": "strength",
+          "required": true,
+          "type": "ObligationStrength",
+          "enumRef": "ObligationStrengthSchema"
+        },
+        {
+          "field": "status",
+          "required": true,
+          "type": "ObligationStatus",
+          "enumRef": "ObligationStatusSchema"
+        }
+      ]
+    },
+    {
+      "eventType": "ConstraintAsserted",
+      "aggregateType": "Constraint",
+      "sourceSection": "UNRATIFIED-AUTHORED (2026-07-19, sponsor delegated authority / JAN-ROADMAP-001 W1 gate G1 condition C1): DOC-002 §11.1 names the Constraint object; DOC-007 schematizes no event interface. AUTHORED to record the minting of a first-class Constraint object. Do NOT treat as ratification. Cited: DOC-002 §11.1.",
+      "payloadFields": [
+        {
+          "field": "constraintId",
+          "required": true,
+          "type": "string",
+          "note": "id-ref"
+        },
+        {
+          "field": "statement",
+          "required": true,
+          "type": "string"
+        },
+        {
+          "field": "constraintType",
+          "required": true,
+          "type": "ConstraintType",
+          "enumRef": "ConstraintTypeSchema"
+        },
+        {
+          "field": "authority",
+          "required": true,
+          "type": "AuthorityReference",
+          "note": "complex type §5"
+        },
+        {
+          "field": "applicability",
+          "required": true,
+          "type": "ApplicabilityRule",
+          "note": "helper §18 (z.record)"
+        },
+        {
+          "field": "strength",
+          "required": true,
+          "type": "ConstraintStrength",
+          "enumRef": "ConstraintStrengthSchema"
+        },
+        {
+          "field": "status",
+          "required": true,
+          "type": "ConstraintStatus",
+          "enumRef": "ConstraintStatusSchema"
         }
       ]
     },
@@ -6279,6 +6465,22 @@
       "machine": "Claim.status",
       "from": "(initial)",
       "to": "OPEN"
+    },
+    {
+      "commandType": "AssertObligation",
+      "eventType": "ObligationAsserted",
+      "machine": "Obligation.status",
+      "from": "(initial)",
+      "to": "PROPOSED",
+      "note": "AUTHORED W1 G1 C1 — mint the first-class Obligation object (WP-1-005)"
+    },
+    {
+      "commandType": "AssertConstraint",
+      "eventType": "ConstraintAsserted",
+      "machine": "Constraint.status",
+      "from": "(initial)",
+      "to": "PROPOSED",
+      "note": "AUTHORED W1 G1 C1 — mint the first-class Constraint object (WP-1-005/006)"
     },
     {
       "commandType": "RecordAssuranceObservation",

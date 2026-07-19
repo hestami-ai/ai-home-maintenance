@@ -74,6 +74,7 @@ import {
 	reviseDecomposition,
 	validateDecomposition
 } from './decomposition.js';
+import { assertConstraint, assertObligation } from './obligation-constraint.js';
 import {
 	createPwa,
 	appendConversationEntries,
@@ -151,6 +152,10 @@ export const HANDLERS: Readonly<Record<string, CommandHandler>> = {
 	ApproveBaseline: approveBaseline,
 	PromoteBaseline: promoteBaseline,
 	SupersedeBaseline: supersedeBaseline,
+	// Obligation / Constraint object plane (DOC-002 §10, §11; master WP-1-005/006) — mint the first-class
+	// objects obligation-conservation (P2) and constraint-propagation (P3) decide over.
+	AssertObligation: assertObligation,
+	AssertConstraint: assertConstraint,
 	// Decomposition / recomposition (DOC-002 §13, §14)
 	ProposeDecomposition: proposeDecomposition,
 	ValidateDecomposition: validateDecomposition,
