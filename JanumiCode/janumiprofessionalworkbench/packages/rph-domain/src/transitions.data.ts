@@ -1652,6 +1652,41 @@ export const STATE_MACHINES: Record<string, StateMachineSpec> = {
 		],
 		illegal: [],
 		guarded: []
+	},
+	'Harness.status': {
+		name: 'Harness.status',
+		states: [
+			'FRAMING',
+			'PLANNING',
+			'COORDINATING',
+			'WAITING',
+			'SYNTHESIZING',
+			'COMPLETED',
+			'ESCALATED',
+			'SUSPENDED',
+			'SUPERSEDED'
+		],
+		initialState: 'FRAMING',
+		terminalStates: ['COMPLETED', 'SUPERSEDED'],
+		transitions: [
+			{ from: 'FRAMING', to: 'PLANNING', trigger: 'objective + scope + authority framed' },
+			{ from: 'PLANNING', to: 'COORDINATING', trigger: 'plan approved; allocation begins' },
+			{ from: 'COORDINATING', to: 'WAITING', trigger: 'durable wait on a dependency/callback' },
+			{ from: 'WAITING', to: 'COORDINATING', trigger: 'wait resolved / restart recovery resumes' },
+			{ from: 'COORDINATING', to: 'SYNTHESIZING', trigger: 'child results ready for synthesis' },
+			{ from: 'SYNTHESIZING', to: 'COORDINATING', trigger: 'synthesis reveals more work' },
+			{ from: 'SYNTHESIZING', to: 'COMPLETED', trigger: 'parent coherence synthesized + accepted' },
+			{ from: 'COORDINATING', to: 'ESCALATED', trigger: 'insufficient authority / no-progress' },
+			{ from: 'WAITING', to: 'ESCALATED', trigger: 'timeout / stuck' },
+			{ from: 'ESCALATED', to: 'COORDINATING', trigger: 'escalation resolved by authority' },
+			{ from: 'COORDINATING', to: 'SUSPENDED', trigger: 'suspend' },
+			{ from: 'SUSPENDED', to: 'COORDINATING', trigger: 'resume' },
+			{ from: 'FRAMING', to: 'SUPERSEDED', trigger: 'harness superseded' },
+			{ from: 'PLANNING', to: 'SUPERSEDED', trigger: 'harness superseded' },
+			{ from: 'COORDINATING', to: 'SUPERSEDED', trigger: 'harness superseded' }
+		],
+		illegal: [],
+		guarded: []
 	}
 };
 

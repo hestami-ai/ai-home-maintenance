@@ -231,73 +231,77 @@
         "additionalProperties": false
       }
     },
-    "originatingExpression": {
+    "objective": {
       "type": "string"
     },
-    "formalizedObjective": {
+    "scopeStatement": {
       "type": "string"
     },
-    "desiredOutcomes": {
-      "type": "array",
-      "items": {
-        "type": "object",
-        "propertyNames": {
+    "authority": {
+      "type": "object",
+      "properties": {
+        "authorityId": {
           "type": "string"
         },
-        "additionalProperties": {}
-      }
-    },
-    "successConditions": {
-      "type": "array",
-      "items": {
-        "type": "object",
-        "propertyNames": {
+        "authorityType": {
+          "type": "string",
+          "enum": [
+            "USER",
+            "ORGANIZATIONAL_ROLE",
+            "POLICY",
+            "LEGAL_REQUIREMENT",
+            "SYSTEM_OWNER",
+            "DELEGATED_AGENT"
+          ]
+        },
+        "grantedBy": {
           "type": "string"
         },
-        "additionalProperties": {}
-      }
+        "scope": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "validFrom": {
+          "type": "string"
+        },
+        "validUntil": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "authorityId",
+        "authorityType",
+        "scope",
+        "validFrom"
+      ],
+      "additionalProperties": false
     },
-    "nonGoals": {
+    "coordinatedPwuIds": {
       "type": "array",
       "items": {
         "type": "string"
       }
     },
-    "ambiguityIds": {
+    "childHarnessIds": {
       "type": "array",
       "items": {
         "type": "string"
       }
     },
-    "constraintIds": {
-      "type": "array",
-      "items": {
-        "type": "string"
-      }
-    },
-    "stakeholderIds": {
-      "type": "array",
-      "items": {
-        "type": "string"
-      }
-    },
-    "parentIntentId": {
-      "type": "string"
-    },
-    "supersedesIntentId": {
-      "type": "string"
-    },
-    "intentStatus": {
+    "status": {
       "type": "string",
       "enum": [
-        "RAW",
-        "UNDER_DISCOVERY",
-        "PROVISIONAL",
-        "FORMALIZED",
-        "APPROVED",
-        "REVISED",
-        "SUPERSEDED",
-        "WITHDRAWN"
+        "FRAMING",
+        "PLANNING",
+        "COORDINATING",
+        "WAITING",
+        "SYNTHESIZING",
+        "COMPLETED",
+        "ESCALATED",
+        "SUSPENDED",
+        "SUPERSEDED"
       ]
     }
   },
@@ -315,15 +319,13 @@
     "provenance",
     "tags",
     "extensions",
-    "originatingExpression",
-    "desiredOutcomes",
-    "successConditions",
-    "nonGoals",
-    "ambiguityIds",
-    "constraintIds",
-    "stakeholderIds",
-    "intentStatus"
+    "objective",
+    "scopeStatement",
+    "authority",
+    "coordinatedPwuIds",
+    "childHarnessIds",
+    "status"
   ],
   "additionalProperties": false,
-  "$id": "urn:janumi:rph:schema:object:IntentObject:1"
+  "$id": "urn:janumi:rph:schema:object:RecursiveProfessionalHarness:1"
 }

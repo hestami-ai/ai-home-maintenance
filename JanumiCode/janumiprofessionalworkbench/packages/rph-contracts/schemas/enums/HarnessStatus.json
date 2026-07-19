@@ -1,0 +1,16 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "type": "string",
+  "enum": [
+    "FRAMING",
+    "PLANNING",
+    "COORDINATING",
+    "WAITING",
+    "SYNTHESIZING",
+    "COMPLETED",
+    "ESCALATED",
+    "SUSPENDED",
+    "SUPERSEDED"
+  ],
+  "$id": "urn:janumi:rph:schema:enum:HarnessStatus:1"
+}

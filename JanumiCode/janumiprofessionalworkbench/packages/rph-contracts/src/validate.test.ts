@@ -70,6 +70,10 @@ describe('validate', () => {
 		// then +1 ExpireAssumption command (W3-INC-2 / WP-3-008) — instantiates the Assumption expiry transition so
 		// the kernel canAuthorizeNewWork (RPH-ASM-006) becomes reachable at ApproveExecutionPlan. The AssumptionExpired
 		// event already existed (no new event). (+1 → 304.)
-		expect(buildContractRegistry().ids()).toHaveLength(304);
+		// then +4 for JAN-IRP capability C7 (durable RPH coordination object): +1 HarnessStatus enum, +1
+		// RecursiveProfessionalHarness object (22nd object type), +1 ProposeHarness command, +1 HarnessProposed
+		// event. (RECURSIVE_PROFESSIONAL_HARNESS is a new VALUE on the existing ProfessionalWorkObjectType enum, not
+		// a new enum entry.) (+4 → 308.)
+		expect(buildContractRegistry().ids()).toHaveLength(308);
 	});
 });

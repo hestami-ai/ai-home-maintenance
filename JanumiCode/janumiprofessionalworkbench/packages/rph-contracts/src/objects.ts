@@ -33,6 +33,7 @@ import {
 	EvidenceTypeSchema,
 	ExecutionPlanStatusSchema,
 	ExecutionStateSchema,
+	HarnessStatusSchema,
 	IndependenceRequirementSchema,
 	IntentStatusSchema,
 	MaterialitySchema,
@@ -705,6 +706,18 @@ export const AuthoringConversationSchema = z.strictObject({
 });
 export type AuthoringConversation = z.infer<typeof AuthoringConversationSchema>;
 
+/** RECURSIVE_PROFESSIONAL_HARNESS — id prefix: rph */
+export const RecursiveProfessionalHarnessSchema = z.strictObject({
+	...objectEnvelopeShape,
+	objective: z.string(),
+	scopeStatement: z.string(),
+	authority: AuthorityReferenceSchema,
+	coordinatedPwuIds: z.array(z.string()),
+	childHarnessIds: z.array(z.string()),
+	status: HarnessStatusSchema
+});
+export type RecursiveProfessionalHarness = z.infer<typeof RecursiveProfessionalHarnessSchema>;
+
 /** Registry: objectType literal -> { schema, idPrefixEntity, tsName }. */
 export const OBJECT_SCHEMAS = {
 	INTENT: { schema: IntentObjectSchema, idPrefixEntity: 'INTENT', tsName: 'IntentObject' },
@@ -779,5 +792,10 @@ export const OBJECT_SCHEMAS = {
 		schema: AuthoringConversationSchema,
 		idPrefixEntity: 'conv',
 		tsName: 'AuthoringConversation'
+	},
+	RECURSIVE_PROFESSIONAL_HARNESS: {
+		schema: RecursiveProfessionalHarnessSchema,
+		idPrefixEntity: 'rph',
+		tsName: 'RecursiveProfessionalHarness'
 	}
 } as const;

@@ -455,6 +455,20 @@ export type ExecutionState = z.infer<typeof ExecutionStateSchema>;
 export const FailureSeveritySchema = z.enum(['ADVISORY', 'MATERIAL', 'BLOCKING', 'CRITICAL']);
 export type FailureSeverity = z.infer<typeof FailureSeveritySchema>;
 
+/** RecursiveProfessionalHarness.status — JAN-IRP-008 C7 (RPH Coordination and Adaptive Tactics) — AUTHORED 2026-07-19 under the JAN-IRP program instance. The corpus mandates a durable RPH lifecycle (frame/plan/coordinate/wait/synthesize/escalate) but schematizes no enum; these are the authored lifecycle states. */
+export const HarnessStatusSchema = z.enum([
+	'FRAMING',
+	'PLANNING',
+	'COORDINATING',
+	'WAITING',
+	'SYNTHESIZING',
+	'COMPLETED',
+	'ESCALATED',
+	'SUSPENDED',
+	'SUPERSEDED'
+]);
+export type HarnessStatus = z.infer<typeof HarnessStatusSchema>;
+
 /** AssurancePolicyDefinition.independenceRequirement; DispositionRule.requiredIndependence — RPH-DOC-004 §8.1 (8 values; governs assurance enums) */
 export const IndependenceRequirementSchema = z.enum([
 	'NONE',
@@ -586,7 +600,8 @@ export const ProfessionalWorkObjectTypeSchema = z.enum([
 	'PROFESSIONAL_WORK_ARCHITECTURE',
 	'PWU_TYPE',
 	'UNDERTAKING',
-	'AUTHORING_CONVERSATION'
+	'AUTHORING_CONVERSATION',
+	'RECURSIVE_PROFESSIONAL_HARNESS'
 ]);
 export type ProfessionalWorkObjectType = z.infer<typeof ProfessionalWorkObjectTypeSchema>;
 
@@ -824,6 +839,7 @@ export const CANONICAL_ENUM_SCHEMAS = {
 	ExecutionPlanStatus: ExecutionPlanStatusSchema,
 	ExecutionState: ExecutionStateSchema,
 	FailureSeverity: FailureSeveritySchema,
+	HarnessStatus: HarnessStatusSchema,
 	IndependenceRequirement: IndependenceRequirementSchema,
 	IntentStatus: IntentStatusSchema,
 	Materiality: MaterialitySchema,

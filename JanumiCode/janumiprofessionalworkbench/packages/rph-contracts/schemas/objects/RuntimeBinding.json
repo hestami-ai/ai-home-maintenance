@@ -29,7 +29,8 @@
         "PROFESSIONAL_WORK_ARCHITECTURE",
         "PWU_TYPE",
         "UNDERTAKING",
-        "AUTHORING_CONVERSATION"
+        "AUTHORING_CONVERSATION",
+        "RECURSIVE_PROFESSIONAL_HARNESS"
       ]
     },
     "schemaVersion": {

@@ -1449,6 +1449,48 @@
           "required": true
         }
       ]
+    },
+    {
+      "objectType": "RECURSIVE_PROFESSIONAL_HARNESS",
+      "tsName": "RecursiveProfessionalHarness",
+      "idPrefixEntity": "rph",
+      "note": "AUTHORED 2026-07-19 (JAN-IRP capability C7). The DURABLE first-class RPH coordination object: the harness that frames, plans, allocates, coordinates, waits, synthesizes, and escalates across PWUs and child harnesses. Before this, the RPH was realized only conceptually (a program coordinating PWUs via decomposition + execution plans) with no durable identity/state — so C7's headline proof obligation 'the RPH survives restart while waiting' was unprovable. This is the minimal durable plane; allocation/tactic-change/synthesis-queue are follow-on increments. Extends ObjectEnvelope.",
+      "fields": [
+        {
+          "field": "objective",
+          "type": "string",
+          "required": true
+        },
+        {
+          "field": "scopeStatement",
+          "type": "string",
+          "required": true
+        },
+        {
+          "field": "authority",
+          "type": "AuthorityReference",
+          "required": true,
+          "note": "the authority under which the harness coordinates (helper §5)"
+        },
+        {
+          "field": "coordinatedPwuIds",
+          "type": "string[]",
+          "required": true,
+          "note": "id-ref[]; the PWUs this harness coordinates (may be empty at framing)"
+        },
+        {
+          "field": "childHarnessIds",
+          "type": "string[]",
+          "required": true,
+          "note": "id-ref[]; subordinate RPHs (may be empty)"
+        },
+        {
+          "field": "status",
+          "type": "HarnessStatus",
+          "required": true,
+          "enumRef": "HarnessStatusSchema"
+        }
+      ]
     }
   ],
   "helperSubTypes": [

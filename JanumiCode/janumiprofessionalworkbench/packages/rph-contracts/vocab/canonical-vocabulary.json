@@ -24,10 +24,28 @@
         "PROFESSIONAL_WORK_ARCHITECTURE",
         "PWU_TYPE",
         "UNDERTAKING",
-        "AUTHORING_CONVERSATION"
+        "AUTHORING_CONVERSATION",
+        "RECURSIVE_PROFESSIONAL_HARNESS"
       ],
       "canonicalSource": "RPH-DOC-002 §4 (17 runtime) + 4 authoring objects (RPH-DOC-010)",
-      "note": "DOC-004/DOC-007 reference this type but do not re-enumerate it. DOC-006 fixture emits only a 10-value subset (display). ARTIFACT is in the union but has no dedicated interface. (PWA/PWU_TYPE/UNDERTAKING added for the RPH-DOC-010 PWA-authoring context.) AUTHORING_CONVERSATION added for the durable event-sourced authoring conversation (governed-stream precursor)."
+      "note": "DOC-004/DOC-007 reference this type but do not re-enumerate it. DOC-006 fixture emits only a 10-value subset (display). ARTIFACT is in the union but has no dedicated interface. (PWA/PWU_TYPE/UNDERTAKING added for the RPH-DOC-010 PWA-authoring context.) AUTHORING_CONVERSATION added for the durable event-sourced authoring conversation (governed-stream precursor.) RECURSIVE_PROFESSIONAL_HARNESS added for JAN-IRP capability C7 (durable RPH coordination object)."
+    },
+    {
+      "name": "HarnessStatus",
+      "appliesTo": "RecursiveProfessionalHarness.status",
+      "values": [
+        "FRAMING",
+        "PLANNING",
+        "COORDINATING",
+        "WAITING",
+        "SYNTHESIZING",
+        "COMPLETED",
+        "ESCALATED",
+        "SUSPENDED",
+        "SUPERSEDED"
+      ],
+      "canonicalSource": "JAN-IRP-008 C7 (RPH Coordination and Adaptive Tactics) — AUTHORED 2026-07-19 under the JAN-IRP program instance. The corpus mandates a durable RPH lifecycle (frame/plan/coordinate/wait/synthesize/escalate) but schematizes no enum; these are the authored lifecycle states.",
+      "note": "FRAMING (initial) -> PLANNING -> COORDINATING <-> WAITING -> SYNTHESIZING -> COMPLETED; ESCALATED/SUSPENDED are governance branches; SUPERSEDED on revision. C7 durable coordination."
     },
     {
       "name": "ActorType",

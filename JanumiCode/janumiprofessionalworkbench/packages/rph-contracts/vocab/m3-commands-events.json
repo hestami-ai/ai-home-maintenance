@@ -2607,6 +2607,46 @@
           "type": "string"
         }
       ]
+    },
+    {
+      "commandType": "ProposeHarness",
+      "targetAggregateType": "RECURSIVE_PROFESSIONAL_HARNESS",
+      "emitsEvent": "HarnessProposed",
+      "drivesMachine": "Harness.status",
+      "drivesFrom": "(initial)",
+      "drivesTo": "FRAMING",
+      "schematized": false,
+      "sourceSection": "UNRATIFIED-AUTHORED (2026-07-19, JAN-IRP program instance / capability C7): the corpus (JAN-IRP-008 C7) mandates a durable RPH coordination object but schematizes no command. AUTHORED to mint the first-class RecursiveProfessionalHarness so C7's 'RPH survives restart while waiting' becomes provable. Cited: JAN-IRP-008 C7.",
+      "payloadFields": [
+        {
+          "field": "objective",
+          "required": true,
+          "type": "string"
+        },
+        {
+          "field": "scopeStatement",
+          "required": true,
+          "type": "string"
+        },
+        {
+          "field": "authority",
+          "required": true,
+          "type": "AuthorityReference",
+          "note": "complex type §5"
+        },
+        {
+          "field": "coordinatedPwuIds",
+          "required": false,
+          "type": "string[]",
+          "note": "id-ref[]; defaults to []"
+        },
+        {
+          "field": "childHarnessIds",
+          "required": false,
+          "type": "string[]",
+          "note": "id-ref[]; defaults to []"
+        }
+      ]
     }
   ],
   "events": [
@@ -6413,9 +6453,64 @@
           "note": "checkIndependence's reason, e.g. 'same agent identity'"
         }
       ]
+    },
+    {
+      "eventType": "HarnessProposed",
+      "aggregateType": "RecursiveProfessionalHarness",
+      "sourceSection": "UNRATIFIED-AUTHORED (2026-07-19, JAN-IRP capability C7): records the minting of a durable RecursiveProfessionalHarness. Cited: JAN-IRP-008 C7.",
+      "payloadFields": [
+        {
+          "field": "harnessId",
+          "required": true,
+          "type": "string",
+          "note": "id-ref"
+        },
+        {
+          "field": "objective",
+          "required": true,
+          "type": "string"
+        },
+        {
+          "field": "scopeStatement",
+          "required": true,
+          "type": "string"
+        },
+        {
+          "field": "authority",
+          "required": true,
+          "type": "AuthorityReference",
+          "note": "complex type §5"
+        },
+        {
+          "field": "coordinatedPwuIds",
+          "required": true,
+          "type": "string[]",
+          "note": "id-ref[]"
+        },
+        {
+          "field": "childHarnessIds",
+          "required": true,
+          "type": "string[]",
+          "note": "id-ref[]"
+        },
+        {
+          "field": "status",
+          "required": true,
+          "type": "HarnessStatus",
+          "enumRef": "HarnessStatusSchema"
+        }
+      ]
     }
   ],
   "bindings": [
+    {
+      "commandType": "ProposeHarness",
+      "eventType": "HarnessProposed",
+      "machine": "Harness.status",
+      "from": "(initial)",
+      "to": "FRAMING",
+      "note": "AUTHORED JAN-IRP C7 — mint the durable RecursiveProfessionalHarness"
+    },
     {
       "commandType": "CaptureIntent",
       "eventType": "IntentCaptured",

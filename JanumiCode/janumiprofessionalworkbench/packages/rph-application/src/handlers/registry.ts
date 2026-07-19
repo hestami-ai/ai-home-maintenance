@@ -77,6 +77,7 @@ import {
 	validateDecomposition
 } from './decomposition.js';
 import { assertConstraint, assertObligation } from './obligation-constraint.js';
+import { proposeHarness } from './harness.js';
 import {
 	createPwa,
 	appendConversationEntries,
@@ -159,6 +160,8 @@ export const HANDLERS: Readonly<Record<string, CommandHandler>> = {
 	// objects obligation-conservation (P2) and constraint-propagation (P3) decide over.
 	AssertObligation: assertObligation,
 	AssertConstraint: assertConstraint,
+	// RecursiveProfessionalHarness — the durable RPH coordination object (JAN-IRP capability C7)
+	ProposeHarness: proposeHarness,
 	// Decomposition / recomposition (DOC-002 §13, §14)
 	ProposeDecomposition: proposeDecomposition,
 	ValidateDecomposition: validateDecomposition,

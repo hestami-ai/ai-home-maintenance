@@ -21,6 +21,7 @@ import {
 	EvidenceTypeSchema,
 	ExecutionPlanStatusSchema,
 	ExecutionStateSchema,
+	HarnessStatusSchema,
 	IndependenceRequirementSchema,
 	IntentStatusSchema,
 	MaterialitySchema,
@@ -619,6 +620,14 @@ export const ActivateAssurancePolicyPayloadSchema = z.strictObject({
 	policyId: z.string()
 });
 export type ActivateAssurancePolicyPayload = z.infer<typeof ActivateAssurancePolicyPayloadSchema>;
+export const ProposeHarnessPayloadSchema = z.strictObject({
+	objective: z.string(),
+	scopeStatement: z.string(),
+	authority: AuthorityReferenceSchema,
+	coordinatedPwuIds: z.array(z.string()).optional(),
+	childHarnessIds: z.array(z.string()).optional()
+});
+export type ProposeHarnessPayload = z.infer<typeof ProposeHarnessPayloadSchema>;
 
 // ---- Event payload schemas ----
 export const AssumptionAcceptedPayloadSchema = z.strictObject({
@@ -1531,6 +1540,16 @@ export const AssuranceIndependenceViolatedPayloadSchema = z.strictObject({
 export type AssuranceIndependenceViolatedPayload = z.infer<
 	typeof AssuranceIndependenceViolatedPayloadSchema
 >;
+export const HarnessProposedPayloadSchema = z.strictObject({
+	harnessId: z.string(),
+	objective: z.string(),
+	scopeStatement: z.string(),
+	authority: AuthorityReferenceSchema,
+	coordinatedPwuIds: z.array(z.string()),
+	childHarnessIds: z.array(z.string()),
+	status: HarnessStatusSchema
+});
+export type HarnessProposedPayload = z.infer<typeof HarnessProposedPayloadSchema>;
 
 export const FIRST_SLICE_COMMANDS = [
 	'CaptureIntent',
@@ -2000,6 +2019,12 @@ export const COMMANDS = {
 		targetAggregateType: 'ASSURANCE_POLICY',
 		emitsEvent: 'AssurancePolicyActivated',
 		firstSlice: false
+	},
+	ProposeHarness: {
+		payload: ProposeHarnessPayloadSchema,
+		targetAggregateType: 'RECURSIVE_PROFESSIONAL_HARNESS',
+		emitsEvent: 'HarnessProposed',
+		firstSlice: false
 	}
 } as const;
 
@@ -2302,6 +2327,10 @@ export const EVENTS = {
 	AssuranceIndependenceViolated: {
 		payload: AssuranceIndependenceViolatedPayloadSchema,
 		aggregateType: 'AssuranceAssessment'
+	},
+	HarnessProposed: {
+		payload: HarnessProposedPayloadSchema,
+		aggregateType: 'RecursiveProfessionalHarness'
 	}
 } as const;
 
@@ -2335,6 +2364,13 @@ export interface CommandEventBinding {
 }
 /** The command -> event -> state-transition binding table. */
 export const BINDINGS: readonly CommandEventBinding[] = [
+	{
+		commandType: 'ProposeHarness',
+		eventType: 'HarnessProposed',
+		machine: 'Harness.status',
+		from: '(initial)',
+		to: 'FRAMING'
+	},
 	{
 		commandType: 'CaptureIntent',
 		eventType: 'IntentCaptured',
