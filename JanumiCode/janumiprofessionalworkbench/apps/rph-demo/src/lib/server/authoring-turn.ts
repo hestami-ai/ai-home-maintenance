@@ -187,6 +187,7 @@ function recordingEngine(
 		},
 		subscribe: (handler) => delegate.subscribe(handler),
 		drainOutbox: () => delegate.drainOutbox(),
+		recoverOutbox: () => delegate.recoverOutbox(),
 		loadObject: (id) => delegate.loadObject(id),
 		readAllEvents: () => delegate.readAllEvents(),
 		fork() {

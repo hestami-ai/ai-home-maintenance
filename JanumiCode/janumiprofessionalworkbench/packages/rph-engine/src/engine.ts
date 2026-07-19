@@ -98,6 +98,9 @@ export interface EngineHandle {
 	): BatchResult;
 	subscribe(handler: EventSubscriber): void;
 	drainOutbox(): number;
+	/** WP-2-007 restart recovery: re-drive PENDING outbox on (re)open of a durable store, idempotently (an
+	 *  already-PUBLISHED message is never re-delivered). A durable host SHALL call this at startup. Returns count. */
+	recoverOutbox(): number;
 	/** Read the current materialized state of an object by id (undefined if absent). */
 	loadObject(id: string): StoredObject | undefined;
 	/** The full append-only event log (for rebuildable projections / replay-equivalence checks). */
@@ -150,6 +153,7 @@ export function createEngine(deps: CreateEngineDeps): EngineHandle {
 			engine.dispatchBatchGuarded(commands, preconditions, expectedEventCount, postconditions),
 		subscribe: (handler) => engine.subscribe(handler),
 		drainOutbox: () => engine.drainOutbox(),
+		recoverOutbox: () => engine.recoverOutbox(),
 		loadObject: (id) => store.loadObject(id),
 		readAllEvents: () => store.readAllEvents(),
 		fork: () =>

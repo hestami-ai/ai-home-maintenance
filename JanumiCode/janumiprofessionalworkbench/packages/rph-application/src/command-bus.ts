@@ -261,4 +261,19 @@ export class Engine {
 		this.store.markOutboxPublished(pending.map((p) => p.outboxId));
 		return pending.length;
 	}
+
+	/**
+	 * W2-INC-2 (WP-2-007) — restart recovery. On (re)open of a DURABLE store, re-drive every outbox message the
+	 * store still holds as PENDING: after a crash between commit and delivery the event is durably committed (it
+	 * is in `domain_events` + `outbox_messages`) but was never delivered to any subscriber. Re-driving is
+	 * idempotent — `readPendingOutbox` returns only PENDING rows and `markOutboxPublished` is the checkpoint, so
+	 * an already-PUBLISHED message is NEVER re-delivered ("restart recovery avoids duplicate external side
+	 * effects"). Delivery is therefore at-least-once; subscribers SHALL be idempotent. A durable host SHALL call
+	 * this at startup, after wiring its subscribers and before accepting new commands. Returns the count recovered.
+	 */
+	recoverOutbox(): number {
+		const recovered = this.drainOutbox();
+		if (recovered > 0) this.logger.info('outbox.recovered', { count: recovered });
+		return recovered;
+	}
 }
