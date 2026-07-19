@@ -221,6 +221,20 @@ export const approveIntent: CommandHandler = (ctx, command, payload) => {
 					'An approved intent must record at least one desired outcome (INT-004)'
 				);
 			}
+			// W3-INC-1 (WP-3-003 / master invariant 7 / W3 exit "human decisions bind exact semantic versions").
+			// The approval names the exact intent version it authorizes; it must equal the intent's CURRENT semantic
+			// version. Before this, `approvedSemanticVersion` was recorded into the IntentApproved event but never
+			// compared — so an approval of v1 could stand after the intent had been revised to v2 (the §19-prohibited
+			// "stale approval governs a changed semantic version"). This is the Intent analog of the PromoteBaseline
+			// stale-decision guard (WIRE-4 / RPH-GOV-003). markPwuReady already enforces the same for PWUs.
+			const currentVersion = current.semanticVersion;
+			if (typeof currentVersion === 'number' && p.approvedSemanticVersion !== currentVersion) {
+				return reject(
+					command,
+					'RPH_INVARIANT_VIOLATION',
+					`ApproveIntent binds an exact semantic version: the approval names v${p.approvedSemanticVersion} but intent ${command.targetAggregateId} is at v${currentVersion}. A stale or mismatched approval cannot govern this intent version — re-approve the current one (master invariant 7; the Intent analog of RPH-GOV-003).`
+				);
+			}
 			return null;
 		}
 	});

@@ -77,6 +77,28 @@ describe('Intent lifecycle handlers (live command drive)', () => {
 		});
 	}
 
+	it('rejects ApproveIntent whose approvedSemanticVersion does not match the intent version (W3-INC-1)', () => {
+		engine.dispatch(capture());
+		engine.dispatch(cmd('BeginIntentDiscovery', {}));
+		engine.dispatch(cmd('ProvisionIntent', { ambiguityIds: [] }));
+		engine.dispatch(formalize([{ description: 'x' }]));
+		// the intent is at semantic version 1; an approval naming v2 is a mismatched/stale binding
+		const stale = engine.dispatch(
+			cmd('ApproveIntent', { decisionId: 'dec_x', approvedSemanticVersion: 2, approvalScope: 'full' })
+		);
+		expect(stale.status).not.toBe('ACCEPTED');
+		expect(stale.error?.code).toBe('RPH_INVARIANT_VIOLATION');
+		expect(stale.error?.message).toContain('exact semantic version');
+		expect(status()).toBe('FORMALIZED'); // not advanced to APPROVED
+		// the control: approving the CURRENT version succeeds
+		expect(
+			engine.dispatch(
+				cmd('ApproveIntent', { decisionId: 'dec_x', approvedSemanticVersion: 1, approvalScope: 'full' })
+			).status
+		).toBe('ACCEPTED');
+		expect(status()).toBe('APPROVED');
+	});
+
 	it('drives the full lifecycle RAW -> UNDER_DISCOVERY -> PROVISIONAL -> FORMALIZED -> APPROVED -> REVISED -> APPROVED', () => {
 		expect(engine.dispatch(capture()).status).toBe('ACCEPTED');
 		expect(status()).toBe('RAW');
