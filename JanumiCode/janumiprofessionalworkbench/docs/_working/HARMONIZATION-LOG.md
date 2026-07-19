@@ -3918,3 +3918,51 @@ pairs" is now "27 pairs, adjudicated: DOC-007-ratified / renamed / id-on-envelop
 
 **Gate:** none needed (no code/contract change — the finding is that a change would be wrong). Footprint: this
 log. Committed.
+
+### Increment U — waiverRules ENFORCED in requestWaiver (#1c)
+
+Re-examining #1's deferred remainder for the follow-up on the TODO list corrected an earlier mistake: I had
+called `dispositionRules` / `escalationRules` / `waiverRules` "thinly authored," but the shapes tell a different
+story. **`WaiverRule` is fully structured** — `waiverAllowed`, `eligibleCriteriaIds`, `prohibitedFindingSeverities`,
+`requiredAuthorityType`, `requiredRationaleFields`, `requiredCompensatingControls` — so #1c is not blocked at all.
+
+`requestWaiver` now enforces the target policy's `waiverRules` (DOC-004 §12): a request must be **eligible under a
+rule that allows waiving** the cited criterion, and must **carry every compensating control that rule requires**
+— a waiver may not drop a control to nothing (DOC-004 §12.2 / JCPWA §36.4, the exact principle #9's research
+surfaced from the sponsor's own corpus). The link is clean: the waiver carries `waivedPolicyId`, so the handler
+loads the policy and reads `waiverRules`. An **empty `waiverRules` array (the seeded default) stays permissive**,
+so the floor + reference + demo waivers are untouched — enforcement fires only for a policy that deliberately
+declared rules.
+
+Red-first (`waiver-rules.test.ts`): a criterion no rule makes eligible → REJECTED; `waiverAllowed:false` →
+REJECTED; a missing/wrong required compensating control → REJECTED, the required one → ACCEPTED; an empty
+`waiverRules` → permissive ACCEPTED.
+
+**Gate:** `check-types` 21/21 · full `test` 21/21 (new `waiver-rules.test.ts` 4) · lint · boundary · **Playwright
+E2E 25/25**. Footprint: `governance.ts` + `waiver-rules.test.ts`. Committed.
+
+### Increment V — dispositionRules ENFORCED: the §10.3 foreclosure (#1a, Gate C)
+
+The rule the codebase kept getting wrong — "an open MATERIAL finding forecloses SATISFIED" (§10.3) — now
+enforced. `DispositionRule`'s general `condition` is free-form (`z.unknown`), but its `forbiddenOpenSeverities` is
+machine-evaluable, and that is the §10.3 rule. `completeAssuranceAssessment` finds the rule matching the
+recommended disposition; if it forbids open severities, the assessment's observations are checked and the
+completion **fails closed** when an observation of a forbidden severity is still OPEN.
+
+Crucially it reads each observation's **current** disposition (`loadObject` per observation id gathered from the
+`AssuranceObservationRecorded` events), not the severity recorded at creation — so a finding that was later
+resolved or **WAIVED** no longer forecloses (which is what makes it compose with the waiver machinery). Negative
+dispositions are unaffected unless a rule names them. Only fires when the policy declares `dispositionRules` with
+`forbiddenOpenSeverities` (unseeded today), so nothing existing changes.
+
+Red-first: a policy forbidding CRITICAL-open for SATISFIED — an assessment with an open CRITICAL observation is
+REJECTED (still ASSESSING); a sibling assessment whose only open observation is MATERIAL (not forbidden) is
+SATISFIED.
+
+**Together, #1a and #1c bring the "settable → enforced" tally to four of six rule arrays** (requiredEvidence +
+permittedControlActions from Increment R; now dispositionRules + waiverRules). `escalationRules` (#1b) stays
+genuinely blocked — `EscalationRule.trigger` is `z.unknown()`, so auto-escalation cannot be wired without
+fabricating trigger semantics; it needs a trigger-shape ratification, like `RemediationRule` (#5).
+
+**Gate:** `check-types` 21/21 · full `test` 21/21 (assurance handler 12) · lint · boundary · **Playwright E2E
+25/25**. Footprint: `assurance.ts` + `assurance-independence.test.ts`. Committed.

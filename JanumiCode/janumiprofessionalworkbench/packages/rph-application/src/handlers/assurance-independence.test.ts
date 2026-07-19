@@ -621,4 +621,85 @@ describe('completeAssuranceAssessment — independence enforcement (Increment I2
 		);
 		expect(stateOf(B)?.assessmentState).toBe('REJECTED');
 	});
+
+	it('§10.3 dispositionRules foreclosure (Gate C): SATISFIED is rejected while an observation of a forbidden severity is OPEN', () => {
+		// A policy whose dispositionRules forbid SATISFIED while a CRITICAL observation is open (§10.3).
+		dispatchOk(
+			cmd('CreateAssurancePolicy', POLICY, 'ASSURANCE_POLICY', {
+				policyId: POLICY,
+				version: '1.0.0',
+				name: 'Foreclosing policy',
+				purpose: 'p',
+				rationale: 'r',
+				applicableObjectTypes: ['PROFESSIONAL_WORK_UNIT'],
+				evaluatedClaimTypes: ['FITNESS'],
+				criteria: [
+					{
+						id: 'C1',
+						name: 'Fit',
+						description: 'd',
+						criterionType: 'QUALITATIVE',
+						evaluationMethod: 'HUMAN_JUDGMENT',
+						requiredEvidenceIds: [],
+						severityIfNotMet: 'MATERIAL',
+						mayBeNotApplicable: false
+					}
+				],
+				evaluatorRole: 'REVIEWER',
+				independenceRequirement: 'NONE',
+				dispositionRules: [
+					{ disposition: 'SATISFIED', condition: 'no open critical', forbiddenOpenSeverities: ['CRITICAL'] }
+				],
+				findingDefinitions: [
+					{
+						code: 'UNFIT',
+						name: 'Unfit',
+						description: 'd',
+						defaultSeverity: 'MATERIAL',
+						affectedClaimTypes: ['FITNESS'],
+						defaultControlActions: ['CONTINUE']
+					}
+				],
+				permittedControlActions: ['CONTINUE']
+			})
+		);
+		dispatchOk(cmd('ActivateAssurancePolicy', POLICY, 'ASSURANCE_POLICY', { policyId: POLICY }));
+
+		// Assessment WITH an open CRITICAL observation -> SATISFIED is foreclosed.
+		const A = 'asm_01ARZ3NDEKTSV4RRFFQ69G5A60';
+		requestAssessment(A);
+		dispatchOk(
+			cmd('RecordAssuranceObservation', 'obs_01ARZ3NDEKTSV4RRFFQ69G5B01', 'ASSURANCE_OBSERVATION', {
+				assessmentId: A,
+				observationType: 'FINDING',
+				severity: 'CRITICAL',
+				statement: 'a critical, unresolved gap'
+			})
+		);
+		const early = engine.dispatch(
+			cmd('CompleteAssuranceAssessment', A, 'ASSURANCE_ASSESSMENT', {
+				validatorResult: verdict(A, 'reviewer-c')
+			})
+		);
+		expect(early.status).toBe('REJECTED');
+		expect(stateOf(A)?.assessmentState).toBe('ASSESSING');
+
+		// A separate assessment whose only open observation is MATERIAL (NOT a forbidden severity) -> SATISFIED stands.
+		const B = 'asm_01ARZ3NDEKTSV4RRFFQ69G5A61';
+		requestAssessment(B);
+		dispatchOk(
+			cmd('RecordAssuranceObservation', 'obs_01ARZ3NDEKTSV4RRFFQ69G5B02', 'ASSURANCE_OBSERVATION', {
+				assessmentId: B,
+				observationType: 'FINDING',
+				severity: 'MATERIAL',
+				statement: 'material, but not a forbidden severity'
+			})
+		);
+		dispatchOk(
+			cmd('CompleteAssuranceAssessment', B, 'ASSURANCE_ASSESSMENT', {
+				validatorResult: verdict(B, 'reviewer-c')
+			})
+		);
+		expect(stateOf(B)?.assessmentState).toBe('SATISFIED');
+	});
 });

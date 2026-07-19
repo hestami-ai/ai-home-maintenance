@@ -15,7 +15,8 @@ import type {
 	DomainCommand,
 	ProposeDecisionPayload,
 	PromoteBaselinePayload,
-	RequestWaiverPayload
+	RequestWaiverPayload,
+	WaiverRule
 } from '@janumipwb/rph-contracts';
 import { authorizeDecisionEffective, canPromoteBaseline } from '@janumipwb/rph-domain';
 import {
@@ -259,6 +260,39 @@ export const revokeDecision: CommandHandler = (ctx, command) =>
 export const requestWaiver: CommandHandler = (ctx, command, payload) => {
 	const p = payload as RequestWaiverPayload;
 	const id = command.targetAggregateId;
+	// #1c — waiverRules ENFORCED (settable -> governing). A policy governs its OWN waivability (DOC-004 §12;
+	// WaiverRule). When the target policy declares waiver rules, the request must satisfy them: the criterion must
+	// be eligible under a rule that ALLOWS waiving, and that rule's required compensating controls must all be
+	// present — a waiver may never drop a control to nothing (DOC-004 §12.2 / JCPWA §36.4). An EMPTY waiverRules
+	// array (the seeded default) stays permissive, so the floor + reference + demo waivers are unaffected;
+	// enforcement fires only for a policy that deliberately declared rules.
+	const policy = ctx.store.loadObject(p.waivedPolicyId)?.state as
+		| { waiverRules?: ReadonlyArray<WaiverRule> }
+		| undefined;
+	const waiverRules = policy?.waiverRules ?? [];
+	if (waiverRules.length > 0) {
+		const applies = (r: WaiverRule) =>
+			r.eligibleCriteriaIds.length === 0 || r.eligibleCriteriaIds.includes(p.waivedCriterionId);
+		const allowingRule = waiverRules.find((r) => r.waiverAllowed && applies(r));
+		if (!allowingRule) {
+			return reject(
+				command,
+				'RPH_VALIDATION_SEMANTIC_FAILED',
+				`RequestWaiver: policy ${p.waivedPolicyId} does not permit waiving criterion '${p.waivedCriterionId}' — no waiver rule allows it (DOC-004 §12 waiverRules).`,
+				[id, p.waivedPolicyId]
+			);
+		}
+		const provided = new Set(p.compensatingControls ?? []);
+		const missing = (allowingRule.requiredCompensatingControls ?? []).filter((c) => !provided.has(c));
+		if (missing.length > 0) {
+			return reject(
+				command,
+				'RPH_VALIDATION_SEMANTIC_FAILED',
+				`RequestWaiver: policy ${p.waivedPolicyId}'s waiver rule requires compensating control(s) [${missing.join(', ')}] that the request does not declare (DOC-004 §12.2 / JCPWA §36.4 — a waiver may not drop a control to nothing).`,
+				[id, p.waivedPolicyId]
+			);
+		}
+	}
 	const state: Record<string, unknown> = {
 		...newEnvelope(command, DECISION, id, {
 			lifecycleStatus: 'PROPOSED',

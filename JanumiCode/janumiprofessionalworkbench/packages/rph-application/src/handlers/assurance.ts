@@ -683,6 +683,10 @@ export const completeAssuranceAssessment: CommandHandler = (ctx, command, payloa
 						independenceRequirement?: string;
 						permittedControlActions?: readonly string[];
 						requiredEvidence?: ReadonlyArray<{ id?: string; requiredForDispositions?: string }>;
+						dispositionRules?: ReadonlyArray<{
+							disposition?: string;
+							forbiddenOpenSeverities?: readonly string[];
+						}>;
 				  }
 				| undefined)
 		: undefined;
@@ -741,6 +745,40 @@ export const completeAssuranceAssessment: CommandHandler = (ctx, command, payloa
 				'RPH_VALIDATION_SEMANTIC_FAILED',
 				`CompleteAssuranceAssessment: a ${disposition} disposition requires evidence for [${unmet.join(', ')}] (§6.1 requiredForDispositions) but none was submitted for those requirements — a positive disposition cannot stand with unmet mandatory evidence (§10.3). Submit it (SubmitEvidenceForAssessment) first, or return a non-satisfied disposition.`,
 				[command.targetAggregateId, ...unmet]
+			);
+		}
+	}
+
+	// GATE C (#1a) — dispositionRules ENFORCED: the §10.3 foreclosure. The policy's rule for the recommended
+	// disposition may forbid it while an observation of certain severities is still OPEN ("an open MATERIAL finding
+	// forecloses SATISFIED"). The matching rule's `forbiddenOpenSeverities` names them; the assessment's observation
+	// OBJECTS carry the CURRENT disposition, so a finding that was resolved or WAIVED no longer forecloses (loaded
+	// per-object, not read from the recording event, precisely so a later waiver is honored). Only fires when the
+	// policy declares dispositionRules with forbiddenOpenSeverities for this disposition — otherwise skipped.
+	const dispositionRule = (policyState?.dispositionRules ?? []).find((r) => r?.disposition === disposition);
+	const forbidden = new Set(dispositionRule?.forbiddenOpenSeverities ?? []);
+	if (forbidden.size > 0) {
+		const openForbiddenSeverities = ctx.store
+			.readAllEvents()
+			.filter(
+				(e) =>
+					e.eventType === 'AssuranceObservationRecorded' &&
+					(e.payload as { assessmentId?: string }).assessmentId === command.targetAggregateId
+			)
+			.map((e) => (e.payload as { observationId?: string }).observationId)
+			.filter((oid): oid is string => typeof oid === 'string')
+			.map(
+				(oid) =>
+					ctx.store.loadObject(oid)?.state as { severity?: string; disposition?: string } | undefined
+			)
+			.filter((o) => o?.disposition === 'OPEN' && typeof o.severity === 'string' && forbidden.has(o.severity))
+			.map((o) => o!.severity as string);
+		if (openForbiddenSeverities.length > 0) {
+			return reject(
+				command,
+				'RPH_VALIDATION_SEMANTIC_FAILED',
+				`CompleteAssuranceAssessment: a ${disposition} disposition is foreclosed — the policy's dispositionRules forbid it while an observation of severity [${[...new Set(openForbiddenSeverities)].join(', ')}] is still OPEN (DOC-004 §10.3). Resolve or waive the finding, or return a non-satisfied disposition.`,
+				[command.targetAggregateId]
 			);
 		}
 	}
