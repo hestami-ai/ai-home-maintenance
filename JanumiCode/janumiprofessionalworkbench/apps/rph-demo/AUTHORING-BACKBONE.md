@@ -71,8 +71,9 @@ The following fixes address concrete failures observed during a large natural-la
   `INDEPENDENCE_VIOLATION`, missing results, escalation, and configuration/external failures remain fail-closed and
   produce retry/configure/change-reviewer guidance rather than graph edits or waiver advice.
 - Before a host configuration that uses the real reviewer starts an isolated agent candidate, an app-local preflight
-  checks that `JPWB_JUDGE_MODEL` is pinned. This preflight does not invoke the reviewer or claim it is healthy; it only
-  avoids starting work when the mandatory review is already known to be unexecutable.
+  resolves the model to the explicit `JPWB_JUDGE_MODEL` override or the application-owned default
+  `Gemini 3.5 Flash (High)`. The actual agy invocation always receives that concrete value through `--model`; the
+  preflight does not invoke the reviewer or claim it is healthy.
 
 These controls improve correctness and recovery behavior. The staged-turn layer below now prevents individual agent
 tools from becoming live canonical mutations, but it still does not provide a durable or post-commit reversible

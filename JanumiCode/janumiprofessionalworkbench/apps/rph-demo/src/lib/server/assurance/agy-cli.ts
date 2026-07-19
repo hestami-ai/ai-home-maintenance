@@ -6,26 +6,23 @@ import { promisify } from 'node:util';
 const execFileAsync = promisify(execFile);
 
 const AGY_BIN = process.env.JPWB_AGY_BIN ?? 'agy';
+export const DEFAULT_JUDGE_MODEL = 'Gemini 3.5 Flash (High)';
 
 /**
- * The judge model, PINNED. §8.4 requires the evaluator's "actual identities and lineage are recorded", and §14.6
- * requires recording "allowed and resolved provider/model/version". Unpinned, agy selects its own model and never
- * tells us which — so the recorded evaluator identity was the literal `'agy:default'`, which is not the name of
- * any model. That is not a weak record; it is a false one, and it made the floor's independence comparison a
- * string test against a placeholder that no real model id can ever equal.
+ * Resolve the judge to a concrete, application-owned model selection. §8.4 requires the evaluator's "actual
+ * identities and lineage are recorded", and §14.6 requires recording "allowed and resolved
+ * provider/model/version". An explicit environment override wins; otherwise the application pins the known agy
+ * model label above. This is materially different from allowing agy to choose an unnamed dynamic default and then
+ * recording the fictional identity `'agy:default'`.
  *
- * Fail closed rather than record a fiction (§13.3: "Fail closed on missing identity, tenant, policy, schema, or
- * authority context"). §8.4 is explicit that an independence-invalid review "cannot satisfy assurance or permit
- * its protected transition" — so refusing to run is the correct outcome, not a degradation.
+ * Whitespace-only configuration is treated as absent so it cannot become an empty evaluator identity.
  */
+export function resolveJudgeModel(configured = process.env.JPWB_JUDGE_MODEL): string {
+	return configured?.trim() || DEFAULT_JUDGE_MODEL;
+}
+
 export function judgeModel(): string {
-	const pinned = process.env.JPWB_JUDGE_MODEL;
-	if (!pinned) {
-		throw new Error(
-			'JPWB_JUDGE_MODEL is required. The Reasoning Review evaluator’s model must be pinned so its actual identity can be recorded (§8.4, §14.6); unpinned, agy chooses its own model and the recorded evaluator identity would be a placeholder rather than the model that actually judged. Set JPWB_JUDGE_MODEL to the agy model id.'
-		);
-	}
-	return pinned;
+	return resolveJudgeModel();
 }
 
 /** One non-interactive `agy --print "<prompt>"` call, returning stdout. Always pins the model, so the model that

@@ -245,19 +245,17 @@ export const POST: RequestHandler = async ({ params, request }) => {
 					return;
 				}
 				const mode = agentMode();
-				// Do not begin even an isolated candidate when its mandatory independent reviewer is already
-				// known to be unconfigured. This is a configuration-only preflight; it never invokes agy.
+				// Resolve the explicit judge-model override or the application-owned default before the isolated
+				// candidate begins. This configuration-only preflight never invokes agy or claims it is healthy.
 				const preflight = assurancePreflight({
 					testMode: isTestMode(),
 					assessor: process.env.JPWB_ASSESSOR,
 					judgeModel: process.env.JPWB_JUDGE_MODEL
 				});
-				if (!preflight.ready) {
-					const text = `⚖ Assurance preflight blocked (${preflight.code}). ${preflight.guidance}`;
+				if (preflight.guidance) {
+					const text = `⚖ ${preflight.guidance}`;
 					send({ kind: 'status', text });
 					transcript.push({ role: 'SYSTEM', kind: 'message', text });
-					send({ kind: 'done' });
-					return;
 				}
 				turn = beginAuthoringTurn(params.id);
 				const agent = await createAuthoringAgent(turn.broker, mode);

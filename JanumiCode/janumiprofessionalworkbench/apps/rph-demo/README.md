@@ -65,5 +65,14 @@ bun run test
 bun run e2e
 ```
 
+Normal development and production use the agy Reasoning Review validator. If `JPWB_JUDGE_MODEL` is not set, the
+application pins `Gemini 3.5 Flash (High)` and passes that exact label to `agy --model`. To override it, set a model
+label returned by `agy models` in the same shell before starting the server, for example in PowerShell:
+
+```powershell
+$env:JPWB_JUDGE_MODEL = 'Gemini 3.1 Pro (High)'
+bun run --filter @janumipwb/rph-demo dev
+```
+
 The package is a Bun workspace and participates in the monorepo's Turbo tasks through its declared scripts. npm is
 not the supported package-manager path for this repository.
