@@ -1,0 +1,323 @@
+document_control:
+  document_id: JAN-W0-DR-001
+  title: W0 Detailed Implementation Roadmap - Normative Baseline and Code Grounding
+  version: 0.1.0-draft
+  status: PROPOSED
+  master_roadmap: JAN-ROADMAP-001@2.0.0-draft
+  master_wave: W0
+  master_work_packages:
+  - JAN-WP-0-001
+  - JAN-WP-0-002
+  - JAN-WP-0-003
+  - JAN-WP-0-004
+  - JAN-WP-0-005
+  - JAN-WP-0-006
+  - JAN-WP-0-007
+  repository:
+    name: hestami-ai (github hestami-ai/ai-home-maintenance)
+    revision: c2b853b1
+    branch: main
+    dirty_state: true  # ai_os_home_cam_service_provider/signoz submodule modified (out of W0 scope)
+  database_or_migration_revision: 'better-sqlite3; packages/rph-persistence/src/schema.ts; five tables; no migration tool'
+  runtime_environment: 'Turbo monorepo (Node/Bun); demo apps/rph-demo (SvelteKit); Vitest + Playwright (system Edge, RPH_DEMO_MODE=test)'
+normative_sources:
+- {id: RPH-DOC-000, role: canonical vocabulary and naming authority}
+- {id: RPH-DOC-001, role: RPH migration architecture and program scope}
+- {id: RPH-DOC-002, role: canonical domain model, invariants, state machines, event contract}
+- {id: RPH-DOC-003, role: PWA professional ontology}
+- {id: RPH-DOC-004, role: assurance policy catalog and validator contract}
+- {id: RPH-DOC-005, role: legacy JanumiCode semantic inventory (doc-based, not code-audited)}
+- {id: RPH-DOC-006, role: Field Service Management reference undertaking}
+- {id: RPH-DOC-007, role: command/event/schema contract package}
+- {id: RPH-DOC-008, role: executable invariant and conformance test spec}
+- {id: RPH-DOC-009, role: persistence, migration, dual-run, cutover}
+- {id: RPH-DOC-010, role: PWA Designer and Undertaking Workbench UX}
+- {id: ENG-CONSTITUTION, role: engineering constitution (governance)}
+- {id: ENG-DOCTRINE, role: engineering doctrine (governance)}
+- {id: JAN-ENG-POL-GIT-001, role: multi-agent git isolation and coordination policy}
+current_state_findings:
+  confirmed:
+  - Single authoritative git repo at E:/Projects/hestami-ai; JPWB tracked directly; vestigial empty inner .git removed.
+  - Three JanumiCode lineages: janumicode (v1, 452 files), janumicode_v2 (8270 files), janumiprofessionalworkbench (JPWB, subject of record).
+  - The 11 legacy phases (INTAKE..REPLAN) are realized in janumicode/src/lib/workflow/orchestrator.ts with a central phase switch.
+  - Legacy term "Product Lens" survives only in janumicode_v2 (15 files); JPWB has 0 "Product Lens" and 0 bare "Lens".
+  - JPWB is a mature layered RPH engine (10 rph-* packages + rph-demo) with a passing conformance gate (check-types 21/21, tests, lint, boundary 159 modules/0 violations, Playwright 25/25).
+  - Machine contracts are generated from packages/rph-contracts/vocab/*.json (single source of truth; WP-1-001 substance already met).
+  - Persistence is event-sourced: five tables (professional_work_objects, professional_work_object_versions, domain_events, outbox_messages, command_receipts).
+  - Prior harmonization produced W0-grade evidence: dead-kernel-census.txt, HARMONIZATION-FINDINGS.md/LOG.md, engine-reference-map.md, OPEN-QUESTIONS.md.
+  inferred:
+  - JPWB substantially satisfies master W1 (semantic kernel) and W2 (persistence/events/projections) and parts of W3/W4/W8.
+  assumed:
+  - The standing green gate reflects the current tree (re-confirm at G0).
+  unknown:
+  - Exact per-capability conformance depth of each master W1/W2 outcome in JPWB (conformant vs partial vs hollow).
+semantic_classification:
+  preserve: []
+  reclassify: []
+  generalize: []
+  replace: []
+  remove:
+  - {element: janumicode (v1) codebase, rationale: sponsor direction 2026-07-19 - nothing to migrate/inherit}
+  - {element: janumicode_v2 codebase, rationale: sponsor direction - nothing to migrate/inherit; sole residence of legacy "Product Lens"}
+  - {element: 11 legacy phases INTAKE..REPLAN (as implementation), rationale: professional intent already carried natively by JPWB RPH model; not mined}
+  - {element: legacy validators, rationale: not migrated; JPWB has native assurance kernel}
+  defer:
+  - {element: per-capability conformance scoring of W1/W2 outcomes, target: respective wave detailed roadmaps}
+  unresolved: []
+target_gap_analysis:
+- {master_assumption: 'W0 grounds a legacy phase engine to migrate it', reality: 'legacy dead; JPWB is realized RPH engine', action: 'reframe W0; DIV-W0-001 material-decision trigger'}
+- {master_assumption: 'W1 semantic kernel to be built', reality: 'substantially built in JPWB', action: 're-baseline W1 as conformance-verification wave'}
+- {master_assumption: 'W2 persistence/events to be built', reality: 'already present (event-sourced 5-table store + outbox + receipts + projections)', action: 're-baseline W2; verify recovery/reconciliation'}
+- {master_assumption: 'W5/W6 legacy shadow-mode and pilot authority', reality: 'no legacy substrate to shadow or govern', action: 'W5/W6 as written moot; preserve intent; DIV-W0-002'}
+- {master_assumption: 'W3/W4/W8 vertical slice/UX/PWA Designer to be built', reality: 'partially built in rph-demo + rph-product-realization-pwa', action: 're-baseline per gate'}
+alternatives_considered:
+- {id: A1, option: execute W0 literally (deep legacy inventory), disposition: rejected - contradicts sponsor direction; dead code}
+- {id: A2, option: skip W0 (assume JPWB conformant), disposition: rejected - violates master 19 and Standard 6/10; hollow-layer evidence}
+- {id: A3, option: reframe W0 to JPWB current-state grounding + legacy REMOVE + register consolidation + G0 re-baseline proposal, disposition: SELECTED}
+selected_strategy:
+  summary: 'Code-ground JPWB against the corpus; classify legacy REMOVE; consolidate harmonization evidence into formal registers; G0 package proposes W1+ re-baseline as a material decision.'
+  rationale: 'Honors sponsor direction and master intent (real grounding, surfaced conflicts); reuses prior work; yields a usable conformance baseline; keeps destination while re-baselining route via governance.'
+  decision_ids: [DEC-W0-001, DEC-W0-002]
+repository_change_map:
+  create:
+  - detailed-roadmaps/W0/JAN-W0-DR-001-detailed-implementation-roadmap.md
+  - detailed-roadmaps/W0/JAN-W0-DR-001.yaml
+  - detailed-roadmaps/W0/evidence/document-manifest-and-source-authority.md
+  - detailed-roadmaps/W0/evidence/canonical-vocabulary-report.md
+  - detailed-roadmaps/W0/evidence/jpwb-current-state-inventory.md
+  - detailed-roadmaps/W0/evidence/legacy-classification.md
+  - detailed-roadmaps/W0/evidence/divergence-register.md
+  - detailed-roadmaps/W0/evidence/G0-gate-package.md
+  modify: []
+  deprecate: []
+  remove: []
+  database_changes: []
+  runtime_changes: []
+  ui_changes: []
+detailed_work_packages:
+- id: JAN-W0-DWP-001
+  master_work_packages: [JAN-WP-0-001]
+  title: Authoritative document manifest and source-authority matrix
+  outcome: Establish the authoritative document set (RPH-DOC-000..010 + governance) with subject-specific authority, versions, statuses, supersession.
+  knowledge_status: CONFIRMED
+  repository_scope:
+    repositories: [hestami-ai]
+    files_or_symbols: ['docs/Recursive Professional Harness/*.md', 'JAN-ROADMAP-001-v2/*']
+    database_objects: []
+    runtime_surfaces: []
+  dependencies: []
+  required_changes: [produce document-manifest-and-source-authority.md]
+  invariants: [authority is subject-specific; generation order is not total precedence]
+  prohibited_shortcuts: [treating generation order as total precedence; allowing undocumented source to govern]
+  tests: []
+  evidence: [RPH-ID to file map; supersession notes]
+  migration_and_compatibility: []
+  rollback_and_recovery: [git revert]
+  risks: []
+  open_decisions: []
+  exit_criteria: [every source identified and assigned authority or marked non-authoritative]
+  delivery_state: NOT_STARTED
+  conformance_state: UNASSESSED
+- id: JAN-W0-DWP-002
+  master_work_packages: [JAN-WP-0-002]
+  title: Canonical-vocabulary conformance report (JPWB)
+  outcome: Confirm JPWB uses canonical vocabulary; record legacy exception.
+  knowledge_status: CONFIRMED
+  repository_scope:
+    repositories: [hestami-ai]
+    files_or_symbols: [packages/**, apps/**]
+    database_objects: []
+    runtime_surfaces: []
+  dependencies: [JAN-W0-DWP-001]
+  required_changes: [produce canonical-vocabulary-report.md]
+  invariants: [no "Product Lens" as canonical PWA name; no "Lens" for both PWA and UI viewpoint]
+  prohibited_shortcuts: [renaming symbols without migration aliases]
+  tests: []
+  evidence: ['grep: 0 Product Lens / 0 bare Lens in JPWB; 63 files canonical']
+  migration_and_compatibility: [legacy "Product Lens" confined to REMOVE-classified janumicode_v2]
+  rollback_and_recovery: [git revert]
+  risks: []
+  open_decisions: []
+  exit_criteria: [no JPWB artifact uses a prohibited canonical name]
+  delivery_state: NOT_STARTED
+  conformance_state: UNASSESSED
+- id: JAN-W0-DWP-003
+  master_work_packages: [JAN-WP-0-003]
+  title: JPWB implementation-unit, storage, service-boundary, and source-of-truth inventory
+  outcome: Identify JPWB packages, persistence stores, service boundaries, and canonical sources of truth.
+  knowledge_status: CONFIRMED
+  repository_scope:
+    repositories: [hestami-ai]
+    files_or_symbols: [packages/rph-*, apps/rph-demo, packages/rph-persistence/src/schema.ts, packages/rph-contracts/vocab]
+    database_objects: [professional_work_objects, professional_work_object_versions, domain_events, outbox_messages, command_receipts]
+    runtime_surfaces: [apps/rph-demo]
+  dependencies: [JAN-W0-DWP-001]
+  required_changes: [produce jpwb-current-state-inventory.md]
+  invariants: [one writable semantic authority; contract single source of truth]
+  prohibited_shortcuts: [inferring behavior solely from design docs]
+  tests: []
+  evidence: [package graph; five-table map; vocab-generation pipeline]
+  migration_and_compatibility: []
+  rollback_and_recovery: [git revert]
+  risks: [green gate proves kernel not production wiring]
+  open_decisions: []
+  exit_criteria: [every JPWB semantic-state and side-effect store identified]
+  delivery_state: NOT_STARTED
+  conformance_state: UNASSESSED
+- id: JAN-W0-DWP-004
+  master_work_packages: [JAN-WP-0-003, JAN-WP-0-004, JAN-WP-0-005]
+  title: Legacy lineage classification (REMOVE)
+  outcome: Classify janumicode + janumicode_v2 REMOVE with evidence; locate and disposition the 11-phase engine.
+  knowledge_status: CONFIRMED
+  repository_scope:
+    repositories: [hestami-ai]
+    files_or_symbols: [janumicode/src/lib/workflow/orchestrator.ts, janumicode_v2/src/lib/orchestrator/phases]
+    database_objects: []
+    runtime_surfaces: []
+  dependencies: [JAN-W0-DWP-001]
+  required_changes: [produce legacy-classification.md]
+  invariants: [do not silently interpret unexplained behavior as accidental]
+  prohibited_shortcuts: [mining dead code as a migration source]
+  tests: []
+  evidence: [phase-name grep; sponsor direction 2026-07-19]
+  migration_and_compatibility: [no dual-run/shadow obligation from legacy]
+  rollback_and_recovery: [git revert]
+  risks: [silently discarding a needed legacy behavior - mitigated by RPH-DOC-005 mapping]
+  open_decisions: [DEC-W0-002]
+  exit_criteria: [legacy dispositioned; no legacy behavior UNRESOLVED]
+  delivery_state: NOT_STARTED
+  conformance_state: UNASSESSED
+- id: JAN-W0-DWP-005
+  master_work_packages: [JAN-WP-0-005, JAN-WP-0-006]
+  title: JPWB assurance/validator and execution side-effect/recovery cross-walk
+  outcome: Cross-walk JPWB assurance + side effects to RPH-DOC-004/008/009; name hollow-layer and recovery gaps.
+  knowledge_status: INFERRED
+  repository_scope:
+    repositories: [hestami-ai]
+    files_or_symbols: [packages/rph-assurance, packages/rph-application/src/handlers, packages/rph-application/src/handlers/execution.ts, docs/_working/dead-kernel-census.txt]
+    database_objects: [domain_events, command_receipts]
+    runtime_surfaces: []
+  dependencies: [JAN-W0-DWP-003]
+  required_changes: [inventory section + register entries]
+  invariants: [execution success != assurance/PWU/baseline satisfaction; no runtime authority via PWA]
+  prohibited_shortcuts: [migrating pass/fail messages as canonical assurance; assuming retries safe]
+  tests: []
+  evidence: [dead-kernel census; harmonization findings]
+  migration_and_compatibility: []
+  rollback_and_recovery: [git revert]
+  risks: [hollow governed layer]
+  open_decisions: []
+  exit_criteria: [each material JPWB validator/side-effect classified or flagged; recovery gaps named]
+  delivery_state: NOT_STARTED
+  conformance_state: UNASSESSED
+- id: JAN-W0-DWP-006
+  master_work_packages: [JAN-WP-0-007]
+  title: JPWB-vs-corpus divergence register + ADR baseline
+  outcome: Consolidate harmonization evidence + new findings into C-contract instances (divergences, decisions, deferrals, assumptions).
+  knowledge_status: CONFIRMED
+  repository_scope:
+    repositories: [hestami-ai]
+    files_or_symbols: [docs/_working/HARMONIZATION-FINDINGS.md, docs/_working/HARMONIZATION-LOG.md]
+    database_objects: []
+    runtime_surfaces: []
+  dependencies: [JAN-W0-DWP-001, JAN-W0-DWP-002, JAN-W0-DWP-003, JAN-W0-DWP-004, JAN-W0-DWP-005]
+  required_changes: [produce divergence-register.md]
+  invariants: [surface material conflicts rather than silently resolve]
+  prohibited_shortcuts: [inventing repository facts to appear complete]
+  tests: []
+  evidence: [DIV-W0-001..004; DEC-W0-001..002; DEF-W0-001; ASM/UNK]
+  migration_and_compatibility: []
+  rollback_and_recovery: [git revert]
+  risks: []
+  open_decisions: [DIV-W0-001 requires sponsor decision]
+  exit_criteria: [every material divergence captured; no unresolved critical item silent]
+  delivery_state: NOT_STARTED
+  conformance_state: UNASSESSED
+- id: JAN-W0-DWP-007
+  master_work_packages: []
+  title: G0 gate package
+  outcome: Assemble the G0 gate package with re-baseline recommendation and explicit decision request.
+  knowledge_status: CONFIRMED
+  repository_scope:
+    repositories: [hestami-ai]
+    files_or_symbols: [detailed-roadmaps/W0/evidence/G0-gate-package.md]
+    database_objects: []
+    runtime_surfaces: []
+  dependencies: [JAN-W0-DWP-001, JAN-W0-DWP-002, JAN-W0-DWP-003, JAN-W0-DWP-004, JAN-W0-DWP-005, JAN-W0-DWP-006]
+  required_changes: [produce G0-gate-package.md]
+  invariants: [no later wave assumes G0 passed until an effective decision exists]
+  prohibited_shortcuts: [claiming completion without evidence]
+  tests: []
+  evidence: [gate package per master 17]
+  migration_and_compatibility: []
+  rollback_and_recovery: [git revert]
+  risks: [reframe rejected at G0]
+  open_decisions: [G0 decision: APPROVE/APPROVE_WITH_CONDITIONS/REJECT/DEFER]
+  exit_criteria: [gate package complete; material-decision trigger surfaced]
+  delivery_state: NOT_STARTED
+  conformance_state: UNASSESSED
+assurance_and_test_plan:
+- W0 is non-mutating; no new tests authored.
+- Conformance baseline for re-baselining = standing gate (check-types 21/21, Vitest, lint, boundary, Playwright 25/25).
+- W0 SHALL NOT assert JPWB capability conformance without a cited test/trace; green gate proves kernel not production wiring.
+security_authority_and_tenant_impact:
+- CRITICAL DIV-W0-003 - no endpoint authenticates; demo fabricates a HUMAN principal; must not ship multi-tenant.
+- JPWB honors no-runtime-authority-via-PWA (rule 10) and one-writable-authority (rule 1) at kernel level; verify per-capability later.
+- No tenant impact from W0 (no code/data change).
+observability_recovery_and_rollback:
+- W0 rollback trivial: git revert of W0 doc commit(s); no runtime/data effect.
+- Forward: JPWB restart-recovery / external-op reconciliation posture (WP-2-007) named to verify; production wiring is a hollow-layer candidate.
+risks_assumptions_unknowns_and_decisions:
+  risks:
+  - {id: R1, risk: treating green gate as full corpus conformance, mitigation: preserve dead-kernel census as counter-evidence}
+  - {id: R2, risk: reframe rejected at G0, mitigation: surface DIV-W0-001 early and explicitly}
+  assumptions:
+  - {id: ASM-W0-001, statement: standing green gate reflects current tree, resolution_gate: G0}
+  unknowns:
+  - {id: UNK-W0-001, statement: exact conformance depth per master capability in JPWB, resolution: DWP-004/005/006 + later waves}
+  decisions:
+  - {id: DEC-W0-001, decision: adopt reframed-W0 strategy A3, authority: agent within delegated latitude, condition: sponsor ratifies DIV-W0-001 at G0}
+  - {id: DEC-W0-002, decision: classify janumicode + janumicode_v2 REMOVE, authority: sponsor direction 2026-07-19}
+  divergences:
+  - {id: DIV-W0-001, subject: roadmap target-framing vs realized state, materiality: MATERIAL, classification: material-decision-trigger, status: OPEN}
+  - {id: DIV-W0-002, subject: no legacy migration substrate (W5/W6 moot), materiality: MATERIAL, status: OPEN}
+  - {id: DIV-W0-003, subject: no authentication (fabricated HUMAN principal), materiality: CRITICAL, status: OPEN}
+  - {id: DIV-W0-004, subject: hollow governed layer (~55 kernel fns dead in production), materiality: MATERIAL, status: OPEN-in-progress}
+  deferrals:
+  - {id: DEF-W0-001, requirement: per-capability conformance scoring, target_wave_or_event: respective wave detailed roadmaps}
+  waivers: []
+implementation_order:
+- DWP-001 and DWP-002 (concurrent)
+- DWP-003 and DWP-004 (concurrent, after DWP-001)
+- DWP-005 (after DWP-003)
+- DWP-006 (consolidates DWP-001..005)
+- DWP-007 (last)
+traceability_updates:
+- {normative: authoritative document set, source: master 6 / WP-0-001, master_wp: JAN-WP-0-001, dwp: JAN-W0-DWP-001, evidence: document-manifest-and-source-authority.md}
+- {normative: canonical vocabulary, source: RPH-DOC-000 / WP-0-002, master_wp: JAN-WP-0-002, dwp: JAN-W0-DWP-002, evidence: canonical-vocabulary-report.md}
+- {normative: implementation units/storage/sources of truth, source: WP-0-003 / RPH-DOC-009, master_wp: JAN-WP-0-003, dwp: JAN-W0-DWP-003, evidence: jpwb-current-state-inventory.md}
+- {normative: legacy grounding/classification, source: WP-0-004/005 / RPH-DOC-005, master_wp: JAN-WP-0-004, dwp: JAN-W0-DWP-004, evidence: legacy-classification.md}
+- {normative: validator/side-effect/recovery, source: WP-0-005/006 / RPH-DOC-004/008/009, master_wp: JAN-WP-0-005, dwp: JAN-W0-DWP-005, evidence: jpwb-current-state-inventory.md + divergence-register.md}
+- {normative: divergence register + ADR baseline, source: WP-0-007, master_wp: JAN-WP-0-007, dwp: JAN-W0-DWP-006, evidence: divergence-register.md}
+- {normative: G0 gate package, source: master 17, master_wp: '', dwp: JAN-W0-DWP-007, evidence: G0-gate-package.md}
+gate_requirements:
+- master and detailed WP status
+- code-grounded findings and deviations
+- conformance-baseline (gate) result
+- migration/recovery/security notes
+- decisions/deferrals/waivers/divergences (register)
+- residual risk
+- recommendation APPROVE/APPROVE_WITH_CONDITIONS/REJECT/DEFER
+- proposed W1+ re-baseline disposition (successor-master proposal for DIV-W0-001)
+self_critique:
+  normative_coverage: 'All 7 master W0 outcomes addressed; 3 substantive vs JPWB (WP-0-001/002/007), 4 discharged by evidence-backed REMOVE of legacy (WP-0-003/004/005/006). Complete for reframed W0.'
+  legacy_preservation: 'None required (sponsor direction). Risk of silent discard mitigated by RPH-DOC-005 doc-level mapping showing legacy intent already carried by JPWB.'
+  migration_safety: 'Greenfield-forward; no legacy dual-run. Recovery-wiring gaps named for W2 re-baseline.'
+  security_and_authority: 'CRITICAL auth gap surfaced (DIV-W0-003), not deferred silently.'
+  overengineering_check: 'Avoids re-deriving harmonization corpus and deep dead-code archaeology; consolidates rather than re-litigates; registers kept lean.'
+  remaining_concerns:
+  - DIV-W0-001 reframe requires sponsor ratification at G0.
+  - Per-capability conformance depth is UNKNOWN pending later-wave roadmaps.
+readiness:
+  determination: AUTHORIZED
+  rationale: 'Sponsor approved G0 (APPROVE_WITH_CONDITIONS, 2026-07-19). Evidence production is COMPLETED; DIV-W0-001 RESOLVED (C1 authorizes the W1+ re-baseline); DEC-W0-001 EFFECTIVE. W0 gate passed with standing conditions C2 (auth, WS-I/W10), C3 (corpus ratification), C4 (hollow-layer closure tracked under W1). Successor artifact: JAN-W1-DR-001.'

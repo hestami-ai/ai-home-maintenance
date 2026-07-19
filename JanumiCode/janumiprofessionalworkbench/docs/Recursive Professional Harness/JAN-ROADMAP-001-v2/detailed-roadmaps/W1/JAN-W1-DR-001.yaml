@@ -1,0 +1,130 @@
+document_control:
+  document_id: JAN-W1-DR-001
+  title: W1 Detailed Implementation Roadmap - RPH Semantic Kernel and Contract Foundation (conformance-verification + hollow-layer closure)
+  version: 1.0.0
+  status: COMPLETED   # G1 APPROVE recorded 2026-07-19 (delegated authority); all 5 WIRE targets closed + object planes instantiated
+  master_roadmap: JAN-ROADMAP-001@2.0.0-draft
+  master_wave: W1
+  master_work_packages: [JAN-WP-1-001, JAN-WP-1-002, JAN-WP-1-003, JAN-WP-1-004, JAN-WP-1-005, JAN-WP-1-006, JAN-WP-1-007, JAN-WP-1-008]
+  predecessor_gate: 'G0 APPROVE_WITH_CONDITIONS (2026-07-19); C1 authorizes the W1 re-baseline (DIV-W0-001 RESOLVED)'
+  repository: {name: hestami-ai, revision: c2b853b1, branch: main, dirty_state: true}
+  database_or_migration_revision: 'better-sqlite3; five tables; NO schema change in W1 (persistence is W2)'
+  runtime_environment: 'Turbo monorepo; Vitest + Playwright'
+normative_sources:
+- {id: RPH-DOC-002, role: domain model, invariants, state machines}
+- {id: RPH-DOC-007, role: command/event/schema contracts}
+- {id: RPH-DOC-008, role: executable invariants (RPH-CON/INT/PWU/CNS/ASM/DEC/EVD/ASR/GOV/BAS/TRC families = W1 conformance targets)}
+- {id: RPH-DOC-004, role: assurance (WP-1-007)}
+current_state_findings:
+  confirmed:
+  - WP-1-001 contract single-source (vocab->gen) is CONFORMANT.
+  - WP-1-002 registry/identity (30 object types, ULID, provenance, (id,revision)) is CONFORMANT (verify immutability property).
+  - 'The W1 gap is ENFORCEMENT WIRING of the governed kernel (DIV-W0-004 hollow layer), not a from-scratch build.'
+  - 'Dead-kernel census (W0 snapshot): LIVE 19 / DEAD 55; the W1-relevant dead set maps to WP-1-004..008.'
+  inferred:
+  - WP-1-007 partly wired by harmonization increments R-Y (5/6 ASSURANCE_POLICY rule arrays enforced); census may overstate remaining gap.
+  assumed:
+  - The wiring method (red-test-first, route through kernel, fail-closed) applies uniformly.
+  unknown:
+  - Exact count of still-dead functions after R-Y (resolved by per-DWP liveness re-verification).
+semantic_classification: {preserve: [], reclassify: [], generalize: [], replace: [], remove: [{element: legacy lineages, rationale: W0 DEC-W0-002}], defer: [{element: execution-plane + persistence-recovery kernel functions, target: W2/W3}], unresolved: []}
+wp_conformance:
+  WP-1-001: CONFORMANT
+  WP-1-002: CONFORMANT-verify
+  WP-1-003: PARTIAL
+  WP-1-004: PARTIAL-HOLLOW
+  WP-1-005: HOLLOW
+  WP-1-006: HOLLOW
+  WP-1-007: PARTIAL(assurance)-HOLLOW(claim/evidence)
+  WP-1-008: HOLLOW
+target_gap_analysis:
+- {wp: WP-1-004, gap: state-machine transition enforcement + presentation/semantic edit classification dead, functions: [getMachine, machineNames, isValidState, initialStateOf, isTerminalState, assertTransition, isPresentationOnlyChange, applyPresentationChange]}
+- {wp: WP-1-005, gap: obligation conservation/constraint propagation/assumption reification dead, functions: [validateObligationConservation, validateConstraintPropagation, requiresReification, validateAssumptionReification]}
+- {wp: WP-1-006, gap: decomposition validity + recomposition + coverage dead, functions: [validateDecomposition, evaluateRecomposition, coverageFor]}
+- {wp: WP-1-007, gap: claim acceptance/falsification + evidence admissibility/applicability + control-action selection dead, functions: [assessAcceptance, assessFalsification, evidenceAdmissibility, evaluateApplicability, classifyEvidenceInvalidation, assessModelOutput, executionAloneSatisfiesAssurance, controllerMarksPwuSatisfied, normalizeControlAction, selectControlAction]}
+- {wp: WP-1-008, gap: effective-approval/version-authorization + baseline immutability/supersession + waiver discharge + typed-link directionality dead, functions: [isEffectiveApproval, decisionAuthorizesVersions, assessDecisionRevocation, waiverCovers, waiverStillDischarges, waiverPreservesFindings, isWaiverApplicable, assertBaselineItemSetImmutable, canSupersedeBaseline, blocksIrreversibleWork, canAuthorizeNewWork, validateLinkDirectionality, impactedObjects, resolvePath]}
+alternatives_considered:
+- {id: A1, option: rebuild kernel from scratch, disposition: rejected - kernel exists/tested; violates C1 re-baseline}
+- {id: A2, option: declare conformant on passing tests, disposition: rejected - green proves kernel not wiring; violates master 19}
+- {id: A3, option: route call sites through existing kernel, red-test-first, fail-closed, no new rule/no literal, disposition: SELECTED}
+selected_strategy:
+  summary: 'Close each HOLLOW enforcement by wiring the production write-path through the existing tested kernel, red-test-first + mutation-proven + fail-closed; verify the already-conformant WPs; defer execution-plane fns to W2/W3.'
+  rationale: 'The established harmonization wiring method, proven this session (rule-array enforcement thread). Leanest closure of DIV-W0-004; no new rules, no schema churn.'
+  decision_ids: [DEC-W1-001]
+repository_change_map:
+  create: ['red-first wiring tests per closed function', 'detailed-roadmaps/W1/JAN-W1-DR-001*', 'W1 evidence + G1 gate package']
+  modify: ['packages/rph-application/src/handlers/* (route write-paths through kernel guards)']
+  deprecate: []
+  remove: []
+  database_changes: []   # none in W1
+  runtime_changes: []
+  ui_changes: []
+detailed_work_packages:
+- {id: JAN-W1-DWP-001, master_work_packages: [JAN-WP-1-001, JAN-WP-1-002], title: Verify contract single-source + identity immutability, knowledge_status: CONFIRMED, dependencies: [], tests: [RPH-CON drift, identity-immutability property], exit_criteria: [contracts reject unknown props; identity survives presentation/execution change], delivery_state: NOT_STARTED, conformance_state: UNASSESSED}
+- {id: JAN-W1-DWP-002, master_work_packages: [JAN-WP-1-003], title: Enforce Intent version-bound authority + revision->impact, knowledge_status: INFERRED, dependencies: [JAN-W1-DWP-001], tests: [RPH-INT-001..007], exit_criteria: [approval binds exact version; revision triggers impact], delivery_state: NOT_STARTED, conformance_state: UNASSESSED}
+- {id: JAN-W1-DWP-003, master_work_packages: [JAN-WP-1-004], title: Wire state-machine transition enforcement + presentation/semantic edit classification, knowledge_status: CONFIRMED, dependencies: [JAN-W1-DWP-001], tests: [RPH-PWU, property P1], exit_criteria: [illegal transition rejected; presentation edit cannot change PWU meaning], delivery_state: NOT_STARTED, conformance_state: UNASSESSED}
+- {id: JAN-W1-DWP-004, master_work_packages: [JAN-WP-1-005], title: Wire obligation conservation/constraint propagation/assumption reification, knowledge_status: CONFIRMED, dependencies: [JAN-W1-DWP-003], tests: [RPH-CNS, RPH-ASM, P2, P3], exit_criteria: [no mandatory obligation/constraint silently disappears; material assumptions reified], delivery_state: NOT_STARTED, conformance_state: UNASSESSED}
+- {id: JAN-W1-DWP-005, master_work_packages: [JAN-WP-1-006], title: Block invalid/uncovered decomposition + enforce recomposition, knowledge_status: CONFIRMED, dependencies: [JAN-W1-DWP-004], tests: [RPH-DEC-001..007], exit_criteria: [children-complete cannot satisfy parent without valid coverage + recomposition], delivery_state: NOT_STARTED, conformance_state: UNASSESSED}
+- {id: JAN-W1-DWP-006, master_work_packages: [JAN-WP-1-007], title: Wire claim acceptance/falsification + evidence admissibility/applicability + control-action selection, knowledge_status: INFERRED, dependencies: [JAN-W1-DWP-004], tests: [RPH-EVD, RPH-ASR], exit_criteria: [satisfied claim traces to admissible evidence + policy assessment; generated output not evidence automatically], delivery_state: NOT_STARTED, conformance_state: UNASSESSED}
+- {id: JAN-W1-DWP-007, master_work_packages: [JAN-WP-1-008], title: Wire effective-approval/version-authorization + baseline immutability/supersession + waiver discharge + typed-link directionality, knowledge_status: CONFIRMED, dependencies: [JAN-W1-DWP-006], tests: [RPH-GOV, RPH-BAS, RPH-TRC], exit_criteria: [no baseline without effective decision + exact versions; baselines immutable; links typed/directional], delivery_state: NOT_STARTED, conformance_state: UNASSESSED}
+- {id: JAN-W1-DWP-008, master_work_packages: [], title: Reference-fixture conformance + G1 gate package + proposed W2-DR-001, knowledge_status: CONFIRMED, dependencies: [JAN-W1-DWP-001, JAN-W1-DWP-002, JAN-W1-DWP-003, JAN-W1-DWP-004, JAN-W1-DWP-005, JAN-W1-DWP-006, JAN-W1-DWP-007], tests: [full gate + reference fixture], exit_criteria: [G1 package complete], delivery_state: NOT_STARTED, conformance_state: UNASSESSED}
+assurance_and_test_plan:
+- 'Red-test-first MANDATORY: each closed function ships a test that goes red when the enforcement is reverted (mutation-proven).'
+- 'W1 conformance evidence = RPH-* test families passing AGAINST PRODUCTION PATHS + standing gate (check-types 21/21, Vitest, lint, boundary 159/0, Playwright 25/25).'
+- 'W1 SHALL NOT claim a WP conformant on kernel-test evidence alone.'
+security_authority_and_tenant_impact:
+- 'W1 does NOT close DIV-W0-003 (auth, C2, WS-I/W10) and SHALL NOT regress it.'
+- 'WP-1-008 wirings fail closed on missing authority context (DOC-002 §27.2), strengthening the pre-auth posture without substituting for authentication.'
+- 'No tenant impact.'
+observability_recovery_and_rollback:
+- 'Per-function increment commits, each git-revert-able; no runtime/data migration.'
+- 'Progress in HARMONIZATION-LOG.md (established increment ledger) + this living roadmap.'
+risks_assumptions_unknowns_and_decisions:
+  risks:
+  - {id: R1, risk: dead-kernel census staleness (some fns already wired R-Y), mitigation: per-DWP liveness re-verification before wiring}
+  - {id: R2, risk: wiring tightens behavior -> seeds/demo breakage, mitigation: fix at the premise; suspend expectations only visibly with un-skip conditions}
+  - {id: R3, risk: target enforcement whose kernel rule shape is undefined (RemediationRule situation), mitigation: fail closed + disclose; escalate; do not fabricate}
+  assumptions:
+  - {id: ASM-W1-001, statement: wiring method applies uniformly, resolution_gate: G1}
+  unknowns:
+  - {id: UNK-W1-001, statement: exact still-dead count after R-Y, resolution: per-DWP liveness re-verification}
+  decisions:
+  - {id: DEC-W1-001, decision: adopt the wiring method (A3) as W1 strategy, authority: agent within C1 re-baseline authorization}
+  divergences:
+  - {id: DIV-W1-001, subject: successor Master Roadmap revision formalizing the wave re-baseline (from DIV-W0-001), status: OPEN - standing governance follow-up; W1 proceeds under C1 in the interim}
+  deferrals:
+  - {id: DEF-W1-001, requirement: execution-plane + persistence-recovery kernel functions, target_wave_or_event: W2/W3}
+  waivers: []
+implementation_order:
+- DWP-001 + DWP-002 (verify contract/identity + Intent)
+- DWP-003 (state machines - foundational)
+- DWP-004 -> DWP-005 (obligation/constraint/assumption -> decomposition/recomposition)
+- DWP-006 (claim/evidence/assurance)
+- DWP-007 (decision/baseline/traceability/waiver)
+- DWP-008 (reference fixture + G1 package)
+traceability_updates:
+- {normative: RPH-DOC-008 RPH-PWU/P1, master_wp: JAN-WP-1-004, dwp: JAN-W1-DWP-003, evidence: red-first transition-enforcement tests + HARMONIZATION-LOG increment}
+- {normative: RPH-DOC-008 RPH-CNS/ASM/P2/P3, master_wp: JAN-WP-1-005, dwp: JAN-W1-DWP-004, evidence: conservation/propagation/reification tests}
+- {normative: RPH-DOC-008 RPH-DEC-001..007, master_wp: JAN-WP-1-006, dwp: JAN-W1-DWP-005, evidence: decomposition/recomposition tests}
+- {normative: RPH-DOC-008 RPH-EVD/ASR, master_wp: JAN-WP-1-007, dwp: JAN-W1-DWP-006, evidence: claim/evidence admissibility tests}
+- {normative: RPH-DOC-008 RPH-GOV/BAS/TRC, master_wp: JAN-WP-1-008, dwp: JAN-W1-DWP-007, evidence: decision/baseline/traceability tests}
+gate_requirements:
+- master + detailed WP status
+- per-function liveness + wiring evidence (red-first, mutation-proven)
+- RPH-* test-family results against production paths
+- residual risk; decisions/deferrals/divergences
+- recommendation APPROVE/APPROVE_WITH_CONDITIONS/REJECT/DEFER
+- proposed JAN-W2-DR-001
+self_critique:
+  normative_coverage: 'All 8 W1 outcomes mapped; WP-1-001/002 conformant-verify, WP-1-004..008 wire, execution-plane deferred with rationale. Hardest anti-shortcuts (decomposition coverage; evidence-not-automatic) are first-class DWP-005/006.'
+  legacy_preservation: 'N/A (REMOVE).'
+  migration_safety: 'Behavior-tightening only; compatibility breakage fixed at the premise; per-function revertible increments.'
+  security_and_authority: 'C2 not closed by W1 and not regressed; WP-1-008 wirings strengthen pre-auth posture (fail-closed on authority context).'
+  overengineering_check: 'No new kernel rules invented; wiring reuses tested kernel; no schema churn. Leanest closure of DIV-W0-004.'
+  remaining_concerns:
+  - Census staleness may overstate the gap (mitigated by re-verification).
+  - Successor master revision for the wave re-baseline (DIV-W1-001) still owed.
+readiness:
+  determination: COMPLETED
+  rationale: 'W1 executed to completion under delegated sponsor authority (procedure change 2026-07-19). The five WIRE gaps + the object-plane sub-program (C1) are closed: obligation conservation (P2), constraint propagation (P3), recomposition evaluation (§14.1), evidence-invalidation pull-guard (P4/CT-10), and stale-decision version binding (P5). Each red-first + controlled + full-gate-green; the Field Service reference fixture stayed green (64/64). G1 decision APPROVE recorded (evidence/G1-gate-package.md §8). Typed trace-link plane deferred to W2 (DEF-W1-002). Successor-master re-baseline (DIV-W1-003) remains owed as a standing governance follow-up.'
+  gate: {id: G1, decision: APPROVE, date: 2026-07-19, commits: [28e077f5, 6020f92f, 20a3733e, 6dc18d00, eb32a8bf]}
