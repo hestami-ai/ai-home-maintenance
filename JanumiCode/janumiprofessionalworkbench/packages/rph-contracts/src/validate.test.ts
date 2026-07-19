@@ -62,6 +62,11 @@ describe('validate', () => {
 		// then +1 SubmitEvidenceForAssessment command +1 AssuranceEvidenceReceived event (Increment Q) — the §32
 		// evidence sub-lifecycle that makes §38 "missing evidence" a real required−received fold. Ratified NAMES
 		// (DOC-004 §32/§31); schemas authored under §0.3 (§31 L1770: "ratified names ... schematized nowhere").
-		expect(buildContractRegistry().ids()).toHaveLength(297);
+		// then +2 AssertObligation/AssertConstraint commands +2 ObligationAsserted/ConstraintAsserted events —
+		// the first-class Obligation/Constraint object plane (JAN-ROADMAP-001 W1 gate G1 condition C1: WP-1-005's
+		// "material obligations SHALL become first-class traceable objects"); then +1 ProposeRecomposition command
+		// +1 RecompositionProposed event — the RecompositionContract mint (WIRE-3a). The RecompositionConflict
+		// helper is a sub-type, not a registry entry. (+6 → 303.)
+		expect(buildContractRegistry().ids()).toHaveLength(303);
 	});
 });
