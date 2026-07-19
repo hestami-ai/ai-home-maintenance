@@ -4,6 +4,13 @@
 // UTC TEXT. Single-writer SQLite makes the whole command pipeline atomic in one transaction, so events +
 // outbox commit together with no broker. DB-role/trigger-based dual-authority prevention (Postgres) becomes
 // an application-level guarantee (command-bus is the only writer). See docs §5 + the architecture synthesis.
+
+// W2-INC-1 (WP-2-001): the schema version stamped into the DB's `PRAGMA user_version`. This is the migration
+// baseline: a fresh (or pre-versioning, user_version=0) DB is stamped at open; an engine that opens a store
+// whose version is NEWER than it supports fails closed rather than silently reading a schema it does not
+// understand. Bump this (and register a forward migration) whenever SCHEMA_SQL changes shape.
+export const SCHEMA_VERSION = 1;
+
 export const SCHEMA_SQL = `
 CREATE TABLE IF NOT EXISTS professional_work_objects (
 	id TEXT PRIMARY KEY,

@@ -7,7 +7,7 @@ import type {
 	StorageAdapter,
 	StoredObject
 } from '@janumipwb/rph-ports';
-import { SCHEMA_SQL } from './schema.js';
+import { SCHEMA_SQL, SCHEMA_VERSION } from './schema.js';
 import { createSqliteDriver, type SqlDriver } from './sql-driver.js';
 
 interface ReceiptRow {
@@ -47,6 +47,32 @@ export class SqliteStorageAdapter implements StorageAdapter {
 		this.db = opts.driver ?? createSqliteDriver(opts.filename);
 		this.now = opts.now ?? (() => new Date().toISOString());
 		this.db.exec(SCHEMA_SQL);
+		this.enforceSchemaVersion();
+	}
+
+	/**
+	 * W2-INC-1 (WP-2-001) migration baseline. Read the DB's `PRAGMA user_version`:
+	 *   - 0 (fresh, or a store that predates versioning) → stamp it at `SCHEMA_VERSION`;
+	 *   - equal to `SCHEMA_VERSION` → open normally;
+	 *   - GREATER than `SCHEMA_VERSION` → fail closed: an older engine SHALL NOT read/write a store written by a
+	 *     newer one (silent misread of an unknown schema is exactly what the version guard exists to prevent);
+	 *   - between 0 and `SCHEMA_VERSION` → fail closed: a forward migration is required and none is registered yet.
+	 * Stamping is idempotent, so reopening a durable store round-trips cleanly.
+	 */
+	private enforceSchemaVersion(): void {
+		const row = this.db.prepare('PRAGMA user_version').get() as { user_version?: number } | undefined;
+		const current = row?.user_version ?? 0;
+		if (current === SCHEMA_VERSION) return;
+		if (current === 0) {
+			this.db.exec(`PRAGMA user_version = ${SCHEMA_VERSION}`);
+			return;
+		}
+		const direction = current > SCHEMA_VERSION ? 'newer than' : 'older than';
+		throw new Error(
+			`RPH persistence: database schema version ${current} is ${direction} this build's ${SCHEMA_VERSION}. ` +
+				'Refusing to open — an engine must not read a store written by a newer schema, and no forward ' +
+				'migration is registered for an older one. Align the engine build with the store.'
+		);
 	}
 
 	/** Run `fn` in one transaction (nestable via savepoints), so a batch of commits is all-or-nothing. */
