@@ -2195,6 +2195,30 @@
       "tightenedBy": "M9"
     },
     {
+      "name": "RecompositionConflict",
+      "note": "AUTHORED 2026-07-19 (W1 G1 C1): a contradiction discovered while aggregating child outputs during recomposition (§14.1 / RPH-DEC-006). Fed to evaluateRecomposition so that a detected conflict forces CONFLICTED even when every child is individually SATISFIED. conflictType matches a ConflictResolutionRule.conflictType.",
+      "fields": [
+        {
+          "field": "conflictType",
+          "type": "string",
+          "required": true,
+          "note": "open value set; matches a ConflictResolutionRule.conflictType"
+        },
+        {
+          "field": "conflictingChildWorkUnitIds",
+          "type": "string[]",
+          "required": true,
+          "note": "id-ref[]; the children whose outputs contradict (§14.1)"
+        },
+        {
+          "field": "description",
+          "type": "string",
+          "required": true
+        }
+      ],
+      "tightenedBy": "M9"
+    },
+    {
       "name": "RetryPolicy",
       "fields": [
         {

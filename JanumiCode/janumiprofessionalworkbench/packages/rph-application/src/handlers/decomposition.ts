@@ -5,17 +5,22 @@
 // further wiring increment. Recomposition begin/complete advance the RecompositionContract.status machine.
 import type {
 	CommandResult,
+	CompleteRecompositionPayload,
 	ConstraintPropagation,
 	DomainCommand,
 	ProposeDecompositionPayload,
+	ProposeRecompositionPayload,
 	ValidateDecompositionPayload
 } from '@janumipwb/rph-contracts';
 import {
+	evaluateRecomposition,
 	validateConstraintPropagation,
 	validateObligationConservation,
 	type ConstraintDispositionRecord,
 	type ParentConstraint,
-	type ParentObligation
+	type ParentObligation,
+	type RecompositionInput,
+	type RequiredChildResult
 } from '@janumipwb/rph-domain';
 import {
 	advanceStatus,
@@ -271,6 +276,47 @@ export const reviseDecomposition: CommandHandler = (ctx, command) =>
 		bumpSemanticVersion: true
 	});
 
+/** ProposeRecomposition — mint a RecompositionContract in READY (parallel to ProposeDecomposition; WIRE-3a /
+ *  §14 / WP-1-006). Before this existed the contract could never be instantiated, so BeginRecomposition and
+ *  CompleteRecomposition — and the evaluateRecomposition kernel they should drive — were dead at the write path. */
+export const proposeRecomposition: CommandHandler = (ctx, command, payload) => {
+	const p = payload as ProposeRecompositionPayload;
+	const id = command.targetAggregateId;
+	if (!ctx.store.loadObject(p.parentWorkUnitId)) {
+		return reject(
+			command,
+			'RPH_VALIDATION_SEMANTIC_FAILED',
+			`ProposeRecomposition requires an existing parent work unit ${p.parentWorkUnitId}`,
+			[id]
+		);
+	}
+	const state: Record<string, unknown> = {
+		...newEnvelope(command, RECOMP, id, {
+			lifecycleStatus: 'READY',
+			sourceObjectIds: [p.parentWorkUnitId, ...p.requiredChildWorkUnitIds]
+		}),
+		parentWorkUnitId: p.parentWorkUnitId,
+		requiredChildWorkUnitIds: p.requiredChildWorkUnitIds,
+		aggregationRules: p.aggregationRules ?? [],
+		conflictResolutionRules: p.conflictResolutionRules ?? [],
+		parentCompletionClaimId: p.parentCompletionClaimId,
+		status: 'READY'
+	};
+	return createObject(ctx, command, {
+		objectType: RECOMP,
+		aggregateId: id,
+		state,
+		eventType: 'RecompositionProposed',
+		eventPayload: {
+			recompositionContractId: id,
+			parentWorkUnitId: p.parentWorkUnitId,
+			requiredChildWorkUnitIds: p.requiredChildWorkUnitIds,
+			parentCompletionClaimId: p.parentCompletionClaimId,
+			status: 'READY'
+		}
+	});
+};
+
 /** BeginRecomposition — RecompositionContract.status READY -> EVALUATING. */
 export const beginRecomposition: CommandHandler = (ctx, command) =>
 	advanceStatus(ctx, command, {
@@ -281,12 +327,78 @@ export const beginRecomposition: CommandHandler = (ctx, command) =>
 		eventType: 'RecompositionStarted'
 	});
 
-/** CompleteRecomposition — RecompositionContract.status EVALUATING -> COMPOSABLE (then SATISFIED on assessment). */
-export const completeRecomposition: CommandHandler = (ctx, command) =>
-	advanceStatus(ctx, command, {
+// §14.1 acceptable-child set: a required child contributes acceptably to recomposition when its assurance rollup
+// is SATISFIED / CONDITIONALLY_SATISFIED / WAIVED. (Child COMPLETION alone is necessary but NOT sufficient.)
+const ACCEPTABLE_CHILD_ASSURANCE = new Set(['SATISFIED', 'CONDITIONALLY_SATISFIED', 'WAIVED']);
+
+// evaluateRecomposition outcome -> RecompositionContract.status machine state.
+const RECOMP_OUTCOME_STATE: Record<string, string> = {
+	SATISFIED: 'COMPOSABLE',
+	CONFLICTED: 'CONFLICTED',
+	INSUFFICIENT: 'INSUFFICIENT'
+};
+
+/** Build the §14.1 recomposition input. Child acceptability is DERIVED (load each required child PWU; the caller
+ *  cannot fake it); detected conflicts + the two whole-checks are the recomposition author's evaluation, carried
+ *  on the command; conflict-resolution rules come from the contract. */
+function buildRecompositionInput(
+	ctx: HandlerContext,
+	contract: Record<string, unknown>,
+	p: CompleteRecompositionPayload
+): RecompositionInput {
+	const requiredChildResults: RequiredChildResult[] = (
+		(contract.requiredChildWorkUnitIds as string[] | undefined) ?? []
+	).map((childWorkUnitId) => ({
+		childWorkUnitId,
+		acceptable: ACCEPTABLE_CHILD_ASSURANCE.has(str(loadState(ctx, childWorkUnitId)?.assuranceState))
+	}));
+	const rules = (contract.conflictResolutionRules as
+		| { conflictType: string; action: string }[]
+		| undefined) ?? [];
+	return {
+		requiredChildResults,
+		detectedConflicts: (p.detectedConflicts ?? []).map((c) => ({
+			conflictType: c.conflictType,
+			conflictingChildWorkUnitIds: c.conflictingChildWorkUnitIds,
+			description: c.description
+		})),
+		conflictResolutionRules: rules.map((r) => ({ conflictType: r.conflictType, action: r.action })),
+		parentCompletionClaimSupported: p.parentCompletionClaimSupported ?? true,
+		parentConstraintsHoldAgainstWhole: p.parentConstraintsHoldAgainstWhole ?? true
+	};
+}
+
+/**
+ * CompleteRecomposition — evaluate the recomposition (§14.1 / RPH-DEC-005/006) and advance the contract to
+ * COMPOSABLE / CONFLICTED / INSUFFICIENT accordingly. This is the WIRE-3a wiring: before it, the handler
+ * unconditionally advanced to COMPOSABLE, so a recomposition with a detected conflict (or an unacceptable
+ * required child) was still marked composable — the §19-prohibited "recomposition = concatenation" shortcut. Now
+ * a detected conflict forces CONFLICTED even when every child is individually SATISFIED, and an unacceptable
+ * required child or a failed whole-check forces INSUFFICIENT.
+ */
+export const completeRecomposition: CommandHandler = (ctx, command, payload) => {
+	const p = payload as CompleteRecompositionPayload;
+	const contract = loadState(ctx, command.targetAggregateId);
+	if (!contract) {
+		return reject(
+			command,
+			'RPH_VALIDATION_SEMANTIC_FAILED',
+			`CompleteRecomposition requires an existing recomposition contract ${command.targetAggregateId}`
+		);
+	}
+	const evaluation = evaluateRecomposition(buildRecompositionInput(ctx, contract, p));
+	return advanceStatus(ctx, command, {
 		objectType: RECOMP,
 		statusField: 'status',
 		machine: 'RecompositionContract.status',
-		target: 'COMPOSABLE',
-		eventType: 'RecompositionCompleted'
+		target: RECOMP_OUTCOME_STATE[evaluation.status] ?? 'INSUFFICIENT',
+		eventType: evaluation.event,
+		eventPayload: () => ({
+			status: RECOMP_OUTCOME_STATE[evaluation.status] ?? 'INSUFFICIENT',
+			...(evaluation.reasons.length ? { reasons: evaluation.reasons } : {}),
+			...(evaluation.unsatisfiedChildWorkUnitIds.length
+				? { unsatisfiedChildWorkUnitIds: evaluation.unsatisfiedChildWorkUnitIds }
+				: {})
+		})
 	});
+};

@@ -71,6 +71,7 @@ import {
 	beginRecomposition,
 	completeRecomposition,
 	proposeDecomposition,
+	proposeRecomposition,
 	reviseDecomposition,
 	validateDecomposition
 } from './decomposition.js';
@@ -160,6 +161,7 @@ export const HANDLERS: Readonly<Record<string, CommandHandler>> = {
 	ProposeDecomposition: proposeDecomposition,
 	ValidateDecomposition: validateDecomposition,
 	ReviseDecomposition: reviseDecomposition,
+	ProposeRecomposition: proposeRecomposition,
 	BeginRecomposition: beginRecomposition,
 	CompleteRecomposition: completeRecomposition,
 	// PWA-authoring context (RPH-DOC-010 §6, §11, §20, §42)

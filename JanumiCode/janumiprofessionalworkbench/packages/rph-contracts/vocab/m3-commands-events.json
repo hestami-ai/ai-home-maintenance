@@ -1452,6 +1452,48 @@
       ]
     },
     {
+      "commandType": "ProposeRecomposition",
+      "targetAggregateType": "RECOMPOSITION_CONTRACT",
+      "emitsEvent": "RecompositionProposed",
+      "drivesMachine": "RecompositionContract.status",
+      "drivesFrom": "(initial)",
+      "drivesTo": "READY",
+      "schematized": false,
+      "sourceSection": "UNRATIFIED-AUTHORED (2026-07-19, sponsor delegated authority / JAN-ROADMAP-001 W1 gate G1 condition C1): DOC-002 §14 defines the RecompositionContract, but no command minted one — Begin/CompleteRecomposition could never load a contract, so evaluateRecomposition (RPH-DEC-005/006) decided over an un-instantiated plane. AUTHORED to mint the RecompositionContract (parallel to ProposeDecomposition), so recomposition evaluation runs non-vacuously. Do NOT treat as ratification. Cited: DOC-002 §14.",
+      "payloadFields": [
+        {
+          "field": "parentWorkUnitId",
+          "required": true,
+          "type": "string",
+          "note": "id-ref"
+        },
+        {
+          "field": "requiredChildWorkUnitIds",
+          "required": true,
+          "type": "string[]",
+          "note": "id-ref[]; the children whose assured results must recombine into the parent claim (§14.1)"
+        },
+        {
+          "field": "parentCompletionClaimId",
+          "required": true,
+          "type": "string",
+          "note": "id-ref"
+        },
+        {
+          "field": "aggregationRules",
+          "required": false,
+          "type": "AggregationRule[]",
+          "note": "defaults to []"
+        },
+        {
+          "field": "conflictResolutionRules",
+          "required": false,
+          "type": "ConflictResolutionRule[]",
+          "note": "defaults to []; maps a detected conflictType to its resolution action (§14.1)"
+        }
+      ]
+    },
+    {
       "commandType": "BeginRecomposition",
       "targetAggregateType": "RecompositionContract",
       "emitsEvent": "RecompositionStarted",
@@ -1484,6 +1526,24 @@
           "required": true,
           "type": "string",
           "note": "id-ref; also RecompositionContract.status EVALUATING->SATISFIED"
+        },
+        {
+          "field": "detectedConflicts",
+          "required": false,
+          "type": "RecompositionConflict[]",
+          "note": "AUTHORED W1 G1 C1: contradictions found while aggregating child outputs; a non-empty list forces CONFLICTED even if every child is individually SATISFIED (§14.1 / RPH-DEC-006). Defaults to []."
+        },
+        {
+          "field": "parentCompletionClaimSupported",
+          "required": false,
+          "type": "boolean",
+          "note": "AUTHORED W1 G1 C1: does the recomposed WHOLE support the parent completion claim (§14.1, not merely child claims)? Defaults to true (preserves prior composable-by-default; a false forces INSUFFICIENT)."
+        },
+        {
+          "field": "parentConstraintsHoldAgainstWhole",
+          "required": false,
+          "type": "boolean",
+          "note": "AUTHORED W1 G1 C1: do the parent constraints hold against the recomposed whole (§14.1)? Defaults to true."
         }
       ]
     },
@@ -5499,6 +5559,44 @@
       ]
     },
     {
+      "eventType": "RecompositionProposed",
+      "aggregateType": "RecompositionContract",
+      "sourceSection": "UNRATIFIED-AUTHORED (2026-07-19, sponsor delegated authority / JAN-ROADMAP-001 W1 gate G1 condition C1): DOC-002 §14 names the RecompositionContract; DOC-007 schematizes no event interface. AUTHORED to record the minting of a RecompositionContract. Do NOT treat as ratification. Cited: DOC-002 §14.",
+      "payloadFields": [
+        {
+          "field": "recompositionContractId",
+          "required": true,
+          "type": "string",
+          "note": "id-ref"
+        },
+        {
+          "field": "parentWorkUnitId",
+          "required": true,
+          "type": "string",
+          "note": "id-ref"
+        },
+        {
+          "field": "requiredChildWorkUnitIds",
+          "required": true,
+          "type": "string[]",
+          "note": "id-ref[]"
+        },
+        {
+          "field": "parentCompletionClaimId",
+          "required": true,
+          "type": "string",
+          "note": "id-ref"
+        },
+        {
+          "field": "status",
+          "required": true,
+          "type": "enum",
+          "enumRef": "RecompositionContractStatusSchema",
+          "note": "(initial)->READY"
+        }
+      ]
+    },
+    {
       "eventType": "RuntimeBindingAuthorized",
       "aggregateType": "RuntimeBinding",
       "sourceSection": "UNRATIFIED-AUTHORED (annotated 2026-07-16 under sponsor grant): DOC-007 schematizes NO interface for this, so these fields were AUTHORED, not derived. The citation below NAMES this command/event but defines no fields (DOC-002 §26.x/§34.x are bare name lists; §16 item 6: DOC-007's first slice deliberately leaves the granular vocabulary unschematized). Do NOT treat this sourceSection as proof the shape is ratified. Ratification pending. Cited: DOC-002 §26.4",
@@ -6568,6 +6666,14 @@
       "from": "(prior)",
       "to": "SUPERSEDED",
       "note": "DOC-002-only; new contract = DRAFT"
+    },
+    {
+      "commandType": "ProposeRecomposition",
+      "eventType": "RecompositionProposed",
+      "machine": "RecompositionContract.status",
+      "from": "(initial)",
+      "to": "READY",
+      "note": "AUTHORED W1 G1 C1 — mint the RecompositionContract (DOC-002 §14)"
     },
     {
       "commandType": "BeginRecomposition",

@@ -259,6 +259,12 @@ export const PermittedChildRuleSchema = z.strictObject({
 	applicabilityNote: z.string().optional()
 });
 export type PermittedChildRule = z.infer<typeof PermittedChildRuleSchema>;
+export const RecompositionConflictSchema = z.strictObject({
+	conflictType: z.string(),
+	conflictingChildWorkUnitIds: z.array(z.string()),
+	description: z.string()
+});
+export type RecompositionConflict = z.infer<typeof RecompositionConflictSchema>;
 export const RemediationRuleSchema = z.strictObject({
 	trigger: z.unknown().optional(),
 	remediationActions: z.array(ControlActionSchema),

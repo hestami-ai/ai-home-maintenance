@@ -37,6 +37,7 @@ import {
 } from './enums.js';
 import { ActorReferenceSchema } from './envelopes.js';
 import {
+	AggregationRuleSchema,
 	ApplicabilityRuleSchema,
 	ArtifactReferenceSchema,
 	AssessmentCriterionSchema,
@@ -45,6 +46,7 @@ import {
 	CapabilityGrantSchema,
 	CapabilityRequestSchema,
 	ConfidenceAssessmentSchema,
+	ConflictResolutionRuleSchema,
 	ConstraintPropagationSchema,
 	ControlActionRecommendationSchema,
 	ConversationEntrySchema,
@@ -63,6 +65,7 @@ import {
 	ObligationAllocationSchema,
 	OutputDefinitionSchema,
 	PermittedChildRuleSchema,
+	RecompositionConflictSchema,
 	RemediationRuleSchema,
 	RetryPolicySchema,
 	SandboxPolicySchema,
@@ -370,12 +373,23 @@ export const ReviseDecompositionPayloadSchema = z.strictObject({
 	constraintPropagations: z.array(ConstraintPropagationSchema).optional()
 });
 export type ReviseDecompositionPayload = z.infer<typeof ReviseDecompositionPayloadSchema>;
+export const ProposeRecompositionPayloadSchema = z.strictObject({
+	parentWorkUnitId: z.string(),
+	requiredChildWorkUnitIds: z.array(z.string()),
+	parentCompletionClaimId: z.string(),
+	aggregationRules: z.array(AggregationRuleSchema).optional(),
+	conflictResolutionRules: z.array(ConflictResolutionRuleSchema).optional()
+});
+export type ProposeRecompositionPayload = z.infer<typeof ProposeRecompositionPayloadSchema>;
 export const BeginRecompositionPayloadSchema = z.strictObject({
 	recompositionContractId: z.string()
 });
 export type BeginRecompositionPayload = z.infer<typeof BeginRecompositionPayloadSchema>;
 export const CompleteRecompositionPayloadSchema = z.strictObject({
-	parentCompletionClaimId: z.string()
+	parentCompletionClaimId: z.string(),
+	detectedConflicts: z.array(RecompositionConflictSchema).optional(),
+	parentCompletionClaimSupported: z.boolean().optional(),
+	parentConstraintsHoldAgainstWhole: z.boolean().optional()
 });
 export type CompleteRecompositionPayload = z.infer<typeof CompleteRecompositionPayloadSchema>;
 export const InvalidateEvidencePayloadSchema = z.strictObject({
@@ -1306,6 +1320,14 @@ export const RecompositionStartedPayloadSchema = z.strictObject({
 	workLifecycleState: WorkLifecycleStateSchema.optional()
 });
 export type RecompositionStartedPayload = z.infer<typeof RecompositionStartedPayloadSchema>;
+export const RecompositionProposedPayloadSchema = z.strictObject({
+	recompositionContractId: z.string(),
+	parentWorkUnitId: z.string(),
+	requiredChildWorkUnitIds: z.array(z.string()),
+	parentCompletionClaimId: z.string(),
+	status: RecompositionContractStatusSchema
+});
+export type RecompositionProposedPayload = z.infer<typeof RecompositionProposedPayloadSchema>;
 export const RuntimeBindingAuthorizedPayloadSchema = z.strictObject({
 	grantedCapabilities: z.array(CapabilityGrantSchema),
 	authorizationStatus: AuthorizationStatusSchema
@@ -1739,6 +1761,12 @@ export const COMMANDS = {
 		payload: ReviseDecompositionPayloadSchema,
 		targetAggregateType: 'DecompositionContract',
 		emitsEvent: 'DecompositionRevised',
+		firstSlice: false
+	},
+	ProposeRecomposition: {
+		payload: ProposeRecompositionPayloadSchema,
+		targetAggregateType: 'RECOMPOSITION_CONTRACT',
+		emitsEvent: 'RecompositionProposed',
 		firstSlice: false
 	},
 	BeginRecomposition: {
@@ -2180,6 +2208,10 @@ export const EVENTS = {
 		payload: RecompositionStartedPayloadSchema,
 		aggregateType: 'RecompositionContract'
 	},
+	RecompositionProposed: {
+		payload: RecompositionProposedPayloadSchema,
+		aggregateType: 'RecompositionContract'
+	},
 	RuntimeBindingAuthorized: {
 		payload: RuntimeBindingAuthorizedPayloadSchema,
 		aggregateType: 'RuntimeBinding'
@@ -2530,6 +2562,13 @@ export const BINDINGS: readonly CommandEventBinding[] = [
 		machine: 'DecompositionContract.status',
 		from: '(prior)',
 		to: 'SUPERSEDED'
+	},
+	{
+		commandType: 'ProposeRecomposition',
+		eventType: 'RecompositionProposed',
+		machine: 'RecompositionContract.status',
+		from: '(initial)',
+		to: 'READY'
 	},
 	{
 		commandType: 'BeginRecomposition',
