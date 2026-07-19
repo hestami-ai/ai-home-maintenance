@@ -67,6 +67,9 @@ describe('validate', () => {
 		// "material obligations SHALL become first-class traceable objects"); then +1 ProposeRecomposition command
 		// +1 RecompositionProposed event — the RecompositionContract mint (WIRE-3a). The RecompositionConflict
 		// helper is a sub-type, not a registry entry. (+6 → 303.)
-		expect(buildContractRegistry().ids()).toHaveLength(303);
+		// then +1 ExpireAssumption command (W3-INC-2 / WP-3-008) — instantiates the Assumption expiry transition so
+		// the kernel canAuthorizeNewWork (RPH-ASM-006) becomes reachable at ApproveExecutionPlan. The AssumptionExpired
+		// event already existed (no new event). (+1 → 304.)
+		expect(buildContractRegistry().ids()).toHaveLength(304);
 	});
 });

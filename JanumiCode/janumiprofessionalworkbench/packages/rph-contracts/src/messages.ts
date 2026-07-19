@@ -269,6 +269,10 @@ export const DetectAssumptionPayloadSchema = z.strictObject({
 	sourceExecutionAttemptId: z.string().optional()
 });
 export type DetectAssumptionPayload = z.infer<typeof DetectAssumptionPayloadSchema>;
+export const ExpireAssumptionPayloadSchema = z.strictObject({
+	expirationCondition: z.string().optional()
+});
+export type ExpireAssumptionPayload = z.infer<typeof ExpireAssumptionPayloadSchema>;
 export const AssertClaimPayloadSchema = z.strictObject({
 	statement: z.string(),
 	claimType: ClaimTypeSchema,
@@ -1679,6 +1683,12 @@ export const COMMANDS = {
 		emitsEvent: 'AssumptionDetected',
 		firstSlice: false
 	},
+	ExpireAssumption: {
+		payload: ExpireAssumptionPayloadSchema,
+		targetAggregateType: 'ASSUMPTION',
+		emitsEvent: 'AssumptionExpired',
+		firstSlice: false
+	},
 	AssertClaim: {
 		payload: AssertClaimPayloadSchema,
 		targetAggregateType: 'CLAIM',
@@ -2464,6 +2474,13 @@ export const BINDINGS: readonly CommandEventBinding[] = [
 		machine: 'Assumption.status',
 		from: '(initial)',
 		to: 'PROPOSED'
+	},
+	{
+		commandType: 'ExpireAssumption',
+		eventType: 'AssumptionExpired',
+		machine: 'Assumption.status',
+		from: 'PROPOSED|DISCLOSED|UNDER_VERIFICATION|ACCEPTED',
+		to: 'EXPIRED'
 	},
 	{
 		commandType: 'AssertClaim',

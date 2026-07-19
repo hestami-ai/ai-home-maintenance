@@ -14,7 +14,12 @@ import type {
 	ExecutionStepSucceededPayload,
 	ProposeExecutionPlanPayload
 } from '@janumipwb/rph-contracts';
-import { canActivatePlan, validateStepCompletion } from '@janumipwb/rph-domain';
+import {
+	canActivatePlan,
+	canAuthorizeNewWork,
+	validateStepCompletion,
+	type AssumptionView
+} from '@janumipwb/rph-domain';
 import {
 	advanceStatus,
 	checkTransition,
@@ -91,6 +96,35 @@ export const proposeExecutionPlan: CommandHandler = (ctx, command, payload) => {
 };
 
 /** ApproveExecutionPlan — UNDER_REVIEW -> APPROVED (approval grants no runtime privileges). */
+/**
+ * W3-INC-2 (WP-3-008 / RPH-ASM-006). Approving an execution plan AUTHORIZES new work for its PWU; it must not do
+ * so on a dead assumption. Load the plan's PWU, and reject if any assumption it depends on is no longer live
+ * (EXPIRED / FALSIFIED / SUPERSEDED per the kernel `canAuthorizeNewWork`). NON-VACUOUS BUT NON-BREAKING: a PWU
+ * with no assumptions (the reference undertaking, `assumptionIds: []`) has nothing to check and passes — the gate
+ * fires only when the PWU genuinely depends on an assumption that has died. This is the first live wiring of the
+ * assumption-impact half of WP-3-008 (the falsification transition + reshape/reassessment loop remain).
+ */
+function assumptionsAuthorizeNewWork(
+	hctx: HandlerContext,
+	workUnitId: string
+): { assumptionId: string; status: string } | null {
+	const pwu = hctx.store.loadObject(workUnitId)?.state as { assumptionIds?: string[] } | undefined;
+	for (const assumptionId of pwu?.assumptionIds ?? []) {
+		const a = hctx.store.loadObject(assumptionId)?.state as
+			| { objectType?: string; status?: string; materiality?: string; affectedObjectIds?: string[] }
+			| undefined;
+		if (a?.objectType !== 'ASSUMPTION') continue; // unknown status → not gatable (sound)
+		const view: AssumptionView = {
+			assumptionId,
+			materiality: typeof a.materiality === 'string' ? a.materiality : '',
+			status: typeof a.status === 'string' ? a.status : '',
+			affectedObjectIds: a.affectedObjectIds ?? []
+		};
+		if (!canAuthorizeNewWork(view)) return { assumptionId, status: view.status };
+	}
+	return null;
+}
+
 export const approveExecutionPlan: CommandHandler = (ctx, command) =>
 	advanceStatus(ctx, command, {
 		objectType: PLAN,
@@ -100,7 +134,20 @@ export const approveExecutionPlan: CommandHandler = (ctx, command) =>
 		eventType: 'ExecutionPlanApproved',
 		// The event records the RESULTING status. ExecutionPlanApproved declares `status` (APPROVED), which the
 		// empty command payload does not carry — so the default emit recorded nothing of the transition. (Pinned.)
-		eventPayload: () => ({ status: 'APPROVED' })
+		eventPayload: () => ({ status: 'APPROVED' }),
+		// RPH-ASM-006: a plan may not authorize new work on an expired/falsified/superseded assumption.
+		guard: (state, hctx) => {
+			const workUnitId = typeof state.workUnitId === 'string' ? state.workUnitId : '';
+			const dead = assumptionsAuthorizeNewWork(hctx, workUnitId);
+			if (dead) {
+				return reject(
+					command,
+					'RPH_INVARIANT_VIOLATION',
+					`Cannot approve execution plan ${command.targetAggregateId}: it authorizes new work for a PWU whose assumption ${dead.assumptionId} is ${dead.status} — an expired, falsified, or superseded assumption cannot authorize new work (RPH-ASM-006). Re-establish or supersede the assumption first.`
+				);
+			}
+			return null;
+		}
 	});
 
 /**

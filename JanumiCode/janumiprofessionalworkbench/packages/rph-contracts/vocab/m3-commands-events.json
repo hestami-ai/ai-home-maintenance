@@ -933,6 +933,24 @@
       ]
     },
     {
+      "commandType": "ExpireAssumption",
+      "targetAggregateType": "ASSUMPTION",
+      "emitsEvent": "AssumptionExpired",
+      "drivesMachine": "Assumption.status",
+      "drivesFrom": "PROPOSED|DISCLOSED|UNDER_VERIFICATION|ACCEPTED",
+      "drivesTo": "EXPIRED",
+      "schematized": false,
+      "sourceSection": "UNRATIFIED-AUTHORED (2026-07-19, sponsor delegated authority / JAN-ROADMAP-001 W3 WP-3-008): DOC-002 §12.2 defines the Assumption lifecycle (RPH-ASM-006: an EXPIRED assumption cannot authorize new work), but before this NO command drove any transition out of PROPOSED — the assumption lifecycle was un-instantiated beyond detection, so the kernel canAuthorizeNewWork could never fire non-vacuously. AUTHORED to instantiate the expiry transition so the RPH-ASM-006 guard becomes reachable. Do NOT treat as ratification. Cited: DOC-002 §12.2. (The falsification transition + the full reshape/reassessment loop are the remaining WP-3-008 sub-program.)",
+      "payloadFields": [
+        {
+          "field": "expirationCondition",
+          "required": false,
+          "type": "string",
+          "note": "the condition under which the assumption expired (§12.1)"
+        }
+      ]
+    },
+    {
       "commandType": "AssertClaim",
       "targetAggregateType": "CLAIM",
       "emitsEvent": "ClaimAsserted",
@@ -6556,6 +6574,14 @@
       "from": "(initial)",
       "to": "PROPOSED",
       "note": "VALUE DRIFT: DOC-007 AssumptionDetected sets status=DISCLOSED ((initial)->DISCLOSED); DOC-002 sets PROPOSED, with separate AssumptionDisclosed PROPOSED->DISCLOSED. No DOC-002 command counterpart"
+    },
+    {
+      "commandType": "ExpireAssumption",
+      "eventType": "AssumptionExpired",
+      "machine": "Assumption.status",
+      "from": "PROPOSED|DISCLOSED|UNDER_VERIFICATION|ACCEPTED",
+      "to": "EXPIRED",
+      "note": "AUTHORED W3 WP-3-008 — assumption expiry (RPH-ASM-006: an expired assumption cannot authorize new work)"
     },
     {
       "commandType": "AssertClaim",
