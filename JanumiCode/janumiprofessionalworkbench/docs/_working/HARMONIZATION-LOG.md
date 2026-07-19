@@ -4112,3 +4112,41 @@ corrections) + `m3-commands-events.json` (`remediationRules` on 2 commands + 2 e
 `messages.ts` + `schemas/objects/AssurancePolicyDefinition.json` (regenerated) + `assurance.ts` (Gates + authoring
 validation + independence reorder + comment fixes) + `assurance-independence.test.ts` + `assurance-policy.test.ts`.
 Committed.
+
+### Increment Y — the execution-plane Execution Attempt: staged design + a stale-log correction (#4)
+
+#4's execution-plane half — actually constructing Execution Attempt records (DOC-009 §10.4 `execution_attempts`)
+so a runtime-produced artifact can resolve its `producingExecutionAttemptId` — was deferred by Increment P as
+"blocked on the full Attempt design." Re-examined under the authoring grant with the **current code as ground
+truth** (not this log's own notes, which are stale — see below), and the block has **narrowed** to two ratification
+decisions plus a bounded build. Documented in full at `docs/_working/DESIGN-execution-attempt-staged.md`; verdict
+**DOCUMENT_STAGED** — no code, because the two decisions are the sponsor's, and minting an Attempt before them would
+fabricate an unconstructible record (the exact §16 item 23 failure). Highlights:
+
+- **The §10.4 table is ratified in full** (id, step, attempt_number, state, timings, runtime_binding_id,
+  idempotency_key, external_operation_id, reconciliation_state, result, error, `provenance jsonb`, + both unique
+  constraints) — item-23 "blocker 1" was false (C2).
+- **The ExecutionProvenance blocker is RESOLVED — and this log was STALE on it.** The log still called
+  `ExecutionProvenance` a "`FORCE_PLACEHOLDER` `z.record`" (L3188) / "undefined" (L3757, L3762), and Increment P's
+  #4 disposition inherited that premise. It has since been **contracted** to a `z.strictObject { originType?,
+  producingExecutionAttemptId?, executedBy?, evaluator? }` (`objects.ts:216-221`; vocab `m1:2706-2734` /
+  `m3:4399-4403`; handler `execution.ts:318`), grounded in the ratified §7.1 `ProvenanceRecord` vocabulary — the
+  contracting landed in code + vocab but was **never recorded here**. So §10.4's `provenance jsonb not null` is now
+  **sourceable losslessly**, and the `rawOutput`-is-chain-of-thought hazard (§9.7) is **structurally avoided** (the
+  shape carries `ActorReference`s + an attempt-id reference, never raw reasoning). **Correction filed:** on
+  `ExecutionProvenance`, `objects.ts` + vocab are authority over this log's older narrative.
+- **What is genuinely unbuilt (verified in code):** no `EXECUTION_ATTEMPT` object type / store row, no
+  `execution_attempts` table (the SQLite schema has five tables, none for attempts), no attempt-construction path,
+  no per-attempt `idempotency_key` (the command envelope's `idempotencyKey` is a **different**, command-dedup key),
+  no attempt-open `runtime_binding_id` binding, no retry-cap counting (RPH-EXE-008).
+- **The two decisions that keep it staged:** (1) Attempt as a rebuildable §10.4 **projection** over the event
+  stream vs a typed command-sourced object — §16 item 21 forbids a competing Event authority, today the content is
+  recorded ONCE (event payload) so a second store would double-record, and embedding attempts in Plan `currentState`
+  is O(N²) under a retry storm — all favoring a projection, but the choice must be ratified (+ a §5.3 prefix
+  Decision; the seed already uses `ata`). (2) The **attempt-open mint/bind contract** (`StartExecutionStep`
+  extension or a new `StartExecutionAttempt`) specifying how the per-attempt `idempotency_key` is derived and which
+  `RuntimeBinding` binds — neither has a source today.
+
+**Gate:** none needed (documentation + a stale-log correction; no code/contract change — the finding is that the
+two remaining decisions are the sponsor's, and building before them would be the §16 item 23 failure). Footprint:
+this log + `docs/_working/DESIGN-execution-attempt-staged.md`. Committed.
