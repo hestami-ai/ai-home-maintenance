@@ -1,0 +1,21 @@
+{
+  "controlSchema": "roadmap-instance.schema.json",
+  "recordId": "RMAP-INSTANCE-UNINSTANTIATED",
+  "recordType": "ROADMAP_INSTANCE",
+  "schemaVersion": "0.3.0",
+  "programInstanceId": "IRP-UNINSTANTIATED",
+  "version": "0.1.0",
+  "status": "DRAFT",
+  "createdAt": "2026-07-19T15:54:56Z",
+  "createdBy": "UNASSIGNED",
+  "canonicalCorpusVersion": "0.3.0",
+  "sourceBaselineId": "JAN-SRC-001-PENDING-P0",
+  "repositoryRevision": "UNASSESSED",
+  "currentStateModelVersion": "UNASSESSED",
+  "transitionArchitectureVersion": "UNASSESSED",
+  "releaseProfile": "UNDEFINED",
+  "capabilityBindings": [],
+  "increments": [],
+  "waves": [],
+  "requirementCoverage": []
+}

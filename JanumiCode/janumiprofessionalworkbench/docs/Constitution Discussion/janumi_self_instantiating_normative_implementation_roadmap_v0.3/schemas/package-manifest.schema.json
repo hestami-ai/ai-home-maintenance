@@ -1,0 +1,70 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://janumi.example/schemas/irp/0.3/package-manifest.schema.json",
+  "title": "IRP Package Manifest",
+  "type": "object",
+  "additionalProperties": false,
+  "properties": {
+    "controlSchema": {
+      "const": "package-manifest.schema.json"
+    },
+    "packageId": {
+      "type": "string"
+    },
+    "version": {
+      "type": "string"
+    },
+    "status": {
+      "type": "string"
+    },
+    "generatedAt": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "root": {
+      "type": "string"
+    },
+    "fileCount": {
+      "type": "integer",
+      "minimum": 0
+    },
+    "files": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": [
+          "path",
+          "sizeBytes",
+          "sha256"
+        ],
+        "properties": {
+          "path": {
+            "type": "string"
+          },
+          "sizeBytes": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "sha256": {
+            "type": "string",
+            "pattern": "^[0-9a-f]{64}$"
+          },
+          "category": {
+            "type": "string"
+          }
+        },
+        "additionalProperties": false
+      }
+    }
+  },
+  "required": [
+    "controlSchema",
+    "packageId",
+    "version",
+    "status",
+    "generatedAt",
+    "root",
+    "fileCount",
+    "files"
+  ]
+}

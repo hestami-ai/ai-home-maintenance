@@ -1,0 +1,91 @@
+document_control:
+  document_id: JAN-W<n>-DR-001
+  title: ''
+  version: 0.1.0-draft
+  status: PROPOSED
+  master_roadmap: JAN-ROADMAP-001@2.0.0-draft
+  master_wave: W<n>
+  master_work_packages: []
+  repository:
+    name: ''
+    revision: ''
+    branch: ''
+    dirty_state: false
+  database_or_migration_revision: ''
+  runtime_environment: ''
+normative_sources: []
+current_state_findings:
+  confirmed: []
+  inferred: []
+  assumed: []
+  unknown: []
+semantic_classification:
+  preserve: []
+  reclassify: []
+  generalize: []
+  replace: []
+  remove: []
+  defer: []
+  unresolved: []
+target_gap_analysis: []
+alternatives_considered: []
+selected_strategy:
+  summary: ''
+  rationale: ''
+  decision_ids: []
+repository_change_map:
+  create: []
+  modify: []
+  deprecate: []
+  remove: []
+  database_changes: []
+  runtime_changes: []
+  ui_changes: []
+detailed_work_packages:
+- id: JAN-W<n>-DWP-001
+  master_work_packages: []
+  title: ''
+  outcome: ''
+  knowledge_status: CONFIRMED
+  repository_scope:
+    repositories: []
+    files_or_symbols: []
+    database_objects: []
+    runtime_surfaces: []
+  dependencies: []
+  required_changes: []
+  invariants: []
+  prohibited_shortcuts: []
+  tests: []
+  evidence: []
+  migration_and_compatibility: []
+  rollback_and_recovery: []
+  risks: []
+  open_decisions: []
+  exit_criteria: []
+  delivery_state: NOT_STARTED
+  conformance_state: UNASSESSED
+assurance_and_test_plan: []
+security_authority_and_tenant_impact: []
+observability_recovery_and_rollback: []
+risks_assumptions_unknowns_and_decisions:
+  risks: []
+  assumptions: []
+  unknowns: []
+  decisions: []
+  divergences: []
+  deferrals: []
+  waivers: []
+implementation_order: []
+traceability_updates: []
+gate_requirements: []
+self_critique:
+  normative_coverage: ''
+  legacy_preservation: ''
+  migration_safety: ''
+  security_and_authority: ''
+  overengineering_check: ''
+  remaining_concerns: []
+readiness:
+  determination: REVISION_REQUIRED
+  rationale: ''

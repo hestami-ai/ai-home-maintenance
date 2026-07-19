@@ -1,0 +1,3520 @@
+document_id: JAN-ROADMAP-001-B
+title: Master Normative Work Package Register
+version: 2.0.0-draft
+status: PROPOSED_NORMATIVE_BASELINE
+state_models:
+  delivery_state:
+  - NOT_STARTED
+  - READY
+  - IN_PROGRESS
+  - IMPLEMENTED
+  - BLOCKED
+  - SUPERSEDED
+  conformance_state:
+  - UNASSESSED
+  - EVIDENCE_REQUIRED
+  - UNDER_REVIEW
+  - CONFORMANT
+  - CONDITIONALLY_CONFORMANT
+  - REJECTED
+  - WAIVED
+  - INVALIDATED
+waves:
+- id: W0
+  title: Normative Baseline and Code Grounding
+  gate: "G0 \u2014 Code-Grounded Migration Authorization"
+  activation_gate: MASTER_ROADMAP_APPROVAL
+  detailed_roadmap_required: true
+  detailed_roadmap_status: NOT_GENERATED
+  implementation_detail_binding: DEFERRED_TO_DETAILED_ROADMAP
+  required_planning_outputs:
+  - repository current-state findings
+  - legacy semantic classification where applicable
+  - alternatives and selected implementation strategy
+  - detailed work-package register
+  - test and evidence plan
+  - migration, rollback, and recovery plan
+  - decision, divergence, deferral, and assumption updates
+  - master-to-implementation traceability
+- id: W1
+  title: RPH Semantic Kernel and Contract Foundation
+  gate: "G1 \u2014 Semantic Kernel Conformance"
+  activation_gate: G0
+  detailed_roadmap_required: true
+  detailed_roadmap_status: NOT_GENERATED
+  implementation_detail_binding: DEFERRED_TO_DETAILED_ROADMAP
+  required_planning_outputs:
+  - repository current-state findings
+  - legacy semantic classification where applicable
+  - alternatives and selected implementation strategy
+  - detailed work-package register
+  - test and evidence plan
+  - migration, rollback, and recovery plan
+  - decision, divergence, deferral, and assumption updates
+  - master-to-implementation traceability
+- id: W2
+  title: Durable Persistence, Events, and Projections
+  gate: "G2 \u2014 Durable Runtime Foundation"
+  activation_gate: G1
+  detailed_roadmap_required: true
+  detailed_roadmap_status: NOT_GENERATED
+  implementation_detail_binding: DEFERRED_TO_DETAILED_ROADMAP
+  required_planning_outputs:
+  - repository current-state findings
+  - legacy semantic classification where applicable
+  - alternatives and selected implementation strategy
+  - detailed work-package register
+  - test and evidence plan
+  - migration, rollback, and recovery plan
+  - decision, divergence, deferral, and assumption updates
+  - master-to-implementation traceability
+- id: W3
+  title: Intent-to-Architecture RPH Vertical Slice
+  gate: "G3 \u2014 RPH Vertical-Slice Proof"
+  activation_gate: G2
+  detailed_roadmap_required: true
+  detailed_roadmap_status: NOT_GENERATED
+  implementation_detail_binding: DEFERRED_TO_DETAILED_ROADMAP
+  required_planning_outputs:
+  - repository current-state findings
+  - legacy semantic classification where applicable
+  - alternatives and selected implementation strategy
+  - detailed work-package register
+  - test and evidence plan
+  - migration, rollback, and recovery plan
+  - decision, divergence, deferral, and assumption updates
+  - master-to-implementation traceability
+- id: W4
+  title: Demonstration PWA and Undertaking UX
+  gate: "G4 \u2014 Demonstration Usability and Concept Integrity"
+  activation_gate: G3
+  detailed_roadmap_required: true
+  detailed_roadmap_status: NOT_GENERATED
+  implementation_detail_binding: DEFERRED_TO_DETAILED_ROADMAP
+  required_planning_outputs:
+  - repository current-state findings
+  - legacy semantic classification where applicable
+  - alternatives and selected implementation strategy
+  - detailed work-package register
+  - test and evidence plan
+  - migration, rollback, and recovery plan
+  - decision, divergence, deferral, and assumption updates
+  - master-to-implementation traceability
+- id: W5
+  title: Legacy Shadow Mode and Conformance Comparison
+  gate: "G5 \u2014 Shadow-Mode Conformance"
+  activation_gate: G4
+  detailed_roadmap_required: true
+  detailed_roadmap_status: NOT_GENERATED
+  implementation_detail_binding: DEFERRED_TO_DETAILED_ROADMAP
+  required_planning_outputs:
+  - repository current-state findings
+  - legacy semantic classification where applicable
+  - alternatives and selected implementation strategy
+  - detailed work-package register
+  - test and evidence plan
+  - migration, rollback, and recovery plan
+  - decision, divergence, deferral, and assumption updates
+  - master-to-implementation traceability
+- id: W6
+  title: RPH Authority for Pilot Undertakings
+  gate: "G6 \u2014 Pilot Authority Acceptance"
+  activation_gate: G5
+  detailed_roadmap_required: true
+  detailed_roadmap_status: NOT_GENERATED
+  implementation_detail_binding: DEFERRED_TO_DETAILED_ROADMAP
+  required_planning_outputs:
+  - repository current-state findings
+  - legacy semantic classification where applicable
+  - alternatives and selected implementation strategy
+  - detailed work-package register
+  - test and evidence plan
+  - migration, rollback, and recovery plan
+  - decision, divergence, deferral, and assumption updates
+  - master-to-implementation traceability
+- id: W7
+  title: Full Product Realization PWA Migration
+  gate: "G7 \u2014 Product Realization Migration Acceptance"
+  activation_gate: G6
+  detailed_roadmap_required: true
+  detailed_roadmap_status: NOT_GENERATED
+  implementation_detail_binding: DEFERRED_TO_DETAILED_ROADMAP
+  required_planning_outputs:
+  - repository current-state findings
+  - legacy semantic classification where applicable
+  - alternatives and selected implementation strategy
+  - detailed work-package register
+  - test and evidence plan
+  - migration, rollback, and recovery plan
+  - decision, divergence, deferral, and assumption updates
+  - master-to-implementation traceability
+- id: W8
+  title: JPWB PWA Designer and Self-Hosting
+  gate: "G8 \u2014 JPWB Bootstrap and PWA Publication"
+  activation_gate: G7
+  detailed_roadmap_required: true
+  detailed_roadmap_status: NOT_GENERATED
+  implementation_detail_binding: DEFERRED_TO_DETAILED_ROADMAP
+  required_planning_outputs:
+  - repository current-state findings
+  - legacy semantic classification where applicable
+  - alternatives and selected implementation strategy
+  - detailed work-package register
+  - test and evidence plan
+  - migration, rollback, and recovery plan
+  - decision, divergence, deferral, and assumption updates
+  - master-to-implementation traceability
+- id: W9
+  title: Tenant Customization and Product Shape Packages
+  gate: "G9 \u2014 Tenant PWA and Handoff Capability"
+  activation_gate: G8
+  detailed_roadmap_required: true
+  detailed_roadmap_status: NOT_GENERATED
+  implementation_detail_binding: DEFERRED_TO_DETAILED_ROADMAP
+  required_planning_outputs:
+  - repository current-state findings
+  - legacy semantic classification where applicable
+  - alternatives and selected implementation strategy
+  - detailed work-package register
+  - test and evidence plan
+  - migration, rollback, and recovery plan
+  - decision, divergence, deferral, and assumption updates
+  - master-to-implementation traceability
+- id: W10
+  title: JanumiCode Productization and Janumi Platform Integration
+  gate: "G10 \u2014 JanumiCode Production Readiness"
+  activation_gate: G9
+  detailed_roadmap_required: true
+  detailed_roadmap_status: NOT_GENERATED
+  implementation_detail_binding: DEFERRED_TO_DETAILED_ROADMAP
+  required_planning_outputs:
+  - repository current-state findings
+  - legacy semantic classification where applicable
+  - alternatives and selected implementation strategy
+  - detailed work-package register
+  - test and evidence plan
+  - migration, rollback, and recovery plan
+  - decision, divergence, deferral, and assumption updates
+  - master-to-implementation traceability
+work_packages:
+- id: JAN-WP-0-001
+  wave: W0
+  title: Authoritative Document Manifest and Source Authority Matrix
+  normative_outcome: The program SHALL establish the authoritative document set, subject-specific authority, versions,
+    statuses, dependencies, and supersession relationships.
+  dependencies: []
+  sources:
+  - RPH-DOC-000
+  - RPH-DOC-001
+  deliverables:
+  - Approved document manifest
+  - Subject-authority matrix
+  - Document discrepancy log
+  verification:
+  - Manifest schema validation
+  - Architecture Authority review
+  exit_criteria:
+  - All source documents are identified and assigned authority or marked non-authoritative.
+  prohibited_shortcuts:
+  - Treating generation order as total precedence
+  - Allowing undocumented source material to govern implementation
+  accountable_role: TBD
+  delivery_state: NOT_STARTED
+  conformance_state: UNASSESSED
+  planning_level: MASTER_CAPABILITY
+  knowledge_status: ARCHITECTURALLY_DERIVED
+  repository_detail_status: DISCOVERY_REQUIRED
+  binding_status: BINDING_ON_MASTER_APPROVAL
+  activation_gate: MASTER_ROADMAP_APPROVAL
+  implementation_prescription_status: DELEGATED_TO_DETAILED_ROADMAP
+  detailed_roadmap_required: true
+  required_detailed_roadmap_content:
+  - code-grounded current state
+  - repository mapping
+  - selected strategy and alternatives
+  - concrete implementation work packages
+  - tests and required evidence
+  - migration and recovery
+  - risks and material decisions
+  master_scope_note: This record defines a required capability outcome, not a precommitted repository task decomposition.
+- id: JAN-WP-0-002
+  wave: W0
+  title: Canonical Vocabulary Migration
+  normative_outcome: All roadmap, code-grounding, and implementation artifacts SHALL use the canonical Janumi, JPWB,
+    PWA, Undertaking, Professional Work Graph, and Execution Workflow vocabulary.
+  dependencies:
+  - JAN-WP-0-001
+  sources:
+  - RPH-DOC-000
+  deliverables:
+  - Terminology migration table
+  - Legacy term aliases
+  - Repository terminology scan report
+  verification:
+  - Vocabulary conformance review
+  - Automated scan for prohibited canonical uses
+  exit_criteria:
+  - No target artifact uses Product Lens as the canonical name for Product Realization PWA.
+  prohibited_shortcuts:
+  - Renaming symbols without preserving migration aliases
+  - Using Lens for both PWA and UI viewpoint
+  accountable_role: TBD
+  delivery_state: NOT_STARTED
+  conformance_state: UNASSESSED
+  planning_level: MASTER_CAPABILITY
+  knowledge_status: ARCHITECTURALLY_DERIVED
+  repository_detail_status: DISCOVERY_REQUIRED
+  binding_status: BINDING_ON_MASTER_APPROVAL
+  activation_gate: MASTER_ROADMAP_APPROVAL
+  implementation_prescription_status: DELEGATED_TO_DETAILED_ROADMAP
+  detailed_roadmap_required: true
+  required_detailed_roadmap_content:
+  - code-grounded current state
+  - repository mapping
+  - selected strategy and alternatives
+  - concrete implementation work packages
+  - tests and required evidence
+  - migration and recovery
+  - risks and material decisions
+  master_scope_note: This record defines a required capability outcome, not a precommitted repository task decomposition.
+- id: JAN-WP-0-003
+  wave: W0
+  title: Legacy Repository, Database, and Service Inventory
+  normative_outcome: The program SHALL identify the actual implementation units, storage locations, service boundaries,
+    and sources of truth in legacy JanumiCode.
+  dependencies:
+  - JAN-WP-0-001
+  sources:
+  - RPH-DOC-005
+  - RPH-DOC-009
+  deliverables:
+  - Repository map
+  - Database schema inventory
+  - Service and module inventory
+  - Source-of-truth map
+  verification:
+  - Code review
+  - Database inspection
+  - Runtime verification
+  exit_criteria:
+  - Every legacy semantic state and side-effect store is identified.
+  prohibited_shortcuts:
+  - Inferring current behavior solely from design documents
+  accountable_role: TBD
+  delivery_state: NOT_STARTED
+  conformance_state: UNASSESSED
+  planning_level: MASTER_CAPABILITY
+  knowledge_status: ARCHITECTURALLY_DERIVED
+  repository_detail_status: DISCOVERY_REQUIRED
+  binding_status: BINDING_ON_MASTER_APPROVAL
+  activation_gate: MASTER_ROADMAP_APPROVAL
+  implementation_prescription_status: DELEGATED_TO_DETAILED_ROADMAP
+  detailed_roadmap_required: true
+  required_detailed_roadmap_content:
+  - code-grounded current state
+  - repository mapping
+  - selected strategy and alternatives
+  - concrete implementation work packages
+  - tests and required evidence
+  - migration and recovery
+  - risks and material decisions
+  master_scope_note: This record defines a required capability outcome, not a precommitted repository task decomposition.
+- id: JAN-WP-0-004
+  wave: W0
+  title: Phase, Substate, Role, Prompt, and Context Inventory
+  normative_outcome: Every legacy phase and substate SHALL be grounded in actual entry conditions, outputs, prompts,
+    context sources, roles, and exit behavior.
+  dependencies:
+  - JAN-WP-0-003
+  sources:
+  - RPH-DOC-005
+  deliverables:
+  - Phase contract catalog
+  - Role catalog
+  - Prompt family catalog
+  - Context assembly catalog
+  verification:
+  - Representative trace comparison
+  - Reviewer sign-off
+  exit_criteria:
+  - All 11 phases and INTAKE substates have code-grounded contracts.
+  prohibited_shortcuts:
+  - Treating phase descriptions as sufficient evidence
+  accountable_role: TBD
+  delivery_state: NOT_STARTED
+  conformance_state: UNASSESSED
+  planning_level: MASTER_CAPABILITY
+  knowledge_status: ARCHITECTURALLY_DERIVED
+  repository_detail_status: DISCOVERY_REQUIRED
+  binding_status: BINDING_ON_MASTER_APPROVAL
+  activation_gate: MASTER_ROADMAP_APPROVAL
+  implementation_prescription_status: DELEGATED_TO_DETAILED_ROADMAP
+  detailed_roadmap_required: true
+  required_detailed_roadmap_content:
+  - code-grounded current state
+  - repository mapping
+  - selected strategy and alternatives
+  - concrete implementation work packages
+  - tests and required evidence
+  - migration and recovery
+  - risks and material decisions
+  master_scope_note: This record defines a required capability outcome, not a precommitted repository task decomposition.
+- id: JAN-WP-0-005
+  wave: W0
+  title: Validator and Assurance Inventory
+  normative_outcome: Every existing validator SHALL be classified by professional purpose, claims, evidence, criteria,
+    independence, outputs, and downstream effects.
+  dependencies:
+  - JAN-WP-0-003
+  - JAN-WP-0-004
+  sources:
+  - RPH-DOC-004
+  - RPH-DOC-005
+  deliverables:
+  - Validator catalog
+  - Legacy-to-assurance-policy mapping
+  - Unmappable validator register
+  verification:
+  - Validator trace sampling
+  - Assurance Authority review
+  exit_criteria:
+  - Each validator is mapped, reclassified, or explicitly deferred.
+  prohibited_shortcuts:
+  - Migrating pass/fail messages as canonical assurance
+  accountable_role: TBD
+  delivery_state: NOT_STARTED
+  conformance_state: UNASSESSED
+  planning_level: MASTER_CAPABILITY
+  knowledge_status: ARCHITECTURALLY_DERIVED
+  repository_detail_status: DISCOVERY_REQUIRED
+  binding_status: BINDING_ON_MASTER_APPROVAL
+  activation_gate: MASTER_ROADMAP_APPROVAL
+  implementation_prescription_status: DELEGATED_TO_DETAILED_ROADMAP
+  detailed_roadmap_required: true
+  required_detailed_roadmap_content:
+  - code-grounded current state
+  - repository mapping
+  - selected strategy and alternatives
+  - concrete implementation work packages
+  - tests and required evidence
+  - migration and recovery
+  - risks and material decisions
+  master_scope_note: This record defines a required capability outcome, not a precommitted repository task decomposition.
+- id: JAN-WP-0-006
+  wave: W0
+  title: Execution Side-Effect and Recovery Inventory
+  normative_outcome: All external and irreversible side effects SHALL be identified with idempotency, reconciliation,
+    rollback, and authority characteristics.
+  dependencies:
+  - JAN-WP-0-003
+  - JAN-WP-0-004
+  sources:
+  - RPH-DOC-008
+  - RPH-DOC-009
+  deliverables:
+  - Side-effect catalog
+  - Idempotency map
+  - Recovery and reconciliation map
+  verification:
+  - Failure injection traces
+  - Operations review
+  exit_criteria:
+  - No material external operation remains without a recovery classification.
+  prohibited_shortcuts:
+  - Assuming retries are safe
+  - Treating unknown completion as failure
+  accountable_role: TBD
+  delivery_state: NOT_STARTED
+  conformance_state: UNASSESSED
+  planning_level: MASTER_CAPABILITY
+  knowledge_status: ARCHITECTURALLY_DERIVED
+  repository_detail_status: DISCOVERY_REQUIRED
+  binding_status: BINDING_ON_MASTER_APPROVAL
+  activation_gate: MASTER_ROADMAP_APPROVAL
+  implementation_prescription_status: DELEGATED_TO_DETAILED_ROADMAP
+  detailed_roadmap_required: true
+  required_detailed_roadmap_content:
+  - code-grounded current state
+  - repository mapping
+  - selected strategy and alternatives
+  - concrete implementation work packages
+  - tests and required evidence
+  - migration and recovery
+  - risks and material decisions
+  master_scope_note: This record defines a required capability outcome, not a precommitted repository task decomposition.
+- id: JAN-WP-0-007
+  wave: W0
+  title: Representative Legacy Trace Corpus and Divergence Register
+  normative_outcome: The program SHALL capture representative successful, failed, clarified, rejected, replanned,
+    and interrupted legacy runs and classify all target-architecture differences.
+  dependencies:
+  - JAN-WP-0-004
+  - JAN-WP-0-005
+  - JAN-WP-0-006
+  sources:
+  - RPH-DOC-005
+  - RPH-DOC-006
+  deliverables:
+  - Trace corpus
+  - Legacy-to-RPH mapping records
+  - Initial divergence register
+  - ADR baseline
+  verification:
+  - Trace completeness review
+  - Critical divergence review
+  exit_criteria:
+  - No unresolved critical legacy behavior remains before G0.
+  prohibited_shortcuts:
+  - Silently interpreting unexplained behavior as accidental
+  accountable_role: TBD
+  delivery_state: NOT_STARTED
+  conformance_state: UNASSESSED
+  planning_level: MASTER_CAPABILITY
+  knowledge_status: ARCHITECTURALLY_DERIVED
+  repository_detail_status: DISCOVERY_REQUIRED
+  binding_status: BINDING_ON_MASTER_APPROVAL
+  activation_gate: MASTER_ROADMAP_APPROVAL
+  implementation_prescription_status: DELEGATED_TO_DETAILED_ROADMAP
+  detailed_roadmap_required: true
+  required_detailed_roadmap_content:
+  - code-grounded current state
+  - repository mapping
+  - selected strategy and alternatives
+  - concrete implementation work packages
+  - tests and required evidence
+  - migration and recovery
+  - risks and material decisions
+  master_scope_note: This record defines a required capability outcome, not a precommitted repository task decomposition.
+- id: JAN-WP-1-001
+  wave: W1
+  title: RPH Contract Package Scaffold
+  normative_outcome: A single canonical source SHALL generate or validate machine contracts for first-slice objects,
+    commands, events, policies, validator results, and projections.
+  dependencies:
+  - JAN-WP-0-001
+  - JAN-WP-0-002
+  sources:
+  - RPH-DOC-007
+  deliverables:
+  - Contract package
+  - Schema IDs
+  - Type generation pipeline
+  - Contract CI
+  verification:
+  - Schema conformance tests
+  - Generated-type drift test
+  exit_criteria:
+  - Canonical contracts build reproducibly and reject unknown canonical properties.
+  prohibited_shortcuts:
+  - Maintaining independent hand-written schemas and types
+  accountable_role: TBD
+  delivery_state: NOT_STARTED
+  conformance_state: UNASSESSED
+  planning_level: MASTER_CAPABILITY
+  knowledge_status: ARCHITECTURALLY_DERIVED
+  repository_detail_status: DISCOVERY_REQUIRED
+  binding_status: BINDING_ON_WAVE_ACTIVATION
+  activation_gate: G0
+  implementation_prescription_status: DELEGATED_TO_DETAILED_ROADMAP
+  detailed_roadmap_required: true
+  required_detailed_roadmap_content:
+  - code-grounded current state
+  - repository mapping
+  - selected strategy and alternatives
+  - concrete implementation work packages
+  - tests and required evidence
+  - migration and recovery
+  - risks and material decisions
+  master_scope_note: This record defines a required capability outcome, not a precommitted repository task decomposition.
+- id: JAN-WP-1-002
+  wave: W1
+  title: Professional Work Object Registry and Identity
+  normative_outcome: All canonical professional objects SHALL have stable opaque identity, provenance, semantic
+    version, revision, and lifecycle metadata.
+  dependencies:
+  - JAN-WP-1-001
+  sources:
+  - RPH-DOC-002
+  - RPH-DOC-007
+  deliverables:
+  - Object envelope
+  - ID library
+  - Provenance model
+  - Semantic-version rules
+  verification:
+  - RPH-CON tests
+  - Property tests for identity immutability
+  exit_criteria:
+  - Objects preserve identity across presentation and execution changes.
+  prohibited_shortcuts:
+  - Using titles or canvas paths as identity
+  accountable_role: TBD
+  delivery_state: NOT_STARTED
+  conformance_state: UNASSESSED
+  planning_level: MASTER_CAPABILITY
+  knowledge_status: ARCHITECTURALLY_DERIVED
+  repository_detail_status: DISCOVERY_REQUIRED
+  binding_status: BINDING_ON_WAVE_ACTIVATION
+  activation_gate: G0
+  implementation_prescription_status: DELEGATED_TO_DETAILED_ROADMAP
+  detailed_roadmap_required: true
+  required_detailed_roadmap_content:
+  - code-grounded current state
+  - repository mapping
+  - selected strategy and alternatives
+  - concrete implementation work packages
+  - tests and required evidence
+  - migration and recovery
+  - risks and material decisions
+  master_scope_note: This record defines a required capability outcome, not a precommitted repository task decomposition.
+- id: JAN-WP-1-003
+  wave: W1
+  title: Intent Aggregate
+  normative_outcome: The runtime SHALL represent raw, formalized, approved, revised, superseded, and withdrawn intent
+    with version-bound authority.
+  dependencies:
+  - JAN-WP-1-002
+  sources:
+  - RPH-DOC-002
+  - RPH-DOC-003
+  - RPH-DOC-008
+  deliverables:
+  - Intent aggregate
+  - Commands and events
+  - Intent lifecycle guards
+  verification:
+  - RPH-INT-001 through RPH-INT-007
+  exit_criteria:
+  - Intent approval binds exact semantic version and revision triggers impact analysis.
+  prohibited_shortcuts:
+  - Approving raw intent
+  - Overwriting approved intent in place
+  accountable_role: TBD
+  delivery_state: NOT_STARTED
+  conformance_state: UNASSESSED
+  planning_level: MASTER_CAPABILITY
+  knowledge_status: ARCHITECTURALLY_DERIVED
+  repository_detail_status: DISCOVERY_REQUIRED
+  binding_status: BINDING_ON_WAVE_ACTIVATION
+  activation_gate: G0
+  implementation_prescription_status: DELEGATED_TO_DETAILED_ROADMAP
+  detailed_roadmap_required: true
+  required_detailed_roadmap_content:
+  - code-grounded current state
+  - repository mapping
+  - selected strategy and alternatives
+  - concrete implementation work packages
+  - tests and required evidence
+  - migration and recovery
+  - risks and material decisions
+  master_scope_note: This record defines a required capability outcome, not a precommitted repository task decomposition.
+- id: JAN-WP-1-004
+  wave: W1
+  title: PWU Aggregate and Independent State Model
+  normative_outcome: The runtime SHALL represent PWU purpose, boundaries, obligations, constraints, assumptions,
+    outputs, and independent work, execution, assurance, and shape-integrity states.
+  dependencies:
+  - JAN-WP-1-002
+  - JAN-WP-1-003
+  sources:
+  - RPH-DOC-002
+  - RPH-DOC-008
+  deliverables:
+  - PWU aggregate
+  - State transition guards
+  - Shape-readiness validation
+  verification:
+  - RPH-PWU-001 through RPH-PWU-010
+  - RPH property P1
+  exit_criteria:
+  - Execution success cannot satisfy a PWU without required assurance.
+  prohibited_shortcuts:
+  - One generic COMPLETE status
+  - Phase state as PWU state
+  accountable_role: TBD
+  delivery_state: NOT_STARTED
+  conformance_state: UNASSESSED
+  planning_level: MASTER_CAPABILITY
+  knowledge_status: ARCHITECTURALLY_DERIVED
+  repository_detail_status: DISCOVERY_REQUIRED
+  binding_status: BINDING_ON_WAVE_ACTIVATION
+  activation_gate: G0
+  implementation_prescription_status: DELEGATED_TO_DETAILED_ROADMAP
+  detailed_roadmap_required: true
+  required_detailed_roadmap_content:
+  - code-grounded current state
+  - repository mapping
+  - selected strategy and alternatives
+  - concrete implementation work packages
+  - tests and required evidence
+  - migration and recovery
+  - risks and material decisions
+  master_scope_note: This record defines a required capability outcome, not a precommitted repository task decomposition.
+- id: JAN-WP-1-005
+  wave: W1
+  title: Obligation, Constraint, and Assumption Model
+  normative_outcome: Mandatory obligations and constraints SHALL survive decomposition, and material assumptions
+    SHALL become first-class traceable objects.
+  dependencies:
+  - JAN-WP-1-004
+  sources:
+  - RPH-DOC-002
+  - RPH-DOC-008
+  deliverables:
+  - Obligation model
+  - Constraint model
+  - Assumption model
+  - Impact links
+  verification:
+  - RPH-CNS tests
+  - RPH-ASM tests
+  - Properties P2 and P3
+  exit_criteria:
+  - No mandatory obligation or applicable constraint can silently disappear.
+  prohibited_shortcuts:
+  - Storing material assumptions only in prose
+  accountable_role: TBD
+  delivery_state: NOT_STARTED
+  conformance_state: UNASSESSED
+  planning_level: MASTER_CAPABILITY
+  knowledge_status: ARCHITECTURALLY_DERIVED
+  repository_detail_status: DISCOVERY_REQUIRED
+  binding_status: BINDING_ON_WAVE_ACTIVATION
+  activation_gate: G0
+  implementation_prescription_status: DELEGATED_TO_DETAILED_ROADMAP
+  detailed_roadmap_required: true
+  required_detailed_roadmap_content:
+  - code-grounded current state
+  - repository mapping
+  - selected strategy and alternatives
+  - concrete implementation work packages
+  - tests and required evidence
+  - migration and recovery
+  - risks and material decisions
+  master_scope_note: This record defines a required capability outcome, not a precommitted repository task decomposition.
+- id: JAN-WP-1-006
+  wave: W1
+  title: Decomposition and Recomposition Contracts
+  normative_outcome: Every material decomposition SHALL allocate parent obligations and constraints and define how
+    assured child results recombine into the parent claim.
+  dependencies:
+  - JAN-WP-1-004
+  - JAN-WP-1-005
+  sources:
+  - RPH-DOC-002
+  - RPH-DOC-003
+  - RPH-DOC-008
+  deliverables:
+  - Decomposition contract
+  - Coverage claims
+  - Recomposition contract
+  - Conflict rules
+  verification:
+  - RPH-DEC-001 through RPH-DEC-007
+  exit_criteria:
+  - Invalid or uncovered decompositions are blocked before child execution.
+  prohibited_shortcuts:
+  - Treating all children complete as parent satisfied
+  accountable_role: TBD
+  delivery_state: NOT_STARTED
+  conformance_state: UNASSESSED
+  planning_level: MASTER_CAPABILITY
+  knowledge_status: ARCHITECTURALLY_DERIVED
+  repository_detail_status: DISCOVERY_REQUIRED
+  binding_status: BINDING_ON_WAVE_ACTIVATION
+  activation_gate: G0
+  implementation_prescription_status: DELEGATED_TO_DETAILED_ROADMAP
+  detailed_roadmap_required: true
+  required_detailed_roadmap_content:
+  - code-grounded current state
+  - repository mapping
+  - selected strategy and alternatives
+  - concrete implementation work packages
+  - tests and required evidence
+  - migration and recovery
+  - risks and material decisions
+  master_scope_note: This record defines a required capability outcome, not a precommitted repository task decomposition.
+- id: JAN-WP-1-007
+  wave: W1
+  title: Claim, Evidence, and Assurance Kernel
+  normative_outcome: Completion and preservation assertions SHALL be explicit claims evaluated under versioned assurance
+    policies using admissible evidence.
+  dependencies:
+  - JAN-WP-1-002
+  - JAN-WP-1-004
+  sources:
+  - RPH-DOC-002
+  - RPH-DOC-004
+  - RPH-DOC-007
+  - RPH-DOC-008
+  deliverables:
+  - Claim model
+  - Evidence model
+  - Assessment and observation model
+  - Disposition engine
+  - Independence checks
+  verification:
+  - RPH-EVD tests
+  - RPH-ASR tests
+  exit_criteria:
+  - A satisfied claim always traces to admissible evidence and a policy assessment.
+  prohibited_shortcuts:
+  - Treating generated output as evidence automatically
+  - Allowing validator recommendation to mutate state directly
+  accountable_role: TBD
+  delivery_state: NOT_STARTED
+  conformance_state: UNASSESSED
+  planning_level: MASTER_CAPABILITY
+  knowledge_status: ARCHITECTURALLY_DERIVED
+  repository_detail_status: DISCOVERY_REQUIRED
+  binding_status: BINDING_ON_WAVE_ACTIVATION
+  activation_gate: G0
+  implementation_prescription_status: DELEGATED_TO_DETAILED_ROADMAP
+  detailed_roadmap_required: true
+  required_detailed_roadmap_content:
+  - code-grounded current state
+  - repository mapping
+  - selected strategy and alternatives
+  - concrete implementation work packages
+  - tests and required evidence
+  - migration and recovery
+  - risks and material decisions
+  master_scope_note: This record defines a required capability outcome, not a precommitted repository task decomposition.
+- id: JAN-WP-1-008
+  wave: W1
+  title: Decision, Baseline, and Traceability Kernel
+  normative_outcome: Authority SHALL be represented through version-bound decisions, and accepted states SHALL be
+    represented through immutable baselines and typed trace links.
+  dependencies:
+  - JAN-WP-1-003
+  - JAN-WP-1-007
+  sources:
+  - RPH-DOC-002
+  - RPH-DOC-007
+  - RPH-DOC-008
+  deliverables:
+  - Decision model
+  - Baseline model
+  - Typed trace links
+  - Version/hash binding
+  verification:
+  - RPH-GOV tests
+  - RPH-BAS tests
+  - RPH-TRC tests
+  exit_criteria:
+  - No authoritative baseline can exist without an effective decision and exact reviewed versions.
+  prohibited_shortcuts:
+  - Treating repository commit as baseline
+  - Editing authoritative baselines in place
+  accountable_role: TBD
+  delivery_state: NOT_STARTED
+  conformance_state: UNASSESSED
+  planning_level: MASTER_CAPABILITY
+  knowledge_status: ARCHITECTURALLY_DERIVED
+  repository_detail_status: DISCOVERY_REQUIRED
+  binding_status: BINDING_ON_WAVE_ACTIVATION
+  activation_gate: G0
+  implementation_prescription_status: DELEGATED_TO_DETAILED_ROADMAP
+  detailed_roadmap_required: true
+  required_detailed_roadmap_content:
+  - code-grounded current state
+  - repository mapping
+  - selected strategy and alternatives
+  - concrete implementation work packages
+  - tests and required evidence
+  - migration and recovery
+  - risks and material decisions
+  master_scope_note: This record defines a required capability outcome, not a precommitted repository task decomposition.
+- id: JAN-WP-2-001
+  wave: W2
+  title: Canonical Relational Schema and Migrations
+  normative_outcome: The database SHALL persist canonical RPH objects and relationships in normalized, versioned
+    structures with enforceable keys and constraints.
+  dependencies:
+  - JAN-WP-1-002
+  - JAN-WP-1-003
+  - JAN-WP-1-004
+  - JAN-WP-1-005
+  - JAN-WP-1-006
+  - JAN-WP-1-007
+  - JAN-WP-1-008
+  sources:
+  - RPH-DOC-009
+  deliverables:
+  - SQL migrations
+  - Indexes and foreign keys
+  - Migration rollback scripts
+  verification:
+  - Database integration tests
+  - Constraint violation tests
+  exit_criteria:
+  - The first-slice model persists without an opaque workflow-definition blob as source of truth.
+  prohibited_shortcuts:
+  - EAV as canonical semantics
+  - One JSON workflow document as authority
+  accountable_role: TBD
+  delivery_state: NOT_STARTED
+  conformance_state: UNASSESSED
+  planning_level: MASTER_CAPABILITY
+  knowledge_status: ARCHITECTURALLY_DERIVED
+  repository_detail_status: DISCOVERY_REQUIRED
+  binding_status: BINDING_ON_WAVE_ACTIVATION
+  activation_gate: G1
+  implementation_prescription_status: DELEGATED_TO_DETAILED_ROADMAP
+  detailed_roadmap_required: true
+  required_detailed_roadmap_content:
+  - code-grounded current state
+  - repository mapping
+  - selected strategy and alternatives
+  - concrete implementation work packages
+  - tests and required evidence
+  - migration and recovery
+  - risks and material decisions
+  master_scope_note: This record defines a required capability outcome, not a precommitted repository task decomposition.
+- id: JAN-WP-2-002
+  wave: W2
+  title: Aggregate Repositories and Optimistic Concurrency
+  normative_outcome: All canonical mutations SHALL enforce expected revision, invariant validation, version snapshots,
+    and append-oriented history.
+  dependencies:
+  - JAN-WP-2-001
+  sources:
+  - RPH-DOC-007
+  - RPH-DOC-009
+  deliverables:
+  - Aggregate repositories
+  - Revision guards
+  - Object version history
+  verification:
+  - RPH-PER-001
+  - Replay equivalence tests
+  exit_criteria:
+  - Stale concurrent commands cannot overwrite semantic state.
+  prohibited_shortcuts:
+  - Automatic silent conflict retries
+  accountable_role: TBD
+  delivery_state: NOT_STARTED
+  conformance_state: UNASSESSED
+  planning_level: MASTER_CAPABILITY
+  knowledge_status: ARCHITECTURALLY_DERIVED
+  repository_detail_status: DISCOVERY_REQUIRED
+  binding_status: BINDING_ON_WAVE_ACTIVATION
+  activation_gate: G1
+  implementation_prescription_status: DELEGATED_TO_DETAILED_ROADMAP
+  detailed_roadmap_required: true
+  required_detailed_roadmap_content:
+  - code-grounded current state
+  - repository mapping
+  - selected strategy and alternatives
+  - concrete implementation work packages
+  - tests and required evidence
+  - migration and recovery
+  - risks and material decisions
+  master_scope_note: This record defines a required capability outcome, not a precommitted repository task decomposition.
+- id: JAN-WP-2-003
+  wave: W2
+  title: Domain Event Store and Transactional Outbox
+  normative_outcome: Accepted semantic mutations SHALL append immutable domain events and publish them through a
+    transactionally consistent outbox.
+  dependencies:
+  - JAN-WP-2-001
+  - JAN-WP-2-002
+  sources:
+  - RPH-DOC-007
+  - RPH-DOC-009
+  deliverables:
+  - Event store
+  - Outbox publisher
+  - Event schema registry
+  - Upcasters
+  verification:
+  - RPH-PER-005
+  - RPH-PER-008
+  - RPH-PER-010
+  exit_criteria:
+  - Aggregate state, events, version snapshots, and outbox records commit atomically.
+  prohibited_shortcuts:
+  - Writing projections without domain events
+  - Rewriting historical events
+  accountable_role: TBD
+  delivery_state: NOT_STARTED
+  conformance_state: UNASSESSED
+  planning_level: MASTER_CAPABILITY
+  knowledge_status: ARCHITECTURALLY_DERIVED
+  repository_detail_status: DISCOVERY_REQUIRED
+  binding_status: BINDING_ON_WAVE_ACTIVATION
+  activation_gate: G1
+  implementation_prescription_status: DELEGATED_TO_DETAILED_ROADMAP
+  detailed_roadmap_required: true
+  required_detailed_roadmap_content:
+  - code-grounded current state
+  - repository mapping
+  - selected strategy and alternatives
+  - concrete implementation work packages
+  - tests and required evidence
+  - migration and recovery
+  - risks and material decisions
+  master_scope_note: This record defines a required capability outcome, not a precommitted repository task decomposition.
+- id: JAN-WP-2-004
+  wave: W2
+  title: Command Receipts and Idempotency
+  normative_outcome: Repeated commands and external operations SHALL not create duplicate professional decisions,
+    baselines, commits, or other side effects.
+  dependencies:
+  - JAN-WP-2-002
+  - JAN-WP-2-003
+  sources:
+  - RPH-DOC-007
+  - RPH-DOC-008
+  - RPH-DOC-009
+  deliverables:
+  - Command receipt store
+  - Idempotency service
+  - External operation keys
+  verification:
+  - RPH-PER-002 through RPH-PER-004
+  - RPH-EXE-007
+  exit_criteria:
+  - Duplicate keys return prior results without new business effects.
+  prohibited_shortcuts:
+  - Using command ID only when business idempotency differs
+  accountable_role: TBD
+  delivery_state: NOT_STARTED
+  conformance_state: UNASSESSED
+  planning_level: MASTER_CAPABILITY
+  knowledge_status: ARCHITECTURALLY_DERIVED
+  repository_detail_status: DISCOVERY_REQUIRED
+  binding_status: BINDING_ON_WAVE_ACTIVATION
+  activation_gate: G1
+  implementation_prescription_status: DELEGATED_TO_DETAILED_ROADMAP
+  detailed_roadmap_required: true
+  required_detailed_roadmap_content:
+  - code-grounded current state
+  - repository mapping
+  - selected strategy and alternatives
+  - concrete implementation work packages
+  - tests and required evidence
+  - migration and recovery
+  - risks and material decisions
+  master_scope_note: This record defines a required capability outcome, not a precommitted repository task decomposition.
+- id: JAN-WP-2-005
+  wave: W2
+  title: Artifact and Evidence Storage
+  normative_outcome: Artifacts and evidence SHALL be immutable or versioned, content-hashed, access-controlled,
+    and traceable to producing work and execution.
+  dependencies:
+  - JAN-WP-2-001
+  - JAN-WP-1-007
+  sources:
+  - RPH-DOC-002
+  - RPH-DOC-009
+  deliverables:
+  - Artifact repository
+  - Content-addressed storage abstraction
+  - Evidence admission integration
+  verification:
+  - Hash integrity tests
+  - Access-control tests
+  - RPH-EVD tests
+  exit_criteria:
+  - Baseline and evidence artifacts can be reproduced and verified by hash.
+  prohibited_shortcuts:
+  - In-place evidence editing
+  - Embedding secrets in events
+  accountable_role: TBD
+  delivery_state: NOT_STARTED
+  conformance_state: UNASSESSED
+  planning_level: MASTER_CAPABILITY
+  knowledge_status: ARCHITECTURALLY_DERIVED
+  repository_detail_status: DISCOVERY_REQUIRED
+  binding_status: BINDING_ON_WAVE_ACTIVATION
+  activation_gate: G1
+  implementation_prescription_status: DELEGATED_TO_DETAILED_ROADMAP
+  detailed_roadmap_required: true
+  required_detailed_roadmap_content:
+  - code-grounded current state
+  - repository mapping
+  - selected strategy and alternatives
+  - concrete implementation work packages
+  - tests and required evidence
+  - migration and recovery
+  - risks and material decisions
+  master_scope_note: This record defines a required capability outcome, not a precommitted repository task decomposition.
+- id: JAN-WP-2-006
+  wave: W2
+  title: Rebuildable Read Projections
+  normative_outcome: Work, Execution, Assurance, Traceability, and legacy compatibility views SHALL be derived,
+    idempotent, and rebuildable from canonical state and events.
+  dependencies:
+  - JAN-WP-2-003
+  sources:
+  - RPH-DOC-009
+  - RPH-DOC-010
+  deliverables:
+  - Projection handlers
+  - Checkpointing
+  - Rebuild tooling
+  - Compatibility derivation rules
+  verification:
+  - RPH-PER-007
+  - RPH-PRJ tests
+  - RPH-CMP tests
+  exit_criteria:
+  - Deleting projections and replaying events produces expected views.
+  prohibited_shortcuts:
+  - Using projections as command authority
+  accountable_role: TBD
+  delivery_state: NOT_STARTED
+  conformance_state: UNASSESSED
+  planning_level: MASTER_CAPABILITY
+  knowledge_status: ARCHITECTURALLY_DERIVED
+  repository_detail_status: DISCOVERY_REQUIRED
+  binding_status: BINDING_ON_WAVE_ACTIVATION
+  activation_gate: G1
+  implementation_prescription_status: DELEGATED_TO_DETAILED_ROADMAP
+  detailed_roadmap_required: true
+  required_detailed_roadmap_content:
+  - code-grounded current state
+  - repository mapping
+  - selected strategy and alternatives
+  - concrete implementation work packages
+  - tests and required evidence
+  - migration and recovery
+  - risks and material decisions
+  master_scope_note: This record defines a required capability outcome, not a precommitted repository task decomposition.
+- id: JAN-WP-2-007
+  wave: W2
+  title: Restart Recovery and External Operation Reconciliation
+  normative_outcome: The runtime SHALL recover durable waits and reconcile uncertain external operations without
+    blind duplicate execution.
+  dependencies:
+  - JAN-WP-2-003
+  - JAN-WP-2-004
+  sources:
+  - RPH-DOC-008
+  - RPH-DOC-009
+  deliverables:
+  - Recovery coordinator
+  - Attempt reconciliation states
+  - Failure-injection harness
+  - Operational telemetry
+  verification:
+  - RPH-PER-011 through RPH-PER-014
+  - RPH-E2E-006
+  exit_criteria:
+  - Restart tests preserve state and avoid duplicate side effects.
+  prohibited_shortcuts:
+  - Automatically retrying uncertain operations
+  accountable_role: TBD
+  delivery_state: NOT_STARTED
+  conformance_state: UNASSESSED
+  planning_level: MASTER_CAPABILITY
+  knowledge_status: ARCHITECTURALLY_DERIVED
+  repository_detail_status: DISCOVERY_REQUIRED
+  binding_status: BINDING_ON_WAVE_ACTIVATION
+  activation_gate: G1
+  implementation_prescription_status: DELEGATED_TO_DETAILED_ROADMAP
+  detailed_roadmap_required: true
+  required_detailed_roadmap_content:
+  - code-grounded current state
+  - repository mapping
+  - selected strategy and alternatives
+  - concrete implementation work packages
+  - tests and required evidence
+  - migration and recovery
+  - risks and material decisions
+  master_scope_note: This record defines a required capability outcome, not a precommitted repository task decomposition.
+- id: JAN-WP-3-001
+  wave: W3
+  title: Product Realization PWA Registration and Undertaking Instantiation
+  normative_outcome: The Product Realization PWA SHALL be registered as reusable architecture, and the Field Service
+    Management SaaS SHALL instantiate it as a distinct Undertaking.
+  dependencies:
+  - JAN-WP-1-004
+  - JAN-WP-1-006
+  - JAN-WP-2-006
+  sources:
+  - RPH-DOC-000
+  - RPH-DOC-003
+  - RPH-DOC-006
+  deliverables:
+  - PWA registration
+  - PWA-version binding
+  - Undertaking aggregate
+  - Root PWU instantiation
+  verification:
+  - Fixture conformance tests
+  - PWA/Undertaking distinction tests
+  exit_criteria:
+  - The Undertaking records exact PWA version and owns PWU instances.
+  prohibited_shortcuts:
+  - Treating the reference undertaking as the PWA definition
+  accountable_role: TBD
+  delivery_state: NOT_STARTED
+  conformance_state: UNASSESSED
+  planning_level: MASTER_CAPABILITY
+  knowledge_status: ARCHITECTURALLY_DERIVED
+  repository_detail_status: DISCOVERY_REQUIRED
+  binding_status: BINDING_ON_WAVE_ACTIVATION
+  activation_gate: G2
+  implementation_prescription_status: DELEGATED_TO_DETAILED_ROADMAP
+  detailed_roadmap_required: true
+  required_detailed_roadmap_content:
+  - code-grounded current state
+  - repository mapping
+  - selected strategy and alternatives
+  - concrete implementation work packages
+  - tests and required evidence
+  - migration and recovery
+  - risks and material decisions
+  master_scope_note: This record defines a required capability outcome, not a precommitted repository task decomposition.
+- id: JAN-WP-3-002
+  wave: W3
+  title: Intent Capture, Discovery, and Formalization
+  normative_outcome: The vertical slice SHALL preserve the originating expression and produce a formalized, bounded,
+    traceable Product Intent.
+  dependencies:
+  - JAN-WP-3-001
+  - JAN-WP-1-003
+  sources:
+  - RPH-DOC-003
+  - RPH-DOC-006
+  deliverables:
+  - Intent interaction service
+  - Intent Discovery PWU execution
+  - Intent artifact
+  verification:
+  - RPH-INT tests
+  - Reference fixture comparison
+  exit_criteria:
+  - User-stated facts, inferred needs, ambiguities, non-goals, and constraints are distinct.
+  prohibited_shortcuts:
+  - Silent solution substitution
+  accountable_role: TBD
+  delivery_state: NOT_STARTED
+  conformance_state: UNASSESSED
+  planning_level: MASTER_CAPABILITY
+  knowledge_status: ARCHITECTURALLY_DERIVED
+  repository_detail_status: DISCOVERY_REQUIRED
+  binding_status: BINDING_ON_WAVE_ACTIVATION
+  activation_gate: G2
+  implementation_prescription_status: DELEGATED_TO_DETAILED_ROADMAP
+  detailed_roadmap_required: true
+  required_detailed_roadmap_content:
+  - code-grounded current state
+  - repository mapping
+  - selected strategy and alternatives
+  - concrete implementation work packages
+  - tests and required evidence
+  - migration and recovery
+  - risks and material decisions
+  master_scope_note: This record defines a required capability outcome, not a precommitted repository task decomposition.
+- id: JAN-WP-3-003
+  wave: W3
+  title: Intent Assurance, Human Approval, and Intent Baseline
+  normative_outcome: Intent Fidelity and Intent Completeness SHALL be assessed before version-bound human approval
+    and Intent Baseline promotion.
+  dependencies:
+  - JAN-WP-3-002
+  - JAN-WP-1-007
+  - JAN-WP-1-008
+  sources:
+  - RPH-DOC-004
+  - RPH-DOC-006
+  deliverables:
+  - Intent assurance assessments
+  - Human review package
+  - Intent decision
+  - Intent Baseline
+  verification:
+  - RPH-ASR-001 through RPH-ASR-005
+  - RPH-GOV tests
+  - RPH-BAS tests
+  exit_criteria:
+  - Architecture work cannot be authorized by an unapproved or stale intent version.
+  prohibited_shortcuts:
+  - Using chat confirmation as unstructured approval
+  accountable_role: TBD
+  delivery_state: NOT_STARTED
+  conformance_state: UNASSESSED
+  planning_level: MASTER_CAPABILITY
+  knowledge_status: ARCHITECTURALLY_DERIVED
+  repository_detail_status: DISCOVERY_REQUIRED
+  binding_status: BINDING_ON_WAVE_ACTIVATION
+  activation_gate: G2
+  implementation_prescription_status: DELEGATED_TO_DETAILED_ROADMAP
+  detailed_roadmap_required: true
+  required_detailed_roadmap_content:
+  - code-grounded current state
+  - repository mapping
+  - selected strategy and alternatives
+  - concrete implementation work packages
+  - tests and required evidence
+  - migration and recovery
+  - risks and material decisions
+  master_scope_note: This record defines a required capability outcome, not a precommitted repository task decomposition.
+- id: JAN-WP-3-004
+  wave: W3
+  title: Architecture PWU Hierarchy and Decomposition Assurance
+  normative_outcome: The Architecture Definition PWU SHALL decompose into applicable architecture concerns with
+    explicit obligation allocation, constraint propagation, and recomposition.
+  dependencies:
+  - JAN-WP-3-003
+  - JAN-WP-1-006
+  sources:
+  - RPH-DOC-003
+  - RPH-DOC-006
+  deliverables:
+  - Architecture PWUs
+  - Decomposition contract
+  - Coverage assessment
+  - Recomposition contract
+  verification:
+  - RPH-DEC tests
+  - Field Service architecture fixture tests
+  exit_criteria:
+  - Architecture child execution is blocked until material decomposition is valid.
+  prohibited_shortcuts:
+  - Using visual nesting as decomposition semantics
+  accountable_role: TBD
+  delivery_state: NOT_STARTED
+  conformance_state: UNASSESSED
+  planning_level: MASTER_CAPABILITY
+  knowledge_status: ARCHITECTURALLY_DERIVED
+  repository_detail_status: DISCOVERY_REQUIRED
+  binding_status: BINDING_ON_WAVE_ACTIVATION
+  activation_gate: G2
+  implementation_prescription_status: DELEGATED_TO_DETAILED_ROADMAP
+  detailed_roadmap_required: true
+  required_detailed_roadmap_content:
+  - code-grounded current state
+  - repository mapping
+  - selected strategy and alternatives
+  - concrete implementation work packages
+  - tests and required evidence
+  - migration and recovery
+  - risks and material decisions
+  master_scope_note: This record defines a required capability outcome, not a precommitted repository task decomposition.
+- id: JAN-WP-3-005
+  wave: W3
+  title: Architecture Execution Plan and Harness Binding
+  normative_outcome: Architecture work SHALL execute through an approved, replaceable Execution Plan with authorized
+    roles, models, tools, context, and sandbox capabilities.
+  dependencies:
+  - JAN-WP-3-004
+  - JAN-WP-2-007
+  sources:
+  - RPH-DOC-002
+  - RPH-DOC-007
+  deliverables:
+  - Execution plan
+  - Execution workflow
+  - Runtime bindings
+  - Context policy
+  - Provenance
+  verification:
+  - RPH-EXE tests
+  - Capability authorization tests
+  exit_criteria:
+  - Changing execution machinery does not silently change Architecture PWU meaning.
+  prohibited_shortcuts:
+  - Prompt node as PWU identity
+  - PWA granting runtime permission
+  accountable_role: TBD
+  delivery_state: NOT_STARTED
+  conformance_state: UNASSESSED
+  planning_level: MASTER_CAPABILITY
+  knowledge_status: ARCHITECTURALLY_DERIVED
+  repository_detail_status: DISCOVERY_REQUIRED
+  binding_status: BINDING_ON_WAVE_ACTIVATION
+  activation_gate: G2
+  implementation_prescription_status: DELEGATED_TO_DETAILED_ROADMAP
+  detailed_roadmap_required: true
+  required_detailed_roadmap_content:
+  - code-grounded current state
+  - repository mapping
+  - selected strategy and alternatives
+  - concrete implementation work packages
+  - tests and required evidence
+  - migration and recovery
+  - risks and material decisions
+  master_scope_note: This record defines a required capability outcome, not a precommitted repository task decomposition.
+- id: JAN-WP-3-006
+  wave: W3
+  title: Assumption Disclosure and Evidence Admission
+  normative_outcome: Model-produced architecture work SHALL disclose material assumptions and propose evidence that
+    is admitted only after provenance, scope, and validity checks.
+  dependencies:
+  - JAN-WP-3-005
+  - JAN-WP-1-005
+  - JAN-WP-2-005
+  sources:
+  - RPH-DOC-004
+  - RPH-DOC-006
+  deliverables:
+  - Assumption extraction
+  - Assumption objects
+  - Evidence proposals
+  - Evidence admission
+  verification:
+  - RPH-ASM tests
+  - RPH-EVD tests
+  exit_criteria:
+  - Material assumptions cannot remain only in architecture prose.
+  prohibited_shortcuts:
+  - Automatic evidence admission
+  accountable_role: TBD
+  delivery_state: NOT_STARTED
+  conformance_state: UNASSESSED
+  planning_level: MASTER_CAPABILITY
+  knowledge_status: ARCHITECTURALLY_DERIVED
+  repository_detail_status: DISCOVERY_REQUIRED
+  binding_status: BINDING_ON_WAVE_ACTIVATION
+  activation_gate: G2
+  implementation_prescription_status: DELEGATED_TO_DETAILED_ROADMAP
+  detailed_roadmap_required: true
+  required_detailed_roadmap_content:
+  - code-grounded current state
+  - repository mapping
+  - selected strategy and alternatives
+  - concrete implementation work packages
+  - tests and required evidence
+  - migration and recovery
+  - risks and material decisions
+  master_scope_note: This record defines a required capability outcome, not a precommitted repository task decomposition.
+- id: JAN-WP-3-007
+  wave: W3
+  title: Architecture Coverage and Intent Preservation Assurance
+  normative_outcome: Architecture completion claims SHALL be evaluated through Architecture Coverage and Intent
+    Preservation policies with independent evaluation and typed findings.
+  dependencies:
+  - JAN-WP-3-005
+  - JAN-WP-3-006
+  sources:
+  - RPH-DOC-004
+  - RPH-DOC-006
+  deliverables:
+  - Architecture claims
+  - Policy assessments
+  - Observations
+  - Disposition and control recommendations
+  verification:
+  - RPH-ASR tests
+  - RPH-E2E-002
+  - Reference expected assessment trace
+  exit_criteria:
+  - A blocking tenant-isolation failure rejects assurance while preserving successful execution evidence.
+  prohibited_shortcuts:
+  - Averaging validator results
+  - Free-form pass/fail only
+  accountable_role: TBD
+  delivery_state: NOT_STARTED
+  conformance_state: UNASSESSED
+  planning_level: MASTER_CAPABILITY
+  knowledge_status: ARCHITECTURALLY_DERIVED
+  repository_detail_status: DISCOVERY_REQUIRED
+  binding_status: BINDING_ON_WAVE_ACTIVATION
+  activation_gate: G2
+  implementation_prescription_status: DELEGATED_TO_DETAILED_ROADMAP
+  detailed_roadmap_required: true
+  required_detailed_roadmap_content:
+  - code-grounded current state
+  - repository mapping
+  - selected strategy and alternatives
+  - concrete implementation work packages
+  - tests and required evidence
+  - migration and recovery
+  - risks and material decisions
+  master_scope_note: This record defines a required capability outcome, not a precommitted repository task decomposition.
+- id: JAN-WP-3-008
+  wave: W3
+  title: Reshape, Impact Analysis, and Reassessment Loop
+  normative_outcome: Material findings or falsified assumptions SHALL trigger governed reshaping, impact analysis,
+    successor semantic versions, and reassessment.
+  dependencies:
+  - JAN-WP-3-007
+  - JAN-WP-1-005
+  - JAN-WP-1-008
+  sources:
+  - RPH-DOC-002
+  - RPH-DOC-006
+  - RPH-DOC-008
+  deliverables:
+  - Impact traversal
+  - Shape revision command
+  - Assessment invalidation
+  - Successor version workflow
+  verification:
+  - RPH-ASM-004
+  - RPH-ASR-010
+  - RPH-INT-006
+  - RPH-E2E-003
+  exit_criteria:
+  - Old decisions and assessments do not authorize revised architecture.
+  prohibited_shortcuts:
+  - Editing approved architecture in place
+  accountable_role: TBD
+  delivery_state: NOT_STARTED
+  conformance_state: UNASSESSED
+  planning_level: MASTER_CAPABILITY
+  knowledge_status: ARCHITECTURALLY_DERIVED
+  repository_detail_status: DISCOVERY_REQUIRED
+  binding_status: BINDING_ON_WAVE_ACTIVATION
+  activation_gate: G2
+  implementation_prescription_status: DELEGATED_TO_DETAILED_ROADMAP
+  detailed_roadmap_required: true
+  required_detailed_roadmap_content:
+  - code-grounded current state
+  - repository mapping
+  - selected strategy and alternatives
+  - concrete implementation work packages
+  - tests and required evidence
+  - migration and recovery
+  - risks and material decisions
+  master_scope_note: This record defines a required capability outcome, not a precommitted repository task decomposition.
+- id: JAN-WP-3-009
+  wave: W3
+  title: Architecture Governance and Baseline Promotion
+  normative_outcome: An exact Architecture version SHALL become authoritative only after required assurance and
+    an effective human decision.
+  dependencies:
+  - JAN-WP-3-007
+  - JAN-WP-3-008
+  sources:
+  - RPH-DOC-006
+  - RPH-DOC-008
+  deliverables:
+  - Architecture review package
+  - Approval decision
+  - Architecture Baseline
+  - Traceability chain
+  verification:
+  - RPH-GOV tests
+  - RPH-BAS tests
+  - RPH-TRC-001
+  exit_criteria:
+  - Intent-to-Architecture-Baseline trace is queryable and hash/version bindings match.
+  prohibited_shortcuts:
+  - Commit or file save as approval
+  accountable_role: TBD
+  delivery_state: NOT_STARTED
+  conformance_state: UNASSESSED
+  planning_level: MASTER_CAPABILITY
+  knowledge_status: ARCHITECTURALLY_DERIVED
+  repository_detail_status: DISCOVERY_REQUIRED
+  binding_status: BINDING_ON_WAVE_ACTIVATION
+  activation_gate: G2
+  implementation_prescription_status: DELEGATED_TO_DETAILED_ROADMAP
+  detailed_roadmap_required: true
+  required_detailed_roadmap_content:
+  - code-grounded current state
+  - repository mapping
+  - selected strategy and alternatives
+  - concrete implementation work packages
+  - tests and required evidence
+  - migration and recovery
+  - risks and material decisions
+  master_scope_note: This record defines a required capability outcome, not a precommitted repository task decomposition.
+- id: JAN-WP-4-001
+  wave: W4
+  title: PWA Library and Product Realization PWA Inspection
+  normative_outcome: The demonstration UI SHALL present Product Realization PWA as reusable architecture independently
+    of any Undertaking.
+  dependencies:
+  - JAN-WP-3-001
+  - JAN-WP-2-006
+  sources:
+  - RPH-DOC-000
+  - RPH-DOC-010
+  deliverables:
+  - PWA Library
+  - PWA overview
+  - Work Architecture view
+  - PWU Type inspector
+  verification:
+  - UX acceptance criteria 1-5
+  - Terminology review
+  exit_criteria:
+  - Concrete execution state is absent from PWA Type views.
+  prohibited_shortcuts:
+  - Calling the Field Service fixture the Product Realization PWA
+  accountable_role: TBD
+  delivery_state: NOT_STARTED
+  conformance_state: UNASSESSED
+  planning_level: MASTER_CAPABILITY
+  knowledge_status: ARCHITECTURALLY_DERIVED
+  repository_detail_status: DISCOVERY_REQUIRED
+  binding_status: BINDING_ON_WAVE_ACTIVATION
+  activation_gate: G3
+  implementation_prescription_status: DELEGATED_TO_DETAILED_ROADMAP
+  detailed_roadmap_required: true
+  required_detailed_roadmap_content:
+  - code-grounded current state
+  - repository mapping
+  - selected strategy and alternatives
+  - concrete implementation work packages
+  - tests and required evidence
+  - migration and recovery
+  - risks and material decisions
+  master_scope_note: This record defines a required capability outcome, not a precommitted repository task decomposition.
+- id: JAN-WP-4-002
+  wave: W4
+  title: Undertaking Portfolio and Instantiation UX
+  normative_outcome: Users SHALL create and inspect Undertakings bound to exact PWA versions.
+  dependencies:
+  - JAN-WP-4-001
+  - JAN-WP-3-001
+  sources:
+  - RPH-DOC-010
+  deliverables:
+  - Undertaking Portfolio
+  - Create Undertaking interaction
+  - PWA-version binding display
+  verification:
+  - Instantiate Lens/PWA interaction tests
+  - Version-binding tests
+  exit_criteria:
+  - Field Service Management SaaS is always labeled as an Undertaking instance.
+  prohibited_shortcuts:
+  - Silent PWA version upgrades
+  accountable_role: TBD
+  delivery_state: NOT_STARTED
+  conformance_state: UNASSESSED
+  planning_level: MASTER_CAPABILITY
+  knowledge_status: ARCHITECTURALLY_DERIVED
+  repository_detail_status: DISCOVERY_REQUIRED
+  binding_status: BINDING_ON_WAVE_ACTIVATION
+  activation_gate: G3
+  implementation_prescription_status: DELEGATED_TO_DETAILED_ROADMAP
+  detailed_roadmap_required: true
+  required_detailed_roadmap_content:
+  - code-grounded current state
+  - repository mapping
+  - selected strategy and alternatives
+  - concrete implementation work packages
+  - tests and required evidence
+  - migration and recovery
+  - risks and material decisions
+  master_scope_note: This record defines a required capability outcome, not a precommitted repository task decomposition.
+- id: JAN-WP-4-003
+  wave: W4
+  title: Undertaking Overview and Professional Work Graph
+  normative_outcome: The UI SHALL display the instantiated PWU hierarchy and independent work, execution, assurance,
+    and shape-integrity state.
+  dependencies:
+  - JAN-WP-4-002
+  - JAN-WP-2-006
+  sources:
+  - RPH-DOC-010
+  deliverables:
+  - Undertaking dashboard
+  - Work Graph view
+  - State indicators
+  verification:
+  - RPH-PRJ-001 through RPH-PRJ-005
+  exit_criteria:
+  - A reviewer can see execution succeeded while assurance rejected.
+  prohibited_shortcuts:
+  - One generic green complete state
+  accountable_role: TBD
+  delivery_state: NOT_STARTED
+  conformance_state: UNASSESSED
+  planning_level: MASTER_CAPABILITY
+  knowledge_status: ARCHITECTURALLY_DERIVED
+  repository_detail_status: DISCOVERY_REQUIRED
+  binding_status: BINDING_ON_WAVE_ACTIVATION
+  activation_gate: G3
+  implementation_prescription_status: DELEGATED_TO_DETAILED_ROADMAP
+  detailed_roadmap_required: true
+  required_detailed_roadmap_content:
+  - code-grounded current state
+  - repository mapping
+  - selected strategy and alternatives
+  - concrete implementation work packages
+  - tests and required evidence
+  - migration and recovery
+  - risks and material decisions
+  master_scope_note: This record defines a required capability outcome, not a precommitted repository task decomposition.
+- id: JAN-WP-4-004
+  wave: W4
+  title: Object Inspector and Controlled Edit Classification
+  normative_outcome: Every edit SHALL be classified as presentation, execution, semantic, or governance before application.
+  dependencies:
+  - JAN-WP-4-003
+  sources:
+  - RPH-DOC-010
+  deliverables:
+  - Object inspector
+  - Edit classifier
+  - Impact preview
+  - Version diff
+  verification:
+  - Presentation-isolation tests
+  - Semantic-change impact tests
+  exit_criteria:
+  - Presentation changes do not emit semantic events; semantic changes preview affected objects.
+  prohibited_shortcuts:
+  - Raw unrestricted CRUD over canonical objects
+  accountable_role: TBD
+  delivery_state: NOT_STARTED
+  conformance_state: UNASSESSED
+  planning_level: MASTER_CAPABILITY
+  knowledge_status: ARCHITECTURALLY_DERIVED
+  repository_detail_status: DISCOVERY_REQUIRED
+  binding_status: BINDING_ON_WAVE_ACTIVATION
+  activation_gate: G3
+  implementation_prescription_status: DELEGATED_TO_DETAILED_ROADMAP
+  detailed_roadmap_required: true
+  required_detailed_roadmap_content:
+  - code-grounded current state
+  - repository mapping
+  - selected strategy and alternatives
+  - concrete implementation work packages
+  - tests and required evidence
+  - migration and recovery
+  - risks and material decisions
+  master_scope_note: This record defines a required capability outcome, not a precommitted repository task decomposition.
+- id: JAN-WP-4-005
+  wave: W4
+  title: Execution Workbench
+  normative_outcome: The UI SHALL expose execution plans, steps, attempts, runtime bindings, recovery, and provenance
+    as temporal machinery subordinate to PWUs.
+  dependencies:
+  - JAN-WP-4-003
+  - JAN-WP-3-005
+  sources:
+  - RPH-DOC-010
+  deliverables:
+  - Execution view
+  - Attempt detail
+  - Retry/replan controls
+  - Recovery UX
+  verification:
+  - Execution interaction tests
+  - Uncertain-operation UX test
+  exit_criteria:
+  - Users can distinguish a PWU from its execution workflow.
+  prohibited_shortcuts:
+  - Editing execution graph to redefine PWU semantics
+  accountable_role: TBD
+  delivery_state: NOT_STARTED
+  conformance_state: UNASSESSED
+  planning_level: MASTER_CAPABILITY
+  knowledge_status: ARCHITECTURALLY_DERIVED
+  repository_detail_status: DISCOVERY_REQUIRED
+  binding_status: BINDING_ON_WAVE_ACTIVATION
+  activation_gate: G3
+  implementation_prescription_status: DELEGATED_TO_DETAILED_ROADMAP
+  detailed_roadmap_required: true
+  required_detailed_roadmap_content:
+  - code-grounded current state
+  - repository mapping
+  - selected strategy and alternatives
+  - concrete implementation work packages
+  - tests and required evidence
+  - migration and recovery
+  - risks and material decisions
+  master_scope_note: This record defines a required capability outcome, not a precommitted repository task decomposition.
+- id: JAN-WP-4-006
+  wave: W4
+  title: Assurance Workbench and Finding Remediation
+  normative_outcome: The UI SHALL expose policies, claims, evidence, criteria, findings, dispositions, independence,
+    and remediation.
+  dependencies:
+  - JAN-WP-4-003
+  - JAN-WP-3-007
+  sources:
+  - RPH-DOC-004
+  - RPH-DOC-010
+  deliverables:
+  - Assurance view
+  - Assessment inspector
+  - Finding remediation actions
+  - Evidence inspector
+  verification:
+  - Assurance UX acceptance tests
+  - Validator failure UX test
+  exit_criteria:
+  - Validator failure is visibly distinct from assurance rejection.
+  prohibited_shortcuts:
+  - Showing only pass/fail messages
+  accountable_role: TBD
+  delivery_state: NOT_STARTED
+  conformance_state: UNASSESSED
+  planning_level: MASTER_CAPABILITY
+  knowledge_status: ARCHITECTURALLY_DERIVED
+  repository_detail_status: DISCOVERY_REQUIRED
+  binding_status: BINDING_ON_WAVE_ACTIVATION
+  activation_gate: G3
+  implementation_prescription_status: DELEGATED_TO_DETAILED_ROADMAP
+  detailed_roadmap_required: true
+  required_detailed_roadmap_content:
+  - code-grounded current state
+  - repository mapping
+  - selected strategy and alternatives
+  - concrete implementation work packages
+  - tests and required evidence
+  - migration and recovery
+  - risks and material decisions
+  master_scope_note: This record defines a required capability outcome, not a precommitted repository task decomposition.
+- id: JAN-WP-4-007
+  wave: W4
+  title: Traceability, Change Impact, Decision, and Baseline UX
+  normative_outcome: Users SHALL navigate intent-to-baseline trace, preview semantic impact, exercise version-bound
+    authority, and promote immutable baselines.
+  dependencies:
+  - JAN-WP-4-004
+  - JAN-WP-4-006
+  - JAN-WP-3-009
+  sources:
+  - RPH-DOC-010
+  deliverables:
+  - Traceability Explorer
+  - Change Impact view
+  - Decision Center
+  - Baseline Manager
+  verification:
+  - Trace path tests
+  - Decision version-binding tests
+  - Baseline UX tests
+  exit_criteria:
+  - The exact version and evidence package being approved are visible.
+  prohibited_shortcuts:
+  - Approving a moving latest version
+  accountable_role: TBD
+  delivery_state: NOT_STARTED
+  conformance_state: UNASSESSED
+  planning_level: MASTER_CAPABILITY
+  knowledge_status: ARCHITECTURALLY_DERIVED
+  repository_detail_status: DISCOVERY_REQUIRED
+  binding_status: BINDING_ON_WAVE_ACTIVATION
+  activation_gate: G3
+  implementation_prescription_status: DELEGATED_TO_DETAILED_ROADMAP
+  detailed_roadmap_required: true
+  required_detailed_roadmap_content:
+  - code-grounded current state
+  - repository mapping
+  - selected strategy and alternatives
+  - concrete implementation work packages
+  - tests and required evidence
+  - migration and recovery
+  - risks and material decisions
+  master_scope_note: This record defines a required capability outcome, not a precommitted repository task decomposition.
+- id: JAN-WP-4-008
+  wave: W4
+  title: Full Reference Demonstration and Accessibility
+  normative_outcome: The Field Service reference demonstration SHALL exercise PWA inspection, Undertaking operation,
+    execution, assurance failure, reshaping, approval, and baseline promotion through accessible interaction paths.
+  dependencies:
+  - JAN-WP-4-001
+  - JAN-WP-4-002
+  - JAN-WP-4-003
+  - JAN-WP-4-004
+  - JAN-WP-4-005
+  - JAN-WP-4-006
+  - JAN-WP-4-007
+  sources:
+  - RPH-DOC-006
+  - RPH-DOC-010
+  deliverables:
+  - Demo fixture
+  - Guided script
+  - Keyboard/list alternatives
+  - Accessibility review
+  verification:
+  - UX acceptance criteria
+  - Reference demo review
+  - Accessibility tests
+  exit_criteria:
+  - A reviewer can explain the PWA/Undertaking/Work Graph/Workflow distinctions after the demo.
+  prohibited_shortcuts:
+  - Canvas-only navigation
+  accountable_role: TBD
+  delivery_state: NOT_STARTED
+  conformance_state: UNASSESSED
+  planning_level: MASTER_CAPABILITY
+  knowledge_status: ARCHITECTURALLY_DERIVED
+  repository_detail_status: DISCOVERY_REQUIRED
+  binding_status: BINDING_ON_WAVE_ACTIVATION
+  activation_gate: G3
+  implementation_prescription_status: DELEGATED_TO_DETAILED_ROADMAP
+  detailed_roadmap_required: true
+  required_detailed_roadmap_content:
+  - code-grounded current state
+  - repository mapping
+  - selected strategy and alternatives
+  - concrete implementation work packages
+  - tests and required evidence
+  - migration and recovery
+  - risks and material decisions
+  master_scope_note: This record defines a required capability outcome, not a precommitted repository task decomposition.
+- id: JAN-WP-5-001
+  wave: W5
+  title: Legacy Instrumentation and Correlation
+  normative_outcome: Legacy phase, role, validator, human-gate, persistence, and side-effect activity SHALL emit
+    correlated observation records for shadow modeling.
+  dependencies:
+  - JAN-WP-0-007
+  - JAN-WP-2-003
+  sources:
+  - RPH-DOC-005
+  - RPH-DOC-009
+  deliverables:
+  - Instrumentation adapters
+  - Correlation IDs
+  - Legacy trace events
+  verification:
+  - Instrumentation completeness tests
+  - No-behavior-change tests
+  exit_criteria:
+  - Representative runs are observable without altering legacy outcomes.
+  prohibited_shortcuts:
+  - Changing legacy control behavior during instrumentation
+  accountable_role: TBD
+  delivery_state: NOT_STARTED
+  conformance_state: UNASSESSED
+  planning_level: MASTER_CAPABILITY
+  knowledge_status: ARCHITECTURALLY_DERIVED
+  repository_detail_status: DISCOVERY_REQUIRED
+  binding_status: BINDING_ON_WAVE_ACTIVATION
+  activation_gate: G4
+  implementation_prescription_status: DELEGATED_TO_DETAILED_ROADMAP
+  detailed_roadmap_required: true
+  required_detailed_roadmap_content:
+  - code-grounded current state
+  - repository mapping
+  - selected strategy and alternatives
+  - concrete implementation work packages
+  - tests and required evidence
+  - migration and recovery
+  - risks and material decisions
+  master_scope_note: This record defines a required capability outcome, not a precommitted repository task decomposition.
+- id: JAN-WP-5-002
+  wave: W5
+  title: Shadow RPH Object and Event Mapping
+  normative_outcome: Selected legacy runs SHALL generate non-authoritative shadow Intent, PWU, execution, assurance,
+    decision, and baseline representations.
+  dependencies:
+  - JAN-WP-5-001
+  - JAN-WP-3-009
+  sources:
+  - RPH-DOC-005
+  - RPH-DOC-009
+  deliverables:
+  - Shadow mapping service
+  - Legacy source mappings
+  - SHADOW authority mode
+  verification:
+  - Shadow fixture tests
+  - Mapping completeness tests
+  exit_criteria:
+  - Shadow objects cannot drive execution, governance, or baseline authority.
+  prohibited_shortcuts:
+  - Writing canonical RPH decisions from ambiguous legacy approvals
+  accountable_role: TBD
+  delivery_state: NOT_STARTED
+  conformance_state: UNASSESSED
+  planning_level: MASTER_CAPABILITY
+  knowledge_status: ARCHITECTURALLY_DERIVED
+  repository_detail_status: DISCOVERY_REQUIRED
+  binding_status: BINDING_ON_WAVE_ACTIVATION
+  activation_gate: G4
+  implementation_prescription_status: DELEGATED_TO_DETAILED_ROADMAP
+  detailed_roadmap_required: true
+  required_detailed_roadmap_content:
+  - code-grounded current state
+  - repository mapping
+  - selected strategy and alternatives
+  - concrete implementation work packages
+  - tests and required evidence
+  - migration and recovery
+  - risks and material decisions
+  master_scope_note: This record defines a required capability outcome, not a precommitted repository task decomposition.
+- id: JAN-WP-5-003
+  wave: W5
+  title: Compatibility Milestone Derivation
+  normative_outcome: Legacy phase labels SHALL be derivable from RPH canonical state through versioned projection
+    rules.
+  dependencies:
+  - JAN-WP-5-002
+  - JAN-WP-2-006
+  sources:
+  - RPH-DOC-009
+  deliverables:
+  - Derivation rules
+  - Compatibility projection
+  - Rule versioning
+  verification:
+  - RPH-CMP tests
+  - Projection rebuild test
+  exit_criteria:
+  - Derived milestones reproduce intended legacy UX without semantic authority.
+  prohibited_shortcuts:
+  - Bidirectional phase synchronization
+  accountable_role: TBD
+  delivery_state: NOT_STARTED
+  conformance_state: UNASSESSED
+  planning_level: MASTER_CAPABILITY
+  knowledge_status: ARCHITECTURALLY_DERIVED
+  repository_detail_status: DISCOVERY_REQUIRED
+  binding_status: BINDING_ON_WAVE_ACTIVATION
+  activation_gate: G4
+  implementation_prescription_status: DELEGATED_TO_DETAILED_ROADMAP
+  detailed_roadmap_required: true
+  required_detailed_roadmap_content:
+  - code-grounded current state
+  - repository mapping
+  - selected strategy and alternatives
+  - concrete implementation work packages
+  - tests and required evidence
+  - migration and recovery
+  - risks and material decisions
+  master_scope_note: This record defines a required capability outcome, not a precommitted repository task decomposition.
+- id: JAN-WP-5-004
+  wave: W5
+  title: Legacy/RPH Divergence Comparison
+  normative_outcome: The system SHALL compare legacy outputs, states, findings, decisions, and side effects against
+    shadow RPH representations and classify differences.
+  dependencies:
+  - JAN-WP-5-002
+  - JAN-WP-5-003
+  sources:
+  - RPH-DOC-005
+  - RPH-DOC-009
+  deliverables:
+  - Comparison engine
+  - Divergence records
+  - Review dashboard
+  verification:
+  - Known divergence fixture tests
+  - Reviewer classification workflow
+  exit_criteria:
+  - Every material divergence receives an approved classification.
+  prohibited_shortcuts:
+  - Treating all differences as defects
+  accountable_role: TBD
+  delivery_state: NOT_STARTED
+  conformance_state: UNASSESSED
+  planning_level: MASTER_CAPABILITY
+  knowledge_status: ARCHITECTURALLY_DERIVED
+  repository_detail_status: DISCOVERY_REQUIRED
+  binding_status: BINDING_ON_WAVE_ACTIVATION
+  activation_gate: G4
+  implementation_prescription_status: DELEGATED_TO_DETAILED_ROADMAP
+  detailed_roadmap_required: true
+  required_detailed_roadmap_content:
+  - code-grounded current state
+  - repository mapping
+  - selected strategy and alternatives
+  - concrete implementation work packages
+  - tests and required evidence
+  - migration and recovery
+  - risks and material decisions
+  master_scope_note: This record defines a required capability outcome, not a precommitted repository task decomposition.
+- id: JAN-WP-5-005
+  wave: W5
+  title: Shadow Side-Effect Isolation
+  normative_outcome: Shadow mode SHALL be physically and logically unable to invoke external mutating capabilities.
+  dependencies:
+  - JAN-WP-5-002
+  sources:
+  - RPH-DOC-009
+  deliverables:
+  - Read-only capability profile
+  - Shadow sandbox policy
+  - Audit alerts
+  verification:
+  - Capability-denial tests
+  - External side-effect monitor
+  exit_criteria:
+  - No shadow execution changes repository, infrastructure, decisions, or baselines.
+  prohibited_shortcuts:
+  - Relying only on developer convention
+  accountable_role: TBD
+  delivery_state: NOT_STARTED
+  conformance_state: UNASSESSED
+  planning_level: MASTER_CAPABILITY
+  knowledge_status: ARCHITECTURALLY_DERIVED
+  repository_detail_status: DISCOVERY_REQUIRED
+  binding_status: BINDING_ON_WAVE_ACTIVATION
+  activation_gate: G4
+  implementation_prescription_status: DELEGATED_TO_DETAILED_ROADMAP
+  detailed_roadmap_required: true
+  required_detailed_roadmap_content:
+  - code-grounded current state
+  - repository mapping
+  - selected strategy and alternatives
+  - concrete implementation work packages
+  - tests and required evidence
+  - migration and recovery
+  - risks and material decisions
+  master_scope_note: This record defines a required capability outcome, not a precommitted repository task decomposition.
+- id: JAN-WP-5-006
+  wave: W5
+  title: Representative Shadow Cohort and Gate Report
+  normative_outcome: The program SHALL run the approved trace corpus and pilot candidates through shadow comparison
+    and produce a G5 conformance report.
+  dependencies:
+  - JAN-WP-5-001
+  - JAN-WP-5-002
+  - JAN-WP-5-003
+  - JAN-WP-5-004
+  - JAN-WP-5-005
+  sources:
+  - RPH-DOC-009
+  deliverables:
+  - Shadow cohort report
+  - Critical divergence disposition
+  - Pilot recommendation
+  verification:
+  - G5 review
+  - Migration Authority approval
+  exit_criteria:
+  - No critical semantic conflict or unexplained authority difference remains.
+  prohibited_shortcuts:
+  - Advancing based only on aggregate success rate
+  accountable_role: TBD
+  delivery_state: NOT_STARTED
+  conformance_state: UNASSESSED
+  planning_level: MASTER_CAPABILITY
+  knowledge_status: ARCHITECTURALLY_DERIVED
+  repository_detail_status: DISCOVERY_REQUIRED
+  binding_status: BINDING_ON_WAVE_ACTIVATION
+  activation_gate: G4
+  implementation_prescription_status: DELEGATED_TO_DETAILED_ROADMAP
+  detailed_roadmap_required: true
+  required_detailed_roadmap_content:
+  - code-grounded current state
+  - repository mapping
+  - selected strategy and alternatives
+  - concrete implementation work packages
+  - tests and required evidence
+  - migration and recovery
+  - risks and material decisions
+  master_scope_note: This record defines a required capability outcome, not a precommitted repository task decomposition.
+- id: JAN-WP-6-001
+  wave: W6
+  title: Per-Undertaking Authority Mode
+  normative_outcome: Every Undertaking SHALL have one explicit authority mode, and RPH-authoritative Undertakings
+    SHALL reject legacy semantic writes.
+  dependencies:
+  - JAN-WP-5-006
+  sources:
+  - RPH-DOC-009
+  deliverables:
+  - Authority mode model
+  - Mode-switch command
+  - Write guards
+  verification:
+  - Dual-authority prevention tests
+  - Unauthorized phase-write alerts
+  exit_criteria:
+  - No Undertaking can be simultaneously LEGACY and RPH authoritative.
+  prohibited_shortcuts:
+  - Global mutable feature flag without per-Undertaking audit
+  accountable_role: TBD
+  delivery_state: NOT_STARTED
+  conformance_state: UNASSESSED
+  planning_level: MASTER_CAPABILITY
+  knowledge_status: ARCHITECTURALLY_DERIVED
+  repository_detail_status: DISCOVERY_REQUIRED
+  binding_status: BINDING_ON_WAVE_ACTIVATION
+  activation_gate: G5
+  implementation_prescription_status: DELEGATED_TO_DETAILED_ROADMAP
+  detailed_roadmap_required: true
+  required_detailed_roadmap_content:
+  - code-grounded current state
+  - repository mapping
+  - selected strategy and alternatives
+  - concrete implementation work packages
+  - tests and required evidence
+  - migration and recovery
+  - risks and material decisions
+  master_scope_note: This record defines a required capability outcome, not a precommitted repository task decomposition.
+- id: JAN-WP-6-002
+  wave: W6
+  title: Legacy Execution Adapter under RPH Control
+  normative_outcome: Legacy execution components MAY be reused only as governed adapters invoked by RPH Execution
+    Plans and returning canonical results.
+  dependencies:
+  - JAN-WP-6-001
+  - JAN-WP-3-005
+  sources:
+  - RPH-DOC-005
+  - RPH-DOC-009
+  deliverables:
+  - Adapter interfaces
+  - Canonical input/output translation
+  - Provenance capture
+  verification:
+  - Adapter integration tests
+  - State authority tests
+  exit_criteria:
+  - Legacy adapter cannot independently advance professional state.
+  prohibited_shortcuts:
+  - Copying legacy phase completion into PWU satisfaction
+  accountable_role: TBD
+  delivery_state: NOT_STARTED
+  conformance_state: UNASSESSED
+  planning_level: MASTER_CAPABILITY
+  knowledge_status: ARCHITECTURALLY_DERIVED
+  repository_detail_status: DISCOVERY_REQUIRED
+  binding_status: BINDING_ON_WAVE_ACTIVATION
+  activation_gate: G5
+  implementation_prescription_status: DELEGATED_TO_DETAILED_ROADMAP
+  detailed_roadmap_required: true
+  required_detailed_roadmap_content:
+  - code-grounded current state
+  - repository mapping
+  - selected strategy and alternatives
+  - concrete implementation work packages
+  - tests and required evidence
+  - migration and recovery
+  - risks and material decisions
+  master_scope_note: This record defines a required capability outcome, not a precommitted repository task decomposition.
+- id: JAN-WP-6-003
+  wave: W6
+  title: Pilot Rollback and Recovery
+  normative_outcome: Pilot authority transfer SHALL have tested rollback, active-attempt reconciliation, and audit-preserving
+    fallback procedures.
+  dependencies:
+  - JAN-WP-6-001
+  - JAN-WP-6-002
+  - JAN-WP-2-007
+  sources:
+  - RPH-DOC-009
+  deliverables:
+  - Rollback runbook
+  - Checkpointing
+  - Recovery automation
+  verification:
+  - Rollback drill
+  - Restart and uncertain-operation tests
+  exit_criteria:
+  - Fallback does not erase RPH objects, evidence, or decisions.
+  prohibited_shortcuts:
+  - Global rollback after RPH-only semantics are committed
+  accountable_role: TBD
+  delivery_state: NOT_STARTED
+  conformance_state: UNASSESSED
+  planning_level: MASTER_CAPABILITY
+  knowledge_status: ARCHITECTURALLY_DERIVED
+  repository_detail_status: DISCOVERY_REQUIRED
+  binding_status: BINDING_ON_WAVE_ACTIVATION
+  activation_gate: G5
+  implementation_prescription_status: DELEGATED_TO_DETAILED_ROADMAP
+  detailed_roadmap_required: true
+  required_detailed_roadmap_content:
+  - code-grounded current state
+  - repository mapping
+  - selected strategy and alternatives
+  - concrete implementation work packages
+  - tests and required evidence
+  - migration and recovery
+  - risks and material decisions
+  master_scope_note: This record defines a required capability outcome, not a precommitted repository task decomposition.
+- id: JAN-WP-6-004
+  wave: W6
+  title: Pilot Cohort Controls and Operational Telemetry
+  normative_outcome: Pilot eligibility, risk profiles, support ownership, alerts, and semantic-integrity metrics
+    SHALL be defined and enforced.
+  dependencies:
+  - JAN-WP-6-001
+  - JAN-WP-6-003
+  sources:
+  - RPH-DOC-009
+  deliverables:
+  - Cohort policy
+  - Operational dashboard
+  - Alerting
+  - Support procedures
+  verification:
+  - Pilot eligibility tests
+  - Alert drills
+  exit_criteria:
+  - Only approved Undertakings enter pilot authority mode.
+  prohibited_shortcuts:
+  - Unbounded beta enrollment
+  accountable_role: TBD
+  delivery_state: NOT_STARTED
+  conformance_state: UNASSESSED
+  planning_level: MASTER_CAPABILITY
+  knowledge_status: ARCHITECTURALLY_DERIVED
+  repository_detail_status: DISCOVERY_REQUIRED
+  binding_status: BINDING_ON_WAVE_ACTIVATION
+  activation_gate: G5
+  implementation_prescription_status: DELEGATED_TO_DETAILED_ROADMAP
+  detailed_roadmap_required: true
+  required_detailed_roadmap_content:
+  - code-grounded current state
+  - repository mapping
+  - selected strategy and alternatives
+  - concrete implementation work packages
+  - tests and required evidence
+  - migration and recovery
+  - risks and material decisions
+  master_scope_note: This record defines a required capability outcome, not a precommitted repository task decomposition.
+- id: JAN-WP-6-005
+  wave: W6
+  title: Pilot Semantic and Outcome Evaluation
+  normative_outcome: Pilot outcomes SHALL be evaluated against legacy behavior, RPH conformance, user comprehension,
+    recovery, latency, and assurance quality.
+  dependencies:
+  - JAN-WP-6-004
+  sources:
+  - RPH-DOC-008
+  - RPH-DOC-009
+  deliverables:
+  - Pilot evaluation report
+  - Defect and divergence register
+  - Remediation plan
+  verification:
+  - G6 gate review
+  exit_criteria:
+  - No severity-one semantic, authority, data-loss, or duplicate-side-effect defect remains.
+  prohibited_shortcuts:
+  - Using node execution success as pilot success
+  accountable_role: TBD
+  delivery_state: NOT_STARTED
+  conformance_state: UNASSESSED
+  planning_level: MASTER_CAPABILITY
+  knowledge_status: ARCHITECTURALLY_DERIVED
+  repository_detail_status: DISCOVERY_REQUIRED
+  binding_status: BINDING_ON_WAVE_ACTIVATION
+  activation_gate: G5
+  implementation_prescription_status: DELEGATED_TO_DETAILED_ROADMAP
+  detailed_roadmap_required: true
+  required_detailed_roadmap_content:
+  - code-grounded current state
+  - repository mapping
+  - selected strategy and alternatives
+  - concrete implementation work packages
+  - tests and required evidence
+  - migration and recovery
+  - risks and material decisions
+  master_scope_note: This record defines a required capability outcome, not a precommitted repository task decomposition.
+- id: JAN-WP-6-006
+  wave: W6
+  title: Default-New-Undertaking Cutover Preparation
+  normative_outcome: The system SHALL be prepared to make RPH authoritative by default for new Product Realization
+    Undertakings while preserving explicit exceptions.
+  dependencies:
+  - JAN-WP-6-005
+  sources:
+  - RPH-DOC-009
+  deliverables:
+  - Cutover checklist
+  - Database role changes
+  - Compatibility support plan
+  - Exception policy
+  verification:
+  - Cutover rehearsal
+  - Write-permission tests
+  exit_criteria:
+  - Legacy phase columns are no longer writable by normal runtime paths.
+  prohibited_shortcuts:
+  - Cutover without projection rebuild and rollback proof
+  accountable_role: TBD
+  delivery_state: NOT_STARTED
+  conformance_state: UNASSESSED
+  planning_level: MASTER_CAPABILITY
+  knowledge_status: ARCHITECTURALLY_DERIVED
+  repository_detail_status: DISCOVERY_REQUIRED
+  binding_status: BINDING_ON_WAVE_ACTIVATION
+  activation_gate: G5
+  implementation_prescription_status: DELEGATED_TO_DETAILED_ROADMAP
+  detailed_roadmap_required: true
+  required_detailed_roadmap_content:
+  - code-grounded current state
+  - repository mapping
+  - selected strategy and alternatives
+  - concrete implementation work packages
+  - tests and required evidence
+  - migration and recovery
+  - risks and material decisions
+  master_scope_note: This record defines a required capability outcome, not a precommitted repository task decomposition.
+- id: JAN-WP-7-001
+  wave: W7
+  title: Product Behavior Professional Work Model
+  normative_outcome: The Product Realization PWA SHALL canonically represent actors, personas where used, capabilities,
+    journeys, scenarios, requirements, and acceptance criteria as traceable work outputs.
+  dependencies:
+  - JAN-WP-6-006
+  - JAN-WP-3-003
+  sources:
+  - RPH-DOC-003
+  - RPH-DOC-006
+  deliverables:
+  - Product Behavior PWUs
+  - Artifact schemas
+  - Coverage traceability
+  - Behavior baseline
+  verification:
+  - Requirement Coverage tests
+  - Journey coverage tests
+  exit_criteria:
+  - Product behavior traces from approved intent into architecture and validation.
+  prohibited_shortcuts:
+  - Treating a generated backlog as complete product behavior
+  accountable_role: TBD
+  delivery_state: NOT_STARTED
+  conformance_state: UNASSESSED
+  planning_level: MASTER_CAPABILITY
+  knowledge_status: ARCHITECTURALLY_DERIVED
+  repository_detail_status: DISCOVERY_REQUIRED
+  binding_status: BINDING_ON_WAVE_ACTIVATION
+  activation_gate: G6
+  implementation_prescription_status: DELEGATED_TO_DETAILED_ROADMAP
+  detailed_roadmap_required: true
+  required_detailed_roadmap_content:
+  - code-grounded current state
+  - repository mapping
+  - selected strategy and alternatives
+  - concrete implementation work packages
+  - tests and required evidence
+  - migration and recovery
+  - risks and material decisions
+  master_scope_note: This record defines a required capability outcome, not a precommitted repository task decomposition.
+- id: JAN-WP-7-002
+  wave: W7
+  title: Implementation Planning and Dynamic PWU Decomposition
+  normative_outcome: Implementation planning SHALL create bounded implementation PWUs, dependencies, test obligations,
+    migration/rollback needs, and replaceable execution plans.
+  dependencies:
+  - JAN-WP-7-001
+  - JAN-WP-3-004
+  sources:
+  - RPH-DOC-003
+  - RPH-DOC-005
+  deliverables:
+  - Planning PWUs
+  - Implementation decomposition
+  - Dependency graph
+  - Test and rollback strategies
+  verification:
+  - Decomposition and constraint tests
+  - Planning fixture tests
+  exit_criteria:
+  - Implementation work cannot begin with uncovered parent obligations.
+  prohibited_shortcuts:
+  - Static task list without recomposition
+  accountable_role: TBD
+  delivery_state: NOT_STARTED
+  conformance_state: UNASSESSED
+  planning_level: MASTER_CAPABILITY
+  knowledge_status: ARCHITECTURALLY_DERIVED
+  repository_detail_status: DISCOVERY_REQUIRED
+  binding_status: BINDING_ON_WAVE_ACTIVATION
+  activation_gate: G6
+  implementation_prescription_status: DELEGATED_TO_DETAILED_ROADMAP
+  detailed_roadmap_required: true
+  required_detailed_roadmap_content:
+  - code-grounded current state
+  - repository mapping
+  - selected strategy and alternatives
+  - concrete implementation work packages
+  - tests and required evidence
+  - migration and recovery
+  - risks and material decisions
+  master_scope_note: This record defines a required capability outcome, not a precommitted repository task decomposition.
+- id: JAN-WP-7-003
+  wave: W7
+  title: Product Implementation and Coding-Agent Integration
+  normative_outcome: Coding agents SHALL execute approved PWU Instances through governed runtime bindings and return
+    artifacts, evidence, assumptions, and deviations.
+  dependencies:
+  - JAN-WP-7-002
+  - JAN-WP-6-002
+  sources:
+  - RPH-DOC-003
+  - RPH-DOC-004
+  deliverables:
+  - Implementation runtime
+  - Repository integration
+  - Build/test tool bindings
+  - Scope-conformance checks
+  verification:
+  - Execution tests
+  - Implementation scope assurance
+  - Side-effect recovery
+  exit_criteria:
+  - Code generation success remains distinct from implementation satisfaction.
+  prohibited_shortcuts:
+  - Agent self-approval
+  - Unauthorized repository scope expansion
+  accountable_role: TBD
+  delivery_state: NOT_STARTED
+  conformance_state: UNASSESSED
+  planning_level: MASTER_CAPABILITY
+  knowledge_status: ARCHITECTURALLY_DERIVED
+  repository_detail_status: DISCOVERY_REQUIRED
+  binding_status: BINDING_ON_WAVE_ACTIVATION
+  activation_gate: G6
+  implementation_prescription_status: DELEGATED_TO_DETAILED_ROADMAP
+  detailed_roadmap_required: true
+  required_detailed_roadmap_content:
+  - code-grounded current state
+  - repository mapping
+  - selected strategy and alternatives
+  - concrete implementation work packages
+  - tests and required evidence
+  - migration and recovery
+  - risks and material decisions
+  master_scope_note: This record defines a required capability outcome, not a precommitted repository task decomposition.
+- id: JAN-WP-7-004
+  wave: W7
+  title: Integrated Product Validation and V&V
+  normative_outcome: Product-level validation SHALL evaluate requirement satisfaction, journey outcomes, architecture
+    conformance, test adequacy, security, operations, and fitness for purpose.
+  dependencies:
+  - JAN-WP-7-001
+  - JAN-WP-7-003
+  sources:
+  - RPH-DOC-003
+  - RPH-DOC-004
+  deliverables:
+  - Integrated Validation PWUs
+  - V&V evidence package
+  - Fitness assessments
+  verification:
+  - Test Adequacy and Fitness-for-Purpose tests
+  - End-to-end journey validation
+  exit_criteria:
+  - A technically passing implementation may still be rejected as unfit for purpose.
+  prohibited_shortcuts:
+  - Equating test pass with product validation
+  accountable_role: TBD
+  delivery_state: NOT_STARTED
+  conformance_state: UNASSESSED
+  planning_level: MASTER_CAPABILITY
+  knowledge_status: ARCHITECTURALLY_DERIVED
+  repository_detail_status: DISCOVERY_REQUIRED
+  binding_status: BINDING_ON_WAVE_ACTIVATION
+  activation_gate: G6
+  implementation_prescription_status: DELEGATED_TO_DETAILED_ROADMAP
+  detailed_roadmap_required: true
+  required_detailed_roadmap_content:
+  - code-grounded current state
+  - repository mapping
+  - selected strategy and alternatives
+  - concrete implementation work packages
+  - tests and required evidence
+  - migration and recovery
+  - risks and material decisions
+  master_scope_note: This record defines a required capability outcome, not a precommitted repository task decomposition.
+- id: JAN-WP-7-005
+  wave: W7
+  title: Historical Consistency and Narrative Memory Integration
+  normative_outcome: Relevant prior decisions, failures, baselines, and narrative memory SHALL be retrievable as
+    scoped evidence without making historical conformity mandatory.
+  dependencies:
+  - JAN-WP-7-002
+  - JAN-WP-7-004
+  sources:
+  - RPH-DOC-004
+  - RPH-DOC-005
+  deliverables:
+  - Historical evidence adapter
+  - Applicability assessment
+  - Design-rationale links
+  verification:
+  - Historical Consistency tests
+  - Stale precedent tests
+  exit_criteria:
+  - Intentional divergence can be approved with rationale; unexplained recurrence is surfaced.
+  prohibited_shortcuts:
+  - Treating all precedent as binding
+  accountable_role: TBD
+  delivery_state: NOT_STARTED
+  conformance_state: UNASSESSED
+  planning_level: MASTER_CAPABILITY
+  knowledge_status: ARCHITECTURALLY_DERIVED
+  repository_detail_status: DISCOVERY_REQUIRED
+  binding_status: BINDING_ON_WAVE_ACTIVATION
+  activation_gate: G6
+  implementation_prescription_status: DELEGATED_TO_DETAILED_ROADMAP
+  detailed_roadmap_required: true
+  required_detailed_roadmap_content:
+  - code-grounded current state
+  - repository mapping
+  - selected strategy and alternatives
+  - concrete implementation work packages
+  - tests and required evidence
+  - migration and recovery
+  - risks and material decisions
+  master_scope_note: This record defines a required capability outcome, not a precommitted repository task decomposition.
+- id: JAN-WP-7-006
+  wave: W7
+  title: Intent-to-Product-Baseline Traceability
+  normative_outcome: The complete Undertaking SHALL support typed traceability from originating intent through product
+    behavior, architecture, implementation, evidence, decisions, and Product Baseline.
+  dependencies:
+  - JAN-WP-7-001
+  - JAN-WP-7-002
+  - JAN-WP-7-003
+  - JAN-WP-7-004
+  sources:
+  - RPH-DOC-003
+  - RPH-DOC-008
+  deliverables:
+  - Full trace graph
+  - Broken-trace detection
+  - Change impact traversal
+  verification:
+  - RPH-TRC tests
+  - Full reference trace review
+  exit_criteria:
+  - Every authoritative Product Baseline has a valid intent-to-baseline path.
+  prohibited_shortcuts:
+  - Trace links generated only for display
+  accountable_role: TBD
+  delivery_state: NOT_STARTED
+  conformance_state: UNASSESSED
+  planning_level: MASTER_CAPABILITY
+  knowledge_status: ARCHITECTURALLY_DERIVED
+  repository_detail_status: DISCOVERY_REQUIRED
+  binding_status: BINDING_ON_WAVE_ACTIVATION
+  activation_gate: G6
+  implementation_prescription_status: DELEGATED_TO_DETAILED_ROADMAP
+  detailed_roadmap_required: true
+  required_detailed_roadmap_content:
+  - code-grounded current state
+  - repository mapping
+  - selected strategy and alternatives
+  - concrete implementation work packages
+  - tests and required evidence
+  - migration and recovery
+  - risks and material decisions
+  master_scope_note: This record defines a required capability outcome, not a precommitted repository task decomposition.
+- id: JAN-WP-7-007
+  wave: W7
+  title: Commit, Deployment, Handoff, and Baseline Separation
+  normative_outcome: Repository commits, deployments, Product Shape Packages, Implementation Packages, and authoritative
+    baselines SHALL remain distinct delivery and governance objects.
+  dependencies:
+  - JAN-WP-7-003
+  - JAN-WP-7-004
+  - JAN-WP-1-008
+  sources:
+  - RPH-DOC-000
+  - RPH-DOC-003
+  deliverables:
+  - Delivery disposition model
+  - Commit artifacts
+  - Baseline promotion
+  - Handoff package interfaces
+  verification:
+  - Commit-not-baseline tests
+  - Version/hash tests
+  - Disposition tests
+  exit_criteria:
+  - An Undertaking can stop at an approved shape boundary or proceed to deployment.
+  prohibited_shortcuts:
+  - Janumi-hosted deployment as implicit PWA requirement
+  accountable_role: TBD
+  delivery_state: NOT_STARTED
+  conformance_state: UNASSESSED
+  planning_level: MASTER_CAPABILITY
+  knowledge_status: ARCHITECTURALLY_DERIVED
+  repository_detail_status: DISCOVERY_REQUIRED
+  binding_status: BINDING_ON_WAVE_ACTIVATION
+  activation_gate: G6
+  implementation_prescription_status: DELEGATED_TO_DETAILED_ROADMAP
+  detailed_roadmap_required: true
+  required_detailed_roadmap_content:
+  - code-grounded current state
+  - repository mapping
+  - selected strategy and alternatives
+  - concrete implementation work packages
+  - tests and required evidence
+  - migration and recovery
+  - risks and material decisions
+  master_scope_note: This record defines a required capability outcome, not a precommitted repository task decomposition.
+- id: JAN-WP-7-008
+  wave: W7
+  title: Legacy Phase Authority Retirement and Full Reference Undertaking
+  normative_outcome: The full Field Service Management SaaS Undertaking SHALL operate through Product Realization
+    PWA, and hardcoded phase state SHALL be retired as semantic authority for new work.
+  dependencies:
+  - JAN-WP-7-001
+  - JAN-WP-7-002
+  - JAN-WP-7-003
+  - JAN-WP-7-004
+  - JAN-WP-7-005
+  - JAN-WP-7-006
+  - JAN-WP-7-007
+  sources:
+  - RPH-DOC-005
+  - RPH-DOC-006
+  - RPH-DOC-009
+  deliverables:
+  - Complete reference undertaking
+  - Legacy retirement changes
+  - Compatibility-only phase view
+  verification:
+  - Full Product Realization E2E suite
+  - G7 migration review
+  exit_criteria:
+  - New Undertakings require no hardcoded phase switch for semantic progression.
+  prohibited_shortcuts:
+  - Leaving hidden legacy writes active
+  accountable_role: TBD
+  delivery_state: NOT_STARTED
+  conformance_state: UNASSESSED
+  planning_level: MASTER_CAPABILITY
+  knowledge_status: ARCHITECTURALLY_DERIVED
+  repository_detail_status: DISCOVERY_REQUIRED
+  binding_status: BINDING_ON_WAVE_ACTIVATION
+  activation_gate: G6
+  implementation_prescription_status: DELEGATED_TO_DETAILED_ROADMAP
+  detailed_roadmap_required: true
+  required_detailed_roadmap_content:
+  - code-grounded current state
+  - repository mapping
+  - selected strategy and alternatives
+  - concrete implementation work packages
+  - tests and required evidence
+  - migration and recovery
+  - risks and material decisions
+  master_scope_note: This record defines a required capability outcome, not a precommitted repository task decomposition.
+- id: JAN-WP-8-001
+  wave: W8
+  title: Canonical PWA Definition and Version Model
+  normative_outcome: JPWB SHALL persist PWAs, PWU Types, rules, policies, profiles, fixtures, and publication lifecycle
+    independently of Undertakings.
+  dependencies:
+  - JAN-WP-7-008
+  sources:
+  - RPH-DOC-000
+  - RPH-DOC-003
+  - RPH-DOC-010
+  deliverables:
+  - PWA aggregate
+  - PWA version model
+  - Published immutability
+  - PWA Library schema
+  verification:
+  - PWA versioning tests
+  - Type/instance isolation tests
+  exit_criteria:
+  - Published PWA versions cannot be edited in place or silently alter Undertakings.
+  prohibited_shortcuts:
+  - Using an Undertaking Work Graph as PWA definition
+  accountable_role: TBD
+  delivery_state: NOT_STARTED
+  conformance_state: UNASSESSED
+  planning_level: MASTER_CAPABILITY
+  knowledge_status: ARCHITECTURALLY_DERIVED
+  repository_detail_status: DISCOVERY_REQUIRED
+  binding_status: BINDING_ON_WAVE_ACTIVATION
+  activation_gate: G7
+  implementation_prescription_status: DELEGATED_TO_DETAILED_ROADMAP
+  detailed_roadmap_required: true
+  required_detailed_roadmap_content:
+  - code-grounded current state
+  - repository mapping
+  - selected strategy and alternatives
+  - concrete implementation work packages
+  - tests and required evidence
+  - migration and recovery
+  - risks and material decisions
+  master_scope_note: This record defines a required capability outcome, not a precommitted repository task decomposition.
+- id: JAN-WP-8-002
+  wave: W8
+  title: PWU Type and Work Architecture Authoring
+  normative_outcome: PWA Designers SHALL create and revise PWU Types, permitted relationships, inputs, outputs,
+    obligations, and completion semantics.
+  dependencies:
+  - JAN-WP-8-001
+  sources:
+  - RPH-DOC-010
+  deliverables:
+  - PWU Type editor
+  - Work Architecture view
+  - Validation rules
+  verification:
+  - PWA authoring interaction tests
+  - Schema conformance
+  exit_criteria:
+  - Concrete execution state never appears on PWU Type definitions.
+  prohibited_shortcuts:
+  - Editing instances to change types globally
+  accountable_role: TBD
+  delivery_state: NOT_STARTED
+  conformance_state: UNASSESSED
+  planning_level: MASTER_CAPABILITY
+  knowledge_status: ARCHITECTURALLY_DERIVED
+  repository_detail_status: DISCOVERY_REQUIRED
+  binding_status: BINDING_ON_WAVE_ACTIVATION
+  activation_gate: G7
+  implementation_prescription_status: DELEGATED_TO_DETAILED_ROADMAP
+  detailed_roadmap_required: true
+  required_detailed_roadmap_content:
+  - code-grounded current state
+  - repository mapping
+  - selected strategy and alternatives
+  - concrete implementation work packages
+  - tests and required evidence
+  - migration and recovery
+  - risks and material decisions
+  master_scope_note: This record defines a required capability outcome, not a precommitted repository task decomposition.
+- id: JAN-WP-8-003
+  wave: W8
+  title: Decomposition, Recomposition, and Applicability Rule Authoring
+  normative_outcome: PWA Designers SHALL define mandatory, conditional, and extensible decomposition patterns and
+    recomposition rules through safe declarative expressions.
+  dependencies:
+  - JAN-WP-8-002
+  sources:
+  - RPH-DOC-003
+  - RPH-DOC-007
+  deliverables:
+  - Rule editor
+  - Applicability expression builder
+  - Coverage validation
+  verification:
+  - Rule evaluation tests
+  - Invalid decomposition fixture
+  exit_criteria:
+  - Arbitrary executable code is not accepted as a policy or applicability rule.
+  prohibited_shortcuts:
+  - Embedding JavaScript in PWA definitions
+  accountable_role: TBD
+  delivery_state: NOT_STARTED
+  conformance_state: UNASSESSED
+  planning_level: MASTER_CAPABILITY
+  knowledge_status: ARCHITECTURALLY_DERIVED
+  repository_detail_status: DISCOVERY_REQUIRED
+  binding_status: BINDING_ON_WAVE_ACTIVATION
+  activation_gate: G7
+  implementation_prescription_status: DELEGATED_TO_DETAILED_ROADMAP
+  detailed_roadmap_required: true
+  required_detailed_roadmap_content:
+  - code-grounded current state
+  - repository mapping
+  - selected strategy and alternatives
+  - concrete implementation work packages
+  - tests and required evidence
+  - migration and recovery
+  - risks and material decisions
+  master_scope_note: This record defines a required capability outcome, not a precommitted repository task decomposition.
+- id: JAN-WP-8-004
+  wave: W8
+  title: Assurance, Role, Authority, Baseline, and Execution-Strategy Authoring
+  normative_outcome: PWA Designers SHALL assign assurance policies, role expectations, authority requirements, baseline
+    types, and compatible execution strategies without granting runtime capabilities.
+  dependencies:
+  - JAN-WP-8-002
+  - JAN-WP-8-003
+  sources:
+  - RPH-DOC-004
+  - RPH-DOC-010
+  deliverables:
+  - Assignment editors
+  - Authority definitions
+  - Baseline type editor
+  - Strategy compatibility
+  verification:
+  - PWA conformance tests
+  - Runtime authority separation tests
+  exit_criteria:
+  - PWA definitions request or constrain capabilities but do not authorize them.
+  prohibited_shortcuts:
+  - PWA template as permission grant
+  accountable_role: TBD
+  delivery_state: NOT_STARTED
+  conformance_state: UNASSESSED
+  planning_level: MASTER_CAPABILITY
+  knowledge_status: ARCHITECTURALLY_DERIVED
+  repository_detail_status: DISCOVERY_REQUIRED
+  binding_status: BINDING_ON_WAVE_ACTIVATION
+  activation_gate: G7
+  implementation_prescription_status: DELEGATED_TO_DETAILED_ROADMAP
+  detailed_roadmap_required: true
+  required_detailed_roadmap_content:
+  - code-grounded current state
+  - repository mapping
+  - selected strategy and alternatives
+  - concrete implementation work packages
+  - tests and required evidence
+  - migration and recovery
+  - risks and material decisions
+  master_scope_note: This record defines a required capability outcome, not a precommitted repository task decomposition.
+- id: JAN-WP-8-005
+  wave: W8
+  title: PWA Conformance Fixtures and Publication Workflow
+  normative_outcome: A PWA SHALL pass structural, semantic, assurance, baseline, role, and reference-fixture conformance
+    before publication.
+  dependencies:
+  - JAN-WP-8-001
+  - JAN-WP-8-002
+  - JAN-WP-8-003
+  - JAN-WP-8-004
+  sources:
+  - RPH-DOC-006
+  - RPH-DOC-008
+  - RPH-DOC-010
+  deliverables:
+  - Fixture runner
+  - PWA validation report
+  - Review and publication workflow
+  verification:
+  - Field Service fixture run
+  - Publication negative tests
+  exit_criteria:
+  - Only validated, reviewed PWA versions can become PUBLISHED.
+  prohibited_shortcuts:
+  - Publishing a PWA based solely on schema validity
+  accountable_role: TBD
+  delivery_state: NOT_STARTED
+  conformance_state: UNASSESSED
+  planning_level: MASTER_CAPABILITY
+  knowledge_status: ARCHITECTURALLY_DERIVED
+  repository_detail_status: DISCOVERY_REQUIRED
+  binding_status: BINDING_ON_WAVE_ACTIVATION
+  activation_gate: G7
+  implementation_prescription_status: DELEGATED_TO_DETAILED_ROADMAP
+  detailed_roadmap_required: true
+  required_detailed_roadmap_content:
+  - code-grounded current state
+  - repository mapping
+  - selected strategy and alternatives
+  - concrete implementation work packages
+  - tests and required evidence
+  - migration and recovery
+  - risks and material decisions
+  master_scope_note: This record defines a required capability outcome, not a precommitted repository task decomposition.
+- id: JAN-WP-8-006
+  wave: W8
+  title: Product Realization PWA vNext Authored through JPWB
+  normative_outcome: The successor Product Realization PWA SHALL be created, reviewed, validated, and published
+    through JPWB rather than source-code-only configuration.
+  dependencies:
+  - JAN-WP-8-005
+  sources:
+  - RPH-DOC-000
+  - RPH-DOC-003
+  deliverables:
+  - Product Realization PWA draft
+  - Conformance results
+  - Published successor version
+  verification:
+  - Diff against current canonical PWA
+  - Fixture conformance
+  - Architecture review
+  exit_criteria:
+  - JanumiCode can bind a new Undertaking to the JPWB-published version.
+  prohibited_shortcuts:
+  - Manual database seeding as publication
+  accountable_role: TBD
+  delivery_state: NOT_STARTED
+  conformance_state: UNASSESSED
+  planning_level: MASTER_CAPABILITY
+  knowledge_status: ARCHITECTURALLY_DERIVED
+  repository_detail_status: DISCOVERY_REQUIRED
+  binding_status: BINDING_ON_WAVE_ACTIVATION
+  activation_gate: G7
+  implementation_prescription_status: DELEGATED_TO_DETAILED_ROADMAP
+  detailed_roadmap_required: true
+  required_detailed_roadmap_content:
+  - code-grounded current state
+  - repository mapping
+  - selected strategy and alternatives
+  - concrete implementation work packages
+  - tests and required evidence
+  - migration and recovery
+  - risks and material decisions
+  master_scope_note: This record defines a required capability outcome, not a precommitted repository task decomposition.
+- id: JAN-WP-8-007
+  wave: W8
+  title: Self-Hosting and Bootstrap Proof
+  normative_outcome: Janumi SHALL use a Product Realization Undertaking under the JPWB-published PWA to implement
+    or materially evolve JPWB or JanumiCode.
+  dependencies:
+  - JAN-WP-8-006
+  sources:
+  - RPH-DOC-000
+  deliverables:
+  - Self-hosting Undertaking
+  - Evidence package
+  - Lessons and PWA improvement proposals
+  verification:
+  - Dogfooding review
+  - Intent-to-baseline trace
+  exit_criteria:
+  - The system demonstrates that it can build and evolve itself without bypassing its own architecture.
+  prohibited_shortcuts:
+  - Demo-only synthetic self-hosting
+  accountable_role: TBD
+  delivery_state: NOT_STARTED
+  conformance_state: UNASSESSED
+  planning_level: MASTER_CAPABILITY
+  knowledge_status: ARCHITECTURALLY_DERIVED
+  repository_detail_status: DISCOVERY_REQUIRED
+  binding_status: BINDING_ON_WAVE_ACTIVATION
+  activation_gate: G7
+  implementation_prescription_status: DELEGATED_TO_DETAILED_ROADMAP
+  detailed_roadmap_required: true
+  required_detailed_roadmap_content:
+  - code-grounded current state
+  - repository mapping
+  - selected strategy and alternatives
+  - concrete implementation work packages
+  - tests and required evidence
+  - migration and recovery
+  - risks and material decisions
+  master_scope_note: This record defines a required capability outcome, not a precommitted repository task decomposition.
+- id: JAN-WP-9-001
+  wave: W9
+  title: PWA Profiles
+  normative_outcome: Tenants SHALL select governed PWA profiles that alter required work, assurance, evidence, authority,
+    and execution compatibility without forking the base PWA unnecessarily.
+  dependencies:
+  - JAN-WP-8-006
+  sources:
+  - RPH-DOC-000
+  deliverables:
+  - Profile model
+  - Profile application and diff
+  - Profile conformance
+  verification:
+  - Profile inheritance tests
+  - Risk profile tests
+  exit_criteria:
+  - Applied profile effects are visible and version-bound.
+  prohibited_shortcuts:
+  - Hidden configuration flags that change semantics
+  accountable_role: TBD
+  delivery_state: NOT_STARTED
+  conformance_state: UNASSESSED
+  planning_level: MASTER_CAPABILITY
+  knowledge_status: ARCHITECTURALLY_DERIVED
+  repository_detail_status: DISCOVERY_REQUIRED
+  binding_status: BINDING_ON_WAVE_ACTIVATION
+  activation_gate: G8
+  implementation_prescription_status: DELEGATED_TO_DETAILED_ROADMAP
+  detailed_roadmap_required: true
+  required_detailed_roadmap_content:
+  - code-grounded current state
+  - repository mapping
+  - selected strategy and alternatives
+  - concrete implementation work packages
+  - tests and required evidence
+  - migration and recovery
+  - risks and material decisions
+  master_scope_note: This record defines a required capability outcome, not a precommitted repository task decomposition.
+- id: JAN-WP-9-002
+  wave: W9
+  title: Tenant-Derived PWA Fork and Extension
+  normative_outcome: A tenant SHALL derive a PWA with explicit lineage, local changes, conformance, and independent
+    publication lifecycle.
+  dependencies:
+  - JAN-WP-8-001
+  - JAN-WP-9-001
+  sources:
+  - RPH-DOC-000
+  - RPH-DOC-010
+  deliverables:
+  - Tenant PWA lifecycle
+  - Fork/merge diff
+  - Tenant publication governance
+  verification:
+  - Isolation tests
+  - Lineage tests
+  - Upgrade conflict tests
+  exit_criteria:
+  - Tenant changes do not mutate Janumi-published PWA versions.
+  prohibited_shortcuts:
+  - Copying without source lineage
+  accountable_role: TBD
+  delivery_state: NOT_STARTED
+  conformance_state: UNASSESSED
+  planning_level: MASTER_CAPABILITY
+  knowledge_status: ARCHITECTURALLY_DERIVED
+  repository_detail_status: DISCOVERY_REQUIRED
+  binding_status: BINDING_ON_WAVE_ACTIVATION
+  activation_gate: G8
+  implementation_prescription_status: DELEGATED_TO_DETAILED_ROADMAP
+  detailed_roadmap_required: true
+  required_detailed_roadmap_content:
+  - code-grounded current state
+  - repository mapping
+  - selected strategy and alternatives
+  - concrete implementation work packages
+  - tests and required evidence
+  - migration and recovery
+  - risks and material decisions
+  master_scope_note: This record defines a required capability outcome, not a precommitted repository task decomposition.
+- id: JAN-WP-9-003
+  wave: W9
+  title: Undertaking-Local PWUs and Inherited-versus-Local UX
+  normative_outcome: An Undertaking SHALL add local PWUs or extensions without silently modifying its bound PWA,
+    and the UI SHALL show inherited and local content distinctly.
+  dependencies:
+  - JAN-WP-9-001
+  - JAN-WP-9-002
+  sources:
+  - RPH-DOC-000
+  - RPH-DOC-010
+  deliverables:
+  - Local extension model
+  - Inherited/local inspector
+  - Promotion proposal path
+  verification:
+  - Type-instance tests
+  - Local extension conformance
+  exit_criteria:
+  - Local additions remain scoped to the Undertaking unless governed into a PWA change.
+  prohibited_shortcuts:
+  - Automatic upstream promotion
+  accountable_role: TBD
+  delivery_state: NOT_STARTED
+  conformance_state: UNASSESSED
+  planning_level: MASTER_CAPABILITY
+  knowledge_status: ARCHITECTURALLY_DERIVED
+  repository_detail_status: DISCOVERY_REQUIRED
+  binding_status: BINDING_ON_WAVE_ACTIVATION
+  activation_gate: G8
+  implementation_prescription_status: DELEGATED_TO_DETAILED_ROADMAP
+  detailed_roadmap_required: true
+  required_detailed_roadmap_content:
+  - code-grounded current state
+  - repository mapping
+  - selected strategy and alternatives
+  - concrete implementation work packages
+  - tests and required evidence
+  - migration and recovery
+  - risks and material decisions
+  master_scope_note: This record defines a required capability outcome, not a precommitted repository task decomposition.
+- id: JAN-WP-9-004
+  wave: W9
+  title: PWA Upgrade and Undertaking Migration
+  normative_outcome: Moving an Undertaking to a successor PWA version SHALL require impact preview, governed migration
+    work, reassessment, and explicit acceptance.
+  dependencies:
+  - JAN-WP-9-002
+  - JAN-WP-9-003
+  sources:
+  - RPH-DOC-000
+  - RPH-DOC-010
+  deliverables:
+  - Upgrade preview
+  - Migration PWUs
+  - Version binding change
+  - Rollback
+  verification:
+  - Upgrade impact tests
+  - Baseline invalidation tests
+  exit_criteria:
+  - No Undertaking changes PWA version silently.
+  prohibited_shortcuts:
+  - Template refresh in place
+  accountable_role: TBD
+  delivery_state: NOT_STARTED
+  conformance_state: UNASSESSED
+  planning_level: MASTER_CAPABILITY
+  knowledge_status: ARCHITECTURALLY_DERIVED
+  repository_detail_status: DISCOVERY_REQUIRED
+  binding_status: BINDING_ON_WAVE_ACTIVATION
+  activation_gate: G8
+  implementation_prescription_status: DELEGATED_TO_DETAILED_ROADMAP
+  detailed_roadmap_required: true
+  required_detailed_roadmap_content:
+  - code-grounded current state
+  - repository mapping
+  - selected strategy and alternatives
+  - concrete implementation work packages
+  - tests and required evidence
+  - migration and recovery
+  - risks and material decisions
+  master_scope_note: This record defines a required capability outcome, not a precommitted repository task decomposition.
+- id: JAN-WP-9-005
+  wave: W9
+  title: Bottom-Up PWA Improvement Proposals
+  normative_outcome: Recurring patterns, findings, and local extensions from Undertakings SHALL be promotable only
+    through evidence-backed PWA change proposals.
+  dependencies:
+  - JAN-WP-9-003
+  sources:
+  - RPH-DOC-010
+  deliverables:
+  - PWA change proposal
+  - Source evidence links
+  - Review workflow
+  verification:
+  - Proposal traceability tests
+  - Authority tests
+  exit_criteria:
+  - Published PWA changes remain governed and versioned.
+  prohibited_shortcuts:
+  - Learning system mutating PWA automatically
+  accountable_role: TBD
+  delivery_state: NOT_STARTED
+  conformance_state: UNASSESSED
+  planning_level: MASTER_CAPABILITY
+  knowledge_status: ARCHITECTURALLY_DERIVED
+  repository_detail_status: DISCOVERY_REQUIRED
+  binding_status: BINDING_ON_WAVE_ACTIVATION
+  activation_gate: G8
+  implementation_prescription_status: DELEGATED_TO_DETAILED_ROADMAP
+  detailed_roadmap_required: true
+  required_detailed_roadmap_content:
+  - code-grounded current state
+  - repository mapping
+  - selected strategy and alternatives
+  - concrete implementation work packages
+  - tests and required evidence
+  - migration and recovery
+  - risks and material decisions
+  master_scope_note: This record defines a required capability outcome, not a precommitted repository task decomposition.
+- id: JAN-WP-9-006
+  wave: W9
+  title: Product Shape and Implementation Package Export
+  normative_outcome: An Undertaking SHALL export a governed Product Shape Package and, where available, an Implementation
+    Package with manifests, versions, evidence, decisions, open conditions, and machine-readable traceability.
+  dependencies:
+  - JAN-WP-7-007
+  - JAN-WP-9-003
+  sources:
+  - RPH-DOC-000
+  deliverables:
+  - Shape package schema
+  - Export pipeline
+  - Manifest validator
+  - External handoff guide
+  verification:
+  - Export round-trip tests
+  - Hash/version validation
+  - External consumer conformance
+  exit_criteria:
+  - A tenant can hand off implementation without Janumi-hosted deployment.
+  prohibited_shortcuts:
+  - Single unversioned shape document
+  - Omitting residual uncertainty
+  accountable_role: TBD
+  delivery_state: NOT_STARTED
+  conformance_state: UNASSESSED
+  planning_level: MASTER_CAPABILITY
+  knowledge_status: ARCHITECTURALLY_DERIVED
+  repository_detail_status: DISCOVERY_REQUIRED
+  binding_status: BINDING_ON_WAVE_ACTIVATION
+  activation_gate: G8
+  implementation_prescription_status: DELEGATED_TO_DETAILED_ROADMAP
+  detailed_roadmap_required: true
+  required_detailed_roadmap_content:
+  - code-grounded current state
+  - repository mapping
+  - selected strategy and alternatives
+  - concrete implementation work packages
+  - tests and required evidence
+  - migration and recovery
+  - risks and material decisions
+  master_scope_note: This record defines a required capability outcome, not a precommitted repository task decomposition.
+- id: JAN-WP-10-001
+  wave: W10
+  title: Janumi Platform Tenancy, Identity, and Authority Integration
+  normative_outcome: JanumiCode SHALL enforce tenant isolation, identity, delegated authority, and access control
+    for PWAs, Undertakings, artifacts, evidence, decisions, and runtime capabilities.
+  dependencies:
+  - JAN-WP-9-006
+  sources:
+  - RPH-DOC-000
+  - RPH-DOC-009
+  deliverables:
+  - Tenant-scoped authorization
+  - Authority integration
+  - Data isolation policies
+  - Audit
+  verification:
+  - Cross-tenant isolation tests
+  - Authority tests
+  - Security review
+  exit_criteria:
+  - No tenant can access or influence another tenant's professional work.
+  prohibited_shortcuts:
+  - Relying only on UI filtering
+  accountable_role: TBD
+  delivery_state: NOT_STARTED
+  conformance_state: UNASSESSED
+  planning_level: MASTER_CAPABILITY
+  knowledge_status: ARCHITECTURALLY_DERIVED
+  repository_detail_status: DISCOVERY_REQUIRED
+  binding_status: BINDING_ON_WAVE_ACTIVATION
+  activation_gate: G9
+  implementation_prescription_status: DELEGATED_TO_DETAILED_ROADMAP
+  detailed_roadmap_required: true
+  required_detailed_roadmap_content:
+  - code-grounded current state
+  - repository mapping
+  - selected strategy and alternatives
+  - concrete implementation work packages
+  - tests and required evidence
+  - migration and recovery
+  - risks and material decisions
+  master_scope_note: This record defines a required capability outcome, not a precommitted repository task decomposition.
+- id: JAN-WP-10-002
+  wave: W10
+  title: Entitlements, Square Billing, Usage, and Quotas
+  normative_outcome: Platform commercial services SHALL authorize product capabilities through explicit entitlements
+    and record usage and cost without coupling billing semantics into PWAs.
+  dependencies:
+  - JAN-WP-10-001
+  sources:
+  - RPH-DOC-000
+  deliverables:
+  - Entitlement service integration
+  - Square subscription boundary
+  - Usage events
+  - Quota enforcement
+  verification:
+  - Entitlement tests
+  - Billing sandbox tests
+  - Quota tests
+  exit_criteria:
+  - PWAs remain portable and do not contain payment credentials or billing authority.
+  prohibited_shortcuts:
+  - Granting runtime capability based on UI availability
+  accountable_role: TBD
+  delivery_state: NOT_STARTED
+  conformance_state: UNASSESSED
+  planning_level: MASTER_CAPABILITY
+  knowledge_status: ARCHITECTURALLY_DERIVED
+  repository_detail_status: DISCOVERY_REQUIRED
+  binding_status: BINDING_ON_WAVE_ACTIVATION
+  activation_gate: G9
+  implementation_prescription_status: DELEGATED_TO_DETAILED_ROADMAP
+  detailed_roadmap_required: true
+  required_detailed_roadmap_content:
+  - code-grounded current state
+  - repository mapping
+  - selected strategy and alternatives
+  - concrete implementation work packages
+  - tests and required evidence
+  - migration and recovery
+  - risks and material decisions
+  master_scope_note: This record defines a required capability outcome, not a precommitted repository task decomposition.
+- id: JAN-WP-10-003
+  wave: W10
+  title: Deployment and Delivery Disposition Integration
+  normative_outcome: Product Realization Undertakings SHALL support governed deployment on Janumi Platform, customer
+    deployment, shape export, implementation export, or external handoff.
+  dependencies:
+  - JAN-WP-9-006
+  - JAN-WP-10-001
+  sources:
+  - RPH-DOC-000
+  deliverables:
+  - Deployment service bindings
+  - Delivery disposition UI
+  - Deployment evidence
+  - Rollback integration
+  verification:
+  - Disposition tests
+  - Deployment reconciliation
+  - Package export tests
+  exit_criteria:
+  - Deployment remains a governed outcome, not an implicit PWA requirement.
+  prohibited_shortcuts:
+  - Treating deploy success as Product Baseline approval
+  accountable_role: TBD
+  delivery_state: NOT_STARTED
+  conformance_state: UNASSESSED
+  planning_level: MASTER_CAPABILITY
+  knowledge_status: ARCHITECTURALLY_DERIVED
+  repository_detail_status: DISCOVERY_REQUIRED
+  binding_status: BINDING_ON_WAVE_ACTIVATION
+  activation_gate: G9
+  implementation_prescription_status: DELEGATED_TO_DETAILED_ROADMAP
+  detailed_roadmap_required: true
+  required_detailed_roadmap_content:
+  - code-grounded current state
+  - repository mapping
+  - selected strategy and alternatives
+  - concrete implementation work packages
+  - tests and required evidence
+  - migration and recovery
+  - risks and material decisions
+  master_scope_note: This record defines a required capability outcome, not a precommitted repository task decomposition.
+- id: JAN-WP-10-004
+  wave: W10
+  title: Multi-Surface Canonical Client Integration
+  normative_outcome: VS Code, web, desktop, and supported mobile review surfaces SHALL use shared canonical commands,
+    objects, authority, and projections.
+  dependencies:
+  - JAN-WP-4-008
+  - JAN-WP-10-001
+  sources:
+  - RPH-DOC-000
+  - RPH-DOC-007
+  - RPH-DOC-010
+  deliverables:
+  - Shared client contract library
+  - VS Code surface
+  - Web surface
+  - Desktop packaging
+  - Mobile review
+  verification:
+  - Cross-client conformance tests
+  - Concurrent edit tests
+  exit_criteria:
+  - No surface invents independent semantic state.
+  prohibited_shortcuts:
+  - Duplicated business logic per client
+  accountable_role: TBD
+  delivery_state: NOT_STARTED
+  conformance_state: UNASSESSED
+  planning_level: MASTER_CAPABILITY
+  knowledge_status: ARCHITECTURALLY_DERIVED
+  repository_detail_status: DISCOVERY_REQUIRED
+  binding_status: BINDING_ON_WAVE_ACTIVATION
+  activation_gate: G9
+  implementation_prescription_status: DELEGATED_TO_DETAILED_ROADMAP
+  detailed_roadmap_required: true
+  required_detailed_roadmap_content:
+  - code-grounded current state
+  - repository mapping
+  - selected strategy and alternatives
+  - concrete implementation work packages
+  - tests and required evidence
+  - migration and recovery
+  - risks and material decisions
+  master_scope_note: This record defines a required capability outcome, not a precommitted repository task decomposition.
+- id: JAN-WP-10-005
+  wave: W10
+  title: Operational Observability, Reliability, and Recovery
+  normative_outcome: Production operation SHALL expose command, event, execution, assurance, projection, migration,
+    cost, and recovery health with tested backup and restoration.
+  dependencies:
+  - JAN-WP-10-001
+  - JAN-WP-10-003
+  sources:
+  - RPH-DOC-009
+  deliverables:
+  - Operational dashboards
+  - SLOs
+  - Backup/restore
+  - Incident runbooks
+  - Projection monitoring
+  verification:
+  - Chaos/restart tests
+  - Restore drill
+  - Outbox lag tests
+  exit_criteria:
+  - Canonical state and active Undertakings recover within approved objectives.
+  prohibited_shortcuts:
+  - Monitoring only infrastructure while ignoring semantic failures
+  accountable_role: TBD
+  delivery_state: NOT_STARTED
+  conformance_state: UNASSESSED
+  planning_level: MASTER_CAPABILITY
+  knowledge_status: ARCHITECTURALLY_DERIVED
+  repository_detail_status: DISCOVERY_REQUIRED
+  binding_status: BINDING_ON_WAVE_ACTIVATION
+  activation_gate: G9
+  implementation_prescription_status: DELEGATED_TO_DETAILED_ROADMAP
+  detailed_roadmap_required: true
+  required_detailed_roadmap_content:
+  - code-grounded current state
+  - repository mapping
+  - selected strategy and alternatives
+  - concrete implementation work packages
+  - tests and required evidence
+  - migration and recovery
+  - risks and material decisions
+  master_scope_note: This record defines a required capability outcome, not a precommitted repository task decomposition.
+- id: JAN-WP-10-006
+  wave: W10
+  title: Enterprise Policy Overlays and Security Hardening
+  normative_outcome: Enterprise deployments SHALL support organizational policy overlays, customer-managed controls,
+    audit export, secure secrets, and hardened runtime boundaries.
+  dependencies:
+  - JAN-WP-10-001
+  - JAN-WP-10-005
+  sources:
+  - RPH-DOC-000
+  - RPH-DOC-004
+  deliverables:
+  - Policy overlay model
+  - Security hardening
+  - Audit exports
+  - Enterprise integration hooks
+  verification:
+  - Threat modeling
+  - Penetration tests
+  - Policy precedence tests
+  exit_criteria:
+  - Enterprise policy cannot silently redefine user intent or weaken mandatory Janumi invariants.
+  prohibited_shortcuts:
+  - Arbitrary enterprise scripts in policy expressions
+  accountable_role: TBD
+  delivery_state: NOT_STARTED
+  conformance_state: UNASSESSED
+  planning_level: MASTER_CAPABILITY
+  knowledge_status: ARCHITECTURALLY_DERIVED
+  repository_detail_status: DISCOVERY_REQUIRED
+  binding_status: BINDING_ON_WAVE_ACTIVATION
+  activation_gate: G9
+  implementation_prescription_status: DELEGATED_TO_DETAILED_ROADMAP
+  detailed_roadmap_required: true
+  required_detailed_roadmap_content:
+  - code-grounded current state
+  - repository mapping
+  - selected strategy and alternatives
+  - concrete implementation work packages
+  - tests and required evidence
+  - migration and recovery
+  - risks and material decisions
+  master_scope_note: This record defines a required capability outcome, not a precommitted repository task decomposition.
+- id: JAN-WP-10-007
+  wave: W10
+  title: Production Readiness and Release Baseline
+  normative_outcome: JanumiCode SHALL pass functional, semantic, assurance, security, migration, operational, and
+    commercial readiness gates before production release.
+  dependencies:
+  - JAN-WP-10-002
+  - JAN-WP-10-003
+  - JAN-WP-10-004
+  - JAN-WP-10-005
+  - JAN-WP-10-006
+  sources:
+  - RPH-DOC-008
+  - RPH-DOC-009
+  deliverables:
+  - Release evidence package
+  - Operational acceptance
+  - Security acceptance
+  - Release Baseline
+  verification:
+  - Full conformance suite
+  - Pilot/scale tests
+  - Release gate review
+  exit_criteria:
+  - The production release is an authoritative, version-bound baseline with known residual risk.
+  prohibited_shortcuts:
+  - Release based solely on feature completion
+  accountable_role: TBD
+  delivery_state: NOT_STARTED
+  conformance_state: UNASSESSED
+  planning_level: MASTER_CAPABILITY
+  knowledge_status: ARCHITECTURALLY_DERIVED
+  repository_detail_status: DISCOVERY_REQUIRED
+  binding_status: BINDING_ON_WAVE_ACTIVATION
+  activation_gate: G9
+  implementation_prescription_status: DELEGATED_TO_DETAILED_ROADMAP
+  detailed_roadmap_required: true
+  required_detailed_roadmap_content:
+  - code-grounded current state
+  - repository mapping
+  - selected strategy and alternatives
+  - concrete implementation work packages
+  - tests and required evidence
+  - migration and recovery
+  - risks and material decisions
+  master_scope_note: This record defines a required capability outcome, not a precommitted repository task decomposition.
+artifact_role: MASTER_CAPABILITY_REGISTER
+implementation_detail_authority: DELEGATED_TO_REPOSITORY_SPECIFIC_DETAILED_ROADMAPS
+detailed_roadmap_standard: JAN-ROADMAP-001-A
+planning_horizons:
+  MASTER: Architectural capability outcome and gate; repository-agnostic.
+  DETAILED: Repository-specific wave roadmap generated by the connected coding agent.
+  TASK: Change-level execution plan derived from the detailed roadmap.

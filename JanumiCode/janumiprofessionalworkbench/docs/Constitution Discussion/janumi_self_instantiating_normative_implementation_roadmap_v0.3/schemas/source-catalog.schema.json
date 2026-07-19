@@ -1,0 +1,78 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://janumi.example/schemas/irp/0.3/source-catalog.schema.json",
+  "title": "Normative Source Catalog",
+  "type": "object",
+  "additionalProperties": false,
+  "properties": {
+    "controlSchema": {
+      "const": "source-catalog.schema.json"
+    },
+    "catalogId": {
+      "type": "string"
+    },
+    "version": {
+      "type": "string"
+    },
+    "status": {
+      "type": "string"
+    },
+    "generatedAt": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "sources": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": [
+          "documentId",
+          "title",
+          "version",
+          "status",
+          "authorityTier",
+          "scope"
+        ],
+        "properties": {
+          "documentId": {
+            "type": "string"
+          },
+          "title": {
+            "type": "string"
+          },
+          "version": {
+            "type": "string"
+          },
+          "status": {
+            "type": "string"
+          },
+          "authorityTier": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "owner": {
+            "type": "string"
+          },
+          "approvalAuthority": {
+            "type": "string"
+          },
+          "scope": {
+            "type": "string"
+          },
+          "baselineStatus": {
+            "type": "string"
+          }
+        },
+        "additionalProperties": false
+      }
+    }
+  },
+  "required": [
+    "controlSchema",
+    "catalogId",
+    "version",
+    "status",
+    "generatedAt",
+    "sources"
+  ]
+}

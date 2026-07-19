@@ -1,0 +1,14 @@
+{
+  "controlSchema": "transition-architecture.schema.json",
+  "recordId": "TRANS-ARCH-UNINSTANTIATED",
+  "recordType": "TRANSITION_ARCHITECTURE",
+  "schemaVersion": "0.3.0",
+  "programInstanceId": "IRP-UNINSTANTIATED",
+  "version": "0.1.0",
+  "status": "DRAFT",
+  "createdAt": "2026-07-19T15:54:56Z",
+  "createdBy": "UNASSIGNED",
+  "repositoryRevision": "UNASSESSED",
+  "targetBaselineId": "UNASSESSED",
+  "transitions": []
+}

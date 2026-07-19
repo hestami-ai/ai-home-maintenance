@@ -1,0 +1,204 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://janumi.example/schemas/irp/0.3/transition-architecture.schema.json",
+  "title": "Transition Architecture",
+  "type": "object",
+  "additionalProperties": false,
+  "properties": {
+    "controlSchema": {
+      "type": "string"
+    },
+    "schemaVersion": {
+      "const": "0.3.0"
+    },
+    "recordId": {
+      "type": "string",
+      "minLength": 1
+    },
+    "recordType": {
+      "type": "string",
+      "minLength": 1
+    },
+    "programInstanceId": {
+      "type": "string",
+      "minLength": 1
+    },
+    "version": {
+      "type": "string",
+      "minLength": 1
+    },
+    "status": {
+      "type": "string",
+      "minLength": 1
+    },
+    "createdAt": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "createdBy": {
+      "type": "string",
+      "minLength": 1
+    },
+    "updatedAt": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "repositoryRevision": {
+      "type": "string"
+    },
+    "targetBaselineId": {
+      "type": "string"
+    },
+    "transitions": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "transitionId",
+          "currentElementIds",
+          "targetRequirementIds",
+          "targetElement",
+          "selectedStrategy",
+          "migrationSteps",
+          "validationPlan"
+        ],
+        "properties": {
+          "transitionId": {
+            "type": "string"
+          },
+          "currentElementIds": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "uniqueItems": true
+          },
+          "targetRequirementIds": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "uniqueItems": true
+          },
+          "targetElement": {
+            "type": "string"
+          },
+          "selectedStrategy": {
+            "enum": [
+              "PRESERVE",
+              "DOCUMENT",
+              "ADAPT",
+              "WRAP",
+              "REFACTOR",
+              "MIGRATE",
+              "REPLACE",
+              "RETIRE",
+              "CREATE",
+              "ESCALATE"
+            ]
+          },
+          "rationale": {
+            "type": "string"
+          },
+          "preservedBehavior": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "uniqueItems": true
+          },
+          "retiredBehavior": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "uniqueItems": true
+          },
+          "dataImpact": {
+            "type": "string"
+          },
+          "apiImpact": {
+            "type": "string"
+          },
+          "uiImpact": {
+            "type": "string"
+          },
+          "runtimeImpact": {
+            "type": "string"
+          },
+          "agentImpact": {
+            "type": "string"
+          },
+          "securityImpact": {
+            "type": "string"
+          },
+          "operationalImpact": {
+            "type": "string"
+          },
+          "dependencies": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "uniqueItems": true
+          },
+          "compatibilityWindow": {
+            "type": "string"
+          },
+          "migrationSteps": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "uniqueItems": true
+          },
+          "rollbackOrRecovery": {
+            "type": "string"
+          },
+          "validationPlan": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "uniqueItems": true
+          },
+          "evidencePlan": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "uniqueItems": true
+          },
+          "bootstrapConcessionIds": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "uniqueItems": true
+          },
+          "owner": {
+            "type": "string"
+          },
+          "status": {
+            "type": "string"
+          }
+        }
+      }
+    }
+  },
+  "required": [
+    "controlSchema",
+    "schemaVersion",
+    "recordId",
+    "recordType",
+    "programInstanceId",
+    "version",
+    "status",
+    "createdAt",
+    "createdBy",
+    "repositoryRevision",
+    "targetBaselineId",
+    "transitions"
+  ]
+}

@@ -1,0 +1,635 @@
+{
+  "controlSchema": "package-manifest.schema.json",
+  "packageId": "JAN-IRP-CORPUS",
+  "version": "0.3.0",
+  "status": "PROPOSED_NORMATIVE_DRAFT",
+  "generatedAt": "2026-07-19T15:59:10Z",
+  "root": "janumi_self_instantiating_normative_implementation_roadmap_v0.3",
+  "fileCount": 104,
+  "files": [
+    {
+      "path": "00-JAN-IRP-000-README.md",
+      "sizeBytes": 9907,
+      "sha256": "3cb406befd3e6c6392a3c2b3251cd660aa867189cbf47718a72aab24c19d6123",
+      "category": "NORMATIVE_DOCUMENT"
+    },
+    {
+      "path": "01-JAN-IRP-001-Program-Charter.md",
+      "sizeBytes": 10828,
+      "sha256": "50fc9d6b26251847ac3376f96ab32b8c0c98428414f2120930413a5e3efedb07",
+      "category": "NORMATIVE_DOCUMENT"
+    },
+    {
+      "path": "02-JAN-IRP-002-Program-Lifecycle-and-Gate-Model.md",
+      "sizeBytes": 14791,
+      "sha256": "d3e6ceff841f6965c1ba6c3d7cb84dc5834b8cbdf259aff82c0da748e09599ee",
+      "category": "NORMATIVE_DOCUMENT"
+    },
+    {
+      "path": "03-JAN-IRP-003-Source-Corpus-and-Requirement-Derivation.md",
+      "sizeBytes": 10005,
+      "sha256": "d220cf490734d10197eb6eb085d1f64e8f49561cb1bed9ae68e722f1ab731711",
+      "category": "NORMATIVE_DOCUMENT"
+    },
+    {
+      "path": "04-JAN-IRP-004-Repository-Investigation-and-Evidence-Acquisition.md",
+      "sizeBytes": 9523,
+      "sha256": "87632c4a910d0db14366d1a8a8c8ceea793dc0a88aebc31827ed78f59ee3e259",
+      "category": "NORMATIVE_DOCUMENT"
+    },
+    {
+      "path": "05-JAN-IRP-005-Current-State-Reconstruction-Specification.md",
+      "sizeBytes": 10999,
+      "sha256": "c493d8b0864f1bd8f19c8709492e61853c5a25396907f5ae035ded1f92216aca",
+      "category": "NORMATIVE_DOCUMENT"
+    },
+    {
+      "path": "06-JAN-IRP-006-Conformance-and-Reconciliation-Control.md",
+      "sizeBytes": 11194,
+      "sha256": "8339bb6c6c3b0e0b0c2b82d5d59795c6a7f3368a7af11b62987a8a4dd69b1858",
+      "category": "NORMATIVE_DOCUMENT"
+    },
+    {
+      "path": "07-JAN-IRP-007-Transition-Architecture-Specification.md",
+      "sizeBytes": 10242,
+      "sha256": "ffb6d319c415368e90b6e3d327a60e3e63d14548831cd80fdd2a09befdd56ba0",
+      "category": "NORMATIVE_DOCUMENT"
+    },
+    {
+      "path": "08-JAN-IRP-008-Canonical-Capability-Increment-Catalog.md",
+      "sizeBytes": 19708,
+      "sha256": "b290d986a6377ec0723b2d2ca24cacb9d3aa3ba1c7e302ac225fef7e59a4e7f2",
+      "category": "NORMATIVE_DOCUMENT"
+    },
+    {
+      "path": "09-JAN-IRP-009-Roadmap-Instantiation-Procedure.md",
+      "sizeBytes": 9188,
+      "sha256": "c61cf52d45392aaeb1c6ad0ced22b7cf84da09286ead00c483e3a94a8187f661",
+      "category": "NORMATIVE_DOCUMENT"
+    },
+    {
+      "path": "10-JAN-IRP-010-Gate-Assurance-and-Evidence-Standard.md",
+      "sizeBytes": 8564,
+      "sha256": "696178a6b40c66d57c18bbddb81831cac484f824c1808aa51680ee17c68706fa",
+      "category": "NORMATIVE_DOCUMENT"
+    },
+    {
+      "path": "11-JAN-IRP-011-Deviation-Deferral-and-Change-Control.md",
+      "sizeBytes": 6810,
+      "sha256": "7d5a6749b32df3b8565aa9d4e6c25408b08b4f2c098b684d7a917e49f6d88031",
+      "category": "NORMATIVE_DOCUMENT"
+    },
+    {
+      "path": "12-JAN-IRP-012-Coding-Agent-Operating-Contract.md",
+      "sizeBytes": 9273,
+      "sha256": "3f7e6ac7a8e848af46185598437c7007353baddd748d9745b3b0e9a07336097a",
+      "category": "NORMATIVE_DOCUMENT"
+    },
+    {
+      "path": "13-JAN-IRP-013-Machine-Readable-Control-Schemas.md",
+      "sizeBytes": 6103,
+      "sha256": "cf68b127fdb3c748b170df5bcb9d694fe3c22b2fbbaf05a21e2c397e4679c9d4",
+      "category": "NORMATIVE_DOCUMENT"
+    },
+    {
+      "path": "14-JAN-IRP-014-Supersession-and-Incorporation-Map.md",
+      "sizeBytes": 4652,
+      "sha256": "8449fcdd4a61afdb3e2dae1555d7f0b1fb95e876ba2d0997477c202dd8767267",
+      "category": "NORMATIVE_DOCUMENT"
+    },
+    {
+      "path": "15-JAN-IRP-015-Reference-Execution-Scenario.md",
+      "sizeBytes": 7364,
+      "sha256": "b1bd560c471059145d5a3b6de67c8de19369b9e99e913748151d5e9adc3ff2af",
+      "category": "NORMATIVE_DOCUMENT"
+    },
+    {
+      "path": "agent-prompts/P1-P3-independent-review.md",
+      "sizeBytes": 1791,
+      "sha256": "9a2c5f2ef13929eb0a2954be9832526b991d204e9ca6971b2e89e640e1ab460b",
+      "category": "AGENT_PROMPT"
+    },
+    {
+      "path": "agent-prompts/P1-P3-primary-investigation.md",
+      "sizeBytes": 3471,
+      "sha256": "b8ed6dd8a720c3668af10a6f31240cc1716a766d9b828a4264b3830c294c125d",
+      "category": "AGENT_PROMPT"
+    },
+    {
+      "path": "agent-prompts/P4-P5-reconciliation-transition.md",
+      "sizeBytes": 1906,
+      "sha256": "380d632aa3a2d5ba9788c4eacc06e06c49152eb063bf99f781129a5bf318a0c6",
+      "category": "AGENT_PROMPT"
+    },
+    {
+      "path": "agent-prompts/P6-roadmap-instantiation.md",
+      "sizeBytes": 2004,
+      "sha256": "e1659e9ce1151c88c4e0eed9dfe00a1e61066f97b8559fd39798f19af19d31f5",
+      "category": "AGENT_PROMPT"
+    },
+    {
+      "path": "agent-prompts/P7-capability-implementation.md",
+      "sizeBytes": 1952,
+      "sha256": "83b2c56864ea0bd18615e8decb81c98a29af0948942ca2d1e5926191d717fab2",
+      "category": "AGENT_PROMPT"
+    },
+    {
+      "path": "agent-prompts/P8-P9-assurance-release.md",
+      "sizeBytes": 1743,
+      "sha256": "0e1f8a9f5b94167f8b13c8faada32614f6af4743cbd409b9bb7787dde108c0db",
+      "category": "AGENT_PROMPT"
+    },
+    {
+      "path": "baseline/JAN-CONF-001-Conformance-and-Evidence-Matrix-v0.1-incorporated.md",
+      "sizeBytes": 18369,
+      "sha256": "f3fc67ada256a752325f14f56c74e20448d58a2bde55839b5fcf540be17eece9",
+      "category": "INCORPORATED_BASELINE"
+    },
+    {
+      "path": "baseline/JAN-REQ-001-Normative-Requirement-Register-v0.1-incorporated.md",
+      "sizeBytes": 47806,
+      "sha256": "eb93a4c632030d2921c127453e40889f3c5d5b97b4eb4a92081f0fd1896aff23",
+      "category": "INCORPORATED_BASELINE"
+    },
+    {
+      "path": "baseline/JAN-SRC-001-Normative-Source-Baseline-v0.1-incorporated.md",
+      "sizeBytes": 6849,
+      "sha256": "fb3324288a94a4b8ed13082db4dbca762367799e44766e82257563e7e4567d7a",
+      "category": "INCORPORATED_BASELINE"
+    },
+    {
+      "path": "control/capability-catalog.json",
+      "sizeBytes": 2412,
+      "sha256": "3ba8ca977c6cd0357fb8d4dddfae389ecc55b813bc0338e2055acdd0c9a66efc",
+      "category": "CONTROL"
+    },
+    {
+      "path": "control/program-model.json",
+      "sizeBytes": 2661,
+      "sha256": "37fbadf8d5eb63dc38ca739b165175aef00d5cae4e0d0a18c44f41f84a40d9d0",
+      "category": "CONTROL"
+    },
+    {
+      "path": "control/requirement-register.csv",
+      "sizeBytes": 46669,
+      "sha256": "21db7b4d577fc8919b40c7dc234114516b8497c014c81a1ac45171f48b26a7e5",
+      "category": "CONTROL"
+    },
+    {
+      "path": "control/requirement-register.json",
+      "sizeBytes": 94770,
+      "sha256": "ffc096e97d8bb3103b2b1733b63ef68b906301a2bac7a6b66af81f2e34b3a2b2",
+      "category": "CONTROL"
+    },
+    {
+      "path": "control/source-catalog.json",
+      "sizeBytes": 9101,
+      "sha256": "484cd10ca8914577e9a12e38ef3288353fe872bced64c24a86772b0208667036",
+      "category": "CONTROL"
+    },
+    {
+      "path": "examples/minimal-program-instance/README.md",
+      "sizeBytes": 178,
+      "sha256": "ce438a538b44da5c73b84a2a42bde92ea5b9969390325d0fc084b16b56573f63",
+      "category": "EXAMPLE"
+    },
+    {
+      "path": "examples/minimal-program-instance/assessments/requirement-assessment.json",
+      "sizeBytes": 106835,
+      "sha256": "55f8bc44f0fcac43da65d5402d580fc4c04c58d10e68055507b1c612162b6e43",
+      "category": "EXAMPLE"
+    },
+    {
+      "path": "examples/minimal-program-instance/control/capability-increment-authorization.json",
+      "sizeBytes": 1162,
+      "sha256": "41f624ce695cbfae17a34008802687ae3b7dbf5b3a5ff5785c5e047c56a83c38",
+      "category": "EXAMPLE"
+    },
+    {
+      "path": "examples/minimal-program-instance/control/current-state-model.json",
+      "sizeBytes": 405,
+      "sha256": "6f376b345e9ada0abc7098f99b09ec8a8d38fd201a06504a68cc61581d5383ee",
+      "category": "EXAMPLE"
+    },
+    {
+      "path": "examples/minimal-program-instance/control/deferral-register.json",
+      "sizeBytes": 336,
+      "sha256": "e92160754e2b261db27ff62877de8f1319088a3d03ae4bcabbe7103690e23acc",
+      "category": "EXAMPLE"
+    },
+    {
+      "path": "examples/minimal-program-instance/control/deviation-register.json",
+      "sizeBytes": 339,
+      "sha256": "923cebf88c744c62c24ec1b3920b5e1c925b02230a6505718c6326842cb96b8d",
+      "category": "EXAMPLE"
+    },
+    {
+      "path": "examples/minimal-program-instance/control/discrepancy-register.json",
+      "sizeBytes": 347,
+      "sha256": "ba3fe0eb4e56ea4f50797540832894f71aba620953aca88c0219307365c8032f",
+      "category": "EXAMPLE"
+    },
+    {
+      "path": "examples/minimal-program-instance/control/gate-acceptance-decision.json",
+      "sizeBytes": 818,
+      "sha256": "bb5d996e9db5a6bbe17091b14fcab03dba185a158c18bad5babdcda22814709f",
+      "category": "EXAMPLE"
+    },
+    {
+      "path": "examples/minimal-program-instance/control/gate-evidence-package.json",
+      "sizeBytes": 941,
+      "sha256": "b4affdeda44588ca8f5feffe38428abb179ac00b4a4fb25c901cac79dfa2c25e",
+      "category": "EXAMPLE"
+    },
+    {
+      "path": "examples/minimal-program-instance/control/program-execution-context.json",
+      "sizeBytes": 1043,
+      "sha256": "5198f9126072fa3eed86c79fb22d38d248c344a63cc3ef5451e6b2ca0e1c7488",
+      "category": "EXAMPLE"
+    },
+    {
+      "path": "examples/minimal-program-instance/control/repository-evidence-manifest.json",
+      "sizeBytes": 483,
+      "sha256": "adacc9ac380a1f5a6a51b435f3d269e9ae54d1f660ed67138cfd6f9482a06f86",
+      "category": "EXAMPLE"
+    },
+    {
+      "path": "examples/minimal-program-instance/control/requirement-register.json",
+      "sizeBytes": 94430,
+      "sha256": "dd88c026db67e67d59d038874e7446ea0c4c138ca25e4201dc1df5ebe63ed348",
+      "category": "EXAMPLE"
+    },
+    {
+      "path": "examples/minimal-program-instance/control/roadmap-instance.json",
+      "sizeBytes": 671,
+      "sha256": "032c81c415e0a8ac0c062040e24fdd2e3198dd107cb24d3560e4a2ef3f223d43",
+      "category": "EXAMPLE"
+    },
+    {
+      "path": "examples/minimal-program-instance/control/source-catalog.json",
+      "sizeBytes": 9052,
+      "sha256": "6af2db60bb4924f16ee83cab85e2645dddec8c85f6a16bd6d1b4686a77adde79",
+      "category": "EXAMPLE"
+    },
+    {
+      "path": "examples/minimal-program-instance/control/specification-change-proposal-register.json",
+      "sizeBytes": 378,
+      "sha256": "2960ece615b65d39b959e716b16577c89b131e320ad5bd5ac41151b3a6b8d70c",
+      "category": "EXAMPLE"
+    },
+    {
+      "path": "examples/minimal-program-instance/control/transition-architecture.json",
+      "sizeBytes": 436,
+      "sha256": "25ba44996bc94db6c2e6c48c7c422fe98521df8af96620635cb44c2c69308b11",
+      "category": "EXAMPLE"
+    },
+    {
+      "path": "legacy/g0-v0.2/00-README.md",
+      "sizeBytes": 4599,
+      "sha256": "4de31c088bbc6ce4a257abdf98086d3c607c652836651c37f41b0dfe428e79b4",
+      "category": "LEGACY_PRESERVATION"
+    },
+    {
+      "path": "legacy/g0-v0.2/01-JAN-G0-EXEC-001-Normative-Baseline-Execution-Specification.md",
+      "sizeBytes": 12637,
+      "sha256": "e4efc8f9a6194fc74b5e269e27e7f058bbf5a77f68d1dc035cd714c6fba2bbe3",
+      "category": "LEGACY_PRESERVATION"
+    },
+    {
+      "path": "legacy/g0-v0.2/02-JAN-G0-INVENTORY-001-Implementation-Inventory-Schema.md",
+      "sizeBytes": 3804,
+      "sha256": "429fa8d155efdd480ed86ba0f60b91211f3c03b50754efbf7e1fd17e075ce99a",
+      "category": "LEGACY_PRESERVATION"
+    },
+    {
+      "path": "legacy/g0-v0.2/03-JAN-G0-ASSESS-001-Conformance-Assessment-Procedure.md",
+      "sizeBytes": 5499,
+      "sha256": "2ca873de8c5bbba19130d9b1e547957fff8760dc24f86179464c41d4382da3c5",
+      "category": "LEGACY_PRESERVATION"
+    },
+    {
+      "path": "legacy/g0-v0.2/05-JAN-G0-REG-001-Discrepancy-Deviation-and-Reconciliation-Control.md",
+      "sizeBytes": 5414,
+      "sha256": "bda44737720af32d4e39ab9ec4c9efbd6db2b50c03fb5679c8a6b084b52fbc88",
+      "category": "LEGACY_PRESERVATION"
+    },
+    {
+      "path": "legacy/g0-v0.2/06-JAN-G0-EVID-001-Evidence-and-Exit-Gate-Contract.md",
+      "sizeBytes": 4124,
+      "sha256": "1580b07e86904bb8115d1f7ec14b462f83d69ad33a5fb353a39a22716b46edd6",
+      "category": "LEGACY_PRESERVATION"
+    },
+    {
+      "path": "legacy/g0-v0.2/07-JAN-G0-DEC-001-Gate-Acceptance-Decision-Template.md",
+      "sizeBytes": 2014,
+      "sha256": "ee26efca4939b14028da0b20abaf1a908c520f09ff6300b5ee86773531761a02",
+      "category": "LEGACY_PRESERVATION"
+    },
+    {
+      "path": "legacy/g0-v0.2/08-JAN-G1-AUTH-001-G1-Increment-Derivation-Procedure.md",
+      "sizeBytes": 2974,
+      "sha256": "282498565139f5189dd096bf99afe61e6268e6212b8781557b6729d4029ec5b2",
+      "category": "LEGACY_PRESERVATION"
+    },
+    {
+      "path": "legacy/g0-v0.2/agent-prompts/JAN-G0-AGENT-001-Primary-Assessment-Prompt.md",
+      "sizeBytes": 4129,
+      "sha256": "dca8acf5c8de699e00f344375f872f0389c568c7af799494ee6b43675042dadb",
+      "category": "LEGACY_PRESERVATION"
+    },
+    {
+      "path": "legacy/g0-v0.2/agent-prompts/JAN-G0-REVIEW-001-Independent-Review-Prompt.md",
+      "sizeBytes": 2178,
+      "sha256": "6c8955378e3fd1223741c02668388433873419c3968877fc58520499482d627c",
+      "category": "LEGACY_PRESERVATION"
+    },
+    {
+      "path": "legacy/g0-v0.2/templates/requirement-assessment.csv",
+      "sizeBytes": 45216,
+      "sha256": "e8ae56d7ee52bfb50cdf8770b84da57b84133247cf8d5df3947c83fe602bf0d1",
+      "category": "LEGACY_PRESERVATION"
+    },
+    {
+      "path": "legacy/g0-v0.2/templates/requirement-assessment.json",
+      "sizeBytes": 144267,
+      "sha256": "6f2ae4b9c79a22f0476587516c9880046c4f157fdb9c5535ddc54471a8810f40",
+      "category": "LEGACY_PRESERVATION"
+    },
+    {
+      "path": "legacy/g0-v0.2/tools/g0_repository_inventory.py",
+      "sizeBytes": 13455,
+      "sha256": "e3b402da9614232598ed32aedba475d9858e7d383d2f92b1fedc12ed430dc346",
+      "category": "LEGACY_PRESERVATION"
+    },
+    {
+      "path": "legacy/roadmap-v0.1/00-README.md",
+      "sizeBytes": 1845,
+      "sha256": "8331e53845cc00fc5a3e57dc757dc8f5b3359235628e4f8260ade5e22ac24564",
+      "category": "LEGACY_PRESERVATION"
+    },
+    {
+      "path": "legacy/roadmap-v0.1/01-JAN-SRC-001-Normative-Source-Baseline.md",
+      "sizeBytes": 6849,
+      "sha256": "fb3324288a94a4b8ed13082db4dbca762367799e44766e82257563e7e4567d7a",
+      "category": "LEGACY_PRESERVATION"
+    },
+    {
+      "path": "legacy/roadmap-v0.1/02-JAN-REQ-001-Normative-Requirement-Register.md",
+      "sizeBytes": 47806,
+      "sha256": "eb93a4c632030d2921c127453e40889f3c5d5b97b4eb4a92081f0fd1896aff23",
+      "category": "LEGACY_PRESERVATION"
+    },
+    {
+      "path": "legacy/roadmap-v0.1/03-JAN-RMAP-001-Normative-Implementation-Roadmap.md",
+      "sizeBytes": 28320,
+      "sha256": "4ca26e740077b90afbb1a5e529387e472cfba9e46360eb2f5b26f79403902b87",
+      "category": "LEGACY_PRESERVATION"
+    },
+    {
+      "path": "legacy/roadmap-v0.1/04-JAN-CONF-001-Conformance-and-Evidence-Matrix.md",
+      "sizeBytes": 18369,
+      "sha256": "f3fc67ada256a752325f14f56c74e20448d58a2bde55839b5fcf540be17eece9",
+      "category": "LEGACY_PRESERVATION"
+    },
+    {
+      "path": "legacy/roadmap-v0.1/05-JAN-INC-001-Capability-Increment-Execution-Template.md",
+      "sizeBytes": 2232,
+      "sha256": "be4cd6fd2a354f0a9b20eda112e040b2d249031f7757d39c283cf6c24dced68f",
+      "category": "LEGACY_PRESERVATION"
+    },
+    {
+      "path": "legacy/roadmap-v0.1/06-JAN-DEV-001-Deviation-and-Reconciliation-Template.md",
+      "sizeBytes": 1474,
+      "sha256": "f2074fdd69e2ad6f76c6fe1b7a828a79fad6efecc2b446fef0f85fa0f9cca8a5",
+      "category": "LEGACY_PRESERVATION"
+    },
+    {
+      "path": "legacy/roadmap-v0.1/07-JAN-GATE-001-Gate-Evidence-Package-Checklist.md",
+      "sizeBytes": 1940,
+      "sha256": "e07d7bf258228b5e55d89357c97b1f22901f2e0f256e6ddc5257ae6fb8c1d35c",
+      "category": "LEGACY_PRESERVATION"
+    },
+    {
+      "path": "schemas/capability-catalog.schema.json",
+      "sizeBytes": 1368,
+      "sha256": "ee2811aa6393c5d07a9972ecaec44f8887a161d5eac10d75007bd54abb455a28",
+      "category": "SCHEMA"
+    },
+    {
+      "path": "schemas/capability-increment-authorization.schema.json",
+      "sizeBytes": 4681,
+      "sha256": "c22ef2a8ad74cf5d94157007a612d010858c1438359b6ee7606f5d2e20e4bc81",
+      "category": "SCHEMA"
+    },
+    {
+      "path": "schemas/current-state-model.schema.json",
+      "sizeBytes": 3928,
+      "sha256": "29a54a424c74d63691d891345d55508135de33b93364834fe6eba377272a7c9d",
+      "category": "SCHEMA"
+    },
+    {
+      "path": "schemas/deferral.schema.json",
+      "sizeBytes": 2364,
+      "sha256": "8c46b1cced6174e669302d30cb14f8fa4566c8959a5ba388d82497c0da7055c3",
+      "category": "SCHEMA"
+    },
+    {
+      "path": "schemas/deviation.schema.json",
+      "sizeBytes": 3979,
+      "sha256": "e6f059ea87e9b5271d22720cdc2a3ca04d7f612746228cceb2f698c2b85d1d2e",
+      "category": "SCHEMA"
+    },
+    {
+      "path": "schemas/discrepancy.schema.json",
+      "sizeBytes": 3998,
+      "sha256": "c54ba6825feaca601fc3b01e37948628917601bde35472c4864c1f9b5b3595c8",
+      "category": "SCHEMA"
+    },
+    {
+      "path": "schemas/gate-acceptance-decision.schema.json",
+      "sizeBytes": 2880,
+      "sha256": "4ead2a4b7805ef80d55959051065c01f8dcd66cc4bf5abc3a1aaf6f30a4cfe39",
+      "category": "SCHEMA"
+    },
+    {
+      "path": "schemas/gate-evidence-package.schema.json",
+      "sizeBytes": 3582,
+      "sha256": "55a3d7a3be1a8847f1765064ee7398c09f3be08f8d7598b6fa90c22965e2f3de",
+      "category": "SCHEMA"
+    },
+    {
+      "path": "schemas/package-manifest.schema.json",
+      "sizeBytes": 1402,
+      "sha256": "f49c805dd240bd01de1fc378a753141beb32f5d4cd8bb6db60f91d5e69b9c59e",
+      "category": "SCHEMA"
+    },
+    {
+      "path": "schemas/program-execution-context.schema.json",
+      "sizeBytes": 2002,
+      "sha256": "5c34aebb2778aa478c70ed19c79b59fb7506ed75f076d7de4834604dc0541f04",
+      "category": "SCHEMA"
+    },
+    {
+      "path": "schemas/program-model.schema.json",
+      "sizeBytes": 1458,
+      "sha256": "fdad11022bcaa1a325ee65e2391f2149f365ba6cf554f6e62012946daf4fafdf",
+      "category": "SCHEMA"
+    },
+    {
+      "path": "schemas/repository-evidence-manifest.schema.json",
+      "sizeBytes": 2746,
+      "sha256": "fd8422ffd3df3f1c84d0260703363a2bad73740b069e5d175fff40d92c7756e6",
+      "category": "SCHEMA"
+    },
+    {
+      "path": "schemas/requirement-assessment.schema.json",
+      "sizeBytes": 3981,
+      "sha256": "ff54350f23ccbf1a11f5bbda59a8285dd7a3fef2ce8b42cbc7de48a39467c45b",
+      "category": "SCHEMA"
+    },
+    {
+      "path": "schemas/requirement-register.schema.json",
+      "sizeBytes": 2409,
+      "sha256": "5486bd94444171e99cf5f487ded26c6c771ef7121e0a3e09a47758d3dccef86f",
+      "category": "SCHEMA"
+    },
+    {
+      "path": "schemas/roadmap-instance.schema.json",
+      "sizeBytes": 3941,
+      "sha256": "064d13df28d022843b9925bca5abb4297e42576a78ff6ba78283409ed0f3e99c",
+      "category": "SCHEMA"
+    },
+    {
+      "path": "schemas/source-catalog.schema.json",
+      "sizeBytes": 1636,
+      "sha256": "b4f78cfc46ed64ec429168f8c1202acce3d44fb052f4644b468d710df858bd6b",
+      "category": "SCHEMA"
+    },
+    {
+      "path": "schemas/specification-change-proposal.schema.json",
+      "sizeBytes": 3697,
+      "sha256": "68138a68e670b1ebad95632d710721af83797f8e25734fca7fc70336ab9ae019",
+      "category": "SCHEMA"
+    },
+    {
+      "path": "schemas/transition-architecture.schema.json",
+      "sizeBytes": 4609,
+      "sha256": "b1e86ef1236463f6e0894483db1586dba9ad69d51c59a85024768d7ae14ddb3d",
+      "category": "SCHEMA"
+    },
+    {
+      "path": "templates/README.md",
+      "sizeBytes": 348,
+      "sha256": "9be5061de7e26dd8dfa64de4c7118bc0c47e3e3d3835dc07ad0d15715f00100c",
+      "category": "TEMPLATE"
+    },
+    {
+      "path": "templates/capability-increment-authorization.json",
+      "sizeBytes": 1152,
+      "sha256": "a161ee5e132c9b4a17c903ce0b892c96871dc28ccdafb4da55d0989042bf8c06",
+      "category": "TEMPLATE"
+    },
+    {
+      "path": "templates/current-state-model.json",
+      "sizeBytes": 395,
+      "sha256": "acec63f5a5c24211af945e3b30f77e3535a8c6b9b5f5fb229e3757483cc8cb11",
+      "category": "TEMPLATE"
+    },
+    {
+      "path": "templates/deferral-register.json",
+      "sizeBytes": 326,
+      "sha256": "658035c66c30c7659f93c1bd9ec02cc25007274a390f1133943c7edabb95b7b9",
+      "category": "TEMPLATE"
+    },
+    {
+      "path": "templates/deviation-register.json",
+      "sizeBytes": 329,
+      "sha256": "6d5248dac2e39371318900feaf0fc5806c0a93638488521dff84c10d226bb5a1",
+      "category": "TEMPLATE"
+    },
+    {
+      "path": "templates/discrepancy-register.json",
+      "sizeBytes": 337,
+      "sha256": "8a961e707184ffa06735fd4c12cf97e705c4d18ac0e08cf6091b96dfb1871c56",
+      "category": "TEMPLATE"
+    },
+    {
+      "path": "templates/gate-acceptance-decision.json",
+      "sizeBytes": 808,
+      "sha256": "4a851e92c42d9d11bed9df1f5fea0988b755d5322b1ebd8d1963d6bfd9486f64",
+      "category": "TEMPLATE"
+    },
+    {
+      "path": "templates/gate-evidence-package.json",
+      "sizeBytes": 931,
+      "sha256": "c230439f133291a548c4825cbc4ae6e125cac584cd8ad1b217b3d927bf874ebf",
+      "category": "TEMPLATE"
+    },
+    {
+      "path": "templates/program-execution-context.json",
+      "sizeBytes": 1033,
+      "sha256": "f08d570b93f940771b35f463cf63d2af8534a598bad991f0ee92d90eb3b85803",
+      "category": "TEMPLATE"
+    },
+    {
+      "path": "templates/repository-evidence-manifest.json",
+      "sizeBytes": 473,
+      "sha256": "7f7c1633a8b7b99758a48e44b16e90da7af33e96f7ee00cf5a4e2da2265f4f6c",
+      "category": "TEMPLATE"
+    },
+    {
+      "path": "templates/requirement-assessment-prefilled-157.json",
+      "sizeBytes": 106825,
+      "sha256": "34cefb95216e23ff73190daa014d5d750609af58bcd4b9f3527dc798dee42543",
+      "category": "TEMPLATE"
+    },
+    {
+      "path": "templates/requirement-assessment.json",
+      "sizeBytes": 391,
+      "sha256": "c2fcecc0deffbbce770812c21f4f8f44217a6b842e78ef50a17c2f1f9356c531",
+      "category": "TEMPLATE"
+    },
+    {
+      "path": "templates/roadmap-instance.json",
+      "sizeBytes": 661,
+      "sha256": "d349a6a5e3cabffa74411ddb4ef6ba411b091f747911b92d5f07dc563954d745",
+      "category": "TEMPLATE"
+    },
+    {
+      "path": "templates/specification-change-proposal-register.json",
+      "sizeBytes": 368,
+      "sha256": "e774774dc444bfbed89fffa810fae4c4a9a336fca5d72e0878131265ec85bdef",
+      "category": "TEMPLATE"
+    },
+    {
+      "path": "templates/transition-architecture.json",
+      "sizeBytes": 426,
+      "sha256": "174597420fe9d7d8f7220607a7de5f119f778cd772870d2e1c83eaa1c8493bab",
+      "category": "TEMPLATE"
+    },
+    {
+      "path": "tools/check_requirement_coverage.py",
+      "sizeBytes": 1428,
+      "sha256": "c8e22a943a0c6c65f9a1bbee2dca51071c3ecb1330056dcf2803a66470d0e1d1",
+      "category": "TOOL"
+    },
+    {
+      "path": "tools/initialize_program_instance.py",
+      "sizeBytes": 3241,
+      "sha256": "414ea08111870af4b9ed7ce7ebdfe9f258b0baa78c7e2bab3d3decad580a36f8",
+      "category": "TOOL"
+    },
+    {
+      "path": "tools/repository_evidence_inventory.py",
+      "sizeBytes": 13455,
+      "sha256": "36c2365a2d6f1da43d046438442829351ef48c0096c230e8c72854de395d3100",
+      "category": "TOOL"
+    },
+    {
+      "path": "tools/validate_control_artifacts.py",
+      "sizeBytes": 2454,
+      "sha256": "587db9b02f05c01121ca6a96d2a2a9ae06be101251c0ced6b8bf519f71d7076e",
+      "category": "TOOL"
+    }
+  ]
+}

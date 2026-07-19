@@ -1,0 +1,152 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://janumi.example/schemas/irp/0.3/gate-acceptance-decision.schema.json",
+  "title": "Gate Acceptance Decision",
+  "type": "object",
+  "additionalProperties": false,
+  "properties": {
+    "controlSchema": {
+      "type": "string"
+    },
+    "schemaVersion": {
+      "const": "0.3.0"
+    },
+    "recordId": {
+      "type": "string",
+      "minLength": 1
+    },
+    "recordType": {
+      "type": "string",
+      "minLength": 1
+    },
+    "programInstanceId": {
+      "type": "string",
+      "minLength": 1
+    },
+    "version": {
+      "type": "string",
+      "minLength": 1
+    },
+    "status": {
+      "type": "string",
+      "minLength": 1
+    },
+    "createdAt": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "createdBy": {
+      "type": "string",
+      "minLength": 1
+    },
+    "updatedAt": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "decisionId": {
+      "type": "string"
+    },
+    "gateType": {
+      "enum": [
+        "PROGRAM_PHASE",
+        "CAPABILITY_INCREMENT"
+      ]
+    },
+    "gateId": {
+      "type": "string"
+    },
+    "subjectVersion": {
+      "type": "string"
+    },
+    "decision": {
+      "enum": [
+        "ACCEPTED",
+        "CONDITIONALLY_ACCEPTED",
+        "REJECTED",
+        "SUSPENDED",
+        "SUPERSEDED"
+      ]
+    },
+    "reviewedEvidenceIds": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      },
+      "uniqueItems": true
+    },
+    "findings": {
+      "type": "array",
+      "items": {
+        "type": "object"
+      }
+    },
+    "conditions": {
+      "type": "array",
+      "items": {
+        "type": "object"
+      }
+    },
+    "acceptedResidualUncertainty": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      },
+      "uniqueItems": true
+    },
+    "activeDeviationIds": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      },
+      "uniqueItems": true
+    },
+    "activeDeferralIds": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      },
+      "uniqueItems": true
+    },
+    "nextAuthorizedScope": {
+      "type": "string"
+    },
+    "rationale": {
+      "type": "string"
+    },
+    "reviewers": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      },
+      "uniqueItems": true
+    },
+    "acceptanceAuthority": {
+      "type": "string"
+    },
+    "decidedAt": {
+      "type": "string",
+      "format": "date-time"
+    }
+  },
+  "required": [
+    "controlSchema",
+    "schemaVersion",
+    "recordId",
+    "recordType",
+    "programInstanceId",
+    "version",
+    "status",
+    "createdAt",
+    "createdBy",
+    "decisionId",
+    "gateType",
+    "gateId",
+    "subjectVersion",
+    "decision",
+    "reviewedEvidenceIds",
+    "nextAuthorizedScope",
+    "rationale",
+    "acceptanceAuthority",
+    "decidedAt"
+  ]
+}

@@ -1,0 +1,109 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://janumi.example/schemas/irp/0.3/requirement-register.schema.json",
+  "title": "Normative Requirement Register",
+  "type": "object",
+  "additionalProperties": false,
+  "properties": {
+    "controlSchema": {
+      "const": "requirement-register.schema.json"
+    },
+    "registerId": {
+      "type": "string"
+    },
+    "version": {
+      "type": "string"
+    },
+    "status": {
+      "type": "string"
+    },
+    "generatedAt": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "source": {
+      "type": "string"
+    },
+    "requirementCount": {
+      "type": "integer",
+      "minimum": 0
+    },
+    "requirements": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": [
+          "requirementId",
+          "normativeStatement",
+          "sourceClause",
+          "requirementClass",
+          "strength",
+          "criticality",
+          "legacyGate",
+          "canonicalCapability",
+          "verificationMethod",
+          "currentStatus",
+          "mappingStatus"
+        ],
+        "properties": {
+          "requirementId": {
+            "type": "string",
+            "pattern": "^JAN-REQ-"
+          },
+          "normativeStatement": {
+            "type": "string"
+          },
+          "sourceClause": {
+            "type": "string"
+          },
+          "requirementClass": {
+            "type": "string"
+          },
+          "strength": {
+            "enum": [
+              "MUST",
+              "MUST_NOT",
+              "SHOULD",
+              "SHOULD_NOT",
+              "MAY"
+            ]
+          },
+          "criticality": {
+            "enum": [
+              "P0",
+              "P1",
+              "P2",
+              "P3"
+            ]
+          },
+          "legacyGate": {
+            "type": "string"
+          },
+          "canonicalCapability": {
+            "type": "string"
+          },
+          "verificationMethod": {
+            "type": "string"
+          },
+          "currentStatus": {
+            "type": "string"
+          },
+          "mappingStatus": {
+            "type": "string"
+          }
+        },
+        "additionalProperties": false
+      }
+    }
+  },
+  "required": [
+    "controlSchema",
+    "registerId",
+    "version",
+    "status",
+    "generatedAt",
+    "source",
+    "requirementCount",
+    "requirements"
+  ]
+}

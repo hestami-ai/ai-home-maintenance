@@ -1,0 +1,187 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://janumi.example/schemas/irp/0.3/gate-evidence-package.schema.json",
+  "title": "Gate Evidence Package",
+  "type": "object",
+  "additionalProperties": false,
+  "properties": {
+    "controlSchema": {
+      "type": "string"
+    },
+    "schemaVersion": {
+      "const": "0.3.0"
+    },
+    "recordId": {
+      "type": "string",
+      "minLength": 1
+    },
+    "recordType": {
+      "type": "string",
+      "minLength": 1
+    },
+    "programInstanceId": {
+      "type": "string",
+      "minLength": 1
+    },
+    "version": {
+      "type": "string",
+      "minLength": 1
+    },
+    "status": {
+      "type": "string",
+      "minLength": 1
+    },
+    "createdAt": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "createdBy": {
+      "type": "string",
+      "minLength": 1
+    },
+    "updatedAt": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "gateType": {
+      "enum": [
+        "PROGRAM_PHASE",
+        "CAPABILITY_INCREMENT"
+      ]
+    },
+    "gateId": {
+      "type": "string"
+    },
+    "subjectVersion": {
+      "type": "string"
+    },
+    "scope": {
+      "type": "string"
+    },
+    "governingRequirements": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      },
+      "uniqueItems": true
+    },
+    "entranceEvidenceIds": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      },
+      "uniqueItems": true
+    },
+    "implementationSummary": {
+      "type": "string"
+    },
+    "requirementAssessmentIds": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      },
+      "uniqueItems": true
+    },
+    "testEvidenceIds": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      },
+      "uniqueItems": true
+    },
+    "negativeEvidenceIds": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      },
+      "uniqueItems": true
+    },
+    "migrationEvidenceIds": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      },
+      "uniqueItems": true
+    },
+    "securityEvidenceIds": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      },
+      "uniqueItems": true
+    },
+    "uiEvidenceIds": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      },
+      "uniqueItems": true
+    },
+    "runtimeRecoveryEvidenceIds": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      },
+      "uniqueItems": true
+    },
+    "deviationIds": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      },
+      "uniqueItems": true
+    },
+    "deferralIds": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      },
+      "uniqueItems": true
+    },
+    "unknowns": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      },
+      "uniqueItems": true
+    },
+    "residualRisks": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      },
+      "uniqueItems": true
+    },
+    "independentReviewReference": {
+      "type": "string"
+    },
+    "integrityManifestReference": {
+      "type": "string"
+    },
+    "recommendation": {
+      "enum": [
+        "ACCEPT",
+        "CONDITIONAL",
+        "REJECT"
+      ]
+    }
+  },
+  "required": [
+    "controlSchema",
+    "schemaVersion",
+    "recordId",
+    "recordType",
+    "programInstanceId",
+    "version",
+    "status",
+    "createdAt",
+    "createdBy",
+    "gateType",
+    "gateId",
+    "subjectVersion",
+    "scope",
+    "governingRequirements",
+    "independentReviewReference",
+    "recommendation"
+  ]
+}

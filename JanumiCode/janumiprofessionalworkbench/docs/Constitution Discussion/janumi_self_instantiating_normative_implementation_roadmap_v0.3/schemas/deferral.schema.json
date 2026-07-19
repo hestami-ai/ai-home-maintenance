@@ -1,0 +1,114 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://janumi.example/schemas/irp/0.3/deferral-register.schema.json",
+  "title": "Deferral Register",
+  "type": "object",
+  "additionalProperties": false,
+  "properties": {
+    "controlSchema": {
+      "type": "string"
+    },
+    "schemaVersion": {
+      "const": "0.3.0"
+    },
+    "recordId": {
+      "type": "string",
+      "minLength": 1
+    },
+    "recordType": {
+      "type": "string",
+      "minLength": 1
+    },
+    "programInstanceId": {
+      "type": "string",
+      "minLength": 1
+    },
+    "version": {
+      "type": "string",
+      "minLength": 1
+    },
+    "status": {
+      "type": "string",
+      "minLength": 1
+    },
+    "createdAt": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "createdBy": {
+      "type": "string",
+      "minLength": 1
+    },
+    "updatedAt": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "deferrals": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": [
+          "deferralId",
+          "requirementOrCapability",
+          "releaseProfile",
+          "reason",
+          "risk",
+          "revisitCondition",
+          "owner",
+          "authority",
+          "status"
+        ],
+        "properties": {
+          "deferralId": {
+            "type": "string"
+          },
+          "requirementOrCapability": {
+            "type": "string"
+          },
+          "releaseProfile": {
+            "type": "string"
+          },
+          "reason": {
+            "type": "string"
+          },
+          "scopeImpact": {
+            "type": "string"
+          },
+          "dependencyImpact": {
+            "type": "string"
+          },
+          "userExperienceImpact": {
+            "type": "string"
+          },
+          "risk": {
+            "type": "string"
+          },
+          "revisitCondition": {
+            "type": "string"
+          },
+          "owner": {
+            "type": "string"
+          },
+          "authority": {
+            "type": "string"
+          },
+          "status": {
+            "type": "string"
+          }
+        }
+      }
+    }
+  },
+  "required": [
+    "controlSchema",
+    "schemaVersion",
+    "recordId",
+    "recordType",
+    "programInstanceId",
+    "version",
+    "status",
+    "createdAt",
+    "createdBy",
+    "deferrals"
+  ]
+}

@@ -1,0 +1,61 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://janumi.example/schemas/irp/0.3/capability-catalog.schema.json",
+  "title": "IRP Canonical Capability Catalog",
+  "type": "object",
+  "additionalProperties": false,
+  "properties": {
+    "controlSchema": {
+      "const": "capability-catalog.schema.json"
+    },
+    "catalogId": {
+      "type": "string"
+    },
+    "version": {
+      "type": "string"
+    },
+    "generatedAt": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "capabilities": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": [
+          "capabilityId",
+          "title",
+          "hardPrerequisites",
+          "repositoryBinding"
+        ],
+        "properties": {
+          "capabilityId": {
+            "type": "string",
+            "pattern": "^C[0-9]+$"
+          },
+          "title": {
+            "type": "string"
+          },
+          "hardPrerequisites": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "uniqueItems": true
+          },
+          "repositoryBinding": {
+            "type": "string"
+          }
+        },
+        "additionalProperties": false
+      }
+    }
+  },
+  "required": [
+    "controlSchema",
+    "catalogId",
+    "version",
+    "generatedAt",
+    "capabilities"
+  ]
+}

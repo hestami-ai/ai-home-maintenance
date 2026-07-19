@@ -1,0 +1,164 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://janumi.example/schemas/irp/0.3/specification-change-proposal-register.schema.json",
+  "title": "Specification Change Proposal Register",
+  "type": "object",
+  "additionalProperties": false,
+  "properties": {
+    "controlSchema": {
+      "type": "string"
+    },
+    "schemaVersion": {
+      "const": "0.3.0"
+    },
+    "recordId": {
+      "type": "string",
+      "minLength": 1
+    },
+    "recordType": {
+      "type": "string",
+      "minLength": 1
+    },
+    "programInstanceId": {
+      "type": "string",
+      "minLength": 1
+    },
+    "version": {
+      "type": "string",
+      "minLength": 1
+    },
+    "status": {
+      "type": "string",
+      "minLength": 1
+    },
+    "createdAt": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "createdBy": {
+      "type": "string",
+      "minLength": 1
+    },
+    "updatedAt": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "proposals": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": [
+          "changeProposalId",
+          "sourceDocumentIds",
+          "affectedClauses",
+          "problemStatement",
+          "proposedMeaning",
+          "rationale",
+          "status"
+        ],
+        "properties": {
+          "changeProposalId": {
+            "type": "string"
+          },
+          "sourceDocumentIds": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "uniqueItems": true
+          },
+          "affectedClauses": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "uniqueItems": true
+          },
+          "problemStatement": {
+            "type": "string"
+          },
+          "newEvidence": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "uniqueItems": true
+          },
+          "currentInterpretation": {
+            "type": "string"
+          },
+          "proposedMeaning": {
+            "type": "string"
+          },
+          "alternatives": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "uniqueItems": true
+          },
+          "rationale": {
+            "type": "string"
+          },
+          "compatibility": {
+            "type": "string"
+          },
+          "requirementImpact": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "uniqueItems": true
+          },
+          "implementationImpact": {
+            "type": "string"
+          },
+          "dataAndEventImpact": {
+            "type": "string"
+          },
+          "uiAndAgentImpact": {
+            "type": "string"
+          },
+          "migrationNeeded": {
+            "type": "boolean"
+          },
+          "revisitTriggers": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "uniqueItems": true
+          },
+          "proposer": {
+            "type": "string"
+          },
+          "reviewers": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "uniqueItems": true
+          },
+          "approvalAuthority": {
+            "type": "string"
+          },
+          "status": {
+            "type": "string"
+          }
+        }
+      }
+    }
+  },
+  "required": [
+    "controlSchema",
+    "schemaVersion",
+    "recordId",
+    "recordType",
+    "programInstanceId",
+    "version",
+    "status",
+    "createdAt",
+    "createdBy",
+    "proposals"
+  ]
+}

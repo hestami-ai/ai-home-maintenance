@@ -1,0 +1,179 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://janumi.example/schemas/irp/0.3/deviation-register.schema.json",
+  "title": "Deviation Register",
+  "type": "object",
+  "additionalProperties": false,
+  "properties": {
+    "controlSchema": {
+      "type": "string"
+    },
+    "schemaVersion": {
+      "const": "0.3.0"
+    },
+    "recordId": {
+      "type": "string",
+      "minLength": 1
+    },
+    "recordType": {
+      "type": "string",
+      "minLength": 1
+    },
+    "programInstanceId": {
+      "type": "string",
+      "minLength": 1
+    },
+    "version": {
+      "type": "string",
+      "minLength": 1
+    },
+    "status": {
+      "type": "string",
+      "minLength": 1
+    },
+    "createdAt": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "createdBy": {
+      "type": "string",
+      "minLength": 1
+    },
+    "updatedAt": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "deviations": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": [
+          "deviationId",
+          "title",
+          "status",
+          "requirementIds",
+          "currentNonconformance",
+          "reason",
+          "scope",
+          "compensatingControls",
+          "authority",
+          "owner",
+          "expiresAtOrIncrement"
+        ],
+        "properties": {
+          "deviationId": {
+            "type": "string"
+          },
+          "title": {
+            "type": "string"
+          },
+          "status": {
+            "enum": [
+              "PROPOSED",
+              "UNDER_REVIEW",
+              "APPROVED",
+              "ACTIVE",
+              "EXPIRING",
+              "EXPIRED",
+              "REMEDIATING",
+              "CLOSED",
+              "REJECTED",
+              "REVOKED",
+              "SUPERSEDED"
+            ]
+          },
+          "requirementIds": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "uniqueItems": true
+          },
+          "sourceClauses": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "uniqueItems": true
+          },
+          "currentNonconformance": {
+            "type": "string"
+          },
+          "reason": {
+            "type": "string"
+          },
+          "professionalRisk": {
+            "type": "string"
+          },
+          "technicalRisk": {
+            "type": "string"
+          },
+          "securityOperationalRisk": {
+            "type": "string"
+          },
+          "scope": {
+            "type": "string"
+          },
+          "compensatingControls": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "uniqueItems": true
+          },
+          "authority": {
+            "type": "string"
+          },
+          "owner": {
+            "type": "string"
+          },
+          "approvedAt": {
+            "type": "string"
+          },
+          "effectiveFrom": {
+            "type": "string"
+          },
+          "expiresAtOrIncrement": {
+            "type": "string"
+          },
+          "remediationIncrement": {
+            "type": "string"
+          },
+          "revisitTriggers": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "uniqueItems": true
+          },
+          "evidenceIds": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "uniqueItems": true
+          },
+          "closureEvidence": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "uniqueItems": true
+          }
+        }
+      }
+    }
+  },
+  "required": [
+    "controlSchema",
+    "schemaVersion",
+    "recordId",
+    "recordType",
+    "programInstanceId",
+    "version",
+    "status",
+    "createdAt",
+    "createdBy",
+    "deviations"
+  ]
+}

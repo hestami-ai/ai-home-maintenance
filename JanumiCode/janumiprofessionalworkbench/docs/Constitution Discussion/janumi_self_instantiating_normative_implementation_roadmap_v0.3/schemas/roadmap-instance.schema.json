@@ -1,0 +1,185 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://janumi.example/schemas/irp/0.3/repository-specific-roadmap-instance.schema.json",
+  "title": "Repository Specific Roadmap Instance",
+  "type": "object",
+  "additionalProperties": false,
+  "properties": {
+    "controlSchema": {
+      "type": "string"
+    },
+    "schemaVersion": {
+      "const": "0.3.0"
+    },
+    "recordId": {
+      "type": "string",
+      "minLength": 1
+    },
+    "recordType": {
+      "type": "string",
+      "minLength": 1
+    },
+    "programInstanceId": {
+      "type": "string",
+      "minLength": 1
+    },
+    "version": {
+      "type": "string",
+      "minLength": 1
+    },
+    "status": {
+      "type": "string",
+      "minLength": 1
+    },
+    "createdAt": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "createdBy": {
+      "type": "string",
+      "minLength": 1
+    },
+    "updatedAt": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "canonicalCorpusVersion": {
+      "type": "string"
+    },
+    "sourceBaselineId": {
+      "type": "string"
+    },
+    "repositoryRevision": {
+      "type": "string"
+    },
+    "currentStateModelVersion": {
+      "type": "string"
+    },
+    "transitionArchitectureVersion": {
+      "type": "string"
+    },
+    "releaseProfile": {
+      "type": "string"
+    },
+    "capabilityBindings": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": [
+          "capabilityId",
+          "bindingStatus"
+        ],
+        "properties": {
+          "capabilityId": {
+            "type": "string"
+          },
+          "bindingStatus": {
+            "type": "string"
+          },
+          "assessmentSummary": {
+            "type": "string"
+          },
+          "incrementIds": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "uniqueItems": true
+          },
+          "preservedEvidenceIds": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "uniqueItems": true
+          }
+        }
+      }
+    },
+    "increments": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    },
+    "waves": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": [
+          "waveId",
+          "incrementIds"
+        ],
+        "properties": {
+          "waveId": {
+            "type": "string"
+          },
+          "title": {
+            "type": "string"
+          },
+          "incrementIds": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "uniqueItems": true
+          },
+          "purpose": {
+            "type": "string"
+          }
+        }
+      }
+    },
+    "requirementCoverage": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": [
+          "requirementId",
+          "coverageType"
+        ],
+        "properties": {
+          "requirementId": {
+            "type": "string"
+          },
+          "coverageType": {
+            "enum": [
+              "PRESERVED_CONFORMANCE",
+              "IMPLEMENTATION_INCREMENT",
+              "APPROVED_DEVIATION",
+              "APPROVED_DEFERRAL",
+              "NOT_APPLICABLE",
+              "UPSTREAM_BLOCKER"
+            ]
+          },
+          "referenceIds": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "uniqueItems": true
+          }
+        }
+      }
+    }
+  },
+  "required": [
+    "controlSchema",
+    "schemaVersion",
+    "recordId",
+    "recordType",
+    "programInstanceId",
+    "version",
+    "status",
+    "createdAt",
+    "createdBy",
+    "canonicalCorpusVersion",
+    "sourceBaselineId",
+    "repositoryRevision",
+    "releaseProfile",
+    "capabilityBindings",
+    "increments",
+    "waves",
+    "requirementCoverage"
+  ]
+}

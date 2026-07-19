@@ -1,0 +1,43 @@
+{
+  "controlSchema": "program-execution-context.schema.json",
+  "recordId": "CTX-UNINSTANTIATED",
+  "recordType": "PROGRAM_EXECUTION_CONTEXT",
+  "schemaVersion": "0.3.0",
+  "programInstanceId": "IRP-UNINSTANTIATED",
+  "version": "0.1.0",
+  "status": "DRAFT",
+  "createdAt": "2026-07-19T15:54:56Z",
+  "createdBy": "UNASSIGNED",
+  "canonicalCorpusVersion": "0.3.0",
+  "sourceBaselineId": "JAN-SRC-001-PENDING-P0",
+  "repository": {
+    "uri": "UNAVAILABLE",
+    "revision": "UNASSESSED",
+    "branch": "UNASSESSED",
+    "worktreeState": "UNASSESSED"
+  },
+  "environment": {
+    "status": "UNASSESSED"
+  },
+  "roles": [
+    {
+      "role": "program_sponsor",
+      "participant": "UNASSIGNED",
+      "authority": "UNASSIGNED"
+    },
+    {
+      "role": "primary_investigator",
+      "participant": "UNASSIGNED",
+      "authority": "P1-P3_PRODUCER"
+    },
+    {
+      "role": "independent_reviewer",
+      "participant": "UNASSIGNED",
+      "authority": "REVIEW_ONLY"
+    }
+  ],
+  "scope": {
+    "included": [],
+    "excluded": []
+  }
+}

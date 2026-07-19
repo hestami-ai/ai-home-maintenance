@@ -1,0 +1,130 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://janumi.example/schemas/irp/0.3/repository-evidence-manifest.schema.json",
+  "title": "Repository Evidence Manifest",
+  "type": "object",
+  "additionalProperties": false,
+  "properties": {
+    "controlSchema": {
+      "type": "string"
+    },
+    "schemaVersion": {
+      "const": "0.3.0"
+    },
+    "recordId": {
+      "type": "string",
+      "minLength": 1
+    },
+    "recordType": {
+      "type": "string",
+      "minLength": 1
+    },
+    "programInstanceId": {
+      "type": "string",
+      "minLength": 1
+    },
+    "version": {
+      "type": "string",
+      "minLength": 1
+    },
+    "status": {
+      "type": "string",
+      "minLength": 1
+    },
+    "createdAt": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "createdBy": {
+      "type": "string",
+      "minLength": 1
+    },
+    "updatedAt": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "repositoryRevision": {
+      "type": "string"
+    },
+    "worktreeState": {
+      "type": "string"
+    },
+    "toolchain": {
+      "type": "object",
+      "additionalProperties": true
+    },
+    "evidenceItems": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "evidenceId",
+          "evidenceType",
+          "sourceLocation",
+          "contentHash",
+          "collectedAt",
+          "collectedBy"
+        ],
+        "properties": {
+          "evidenceId": {
+            "type": "string"
+          },
+          "evidenceType": {
+            "type": "string"
+          },
+          "sourceLocation": {
+            "type": "string"
+          },
+          "repositoryRevision": {
+            "type": "string"
+          },
+          "contentHash": {
+            "type": "string"
+          },
+          "collectedAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "collectedBy": {
+            "type": "string"
+          },
+          "reproducibilityInstructions": {
+            "type": "string"
+          },
+          "reliability": {
+            "enum": [
+              "DIRECT",
+              "CORROBORATED",
+              "INFERRED",
+              "CLAIMED",
+              "UNKNOWN"
+            ]
+          },
+          "limitations": {
+            "type": "string"
+          }
+        }
+      }
+    },
+    "excludedEvidence": {
+      "type": "array",
+      "items": {
+        "type": "object"
+      }
+    }
+  },
+  "required": [
+    "controlSchema",
+    "schemaVersion",
+    "recordId",
+    "recordType",
+    "programInstanceId",
+    "version",
+    "status",
+    "createdAt",
+    "createdBy",
+    "repositoryRevision",
+    "evidenceItems"
+  ]
+}

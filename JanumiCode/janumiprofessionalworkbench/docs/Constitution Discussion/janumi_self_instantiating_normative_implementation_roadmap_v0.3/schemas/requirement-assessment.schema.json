@@ -1,0 +1,172 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://janumi.example/schemas/irp/0.3/requirement-assessment-register.schema.json",
+  "title": "Requirement Assessment Register",
+  "type": "object",
+  "additionalProperties": false,
+  "properties": {
+    "controlSchema": {
+      "type": "string"
+    },
+    "schemaVersion": {
+      "const": "0.3.0"
+    },
+    "recordId": {
+      "type": "string",
+      "minLength": 1
+    },
+    "recordType": {
+      "type": "string",
+      "minLength": 1
+    },
+    "programInstanceId": {
+      "type": "string",
+      "minLength": 1
+    },
+    "version": {
+      "type": "string",
+      "minLength": 1
+    },
+    "status": {
+      "type": "string",
+      "minLength": 1
+    },
+    "createdAt": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "createdBy": {
+      "type": "string",
+      "minLength": 1
+    },
+    "updatedAt": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "repositoryRevision": {
+      "type": "string"
+    },
+    "assessments": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "assessmentId",
+          "requirementId",
+          "applicability",
+          "conformanceStatus",
+          "assessmentConfidence",
+          "evidenceIds"
+        ],
+        "properties": {
+          "assessmentId": {
+            "type": "string"
+          },
+          "requirementId": {
+            "type": "string",
+            "pattern": "^JAN-REQ-"
+          },
+          "applicability": {
+            "enum": [
+              "APPLICABLE",
+              "CONDITIONALLY_APPLICABLE",
+              "NOT_APPLICABLE",
+              "APPLICABILITY_UNKNOWN"
+            ]
+          },
+          "conformanceStatus": {
+            "enum": [
+              "CONFORMANT",
+              "PARTIALLY_CONFORMANT",
+              "NONCONFORMANT",
+              "NOT_IMPLEMENTED",
+              "NOT_APPLICABLE",
+              "UNKNOWN",
+              "BLOCKED_BY_SPECIFICATION"
+            ]
+          },
+          "assessmentConfidence": {
+            "enum": [
+              "HIGH",
+              "MEDIUM",
+              "LOW",
+              "UNKNOWN",
+              "CONFLICTED"
+            ]
+          },
+          "currentImplementationSummary": {
+            "type": "string"
+          },
+          "implementationReferences": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "uniqueItems": true
+          },
+          "testReferences": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "uniqueItems": true
+          },
+          "runtimeEvidenceReferences": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "uniqueItems": true
+          },
+          "evidenceIds": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "uniqueItems": true
+          },
+          "semanticAnalysis": {
+            "type": "string"
+          },
+          "gapDescription": {
+            "type": "string"
+          },
+          "discrepancyIds": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "uniqueItems": true
+          },
+          "recommendedDisposition": {
+            "type": "string"
+          },
+          "assessedBy": {
+            "type": "string"
+          },
+          "reviewedBy": {
+            "type": "string"
+          },
+          "assessmentDate": {
+            "type": "string",
+            "format": "date-time"
+          }
+        }
+      }
+    }
+  },
+  "required": [
+    "controlSchema",
+    "schemaVersion",
+    "recordId",
+    "recordType",
+    "programInstanceId",
+    "version",
+    "status",
+    "createdAt",
+    "createdBy",
+    "repositoryRevision",
+    "assessments"
+  ]
+}

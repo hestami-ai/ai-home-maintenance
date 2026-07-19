@@ -1,0 +1,177 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://janumi.example/schemas/irp/0.3/discrepancy-register.schema.json",
+  "title": "Discrepancy Register",
+  "type": "object",
+  "additionalProperties": false,
+  "properties": {
+    "controlSchema": {
+      "type": "string"
+    },
+    "schemaVersion": {
+      "const": "0.3.0"
+    },
+    "recordId": {
+      "type": "string",
+      "minLength": 1
+    },
+    "recordType": {
+      "type": "string",
+      "minLength": 1
+    },
+    "programInstanceId": {
+      "type": "string",
+      "minLength": 1
+    },
+    "version": {
+      "type": "string",
+      "minLength": 1
+    },
+    "status": {
+      "type": "string",
+      "minLength": 1
+    },
+    "createdAt": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "createdBy": {
+      "type": "string",
+      "minLength": 1
+    },
+    "updatedAt": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "discrepancies": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "discrepancyId",
+          "title",
+          "classification",
+          "severity",
+          "requirementIds",
+          "currentState",
+          "targetState",
+          "status"
+        ],
+        "properties": {
+          "discrepancyId": {
+            "type": "string"
+          },
+          "title": {
+            "type": "string"
+          },
+          "classification": {
+            "enum": [
+              "IMPLEMENTATION_DEFECT",
+              "SPECIFICATION_DEFECT",
+              "DOCUMENTATION_STALENESS",
+              "VALID_EXISTING_BEHAVIOR",
+              "TEMPORARY_DEVIATION",
+              "UNRESOLVED_AMBIGUITY"
+            ]
+          },
+          "severity": {
+            "enum": [
+              "S1",
+              "S2",
+              "S3",
+              "S4"
+            ]
+          },
+          "requirementIds": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "uniqueItems": true
+          },
+          "sourceClauses": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "uniqueItems": true
+          },
+          "currentState": {
+            "type": "string"
+          },
+          "targetState": {
+            "type": "string"
+          },
+          "evidenceIds": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "uniqueItems": true
+          },
+          "professionalImpact": {
+            "type": "string"
+          },
+          "technicalImpact": {
+            "type": "string"
+          },
+          "securityOrOperationalImpact": {
+            "type": "string"
+          },
+          "downstreamDependencies": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "uniqueItems": true
+          },
+          "candidateDispositions": {
+            "type": "array",
+            "items": {
+              "enum": [
+                "PRESERVE",
+                "DOCUMENT",
+                "ADAPT",
+                "WRAP",
+                "REFACTOR",
+                "MIGRATE",
+                "REPLACE",
+                "RETIRE",
+                "CREATE",
+                "ESCALATE"
+              ]
+            }
+          },
+          "recommendedDisposition": {
+            "type": "string"
+          },
+          "owner": {
+            "type": "string"
+          },
+          "authority": {
+            "type": "string"
+          },
+          "status": {
+            "type": "string"
+          },
+          "resolutionDueByPhase": {
+            "type": "string"
+          }
+        }
+      }
+    }
+  },
+  "required": [
+    "controlSchema",
+    "schemaVersion",
+    "recordId",
+    "recordType",
+    "programInstanceId",
+    "version",
+    "status",
+    "createdAt",
+    "createdBy",
+    "discrepancies"
+  ]
+}

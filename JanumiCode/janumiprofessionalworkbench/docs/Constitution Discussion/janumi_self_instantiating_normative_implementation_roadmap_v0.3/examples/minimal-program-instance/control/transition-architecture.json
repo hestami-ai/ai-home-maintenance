@@ -1,0 +1,14 @@
+{
+  "controlSchema": "transition-architecture.schema.json",
+  "recordId": "TRANS-ARCH-UNINSTANTIATED",
+  "recordType": "TRANSITION_ARCHITECTURE",
+  "schemaVersion": "0.3.0",
+  "programInstanceId": "IRP-EXAMPLE-001",
+  "version": "0.1.0",
+  "status": "DRAFT",
+  "createdAt": "2026-07-19T15:57:13Z",
+  "createdBy": "janumi-corpus-generator",
+  "repositoryRevision": "UNASSESSED",
+  "targetBaselineId": "UNASSESSED",
+  "transitions": []
+}

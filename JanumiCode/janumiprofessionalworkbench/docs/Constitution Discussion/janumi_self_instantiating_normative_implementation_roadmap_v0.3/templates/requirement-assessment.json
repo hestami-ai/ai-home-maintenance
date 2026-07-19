@@ -1,0 +1,13 @@
+{
+  "controlSchema": "requirement-assessment.schema.json",
+  "recordId": "REQA-UNINSTANTIATED",
+  "recordType": "REQUIREMENT_ASSESSMENT_REGISTER",
+  "schemaVersion": "0.3.0",
+  "programInstanceId": "IRP-UNINSTANTIATED",
+  "version": "0.1.0",
+  "status": "DRAFT",
+  "createdAt": "2026-07-19T15:54:56Z",
+  "createdBy": "UNASSIGNED",
+  "repositoryRevision": "UNASSESSED",
+  "assessments": []
+}

@@ -1,0 +1,262 @@
+{
+  "controlSchema": "source-catalog.schema.json",
+  "catalogId": "JAN-SRC-001",
+  "version": "0.3.0-incorporated",
+  "status": "PROVISIONAL_PENDING_P0_AUDIT",
+  "generatedAt": "2026-07-19T15:54:56Z",
+  "sources": [
+    {
+      "documentId": "JAN-CONST-001",
+      "title": "Janumi Constitution",
+      "version": "0.1",
+      "status": "PROPOSED_NORMATIVE_HIGHEST_AUTHORITY",
+      "authorityTier": 0,
+      "owner": "TBD",
+      "approvalAuthority": "TBD",
+      "scope": "Constitutional obligations governing all Janumi implementations.",
+      "baselineStatus": "PROVISIONAL_PENDING_P0_AUDIT"
+    },
+    {
+      "documentId": "JAN-CONOP-001",
+      "title": "Janumi Concept of Operations",
+      "version": "0.1",
+      "status": "PROPOSED_DOCTRINAL",
+      "authorityTier": 1,
+      "owner": "TBD",
+      "approvalAuthority": "TBD",
+      "scope": "Lived operating concept for AI-native professional work.",
+      "baselineStatus": "PROVISIONAL_PENDING_P0_AUDIT"
+    },
+    {
+      "documentId": "JAN-CPCO-001",
+      "title": "Canonical Professional Cognition Ontology",
+      "version": "0.1",
+      "status": "PROPOSED_NORMATIVE",
+      "authorityTier": 1,
+      "owner": "TBD",
+      "approvalAuthority": "TBD",
+      "scope": "Canonical domain-independent semantic model.",
+      "baselineStatus": "PROVISIONAL_PENDING_P0_AUDIT"
+    },
+    {
+      "documentId": "JAN-FCA-001",
+      "title": "Derived Corollaries and Architectural Consequences",
+      "version": "0.1",
+      "status": "PROPOSED_NORMATIVE",
+      "authorityTier": 1,
+      "owner": "TBD",
+      "approvalAuthority": "TBD",
+      "scope": "Derivation of architectural consequences from the foundational laws.",
+      "baselineStatus": "PROVISIONAL_PENDING_P0_AUDIT"
+    },
+    {
+      "documentId": "JAN-FPC-001",
+      "title": "Foundations of Professional Cognition \u2014 Primitive Concepts",
+      "version": "0.1",
+      "status": "PROPOSED_NORMATIVE",
+      "authorityTier": 1,
+      "owner": "TBD",
+      "approvalAuthority": "TBD",
+      "scope": "Domain-independent primitives of professional cognition.",
+      "baselineStatus": "PROVISIONAL_PENDING_P0_AUDIT"
+    },
+    {
+      "documentId": "JAN-FPL-001",
+      "title": "Fundamental Laws of Professional Cognition",
+      "version": "0.1",
+      "status": "PROPOSED_NORMATIVE",
+      "authorityTier": 1,
+      "owner": "TBD",
+      "approvalAuthority": "TBD",
+      "scope": "Domain-independent laws governing professional cognition.",
+      "baselineStatus": "PROVISIONAL_PENDING_P0_AUDIT"
+    },
+    {
+      "documentId": "JAN-PCLC-001",
+      "title": "Professional Cognition Life Cycle",
+      "version": "0.1",
+      "status": "PROPOSED_NORMATIVE",
+      "authorityTier": 1,
+      "owner": "TBD",
+      "approvalAuthority": "TBD",
+      "scope": "Dynamic model of professional cognition.",
+      "baselineStatus": "PROVISIONAL_PENDING_P0_AUDIT"
+    },
+    {
+      "documentId": "JAN-CPM-001",
+      "title": "Canonical Projection Model",
+      "version": "0.1",
+      "status": "PROPOSED_NORMATIVE",
+      "authorityTier": 2,
+      "owner": "TBD",
+      "approvalAuthority": "TBD",
+      "scope": "Rules for derived role- and purpose-specific projections.",
+      "baselineStatus": "PROVISIONAL_PENDING_P0_AUDIT"
+    },
+    {
+      "documentId": "JAN-JCPWA-001",
+      "title": "JanumiCode Professional Work Architecture Profile",
+      "version": "0.1",
+      "status": "PROPOSED_NORMATIVE_PROFILE",
+      "authorityTier": 2,
+      "owner": "TBD",
+      "approvalAuthority": "TBD",
+      "scope": "Product-realization specialization of the Janumi discipline.",
+      "baselineStatus": "PROVISIONAL_PENDING_P0_AUDIT"
+    },
+    {
+      "documentId": "JAN-JEM-001",
+      "title": "Janumi Execution Model",
+      "version": "0.1",
+      "status": "PROPOSED_NORMATIVE",
+      "authorityTier": 2,
+      "owner": "TBD",
+      "approvalAuthority": "TBD",
+      "scope": "Infrastructure-independent execution semantics.",
+      "baselineStatus": "PROVISIONAL_PENDING_P0_AUDIT"
+    },
+    {
+      "documentId": "JAN-JSDL-001",
+      "title": "Janumi Semantic Definition Language",
+      "version": "0.1",
+      "status": "PROPOSED_NORMATIVE",
+      "authorityTier": 2,
+      "owner": "TBD",
+      "approvalAuthority": "TBD",
+      "scope": "Machine-readable semantic source language.",
+      "baselineStatus": "PROVISIONAL_PENDING_P0_AUDIT"
+    },
+    {
+      "documentId": "JAN-PWU-001",
+      "title": "Professional Work Unit Aggregate Specification",
+      "version": "0.1",
+      "status": "PROPOSED_NORMATIVE",
+      "authorityTier": 2,
+      "owner": "TBD",
+      "approvalAuthority": "TBD",
+      "scope": "Semantic and operational contract for Professional Work Units.",
+      "baselineStatus": "PROVISIONAL_PENDING_P0_AUDIT"
+    },
+    {
+      "documentId": "JAN-RPH-001",
+      "title": "Recursive Professional Harness Coordination Specification",
+      "version": "0.1",
+      "status": "PROPOSED_NORMATIVE",
+      "authorityTier": 2,
+      "owner": "TBD",
+      "approvalAuthority": "TBD",
+      "scope": "Coordination obligations for recursive professional work.",
+      "baselineStatus": "PROVISIONAL_PENDING_P0_AUDIT"
+    },
+    {
+      "documentId": "JAN-RXM-001",
+      "title": "Reference Experience Model",
+      "version": "0.1",
+      "status": "PROPOSED_NORMATIVE",
+      "authorityTier": 2,
+      "owner": "TBD",
+      "approvalAuthority": "TBD",
+      "scope": "Canonical experience principles for professional cognition.",
+      "baselineStatus": "PROVISIONAL_PENDING_P0_AUDIT"
+    },
+    {
+      "documentId": "JAN-SEH-001",
+      "title": "Shape Engineering Handbook",
+      "version": "0.1",
+      "status": "PROPOSED_NORMATIVE_METHOD",
+      "authorityTier": 2,
+      "owner": "TBD",
+      "approvalAuthority": "TBD",
+      "scope": "Method for engineering Professional Work Architectures.",
+      "baselineStatus": "PROVISIONAL_PENDING_P0_AUDIT"
+    },
+    {
+      "documentId": "JAN-JCUX-001",
+      "title": "JanumiCode UI Information Architecture and Screen Contract",
+      "version": "0.1",
+      "status": "PROPOSED_NORMATIVE_PROFILE",
+      "authorityTier": 3,
+      "owner": "TBD",
+      "approvalAuthority": "TBD",
+      "scope": "Concrete routes, screens, component contracts, and acceptance journeys.",
+      "baselineStatus": "PROVISIONAL_PENDING_P0_AUDIT"
+    },
+    {
+      "documentId": "JAN-JSDLC-001",
+      "title": "JSDL Compiler Architecture and Bootstrap Implementation Specification",
+      "version": "0.1",
+      "status": "PROPOSED_NORMATIVE",
+      "authorityTier": 3,
+      "owner": "TBD",
+      "approvalAuthority": "TBD",
+      "scope": "Compiler phases, IR, diagnostics, and generators.",
+      "baselineStatus": "PROVISIONAL_PENDING_P0_AUDIT"
+    },
+    {
+      "documentId": "JAN-JSRP-001",
+      "title": "Janumi Single-Node Runtime Profile",
+      "version": "0.1",
+      "status": "PROPOSED_NORMATIVE_PROFILE",
+      "authorityTier": 3,
+      "owner": "TBD",
+      "approvalAuthority": "TBD",
+      "scope": "Initial PostgreSQL-centered implementation profile.",
+      "baselineStatus": "PROVISIONAL_PENDING_P0_AUDIT"
+    },
+    {
+      "documentId": "JAN-RIWS-001",
+      "title": "Reference Interaction and Workspace Specification",
+      "version": "0.1",
+      "status": "PROPOSED_NORMATIVE",
+      "authorityTier": 3,
+      "owner": "TBD",
+      "approvalAuthority": "TBD",
+      "scope": "Canonical application shell, workspaces, and interaction semantics.",
+      "baselineStatus": "PROVISIONAL_PENDING_P0_AUDIT"
+    },
+    {
+      "documentId": "JAN-CONF-001",
+      "title": "Conformance and Evidence Matrix",
+      "version": "0.1",
+      "status": "WORKING_NORMATIVE_CONTROL_RECORD",
+      "authorityTier": 4,
+      "owner": "TBD",
+      "approvalAuthority": "TBD",
+      "scope": "Traceability from requirements to implementation, verification, evidence, and acceptance.",
+      "baselineStatus": "PROVISIONAL_PENDING_P0_AUDIT"
+    },
+    {
+      "documentId": "JAN-REQ-001",
+      "title": "Normative Requirement Register",
+      "version": "0.1",
+      "status": "PROPOSED_NORMATIVE_CONTROL",
+      "authorityTier": 4,
+      "owner": "TBD",
+      "approvalAuthority": "TBD",
+      "scope": "Stable implementation-oriented obligation register.",
+      "baselineStatus": "PROVISIONAL_PENDING_P0_AUDIT"
+    },
+    {
+      "documentId": "JAN-RMAP-001",
+      "title": "Normative Implementation Roadmap",
+      "version": "0.1",
+      "status": "PROPOSED_NORMATIVE_CONTROL",
+      "authorityTier": 4,
+      "owner": "TBD",
+      "approvalAuthority": "TBD",
+      "scope": "Capability order, gates, evidence, deferrals, and deviations.",
+      "baselineStatus": "PROVISIONAL_PENDING_P0_AUDIT"
+    },
+    {
+      "documentId": "JAN-SRC-001",
+      "title": "Normative Source Baseline",
+      "version": "0.1",
+      "status": "PROPOSED_NORMATIVE_CONTROL",
+      "authorityTier": 4,
+      "owner": "TBD",
+      "approvalAuthority": "TBD",
+      "scope": "Source catalog, authority hierarchy, and conflict-disposition rules.",
+      "baselineStatus": "PROVISIONAL_PENDING_P0_AUDIT"
+    }
+  ]
+}

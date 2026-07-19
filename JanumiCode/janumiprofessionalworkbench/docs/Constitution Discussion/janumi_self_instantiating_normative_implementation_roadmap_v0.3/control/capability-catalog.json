@@ -1,0 +1,97 @@
+{
+  "controlSchema": "capability-catalog.schema.json",
+  "catalogId": "JAN-IRP-CAPABILITY-CATALOG",
+  "version": "0.3.0",
+  "generatedAt": "2026-07-19T15:54:56Z",
+  "capabilities": [
+    {
+      "capabilityId": "C1",
+      "title": "Semantic Identity and Contract Foundation",
+      "hardPrerequisites": [
+        "PROGRAM_CONTROL"
+      ],
+      "repositoryBinding": "UNRESOLVED_UNTIL_P6"
+    },
+    {
+      "capabilityId": "C2",
+      "title": "Intent, Outcome, Participant, and PWU Semantic Kernel",
+      "hardPrerequisites": [
+        "C1"
+      ],
+      "repositoryBinding": "UNRESOLVED_UNTIL_P6"
+    },
+    {
+      "capabilityId": "C3",
+      "title": "Authoritative Command, Event, and Projection Spine",
+      "hardPrerequisites": [
+        "C2"
+      ],
+      "repositoryBinding": "UNRESOLVED_UNTIL_P6"
+    },
+    {
+      "capabilityId": "C4",
+      "title": "PWU Cognitive Vertical Slice",
+      "hardPrerequisites": [
+        "C3"
+      ],
+      "repositoryBinding": "UNRESOLVED_UNTIL_P6"
+    },
+    {
+      "capabilityId": "C5",
+      "title": "Evidence-Bearing Reasoning and Decision",
+      "hardPrerequisites": [
+        "C4"
+      ],
+      "repositoryBinding": "UNRESOLVED_UNTIL_P6"
+    },
+    {
+      "capabilityId": "C6",
+      "title": "Recursive Decomposition and Recomposition",
+      "hardPrerequisites": [
+        "C5"
+      ],
+      "repositoryBinding": "UNRESOLVED_UNTIL_P6"
+    },
+    {
+      "capabilityId": "C7",
+      "title": "RPH Coordination and Adaptive Tactics",
+      "hardPrerequisites": [
+        "C6"
+      ],
+      "repositoryBinding": "UNRESOLVED_UNTIL_P6"
+    },
+    {
+      "capabilityId": "C8",
+      "title": "Continuous Reconciliation and Professional Attention",
+      "hardPrerequisites": [
+        "C7"
+      ],
+      "repositoryBinding": "UNRESOLVED_UNTIL_P6"
+    },
+    {
+      "capabilityId": "C9",
+      "title": "JanumiCode End-to-End Product Realization",
+      "hardPrerequisites": [
+        "C8"
+      ],
+      "repositoryBinding": "UNRESOLVED_UNTIL_P6"
+    },
+    {
+      "capabilityId": "C10",
+      "title": "Governed Agentic Execution",
+      "hardPrerequisites": [
+        "C5"
+      ],
+      "repositoryBinding": "UNRESOLVED_UNTIL_P6"
+    },
+    {
+      "capabilityId": "C11",
+      "title": "Operational Beta Assurance",
+      "hardPrerequisites": [
+        "C9",
+        "C10"
+      ],
+      "repositoryBinding": "UNRESOLVED_UNTIL_P6"
+    }
+  ]
+}

@@ -1,0 +1,102 @@
+{
+  "controlSchema": "program-model.schema.json",
+  "programModelId": "JAN-IRP-PROGRAM-MODEL",
+  "version": "0.3.0",
+  "generatedAt": "2026-07-19T15:54:56Z",
+  "phaseStates": [
+    "NOT_STARTED",
+    "PROPOSED",
+    "AUTHORIZED",
+    "ACTIVE",
+    "WAITING_FOR_EVIDENCE",
+    "WAITING_FOR_AUTHORITY",
+    "UNDER_REVIEW",
+    "CONDITIONALLY_ACCEPTED",
+    "ACCEPTED",
+    "REJECTED",
+    "REOPENED",
+    "SUSPENDED",
+    "SUPERSEDED",
+    "CANCELLED"
+  ],
+  "phases": [
+    {
+      "phaseId": "P0",
+      "title": "Program Foundation and Source Baseline",
+      "outcome": "Control the corpus, authority hierarchy, requirement register, and program roles.",
+      "hardPrerequisites": []
+    },
+    {
+      "phaseId": "P1",
+      "title": "Repository Intake and Evidence Preservation",
+      "outcome": "Acquire and preserve the exact implementation and operational evidence.",
+      "hardPrerequisites": [
+        "P0"
+      ]
+    },
+    {
+      "phaseId": "P2",
+      "title": "Current-State Semantic Reconstruction",
+      "outcome": "Reconstruct implementation meaning, behavior, authority, experience, and operations.",
+      "hardPrerequisites": [
+        "P1"
+      ]
+    },
+    {
+      "phaseId": "P3",
+      "title": "Normative Applicability and Conformance Assessment",
+      "outcome": "Assess every requirement against evidence.",
+      "hardPrerequisites": [
+        "P2"
+      ]
+    },
+    {
+      "phaseId": "P4",
+      "title": "Code\u2013Specification Reconciliation",
+      "outcome": "Classify and dispose material discrepancies.",
+      "hardPrerequisites": [
+        "P3"
+      ]
+    },
+    {
+      "phaseId": "P5",
+      "title": "Transition Architecture",
+      "outcome": "Define controlled preserve/adapt/migrate/replace paths.",
+      "hardPrerequisites": [
+        "P4"
+      ]
+    },
+    {
+      "phaseId": "P6",
+      "title": "Repository-Specific Roadmap Instantiation",
+      "outcome": "Generate exact repository increments and dependency DAG.",
+      "hardPrerequisites": [
+        "P5"
+      ]
+    },
+    {
+      "phaseId": "P7",
+      "title": "Capability Realization",
+      "outcome": "Implement and accept authorized increments.",
+      "hardPrerequisites": [
+        "P6"
+      ]
+    },
+    {
+      "phaseId": "P8",
+      "title": "Integration and Operational Conformance",
+      "outcome": "Prove capabilities compose securely and recoverably.",
+      "hardPrerequisites": [
+        "P7"
+      ]
+    },
+    {
+      "phaseId": "P9",
+      "title": "Release and Evolution Baseline",
+      "outcome": "Accept an identified implementation and operating profile.",
+      "hardPrerequisites": [
+        "P8"
+      ]
+    }
+  ]
+}

@@ -1,0 +1,21 @@
+{
+  "controlSchema": "roadmap-instance.schema.json",
+  "recordId": "RMAP-INSTANCE-UNINSTANTIATED",
+  "recordType": "ROADMAP_INSTANCE",
+  "schemaVersion": "0.3.0",
+  "programInstanceId": "IRP-EXAMPLE-001",
+  "version": "0.1.0",
+  "status": "DRAFT",
+  "createdAt": "2026-07-19T15:57:13Z",
+  "createdBy": "janumi-corpus-generator",
+  "canonicalCorpusVersion": "0.3.0",
+  "sourceBaselineId": "JAN-SRC-001-PENDING-P0",
+  "repositoryRevision": "UNASSESSED",
+  "currentStateModelVersion": "UNASSESSED",
+  "transitionArchitectureVersion": "UNASSESSED",
+  "releaseProfile": "UNDEFINED",
+  "capabilityBindings": [],
+  "increments": [],
+  "waves": [],
+  "requirementCoverage": []
+}

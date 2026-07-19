@@ -1,0 +1,63 @@
+document_id: JAN-ROADMAP-001-C
+title: Living Roadmap Control Registers
+version: 2.0.0-draft
+status: ACTIVE_TEMPLATE
+record_contracts:
+  decision:
+    required_fields:
+    - id
+    - title
+    - question
+    - status
+    - authority
+    - evidence
+    - alternatives
+    - decision
+    - rationale
+    - affected_artifacts
+  divergence:
+    required_fields:
+    - id
+    - subject
+    - sources_in_conflict
+    - description
+    - materiality
+    - classification
+    - proposed_resolution
+    - status
+  deferral:
+    required_fields:
+    - id
+    - requirement
+    - rationale
+    - target_wave_or_event
+    - consequence
+    - compensating_controls
+    - authority
+    - status
+  waiver:
+    required_fields:
+    - id
+    - requirement_or_finding
+    - scope
+    - version_binding
+    - rationale
+    - authority
+    - expiration
+    - compensating_controls
+    - status
+  assumption_or_unknown:
+    required_fields:
+    - id
+    - statement
+    - type
+    - impact
+    - resolution_method
+    - resolution_gate
+    - owner
+    - status
+decisions: []
+divergences: []
+deferrals: []
+waivers: []
+assumptions_and_unknowns: []

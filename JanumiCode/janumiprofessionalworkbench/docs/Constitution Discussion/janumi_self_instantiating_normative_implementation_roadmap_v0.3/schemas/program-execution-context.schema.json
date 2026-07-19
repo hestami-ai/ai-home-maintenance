@@ -1,0 +1,101 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://janumi.example/schemas/irp/0.3/program-execution-context.schema.json",
+  "title": "Program Execution Context",
+  "type": "object",
+  "additionalProperties": false,
+  "properties": {
+    "controlSchema": {
+      "type": "string"
+    },
+    "schemaVersion": {
+      "const": "0.3.0"
+    },
+    "recordId": {
+      "type": "string",
+      "minLength": 1
+    },
+    "recordType": {
+      "type": "string",
+      "minLength": 1
+    },
+    "programInstanceId": {
+      "type": "string",
+      "minLength": 1
+    },
+    "version": {
+      "type": "string",
+      "minLength": 1
+    },
+    "status": {
+      "type": "string",
+      "minLength": 1
+    },
+    "createdAt": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "createdBy": {
+      "type": "string",
+      "minLength": 1
+    },
+    "updatedAt": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "canonicalCorpusVersion": {
+      "type": "string"
+    },
+    "sourceBaselineId": {
+      "type": "string"
+    },
+    "repository": {
+      "type": "object",
+      "additionalProperties": true
+    },
+    "environment": {
+      "type": "object",
+      "additionalProperties": true
+    },
+    "roles": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": [
+          "role",
+          "participant"
+        ],
+        "properties": {
+          "role": {
+            "type": "string"
+          },
+          "participant": {
+            "type": "string"
+          },
+          "authority": {
+            "type": "string"
+          }
+        }
+      }
+    },
+    "scope": {
+      "type": "object",
+      "additionalProperties": true
+    }
+  },
+  "required": [
+    "controlSchema",
+    "schemaVersion",
+    "recordId",
+    "recordType",
+    "programInstanceId",
+    "version",
+    "status",
+    "createdAt",
+    "createdBy",
+    "canonicalCorpusVersion",
+    "sourceBaselineId",
+    "repository",
+    "roles"
+  ]
+}

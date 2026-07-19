@@ -1,0 +1,30 @@
+package_id: JAN-ROADMAP-001-V2-PACKAGE
+title: JanumiCode RPH Migration and JPWB Bootstrap Master Roadmap v2
+version: 2.0.0-draft
+status: PROPOSED_NORMATIVE_BASELINE
+generated_at: '2026-07-19T17:43:22.075039+00:00'
+supersedes:
+- JAN-ROADMAP-001@1.0.0-draft
+incorporates:
+- selected controls from JAN-ROADMAP-002
+- selected controls from JAN-ROADMAP-003
+- selected Wave 0 templates
+files:
+- path: JAN-ROADMAP-001-A-detailed-roadmap-generation-standard.md
+  role: detailed_roadmap_standard
+- path: JAN-ROADMAP-001-B-v2-master-work-package-register.yaml
+  role: master_work_package_register
+- path: JAN-ROADMAP-001-C-living-control-registers.yaml
+  role: living_control_registers
+- path: JAN-ROADMAP-001-D-coding-agent-handoff-directive.md
+  role: agent_handoff
+- path: JAN-ROADMAP-001-E-detailed-roadmap-template.yaml
+  role: detailed_roadmap_template
+- path: JAN-ROADMAP-001-F-master-to-implementation-traceability-template.csv
+  role: traceability_template
+- path: JAN-ROADMAP-001-v2-master-normative-implementation-roadmap.md
+  role: master_roadmap
+- path: README.md
+  role: package_readme
+- path: SUPERSESSION-NOTE.md
+  role: supersession_note

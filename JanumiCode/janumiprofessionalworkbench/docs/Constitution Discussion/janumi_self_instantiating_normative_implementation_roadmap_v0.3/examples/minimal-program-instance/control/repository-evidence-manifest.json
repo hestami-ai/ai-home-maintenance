@@ -1,0 +1,16 @@
+{
+  "controlSchema": "repository-evidence-manifest.schema.json",
+  "recordId": "EVM-UNINSTANTIATED",
+  "recordType": "REPOSITORY_EVIDENCE_MANIFEST",
+  "schemaVersion": "0.3.0",
+  "programInstanceId": "IRP-EXAMPLE-001",
+  "version": "0.1.0",
+  "status": "DRAFT",
+  "createdAt": "2026-07-19T15:57:13Z",
+  "createdBy": "janumi-corpus-generator",
+  "repositoryRevision": "UNASSESSED",
+  "worktreeState": "UNASSESSED",
+  "toolchain": {},
+  "evidenceItems": [],
+  "excludedEvidence": []
+}
