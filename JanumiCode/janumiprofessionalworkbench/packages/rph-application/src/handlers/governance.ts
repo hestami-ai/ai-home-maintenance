@@ -18,7 +18,11 @@ import type {
 	RequestWaiverPayload,
 	WaiverRule
 } from '@janumipwb/rph-contracts';
-import { authorizeDecisionEffective, canPromoteBaseline } from '@janumipwb/rph-domain';
+import {
+	authorizeDecisionEffective,
+	canPromoteBaseline,
+	decisionAuthorizesVersions
+} from '@janumipwb/rph-domain';
 import {
 	advanceStatus,
 	createObject,
@@ -483,6 +487,30 @@ export const promoteBaseline: CommandHandler = (ctx, command, payload) => {
 					'RPH_INVARIANT_VIOLATION',
 					`Cannot promote baseline ${command.targetAggregateId}: ${codes}`
 				);
+			}
+			// W1 WIRE-4 (RPH-GOV-003 / Property P5): a promotion decision binds EXACT subject semantic versions.
+			// canPromoteBaseline above proves the decision is EFFECTIVE; this proves it is still CURRENT. If a bound
+			// subject's current semantic version no longer equals the version the decision approved, the decision is
+			// stale — the subject became re-review-required and cannot be promoted under it. Wires the kernel
+			// decisionAuthorizesVersions at the live write-path (promotionDecision already carries the DecisionView
+			// shape); previously the kernel was unreachable and a stale-version approval promoted to AUTHORITATIVE.
+			if (promotionDecision) {
+				const currentSubjectVersions: Record<string, number> = {};
+				for (const subjectId of Object.keys(promotionDecision.subjectSemanticVersions)) {
+					const v = hctx.store.loadObject(subjectId)?.semanticVersion;
+					if (typeof v === 'number') currentSubjectVersions[subjectId] = v;
+				}
+				const binding = decisionAuthorizesVersions(promotionDecision, currentSubjectVersions);
+				if (!binding.ok) {
+					const stale = binding.staleSubjects
+						.map((s) => `${s.subjectId} approved@${s.approvedVersion} current@${s.currentVersion}`)
+						.join('; ');
+					return reject(
+						command,
+						'RPH_INVARIANT_VIOLATION',
+						`Cannot promote baseline ${command.targetAggregateId}: STALE_DECISION_VERSION — the promotion decision ${p.promotionDecisionId} bound subject version(s) no longer current (${stale}); the subject is re-review-required (RPH-GOV-003).`
+					);
+				}
 			}
 			return null;
 		},
