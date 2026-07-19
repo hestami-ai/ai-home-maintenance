@@ -15,7 +15,12 @@ import {
 	REFERENCE_OPEN_RESIDUALS,
 	SEED_UNDERTAKING
 } from '@janumipwb/rph-engine';
-import { buildApplicablePolicies, buildAssuranceView } from '@janumipwb/rph-projections';
+import {
+	buildApplicablePolicies,
+	buildAssuranceView,
+	rebuildProjection,
+	traceabilityProjector
+} from '@janumipwb/rph-projections';
 import { dispatch, getEngine, getRegisteredIntent, mintUiId } from '$lib/server/workbench';
 import type { Actions, PageServerLoad } from './$types';
 
@@ -71,6 +76,19 @@ export const load: PageServerLoad = ({ params }) => {
 	// passed, 'VIOLATED' on an AssuranceIndependenceViolated, undefined = unknown, never a fabricated pass), the
 	// disposition, and the open conditions a CONDITIONALLY_SATISFIED verdict leaves. Joined by assessment id onto
 	// the working set. This is the read model's FIRST live consumer; before, §38 was folded but never rendered.
+	// W4-INC-1 (WP-4-007): the intent-to-baseline TRACEABILITY surface. The `traceabilityProjector` (rph-projections,
+	// built in W2-INC-3) folds the event log into a typed link graph but had no UI consumer — the clearest
+	// "backend built, UI absent" gap. Rebuild it and scope to this Undertaking: every typed link touching one of
+	// its PWUs (TRACES_TO_INTENT / DECOMPOSES / CHILD_OF / ASSESSES / ABOUT / OBLIGATION_OF / BASELINES). Read-only,
+	// derived, no authority (master invariant 9).
+	const pwuIdSet = new Set(pwus.map((p) => p.id));
+	const traceView = rebuildProjection(traceabilityProjector, engine.readAllEvents());
+	const traceLinks = traceView.links
+		.filter((l) => pwuIdSet.has(l.from) || pwuIdSet.has(l.to))
+		.map((l) => ({ from: l.from, to: l.to, type: l.type }));
+	const traceCounts: Record<string, number> = {};
+	for (const l of traceLinks) traceCounts[l.type] = (traceCounts[l.type] ?? 0) + 1;
+
 	const view = buildAssuranceView(engine.readAllEvents());
 	const assessments = listAssessments(engine).map((a) => {
 		const v = view.assessments[a.id];
@@ -174,7 +192,8 @@ export const load: PageServerLoad = ({ params }) => {
 		observations,
 		decisions,
 		baselines,
-		pwuTypeOptions
+		pwuTypeOptions,
+		trace: { links: traceLinks, counts: traceCounts }
 	};
 };
 

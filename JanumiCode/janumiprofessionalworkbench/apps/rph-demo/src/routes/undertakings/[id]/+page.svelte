@@ -22,10 +22,18 @@
 		nodes = flow.nodes;
 		edges = flow.edges;
 	});
-	let tab = $state<'graph' | 'overview' | 'execution' | 'assurance' | 'decisions' | 'baselines'>(
-		'graph'
-	);
-	const tabs = ['graph', 'overview', 'execution', 'assurance', 'decisions', 'baselines'] as const;
+	let tab = $state<
+		'graph' | 'overview' | 'execution' | 'assurance' | 'decisions' | 'baselines' | 'traceability'
+	>('graph');
+	const tabs = [
+		'graph',
+		'overview',
+		'execution',
+		'assurance',
+		'decisions',
+		'baselines',
+		'traceability'
+	] as const;
 </script>
 
 <svelte:head><title>{data.undertaking.name} — Workbench</title></svelte:head>
@@ -287,7 +295,7 @@
 			</tbody>
 		</table>
 	</div>
-{:else}
+{:else if tab === 'baselines'}
 	<div class="panel">
 		<h2>Baselines — authoritative promotions</h2>
 		<table>
@@ -299,6 +307,36 @@
 						></tr
 					>{/each}
 				{#if !data.baselines.length}<tr><td colspan="4" class="none">No baselines.</td></tr>{/if}
+			</tbody>
+		</table>
+	</div>
+{:else}
+	<!-- W4-INC-1 (WP-4-007): the intent-to-baseline TRACEABILITY surface, consuming the rph-projections
+	     traceabilityProjector (W2-INC-3). A derived, read-only typed-link view — never authoritative state. -->
+	<div class="panel" data-testid="traceability-panel">
+		<h2>Traceability — typed intent-to-baseline links</h2>
+		<p class="hint">
+			Derived from the event log (rebuildable projection); scoped to this Undertaking's PWUs. Carries no
+			authority.
+		</p>
+		<div class="trace-counts">
+			{#each Object.entries(data.trace.counts) as [type, n] (type)}
+				<span class="tag" data-trace-type={type}>{type} · {n}</span>
+			{/each}
+		</div>
+		<table>
+			<thead><tr><th>From</th><th>Link</th><th>To</th></tr></thead>
+			<tbody>
+				{#each data.trace.links as l, i (i)}
+					<tr>
+						<td class="mono">{l.from.slice(0, 16)}…</td>
+						<td><span class="tag">{l.type}</span></td>
+						<td class="mono">{l.to.slice(0, 16)}…</td>
+					</tr>
+				{/each}
+				{#if !data.trace.links.length}
+					<tr><td colspan="3" class="none">No traceability links.</td></tr>
+				{/if}
 			</tbody>
 		</table>
 	</div>
