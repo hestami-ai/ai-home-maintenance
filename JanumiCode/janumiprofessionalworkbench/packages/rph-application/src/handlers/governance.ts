@@ -428,6 +428,45 @@ export const approveBaseline: CommandHandler = (ctx, command, payload) => {
 	});
 };
 
+/**
+ * W1 WIRE-3b (Property P4 / conformance test CT-10 — the evidence-invalidation pull-guard authorized at G1/C1):
+ * "invalidated evidence re-examines the claims it supported." A baseline promotion is an authoritative act
+ * (master §10 / §19); it may not silently rest on evidence that has since been INVALIDATED. Following only
+ * FORWARD references (so no reverse index / trace graph is needed — the trace-graph form was the structural
+ * blocker recorded at G1), gather every Evidence the promotion relies on:
+ *   (a) each required assessment's claims' supportingEvidenceIds — the §CT-10 "supported claims" path, and
+ *   (b) the promotion decision's consideredEvidenceIds — the evidentiary basis the authority relied on;
+ * and return those whose Evidence.status is INVALIDATED. This is the corpus's own PULL-GUARD framing
+ * (transitions.data §16.2: "guard on claim support, not an intra-machine transition") rather than a push-cascade
+ * that would contest N claim aggregates from one command.
+ */
+function invalidatedEvidenceUnderminingPromotion(
+	hctx: HandlerContext,
+	requiredAssessmentIds: readonly string[],
+	consideredEvidenceIds: readonly string[]
+): { evidenceId: string; via: string }[] {
+	const undermining: { evidenceId: string; via: string }[] = [];
+	const isInvalidated = (evidenceId: string): boolean =>
+		(hctx.store.loadObject(evidenceId)?.state as { status?: string } | undefined)?.status ===
+		'INVALIDATED';
+	// (a) required assessment -> claims -> supporting evidence (the CT-10 "supported claims" path)
+	for (const assessmentId of requiredAssessmentIds) {
+		const a = hctx.store.loadObject(assessmentId)?.state as { claimIds?: string[] } | undefined;
+		for (const claimId of a?.claimIds ?? []) {
+			const c = hctx.store.loadObject(claimId)?.state as
+				| { supportingEvidenceIds?: string[] }
+				| undefined;
+			for (const evidenceId of c?.supportingEvidenceIds ?? [])
+				if (isInvalidated(evidenceId)) undermining.push({ evidenceId, via: `claim ${claimId}` });
+		}
+	}
+	// (b) the promotion decision's considered evidence (the authority's evidentiary basis)
+	for (const evidenceId of consideredEvidenceIds)
+		if (isInvalidated(evidenceId))
+			undermining.push({ evidenceId, via: 'promotion-decision considered evidence' });
+	return undermining;
+}
+
 /** PromoteBaseline — APPROVED -> AUTHORITATIVE, gated by canPromoteBaseline (effective promotion decision +
  * required assessments satisfied/waived + no open blocking + item versions pinned). "No green without assurance." */
 export const promoteBaseline: CommandHandler = (ctx, command, payload) => {
@@ -511,6 +550,24 @@ export const promoteBaseline: CommandHandler = (ctx, command, payload) => {
 						`Cannot promote baseline ${command.targetAggregateId}: STALE_DECISION_VERSION — the promotion decision ${p.promotionDecisionId} bound subject version(s) no longer current (${stale}); the subject is re-review-required (RPH-GOV-003).`
 					);
 				}
+			}
+			// W1 WIRE-3b (Property P4 / CT-10): the promotion may not rest on INVALIDATED evidence. Invalidated
+			// evidence must re-examine the claims it supported before an authoritative baseline can rest on them —
+			// enforced here as a pull-guard over forward references (assessment->claim->evidence and the decision's
+			// considered evidence), since no runtime trace graph exists. See invalidatedEvidenceUnderminingPromotion.
+			const consideredEvidenceIds = (decision?.consideredEvidenceIds as string[] | undefined) ?? [];
+			const undermined = invalidatedEvidenceUnderminingPromotion(
+				hctx,
+				p.requiredAssessmentIds,
+				consideredEvidenceIds
+			);
+			if (undermined.length > 0) {
+				const detail = undermined.map((u) => `${u.evidenceId} (via ${u.via})`).join('; ');
+				return reject(
+					command,
+					'RPH_INVARIANT_VIOLATION',
+					`Cannot promote baseline ${command.targetAggregateId}: INVALIDATED_EVIDENCE — the promotion rests on invalidated evidence that must re-examine the claims it supported before an authoritative baseline can stand on it (${detail}); re-assess before promoting (P4 / CT-10).`
+				);
 			}
 			return null;
 		},
