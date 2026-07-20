@@ -140,29 +140,37 @@ function zodExpr(type: string | undefined, enumRef?: string): string {
 		usedEnums.add(enumRef.replace(/Schema$/, ''));
 		return arr ? `z.array(${enumRef})` : enumRef;
 	}
-	let expr: string;
 	// Inline string-literal union, e.g. "'A' | 'B' | 'C'" -> z.enum(['A','B','C']). Lets a tightened helper
 	// pin a small closed value set without minting a named enum in the canonical vocabulary.
 	const literalUnion = /^'[^']*'(\s*\|\s*'[^']*')*$/.exec(t);
 	if (literalUnion) {
 		const values = [...t.matchAll(/'([^']*)'/g)].map((m) => JSON.stringify(m[1]));
-		expr = `z.enum([${values.join(', ')}])`;
-		return arr ? `z.array(${expr})` : expr;
+		const unionExpr = `z.enum([${values.join(', ')}])`;
+		return arr ? `z.array(${unionExpr})` : unionExpr;
 	}
-	if (t === 'string') expr = 'z.string()';
-	else if (t === 'number') expr = 'z.number()';
-	else if (t === 'boolean') expr = 'z.boolean()';
-	else if (t === '(string | number)') expr = 'z.union([z.string(), z.number()])';
-	else if (t === 'Record<string, number>') expr = 'z.record(z.string(), z.number())';
-	else if (ENUM_NAMES.has(t)) {
-		usedEnums.add(t);
-		expr = `${t}Schema`;
-	} else if (EXTERNAL_HELPERS[t]) {
-		usedExternal.add(EXTERNAL_HELPERS[t]!);
-		expr = EXTERNAL_HELPERS[t]!;
-	} else if (HELPER_NAMES.has(t)) expr = `${t}Schema`;
-	else expr = 'z.unknown()';
+	const expr = scalarZodExpr(t);
 	return arr ? `z.array(${expr})` : expr;
+}
+
+// Map a non-array, non-enumRef, non-literal-union scalar type string -> a Zod expression, performing the same
+// enum/external usage side effects (usedEnums.add / usedExternal.add) in the same order as the inline ladder it
+// replaces. Extracted from zodExpr to reduce cognitive complexity; behavior and emitted strings are identical.
+function scalarZodExpr(t: string): string {
+	if (t === 'string') return 'z.string()';
+	if (t === 'number') return 'z.number()';
+	if (t === 'boolean') return 'z.boolean()';
+	if (t === '(string | number)') return 'z.union([z.string(), z.number()])';
+	if (t === 'Record<string, number>') return 'z.record(z.string(), z.number())';
+	if (ENUM_NAMES.has(t)) {
+		usedEnums.add(t);
+		return `${t}Schema`;
+	}
+	if (EXTERNAL_HELPERS[t]) {
+		usedExternal.add(EXTERNAL_HELPERS[t]!);
+		return EXTERNAL_HELPERS[t]!;
+	}
+	if (HELPER_NAMES.has(t)) return `${t}Schema`;
+	return 'z.unknown()';
 }
 
 function fieldLine(f: Field): string {
@@ -183,14 +191,16 @@ body.push(
 	'// ---- Helper sub-types the specs reference but never fully define. Permissive structured',
 	'// placeholders (any object) — tightened in the milestone that defines them (M7/M9/M11). ----'
 );
-for (const h of placeholders.sort((a, b) => a.name.localeCompare(b.name))) {
+placeholders.sort((a, b) => a.name.localeCompare(b.name));
+for (const h of placeholders) {
 	body.push(
 		`export const ${h.name}Schema = z.record(z.string(), z.unknown());`,
 		`export type ${h.name} = z.infer<typeof ${h.name}Schema>;`
 	);
 }
 body.push('', '// ---- Well-specified helper sub-types. ----');
-for (const h of fullHelpers.sort((a, b) => a.name.localeCompare(b.name))) {
+fullHelpers.sort((a, b) => a.name.localeCompare(b.name));
+for (const h of fullHelpers) {
 	const lines = h.fields.map(fieldLine).join(',\n');
 	body.push(
 		`export const ${h.name}Schema = z.strictObject({\n${lines}\n});`,

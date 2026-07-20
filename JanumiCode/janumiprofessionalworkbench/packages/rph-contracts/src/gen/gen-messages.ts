@@ -199,8 +199,6 @@ for (const e of spec.events) {
 		`\t${j(e.eventType)}: { payload: ${e.eventType}PayloadSchema, aggregateType: ${j(e.aggregateType ?? '')} },`
 	);
 }
-body.push('} as const;', '');
-
 // RATIFIED_EVENT_PAYLOADS — the events whose payload the CORPUS actually schematizes.
 //
 // DERIVED FROM PROVENANCE, never hand-kept. An event is in iff BOTH hold:
@@ -218,6 +216,8 @@ body.push('} as const;', '');
 // A hand-kept list would rot into exactly that. This one cannot: annotating a vocab entry UNRATIFIED-AUTHORED,
 // or an entry having no payloadFields, removes it from enforcement on the next `bun run gen`.
 body.push(
+	'} as const;',
+	'',
 	'/** Payload schemas for the events the corpus actually SCHEMATIZES (vocab sourceSection present and not',
 	' *  UNRATIFIED-AUTHORED). Derived from provenance by gen-messages — the kit gate enforces exactly these, so',
 	' *  that marking an entry UNRATIFIED-AUTHORED in the vocab removes it from enforcement on the next gen. */',
