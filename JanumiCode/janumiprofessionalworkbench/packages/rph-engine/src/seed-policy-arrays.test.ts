@@ -132,7 +132,7 @@ describe('the seeded policy objects ARE the ontology — one catalog, not two', 
 	// Deduping fixed today's divergence; this is what stops tomorrow's, by failing the moment the seeded object
 	// stops being the ontology's own content.
 	it('every ratified policy in the ontology is seeded as an ACTIVE object', () => {
-		expect(ontology.seedPolicies.length).toBe(12);
+		expect(ontology.seedPolicies).toHaveLength(12);
 		for (const p of ontology.seedPolicies) {
 			const seededObject = load(p.policyId);
 			expect(seededObject, `${p.policyId} is in the ontology but is NOT seeded`).toBeDefined();

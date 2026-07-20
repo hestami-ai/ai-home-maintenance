@@ -44,7 +44,7 @@ describe('W2-INC-1 reference-fixture durability round-trip', () => {
 			for (const id of ids) {
 				expect(store2.loadObject(id)).toEqual(before.get(id));
 			}
-			expect(store2.readAllEvents().length).toBe(eventCount);
+			expect(store2.readAllEvents()).toHaveLength(eventCount);
 		} finally {
 			store2.close();
 		}

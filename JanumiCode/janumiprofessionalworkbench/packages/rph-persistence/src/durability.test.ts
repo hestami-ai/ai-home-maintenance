@@ -92,7 +92,7 @@ describe('W2-INC-1 durable persistence round-trip', () => {
 				expect(reopened.loadObject(objects[i]![0])).toEqual(before[i]);
 			}
 			// The event log survived too (auditability / replayability).
-			expect(reopened.readAllEvents().length).toBe(objects.length);
+			expect(reopened.readAllEvents()).toHaveLength(objects.length);
 		} finally {
 			reopened.close();
 		}
@@ -120,7 +120,9 @@ describe('W2-INC-1 schema-version migration baseline', () => {
 		try {
 			new SqliteStorageAdapter({ filename: path, now: () => TS }).close();
 			// second open sees user_version === SCHEMA_VERSION and just proceeds
-			expect(() => new SqliteStorageAdapter({ filename: path, now: () => TS }).close()).not.toThrow();
+			expect(() =>
+				new SqliteStorageAdapter({ filename: path, now: () => TS }).close()
+			).not.toThrow();
 		} finally {
 			cleanup(path);
 		}

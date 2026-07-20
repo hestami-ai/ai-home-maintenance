@@ -47,7 +47,7 @@ test.describe('PWA Designer — Assurance Policy manager', () => {
 		const created = findByName('Tenant Isolation Review');
 		expect(created, 'new policy exists').toBeTruthy();
 		expect(created.state.status).toBe('DRAFT');
-		expect((created.state.criteria as unknown[]).length).toBe(2);
+		expect(created.state.criteria as unknown[]).toHaveLength(2);
 		const createdId = created.id as string;
 		const card = mgr.locator(`[data-policy-id="${createdId}"]`);
 		await expect(card.getByText('DRAFT', { exact: true })).toBeVisible();
@@ -117,7 +117,7 @@ test.describe('PWA Designer — Assurance Policy manager', () => {
 			(p: { id: string; state: { name?: string } }) =>
 				p.state.name === 'Tenant Isolation Review' && p.id !== createdId
 		);
-		expect(successors.length).toBe(1);
+		expect(successors).toHaveLength(1);
 		expect(successors[0].state.status).toBe('ACTIVE');
 		const successorId = successors[0].id as string;
 		const migratedRoot = snap.pwuTypes.find((t: { id: string }) => t.id === root.id);

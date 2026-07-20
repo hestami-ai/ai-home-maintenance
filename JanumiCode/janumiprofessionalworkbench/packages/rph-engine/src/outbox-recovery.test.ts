@@ -35,7 +35,7 @@ describe('W2-INC-2 restart outbox recovery', () => {
 		driveReferenceUndertaking(engine1);
 		const committed = store1.readAllEvents().length;
 		// Premise: dispatch did NOT auto-deliver — every committed event is still PENDING in the outbox.
-		expect(store1.readPendingOutbox().length).toBe(committed);
+		expect(store1.readPendingOutbox()).toHaveLength(committed);
 		store1.close(); // crash before delivery
 
 		// --- session 2: restart, wire a subscriber, recover ---
@@ -47,7 +47,7 @@ describe('W2-INC-2 restart outbox recovery', () => {
 
 			const recovered = engine2.recoverOutbox();
 			expect(recovered).toBe(committed); // every PENDING message re-driven
-			expect(delivered.length).toBe(committed); // each delivered exactly once
+			expect(delivered).toHaveLength(committed); // each delivered exactly once
 			expect(new Set(delivered).size).toBe(committed); // no duplicates within the recovery
 
 			// A second recovery finds nothing PENDING — no duplicate external side effect.
