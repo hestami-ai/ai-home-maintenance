@@ -39,8 +39,11 @@ export function renderRationale(summary: ProfessionalRationaleSummary | undefine
 	if (!summary) {
 		return '(NOT DECLARED — the producer returned no professional rationale summary. Section 9.7 requires one; judge the artifact on its own terms and treat the omission itself as a completeness shortcut.)';
 	}
-	const list = (label: string, xs: readonly string[]) =>
-		xs.length ? `${label}:\n${xs.map((x) => `  - ${x}`).join('\n')}` : `${label}: (none declared)`;
+	const list = (label: string, xs: readonly string[]) => {
+		if (!xs.length) return `${label}: (none declared)`;
+		const items = xs.map((x) => `  - ${x}`).join('\n');
+		return `${label}:\n${items}`;
+	};
 	return [
 		summary.rationale,
 		'',

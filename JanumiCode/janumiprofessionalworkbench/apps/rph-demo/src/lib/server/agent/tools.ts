@@ -22,7 +22,7 @@ function str(v: unknown): string {
 /** Convert a cardinality after the user-facing tool has validated it. */
 function asCardinality(v: unknown): CardinalityCode {
 	if (!CARDINALITY_CODES.has(v as CardinalityCode)) {
-		throw new Error(`Invalid cardinality ${String(v)}.`);
+		throw new Error(`Invalid cardinality ${String(v as string | number | boolean)}.`);
 	}
 	return v as CardinalityCode;
 }

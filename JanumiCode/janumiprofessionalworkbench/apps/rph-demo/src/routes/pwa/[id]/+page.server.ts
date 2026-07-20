@@ -133,7 +133,7 @@ export const load: PageServerLoad = ({ params }) => {
 		// adversarial review proved it was not — see policy-fields.ts / policy-round-trip.test.ts.)
 		criteria: Array.isArray(p.state.criteria)
 			? (p.state.criteria as Array<{ description?: unknown }>).map((c) =>
-					String(c.description ?? '')
+					String((c.description ?? '') as string)
 				)
 			: [],
 		isFloor: FLOOR_POLICY_IDS.has(p.id)
@@ -184,7 +184,7 @@ function strList(v: unknown, fallback: string): string[] {
 
 /** Render a stored ratified-array field into the comma-separated text input the policy form uses. */
 function joinList(v: unknown): string {
-	return Array.isArray(v) ? (v as unknown[]).map(String).join(', ') : String(v ?? '');
+	return Array.isArray(v) ? (v as unknown[]).map(String).join(', ') : String((v ?? '') as string);
 }
 
 /** Split a comma/newline-separated artifact list from a form field into a clean string[]. */
@@ -347,8 +347,7 @@ export const actions: Actions = {
 		const pwuTypeId = String((form.get('pwuTypeId') ?? '') as string).trim();
 		if (!pwuTypeId) return fail(400, { error: 'Missing PWU Type.' });
 		const stored = getObject(getEngine(), pwuTypeId);
-		if (!stored || stored.pwaId !== params.id)
-			return fail(400, { error: 'PWU Type not found on this PWA.' });
+		if (stored?.pwaId !== params.id) return fail(400, { error: 'PWU Type not found on this PWA.' });
 		const f = readTypeFields(form);
 		if (!f.name || !f.pwuKind)
 			return fail(400, { error: 'A PWU Type name and kind are required.' });

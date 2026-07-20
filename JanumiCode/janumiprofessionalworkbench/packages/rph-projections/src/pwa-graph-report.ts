@@ -54,7 +54,8 @@ function nodesSection(ex: PwaGraphExport): string[] {
 		]
 			.filter(Boolean)
 			.join(' · ');
-		return `- [${leaf}] **${n.name}** \`${n.pwuKind}\`${root}${io ? ` — ${io}` : ''}`;
+		const ioSuffix = io ? ` — ${io}` : '';
+		return `- [${leaf}] **${n.name}** \`${n.pwuKind}\`${root}${ioSuffix}`;
 	});
 	return ['## Nodes', '', ...rows, ''];
 }
@@ -81,7 +82,8 @@ function flowsSection(ex: PwaGraphExport): string[] {
 		return true;
 	};
 	const rows = ex.dataFlow.map(
-		(e) => `- ${nameOf(e.producer)} → ${nameOf(e.consumer)} : \`${e.artifact}\`${crosses(e) ? ' ⚠ cross-subtree' : ''}`
+		(e) =>
+			`- ${nameOf(e.producer)} → ${nameOf(e.consumer)} : \`${e.artifact}\`${crosses(e) ? ' ⚠ cross-subtree' : ''}`
 	);
 	if (rows.length === 0) return ['## Data-flow edges', '', '_none declared_', ''];
 	return ['## Data-flow edges', '', ...rows, ''];

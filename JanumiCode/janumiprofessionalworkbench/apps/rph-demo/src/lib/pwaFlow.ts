@@ -380,7 +380,7 @@ export async function toPwaFlow(
 	const nodes: Node[] = visibleTypes.map((t) => {
 		const layoutNode = layoutNodeById.get(t.id);
 		const data: PwuCardData = {
-			...(layoutNode?.data ?? {}),
+			...layoutNode?.data,
 			id: t.id,
 			name: t.name,
 			pwuKind: t.pwuKind,

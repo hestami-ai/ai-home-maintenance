@@ -55,8 +55,7 @@ function linksFor(event: DomainEvent): TraceLink[] {
 			for (const subject of arr(p.subjectObjectIds)) push(p.claimId as string, subject, 'ABOUT');
 			break;
 		case 'EvidenceProposed':
-			for (const claim of arr(p.supportsClaimIds))
-				push(event.aggregateId, claim, 'SUPPORTS');
+			for (const claim of arr(p.supportsClaimIds)) push(event.aggregateId, claim, 'SUPPORTS');
 			break;
 		case 'AssuranceAssessmentRequested':
 			for (const subject of arr(p.subjectObjectIds))
@@ -70,7 +69,9 @@ function linksFor(event: DomainEvent): TraceLink[] {
 				push(p.assumptionId as string, affected, 'AFFECTS');
 			break;
 		case 'BaselinePromoted':
-			for (const item of arr((p.itemObjectVersions as { objectId?: string }[] | undefined)?.map((i) => i.objectId)))
+			for (const item of arr(
+				(p.itemObjectVersions as { objectId?: string }[] | undefined)?.map((i) => i.objectId)
+			))
 				push(p.baselineId as string, item, 'BASELINES');
 			break;
 		default:
@@ -86,8 +87,7 @@ export const traceabilityProjector: Projector<TraceView> = {
 	apply: (view, event) => {
 		const nodes: Record<string, TraceNode> = { ...view.nodes };
 		// Register the acting aggregate as a node the first time it appears.
-		if (!nodes[event.aggregateId])
-			nodes[event.aggregateId] = { id: event.aggregateId, objectType: event.aggregateType };
+		nodes[event.aggregateId] ??= { id: event.aggregateId, objectType: event.aggregateType };
 		const newLinks = linksFor(event);
 		return { nodes, links: newLinks.length ? [...view.links, ...newLinks] : view.links };
 	}

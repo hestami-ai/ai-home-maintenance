@@ -40,6 +40,9 @@ const UNDERTAKING = 'UNDERTAKING';
 const CONVERSATION = 'AUTHORING_CONVERSATION';
 const PWA_MACHINE = 'PWA.publicationStatus';
 
+/** Primitive types `String(...)` coerces without hitting Object's default `[object Object]` stringification. */
+type Stringifiable = string | number | boolean;
+
 /** AppendConversationEntries — the durable, event-sourced transcript of the authoring agent's work on a DRAFT PWA.
  *  This is DOMAIN state (a precursor to the JanumiCode v2 governed stream), NOT UI metadata: each turn's messages /
  *  tool calls / results are appended as domain events, so the conversation survives reloads and (when the engine is
@@ -210,8 +213,7 @@ export const createPwa: CommandHandler = (ctx, command, payload) => {
 export const definePwuType: CommandHandler = (ctx, command, payload) => {
 	const p = payload as DefinePwuTypePayload;
 	const pwa = ctx.store.loadObject(p.pwaId)?.state as
-		| { publicationStatus?: string; version?: string }
-		| undefined;
+		{ publicationStatus?: string; version?: string } | undefined;
 	if (!pwa) {
 		return reject(command, 'RPH_VALIDATION_SEMANTIC_FAILED', `PWA ${p.pwaId} does not exist`, [
 			p.pwuTypeId
@@ -526,11 +528,11 @@ function pwuTypeNodesOf(ctx: HandlerContext, pwaId: string): PwaGraphNode[] {
 	const nodes: PwaGraphNode[] = [];
 	for (const id of ids) {
 		const s = ctx.store.loadObject(id)?.state as Record<string, unknown> | undefined;
-		if (!s || s.pwaId !== pwaId || s.status === 'REMOVED') continue;
+		if (s?.pwaId !== pwaId || s?.status === 'REMOVED') continue;
 		nodes.push({
 			id,
-			name: String(s.name ?? id),
-			pwuKind: String(s.pwuKind ?? ''),
+			name: String((s.name ?? id) as Stringifiable),
+			pwuKind: String((s.pwuKind ?? '') as Stringifiable),
 			isRoot: Boolean(s.isRoot),
 			permittedChildTypeIds: arr(s.permittedChildTypeIds),
 			requiredInputs: arr(s.requiredInputs),
@@ -549,10 +551,10 @@ function pwaGraphExport(
 	return buildPwaGraphExport(
 		{
 			id: pwaId,
-			name: String(state.name ?? pwaId),
-			domain: String(state.domain ?? ''),
-			version: String(state.version ?? ''),
-			publicationStatus: String(state.publicationStatus ?? 'DRAFT')
+			name: String((state.name ?? pwaId) as Stringifiable),
+			domain: String((state.domain ?? '') as Stringifiable),
+			version: String((state.version ?? '') as Stringifiable),
+			publicationStatus: String((state.publicationStatus ?? 'DRAFT') as Stringifiable)
 		},
 		pwuTypeNodesOf(ctx, pwaId)
 	);

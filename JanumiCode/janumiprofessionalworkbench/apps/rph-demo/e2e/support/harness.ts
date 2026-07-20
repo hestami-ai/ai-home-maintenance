@@ -63,7 +63,7 @@ export async function acceptAgentCandidate(
 	pwaId: string,
 	sseBody: string
 ): Promise<string> {
-	const candidateHash = sseBody.match(/sha256:[0-9a-f]{64}/)?.[0];
+	const candidateHash = /sha256:[0-9a-f]{64}/.exec(sseBody)?.[0];
 	expect(candidateHash, 'agent SSE should expose the exact assured candidate hash').toBeTruthy();
 	const res = await request.post(`/pwa/${pwaId}?/acceptAgentCandidate`, {
 		form: { candidateHash: candidateHash! }
