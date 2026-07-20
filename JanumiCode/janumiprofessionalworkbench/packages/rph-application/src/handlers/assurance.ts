@@ -214,6 +214,28 @@ export const createAssurancePolicy: CommandHandler = (ctx, command, payload) => 
 	});
 };
 
+/** The ASSURANCE_POLICY content fields EditAssurancePolicy may patch (envelope fields are handled separately).
+ *  waiverRules + remediationRules were on the Edit payload but historically dropped on the edit side (create
+ *  threaded them); including them here closes that pre-existing gap (adversarial review, Inc C / #5). */
+const EDITABLE_PATCH_FIELDS = [
+	'name',
+	'purpose',
+	'rationale',
+	'applicableObjectTypes',
+	'evaluatedClaimTypes',
+	'criteria',
+	'evaluatorRole',
+	'independenceRequirement',
+	'findingDefinitions',
+	'requiredEvidence',
+	'optionalEvidence',
+	'dispositionRules',
+	'escalationRules',
+	'waiverRules',
+	'remediationRules',
+	'permittedControlActions'
+] as const satisfies readonly (keyof EditAssurancePolicyPayload)[];
+
 /** Build the next ASSURANCE_POLICY state for an edit: the envelope bump plus a patch that changes ONLY the
  *  payload-present fields (an absent field is left exactly as it was — same version, revision++). Extracted from
  *  editAssurancePolicy so the handler's reject short-circuit stays flat; the per-field patch is pure construction. */
@@ -223,36 +245,13 @@ function buildEditedPolicyState(
 	p: EditAssurancePolicyPayload,
 	newRevision: number
 ): Record<string, unknown> {
-	return {
-		...nextEnvelope(loadedState, command, newRevision),
-		...(p.name !== undefined ? { name: p.name } : {}),
-		...(p.purpose !== undefined ? { purpose: p.purpose } : {}),
-		...(p.rationale !== undefined ? { rationale: p.rationale } : {}),
-		...(p.applicableObjectTypes !== undefined
-			? { applicableObjectTypes: p.applicableObjectTypes }
-			: {}),
-		...(p.evaluatedClaimTypes !== undefined ? { evaluatedClaimTypes: p.evaluatedClaimTypes } : {}),
-		...(p.criteria !== undefined ? { criteria: p.criteria } : {}),
-		...(p.evaluatorRole !== undefined ? { evaluatorRole: p.evaluatorRole } : {}),
-		...(p.independenceRequirement !== undefined
-			? { independenceRequirement: p.independenceRequirement }
-			: {}),
-		...(p.findingDefinitions !== undefined ? { findingDefinitions: p.findingDefinitions } : {}),
-		...(p.requiredEvidence !== undefined ? { requiredEvidence: p.requiredEvidence } : {}),
-		...(p.optionalEvidence !== undefined ? { optionalEvidence: p.optionalEvidence } : {}),
-		...(p.dispositionRules !== undefined ? { dispositionRules: p.dispositionRules } : {}),
-		...(p.escalationRules !== undefined ? { escalationRules: p.escalationRules } : {}),
-		// waiverRules has been on the Edit payload since Inc 13 but was never applied here — the create side threaded
-		// it, the edit side silently dropped it, so a policy's waivability could be set at birth but never revised.
-		// Closing that pre-existing gap (adversarial review, Inc C).
-		...(p.waiverRules !== undefined ? { waiverRules: p.waiverRules } : {}),
-		// #5 — remediationRules now revisable too (was never applied here — it was hardcoded [] at create and had no
-		// element shape). Subset-validated above.
-		...(p.remediationRules !== undefined ? { remediationRules: p.remediationRules } : {}),
-		...(p.permittedControlActions !== undefined
-			? { permittedControlActions: p.permittedControlActions }
-			: {})
-	};
+	// The envelope bump carries the prior state forward; each payload-present field then overrides it, so an
+	// absent field is left exactly as it was. remediationRules is subset-validated above.
+	const next: Record<string, unknown> = { ...nextEnvelope(loadedState, command, newRevision) };
+	for (const field of EDITABLE_PATCH_FIELDS) {
+		if (p[field] !== undefined) next[field] = p[field];
+	}
+	return next;
 }
 
 /** EditAssurancePolicy — revise a non-floor, non-superseded policy's content in place (same version, revision++).
