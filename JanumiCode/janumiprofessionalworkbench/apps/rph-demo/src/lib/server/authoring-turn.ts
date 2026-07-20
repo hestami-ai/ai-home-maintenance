@@ -147,6 +147,18 @@ function snapshotRevisions(snapshot: EngineHandle, pwaId: string): RevisionSnaps
 
 const MUTABLE_STATES: ReadonlySet<AuthoringTurnState> = new Set(['COLLECTING', 'ASSURING']);
 
+/** Recoverable staged states: a candidate the human can address WITHOUT discarding — a substantive revision request
+ *  (REVISION_REQUIRED) or an external/operational reviewer failure (BLOCKED_EXTERNAL, e.g. a transient reviewer
+ *  outage). Both can be reopened for another agent turn over the SAME isolated fork, so no accepted work is lost. */
+const RESUMABLE_STATES: ReadonlySet<AuthoringTurnState> = new Set([
+	'REVISION_REQUIRED',
+	'BLOCKED_EXTERNAL'
+]);
+
+export function isResumableAuthoringTurn(status: AuthoringTurnState): boolean {
+	return RESUMABLE_STATES.has(status);
+}
+
 /** Record only mutations that really exist in the isolated fork. Failed commands and rolled-back batches never
  * enter the replay log. Any accepted mutation invalidates cached assurance/acceptance bindings. */
 function recordingEngine(
@@ -279,6 +291,27 @@ export function markAuthoringTurnExternalBlock(turn: AuthoringTurn, detail: stri
 	transition(current, { type: 'EXTERNAL_BLOCK' }, 'BLOCKED_EXTERNAL');
 	current.detail = detail;
 	finalizeAuthoringTurn(turn);
+}
+
+/**
+ * Reopen a recoverable staged candidate (REVISION_REQUIRED or BLOCKED_EXTERNAL) for another agent turn over its
+ * EXISTING isolated fork — the non-destructive path so a substantive revision or a transient reviewer failure never
+ * forces the human to discard accepted work. Moves the turn back to a mutable state (REVISE→COLLECTING /
+ * RETRY_ASSURANCE→ASSURING) so the next agent run refines the SAME candidate; the prior conversation is preserved
+ * (it lives on the fork and grows by append). Returns undefined when there is no resumable turn to reopen.
+ */
+export function resumeAuthoringTurn(pwaId: string): AuthoringTurn | undefined {
+	const turn = turnsByPwa.get(pwaId);
+	if (!turn) return undefined;
+	const status = stateOf(turn);
+	if (status === 'REVISION_REQUIRED') transition(turn, { type: 'REVISE' }, 'COLLECTING');
+	else if (status === 'BLOCKED_EXTERNAL') transition(turn, { type: 'RETRY_ASSURANCE' }, 'ASSURING');
+	else return undefined;
+	// The prior candidate/assurance bindings no longer describe the (about to be refined) candidate.
+	turn.candidateHash = undefined;
+	turn.assuredSubjectHash = undefined;
+	turn.detail = undefined;
+	return publicTurn(turn);
 }
 
 /** Bind a SATISFIED floor to the exact subject hash the reviewer received. */

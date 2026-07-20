@@ -20,16 +20,41 @@ export function draggable(node: HTMLElement, opts: DraggableOptions = {}) {
 	let baseTop = 0;
 	let bound: DOMRect | null = null;
 	let dragging = false;
+	let observer: ResizeObserver | null = null;
 
 	const clamp = (v: number, lo: number, hi: number) => Math.max(lo, Math.min(hi, v));
+	const M = 8; // keep at least this far inside the flow area
+
+	/** Clamp an anchor-relative offset so the panel stays inside `b`, given its on-screen position at zero transform. */
+	function clampOffset(nx: number, ny: number, baseL: number, baseT: number, b: DOMRect): [number, number] {
+		return [
+			clamp(nx, b.left + M - baseL, b.right - node.offsetWidth - M - baseL),
+			clamp(ny, b.top + M - baseT, b.bottom - node.offsetHeight - M - baseT)
+		];
+	}
+
+	function apply(nx: number, ny: number) {
+		offX = nx;
+		offY = ny;
+		node.dataset.dragX = String(nx);
+		node.dataset.dragY = String(ny);
+		node.style.transform = `translate(${nx}px, ${ny}px)`;
+	}
+
+	function flowRect(): DOMRect {
+		const flow = node.closest('.flowarea') as HTMLElement | null;
+		return (flow ?? node.offsetParent ?? document.body).getBoundingClientRect();
+	}
 
 	function onMove(e: PointerEvent) {
 		if (!dragging || !bound) return;
-		const m = 8; // keep at least this far inside the flow area
-		let nx = offX + (e.clientX - startX);
-		let ny = offY + (e.clientY - startY);
-		nx = clamp(nx, bound.left + m - baseLeft, bound.right - node.offsetWidth - m - baseLeft);
-		ny = clamp(ny, bound.top + m - baseTop, bound.bottom - node.offsetHeight - m - baseTop);
+		const [nx, ny] = clampOffset(
+			offX + (e.clientX - startX),
+			offY + (e.clientY - startY),
+			baseLeft,
+			baseTop,
+			bound
+		);
 		node.style.transform = `translate(${nx}px, ${ny}px)`;
 		node.dataset.dragX = String(nx);
 		node.dataset.dragY = String(ny);
@@ -46,11 +71,20 @@ export function draggable(node: HTMLElement, opts: DraggableOptions = {}) {
 		window.removeEventListener('pointerup', onUp);
 	}
 
+	// Re-clamp a moved panel back into view when the viewport/container changes (window resize, fullscreen toggle,
+	// layout reflow). Positions are stored as a px offset relative to the panel's anchor corner, so a change in the
+	// flow area's size would otherwise strand a previously-moved panel off-screen with nothing pulling it back.
+	function reclamp() {
+		if (dragging || (offX === 0 && offY === 0)) return; // active drag self-clamps; an unmoved panel is at anchor
+		const rect = node.getBoundingClientRect();
+		const [nx, ny] = clampOffset(offX, offY, rect.left - offX, rect.top - offY, flowRect());
+		if (nx !== offX || ny !== offY) apply(nx, ny);
+	}
+
 	function onDown(e: PointerEvent) {
 		if (e.button !== 0) return;
 		if ((e.target as HTMLElement).closest(INTERACTIVE)) return;
-		const flow = node.closest('.flowarea') as HTMLElement | null;
-		bound = (flow ?? node.offsetParent ?? document.body).getBoundingClientRect();
+		bound = flowRect();
 		const rect = node.getBoundingClientRect();
 		baseLeft = rect.left - offX; // panel's on-screen position at zero transform
 		baseTop = rect.top - offY;
@@ -70,6 +104,13 @@ export function draggable(node: HTMLElement, opts: DraggableOptions = {}) {
 	}
 
 	bind();
+	const flowArea = node.closest('.flowarea');
+	if (typeof ResizeObserver !== 'undefined' && flowArea) {
+		observer = new ResizeObserver(() => reclamp());
+		observer.observe(flowArea);
+	}
+	window.addEventListener('resize', reclamp);
+	document.addEventListener('fullscreenchange', reclamp);
 
 	return {
 		update(next: DraggableOptions) {
@@ -81,6 +122,9 @@ export function draggable(node: HTMLElement, opts: DraggableOptions = {}) {
 			handle.removeEventListener('pointerdown', onDown);
 			window.removeEventListener('pointermove', onMove);
 			window.removeEventListener('pointerup', onUp);
+			window.removeEventListener('resize', reclamp);
+			document.removeEventListener('fullscreenchange', reclamp);
+			observer?.disconnect();
 		}
 	};
 }

@@ -74,15 +74,25 @@
 	let running = $state(false);
 	const isDraft = $derived(data.pwa.publicationStatus === 'DRAFT');
 	const hasStagedCandidate = $derived(Boolean(data.authoringTurn));
+	// A recoverable staged candidate can be ADDRESSED in place — a substantive revision request, or a transient/
+	// operational reviewer failure (e.g. an outage) that is NOT a graph rejection. The server reopens the same fork.
+	const candidateResumable = $derived(
+		data.authoringTurn?.status === 'REVISION_REQUIRED' ||
+			data.authoringTurn?.status === 'BLOCKED_EXTERNAL'
+	);
 	// A live run needs its candidate preview to stay visible as tool invalidations arrive. Once the run finishes,
 	// canonical/manual controls lock until the exact candidate is accepted or discarded.
 	const editable = $derived(isDraft && (!hasStagedCandidate || running));
+	// The chat stays open in MORE cases than manual canonical editing: a recoverable staged candidate can be refined
+	// via chat (routed into the same fork) without discarding — while manual canonical edits stay locked so they can
+	// never diverge from the staged fork.
+	const chatOpen = $derived(editable || (isDraft && candidateResumable));
 	const panelAwareFitViewOptions: FitViewOptions = $derived({
 		padding: {
 			top: '24px',
 			right: '360px',
 			bottom: '150px',
-			left: editable ? '328px' : '24px'
+			left: chatOpen ? '328px' : '24px'
 		},
 		minZoom: 0.2
 	});
@@ -126,6 +136,10 @@
 	let keyboardStartNodes: Node[] | null = null;
 	let layoutRequest = 0;
 	let appliedLayoutKey = '';
+	// The layout DIRECTION the current node positions were computed in. Manual/prior positions are only valid to keep
+	// when the direction is unchanged (positions are direction-specific), which is what lets an agent turn preserve
+	// the user's arrangement while a direction switch still re-lays-out from scratch.
+	let appliedDirection: PwaLayoutDirection | null = null;
 	let behaviorRun = $state(0);
 	const behaviorTopology = buildPwuBehaviorProjection();
 
@@ -251,24 +265,28 @@
 			.then((flow) => {
 				if (request !== layoutRequest) return;
 
-				// Toggling a non-layout overlay must not erase a user's manual arrangement or its history.
+				// Preserve the user's arrangement across BOTH an overlay toggle AND a structural agent re-layout — as
+				// long as the layout DIRECTION is unchanged (positions are direction-specific). Surviving nodes keep
+				// their place; only a genuinely new node takes ELK's computed position. A direction switch re-arranges.
 				const prior = new Map(nodes.map((node) => [node.id, node]));
 				const preservePresentation = appliedLayoutKey === layoutKey;
-				nodes = preservePresentation
-					? flow.nodes.map((node) => {
-							const previous = prior.get(node.id);
-							return previous
-								? { ...node, position: previous.position, selected: previous.selected }
-								: node;
-						})
-					: flow.nodes;
+				const sameDirection = appliedDirection === direction;
+				nodes = flow.nodes.map((node) => {
+					const previous = sameDirection ? prior.get(node.id) : undefined;
+					return previous
+						? { ...node, position: previous.position, selected: previous.selected }
+						: node;
+				});
 				edges = flow.edges;
 				layoutEngine = flow.layoutEngine;
 				if (!preservePresentation) {
+					// The node set or direction changed, so canvas undo/redo history no longer maps cleanly onto it;
+					// surviving-node positions are still preserved above when the direction is unchanged.
 					canvasHistory = EMPTY_CANVAS_HISTORY;
 					dragStartNodes = null;
 				}
 				appliedLayoutKey = layoutKey;
+				appliedDirection = direction;
 				layoutPending = false;
 			})
 			.catch((error) => {
@@ -580,6 +598,26 @@
 		} else push({ kind, text: t });
 	}
 
+	// Chat autoscroll: follow new streamed output only while the user is at the bottom; a scroll-to-bottom control
+	// appears when they have scrolled up. No-op while the log panel is collapsed (its container is not in the DOM).
+	let agentLogEl = $state<HTMLDivElement>();
+	let stickToBottom = $state(true);
+	function onAgentLogScroll() {
+		const el = agentLogEl;
+		if (el) stickToBottom = el.scrollHeight - el.scrollTop - el.clientHeight <= 40;
+	}
+	function scrollAgentLogToBottom() {
+		if (agentLogEl) agentLogEl.scrollTop = agentLogEl.scrollHeight;
+		stickToBottom = true;
+	}
+	$effect(() => {
+		// Depend on the log length AND the tail text length so BOTH new entries and streamed text deltas re-run this.
+		const tick = log.length + (log.at(-1)?.text.length ?? 0);
+		if (agentLogEl && !agentCollapsed && stickToBottom && tick >= 0) {
+			agentLogEl.scrollTop = agentLogEl.scrollHeight;
+		}
+	});
+
 	async function sendToAgent(e: SubmitEvent) {
 		e.preventDefault();
 		const instruction = chatInput.trim();
@@ -798,6 +836,13 @@
 				{#if data.authoringTurn.candidateHash}
 					<code title={data.authoringTurn.candidateHash}>{data.authoringTurn.candidateHash}</code>
 				{/if}
+				{#if candidateResumable}
+					<span class="candidatehint" data-testid="candidate-resume-hint">
+						{data.authoringTurn.status === 'BLOCKED_EXTERNAL'
+							? 'The reviewer call failed (external/operational) — this candidate is preserved.'
+							: 'Revision requested — this candidate is preserved.'} Refine it in the chat below (it continues on the same candidate), or Discard.
+					</span>
+				{/if}
 			</div>
 			<div class="candidateactions">
 				{#if data.authoringTurn.status === 'READY_TO_COMMIT' && data.authoringTurn.candidateHash}
@@ -858,7 +903,7 @@
 							</ul>
 						</aside>
 					{/if}
-					<div class="overlaytoggle" data-testid="overlay-toggle">
+					<div class="overlaytoggle" data-testid="overlay-toggle" use:draggable={{ handle: '.layoutscope' }}>
 						<div class="viewrow">
 							<label class="viewlabel">
 								<span>Composition lens</span>
@@ -886,7 +931,7 @@
 								>
 							</div>
 						</div>
-						<p class="layoutscope">
+						<p class="layoutscope" title="Drag here to move the Composition Lens">
 							<span data-testid="layout-engine"
 								>{layoutPending ? 'Arranging…' : `Layout: ${layoutEngine ?? 'unavailable'}`}</span
 							>
@@ -938,7 +983,12 @@
 							</div>
 						</header>
 						{#if !agentCollapsed}
-							<div class="agentlog" data-testid="agent-log">
+							<div
+								class="agentlog"
+								data-testid="agent-log"
+								bind:this={agentLogEl}
+								onscroll={onAgentLogScroll}
+							>
 								{#if log.length === 0}
 									<p class="logempty">
 										Describe what you want and the JPWB agent proposes the PWU Types + links onto this
@@ -958,6 +1008,15 @@
 									</div>
 								{/each}
 							</div>
+							{#if !stickToBottom}
+								<button
+									class="scrolldown"
+									type="button"
+									onclick={scrollAgentLogToBottom}
+									title="Scroll to the latest message"
+									aria-label="Scroll to latest">↓ Latest</button
+								>
+							{/if}
 						{/if}
 					</section>
 				</Panel>
@@ -1492,7 +1551,7 @@
 			{/if}
 			</SvelteFlow>
 		</div>
-		{#if editable}
+		{#if chatOpen}
 			<form class="chatbar" onsubmit={sendToAgent}>
 				<textarea
 					bind:value={chatInput}
@@ -1537,6 +1596,14 @@
 	.candidatemeta {
 		color: #fde68a;
 		font-size: 0.78rem;
+		white-space: nowrap;
+	}
+	.candidatehint {
+		min-width: 0;
+		overflow: hidden;
+		color: #fde68a;
+		font-size: 0.76rem;
+		text-overflow: ellipsis;
 		white-space: nowrap;
 	}
 	.candidatecopy code {
@@ -1746,12 +1813,35 @@
 		box-shadow: 0 10px 30px rgba(0, 0, 0, 0.4);
 	}
 	.agentpanel {
+		position: relative;
 		width: 288px;
 		/* Fits inside the flow area (which sits above the chat bar), scrolling internally. */
 		max-height: calc(100vh - 235px);
 		display: flex;
 		flex-direction: column;
 		padding: 12px;
+	}
+	.scrolldown {
+		position: absolute;
+		right: 14px;
+		bottom: 12px;
+		padding: 3px 9px;
+		border: 1px solid rgba(148, 163, 184, 0.5);
+		border-radius: 999px;
+		background: rgba(15, 23, 42, 0.92);
+		color: #e2e8f0;
+		font-size: 0.72rem;
+		cursor: pointer;
+		box-shadow: 0 2px 8px rgba(0, 0, 0, 0.35);
+	}
+	.scrolldown:hover {
+		border-color: rgba(148, 163, 184, 0.85);
+	}
+	.layoutscope {
+		cursor: grab;
+	}
+	.layoutscope:active {
+		cursor: grabbing;
 	}
 	.agentpanel.collapsed {
 		width: 200px;

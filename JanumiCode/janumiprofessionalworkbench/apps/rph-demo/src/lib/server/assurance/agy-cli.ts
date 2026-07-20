@@ -25,9 +25,26 @@ export function judgeModel(): string {
 	return resolveJudgeModel();
 }
 
+/**
+ * agy takes the prompt ONLY as the value of its `--print`/`--prompt` string flag — it reads no stdin (an empty
+ * `--print` errors "empty prompt", `-` is taken literally) and no file. So the whole prompt rides in argv, and on
+ * Windows the entire command line is capped near 32,767 chars by CreateProcess — a longer prompt fails as
+ * `spawn ENAMETOOLONG`. This ceiling keeps the prompt well under that, leaving room for the exe path, the other
+ * flags, and Windows arg-escaping overhead (which inflates quote-heavy JSON). Callers that assemble large prompts
+ * (the Reasoning Review) MUST budget to this; this is the fail-closed backstop that converts a would-be opaque
+ * `ENAMETOOLONG` into a clear, classifiable error.
+ */
+export const MAX_AGY_PROMPT_CHARS = 28_000;
+
 /** One non-interactive `agy --print "<prompt>"` call, returning stdout. Always pins the model, so the model that
- *  actually judged is the model recorded. */
+ *  actually judged is the model recorded. Fails closed if the prompt exceeds the command-line budget. */
 export async function agyPrint(prompt: string): Promise<string> {
+	if (prompt.length > MAX_AGY_PROMPT_CHARS)
+		throw new Error(
+			`agy prompt is ${prompt.length} chars, over the ${MAX_AGY_PROMPT_CHARS}-char command-line budget ` +
+				`(agy accepts the prompt only as an argv value; a longer one fails as spawn ENAMETOOLONG). ` +
+				`The caller must shorten it.`
+		);
 	const args = ['--print', prompt, '--print-timeout', '3m', '--model', judgeModel()];
 	const { stdout } = await execFileAsync(AGY_BIN, args, {
 		timeout: 240_000,

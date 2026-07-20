@@ -2,7 +2,7 @@
 // "allowed and resolved provider/model/version". Both the application default and an environment override are
 // concrete selections passed to agy --model; neither permits agy's unnamed dynamic default.
 import { afterEach, describe, expect, it } from 'vitest';
-import { DEFAULT_JUDGE_MODEL, judgeModel } from './agy-cli.js';
+import { agyPrint, DEFAULT_JUDGE_MODEL, judgeModel, MAX_AGY_PROMPT_CHARS } from './agy-cli.js';
 
 const KEY = 'JPWB_JUDGE_MODEL';
 const original = process.env[KEY];
@@ -27,5 +27,16 @@ describe('judgeModel — the evaluator identity may not be a fiction (§8.4 / §
 	it('treats an empty override as absent instead of recording an empty identity', () => {
 		process.env[KEY] = '';
 		expect(judgeModel()).toBe(DEFAULT_JUDGE_MODEL);
+	});
+});
+
+describe('agyPrint — fails closed above the command-line budget instead of crashing as spawn ENAMETOOLONG', () => {
+	// agy takes the prompt only as an argv value, so an over-long prompt would fail deep in the OS as an opaque
+	// `spawn ENAMETOOLONG`. The guard throws a clear, classifiable error BEFORE spawning (so this never touches agy),
+	// which the floor classifies as an operational validator failure the user can retry — never a graph rejection.
+	it('rejects an over-budget prompt with a clear message and never spawns', async () => {
+		await expect(agyPrint('x'.repeat(MAX_AGY_PROMPT_CHARS + 1))).rejects.toThrow(
+			/command-line budget/
+		);
 	});
 });

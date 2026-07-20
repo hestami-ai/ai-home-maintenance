@@ -174,8 +174,12 @@ export class PiAuthoringAgent implements AuthoringAgent {
 	}
 }
 
-/** Pull a short human summary out of a Pi tool result (its first text content block). */
+/** The terse, human-facing tool summary for the chat log / durable transcript. Prefer the descriptor's own
+ *  `details.summary` (kept SEPARATE from the model-facing `content`, which also carries the full structured JSON, so
+ *  the raw JSON never reaches the visible conversation); fall back to the first text content block otherwise. */
 function summarize(result: unknown): string {
+	const details = (result as { details?: { summary?: unknown } } | undefined)?.details;
+	if (details && typeof details.summary === 'string') return details.summary;
 	const content = (result as { content?: Array<{ type?: string; text?: string }> } | undefined)
 		?.content;
 	const first = content?.find((c) => c.type === 'text');

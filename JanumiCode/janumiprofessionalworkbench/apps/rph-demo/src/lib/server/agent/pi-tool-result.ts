@@ -4,18 +4,24 @@ import type { ToolRunResult } from './types.js';
 
 export interface PiCompatibleToolResult {
 	readonly content: Array<{ readonly type: 'text'; readonly text: string }>;
-	readonly details: { readonly ok: boolean; readonly data?: unknown };
+	readonly details: { readonly ok: boolean; readonly summary: string; readonly data?: unknown };
 }
 
 /**
  * Pi returns `content` to the model; `details` is host/UI metadata. Keep the human summary first, but include the
  * descriptor's JSON-safe structured result so read tools actually give the model the state their contracts promise.
+ * `details.summary` carries the terse human line ALONE — the chat log and durable transcript render that, never the
+ * `content` blob, so a read tool's raw JSON dump can no longer leak into the visible conversation.
  */
 export function toPiToolResult(result: ToolRunResult): PiCompatibleToolResult {
 	const structured = result.data === undefined ? '' : `\n\nStructured result:\n${JSON.stringify(result.data)}`;
 	return {
 		content: [{ type: 'text', text: `${result.summary}${structured}` }],
-		details: { ok: result.ok, ...(result.data === undefined ? {} : { data: result.data }) }
+		details: {
+			ok: result.ok,
+			summary: result.summary,
+			...(result.data === undefined ? {} : { data: result.data })
+		}
 	};
 }
 

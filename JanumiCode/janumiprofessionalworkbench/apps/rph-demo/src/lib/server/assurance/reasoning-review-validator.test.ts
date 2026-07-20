@@ -20,6 +20,7 @@ import {
 	type ValidatorContext
 } from '@janumipwb/rph-assurance';
 import { describe, expect, it } from 'vitest';
+import { MAX_AGY_PROMPT_CHARS } from './agy-cli.js';
 import { createAgyReasoningReviewValidator, type AgyPrint } from './reasoning-review-validator.js';
 
 const SUBJECT: AssuranceSubject = {
@@ -159,6 +160,24 @@ describe('Reasoning Review Validator — §14.3 conformance: no private chain-of
 			modelId: JUDGE
 		}).evaluate(SUBJECT, ctx({ rationale: RATIONALE }));
 		expect(ok.limitations.some((l) => l.includes('no professional rationale summary'))).toBe(false);
+	});
+
+	it('budgets the WHOLE prompt under agy\'s command-line ceiling on a huge graph (the ENAMETOOLONG fix)', async () => {
+		const { prompts, print } = capturing();
+		const result = await createAgyReasoningReviewValidator({ print, modelId: JUDGE }).evaluate(
+			SUBJECT,
+			ctx({
+				rationale: RATIONALE,
+				narration: 'n'.repeat(50_000),
+				content: `{"pad":"${'x'.repeat(200_000)}"}`
+			})
+		);
+		// The assembled prompt stays under the argv ceiling, so agyPrint can never reach `spawn ENAMETOOLONG`...
+		expect(prompts[0].length).toBeLessThanOrEqual(MAX_AGY_PROMPT_CHARS);
+		// ...the oversized graph content is truncated (declared, §9.7)...
+		expect(prompts[0]).toContain('…(truncated)');
+		// ...and the review still reaches a real disposition rather than failing on the payload size.
+		expect(result.executionFailed).toBe(false);
 	});
 
 	it('DECLARES truncation rather than silently cutting the subject or the account (§9.7)', async () => {

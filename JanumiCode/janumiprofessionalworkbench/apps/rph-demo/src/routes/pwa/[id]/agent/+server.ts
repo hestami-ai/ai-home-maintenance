@@ -34,6 +34,7 @@ import {
 	markAuthoringTurnExternalBlock,
 	markAuthoringTurnRevisionRequired,
 	markAuthoringTurnValid,
+	resumeAuthoringTurn,
 	type AuthoringTurn
 } from '$lib/server/authoring-turn';
 import type { RequestHandler } from './$types';
@@ -257,7 +258,10 @@ export const POST: RequestHandler = async ({ params, request }) => {
 					send({ kind: 'status', text });
 					transcript.push({ role: 'SYSTEM', kind: 'message', text });
 				}
-				turn = beginAuthoringTurn(params.id);
+				// Resume a recoverable staged candidate (REVISION_REQUIRED / BLOCKED_EXTERNAL) over its existing fork so
+				// the human can address it in place — never forced to discard accepted work; otherwise begin a fresh
+				// isolated candidate. Either path leaves canonical DRAFT unchanged.
+				turn = resumeAuthoringTurn(params.id) ?? beginAuthoringTurn(params.id);
 				const agent = await createAuthoringAgent(turn.broker, mode);
 				// The run declares its ACTUAL resolved model/provider; the floor binds independence to that, never
 				// to a role label (§8.12).
@@ -270,7 +274,9 @@ export const POST: RequestHandler = async ({ params, request }) => {
 				};
 				await agent.run(instruction, onEvent, request.signal);
 
-				markAuthoringTurnValid(turn);
+				// A fresh or REVISE-resumed candidate is COLLECTING and advances to ASSURING here; a candidate resumed
+				// from BLOCKED_EXTERNAL is already ASSURING (a mutable state), so the agent refined it in place.
+				if (turn.status === 'COLLECTING') markAuthoringTurnValid(turn);
 				// Run + record the de minimis floor over the same isolated candidate and auto-refine at most once.
 				const floorResult = await runFloorAfterTurn({
 					pwaId: params.id,
