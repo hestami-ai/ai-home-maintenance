@@ -44,4 +44,36 @@ describe('lintComposition — advisory structure checks', () => {
 	it('returns nothing for an empty graph', () => {
 		expect(lintComposition([])).toEqual([]);
 	});
+
+	// JAN-PRPWA-DS-001 SPEC-2 / INV-4a / INV-4b (DWP-03): the under-decomposition advisory.
+	const leaf = (
+		id: string,
+		requiredOutputs: string[],
+		executionBoundary?: 'INTERNAL' | 'DELEGATED_EXTERNAL'
+	) => ({ id, name: id, isRoot: false, permittedChildTypeIds: [] as string[], requiredOutputs, executionBoundary });
+
+	it('INV-4b: fires on an INTERNAL leaf that produces >1 distinct output', () => {
+		const f = lintComposition([node('root', true, ['multi']), leaf('multi', ['spec', 'code', 'tests'])]);
+		expect(
+			f.some((x) => x.severity === 'info' && /distinct outputs/.test(x.message))
+		).toBe(true);
+	});
+
+	it('INV-4b: does NOT fire on a single-output (or zero-output) irreducible INTERNAL leaf', () => {
+		const f = lintComposition([node('root', true, ['one', 'none']), leaf('one', ['artifact']), leaf('none', [])]);
+		expect(f.some((x) => /distinct outputs/.test(x.message))).toBe(false);
+	});
+
+	it('INV-4a: NEVER fires on a DELEGATED_EXTERNAL node, whatever it produces (structural suppression)', () => {
+		const f = lintComposition([
+			node('root', true, ['delegated']),
+			leaf('delegated', ['result-a', 'result-b', 'result-c'], 'DELEGATED_EXTERNAL')
+		]);
+		expect(f.some((x) => /distinct outputs/.test(x.message))).toBe(false);
+	});
+
+	it('deduplicates outputs: a leaf repeating one output name is not flagged', () => {
+		const f = lintComposition([node('root', true, ['dup']), leaf('dup', ['artifact', 'artifact'])]);
+		expect(f.some((x) => /distinct outputs/.test(x.message))).toBe(false);
+	});
 });

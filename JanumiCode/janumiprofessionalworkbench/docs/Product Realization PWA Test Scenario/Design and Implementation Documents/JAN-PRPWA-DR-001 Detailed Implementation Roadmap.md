@@ -209,8 +209,8 @@ rollback_and_recovery: ["Remove checkUnderDecomposition call"]
 risks: ["Only the >1-output arm is implementable now (template arms deferred) — communicate the partial heuristic (no silent cap)"]
 open_decisions: ["Confirm >1-output-only scope for this wave (F-9 UNKNOWN)"]
 exit_criteria: ["check-types + rph-authoring tests green; INV-4a/INV-4b property tests pass"]
-delivery_state: NOT_STARTED
-conformance_state: UNASSESSED
+delivery_state: DELIVERED  # lint.ts checkUnderDecomposition wired after checkFanout; CompositionNode gains optional executionBoundary + requiredOutputs (PwuTypeView already assignable from DWP-02); surfaces via review_composition (tools.ts:207 unchanged — passes listTypes() through). Gate: check-types 21/21, rph-authoring 33 tests (lint +4), lint 0, boundary 0.
+conformance_state: CONFORMANT  # INV-4a hard structural skip on DELEGATED_EXTERNAL; INV-4b advisory (info) on >1 distinct requiredOutput, dismissible per R-5 (structural proxy, not an irreducibility machine-check); INV-6 non-blocking. Template-keyed arms DEFERRED (need SPEC-4/R-12) — partial heuristic disclosed in code + finding text (no silent cap).
 ```
 
 ```yaml
