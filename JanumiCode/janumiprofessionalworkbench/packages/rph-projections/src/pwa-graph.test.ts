@@ -89,3 +89,64 @@ describe('analyzePwaGraph — structural validity', () => {
 		expect(r.findings.some((f) => /flat star/.test(f))).toBe(true);
 	});
 });
+
+describe('analyzePwaGraph — artifact-flow conservation (the coherent verdict)', () => {
+	// A branch whose subtree GROUNDS its output (a leaf re-exports it): valid AND coherent, no conservation advisory.
+	it('a grounded branch is coherent (a child produces the parent output)', () => {
+		const r = analyze([
+			node('root', true, ['phase'], [], ['product']),
+			node('phase', false, ['leaf'], [], ['product']),
+			node('leaf', false, [], [], ['product'])
+		]);
+		expect(r.valid).toBe(true);
+		expect(r.coherent).toBe(true);
+		expect(r.conservation).toEqual([]);
+		expect(r.metrics.ungroundedBranches).toBe(0);
+	});
+
+	// The reported pathology: a branch emits an artifact, but nothing in its subtree produces or feeds it.
+	it('an ungrounded branch is valid but NOT coherent (children feed the parent nothing)', () => {
+		const r = analyze([
+			node('root', true, ['phase'], [], []),
+			node('phase', false, ['leaf'], [], ['owners-project-requirements']),
+			node('leaf', false, [], [], ['unrelated-artifact'])
+		]);
+		expect(r.valid).toBe(true); // structural invariants still hold — the gate is unchanged
+		expect(r.coherent).toBe(false);
+		expect(r.metrics.ungroundedBranches).toBe(1);
+		expect(r.conservation.some((c) => /ungrounded branch: "phase"/.test(c))).toBe(true);
+	});
+
+	// Synthesis grounds a branch too: the parent CONSUMES a child's output (it doesn't have to re-export it).
+	it('a branch that synthesises from a child output is grounded', () => {
+		const r = analyze([
+			node('root', true, ['phase']),
+			node('phase', false, ['leaf'], ['sub-result'], ['phase-result']),
+			node('leaf', false, [], [], ['sub-result'])
+		]);
+		expect(r.coherent).toBe(true);
+		expect(r.metrics.ungroundedBranches).toBe(0);
+	});
+
+	// Cross-subtree flows (endpoints meet only at the root) are COUNTED but are not a coherence violation.
+	it('counts cross-subtree data-flow edges without failing coherence', () => {
+		const r = analyze([
+			node('root', true, ['pa', 'pb'], [], []),
+			node('pa', false, ['la'], ['x'], ['x']),
+			node('la', false, [], [], ['x']),
+			node('pb', false, ['lb'], [], []),
+			node('lb', false, [], ['x'], [])
+		]);
+		// pa.out x is grounded by la (re-export); lb consumes x produced in pa's subtree → a cross-subtree edge.
+		expect(r.metrics.crossSubtreeFlows).toBeGreaterThan(0);
+		expect(r.coherent).toBe(true);
+	});
+
+	// The conservation layer must be strictly ADDITIVE: it never mutates the structural findings or the valid flag.
+	it('does not alter structural findings or the valid flag', () => {
+		const r = analyze([node('root', true, ['a']), node('a', false, [], ['ghost'], [])]);
+		expect(r.valid).toBe(true);
+		expect(r.findings.some((f) => /dangling input/.test(f))).toBe(true);
+		expect(r.conservation).toEqual([]); // a is a leaf — no branch to ground
+	});
+});

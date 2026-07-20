@@ -7,6 +7,7 @@ import { test, type Page, type APIRequestContext } from '@playwright/test';
 import {
 	analyzePwaGraph,
 	buildPwaGraphExport,
+	formatPwaCoherenceReport,
 	type PwaGraphExport,
 	type PwaGraphNode,
 	type PwaGraphReport
@@ -91,5 +92,8 @@ export async function snapshotPwaGraph(
 	const report = analyzePwaGraph(exported);
 	writeFileSync(join(dir, `${slug(label)}.export.json`), JSON.stringify(exported, null, 2));
 	writeFileSync(join(dir, `${slug(label)}.report.json`), JSON.stringify(report, null, 2));
+	// The legible proof artifact a debugging agent (or a human) reads — the coherence verdict, invariants, and the
+	// conservation cross-check, rendered from the same export/report the assertions run on.
+	writeFileSync(join(dir, `${slug(label)}.report.md`), formatPwaCoherenceReport(exported, report));
 	return { export: exported, report };
 }

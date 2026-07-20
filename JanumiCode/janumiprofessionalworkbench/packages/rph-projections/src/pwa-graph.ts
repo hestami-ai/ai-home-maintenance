@@ -8,6 +8,13 @@
 //   • dataFlow — ORDERING: a producer's requiredOutput artifact = a consumer's requiredInput artifact.
 // Structural validity is asserted on the permits hierarchy (single root, acyclic, connected); data-flow gaps and
 // fan-out are reported as findings. Everything here is PURE and browser-safe (no engine import).
+//
+// The two relations are computed independently — which is exactly why a flat output→input name-join can look
+// incoherent (a branch that emits an artifact its own children never produce still draws edges). The CONSERVATION
+// layer (analyzeConservation, the `coherent` verdict, and the `conservation` advisories) crosses permits × dataFlow
+// to catch that class: an "ungrounded branch" emits outputs nothing in its subtree grounds. It reports in SEPARATE
+// report fields and never touches `valid`, so the structural ValidatePwa gate is unchanged; a proof-harness asserts
+// on `coherent`.
 
 export interface PwaGraphNode {
 	readonly id: string;
@@ -69,14 +76,28 @@ export interface PwaGraphMetrics {
 	readonly danglingInputs: number;
 	readonly unusedOutputs: number;
 	readonly cycleCount: number;
+	/** Non-leaf types that emit outputs their own subtree does not produce or feed (conservation gap). */
+	readonly ungroundedBranches: number;
+	/** Data-flow edges whose producer and consumer share no common ancestor below the root (the "spray"). */
+	readonly crossSubtreeFlows: number;
 }
 
 export interface PwaGraphReport {
 	/** True iff every HARD invariant holds (single root, acyclic permits, connected). Findings are advisory. */
 	readonly valid: boolean;
+	/**
+	 * `valid` AND every artifact-flow conservation check holds (no ungrounded branches). This is the STRICTER
+	 * verdict a proof-harness asserts on — it answers "is this a coherent PWA?", not merely "is it well-formed?".
+	 * Kept distinct from `valid` on purpose: `valid` stays purely structural so the ValidatePwa/floor gate (which
+	 * keys on `valid`) is unchanged by this layer.
+	 */
+	readonly coherent: boolean;
 	readonly invariants: Invariant[];
 	readonly metrics: PwaGraphMetrics;
+	/** Structural advisories (fan-out, dangling/unused artifacts, duplicate kinds/names). */
 	readonly findings: string[];
+	/** Artifact-flow CONSERVATION advisories — the checks the flat name-join cannot see (permits × dataFlow). */
+	readonly conservation: string[];
 }
 
 const FANOUT_LIMIT = 5;
@@ -205,10 +226,114 @@ function maxDepth(ex: PwaGraphExport): number {
 	return Math.max(0, ...ex.roots.map(depth));
 }
 
+/** parent→children over permits (rebuilt locally, like the other structural passes). */
+function permitsChildren(ex: PwaGraphExport): Map<string, string[]> {
+	const m = new Map<string, string[]>();
+	for (const e of ex.permits) m.set(e.parent, [...(m.get(e.parent) ?? []), e.child]);
+	return m;
+}
+
+/** child→parents over permits (a type may be permitted by more than one parent). */
+function permitsParents(ex: PwaGraphExport): Map<string, string[]> {
+	const m = new Map<string, string[]>();
+	for (const e of ex.permits) m.set(e.child, [...(m.get(e.child) ?? []), e.parent]);
+	return m;
+}
+
+/** Descendants of `start` over permits (excludes `start`; cycle-guarded). */
+function descendantsOf(children: ReadonlyMap<string, string[]>, start: string): Set<string> {
+	const out = new Set<string>();
+	const queue = [...(children.get(start) ?? [])];
+	while (queue.length) {
+		const id = queue.shift()!;
+		if (out.has(id)) continue;
+		out.add(id);
+		for (const c of children.get(id) ?? []) if (!out.has(c)) queue.push(c);
+	}
+	return out;
+}
+
+/** Ancestors of `id` over permits, INCLUDING `id` itself (multi-parent, cycle-guarded). */
+function ancestorsOf(parents: ReadonlyMap<string, string[]>, id: string): Set<string> {
+	const out = new Set<string>();
+	const queue = [id];
+	while (queue.length) {
+		const x = queue.shift()!;
+		if (out.has(x)) continue;
+		out.add(x);
+		for (const p of parents.get(x) ?? []) if (!out.has(p)) queue.push(p);
+	}
+	return out;
+}
+
+/** Every artifact produced by any strict descendant of `id`. */
+function producedInSubtree(
+	nodeById: ReadonlyMap<string, PwaGraphNode>,
+	children: ReadonlyMap<string, string[]>,
+	id: string
+): Set<string> {
+	const produced = new Set<string>();
+	for (const d of descendantsOf(children, id))
+		for (const o of nodeById.get(d)?.requiredOutputs ?? []) produced.add(o);
+	return produced;
+}
+
+/** A branch is GROUNDED iff a descendant re-exports one of its outputs, or it synthesises from a descendant output. */
+function branchIsGrounded(n: PwaGraphNode, produced: ReadonlySet<string>): boolean {
+	return n.requiredOutputs.some((o) => produced.has(o)) || n.requiredInputs.some((i) => produced.has(i));
+}
+
+/** A data-flow edge is CROSS-SUBTREE iff its endpoints share no common ancestor below the root (the "spray"). */
+function isCrossSubtree(
+	parents: ReadonlyMap<string, string[]>,
+	rootSet: ReadonlySet<string>,
+	e: DataFlowEdge
+): boolean {
+	const up = ancestorsOf(parents, e.consumer);
+	for (const a of ancestorsOf(parents, e.producer)) if (!rootSet.has(a) && up.has(a)) return false;
+	return true;
+}
+
+/**
+ * ARTIFACT-FLOW CONSERVATION — cross the two otherwise-independent relations (permits × dataFlow) that a flat
+ * output→input name-join cannot see. Returns advisory messages + counters; drives `coherent`, never `valid`.
+ *   • ungrounded-branch (a real conservation VIOLATION): a non-leaf declares outputs, yet nothing in its subtree
+ *     produces or feeds them — the children don't ground the parent's output. This is the "a branch emits data but
+ *     none of its sub-phases feed anything up to it" pathology.
+ *   • cross-subtree flow (a descriptive SIGNAL, not a violation): a data-flow edge whose producer and consumer
+ *     share no common ancestor below the root — the "spray across the whole graph" that reads as an incoherent
+ *     overlay. Counted only; a broadly-consumed baseline is legitimately cross-cutting.
+ */
+function analyzeConservation(ex: PwaGraphExport): {
+	conservation: string[];
+	ungroundedBranches: number;
+	crossSubtreeFlows: number;
+} {
+	const nodeById = new Map(ex.nodes.map((n) => [n.id, n]));
+	const children = permitsChildren(ex);
+	const parents = permitsParents(ex);
+	const rootSet = new Set(ex.roots);
+
+	const conservation: string[] = [];
+	for (const n of ex.nodes) {
+		const isBranch = (children.get(n.id) ?? []).length > 0;
+		if (!isBranch || n.requiredOutputs.length === 0) continue; // a leaf, or emits nothing
+		if (!branchIsGrounded(n, producedInSubtree(nodeById, children, n.id)))
+			conservation.push(
+				`ungrounded branch: "${n.name}" emits [${n.requiredOutputs.join(', ')}] but nothing in its subtree produces or feeds those artifacts — its children don't ground the parent's output.`
+			);
+	}
+
+	const crossSubtreeFlows = ex.dataFlow.filter((e) => isCrossSubtree(parents, rootSet, e)).length;
+	return { conservation, ungroundedBranches: conservation.length, crossSubtreeFlows };
+}
+
 /**
  * Analyze a PWA graph export. HARD invariants (drive `valid`): exactly one root, permits acyclic, every node
  * reachable from the root. Advisory findings: dangling data-flow inputs (a non-root type consumes an artifact no
  * type produces), unused outputs, over-broad fan-out (a "star" not a decomposition), duplicate kinds/names.
+ * A separate CONSERVATION layer (permits × dataFlow) drives the stricter `coherent` verdict + `conservation`
+ * advisories without touching `valid`.
  */
 export function analyzePwaGraph(ex: PwaGraphExport): PwaGraphReport {
 	const nodeById = new Map(ex.nodes.map((n) => [n.id, n]));
@@ -282,6 +407,8 @@ export function analyzePwaGraph(ex: PwaGraphExport): PwaGraphReport {
 	dup((n) => n.pwuKind, 'kind');
 	dup((n) => n.name, 'name');
 
+	const cons = analyzeConservation(ex);
+
 	const metrics: PwaGraphMetrics = {
 		nodeCount: ex.nodes.length,
 		permitsEdges: ex.permits.length,
@@ -292,13 +419,18 @@ export function analyzePwaGraph(ex: PwaGraphExport): PwaGraphReport {
 		orphanCount: orphans.length,
 		danglingInputs,
 		unusedOutputs,
-		cycleCount: cyc.size
+		cycleCount: cyc.size,
+		ungroundedBranches: cons.ungroundedBranches,
+		crossSubtreeFlows: cons.crossSubtreeFlows
 	};
 
+	const valid = invariants.every((i) => i.ok);
 	return {
-		valid: invariants.every((i) => i.ok),
+		valid,
+		coherent: valid && cons.ungroundedBranches === 0,
 		invariants,
 		metrics,
-		findings
+		findings,
+		conservation: cons.conservation
 	};
 }

@@ -8,6 +8,7 @@ export * from './pwu-replay.js';
 export * from './work-projection.js';
 export * from './graph-view.js';
 export * from './pwa-graph.js';
+export * from './pwa-graph-report.js';
 export * from './pwu-behavior.js';
 export * from './traceability-view.js';
 export * from './compatibility-view.js';
