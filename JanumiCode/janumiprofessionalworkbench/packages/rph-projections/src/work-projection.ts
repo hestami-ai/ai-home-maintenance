@@ -76,6 +76,95 @@ function node(partial: Omit<WorkNode, 'qualifiedSuccess'>): WorkNode {
 	};
 }
 
+/** Fold `IntentCaptured` into the node set (mutates `nodes` by reference). */
+function applyIntentCaptured(nodes: Record<string, WorkNode>, event: DomainEvent): void {
+	const p = event.payload as { intentId: string; originatingExpression?: string };
+	nodes[p.intentId] = node({
+		id: p.intentId,
+		objectType: 'INTENT',
+		title: p.originatingExpression,
+		intentStatus: 'RAW',
+		openObservationCounts: {}
+	});
+}
+
+/** Fold `PwuProposed` into the node set (mutates `nodes` by reference). */
+function applyPwuProposed(nodes: Record<string, WorkNode>, event: DomainEvent): void {
+	const p = event.payload as { pwuId: string; title?: string };
+	// The axes are READ FROM THE EVENT by applyPwuAxisEvent, not assumed here. They used to be
+	// hardcoded PROPOSED/NOT_PLANNED/UNASSESSED/UNKNOWN — right for a freshly proposed PWU, and a
+	// lie the moment §11.3's payload says anything else.
+	const axes = applyPwuAxisEvent(undefined, event);
+	if (!axes) return;
+	nodes[p.pwuId] = node({
+		id: p.pwuId,
+		objectType: 'PROFESSIONAL_WORK_UNIT',
+		title: p.title,
+		...axes,
+		openObservationCounts: {}
+	});
+}
+
+// THE FINDINGS. DOC-004 §38 permits a green node only when "no blocking finding remains", and
+// WorkNode.openObservationCounts exists for exactly that check — and was ALWAYS `{}`, because nothing
+// folded this event. The field anticipated the ratified rule; the fold never arrived. An observation
+// is counted against every subject it names, by severity, while its disposition is OPEN (§18.1:
+// observations "must remain visible after remediation", so REMEDIATED stays in the log but stops
+// blocking).
+/** Fold `AssuranceObservationRecorded` into the node set (mutates `nodes` by reference). */
+function applyAssuranceObservationRecorded(
+	nodes: Record<string, WorkNode>,
+	event: DomainEvent
+): void {
+	const p = event.payload as {
+		subjectObjectIds?: string[];
+		severity?: string;
+		disposition?: string;
+	};
+	if (!OPEN_DISPOSITIONS.has(p.disposition ?? '')) return;
+	const severity = p.severity;
+	if (!severity) return;
+	for (const subjectId of p.subjectObjectIds ?? []) {
+		const subject = nodes[subjectId];
+		if (!subject) continue;
+		const counts = {
+			...subject.openObservationCounts,
+			[severity]: (subject.openObservationCounts[severity] ?? 0) + 1
+		};
+		nodes[subjectId] = node({ ...subject, openObservationCounts: counts });
+	}
+}
+
+// EVERY OTHER PWU EVENT. This used to be `default: break` with a comment promising that "further
+// events (state changes, observations) update the axes / counts here as later milestones add their
+// commands". The milestones came; the fold never followed. Rebuilt over the reference undertaking's
+// 251 events this view reported every PWU as PROPOSED/NOT_PLANNED/UNASSESSED while the objects were
+// BASELINED/SUCCEEDED/SATISFIED — a read model that surfaces render, wrong for every PWU that had
+// ever done anything. Its RPH-PER-007 test was green throughout, because it compared the fold to
+// ITSELF: a broken fold equals a broken fold.
+/** Fold any other PWU axis-state event into the node set (mutates `nodes` by reference). */
+function applyPwuAxisUpdate(nodes: Record<string, WorkNode>, event: DomainEvent): void {
+	const existing = nodes[event.aggregateId];
+	if (existing?.objectType !== 'PROFESSIONAL_WORK_UNIT') return;
+	const next = applyPwuAxisEvent(
+		{
+			workLifecycleState: existing.workLifecycleState ?? '',
+			executionState: existing.executionState ?? '',
+			assuranceState: existing.assuranceState ?? '',
+			shapeIntegrityState: existing.shapeIntegrityState ?? ''
+		},
+		event
+	);
+	if (!next) return;
+	nodes[event.aggregateId] = node({
+		id: existing.id,
+		objectType: existing.objectType,
+		...(existing.title === undefined ? {} : { title: existing.title }),
+		...next,
+		openObservationCounts: existing.openObservationCounts
+	});
+}
+
 export const workProjector: Projector<WorkView> = {
 	name: 'work',
 	handlerVersion: 1,
@@ -83,88 +172,18 @@ export const workProjector: Projector<WorkView> = {
 	apply: (view, event: DomainEvent): WorkView => {
 		const nodes: Record<string, WorkNode> = { ...view.nodes };
 		switch (event.eventType) {
-			case 'IntentCaptured': {
-				const p = event.payload as { intentId: string; originatingExpression?: string };
-				nodes[p.intentId] = node({
-					id: p.intentId,
-					objectType: 'INTENT',
-					title: p.originatingExpression,
-					intentStatus: 'RAW',
-					openObservationCounts: {}
-				});
+			case 'IntentCaptured':
+				applyIntentCaptured(nodes, event);
 				break;
-			}
-			case 'PwuProposed': {
-				const p = event.payload as { pwuId: string; title?: string };
-				// The axes are READ FROM THE EVENT by applyPwuAxisEvent, not assumed here. They used to be
-				// hardcoded PROPOSED/NOT_PLANNED/UNASSESSED/UNKNOWN — right for a freshly proposed PWU, and a
-				// lie the moment §11.3's payload says anything else.
-				const axes = applyPwuAxisEvent(undefined, event);
-				if (!axes) break;
-				nodes[p.pwuId] = node({
-					id: p.pwuId,
-					objectType: 'PROFESSIONAL_WORK_UNIT',
-					title: p.title,
-					...axes,
-					openObservationCounts: {}
-				});
+			case 'PwuProposed':
+				applyPwuProposed(nodes, event);
 				break;
-			}
-			// EVERY OTHER PWU EVENT. This used to be `default: break` with a comment promising that "further
-			// events (state changes, observations) update the axes / counts here as later milestones add their
-			// commands". The milestones came; the fold never followed. Rebuilt over the reference undertaking's
-			// 251 events this view reported every PWU as PROPOSED/NOT_PLANNED/UNASSESSED while the objects were
-			// BASELINED/SUCCEEDED/SATISFIED — a read model that surfaces render, wrong for every PWU that had
-			// ever done anything. Its RPH-PER-007 test was green throughout, because it compared the fold to
-			// ITSELF: a broken fold equals a broken fold.
-			// THE FINDINGS. DOC-004 §38 permits a green node only when "no blocking finding remains", and
-			// WorkNode.openObservationCounts exists for exactly that check — and was ALWAYS `{}`, because nothing
-			// folded this event. The field anticipated the ratified rule; the fold never arrived. An observation
-			// is counted against every subject it names, by severity, while its disposition is OPEN (§18.1:
-			// observations "must remain visible after remediation", so REMEDIATED stays in the log but stops
-			// blocking).
-			case 'AssuranceObservationRecorded': {
-				const p = event.payload as {
-					subjectObjectIds?: string[];
-					severity?: string;
-					disposition?: string;
-				};
-				if (!OPEN_DISPOSITIONS.has(p.disposition ?? '')) break;
-				const severity = p.severity;
-				if (!severity) break;
-				for (const subjectId of p.subjectObjectIds ?? []) {
-					const subject = nodes[subjectId];
-					if (!subject) continue;
-					const counts = {
-						...subject.openObservationCounts,
-						[severity]: (subject.openObservationCounts[severity] ?? 0) + 1
-					};
-					nodes[subjectId] = node({ ...subject, openObservationCounts: counts });
-				}
+			case 'AssuranceObservationRecorded':
+				applyAssuranceObservationRecorded(nodes, event);
 				break;
-			}
-			default: {
-				const existing = nodes[event.aggregateId];
-				if (existing?.objectType !== 'PROFESSIONAL_WORK_UNIT') break;
-				const next = applyPwuAxisEvent(
-					{
-						workLifecycleState: existing.workLifecycleState ?? '',
-						executionState: existing.executionState ?? '',
-						assuranceState: existing.assuranceState ?? '',
-						shapeIntegrityState: existing.shapeIntegrityState ?? ''
-					},
-					event
-				);
-				if (!next) break;
-				nodes[event.aggregateId] = node({
-					id: existing.id,
-					objectType: existing.objectType,
-					...(existing.title === undefined ? {} : { title: existing.title }),
-					...next,
-					openObservationCounts: existing.openObservationCounts
-				});
+			default:
+				applyPwuAxisUpdate(nodes, event);
 				break;
-			}
 		}
 		return { nodes };
 	}

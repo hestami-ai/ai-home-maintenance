@@ -15,6 +15,7 @@ import type {
 	ActorReference,
 	AdmitEvidencePayload,
 	AssertClaimPayload,
+	CommandResult,
 	CreateAssurancePolicyPayload,
 	DetectAssumptionPayload,
 	DomainCommand,
@@ -114,7 +115,9 @@ function rejectRemediationActionsNotPermitted(
 	const permitted = new Set(permittedControlActions);
 	const bad = [
 		...new Set(
-			(remediationRules ?? []).flatMap((r) => r?.remediationActions ?? []).filter((a) => !permitted.has(a))
+			(remediationRules ?? [])
+				.flatMap((r) => r?.remediationActions ?? [])
+				.filter((a) => !permitted.has(a))
 		)
 	];
 	return bad.length === 0
@@ -139,7 +142,11 @@ export const createAssurancePolicy: CommandHandler = (ctx, command, payload) => 
 	const escBlock = rejectUnratifiedEscalationSeverities(command, p.escalationRules);
 	if (escBlock) return escBlock;
 	// #5 — remediationRules may only prescribe permitted control actions (§11).
-	const remBlock = rejectRemediationActionsNotPermitted(command, p.remediationRules, p.permittedControlActions);
+	const remBlock = rejectRemediationActionsNotPermitted(
+		command,
+		p.remediationRules,
+		p.permittedControlActions
+	);
 	if (remBlock) return remBlock;
 	// The initial governance state, split by policy kind:
 	//   - REGULAR (ratified DOC-004 catalog) policies are born DRAFT — the RATIFIED AssurancePolicy.status initial
@@ -207,42 +214,17 @@ export const createAssurancePolicy: CommandHandler = (ctx, command, payload) => 
 	});
 };
 
-/** EditAssurancePolicy — revise a non-floor, non-superseded policy's content in place (same version, revision++).
- *  Only payload-present fields change (patch). Floor policies + SUPERSEDED policies reject. */
-export const editAssurancePolicy: CommandHandler = (ctx, command, payload) => {
-	const p = payload as EditAssurancePolicyPayload;
-	const id = command.targetAggregateId;
-	const floorBlock = rejectIfFloorLocked(command)();
-	if (floorBlock) return floorBlock;
-	const loaded = loadOrReject(ctx, command, id);
-	if (!loaded.ok) return loaded.result;
-	if (loaded.state.status === 'SUPERSEDED') {
-		return reject(
-			command,
-			'RPH_INVARIANT_VIOLATION',
-			`Policy ${id} is SUPERSEDED and cannot be edited — create a new version instead`,
-			[id]
-		);
-	}
-	// #1b — a revised escalationRules must also honor §10.3's escalatable severity (CRITICAL only). Content validation
-	// runs AFTER the existence/SUPERSEDED checks (mirroring remBlock) so a lifecycle rejection takes precedence over a
-	// payload-shape rejection.
-	const escBlock = rejectUnratifiedEscalationSeverities(command, p.escalationRules);
-	if (escBlock) return escBlock;
-	// #5 — the effective remediationRules (new or existing) must keep remediationActions ⊆ the effective permitted
-	// set, so an edit that narrows permittedControlActions or revises remediationRules cannot leave an ungoverned
-	// remediation action behind.
-	const remBlock = rejectRemediationActionsNotPermitted(
-		command,
-		(p.remediationRules ?? loaded.state.remediationRules) as
-			| ReadonlyArray<{ remediationActions?: readonly string[] }>
-			| undefined,
-		(p.permittedControlActions ?? loaded.state.permittedControlActions) as readonly string[] | undefined
-	);
-	if (remBlock) return remBlock;
-	const newRevision = loaded.revision + 1;
-	const next: Record<string, unknown> = {
-		...nextEnvelope(loaded.state, command, newRevision),
+/** Build the next ASSURANCE_POLICY state for an edit: the envelope bump plus a patch that changes ONLY the
+ *  payload-present fields (an absent field is left exactly as it was — same version, revision++). Extracted from
+ *  editAssurancePolicy so the handler's reject short-circuit stays flat; the per-field patch is pure construction. */
+function buildEditedPolicyState(
+	loadedState: Record<string, unknown>,
+	command: DomainCommand,
+	p: EditAssurancePolicyPayload,
+	newRevision: number
+): Record<string, unknown> {
+	return {
+		...nextEnvelope(loadedState, command, newRevision),
 		...(p.name !== undefined ? { name: p.name } : {}),
 		...(p.purpose !== undefined ? { purpose: p.purpose } : {}),
 		...(p.rationale !== undefined ? { rationale: p.rationale } : {}),
@@ -271,6 +253,43 @@ export const editAssurancePolicy: CommandHandler = (ctx, command, payload) => {
 			? { permittedControlActions: p.permittedControlActions }
 			: {})
 	};
+}
+
+/** EditAssurancePolicy — revise a non-floor, non-superseded policy's content in place (same version, revision++).
+ *  Only payload-present fields change (patch). Floor policies + SUPERSEDED policies reject. */
+export const editAssurancePolicy: CommandHandler = (ctx, command, payload) => {
+	const p = payload as EditAssurancePolicyPayload;
+	const id = command.targetAggregateId;
+	const floorBlock = rejectIfFloorLocked(command)();
+	if (floorBlock) return floorBlock;
+	const loaded = loadOrReject(ctx, command, id);
+	if (!loaded.ok) return loaded.result;
+	if (loaded.state.status === 'SUPERSEDED') {
+		return reject(
+			command,
+			'RPH_INVARIANT_VIOLATION',
+			`Policy ${id} is SUPERSEDED and cannot be edited — create a new version instead`,
+			[id]
+		);
+	}
+	// #1b — a revised escalationRules must also honor §10.3's escalatable severity (CRITICAL only). Content validation
+	// runs AFTER the existence/SUPERSEDED checks (mirroring remBlock) so a lifecycle rejection takes precedence over a
+	// payload-shape rejection.
+	const escBlock = rejectUnratifiedEscalationSeverities(command, p.escalationRules);
+	if (escBlock) return escBlock;
+	// #5 — the effective remediationRules (new or existing) must keep remediationActions ⊆ the effective permitted
+	// set, so an edit that narrows permittedControlActions or revises remediationRules cannot leave an ungoverned
+	// remediation action behind.
+	const remBlock = rejectRemediationActionsNotPermitted(
+		command,
+		(p.remediationRules ?? loaded.state.remediationRules) as
+			ReadonlyArray<{ remediationActions?: readonly string[] }> | undefined,
+		(p.permittedControlActions ?? loaded.state.permittedControlActions) as
+			readonly string[] | undefined
+	);
+	if (remBlock) return remBlock;
+	const newRevision = loaded.revision + 1;
+	const next = buildEditedPolicyState(loaded.state, command, p, newRevision);
 	const event = makeEvent(ctx, command, {
 		eventType: 'AssurancePolicyEdited',
 		aggregateType: POLICY,
@@ -408,7 +427,7 @@ export const admitEvidence: CommandHandler = (ctx, command, payload) => {
 		}),
 		guard: (state) => {
 			const verdict = evidenceAdmissibility({
-				id: String(state.id ?? ''),
+				id: String((state.id ?? '') as string | number | boolean),
 				provenance: state.provenance,
 				contentReference: state.contentReference,
 				scope: state.scope as string | undefined,
@@ -656,7 +675,8 @@ export const submitEvidenceForAssessment: CommandHandler = (ctx, command, payloa
 	// for. (This is exactly the namespace subtlety Increment K flagged as why this was not a trivial fold.)
 	const policyId = loaded.state.assurancePolicyId as string | undefined;
 	const policy = policyId
-		? (ctx.store.loadObject(policyId)?.state as { requiredEvidence?: Array<{ id?: string }> } | undefined)
+		? (ctx.store.loadObject(policyId)?.state as
+				{ requiredEvidence?: Array<{ id?: string }> } | undefined)
 		: undefined;
 	const declared = new Set(
 		(policy?.requiredEvidence ?? [])
@@ -713,32 +733,47 @@ function actorReferenceToIdentity(a: ActorReference): Identity {
 	};
 }
 
-/** CompleteAssuranceAssessment — ASSESSING -> a terminal disposition read from the validator recommendation
- * (validatorResult.dispositionRecommendation). The AssuranceAssessment.state machine rejects the illegal
- * disposition transitions (INV-8/INV-9/INV-10). */
-export const completeAssuranceAssessment: CommandHandler = (ctx, command, payload) => {
-	const p = payload as {
-		validatorResult?: {
-			validatorId?: string;
-			validatorVersion?: string;
-			dispositionRecommendation?: string;
-			subjectObjectIds?: string[];
-			subjectSemanticVersions?: Record<string, number>;
-			evidenceConsideredIds?: string[];
-			residualUncertainty?: string[];
-			recommendedControlActions?: Record<string, unknown>[];
-			executionProvenance?: { evaluator?: ActorReference };
-		};
-		/** Increment I2: the identity that PRODUCED the subject, for the independence check against the evaluator. */
-		producer?: ActorReference;
-	};
-	const disposition = p.validatorResult?.dispositionRecommendation;
+/** The validator's verdict as CompleteAssuranceAssessment receives it (DOC-007 §20 ValidatorResult, the fields
+ *  this handler reads). Named so the parsing/gate helpers below can share the shape with the handler. */
+interface CompleteValidatorResult {
+	validatorId?: string;
+	validatorVersion?: string;
+	dispositionRecommendation?: string;
+	subjectObjectIds?: string[];
+	subjectSemanticVersions?: Record<string, number>;
+	evidenceConsideredIds?: string[];
+	residualUncertainty?: string[];
+	recommendedControlActions?: Record<string, unknown>[];
+	executionProvenance?: { evaluator?: ActorReference };
+}
+
+/** The validated completion inputs, or the rejection to return. Threads `disposition` back as a proven `string`
+ *  (not `string | undefined`) so the caller keeps the same narrowing the inline `if (!disposition)` gave it. */
+type ParsedCompletion =
+	| { readonly ok: false; readonly result: CommandResult }
+	| {
+			readonly ok: true;
+			readonly disposition: string;
+			readonly subjectIds: string[];
+			readonly versions: Record<string, number>;
+	  };
+
+/** Parse + validate the validatorResult: a legal disposition recommendation AND (DOC-004 invariant 2) a named
+ *  semantic version for every subject. Reject short-circuit order preserved — disposition first, then invariant 2. */
+function parseCompletion(
+	command: DomainCommand,
+	validatorResult: CompleteValidatorResult | undefined
+): ParsedCompletion {
+	const disposition = validatorResult?.dispositionRecommendation;
 	if (!disposition || !DISPOSITIONS.has(disposition)) {
-		return reject(
-			command,
-			'RPH_VALIDATOR_OUTPUT_INVALID',
-			`CompleteAssuranceAssessment requires validatorResult.dispositionRecommendation in ${[...DISPOSITIONS].join('|')}`
-		);
+		return {
+			ok: false,
+			result: reject(
+				command,
+				'RPH_VALIDATOR_OUTPUT_INVALID',
+				`CompleteAssuranceAssessment requires validatorResult.dispositionRecommendation in ${[...DISPOSITIONS].join('|')}`
+			)
+		};
 	}
 	// DOC-004 INVARIANT 2 — "Every assessment identifies its subject semantic version." THE SCHEMA CANNOT SAY
 	// THIS. `subjectSemanticVersions: Record<string, number>` is satisfied by `{}`, so a verdict that names a
@@ -748,17 +783,81 @@ export const completeAssuranceAssessment: CommandHandler = (ctx, command, payloa
 	// effort exists to close. A shape check is not an invariant check.
 	//
 	// §13.3: "Fail closed on missing identity, tenant, policy, schema, or authority context."
-	const subjectIds = p.validatorResult?.subjectObjectIds ?? [];
-	const versions = p.validatorResult?.subjectSemanticVersions ?? {};
+	const subjectIds = validatorResult?.subjectObjectIds ?? [];
+	const versions = validatorResult?.subjectSemanticVersions ?? {};
 	const unversioned = subjectIds.filter((id) => typeof versions[id] !== 'number');
 	if (unversioned.length > 0) {
-		return reject(
-			command,
-			'RPH_VALIDATOR_OUTPUT_INVALID',
-			`CompleteAssuranceAssessment: validatorResult.subjectSemanticVersions must name a version for every subject (DOC-004 invariant 2 — "Every assessment identifies its subject semantic version"). Missing: ${unversioned.join(', ')}`,
-			unversioned
-		);
+		return {
+			ok: false,
+			result: reject(
+				command,
+				'RPH_VALIDATOR_OUTPUT_INVALID',
+				`CompleteAssuranceAssessment: validatorResult.subjectSemanticVersions must name a version for every subject (DOC-004 invariant 2 — "Every assessment identifies its subject semantic version"). Missing: ${unversioned.join(', ')}`,
+				unversioned
+			)
+		};
 	}
+	return { ok: true, disposition, subjectIds, versions };
+}
+
+/** GATE B (Increment R) — permittedControlActions ENFORCED: a validator may only recommend a control action the
+ *  policy permits (§11). An empty permitted set constrains nothing (skip). Returns a rejection or null (pass). */
+function rejectUnpermittedControlActions(
+	command: DomainCommand,
+	validatorResult: CompleteValidatorResult | undefined,
+	permittedControlActions: readonly string[] | undefined
+): CommandResult | null {
+	const permitted = new Set(permittedControlActions ?? []);
+	if (permitted.size === 0) return null;
+	const offending = (validatorResult?.recommendedControlActions ?? [])
+		.map((r) => (r as { action?: unknown }).action)
+		.filter((a): a is string => typeof a === 'string' && !permitted.has(a));
+	if (offending.length === 0) return null;
+	return reject(
+		command,
+		'RPH_VALIDATION_SEMANTIC_FAILED',
+		`CompleteAssuranceAssessment: the validator recommended control action(s) [${offending.join(', ')}] that this policy does not permit (§11). Permitted: [${[...permitted].join(', ')}].`,
+		[command.targetAggregateId]
+	);
+}
+
+/** GATE C (#1a) — dispositionRules ENFORCED: the §10.3 foreclosure. The policy's rule for the recommended
+ *  disposition may forbid it while an observation of certain severities is still OPEN. Only fires when the policy
+ *  declares forbiddenOpenSeverities for this disposition. `openSeverities` is the memoized per-completion loader.
+ *  Returns a rejection or null (pass). */
+function rejectForeclosedDisposition(
+	command: DomainCommand,
+	disposition: string,
+	dispositionRules:
+		| ReadonlyArray<{ disposition?: string; forbiddenOpenSeverities?: readonly string[] }>
+		| undefined,
+	openSeverities: () => Set<string>
+): CommandResult | null {
+	const dispositionRule = (dispositionRules ?? []).find((r) => r?.disposition === disposition);
+	const forbidden = new Set(dispositionRule?.forbiddenOpenSeverities ?? []);
+	if (forbidden.size === 0) return null;
+	const openForbiddenSeverities = [...openSeverities()].filter((s) => forbidden.has(s));
+	if (openForbiddenSeverities.length === 0) return null;
+	return reject(
+		command,
+		'RPH_VALIDATION_SEMANTIC_FAILED',
+		`CompleteAssuranceAssessment: a ${disposition} disposition is foreclosed — the policy's dispositionRules forbid it while an observation of severity [${[...new Set(openForbiddenSeverities)].join(', ')}] is still OPEN (DOC-004 §10.3). Resolve or waive the finding, or return a non-satisfied disposition.`,
+		[command.targetAggregateId]
+	);
+}
+
+/** CompleteAssuranceAssessment — ASSESSING -> a terminal disposition read from the validator recommendation
+ * (validatorResult.dispositionRecommendation). The AssuranceAssessment.state machine rejects the illegal
+ * disposition transitions (INV-8/INV-9/INV-10). */
+export const completeAssuranceAssessment: CommandHandler = (ctx, command, payload) => {
+	const p = payload as {
+		validatorResult?: CompleteValidatorResult;
+		/** Increment I2: the identity that PRODUCED the subject, for the independence check against the evaluator. */
+		producer?: ActorReference;
+	};
+	const parsed = parseCompletion(command, p.validatorResult);
+	if (!parsed.ok) return parsed.result;
+	const { disposition, subjectIds, versions } = parsed;
 	// Record WHO judged. The Assessment object has always carried an optional `evaluator: ActorReference`; the
 	// completion path simply never wrote it, so the model/provider that actually reviewed the artifact was
 	// persisted nowhere (§9.7 "resolved provider/model/version actually invoked"; §8.4 L851 "actual identities and
@@ -832,7 +931,8 @@ export const completeAssuranceAssessment: CommandHandler = (ctx, command, payloa
 				.filter((oid): oid is string => typeof oid === 'string')
 				.map(
 					(oid) =>
-						ctx.store.loadObject(oid)?.state as { severity?: string; disposition?: string } | undefined
+						ctx.store.loadObject(oid)?.state as
+							{ severity?: string; disposition?: string } | undefined
 				)
 				.filter((o) => o?.disposition === 'OPEN' && typeof o.severity === 'string')
 				.map((o) => o!.severity as string)
@@ -843,20 +943,12 @@ export const completeAssuranceAssessment: CommandHandler = (ctx, command, payloa
 	// completion fails closed rather than record an ungoverned recommendation. permittedControlActions is now a
 	// coherent per-policy set with a universal escalate-and-reshape floor (Increment N), so "permitted" means
 	// something for every policy. Empty permitted set → skip (a policy that declares none constrains nothing).
-	const permitted = new Set(policyState?.permittedControlActions ?? []);
-	if (permitted.size > 0) {
-		const offending = (p.validatorResult?.recommendedControlActions ?? [])
-			.map((r) => (r as { action?: unknown }).action)
-			.filter((a): a is string => typeof a === 'string' && !permitted.has(a));
-		if (offending.length > 0) {
-			return reject(
-				command,
-				'RPH_VALIDATION_SEMANTIC_FAILED',
-				`CompleteAssuranceAssessment: the validator recommended control action(s) [${offending.join(', ')}] that this policy does not permit (§11). Permitted: [${[...permitted].join(', ')}].`,
-				[command.targetAggregateId]
-			);
-		}
-	}
+	const gateBReject = rejectUnpermittedControlActions(
+		command,
+		p.validatorResult,
+		policyState?.permittedControlActions
+	);
+	if (gateBReject) return gateBReject;
 
 	// INV-8 INDEPENDENCE (precedes Gate D — adversarial-review fix). A required-independence VIOLATION is a
 	// PRECONDITION failure that invalidates the evaluation itself, so it must decide BEFORE the outcome gates —
@@ -921,7 +1013,9 @@ export const completeAssuranceAssessment: CommandHandler = (ctx, command, payloa
 		const openSev = openObservationSeverities();
 		const matchable = (r: { escalateOnOpenSeverities?: readonly string[] }): string[] => [
 			...new Set(
-				(r.escalateOnOpenSeverities ?? []).filter((s) => ESCALATABLE_SEVERITIES.has(s) && openSev.has(s))
+				(r.escalateOnOpenSeverities ?? []).filter(
+					(s) => ESCALATABLE_SEVERITIES.has(s) && openSev.has(s)
+				)
 			)
 		];
 		const rule = escalationRules.find((r) => matchable(r).length > 0);
@@ -987,19 +1081,13 @@ export const completeAssuranceAssessment: CommandHandler = (ctx, command, payloa
 	// OBJECTS carry the CURRENT disposition, so a finding that was resolved or WAIVED no longer forecloses (loaded
 	// per-object, not read from the recording event, precisely so a later waiver is honored). Only fires when the
 	// policy declares dispositionRules with forbiddenOpenSeverities for this disposition — otherwise skipped.
-	const dispositionRule = (policyState?.dispositionRules ?? []).find((r) => r?.disposition === disposition);
-	const forbidden = new Set(dispositionRule?.forbiddenOpenSeverities ?? []);
-	if (forbidden.size > 0) {
-		const openForbiddenSeverities = [...openObservationSeverities()].filter((s) => forbidden.has(s));
-		if (openForbiddenSeverities.length > 0) {
-			return reject(
-				command,
-				'RPH_VALIDATION_SEMANTIC_FAILED',
-				`CompleteAssuranceAssessment: a ${disposition} disposition is foreclosed — the policy's dispositionRules forbid it while an observation of severity [${[...new Set(openForbiddenSeverities)].join(', ')}] is still OPEN (DOC-004 §10.3). Resolve or waive the finding, or return a non-satisfied disposition.`,
-				[command.targetAggregateId]
-			);
-		}
-	}
+	const gateCReject = rejectForeclosedDisposition(
+		command,
+		disposition,
+		policyState?.dispositionRules,
+		openObservationSeverities
+	);
+	if (gateCReject) return gateCReject;
 
 	return advanceStatus(ctx, command, {
 		objectType: ASSESSMENT,

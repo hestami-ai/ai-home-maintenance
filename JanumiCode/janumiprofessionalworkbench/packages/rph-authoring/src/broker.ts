@@ -376,13 +376,8 @@ export class PwaAuthoringBroker {
 		if (guard) return guard;
 		const existing = this.getType(pwuTypeId);
 		if (!existing) return { ok: false, error: `PWU Type ${pwuTypeId} does not exist on this PWA.` };
-		if (patch.requiredAssurancePolicyIds !== undefined) {
-			const policyGuard = this.validatePolicyReferences(
-				patch.requiredAssurancePolicyIds,
-				existing.requiredAssurancePolicyIds
-			);
-			if (policyGuard) return policyGuard;
-		}
+		const policyGuard = this.validatePolicyPatch(patch, existing);
+		if (policyGuard) return policyGuard;
 		const r = this.dispatch(
 			this.cmd('EditPwuType', PWU_TYPE, pwuTypeId, {
 				pwuTypeId,
@@ -430,7 +425,7 @@ export class PwaAuthoringBroker {
 			return { ok: false, error: `Child PWU Type ${childId} does not exist.` };
 
 		const existing = parent.permittedChildren.find((rule) => rule.typeId === childId);
-		const hasApplicabilityNote = Object.prototype.hasOwnProperty.call(input, 'applicabilityNote');
+		const hasApplicabilityNote = Object.hasOwn(input, 'applicabilityNote');
 		const applicabilityNote = hasApplicabilityNote
 			? input.applicabilityNote?.trim() || undefined
 			: existing?.applicabilityNote;
@@ -609,6 +604,15 @@ export class PwaAuthoringBroker {
 				error: `PWA ${this.pwaId} is ${pwa.publicationStatus}, not DRAFT — authoring is closed (a PUBLISHED version is immutable).`
 			};
 		return null;
+	}
+
+	/** Validate a patch's assurance-policy references against the existing declarations, when the patch touches them. */
+	private validatePolicyPatch(patch: EditTypeInput, existing: PwuTypeView): ProposalResult | null {
+		if (patch.requiredAssurancePolicyIds === undefined) return null;
+		return this.validatePolicyReferences(
+			patch.requiredAssurancePolicyIds,
+			existing.requiredAssurancePolicyIds
+		);
 	}
 
 	/** Only ACTIVE, non-floor policies may be newly declared. Existing declarations may be retained or removed after

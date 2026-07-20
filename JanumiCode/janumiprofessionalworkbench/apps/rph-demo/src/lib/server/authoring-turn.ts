@@ -78,7 +78,7 @@ function newTurnActor() {
 }
 
 function stateOf(turn: MutableAuthoringTurn): AuthoringTurnState {
-	return String(turn.actor.getSnapshot().value) as AuthoringTurnState;
+	return String(turn.actor.getSnapshot().value as string | number | boolean) as AuthoringTurnState;
 }
 
 function transition(
@@ -248,8 +248,7 @@ export function beginAuthoringTurn(
 
 function mutable(turn: AuthoringTurn): MutableAuthoringTurn {
 	const current = turnsByPwa.get(turn.pwaId);
-	if (!current || current.id !== turn.id)
-		throw new Error(`Authoring turn ${turn.id} is not active.`);
+	if (current?.id !== turn.id) throw new Error(`Authoring turn ${turn.id} is not active.`);
 	return current;
 }
 
@@ -335,7 +334,7 @@ function candidateArtifacts(turn: MutableAuthoringTurn) {
 			...turn.recordedCommands.map((command) => command.targetAggregateId),
 			...stagedEvents.map((event) => event.aggregateId)
 		])
-	].sort();
+	].sort((left, right) => Number(left > right) - Number(left < right));
 	const affectedObjects = affectedIds.map((id) => {
 		const object = turn.engine.loadObject(id);
 		if (!object) throw new Error(`Candidate affected aggregate ${id} is missing.`);
@@ -363,15 +362,15 @@ export function finalizeAuthoringTurn(turn: AuthoringTurn): string {
 	return current.candidateHash;
 }
 
-/**
- * A human accepts the exact preview hash. The engine then checks the revision vector and expected resultant object
- * hashes inside the same transaction as replay. Any conflict/rejection/divergence leaves canonical state unchanged.
- */
-export function commitAuthoringTurn(
+type GuardedBatchResult = ReturnType<EngineHandle['dispatchBatchGuarded']>;
+type GuardPrecondition = Parameters<EngineHandle['dispatchBatchGuarded']>[1][number];
+
+/** Guard the READY_TO_COMMIT preconditions and re-verify the exact accepted candidate; returns its digest. */
+function assertReadyToCommit(
 	turn: AuthoringTurn,
+	current: MutableAuthoringTurn,
 	acceptedCandidateHash: string
-): CommitAuthoringTurnResult {
-	const current = mutable(turn);
+): string {
 	if (stateOf(current) !== 'READY_TO_COMMIT') {
 		throw new Error(`Authoring turn ${turn.id} is ${stateOf(current)}, not READY_TO_COMMIT.`);
 	}
@@ -385,26 +384,74 @@ export function commitAuthoringTurn(
 			`Acceptance hash does not match the exact candidate (${acceptedCandidateHash || 'missing'} != ${candidateHash}).`
 		);
 	}
-	transition(current, { type: 'COMMIT' }, 'COMMITTING');
+	return candidateHash;
+}
 
+/** Build the revision guard vector: captured base revisions plus a mustNotExist guard for every touched aggregate. */
+function commitGuardPreconditions(
+	current: MutableAuthoringTurn,
+	affectedIds: readonly string[]
+): GuardPrecondition[] {
 	const preconditions = new Map<string, number | undefined>(current.base.revisions);
 	for (const targetId of current.recordedCommands.map((command) => command.targetAggregateId)) {
 		if (!preconditions.has(targetId)) preconditions.set(targetId, undefined);
 	}
-	const { affectedIds, affectedObjects } = candidateArtifacts(current);
 	for (const id of affectedIds) {
 		if (!preconditions.has(id)) preconditions.set(id, undefined);
 	}
+	return [...preconditions].map(([aggregateId, expectedRevision]) =>
+		expectedRevision === undefined
+			? { aggregateId, mustNotExist: true as const }
+			: { aggregateId, expectedRevision }
+	);
+}
+
+/** Classify a failed guarded canonical batch (revision conflict vs commit failure), record the detail, and transition. */
+function recordCommitFailure(
+	current: MutableAuthoringTurn,
+	candidateHash: string,
+	result: GuardedBatchResult
+): CommitAuthoringTurnResult {
+	const rejected =
+		result.failedIndex === undefined ? undefined : result.results[result.failedIndex];
+	const conflict = result.guardConflict ?? (rejected?.status === 'CONFLICT' ? rejected : undefined);
+	if (conflict) {
+		const detail = result.guardConflict
+			? `${result.guardConflict.aggregateId} changed from revision ${String(result.guardConflict.expectedRevision)} to ${String(result.guardConflict.actualRevision)}.`
+			: (rejected?.error?.message ?? 'A replayed command observed a revision conflict.');
+		current.detail = detail;
+		transition(current, { type: 'CONFLICT' }, 'CONFLICTED');
+		return { ok: false, status: 'CONFLICTED', candidateHash, detail };
+	}
+	const detail = result.postconditionConflict
+		? `Canonical replay diverged for ${result.postconditionConflict.aggregateId}; the transaction was rolled back.`
+		: (rejected?.error?.message ??
+			`Canonical batch rejected at command ${String(result.failedIndex ?? 'unknown')}.`);
+	current.detail = detail;
+	transition(current, { type: 'COMMIT_ERROR' }, 'COMMIT_FAILED');
+	return { ok: false, status: 'COMMIT_FAILED', candidateHash, detail };
+}
+
+/**
+ * A human accepts the exact preview hash. The engine then checks the revision vector and expected resultant object
+ * hashes inside the same transaction as replay. Any conflict/rejection/divergence leaves canonical state unchanged.
+ */
+export function commitAuthoringTurn(
+	turn: AuthoringTurn,
+	acceptedCandidateHash: string
+): CommitAuthoringTurnResult {
+	const current = mutable(turn);
+	const candidateHash = assertReadyToCommit(turn, current, acceptedCandidateHash);
+	transition(current, { type: 'COMMIT' }, 'COMMITTING');
+
+	const { affectedIds, affectedObjects } = candidateArtifacts(current);
+	const preconditions = commitGuardPreconditions(current, affectedIds);
 
 	let result;
 	try {
 		result = current.canonical.dispatchBatchGuarded(
 			current.recordedCommands,
-			[...preconditions].map(([aggregateId, expectedRevision]) =>
-				expectedRevision === undefined
-					? { aggregateId, mustNotExist: true as const }
-					: { aggregateId, expectedRevision }
-			),
+			preconditions,
 			current.base.eventCount,
 			affectedObjects.map(({ id: aggregateId, contentHash: expectedContentHash }) => ({
 				aggregateId,
@@ -418,27 +465,7 @@ export function commitAuthoringTurn(
 		return { ok: false, status: 'COMMIT_FAILED', candidateHash, detail };
 	}
 
-	if (!result.ok) {
-		const rejected =
-			result.failedIndex === undefined ? undefined : result.results[result.failedIndex];
-		const conflict =
-			result.guardConflict ?? (rejected?.status === 'CONFLICT' ? rejected : undefined);
-		if (conflict) {
-			const detail = result.guardConflict
-				? `${result.guardConflict.aggregateId} changed from revision ${String(result.guardConflict.expectedRevision)} to ${String(result.guardConflict.actualRevision)}.`
-				: (rejected?.error?.message ?? 'A replayed command observed a revision conflict.');
-			current.detail = detail;
-			transition(current, { type: 'CONFLICT' }, 'CONFLICTED');
-			return { ok: false, status: 'CONFLICTED', candidateHash, detail };
-		}
-		const detail = result.postconditionConflict
-			? `Canonical replay diverged for ${result.postconditionConflict.aggregateId}; the transaction was rolled back.`
-			: (rejected?.error?.message ??
-				`Canonical batch rejected at command ${String(result.failedIndex ?? 'unknown')}.`);
-		current.detail = detail;
-		transition(current, { type: 'COMMIT_ERROR' }, 'COMMIT_FAILED');
-		return { ok: false, status: 'COMMIT_FAILED', candidateHash, detail };
-	}
+	if (!result.ok) return recordCommitFailure(current, candidateHash, result);
 
 	// Canonical state is committed at this point. Projection delivery/cleanup failure must never turn this into a
 	// retryable COMMIT_FAILED state and accidentally replay an already-successful turn.

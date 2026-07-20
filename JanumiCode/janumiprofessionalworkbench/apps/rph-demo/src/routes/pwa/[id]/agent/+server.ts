@@ -184,6 +184,98 @@ async function runFloorAfterTurn(ctx: {
 	}
 }
 
+/** Append a recordable agent event to the candidate transcript. §9.7 write boundary: volunteered reasoning material
+ * is never admitted to the durable transcript. Events are immutable and permanent (§9.4), so anything recorded here
+ * could never be purged — the drop has to happen before the write, not after. See $lib/server/agent/transcript. */
+function recordEvent(transcript: TurnEntry[], ev: AuthoringAgentEvent): void {
+	if (!isRecordable(TRANSCRIPT_KIND[ev.kind] ?? '')) return;
+	if (ev.kind === 'text') {
+		const last = transcript.at(-1);
+		if (last?.role === 'AGENT' && last.kind === 'message') last.text += ev.text;
+		else transcript.push({ role: 'AGENT', kind: 'message', text: ev.text });
+	} else if (ev.kind === 'tool_start') {
+		transcript.push({
+			role: 'AGENT',
+			kind: 'tool_call',
+			text: `${ev.tool}(${compactArgs(ev.args)})`
+		});
+	} else if (ev.kind === 'tool_end') {
+		transcript.push({
+			role: 'AGENT',
+			kind: 'tool_result',
+			text: `${ev.tool}: ${ev.summary}`,
+			success: ev.ok
+		});
+	} else if (ev.kind === 'error') {
+		transcript.push({ role: 'SYSTEM', kind: 'error', text: ev.message });
+	}
+}
+
+/** Post-floor disposition: stage the assured candidate, or mark the staged candidate blocked (operational reviewer
+ * failure) / revision-required (valid subject findings). Canonical DRAFT is unchanged either way. */
+function applyFloorDisposition(
+	turn: AuthoringTurn,
+	floorResult: FloorTurnResult,
+	send: (ev: AuthoringAgentEvent) => void
+): void {
+	if (floorResult.floor?.satisfied && floorResult.subjectHash) {
+		const candidateHash = markAuthoringTurnAssured(turn, floorResult.subjectHash);
+		const text = `✓ Assured candidate ${candidateHash} is staged. Canonical DRAFT is unchanged until you accept this exact preview.`;
+		send({ kind: 'status', text });
+		return;
+	}
+	const remediation = floorResult.remediation;
+	const operational =
+		floorResult.externalDetail ||
+		remediation?.action === 'RETRY_OR_CONFIGURE_REVIEWER' ||
+		remediation?.action === 'CHANGE_REVIEWER' ||
+		remediation?.action === 'ESCALATE_REVIEW';
+	const detail =
+		floorResult.externalDetail ||
+		remediation?.guidance ||
+		'The candidate did not satisfy the authoring assurance floor.';
+	if (operational) markAuthoringTurnExternalBlock(turn, detail);
+	else markAuthoringTurnRevisionRequired(turn, detail);
+	send({
+		kind: 'status',
+		text: 'The candidate remains staged for inspection or discard; canonical DRAFT is unchanged.'
+	});
+}
+
+interface FailedTurnCleanup {
+	readonly pwaId: string;
+	readonly turn: AuthoringTurn | undefined;
+	readonly transcript: TurnEntry[];
+	readonly conversationRecorded: boolean;
+	readonly aborted: boolean;
+	readonly message: string;
+}
+
+/** Best-effort cleanup for a turn that threw mid-run: discard on client-abort, otherwise preserve the isolated
+ * candidate (recording the conversation once if it was not already) and mark it REVISION_REQUIRED. Canonical DRAFT
+ * is never touched here. */
+function cleanupFailedTurn(ctx: FailedTurnCleanup): void {
+	const { pwaId, turn, transcript, conversationRecorded, aborted, message } = ctx;
+	if (!turn) return;
+	if (aborted) {
+		try {
+			discardAuthoringTurn(pwaId);
+		} catch {
+			// Canonical state is still unchanged; cleanup is best effort on disconnect.
+		}
+		return;
+	}
+	if (turn.status !== 'COLLECTING' && turn.status !== 'ASSURING') return;
+	try {
+		if (!conversationRecorded) {
+			recordConversation(pwaId, transcript, turn.engine, turn.id);
+		}
+		markAuthoringTurnRevisionRequired(turn, message);
+	} catch {
+		// Preserve the isolated candidate for inspection; never fall back to canonical persistence.
+	}
+}
+
 export const POST: RequestHandler = async ({ params, request }) => {
 	const broker = makeAuthoringBroker(params.id);
 	const pwa = broker.getPwa();
@@ -213,29 +305,7 @@ export const POST: RequestHandler = async ({ params, request }) => {
 			// §9.7 write boundary: volunteered reasoning material is never admitted to the durable transcript.
 			// Events are immutable and permanent (§9.4), so anything recorded here could never be purged — the
 			// drop has to happen before the write, not after. See $lib/server/agent/transcript.
-			const record = (ev: AuthoringAgentEvent) => {
-				if (!isRecordable(TRANSCRIPT_KIND[ev.kind] ?? '')) return;
-				if (ev.kind === 'text') {
-					const last = transcript.at(-1);
-					if (last?.role === 'AGENT' && last.kind === 'message') last.text += ev.text;
-					else transcript.push({ role: 'AGENT', kind: 'message', text: ev.text });
-				} else if (ev.kind === 'tool_start') {
-					transcript.push({
-						role: 'AGENT',
-						kind: 'tool_call',
-						text: `${ev.tool}(${compactArgs(ev.args)})`
-					});
-				} else if (ev.kind === 'tool_end') {
-					transcript.push({
-						role: 'AGENT',
-						kind: 'tool_result',
-						text: `${ev.tool}: ${ev.summary}`,
-						success: ev.ok
-					});
-				} else if (ev.kind === 'error') {
-					transcript.push({ role: 'SYSTEM', kind: 'error', text: ev.message });
-				}
-			};
+			const record = (ev: AuthoringAgentEvent) => recordEvent(transcript, ev);
 			try {
 				if (pwa.publicationStatus !== 'DRAFT') {
 					send({
@@ -295,51 +365,19 @@ export const POST: RequestHandler = async ({ params, request }) => {
 				recordConversation(params.id, transcript, turn.engine, turn.id);
 				conversationRecorded = true;
 
-				if (floorResult.floor?.satisfied && floorResult.subjectHash) {
-					const candidateHash = markAuthoringTurnAssured(turn, floorResult.subjectHash);
-					const text = `✓ Assured candidate ${candidateHash} is staged. Canonical DRAFT is unchanged until you accept this exact preview.`;
-					send({ kind: 'status', text });
-				} else {
-					const remediation = floorResult.remediation;
-					const operational =
-						floorResult.externalDetail ||
-						remediation?.action === 'RETRY_OR_CONFIGURE_REVIEWER' ||
-						remediation?.action === 'CHANGE_REVIEWER' ||
-						remediation?.action === 'ESCALATE_REVIEW';
-					const detail =
-						floorResult.externalDetail ||
-						remediation?.guidance ||
-						'The candidate did not satisfy the authoring assurance floor.';
-					if (operational) markAuthoringTurnExternalBlock(turn, detail);
-					else markAuthoringTurnRevisionRequired(turn, detail);
-					send({
-						kind: 'status',
-						text: 'The candidate remains staged for inspection or discard; canonical DRAFT is unchanged.'
-					});
-				}
+				applyFloorDisposition(turn, floorResult, send);
 				send({ kind: 'done' });
 			} catch (e) {
 				const message = e instanceof Error ? e.message : String(e);
 				record({ kind: 'error', message });
-				if (turn) {
-					if (request.signal.aborted) {
-						try {
-							discardAuthoringTurn(params.id);
-						} catch {
-							// Canonical state is still unchanged; cleanup is best effort on disconnect.
-						}
-					} else if (turn.status === 'COLLECTING' || turn.status === 'ASSURING') {
-						try {
-							if (!conversationRecorded) {
-								recordConversation(params.id, transcript, turn.engine, turn.id);
-								conversationRecorded = true;
-							}
-							markAuthoringTurnRevisionRequired(turn, message);
-						} catch {
-							// Preserve the isolated candidate for inspection; never fall back to canonical persistence.
-						}
-					}
-				}
+				cleanupFailedTurn({
+					pwaId: params.id,
+					turn,
+					transcript,
+					conversationRecorded,
+					aborted: request.signal.aborted,
+					message
+				});
 				send({ kind: 'error', message });
 				send({ kind: 'done' });
 			} finally {
