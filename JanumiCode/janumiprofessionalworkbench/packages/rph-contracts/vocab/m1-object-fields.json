@@ -1353,6 +1353,18 @@
           "note": "Per-child composition rules (cardinality + optional applicability). permittedChildTypeIds is the flat id projection of these; a child with no rule defaults to M1. Optional/additive — a type may carry only the flat projection."
         },
         {
+          "field": "executionBoundary",
+          "type": "ExecutionBoundary",
+          "required": false,
+          "note": "JAN-PRPWA-DS-001 STD-2 (R-9): where this type's work is discharged. Optional/additive — absent resolves to INTERNAL, so pre-existing types are unaffected. DELEGATED_EXTERNAL ⇒ terminal (INV-1: no permitted child types) plus a boundaryContract (STD-3). Authored PER TYPE, never a global PWA setting (forward-compat F-1). The handler defaults it to INTERNAL on every write."
+        },
+        {
+          "field": "boundaryContract",
+          "type": "BoundaryContract",
+          "required": false,
+          "note": "JAN-PRPWA-DS-001 STD-3 (R-9): the org-boundary ICD authored in lieu of decomposition. Present iff executionBoundary is DELEGATED_EXTERNAL (INV-1); the handler enforces coherence both ways (present-when-delegated, absent-when-internal) at the write boundary."
+        },
+        {
           "field": "requiredInputs",
           "type": "string[]",
           "required": true
@@ -2869,6 +2881,30 @@
           "type": "string",
           "required": false,
           "note": "For conditional (C*) rules: free-text applicability condition. Structured predicate/resolver deferred (M7/M9/M11)."
+        }
+      ]
+    },
+    {
+      "name": "BoundaryContract",
+      "note": "JAN-PRPWA-DS-001 STD-3: the interface-control document authored at an organizational boundary in lieu of an internal decomposition, for a DELEGATED_EXTERNAL PwuType. Self-contained (F-3) — counterparty + attested policies + optional note — so a future org-profile can rebind it without dangling cross-references. The required inputs/outputs exchanged with the counterparty reuse the PwuType's existing requiredInputs/requiredOutputs (the artifact hand-off plane). AUTHORED 2026-07-20 under the design-session sponsor grant.",
+      "fields": [
+        {
+          "field": "counterpartyLabel",
+          "type": "string",
+          "required": true,
+          "note": "Human-readable identity of the external party discharging the work (e.g. 'Contract Lab — Hematology'). SHALL be non-empty; the min-length constraint is enforced at the handler write boundary (a strict schema cannot express minLength)."
+        },
+        {
+          "field": "attestedAssurancePolicyIds",
+          "type": "string[]",
+          "required": true,
+          "note": "id-refs to ACTIVE non-floor AssurancePolicies the counterparty attests to satisfying (R-10, assurance-by-attestation). Each id present SHALL resolve to an ACTIVE non-floor policy, validated against real policy status at the broker (D-C Option 1); an empty list is permitted (a pure disclosure with no attested substitution — INV-2's substantive assurance is then unmet until attestation is captured at runtime, which is deferred). INV-5: this is a CLAIM by the counterparty, never authoring self-certification."
+        },
+        {
+          "field": "applicabilityNote",
+          "type": "string",
+          "required": false,
+          "note": "Free-text scope/condition of the delegation (e.g. 'STAT panels only; routine handled internally'). Structured applicability predicate deferred, consistent with PermittedChildRule.applicabilityNote."
         }
       ]
     },

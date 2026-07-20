@@ -289,6 +289,35 @@
         "additionalProperties": false
       }
     },
+    "executionBoundary": {
+      "type": "string",
+      "enum": [
+        "INTERNAL",
+        "DELEGATED_EXTERNAL"
+      ]
+    },
+    "boundaryContract": {
+      "type": "object",
+      "properties": {
+        "counterpartyLabel": {
+          "type": "string"
+        },
+        "attestedAssurancePolicyIds": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "applicabilityNote": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "counterpartyLabel",
+        "attestedAssurancePolicyIds"
+      ],
+      "additionalProperties": false
+    },
     "requiredInputs": {
       "type": "array",
       "items": {

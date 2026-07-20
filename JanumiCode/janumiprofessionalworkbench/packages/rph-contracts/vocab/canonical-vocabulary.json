@@ -74,6 +74,16 @@
       "note": "M1 mandatory-exactly-one; M+ mandatory-one-or-more; C1 conditional-zero-or-one; C+ conditional-zero-or-more. Presentation shorthands with executable min/max semantics; the structured applicability predicate for C* is deferred (free-text note for now)."
     },
     {
+      "name": "ExecutionBoundary",
+      "appliesTo": "PwuType.executionBoundary — where a PWU Type's work is discharged relative to the authoring organization's accountability scope (JAN-PRPWA-DS-001 STD-2, R-9)",
+      "values": [
+        "INTERNAL",
+        "DELEGATED_EXTERNAL"
+      ],
+      "canonicalSource": "JAN-PRPWA-DS-001 §2.6 STD-2 / R-9 (design-session ratified 2026-07-20)",
+      "note": "INTERNAL (default when absent): the work lies within our accountability scope, decomposed/executed under the platform floor. DELEGATED_EXTERNAL: the work is handed to an external party across an organizational boundary; the node is terminal (INV-1: SHALL NOT declare permitted child types) and authors a boundaryContract in lieu of decomposition (STD-3). The automation axis (autonomous-agent vs human-required, ASPLE §2.3) is a SEPARATE future field, NOT folded into this enum (R-9)."
+    },
+    {
       "name": "AuthorityType",
       "appliesTo": "AuthorityReference.authorityType",
       "values": [

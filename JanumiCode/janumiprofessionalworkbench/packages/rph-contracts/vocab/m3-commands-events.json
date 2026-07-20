@@ -2076,6 +2076,16 @@
           "field": "completionRule",
           "required": false,
           "type": "string"
+        },
+        {
+          "field": "executionBoundary",
+          "required": false,
+          "type": "ExecutionBoundary"
+        },
+        {
+          "field": "boundaryContract",
+          "required": false,
+          "type": "BoundaryContract"
         }
       ]
     },
@@ -2301,6 +2311,16 @@
           "field": "requiredAssurancePolicyIds",
           "required": false,
           "type": "string[]"
+        },
+        {
+          "field": "executionBoundary",
+          "required": false,
+          "type": "ExecutionBoundary"
+        },
+        {
+          "field": "boundaryContract",
+          "required": false,
+          "type": "BoundaryContract"
         }
       ]
     },

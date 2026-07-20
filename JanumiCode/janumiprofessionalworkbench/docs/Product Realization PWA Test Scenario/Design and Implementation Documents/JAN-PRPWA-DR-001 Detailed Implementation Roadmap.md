@@ -130,8 +130,8 @@ rollback_and_recovery: ["Revert the prompt edit"]
 risks: ["Prompt bloat / agy ENAMETOOLONG budget (reasoning-review prompt is separately budgeted — unrelated, but keep prompt concise)"]
 open_decisions: ["Exact three-planes wording vs existing implicit coverage (F-11)"]
 exit_criteria: ["check-types + test green; prompt states STD-1/P-1/D-3/three planes"]
-delivery_state: NOT_STARTED
-conformance_state: UNASSESSED
+delivery_state: DELIVERED  # commit af3825c8 — svelte-check 1604 files 0 errors/0 warnings; rph-demo unit suite 88/88
+conformance_state: CONFORMANT
 ```
 
 ```yaml
@@ -184,8 +184,8 @@ rollback_and_recovery: ["Revert vocab + regen + revert handler/broker; additive 
 risks: ["Dual-gate silent VALIDATION_FAILED if one schema layer missed (F-2)", "Placeholder demotion of BoundaryContract if <2 typed fields (F-4)"]
 open_decisions: ["D-C RULED (Option 1, broker-parity): attestedAssurancePolicyIds validated in the broker like requiredAssurancePolicyIds; Option 3 handler-hardening backlogged (§15)"]
 exit_criteria: ["All above tests green; a DELEGATED_EXTERNAL PwuType round-trips through the engine with a valid boundaryContract and is rejected if it has children"]
-delivery_state: NOT_STARTED
-conformance_state: UNASSESSED
+delivery_state: DELIVERED  # ExecutionBoundary enum + BoundaryContract helper (z.strictObject, no F-4) → full gen + prettier byte-exact; handler checkBoundaryCoherence (INV-1/STD-3, write-boundary, observable) on define+edit incl. strip-on-INTERNAL; broker validateBoundary (D-C Option 1 attested-policy parity) on define/edit/scaffold. Gate: check-types 21/21, lint 0, boundary 0, rph-contracts 153 / rph-application 184 / rph-authoring 29 (broker 24) green.
+conformance_state: CONFORMANT  # SPEC-3/STD-2/STD-3/R-9/R-10(authoring)/INV-1/F-1/F-3 realized as specified; INV-5 untouched (attestation = counterparty claim, never authoring self-cert). Option-3 systemic handler-hardening remains backlogged (§15).
 ```
 
 ```yaml

@@ -423,6 +423,10 @@ export const EvidenceTypeSchema = z.enum([
 ]);
 export type EvidenceType = z.infer<typeof EvidenceTypeSchema>;
 
+/** PwuType.executionBoundary — where a PWU Type's work is discharged relative to the authoring organization's accountability scope (JAN-PRPWA-DS-001 STD-2, R-9) — JAN-PRPWA-DS-001 §2.6 STD-2 / R-9 (design-session ratified 2026-07-20) */
+export const ExecutionBoundarySchema = z.enum(['INTERNAL', 'DELEGATED_EXTERNAL']);
+export type ExecutionBoundary = z.infer<typeof ExecutionBoundarySchema>;
+
 /** ExecutionPlan.status — RPH-DOC-007 §15 / DOC-002 §20.1 (8 values) */
 export const ExecutionPlanStatusSchema = z.enum([
 	'PROPOSED',
@@ -836,6 +840,7 @@ export const CANONICAL_ENUM_SCHEMAS = {
 	EvidenceCardinality: EvidenceCardinalitySchema,
 	EvidenceStatus: EvidenceStatusSchema,
 	EvidenceType: EvidenceTypeSchema,
+	ExecutionBoundary: ExecutionBoundarySchema,
 	ExecutionPlanStatus: ExecutionPlanStatusSchema,
 	ExecutionState: ExecutionStateSchema,
 	FailureSeverity: FailureSeveritySchema,

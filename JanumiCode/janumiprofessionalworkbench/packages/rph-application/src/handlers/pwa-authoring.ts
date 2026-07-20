@@ -209,6 +209,70 @@ export const createPwa: CommandHandler = (ctx, command, payload) => {
 	});
 };
 
+/**
+ * INV-1 / STD-3 (JAN-PRPWA-DS-001) — the executionBoundary/boundaryContract coherence invariant, checked at the
+ * domain WRITE boundary (never only in the broker/UI, C-5) against the already-MERGED next state, so a patch-merge
+ * edit cannot leave an incoherent pair. `next.executionBoundary` is resolved absent → INTERNAL (STD-2 default).
+ *
+ *   DELEGATED_EXTERNAL ⇒ a boundaryContract with a non-empty counterpartyLabel (STD-3, min-length not
+ *                        schema-expressible) AND no permitted child types (INV-1: a delegated node is terminal).
+ *   INTERNAL           ⇒ no boundaryContract (a boundary contract is authored only across an org boundary).
+ *
+ * Returns a rejecting CommandResult (RPH_INVARIANT_VIOLATION — the removePwuType precedent for a domain invariant)
+ * or null. Decision observability (EP-OBS-2 / JAN-ENGC-001 §4.11): every rejection emits a structured, greppable
+ * record (reason + resolved boundary). `warn`, not `error`: an incoherent authoring request is an EXPECTED input
+ * rejection, whereas `error` (kit.ts `invariant.produced_state_invalid`) is reserved for a handler that built a
+ * bad state — a genuine fault. The record makes the violation queryable without a false alarm.
+ */
+function checkBoundaryCoherence(
+	ctx: HandlerContext,
+	command: DomainCommand,
+	next: Record<string, unknown>,
+	id: string
+): CommandResult | null {
+	const boundary = next.executionBoundary === 'DELEGATED_EXTERNAL' ? 'DELEGATED_EXTERNAL' : 'INTERNAL';
+	const contract = next.boundaryContract as { counterpartyLabel?: unknown } | undefined;
+	const childCount =
+		(Array.isArray(next.permittedChildTypeIds) ? next.permittedChildTypeIds.length : 0) +
+		(Array.isArray(next.permittedChildren) ? next.permittedChildren.length : 0);
+	const violation = (reason: string, message: string): CommandResult => {
+		ctx.logger.warn('invariant.boundary_coherence_violation', {
+			correlationId: command.correlationId,
+			aggregateId: id,
+			commandType: command.commandType,
+			boundary,
+			reason
+		});
+		return reject(command, 'RPH_INVARIANT_VIOLATION', message, [id]);
+	};
+	if (boundary === 'DELEGATED_EXTERNAL') {
+		if (!contract) {
+			return violation(
+				'delegated_without_contract',
+				`PWU Type ${id} is DELEGATED_EXTERNAL but declares no boundaryContract (STD-3: a delegated node authors a boundary contract in lieu of an internal decomposition)`
+			);
+		}
+		if (typeof contract.counterpartyLabel !== 'string' || contract.counterpartyLabel.trim() === '') {
+			return violation(
+				'empty_counterparty_label',
+				`PWU Type ${id}: boundaryContract.counterpartyLabel must be a non-empty label identifying the external counterparty (STD-3)`
+			);
+		}
+		if (childCount > 0) {
+			return violation(
+				'delegated_with_children',
+				`PWU Type ${id} is DELEGATED_EXTERNAL and therefore terminal (INV-1): it must declare no permitted child types`
+			);
+		}
+	} else if (contract) {
+		return violation(
+			'internal_with_contract',
+			`PWU Type ${id} is INTERNAL but carries a boundaryContract; a boundary contract is authored only for a DELEGATED_EXTERNAL node (INV-1)`
+		);
+	}
+	return null;
+}
+
 /** DefinePwuType — create a PWU Type under a DRAFT PWA (types are edited draft-only, §39). */
 export const definePwuType: CommandHandler = (ctx, command, payload) => {
 	const p = payload as DefinePwuTypePayload;
@@ -249,6 +313,12 @@ export const definePwuType: CommandHandler = (ctx, command, payload) => {
 		permittedParentTypeIds: p.permittedParentTypeIds ?? [],
 		permittedChildTypeIds: p.permittedChildTypeIds ?? childRules.map((r) => r.typeId),
 		permittedChildren: p.permittedChildren ?? [],
+		// STD-2/STD-3 (JAN-PRPWA-DS-001, DWP-02): executionBoundary defaults to INTERNAL (absent ⇒ INTERNAL); the
+		// boundaryContract is set only when supplied. An INTERNAL define carrying a contract is a contradictory
+		// request and is REJECTED below (not silently stripped) — stripping is an edit-only affordance for the
+		// DELEGATED→INTERNAL flip. INV-1/STD-3 are then enforced against the merged state before the commit.
+		executionBoundary: p.executionBoundary ?? 'INTERNAL',
+		...(p.boundaryContract !== undefined ? { boundaryContract: p.boundaryContract } : {}),
 		requiredInputs: p.requiredInputs ?? [],
 		requiredOutputs: p.requiredOutputs ?? [],
 		requiredAssurancePolicyIds: p.requiredAssurancePolicyIds ?? [],
@@ -256,6 +326,8 @@ export const definePwuType: CommandHandler = (ctx, command, payload) => {
 			p.completionRule ?? 'Execution succeeded AND required outputs exist AND assurance satisfied',
 		status: 'DRAFT'
 	};
+	const boundaryViolation = checkBoundaryCoherence(ctx, command, state, p.pwuTypeId);
+	if (boundaryViolation) return boundaryViolation;
 	// Adding a PWU Type materially edits the PWA's graph: raise the PWA's semanticVersion with it, so a floor
 	// satisfied over the previous graph cannot authorize this one (§10.1 L1379).
 	return withPwaVersionBump(ctx, command, p.pwaId, () =>
@@ -418,6 +490,21 @@ export const editPwuType: CommandHandler = (ctx, command, payload) => {
 			? { requiredAssurancePolicyIds: p.requiredAssurancePolicyIds }
 			: {})
 	};
+	// STD-2/STD-3/INV-1 (JAN-PRPWA-DS-001, DWP-02). executionBoundary is authoritative and defaulted onto every
+	// edit (resolve: explicit patch → existing state → INTERNAL). The boundaryContract is DERIVED from the RESOLVED
+	// boundary: on the INTERNAL branch it is STRIPPED — a DELEGATED→INTERNAL flip patch-merges, so a stale contract
+	// carried forward by nextEnvelope would otherwise violate INV-1; on the DELEGATED branch an explicit contract in
+	// the patch overrides, else the existing one carries forward. INV-1/STD-3 are then enforced on the merged state.
+	const nextBoundary =
+		p.executionBoundary ?? (loaded.state.executionBoundary as string | undefined) ?? 'INTERNAL';
+	next.executionBoundary = nextBoundary;
+	if (nextBoundary === 'DELEGATED_EXTERNAL') {
+		if (p.boundaryContract !== undefined) next.boundaryContract = p.boundaryContract;
+	} else {
+		delete next.boundaryContract;
+	}
+	const boundaryViolation = checkBoundaryCoherence(ctx, command, next, id);
+	if (boundaryViolation) return boundaryViolation;
 	const event = makeEvent(ctx, command, {
 		eventType: 'PwuTypeRedefined',
 		aggregateType: PWU_TYPE,

@@ -899,3 +899,162 @@ describe('PublishPwa protected-transition gate — the de minimis assurance floo
 		expect(pub()).toBe('VALIDATED');
 	});
 });
+
+// JAN-PRPWA-DS-001 STD-2/STD-3/INV-1 (DWP-02): the execution-boundary coherence invariant is enforced at the
+// domain WRITE boundary (checkBoundaryCoherence), against the merged next state, for both DefinePwuType and the
+// patch-merging EditPwuType. The engine is the authoritative gate (C-5); these prove it directly.
+describe('PWU-Type execution boundary — INV-1 / STD-2 / STD-3 (JAN-PRPWA-DS-001, DWP-02)', () => {
+	let store: SqliteStorageAdapter;
+	let engine: Engine;
+	let seq = 0;
+	const B_PWA = 'pwa_01ARZ3NDEKTSV4RRFFQ69G5B00';
+	const B_ROOT = 'pwut_01ARZ3NDEKTSV4RRFFQ69G5B10';
+	const CONTRACT = {
+		counterpartyLabel: 'Contract Lab — Hematology',
+		attestedAssurancePolicyIds: [] as string[]
+	};
+
+	function dispatch(commandType: string, payload: unknown, id: string, type: string) {
+		const n = ++seq;
+		const command: DomainCommand = {
+			commandId: `c-${n}`,
+			commandType,
+			commandSchemaVersion: 1,
+			targetAggregateType: type,
+			targetAggregateId: id,
+			issuedAt: TS,
+			issuedBy: actor,
+			correlationId: 'corr',
+			idempotencyKey: `k-${n}`,
+			payload
+		};
+		return engine.dispatch(command);
+	}
+	const defineType = (id: string, extra: Record<string, unknown>) =>
+		dispatch(
+			'DefinePwuType',
+			{ pwuTypeId: id, pwaId: B_PWA, pwuKind: 'X', name: 'X', purpose: 'p', isRoot: false, ...extra },
+			id,
+			'PWU_TYPE'
+		);
+	const editType = (id: string, patch: Record<string, unknown>) =>
+		dispatch('EditPwuType', { pwuTypeId: id, ...patch }, id, 'PWU_TYPE');
+	const load = (id: string) => store.loadObject(id)?.state as Record<string, unknown> | undefined;
+
+	beforeEach(() => {
+		store = new SqliteStorageAdapter({ now: () => TS });
+		seq = 0;
+		engine = new Engine({ store, now: () => TS, newEventId: () => `e${++seq}` });
+		const r = dispatch(
+			'CreatePwa',
+			{ pwaId: B_PWA, name: 'Boundary', description: 'd', domain: 'healthcare', version: '1.0.0' },
+			B_PWA,
+			'PROFESSIONAL_WORK_ARCHITECTURE'
+		);
+		expect(r.status, JSON.stringify(r.error)).toBe('ACCEPTED');
+	});
+
+	it('rejects a DELEGATED_EXTERNAL type with no boundaryContract (STD-3)', () => {
+		const r = defineType(B_ROOT, { executionBoundary: 'DELEGATED_EXTERNAL' });
+		expect(r.status).toBe('REJECTED');
+		expect(r.error?.code).toBe('RPH_INVARIANT_VIOLATION');
+	});
+
+	it('rejects a DELEGATED_EXTERNAL type that declares permitted children (INV-1: terminal)', () => {
+		const r = defineType(B_ROOT, {
+			executionBoundary: 'DELEGATED_EXTERNAL',
+			boundaryContract: CONTRACT,
+			permittedChildTypeIds: ['pwut_child']
+		});
+		expect(r.status).toBe('REJECTED');
+		expect(r.error?.code).toBe('RPH_INVARIANT_VIOLATION');
+	});
+
+	it('rejects an INTERNAL type carrying a boundaryContract (coherence)', () => {
+		const r = defineType(B_ROOT, { boundaryContract: CONTRACT });
+		expect(r.status).toBe('REJECTED');
+		expect(r.error?.code).toBe('RPH_INVARIANT_VIOLATION');
+	});
+
+	it('rejects a boundaryContract with an empty counterpartyLabel (STD-3 non-empty, handler-enforced)', () => {
+		const r = defineType(B_ROOT, {
+			executionBoundary: 'DELEGATED_EXTERNAL',
+			boundaryContract: { counterpartyLabel: '   ', attestedAssurancePolicyIds: [] }
+		});
+		expect(r.status).toBe('REJECTED');
+		expect(r.error?.code).toBe('RPH_INVARIANT_VIOLATION');
+	});
+
+	it('rejects an out-of-enum executionBoundary at the command-bus gate (VALIDATION_FAILED)', () => {
+		const r = defineType(B_ROOT, { executionBoundary: 'OFFSHORE' });
+		expect(r.status).toBe('VALIDATION_FAILED');
+	});
+
+	it('accepts a well-formed DELEGATED_EXTERNAL leaf and persists both fields (round-trip)', () => {
+		const r = defineType(B_ROOT, {
+			executionBoundary: 'DELEGATED_EXTERNAL',
+			boundaryContract: {
+				counterpartyLabel: 'Contract Lab',
+				attestedAssurancePolicyIds: [],
+				applicabilityNote: 'STAT only'
+			}
+		});
+		expect(r.status, JSON.stringify(r.error)).toBe('ACCEPTED');
+		const s = load(B_ROOT)!;
+		expect(s.executionBoundary).toBe('DELEGATED_EXTERNAL');
+		expect(s.boundaryContract).toMatchObject({ counterpartyLabel: 'Contract Lab' });
+	});
+
+	it('defaults executionBoundary to INTERNAL when absent, and a later unrelated edit preserves it', () => {
+		expect(defineType(B_ROOT, {}).status).toBe('ACCEPTED');
+		expect(load(B_ROOT)!.executionBoundary).toBe('INTERNAL');
+		expect(load(B_ROOT)!.boundaryContract).toBeUndefined();
+		expect(editType(B_ROOT, { purpose: 'revised' }).status).toBe('ACCEPTED');
+		expect(load(B_ROOT)!.executionBoundary).toBe('INTERNAL');
+		expect(load(B_ROOT)!.boundaryContract).toBeUndefined();
+	});
+
+	it('edit DELEGATED_EXTERNAL → INTERNAL clears the contract and succeeds', () => {
+		expect(
+			defineType(B_ROOT, { executionBoundary: 'DELEGATED_EXTERNAL', boundaryContract: CONTRACT })
+				.status
+		).toBe('ACCEPTED');
+		const r = editType(B_ROOT, { executionBoundary: 'INTERNAL' });
+		expect(r.status, JSON.stringify(r.error)).toBe('ACCEPTED');
+		const s = load(B_ROOT)!;
+		expect(s.executionBoundary).toBe('INTERNAL');
+		expect(s.boundaryContract).toBeUndefined();
+	});
+
+	it('edit flipping INTERNAL → DELEGATED_EXTERNAL while children remain is rejected (INV-1)', () => {
+		expect(defineType(B_ROOT, { permittedChildTypeIds: ['pwut_child'] }).status).toBe('ACCEPTED');
+		const r = editType(B_ROOT, {
+			executionBoundary: 'DELEGATED_EXTERNAL',
+			boundaryContract: CONTRACT
+		});
+		expect(r.status).toBe('REJECTED');
+		expect(r.error?.code).toBe('RPH_INVARIANT_VIOLATION');
+	});
+
+	it('edit INTERNAL → DELEGATED_EXTERNAL succeeds when the children are cleared in the same edit', () => {
+		expect(defineType(B_ROOT, { permittedChildTypeIds: ['pwut_child'] }).status).toBe('ACCEPTED');
+		const r = editType(B_ROOT, {
+			executionBoundary: 'DELEGATED_EXTERNAL',
+			boundaryContract: CONTRACT,
+			permittedChildTypeIds: []
+		});
+		expect(r.status, JSON.stringify(r.error)).toBe('ACCEPTED');
+		expect(load(B_ROOT)!.executionBoundary).toBe('DELEGATED_EXTERNAL');
+	});
+
+	it('an unrelated edit of a DELEGATED_EXTERNAL type retains its boundaryContract (carried forward)', () => {
+		expect(
+			defineType(B_ROOT, { executionBoundary: 'DELEGATED_EXTERNAL', boundaryContract: CONTRACT })
+				.status
+		).toBe('ACCEPTED');
+		expect(editType(B_ROOT, { purpose: 'clarified scope' }).status).toBe('ACCEPTED');
+		const s = load(B_ROOT)!;
+		expect(s.executionBoundary).toBe('DELEGATED_EXTERNAL');
+		expect(s.boundaryContract).toMatchObject({ counterpartyLabel: 'Contract Lab — Hematology' });
+	});
+});

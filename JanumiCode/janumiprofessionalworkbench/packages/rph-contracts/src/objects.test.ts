@@ -7,7 +7,7 @@ import { fileURLToPath } from 'node:url';
 import { describe, expect, it } from 'vitest';
 import { objectEnvelopeShape } from './envelopes.js';
 import { mintId } from './ids.js';
-import { IntentObjectSchema, OBJECT_SCHEMAS } from './objects.js';
+import { IntentObjectSchema, OBJECT_SCHEMAS, PwuTypeSchema } from './objects.js';
 
 const spec = JSON.parse(
 	readFileSync(
@@ -93,5 +93,79 @@ describe('M1 representative validation', () => {
 		const { formalizedObjective, ...raw } = intent;
 		void formalizedObjective;
 		expect(IntentObjectSchema.safeParse(raw).success).toBe(true);
+	});
+});
+
+// JAN-PRPWA-DS-001 STD-2/STD-3 (DWP-02): the PwuType object schema is the SECOND of the two strict gates
+// (kit.ts commitState validates produced state) — INV-1's structural coherence is enforced by the handler, but
+// the schema must (a) accept the delegated shape, (b) stay back-compat (both fields optional; absent ⇒ INTERNAL),
+// and (c) reject an out-of-enum boundary or a non-strict boundaryContract.
+describe('PWU_TYPE execution boundary schema (JAN-PRPWA-DS-001 STD-2/STD-3, DWP-02)', () => {
+	const actor = { actorId: 'u1', actorType: 'HUMAN', displayName: 'A' };
+	const base = {
+		id: 'pwut_01ARZ3NDEKTSV4RRFFQ69G5FAV',
+		objectType: 'PWU_TYPE',
+		schemaVersion: 1,
+		semanticVersion: 1,
+		revision: 0,
+		lifecycleStatus: 'DRAFT',
+		createdAt: '2026-07-20T00:00:00Z',
+		createdBy: actor,
+		updatedAt: '2026-07-20T00:00:00Z',
+		updatedBy: actor,
+		provenance: { originType: 'HUMAN_DECISION', sourceObjectIds: [], sourceEventIds: [] },
+		tags: [],
+		extensions: [],
+		pwaId: 'pwa_01ARZ3NDEKTSV4RRFFQ69G5P00',
+		pwaVersion: '1.0.0',
+		pwuKind: 'PRODUCT_REALIZATION',
+		name: 'Root',
+		purpose: 'root',
+		isRoot: true,
+		permittedParentTypeIds: [],
+		permittedChildTypeIds: [],
+		requiredInputs: [],
+		requiredOutputs: [],
+		requiredAssurancePolicyIds: [],
+		completionRule: 'done',
+		status: 'DRAFT'
+	};
+
+	it('is back-compat: a PwuType with NO executionBoundary/boundaryContract validates (both optional)', () => {
+		expect(PwuTypeSchema.safeParse(base).success).toBe(true);
+	});
+
+	it('accepts a DELEGATED_EXTERNAL type carrying a boundaryContract (STD-3)', () => {
+		const delegated = {
+			...base,
+			executionBoundary: 'DELEGATED_EXTERNAL',
+			boundaryContract: {
+				counterpartyLabel: 'Contract Lab — Hematology',
+				attestedAssurancePolicyIds: [],
+				applicabilityNote: 'STAT panels only'
+			}
+		};
+		expect(PwuTypeSchema.safeParse(delegated).success).toBe(true);
+	});
+
+	it('rejects an out-of-enum executionBoundary at the object (commitState) gate', () => {
+		expect(PwuTypeSchema.safeParse({ ...base, executionBoundary: 'OFFSHORE' }).success).toBe(false);
+	});
+
+	it('rejects a boundaryContract missing its required counterpartyLabel, and one carrying an unknown key (strict)', () => {
+		expect(
+			PwuTypeSchema.safeParse({
+				...base,
+				executionBoundary: 'DELEGATED_EXTERNAL',
+				boundaryContract: { attestedAssurancePolicyIds: [] }
+			}).success
+		).toBe(false);
+		expect(
+			PwuTypeSchema.safeParse({
+				...base,
+				executionBoundary: 'DELEGATED_EXTERNAL',
+				boundaryContract: { counterpartyLabel: 'Lab', attestedAssurancePolicyIds: [], sneaky: 1 }
+			}).success
+		).toBe(false);
 	});
 });

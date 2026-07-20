@@ -74,6 +74,9 @@ describe('validate', () => {
 		// RecursiveProfessionalHarness object (22nd object type), +1 ProposeHarness command, +1 HarnessProposed
 		// event. (RECURSIVE_PROFESSIONAL_HARNESS is a new VALUE on the existing ProfessionalWorkObjectType enum, not
 		// a new enum entry.) (+4 → 308.)
-		expect(buildContractRegistry().ids()).toHaveLength(308);
+		// then +1 ExecutionBoundary enum (JAN-PRPWA-DS-001 STD-2 / DWP-02) — the INTERNAL/DELEGATED_EXTERNAL boundary
+		// annotation on PwuType. The BoundaryContract sub-type (STD-3) is a helper, NOT a registry entry (like
+		// RecompositionConflict above); the two new PwuType fields + two command-payload fields add no schemas. (+1 → 309.)
+		expect(buildContractRegistry().ids()).toHaveLength(309);
 	});
 });

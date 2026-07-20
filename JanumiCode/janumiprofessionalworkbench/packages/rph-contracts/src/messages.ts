@@ -19,6 +19,7 @@ import {
 	DecompositionContractStatusSchema,
 	EvidenceStatusSchema,
 	EvidenceTypeSchema,
+	ExecutionBoundarySchema,
 	ExecutionPlanStatusSchema,
 	ExecutionStateSchema,
 	HarnessStatusSchema,
@@ -44,6 +45,7 @@ import {
 	AssessmentCriterionSchema,
 	AssumptionPropagationSchema,
 	AuthorityReferenceSchema,
+	BoundaryContractSchema,
 	CapabilityGrantSchema,
 	CapabilityRequestSchema,
 	ConfidenceAssessmentSchema,
@@ -502,7 +504,9 @@ export const DefinePwuTypePayloadSchema = z.strictObject({
 	requiredInputs: z.array(z.string()).optional(),
 	requiredOutputs: z.array(z.string()).optional(),
 	requiredAssurancePolicyIds: z.array(z.string()).optional(),
-	completionRule: z.string().optional()
+	completionRule: z.string().optional(),
+	executionBoundary: ExecutionBoundarySchema.optional(),
+	boundaryContract: BoundaryContractSchema.optional()
 });
 export type DefinePwuTypePayload = z.infer<typeof DefinePwuTypePayloadSchema>;
 export const SubmitPwaForReviewPayloadSchema = z.strictObject({});
@@ -551,7 +555,9 @@ export const EditPwuTypePayloadSchema = z.strictObject({
 	permittedChildren: z.array(PermittedChildRuleSchema).optional(),
 	requiredInputs: z.array(z.string()).optional(),
 	requiredOutputs: z.array(z.string()).optional(),
-	requiredAssurancePolicyIds: z.array(z.string()).optional()
+	requiredAssurancePolicyIds: z.array(z.string()).optional(),
+	executionBoundary: ExecutionBoundarySchema.optional(),
+	boundaryContract: BoundaryContractSchema.optional()
 });
 export type EditPwuTypePayload = z.infer<typeof EditPwuTypePayloadSchema>;
 export const RemovePwuTypePayloadSchema = z.strictObject({

@@ -168,6 +168,113 @@ describe('PwaAuthoringBroker — the LLM-agnostic PWA-authoring capability layer
 		).toMatch(/is DRAFT/);
 	});
 
+	// JAN-PRPWA-DS-001 STD-2/STD-3/INV-1 (DWP-02): the broker's friendly pre-check mirrors the handler's coherence
+	// gate (the engine remains authoritative — C-5) and, per D-C Option 1, validates attestedAssurancePolicyIds
+	// exactly like requiredAssurancePolicyIds.
+	it('defineType pre-checks INV-1/STD-3 for a delegated leaf (contract, named counterparty, no children)', () => {
+		expect(
+			broker.defineType({
+				name: 'Bloodwork',
+				pwuKind: 'DELEGATED',
+				executionBoundary: 'DELEGATED_EXTERNAL'
+			}).error
+		).toMatch(/must declare a boundaryContract/);
+		expect(
+			broker.defineType({
+				name: 'Bloodwork',
+				pwuKind: 'DELEGATED',
+				executionBoundary: 'DELEGATED_EXTERNAL',
+				boundaryContract: { counterpartyLabel: '  ', attestedAssurancePolicyIds: [] }
+			}).error
+		).toMatch(/counterpartyLabel must name/);
+		expect(
+			broker.defineType({
+				name: 'Bloodwork',
+				pwuKind: 'DELEGATED',
+				executionBoundary: 'DELEGATED_EXTERNAL',
+				boundaryContract: { counterpartyLabel: 'Lab', attestedAssurancePolicyIds: [] },
+				permittedChildTypeIds: ['pwut_x']
+			}).error
+		).toMatch(/terminal \(INV-1\)/);
+		expect(
+			broker.defineType({
+				name: 'Internal',
+				pwuKind: 'X',
+				boundaryContract: { counterpartyLabel: 'Lab', attestedAssurancePolicyIds: [] }
+			}).error
+		).toMatch(/Only a DELEGATED_EXTERNAL/);
+	});
+
+	it('defineType accepts a valid delegated leaf; the view resolves executionBoundary + exposes the contract', () => {
+		const r = broker.defineType({
+			name: 'Bloodwork',
+			pwuKind: 'DELEGATED',
+			executionBoundary: 'DELEGATED_EXTERNAL',
+			boundaryContract: { counterpartyLabel: 'Contract Lab', attestedAssurancePolicyIds: [] }
+		});
+		expect(r.ok, r.error).toBe(true);
+		const view = broker.getType(r.id!)!;
+		expect(view.executionBoundary).toBe('DELEGATED_EXTERNAL');
+		expect(view.boundaryContract).toMatchObject({ counterpartyLabel: 'Contract Lab' });
+		const internal = broker.defineType({ name: 'Internal', pwuKind: 'X' });
+		expect(broker.getType(internal.id!)!.executionBoundary).toBe('INTERNAL');
+		expect(broker.getType(internal.id!)!.boundaryContract).toBeUndefined();
+	});
+
+	it('validates attestedAssurancePolicyIds exactly like requiredAssurancePolicyIds (R-10, D-C Option 1 parity)', () => {
+		const contract = (ids: string[]) => ({ counterpartyLabel: 'Lab', attestedAssurancePolicyIds: ids });
+		const del = (name: string, ids: string[]) =>
+			broker.defineType({
+				name,
+				pwuKind: 'DELEGATED',
+				executionBoundary: 'DELEGATED_EXTERNAL',
+				boundaryContract: contract(ids)
+			});
+		expect(del('Floor', ['floor.reasoning-review']).error).toMatch(/must not be referenced explicitly/);
+		expect(del('Missing', ['pol_missing']).error).toMatch(/does not exist/);
+		const policy = broker.createPolicy({ name: 'Lab Accreditation' });
+		expect(del('Draft', [policy.id!]).error).toMatch(/is DRAFT/);
+		expect(
+			raw('ActivateAssurancePolicy', policy.id!, 'ASSURANCE_POLICY', { policyId: policy.id! }).status
+		).toBe('ACCEPTED');
+		const ok = del('Governed', [policy.id!]);
+		expect(ok.ok, ok.error).toBe(true);
+		// After suspension an UNRELATED edit retains the pre-existing attested declaration (never erased).
+		expect(
+			raw('SuspendAssurancePolicy', policy.id!, 'ASSURANCE_POLICY', { policyId: policy.id! }).status
+		).toBe('ACCEPTED');
+		expect(broker.editType(ok.id!, { purpose: 'clarified scope' }).ok).toBe(true);
+		expect(broker.getType(ok.id!)!.boundaryContract?.attestedAssurancePolicyIds).toEqual([policy.id]);
+	});
+
+	it('scaffold builds a delegated leaf under an internal root and rejects a delegated node that names children', () => {
+		const ok = broker.scaffold([
+			{ tempKey: 'root', name: 'Encounter', pwuKind: 'ROOT', isRoot: true, childTempKeys: ['bloodwork'] },
+			{
+				tempKey: 'bloodwork',
+				name: 'Bloodwork',
+				pwuKind: 'DELEGATED',
+				executionBoundary: 'DELEGATED_EXTERNAL',
+				boundaryContract: { counterpartyLabel: 'Contract Lab', attestedAssurancePolicyIds: [] }
+			}
+		]);
+		expect(ok.ok, ok.error).toBe(true);
+		expect(broker.getType(ok.ids!.bloodwork!)!.executionBoundary).toBe('DELEGATED_EXTERNAL');
+		const bad = broker.scaffold([
+			{
+				tempKey: 'a',
+				name: 'A',
+				pwuKind: 'DELEGATED',
+				executionBoundary: 'DELEGATED_EXTERNAL',
+				boundaryContract: { counterpartyLabel: 'Lab', attestedAssurancePolicyIds: [] },
+				childTempKeys: ['b']
+			},
+			{ tempKey: 'b', name: 'B', pwuKind: 'X' }
+		]);
+		expect(bad.ok).toBe(false);
+		expect(bad.error).toMatch(/terminal \(INV-1\)/);
+	});
+
 	it('defines from a catalog template, carrying the blueprint fields (copy-on-use)', () => {
 		const r = broker.defineFromTemplate('architecture');
 		expect(r.ok).toBe(true);

@@ -9,15 +9,22 @@
 // FSM — a human advances DRAFT -> ... -> PUBLISHED. That is the "agent proposes, human publishes" seam.
 import type {
 	AssessmentCriterion,
+	BoundaryContract,
 	CardinalityCode,
 	CommandResult,
 	DomainCommand,
+	ExecutionBoundary,
 	PermittedChildRule
 } from '@janumipwb/rph-contracts';
 
 // Re-export the PWU-Type authoring value types so every authoring surface (the agent tools, the UI) can name them
 // via @janumipwb/rph-authoring without reaching into the contracts package directly.
-export type { CardinalityCode, PermittedChildRule } from '@janumipwb/rph-contracts';
+export type {
+	BoundaryContract,
+	CardinalityCode,
+	ExecutionBoundary,
+	PermittedChildRule
+} from '@janumipwb/rph-contracts';
 import {
 	getObject,
 	listAssurancePolicies,
@@ -56,6 +63,10 @@ export interface PwuTypeView {
 	readonly requiredOutputs: string[];
 	/** Declared (required-treatment) assurance policy ids for future instances of this type (§11.7.4). */
 	readonly requiredAssurancePolicyIds: string[];
+	/** JAN-PRPWA-DS-001 STD-2 — where this type's work is discharged (resolved: absent state ⇒ INTERNAL). */
+	readonly executionBoundary: ExecutionBoundary;
+	/** JAN-PRPWA-DS-001 STD-3 — the org-boundary ICD; present iff executionBoundary is DELEGATED_EXTERNAL (INV-1). */
+	readonly boundaryContract?: BoundaryContract;
 }
 
 /** The outcome of a PROPOSE operation. `ok` mirrors the engine's acceptance; on failure `error` carries the
@@ -82,6 +93,10 @@ export interface DefineTypeInput {
 	readonly requiredInputs?: readonly string[];
 	readonly requiredOutputs?: readonly string[];
 	readonly requiredAssurancePolicyIds?: readonly string[];
+	/** STD-2 — INTERNAL (default) or DELEGATED_EXTERNAL. DELEGATED requires a boundaryContract and no children (INV-1). */
+	readonly executionBoundary?: ExecutionBoundary;
+	/** STD-3 — the org-boundary ICD, authored only when executionBoundary is DELEGATED_EXTERNAL. */
+	readonly boundaryContract?: BoundaryContract;
 }
 
 /** A patch to an existing PWU Type — only the present fields change (mirrors the EditPwuType field-patch). */
@@ -96,6 +111,10 @@ export interface EditTypeInput {
 	readonly requiredInputs?: readonly string[];
 	readonly requiredOutputs?: readonly string[];
 	readonly requiredAssurancePolicyIds?: readonly string[];
+	/** STD-2 — reassign the execution boundary. The engine strips a stale contract on a DELEGATED→INTERNAL flip. */
+	readonly executionBoundary?: ExecutionBoundary;
+	/** STD-3 — set/replace the org-boundary ICD (only meaningful when the resolved boundary is DELEGATED_EXTERNAL). */
+	readonly boundaryContract?: BoundaryContract;
 }
 
 /** Semantic attributes for one parent -> child composition edge. Omitted attributes preserve an existing rule;
@@ -152,6 +171,11 @@ export interface ScaffoldSpec {
 		readonly cardinality: CardinalityCode;
 		readonly applicabilityNote?: string;
 	}[];
+	/** STD-2 — a scaffolded node MAY be a delegated leaf; DELEGATED_EXTERNAL requires a boundaryContract and no
+	 *  childTempKeys (INV-1, pre-checked here and enforced by the engine). */
+	readonly executionBoundary?: ExecutionBoundary;
+	/** STD-3 — the org-boundary ICD for a delegated scaffolded node. */
+	readonly boundaryContract?: BoundaryContract;
 }
 
 export interface BrokerDeps {
@@ -194,7 +218,9 @@ function toTypeView(id: string, s: Record<string, unknown>): PwuTypeView {
 			: [],
 		requiredInputs: arr(s.requiredInputs),
 		requiredOutputs: arr(s.requiredOutputs),
-		requiredAssurancePolicyIds: arr(s.requiredAssurancePolicyIds)
+		requiredAssurancePolicyIds: arr(s.requiredAssurancePolicyIds),
+		executionBoundary: s.executionBoundary === 'DELEGATED_EXTERNAL' ? 'DELEGATED_EXTERNAL' : 'INTERNAL',
+		...(s.boundaryContract ? { boundaryContract: s.boundaryContract as BoundaryContract } : {})
 	};
 }
 
@@ -335,6 +361,13 @@ export class PwaAuthoringBroker {
 			return { ok: false, error: 'A PWU Type name and kind are required.' };
 		const policyGuard = this.validatePolicyReferences(input.requiredAssurancePolicyIds ?? []);
 		if (policyGuard) return policyGuard;
+		const boundaryGuard = this.validateBoundary(
+			input.executionBoundary,
+			input.boundaryContract,
+			input.permittedChildTypeIds ?? [],
+			input.permittedChildren ?? []
+		);
+		if (boundaryGuard) return boundaryGuard;
 		const id = this.mintId('pwut');
 		const r = this.dispatch(
 			this.cmd('DefinePwuType', PWU_TYPE, id, {
@@ -349,6 +382,8 @@ export class PwaAuthoringBroker {
 				requiredOutputs: [...(input.requiredOutputs ?? [])],
 				requiredAssurancePolicyIds: [...(input.requiredAssurancePolicyIds ?? [])],
 				...(input.permittedChildren ? { permittedChildren: [...input.permittedChildren] } : {}),
+				...(input.executionBoundary ? { executionBoundary: input.executionBoundary } : {}),
+				...(input.boundaryContract ? { boundaryContract: input.boundaryContract } : {}),
 				...(input.completionRule ? { completionRule: input.completionRule } : {})
 			})
 		);
@@ -370,6 +405,59 @@ export class PwaAuthoringBroker {
 		});
 	}
 
+	/** INV-1/STD-3 pre-check for an edit: resolve the boundary the way the handler does (patch → existing →
+	 *  INTERNAL; strip the contract on the INTERNAL branch) so the friendly message reflects the exact next-state
+	 *  the engine will validate. The engine remains the authoritative gate (C-5). */
+	private checkEditBoundary(patch: EditTypeInput, existing: PwuTypeView): ProposalResult | null {
+		const resolvedBoundary =
+			(patch.executionBoundary ?? existing.executionBoundary) === 'DELEGATED_EXTERNAL'
+				? 'DELEGATED_EXTERNAL'
+				: 'INTERNAL';
+		const nextContract =
+			resolvedBoundary === 'DELEGATED_EXTERNAL'
+				? (patch.boundaryContract ?? existing.boundaryContract)
+				: undefined;
+		return this.validateBoundary(
+			resolvedBoundary,
+			nextContract,
+			patch.permittedChildTypeIds ?? existing.permittedChildTypeIds,
+			patch.permittedChildren ?? existing.permittedChildren,
+			existing.boundaryContract?.attestedAssurancePolicyIds ?? []
+		);
+	}
+
+	/** Assemble the EditPwuType command payload from the present patch fields (only present fields change — the
+	 *  handler patch-merges). Extracted from editType to keep that method within the cognitive-complexity budget. */
+	private editTypePayload(pwuTypeId: string, patch: EditTypeInput): Record<string, unknown> {
+		return {
+			pwuTypeId,
+			...(patch.name !== undefined ? { name: patch.name } : {}),
+			...(patch.pwuKind !== undefined ? { pwuKind: patch.pwuKind } : {}),
+			...(patch.purpose !== undefined ? { purpose: patch.purpose } : {}),
+			...(patch.isRoot !== undefined ? { isRoot: patch.isRoot } : {}),
+			...(patch.completionRule !== undefined ? { completionRule: patch.completionRule } : {}),
+			...(patch.permittedChildTypeIds !== undefined
+				? { permittedChildTypeIds: [...patch.permittedChildTypeIds] }
+				: {}),
+			...(patch.permittedChildren !== undefined
+				? { permittedChildren: [...patch.permittedChildren] }
+				: {}),
+			...(patch.requiredInputs !== undefined ? { requiredInputs: [...patch.requiredInputs] } : {}),
+			...(patch.requiredOutputs !== undefined
+				? { requiredOutputs: [...patch.requiredOutputs] }
+				: {}),
+			...(patch.requiredAssurancePolicyIds !== undefined
+				? { requiredAssurancePolicyIds: [...patch.requiredAssurancePolicyIds] }
+				: {}),
+			...(patch.executionBoundary !== undefined
+				? { executionBoundary: patch.executionBoundary }
+				: {}),
+			...(patch.boundaryContract !== undefined
+				? { boundaryContract: patch.boundaryContract }
+				: {})
+		};
+	}
+
 	/** Edit an existing PWU Type in place (only present fields change). */
 	editType(pwuTypeId: string, patch: EditTypeInput): ProposalResult {
 		const guard = this.requireDraft();
@@ -378,30 +466,10 @@ export class PwaAuthoringBroker {
 		if (!existing) return { ok: false, error: `PWU Type ${pwuTypeId} does not exist on this PWA.` };
 		const policyGuard = this.validatePolicyPatch(patch, existing);
 		if (policyGuard) return policyGuard;
+		const boundaryGuard = this.checkEditBoundary(patch, existing);
+		if (boundaryGuard) return boundaryGuard;
 		const r = this.dispatch(
-			this.cmd('EditPwuType', PWU_TYPE, pwuTypeId, {
-				pwuTypeId,
-				...(patch.name !== undefined ? { name: patch.name } : {}),
-				...(patch.pwuKind !== undefined ? { pwuKind: patch.pwuKind } : {}),
-				...(patch.purpose !== undefined ? { purpose: patch.purpose } : {}),
-				...(patch.isRoot !== undefined ? { isRoot: patch.isRoot } : {}),
-				...(patch.completionRule !== undefined ? { completionRule: patch.completionRule } : {}),
-				...(patch.permittedChildTypeIds !== undefined
-					? { permittedChildTypeIds: [...patch.permittedChildTypeIds] }
-					: {}),
-				...(patch.permittedChildren !== undefined
-					? { permittedChildren: [...patch.permittedChildren] }
-					: {}),
-				...(patch.requiredInputs !== undefined
-					? { requiredInputs: [...patch.requiredInputs] }
-					: {}),
-				...(patch.requiredOutputs !== undefined
-					? { requiredOutputs: [...patch.requiredOutputs] }
-					: {}),
-				...(patch.requiredAssurancePolicyIds !== undefined
-					? { requiredAssurancePolicyIds: [...patch.requiredAssurancePolicyIds] }
-					: {})
-			})
+			this.cmd('EditPwuType', PWU_TYPE, pwuTypeId, this.editTypePayload(pwuTypeId, patch))
 		);
 		return accepted(r) ? { ok: true, id: pwuTypeId, status: r.status } : rejected(r);
 	}
@@ -552,43 +620,63 @@ export class PwaAuthoringBroker {
 	): { commands: DomainCommand[] } | { error: ProposalResult } {
 		const commands: DomainCommand[] = [];
 		for (const s of specs) {
-			if (!s.name?.trim() || !s.pwuKind?.trim())
-				return { error: { ok: false, error: `Type "${s.tempKey}" needs a name and kind.` } };
-			const childIds: string[] = [];
-			const childRules: PermittedChildRule[] = [];
-			for (const ck of s.childTempKeys ?? []) {
-				const cid = idFor.get(ck);
-				if (!cid)
-					return {
-						error: { ok: false, error: `Type "${s.tempKey}" names unknown child "${ck}".` }
-					};
-				childIds.push(cid);
-				const card = s.childCardinalities?.find((c) => c.tempKey === ck);
-				childRules.push({
-					typeId: cid,
-					cardinality: card?.cardinality ?? 'M1',
-					...(card?.applicabilityNote ? { applicabilityNote: card.applicabilityNote } : {})
-				});
-			}
-			const id = idFor.get(s.tempKey)!;
-			commands.push(
-				this.cmd('DefinePwuType', PWU_TYPE, id, {
-					pwuTypeId: id,
-					pwaId: this.pwaId,
-					pwuKind: s.pwuKind,
-					name: s.name,
-					purpose: s.purpose || s.name,
-					isRoot: s.isRoot ?? false,
-					permittedChildTypeIds: childIds,
-					permittedChildren: childRules,
-					requiredInputs: [...(s.requiredInputs ?? [])],
-					requiredOutputs: [...(s.requiredOutputs ?? [])],
-					requiredAssurancePolicyIds: [...(s.requiredAssurancePolicyIds ?? [])],
-					...(s.completionRule ? { completionRule: s.completionRule } : {})
-				})
-			);
+			const built = this.scaffoldCommandFor(s, idFor);
+			if ('error' in built) return { error: built.error };
+			commands.push(built.command);
 		}
 		return { commands };
+	}
+
+	/** Build one scaffolded DefinePwuType command — resolve child temp keys → per-child cardinality rules, run the
+	 *  INV-1/STD-3 boundary pre-check, then assemble the command — or return the first validation failure. Extracted
+	 *  from buildScaffoldCommands so each stays within the cognitive-complexity budget; spec order (and therefore
+	 *  `this.cmd`'s seq numbering) is preserved because the caller iterates specs in order. */
+	private scaffoldCommandFor(
+		s: ScaffoldSpec,
+		idFor: Map<string, string>
+	): { command: DomainCommand } | { error: ProposalResult } {
+		if (!s.name?.trim() || !s.pwuKind?.trim())
+			return { error: { ok: false, error: `Type "${s.tempKey}" needs a name and kind.` } };
+		const childIds: string[] = [];
+		const childRules: PermittedChildRule[] = [];
+		for (const ck of s.childTempKeys ?? []) {
+			const cid = idFor.get(ck);
+			if (!cid)
+				return { error: { ok: false, error: `Type "${s.tempKey}" names unknown child "${ck}".` } };
+			childIds.push(cid);
+			const card = s.childCardinalities?.find((c) => c.tempKey === ck);
+			childRules.push({
+				typeId: cid,
+				cardinality: card?.cardinality ?? 'M1',
+				...(card?.applicabilityNote ? { applicabilityNote: card.applicabilityNote } : {})
+			});
+		}
+		const boundaryError = this.validateBoundary(
+			s.executionBoundary,
+			s.boundaryContract,
+			childIds,
+			childRules
+		);
+		if (boundaryError) return { error: boundaryError };
+		const id = idFor.get(s.tempKey)!;
+		return {
+			command: this.cmd('DefinePwuType', PWU_TYPE, id, {
+				pwuTypeId: id,
+				pwaId: this.pwaId,
+				pwuKind: s.pwuKind,
+				name: s.name,
+				purpose: s.purpose || s.name,
+				isRoot: s.isRoot ?? false,
+				permittedChildTypeIds: childIds,
+				permittedChildren: childRules,
+				requiredInputs: [...(s.requiredInputs ?? [])],
+				requiredOutputs: [...(s.requiredOutputs ?? [])],
+				requiredAssurancePolicyIds: [...(s.requiredAssurancePolicyIds ?? [])],
+				...(s.executionBoundary ? { executionBoundary: s.executionBoundary } : {}),
+				...(s.boundaryContract ? { boundaryContract: s.boundaryContract } : {}),
+				...(s.completionRule ? { completionRule: s.completionRule } : {})
+			})
+		};
 	}
 
 	// ---- internals ---------------------------------------------------------------------------------
@@ -640,6 +728,50 @@ export class PwaAuthoringBroker {
 				};
 			}
 		}
+		return null;
+	}
+
+	/** Friendly INV-1/STD-3 pre-check mirroring the domain handler's coherence gate (the engine is the hard,
+	 *  authoritative gate — C-5; this returns an actionable message instead of a raw rejection). Resolves the
+	 *  boundary the same way the handler does (absent ⇒ INTERNAL) and validates the RESOLVED next-state: a
+	 *  DELEGATED_EXTERNAL node needs a non-empty counterparty and no children (INV-1), and its attested policy ids
+	 *  are validated exactly like requiredAssurancePolicyIds (D-C Option 1, broker-parity: ACTIVE non-floor,
+	 *  retaining pre-existing declarations); an INTERNAL node carries no contract. `existingAttestedIds` is the
+	 *  retain set so an unrelated edit never re-validates a since-deactivated attested policy. */
+	private validateBoundary(
+		boundary: ExecutionBoundary | undefined,
+		contract: BoundaryContract | undefined,
+		childIds: readonly string[],
+		childRules: readonly PermittedChildRule[],
+		existingAttestedIds: readonly string[] = []
+	): ProposalResult | null {
+		const resolved = boundary === 'DELEGATED_EXTERNAL' ? 'DELEGATED_EXTERNAL' : 'INTERNAL';
+		if (resolved === 'DELEGATED_EXTERNAL') {
+			if (!contract)
+				return {
+					ok: false,
+					error: 'A DELEGATED_EXTERNAL PWU Type must declare a boundaryContract (STD-3): the external counterparty and the assurance policies it attests to.'
+				};
+			if (!contract.counterpartyLabel?.trim())
+				return {
+					ok: false,
+					error: 'boundaryContract.counterpartyLabel must name the external counterparty (STD-3).'
+				};
+			if (childIds.length > 0 || childRules.length > 0)
+				return {
+					ok: false,
+					error: 'A DELEGATED_EXTERNAL PWU Type is terminal (INV-1): it cannot declare permitted child types. Delegate the whole unit across the boundary, or keep it INTERNAL and decompose.'
+				};
+			return this.validatePolicyReferences(
+				contract.attestedAssurancePolicyIds ?? [],
+				existingAttestedIds
+			);
+		}
+		if (contract)
+			return {
+				ok: false,
+				error: 'Only a DELEGATED_EXTERNAL PWU Type may carry a boundaryContract (INV-1). Set executionBoundary to DELEGATED_EXTERNAL, or omit the contract.'
+			};
 		return null;
 	}
 

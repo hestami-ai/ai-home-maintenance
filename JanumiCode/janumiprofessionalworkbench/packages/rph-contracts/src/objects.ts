@@ -31,6 +31,7 @@ import {
 	EvidenceCardinalitySchema,
 	EvidenceStatusSchema,
 	EvidenceTypeSchema,
+	ExecutionBoundarySchema,
 	ExecutionPlanStatusSchema,
 	ExecutionStateSchema,
 	HarnessStatusSchema,
@@ -148,6 +149,12 @@ export const BaselineItemVersionSchema = z.strictObject({
 	contentHash: z.string().optional()
 });
 export type BaselineItemVersion = z.infer<typeof BaselineItemVersionSchema>;
+export const BoundaryContractSchema = z.strictObject({
+	counterpartyLabel: z.string(),
+	attestedAssurancePolicyIds: z.array(z.string()),
+	applicabilityNote: z.string().optional()
+});
+export type BoundaryContract = z.infer<typeof BoundaryContractSchema>;
 export const ConflictResolutionRuleSchema = z.strictObject({
 	conflictType: z.string(),
 	action: z.string()
@@ -675,6 +682,8 @@ export const PwuTypeSchema = z.strictObject({
 	permittedParentTypeIds: z.array(z.string()),
 	permittedChildTypeIds: z.array(z.string()),
 	permittedChildren: z.array(PermittedChildRuleSchema).optional(),
+	executionBoundary: ExecutionBoundarySchema.optional(),
+	boundaryContract: BoundaryContractSchema.optional(),
 	requiredInputs: z.array(z.string()),
 	requiredOutputs: z.array(z.string()),
 	requiredAssurancePolicyIds: z.array(z.string()),
