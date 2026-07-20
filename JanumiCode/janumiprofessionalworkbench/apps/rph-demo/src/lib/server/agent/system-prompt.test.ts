@@ -38,4 +38,30 @@ describe('buildSystemPrompt authoring-backbone boundaries', () => {
 			'There is no staged preview, whole-turn transaction, semantic undo, or rollback'
 		);
 	});
+
+	// JAN-PRPWA-DS-001 SPEC-1 / DR-001 DWP-01: the agnostic core states the STD-1 leaf criterion (both branches),
+	// comprehensive-by-default (P-1), the D-3 negative platform rule + substrate list, and the three named planes.
+	it('states the STD-1 leaf criterion (irreducible OR delegated), comprehensive-by-default, the platform/content rule, and the three planes', () => {
+		const prompt = buildSystemPrompt({
+			id: 'PWA-TEST',
+			name: 'Test PWA',
+			domain: 'testing',
+			publicationStatus: 'DRAFT'
+		});
+
+		// STD-1 — both leaf branches present.
+		expect(prompt).toContain('IRREDUCIBLE within scope');
+		expect(prompt).toContain('DELEGATED across an organizational boundary');
+		// P-1 — comprehensive-by-default.
+		expect(prompt).toContain('COMPREHENSIVE BY DEFAULT');
+		// D-3 — negative platform rule + the substrate the agent must NOT author.
+		expect(prompt).toContain('MUST NOT be created as PWU Types');
+		expect(prompt).toContain('event ledger / governed stream');
+		expect(prompt).toContain('universal assurance floor');
+		// D-1a — the three planes named and kept distinct.
+		expect(prompt).toContain('THREE distinct planes');
+		expect(prompt).toContain('COMPOSITION ARCHITECTURE');
+		expect(prompt).toContain('ARTIFACT HAND-OFF');
+		expect(prompt).toContain('PWU LIFECYCLE');
+	});
 });

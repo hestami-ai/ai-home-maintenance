@@ -3,6 +3,12 @@
 // ("you propose onto a DRAFT; a human publishes"). It is deliberately concise: the ENGINE is the source of truth,
 // so the prompt tells the agent to read state with the tools and react to rejections rather than to memorize
 // invariants. The current PWA is injected so the agent is oriented from turn one.
+//
+// SPEC-1 (JAN-PRPWA-DS-001 / JAN-PRPWA-DR-001 DWP-01): the GRAPH STRUCTURE, PLATFORM VS CONTENT, and THE THREE
+// PLANES sections below encode the STD-1 leaf criterion (a legitimate leaf is IRREDUCIBLE-within-scope OR
+// DELEGATED-across-a-boundary), comprehensive-by-default (P-1), the D-3 negative platform rule, and the three
+// distinct planes (D-1a). The delegated-leaf AUTHORING mechanics (executionBoundary + boundaryContract) arrive
+// with DWP-04's tools; here the criterion is stated conceptually — a delegated leaf is, for now, just a leaf.
 
 export interface PwaContext {
 	readonly id: string;
@@ -26,8 +32,16 @@ WHAT YOU ARE AUTHORING
 GRAPH STRUCTURE — decompose, do NOT mesh (important)
 - Composition (permits) is a DECOMPOSITION HIERARCHY, not a flat list. It answers "what is this made of?". Build a TREE (or shallow DAG): the root permits a SMALL number of top-level areas (aim for 2–4), and each of those permits its own sub-areas. Depth is good; breadth-from-one-node is not.
 - Do NOT make the root permit every area (a star). That is the most common mistake: it produces a meshy graph and is not a real decomposition. If you find yourself giving one type 5+ children, group them under intermediate areas instead.
+- COMPREHENSIVE BY DEFAULT: decompose the domain work until every leaf is a LEGITIMATE leaf (below), not a high-level map. A leaf that is simply "not decomposed yet" is under-specified — keep going. Comprehensive means content-complete for the WORK, not re-specifying the platform (see PLATFORM VS CONTENT).
+- WHEN A NODE IS A LEAF (when to STOP decomposing): a PWU Type is a legitimate leaf when EITHER (a) it is IRREDUCIBLE within scope — one accountable role/discipline produces its ONE nameable, verifiable output end-to-end, and splitting it would fragment a single professional judgment rather than reveal distinct responsibilities; OR (b) it is DELEGATED across an organizational boundary — the work is real and decomposable but belongs to ANOTHER organization, so from here it is a single external party you hand off to (you specify the interface, not their internal work). A node that is NEITHER — coarse work that is yours and simply undecomposed — is not a legitimate leaf; decompose it. Irreducibility is relative to YOUR accountability scope: what is one atomic unit to you may be a whole architecture to the party you delegate it to.
 - Keep composition and artifact hand-off distinct. A permits edge says "part-of"; a matching output/input says "can hand off this artifact". Neither canvas position nor a data-flow overlay proves temporal sequence.
 - If the professional design needs an execution order, report that it is outside this PWA Type graph. Do not encode "then" by abusing composition or claim that artifact hand-off establishes workflow order.
+
+PLATFORM VS CONTENT — author the work, not the platform (important)
+- You author DOMAIN WORK as PWU Types. You do NOT author the PLATFORM that runs the work. These are provided by JPWB/RPH and MUST NOT be created as PWU Types: the event ledger / governed stream, memory or narrative synthesis, loop/retry control, context assembly, credential issuance, and the universal assurance floor. If a design names such infrastructure, treat it as already provided — do not model it as a work unit. (A domain-specific SUBSTANTIVE review that is genuinely part of the work — e.g. a constructive-critique review sub-phase — IS authored as a PWU Type; only the universal platform floor is off-limits.)
+
+THE THREE PLANES — keep them distinct (do not conflate)
+- A PWA is read on THREE distinct planes: (1) COMPOSITION ARCHITECTURE — the permits tree, "what is this made of", timeless (it does not imply order); (2) ARTIFACT HAND-OFF — requiredOutputs → requiredInputs matched by artifact name, a DEPENDENCY relation, not a schedule; (3) PWU LIFECYCLE — the per-unit state-machine exercised later during an Undertaking (simulation-only here, never authored). Composition is not sequence; hand-off is not schedule; lifecycle is not authored here. These three planes describe the WORK and are separate from the platform-vs-content distinction above.
 
 CANVAS AND LIFECYCLE TOPOLOGY — presentation/read-only
 - Canvas layout direction, ELK/Dagre coordinates, node movement, collapse, selection, zoom, and the data-flow overlay are human presentation controls only. They do not change authored semantics, and you have no tool to move nodes.
