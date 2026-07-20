@@ -132,3 +132,113 @@ describe('scaffold_graph semantic edge attributes', () => {
 		expect(scaffold).not.toHaveBeenCalled();
 	});
 });
+
+// JAN-PRPWA-DS-001 STD-2/STD-3 (DWP-04): the flattened boundary params across the three authoring tools. The
+// engine enforces INV-1 (F-10) — the tools only pre-check the enum and reassemble the contract for the broker.
+describe('PWU-Type boundary tool params (JAN-PRPWA DWP-04)', () => {
+	const FULL_HELP = {
+		name: 'name',
+		pwuKind: 'kind',
+		purpose: 'purpose',
+		isRoot: 'root',
+		completionRule: 'completion',
+		requiredInputs: 'inputs',
+		requiredOutputs: 'outputs',
+		requiredAssurancePolicyIds: 'policies',
+		executionBoundary: 'Where work is discharged: INTERNAL or DELEGATED_EXTERNAL.',
+		counterpartyLabel: 'the external party',
+		attestedAssurancePolicyIds: 'attested policies',
+		boundaryApplicabilityNote: 'scope note'
+	};
+	const rationale = { declare: vi.fn(), get: () => undefined } as RationaleSink;
+	const buildTools = (methods: Record<string, unknown>) =>
+		buildAuthoringTools({ help: () => FULL_HELP, ...methods } as unknown as PwaAuthoringBroker, rationale);
+	const find = (methods: Record<string, unknown>, name: string) =>
+		buildTools(methods).find((t) => t.name === name)!;
+
+	it('define_pwu_type: rejects a garbage executionBoundary and does not call the broker', () => {
+		const defineType = vi.fn(() => ({ ok: true, id: 'pwut_x', status: 'ACCEPTED' }));
+		const tool = find({ defineType }, 'define_pwu_type');
+		expect(tool.parameters.executionBoundary?.description).toMatch(/DELEGATED_EXTERNAL/);
+		const r = tool.run({ name: 'X', pwuKind: 'X', executionBoundary: 'OFFSHORE' });
+		expect(r).toMatchObject({ ok: false });
+		expect(r.summary).toMatch(/INTERNAL or DELEGATED_EXTERNAL/);
+		expect(defineType).not.toHaveBeenCalled();
+	});
+
+	it('define_pwu_type: reassembles the flattened params into a boundaryContract and forwards it', () => {
+		const defineType = vi.fn(() => ({ ok: true, id: 'pwut_x', status: 'ACCEPTED' }));
+		const tool = find({ defineType }, 'define_pwu_type');
+		tool.run({
+			name: 'Bloodwork',
+			pwuKind: 'DELEGATED',
+			executionBoundary: 'DELEGATED_EXTERNAL',
+			counterpartyLabel: 'Contract Lab',
+			attestedAssurancePolicyIds: ['pol_x'],
+			boundaryApplicabilityNote: 'STAT only'
+		});
+		expect(defineType).toHaveBeenCalledWith(
+			expect.objectContaining({
+				executionBoundary: 'DELEGATED_EXTERNAL',
+				boundaryContract: {
+					counterpartyLabel: 'Contract Lab',
+					attestedAssurancePolicyIds: ['pol_x'],
+					applicabilityNote: 'STAT only'
+				}
+			})
+		);
+	});
+
+	it('define_pwu_type: omits boundary fields entirely when none are given (INTERNAL resolves downstream)', () => {
+		const defineType = vi.fn(() => ({ ok: true, id: 'pwut_x', status: 'ACCEPTED' }));
+		find({ defineType }, 'define_pwu_type').run({ name: 'Internal', pwuKind: 'X' });
+		expect(defineType).toHaveBeenCalledWith(expect.not.objectContaining({ executionBoundary: expect.anything() }));
+		expect(defineType).toHaveBeenCalledWith(expect.not.objectContaining({ boundaryContract: expect.anything() }));
+	});
+
+	it('edit_pwu_type: rejects a garbage boundary, then reassembles the contract into the patch', () => {
+		const editType = vi.fn(() => ({ ok: true, id: 'pwut_x', status: 'ACCEPTED' }));
+		const tool = find({ editType }, 'edit_pwu_type');
+		expect(tool.run({ pwuTypeId: 'pwut_x', executionBoundary: 'nope' })).toMatchObject({ ok: false });
+		expect(editType).not.toHaveBeenCalled();
+		tool.run({ pwuTypeId: 'pwut_x', executionBoundary: 'DELEGATED_EXTERNAL', counterpartyLabel: 'Lab' });
+		expect(editType).toHaveBeenCalledWith(
+			'pwut_x',
+			expect.objectContaining({
+				executionBoundary: 'DELEGATED_EXTERNAL',
+				boundaryContract: { counterpartyLabel: 'Lab', attestedAssurancePolicyIds: [] }
+			})
+		);
+	});
+
+	it('scaffold_graph: rejects a garbage executionBoundary on any item and forwards a delegated leaf contract', () => {
+		const scaffold = vi.fn(() => ({ ok: true, ids: {}, status: 'ACCEPTED' }));
+		const tool = find({ scaffold }, 'scaffold_graph');
+		expect(
+			tool.run({ types: [{ tempKey: 'a', name: 'A', pwuKind: 'X', executionBoundary: 'bad' }] })
+		).toMatchObject({ ok: false });
+		expect(scaffold).not.toHaveBeenCalled();
+		tool.run({
+			types: [
+				{ tempKey: 'root', name: 'Root', pwuKind: 'ROOT', isRoot: true, childTempKeys: ['lab'] },
+				{
+					tempKey: 'lab',
+					name: 'Lab',
+					pwuKind: 'DELEGATED',
+					executionBoundary: 'DELEGATED_EXTERNAL',
+					counterpartyLabel: 'Contract Lab',
+					attestedAssurancePolicyIds: []
+				}
+			]
+		});
+		expect(scaffold).toHaveBeenCalledWith(
+			expect.arrayContaining([
+				expect.objectContaining({
+					tempKey: 'lab',
+					executionBoundary: 'DELEGATED_EXTERNAL',
+					boundaryContract: { counterpartyLabel: 'Contract Lab', attestedAssurancePolicyIds: [] }
+				})
+			])
+		);
+	});
+});

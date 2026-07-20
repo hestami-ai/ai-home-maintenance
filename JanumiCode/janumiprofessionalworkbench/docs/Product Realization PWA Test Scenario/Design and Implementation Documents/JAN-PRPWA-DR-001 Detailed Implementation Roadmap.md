@@ -234,8 +234,8 @@ rollback_and_recovery: ["Revert tool + prompt edits"]
 risks: ["Flattened params must reassemble exactly to the broker's BoundaryContract shape"]
 open_decisions: ["Whether define_from_template accepts executionBoundary (templates are all INTERNAL — likely leave INTERNAL-only)"]
 exit_criteria: ["check-types + e2e (mock) green; delegated leaf authorable by the agent"]
-delivery_state: NOT_STARTED
-conformance_state: UNASSESSED
+delivery_state: DELIVERED  # tools.ts: EXECUTION_BOUNDARY_CODES + executionBoundaryError enum pre-check + boundaryInput reassembly (flattened counterpartyLabel/attestedAssurancePolicyIds/boundaryApplicabilityNote → BoundaryContract), threaded through define_pwu_type/edit_pwu_type/scaffold_graph; PWU_TYPE_HELP gains 4 keys (help.* not inline); system-prompt gains STD-3 "AUTHORING A DELEGATED LEAF" prose. mock-agent untouched (verbatim forwarder). Gate: check-types 21/21, rph-demo 94 tests (tools +5, prompt +1), lint 0, existing mock-path e2e green (12.3s).
+conformance_state: CONFORMANT  # STD-3(tools)/R-10(authoring)/SPEC-1(STD-3 prose) realized; INV-1 left to the engine (F-10); INV-2 honored in prose (attested = counterparty claim). RC-4 (disclosed, PB-3 no-silent-narrowing): the dedicated delegated-leaf END-TO-END e2e (author → rendered node showing boundary) moves to DWP-05, where the form control + boundary rendering exist and the assertion is end-to-end meaningful; the delegated round-trip itself is already proven at unit (tool→broker reassembly) + integration (handler persist/INV-1) level, and the existing mock-path e2e is regression-green.
 ```
 
 ```yaml

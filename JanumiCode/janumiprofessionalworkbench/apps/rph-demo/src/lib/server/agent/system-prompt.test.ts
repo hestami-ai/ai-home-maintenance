@@ -64,4 +64,22 @@ describe('buildSystemPrompt authoring-backbone boundaries', () => {
 		expect(prompt).toContain('ARTIFACT HAND-OFF');
 		expect(prompt).toContain('PWU LIFECYCLE');
 	});
+
+	// JAN-PRPWA-DS-001 STD-3 / DR-001 DWP-04: the agnostic core teaches how to AUTHOR a delegated leaf — the
+	// contract in lieu of children, the attested policies as the counterparty's claim (INV-2), the hand-off via
+	// requiredInputs/requiredOutputs.
+	it('states how to author a DELEGATED_EXTERNAL leaf (STD-3): contract in lieu of children, attested claim, hand-off', () => {
+		const prompt = buildSystemPrompt({
+			id: 'PWA-TEST',
+			name: 'Test PWA',
+			domain: 'testing',
+			publicationStatus: 'DRAFT'
+		});
+
+		expect(prompt).toContain('AUTHORING A DELEGATED LEAF');
+		expect(prompt).toContain('executionBoundary = DELEGATED_EXTERNAL');
+		expect(prompt).toContain('attestedAssurancePolicyIds');
+		expect(prompt).toContain('disclosure is not verification');
+		expect(prompt).toMatch(/requiredInputs\/requiredOutputs/);
+	});
 });

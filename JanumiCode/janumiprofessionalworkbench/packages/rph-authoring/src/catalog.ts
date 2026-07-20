@@ -24,7 +24,15 @@ export const PWU_TYPE_HELP = {
 	requiredInputs:
 		'Named artifacts this type of work CONSUMES (e.g. "approved-behavior"). A matching output declares a compatible artifact hand-off; it does not establish execution order.',
 	requiredOutputs:
-		'Named artifacts this type of work PRODUCES (e.g. "architecture-baseline"). A type with a matching required input can consume that artifact; this compatibility does not establish temporal order.'
+		'Named artifacts this type of work PRODUCES (e.g. "architecture-baseline"). A type with a matching required input can consume that artifact; this compatibility does not establish temporal order.',
+	executionBoundary:
+		'Where this type’s work is discharged. INTERNAL (default) = inside your accountability scope, decomposed/executed under the platform assurance floor. DELEGATED_EXTERNAL = handed to an external party across an organizational boundary; the node is then TERMINAL (it declares NO child types) and instead carries a boundaryContract. Use DELEGATED_EXTERNAL for a whole unit of work you contract out and only receive a result from — not for work you still own and decompose.',
+	counterpartyLabel:
+		'For a DELEGATED_EXTERNAL type: the external party that performs the work (e.g. "Contract Lab — Hematology"). Required when delegating — it names who is accountable across the boundary.',
+	attestedAssurancePolicyIds:
+		'For a DELEGATED_EXTERNAL type: ids of ACTIVE non-floor assurance policies the counterparty ATTESTS it satisfies (assurance-by-attestation). This is the counterparty’s CLAIM, not your own review — disclosure is not verification. Same id rules as requiredAssurancePolicyIds (locked-floor, DRAFT, SUSPENDED, and missing ids are rejected). May be empty.',
+	boundaryApplicabilityNote:
+		'For a DELEGATED_EXTERNAL type: free-text scope/condition of the delegation (e.g. "STAT panels only; routine handled internally"). Optional.'
 } as const;
 
 export interface PwuTypeTemplate {

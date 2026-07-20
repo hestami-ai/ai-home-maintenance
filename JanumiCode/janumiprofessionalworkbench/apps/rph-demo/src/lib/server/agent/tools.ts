@@ -5,7 +5,9 @@
 // explain the fields identically. The Pi adapter and the mock both consume these descriptors unchanged.
 import {
 	lintComposition,
+	type BoundaryContract,
 	type CardinalityCode,
+	type ExecutionBoundary,
 	type LinkTypesInput,
 	type PwaAuthoringBroker,
 	type ProposalResult
@@ -15,6 +17,10 @@ import type { RationaleSink } from './rationale.js';
 import type { AuthoringToolDescriptor, ToolRunResult } from './types.js';
 
 const CARDINALITY_CODES: ReadonlySet<CardinalityCode> = new Set(['M1', 'M+', 'C1', 'C+']);
+const EXECUTION_BOUNDARY_CODES: ReadonlySet<ExecutionBoundary> = new Set([
+	'INTERNAL',
+	'DELEGATED_EXTERNAL'
+]);
 
 function str(v: unknown): string {
 	return typeof v === 'string' ? v : '';
@@ -25,6 +31,42 @@ function asCardinality(v: unknown): CardinalityCode {
 		throw new Error(`Invalid cardinality ${String(v as string | number | boolean)}.`);
 	}
 	return v as CardinalityCode;
+}
+
+/** Friendly pre-check for the flattened executionBoundary param (mirrors the cardinality pre-check). Returns an
+ *  error message, or null when the arg is absent/empty (the broker resolves that to INTERNAL) or a valid enum. */
+function executionBoundaryError(a: Record<string, unknown>): string | null {
+	const v = a.executionBoundary;
+	if (v === undefined || v === '') return null;
+	if (!EXECUTION_BOUNDARY_CODES.has(v as ExecutionBoundary))
+		return 'executionBoundary must be INTERNAL or DELEGATED_EXTERNAL.';
+	return null;
+}
+
+/** Reassemble the FLATTENED boundary params (executionBoundary + counterpartyLabel + attestedAssurancePolicyIds +
+ *  boundaryApplicabilityNote — flattened because the tool ParamType set has no singular object, and object[] would
+ *  wrongly model a 0-or-many contract against INV-1) into the broker's { executionBoundary?, boundaryContract? }.
+ *  A boundaryContract is assembled whenever ANY of its scalar parts is provided; the engine — not the tool —
+ *  enforces INV-1/STD-3 coherence (F-10: tools do not re-implement the invariant). Assumes executionBoundary has
+ *  already passed executionBoundaryError. */
+function boundaryInput(a: Record<string, unknown>): {
+	executionBoundary?: ExecutionBoundary;
+	boundaryContract?: BoundaryContract;
+} {
+	const out: { executionBoundary?: ExecutionBoundary; boundaryContract?: BoundaryContract } = {};
+	if (a.executionBoundary === 'INTERNAL' || a.executionBoundary === 'DELEGATED_EXTERNAL')
+		out.executionBoundary = a.executionBoundary;
+	const counterpartyLabel = str(a.counterpartyLabel).trim();
+	const attestedAssurancePolicyIds = strArr(a.attestedAssurancePolicyIds);
+	const note = str(a.boundaryApplicabilityNote).trim();
+	if (counterpartyLabel || attestedAssurancePolicyIds.length > 0 || note) {
+		out.boundaryContract = {
+			counterpartyLabel,
+			attestedAssurancePolicyIds,
+			...(note ? { applicabilityNote: note } : {})
+		};
+	}
+	return out;
 }
 function bool(v: unknown): boolean {
 	return v === true || v === 'true';
@@ -244,6 +286,16 @@ export function buildAuthoringTools(
 							type: 'string[]',
 							description: help.requiredAssurancePolicyIds
 						},
+						executionBoundary: { type: 'string', description: help.executionBoundary },
+						counterpartyLabel: { type: 'string', description: help.counterpartyLabel },
+						attestedAssurancePolicyIds: {
+							type: 'string[]',
+							description: help.attestedAssurancePolicyIds
+						},
+						boundaryApplicabilityNote: {
+							type: 'string',
+							description: help.boundaryApplicabilityNote
+						},
 						childTempKeys: {
 							type: 'string[]',
 							description:
@@ -278,6 +330,8 @@ export function buildAuthoringTools(
 			run: (a) => {
 				const rawTypes = Array.isArray(a.types) ? (a.types as Record<string, unknown>[]) : [];
 				for (const [typeIndex, rawType] of rawTypes.entries()) {
+					const ebError = executionBoundaryError(rawType);
+					if (ebError) return { ok: false, summary: `Rejected: types[${typeIndex}].${ebError}` };
 					const childCardinalities = Array.isArray(rawType.childCardinalities)
 						? (rawType.childCardinalities as Record<string, unknown>[])
 						: [];
@@ -300,6 +354,7 @@ export function buildAuthoringTools(
 					requiredInputs: strArr(o.requiredInputs),
 					requiredOutputs: strArr(o.requiredOutputs),
 					requiredAssurancePolicyIds: strArr(o.requiredAssurancePolicyIds),
+					...boundaryInput(o),
 					childTempKeys: strArr(o.childTempKeys),
 					childCardinalities: Array.isArray(o.childCardinalities)
 						? (o.childCardinalities as Record<string, unknown>[]).map((c) => ({
@@ -401,10 +456,22 @@ export function buildAuthoringTools(
 				requiredAssurancePolicyIds: {
 					type: 'string[]',
 					description: help.requiredAssurancePolicyIds
+				},
+				executionBoundary: { type: 'string', description: help.executionBoundary },
+				counterpartyLabel: { type: 'string', description: help.counterpartyLabel },
+				attestedAssurancePolicyIds: {
+					type: 'string[]',
+					description: help.attestedAssurancePolicyIds
+				},
+				boundaryApplicabilityNote: {
+					type: 'string',
+					description: help.boundaryApplicabilityNote
 				}
 			},
 			mutates: true,
 			run: (a) => {
+				const ebError = executionBoundaryError(a);
+				if (ebError) return { ok: false, summary: `Rejected: ${ebError}` };
 				const r = broker.defineType({
 					name: str(a.name),
 					pwuKind: str(a.pwuKind),
@@ -413,7 +480,8 @@ export function buildAuthoringTools(
 					completionRule: str(a.completionRule) || undefined,
 					requiredInputs: strArr(a.requiredInputs),
 					requiredOutputs: strArr(a.requiredOutputs),
-					requiredAssurancePolicyIds: strArr(a.requiredAssurancePolicyIds)
+					requiredAssurancePolicyIds: strArr(a.requiredAssurancePolicyIds),
+					...boundaryInput(a)
 				});
 				return fromProposal(r, `Defined PWU Type "${str(a.name)}" as ${r.id}.`);
 			}
@@ -460,10 +528,22 @@ export function buildAuthoringTools(
 				requiredAssurancePolicyIds: {
 					type: 'string[]',
 					description: help.requiredAssurancePolicyIds
+				},
+				executionBoundary: { type: 'string', description: help.executionBoundary },
+				counterpartyLabel: { type: 'string', description: help.counterpartyLabel },
+				attestedAssurancePolicyIds: {
+					type: 'string[]',
+					description: help.attestedAssurancePolicyIds
+				},
+				boundaryApplicabilityNote: {
+					type: 'string',
+					description: help.boundaryApplicabilityNote
 				}
 			},
 			mutates: true,
 			run: (a) => {
+				const ebError = executionBoundaryError(a);
+				if (ebError) return { ok: false, summary: `Rejected: ${ebError}` };
 				const patch: Record<string, unknown> = {};
 				if ('name' in a) patch.name = str(a.name);
 				if ('pwuKind' in a) patch.pwuKind = str(a.pwuKind);
@@ -474,6 +554,7 @@ export function buildAuthoringTools(
 				if ('requiredOutputs' in a) patch.requiredOutputs = strArr(a.requiredOutputs);
 				if ('requiredAssurancePolicyIds' in a)
 					patch.requiredAssurancePolicyIds = strArr(a.requiredAssurancePolicyIds);
+				Object.assign(patch, boundaryInput(a));
 				return fromProposal(
 					broker.editType(str(a.pwuTypeId), patch),
 					`Edited ${str(a.pwuTypeId)}.`
