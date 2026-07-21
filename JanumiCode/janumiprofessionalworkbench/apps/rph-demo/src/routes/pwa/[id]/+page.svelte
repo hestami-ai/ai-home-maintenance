@@ -5,7 +5,7 @@
 	import { SvelteFlow, Background, Controls, Panel } from '@xyflow/svelte';
 	import '@xyflow/svelte/dist/style.css';
 	import type { Edge, FitViewOptions, Node } from '@xyflow/svelte';
-	import { tick } from 'svelte';
+	import { tick, setContext } from 'svelte';
 	import {
 		toPwaFlow,
 		type DataFlowEdgeData,
@@ -13,6 +13,12 @@
 	} from '$lib/pwaFlow';
 	import PwuTypeCard from '$lib/PwuTypeCard.svelte';
 	import PwuBehaviorPanel from '$lib/behavior/PwuBehaviorPanel.svelte';
+	import WalkthroughPanel from '$lib/WalkthroughPanel.svelte';
+	import {
+		stepNumbersByNode,
+		WALKTHROUGH_CONTEXT_KEY,
+		type WalkthroughContext
+	} from '$lib/walkthrough';
 	import {
 		EMPTY_CANVAS_HISTORY,
 		recordCanvasMove,
@@ -25,6 +31,8 @@
 		analyzePwaGraph,
 		buildPwaGraphExport,
 		buildPwuBehaviorProjection,
+		handoffFindings,
+		layerHandoff,
 		leafKind,
 		leafKindLabel
 	} from '@janumipwb/rph-projections';
@@ -211,28 +219,32 @@
 
 	// Structural health of the graph — the same queryable report the harness asserts on (single root, acyclic,
 	// connected; advisory findings for dangling data-flow / fan-out). Surfaced as a chip so the author sees issues.
-	const graphReport = $derived(
-		analyzePwaGraph(
-			buildPwaGraphExport(
-				{
-					id: data.pwa.id,
-					name: data.pwa.name,
-					domain: data.pwa.domain,
-					version: data.pwa.version,
-					publicationStatus: data.pwa.publicationStatus
-				},
-				data.types.map((t) => ({
-					id: t.id,
-					name: t.name,
-					pwuKind: t.pwuKind,
-					isRoot: t.isRoot,
-					permittedChildTypeIds: t.permittedChildTypeIds,
-					requiredInputs: t.requiredInputs,
-					requiredOutputs: t.requiredOutputs,
-					executionBoundary: t.executionBoundary
-				}))
-			)
+	const graphExport = $derived(
+		buildPwaGraphExport(
+			{
+				id: data.pwa.id,
+				name: data.pwa.name,
+				domain: data.pwa.domain,
+				version: data.pwa.version,
+				publicationStatus: data.pwa.publicationStatus
+			},
+			data.types.map((t) => ({
+				id: t.id,
+				name: t.name,
+				pwuKind: t.pwuKind,
+				isRoot: t.isRoot,
+				permittedChildTypeIds: t.permittedChildTypeIds,
+				requiredInputs: t.requiredInputs,
+				requiredOutputs: t.requiredOutputs,
+				executionBoundary: t.executionBoundary
+			}))
 		)
+	);
+	const graphReport = $derived(analyzePwaGraph(graphExport));
+	// JAN-PWADESIGNER — the hand-off dependency layering (4-way partition) + node-keyed findings for the walkthrough.
+	const handoffOrder = $derived(layerHandoff(graphExport));
+	const handoffFindingsByNode = $derived(
+		new Map(handoffFindings(graphExport).map((f) => [f.nodeId, f]))
 	);
 	const graphIssues = $derived(
 		graphReport.invariants.filter((i) => !i.ok).length + graphReport.findings.length
@@ -243,6 +255,78 @@
 			...graphReport.findings.map((f) => `• ${f}`)
 		].join('\n')
 	);
+
+	// ── Walkthrough mode (JAN-PWADESIGNER) ───────────────────────────────────────────────────────────────────────
+	// A READ-ONLY hand-off DEPENDENCY walk: step the graph in hand-off dependency order and inspect each node. Off by
+	// default; ephemeral $state; writes NOTHING to the engine. The badges are DEPENDENCY steps, NOT execution order (§9.1).
+	let showWalkthrough = $state(false);
+	let walkStep = $state(0);
+	let walkPickedId = $state<string | null>(null);
+	let savedOverlay: { showDataFlow: boolean; collapsed: Set<string> } | null = null;
+
+	const walkCount = $derived(handoffOrder.layers.length);
+	const walkClampedStep = $derived(Math.min(walkStep, Math.max(0, walkCount - 1)));
+	const currentWalkLayer = $derived(
+		showWalkthrough ? (handoffOrder.layers[walkClampedStep] ?? []) : []
+	);
+	const walkStepByNode = $derived(stepNumbersByNode(handoffOrder));
+	const walkLit = $derived(new Set(currentWalkLayer));
+	const walkDimmed = $derived(
+		showWalkthrough
+			? new Set(data.types.map((t) => t.id).filter((id) => !walkLit.has(id)))
+			: new Set<string>()
+	);
+	const walkPicked = $derived(
+		currentWalkLayer.includes(walkPickedId ?? '') ? walkPickedId : (currentWalkLayer[0] ?? null)
+	);
+	const walkPickedNode = $derived(data.types.find((t) => t.id === walkPicked));
+	const walkPickedFinding = $derived(
+		walkPicked ? handoffFindingsByNode.get(walkPicked) : undefined
+	);
+
+	function enterWalkthrough() {
+		savedOverlay = { showDataFlow, collapsed };
+		collapsed = new Set(); // auto-expand so a step never targets a hidden node
+		showDataFlow = true; // the walk IS over the hand-off plane
+		walkStep = 0;
+		walkPickedId = null;
+		showWalkthrough = true;
+	}
+	function exitWalkthrough() {
+		showWalkthrough = false;
+		if (savedOverlay) {
+			showDataFlow = savedOverlay.showDataFlow;
+			collapsed = savedOverlay.collapsed;
+			savedOverlay = null;
+		}
+	}
+	function walkNext() {
+		if (walkClampedStep < walkCount - 1) {
+			walkStep = walkClampedStep + 1;
+			walkPickedId = null;
+		}
+	}
+	function walkPrev() {
+		if (walkClampedStep > 0) {
+			walkStep = walkClampedStep - 1;
+			walkPickedId = null;
+		}
+	}
+
+	// The badge/dim reach PwuTypeCard via CONTEXT (reactive getters), so the layout `$effect` that owns `nodes` is
+	// never a second writer — no re-layout on step change, no reactive self-loop (JAN-PWADESIGNER-DR-001 §19 dim-10).
+	setContext<WalkthroughContext>(WALKTHROUGH_CONTEXT_KEY, {
+		get active() {
+			return showWalkthrough;
+		},
+		stepOf(id: string): number | undefined {
+			return showWalkthrough ? walkStepByNode.get(id) : undefined;
+		},
+		isDimmed(id: string): boolean {
+			return showWalkthrough && walkDimmed.has(id);
+		}
+	});
+
 	$effect(() => {
 		// Capture every reactive input synchronously. ELK resolves asynchronously, so a generation token prevents an
 		// older layout from overwriting a newer structure, collapse state, overlay, or lens selection.
@@ -978,6 +1062,15 @@
 								<input type="checkbox" bind:checked={showDataFlow} />
 								Data-flow overlay
 							</label>
+							<label class="ovlabel" data-testid="walkthrough-toggle">
+								<input
+									type="checkbox"
+									checked={showWalkthrough}
+									onchange={(e) =>
+										e.currentTarget.checked ? enterWalkthrough() : exitWalkthrough()}
+								/>
+								Walkthrough
+							</label>
 							{#if collapsed.size}
 								<button class="ghost small" onclick={() => (collapsed = new Set())}>Expand all</button>
 							{/if}
@@ -990,6 +1083,60 @@
 								>
 							{/if}
 						</div>
+						{#if showWalkthrough}
+							<div class="walkcontroller" data-testid="walkthrough-controller">
+								<div class="walknav">
+									<button
+										class="ghost xs"
+										onclick={walkPrev}
+										disabled={walkCount === 0 || walkClampedStep === 0}
+										aria-label="Previous dependency step">◀</button
+									>
+									<span class="walkstep" data-testid="walk-stepcount">
+										{#if walkCount === 0}No dependency layers{:else}Dependency step {walkClampedStep +
+												1} of {walkCount}{/if}
+									</span>
+									<button
+										class="ghost xs"
+										onclick={walkNext}
+										disabled={walkCount === 0 || walkClampedStep >= walkCount - 1}
+										aria-label="Next dependency step">▶</button
+									>
+								</div>
+								{#if handoffOrder.cycles.length || handoffOrder.blocked.length || handoffOrder.unordered.length}
+									<p class="walkflags" data-testid="walk-flags">
+										{#if handoffOrder.cycles.length}<span class="warn"
+												>⟲ {handoffOrder.cycles.length} hand-off cycle{handoffOrder.cycles.length > 1
+													? 's'
+													: ''}</span
+											>{/if}
+										{#if handoffOrder.blocked.length}<span class="warn"
+												>⊘ {handoffOrder.blocked.length} blocked</span
+											>{/if}
+										{#if handoffOrder.unordered.length}<span class="muted"
+												>◇ {handoffOrder.unordered.length} no hand-off</span
+											>{/if}
+									</p>
+								{/if}
+								{#if currentWalkLayer.length > 1}
+									<div class="walkpicker" data-testid="walk-picker">
+										<span class="fhelp">Concurrent in this step:</span>
+										{#each currentWalkLayer as id (id)}
+											<button
+												class="ghost xs"
+												class:active={walkPicked === id}
+												onclick={() => (walkPickedId = id)}
+												>{data.types.find((t) => t.id === id)?.name ?? id}</button
+											>
+										{/each}
+									</div>
+								{/if}
+								<p class="fhelp walkcaveat" data-testid="walk-caveat">
+									Hand-off dependency order — what must be produced before what can be consumed. NOT an
+									execution schedule.
+								</p>
+							</div>
+						{/if}
 					</div>
 				</div>
 			</Panel>
@@ -1062,7 +1209,13 @@
 					use:draggable={{ handle: '.paneldrag' }}
 				>
 					<header class="ppanelhead paneldrag">
-						<span class="itag">{showPolicyManager ? 'ASSURANCE POLICIES' : 'PWU TYPE'}</span>
+						<span class="itag"
+							>{showWalkthrough
+								? 'WALKTHROUGH'
+								: showPolicyManager
+									? 'ASSURANCE POLICIES'
+									: 'PWU TYPE'}</span
+						>
 						<button
 							class="collapsebtn"
 							onclick={() => (inspectorCollapsed = !inspectorCollapsed)}
@@ -1072,7 +1225,22 @@
 					</header>
 					{#if !inspectorCollapsed}
 						<div class="panelbody">
-							{#if showPolicyManager}
+							{#if showWalkthrough}
+								{#if walkPickedNode}
+									<WalkthroughPanel
+										node={walkPickedNode}
+										types={data.types}
+										behavior={behaviorTopology}
+										finding={walkPickedFinding}
+										stepNumber={walkStepByNode.get(walkPickedNode.id)}
+									/>
+								{:else}
+									<p class="hint" data-testid="walk-empty">
+										No node at this dependency step.{#if handoffOrder.unordered.length}
+											This PWA has no hand-off edges — all nodes are in the “no hand-off” bucket.{/if}
+									</p>
+								{/if}
+							{:else if showPolicyManager}
 								<div class="pmgrhead">
 									<span class="fhelp"
 										>Workbench assurance-policy library — the locked mandatory policies (always apply) plus your

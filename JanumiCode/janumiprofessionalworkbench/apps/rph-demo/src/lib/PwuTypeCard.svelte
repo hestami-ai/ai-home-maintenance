@@ -4,10 +4,18 @@
 	// RAIL — the locked de-minimis floor (always shown, even collapsed) plus any declared additive policies.
 	// Clicking the card body selects it (Svelte Flow's onnodeclick); the chevron toggles collapse without selecting.
 	import { Handle, Position } from '@xyflow/svelte';
+	import { getContext } from 'svelte';
 	import type { PwuCardData } from '$lib/pwaFlow';
+	import { WALKTHROUGH_CONTEXT_KEY, type WalkthroughContext } from '$lib/walkthrough';
 
 	// `selected` is Svelte Flow's native per-node selection flag — clicking a node sets it without re-laying-out.
 	let { data, selected = false }: { data: PwuCardData; selected?: boolean } = $props();
+
+	// Walkthrough badge/dim come from CONTEXT (not node.data), so the route's layout $effect that owns `nodes` is
+	// never a second writer — no re-layout on step change, no reactive self-loop. Undefined when not in a walkthrough.
+	const walk = getContext<WalkthroughContext | undefined>(WALKTHROUGH_CONTEXT_KEY);
+	const stepNumber = $derived(walk?.stepOf(data.id));
+	const dimmed = $derived(walk?.isDimmed(data.id) ?? false);
 
 	function onChevron(e: MouseEvent) {
 		e.stopPropagation(); // toggle collapse without selecting the node
@@ -21,7 +29,7 @@
 	}
 </script>
 
-<div class="card" class:selected class:root={data.isRoot}>
+<div class="card" class:selected class:root={data.isRoot} class:dimmed>
 	<Handle type="target" position={data.layoutDirection === 'RIGHT' ? Position.Left : Position.Top} />
 	<header class="head">
 		<div class="titles">
@@ -31,6 +39,14 @@
 			<div class="kind">{data.pwuKind}</div>
 		</div>
 		<div class="marks">
+			{#if stepNumber !== undefined}
+				<span
+					class="stepbadge"
+					data-testid="step-badge"
+					title="Dependency step — what must be produced before what can be consumed. Not an execution order."
+					>{stepNumber}</span
+				>
+			{/if}
 			<span class="nl" title={data.isLeaf ? 'Leaf PWU Type' : 'Non-leaf PWU Type'}
 				>{data.isLeaf ? 'L' : 'N'}</span
 			>
@@ -113,6 +129,18 @@
 	.card.selected {
 		border-color: #9fcaff;
 		box-shadow: 0 0 0 1px #9fcaff;
+	}
+	.card.dimmed {
+		opacity: 0.32;
+	}
+	.stepbadge {
+		font-family: 'Source Code Pro', monospace;
+		font-size: 9.5px;
+		font-weight: 700;
+		color: #10233f;
+		background: #9fcaff;
+		border-radius: 4px;
+		padding: 0 5px;
 	}
 	.head {
 		display: flex;

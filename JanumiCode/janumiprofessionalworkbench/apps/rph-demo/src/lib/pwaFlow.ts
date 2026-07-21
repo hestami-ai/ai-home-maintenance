@@ -90,6 +90,29 @@ const DETERMINISTIC_FLOOR_LABELS = ASSURANCE_FLOOR.filter(
 const REASONING_REVIEW_LABEL =
 	ASSURANCE_FLOOR.find((p) => p.id === REASONING_REVIEW_FLOOR_ID)?.label ?? 'Reasoning Review';
 
+/** The §11.7.4 assurance-floor rail for a node. */
+export interface FloorRail {
+	readonly labels: readonly string[];
+	/** INV-2 (DELEGATED only): the Reasoning-Review slot as SUBSTITUTED by counterparty attestation. */
+	readonly attestationSubstitute?: string;
+}
+
+/** INV-2-conditioned assurance-floor rail: a DELEGATED leaf shows the two DETERMINISTIC limbs plus a Reasoning-Review
+ *  attestation SUBSTITUTE (never Reasoning Review as a satisfied floor on external work); everything else shows the
+ *  full floor. Derived from the single ASSURANCE_FLOOR source (F-13). Shared by the card node build AND the
+ *  walkthrough panel so they never diverge — the inspector rail (which renders the full floor unconditionally) is NOT
+ *  the exemplar to copy. */
+export function floorRailFor(node: {
+	readonly executionBoundary?: ExecutionBoundary;
+	readonly permittedChildTypeIds?: readonly string[];
+}): FloorRail {
+	if (leafKind(node) !== 'DELEGATED') return { labels: FLOOR_LABELS };
+	return {
+		labels: DETERMINISTIC_FLOOR_LABELS,
+		attestationSubstitute: `${REASONING_REVIEW_LABEL} · substituted by counterparty attestation (required at Undertaking time)`
+	};
+}
+
 /** The permits (composition) edges among known types. */
 function permitPairs(
 	types: readonly PwuTypeNode[],
@@ -398,7 +421,7 @@ export async function toPwaFlow(
 		// INV-2: a DELEGATED_EXTERNAL leaf's rail shows the two deterministic floor limbs plus an attestation
 		// SUBSTITUTE for Reasoning Review — never Reasoning Review as an applicable/satisfied floor on external work.
 		// Leaf KIND comes from the shared helper so the card, inspector, and graph report all agree (F-13).
-		const delegated = leafKind(t) === 'DELEGATED';
+		const rail = floorRailFor(t);
 		const data: PwuCardData = {
 			...layoutNode?.data,
 			id: t.id,
@@ -410,10 +433,8 @@ export async function toPwaFlow(
 			collapsed: opts.collapsed.has(t.id),
 			orphan: !t.isRoot && !hasParent.has(t.id),
 			cardinalitySummary: cardinalitySummary(t),
-			floorLabels: delegated ? DETERMINISTIC_FLOOR_LABELS : FLOOR_LABELS,
-			attestationSubstitute: delegated
-				? `${REASONING_REVIEW_LABEL} · substituted by counterparty attestation (required at Undertaking time)`
-				: undefined,
+			floorLabels: rail.labels,
+			attestationSubstitute: rail.attestationSubstitute,
 			policyLabels: (t.requiredAssurancePolicyIds ?? []).map(assurancePolicyLabel),
 			layoutDirection: opts.layoutDirection ?? 'DOWN',
 			onToggleCollapse: () => opts.onToggleCollapse(t.id)
