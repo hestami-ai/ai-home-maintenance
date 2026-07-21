@@ -388,10 +388,10 @@ function dataFlowEdges(types: readonly PwuTypeNode[], visible: ReadonlySet<strin
 				selectable: true,
 				class: 'dataflow-edge',
 				data,
-				style: 'stroke:#61dac1;stroke-dasharray:6 4;',
-				// Teal chip, dark text (HTML label div — `color`/`background`, not SVG `fill`). Signals "clickable".
+				style: 'stroke:var(--graph-edge-dataflow);stroke-dasharray:6 4;',
+				// Contrasting chip (HTML label div — `color`/`background`, not SVG `fill`). Signals "clickable".
 				labelStyle:
-					'color:#06110d;background:#61dac1;border-color:#61dac1;font-weight:700;cursor:pointer;'
+					'color:var(--graph-dataflow-label-text);background:var(--graph-dataflow-label-background);border-color:var(--graph-edge-dataflow);font-weight:700;cursor:pointer;'
 			});
 		}
 	}
@@ -461,9 +461,8 @@ export async function toPwaFlow(
 			target: e.to,
 			label: 'permits',
 			animated: false,
-			// Muted-but-visible stroke on the dark canvas. The label chip (an HTML .svelte-flow__edge-label) is themed
-			// via CSS variables in +page.svelte — the default white-bg/light-text washed out (§11.7 contrast fix).
-			style: 'stroke:#454b54;stroke-width:1.5;'
+			// Muted-but-visible composition stroke. The HTML label chip is themed through shared graph tokens.
+			style: 'stroke:var(--graph-edge-permits);stroke-width:1.5;'
 		};
 	});
 	const edges = opts.showDataFlow

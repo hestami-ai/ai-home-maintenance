@@ -88,7 +88,7 @@
 	}
 	button.primary {
 		background: var(--primary);
-		color: #00263f;
+		color: var(--on-primary);
 		border: none;
 		border-radius: 8px;
 		padding: 9px 16px;
@@ -184,7 +184,7 @@
 		font-weight: 700;
 		padding: 3px 8px;
 		border-radius: 5px;
-		background: rgba(97, 218, 193, 0.15);
+		background: var(--tertiary-soft);
 		color: var(--tertiary);
 	}
 	.count {

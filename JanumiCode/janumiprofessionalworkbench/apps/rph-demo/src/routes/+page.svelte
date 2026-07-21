@@ -124,7 +124,7 @@
 	}
 	button.primary {
 		background: var(--primary);
-		color: #00263f;
+		color: var(--on-primary);
 		border: none;
 		border-radius: 8px;
 		padding: 9px 16px;
@@ -187,7 +187,7 @@
 	}
 	.del:hover {
 		color: var(--error);
-		border-color: rgba(255, 180, 171, 0.4);
+		border-color: var(--error-border);
 	}
 	.delconfirm {
 		display: flex;
@@ -207,7 +207,7 @@
 	}
 	.danger {
 		background: var(--error);
-		color: #3a0906;
+		color: var(--on-error);
 		border: none;
 		border-radius: 6px;
 		padding: 6px 12px;
@@ -246,11 +246,11 @@
 		letter-spacing: 0.08em;
 		padding: 3px 8px;
 		border-radius: 5px;
-		background: rgba(159, 202, 255, 0.15);
+		background: var(--primary-soft);
 		color: var(--primary);
 	}
 	.pill.pub {
-		background: rgba(97, 218, 193, 0.15);
+		background: var(--tertiary-soft);
 		color: var(--tertiary);
 	}
 	.card h3 {

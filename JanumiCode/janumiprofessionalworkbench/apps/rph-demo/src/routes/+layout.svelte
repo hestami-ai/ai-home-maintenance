@@ -1,15 +1,50 @@
 <script lang="ts">
-	import { onMount } from 'svelte';
+	import { get, writable } from 'svelte/store';
+	import { onMount, setContext } from 'svelte';
 	import { page } from '$app/state';
+	import ThemeToggle from '$lib/ThemeToggle.svelte';
+	import {
+		applyTheme,
+		documentTheme,
+		nextTheme,
+		parseTheme,
+		persistTheme,
+		THEME_CONTEXT,
+		THEME_STORAGE_KEY,
+		type Theme,
+		type ThemeContext
+	} from '$lib/theme';
+	import '$lib/styles/theme.css';
 	let { children } = $props();
+
+	const theme = writable<Theme>('dark');
+	function setTheme(next: Theme, persist = true) {
+		applyTheme(next);
+		theme.set(next);
+		if (persist) persistTheme(next);
+	}
+	const themeContext: ThemeContext = {
+		theme,
+		setTheme,
+		toggleTheme: () => setTheme(nextTheme(get(theme)))
+	};
+	setContext(THEME_CONTEXT, themeContext);
 
 	// E2E hydration marker: the client sets this once Svelte has hydrated, so tests can wait for interactivity
 	// before driving toggle/enhance controls (otherwise a click can land before its handler is attached). Harmless
 	// in production — it just stamps one data attribute on <html>.
 	onMount(() => {
+		setTheme(documentTheme(), false);
 		document.documentElement.dataset.hydrated = 'true';
 		const saved = localStorage.getItem('jpwb-nav-collapsed');
 		if (saved !== null) collapsed = saved === '1';
+
+		const syncThemeAcrossTabs = (event: StorageEvent) => {
+			if (event.key !== THEME_STORAGE_KEY) return;
+			setTheme(parseTheme(event.newValue) ?? 'dark', false);
+		};
+		window.addEventListener('storage', syncThemeAcrossTabs);
+		return () => window.removeEventListener('storage', syncThemeAcrossTabs);
 	});
 
 	// The left navigation collapses to an icon rail to give the node-graph designer more room.
@@ -74,6 +109,7 @@
 				</a>
 			{/each}
 		</nav>
+		<div class="theme-slot" class:collapsed><ThemeToggle {collapsed} /></div>
 		{#if !collapsed}
 			<div class="foot">Recursive Professional Harness · live engine</div>
 		{/if}
@@ -95,23 +131,6 @@
 <style>
 	:global(*, *::before, *::after) {
 		box-sizing: border-box;
-	}
-	:global(:root) {
-		--surface: #131313;
-		--surface-low: #1b1b1c;
-		--sc: #202020;
-		--sc-high: #2a2a2a;
-		--sc-highest: #353535;
-		--on: #e5e2e1;
-		--on-variant: #c0c7d3;
-		--outline: #8a919d;
-		--outline-faint: #404751;
-		--primary: #9fcaff;
-		--primary-container: #007acc;
-		--tertiary: #61dac1;
-		--error: #ffb4ab;
-		--amber: #e6b566;
-		--indigo: #9a8cff;
 	}
 	:global(body) {
 		margin: 0;
@@ -157,7 +176,7 @@
 		flex-shrink: 0;
 		border-radius: 6px;
 		background: var(--primary-container);
-		color: #fff;
+		color: var(--on-primary-container);
 		display: grid;
 		place-items: center;
 		font-size: 18px;
@@ -242,12 +261,21 @@
 		opacity: 0.85;
 	}
 	.foot {
-		margin-top: auto;
+		margin-top: 0;
 		padding: 16px 18px;
 		font-size: 10px;
 		color: var(--outline);
 		text-transform: uppercase;
 		letter-spacing: 0.1em;
+	}
+	.theme-slot {
+		margin-top: auto;
+		padding: 10px 12px 0;
+	}
+	.theme-slot.collapsed {
+		display: flex;
+		justify-content: center;
+		padding: 10px 9px 14px;
 	}
 	main {
 		flex: 1;
@@ -265,11 +293,11 @@
 		border-bottom: 1px solid var(--sc);
 	}
 	.ctxbar.design {
-		background: linear-gradient(90deg, rgba(159, 202, 255, 0.12), transparent);
+		background: linear-gradient(90deg, var(--primary-soft), transparent);
 		color: var(--primary);
 	}
 	.ctxbar.undertaking {
-		background: linear-gradient(90deg, rgba(97, 218, 193, 0.12), transparent);
+		background: linear-gradient(90deg, var(--tertiary-soft), transparent);
 		color: var(--tertiary);
 	}
 	.content {

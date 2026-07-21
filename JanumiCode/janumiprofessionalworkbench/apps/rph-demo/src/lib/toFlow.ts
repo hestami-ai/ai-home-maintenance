@@ -44,21 +44,23 @@ function layout(g: DemoGraph): Record<string, { x: number; y: number }> {
 function styleFor(n: GraphNode): string {
 	let bg: string;
 	if (n.qualifiedSuccess) {
-		bg = '#e6f4ea';
+		bg = 'var(--work-node-success-background)';
 	} else if (n.axes.executionState === 'SUCCEEDED') {
-		bg = '#fdf2e3';
+		bg = 'var(--work-node-warning-background)';
 	} else {
-		bg = '#eef0f2';
+		bg = 'var(--work-node-neutral-background)';
 	}
 	let fg: string;
 	if (n.qualifiedSuccess) {
-		fg = '#137333';
+		fg = 'var(--work-node-success-text)';
 	} else if (n.axes.executionState === 'SUCCEEDED') {
-		fg = '#8a5a00';
+		fg = 'var(--work-node-warning-text)';
 	} else {
-		fg = '#5f6368';
+		fg = 'var(--work-node-neutral-text)';
 	}
-	const border = n.baselined ? '3px solid #3730a3' : '1px solid #c7ccd1';
+	const border = n.baselined
+		? '3px solid var(--work-node-authoritative)'
+		: '1px solid var(--work-node-border)';
 	return `background:${bg};color:${fg};border:${border};border-radius:10px;padding:8px 12px;width:180px;font:12px/1.35 system-ui,sans-serif;`;
 }
 

@@ -111,9 +111,9 @@
 		display: flex;
 		flex-direction: column;
 		overflow: visible;
-		background: #1b1b1c;
-		color: #e5e2e1;
-		border: 1px solid #404751;
+		background: var(--graph-node-background);
+		color: var(--graph-node-text);
+		border: 1px solid var(--graph-node-border);
 		border-radius: 10px;
 		padding: 8px 10px;
 		font:
@@ -124,11 +124,11 @@
 		cursor: pointer;
 	}
 	.card.root {
-		border-color: #007acc;
+		border-color: var(--graph-node-root);
 	}
 	.card.selected {
-		border-color: #9fcaff;
-		box-shadow: 0 0 0 1px #9fcaff;
+		border-color: var(--graph-node-selected);
+		box-shadow: 0 0 0 1px var(--graph-node-selected);
 	}
 	.card.dimmed {
 		opacity: 0.32;
@@ -137,8 +137,8 @@
 		font-family: 'Source Code Pro', monospace;
 		font-size: 9.5px;
 		font-weight: 700;
-		color: #10233f;
-		background: #9fcaff;
+		color: var(--graph-step-badge-text);
+		background: var(--graph-node-selected);
 		border-radius: 4px;
 		padding: 0 5px;
 	}
@@ -158,8 +158,8 @@
 		font-size: 8.5px;
 		font-weight: 700;
 		letter-spacing: 0.05em;
-		color: #9fcaff;
-		border: 1px solid #345;
+		color: var(--graph-node-selected);
+		border: 1px solid var(--graph-node-border);
 		border-radius: 4px;
 		padding: 0 3px;
 		margin-left: 5px;
@@ -168,7 +168,7 @@
 	.kind {
 		font-family: 'Source Code Pro', monospace;
 		font-size: 9.5px;
-		color: #8b9199;
+		color: var(--graph-node-muted);
 		margin-top: 2px;
 	}
 	.marks {
@@ -181,15 +181,15 @@
 		font-family: 'Source Code Pro', monospace;
 		font-size: 9.5px;
 		font-weight: 700;
-		color: #b8c0c8;
-		border: 1px solid #404751;
+		color: var(--graph-node-secondary);
+		border: 1px solid var(--graph-node-border);
 		border-radius: 4px;
 		padding: 0 4px;
 	}
 	.chevron {
 		background: none;
 		border: none;
-		color: #b8c0c8;
+		color: var(--graph-node-secondary);
 		font-size: 11px;
 		cursor: pointer;
 		padding: 0 2px;
@@ -201,47 +201,47 @@
 		flex-wrap: wrap;
 		gap: 6px;
 		font-size: 10px;
-		color: #8b9199;
+		color: var(--graph-node-muted);
 		margin: 4px 0 6px;
 	}
 	.meta .cards {
 		font-family: 'Source Code Pro', monospace;
-		color: #9fcaff;
+		color: var(--graph-node-selected);
 	}
 	.meta .warn {
-		color: #e0a34b;
+		color: var(--graph-warning);
 	}
 	.rail {
 		flex: 1 1 auto;
 		min-height: 0;
-		border-top: 1px solid #333;
+		border-top: 1px solid var(--graph-node-divider);
 		padding-top: 5px;
 		overflow-y: auto;
 	}
 	.rail:focus-visible {
-		outline: 2px solid #2970ff;
+		outline: 2px solid var(--focus-ring);
 		outline-offset: 1px;
 	}
 	.locked {
 		font-size: 9.5px;
 		font-weight: 700;
-		color: #d8c56a;
+		color: var(--graph-assurance);
 		margin-bottom: 2px;
 	}
 	.floor {
 		font-size: 10px;
-		color: #b8c0c8;
+		color: var(--graph-node-secondary);
 		line-height: 1.45;
 	}
 	.plus {
 		font-size: 10px;
-		color: #61dac1;
+		color: var(--graph-edge-dataflow);
 		line-height: 1.45;
 	}
 	.attestation {
 		font-size: 9.5px;
 		font-style: italic;
-		color: #ffd08a;
+		color: var(--graph-attestation);
 		line-height: 1.4;
 		margin-top: 1px;
 	}

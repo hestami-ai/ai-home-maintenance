@@ -171,7 +171,7 @@
 	}
 
 	button:focus-visible {
-		outline: 2px solid #2970ff;
+		outline: 2px solid var(--focus-ring, #2970ff);
 		outline-offset: 2px;
 	}
 

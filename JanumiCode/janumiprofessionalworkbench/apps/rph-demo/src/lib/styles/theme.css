@@ -1,0 +1,244 @@
+:root,
+html[data-theme='dark'] {
+	color-scheme: dark;
+
+	/* Existing rph-demo palette: these values are the dark-mode compatibility contract. */
+	--surface: #131313;
+	--surface-low: #1b1b1c;
+	--sc: #202020;
+	--sc-high: #2a2a2a;
+	--sc-highest: #353535;
+	--on: #e5e2e1;
+	--on-surface: #e5e2e1;
+	--on-variant: #c0c7d3;
+	--outline: #8a919d;
+	--outline-faint: #404751;
+	--primary: #9fcaff;
+	--primary-container: #007acc;
+	--on-primary: #00263f;
+	--on-primary-container: #ffffff;
+	--tertiary: #61dac1;
+	--error: #ffb4ab;
+	--on-error: #3a0906;
+	--amber: #e6b566;
+	--indigo: #9a8cff;
+	--focus-ring: #2970ff;
+
+	--primary-soft: rgba(159, 202, 255, 0.15);
+	--tertiary-soft: rgba(97, 218, 193, 0.15);
+	--amber-soft: rgba(230, 181, 102, 0.15);
+	--error-soft: rgba(255, 180, 171, 0.15);
+	--error-border: rgba(255, 180, 171, 0.4);
+	--indigo-soft: rgba(154, 140, 255, 0.2);
+	--shadow-color: rgba(0, 0, 0, 0.4);
+	--shadow-color-faint: rgba(0, 0, 0, 0.18);
+	--shadow-color-medium: rgba(0, 0, 0, 0.35);
+	--shadow-color-strong: rgba(0, 0, 0, 0.45);
+	--overlay-background-soft: rgba(20, 20, 21, 0.9);
+	--overlay-background: rgba(20, 20, 21, 0.94);
+	--overlay-background-strong: rgba(20, 20, 21, 0.96);
+	--scroll-control-background: rgba(15, 23, 42, 0.92);
+	--scroll-control-border: rgba(148, 163, 184, 0.5);
+	--scroll-control-border-hover: rgba(148, 163, 184, 0.85);
+	--scroll-control-text: #e2e8f0;
+
+	--candidate-border: rgba(250, 204, 21, 0.42);
+	--candidate-background: rgba(113, 63, 18, 0.36);
+	--candidate-text: #fef3c7;
+	--candidate-muted: #fde68a;
+	--candidate-code: #fef9c3;
+
+	--assurance-border: #4a4a2a;
+	--assurance-background: #201f16;
+	--assurance-text: #d8c56a;
+	--delegated-border: #6a5320;
+	--delegated-background: #2a220f;
+	--delegated-text: #ffd08a;
+
+	--graph-node-background: #1b1b1c;
+	--graph-node-text: #e5e2e1;
+	--graph-node-border: #404751;
+	--graph-node-root: #007acc;
+	--graph-node-selected: #9fcaff;
+	--graph-step-badge-text: #10233f;
+	--graph-node-muted: #8b9199;
+	--graph-node-secondary: #b8c0c8;
+	--graph-node-divider: #333333;
+	--graph-warning: #e0a34b;
+	--graph-assurance: #d8c56a;
+	--graph-attestation: #ffd08a;
+	--graph-edge-permits: #454b54;
+	--graph-edge-dataflow: #61dac1;
+	--graph-dataflow-label-background: #61dac1;
+	--graph-dataflow-label-text: #06110d;
+	--graph-edge-label-background: #1b1c1f;
+	--graph-edge-label-text: #cdd6df;
+	--graph-edge-label-border: #33383f;
+	--graph-control-background: #26282c;
+	--graph-control-background-hover: #34373c;
+	--graph-control-border: #35383d;
+	--graph-control-text: #d7dde5;
+	--graph-panel-background: rgba(24, 24, 26, 0.85);
+	--graph-panel-border: #2f5c53;
+
+	/* Undertaking graph state colors are intentionally preserved in dark mode. */
+	--work-node-success-background: #e6f4ea;
+	--work-node-success-text: #137333;
+	--work-node-warning-background: #fdf2e3;
+	--work-node-warning-text: #8a5a00;
+	--work-node-neutral-background: #eef0f2;
+	--work-node-neutral-text: #5f6368;
+	--work-node-border: #c7ccd1;
+	--work-node-authoritative: #3730a3;
+}
+
+html[data-theme='light'] {
+	color-scheme: light;
+
+	/* Janumi Vision Website Prototype palette, mapped to workbench semantic roles. */
+	--janumi-bone: #f0ecdf;
+	--janumi-bone-deep: #e5decf;
+	--janumi-paper: #faf7ef;
+	--janumi-ink: #201f1a;
+	--janumi-umber: #3b3027;
+	--janumi-umber-soft: #6e6256;
+	--janumi-forest: #19342a;
+	--janumi-forest-2: #24483a;
+	--janumi-moss: #536b54;
+	--janumi-clay: #a75f47;
+	--janumi-ochre: #c39c55;
+	--janumi-mineral: #5c7880;
+	--janumi-sage: #bcc5ad;
+	--janumi-white: #fffdf7;
+	--janumi-line: rgba(32, 31, 26, 0.17);
+
+	--surface: var(--janumi-bone);
+	--surface-low: var(--janumi-paper);
+	--sc: var(--janumi-bone-deep);
+	--sc-high: #eee8da;
+	--sc-highest: var(--janumi-white);
+	--on: var(--janumi-ink);
+	--on-surface: var(--janumi-ink);
+	--on-variant: var(--janumi-umber);
+	--outline: var(--janumi-umber-soft);
+	--outline-faint: var(--janumi-line);
+	--primary: var(--janumi-forest);
+	--primary-container: var(--janumi-sage);
+	--on-primary: var(--janumi-white);
+	--on-primary-container: var(--janumi-ink);
+	--tertiary: var(--janumi-moss);
+	/* Accessible derivatives retain the prototype hue families for small text. */
+	--error: #8a4636;
+	--on-error: var(--janumi-white);
+	--amber: #6e5525;
+	--indigo: #49636a;
+	--focus-ring: var(--janumi-clay);
+
+	--primary-soft: rgba(25, 52, 42, 0.12);
+	--tertiary-soft: rgba(83, 107, 84, 0.16);
+	--amber-soft: rgba(195, 156, 85, 0.24);
+	--error-soft: rgba(167, 95, 71, 0.14);
+	--error-border: rgba(138, 70, 54, 0.48);
+	--indigo-soft: rgba(92, 120, 128, 0.18);
+	--shadow-color: rgba(35, 29, 23, 0.16);
+	--shadow-color-faint: rgba(35, 29, 23, 0.09);
+	--shadow-color-medium: rgba(35, 29, 23, 0.13);
+	--shadow-color-strong: rgba(35, 29, 23, 0.2);
+	--overlay-background-soft: rgba(250, 247, 239, 0.9);
+	--overlay-background: rgba(250, 247, 239, 0.94);
+	--overlay-background-strong: rgba(250, 247, 239, 0.97);
+	--scroll-control-background: rgba(250, 247, 239, 0.96);
+	--scroll-control-border: rgba(59, 48, 39, 0.38);
+	--scroll-control-border-hover: rgba(59, 48, 39, 0.68);
+	--scroll-control-text: var(--janumi-ink);
+
+	--candidate-border: rgba(195, 156, 85, 0.68);
+	--candidate-background: rgba(195, 156, 85, 0.24);
+	--candidate-text: var(--janumi-umber);
+	--candidate-muted: #6e5525;
+	--candidate-code: var(--janumi-ink);
+
+	--assurance-border: rgba(195, 156, 85, 0.72);
+	--assurance-background: rgba(195, 156, 85, 0.17);
+	--assurance-text: #6e5525;
+	--delegated-border: rgba(167, 95, 71, 0.58);
+	--delegated-background: rgba(167, 95, 71, 0.12);
+	--delegated-text: #8a4636;
+
+	--graph-node-background: var(--janumi-paper);
+	--graph-node-text: var(--janumi-ink);
+	--graph-node-border: rgba(32, 31, 26, 0.28);
+	--graph-node-root: var(--janumi-forest-2);
+	--graph-node-selected: var(--janumi-forest);
+	--graph-step-badge-text: var(--janumi-white);
+	--graph-node-muted: var(--janumi-umber-soft);
+	--graph-node-secondary: var(--janumi-umber);
+	--graph-node-divider: var(--janumi-line);
+	--graph-warning: #6e5525;
+	--graph-assurance: #6e5525;
+	--graph-attestation: #8a4636;
+	--graph-edge-permits: rgba(59, 48, 39, 0.58);
+	--graph-edge-dataflow: var(--janumi-moss);
+	--graph-dataflow-label-background: var(--janumi-moss);
+	--graph-dataflow-label-text: var(--janumi-white);
+	--graph-edge-label-background: var(--janumi-paper);
+	--graph-edge-label-text: var(--janumi-umber);
+	--graph-edge-label-border: rgba(32, 31, 26, 0.25);
+	--graph-control-background: var(--janumi-paper);
+	--graph-control-background-hover: var(--janumi-bone-deep);
+	--graph-control-border: var(--janumi-line);
+	--graph-control-text: var(--janumi-ink);
+	--graph-panel-background: rgba(250, 247, 239, 0.9);
+	--graph-panel-border: rgba(83, 107, 84, 0.52);
+
+	--work-node-success-background: var(--janumi-sage);
+	--work-node-success-text: var(--janumi-forest);
+	--work-node-warning-background: var(--janumi-ochre);
+	--work-node-warning-text: var(--janumi-ink);
+	--work-node-neutral-background: var(--janumi-paper);
+	--work-node-neutral-text: var(--janumi-umber);
+	--work-node-border: rgba(32, 31, 26, 0.28);
+	--work-node-authoritative: #49636a;
+}
+
+html,
+body {
+	background: var(--surface);
+	color: var(--on);
+}
+
+::selection {
+	background: var(--amber-soft);
+	color: var(--on);
+}
+
+:where(button, a, input, select, textarea, [tabindex]):focus-visible {
+	outline-color: var(--focus-ring);
+}
+
+/* The root selector outranks Svelte Flow's own mode defaults without resorting to !important. */
+html[data-theme] .svelte-flow {
+	--xy-edge-stroke-default: var(--graph-edge-permits);
+	--xy-edge-stroke-selected-default: var(--primary);
+	--xy-connectionline-stroke-default: var(--primary);
+	--xy-attribution-background-color-default: var(--overlay-background);
+	--xy-minimap-background-color-default: var(--surface-low);
+	--xy-background-pattern-dots-color-default: var(--outline-faint);
+	--xy-background-pattern-lines-color-default: var(--outline-faint);
+	--xy-background-pattern-cross-color-default: var(--outline-faint);
+	--xy-node-color-default: var(--on);
+	--xy-node-border-default: 1px solid var(--graph-node-border);
+	--xy-node-background-color-default: var(--graph-node-background);
+	--xy-handle-background-color-default: var(--primary);
+	--xy-handle-border-color-default: var(--surface-low);
+	--xy-selection-background-color-default: var(--primary-soft);
+	--xy-selection-border-default: 1px dotted var(--primary);
+	--xy-controls-button-background-color-default: var(--graph-control-background);
+	--xy-controls-button-background-color-hover-default: var(--graph-control-background-hover);
+	--xy-controls-button-color-default: var(--graph-control-text);
+	--xy-controls-button-color-hover-default: var(--graph-control-text);
+	--xy-controls-button-border-color-default: var(--graph-control-border);
+	--xy-controls-box-shadow-default: 0 6px 20px var(--shadow-color);
+	--xy-edge-label-background-color: var(--graph-edge-label-background);
+	--xy-edge-label-color: var(--graph-edge-label-text);
+}

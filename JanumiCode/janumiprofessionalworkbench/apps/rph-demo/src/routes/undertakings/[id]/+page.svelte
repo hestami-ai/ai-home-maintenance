@@ -3,7 +3,9 @@
 	import type { Edge, Node } from '@xyflow/svelte';
 	import '@xyflow/svelte/dist/style.css';
 	import { enhance } from '$app/forms';
+	import { getContext } from 'svelte';
 	import { toFlow } from '$lib/toFlow';
+	import { THEME_CONTEXT, type ThemeContext } from '$lib/theme';
 	import type { PageData } from './$types';
 
 	let {
@@ -13,6 +15,8 @@
 		data: PageData;
 		form: { error?: string; proposed?: string; advanced?: string } | null;
 	} = $props();
+	const themeContext = getContext<ThemeContext>(THEME_CONTEXT);
+	const colorTheme = themeContext.theme;
 	// Derive the graph from `data` and sync it into the bindable node/edge state (so it tracks server updates and
 	// doesn't just capture the initial prop value).
 	const flow = $derived(toFlow(data.graph));
@@ -116,7 +120,7 @@
 		<p class="residual">⚠ Open residual: {flow.openResiduals.join('; ')}</p>
 	{/if}
 	<div class="flow">
-		<SvelteFlow bind:nodes bind:edges fitView>
+		<SvelteFlow bind:nodes bind:edges colorMode={$colorTheme} fitView>
 			<Background />
 			<Controls />
 			<MiniMap />
@@ -582,7 +586,7 @@
 		font-weight: 700;
 		padding: 2px 7px;
 		border-radius: 5px;
-		background: rgba(97, 218, 193, 0.15);
+		background: var(--tertiary-soft);
 		color: var(--tertiary);
 	}
 	.obj {
@@ -685,7 +689,7 @@
 	}
 	.instform button.primary {
 		background: var(--primary);
-		color: #00263f;
+		color: var(--on-primary);
 		border: none;
 		border-radius: 8px;
 		padding: 8px 14px;
@@ -750,7 +754,7 @@
 		color: var(--on);
 	}
 	.tag.auth {
-		background: rgba(154, 140, 255, 0.2);
+		background: var(--indigo-soft);
 		color: var(--indigo);
 	}
 	.none {
@@ -936,7 +940,7 @@
 	}
 	button.mini.primary {
 		background: var(--primary);
-		color: #00263f;
+		color: var(--on-primary);
 		border: none;
 	}
 	.done {
@@ -982,7 +986,7 @@
 		font-weight: 600;
 	}
 	.req {
-		color: var(--error, #ff6b6b);
+		color: var(--error);
 		font-weight: 700;
 		font-size: 11px;
 	}

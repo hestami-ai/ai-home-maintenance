@@ -162,8 +162,8 @@
 		margin-right: 0.4rem;
 		padding: 0.05rem 0.4rem;
 		border-radius: 0.5rem;
-		background: var(--accent-soft, #e5edff);
-		color: var(--accent, #2748b8);
+		background: var(--primary-soft);
+		color: var(--primary);
 		font-size: 0.72rem;
 		font-weight: 600;
 	}
@@ -181,10 +181,10 @@
 		opacity: 0.85;
 	}
 	.warn {
-		color: var(--warn, #b26a00);
+		color: var(--amber);
 	}
 	.wp-caveat {
-		border-top: 1px dashed var(--border, #d4d8e0);
+		border-top: 1px dashed var(--outline-faint);
 		padding-top: 0.4rem;
 	}
 </style>

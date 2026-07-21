@@ -5,7 +5,7 @@
 	import { SvelteFlow, Background, Controls, Panel } from '@xyflow/svelte';
 	import '@xyflow/svelte/dist/style.css';
 	import type { Edge, FitViewOptions, Node } from '@xyflow/svelte';
-	import { tick, setContext } from 'svelte';
+	import { getContext, tick, setContext } from 'svelte';
 	import {
 		toPwaFlow,
 		type DataFlowEdgeData,
@@ -27,6 +27,7 @@
 		type CanvasHistory
 	} from '$lib/canvasHistory';
 	import { draggable } from '$lib/actions/draggable';
+	import { THEME_CONTEXT, type ThemeContext } from '$lib/theme';
 	import {
 		analyzePwaGraph,
 		buildPwaGraphExport,
@@ -65,6 +66,8 @@
 			candidateStatus?: string;
 		} | null;
 	} = $props();
+	const themeContext = getContext<ThemeContext>(THEME_CONTEXT);
+	const colorTheme = themeContext.theme;
 
 	// Selection = an explicit user/agent override, falling back to the root (or first) type. Deriving it from `data`
 	// keeps it correct when the graph changes and self-heals when the selected type is removed.
@@ -979,6 +982,7 @@
 			<SvelteFlow
 				bind:nodes
 				bind:edges
+				colorMode={$colorTheme}
 				{nodeTypes}
 				onnodeclick={(e) => selectNode(e.node.id)}
 				onnodedragstart={beginCanvasMove}
@@ -1882,9 +1886,9 @@
 		justify-content: space-between;
 		gap: 1rem;
 		padding: 0.55rem 0.9rem;
-		border-bottom: 1px solid rgba(250, 204, 21, 0.42);
-		background: rgba(113, 63, 18, 0.36);
-		color: #fef3c7;
+		border-bottom: 1px solid var(--candidate-border);
+		background: var(--candidate-background);
+		color: var(--candidate-text);
 	}
 	.candidatecopy {
 		display: flex;
@@ -1893,14 +1897,14 @@
 		gap: 0.7rem;
 	}
 	.candidatemeta {
-		color: #fde68a;
+		color: var(--candidate-muted);
 		font-size: 0.78rem;
 		white-space: nowrap;
 	}
 	.candidatehint {
 		min-width: 0;
 		overflow: hidden;
-		color: #fde68a;
+		color: var(--candidate-muted);
 		font-size: 0.76rem;
 		text-overflow: ellipsis;
 		white-space: nowrap;
@@ -1908,7 +1912,7 @@
 	.candidatecopy code {
 		overflow: hidden;
 		max-width: 21rem;
-		color: #fef9c3;
+		color: var(--candidate-code);
 		font-size: 0.7rem;
 		text-overflow: ellipsis;
 		white-space: nowrap;
@@ -1956,11 +1960,11 @@
 		font-weight: 700;
 		padding: 3px 8px;
 		border-radius: 5px;
-		background: rgba(159, 202, 255, 0.15);
+		background: var(--primary-soft);
 		color: var(--primary);
 	}
 	.pill.pub {
-		background: rgba(97, 218, 193, 0.15);
+		background: var(--tertiary-soft);
 		color: var(--tertiary);
 	}
 	.health {
@@ -1968,17 +1972,17 @@
 		font-weight: 700;
 		padding: 3px 8px;
 		border-radius: 5px;
-		background: rgba(97, 218, 193, 0.15);
+		background: var(--tertiary-soft);
 		color: var(--tertiary);
 		cursor: help;
 		white-space: nowrap;
 	}
 	.health.warn {
-		background: rgba(230, 181, 102, 0.15);
+		background: var(--amber-soft);
 		color: var(--amber);
 	}
 	.health.bad {
-		background: rgba(255, 180, 171, 0.15);
+		background: var(--error-soft);
 		color: var(--error);
 	}
 	.detailform {
@@ -2070,46 +2074,45 @@
 	.canvas :global(.svelte-flow__node) {
 		cursor: pointer;
 	}
-	/* The zoom / fit / lock toolbar ships light-on-white and washes out on the dark canvas — retheme it. */
+	/* Keep the zoom / fit / lock toolbar aligned with the selected application theme. */
 	.canvas :global(.svelte-flow__controls) {
-		box-shadow: 0 6px 20px rgba(0, 0, 0, 0.4);
+		box-shadow: 0 6px 20px var(--shadow-color);
 		border-radius: 8px;
 		overflow: hidden;
 	}
 	.canvas :global(.svelte-flow__controls-button) {
-		background: #26282c;
-		border-bottom: 1px solid #35383d;
-		fill: #d7dde5;
-		color: #d7dde5;
+		background: var(--graph-control-background);
+		border-bottom: 1px solid var(--graph-control-border);
+		fill: var(--graph-control-text);
+		color: var(--graph-control-text);
 	}
 	.canvas :global(.svelte-flow__controls-button:hover) {
-		background: #34373c;
+		background: var(--graph-control-background-hover);
 	}
 	.canvas :global(.svelte-flow__controls-button svg) {
-		fill: #d7dde5;
+		fill: var(--graph-control-text);
 	}
-	/* Edge label chips render as HTML .svelte-flow__edge-label divs themed by CSS variables (the default white-bg /
-	   light-text washed out on the dark canvas). Give them a legible dark pill. */
+	/* Edge label chips render as HTML divs and use the same graph tokens as their SVG edges. */
 	.canvas :global(.svelte-flow) {
-		--xy-edge-label-background-color: #1b1c1f;
-		--xy-edge-label-color: #cdd6df;
+		--xy-edge-label-background-color: var(--graph-edge-label-background);
+		--xy-edge-label-color: var(--graph-edge-label-text);
 	}
 	.canvas :global(.svelte-flow__edge-label) {
 		padding: 2px 7px;
 		border-radius: 5px;
 		font-size: 10px;
 		font-weight: 600;
-		border: 1px solid #33383f;
-		box-shadow: 0 1px 4px rgba(0, 0, 0, 0.45);
+		border: 1px solid var(--graph-edge-label-border);
+		box-shadow: 0 1px 4px var(--shadow-color-strong);
 	}
 	/* Floating panels overlaid on the canvas (Svelte Flow <Panel>) */
 	.agentpanel,
 	.inspectorpanel {
-		background: rgba(20, 20, 21, 0.94);
+		background: var(--overlay-background);
 		border: 1px solid var(--outline-faint);
 		border-radius: 12px;
 		backdrop-filter: blur(6px);
-		box-shadow: 0 10px 30px rgba(0, 0, 0, 0.4);
+		box-shadow: 0 10px 30px var(--shadow-color);
 	}
 	.agentpanel {
 		position: relative;
@@ -2125,16 +2128,16 @@
 		right: 14px;
 		bottom: 12px;
 		padding: 3px 9px;
-		border: 1px solid rgba(148, 163, 184, 0.5);
+		border: 1px solid var(--scroll-control-border);
 		border-radius: 999px;
-		background: rgba(15, 23, 42, 0.92);
-		color: #e2e8f0;
+		background: var(--scroll-control-background);
+		color: var(--scroll-control-text);
 		font-size: 0.72rem;
 		cursor: pointer;
-		box-shadow: 0 2px 8px rgba(0, 0, 0, 0.35);
+		box-shadow: 0 2px 8px var(--shadow-color-medium);
 	}
 	.scrolldown:hover {
-		border-color: rgba(148, 163, 184, 0.85);
+		border-color: var(--scroll-control-border-hover);
 	}
 	.layoutscope {
 		cursor: grab;
@@ -2285,7 +2288,7 @@
 		max-height: 96px;
 	}
 	.emptyhint {
-		background: rgba(20, 20, 21, 0.9);
+		background: var(--overlay-background-soft);
 		border: 1px dashed var(--outline-faint);
 		border-radius: 10px;
 		padding: 10px 14px;
@@ -2376,7 +2379,7 @@
 	.cardsel {
 		font-size: 10px;
 		padding: 1px 2px;
-		background: #232324;
+		background: var(--sc-high);
 		color: var(--on-variant);
 		border: 1px solid var(--outline);
 		border-radius: 4px;
@@ -2385,7 +2388,7 @@
 		flex: 1 1 100%;
 		font-size: 11px;
 		padding: 2px 5px;
-		background: #232324;
+		background: var(--sc-high);
 		color: var(--on-variant);
 		border: 1px solid var(--outline);
 		border-radius: 4px;
@@ -2435,8 +2438,8 @@
 		background: var(--sc);
 	}
 	.policycard.floorcard {
-		border-color: #4a4a2a;
-		background: #201f16;
+		border-color: var(--assurance-border);
+		background: var(--assurance-background);
 	}
 	.policycard.supersededcard {
 		opacity: 0.6;
@@ -2455,7 +2458,7 @@
 	.pclock {
 		font-size: 9.5px;
 		font-weight: 700;
-		color: #d8c56a;
+		color: var(--assurance-text);
 		white-space: nowrap;
 	}
 	.pcstatus {
@@ -2469,11 +2472,11 @@
 		white-space: nowrap;
 	}
 	.pcstatus.active {
-		background: rgba(97, 218, 193, 0.15);
+		background: var(--tertiary-soft);
 		color: var(--tertiary);
 	}
 	.pcstatus.suspended {
-		background: rgba(230, 181, 102, 0.15);
+		background: var(--amber-soft);
 		color: var(--amber);
 	}
 	.pcstatus.superseded {
@@ -2525,8 +2528,8 @@
 		font-family: 'Source Code Pro', monospace;
 		font-size: 10px;
 		font-weight: 600;
-		color: #9fcaff;
-		border: 1px solid #345;
+		color: var(--primary);
+		border: 1px solid var(--outline-faint);
 		border-radius: 4px;
 		padding: 0 4px;
 		flex: 0 0 auto;
@@ -2544,33 +2547,33 @@
 		margin-right: 6px;
 	}
 	.boundarybadge.internal {
-		color: #9fcaff;
-		border: 1px solid #345;
+		color: var(--primary);
+		border: 1px solid var(--outline-faint);
 	}
 	.boundarybadge.delegated {
-		color: #ffd08a;
-		border: 1px solid #6a5320;
-		background: #2a220f;
+		color: var(--delegated-text);
+		border: 1px solid var(--delegated-border);
+		background: var(--delegated-background);
 	}
 	.leafkind {
 		color: var(--outline);
 		font-size: 11px;
 	}
 	.assurancerail {
-		border-left: 2px solid #4a4a2a;
+		border-left: 2px solid var(--assurance-border);
 		padding-left: 8px;
 	}
 	.railfloor {
 		border-radius: 6px;
-		background: #201f16;
-		border: 1px solid #4a4a2a;
+		background: var(--assurance-background);
+		border: 1px solid var(--assurance-border);
 		padding: 6px 8px;
 		margin-bottom: 4px;
 	}
 	.raillocked {
 		font-size: 10.5px;
 		font-weight: 600;
-		color: #d8c56a;
+		color: var(--assurance-text);
 		margin-bottom: 3px;
 	}
 	.railitem {
@@ -2579,7 +2582,7 @@
 		line-height: 1.5;
 	}
 	.railitem.plus {
-		color: #61dac1;
+		color: var(--graph-edge-dataflow);
 	}
 	.railadd {
 		padding: 2px 0 0 2px;
@@ -2595,7 +2598,7 @@
 		flex-direction: column;
 		gap: 6px;
 		min-width: 330px;
-		background: rgba(24, 24, 26, 0.85);
+		background: var(--graph-panel-background);
 		border: 1px solid var(--outline);
 		border-radius: 8px;
 		padding: 6px 9px;
@@ -2674,21 +2677,21 @@
 		flex: 0 0 auto;
 	}
 	.legline.permits {
-		border-top-color: #6a717b;
+		border-top-color: var(--graph-edge-permits);
 	}
 	.legline.flow {
 		border-top-style: dashed;
-		border-top-color: #61dac1;
+		border-top-color: var(--graph-edge-dataflow);
 	}
 	/* Data-flow hand-off detail (opens on clicking a ⤳ link). */
 	.flowdetail {
-		background: rgba(20, 20, 21, 0.96);
-		border: 1px solid #2f5c53;
+		background: var(--overlay-background-strong);
+		border: 1px solid var(--graph-panel-border);
 		border-radius: 10px;
 		padding: 10px 12px 12px;
 		width: 300px;
 		max-width: 60vw;
-		box-shadow: 0 10px 30px rgba(0, 0, 0, 0.45);
+		box-shadow: 0 10px 30px var(--shadow-color-strong);
 		user-select: text;
 	}
 	.flowdetailhead {
@@ -2704,7 +2707,7 @@
 		line-height: 1.4;
 	}
 	.flowarrow {
-		color: #61dac1;
+		color: var(--graph-edge-dataflow);
 		margin: 0 4px;
 		font-weight: 700;
 	}
@@ -2719,9 +2722,8 @@
 	.artifactchip {
 		font-family: 'Source Code Pro', monospace;
 		font-size: 11px;
-		color: #061; /* fallback */
-		color: #06110d;
-		background: #61dac1;
+		color: var(--graph-dataflow-label-text);
+		background: var(--graph-dataflow-label-background);
 		border-radius: 5px;
 		padding: 2px 7px;
 	}
@@ -2805,7 +2807,7 @@
 		font-weight: 700;
 		letter-spacing: 0.08em;
 		background: var(--primary-container);
-		color: #fff;
+		color: var(--on-primary-container);
 		padding: 1px 6px;
 		border-radius: 4px;
 		margin-right: 6px;
@@ -2832,11 +2834,11 @@
 	}
 	button.ghost.danger {
 		color: var(--error);
-		border-color: rgba(255, 180, 171, 0.4);
+		border-color: var(--error-border);
 	}
 	button.primary {
 		background: var(--primary);
-		color: #00263f;
+		color: var(--on-primary);
 		border: none;
 		border-radius: 8px;
 		padding: 8px 16px;
@@ -2850,16 +2852,16 @@
 	}
 	/* De minimis assurance floor — chip + panel */
 	.floorchip { font-size: 11px; font-weight: 700; padding: 2px 8px; border-radius: 5px; border: 1px solid transparent; white-space: nowrap; cursor: help; }
-	.floorchip.ok { background: rgba(97, 218, 193, 0.15); color: var(--tertiary); }
-	.floorchip.warn { background: rgba(230, 181, 102, 0.15); color: var(--amber); }
-	.floorchip.bad { background: rgba(255, 180, 171, 0.15); color: var(--error); }
-	.floorpanel { width: 280px; max-width: 32vw; max-height: calc(50vh - 96px); padding: 0; border: 1px solid var(--sc); border-radius: 10px; background: var(--surface); box-shadow: 0 6px 20px rgba(0, 0, 0, 0.18); font-size: 12px; }
+	.floorchip.ok { background: var(--tertiary-soft); color: var(--tertiary); }
+	.floorchip.warn { background: var(--amber-soft); color: var(--amber); }
+	.floorchip.bad { background: var(--error-soft); color: var(--error); }
+	.floorpanel { width: 280px; max-width: 32vw; max-height: calc(50vh - 96px); padding: 0; border: 1px solid var(--sc); border-radius: 10px; background: var(--surface); box-shadow: 0 6px 20px var(--shadow-color-faint); font-size: 12px; }
 	.floorpanel .panelbody { padding: 4px 14px 12px; }
 	.floorpanel .ppanelhead { padding: 10px 12px 6px 14px; }
 	.floorhead { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
-	.floortag { font-size: 11px; font-weight: 800; padding: 2px 8px; border-radius: 5px; background: rgba(230, 181, 102, 0.15); color: var(--amber); }
-	.floortag.ok { background: rgba(97, 218, 193, 0.15); color: var(--tertiary); }
-	.floortag.bad { background: rgba(255, 180, 171, 0.15); color: var(--error); }
+	.floortag { font-size: 11px; font-weight: 800; padding: 2px 8px; border-radius: 5px; background: var(--amber-soft); color: var(--amber); }
+	.floortag.ok { background: var(--tertiary-soft); color: var(--tertiary); }
+	.floortag.bad { background: var(--error-soft); color: var(--error); }
 	.floorsub { font-size: 10px; color: var(--outline); }
 	.floorpolicies { list-style: none; margin: 10px 0 0; padding: 0; display: flex; flex-direction: column; gap: 4px; }
 	.floorpolicies li { display: flex; gap: 6px; align-items: baseline; color: var(--on-variant); }
@@ -2873,5 +2875,5 @@
 	.floorhint { margin: 10px 0 0; color: var(--on-variant); line-height: 1.4; }
 	.floorwaiver { margin-top: 10px; display: flex; flex-direction: column; gap: 6px; border-top: 1px solid var(--sc); padding-top: 10px; }
 	.floorwaiver input { padding: 6px 8px; border: 1px solid var(--sc); border-radius: 6px; background: var(--surface); color: inherit; font-size: 11px; }
-	.waivedbadge { font-size: 10px; font-weight: 700; padding: 2px 6px; border-radius: 5px; background: rgba(97, 218, 193, 0.15); color: var(--tertiary); }
+	.waivedbadge { font-size: 10px; font-weight: 700; padding: 2px 6px; border-radius: 5px; background: var(--tertiary-soft); color: var(--tertiary); }
 </style>

@@ -170,7 +170,7 @@
 		color: var(--on);
 	}
 	.tag.auth {
-		background: rgba(154, 140, 255, 0.2);
+		background: var(--indigo-soft);
 		color: var(--indigo);
 	}
 	.act form {
@@ -195,7 +195,7 @@
 	}
 	button.primary {
 		background: var(--primary);
-		color: #00263f;
+		color: var(--on-primary);
 		border: none;
 		border-radius: 8px;
 		padding: 8px 16px;
