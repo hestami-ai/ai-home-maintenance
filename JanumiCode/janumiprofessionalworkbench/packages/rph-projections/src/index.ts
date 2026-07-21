@@ -12,6 +12,7 @@ export * from './pwa-graph-report.js';
 export * from './leaf.js';
 export * from './handoff-order.js';
 export * from './execution-view.js';
+export * from './execution-attempts.js';
 export * from './calibration.js';
 export * from './pwu-behavior.js';
 export * from './traceability-view.js';

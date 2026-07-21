@@ -61,6 +61,15 @@
 		retry: 'retryStep'
 	} as const;
 	const STEP_LABEL = { start: 'Start', complete: 'Complete', fail: 'Fail', retry: 'Retry' } as const;
+	// DWP-05: attempt-state → tone for the per-step attempt-history rows.
+	const attemptTone = (state: string): string =>
+		state === 'SUCCEEDED'
+			? 'positive'
+			: state === 'FAILED'
+				? 'negative'
+				: state === 'RUNNING'
+					? 'active'
+					: 'muted';
 	// DWP-04: which instances a hand-off advisory flags (display-only highlight; the advisory gates nothing).
 	const advisoryConsumerIds = $derived(new Set(data.sequence.advisories.map((a) => a.consumerInstanceId)));
 </script>
@@ -205,10 +214,10 @@
 			It is not the Professional Work Graph, and it is not named a "workflow" here except for temporal execution
 			machinery.
 		</p>
-		<p class="hint dim" data-testid="exec-nocomplete">
-			Plans are driven step-by-step (Start · Complete · Fail · Retry) and cancelled as a whole. The domain has
-			no plan-COMPLETION command yet, so a fully-succeeded plan stays ACTIVE — surfaced honestly, not faked
-			(JAN-EXECPLAN §15 / F-9).
+		<p class="hint dim" data-testid="exec-plan-actions-note">
+			Plans are driven step-by-step (Start · Complete · Fail · Retry) and completed / failed / cancelled as a
+			whole. A COMPLETED plan is an <b>execution-axis</b> fact — never assurance: a PWU turns green only when its
+			assurance is SATISFIED (INV-5). Each step shows its attempt history (JAN-EXECPLAN Tier 3).
 		</p>
 		{#if form?.error}<p class="err" role="alert" data-testid="exec-error">{form.error}</p>{/if}
 		{#if !plansByPwu.length}
@@ -223,8 +232,20 @@
 					<div class="plancard" data-testid="exec-plan">
 						<div class="planhead">
 							<span class="mono">{pl.id.slice(0, 14)}…</span>
-							<span class="tag">{pl.status}</span>
+							<span class="tag" data-testid="plan-status">{pl.status}</span>
 							{#if pl.planVersion !== undefined}<span class="dim">v{pl.planVersion}</span>{/if}
+							{#if pl.status === 'ACTIVE'}
+								<!-- Plan-terminal actions (DWP-05). CompleteExecutionPlan's engine guard is the success
+								     allow-list; a rejection surfaces verbatim above. COMPLETED ≠ green (INV-5). -->
+								<form method="POST" action="?/completePlan" use:enhance class="inlineform">
+									<input type="hidden" name="planId" value={pl.id} />
+									<button class="mini" data-testid="plan-complete">Complete plan</button>
+								</form>
+								<form method="POST" action="?/failPlan" use:enhance class="inlineform">
+									<input type="hidden" name="planId" value={pl.id} />
+									<button class="mini" data-testid="plan-fail">Fail plan</button>
+								</form>
+							{/if}
 							{#if pl.status !== 'CANCELLED'}
 								<form method="POST" action="?/cancelPlan" use:enhance class="inlineform">
 									<input type="hidden" name="planId" value={pl.id} />
@@ -285,6 +306,23 @@
 											>
 										{/if}
 									</span>
+									{#if data.attemptsByStepId[s.id]?.length}
+										<ol class="attempts" data-testid="step-attempts">
+											{#each data.attemptsByStepId[s.id] as at (at.idempotencyKey)}
+												<li class="attempt" data-testid="step-attempt">
+													<span class="dim">#{at.attemptNumber}</span>
+													<span class="st {attemptTone(at.state)}">{at.state}</span>
+													{#if at.runtimeBindingId}<span class="dim mono"
+															>rb {at.runtimeBindingId.slice(0, 8)}…</span
+														>{/if}
+													{#if at.error}<span class="dim">{at.error}</span>{/if}
+													{#if at.aiNoBinding}<span class="advisory" data-testid="attempt-ai-nobinding"
+															>⚠ AI step, no runtime binding</span
+														>{/if}
+												</li>
+											{/each}
+										</ol>
+									{/if}
 								</li>
 							{/each}
 						</ol>
@@ -794,6 +832,21 @@
 		display: inline-flex;
 		gap: 2px;
 		align-items: center;
+	}
+	/* DWP-05: per-step attempt history. */
+	ol.attempts {
+		list-style: none;
+		margin: 3px 0 0 18px;
+		padding: 0;
+		display: flex;
+		flex-direction: column;
+		gap: 2px;
+	}
+	.attempt {
+		display: flex;
+		gap: 6px;
+		align-items: center;
+		font-size: 11px;
 	}
 	/* Tier-2 execution sequence (DWP-04): dependency layers + advisories. */
 	.t2head {

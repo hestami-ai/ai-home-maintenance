@@ -12,11 +12,13 @@ import type {
 	DomainCommand,
 	ExecutionPlanActivatedPayload,
 	ExecutionStepSucceededPayload,
+	FailExecutionPlanPayload,
 	ProposeExecutionPlanPayload
 } from '@janumipwb/rph-contracts';
 import {
 	canActivatePlan,
 	canAuthorizeNewWork,
+	retryDecision,
 	validateStepCompletion,
 	type AssumptionView
 } from '@janumipwb/rph-domain';
@@ -239,6 +241,106 @@ export const cancelExecutionPlan: CommandHandler = (ctx: HandlerContext, command
 		eventType: 'ExecutionTerminated'
 	});
 
+/**
+ * CompleteExecutionPlan — ACTIVE -> COMPLETED (JAN-EXECPLAN-DR-002 DWP-01 / §20.1). The completion CONDITION is a
+ * SUCCESS ALLOW-LIST, not a negation: a plan completes iff it has ≥1 step AND EVERY step is SUCCEEDED or SKIPPED.
+ *
+ * Do not change: this is `every(SUCCEEDED || SKIPPED)`, NOT "terminal ∧ ¬FAILED". The reachable terminal step set is
+ *   {SUCCEEDED, FAILED, SKIPPED, CANCELLED, SUPERSEDED}, so a negation would silently admit CANCELLED/SUPERSEDED
+ *   steps as success (§19 L3-2). The `steps.length > 0` guard blocks the vacuous empty-plan completion — `[].every`
+ *   is true (§19 L3-1). SKIPPED counts as success only once 3C's skip handler enforces authorized-skip; until then
+ *   SKIPPED is unreachable, so the allow-list is future-safe. Exec ≠ assurance (INV-5): this moves only `status`.
+ */
+export const completeExecutionPlan: CommandHandler = (ctx, command) =>
+	advanceStatus(ctx, command, {
+		objectType: PLAN,
+		statusField: 'status',
+		machine: MACHINE,
+		target: 'COMPLETED',
+		eventType: 'ExecutionPlanCompleted',
+		eventPayload: () => ({ status: 'COMPLETED' }),
+		guard: (state) => {
+			const steps = Array.isArray(state.steps)
+				? (state.steps as Array<{ stepState?: string }>)
+				: [];
+			if (steps.length === 0)
+				return reject(
+					command,
+					'RPH_INVARIANT_VIOLATION',
+					`CompleteExecutionPlan blocked: plan ${command.targetAggregateId} has no steps — an empty plan cannot be COMPLETED (§20.1 requires all required steps to reach terminal success).`
+				);
+			const offenders = steps.filter(
+				(s) => s.stepState !== 'SUCCEEDED' && s.stepState !== 'SKIPPED'
+			);
+			if (offenders.length > 0)
+				return reject(
+					command,
+					'RPH_INVARIANT_VIOLATION',
+					`CompleteExecutionPlan blocked: plan ${command.targetAggregateId} has ${offenders.length} step(s) not in terminal success (${offenders.map((s) => s.stepState ?? 'undefined').join(', ')}); COMPLETED requires every step SUCCEEDED or SKIPPED (§20.1 success allow-list). FailExecutionPlan a plan with a failed step.`
+				);
+			return null;
+		}
+	});
+
+/** FailExecutionPlan — ACTIVE -> FAILED (JAN-EXECPLAN-DR-002 DWP-01 / §36.2). The machine only permits FAILED from
+ *  ACTIVE, so checkTransition guards the source; the event records the failureReason. Exec ≠ assurance (INV-5). */
+export const failExecutionPlan: CommandHandler = (ctx, command) => {
+	const p = command.payload as FailExecutionPlanPayload;
+	return advanceStatus(ctx, command, {
+		objectType: PLAN,
+		statusField: 'status',
+		machine: MACHINE,
+		target: 'FAILED',
+		eventType: 'ExecutionPlanFailed',
+		eventPayload: () => ({
+			status: 'FAILED',
+			failureReason: p.failureReason,
+			...(p.failureClass ? { failureClass: p.failureClass } : {})
+		})
+	});
+};
+
+/**
+ * SupersedeExecutionPlan — {PROPOSED|UNDER_REVIEW|APPROVED|ACTIVE} -> SUPERSEDED (JAN-EXECPLAN-DR-002 DWP-02 /
+ * §35.1 / RPH-EXE-002). The machine guards the source (checkTransition); this handler additionally validates that
+ * the cited successor resolves to an EXECUTION_PLAN on the SAME PWU — a supersession must name a real successor,
+ * not a dangling/foreign id (§19 L3-11). Reuses the existing ExecutionPlanSuperseded event. RPH-EXE-002 (a
+ * superseded plan opens no new step OR attempt) is enforced downstream by the plan-ACTIVE prechecks on
+ * startExecutionStep AND retryExecutionStep (both reject once the plan leaves ACTIVE). Exec ≠ assurance (INV-5).
+ */
+export const supersedeExecutionPlan: CommandHandler = (ctx, command) => {
+	const p = command.payload as { supersedingExecutionPlanId: string };
+	return advanceStatus(ctx, command, {
+		objectType: PLAN,
+		statusField: 'status',
+		machine: MACHINE,
+		target: 'SUPERSEDED',
+		eventType: 'ExecutionPlanSuperseded',
+		eventPayload: () => ({
+			supersedingExecutionPlanId: p.supersedingExecutionPlanId,
+			status: 'SUPERSEDED'
+		}),
+		guard: (state) => {
+			const successor = ctx.store.loadObject(p.supersedingExecutionPlanId)?.state as
+				| { workUnitId?: string }
+				| undefined;
+			if (!successor)
+				return reject(
+					command,
+					'RPH_VALIDATION_SEMANTIC_FAILED',
+					`SupersedeExecutionPlan blocked: successor plan ${p.supersedingExecutionPlanId} does not exist — a supersession must name a real successor EXECUTION_PLAN (§19 L3-11).`
+				);
+			if (successor.workUnitId !== state.workUnitId)
+				return reject(
+					command,
+					'RPH_VALIDATION_SEMANTIC_FAILED',
+					`SupersedeExecutionPlan blocked: successor plan ${p.supersedingExecutionPlanId} belongs to a different PWU (${String(successor.workUnitId)} ≠ ${String(state.workUnitId)}) — a plan may only be superseded by a successor on the same PWU.`
+				);
+			return null;
+		}
+	});
+};
+
 /** ApplyTacticalChange — ACTIVE -> ACTIVE (a within-plan tactical adjustment; no plan-status change). Requires
  * the plan to be ACTIVE and an authorizing policy (tactical changes only when policy authorizes, §20.2). */
 export const applyTacticalChange: CommandHandler = (ctx, command) =>
@@ -446,13 +548,71 @@ export const failExecutionStep: CommandHandler = (ctx, command) => {
 	});
 };
 
-/** RetryExecutionStep — a FAILED step -> QUEUED (re-attempt; the retry cap RPH-EXE-008 is enforced by the
- * execution kernel's retryDecision, wired when attempt counting lands — documented in RESUME-STATE). */
+/** The default retry cap when the plan's RetryPolicy carries no valid maxAttempts (the Conformance §12 fixture
+ *  value; the RetryPolicy shape itself is Source-TBD, so only a conventional `maxAttempts` key is read). */
+const DEFAULT_MAX_ATTEMPTS = 3;
+
+/** Attempts made for a step = count of ExecutionStepStarted events (each Started = one RUNNING episode = one
+ *  attempt; ExecutionStepRetried is a re-queue MARKER, NOT an attempt — JAN-EXECPLAN §19 L3-3). Mirrors the
+ *  execution-attempts projection's attempt_number, counted here from the authoritative event log (replay-stable). */
+function attemptsMadeForStep(ctx: HandlerContext, planId: string, stepId: string): number {
+	let n = 0;
+	for (const e of ctx.store.readAllEvents()) {
+		if (
+			e.eventType === 'ExecutionStepStarted' &&
+			e.aggregateId === planId &&
+			(e.payload as { stepId?: string })?.stepId === stepId
+		)
+			n += 1;
+	}
+	return n;
+}
+
+/** The retry cap, read as a CONVENTION on the Source-TBD RetryPolicy bag: a valid positive integer `maxAttempts`,
+ *  else DEFAULT. Guards the degenerate values (absent/NaN/0/negative/non-integer — §19 L3-6). */
+function retryCapFor(plan: Record<string, unknown>): number {
+	const raw = (plan.retryPolicy as { maxAttempts?: unknown } | undefined)?.maxAttempts;
+	return typeof raw === 'number' && Number.isInteger(raw) && raw >= 1 ? raw : DEFAULT_MAX_ATTEMPTS;
+}
+
+/**
+ * RetryExecutionStep — a FAILED step -> QUEUED (re-attempt). Two prechecks, in order:
+ *  1. RPH-EXE-002 / §35.1 (DWP-02, §19 L3-5): a retry RE-OPENS the attempt cycle, so a SUPERSEDED/terminal plan must
+ *     reject it — not only StartExecutionStep. Mirrors the start precheck so both reject a non-ACTIVE plan identically.
+ *  2. RPH-EXE-008 (DWP-04): the ready-made kernel `retryDecision` caps retries at the plan's RetryPolicy maxAttempts
+ *     (MAX-TOTAL-ATTEMPTS, 1-based). attemptsMade = count(ExecutionStepStarted) (NOT +Retried). On exhaustion the
+ *     retry is REJECTED (there is no canonical RPH_RETRY_EXHAUSTED code — the cap is an invariant, so
+ *     RPH_INVARIANT_VIOLATION) surfacing the permitted control actions {CHANGE_TACTIC, REPLAN_EXECUTION, ESCALATE,
+ *     REJECT, ABANDON}. At maxAttempts=3: 2 retries proceed (opening attempts 2,3), the retry at attemptsMade=3 is
+ *     refused. Exec ≠ assurance (INV-5): the retry moves only stepState.
+ */
 export const retryExecutionStep: CommandHandler = (ctx, command) => {
 	const p = command.payload as { stepId: string };
 	return advanceStep(ctx, command, {
 		stepId: p.stepId,
 		target: 'QUEUED',
-		eventType: 'ExecutionStepRetried'
+		eventType: 'ExecutionStepRetried',
+		precheck: (step, plan) => {
+			if (plan.status !== 'ACTIVE')
+				return reject(
+					command,
+					'RPH_ILLEGAL_STATE_TRANSITION',
+					`Cannot retry a step: plan ${command.targetAggregateId} is not ACTIVE (${String(plan.status)}) — a superseded/terminal plan creates no new attempts (RPH-EXE-002).`
+				);
+			const attemptsMade = attemptsMadeForStep(ctx, command.targetAggregateId, p.stepId);
+			const maxAttempts = retryCapFor(plan);
+			const decision = retryDecision({
+				attemptsMade,
+				maxAttempts,
+				lastAttemptFailed: String(step.stepState) === 'FAILED'
+			});
+			if (decision.mustSelectAlternateAction)
+				return reject(
+					command,
+					'RPH_INVARIANT_VIOLATION',
+					`Cannot retry step ${p.stepId}: the retry cap (${maxAttempts} total attempts) is reached after ${attemptsMade} attempt(s) — the controller must not retry again (RPH-EXE-008); select an alternate control action: ${decision.permittedControlActions.join(', ')}.`
+				);
+			return null;
+		}
 	});
 };

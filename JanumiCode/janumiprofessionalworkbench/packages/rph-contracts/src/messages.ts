@@ -444,6 +444,17 @@ export const CancelExecutionPlanPayloadSchema = z.strictObject({
 	reason: z.string()
 });
 export type CancelExecutionPlanPayload = z.infer<typeof CancelExecutionPlanPayloadSchema>;
+export const CompleteExecutionPlanPayloadSchema = z.strictObject({});
+export type CompleteExecutionPlanPayload = z.infer<typeof CompleteExecutionPlanPayloadSchema>;
+export const FailExecutionPlanPayloadSchema = z.strictObject({
+	failureReason: z.string(),
+	failureClass: z.string().optional()
+});
+export type FailExecutionPlanPayload = z.infer<typeof FailExecutionPlanPayloadSchema>;
+export const SupersedeExecutionPlanPayloadSchema = z.strictObject({
+	supersedingExecutionPlanId: z.string()
+});
+export type SupersedeExecutionPlanPayload = z.infer<typeof SupersedeExecutionPlanPayloadSchema>;
 export const RevokeDecisionPayloadSchema = z.strictObject({
 	revocationRationale: z.string()
 });
@@ -1069,6 +1080,16 @@ export const ExecutionPlanSupersededPayloadSchema = z.strictObject({
 	status: ExecutionPlanStatusSchema
 });
 export type ExecutionPlanSupersededPayload = z.infer<typeof ExecutionPlanSupersededPayloadSchema>;
+export const ExecutionPlanCompletedPayloadSchema = z.strictObject({
+	status: ExecutionPlanStatusSchema
+});
+export type ExecutionPlanCompletedPayload = z.infer<typeof ExecutionPlanCompletedPayloadSchema>;
+export const ExecutionPlanFailedPayloadSchema = z.strictObject({
+	status: ExecutionPlanStatusSchema,
+	failureReason: z.string(),
+	failureClass: z.string().optional()
+});
+export type ExecutionPlanFailedPayload = z.infer<typeof ExecutionPlanFailedPayloadSchema>;
 export const ExecutionStepCancelledPayloadSchema = z.strictObject({
 	stepId: z.string(),
 	stepState: StepStateSchema
@@ -1858,6 +1879,24 @@ export const COMMANDS = {
 		emitsEvent: 'ExecutionTerminated',
 		firstSlice: false
 	},
+	CompleteExecutionPlan: {
+		payload: CompleteExecutionPlanPayloadSchema,
+		targetAggregateType: 'EXECUTION_PLAN',
+		emitsEvent: 'ExecutionPlanCompleted',
+		firstSlice: false
+	},
+	FailExecutionPlan: {
+		payload: FailExecutionPlanPayloadSchema,
+		targetAggregateType: 'EXECUTION_PLAN',
+		emitsEvent: 'ExecutionPlanFailed',
+		firstSlice: false
+	},
+	SupersedeExecutionPlan: {
+		payload: SupersedeExecutionPlanPayloadSchema,
+		targetAggregateType: 'EXECUTION_PLAN',
+		emitsEvent: 'ExecutionPlanSuperseded',
+		firstSlice: false
+	},
 	RevokeDecision: {
 		payload: RevokeDecisionPayloadSchema,
 		targetAggregateType: 'Decision',
@@ -2159,6 +2198,14 @@ export const EVENTS = {
 	},
 	ExecutionPlanSuperseded: {
 		payload: ExecutionPlanSupersededPayloadSchema,
+		aggregateType: 'ExecutionPlan'
+	},
+	ExecutionPlanCompleted: {
+		payload: ExecutionPlanCompletedPayloadSchema,
+		aggregateType: 'ExecutionPlan'
+	},
+	ExecutionPlanFailed: {
+		payload: ExecutionPlanFailedPayloadSchema,
 		aggregateType: 'ExecutionPlan'
 	},
 	ExecutionStepCancelled: {

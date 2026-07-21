@@ -77,6 +77,11 @@ describe('validate', () => {
 		// then +1 ExecutionBoundary enum (JAN-PRPWA-DS-001 STD-2 / DWP-02) — the INTERNAL/DELEGATED_EXTERNAL boundary
 		// annotation on PwuType. The BoundaryContract sub-type (STD-3) is a helper, NOT a registry entry (like
 		// RecompositionConflict above); the two new PwuType fields + two command-payload fields add no schemas. (+1 → 309.)
-		expect(buildContractRegistry().ids()).toHaveLength(309);
+		// then +4 for JAN-EXECPLAN-DR-002 DWP-01 (plan-terminal lifecycle, Tier 3 / 3A): +2 commands
+		// (CompleteExecutionPlan, FailExecutionPlan) + +2 events (ExecutionPlanCompleted, ExecutionPlanFailed) —
+		// AUTHORED under the standing 2026-07-16 execution grant (states + §20.1 condition ratified; shapes not). (+4 → 313.)
+		// then +1 for DWP-02 (supersession): +1 command SupersedeExecutionPlan (REUSES the existing
+		// ExecutionPlanSuperseded event — no new event). (+1 → 314.)
+		expect(buildContractRegistry().ids()).toHaveLength(314);
 	});
 });

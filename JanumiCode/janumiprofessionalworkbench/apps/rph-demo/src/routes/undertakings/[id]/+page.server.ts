@@ -18,6 +18,8 @@ import {
 import {
 	buildApplicablePolicies,
 	buildAssuranceView,
+	type ExecutionAttemptView,
+	executionAttempts,
 	type ExecutionPlanInput,
 	plansForPwus,
 	rebuildProjection,
@@ -201,6 +203,17 @@ export const load: PageServerLoad = ({ params }) => {
 	}));
 	const plans = plansForPwus(planRows, pwuIdSet);
 
+	// Execution Attempt history (JAN-EXECPLAN Tier-3 DWP-03/05): fold the Execution* event stream into §10.4 attempt
+	// records, scoped to THIS undertaking's plans, keyed by step for the per-step history render. stepTypeById (from
+	// the shaped plans — the events don't carry stepType) drives the AI-no-binding coherence advisory.
+	const stepTypeById: Record<string, string> = {};
+	for (const pl of plans) for (const s of pl.steps) stepTypeById[s.id] = s.stepType;
+	const scopedPlanIds = new Set(plans.map((pl) => pl.id));
+	const attemptsByStepId: Record<string, ExecutionAttemptView[]> = {};
+	for (const a of executionAttempts(engine.readAllEvents(), stepTypeById)) {
+		if (scopedPlanIds.has(a.executionPlanId)) (attemptsByStepId[a.stepId] ??= []).push(a);
+	}
+
 	// Tier-2 execution SEQUENCE (JAN-EXECPLAN DWP-04, fork C): arrange the Undertaking's PWU INSTANCES by their TYPES'
 	// hand-off dependency (reuse buildPwaExport — version-scoped to the bound (pwaId, pwaVersion) — then layerHandoff),
 	// plus a SINGLE-AXIS coherence advisory (consumer began before any producer instance SUCCEEDED). The type→instance
@@ -239,6 +252,7 @@ export const load: PageServerLoad = ({ params }) => {
 		rollup,
 		pwuList,
 		plans,
+		attemptsByStepId,
 		sequence,
 		assessments,
 		applicablePolicies,
@@ -483,6 +497,20 @@ export const actions: Actions = {
 		const f = await request.formData();
 		return dispatchResult('CancelExecutionPlan', str(f, 'planId'), {
 			reason: str(f, 'reason') || 'Operator cancelled the plan.'
+		});
+	},
+	// JAN-EXECPLAN Tier-3 DWP-05 — the plan-terminal actions (DWP-01). CompleteExecutionPlan's engine guard is the
+	// SUCCESS allow-list (every step SUCCEEDED-or-SKIPPED, non-empty); a rejection surfaces verbatim. Exec ≠ assurance:
+	// a COMPLETED plan is an EXECUTION-axis fact, never assurance/green (INV-5 — the UI renders it as a plain status).
+	// (SupersedeExecutionPlan needs a successor plan id and is domain-tested; it is not surfaced as a demo button.)
+	completePlan: async ({ request }) => {
+		const f = await request.formData();
+		return dispatchResult('CompleteExecutionPlan', str(f, 'planId'), {});
+	},
+	failPlan: async ({ request }) => {
+		const f = await request.formData();
+		return dispatchResult('FailExecutionPlan', str(f, 'planId'), {
+			failureReason: str(f, 'reason') || 'Operator failed the plan.'
 		});
 	},
 	// Complete a RUNNING step. Default: a HUMAN, no-output completion (RPH-EXE-006) the floor gate admits (no
