@@ -309,8 +309,8 @@ rollback_and_recovery: ["Remove fixtures"]
 risks: ["Live-agent nondeterminism — prefer the deterministic mock path for CI; live run as a manual calibration"]
 open_decisions: ["Projected-ASPLE oracle format (structured expected-decomposition vs assertion set)"]
 exit_criteria: ["Fixtures A + B green on the mock path; projected oracle committed"]
-delivery_state: NOT_STARTED
-conformance_state: UNASSESSED
+delivery_state: DELIVERED  # rph-projections/calibration.ts: PROJECTED_APLE_ORACLE (platform-peeled: Governed Stream/Historian/Loop Detector/Backpressure/Sandbox/Model-Diversity stripped; content = 6 ASPLE phases + AFU leaf + CACA review) + scoreAgainstOracle (calibrate-peel-diff, reuses the shared leafKind — F-13). Fixture A: conformant scores clean; INV-3 platform OMISSION = pass; platform-authored-as-PWU flagged; missing-area = gap; decomposed-AFU flagged. Fixture B (bloodwork trio): small-office DELEGATED analysis, integrated-hospital INTERNAL non-leaf, referral single DELEGATED leaf — each asserts leafKind + delegatedAssurance (ties DWP-06). Gate: check-types 21/21, lint 0, boundary 0, rph-projections 73 (+8 calibration).
+conformance_state: CONFORMANT  # Oracle-format decision RULED → assertion-set (required work-area kinds + expected-leaf kinds + forbidden-platform kinds), robust to mock-plan wording vs a brittle full expected-tree. Deterministic CI path via literal graphs; the SAME scorer is reusable against a live-agent authoring run (the EP-TST-8 prompt-regression evaluation set for DWP-01/DWP-04) — that live path is MANUAL (agent nondeterminism), disclosed here (no silent cap). INV-3 discrimination (platform peeled, omission = pass) is proven both positively and negatively.
 ```
 
 ## 10. Data and persistence changes

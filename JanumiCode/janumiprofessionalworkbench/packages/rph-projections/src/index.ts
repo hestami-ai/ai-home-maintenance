@@ -10,6 +10,7 @@ export * from './graph-view.js';
 export * from './pwa-graph.js';
 export * from './pwa-graph-report.js';
 export * from './leaf.js';
+export * from './calibration.js';
 export * from './pwu-behavior.js';
 export * from './traceability-view.js';
 export * from './compatibility-view.js';
