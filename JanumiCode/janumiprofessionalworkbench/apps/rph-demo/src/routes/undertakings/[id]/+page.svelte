@@ -34,6 +34,35 @@
 		'baselines',
 		'traceability'
 	] as const;
+
+	// Execution plane (JAN-EXECPLAN DWP-02): group the undertaking-scoped Execution Plans by the PWU Instance they
+	// perform, and title each group from the PWU list. The plans are already scoped + shaped server-side (F-6 fix).
+	const pwuTitleById = $derived(new Map(data.pwuList.map((p) => [p.id, p.title])));
+	const plansByPwu = $derived.by(() => {
+		const groups = new Map<string, typeof data.plans>();
+		for (const pl of data.plans) {
+			const g = groups.get(pl.workUnitId) ?? [];
+			g.push(pl);
+			groups.set(pl.workUnitId, g);
+		}
+		return [...groups.entries()].map(([pwuId, plans]) => ({
+			pwuId,
+			title: pwuTitleById.get(pwuId) ?? pwuId,
+			plans
+		}));
+	});
+	// DWP-03: the step affordance → form-action + label. Keyed to the read-model's advanceCommands (the FOUR
+	// command-backed transitions ONLY — never the wider stepState machine topology, F-11). A stepState with no
+	// command-backed transition yields no entry here and renders no button.
+	const STEP_ACTION = {
+		start: 'startStep',
+		complete: 'completeStep',
+		fail: 'failStep',
+		retry: 'retryStep'
+	} as const;
+	const STEP_LABEL = { start: 'Start', complete: 'Complete', fail: 'Fail', retry: 'Retry' } as const;
+	// DWP-04: which instances a hand-off advisory flags (display-only highlight; the advisory gates nothing).
+	const advisoryConsumerIds = $derived(new Set(data.sequence.advisories.map((a) => a.consumerInstanceId)));
 </script>
 
 <svelte:head><title>{data.undertaking.name} — Workbench</title></svelte:head>
@@ -176,17 +205,135 @@
 			It is not the Professional Work Graph, and it is not named a "workflow" here except for temporal execution
 			machinery.
 		</p>
-		<table>
-			<thead><tr><th>Execution Plan</th><th>Performs PWU</th><th>Status</th><th>Steps</th></tr></thead>
-			<tbody>
-				{#each data.plans as pl (pl.id)}<tr
-						><td class="mono">{pl.id.slice(0, 14)}…</td><td class="mono"
-							>{pl.workUnitId.slice(0, 14)}…</td
-						><td><span class="tag">{pl.status}</span></td><td>{pl.steps}</td></tr
-					>{/each}
-				{#if !data.plans.length}<tr><td colspan="4" class="none">No execution plans.</td></tr>{/if}
-			</tbody>
-		</table>
+		<p class="hint dim" data-testid="exec-nocomplete">
+			Plans are driven step-by-step (Start · Complete · Fail · Retry) and cancelled as a whole. The domain has
+			no plan-COMPLETION command yet, so a fully-succeeded plan stays ACTIVE — surfaced honestly, not faked
+			(JAN-EXECPLAN §15 / F-9).
+		</p>
+		{#if form?.error}<p class="err" role="alert" data-testid="exec-error">{form.error}</p>{/if}
+		{#if !plansByPwu.length}
+			<p class="none" data-testid="exec-empty">No execution plans for this undertaking.</p>
+		{/if}
+		{#each plansByPwu as group (group.pwuId)}
+			<div class="planpwu" data-testid="exec-pwu-group">
+				<h3 class="pwuhead">
+					{group.title} <span class="mono dim">{group.pwuId.slice(0, 14)}…</span>
+				</h3>
+				{#each group.plans as pl (pl.id)}
+					<div class="plancard" data-testid="exec-plan">
+						<div class="planhead">
+							<span class="mono">{pl.id.slice(0, 14)}…</span>
+							<span class="tag">{pl.status}</span>
+							{#if pl.planVersion !== undefined}<span class="dim">v{pl.planVersion}</span>{/if}
+							{#if pl.status !== 'CANCELLED'}
+								<form method="POST" action="?/cancelPlan" use:enhance class="inlineform">
+									<input type="hidden" name="planId" value={pl.id} />
+									<button class="mini" data-testid="plan-cancel">Cancel plan</button>
+								</form>
+							{/if}
+						</div>
+						{#if !pl.steps.length}<p class="none">No steps.</p>{/if}
+						<ol class="steps">
+							{#each pl.steps as s (s.id)}
+								<li class="step" data-testid="exec-step">
+									<span class="st {s.tone}" data-testid="step-state">{s.stepState}</span>
+									<span class="stype">{s.stepType}</span>
+									<span class="spurpose">{s.purpose}</span>
+									{#if s.runtimeBindingId}<span class="dim mono">rb {s.runtimeBindingId.slice(0, 10)}…</span
+										>{/if}
+									<span class="stepacts">
+										{#each s.advanceCommands as cmd (cmd)}
+											{#if cmd === 'complete'}
+												<!-- Complete names its produced output + provenance. Empty + non-AI = a HUMAN no-output
+												     completion the floor gate admits; an AI-produced output whose floor is unsatisfied is
+												     REJECTED by the §8.4 gate (surfaced verbatim above). -->
+												<form
+													method="POST"
+													action="?/completeStep"
+													use:enhance
+													class="inlineform completeform"
+												>
+													<input type="hidden" name="planId" value={pl.id} />
+													<input type="hidden" name="stepId" value={s.id} />
+													<input
+														name="outputArtifactId"
+														placeholder="output id"
+														class="tinyinput"
+														data-testid="complete-output"
+													/>
+													<label class="ailbl"
+														><input
+															type="checkbox"
+															name="aiProduced"
+															value="true"
+															data-testid="complete-ai"
+														/> AI</label
+													>
+													<button class="mini" data-testid="step-action-complete">Complete</button>
+												</form>
+											{:else}
+												<form method="POST" action="?/{STEP_ACTION[cmd]}" use:enhance class="inlineform">
+													<input type="hidden" name="planId" value={pl.id} />
+													<input type="hidden" name="stepId" value={s.id} />
+													<button class="mini" data-testid="step-action-{cmd}">{STEP_LABEL[cmd]}</button>
+												</form>
+											{/if}
+										{/each}
+										{#if s.belowQueued}
+											<span class="dim" data-testid="step-belowqueued"
+												>no advance command in the domain (below QUEUED)</span
+											>
+										{/if}
+									</span>
+								</li>
+							{/each}
+						</ol>
+					</div>
+				{/each}
+			</div>
+		{/each}
+
+		<!-- DWP-04 (Tier 2, fork C): the Undertaking execution SEQUENCE + the layerHandoff advisory. Instances are
+		     arranged by their TYPES' hand-off DEPENDENCY (a partial order — a shared layer is concurrent), NOT an
+		     execution schedule (§9.1). The advisory is a coherence check that gates NOTHING. -->
+		<h3 class="t2head">Execution sequence — hand-off dependency</h3>
+		<p class="hint dim" data-testid="seq-caveat">
+			Instances arranged by their PWU Types' hand-off dependency — a partial order (a shared layer runs
+			independently), NOT an execution schedule (§9.1). The advisory below is a coherence surface; it gates
+			nothing (fork C).
+		</p>
+		{#each data.sequence.layers as layer (layer.index)}
+			<div class="seqlayer" data-testid="seq-layer">
+				<span class="dim seqlabel">dep {layer.index + 1}</span>
+				{#each layer.instances as si (si.id)}
+					<span
+						class="seqinst"
+						class:flagged={advisoryConsumerIds.has(si.id)}
+						data-testid="seq-instance">{si.title} <span class="tag">{si.executionState || '—'}</span></span
+					>
+				{/each}
+			</div>
+		{/each}
+		{#if data.sequence.unplaced.length}
+			<div class="seqlayer">
+				<span class="dim seqlabel">unplaced</span>
+				{#each data.sequence.unplaced as si (si.id)}
+					<span class="seqinst" data-testid="seq-unplaced"
+						>{si.title} <span class="tag">{si.executionState || '—'}</span>
+						<span class="dim">({si.reason})</span></span
+					>
+				{/each}
+			</div>
+		{/if}
+		{#if data.sequence.advisories.length}
+			<div class="advisories" data-testid="seq-advisories">
+				{#each data.sequence.advisories as a (a.consumerInstanceId + a.producerTypeId + a.artifact)}
+					<p class="advisory" data-testid="seq-advisory">⚠ {a.consumerTitle}: {a.detail}</p>
+				{/each}
+			</div>
+		{:else}
+			<p class="dim" data-testid="seq-noadvisory">No hand-off coherence advisories.</p>
+		{/if}
 	</div>
 {:else if tab === 'assurance'}
 	<div class="panel">
@@ -539,6 +686,149 @@
 	.none {
 		color: var(--outline);
 		text-align: center;
+	}
+	/* Execution plane (DWP-02): per-PWU plan → steps panel. */
+	.planpwu {
+		margin: 10px 0 16px;
+	}
+	.pwuhead {
+		font-size: 13px;
+		margin: 0 0 6px;
+		display: flex;
+		gap: 8px;
+		align-items: baseline;
+	}
+	.plancard {
+		border: 1px solid var(--outline-faint);
+		border-radius: 8px;
+		padding: 8px 10px;
+		margin: 6px 0;
+		background: var(--surface-low);
+	}
+	.planhead {
+		display: flex;
+		gap: 8px;
+		align-items: center;
+		margin-bottom: 6px;
+	}
+	.dim {
+		color: var(--outline);
+		font-size: 11px;
+	}
+	ol.steps {
+		list-style: none;
+		margin: 0;
+		padding: 0;
+		display: flex;
+		flex-direction: column;
+		gap: 4px;
+	}
+	.step {
+		display: flex;
+		gap: 8px;
+		align-items: center;
+		font-size: 12px;
+		flex-wrap: wrap;
+	}
+	.stype {
+		color: var(--on-variant);
+		font-weight: 600;
+	}
+	.spurpose {
+		color: var(--on);
+	}
+	/* stepState tone → colour. Every StepState maps to a defined tone in rph-projections (state-transition totality,
+	   EP-TST-5); these five classes cover all five tones — no stepState renders without a colour. */
+	.st {
+		font-size: 10px;
+		font-weight: 700;
+		padding: 2px 7px;
+		border-radius: 4px;
+		border: 1px solid transparent;
+		white-space: nowrap;
+	}
+	.st.positive {
+		color: var(--tertiary);
+		border-color: var(--tertiary);
+	}
+	.st.active {
+		color: var(--indigo);
+		border-color: var(--indigo);
+	}
+	.st.negative {
+		color: var(--error);
+		border-color: var(--error);
+	}
+	.st.pending {
+		color: var(--amber);
+		border-color: var(--amber);
+	}
+	.st.muted {
+		color: var(--outline);
+		border-color: var(--outline-faint);
+	}
+	.stepacts {
+		display: inline-flex;
+		gap: 6px;
+		align-items: center;
+		flex-wrap: wrap;
+		margin-left: auto;
+	}
+	.inlineform {
+		margin: 0;
+		display: inline;
+	}
+	.completeform {
+		display: inline-flex;
+		gap: 4px;
+		align-items: center;
+	}
+	.tinyinput {
+		width: 96px;
+		font-size: 10px;
+		padding: 2px 5px;
+	}
+	.ailbl {
+		font-size: 10px;
+		color: var(--outline);
+		display: inline-flex;
+		gap: 2px;
+		align-items: center;
+	}
+	/* Tier-2 execution sequence (DWP-04): dependency layers + advisories. */
+	.t2head {
+		margin-top: 18px;
+	}
+	.seqlayer {
+		display: flex;
+		gap: 8px;
+		align-items: center;
+		flex-wrap: wrap;
+		padding: 4px 0;
+	}
+	.seqlabel {
+		min-width: 64px;
+		font-size: 11px;
+	}
+	.seqinst {
+		display: inline-flex;
+		gap: 6px;
+		align-items: center;
+		font-size: 12px;
+		border: 1px solid var(--outline-faint);
+		border-radius: 6px;
+		padding: 3px 8px;
+	}
+	.seqinst.flagged {
+		border-color: var(--amber);
+	}
+	.advisories {
+		margin-top: 8px;
+	}
+	.advisory {
+		font-size: 12px;
+		color: var(--amber);
+		margin: 3px 0;
 	}
 	.acts {
 		display: flex;

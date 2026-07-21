@@ -248,14 +248,20 @@ export function mintUiId(prefix: string): string {
 
 const arr = (v: unknown): string[] => (Array.isArray(v) ? (v as string[]) : []);
 
-/** The current PWA's PWU-Type graph as the canonical export a judge reads (engine truth, not the render model). */
+/** The current PWA's PWU-Type graph as the canonical export a judge reads (engine truth, not the render model).
+ *  `pwaVersion` (optional) scopes the node set to ONE version of the PWA: `listPwuTypes` filters by pwaId only, but a
+ *  PWU_TYPE binds to a VERSIONED PWA (RPH-CON-009), so a republished PWA has two versions' types under one pwaId —
+ *  passing the bound pwaVersion keeps the graph to that version (JAN-EXECPLAN §19 L3-C2). Omitted ⇒ all versions. */
 export function buildPwaExport(
 	pwaId: string,
-	engine: EngineHandle = getEngine()
+	engine: EngineHandle = getEngine(),
+	pwaVersion?: string
 ): PwaGraphExport | undefined {
 	const pwa = getObject(engine, pwaId);
 	if (!pwa) return undefined;
-	const nodes = listPwuTypes(engine, pwaId).map((t) => ({
+	const nodes = listPwuTypes(engine, pwaId)
+		.filter((t) => pwaVersion === undefined || String((t.state.pwaVersion ?? '') as string) === pwaVersion)
+		.map((t) => ({
 		id: t.id,
 		name: String((t.state.name ?? t.id) as string),
 		pwuKind: String((t.state.pwuKind ?? '') as string),

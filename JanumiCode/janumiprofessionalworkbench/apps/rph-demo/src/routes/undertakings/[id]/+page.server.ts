@@ -18,10 +18,20 @@ import {
 import {
 	buildApplicablePolicies,
 	buildAssuranceView,
+	type ExecutionPlanInput,
+	plansForPwus,
 	rebuildProjection,
+	type SequenceInstance,
+	sequenceView,
 	traceabilityProjector
 } from '@janumipwb/rph-projections';
-import { dispatch, getEngine, getRegisteredIntent, mintUiId } from '$lib/server/workbench';
+import {
+	buildPwaExport,
+	dispatch,
+	getEngine,
+	getRegisteredIntent,
+	mintUiId
+} from '$lib/server/workbench';
 import type { Actions, PageServerLoad } from './$types';
 
 export const load: PageServerLoad = ({ params }) => {
@@ -166,12 +176,54 @@ export const load: PageServerLoad = ({ params }) => {
 		status: String((b.state.status ?? '') as string),
 		items: Array.isArray(b.state.itemObjectVersions) ? b.state.itemObjectVersions.length : 0
 	}));
-	const plans = listExecutionPlans(engine).map((pl) => ({
+	// Execution plane (JAN-EXECPLAN DWP-01/02): shape the EXECUTION_PLAN aggregates into per-PWU views and SCOPE them
+	// to THIS Undertaking's PWUs — fixing the F-6 bug (listExecutionPlans is engine-GLOBAL, unlike graph/pwuList/trace).
+	// pwuIdSet is the two-hop scope: listPwus(engine, params.id) → the PWU ids → plan.workUnitId ∈ that set (a plan
+	// carries no undertakingId — F-1). The pure view (rph-projections) derives each step's tone + command-backed
+	// affordances; this load() only reads.
+	const asRec = (v: unknown): Record<string, unknown> =>
+		v && typeof v === 'object' ? (v as Record<string, unknown>) : {};
+	const planRows: ExecutionPlanInput[] = listExecutionPlans(engine).map((pl) => ({
 		id: pl.id,
 		workUnitId: String((pl.state.workUnitId ?? '') as string),
 		status: String((pl.state.status ?? '') as string),
-		steps: Array.isArray(pl.state.steps) ? pl.state.steps.length : 0
+		...(typeof pl.state.planVersion === 'number' ? { planVersion: pl.state.planVersion } : {}),
+		steps: (Array.isArray(pl.state.steps) ? pl.state.steps : []).map((raw) => {
+			const s = asRec(raw);
+			return {
+				id: String((s.id ?? '') as string),
+				stepType: String((s.stepType ?? '') as string),
+				purpose: String((s.purpose ?? '') as string),
+				stepState: String((s.stepState ?? '') as string),
+				...(s.runtimeBindingId ? { runtimeBindingId: String(s.runtimeBindingId as string) } : {})
+			};
+		})
 	}));
+	const plans = plansForPwus(planRows, pwuIdSet);
+
+	// Tier-2 execution SEQUENCE (JAN-EXECPLAN DWP-04, fork C): arrange the Undertaking's PWU INSTANCES by their TYPES'
+	// hand-off dependency (reuse buildPwaExport — version-scoped to the bound (pwaId, pwaVersion) — then layerHandoff),
+	// plus a SINGLE-AXIS coherence advisory (consumer began before any producer instance SUCCEEDED). The type→instance
+	// join is done HERE in load() where the raw pwuTypeId lives (the serialized pwuList drops it). ADVISORY ONLY — the
+	// value is display-only and never flows into a command dispatch (fork C; it gates nothing).
+	const boundVersion = u.pwaVersion ? String(u.pwaVersion as string) : undefined;
+	const boundTypeGraph = buildPwaExport(String(u.pwaId as string), engine, boundVersion);
+	const seqInstances: SequenceInstance[] = pwus.map((p) => {
+		const typeId = p.state.pwuTypeId ? String(p.state.pwuTypeId as string) : '';
+		return {
+			id: p.id,
+			title: String((p.state.title ?? p.id) as string),
+			executionState: String((p.state.executionState ?? '') as string),
+			...(typeId ? { pwuTypeId: typeId } : {})
+		};
+	});
+	const sequence = boundTypeGraph
+		? sequenceView(boundTypeGraph, seqInstances)
+		: {
+				layers: [],
+				unplaced: seqInstances.map((i) => ({ ...i, reason: 'off-graph' as const })),
+				advisories: []
+			};
 
 	return {
 		undertaking: {
@@ -187,6 +239,7 @@ export const load: PageServerLoad = ({ params }) => {
 		rollup,
 		pwuList,
 		plans,
+		sequence,
 		assessments,
 		applicablePolicies,
 		observations,
@@ -260,6 +313,20 @@ function runSteps(steps: Step[]): string | null {
 
 async function pwuIdFrom(request: Request): Promise<string> {
 	return String(((await request.formData()).get('pwuId') ?? '') as string);
+}
+
+const str = (f: FormData, k: string): string => String((f.get(k) ?? '') as string).trim();
+
+/** Dispatch ONE existing domain command and map the engine result to a form-action result. On rejection the RPH_*
+ *  code + message surface VERBATIM (JAN-EXECPLAN DWP-03): the UI shows the engine's reason and never fabricates a
+ *  success. The engine guards (plan-ACTIVE, the §8.4 floor gate on complete, one-active-plan) stay authoritative. */
+function dispatchResult(commandType: string, aggId: string, payload: unknown) {
+	const r = dispatch(commandType, 'EXECUTION_PLAN', aggId, payload);
+	if (r.status !== 'ACCEPTED' && r.status !== 'DUPLICATE')
+		return fail(400, {
+			error: `${commandType} rejected — ${r.error?.code ?? r.status}: ${r.error?.message ?? ''}`
+		});
+	return { advanced: commandType };
 }
 
 export const actions: Actions = {
@@ -387,6 +454,63 @@ export const actions: Actions = {
 		]);
 		if (err) return fail(400, { error: `Execution failed: ${err}` });
 		return { advanced: 'executed' };
+	},
+
+	// JAN-EXECPLAN DWP-03 — handler-backed step actions. Each dispatches ONE existing command from the EXPLICIT
+	// allowlist (Start/Complete/Fail/Retry step + Cancel plan). The UI derives WHICH button to show from the
+	// read-model's advanceCommands (the four command-backed transitions ONLY — never the wider stepState machine
+	// topology, F-11); these actions only DISPATCH. None sets executionState — that is still the gated ChangePwuState
+	// (INV-5); these move stepState / plan status, and the floor gate on complete stays authoritative.
+	startStep: async ({ request }) => {
+		const f = await request.formData();
+		return dispatchResult('StartExecutionStep', str(f, 'planId'), { stepId: str(f, 'stepId') });
+	},
+	failStep: async ({ request }) => {
+		const f = await request.formData();
+		return dispatchResult('FailExecutionStep', str(f, 'planId'), {
+			stepId: str(f, 'stepId'),
+			failureReason: str(f, 'reason') || 'Operator marked the step failed.'
+		});
+	},
+	retryStep: async ({ request }) => {
+		const f = await request.formData();
+		return dispatchResult('RetryExecutionStep', str(f, 'planId'), {
+			stepId: str(f, 'stepId'),
+			retryReason: str(f, 'reason') || 'Operator retry.'
+		});
+	},
+	cancelPlan: async ({ request }) => {
+		const f = await request.formData();
+		return dispatchResult('CancelExecutionPlan', str(f, 'planId'), {
+			reason: str(f, 'reason') || 'Operator cancelled the plan.'
+		});
+	},
+	// Complete a RUNNING step. Default: a HUMAN, no-output completion (RPH-EXE-006) the floor gate admits (no
+	// AI-produced result to assess), mirroring beginExecute. Optional `outputArtifactId` + `aiProduced` let a caller
+	// name a produced output and its provenance — an AGENT/MODEL producer makes the result AI-produced, so its de
+	// minimis floor MUST be SATISFIED before the step may SUCCEED (§8.4 floor gate; floor-gate.ts signal-0). An
+	// AI-produced output whose floor is unsatisfied is REJECTED (RPH_INVARIANT_VIOLATION); a nonexistent output id is
+	// REJECTED (RPH_VALIDATION_SEMANTIC_FAILED) — both surfaced verbatim (the gate is demonstrated, not assumed).
+	completeStep: async ({ request }) => {
+		const f = await request.formData();
+		const outputArtifactId = str(f, 'outputArtifactId');
+		const executionProvenance =
+			str(f, 'aiProduced') === 'true'
+				? {
+						originType: 'MODEL_GENERATION',
+						executedBy: { actorId: 'agent-x', actorType: 'AGENT', displayName: 'Authoring Agent' }
+					}
+				: { executedBy: { actorId: 'ui-user', actorType: 'HUMAN', displayName: 'Workbench User' } };
+		return dispatchResult('CompleteExecutionStep', str(f, 'planId'), {
+			executionStepId: str(f, 'stepId'),
+			executionAttemptId: mintUiId('attempt'),
+			resultStatus: 'SUCCEEDED',
+			outputArtifactIds: outputArtifactId ? [outputArtifactId] : [],
+			proposedEvidenceIds: [],
+			detectedAssumptionIds: [],
+			structuredResult: {},
+			executionProvenance
+		});
 	},
 
 	// Earn assuranceState=SATISFIED with a REAL assessment. The controller may NOT declare a disposition: RPH-PWU-006
