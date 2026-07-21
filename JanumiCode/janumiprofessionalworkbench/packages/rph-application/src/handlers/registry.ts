@@ -25,12 +25,14 @@ import {
 	applyTacticalChange,
 	approveExecutionPlan,
 	cancelExecutionPlan,
+	cancelExecutionStep,
 	completeExecutionPlan,
 	completeExecutionStep,
 	failExecutionPlan,
 	failExecutionStep,
 	proposeExecutionPlan,
 	retryExecutionStep,
+	skipExecutionStep,
 	startExecutionStep,
 	supersedeExecutionPlan
 } from './execution.js';
@@ -127,6 +129,8 @@ export const HANDLERS: Readonly<Record<string, CommandHandler>> = {
 	CompleteExecutionStep: completeExecutionStep,
 	FailExecutionStep: failExecutionStep,
 	RetryExecutionStep: retryExecutionStep,
+	SkipExecutionStep: skipExecutionStep,
+	CancelExecutionStep: cancelExecutionStep,
 	RequestRuntimeBinding: requestRuntimeBinding,
 	AuthorizeRuntimeBinding: authorizeRuntimeBinding,
 	DenyRuntimeBinding: denyRuntimeBinding,

@@ -25,6 +25,12 @@ import type { PwaGraphExport } from './pwa-graph.js';
 /** The command-backed step transitions — the ONLY affordances the domain can drive (registry handlers). */
 export type StepAdvanceCommand = 'start' | 'complete' | 'fail' | 'retry';
 
+/** The command-backed CONTROL actions (off-happy-path, JAN-EXECPLAN-DR-003 DWP-02/03): skip (READY/QUEUED→SKIPPED)
+ *  and cancel (READY/QUEUED/RUNNING/WAITING→CANCELLED). Distinct from advanceCommands (forward progress) — a control
+ *  action WAIVES or ABORTS a step rather than progressing it. Kept as its own allowlist so the UI never invents a
+ *  skip/cancel button from the machine topology (the F-11 discipline); both commands now exist (DWP-02). */
+export type StepControlCommand = 'skip' | 'cancel';
+
 /** A semantic tone for a stepState — the UI maps tone → colour. Kept here (not in the component) so the
  *  every-stepState-has-a-defined-tone totality is unit-tested in the pure layer (EP-TST-5 state-transition). */
 export type StepTone = 'positive' | 'active' | 'negative' | 'pending' | 'muted';
@@ -57,6 +63,8 @@ export interface ExecutionStepView {
 	readonly tone: StepTone;
 	/** The command-backed affordances legal from this stepState (empty for the commandless/terminal states). */
 	readonly advanceCommands: readonly StepAdvanceCommand[];
+	/** The command-backed CONTROL actions legal from this stepState (skip/cancel — DWP-02/03; empty for terminal). */
+	readonly controlCommands: readonly StepControlCommand[];
 	/** Below the domain's driveable floor (NOT_READY/READY — the initial state, no advance command) — F-11. */
 	readonly belowQueued: boolean;
 }
@@ -84,6 +92,22 @@ const ADVANCE_BY_STEP_STATE: Record<StepState, readonly StepAdvanceCommand[]> = 
 	SUPERSEDED: []
 };
 
+// The command-backed CONTROL affordances per stepState (DWP-02/03). Derived from the MACHINE's skip/cancel arrows now
+// that both commands exist: skip is legal READY|QUEUED→SKIPPED; cancel is legal READY|QUEUED|RUNNING|WAITING→CANCELLED
+// (NOT from NOT_READY — the machine has no such arrow). Record<StepState, …> forces every value to be classified.
+const CONTROL_BY_STEP_STATE: Record<StepState, readonly StepControlCommand[]> = {
+	NOT_READY: [], // machine: →CANCELLED only from READY/QUEUED/RUNNING/WAITING; →SKIPPED only from READY/QUEUED
+	READY: ['skip', 'cancel'],
+	QUEUED: ['skip', 'cancel'],
+	RUNNING: ['cancel'], // a running step can be cancelled but not skipped (machine)
+	WAITING: ['cancel'],
+	SUCCEEDED: [],
+	FAILED: [], // terminal — no control action (retry is a progress affordance, not control)
+	SKIPPED: [],
+	CANCELLED: [],
+	SUPERSEDED: []
+};
+
 const TONE_BY_STEP_STATE: Record<StepState, StepTone> = {
 	NOT_READY: 'muted',
 	READY: 'pending',
@@ -101,6 +125,13 @@ const TONE_BY_STEP_STATE: Record<StepState, StepTone> = {
  *  (never fabricate an affordance). */
 export function advanceCommandsFor(stepState: string): readonly StepAdvanceCommand[] {
 	return ADVANCE_BY_STEP_STATE[stepState as StepState] ?? [];
+}
+
+/** The command-backed CONTROL actions (skip/cancel) legal from a stepState — the DWP-02/03 allowlist. Unknown/
+ *  off-contract states → [] (never fabricate). Plan-level gating (skip needs an ACTIVE plan; cancel is cleanup) is
+ *  applied by the caller — this is the per-stepState machine-legal set only. */
+export function controlCommandsFor(stepState: string): readonly StepControlCommand[] {
+	return CONTROL_BY_STEP_STATE[stepState as StepState] ?? [];
 }
 
 /** The semantic tone for a stepState — total over the 10 values; unknown → 'muted'. */
@@ -122,6 +153,7 @@ function stepView(s: ExecutionStepInput): ExecutionStepView {
 		stepState: s.stepState,
 		tone: stepStateTone(s.stepState),
 		advanceCommands: advanceCommandsFor(s.stepState),
+		controlCommands: controlCommandsFor(s.stepState),
 		belowQueued: isBelowQueued(s.stepState)
 	};
 	// Preserve the optional runtimeBindingId only when present (exactOptionalPropertyTypes-friendly).
@@ -138,6 +170,61 @@ export function executionPlanView(row: ExecutionPlanInput): ExecutionPlanView {
 		steps: row.steps.map(stepView)
 	};
 	return row.planVersion === undefined ? base : { ...base, planVersion: row.planVersion };
+}
+
+// ── Tier 3C-i: the linear start-gate read-model (JAN-EXECPLAN-DR-003 DWP-01, fork B→start-gate / fork F) ────────────
+//
+// Boundary (EP-CMT-4 — this crosses WORKFLOW-ENGINE SEQUENCING): a plan sequences itself by having exactly ONE step
+// be "startable" at a time — the first non-terminal step, provided every EARLIER step (array index in plan.steps) is
+// terminal-SUCCESS. Completing/skipping that step makes the next one startable, so a multi-step plan drives itself
+// with NO readying events, NO cascade, NO multi-event commit, NO `ordinal` field (array index IS the order — F-2: the
+// strict ExecutionStep schema has no `ordinal`; it rides in every plan event → replay-stable), NO machine change.
+//
+// Do not change: this is the DISPLAY affordance only. The AUTHORITY is the identical predecessor precheck on
+//   `startExecutionStep` (execution.ts) — the engine, not this derivation, forbids an out-of-order start (§19 L3-4c).
+//   "Terminal-success" is {SUCCEEDED, SKIPPED} — NOT the full terminal set: a FAILED/CANCELLED/SUPERSEDED predecessor
+//   BLOCKS the plan (no startable frontier), so the loop returns undefined rather than skipping past it.
+
+/** A step state that counts as a satisfied predecessor: SUCCEEDED (produced a result) or (authorized-)SKIPPED. This
+ *  is the terminal-SUCCESS subset, NOT the full terminal set — FAILED/CANCELLED/SUPERSEDED do not satisfy a successor. */
+const TERMINAL_SUCCESS_STEP_STATES = new Set<StepState>(['SUCCEEDED', 'SKIPPED']);
+
+/** The full terminal set of the ExecutionStep machine (transitions.data.ts terminalStates) — a step here can never
+ *  become the startable frontier; a terminal-NON-success one (FAILED/CANCELLED/SUPERSEDED) blocks the sequence. */
+const TERMINAL_STEP_STATES = new Set<StepState>([
+	'SUCCEEDED',
+	'FAILED',
+	'SKIPPED',
+	'CANCELLED',
+	'SUPERSEDED'
+]);
+
+/** Is this step state a satisfied predecessor (terminal-success: SUCCEEDED/SKIPPED)? */
+export function isTerminalSuccessStep(stepState: string): boolean {
+	return TERMINAL_SUCCESS_STEP_STATES.has(stepState as StepState);
+}
+
+/**
+ * The single step a plan may currently START — the linear start-gate (RPH-EXE-005 read linearly, Fork F). It is the
+ * FIRST step (array order) that is not terminal-success, IFF every earlier step is terminal-success AND the plan is
+ * ACTIVE; else `undefined`. A terminal-NON-success predecessor (FAILED/CANCELLED/SUPERSEDED) blocks the sequence
+ * (no startable frontier) rather than being skipped past. Pure/browser-safe; drives the UI Start affordance — the
+ * `startExecutionStep` gate is the backstop that actually forbids an out-of-order start.
+ *
+ * Note the frontier is returned regardless of whether it is itself QUEUED: a RUNNING/READY/NOT_READY frontier is
+ * still "the current step", but only a QUEUED one carries the `start` advance command — the UI shows Start only when
+ * BOTH hold (id === startable AND advanceCommands includes 'start'), so a RUNNING frontier shows Complete/Fail, and a
+ * READY/NOT_READY frontier shows the belowQueued note — never a Start that the engine would reject.
+ */
+export function startableStepId(plan: ExecutionPlanView): string | undefined {
+	if (plan.status !== 'ACTIVE') return undefined;
+	for (const s of plan.steps) {
+		if (TERMINAL_SUCCESS_STEP_STATES.has(s.stepState as StepState)) continue; // predecessor done — look past it
+		// The first non-terminal-success step: it is the startable frontier UNLESS it is terminal (a
+		// FAILED/CANCELLED/SUPERSEDED step blocks the plan — nothing after it can start until it is addressed).
+		return TERMINAL_STEP_STATES.has(s.stepState as StepState) ? undefined : s.id;
+	}
+	return undefined; // every step is terminal-success — the plan is completable, nothing left to start
 }
 
 /**

@@ -82,6 +82,10 @@ describe('validate', () => {
 		// AUTHORED under the standing 2026-07-16 execution grant (states + §20.1 condition ratified; shapes not). (+4 → 313.)
 		// then +1 for DWP-02 (supersession): +1 command SupersedeExecutionPlan (REUSES the existing
 		// ExecutionPlanSuperseded event — no new event). (+1 → 314.)
-		expect(buildContractRegistry().ids()).toHaveLength(314);
+		// then +2 for JAN-EXECPLAN-DR-003 3C-iii (step interpreter): +2 commands (SkipExecutionStep,
+		// CancelExecutionStep). Their events (ExecutionStepSkipped / ExecutionStepCancelled) PRE-EXISTED, and the
+		// optional `reason` field added to ExecutionStepCancelled is a field on an existing event — neither adds a
+		// registry id. (+2 → 316.)
+		expect(buildContractRegistry().ids()).toHaveLength(316);
 	});
 });

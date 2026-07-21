@@ -1,10 +1,13 @@
 import { describe, expect, it } from 'vitest';
 import {
 	advanceCommandsFor,
+	controlCommandsFor,
 	executionPlanView,
 	isBelowQueued,
+	isTerminalSuccessStep,
 	plansForPwus,
 	sequenceView,
+	startableStepId,
 	stepStateTone,
 	type ExecutionPlanInput,
 	type ExecutionStepInput,
@@ -97,6 +100,37 @@ describe('advanceCommandsFor — the F-11 command-backed allowlist (never the ma
 	});
 });
 
+describe('controlCommandsFor — the skip/cancel control allowlist (DWP-02/03; machine-legal set, EP-TST-5)', () => {
+	it('offers skip+cancel from READY/QUEUED (both →SKIPPED and →CANCELLED are legal there)', () => {
+		expect(controlCommandsFor('READY')).toEqual(['skip', 'cancel']);
+		expect(controlCommandsFor('QUEUED')).toEqual(['skip', 'cancel']);
+	});
+
+	it('offers cancel-only from RUNNING/WAITING (a running step cancels but does not skip — machine)', () => {
+		expect(controlCommandsFor('RUNNING')).toEqual(['cancel']);
+		expect(controlCommandsFor('WAITING')).toEqual(['cancel']);
+	});
+
+	it('offers NO control action from NOT_READY (machine has no →CANCELLED/→SKIPPED from there) or any terminal state', () => {
+		for (const s of ['NOT_READY', 'SUCCEEDED', 'FAILED', 'SKIPPED', 'CANCELLED', 'SUPERSEDED'])
+			expect(controlCommandsFor(s)).toEqual([]);
+	});
+
+	it('yields NO control action for an unknown / off-contract state (never fabricate)', () => {
+		expect(controlCommandsFor('NONSENSE')).toEqual([]);
+	});
+
+	it('is defined for every one of the 10 StepState values (state-transition totality, EP-TST-5)', () => {
+		for (const s of ALL_STEP_STATES) expect(Array.isArray(controlCommandsFor(s))).toBe(true);
+	});
+
+	it('is surfaced on the step view', () => {
+		const v = executionPlanView(plan('plan_1', 'pwu_a', [step('s1', 'QUEUED'), step('s2', 'RUNNING')]));
+		expect(v.steps[0]?.controlCommands).toEqual(['skip', 'cancel']); // QUEUED
+		expect(v.steps[1]?.controlCommands).toEqual(['cancel']); // RUNNING
+	});
+});
+
 describe('stepStateTone — every stepState maps to a defined tone (EP-TST-5 / DWP-02 colour totality)', () => {
 	it('classifies the load-bearing states', () => {
 		expect(stepStateTone('SUCCEEDED')).toBe('positive');
@@ -167,6 +201,58 @@ describe('plansForPwus — undertaking scoping (the F-6 global-list-bug regressi
 		const scoped = plansForPwus(rows, new Set(['pwu_in_scope', 'pwu_with_no_plan']));
 		expect(scoped).toHaveLength(1);
 		expect(scoped[0]?.steps[0]?.advanceCommands).toEqual(['start']); // QUEUED → start
+	});
+});
+
+// DWP-01 (DR-003) — the Tier-3C linear start-gate read-model. `startableStepId` names the single step a plan may
+// currently start (the frontier); the identical predecessor rule is enforced authoritatively at startExecutionStep.
+describe('startableStepId — the linear start-gate frontier (Tier 3C-i, fork B→start-gate / F)', () => {
+	const ex = (states: string[], status = 'ACTIVE') =>
+		executionPlanView(plan('plan_seq', 'pwu_a', states.map((s, i) => step(`s${i + 1}`, s)), { status }));
+
+	it('is the FIRST step when nothing has run yet (a fresh multi-step plan)', () => {
+		expect(startableStepId(ex(['QUEUED', 'QUEUED']))).toBe('s1');
+	});
+
+	it('advances to the next step once the earlier one is SUCCEEDED', () => {
+		expect(startableStepId(ex(['SUCCEEDED', 'QUEUED']))).toBe('s2');
+	});
+
+	it('treats a SKIPPED predecessor as terminal-success (skipping advances the frontier — no deadlock, L3-M6)', () => {
+		expect(startableStepId(ex(['SKIPPED', 'QUEUED']))).toBe('s2');
+	});
+
+	it('is undefined when every step is terminal-success (the plan is completable, nothing to start)', () => {
+		expect(startableStepId(ex(['SUCCEEDED', 'SKIPPED']))).toBeUndefined();
+	});
+
+	it('is undefined when the plan is NOT ACTIVE (no start under a non-ACTIVE plan — RPH-EXE-002)', () => {
+		expect(startableStepId(ex(['QUEUED', 'QUEUED'], 'SUPERSEDED'))).toBeUndefined();
+		expect(startableStepId(ex(['QUEUED'], 'APPROVED'))).toBeUndefined();
+	});
+
+	it('is undefined when a terminal-NON-success predecessor blocks the sequence (FAILED before a QUEUED step)', () => {
+		// A FAILED step is terminal but NOT success — nothing after it may start until it is retried/addressed.
+		expect(startableStepId(ex(['FAILED', 'QUEUED']))).toBeUndefined();
+		expect(startableStepId(ex(['SUCCEEDED', 'CANCELLED', 'QUEUED']))).toBeUndefined();
+	});
+
+	it('returns the RUNNING frontier itself (not the QUEUED step behind it) — the UI shows Complete/Fail there, not Start', () => {
+		// The frontier is the first non-terminal-success step; a RUNNING one is the current step. The Start button is
+		// gated on id===startable AND advanceCommands (QUEUED only), so a RUNNING frontier never offers Start, and the
+		// QUEUED step behind it is not the frontier → also no Start. Exactly one step is ever "current".
+		expect(startableStepId(ex(['SUCCEEDED', 'RUNNING', 'QUEUED']))).toBe('s2');
+	});
+
+	it('is the sole step for a single-step plan (back-compat — the reference/demo drive is unchanged)', () => {
+		expect(startableStepId(ex(['QUEUED']))).toBe('s1');
+	});
+
+	it('classifies terminal-success (SUCCEEDED/SKIPPED) exactly — FAILED/CANCELLED/SUPERSEDED are not success', () => {
+		expect(isTerminalSuccessStep('SUCCEEDED')).toBe(true);
+		expect(isTerminalSuccessStep('SKIPPED')).toBe(true);
+		for (const s of ['FAILED', 'CANCELLED', 'SUPERSEDED', 'QUEUED', 'RUNNING', 'NOT_READY', 'READY', 'WAITING'])
+			expect(isTerminalSuccessStep(s)).toBe(false);
 	});
 });
 

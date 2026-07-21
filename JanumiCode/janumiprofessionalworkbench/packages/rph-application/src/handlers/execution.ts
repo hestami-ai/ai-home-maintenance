@@ -8,16 +8,19 @@
 // step success ≠ PWU success, §21.1).
 import type {
 	ActivateExecutionPlanPayload,
+	CancelExecutionStepPayload,
 	CompleteExecutionStepPayload,
 	DomainCommand,
 	ExecutionPlanActivatedPayload,
 	ExecutionStepSucceededPayload,
 	FailExecutionPlanPayload,
-	ProposeExecutionPlanPayload
+	ProposeExecutionPlanPayload,
+	SkipExecutionStepPayload
 } from '@janumipwb/rph-contracts';
 import {
 	canActivatePlan,
 	canAuthorizeNewWork,
+	canSkipStep,
 	retryDecision,
 	validateStepCompletion,
 	type AssumptionView
@@ -243,13 +246,19 @@ export const cancelExecutionPlan: CommandHandler = (ctx: HandlerContext, command
 
 /**
  * CompleteExecutionPlan — ACTIVE -> COMPLETED (JAN-EXECPLAN-DR-002 DWP-01 / §20.1). The completion CONDITION is a
- * SUCCESS ALLOW-LIST, not a negation: a plan completes iff it has ≥1 step AND EVERY step is SUCCEEDED or SKIPPED.
+ * SUCCESS ALLOW-LIST, not a negation: a plan completes iff it has ≥1 step, EVERY step is SUCCEEDED or SKIPPED, AND
+ * ≥1 step actually SUCCEEDED.
  *
  * Do not change: this is `every(SUCCEEDED || SKIPPED)`, NOT "terminal ∧ ¬FAILED". The reachable terminal step set is
  *   {SUCCEEDED, FAILED, SKIPPED, CANCELLED, SUPERSEDED}, so a negation would silently admit CANCELLED/SUPERSEDED
  *   steps as success (§19 L3-2). The `steps.length > 0` guard blocks the vacuous empty-plan completion — `[].every`
- *   is true (§19 L3-1). SKIPPED counts as success only once 3C's skip handler enforces authorized-skip; until then
- *   SKIPPED is unreachable, so the allow-list is future-safe. Exec ≠ assurance (INV-5): this moves only `status`.
+ *   is true (§19 L3-1).
+ *
+ * The ≥1-SUCCEEDED clause (JAN-EXECPLAN-DR-003 DWP-02 / §19 L3-M7): once 3C-iii's SkipExecutionStep makes SKIPPED
+ *   reachable, an ALL-SKIPPED plan would satisfy the allow-list yet have PRODUCED NOTHING — it must not "complete".
+ *   The ratified PWU-level `rejectUnbackedExecutionSuccess` (pwu.ts:649) requires a SUCCEEDED step for the PWU to
+ *   claim execution success; this clause aligns the plan-level rule with it, so the two planes cannot diverge (a plan
+ *   "COMPLETED" whose PWU cannot claim success). Exec ≠ assurance (INV-5): this moves only `status`.
  */
 export const completeExecutionPlan: CommandHandler = (ctx, command) =>
 	advanceStatus(ctx, command, {
@@ -277,6 +286,12 @@ export const completeExecutionPlan: CommandHandler = (ctx, command) =>
 					command,
 					'RPH_INVARIANT_VIOLATION',
 					`CompleteExecutionPlan blocked: plan ${command.targetAggregateId} has ${offenders.length} step(s) not in terminal success (${offenders.map((s) => s.stepState ?? 'undefined').join(', ')}); COMPLETED requires every step SUCCEEDED or SKIPPED (§20.1 success allow-list). FailExecutionPlan a plan with a failed step.`
+				);
+			if (!steps.some((s) => s.stepState === 'SUCCEEDED'))
+				return reject(
+					command,
+					'RPH_INVARIANT_VIOLATION',
+					`CompleteExecutionPlan blocked: plan ${command.targetAggregateId} has no SUCCEEDED step — every step is SKIPPED, so the plan produced nothing to complete on. At least one step must SUCCEED (aligning the plan-level rule with the ratified PWU-level rejectUnbackedExecutionSuccess, §21.1). FailExecutionPlan or SupersedeExecutionPlan instead.`
 				);
 			return null;
 		}
@@ -418,7 +433,17 @@ function advanceStep(
 	});
 }
 
-/** StartExecutionStep — a step READY|QUEUED -> RUNNING (only under an ACTIVE plan). */
+/**
+ * StartExecutionStep — a step QUEUED -> RUNNING (only under an ACTIVE plan). Two prechecks, in order:
+ *  1. plan-ACTIVE (RPH-EXE-002): a superseded/terminal plan opens no new step (mirrors the retry precheck).
+ *  2. Linear start-gate (JAN-EXECPLAN-DR-003 DWP-01 / RPH-EXE-005, Fork F): a step may start ONLY when every EARLIER
+ *     step (array index in plan.steps) is terminal-success (SUCCEEDED/SKIPPED) — so nothing runs out of order. Array
+ *     index IS the order (F-2: the strict ExecutionStep contract has NO `ordinal`; it is persistence-only). This is
+ *     the AUTHORITY the read-model `startableStepId` (execution-view.ts) mirrors for the UI — the gate is the backstop
+ *     (§19 L3-4c), enforced here at start rather than by which step was "readied" (the pivot from a completion-fold
+ *     cascade to a start-gate, §7). Back-compat: a single-step (or first-step) start has no earlier steps → passes.
+ *     Exec ≠ assurance (INV-5): the gate reads state, sets nothing.
+ */
 export const startExecutionStep: CommandHandler = (ctx, command) => {
 	const p = command.payload as { stepId: string; runtimeBindingId?: string };
 	return advanceStep(ctx, command, {
@@ -434,14 +459,27 @@ export const startExecutionStep: CommandHandler = (ctx, command) => {
 			...(p.runtimeBindingId ? { runtimeBindingId: p.runtimeBindingId } : {}),
 			stepState: 'RUNNING'
 		},
-		precheck: (_step, plan) =>
-			plan.status === 'ACTIVE'
-				? null
-				: reject(
-						command,
-						'RPH_ILLEGAL_STATE_TRANSITION',
-						`Cannot start a step: plan ${command.targetAggregateId} is not ACTIVE (${String(plan.status)})`
-					)
+		precheck: (_step, plan) => {
+			if (plan.status !== 'ACTIVE')
+				return reject(
+					command,
+					'RPH_ILLEGAL_STATE_TRANSITION',
+					`Cannot start a step: plan ${command.targetAggregateId} is not ACTIVE (${String(plan.status)})`
+				);
+			const steps = (plan.steps as Array<{ id?: string; stepState?: string }>) ?? [];
+			const idx = steps.findIndex((s) => String(s.id) === p.stepId);
+			const blocker = steps
+				.slice(0, idx)
+				.find((s) => s.stepState !== 'SUCCEEDED' && s.stepState !== 'SKIPPED');
+			if (blocker)
+				return reject(
+					command,
+					'RPH_ILLEGAL_STATE_TRANSITION',
+					`Cannot start step ${p.stepId}: an earlier step (${String(blocker.id)}) is ${String(blocker.stepState)} — a step may not start until every earlier step is terminal-success (SUCCEEDED/SKIPPED); the plan runs its steps in order (RPH-EXE-005). Complete, skip, or address the earlier step first.`,
+					[p.stepId, String(blocker.id)]
+				);
+			return null;
+		}
 	});
 };
 
@@ -613,6 +651,74 @@ export const retryExecutionStep: CommandHandler = (ctx, command) => {
 					`Cannot retry step ${p.stepId}: the retry cap (${maxAttempts} total attempts) is reached after ${attemptsMade} attempt(s) — the controller must not retry again (RPH-EXE-008); select an alternate control action: ${decision.permittedControlActions.join(', ')}.`
 				);
 			return null;
+		}
+	});
+};
+
+/**
+ * SkipExecutionStep — a step READY|QUEUED -> SKIPPED (JAN-EXECPLAN-DR-003 DWP-02 / §21.1). Routed through the ratified
+ * `canSkipStep` kernel, FAIL-CLOSED: `mandatory` is CALLER-ASSERTED (no step-level mandatory field is ratified) and
+ * defaults to TRUE when omitted, so an unmarked step is treated as MANDATORY and REQUIRES an authorized plan revision
+ * or waiver (waiverOrRevisionId) — a mandatory-no-waiver skip is REJECTED, never fail-open (§19 L3-B2). A plan-ACTIVE
+ * precheck mirrors start/retry (a superseded/terminal plan opens no new work, RPH-EXE-002). SKIPPED is terminal-success
+ * for the start-gate (execution-view.ts startableStepId), so skipping the startable step advances the sequence — no
+ * deadlock (§19 L3-M6). Exec ≠ assurance (INV-5): the skip moves only stepState.
+ */
+export const skipExecutionStep: CommandHandler = (ctx, command) => {
+	const p = command.payload as SkipExecutionStepPayload;
+	return advanceStep(ctx, command, {
+		stepId: p.stepId,
+		target: 'SKIPPED',
+		eventType: 'ExecutionStepSkipped',
+		// The event records the RESULTING state + the authorization; `mandatory` is a decision-time assertion, not a
+		// recorded fact (the ratified ExecutionStepSkipped shape carries no `mandatory`), so it does not ride the event.
+		eventPayload: {
+			stepId: p.stepId,
+			...(p.waiverOrRevisionId ? { waiverOrRevisionId: p.waiverOrRevisionId } : {}),
+			stepState: 'SKIPPED'
+		},
+		precheck: (_step, plan) => {
+			if (plan.status !== 'ACTIVE')
+				return reject(
+					command,
+					'RPH_ILLEGAL_STATE_TRANSITION',
+					`Cannot skip a step: plan ${command.targetAggregateId} is not ACTIVE (${String(plan.status)}) — a superseded/terminal plan opens no new work (RPH-EXE-002).`
+				);
+			// FAIL-CLOSED: an unmarked step defaults to MANDATORY (mandatory ?? true), so it needs an authorized
+			// waiver/revision to be skipped — never fail-open. `canSkipStep` is the ratified kernel (rph-domain).
+			const check = canSkipStep({
+				mandatory: p.mandatory ?? true,
+				hasAuthorizedWaiverOrRevision: !!p.waiverOrRevisionId
+			});
+			if (!check.ok)
+				return reject(
+					command,
+					'RPH_INVARIANT_VIOLATION',
+					`Cannot skip step ${p.stepId}: ${check.reason ?? 'skipping a mandatory step requires an authorized plan revision or waiver'} (§21.1). Provide waiverOrRevisionId, or assert mandatory:false only for a genuinely optional step.`
+				);
+			return null;
+		}
+	});
+};
+
+/**
+ * CancelExecutionStep — a step READY|QUEUED|RUNNING|WAITING -> CANCELLED (JAN-EXECPLAN-DR-003 DWP-02 / §26.4). Cancel
+ * is CLEANUP, not new work: it is permitted even under a SUPERSEDED/terminal plan (RPH-EXE-002 forbids OPENING new
+ * work/attempts, not terminating an existing step), so there is DELIBERATELY no plan-ACTIVE precheck — the
+ * ExecutionStep.stepState machine (checkTransition, from READY/QUEUED/RUNNING/WAITING) alone gates the source state
+ * (§19 L3-M11). The `reason` is recorded on the event so the governed stream names the control action. Exec ≠
+ * assurance (INV-5): the cancel moves only stepState.
+ */
+export const cancelExecutionStep: CommandHandler = (ctx, command) => {
+	const p = command.payload as CancelExecutionStepPayload;
+	return advanceStep(ctx, command, {
+		stepId: p.stepId,
+		target: 'CANCELLED',
+		eventType: 'ExecutionStepCancelled',
+		eventPayload: {
+			stepId: p.stepId,
+			reason: p.reason,
+			stepState: 'CANCELLED'
 		}
 	});
 };

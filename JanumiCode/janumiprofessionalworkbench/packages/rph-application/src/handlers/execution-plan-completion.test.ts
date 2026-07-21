@@ -163,6 +163,18 @@ describe('CompleteExecutionPlan / FailExecutionPlan — plan-terminal lifecycle 
 		expect(planStatus(PLAN)).toBe('ACTIVE');
 	});
 
+	it('REJECTS completing an ALL-SKIPPED plan — ≥1 step must SUCCEED (DR-003 DWP-02, §19 L3-M7)', () => {
+		// Now that SkipExecutionStep makes SKIPPED reachable, an all-SKIPPED plan satisfies the allow-list yet has
+		// PRODUCED NOTHING — it must not "complete". This aligns the plan-level rule with the ratified PWU-level
+		// rejectUnbackedExecutionSuccess (which needs a SUCCEEDED step). Fail or supersede such a plan instead.
+		activePlan(['SKIPPED', 'SKIPPED']);
+		const r = complete();
+		expect(r.status).toBe('REJECTED');
+		expect(r.error?.code).toBe('RPH_INVARIANT_VIOLATION');
+		expect(r.error?.message).toContain('no SUCCEEDED step');
+		expect(planStatus(PLAN)).toBe('ACTIVE');
+	});
+
 	it('FAILS an ACTIVE plan (records the failureReason)', () => {
 		activePlan(['SUCCEEDED', 'FAILED']);
 		expect(fail('a step failed unrecoverably').status).toBe('ACCEPTED');

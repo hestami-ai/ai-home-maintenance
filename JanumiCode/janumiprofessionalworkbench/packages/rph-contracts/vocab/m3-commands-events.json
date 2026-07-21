@@ -874,6 +874,60 @@
 			]
 		},
 		{
+			"commandType": "SkipExecutionStep",
+			"targetAggregateType": "EXECUTION_PLAN",
+			"emitsEvent": "ExecutionStepSkipped",
+			"drivesMachine": "ExecutionStep.stepState",
+			"drivesFrom": "READY|QUEUED",
+			"drivesTo": "SKIPPED",
+			"schematized": false,
+			"sourceSection": "UNRATIFIED-AUTHORED (annotated 2026-07-21 under sponsor grant, JAN-EXECPLAN-DR-003 3C-iii): the ExecutionStep READY|QUEUED->SKIPPED arrows + the §21.1 canSkipStep rule (a MANDATORY step may be skipped only under an authorized plan revision or waiver) + the ExecutionStepSkipped EVENT are ratified/pre-authored, but DOC-007 schematizes NO Skip-Step command interface (§16 item 6 leaves the granular vocabulary unschematized) — so this command shape was AUTHORED, not derived. `mandatory` is CALLER-ASSERTED (no step-level mandatory field is ratified) and defaults FAIL-CLOSED to TRUE in the handler, so an unmarked step needs waiverOrRevisionId. Do NOT treat this sourceSection as proof the shape is ratified. Ratification pending. Cited: DOC-002 §21.1 (canSkipStep), ExecutionStep.stepState machine.",
+			"payloadFields": [
+				{
+					"field": "stepId",
+					"required": true,
+					"type": "string",
+					"note": "id-ref"
+				},
+				{
+					"field": "mandatory",
+					"required": false,
+					"type": "boolean",
+					"note": "caller-asserted; omitted => TRUE (fail-closed) — a mandatory step then requires waiverOrRevisionId (canSkipStep, §21.1). No step-level mandatory field is ratified, so this rides the command."
+				},
+				{
+					"field": "waiverOrRevisionId",
+					"required": false,
+					"type": "string",
+					"note": "id-ref: the authorized plan revision or waiver that permits skipping a mandatory step; recorded on ExecutionStepSkipped"
+				}
+			]
+		},
+		{
+			"commandType": "CancelExecutionStep",
+			"targetAggregateType": "EXECUTION_PLAN",
+			"emitsEvent": "ExecutionStepCancelled",
+			"drivesMachine": "ExecutionStep.stepState",
+			"drivesFrom": "READY|QUEUED|RUNNING|WAITING",
+			"drivesTo": "CANCELLED",
+			"schematized": false,
+			"sourceSection": "UNRATIFIED-AUTHORED (annotated 2026-07-21 under sponsor grant, JAN-EXECPLAN-DR-003 3C-iii): the ExecutionStep READY|QUEUED|RUNNING|WAITING->CANCELLED arrows + the ExecutionStepCancelled EVENT are pre-authored, but DOC-007 schematizes NO Cancel-Step command interface — so this command shape was AUTHORED, not derived. Cancel is CLEANUP: it is permitted even under a SUPERSEDED/terminal plan (RPH-EXE-002 forbids new WORK, not termination), so the handler applies NO plan-ACTIVE precheck — the ExecutionStep.stepState machine gates the source state. Ratification pending. Cited: DOC-002 §26.4, ExecutionStep.stepState machine, RPH-EXE-002.",
+			"payloadFields": [
+				{
+					"field": "stepId",
+					"required": true,
+					"type": "string",
+					"note": "id-ref"
+				},
+				{
+					"field": "reason",
+					"required": true,
+					"type": "string",
+					"note": "why the step was cancelled (a control action); recorded on ExecutionStepCancelled"
+				}
+			]
+		},
+		{
 			"commandType": "DetectAssumption",
 			"targetAggregateType": "ASSUMPTION",
 			"emitsEvent": "AssumptionDetected",
@@ -4563,13 +4617,19 @@
 		{
 			"eventType": "ExecutionStepCancelled",
 			"aggregateType": "ExecutionPlan",
-			"sourceSection": "UNRATIFIED-AUTHORED (annotated 2026-07-16 under sponsor grant): DOC-007 schematizes NO interface for this, so these fields were AUTHORED, not derived. The citation below NAMES this command/event but defines no fields (DOC-002 §26.x/§34.x are bare name lists; §16 item 6: DOC-007's first slice deliberately leaves the granular vocabulary unschematized). Do NOT treat this sourceSection as proof the shape is ratified. Ratification pending. Cited: DOC-002 §26.4",
+			"sourceSection": "UNRATIFIED-AUTHORED (annotated 2026-07-16 under sponsor grant; `reason` added 2026-07-21 JAN-EXECPLAN-DR-003 3C-iii): DOC-007 schematizes NO interface for this, so these fields were AUTHORED, not derived. The citation below NAMES this command/event but defines no fields (DOC-002 §26.x/§34.x are bare name lists; §16 item 6: DOC-007's first slice deliberately leaves the granular vocabulary unschematized). Do NOT treat this sourceSection as proof the shape is ratified. Ratification pending. Cited: DOC-002 §26.4",
 			"payloadFields": [
 				{
 					"field": "stepId",
 					"required": true,
 					"type": "string",
 					"note": "id-ref"
+				},
+				{
+					"field": "reason",
+					"required": false,
+					"type": "string",
+					"note": "why the step was cancelled (a control action); carried from CancelExecutionStep — authored atop the pre-authored event shape so the governed stream names the cancellation rationale"
 				},
 				{
 					"field": "stepState",
@@ -4679,7 +4739,7 @@
 					"required": true,
 					"type": "enum",
 					"enumRef": "StepStateSchema",
-					"note": "{NOT_READY,READY}->SKIPPED"
+					"note": "{READY,QUEUED}->SKIPPED (the ExecutionStep.stepState machine permits SKIPPED only from READY and QUEUED — never NOT_READY, which must pass through READY first)"
 				}
 			]
 		},

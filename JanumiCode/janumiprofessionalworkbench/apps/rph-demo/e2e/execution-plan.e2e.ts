@@ -213,22 +213,34 @@ test.describe('Execution Plan view — DWP-03 handler-backed step actions', () =
 		await expect.poll(() => stepStateOf(request, STEP1)).toBe('SUCCEEDED');
 	});
 
-	test('the allowlist shows no action for commandless/terminal steps, and no step-cancel button (F-11)', async ({
+	test('the allowlist: startable-only Start, skip/cancel on QUEUED steps, nothing below QUEUED (F-11 + DWP-01/02/03)', async ({
 		page,
 		request
 	}) => {
 		const undertakingId = await stageActivePlan(request);
 		await gotoHydrated(page, `/undertakings/${undertakingId}`);
 		await page.getByRole('button', { name: 'execution' }).click();
+		// Scope to the staged plan (step1/step2 QUEUED, step3 NOT_READY) — the seed's own plans render SUCCEEDED steps.
+		const grp = page.getByTestId('exec-pwu-group').filter({ hasText: 'Staged execution PWU' });
+		const steps = grp.getByTestId('exec-step');
 
-		// step3 is NOT_READY → below the domain's driveable floor: NO action button, the honest note instead (F-11).
-		await expect(page.getByTestId('step-belowqueued')).toBeVisible();
-		// There is no step-level cancel/skip/supersede anywhere — only the four command-backed step actions exist.
-		await expect(page.getByTestId('step-action-skip')).toHaveCount(0);
-		await expect(page.getByTestId('step-action-cancel')).toHaveCount(0);
-		// The seeded plans' SUCCEEDED steps (terminal) render no advance action.
-		const startBtns = await page.getByTestId('step-action-start').count();
-		expect(startBtns).toBe(2); // exactly the two staged QUEUED steps — never the seed's SUCCEEDED steps
+		// step3 is NOT_READY → below the domain's driveable floor: the honest note, and NO action at all — NOT_READY
+		// has neither an advance command NOR a control command (the machine has no →SKIPPED/→CANCELLED from it) (F-11).
+		await expect(grp.getByTestId('step-belowqueued')).toBeVisible();
+		await expect(steps.nth(2).getByTestId('step-action-start')).toHaveCount(0);
+		await expect(steps.nth(2).getByTestId('step-action-skip')).toHaveCount(0);
+		await expect(steps.nth(2).getByTestId('step-action-cancel')).toHaveCount(0);
+
+		// Start is offered on exactly the ONE startable step (step1) — never the later QUEUED step2 (start-gate, DWP-01).
+		await expect(grp.getByTestId('step-action-start')).toHaveCount(1);
+		await expect(steps.nth(0).getByTestId('step-action-start')).toBeVisible();
+		await expect(steps.nth(1).getByTestId('step-action-start')).toHaveCount(0);
+
+		// Skip + Cancel ARE now offered on both QUEUED steps (DWP-02/03 command-backed control actions; skip needs an
+		// ACTIVE plan — this plan is ACTIVE). These are real commands now, so the F-11 "no fabricated button" rule is
+		// SATISFIED by them existing, not by their absence.
+		await expect(grp.getByTestId('step-action-skip')).toHaveCount(2);
+		await expect(grp.getByTestId('step-action-cancel')).toHaveCount(2);
 	});
 
 	test('the Complete form action surfaces the FLOOR-GATE rejection verbatim; the step does not advance', async ({
@@ -239,10 +251,10 @@ test.describe('Execution Plan view — DWP-03 handler-backed step actions', () =
 		await gotoHydrated(page, `/undertakings/${undertakingId}`);
 		await page.getByRole('button', { name: 'execution' }).click();
 
-		// Start step2 (the LAST of the two Start buttons) → RUNNING, then complete it naming an AI-produced,
-		// floor-UNSATISFIED artifact → the §8.4 floor gate REJECTS (RPH_INVARIANT_VIOLATION), surfaced verbatim.
-		await page.getByTestId('step-action-start').last().click();
-		await expect.poll(() => stepStateOf(request, STEP2)).toBe('RUNNING');
+		// Start the startable step (step1 — the ONLY Start under the DWP-01 start-gate) → RUNNING, then complete it
+		// naming an AI-produced, floor-UNSATISFIED artifact → the §8.4 floor gate REJECTS (RPH_INVARIANT_VIOLATION).
+		await page.getByTestId('step-action-start').first().click();
+		await expect.poll(() => stepStateOf(request, STEP1)).toBe('RUNNING');
 		await page.getByTestId('complete-output').fill(ARTIFACT_ID);
 		await page.getByTestId('complete-ai').check();
 		await page.getByTestId('step-action-complete').click();
@@ -251,7 +263,7 @@ test.describe('Execution Plan view — DWP-03 handler-backed step actions', () =
 		await expect(err).toBeVisible();
 		await expect(err).toContainText('RPH_INVARIANT_VIOLATION');
 		// Gate is AUTHORITATIVE: the form action did NOT fabricate success — the step is still RUNNING.
-		expect(await stepStateOf(request, STEP2)).toBe('RUNNING');
+		expect(await stepStateOf(request, STEP1)).toBe('RUNNING');
 	});
 
 	test('the Complete form action surfaces the unresolved-artifact rejection verbatim', async ({
@@ -262,9 +274,9 @@ test.describe('Execution Plan view — DWP-03 handler-backed step actions', () =
 		await gotoHydrated(page, `/undertakings/${undertakingId}`);
 		await page.getByRole('button', { name: 'execution' }).click();
 
-		await page.getByTestId('step-action-start').last().click();
-		await expect.poll(() => stepStateOf(request, STEP2)).toBe('RUNNING');
-		// Naming a result that is not a recorded object fails closed (execution.ts:410-417) — the bypass the gate
+		await page.getByTestId('step-action-start').first().click();
+		await expect.poll(() => stepStateOf(request, STEP1)).toBe('RUNNING');
+		// Naming a result that is not a recorded object fails closed (execution.ts) — the bypass the gate
 		// exists to stop ("name a nonexistent artifact to yield zero subjects and sail through").
 		await page.getByTestId('complete-output').fill('art_01ARZ3NDEKTSV4RRFFQ69GNONE0');
 		await page.getByTestId('step-action-complete').click();
@@ -272,7 +284,7 @@ test.describe('Execution Plan view — DWP-03 handler-backed step actions', () =
 		const err = page.getByTestId('exec-error');
 		await expect(err).toBeVisible();
 		await expect(err).toContainText('RPH_VALIDATION_SEMANTIC_FAILED');
-		expect(await stepStateOf(request, STEP2)).toBe('RUNNING');
+		expect(await stepStateOf(request, STEP1)).toBe('RUNNING');
 	});
 
 	test('an illegal action (Complete a non-RUNNING step) is rejected with its reason', async ({

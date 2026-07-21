@@ -261,6 +261,17 @@ export const FailExecutionStepPayloadSchema = z.strictObject({
 	failureClass: z.string().optional()
 });
 export type FailExecutionStepPayload = z.infer<typeof FailExecutionStepPayloadSchema>;
+export const SkipExecutionStepPayloadSchema = z.strictObject({
+	stepId: z.string(),
+	mandatory: z.boolean().optional(),
+	waiverOrRevisionId: z.string().optional()
+});
+export type SkipExecutionStepPayload = z.infer<typeof SkipExecutionStepPayloadSchema>;
+export const CancelExecutionStepPayloadSchema = z.strictObject({
+	stepId: z.string(),
+	reason: z.string()
+});
+export type CancelExecutionStepPayload = z.infer<typeof CancelExecutionStepPayloadSchema>;
 export const DetectAssumptionPayloadSchema = z.strictObject({
 	assumptionId: z.string(),
 	statement: z.string(),
@@ -1092,6 +1103,7 @@ export const ExecutionPlanFailedPayloadSchema = z.strictObject({
 export type ExecutionPlanFailedPayload = z.infer<typeof ExecutionPlanFailedPayloadSchema>;
 export const ExecutionStepCancelledPayloadSchema = z.strictObject({
 	stepId: z.string(),
+	reason: z.string().optional(),
 	stepState: StepStateSchema
 });
 export type ExecutionStepCancelledPayload = z.infer<typeof ExecutionStepCancelledPayloadSchema>;
@@ -1721,6 +1733,18 @@ export const COMMANDS = {
 		payload: FailExecutionStepPayloadSchema,
 		targetAggregateType: 'EXECUTION_PLAN',
 		emitsEvent: 'ExecutionStepFailed',
+		firstSlice: false
+	},
+	SkipExecutionStep: {
+		payload: SkipExecutionStepPayloadSchema,
+		targetAggregateType: 'EXECUTION_PLAN',
+		emitsEvent: 'ExecutionStepSkipped',
+		firstSlice: false
+	},
+	CancelExecutionStep: {
+		payload: CancelExecutionStepPayloadSchema,
+		targetAggregateType: 'EXECUTION_PLAN',
+		emitsEvent: 'ExecutionStepCancelled',
 		firstSlice: false
 	},
 	DetectAssumption: {

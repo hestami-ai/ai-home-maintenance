@@ -61,6 +61,11 @@
 		retry: 'retryStep'
 	} as const;
 	const STEP_LABEL = { start: 'Start', complete: 'Complete', fail: 'Fail', retry: 'Retry' } as const;
+	// DWP-03: the CONTROL action (skip/cancel) → form-action + label. Keyed to the read-model's controlCommands (the
+	// command-backed skip/cancel allowlist — never the wider machine topology). Plan-level gating (skip needs an ACTIVE
+	// plan; cancel is cleanup) is applied in the template.
+	const STEP_CONTROL_ACTION = { skip: 'skipStep', cancel: 'cancelStep' } as const;
+	const STEP_CONTROL_LABEL = { skip: 'Skip', cancel: 'Cancel' } as const;
 	// DWP-05: attempt-state → tone for the per-step attempt-history rows.
 	const attemptTone = (state: string): string =>
 		state === 'SUCCEEDED'
@@ -246,7 +251,11 @@
 									<button class="mini" data-testid="plan-fail">Fail plan</button>
 								</form>
 							{/if}
-							{#if pl.status !== 'CANCELLED'}
+							{#if pl.status === 'ACTIVE' || pl.status === 'APPROVED'}
+								<!-- Cancel plan is offered ONLY where the ExecutionPlan.status machine permits →CANCELLED — from
+								     APPROVED or ACTIVE (transitions.data.ts). The prior `!== 'CANCELLED'` gate tempted a
+								     machine-forbidden CancelExecutionPlan on a COMPLETED/FAILED/SUPERSEDED/PROPOSED plan (the engine
+								     would reject it); this is the same command-backed-allowlist discipline as the step actions (F-11). -->
 								<form method="POST" action="?/cancelPlan" use:enhance class="inlineform">
 									<input type="hidden" name="planId" value={pl.id} />
 									<button class="mini" data-testid="plan-cancel">Cancel plan</button>
@@ -292,11 +301,34 @@
 													>
 													<button class="mini" data-testid="step-action-complete">Complete</button>
 												</form>
+											{:else if cmd === 'start'}
+												<!-- Start ONLY on the startable step (DWP-01 start-gate): the first non-terminal step whose
+												     predecessors are all terminal-success. A later QUEUED step is not startable → no Start (the
+												     engine's startExecutionStep gate would reject an out-of-order start; the UI does not tempt it). -->
+												{#if s.id === data.startableStepByPlan[pl.id]}
+													<form method="POST" action="?/startStep" use:enhance class="inlineform">
+														<input type="hidden" name="planId" value={pl.id} />
+														<input type="hidden" name="stepId" value={s.id} />
+														<button class="mini" data-testid="step-action-start">Start</button>
+													</form>
+												{/if}
 											{:else}
 												<form method="POST" action="?/{STEP_ACTION[cmd]}" use:enhance class="inlineform">
 													<input type="hidden" name="planId" value={pl.id} />
 													<input type="hidden" name="stepId" value={s.id} />
 													<button class="mini" data-testid="step-action-{cmd}">{STEP_LABEL[cmd]}</button>
+												</form>
+											{/if}
+										{/each}
+										{#each s.controlCommands as ctl (ctl)}
+											<!-- Skip asserts mandatory:false (optional skip; the fail-closed mandatory/waiver path is
+											     domain-tested, not a demo button) and needs an ACTIVE plan. Cancel is CLEANUP — permitted
+											     even under a superseded/terminal plan. So: cancel always; skip only while the plan is ACTIVE. -->
+											{#if ctl === 'cancel' || pl.status === 'ACTIVE'}
+												<form method="POST" action="?/{STEP_CONTROL_ACTION[ctl]}" use:enhance class="inlineform">
+													<input type="hidden" name="planId" value={pl.id} />
+													<input type="hidden" name="stepId" value={s.id} />
+													<button class="mini" data-testid="step-action-{ctl}">{STEP_CONTROL_LABEL[ctl]}</button>
 												</form>
 											{/if}
 										{/each}

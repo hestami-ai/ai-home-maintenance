@@ -25,6 +25,7 @@ import {
 	rebuildProjection,
 	type SequenceInstance,
 	sequenceView,
+	startableStepId,
 	traceabilityProjector
 } from '@janumipwb/rph-projections';
 import {
@@ -203,6 +204,16 @@ export const load: PageServerLoad = ({ params }) => {
 	}));
 	const plans = plansForPwus(planRows, pwuIdSet);
 
+	// JAN-EXECPLAN-DR-003 DWP-01/03 — the linear start-gate affordance. For each plan, derive the SINGLE step the
+	// engine would currently let start (the first non-terminal step, iff every earlier step is terminal-success and the
+	// plan is ACTIVE). The UI offers Start ONLY on this step (the engine's startExecutionStep gate is the backstop —
+	// the UI does not tempt an out-of-order start it would reject). A plan with no startable step is absent from the map.
+	const startableStepByPlan: Record<string, string> = {};
+	for (const pl of plans) {
+		const sid = startableStepId(pl);
+		if (sid) startableStepByPlan[pl.id] = sid;
+	}
+
 	// Execution Attempt history (JAN-EXECPLAN Tier-3 DWP-03/05): fold the Execution* event stream into §10.4 attempt
 	// records, scoped to THIS undertaking's plans, keyed by step for the per-step history render. stepTypeById (from
 	// the shaped plans — the events don't carry stepType) drives the AI-no-binding coherence advisory.
@@ -252,6 +263,7 @@ export const load: PageServerLoad = ({ params }) => {
 		rollup,
 		pwuList,
 		plans,
+		startableStepByPlan,
 		attemptsByStepId,
 		sequence,
 		assessments,
@@ -491,6 +503,24 @@ export const actions: Actions = {
 		return dispatchResult('RetryExecutionStep', str(f, 'planId'), {
 			stepId: str(f, 'stepId'),
 			retryReason: str(f, 'reason') || 'Operator retry.'
+		});
+	},
+	// JAN-EXECPLAN-DR-003 DWP-02/03 — the terminal step-lifecycle actions. Skip asserts mandatory:false (an OPTIONAL
+	// skip): the fail-closed mandatory/waiver path is DOMAIN-tested, not a demo button, so the UI never silently skips
+	// a mandatory step. A SKIPPED step is terminal-success, so the start-gate advances to the next step. Cancel is
+	// CLEANUP (permitted even post-supersession). Both dispatch one allowlisted command; a rejection surfaces verbatim.
+	skipStep: async ({ request }) => {
+		const f = await request.formData();
+		return dispatchResult('SkipExecutionStep', str(f, 'planId'), {
+			stepId: str(f, 'stepId'),
+			mandatory: false
+		});
+	},
+	cancelStep: async ({ request }) => {
+		const f = await request.formData();
+		return dispatchResult('CancelExecutionStep', str(f, 'planId'), {
+			stepId: str(f, 'stepId'),
+			reason: str(f, 'reason') || 'Operator cancelled the step.'
 		});
 	},
 	cancelPlan: async ({ request }) => {
