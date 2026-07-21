@@ -12,7 +12,12 @@ import {
 	listUndertakings,
 	SEED_UNDERTAKING
 } from '@janumipwb/rph-engine';
-import type { CardinalityCode, PermittedChildRule } from '@janumipwb/rph-authoring';
+import type {
+	BoundaryContract,
+	CardinalityCode,
+	ExecutionBoundary,
+	PermittedChildRule
+} from '@janumipwb/rph-authoring';
 import type { AssessmentCriterion } from '@janumipwb/rph-contracts';
 import { readPolicyFields } from './policy-fields';
 
@@ -104,7 +109,13 @@ export const load: PageServerLoad = ({ params }) => {
 			: [],
 		requiredAssurancePolicyIds: Array.isArray(t.state.requiredAssurancePolicyIds)
 			? (t.state.requiredAssurancePolicyIds as string[])
-			: []
+			: [],
+		// STD-2/STD-3 (DWP-05): the resolved execution boundary (absent ⇒ INTERNAL) + the delegated contract, so the
+		// form pre-fills, the inspector shows the boundary/leaf-kind, and the card rail (DWP-06) can condition itself.
+		executionBoundary: (t.state.executionBoundary === 'DELEGATED_EXTERNAL'
+			? 'DELEGATED_EXTERNAL'
+			: 'INTERNAL') as ExecutionBoundary,
+		boundaryContract: t.state.boundaryContract as BoundaryContract | undefined
 	}));
 	// The engine's Assurance Policy library (real ASSURANCE_POLICY objects): the manager lists these, the PWU-type
 	// picker offers the ACTIVE non-floor ones, and the rail resolves ids to names. Floor policies are flagged locked.
@@ -174,6 +185,9 @@ interface TypeFields {
 	requiredInputs: string[];
 	requiredOutputs: string[];
 	requiredAssurancePolicyIds: string[];
+	executionBoundary: ExecutionBoundary;
+	/** Present iff executionBoundary is DELEGATED_EXTERNAL (STD-3). */
+	boundaryContract?: BoundaryContract;
 }
 
 /** Copy a stored ratified-array field through verbatim, falling back to a single-value array. Never String():
@@ -198,14 +212,36 @@ function csv(v: FormDataEntryValue | null): string[] {
 /** Read the shared PWU-Type authoring fields from a form (used by both defineType and editType). Per-child
  *  cardinality is posted as `cardinality:<childId>` / `applicability:<childId>` alongside the child checkbox. */
 function readTypeFields(form: FormData): TypeFields {
-	const permittedChildTypeIds = (form.getAll('permittedChildTypeIds') as string[])
-		.map(String)
-		.filter(Boolean);
+	// STD-2: resolve the execution boundary (absent/garbage ⇒ INTERNAL). The engine is the hard INV-1 gate, but the
+	// write boundary enforces the symmetric coherence HERE so a client cannot post an incoherent shape: a
+	// DELEGATED_EXTERNAL node is terminal (children cleared, contract assembled); an INTERNAL node carries no
+	// contract (the form hides the opposite block, but the server must not trust the DOM).
+	const executionBoundary: ExecutionBoundary =
+		String((form.get('executionBoundary') ?? '') as string) === 'DELEGATED_EXTERNAL'
+			? 'DELEGATED_EXTERNAL'
+			: 'INTERNAL';
+	const delegated = executionBoundary === 'DELEGATED_EXTERNAL';
+	const permittedChildTypeIds = delegated
+		? []
+		: (form.getAll('permittedChildTypeIds') as string[]).map(String).filter(Boolean);
 	const permittedChildren: PermittedChildRule[] = permittedChildTypeIds.map((typeId) => {
 		const cardinality = asCardinality(String((form.get(`cardinality:${typeId}`) ?? '') as string));
 		const note = String((form.get(`applicability:${typeId}`) ?? '') as string).trim();
 		return { typeId, cardinality, ...(note ? { applicabilityNote: note } : {}) };
 	});
+	let boundaryContract: BoundaryContract | undefined;
+	if (delegated) {
+		const applicabilityNote = String(
+			(form.get('boundaryApplicabilityNote') ?? '') as string
+		).trim();
+		boundaryContract = {
+			counterpartyLabel: String((form.get('counterpartyLabel') ?? '') as string).trim(),
+			attestedAssurancePolicyIds: (form.getAll('attestedAssurancePolicyIds') as string[])
+				.map(String)
+				.filter(Boolean),
+			...(applicabilityNote ? { applicabilityNote } : {})
+		};
+	}
 	return {
 		name: String((form.get('name') ?? '') as string).trim(),
 		pwuKind: String((form.get('pwuKind') ?? '') as string)
@@ -222,7 +258,9 @@ function readTypeFields(form: FormData): TypeFields {
 		requiredOutputs: csv(form.get('requiredOutputs')),
 		requiredAssurancePolicyIds: (form.getAll('requiredAssurancePolicyIds') as string[])
 			.map(String)
-			.filter(Boolean)
+			.filter(Boolean),
+		executionBoundary,
+		boundaryContract
 	};
 }
 
@@ -322,6 +360,11 @@ export const actions: Actions = {
 			return fail(400, { error: 'A PWU Type name and kind are required.' });
 		const policyError = policyReferenceError(f.requiredAssurancePolicyIds);
 		if (policyError) return fail(400, { error: policyError });
+		// R-10 (D-C Option 1 parity): attested policy ids obey the same ACTIVE/non-floor rule as declared ones.
+		if (f.boundaryContract) {
+			const attestError = policyReferenceError(f.boundaryContract.attestedAssurancePolicyIds);
+			if (attestError) return fail(400, { error: attestError });
+		}
 		const id = mintUiId('pwut');
 		const r = dispatch('DefinePwuType', 'PWU_TYPE', id, {
 			pwuTypeId: id,
@@ -335,7 +378,9 @@ export const actions: Actions = {
 			permittedChildren: f.permittedChildren,
 			requiredInputs: f.requiredInputs,
 			requiredOutputs: f.requiredOutputs,
-			requiredAssurancePolicyIds: f.requiredAssurancePolicyIds
+			requiredAssurancePolicyIds: f.requiredAssurancePolicyIds,
+			executionBoundary: f.executionBoundary,
+			...(f.boundaryContract ? { boundaryContract: f.boundaryContract } : {})
 		});
 		if (r.status !== 'ACCEPTED') return fail(400, { error: r.error?.message ?? r.status });
 		return { definedType: id };
@@ -356,6 +401,18 @@ export const actions: Actions = {
 			: [];
 		const policyError = policyReferenceError(f.requiredAssurancePolicyIds, existingPolicyIds);
 		if (policyError) return fail(400, { error: policyError });
+		// R-10: validate attested ids, retaining the type's pre-existing attested declarations (an unrelated edit
+		// must not re-reject a since-deactivated attested policy).
+		if (f.boundaryContract) {
+			const existingAttested =
+				(stored.boundaryContract as { attestedAssurancePolicyIds?: string[] } | undefined)
+					?.attestedAssurancePolicyIds ?? [];
+			const attestError = policyReferenceError(
+				f.boundaryContract.attestedAssurancePolicyIds,
+				existingAttested
+			);
+			if (attestError) return fail(400, { error: attestError });
+		}
 		const r = dispatch('EditPwuType', 'PWU_TYPE', pwuTypeId, {
 			pwuTypeId,
 			name: f.name,
@@ -367,7 +424,9 @@ export const actions: Actions = {
 			permittedChildren: f.permittedChildren,
 			requiredInputs: f.requiredInputs,
 			requiredOutputs: f.requiredOutputs,
-			requiredAssurancePolicyIds: f.requiredAssurancePolicyIds
+			requiredAssurancePolicyIds: f.requiredAssurancePolicyIds,
+			executionBoundary: f.executionBoundary,
+			...(f.boundaryContract ? { boundaryContract: f.boundaryContract } : {})
 		});
 		if (r.status !== 'ACCEPTED') return fail(400, { error: r.error?.message ?? r.status });
 		return { editedType: pwuTypeId };

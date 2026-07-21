@@ -24,7 +24,9 @@
 	import {
 		analyzePwaGraph,
 		buildPwaGraphExport,
-		buildPwuBehaviorProjection
+		buildPwuBehaviorProjection,
+		leafKind,
+		leafKindLabel
 	} from '@janumipwb/rph-projections';
 	import {
 		PWU_TYPE_CATALOG,
@@ -315,11 +317,18 @@
 		completionRule: '',
 		isRoot: false,
 		requiredInputs: '',
-		requiredOutputs: ''
+		requiredOutputs: '',
+		// STD-2/STD-3 (DWP-05): where this type's work is discharged, and (when DELEGATED_EXTERNAL) the boundary
+		// contract's scalar parts. attestedAssurancePolicyIds is a separate checkbox-selection state below.
+		executionBoundary: 'INTERNAL',
+		counterpartyLabel: '',
+		boundaryApplicabilityNote: ''
 	});
 	let children = $state<string[]>([]);
 	// Selected declared assurance policy ids for the type being authored (distinct from data.policies, the library).
 	let selectedPolicyIds = $state<string[]>([]);
+	// Attested assurance policy ids for a DELEGATED_EXTERNAL type's boundary contract (the counterparty's claim).
+	let attestedPolicyIds = $state<string[]>([]);
 	// Per-child cardinality being authored, keyed by child type id (only meaningful for checked children).
 	let childRules = $state<Record<string, { cardinality: string; note: string }>>({});
 	const editingId = $derived(typeof formMode === 'object' && formMode ? formMode.editId : '');
@@ -361,10 +370,14 @@
 			completionRule: '',
 			isRoot: false,
 			requiredInputs: '',
-			requiredOutputs: ''
+			requiredOutputs: '',
+			executionBoundary: 'INTERNAL',
+			counterpartyLabel: '',
+			boundaryApplicabilityNote: ''
 		});
 		children = [];
 		selectedPolicyIds = [];
+		attestedPolicyIds = [];
 		childRules = {};
 		formMode = 'define';
 		focusTypeForm();
@@ -382,10 +395,14 @@
 			completionRule: t.completionRule,
 			isRoot: t.isRoot,
 			requiredInputs: t.requiredInputs.join(', '),
-			requiredOutputs: t.requiredOutputs.join(', ')
+			requiredOutputs: t.requiredOutputs.join(', '),
+			executionBoundary: t.executionBoundary,
+			counterpartyLabel: t.boundaryContract?.counterpartyLabel ?? '',
+			boundaryApplicabilityNote: t.boundaryContract?.applicabilityNote ?? ''
 		});
 		children = [...t.permittedChildTypeIds];
 		selectedPolicyIds = [...t.requiredAssurancePolicyIds];
+		attestedPolicyIds = [...(t.boundaryContract?.attestedAssurancePolicyIds ?? [])];
 		childRules = Object.fromEntries(
 			t.permittedChildren.map((r) => [
 				r.typeId,
@@ -398,14 +415,19 @@
 	function applyTemplate(key: string) {
 		const t = PWU_TYPE_CATALOG.find((x) => x.key === key);
 		if (!t) return;
+		// Catalog blueprints are all INTERNAL work areas — a template never carries a delegation boundary.
 		Object.assign(f, {
 			name: t.name,
 			pwuKind: t.pwuKind,
 			purpose: t.purpose,
 			isRoot: t.isRoot,
 			requiredInputs: (t.requiredInputs ?? []).join(', '),
-			requiredOutputs: (t.requiredOutputs ?? []).join(', ')
+			requiredOutputs: (t.requiredOutputs ?? []).join(', '),
+			executionBoundary: 'INTERNAL',
+			counterpartyLabel: '',
+			boundaryApplicabilityNote: ''
 		});
+		attestedPolicyIds = [];
 	}
 	function toggleChild(id: string, on: boolean) {
 		children = on ? [...children, id] : children.filter((c) => c !== id);
@@ -415,6 +437,11 @@
 		selectedPolicyIds = on
 			? [...selectedPolicyIds, id]
 			: selectedPolicyIds.filter((p) => p !== id);
+	}
+	function toggleAttested(id: string, on: boolean) {
+		attestedPolicyIds = on
+			? [...attestedPolicyIds, id]
+			: attestedPolicyIds.filter((p) => p !== id);
 	}
 
 	// ---- Assurance Policy library manager (engine-backed): list all policies, create / edit / version / suspend /
@@ -494,6 +521,10 @@
 	// unrelated edit instead of silently dropping them because they are absent from the ACTIVE-only picker.
 	const inactiveSelectedPolicyIds = $derived(
 		selectedPolicyIds.filter((id) => !pickablePolicies.some((policy) => policy.id === id))
+	);
+	// Same retain-visible discipline for a delegated type's ATTESTED ids (the boundary contract).
+	const inactiveAttestedPolicyIds = $derived(
+		attestedPolicyIds.filter((id) => !pickablePolicies.some((policy) => policy.id === id))
 	);
 	// Resolve a policy id to its human name: engine library first, then the locked-floor labels, then the id.
 	const policyNameById = $derived(new Map(data.policies.map((p) => [p.id, p.name])));
@@ -1250,6 +1281,14 @@
 								<span class="fhelp">{PWU_TYPE_HELP.isRoot}</span>
 							</div>
 							<div class="ffield">
+								{@render fhead('Execution boundary', PWU_TYPE_HELP.executionBoundary, 'pwu-type-boundary')}
+								<select id="pwu-type-boundary" name="executionBoundary" bind:value={f.executionBoundary}>
+									<option value="INTERNAL">INTERNAL · we decompose &amp; execute this</option>
+									<option value="DELEGATED_EXTERNAL">DELEGATED_EXTERNAL · handed to an external party</option>
+								</select>
+							</div>
+							{#if f.executionBoundary !== 'DELEGATED_EXTERNAL'}
+							<div class="ffield">
 								{@render fhead('Permitted child types + cardinality', PWU_TYPE_HELP.permittedChildren)}
 								<div class="childlist">
 									{#each data.types.filter((t) => t.id !== editingId) as t (t.id)}
@@ -1304,6 +1343,66 @@
 									{/if}
 								</div>
 							</div>
+							{:else}
+							<div class="ffield" data-testid="boundary-contract">
+								{@render fhead('Counterparty', PWU_TYPE_HELP.counterpartyLabel, 'pwu-type-counterparty')}
+								<input
+									id="pwu-type-counterparty"
+									name="counterpartyLabel"
+									bind:value={f.counterpartyLabel}
+									placeholder="Contract Lab — Hematology"
+								/>
+							</div>
+							<div class="ffield">
+								{@render fhead('Attested assurance policies', PWU_TYPE_HELP.attestedAssurancePolicyIds)}
+								<div class="policylist">
+									<div class="floornote">The counterparty’s CLAIM · not our review (disclosure is not verification)</div>
+									{#each pickablePolicies as p (p.id)}
+										<label class="childopt" title={p.purpose}>
+											<input
+												type="checkbox"
+												name="attestedAssurancePolicyIds"
+												value={p.id}
+												checked={attestedPolicyIds.includes(p.id)}
+												onchange={(e) => toggleAttested(p.id, e.currentTarget.checked)}
+											/>
+											{p.name}
+										</label>
+									{/each}
+									{#each inactiveAttestedPolicyIds as policyId (policyId)}
+										{@const retained = data.policies.find((policy) => policy.id === policyId)}
+										<label
+											class="childopt inactivepolicy"
+											title="Existing inactive attestation — retained unless you uncheck it"
+										>
+											<input
+												type="checkbox"
+												name="attestedAssurancePolicyIds"
+												value={policyId}
+												checked={attestedPolicyIds.includes(policyId)}
+												onchange={(e) => toggleAttested(policyId, e.currentTarget.checked)}
+											/>
+											{policyDisplayName(policyId)}
+											<span class="policyrefstatus"
+												>{retained?.isFloor ? 'LOCKED FLOOR' : (retained?.status ?? 'MISSING')}</span
+											>
+										</label>
+									{/each}
+									{#if pickablePolicies.length === 0}
+										<span class="fhelp">No active policies yet — create and activate one in ⚖ Policies.</span>
+									{/if}
+								</div>
+							</div>
+							<div class="ffield">
+								{@render fhead('Applicability note', PWU_TYPE_HELP.boundaryApplicabilityNote, 'pwu-type-boundary-note')}
+								<input
+									id="pwu-type-boundary-note"
+									name="boundaryApplicabilityNote"
+									bind:value={f.boundaryApplicabilityNote}
+									placeholder="STAT panels only; routine handled internally"
+								/>
+							</div>
+							{/if}
 							<div class="ffield">
 								{@render fhead('Declared assurance policies', PWU_TYPE_HELP.requiredAssurancePolicyIds)}
 								<div class="policylist">
@@ -1362,6 +1461,17 @@
 					{:else if current}
 						<h3>{current.name}</h3>
 						<div class="field"><span class="flabel">Kind</span><p class="mono">{current.pwuKind}</p></div>
+						<div class="field" data-testid="inspector-boundary">
+							<span class="flabel">Boundary</span>
+							<p>
+								<span class={current.executionBoundary === 'DELEGATED_EXTERNAL'
+									? 'boundarybadge delegated'
+									: 'boundarybadge internal'}>
+									{current.executionBoundary === 'DELEGATED_EXTERNAL' ? 'DELEGATED · external' : 'INTERNAL'}
+								</span>
+								<span class="leafkind">{leafKindLabel(leafKind(current))}</span>
+							</p>
+						</div>
 						<div class="field"><span class="flabel">Purpose</span><p>{current.purpose}</p></div>
 						<div class="field">
 							<span class="flabel">Completion rule</span><p class="mono">{current.completionRule || '—'}</p>
@@ -1374,6 +1484,25 @@
 							<span class="flabel">Required outputs</span>
 							<p>{current.requiredOutputs.length ? current.requiredOutputs.join(', ') : '—'}</p>
 						</div>
+						{#if current.executionBoundary === 'DELEGATED_EXTERNAL'}
+						<div class="field" data-testid="inspector-boundary-contract">
+							<span class="flabel">Boundary contract</span>
+							<p>Counterparty: <strong>{current.boundaryContract?.counterpartyLabel || '—'}</strong></p>
+							<p class="fhelp">Attested policies — the counterparty’s claim, not verified by us:</p>
+							{#if current.boundaryContract?.attestedAssurancePolicyIds.length}
+								<ul class="childcards">
+									{#each current.boundaryContract.attestedAssurancePolicyIds as pid (pid)}
+										<li><span class="cardbadge">attested</span> {policyDisplayName(pid)}</li>
+									{/each}
+								</ul>
+							{:else}
+								<p>— (none attested)</p>
+							{/if}
+							{#if current.boundaryContract?.applicabilityNote}
+								<p><em class="applic">· {current.boundaryContract.applicabilityNote}</em></p>
+							{/if}
+						</div>
+						{:else}
 						<div class="field">
 							<span class="flabel">Permitted children</span>
 							{#if current.permittedChildTypeIds.length === 0}
@@ -1393,6 +1522,7 @@
 								</ul>
 							{/if}
 						</div>
+						{/if}
 						<div class="field assurancerail">
 							<span class="flabel">Required assurance policies</span>
 							<div class="railfloor">
@@ -2233,6 +2363,27 @@
 		flex: 0 0 auto;
 	}
 	.applic {
+		color: var(--outline);
+		font-size: 11px;
+	}
+	.boundarybadge {
+		font-family: 'Source Code Pro', monospace;
+		font-size: 10px;
+		font-weight: 600;
+		border-radius: 4px;
+		padding: 0 5px;
+		margin-right: 6px;
+	}
+	.boundarybadge.internal {
+		color: #9fcaff;
+		border: 1px solid #345;
+	}
+	.boundarybadge.delegated {
+		color: #ffd08a;
+		border: 1px solid #6a5320;
+		background: #2a220f;
+	}
+	.leafkind {
 		color: var(--outline);
 		font-size: 11px;
 	}
