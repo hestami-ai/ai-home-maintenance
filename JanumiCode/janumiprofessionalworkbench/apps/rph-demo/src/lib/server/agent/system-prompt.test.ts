@@ -63,6 +63,8 @@ describe('buildSystemPrompt authoring-backbone boundaries', () => {
 		expect(prompt).toContain('COMPOSITION ARCHITECTURE');
 		expect(prompt).toContain('ARTIFACT HAND-OFF');
 		expect(prompt).toContain('PWU LIFECYCLE');
+		// D-1a — the trio SHALL NOT be conflated with platform/content NOR with STD-1-I(d)'s three-policy floor triad.
+		expect(prompt).toContain('three PLANES, not three policies');
 	});
 
 	// JAN-PRPWA-DS-001 STD-3 / DR-001 DWP-04: the agnostic core teaches how to AUTHOR a delegated leaf — the

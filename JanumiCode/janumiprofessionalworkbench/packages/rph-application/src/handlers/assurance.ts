@@ -8,6 +8,7 @@
 import {
 	checkIndependence,
 	evidenceAdmissibility,
+	FLOOR_POLICY_IDS,
 	type Identity,
 	type IndependenceRequirement
 } from '@janumipwb/rph-assurance';
@@ -43,18 +44,15 @@ import {
 const POLICY = 'ASSURANCE_POLICY';
 
 // The 3 de minimis floor policies (guide §8.4) are LOCKED: always-apply, non-waivable, non-editable — the
-// exec≠assurance floor (INV-5). Their ids mirror @janumipwb/rph-assurance FLOOR_POLICY_IDS (kept literal here to
-// avoid a cross-package dep). Edit / Supersede / Suspend / Activate all reject when targeting one.
-const FLOOR_POLICY_IDS: ReadonlySet<string> = new Set([
-	'floor.schema-invariant',
-	'floor.identity-provenance',
-	'floor.reasoning-review'
-]);
+// exec≠assurance floor (INV-5). Their ids come from the single canonical source (@janumipwb/rph-assurance
+// FLOOR_POLICY_IDS) — the edge is acyclic and already taken by floor-gate.ts, so no literal copy (F-13). Edit /
+// Supersede / Suspend / Activate all reject when targeting one.
+const FLOOR_POLICY_ID_SET: ReadonlySet<string> = new Set(Object.values(FLOOR_POLICY_IDS));
 
 /** A status-transition guard that rejects any lifecycle change to a locked de minimis floor policy. */
 function rejectIfFloorLocked(command: DomainCommand): () => ReturnType<typeof reject> | null {
 	return () =>
-		FLOOR_POLICY_IDS.has(command.targetAggregateId)
+		FLOOR_POLICY_ID_SET.has(command.targetAggregateId)
 			? reject(
 					command,
 					'RPH_INVARIANT_VIOLATION',
@@ -157,7 +155,7 @@ export const createAssurancePolicy: CommandHandler = (ctx, command, payload) => 
 	//   - The three de minimis FLOOR policies (§8.4, a guide construct) are LOCKED and always-apply: rejectIfFloorLocked
 	//     rejects Activate/Suspend/Supersede/Edit on them, so they CANNOT be activated and MUST be born ACTIVE. The
 	//     ratified §18 lifecycle governs the ratified catalog; the authored floor overlay is exempt by construction.
-	const bornStatus = FLOOR_POLICY_IDS.has(p.policyId) ? 'ACTIVE' : 'DRAFT';
+	const bornStatus = FLOOR_POLICY_ID_SET.has(p.policyId) ? 'ACTIVE' : 'DRAFT';
 	const state: Record<string, unknown> = {
 		...newEnvelope(command, POLICY, p.policyId, {
 			lifecycleStatus: bornStatus,

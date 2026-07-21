@@ -144,3 +144,58 @@ describe('Fixture B — bloodwork trio (delegation across three boundary placeme
 		expect(r.delegatedAssurance[0]!.reasoningReview).toBe('SUBSTITUTED_BY_ATTESTATION');
 	});
 });
+
+describe('Fixture C — import-and-project (PB-4/R-8): platform-satisfied / author-as-PWU / out-of-model', () => {
+	// Enterprise robustness: a foreign decomposition imported from another tool is PROJECTED onto the JPWB model, and
+	// the SAME projected scorer (Fixture A) is the reconciliation lens. Each foreign element lands in exactly one
+	// bucket — a platform kind wrongly carried in (OMIT it, INV-3), a MISSING required work area (AUTHOR it), or an
+	// OUT-OF-MODEL kind that fits no slot and must be reconciled as an untrusted DRAFT (C-5), never gospel. Only the
+	// calibration limb is built here; the full import PLAYBOOK/UI stays deferred (R-8/PB-4, §11). This fixture also
+	// pins the closed gap: an unknown kind used to be silently dropped, so a foreign element read as "no finding".
+
+	// A clean import: the ASPLE structure with platform correctly peeled — projects conformant, nothing out-of-model.
+	const cleanImport = (): PwaGraphNode[] => [
+		gnode('root', 'PRODUCT_REALIZATION', true, ['p1', 'p2', 'p3', 'p4', 'p5', 'p6', 'caca']),
+		gnode('p1', 'INTENT_JTBD', false),
+		gnode('p2', 'UCD_EXPERIENCE', false),
+		gnode('p3', 'SYSTEMS_VMODEL', false, ['afu']),
+		gnode('afu', 'AFU', false),
+		gnode('p4', 'AGILE_FDD', false),
+		gnode('p5', 'INTEGRATION_VV', false),
+		gnode('p6', 'RELEASE_OPERATIONS', false),
+		gnode('caca', 'CACA_REVIEW', false)
+	];
+
+	it('a clean import projects conformant — the structural root is in-model, nothing is out-of-model', () => {
+		const score = scoreAgainstOracle(cleanImport());
+		expect(score.conformant, JSON.stringify(score)).toBe(true);
+		expect(score.outOfModelKinds).toEqual([]);
+	});
+
+	it('classifies a mixed foreign import into all three buckets at once (platform / missing / out-of-model)', () => {
+		const imported = cleanImport()
+			// author-as-PWU: the import is MISSING a required work area.
+			.filter((n) => n.pwuKind !== 'INTEGRATION_VV')
+			.concat([
+				// platform-satisfied but wrongly carried in as a node → platform leak (omit on projection).
+				gnode('gs', 'GOVERNED_STREAM', false),
+				// out-of-model: a foreign tool artifact that fits no JPWB slot → reconcile as untrusted DRAFT.
+				gnode('gantt', 'GANTT_SCHEDULE', false)
+			]);
+		const score = scoreAgainstOracle(imported);
+		expect(score.platformLeaks).toContain('GOVERNED_STREAM'); // omit
+		expect(score.missingWorkAreas).toContain('INTEGRATION_VV'); // author
+		expect(score.outOfModelKinds).toContain('GANTT_SCHEDULE'); // reconcile
+		// The platform kind is NOT also counted out-of-model — each element lands in exactly one bucket.
+		expect(score.outOfModelKinds).not.toContain('GOVERNED_STREAM');
+		expect(score.conformant).toBe(false);
+	});
+
+	it('an out-of-model foreign kind is FLAGGED, not silently dropped (the pre-fix gap)', () => {
+		const score = scoreAgainstOracle(cleanImport().concat([gnode('foreign', 'LEGACY_WORK_ITEM', false)]));
+		// Before the out-of-model arm, an unknown kind produced no missing/leak/non-leaf finding, so the graph read as
+		// fully conformant — a foreign element passing as "no finding". Now it is surfaced for reconciliation.
+		expect(score.outOfModelKinds).toEqual(['LEGACY_WORK_ITEM']);
+		expect(score.conformant).toBe(false);
+	});
+});
