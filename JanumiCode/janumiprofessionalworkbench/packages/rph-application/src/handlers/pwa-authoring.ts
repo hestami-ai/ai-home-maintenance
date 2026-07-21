@@ -623,7 +623,8 @@ function pwuTypeNodesOf(ctx: HandlerContext, pwaId: string): PwaGraphNode[] {
 			isRoot: Boolean(s.isRoot),
 			permittedChildTypeIds: arr(s.permittedChildTypeIds),
 			requiredInputs: arr(s.requiredInputs),
-			requiredOutputs: arr(s.requiredOutputs)
+			requiredOutputs: arr(s.requiredOutputs),
+			executionBoundary: s.executionBoundary === 'DELEGATED_EXTERNAL' ? 'DELEGATED_EXTERNAL' : 'INTERNAL'
 		});
 	}
 	return nodes;

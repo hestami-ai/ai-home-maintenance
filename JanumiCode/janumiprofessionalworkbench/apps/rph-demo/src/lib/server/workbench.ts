@@ -262,7 +262,11 @@ export function buildPwaExport(
 		isRoot: Boolean(t.state.isRoot),
 		permittedChildTypeIds: arr(t.state.permittedChildTypeIds),
 		requiredInputs: arr(t.state.requiredInputs),
-		requiredOutputs: arr(t.state.requiredOutputs)
+		requiredOutputs: arr(t.state.requiredOutputs),
+		executionBoundary:
+			t.state.executionBoundary === 'DELEGATED_EXTERNAL'
+				? ('DELEGATED_EXTERNAL' as const)
+				: ('INTERNAL' as const)
 	}));
 	return buildPwaGraphExport(
 		{

@@ -68,6 +68,14 @@
 		{#each data.floorLabels as label (label)}
 			<div class="floor">{label}</div>
 		{/each}
+		{#if data.attestationSubstitute}
+			<div
+				class="attestation"
+				title="External work — Reasoning Review is discharged by the counterparty's attestation, not our floor (INV-2)"
+			>
+				{data.attestationSubstitute}
+			</div>
+		{/if}
 		{#each data.policyLabels as label (label)}
 			<div class="plus">+ {label}</div>
 		{/each}
@@ -201,5 +209,12 @@
 		font-size: 10px;
 		color: #61dac1;
 		line-height: 1.45;
+	}
+	.attestation {
+		font-size: 9.5px;
+		font-style: italic;
+		color: #ffd08a;
+		line-height: 1.4;
+		margin-top: 1px;
 	}
 </style>

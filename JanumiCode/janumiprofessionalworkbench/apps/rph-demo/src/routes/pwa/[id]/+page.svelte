@@ -228,7 +228,8 @@
 					isRoot: t.isRoot,
 					permittedChildTypeIds: t.permittedChildTypeIds,
 					requiredInputs: t.requiredInputs,
-					requiredOutputs: t.requiredOutputs
+					requiredOutputs: t.requiredOutputs,
+					executionBoundary: t.executionBoundary
 				}))
 			)
 		)

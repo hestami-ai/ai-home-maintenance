@@ -8,6 +8,8 @@
 import dagre from '@dagrejs/dagre';
 import type { Edge, Node } from '@xyflow/svelte';
 import { assurancePolicyLabel, ASSURANCE_FLOOR } from '$lib/authoring/pwuType';
+import { leafKind } from '@janumipwb/rph-projections';
+import type { ExecutionBoundary } from '@janumipwb/rph-authoring';
 
 /** A per-child composition rule (cardinality annotation) as the card reads it. */
 export interface ChildRule {
@@ -26,6 +28,8 @@ export interface PwuTypeNode {
 	readonly requiredInputs?: readonly string[];
 	readonly requiredOutputs?: readonly string[];
 	readonly requiredAssurancePolicyIds?: readonly string[];
+	/** STD-2 — where the work is discharged (absent ⇒ INTERNAL). Conditions the §11.7.4 rail (INV-2). */
+	readonly executionBoundary?: ExecutionBoundary;
 }
 
 /** The data the PwuTypeCard custom node renders. */
@@ -40,8 +44,12 @@ export interface PwuCardData {
 	readonly orphan: boolean;
 	/** Compact cardinality summary of the permitted children, e.g. "2×M1 · 1×M+". */
 	readonly cardinalitySummary: string;
-	/** The locked de-minimis floor (constant labels) shown on every card. */
+	/** The locked de-minimis floor labels shown on the card. For a DELEGATED_EXTERNAL leaf this is ONLY the two
+	 *  deterministic limbs — Reasoning Review is NOT shown here (INV-2); see attestationSubstitute. */
 	readonly floorLabels: readonly string[];
+	/** INV-2 (delegated leaf only): the Reasoning-Review slot, shown as SUBSTITUTED by the counterparty's
+	 *  attestation — never as a satisfied floor limb. Undefined for an INTERNAL node. */
+	readonly attestationSubstitute?: string;
 	/** Declared additive assurance policy labels (from requiredAssurancePolicyIds). */
 	readonly policyLabels: readonly string[];
 	/** Keeps connection handles aligned with the active ELK/Dagre lens. */
@@ -73,6 +81,14 @@ export interface PwaFlow {
 const NODE_W = 240;
 const NODE_H = 160;
 const FLOOR_LABELS = ASSURANCE_FLOOR.map((p) => p.label);
+const REASONING_REVIEW_FLOOR_ID = 'floor.reasoning-review';
+// The two DETERMINISTIC floor limbs (everything except the model-judgment Reasoning Review), DERIVED from the same
+// ASSURANCE_FLOOR source — never a 4th hardcoded label list (F-13). A DELEGATED leaf shows these + a substitute.
+const DETERMINISTIC_FLOOR_LABELS = ASSURANCE_FLOOR.filter(
+	(p) => p.id !== REASONING_REVIEW_FLOOR_ID
+).map((p) => p.label);
+const REASONING_REVIEW_LABEL =
+	ASSURANCE_FLOOR.find((p) => p.id === REASONING_REVIEW_FLOOR_ID)?.label ?? 'Reasoning Review';
 
 /** The permits (composition) edges among known types. */
 function permitPairs(
@@ -379,6 +395,10 @@ export async function toPwaFlow(
 
 	const nodes: Node[] = visibleTypes.map((t) => {
 		const layoutNode = layoutNodeById.get(t.id);
+		// INV-2: a DELEGATED_EXTERNAL leaf's rail shows the two deterministic floor limbs plus an attestation
+		// SUBSTITUTE for Reasoning Review — never Reasoning Review as an applicable/satisfied floor on external work.
+		// Leaf KIND comes from the shared helper so the card, inspector, and graph report all agree (F-13).
+		const delegated = leafKind(t) === 'DELEGATED';
 		const data: PwuCardData = {
 			...layoutNode?.data,
 			id: t.id,
@@ -390,7 +410,10 @@ export async function toPwaFlow(
 			collapsed: opts.collapsed.has(t.id),
 			orphan: !t.isRoot && !hasParent.has(t.id),
 			cardinalitySummary: cardinalitySummary(t),
-			floorLabels: FLOOR_LABELS,
+			floorLabels: delegated ? DETERMINISTIC_FLOOR_LABELS : FLOOR_LABELS,
+			attestationSubstitute: delegated
+				? `${REASONING_REVIEW_LABEL} · substituted by counterparty attestation (required at Undertaking time)`
+				: undefined,
 			policyLabels: (t.requiredAssurancePolicyIds ?? []).map(assurancePolicyLabel),
 			layoutDirection: opts.layoutDirection ?? 'DOWN',
 			onToggleCollapse: () => opts.onToggleCollapse(t.id)

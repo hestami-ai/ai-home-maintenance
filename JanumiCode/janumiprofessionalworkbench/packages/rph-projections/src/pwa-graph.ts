@@ -16,6 +16,9 @@
 // report fields and never touches `valid`, so the structural ValidatePwa gate is unchanged; a proof-harness asserts
 // on `coherent`.
 
+import type { ExecutionBoundary } from '@janumipwb/rph-contracts';
+import { leafKind } from './leaf.js';
+
 export interface PwaGraphNode {
 	readonly id: string;
 	readonly name: string;
@@ -24,6 +27,8 @@ export interface PwaGraphNode {
 	readonly permittedChildTypeIds: readonly string[];
 	readonly requiredInputs: readonly string[];
 	readonly requiredOutputs: readonly string[];
+	/** JAN-PRPWA-DS-001 STD-2 — resolved boundary (absent ⇒ INTERNAL). Drives the delegated-assurance projection. */
+	readonly executionBoundary?: ExecutionBoundary;
 }
 
 export interface PwaMeta {
@@ -80,6 +85,24 @@ export interface PwaGraphMetrics {
 	readonly ungroundedBranches: number;
 	/** Data-flow edges whose producer and consumer share no common ancestor below the root (the "spray"). */
 	readonly crossSubtreeFlows: number;
+	/** DELEGATED_EXTERNAL leaves — terminal nodes whose work is discharged across an organizational boundary. */
+	readonly delegatedLeaves: number;
+}
+
+/**
+ * JAN-PRPWA-DS-001 R-10 / INV-2 — how a DELEGATED_EXTERNAL leaf's assurance is represented, WITHOUT ever claiming
+ * our platform floor discharges the external work. At the boundary crossing the two DETERMINISTIC floor limbs
+ * (Output Contract & Invariant Integrity; Identity/Provenance/Trace) still apply to what crosses; the model-judgment
+ * Reasoning Review does NOT run on external work — it is SUBSTITUTED by the counterparty's attestation, captured at
+ * Undertaking time (the runtime capture is deferred). This record NEVER carries a 'SATISFIED' Reasoning Review.
+ */
+export interface DelegatedAssuranceRecord {
+	readonly nodeId: string;
+	readonly name: string;
+	/** The two deterministic floor limbs apply to the boundary-crossing artifacts. */
+	readonly deterministicFloorApplies: true;
+	/** INV-2: never 'SATISFIED' for external work. */
+	readonly reasoningReview: 'SUBSTITUTED_BY_ATTESTATION';
 }
 
 export interface PwaGraphReport {
@@ -98,6 +121,9 @@ export interface PwaGraphReport {
 	readonly findings: string[];
 	/** Artifact-flow CONSERVATION advisories — the checks the flat name-join cannot see (permits × dataFlow). */
 	readonly conservation: string[];
+	/** JAN-PRPWA-DS-001 INV-2 — the conditioned assurance representation for each DELEGATED_EXTERNAL leaf. A
+	 *  SEPARATE field (like `conservation`): it never touches `valid`, so the ValidatePwa/floor gate is unchanged. */
+	readonly delegatedAssurance: DelegatedAssuranceRecord[];
 }
 
 const FANOUT_LIMIT = 5;
@@ -328,12 +354,26 @@ function analyzeConservation(ex: PwaGraphExport): {
 	return { conservation, ungroundedBranches: conservation.length, crossSubtreeFlows };
 }
 
+/** INV-2 — the conditioned assurance representation for every DELEGATED_EXTERNAL leaf (leaf KIND from the shared
+ *  helper, so this agrees with the inspector + card rail). Reasoning Review is always SUBSTITUTED, never SATISFIED. */
+function delegatedAssuranceOf(ex: PwaGraphExport): DelegatedAssuranceRecord[] {
+	return ex.nodes
+		.filter((n) => leafKind(n) === 'DELEGATED')
+		.map((n) => ({
+			nodeId: n.id,
+			name: n.name,
+			deterministicFloorApplies: true as const,
+			reasoningReview: 'SUBSTITUTED_BY_ATTESTATION' as const
+		}));
+}
+
 /**
  * Analyze a PWA graph export. HARD invariants (drive `valid`): exactly one root, permits acyclic, every node
  * reachable from the root. Advisory findings: dangling data-flow inputs (a non-root type consumes an artifact no
  * type produces), unused outputs, over-broad fan-out (a "star" not a decomposition), duplicate kinds/names.
  * A separate CONSERVATION layer (permits × dataFlow) drives the stricter `coherent` verdict + `conservation`
- * advisories without touching `valid`.
+ * advisories without touching `valid`. A separate DELEGATED-ASSURANCE projection (INV-2) represents each
+ * delegated leaf's conditioned assurance, also without touching `valid`.
  */
 export function analyzePwaGraph(ex: PwaGraphExport): PwaGraphReport {
 	const nodeById = new Map(ex.nodes.map((n) => [n.id, n]));
@@ -408,6 +448,7 @@ export function analyzePwaGraph(ex: PwaGraphExport): PwaGraphReport {
 	dup((n) => n.name, 'name');
 
 	const cons = analyzeConservation(ex);
+	const delegatedAssurance = delegatedAssuranceOf(ex);
 
 	const metrics: PwaGraphMetrics = {
 		nodeCount: ex.nodes.length,
@@ -421,7 +462,8 @@ export function analyzePwaGraph(ex: PwaGraphExport): PwaGraphReport {
 		unusedOutputs,
 		cycleCount: cyc.size,
 		ungroundedBranches: cons.ungroundedBranches,
-		crossSubtreeFlows: cons.crossSubtreeFlows
+		crossSubtreeFlows: cons.crossSubtreeFlows,
+		delegatedLeaves: delegatedAssurance.length
 	};
 
 	const valid = invariants.every((i) => i.ok);
@@ -431,6 +473,7 @@ export function analyzePwaGraph(ex: PwaGraphExport): PwaGraphReport {
 		invariants,
 		metrics,
 		findings,
-		conservation: cons.conservation
+		conservation: cons.conservation,
+		delegatedAssurance
 	};
 }

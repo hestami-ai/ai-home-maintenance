@@ -117,3 +117,33 @@ describe('toPwaFlow layout projection', () => {
 		expect(overlay.edges.map((edge) => edge.id)).toEqual(['root->consumer', 'flow:root->consumer']);
 	});
 });
+
+describe('toPwaFlow — delegated-leaf assurance rail (JAN-PRPWA-DS-001 INV-2, DWP-06)', () => {
+	const REASONING_REVIEW = 'Reasoning Review';
+	const railOf = (flow: Awaited<ReturnType<typeof toPwaFlow>>, id: string) =>
+		flow.nodes.find((n) => n.id === id)!.data as {
+			floorLabels: string[];
+			attestationSubstitute?: string;
+		};
+
+	it('conditions a DELEGATED_EXTERNAL leaf: two deterministic floor limbs + attestation substitute, NO Reasoning Review floor', async () => {
+		const flow = await toPwaFlow(
+			[type('root', ['lab']), type('lab', [], { executionBoundary: 'DELEGATED_EXTERNAL' })],
+			options()
+		);
+		const lab = railOf(flow, 'lab');
+		expect(lab.floorLabels).not.toContain(REASONING_REVIEW);
+		expect(lab.floorLabels).toHaveLength(2);
+		expect(lab.attestationSubstitute).toMatch(/substituted by counterparty attestation/);
+		// The substitute NAMES Reasoning Review, but it is never shown as a satisfied/applicable floor limb.
+		expect(lab.attestationSubstitute).toContain(REASONING_REVIEW);
+	});
+
+	it('an INTERNAL leaf keeps all three floor limbs and no substitute (back-compat)', async () => {
+		const flow = await toPwaFlow([type('root', ['a']), type('a')], options());
+		const a = railOf(flow, 'a');
+		expect(a.floorLabels).toContain(REASONING_REVIEW);
+		expect(a.floorLabels).toHaveLength(3);
+		expect(a.attestationSubstitute).toBeUndefined();
+	});
+});

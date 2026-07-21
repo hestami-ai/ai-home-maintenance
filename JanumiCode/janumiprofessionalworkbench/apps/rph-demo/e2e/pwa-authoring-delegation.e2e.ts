@@ -70,5 +70,14 @@ test.describe('PWA Designer — delegated-leaf authoring', () => {
 		await expect(page.getByTestId('inspector-boundary-contract')).toContainText(
 			'Contract Lab — Hematology'
 		);
+
+		// INV-2 on the RENDERED CARD (not just the graph report): the delegated node's §11.7.4 rail SUBSTITUTES
+		// Reasoning Review with the counterparty attestation and never shows it as a satisfied floor limb.
+		const rail = page
+			.locator('.svelte-flow__node')
+			.filter({ hasText: 'Bloodwork' })
+			.getByRole('region', { name: /Assurance policies for Bloodwork/ });
+		await expect(rail).toContainText('substituted by counterparty attestation');
+		await expect(rail.locator('.floor').filter({ hasText: 'Reasoning Review' })).toHaveCount(0);
 	});
 });

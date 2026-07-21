@@ -150,3 +150,35 @@ describe('analyzePwaGraph — artifact-flow conservation (the coherent verdict)'
 		expect(r.conservation).toEqual([]); // a is a leaf — no branch to ground
 	});
 });
+
+describe('analyzePwaGraph — delegated-leaf assurance (JAN-PRPWA-DS-001 INV-2, DWP-06)', () => {
+	const delegated = (id: string): PwaGraphNode => ({
+		...node(id, false),
+		executionBoundary: 'DELEGATED_EXTERNAL'
+	});
+
+	it('projects a delegated leaf as deterministic-floor + attestation-substitute — never Reasoning Review satisfied', () => {
+		const r = analyze([node('root', true, ['lab']), delegated('lab')]);
+		expect(r.metrics.delegatedLeaves).toBe(1);
+		expect(r.delegatedAssurance).toHaveLength(1);
+		const rec = r.delegatedAssurance[0]!;
+		expect(rec.nodeId).toBe('lab');
+		expect(rec.deterministicFloorApplies).toBe(true);
+		expect(rec.reasoningReview).toBe('SUBSTITUTED_BY_ATTESTATION');
+		// INV-2: nothing in the delegated-assurance projection represents Reasoning Review as SATISFIED.
+		expect(JSON.stringify(r.delegatedAssurance)).not.toMatch(/SATISFIED\b/);
+	});
+
+	it('an all-INTERNAL graph produces no delegated-assurance records', () => {
+		const r = analyze([node('root', true, ['a']), node('a', false)]);
+		expect(r.metrics.delegatedLeaves).toBe(0);
+		expect(r.delegatedAssurance).toEqual([]);
+	});
+
+	it('report.valid + coherent are UNCHANGED by the delegated boundary (the gate stays purely structural)', () => {
+		const internal = analyze([node('root', true, ['lab']), node('lab', false)]);
+		const withDelegated = analyze([node('root', true, ['lab']), delegated('lab')]);
+		expect(withDelegated.valid).toBe(internal.valid);
+		expect(withDelegated.coherent).toBe(internal.coherent);
+	});
+});

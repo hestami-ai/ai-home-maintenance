@@ -284,8 +284,8 @@ rollback_and_recovery: ["Revert projection + card edits"]
 risks: ["Triplicated floor labels (F-13) — do not deepen divergence", "Whole-PWA floor subject cannot express per-node today — projection-only this wave"]
 open_decisions: ["D-F: exact label for the delegated Reasoning-Review slot pre-attestation ('attestation required at Undertaking time' vs 'N/A — delegated') — must not read SATISFIED", "Whether requiredAssurancePolicyIds is also projected onto PwaGraphNode"]
 exit_criteria: ["INV-2 contract test green; report.valid unchanged; delegated rail conditioned"]
-delivery_state: NOT_STARTED
-conformance_state: UNASSESSED
+delivery_state: DELIVERED  # BOTH limbs. Graph-report: PwaGraphNode gains executionBoundary via BOTH builders (pwuTypeNodesOf + buildPwaExport); analyzePwaGraph adds delegatedAssurance[] (SEPARATE field, mirrors `conservation`) + metric delegatedLeaves — valid/coherent UNCHANGED. Card-rail: PwuTypeNode/PwuCardData gain executionBoundary/attestationSubstitute; toPwaFlow conditions floorLabels via the shared leafKind (delegated ⇒ 2 deterministic limbs, DERIVED from ASSURANCE_FLOOR not a 4th list) + attestation substitute; PwuTypeCard renders the substitute row; +page load-adapter threads executionBoundary. Gate: check-types 21/21, lint 0, boundary 0, rph-projections 65 (+3 graph), rph-demo 96 (+2 flow), e2e card INV-2 (delegated rail substitutes RR, shows no RR floor) + INTERNAL-rail regression green.
+conformance_state: CONFORMANT  # INV-2 enforced on BOTH the graph report AND the rendered card (the load()→data.types→PwuTypeNode→card path — no false-green). INV-5 untouched. P-2/INV-6: ValidatePwa gate keyed on report.valid, unchanged. leafKind is the SINGLE classifier (F-13) shared by inspector+card+report. D-F RULED: the delegated Reasoning-Review slot reads "…· substituted by counterparty attestation (required at Undertaking time)" — never SATISFIED. requiredAssurancePolicyIds NOT projected onto PwaGraphNode (unneeded; the card rail already shows declared policies from PwuTypeNode). Runtime floor-plan branch stays DEFERRED (R-10 runtime).
 ```
 
 ```yaml
