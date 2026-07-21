@@ -1058,3 +1058,155 @@ describe('PWU-Type execution boundary — INV-1 / STD-2 / STD-3 (JAN-PRPWA-DS-00
 		expect(s.boundaryContract).toMatchObject({ counterpartyLabel: 'Contract Lab — Hematology' });
 	});
 });
+
+// F-7 closure (JAN-PRPWA-DR-001 §15 Option 3): the assurance-policy-reference gate is now enforced at the DOMAIN
+// write boundary, so a DIRECT command (bypassing the broker + SvelteKit-action friendly pre-checks) can no longer
+// persist a reference to a locked-floor / DRAFT / SUSPENDED / missing policy — for requiredAssurancePolicyIds OR a
+// delegated node's boundaryContract.attestedAssurancePolicyIds. Existing declarations are retained.
+describe('PWU-Type assurance-policy references — handler write-boundary gate (F-7 closure)', () => {
+	let store: SqliteStorageAdapter;
+	let engine: Engine;
+	let seq = 0;
+	const F_PWA = 'pwa_01ARZ3NDEKTSV4RRFFQ69G5F00';
+	const F_TYPE = 'pwut_01ARZ3NDEKTSV4RRFFQ69G5F10';
+	const ACTIVE_POL = 'pol_f7_active';
+	const DRAFT_POL = 'pol_f7_draft';
+	const FLOOR_POL = 'floor.reasoning-review';
+
+	function dispatch(commandType: string, payload: unknown, id: string, type: string) {
+		const n = ++seq;
+		const command: DomainCommand = {
+			commandId: `c-${n}`,
+			commandType,
+			commandSchemaVersion: 1,
+			targetAggregateType: type,
+			targetAggregateId: id,
+			issuedAt: TS,
+			issuedBy: actor,
+			correlationId: 'corr',
+			idempotencyKey: `k-${n}`,
+			payload
+		};
+		return engine.dispatch(command);
+	}
+	function createPolicy(id: string, activate: boolean) {
+		const r = dispatch(
+			'CreateAssurancePolicy',
+			{
+				policyId: id,
+				version: '1.0.0',
+				name: id,
+				purpose: 'p',
+				rationale: 'r',
+				applicableObjectTypes: ['PROFESSIONAL_WORK_UNIT'],
+				evaluatedClaimTypes: ['CORRECTNESS'],
+				criteria: [
+					{
+						id: 'C-01',
+						name: 'n',
+						description: 's',
+						criterionType: 'BOOLEAN',
+						evaluationMethod: 'MODEL_JUDGMENT',
+						requiredEvidenceIds: [],
+						severityIfNotMet: 'BLOCKING',
+						mayBeNotApplicable: false
+					}
+				],
+				evaluatorRole: 'reviewer',
+				independenceRequirement: 'DIFFERENT_AGENT',
+				findingDefinitions: [],
+				permittedControlActions: ['CLARIFY']
+			},
+			id,
+			'ASSURANCE_POLICY'
+		);
+		expect(r.status, JSON.stringify(r.error)).toBe('ACCEPTED');
+		if (activate)
+			expect(
+				dispatch('ActivateAssurancePolicy', { policyId: id }, id, 'ASSURANCE_POLICY').status
+			).toBe('ACCEPTED');
+	}
+	const defineType = (id: string, extra: Record<string, unknown>) =>
+		dispatch(
+			'DefinePwuType',
+			{ pwuTypeId: id, pwaId: F_PWA, pwuKind: 'X', name: 'X', purpose: 'p', isRoot: false, ...extra },
+			id,
+			'PWU_TYPE'
+		);
+	const delegatedTo = (ids: string[]) => ({
+		executionBoundary: 'DELEGATED_EXTERNAL',
+		boundaryContract: { counterpartyLabel: 'Lab', attestedAssurancePolicyIds: ids }
+	});
+	const load = (id: string) => store.loadObject(id)?.state as Record<string, unknown> | undefined;
+
+	beforeEach(() => {
+		store = new SqliteStorageAdapter({ now: () => TS });
+		seq = 0;
+		engine = new Engine({ store, now: () => TS, newEventId: () => `e${++seq}` });
+		seedFloorPolicies(engine);
+		createPolicy(ACTIVE_POL, true);
+		createPolicy(DRAFT_POL, false);
+		const r = dispatch(
+			'CreatePwa',
+			{ pwaId: F_PWA, name: 'F7', description: 'd', domain: 'software', version: '1.0.0' },
+			F_PWA,
+			'PROFESSIONAL_WORK_ARCHITECTURE'
+		);
+		expect(r.status, JSON.stringify(r.error)).toBe('ACCEPTED');
+	});
+
+	it('rejects a DIRECT command that references a locked floor policy (bypassing broker/UI)', () => {
+		const r = defineType(F_TYPE, { requiredAssurancePolicyIds: [FLOOR_POL] });
+		expect(r.status).toBe('REJECTED');
+		expect(r.error?.code).toBe('RPH_INVARIANT_VIOLATION');
+		expect(load(F_TYPE)).toBeUndefined(); // nothing persisted
+	});
+
+	it('rejects a DIRECT command that references a DRAFT policy', () => {
+		const r = defineType(F_TYPE, { requiredAssurancePolicyIds: [DRAFT_POL] });
+		expect(r.status).toBe('REJECTED');
+		expect(r.error?.code).toBe('RPH_INVARIANT_VIOLATION');
+	});
+
+	it('rejects a DIRECT command that references a missing policy', () => {
+		const r = defineType(F_TYPE, { requiredAssurancePolicyIds: ['pol_does_not_exist'] });
+		expect(r.status).not.toBe('ACCEPTED');
+		expect(r.error?.code).toBe('RPH_VALIDATION_SEMANTIC_FAILED');
+	});
+
+	it('accepts an ACTIVE non-floor policy reference and persists it', () => {
+		expect(defineType(F_TYPE, { requiredAssurancePolicyIds: [ACTIVE_POL] }).status).toBe('ACCEPTED');
+		expect(load(F_TYPE)!.requiredAssurancePolicyIds).toEqual([ACTIVE_POL]);
+	});
+
+	it('applies the same gate to a delegated node’s attestedAssurancePolicyIds (R-10)', () => {
+		expect(defineType('pwut_01ARZ3NDEKTSV4RRFFQ69G5FA1', delegatedTo([DRAFT_POL])).status).toBe(
+			'REJECTED'
+		);
+		expect(defineType('pwut_01ARZ3NDEKTSV4RRFFQ69G5FA2', delegatedTo([FLOOR_POL])).status).toBe(
+			'REJECTED'
+		);
+		const cr = defineType('pwut_01ARZ3NDEKTSV4RRFFQ69G5FA3', delegatedTo([ACTIVE_POL]));
+		expect(cr.status, JSON.stringify(cr.error)).toBe('ACCEPTED');
+	});
+
+	it('retains a since-suspended reference on an unrelated edit, but rejects newly adding a non-ACTIVE one', () => {
+		expect(defineType(F_TYPE, { requiredAssurancePolicyIds: [ACTIVE_POL] }).status).toBe('ACCEPTED');
+		expect(
+			dispatch('SuspendAssurancePolicy', { policyId: ACTIVE_POL }, ACTIVE_POL, 'ASSURANCE_POLICY')
+				.status
+		).toBe('ACCEPTED');
+		// The reference is now to a SUSPENDED policy — an unrelated edit must retain it, not re-reject.
+		const e = dispatch('EditPwuType', { pwuTypeId: F_TYPE, purpose: 'clarified' }, F_TYPE, 'PWU_TYPE');
+		expect(e.status, JSON.stringify(e.error)).toBe('ACCEPTED');
+		expect(load(F_TYPE)!.requiredAssurancePolicyIds).toEqual([ACTIVE_POL]);
+		// But NEWLY adding a non-ACTIVE policy on an edit is still rejected.
+		const e2 = dispatch(
+			'EditPwuType',
+			{ pwuTypeId: F_TYPE, requiredAssurancePolicyIds: [ACTIVE_POL, DRAFT_POL] },
+			F_TYPE,
+			'PWU_TYPE'
+		);
+		expect(e2.status).toBe('REJECTED');
+	});
+});

@@ -32,10 +32,11 @@ import {
 	type CommandHandler,
 	type HandlerContext
 } from './kit.js';
-import { AI_ACTOR_TYPES, floorGateBlock } from './floor-gate.js';
+import { AI_ACTOR_TYPES, FLOOR_POLICY_IDS_REQUIRED, floorGateBlock } from './floor-gate.js';
 
 const PWA = 'PROFESSIONAL_WORK_ARCHITECTURE';
 const PWU_TYPE = 'PWU_TYPE';
+const ASSURANCE_POLICY = 'ASSURANCE_POLICY';
 const UNDERTAKING = 'UNDERTAKING';
 const CONVERSATION = 'AUTHORING_CONVERSATION';
 const PWA_MACHINE = 'PWA.publicationStatus';
@@ -273,6 +274,96 @@ function checkBoundaryCoherence(
 	return null;
 }
 
+/** Live status (id → status) of every ASSURANCE_POLICY object, built once per command so a single write that
+ *  touches both requiredAssurancePolicyIds and a boundaryContract's attested ids scans the store only once. */
+function assurancePolicyStatuses(ctx: HandlerContext): Map<string, string> {
+	const status = new Map<string, string>();
+	const ids = new Set<string>();
+	for (const e of ctx.store.readAllEvents())
+		if (e.aggregateType === ASSURANCE_POLICY) ids.add(e.aggregateId);
+	for (const pid of ids) {
+		const s = ctx.store.loadObject(pid)?.state as { status?: string } | undefined;
+		if (s) status.set(pid, String(s.status ?? 'DRAFT'));
+	}
+	return status;
+}
+
+/**
+ * F-7 closure (systemic — JAN-PRPWA-DR-001 §15 Option 3). The AUTHORITATIVE assurance-policy-reference gate, at the
+ * DOMAIN write boundary: a policy id newly referenced by a PWU Type SHALL be an ACTIVE, non-floor policy. The broker
+ * and the SvelteKit action carry the same rule as FRIENDLY pre-checks, but until now the engine did not — so a
+ * direct command (bypassing both) could persist a reference to a locked floor / DRAFT / SUSPENDED / SUPERSEDED /
+ * missing policy. This closes that bypass (C-5), for BOTH requiredAssurancePolicyIds and a delegated node's
+ * boundaryContract.attestedAssurancePolicyIds (R-10). Only NEWLY-added ids are checked; existing declarations are
+ * RETAINED even after the policy leaves ACTIVE, so an unrelated edit never erases historical intent (matches the
+ * broker/UI). Floor ids come from the single canonical source (rph-assurance via floor-gate) — no 4th hardcoded list.
+ */
+function checkAssurancePolicyRefs(
+	command: DomainCommand,
+	statuses: ReadonlyMap<string, string>,
+	requestedIds: readonly string[],
+	existingIds: readonly string[],
+	id: string,
+	label: string
+): CommandResult | null {
+	const existing = new Set(existingIds);
+	const floor = new Set<string>(FLOOR_POLICY_IDS_REQUIRED);
+	for (const pid of requestedIds) {
+		if (existing.has(pid)) continue; // a retained declaration — never re-validated
+		if (floor.has(pid))
+			return reject(
+				command,
+				'RPH_INVARIANT_VIOLATION',
+				`${label}: the locked floor policy ${pid} always applies and must not be referenced explicitly.`,
+				[id]
+			);
+		const st = statuses.get(pid);
+		if (st === undefined)
+			return reject(command, 'RPH_VALIDATION_SEMANTIC_FAILED', `${label}: Assurance Policy ${pid} does not exist.`, [id]);
+		if (st !== 'ACTIVE')
+			return reject(
+				command,
+				'RPH_INVARIANT_VIOLATION',
+				`${label}: Assurance Policy ${pid} is ${st}; only ACTIVE policies may be newly referenced.`,
+				[id]
+			);
+	}
+	return null;
+}
+
+/** Validate BOTH assurance-policy-reference fields of a PWU-Type write against the live policy library, retaining
+ *  each field's pre-existing declarations. Returns a rejecting CommandResult or null. */
+function checkPolicyRefsOnState(
+	ctx: HandlerContext,
+	command: DomainCommand,
+	nextState: Record<string, unknown>,
+	priorState: Record<string, unknown> | undefined,
+	id: string
+): CommandResult | null {
+	const arr = (v: unknown): string[] => (Array.isArray(v) ? (v as string[]) : []);
+	const attestedOf = (s: Record<string, unknown> | undefined): string[] =>
+		arr((s?.boundaryContract as { attestedAssurancePolicyIds?: unknown } | undefined)?.attestedAssurancePolicyIds);
+	const statuses = assurancePolicyStatuses(ctx);
+	return (
+		checkAssurancePolicyRefs(
+			command,
+			statuses,
+			arr(nextState.requiredAssurancePolicyIds),
+			arr(priorState?.requiredAssurancePolicyIds),
+			id,
+			'requiredAssurancePolicyIds'
+		) ??
+		checkAssurancePolicyRefs(
+			command,
+			statuses,
+			attestedOf(nextState),
+			attestedOf(priorState),
+			id,
+			'attestedAssurancePolicyIds'
+		)
+	);
+}
+
 /** DefinePwuType — create a PWU Type under a DRAFT PWA (types are edited draft-only, §39). */
 export const definePwuType: CommandHandler = (ctx, command, payload) => {
 	const p = payload as DefinePwuTypePayload;
@@ -328,6 +419,8 @@ export const definePwuType: CommandHandler = (ctx, command, payload) => {
 	};
 	const boundaryViolation = checkBoundaryCoherence(ctx, command, state, p.pwuTypeId);
 	if (boundaryViolation) return boundaryViolation;
+	const policyViolation = checkPolicyRefsOnState(ctx, command, state, undefined, p.pwuTypeId);
+	if (policyViolation) return policyViolation;
 	// Adding a PWU Type materially edits the PWA's graph: raise the PWA's semanticVersion with it, so a floor
 	// satisfied over the previous graph cannot authorize this one (§10.1 L1379).
 	return withPwaVersionBump(ctx, command, p.pwaId, () =>
@@ -505,6 +598,8 @@ export const editPwuType: CommandHandler = (ctx, command, payload) => {
 	}
 	const boundaryViolation = checkBoundaryCoherence(ctx, command, next, id);
 	if (boundaryViolation) return boundaryViolation;
+	const policyViolation = checkPolicyRefsOnState(ctx, command, next, loaded.state, id);
+	if (policyViolation) return policyViolation;
 	const event = makeEvent(ctx, command, {
 		eventType: 'PwuTypeRedefined',
 		aggregateType: PWU_TYPE,
