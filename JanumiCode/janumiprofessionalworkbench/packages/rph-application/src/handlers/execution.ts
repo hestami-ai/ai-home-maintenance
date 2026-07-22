@@ -22,8 +22,11 @@ import {
 	canAuthorizeNewWork,
 	canSkipStep,
 	retryDecision,
+	startStepGate,
 	validateStepCompletion,
-	type AssumptionView
+	validateTransitionGraph,
+	type AssumptionView,
+	type GatePlan
 } from '@janumipwb/rph-domain';
 import {
 	advanceStatus,
@@ -44,6 +47,23 @@ const PLAN = 'EXECUTION_PLAN';
 const MACHINE = 'ExecutionPlan.status';
 const STEP_MACHINE = 'ExecutionStep.stepState';
 
+/** Project a plan state bag into the pure transition-graph gate read-model (DR-004 DWP-01). The SAME GatePlan the
+ *  read-model builds, so the engine authority (startExecutionStep) and the UI affordance cannot diverge (§19-M2). */
+function toGatePlan(plan: Record<string, unknown>): GatePlan {
+	const steps = (plan.steps as Array<{ id?: unknown; stepState?: unknown }>) ?? [];
+	const transitions = (plan.transitions as Array<Record<string, unknown>>) ?? [];
+	return {
+		status: String(plan.status ?? ''),
+		steps: steps.map((s) => ({ id: String(s.id ?? ''), stepState: String(s.stepState ?? '') })),
+		transitions: transitions.map((t) => ({
+			sourceStepId: t.sourceStepId === undefined ? undefined : String(t.sourceStepId),
+			targetStepId: t.targetStepId === undefined ? undefined : String(t.targetStepId),
+			transitionType: t.transitionType === undefined ? undefined : String(t.transitionType),
+			conditionExpression: t.conditionExpression
+		}))
+	};
+}
+
 /** ProposeExecutionPlan — create the plan for a PWU, submitted for review (UNDER_REVIEW). */
 export const proposeExecutionPlan: CommandHandler = (ctx, command, payload) => {
 	const p = payload as ProposeExecutionPlanPayload;
@@ -52,6 +72,25 @@ export const proposeExecutionPlan: CommandHandler = (ctx, command, payload) => {
 			command,
 			'RPH_VALIDATION_SEMANTIC_FAILED',
 			`ProposeExecutionPlan requires an existing work unit ${p.workUnitId}`,
+			[p.executionPlanId]
+		);
+	}
+	// DR-004 DWP-01: a malformed transition graph must never reach ACTIVE. A NO-OP for a linear plan (empty
+	// transitions[]); a graph plan is validated (dangling ids, one entry, reachability, acyclicity, BRANCH-default).
+	const graph = validateTransitionGraph(
+		p.steps.map((s) => ({ id: s.id, stepType: s.stepType })),
+		(p.transitions ?? []).map((t) => ({
+			sourceStepId: t.sourceStepId,
+			targetStepId: t.targetStepId,
+			transitionType: t.transitionType,
+			conditionExpression: t.conditionExpression
+		}))
+	);
+	if (!graph.ok) {
+		return reject(
+			command,
+			'RPH_VALIDATION_SEMANTIC_FAILED',
+			`ProposeExecutionPlan blocked: malformed transition graph — ${graph.message} (DR-004 DWP-01).`,
 			[p.executionPlanId]
 		);
 	}
@@ -466,17 +505,19 @@ export const startExecutionStep: CommandHandler = (ctx, command) => {
 					'RPH_ILLEGAL_STATE_TRANSITION',
 					`Cannot start a step: plan ${command.targetAggregateId} is not ACTIVE (${String(plan.status)})`
 				);
-			const steps = (plan.steps as Array<{ id?: string; stepState?: string }>) ?? [];
-			const idx = steps.findIndex((s) => String(s.id) === p.stepId);
-			const blocker = steps
-				.slice(0, idx)
-				.find((s) => s.stepState !== 'SUCCEEDED' && s.stepState !== 'SKIPPED');
-			if (blocker)
+			// The linear/graph start-gate — the SAME rph-domain predicate the read-model (execution-view.ts
+			// startableStepIds) uses, so the UI Start affordance and this engine authority cannot diverge (DR-004
+			// §19-M2). Empty transitions[] ⇒ byte-identical linear (every earlier array-index step terminal-success);
+			// a graph ⇒ the in-edge barrier (a PENDING in-edge blocks, naming its source). RPH-EXE-005.
+			const gate = startStepGate(toGatePlan(plan), p.stepId);
+			if (!gate.ok)
 				return reject(
 					command,
 					'RPH_ILLEGAL_STATE_TRANSITION',
-					`Cannot start step ${p.stepId}: an earlier step (${String(blocker.id)}) is ${String(blocker.stepState)} — a step may not start until every earlier step is terminal-success (SUCCEEDED/SKIPPED); the plan runs its steps in order (RPH-EXE-005). Complete, skip, or address the earlier step first.`,
-					[p.stepId, String(blocker.id)]
+					gate.blockerStepId
+						? `Cannot start step ${p.stepId}: a predecessor (${gate.blockerStepId}) is ${String(gate.blockerState)} — a step may not start until its predecessors are terminal-success (${gate.reason}) — the plan runs in order (RPH-EXE-005). Complete, skip, or address it first.`
+						: `Cannot start step ${p.stepId}: ${gate.reason} (RPH-EXE-005).`,
+					gate.blockerStepId ? [p.stepId, gate.blockerStepId] : [p.stepId]
 				);
 			return null;
 		}

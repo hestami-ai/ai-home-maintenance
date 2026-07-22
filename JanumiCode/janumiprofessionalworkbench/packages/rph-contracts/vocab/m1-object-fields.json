@@ -2318,12 +2318,44 @@
     },
     {
       "name": "ExecutionTransition",
+      "note": "AUTHORED 2026-07-21 UNRATIFIED-AUTHORED under JAN-EXECPLAN-DR-004 (Tier 3C-ii), DERIVED from the ratified DOC-009 §10.3 execution_transitions columns (id, execution_plan_id, source_step_id?, target_step_id?, condition_expression jsonb?, transition_type). A guarded directed EDGE over an ExecutionPlan's steps: sourceStepId absent = a plan-entry edge, targetStepId absent = an exit edge; conditionExpression stays OPAQUE at the contract layer (the §10.3 jsonb envelope, z.unknown) and is validated against the hand-authored ConditionExpression grammar (rph-domain) at proposeExecutionPlan — the object-schema generator cannot emit that union (DR-004 §19-B1). transitionType is the EDGE ROLE (SEQUENTIAL|CONDITIONAL); the FLOW SEMANTICS (BRANCH/WAIT/PARALLEL_GROUP) live on the ratified ExecutionStep.stepType (RPH-DOC-002 §21), NOT the edge. DOC-007 schematizes no ExecutionTransition interface (§16 item 6). Ratification pending.",
       "fields": [
         {
-          "field": "(undefined)",
-          "type": "—",
+          "field": "id",
+          "type": "string",
+          "required": true,
+          "note": "id-ref (idPrefix 'trans')"
+        },
+        {
+          "field": "executionPlanId",
+          "type": "string",
+          "required": true,
+          "note": "id-ref: the owning ExecutionPlan (§10.3 execution_plan_id)"
+        },
+        {
+          "field": "sourceStepId",
+          "type": "string",
           "required": false,
-          "note": "Referenced by ExecutionPlan.transitions (embedded per DOC-007 §15) / transitionIds (DOC-002 §20.1). NOT field-defined (persistence: execution_transitions §31). Source TBD."
+          "note": "id-ref: the edge's source ExecutionStep (§10.3 source_step_id, NULLABLE); absent = a plan-entry edge"
+        },
+        {
+          "field": "targetStepId",
+          "type": "string",
+          "required": false,
+          "note": "id-ref: the edge's target ExecutionStep (§10.3 target_step_id, NULLABLE); absent = an exit edge"
+        },
+        {
+          "field": "conditionExpression",
+          "type": "Record<string, unknown>",
+          "required": false,
+          "note": "OPAQUE §10.3 condition_expression jsonb envelope (generates z.unknown); validated against the hand-authored ConditionExpression grammar (rph-domain) at proposeExecutionPlan (DR-004 §19-B1)"
+        },
+        {
+          "field": "transitionType",
+          "type": "TransitionType",
+          "required": true,
+          "enumRef": "TransitionTypeSchema",
+          "note": "the EDGE ROLE: SEQUENTIAL (unconditional) | CONDITIONAL (carries conditionExpression). §10.3 transition_type NOT NULL. Node kinds live on ExecutionStep.stepType (§21)."
         }
       ]
     },

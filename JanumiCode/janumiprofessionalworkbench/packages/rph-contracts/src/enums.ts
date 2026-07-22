@@ -746,6 +746,10 @@ export const TraceRelationSchema = z.enum([
 ]);
 export type TraceRelation = z.infer<typeof TraceRelationSchema>;
 
+/** ExecutionTransition.transitionType — AUTHORED-NEW 2026-07-21 (JAN-EXECPLAN-DR-004 Tier 3C-ii): the DOC-009 §10.3 execution_transitions.transition_type column is `text NOT NULL` with NO ratified value set; this is the minimal edge-role set (SEQUENTIAL=unconditional, CONDITIONAL=guarded). UNRATIFIED-AUTHORED under R2 + the ratified machine. Flow-node kinds stay on StepType (§21). */
+export const TransitionTypeSchema = z.enum(['SEQUENTIAL', 'CONDITIONAL']);
+export type TransitionType = z.infer<typeof TransitionTypeSchema>;
+
 /** ValidatorRegistryEntry.costClass — RPH-DOC-004 §35 */
 export const ValidatorCostClassSchema = z.enum(['LOW', 'MEDIUM', 'HIGH']);
 export type ValidatorCostClass = z.infer<typeof ValidatorCostClassSchema>;
@@ -872,6 +876,7 @@ export const CANONICAL_ENUM_SCHEMAS = {
 	StepState: StepStateSchema,
 	StepType: StepTypeSchema,
 	TraceRelation: TraceRelationSchema,
+	TransitionType: TransitionTypeSchema,
 	ValidatorCostClass: ValidatorCostClassSchema,
 	ValidatorDeterminism: ValidatorDeterminismSchema,
 	ValidatorImplementationType: ValidatorImplementationTypeSchema,

@@ -56,6 +56,7 @@ import {
 	StepStateSchema,
 	StepTypeSchema,
 	TraceRelationSchema,
+	TransitionTypeSchema,
 	WorkLifecycleStateSchema
 } from './enums.js';
 
@@ -87,8 +88,6 @@ export const DesiredOutcomeSchema = z.record(z.string(), z.unknown());
 export type DesiredOutcome = z.infer<typeof DesiredOutcomeSchema>;
 export const EscalationPolicySchema = z.record(z.string(), z.unknown());
 export type EscalationPolicy = z.infer<typeof EscalationPolicySchema>;
-export const ExecutionTransitionSchema = z.record(z.string(), z.unknown());
-export type ExecutionTransition = z.infer<typeof ExecutionTransitionSchema>;
 export const InputBindingSchema = z.record(z.string(), z.unknown());
 export type InputBinding = z.infer<typeof InputBindingSchema>;
 export const ModelSelectionPolicySchema = z.record(z.string(), z.unknown());
@@ -241,6 +240,15 @@ export const ExecutionStepSchema = z.strictObject({
 	stepState: StepStateSchema
 });
 export type ExecutionStep = z.infer<typeof ExecutionStepSchema>;
+export const ExecutionTransitionSchema = z.strictObject({
+	id: z.string(),
+	executionPlanId: z.string(),
+	sourceStepId: z.string().optional(),
+	targetStepId: z.string().optional(),
+	conditionExpression: z.unknown().optional(),
+	transitionType: TransitionTypeSchema
+});
+export type ExecutionTransition = z.infer<typeof ExecutionTransitionSchema>;
 export const FindingDefinitionSchema = z.strictObject({
 	code: z.string(),
 	name: z.string(),

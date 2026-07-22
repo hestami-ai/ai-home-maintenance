@@ -86,6 +86,9 @@ describe('validate', () => {
 		// CancelExecutionStep). Their events (ExecutionStepSkipped / ExecutionStepCancelled) PRE-EXISTED, and the
 		// optional `reason` field added to ExecutionStepCancelled is a field on an existing event — neither adds a
 		// registry id. (+2 → 316.)
-		expect(buildContractRegistry().ids()).toHaveLength(316);
+		// then +1 for JAN-EXECPLAN-DR-004 DWP-01 (Tier 3C-ii): +1 enum TransitionType. ExecutionTransition changed from
+		// an opaque placeholder (z.record) to a full strictObject helper (same schema id, no delta); conditionExpression
+		// stays opaque z.unknown (the grammar is hand-authored in rph-domain, not vocab-generated). (+1 → 317.)
+		expect(buildContractRegistry().ids()).toHaveLength(317);
 	});
 });

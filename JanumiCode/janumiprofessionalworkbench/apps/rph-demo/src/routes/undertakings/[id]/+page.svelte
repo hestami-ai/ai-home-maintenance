@@ -309,7 +309,7 @@
 												<!-- Start ONLY on the startable step (DWP-01 start-gate): the first non-terminal step whose
 												     predecessors are all terminal-success. A later QUEUED step is not startable → no Start (the
 												     engine's startExecutionStep gate would reject an out-of-order start; the UI does not tempt it). -->
-												{#if s.id === data.startableStepByPlan[pl.id]}
+												{#if data.startableStepByPlan[pl.id]?.includes(s.id)}
 													<form method="POST" action="?/startStep" use:enhance class="inlineform">
 														<input type="hidden" name="planId" value={pl.id} />
 														<input type="hidden" name="stepId" value={s.id} />

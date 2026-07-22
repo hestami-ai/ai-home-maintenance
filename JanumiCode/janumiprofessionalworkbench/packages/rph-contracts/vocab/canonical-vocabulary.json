@@ -754,6 +754,12 @@
       "canonicalSource": "RPH-DOC-002 §21 (9 values)"
     },
     {
+      "name": "TransitionType",
+      "appliesTo": "ExecutionTransition.transitionType",
+      "values": ["SEQUENTIAL", "CONDITIONAL"],
+      "canonicalSource": "AUTHORED-NEW 2026-07-21 (JAN-EXECPLAN-DR-004 Tier 3C-ii): the DOC-009 §10.3 execution_transitions.transition_type column is `text NOT NULL` with NO ratified value set; this is the minimal edge-role set (SEQUENTIAL=unconditional, CONDITIONAL=guarded). UNRATIFIED-AUTHORED under R2 + the ratified machine. Flow-node kinds stay on StepType (§21)."
+    },
+    {
       "name": "StepState",
       "appliesTo": "ExecutionStep.stepState",
       "values": [

@@ -19,6 +19,10 @@
 //
 // Pure + browser-safe (type-only contract imports), like the rest of rph-projections.
 import type { StepState } from '@janumipwb/rph-contracts';
+import {
+	isTerminalSuccessStepState,
+	startableStepIds as gateStartableStepIds
+} from '@janumipwb/rph-domain';
 import { layerHandoff, type HandoffOrder } from './handoff-order.js';
 import type { PwaGraphExport } from './pwa-graph.js';
 
@@ -45,6 +49,16 @@ export interface ExecutionStepInput {
 	readonly runtimeBindingId?: string;
 }
 
+/** Pure input: an ExecutionPlan transition (edge) the flow gate reads (DR-004 DWP-01). `conditionExpression` is opaque
+ *  here — DWP-02's evaluator interprets it. Absent ⇒ the plan is linear (the array-index degenerate). */
+export interface ExecutionTransitionInput {
+	readonly id?: string;
+	readonly sourceStepId?: string;
+	readonly targetStepId?: string;
+	readonly transitionType?: string;
+	readonly conditionExpression?: unknown;
+}
+
 /** Pure input: the subset of an ExecutionPlan aggregate the view needs. */
 export interface ExecutionPlanInput {
 	readonly id: string;
@@ -52,6 +66,8 @@ export interface ExecutionPlanInput {
 	readonly status: string;
 	readonly planVersion?: number;
 	readonly steps: readonly ExecutionStepInput[];
+	/** The transition graph (DR-004 DWP-01); absent/empty ⇒ linear. */
+	readonly transitions?: readonly ExecutionTransitionInput[];
 }
 
 export interface ExecutionStepView {
@@ -75,6 +91,8 @@ export interface ExecutionPlanView {
 	readonly status: string;
 	readonly planVersion?: number;
 	readonly steps: readonly ExecutionStepView[];
+	/** The transition graph (DR-004 DWP-01); empty ⇒ linear. Carried so the gate + a future graph view can read it. */
+	readonly transitions: readonly ExecutionTransitionInput[];
 }
 
 // Record<StepState, …> makes the compiler REQUIRE every one of the 10 StepState values — if a value is added to the
@@ -160,71 +178,49 @@ function stepView(s: ExecutionStepInput): ExecutionStepView {
 	return s.runtimeBindingId === undefined ? base : { ...base, runtimeBindingId: s.runtimeBindingId };
 }
 
-/** Shape one ExecutionPlan aggregate row into the view — step order preserved as authored (flat list, fork B; there
- *  is no transitions[] edge source, F-9). */
+/** Shape one ExecutionPlan aggregate row into the view — step order preserved as authored; the transition graph is
+ *  carried (DR-004 DWP-01; empty ⇒ linear, the Tier-3C degenerate). */
 export function executionPlanView(row: ExecutionPlanInput): ExecutionPlanView {
 	const base: ExecutionPlanView = {
 		id: row.id,
 		workUnitId: row.workUnitId,
 		status: row.status,
-		steps: row.steps.map(stepView)
+		steps: row.steps.map(stepView),
+		transitions: row.transitions ?? []
 	};
 	return row.planVersion === undefined ? base : { ...base, planVersion: row.planVersion };
 }
 
-// ── Tier 3C-i: the linear start-gate read-model (JAN-EXECPLAN-DR-003 DWP-01, fork B→start-gate / fork F) ────────────
+// ── The transition-graph flow gate read-model (JAN-EXECPLAN-DR-004 DWP-01, Tier 3C-ii) ──────────────────────────────
 //
-// Boundary (EP-CMT-4 — this crosses WORKFLOW-ENGINE SEQUENCING): a plan sequences itself by having exactly ONE step
-// be "startable" at a time — the first non-terminal step, provided every EARLIER step (array index in plan.steps) is
-// terminal-SUCCESS. Completing/skipping that step makes the next one startable, so a multi-step plan drives itself
-// with NO readying events, NO cascade, NO multi-event commit, NO `ordinal` field (array index IS the order — F-2: the
-// strict ExecutionStep schema has no `ordinal`; it rides in every plan event → replay-stable), NO machine change.
-//
-// Do not change: this is the DISPLAY affordance only. The AUTHORITY is the identical predecessor precheck on
-//   `startExecutionStep` (execution.ts) — the engine, not this derivation, forbids an out-of-order start (§19 L3-4c).
-//   "Terminal-success" is {SUCCEEDED, SKIPPED} — NOT the full terminal set: a FAILED/CANCELLED/SUPERSEDED predecessor
-//   BLOCKS the plan (no startable frontier), so the loop returns undefined rather than skipping past it.
+// Boundary (EP-CMT-4 — this crosses WORKFLOW-ENGINE SEQUENCING): "which steps may start" is derived by the SINGLE pure
+// gate in rph-domain (`startableStepIds`), which BOTH this read-model (the UI Start affordance) AND the engine
+// authority (`startExecutionStep`'s precheck) call — so display and authority cannot diverge (DR-004 §19-M2). The graph
+// GENERALIZES the shipped linear gate: an EMPTY transitions[] is byte-identical to the Tier-3C single array-index
+// frontier; a non-empty graph gates on the in-edge barrier (no PENDING in-edge, ≥1 SATISFIED), covering a diamond
+// barrier-join and (later) a PARALLEL_GROUP set-frontier. This is the DISPLAY seam only; the engine gate is authority.
 
-/** A step state that counts as a satisfied predecessor: SUCCEEDED (produced a result) or (authorized-)SKIPPED. This
- *  is the terminal-SUCCESS subset, NOT the full terminal set — FAILED/CANCELLED/SUPERSEDED do not satisfy a successor. */
-const TERMINAL_SUCCESS_STEP_STATES = new Set<StepState>(['SUCCEEDED', 'SKIPPED']);
-
-/** The full terminal set of the ExecutionStep machine (transitions.data.ts terminalStates) — a step here can never
- *  become the startable frontier; a terminal-NON-success one (FAILED/CANCELLED/SUPERSEDED) blocks the sequence. */
-const TERMINAL_STEP_STATES = new Set<StepState>([
-	'SUCCEEDED',
-	'FAILED',
-	'SKIPPED',
-	'CANCELLED',
-	'SUPERSEDED'
-]);
-
-/** Is this step state a satisfied predecessor (terminal-success: SUCCEEDED/SKIPPED)? */
+/** Is this step state a satisfied predecessor (terminal-success: SUCCEEDED/SKIPPED)? Delegates to the shared rph-domain
+ *  gate so the definition lives in exactly one place. */
 export function isTerminalSuccessStep(stepState: string): boolean {
-	return TERMINAL_SUCCESS_STEP_STATES.has(stepState as StepState);
+	return isTerminalSuccessStepState(stepState);
 }
 
 /**
- * The single step a plan may currently START — the linear start-gate (RPH-EXE-005 read linearly, Fork F). It is the
- * FIRST step (array order) that is not terminal-success, IFF every earlier step is terminal-success AND the plan is
- * ACTIVE; else `undefined`. A terminal-NON-success predecessor (FAILED/CANCELLED/SUPERSEDED) blocks the sequence
- * (no startable frontier) rather than being skipped past. Pure/browser-safe; drives the UI Start affordance — the
- * `startExecutionStep` gate is the backstop that actually forbids an out-of-order start.
- *
- * Note the frontier is returned regardless of whether it is itself QUEUED: a RUNNING/READY/NOT_READY frontier is
- * still "the current step", but only a QUEUED one carries the `start` advance command — the UI shows Start only when
- * BOTH hold (id === startable AND advanceCommands includes 'start'), so a RUNNING frontier shows Complete/Fail, and a
- * READY/NOT_READY frontier shows the belowQueued note — never a Start that the engine would reject.
+ * The SET of steps a plan may currently START — the transition-graph flow gate (DR-004 DWP-01), delegating to the pure
+ * rph-domain predicate the engine also uses. Empty transitions[] ⇒ the single linear frontier (byte-identical to
+ * Tier-3C); a graph ⇒ every step whose in-edge barrier is satisfied (a linear/single-path plan still yields a
+ * singleton; a fan-out can yield several). The UI shows Start on a step iff it is in this set AND its advanceCommands
+ * include 'start' (so a RUNNING frontier shows Complete/Fail, a READY/NOT_READY one the belowQueued note).
  */
+export function startableStepIds(plan: ExecutionPlanView): string[] {
+	return gateStartableStepIds(plan);
+}
+
+/** The single startable step — back-compat with the Tier-3C scalar frontier: the first of `startableStepIds`, or
+ *  undefined. A linear plan yields exactly one; `startableStepIds` is the graph-general (set) API the UI consumes. */
 export function startableStepId(plan: ExecutionPlanView): string | undefined {
-	if (plan.status !== 'ACTIVE') return undefined;
-	for (const s of plan.steps) {
-		if (TERMINAL_SUCCESS_STEP_STATES.has(s.stepState as StepState)) continue; // predecessor done — look past it
-		// The first non-terminal-success step: it is the startable frontier UNLESS it is terminal (a
-		// FAILED/CANCELLED/SUPERSEDED step blocks the plan — nothing after it can start until it is addressed).
-		return TERMINAL_STEP_STATES.has(s.stepState as StepState) ? undefined : s.id;
-	}
-	return undefined; // every step is terminal-success — the plan is completable, nothing left to start
+	return startableStepIds(plan)[0];
 }
 
 /**

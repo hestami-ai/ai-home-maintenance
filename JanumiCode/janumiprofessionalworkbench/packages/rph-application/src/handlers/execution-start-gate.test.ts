@@ -103,6 +103,41 @@ describe('StartExecutionStep — the linear start-gate (DWP-01, RPH-EXE-005 / fo
 			'EXECUTION_PLAN'
 		);
 
+	/** A SEQUENTIAL transition edge from step `from` to step `to` (by index). */
+	const gedge = (from: number, to: number) => ({
+		id: `${PLAN}-t${from}-${to}`,
+		executionPlanId: PLAN,
+		sourceStepId: stepId(from),
+		targetStepId: stepId(to),
+		transitionType: 'SEQUENTIAL'
+	});
+	/** Propose a plan carrying a transition graph — returns the raw result (so a test can assert a reject). */
+	const proposeGraph = (stepStates: string[], transitions: unknown[]) =>
+		dispatch(
+			'ProposeExecutionPlan',
+			{
+				executionPlanId: PLAN,
+				workUnitId: PWU,
+				steps: stepStates.map((s, i) => step(i + 1, s)),
+				transitions,
+				retryPolicy: {},
+				tacticalChangePolicy: {},
+				escalationPolicy: {},
+				terminationPolicy: {}
+			},
+			PLAN,
+			'EXECUTION_PLAN'
+		);
+	/** Propose + approve + activate a graph plan (asserting each step accepted). */
+	function activeGraphPlan(stepStates: string[], transitions: unknown[]) {
+		const r = proposeGraph(stepStates, transitions);
+		expect(r.status, JSON.stringify(r.error)).toBe('ACCEPTED');
+		expect(dispatch('ApproveExecutionPlan', {}, PLAN, 'EXECUTION_PLAN').status).toBe('ACCEPTED');
+		expect(
+			dispatch('ActivateExecutionPlan', { authorizedRuntimeBindingIds: [] }, PLAN, 'EXECUTION_PLAN').status
+		).toBe('ACCEPTED');
+	}
+
 	beforeEach(() => {
 		store = new SqliteStorageAdapter({ now: () => TS });
 		seq = 0;
@@ -151,7 +186,7 @@ describe('StartExecutionStep — the linear start-gate (DWP-01, RPH-EXE-005 / fo
 		const r = start(2);
 		expect(r.status).toBe('REJECTED');
 		expect(r.error?.code).toBe('RPH_ILLEGAL_STATE_TRANSITION');
-		expect(r.error?.message).toContain('every earlier step is terminal-success');
+		expect(r.error?.message).toContain('terminal-success');
 		expect(stepStateOf(2)).toBe('QUEUED'); // untouched
 	});
 
@@ -216,5 +251,27 @@ describe('StartExecutionStep — the linear start-gate (DWP-01, RPH-EXE-005 / fo
 		activePlan(['QUEUED']);
 		expect(start(1).status).toBe('ACCEPTED');
 		expect(stepStateOf(1)).toBe('RUNNING');
+	});
+
+	// DR-004 DWP-01 (Tier 3C-ii) — the transition GRAPH. The engine gate uses the SAME rph-domain predicate the
+	// read-model uses; a malformed graph is rejected at propose; a graph plan drives via the in-edge barrier.
+	it('REJECTS a malformed transition graph at propose (dangling target id)', () => {
+		const r = proposeGraph(['QUEUED', 'QUEUED'], [
+			gedge(1, 2),
+			{ id: 'bad', executionPlanId: PLAN, sourceStepId: stepId(1), targetStepId: 'no_such_step', transitionType: 'SEQUENTIAL' }
+		]);
+		expect(r.status).toBe('REJECTED');
+		expect(r.error?.code).toBe('RPH_VALIDATION_SEMANTIC_FAILED');
+		expect(r.error?.message).toContain('transition graph');
+	});
+
+	it('drives a 2-node graph via the in-edge gate (entry starts; the successor waits then starts)', () => {
+		activeGraphPlan(['QUEUED', 'QUEUED'], [gedge(1, 2)]);
+		expect(start(1).status, 's1 is the graph entry (no in-edges)').toBe('ACCEPTED'); // → RUNNING
+		expect(start(2).status, 's2 in-edge PENDING (s1 not terminal)').toBe('REJECTED');
+		expect(complete(1).status).toBe('ACCEPTED'); // s1 SUCCEEDED → s2 in-edge SATISFIED
+		const s2 = start(2);
+		expect(s2.status, JSON.stringify(s2.error)).toBe('ACCEPTED');
+		expect(stepStateOf(2)).toBe('RUNNING');
 	});
 });

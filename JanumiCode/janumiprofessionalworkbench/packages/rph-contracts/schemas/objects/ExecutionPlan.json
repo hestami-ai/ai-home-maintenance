@@ -342,10 +342,34 @@
       "type": "array",
       "items": {
         "type": "object",
-        "propertyNames": {
-          "type": "string"
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "executionPlanId": {
+            "type": "string"
+          },
+          "sourceStepId": {
+            "type": "string"
+          },
+          "targetStepId": {
+            "type": "string"
+          },
+          "conditionExpression": {},
+          "transitionType": {
+            "type": "string",
+            "enum": [
+              "SEQUENTIAL",
+              "CONDITIONAL"
+            ]
+          }
         },
-        "additionalProperties": {}
+        "required": [
+          "id",
+          "executionPlanId",
+          "transitionType"
+        ],
+        "additionalProperties": false
       }
     },
     "retryPolicy": {

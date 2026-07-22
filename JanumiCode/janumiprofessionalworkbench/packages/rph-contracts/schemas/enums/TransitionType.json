@@ -1,0 +1,9 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "type": "string",
+  "enum": [
+    "SEQUENTIAL",
+    "CONDITIONAL"
+  ],
+  "$id": "urn:janumi:rph:schema:enum:TransitionType:1"
+}

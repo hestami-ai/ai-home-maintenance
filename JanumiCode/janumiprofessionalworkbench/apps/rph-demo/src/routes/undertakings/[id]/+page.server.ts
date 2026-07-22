@@ -25,7 +25,7 @@ import {
 	rebuildProjection,
 	type SequenceInstance,
 	sequenceView,
-	startableStepId,
+	startableStepIds,
 	traceabilityProjector
 } from '@janumipwb/rph-projections';
 import {
@@ -200,18 +200,29 @@ export const load: PageServerLoad = ({ params }) => {
 				stepState: String((s.stepState ?? '') as string),
 				...(s.runtimeBindingId ? { runtimeBindingId: String(s.runtimeBindingId as string) } : {})
 			};
+		}),
+		// DR-004 DWP-01 — the transition graph (empty ⇒ linear). Fed to the flow gate + a future graph view.
+		transitions: (Array.isArray(pl.state.transitions) ? pl.state.transitions : []).map((raw) => {
+			const t = asRec(raw);
+			return {
+				...(t.id ? { id: String(t.id as string) } : {}),
+				...(t.sourceStepId ? { sourceStepId: String(t.sourceStepId as string) } : {}),
+				...(t.targetStepId ? { targetStepId: String(t.targetStepId as string) } : {}),
+				...(t.transitionType ? { transitionType: String(t.transitionType as string) } : {}),
+				...(t.conditionExpression !== undefined ? { conditionExpression: t.conditionExpression } : {})
+			};
 		})
 	}));
 	const plans = plansForPwus(planRows, pwuIdSet);
 
-	// JAN-EXECPLAN-DR-003 DWP-01/03 — the linear start-gate affordance. For each plan, derive the SINGLE step the
-	// engine would currently let start (the first non-terminal step, iff every earlier step is terminal-success and the
-	// plan is ACTIVE). The UI offers Start ONLY on this step (the engine's startExecutionStep gate is the backstop —
-	// the UI does not tempt an out-of-order start it would reject). A plan with no startable step is absent from the map.
-	const startableStepByPlan: Record<string, string> = {};
+	// JAN-EXECPLAN-DR-004 DWP-01 — the transition-graph flow gate affordance (set-frontier). For each plan, derive the
+	// SET of steps the engine would currently let start (the graph in-edge barrier; a linear plan yields a singleton).
+	// The UI offers Start ONLY on a step in this set (the engine's startExecutionStep gate is the backstop — the UI does
+	// not tempt a start it would reject). A plan with no startable step maps to an empty/absent list.
+	const startableStepByPlan: Record<string, string[]> = {};
 	for (const pl of plans) {
-		const sid = startableStepId(pl);
-		if (sid) startableStepByPlan[pl.id] = sid;
+		const sids = startableStepIds(pl);
+		if (sids.length) startableStepByPlan[pl.id] = sids;
 	}
 
 	// Execution Attempt history (JAN-EXECPLAN Tier-3 DWP-03/05): fold the Execution* event stream into §10.4 attempt
