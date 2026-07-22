@@ -418,6 +418,10 @@ export const approveBaseline: CommandHandler = (ctx, command, payload) => {
 		statusField: 'status',
 		machine: 'Baseline.status',
 		target: 'APPROVED',
+		// The machine's only in-arrow to APPROVED is UNDER_REVIEW. Re-approving an already-APPROVED baseline REWROTE
+		// approvalDecisionId — the field that exists to answer WHICH decision authorized this baseline — and appended a
+		// second BaselineApproved naming a different decision, with no revocation of the first.
+		requireFrom: ['UNDER_REVIEW'],
 		eventType: 'BaselineApproved',
 		mutate: (base) =>
 			p.approvalDecisionId ? { ...base, approvalDecisionId: p.approvalDecisionId } : base,

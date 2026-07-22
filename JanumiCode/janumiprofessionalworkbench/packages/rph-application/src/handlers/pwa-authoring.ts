@@ -832,6 +832,11 @@ export const publishPwa: CommandHandler = (ctx, command) =>
 		statusField: 'publicationStatus',
 		machine: PWA_MACHINE,
 		target: 'PUBLISHED',
+		// In-arrow: VALIDATED only. A re-publish of an already-PUBLISHED PWA rewrote rootPwuTypeId — editing a version
+		// this file's own header and editPwa both declare IMMUTABLE, and bypassing the single-root composition gate,
+		// which runs on ValidatePwa and not here. Undertakings bind pwaVersion, which does not change, so they would
+		// silently inherit a different root.
+		requireFrom: ['VALIDATED'],
 		eventType: 'PwaPublished',
 		guard: (state, gctx) => pwaFloorGate(command, state, gctx),
 		mutate: (base) => {

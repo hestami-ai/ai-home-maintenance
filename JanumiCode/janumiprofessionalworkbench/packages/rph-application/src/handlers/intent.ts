@@ -95,6 +95,12 @@ function advanceIntent(
 			readonly prior: number;
 			readonly next: number;
 		}) => unknown;
+		/** The states this command may be issued FROM — see kit.advanceStatus.requireFrom. `advanceIntent` is an
+		 *  independent hand-written copy of that primitive, so it carries the identical hole and needs the identical
+		 *  guard: without it a re-issued ReviseIntent is absorbed as a NOOP and still bumps semanticVersion, and
+		 *  ApproveIntent rejects unless approvedSemanticVersion matches the current one — so replaying a command that
+		 *  changes nothing silently voids an outstanding approval. */
+		readonly requireFrom?: readonly string[];
 	}
 ) {
 	const id = command.targetAggregateId;
@@ -103,6 +109,13 @@ function advanceIntent(
 	const precheckFailure = args.precheck?.(loaded.state);
 	if (precheckFailure) return precheckFailure;
 	const from = String(loaded.state.intentStatus);
+	if (args.requireFrom && !args.requireFrom.includes(from))
+		return reject(
+			command,
+			'RPH_ILLEGAL_STATE_TRANSITION',
+			`${command.commandType} requires intent ${id} to be ${args.requireFrom.join(' or ')}, but it is ${from}. Re-issuing it would append a second ${args.eventType} recording a change that did not happen.`,
+			[id]
+		);
 	const illegal = checkTransition(command, MACHINE, from, args.target);
 	if (illegal) return illegal;
 	const newRevision = loaded.revision + 1;
@@ -244,6 +257,10 @@ export const approveIntent: CommandHandler = (ctx, command, payload) => {
 export const reviseIntent: CommandHandler = (ctx, command) =>
 	advanceIntent(ctx, command, {
 		target: 'REVISED',
+		// In-arrow: APPROVED only. Re-issuing from REVISED was absorbed as a NOOP yet still bumped semanticVersion, and
+		// ApproveIntent requires approvedSemanticVersion === current — so replaying a command that changed nothing
+		// silently VOIDED an outstanding approval, and baseline staleness keys on the same field.
+		requireFrom: ['APPROVED'],
 		eventType: 'IntentRevised',
 		bumpSemanticVersion: true
 	});

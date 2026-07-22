@@ -970,6 +970,10 @@ export const completeAssuranceAssessment: CommandHandler = (ctx, command, payloa
 				statusField: 'assessmentState',
 				machine: 'AssuranceAssessment.state',
 				target: 'INDEPENDENCE_VIOLATION',
+				// Every terminal disposition is reachable ONLY from ASSESSING. Re-issuing over an already-terminal
+				// assessment overwrote the recorded producer/evaluator pair — so an independence violation would no
+				// longer name the operands that violated it, which is exactly what this mutate exists to preserve.
+				requireFrom: ['ASSESSING'],
 				eventType: 'AssuranceIndependenceViolated',
 				setLifecycleStatus: true,
 				eventPayload: (next) => ({
@@ -1024,6 +1028,7 @@ export const completeAssuranceAssessment: CommandHandler = (ctx, command, payloa
 				statusField: 'assessmentState',
 				machine: 'AssuranceAssessment.state',
 				target: 'ESCALATED',
+				requireFrom: ['ASSESSING'],
 				eventType: 'AssuranceAssessmentEscalated',
 				setLifecycleStatus: true,
 				eventPayload: () => ({
@@ -1091,6 +1096,12 @@ export const completeAssuranceAssessment: CommandHandler = (ctx, command, payloa
 		statusField: 'assessmentState',
 		machine: 'AssuranceAssessment.state',
 		target: disposition,
+		// The verdict's CONTENT (subject versions, validator identity, residual uncertainty) rides the EVENT, not the
+		// object — so re-completing an already-terminal assessment appended a second, fully contradicting verdict: a
+		// different validator, a different subject semanticVersion, even a different independence posture, with the
+		// object still reading SATISFIED. A reader taking the latest event concludes a version was assured that was
+		// never assessed. Every terminal disposition has exactly one in-arrow, from ASSESSING.
+		requireFrom: ['ASSESSING'],
 		eventType: 'AssuranceAssessmentCompleted',
 		setLifecycleStatus: true,
 		// §19.3 AssuranceAssessmentCompletedPayload — was the raw CompleteAssuranceAssessment command payload,
