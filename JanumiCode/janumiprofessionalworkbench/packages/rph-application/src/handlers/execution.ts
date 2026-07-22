@@ -26,6 +26,7 @@ import {
 	conditionStepRefs,
 	evaluateCondition,
 	prunableStepIds,
+	resolveBranchSelection,
 	retryDecision,
 	startStepGate,
 	validateStepCompletion,
@@ -65,15 +66,27 @@ function toGatePlan(plan: Record<string, unknown>): GatePlan {
 			stepState: String(s.stepState ?? ''),
 			// stepType decides which node may branch EXCLUSIVELY (a BRANCH selects ONE arm; every other node's
 			// out-edges are independent). Deadness is NOT carried here — it is STRUCTURAL, computed by the gate.
-			...(s.stepType === undefined ? {} : { stepType: String(s.stepType) })
+			// selectedTransitionId IS carried: a resolved branch's decision is a recorded fact, not a re-computation.
+			...(s.stepType === undefined ? {} : { stepType: String(s.stepType) }),
+			...(s.selectedTransitionId === undefined
+				? {}
+				: { selectedTransitionId: String(s.selectedTransitionId) })
 		})),
 		transitions: transitions.map((t) => ({
+			// The edge id is load-bearing: it is how a BRANCH's recorded selection is matched back to its edge.
+			...(t.id === undefined ? {} : { id: String(t.id) }),
 			sourceStepId: t.sourceStepId === undefined ? undefined : String(t.sourceStepId),
 			targetStepId: t.targetStepId === undefined ? undefined : String(t.targetStepId),
 			transitionType: t.transitionType === undefined ? undefined : String(t.transitionType),
 			conditionExpression: t.conditionExpression
 		}))
 	};
+}
+
+/** The plan aggregate's current state bag, or an empty one. Used where a mutator needs the WHOLE plan, not just the
+ *  step it is rewriting (the branch-selection recording in completeExecutionStep). */
+function loadPlanState(ctx: HandlerContext, planId: string): Record<string, unknown> {
+	return (ctx.store.loadObject(planId)?.state as Record<string, unknown> | undefined) ?? {};
 }
 
 /**
@@ -133,6 +146,22 @@ export const proposeExecutionPlan: CommandHandler = (ctx, command, payload) => {
 	}
 	// DR-004 DWP-02: each edge's conditionExpression must parse against the hand-authored grammar (reject malformed),
 	// and every stepId it references must resolve to a declared step — so a guard is never silently false at runtime.
+	// A BRANCH records its decision AS a transition id (DWP-09), and the transitions view keys its rows on the same id,
+	// so a duplicate makes both the recorded selection and the render ambiguous. The contract requires `id` on every
+	// transition but nothing enforced UNIQUENESS.
+	const edgeIds = new Set<string>();
+	for (const t of p.transitions ?? []) {
+		const id = (t as { id?: string }).id;
+		if (id === undefined) continue;
+		if (edgeIds.has(id))
+			return reject(
+				command,
+				'RPH_VALIDATION_SEMANTIC_FAILED',
+				`ProposeExecutionPlan blocked: transition id "${id}" is declared more than once — transition ids must be unique (a BRANCH records its decision by transition id).`,
+				[p.executionPlanId]
+			);
+		edgeIds.add(id);
+	}
 	const declaredStepIds = new Set(p.steps.map((s) => s.id));
 	for (const t of p.transitions ?? []) {
 		if (t.conditionExpression === undefined) continue;
@@ -640,6 +669,24 @@ export const completeExecutionStep: CommandHandler = (ctx, command) => {
 		// second ExecutionStepSucceeded — and the condition subject folds last-write-wins, so a re-Complete carrying a
 		// different structuredResult could retroactively flip an already-resolved BRANCH.
 		requireFrom: ['RUNNING'],
+		// DWP-09: a BRANCH DECIDES at the moment it succeeds. Record which out-edge it selected, so the decision is a
+		// durable fact rather than something re-derived on every later read. Re-derivation was not stable: a step
+		// reachable only through a not-taken edge can still change state afterwards, and an ATTEMPTS/STEP_STATE guard
+		// over it flips — silently re-resolving a settled branch and making the losing arm live. Unlike reachability
+		// (structural, deliberately NOT persisted), a point-in-time decision cannot be reconstructed later.
+		mutateStep: (step) => {
+			if (step.stepType !== 'BRANCH') return step;
+			const gatePlan = toGatePlan(loadPlanState(ctx, command.targetAggregateId));
+			// Evaluate against the subject as it stands NOW — the step is still RUNNING here, and the gate treats a
+			// non-terminal source as deciding nothing, so ask the plan as if this step had already succeeded.
+			const resolved = { ...gatePlan, steps: gatePlan.steps.map((s) => (s.id === String(step.id) ? { ...s, stepState: 'SUCCEEDED' } : s)) };
+			const selected = resolveBranchSelection(
+				resolved,
+				String(step.id),
+				guardEvaluatorFor(ctx, command.targetAggregateId, resolved)
+			);
+			return selected === undefined ? step : { ...step, selectedTransitionId: selected };
+		},
 		// DOC-007 §16.2 ExecutionStepSucceededPayload. The five id/ref fields are the command's own (§16.1 and §16.2
 		// share them verbatim); resultingExecutionState is §16.2's const, and is the EXECUTION dimension only —
 		// §16.2 L1244 / INV-5: step success never implies assuranceState=SATISFIED.

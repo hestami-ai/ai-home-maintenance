@@ -322,6 +322,9 @@
               "CANCELLED",
               "SUPERSEDED"
             ]
+          },
+          "selectedTransitionId": {
+            "type": "string"
           }
         },
         "required": [

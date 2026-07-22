@@ -201,7 +201,12 @@ export const load: PageServerLoad = ({ params }) => {
 				stepType: String((s.stepType ?? '') as string),
 				purpose: String((s.purpose ?? '') as string),
 				stepState: String((s.stepState ?? '') as string),
-				...(s.runtimeBindingId ? { runtimeBindingId: String(s.runtimeBindingId as string) } : {})
+				...(s.runtimeBindingId ? { runtimeBindingId: String(s.runtimeBindingId as string) } : {}),
+				// DWP-09: a resolved BRANCH's recorded decision. Without it the UI would re-derive first-match and could
+				// show a different arm than the engine already committed to.
+				...(s.selectedTransitionId
+					? { selectedTransitionId: String(s.selectedTransitionId as string) }
+					: {})
 			};
 		}),
 		// DR-004 DWP-01 — the transition graph (empty ⇒ linear). Fed to the flow gate + a future graph view.

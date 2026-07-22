@@ -1787,6 +1787,12 @@
           "type": "StepState",
           "required": true,
           "enumRef": "StepStateSchema"
+        },
+        {
+          "field": "selectedTransitionId",
+          "type": "string",
+          "required": false,
+          "note": "UNRATIFIED-AUTHORED (annotated 2026-07-22 under sponsor grant, JAN-EXECPLAN DWP-09): id-ref of the out-edge a BRANCH step SELECTED, recorded when the BRANCH reached SUCCEEDED. A branch decision is evaluated at a point in time against the plan's then-current condition subject, and that subject is NOT stable afterwards (a step reachable only via a not-taken edge can still change state, and ATTEMPTS/STEP_STATE guards over it flip), so RE-deriving the selection on every read let a settled BRANCH silently re-resolve and both arms run. Unlike reachability — which is structural and must never be persisted — a selection is a POINT-IN-TIME DECISION that cannot be reconstructed later, so it is recorded as a durable fact. Absent => the gate falls back to first-match evaluation (plans authored before this field, and branches not yet resolved). Ratification pending. Cited: DOC-002 §21, JAN-EXECPLAN-DS-004 D3 (first-match)."
         }
       ]
     },

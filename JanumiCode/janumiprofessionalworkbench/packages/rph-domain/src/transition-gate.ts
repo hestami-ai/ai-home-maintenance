@@ -38,10 +38,16 @@ export interface GateStep {
 	/** The node KIND. Load-bearing: exclusive first-match selection belongs to a BRANCH node and nothing else. Absent
 	 *  ⇒ treated as non-BRANCH (independent out-edges), the safe default. */
 	readonly stepType?: string;
+	/** For a RESOLVED BRANCH: the id of the out-edge it actually selected, recorded when the branch reached SUCCEEDED
+	 *  (DWP-09). Absent ⇒ not yet resolved, or a plan authored before the field existed; the gate then falls back to
+	 *  evaluating first-match. See selectBranchEdge for why a recorded decision must win over a re-derived one. */
+	readonly selectedTransitionId?: string;
 }
 
 /** The minimal transition (edge) read-model the gate needs. `conditionExpression` is opaque here (DWP-02 evaluates). */
 export interface GateTransition {
+	/** The persisted edge id. Carried so a BRANCH's RECORDED selection can be matched back to its edge. */
+	readonly id?: string;
 	readonly sourceStepId?: string;
 	readonly targetStepId?: string;
 	readonly transitionType?: string;
@@ -92,8 +98,20 @@ const isConditionalEdge = (e: GateTransition): boolean =>
 function selectBranchEdge(
 	outEdges: readonly GateTransition[],
 	plan: GatePlan,
-	evaluateGuard?: EdgeGuardEvaluator
+	evaluateGuard?: EdgeGuardEvaluator,
+	source?: GateStep
 ): GateTransition | undefined {
+	// A RECORDED decision wins over a re-derived one (DWP-09). A branch is evaluated at a point in time against the
+	// plan's then-current condition subject, and that subject does NOT stay still: a step reachable only through a
+	// not-taken edge can still change state, and an ATTEMPTS or STEP_STATE guard over it will flip. Re-deriving on
+	// every read therefore let an already-settled BRANCH silently re-resolve, making the LOSING arm live and running
+	// both. Once the branch has acted, the decision is history, not a computation.
+	if (source?.selectedTransitionId !== undefined) {
+		const recorded = outEdges.find((e) => e.id === source.selectedTransitionId);
+		// If the recorded id no longer matches any out-edge the plan is incoherent; select NOTHING rather than
+		// silently falling back to a fresh evaluation that could contradict what the plan already did.
+		return recorded;
+	}
 	for (const e of outEdges) {
 		if (!isConditionalEdge(e)) return e; // an unconditional edge (the SEQUENTIAL default) always matches
 		if (evaluateGuard?.(e, plan)) return e; // the first true conditional
@@ -151,10 +169,32 @@ function branchExcludes(
 	if (source === undefined || !TERMINAL_SUCCESS.has(source.stepState)) return false; // unsettled ⇒ excludes nothing
 	const outEdges = outEdgesOf(plan, edge.sourceStepId);
 	if (source.stepType === 'BRANCH' && outEdges.some(isConditionalEdge))
-		return selectBranchEdge(outEdges, plan, evaluateGuard) !== edge;
+		return selectBranchEdge(outEdges, plan, evaluateGuard, source) !== edge;
 	if (!isConditionalEdge(edge)) return false;
 	return evaluateGuard?.(edge, plan) !== true;
 }
+/**
+ * The out-edge a BRANCH step selects RIGHT NOW, by first-match — the decision the handler records when the branch
+ * reaches SUCCEEDED (DWP-09). Returns undefined for a non-BRANCH step, a step with no guarded out-edge, or a
+ * malformed branch where no conditional guard holds and no unconditional default exists (propose-time validation
+ * forbids the last case). Deliberately ignores any ALREADY-recorded selection: this is the act of deciding.
+ */
+export function resolveBranchSelection(
+	plan: GatePlan,
+	stepId: string,
+	evaluateGuard?: EdgeGuardEvaluator
+): string | undefined {
+	const source = plan.steps.find((s) => s.id === stepId);
+	if (source === undefined || source.stepType !== 'BRANCH') return undefined;
+	const outEdges = outEdgesOf(plan, stepId);
+	if (!outEdges.some(isConditionalEdge)) return undefined;
+	for (const e of outEdges) {
+		if (!isConditionalEdge(e)) return e.id;
+		if (evaluateGuard?.(e, plan)) return e.id;
+	}
+	return undefined;
+}
+
 /**
  * The disposition of ONE in-edge. SATISFIED: source terminal-success (or a plan-entry edge with no source) AND the
  * edge guard holds. NEUTRALIZED: source terminal-non-success (FAILED/CANCELLED/SUPERSEDED), or a CONDITIONAL edge
@@ -186,7 +226,7 @@ export function inEdgeDisposition(
 	// but the first match, while propose-time validation (keyed on stepType) never looked. The two planes now agree, and
 	// validateTransitionGraph additionally REFUSES a conditional out-edge from a non-BRANCH step so they cannot drift.
 	if (source.stepType === 'BRANCH' && outEdges.some(isConditionalEdge))
-		return selectBranchEdge(outEdges, plan, evaluateGuard) === edge ? 'SATISFIED' : 'NEUTRALIZED';
+		return selectBranchEdge(outEdges, plan, evaluateGuard, source) === edge ? 'SATISFIED' : 'NEUTRALIZED';
 	// Non-BRANCH source: out-edges are INDEPENDENT. An unconditional edge is taken; a guarded one is taken iff it holds.
 	if (!isConditionalEdge(edge)) return 'SATISFIED';
 	return evaluateGuard?.(edge, plan) === true ? 'SATISFIED' : 'NEUTRALIZED';

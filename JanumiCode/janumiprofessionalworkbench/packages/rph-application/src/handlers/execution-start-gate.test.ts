@@ -853,4 +853,106 @@ describe('StartExecutionStep — the linear start-gate (DWP-01, RPH-EXE-005 / fo
 			expect(stepStateOf(3)).toBe('RUNNING');
 		});
 	});
+
+	// ── DWP-09: a BRANCH decision is a POINT-IN-TIME fact, not a computation to redo on every read. The condition
+	// subject does not stand still — a step reachable only through a not-taken edge can still change state, and an
+	// ATTEMPTS/STEP_STATE guard over it flips — so re-deriving let a settled branch silently re-resolve and both arms
+	// become live. The decision is now RECORDED when the branch succeeds.
+	describe('DWP-09 — a resolved BRANCH does not re-resolve', () => {
+		const prune = (i: number) => dispatch('PruneExecutionStep', { stepId: stepId(i) }, PLAN, 'EXECUTION_PLAN');
+		const planState = () => store.loadObject(PLAN)?.state as Record<string, unknown>;
+		const stepOf = (i: number) =>
+			(planState().steps as Array<Record<string, unknown>>).find((s) => s.id === stepId(i));
+
+		/**
+		 * s1 BRANCH --COND[ s4 is SKIPPED ]--> s2 ; --SEQ default--> s3. The guard references s4, which is NOT an
+		 * ancestor of s1 and is still QUEUED when the branch resolves — so the guard is false and the DEFAULT wins.
+		 * Later, s4 changes state, which under re-derivation would flip the guard TRUE and hand the branch to s2.
+		 */
+		function activeLateFlipPlan() {
+			const r = dispatch(
+				'ProposeExecutionPlan',
+				{
+					executionPlanId: PLAN,
+					workUnitId: PWU,
+					steps: [
+						{ ...step(1, 'QUEUED'), stepType: 'BRANCH' },
+						step(2, 'QUEUED'),
+						step(3, 'QUEUED'),
+						step(4, 'QUEUED')
+					],
+					transitions: [
+						cedge(1, 2, { op: 'STEP_STATE', stepId: stepId(4), state: 'SKIPPED' }),
+						gedge(1, 3),
+						gedge(3, 4)
+					],
+					retryPolicy: {},
+					tacticalChangePolicy: {},
+					escalationPolicy: {},
+					terminationPolicy: {}
+				},
+				PLAN,
+				'EXECUTION_PLAN'
+			);
+			expect(r.status, JSON.stringify(r.error)).toBe('ACCEPTED');
+			expect(dispatch('ApproveExecutionPlan', {}, PLAN, 'EXECUTION_PLAN').status).toBe('ACCEPTED');
+			expect(
+				dispatch('ActivateExecutionPlan', { authorizedRuntimeBindingIds: [] }, PLAN, 'EXECUTION_PLAN').status
+			).toBe('ACCEPTED');
+		}
+
+		it('records the selected out-edge on the BRANCH step when it succeeds', () => {
+			activeLateFlipPlan();
+			expect(stepOf(1)?.selectedTransitionId, 'not decided before the branch runs').toBeUndefined();
+			expect(start(1).status).toBe('ACCEPTED');
+			expect(complete(1).status).toBe('ACCEPTED');
+			// s4 is QUEUED, so STEP_STATE(s4,'SKIPPED') is false → the SEQUENTIAL default (s1→s3) is selected.
+			expect(stepOf(1)?.selectedTransitionId).toBe(`${PLAN}-t1-3`);
+		});
+
+		it('HOLDS the decision when a later state change would have flipped the guard', () => {
+			activeLateFlipPlan();
+			start(1);
+			complete(1); // default arm (s3) selected; s2 excluded
+			expect(start(2).status, 's2 is the not-taken arm').toBe('REJECTED');
+			expect(start(3).status, 's3 is the taken arm').toBe('ACCEPTED');
+			expect(complete(3).status).toBe('ACCEPTED');
+
+			// Now make the guard TRUE after the fact: s4 becomes SKIPPED. Under re-derivation the branch would
+			// re-resolve to s2, making the LOSING arm live while the winning arm has already run — both arms.
+			expect(
+				dispatch('SkipExecutionStep', { stepId: stepId(4), mandatory: false }, PLAN, 'EXECUTION_PLAN').status
+			).toBe('ACCEPTED');
+			expect(stepStateOf(4)).toBe('SKIPPED');
+
+			const flipped = start(2);
+			expect(flipped.status, 'the branch already decided; it must not re-resolve').toBe('REJECTED');
+			expect(stepStateOf(2)).toBe('QUEUED');
+			// The excluded arm is still prunable, so the plan can be closed out honestly.
+			expect(prune(2).status).toBe('ACCEPTED');
+			const done = dispatch('CompleteExecutionPlan', {}, PLAN, 'EXECUTION_PLAN');
+			expect(done.status, JSON.stringify(done.error)).toBe('ACCEPTED');
+		});
+
+		it('REJECTS a plan declaring two transitions with the same id (the decision is recorded BY id)', () => {
+			const dup = { ...gedge(1, 2), id: `${PLAN}-dup` };
+			const r = dispatch(
+				'ProposeExecutionPlan',
+				{
+					executionPlanId: PLAN,
+					workUnitId: PWU,
+					steps: [step(1, 'QUEUED'), step(2, 'QUEUED')],
+					transitions: [dup, { ...dup, targetStepId: stepId(2) }],
+					retryPolicy: {},
+					tacticalChangePolicy: {},
+					escalationPolicy: {},
+					terminationPolicy: {}
+				},
+				PLAN,
+				'EXECUTION_PLAN'
+			);
+			expect(r.status).toBe('REJECTED');
+			expect(r.error?.message).toContain('declared more than once');
+		});
+	});
 });

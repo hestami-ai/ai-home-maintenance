@@ -60,6 +60,10 @@ export interface ExecutionStepInput {
 	readonly purpose: string;
 	readonly stepState: string;
 	readonly runtimeBindingId?: string;
+	/** For a RESOLVED BRANCH: the out-edge it actually selected, recorded when it succeeded (DWP-09). The flow gate
+	 *  honours a recorded decision over a re-derived one, so this MUST reach the read-model or the UI's branch
+	 *  verdict can drift from the engine's the moment a guard's inputs change. */
+	readonly selectedTransitionId?: string;
 }
 
 /** Pure input: an ExecutionPlan transition (edge) the flow gate reads (DR-004 DWP-01). `conditionExpression` is opaque
@@ -89,6 +93,8 @@ export interface ExecutionStepView {
 	readonly purpose: string;
 	readonly stepState: string;
 	readonly runtimeBindingId?: string;
+	/** The out-edge a resolved BRANCH selected — see ExecutionStepInput. */
+	readonly selectedTransitionId?: string;
 	readonly tone: StepTone;
 	/** The command-backed affordances legal from this stepState (empty for the commandless/terminal states). */
 	readonly advanceCommands: readonly StepAdvanceCommand[];
@@ -184,6 +190,7 @@ function stepView(s: ExecutionStepInput): ExecutionStepView {
 		stepType: s.stepType,
 		purpose: s.purpose,
 		stepState: s.stepState,
+		...(s.selectedTransitionId === undefined ? {} : { selectedTransitionId: s.selectedTransitionId }),
 		tone: stepStateTone(s.stepState),
 		advanceCommands: advanceCommandsFor(s.stepState),
 		controlCommands: controlCommandsFor(s.stepState),
