@@ -278,6 +278,16 @@ export const PruneExecutionStepPayloadSchema = z.strictObject({
 	selectedEdgeId: z.string().optional()
 });
 export type PruneExecutionStepPayload = z.infer<typeof PruneExecutionStepPayloadSchema>;
+export const EnterExecutionStepWaitPayloadSchema = z.strictObject({
+	stepId: z.string(),
+	waitReason: z.string().optional()
+});
+export type EnterExecutionStepWaitPayload = z.infer<typeof EnterExecutionStepWaitPayloadSchema>;
+export const ResolveExecutionStepWaitPayloadSchema = z.strictObject({
+	stepId: z.string(),
+	resolution: z.string().optional()
+});
+export type ResolveExecutionStepWaitPayload = z.infer<typeof ResolveExecutionStepWaitPayloadSchema>;
 export const DetectAssumptionPayloadSchema = z.strictObject({
 	assumptionId: z.string(),
 	statement: z.string(),
@@ -1181,6 +1191,14 @@ export const ExecutionStepWaitingPayloadSchema = z.strictObject({
 	stepState: StepStateSchema
 });
 export type ExecutionStepWaitingPayload = z.infer<typeof ExecutionStepWaitingPayloadSchema>;
+export const ExecutionStepWaitResolvedPayloadSchema = z.strictObject({
+	stepId: z.string(),
+	resolution: z.string().optional(),
+	stepState: StepStateSchema
+});
+export type ExecutionStepWaitResolvedPayload = z.infer<
+	typeof ExecutionStepWaitResolvedPayloadSchema
+>;
 export const ExecutionTerminatedPayloadSchema = z.strictObject({
 	reason: z.string(),
 	terminationPolicyId: z.string().optional(),
@@ -1766,6 +1784,18 @@ export const COMMANDS = {
 		emitsEvent: 'ExecutionStepPruned',
 		firstSlice: false
 	},
+	EnterExecutionStepWait: {
+		payload: EnterExecutionStepWaitPayloadSchema,
+		targetAggregateType: 'EXECUTION_PLAN',
+		emitsEvent: 'ExecutionStepWaiting',
+		firstSlice: false
+	},
+	ResolveExecutionStepWait: {
+		payload: ResolveExecutionStepWaitPayloadSchema,
+		targetAggregateType: 'EXECUTION_PLAN',
+		emitsEvent: 'ExecutionStepWaitResolved',
+		firstSlice: false
+	},
 	DetectAssumption: {
 		payload: DetectAssumptionPayloadSchema,
 		targetAggregateType: 'ASSUMPTION',
@@ -2283,6 +2313,10 @@ export const EVENTS = {
 	},
 	ExecutionStepWaiting: {
 		payload: ExecutionStepWaitingPayloadSchema,
+		aggregateType: 'ExecutionPlan'
+	},
+	ExecutionStepWaitResolved: {
+		payload: ExecutionStepWaitResolvedPayloadSchema,
 		aggregateType: 'ExecutionPlan'
 	},
 	ExecutionTerminated: {

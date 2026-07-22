@@ -241,6 +241,38 @@ test.describe('Execution Plan view — DWP-03 handler-backed step actions', () =
 		// SATISFIED by them existing, not by their absence.
 		await expect(grp.getByTestId('step-action-skip')).toHaveCount(2);
 		await expect(grp.getByTestId('step-action-cancel')).toHaveCount(2);
+
+		// DR-004 DWP-04: Wait belongs to RUNNING and Resume to WAITING — neither is offered on a QUEUED/NOT_READY step
+		// (the machine has no such arrow, so offering one would be a fabricated button — F-11).
+		await expect(grp.getByTestId('step-action-wait')).toHaveCount(0);
+		await expect(grp.getByTestId('step-action-resolve')).toHaveCount(0);
+	});
+
+	// DR-004 DWP-04 (Tier 3C-ii) — the WAIT pair, end to end through the real commands. Before this, WAITING was a state
+	// the machine declared that nothing could reach, and its resume had no event (the DS-004 F-6 hole).
+	test('Wait suspends a RUNNING step and Resume returns it to RUNNING (DWP-04)', async ({
+		page,
+		request
+	}) => {
+		const undertakingId = await stageActivePlan(request);
+		await gotoHydrated(page, `/undertakings/${undertakingId}`);
+		await page.getByRole('button', { name: 'execution' }).click();
+		const grp = page.getByTestId('exec-pwu-group').filter({ hasText: 'Staged execution PWU' });
+
+		await grp.getByTestId('step-action-start').first().click();
+		await expect.poll(() => stepStateOf(request, STEP1)).toBe('RUNNING');
+
+		// RUNNING affords Wait (and cancel) but never Resume — the machine has no RUNNING→RUNNING resume.
+		await expect(grp.getByTestId('step-action-wait')).toHaveCount(1);
+		await expect(grp.getByTestId('step-action-resolve')).toHaveCount(0);
+		await grp.getByTestId('step-action-wait').click();
+		await expect.poll(() => stepStateOf(request, STEP1)).toBe('WAITING');
+
+		// WAITING affords Resume (and cancel) but no longer Wait, nor any advance command.
+		await expect(grp.getByTestId('step-action-resolve')).toHaveCount(1);
+		await expect(grp.getByTestId('step-action-wait')).toHaveCount(0);
+		await grp.getByTestId('step-action-resolve').click();
+		await expect.poll(() => stepStateOf(request, STEP1)).toBe('RUNNING');
 	});
 
 	test('the Complete form action surfaces the FLOOR-GATE rejection verbatim; the step does not advance', async ({

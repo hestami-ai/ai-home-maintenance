@@ -91,6 +91,9 @@ describe('validate', () => {
 		// stays opaque z.unknown (the grammar is hand-authored in rph-domain, not vocab-generated). (+1 → 317.)
 		// then +2 for JAN-EXECPLAN-DR-004 DWP-03 (BRANCH/prune): +1 command PruneExecutionStep + +1 event
 		// ExecutionStepPruned (a system prune of a not-taken branch arm to SKIPPED). (+2 → 319.)
-		expect(buildContractRegistry().ids()).toHaveLength(319);
+		// DR-004 DWP-04 (Tier 3C-ii): EnterExecutionStepWait + ResolveExecutionStepWait commands and the MINTED
+		// ExecutionStepWaitResolved event — the WAITING state and its RUNNING resume become reachable and replayable
+		// (ExecutionStepWaiting already existed with no command able to emit it). (+3 → 322.)
+		expect(buildContractRegistry().ids()).toHaveLength(322);
 	});
 });

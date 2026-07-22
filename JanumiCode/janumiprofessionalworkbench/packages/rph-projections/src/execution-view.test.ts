@@ -100,15 +100,25 @@ describe('advanceCommandsFor — the F-11 command-backed allowlist (never the ma
 	});
 });
 
-describe('controlCommandsFor — the skip/cancel control allowlist (DWP-02/03; machine-legal set, EP-TST-5)', () => {
+describe('controlCommandsFor — the skip/cancel/wait/resolve allowlist (DWP-02/03 + DWP-04; machine-legal set, EP-TST-5)', () => {
 	it('offers skip+cancel from READY/QUEUED (both →SKIPPED and →CANCELLED are legal there)', () => {
 		expect(controlCommandsFor('READY')).toEqual(['skip', 'cancel']);
 		expect(controlCommandsFor('QUEUED')).toEqual(['skip', 'cancel']);
 	});
 
-	it('offers cancel-only from RUNNING/WAITING (a running step cancels but does not skip — machine)', () => {
-		expect(controlCommandsFor('RUNNING')).toEqual(['cancel']);
-		expect(controlCommandsFor('WAITING')).toEqual(['cancel']);
+	it('offers cancel+wait from RUNNING (a running step cancels or suspends, but does not skip — machine)', () => {
+		expect(controlCommandsFor('RUNNING')).toEqual(['cancel', 'wait']);
+	});
+
+	it('offers cancel+resolve from WAITING — resume is the only non-terminating exit (DWP-04)', () => {
+		expect(controlCommandsFor('WAITING')).toEqual(['cancel', 'resolve']);
+	});
+
+	it('never offers resolve outside WAITING, nor wait outside RUNNING (the arrows exist nowhere else)', () => {
+		for (const s of ALL_STEP_STATES) {
+			if (s !== 'WAITING') expect(controlCommandsFor(s)).not.toContain('resolve');
+			if (s !== 'RUNNING') expect(controlCommandsFor(s)).not.toContain('wait');
+		}
 	});
 
 	it('offers NO control action from NOT_READY (machine has no →CANCELLED/→SKIPPED from there) or any terminal state', () => {
@@ -127,7 +137,7 @@ describe('controlCommandsFor — the skip/cancel control allowlist (DWP-02/03; m
 	it('is surfaced on the step view', () => {
 		const v = executionPlanView(plan('plan_1', 'pwu_a', [step('s1', 'QUEUED'), step('s2', 'RUNNING')]));
 		expect(v.steps[0]?.controlCommands).toEqual(['skip', 'cancel']); // QUEUED
-		expect(v.steps[1]?.controlCommands).toEqual(['cancel']); // RUNNING
+		expect(v.steps[1]?.controlCommands).toEqual(['cancel', 'wait']); // RUNNING
 	});
 });
 

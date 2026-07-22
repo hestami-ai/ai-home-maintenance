@@ -65,11 +65,22 @@
 		retry: 'retryStep'
 	} as const;
 	const STEP_LABEL = { start: 'Start', complete: 'Complete', fail: 'Fail', retry: 'Retry' } as const;
-	// DWP-03: the CONTROL action (skip/cancel) → form-action + label. Keyed to the read-model's controlCommands (the
-	// command-backed skip/cancel allowlist — never the wider machine topology). Plan-level gating (skip needs an ACTIVE
-	// plan; cancel is cleanup) is applied in the template.
-	const STEP_CONTROL_ACTION = { skip: 'skipStep', cancel: 'cancelStep' } as const;
-	const STEP_CONTROL_LABEL = { skip: 'Skip', cancel: 'Cancel' } as const;
+	// DWP-03 (+ DR-004 DWP-04): the CONTROL action (skip/cancel/wait/resolve) → form-action + label. Keyed to the
+	// read-model's controlCommands (the command-backed allowlist — never the wider machine topology). Plan-level gating
+	// (skip and resolve need an ACTIVE plan; cancel is cleanup and wait suspends already-running work) is applied in the
+	// template.
+	const STEP_CONTROL_ACTION = {
+		skip: 'skipStep',
+		cancel: 'cancelStep',
+		wait: 'enterWaitStep',
+		resolve: 'resolveWaitStep'
+	} as const;
+	const STEP_CONTROL_LABEL = {
+		skip: 'Skip',
+		cancel: 'Cancel',
+		wait: 'Wait',
+		resolve: 'Resume'
+	} as const;
 	// DWP-05: attempt-state → tone for the per-step attempt-history rows.
 	const attemptTone = (state: string): string =>
 		state === 'SUCCEEDED'
@@ -326,9 +337,10 @@
 										{/each}
 										{#each s.controlCommands as ctl (ctl)}
 											<!-- Skip asserts mandatory:false (optional skip; the fail-closed mandatory/waiver path is
-											     domain-tested, not a demo button) and needs an ACTIVE plan. Cancel is CLEANUP — permitted
-											     even under a superseded/terminal plan. So: cancel always; skip only while the plan is ACTIVE. -->
-											{#if ctl === 'cancel' || pl.status === 'ACTIVE'}
+											     domain-tested, not a demo button) and needs an ACTIVE plan; Resume likewise re-opens the
+											     RUNNING state. Cancel is CLEANUP and Wait SUSPENDS work already running — both are permitted
+											     even under a superseded/terminal plan. So: cancel/wait always; skip/resolve only while ACTIVE. -->
+											{#if ctl === 'cancel' || ctl === 'wait' || pl.status === 'ACTIVE'}
 												<form method="POST" action="?/{STEP_CONTROL_ACTION[ctl]}" use:enhance class="inlineform">
 													<input type="hidden" name="planId" value={pl.id} />
 													<input type="hidden" name="stepId" value={s.id} />

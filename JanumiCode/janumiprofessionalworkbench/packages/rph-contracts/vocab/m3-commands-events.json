@@ -958,6 +958,54 @@
 			]
 		},
 		{
+			"commandType": "EnterExecutionStepWait",
+			"targetAggregateType": "EXECUTION_PLAN",
+			"emitsEvent": "ExecutionStepWaiting",
+			"drivesMachine": "ExecutionStep.stepState",
+			"drivesFrom": "RUNNING",
+			"drivesTo": "WAITING",
+			"schematized": false,
+			"sourceSection": "UNRATIFIED-AUTHORED (annotated 2026-07-22 under sponsor grant, JAN-EXECPLAN-DR-004 DWP-04, Tier 3C-ii): the ExecutionStep RUNNING->WAITING arrow AND the ExecutionStepWaiting EVENT are both pre-authored, but DOC-007 schematizes NO Enter-Wait command interface (§16 item 6 leaves the granular vocabulary unschematized) — so this COMMAND shape was AUTHORED, not derived. The event already existed with NO command that could emit it: WAITING was a state the machine declared and nothing could reach (the DS-004 F-6 unreachable-state hole). A wait SUSPENDS work already RUNNING — it opens none — so the handler applies NO plan-ACTIVE precheck (mirroring Cancel/Fail; RPH-EXE-002 forbids OPENING work, not pausing it): a RUNNING step under a superseded plan must still be able to record honestly that it is blocked. Do NOT treat this sourceSection as proof the shape is ratified. Ratification pending. Cited: DOC-002 §26.4, ExecutionStep.stepState machine (RUNNING->WAITING, trigger ExecutionStepWaiting), RPH-EXE-002.",
+			"payloadFields": [
+				{
+					"field": "stepId",
+					"required": true,
+					"type": "string",
+					"note": "id-ref: the RUNNING step suspending on an external condition"
+				},
+				{
+					"field": "waitReason",
+					"required": false,
+					"type": "string",
+					"note": "WHAT the step is waiting on (free text — no ratified wait-reason vocabulary exists); recorded on ExecutionStepWaiting"
+				}
+			]
+		},
+		{
+			"commandType": "ResolveExecutionStepWait",
+			"targetAggregateType": "EXECUTION_PLAN",
+			"emitsEvent": "ExecutionStepWaitResolved",
+			"drivesMachine": "ExecutionStep.stepState",
+			"drivesFrom": "WAITING",
+			"drivesTo": "RUNNING",
+			"schematized": false,
+			"sourceSection": "UNRATIFIED-AUTHORED (annotated 2026-07-22 under sponsor grant, JAN-EXECPLAN-DR-004 DWP-04, Tier 3C-ii): the ExecutionStep WAITING->RUNNING arrow IS ratified but its trigger is the bare phrase 'wait resolved' — the machine names a transition NO event could record, so DWP-04 MINTS ExecutionStepWaitResolved (see the event). Without it the resume would move stepState with no governed-stream fact, i.e. a state change invisible to replay (the DS-004 F-6 replay hole). Resuming RE-OPENS the RUNNING state where attempts execute, so unlike Enter-Wait this handler DOES apply the plan-ACTIVE precheck, mirroring Start/Retry (RPH-EXE-002 / §35.1): under a superseded plan the correct action is Cancel, not resume. The resume is NOT a new attempt — attemptsMade counts ExecutionStepStarted only, so a wait/resume cycle does not inflate the retry cap (RPH-EXE-008). Do NOT treat this sourceSection as proof the shape is ratified. Ratification pending. Cited: DOC-002 §26.4, ExecutionStep.stepState machine (WAITING->RUNNING, trigger 'wait resolved'), RPH-EXE-002, RPH-EXE-008.",
+			"payloadFields": [
+				{
+					"field": "stepId",
+					"required": true,
+					"type": "string",
+					"note": "id-ref: the WAITING step resuming"
+				},
+				{
+					"field": "resolution",
+					"required": false,
+					"type": "string",
+					"note": "WHAT resolved the wait (free text); recorded on ExecutionStepWaitResolved so the governed stream names why the step resumed"
+				}
+			]
+		},
+		{
 			"commandType": "DetectAssumption",
 			"targetAggregateType": "ASSUMPTION",
 			"emitsEvent": "AssumptionDetected",
@@ -4971,6 +5019,32 @@
 					"type": "enum",
 					"enumRef": "StepStateSchema",
 					"note": "RUNNING->WAITING"
+				}
+			]
+		},
+		{
+			"eventType": "ExecutionStepWaitResolved",
+			"aggregateType": "ExecutionPlan",
+			"sourceSection": "UNRATIFIED-AUTHORED — MINTED 2026-07-22 under sponsor grant (JAN-EXECPLAN-DR-004 DWP-04, Tier 3C-ii). The ExecutionStep.stepState machine ratifies the WAITING->RUNNING arrow but names its trigger only as the bare phrase 'wait resolved' — no event exists for it, so a resume would change state with NO governed-stream fact and be invisible to replay (the DS-004 F-6 hole; every other arrow in this machine has a named event). This event is the missing counterpart to the pre-authored ExecutionStepWaiting, minted rather than reused because a resume is a DIFFERENT fact from a suspend and the read-model/attempt projections must be able to tell them apart. Deliberately NOT an attempt marker: attemptsMade counts ExecutionStepStarted only (RPH-EXE-008), so a wait/resume cycle continues the SAME attempt. Do NOT treat this sourceSection as proof the shape is ratified. Ratification pending. Cited: DOC-002 §26.4, ExecutionStep.stepState machine (WAITING->RUNNING).",
+			"payloadFields": [
+				{
+					"field": "stepId",
+					"required": true,
+					"type": "string",
+					"note": "id-ref"
+				},
+				{
+					"field": "resolution",
+					"required": false,
+					"type": "string",
+					"note": "WHAT resolved the wait (free text)"
+				},
+				{
+					"field": "stepState",
+					"required": true,
+					"type": "enum",
+					"enumRef": "StepStateSchema",
+					"note": "WAITING->RUNNING (the RESULTING state, mirroring ExecutionStepStarted/Waiting)"
 				}
 			]
 		},

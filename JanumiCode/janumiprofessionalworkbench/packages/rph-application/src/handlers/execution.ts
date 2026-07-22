@@ -459,6 +459,17 @@ function advanceStep(
 		/** The EVENT payload. Omitted → the raw command payload (the default for the step events DOC-007 leaves
 		 * unschematized). Mirrors kit.advanceStatus's `eventPayload`: the command shape is not the event shape. */
 		readonly eventPayload?: unknown;
+		/**
+		 * Refuse a step ALREADY in the target state, with this explanation, instead of taking checkTransition's NOOP
+		 * path (DR-004 DWP-04). The machine classifies from===to as NOOP so an idempotently RE-ISSUED command is
+		 * absorbed — correct for skip/cancel/prune (already SKIPPED by the same means IS the requested outcome), but
+		 * WRONG when the target is a LIVE state re-entered by a distinct cause: an already-RUNNING step has not
+		 * "already been resumed" (it never waited) and has not "already been started" a second time. Absorbing those
+		 * silently emits a second ExecutionStepStarted / a WaitResolved for a step that never waited — spurious
+		 * governed-stream facts, and in the Started case an inflated attemptsMade that consumes the retry cap
+		 * (RPH-EXE-008). Set for the two RUNNING-targeting handlers; left unset where re-issue IS idempotent.
+		 */
+		readonly rejectReentry?: string;
 	}
 ) {
 	const planId = command.targetAggregateId;
@@ -477,6 +488,8 @@ function advanceStep(
 	const step = steps[idx] as Record<string, unknown>;
 	const precheckFailure = args.precheck?.(step, plan);
 	if (precheckFailure) return precheckFailure;
+	if (args.rejectReentry && String(step.stepState) === args.target)
+		return reject(command, 'RPH_ILLEGAL_STATE_TRANSITION', args.rejectReentry, [args.stepId]);
 	const illegal = checkTransition(command, STEP_MACHINE, String(step.stepState), args.target);
 	if (illegal) return illegal;
 	const nextStep = { ...(args.mutateStep ? args.mutateStep(step) : step), stepState: args.target };
@@ -518,6 +531,10 @@ export const startExecutionStep: CommandHandler = (ctx, command) => {
 		stepId: p.stepId,
 		target: 'RUNNING',
 		eventType: 'ExecutionStepStarted',
+		// Re-starting an already-RUNNING step is NOT an idempotent re-issue: the machine's from===to NOOP path would
+		// emit a SECOND ExecutionStepStarted, and attemptsMade counts exactly those — so a double-dispatched Start
+		// silently burned one of the plan's retries (RPH-EXE-008). Adjacent defect, fixed with DWP-04's mechanism.
+		rejectReentry: `Cannot start step ${p.stepId}: it is already RUNNING — a re-issued start would open a second attempt against the retry cap (RPH-EXE-008). Complete, fail, or cancel the running step first.`,
 		// The event records the RESULTING state, not the command input: ExecutionStepStarted declares `stepState`
 		// (the RUNNING it transitioned to), which `command.payload` ({ stepId }) does not carry — so the default
 		// emitted `{ stepId }` was missing the one field the event exists to record. The event that says "this step
@@ -832,6 +849,63 @@ export const pruneExecutionStep: CommandHandler = (ctx, command) => {
 						command,
 						'RPH_ILLEGAL_STATE_TRANSITION',
 						`Cannot prune a step: plan ${command.targetAggregateId} is not ACTIVE (${String(plan.status)}) — a prune is within-execution branch resolution.`
+					)
+	});
+};
+
+/**
+ * EnterExecutionStepWait — a step RUNNING -> WAITING (JAN-EXECPLAN-DR-004 DWP-04 / D6). The machine declared WAITING and
+ * the ExecutionStepWaiting event was pre-authored, but NO command could emit it: WAITING was an unreachable state
+ * (DS-004 F-6). A wait SUSPENDS work already RUNNING rather than opening any, so — like Cancel/Fail and UNLIKE
+ * Start/Retry/Resolve — there is DELIBERATELY no plan-ACTIVE precheck: RPH-EXE-002 forbids OPENING work under a
+ * superseded/terminal plan, not recording that a running step is blocked. The machine (checkTransition, from RUNNING)
+ * alone gates the source. Exec != assurance (INV-5): the wait moves only stepState.
+ */
+export const enterExecutionStepWait: CommandHandler = (ctx, command) => {
+	const p = command.payload as { stepId: string; waitReason?: string };
+	return advanceStep(ctx, command, {
+		stepId: p.stepId,
+		target: 'WAITING',
+		eventType: 'ExecutionStepWaiting',
+		// The event records the RESULTING state (mirroring Started/Skipped/Pruned): the command payload carries no
+		// stepState, and the ratified event declares it required.
+		eventPayload: {
+			stepId: p.stepId,
+			...(p.waitReason ? { waitReason: p.waitReason } : {}),
+			stepState: 'WAITING'
+		}
+	});
+};
+
+/**
+ * ResolveExecutionStepWait — a step WAITING -> RUNNING (JAN-EXECPLAN-DR-004 DWP-04 / D6). The machine ratifies this
+ * arrow but names its trigger only as the bare phrase "wait resolved"; DWP-04 MINTS ExecutionStepWaitResolved so the
+ * resume is a governed-stream FACT rather than a state change invisible to replay (the DS-004 F-6 hole). Resuming
+ * re-opens RUNNING — the state in which attempts execute — so this DOES apply the plan-ACTIVE precheck, mirroring
+ * Start/Retry (RPH-EXE-002 / §35.1); under a superseded plan the correct action is Cancel, not resume. The resume is
+ * NOT a new attempt: attemptsMadeForStep counts ExecutionStepStarted only, so a wait/resume cycle continues the SAME
+ * attempt and does not consume the retry cap (RPH-EXE-008). Exec != assurance (INV-5): moves only stepState.
+ */
+export const resolveExecutionStepWait: CommandHandler = (ctx, command) => {
+	const p = command.payload as { stepId: string; resolution?: string };
+	return advanceStep(ctx, command, {
+		stepId: p.stepId,
+		target: 'RUNNING',
+		eventType: 'ExecutionStepWaitResolved',
+		// An already-RUNNING step never waited, so this is not an idempotent re-issue — see advanceStep.rejectReentry.
+		rejectReentry: `Cannot resume step ${p.stepId}: it is RUNNING, not WAITING — there is no wait to resolve (a resume is not an idempotent re-issue; the step never suspended).`,
+		eventPayload: {
+			stepId: p.stepId,
+			...(p.resolution ? { resolution: p.resolution } : {}),
+			stepState: 'RUNNING'
+		},
+		precheck: (_step, plan) =>
+			plan.status === 'ACTIVE'
+				? null
+				: reject(
+						command,
+						'RPH_ILLEGAL_STATE_TRANSITION',
+						`Cannot resume a waiting step: plan ${command.targetAggregateId} is not ACTIVE (${String(plan.status)}) — resuming re-opens the RUNNING state where attempts execute, and a superseded/terminal plan opens no new work (RPH-EXE-002). Cancel the step instead.`
 					)
 	});
 };

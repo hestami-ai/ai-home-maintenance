@@ -284,6 +284,19 @@ describe('StartExecutionStep — the linear start-gate (DWP-01, RPH-EXE-005 / fo
 		expect(stepStateOf(2)).toBe('RUNNING');
 	});
 
+	// DR-004 DWP-04 (adjacent defect) — the machine classifies RUNNING→RUNNING as a NOOP, so a re-issued Start was
+	// ABSORBED and still emitted a second ExecutionStepStarted. attemptsMade counts exactly those events, so a
+	// double-dispatched Start silently burned one of the plan's retries (RPH-EXE-008) without opening a real attempt.
+	it('REFUSES to re-start an already-RUNNING step (a NOOP re-issue would inflate attemptsMade)', () => {
+		activePlan(['QUEUED']);
+		expect(start(1).status).toBe('ACCEPTED');
+		const again = start(1);
+		expect(again.status).toBe('REJECTED');
+		expect(again.error?.code).toBe('RPH_ILLEGAL_STATE_TRANSITION');
+		expect(again.error?.message).toContain('retry cap');
+		expect(store.readAllEvents().filter((e) => e.eventType === 'ExecutionStepStarted')).toHaveLength(1);
+	});
+
 	// DR-004 DWP-02 (Tier 3C-ii) — CONDITIONAL edges: the guard is evaluated against the plan's committed subject.
 	it('a CONDITIONAL in-edge with a TRUE guard makes the target startable once the source succeeds', () => {
 		activeGraphPlan(['QUEUED', 'QUEUED'], [cedge(1, 2, { op: 'STEP_SUCCEEDED', stepId: stepId(1) })]);
@@ -353,6 +366,93 @@ describe('StartExecutionStep — the linear start-gate (DWP-01, RPH-EXE-005 / fo
 			// s1 SUCCEEDED, s2 SUCCEEDED, s3 SKIPPED → the plan completes (≥1 SUCCEEDED, all terminal-success).
 			const done = dispatch('CompleteExecutionPlan', {}, PLAN, 'EXECUTION_PLAN');
 			expect(done.status, JSON.stringify(done.error)).toBe('ACCEPTED');
+		});
+	});
+
+	// DR-004 DWP-04 (Tier 3C-ii) — WAIT: the machine declared RUNNING↔WAITING but no command could reach it and no
+	// event could record the resume (the DS-004 F-6 unreachable-state + replay hole). Both are now closed.
+	describe('WAIT + resume (DWP-04)', () => {
+		const wait = (i: number, waitReason?: string) =>
+			dispatch(
+				'EnterExecutionStepWait',
+				{ stepId: stepId(i), ...(waitReason ? { waitReason } : {}) },
+				PLAN,
+				'EXECUTION_PLAN'
+			);
+		const resolve = (i: number, resolution?: string) =>
+			dispatch(
+				'ResolveExecutionStepWait',
+				{ stepId: stepId(i), ...(resolution ? { resolution } : {}) },
+				PLAN,
+				'EXECUTION_PLAN'
+			);
+		const eventsOfType = (t: string) => store.readAllEvents().filter((e) => e.eventType === t);
+
+		it('suspends a RUNNING step to WAITING and resumes it to RUNNING, then completes', () => {
+			activePlan(['QUEUED']);
+			expect(start(1).status).toBe('ACCEPTED');
+			const w = wait(1, 'blocked on an external approval');
+			expect(w.status, JSON.stringify(w.error)).toBe('ACCEPTED');
+			expect(stepStateOf(1)).toBe('WAITING');
+			const r = resolve(1, 'approval granted');
+			expect(r.status, JSON.stringify(r.error)).toBe('ACCEPTED');
+			expect(stepStateOf(1)).toBe('RUNNING');
+			expect(complete(1).status).toBe('ACCEPTED');
+		});
+
+		it('records BOTH halves as governed-stream facts carrying the RESULTING state (the replay hole)', () => {
+			activePlan(['QUEUED']);
+			start(1);
+			wait(1, 'awaiting fixture');
+			resolve(1, 'fixture arrived');
+			const waiting = eventsOfType('ExecutionStepWaiting');
+			const resumed = eventsOfType('ExecutionStepWaitResolved');
+			expect(waiting).toHaveLength(1);
+			expect(waiting[0]?.payload).toMatchObject({
+				stepId: stepId(1),
+				waitReason: 'awaiting fixture',
+				stepState: 'WAITING'
+			});
+			expect(resumed).toHaveLength(1);
+			expect(resumed[0]?.payload).toMatchObject({
+				stepId: stepId(1),
+				resolution: 'fixture arrived',
+				stepState: 'RUNNING'
+			});
+		});
+
+		it('does NOT count the resume as an attempt (the retry cap reads ExecutionStepStarted only, RPH-EXE-008)', () => {
+			activePlan(['QUEUED']);
+			start(1);
+			wait(1);
+			resolve(1);
+			// One RUNNING episode = one attempt, however many times it paused: the resume must not re-mint a Started.
+			expect(eventsOfType('ExecutionStepStarted')).toHaveLength(1);
+		});
+
+		it('REJECTS a wait from a non-RUNNING state and a resume from a non-WAITING state (the machine gates both)', () => {
+			activePlan(['QUEUED']);
+			expect(wait(1).status, 'QUEUED has no →WAITING arrow').toBe('REJECTED');
+			expect(start(1).status).toBe('ACCEPTED');
+			expect(resolve(1).status, 'RUNNING has no →RUNNING resume arrow').toBe('REJECTED');
+		});
+
+		it('permits a wait under a NON-ACTIVE plan but REFUSES the resume (suspend ≠ opening work, RPH-EXE-002)', () => {
+			activePlan(['QUEUED']);
+			expect(start(1).status).toBe('ACCEPTED');
+			expect(
+				dispatch('CancelExecutionPlan', { reason: 'sponsor pulled it' }, PLAN, 'EXECUTION_PLAN').status
+			).toBe('ACCEPTED');
+			// A running step must still be able to say honestly that it is blocked — cancel-shaped, not start-shaped.
+			const w = wait(1, 'blocked');
+			expect(w.status, JSON.stringify(w.error)).toBe('ACCEPTED');
+			expect(stepStateOf(1)).toBe('WAITING');
+			// Resuming re-opens RUNNING (where attempts execute), so it is start-shaped and must be refused.
+			const r = resolve(1);
+			expect(r.status).toBe('REJECTED');
+			expect(r.error?.code).toBe('RPH_ILLEGAL_STATE_TRANSITION');
+			expect(r.error?.message).toContain('Cancel the step instead');
+			expect(stepStateOf(1)).toBe('WAITING');
 		});
 	});
 });

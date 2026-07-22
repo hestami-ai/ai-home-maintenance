@@ -551,6 +551,23 @@ export const actions: Actions = {
 		const f = await request.formData();
 		return dispatchResult('PruneExecutionStep', str(f, 'planId'), { stepId: str(f, 'stepId') });
 	},
+	// DR-004 DWP-04 — the WAIT pair. Enter-wait SUSPENDS a RUNNING step (permitted even post-supersession, like cancel);
+	// resolve RESUMES it (needs an ACTIVE plan, like start/retry) and emits the MINTED ExecutionStepWaitResolved so the
+	// resume is replayable. A resume is NOT a new attempt, so the retry cap is untouched.
+	enterWaitStep: async ({ request }) => {
+		const f = await request.formData();
+		return dispatchResult('EnterExecutionStepWait', str(f, 'planId'), {
+			stepId: str(f, 'stepId'),
+			waitReason: str(f, 'reason') || 'Operator suspended the step pending an external condition.'
+		});
+	},
+	resolveWaitStep: async ({ request }) => {
+		const f = await request.formData();
+		return dispatchResult('ResolveExecutionStepWait', str(f, 'planId'), {
+			stepId: str(f, 'stepId'),
+			resolution: str(f, 'reason') || 'Operator resolved the wait.'
+		});
+	},
 	cancelPlan: async ({ request }) => {
 		const f = await request.formData();
 		return dispatchResult('CancelExecutionPlan', str(f, 'planId'), {

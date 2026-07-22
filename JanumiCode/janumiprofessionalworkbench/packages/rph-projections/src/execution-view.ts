@@ -9,10 +9,12 @@
 // step transitions the domain can actually drive. It is derived ONLY from the FOUR command-backed step transitions
 // in the handler registry (StartExecutionStep: QUEUED→RUNNING; CompleteExecutionStep: RUNNING→SUCCEEDED;
 // FailExecutionStep: RUNNING→FAILED; RetryExecutionStep: FAILED→QUEUED). The wider StepState machine has ~18 legal
-// arrows, but the rest (NOT_READY→READY, →SKIPPED, →CANCELLED, →SUPERSEDED, →WAITING …) have NO command handler.
+// arrows; the ones that have since GAINED a command handler live in the separate `controlCommands` allowlist below
+// (skip/cancel — DR-003 DWP-02/03; wait/resolve — DR-004 DWP-04), and the rest (NOT_READY→READY, →SUPERSEDED …) still
+// have NO handler and therefore NO affordance.
 //
 // Do not change: advanceCommands MUST come from this allowlist, NOT from the machine's legal-transition topology.
-//   Deriving affordances from the topology would mint buttons (Skip / Cancel-step / Wait / Supersede) that dispatch
+//   Deriving affordances from the topology would mint buttons (Supersede-step, NOT_READY→READY …) that dispatch
 //   nonexistent commands (JAN-EXECPLAN-DR-001 F-11 / §19 L3-C3). A step below QUEUED (NOT_READY/READY — the domain's
 //   own initial state) has NO advance command at all; `belowQueued` surfaces that honestly rather than as an inert
 //   row (F-11), parallel to the plan-level no-completion-handler gap (F-9).
@@ -35,11 +37,13 @@ import type { PwaGraphExport } from './pwa-graph.js';
 /** The command-backed step transitions — the ONLY affordances the domain can drive (registry handlers). */
 export type StepAdvanceCommand = 'start' | 'complete' | 'fail' | 'retry';
 
-/** The command-backed CONTROL actions (off-happy-path, JAN-EXECPLAN-DR-003 DWP-02/03): skip (READY/QUEUED→SKIPPED)
- *  and cancel (READY/QUEUED/RUNNING/WAITING→CANCELLED). Distinct from advanceCommands (forward progress) — a control
- *  action WAIVES or ABORTS a step rather than progressing it. Kept as its own allowlist so the UI never invents a
- *  skip/cancel button from the machine topology (the F-11 discipline); both commands now exist (DWP-02). */
-export type StepControlCommand = 'skip' | 'cancel';
+/** The command-backed CONTROL actions (off-happy-path, JAN-EXECPLAN-DR-003 DWP-02/03 + DR-004 DWP-04): skip
+ *  (READY/QUEUED→SKIPPED), cancel (READY/QUEUED/RUNNING/WAITING→CANCELLED), wait (RUNNING→WAITING) and resolve
+ *  (WAITING→RUNNING). Distinct from advanceCommands (forward progress toward a terminal state) — a control action
+ *  WAIVES, ABORTS or SUSPENDS a step rather than progressing it. Kept as its own allowlist so the UI never invents a
+ *  button from the machine topology (the F-11 discipline); every member here has a registry handler (DWP-04 added the
+ *  last two, which is what made WAITING reachable and its resume replayable at all). */
+export type StepControlCommand = 'skip' | 'cancel' | 'wait' | 'resolve';
 
 /** A semantic tone for a stepState — the UI maps tone → colour. Kept here (not in the component) so the
  *  every-stepState-has-a-defined-tone totality is unit-tested in the pure layer (EP-TST-5 state-transition). */
@@ -116,15 +120,16 @@ const ADVANCE_BY_STEP_STATE: Record<StepState, readonly StepAdvanceCommand[]> = 
 	SUPERSEDED: []
 };
 
-// The command-backed CONTROL affordances per stepState (DWP-02/03). Derived from the MACHINE's skip/cancel arrows now
-// that both commands exist: skip is legal READY|QUEUED→SKIPPED; cancel is legal READY|QUEUED|RUNNING|WAITING→CANCELLED
-// (NOT from NOT_READY — the machine has no such arrow). Record<StepState, …> forces every value to be classified.
+// The command-backed CONTROL affordances per stepState (DWP-02/03 + DR-004 DWP-04). Derived from the MACHINE's
+// skip/cancel/wait/resume arrows now that every one of them has a command: skip is legal READY|QUEUED→SKIPPED; cancel
+// is legal READY|QUEUED|RUNNING|WAITING→CANCELLED (NOT from NOT_READY — the machine has no such arrow); wait is legal
+// RUNNING→WAITING; resolve is legal WAITING→RUNNING. Record<StepState, …> forces every value to be classified.
 const CONTROL_BY_STEP_STATE: Record<StepState, readonly StepControlCommand[]> = {
 	NOT_READY: [], // machine: →CANCELLED only from READY/QUEUED/RUNNING/WAITING; →SKIPPED only from READY/QUEUED
 	READY: ['skip', 'cancel'],
 	QUEUED: ['skip', 'cancel'],
-	RUNNING: ['cancel'], // a running step can be cancelled but not skipped (machine)
-	WAITING: ['cancel'],
+	RUNNING: ['cancel', 'wait'], // a running step can be cancelled or suspended, but not skipped (machine)
+	WAITING: ['cancel', 'resolve'], // resolve is the ONLY way out of WAITING besides cancel (DWP-04)
 	SUCCEEDED: [],
 	FAILED: [], // terminal — no control action (retry is a progress affordance, not control)
 	SKIPPED: [],
@@ -151,9 +156,10 @@ export function advanceCommandsFor(stepState: string): readonly StepAdvanceComma
 	return ADVANCE_BY_STEP_STATE[stepState as StepState] ?? [];
 }
 
-/** The command-backed CONTROL actions (skip/cancel) legal from a stepState — the DWP-02/03 allowlist. Unknown/
- *  off-contract states → [] (never fabricate). Plan-level gating (skip needs an ACTIVE plan; cancel is cleanup) is
- *  applied by the caller — this is the per-stepState machine-legal set only. */
+/** The command-backed CONTROL actions (skip/cancel/wait/resolve) legal from a stepState — the DWP-02/03 + DWP-04
+ *  allowlist. Unknown/off-contract states → [] (never fabricate). Plan-level gating is applied by the caller — this is
+ *  the per-stepState machine-legal set only. (Caller-side: skip and resolve need an ACTIVE plan; cancel is cleanup and
+ *  wait suspends already-running work, so neither does.) */
 export function controlCommandsFor(stepState: string): readonly StepControlCommand[] {
 	return CONTROL_BY_STEP_STATE[stepState as StepState] ?? [];
 }
