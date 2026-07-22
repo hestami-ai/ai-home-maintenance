@@ -25,6 +25,7 @@ import {
 	ConditionExpressionSchema,
 	conditionStepRefs,
 	evaluateCondition,
+	prunableStepIds,
 	retryDecision,
 	startStepGate,
 	validateStepCompletion,
@@ -59,13 +60,45 @@ function toGatePlan(plan: Record<string, unknown>): GatePlan {
 	const transitions = (plan.transitions as Array<Record<string, unknown>>) ?? [];
 	return {
 		status: String(plan.status ?? ''),
-		steps: steps.map((s) => ({ id: String(s.id ?? ''), stepState: String(s.stepState ?? '') })),
+		steps: (steps as Array<Record<string, unknown>>).map((s) => ({
+			id: String(s.id ?? ''),
+			stepState: String(s.stepState ?? ''),
+			// stepType decides which node may branch EXCLUSIVELY; prunedAsUnreachable distinguishes a step SKIPPED
+			// because the plan excluded it (dead — satisfies nothing) from one skipped by an operator waiver (DWP-07).
+			...(s.stepType === undefined ? {} : { stepType: String(s.stepType) }),
+			...(s.prunedAsUnreachable === true ? { prunedAsUnreachable: true } : {})
+		})),
 		transitions: transitions.map((t) => ({
 			sourceStepId: t.sourceStepId === undefined ? undefined : String(t.sourceStepId),
 			targetStepId: t.targetStepId === undefined ? undefined : String(t.targetStepId),
 			transitionType: t.transitionType === undefined ? undefined : String(t.transitionType),
 			conditionExpression: t.conditionExpression
 		}))
+	};
+}
+
+/**
+ * The CONDITIONAL-edge guard evaluator for a plan, or `undefined` when the plan has no guarded edge at all.
+ *
+ * Building it folds the plan's condition subject out of the event log, which means reading the WHOLE store. Doing that
+ * unconditionally made every StartExecutionStep — the hottest command in the system, and one that previously read no
+ * events whatsoever — O(total events across all aggregates), even for a linear plan whose gate never consults a guard
+ * (DWP-07, flagged by the audit's completeness sweep). Returning undefined is not a behaviour change: the gate's
+ * evaluator parameter is optional and is only ever called for a CONDITIONAL edge, of which there are none here.
+ */
+function guardEvaluatorFor(
+	ctx: HandlerContext,
+	planId: string,
+	gatePlan: GatePlan
+): EdgeGuardEvaluator | undefined {
+	const hasGuard = (gatePlan.transitions ?? []).some(
+		(t) => t.conditionExpression !== undefined || t.transitionType === 'CONDITIONAL'
+	);
+	if (!hasGuard) return undefined;
+	const subject = buildConditionSubject(gatePlan.steps, ctx.store.readAllEvents(), planId);
+	return (edge) => {
+		const parsed = ConditionExpressionSchema.safeParse(edge.conditionExpression);
+		return parsed.success && evaluateCondition(parsed.data, subject);
 	};
 }
 
@@ -469,16 +502,21 @@ function advanceStep(
 		 * unschematized). Mirrors kit.advanceStatus's `eventPayload`: the command shape is not the event shape. */
 		readonly eventPayload?: unknown;
 		/**
-		 * Refuse a step ALREADY in the target state, with this explanation, instead of taking checkTransition's NOOP
-		 * path (DR-004 DWP-04). The machine classifies from===to as NOOP so an idempotently RE-ISSUED command is
-		 * absorbed — correct for skip/cancel/prune (already SKIPPED by the same means IS the requested outcome), but
-		 * WRONG when the target is a LIVE state re-entered by a distinct cause: an already-RUNNING step has not
-		 * "already been resumed" (it never waited) and has not "already been started" a second time. Absorbing those
-		 * silently emits a second ExecutionStepStarted / a WaitResolved for a step that never waited — spurious
-		 * governed-stream facts, and in the Started case an inflated attemptsMade that consumes the retry cap
-		 * (RPH-EXE-008). Set for the two RUNNING-targeting handlers; left unset where re-issue IS idempotent.
+		 * The step states this command may be issued FROM — the `drivesFrom` its own vocab entry already declares.
+		 *
+		 * The machine alone is NOT sufficient (DWP-07). It classifies from===to as a NOOP, so a re-issued command was
+		 * absorbed while STILL emitting an event; and it legalises every arrow into the target from ANY source, so
+		 * StartExecutionStep (drivesFrom QUEUED) was happily accepted on a WAITING step because WAITING→RUNNING is a
+		 * legal arrow — silently performing a RESUME, emitting a second ExecutionStepStarted that consumes one of the
+		 * plan's retries (RPH-EXE-008), and bypassing the ExecutionStepWaitResolved event minted so a resume would be
+		 * replayable. Likewise a re-issued Complete on a SUCCEEDED step was absorbed and REWROTE its structuredResult,
+		 * which last-write-wins in the condition subject and can retroactively flip a resolved BRANCH.
+		 *
+		 * So every step command now states its legal source set explicitly, and the handler enforces the contract the
+		 * vocab declares. Genuine transport retries are already absorbed upstream by idempotencyKey dedup, so a command
+		 * that reaches here from the wrong state is a DISTINCT request and rejecting it is the honest answer.
 		 */
-		readonly rejectReentry?: string;
+		readonly requireFrom?: readonly string[];
 	}
 ) {
 	const planId = command.targetAggregateId;
@@ -497,8 +535,13 @@ function advanceStep(
 	const step = steps[idx] as Record<string, unknown>;
 	const precheckFailure = args.precheck?.(step, plan);
 	if (precheckFailure) return precheckFailure;
-	if (args.rejectReentry && String(step.stepState) === args.target)
-		return reject(command, 'RPH_ILLEGAL_STATE_TRANSITION', args.rejectReentry, [args.stepId]);
+	if (args.requireFrom && !args.requireFrom.includes(String(step.stepState)))
+		return reject(
+			command,
+			'RPH_ILLEGAL_STATE_TRANSITION',
+			`${command.commandType} requires step ${args.stepId} to be ${args.requireFrom.join(' or ')}, but it is ${String(step.stepState)}. The stepState machine may permit that arrow for a DIFFERENT command; this command declares drivesFrom ${args.requireFrom.join('|')}.`,
+			[args.stepId]
+		);
 	const illegal = checkTransition(command, STEP_MACHINE, String(step.stepState), args.target);
 	if (illegal) return illegal;
 	const nextStep = { ...(args.mutateStep ? args.mutateStep(step) : step), stepState: args.target };
@@ -540,10 +583,10 @@ export const startExecutionStep: CommandHandler = (ctx, command) => {
 		stepId: p.stepId,
 		target: 'RUNNING',
 		eventType: 'ExecutionStepStarted',
-		// Re-starting an already-RUNNING step is NOT an idempotent re-issue: the machine's from===to NOOP path would
-		// emit a SECOND ExecutionStepStarted, and attemptsMade counts exactly those — so a double-dispatched Start
-		// silently burned one of the plan's retries (RPH-EXE-008). Adjacent defect, fixed with DWP-04's mechanism.
-		rejectReentry: `Cannot start step ${p.stepId}: it is already RUNNING — a re-issued start would open a second attempt against the retry cap (RPH-EXE-008). Complete, fail, or cancel the running step first.`,
+		// drivesFrom QUEUED. NOT merely "not already RUNNING": the machine also legalises WAITING->RUNNING (the resume
+		// arrow), so without this a Start on a WAITING step performed a resume, burning a retry (RPH-EXE-008) and
+		// skipping the ExecutionStepWaitResolved fact. Resuming is ResolveExecutionStepWait's job.
+		requireFrom: ['QUEUED'],
 		// The event records the RESULTING state, not the command input: ExecutionStepStarted declares `stepState`
 		// (the RUNNING it transitioned to), which `command.payload` ({ stepId }) does not carry — so the default
 		// emitted `{ stepId }` was missing the one field the event exists to record. The event that says "this step
@@ -566,13 +609,9 @@ export const startExecutionStep: CommandHandler = (ctx, command) => {
 			// a graph ⇒ the in-edge barrier (a PENDING in-edge blocks, naming its source). RPH-EXE-005.
 			const gatePlan = toGatePlan(plan);
 			// DWP-02: a CONDITIONAL in-edge's guard is evaluated against the plan's committed subject (a replay-safe
-			// fold of committed step state + this plan's event log). Parse is safe (validated at propose).
-			const subject = buildConditionSubject(gatePlan.steps, ctx.store.readAllEvents(), command.targetAggregateId);
-			const evalGuard: EdgeGuardEvaluator = (edge) => {
-				const parsed = ConditionExpressionSchema.safeParse(edge.conditionExpression);
-				return parsed.success && evaluateCondition(parsed.data, subject);
-			};
-			const gate = startStepGate(gatePlan, p.stepId, evalGuard);
+			// fold of committed step state + this plan's event log). Parse is safe (validated at propose). Built only
+			// when the plan actually HAS a guarded edge (DWP-07) — a linear plan must not pay for an event-log scan.
+			const gate = startStepGate(gatePlan, p.stepId, guardEvaluatorFor(ctx, command.targetAggregateId, gatePlan));
 			if (!gate.ok)
 				return reject(
 					command,
@@ -598,6 +637,10 @@ export const completeExecutionStep: CommandHandler = (ctx, command) => {
 		stepId: p.executionStepId,
 		target: 'SUCCEEDED',
 		eventType: 'ExecutionStepSucceeded',
+		// drivesFrom RUNNING. A re-issued Complete on a SUCCEEDED step used to be NOOP-absorbed while still emitting a
+		// second ExecutionStepSucceeded — and the condition subject folds last-write-wins, so a re-Complete carrying a
+		// different structuredResult could retroactively flip an already-resolved BRANCH.
+		requireFrom: ['RUNNING'],
 		// DOC-007 §16.2 ExecutionStepSucceededPayload. The five id/ref fields are the command's own (§16.1 and §16.2
 		// share them verbatim); resultingExecutionState is §16.2's const, and is the EXECUTION dimension only —
 		// §16.2 L1244 / INV-5: step success never implies assuranceState=SATISFIED.
@@ -686,7 +729,8 @@ export const failExecutionStep: CommandHandler = (ctx, command) => {
 	return advanceStep(ctx, command, {
 		stepId: p.stepId,
 		target: 'FAILED',
-		eventType: 'ExecutionStepFailed'
+		eventType: 'ExecutionStepFailed',
+		requireFrom: ['RUNNING'] // drivesFrom RUNNING
 	});
 };
 
@@ -734,6 +778,7 @@ export const retryExecutionStep: CommandHandler = (ctx, command) => {
 		stepId: p.stepId,
 		target: 'QUEUED',
 		eventType: 'ExecutionStepRetried',
+		requireFrom: ['FAILED'], // drivesFrom FAILED — a retry re-opens a FAILED attempt, nothing else
 		precheck: (step, plan) => {
 			if (plan.status !== 'ACTIVE')
 				return reject(
@@ -774,6 +819,7 @@ export const skipExecutionStep: CommandHandler = (ctx, command) => {
 		stepId: p.stepId,
 		target: 'SKIPPED',
 		eventType: 'ExecutionStepSkipped',
+		requireFrom: ['READY', 'QUEUED'], // drivesFrom READY|QUEUED
 		// The event records the RESULTING state + the authorization; `mandatory` is a decision-time assertion, not a
 		// recorded fact (the ratified ExecutionStepSkipped shape carries no `mandatory`), so it does not ride the event.
 		eventPayload: {
@@ -819,6 +865,7 @@ export const cancelExecutionStep: CommandHandler = (ctx, command) => {
 		stepId: p.stepId,
 		target: 'CANCELLED',
 		eventType: 'ExecutionStepCancelled',
+		requireFrom: ['READY', 'QUEUED', 'RUNNING', 'WAITING'], // drivesFrom READY|QUEUED|RUNNING|WAITING
 		eventPayload: {
 			stepId: p.stepId,
 			reason: p.reason,
@@ -828,12 +875,19 @@ export const cancelExecutionStep: CommandHandler = (ctx, command) => {
 };
 
 /**
- * PruneExecutionStep — a not-taken/unreachable step QUEUED -> SKIPPED (JAN-EXECPLAN-DR-004 DWP-03 / D5). A SYSTEM prune
- * of a BRANCH's not-taken arm (or its transitively-unreachable downstream), controller-issued from the pure
- * `prunableStepIds` read-model. NOT a user waiver: it does NOT route through canSkipStep (the plan's own declared branch
- * logic excludes the step — no waiver applies). Drives QUEUED->SKIPPED (machine-legal) so the pruned step is
- * completion-compatible (SKIPPED is terminal-success). Idempotent (checkTransition no-ops an already-terminal step);
- * plan-ACTIVE-gated (prune is within-execution branch resolution). Exec != assurance (INV-5): moves only stepState.
+ * PruneExecutionStep — a not-taken/unreachable step QUEUED -> SKIPPED (JAN-EXECPLAN-DR-004 DWP-03 / D5, hardened DWP-07).
+ *
+ * A SYSTEM prune of a BRANCH's not-taken arm (or its transitively-unreachable downstream). It does NOT route through
+ * canSkipStep because the plan's own declared branch logic — not an operator — excludes the step, so no waiver applies.
+ * That exemption is only defensible if the step really IS excluded, and it was NOT checked: the sole precheck was
+ * plan-ACTIVE, so ANY QUEUED/READY step could be driven to terminal-success SKIPPED with no waiver, including a
+ * MANDATORY step on the taken path of a plan with no transitions at all. That is precisely the outcome §21.1's
+ * canSkipStep exists to refuse. The prunability check below closes that back door: prune is now authorised by the SAME
+ * pure read-model the UI offers it from, exactly as startExecutionStep is authorised by startStepGate.
+ *
+ * The step is additionally marked `prunedAsUnreachable`, because SKIPPED alone cannot carry the distinction: it is
+ * terminal-SUCCESS (so a waived skip lets the plan continue), and without the mark a pruned step's out-edges SATISFIED
+ * the rest of its own dead arm — resurrecting it as startable work. Exec != assurance (INV-5): moves only stepState.
  */
 export const pruneExecutionStep: CommandHandler = (ctx, command) => {
 	const p = command.payload as {
@@ -845,20 +899,31 @@ export const pruneExecutionStep: CommandHandler = (ctx, command) => {
 		stepId: p.stepId,
 		target: 'SKIPPED',
 		eventType: 'ExecutionStepPruned',
+		requireFrom: ['READY', 'QUEUED'], // drivesFrom READY|QUEUED
+		mutateStep: (step) => ({ ...step, prunedAsUnreachable: true }),
 		eventPayload: {
 			stepId: p.stepId,
 			...(p.selectedByBranchStepId ? { selectedByBranchStepId: p.selectedByBranchStepId } : {}),
 			...(p.selectedEdgeId ? { selectedEdgeId: p.selectedEdgeId } : {}),
 			stepState: 'SKIPPED'
 		},
-		precheck: (_step, plan) =>
-			plan.status === 'ACTIVE'
-				? null
-				: reject(
-						command,
-						'RPH_ILLEGAL_STATE_TRANSITION',
-						`Cannot prune a step: plan ${command.targetAggregateId} is not ACTIVE (${String(plan.status)}) — a prune is within-execution branch resolution.`
-					)
+		precheck: (_step, plan) => {
+			if (plan.status !== 'ACTIVE')
+				return reject(
+					command,
+					'RPH_ILLEGAL_STATE_TRANSITION',
+					`Cannot prune a step: plan ${command.targetAggregateId} is not ACTIVE (${String(plan.status)}) — a prune is within-execution branch resolution.`
+				);
+			const gatePlan = toGatePlan(plan);
+			if (!prunableStepIds(gatePlan, guardEvaluatorFor(ctx, command.targetAggregateId, gatePlan)).includes(p.stepId))
+				return reject(
+					command,
+					'RPH_INVARIANT_VIOLATION',
+					`Cannot prune step ${p.stepId}: it is still reachable — every in-edge would have to be excluded by the plan's own branch logic (or come from an already-pruned step). A prune is NOT a waiver: to skip a reachable step use SkipExecutionStep, which enforces the mandatory/waiver rule (§21.1).`,
+					[p.stepId]
+				);
+			return null;
+		}
 	});
 };
 
@@ -876,6 +941,7 @@ export const enterExecutionStepWait: CommandHandler = (ctx, command) => {
 		stepId: p.stepId,
 		target: 'WAITING',
 		eventType: 'ExecutionStepWaiting',
+		requireFrom: ['RUNNING'], // drivesFrom RUNNING
 		// The event records the RESULTING state (mirroring Started/Skipped/Pruned): the command payload carries no
 		// stepState, and the ratified event declares it required.
 		eventPayload: {
@@ -901,8 +967,7 @@ export const resolveExecutionStepWait: CommandHandler = (ctx, command) => {
 		stepId: p.stepId,
 		target: 'RUNNING',
 		eventType: 'ExecutionStepWaitResolved',
-		// An already-RUNNING step never waited, so this is not an idempotent re-issue — see advanceStep.rejectReentry.
-		rejectReentry: `Cannot resume step ${p.stepId}: it is RUNNING, not WAITING — there is no wait to resolve (a resume is not an idempotent re-issue; the step never suspended).`,
+		requireFrom: ['WAITING'], // drivesFrom WAITING — an already-RUNNING step never waited, so there is no wait to resolve
 		eventPayload: {
 			stepId: p.stepId,
 			...(p.resolution ? { resolution: p.resolution } : {}),

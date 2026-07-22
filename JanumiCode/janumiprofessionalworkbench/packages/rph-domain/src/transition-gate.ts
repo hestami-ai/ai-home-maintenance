@@ -31,6 +31,15 @@ export function isTerminalStepState(stepState: string): boolean {
 export interface GateStep {
 	readonly id: string;
 	readonly stepState: string;
+	/** The node KIND. Load-bearing: exclusive first-match selection belongs to a BRANCH node and nothing else. Absent
+	 *  ⇒ treated as non-BRANCH (independent out-edges), the safe default. */
+	readonly stepType?: string;
+	/** Set when this step reached SKIPPED via PruneExecutionStep rather than a user waiver (DWP-07). The stepState
+	 *  machine has no PRUNED state (its 10 values are ratified), and SKIPPED is deliberately terminal-SUCCESS so a
+	 *  waived skip lets the plan continue — but a PRUNED step is DEAD, and its out-edges must NOT satisfy anything
+	 *  downstream. Without this discriminator the gate cannot tell "waived, carry on" from "excluded, stop", and
+	 *  pruning one step resurrects the rest of the arm it belonged to. */
+	readonly prunedAsUnreachable?: boolean;
 }
 /** The minimal transition (edge) read-model the gate needs. `conditionExpression` is opaque here (DWP-02 evaluates). */
 export interface GateTransition {
@@ -61,6 +70,14 @@ const stateOf = (plan: GatePlan, stepId: string | undefined): string | undefined
 /** The in-edges of a step = transitions whose targetStepId is this step. */
 const inEdgesOf = (plan: GatePlan, stepId: string): readonly GateTransition[] =>
 	(plan.transitions ?? []).filter((t) => t.targetStepId === stepId);
+
+/** The out-edges of a step, in authored (array) order — which IS the branch first-match order. A half-edge (a source
+ *  with NO target) is excluded: it reaches nothing, so it must not participate in selection. Filtering on source alone
+ *  let such an edge win first-match and neutralize every real arm, while validateTransitionGraph's adjacency (which
+ *  requires both endpoints) never saw it — the two disagreed and the plan deadlocked. Propose now rejects half-edges
+ *  outright; this filter keeps the runtime safe for any that predate that rule. */
+const outEdgesOf = (plan: GatePlan, stepId: string): readonly GateTransition[] =>
+	(plan.transitions ?? []).filter((t) => t.sourceStepId === stepId && t.targetStepId !== undefined);
 
 /** An edge is CONDITIONAL (guarded) if it carries a conditionExpression or is tagged CONDITIONAL. */
 const isConditionalEdge = (e: GateTransition): boolean =>
@@ -97,17 +114,51 @@ export function inEdgeDisposition(
 	evaluateGuard?: EdgeGuardEvaluator
 ): InEdgeDisposition {
 	if (edge.sourceStepId === undefined) return 'SATISFIED'; // a plan-entry edge is always satisfied
-	const src = stateOf(plan, edge.sourceStepId);
-	if (src === undefined) return 'PENDING'; // dangling (rejected at propose) — conservative
+	const source = plan.steps.find((s) => s.id === edge.sourceStepId);
+	if (source === undefined) return 'PENDING'; // dangling (rejected at propose) — conservative
+	const src = source.stepState;
 	if (!TERMINAL.has(src)) return 'PENDING'; // source not yet done
-	// Source is terminal. A terminal-non-success source neutralizes the edge regardless of guard.
+	// A PRUNED source is DEAD, not done: it reached SKIPPED only because the plan's own branch logic excluded it, so it
+	// satisfies nothing downstream. Checked BEFORE the terminal-success test precisely because SKIPPED is in that set —
+	// conflating the two is what let a single prune resurrect the rest of its arm (DWP-07).
+	if (source.prunedAsUnreachable === true) return 'NEUTRALIZED';
+	// A terminal-non-success source (FAILED/CANCELLED/SUPERSEDED) neutralizes the edge regardless of guard, so a barrier
+	// JOIN does not wedge behind a failed arm (D7). NOTE: this is NOT the same as "the plan excluded this path" — see
+	// isDeadForPruning, which deliberately does not treat it as grounds to prune.
 	if (!TERMINAL_SUCCESS.has(src)) return 'NEUTRALIZED';
-	// Terminal-success source. If the source is a BRANCH (has ≥1 CONDITIONAL out-edge), first-match selects exactly ONE
-	// out-edge — this edge is SATISFIED iff it IS the selected one, else NEUTRALIZED (a not-taken arm). If the source
-	// has only unconditional out-edges (a linear single successor, or a PARALLEL_GROUP fan-out), every out-edge is taken.
-	const outEdges = (plan.transitions ?? []).filter((t) => t.sourceStepId === edge.sourceStepId);
-	if (!outEdges.some(isConditionalEdge)) return 'SATISFIED'; // linear / fan-out: all taken
-	return selectBranchEdge(outEdges, plan, evaluateGuard) === edge ? 'SATISFIED' : 'NEUTRALIZED';
+	const outEdges = outEdgesOf(plan, edge.sourceStepId);
+	// EXCLUSIVE first-match belongs to a BRANCH node and to nothing else (D2: a BRANCH is a stepType; parallelism is
+	// topology). Keying this on "the source has ≥1 conditional out-edge" instead made every node with one guarded arm an
+	// exclusive branch — so a PARALLEL_GROUP fan-out mixing a guarded arm with unconditional ones silently lost every arm
+	// but the first match, while propose-time validation (keyed on stepType) never looked. The two planes now agree, and
+	// validateTransitionGraph additionally REFUSES a conditional out-edge from a non-BRANCH step so they cannot drift.
+	if (source.stepType === 'BRANCH' && outEdges.some(isConditionalEdge))
+		return selectBranchEdge(outEdges, plan, evaluateGuard) === edge ? 'SATISFIED' : 'NEUTRALIZED';
+	// Non-BRANCH source: out-edges are INDEPENDENT. An unconditional edge is taken; a guarded one is taken iff it holds.
+	if (!isConditionalEdge(edge)) return 'SATISFIED';
+	return evaluateGuard?.(edge, plan) === true ? 'SATISFIED' : 'NEUTRALIZED';
+}
+
+/**
+ * Is this in-edge dead for PRUNING purposes — i.e. did the plan's own declared logic EXCLUDE this path?
+ *
+ * Deliberately narrower than `NEUTRALIZED`. The barrier-join treats a FAILED/CANCELLED source as neutralized so a join
+ * cannot wedge behind a failed arm, but a FAILED step is RETRYABLE (FAILED→QUEUED): its downstream is not dead, it is
+ * waiting on a decision. Pruning on that basis let a transient failure offer the whole downstream for prune-to-SKIPPED
+ * — laundering a failed plan into a completable one. Only branch non-selection (or a source that is itself pruned)
+ * counts as exclusion.
+ */
+function isDeadForPruning(
+	plan: GatePlan,
+	edge: GateTransition,
+	evaluateGuard?: EdgeGuardEvaluator
+): boolean {
+	if (edge.sourceStepId === undefined) return false; // a plan-entry edge is never dead
+	const source = plan.steps.find((s) => s.id === edge.sourceStepId);
+	if (source === undefined) return false;
+	if (source.prunedAsUnreachable === true) return true; // the source was itself excluded
+	if (!TERMINAL_SUCCESS.has(source.stepState)) return false; // unfinished, failed or cancelled ⇒ not an exclusion
+	return inEdgeDisposition(plan, edge, evaluateGuard) === 'NEUTRALIZED';
 }
 
 /**
@@ -186,8 +237,14 @@ export function startableStepIds(plan: GatePlan, evaluateGuard?: EdgeGuardEvalua
  * fixpoint, so a whole exclusive subtree prunes, while a JOIN reachable via the TAKEN path keeps a SATISFIED in-edge and
  * is NOT pruned). Pure; the controller issues PruneExecutionStep for each (idempotent — a re-computed already-terminal
  * step drops out). Empty transitions[] ⇒ [] (a linear plan never prunes).
+ *
+ * [] when the plan is not ACTIVE, mirroring startableStepIds (DWP-06). This is not cosmetic symmetry: pruneExecutionStep
+ * REJECTS a non-ACTIVE plan ("a prune is within-execution branch resolution"), so without this gate the read-model
+ * offered a Prune the engine would refuse — precisely the read-model/authority divergence this single gate home exists
+ * to prevent (DR-004 §19-M2), and an F-11 violation the moment a UI renders from it.
  */
 export function prunableStepIds(plan: GatePlan, evaluateGuard?: EdgeGuardEvaluator): string[] {
+	if (plan.status !== 'ACTIVE') return [];
 	const prunable = new Set<string>();
 	let changed = true;
 	while (changed) {
@@ -199,7 +256,7 @@ export function prunableStepIds(plan: GatePlan, evaluateGuard?: EdgeGuardEvaluat
 			const allDead = inEdges.every(
 				(e) =>
 					(e.sourceStepId !== undefined && prunable.has(e.sourceStepId)) ||
-					inEdgeDisposition(plan, e, evaluateGuard) === 'NEUTRALIZED'
+					isDeadForPruning(plan, e, evaluateGuard)
 			);
 			if (allDead) {
 				prunable.add(s.id);
@@ -230,6 +287,15 @@ export function startStepGate(
 	stepId: string,
 	evaluateGuard?: EdgeGuardEvaluator
 ): StartGateResult {
+	// Mirror startableStepIds' own preconditions FIRST (DWP-07). The read-model half excludes an unknown step and a
+	// TERMINAL one (stepAtFrontier opens with exactly that test); the authority half used to check neither, so on the
+	// graph path an entry step returned ok unconditionally and on the linear path an unknown id produced an empty
+	// predecessor slice and also returned ok. "The two halves cannot diverge" has to hold in BOTH directions.
+	const target = plan.steps.find((s) => s.id === stepId);
+	if (target === undefined)
+		return { ok: false, reason: `step ${stepId} is not declared in this plan` };
+	if (TERMINAL.has(target.stepState))
+		return { ok: false, blockerStepId: stepId, blockerState: target.stepState, reason: 'the step is already terminal' };
 	if ((plan.transitions ?? []).length === 0) {
 		const idx = plan.steps.findIndex((s) => s.id === stepId);
 		const blocker = plan.steps
@@ -316,6 +382,14 @@ function checkDanglingIds(
 			return invalid(`transition source step "${t.sourceStepId}" is not a declared step in the plan`);
 		if (t.targetStepId !== undefined && !idSet.has(t.targetStepId))
 			return invalid(`transition target step "${t.targetStepId}" is not a declared step in the plan`);
+		// A HALF-EDGE (a source that reaches nothing) is contract-legal — the persisted shape makes both endpoints
+		// optional — but meaningless, and it was INVISIBLE to every other limb here (adjacency requires both endpoints)
+		// while still participating in runtime out-edge selection. Reject it rather than let the two planes disagree.
+		// A missing SOURCE is legitimate: that is a plan-entry edge.
+		if (t.targetStepId === undefined)
+			return invalid(
+				`transition from "${t.sourceStepId ?? '(entry)'}" declares no targetStepId — an edge that reaches no step is not a transition`
+			);
 	}
 	return undefined;
 }
@@ -353,20 +427,43 @@ function unreachableFrom(
 	return stepIds.filter((id) => !reachable.has(id));
 }
 
-/** (5) A BRANCH step has ≥1 out-edge and its LAST out-edge (array order) is an unconditional SEQUENTIAL default. */
+/**
+ * (5) The BRANCH rules, which exist so that propose-time validation and the runtime gate cannot disagree about which
+ * node is exclusive (DWP-07 — they did, and a PARALLEL_GROUP silently lost its arms):
+ *   a. A CONDITIONAL out-edge may leave ONLY a BRANCH step. Guarded arms on a non-BRANCH node are independent filters
+ *      at runtime, which is a different semantics; forbidding the mix keeps one meaning per shape.
+ *   b. A BRANCH step has ≥1 out-edge and EXACTLY ONE unconditional edge, which must be LAST. First-match returns on the
+ *      first unconditional edge it meets, so an earlier default would make every later conditional arm dead — which the
+ *      old "last edge is unconditional" test permitted.
+ */
 function checkBranchDefaults(
 	steps: readonly GraphValidationStep[],
 	outEdges: ReadonlyMap<string, readonly GateTransition[]>
 ): GraphValidationResult | undefined {
+	const isDefaultEdge = (e: GateTransition): boolean =>
+		e.conditionExpression === undefined && e.transitionType !== 'CONDITIONAL';
 	for (const s of steps) {
-		if (s.stepType !== 'BRANCH') continue;
 		const outs = outEdges.get(s.id) ?? [];
-		const last = outs.at(-1);
-		if (last === undefined) return invalid(`BRANCH step "${s.id}" has no out-edges`);
-		const lastIsDefault = last.conditionExpression === undefined && last.transitionType !== 'CONDITIONAL';
-		if (!lastIsDefault)
+		if (s.stepType !== 'BRANCH') {
+			if (outs.some(isConditionalEdge))
+				return invalid(
+					`step "${s.id}" declares a CONDITIONAL out-edge but its stepType is "${s.stepType ?? 'unset'}", not BRANCH — exclusive guarded selection belongs to a BRANCH step (retype the step, or make the edge SEQUENTIAL)`
+				);
+			continue;
+		}
+		if (outs.length === 0) return invalid(`BRANCH step "${s.id}" has no out-edges`);
+		const defaults = outs.filter(isDefaultEdge);
+		if (defaults.length === 0)
 			return invalid(
 				`BRANCH step "${s.id}" must declare an unconditional SEQUENTIAL default as its LAST out-edge (so branch first-match always resolves)`
+			);
+		if (defaults.length > 1)
+			return invalid(
+				`BRANCH step "${s.id}" declares ${defaults.length} unconditional out-edges; exactly one is permitted (first-match returns on the first, so the rest would be unreachable)`
+			);
+		if (!isDefaultEdge(outs.at(-1)!))
+			return invalid(
+				`BRANCH step "${s.id}" must declare its unconditional SEQUENTIAL default as its LAST out-edge (an earlier default makes every conditional arm after it unreachable)`
 			);
 	}
 	return undefined;

@@ -81,6 +81,12 @@
 		wait: 'Wait',
 		resolve: 'Resume'
 	} as const;
+	// DR-004 DWP-06: in-edge disposition → tone for the transitions panel. Reuses the step-state tone vocabulary, but
+	// SATISFIED deliberately maps to 'active' (a LIVE edge), NOT 'positive' — the success green in this app is reserved
+	// for QUALIFIED success (execution SUCCEEDED *and* assurance SATISFIED, see toFlow.ts). An edge being taken is a
+	// pure execution fact, so painting it green would read as assurance and violate INV-5.
+	const dispositionTone = (d: string): string =>
+		d === 'SATISFIED' ? 'active' : d === 'PENDING' ? 'pending' : 'muted';
 	// DWP-05: attempt-state → tone for the per-step attempt-history rows.
 	const attemptTone = (state: string): string =>
 		state === 'SUCCEEDED'
@@ -348,6 +354,21 @@
 												</form>
 											{/if}
 										{/each}
+										<!-- DR-004 DWP-06 — Prune. NOT a stepState affordance (it is absent from controlCommands by
+										     design): a prune is a SYSTEM consequence of a resolved BRANCH, so it is offered only for a
+										     step the read-model computed as unreachable. prunableStepIds is itself plan-ACTIVE-gated
+										     (mirroring startableStepIds), so this set never tempts a prune the engine would reject.
+										     Semantically distinct from the Skip two lines above: Skip is an operator waiver, this is the
+										     plan's own declared branch logic excluding the step. -->
+										{#if data.prunableStepByPlan[pl.id]?.includes(s.id)}
+											<form method="POST" action="?/pruneStep" use:enhance class="inlineform">
+												<input type="hidden" name="planId" value={pl.id} />
+												<input type="hidden" name="stepId" value={s.id} />
+												<button class="mini" data-testid="step-action-prune" title="Not reachable — the branch went the other way"
+													>Prune</button
+												>
+											</form>
+										{/if}
 										{#if s.belowQueued}
 											<span class="dim" data-testid="step-belowqueued"
 												>no advance command in the domain (below QUEUED)</span
@@ -374,6 +395,39 @@
 								</li>
 							{/each}
 						</ol>
+						<!-- DR-004 DWP-06 — the transitions (edge) plane. READ-ONLY: it EXPLAINS the affordances derived
+						     above and drives nothing itself (F-11). Transitions are immutable after propose (DS-004 F-4),
+						     so there is deliberately no edit control. A linear plan has no transitions[] and renders no
+						     panel at all — the D1 back-compat degenerate must look exactly as it did before this DWP.
+						     Dispositions are the interpreter's own verdict in EXECUTION vocabulary only: SATISFIED means
+						     "this edge is live", never "assured" (INV-5), hence the neutral tone rather than success. -->
+						{#if data.transitionRowsByPlan[pl.id]?.length}
+							<div class="flowgraph" data-testid="plan-transitions">
+								<h4 class="flowhead">
+									Flow <span class="dim"
+										>— {data.transitionRowsByPlan[pl.id].length} transition(s); an edge is live when SATISFIED</span
+									>
+								</h4>
+								<ol class="edges">
+									{#each data.transitionRowsByPlan[pl.id] as t (t.key)}
+										<li class="edge" data-testid="plan-transition">
+											<span class="edgeends"
+												>{t.sourceLabel} <span class="arrow">→</span> {t.targetLabel}</span
+											>
+											<span class="tag" data-testid="transition-role">{t.role}</span>
+											<span
+												class="st {dispositionTone(t.disposition)}"
+												data-testid="transition-disposition">{t.disposition}</span
+											>
+											{#if t.conditionText}
+												<span class="cond dim" data-testid="transition-condition">when {t.conditionText}</span
+												>
+											{/if}
+										</li>
+									{/each}
+								</ol>
+							</div>
+						{/if}
 					</div>
 				{/each}
 			</div>
@@ -895,6 +949,44 @@
 		gap: 6px;
 		align-items: center;
 		font-size: 11px;
+	}
+	/* DR-004 DWP-06: the transitions (edge) plane of a plan. Deliberately typographic, not a canvas — the load-bearing
+	   facts (edge role, guard, disposition) are text, and a per-plan canvas would be one graph instance per rendered
+	   plan card. Colours come only from the shared tone vocabulary (var tokens), so both themes follow. */
+	.flowgraph {
+		margin-top: 8px;
+		padding-top: 6px;
+		border-top: 1px dashed var(--outline-faint);
+	}
+	.flowhead {
+		margin: 0 0 4px;
+		font-size: 12px;
+		font-weight: 600;
+	}
+	ol.edges {
+		list-style: none;
+		margin: 0;
+		padding: 0;
+		display: flex;
+		flex-direction: column;
+		gap: 3px;
+	}
+	.edge {
+		display: flex;
+		gap: 6px;
+		align-items: center;
+		flex-wrap: wrap;
+		font-size: 11px;
+	}
+	.edgeends {
+		font-weight: 500;
+	}
+	.arrow {
+		color: var(--outline);
+		padding: 0 2px;
+	}
+	.cond {
+		font-style: italic;
 	}
 	/* Tier-2 execution sequence (DWP-04): dependency layers + advisories. */
 	.t2head {

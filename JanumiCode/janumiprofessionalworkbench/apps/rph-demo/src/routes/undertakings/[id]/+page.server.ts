@@ -28,7 +28,8 @@ import {
 	type SequenceInstance,
 	sequenceView,
 	startableStepIds,
-	traceabilityProjector
+	traceabilityProjector,
+	transitionRows
 } from '@janumipwb/rph-projections';
 import {
 	buildPwaExport,
@@ -200,7 +201,10 @@ export const load: PageServerLoad = ({ params }) => {
 				stepType: String((s.stepType ?? '') as string),
 				purpose: String((s.purpose ?? '') as string),
 				stepState: String((s.stepState ?? '') as string),
-				...(s.runtimeBindingId ? { runtimeBindingId: String(s.runtimeBindingId as string) } : {})
+				...(s.runtimeBindingId ? { runtimeBindingId: String(s.runtimeBindingId as string) } : {}),
+				// DWP-07: a step SKIPPED by a PRUNE is dead (satisfies nothing downstream); one skipped by an operator
+				// WAIVER lets the plan continue. Omitting this here would make the UI's gate disagree with the engine's.
+				...(s.prunedAsUnreachable === true ? { prunedAsUnreachable: true as const } : {})
 			};
 		}),
 		// DR-004 DWP-01 — the transition graph (empty ⇒ linear). Fed to the flow gate + a future graph view.
@@ -224,15 +228,22 @@ export const load: PageServerLoad = ({ params }) => {
 	// The CONDITIONAL-edge guard evaluator (DWP-02/03) is folded per plan from its committed state + the event log, so
 	// the read-model's BRANCH first-match matches the engine authority exactly (§19-M2). prunableStepByPlan surfaces a
 	// resolved BRANCH's not-taken arm (+ transitive downstream) for a Prune action (DWP-03/06).
+	// DWP-06 adds transitionRowsByPlan — the READ-ONLY edge plane the tab renders (source→target, role, guard summary,
+	// and the interpreter's own in-edge disposition). It drives NO affordance (F-11); it explains the ones already
+	// derived above. All three read-models share the ONE evaluator closure per plan so the condition subject is folded
+	// once, not three times over the whole event log.
 	const engineEvents = engine.readAllEvents();
 	const startableStepByPlan: Record<string, string[]> = {};
 	const prunableStepByPlan: Record<string, string[]> = {};
+	const transitionRowsByPlan: Record<string, ReturnType<typeof transitionRows>> = {};
 	for (const pl of plans) {
 		const evalGuard = conditionEvaluatorFor(pl, engineEvents);
 		const sids = startableStepIds(pl, evalGuard);
 		if (sids.length) startableStepByPlan[pl.id] = sids;
 		const prunable = prunableStepIds(pl, evalGuard);
 		if (prunable.length) prunableStepByPlan[pl.id] = prunable;
+		const rows = transitionRows(pl, evalGuard);
+		if (rows.length) transitionRowsByPlan[pl.id] = rows;
 	}
 
 	// Execution Attempt history (JAN-EXECPLAN Tier-3 DWP-03/05): fold the Execution* event stream into §10.4 attempt
@@ -286,6 +297,7 @@ export const load: PageServerLoad = ({ params }) => {
 		plans,
 		startableStepByPlan,
 		prunableStepByPlan,
+		transitionRowsByPlan,
 		attemptsByStepId,
 		sequence,
 		assessments,

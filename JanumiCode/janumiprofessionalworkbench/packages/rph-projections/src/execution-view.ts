@@ -25,11 +25,14 @@ import {
 	buildConditionSubject,
 	ConditionExpressionSchema,
 	evaluateCondition,
+	inEdgeDisposition,
 	isTerminalSuccessStepState,
 	prunableStepIds as gatePrunableStepIds,
 	startableStepIds as gateStartableStepIds,
+	type ConditionExpression,
 	type ConditionSubjectEvent,
-	type EdgeGuardEvaluator
+	type EdgeGuardEvaluator,
+	type InEdgeDisposition
 } from '@janumipwb/rph-domain';
 import { layerHandoff, type HandoffOrder } from './handoff-order.js';
 import type { PwaGraphExport } from './pwa-graph.js';
@@ -57,6 +60,10 @@ export interface ExecutionStepInput {
 	readonly purpose: string;
 	readonly stepState: string;
 	readonly runtimeBindingId?: string;
+	/** Set when this step reached SKIPPED via a PRUNE (the plan excluded it) rather than an operator waiver. The flow
+	 *  gate reads it: a pruned step is DEAD and satisfies nothing downstream, whereas a waived skip lets the plan
+	 *  continue. Carried through the view so the read-model half of the gate sees exactly what the authority half does. */
+	readonly prunedAsUnreachable?: boolean;
 }
 
 /** Pure input: an ExecutionPlan transition (edge) the flow gate reads (DR-004 DWP-01). `conditionExpression` is opaque
@@ -86,6 +93,8 @@ export interface ExecutionStepView {
 	readonly purpose: string;
 	readonly stepState: string;
 	readonly runtimeBindingId?: string;
+	/** SKIPPED because the plan excluded it (a prune), not because an operator waived it — see ExecutionStepInput. */
+	readonly prunedAsUnreachable?: boolean;
 	readonly tone: StepTone;
 	/** The command-backed affordances legal from this stepState (empty for the commandless/terminal states). */
 	readonly advanceCommands: readonly StepAdvanceCommand[];
@@ -184,7 +193,10 @@ function stepView(s: ExecutionStepInput): ExecutionStepView {
 		tone: stepStateTone(s.stepState),
 		advanceCommands: advanceCommandsFor(s.stepState),
 		controlCommands: controlCommandsFor(s.stepState),
-		belowQueued: isBelowQueued(s.stepState)
+		belowQueued: isBelowQueued(s.stepState),
+		// Carried so the read-model half of the flow gate sees the same prune/waiver distinction the authority does
+		// (DWP-07). Only when true — an absent flag must not read as an explicit false.
+		...(s.prunedAsUnreachable === true ? { prunedAsUnreachable: true } : {})
 	};
 	// Preserve the optional runtimeBindingId only when present (exactOptionalPropertyTypes-friendly).
 	return s.runtimeBindingId === undefined ? base : { ...base, runtimeBindingId: s.runtimeBindingId };
@@ -257,6 +269,97 @@ export function conditionEvaluatorFor(
  *  undefined. A linear plan yields exactly one; `startableStepIds` is the graph-general (set) API the UI consumes. */
 export function startableStepId(plan: ExecutionPlanView): string | undefined {
 	return startableStepIds(plan)[0];
+}
+
+// ── The transitions view (DWP-06). A READ-ONLY rendering of the plan's immutable graph. ──────────────────────────────
+//
+// Boundary (EP-CMT-4): this is the EDGE plane of the execution view. It renders what the interpreter already decided;
+// it is NOT a second source of affordances. Every button on the execution tab still comes from advanceCommands /
+// controlCommands / startableStepIds / prunableStepIds (the F-11 discipline) — a transition row drives nothing.
+// Transitions are immutable post-propose (DS-004 F-4), so there is deliberately no edit affordance here.
+
+/** One rendered transition (edge) row. `disposition` is the interpreter's own verdict, not a re-derivation. */
+export interface TransitionRow {
+	/** Stable row key. The persisted edge id when present; else a positional fallback (the projections input type
+	 *  makes `id` optional, and a Svelte keyed each-block may not key on undefined). */
+	readonly key: string;
+	readonly sourceStepId?: string;
+	readonly targetStepId?: string;
+	/** Human labels — the step's purpose when it resolves, else an honest marker. Never a fabricated name. */
+	readonly sourceLabel: string;
+	readonly targetLabel: string;
+	/** SEQUENTIAL | CONDITIONAL — the authored edge role. Absent in the input type, so it is defaulted honestly. */
+	readonly role: string;
+	/** A human summary of the guard, or undefined for an unconditional edge. */
+	readonly conditionText?: string;
+	/** SATISFIED (this edge is live/taken) · NEUTRALIZED (not-taken arm, or a failed source) · PENDING (source unfinished). */
+	readonly disposition: InEdgeDisposition;
+}
+
+/** A one-line human summary of a condition expression. Exhaustive over the grammar's 8 ops — a new op fails to compile
+ *  here rather than silently rendering as blank. An expression that does not PARSE renders as an explicit marker: the
+ *  UI must never present an uninterpretable guard as though it were understood, nor as `[object Object]`. */
+export function describeCondition(expression: unknown): string {
+	const parsed = ConditionExpressionSchema.safeParse(expression);
+	if (!parsed.success) return 'unparseable condition';
+	return renderCondition(parsed.data);
+}
+
+function renderCondition(c: ConditionExpression): string {
+	switch (c.op) {
+		case 'STEP_STATE':
+			return `step ${shortId(c.stepId)} is ${c.state}`;
+		case 'STEP_SUCCEEDED':
+			return `step ${shortId(c.stepId)} succeeded`;
+		case 'OUTPUT_COUNT':
+			return `step ${shortId(c.stepId)} outputs ${c.cmp} ${c.value}`;
+		case 'ATTEMPTS':
+			return `step ${shortId(c.stepId)} attempts ${c.cmp} ${c.value}`;
+		case 'RESULT_EQUALS':
+			return `step ${shortId(c.stepId)} result.${c.path} = ${String(c.value)}`;
+		case 'ALL':
+			return c.operands.length ? `all of (${c.operands.map(renderCondition).join('; ')})` : 'all of ()';
+		case 'ANY':
+			return c.operands.length ? `any of (${c.operands.map(renderCondition).join('; ')})` : 'any of ()';
+		case 'NOT':
+			return `not (${renderCondition(c.operand)})`;
+	}
+}
+
+/** Ids are ULIDs; render a readable prefix rather than 30 characters of entropy. */
+const shortId = (id: string): string => (id.length > 12 ? `${id.slice(0, 12)}…` : id);
+
+/**
+ * The plan's transition graph as renderable rows (DWP-06).
+ *
+ * CRITICAL — the edge objects are passed to `inEdgeDisposition` BY REFERENCE, straight out of `plan.transitions`.
+ * The BRANCH first-match in rph-domain decides "is this the selected arm?" by OBJECT IDENTITY against the elements of
+ * that same array (`selectBranchEdge(...) === edge`). Cloning or normalizing an edge before asking would make every
+ * CONDITIONAL edge report NEUTRALIZED, with no type error and no test failure outside a branch fixture. Do not map
+ * over `plan.transitions` before this call.
+ */
+export function transitionRows(
+	plan: ExecutionPlanView,
+	evaluateGuard?: EdgeGuardEvaluator
+): TransitionRow[] {
+	const labelOf = (stepId: string | undefined, absent: string): string => {
+		if (stepId === undefined) return absent;
+		const step = plan.steps.find((s) => s.id === stepId);
+		return step ? step.purpose : `unknown step ${shortId(stepId)}`;
+	};
+	return plan.transitions.map((edge, i) => ({
+		key: edge.id ?? `${plan.id}-edge-${i}`,
+		...(edge.sourceStepId !== undefined ? { sourceStepId: edge.sourceStepId } : {}),
+		...(edge.targetStepId !== undefined ? { targetStepId: edge.targetStepId } : {}),
+		// An edge may legitimately have no source (a plan-entry edge) — the contract marks both endpoints optional.
+		sourceLabel: labelOf(edge.sourceStepId, '(plan entry)'),
+		targetLabel: labelOf(edge.targetStepId, '(plan exit)'),
+		role: edge.transitionType ?? (edge.conditionExpression !== undefined ? 'CONDITIONAL' : 'SEQUENTIAL'),
+		...(edge.conditionExpression !== undefined
+			? { conditionText: describeCondition(edge.conditionExpression) }
+			: {}),
+		disposition: inEdgeDisposition(plan, edge, evaluateGuard)
+	}));
 }
 
 /**

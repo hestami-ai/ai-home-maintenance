@@ -293,13 +293,40 @@ describe('StartExecutionStep — the linear start-gate (DWP-01, RPH-EXE-005 / fo
 		const again = start(1);
 		expect(again.status).toBe('REJECTED');
 		expect(again.error?.code).toBe('RPH_ILLEGAL_STATE_TRANSITION');
-		expect(again.error?.message).toContain('retry cap');
+		expect(again.error?.message).toContain('to be QUEUED, but it is RUNNING');
 		expect(store.readAllEvents().filter((e) => e.eventType === 'ExecutionStepStarted')).toHaveLength(1);
 	});
 
 	// DR-004 DWP-02 (Tier 3C-ii) — CONDITIONAL edges: the guard is evaluated against the plan's committed subject.
+	// A guarded arm may leave ONLY a BRANCH step (DWP-07): propose-time validation and the runtime gate now agree on
+	// which node selects exclusively, so these fixtures type s1 BRANCH and give it the required SEQUENTIAL default last.
+	const proposeBranch = (transitions: unknown[]) =>
+		dispatch(
+			'ProposeExecutionPlan',
+			{
+				executionPlanId: PLAN,
+				workUnitId: PWU,
+				steps: [{ ...step(1, 'QUEUED'), stepType: 'BRANCH' }, step(2, 'QUEUED'), step(3, 'QUEUED')],
+				transitions,
+				retryPolicy: {},
+				tacticalChangePolicy: {},
+				escalationPolicy: {},
+				terminationPolicy: {}
+			},
+			PLAN,
+			'EXECUTION_PLAN'
+		);
+	const activeBranch = (transitions: unknown[]) => {
+		const r = proposeBranch(transitions);
+		expect(r.status, JSON.stringify(r.error)).toBe('ACCEPTED');
+		expect(dispatch('ApproveExecutionPlan', {}, PLAN, 'EXECUTION_PLAN').status).toBe('ACCEPTED');
+		expect(
+			dispatch('ActivateExecutionPlan', { authorizedRuntimeBindingIds: [] }, PLAN, 'EXECUTION_PLAN').status
+		).toBe('ACCEPTED');
+	};
+
 	it('a CONDITIONAL in-edge with a TRUE guard makes the target startable once the source succeeds', () => {
-		activeGraphPlan(['QUEUED', 'QUEUED'], [cedge(1, 2, { op: 'STEP_SUCCEEDED', stepId: stepId(1) })]);
+		activeBranch([cedge(1, 2, { op: 'STEP_SUCCEEDED', stepId: stepId(1) }), gedge(1, 3)]);
 		expect(start(1).status).toBe('ACCEPTED'); // s1 entry
 		expect(complete(1).status).toBe('ACCEPTED'); // s1 SUCCEEDED
 		const s2 = start(2);
@@ -307,23 +334,42 @@ describe('StartExecutionStep — the linear start-gate (DWP-01, RPH-EXE-005 / fo
 	});
 
 	it('a CONDITIONAL in-edge with a FALSE guard leaves the target non-startable (NEUTRALIZED)', () => {
-		activeGraphPlan(['QUEUED', 'QUEUED'], [cedge(1, 2, { op: 'ATTEMPTS', stepId: stepId(1), cmp: '>', value: 99 })]);
+		activeBranch([cedge(1, 2, { op: 'ATTEMPTS', stepId: stepId(1), cmp: '>', value: 99 }), gedge(1, 3)]);
 		expect(start(1).status).toBe('ACCEPTED');
 		expect(complete(1).status).toBe('ACCEPTED'); // s1 SUCCEEDED (attemptsMade = 1)
 		expect(start(2).status, 'attempts(s1)=1 is not > 99 → guard false → s2 neutralized').toBe('REJECTED');
 	});
 
 	it('REJECTS a malformed conditionExpression at propose (RPH_VALIDATION_SCHEMA_FAILED)', () => {
-		const r = proposeGraph(['QUEUED', 'QUEUED'], [cedge(1, 2, { op: 'NONSENSE', stepId: stepId(1) })]);
+		const r = proposeBranch([cedge(1, 2, { op: 'NONSENSE', stepId: stepId(1) }), gedge(1, 3)]);
 		expect(r.status, JSON.stringify(r.error)).not.toBe('ACCEPTED');
 		expect(r.error?.code).toBe('RPH_VALIDATION_SCHEMA_FAILED');
 	});
 
 	it('REJECTS a condition referencing an undeclared step at propose', () => {
-		const r = proposeGraph(['QUEUED', 'QUEUED'], [cedge(1, 2, { op: 'STEP_SUCCEEDED', stepId: 'ghost_step' })]);
+		const r = proposeBranch([cedge(1, 2, { op: 'STEP_SUCCEEDED', stepId: 'ghost_step' }), gedge(1, 3)]);
 		expect(r.status).toBe('REJECTED');
 		expect(r.error?.code).toBe('RPH_VALIDATION_SEMANTIC_FAILED');
 		expect(r.error?.message).toContain('ghost_step');
+	});
+
+	// DWP-07: the two planes must agree on which node branches. A guarded arm leaving a non-BRANCH step used to pass
+	// propose validation and then get FULL exclusive semantics at runtime — so a PARALLEL_GROUP mixing one guarded arm
+	// with unconditional ones silently lost every arm but the first match.
+	it('REJECTS a CONDITIONAL out-edge from a non-BRANCH step at propose (the two planes cannot drift)', () => {
+		const r = proposeGraph(
+			['QUEUED', 'QUEUED'],
+			[cedge(1, 2, { op: 'STEP_SUCCEEDED', stepId: stepId(1) })]
+		);
+		expect(r.status).toBe('REJECTED');
+		expect(r.error?.code).toBe('RPH_VALIDATION_SEMANTIC_FAILED');
+		expect(r.error?.message).toContain('not BRANCH');
+	});
+
+	it('REJECTS a BRANCH whose unconditional default is not LAST (it would make later arms unreachable)', () => {
+		const r = proposeBranch([gedge(1, 3), cedge(1, 2, { op: 'STEP_SUCCEEDED', stepId: stepId(1) })]);
+		expect(r.status).toBe('REJECTED');
+		expect(r.error?.message).toContain('LAST out-edge');
 	});
 
 	// DR-004 DWP-03 (Tier 3C-ii) — BRANCH: first-match selection + prune-to-SKIPPED, driven to completion.
@@ -580,6 +626,142 @@ describe('StartExecutionStep — the linear start-gate (DWP-01, RPH-EXE-005 / fo
 			expect(r.error?.code).toBe('RPH_ILLEGAL_STATE_TRANSITION');
 			expect(r.error?.message).toContain('Cancel the step instead');
 			expect(stepStateOf(1)).toBe('WAITING');
+		});
+	});
+
+	// ── DWP-07: adversarial-audit remediation at the AUTHORITY layer. Each reproduces a real defect in the landed code.
+	describe('DWP-07 — audit remediation (command authorization)', () => {
+		const wait = (i: number) =>
+			dispatch('EnterExecutionStepWait', { stepId: stepId(i) }, PLAN, 'EXECUTION_PLAN');
+		const prune = (i: number) =>
+			dispatch('PruneExecutionStep', { stepId: stepId(i) }, PLAN, 'EXECUTION_PLAN');
+		const startedCount = (i: number) =>
+			store
+				.readAllEvents()
+				.filter(
+					(e) =>
+						e.eventType === 'ExecutionStepStarted' &&
+						(e.payload as { stepId?: string })?.stepId === stepId(i)
+				).length;
+
+		// A command must be issuable only from the states its OWN vocab declares. The machine alone is not enough: it
+		// legalises WAITING->RUNNING for the RESUME, and Start was riding that arrow.
+		it('REFUSES StartExecutionStep on a WAITING step — that arrow belongs to ResolveExecutionStepWait', () => {
+			activePlan(['QUEUED']);
+			expect(start(1).status).toBe('ACCEPTED');
+			expect(wait(1).status).toBe('ACCEPTED');
+			expect(stepStateOf(1)).toBe('WAITING');
+
+			const forced = start(1);
+			expect(forced.status).toBe('REJECTED');
+			expect(forced.error?.code).toBe('RPH_ILLEGAL_STATE_TRANSITION');
+			expect(forced.error?.message).toContain('drivesFrom QUEUED');
+			// The step did NOT silently resume, and no second attempt was opened against the retry cap (RPH-EXE-008).
+			expect(stepStateOf(1)).toBe('WAITING');
+			expect(startedCount(1)).toBe(1);
+			// The legitimate route still works, and records the resume as its own governed fact.
+			expect(dispatch('ResolveExecutionStepWait', { stepId: stepId(1) }, PLAN, 'EXECUTION_PLAN').status).toBe(
+				'ACCEPTED'
+			);
+			expect(startedCount(1), 'a resume is not an attempt').toBe(1);
+		});
+
+		// A re-issued Complete used to be NOOP-absorbed while still emitting a second ExecutionStepSucceeded — and the
+		// condition subject folds last-write-wins, so it could retroactively rewrite the basis of a resolved BRANCH.
+		it('REFUSES a second CompleteExecutionStep on a SUCCEEDED step (it would rewrite the recorded result)', () => {
+			activePlan(['QUEUED']);
+			start(1);
+			expect(complete(1).status).toBe('ACCEPTED');
+			const again = complete(1);
+			expect(again.status).toBe('REJECTED');
+			expect(again.error?.code).toBe('RPH_ILLEGAL_STATE_TRANSITION');
+			expect(
+				store.readAllEvents().filter((e) => e.eventType === 'ExecutionStepSucceeded')
+			).toHaveLength(1);
+		});
+
+		// The prune exemption from canSkipStep is only defensible if the step really IS excluded by the plan's own
+		// logic. Unchecked, PruneExecutionStep was a universal skip that bypassed the mandatory/waiver rule (§21.1).
+		it('REFUSES to prune a REACHABLE step — prune is not a back door around the mandatory-skip waiver', () => {
+			activePlan(['QUEUED', 'QUEUED']); // a LINEAR plan: no transitions, so nothing is ever excluded
+			const r = prune(2);
+			expect(r.status).toBe('REJECTED');
+			expect(r.error?.code).toBe('RPH_INVARIANT_VIOLATION');
+			expect(r.error?.message).toContain('still reachable');
+			expect(stepStateOf(2)).toBe('QUEUED');
+			// The honest route for a reachable step is Skip, which enforces the waiver rule and refuses fail-closed.
+			const mandatorySkip = dispatch(
+				'SkipExecutionStep',
+				{ stepId: stepId(2) },
+				PLAN,
+				'EXECUTION_PLAN'
+			);
+			expect(mandatorySkip.status, 'mandatory defaults TRUE, so an unwaived skip is refused').toBe('REJECTED');
+		});
+
+		it('REFUSES to prune the step a BRANCH actually SELECTED, while still permitting the not-taken arm', () => {
+			activeBranch([cedge(1, 2, { op: 'STEP_SUCCEEDED', stepId: stepId(1) }), gedge(1, 3)]);
+			expect(start(1).status).toBe('ACCEPTED');
+			expect(complete(1).status).toBe('ACCEPTED'); // guard true → s2 selected, s3 excluded
+			const selected = prune(2);
+			expect(selected.status, 'the taken arm is reachable').toBe('REJECTED');
+			expect(selected.error?.message).toContain('still reachable');
+			expect(prune(3).status, 'the not-taken arm is genuinely excluded').toBe('ACCEPTED');
+			expect(stepStateOf(3)).toBe('SKIPPED');
+		});
+
+		// The headline BLOCKER, end to end through the engine: pruning one step of a dead arm must not make the REST
+		// of that arm startable. The DWP-03 fixture could not catch this — its not-taken arm was a leaf.
+		it('does not RESURRECT a dead arm: after pruning it, its interior is still refused a start', () => {
+			// s1 BRANCH -> s2 (guard FALSE, excluded) -> s4 ; and -> s3 (default, taken).
+			const r = dispatch(
+				'ProposeExecutionPlan',
+				{
+					executionPlanId: PLAN,
+					workUnitId: PWU,
+					steps: [
+						{ ...step(1, 'QUEUED'), stepType: 'BRANCH' },
+						step(2, 'QUEUED'),
+						step(3, 'QUEUED'),
+						step(4, 'QUEUED')
+					],
+					transitions: [
+						cedge(1, 2, { op: 'ATTEMPTS', stepId: stepId(1), cmp: '>', value: 99 }), // never true
+						gedge(1, 3),
+						gedge(2, 4)
+					],
+					retryPolicy: {},
+					tacticalChangePolicy: {},
+					escalationPolicy: {},
+					terminationPolicy: {}
+				},
+				PLAN,
+				'EXECUTION_PLAN'
+			);
+			expect(r.status, JSON.stringify(r.error)).toBe('ACCEPTED');
+			expect(dispatch('ApproveExecutionPlan', {}, PLAN, 'EXECUTION_PLAN').status).toBe('ACCEPTED');
+			expect(
+				dispatch('ActivateExecutionPlan', { authorizedRuntimeBindingIds: [] }, PLAN, 'EXECUTION_PLAN').status
+			).toBe('ACCEPTED');
+
+			expect(start(1).status).toBe('ACCEPTED');
+			expect(complete(1).status).toBe('ACCEPTED'); // guard false → s3 taken; s2 and its interior s4 excluded
+			expect(start(4).status, 's4 is interior to the dead arm').toBe('REJECTED');
+
+			expect(prune(2).status, JSON.stringify(prune(2))).toBe('ACCEPTED');
+			expect(stepStateOf(2)).toBe('SKIPPED');
+			// THE DEFECT: before DWP-07 the prune made s2 terminal-SUCCESS, which SATISFIED s2->s4 and let s4 start.
+			const resurrect = start(4);
+			expect(resurrect.status, 'the pruned arm must stay dead').toBe('REJECTED');
+			expect(stepStateOf(4)).toBe('QUEUED');
+			// …and s4 is still offered for prune, so the arm can actually be cleared and the plan can complete.
+			expect(prune(4).status).toBe('ACCEPTED');
+			expect(stepStateOf(4)).toBe('SKIPPED');
+
+			expect(start(3).status).toBe('ACCEPTED');
+			expect(complete(3).status).toBe('ACCEPTED');
+			const done = dispatch('CompleteExecutionPlan', {}, PLAN, 'EXECUTION_PLAN');
+			expect(done.status, JSON.stringify(done.error)).toBe('ACCEPTED');
 		});
 	});
 });

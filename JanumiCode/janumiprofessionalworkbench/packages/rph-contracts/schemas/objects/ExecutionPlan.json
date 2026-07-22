@@ -322,6 +322,9 @@
               "CANCELLED",
               "SUPERSEDED"
             ]
+          },
+          "prunedAsUnreachable": {
+            "type": "boolean"
           }
         },
         "required": [

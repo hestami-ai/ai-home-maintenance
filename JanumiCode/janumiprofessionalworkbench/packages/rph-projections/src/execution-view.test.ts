@@ -6,12 +6,14 @@ import {
 	executionPlanView,
 	isBelowQueued,
 	isTerminalSuccessStep,
+	describeCondition,
 	plansForPwus,
 	prunableStepIds,
 	sequenceView,
 	startableStepId,
 	startableStepIds,
 	stepStateTone,
+	transitionRows,
 	type ExecutionPlanInput,
 	type ExecutionStepInput,
 	type SequenceInstance,
@@ -462,5 +464,134 @@ describe('startableStepIds / prunableStepIds — the graph frontier surfaced to 
 			]
 		);
 		expect(startableStepIds(v, conditionEvaluatorFor(v, []))).toEqual(['s3']); // falls to the default
+	});
+});
+
+// DR-004 DWP-06 (Tier 3C-ii) — the transitions view. A READ-ONLY rendering of the immutable graph (DS-004 F-4): it
+// reports what the interpreter decided and drives nothing (F-11 — buttons come from the affordance allowlists only).
+describe('describeCondition — a human summary of the guard, total over the grammar (DWP-06)', () => {
+	const S = 'step_01ARZ3NDEKTSV4RRFFQ69G5K00';
+
+	it('renders each leaf op with its operands', () => {
+		expect(describeCondition({ op: 'STEP_SUCCEEDED', stepId: S })).toMatch(/^step step_01ARZ3N… succeeded$/);
+		expect(describeCondition({ op: 'STEP_STATE', stepId: S, state: 'FAILED' })).toContain('is FAILED');
+		expect(describeCondition({ op: 'OUTPUT_COUNT', stepId: S, cmp: '>=', value: 2 })).toContain('outputs >= 2');
+		expect(describeCondition({ op: 'ATTEMPTS', stepId: S, cmp: '>', value: 1 })).toContain('attempts > 1');
+		expect(describeCondition({ op: 'RESULT_EQUALS', stepId: S, path: 'a.b', value: true })).toContain('result.a.b = true');
+	});
+
+	it('renders the nested combinators', () => {
+		const leaf = { op: 'STEP_SUCCEEDED', stepId: S };
+		expect(describeCondition({ op: 'NOT', operand: leaf })).toMatch(/^not \(/);
+		expect(describeCondition({ op: 'ALL', operands: [leaf, leaf] })).toMatch(/^all of \(.*;.*\)$/);
+		expect(describeCondition({ op: 'ANY', operands: [leaf] })).toMatch(/^any of \(/);
+	});
+
+	it('renders an UNPARSEABLE expression as an explicit marker — never as understood, never [object Object]', () => {
+		for (const bad of [{ op: 'NONSENSE' }, {}, null, undefined, 'true', 42, { op: 'ALL' }]) {
+			const text = describeCondition(bad);
+			expect(text).toBe('unparseable condition');
+			expect(text).not.toContain('[object');
+		}
+	});
+
+	it('truncates ULIDs rather than dumping 30 characters of entropy', () => {
+		expect(describeCondition({ op: 'STEP_SUCCEEDED', stepId: S })).toContain('…');
+		expect(describeCondition({ op: 'STEP_SUCCEEDED', stepId: 's1' })).toContain('s1');
+	});
+});
+
+describe('transitionRows — the edge plane of the execution view (DWP-06)', () => {
+	const seq = (sourceStepId: string, targetStepId: string, id?: string) => ({
+		...(id ? { id } : {}),
+		sourceStepId,
+		targetStepId,
+		transitionType: 'SEQUENTIAL'
+	});
+	const gview = (steps: ExecutionStepInput[], transitions: ExecutionPlanInput['transitions']) =>
+		executionPlanView(plan('plan_g', 'pwu_a', steps, { transitions }));
+
+	it('renders one row per edge with resolved step labels, role and disposition', () => {
+		const v = gview(
+			[step('s1', 'SUCCEEDED'), step('s2', 'QUEUED')],
+			[seq('s1', 's2', 'edge_1')]
+		);
+		const rows = transitionRows(v);
+		expect(rows).toHaveLength(1);
+		expect(rows[0]).toMatchObject({
+			key: 'edge_1',
+			sourceStepId: 's1',
+			targetStepId: 's2',
+			sourceLabel: 'purpose s1',
+			targetLabel: 'purpose s2',
+			role: 'SEQUENTIAL',
+			disposition: 'SATISFIED'
+		});
+		expect(rows[0]?.conditionText).toBeUndefined(); // unconditional edge → no guard text
+	});
+
+	it('is empty for a linear plan — the D1 degenerate renders no graph at all', () => {
+		expect(transitionRows(executionPlanView(plan('p', 'pwu_a', [step('s1', 'QUEUED')])))).toEqual([]);
+	});
+
+	it('reports PENDING while the source is unfinished', () => {
+		const v = gview([step('s1', 'RUNNING'), step('s2', 'QUEUED')], [seq('s1', 's2')]);
+		expect(transitionRows(v)[0]?.disposition).toBe('PENDING');
+	});
+
+	// THE IDENTITY TRAP: rph-domain's BRANCH first-match decides "is this the selected arm?" by OBJECT IDENTITY against
+	// the elements of plan.transitions. If transitionRows ever cloned an edge before asking, every CONDITIONAL edge
+	// would silently read NEUTRALIZED — no type error, no failure outside a branch fixture. This is that fixture.
+	it('reports the SELECTED branch arm as SATISFIED and the not-taken arm as NEUTRALIZED (by-reference guard)', () => {
+		const v = gview(
+			[step('s1', 'SUCCEEDED', { stepType: 'BRANCH' }), step('s2', 'QUEUED'), step('s3', 'QUEUED')],
+			[
+				{
+					id: 'edge_cond',
+					sourceStepId: 's1',
+					targetStepId: 's2',
+					transitionType: 'CONDITIONAL',
+					conditionExpression: { op: 'STEP_SUCCEEDED', stepId: 's1' }
+				},
+				seq('s1', 's3', 'edge_default')
+			]
+		);
+		const rows = transitionRows(v, conditionEvaluatorFor(v, []));
+		expect(rows.find((r) => r.key === 'edge_cond')).toMatchObject({
+			role: 'CONDITIONAL',
+			conditionText: 'step s1 succeeded',
+			disposition: 'SATISFIED'
+		});
+		expect(rows.find((r) => r.key === 'edge_default')?.disposition).toBe('NEUTRALIZED');
+		// And the rows agree with the frontier the SAME evaluator produces — one interpreter, two renderings.
+		expect(startableStepIds(v, conditionEvaluatorFor(v, []))).toEqual(['s2']);
+	});
+
+	it('labels a plan-entry edge honestly instead of rendering an empty source', () => {
+		const v = gview([step('s1', 'QUEUED')], [{ targetStepId: 's1', transitionType: 'SEQUENTIAL' }]);
+		const rows = transitionRows(v);
+		expect(rows[0]?.sourceLabel).toBe('(plan entry)');
+		expect(rows[0]?.sourceStepId).toBeUndefined();
+		expect(rows[0]?.disposition).toBe('SATISFIED');
+	});
+
+	it('names an unresolvable step id rather than rendering a blank row', () => {
+		const v = gview([step('s1', 'SUCCEEDED')], [seq('s1', 'ghost')]);
+		expect(transitionRows(v)[0]?.targetLabel).toContain('unknown step');
+	});
+
+	it('synthesizes a stable key when the edge carries no id (a keyed each-block cannot key on undefined)', () => {
+		const v = gview([step('s1', 'SUCCEEDED'), step('s2', 'QUEUED')], [seq('s1', 's2'), seq('s1', 's2')]);
+		const keys = transitionRows(v).map((r) => r.key);
+		expect(new Set(keys).size).toBe(2);
+		for (const k of keys) expect(typeof k).toBe('string');
+	});
+
+	it('infers the role from the presence of a guard when transitionType is absent', () => {
+		const v = gview(
+			[step('s1', 'SUCCEEDED'), step('s2', 'QUEUED')],
+			[{ sourceStepId: 's1', targetStepId: 's2', conditionExpression: { op: 'STEP_SUCCEEDED', stepId: 's1' } }]
+		);
+		expect(transitionRows(v)[0]?.role).toBe('CONDITIONAL');
 	});
 });

@@ -121,7 +121,10 @@ describe('PARALLEL_GROUP fan-out + barrier JOIN (DWP-05)', () => {
 			edge('s2', 's4'),
 			edge('s3', 's4')
 		];
-		const p = (states: string[]) => plan(states.map((st, i) => step(s(i + 1), st)), t);
+		// s1 is the BRANCH node — exclusive first-match belongs to a BRANCH stepType and nothing else (DWP-07), and
+		// propose-time validation now REFUSES a CONDITIONAL out-edge from any other kind of step.
+		const p = (states: string[]) =>
+			plan(states.map((st, i) => step(s(i + 1), st, i === 0 ? 'BRANCH' : undefined)), t);
 
 		it('WEDGES while the not-taken arm sits QUEUED (its in-edge to the join stays PENDING)', () => {
 			const wedged = p(['SUCCEEDED', 'SUCCEEDED', 'QUEUED', 'QUEUED']);
@@ -177,14 +180,14 @@ describe('BRANCH first-match + prune (DWP-03)', () => {
 
 	it('first-match selects exactly ONE arm (the first true conditional); the default is not-taken', () => {
 		const t: GateTransition[] = [{ sourceStepId: 's1', targetStepId: 's2', ...cond(true) }, seq('s1', 's3')];
-		const p = plan([step('s1', 'SUCCEEDED'), step('s2', 'QUEUED'), step('s3', 'QUEUED')], t);
+		const p = plan([step('s1', 'SUCCEEDED', 'BRANCH'), step('s2', 'QUEUED'), step('s3', 'QUEUED')], t);
 		expect(startableStepIds(p, guard)).toEqual(['s2']);
 		expect(inEdgeDisposition(p, t[1]!, guard)).toBe('NEUTRALIZED'); // the default arm is not-taken
 	});
 
 	it('falls to the SEQUENTIAL default when no conditional guard is true', () => {
 		const t: GateTransition[] = [{ sourceStepId: 's1', targetStepId: 's2', ...cond(false) }, seq('s1', 's3')];
-		const p = plan([step('s1', 'SUCCEEDED'), step('s2', 'QUEUED'), step('s3', 'QUEUED')], t);
+		const p = plan([step('s1', 'SUCCEEDED', 'BRANCH'), step('s2', 'QUEUED'), step('s3', 'QUEUED')], t);
 		expect(startableStepIds(p, guard)).toEqual(['s3']);
 	});
 
@@ -194,7 +197,7 @@ describe('BRANCH first-match + prune (DWP-03)', () => {
 			{ sourceStepId: 's1', targetStepId: 's3', ...cond(true) },
 			seq('s1', 's4')
 		];
-		const p = plan([step('s1', 'SUCCEEDED'), step('s2', 'QUEUED'), step('s3', 'QUEUED'), step('s4', 'QUEUED')], t);
+		const p = plan([step('s1', 'SUCCEEDED', 'BRANCH'), step('s2', 'QUEUED'), step('s3', 'QUEUED'), step('s4', 'QUEUED')], t);
 		expect(startableStepIds(p, guard)).toEqual(['s2']); // only the first true conditional
 	});
 
@@ -207,7 +210,7 @@ describe('BRANCH first-match + prune (DWP-03)', () => {
 			seq('s3', 's4') // s4 is a JOIN of taken (s2) + not-taken (s3)
 		];
 		const p = plan(
-			[step('s1', 'SUCCEEDED'), step('s2', 'QUEUED'), step('s3', 'QUEUED'), step('s4', 'QUEUED'), step('s5', 'QUEUED')],
+			[step('s1', 'SUCCEEDED', 'BRANCH'), step('s2', 'QUEUED'), step('s3', 'QUEUED'), step('s4', 'QUEUED'), step('s5', 'QUEUED')],
 			t
 		);
 		const prunable = new Set(prunableStepIds(p, guard));
@@ -219,6 +222,18 @@ describe('BRANCH first-match + prune (DWP-03)', () => {
 
 	it('a linear plan never prunes (empty transitions)', () => {
 		expect(prunableStepIds(plan([step('s1', 'SUCCEEDED'), step('s2', 'QUEUED')]))).toEqual([]);
+	});
+
+	// DWP-06: pruneExecutionStep REJECTS a non-ACTIVE plan, so a read-model that still called the arm prunable would
+	// offer a Prune the engine refuses — the read-model/authority divergence this single gate home exists to prevent.
+	it('yields NO prunable step under a non-ACTIVE plan, mirroring startableStepIds (authority agreement)', () => {
+		const t: GateTransition[] = [{ sourceStepId: 's1', targetStepId: 's2', ...cond(true) }, seq('s1', 's3')];
+		const steps = [step('s1', 'SUCCEEDED', 'BRANCH'), step('s2', 'QUEUED'), step('s3', 'QUEUED')];
+		expect(prunableStepIds(plan(steps, t, 'ACTIVE'), guard)).toEqual(['s3']);
+		for (const status of ['SUPERSEDED', 'CANCELLED', 'COMPLETED', 'APPROVED', 'PROPOSED']) {
+			expect(prunableStepIds(plan(steps, t, status), guard), status).toEqual([]);
+			expect(startableStepIds(plan(steps, t, status), guard), status).toEqual([]);
+		}
 	});
 });
 
@@ -298,5 +313,141 @@ describe('validateTransitionGraph — every rejection limb (EP-TST-5)', () => {
 			[edge('s1', 's2', { transitionType: 'CONDITIONAL', conditionExpression: {} }), edge('s1', 's3', { transitionType: 'SEQUENTIAL' })]
 		);
 		expect(r.ok, r.message).toBe(true);
+	});
+});
+
+// ── DWP-07: adversarial-audit remediation. Each of these reproduces a defect the shipped gate had; each FAILED before
+// the fix. They exist because the original DWP-03/05 fixtures were all shaped so the defects could not appear —
+// a branch whose not-taken arm was a LEAF, and step lists that happened to be topologically ordered.
+describe('DWP-07 — defects found by adversarial audit of the landed increment', () => {
+	const guard: EdgeGuardEvaluator = (e) =>
+		(e.conditionExpression as { result?: boolean } | undefined)?.result === true;
+	const cond = (result: boolean): Partial<GateTransition> => ({
+		transitionType: 'CONDITIONAL',
+		conditionExpression: { result }
+	});
+
+	// BLOCKER 1. Pruning is a MULTI-command operation, so the gate must be correct at every intermediate state — not
+	// only if the whole fixpoint were applied atomically, which nothing guarantees.
+	describe('a prune must not resurrect the rest of its own arm', () => {
+		// s1 BRANCH → s2 (guard FALSE, not taken) → s4 ; and → s3 (default, taken). s4 is INTERIOR to the dead arm.
+		const t: GateTransition[] = [
+			{ sourceStepId: 's1', targetStepId: 's2', ...cond(false) },
+			{ sourceStepId: 's1', targetStepId: 's3', transitionType: 'SEQUENTIAL' },
+			edge('s2', 's4')
+		];
+		const p = (s2State: string, s2Pruned = false) =>
+			plan(
+				[
+					step('s1', 'SUCCEEDED', 'BRANCH'),
+					{ id: 's2', stepState: s2State, ...(s2Pruned ? { prunedAsUnreachable: true } : {}) },
+					step('s3', 'QUEUED'),
+					step('s4', 'QUEUED')
+				],
+				t
+			);
+
+		it('offers the whole dead arm for prune before any of it is pruned', () => {
+			expect(prunableStepIds(p('QUEUED'), guard).sort()).toEqual(['s2', 's4']);
+			expect(startableStepIds(p('QUEUED'), guard)).toEqual(['s3']);
+		});
+
+		it('keeps the arm DEAD after the first prune commits — s4 must not become startable', () => {
+			const after = p('SKIPPED', true);
+			expect(startableStepIds(after, guard), 's4 must NOT be resurrected').toEqual(['s3']);
+			expect(startStepGate(after, 's4', guard).ok).toBe(false);
+			expect(prunableStepIds(after, guard), 's4 is still prunable so the arm can be cleared').toEqual(['s4']);
+		});
+
+		it('still lets a WAIVED skip (not a prune) satisfy its successors — the two must stay distinguishable', () => {
+			// Same shape, but s2 reached SKIPPED by an operator waiver: no prunedAsUnreachable mark.
+			expect(startableStepIds(p('SKIPPED', false), guard)).toContain('s4');
+		});
+	});
+
+	// BLOCKER 2. Exclusive selection belongs to a BRANCH node, not to "any node that happens to have a guarded arm".
+	it('a PARALLEL_GROUP with one guarded arm keeps its unconditional arms (independent, not a branch)', () => {
+		const withTrue = plan(
+			[step('s1', 'SUCCEEDED', 'PARALLEL_GROUP'), step('s2', 'QUEUED'), step('s3', 'QUEUED'), step('s4', 'QUEUED')],
+			[{ sourceStepId: 's1', targetStepId: 's2', ...cond(true) }, edge('s1', 's3'), edge('s1', 's4')]
+		);
+		expect(startableStepIds(withTrue, guard).sort()).toEqual(['s2', 's3', 's4']);
+		// …and a FALSE guard removes only its own arm, leaving the unconditional ones untouched.
+		const withFalse = plan(
+			[step('s1', 'SUCCEEDED', 'PARALLEL_GROUP'), step('s2', 'QUEUED'), step('s3', 'QUEUED'), step('s4', 'QUEUED')],
+			[{ sourceStepId: 's1', targetStepId: 's2', ...cond(false) }, edge('s1', 's3'), edge('s1', 's4')]
+		);
+		expect(startableStepIds(withFalse, guard).sort()).toEqual(['s3', 's4']);
+	});
+
+	// BLOCKER 3. A FAILED step is RETRYABLE (FAILED→QUEUED). Its downstream awaits a decision; it is not excluded.
+	it('does NOT offer the downstream of a FAILED step for prune (a failure is not an exclusion)', () => {
+		const t = [edge('s1', 's2'), edge('s2', 's3')];
+		const p = plan([step('s1', 'SUCCEEDED'), step('s2', 'FAILED'), step('s3', 'QUEUED')], t);
+		expect(prunableStepIds(p, guard), 'a retryable failure must not launder into SKIPPED').toEqual([]);
+		// The barrier still neutralizes the failed edge so a JOIN cannot wedge — the two rules are deliberately different.
+		expect(inEdgeDisposition(p, t[1]!, guard)).toBe('NEUTRALIZED');
+	});
+
+	// The MINOR that mattered: the fixpoint was only ever exercised by topologically-ordered fixtures, so a single-pass
+	// regression survived the whole suite. DWP-01 made the GRAPH the order, so array order proves nothing.
+	it('prunes a transitively-dead chain declared in REVERSE topological order (a true fixpoint, not one pass)', () => {
+		const t: GateTransition[] = [
+			{ sourceStepId: 's1', targetStepId: 'dead1', ...cond(false) },
+			{ sourceStepId: 's1', targetStepId: 'taken', transitionType: 'SEQUENTIAL' },
+			edge('dead1', 'dead2'),
+			edge('dead2', 'dead3')
+		];
+		// steps[] deliberately lists the dead chain DEEPEST-FIRST.
+		const p = plan(
+			[
+				step('dead3', 'QUEUED'),
+				step('dead2', 'QUEUED'),
+				step('dead1', 'QUEUED'),
+				step('taken', 'QUEUED'),
+				step('s1', 'SUCCEEDED', 'BRANCH')
+			],
+			t
+		);
+		expect(prunableStepIds(p, guard).sort()).toEqual(['dead1', 'dead2', 'dead3']);
+	});
+
+	// The authority half must exclude everything the read-model half excludes — in BOTH directions.
+	it('startStepGate refuses an unknown step and an already-terminal step (mirroring startableStepIds)', () => {
+		const p = plan([step('s1', 'SUCCEEDED'), step('s2', 'QUEUED')], [edge('s1', 's2')]);
+		expect(startStepGate(p, 'not_a_step').ok).toBe(false);
+		expect(startStepGate(p, 's1').ok, 'already SUCCEEDED').toBe(false);
+		const frontier = new Set(startableStepIds(p));
+		expect(frontier.has('s1')).toBe(false);
+		expect(frontier).toEqual(new Set(['s2']));
+	});
+
+	// A half-edge was invisible to every validation limb yet won runtime first-match, deadlocking the plan.
+	it('REFUSES a transition that declares no target at propose-time', () => {
+		const r = validateTransitionGraph(
+			[{ id: 's1', stepType: 'BRANCH' }, { id: 's2' }],
+			[{ sourceStepId: 's1' }, { sourceStepId: 's1', targetStepId: 's2', transitionType: 'SEQUENTIAL' }]
+		);
+		expect(r.ok).toBe(false);
+		expect(r.message).toContain('no targetStepId');
+	});
+
+	it('REFUSES a conditional out-edge from a non-BRANCH step, and a BRANCH with two unconditional defaults', () => {
+		const nonBranch = validateTransitionGraph(
+			[{ id: 's1', stepType: 'TRANSFORMATION' }, { id: 's2' }],
+			[{ sourceStepId: 's1', targetStepId: 's2', ...cond(true) }]
+		);
+		expect(nonBranch.ok).toBe(false);
+		expect(nonBranch.message).toContain('not BRANCH');
+
+		const twoDefaults = validateTransitionGraph(
+			[{ id: 's1', stepType: 'BRANCH' }, { id: 's2' }, { id: 's3' }],
+			[
+				{ sourceStepId: 's1', targetStepId: 's2', transitionType: 'SEQUENTIAL' },
+				{ sourceStepId: 's1', targetStepId: 's3', transitionType: 'SEQUENTIAL' }
+			]
+		);
+		expect(twoDefaults.ok).toBe(false);
+		expect(twoDefaults.message).toContain('exactly one is permitted');
 	});
 });
