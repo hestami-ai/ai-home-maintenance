@@ -18,10 +18,12 @@ import {
 import {
 	buildApplicablePolicies,
 	buildAssuranceView,
+	conditionEvaluatorFor,
 	type ExecutionAttemptView,
 	executionAttempts,
 	type ExecutionPlanInput,
 	plansForPwus,
+	prunableStepIds,
 	rebuildProjection,
 	type SequenceInstance,
 	sequenceView,
@@ -219,10 +221,18 @@ export const load: PageServerLoad = ({ params }) => {
 	// SET of steps the engine would currently let start (the graph in-edge barrier; a linear plan yields a singleton).
 	// The UI offers Start ONLY on a step in this set (the engine's startExecutionStep gate is the backstop — the UI does
 	// not tempt a start it would reject). A plan with no startable step maps to an empty/absent list.
+	// The CONDITIONAL-edge guard evaluator (DWP-02/03) is folded per plan from its committed state + the event log, so
+	// the read-model's BRANCH first-match matches the engine authority exactly (§19-M2). prunableStepByPlan surfaces a
+	// resolved BRANCH's not-taken arm (+ transitive downstream) for a Prune action (DWP-03/06).
+	const engineEvents = engine.readAllEvents();
 	const startableStepByPlan: Record<string, string[]> = {};
+	const prunableStepByPlan: Record<string, string[]> = {};
 	for (const pl of plans) {
-		const sids = startableStepIds(pl);
+		const evalGuard = conditionEvaluatorFor(pl, engineEvents);
+		const sids = startableStepIds(pl, evalGuard);
 		if (sids.length) startableStepByPlan[pl.id] = sids;
+		const prunable = prunableStepIds(pl, evalGuard);
+		if (prunable.length) prunableStepByPlan[pl.id] = prunable;
 	}
 
 	// Execution Attempt history (JAN-EXECPLAN Tier-3 DWP-03/05): fold the Execution* event stream into §10.4 attempt
@@ -275,6 +285,7 @@ export const load: PageServerLoad = ({ params }) => {
 		pwuList,
 		plans,
 		startableStepByPlan,
+		prunableStepByPlan,
 		attemptsByStepId,
 		sequence,
 		assessments,
@@ -533,6 +544,12 @@ export const actions: Actions = {
 			stepId: str(f, 'stepId'),
 			reason: str(f, 'reason') || 'Operator cancelled the step.'
 		});
+	},
+	// DR-004 DWP-03 — prune a not-taken BRANCH arm (or transitively-unreachable step) to SKIPPED. Surfaced only for
+	// steps in prunableStepByPlan (system prune ≠ user waiver; dispatch surfaces a rejection verbatim).
+	pruneStep: async ({ request }) => {
+		const f = await request.formData();
+		return dispatchResult('PruneExecutionStep', str(f, 'planId'), { stepId: str(f, 'stepId') });
 	},
 	cancelPlan: async ({ request }) => {
 		const f = await request.formData();

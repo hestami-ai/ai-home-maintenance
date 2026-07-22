@@ -312,4 +312,47 @@ describe('StartExecutionStep — the linear start-gate (DWP-01, RPH-EXE-005 / fo
 		expect(r.error?.code).toBe('RPH_VALIDATION_SEMANTIC_FAILED');
 		expect(r.error?.message).toContain('ghost_step');
 	});
+
+	// DR-004 DWP-03 (Tier 3C-ii) — BRANCH: first-match selection + prune-to-SKIPPED, driven to completion.
+	describe('BRANCH + prune (DWP-03)', () => {
+		const prune = (i: number) => dispatch('PruneExecutionStep', { stepId: stepId(i) }, PLAN, 'EXECUTION_PLAN');
+		/** Propose+approve+activate a BRANCH plan: s1 BRANCH → [s2 (COND STEP_SUCCEEDED s1), s3 (SEQ default)]. */
+		function activeBranchPlan() {
+			const r = dispatch(
+				'ProposeExecutionPlan',
+				{
+					executionPlanId: PLAN,
+					workUnitId: PWU,
+					steps: [{ ...step(1, 'QUEUED'), stepType: 'BRANCH' }, step(2, 'QUEUED'), step(3, 'QUEUED')],
+					transitions: [cedge(1, 2, { op: 'STEP_SUCCEEDED', stepId: stepId(1) }), gedge(1, 3)],
+					retryPolicy: {},
+					tacticalChangePolicy: {},
+					escalationPolicy: {},
+					terminationPolicy: {}
+				},
+				PLAN,
+				'EXECUTION_PLAN'
+			);
+			expect(r.status, JSON.stringify(r.error)).toBe('ACCEPTED');
+			expect(dispatch('ApproveExecutionPlan', {}, PLAN, 'EXECUTION_PLAN').status).toBe('ACCEPTED');
+			expect(
+				dispatch('ActivateExecutionPlan', { authorizedRuntimeBindingIds: [] }, PLAN, 'EXECUTION_PLAN').status
+			).toBe('ACCEPTED');
+		}
+
+		it('selects one arm (first-match), prunes the not-taken arm to SKIPPED, and completes', () => {
+			activeBranchPlan();
+			expect(start(1).status).toBe('ACCEPTED'); // s1 BRANCH is the entry
+			expect(complete(1).status).toBe('ACCEPTED'); // s1 SUCCEEDED → STEP_SUCCEEDED(s1) true → s2 selected
+			expect(start(2).status, 's2 is the selected arm').toBe('ACCEPTED');
+			expect(start(3).status, 's3 is the not-taken default → NEUTRALIZED → not startable').toBe('REJECTED');
+			const pr = prune(3);
+			expect(pr.status, JSON.stringify(pr.error)).toBe('ACCEPTED'); // system prune → SKIPPED
+			expect(stepStateOf(3)).toBe('SKIPPED');
+			expect(complete(2).status).toBe('ACCEPTED'); // s2 SUCCEEDED
+			// s1 SUCCEEDED, s2 SUCCEEDED, s3 SKIPPED → the plan completes (≥1 SUCCEEDED, all terminal-success).
+			const done = dispatch('CompleteExecutionPlan', {}, PLAN, 'EXECUTION_PLAN');
+			expect(done.status, JSON.stringify(done.error)).toBe('ACCEPTED');
+		});
+	});
 });

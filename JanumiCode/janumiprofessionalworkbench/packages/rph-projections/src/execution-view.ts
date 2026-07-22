@@ -20,8 +20,14 @@
 // Pure + browser-safe (type-only contract imports), like the rest of rph-projections.
 import type { StepState } from '@janumipwb/rph-contracts';
 import {
+	buildConditionSubject,
+	ConditionExpressionSchema,
+	evaluateCondition,
 	isTerminalSuccessStepState,
-	startableStepIds as gateStartableStepIds
+	prunableStepIds as gatePrunableStepIds,
+	startableStepIds as gateStartableStepIds,
+	type ConditionSubjectEvent,
+	type EdgeGuardEvaluator
 } from '@janumipwb/rph-domain';
 import { layerHandoff, type HandoffOrder } from './handoff-order.js';
 import type { PwaGraphExport } from './pwa-graph.js';
@@ -213,8 +219,32 @@ export function isTerminalSuccessStep(stepState: string): boolean {
  * singleton; a fan-out can yield several). The UI shows Start on a step iff it is in this set AND its advanceCommands
  * include 'start' (so a RUNNING frontier shows Complete/Fail, a READY/NOT_READY one the belowQueued note).
  */
-export function startableStepIds(plan: ExecutionPlanView): string[] {
-	return gateStartableStepIds(plan);
+export function startableStepIds(plan: ExecutionPlanView, evaluateGuard?: EdgeGuardEvaluator): string[] {
+	return gateStartableStepIds(plan, evaluateGuard);
+}
+
+/** The set of steps that are now UNREACHABLE and should be pruned to SKIPPED (a resolved BRANCH's not-taken arm + its
+ *  transitive downstream) — DWP-03. Delegates to the shared rph-domain fixpoint. The UI surfaces these for a Prune
+ *  action; a linear plan yields none. */
+export function prunableStepIds(plan: ExecutionPlanView, evaluateGuard?: EdgeGuardEvaluator): string[] {
+	return gatePrunableStepIds(plan, evaluateGuard);
+}
+
+/**
+ * Build the CONDITIONAL-edge guard evaluator for a plan (DWP-02/03) — a closure over the plan's committed subject
+ * (folded from its steps + this plan's own event log). Passed to startableStepIds/prunableStepIds so the read-model's
+ * BRANCH first-match matches the engine authority exactly. Pure/browser-safe (the subject fold + evaluator are
+ * rph-domain; the schema parse is Zod, already in the browser bundle). Reuse for both calls so the fold happens once.
+ */
+export function conditionEvaluatorFor(
+	plan: ExecutionPlanView,
+	events: readonly ConditionSubjectEvent[]
+): EdgeGuardEvaluator {
+	const subject = buildConditionSubject(plan.steps, events, plan.id);
+	return (edge) => {
+		const parsed = ConditionExpressionSchema.safeParse(edge.conditionExpression);
+		return parsed.success && evaluateCondition(parsed.data, subject);
+	};
 }
 
 /** The single startable step — back-compat with the Tier-3C scalar frontier: the first of `startableStepIds`, or

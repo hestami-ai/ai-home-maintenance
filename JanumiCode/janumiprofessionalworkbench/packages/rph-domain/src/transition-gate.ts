@@ -62,6 +62,29 @@ const stateOf = (plan: GatePlan, stepId: string | undefined): string | undefined
 const inEdgesOf = (plan: GatePlan, stepId: string): readonly GateTransition[] =>
 	(plan.transitions ?? []).filter((t) => t.targetStepId === stepId);
 
+/** An edge is CONDITIONAL (guarded) if it carries a conditionExpression or is tagged CONDITIONAL. */
+const isConditionalEdge = (e: GateTransition): boolean =>
+	e.conditionExpression !== undefined || e.transitionType === 'CONDITIONAL';
+
+/**
+ * BRANCH first-match (DWP-03/D3): among a source's out-edges (array order) select the FIRST CONDITIONAL edge whose
+ * guard is true, else the first unconditional (SEQUENTIAL default) — so exactly ONE arm is ever selected. Returns
+ * undefined only if no unconditional default exists and every conditional guard is false (a malformed BRANCH — propose
+ * validation forbids it by requiring a SEQUENTIAL default). Evaluated IN the gate so a losing arm is rejected at start
+ * regardless of prune timing (closes the double-run window, §10-M-D3).
+ */
+function selectBranchEdge(
+	outEdges: readonly GateTransition[],
+	plan: GatePlan,
+	evaluateGuard?: EdgeGuardEvaluator
+): GateTransition | undefined {
+	for (const e of outEdges) {
+		if (!isConditionalEdge(e)) return e; // an unconditional edge (the SEQUENTIAL default) always matches
+		if (evaluateGuard?.(e, plan)) return e; // the first true conditional
+	}
+	return undefined;
+}
+
 /**
  * The disposition of ONE in-edge. SATISFIED: source terminal-success (or a plan-entry edge with no source) AND the
  * edge guard holds. NEUTRALIZED: source terminal-non-success (FAILED/CANCELLED/SUPERSEDED), or a CONDITIONAL edge
@@ -79,11 +102,12 @@ export function inEdgeDisposition(
 	if (!TERMINAL.has(src)) return 'PENDING'; // source not yet done
 	// Source is terminal. A terminal-non-success source neutralizes the edge regardless of guard.
 	if (!TERMINAL_SUCCESS.has(src)) return 'NEUTRALIZED';
-	// Terminal-success source: an unconditional (SEQUENTIAL / no condition) edge is satisfied; a conditional edge
-	// depends on its guard (DWP-02/03). With no evaluator (DWP-01) a guarded edge is NEUTRALIZED.
-	const isConditional = edge.conditionExpression !== undefined || edge.transitionType === 'CONDITIONAL';
-	if (!isConditional) return 'SATISFIED';
-	return evaluateGuard?.(edge, plan) ? 'SATISFIED' : 'NEUTRALIZED';
+	// Terminal-success source. If the source is a BRANCH (has ≥1 CONDITIONAL out-edge), first-match selects exactly ONE
+	// out-edge — this edge is SATISFIED iff it IS the selected one, else NEUTRALIZED (a not-taken arm). If the source
+	// has only unconditional out-edges (a linear single successor, or a PARALLEL_GROUP fan-out), every out-edge is taken.
+	const outEdges = (plan.transitions ?? []).filter((t) => t.sourceStepId === edge.sourceStepId);
+	if (!outEdges.some(isConditionalEdge)) return 'SATISFIED'; // linear / fan-out: all taken
+	return selectBranchEdge(outEdges, plan, evaluateGuard) === edge ? 'SATISFIED' : 'NEUTRALIZED';
 }
 
 /**
@@ -148,6 +172,37 @@ export function startableStepIds(plan: GatePlan, evaluateGuard?: EdgeGuardEvalua
 		return f === undefined ? [] : [f];
 	}
 	return plan.steps.filter((s) => stepAtFrontier(plan, s, evaluateGuard)).map((s) => s.id);
+}
+
+/**
+ * The set of steps that are now UNREACHABLE and should be pruned to SKIPPED (DWP-03/D5) — the not-taken arm(s) of a
+ * resolved BRANCH plus their transitively-unreachable downstream. A non-terminal, non-entry step is prunable when every
+ * in-edge is either NEUTRALIZED (a not-taken/failed arm) OR comes from an already-prunable step (transitivity — a
+ * fixpoint, so a whole exclusive subtree prunes, while a JOIN reachable via the TAKEN path keeps a SATISFIED in-edge and
+ * is NOT pruned). Pure; the controller issues PruneExecutionStep for each (idempotent — a re-computed already-terminal
+ * step drops out). Empty transitions[] ⇒ [] (a linear plan never prunes).
+ */
+export function prunableStepIds(plan: GatePlan, evaluateGuard?: EdgeGuardEvaluator): string[] {
+	const prunable = new Set<string>();
+	let changed = true;
+	while (changed) {
+		changed = false;
+		for (const s of plan.steps) {
+			if (prunable.has(s.id) || TERMINAL.has(s.stepState)) continue;
+			const inEdges = inEdgesOf(plan, s.id);
+			if (inEdges.length === 0) continue; // an entry step is never prunable
+			const allDead = inEdges.every(
+				(e) =>
+					(e.sourceStepId !== undefined && prunable.has(e.sourceStepId)) ||
+					inEdgeDisposition(plan, e, evaluateGuard) === 'NEUTRALIZED'
+			);
+			if (allDead) {
+				prunable.add(s.id);
+				changed = true;
+			}
+		}
+	}
+	return [...prunable];
 }
 
 /** The result of the start-gate authority: startable, or the blocking predecessor + why. */

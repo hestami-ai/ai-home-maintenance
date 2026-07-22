@@ -1,9 +1,11 @@
 import { describe, expect, it } from 'vitest';
 import {
 	inEdgeDisposition,
+	prunableStepIds,
 	startableStepIds,
 	startStepGate,
 	validateTransitionGraph,
+	type EdgeGuardEvaluator,
 	type GatePlan,
 	type GateStep,
 	type GateTransition,
@@ -91,6 +93,59 @@ describe('startStepGate — the authority mirrors the read-model', () => {
 		const startable = new Set(startableStepIds(p));
 		for (const st of p.steps) expect(startStepGate(p, st.id).ok || !startable.has(st.id)).toBe(true);
 		expect(startable).toEqual(new Set(['s2', 's3']));
+	});
+});
+
+describe('BRANCH first-match + prune (DWP-03)', () => {
+	// A test guard: a CONDITIONAL edge carries { result: boolean } and the guard reads it.
+	const guard: EdgeGuardEvaluator = (e) => (e.conditionExpression as { result?: boolean } | undefined)?.result === true;
+	const cond = (result: boolean): Partial<GateTransition> => ({ transitionType: 'CONDITIONAL', conditionExpression: { result } });
+	const seq = (source: string, target: string): GateTransition => ({ sourceStepId: source, targetStepId: target, transitionType: 'SEQUENTIAL' });
+
+	it('first-match selects exactly ONE arm (the first true conditional); the default is not-taken', () => {
+		const t: GateTransition[] = [{ sourceStepId: 's1', targetStepId: 's2', ...cond(true) }, seq('s1', 's3')];
+		const p = plan([step('s1', 'SUCCEEDED'), step('s2', 'QUEUED'), step('s3', 'QUEUED')], t);
+		expect(startableStepIds(p, guard)).toEqual(['s2']);
+		expect(inEdgeDisposition(p, t[1]!, guard)).toBe('NEUTRALIZED'); // the default arm is not-taken
+	});
+
+	it('falls to the SEQUENTIAL default when no conditional guard is true', () => {
+		const t: GateTransition[] = [{ sourceStepId: 's1', targetStepId: 's2', ...cond(false) }, seq('s1', 's3')];
+		const p = plan([step('s1', 'SUCCEEDED'), step('s2', 'QUEUED'), step('s3', 'QUEUED')], t);
+		expect(startableStepIds(p, guard)).toEqual(['s3']);
+	});
+
+	it('two true conditions → the FIRST (array order) wins, deterministically (closes the double-run window)', () => {
+		const t: GateTransition[] = [
+			{ sourceStepId: 's1', targetStepId: 's2', ...cond(true) },
+			{ sourceStepId: 's1', targetStepId: 's3', ...cond(true) },
+			seq('s1', 's4')
+		];
+		const p = plan([step('s1', 'SUCCEEDED'), step('s2', 'QUEUED'), step('s3', 'QUEUED'), step('s4', 'QUEUED')], t);
+		expect(startableStepIds(p, guard)).toEqual(['s2']); // only the first true conditional
+	});
+
+	it('prunableStepIds prunes the not-taken arm + its transitive downstream, but NOT a JOIN reachable via the taken arm', () => {
+		const t: GateTransition[] = [
+			{ sourceStepId: 's1', targetStepId: 's2', ...cond(true) }, // taken
+			seq('s1', 's3'), // default — not-taken
+			seq('s3', 's5'), // downstream of the not-taken arm
+			seq('s2', 's4'),
+			seq('s3', 's4') // s4 is a JOIN of taken (s2) + not-taken (s3)
+		];
+		const p = plan(
+			[step('s1', 'SUCCEEDED'), step('s2', 'QUEUED'), step('s3', 'QUEUED'), step('s4', 'QUEUED'), step('s5', 'QUEUED')],
+			t
+		);
+		const prunable = new Set(prunableStepIds(p, guard));
+		expect(prunable.has('s3')).toBe(true); // not-taken arm
+		expect(prunable.has('s5')).toBe(true); // transitive downstream of s3
+		expect(prunable.has('s4')).toBe(false); // JOIN — still reachable via the taken arm s2
+		expect(prunable.has('s2')).toBe(false); // taken arm
+	});
+
+	it('a linear plan never prunes (empty transitions)', () => {
+		expect(prunableStepIds(plan([step('s1', 'SUCCEEDED'), step('s2', 'QUEUED')]))).toEqual([]);
 	});
 });
 

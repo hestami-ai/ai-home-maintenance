@@ -89,6 +89,8 @@ describe('validate', () => {
 		// then +1 for JAN-EXECPLAN-DR-004 DWP-01 (Tier 3C-ii): +1 enum TransitionType. ExecutionTransition changed from
 		// an opaque placeholder (z.record) to a full strictObject helper (same schema id, no delta); conditionExpression
 		// stays opaque z.unknown (the grammar is hand-authored in rph-domain, not vocab-generated). (+1 → 317.)
-		expect(buildContractRegistry().ids()).toHaveLength(317);
+		// then +2 for JAN-EXECPLAN-DR-004 DWP-03 (BRANCH/prune): +1 command PruneExecutionStep + +1 event
+		// ExecutionStepPruned (a system prune of a not-taken branch arm to SKIPPED). (+2 → 319.)
+		expect(buildContractRegistry().ids()).toHaveLength(319);
 	});
 });

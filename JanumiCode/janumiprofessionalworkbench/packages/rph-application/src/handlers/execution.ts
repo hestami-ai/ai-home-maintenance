@@ -800,3 +800,38 @@ export const cancelExecutionStep: CommandHandler = (ctx, command) => {
 		}
 	});
 };
+
+/**
+ * PruneExecutionStep — a not-taken/unreachable step QUEUED -> SKIPPED (JAN-EXECPLAN-DR-004 DWP-03 / D5). A SYSTEM prune
+ * of a BRANCH's not-taken arm (or its transitively-unreachable downstream), controller-issued from the pure
+ * `prunableStepIds` read-model. NOT a user waiver: it does NOT route through canSkipStep (the plan's own declared branch
+ * logic excludes the step — no waiver applies). Drives QUEUED->SKIPPED (machine-legal) so the pruned step is
+ * completion-compatible (SKIPPED is terminal-success). Idempotent (checkTransition no-ops an already-terminal step);
+ * plan-ACTIVE-gated (prune is within-execution branch resolution). Exec != assurance (INV-5): moves only stepState.
+ */
+export const pruneExecutionStep: CommandHandler = (ctx, command) => {
+	const p = command.payload as {
+		stepId: string;
+		selectedByBranchStepId?: string;
+		selectedEdgeId?: string;
+	};
+	return advanceStep(ctx, command, {
+		stepId: p.stepId,
+		target: 'SKIPPED',
+		eventType: 'ExecutionStepPruned',
+		eventPayload: {
+			stepId: p.stepId,
+			...(p.selectedByBranchStepId ? { selectedByBranchStepId: p.selectedByBranchStepId } : {}),
+			...(p.selectedEdgeId ? { selectedEdgeId: p.selectedEdgeId } : {}),
+			stepState: 'SKIPPED'
+		},
+		precheck: (_step, plan) =>
+			plan.status === 'ACTIVE'
+				? null
+				: reject(
+						command,
+						'RPH_ILLEGAL_STATE_TRANSITION',
+						`Cannot prune a step: plan ${command.targetAggregateId} is not ACTIVE (${String(plan.status)}) — a prune is within-execution branch resolution.`
+					)
+	});
+};

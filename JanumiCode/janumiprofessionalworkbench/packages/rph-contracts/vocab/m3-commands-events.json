@@ -928,6 +928,36 @@
 			]
 		},
 		{
+			"commandType": "PruneExecutionStep",
+			"targetAggregateType": "EXECUTION_PLAN",
+			"emitsEvent": "ExecutionStepPruned",
+			"drivesMachine": "ExecutionStep.stepState",
+			"drivesFrom": "READY|QUEUED",
+			"drivesTo": "SKIPPED",
+			"schematized": false,
+			"sourceSection": "UNRATIFIED-AUTHORED (annotated 2026-07-22 under sponsor grant, JAN-EXECPLAN-DR-004 DWP-03, Tier 3C-ii): a SYSTEM prune of a not-taken BRANCH arm (or its transitively-unreachable downstream) to SKIPPED — authored under R2 + the ratified ExecutionStep READY|QUEUED->SKIPPED arrow / the standing 2026-07-16 execution grant (NOT R1, which is the condition grammar). This is NOT a user waiver: it does NOT route through canSkipStep (the plan's own declared branch logic excludes the step, so no waiver applies); it drives QUEUED->SKIPPED so the pruned step is completion-compatible (SKIPPED is terminal-success). Controller-issued (like Start), idempotent (checkTransition no-ops an already-terminal step), plan-ACTIVE-gated. Do NOT treat this sourceSection as proof the shape is ratified. Ratification pending. Cited: DOC-002 §26.4, ExecutionStep.stepState machine.",
+			"payloadFields": [
+				{
+					"field": "stepId",
+					"required": true,
+					"type": "string",
+					"note": "id-ref: the pruned (unreachable/not-taken) step"
+				},
+				{
+					"field": "selectedByBranchStepId",
+					"required": false,
+					"type": "string",
+					"note": "id-ref: the BRANCH step whose first-match selection excluded this step (provenance)"
+				},
+				{
+					"field": "selectedEdgeId",
+					"required": false,
+					"type": "string",
+					"note": "id-ref: the transition edge the BRANCH selected instead (provenance)"
+				}
+			]
+		},
+		{
 			"commandType": "DetectAssumption",
 			"targetAggregateType": "ASSUMPTION",
 			"emitsEvent": "AssumptionDetected",
@@ -4637,6 +4667,38 @@
 					"type": "enum",
 					"enumRef": "StepStateSchema",
 					"note": "(active)->CANCELLED"
+				}
+			]
+		},
+		{
+			"eventType": "ExecutionStepPruned",
+			"aggregateType": "ExecutionPlan",
+			"sourceSection": "UNRATIFIED-AUTHORED (2026-07-22, JAN-EXECPLAN-DR-004 DWP-03, Tier 3C-ii): records a SYSTEM prune of a not-taken/transitively-unreachable step to SKIPPED (BRANCH first-match selection). NOT a user waiver (does not route through canSkipStep). Authored under R2 + the ratified ExecutionStep READY|QUEUED->SKIPPED arrow. Ratification pending. Cited: DOC-002 §26.4, ExecutionStep.stepState machine.",
+			"payloadFields": [
+				{
+					"field": "stepId",
+					"required": true,
+					"type": "string",
+					"note": "id-ref: the pruned step"
+				},
+				{
+					"field": "selectedByBranchStepId",
+					"required": false,
+					"type": "string",
+					"note": "id-ref: the BRANCH step whose selection excluded this step (provenance)"
+				},
+				{
+					"field": "selectedEdgeId",
+					"required": false,
+					"type": "string",
+					"note": "id-ref: the transition edge the BRANCH selected instead (provenance)"
+				},
+				{
+					"field": "stepState",
+					"required": true,
+					"type": "enum",
+					"enumRef": "StepStateSchema",
+					"note": "(unreachable)->SKIPPED"
 				}
 			]
 		},
