@@ -369,6 +369,133 @@ describe('StartExecutionStep — the linear start-gate (DWP-01, RPH-EXE-005 / fo
 		});
 	});
 
+	// DR-004 DWP-05 (Tier 3C-ii) — PARALLEL_GROUP fan-out + barrier JOIN. No gate logic is added here: the set frontier
+	// and the in-edge barrier shipped in DWP-01 and PARALLEL_GROUP is a node KIND the gate deliberately does not
+	// special-case (D2 — parallelism is TOPOLOGY, ≥2 unconditional out-edges, not an edge type). What this suite proves
+	// is that the AGGREGATE and its per-step machinery survive N concurrently-RUNNING steps: nothing in the handlers
+	// assumed a single active step, and N starts against one aggregate serialize without a lost update.
+	describe('PARALLEL_GROUP + JOIN (DWP-05)', () => {
+		const fail = (i: number) =>
+			dispatch(
+				'FailExecutionStep',
+				{ stepId: stepId(i), failureReason: `step ${i} failed` },
+				PLAN,
+				'EXECUTION_PLAN'
+			);
+		const retry = (i: number) =>
+			dispatch('RetryExecutionStep', { stepId: stepId(i) }, PLAN, 'EXECUTION_PLAN');
+		const revisionOf = () => store.loadObject(PLAN)?.revision;
+		const startedCount = (i: number) =>
+			store
+				.readAllEvents()
+				.filter(
+					(e) =>
+						e.eventType === 'ExecutionStepStarted' &&
+						(e.payload as { stepId?: string })?.stepId === stepId(i)
+				).length;
+
+		/** s1 (PARALLEL_GROUP) → s2 ∥ s3 → s4 (join). The canonical fan-out/join shape. */
+		function activeParallelPlan() {
+			const r = dispatch(
+				'ProposeExecutionPlan',
+				{
+					executionPlanId: PLAN,
+					workUnitId: PWU,
+					steps: [
+						{ ...step(1, 'QUEUED'), stepType: 'PARALLEL_GROUP' },
+						step(2, 'QUEUED'),
+						step(3, 'QUEUED'),
+						step(4, 'QUEUED')
+					],
+					transitions: [gedge(1, 2), gedge(1, 3), gedge(2, 4), gedge(3, 4)],
+					retryPolicy: {},
+					tacticalChangePolicy: {},
+					escalationPolicy: {},
+					terminationPolicy: {}
+				},
+				PLAN,
+				'EXECUTION_PLAN'
+			);
+			expect(r.status, JSON.stringify(r.error)).toBe('ACCEPTED');
+			expect(dispatch('ApproveExecutionPlan', {}, PLAN, 'EXECUTION_PLAN').status).toBe('ACCEPTED');
+			expect(
+				dispatch('ActivateExecutionPlan', { authorizedRuntimeBindingIds: [] }, PLAN, 'EXECUTION_PLAN').status
+			).toBe('ACCEPTED');
+			// The PARALLEL_GROUP node itself is an ordinary step that runs first; its SUCCESS is what opens the fan-out.
+			expect(start(1).status).toBe('ACCEPTED');
+			expect(complete(1).status).toBe('ACCEPTED');
+		}
+
+		it('runs BOTH arms concurrently, then JOINS only after the last one succeeds', () => {
+			activeParallelPlan();
+			expect(start(1).status, 's1 already SUCCEEDED — no restart').not.toBe('ACCEPTED');
+
+			// Both arms start; neither start clobbers the other's stepState (each command reloads the aggregate).
+			expect(start(2).status).toBe('ACCEPTED');
+			expect(start(3).status).toBe('ACCEPTED');
+			expect(stepStateOf(2)).toBe('RUNNING');
+			expect(stepStateOf(3)).toBe('RUNNING'); // ← the lost-update guard: s2 is still RUNNING too
+
+			// The join is blocked while EITHER arm is unfinished, and says which one.
+			expect(start(4).status, 'both arms still RUNNING').toBe('REJECTED');
+			expect(complete(2).status).toBe('ACCEPTED');
+			const blocked = start(4);
+			expect(blocked.status, 'one arm still RUNNING').toBe('REJECTED');
+			expect(blocked.error?.message).toContain(stepId(3));
+
+			expect(complete(3).status).toBe('ACCEPTED');
+			const joined = start(4);
+			expect(joined.status, JSON.stringify(joined.error)).toBe('ACCEPTED');
+			expect(complete(4).status).toBe('ACCEPTED');
+			const done = dispatch('CompleteExecutionPlan', {}, PLAN, 'EXECUTION_PLAN');
+			expect(done.status, JSON.stringify(done.error)).toBe('ACCEPTED');
+		});
+
+		it('serializes N starts on the aggregate revision — one revision per accepted command, no lost update', () => {
+			activeParallelPlan();
+			const before = revisionOf()!;
+			expect(start(2).status).toBe('ACCEPTED');
+			expect(start(3).status).toBe('ACCEPTED');
+			// Each accepted step command commits exactly one revision (commitState's expectedRevision check); the
+			// second start read the FIRST one's committed state, which is why both arms survive.
+			expect(revisionOf()).toBe(before + 2);
+			expect([stepStateOf(2), stepStateOf(3)]).toEqual(['RUNNING', 'RUNNING']);
+		});
+
+		it('keeps retry + the attempt cap PER STEP — one arm failing and retrying leaves its sibling untouched', () => {
+			activeParallelPlan();
+			start(2);
+			start(3);
+			expect(fail(2).status).toBe('ACCEPTED');
+			expect(stepStateOf(3), 'the sibling is unaffected by its arm failing').toBe('RUNNING');
+			expect(retry(2).status).toBe('ACCEPTED');
+			expect(stepStateOf(2)).toBe('QUEUED');
+			expect(start(2).status, 'the retried arm is startable again (its in-edge is still SATISFIED)').toBe(
+				'ACCEPTED'
+			);
+			// attemptsMade is counted per stepId: the retried arm is on attempt 2, its sibling still on attempt 1.
+			expect(startedCount(2)).toBe(2);
+			expect(startedCount(3)).toBe(1);
+		});
+
+		it('the JOIN still fires when one arm FAILED (neutralized, not wedged) — but the PLAN cannot complete', () => {
+			// D7 chose "no PENDING ∧ ≥1 SATISFIED" precisely so a failed arm neutralizes rather than wedging the join
+			// forever. That is not a fabricated success: the plan-completion allow-list independently refuses to close
+			// a plan holding a FAILED step, so the failure still has to be dealt with.
+			activeParallelPlan();
+			start(2);
+			start(3);
+			expect(complete(2).status).toBe('ACCEPTED');
+			expect(fail(3).status).toBe('ACCEPTED');
+			const joined = start(4);
+			expect(joined.status, JSON.stringify(joined.error)).toBe('ACCEPTED');
+			expect(complete(4).status).toBe('ACCEPTED');
+			const done = dispatch('CompleteExecutionPlan', {}, PLAN, 'EXECUTION_PLAN');
+			expect(done.status, 'a FAILED step is not terminal-success').toBe('REJECTED');
+			expect(done.error?.message).toContain('FAILED');
+		});
+	});
+
 	// DR-004 DWP-04 (Tier 3C-ii) — WAIT: the machine declared RUNNING↔WAITING but no command could reach it and no
 	// event could record the resume (the DS-004 F-6 unreachable-state + replay hole). Both are now closed.
 	describe('WAIT + resume (DWP-04)', () => {

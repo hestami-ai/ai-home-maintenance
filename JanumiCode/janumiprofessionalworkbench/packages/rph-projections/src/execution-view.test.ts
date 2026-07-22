@@ -1,13 +1,16 @@
 import { describe, expect, it } from 'vitest';
 import {
 	advanceCommandsFor,
+	conditionEvaluatorFor,
 	controlCommandsFor,
 	executionPlanView,
 	isBelowQueued,
 	isTerminalSuccessStep,
 	plansForPwus,
+	prunableStepIds,
 	sequenceView,
 	startableStepId,
+	startableStepIds,
 	stepStateTone,
 	type ExecutionPlanInput,
 	type ExecutionStepInput,
@@ -383,5 +386,81 @@ describe('sequenceView — M+ cardinality (type-level hand-off)', () => {
 			inst('i_c2', 'QUEUED', 'C')
 		]);
 		expect(v.advisories.map((a) => a.consumerInstanceId).sort()).toEqual(['i_c1', 'i_c2']);
+	});
+});
+
+// DR-004 DWP-05 (Tier 3C-ii) — the read-model's frontier surface. These wrappers had NO direct coverage: the set
+// frontier and prune set are thin delegations to the single rph-domain gate (deliberately — one home, DR-004 §19-M2),
+// but `conditionEvaluatorFor` is NOT thin. It folds the plan's condition subject from the event log and is the exact
+// seam where the UI's BRANCH first-match could drift from the engine authority's, which is the divergence the whole
+// single-gate design exists to prevent. Tested here at the seam, not only end-to-end through the browser.
+describe('startableStepIds / prunableStepIds — the graph frontier surfaced to the UI (DWP-05)', () => {
+	const gplan = (steps: ExecutionStepInput[], transitions: ExecutionPlanInput['transitions']) =>
+		executionPlanView(plan('plan_g', 'pwu_a', steps, { transitions }));
+	const e = (sourceStepId: string, targetStepId: string) => ({
+		sourceStepId,
+		targetStepId,
+		transitionType: 'SEQUENTIAL'
+	});
+
+	it('surfaces the SET of startable steps for a PARALLEL fan-out (not a scalar)', () => {
+		const v = gplan(
+			[step('s1', 'SUCCEEDED', { stepType: 'PARALLEL_GROUP' }), step('s2', 'QUEUED'), step('s3', 'QUEUED')],
+			[e('s1', 's2'), e('s1', 's3')]
+		);
+		expect(startableStepIds(v).sort()).toEqual(['s2', 's3']);
+		// The Tier-3C scalar back-compat accessor takes the first — it is NOT the graph API the UI consumes.
+		expect(startableStepId(v)).toBe('s2');
+	});
+
+	it('holds the JOIN until every arm is terminal-success', () => {
+		const t = [e('s1', 's2'), e('s1', 's3'), e('s2', 's4'), e('s3', 's4')];
+		const states = (a: string, b: string) =>
+			gplan(
+				[step('s1', 'SUCCEEDED'), step('s2', a), step('s3', b), step('s4', 'QUEUED')],
+				t
+			);
+		expect(startableStepIds(states('SUCCEEDED', 'RUNNING'))).not.toContain('s4');
+		expect(startableStepIds(states('SUCCEEDED', 'SUCCEEDED'))).toEqual(['s4']);
+	});
+
+	it('an empty transitions[] keeps the shipped linear scalar frontier (the D1 degenerate)', () => {
+		const v = executionPlanView(plan('plan_l', 'pwu_a', [step('s1', 'SUCCEEDED'), step('s2', 'QUEUED')]));
+		expect(startableStepIds(v)).toEqual(['s2']);
+		expect(prunableStepIds(v)).toEqual([]); // a linear plan never prunes
+	});
+
+	it('conditionEvaluatorFor folds the event log so the UI first-match MATCHES the engine authority', () => {
+		// s1 BRANCH → s2 (CONDITIONAL: s1 succeeded) | s3 (SEQUENTIAL default). With s1 SUCCEEDED the guard holds, so
+		// s2 is the selected arm and s3 becomes prunable — the same verdict startExecutionStep's precheck reaches.
+		const v = gplan(
+			[step('s1', 'SUCCEEDED', { stepType: 'BRANCH' }), step('s2', 'QUEUED'), step('s3', 'QUEUED')],
+			[
+				{
+					sourceStepId: 's1',
+					targetStepId: 's2',
+					transitionType: 'CONDITIONAL',
+					conditionExpression: { op: 'STEP_SUCCEEDED', stepId: 's1' }
+				},
+				e('s1', 's3')
+			]
+		);
+		const evalGuard = conditionEvaluatorFor(v, []);
+		expect(startableStepIds(v, evalGuard)).toEqual(['s2']);
+		expect(prunableStepIds(v, evalGuard)).toEqual(['s3']);
+		// WITHOUT the evaluator a conditional edge is never satisfied — so the default arm wins instead. This is why
+		// the server must pass the evaluator: omitting it silently changes which arm the UI offers.
+		expect(startableStepIds(v)).toEqual(['s3']);
+	});
+
+	it('a malformed conditionExpression evaluates FALSE rather than throwing (the UI must not crash)', () => {
+		const v = gplan(
+			[step('s1', 'SUCCEEDED', { stepType: 'BRANCH' }), step('s2', 'QUEUED'), step('s3', 'QUEUED')],
+			[
+				{ sourceStepId: 's1', targetStepId: 's2', transitionType: 'CONDITIONAL', conditionExpression: { op: 'NONSENSE' } },
+				e('s1', 's3')
+			]
+		);
+		expect(startableStepIds(v, conditionEvaluatorFor(v, []))).toEqual(['s3']); // falls to the default
 	});
 });

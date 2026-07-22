@@ -163,7 +163,12 @@ function stepAtFrontier(plan: GatePlan, step: GateStep, evaluateGuard?: EdgeGuar
  * The set of steps a plan may currently START (the frontier) — the graph gate GENERALIZING the shipped scalar
  * startableStepId. Empty transitions[] ⇒ [linearFrontier] (byte-identical). Non-empty ⇒ every non-terminal step
  * whose in-edge barrier is satisfied (or that is an entry). [] when the plan is not ACTIVE. A single-path/linear
- * graph yields a singleton; a fan-out (diamond) can yield several (the set frontier PARALLEL_GROUP later drives).
+ * graph yields a singleton; a fan-out yields several — this IS the PARALLEL_GROUP mechanism (DWP-05): parallelism is
+ * TOPOLOGY (a node with ≥2 unconditional out-edges), never an edge type, so the gate does not special-case the
+ * stepType. Each member of the set is started by its OWN StartExecutionStep; those commands serialize on the plan
+ * aggregate's revision, so N concurrent arms are N independent stepStates in one aggregate with no lost update.
+ * A RUNNING step remains in this set (it is non-terminal); the ENGINE refuses to re-start it (rejectReentry), so the
+ * two layers together offer each arm exactly once.
  */
 export function startableStepIds(plan: GatePlan, evaluateGuard?: EdgeGuardEvaluator): string[] {
 	if (plan.status !== 'ACTIVE') return [];

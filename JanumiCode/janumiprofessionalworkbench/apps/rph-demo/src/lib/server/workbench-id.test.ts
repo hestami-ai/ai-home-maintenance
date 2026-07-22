@@ -13,7 +13,11 @@ afterEach(() => {
 });
 
 describe('mintUiId', () => {
-	it('mints unique, ordered, structurally valid production ids during a frozen-time burst', async () => {
+	// The 128-id burst itself is instant; the cost is `vi.resetModules()` + a fresh dynamic import of workbench.js
+	// (which pulls the engine). Under a loaded turbo run that import alone can exceed vitest's 5s default, making this
+	// test fail on MACHINE LOAD rather than on behaviour — a false red in a gate that runs on every work package.
+	// The timeout is raised to bound the import, not to tolerate a slow assertion.
+	it('mints unique, ordered, structurally valid production ids during a frozen-time burst', { timeout: 30_000 }, async () => {
 		vi.useFakeTimers();
 		vi.setSystemTime(new Date('2026-07-18T12:00:00.000Z'));
 		const { mintUiId } = await loadWorkbench('production');

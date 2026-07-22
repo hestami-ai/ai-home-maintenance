@@ -443,7 +443,16 @@ export const applyTacticalChange: CommandHandler = (ctx, command) =>
 					)
 	});
 
-/** Advance one embedded step (by id) of a plan's steps[] along the ExecutionStep.stepState machine. */
+/**
+ * Advance one embedded step (by id) of a plan's steps[] along the ExecutionStep.stepState machine.
+ *
+ * Concurrency (DWP-05): several steps of ONE plan may be RUNNING at once (a PARALLEL_GROUP fan-out). Each is advanced
+ * by its own command, and this function re-LOADS the aggregate and commits at `expectedRevision` — so N starts against
+ * the same plan SERIALIZE on the revision rather than interleaving: each sees its predecessor's committed steps[] and
+ * rewrites the array from THAT, never from a stale snapshot (no lost update). Everything downstream is keyed by
+ * stepId — the retry cap (attemptsMadeForStep), the floor gate (per-result subjects), the graph gate (per-in-edge) —
+ * so no handler assumes a single active step.
+ */
 function advanceStep(
 	ctx: HandlerContext,
 	command: DomainCommand,

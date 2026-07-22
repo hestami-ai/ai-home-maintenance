@@ -70,6 +70,79 @@ describe('startableStepIds — the transition graph (unconditional edges)', () =
 	});
 });
 
+// DR-004 DWP-05 (Tier 3C-ii) — PARALLEL_GROUP fan-out + JOIN. No new gate logic: the set frontier and the in-edge
+// barrier are DWP-01's, and PARALLEL_GROUP is a node KIND the gate deliberately does not special-case (D2: parallelism
+// is TOPOLOGY — ≥2 unconditional out-edges — not an edge type). These prove that under real fan-out widths and the
+// prune/branch interaction, rather than assuming it from the binary diamond above.
+describe('PARALLEL_GROUP fan-out + barrier JOIN (DWP-05)', () => {
+	/** s1 (PARALLEL_GROUP) fans out to `width` arms, each rejoining at the last step. */
+	const fan = (width: number) => {
+		const armIds = Array.from({ length: width }, (_, i) => s(i + 2));
+		const joinId = s(width + 2);
+		const transitions = [
+			...armIds.map((a) => edge('s1', a)),
+			...armIds.map((a) => edge(a, joinId))
+		];
+		return { armIds, joinId, transitions };
+	};
+	const at = (states: string[], transitions: readonly GateTransition[]) =>
+		startableStepIds(plan(states.map((st, i) => step(s(i + 1), st)), transitions)).sort();
+
+	it('fans out to EVERY arm at once — the frontier is a set, not a scalar (width 3)', () => {
+		const { armIds, transitions } = fan(3);
+		// s1 SUCCEEDED; s2/s3/s4 QUEUED; s5 (join) QUEUED.
+		expect(at(['SUCCEEDED', 'QUEUED', 'QUEUED', 'QUEUED', 'QUEUED'], transitions)).toEqual(armIds);
+	});
+
+	it('the JOIN waits for the LAST arm — one arm still RUNNING keeps it PENDING (width 3)', () => {
+		const { joinId, transitions } = fan(3);
+		expect(at(['SUCCEEDED', 'SUCCEEDED', 'SUCCEEDED', 'RUNNING', 'QUEUED'], transitions)).toEqual(['s4']);
+		expect(at(['SUCCEEDED', 'SUCCEEDED', 'SUCCEEDED', 'SUCCEEDED', 'QUEUED'], transitions)).toEqual([joinId]);
+	});
+
+	it('a concurrently-RUNNING sibling is not re-offered, but does not block its still-QUEUED siblings', () => {
+		// Fan-out is independent per arm: starting s2 changes nothing about s3/s4's own barriers. (A RUNNING step is
+		// non-terminal so it stays "at the frontier" by the pure rule; the ENGINE refuses to re-start it — DWP-04
+		// rejectReentry — so the two layers together offer each arm exactly once.)
+		const { transitions } = fan(3);
+		expect(at(['SUCCEEDED', 'RUNNING', 'QUEUED', 'QUEUED', 'QUEUED'], transitions)).toEqual(['s2', 's3', 's4']);
+	});
+
+	// The parallel × branch interaction the roadmap calls out: a not-taken arm left QUEUED holds a PENDING in-edge on
+	// the join FOREVER. That is exactly the wedge prune exists to clear — and why prune drives to SKIPPED (terminal
+	// SUCCESS) rather than a terminal-failure state, which would only neutralize the edge, not satisfy it.
+	describe('a JOIN behind a resolved BRANCH', () => {
+		const guard: EdgeGuardEvaluator = (e) =>
+			(e.conditionExpression as { result?: boolean } | undefined)?.result === true;
+		// s1 BRANCH → s2 (CONDITIONAL, true) | s3 (SEQUENTIAL default); both → s4 (join).
+		const t: GateTransition[] = [
+			{ sourceStepId: 's1', targetStepId: 's2', transitionType: 'CONDITIONAL', conditionExpression: { result: true } },
+			{ sourceStepId: 's1', targetStepId: 's3', transitionType: 'SEQUENTIAL' },
+			edge('s2', 's4'),
+			edge('s3', 's4')
+		];
+		const p = (states: string[]) => plan(states.map((st, i) => step(s(i + 1), st)), t);
+
+		it('WEDGES while the not-taken arm sits QUEUED (its in-edge to the join stays PENDING)', () => {
+			const wedged = p(['SUCCEEDED', 'SUCCEEDED', 'QUEUED', 'QUEUED']);
+			expect(startableStepIds(wedged, guard)).not.toContain('s4');
+			expect(startStepGate(wedged, 's4', guard).ok).toBe(false);
+			// …and the pure prune read-model names the culprit, so the controller can clear it.
+			expect(prunableStepIds(wedged, guard)).toEqual(['s3']);
+		});
+
+		it('is RELEASED once the not-taken arm is pruned to SKIPPED (terminal-SUCCESS satisfies the edge)', () => {
+			const pruned = p(['SUCCEEDED', 'SUCCEEDED', 'SKIPPED', 'QUEUED']);
+			expect(startableStepIds(pruned, guard)).toEqual(['s4']);
+			expect(startStepGate(pruned, 's4', guard).ok).toBe(true);
+		});
+
+		it('does NOT prune the join itself — it keeps a live in-edge via the TAKEN arm', () => {
+			expect(prunableStepIds(p(['SUCCEEDED', 'QUEUED', 'QUEUED', 'QUEUED']), guard)).toEqual(['s3']);
+		});
+	});
+});
+
 describe('startStepGate — the authority mirrors the read-model', () => {
 	it('linear: an earlier non-terminal-success step blocks, naming it', () => {
 		const p = plan([step('s1', 'QUEUED'), step('s2', 'QUEUED')]);
