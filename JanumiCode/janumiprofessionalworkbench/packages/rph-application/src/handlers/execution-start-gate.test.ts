@@ -764,4 +764,93 @@ describe('StartExecutionStep — the linear start-gate (DWP-01, RPH-EXE-005 / fo
 			expect(done.status, JSON.stringify(done.error)).toBe('ACCEPTED');
 		});
 	});
+
+	// ── DWP-08: the DWP-07 remediation was itself incomplete. It keyed "this step is DEAD" on WHICH COMMAND drove the
+	// step to SKIPPED (only prune set the marker), so SkipExecutionStep — the same READY|QUEUED→SKIPPED arrow, offered
+	// by the UI on the very same row — reproduced the original resurrection in full. Deadness is now STRUCTURAL.
+	describe('DWP-08 — deadness is structural, not command-keyed', () => {
+		const prune = (i: number) => dispatch('PruneExecutionStep', { stepId: stepId(i) }, PLAN, 'EXECUTION_PLAN');
+		const skip = (i: number) =>
+			dispatch('SkipExecutionStep', { stepId: stepId(i), mandatory: false }, PLAN, 'EXECUTION_PLAN');
+
+		/** s1 BRANCH --COND(never true)--> s2 --> s4 ; s1 --SEQ default--> s3. s4 is INTERIOR to the excluded arm. */
+		function activeExcludedArmPlan() {
+			const r = dispatch(
+				'ProposeExecutionPlan',
+				{
+					executionPlanId: PLAN,
+					workUnitId: PWU,
+					steps: [
+						{ ...step(1, 'QUEUED'), stepType: 'BRANCH' },
+						step(2, 'QUEUED'),
+						step(3, 'QUEUED'),
+						step(4, 'QUEUED')
+					],
+					transitions: [
+						cedge(1, 2, { op: 'ATTEMPTS', stepId: stepId(1), cmp: '>', value: 99 }),
+						gedge(1, 3),
+						gedge(2, 4)
+					],
+					retryPolicy: {},
+					tacticalChangePolicy: {},
+					escalationPolicy: {},
+					terminationPolicy: {}
+				},
+				PLAN,
+				'EXECUTION_PLAN'
+			);
+			expect(r.status, JSON.stringify(r.error)).toBe('ACCEPTED');
+			expect(dispatch('ApproveExecutionPlan', {}, PLAN, 'EXECUTION_PLAN').status).toBe('ACCEPTED');
+			expect(
+				dispatch('ActivateExecutionPlan', { authorizedRuntimeBindingIds: [] }, PLAN, 'EXECUTION_PLAN').status
+			).toBe('ACCEPTED');
+			expect(start(1).status).toBe('ACCEPTED');
+			expect(complete(1).status).toBe('ACCEPTED'); // guard false → s3 taken; s2 and its interior s4 excluded
+		}
+
+		it('a WAIVER-skip of an excluded step does NOT resurrect its downstream (the DWP-07 hole)', () => {
+			activeExcludedArmPlan();
+			expect(start(4).status, 'excluded before any skip').toBe('REJECTED');
+			// The operator uses Skip — which the UI offers on the same row as Prune — rather than Prune.
+			expect(skip(2).status, JSON.stringify(skip(2))).toBe('ACCEPTED');
+			expect(stepStateOf(2)).toBe('SKIPPED');
+			const resurrect = start(4);
+			expect(resurrect.status, 'a waiver over s2 cannot re-authorise s4 on the arm the BRANCH excluded').toBe(
+				'REJECTED'
+			);
+			expect(stepStateOf(4)).toBe('QUEUED');
+			// s4 remains prunable, so the plan can still be driven to completion.
+			expect(prune(4).status).toBe('ACCEPTED');
+			expect(start(3).status).toBe('ACCEPTED');
+			expect(complete(3).status).toBe('ACCEPTED');
+			expect(dispatch('CompleteExecutionPlan', {}, PLAN, 'EXECUTION_PLAN').status).toBe('ACCEPTED');
+		});
+
+		it('reaches the identical verdict whichever command terminated the excluded step', () => {
+			activeExcludedArmPlan();
+			expect(prune(2).status).toBe('ACCEPTED');
+			expect(start(4).status, 'pruned route').toBe('REJECTED');
+		});
+
+		// The read-model half must agree, since the UI renders from it and the engine from the gate.
+		it('a waived-away excluded arm is still offered for Prune, and never for Start', () => {
+			activeExcludedArmPlan();
+			skip(2);
+			const plan = store.loadObject(PLAN)?.state as Record<string, unknown>;
+			const steps = plan.steps as Array<{ id: string; stepState: string }>;
+			expect(steps.find((s) => s.id === stepId(4))?.stepState).toBe('QUEUED');
+			expect(start(4).status).toBe('REJECTED');
+			expect(prune(4).status).toBe('ACCEPTED');
+		});
+
+		// The read-model must not offer a prune the engine's drivesFrom refuses. RUNNING/WAITING are live work.
+		it('never offers Prune for a RUNNING step — live work is CANCELLED, not pruned', () => {
+			activeExcludedArmPlan();
+			// s3 is the taken arm; start it so it is RUNNING, then confirm prune refuses it on BOTH halves.
+			expect(start(3).status).toBe('ACCEPTED');
+			const r = prune(3);
+			expect(r.status).toBe('REJECTED');
+			expect(stepStateOf(3)).toBe('RUNNING');
+		});
+	});
 });

@@ -17,6 +17,10 @@
 const TERMINAL_SUCCESS = new Set<string>(['SUCCEEDED', 'SKIPPED']);
 /** The full terminal set of the ExecutionStep.stepState machine. */
 const TERMINAL = new Set<string>(['SUCCEEDED', 'FAILED', 'SKIPPED', 'CANCELLED', 'SUPERSEDED']);
+/** The states PruneExecutionStep may be issued FROM (its vocab drivesFrom). The read-model must not offer a prune
+ *  outside this set or it tempts a command the engine refuses — the read-model/authority divergence this module
+ *  exists to prevent. RUNNING/WAITING are deliberately absent: live work is CANCELLED, never pruned. */
+const PRUNABLE_SOURCE_STATES = new Set<string>(['NOT_READY', 'READY', 'QUEUED']);
 
 /** Is this step state a satisfied predecessor (SUCCEEDED/SKIPPED)? */
 export function isTerminalSuccessStepState(stepState: string): boolean {
@@ -34,13 +38,8 @@ export interface GateStep {
 	/** The node KIND. Load-bearing: exclusive first-match selection belongs to a BRANCH node and nothing else. Absent
 	 *  ⇒ treated as non-BRANCH (independent out-edges), the safe default. */
 	readonly stepType?: string;
-	/** Set when this step reached SKIPPED via PruneExecutionStep rather than a user waiver (DWP-07). The stepState
-	 *  machine has no PRUNED state (its 10 values are ratified), and SKIPPED is deliberately terminal-SUCCESS so a
-	 *  waived skip lets the plan continue — but a PRUNED step is DEAD, and its out-edges must NOT satisfy anything
-	 *  downstream. Without this discriminator the gate cannot tell "waived, carry on" from "excluded, stop", and
-	 *  pruning one step resurrects the rest of the arm it belonged to. */
-	readonly prunedAsUnreachable?: boolean;
 }
+
 /** The minimal transition (edge) read-model the gate needs. `conditionExpression` is opaque here (DWP-02 evaluates). */
 export interface GateTransition {
 	readonly sourceStepId?: string;
@@ -103,6 +102,60 @@ function selectBranchEdge(
 }
 
 /**
+ * The steps still LIVE — reachable from a plan entry along edges the plan's own branch logic has not excluded (DWP-08).
+ *
+ * This replaces the DWP-07 `prunedAsUnreachable` flag, which keyed deadness on WHICH COMMAND drove a step to SKIPPED.
+ * That was the wrong axis and only half-closed the defect it targeted: SkipExecutionStep drives the same
+ * READY|QUEUED→SKIPPED arrow, so waiving a step on a not-taken arm left it terminal-SUCCESS and unmarked, and its
+ * out-edges went live again — resurrecting exactly the arm the BRANCH excluded. Reachability is a property of the
+ * GRAPH, not of the command that happened to terminate a node, so it is computed here and cannot be bypassed by any
+ * command, present or future. It also needs no persisted flag, so plans written by earlier builds read correctly.
+ *
+ * Forward BFS from the entries (the graph is a validated DAG), so this is O(V+E) — the previous nested fixpoint was
+ * cubic and re-ran the guard evaluator per edge per pass.
+ */
+function liveStepIds(plan: GatePlan, evaluateGuard?: EdgeGuardEvaluator): ReadonlySet<string> {
+	const transitions = plan.transitions ?? [];
+	if (transitions.length === 0) return new Set(plan.steps.map((s) => s.id)); // linear plan: everything is reachable
+	const live = new Set<string>();
+	const frontier = plan.steps.filter((s) => inEdgesOf(plan, s.id).length === 0).map((s) => s.id);
+	while (frontier.length) {
+		const id = frontier.pop()!;
+		if (live.has(id)) continue;
+		live.add(id);
+		for (const e of outEdgesOf(plan, id)) {
+			if (e.targetStepId === undefined || live.has(e.targetStepId)) continue;
+			// The edge carries reachability unless the plan EXCLUDED it — i.e. a resolved BRANCH did not select it.
+			if (!branchExcludes(plan, e, evaluateGuard)) frontier.push(e.targetStepId);
+		}
+	}
+	return live;
+}
+
+/**
+ * Did the plan's own declared logic EXCLUDE this edge? True only for a not-taken arm of a RESOLVED BRANCH (or a
+ * guarded edge off a settled non-BRANCH source whose guard is false).
+ *
+ * Deliberately narrow, and deliberately NOT "the source failed": a FAILED step is retryable (FAILED→QUEUED) and a
+ * source that has not finished may still take this edge, so neither excludes anything. The barrier-join separately
+ * treats a failed source as NEUTRALIZED so a JOIN cannot wedge behind it — that is a different question with a
+ * different answer, and conflating them let a transient failure offer a whole downstream for prune-to-SKIPPED.
+ */
+function branchExcludes(
+	plan: GatePlan,
+	edge: GateTransition,
+	evaluateGuard?: EdgeGuardEvaluator
+): boolean {
+	if (edge.sourceStepId === undefined) return false;
+	const source = plan.steps.find((s) => s.id === edge.sourceStepId);
+	if (source === undefined || !TERMINAL_SUCCESS.has(source.stepState)) return false; // unsettled ⇒ excludes nothing
+	const outEdges = outEdgesOf(plan, edge.sourceStepId);
+	if (source.stepType === 'BRANCH' && outEdges.some(isConditionalEdge))
+		return selectBranchEdge(outEdges, plan, evaluateGuard) !== edge;
+	if (!isConditionalEdge(edge)) return false;
+	return evaluateGuard?.(edge, plan) !== true;
+}
+/**
  * The disposition of ONE in-edge. SATISFIED: source terminal-success (or a plan-entry edge with no source) AND the
  * edge guard holds. NEUTRALIZED: source terminal-non-success (FAILED/CANCELLED/SUPERSEDED), or a CONDITIONAL edge
  * whose guard is false off a terminal source. PENDING: source non-terminal. The guard defaults to TRUE for a
@@ -118,10 +171,10 @@ export function inEdgeDisposition(
 	if (source === undefined) return 'PENDING'; // dangling (rejected at propose) — conservative
 	const src = source.stepState;
 	if (!TERMINAL.has(src)) return 'PENDING'; // source not yet done
-	// A PRUNED source is DEAD, not done: it reached SKIPPED only because the plan's own branch logic excluded it, so it
-	// satisfies nothing downstream. Checked BEFORE the terminal-success test precisely because SKIPPED is in that set —
-	// conflating the two is what let a single prune resurrect the rest of its arm (DWP-07).
-	if (source.prunedAsUnreachable === true) return 'NEUTRALIZED';
+	// An UNREACHABLE source satisfies nothing, however it reached its terminal state (DWP-08). Checked BEFORE the
+	// terminal-success test precisely because SKIPPED is IN that set: a step on a not-taken arm is terminal-success
+	// whether it was pruned OR waived away, and treating that as "done, carry on" resurrected the excluded arm.
+	if (!liveStepIds(plan, evaluateGuard).has(source.id)) return 'NEUTRALIZED';
 	// A terminal-non-success source (FAILED/CANCELLED/SUPERSEDED) neutralizes the edge regardless of guard, so a barrier
 	// JOIN does not wedge behind a failed arm (D7). NOTE: this is NOT the same as "the plan excluded this path" — see
 	// isDeadForPruning, which deliberately does not treat it as grounds to prune.
@@ -137,28 +190,6 @@ export function inEdgeDisposition(
 	// Non-BRANCH source: out-edges are INDEPENDENT. An unconditional edge is taken; a guarded one is taken iff it holds.
 	if (!isConditionalEdge(edge)) return 'SATISFIED';
 	return evaluateGuard?.(edge, plan) === true ? 'SATISFIED' : 'NEUTRALIZED';
-}
-
-/**
- * Is this in-edge dead for PRUNING purposes — i.e. did the plan's own declared logic EXCLUDE this path?
- *
- * Deliberately narrower than `NEUTRALIZED`. The barrier-join treats a FAILED/CANCELLED source as neutralized so a join
- * cannot wedge behind a failed arm, but a FAILED step is RETRYABLE (FAILED→QUEUED): its downstream is not dead, it is
- * waiting on a decision. Pruning on that basis let a transient failure offer the whole downstream for prune-to-SKIPPED
- * — laundering a failed plan into a completable one. Only branch non-selection (or a source that is itself pruned)
- * counts as exclusion.
- */
-function isDeadForPruning(
-	plan: GatePlan,
-	edge: GateTransition,
-	evaluateGuard?: EdgeGuardEvaluator
-): boolean {
-	if (edge.sourceStepId === undefined) return false; // a plan-entry edge is never dead
-	const source = plan.steps.find((s) => s.id === edge.sourceStepId);
-	if (source === undefined) return false;
-	if (source.prunedAsUnreachable === true) return true; // the source was itself excluded
-	if (!TERMINAL_SUCCESS.has(source.stepState)) return false; // unfinished, failed or cancelled ⇒ not an exclusion
-	return inEdgeDisposition(plan, edge, evaluateGuard) === 'NEUTRALIZED';
 }
 
 /**
@@ -245,26 +276,15 @@ export function startableStepIds(plan: GatePlan, evaluateGuard?: EdgeGuardEvalua
  */
 export function prunableStepIds(plan: GatePlan, evaluateGuard?: EdgeGuardEvaluator): string[] {
 	if (plan.status !== 'ACTIVE') return [];
-	const prunable = new Set<string>();
-	let changed = true;
-	while (changed) {
-		changed = false;
-		for (const s of plan.steps) {
-			if (prunable.has(s.id) || TERMINAL.has(s.stepState)) continue;
-			const inEdges = inEdgesOf(plan, s.id);
-			if (inEdges.length === 0) continue; // an entry step is never prunable
-			const allDead = inEdges.every(
-				(e) =>
-					(e.sourceStepId !== undefined && prunable.has(e.sourceStepId)) ||
-					isDeadForPruning(plan, e, evaluateGuard)
-			);
-			if (allDead) {
-				prunable.add(s.id);
-				changed = true;
-			}
-		}
-	}
-	return [...prunable];
+	const live = liveStepIds(plan, evaluateGuard);
+	return plan.steps
+		.filter(
+			(s) =>
+				!live.has(s.id) && // the plan's own branch logic excluded it
+				!TERMINAL.has(s.stepState) && // already done, one way or another — nothing to prune
+				PRUNABLE_SOURCE_STATES.has(s.stepState) // and the engine will actually accept the command
+		)
+		.map((s) => s.id);
 }
 
 /** The result of the start-gate authority: startable, or the blocking predecessor + why. */

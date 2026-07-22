@@ -60,10 +60,6 @@ export interface ExecutionStepInput {
 	readonly purpose: string;
 	readonly stepState: string;
 	readonly runtimeBindingId?: string;
-	/** Set when this step reached SKIPPED via a PRUNE (the plan excluded it) rather than an operator waiver. The flow
-	 *  gate reads it: a pruned step is DEAD and satisfies nothing downstream, whereas a waived skip lets the plan
-	 *  continue. Carried through the view so the read-model half of the gate sees exactly what the authority half does. */
-	readonly prunedAsUnreachable?: boolean;
 }
 
 /** Pure input: an ExecutionPlan transition (edge) the flow gate reads (DR-004 DWP-01). `conditionExpression` is opaque
@@ -93,8 +89,6 @@ export interface ExecutionStepView {
 	readonly purpose: string;
 	readonly stepState: string;
 	readonly runtimeBindingId?: string;
-	/** SKIPPED because the plan excluded it (a prune), not because an operator waived it — see ExecutionStepInput. */
-	readonly prunedAsUnreachable?: boolean;
 	readonly tone: StepTone;
 	/** The command-backed affordances legal from this stepState (empty for the commandless/terminal states). */
 	readonly advanceCommands: readonly StepAdvanceCommand[];
@@ -193,10 +187,7 @@ function stepView(s: ExecutionStepInput): ExecutionStepView {
 		tone: stepStateTone(s.stepState),
 		advanceCommands: advanceCommandsFor(s.stepState),
 		controlCommands: controlCommandsFor(s.stepState),
-		belowQueued: isBelowQueued(s.stepState),
-		// Carried so the read-model half of the flow gate sees the same prune/waiver distinction the authority does
-		// (DWP-07). Only when true — an absent flag must not read as an explicit false.
-		...(s.prunedAsUnreachable === true ? { prunedAsUnreachable: true } : {})
+		belowQueued: isBelowQueued(s.stepState)
 	};
 	// Preserve the optional runtimeBindingId only when present (exactOptionalPropertyTypes-friendly).
 	return s.runtimeBindingId === undefined ? base : { ...base, runtimeBindingId: s.runtimeBindingId };

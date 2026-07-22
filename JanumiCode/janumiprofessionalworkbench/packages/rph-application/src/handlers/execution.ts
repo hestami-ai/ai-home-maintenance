@@ -63,10 +63,9 @@ function toGatePlan(plan: Record<string, unknown>): GatePlan {
 		steps: (steps as Array<Record<string, unknown>>).map((s) => ({
 			id: String(s.id ?? ''),
 			stepState: String(s.stepState ?? ''),
-			// stepType decides which node may branch EXCLUSIVELY; prunedAsUnreachable distinguishes a step SKIPPED
-			// because the plan excluded it (dead — satisfies nothing) from one skipped by an operator waiver (DWP-07).
-			...(s.stepType === undefined ? {} : { stepType: String(s.stepType) }),
-			...(s.prunedAsUnreachable === true ? { prunedAsUnreachable: true } : {})
+			// stepType decides which node may branch EXCLUSIVELY (a BRANCH selects ONE arm; every other node's
+			// out-edges are independent). Deadness is NOT carried here — it is STRUCTURAL, computed by the gate.
+			...(s.stepType === undefined ? {} : { stepType: String(s.stepType) })
 		})),
 		transitions: transitions.map((t) => ({
 			sourceStepId: t.sourceStepId === undefined ? undefined : String(t.sourceStepId),
@@ -885,9 +884,9 @@ export const cancelExecutionStep: CommandHandler = (ctx, command) => {
  * canSkipStep exists to refuse. The prunability check below closes that back door: prune is now authorised by the SAME
  * pure read-model the UI offers it from, exactly as startExecutionStep is authorised by startStepGate.
  *
- * The step is additionally marked `prunedAsUnreachable`, because SKIPPED alone cannot carry the distinction: it is
- * terminal-SUCCESS (so a waived skip lets the plan continue), and without the mark a pruned step's out-edges SATISFIED
- * the rest of its own dead arm — resurrecting it as startable work. Exec != assurance (INV-5): moves only stepState.
+ * Deadness itself is NOT recorded (DWP-08): it is STRUCTURAL — the gate computes reachability from the graph — so it
+ * cannot be bypassed by reaching SKIPPED through some other command, and needs no persisted flag (which also means
+ * plans written by earlier builds read correctly). Exec != assurance (INV-5): the prune moves only stepState.
  */
 export const pruneExecutionStep: CommandHandler = (ctx, command) => {
 	const p = command.payload as {
@@ -899,8 +898,10 @@ export const pruneExecutionStep: CommandHandler = (ctx, command) => {
 		stepId: p.stepId,
 		target: 'SKIPPED',
 		eventType: 'ExecutionStepPruned',
-		requireFrom: ['READY', 'QUEUED'], // drivesFrom READY|QUEUED
-		mutateStep: (step) => ({ ...step, prunedAsUnreachable: true }),
+		// drivesFrom NOT_READY|READY|QUEUED. NOT_READY is included because a step on an excluded arm that never became
+		// ready must still be prunable, or the plan can never reach terminal-success and deadlocks (D5). RUNNING and
+		// WAITING are deliberately excluded: live work is CANCELLED, not pruned.
+		requireFrom: ['NOT_READY', 'READY', 'QUEUED'],
 		eventPayload: {
 			stepId: p.stepId,
 			...(p.selectedByBranchStepId ? { selectedByBranchStepId: p.selectedByBranchStepId } : {}),

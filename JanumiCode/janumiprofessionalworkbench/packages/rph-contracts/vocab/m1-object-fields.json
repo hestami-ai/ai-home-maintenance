@@ -1787,12 +1787,6 @@
           "type": "StepState",
           "required": true,
           "enumRef": "StepStateSchema"
-        },
-        {
-          "field": "prunedAsUnreachable",
-          "type": "boolean",
-          "required": false,
-          "note": "UNRATIFIED-AUTHORED (annotated 2026-07-22 under sponsor grant, JAN-EXECPLAN DWP-07 remediation): set by PruneExecutionStep when this step reached SKIPPED because the plan's own branch logic EXCLUDED it, rather than by an operator waiver (SkipExecutionStep). The ratified StepState enum has 10 values and no PRUNED state, and SKIPPED is deliberately terminal-SUCCESS so a WAIVED skip lets the plan continue — so stepState alone cannot carry the distinction, and without it a pruned step's out-edges SATISFIED the rest of its own dead arm, resurrecting the excluded branch as startable work. This flag is the discriminator the flow gate reads (transition-gate.ts inEdgeDisposition / isDeadForPruning). Ratification pending. Cited: DOC-002 §21 (StepState), §21.1 (canSkipStep)."
         }
       ]
     },

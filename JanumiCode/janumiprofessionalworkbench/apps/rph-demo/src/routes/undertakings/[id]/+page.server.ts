@@ -201,10 +201,7 @@ export const load: PageServerLoad = ({ params }) => {
 				stepType: String((s.stepType ?? '') as string),
 				purpose: String((s.purpose ?? '') as string),
 				stepState: String((s.stepState ?? '') as string),
-				...(s.runtimeBindingId ? { runtimeBindingId: String(s.runtimeBindingId as string) } : {}),
-				// DWP-07: a step SKIPPED by a PRUNE is dead (satisfies nothing downstream); one skipped by an operator
-				// WAIVER lets the plan continue. Omitting this here would make the UI's gate disagree with the engine's.
-				...(s.prunedAsUnreachable === true ? { prunedAsUnreachable: true as const } : {})
+				...(s.runtimeBindingId ? { runtimeBindingId: String(s.runtimeBindingId as string) } : {})
 			};
 		}),
 		// DR-004 DWP-01 — the transition graph (empty ⇒ linear). Fed to the flow gate + a future graph view.

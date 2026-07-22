@@ -237,8 +237,7 @@ export const ExecutionStepSchema = z.strictObject({
 	runtimeBindingId: z.string().optional(),
 	preconditions: z.array(ConditionSchema),
 	postconditions: z.array(ConditionSchema),
-	stepState: StepStateSchema,
-	prunedAsUnreachable: z.boolean().optional()
+	stepState: StepStateSchema
 });
 export type ExecutionStep = z.infer<typeof ExecutionStepSchema>;
 export const ExecutionTransitionSchema = z.strictObject({

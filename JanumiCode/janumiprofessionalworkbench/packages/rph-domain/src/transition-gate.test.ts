@@ -336,11 +336,13 @@ describe('DWP-07 — defects found by adversarial audit of the landed increment'
 			{ sourceStepId: 's1', targetStepId: 's3', transitionType: 'SEQUENTIAL' },
 			edge('s2', 's4')
 		];
-		const p = (s2State: string, s2Pruned = false) =>
+		// The second parameter is vestigial: DWP-08 removed the persisted flag, so BOTH routes to SKIPPED are
+		// identical state and the gate must reach the same verdict from the graph alone.
+		const p = (s2State: string, _wasPruned = false) =>
 			plan(
 				[
 					step('s1', 'SUCCEEDED', 'BRANCH'),
-					{ id: 's2', stepState: s2State, ...(s2Pruned ? { prunedAsUnreachable: true } : {}) },
+					step('s2', s2State),
 					step('s3', 'QUEUED'),
 					step('s4', 'QUEUED')
 				],
@@ -359,9 +361,34 @@ describe('DWP-07 — defects found by adversarial audit of the landed increment'
 			expect(prunableStepIds(after, guard), 's4 is still prunable so the arm can be cleared').toEqual(['s4']);
 		});
 
-		it('still lets a WAIVED skip (not a prune) satisfy its successors — the two must stay distinguishable', () => {
-			// Same shape, but s2 reached SKIPPED by an operator waiver: no prunedAsUnreachable mark.
-			expect(startableStepIds(p('SKIPPED', false), guard)).toContain('s4');
+		// DWP-08 correction. The DWP-07 fix keyed deadness on WHICH COMMAND produced SKIPPED, and this test asserted
+		// that model: that a WAIVER-skip of the excluded step should re-open its downstream. That was the defect, not
+		// the contract — an operator waiving step X cannot re-authorise step Y on the arm the BRANCH did not select.
+		// Deadness is STRUCTURAL, so BOTH routes to SKIPPED leave the arm dead.
+		it('keeps the arm dead even when the excluded step was SKIPPED by an operator WAIVER, not a prune', () => {
+			const waived = p('SKIPPED', false); // no flag anywhere — reachability is computed from the graph
+			expect(startableStepIds(waived, guard)).toEqual(['s3']);
+			expect(startStepGate(waived, 's4', guard).ok).toBe(false);
+		});
+
+		it('but a waived skip of a REACHABLE step still satisfies its successors (the plan carries on)', () => {
+			// s3 is the TAKEN arm. Waiving it must advance the plan exactly as before — this is the case the
+			// structural rule must NOT break, and the reason deadness cannot simply mean "SKIPPED".
+			const t2: GateTransition[] = [
+				{ sourceStepId: 's1', targetStepId: 's2', ...cond(false) },
+				{ sourceStepId: 's1', targetStepId: 's3', transitionType: 'SEQUENTIAL' },
+				edge('s3', 's5')
+			];
+			const live = plan(
+				[
+					step('s1', 'SUCCEEDED', 'BRANCH'),
+					step('s2', 'QUEUED'),
+					step('s3', 'SKIPPED'),
+					step('s5', 'QUEUED')
+				],
+				t2
+			);
+			expect(startableStepIds(live, guard)).toContain('s5');
 		});
 	});
 
