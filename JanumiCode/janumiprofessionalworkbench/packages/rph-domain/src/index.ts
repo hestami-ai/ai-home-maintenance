@@ -10,5 +10,6 @@ export * from './decomposition.js';
 export * from './governance.js';
 export * from './execution.js';
 export * from './transition-gate.js';
+export * from './condition-grammar.js';
 export * from './presentation.js';
 export * from './conformance-manifest.js';

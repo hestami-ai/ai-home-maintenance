@@ -18,14 +18,19 @@ import type {
 	SkipExecutionStepPayload
 } from '@janumipwb/rph-contracts';
 import {
+	buildConditionSubject,
 	canActivatePlan,
 	canAuthorizeNewWork,
 	canSkipStep,
+	ConditionExpressionSchema,
+	conditionStepRefs,
+	evaluateCondition,
 	retryDecision,
 	startStepGate,
 	validateStepCompletion,
 	validateTransitionGraph,
 	type AssumptionView,
+	type EdgeGuardEvaluator,
 	type GatePlan
 } from '@janumipwb/rph-domain';
 import {
@@ -93,6 +98,30 @@ export const proposeExecutionPlan: CommandHandler = (ctx, command, payload) => {
 			`ProposeExecutionPlan blocked: malformed transition graph — ${graph.message} (DR-004 DWP-01).`,
 			[p.executionPlanId]
 		);
+	}
+	// DR-004 DWP-02: each edge's conditionExpression must parse against the hand-authored grammar (reject malformed),
+	// and every stepId it references must resolve to a declared step — so a guard is never silently false at runtime.
+	const declaredStepIds = new Set(p.steps.map((s) => s.id));
+	for (const t of p.transitions ?? []) {
+		if (t.conditionExpression === undefined) continue;
+		const parsed = ConditionExpressionSchema.safeParse(t.conditionExpression);
+		if (!parsed.success) {
+			return reject(
+				command,
+				'RPH_VALIDATION_SCHEMA_FAILED',
+				`ProposeExecutionPlan blocked: a transition conditionExpression is malformed (DR-004 DWP-02): ${parsed.error.issues[0]?.message ?? 'invalid'}.`,
+				[p.executionPlanId]
+			);
+		}
+		const badRef = conditionStepRefs(parsed.data).find((id) => !declaredStepIds.has(id));
+		if (badRef) {
+			return reject(
+				command,
+				'RPH_VALIDATION_SEMANTIC_FAILED',
+				`ProposeExecutionPlan blocked: a transition condition references step "${badRef}", which is not a declared step in the plan (DR-004 DWP-02).`,
+				[p.executionPlanId]
+			);
+		}
 	}
 	const state: Record<string, unknown> = {
 		...newEnvelope(command, PLAN, p.executionPlanId, {
@@ -509,7 +538,15 @@ export const startExecutionStep: CommandHandler = (ctx, command) => {
 			// startableStepIds) uses, so the UI Start affordance and this engine authority cannot diverge (DR-004
 			// §19-M2). Empty transitions[] ⇒ byte-identical linear (every earlier array-index step terminal-success);
 			// a graph ⇒ the in-edge barrier (a PENDING in-edge blocks, naming its source). RPH-EXE-005.
-			const gate = startStepGate(toGatePlan(plan), p.stepId);
+			const gatePlan = toGatePlan(plan);
+			// DWP-02: a CONDITIONAL in-edge's guard is evaluated against the plan's committed subject (a replay-safe
+			// fold of committed step state + this plan's event log). Parse is safe (validated at propose).
+			const subject = buildConditionSubject(gatePlan.steps, ctx.store.readAllEvents(), command.targetAggregateId);
+			const evalGuard: EdgeGuardEvaluator = (edge) => {
+				const parsed = ConditionExpressionSchema.safeParse(edge.conditionExpression);
+				return parsed.success && evaluateCondition(parsed.data, subject);
+			};
+			const gate = startStepGate(gatePlan, p.stepId, evalGuard);
 			if (!gate.ok)
 				return reject(
 					command,

@@ -26,7 +26,8 @@
     "gen:transitions": "bun run src/gen/gen-transitions.ts"
   },
   "dependencies": {
-    "@janumipwb/rph-contracts": "workspace:*"
+    "@janumipwb/rph-contracts": "workspace:*",
+    "zod": "^4.4.3"
   },
   "devDependencies": {
     "@janumipwb/typescript-config": "workspace:*",

@@ -111,6 +111,15 @@ describe('StartExecutionStep — the linear start-gate (DWP-01, RPH-EXE-005 / fo
 		targetStepId: stepId(to),
 		transitionType: 'SEQUENTIAL'
 	});
+	/** A CONDITIONAL transition edge guarded by `condition` (DWP-02). */
+	const cedge = (from: number, to: number, condition: unknown) => ({
+		id: `${PLAN}-t${from}-${to}`,
+		executionPlanId: PLAN,
+		sourceStepId: stepId(from),
+		targetStepId: stepId(to),
+		transitionType: 'CONDITIONAL',
+		conditionExpression: condition
+	});
 	/** Propose a plan carrying a transition graph — returns the raw result (so a test can assert a reject). */
 	const proposeGraph = (stepStates: string[], transitions: unknown[]) =>
 		dispatch(
@@ -273,5 +282,34 @@ describe('StartExecutionStep — the linear start-gate (DWP-01, RPH-EXE-005 / fo
 		const s2 = start(2);
 		expect(s2.status, JSON.stringify(s2.error)).toBe('ACCEPTED');
 		expect(stepStateOf(2)).toBe('RUNNING');
+	});
+
+	// DR-004 DWP-02 (Tier 3C-ii) — CONDITIONAL edges: the guard is evaluated against the plan's committed subject.
+	it('a CONDITIONAL in-edge with a TRUE guard makes the target startable once the source succeeds', () => {
+		activeGraphPlan(['QUEUED', 'QUEUED'], [cedge(1, 2, { op: 'STEP_SUCCEEDED', stepId: stepId(1) })]);
+		expect(start(1).status).toBe('ACCEPTED'); // s1 entry
+		expect(complete(1).status).toBe('ACCEPTED'); // s1 SUCCEEDED
+		const s2 = start(2);
+		expect(s2.status, JSON.stringify(s2.error)).toBe('ACCEPTED'); // STEP_SUCCEEDED(s1) is true → SATISFIED
+	});
+
+	it('a CONDITIONAL in-edge with a FALSE guard leaves the target non-startable (NEUTRALIZED)', () => {
+		activeGraphPlan(['QUEUED', 'QUEUED'], [cedge(1, 2, { op: 'ATTEMPTS', stepId: stepId(1), cmp: '>', value: 99 })]);
+		expect(start(1).status).toBe('ACCEPTED');
+		expect(complete(1).status).toBe('ACCEPTED'); // s1 SUCCEEDED (attemptsMade = 1)
+		expect(start(2).status, 'attempts(s1)=1 is not > 99 → guard false → s2 neutralized').toBe('REJECTED');
+	});
+
+	it('REJECTS a malformed conditionExpression at propose (RPH_VALIDATION_SCHEMA_FAILED)', () => {
+		const r = proposeGraph(['QUEUED', 'QUEUED'], [cedge(1, 2, { op: 'NONSENSE', stepId: stepId(1) })]);
+		expect(r.status, JSON.stringify(r.error)).not.toBe('ACCEPTED');
+		expect(r.error?.code).toBe('RPH_VALIDATION_SCHEMA_FAILED');
+	});
+
+	it('REJECTS a condition referencing an undeclared step at propose', () => {
+		const r = proposeGraph(['QUEUED', 'QUEUED'], [cedge(1, 2, { op: 'STEP_SUCCEEDED', stepId: 'ghost_step' })]);
+		expect(r.status).toBe('REJECTED');
+		expect(r.error?.code).toBe('RPH_VALIDATION_SEMANTIC_FAILED');
+		expect(r.error?.message).toContain('ghost_step');
 	});
 });

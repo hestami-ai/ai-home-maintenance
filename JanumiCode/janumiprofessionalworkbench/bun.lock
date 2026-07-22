@@ -108,6 +108,7 @@
       "version": "0.0.0",
       "dependencies": {
         "@janumipwb/rph-contracts": "workspace:*",
+        "zod": "^4.4.3",
       },
       "devDependencies": {
         "@janumipwb/typescript-config": "workspace:*",
