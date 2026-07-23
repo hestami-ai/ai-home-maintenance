@@ -134,7 +134,7 @@ describe('JAN-NOOP-01 — a re-issued command cannot append a contradicting fact
 		});
 
 		it('still permits the legitimate PARTIALLY_AUTHORIZED → AUTHORIZED widening path', () => {
-			// requireFrom must not be narrower than the machine: PARTIALLY_AUTHORIZED is a real in-arrow to AUTHORIZED.
+			// The precondition must not be narrower than the machine: PARTIALLY_AUTHORIZED is a real in-arrow to AUTHORIZED.
 			request();
 			const partial = stateOf(BINDING);
 			expect(partial.authorizationStatus).toBe('REQUESTED');
@@ -147,6 +147,28 @@ describe('JAN-NOOP-01 — a re-issued command cannot append a contradicting fact
 				).status
 			).toBe('ACCEPTED');
 			expect(stateOf(BINDING).authorizationStatus).toBe('AUTHORIZED');
+		});
+
+		// JAN-CMDPRE DWP-01b kill coverage: denyRuntimeBinding's fromStates('REQUESTED') — the machine's only
+		// in-arrow to DENIED. Nothing else in the suite dispatches DenyRuntimeBinding, so weakening this set went
+		// unpunished. A re-issued denial would rewrite the recorded denial and append a second RuntimeBindingDenied.
+		it('REFUSES a re-issued DenyRuntimeBinding over an already-DENIED binding', () => {
+			request();
+			expect(
+				dispatch('DenyRuntimeBinding', { reason: 'not permitted' }, BINDING, 'RUNTIME_BINDING').status
+			).toBe('ACCEPTED');
+			expect(stateOf(BINDING).authorizationStatus).toBe('DENIED');
+
+			const again = dispatch(
+				'DenyRuntimeBinding',
+				{ reason: 'a different, contradicting reason' },
+				BINDING,
+				'RUNTIME_BINDING',
+				USER_2
+			);
+			expect(again.status).toBe('REJECTED');
+			expect(again.error?.code).toBe('RPH_ILLEGAL_STATE_TRANSITION');
+			expect(eventsOfType('RuntimeBindingDenied')).toHaveLength(1);
 		});
 	});
 

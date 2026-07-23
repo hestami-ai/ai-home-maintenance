@@ -32,6 +32,7 @@ import {
 	type CommandHandler,
 	type HandlerContext
 } from './kit.js';
+import { fromStates } from './command-precondition.js';
 import { AI_ACTOR_TYPES, FLOOR_POLICY_IDS_REQUIRED, floorGateBlock } from './floor-gate.js';
 
 const PWA = 'PROFESSIONAL_WORK_ARCHITECTURE';
@@ -836,7 +837,10 @@ export const publishPwa: CommandHandler = (ctx, command) =>
 		// this file's own header and editPwa both declare IMMUTABLE, and bypassing the single-root composition gate,
 		// which runs on ValidatePwa and not here. Undertakings bind pwaVersion, which does not change, so they would
 		// silently inherit a different root.
-		requireFrom: ['VALIDATED'],
+		// DELIBERATE refusal-code change (JAN-CMDPRE DWP-01b): the precondition now runs BEFORE the floor guard, so
+		// a wrong-state publish whose floor is ALSO unsatisfied refuses RPH_ILLEGAL_STATE_TRANSITION where it
+		// previously surfaced the floor's RPH_INVARIANT_VIOLATION — the state fact is the more fundamental refusal.
+		precondition: fromStates('VALIDATED'),
 		eventType: 'PwaPublished',
 		guard: (state, gctx) => pwaFloorGate(command, state, gctx),
 		mutate: (base) => {

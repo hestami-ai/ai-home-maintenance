@@ -4,6 +4,7 @@
 // separately-granted set. A revoked binding cannot back a new attempt (§22.1).
 import type { RequestRuntimeBindingPayload } from '@janumipwb/rph-contracts';
 import { advanceStatus, createObject, newEnvelope, type CommandHandler } from './kit.js';
+import { fromStates } from './command-precondition.js';
 
 const BINDING = 'RUNTIME_BINDING';
 const MACHINE = 'RuntimeBinding.authorizationStatus';
@@ -47,7 +48,7 @@ export const authorizeRuntimeBinding: CommandHandler = (ctx, command) =>
 		// could grant capabilities the binding never REQUESTED (§22.1 — requested is not granted), with no new request
 		// and no new authorization decision, leaving two RuntimeBindingAuthorized events and nothing saying which
 		// governs. Runtime bindings gate what an execution step may actually do, so this is a privilege escalation.
-		requireFrom: ['REQUESTED', 'PARTIALLY_AUTHORIZED'],
+		precondition: fromStates('REQUESTED', 'PARTIALLY_AUTHORIZED'),
 		eventType: 'RuntimeBindingAuthorized',
 		mutate: (base) => {
 			const p = command.payload as { grantedCapabilities?: unknown[] };
@@ -62,7 +63,7 @@ export const denyRuntimeBinding: CommandHandler = (ctx, command) =>
 		statusField: 'authorizationStatus',
 		machine: MACHINE,
 		target: 'DENIED',
-		requireFrom: ['REQUESTED'], // the machine's only in-arrow to DENIED
+		precondition: fromStates('REQUESTED'), // the machine's only in-arrow to DENIED
 		eventType: 'RuntimeBindingDenied'
 	});
 
@@ -75,6 +76,6 @@ export const revokeRuntimeCapability: CommandHandler = (ctx, command) =>
 		target: 'REVOKED',
 		// In-arrows: AUTHORIZED|PARTIALLY_AUTHORIZED. A re-revocation would re-write the revocation reason/actor over
 		// an already-revoked binding and append a second RuntimeCapabilityRevoked for a revocation that did not occur.
-		requireFrom: ['AUTHORIZED', 'PARTIALLY_AUTHORIZED'],
+		precondition: fromStates('AUTHORIZED', 'PARTIALLY_AUTHORIZED'),
 		eventType: 'RuntimeCapabilityRevoked'
 	});

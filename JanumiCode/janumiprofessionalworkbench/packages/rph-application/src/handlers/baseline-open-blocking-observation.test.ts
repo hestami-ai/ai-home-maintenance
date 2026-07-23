@@ -202,4 +202,20 @@ describe('PromoteBaseline call site: open blocking observation (RPH-BAS-003, liv
 		expect(promote().status).toBe('ACCEPTED');
 		expect(statusOf(BASE)).toBe('AUTHORITATIVE');
 	});
+
+	// JAN-CMDPRE DWP-01b kill coverage: ApproveBaseline's fromStates('UNDER_REVIEW'). The beforeEach drives the
+	// baseline to APPROVED; a re-issue would rewrite approvalDecisionId — the field answering WHICH decision
+	// authorized the baseline — and append a second BaselineApproved with no revocation of the first.
+	it('REFUSES a re-issued ApproveBaseline over an already-APPROVED baseline', () => {
+		expect(statusOf(BASE)).toBe('APPROVED');
+		const approvals = () =>
+			store.readAllEvents().filter((e) => e.eventType === 'BaselineApproved' && e.aggregateId === BASE);
+		expect(approvals()).toHaveLength(1);
+
+		const again = dispatch('ApproveBaseline', { approvalDecisionId: DEC }, { targetAggregateId: BASE });
+
+		expect(again.status).toBe('REJECTED');
+		expect(again.error?.code).toBe('RPH_ILLEGAL_STATE_TRANSITION');
+		expect(approvals()).toHaveLength(1);
+	});
 });

@@ -15,7 +15,8 @@
 //    emitting WaiverDenied about a decision that never requested a waiver.
 //
 // The kind mismatch refuses as RPH_VALIDATION_SEMANTIC_FAILED (the state arrow is legal; the command addresses the
-// wrong KIND of decision). DenyWaiver's wrong-STATE half refuses as RPH_ILLEGAL_STATE_TRANSITION via requireFrom.
+// wrong KIND of decision). DenyWaiver's wrong-STATE half refuses as RPH_ILLEGAL_STATE_TRANSITION via its
+// fromStates('PROPOSED') precondition (DWP-01a authored these as requireFrom; DWP-01b migrated them to the union).
 import type {
 	ActorReference,
 	AssuranceDispositionRecommendation,
@@ -316,8 +317,8 @@ describe('JAN-CMDPRE DWP-01a — a Decision command cannot address the wrong KIN
 		expect(eventsOfType('WaiverDenied')).toHaveLength(1);
 	});
 
-	// The re-issue (NOOP) half of requireFrom: SUPERSEDED -> SUPERSEDED classifies NOOP, which checkTransition
-	// admits — only requireFrom ['PROPOSED'] stops a second contradicting WaiverDenied. This is the test that
+	// The re-issue (NOOP) half of the precondition: SUPERSEDED -> SUPERSEDED classifies NOOP, which checkTransition
+	// admits — only fromStates('PROPOSED') stops a second contradicting WaiverDenied. This is the test that
 	// kills the ['PROPOSED','SUPERSEDED'] mutant (JAN-NOOP-01 discipline: reverting the enforcement must fail here).
 	it('a RE-ISSUED DenyWaiver on an already-denied waiver is REFUSED and appends no second WaiverDenied', () => {
 		requestWaiver({ policyId: REVIEW, criterionId: 'RR-04-completeness-shortcut', findingIds: [] });
@@ -336,5 +337,29 @@ describe('JAN-CMDPRE DWP-01a — a Decision command cannot address the wrong KIN
 		expect(r.status, JSON.stringify(r.error)).toBe('ACCEPTED');
 		expect(stateOf(APPROVAL).status).toBe('EFFECTIVE');
 		expect(eventsOfType('DecisionEffective')).toHaveLength(1);
+	});
+
+	// DWP-01b: the factory's source set is now EXPLICIT (fromStates('PROPOSED') ahead of the authority guard).
+	// DELIBERATE refusal-code change, enumerated in the roadmap: these re-issues were refused by ACCIDENT —
+	// authorizeDecisionEffective's legality arm, surfacing RPH_AUTHORITY_INSUFFICIENT — and authority was never
+	// the defect. The state fact now refuses first, with the state code.
+	it('a RE-ISSUED ApproveDecision on an EFFECTIVE decision is REFUSED on state, with no second DecisionEffective', () => {
+		proposeDecision();
+		expect(approveDecision().status).toBe('ACCEPTED');
+
+		const reissue = approveDecision();
+		expect(reissue.status).toBe('REJECTED');
+		expect(reissue.error?.code).toBe('RPH_ILLEGAL_STATE_TRANSITION');
+		expect(eventsOfType('DecisionEffective')).toHaveLength(1);
+	});
+
+	it('a RE-ISSUED GrantWaiver on an EFFECTIVE waiver is REFUSED on state, with no second WaiverGranted', () => {
+		requestWaiver({ policyId: REVIEW, criterionId: 'RR-04-completeness-shortcut', findingIds: [] });
+		expect(grantWaiver().status).toBe('ACCEPTED');
+
+		const reissue = grantWaiver();
+		expect(reissue.status).toBe('REJECTED');
+		expect(reissue.error?.code).toBe('RPH_ILLEGAL_STATE_TRANSITION');
+		expect(eventsOfType('WaiverGranted')).toHaveLength(1);
 	});
 });

@@ -771,12 +771,48 @@ describe('PublishPwa protected-transition gate — the de minimis assurance floo
 		expect(pub()).toBe('VALIDATED');
 	});
 
+	// DWP-01b: the precondition (fromStates('VALIDATED')) now runs BEFORE the floor guard. DELIBERATE
+	// refusal-code change, enumerated in the roadmap: a wrong-state publish whose floor is ALSO unsatisfied
+	// (here: a DRAFT that was never validated and has no floor) refuses on the state fact, where the floor
+	// guard previously fired first with RPH_INVARIANT_VIOLATION. The floor gate itself is untouched — every
+	// publish from VALIDATED still refuses on the floor, as the tests above prove.
+	it('publishing a DRAFT (never-validated) AI PWA refuses on state, not on the floor', () => {
+		d(
+			AGENT,
+			'CreatePwa',
+			{ pwaId: AI_PWA, name: 'Agent-authored', description: 'd', domain: 'software', version: '1.0.0' },
+			AI_PWA,
+			'PROFESSIONAL_WORK_ARCHITECTURE'
+		);
+		const r = publish();
+		expect(r.status).toBe('REJECTED');
+		expect(r.error?.code).toBe('RPH_ILLEGAL_STATE_TRANSITION');
+	});
+
 	it('permits publish once all three floor policies are recorded SATISFIED', () => {
 		authorValidatedAiPwa();
 		recordFloor({ [SCHEMA]: 'SATISFIED', [IDENTITY]: 'SATISFIED', [REVIEW]: 'SATISFIED' });
 		const r = publish();
 		expect(r.status, JSON.stringify(r.error)).toBe('ACCEPTED');
 		expect(pub()).toBe('PUBLISHED');
+	});
+
+	// JAN-CMDPRE DWP-01b kill coverage: publishPwa's fromStates('VALIDATED'). Once PUBLISHED, a re-publish would
+	// rewrite rootPwuTypeId (a field editPwa declares immutable) and bypass the single-root gate that runs only on
+	// ValidatePwa — so the precondition, not the floor guard, must refuse it. Weakening the set went unpunished.
+	it('REFUSES a re-published PWA once it is PUBLISHED (rootPwuTypeId is immutable after publish)', () => {
+		authorValidatedAiPwa();
+		recordFloor({ [SCHEMA]: 'SATISFIED', [IDENTITY]: 'SATISFIED', [REVIEW]: 'SATISFIED' });
+		expect(publish().status).toBe('ACCEPTED');
+		expect(pub()).toBe('PUBLISHED');
+		const published = store.readAllEvents().filter((e) => e.eventType === 'PwaPublished').length;
+
+		const again = publish();
+		expect(again.status).toBe('REJECTED');
+		expect(again.error?.code).toBe('RPH_ILLEGAL_STATE_TRANSITION');
+		expect(store.readAllEvents().filter((e) => e.eventType === 'PwaPublished')).toHaveLength(
+			published
+		);
 	});
 
 	it('keeps publish blocked when the Reasoning Review floor is REJECTED', () => {

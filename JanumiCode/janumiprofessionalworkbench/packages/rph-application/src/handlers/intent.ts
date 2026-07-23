@@ -15,10 +15,16 @@ import {
 	loadOrReject,
 	makeEvent,
 	nextEnvelope,
+	preconditionReader,
 	reject,
 	type CommandHandler,
 	type HandlerContext
 } from './kit.js';
+import {
+	evaluatePrecondition,
+	fromStates,
+	type Precondition
+} from './command-precondition.js';
 
 const INTENT = 'INTENT';
 const MACHINE = 'Intent.intentStatus';
@@ -95,27 +101,36 @@ function advanceIntent(
 			readonly prior: number;
 			readonly next: number;
 		}) => unknown;
-		/** The states this command may be issued FROM — see kit.advanceStatus.requireFrom. `advanceIntent` is an
-		 *  independent hand-written copy of that primitive, so it carries the identical hole and needs the identical
-		 *  guard: without it a re-issued ReviseIntent is absorbed as a NOOP and still bumps semanticVersion, and
-		 *  ApproveIntent rejects unless approvedSemanticVersion matches the current one — so replaying a command that
-		 *  changes nothing silently voids an outstanding approval. */
-		readonly requireFrom?: readonly string[];
+		/** The precondition under which this command may be issued — see kit.advanceStatus.precondition (JAN-CMDPRE;
+		 *  supersedes DWP-00's `requireFrom`). `advanceIntent` is an independent hand-written copy of that primitive,
+		 *  so it carries the identical hole and needs the identical enforcement, sited identically (BEFORE `precheck`,
+		 *  the local analogue of `guard`): without it a re-issued ReviseIntent is absorbed as a NOOP and still bumps
+		 *  semanticVersion, and ApproveIntent rejects unless approvedSemanticVersion matches the current one — so
+		 *  replaying a command that changes nothing silently voids an outstanding approval. */
+		readonly precondition?: Precondition;
 	}
 ) {
 	const id = command.targetAggregateId;
 	const loaded = loadOrReject(ctx, command, id);
 	if (!loaded.ok) return loaded.result;
+	if (args.precondition) {
+		// Clones, not the live references — see kit.advanceStatus: a predicate must not be able to write into
+		// the commit path or the default event payload (critique-B4 ruling, enforced mechanically).
+		const refusal = evaluatePrecondition(
+			args.precondition,
+			{
+				state: structuredClone(loaded.state),
+				payload: structuredClone(command.payload),
+				command,
+				read: preconditionReader(ctx)
+			},
+			{ statusField: 'intentStatus', subject: 'intent', eventType: args.eventType }
+		);
+		if (refusal) return reject(command, refusal.code, refusal.message, [id]);
+	}
 	const precheckFailure = args.precheck?.(loaded.state);
 	if (precheckFailure) return precheckFailure;
 	const from = String(loaded.state.intentStatus);
-	if (args.requireFrom && !args.requireFrom.includes(from))
-		return reject(
-			command,
-			'RPH_ILLEGAL_STATE_TRANSITION',
-			`${command.commandType} requires intent ${id} to be ${args.requireFrom.join(' or ')}, but it is ${from}. Re-issuing it would append a second ${args.eventType} recording a change that did not happen.`,
-			[id]
-		);
 	const illegal = checkTransition(command, MACHINE, from, args.target);
 	if (illegal) return illegal;
 	const newRevision = loaded.revision + 1;
@@ -260,7 +275,7 @@ export const reviseIntent: CommandHandler = (ctx, command) =>
 		// In-arrow: APPROVED only. Re-issuing from REVISED was absorbed as a NOOP yet still bumped semanticVersion, and
 		// ApproveIntent requires approvedSemanticVersion === current — so replaying a command that changed nothing
 		// silently VOIDED an outstanding approval, and baseline staleness keys on the same field.
-		requireFrom: ['APPROVED'],
+		precondition: fromStates('APPROVED'),
 		eventType: 'IntentRevised',
 		bumpSemanticVersion: true
 	});

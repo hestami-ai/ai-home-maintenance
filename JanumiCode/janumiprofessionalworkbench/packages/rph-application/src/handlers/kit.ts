@@ -17,6 +17,11 @@ import { contentHash } from '@janumipwb/rph-contracts/hash';
 import { classifyTransition } from '@janumipwb/rph-domain';
 import type { CommitInput, Logger, StorageAdapter } from '@janumipwb/rph-ports';
 import type { ZodType } from 'zod';
+import {
+	evaluatePrecondition,
+	type Precondition,
+	type PreconditionReader
+} from './command-precondition.js';
 
 /** What a handler needs from the Engine to do its work (a projection of the Engine's fields). */
 export interface HandlerContext {
@@ -32,6 +37,16 @@ export type CommandHandler = (
 	command: DomainCommand,
 	payload: unknown
 ) => CommandResult;
+
+/** The narrow read-only surface a PREDICATE precondition may consult (JAN-CMDPRE critique-B4 ruling):
+ *  never the full HandlerContext — a precondition is a declaration and must not be able to write. */
+export function preconditionReader(ctx: HandlerContext): PreconditionReader {
+	return {
+		objectState: (oid) => ctx.store.loadObject(oid)?.state as Record<string, unknown> | undefined,
+		aggregateEvents: (aggregateType, aggregateId) =>
+			ctx.store.readAggregateEvents(aggregateType, aggregateId)
+	};
+}
 
 type CommandStatus = CommandResult['status'];
 
@@ -414,7 +429,8 @@ export function advanceStatus(
 		readonly eventPayload?: (nextState: Record<string, unknown>) => unknown;
 		readonly bumpSemanticVersion?: boolean;
 		/**
-		 * The states this command may be issued FROM (JAN-NOOP-01).
+		 * The PRECONDITION under which this command may be issued (JAN-CMDPRE; supersedes DWP-00's `requireFrom`).
+		 * `fromStates(...)` is the common special case — the states this command may be issued FROM (JAN-NOOP-01).
 		 *
 		 * The state machine alone is NOT a sufficient precondition, for two independent reasons:
 		 *
@@ -425,34 +441,45 @@ export function advanceStatus(
 		 *     (DOC-002 §27; DOC-007 §9.1 "the accepted facts, not the original request"), so an event for a change that
 		 *     did not happen is a false entry in an append-only record that has no retraction mechanism.
 		 *  2. The machine legalises an arrow into the target from ANY of its sources, but a COMMAND is usually narrower
-		 *     than the machine — several distinct commands can drive the same target from different states.
+		 *     than the machine — several distinct commands can drive the same target from different states — and at
+		 *     least one command family is narrower in a way NO state set can express (`decisionType`, DS-001 §5).
 		 *
-		 * Note the engine's own sibling helper `canTransition` counts only 'LEGAL', excluding NOOP. That undocumented
-		 * split is the sole reason ApproveDecision, GrantWaiver, PromoteBaseline and ActivateExecutionPlan are safe
-		 * today — protection by accident. This option makes the precondition explicit at the call site instead.
-		 *
-		 * DELIBERATELY OPTIONAL, not mandatory: two call sites are genuine same-state HOLDS (ApplyTacticalChange
-		 * declares ACTIVE→ACTIVE; ChangePwuState holds the work axis while advancing an orthogonal sub-axis, which the
-		 * seeded reference undertaking exercises). Source sets are HAND-AUTHORED per call site from the machine's own
-		 * in-arrows — NOT generated from the vocab's `drivesFrom`, which has no ratified authority, is absent for
-		 * twelve commands, names the wrong machine for at least one, and is narrower than the machine for eight.
+		 * Enforced BEFORE `args.guard` (DR-001 roadmap critique B3): a precondition sited behind a `canTransition`-based guard
+		 * is dead code, because `canTransition` counts only 'LEGAL' (excluding NOOP) and refuses the same inputs first
+		 * — protection by accident, with the wrong refusal code. Sets are HAND-AUTHORED per call site from the
+		 * machine's own in-arrows — NOT generated from the vocab's `drivesFrom`, which has no ratified authority, is
+		 * absent for twelve commands, names the wrong machine for at least one, and is narrower than the machine for
+		 * eight. OPTIONAL until every site declares one; DWP-06 then flips it to required as a pure type change (two
+		 * call sites are genuine same-state HOLDS — ApplyTacticalChange declares ACTIVE→ACTIVE — and they declare
+		 * their own target state rather than omitting the declaration).
 		 */
-		readonly requireFrom?: readonly string[];
+		readonly precondition?: Precondition;
 	}
 ): CommandResult {
 	const id = command.targetAggregateId;
 	const loaded = loadOrReject(ctx, command, id);
 	if (!loaded.ok) return loaded.result;
+	if (args.precondition) {
+		// CLONES, not the live references: `loaded.state` is later spread into the committed next state and
+		// `command.payload` is the default event payload, so handing either to a predicate would let a
+		// "declaration" write into the store or the governed stream — the exact thing the critique-B4 ruling
+		// (see command-precondition.ts) exists to prevent. The reader is already copy-on-read; this closes the
+		// only other write path mechanically rather than by convention.
+		const refusal = evaluatePrecondition(
+			args.precondition,
+			{
+				state: structuredClone(loaded.state),
+				payload: structuredClone(command.payload),
+				command,
+				read: preconditionReader(ctx)
+			},
+			{ statusField: args.statusField, subject: args.objectType, eventType: args.eventType }
+		);
+		if (refusal) return reject(command, refusal.code, refusal.message, [id]);
+	}
 	const guardFailure = args.guard?.(loaded.state, ctx);
 	if (guardFailure) return guardFailure;
 	const from = String(loaded.state[args.statusField]);
-	if (args.requireFrom && !args.requireFrom.includes(from))
-		return reject(
-			command,
-			'RPH_ILLEGAL_STATE_TRANSITION',
-			`${command.commandType} requires ${args.objectType} ${id} to be ${args.requireFrom.join(' or ')}, but it is ${from}. Re-issuing it would append a second ${args.eventType} recording a change that did not happen.`,
-			[id]
-		);
 	const illegal = checkTransition(command, args.machine, from, args.target);
 	if (illegal) return illegal;
 	const newRevision = loaded.revision + 1;

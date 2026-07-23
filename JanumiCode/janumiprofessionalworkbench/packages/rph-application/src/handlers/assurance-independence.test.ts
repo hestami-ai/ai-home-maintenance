@@ -224,6 +224,25 @@ describe('completeAssuranceAssessment — independence enforcement (Increment I2
 			(violated[0]!.payload as { independenceRequirement?: string }).independenceRequirement
 		).toBe('DIFFERENT_AGENT');
 		expect((violated[0]!.payload as { reason?: string }).reason).toBe('same agent identity');
+
+		// JAN-CMDPRE DWP-01b kill coverage: the independence-violation branch's own fromStates('ASSESSING')
+		// refuses a re-issue over the now-terminal assessment. Without it the mutate would overwrite the recorded
+		// producer/evaluator pair — the exact operands the violation exists to name — and append a second event.
+		const reissue = engine.dispatch(
+			cmd('CompleteAssuranceAssessment', assessmentId, 'ASSURANCE_ASSESSMENT', {
+				validatorResult: verdict(assessmentId, 'same-1'),
+				producer: { actorId: 'same-1', actorType: 'HUMAN', displayName: 'Same' }
+			})
+		);
+		expect(reissue.status).toBe('REJECTED');
+		expect(reissue.error?.code).toBe('RPH_ILLEGAL_STATE_TRANSITION');
+		expect(
+			store
+				.readAllEvents()
+				.filter(
+					(e) => e.eventType === 'AssuranceIndependenceViolated' && e.aggregateId === assessmentId
+				)
+		).toHaveLength(1);
 	});
 
 	it('a DIFFERENT_AGENT policy where producer !== evaluator completes normally to the disposition', () => {
@@ -789,6 +808,36 @@ describe('completeAssuranceAssessment — independence enforcement (Increment I2
 			})
 		);
 		expect(stateOf(B)?.assessmentState).toBe('SATISFIED');
+
+		// JAN-CMDPRE DWP-01b kill coverage: the escalation branch (A) and the final disposition branch (B) each
+		// carry their OWN fromStates('ASSESSING'). Re-issuing over either terminal state is refused — without the
+		// precondition the escalation branch re-fires Gate D and the disposition branch re-completes, each
+		// appending a second, contradicting verdict against an assessment the reader already treats as settled.
+		const reA = engine.dispatch(
+			cmd('CompleteAssuranceAssessment', A, 'ASSURANCE_ASSESSMENT', {
+				validatorResult: verdict(A, 'reviewer-e')
+			})
+		);
+		expect(reA.status).toBe('REJECTED');
+		expect(reA.error?.code).toBe('RPH_ILLEGAL_STATE_TRANSITION');
+		expect(
+			store
+				.readAllEvents()
+				.filter((e) => e.eventType === 'AssuranceAssessmentEscalated' && e.aggregateId === A)
+		).toHaveLength(1);
+
+		const reB = engine.dispatch(
+			cmd('CompleteAssuranceAssessment', B, 'ASSURANCE_ASSESSMENT', {
+				validatorResult: verdict(B, 'reviewer-e')
+			})
+		);
+		expect(reB.status).toBe('REJECTED');
+		expect(reB.error?.code).toBe('RPH_ILLEGAL_STATE_TRANSITION');
+		expect(
+			store
+				.readAllEvents()
+				.filter((e) => e.eventType === 'AssuranceAssessmentCompleted' && e.aggregateId === B)
+		).toHaveLength(1);
 	});
 
 	it('§10.3 escalation is CRITICAL-only: authoring a non-CRITICAL escalateOnOpenSeverities is rejected', () => {
