@@ -39,14 +39,14 @@ Carried verbatim from DS §4 (F-1…F-15), grounded by a 6-lens read-only workfl
 
 ## 5. Legacy semantic classification
 
-No legacy semantics are being preserved or migrated. `requireFrom` (DWP-00's optional shape) is **superseded within this series** by the general `precondition` field in DWP-01 — a same-series refactor, not a compatibility surface.
+No legacy semantics are being preserved or migrated. `requireFrom` (DWP-00's optional shape) is **superseded within this series** by the general `precondition` field in DWP-01b — a same-series refactor, not a compatibility surface. DWP-01a deliberately AUTHORS ON the DWP-00 shape (a guard-sited predicate + `requireFrom`), accepting one extra migration in DWP-01b in exchange for landing the live exploit closure without the guard reorder's fourteen-site refusal-code change.
 
 ## 6. Target-state gap analysis
 
 | Concern | Today | Target |
 |---|---|---|
 | Re-issue at a demonstrated exploit site | ACCEPTED, appends a contradicting event | REFUSED (**DWP-00, landed**) |
-| `DenyWaiver` aimed at a non-waiver decision | ACCEPTED | REFUSED by a payload predicate (DWP-01) |
+| `DenyWaiver` aimed at a non-waiver decision | ACCEPTED | REFUSED by a payload predicate (DWP-01a) |
 | `ChangePwuState` all-axes-held re-issue | ACCEPTED, second contradicting event | REFUSED by an at-least-one-axis-differs predicate (DWP-02) |
 | The other 31 advanceStatus/advanceIntent sites | unguarded | precondition authored per site (DWP-03…05) |
 | A NEW call site omitting the declaration | silently unguarded | compile error (DWP-06) |
@@ -81,37 +81,62 @@ delivery_state: DELIVERED
 ```
 
 ```yaml
-id: JAN-CMDPRE-DWP-01
-title: "The precondition mechanism + the Decision family closed SYMMETRICALLY (two live exploits)"
+id: JAN-CMDPRE-DWP-01a
+title: "The Decision family closed SYMMETRICALLY (two live exploits) — security half, split in flight"
 master_work_packages: [DS-001:D1, DS-001:D8]
-outcome: "Both primitives gain a general `precondition` over (loadedState, payload) — a union whose `from` variant is the state-set special case. Enforcement is sited BEFORE `args.guard`, not merely before checkTransition. The Decision family is closed in BOTH directions: ApproveDecision requires decisionType !== WAIVER; GrantWaiver/DenyWaiver require === WAIVER. DWP-00's NINE sites migrate onto the union."
+split_rationale: "§19 residual 1 predicted this split. The two live exploits do NOT depend on the guard reorder: at makeDecisionEffective the factory OWNS the guard, so a precondition parameter composed at the guard's head is live; denyWaiver has NO guard, so DWP-00's shipped requireFrom + a guard-sited predicate are both live. Landing them first avoids coupling a security fix to the fourteen-site refusal-code change."
+outcome: "The Decision family is closed in BOTH directions on DWP-00's shipped shape: ApproveDecision requires decisionType !== WAIVER; GrantWaiver/DenyWaiver require === WAIVER; DenyWaiver additionally requires status PROPOSED (the machine's EFFECTIVE -> SUPERSEDED arrow belongs to supersede flows, and unmaking a GRANTED waiver is RevokeDecision's act). No mechanism module, no reorder, no migration."
+knowledge_status: CONFIRMED
+repository_scope:
+  files_or_symbols:
+    - "governance.ts makeDecisionEffective (the FACTORY, not its single advanceStatus literal) — gains a precondition PARAMETER sited at the HEAD of the factory-owned guard; approveDecision and grantWaiver each pass their own"
+    - "governance.ts denyWaiver — the WAIVER predicate (guard) + requireFrom ['PROPOSED']"
+    - "governance.ts revokeDecision — AUDIT of the same asymmetry, recorded in a comment (its precondition is DWP-04's to author)"
+    - "apps/rph-demo decisions route (+page.server.ts, +page.svelte) — companion change found by post-build verification: WAIVER removed from the propose dropdown (ProposeDecision cannot carry §12.2 WaiverDetail); PROPOSED waiver rows gain Grant/Deny actions mirroring the engine's preconditions (§11)"
+required_changes:
+  - "makeDecisionEffective takes a `precondition` parameter; approveDecision passes `decisionType !== 'WAIVER'`, grantWaiver passes `=== 'WAIVER'`. Attaching one predicate to the shared literal would refuse every ApproveDecision on a non-waiver decision and take the SEED down (reference-undertaking.ts approves a PROMOTE_BASELINE decision — which is also why the predicate is !== WAIVER, not === APPROVAL)."
+  - "Refusal code for the kind mismatch: RPH_VALIDATION_SEMANTIC_FAILED (the state arrow is legal; the command addresses the wrong KIND of decision). The state half at denyWaiver refuses as RPH_ILLEGAL_STATE_TRANSITION via requireFrom."
+  - "Do NOT add requireFrom to the factory sites: PROPOSED -> EFFECTIVE is the machine's ONLY in-arrow to EFFECTIVE and authorizeDecisionEffective routes through canTransition (NOOP-excluding), so every wrong-state source is already refused by the guard that runs FIRST — a requireFrom behind it is dead code (critique B3's exact shape). Record that in the factory comment; DWP-01b makes it explicit once enforcement moves ahead of the guard."
+invariants:
+  - "ApproveDecision on a PROPOSED WAIVER is REFUSED — the floor gate can no longer be discharged by a decision that never recorded a waiver fact."
+  - "DenyWaiver on a non-WAIVER decision is REFUSED regardless of status; DenyWaiver on an EFFECTIVE (granted) waiver is REFUSED; a legitimate DenyWaiver on a PROPOSED waiver still succeeds."
+  - "GrantWaiver on a genuine waiver still succeeds, and the seed drives END TO END unchanged."
+prohibited_shortcuts:
+  - "Do NOT express either waiver check as a state set — provably unreachable (DS §5)."
+  - "Do NOT attach a precondition to the shared advanceStatus literal inside makeDecisionEffective."
+  - "Do NOT start the mechanism module, the signature decision, the reorder, or the nine-site migration here (DWP-01b)."
+tests:
+  - "handler: ApproveDecision on a PROPOSED WAIVER -> REJECTED, decision stays PROPOSED, and the floor gate still blocks publish; the same waiver then granted legitimately -> publish succeeds."
+  - "handler: DenyWaiver on an EFFECTIVE non-waiver -> REJECTED with no event; DenyWaiver on an EFFECTIVE waiver -> REJECTED; DenyWaiver on a PROPOSED waiver -> ACCEPTED, WaiverDenied appended, status SUPERSEDED."
+  - "handler: GrantWaiver on a PROPOSED non-waiver -> REJECTED with no event."
+  - "handler: DenyWaiver RE-ISSUED on an already-SUPERSEDED waiver -> REJECTED with WaiverDenied still singular (kills the requireFrom ['PROPOSED','SUPERSEDED'] mutant its verification named)."
+  - "seed: the reference undertaking drives unchanged (the acceptance gate for the factory change)."
+delivery_state: DELIVERED
+```
+
+```yaml
+id: JAN-CMDPRE-DWP-01b
+title: "The precondition MECHANISM: union type, signature settled, enforcement ahead of the guard, migration"
+master_work_packages: [DS-001:D1, DS-001:D8]
+outcome: "Both primitives gain a general `precondition` over (loadedState, payload) — a union whose `from` variant is the state-set special case. Enforcement is sited BEFORE `args.guard`, not merely before checkTransition. DWP-00's NINE sites and DWP-01a's three command types migrate onto the union; the factory sites' now-reachable source sets become explicit."
 knowledge_status: CONFIRMED
 repository_scope:
   files_or_symbols:
     - "NEW packages/rph-application/src/handlers/command-precondition.ts — the Precondition union, fromStates(...), evaluatePrecondition(...)"
     - "kit.ts advanceStatus + intent.ts advanceIntent — the field, enforced BEFORE args.guard"
-    - "governance.ts makeDecisionEffective (the FACTORY, not its single advanceStatus literal) — gains a precondition PARAMETER; approveDecision and grantWaiver each pass their own"
-    - "governance.ts denyWaiver, revokeDecision — the WAIVER predicate / an audit of the same question"
-    - "runtime-binding.ts, governance.ts, assurance.ts, pwa-authoring.ts, intent.ts — migrate DWP-00's NINE sites (authorize/deny/revoke RuntimeBinding, approveBaseline, the three completeAssuranceAssessment branches, reviseIntent, publishPwa)"
+    - "runtime-binding.ts, governance.ts, assurance.ts, pwa-authoring.ts, intent.ts — migrate DWP-00's NINE sites (authorize/deny/revoke RuntimeBinding, approveBaseline, the three completeAssuranceAssessment branches, reviseIntent, publishPwa) + DWP-01a's ApproveDecision/GrantWaiver/DenyWaiver"
 required_changes:
-  - "SETTLE THE SIGNATURE (critique B4): decide NOW whether Precondition.check receives only (state, payload) or also a READER over committed objects/events. DWP-08 has a site whose only correct precondition needs the event log; discovering that at DWP-08 would ripple back through DWP-01..06 and the type flip. Decide it here, in writing, even if the reader stays unused until DWP-08."
-  - "MOVE ENFORCEMENT AHEAD OF `args.guard` (critique B3). advanceStatus currently runs `guard` first (kit.ts), so a precondition sited after it is DEAD CODE at the four canTransition-guarded sites — DWP-04's whole outcome, unreachable, and §12's mutation discipline unsatisfiable there. Consequence to accept and test: the migration is then NOT zero-behaviour at the 14 guarded sites, because the refusal CODE changes (RPH_AUTHORITY_INSUFFICIENT -> RPH_ILLEGAL_STATE_TRANSITION). Re-check every DWP-00 test against that."
-  - "makeDecisionEffective takes a `precondition` parameter; approveDecision passes `decisionType !== 'WAIVER'`, grantWaiver passes `=== 'WAIVER'`. Attaching one predicate to the shared literal would refuse every ApproveDecision on an approval decision and take the SEED down (reference-undertaking.ts throws on any non-ACCEPTED dispatch)."
-  - "denyWaiver: decisionType === 'WAIVER' plus its source set. revokeDecision (bare advanceStatus, no guard): audit for the same asymmetry and author or record why not."
+  - "SETTLE THE SIGNATURE (critique B4): decide NOW whether Precondition.check receives only (state, payload) or also a READER over committed objects/events. DWP-08 has a site whose only correct precondition needs the event log; discovering that at DWP-08 would ripple back through DWP-01b..06 and the type flip. Decide it here, in writing, even if the reader stays unused until DWP-08."
+  - "MOVE ENFORCEMENT AHEAD OF `args.guard` (critique B3). advanceStatus currently runs `guard` first (kit.ts), so a precondition sited after it is DEAD CODE at the four canTransition-guarded sites — DWP-04's whole outcome, unreachable, and §12's mutation discipline unsatisfiable there. Consequence to accept and test: the migration is then NOT zero-behaviour at the 14 guarded sites, because the refusal CODE changes (RPH_AUTHORITY_INSUFFICIENT -> RPH_ILLEGAL_STATE_TRANSITION). Re-check every DWP-00 AND DWP-01a test against that."
+  - "The factory sites gain their explicit fromStates(['PROPOSED']) — reachable now that enforcement precedes the guard."
 invariants:
-  - "ApproveDecision on a PROPOSED WAIVER is REFUSED — the floor gate can no longer be discharged by a decision that never recorded a waiver fact."
-  - "DenyWaiver on a non-WAIVER decision is REFUSED regardless of status; a legitimate DenyWaiver on a PROPOSED waiver still succeeds."
-  - "GrantWaiver on a genuine waiver still succeeds, and the seed drives END TO END unchanged."
   - "A state-set precondition behaves identically to DWP-00's requireFrom EXCEPT at guarded sites, where the refusal code changes — enumerated and tested, not discovered."
+  - "Every DWP-01a refusal still fires, with its DWP-01a code unless the enumeration says otherwise."
 prohibited_shortcuts:
-  - "Do NOT express either waiver check as a state set — provably unreachable (DS §5)."
-  - "Do NOT attach a precondition to the shared advanceStatus literal inside makeDecisionEffective."
   - "Do NOT make the field mandatory here (DWP-06)."
 tests:
   - "unit: the Precondition module in isolation, incl. the reader variant if adopted."
-  - "handler: ApproveDecision on a PROPOSED WAIVER -> REJECTED and the floor gate still blocks; DenyWaiver on an EFFECTIVE APPROVAL -> REJECTED with no event; both legitimate paths -> ACCEPTED."
-  - "seed: the reference undertaking drives unchanged (the acceptance gate for the factory change)."
-  - "regression: every DWP-00 test, with any changed refusal code updated deliberately and listed in the commit."
+  - "regression: every DWP-00 + DWP-01a test, with any changed refusal code updated deliberately and listed in the commit."
 delivery_state: NOT_STARTED
 ```
 
@@ -172,10 +197,10 @@ knowledge_status: CONFIRMED
 repository_scope:
   files_or_symbols:
     - "assurance.ts:312,333,344 (Supersede/Suspend/ActivateAssurancePolicy — the three with NO drivesFrom at all), :318,339,350,425 (guarded sites)"
-    - "governance.ts promoteBaseline, supersedeBaseline, revokeDecision — NOT makeDecisionEffective, which DWP-01 owns (critique B1: one literal, two command types, double-owned in v0.1.0)"
+    - "governance.ts promoteBaseline, supersedeBaseline, revokeDecision — NOT makeDecisionEffective, which DWP-01a owns (critique B1: one literal, two command types, double-owned in v0.1.0)"
 required_changes:
   - "The three AssurancePolicy commands have no drivesFrom anywhere; author from the machine and mark UNRATIFIED-AUTHORED. ActivateAssurancePolicy has TWO legal sources — the set is a list, not a scalar."
-  - "Make the canTransition-accidental protection EXPLICIT. This only works because DWP-01 moved enforcement ahead of `args.guard`; without that these preconditions are unreachable and the mutation test cannot fail (critique B3). Do not remove the canTransition guards — they carry other domain rules."
+  - "Make the canTransition-accidental protection EXPLICIT. This only works because DWP-01b moved enforcement ahead of `args.guard`; without that these preconditions are unreachable and the mutation test cannot fail (critique B3). Do not remove the canTransition guards — they carry other domain rules."
   - "Re-verify the BENIGN classification of every site in these families before accepting it (DS §10 residual 2 expects at least one reclassification)."
 invariants:
   - "SupersedeAssurancePolicy's tags array cannot grow on a re-issue (the compounding case, DS F-4)."
@@ -212,12 +237,12 @@ delivery_state: NOT_STARTED
 id: JAN-CMDPRE-DWP-06
 title: "Make the declaration MANDATORY (zero-behaviour type flip at census 0)"
 master_work_packages: [DS-001:D5]
-outcome: "`precondition` becomes a REQUIRED property on both primitives' args. Because DWP-01..05 authored every site, this is a pure type change with no behavioural diff — and from here a NEW call site cannot silently omit the declaration."
+outcome: "`precondition` becomes a REQUIRED property on both primitives' args. Because DWP-01a..05 authored every site, this is a pure type change with no behavioural diff — and from here a NEW call site cannot silently omit the declaration."
 knowledge_status: CONFIRMED
 repository_scope:
   files_or_symbols: ["kit.ts advanceStatus args", "intent.ts advanceIntent args"]
 required_changes:
-  - "Flip optional -> required. The diff must contain NO logic change; if any call site needs a set authored here, DWP-01..05 was incomplete and THAT is the finding."
+  - "Flip optional -> required. The diff must contain NO logic change; if any call site needs a set authored here, DWP-01a..05 was incomplete and THAT is the finding."
   - "Add a census test asserting every advanceStatus/advanceIntent call site is accounted for, so the count cannot silently regress."
 invariants:
   - "check-types is the gate: it is a compile error to omit the declaration."
@@ -268,7 +293,7 @@ repository_scope:
   files_or_symbols: ["assurance.ts:297,706", "pwa-authoring.ts:89,149,465,521,612,681"]
 required_changes:
   - "Author a per-site rule TABLE split by rule KIND — these are not one rule (critique B4, DS D9 amended): EDIT (must change something) · DELETION (must exist / not already removed: deletePwa, removePwuType) · EVENT-LOG-DEPENDENT (submitEvidenceForAssessment) · DERIVED (bumpPwaSemanticVersion)."
-  - "submitEvidenceForAssessment commits with NO state delta BY DESIGN — its own comment says the received-evidence fact lives on the EVENT. A generic no-change rule REFUSES it and takes down the claim->evidence->assessment->decision->baseline chain and the seed. Its real defect is the same evidenceId submitted twice, which is undecidable from (state,payload) and needs the reader settled in DWP-01."
+  - "submitEvidenceForAssessment commits with NO state delta BY DESIGN — its own comment says the received-evidence fact lives on the EVENT. A generic no-change rule REFUSES it and takes down the claim->evidence->assessment->decision->baseline chain and the seed. Its real defect is the same evidenceId submitted twice, which is undecidable from (state,payload) and needs the reader settled in DWP-01b."
   - "REMOVE bumpPwaSemanticVersion from the class as a disclosed residual: it is a derived write with no command of its own and a synthesised idempotency key, firing nine times on one aggregate in the seed."
   - "Confirm the count is EIGHT — DS F-11 originally said nine and wrongly included pwu.ts:298, which IS guarded via canTransition."
 invariants:
@@ -303,7 +328,7 @@ delivery_state: NOT_STARTED
 
 ## 11. Execution, compatibility, and migration strategy
 
-Land order **01 → 09** (§17). Each: land → central gate → commit by explicit path. **Back-compat:** DWP-01…05 refuse commands that are already semantically inapplicable; no currently-*legitimate* flow may start failing, which is why every DWP carries a positive test for its widest legal path. **Known behaviour change outside `packages/`** (DS F-15): the demo's form actions surface a 400 on a double-submit that silently succeeded before, and a rejecting command aborts its `dispatchBatch` — accepted under D3, verified per DWP.
+Land order **01a → 09** (§17). Each: land → central gate → commit by explicit path. **Back-compat:** DWP-01a…05 refuse commands that are already semantically inapplicable; no currently-*legitimate* flow may start failing, which is why every DWP carries a positive test for its widest legal path. **Known behaviour change outside `packages/`** (DS F-15): the demo's form actions surface a 400 on a double-submit that silently succeeded before, and a rejecting command aborts its `dispatchBatch` — accepted under D3, verified per DWP. **DWP-01a's companion demo change** (found by its post-build verification): the Decision Center's propose form offered `WAIVER` — minting decisions that carried no §12.2 WaiverDetail and could never discharge anything — and rendered an Approve button the new precondition refuses on first submit, with no grant/deny affordance anywhere. `WAIVER` is removed from the propose dropdown (RequestWaiver is the authoring path) and PROPOSED waiver rows now offer Grant/Deny, mirroring the engine's own preconditions.
 
 ## 12. Assurance, tests, and evidence plan
 
@@ -316,11 +341,11 @@ Land order **01 → 09** (§17). Each: land → central gate → commit by expli
 
 ## 13. Security, authority, and tenant-impact analysis
 
-DWP-00 closed a **live privilege escalation** (`AuthorizeRuntimeBinding` re-authorization replacing the granted capability set wholesale, exceeding what was requested, by a second actor, with no new authorization decision). DWP-01 closes **two** governance-authority holes, which are mirrors of each other: `DenyWaiver` driving a non-waiver approval decision to SUPERSEDED, and — found by the roadmap critique, named nowhere in the design until now — **`ApproveDecision` aimed at a PROPOSED WAIVER driving it EFFECTIVE and thereby DISCHARGING THE ASSURANCE FLOOR**, because `authorizeDecisionEffective` never checks `decisionType` and `floor-gate.ts` honours the resulting object without regard to which command produced it. The second is the more serious: it retires an assurance obligation while writing `DecisionEffective` where a `WaiverGranted` should be, so no waiver fact exists to audit, review or expire. No DWP grants, withholds, or re-scopes any actor's authority; every change REFUSES commands the domain already implies are inapplicable. No tenant surface.
+DWP-00 closed a **live privilege escalation** (`AuthorizeRuntimeBinding` re-authorization replacing the granted capability set wholesale, exceeding what was requested, by a second actor, with no new authorization decision). DWP-01a closes **two** governance-authority holes, which are mirrors of each other: `DenyWaiver` driving a non-waiver approval decision to SUPERSEDED, and — found by the roadmap critique, named nowhere in the design until now — **`ApproveDecision` aimed at a PROPOSED WAIVER driving it EFFECTIVE and thereby DISCHARGING THE ASSURANCE FLOOR**, because `authorizeDecisionEffective` never checks `decisionType` and `floor-gate.ts` honours the resulting object without regard to which command produced it. The second is the more serious: it retires an assurance obligation while writing `DecisionEffective` where a `WaiverGranted` should be, so no waiver fact exists to audit, review or expire. No DWP grants, withholds, or re-scopes any actor's authority; every change REFUSES commands the domain already implies are inapplicable. No tenant surface.
 
 ## 14. Observability, recovery, and rollback
 
-Every refusal returns `RPH_ILLEGAL_STATE_TRANSITION` with a message naming the command, the aggregate, the expected precondition and the actual state — so a refused double-submit is diagnosable from the response alone. **Rollback:** each DWP is a self-contained commit and independently revertible; DWP-06 is the only one with a cross-cutting type dependency, which is why it is sequenced last.
+A wrong-STATE refusal returns `RPH_ILLEGAL_STATE_TRANSITION` where `requireFrom` enforces it; at the `canTransition`-guarded factory sites the guard refuses first — today as `RPH_AUTHORITY_INSUFFICIENT` — until DWP-01b moves precondition enforcement ahead of the guard. A wrong-KIND refusal (DWP-01a's decisionType mismatch, where the state arrow is legal) returns `RPH_VALIDATION_SEMANTIC_FAILED`. Every refusal carries a message naming the command, the aggregate, the expected precondition and the actual state — so a refused double-submit is diagnosable from the response alone. **Rollback:** each DWP is a self-contained commit and independently revertible; DWP-06 is the only one with a cross-cutting type dependency, which is why it is sequenced last.
 
 ## 15. Risks, assumptions, unknowns, decisions, deferrals, divergences
 
@@ -335,8 +360,8 @@ Every refusal returns `RPH_ILLEGAL_STATE_TRANSITION` with a message naming the c
 
 | Design decision | DWP | Primary files | Verified by |
 |---|---|---|---|
-| D1 precondition shape | 01 | command-precondition.ts, kit.ts, intent.ts | unit + DWP-00 tests unchanged |
-| D8 wrong-source half | 01 | governance.ts | DenyWaiver-on-approval refused |
+| D1 precondition shape | 01b | command-precondition.ts, kit.ts, intent.ts | unit + DWP-00 tests unchanged |
+| D8 wrong-source half | 01a | governance.ts | DenyWaiver-on-approval refused |
 | D10 ChangePwuState | 02 | pwu.ts | seed drives unchanged |
 | D4 authored allowlists | 03, 04, 05 | six handler families | refusal + widest-legal-path per site |
 | D5 mandatory | 06 | kit.ts, intent.ts | check-types; zero assertion edits |
@@ -346,7 +371,7 @@ Every refusal returns `RPH_ILLEGAL_STATE_TRANSITION` with a message naming the c
 
 ## 17. Implementation ordering and concurrency plan
 
-Critical path **01 → 02 → 03 → 04 → 05 → 06 → 07 → 08 → 09**, sequential. Rationale for the order: the **live wrong-source exploit first** (01), then the **vacuity trap on the busiest write path** (02), then the families in ascending stakes (03 → 04 → 05), then the type flip **only once the census is zero** (06), then the kernel (07 — independent, but deliberately after the call sites so a classifier change lands against a fully-guarded engine), then the different-in-kind class (08), then the audit (09). **07 and 08 are the only pair that could run concurrently**; they are kept sequential because both touch invariant tests.
+Critical path **01a → 01b → 02 → 03 → 04 → 05 → 06 → 07 → 08 → 09**, sequential. Rationale for the order: the **live wrong-source exploits first** (01a — the security half, split from the mechanism per §19 residual 1), then the **mechanism that generalises them** (01b), then the **vacuity trap on the busiest write path** (02), then the families in ascending stakes (03 → 04 → 05), then the type flip **only once the census is zero** (06), then the kernel (07 — independent, but deliberately after the call sites so a classifier change lands against a fully-guarded engine), then the different-in-kind class (08), then the audit (09). **07 and 08 are the only pair that could run concurrently**; they are kept sequential because both touch invariant tests.
 
 ## 18. Exit criteria and gate package requirements
 
@@ -358,18 +383,18 @@ Critical path **01 → 02 → 03 → 04 → 05 → 06 → 07 → 08 → 09**, se
 
 - **B1 → FIXED.** `GrantWaiver` has no call site of its own. `makeDecisionEffective` is a FACTORY with one `advanceStatus` literal serving both `ApproveDecision` and `GrantWaiver`, so v0.1.0 both double-owned it (DWP-01 and DWP-04) and made its own fix impossible: one predicate on that literal refuses every `ApproveDecision` and takes the seed down. The factory now takes a precondition PARAMETER; the census counts command types, not call sites.
 - **B2 → FIXED, and it is a LIVE EXPLOIT the design had not named.** `ApproveDecision` on a PROPOSED WAIVER drives it EFFECTIVE and discharges the assurance floor with no waiver fact recorded. Verified in source: `authorizeDecisionEffective` checks only legality + authority; `floor-gate.ts:224-233` filters on the OBJECT's `decisionType`/`status`, never on the event type. §13's "DWP-01 closes a governance-authority hole" was an overclaim while its mirror was open. The family is now closed symmetrically. **DS D8 amended.**
-- **B3 → FIXED.** `advanceStatus` runs `args.guard` BEFORE the precondition slot, so at the four `canTransition`-guarded sites a precondition would be **dead code** — DWP-04's headline outcome unreachable, and §12's mutation discipline unsatisfiable there, which is the "fixtures shaped so the defect could not appear" failure §12 exists to prevent, reproduced at the sites DWP-04 exists for. Enforcement moves ahead of the guard in DWP-01, and the consequence is accepted explicitly: the migration is **not** zero-behaviour at guarded sites, because the refusal code changes.
+- **B3 → FIXED.** `advanceStatus` runs `args.guard` BEFORE the precondition slot, so at the four `canTransition`-guarded sites a precondition would be **dead code** — DWP-04's headline outcome unreachable, and §12's mutation discipline unsatisfiable there, which is the "fixtures shaped so the defect could not appear" failure §12 exists to prevent, reproduced at the sites DWP-04 exists for. Enforcement moves ahead of the guard in DWP-01b, and the consequence is accepted explicitly: the migration is **not** zero-behaviour at guarded sites, because the refusal code changes.
 - **B4 → FIXED. DS D9 amended.** DWP-08's single invariant is false at `submitEvidenceForAssessment`, whose zero-state-delta commit is DESIGNED, and wrong-shaped at three more sites. It also forced a decision that had to move to the FIRST increment: whether `Precondition.check` receives a reader, since the only correct rule at that site depends on the event log.
 - **M1…M5 → FIXED.** Stale line numbers (all references now by exported symbol); `ProposeDecomposition` was not a state-advancing site; nine commands were covered by aggregate COUNT but named in no DWP — including three on `Evidence.status` and `Assumption.status`, two machines the roadmap never mentioned, making §12's per-machine obligation unmeetable; the per-DWP counts summed to 33 against 31 real sites; DWP-00's site count is NINE, not eight.
 
 **Residual weaknesses I still hold, disclosed:**
 
-1. **DWP-01 is now larger than v0.1.0's, not smaller** — mechanism + signature decision + guard reordering + a symmetric family fix + a nine-site migration. The reordering alone changes refusal codes at fourteen sites. This is the increment most likely to need splitting once building starts, and I would rather split it in flight than pretend the scope is settled.
+1. **DWP-01 was larger than v0.1.0's, not smaller — and the predicted split WAS TAKEN in flight** (v0.2.1): DWP-01a lands the two live exploits on DWP-00's shipped shape (the security half, small and revertible); DWP-01b carries the mechanism, the signature decision, the guard reorder and the migration. The split is sound because neither exploit depends on the reorder — the factory owns its guard, and `denyWaiver` has none. Cost accepted: DWP-01a's three command types are one more thing DWP-01b migrates.
 2. **The BENIGN classifications remain second-hand** (DS §10 residual 2), now compounded: the critique reclassified sites in three DWPs, so I expect further reclassification during DWP-03/04/05.
 3. **DWP-07's ordering is still unsettled.** The critique did not conclusively establish that the classifier reorder is behaviour-neutral for all 26 non-Baseline machines; until it is measured, "late is safe" is an assumption.
 
-**Readiness: `READY_TO_BUILD` for DWP-01 only.** DWP-02…09 are `READY_TO_BUILD` in shape but carry the residuals above; each is re-checked against the tree at its own start. DWP-00 `DELIVERED`.
+**Readiness: DWP-01a `DELIVERED`** (post-build 4-lens adversarial verification EXECUTED: 11 agents, 6 distinct confirmed findings — the bypass lens found NO remaining path to either exploit; the survivors were 1 MAJOR demo-affordance regression + 5 documentation/test-discipline MINORs, all reconciled in the same changeset). **`READY_TO_BUILD` for DWP-01b next.** DWP-01b…09 carry the residuals above; each is re-checked against the tree at its own start. DWP-00 `DELIVERED`.
 
 ---
 
-*`READY_TO_BUILD` (DWP-01) / v0.2.0 — design authority JAN-CMDPRE-DS-001 v0.2.1. Self-critique EXECUTED: 4 blockers + 5 majors reconciled, one of them a live exploit (B2) now carried back into the design. DWP-00 `DELIVERED`; DWP-01…09 `NOT_STARTED`.*
+*`READY_TO_BUILD` (DWP-01b) / v0.2.2 — design authority JAN-CMDPRE-DS-001 v0.2.1. Self-critique EXECUTED: 4 blockers + 5 majors reconciled, one of them a live exploit (B2) now carried back into the design. §19 residual 1's predicted split TAKEN in flight: DWP-01 → DWP-01a (security half) + DWP-01b (mechanism). DWP-00 + DWP-01a `DELIVERED` (01a adversarially verified post-build, findings reconciled in-changeset); DWP-01b…09 `NOT_STARTED`.*

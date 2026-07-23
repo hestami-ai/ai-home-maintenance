@@ -9,6 +9,7 @@ import type {
 	ApproveDecisionPayload,
 	BaselineObject,
 	BaselinePromotedPayload,
+	CommandResult,
 	CreateBaselinePayload,
 	DecisionEffectivePayload,
 	DecisionObject,
@@ -156,10 +157,26 @@ export const proposeDecision: CommandHandler = (ctx, command, payload) => {
 };
 
 /** The authority gate shared by ApproveDecision + GrantWaiver: PROPOSED -> EFFECTIVE requires a held authority
- * (an AGENT/MODEL actor may recommend but not approve — GOV-001/002). */
+ * (an AGENT/MODEL actor may recommend but not approve — GOV-001/002).
+ *
+ * `precondition` (JAN-CMDPRE DWP-01a, DS-001 D1/D8): one advanceStatus literal serves TWO command types whose
+ * legality differs on `decisionType` — a NON-state field no source-state set can reach. Each caller declares
+ * which decision KIND its command may address; a single predicate on the shared literal would refuse every
+ * ApproveDecision on a non-waiver decision. Without this, ApproveDecision aimed at a PROPOSED WAIVER drove it
+ * EFFECTIVE — discharging the assurance floor with a DecisionEffective where a WaiverGranted should be. The
+ * discharge stayed criterion-scoped and expiry-bound (the floor gate reads the OBJECT's WaiverDetail, written at
+ * RequestWaiver and untouched by the exploit), but the GRANT itself went unrecorded: no WaiverGranted fact to
+ * audit (authorizeDecisionEffective checks only legality + authority, and floor-gate reads the resulting OBJECT
+ * without regard to which command produced it).
+ *
+ * Deliberately NO `requireFrom` here: PROPOSED -> EFFECTIVE is Decision.status's only in-arrow to EFFECTIVE and
+ * authorizeDecisionEffective routes through the NOOP-excluding `canTransition`, so the guard — which advanceStatus
+ * runs FIRST — already refuses every wrong-state source. A requireFrom sited behind it is dead code; DWP-01b makes
+ * the source set explicit once precondition enforcement moves ahead of the guard. */
 function makeDecisionEffective(
 	target: 'EFFECTIVE',
 	eventType: string,
+	precondition: (state: Record<string, unknown>, command: DomainCommand) => CommandResult | null,
 	extraMutate?: (base: Record<string, unknown>, command: DomainCommand) => Record<string, unknown>
 ): CommandHandler {
 	return (ctx, command) =>
@@ -170,6 +187,8 @@ function makeDecisionEffective(
 			target,
 			eventType,
 			guard: (state) => {
+				const kindFailure = precondition(state, command);
+				if (kindFailure) return kindFailure;
 				const authority = state.authority as { actorType?: string } | undefined;
 				const authorityHeld = authority?.actorType === 'HUMAN' || authority?.actorType === 'SYSTEM';
 				const check = authorizeDecisionEffective({
@@ -214,10 +233,22 @@ function makeDecisionEffective(
 		});
 }
 
-/** ApproveDecision — PROPOSED -> EFFECTIVE (records the approved subject versions + selected option). */
+/** ApproveDecision — PROPOSED -> EFFECTIVE (records the approved subject versions + selected option).
+ * Addresses any decision kind EXCEPT a waiver (`!== 'WAIVER'`, not `=== 'APPROVAL'` — the seed approves a
+ * PROMOTE_BASELINE decision). Granting a waiver is GrantWaiver's act, which is what records the waiver fact
+ * the floor gate scopes by. */
 export const approveDecision: CommandHandler = makeDecisionEffective(
 	'EFFECTIVE',
 	'DecisionEffective',
+	(state, command) =>
+		String(state.decisionType) === 'WAIVER'
+			? reject(
+					command,
+					'RPH_VALIDATION_SEMANTIC_FAILED',
+					`ApproveDecision cannot make WAIVER decision ${command.targetAggregateId} effective: a waiver becomes effective only via GrantWaiver, whose WaiverGranted event is the waiver fact the assurance floor audits. Approving it here would discharge the floor with no waiver fact recorded.`,
+					[command.targetAggregateId]
+				)
+			: null,
 	(base, command) => {
 		const p = command.payload as ApproveDecisionPayload;
 		return {
@@ -232,7 +263,12 @@ export const approveDecision: CommandHandler = makeDecisionEffective(
 	}
 );
 
-/** RevokeDecision — EFFECTIVE -> REVOKED (triggers impact analysis; cannot retroactively change evidence). */
+/** RevokeDecision — EFFECTIVE -> REVOKED (triggers impact analysis; cannot retroactively change evidence).
+ * AUDITED for the Decision-family kind asymmetry (JAN-CMDPRE DWP-01a): deliberately NO decisionType predicate —
+ * revocation legitimately addresses BOTH kinds. Revoking a granted waiver reinstates the floor obligation it
+ * discharged; revoking an approval withdraws the authorization. Its source set (the machine's single
+ * EFFECTIVE -> REVOKED in-arrow; today a REVOKED re-issue is a NOOP-admitted second DecisionRevoked) is
+ * DWP-04's to author with the rest of the governance family. */
 export const revokeDecision: CommandHandler = (ctx, command) =>
 	advanceStatus(ctx, command, {
 		objectType: DECISION,
@@ -331,24 +367,52 @@ export const requestWaiver: CommandHandler = (ctx, command, payload) => {
 	});
 };
 
-/** GrantWaiver — PROPOSED -> EFFECTIVE (same authority gate as an approval). */
+/** GrantWaiver — PROPOSED -> EFFECTIVE (same authority gate as an approval).
+ * Addresses ONLY a waiver: a non-waiver decision carries no WaiverDetail to scope by, so "granting" it would
+ * mint an effective decision whose WaiverGranted event describes an act that never happened. */
 export const grantWaiver: CommandHandler = makeDecisionEffective(
 	'EFFECTIVE',
 	'WaiverGranted',
+	(state, command) =>
+		String(state.decisionType) !== 'WAIVER'
+			? reject(
+					command,
+					'RPH_VALIDATION_SEMANTIC_FAILED',
+					`GrantWaiver cannot make ${String(state.decisionType)} decision ${command.targetAggregateId} effective: only a Decision of decisionType WAIVER carries the waiver detail the floor gate scopes by. A non-waiver decision becomes effective via ApproveDecision.`,
+					[command.targetAggregateId]
+				)
+			: null,
 	(base, command) => ({
 		...base,
 		effectiveAt: command.issuedAt
 	})
 );
 
-/** DenyWaiver — PROPOSED -> SUPERSEDED (a denied waiver request; DecisionStatus has no DENIED value, §23.1 gap). */
+/** DenyWaiver — PROPOSED -> SUPERSEDED (a denied waiver request; DecisionStatus has no DENIED value, §23.1 gap).
+ * Two preconditions (JAN-CMDPRE DWP-01a), both live because this site has no other guard:
+ *  - decisionType === 'WAIVER': the machine legalises EFFECTIVE -> SUPERSEDED too, so ANY state set derived from
+ *    it admits DenyWaiver aimed at an EFFECTIVE non-waiver — driving a governance authorization to SUPERSEDED
+ *    while emitting WaiverDenied about a decision that never requested a waiver (DS-001 §5 / F-10).
+ *  - requireFrom ['PROPOSED'] (hand-authored from Decision.status's PROPOSED -> SUPERSEDED row): denial addresses
+ *    the REQUEST. Unmaking a GRANTED (EFFECTIVE) waiver is RevokeDecision's act, with its own impact analysis;
+ *    the EFFECTIVE -> SUPERSEDED arrow belongs to supersede flows. */
 export const denyWaiver: CommandHandler = (ctx, command) =>
 	advanceStatus(ctx, command, {
 		objectType: DECISION,
 		statusField: 'status',
 		machine: 'Decision.status',
 		target: 'SUPERSEDED',
-		eventType: 'WaiverDenied'
+		eventType: 'WaiverDenied',
+		guard: (state) =>
+			String(state.decisionType) !== 'WAIVER'
+				? reject(
+						command,
+						'RPH_VALIDATION_SEMANTIC_FAILED',
+						`DenyWaiver cannot supersede ${String(state.decisionType)} decision ${command.targetAggregateId}: it denies a WAIVER request, and this decision never requested one. Superseding a non-waiver decision is a supersede/revoke flow, not a waiver denial.`,
+						[command.targetAggregateId]
+					)
+				: null,
+		requireFrom: ['PROPOSED']
 	});
 
 // ---- Baselines ----

@@ -1,9 +1,14 @@
 // Decision Center — governance acts across the workbench (approvals, waivers, promotions). The list is a read
-// View of every Decision; the actions author governance: propose a Decision (PROPOSED) then approve it (EFFECTIVE).
-// A decision is authority exercised — a PROPOSED recommendation is not approval (INV / RPH-GOV-001/002).
+// View of every Decision; the actions author governance: propose a Decision (PROPOSED) then approve it (EFFECTIVE),
+// or grant/deny a PROPOSED waiver. A decision is authority exercised — a PROPOSED recommendation is not approval
+// (INV / RPH-GOV-001/002). Waivers are NOT proposable here: ProposeDecision cannot carry the WaiverDetail DOC-004
+// §12.2 requires (exact policy, criterion, finding, controls), so a decision it minted as 'WAIVER' could never
+// discharge anything — RequestWaiver is the authoring path (the PWA floor panel drives it). The per-row actions
+// mirror the engine's own preconditions (JAN-CMDPRE DWP-01a): ApproveDecision refuses a WAIVER target, and
+// GrantWaiver/DenyWaiver refuse a non-WAIVER target, so each row offers only the command the engine will accept.
 import { fail } from '@sveltejs/kit';
 import { listDecisions } from '@janumipwb/rph-engine';
-import { dispatch, getEngine, mintUiId } from '$lib/server/workbench';
+import { dispatch, getEngine, hostNow, mintUiId } from '$lib/server/workbench';
 import type { Actions, PageServerLoad } from './$types';
 
 export const load: PageServerLoad = () => {
@@ -56,5 +61,33 @@ export const actions: Actions = {
 		});
 		if (r.status !== 'ACCEPTED') return fail(400, { error: r.error?.message ?? r.status });
 		return { approved: id };
+	},
+
+	// Grant a PROPOSED waiver — PROPOSED -> EFFECTIVE, recording the WaiverGranted fact the floor gate audits.
+	grant: async ({ request }) => {
+		const form = await request.formData();
+		const id = String((form.get('id') ?? '') as string).trim();
+		if (!id) return fail(400, { error: 'A waiver decision id is required to grant.' });
+		const r = dispatch('GrantWaiver', 'DECISION', id, {
+			waiverDecisionId: id,
+			effectiveAt: hostNow(),
+			duration: 'until superseded'
+		});
+		if (r.status !== 'ACCEPTED') return fail(400, { error: r.error?.message ?? r.status });
+		return { granted: id };
+	},
+
+	// Deny a PROPOSED waiver — PROPOSED -> SUPERSEDED (denial addresses the REQUEST; unmaking a granted waiver
+	// is RevokeDecision's act).
+	deny: async ({ request }) => {
+		const form = await request.formData();
+		const id = String((form.get('id') ?? '') as string).trim();
+		const rationale = String((form.get('rationale') ?? '') as string).trim();
+		if (!id) return fail(400, { error: 'A waiver decision id is required to deny.' });
+		const r = dispatch('DenyWaiver', 'DECISION', id, {
+			rationale: rationale || 'Denied from the Decision Center.'
+		});
+		if (r.status !== 'ACCEPTED') return fail(400, { error: r.error?.message ?? r.status });
+		return { denied: id };
 	}
 };

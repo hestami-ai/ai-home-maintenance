@@ -6,14 +6,21 @@
 		form
 	}: {
 		data: PageData;
-		form: { error?: string; proposed?: string; approved?: string } | null;
+		form: {
+			error?: string;
+			proposed?: string;
+			approved?: string;
+			granted?: string;
+			denied?: string;
+		} | null;
 	} = $props();
 
-	// The 9 governance DecisionType values (RPH-DOC-007 §22 / DOC-002 §23.1).
+	// The proposable DecisionType values (RPH-DOC-007 §22 / DOC-002 §23.1) — WAIVER deliberately absent:
+	// ProposeDecision cannot carry DOC-004 §12.2's WaiverDetail, so a waiver proposed here could never
+	// discharge anything and (JAN-CMDPRE DWP-01a) could never be approved. Waivers are born via RequestWaiver.
 	const DECISION_TYPES = [
 		'APPROVAL',
 		'REJECTION',
-		'WAIVER',
 		'ESCALATION',
 		'RESHAPE',
 		'REPLAN',
@@ -77,13 +84,27 @@
 				<td>{d.selectedOption}</td>
 				<td>{d.rationale}</td>
 				<td class="act">
+					<!-- Affordances mirror the engine's preconditions (JAN-CMDPRE DWP-01a): a waiver is granted or
+					     denied, never "approved" — each row offers only the command the engine will accept. -->
 					{#if d.status === 'PROPOSED'}
-						<form method="POST" action="?/approve" use:enhance>
-							<input type="hidden" name="id" value={d.id} />
-							<input type="hidden" name="selectedOption" value={d.selectedOption} />
-							<input type="hidden" name="rationale" value={d.rationale} />
-							<button class="ghost small" type="submit">Approve</button>
-						</form>
+						{#if d.type === 'WAIVER'}
+							<form method="POST" action="?/grant" use:enhance>
+								<input type="hidden" name="id" value={d.id} />
+								<button class="ghost small" type="submit">Grant waiver</button>
+							</form>
+							<form method="POST" action="?/deny" use:enhance>
+								<input type="hidden" name="id" value={d.id} />
+								<input type="hidden" name="rationale" value={d.rationale} />
+								<button class="ghost small" type="submit">Deny</button>
+							</form>
+						{:else}
+							<form method="POST" action="?/approve" use:enhance>
+								<input type="hidden" name="id" value={d.id} />
+								<input type="hidden" name="selectedOption" value={d.selectedOption} />
+								<input type="hidden" name="rationale" value={d.rationale} />
+								<button class="ghost small" type="submit">Approve</button>
+							</form>
+						{/if}
 					{/if}
 				</td>
 			</tr>
@@ -196,9 +217,14 @@
 	}
 	td.act {
 		text-align: right;
+		white-space: nowrap;
 	}
 	td.act form {
 		margin: 0;
+		display: inline-block;
+	}
+	td.act form + form {
+		margin-left: 6px;
 	}
 	.mono {
 		font-family: 'Source Code Pro', monospace;
