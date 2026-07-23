@@ -152,22 +152,23 @@ outcome: "changePwuState's inline four-machine path gains its own precondition: 
 knowledge_status: CONFIRMED
 repository_scope:
   files_or_symbols:
-    - "packages/rph-application/src/handlers/pwu.ts changePwuState (:670-737) — the precondition, sited after the previousState staleness check and before the sub-axis loop"
-    - "packages/rph-engine/src/reference-undertaking.ts — READ ONLY, as the validation fixture"
+    - "packages/rph-application/src/handlers/pwu.ts changePwuState — the `changeNothingPrecondition` (module-level PREDICATE) evaluated via evaluatePrecondition, sited AFTER the previousState staleness check and BEFORE the sub-axis loop"
+    - "packages/rph-application/src/handlers/pwu.test.ts — the all-four-equal + single-orthogonal-axis-hold tests"
+    - "packages/rph-engine/src/reference-undertaking.ts — READ ONLY, the validation fixture (drove unchanged: rph-engine 69/69)"
 required_changes:
-  - "Precondition (PREDICATE kind): refuse iff newState === current.workLifecycleState AND executionState === current AND assuranceState === current AND shapeIntegrityState === current. Message must name which axes were compared, not just 'no change'."
-  - "Do NOT attempt a state-set declaration here: all four targets are payload-derived and the only correct set is the machine's entire state list (DS D10)."
+  - "Precondition (PREDICATE kind, from the DWP-01b command-precondition module — NOT a bespoke inline if, so the rule is a first-class discoverable Precondition even though changePwuState is not an advanceStatus site): refuse iff newState === current.workLifecycleState AND executionState/assuranceState/shapeIntegrityState each === current. Message NAMES all four axes with their values, per the roadmap. DONE."
+  - "Do NOT attempt a state-set declaration here: all four targets are payload-derived and the only correct set is the machine's entire state list (DS D10). HELD — it is a PREDICATE."
 invariants:
-  - "The seeded reference undertaking drives UNCHANGED end to end (it holds at least one axis on every ChangePwuState dispatch)."
-  - "A partial hold (>=1 axis moves) is ACCEPTED exactly as today."
-  - "An all-axes-equal re-issue is REFUSED and appends no event."
+  - "The seeded reference undertaking drives UNCHANGED end to end (it holds at least one axis on every ChangePwuState dispatch). VERIFIED: rph-engine 69/69, including reference-undertaking."
+  - "A partial hold (>=1 axis moves) is ACCEPTED exactly as today. VERIFIED by the single-orthogonal-axis-hold test."
+  - "An all-axes-equal re-issue is REFUSED and appends no event. VERIFIED, mutation-checked live (neutralising the guard fails the test)."
 prohibited_shortcuts:
-  - "Do NOT ban same-state sub-axis transitions — 33/35/57 of the seed's sub-axis dispatches are holds."
+  - "Do NOT ban same-state sub-axis transitions — 33/35/57 of the seed's sub-axis dispatches are holds. HELD: the rule fires only when ALL FOUR are equal."
   - "Do NOT rely on a type or lint to catch a vacuous declaration here; for this command the vacuous value IS correct (DS D10)."
 tests:
-  - "handler: all-axes-equal re-issue REFUSED (no event, no revision bump); each single-axis move ACCEPTED; work-axis hold with a sub-axis move ACCEPTED."
-  - "seed: the reference undertaking builds and the workbench e2e stay green — the explicit acceptance gate for this DWP."
-delivery_state: NOT_STARTED
+  - "handler: all-four-axes-equal re-issue REFUSED (RPH_ILLEGAL_STATE_TRANSITION, no event, no revision bump); a hold advancing a single orthogonal axis ACCEPTED. Axes read live from state so the fixture cannot drift."
+  - "seed: the reference undertaking + full rph-engine suite stay green — the explicit acceptance gate for this DWP."
+delivery_state: DELIVERED
 ```
 
 ```yaml
@@ -397,8 +398,8 @@ Critical path **01a → 01b → 02 → 03 → 04 → 05 → 06 → 07 → 08 →
 2. **The BENIGN classifications remain second-hand** (DS §10 residual 2), now compounded: the critique reclassified sites in three DWPs, so I expect further reclassification during DWP-03/04/05.
 3. **DWP-07's ordering is still unsettled.** The critique did not conclusively establish that the classifier reorder is behaviour-neutral for all 26 non-Baseline machines; until it is measured, "late is safe" is an assumption.
 
-**Readiness: DWP-01a `DELIVERED`** (post-build 4-lens adversarial verification EXECUTED: 11 agents, 6 distinct confirmed findings — the bypass lens found NO remaining path to either exploit; the survivors were 1 MAJOR demo-affordance regression + 5 documentation/test-discipline MINORs, all reconciled in the same changeset). **DWP-01b `DELIVERED`** (mechanism + B4 signature ruling + B3 reorder + 12-site migration). Its post-build 4-lens verification (20 agents) EXECUTED and RECONCILED: 15 confirmed findings — the semantics lens found NO logic defect in the mechanism; the four MAJORs were a single class (six migrated fromStates sets the initial build left without kill coverage), now each carried by a named re-issue test with the mutation discipline verified live; the 11 MINORs (the no-write property made mechanical via clone, a B3 mis-attribution, an unenumerated status-flip/message-reword, stale comments, payload/reader-wiring tests, doc precision) all folded into this changeset. **`READY_TO_BUILD` for DWP-02 next.** DWP-02…09 carry the residuals above; each is re-checked against the tree at its own start. DWP-00 `DELIVERED`.
+**Readiness: DWP-01a `DELIVERED`** (post-build 4-lens adversarial verification EXECUTED: 11 agents, 6 distinct confirmed findings — the bypass lens found NO remaining path to either exploit; the survivors were 1 MAJOR demo-affordance regression + 5 documentation/test-discipline MINORs, all reconciled in the same changeset). **DWP-01b `DELIVERED`** (mechanism + B4 signature ruling + B3 reorder + 12-site migration). Its post-build 4-lens verification (20 agents) EXECUTED and RECONCILED: 15 confirmed findings — the semantics lens found NO logic defect in the mechanism; the four MAJORs were a single class (six migrated fromStates sets the initial build left without kill coverage), now each carried by a named re-issue test with the mutation discipline verified live; the 11 MINORs (the no-write property made mechanical via clone, a B3 mis-attribution, an unenumerated status-flip/message-reword, stale comments, payload/reader-wiring tests, doc precision) all folded into this changeset. **DWP-02 `DELIVERED`** — ChangePwuState's vacuity PREDICATE (all-four-axes-equal REFUSED) on the DWP-01b mechanism; seed drove unchanged (rph-engine 69/69), the mutant verified killed live, and its post-build 3-lens verification (semantics · seed-regression · mechanism-fit) returned ZERO findings after substantial investigation. **`READY_TO_BUILD` for DWP-03 next.** DWP-03…09 carry the residuals above; each is re-checked against the tree at its own start. DWP-00 `DELIVERED`.
 
 ---
 
-*`READY_TO_BUILD` (DWP-02) / v0.2.4 — design authority JAN-CMDPRE-DS-001 v0.2.1. Self-critique EXECUTED: 4 blockers + 5 majors reconciled, one of them a live exploit (B2) now carried back into the design. §19 residual 1's predicted split TAKEN in flight: DWP-01 → DWP-01a (security half) + DWP-01b (mechanism), both now `DELIVERED`, each with post-build adversarial verification executed AND reconciled (01a: 6 findings; 01b: 15 findings, incl. six kill-coverage gaps closed). DWP-00 `DELIVERED`; DWP-02…09 `NOT_STARTED`.*
+*`READY_TO_BUILD` (DWP-03) / v0.2.5 — design authority JAN-CMDPRE-DS-001 v0.2.1. Self-critique EXECUTED: 4 blockers + 5 majors reconciled, one of them a live exploit (B2) now carried back into the design. §19 residual 1's predicted split TAKEN in flight: DWP-01 → DWP-01a (security half) + DWP-01b (mechanism). DWP-00, DWP-01a, DWP-01b, DWP-02 all `DELIVERED`, each with post-build adversarial verification executed AND reconciled (01a: 6 findings; 01b: 15 findings incl. six kill-coverage gaps closed; 02: 0 findings). DWP-03…09 `NOT_STARTED`.*

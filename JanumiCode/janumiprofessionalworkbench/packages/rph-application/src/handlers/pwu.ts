@@ -37,12 +37,49 @@ import {
 	loadOrReject,
 	makeEvent,
 	nextEnvelope,
+	preconditionReader,
 	reject,
 	type CommandHandler,
 	type HandlerContext
 } from './kit.js';
+import { evaluatePrecondition, predicate } from './command-precondition.js';
 
 const PWU = 'PROFESSIONAL_WORK_UNIT';
+
+/**
+ * JAN-CMDPRE DWP-02 (DS-001 D10) — ChangePwuState's vacuity precondition. All four axis targets are
+ * payload-derived and this ONE command drives every arrow on four machines PLUS every legitimate hold, so the only
+ * state set that would admit it is the machine's entire state list — a declaration whose only correct value is
+ * "everything", which no type or lint can flag as vacuous. So the rule is a PREDICATE, not a FROM_STATES set: it
+ * refuses a re-issue in which ALL FOUR axes already equal the requested values. Such a command changes nothing yet
+ * would append a second PwuStateChanged — carrying, e.g., a fresh contradicting `reasonCode` — over a state that
+ * did not move (DOC-002 §27; the same NOOP-admitted-by-checkTransition hole the whole series closes). A hold that
+ * advances at least one orthogonal axis is the DOMINANT case (24 of the seed's 67 workLifecycle dispatches) and
+ * stays legal. Message names every axis compared, per the roadmap.
+ */
+const changeNothingPrecondition = predicate(
+	'ChangePwuState must move at least one of the four axes',
+	({ state, payload }) => {
+		const p = payload as ChangePwuStatePayload;
+		const a = axesOf(state);
+		if (
+			p.newState === a.workLifecycleState &&
+			p.executionState === a.executionState &&
+			p.assuranceState === a.assuranceState &&
+			p.shapeIntegrityState === a.shapeIntegrityState
+		) {
+			return (
+				`ChangePwuState changes nothing: all four axes already equal the requested values ` +
+				`(workLifecycle=${a.workLifecycleState}, execution=${a.executionState}, ` +
+				`assurance=${a.assuranceState}, shapeIntegrity=${a.shapeIntegrityState}). ` +
+				`Re-issuing would append a second PwuStateChanged recording a change that did not happen. ` +
+				`A hold that advances at least one orthogonal axis is legal; a hold of ALL four is not.`
+			);
+		}
+		return null;
+	},
+	'RPH_ILLEGAL_STATE_TRANSITION'
+);
 
 interface PwuAxes {
 	workLifecycleState: string;
@@ -680,6 +717,20 @@ export const changePwuState: CommandHandler = (ctx, command, payload) => {
 			`ChangePwuState previousState ${p.previousState} does not match current ${current.workLifecycleState} (stale)`
 		);
 	}
+	// JAN-CMDPRE DWP-02: refuse an all-axes-equal re-issue BEFORE the sub-axis loop (which would admit it as three
+	// NOOPs). Routed through the DWP-01b mechanism so this bespoke handler's rule is a first-class Precondition;
+	// the predicate reads only (state, payload), so the reader is inert here — settled by DWP-08.
+	const vacuity = evaluatePrecondition(
+		changeNothingPrecondition,
+		{
+			state: structuredClone(loaded.state),
+			payload: structuredClone(command.payload),
+			command,
+			read: preconditionReader(ctx)
+		},
+		{ statusField: 'workLifecycleState', subject: 'PWU', eventType: 'PwuStateChanged' }
+	);
+	if (vacuity) return reject(command, vacuity.code, vacuity.message, [id]);
 	const nextAxes: PwuAxes = {
 		workLifecycleState: p.newState,
 		executionState: p.executionState,

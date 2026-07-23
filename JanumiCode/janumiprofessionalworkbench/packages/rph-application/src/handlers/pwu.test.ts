@@ -702,6 +702,80 @@ describe('PWU lifecycle handlers (live command drive)', () => {
 		expect(r.error?.code).toBe('RPH_ILLEGAL_STATE_TRANSITION');
 	});
 
+	// JAN-CMDPRE DWP-02 (DS-001 D10) — the vacuity precondition. ChangePwuState drives every arrow on four machines
+	// PLUS every hold, so no state SET can express "must move something"; the rule is a PREDICATE. Read the axes
+	// live so the fixture cannot drift out from under the assertions.
+	function readyAxes(): {
+		workLifecycleState: string;
+		executionState: string;
+		assuranceState: string;
+		shapeIntegrityState: string;
+	} {
+		seedIntent();
+		engine.dispatch(cmd('ProposePwu', proposePayload()));
+		engine.dispatch(cmd('BeginPwuShaping', {}));
+		engine.dispatch(
+			cmd('MarkPwuReady', { shapeReadinessAssessmentId: 'a', expectedSemanticVersion: 1 })
+		);
+		const s = store.loadObject(PWU_ID)?.state as {
+			workLifecycleState: string;
+			executionState: string;
+			assuranceState: string;
+			shapeIntegrityState: string;
+		};
+		return {
+			workLifecycleState: s.workLifecycleState,
+			executionState: s.executionState,
+			assuranceState: s.assuranceState,
+			shapeIntegrityState: s.shapeIntegrityState
+		};
+	}
+
+	it('ChangePwuState REFUSES an all-four-axes-equal re-issue and appends no event (DWP-02 vacuity)', () => {
+		const a = readyAxes();
+		const changed = () => store.readAllEvents().filter((e) => e.eventType === 'PwuStateChanged');
+		const before = changed().length;
+		const rev = store.loadObject(PWU_ID)?.revision;
+
+		const r = engine.dispatch(
+			change({
+				previousState: a.workLifecycleState,
+				newState: a.workLifecycleState,
+				executionState: a.executionState,
+				assuranceState: a.assuranceState,
+				shapeIntegrityState: a.shapeIntegrityState
+			})
+		);
+
+		expect(r.status).toBe('REJECTED');
+		expect(r.error?.code).toBe('RPH_ILLEGAL_STATE_TRANSITION');
+		expect(r.error?.message).toContain('all four axes');
+		// The message names every axis compared (roadmap requirement), not just "no change".
+		expect(r.error?.message).toContain('workLifecycle=');
+		expect(r.error?.message).toContain('shapeIntegrity=');
+		expect(changed()).toHaveLength(before); // no contradicting second event
+		expect(store.loadObject(PWU_ID)?.revision).toBe(rev); // no silent revision bump
+	});
+
+	it('ChangePwuState ACCEPTS a hold that advances a SINGLE orthogonal axis (the dominant seed case)', () => {
+		const a = readyAxes();
+		expect(a.assuranceState).toBe('UNASSESSED'); // guard the fixture: the move below must be a real change
+		// Hold workLifecycle/execution/shapeIntegrity; move ONLY assuranceState along its own legal arrow.
+		const r = engine.dispatch(
+			change({
+				previousState: a.workLifecycleState,
+				newState: a.workLifecycleState,
+				executionState: a.executionState,
+				assuranceState: 'EVIDENCE_REQUIRED',
+				shapeIntegrityState: a.shapeIntegrityState
+			})
+		);
+		expect(r.status, r.error?.message).toBe('ACCEPTED');
+		expect((store.loadObject(PWU_ID)?.state as Record<string, string>).assuranceState).toBe(
+			'EVIDENCE_REQUIRED'
+		);
+	});
+
 	it('SupersedePwu moves a non-baselined PWU -> SUPERSEDED', () => {
 		seedIntent();
 		engine.dispatch(cmd('ProposePwu', proposePayload()));
