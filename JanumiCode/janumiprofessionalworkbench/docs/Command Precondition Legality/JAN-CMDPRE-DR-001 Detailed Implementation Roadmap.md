@@ -328,7 +328,8 @@ required_changes:
   - "State explicitly which contradictions are UNREPAIRABLE and why (DOC-007 §9.1)."
 invariants: ["The audit is READ-ONLY. No event is modified, deleted, or compensated."]
 tests: ["the audit runs against the reference seed and its output is committed as the register."]
-delivery_state: NOT_STARTED
+delivered_under: "A read-only scratch runner (packages/rph-engine/src/_dwp09-audit.test.ts — run then REMOVED, not shipped; source embedded in the register §5 for reproducibility) seeded a fresh store via seedWorkbench (the superset history: policy library + Product Realization PWA + Field Service Management Undertaking + reference-undertaking chain) and scanned engine.readAllEvents() only. Scale: 299 events, 104 aggregates. FINDING: ZERO contradictions — no duplicate terminal/once-only event on any aggregate (no DecisionRevoked/BaselineSuperseded/AssurancePolicySuperseded occurs at all; BaselinePromoted/DecisionEffective/BaselineApproved each land once per aggregate, the ×2 tallies being across two DISTINCT aggregates), and ZERO re-pointed PWA roots (one PwaPublished, one rootPwuTypeId, one isRoot type). The only per-aggregate multiplicities are BENIGN and disclosed: PwaEdited ×9 (the bumpPwaSemanticVersion derived write = residual R1) and distinct-payload PwuStateChanged lifecycle steps. docs/Command Precondition Legality/RESIDUALS.md commits the audit + the §3 UNREPAIRABLE rationale (JPWB-DOC-003 §9 PER-1/PER-2 + JPWB-CON-000 AX-7; the roadmap's legacy 'DOC-007 §9.1' resolves to these) + the R1-R5 residual register (R1 bumpPwaSemanticVersion + R2 AppendConversationEntries duplicate-BATCH rule = the two DWP-08 disclosures; R3-R5 = DS-001 §15 standing deferrals). Nothing rewritten — the audit is read-only. No package/gate change (the scratch runner was removed); check-types/test/lint/boundary confirmed unchanged."
+delivery_state: DELIVERED
 ```
 
 ## 10. Data and persistence changes
@@ -376,7 +377,7 @@ A wrong-STATE refusal returns `RPH_ILLEGAL_STATE_TRANSITION` (status `REJECTED`)
 | D5 mandatory | **06 (DELIVERED)** | kit.ts, intent.ts, governance.ts (submitBaselineForReview — the one gap the flip surfaced) | check-types is the gate (compile error to omit); zero edits to existing assertions; dwp06-precondition-coverage.test.ts + mutation-red-proof |
 | D2 + D6 kernel | **07 (DELIVERED)** | stateMachine.ts, gen-transitions.ts, transitions.data.ts (regen), kit.ts | illegal-row invariant green (no assertion weakened); regen diff = exactly the Baseline AUTHORITATIVE→AUTHORITATIVE row; differential test proves exactly one changed classification; split documented at both helpers |
 | D9 commitState | **08 (DELIVERED)** | assurance.ts, pwa-authoring.ts, kit.ts (checkPrecondition), command-precondition.ts (noOpEditPrecondition) | 6 per-KIND predicates (EDIT/DELETION/reader/empty-batch); refusable refused + legitimate succeeds; mutation-red-proofed; seed unchanged; deletePwa already-covered; dup-batch + bumpPwaSemanticVersion = disclosed residuals (dwp08-precondition-coverage.test.ts) |
-| D7 history | 09 | RESIDUALS.md | audit output committed |
+| D7 history | **09 (DELIVERED)** | RESIDUALS.md | read-only audit committed: 299 events / 104 aggregates, ZERO contradictions (no duplicate terminal event, no re-pointed root); §3 UNREPAIRABLE rationale grounded in DOC-003 §9 PER-1/PER-2 + CON-000 AX-7; R1-R5 residual register (R1/R2 = DWP-08 disclosures, R3-R5 = DS-001 §15 deferrals); scratch runner removed (not shipped) |
 
 ## 17. Implementation ordering and concurrency plan
 
@@ -385,6 +386,8 @@ Critical path **01a → 01b → 02 → 03 → 04 → 05 → 06 → 07 → 08 →
 ## 18. Exit criteria and gate package requirements
 
 **Series complete when:** DWP-00…09 `DELIVERED`; full gate green (check-types · test · lint 0 · boundary 0 · svelte-check 0 · Playwright); every state-advancing site carries a declared precondition and omitting one is a compile error; the reference seed drives unchanged; a re-issue at every previously-demonstrated exploit is refused with no event appended; the ratified §24.2 self-edge is honoured end to end; the residual register is committed; **post-build adversarial verification executed + reconciled**. Gate package `G-CMDPRE-001`.
+
+**SERIES COMPLETE (DWP-09 delivered).** All ten increments DWP-00…09 are `DELIVERED`. Every state-advancing site carries a compiler-mandatory precondition (D5/DWP-06); the `commitState` sites carry per-KIND predicates (D9/DWP-08); the kernel honours the ratified §24.2 illegal self-edge (D2+D6/DWP-07); the reference seed drives unchanged across the whole series; and the residual register (RESIDUALS.md) is committed with a read-only audit finding ZERO pre-existing contradictions and disclosing residuals R1–R5. The only remaining open items are the disclosed residuals in that register — none a defect, each with a stated disposition.
 
 ## 19. Self-critique and readiness determination
 
@@ -406,4 +409,4 @@ Critical path **01a → 01b → 02 → 03 → 04 → 05 → 06 → 07 → 08 →
 
 ---
 
-*`READY_TO_BUILD` (DWP-04) / v0.2.6 — design authority JAN-CMDPRE-DS-001 v0.2.1. Self-critique EXECUTED: 4 blockers + 5 majors reconciled, one of them a live exploit (B2) now carried back into the design. §19 residual 1's predicted split TAKEN in flight: DWP-01 → DWP-01a (security half) + DWP-01b (mechanism). DWP-00, DWP-01a, DWP-01b, DWP-02, DWP-03 all `DELIVERED`, each with post-build adversarial verification executed AND reconciled (01a: 6 findings; 01b: 15 findings incl. six kill-coverage gaps closed; 02: 0 findings; 03: 3 MINORs, no logic defect). DWP-04…09 `NOT_STARTED`.*
+*`SERIES COMPLETE` / v1.0.0 — design authority JAN-CMDPRE-DS-001 v0.2.1. Self-critique EXECUTED: 4 blockers + 5 majors reconciled, one of them a live exploit (B2) carried back into the design. §19 residual 1's predicted split TAKEN in flight: DWP-01 → DWP-01a (security half) + DWP-01b (mechanism). **All ten increments DWP-00, 01a, 01b, 02, 03, 04, 05, 06, 07, 08, 09 `DELIVERED`**, each with post-build adversarial verification executed AND reconciled (01a: 6 findings; 01b: 15 findings incl. six kill-coverage gaps closed; 02: 0 findings; 03: 3 MINORs; 04/05: 2 independent lenses clean; 06: the mandatory flip surfaced submitBaselineForReview as predicted; 07: regen diff = exactly the §24.2 self-edge; 08: adversarial verify caught the AppendConversationEntries over-refusal, deferred as residual R2; 09: read-only audit, ZERO contradictions, residuals R1–R5 registered). Residual weaknesses §19.1–.3 all discharged in flight. Standing open items = the RESIDUALS.md register only (R1–R5), none a defect.*
