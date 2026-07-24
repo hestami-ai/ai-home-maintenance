@@ -172,6 +172,8 @@ type CommandHandlerReject = ReturnType<typeof reject>;
 export const beginIntentDiscovery: CommandHandler = (ctx, command) =>
 	advanceIntent(ctx, command, {
 		target: 'UNDER_DISCOVERY',
+		// JAN-CMDPRE DWP-03: Intent.intentStatus has a single in-arrow to UNDER_DISCOVERY, from RAW.
+		precondition: fromStates('RAW'),
 		eventType: 'IntentDiscoveryStarted',
 		// The event records the RESULTING status. IntentDiscoveryStarted declares `intentStatus`, which the
 		// BeginIntentDiscovery command payload ({}) does not carry — so the default emitted `{}` recorded nothing of
@@ -183,6 +185,8 @@ export const beginIntentDiscovery: CommandHandler = (ctx, command) =>
 export const provisionIntent: CommandHandler = (ctx, command, payload) =>
 	advanceIntent(ctx, command, {
 		target: 'PROVISIONAL',
+		// JAN-CMDPRE DWP-03: single in-arrow to PROVISIONAL, from UNDER_DISCOVERY.
+		precondition: fromStates('UNDER_DISCOVERY'),
 		eventType: 'IntentProvisioned',
 		mutate: (c) => {
 			const p = payload as ProvisionIntentPayload;
@@ -195,6 +199,8 @@ export const formalizeIntent: CommandHandler = (ctx, command, payload) => {
 	const p = payload as FormalizeIntentPayload;
 	return advanceIntent(ctx, command, {
 		target: 'FORMALIZED',
+		// JAN-CMDPRE DWP-03: single in-arrow to FORMALIZED, from PROVISIONAL.
+		precondition: fromStates('PROVISIONAL'),
 		eventType: 'IntentFormalized',
 		mutate: (c) => ({
 			...c,
@@ -228,6 +234,14 @@ export const approveIntent: CommandHandler = (ctx, command, payload) => {
 	const p = payload as ApproveIntentPayload;
 	return advanceIntent(ctx, command, {
 		target: 'APPROVED',
+		// JAN-CMDPRE DWP-03: Intent.intentStatus has TWO in-arrows to APPROVED — FORMALIZED (first approval) and
+		// REVISED (re-approval after a revision). Authored from the MACHINE, deliberately WIDER than the vocab's
+		// `drivesFrom`, which says FORMALIZED only (DS-001 D4: the vocab has no ratified authority and is narrower
+		// than the machine here; the handler's own docstring already says FORMALIZED|REVISED). This refuses a
+		// re-issue against an already-APPROVED intent (the stale-version precheck below only fired if the same
+		// version was re-sent; now the source-state guard refuses it first) while keeping the legitimate
+		// REVISED -> APPROVED re-approval cycle.
+		precondition: fromStates('FORMALIZED', 'REVISED'),
 		eventType: 'IntentApproved',
 		// Event payload per DOC-007 §10.7 (IntentApprovedPayload) — was the raw ApproveIntent command payload, which
 		// lacks intentStatus. Contract-drift fix: approvalScope (WHAT the approval authorized) is required on the

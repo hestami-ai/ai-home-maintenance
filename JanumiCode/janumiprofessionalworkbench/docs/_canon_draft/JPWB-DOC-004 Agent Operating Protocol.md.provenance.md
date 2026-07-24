@@ -87,3 +87,6 @@ Cross-artifact residue closed by the program finalizer: Attention Item entries a
 
 ## Amendment pass (2026-07-16, sponsor-directed: AssessmentCriterion incident)
 REG-D-008 applied: CON-000 B1 gained the reference-artifact non-example (implementation is never its own shape authority); DOC-004 §2.3 gained the reference/experiment discipline paragraph; REG-005 gained REG-D-008 (decision) + REG-F-005 (the AssessmentCriterion impoverishment, DOCS_STRONGER + B7); Ratify Sheet Part 4 gained retirement precondition 2 (shape-survivorship audit). Source: sponsor discussion of the {id, statement, mandatory} vs ratified 8-field criterion gap found against the pre-canon corpus.
+
+## Amendment pass 2 (2026-07-16, sponsor-directed: three-tier architecture)
+REG-D-009 applied: CON-000 B1 now recognizes the JPWB-SPEC-nnn series (deep reference specifications, per-subsystem, individually ratified, HYPOTHESIS, subordinate to DOC-003); DOC-004 §2.1 gained the SPEC load rule + 'SPEC absence = finding, never license for economy' + ungoverned-ground non-example; REG-005 gained REG-D-009 (rationale: rigor tracks visible obligation surface — the sponsor-observed antidote to implementation economy); Ratify Sheet gained the countersign row. Sequencing rule binds PLN-006 when generated: brief → forks → SPEC → artifacts → implementation.

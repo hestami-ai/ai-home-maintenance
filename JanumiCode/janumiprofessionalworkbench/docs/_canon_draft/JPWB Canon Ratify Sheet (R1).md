@@ -116,6 +116,7 @@ These were made in session by sponsor + drafting agent; per B2 they require your
 | REG-D-006 | Source corpus retirement upon ratification | ☐ |
 | REG-D-007 | Delegation boundaries | ☐ |
 | REG-D-008 | Reference/experiment split; shape-survivorship audit as retirement gate (sponsor-directed 2026-07-16, motivated by REG-F-005) | ☐ |
+| REG-D-009 | Three-tier documentation architecture: canon overview + JPWB-SPEC-nnn deep reference specifications + enforced reference artifacts; spec-before-implementation on governed ground; SPEC absence = finding, never license for economy (sponsor-directed 2026-07-16) | ☐ |
 | Sections B–D | 25 carried Guide §16 questions (B), 23 extraction questions (C), 4 founding findings (D) — ratified as *faithfully recorded*, not as answered | ☐ |
 
 ## Part 3 — Elicitation questions (REG-E-001..022)

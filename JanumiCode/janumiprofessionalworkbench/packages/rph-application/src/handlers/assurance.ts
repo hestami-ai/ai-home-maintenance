@@ -412,6 +412,9 @@ export const admitEvidence: CommandHandler = (ctx, command, payload) => {
 		statusField: 'status',
 		machine: 'Evidence.status',
 		target: 'ADMISSIBLE',
+		// JAN-CMDPRE DWP-03: single in-arrow to ADMISSIBLE, from PROPOSED (Evidence.status). A re-admit of
+		// already-ADMISSIBLE evidence would re-run the admissibility guard and append a second EvidenceAdmitted.
+		precondition: fromStates('PROPOSED'),
 		eventType: 'EvidenceAdmitted',
 		// §14.3 EvidenceAdmittedPayload — was the raw AdmitEvidence command payload (admissibilityAssessmentId /
 		// admittedScope / admittedClaimIds, which §14.3 does want, verbatim). Delta: + evidenceId (the target
@@ -452,6 +455,9 @@ export const invalidateEvidence: CommandHandler = (ctx, command) =>
 		statusField: 'status',
 		machine: 'Evidence.status',
 		target: 'INVALIDATED',
+		// JAN-CMDPRE DWP-03: single in-arrow to INVALIDATED, from ADMISSIBLE (Evidence.status). A re-issue against
+		// already-INVALIDATED evidence would append a second EvidenceInvalidated and re-trigger P4 claim re-contest.
+		precondition: fromStates('ADMISSIBLE'),
 		eventType: 'EvidenceInvalidated'
 	});
 
@@ -555,6 +561,10 @@ export const expireAssumption: CommandHandler = (ctx, command, payload) => {
 		statusField: 'status',
 		machine: 'Assumption.status',
 		target: 'EXPIRED',
+		// JAN-CMDPRE DWP-03: Assumption.status has FOUR in-arrows to EXPIRED — from PROPOSED, DISCLOSED,
+		// UNDER_VERIFICATION, ACCEPTED (every non-terminal state; VERIFIED/FALSIFIED/EXPIRED/SUPERSEDED are terminal).
+		// A re-issue against an already-EXPIRED assumption would append a second AssumptionExpired.
+		precondition: fromStates('PROPOSED', 'DISCLOSED', 'UNDER_VERIFICATION', 'ACCEPTED'),
 		eventType: 'AssumptionExpired',
 		eventPayload: () => ({
 			status: 'EXPIRED',

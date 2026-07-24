@@ -30,6 +30,7 @@ import {
 	type CommandHandler,
 	type HandlerContext
 } from './kit.js';
+import { fromStates } from './command-precondition.js';
 
 const DECOMP = 'DECOMPOSITION_CONTRACT';
 const RECOMP = 'RECOMPOSITION_CONTRACT';
@@ -242,6 +243,13 @@ export const validateDecomposition: CommandHandler = (ctx, command, payload) => 
 		statusField: 'status',
 		machine: 'DecompositionContract.status',
 		target: mapping.target,
+		// JAN-CMDPRE DWP-03: the target is payload-derived (VALID|CONDITIONALLY_VALID|INVALID), but ALL THREE share
+		// a SINGLE in-arrow — from UNDER_REVIEW — so the source precondition is a clean state set, NOT a D10-shaped
+		// predicate (the roadmap's DWP-03 note over-worried: a payload-derived TARGET does not imply a varying
+		// SOURCE, unlike ChangePwuState where the source itself varied). This refuses a re-issue against a contract
+		// that already left review (VALID/COND/INVALID -> the same disposition is a NOOP checkTransition admits;
+		// a different disposition is not even an arrow), which would flip/append a contradicting DecompositionValidated.
+		precondition: fromStates('UNDER_REVIEW'),
 		eventType: mapping.event,
 		// P2/P3 conservation gate — only when the validator claims the decomposition holds (VALID/COND); an
 		// INVALID verdict already rejects it. See checkDecompositionConservation.
@@ -272,6 +280,10 @@ export const reviseDecomposition: CommandHandler = (ctx, command) =>
 		statusField: 'status',
 		machine: 'DecompositionContract.status',
 		target: 'SUPERSEDED',
+		// JAN-CMDPRE DWP-03: DecompositionContract.status has THREE in-arrows to SUPERSEDED — from VALID,
+		// CONDITIONALLY_VALID, INVALID (a revision supersedes a REVIEWED contract; DRAFT/UNDER_REVIEW do not revise).
+		// A re-issue bumps semanticVersion, so an un-guarded re-revise would inflate the version with no real change.
+		precondition: fromStates('VALID', 'CONDITIONALLY_VALID', 'INVALID'),
 		eventType: 'DecompositionRevised',
 		bumpSemanticVersion: true
 	});
@@ -324,6 +336,17 @@ export const beginRecomposition: CommandHandler = (ctx, command) =>
 		statusField: 'status',
 		machine: 'RecompositionContract.status',
 		target: 'EVALUATING',
+		// JAN-CMDPRE DWP-03: RecompositionContract.status has THREE in-arrows to EVALUATING — READY (first pass) and
+		// CONFLICTED/INSUFFICIENT ("re-evaluation after remediation"). No separate re-evaluation command exists
+		// (registry has only Propose/Begin/CompleteRecomposition), so BeginRecomposition IS the re-evaluation driver;
+		// authoring the machine's full set keeps that legitimate. A re-issue from EVALUATING (already evaluating) is
+		// the only NOOP, and it is refused. RESOLVED (DWP-03 UNCLEAR row): no consumer treats a duplicate
+		// RecompositionStarted as a distinct attempt — replay-conformance checks event-TYPE set membership only, and
+		// the §26 canonical fixture (expected-events.jsonl / m13-replay.json) carries exactly one. (The live seed
+		// driveReferenceUndertaking drives NO recomposition at all — replay-conformance pins RecompositionStarted in
+		// its `missing` list — so it is silent on the count either way.) Admitting re-evaluations (which legitimately
+		// re-emit) therefore breaks nothing; refusing the true NOOP is the only thing needed.
+		precondition: fromStates('READY', 'CONFLICTED', 'INSUFFICIENT'),
 		eventType: 'RecompositionStarted'
 	});
 
@@ -392,6 +415,12 @@ export const completeRecomposition: CommandHandler = (ctx, command, payload) => 
 		statusField: 'status',
 		machine: 'RecompositionContract.status',
 		target: RECOMP_OUTCOME_STATE[evaluation.status] ?? 'INSUFFICIENT',
+		// JAN-CMDPRE DWP-03: like validateDecomposition, the target is EVALUATION-derived
+		// (COMPOSABLE|CONFLICTED|INSUFFICIENT) but ALL THREE share a SINGLE in-arrow — from EVALUATING — so the
+		// source precondition is a clean state set, NOT a D10 predicate (roadmap over-worried). This is the
+		// EVALUATING -> outcome hop (NOT the machine's COMPOSABLE -> SATISFIED arrow its `completeRecomposition`
+		// trigger label names); a re-issue from a settled outcome is refused, so no contradicting second evaluation.
+		precondition: fromStates('EVALUATING'),
 		eventType: evaluation.event,
 		eventPayload: () => ({
 			status: RECOMP_OUTCOME_STATE[evaluation.status] ?? 'INSUFFICIENT',
