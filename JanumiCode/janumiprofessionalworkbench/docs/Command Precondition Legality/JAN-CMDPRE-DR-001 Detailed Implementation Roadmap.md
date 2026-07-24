@@ -218,25 +218,26 @@ delivery_state: DELIVERED
 
 ```yaml
 id: JAN-CMDPRE-DWP-05
-title: "Author preconditions — pwa-authoring and the SEVEN execution PLAN-level sites"
+title: "Author preconditions — pwa-authoring publication (4) and the SEVEN execution PLAN-level sites"
 master_work_packages: [DS-001:D4, DS-001:D8]
-outcome: "pwa-authoring's remaining 4 sites and the 7 execution PLAN-level sites — the seam no grounding inventory covered, in the file a prior commit claimed to have hardened — carry authored preconditions."
-knowledge_status: PARTIAL
+outcome: "The 11 ELEVEN status-advancing sites are authored: execution.ts approveExecutionPlan(UNDER_REVIEW), activateExecutionPlan(APPROVED), cancelExecutionPlan(APPROVED|ACTIVE), completeExecutionPlan(ACTIVE), failExecutionPlan(ACTIVE), supersedeExecutionPlan(PROPOSED|UNDER_REVIEW|APPROVED|ACTIVE), applyTacticalChange(ACTIVE, the declared hold); pwa-authoring.ts submitPwaForReview(DRAFT), validatePwa(UNDER_REVIEW), deprecatePwa(PUBLISHED), retirePwa(DEPRECATED). The 5 commitState/edit-append sites (DeletePwa, EditPwa, EditPwuType, RemovePwuType, AppendConversationEntries) are NOT status advances and are deferred to DWP-08 (reader-precondition variant)."
+knowledge_status: CONFIRMED
+delivered_under: "DWP-05 step 1 (empirical establishment via a 16-site establish->verify->synthesize workflow, run wf_aa098578-c84) CONFIRMED the PARTIAL exposures and CORRECTED RetirePwa; the sponsor approved the target-set proposal ('Proceed') and the four fork resolutions as delegated authority (2026-07-24). Every set authored from its machine's own in-arrows (ExecutionPlan.status transitions.data.ts:1355-1420; PWA.publicationStatus :1616-1630)."
 repository_scope:
   files_or_symbols:
-    - "pwa-authoring.ts:792,836 + the remaining unguarded sites"
-    - "execution.ts:263 (Approve), :324 (Activate — canActivatePlan-protected), :368 (CancelPlan), :393 (CompletePlan — its guard is re-issue-STABLE and does not protect), :433 (FailPlan), :457 (SupersedePlan), :491 (ApplyTacticalChange — the DECLARED HOLD)"
+    - "execution.ts approveExecutionPlan(:262), activateExecutionPlan(:323), cancelExecutionPlan(:367), completeExecutionPlan(:392), failExecutionPlan(:431), supersedeExecutionPlan(:455), applyTacticalChange(:490)"
+    - "pwa-authoring.ts submitPwaForReview(:695), validatePwa(:786), deprecatePwa(:853), retirePwa(:863)"
 required_changes:
-  - "ApplyTacticalChange declares fromStates(['ACTIVE']) and drives to ACTIVE — the hold stated honestly, per DS §5. Its hand-rolled status guard then becomes redundant; remove it or keep it and say which is authoritative."
-  - "CompleteExecutionPlan: its existing guard is trivially still true on an already-COMPLETED plan (DS F-7) — the precondition is what actually protects it."
-  - "Establish the four unconfirmed exposures (Cancel/Fail/Supersede/Complete plan) empirically before authoring; knowledge_status is PARTIAL for exactly this reason."
+  - "DONE. ApplyTacticalChange declares fromStates('ACTIVE') (the honest hold, DS §5) and its redundant hand-rolled status guard was REMOVED — the precondition is the single authoritative source-state declaration. Load-bearing beyond NOOP closure: without it, APPROVED->ACTIVE is a LEGAL transition, so a tactical change would be a backdoor activation bypassing canActivatePlan (proven by the mutation red-proof)."
+  - "DONE. ENUMERATED CODE CHANGE (INV-7): activateExecutionPlan was GUARD_ONLY_ACCIDENTAL — canActivatePlan's canTransition (NOOP-excluding) refused an already-ACTIVE re-issue with the WRONG code RPH_INVARIANT_VIOLATION; now RPH_ILLEGAL_STATE_TRANSITION from the precondition ahead of the guard. The one-active-plan-per-PWU rule (RPH-EXE-001) is retained in the guard (INV-3 non-example), verified unaffected by execution-plan-activation-guard.test.ts."
+  - "DONE. Guard-mask corrections (INV-3): completeExecutionPlan (step guard), supersedeExecutionPlan (successor guard), validatePwa (pwaCompositionGate, the PILOT-002 ordering issue) all sit the precondition ahead of a content/structural guard, so a wrong-state input now refuses on STATE. Guards retained for legitimate inputs."
+  - "RECLASSIFICATION (DWP-05 step 1): RetirePwa was recorded codeChange=none by the establish agent (a wrong-state parity fallacy); the verify agent CORRECTED it — the NOOP closure still requires the source edit. The 5 commitState sites were re-classified out of DWP-05 into DWP-08 (no status advance)."
 invariants:
-  - "The declared ACTIVE->ACTIVE hold still works; a re-issued ApplyTacticalChange that changes nothing does not."
-  - "Plan-terminal e2e (execution-tier3) stay green."
+  - "The declared ACTIVE->ACTIVE hold still works and is REPEATABLE (two distinct tactical changes accepted); a re-issue from a non-ACTIVE state does not. VERIFIED (dwp05-precondition-coverage.test.ts)."
+  - "No currently-refused command becomes accepted; every reachable source still succeeds (INV-5 two-source Cancel; the 3 reachable sources of the 4-source Supersede — PROPOSED is machine-legal but unreachable, ProposeExecutionPlan creates plans in UNDER_REVIEW). VERIFIED. Full gate green (check-types 21/21, vitest full-monorepo incl. rph-application 338, lint, boundary 0, playwright 49/49)."
 tests:
-  - "handler: double ApproveExecutionPlan -> REJECTED with ONE ExecutionPlanApproved (the one executed exposure); each plan-terminal command refuses a re-issue."
-  - "e2e: the full execution suite regression."
-delivery_state: NOT_STARTED
+  - "NEW dwp05-precondition-coverage.test.ts (18): per-site negative kill (re-issue from target + a wrong source) at RPH_ILLEGAL_STATE_TRANSITION with no second event / no revision bump; two-source Cancel + 3-reachable-source Supersede positives; the ActivateExecutionPlan code-change assertion; the Complete/Supersede/Validate guard-mask corrections; the ApplyTacticalChange declared-hold (admitted + repeatable) + wrong-state refusal. Mutation red-proof performed LIVE: weakening all 11 sets (widen 10, delete the hold's) made EXACTLY the 11 kill/wrong-state tests RED and left all 7 positives green (CON-000 B7). No existing test needed updating."
+delivery_state: DELIVERED
 ```
 
 ```yaml
@@ -369,7 +370,7 @@ A wrong-STATE refusal returns `RPH_ILLEGAL_STATE_TRANSITION` (status `REJECTED`)
 | D1 precondition shape | 01b | command-precondition.ts, kit.ts, intent.ts | unit + DWP-00 tests unchanged |
 | D8 wrong-source half | 01a | governance.ts | DenyWaiver-on-approval refused |
 | D10 ChangePwuState | 02 | pwu.ts | seed drives unchanged |
-| D4 authored allowlists | **03 (intent+evidence/assumption+decomp/recomp, DELIVERED)**, **04 (governance ×3 + AssurancePolicy ×3, DELIVERED)**, 05 | intent.ts, assurance.ts, decomposition.ts, governance.ts | refusal + widest-legal-path per site (dwp03-, dwp04-precondition-coverage.test.ts); DWP-04 mutation-red-proofed live + adversarially verified |
+| D4 authored allowlists | **03 (intent+evidence/assumption+decomp/recomp, DELIVERED)**, **04 (governance ×3 + AssurancePolicy ×3, DELIVERED)**, **05 (execution plan-level ×7 + pwa-authoring publication ×4, DELIVERED)** | intent.ts, assurance.ts, decomposition.ts, governance.ts, execution.ts, pwa-authoring.ts | refusal + widest-legal-path per site (dwp03-/dwp04-/dwp05-precondition-coverage.test.ts); DWP-04/05 mutation-red-proofed live + adversarially verified |
 | D5 mandatory | 06 | kit.ts, intent.ts | check-types; zero assertion edits |
 | D2 + D6 kernel | 07 | stateMachine.ts, gen-transitions.ts | illegal-row invariant green, 27-machine differential |
 | D9 commitState | 08 | assurance.ts, pwa-authoring.ts | no-change edit refused |

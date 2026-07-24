@@ -49,6 +49,7 @@ import {
 	type HandlerContext
 } from './kit.js';
 import { floorGateBlock, stepOutputIsAiProduced, stepResultSubjects } from './floor-gate.js';
+import { fromStates } from './command-precondition.js';
 
 const PLAN = 'EXECUTION_PLAN';
 const MACHINE = 'ExecutionPlan.status';
@@ -269,6 +270,13 @@ export const approveExecutionPlan: CommandHandler = (ctx, command) =>
 		// The event records the RESULTING status. ExecutionPlanApproved declares `status` (APPROVED), which the
 		// empty command payload does not carry — so the default emit recorded nothing of the transition. (Pinned.)
 		eventPayload: () => ({ status: 'APPROVED' }),
+		// JAN-CMDPRE DWP-05: the sole in-arrow to APPROVED is UNDER_REVIEW (ExecutionPlan.status). Before this, an
+		// already-APPROVED re-issue was a NOOP that appended a second ExecutionPlanApproved. Sited ahead of the guard
+		// (INV-3), it also corrects a latent mask: a wrong-state plan whose PWU ALSO has a dead assumption used to
+		// refuse RPH_INVARIANT_VIOLATION (the guard runs before checkTransition); the state fact now refuses first with
+		// RPH_ILLEGAL_STATE_TRANSITION. The RPH-ASM-006 guard is retained for the legitimate UNDER_REVIEW input (INV-3
+		// non-example).
+		precondition: fromStates('UNDER_REVIEW'),
 		// RPH-ASM-006: a plan may not authorize new work on an expired/falsified/superseded assumption.
 		guard: (state, hctx) => {
 			const workUnitId = typeof state.workUnitId === 'string' ? state.workUnitId : '';
@@ -327,6 +335,14 @@ export const activateExecutionPlan: CommandHandler = (ctx, command) =>
 		machine: MACHINE,
 		target: 'ACTIVE',
 		eventType: 'ExecutionPlanActivated',
+		// JAN-CMDPRE DWP-05: the sole in-arrow to ACTIVE is APPROVED (ExecutionPlan.status). This was a
+		// GUARD_ONLY_ACCIDENTAL site — canActivatePlan routes through canTransition (NOOP-excluding), so an
+		// already-ACTIVE re-issue was refused, but with the WRONG code RPH_INVARIANT_VIOLATION. ENUMERATED CODE CHANGE
+		// (INV-7): sited ahead of the guard, the wrong-state/NOOP re-issue now refuses RPH_ILLEGAL_STATE_TRANSITION. The
+		// one-active-plan-per-PWU rule (RPH-EXE-001) is an INDEPENDENT invariant retained in the guard as
+		// RPH_INVARIANT_VIOLATION — an APPROVED plan with a sibling ACTIVE plan passes the precondition and the guard
+		// still fires (INV-3 non-example).
+		precondition: fromStates('APPROVED'),
 		// DOC-007 §15.3 ExecutionPlanActivatedPayload. This emitted the raw ActivateExecutionPlan command payload
 		// (§15.2: { approvalDecisionId?, authorizedRuntimeBindingIds }) — three ratified fields missing
 		// (executionPlanId, workUnitId, planVersion), `status` missing. Every field derives: the ids/version from the
@@ -363,14 +379,18 @@ export const activateExecutionPlan: CommandHandler = (ctx, command) =>
 		}
 	});
 
-/** CancelExecutionPlan — APPROVED|ACTIVE -> CANCELLED (emits ExecutionTerminated). */
+/** CancelExecutionPlan — APPROVED|ACTIVE -> CANCELLED (emits ExecutionTerminated).
+ *  `precondition: fromStates('APPROVED', 'ACTIVE')` (JAN-CMDPRE DWP-05) — the machine's TWO in-arrows to CANCELLED
+ *  (ExecutionPlan.status). NONE site: an already-CANCELLED re-issue was a NOOP appending a second ExecutionTerminated.
+ *  Both sources are exercised by the mandatory two-source positive fixture (INV-5). */
 export const cancelExecutionPlan: CommandHandler = (ctx: HandlerContext, command: DomainCommand) =>
 	advanceStatus(ctx, command, {
 		objectType: PLAN,
 		statusField: 'status',
 		machine: MACHINE,
 		target: 'CANCELLED',
-		eventType: 'ExecutionTerminated'
+		eventType: 'ExecutionTerminated',
+		precondition: fromStates('APPROVED', 'ACTIVE')
 	});
 
 /**
@@ -397,6 +417,12 @@ export const completeExecutionPlan: CommandHandler = (ctx, command) =>
 		target: 'COMPLETED',
 		eventType: 'ExecutionPlanCompleted',
 		eventPayload: () => ({ status: 'COMPLETED' }),
+		// JAN-CMDPRE DWP-05: the sole in-arrow to COMPLETED is ACTIVE (ExecutionPlan.status). NONE site — an
+		// already-COMPLETED re-issue was a NOOP appending a second ExecutionPlanCompleted. Sited ahead of the guard
+		// (INV-3): a wrong-state plan (e.g. APPROVED) with non-terminal steps used to refuse the step-guard's
+		// RPH_INVARIANT_VIOLATION; the state fact now refuses first with RPH_ILLEGAL_STATE_TRANSITION. The step-success
+		// allow-list guard is retained for the legitimate ACTIVE input (INV-3 non-example).
+		precondition: fromStates('ACTIVE'),
 		guard: (state) => {
 			const steps = Array.isArray(state.steps)
 				? (state.steps as Array<{ stepState?: string }>)
@@ -426,8 +452,10 @@ export const completeExecutionPlan: CommandHandler = (ctx, command) =>
 		}
 	});
 
-/** FailExecutionPlan — ACTIVE -> FAILED (JAN-EXECPLAN-DR-002 DWP-01 / §36.2). The machine only permits FAILED from
- *  ACTIVE, so checkTransition guards the source; the event records the failureReason. Exec ≠ assurance (INV-5). */
+/** FailExecutionPlan — ACTIVE -> FAILED (JAN-EXECPLAN-DR-002 DWP-01 / §36.2). `precondition: fromStates('ACTIVE')`
+ *  (JAN-CMDPRE DWP-05) — the machine's single in-arrow to FAILED. checkTransition alone did NOT guard the source: it
+ *  admits the FAILED -> FAILED NOOP, so an already-FAILED re-issue appended a second ExecutionPlanFailed. The
+ *  precondition closes that NOOP. The event records the failureReason. Exec ≠ assurance (INV-5). */
 export const failExecutionPlan: CommandHandler = (ctx, command) => {
 	const p = command.payload as FailExecutionPlanPayload;
 	return advanceStatus(ctx, command, {
@@ -436,6 +464,7 @@ export const failExecutionPlan: CommandHandler = (ctx, command) => {
 		machine: MACHINE,
 		target: 'FAILED',
 		eventType: 'ExecutionPlanFailed',
+		precondition: fromStates('ACTIVE'),
 		eventPayload: () => ({
 			status: 'FAILED',
 			failureReason: p.failureReason,
@@ -464,6 +493,14 @@ export const supersedeExecutionPlan: CommandHandler = (ctx, command) => {
 			supersedingExecutionPlanId: p.supersedingExecutionPlanId,
 			status: 'SUPERSEDED'
 		}),
+		// JAN-CMDPRE DWP-05: the machine's FOUR in-arrows to SUPERSEDED are PROPOSED, UNDER_REVIEW, APPROVED, ACTIVE
+		// (ExecutionPlan.status) — every non-terminal state. NONE site: an already-SUPERSEDED re-issue was a NOOP
+		// appending a second ExecutionPlanSuperseded (and, naming a different successor, rewriting the recorded
+		// supersedingExecutionPlanId). All four sources are exercised by the widest-in-arrow positive fixture (INV-5).
+		// Sited ahead of the guard (INV-3): an already-SUPERSEDED re-issue naming a dangling/foreign successor used to
+		// refuse the successor-guard's RPH_VALIDATION_SEMANTIC_FAILED; the state fact now refuses first with
+		// RPH_ILLEGAL_STATE_TRANSITION. The successor-validity guard is retained for legitimate inputs (INV-3 non-example).
+		precondition: fromStates('PROPOSED', 'UNDER_REVIEW', 'APPROVED', 'ACTIVE'),
 		guard: (state) => {
 			const successor = ctx.store.loadObject(p.supersedingExecutionPlanId)?.state as
 				| { workUnitId?: string }
@@ -485,8 +522,13 @@ export const supersedeExecutionPlan: CommandHandler = (ctx, command) => {
 	});
 };
 
-/** ApplyTacticalChange — ACTIVE -> ACTIVE (a within-plan tactical adjustment; no plan-status change). Requires
- * the plan to be ACTIVE and an authorizing policy (tactical changes only when policy authorizes, §20.2). */
+/** ApplyTacticalChange — ACTIVE -> ACTIVE (a within-plan tactical adjustment; no plan-status change). The DECLARED
+ * HOLD (JAN-CMDPRE DWP-05; DS-001 §5): a tactical change is a legitimate REPEATED action on a live plan, so
+ * ACTIVE -> ACTIVE is admitted, not refused. `precondition: fromStates('ACTIVE')` states that honestly — the plan
+ * must be ACTIVE. This REPLACES the prior hand-rolled `state.status === 'ACTIVE'` guard, which checked the same fact
+ * and returned the same code (RPH_ILLEGAL_STATE_TRANSITION) but as a bespoke guard rather than the standard
+ * precondition mechanism; the precondition is now the single authoritative source-state declaration (roadmap DWP-05:
+ * "remove it or keep it and say which is authoritative" — removed). */
 export const applyTacticalChange: CommandHandler = (ctx, command) =>
 	advanceStatus(ctx, command, {
 		objectType: PLAN,
@@ -494,14 +536,7 @@ export const applyTacticalChange: CommandHandler = (ctx, command) =>
 		machine: MACHINE,
 		target: 'ACTIVE',
 		eventType: 'TacticalChangeApplied',
-		guard: (state) =>
-			state.status === 'ACTIVE'
-				? null
-				: reject(
-						command,
-						'RPH_ILLEGAL_STATE_TRANSITION',
-						`ApplyTacticalChange requires an ACTIVE plan (is ${String(state.status)})`
-					)
+		precondition: fromStates('ACTIVE')
 	});
 
 /**

@@ -691,14 +691,17 @@ export const removePwuType: CommandHandler = (ctx, command) => {
 	);
 };
 
-/** SubmitPwaForReview — DRAFT -> UNDER_REVIEW. */
+/** SubmitPwaForReview — DRAFT -> UNDER_REVIEW. `precondition: fromStates('DRAFT')` (JAN-CMDPRE DWP-05) — the sole
+ *  in-arrow to UNDER_REVIEW (PWA.publicationStatus). NONE site: an already-UNDER_REVIEW re-issue was a NOOP appending
+ *  a second PwaSubmittedForReview. */
 export const submitPwaForReview: CommandHandler = (ctx, command) =>
 	advanceStatus(ctx, command, {
 		objectType: PWA,
 		statusField: 'publicationStatus',
 		machine: PWA_MACHINE,
 		target: 'UNDER_REVIEW',
-		eventType: 'PwaSubmittedForReview'
+		eventType: 'PwaSubmittedForReview',
+		precondition: fromStates('DRAFT')
 	});
 
 // ── ValidatePwa gate: recursive-composition validation (guide §11.6 L1639) ───────────────────────────────────────
@@ -782,7 +785,14 @@ function pwaCompositionGate(
 	);
 }
 
-/** ValidatePwa — UNDER_REVIEW -> VALIDATED. Gated by recursive-composition validation (pwaCompositionGate). */
+/** ValidatePwa — UNDER_REVIEW -> VALIDATED. Gated by recursive-composition validation (pwaCompositionGate).
+ *  `precondition: fromStates('UNDER_REVIEW')` (JAN-CMDPRE DWP-05; SPEC-001 PILOT-002) — the sole in-arrow to VALIDATED
+ *  (PWA.publicationStatus). This closes TWO things: (1) an already-VALIDATED re-issue was a NOOP appending a second
+ *  PwaValidated; (2) the precondition-before-guard ordering issue PILOT-002 flagged — pwaCompositionGate (structural,
+ *  RPH_INVARIANT_VIOLATION) runs before checkTransition, so a wrong-state ValidatePwa whose graph is ALSO invalid used
+ *  to surface the guard's RPH_INVARIANT_VIOLATION instead of the state code. Sited ahead of the guard (INV-3, exactly
+ *  as publishPwa was fixed in DWP-01b), the state fact now refuses first with RPH_ILLEGAL_STATE_TRANSITION; the
+ *  composition gate is retained for the legitimate UNDER_REVIEW input (INV-3 non-example). */
 export const validatePwa: CommandHandler = (ctx, command) =>
 	advanceStatus(ctx, command, {
 		objectType: PWA,
@@ -790,6 +800,7 @@ export const validatePwa: CommandHandler = (ctx, command) =>
 		machine: PWA_MACHINE,
 		target: 'VALIDATED',
 		eventType: 'PwaValidated',
+		precondition: fromStates('UNDER_REVIEW'),
 		guard: (state, gctx) => pwaCompositionGate(command, state, gctx)
 	});
 
@@ -856,17 +867,23 @@ export const deprecatePwa: CommandHandler = (ctx, command) =>
 		statusField: 'publicationStatus',
 		machine: PWA_MACHINE,
 		target: 'DEPRECATED',
-		eventType: 'PwaDeprecated'
+		eventType: 'PwaDeprecated',
+		// JAN-CMDPRE DWP-05: the sole in-arrow to DEPRECATED is PUBLISHED (PWA.publicationStatus). NONE site — an
+		// already-DEPRECATED re-issue was a NOOP appending a second PwaDeprecated.
+		precondition: fromStates('PUBLISHED')
 	});
 
-/** RetirePwa — DEPRECATED -> RETIRED. */
+/** RetirePwa — DEPRECATED -> RETIRED. `precondition: fromStates('DEPRECATED')` (JAN-CMDPRE DWP-05) — the sole
+ *  in-arrow to RETIRED (PWA.publicationStatus). NONE site: an already-RETIRED re-issue was a NOOP appending a second
+ *  PwaRetired. */
 export const retirePwa: CommandHandler = (ctx, command) =>
 	advanceStatus(ctx, command, {
 		objectType: PWA,
 		statusField: 'publicationStatus',
 		machine: PWA_MACHINE,
 		target: 'RETIRED',
-		eventType: 'PwaRetired'
+		eventType: 'PwaRetired',
+		precondition: fromStates('DEPRECATED')
 	});
 
 /** CreateUndertaking — instantiate a PUBLISHED PWA version as a concrete Undertaking (§42). The root PWU Instance
