@@ -1,6 +1,6 @@
 # Operating under the JPWB Canon (pilot session)
 
-You are working in `JanumiCode/janumiprofessionalworkbench/`. This repository's documentation authority is the six-artifact canon in `docs/_canon_draft/`. The artifacts are marked DRAFT pending ratification; for this session I, the sponsor, direct you to operate under them as if ratified (pilot authority). Where the canon records an open question or elicitation item, its stated safe default governs — do not relitigate defaults.
+You are working in `JanumiCode/janumiprofessionalworkbench/`. This repository's documentation authority is the six-artifact canon in `docs/canon/` — OPERATIVE since REG-D-010 (2026-07-24). Where the canon records an open question or elicitation item, its stated safe default governs — do not relitigate defaults.
 
 ## Read in this order, before touching anything
 
@@ -12,7 +12,7 @@ You are working in `JanumiCode/janumiprofessionalworkbench/`. This repository's 
 
 - **The canon is the sole semantic authority; the code is the first experiment** being brought into conformance (CON-000 B6). Expect divergence. Classify it per DOC-004 §8 — never silently patch either side to match the other.
 - **Exact shapes** (fields, enums, envelopes, IDs, error codes) belong to the repository's **reference artifacts** — schemas, generated contracts, conformance fixtures — never to prose, and never to implementation code (DOC-004 §2.3). An implemented struct is not its own authority; a placeholder type that permits divergence silently is a named defect.
-- **Everything in `docs/` outside `_canon_draft/` is retired-equivalent**: historical evidence only (DOC-004 §2.4). Do not consult it as authority, cite it to justify a change, or fill a canon gap from it. If a task legitimately requires it as historical evidence (e.g., transplanting a ratified schema into a reference artifact), say so explicitly when you use it. Also non-authoritative: `_design-brief.md`, `_extracts/`, `*.provenance.md`, and the Ratify Sheet — program records, not canon.
+- **Everything in `docs/` outside `canon/` is retired-equivalent**: historical evidence only (DOC-004 §2.4). Do not consult it as authority, cite it to justify a change, or fill a canon gap from it. If a task legitimately requires it as historical evidence (e.g., transplanting a ratified schema into a reference artifact), say so explicitly when you use it. Also non-authoritative: `_design-brief.md`, `_extracts/`, `*.provenance.md`, and the Ratify Sheet — program records, not canon.
 - **Where the canon is silent or ambiguous: fail closed — file, don't invent** (CON-000 AX-8). You may autonomously fix `DOCS_STRONGER` and `ACCIDENTAL_CODE_BEHAVIOR` divergences under normal change discipline; everything else escalates (DOC-004 §8.2).
 
 ## Stance
@@ -21,7 +21,7 @@ Implement the canon's hypotheses faithfully — rigor is what makes friction inf
 
 ## Filing — this session is also a test of the canon
 
-Do **not** write to REG-005 (it is append-only and sponsor-governed). Instead append findings to `docs/_canon_draft/_test/pilot-findings-<date>.md` using REG-005's entry discipline (`PILOT-nnn`, date, type, statement, divergence class where applicable, the safe default or interpretation you adopted, the merge target you would propose). File an entry for:
+Do **not** write to REG-005 (it is append-only and sponsor-governed). Instead append findings to `docs/canon/_test/pilot-findings-<date>.md` using REG-005's entry discipline (`PILOT-nnn`, date, type, statement, divergence class where applicable, the safe default or interpretation you adopted, the merge target you would propose). File an entry for:
 
 - every divergence you classify, including the ones you fix autonomously;
 - every question the canon did not answer;

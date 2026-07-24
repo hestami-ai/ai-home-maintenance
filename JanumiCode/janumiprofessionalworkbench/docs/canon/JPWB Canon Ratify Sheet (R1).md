@@ -2,9 +2,11 @@
 
 **Instrument:** This sheet is the conferral act for the JPWB canon. Per CON-000 B2, status is conferred, not authored: none of the six drafted artifacts has authority until the sponsor disposes of the items below. The completed sheet becomes the founding ratification record in JPWB-REG-005, and Section 4's approval triggers retirement of the pre-canon corpus (CON-000 B8).
 
+> **R1 EXECUTED — wholesale interim (REG-D-010, 2026-07-24).** The sponsor ratified all six artifacts as drafted at v1.0.0; every item below not individually disposed stands as RATIFY-as-drafted, and every Part 3 elicitation item is DEFERRED to its safe default. The sheet remains open: any disposition marked after this date is processed as a B5 amendment to the operative canon. Part 4's retirement approval and its four preconditions remain outstanding.
+
 **Dispositions:** mark each item **RATIFY** (text stands), **AMEND** (state the change — applied before effect), **REJECT** (struck; content returns to historical status), or **DEFER** (remains an open REG-005 question with its safe default governing; the artifact is effective around it).
 
-**The artifacts** (all in `docs/_canon_draft/`, each with a `.provenance.md` sidecar):
+**The artifacts** (all in `docs/canon/`, each with a `.provenance.md` sidecar):
 
 | ID | Title | Words | Layer |
 |---|---|---|---|
@@ -116,7 +118,7 @@ These were made in session by sponsor + drafting agent; per B2 they require your
 | REG-D-006 | Source corpus retirement upon ratification | ☐ |
 | REG-D-007 | Delegation boundaries | ☐ |
 | REG-D-008 | Reference/experiment split; shape-survivorship audit as retirement gate (sponsor-directed 2026-07-16, motivated by REG-F-005) | ☐ |
-| REG-D-009 | Three-tier documentation architecture: canon overview + JPWB-SPEC-nnn deep reference specifications + enforced reference artifacts; spec-before-implementation on governed ground; SPEC absence = finding, never license for economy (sponsor-directed 2026-07-16) | ☐ |
+| REG-D-009 | Three-tier documentation architecture: canon overview + JPWB-SPEC-nnn deep reference specifications + enforced reference artifacts; spec-before-implementation on governed ground; SPEC absence = finding, never license for economy. SPEC lifecycle: phase-bound construction authorities — retire by authority transfer when fully performed by executable specification; the survivorship audit is the transfer verification (sponsor-directed 2026-07-16) | ☐ |
 | Sections B–D | 25 carried Guide §16 questions (B), 23 extraction questions (C), 4 founding findings (D) — ratified as *faithfully recorded*, not as answered | ☐ |
 
 ## Part 3 — Elicitation questions (REG-E-001..022)
@@ -132,14 +134,14 @@ Full text and safe defaults are in REG-005 Section E; answering here disposes th
 
 ## Part 4 — The retirement decision
 
-☐ **APPROVE RETIREMENT** of the pre-canon corpus (everything under `docs/` except `_canon_draft/`) to an archive outside the agent-visible tree, upon ratification, **subject to four preconditions**:
+☐ **APPROVE RETIREMENT** of the pre-canon corpus (everything under `docs/` except `canon/`) to an archive outside the agent-visible tree, upon ratification, **subject to four preconditions**:
 
 1. **REG-Q-045 survivorship hold:** RPH-DOC-003/004 are retained (as marked historical evidence) until verification passes that the repository's seeded Product Realization PWA carries their type hierarchy, policy catalog, profiles, and taxonomies losslessly — the hollow-seed finding (REG-F-001) means carriage cannot be assumed.
 2. **REG-D-008 shape-survivorship audit:** for every ratified schema in the schema-bearing source documents (RPH-DOC-000, -002, -004, -007, -008, -009 foremost), verify a corresponding *enforced* repository reference artifact exists (real type, real conformance fixture — no placeholder types) and that the implementation conforms or has a filed divergence finding. Documents failing the audit join the hold. Motivated by REG-F-005 (the AssessmentCriterion impoverishment): the source schemas are the independent "expected" that made the gap detectable; they retire only after a verified transplant.
 3. **REG-E-020:** the numeric coverage/mutation floors are encoded in repository gate configuration.
 4. **REG-E-019:** the scanner operating procedure has a repository home.
 
-The extraction files (`_canon_draft/_extracts/`, 52 files with byte-exact quotes and line references) are retained as the retirement-era provenance index.
+The extraction files (`canon/_extracts/`, 52 files with byte-exact quotes and line references) are retained as the retirement-era provenance index.
 
 ## Part 5 — Program record
 

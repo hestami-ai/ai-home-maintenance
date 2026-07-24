@@ -1,0 +1,66 @@
+# Extract: RPH-DOC-004 — Assurance Policy Catalog and Validator Contract (lines 1-1150)
+
+Source file: `docs/Recursive Professional Harness/Janumi Professional Workbench Product Realization PWA - Assurance Policy Catalog and Validator Contract.md` (cited below as RPH-DOC-004)
+
+## CONSTITUTIONAL CANDIDATES
+
+- "A validator is an implementation of an Assurance Policy. It evaluates one or more claims under that policy using identified evidence and returns schema-conformant findings and a disposition recommendation; the Assurance Service applies policy and records the authoritative disposition." (RPH-DOC-004 L31-33) — The document's self-declared central architectural rule; validators evaluate, the service disposes.
+- "Validator implementations must not return only: free-form prose; generic pass or fail; unscoped confidence; untyped recommendations; hidden state changes. Every material result must be represented through canonical assurance objects." (RPH-DOC-004 L35-43) — Bans prose-only and side-effecting validation; all results flow through governed objects.
+- "The validator implementation's recommendation does not itself mutate assurance state. The Assurance Service validates the result, enforces policy, and records the authoritative disposition." (RPH-DOC-004 L256-258) — Disposition authority sits in the service, never in the evaluator.
+- "`ValidatorContract` is the implementation-level contract for a runtime evaluator of one or more Assurance Policies. It does not define policy semantics or possess disposition authority." (RPH-DOC-004 L182) — Contract explicitly stripped of semantic and disposition authority.
+- "Shape Engineering asks: What must remain true as professional work is transformed? Assurance Engineering asks: How do we know that it remains true?" (RPH-DOC-004 L49-55) — Foundational division of labor between Shape and Assurance disciplines.
+- "A validator implementation is not independent merely because it is called a 'Verifier.'" (RPH-DOC-004 L432) — Independence is a verified runtime property, not a naming convention.
+- "'Unable to determine' is not equivalent to 'met.'" (RPH-DOC-004 L410) — Fail-closed criterion semantics; uncertainty never counts as satisfaction.
+- "A waiver does not: erase a finding; transform false evidence into valid evidence; declare a rejected claim true; apply to future semantic versions unless explicitly renewed." (RPH-DOC-004 L656-661) — Waivers accept risk without rewriting truth; scoped to a semantic version.
+- "Unauthorized intent alteration cannot be waived. A user may explicitly approve a revised intent, which creates a governed intent revision rather than a waiver." (RPH-DOC-004 L827-829) — Intent fidelity is unwaivable; the only exit is governed revision by the user.
+
+## DOCTRINE-CONOP
+
+- "Assurance protects the connection between: Originating Intent → Professional Work Shape → Decomposition → Execution → Artifacts → Claims → Evidence → Accepted Outcome" (RPH-DOC-004 L57-75) — The chain assurance exists to protect; loss anywhere breaks acceptance.
+- "The assurance layer must detect or expose: intent loss; intent drift; silent scope expansion; obligation erosion; missing constraints; invalid assumptions; unsupported claims; incomplete decomposition; local success that does not satisfy the parent objective; inadequate evidence; unauthorized decisions; invalid baseline promotion." (RPH-DOC-004 L77-90) — Canonical failure-mode list assurance is accountable for.
+- "The policy defines: professional purpose; claims; evidence; criteria; authority; outcomes. The validator implementation defines: prompts; deterministic checks; models; tools... Multiple validator implementations may conform to the same policy." (RPH-DOC-004 L140-161) — Policy/implementation separation; meaning lives in policy, mechanics in implementation.
+- "A validator implementation may be replaced without changing the policy, provided it remains conformant." (RPH-DOC-004 L174) — Implementations are swappable; policy identity survives replacement.
+- "The initial Product Realization PWA catalog contains twelve mandatory core policies." — Intent Fidelity, Intent Completeness, Assumption Disclosure, Requirement Coverage, Decomposition Coverage, Constraint Propagation, Architecture Coverage, Historical Consistency, Intent Preservation, Test Adequacy, Fitness for Purpose, Baseline Promotion. (RPH-DOC-004 L703-718) — The mandatory twelve-policy catalog with lifecycle anchor points.
+- "A validator implementation recommends control actions. The controller selects and executes them under policy." (RPH-DOC-004 L615-617) — Control-action authority split: validator recommends, controller executes.
+- Default independence profiles: "Lightweight: Different invocation. Standard: Different agent role; a different model is preferred for material claims. High assurance: Different model or provider, plus human or organizationally independent assessment for critical claims." (RPH-DOC-004 L445-457) — Three-tier independence doctrine scaling with claim materiality.
+- "Completeness is proportional to: risk; consequence; uncertainty; irreversibility." (RPH-DOC-004 L839-844) — Risk-proportional completeness; rigor scales, it is not uniform.
+- "Escalation packages must be synthesized for the authority receiving them." (RPH-DOC-004 L685) — Escalation is audience-shaped decision support, not raw finding dumps.
+
+## VOCABULARY
+
+- Disposition meanings: "SATISFIED: The available admissible evidence supports the assessed claims under the policy criteria, subject to recorded limitations... INCONCLUSIVE: The available evidence is insufficient to support or reject the claim. WAIVED: An authorized actor accepts proceeding without satisfaction of one or more criteria." (RPH-DOC-004 L518-542) — Disposition semantics; SATISFIED is evidence-bounded, WAIVED is authority-bounded.
+- "ESCALATED: The validator implementation or policy-designated authority cannot resolve the issue within its authority or competence." (RPH-DOC-004 L540-542) — Escalation is a competence/authority boundary, not a severity level.
+- Applicability outcomes include `REQUIRES_HUMAN_DETERMINATION` alongside REQUIRED/RECOMMENDED/OPTIONAL/NOT_APPLICABLE. (RPH-DOC-004 L286-293) — Whether a policy applies can itself require human judgment.
+- "Every criterion result must be: met; partially met; not met; not applicable; unable to determine." (RPH-DOC-004 L402-408) — Five-valued criterion results; no binary pass/fail collapse.
+
+## SEMANTIC-INVARIANTS
+
+- "Evidence is admissible only when: its identity is stable; provenance is present; content or reference is available; scope is stated; limitations are recorded; it is not invalidated; it is sufficiently current; it is relevant to the assessed claim." (RPH-DOC-004 L345-354) — Eight-condition admissibility gate; evidence without provenance or scope is inadmissible.
+- "A test result does not establish requirements coverage unless its relationship to requirements is shown... A citation proves that a source made a statement, not necessarily that the statement is correct." (RPH-DOC-004 L358-362) — Evidence is not proof by existence; the claim-evidence relationship must be shown.
+- "A validator implementation's opinion is not independent evidence unless the policy permits professional judgment as evidence." (RPH-DOC-004 L363) — Evaluator opinion is demoted; evidentiary status requires explicit policy grant.
+- "A successful execution trace proves execution occurred, not that the outcome satisfies intent." (RPH-DOC-004 L364) — Execution success is never satisfaction; blocks green-run-equals-done reasoning.
+- "If required independence is not satisfied: the assessment cannot receive `SATISFIED`; an Independence Violation Observation is created; another evaluator must be invoked or a waiver obtained." (RPH-DOC-004 L461-465) — Independence violation hard-blocks SATISFIED and must leave a governed trace.
+- The runtime must compare "producer invocation; evaluator invocation; agent identity; model identity; provider; shared hidden context; shared prompt lineage; organizational authority." (RPH-DOC-004 L434-443) — Independence is measured across eight dimensions including hidden-context and prompt-lineage sharing.
+- Default disposition precedence: "CRITICAL open finding → REJECTED or ESCALATED. BLOCKING open finding → REJECTED. MATERIAL open finding → CONDITIONALLY_SATISFIED, INCONCLUSIVE, or REJECTED. Evidence deficit → INCONCLUSIVE. All mandatory criteria met → SATISFIED." (RPH-DOC-004 L565-582) — Severity-driven default precedence unless a policy overrides it.
+- "Observations must avoid vague language such as: 'could be improved'; 'looks reasonable'... The finding must explain what is deficient and why it matters." (RPH-DOC-004 L505-512) — Vague-language ban; every material observation must name subject, policy, criterion, evidence, severity, implications.
+- "A waiver must record: exact policy and criterion; exact object and semantic version; finding being waived; authority; rationale; duration or expiration; compensating controls; downstream impact; review conditions." (RPH-DOC-004 L644-654) — Nine mandatory waiver record fields; waivers are fully attributable and bounded.
+- POL-INTENT-FIDELITY: "SATISFIED only when: no blocking fidelity finding remains; all mandatory constraints trace into the intent; material ambiguities are disclosed; required evidence is admissible." (RPH-DOC-004 L810-815) — Intent fidelity satisfaction requires constraint traceability and disclosed ambiguity, not absence of complaints.
+- POL-INTENT-COMPLETENESS: "Exploratory work may receive conditional satisfaction when uncertainty is explicit and downstream execution remains reversible." (RPH-DOC-004 L889) — Reversibility plus explicit uncertainty is the sanctioned path for exploratory work.
+- POL-ASSUMPTION-DISCLOSURE: "SATISFIED means assumptions have been disclosed, not necessarily verified." (RPH-DOC-004 L952) — Disclosure and verification are distinct assurance obligations; this policy governs only the former.
+- "Every material assumption becomes an Assumption Object with: statement; basis; materiality; affected objects; status; verification method or authority requirement." (RPH-DOC-004 L941-948) — Assumptions are first-class governed objects, never prose footnotes.
+- "critical assumptions do not silently authorize irreversible work." (RPH-DOC-004 L917) — Irreversible work cannot rest on unadjudicated critical assumptions.
+- POL-REQUIREMENT-COVERAGE: "Blocking when a mandatory user outcome or constraint has no requirement or governed exclusion." (RPH-DOC-004 L1031) — Every mandatory outcome must be covered or explicitly, governedly excluded.
+- POL-DECOMPOSITION-COVERAGE: "Every mandatory parent obligation is allocated, retained, satisfied, or waived." and "DC-01 Obligation coverage: No mandatory obligation silently disappears." (RPH-DOC-004 L1052, L1073-1075) — Obligation conservation law across decomposition; the four legal fates are exhaustive.
+- "Any missing mandatory obligation or child intent divergence is blocking." (RPH-DOC-004 L1116) — Decomposition cannot pass while dropping obligations or letting children drift from parent intent.
+- POL-CONSTRAINT-PROPAGATION: "Every mandatory applicable parent constraint has an explicit disposition. propagated constraints retain authority and strength. inapplicability decisions have rationale." (RPH-DOC-004 L1147-1149) — Constraints cannot silently weaken or vanish through decomposition, delegation, or revision.
+
+## PROTOCOL-PRACTICE
+
+- "A policy may activate because: a PWU reaches a lifecycle boundary; a material artifact is produced; decomposition is proposed; an assumption is detected; a claim is asserted; intent or a constraint changes; execution succeeds; baseline promotion is requested; risk exceeds a threshold; another validator implementation emits a triggering observation." (RPH-DOC-004 L297-308) — Ten activation triggers, including validator-to-validator cascade.
+- Escalation packages "should include: decision requested; subject; current state; claims; evidence; findings; alternatives; consequences; residual uncertainty." (RPH-DOC-004 L687-697) — Nine-part escalation package composition for the receiving authority.
+- ValidatorResult must carry "evidenceConsideredIds... evidenceRejected... residualUncertainty... limitations... executionProvenance." (RPH-DOC-004 L235-252) — Validators must disclose what evidence they rejected and their own residual uncertainty and provenance.
+
+## OPEN-QUESTIONS-CONTRADICTIONS
+
+- WAIVED is defined as a disposition meaning (RPH-DOC-004 L536-538) but is absent from both the validator's `dispositionRecommendation` enum (L240-245) and `DispositionRule.disposition` (L548-553); the document never states which mechanism records an authoritative WAIVED disposition — implied to be the Waiver Contract (§12), but the recording path is unspecified.
+- Default precedence for a MATERIAL open finding permits three different dispositions ("CONDITIONALLY_SATISFIED, INCONCLUSIVE, or REJECTED", L574-575) with no default tiebreaker; unless every policy overrides it, the "default" is nondeterministic at exactly the severity where judgment varies most.

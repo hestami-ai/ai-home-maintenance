@@ -3,8 +3,8 @@ artifactId: JPWB-DOC-002
 title: Canonical Vocabulary
 layer: Vocabulary
 settledness: PRESUMPTIVE
-status: DRAFT — pending sponsor ratification
-version: 0.1.0
+status: OPERATIVE — ratified as drafted (wholesale interim, REG-D-010, 2026-07-24); Ratify Sheet R1 remains open for clause-level amendment
+version: 1.0.0
 date: 2026-07-16
 governs:
   - Naming and meaning of canonical terms across the Janumi product family and the JPWB canon
@@ -20,7 +20,7 @@ doesNotGovern:
   - Open questions and rulings → JPWB-REG-005
 precedence: Owns the concern "naming and meaning of terms" (JPWB-CON-000 Part B). On a naming or meaning question this artifact controls and no other artifact may redefine a canonical term locally; on shape questions the repository controls; on structural and invariant questions JPWB-DOC-003 controls.
 changeProcedure: PRESUMPTIVE — new canonical terms, retirements, and meaning changes are proposed via a JPWB-REG-005 finding, sponsor-ratified, then merged (JPWB-CON-000 Part B). Never casual drift; no vocabulary is introduced as a side effect of code or prose.
-ratification: PENDING — becomes effective via REG-005 entry
+ratification: REG-D-010 (2026-07-24) — sponsor wholesale interim ratification; elicitation items DEFERRED to their safe defaults; clause-level dispositions remain open via Ratify Sheet R1 under the B5 change procedure
 ---
 
 # JPWB-DOC-002 — Canonical Vocabulary

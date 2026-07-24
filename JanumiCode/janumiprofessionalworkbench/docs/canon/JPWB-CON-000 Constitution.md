@@ -3,8 +3,8 @@ artifactId: JPWB-CON-000
 title: JPWB Constitution
 layer: Constitutional
 settledness: CONSTITUTIONAL
-status: DRAFT — pending sponsor ratification
-version: 0.1.0
+status: OPERATIVE — ratified as drafted (wholesale interim, REG-D-010, 2026-07-24); Ratify Sheet R1 remains open for clause-level amendment
+version: 1.0.0
 date: 2026-07-16
 governs:
   - The vision, worldview, thesis, values, axioms, and first principles of the Janumi Professional Workbench program.
@@ -19,7 +19,7 @@ doesNotGovern:
   - Open questions, rulings, and divergence findings — JPWB-REG-005.
 precedence: Highest settledness class in the canon. On any conflict within the canon, this artifact controls for vision, values, first principles, and recognition; for every other concern, the artifact that owns the concern controls (Part B, clause 3).
 changeProcedure: Sponsor decision only, recorded as a JPWB-REG-005 entry and merged here. No other actor may amend this artifact.
-ratification: PENDING — becomes effective via REG-005 entry
+ratification: REG-D-010 (2026-07-24) — sponsor wholesale interim ratification; elicitation items DEFERRED to their safe defaults; clause-level dispositions remain open via Ratify Sheet R1 under the B5 change procedure
 ---
 
 # JPWB-CON-000 — Constitution
@@ -112,7 +112,7 @@ Every normative statement in the canon inherits its artifact's settledness class
 
 **B5 — Change procedure.** CONSTITUTIONAL: sponsor decision, recorded. PRESUMPTIVE: proposed via a REG-005 finding, sponsor-ratified, then merged. HYPOTHESIS: the divergence protocol in DOC-004. No canon text is ever changed silently; every change traces to a register entry. A ruling made in conversation is not effective until it lands as a REG-005 entry and is merged into its governing artifact — a ruling may never float outside the canon.
 
-**B6 — The convergence clause.** During the convergence phase — now, until closure — the canon is the sole semantic authority, and the code is the first experiment being brought into conformance. Dual run never means dual semantic authority. The code was written without benefit of this canon; divergence is expected and is evidence, not scandal. The docs-win presumption is a property of this phase, not a permanent fact; settledness is thereafter earned bottom-up through real-world operation.
+**B6 — The convergence clause.** During the convergence phase — now, until closure — the canon is the sole semantic authority, and the code is the first experiment being brought into conformance. Dual run never means dual semantic authority. The code was written without benefit of this canon; divergence is expected and is evidence, not scandal. The docs-win presumption is a property of this phase, not a permanent fact; settledness is thereafter earned bottom-up through real-world operation. Convergence closes subsystem by subsystem: a subsystem exits convergence when its specification's content is fully performed by enforced reference artifacts and conformance tests; authority for that ground then rests with the codebase — including its executable specification — and the prose specification retires by sponsor act under B8's discipline. Retirement is discharge, not disposal: it is the ceremony of authority transfer, and the survivorship audit is its verification.
 
 **B7 — Anti-vacuity clause.** No artifact, object, or field may claim a status its relations do not perform: no provenance theater, no policy objects the runtime never reads, no assurance represented by an unread flag. Asserted status must be performed status. A discovered gap between asserted and performed status is a SEMANTIC_CONFLICT, escalated via REG-005 — never quietly documented around and never quietly deleted. Non-example: a canon statement the code does not yet satisfy is a divergence under B6, not vacuity; a status block marked DRAFT, or a claim explicitly declared as target, is not theater. This clause governs claims of currently performed status.
 

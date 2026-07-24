@@ -3,8 +3,8 @@ artifactId: JPWB-DOC-003
 title: Semantic Model and Invariant Catalog
 layer: Semantic Model
 settledness: HYPOTHESIS
-status: DRAFT — pending sponsor ratification
-version: 0.2.0
+status: OPERATIVE — ratified as drafted (wholesale interim, REG-D-010, 2026-07-24); Ratify Sheet R1 remains open for clause-level amendment
+version: 1.0.0
 date: 2026-07-16
 governs: |
   - The meaning of the five-layer semantic model and its layer boundaries.
@@ -35,7 +35,7 @@ changeProcedure: |
   HYPOTHESIS class. Changes flow through the divergence protocol (JPWB-DOC-004): classify,
   fix code toward canon where canon is stronger, escalate reality-taught candidates and
   semantic conflicts via JPWB-REG-005. No silent edits; every change traces to a register entry.
-ratification: PENDING — becomes effective via REG-005 entry
+ratification: REG-D-010 (2026-07-24) — sponsor wholesale interim ratification; elicitation items DEFERRED to their safe defaults; clause-level dispositions remain open via Ratify Sheet R1 under the B5 change procedure
 ---
 
 # JPWB-DOC-003 — Semantic Model and Invariant Catalog

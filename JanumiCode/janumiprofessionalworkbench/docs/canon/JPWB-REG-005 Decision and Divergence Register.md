@@ -3,8 +3,8 @@ artifactId: JPWB-REG-005
 title: Decision and Divergence Register
 layer: Register
 settledness: LIVING
-status: DRAFT — pending sponsor ratification
-version: 0.1.0
+status: OPERATIVE — ratified as drafted (wholesale interim, REG-D-010, 2026-07-24); Ratify Sheet R1 remains open for clause-level amendment
+version: 1.0.0
 date: 2026-07-16
 governs: >
   - The authoritative record of what is decided, what is open, and what has diverged.
@@ -17,7 +17,7 @@ precedence: >
   On any substantive concern, the owning artifact controls; this register controls only questions of record — what was decided, by whom, when, and what remains open. A safe default recorded here binds agents only while the question it attaches to is OPEN.
 changeProcedure: >
   Append-only after ratification (Section E may be rewritten by the synthesis program before ratification; thereafter append-only applies to it as to all sections). Entries are never destructively edited; a correction is a superseding entry citing the entry it supersedes. DECISION entries require sponsor authority (or explicitly recorded delegated best judgment, flagged for sponsor confirmation, per the M0 precedent). Any agent may append an OPEN QUESTION or DIVERGENCE FINDING with evidence.
-ratification: PENDING — becomes effective via the sponsor's founding ratification act, recorded as this register's first post-draft entry; that same act makes the register the conferral mechanism for all other artifacts
+ratification: REG-D-010 (2026-07-24) — the sponsor's founding ratification act, recorded in this register's Section A; that same act made this register the operative conferral mechanism for all canon artifacts
 ---
 
 # JPWB-REG-005 — Decision and Divergence Register
@@ -105,8 +105,15 @@ Context note: the M0 Reconciliation Ratify Sheet stands as the ENTRY-DISCIPLINE 
 ### REG-D-009 — The three-tier documentation architecture
 - **Date:** 2026-07-16 · **Type:** DECISION (sponsor-directed: "Proceed" on the drafted amendment)
 - **Statement:** The canon is the **overview tier**, not the whole documentation system. Depth is a **standing tier**: the JPWB-SPEC-nnn series of deep reference specifications — one per subsystem, at field/class/state grain (object catalogs with per-field contracts, numbered invariants with why/scope/non-example, complete state machines with illegal transitions enumerated, event and error catalogs, conformance-fixture specifications) — authored under explicit sponsor grants with forks surfaced, individually ratified per this register, each paired with **enforced** repository reference artifacts that cite the spec sections they implement. The third tier is those artifacts themselves. **Rationale (sponsor-observed dynamic):** an implementing agent's rigor tracks the explicitness of the visible obligation surface; enumerated specifications convert "undue economy" into countable omission and demonstrably pulled implementations up under the pre-canon corpus, while schemas alone enforce shape at boundaries but exert no specification pressure mid-implementation. **Sequencing rule (binds the implementation roadmap when generated):** on governed ground, decision brief → sponsor rules forks → SPEC commissioned → reference artifacts → implementation; the absence of a SPEC for governed ground is a finding, never license for economy. The REG-D-008 survivorship transplant lands in this tier: a schema-bearing source document retires only as its successor SPEC + enforced artifacts stand up.
-- **Disposition:** Decided; merged into CON-000 B1 (SPEC-series recognition) and JPWB-DOC-004 §2.1 (load order + no-economy rule). Generator: the deep-spec commission template (`_canon_draft/_test/deep-spec-commission-prompt.md`, program tooling, non-canonical).
-- **Merge target:** CON-000 B1; DOC-004 §2.1; the implementation roadmap (PLN-006) when generated. **Status:** DECIDED — MERGE PENDING (countersign via Ratify Sheet).
+- **SPEC lifecycle (sponsor clarification, same date):** individual SPECs are **phase-bound construction authorities; only the tier is standing.** A SPEC holds authority over its ground during convergence; when its content is fully performed by enforced reference artifacts and conformance tests, its authority **transfers to the codebase** and the SPEC retires to historical status by sponsor act. At transfer, the enumerated obligation surface changes medium — prose → executable (conformance suites, fixtures, schemas) — it never disappears. Semantic modification of converged ground re-enters the pipeline (decision brief → forks → spec-delta), never informal edits to converged ground. This clause prevents SPEC-series accretion (P7 recurring in sharded form) and states the meaning of the pre-canon corpus's own retirement: **authority transfer made manifest** — the sponsor's original retirement rationale was not the corpus's depth but (a) its single orientation and (b) the transition from documentation-as-authority to codebase-as-authority once construction it instructed was realized. The shape-survivorship audit (REG-D-008) is the transfer verification.
+- **Disposition:** Decided; merged into CON-000 B1 (SPEC-series recognition), CON-000 B6 (subsystem-wise convergence exit and authority transfer), and JPWB-DOC-004 §2.1 (load order + no-economy rule). Generator: the deep-spec commission template (`canon/_test/deep-spec-commission-prompt.md`, program tooling, non-canonical).
+- **Merge target:** CON-000 B1 and B6; DOC-004 §2.1; the implementation roadmap (PLN-006) when generated. **Status:** DECIDED — MERGE PENDING (countersign via Ratify Sheet).
+
+### REG-D-010 — Founding ratification: wholesale interim (the conferral act)
+- **Date:** 2026-07-24 · **Type:** DECISION (sponsor act: directive to move the canon from draft to operative state)
+- **Statement:** All six canon artifacts are ratified **as drafted**, effective immediately, at version 1.0.0, in wholesale interim mode: every Ratify Sheet R1 item not individually disposed is RATIFY-as-drafted; every elicitation item (REG-E-001..022) is **DEFERRED** — its recorded safe default governs. R1 remains open: clause-level dispositions made after this date are processed as B5 amendments to the operative canon, not as pre-ratification review. Per B1, from this moment every document outside the registry is historical material — the pre-canon corpus is **quarantined by recognition** even though physical retirement awaits its four preconditions (Ratify Sheet Part 4). Physical relocation was originally deferred to retirement execution; by sponsor direction it was executed early on 2026-07-24 — `docs/_canon_draft/` → `docs/canon/` — because the old name misstated operative status. The relocation is separate from retirement, which remains gated by its four preconditions.
+- **Disposition:** Effective. This entry is the ratification record contemplated by the closure-rule exception; it does not itself close by merging.
+- **Merge target:** The six status blocks (applied same date). **Status:** EFFECTIVE.
 
 ---
 

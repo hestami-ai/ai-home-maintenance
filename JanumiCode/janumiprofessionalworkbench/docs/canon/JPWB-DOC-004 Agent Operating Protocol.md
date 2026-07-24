@@ -3,8 +3,8 @@ artifactId: JPWB-DOC-004
 title: Agent Operating Protocol
 layer: Protocol
 settledness: PRESUMPTIVE
-status: DRAFT — pending sponsor ratification
-version: 0.1.0
+status: OPERATIVE — ratified as drafted (wholesale interim, REG-D-010, 2026-07-24); Ratify Sheet R1 remains open for clause-level amendment
+version: 1.0.0
 date: 2026-07-16
 governs: |
   - How an agent reads and consults the canon (load order, precedence by concern, treatment of retired material).
@@ -32,7 +32,7 @@ changeProcedure: |
   PRESUMPTIVE. Proposed via a JPWB-REG-005 finding, sponsor-ratified, then merged.
   Never changed by casual drift, convenience, or silent edit. An agent may propose
   refinements to this protocol; it may never apply one unratified.
-ratification: PENDING — becomes effective via REG-005 entry
+ratification: REG-D-010 (2026-07-24) — sponsor wholesale interim ratification; elicitation items DEFERRED to their safe defaults; clause-level dispositions remain open via Ratify Sheet R1 under the B5 change procedure
 ---
 
 # JPWB-DOC-004 — Agent Operating Protocol

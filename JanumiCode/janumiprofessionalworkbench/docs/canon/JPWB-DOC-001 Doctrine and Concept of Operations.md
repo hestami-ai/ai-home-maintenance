@@ -3,8 +3,8 @@ artifactId: JPWB-DOC-001
 title: Doctrine and Concept of Operations
 layer: Doctrine
 settledness: PRESUMPTIVE
-status: DRAFT — pending sponsor ratification
-version: 0.1.0
+status: OPERATIVE — ratified as drafted (wholesale interim, REG-D-010, 2026-07-24); Ratify Sheet R1 remains open for clause-level amendment
+version: 1.0.0
 date: 2026-07-16
 governs:
   - Why the Janumi system exists as a coherent whole: the theory of professional work that generates the canonical vocabulary
@@ -23,7 +23,7 @@ doesNotGovern:
   - Rulings and open questions → JPWB-REG-005
 precedence: Owns reasoning, judgment, and operation. On a naming or meaning question DOC-002 controls; on a structural or invariant question DOC-003 controls; on a conduct question DOC-004 controls; on any shape question the repository controls. Within this artifact, sections marked HYPOTHESIS are subordinate to the PRESUMPTIVE doctrine core.
 changeProcedure: PRESUMPTIVE — proposed via JPWB-REG-005 finding, sponsor-ratified, merged. HYPOTHESIS subsections follow the divergence protocol in JPWB-DOC-004. Never casual drift.
-ratification: PENDING — becomes effective via REG-005 entry
+ratification: REG-D-010 (2026-07-24) — sponsor wholesale interim ratification; elicitation items DEFERRED to their safe defaults; clause-level dispositions remain open via Ratify Sheet R1 under the B5 change procedure
 ---
 
 # JPWB-DOC-001 — Doctrine and Concept of Operations

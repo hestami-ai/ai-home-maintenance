@@ -1,0 +1,73 @@
+# Extract: RPH-DOC-002 — Canonical Domain Model, Invariant Catalog, State Machines, and Event Contract (lines 1-1250)
+
+Source file: `docs/Recursive Professional Harness/Janumi Professional Workbench Recursive Professional Harness - Canonical Domain Model, Invariant Catalog, State Machines, and Event Contract.md` (cited below as RPH-DOC-002)
+
+## CONSTITUTIONAL CANDIDATES
+
+- "The authoritative state of the Undertaking is represented by Professional Work Objects and their relationships. Canvas nodes, Execution Workflow diagrams, chat messages, and legacy phase labels are projections or interaction surfaces. They are not the canonical source of truth." (RPH-DOC-002 L91-95) — Root authority rule: work objects, not UI or prose, are canon.
+- "Its purpose is to ensure that implementation agents cannot accidentally reduce the RPH to: an Execution Workflow graph; a node executor; a collection of prompts; a pass/fail validation pipeline; a generic task hierarchy." (RPH-DOC-002 L67-73) — Anti-reduction clause; the constitutional reason this spec exists.
+- "The canonical model must preserve the distinction among: professional work; execution strategy; runtime capability; assurance; evidence; governance; presentation." (RPH-DOC-002 L75-83) — Seven-way separation of concerns is non-negotiable.
+- "Runtime Bindings connect execution steps to: agents; models; tools... They cannot redefine the intent or obligations of the work." (RPH-DOC-002 L126-138) — Capability grants no semantic authority; runtime cannot rewrite meaning.
+- "No semantic state may be inferred solely from: null values; empty arrays; missing rows; absent output; legacy phase order; UI position; agent prose. Illegal or incomplete states must be represented explicitly." (RPH-DOC-002 L152-164) — Explicit-state principle; forbids inferring meaning from absence.
+- "Material semantic changes must preserve: prior values; change actor; change rationale; timestamp; causal relationship; affected objects... authoritative history must remain reconstructable." (RPH-DOC-002 L166-177) — Append-oriented history; materialized state is a cache, not authority.
+- "Assurance does not merely inspect node output. It evaluates explicit or implicit claims using: criteria; evidence; observations; authority; policy." (RPH-DOC-002 L140-150) — Assurance = claim evaluation, not output inspection; core RPH semantics.
+- "An agent may create a proposal without having authority to approve it." (RPH-DOC-002 L416) — Authority is distinct from actor identity; separation of propose and approve.
+- "Confidence values must not replace evidence." (RPH-DOC-002 L1002) — Blocks probability-as-proof; keeps assurance evidence-grounded.
+- "Generated prose is not automatically evidence. A validator opinion is an observation; its underlying basis may be evidence." (RPH-DOC-002 L1055-1056) — Demotes LLM output from evidentiary status; observation ≠ evidence.
+
+## DOCTRINE-CONOP
+
+- "The RPH is the underlying control and runtime architecture. The Janumi Professional Workbench (JPWB) is the principal user-facing environment that exposes it." (RPH-DOC-002 L12) — Relationship between RPH and JPWB.
+- "Unless a type-level definition is explicitly discussed, an unqualified `PWU` in this runtime document means a concrete PWU Instance. It never means the PWA itself, the Undertaking, its Professional Work Graph, or an Execution Workflow." (RPH-DOC-002 L31) — Default-reading rule preventing type/instance conflation.
+- "A PWU is not merely a task. It represents a bounded professional obligation with: intent; authority; boundaries; inherited constraints; expected outputs; evidence requirements; verification criteria; lifecycle state; traceability." (RPH-DOC-002 L99-111) — Defines what a PWU IS; anti-task-hierarchy doctrine.
+- "An Execution Plan describes how a PWU is currently intended to be performed. Changing the plan does not necessarily change the identity or meaning of the PWU." (RPH-DOC-002 L115-117) — Plans are replaceable strategies; work identity survives strategy change.
+- "the initial RPH runtime implementation should use five principal aggregates" — Work, Assurance, Execution, Governance, Baseline; "Cross-aggregate updates must occur through commands and events rather than direct mutation of another aggregate's internal state." (RPH-DOC-002 L190-270) — Aggregate decomposition and command/event boundary doctrine.
+- "The PWA definition and Undertaking identity must remain explicit even when their management contracts are implemented by adjacent JPWB services. They are not replaced by the Work Aggregate or an Execution Workflow." (RPH-DOC-002 L188) — Enclosing ownership boundaries survive service factoring.
+- "Higher-risk PWUs may additionally require: approved decomposition; independent assurance; rollback strategy; explicit residual-risk acceptance; human approval; stronger evidence; sandbox restrictions." (RPH-DOC-002 L690-698) — Risk-proportional governance: rigor scales with consequence/uncertainty/irreversibility.
+
+## VOCABULARY
+
+- "`revision` increments for any persisted change. `semanticVersion` increments only when the meaning, obligations, assurance requirements, or authority of the object changes." (RPH-DOC-002 L331-333) — Two-axis versioning; semantic change is a distinct concept from persistence change.
+- "Every runtime `ProfessionalWorkUnit` record is a PWU Instance owned by exactly one Undertaking." (RPH-DOC-002 L529) — Ownership cardinality of instances.
+- "`pwuKind` is a descriptive or compatibility discriminator; it does not replace the canonical PWU Type identity." (RPH-DOC-002 L533) — Kind labels carry no type authority.
+- Four orthogonal PWU state axes: `executionState`, `assuranceState`, `shapeIntegrityState`, `workLifecycleState` on every PWU. (RPH-DOC-002 L518-521) — Execution, assurance, shape, and lifecycle are independent axes, never collapsed into one status.
+- "Accepted is not equivalent to verified." (RPH-DOC-002 L848) — Assumption statuses ACCEPTED vs VERIFIED are semantically distinct dispositions.
+- "An assessment is a specific application of an Assurance Policy." (RPH-DOC-002 L1108) — Policy (reusable rule) vs assessment (one application) distinction.
+
+## SEMANTIC-INVARIANTS
+
+- "A root PWU cannot enter `READY` unless its intent is at least `PROVISIONAL`... cannot become `SATISFIED` unless its intent is `APPROVED` or the result is explicitly marked provisional." (RPH-DOC-002 L472-473) — Intent maturity gates work maturity; no satisfied work under unapproved intent.
+- "An intent cannot be deleted after downstream PWUs exist. A superseded intent cannot authorize new PWUs." (RPH-DOC-002 L476-477) — Intent traceability and authorization scope survive supersession.
+- Illegal transitions: "`EXECUTING → SATISFIED` without assurance; `FAILED → SATISFIED`; `INVALIDATED → BASELINED`... `BASELINED → EXECUTING` without creating a new revision or successor PWU." (RPH-DOC-002 L645-655) — Hard guards: execution success never implies satisfaction; baselines are immutable-forward.
+- "A PWU may enter `READY` only if its Shape Readiness Profile is satisfied." Minimum shape includes intent reference, in/out-of-scope, expected output, "at least one completion claim or verification criterion", constraints, assumptions, authority, risk profile. (RPH-DOC-002 L661-676) — Readiness is a substantive shape gate, not a status flip.
+- "An obligation cannot become `SATISFIED` solely because a related PWU is completed. Satisfaction requires a supported claim." (RPH-DOC-002 L745-746) — Obligation satisfaction routes through claims/evidence, never task completion.
+- "A child PWU may satisfy a parent obligation only through an explicit allocation... An active obligation cannot disappear during decomposition." (RPH-DOC-002 L744, L749) — Obligation conservation across decomposition; allocation must be explicit.
+- "A waived mandatory obligation requires an authorized waiver. A violated obligation must affect assurance disposition." (RPH-DOC-002 L747-748) — Waiver needs authority; violations cannot be assurance-neutral.
+- Constraint propagation: "For every mandatory parent constraint, one of the following must be true for each relevant child: propagated; retained at parent level; marked inapplicable with rationale; waived through authority; superseded by a stronger constraint. No silent omission is permitted." (RPH-DOC-002 L795-803) — Exhaustive-disposition rule; constraints cannot silently vanish in decomposition.
+- "A material assumption detected during execution must become a first-class object. No material assumption may remain embedded only in model prose." (RPH-DOC-002 L843-844) — Assumption surfacing invariant; prose-only assumptions are illegal state.
+- "A critical assumption must be verified or explicitly accepted by authority before dependent irreversible work proceeds. Falsification triggers impact analysis. Expired assumptions cannot continue authorizing work." (RPH-DOC-002 L845-847) — Assumption lifecycle gates irreversible work; falsification/expiry propagate.
+- "The parent cannot become `PLANNED` through child execution unless the decomposition contract is valid or conditionally valid... Decomposition validation must be independent for high-risk work." (RPH-DOC-002 L895-896) — Decomposition contract validity gates parent progress; independence for high risk.
+- "Every mandatory obligation must be allocated or retained. Every relevant mandatory constraint must be propagated. Material assumptions must be propagated when applicable. Sibling dependencies must be explicit." (RPH-DOC-002 L891-894) — Decomposition completeness invariants: nothing mandatory falls through.
+- "A decomposition may be revised without changing parent identity, but it increments semantic version." (RPH-DOC-002 L898) — Decomposition revision is a semantic change to the parent.
+- "Child evidence must support the parent claim, not merely child claims... Recomposition may fail even when all child PWUs are individually satisfied. A recomposed result requires an explicit assessment." (RPH-DOC-002 L949-952) — Emergent-whole rule: parent satisfaction is assessed, never summed from children.
+- "All required child PWUs must be satisfied, conditionally satisfied, waived, or superseded through an authorized decision. Child outputs must be checked for contradiction." (RPH-DOC-002 L947-948) — Recomposition preconditions; contradiction check is mandatory.
+- "Every completion assertion must be represented as a claim... A contested claim cannot authorize baseline promotion unless resolved or waived... Contradicting evidence must remain visible." (RPH-DOC-002 L998-1004) — Claims mediate all completion; contest blocks promotion; counter-evidence is undeletable.
+- "Evidence must state scope and limitations. Evidence cannot support a claim outside its declared scope without an explicit assessment. Invalidated evidence cannot support an active claim." (RPH-DOC-002 L1052-1054) — Evidence scoping and invalidation propagation.
+- "Evidence expiration must trigger reassessment of dependent claims. Evidence immutability is preferred; corrections create a new version." (RPH-DOC-002 L1057-1058) — Time-bounded evidence; corrections are new versions, not edits.
+- "An inconclusive disposition cannot be treated as satisfied... Independence requirements must be checked before evaluation begins. A policy cannot waive its own blocking finding unless waiver authority is separately defined." (RPH-DOC-002 L1160-1163) — Fail-closed assurance; independence checked up front; no self-waiver.
+- "Every assessment must identify the policy version used. Every disposition must identify evidence considered... Assurance observations must remain visible after remediation." (RPH-DOC-002 L1156-1164) — Assessment provenance; remediated findings stay on the record.
+- "A PWU may have only one active plan at a time. A plan may not change PWU intent or obligations... Runtime privileges are not granted by plan approval. A superseded plan cannot create new execution attempts. Plan revision preserves prior attempt history." (RPH-DOC-002 L1241-1247) — Plan/work separation enforced at runtime; approval ≠ privilege grant.
+- "Plan approval is required before irreversible execution for high-risk work... Tactical changes may occur within a plan only if authorized by policy." (RPH-DOC-002 L1244, L1248) — Irreversibility gate plus policy-bounded in-plan adaptation.
+- Assurance policies declare `independenceRequirement` ('NONE' | 'DIFFERENT_INVOCATION' | 'DIFFERENT_AGENT' | 'DIFFERENT_MODEL' | 'HUMAN') and graded `failureSeverity`. (RPH-DOC-002 L1079-1090) — Semantic rule: independence of the evaluator is a policy-declared, graduated requirement, not implicit.
+
+## PROTOCOL-PRACTICE
+
+- "An Undertaking-local PWU Instance must set `isLocalExtension = true`, must not claim a published `pwuTypeId`, and does not mutate the selected PWA." (RPH-DOC-002 L532) — Local extension protocol preserving PWA-version immutability.
+- Intent transition matrix RAW → UNDER_DISCOVERY → PROVISIONAL → FORMALIZED → APPROVED, with "Revise... Change rationale and impact analysis initiated" and supersession/withdrawal paths. (RPH-DOC-002 L457-466) — Intent maturation ladder; each step has substantive required conditions.
+- PWU primary path PROPOSED → SHAPING → READY → PLANNED → EXECUTING → EVIDENCE_PENDING → UNDER_ASSURANCE → SATISFIED → RECOMPOSING/RECOMPOSED → BASELINED, each guarded (e.g. "Required evidence is available or deficit explicitly recorded"). (RPH-DOC-002 L613-625) — Canonical happy path inserts evidence and assurance stages between execution and satisfaction.
+- Exception routes: falsified material assumption → RESHAPING; blocking finding → REJECTED or RESHAPING; condition violated or upstream change → INVALIDATED; sibling conflict after recomposition → INVALIDATED. (RPH-DOC-002 L629-641) — Invalidation semantics: satisfaction is revocable by upstream/sibling change.
+- Identifiers "globally unique... immutable; opaque; independent of titles and hierarchy; preserved across presentation changes." (RPH-DOC-002 L350-356) — Identity rule behind IDs: meaning-bearing names never serve as identity.
+
+## OPEN-QUESTIONS-CONTRADICTIONS
+
+- §8.1 puts "Begin recomposition" on the SATISFIED PWU itself ("Parent exists and recomposition is required"), while §14 recomposition contracts belong to the parent with `requiredChildWorkUnitIds` — whether RECOMPOSING/RECOMPOSED is a child-side or parent-side lifecycle state is not stated. (RPH-DOC-002 L623-624 vs L921-952) — Ambiguity over which PWU carries recomposition states; affects state-machine implementation.

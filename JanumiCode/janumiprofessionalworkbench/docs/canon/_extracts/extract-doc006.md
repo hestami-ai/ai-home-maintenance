@@ -1,0 +1,56 @@
+# Extract: RPH-DOC-006 Field Service Management SaaS Reference Undertaking
+
+Source: `docs/Recursive Professional Harness/Janumi Professional Workbench Field Service Management SaaS Reference Undertaking.md` (full file, 1887 lines).
+Note: this is a reference fixture, not a transcript — no HUMAN/ASSISTANT tags apply and no sponsor turns occur, so there are no SPONSOR-RULINGS items. Per brief, the fixture stays in the repo; extraction is invariant-bearing lessons only (exec/assurance separation, conditional-satisfaction meaning). Citation filename shortened to `RPH-DOC-006.md`.
+
+## CONSTITUTIONAL CANDIDATES
+
+- "A model may successfully produce an architecture without the system yet being justified in believing that the architecture satisfies the user's intent." (RPH-DOC-006.md L1885) — The fixture's stated core control principle; the whole exec≠assurance gap in one sentence.
+- "The RPH closes that gap by preserving the work's shape, collecting evidence, assessing the resulting claims, invoking governance where authority is required, and preventing the work from becoming authoritative until the available evidence supports that transition." (RPH-DOC-006.md L1887) — Canonical five-part statement of how the harness converts produced work into authoritative work.
+- "Architecture generation succeeded, but architecture assurance is not yet complete." (RPH-DOC-006.md L1177) — The fixture's worked exemplar of the exec≠assurance invariant: success on one axis asserts nothing on the other.
+- "This output is an architecture artifact, not proof that the Architecture Definition PWU Instance is satisfied." (RPH-DOC-006.md L924) — Artifacts are evidence candidates, never satisfaction proofs; blocks artifact-existence-as-completion.
+- "Conditional satisfaction cannot be displayed as unconditional success." (RPH-DOC-006.md L1521) — Presentation-layer invariant: the UI may never launder a conditional disposition into a green check.
+- "The decision approves a specific semantic version. Any later semantic architecture change invalidates or supersedes this approval." (RPH-DOC-006.md L1231-1233) — Approval binds to a version, not to the work in general; drift auto-voids authority.
+- "The system must not use this legacy compatibility phase label as the authoritative state." (RPH-DOC-006.md L1459) — Legacy Product Lens phases are derived projections only; canonical state governs.
+- "The fixture therefore begins with a provisional intent rather than treating the user's sentence as an executable specification." (RPH-DOC-006.md L53) — Raw user expression enters discovery, never execution; anti-solution-substitution at the entry point.
+
+## DOCTRINE-CONOP
+
+- "Execution State: SUCCEEDED / Assurance State: CONDITIONALLY_SATISFIED / Shape Integrity: AT_RISK / Open Material Observations: 2 ... It does not mark the Architecture Definition PWU Instance as satisfied." (RPH-DOC-006.md L1158-1165) — Controller doctrine: satisfaction is computed from all state axes jointly; execution success alone never flips lifecycle state.
+- "Recommended response: 1. Create clarification question for offline scope. 2. Revise mobile architecture evidence. 3. Create implementation-level tenant-isolation verification obligation. 4. Re-run Architecture Coverage. 5. Present the revised evidence package for human approval." (RPH-DOC-006.md L1167-1173) — Conditional satisfaction's operational meaning: a bounded remediation loop (clarify, gather evidence, mint obligations, re-assess), not failure and not acceptance.
+- "Limited offline capability is retained as an architectural requirement but deferred from the first implementation increment. Tenant-isolation verification obligations must remain mandatory." (RPH-DOC-006.md L1208) — How a human closes a conditional: explicit rationale that converts residual conditions into retained requirements and forward obligations, never silent dismissal.
+- "Use child PWU Instances for distinct professional obligations. Use execution steps for operational actions used to satisfy one obligation." (RPH-DOC-006.md L1639-1641) — The decision rule for the PWU-vs-execution-step boundary blur (friction 29.5).
+- "Evidence proposed → evidence checked for provenance and scope → evidence admitted or rejected" (RPH-DOC-006.md L1650-1654) — Evidence admission is governed: not every generated artifact automatically becomes admissible evidence.
+- "Use risk and object-type applicability rules." [e.g. "Human Architecture Approval: Apply when architecture changes a public interface, data boundary, security boundary, migration strategy, or irreversible commitment."] (RPH-DOC-006.md L1616-1630) — Assurance policies attach by risk/object-type applicability, not blanket application; human approval triggers on consequence class.
+- "Use a separate PWU Instance when the definition: requires substantive analysis; has independent acceptance criteria; may decompose; requires assurance; has its own lifecycle." (RPH-DOC-006.md L1588-1594) — Five-part test for when a modeled concept earns PWU Instance status.
+- "Avoid initial numerical confidence aggregation. Use: satisfied; conditionally satisfied; rejected; inconclusive; residual uncertainty; severity; evidence sufficiency." (RPH-DOC-006.md L1716-1726) — Assurance dispositions stay categorical and reasoned; no confidence-score arithmetic.
+## VOCABULARY
+
+- "disposition": "CONDITIONALLY_SATISFIED" with "residualUncertainty": ["The required offline capability is not yet sufficiently bounded." ...] and "recommendedControlAction": "GATHER_EVIDENCE" (RPH-DOC-006.md L1097-1102) — Semantic anatomy of conditional satisfaction: a disposition plus enumerated residual uncertainty plus a recommended control action, jointly.
+- "Authoritative architecture reference for implementation planning, subject to recorded constraints, assumptions, and residual uncertainty." (RPH-DOC-006.md L1265) — Baseline purpose statement: authority is always scoped and qualified, never unconditional.
+- "`pwuKind` values are compatibility identifiers that must resolve to governing PWU Types defined by the selected Product Realization PWA version; `pwuKind` does not make an instance a reusable type." (RPH-DOC-006.md L150) — Instance≠type rule: kind labels are compatibility handles, never type authority.
+
+## SEMANTIC-INVARIANTS
+
+- "Test 1: Execution is not assurance ... ExecutionState = SUCCEEDED / AssuranceState != automatically SATISFIED" (RPH-DOC-006.md L1465-1477) — The exec≠assurance invariant in executable-test form; state axes are orthogonal.
+- "execution success does not imply assurance success; approval references a specific semantic version; baseline promotion references an effective decision; ... open residual uncertainty remains visible" (RPH-DOC-006.md L1852-1856) — Fixture acceptance criteria restating the load-bearing invariants as validity conditions on the whole Undertaking.
+- "an Assumption Object is created; affected PWU Instances are linked; the assumption cannot remain only in prose." (RPH-DOC-006.md L1484-1487) — Material assumptions must reify as linked objects; prose disclosure is insufficient.
+- "The Architecture Definition PWU Instance cannot begin child execution unless: mandatory obligations are allocated; constraints are propagated; a recomposition contract exists." (RPH-DOC-006.md L1499-1503) — Decomposition gate: allocation + propagation + recomposition contract precede any child execution.
+- "A critical unresolved tenant-isolation finding blocks Architecture Baseline promotion." (RPH-DOC-006.md L1517) — Open blocking findings veto promotion regardless of execution or approval momentum.
+- "Moving the Architecture Definition PWU Instance on the canvas: changes presentation revision; does not change the PWU Instance semantic version; does not invalidate approval." (RPH-DOC-006.md L1525-1529) — Layout has no semantic effect; presentation revision and semantic version are disjoint axes.
+- "Intent semantic version increments; architecture and product behavior require review; scale assumptions are invalidated; prior Architecture Baseline remains immutable; a successor baseline is required." (RPH-DOC-006.md L1534-1539) — Intent revision doctrine: impact propagates forward, history stays immutable, supersession not mutation.
+- "If the tenant-isolation analysis is invalidated: the tenant-isolation claim becomes contested or under assessment; Architecture Assurance may become invalidated; dependent baseline status is flagged for review." (RPH-DOC-006.md L1543-1547) — Evidence invalidation cascades upward through claims, assessments, and baselines.
+- "Mobile/Offline Architecture     CONDITIONALLY SATISFIED" under "Architecture Definition             BASELINED" plus "Open Residual Condition └── Offline behavior deferred from first increment" (RPH-DOC-006.md L1791-1808) — Conditional satisfaction persists in read models even after parent baselining; the residual condition stays visible post-approval (Test 7 realized).
+- "Tenant Isolation Claim ↓ VERIFIED_BY Architecture Assessment ↓ BECOMES Mandatory Implementation Verification Obligation" (RPH-DOC-006.md L1351-1356) — Assurance findings at one stage mint mandatory obligations for later stages; conditions convert to forward-carried duties.
+
+## PROTOCOL-PRACTICE
+
+- "The fixture should support three modes: 1. Seed mode ... 2. Replay mode ... 3. Conformance mode — Runs commands and checks resulting state against expected projections." (RPH-DOC-006.md L1770-1779) — The fixture's validation contract: same canonical state reachable by seed, replay, and command-driven conformance.
+- "duplicate command replay does not create duplicate decisions or baselines" (RPH-DOC-006.md L1859) — Idempotency requirement on governance-producing commands.
+- "Generate a governed review package containing: decision requested; changed shape; major claims; material assumptions; blocking and material findings; evidence summary; residual uncertainty; exact baseline candidate." (RPH-DOC-006.md L1662-1671) — Human review consumes a synthesized governed package, never the raw object graph; eight required components.
+
+## OPEN-QUESTIONS-CONTRADICTIONS
+
+- Event trace ends "60. AssuranceAssessmentSatisfied ... 63. PwuSatisfied" (RPH-DOC-006.md L1426-1429) yet the Work/Assurance views retain "Mobile/Offline Architecture CONDITIONALLY SATISFIED" and an "Open Residual Condition" (L1795, L1807-1808) — Unresolved whether post-remediation SATISFIED events should coexist with a persistently conditional child, or whether the human deferral re-instates the conditional; the reconciliation rule is unstated.
+- "recompositionContractId": ... "status": "SATISFIED" (RPH-DOC-006.md L1308) while the paired Decomposition Contract shows "status": "UNDER_REVIEW" (L791) — The two contracts are snapshots at different fixture moments with no timestamp discipline; ambiguous whether a recomposition contract may be SATISFIED while its decomposition contract is still under review.
+- "The implementation must decide when defining one of these constitutes a separate PWU Instance governed by an applicable PWU Type." (RPH-DOC-006.md L1584) — Explicitly open: actors/journeys/capabilities/requirements are under-modeled; the five-part rule at L1588-1594 is offered as recommendation, not settled canon.

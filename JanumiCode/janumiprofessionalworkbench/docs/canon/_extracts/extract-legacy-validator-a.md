@@ -1,0 +1,63 @@
+# Extract: Janumicode_v2 - Validator Subsystem ("The Professional Wisdom Compiler"), lines 1-1250
+
+Source: `docs/Legacy JanumiCode Source Materials/Janumicode_v2 - Validator Subsystem.md`, lines 1-1249 (entire file falls within the assigned 1-1250 slice). Cited below as `Validator-Subsystem.md`.
+Speaker note: this is a concept paper, not a transcript — no HUMAN/ASSISTANT turns exist, so no SPONSOR-RULINGS items arise from this source.
+Focus honored: assurance-engineering rationale only; the IR field lists, finding schemas, and stage enumerations are cited for their semantic rule, not their wire shape.
+
+## CONSTITUTIONAL CANDIDATES
+
+- "Mature professional knowledge should not merely be placed in an agent's context. It should be compiled into the control architecture governing how agentic work is produced, inspected, corrected, and trusted." (Validator-Subsystem.md L21-23) — The paper's central proposition; the founding rationale of Assurance Engineering doctrine.
+- "Every mature professional domain contains accumulated knowledge about how its work products and work processes predictably fail. That knowledge can be transformed into executable control structures for agentic work." (Validator-Subsystem.md L126-128) — Core thesis: failure knowledge is compilable, not just readable.
+- "**Intrinsic:** Is it good? **Derivational:** Is it justified? **Systemic:** Does it fit? A mature agentic control architecture requires all three." (Validator-Subsystem.md L631-639) — The three validation dimensions; artifact quality alone declared insufficient (L584).
+- "a high-quality artifact can still be the wrong artifact. A requirement can be atomic, measurable, feasible, and testable while having no legitimate relationship to the original need." (Validator-Subsystem.md L614-616) — Why derivation validation is a separate dimension; intrinsic quality cannot prove legitimacy.
+- "Every compiled control should retain the epistemic status of its source. A statutory prohibition may create a hard gate ... A heuristic may create a review question. A smell may trigger investigation without presuming a defect." (Validator-Subsystem.md L275-283) — Epistemic-status preservation rule; "prevents the system from turning all professional wisdom into rigid bureaucracy" (L285).
+- "The correct architecture is therefore not: **Rule violated → reject** It is: **Signal detected → investigate → gather evidence → assess context → determine consequence**" (Validator-Subsystem.md L657-663) — Validation as professional inquiry, not mechanical compliance; the anti-linting constitutional stance.
+- "The work is not fully specified merely because the desired output is known. A complete work specification also includes the known ways the work can become deceptively wrong." (Validator-Subsystem.md L1060-1062) — Failure knowledge is part of the shape of work itself (L1058); direct ancestor of PWU assurance obligations.
+- "The compiler should preserve these tensions rather than silently choosing one side." (Validator-Subsystem.md L870) — Conflicting valid principles (simplicity vs extensibility, speed vs assurance) must survive compilation as explicit tensions.
+
+## DOCTRINE-CONOP
+
+- "The bottleneck increasingly moves from production to assurance." (Validator-Subsystem.md L35) — The problem statement motivating the whole subsystem: agents produce faster than trust can be established (L31).
+- "**Professional wisdom → recurrent dynamic → hazard → invariant → operational control**" (Validator-Subsystem.md L132) — The canonical transformation chain; expanded at L134-150 through evidence, inspection, remediation, convergence, escalation.
+- "This is the difference between professional knowledge as information and professional knowledge as control." (Validator-Subsystem.md L178) — Conclusion of the worked Hyrum's Law compilation (L152-176), the paper's exemplar of the method.
+- "The compiler's primary task is semantic extraction, not summarization." (Validator-Subsystem.md L312) — Wisdom is encoded indirectly; compilation must recover mechanism, hazard, conditions, exceptions (L303-310).
+- "The constitution should remain concise enough to influence behavior. It is not the full validation specification." (Validator-Subsystem.md L444-446) — Constitutions and validators are distinct compilation targets with different roles.
+- "Invariants are especially important in long-horizon workflows because they define what must survive change." (Validator-Subsystem.md L461) — Rationale for invariants as a first-class target class.
+- "Some wisdom applies not to the artifact but to the behavior of the workflow itself." (Validator-Subsystem.md L559) — Control-loop policies as a distinct target: retry rules, convergence tests, tactic changes, escalation (L570-578).
+- "Not all validators should inspect work in the same way. A robust system should instantiate different modes of professional skepticism. ... Together, these validators create structured cognitive diversity." (Validator-Subsystem.md L685-687, L777) — Validator roles as distinct epistemic attacks (Smell Detector through Tactic-Change Controller, L689-775).
+- "The Professional Wisdom Compiler should not create a giant rule engine that mechanically rejects work. Professional judgment often operates under uncertainty. A smell is not a defect. A heuristic has exceptions." (Validator-Subsystem.md L645-651) — Uncertainty-tolerant assurance doctrine; findings are calibrated, not binary.
+- "The controls themselves must be reviewed. ... Does the validator actually test the intended concern? Can it be gamed? Does it create false confidence? ... Is its cost proportionate to risk?" (Validator-Subsystem.md L872-885) — Meta-assurance: validation of the compiled controls is a mandatory pipeline stage.
+- "**Professional wisdom → controls → agentic work → outcomes → new professional wisdom**" (Validator-Subsystem.md L904) — The closed learning loop; runtime observation (L886-896) feeds wisdom evolution.
+- "The applicable control set should depend on risk and context. ... This requires a **control planner**." (Validator-Subsystem.md L1119, L1142) — From static checklist to adaptive control; planner selects which wisdom applies, which validators run, at what depth and cost (L1144-1151).
+- "analogous not merely to a source-code compiler but to a compiler plus runtime. The compiler produces the available controls. The runtime determines when and how to execute them." (Validator-Subsystem.md L1153-1157) — Compile-time/runtime split for assurance controls.
+- "A major failure mode of agentic validation systems is endless static critique. ... Nothing determines whether the loop is making meaningful progress." (Validator-Subsystem.md L1163-1173) — The named hazard that convergence/tactic-change/escalation controls exist to defeat.
+- "This transforms validators from critics into components of a controlled professional reasoning system." (Validator-Subsystem.md L1215) — End-state doctrine for the repair/revalidation loop.
+- "The system should not assume that published professional wisdom is complete. Every execution can generate new evidence. ... This supports the discovery of local professional wisdom." (Validator-Subsystem.md L1221-1235) — Outcome learning: incident patterns graduate to failure modes, invariants, validators, runtime controls (L1243-1249).
+- "The result is not one generic validation framework. It is a phase-sensitive professional control system." (Validator-Subsystem.md L1027-1029) — Controls are compiled per work-unit/phase, not shared as a universal checklist.
+- "Each phase can be modeled as a Professional Work Unit. A Professional Work Unit contains: an input shape; an intended transformation; ... invariants; known failure modes; evidence requirements; validators; completion criteria; escalation conditions." (Validator-Subsystem.md L912-925) — Legacy origin of the PWU concept carrying assurance content intrinsically.
+- "Shape Engineering asks: What is the work? ... The compiler adds: How does this kind of work predictably fail, and what professional controls should therefore govern it?" (Validator-Subsystem.md L1037-1043) — Division of labor between Shape Engineering and wisdom compilation.
+- "Findings, remediation, retry, tactic changes, convergence, and escalation govern temporal behavior. The question is: What happens after the system discovers that the work may be wrong?" (Validator-Subsystem.md L1094-1100) — Loop Engineering's defining question within the prompt/context/harness/loop/shape stack (L1066-1110).
+
+## VOCABULARY
+
+- "This paper proposes the **Professional Wisdom Compiler**: a system and methodology for transforming accumulated professional wisdom into executable control structures for agentic work." (Validator-Subsystem.md L17) — Canonical name and definition of the concept.
+- "The core technical artifact should be a domain-neutral intermediate representation, or **Professional Wisdom IR**." (Validator-Subsystem.md L318) — Named IR whose point is target-independence: "The source wisdom remains stable. The executable target changes." (L418).
+- "may all partially instantiate a broader class: **Proxy displacement of objective**" (Validator-Subsystem.md L835-837) — Failure normalization exemplar: metric/test/benchmark/KPI/spec gaming unified under one Goodhart-class failure name.
+
+## SEMANTIC-INVARIANTS
+
+- "Existing observable behavior must be presumed depended upon until evidence establishes otherwise." (Validator-Subsystem.md L164) — The compiled Hyrum invariant; template for presumption-until-evidence invariants.
+- "A finding should identify: the suspected failure mode; the evidence; the reasoning; ... the confidence level; the unresolved uncertainty; the recommended remediation; the conditions under which no remediation is necessary." (Validator-Subsystem.md L667-677) — Semantic rule for durable findings: calibrated, evidence-bearing, and dismissible on stated conditions.
+- "A validator should not merely ask whether an artifact is 'good.' It should have: a defined concern; an applicability condition; required evidence; an inspection procedure; ... remediation guidance; escalation criteria." (Validator-Subsystem.md L543-555) — What makes a validator legitimate; a concern without evidence and escalation paths is not a validator.
+
+## PROTOCOL-PRACTICE
+
+- "Possible convergence signals include: declining weighted defect severity; increasing evidence coverage; stable resolution of prior findings; absence of newly introduced critical defects; increasing agreement among independent validators." (Validator-Subsystem.md L1177-1183) — The convergence test vocabulary for repair/revalidation loops.
+- "Possible stagnation signals include: recurrence of the same failure class; oscillation between incompatible remediations; increasing change volume without quality improvement; ... validator disagreement that does not narrow; declining marginal improvement." (Validator-Subsystem.md L1185-1192) — Stagnation detection triggers tactic change, not more retries.
+- "Possible tactic changes include: broaden the search space; retrieve new evidence; invoke a different professional role; generate competing hypotheses; replace the implementation strategy; revisit upstream artifacts; reduce scope; ... request human judgment." (Validator-Subsystem.md L1194-1204) — The tactic-change menu between blind retry and escalation.
+- "Escalation should occur when: authority is required; evidence is unavailable; professional principles remain irreconcilable; risk exceeds autonomous authority; uncertainty remains above the permitted threshold; repeated tactic changes fail to restore convergence." (Validator-Subsystem.md L1206-1213) — Escalation as bounded-autonomy protocol, the last resort after tactic change.
+- "Remediation: Preserve compatibility, migrate consumers, version the interface, or obtain explicit authorization for the break. Escalation: If dependency scope cannot be established with adequate confidence, require human review." (Validator-Subsystem.md L174-176) — Worked remediation/escalation pair showing repair options ordered before authorized breakage.
+
+## OPEN-QUESTIONS-CONTRADICTIONS
+
+- The extraction brief names "durable findings" and "repair/revalidation" as focus areas, but the paper never uses "durable" or describes finding persistence/re-validation of resolved findings explicitly; the closest content is "stable resolution of prior findings" (Validator-Subsystem.md L1181) and the finding schema (L667-677). Downstream doctrine attributing a durable-findings mechanism to this source is an extrapolation, not a quote.
