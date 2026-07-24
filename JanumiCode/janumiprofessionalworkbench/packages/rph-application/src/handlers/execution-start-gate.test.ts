@@ -763,6 +763,58 @@ describe('StartExecutionStep — the linear start-gate (DWP-01, RPH-EXE-005 / fo
 			const done = dispatch('CompleteExecutionPlan', {}, PLAN, 'EXECUTION_PLAN');
 			expect(done.status, JSON.stringify(done.error)).toBe('ACCEPTED');
 		});
+
+		// CMDPRE post-build adversarial review (2026-07-24): a not-taken arm's interior step that never became READY
+		// (seeded NOT_READY) must still be prunable. pruneExecutionStep declares NOT_READY in requireFrom (execution.ts:986,
+		// D5: "or the plan can never reach terminal-success and deadlocks"), but the ExecutionStep machine had NO
+		// NOT_READY->SKIPPED arrow — so checkTransition refused the prune with RPH_ILLEGAL_STATE_TRANSITION and the excluded
+		// step deadlocked the plan. The review added that arrow to transitions.data.ts (INV-4: requireFrom = machine
+		// in-arrows). This is the previously-broken path, now green.
+		it('prunes a NOT_READY interior step of a dead arm (the review-added NOT_READY->SKIPPED arrow; no deadlock)', () => {
+			const r = dispatch(
+				'ProposeExecutionPlan',
+				{
+					executionPlanId: PLAN,
+					workUnitId: PWU,
+					steps: [
+						{ ...step(1, 'QUEUED'), stepType: 'BRANCH' },
+						step(2, 'QUEUED'),
+						step(3, 'QUEUED'),
+						step(4, 'NOT_READY') // interior of the excluded arm; it never becomes READY
+					],
+					transitions: [
+						cedge(1, 2, { op: 'ATTEMPTS', stepId: stepId(1), cmp: '>', value: 99 }), // never true → s2 excluded
+						gedge(1, 3), // default taken
+						gedge(2, 4)
+					],
+					retryPolicy: {},
+					tacticalChangePolicy: {},
+					escalationPolicy: {},
+					terminationPolicy: {}
+				},
+				PLAN,
+				'EXECUTION_PLAN'
+			);
+			expect(r.status, JSON.stringify(r.error)).toBe('ACCEPTED');
+			expect(dispatch('ApproveExecutionPlan', {}, PLAN, 'EXECUTION_PLAN').status).toBe('ACCEPTED');
+			expect(
+				dispatch('ActivateExecutionPlan', { authorizedRuntimeBindingIds: [] }, PLAN, 'EXECUTION_PLAN').status
+			).toBe('ACCEPTED');
+
+			expect(start(1).status).toBe('ACCEPTED');
+			expect(complete(1).status).toBe('ACCEPTED'); // guard false → s3 taken; s2 + interior s4 (NOT_READY) excluded
+			expect(stepStateOf(4)).toBe('NOT_READY');
+
+			expect(prune(2).status).toBe('ACCEPTED'); // clear the head of the dead arm first
+			const prunedNotReady = prune(4); // the NOT_READY interior; before the arrow this was RPH_ILLEGAL_STATE_TRANSITION
+			expect(prunedNotReady.status, JSON.stringify(prunedNotReady.error)).toBe('ACCEPTED');
+			expect(stepStateOf(4)).toBe('SKIPPED');
+
+			// The plan can now be driven to completion — the deadlock the missing arrow would have caused is gone.
+			expect(start(3).status).toBe('ACCEPTED');
+			expect(complete(3).status).toBe('ACCEPTED');
+			expect(dispatch('CompleteExecutionPlan', {}, PLAN, 'EXECUTION_PLAN').status).toBe('ACCEPTED');
+		});
 	});
 
 	// ── DWP-08: the DWP-07 remediation was itself incomplete. It keyed "this step is DEAD" on WHICH COMMAND drove the

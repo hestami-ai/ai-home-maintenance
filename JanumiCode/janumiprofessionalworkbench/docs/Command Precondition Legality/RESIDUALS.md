@@ -48,11 +48,23 @@ by exactly one transition.
 | Re-pointed PWA root | **0** | Exactly one `PwaPublished` carrying one `rootPwuTypeId`; exactly one PWU Type declares `isRoot`. `repointedRoots: []`. |
 | Terminal state reached by >1 transition | **0** | The 8 PWUs that reach a terminal axis (`executionState=SUCCEEDED`, `assuranceState=SATISFIED`, one `workLifecycleState=BASELINED`) each arrive via a single final `PwuStateChanged`. |
 
-The reference seed is **contradiction-free**. This is the expected result and it is load-bearing, not a
-formality: the seed is driven entirely through *legal* transitions, and — after DWP-01a…08 — every re-issue of
-a state-advancing or `commitState` command is now **refused** with no event appended. A history built through
-the hardened engine cannot accrue either contradiction shape. The audit confirms the corpus the series was
-built to protect starts clean.
+The reference seed is **contradiction-free with respect to the three shapes scanned above** — a same-type
+terminal/once-only duplicate on one aggregate, a re-pointed root, and a terminal state reached by more than one
+transition. This is the expected result and it is load-bearing, not a formality: the seed is driven entirely
+through *legal* transitions, and — after DWP-01a…08 — every re-issue of a state-advancing or `commitState`
+command is now **refused** with no event appended. A history built through the hardened engine cannot accrue
+**those** contradiction shapes.
+
+**Scope of the claim (do not over-read it).** The census keys duplicates on `(aggregateType, aggregateId,
+eventType)` and scans the root by `rootPwuTypeId` cardinality; it is therefore *structurally blind* to four
+other shapes it does **not** assert freedom from: (a) two **different** mutually-exclusive terminal events on one
+aggregate (e.g. an `ExecutionPlanCompleted` **and** an `ExecutionPlanFailed`) — each a distinct `eventType`, so
+each is a `count=1` group; (b) a terminal aggregate that later received a non-self event of a different type; (c)
+a **non-monotonic** `aggregateRevision` (the census never reads revision); (d) a **cross-aggregate** stale
+reference (a `REVOKED` Decision still named by an `AUTHORITATIVE` Baseline; a root pointing at a `REMOVED` PwuType).
+The audit provides no evidence the seed contains any of these — but it also does not *scan* for them; surfacing
+them is exactly the deferred **R5** (projection-level contradiction surfacing). The unqualified sense of
+"contradiction-free" is therefore the three-shape sense above, not a universal one.
 
 ### 2.2 Multiplicities observed that are **not** contradictions
 
@@ -85,10 +97,11 @@ Had the audit found a duplicate terminal event or a re-pointed root, it would be
   is never rewritten … Event payloads carry the accepted facts" (JPWB-DOC-003 §9 / **PER-1**). "History is
   never rewritten by invalidation — the record of prior satisfaction stands" (**PER-2**).
 - **A false append has no retraction.** "A second event for a change that did not happen is a permanent false
-  entry in an append-only record with no retraction" (JPWB-CON-000 **AX-7**; restated at
-  JAN-CMDPRE-SPEC-001 INV-2 WHY). The roadmap's legacy citation "DOC-007 §9.1" resolves to these live canon
-  clauses (the DOC-007 numbering predates the canon consolidation; the persistence semantics moved to
-  DOC-003 §9 / PER-1–PER-2).
+  entry in an append-only record with no retraction" — this is JAN-CMDPRE-SPEC-001 **INV-2 WHY**'s wording,
+  restating the ratified principle **JPWB-CON-000 AX-7**: "History is append-only. Accepted semantic changes
+  produce immutable events; correction moves forward through new events, supersession, or reconciliation, never
+  by rewriting." The roadmap's legacy citation "DOC-007 §9.1" resolves to these live canon clauses (the DOC-007
+  numbering predates the canon consolidation; the persistence semantics moved to DOC-003 §9 / PER-1–PER-2).
 
 The consequence is definite: the **only lawful remedy for a pre-existing contradiction is a forward superseding
 event** (a new supersession/correction fact that preserves the contradicting one, per DOC-003 REL-3 / ASR-8),
@@ -113,9 +126,13 @@ disposition.
 | **R3** | **`expectedRevision` migration** — optimistic-concurrency preconditions are not yet required on every mutating command. | DS-001 §15 | Out of the JAN-CMDPRE precondition-legality scope (that program governs *source-state* legality, not concurrency tokens). | Deferred; disclosed in the design. |
 | **R4** | **Retraction of written events** — there is no command to retract or compensate an event. | DS-001 §15 | Structural, by ratification: events are immutable and append-only (§3). This is a *property*, not a gap — the only lawful correction is a forward superseding event. | Permanent by design. Recorded so it is never mistaken for a missing feature. |
 | **R5** | **Projection-level contradiction surfacing** — read models do not yet flag a stored contradiction to the UI. | DS-001 §15 | The audit is currently a point-in-time script (this document), not a live projection. | Deferred; the audit method in §1/§5 is the seed of a future projection-side check. |
+| **R6** | **`advancePwuLifecycle` (the F-6 PWU-lifecycle family)** — the six state-advancing PWU commands `BeginPwuShaping`, `MarkPwuReady`, `ChallengePwu`, `ReshapePwu`, `InvalidatePwu`, `SupersedePwu` carry **no** `precondition` field: `advancePwuLifecycle` is the third write primitive, independent of `advanceStatus`, so the DWP-06 compiler-mandatory INV-1 does not reach them. | SPEC §5.4 / F-6 | They advance a status axis but their re-issue refusal rides on `canAdvanceWorkLifecycle` → `canTransition` (which excludes the NOOP), classified GUARD_ONLY_ACCIDENTAL. Not migrated to the `fromStates` mechanism; lowest-priority remediation. | **Deferred, disclosed.** A same-state re-issue *is* refused today and returns the correct `RPH_ILLEGAL_STATE_TRANSITION` (SPEC §7), so this is a mechanism-uniformity gap (INV-1 coverage + wrong-code risk if a guard changes), not a live exploit; no application-layer re-issue kill test exists yet. |
 
 **R1 and R2 are the two DWP-08 disclosures** the series owed to this register; **R3–R5** are the standing
-deferrals from DS-001 §15, gathered here so the residual set is complete in one place.
+deferrals from DS-001 §15; **R6** is the SPEC's F-6 backlog (the one state-advancing family outside INV-1). Together
+they are the DWP-00…08 mechanism-level residuals gathered in one place. (Genuinely out of this register's scope,
+because established after the fact: the SPEC §3.1/§7 execution-plan/pwa target sets tabled under F-1 were
+subsequently **DELIVERED** in DWP-05, so they are closed, not residual.)
 
 ---
 
@@ -140,22 +157,23 @@ it('DWP-09 read-only history audit', () => {
 	const events = engine.readAllEvents();
 	const aggIds = [...new Set(events.map((e) => e.aggregateId))];
 
-	// (1) duplicate (aggregate, eventType) census
-	const byAggType = new Map<string, typeof events>();
+	// (1) duplicate (aggregate, eventType) census. Key on a JSON-encoded tuple (unambiguous, no in-id
+	// collision) and carry the tuple in the value, so the report never re-parses the key.
+	const byAggType = new Map<string, { key: [string, string, string]; list: typeof events }>();
 	for (const e of events) {
-		const k = `${e.aggregateType}${e.aggregateId}${e.eventType}`;
-		(byAggType.get(k) ?? byAggType.set(k, []).get(k)!).push(e);
+		const key: [string, string, string] = [e.aggregateType, e.aggregateId, e.eventType];
+		const k = JSON.stringify(key);
+		const entry = byAggType.get(k) ?? { key, list: [] as typeof events };
+		entry.list.push(e);
+		byAggType.set(k, entry);
 	}
-	const duplicates = [...byAggType.entries()]
-		.filter(([, list]) => list.length > 1)
-		.map(([k, list]) => {
-			const [aggregateType, aggregateId, eventType] = k.split('');
-			return {
-				aggregateType, aggregateId, eventType, count: list.length,
-				eventIds: list.map((e) => e.eventId),
-				payloadsDistinct: new Set(list.map((e) => JSON.stringify(e.payload))).size > 1
-			};
-		});
+	const duplicates = [...byAggType.values()]
+		.filter(({ list }) => list.length > 1)
+		.map(({ key: [aggregateType, aggregateId, eventType], list }) => ({
+			aggregateType, aggregateId, eventType, count: list.length,
+			eventIds: list.map((e) => e.eventId),
+			payloadsDistinct: new Set(list.map((e) => JSON.stringify(e.payload))).size > 1
+		}));
 
 	// (2) re-pointed PWA root
 	const rootAssertions = new Map<string, Set<string>>();

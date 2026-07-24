@@ -1466,6 +1466,11 @@ export const STATE_MACHINES: Record<string, StateMachineSpec> = {
 				trigger: 'ExecutionStepSkipped',
 				guard: 'a skipped MANDATORY step requires an authorized plan revision or waiver (§21.1)'
 			},
+			{
+				from: 'NOT_READY',
+				to: 'SKIPPED',
+				trigger: 'pruneExecutionStep / ExecutionStepPruned (not-taken/unreachable arm)'
+			},
 			{ from: 'READY', to: 'CANCELLED', trigger: 'ExecutionStepCancelled' },
 			{ from: 'QUEUED', to: 'CANCELLED', trigger: 'ExecutionStepCancelled' },
 			{ from: 'RUNNING', to: 'CANCELLED', trigger: 'ExecutionStepCancelled' },

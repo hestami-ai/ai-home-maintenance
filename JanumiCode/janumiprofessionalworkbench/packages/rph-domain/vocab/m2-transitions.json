@@ -1561,6 +1561,12 @@
           "note": "RECONSTRUCTED. Both named from-states are in the states list."
         },
         {
+          "from": "NOT_READY",
+          "to": "SKIPPED",
+          "trigger": "pruneExecutionStep / ExecutionStepPruned (not-taken/unreachable arm)",
+          "note": "A not-taken BRANCH arm that never became READY is prunable to SKIPPED — a SYSTEM prune authorized by the plan's own branch logic (no waiver; distinct from the waiver-gated READY/QUEUED skip, which skipExecutionStep.requireFrom keeps to READY|QUEUED). Without this arrow an excluded NOT_READY step can never reach terminal-success and the plan deadlocks (D5); pruneExecutionStep declares NOT_READY in drivesFrom, so INV-4 requires the machine's SKIPPED in-arrows to include it. Added by the JAN-CMDPRE post-build adversarial review (2026-07-24)."
+        },
+        {
           "from": "READY/QUEUED/RUNNING/WAITING",
           "to": "CANCELLED",
           "trigger": "ExecutionStepCancelled",
