@@ -106,8 +106,9 @@ function advanceIntent(
 		 *  so it carries the identical hole and needs the identical enforcement, sited identically (BEFORE `precheck`,
 		 *  the local analogue of `guard`): without it a re-issued ReviseIntent is absorbed as a NOOP and still bumps
 		 *  semanticVersion, and ApproveIntent rejects unless approvedSemanticVersion matches the current one — so
-		 *  replaying a command that changes nothing silently voids an outstanding approval. */
-		readonly precondition?: Precondition;
+		 *  replaying a command that changes nothing silently voids an outstanding approval.
+		 *  REQUIRED since JAN-CMDPRE DWP-06 (D5), matching kit.advanceStatus — every advanceIntent site declares one. */
+		readonly precondition: Precondition;
 	}
 ) {
 	const id = command.targetAggregateId;

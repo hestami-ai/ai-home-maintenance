@@ -449,11 +449,12 @@ export function advanceStatus(
 		 * — protection by accident, with the wrong refusal code. Sets are HAND-AUTHORED per call site from the
 		 * machine's own in-arrows — NOT generated from the vocab's `drivesFrom`, which has no ratified authority, is
 		 * absent for twelve commands, names the wrong machine for at least one, and is narrower than the machine for
-		 * eight. OPTIONAL until every site declares one; DWP-06 then flips it to required as a pure type change (two
-		 * call sites are genuine same-state HOLDS — ApplyTacticalChange declares ACTIVE→ACTIVE — and they declare
-		 * their own target state rather than omitting the declaration).
+		 * eight. REQUIRED since JAN-CMDPRE DWP-06 (D5): every status advance MUST declare a precondition — the compiler
+		 * enforces it, so no `advanceStatus` site can silently omit one again. The two genuine same-state HOLDS
+		 * (ApplyTacticalChange declares fromStates('ACTIVE') → ACTIVE; the analogous ChangePwuState path) declare their
+		 * own target state rather than omitting the declaration.
 		 */
-		readonly precondition?: Precondition;
+		readonly precondition: Precondition;
 	}
 ): CommandResult {
 	const id = command.targetAggregateId;

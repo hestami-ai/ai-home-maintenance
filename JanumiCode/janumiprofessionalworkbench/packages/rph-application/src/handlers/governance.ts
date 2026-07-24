@@ -472,7 +472,10 @@ export const createBaseline: CommandHandler = (ctx, command, payload) => {
 	});
 };
 
-/** SubmitBaselineForReview — CANDIDATE -> UNDER_REVIEW. */
+/** SubmitBaselineForReview — CANDIDATE -> UNDER_REVIEW. `precondition: fromStates('CANDIDATE')` (JAN-CMDPRE DWP-06)
+ *  — the machine's single in-arrow to UNDER_REVIEW (Baseline.status). NONE site: an already-UNDER_REVIEW re-issue
+ *  was a NOOP appending a second BaselineSubmittedForReview. This site was outside DWP-04's six; the D5
+ *  required-precondition flip (making `precondition` mandatory on `advanceStatus`) is exactly what surfaced it. */
 export const submitBaselineForReview: CommandHandler = (ctx, command) =>
 	advanceStatus(ctx, command, {
 		objectType: BASELINE,
@@ -480,6 +483,7 @@ export const submitBaselineForReview: CommandHandler = (ctx, command) =>
 		machine: 'Baseline.status',
 		target: 'UNDER_REVIEW',
 		eventType: 'BaselineSubmittedForReview',
+		precondition: fromStates('CANDIDATE'),
 		// The event records the RESULTING status. BaselineSubmittedForReview declares `status` (UNDER_REVIEW), which
 		// the empty command payload does not carry. (Pinned defect in emitted-event-conformance; now conforms.)
 		eventPayload: () => ({ status: 'UNDER_REVIEW' })

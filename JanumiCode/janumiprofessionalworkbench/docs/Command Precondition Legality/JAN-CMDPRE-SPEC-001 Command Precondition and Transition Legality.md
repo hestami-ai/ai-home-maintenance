@@ -796,6 +796,8 @@ This section is what Phase 2 (DWP-04) and every future DWP implement against. Fo
 
 All eleven were established empirically (DWP-05 step 1 establish→verify→synthesize), authored, mutation-red-proofed live (weakening all 11 sets made exactly the 11 kill/wrong-state tests RED, all 7 positives green), gated green, and adversarially verified. Fixtures: `dwp05-precondition-coverage.test.ts`. The five `commitState`/edit-append sites (`DeletePwa`, `EditPwa`, `EditPwuType`, `RemovePwuType`, `AppendConversationEntries`) are **not** status advances — deferred to DWP-08's reader-precondition variant (§7).
 
+**5.4 INV-1 is now compiler-mandatory (DWP-06 / D5).** `precondition` is a *required* property on both write primitives (`advanceStatus`, `advanceIntent`) — omitting it is a compile error, so no status advance can silently skip its declaration and the count cannot regress. The flip surfaced exactly one residual `advanceStatus` site the earlier DWPs had missed — `submitBaselineForReview` (`Baseline.status`, in-arrow `CANDIDATE`, a NONE site outside DWP-04's six) — now authored `fromStates('CANDIDATE')` with a kill test + mutation red-proof (`dwp06-precondition-coverage.test.ts`). The third primitive `advancePwuLifecycle` (PWU-lifecycle) is independent of `advanceStatus` and remains the F-6 backlog.
+
 ## 6. Forks — numbered sponsor decisions
 
 Authored under the 2026-07-24 grant; each is a decision a reasonable sponsor might rule differently. The recommendation is adopted to keep writing (DOC-004 §10.7) and is marked; ruling otherwise changes what is cited.

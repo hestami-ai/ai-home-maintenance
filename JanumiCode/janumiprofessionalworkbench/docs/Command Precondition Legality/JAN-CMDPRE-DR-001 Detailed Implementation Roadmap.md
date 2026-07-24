@@ -244,21 +244,21 @@ delivery_state: DELIVERED
 id: JAN-CMDPRE-DWP-06
 title: "Make the declaration MANDATORY (zero-behaviour type flip at census 0)"
 master_work_packages: [DS-001:D5]
-outcome: "`precondition` becomes a REQUIRED property on both primitives' args. Because DWP-01a..05 authored every site, this is a pure type change with no behavioural diff — and from here a NEW call site cannot silently omit the declaration."
+outcome: "`precondition` is now a REQUIRED property on both primitives' args (kit.ts advanceStatus, intent.ts advanceIntent). The compiler enforces that every status advance declares a source-state precondition — a new call site cannot silently omit it. `advancePwuLifecycle` (the third primitive, pwu.ts:299) is independent (does not route through advanceStatus) and out of scope — the F-6 PWU-lifecycle sites."
 knowledge_status: CONFIRMED
 repository_scope:
-  files_or_symbols: ["kit.ts advanceStatus args", "intent.ts advanceIntent args"]
+  files_or_symbols: ["kit.ts advanceStatus args", "intent.ts advanceIntent args", "governance.ts submitBaselineForReview (the one site the flip surfaced)"]
 required_changes:
-  - "Flip optional -> required. The diff must contain NO logic change; if any call site needs a set authored here, DWP-01a..05 was incomplete and THAT is the finding."
-  - "Add a census test asserting every advanceStatus/advanceIntent call site is accounted for, so the count cannot silently regress."
+  - "DONE. Flipped `precondition?` -> `precondition` (required) on both primitives. The flip surfaced EXACTLY ONE previously-uncovered advanceStatus site — submitBaselineForReview (Baseline.status CANDIDATE->UNDER_REVIEW), a NONE site OUTSIDE DWP-04's six — precisely the 'if any call site needs a set authored here, DWP-01a..05 was incomplete and THAT is the finding' case this DWP anticipated. Closed it: `precondition: fromStates('CANDIDATE')` + a kill test + live mutation red-proof (weakening to include UNDER_REVIEW makes the kill test RED)."
+  - "The compiler requirement SUBSUMES the census test the plan called for: a missing declaration is now a compile error (initial flip reported exactly one TS2345 at governance.ts submitBaselineForReview), so the count cannot silently regress — no separate census test needed."
 invariants:
-  - "check-types is the gate: it is a compile error to omit the declaration."
-  - "Zero behavioural change — every test passes untouched."
+  - "check-types is the gate: it is now a compile error to omit the declaration. VERIFIED (21/21 after the fix)."
+  - "Zero behavioural change from the flip itself — every PRE-EXISTING test passed untouched (zero assertion edits). The only NEW test is dwp06-precondition-coverage.test.ts (1) for the surfaced site. Full gate green (vitest rph-application 339, rph-demo 104; lint; boundary 0; playwright 49/49)."
 prohibited_shortcuts:
-  - "Do NOT introduce a sentinel/escape-hatch value. Sequencing this LAST is what makes the sentinel unnecessary (DS D5, B3)."
-  - "Do NOT land this before the census reaches zero — it is a 31-site red branch otherwise."
-tests: ["the entire suite passes with NO assertion edited — that is the proof of zero behaviour change."]
-delivery_state: NOT_STARTED
+  - "HELD: no sentinel/escape-hatch value introduced — sequencing this LAST made it unnecessary (DS D5, B3)."
+  - "HELD: landed only after the census reached (effectively) zero — the flip found ONE residual site, not a 31-site red branch, confirming DWP-01a..05 had authored the rest."
+tests: ["NEW dwp06-precondition-coverage.test.ts (1): submitBaselineForReview accepts CANDIDATE->UNDER_REVIEW and refuses a re-issue from UNDER_REVIEW (RPH_ILLEGAL_STATE_TRANSITION, one event, no rev bump), mutation-red-proofed. The rest of the suite is UNTOUCHED — the proof of zero behaviour change for the flip."]
+delivery_state: DELIVERED
 ```
 
 ```yaml
@@ -371,7 +371,7 @@ A wrong-STATE refusal returns `RPH_ILLEGAL_STATE_TRANSITION` (status `REJECTED`)
 | D8 wrong-source half | 01a | governance.ts | DenyWaiver-on-approval refused |
 | D10 ChangePwuState | 02 | pwu.ts | seed drives unchanged |
 | D4 authored allowlists | **03 (intent+evidence/assumption+decomp/recomp, DELIVERED)**, **04 (governance ×3 + AssurancePolicy ×3, DELIVERED)**, **05 (execution plan-level ×7 + pwa-authoring publication ×4, DELIVERED)** | intent.ts, assurance.ts, decomposition.ts, governance.ts, execution.ts, pwa-authoring.ts | refusal + widest-legal-path per site (dwp03-/dwp04-/dwp05-precondition-coverage.test.ts); DWP-04/05 mutation-red-proofed live + adversarially verified |
-| D5 mandatory | 06 | kit.ts, intent.ts | check-types; zero assertion edits |
+| D5 mandatory | **06 (DELIVERED)** | kit.ts, intent.ts, governance.ts (submitBaselineForReview — the one gap the flip surfaced) | check-types is the gate (compile error to omit); zero edits to existing assertions; dwp06-precondition-coverage.test.ts + mutation-red-proof |
 | D2 + D6 kernel | 07 | stateMachine.ts, gen-transitions.ts | illegal-row invariant green, 27-machine differential |
 | D9 commitState | 08 | assurance.ts, pwa-authoring.ts | no-change edit refused |
 | D7 history | 09 | RESIDUALS.md | audit output committed |
