@@ -5,7 +5,9 @@
 //   1. Umbrella `from` states ("Any active", "Any non-baselined") are EXPANDED to concrete non-terminal states.
 //   2. CROSS-AXIS rules (from/to naming a different axis, e.g. executionState=SUCCEEDED -> SATISFIED) are
 //      LIFTED OUT into CROSS_AXIS_RULES — the generic same-axis engine cannot represent them (enforced by P1 guards).
-//   3. Self-loop "illegal" entries (from === to) are DROPPED (a NOOP is not a forbidden transition).
+//   3. Self-loop "illegal" entries (from === to) are RETAINED (JAN-CMDPRE DWP-07 / D6): a DECLARED illegal self-edge
+//      is a forbidden IN-PLACE mutation (§24.2: an AUTHORITATIVE baseline is immutable), NOT a NOOP. classifyTransition
+//      (stateMachine.ts) consults `illegal` BEFORE the from===to shortcut, so the row classifies ILLEGAL_EXPLICIT.
 //   4. An "illegal" entry that also appears as a LEGAL edge is a GUARDED-legal transition (the note is a guard
 //      condition, enforced by the owning subsystem, e.g. M7 assurance) and is recorded under `guarded`.
 import { readFileSync, writeFileSync } from 'node:fs';
@@ -130,7 +132,9 @@ function classifyIllegal(
 			crossAxis.push({ machine: m.name, from: i.from, to: i.to, reason: i.reason });
 			continue;
 		}
-		if (i.from === i.to) continue; // self-loop "illegal" is a NOOP
+		// JAN-CMDPRE DWP-07 (D6): a DECLARED illegal self-edge (from === to) is RETAINED, not dropped — the corpus can
+		// forbid mutating an aggregate in place (§24.2: an AUTHORITATIVE baseline is immutable, so AUTHORITATIVE ->
+		// AUTHORITATIVE is ILLEGAL, not a NOOP). classifyTransition consults `illegal` before the from===to shortcut.
 		if (legalKeys.has(`${i.from}->${i.to}`)) guarded.push(i);
 		else illegal.push(i);
 	}

@@ -40,9 +40,14 @@ export function classifyTransition(machine: string, from: string, to: string): C
 	if (!m.states.includes(from))
 		return { klass: 'UNKNOWN_STATE', reason: `unknown from-state '${from}'` };
 	if (!m.states.includes(to)) return { klass: 'UNKNOWN_STATE', reason: `unknown to-state '${to}'` };
-	if (from === to) return { klass: 'NOOP' };
+	// JAN-CMDPRE DWP-07 (D2/D6): the `illegal` table is consulted BEFORE the from === to shortcut, so a machine that
+	// DECLARES a self-edge illegal — forbidding an in-place mutation, e.g. §24.2 "an AUTHORITATIVE baseline is
+	// immutable" (AUTHORITATIVE -> AUTHORITATIVE) — classifies ILLEGAL_EXPLICIT, not NOOP. An UNdeclared self-edge
+	// (the common case) still falls through to NOOP just below. Ordering these the other way silently downgraded a
+	// declared prohibition to a permitted no-op.
 	const explicit = m.illegal.find((i) => i.from === from && i.to === to);
 	if (explicit) return { klass: 'ILLEGAL_EXPLICIT', reason: explicit.reason };
+	if (from === to) return { klass: 'NOOP' };
 	if (m.transitions.some((t) => t.from === from && t.to === to)) return { klass: 'LEGAL' };
 	return {
 		klass: 'ILLEGAL_UNDEFINED',
@@ -50,6 +55,18 @@ export function classifyTransition(machine: string, from: string, to: string): C
 	};
 }
 
+/**
+ * canTransition — LEGAL ONLY (a NOOP is NOT a transition). The STRICT sibling of the application layer's
+ * `checkTransition` (kit.ts), which admits LEGAL **or** NOOP. The split is deliberate and load-bearing (JAN-CMDPRE
+ * DWP-07 / D2):
+ *   - GUARDS use `canTransition` (LEGAL only): `canActivatePlan`, `canPromoteBaseline`, `canAdvanceWorkLifecycle` —
+ *     they must REFUSE a same-state re-issue, so a NOOP reads as "cannot". This is precisely why those sites were
+ *     GUARD_ONLY_ACCIDENTAL: they refused the NOOP re-issue, but with the guard's code, not the state code.
+ *   - The write primitive `advanceStatus` uses `checkTransition` (LEGAL|NOOP): the NOOP is admitted at the machine
+ *     layer and refused ONE layer up by the command's `precondition` (JAN-CMDPRE) — which is why re-issue legality is
+ *     declared PER COMMAND, not baked into the machine.
+ * A DECLARED illegal self-edge (DWP-07) is neither LEGAL nor NOOP: `canTransition` is false AND `checkTransition` refuses.
+ */
 export function canTransition(machine: string, from: string, to: string): boolean {
 	return classifyTransition(machine, from, to).klass === 'LEGAL';
 }

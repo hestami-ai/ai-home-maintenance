@@ -123,7 +123,15 @@ export function loadOrReject(ctx: HandlerContext, command: DomainCommand, id: st
 	};
 }
 
-/** A REJECTED result if `from -> to` is not a legal (or no-op) transition on `machine`; otherwise null. */
+/**
+ * A REJECTED result if `from -> to` is not a legal (or no-op) transition on `machine`; otherwise null.
+ *
+ * ADMITS LEGAL **or** NOOP — the PERMISSIVE sibling of rph-domain's `canTransition` (LEGAL only). The split is
+ * deliberate (JAN-CMDPRE DWP-07 / D2): `advanceStatus` admits the NOOP here at the machine layer and refuses a
+ * same-state re-issue ONE layer up, via the command's `precondition` — so re-issue legality is declared PER COMMAND,
+ * not baked into the machine. Guards that must refuse the NOOP themselves use `canTransition` instead. A DECLARED
+ * illegal self-edge (DWP-07: §24.2 AUTHORITATIVE-baseline immutability) classifies ILLEGAL_EXPLICIT and IS refused here.
+ */
 export function checkTransition(
 	command: DomainCommand,
 	machine: string,

@@ -1584,6 +1584,12 @@ export const STATE_MACHINES: Record<string, StateMachineSpec> = {
 				to: 'AUTHORITATIVE',
 				reason:
 					"§24.2 + §35.1 'No unauthorized baseline': a baseline cannot become AUTHORITATIVE without an effective promotion decision (must be APPROVED + carry a promotion decision); open blocking observations block promotion unless waived."
+			},
+			{
+				from: 'AUTHORITATIVE',
+				to: 'AUTHORITATIVE',
+				reason:
+					'§24.2: an authoritative baseline is IMMUTABLE — it cannot be re-promoted/mutated in place; changes create a successor baseline.'
 			}
 		],
 		guarded: []

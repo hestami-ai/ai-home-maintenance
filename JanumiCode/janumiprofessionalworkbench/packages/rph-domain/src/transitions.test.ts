@@ -84,3 +84,44 @@ describe('generic transition engine (all machines)', () => {
 		);
 	});
 });
+
+describe('JAN-CMDPRE DWP-07 — a DECLARED illegal self-edge classifies ILLEGAL_EXPLICIT, not NOOP', () => {
+	// The illegal table is consulted BEFORE the from === to shortcut (D2/D6): §24.2 makes an AUTHORITATIVE baseline
+	// immutable, so AUTHORITATIVE -> AUTHORITATIVE is a forbidden in-place mutation, not a permitted no-op.
+	it('Baseline.status AUTHORITATIVE -> AUTHORITATIVE is ILLEGAL_EXPLICIT (canTransition false; assertTransition throws)', () => {
+		const c = classifyTransition('Baseline.status', 'AUTHORITATIVE', 'AUTHORITATIVE');
+		expect(c.klass).toBe('ILLEGAL_EXPLICIT');
+		expect(c.reason).toContain('§24.2');
+		expect(canTransition('Baseline.status', 'AUTHORITATIVE', 'AUTHORITATIVE')).toBe(false);
+		expect(() =>
+			assertTransition('Baseline.status', 'AUTHORITATIVE', 'AUTHORITATIVE', { correlationId: 'c1' })
+		).toThrow(RphErrorException);
+	});
+
+	// The 27-machine differential: exactly ONE (from === to) pair is declared illegal across ALL machines — so the
+	// reorder + generator change alter EXACTLY ONE classification (Baseline's), not a blanket self-edge ban.
+	it('exactly one declared illegal self-edge exists across all machines, and it is the Baseline row', () => {
+		const declaredSelfEdges = machineNames().flatMap((name) =>
+			getMachine(name)
+				.illegal.filter((i) => i.from === i.to)
+				.map((i) => `${name}: ${i.from}->${i.to}`)
+		);
+		expect(declaredSelfEdges).toEqual(['Baseline.status: AUTHORITATIVE->AUTHORITATIVE']);
+	});
+
+	// Every OTHER self-edge — one NOT declared illegal — still classifies NOOP (the reorder falls through to the
+	// from === to shortcut). This is the property that proves DWP-07 did not blanket-ban self-transitions.
+	it('every self-edge NOT declared illegal still classifies NOOP', () => {
+		for (const name of machineNames()) {
+			const declaredIllegal = new Set(
+				getMachine(name)
+					.illegal.filter((i) => i.from === i.to)
+					.map((i) => i.from)
+			);
+			for (const s of getMachine(name).states) {
+				if (declaredIllegal.has(s)) continue;
+				expect(classifyTransition(name, s, s).klass, `${name}: ${s}->${s}`).toBe('NOOP');
+			}
+		}
+	});
+});

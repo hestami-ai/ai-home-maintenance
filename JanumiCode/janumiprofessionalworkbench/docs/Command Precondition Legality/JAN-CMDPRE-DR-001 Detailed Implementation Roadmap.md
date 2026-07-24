@@ -274,20 +274,21 @@ repository_scope:
     - "packages/rph-domain/vocab/m2-transitions.json (the §24.2 Baseline row — already present)"
     - "packages/rph-domain/src/transitions.test.ts (the illegal-row invariant that goes RED without the reorder)"
 required_changes:
-  - "Reorder classifyTransition to check `m.illegal` BEFORE the from===to shortcut. Verified safe: 27 machines / 202 states / ZERO declared self-edges today, exactly one after this DWP."
-  - "Stop the generator dropping declared self-edges (BOTH tables), so the corpus's own §24.2 rule can reach the tables at all."
-  - "Document the checkTransition (LEGAL|NOOP) vs canTransition (LEGAL only) split at both definitions, naming which commands depend on which."
+  - "DONE. classifyTransition (stateMachine.ts) consults `m.illegal` BEFORE the from===to shortcut. Verified safe: EXACTLY ONE declared illegal self-edge exists across all 27 machines (Baseline AUTHORITATIVE->AUTHORITATIVE — a vocab scan + the new differential test confirm it), so exactly one classification changes and every UNdeclared self-edge still classifies NOOP."
+  - "DONE. The generator's self-loop drop (`gen-transitions.ts` classifyIllegal `if (i.from === i.to) continue`) is removed, so the corpus's §24.2 row reaches the table. Regenerated via `bun run gen` + prettier; the transitions.data.ts diff is EXACTLY the one illegal row (gen output is compact and round-trips to the committed file under prettier — no content drift; the 1653-line raw-gen scare was formatting-only). The generator's OTHER drop branches (cross-axis lift, `guarded` reclassification) are untouched."
+  - "DONE. The checkTransition (LEGAL|NOOP, kit.ts) vs canTransition (LEGAL only, stateMachine.ts) split is documented at BOTH definitions, naming which sites depend on which (guards use canTransition and must refuse the NOOP; advanceStatus uses checkTransition and refuses the NOOP one layer up via the precondition)."
 invariants:
-  - "Baseline AUTHORITATIVE->AUTHORITATIVE classifies ILLEGAL_EXPLICIT and canTransition is false."
-  - "transitions.test.ts's illegal-row invariant passes WITHOUT deleting or weakening any assertion."
-  - "No machine other than Baseline changes classification (a 27-machine differential test)."
+  - "Baseline AUTHORITATIVE->AUTHORITATIVE classifies ILLEGAL_EXPLICIT and canTransition is false. VERIFIED (new test + the existing illegal-row invariant now covers the restored row)."
+  - "transitions.test.ts's illegal-row invariant passes WITHOUT deleting or weakening any assertion — it now iterates the restored row and asserts ILLEGAL_EXPLICIT (it would be RED without the reorder). VERIFIED (34 -> 37 tests, all green)."
+  - "No machine other than Baseline changes classification. VERIFIED three ways: the regenerated diff is one row; the new differential test asserts exactly one declared illegal self-edge; every non-illegal self-edge still classifies NOOP."
+  - "No OBSERVABLE command behaviour change — this is kernel defense-in-depth BELOW the precondition: promoteBaseline's DWP-04 fromStates('APPROVED') refuses an AUTHORITATIVE re-issue before checkTransition, and canPromoteBaseline's canTransition was already false for it. Full gate green (vitest all packages incl. rph-domain 220, rph-application 339; check-types 21/21; lint; boundary 0; playwright 49/49)."
 prohibited_shortcuts:
-  - "Do NOT delete the failing assertion to make the row land — that is the exact failure this DWP exists to prevent."
-  - "Do NOT introduce a blanket from===to ban (breaks the seed + two green tests, DS D2)."
-  - "Do NOT disturb the generator's other drop branches (cross-axis drops, `guarded` reclassification) — they are load-bearing."
+  - "HELD: no failing assertion deleted — the illegal-row invariant passes on its own terms."
+  - "HELD: no blanket from===to ban — every UNdeclared self-edge still classifies NOOP (proven by the differential test across all machines + the seed/full suite)."
+  - "HELD: the generator's cross-axis + guarded drop branches are untouched (the regen diff is one row)."
 tests:
-  - "unit: the restored row classifies ILLEGAL_EXPLICIT; a 27-machine before/after differential shows exactly one changed classification."
-delivery_state: NOT_STARTED
+  - "NEW dwp07 block in transitions.test.ts (3): Baseline AUTHORITATIVE->AUTHORITATIVE is ILLEGAL_EXPLICIT (canTransition false + assertTransition throws); exactly one declared illegal self-edge exists across all machines; every non-illegal self-edge still classifies NOOP. Plus the existing illegal-row invariant now covers the restored row."
+delivery_state: DELIVERED
 ```
 
 ```yaml
@@ -372,7 +373,7 @@ A wrong-STATE refusal returns `RPH_ILLEGAL_STATE_TRANSITION` (status `REJECTED`)
 | D10 ChangePwuState | 02 | pwu.ts | seed drives unchanged |
 | D4 authored allowlists | **03 (intent+evidence/assumption+decomp/recomp, DELIVERED)**, **04 (governance ×3 + AssurancePolicy ×3, DELIVERED)**, **05 (execution plan-level ×7 + pwa-authoring publication ×4, DELIVERED)** | intent.ts, assurance.ts, decomposition.ts, governance.ts, execution.ts, pwa-authoring.ts | refusal + widest-legal-path per site (dwp03-/dwp04-/dwp05-precondition-coverage.test.ts); DWP-04/05 mutation-red-proofed live + adversarially verified |
 | D5 mandatory | **06 (DELIVERED)** | kit.ts, intent.ts, governance.ts (submitBaselineForReview — the one gap the flip surfaced) | check-types is the gate (compile error to omit); zero edits to existing assertions; dwp06-precondition-coverage.test.ts + mutation-red-proof |
-| D2 + D6 kernel | 07 | stateMachine.ts, gen-transitions.ts | illegal-row invariant green, 27-machine differential |
+| D2 + D6 kernel | **07 (DELIVERED)** | stateMachine.ts, gen-transitions.ts, transitions.data.ts (regen), kit.ts | illegal-row invariant green (no assertion weakened); regen diff = exactly the Baseline AUTHORITATIVE→AUTHORITATIVE row; differential test proves exactly one changed classification; split documented at both helpers |
 | D9 commitState | 08 | assurance.ts, pwa-authoring.ts | no-change edit refused |
 | D7 history | 09 | RESIDUALS.md | audit output committed |
 
