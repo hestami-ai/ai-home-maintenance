@@ -318,4 +318,10 @@ A **3-lens roadmap-level self-critique was EXECUTED** on v0.1.0 (DWP feasibility
 
 ---
 
-*`PROPOSED` / v0.2.0 — the §19 roadmap self-critique is EXECUTED and reconciled (2 blockers + majors folded into §5/§8/§9). Design authority DS-004 v0.2.0. `READY_TO_BUILD`. Nothing built.*
+*`BUILT — RECORD CORRECTED 2026-07-24` / v0.2.1 — the §19 roadmap self-critique is EXECUTED and reconciled (2 blockers + majors folded into §5/§8/§9). Design authority DS-004 v0.2.0.*
+
+> **RECORD CORRECTION (2026-07-24).** This footer previously read “`READY_TO_BUILD`. Nothing built.” and every DWP block below still reads `delivery_state: NOT_STARTED`. **That is false.** Tier 3C-ii was BUILT and committed as nine commits (DWP-01 ExecutionTransition schema + graph-aware start-gate · DWP-02 condition grammar + evaluator · DWP-03 BRANCH first-match + prune · DWP-04 WAIT + resume · DWP-05 PARALLEL fan-out + barrier JOIN · DWP-06/07 execution tab + flow-interpreter repair · DWP-08 structural deadness · DWP-09 resolved-once BRANCH). The per-DWP `delivery_state` markers are left untouched as evidence of the drift.
+>
+> **The §18 exit criterion “Post-build adversarial verification (ultracode) before the final commit” was NEVER EXECUTED at the time of building.** It has now been executed (2026-07-24): 118 agents, 56 findings raised → **40 CONFIRMED** (7 BLOCKERs), 6 PLAUSIBLE, 10 refuted; no lens returned clean. Register: `JAN-EXECPLAN-T3Cii-review-findings-2026-07-24.md`. Remediation: `JAN-EXECREM-DS-001` + `JAN-EXECREM-DR-001`.
+>
+> **This roadmap is therefore SUPERSEDED as a delivery record** by the JAN-EXECREM program. Its DWP specifications remain the design history of the feature; they are not evidence that the feature is sound.*
