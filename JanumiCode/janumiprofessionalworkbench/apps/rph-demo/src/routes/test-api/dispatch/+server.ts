@@ -16,6 +16,6 @@ export const POST: RequestHandler = async ({ request }) => {
 		const r = dispatch(ct, agg, id, pl);
 		return { commandType: ct, status: r.status, code: r.error?.code, message: r.error?.message };
 	});
-	const firstFailure = results.find((r) => r.status !== 'ACCEPTED' && r.status !== 'DUPLICATE');
-	return json({ ok: !firstFailure, results });
+	const hasFailure = results.some((r) => r.status !== 'ACCEPTED' && r.status !== 'DUPLICATE');
+	return json({ ok: !hasFailure, results });
 };

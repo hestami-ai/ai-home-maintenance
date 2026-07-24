@@ -29,7 +29,9 @@ const ex = (ids: string[], flows: Array<[string, string, string]>): PwaGraphExpo
 
 /** Every node appears exactly once across the four buckets (strict partition). */
 const partitionOf = (o: HandoffOrder): string[] =>
-	[...o.layers.flat(), ...o.cycles.flat(), ...o.blocked, ...o.unordered].sort((a, b) => a.localeCompare(b));
+	[...o.layers.flat(), ...o.cycles.flat(), ...o.blocked, ...o.unordered].sort((a, b) =>
+		a.localeCompare(b)
+	);
 
 const layerIndex = (o: HandoffOrder): Map<string, number> => {
 	const m = new Map<string, number>();
@@ -39,7 +41,15 @@ const layerIndex = (o: HandoffOrder): Map<string, number> => {
 
 describe('layerHandoff — 4-way partition of the hand-off dependency graph', () => {
 	it('a linear chain becomes N singleton layers, in order', () => {
-		const o = layerHandoff(ex(['A', 'B', 'C'], [['A', 'B', 'x'], ['B', 'C', 'y']]));
+		const o = layerHandoff(
+			ex(
+				['A', 'B', 'C'],
+				[
+					['A', 'B', 'x'],
+					['B', 'C', 'y']
+				]
+			)
+		);
 		expect(o.layers).toEqual([['A'], ['B'], ['C']]);
 		expect(o.cycles).toEqual([]);
 		expect(o.blocked).toEqual([]);
@@ -48,7 +58,15 @@ describe('layerHandoff — 4-way partition of the hand-off dependency graph', ()
 
 	it('a diamond shows concurrency: the two independent middle nodes share a layer', () => {
 		const o = layerHandoff(
-			ex(['A', 'B', 'C', 'D'], [['A', 'B', 'x'], ['A', 'C', 'y'], ['B', 'D', 'u'], ['C', 'D', 'v']])
+			ex(
+				['A', 'B', 'C', 'D'],
+				[
+					['A', 'B', 'x'],
+					['A', 'C', 'y'],
+					['B', 'D', 'u'],
+					['C', 'D', 'v']
+				]
+			)
 		);
 		expect(o.layers).toEqual([['A'], ['B', 'C'], ['D']]);
 		expect(o.cycles).toEqual([]);
@@ -62,7 +80,12 @@ describe('layerHandoff — 4-way partition of the hand-off dependency graph', ()
 	});
 
 	it('an empty graph and a single isolated node are handled', () => {
-		expect(layerHandoff(ex([], []))).toEqual({ layers: [], cycles: [], blocked: [], unordered: [] });
+		expect(layerHandoff(ex([], []))).toEqual({
+			layers: [],
+			cycles: [],
+			blocked: [],
+			unordered: []
+		});
 		expect(layerHandoff(ex(['only'], []))).toEqual({
 			layers: [],
 			cycles: [],
@@ -72,7 +95,15 @@ describe('layerHandoff — 4-way partition of the hand-off dependency graph', ()
 	});
 
 	it('a mutual hand-off (A↔B) is a cycle cluster, nothing fabricated into a layer', () => {
-		const o = layerHandoff(ex(['A', 'B'], [['A', 'B', 'x'], ['B', 'A', 'y']]));
+		const o = layerHandoff(
+			ex(
+				['A', 'B'],
+				[
+					['A', 'B', 'x'],
+					['B', 'A', 'y']
+				]
+			)
+		);
 		expect(o.cycles).toEqual([['A', 'B']]);
 		expect(o.layers).toEqual([]);
 		expect(o.blocked).toEqual([]);
@@ -83,7 +114,15 @@ describe('layerHandoff — 4-way partition of the hand-off dependency graph', ()
 	// but they are NOT cycle members. They must land in `blocked`, not in `cycles` and not in `unordered`.
 	it('nodes downstream of a cycle are `blocked`, NOT mislabeled as cycle members', () => {
 		const o = layerHandoff(
-			ex(['A', 'B', 'F', 'G'], [['A', 'B', 'x'], ['B', 'A', 'y'], ['B', 'F', 'z'], ['F', 'G', 'w']])
+			ex(
+				['A', 'B', 'F', 'G'],
+				[
+					['A', 'B', 'x'],
+					['B', 'A', 'y'],
+					['B', 'F', 'z'],
+					['F', 'G', 'w']
+				]
+			)
 		);
 		expect(o.cycles).toEqual([['A', 'B']]);
 		expect(o.blocked).toEqual(['F', 'G']);
@@ -93,7 +132,16 @@ describe('layerHandoff — 4-way partition of the hand-off dependency graph', ()
 
 	it('a clean chain that merely FEEDS a separate cycle keeps its upstream layers; only the cycle+below is stuck', () => {
 		// S → A, A↔B. S is emittable (nothing depends-back on it); A,B are the cycle.
-		const o = layerHandoff(ex(['S', 'A', 'B'], [['S', 'A', 's'], ['A', 'B', 'x'], ['B', 'A', 'y']]));
+		const o = layerHandoff(
+			ex(
+				['S', 'A', 'B'],
+				[
+					['S', 'A', 's'],
+					['A', 'B', 'x'],
+					['B', 'A', 'y']
+				]
+			)
+		);
 		expect(o.layers).toEqual([['S']]);
 		expect(o.cycles).toEqual([['A', 'B']]);
 		expect(o.blocked).toEqual([]);
@@ -101,9 +149,20 @@ describe('layerHandoff — 4-way partition of the hand-off dependency graph', ()
 
 	it('two disjoint cycles are two separate clusters', () => {
 		const o = layerHandoff(
-			ex(['A', 'B', 'C', 'D'], [['A', 'B', 'p'], ['B', 'A', 'q'], ['C', 'D', 'r'], ['D', 'C', 's']])
+			ex(
+				['A', 'B', 'C', 'D'],
+				[
+					['A', 'B', 'p'],
+					['B', 'A', 'q'],
+					['C', 'D', 'r'],
+					['D', 'C', 's']
+				]
+			)
 		);
-		expect(o.cycles).toEqual([['A', 'B'], ['C', 'D']]);
+		expect(o.cycles).toEqual([
+			['A', 'B'],
+			['C', 'D']
+		]);
 		expect(o.blocked).toEqual([]);
 		expect(o.layers).toEqual([]);
 	});
@@ -111,9 +170,31 @@ describe('layerHandoff — 4-way partition of the hand-off dependency graph', ()
 
 describe('layerHandoff — partition + partial-order invariants (property-style)', () => {
 	const fixtures: PwaGraphExport[] = [
-		ex(['A', 'B', 'C'], [['A', 'B', 'x'], ['B', 'C', 'y']]),
-		ex(['A', 'B', 'C', 'D'], [['A', 'B', 'x'], ['A', 'C', 'y'], ['B', 'D', 'u'], ['C', 'D', 'v']]),
-		ex(['A', 'B', 'F', 'G'], [['A', 'B', 'x'], ['B', 'A', 'y'], ['B', 'F', 'z'], ['F', 'G', 'w']]),
+		ex(
+			['A', 'B', 'C'],
+			[
+				['A', 'B', 'x'],
+				['B', 'C', 'y']
+			]
+		),
+		ex(
+			['A', 'B', 'C', 'D'],
+			[
+				['A', 'B', 'x'],
+				['A', 'C', 'y'],
+				['B', 'D', 'u'],
+				['C', 'D', 'v']
+			]
+		),
+		ex(
+			['A', 'B', 'F', 'G'],
+			[
+				['A', 'B', 'x'],
+				['B', 'A', 'y'],
+				['B', 'F', 'z'],
+				['F', 'G', 'w']
+			]
+		),
 		ex(['A', 'B', 'X'], [['A', 'B', 'x']]),
 		ex(['only'], [])
 	];
@@ -123,7 +204,7 @@ describe('layerHandoff — partition + partial-order invariants (property-style)
 			const o = layerHandoff(fx);
 			const all = partitionOf(o);
 			expect(all).toEqual(fx.nodes.map((n) => n.id).sort((a, b) => a.localeCompare(b)));
-			expect(all.length).toBe(new Set(all).size); // no duplicates
+			expect(all).toHaveLength(new Set(all).size); // no duplicates
 		}
 	});
 
@@ -141,7 +222,14 @@ describe('handoffFindings — node-keyed facts (no name-substring resolution)', 
 	it('keys leaf-kind + cycle/blocked membership by nodeId, and is duplicate-NAME safe', () => {
 		// Two nodes share the NAME "dup" but have distinct ids — a name-substring approach would cross-attribute.
 		const graph: PwaGraphExport = {
-			...ex(['a1', 'a2', 'F'], [['a1', 'a2', 'x'], ['a2', 'a1', 'y'], ['a2', 'F', 'z']]),
+			...ex(
+				['a1', 'a2', 'F'],
+				[
+					['a1', 'a2', 'x'],
+					['a2', 'a1', 'y'],
+					['a2', 'F', 'z']
+				]
+			),
 			nodes: [
 				node('a1', { name: 'dup' }),
 				node('a2', { name: 'dup' }),

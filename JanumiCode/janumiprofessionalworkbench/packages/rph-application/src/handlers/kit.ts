@@ -62,12 +62,13 @@ export function checkPrecondition(
 	command: DomainCommand,
 	pre: Precondition,
 	state: Record<string, unknown>,
-	site: { statusField: string; subject: string; eventType: string } = {
+	site?: { statusField: string; subject: string; eventType: string }
+): CommandResult | null {
+	const resolvedSite = site ?? {
 		statusField: 'status',
 		subject: command.targetAggregateType,
 		eventType: command.commandType
-	}
-): CommandResult | null {
+	};
 	const refusal = evaluatePrecondition(
 		pre,
 		{
@@ -76,7 +77,7 @@ export function checkPrecondition(
 			command,
 			read: preconditionReader(ctx)
 		},
-		site
+		resolvedSite
 	);
 	return refusal
 		? reject(command, refusal.code, refusal.message, [command.targetAggregateId])

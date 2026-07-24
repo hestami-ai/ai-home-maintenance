@@ -185,7 +185,7 @@ export function resolveBranchSelection(
 	evaluateGuard?: EdgeGuardEvaluator
 ): string | undefined {
 	const source = plan.steps.find((s) => s.id === stepId);
-	if (source === undefined || source.stepType !== 'BRANCH') return undefined;
+	if (source?.stepType !== 'BRANCH') return undefined;
 	const outEdges = outEdgesOf(plan, stepId);
 	if (!outEdges.some(isConditionalEdge)) return undefined;
 	for (const e of outEdges) {
@@ -226,7 +226,9 @@ export function inEdgeDisposition(
 	// but the first match, while propose-time validation (keyed on stepType) never looked. The two planes now agree, and
 	// validateTransitionGraph additionally REFUSES a conditional out-edge from a non-BRANCH step so they cannot drift.
 	if (source.stepType === 'BRANCH' && outEdges.some(isConditionalEdge))
-		return selectBranchEdge(outEdges, plan, evaluateGuard, source) === edge ? 'SATISFIED' : 'NEUTRALIZED';
+		return selectBranchEdge(outEdges, plan, evaluateGuard, source) === edge
+			? 'SATISFIED'
+			: 'NEUTRALIZED';
 	// Non-BRANCH source: out-edges are INDEPENDENT. An unconditional edge is taken; a guarded one is taken iff it holds.
 	if (!isConditionalEdge(edge)) return 'SATISFIED';
 	return evaluateGuard?.(edge, plan) === true ? 'SATISFIED' : 'NEUTRALIZED';
@@ -273,7 +275,11 @@ function barrierState(
 }
 
 /** Is a non-terminal step at the startable frontier? Entry (no in-edges) ⇒ yes; else the barrier: no PENDING, ≥1 SATISFIED. */
-function stepAtFrontier(plan: GatePlan, step: GateStep, evaluateGuard?: EdgeGuardEvaluator): boolean {
+function stepAtFrontier(
+	plan: GatePlan,
+	step: GateStep,
+	evaluateGuard?: EdgeGuardEvaluator
+): boolean {
 	if (TERMINAL.has(step.stepState)) return false; // already done/failed
 	const inEdges = inEdgesOf(plan, step.id);
 	if (inEdges.length === 0) return true; // entry step
@@ -355,7 +361,12 @@ export function startStepGate(
 	if (target === undefined)
 		return { ok: false, reason: `step ${stepId} is not declared in this plan` };
 	if (TERMINAL.has(target.stepState))
-		return { ok: false, blockerStepId: stepId, blockerState: target.stepState, reason: 'the step is already terminal' };
+		return {
+			ok: false,
+			blockerStepId: stepId,
+			blockerState: target.stepState,
+			reason: 'the step is already terminal'
+		};
 	if ((plan.transitions ?? []).length === 0) {
 		const idx = plan.steps.findIndex((s) => s.id === stepId);
 		const blocker = plan.steps
@@ -381,7 +392,10 @@ export function startStepGate(
 			reason: 'an in-edge predecessor is not yet terminal'
 		};
 	if (!b.anySatisfied)
-		return { ok: false, reason: 'every in-edge is neutralized — the step is unreachable (it should be pruned)' };
+		return {
+			ok: false,
+			reason: 'every in-edge is neutralized — the step is unreachable (it should be pruned)'
+		};
 	return { ok: true };
 }
 
@@ -425,10 +439,11 @@ function findCycle(
 		color.set(id, 2);
 		return undefined;
 	};
-	for (const id of stepIds) if ((color.get(id) ?? 0) === 0) {
-		const found = walk(id);
-		if (found) return found;
-	}
+	for (const id of stepIds)
+		if ((color.get(id) ?? 0) === 0) {
+			const found = walk(id);
+			if (found) return found;
+		}
 	return undefined;
 }
 
@@ -439,9 +454,13 @@ function checkDanglingIds(
 ): GraphValidationResult | undefined {
 	for (const t of transitions) {
 		if (t.sourceStepId !== undefined && !idSet.has(t.sourceStepId))
-			return invalid(`transition source step "${t.sourceStepId}" is not a declared step in the plan`);
+			return invalid(
+				`transition source step "${t.sourceStepId}" is not a declared step in the plan`
+			);
 		if (t.targetStepId !== undefined && !idSet.has(t.targetStepId))
-			return invalid(`transition target step "${t.targetStepId}" is not a declared step in the plan`);
+			return invalid(
+				`transition target step "${t.targetStepId}" is not a declared step in the plan`
+			);
 		// A HALF-EDGE (a source that reaches nothing) is contract-legal — the persisted shape makes both endpoints
 		// optional — but meaningless, and it was INVISIBLE to every other limb here (adjacency requires both endpoints)
 		// while still participating in runtime out-edge selection. Reject it rather than let the two planes disagree.
@@ -482,7 +501,8 @@ function unreachableFrom(
 		const id = stack.pop()!;
 		if (reachable.has(id)) continue;
 		reachable.add(id);
-		for (const e of outEdges.get(id) ?? []) if (e.targetStepId !== undefined) stack.push(e.targetStepId);
+		for (const e of outEdges.get(id) ?? [])
+			if (e.targetStepId !== undefined) stack.push(e.targetStepId);
 	}
 	return stepIds.filter((id) => !reachable.has(id));
 }
