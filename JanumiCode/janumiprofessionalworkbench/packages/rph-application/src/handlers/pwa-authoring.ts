@@ -22,6 +22,7 @@ import {
 } from '@janumipwb/rph-projections';
 import {
 	advanceStatus,
+	checkPrecondition,
 	commitState,
 	createObject,
 	loadOrReject,
@@ -32,7 +33,7 @@ import {
 	type CommandHandler,
 	type HandlerContext
 } from './kit.js';
-import { fromStates } from './command-precondition.js';
+import { fromStates, noOpEditPrecondition, predicate } from './command-precondition.js';
 import { AI_ACTOR_TYPES, FLOOR_POLICY_IDS_REQUIRED, floorGateBlock } from './floor-gate.js';
 
 const PWA = 'PROFESSIONAL_WORK_ARCHITECTURE';
@@ -51,9 +52,27 @@ type Stringifiable = string | number | boolean;
  *  backed by a durable store) restarts, and is part of the authoritative audit trail. First append CREATES the
  *  conversation aggregate; subsequent appends extend its ordered entries. One conversation per PWA (the host keys
  *  the conversationId to the pwaId). */
+/** JAN-CMDPRE DWP-08 (EDIT sub-rule): refuse an EMPTY entries batch — appending nothing would still emit a
+ *  ConversationEntriesAppended and bump revision. (The duplicate-BATCH rule — a whole-batch content match against a
+ *  prior append — is DEFERRED: entries carry no per-batch id, so a content-only key would over-refuse a legitimately
+ *  recurring identical turn; it awaits a stable per-batch id. See the DWP-08 residual register.) */
+const entriesNonEmpty = predicate(
+	'AppendConversationEntries must append at least one entry',
+	({ payload }) => {
+		const p = payload as AppendConversationEntriesPayload;
+		return Array.isArray(p.entries) && p.entries.length > 0
+			? null
+			: `AppendConversationEntries changes nothing: the entries batch is empty. Re-issuing would append a second ConversationEntriesAppended and bump revision for entries that do not exist.`;
+	},
+	'RPH_VALIDATION_SEMANTIC_FAILED'
+);
+
 export const appendConversationEntries: CommandHandler = (ctx, command, payload) => {
 	const p = payload as AppendConversationEntriesPayload;
 	const id = command.targetAggregateId;
+	// JAN-CMDPRE DWP-08: an empty append is a no-op regardless of the create-vs-append branch — refuse it first.
+	const empty = checkPrecondition(ctx, command, entriesNonEmpty, {});
+	if (empty) return empty;
 	const existing = ctx.store.loadObject(id);
 	if (!existing) {
 		const state: Record<string, unknown> = {
@@ -436,6 +455,9 @@ export const definePwuType: CommandHandler = (ctx, command, payload) => {
 
 /** EditPwa — update a DRAFT PWA's metadata in place. A PUBLISHED version is immutable (§11), so this rejects
  *  unless publicationStatus is DRAFT. Only the fields present in the payload are changed. */
+/** JAN-CMDPRE DWP-08 (EDIT): refuse a no-op EditPwa — name/description/domain/version all already equal current. */
+const pwaEditNoOp = noOpEditPrecondition('EditPwa', ['name', 'description', 'domain', 'version']);
+
 export const editPwa: CommandHandler = (ctx, command, payload) => {
 	const p = payload as EditPwaPayload;
 	const id = command.targetAggregateId;
@@ -448,6 +470,9 @@ export const editPwa: CommandHandler = (ctx, command, payload) => {
 			`A PWA can only be edited while DRAFT (${id} is ${String(loaded.state.publicationStatus)})`
 		);
 	}
+	// JAN-CMDPRE DWP-08: refuse a no-op edit (after the DRAFT guard, so a non-DRAFT edit refuses on lifecycle first).
+	const noop = checkPrecondition(ctx, command, pwaEditNoOp, loaded.state);
+	if (noop) return noop;
 	const newRevision = loaded.revision + 1;
 	const next: Record<string, unknown> = {
 		...nextEnvelope(loaded.state, command, newRevision),
@@ -491,7 +516,8 @@ function undertakingsOf(ctx: HandlerContext, pwaId: string): number {
  *  integrity is enforced HERE: a PWA that any Undertaking was instantiated from is IN USE and cannot be deleted
  *  (deprecate/retire it instead) — deleting it would strand those Undertakings' PWA binding. Deletion is otherwise
  *  allowed from any status (a DRAFT you no longer want, or an unused published version). Idempotent-safe: a second
- *  delete of an already-DISCARDED PWA is rejected by loadOrReject/guard naturally. */
+ *  delete of an already-DISCARDED PWA is rejected by the EXPLICIT already-DISCARDED guard below (JAN-CMDPRE DWP-08
+ *  classifies this the DELETION rule — already satisfied here, so no separate precondition is authored). */
 export const deletePwa: CommandHandler = (ctx, command) => {
 	const id = command.targetAggregateId;
 	const loaded = loadOrReject(ctx, command, id);
@@ -552,6 +578,24 @@ function requireDraftOwner(
 /** EditPwuType — update a PWU Type's definition in place while its PWA is DRAFT. Only payload-present fields
  *  change; this is how the richer fields (completionRule, permittedChildTypeIds, requiredAssurancePolicyIds) are
  *  authored after the initial DefinePwuType. */
+/** The EditPwuType patch fields (JAN-CMDPRE DWP-08 EDIT no-op compares these RAW payload fields vs current — NOT the
+ *  derived `next`, whose executionBoundary default + permittedChildTypeIds re-derivation would skew the comparison). */
+const EDITABLE_PWU_TYPE_FIELDS = [
+	'name',
+	'purpose',
+	'pwuKind',
+	'isRoot',
+	'completionRule',
+	'permittedChildTypeIds',
+	'permittedChildren',
+	'requiredInputs',
+	'requiredOutputs',
+	'requiredAssurancePolicyIds',
+	'executionBoundary',
+	'boundaryContract'
+] as const satisfies readonly (keyof EditPwuTypePayload)[];
+const pwuTypeEditNoOp = noOpEditPrecondition('EditPwuType', EDITABLE_PWU_TYPE_FIELDS);
+
 export const editPwuType: CommandHandler = (ctx, command, payload) => {
 	const p = payload as EditPwuTypePayload;
 	const id = command.targetAggregateId;
@@ -559,6 +603,11 @@ export const editPwuType: CommandHandler = (ctx, command, payload) => {
 	if (!loaded.ok) return loaded.result;
 	const guard = requireDraftOwner(ctx, command, loaded.state);
 	if (guard) return guard;
+	// JAN-CMDPRE DWP-08: refuse a no-op edit — it would append a second PwuTypeRedefined AND re-bump the owning PWA's
+	// semanticVersion (the INV-6 leak) for an edit that did not happen. Compares RAW payload fields (before the
+	// executionBoundary default / permittedChildTypeIds re-derivation below).
+	const noop = checkPrecondition(ctx, command, pwuTypeEditNoOp, loaded.state);
+	if (noop) return noop;
 	const newRevision = loaded.revision + 1;
 	// Keep the flat edge list authoritative: an explicit permittedChildTypeIds wins; otherwise, when only the
 	// cardinality rules are edited, re-derive the flat list from them so the two never drift.
@@ -649,10 +698,25 @@ function referencingSiblings(ctx: HandlerContext, pwaId: string, pwuTypeId: stri
 /** RemovePwuType — tombstone a PWU Type (status REMOVED) while its PWA is DRAFT; the query surface hides REMOVED
  *  types so they disappear from the Work Architecture. Referential integrity (no dangling permitted parent/child
  *  reference) is enforced HERE, in the domain — not just the UI. */
+/** JAN-CMDPRE DWP-08 (DELETION): refuse re-removing an already-REMOVED PWU Type. Unlike deletePwa (which has its own
+ *  already-DISCARDED guard), removePwuType had NO such check — a re-issue appended a second PwuTypeRemoved AND
+ *  re-bumped the owning PWA's semanticVersion (INV-6). RPH_INVARIANT_VIOLATION, matching the deletePwa tombstone. */
+const pwuTypeNotAlreadyRemoved = predicate(
+	'the PWU Type is not already REMOVED',
+	({ state, command }) =>
+		(state as { status?: string }).status === 'REMOVED'
+			? `RemovePwuType: PWU Type ${command.targetAggregateId} is already REMOVED. Re-issuing would append a second PwuTypeRemoved and re-bump the owning PWA's semanticVersion for a removal that already happened.`
+			: null,
+	'RPH_INVARIANT_VIOLATION'
+);
+
 export const removePwuType: CommandHandler = (ctx, command) => {
 	const id = command.targetAggregateId;
 	const loaded = loadOrReject(ctx, command, id);
 	if (!loaded.ok) return loaded.result;
+	// JAN-CMDPRE DWP-08: refuse a re-remove of an already-REMOVED type (before requireDraftOwner).
+	const removed = checkPrecondition(ctx, command, pwuTypeNotAlreadyRemoved, loaded.state);
+	if (removed) return removed;
 	const guard = requireDraftOwner(ctx, command, loaded.state);
 	if (guard) return guard;
 	// Referential integrity is now enforced HERE (the domain), not just the UI: don't strand a dangling reference.

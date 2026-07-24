@@ -48,6 +48,41 @@ export function preconditionReader(ctx: HandlerContext): PreconditionReader {
 	};
 }
 
+/**
+ * Evaluate a PRECONDITION for a `commitState`-based handler (JAN-CMDPRE DWP-08). `advanceStatus`/`advanceIntent`
+ * evaluate their precondition inline; the eight `commitState` sites are EDITS / DELETIONS / appends (no status arrow),
+ * so they call this DIRECTLY — ahead of their `commitState` — to make each per-site rule a first-class `Precondition`
+ * (critique-B4 reader-precondition variant). Returns a REJECTED result if the precondition refuses, else null. `state`
+ * is CLONED (exactly as `advanceStatus` clones it) so a predicate cannot write the committed state; the reader is
+ * copy-on-read. `site` only shapes a FROM_STATES refusal message, which these predicate-kind rules never use, so it
+ * defaults sensibly from the command.
+ */
+export function checkPrecondition(
+	ctx: HandlerContext,
+	command: DomainCommand,
+	pre: Precondition,
+	state: Record<string, unknown>,
+	site: { statusField: string; subject: string; eventType: string } = {
+		statusField: 'status',
+		subject: command.targetAggregateType,
+		eventType: command.commandType
+	}
+): CommandResult | null {
+	const refusal = evaluatePrecondition(
+		pre,
+		{
+			state: structuredClone(state),
+			payload: structuredClone(command.payload),
+			command,
+			read: preconditionReader(ctx)
+		},
+		site
+	);
+	return refusal
+		? reject(command, refusal.code, refusal.message, [command.targetAggregateId])
+		: null;
+}
+
 type CommandStatus = CommandResult['status'];
 
 // Map the fail-loud error codes to the CommandResult status the pipeline reports. Codes not listed → 'REJECTED'.

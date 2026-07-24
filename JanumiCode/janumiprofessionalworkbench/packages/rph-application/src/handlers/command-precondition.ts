@@ -19,9 +19,11 @@
 // and the command payload (both are otherwise live references into the commit path / default event payload),
 // and the reader is copy-on-read at the storage adapters — so a mutating predicate corrupts only its own copy.
 //
-// This module is a LEAF: it imports only contracts, returns refusal DESCRIPTORS ({code, message}), and the
-// write primitives map them through their own `reject` — so the primitives depend on it, never the reverse.
+// This module is a LEAF: it imports only contracts (+ node:util for structural equality), returns refusal
+// DESCRIPTORS ({code, message}), and the write primitives map them through their own `reject` — so the primitives
+// depend on it, never the reverse.
 import type { DomainCommand, DomainEvent, RphErrorCode } from '@janumipwb/rph-contracts';
+import { isDeepStrictEqual } from 'node:util';
 
 /** The read-only surface a PREDICATE may consult (critique B4 ruling — never the full HandlerContext). */
 export interface PreconditionReader {
@@ -77,6 +79,32 @@ export const allOf = (...all: [Precondition, ...Precondition[]]): Precondition =
 	kind: 'ALL_OF',
 	all
 });
+
+/**
+ * An EDIT no-op precondition (JAN-CMDPRE DWP-08): refuse when EVERY payload-present field in `fields` already
+ * deep-equals the target's current state — a re-issue that changes nothing would append a duplicate edit event and
+ * bump revision for an edit that did not happen (§27). `fields` is the handler's own patch-field set. Comparison is
+ * STRUCTURAL (`isDeepStrictEqual`) because these fields are arrays/objects; a wrong reference compare would only
+ * UNDER-refuse (admit a no-op), never OVER-refuse a legitimate edit. Absent fields are NOT compared — a partial edit
+ * is legal as long as at least one PRESENT field differs. Refuses `RPH_VALIDATION_SEMANTIC_FAILED` (these edits are
+ * not status arrows, unlike DWP-02's ChangePwuState). The reader is inert (decidable from state + payload).
+ */
+export const noOpEditPrecondition = (
+	commandLabel: string,
+	fields: readonly string[]
+): Precondition =>
+	predicate(
+		`${commandLabel} must change at least one editable field`,
+		({ state, payload }) => {
+			const p = payload as Record<string, unknown>;
+			const s = state as Record<string, unknown>;
+			const changed = fields.some((f) => p[f] !== undefined && !isDeepStrictEqual(p[f], s[f]));
+			return changed
+				? null
+				: `${commandLabel} changes nothing: every field present in the payload already equals the target's current value. Re-issuing would append a second edit event and bump revision for an edit that did not happen.`;
+		},
+		'RPH_VALIDATION_SEMANTIC_FAILED'
+	);
 
 /** A refusal descriptor — the caller (a write primitive) maps it through its own `reject`. */
 export interface PreconditionRefusal {

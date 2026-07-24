@@ -296,7 +296,7 @@ id: JAN-CMDPRE-DWP-08
 title: "The eight unchecked commitState sites"
 master_work_packages: [DS-001:D9]
 outcome: "The eight commitState sites that mutate-and-emit with NO transition check gain an explicit precondition. They are EDITS, not transitions, so the rule differs in kind — the state set does not apply and a predicate is authored per site."
-knowledge_status: PARTIAL
+knowledge_status: CONFIRMED
 repository_scope:
   files_or_symbols: ["assurance.ts:297,706", "pwa-authoring.ts:89,149,465,521,612,681"]
 required_changes:
@@ -310,8 +310,9 @@ invariants:
 prohibited_shortcuts:
   - "Do NOT force these into the state-set shape; they are not transitions."
   - "Do NOT apply a blanket no-change rule — it is false at submitEvidenceForAssessment."
-tests: ["per site and per KIND: the refusable case is refused; the legitimate case still succeeds; seed + dispatchBatch e2e green."]
-delivery_state: NOT_STARTED
+tests: ["NEW dwp08-precondition-coverage.test.ts (10): per site the refusable case is REFUSED and the LEGITIMATE case still SUCCEEDS — incl. submitEvidence's zero-delta FIRST submission (a generic no-change rule would have refused it), and a legitimately-recurring IDENTICAL conversation batch (proving the deferred dup-batch rule was NOT shipped). Mutation red-proof: neutering kit.checkPrecondition (the shared DWP-08 enforcement point) made EXACTLY the 6 kill tests RED and the 4 legitimate tests green (CON-000 B7). Seed drives unchanged (rph-engine 69) + PWA/dispatchBatch e2e green (playwright 49/49)."]
+delivered_under: "6 predicates authored via a new kit.checkPrecondition (factored from advanceStatus' inline logic) + command-precondition.noOpEditPrecondition (deep-equal via node:util isDeepStrictEqual). KINDs: EDIT no-op (editAssurancePolicy, editPwa, editPwuType) · DELETION (removePwuType, status==='REMOVED', RPH_INVARIANT_VIOLATION matching deletePwa) · EVENT-LOG-DEPENDENT reader (submitEvidenceForAssessment, dup (evidenceId,requirement) via read.aggregateEvents — the seed trap: it commits NO state delta by design) · EDIT sub-rule (appendConversationEntries empty-batch). deletePwa was ALREADY covered (explicit already-DISCARDED guard) -> documented, not double-authored (stale docstring corrected). RESIDUALS: bumpPwaSemanticVersion (DERIVED, disclosed) + the appendConversationEntries duplicate-BATCH rule (DEFERRED — entries carry no per-batch id, so a content-only key would OVER-REFUSE a legitimately recurring identical turn; the establishment's adversarial verify CAUGHT this over-refusal; awaits a stable per-batch id). Count confirmed 8 = 6 authored + deletePwa documented + bumpPwaSemanticVersion residual; pwu.ts:298 (changePwuState) is DWP-02 + guarded, not a DWP-08 site."
+delivery_state: DELIVERED
 ```
 
 ```yaml
@@ -374,7 +375,7 @@ A wrong-STATE refusal returns `RPH_ILLEGAL_STATE_TRANSITION` (status `REJECTED`)
 | D4 authored allowlists | **03 (intent+evidence/assumption+decomp/recomp, DELIVERED)**, **04 (governance ×3 + AssurancePolicy ×3, DELIVERED)**, **05 (execution plan-level ×7 + pwa-authoring publication ×4, DELIVERED)** | intent.ts, assurance.ts, decomposition.ts, governance.ts, execution.ts, pwa-authoring.ts | refusal + widest-legal-path per site (dwp03-/dwp04-/dwp05-precondition-coverage.test.ts); DWP-04/05 mutation-red-proofed live + adversarially verified |
 | D5 mandatory | **06 (DELIVERED)** | kit.ts, intent.ts, governance.ts (submitBaselineForReview — the one gap the flip surfaced) | check-types is the gate (compile error to omit); zero edits to existing assertions; dwp06-precondition-coverage.test.ts + mutation-red-proof |
 | D2 + D6 kernel | **07 (DELIVERED)** | stateMachine.ts, gen-transitions.ts, transitions.data.ts (regen), kit.ts | illegal-row invariant green (no assertion weakened); regen diff = exactly the Baseline AUTHORITATIVE→AUTHORITATIVE row; differential test proves exactly one changed classification; split documented at both helpers |
-| D9 commitState | 08 | assurance.ts, pwa-authoring.ts | no-change edit refused |
+| D9 commitState | **08 (DELIVERED)** | assurance.ts, pwa-authoring.ts, kit.ts (checkPrecondition), command-precondition.ts (noOpEditPrecondition) | 6 per-KIND predicates (EDIT/DELETION/reader/empty-batch); refusable refused + legitimate succeeds; mutation-red-proofed; seed unchanged; deletePwa already-covered; dup-batch + bumpPwaSemanticVersion = disclosed residuals (dwp08-precondition-coverage.test.ts) |
 | D7 history | 09 | RESIDUALS.md | audit output committed |
 
 ## 17. Implementation ordering and concurrency plan

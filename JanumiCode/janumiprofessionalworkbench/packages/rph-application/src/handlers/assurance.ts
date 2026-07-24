@@ -30,6 +30,7 @@ import type {
 } from '@janumipwb/rph-contracts';
 import {
 	advanceStatus,
+	checkPrecondition,
 	commitState,
 	createObject,
 	loadOrReject,
@@ -39,7 +40,7 @@ import {
 	reject,
 	type CommandHandler
 } from './kit.js';
-import { fromStates } from './command-precondition.js';
+import { fromStates, noOpEditPrecondition, predicate } from './command-precondition.js';
 
 // ---- Assurance Policy ----
 const POLICY = 'ASSURANCE_POLICY';
@@ -235,6 +236,10 @@ const EDITABLE_PATCH_FIELDS = [
 	'permittedControlActions'
 ] as const satisfies readonly (keyof EditAssurancePolicyPayload)[];
 
+/** JAN-CMDPRE DWP-08 (EDIT): refuse a no-op EditAssurancePolicy — every payload-present editable field already equals
+ *  the policy's current value. Compares exactly EDITABLE_PATCH_FIELDS (the set buildEditedPolicyState patches). */
+const editPolicyNoOp = noOpEditPrecondition('EditAssurancePolicy', EDITABLE_PATCH_FIELDS);
+
 /** Build the next ASSURANCE_POLICY state for an edit: the envelope bump plus a patch that changes ONLY the
  *  payload-present fields (an absent field is left exactly as it was — same version, revision++). Extracted from
  *  editAssurancePolicy so the handler's reject short-circuit stays flat; the per-field patch is pure construction. */
@@ -286,6 +291,11 @@ export const editAssurancePolicy: CommandHandler = (ctx, command, payload) => {
 			readonly string[] | undefined
 	);
 	if (remBlock) return remBlock;
+	// JAN-CMDPRE DWP-08: refuse a no-op edit (every payload-present field already equals current) — it would append a
+	// second AssurancePolicyEdited and bump revision for a change that did not happen. Sited AFTER the lifecycle +
+	// shape guards so a floor/SUPERSEDED/shape rejection keeps precedence, and before commit.
+	const noop = checkPrecondition(ctx, command, editPolicyNoOp, loaded.state);
+	if (noop) return noop;
 	const newRevision = loaded.revision + 1;
 	const next = buildEditedPolicyState(loaded.state, command, p, newRevision);
 	const event = makeEvent(ctx, command, {
@@ -676,6 +686,27 @@ export const requestAssuranceAssessment: CommandHandler = (ctx, command, payload
 	});
 };
 
+/** JAN-CMDPRE DWP-08 (EVENT-LOG-DEPENDENT): refuse re-submitting the SAME (evidenceId, satisfiesRequirementId) pair
+ *  for this assessment. submitEvidenceForAssessment commits NO state delta by design (the receipt lives on the
+ *  AssuranceEvidenceReceived EVENT), so a "did state change" rule cannot decide it — the reader inspects the
+ *  aggregate's committed events for a prior receipt of the same pair. Matches on BOTH ids: the same evidence for a
+ *  DIFFERENT requirement, or DIFFERENT evidence for the same requirement, are legitimate and admitted. */
+const evidenceNotAlreadyReceived = predicate(
+	'the (evidenceId, satisfiesRequirementId) pair has not already been received for this assessment',
+	({ command, payload, read }) => {
+		const p = payload as SubmitEvidenceForAssessmentPayload;
+		const already = read.aggregateEvents(ASSESSMENT, command.targetAggregateId).some((e) => {
+			if (e.eventType !== 'AssuranceEvidenceReceived') return false;
+			const ep = e.payload as { evidenceId?: string; satisfiesRequirementId?: string };
+			return ep.evidenceId === p.evidenceId && ep.satisfiesRequirementId === p.satisfiesRequirementId;
+		});
+		return already
+			? `SubmitEvidenceForAssessment: evidence ${p.evidenceId} was already received for requirement '${p.satisfiesRequirementId}' on assessment ${command.targetAggregateId}. Re-issuing would append a second AssuranceEvidenceReceived recording a receipt that already happened.`
+			: null;
+	},
+	'RPH_VALIDATION_SEMANTIC_FAILED'
+);
+
 /** SubmitEvidenceForAssessment (DOC-004 §32) — the SATISFACTION side of "missing evidence". Records that an
  *  Evidence object satisfying one of the assessment's declared EvidenceRequirements (§6.1) was received, emitting
  *  AssuranceEvidenceReceived (§31). The §38 view folds `missingEvidence = requiredEvidenceIds` (from the Started
@@ -724,6 +755,10 @@ export const submitEvidenceForAssessment: CommandHandler = (ctx, command, payloa
 			[id, p.satisfiesRequirementId]
 		);
 	}
+	// JAN-CMDPRE DWP-08 (reader): refuse a duplicate receipt of the same (evidenceId, requirement) pair — decidable
+	// only from the event log, since this handler commits no state delta (the receipt lives on the event).
+	const dup = checkPrecondition(ctx, command, evidenceNotAlreadyReceived, loaded.state);
+	if (dup) return dup;
 	const newRevision = loaded.revision + 1;
 	// The assessment SNAPSHOT is unchanged beyond the envelope bump — the received-evidence fact lives on the EVENT.
 	const next = nextEnvelope(loaded.state, command, newRevision);
