@@ -273,16 +273,22 @@ export const approveDecision: CommandHandler = makeDecisionEffective(
 /** RevokeDecision — EFFECTIVE -> REVOKED (triggers impact analysis; cannot retroactively change evidence).
  * AUDITED for the Decision-family kind asymmetry (JAN-CMDPRE DWP-01a): deliberately NO decisionType predicate —
  * revocation legitimately addresses BOTH kinds. Revoking a granted waiver reinstates the floor obligation it
- * discharged; revoking an approval withdraws the authorization. Its source set (the machine's single
- * EFFECTIVE -> REVOKED in-arrow; today a REVOKED re-issue is a NOOP-admitted second DecisionRevoked) is
- * DWP-04's to author with the rest of the governance family. */
+ * discharged; revoking an approval withdraws the authorization.
+ *
+ * `precondition: fromStates('EFFECTIVE')` (JAN-CMDPRE DWP-04; SPEC-001 §5.2, INV-1/INV-2) — the machine's single
+ * EFFECTIVE -> REVOKED in-arrow (Decision.status). Before this, a REVOKED -> REVOKED re-issue was a NOOP admitted by
+ * checkTransition, appending a second DecisionRevoked recording a revocation that did not happen — a permanent false
+ * entry in the append-only log (AX-7). NONE site: the wrong-source code was already RPH_ILLEGAL_STATE_TRANSITION via
+ * checkTransition, so the precondition changes NO refusal code — only WHICH re-issue is refused (the same-state NOOP).
+ * No decisionType predicate on purpose: an APPROVAL-family decision AND a WAIVER are both revocable from EFFECTIVE. */
 export const revokeDecision: CommandHandler = (ctx, command) =>
 	advanceStatus(ctx, command, {
 		objectType: DECISION,
 		statusField: 'status',
 		machine: 'Decision.status',
 		target: 'REVOKED',
-		eventType: 'DecisionRevoked'
+		eventType: 'DecisionRevoked',
+		precondition: fromStates('EFFECTIVE')
 	});
 
 // ---- Waivers (a Decision of decisionType WAIVER) ----
@@ -545,7 +551,16 @@ function invalidatedEvidenceUnderminingPromotion(
 }
 
 /** PromoteBaseline — APPROVED -> AUTHORITATIVE, gated by canPromoteBaseline (effective promotion decision +
- * required assessments satisfied/waived + no open blocking + item versions pinned). "No green without assurance." */
+ * required assessments satisfied/waived + no open blocking + item versions pinned). "No green without assurance."
+ *
+ * `precondition: fromStates('APPROVED')` (JAN-CMDPRE DWP-04; SPEC-001 §5.2 + fork F-3) sits AHEAD of the guard. This
+ * was a GUARD_ONLY_ACCIDENTAL site, not NONE: canPromoteBaseline routes through canTransition (NOOP-excluding), so an
+ * AUTHORITATIVE -> AUTHORITATIVE re-issue was already refused — but by the promotion GATE, with the WRONG code
+ * RPH_INVARIANT_VIOLATION (an ILLEGAL_PROMOTION_TRANSITION finding), as though the promotion rules were unmet when the
+ * true defect is the state. ENUMERATED REFUSAL-CODE CHANGE (SPEC-001 INV-7; DS-001 §14; forks F-2/F-3): the re-issue
+ * now refuses RPH_ILLEGAL_STATE_TRANSITION from the precondition, before the guard. The guard is RETAINED unchanged —
+ * it carries the independent promotion-decision, stale-version (RPH-GOV-003), and invalidated-evidence (P4/CT-10)
+ * rules, which still fire on the APPROVED inputs the precondition admits (INV-3 non-example). */
 export const promoteBaseline: CommandHandler = (ctx, command, payload) => {
 	const p = payload as PromoteBaselinePayload;
 	return advanceStatus(ctx, command, {
@@ -554,6 +569,9 @@ export const promoteBaseline: CommandHandler = (ctx, command, payload) => {
 		machine: 'Baseline.status',
 		target: 'AUTHORITATIVE',
 		eventType: 'BaselinePromoted',
+		// APPROVED is the machine's single in-arrow to AUTHORITATIVE (Baseline.status). Refuses the re-issue on STATE,
+		// ahead of canPromoteBaseline — which would otherwise refuse it on the wrong (invariant) code. See header.
+		precondition: fromStates('APPROVED'),
 		guard: (state, hctx) => {
 			const decision = hctx.store.loadObject(p.promotionDecisionId)?.state as
 				Record<string, unknown> | undefined;
@@ -672,12 +690,18 @@ export const promoteBaseline: CommandHandler = (ctx, command, payload) => {
 	});
 };
 
-/** SupersedeBaseline — AUTHORITATIVE -> SUPERSEDED (immutability: changes create a successor, P7). */
+/** SupersedeBaseline — AUTHORITATIVE -> SUPERSEDED (immutability: changes create a successor, P7).
+ *
+ * `precondition: fromStates('AUTHORITATIVE')` (JAN-CMDPRE DWP-04; SPEC-001 §5.2) — the machine's single
+ * AUTHORITATIVE -> SUPERSEDED in-arrow (Baseline.status). NONE site: a SUPERSEDED -> SUPERSEDED re-issue was a NOOP
+ * admitted by checkTransition (SUPERSEDED is terminal, but from === to still classifies NOOP), appending a second
+ * BaselineSuperseded. No code change — the wrong-source code was already RPH_ILLEGAL_STATE_TRANSITION. */
 export const supersedeBaseline: CommandHandler = (ctx, command) =>
 	advanceStatus(ctx, command, {
 		objectType: BASELINE,
 		statusField: 'status',
 		machine: 'Baseline.status',
 		target: 'SUPERSEDED',
-		eventType: 'BaselineSuperseded'
+		eventType: 'BaselineSuperseded',
+		precondition: fromStates('AUTHORITATIVE')
 	});

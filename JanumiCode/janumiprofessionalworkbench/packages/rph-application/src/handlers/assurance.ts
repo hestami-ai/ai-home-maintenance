@@ -307,7 +307,18 @@ export const editAssurancePolicy: CommandHandler = (ctx, command, payload) => {
 };
 
 /** SupersedeAssurancePolicy — retire a policy version (ACTIVE|SUSPENDED -> SUPERSEDED) when a successor replaces
- *  it. The successor id (if given) is recorded as a `superseded-by:<id>` tag. Floor policies reject. */
+ *  it. The successor id (if given) is recorded as a `superseded-by:<id>` tag. Floor policies reject.
+ *
+ *  `precondition: fromStates('ACTIVE', 'SUSPENDED')` (JAN-CMDPRE DWP-04; SPEC-001 §5.2, fork F-4 + INV-6) — the
+ *  machine's two in-arrows to SUPERSEDED (AssurancePolicy.status, UNRATIFIED-AUTHORED from the rows since no
+ *  `drivesFrom` exists, fork F-4; each source is exercised by the widest-in-arrow positive fixture, INV-5). This is
+ *  the concrete accumulative-field case INV-6 generalizes from DS-001 F-4: `tags` is an array PUSH, so a
+ *  SUPERSEDED -> SUPERSEDED re-issue carrying a `supersededByPolicyId` would append a SECOND `superseded-by:<id>` tag —
+ *  the governed record growing a fact for a supersession that did not happen. Refusing the NOOP re-issue is what keeps
+ *  `tags` from compounding. `rejectIfFloorLocked` is an INDEPENDENT domain rule (the floor lock) retained AFTER the
+ *  precondition (INV-3 non-example); because the precondition runs first, a floor policy in a wrong source state now
+ *  refuses on state before the floor-lock arm — the floor-lock refusal for a floor policy in a legal source is
+ *  unchanged (SPEC-001 §5.2 note). */
 export const supersedeAssurancePolicy: CommandHandler = (ctx, command, payload) => {
 	const p = payload as SupersedeAssurancePolicyPayload;
 	return advanceStatus(ctx, command, {
@@ -316,6 +327,7 @@ export const supersedeAssurancePolicy: CommandHandler = (ctx, command, payload) 
 		machine: 'AssurancePolicy.status',
 		target: 'SUPERSEDED',
 		eventType: 'AssurancePolicySuperseded',
+		precondition: fromStates('ACTIVE', 'SUSPENDED'),
 		guard: rejectIfFloorLocked(command),
 		mutate: p.supersededByPolicyId
 			? (base) => ({
@@ -329,7 +341,11 @@ export const supersedeAssurancePolicy: CommandHandler = (ctx, command, payload) 
 	});
 };
 
-/** SuspendAssurancePolicy — temporarily disable a policy (ACTIVE -> SUSPENDED). Floor policies reject. */
+/** SuspendAssurancePolicy — temporarily disable a policy (ACTIVE -> SUSPENDED). Floor policies reject.
+ *  `precondition: fromStates('ACTIVE')` (JAN-CMDPRE DWP-04; SPEC-001 §5.2, fork F-4) — the machine's single
+ *  ACTIVE -> SUSPENDED in-arrow. A SUSPENDED -> SUSPENDED re-issue was a NOOP appending a second
+ *  AssurancePolicySuspended. `rejectIfFloorLocked` retained after the precondition (INV-3 non-example). NONE site,
+ *  no code change (wrong-source was already RPH_ILLEGAL_STATE_TRANSITION). */
 export const suspendAssurancePolicy: CommandHandler = (ctx, command) =>
 	advanceStatus(ctx, command, {
 		objectType: POLICY,
@@ -337,10 +353,18 @@ export const suspendAssurancePolicy: CommandHandler = (ctx, command) =>
 		machine: 'AssurancePolicy.status',
 		target: 'SUSPENDED',
 		eventType: 'AssurancePolicySuspended',
+		precondition: fromStates('ACTIVE'),
 		guard: rejectIfFloorLocked(command)
 	});
 
-/** ActivateAssurancePolicy — put a policy into force (DRAFT|SUSPENDED -> ACTIVE). */
+/** ActivateAssurancePolicy — put a policy into force (DRAFT|SUSPENDED -> ACTIVE).
+ *  `precondition: fromStates('DRAFT', 'SUSPENDED')` (JAN-CMDPRE DWP-04; SPEC-001 §5.2, fork F-4) — the machine's TWO
+ *  in-arrows to ACTIVE (a first activation from DRAFT and a re-activation from SUSPENDED; BOTH are exercised by the
+ *  mandatory two-source positive fixture, INV-5). An ACTIVE -> ACTIVE re-issue was a NOOP appending a second
+ *  AssurancePolicyActivated. `rejectIfFloorLocked` retained (INV-3 non-example): a floor policy is born ACTIVE, so
+ *  ACTIVE is not in this set and the precondition now refuses a floor Activate on STATE
+ *  (RPH_ILLEGAL_STATE_TRANSITION) before the floor-lock arm — a benign ordering effect within the same REJECTED
+ *  result (SPEC-001 §5.2 note). NONE site otherwise, no code change. */
 export const activateAssurancePolicy: CommandHandler = (ctx, command) =>
 	advanceStatus(ctx, command, {
 		objectType: POLICY,
@@ -348,6 +372,7 @@ export const activateAssurancePolicy: CommandHandler = (ctx, command) =>
 		machine: 'AssurancePolicy.status',
 		target: 'ACTIVE',
 		eventType: 'AssurancePolicyActivated',
+		precondition: fromStates('DRAFT', 'SUSPENDED'),
 		guard: rejectIfFloorLocked(command)
 	});
 

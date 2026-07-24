@@ -197,22 +197,23 @@ delivery_state: DELIVERED
 id: JAN-CMDPRE-DWP-04
 title: "Author preconditions — assurance and governance (the highest-stakes families)"
 master_work_packages: [DS-001:D4]
-outcome: "The remaining assurance (6) and governance (6) advanceStatus sites carry authored preconditions. The three sites protected only by canTransition (ApproveDecision, GrantWaiver, PromoteBaseline) gain an EXPLICIT precondition so their safety stops being accidental."
+outcome: "The SIX highest-stakes advanceStatus sites carry authored preconditions: governance.ts revokeDecision(EFFECTIVE), promoteBaseline(APPROVED), supersedeBaseline(AUTHORITATIVE) and assurance.ts activateAssurancePolicy(DRAFT|SUSPENDED), suspendAssurancePolicy(ACTIVE), supersedeAssurancePolicy(ACTIVE|SUSPENDED). SCOPE CORRECTED by JAN-CMDPRE-SPEC-001 §3.1/§5.2: the v0.1.0 'assurance (6) + governance (6)' framing over-counted — ApproveDecision/GrantWaiver are DWP-01a's (critique B1); EditAssurancePolicy + SubmitEvidenceForAssessment are commitState / reader-precondition sites (no status advance) deferred to F-6/DWP-08; admitEvidence/invalidateEvidence/expireAssumption were DWP-03. DWP-04's true advanceStatus surface is these six."
 knowledge_status: CONFIRMED
+delivered_under: "JAN-CMDPRE two-phase engagement (DWP-04-agent-prompt.md). Phase 1: authored JAN-CMDPRE-SPEC-001 Command Precondition and Transition Legality (docs/Command Precondition Legality/) — the program deep reference these six implement against; commissioned as a canon SPEC but reclassified by the sponsor (2026-07-24) as a JAN-CMDPRE program reference, NOT canon. Phase 2: this implementation. Forks F-2 (accept the guarded-site code change), F-3 (PromoteBaseline = fromStates(APPROVED) + keep canPromoteBaseline), F-4 (the three AssurancePolicy sets UNRATIFIED-AUTHORED from the machine), F-5 (revision out of INV-6) ADOPTED as delegated authority (sponsor 'Proceed', 2026-07-24)."
 repository_scope:
   files_or_symbols:
-    - "assurance.ts:312,333,344 (Supersede/Suspend/ActivateAssurancePolicy — the three with NO drivesFrom at all), :318,339,350,425 (guarded sites)"
-    - "governance.ts promoteBaseline, supersedeBaseline, revokeDecision — NOT makeDecisionEffective, which DWP-01a owns (critique B1: one literal, two command types, double-owned in v0.1.0)"
+    - "governance.ts revokeDecision(:279), promoteBaseline(:549), supersedeBaseline(:676)"
+    - "assurance.ts activateAssurancePolicy(:344), suspendAssurancePolicy(:333), supersedeAssurancePolicy(:311) — the three with NO drivesFrom, authored from the machine and marked UNRATIFIED-AUTHORED (F-4)"
 required_changes:
-  - "The three AssurancePolicy commands have no drivesFrom anywhere; author from the machine and mark UNRATIFIED-AUTHORED. ActivateAssurancePolicy has TWO legal sources — the set is a list, not a scalar."
-  - "Make the canTransition-accidental protection EXPLICIT. This only works because DWP-01b moved enforcement ahead of `args.guard`; without that these preconditions are unreachable and the mutation test cannot fail (critique B3). Do not remove the canTransition guards — they carry other domain rules."
-  - "Re-verify the BENIGN classification of every site in these families before accepting it (DS §10 residual 2 expects at least one reclassification)."
+  - "DONE. Six fromStates(...) sets authored from each machine's own in-arrows, rows cited in-comment; each EQUALS its machine in-arrow set (adversarial set-correctness lens: zero mismatches, none narrower/wider). The retained guards (canPromoteBaseline; rejectIfFloorLocked ×3) are INDEPENDENT domain rules kept AFTER the precondition (INV-3 non-example), never removed."
+  - "RECLASSIFICATION (DS §10 residual 2, as anticipated): PromoteBaseline is GUARD_ONLY_ACCIDENTAL, not NONE — canPromoteBaseline already refused the AUTHORITATIVE re-issue via canTransition (NOOP-excluding) but with the WRONG code RPH_INVARIANT_VIOLATION. ENUMERATED CODE CHANGE (INV-7 / DS §14): the re-issue now refuses RPH_ILLEGAL_STATE_TRANSITION from the precondition, ahead of the guard. Third instance of the family code change (after makeDecisionEffective and publishPwa, both DWP-01b)."
+  - "revokeDecision carries NO decisionType predicate — revocation legitimately addresses BOTH an APPROVAL-family decision and a WAIVER from EFFECTIVE (tested on both)."
 invariants:
-  - "SupersedeAssurancePolicy's tags array cannot grow on a re-issue (the compounding case, DS F-4)."
-  - "No currently-refused command becomes accepted."
+  - "SupersedeAssurancePolicy's tags array cannot grow on a re-issue (DS F-4 / SPEC INV-6). VERIFIED: the negative fixture supplies a DIFFERENT supersededByPolicyId and asserts tags did not grow."
+  - "No currently-refused command becomes accepted; the widest legal in-arrow still succeeds (INV-5). VERIFIED: two-source positive fixtures for Activate and Supersede accept BOTH sources; full gate green (1069 vitest, 49 playwright incl. policy-manager lifecycle e2e)."
 tests:
-  - "handler: the compounding case (tags) is refused; each policy-lifecycle command refuses a re-issue; the two-source ActivateAssurancePolicy accepts BOTH sources."
-delivery_state: NOT_STARTED
+  - "NEW dwp04-precondition-coverage.test.ts (18): per-site negative kill (re-issue from target + a wrong source) at RPH_ILLEGAL_STATE_TRANSITION with no second event / no revision bump; positive widest-in-arrow (two-source for Activate/Supersede); the PromoteBaseline code-change assertion; the F-4 tags-not-compounded assertion. Mutation red-proof performed LIVE: weakening all six sets made EXACTLY the six kill tests RED and left all 12 positives green (CON-000 B7)."
+delivery_state: DELIVERED
 ```
 
 ```yaml
@@ -368,7 +369,7 @@ A wrong-STATE refusal returns `RPH_ILLEGAL_STATE_TRANSITION` (status `REJECTED`)
 | D1 precondition shape | 01b | command-precondition.ts, kit.ts, intent.ts | unit + DWP-00 tests unchanged |
 | D8 wrong-source half | 01a | governance.ts | DenyWaiver-on-approval refused |
 | D10 ChangePwuState | 02 | pwu.ts | seed drives unchanged |
-| D4 authored allowlists | **03 (intent+evidence/assumption+decomp/recomp, DELIVERED)**, 04, 05 | intent.ts, assurance.ts, decomposition.ts | refusal + widest-legal-path per site (dwp03-precondition-coverage.test.ts) |
+| D4 authored allowlists | **03 (intent+evidence/assumption+decomp/recomp, DELIVERED)**, **04 (governance ×3 + AssurancePolicy ×3, DELIVERED)**, 05 | intent.ts, assurance.ts, decomposition.ts, governance.ts | refusal + widest-legal-path per site (dwp03-, dwp04-precondition-coverage.test.ts); DWP-04 mutation-red-proofed live + adversarially verified |
 | D5 mandatory | 06 | kit.ts, intent.ts | check-types; zero assertion edits |
 | D2 + D6 kernel | 07 | stateMachine.ts, gen-transitions.ts | illegal-row invariant green, 27-machine differential |
 | D9 commitState | 08 | assurance.ts, pwa-authoring.ts | no-change edit refused |
