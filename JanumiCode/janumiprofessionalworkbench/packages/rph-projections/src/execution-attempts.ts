@@ -65,6 +65,85 @@ interface AttemptDraft {
 
 const key = (planId: string, stepId: string): string => `${planId}::${stepId}`;
 
+/** Mutable fold accumulators, threaded by reference through the per-event-type appliers. */
+interface FoldState {
+	attempts: AttemptDraft[];
+	startedCount: Map<string, number>; // planId::stepId -> attempts opened so far
+	current: Map<string, AttemptDraft>; // planId::stepId -> the open/latest attempt
+}
+
+/** ExecutionStepStarted (QUEUED→RUNNING): opens attempt n+1 for the step and records it as the current draft. */
+function applyStepStarted(
+	state: FoldState,
+	event: DomainEvent,
+	p: Record<string, unknown>,
+	planId: string
+): void {
+	const stepId = str(p.stepId);
+	if (!stepId) return;
+	const k = key(planId, stepId);
+	const n = (state.startedCount.get(k) ?? 0) + 1;
+	state.startedCount.set(k, n);
+	const draft: AttemptDraft = {
+		executionPlanId: planId,
+		stepId,
+		attemptNumber: n,
+		idempotencyKey: `${stepId}#${n}`,
+		state: 'RUNNING',
+		...(str(p.runtimeBindingId) ? { runtimeBindingId: str(p.runtimeBindingId) } : {}),
+		...(str(event.occurredAt) ? { startedAt: str(event.occurredAt) } : {})
+	};
+	state.attempts.push(draft);
+	state.current.set(k, draft);
+}
+
+/** ExecutionStepSucceeded: closes the step's current attempt as SUCCEEDED (§16.2 uses `executionStepId`). */
+function applyStepSucceeded(
+	state: FoldState,
+	event: DomainEvent,
+	p: Record<string, unknown>,
+	planId: string
+): void {
+	const stepId = str(p.executionStepId);
+	const draft = stepId ? state.current.get(key(planId, stepId)) : undefined;
+	if (!draft) return;
+	draft.state = 'SUCCEEDED';
+	draft.completedAt = str(event.occurredAt);
+	if (p.executionProvenance !== undefined) draft.provenance = p.executionProvenance;
+}
+
+/** ExecutionStepFailed: closes the step's current attempt as FAILED with its failure reason. */
+function applyStepFailed(
+	state: FoldState,
+	event: DomainEvent,
+	p: Record<string, unknown>,
+	planId: string
+): void {
+	const stepId = str(p.stepId);
+	const draft = stepId ? state.current.get(key(planId, stepId)) : undefined;
+	if (!draft) return;
+	draft.state = 'FAILED';
+	draft.completedAt = str(event.occurredAt);
+	draft.error = str(p.failureReason) ?? 'failed';
+}
+
+type StepApplier = (
+	state: FoldState,
+	event: DomainEvent,
+	p: Record<string, unknown>,
+	planId: string
+) => void;
+
+// ExecutionStepRetried is intentionally absent (a re-queue marker; the next Started opens attempt n+1).
+// A Map (not an object literal) so a hostile/degenerate event.eventType — e.g. "__proto__" — resolves to
+// undefined and is ignored, exactly as the original if/else-if chain did (an object literal would surface
+// Object.prototype and throw on the ?.() invocation).
+const STEP_APPLIERS = new Map<string, StepApplier>([
+	['ExecutionStepStarted', applyStepStarted],
+	['ExecutionStepSucceeded', applyStepSucceeded],
+	['ExecutionStepFailed', applyStepFailed]
+]);
+
 /**
  * Fold the Execution* event stream into per-attempt §10.4 records (global event order). `stepTypeById` (from the
  * caller's plan aggregate — the events don't carry stepType) drives the AI-no-binding advisory; omit it and no
@@ -74,52 +153,13 @@ export function executionAttempts(
 	events: readonly DomainEvent[],
 	stepTypeById: Readonly<Record<string, string>> = {}
 ): ExecutionAttemptView[] {
-	const attempts: AttemptDraft[] = [];
-	const startedCount = new Map<string, number>(); // planId::stepId -> attempts opened so far
-	const current = new Map<string, AttemptDraft>(); // planId::stepId -> the open/latest attempt
+	const state: FoldState = { attempts: [], startedCount: new Map(), current: new Map() };
 
 	for (const event of events) {
-		const p = asRec(event.payload);
-		const planId = event.aggregateId;
-		if (event.eventType === 'ExecutionStepStarted') {
-			const stepId = str(p.stepId);
-			if (!stepId) continue;
-			const k = key(planId, stepId);
-			const n = (startedCount.get(k) ?? 0) + 1;
-			startedCount.set(k, n);
-			const draft: AttemptDraft = {
-				executionPlanId: planId,
-				stepId,
-				attemptNumber: n,
-				idempotencyKey: `${stepId}#${n}`,
-				state: 'RUNNING',
-				...(str(p.runtimeBindingId) ? { runtimeBindingId: str(p.runtimeBindingId) } : {}),
-				...(str(event.occurredAt) ? { startedAt: str(event.occurredAt) } : {})
-			};
-			attempts.push(draft);
-			current.set(k, draft);
-		} else if (event.eventType === 'ExecutionStepSucceeded') {
-			// §16.2 uses `executionStepId` (not stepId) for the step reference.
-			const stepId = str(p.executionStepId);
-			const draft = stepId ? current.get(key(planId, stepId)) : undefined;
-			if (draft) {
-				draft.state = 'SUCCEEDED';
-				draft.completedAt = str(event.occurredAt);
-				if (p.executionProvenance !== undefined) draft.provenance = p.executionProvenance;
-			}
-		} else if (event.eventType === 'ExecutionStepFailed') {
-			const stepId = str(p.stepId);
-			const draft = stepId ? current.get(key(planId, stepId)) : undefined;
-			if (draft) {
-				draft.state = 'FAILED';
-				draft.completedAt = str(event.occurredAt);
-				draft.error = str(p.failureReason) ?? 'failed';
-			}
-		}
-		// ExecutionStepRetried: intentionally NOT counted (a re-queue marker; the next Started opens attempt n+1).
+		STEP_APPLIERS.get(event.eventType)?.(state, event, asRec(event.payload), event.aggregateId);
 	}
 
-	return attempts.map((a) => ({
+	return state.attempts.map((a) => ({
 		...a,
 		aiNoBinding: AI_STEP_TYPES.has(stepTypeById[a.stepId] ?? '') && a.runtimeBindingId === undefined
 	}));
@@ -141,6 +181,6 @@ export function attemptsByStep(attempts: readonly ExecutionAttemptView[]): StepA
 		stepId,
 		attempts: list,
 		attemptCount: list.length,
-		latestState: list[list.length - 1]?.state
+		latestState: list.at(-1)?.state
 	}));
 }

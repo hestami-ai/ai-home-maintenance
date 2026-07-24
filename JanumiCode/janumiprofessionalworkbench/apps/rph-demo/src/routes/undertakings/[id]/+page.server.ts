@@ -40,6 +40,146 @@ import {
 } from '$lib/server/workbench';
 import type { Actions, PageServerLoad } from './$types';
 
+type PwuRecord = ReturnType<typeof listPwus>[number];
+type ShapedPlans = ReturnType<typeof plansForPwus>;
+type EngineEvents = ReturnType<ReturnType<typeof getEngine>['readAllEvents']>;
+
+/** Lifecycle rollup: count PWUs by their workLifecycleState (defaulting to PROPOSED). */
+function buildLifecycleRollup(pwus: ReturnType<typeof listPwus>): Record<string, number> {
+	const rollup: Record<string, number> = {};
+	for (const p of pwus) {
+		const s = String((p.state.workLifecycleState ?? 'PROPOSED') as string);
+		rollup[s] = (rollup[s] ?? 0) + 1;
+	}
+	return rollup;
+}
+
+/** One pwuList row: resolve the Instance -> Type name/PWA (§14 / §28). */
+function mapPwuRow(engine: ReturnType<typeof getEngine>, p: PwuRecord) {
+	const typeId = p.state.pwuTypeId ? String(p.state.pwuTypeId as string) : '';
+	const type = typeId ? getObject(engine, typeId) : undefined;
+	let typeName: string;
+	if (type) {
+		typeName = String((type.name ?? typeId) as string);
+	} else if (p.state.isLocalExtension) {
+		typeName = 'Undertaking-local extension';
+	} else {
+		typeName = '—';
+	}
+	return {
+		id: p.id,
+		title: String((p.state.title ?? p.id) as string),
+		workLifecycleState: String((p.state.workLifecycleState ?? '') as string),
+		executionState: String((p.state.executionState ?? '') as string),
+		assuranceState: String((p.state.assuranceState ?? '') as string),
+		typeName,
+		typePwaId: type ? String((type.pwaId ?? '') as string) : ''
+	};
+}
+
+/** §38 "applicable policies" per PWU — the required-but-unassessed join, kept only where non-empty. */
+function buildApplicablePoliciesView(
+	engine: ReturnType<typeof getEngine>,
+	pwus: ReturnType<typeof listPwus>,
+	view: ReturnType<typeof buildAssuranceView>
+) {
+	return pwus
+		.map((p) => {
+			const typeId = p.state.pwuTypeId ? String(p.state.pwuTypeId as string) : '';
+			const type = typeId ? getObject(engine, typeId) : undefined;
+			const asStrings = (v: unknown): string[] => (Array.isArray(v) ? v.map(String) : []);
+			const rows = buildApplicablePolicies({
+				pwuId: p.id,
+				directPolicyIds: asStrings(p.state.assurancePolicyIds),
+				typeRequiredPolicyIds: asStrings(type?.requiredAssurancePolicyIds),
+				view
+			});
+			return {
+				pwuId: p.id,
+				pwuTitle: String((p.state.title ?? p.id) as string),
+				rows
+			};
+		})
+		.filter((x) => x.rows.length > 0);
+}
+
+/** Shape one EXECUTION_PLAN aggregate into the pure-view ExecutionPlanInput (steps + transition graph). */
+function shapeExecutionPlanInput(
+	pl: ReturnType<typeof listExecutionPlans>[number]
+): ExecutionPlanInput {
+	const asRec = (v: unknown): Record<string, unknown> =>
+		v && typeof v === 'object' ? (v as Record<string, unknown>) : {};
+	return {
+		id: pl.id,
+		workUnitId: String((pl.state.workUnitId ?? '') as string),
+		status: String((pl.state.status ?? '') as string),
+		...(typeof pl.state.planVersion === 'number' ? { planVersion: pl.state.planVersion } : {}),
+		steps: (Array.isArray(pl.state.steps) ? pl.state.steps : []).map((raw) => {
+			const s = asRec(raw);
+			return {
+				id: String((s.id ?? '') as string),
+				stepType: String((s.stepType ?? '') as string),
+				purpose: String((s.purpose ?? '') as string),
+				stepState: String((s.stepState ?? '') as string),
+				...(s.runtimeBindingId ? { runtimeBindingId: String(s.runtimeBindingId as string) } : {}),
+				// DWP-09: a resolved BRANCH's recorded decision. Without it the UI would re-derive first-match and could
+				// show a different arm than the engine already committed to.
+				...(s.selectedTransitionId
+					? { selectedTransitionId: String(s.selectedTransitionId as string) }
+					: {})
+			};
+		}),
+		// DR-004 DWP-01 — the transition graph (empty ⇒ linear). Fed to the flow gate + a future graph view.
+		transitions: (Array.isArray(pl.state.transitions) ? pl.state.transitions : []).map((raw) => {
+			const t = asRec(raw);
+			return {
+				...(t.id ? { id: String(t.id as string) } : {}),
+				...(t.sourceStepId ? { sourceStepId: String(t.sourceStepId as string) } : {}),
+				...(t.targetStepId ? { targetStepId: String(t.targetStepId as string) } : {}),
+				...(t.transitionType ? { transitionType: String(t.transitionType as string) } : {}),
+				...(t.conditionExpression !== undefined
+					? { conditionExpression: t.conditionExpression }
+					: {})
+			};
+		})
+	};
+}
+
+/** Per-plan flow read-models (startable frontier, prunable arms, transition rows) via one evaluator per plan. */
+function buildExecutionReadModels(plans: ShapedPlans, engineEvents: EngineEvents) {
+	const startableStepByPlan: Record<string, string[]> = {};
+	const prunableStepByPlan: Record<string, string[]> = {};
+	const transitionRowsByPlan: Record<string, ReturnType<typeof transitionRows>> = {};
+	for (const pl of plans) {
+		const evalGuard = conditionEvaluatorFor(pl, engineEvents);
+		const sids = startableStepIds(pl, evalGuard);
+		if (sids.length) startableStepByPlan[pl.id] = sids;
+		const prunable = prunableStepIds(pl, evalGuard);
+		if (prunable.length) prunableStepByPlan[pl.id] = prunable;
+		const rows = transitionRows(pl, evalGuard);
+		if (rows.length) transitionRowsByPlan[pl.id] = rows;
+	}
+	return { startableStepByPlan, prunableStepByPlan, transitionRowsByPlan };
+}
+
+/** Fold the Execution* event stream into §10.4 attempt records, scoped to these plans and keyed by step. */
+function buildAttemptsByStepId(
+	plans: ShapedPlans,
+	events: EngineEvents
+): Record<string, ExecutionAttemptView[]> {
+	const stepTypeById: Record<string, string> = {};
+	for (const pl of plans) for (const s of pl.steps) stepTypeById[s.id] = s.stepType;
+	const scopedPlanIds = new Set(plans.map((pl) => pl.id));
+	const attemptsByStepId: Record<string, ExecutionAttemptView[]> = {};
+	for (const a of executionAttempts(events, stepTypeById)) {
+		if (scopedPlanIds.has(a.executionPlanId)) {
+			attemptsByStepId[a.stepId] ??= [];
+			attemptsByStepId[a.stepId].push(a);
+		}
+	}
+	return attemptsByStepId;
+}
+
 export const load: PageServerLoad = ({ params }) => {
 	const engine = getEngine();
 	const u = getObject(engine, params.id);
@@ -58,33 +198,9 @@ export const load: PageServerLoad = ({ params }) => {
 	});
 
 	const pwus = listPwus(engine, params.id);
-	const rollup: Record<string, number> = {};
-	for (const p of pwus) {
-		const s = String((p.state.workLifecycleState ?? 'PROPOSED') as string);
-		rollup[s] = (rollup[s] ?? 0) + 1;
-	}
+	const rollup = buildLifecycleRollup(pwus);
 	// Instance -> Type navigation (§14 / §28): each PWU Instance links to its PWU Type definition (in its PWA).
-	const pwuList = pwus.map((p) => {
-		const typeId = p.state.pwuTypeId ? String(p.state.pwuTypeId as string) : '';
-		const type = typeId ? getObject(engine, typeId) : undefined;
-		let typeName: string;
-		if (type) {
-			typeName = String((type.name ?? typeId) as string);
-		} else if (p.state.isLocalExtension) {
-			typeName = 'Undertaking-local extension';
-		} else {
-			typeName = '—';
-		}
-		return {
-			id: p.id,
-			title: String((p.state.title ?? p.id) as string),
-			workLifecycleState: String((p.state.workLifecycleState ?? '') as string),
-			executionState: String((p.state.executionState ?? '') as string),
-			assuranceState: String((p.state.assuranceState ?? '') as string),
-			typeName,
-			typePwaId: type ? String((type.pwaId ?? '') as string) : ''
-		};
-	});
+	const pwuList = pwus.map((p) => mapPwuRow(engine, p));
 
 	// The §38 Assurance View (DOC-004 §38 "Assurance Workbench Requirements") — a fold over the assurance events,
 	// NOT the raw object store. This surfaces what the object store cannot: the validator implementation identity
@@ -146,24 +262,7 @@ export const load: PageServerLoad = ({ params }) => {
 	// §38 "applicable policies" per PWU — the required-but-unassessed join. A PWU's applicable set is its own
 	// assurancePolicyIds plus its PwuType's requiredAssurancePolicyIds (object state, not events); buildApplicablePolicies
 	// marks each assessed or not. Only PWUs that actually have applicable policies are surfaced.
-	const applicablePolicies = pwus
-		.map((p) => {
-			const typeId = p.state.pwuTypeId ? String(p.state.pwuTypeId as string) : '';
-			const type = typeId ? getObject(engine, typeId) : undefined;
-			const asStrings = (v: unknown): string[] => (Array.isArray(v) ? v.map(String) : []);
-			const rows = buildApplicablePolicies({
-				pwuId: p.id,
-				directPolicyIds: asStrings(p.state.assurancePolicyIds),
-				typeRequiredPolicyIds: asStrings(type?.requiredAssurancePolicyIds),
-				view
-			});
-			return {
-				pwuId: p.id,
-				pwuTitle: String((p.state.title ?? p.id) as string),
-				rows
-			};
-		})
-		.filter((x) => x.rows.length > 0);
+	const applicablePolicies = buildApplicablePoliciesView(engine, pwus, view);
 	const observations = listObservations(engine).map((o) => ({
 		id: o.id,
 		severity: String((o.state.severity ?? '') as string),
@@ -187,40 +286,7 @@ export const load: PageServerLoad = ({ params }) => {
 	// pwuIdSet is the two-hop scope: listPwus(engine, params.id) → the PWU ids → plan.workUnitId ∈ that set (a plan
 	// carries no undertakingId — F-1). The pure view (rph-projections) derives each step's tone + command-backed
 	// affordances; this load() only reads.
-	const asRec = (v: unknown): Record<string, unknown> =>
-		v && typeof v === 'object' ? (v as Record<string, unknown>) : {};
-	const planRows: ExecutionPlanInput[] = listExecutionPlans(engine).map((pl) => ({
-		id: pl.id,
-		workUnitId: String((pl.state.workUnitId ?? '') as string),
-		status: String((pl.state.status ?? '') as string),
-		...(typeof pl.state.planVersion === 'number' ? { planVersion: pl.state.planVersion } : {}),
-		steps: (Array.isArray(pl.state.steps) ? pl.state.steps : []).map((raw) => {
-			const s = asRec(raw);
-			return {
-				id: String((s.id ?? '') as string),
-				stepType: String((s.stepType ?? '') as string),
-				purpose: String((s.purpose ?? '') as string),
-				stepState: String((s.stepState ?? '') as string),
-				...(s.runtimeBindingId ? { runtimeBindingId: String(s.runtimeBindingId as string) } : {}),
-				// DWP-09: a resolved BRANCH's recorded decision. Without it the UI would re-derive first-match and could
-				// show a different arm than the engine already committed to.
-				...(s.selectedTransitionId
-					? { selectedTransitionId: String(s.selectedTransitionId as string) }
-					: {})
-			};
-		}),
-		// DR-004 DWP-01 — the transition graph (empty ⇒ linear). Fed to the flow gate + a future graph view.
-		transitions: (Array.isArray(pl.state.transitions) ? pl.state.transitions : []).map((raw) => {
-			const t = asRec(raw);
-			return {
-				...(t.id ? { id: String(t.id as string) } : {}),
-				...(t.sourceStepId ? { sourceStepId: String(t.sourceStepId as string) } : {}),
-				...(t.targetStepId ? { targetStepId: String(t.targetStepId as string) } : {}),
-				...(t.transitionType ? { transitionType: String(t.transitionType as string) } : {}),
-				...(t.conditionExpression !== undefined ? { conditionExpression: t.conditionExpression } : {})
-			};
-		})
-	}));
+	const planRows: ExecutionPlanInput[] = listExecutionPlans(engine).map(shapeExecutionPlanInput);
 	const plans = plansForPwus(planRows, pwuIdSet);
 
 	// JAN-EXECPLAN-DR-004 DWP-01 — the transition-graph flow gate affordance (set-frontier). For each plan, derive the
@@ -235,29 +301,13 @@ export const load: PageServerLoad = ({ params }) => {
 	// derived above. All three read-models share the ONE evaluator closure per plan so the condition subject is folded
 	// once, not three times over the whole event log.
 	const engineEvents = engine.readAllEvents();
-	const startableStepByPlan: Record<string, string[]> = {};
-	const prunableStepByPlan: Record<string, string[]> = {};
-	const transitionRowsByPlan: Record<string, ReturnType<typeof transitionRows>> = {};
-	for (const pl of plans) {
-		const evalGuard = conditionEvaluatorFor(pl, engineEvents);
-		const sids = startableStepIds(pl, evalGuard);
-		if (sids.length) startableStepByPlan[pl.id] = sids;
-		const prunable = prunableStepIds(pl, evalGuard);
-		if (prunable.length) prunableStepByPlan[pl.id] = prunable;
-		const rows = transitionRows(pl, evalGuard);
-		if (rows.length) transitionRowsByPlan[pl.id] = rows;
-	}
+	const { startableStepByPlan, prunableStepByPlan, transitionRowsByPlan } =
+		buildExecutionReadModels(plans, engineEvents);
 
 	// Execution Attempt history (JAN-EXECPLAN Tier-3 DWP-03/05): fold the Execution* event stream into §10.4 attempt
 	// records, scoped to THIS undertaking's plans, keyed by step for the per-step history render. stepTypeById (from
 	// the shaped plans — the events don't carry stepType) drives the AI-no-binding coherence advisory.
-	const stepTypeById: Record<string, string> = {};
-	for (const pl of plans) for (const s of pl.steps) stepTypeById[s.id] = s.stepType;
-	const scopedPlanIds = new Set(plans.map((pl) => pl.id));
-	const attemptsByStepId: Record<string, ExecutionAttemptView[]> = {};
-	for (const a of executionAttempts(engine.readAllEvents(), stepTypeById)) {
-		if (scopedPlanIds.has(a.executionPlanId)) (attemptsByStepId[a.stepId] ??= []).push(a);
-	}
+	const attemptsByStepId = buildAttemptsByStepId(plans, engine.readAllEvents());
 
 	// Tier-2 execution SEQUENCE (JAN-EXECPLAN DWP-04, fork C): arrange the Undertaking's PWU INSTANCES by their TYPES'
 	// hand-off dependency (reuse buildPwaExport — version-scoped to the bound (pwaId, pwaVersion) — then layerHandoff),
@@ -685,7 +735,12 @@ export const actions: Actions = {
 							permittedControlActions: ['CONTINUE', 'GATHER_CONTEXT']
 						}
 					],
-					['ActivateAssurancePolicy', 'ASSURANCE_POLICY', DEMO_POLICY_ID, { policyId: DEMO_POLICY_ID }]
+					[
+						'ActivateAssurancePolicy',
+						'ASSURANCE_POLICY',
+						DEMO_POLICY_ID,
+						{ policyId: DEMO_POLICY_ID }
+					]
 				];
 		const err = runSteps([
 			...policySteps,

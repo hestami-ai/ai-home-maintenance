@@ -70,6 +70,18 @@ function buildDependencyGraph(ex: PwaGraphExport): {
 	return { adj, participants };
 }
 
+/** Distinct-predecessor indegree over the participant subgraph. adj values are Sets, so A→B via two artifacts
+ *  still counts B's dependence on A once. Participants with no producer start at 0. */
+function computeIndegrees(
+	adj: Map<string, Set<string>>,
+	participants: Set<string>
+): Map<string, number> {
+	const indeg = new Map<string, number>();
+	for (const p of participants) indeg.set(p, 0);
+	for (const outs of adj.values()) for (const c of outs) indeg.set(c, (indeg.get(c) ?? 0) + 1);
+	return indeg;
+}
+
 /**
  * Kahn layering over the participant subgraph: repeatedly emit the set of nodes whose producers are all already
  * emitted. Each emitted set is one layer (a shared dependency-step). Indegree counts DISTINCT predecessors (adj
@@ -80,9 +92,7 @@ function kahnLayers(
 	adj: Map<string, Set<string>>,
 	participants: Set<string>
 ): { layers: string[][]; emitted: Set<string> } {
-	const indeg = new Map<string, number>();
-	for (const p of participants) indeg.set(p, 0);
-	for (const outs of adj.values()) for (const c of outs) indeg.set(c, (indeg.get(c) ?? 0) + 1);
+	const indeg = computeIndegrees(adj, participants);
 
 	const layers: string[][] = [];
 	const emitted = new Set<string>();
@@ -97,7 +107,8 @@ function kahnLayers(
 				indeg.set(c, d);
 				if (d === 0) next.push(c);
 			}
-		frontier = next.sort(byId);
+		next.sort(byId);
+		frontier = next;
 	}
 	return { layers, emitted };
 }
@@ -140,7 +151,9 @@ function classifyStuck(
 	for (const n of cycleNodes) {
 		if (assigned.has(n)) continue;
 		// Same SCC iff mutually reachable (n reaches m AND m reaches n). n reaches n (it is on a cycle), so n ∈ cluster.
-		const cluster = cycleNodes.filter((m) => (reach.get(n)?.has(m) ?? false) && (reach.get(m)?.has(n) ?? false));
+		const cluster = cycleNodes.filter(
+			(m) => (reach.get(n)?.has(m) ?? false) && (reach.get(m)?.has(n) ?? false)
+		);
 		for (const m of cluster) assigned.add(m);
 		cycles.push([...cluster].sort(byId));
 	}
@@ -154,7 +167,10 @@ function classifyStuck(
  */
 export function layerHandoff(ex: PwaGraphExport): HandoffOrder {
 	const { adj, participants } = buildDependencyGraph(ex);
-	const unordered = ex.nodes.map((n) => n.id).filter((id) => !participants.has(id)).sort(byId);
+	const unordered = ex.nodes
+		.map((n) => n.id)
+		.filter((id) => !participants.has(id))
+		.sort(byId);
 	const { layers, emitted } = kahnLayers(adj, participants);
 	const stuck = [...participants].filter((n) => !emitted.has(n));
 	const { cycles, blocked } = classifyStuck(stuck, adj);

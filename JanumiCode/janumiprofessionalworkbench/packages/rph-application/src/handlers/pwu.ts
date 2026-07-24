@@ -698,6 +698,40 @@ function rejectUnbackedExecutionSuccess(
 }
 
 /**
+ * The workLifecycle axis either ADVANCES (a legal transition whose cross-axis guard holds against the NEW
+ * sub-axes) or HOLDS (a no-op move that only advances the orthogonal sub-axes) — and a hold must still not park
+ * the PWU in a SATISFIED-without-assurance state (property P1 / INV-5). Returns a reject-result when the move is
+ * illegal, or undefined when it is permitted.
+ */
+function rejectIllegalWorkLifecycleMove(
+	command: DomainCommand,
+	id: string,
+	currentWorkLifecycleState: string,
+	newState: string,
+	nextAxes: PwuAxes
+): CommandResult | undefined {
+	if (newState === currentWorkLifecycleState) {
+		if (!satisfiesP1(nextAxes)) {
+			return reject(
+				command,
+				'RPH_INVARIANT_VIOLATION',
+				`PWU ${id} would hold in SATISFIED without assuranceState=SATISFIED (P1/INV-5)`
+			);
+		}
+		return undefined;
+	}
+	const advance = canAdvanceWorkLifecycle(currentWorkLifecycleState, newState, nextAxes);
+	if (!advance.ok) {
+		return reject(
+			command,
+			'RPH_ILLEGAL_STATE_TRANSITION',
+			`Cannot advance PWU ${id} ${currentWorkLifecycleState} -> ${newState}${advance.reason ? ': ' + advance.reason : ''}`
+		);
+	}
+	return undefined;
+}
+
+/**
  * ChangePwuState — the controller's authoritative multi-axis setter. It moves the workLifecycle axis to
  * `newState` (validated by canAdvanceWorkLifecycle against the NEW sub-axis values, so the cross-axis guards
  * still hold — e.g. only reaching SATISFIED when assuranceState=SATISFIED) AND moves each sub-axis, each of which
@@ -759,24 +793,14 @@ export const changePwuState: CommandHandler = (ctx, command, payload) => {
 	// The workLifecycle axis either advances (legal transition + cross-axis guard against the NEW sub-axes) or
 	// holds (a no-op move that only advances the orthogonal sub-axes) — and a hold must still not park the PWU in
 	// a SATISFIED-without-assurance state (property P1 / INV-5).
-	if (p.newState === current.workLifecycleState) {
-		if (!satisfiesP1(nextAxes)) {
-			return reject(
-				command,
-				'RPH_INVARIANT_VIOLATION',
-				`PWU ${id} would hold in SATISFIED without assuranceState=SATISFIED (P1/INV-5)`
-			);
-		}
-	} else {
-		const advance = canAdvanceWorkLifecycle(current.workLifecycleState, p.newState, nextAxes);
-		if (!advance.ok) {
-			return reject(
-				command,
-				'RPH_ILLEGAL_STATE_TRANSITION',
-				`Cannot advance PWU ${id} ${current.workLifecycleState} -> ${p.newState}${advance.reason ? ': ' + advance.reason : ''}`
-			);
-		}
-	}
+	const illegalMove = rejectIllegalWorkLifecycleMove(
+		command,
+		id,
+		current.workLifecycleState,
+		p.newState,
+		nextAxes
+	);
+	if (illegalMove) return illegalMove;
 	const newRevision = loaded.revision + 1;
 	const next = {
 		...nextEnvelope(loaded.state, command, newRevision),

@@ -251,7 +251,8 @@ function checkBoundaryCoherence(
 	next: Record<string, unknown>,
 	id: string
 ): CommandResult | null {
-	const boundary = next.executionBoundary === 'DELEGATED_EXTERNAL' ? 'DELEGATED_EXTERNAL' : 'INTERNAL';
+	const boundary =
+		next.executionBoundary === 'DELEGATED_EXTERNAL' ? 'DELEGATED_EXTERNAL' : 'INTERNAL';
 	const contract = next.boundaryContract as { counterpartyLabel?: unknown } | undefined;
 	const childCount =
 		(Array.isArray(next.permittedChildTypeIds) ? next.permittedChildTypeIds.length : 0) +
@@ -273,7 +274,10 @@ function checkBoundaryCoherence(
 				`PWU Type ${id} is DELEGATED_EXTERNAL but declares no boundaryContract (STD-3: a delegated node authors a boundary contract in lieu of an internal decomposition)`
 			);
 		}
-		if (typeof contract.counterpartyLabel !== 'string' || contract.counterpartyLabel.trim() === '') {
+		if (
+			typeof contract.counterpartyLabel !== 'string' ||
+			contract.counterpartyLabel.trim() === ''
+		) {
 			return violation(
 				'empty_counterparty_label',
 				`PWU Type ${id}: boundaryContract.counterpartyLabel must be a non-empty label identifying the external counterparty (STD-3)`
@@ -339,7 +343,12 @@ function checkAssurancePolicyRefs(
 			);
 		const st = statuses.get(pid);
 		if (st === undefined)
-			return reject(command, 'RPH_VALIDATION_SEMANTIC_FAILED', `${label}: Assurance Policy ${pid} does not exist.`, [id]);
+			return reject(
+				command,
+				'RPH_VALIDATION_SEMANTIC_FAILED',
+				`${label}: Assurance Policy ${pid} does not exist.`,
+				[id]
+			);
 		if (st !== 'ACTIVE')
 			return reject(
 				command,
@@ -362,7 +371,10 @@ function checkPolicyRefsOnState(
 ): CommandResult | null {
 	const arr = (v: unknown): string[] => (Array.isArray(v) ? (v as string[]) : []);
 	const attestedOf = (s: Record<string, unknown> | undefined): string[] =>
-		arr((s?.boundaryContract as { attestedAssurancePolicyIds?: unknown } | undefined)?.attestedAssurancePolicyIds);
+		arr(
+			(s?.boundaryContract as { attestedAssurancePolicyIds?: unknown } | undefined)
+				?.attestedAssurancePolicyIds
+		);
 	const statuses = assurancePolicyStatuses(ctx);
 	return (
 		checkAssurancePolicyRefs(
@@ -596,21 +608,16 @@ const EDITABLE_PWU_TYPE_FIELDS = [
 ] as const satisfies readonly (keyof EditPwuTypePayload)[];
 const pwuTypeEditNoOp = noOpEditPrecondition('EditPwuType', EDITABLE_PWU_TYPE_FIELDS);
 
-export const editPwuType: CommandHandler = (ctx, command, payload) => {
-	const p = payload as EditPwuTypePayload;
-	const id = command.targetAggregateId;
-	const loaded = loadOrReject(ctx, command, id);
-	if (!loaded.ok) return loaded.result;
-	const guard = requireDraftOwner(ctx, command, loaded.state);
-	if (guard) return guard;
-	// JAN-CMDPRE DWP-08: refuse a no-op edit — it would append a second PwuTypeRedefined AND re-bump the owning PWA's
-	// semanticVersion (the INV-6 leak) for an edit that did not happen. Compares RAW payload fields (before the
-	// executionBoundary default / permittedChildTypeIds re-derivation below).
-	const noop = checkPrecondition(ctx, command, pwuTypeEditNoOp, loaded.state);
-	if (noop) return noop;
-	const newRevision = loaded.revision + 1;
-	// Keep the flat edge list authoritative: an explicit permittedChildTypeIds wins; otherwise, when only the
-	// cardinality rules are edited, re-derive the flat list from them so the two never drift.
+/** Build the redefined PWU Type state: the carried-forward envelope plus every payload-present editable field.
+ *  Only fields present in the patch are copied (undefined-means-absent). Keep the flat edge list authoritative: an
+ *  explicit permittedChildTypeIds wins; otherwise, when only the cardinality rules are edited, re-derive the flat list
+ *  from them so the two never drift. The executionBoundary/boundaryContract derivation is applied by the caller. */
+function buildRedefinedTypeState(
+	state: Record<string, unknown>,
+	command: DomainCommand,
+	p: EditPwuTypePayload,
+	newRevision: number
+): Record<string, unknown> {
 	const childRules = p.permittedChildren as ReadonlyArray<{ typeId: string }> | undefined;
 	let childTypeIdsPatch: Record<string, unknown> = {};
 	if (p.permittedChildTypeIds !== undefined) {
@@ -618,8 +625,8 @@ export const editPwuType: CommandHandler = (ctx, command, payload) => {
 	} else if (childRules !== undefined) {
 		childTypeIdsPatch = { permittedChildTypeIds: childRules.map((r) => r.typeId) };
 	}
-	const next: Record<string, unknown> = {
-		...nextEnvelope(loaded.state, command, newRevision),
+	return {
+		...nextEnvelope(state, command, newRevision),
 		...(p.name !== undefined ? { name: p.name } : {}),
 		...(p.purpose !== undefined ? { purpose: p.purpose } : {}),
 		...(p.pwuKind !== undefined ? { pwuKind: p.pwuKind } : {}),
@@ -633,6 +640,22 @@ export const editPwuType: CommandHandler = (ctx, command, payload) => {
 			? { requiredAssurancePolicyIds: p.requiredAssurancePolicyIds }
 			: {})
 	};
+}
+
+export const editPwuType: CommandHandler = (ctx, command, payload) => {
+	const p = payload as EditPwuTypePayload;
+	const id = command.targetAggregateId;
+	const loaded = loadOrReject(ctx, command, id);
+	if (!loaded.ok) return loaded.result;
+	const guard = requireDraftOwner(ctx, command, loaded.state);
+	if (guard) return guard;
+	// JAN-CMDPRE DWP-08: refuse a no-op edit — it would append a second PwuTypeRedefined AND re-bump the owning PWA's
+	// semanticVersion (the INV-6 leak) for an edit that did not happen. Compares RAW payload fields (before the
+	// executionBoundary default / permittedChildTypeIds re-derivation below).
+	const noop = checkPrecondition(ctx, command, pwuTypeEditNoOp, loaded.state);
+	if (noop) return noop;
+	const newRevision = loaded.revision + 1;
+	const next = buildRedefinedTypeState(loaded.state, command, p, newRevision);
 	// STD-2/STD-3/INV-1 (JAN-PRPWA-DS-001, DWP-02). executionBoundary is authoritative and defaulted onto every
 	// edit (resolve: explicit patch → existing state → INTERNAL). The boundaryContract is DERIVED from the RESOLVED
 	// boundary: on the INTERNAL branch it is STRIPPED — a DELEGATED→INTERNAL flip patch-merges, so a stale contract
@@ -787,7 +810,8 @@ function pwuTypeNodesOf(ctx: HandlerContext, pwaId: string): PwaGraphNode[] {
 			permittedChildTypeIds: arr(s.permittedChildTypeIds),
 			requiredInputs: arr(s.requiredInputs),
 			requiredOutputs: arr(s.requiredOutputs),
-			executionBoundary: s.executionBoundary === 'DELEGATED_EXTERNAL' ? 'DELEGATED_EXTERNAL' : 'INTERNAL'
+			executionBoundary:
+				s.executionBoundary === 'DELEGATED_EXTERNAL' ? 'DELEGATED_EXTERNAL' : 'INTERNAL'
 		});
 	}
 	return nodes;

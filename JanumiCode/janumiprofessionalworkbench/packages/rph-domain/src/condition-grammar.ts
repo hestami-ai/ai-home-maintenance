@@ -34,8 +34,18 @@ export const ConditionExpressionSchema: z.ZodType<ConditionExpression> = z.lazy(
 	z.discriminatedUnion('op', [
 		z.strictObject({ op: z.literal('STEP_STATE'), stepId: z.string(), state: z.string() }),
 		z.strictObject({ op: z.literal('STEP_SUCCEEDED'), stepId: z.string() }),
-		z.strictObject({ op: z.literal('OUTPUT_COUNT'), stepId: z.string(), cmp: NumericComparatorSchema, value: z.number() }),
-		z.strictObject({ op: z.literal('ATTEMPTS'), stepId: z.string(), cmp: NumericComparatorSchema, value: z.number() }),
+		z.strictObject({
+			op: z.literal('OUTPUT_COUNT'),
+			stepId: z.string(),
+			cmp: NumericComparatorSchema,
+			value: z.number()
+		}),
+		z.strictObject({
+			op: z.literal('ATTEMPTS'),
+			stepId: z.string(),
+			cmp: NumericComparatorSchema,
+			value: z.number()
+		}),
 		z.strictObject({
 			op: z.literal('RESULT_EQUALS'),
 			stepId: z.string(),
@@ -160,6 +170,35 @@ export function conditionStepRefs(expr: ConditionExpression): string[] {
 	}
 }
 
+/** The mutable per-step accumulator threaded through the event fold (finalized into a ConditionSubjectStep). */
+type StepFoldAcc = {
+	stepState: string;
+	outputArtifactIds: string[];
+	attemptsMade: number;
+	structuredResult?: unknown;
+};
+
+/**
+ * Fold ONE of this plan's committed events into the step accumulator (mutating the matched record in place). Extracted
+ * from buildConditionSubject so the fold's per-event-type branching stays out of the top-level loop; behaviour is
+ * identical to the inline form — same String() coercions, same record mutations, no-op for unmatched event types.
+ */
+function foldExecutionEventInto(acc: Map<string, StepFoldAcc>, e: ConditionSubjectEvent): void {
+	const p = (e.payload ?? {}) as Record<string, unknown>;
+	if (e.eventType === 'ExecutionStepStarted') {
+		const rec = acc.get(String((p.stepId ?? '') as string | number | boolean));
+		if (rec) rec.attemptsMade += 1;
+	} else if (e.eventType === 'ExecutionStepSucceeded') {
+		const rec = acc.get(String((p.executionStepId ?? '') as string | number | boolean));
+		if (rec) {
+			rec.outputArtifactIds = Array.isArray(p.outputArtifactIds)
+				? p.outputArtifactIds.map(String)
+				: [];
+			rec.structuredResult = p.structuredResult;
+		}
+	}
+}
+
 /**
  * Fold a plan's committed steps + this plan's own event log into the evaluation subject (DWP-02/D4). Per step:
  * stepState (from the aggregate), outputArtifactIds + structuredResult (from its latest ExecutionStepSucceeded),
@@ -171,26 +210,12 @@ export function buildConditionSubject(
 	events: readonly ConditionSubjectEvent[],
 	planId: string
 ): ConditionSubject {
-	const acc = new Map<
-		string,
-		{ stepState: string; outputArtifactIds: string[]; attemptsMade: number; structuredResult?: unknown }
-	>();
-	for (const s of steps) acc.set(s.id, { stepState: s.stepState, outputArtifactIds: [], attemptsMade: 0 });
+	const acc = new Map<string, StepFoldAcc>();
+	for (const s of steps)
+		acc.set(s.id, { stepState: s.stepState, outputArtifactIds: [], attemptsMade: 0 });
 	for (const e of events) {
 		if (e.aggregateId !== planId) continue;
-		const p = (e.payload ?? {}) as Record<string, unknown>;
-		if (e.eventType === 'ExecutionStepStarted') {
-			const rec = acc.get(String(p.stepId ?? ''));
-			if (rec) rec.attemptsMade += 1;
-		} else if (e.eventType === 'ExecutionStepSucceeded') {
-			const rec = acc.get(String(p.executionStepId ?? ''));
-			if (rec) {
-				rec.outputArtifactIds = Array.isArray(p.outputArtifactIds)
-					? p.outputArtifactIds.map((x) => String(x))
-					: [];
-				rec.structuredResult = p.structuredResult;
-			}
-		}
+		foldExecutionEventInto(acc, e);
 	}
 	const out: Record<string, ConditionSubjectStep> = {};
 	for (const [id, rec] of acc) out[id] = rec;

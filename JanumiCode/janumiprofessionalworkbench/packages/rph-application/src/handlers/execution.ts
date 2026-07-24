@@ -55,30 +55,36 @@ const PLAN = 'EXECUTION_PLAN';
 const MACHINE = 'ExecutionPlan.status';
 const STEP_MACHINE = 'ExecutionStep.stepState';
 
+/** Preserve the read-model's existing String() coercion for a value it treats as a scalar, without S6551 flagging the
+ *  possibly-structured argument. The cast is compile-time only — String() runs on the same value with the same result;
+ *  this is NOT JSON.stringify. Centralising the union here also avoids repeating it at every projection site (S4323). */
+type Stringifiable = string | number | boolean;
+const asScalarString = (value: unknown): string => String(value as Stringifiable);
+
 /** Project a plan state bag into the pure transition-graph gate read-model (DR-004 DWP-01). The SAME GatePlan the
  *  read-model builds, so the engine authority (startExecutionStep) and the UI affordance cannot diverge (§19-M2). */
 function toGatePlan(plan: Record<string, unknown>): GatePlan {
 	const steps = (plan.steps as Array<{ id?: unknown; stepState?: unknown }>) ?? [];
 	const transitions = (plan.transitions as Array<Record<string, unknown>>) ?? [];
 	return {
-		status: String(plan.status ?? ''),
+		status: asScalarString(plan.status ?? ''),
 		steps: (steps as Array<Record<string, unknown>>).map((s) => ({
-			id: String(s.id ?? ''),
-			stepState: String(s.stepState ?? ''),
+			id: asScalarString(s.id ?? ''),
+			stepState: asScalarString(s.stepState ?? ''),
 			// stepType decides which node may branch EXCLUSIVELY (a BRANCH selects ONE arm; every other node's
 			// out-edges are independent). Deadness is NOT carried here — it is STRUCTURAL, computed by the gate.
 			// selectedTransitionId IS carried: a resolved branch's decision is a recorded fact, not a re-computation.
-			...(s.stepType === undefined ? {} : { stepType: String(s.stepType) }),
+			...(s.stepType === undefined ? {} : { stepType: asScalarString(s.stepType) }),
 			...(s.selectedTransitionId === undefined
 				? {}
-				: { selectedTransitionId: String(s.selectedTransitionId) })
+				: { selectedTransitionId: asScalarString(s.selectedTransitionId) })
 		})),
 		transitions: transitions.map((t) => ({
 			// The edge id is load-bearing: it is how a BRANCH's recorded selection is matched back to its edge.
-			...(t.id === undefined ? {} : { id: String(t.id) }),
-			sourceStepId: t.sourceStepId === undefined ? undefined : String(t.sourceStepId),
-			targetStepId: t.targetStepId === undefined ? undefined : String(t.targetStepId),
-			transitionType: t.transitionType === undefined ? undefined : String(t.transitionType),
+			...(t.id === undefined ? {} : { id: asScalarString(t.id) }),
+			sourceStepId: t.sourceStepId === undefined ? undefined : asScalarString(t.sourceStepId),
+			targetStepId: t.targetStepId === undefined ? undefined : asScalarString(t.targetStepId),
+			transitionType: t.transitionType === undefined ? undefined : asScalarString(t.transitionType),
 			conditionExpression: t.conditionExpression
 		}))
 	};
@@ -115,19 +121,15 @@ function guardEvaluatorFor(
 	};
 }
 
-/** ProposeExecutionPlan — create the plan for a PWU, submitted for review (UNDER_REVIEW). */
-export const proposeExecutionPlan: CommandHandler = (ctx, command, payload) => {
-	const p = payload as ProposeExecutionPlanPayload;
-	if (!ctx.store.loadObject(p.workUnitId)) {
-		return reject(
-			command,
-			'RPH_VALIDATION_SEMANTIC_FAILED',
-			`ProposeExecutionPlan requires an existing work unit ${p.workUnitId}`,
-			[p.executionPlanId]
-		);
-	}
-	// DR-004 DWP-01: a malformed transition graph must never reach ACTIVE. A NO-OP for a linear plan (empty
-	// transitions[]); a graph plan is validated (dangling ids, one entry, reachability, acyclicity, BRANCH-default).
+/**
+ * DR-004 DWP-01: a malformed transition graph must never reach ACTIVE. A NO-OP for a linear plan (empty
+ * transitions[]); a graph plan is validated (dangling ids, one entry, reachability, acyclicity, BRANCH-default).
+ * Returns a reject result to short-circuit ProposeExecutionPlan, or null when the graph is well-formed.
+ */
+function rejectMalformedTransitionGraph(
+	command: DomainCommand,
+	p: ProposeExecutionPlanPayload
+): ReturnType<typeof reject> | null {
 	const graph = validateTransitionGraph(
 		p.steps.map((s) => ({ id: s.id, stepType: s.stepType })),
 		(p.transitions ?? []).map((t) => ({
@@ -145,11 +147,18 @@ export const proposeExecutionPlan: CommandHandler = (ctx, command, payload) => {
 			[p.executionPlanId]
 		);
 	}
-	// DR-004 DWP-02: each edge's conditionExpression must parse against the hand-authored grammar (reject malformed),
-	// and every stepId it references must resolve to a declared step — so a guard is never silently false at runtime.
-	// A BRANCH records its decision AS a transition id (DWP-09), and the transitions view keys its rows on the same id,
-	// so a duplicate makes both the recorded selection and the render ambiguous. The contract requires `id` on every
-	// transition but nothing enforced UNIQUENESS.
+	return null;
+}
+
+/**
+ * A BRANCH records its decision AS a transition id (DWP-09), and the transitions view keys its rows on the same id,
+ * so a duplicate makes both the recorded selection and the render ambiguous. The contract requires `id` on every
+ * transition but nothing enforced UNIQUENESS. Returns a reject on the first duplicate id, or null.
+ */
+function rejectDuplicateTransitionId(
+	command: DomainCommand,
+	p: ProposeExecutionPlanPayload
+): ReturnType<typeof reject> | null {
 	const edgeIds = new Set<string>();
 	for (const t of p.transitions ?? []) {
 		const id = (t as { id?: string }).id;
@@ -163,6 +172,18 @@ export const proposeExecutionPlan: CommandHandler = (ctx, command, payload) => {
 			);
 		edgeIds.add(id);
 	}
+	return null;
+}
+
+/**
+ * DR-004 DWP-02: each edge's conditionExpression must parse against the hand-authored grammar (reject malformed),
+ * and every stepId it references must resolve to a declared step — so a guard is never silently false at runtime.
+ * Returns a reject on the first malformed/dangling condition, or null.
+ */
+function rejectMalformedTransitionCondition(
+	command: DomainCommand,
+	p: ProposeExecutionPlanPayload
+): ReturnType<typeof reject> | null {
 	const declaredStepIds = new Set(p.steps.map((s) => s.id));
 	for (const t of p.transitions ?? []) {
 		if (t.conditionExpression === undefined) continue;
@@ -185,6 +206,53 @@ export const proposeExecutionPlan: CommandHandler = (ctx, command, payload) => {
 			);
 		}
 	}
+	return null;
+}
+
+/**
+ * The ExecutionPlanProposed event payload — a PROJECTION of the command. It records the RESULTING state:
+ * ExecutionPlanProposed declares the plan's identity + `status` (UNDER_REVIEW), and references its steps/transitions
+ * by ID (not the full embedded objects the command carries), plus the created status the command omits. The policies
+ * ride when non-empty (the reference undertaking supplies `{}`, so they are omitted — not specified, not a fabricated
+ * empty). (Pinned defect in emitted-event-conformance; now conforms.)
+ */
+function proposedPlanEventPayload(p: ProposeExecutionPlanPayload) {
+	return {
+		workUnitId: p.workUnitId,
+		planVersion: 1,
+		status: 'UNDER_REVIEW',
+		stepIds: p.steps.map((s) => s.id),
+		transitionIds: p.transitions.map((t) => (t as { id?: string }).id ?? ''),
+		...(p.retryPolicy && Object.keys(p.retryPolicy).length ? { retryPolicy: p.retryPolicy } : {}),
+		...(p.tacticalChangePolicy && Object.keys(p.tacticalChangePolicy).length
+			? { tacticalChangePolicy: p.tacticalChangePolicy }
+			: {}),
+		...(p.escalationPolicy && Object.keys(p.escalationPolicy).length
+			? { escalationPolicy: p.escalationPolicy }
+			: {}),
+		...(p.terminationPolicy && Object.keys(p.terminationPolicy).length
+			? { terminationPolicy: p.terminationPolicy }
+			: {})
+	};
+}
+
+/** ProposeExecutionPlan — create the plan for a PWU, submitted for review (UNDER_REVIEW). */
+export const proposeExecutionPlan: CommandHandler = (ctx, command, payload) => {
+	const p = payload as ProposeExecutionPlanPayload;
+	if (!ctx.store.loadObject(p.workUnitId)) {
+		return reject(
+			command,
+			'RPH_VALIDATION_SEMANTIC_FAILED',
+			`ProposeExecutionPlan requires an existing work unit ${p.workUnitId}`,
+			[p.executionPlanId]
+		);
+	}
+	const graphFailure = rejectMalformedTransitionGraph(command, p);
+	if (graphFailure) return graphFailure;
+	const duplicateIdFailure = rejectDuplicateTransitionId(command, p);
+	if (duplicateIdFailure) return duplicateIdFailure;
+	const conditionFailure = rejectMalformedTransitionCondition(command, p);
+	if (conditionFailure) return conditionFailure;
 	const state: Record<string, unknown> = {
 		...newEnvelope(command, PLAN, p.executionPlanId, {
 			lifecycleStatus: 'UNDER_REVIEW',
@@ -205,28 +273,7 @@ export const proposeExecutionPlan: CommandHandler = (ctx, command, payload) => {
 		aggregateId: p.executionPlanId,
 		state,
 		eventType: 'ExecutionPlanProposed',
-		// The event records the RESULTING state. ExecutionPlanProposed declares the plan's identity + `status`
-		// (UNDER_REVIEW), and references its steps/transitions by ID (not the full embedded objects the command
-		// carries) — so the event is a PROJECTION of the command, plus the created status the command omits. The
-		// policies ride when non-empty (the reference undertaking supplies `{}`, so they are omitted — not specified,
-		// not a fabricated empty). (Pinned defect in emitted-event-conformance; now conforms.)
-		eventPayload: {
-			workUnitId: p.workUnitId,
-			planVersion: 1,
-			status: 'UNDER_REVIEW',
-			stepIds: p.steps.map((s) => s.id),
-			transitionIds: p.transitions.map((t) => (t as { id?: string }).id ?? ''),
-			...(p.retryPolicy && Object.keys(p.retryPolicy).length ? { retryPolicy: p.retryPolicy } : {}),
-			...(p.tacticalChangePolicy && Object.keys(p.tacticalChangePolicy).length
-				? { tacticalChangePolicy: p.tacticalChangePolicy }
-				: {}),
-			...(p.escalationPolicy && Object.keys(p.escalationPolicy).length
-				? { escalationPolicy: p.escalationPolicy }
-				: {}),
-			...(p.terminationPolicy && Object.keys(p.terminationPolicy).length
-				? { terminationPolicy: p.terminationPolicy }
-				: {})
-		}
+		eventPayload: proposedPlanEventPayload(p)
 	});
 };
 
@@ -503,8 +550,7 @@ export const supersedeExecutionPlan: CommandHandler = (ctx, command) => {
 		precondition: fromStates('PROPOSED', 'UNDER_REVIEW', 'APPROVED', 'ACTIVE'),
 		guard: (state) => {
 			const successor = ctx.store.loadObject(p.supersedingExecutionPlanId)?.state as
-				| { workUnitId?: string }
-				| undefined;
+				{ workUnitId?: string } | undefined;
 			if (!successor)
 				return reject(
 					command,
@@ -674,7 +720,11 @@ export const startExecutionStep: CommandHandler = (ctx, command) => {
 			// DWP-02: a CONDITIONAL in-edge's guard is evaluated against the plan's committed subject (a replay-safe
 			// fold of committed step state + this plan's event log). Parse is safe (validated at propose). Built only
 			// when the plan actually HAS a guarded edge (DWP-07) — a linear plan must not pay for an event-log scan.
-			const gate = startStepGate(gatePlan, p.stepId, guardEvaluatorFor(ctx, command.targetAggregateId, gatePlan));
+			const gate = startStepGate(
+				gatePlan,
+				p.stepId,
+				guardEvaluatorFor(ctx, command.targetAggregateId, gatePlan)
+			);
 			if (!gate.ok)
 				return reject(
 					command,
@@ -714,7 +764,12 @@ export const completeExecutionStep: CommandHandler = (ctx, command) => {
 			const gatePlan = toGatePlan(loadPlanState(ctx, command.targetAggregateId));
 			// Evaluate against the subject as it stands NOW — the step is still RUNNING here, and the gate treats a
 			// non-terminal source as deciding nothing, so ask the plan as if this step had already succeeded.
-			const resolved = { ...gatePlan, steps: gatePlan.steps.map((s) => (s.id === String(step.id) ? { ...s, stepState: 'SUCCEEDED' } : s)) };
+			const resolved = {
+				...gatePlan,
+				steps: gatePlan.steps.map((s) =>
+					s.id === String(step.id) ? { ...s, stepState: 'SUCCEEDED' } : s
+				)
+			};
 			const selected = resolveBranchSelection(
 				resolved,
 				String(step.id),
@@ -998,7 +1053,12 @@ export const pruneExecutionStep: CommandHandler = (ctx, command) => {
 					`Cannot prune a step: plan ${command.targetAggregateId} is not ACTIVE (${String(plan.status)}) — a prune is within-execution branch resolution.`
 				);
 			const gatePlan = toGatePlan(plan);
-			if (!prunableStepIds(gatePlan, guardEvaluatorFor(ctx, command.targetAggregateId, gatePlan)).includes(p.stepId))
+			if (
+				!prunableStepIds(
+					gatePlan,
+					guardEvaluatorFor(ctx, command.targetAggregateId, gatePlan)
+				).includes(p.stepId)
+			)
 				return reject(
 					command,
 					'RPH_INVARIANT_VIOLATION',
