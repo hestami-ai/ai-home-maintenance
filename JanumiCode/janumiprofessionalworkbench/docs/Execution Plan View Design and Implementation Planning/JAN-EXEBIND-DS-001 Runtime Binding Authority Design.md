@@ -146,9 +146,12 @@ and §4-R3 rules on it.
   programme exists to stop.
 - **R5 — An ABSENT `runtimeBindingId` is OUT OF SCOPE of RPH-EXE-003, not a fail-open.** The rule's antecedent is
   *"with a runtime binding"*. A step naming no binding is not a step whose binding is unauthorized. This is
-  load-bearing: the reference seed authors **no** `RUNTIME_BINDING` at all, so refusing the absent case would make
-  every existing plan unstartable and break all 69 engine tests — and "the rule as ratified does not cover it" is
-  the honest reason, not the convenient one. **Disclosed:** an AI step running unbound remains governed only by
+  load-bearing, and **measured rather than asserted**: the reference seed authors no `RUNTIME_BINDING` at all, and
+  a mutant that refuses the absent case fails **34 of the 69** engine tests. *(The first measurement reported a
+  false GREEN — `rph-engine` resolves `@janumipwb/rph-application` to its built dist, so mutating src without
+  rebuilding proves nothing. Recorded because the claim was right and the evidence was worthless, which are
+  different things.)* "The rule as ratified does not cover it" remains the honest reason; the seed is the
+  consequence, not the justification. **Disclosed:** an AI step running unbound remains governed only by
   `executionAttempts`' existing *advisory* (`aiNoBinding`), which gates nothing. Recorded in §8, not hidden.
 
 ## 5. The fix

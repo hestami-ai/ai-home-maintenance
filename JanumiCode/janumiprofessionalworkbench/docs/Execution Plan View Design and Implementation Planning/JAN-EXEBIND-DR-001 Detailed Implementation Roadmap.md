@@ -108,9 +108,38 @@ where it was closed. **The residual register stays the authoritative index** —
 
 ## 6. Delivery record
 
-*(WP-B3 writes this. Empty until then — deliberately, and this note is here so it cannot be mistaken for an
-omission. `JAN-EXECPLAN-DR-004` shipped a feature under a record that said "Nothing built"; the lesson taken from
-it is that an empty delivery record must say it is empty.)*
+**WP-B0 … WP-B3 DELIVERED, 2026-07-25.**
+
+| WP | Commit | Outcome |
+|---|---|---|
+| B0 | `1eb0b2af` | Design + roadmap; N-2/N-3 reasons corrected; N-4 and N-5 raised. |
+| B1–B3 | `9cfee6f4` | `bindingAuthorityRefusal` wired; RPH-EXE-003 `ENFORCED`; register + manifest reconciled; N-6 raised. |
+
+**Gate `G-EXEBIND-001` green:** check-types 21/21 (svelte-check 0) · vitest 21/21 (`rph-application` 533→545,
+`rph-domain` 415, **`rph-engine` 69 — the reference seed drives unchanged**) · lint clean · boundary 0
+(244 modules) · Playwright 50 passed.
+
+**Mutation red-proof: 7 declared mutants, all RED** — invert the accept set · delete the allowlist limb ·
+reorder the limbs · refuse the absent binding (application *and* seed) · fail OPEN on an unresolvable authority ·
+drop the precheck entirely.
+
+**Three things the build corrected in this roadmap's own design**, recorded because each was a claim that turned
+out to be unproven or wrong:
+
+1. **The order mutant SURVIVED the first battery.** §3's argument that status-must-precede-allowlist was correct
+   and *tested nowhere* — every case allowlisted its binding, so both orders behaved identically. Only an input
+   failing **both** limbs can tell them apart. Added as "THE ORDER PROOF". An argument without a failing case is
+   not evidence.
+2. **The seed mutant reported a FALSE GREEN.** `rph-engine` resolves `@janumipwb/rph-application` to its built
+   dist; mutating src without rebuilding proves nothing. Rebuilt: 34 of 69 fail. The harness now rebuilds, so the
+   ledger is reproducible rather than footnoted.
+3. **`RPH_BINDING_NOT_AUTHORIZED` is not a ratified wire code.** `RphErrorCodeSchema` is a closed 15-value enum;
+   that string is the kernel's label. Corrected in DS §5 *before* building against it.
+
+**And the new gate immediately caught a fixture that depended on the hole it closed:**
+`execrem-wp14-provenance.test.ts` authored steps naming a binding that never existed — legal only while nothing
+resolved the field. DS-001 §4 item 3 verbatim ("tests codified the holes as intent"). The fixture was made
+honest; the rule was not weakened.
 
 ## 7. What this roadmap does NOT close
 
@@ -124,4 +153,4 @@ The new finding R4 (an unconstrained first grant) is **raised, not fixed**, for 
 
 ---
 
-*`READY_TO_BUILD` / v0.1.0 — 4 work packages. Nothing built yet.*
+*`DELIVERED` / v0.1.0 — 4 work packages, all landed 2026-07-25. One of three findings closed; the other two escalated as a corpus gap rather than worked around. Three new findings raised (N-4, N-5, N-6).*
