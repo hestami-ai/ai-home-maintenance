@@ -1,27 +1,39 @@
-// JAN-EXEBIND WP-B1 — RPH-EXE-003 becomes ENFORCED, and §15.3's allowlist becomes load-bearing.
+// JAN-EXEBIND WP-B1 (RPH-EXE-003) + JAN-REVREM RW-0 — runtime binding authority, as a DECLARED COLUMN.
 //
-// WHAT WAS WRONG. `bindingPermitsExecution` is ratified, correct and unit-tested, and had — repo-wide — exactly
-// two references: its own definition and its own unit test. RPH-EXE-003's ratified statement is "starting
-// execution with a runtime binding still in REQUESTED is REJECTED"; `startExecutionStep` never resolved the
-// step's `runtimeBindingId` at all, so a step started freely against a REQUESTED, DENIED or REVOKED binding. The
-// M12 conformance manifest meanwhile certified the whole RPH-EXE family COVERED "001..009 by id" on the strength
-// of that unit test — a pure-predicate assertion accepted as evidence for a rule whose ratified `then` is "the
-// command is rejected".
+// WHAT WAS WRONG ORIGINALLY. `bindingPermitsExecution` is ratified, correct and unit-tested, and had — repo-wide
+// — exactly two references: its own definition and its own unit test. `startExecutionStep` never resolved the
+// step's runtimeBindingId at all, so a step started freely against a REQUESTED, DENIED or REVOKED binding, while
+// the M12 manifest certified the whole RPH-EXE family COVERED "001..009 by id".
 //
-// That is F-28's shape exactly, and it was found by the register JAN-EXECREM WP-16 built BECAUSE F-28 happened.
+// AND WHAT WAS WRONG WITH THE FIX — the post-build adversarial review's only BLOCKER. WP-B1 wired the rule as a
+// hand-inlined precheck inside `startExecutionStep`. **TWO ARROWS DRIVE A STEP INTO RUNNING.**
+// `resolveExecutionStepWait` passed no precheck at all, so:
 //
-// TWO LIMBS, AND K5 IS THE TEST THAT MATTERS. Limb 3 asks "is this binding authorized at all?" (RPH-EXE-003,
-// ratified); limb 4 asks "did THIS ACTIVATION authorize it?" (§15.3, authored). Every negative except K5 is
-// satisfied by limb 3 alone — so without K5 the two limbs are ONE limb wearing two names, and deleting the
-// allowlist check would fail nothing. K5 therefore arranges a genuinely AUTHORIZED binding, which is the only
-// arrangement in which limb 4 can be the thing that refuses.
+//     Start (binding AUTHORIZED) -> EnterExecutionStepWait -> RevokeRuntimeCapability -> ResolveExecutionStepWait
+//     = ACCEPTED, step RUNNING, binding REVOKED.
 //
-// AND THE CODE IS NEVER ASSERTED ALONE. Limbs 3 and 4 share `RPH_INVARIANT_VIOLATION`, which is also returned by
-// the PWU-openness limb, the retry cap and the prunability precheck. A code-only assertion proves that SOMETHING
-// refused — the vacuous negative this lineage keeps removing. Each case asserts its own marker.
+// Revocation was unenforceable for every step that can be parked in WAITING, while the engine's own refusal
+// message asserted that state was impossible. That is the exact shape `STEP_COMMAND_SPECS` exists to end — WP-8:
+// "an omission is invisible in a list that does not exist" — reintroduced ONE work package after WP-12b moved the
+// other two authorities into it as columns. A guard that must be remembered per call site will be forgotten at
+// one of them.
+//
+// SO THE AXIS IS NOW A COLUMN (`bindingAuthority`), declared per command with a rationale, evaluated ONCE in
+// `stepAuthorityRefusal` for all nine. B3 below iterates the table, so a tenth command declaring
+// REQUIRES_AUTHORIZED_BINDING without enforcement fails HERE rather than in the next review.
+//
+// THE §15.3 ALLOWLIST LIMB IS WITHDRAWN, and its two tests went with it. The review proved it an unrecoverable
+// wedge whose message prescribed a remedy the engine forbids, while both shipped activation sites pass `[]` —
+// so any step naming a binding was permanently unstartable. See `bindingAuthorityRefusal`'s header for why it is
+// withdrawn rather than repaired.
+//
+// THE CODE IS NEVER ASSERTED ALONE. `RPH_INVARIANT_VIOLATION` is also returned by the PWU-openness limb, the
+// retry cap and the prunability precheck, so a code-only assertion proves that SOMETHING refused — the vacuous
+// negative this lineage keeps removing. Each case asserts the marker.
 import type { ActorReference, DomainCommand } from '@janumipwb/rph-contracts';
 import { SqliteStorageAdapter } from '@janumipwb/rph-persistence';
 import { beforeEach, describe, expect, it } from 'vitest';
+import { STEP_COMMAND_SPECS, STEP_COMMAND_TYPES } from '@janumipwb/rph-domain';
 import { Engine } from '../index.js';
 import { seedRuntimeBindingStatus_FIXTURE } from './__tests__/binding-fixtures.js';
 
@@ -36,8 +48,6 @@ const sid = (i: number) => `${PLAN}-s${i}`;
 /** The marker only the RPH-EXE-003 status limb produces. */
 const STATUS_MARKER =
 	'a step may only execute against an AUTHORIZED or PARTIALLY_AUTHORIZED binding';
-/** The marker only the §15.3 allowlist limb produces. */
-const ALLOWLIST_MARKER = 'it is not among the bindings THIS ACTIVATION authorized';
 
 describe('JAN-EXEBIND WP-B1 — runtime binding authority at Start', () => {
 	let store: SqliteStorageAdapter;
@@ -107,7 +117,8 @@ describe('JAN-EXEBIND WP-B1 — runtime binding authority at Start', () => {
 
 	/**
 	 * An ACTIVE one-step plan. `bindingOnStep` is what the STEP names; `authorized` is what the ACTIVATION
-	 * authorized — kept as separate arguments precisely so K5 can make them disagree.
+	 * authorized. They are still separate arguments so a test CAN make them disagree — which is now a POSITIVE
+	 * case (P4), since the allowlist limb was withdrawn.
 	 */
 	function activePlan(bindingOnStep?: string, authorized: string[] = []) {
 		ok(
@@ -127,7 +138,8 @@ describe('JAN-EXEBIND WP-B1 — runtime binding authority at Start', () => {
 		ok(dispatch('ActivateExecutionPlan', { authorizedRuntimeBindingIds: authorized }), 'activate');
 	}
 
-	beforeEach(() => {
+	/** Fresh store + engine + intent + PWU. Extracted so the class battery can re-arrange per command. */
+	function resetEngine() {
 		store = new SqliteStorageAdapter({ now: () => TS });
 		seq = 0;
 		engine = new Engine({ store, now: () => TS, newEventId: () => `e${++seq}` });
@@ -162,7 +174,9 @@ describe('JAN-EXEBIND WP-B1 — runtime binding authority at Start', () => {
 			PWU,
 			'PROFESSIONAL_WORK_UNIT'
 		);
-	});
+	}
+
+	beforeEach(resetEngine);
 
 	// ── THE RATIFIED LIMB (RPH-EXE-003) ───────────────────────────────────────────────────────────────────────
 	describe('limb 3 — RPH-EXE-003: the binding must be authorized AT ALL', () => {
@@ -227,56 +241,6 @@ describe('JAN-EXEBIND WP-B1 — runtime binding authority at Start', () => {
 		});
 	});
 
-	// ── THE AUTHORED LIMB (§15.3) ─────────────────────────────────────────────────────────────────────────────
-	describe('limb 4 — §15.3: did THIS ACTIVATION authorize this binding?', () => {
-		it('K5 THE LIMB-SEPARATION PROOF: an AUTHORIZED binding outside the allowlist still REFUSES', () => {
-			// Without this case the allowlist check is unkillable: every other negative in this file is satisfied by
-			// the status limb alone, so deleting limb 4 would fail nothing. The binding here is genuinely AUTHORIZED,
-			// which is the only arrangement in which limb 4 can be the thing that refuses.
-			ok(requestBinding(), 'request binding');
-			ok(authorizeBinding(), 'authorize');
-			activePlan(BINDING, []); // the activation authorized NO bindings
-
-			const r = dispatch('StartExecutionStep', { stepId: sid(1) });
-			expect(r.status).toBe('REJECTED');
-			expect(r.error?.code).toBe('RPH_INVARIANT_VIOLATION');
-			expect(r.error?.message, 'the ALLOWLIST limb, not the status limb').toContain(
-				ALLOWLIST_MARKER
-			);
-			// …and it is demonstrably NOT the status limb: that limb's marker must be absent, or the two rows are
-			// one row and K1-K3 prove nothing about limb 4.
-			expect(r.error?.message).not.toContain(STATUS_MARKER);
-			expect(stepStateOf(1)).toBe('QUEUED');
-		});
-
-		it('THE ORDER PROOF: a binding that fails BOTH limbs is refused by the RATIFIED one', () => {
-			// ADDED AFTER A SURVIVING MUTANT. Moving the allowlist limb ahead of the status check survived the whole
-			// battery above, because every other case allowlists the binding — so the ORDER this design argued for
-			// was asserted in prose and tested nowhere. This is the only input that can tell the two orders apart: a
-			// REQUESTED binding that is ALSO outside the allowlist.
-			//
-			// It must be RPH-EXE-003 that refuses. If the authored §15.3 limb answered first it would MASK the
-			// ratified rule for exactly the population the ratified rule exists to catch — and RPH-EXE-003's kill
-			// tests would be measuring the allowlist, which is the defect class reintroduced by its own fix.
-			ok(requestBinding(), 'request binding');
-			activePlan(BINDING, []); // unauthorized AND unallowlisted
-
-			const r = dispatch('StartExecutionStep', { stepId: sid(1) });
-			expect(r.status).toBe('REJECTED');
-			expect(r.error?.message, 'the RATIFIED rule must answer first').toContain(STATUS_MARKER);
-			expect(r.error?.message).not.toContain(ALLOWLIST_MARKER);
-		});
-
-		it('a binding authorized for a DIFFERENT plan is not authorized for this one', () => {
-			ok(requestBinding(), 'request binding');
-			ok(authorizeBinding(), 'authorize');
-			activePlan(BINDING, ['bind_01ARZ3NDEKTSV4RRFFQ69HBOTH']);
-			const r = dispatch('StartExecutionStep', { stepId: sid(1) });
-			expect(r.status).toBe('REJECTED');
-			expect(r.error?.message).toContain(ALLOWLIST_MARKER);
-		});
-	});
-
 	// ── THE POSITIVE HALF ─────────────────────────────────────────────────────────────────────────────────────
 	describe('the widest legitimate input still starts', () => {
 		it('P1: AUTHORIZED and allowlisted — ACCEPTED', () => {
@@ -312,17 +276,147 @@ describe('JAN-EXEBIND WP-B1 — runtime binding authority at Start', () => {
 			expect(stepStateOf(1)).toBe('RUNNING');
 		});
 
-		it('P4: a plan with NO allowlist field at all still starts an authorized binding (the legacy residual)', () => {
-			// Plans activated BEFORE JAN-EXECREM WP-14 persisted the field carry no array. Skipping them is the
-			// "legacy stored plans are never re-validated" residual this lineage has disclosed throughout — and it is
-			// distinguishable from an EMPTY array, which REFUSES (K5): an activation that authorized no bindings
-			// authorized no bindings.
+		it('P4: a binding NOT in the activation allowlist starts — the withdrawn §15.3 limb', () => {
+			// The limb WP-B1 added refused this, and both shipped activation sites pass `[]`, so every step naming a
+			// binding was permanently unstartable and its plan could never complete. Withdrawn; this pins that it
+			// stays withdrawn, and it is the mutant that reddens if anyone restores it.
+			ok(requestBinding(), 'request binding');
+			ok(authorizeBinding(), 'authorize');
+			activePlan(BINDING, []); // the activation authorized NOTHING
+			ok(dispatch('StartExecutionStep', { stepId: sid(1) }), 'start');
+			expect(stepStateOf(1)).toBe('RUNNING');
+		});
+	});
+
+	// ── THE BLOCKER, AND THE CLASS BEHIND IT (JAN-REVREM RW-0) ────────────────────────────────────────────────
+	describe('the SECOND arrow into RUNNING', () => {
+		/** Start a step under an AUTHORIZED binding, park it in WAITING, then revoke the binding. */
+		function runningThenRevoked() {
 			ok(requestBinding(), 'request binding');
 			ok(authorizeBinding(), 'authorize');
 			activePlan(BINDING, [BINDING]);
-			const stored = store.loadObject(PLAN)!;
-			const state = stored.state as Record<string, unknown>;
-			expect(state.authorizedRuntimeBindingIds, 'WP-14 persists it').toEqual([BINDING]);
+			ok(dispatch('StartExecutionStep', { stepId: sid(1) }), 'start');
+			ok(dispatch('EnterExecutionStepWait', { stepId: sid(1) }), 'wait');
+			ok(
+				dispatch(
+					'RevokeRuntimeCapability',
+					{ reason: 'credential rotated mid-flight' },
+					BINDING,
+					'RUNTIME_BINDING'
+				),
+				'revoke'
+			);
+			expect(stepStateOf(1)).toBe('WAITING');
+		}
+
+		it('B1 THE BLOCKER: ResolveExecutionStepWait REFUSES a resume against a REVOKED binding', () => {
+			// This exact sequence was ACCEPTED before RW-0, leaving the step RUNNING against a REVOKED binding —
+			// which made revocation unenforceable for every step that can be parked in WAITING.
+			runningThenRevoked();
+			const r = dispatch('ResolveExecutionStepWait', { stepId: sid(1) });
+			expect(r.status).toBe('REJECTED');
+			expect(r.error?.code).toBe('RPH_INVARIANT_VIOLATION');
+			expect(r.error?.message).toContain(STATUS_MARKER);
+			expect(r.error?.message).toContain('REVOKED');
+			expect(stepStateOf(1), 'the step must stay parked').toBe('WAITING');
+		});
+
+		it('…and CANCEL still works on that step, so revocation never strands it', () => {
+			// The other half of the ruling: Cancel is NOT_EXECUTING by declaration, precisely so the step whose
+			// binding was revoked has an exit. Gating cancel on the binding would strand exactly the case
+			// revocation exists to stop.
+			runningThenRevoked();
+			ok(
+				dispatch('CancelExecutionStep', { stepId: sid(1), reason: 'binding revoked; abandoning' }),
+				'cancel'
+			);
+			expect(stepStateOf(1)).toBe('CANCELLED');
+		});
+
+		it('…and a RUNNING step whose binding is revoked can still FAIL', () => {
+			// Reporting trouble must never require a live authority. Arranged from RUNNING rather than WAITING
+			// because Fail drivesFrom RUNNING — which is itself worth naming: from WAITING under a revoked binding
+			// the ONLY exit is Cancel, and that is precisely why Cancel is the one command exempt from every
+			// authority limb in the table.
+			ok(requestBinding(), 'request binding');
+			ok(authorizeBinding(), 'authorize');
+			activePlan(BINDING, [BINDING]);
+			ok(dispatch('StartExecutionStep', { stepId: sid(1) }), 'start');
+			ok(
+				dispatch('RevokeRuntimeCapability', { reason: 'rotated' }, BINDING, 'RUNTIME_BINDING'),
+				'revoke'
+			);
+			ok(
+				dispatch('FailExecutionStep', { stepId: sid(1), failureReason: 'binding revoked' }),
+				'fail'
+			);
+			expect(stepStateOf(1)).toBe('FAILED');
+		});
+	});
+
+	describe('B3 — the CLASS: every command the table declares is enforced', () => {
+		it('every REQUIRES_AUTHORIZED_BINDING command refuses an unauthorized binding', () => {
+			// DERIVED FROM THE TABLE, so a tenth command declaring the column without enforcement fails HERE rather
+			// than in the next adversarial review. This is the difference between fixing the instance and fixing the
+			// class — and the instance is what WP-B1 fixed.
+			const gated = STEP_COMMAND_TYPES.filter(
+				(c) => STEP_COMMAND_SPECS[c].bindingAuthority === 'REQUIRES_AUTHORIZED_BINDING'
+			);
+			expect(gated.length, 'the table must actually declare some').toBeGreaterThan(1);
+
+			for (const commandType of gated) {
+				// Arrange the step in this command's own source state, with the binding REVOKED.
+				const spec = STEP_COMMAND_SPECS[commandType];
+				resetEngine();
+				ok(requestBinding(), 'request binding');
+				ok(authorizeBinding(), 'authorize');
+				activePlan(BINDING, [BINDING]);
+				if (spec.sourceStates.includes('WAITING')) {
+					ok(dispatch('StartExecutionStep', { stepId: sid(1) }), 'start');
+					ok(dispatch('EnterExecutionStepWait', { stepId: sid(1) }), 'wait');
+				}
+				ok(
+					dispatch('RevokeRuntimeCapability', { reason: 'r' }, BINDING, 'RUNTIME_BINDING'),
+					'revoke'
+				);
+
+				const r = dispatch(commandType, { stepId: sid(1) });
+				expect(r.status, `${commandType} must refuse an unauthorized binding`).toBe('REJECTED');
+				expect(r.error?.message, `${commandType}: not the binding limb`).toContain(STATUS_MARKER);
+			}
+		});
+
+		it('and every NOT_EXECUTING command is UNAFFECTED by binding status (the over-refusal half)', () => {
+			// A column that gated everything would pass the test above and strand every revoked step. Cancel and Fail
+			// are the two that matter most: they are the exits.
+			for (const commandType of ['CancelExecutionStep', 'FailExecutionStep'] as const) {
+				expect(STEP_COMMAND_SPECS[commandType].bindingAuthority).toBe('NOT_EXECUTING');
+				resetEngine();
+				ok(requestBinding(), 'request binding');
+				ok(authorizeBinding(), 'authorize');
+				activePlan(BINDING, [BINDING]);
+				ok(dispatch('StartExecutionStep', { stepId: sid(1) }), 'start');
+				ok(
+					dispatch('RevokeRuntimeCapability', { reason: 'r' }, BINDING, 'RUNTIME_BINDING'),
+					'revoke'
+				);
+				const payload =
+					commandType === 'FailExecutionStep'
+						? { stepId: sid(1), failureReason: 'x' }
+						: { stepId: sid(1), reason: 'x' };
+				ok(dispatch(commandType, payload), `${commandType} under a revoked binding`);
+			}
+		});
+
+		it('the two gated commands are exactly the two arrows into RUNNING', () => {
+			// Stated LITERALLY rather than derived, per the WP-12b ruling: a matrix generated from the table proves
+			// totality only — mutating a row moves the generated expectation along with the behaviour. The
+			// CLASSIFICATION is asserted by a case that does not read the table for its expectation.
+			const gated = STEP_COMMAND_TYPES.filter(
+				(c) => STEP_COMMAND_SPECS[c].bindingAuthority === 'REQUIRES_AUTHORIZED_BINDING'
+			);
+			expect([...gated].sort()).toEqual(['ResolveExecutionStepWait', 'StartExecutionStep']);
+			for (const c of gated) expect(STEP_COMMAND_SPECS[c].target, c).toBe('RUNNING');
 		});
 	});
 });

@@ -88,6 +88,28 @@ export interface StepCommandSpec {
 	/** Why `branchDecision` is what it is — the same discipline as `activePlanRationale`: a silence must be a
 	 *  DECLARATION with a reason, or it is indistinguishable from the omission that produced this family. */
 	readonly branchDecisionRationale: string;
+	/**
+	 * Does this command require the step's RUNTIME BINDING to be authorized (RPH-EXE-003 / §8.1)?
+	 *
+	 * THIS COLUMN EXISTS BECAUSE ITS ABSENCE SHIPPED A BLOCKER. JAN-EXEBIND wired RPH-EXE-003 as a hand-inlined
+	 * precheck inside `startExecutionStep` — one call site — and **two arrows drive a step into RUNNING**.
+	 * `resolveExecutionStepWait` passes no precheck at all, so a step could be started under an AUTHORIZED
+	 * binding, parked in WAITING, have the binding REVOKED, and then RESUME: proved live through
+	 * `Engine.dispatch`, with the engine's own refusal message asserting that state is impossible. Revocation was
+	 * unenforceable for any waitable step.
+	 *
+	 * That is precisely the shape this table was built to end. WP-8's header: "an omission is invisible in a list
+	 * that does not exist." WP-12b moved `planLiveness` and `pwuOpenness` into it as COLUMNS so no command could
+	 * omit an authority — and the next authority was added at a call site anyway. A guard that must be remembered
+	 * per site will be forgotten at one of them.
+	 *
+	 * So the axis is declared once and evaluated once: **does this command drive the step INTO RUNNING** — the
+	 * state in which attempts actually execute against the binding? Two commands do. The other seven declare
+	 * `NOT_EXECUTING` with a stated reason, so a silence is a declaration rather than an absence.
+	 */
+	readonly bindingAuthority: BindingAuthority;
+	/** Why `bindingAuthority` is what it is. */
+	readonly bindingAuthorityRationale: string;
 }
 
 /** REQUIRES_ACTIVE_PLAN: mints terminal-success or a durable decision. CLEANUP_EXEMPT: terminates or suspends
@@ -97,6 +119,10 @@ export type PlanLiveness = 'REQUIRES_ACTIVE_PLAN' | 'CLEANUP_EXEMPT';
 /** REQUIRES_OPEN_PWU: grants runtime privilege, mints execution credit, or opens an attempt. CLEANUP_EXEMPT: as above. */
 export type PwuOpenness = 'REQUIRES_OPEN_PWU' | 'CLEANUP_EXEMPT';
 
+/** REQUIRES_AUTHORIZED_BINDING: drives the step INTO RUNNING, the state in which attempts execute against the
+ *  binding. NOT_EXECUTING: does not open or re-open runtime execution, so the binding's status cannot bear on it. */
+export type BindingAuthority = 'REQUIRES_AUTHORIZED_BINDING' | 'NOT_EXECUTING';
+
 /**
  * RECORD_AT_SETTLEMENT   — this command drives a step to TERMINAL_SUCCESS, so if that step is a BRANCH it must take
  *                          and record its decision at that instant, under Rule B1's settlement view.
@@ -104,9 +130,7 @@ export type PwuOpenness = 'REQUIRES_OPEN_PWU' | 'CLEANUP_EXEMPT';
  * NOT_TERMINAL_SUCCESS   — its target is not terminal-success, so no decision arises. Checked against the target.
  */
 export type BranchDecisionPolicy =
-	| 'RECORD_AT_SETTLEMENT'
-	| 'NONE_STRUCTURALLY_DEAD'
-	| 'NOT_TERMINAL_SUCCESS';
+	'RECORD_AT_SETTLEMENT' | 'NONE_STRUCTURALLY_DEAD' | 'NOT_TERMINAL_SUCCESS';
 
 const spec = (s: StepCommandSpec): StepCommandSpec => s;
 
@@ -131,7 +155,10 @@ export const STEP_COMMAND_SPECS: Readonly<Record<StepCommandType, StepCommandSpe
 		pwuOpennessRationale:
 			'a closed PWU (BASELINED / ABANDONED / SUPERSEDED) accepts no new attempt in place — RPH-PWU-010 requires a successor revision or successor PWU.',
 		branchDecision: 'NOT_TERMINAL_SUCCESS',
-		branchDecisionRationale: 'RUNNING is not terminal-success.'
+		branchDecisionRationale: 'RUNNING is not terminal-success.',
+		bindingAuthority: 'REQUIRES_AUTHORIZED_BINDING',
+		bindingAuthorityRationale:
+			'the FIRST of the two arrows into RUNNING. Starting opens an attempt, and an attempt executes against the binding — RPH-EXE-003 names this case verbatim.'
 	}),
 	CompleteExecutionStep: spec({
 		commandType: 'CompleteExecutionStep',
@@ -146,7 +173,10 @@ export const STEP_COMMAND_SPECS: Readonly<Record<StepCommandType, StepCommandSpe
 			'completion is the fact a PWU execution-success claim rests on; a closed PWU may not accrue more of it.',
 		branchDecision: 'RECORD_AT_SETTLEMENT',
 		branchDecisionRationale:
-			'the primary settling command: a BRANCH decides at the moment it succeeds, against a settlement view that INCLUDES its own result (Rule B1).'
+			'the primary settling command: a BRANCH decides at the moment it succeeds, against a settlement view that INCLUDES its own result (Rule B1).',
+		bindingAuthority: 'NOT_EXECUTING',
+		bindingAuthorityRationale:
+			'completion CLOSES an attempt. Refusing it on a revoked binding would strand a step that has already done the work, with no way to record what it produced.'
 	}),
 	FailExecutionStep: spec({
 		commandType: 'FailExecutionStep',
@@ -160,7 +190,11 @@ export const STEP_COMMAND_SPECS: Readonly<Record<StepCommandType, StepCommandSpe
 		pwuOpennessRationale:
 			'recording that work failed must never require the PWU to be open, or a closed PWU strands running steps.',
 		branchDecision: 'NOT_TERMINAL_SUCCESS',
-		branchDecisionRationale: 'FAILED is terminal, but not success; the flow does not advance, so no arm is taken.'
+		branchDecisionRationale:
+			'FAILED is terminal, but not success; the flow does not advance, so no arm is taken.',
+		bindingAuthority: 'NOT_EXECUTING',
+		bindingAuthorityRationale:
+			'recording failure must never require a live authority — the same argument as its planLiveness and pwuOpenness exemptions. A revoked binding makes failure MORE likely to be the truth, not less reportable.'
 	}),
 	RetryExecutionStep: spec({
 		commandType: 'RetryExecutionStep',
@@ -171,9 +205,13 @@ export const STEP_COMMAND_SPECS: Readonly<Record<StepCommandType, StepCommandSpe
 		activePlanRationale:
 			'a retry RE-OPENS the attempt cycle, so it is new work even though the step already exists (RPH-EXE-002).',
 		pwuOpenness: 'REQUIRES_OPEN_PWU',
-		pwuOpennessRationale: 'a retry opens a fresh attempt, which is exactly what RPH-PWU-010 forbids in place.',
+		pwuOpennessRationale:
+			'a retry opens a fresh attempt, which is exactly what RPH-PWU-010 forbids in place.',
 		branchDecision: 'NOT_TERMINAL_SUCCESS',
-		branchDecisionRationale: 'QUEUED re-opens the step; nothing settles.'
+		branchDecisionRationale: 'QUEUED re-opens the step; nothing settles.',
+		bindingAuthority: 'NOT_EXECUTING',
+		bindingAuthorityRationale:
+			'retry drives FAILED -> QUEUED, which opens no attempt: the attempt opens at the NEXT Start, which IS gated. Gating here too would double-guard one act and refuse earlier with a less useful message.'
 	}),
 	SkipExecutionStep: spec({
 		commandType: 'SkipExecutionStep',
@@ -184,10 +222,14 @@ export const STEP_COMMAND_SPECS: Readonly<Record<StepCommandType, StepCommandSpe
 		activePlanRationale:
 			'a skip MINTS TERMINAL-SUCCESS under a waiver while opening no work at all — which is precisely why the axis is CREDIT rather than work. Its pre-existing gate is the evidence that the codebase already believed the credit axis.',
 		pwuOpenness: 'REQUIRES_OPEN_PWU',
-		pwuOpennessRationale: 'SKIPPED is terminal-success, so a skip advances a plan on a PWU that must not advance.',
+		pwuOpennessRationale:
+			'SKIPPED is terminal-success, so a skip advances a plan on a PWU that must not advance.',
 		branchDecision: 'RECORD_AT_SETTLEMENT',
 		branchDecisionRationale:
-			'SKIPPED is terminal-SUCCESS precisely so the flow ADVANCES past the step, so an arm must be taken and somebody must choose it. Recording nothing here is what let a later guard flip re-resolve a settled branch and run BOTH arms (F-15/21/23). Not fabrication: the same act as at Complete, truthfully evaluated against a step that produced no result.'
+			'SKIPPED is terminal-SUCCESS precisely so the flow ADVANCES past the step, so an arm must be taken and somebody must choose it. Recording nothing here is what let a later guard flip re-resolve a settled branch and run BOTH arms (F-15/21/23). Not fabrication: the same act as at Complete, truthfully evaluated against a step that produced no result.',
+		bindingAuthority: 'NOT_EXECUTING',
+		bindingAuthorityRationale:
+			'a skip runs nothing; it retires the step under an authorization. No binding is exercised.'
 	}),
 	CancelExecutionStep: spec({
 		commandType: 'CancelExecutionStep',
@@ -201,7 +243,11 @@ export const STEP_COMMAND_SPECS: Readonly<Record<StepCommandType, StepCommandSpe
 		pwuOpennessRationale:
 			'the exit of last resort, and the one every other refusal message points at; closing a PWU must never strand its live steps.',
 		branchDecision: 'NOT_TERMINAL_SUCCESS',
-		branchDecisionRationale: 'CANCELLED is terminal-non-success; the downstream is not released, so no arm is taken.'
+		branchDecisionRationale:
+			'CANCELLED is terminal-non-success; the downstream is not released, so no arm is taken.',
+		bindingAuthority: 'NOT_EXECUTING',
+		bindingAuthorityRationale:
+			'cancel is the exit of last resort and is exempt from every authority limb. Gating it on the binding would strand exactly the step whose binding was revoked — the case revocation exists to stop.'
 	}),
 	PruneExecutionStep: spec({
 		commandType: 'PruneExecutionStep',
@@ -212,10 +258,13 @@ export const STEP_COMMAND_SPECS: Readonly<Record<StepCommandType, StepCommandSpe
 		activePlanRationale:
 			'a prune MINTS TERMINAL-SUCCESS under branch logic, and is within-execution branch resolution, which only an ACTIVE plan performs. NOT_READY is in the source set so a not-taken arm that never became ready is still clearable (D5 anti-deadlock).',
 		pwuOpenness: 'REQUIRES_OPEN_PWU',
-		pwuOpennessRationale: 'pruning drives SKIPPED (terminal-success) and resolves a branch — both execution acts.',
+		pwuOpennessRationale:
+			'pruning drives SKIPPED (terminal-success) and resolves a branch — both execution acts.',
 		branchDecision: 'NONE_STRUCTURALLY_DEAD',
 		branchDecisionRationale:
-			'a prune only ever reaches a step the branch logic ALREADY excluded, so there is no decision left to take. SAFE STRUCTURALLY, not by convention: the disposition ladder tests source liveness before it reaches any branch rung, and the reachability BFS never expands a non-live node. Both are pinned by test rather than assumed.'
+			'a prune only ever reaches a step the branch logic ALREADY excluded, so there is no decision left to take. SAFE STRUCTURALLY, not by convention: the disposition ladder tests source liveness before it reaches any branch rung, and the reachability BFS never expands a non-live node. Both are pinned by test rather than assumed.',
+		bindingAuthority: 'NOT_EXECUTING',
+		bindingAuthorityRationale: 'prune clears a structurally dead arm; it executes nothing.'
 	}),
 	EnterExecutionStepWait: spec({
 		commandType: 'EnterExecutionStepWait',
@@ -229,7 +278,10 @@ export const STEP_COMMAND_SPECS: Readonly<Record<StepCommandType, StepCommandSpe
 		pwuOpennessRationale:
 			'a running step must be able to record honestly that it is blocked, whatever the PWU is doing; the alternative strips it of that.',
 		branchDecision: 'NOT_TERMINAL_SUCCESS',
-		branchDecisionRationale: 'WAITING suspends; nothing settles.'
+		branchDecisionRationale: 'WAITING suspends; nothing settles.',
+		bindingAuthority: 'NOT_EXECUTING',
+		bindingAuthorityRationale:
+			'waiting SUSPENDS execution. A running step must be able to record that it is blocked whatever the binding is doing — and parking a step whose binding was just revoked is the CORRECT response, not one to refuse.'
 	}),
 	ResolveExecutionStepWait: spec({
 		commandType: 'ResolveExecutionStepWait',
@@ -242,7 +294,10 @@ export const STEP_COMMAND_SPECS: Readonly<Record<StepCommandType, StepCommandSpe
 		pwuOpenness: 'REQUIRES_OPEN_PWU',
 		pwuOpennessRationale: 'a resume re-opens RUNNING, the state in which attempts execute.',
 		branchDecision: 'NOT_TERMINAL_SUCCESS',
-		branchDecisionRationale: 'RUNNING resumes; nothing settles.'
+		branchDecisionRationale: 'RUNNING resumes; nothing settles.',
+		bindingAuthority: 'REQUIRES_AUTHORIZED_BINDING',
+		bindingAuthorityRationale:
+			'THE SECOND ARROW INTO RUNNING, and the one whose omission was a BLOCKER. A resume re-enters RUNNING, so it re-opens execution against the binding exactly as Start does — this handler’s own docblock already said "resuming re-opens RUNNING, the state in which attempts execute". Anything else makes REVOCATION UNENFORCEABLE for every step that can be parked in WAITING.'
 	})
 };
 

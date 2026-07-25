@@ -583,6 +583,7 @@ function stepAuthorityRefusal(
 	command: DomainCommand,
 	spec: StepCommandSpec,
 	plan: Record<string, unknown>,
+	step: Record<string, unknown>,
 	stepId: string,
 	planId: string
 ): ReturnType<typeof reject> | null {
@@ -595,6 +596,22 @@ function stepAuthorityRefusal(
 		);
 	if (spec.pwuOpenness === 'REQUIRES_OPEN_PWU') {
 		const refusal = pwuOpennessRefusal(ctx, command, String(plan.workUnitId), stepId);
+		if (refusal) return refusal;
+	}
+	// THE THIRD LIMB, AND THE REASON IT IS HERE RATHER THAN AT A CALL SITE (JAN-REVREM RW-0).
+	//
+	// JAN-EXEBIND wired RPH-EXE-003 as a hand-inlined precheck inside `startExecutionStep` — and TWO arrows drive a
+	// step into RUNNING. `resolveExecutionStepWait` passed no precheck at all, so a step could start under an
+	// AUTHORIZED binding, park in WAITING, have the binding REVOKED, and RESUME. Proved live through
+	// `Engine.dispatch`. Revocation was unenforceable for every waitable step, while the refusal message a metre up
+	// this file asserted that state was impossible.
+	//
+	// That is the exact shape this table exists to end (WP-8: "an omission is invisible in a list that does not
+	// exist"), reintroduced one work package after WP-12b moved the other two authorities into it. A guard that must
+	// be remembered per call site will be forgotten at one of them — so the axis is DECLARED per command and
+	// evaluated ONCE, here, for all nine.
+	if (spec.bindingAuthority === 'REQUIRES_AUTHORIZED_BINDING') {
+		const refusal = bindingAuthorityRefusal(ctx, command, step, stepId);
 		if (refusal) return refusal;
 	}
 	return null;
@@ -705,7 +722,15 @@ function advanceStep(
 	//
 	// F-28: RPH-PWU-010 was ratified and enforced NOWHERE — `canResumeExecutionOnPwu` had no production caller at
 	// all, while the conformance manifest certified the rule COVERED on the strength of a pure-predicate unit test.
-	const authorityFailure = stepAuthorityRefusal(ctx, command, args.spec, plan, args.stepId, planId);
+	const authorityFailure = stepAuthorityRefusal(
+		ctx,
+		command,
+		args.spec,
+		plan,
+		step,
+		args.stepId,
+		planId
+	);
 	if (authorityFailure) return authorityFailure;
 	const precheckFailure = args.precheck?.(step, plan);
 	if (precheckFailure) return precheckFailure;
@@ -846,7 +871,6 @@ function advanceStep(
 function bindingAuthorityRefusal(
 	ctx: HandlerContext,
 	command: DomainCommand,
-	plan: Record<string, unknown>,
 	step: Record<string, unknown>,
 	stepId: string
 ): ReturnType<typeof reject> | null {
@@ -874,22 +898,25 @@ function bindingAuthorityRefusal(
 			[stepId, bindingId]
 		);
 
-	// The AUTHORED limb. `authorizedRuntimeBindingIds` is the ratified §15.3 allowlist that JAN-EXECREM WP-14
-	// persisted onto the plan precisely so a rule could read it back — and until now nothing did, which leaves a
-	// written-but-never-read field one refactor away from being deleted as unused.
+	// ── THE §15.3 ALLOWLIST LIMB IS WITHDRAWN (JAN-REVREM RW-0) ─────────────────────────────────────────────────
 	//
-	// ABSENT (not merely empty) means a plan activated BEFORE WP-14 persisted the field. Those are skipped, and that
-	// is the "legacy stored plans are never re-validated" residual this lineage has disclosed throughout — NOT a
-	// silent default: WP-14's `mutate` writes `?? []`, so every plan activated since carries the array, and an EMPTY
-	// array refuses, because an activation that authorized no bindings authorized no bindings.
-	const allowlist = plan.authorizedRuntimeBindingIds;
-	if (Array.isArray(allowlist) && !allowlist.includes(bindingId))
-		return reject(
-			command,
-			'RPH_INVARIANT_VIOLATION',
-			`${command.commandType} blocked: runtime binding ${bindingId} is authorized, but it is not among the bindings THIS ACTIVATION authorized for plan ${String(command.targetAggregateId)} (§15.3 authorizedRuntimeBindingIds: ${allowlist.length === 0 ? 'none' : allowlist.join(', ')}). Re-activate the plan naming this binding, or start a step whose binding it authorized.`,
-			[stepId, bindingId]
-		);
+	// JAN-EXEBIND added a second limb here: refuse a binding absent from `plan.authorizedRuntimeBindingIds`. The
+	// post-build review proved it an UNRECOVERABLE WEDGE whose refusal message prescribed a remedy the engine
+	// categorically forbids — "re-activate the plan naming this binding", while `activateExecutionPlan` requires
+	// APPROVED and the plan is ACTIVE. And both shipped activation sites pass `authorizedRuntimeBindingIds: []`
+	// (`rph-engine/src/reference-undertaking.ts`, the demo's `+page.server.ts`), so ANY step naming a binding became
+	// permanently unstartable and its plan could never complete.
+	//
+	// IT IS WITHDRAWN RATHER THAN REPAIRED, because the analysis that should have preceded it has only two outcomes:
+	// if activation DERIVES the list from the plan's own steps the check always passes (vacuous), and if a human
+	// supplies it production supplies `[]` (wedging). There is no UI, API or command by which a sponsor could supply
+	// a meaningful list, so there is no third state. §15.3 ratifies the FIELD, not a refusal, so withdrawing this
+	// removes no ratified rule.
+	//
+	// `authorizedRuntimeBindingIds` therefore returns to what WP-14 left it: persisted, and read by nothing. That is
+	// a real problem and it is recorded as OPEN rather than as closed — a refusal that bricks the engine is a worse
+	// problem than a field nobody reads, and shipping the worse one to avoid admitting the first is exactly how this
+	// defect family propagates.
 	return null;
 }
 
@@ -935,12 +962,6 @@ export const startExecutionStep: CommandHandler = (ctx, command) => {
 			stepState: 'RUNNING'
 		}),
 		precheck: (step, plan) => {
-			// RPH-EXE-003 / §15.3 (JAN-EXEBIND WP-B1) — sited FIRST among Start's prechecks, and deliberately: a step
-			// whose runtime authority is not established should be refused on THAT ground, not on a sequencing one.
-			// The alternative order would report "a predecessor is QUEUED" for a step that is also unauthorized, and
-			// an operator would fix the wrong thing.
-			const unauthorized = bindingAuthorityRefusal(ctx, command, plan, step, p.stepId);
-			if (unauthorized) return unauthorized;
 			// The linear/graph start-gate — the SAME rph-domain predicate the read-model (execution-view.ts
 			// startableStepIds) uses, so the UI Start affordance and this engine authority cannot diverge (DR-004
 			// §19-M2). Empty transitions[] ⇒ byte-identical linear (every earlier array-index step terminal-success);
