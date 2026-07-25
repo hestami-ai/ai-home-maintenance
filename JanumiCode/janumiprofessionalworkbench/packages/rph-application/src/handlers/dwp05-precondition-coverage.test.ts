@@ -17,6 +17,7 @@ import type { ActorReference, DomainCommand } from '@janumipwb/rph-contracts';
 import { SqliteStorageAdapter } from '@janumipwb/rph-persistence';
 import { beforeEach, describe, expect, it } from 'vitest';
 import { Engine } from '../index.js';
+import { seedStepStates } from './__tests__/plan-fixtures.js';
 
 const TS = '2026-07-24T00:00:00Z';
 const HUMAN: ActorReference = { actorId: 'u1', actorType: 'HUMAN', displayName: 'User' };
@@ -97,11 +98,12 @@ describe('DWP-05 execution plan-level — per-site precondition on ExecutionPlan
 	/** ProposeExecutionPlan creates the plan already in UNDER_REVIEW (the PROPOSED->UNDER_REVIEW trigger fires at
 	 *  creation — so PROPOSED is never a runtime-reachable state for a live plan). */
 	function proposePlan(planId: string, pwuId: string, stepStates: string[]) {
+		// WP-0/SM-7: propose all-QUEUED (the at-rest convention WP-6 enforces), then patch the arrangement in.
 		expect(
 			h.d('ProposeExecutionPlan', planId, 'EXECUTION_PLAN', {
 				executionPlanId: planId,
 				workUnitId: pwuId,
-				steps: stepStates.map((s, i) => step(planId, i, s)),
+				steps: stepStates.map((_s, i) => step(planId, i, 'QUEUED')),
 				transitions: [],
 				retryPolicy: {},
 				tacticalChangePolicy: {},
@@ -109,6 +111,7 @@ describe('DWP-05 execution plan-level — per-site precondition on ExecutionPlan
 				terminationPolicy: {}
 			}).status
 		).toBe('ACCEPTED');
+		if (stepStates.some((s) => s !== 'QUEUED')) seedStepStates(h.store, planId, stepStates);
 		expect(h.statusOf(planId)).toBe('UNDER_REVIEW');
 	}
 	const approve = (planId: string) => h.d('ApproveExecutionPlan', planId, 'EXECUTION_PLAN', {});

@@ -6,6 +6,7 @@ import type { DomainCommand } from '@janumipwb/rph-contracts';
 import { SqliteStorageAdapter } from '@janumipwb/rph-persistence';
 import { beforeEach, describe, expect, it } from 'vitest';
 import { Engine } from '../index.js';
+import { seedStepStates } from './__tests__/plan-fixtures.js';
 
 const TS = '2026-07-12T00:00:00Z';
 const actor = { actorId: 'u1', actorType: 'HUMAN' as const, displayName: 'A' };
@@ -124,9 +125,11 @@ describe('SupersedeExecutionPlan + RPH-EXE-002 (DWP-02)', () => {
 		proposePwu(PWU);
 		proposePwu(PWU2);
 		// PLAN_A: ACTIVE on PWU, with a QUEUED and a FAILED step (to probe start + retry after supersession).
-		proposePlan(PLAN_A, PWU, [mkStep(PLAN_A, S_QUEUED, 'QUEUED'), mkStep(PLAN_A, S_FAILED, 'FAILED')]);
+		// WP-0/SM-7: both steps are PROPOSED at-rest QUEUED and the FAILED arrangement is patched in afterwards.
+		proposePlan(PLAN_A, PWU, [mkStep(PLAN_A, S_QUEUED, 'QUEUED'), mkStep(PLAN_A, S_FAILED, 'QUEUED')]);
 		dispatch('ApproveExecutionPlan', {}, PLAN_A, 'EXECUTION_PLAN');
 		dispatch('ActivateExecutionPlan', { authorizedRuntimeBindingIds: [] }, PLAN_A, 'EXECUTION_PLAN');
+		seedStepStates(store, PLAN_A, ['QUEUED', 'FAILED']);
 		// PLAN_B: a valid same-PWU successor (need only exist). PLAN_C: a foreign successor on PWU2.
 		proposePlan(PLAN_B, PWU, [mkStep(PLAN_B, `${PLAN_B}-s`, 'QUEUED')]);
 		proposePlan(PLAN_C, PWU2, [mkStep(PLAN_C, `${PLAN_C}-s`, 'QUEUED')]);

@@ -8,6 +8,7 @@ import type { DomainCommand } from '@janumipwb/rph-contracts';
 import { SqliteStorageAdapter } from '@janumipwb/rph-persistence';
 import { beforeEach, describe, expect, it } from 'vitest';
 import { Engine } from '../index.js';
+import { seedEmptyStepArray_LEGACY_ONLY, seedStepStates } from './__tests__/plan-fixtures.js';
 
 const TS = '2026-07-12T00:00:00Z';
 const actor = { actorId: 'u1', actorType: 'HUMAN' as const, displayName: 'A' };
@@ -52,14 +53,20 @@ describe('CompleteExecutionPlan / FailExecutionPlan — plan-terminal lifecycle 
 		stepState
 	});
 
-	/** Propose a plan with steps at the given states + approve it (UNDER_REVIEW→APPROVED). */
+	/** Propose a plan with steps at the given states + approve it (UNDER_REVIEW→APPROVED).
+	 *
+	 *  WP-0/SM-7: the proposal is always all-QUEUED (the at-rest convention WP-6 will enforce); the arrangement is
+	 *  patched in afterwards by the fixture seam. The empty-step case proposes one step and then empties the array,
+	 *  because a step-less PROPOSAL is exactly what WP-6 refuses — while a step-less STORED plan remains a real
+	 *  population this suite must still cover. Call sites are unchanged. */
 	function approvedPlan(stepStates: string[]) {
+		const authoredCount = stepStates.length === 0 ? 1 : stepStates.length;
 		const r = dispatch(
 			'ProposeExecutionPlan',
 			{
 				executionPlanId: PLAN,
 				workUnitId: PWU,
-				steps: stepStates.map((s, i) => step(i, s)),
+				steps: Array.from({ length: authoredCount }, (_v, i) => step(i, 'QUEUED')),
 				transitions: [],
 				retryPolicy: {},
 				tacticalChangePolicy: {},
@@ -71,6 +78,8 @@ describe('CompleteExecutionPlan / FailExecutionPlan — plan-terminal lifecycle 
 		);
 		expect(r.status, JSON.stringify(r.error)).toBe('ACCEPTED');
 		expect(dispatch('ApproveExecutionPlan', {}, PLAN, 'EXECUTION_PLAN').status).toBe('ACCEPTED');
+		if (stepStates.length === 0) seedEmptyStepArray_LEGACY_ONLY(store, PLAN);
+		else if (stepStates.some((s) => s !== 'QUEUED')) seedStepStates(store, PLAN, stepStates);
 	}
 
 	/** Propose + approve + activate a plan with steps at the given states. */

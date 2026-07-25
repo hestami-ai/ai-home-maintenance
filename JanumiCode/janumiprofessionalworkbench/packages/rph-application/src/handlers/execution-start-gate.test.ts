@@ -8,6 +8,7 @@ import type { DomainCommand } from '@janumipwb/rph-contracts';
 import { SqliteStorageAdapter } from '@janumipwb/rph-persistence';
 import { beforeEach, describe, expect, it } from 'vitest';
 import { Engine } from '../index.js';
+import { seedStepStates } from './__tests__/plan-fixtures.js';
 
 const TS = '2026-07-12T00:00:00Z';
 const actor = { actorId: 'u1', actorType: 'HUMAN' as const, displayName: 'A' };
@@ -58,15 +59,18 @@ describe('StartExecutionStep — the linear start-gate (DWP-01, RPH-EXE-005 / fo
 		stepState
 	});
 
-	/** Propose + approve + activate a plan whose steps sit at the given states (seeded directly — the gate is
-	 *  exercised against every arrangement without needing to drive each predecessor there by command). */
+	/** Propose + approve + activate a plan whose steps sit at the given states.
+	 *
+	 *  The states are arranged by the WP-0 fixture seam AFTER activation, never authored into the proposal: a plan
+	 *  is proposed all-QUEUED (the at-rest convention DS-004 declares and WP-6 will enforce) and then patched. The
+	 *  call sites below are unchanged — this helper is the seam adapter. */
 	function activePlan(stepStates: string[]) {
 		const r = dispatch(
 			'ProposeExecutionPlan',
 			{
 				executionPlanId: PLAN,
 				workUnitId: PWU,
-				steps: stepStates.map((s, i) => step(i + 1, s)),
+				steps: stepStates.map((_s, i) => step(i + 1, 'QUEUED')),
 				transitions: [],
 				retryPolicy: {},
 				tacticalChangePolicy: {},
@@ -82,6 +86,7 @@ describe('StartExecutionStep — the linear start-gate (DWP-01, RPH-EXE-005 / fo
 			dispatch('ActivateExecutionPlan', { authorizedRuntimeBindingIds: [] }, PLAN, 'EXECUTION_PLAN')
 				.status
 		).toBe('ACCEPTED');
+		if (stepStates.some((s) => s !== 'QUEUED')) seedStepStates(store, PLAN, stepStates);
 	}
 
 	const start = (i: number) => dispatch('StartExecutionStep', { stepId: stepId(i) }, PLAN, 'EXECUTION_PLAN');
