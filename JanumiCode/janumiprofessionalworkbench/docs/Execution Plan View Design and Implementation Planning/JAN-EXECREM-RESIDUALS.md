@@ -15,6 +15,45 @@ adversarial review of Tier 3C-ii (40 CONFIRMED including 7 BLOCKERs, 6 PLAUSIBLE
 
 ---
 
+## 0. THE UNMET EXIT CRITERION — this programme has had no post-build adversarial review
+
+**Owed, not done.** `JAN-EXECREM-DS-001 §4` rules that fixing defects without fixing *how they got in* schedules
+the next recurrence. The reason the 46 findings below existed is that `JAN-EXECPLAN-DR-004 §18`'s mandated
+post-build adversarial verification was **never executed** at the time of building. **JAN-EXECREM has not had one
+either.** Recorded here — first, before anything else — because a register of what is owed that omits the largest
+owed item repeats the exact omission it exists to prevent.
+
+**This is NOT one of the residuals in §4, and it is not one of the findings in §5, and the distinction matters.**
+A residual is a hazard that was seen, argued, and deliberately left standing; a finding is a defect that was
+found. Both are *known*. The missing review is the unknown-unknowns problem, and by construction nothing in this
+document bounds it: the same author wrote the code, chose the tests, picked the mutants, and wrote this register.
+Anything not seen is absent from all four. §8's machine-checked list is real and is **not** a substitute — it
+proves the properties someone thought to state.
+
+**What the gates DO establish, precisely.** WP-16's registries make three specific defect shapes fail the build
+rather than wait for a review: a ratified rule with no enforcement site, an enforcement site with no kill test,
+and a guard whose declared inputs cannot disagree. On their first run they found three more ratified rules
+enforced nowhere (§5) — which is evidence the mechanism works, and evidence that it finds things a human pass had
+already missed twice. Neither is evidence that nothing else is wrong.
+
+**Scoping note for whoever runs it.** The surface has changed materially since 2026-07-24 and the review should be
+scoped to what this programme actually wrote, not re-run against the old one. Highest-value lenses, in the order I
+would rank them by where I am least able to check my own work:
+
+1. **The registers themselves** (`step-command-spec.ts`, `enforcement-register.ts`, `ATTEMPT_EFFECTS`, the arrow
+   census) — a declaration is only as good as its rationale, and I wrote both the rationale and the test that
+   reads it. §9's honest limit is the stated attack surface: consistent edits across production + register +
+   probe map pass.
+2. **The five argued divergences in §3** — each is a place I did not do what the design said. They are the items
+   with the least independent scrutiny in the whole programme.
+3. **The two authored rule extensions in §2** — shipped behaviour wider than its ratified text.
+4. **The seams** (`plan-fixtures.ts`, `pwu-fixtures.ts`) — a fixture that can arrange an impossible aggregate lets
+   a suite rehearse against a state the engine cannot produce, which is how `floor-fixtures.ts`'s own defect arose.
+5. **The mutation ledgers** — ~60 declared mutants across the programme, all reported RED. A mutant that does not
+   reach the code proves nothing, and a mutant chosen by the person defending the guard is not adversarial.
+
+---
+
 ## 1. Authored contract additions (`UNRATIFIED-AUTHORED`)
 
 Each is a shape the corpus does not ratify, landed because a ratified RULE was unenforceable without it. All are
@@ -161,3 +200,6 @@ as the one it replaces:
 *JAN-EXECREM WP-0 … WP-17 delivered. Series gate `G-EXECREM-001` green: check-types · vitest · lint 0 ·
 boundary 0 · svelte-check 0 · Playwright · `rph-engine` 69 (reference seed unchanged) · the registry-totality
 gates · every new or repaired guard live mutation-red-proofed.*
+
+***One exit criterion is UNMET: the post-build adversarial verification of this programme itself (§0). Delivered
+is not the same as verified, and the difference is exactly what produced the 46 findings this programme fixed.***
