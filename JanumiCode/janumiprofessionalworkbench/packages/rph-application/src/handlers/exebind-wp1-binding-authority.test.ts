@@ -48,6 +48,8 @@ const sid = (i: number) => `${PLAN}-s${i}`;
 /** The marker only the RPH-EXE-003 status limb produces. */
 const STATUS_MARKER =
 	'a step may only execute against an AUTHORIZED or PARTIALLY_AUTHORIZED binding';
+/** The marker only the SCOPE limb produces (JAN-REVREM RW-3). */
+const SCOPE_MARKER = 'a binding authorizes the step it names and no other';
 
 describe('JAN-EXEBIND WP-B1 — runtime binding authority at Start', () => {
 	let store: SqliteStorageAdapter;
@@ -283,6 +285,91 @@ describe('JAN-EXEBIND WP-B1 — runtime binding authority at Start', () => {
 			ok(requestBinding(), 'request binding');
 			ok(authorizeBinding(), 'authorize');
 			activePlan(BINDING, []); // the activation authorized NOTHING
+			ok(dispatch('StartExecutionStep', { stepId: sid(1) }), 'start');
+			expect(stepStateOf(1)).toBe('RUNNING');
+		});
+	});
+
+	// ── SCOPE: WHICH step did this binding authorize? (JAN-REVREM RW-3, review finding #2) ────────────────────
+	describe('limb 2 — the binding must be the one authorized FOR THIS STEP', () => {
+		/** A two-step plan where the binding names step 1. */
+		function planWithBindingForStep1() {
+			ok(
+				dispatch('ProposeExecutionPlan', {
+					executionPlanId: PLAN,
+					workUnitId: PWU,
+					steps: [mkStep(1, BINDING), mkStep(2, BINDING)],
+					transitions: [],
+					retryPolicy: { maxAttempts: 5 },
+					tacticalChangePolicy: {},
+					escalationPolicy: {},
+					terminationPolicy: {}
+				}),
+				'propose'
+			);
+			ok(dispatch('ApproveExecutionPlan', {}), 'approve');
+			ok(dispatch('ActivateExecutionPlan', { authorizedRuntimeBindingIds: [] }), 'activate');
+		}
+
+		it('S1 THE KILL TEST: a binding authorized for step 1 does NOT back step 2', () => {
+			// Every status check passes — the binding is genuinely AUTHORIZED — and the authority being exercised was
+			// granted for DIFFERENT work, with whatever capabilities that step's risk justified. A privilege-SCOPE
+			// hole, not a privilege-STATUS one, and the same shape as an unscoped waiver.
+			ok(requestBinding(), 'request binding'); // names sid(1)
+			ok(authorizeBinding(), 'authorize');
+			planWithBindingForStep1();
+			ok(dispatch('StartExecutionStep', { stepId: sid(1) }), 'step 1 is in scope');
+			ok(
+				dispatch('CompleteExecutionStep', {
+					executionStepId: sid(1),
+					executionAttemptId: `${sid(1)}-a1`,
+					resultStatus: 'SUCCEEDED',
+					outputArtifactIds: [],
+					proposedEvidenceIds: [],
+					detectedAssumptionIds: [],
+					structuredResult: {},
+					noOutputResult: { reason: 'NO_DOWNSTREAM_CONSUMABLE_RESULT', detail: 'fixture' },
+					executionProvenance: { executedBy: actor, originType: 'HUMAN_DECISION' }
+				}),
+				'complete s1'
+			);
+
+			const r = dispatch('StartExecutionStep', { stepId: sid(2) });
+			expect(r.status).toBe('REJECTED');
+			expect(r.error?.code).toBe('RPH_INVARIANT_VIOLATION');
+			expect(r.error?.message).toContain(SCOPE_MARKER);
+			// …and demonstrably NOT the status limb: the binding is AUTHORIZED, so a status refusal here would mean
+			// the two limbs are one.
+			expect(r.error?.message).not.toContain(STATUS_MARKER);
+			expect(stepStateOf(2)).toBe('QUEUED');
+		});
+
+		it('S2: a binding naming a step that does not exist authorizes nothing', () => {
+			ok(
+				dispatch(
+					'RequestRuntimeBinding',
+					{
+						runtimeBindingId: BINDING,
+						executionStepId: `${PLAN}-does-not-exist`,
+						roleId: 'r',
+						requestedCapabilities: [{ capability: 'file-system' }]
+					},
+					BINDING,
+					'RUNTIME_BINDING'
+				),
+				'request binding for a phantom step'
+			);
+			ok(authorizeBinding(), 'authorize');
+			activePlan(BINDING, []);
+			const r = dispatch('StartExecutionStep', { stepId: sid(1) });
+			expect(r.status).toBe('REJECTED');
+			expect(r.error?.message).toContain(SCOPE_MARKER);
+		});
+
+		it('S3 the over-refusal half: the binding’s OWN step still starts', () => {
+			ok(requestBinding(), 'request binding');
+			ok(authorizeBinding(), 'authorize');
+			activePlan(BINDING, []);
 			ok(dispatch('StartExecutionStep', { stepId: sid(1) }), 'start');
 			expect(stepStateOf(1)).toBe('RUNNING');
 		});

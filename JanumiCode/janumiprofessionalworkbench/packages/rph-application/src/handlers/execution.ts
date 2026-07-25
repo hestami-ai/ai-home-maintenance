@@ -888,6 +888,28 @@ function bindingAuthorityRefusal(
 			[stepId, bindingId]
 		);
 
+	// ── SCOPE: the binding must be the one authorized FOR THIS STEP (JAN-REVREM RW-3, review finding #2) ────────
+	//
+	// `RuntimeBinding.executionStepId` is a REQUIRED ratified field, set by `RequestRuntimeBinding`, and the whole
+	// direction of the relation is Binding -> Step. It was read by nothing. So a binding authorized to run step 1 —
+	// with whatever capabilities that step's risk justified — backed ANY step in the plan that named its id, and a
+	// binding pointing at a step that does not exist at all still authorized a real one (proved live).
+	//
+	// That is a privilege-SCOPE hole, not a privilege-STATUS one: every check above can pass while the authority
+	// being exercised was granted for different work. It is the same shape as an unscoped waiver — REG-Q-012's
+	// concern, and the argument WP-12c already made for skip authorizations, which name their steps explicitly for
+	// exactly this reason. An authorization that does not say WHAT it authorizes is not an authorization.
+	const boundStepId = String(
+		(binding.state as { executionStepId?: unknown }).executionStepId ?? ''
+	);
+	if (boundStepId !== stepId)
+		return reject(
+			command,
+			'RPH_INVARIANT_VIOLATION',
+			`${command.commandType} blocked: runtime binding ${bindingId} was authorized for step ${boundStepId || '(unset)'}, not for step ${stepId} — a binding authorizes the step it names and no other (§8.1). Request a binding for this step.`,
+			[stepId, bindingId]
+		);
+
 	const status = String((binding.state as { authorizationStatus?: unknown }).authorizationStatus);
 	const check = bindingPermitsExecution(status);
 	if (!check.ok)

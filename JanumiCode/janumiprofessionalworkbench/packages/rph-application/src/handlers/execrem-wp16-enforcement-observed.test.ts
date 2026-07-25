@@ -251,32 +251,45 @@ describe('JAN-EXECREM WP-16 (c) — the enforcement register is OBSERVED, not as
 			}
 		},
 		'RPH-EXE-003': {
-			arrangement: 'a step whose runtimeBindingId names a binding still in REQUESTED',
+			arrangement: 'a step whose runtimeBindingId names a binding that has been REVOKED',
 			run: () => {
-				// JAN-EXEBIND WP-B1 closed this row, and the register's totality gate is what FORCED this probe: the
-				// map is a total Record over the id union, so flipping RPH-EXE-003 to ENFORCED does not compile until
-				// an observation exists. That is the mechanism working, in the direction it was built for.
+				// JAN-EXEBIND WP-B1 closed this row, and the register's totality gate FORCED this probe: the map is a
+				// total Record over the id union, so flipping RPH-EXE-003 to ENFORCED does not compile until an
+				// observation exists.
 				//
-				// The CONTROL is the same command on the same plan with the binding AUTHORIZED — so the arrangement
-				// (the binding's status) is demonstrably what flips the answer, not the plan, the step or the PWU.
-				const BIND = 'bind_01ARZ3NDEKTSV4RRFFQ69H6140';
-				const requestBinding = () =>
+				// TWO BINDINGS, ONE PER STEP — corrected by JAN-REVREM RW-3. This fixture used ONE binding for both
+				// steps, which was only legal because nothing compared the binding's ratified `executionStepId` to the
+				// step being started (review finding #2). The moment that scope check landed, this probe started
+				// failing for the WRONG reason. A fixture that depended on the hole; made honest, not weakened.
+				const bindFor = (n: number) => `bind_01ARZ3NDEKTSV4RRFFQ69H614${n}`;
+				const requestBinding = (n: number) =>
 					ok(
 						dispatch(
 							'RequestRuntimeBinding',
 							{
-								runtimeBindingId: BIND,
-								executionStepId: sid(1),
+								runtimeBindingId: bindFor(n),
+								executionStepId: sid(n),
 								roleId: 'role-architect',
 								requestedCapabilities: [{ capability: 'file-system' }]
 							},
-							BIND,
+							bindFor(n),
 							'RUNTIME_BINDING'
 						),
-						'request binding'
+						`request binding ${n}`
+					);
+				const authorize = (n: number) =>
+					ok(
+						dispatch(
+							'AuthorizeRuntimeBinding',
+							{ grantedCapabilities: [{ capability: 'file-system' }] },
+							bindFor(n),
+							'RUNTIME_BINDING'
+						),
+						`authorize ${n}`
 					);
 
-				requestBinding();
+				requestBinding(1);
+				requestBinding(2);
 				ok(chg('PROPOSED', 'SHAPING'), 'shaping');
 				ok(chg('SHAPING', 'READY'), 'ready');
 				ok(
@@ -284,8 +297,8 @@ describe('JAN-EXECREM WP-16 (c) — the enforcement register is OBSERVED, not as
 						executionPlanId: PLAN,
 						workUnitId: PWU,
 						steps: [
-							{ ...mkStep(1), runtimeBindingId: BIND },
-							{ ...mkStep(2), runtimeBindingId: BIND }
+							{ ...mkStep(1), runtimeBindingId: bindFor(1) },
+							{ ...mkStep(2), runtimeBindingId: bindFor(2) }
 						],
 						transitions: [],
 						retryPolicy: {},
@@ -296,27 +309,20 @@ describe('JAN-EXECREM WP-16 (c) — the enforcement register is OBSERVED, not as
 					'propose'
 				);
 				ok(dispatch('ApproveExecutionPlan', {}), 'approve');
-				ok(dispatch('ActivateExecutionPlan', { authorizedRuntimeBindingIds: [BIND] }), 'activate');
+				ok(dispatch('ActivateExecutionPlan', { authorizedRuntimeBindingIds: [] }), 'activate');
 
-				// AUTHORIZED -> the control accepts…
-				ok(
-					dispatch(
-						'AuthorizeRuntimeBinding',
-						{ grantedCapabilities: [{ capability: 'file-system' }] },
-						BIND,
-						'RUNTIME_BINDING'
-					),
-					'authorize'
-				);
-				const control = start(1);
+				authorize(1);
+				authorize(2);
+				const control = start(1); // …the control accepts under an AUTHORIZED binding
 				ok(complete(1), 'complete s1');
 
-				// …and REVOKED, which `bindingPermitsExecution` refuses by the same limb as REQUESTED, refuses s2.
+				// …and REVOKING s2's OWN binding refuses s2 — so the arrangement under test is the STATUS, not the
+				// scope. The two limbs are kept apart deliberately: the marker asserted below is the status one.
 				ok(
 					dispatch(
 						'RevokeRuntimeCapability',
 						{ reason: 'credential rotated mid-plan' },
-						BIND,
+						bindFor(2),
 						'RUNTIME_BINDING'
 					),
 					'revoke'
