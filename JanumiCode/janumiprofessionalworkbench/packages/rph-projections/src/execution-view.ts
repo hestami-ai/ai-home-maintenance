@@ -21,12 +21,14 @@
 //
 // Pure + browser-safe (type-only contract imports), like the rest of rph-projections.
 import type { StepState } from '@janumipwb/rph-contracts';
-import { STEP_COMMAND_SPECS, type StepCommandType } from '@janumipwb/rph-domain';
 import {
 	buildConditionSubject,
 	ConditionExpressionSchema,
 	evaluateGuardExpression,
+	getMachine,
 	inEdgeDisposition,
+	STEP_COMMAND_SPECS,
+	type StepCommandType,
 	isTerminalSuccessStepState,
 	prunableStepIds as gatePrunableStepIds,
 	startableStepIds as gateStartableStepIds,
@@ -127,6 +129,13 @@ export interface ExecutionPlanView {
 	readonly steps: readonly ExecutionStepView[];
 	/** The transition graph (DR-004 DWP-01); empty ⇒ linear. Carried so the gate + a future graph view can read it. */
 	readonly transitions: readonly ExecutionTransitionInput[];
+	/**
+	 * The owning PWU's `workLifecycleState`, when the caller could supply it (JAN-REVREM RW-1).
+	 *
+	 * Carried on the VIEW, not just the input, because `prunableStepIds` takes a view and had no way to see it —
+	 * which is why Prune escaped the PWU gate entirely while every other affordance was filtered.
+	 */
+	readonly pwuWorkLifecycleState?: string;
 }
 
 // Record<StepState, …> makes the compiler REQUIRE every one of the 10 StepState values — if a value is added to the
@@ -199,7 +208,9 @@ function controlCommandsFor(stepState: string): readonly StepControlCommand[] {
  * `Record<..., StepCommandType>` over BOTH affordance unions: a new affordance cannot ship without naming the
  * command it dispatches, which is the same totality mechanism the specs table itself uses.
  */
-const COMMAND_BY_AFFORDANCE: Record<StepAdvanceCommand | StepControlCommand, StepCommandType> = {
+export type GatedAffordance = StepAdvanceCommand | StepControlCommand | 'prune';
+
+const COMMAND_BY_AFFORDANCE: Record<GatedAffordance, StepCommandType> = {
 	start: 'StartExecutionStep',
 	complete: 'CompleteExecutionStep',
 	fail: 'FailExecutionStep',
@@ -207,14 +218,36 @@ const COMMAND_BY_AFFORDANCE: Record<StepAdvanceCommand | StepControlCommand, Ste
 	skip: 'SkipExecutionStep',
 	cancel: 'CancelExecutionStep',
 	wait: 'EnterExecutionStepWait',
-	resolve: 'ResolveExecutionStepWait'
+	resolve: 'ResolveExecutionStepWait',
+	// JAN-REVREM RW-1. Prune was ABSENT from this map, and its absence is why nobody noticed it was ungated:
+	// `prunableStepIds` is a bare passthrough to a gate that knows only `plan.status`, while `PruneExecutionStep`
+	// declares `pwuOpenness: REQUIRES_OPEN_PWU` and the engine refuses it on a closed PWU. The totality type could
+	// not catch the omission because prune was not in the union it is total over — the same invisibility WP-8
+	// diagnosed, one layer down. Adding the row is what lets `prunableStepIds` be filtered like every other
+	// affordance.
+	prune: 'PruneExecutionStep'
 };
 
 /** The plan statuses under which an affordance requiring a live plan may be offered. */
 const PLAN_STATUS_ACTIVE = 'ACTIVE';
 
-/** The PWU workLifecycleStates that open no new execution — the machine's own terminal set (RPH-PWU-010). */
-const CLOSED_PWU_STATES: ReadonlySet<string> = new Set(['BASELINED', 'ABANDONED', 'SUPERSEDED']);
+/**
+ * The PWU workLifecycleStates that open no new execution (RPH-PWU-010).
+ *
+ * DERIVED, not copied — JAN-REVREM RW-1. This was `new Set(['BASELINED','ABANDONED','SUPERSEDED'])`, a literal
+ * whose own comment called it "the machine's own terminal set" while being unbound to it. The AUTHORITY derives
+ * the set (`canResumeExecutionOnPwu` → `isTerminalState('PWU.workLifecycleState', …)`) and its comment says so
+ * explicitly; `JAN-EXECREM-RESIDUALS.md` §2 then recorded the rule as "derived rather than hardcoded", which was
+ * true of one side and false of the other. Ratify a fourth terminal state and the engine refuses while this
+ * read-model kept offering Start — F-29's invariant re-broken on the very limb WP-15 added to protect it, with
+ * the whole suite green because the one test of this limb retyped the same three literals.
+ *
+ * `getMachine` is already used for exactly this purpose two files away (`pwu-behavior.ts`), and this module
+ * already imports runtime values from rph-domain, so there was never a layering reason for the copy.
+ */
+const CLOSED_PWU_STATES: ReadonlySet<string> = new Set(
+	getMachine('PWU.workLifecycleState').terminalStates
+);
 
 /**
  * Would the ENGINE accept this affordance under a plan in `planStatus`?
@@ -226,11 +259,12 @@ const CLOSED_PWU_STATES: ReadonlySet<string> = new Set(['BASELINED', 'ABANDONED'
  */
 function planPermitsAffordance(
 	planStatus: string,
-	affordance: StepAdvanceCommand | StepControlCommand,
+	affordance: GatedAffordance,
 	pwuWorkLifecycleState?: string
 ): boolean {
 	const spec = STEP_COMMAND_SPECS[COMMAND_BY_AFFORDANCE[affordance]];
-	if (spec.planLiveness === 'REQUIRES_ACTIVE_PLAN' && planStatus !== PLAN_STATUS_ACTIVE) return false;
+	if (spec.planLiveness === 'REQUIRES_ACTIVE_PLAN' && planStatus !== PLAN_STATUS_ACTIVE)
+		return false;
 	// RPH-PWU-010 (WP-12b's second limb). Only gate when the caller actually TOLD us the PWU's state — see the
 	// disclosure on `ExecutionPlanInput.pwuWorkLifecycleState`.
 	if (
@@ -295,14 +329,18 @@ function stepView(
 		stepType: s.stepType,
 		purpose: s.purpose,
 		stepState: s.stepState,
-		...(s.selectedTransitionId === undefined ? {} : { selectedTransitionId: s.selectedTransitionId }),
+		...(s.selectedTransitionId === undefined
+			? {}
+			: { selectedTransitionId: s.selectedTransitionId }),
 		tone: stepStateTone(s.stepState),
 		advanceCommands: afforded.advance,
 		controlCommands: afforded.control,
 		belowQueued: isBelowQueued(s.stepState)
 	};
 	// Preserve the optional runtimeBindingId only when present (exactOptionalPropertyTypes-friendly).
-	return s.runtimeBindingId === undefined ? base : { ...base, runtimeBindingId: s.runtimeBindingId };
+	return s.runtimeBindingId === undefined
+		? base
+		: { ...base, runtimeBindingId: s.runtimeBindingId };
 }
 
 /** Shape one ExecutionPlan aggregate row into the view — step order preserved as authored; the transition graph is
@@ -314,6 +352,9 @@ export function executionPlanView(row: ExecutionPlanInput): ExecutionPlanView {
 		status: row.status,
 		// The plan's status was already sitting HERE, unused, while the UI grew five inline conditions to
 		// reconstruct what it implies. Threading it is the whole fix (JAN-EXECREM WP-15 / F-29).
+		...(row.pwuWorkLifecycleState === undefined
+			? {}
+			: { pwuWorkLifecycleState: row.pwuWorkLifecycleState }),
 		steps: row.steps.map((step) => stepView(step, row.status, row.pwuWorkLifecycleState)),
 		transitions: row.transitions ?? []
 	};
@@ -342,14 +383,29 @@ export function isTerminalSuccessStep(stepState: string): boolean {
  * singleton; a fan-out can yield several). The UI shows Start on a step iff it is in this set AND its advanceCommands
  * include 'start' (so a RUNNING frontier shows Complete/Fail, a READY/NOT_READY one the belowQueued note).
  */
-export function startableStepIds(plan: ExecutionPlanView, evaluateGuard?: EdgeGuardEvaluator): string[] {
+export function startableStepIds(
+	plan: ExecutionPlanView,
+	evaluateGuard?: EdgeGuardEvaluator
+): string[] {
 	return gateStartableStepIds(plan, evaluateGuard);
 }
 
 /** The set of steps that are now UNREACHABLE and should be pruned to SKIPPED (a resolved BRANCH's not-taken arm + its
  *  transitive downstream) — DWP-03. Delegates to the shared rph-domain fixpoint. The UI surfaces these for a Prune
  *  action; a linear plan yields none. */
-export function prunableStepIds(plan: ExecutionPlanView, evaluateGuard?: EdgeGuardEvaluator): string[] {
+export function prunableStepIds(
+	plan: ExecutionPlanView,
+	evaluateGuard?: EdgeGuardEvaluator
+): string[] {
+	// JAN-REVREM RW-1 — THE AUTHORITY FILTER PRUNE ESCAPED. This was a bare passthrough. The underlying gate knows
+	// only `plan.status`, while `PruneExecutionStep` declares `pwuOpenness: REQUIRES_OPEN_PWU` and the engine refuses
+	// it on a closed PWU (WP-12b) — so the read-model offered a Prune the engine would reject, which is F-29's
+	// invariant, in the one place WP-15 never looked. The template comment asserting prune was already gated was
+	// simply false.
+	//
+	// Routed through the SAME `planPermitsAffordance` every other affordance uses, reading Prune's own spec row, so
+	// this cannot drift from the authority independently.
+	if (!planPermitsAffordance(plan.status, 'prune', plan.pwuWorkLifecycleState)) return [];
 	return gatePrunableStepIds(plan, evaluateGuard);
 }
 
@@ -421,9 +477,13 @@ function renderCondition(c: ConditionExpression): string {
 		case 'RESULT_EQUALS':
 			return `step ${shortId(c.stepId)} result.${c.path} = ${String(c.value)}`;
 		case 'ALL':
-			return c.operands.length ? `all of (${c.operands.map(renderCondition).join('; ')})` : 'all of ()';
+			return c.operands.length
+				? `all of (${c.operands.map(renderCondition).join('; ')})`
+				: 'all of ()';
 		case 'ANY':
-			return c.operands.length ? `any of (${c.operands.map(renderCondition).join('; ')})` : 'any of ()';
+			return c.operands.length
+				? `any of (${c.operands.map(renderCondition).join('; ')})`
+				: 'any of ()';
 		case 'NOT':
 			return `not (${renderCondition(c.operand)})`;
 	}
@@ -457,7 +517,9 @@ export function transitionRows(
 		// An edge may legitimately have no source (a plan-entry edge) — the contract marks both endpoints optional.
 		sourceLabel: labelOf(edge.sourceStepId, '(plan entry)'),
 		targetLabel: labelOf(edge.targetStepId, '(plan exit)'),
-		role: edge.transitionType ?? (edge.conditionExpression !== undefined ? 'CONDITIONAL' : 'SEQUENTIAL'),
+		role:
+			edge.transitionType ??
+			(edge.conditionExpression !== undefined ? 'CONDITIONAL' : 'SEQUENTIAL'),
 		...(edge.conditionExpression !== undefined
 			? { conditionText: describeCondition(edge.conditionExpression) }
 			: {}),
@@ -509,7 +571,13 @@ export function plansForPwus(
 //   the JAN-EXECPLAN §19 L3-C1 defect). Crossing the architectural cut is permitted ONLY advisorily.
 
 /** executionState values that mean the instance HAS BEGUN — SINGLE AXIS (executionState), never workLifecycleState. */
-const BEGUN_EXECUTION_STATES = new Set<string>(['QUEUED', 'RUNNING', 'WAITING', 'RETRYING', 'SUCCEEDED']);
+const BEGUN_EXECUTION_STATES = new Set<string>([
+	'QUEUED',
+	'RUNNING',
+	'WAITING',
+	'RETRYING',
+	'SUCCEEDED'
+]);
 
 export interface SequenceInstance {
 	readonly id: string;
@@ -592,7 +660,10 @@ function placeInstances(
 			unplaced.push({ ...inst, reason: c.reason });
 			continue;
 		}
-		const placed: SequenceInstance = { ...inst, typeName: inst.typeName ?? nameOf.get(inst.pwuTypeId ?? '') };
+		const placed: SequenceInstance = {
+			...inst,
+			typeName: inst.typeName ?? nameOf.get(inst.pwuTypeId ?? '')
+		};
 		layerBuckets.set(c.layer, [...(layerBuckets.get(c.layer) ?? []), placed]);
 	}
 	const layers = [...layerBuckets.keys()]

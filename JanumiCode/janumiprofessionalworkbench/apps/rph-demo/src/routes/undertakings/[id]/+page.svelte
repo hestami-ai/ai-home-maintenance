@@ -361,10 +361,15 @@
 										{/each}
 										<!-- DR-004 DWP-06 — Prune. NOT a stepState affordance (it is absent from controlCommands by
 										     design): a prune is a SYSTEM consequence of a resolved BRANCH, so it is offered only for a
-										     step the read-model computed as unreachable. prunableStepIds is itself plan-ACTIVE-gated
-										     (mirroring startableStepIds), so this set never tempts a prune the engine would reject.
-										     Semantically distinct from the Skip two lines above: Skip is an operator waiver, this is the
-										     plan's own declared branch logic excluding the step. -->
+										     step the read-model computed as unreachable. Semantically distinct from the Skip two lines
+										     above: Skip is an operator waiver, this is the plan's own declared branch logic excluding
+										     the step.
+										     CORRECTED 2026-07-25 (JAN-REVREM RW-1). This comment used to claim "prunableStepIds is
+										     itself plan-ACTIVE-gated, so this set never tempts a prune the engine would reject". The
+										     first clause was true and the CONCLUSION was false: WP-12b also gave Prune a PWU-openness
+										     limb (it declares REQUIRES_OPEN_PWU), and a plan on a closed PWU keeps status ACTIVE — so
+										     this button was offered for a prune the engine refuses. `prunableStepIds` now routes through
+										     the same `planPermitsAffordance` every other affordance uses, reading Prune's own spec row. -->
 										{#if data.prunableStepByPlan[pl.id]?.includes(s.id)}
 											<form method="POST" action="?/pruneStep" use:enhance class="inlineform">
 												<input type="hidden" name="planId" value={pl.id} />
