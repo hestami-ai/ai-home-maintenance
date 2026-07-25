@@ -1117,6 +1117,12 @@
           "type": "ExecutionPlanStatus",
           "required": true,
           "enumRef": "ExecutionPlanStatusSchema"
+        },
+        {
+          "field": "authorizedRuntimeBindingIds",
+          "type": "string[]",
+          "required": false,
+          "note": "JAN-EXECREM WP-14 (F-31). AUTHORED addition atop the ratified shape, and the reason is that the ratified surface is incomplete without it: `authorizedRuntimeBindingIds` is a REQUIRED field of the ratified ActivateExecutionPlan command (DOC-007 §15.2) and of the ExecutionPlanActivated event (§15.3), but no ratified OBJECT field holds it — so the allowlist existed only in the event log, and nothing could read it back to check that a step's runtime binding was among the ones the activation authorized. Any rule citing the allowlist was therefore dead on arrival. OPTIONAL so plans stored before this addition still parse."
         }
       ]
     },

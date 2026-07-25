@@ -97,6 +97,14 @@ describe('executionAttempts — the AI-no-binding advisory (stepType from the ca
 		expect(attempts[0]?.aiNoBinding).toBe(true);
 	});
 
+	// FICTION UNTIL JAN-EXECREM WP-14 (F-31), and worth recording rather than quietly fixing. This case passed only
+	// because the helper hand-crafts an event shape NO PRODUCER COULD EMIT: `StartExecutionStepPayloadSchema` is a
+	// strictObject carrying only `stepId`, and the handler read `p.runtimeBindingId` — unreachable dead code — so
+	// `ExecutionStepStarted.runtimeBindingId` had no producer at all. The advisory it guards was therefore
+	// UNCONDITIONALLY TRUE for every AI attempt the engine would ever emit, and an always-on advisory carries no
+	// information. A test proving a branch that production cannot reach proves nothing about production (CON-000
+	// B7). WP-14 gave the field a producer — the AUTHORED STEP, which is where the approved plan fixes it — so this
+	// is now a test of a reachable path. The live proof is execrem-wp14-provenance.test.ts.
 	it('is SILENT for an AI step that DID bind a runtime binding', () => {
 		const attempts = executionAttempts([started('rb_1')], { [STEP]: 'MODEL_INVOCATION' });
 		expect(attempts[0]?.aiNoBinding).toBe(false);

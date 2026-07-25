@@ -601,6 +601,78 @@ export function prunableStepIds(plan: GatePlan, evaluateGuard?: EdgeGuardEvaluat
 		.map((s) => s.id);
 }
 
+/**
+ * Which BRANCH decision excluded a step, which arm it TOOK, and which arm was CUT.
+ *
+ * Three distinct facts, and the event declares a field for each. `selectedEdgeId` is the arm the branch chose
+ * (DS-004 D5: "pruned: BRANCH <stepId> selected edge <edgeId>"); `excludedEdgeId` is the arm this step hangs off,
+ * which is what actually cut it. On a two-armed branch they are complementary; on a wider one they are not, and
+ * an auditor needs both to reconstruct the decision from the stream alone.
+ */
+export interface PruneProvenance {
+	/** The settled BRANCH whose recorded decision cut this step off. */
+	readonly branchStepId: string;
+	/** The out-edge that BRANCH actually selected — its recorded decision. */
+	readonly selectedEdgeId?: string;
+	/** The not-taken out-edge on whose subgraph this step sits — the CUT. */
+	readonly excludedEdgeId?: string;
+}
+
+/**
+ * WHY is `stepId` prunable — which branch decision excluded it, and through which edge (JAN-EXECREM WP-14 / F-37)?
+ *
+ * DERIVED from the same graph that AUTHORIZED the prune, never read from a caller. That is the whole point: the
+ * event's prune-provenance is the sole justification DR-004 §19-M1 gave for minting `ExecutionStepPruned` instead
+ * of reusing the waived-skip event ("do not conflate a system prune with a user waiver"), and it was never
+ * populated by any producer — so the two events differed only by TYPE, not by CONTENT, and an auditor replaying
+ * the stream could not tell which decision excluded the step.
+ *
+ * IT WALKS THE DEAD SUBGRAPH TO THE CUT, rather than reading the step's own in-edges. A pruned step is frequently
+ * NOT adjacent to the branch: the not-taken arm's whole downstream prunes transitively, and those steps' in-edges
+ * come from other DEAD steps, not from the BRANCH. Reading only the immediate in-edges would find provenance for
+ * the first step of a dead arm and nothing for the rest.
+ *
+ * THE CUT is the first edge, walking back, that leaves a LIVE source and is NEUTRALIZED. Requiring the source to
+ * be live is what stops a JOIN — still reachable via the taken arm — being mis-attributed as the cut.
+ */
+export function pruneProvenance(
+	plan: GatePlan,
+	stepId: string,
+	evaluateGuard?: EdgeGuardEvaluator
+): PruneProvenance | undefined {
+	const ctx = gateContext(plan, evaluateGuard);
+	const live = ctx.live();
+	if (live.has(stepId)) return undefined; // still reachable — nothing cut it off
+	const seen = new Set<string>([stepId]);
+	const frontier = [stepId];
+	while (frontier.length) {
+		const id = frontier.shift()!;
+		for (const edge of inEdgesOf(ctx, id)) {
+			const source = edge.sourceStepId;
+			if (source === undefined) continue; // a plan-entry edge cuts nothing
+			if (live.has(source)) {
+				// A live source with a dead target: this edge is a CUT. Attribute it only when the source actually
+				// DECIDED — a PENDING or non-branch source has excluded nothing yet.
+				if (ctx.localOf(edge) !== 'NEUTRALIZED') continue;
+				const step = stepOf(ctx, source);
+				if (step?.stepType !== 'BRANCH') continue;
+				return {
+					branchStepId: source,
+					...(step.selectedTransitionId === undefined
+						? {}
+						: { selectedEdgeId: step.selectedTransitionId }),
+					...(edge.id === undefined ? {} : { excludedEdgeId: edge.id })
+				};
+			}
+			if (!seen.has(source)) {
+				seen.add(source);
+				frontier.push(source); // keep walking back through the dead subgraph
+			}
+		}
+	}
+	return undefined;
+}
+
 /** The result of the start-gate authority: startable, or the blocking predecessor + why. */
 export interface StartGateResult {
 	readonly ok: boolean;

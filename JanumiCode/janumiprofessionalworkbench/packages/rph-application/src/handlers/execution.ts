@@ -25,6 +25,7 @@ import {
 	canSkipStep,
 	evaluateGuardExpression,
 	planEvidencesExecutionSuccess,
+	pruneProvenance,
 	prunableStepIds,
 	resolveBranchSelection,
 	retryDecision,
@@ -98,6 +99,12 @@ function toGatePlan(plan: Record<string, unknown>): GatePlan {
 			conditionExpression: t.conditionExpression
 		}))
 	};
+}
+
+/** The plan aggregate's current state bag, or an empty one — for a producer that needs the WHOLE plan before
+ *  `advanceStep` loads it (prune provenance must be derived BEFORE the step moves, or the cut is already gone). */
+function loadPlanState(ctx: HandlerContext, planId: string): Record<string, unknown> {
+	return (ctx.store.loadObject(planId)?.state as Record<string, unknown> | undefined) ?? {};
 }
 
 /**
@@ -359,6 +366,15 @@ export const activateExecutionPlan: CommandHandler = (ctx, command) =>
 				...(cmd.approvalDecisionId ? { approvalDecisionId: cmd.approvalDecisionId } : {})
 			};
 		},
+		// JAN-EXECREM WP-14 / F-31. `authorizedRuntimeBindingIds` was carried on the EVENT and never written to the
+		// plan aggregate — activation passed an eventPayload but no `mutate`, though advanceStatus supports one. So
+		// the ratified allowlist existed only in the log: nothing could read it back to check that a step's binding
+		// was among the ones the activation authorized, and any rule citing it would have been dead on arrival.
+		mutate: (base) => ({
+			...base,
+			authorizedRuntimeBindingIds:
+				(command.payload as ActivateExecutionPlanPayload).authorizedRuntimeBindingIds ?? []
+		}),
 		guard: (state, hctx) => {
 			// RPH-PWU-010 (JAN-EXECREM WP-12 / F-28). Activation is the command that GRANTS runtime privilege, so
 			// it is the other half of the openness gate — gating the step commands alone would leave the hole where
@@ -548,6 +564,11 @@ export const applyTacticalChange: CommandHandler = (ctx, command) =>
 		precondition: fromStates('ACTIVE')
 	});
 
+/** An event payload: a literal, or one DERIVED from the authored step (see `advanceStep`'s `eventPayload`). */
+type StepEventPayload =
+	| Readonly<Record<string, unknown>>
+	| ((step: Record<string, unknown>) => Readonly<Record<string, unknown>>);
+
 /**
  * The two DECLARED authority limbs, read from the command's spec row (JAN-EXECREM WP-12 / F-26 + F-28).
  *
@@ -636,7 +657,14 @@ function advanceStep(
 			plan: Record<string, unknown>
 		) => ReturnType<typeof reject> | null;
 		/**
-		 * The EVENT payload. REQUIRED (JAN-EXECREM WP-13 / F-25).
+		 * The EVENT payload — a literal, or a function of the AUTHORED STEP (JAN-EXECREM WP-14).
+		 *
+		 * The function form exists because some recorded facts belong to the PLAN, not to the command: a step's
+		 * `runtimeBindingId` is fixed when the plan is authored and approved, so the producer must read it from the
+		 * step rather than accept it from the caller. Taking it from the command would create a second, later,
+		 * unauthorized source of truth for a fact the approved plan already settled.
+		 *
+		 * REQUIRED (JAN-EXECREM WP-13 / F-25).
 		 *
 		 * It used to be optional, defaulting to the raw COMMAND payload — and that implicit default is the defect,
 		 * not the two handlers that took it. A command shape is not an event shape: the command says what to DO,
@@ -644,7 +672,7 @@ function advanceStep(
 		 * their own declared schemas. Making it required converts "the author forgot" into a compile error, which
 		 * is the only form of that guarantee that survives the next handler.
 		 */
-		readonly eventPayload: unknown;
+		readonly eventPayload: StepEventPayload;
 	}
 ) {
 	const planId = command.targetAggregateId;
@@ -717,7 +745,8 @@ function advanceStep(
 	// ONE payload object, ONE makeEvent call. If a later edit builds the payload twice — once for the overlay, once
 	// for the commit — they can drift and the identity silently breaks. `execution-branch-settlement.test.ts` asserts
 	// state == event as the standing guard on that.
-	const basePayload = args.eventPayload;
+	const basePayload =
+		typeof args.eventPayload === 'function' ? args.eventPayload(step) : args.eventPayload;
 	const pendingEvent = makeEvent(ctx, command, {
 		eventType: args.spec.eventType,
 		aggregateType: PLAN,
@@ -788,7 +817,7 @@ function advanceStep(
  *     Exec ≠ assurance (INV-5): the gate reads state, sets nothing.
  */
 export const startExecutionStep: CommandHandler = (ctx, command) => {
-	const p = command.payload as { stepId: string; runtimeBindingId?: string };
+	const p = command.payload as { stepId: string };
 	return advanceStep(ctx, command, {
 		stepId: p.stepId,
 		// drivesFrom QUEUED (declared in STEP_COMMAND_SPECS). NOT merely "not already RUNNING": the machine also
@@ -800,11 +829,23 @@ export const startExecutionStep: CommandHandler = (ctx, command) => {
 		// (the RUNNING it transitioned to), which `command.payload` ({ stepId }) does not carry — so the default
 		// emitted `{ stepId }` was missing the one field the event exists to record. The event that says "this step
 		// started" now contains the state it started INTO. (Pinned defect in emitted-event-conformance; now conforms.)
-		eventPayload: {
+		// JAN-EXECREM WP-14 / F-31: the binding is read from the AUTHORED STEP, not from the command.
+		//
+		// The disposition is ARGUED, not defaulted. `StartExecutionStepPayloadSchema` is a strictObject carrying
+		// only `stepId`, so the handler's old `p.runtimeBindingId` read was UNREACHABLE — a command carrying the
+		// field was refused at the schema boundary before any handler ran. The tempting repair (widen the command)
+		// is the wrong one: the ratified relation is Binding -> Step (RequestRuntimeBinding names an
+		// executionStepId), `ExecutionStepSchema` already carries the field, and three consumers already read
+		// `step.runtimeBindingId` as authoritative. A per-invocation binding on Start would be a SECOND, LATER,
+		// UNAUTHORIZED source of truth for a fact the approved plan already fixed. The strictObject was accidentally
+		// preventing exactly that, so it stays — and the producer reads the plan instead.
+		eventPayload: (step) => ({
 			stepId: p.stepId,
-			...(p.runtimeBindingId ? { runtimeBindingId: p.runtimeBindingId } : {}),
+			...(typeof step.runtimeBindingId === 'string' && step.runtimeBindingId !== ''
+				? { runtimeBindingId: step.runtimeBindingId }
+				: {}),
 			stepState: 'RUNNING'
-		},
+		}),
 		precheck: (_step, plan) => {
 			// The linear/graph start-gate — the SAME rph-domain predicate the read-model (execution-view.ts
 			// startableStepIds) uses, so the UI Start affordance and this engine authority cannot diverge (DR-004
@@ -1188,18 +1229,41 @@ export const cancelExecutionStep: CommandHandler = (ctx, command) => {
  * plans written by earlier builds read correctly). Exec != assurance (INV-5): the prune moves only stepState.
  */
 export const pruneExecutionStep: CommandHandler = (ctx, command) => {
-	const p = command.payload as {
-		stepId: string;
-		selectedByBranchStepId?: string;
-		selectedEdgeId?: string;
-	};
+	const p = command.payload as { stepId: string };
+	// JAN-EXECREM WP-14 / F-37 — prune provenance is DERIVED from the graph that AUTHORIZED the prune.
+	//
+	// The provenance is the SOLE justification DR-004 §19-M1 gave for minting `ExecutionStepPruned` rather than
+	// reusing the waived-skip event ("do not conflate a system prune with a user waiver"). No producer ever
+	// populated it, so the two events differed only by TYPE and never by CONTENT: an auditor replaying the stream
+	// could not tell which decision excluded the step, which is exactly what the new event existed to preserve.
+	//
+	// A CORRECTION TO THE FINDING, which claimed both fields were optional on the COMMAND and merely forwarded.
+	// They are not: `PruneExecutionStepPayloadSchema` is a strictObject carrying only `stepId`, so the handler's
+	// `p.selectedByBranchStepId` / `p.selectedEdgeId` reads were UNREACHABLE DEAD CODE — the same shape as F-31's
+	// unreachable `p.runtimeBindingId`, in the same file, which the finding did not notice. So there was never a
+	// caller to distrust; there was simply no producer. Deriving it is the only way it can be recorded at all.
+	const gatePlanForPrune = toGatePlan(loadPlanState(ctx, command.targetAggregateId));
+	const provenance = pruneProvenance(
+		gatePlanForPrune,
+		p.stepId,
+		guardEvaluatorFor(ctx, command.targetAggregateId, gatePlanForPrune)
+	);
 	return advanceStep(ctx, command, {
 		stepId: p.stepId,
 		spec: STEP_COMMAND_SPECS.PruneExecutionStep,
 		eventPayload: {
 			stepId: p.stepId,
-			...(p.selectedByBranchStepId ? { selectedByBranchStepId: p.selectedByBranchStepId } : {}),
-			...(p.selectedEdgeId ? { selectedEdgeId: p.selectedEdgeId } : {}),
+			...(provenance === undefined
+				? {}
+				: {
+						selectedByBranchStepId: provenance.branchStepId,
+						...(provenance.selectedEdgeId === undefined
+							? {}
+							: { selectedEdgeId: provenance.selectedEdgeId }),
+						...(provenance.excludedEdgeId === undefined
+							? {}
+							: { excludedEdgeId: provenance.excludedEdgeId })
+					}),
 			stepState: 'SKIPPED'
 		},
 		precheck: (_step, plan) => {

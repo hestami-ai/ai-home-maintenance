@@ -637,7 +637,8 @@ export const ExecutionPlanSchema = z.strictObject({
 	tacticalChangePolicy: TacticalChangePolicySchema,
 	escalationPolicy: EscalationPolicySchema,
 	terminationPolicy: TerminationPolicySchema,
-	status: ExecutionPlanStatusSchema
+	status: ExecutionPlanStatusSchema,
+	authorizedRuntimeBindingIds: z.array(z.string()).optional()
 });
 export type ExecutionPlan = z.infer<typeof ExecutionPlanSchema>;
 
