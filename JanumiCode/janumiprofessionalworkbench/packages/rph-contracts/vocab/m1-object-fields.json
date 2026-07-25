@@ -2993,6 +2993,24 @@
           "note": "DOC-004 §12.2 'review conditions'."
         }
       ]
+    },
+    {
+      "name": "NoOutputResult",
+      "note": "JAN-EXECREM WP-1 (F-01). RPH-EXE-006 requires a succeeded step to record outputs OR an EXPLICIT no-output result. The explicit case had no wire representation, so the handler DERIVED it as !hasOutput and the guard became the tautology `hasOutput || !hasOutput`. This type is the missing second fact: an ASSERTION by the caller, never derived. `detail` is required because a bare boolean would record the claim without its justification.",
+      "fields": [
+        {
+          "field": "reason",
+          "type": "'NO_DOWNSTREAM_CONSUMABLE_RESULT' | 'SIDE_EFFECT_ONLY' | 'TIMEOUT' | 'NO_CANDIDATE_OUTPUT'",
+          "required": true,
+          "note": "Inline literal union (gen-objects zodExpr pins a small closed set without minting a canonical enum). TIMEOUT is failure-shaped: WP-11 refuses it as a SUCCEEDED completion (a timeout is a FailExecutionStep)."
+        },
+        {
+          "field": "detail",
+          "type": "string",
+          "required": true,
+          "note": "minLength 1. The rationale for asserting no output — the record of WHY, not merely THAT."
+        }
+      ]
     }
   ],
   "conflicts": [

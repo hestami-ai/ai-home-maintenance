@@ -65,6 +65,7 @@ import {
 	FindingDefinitionSchema,
 	IntentMappingSchema,
 	ModelSelectionPolicySchema,
+	NoOutputResultSchema,
 	ObligationAllocationSchema,
 	OutputDefinitionSchema,
 	PermittedChildRuleSchema,
@@ -168,7 +169,8 @@ export const CompleteExecutionStepPayloadSchema = z.strictObject({
 	proposedEvidenceIds: z.array(z.string()),
 	detectedAssumptionIds: z.array(z.string()),
 	structuredResult: z.unknown(),
-	executionProvenance: ExecutionProvenanceSchema
+	executionProvenance: ExecutionProvenanceSchema,
+	noOutputResult: NoOutputResultSchema.optional()
 });
 export type CompleteExecutionStepPayload = z.infer<typeof CompleteExecutionStepPayloadSchema>;
 export const ProposeEvidencePayloadSchema = z.strictObject({
@@ -273,9 +275,7 @@ export const CancelExecutionStepPayloadSchema = z.strictObject({
 });
 export type CancelExecutionStepPayload = z.infer<typeof CancelExecutionStepPayloadSchema>;
 export const PruneExecutionStepPayloadSchema = z.strictObject({
-	stepId: z.string(),
-	selectedByBranchStepId: z.string().optional(),
-	selectedEdgeId: z.string().optional()
+	stepId: z.string()
 });
 export type PruneExecutionStepPayload = z.infer<typeof PruneExecutionStepPayloadSchema>;
 export const EnterExecutionStepWaitPayloadSchema = z.strictObject({
@@ -1127,7 +1127,8 @@ export const ExecutionStepPrunedPayloadSchema = z.strictObject({
 	stepId: z.string(),
 	selectedByBranchStepId: z.string().optional(),
 	selectedEdgeId: z.string().optional(),
-	stepState: StepStateSchema
+	stepState: StepStateSchema,
+	excludedEdgeId: z.string().optional()
 });
 export type ExecutionStepPrunedPayload = z.infer<typeof ExecutionStepPrunedPayloadSchema>;
 export const ExecutionStepFailedPayloadSchema = z.strictObject({
@@ -1145,13 +1146,15 @@ export type ExecutionStepReadyPayload = z.infer<typeof ExecutionStepReadyPayload
 export const ExecutionStepRetriedPayloadSchema = z.strictObject({
 	stepId: z.string(),
 	attemptNumber: z.number().optional(),
-	stepState: StepStateSchema
+	stepState: StepStateSchema,
+	retryReason: z.string().optional()
 });
 export type ExecutionStepRetriedPayload = z.infer<typeof ExecutionStepRetriedPayloadSchema>;
 export const ExecutionStepSkippedPayloadSchema = z.strictObject({
 	stepId: z.string(),
 	waiverOrRevisionId: z.string().optional(),
-	stepState: StepStateSchema
+	stepState: StepStateSchema,
+	selectedTransitionId: z.string().optional()
 });
 export type ExecutionStepSkippedPayload = z.infer<typeof ExecutionStepSkippedPayloadSchema>;
 export const ExecutionStepStartedPayloadSchema = z.strictObject({
@@ -1182,7 +1185,9 @@ export const ExecutionStepSucceededPayloadSchema = z.strictObject({
 	detectedAssumptionIds: z.array(z.string()),
 	resultingExecutionState: ExecutionStateSchema,
 	executionProvenance: ExecutionProvenanceSchema.optional(),
-	structuredResult: z.unknown().optional()
+	structuredResult: z.unknown().optional(),
+	noOutputResult: NoOutputResultSchema.optional(),
+	selectedTransitionId: z.string().optional()
 });
 export type ExecutionStepSucceededPayload = z.infer<typeof ExecutionStepSucceededPayloadSchema>;
 export const ExecutionStepWaitingPayloadSchema = z.strictObject({

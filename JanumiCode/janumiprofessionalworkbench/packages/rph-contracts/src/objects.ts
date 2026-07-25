@@ -265,6 +265,16 @@ export const IntentMappingSchema = z.strictObject({
 	rationale: z.string().optional()
 });
 export type IntentMapping = z.infer<typeof IntentMappingSchema>;
+export const NoOutputResultSchema = z.strictObject({
+	reason: z.enum([
+		'NO_DOWNSTREAM_CONSUMABLE_RESULT',
+		'SIDE_EFFECT_ONLY',
+		'TIMEOUT',
+		'NO_CANDIDATE_OUTPUT'
+	]),
+	detail: z.string()
+});
+export type NoOutputResult = z.infer<typeof NoOutputResultSchema>;
 export const ObligationAllocationSchema = z.strictObject({
 	obligationId: z.string(),
 	allocatedTo: z.array(z.string())

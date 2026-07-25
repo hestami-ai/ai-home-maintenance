@@ -478,6 +478,12 @@
 					"required": true,
 					"type": "ExecutionProvenance",
 					"note": "complex type; §16/§35.2: success drives execution dim only, must NOT set assuranceState=SATISFIED"
+				},
+				{
+					"field": "noOutputResult",
+					"required": false,
+					"type": "NoOutputResult",
+					"note": "JAN-EXECREM WP-1 (F-01). The caller's EXPLICIT no-output assertion. OPTIONAL on the wire so existing callers are unaffected; WP-11 makes its ABSENCE the refusal when no outputs are named (RPH-EXE-006), which is the enforcement the derived form could never provide."
 				}
 			]
 		},
@@ -830,7 +836,7 @@
 			"targetAggregateType": "EXECUTION_PLAN",
 			"emitsEvent": "ExecutionStepStarted",
 			"drivesMachine": "ExecutionStep.stepState",
-			"drivesFrom": "READY|QUEUED",
+			"drivesFrom": "QUEUED",
 			"drivesTo": "RUNNING",
 			"schematized": false,
 			"sourceSection": "UNRATIFIED-AUTHORED (annotated 2026-07-16 under sponsor grant): DOC-007 schematizes NO interface for this, so these fields were AUTHORED, not derived. The citation below NAMES this command/event but defines no fields (DOC-002 §26.x/§34.x are bare name lists; §16 item 6: DOC-007's first slice deliberately leaves the granular vocabulary unschematized). Do NOT treat this sourceSection as proof the shape is ratified. Ratification pending. Cited: DOC-007 §32/§33 (payload from DOC-002 §34.3; DOC-007 from=PENDING)",
@@ -841,7 +847,8 @@
 					"type": "string",
 					"note": "id-ref"
 				}
-			]
+			],
+			"note": "[JAN-EXECREM WP-1: drivesFrom corrected READY|QUEUED -> QUEUED; the m2 machine has no READY->RUNNING arrow at all, and the code declares QUEUED; adopting the vocab would WIDEN Start.]"
 		},
 		{
 			"commandType": "FailExecutionStep",
@@ -932,7 +939,7 @@
 			"targetAggregateType": "EXECUTION_PLAN",
 			"emitsEvent": "ExecutionStepPruned",
 			"drivesMachine": "ExecutionStep.stepState",
-			"drivesFrom": "READY|QUEUED",
+			"drivesFrom": "NOT_READY|READY|QUEUED",
 			"drivesTo": "SKIPPED",
 			"schematized": false,
 			"sourceSection": "UNRATIFIED-AUTHORED (annotated 2026-07-22 under sponsor grant, JAN-EXECPLAN-DR-004 DWP-03, Tier 3C-ii): a SYSTEM prune of a not-taken BRANCH arm (or its transitively-unreachable downstream) to SKIPPED — authored under R2 + the ratified ExecutionStep READY|QUEUED->SKIPPED arrow / the standing 2026-07-16 execution grant (NOT R1, which is the condition grammar). This is NOT a user waiver: it does NOT route through canSkipStep (the plan's own declared branch logic excludes the step, so no waiver applies); it drives QUEUED->SKIPPED so the pruned step is completion-compatible (SKIPPED is terminal-success). Controller-issued (like Start), idempotent (checkTransition no-ops an already-terminal step), plan-ACTIVE-gated. Do NOT treat this sourceSection as proof the shape is ratified. Ratification pending. Cited: DOC-002 §26.4, ExecutionStep.stepState machine.",
@@ -942,20 +949,9 @@
 					"required": true,
 					"type": "string",
 					"note": "id-ref: the pruned (unreachable/not-taken) step"
-				},
-				{
-					"field": "selectedByBranchStepId",
-					"required": false,
-					"type": "string",
-					"note": "id-ref: the BRANCH step whose first-match selection excluded this step (provenance)"
-				},
-				{
-					"field": "selectedEdgeId",
-					"required": false,
-					"type": "string",
-					"note": "id-ref: the transition edge the BRANCH selected instead (provenance)"
 				}
-			]
+			],
+			"note": "[JAN-EXECREM WP-1: drivesFrom corrected READY|QUEUED -> NOT_READY|READY|QUEUED; prune must reach a not-taken arm that never became READY (D5 anti-deadlock); the NOT_READY->SKIPPED arrow now exists.]"
 		},
 		{
 			"commandType": "EnterExecutionStepWait",
@@ -4747,6 +4743,12 @@
 					"type": "enum",
 					"enumRef": "StepStateSchema",
 					"note": "(unreachable)->SKIPPED"
+				},
+				{
+					"field": "excludedEdgeId",
+					"required": false,
+					"type": "string",
+					"note": "JAN-EXECREM WP-1 (F-37). id-ref: the in-edge whose exclusion made this step unreachable — prune provenance DERIVED by the gate, never asserted by the caller. This is the fact that justifies minting a distinct event instead of reusing ExecutionStepSkipped; the shipped build dropped it. WP-14 emits it."
 				}
 			]
 		},
@@ -4824,6 +4826,12 @@
 					"type": "enum",
 					"enumRef": "StepStateSchema",
 					"note": "FAILED->QUEUED; drives PWU.executionState ->RETRYING"
+				},
+				{
+					"field": "retryReason",
+					"required": false,
+					"type": "string",
+					"note": "JAN-EXECREM WP-1 (F-25 family). Why this attempt was re-opened. Optional; WP-13 makes the emitted payload schema-complete."
 				}
 			]
 		},
@@ -4850,6 +4858,12 @@
 					"type": "enum",
 					"enumRef": "StepStateSchema",
 					"note": "{READY,QUEUED}->SKIPPED (the ExecutionStep.stepState machine permits SKIPPED only from READY and QUEUED — never NOT_READY, which must pass through READY first)"
+				},
+				{
+					"field": "selectedTransitionId",
+					"required": false,
+					"type": "string",
+					"note": "JAN-EXECREM WP-1 (F-15/F-21/F-23). A BRANCH driven to terminal-success by Skip must record its selection for the same reason Complete does — the shipped build recorded none, so its decision kept re-deriving."
 				}
 			]
 		},
@@ -4994,6 +5008,18 @@
 					"required": false,
 					"type": "unknown",
 					"note": "the inline machine-readable result of the step (WHAT it produced). AUTHORED optional field atop §16.2. §16.1 requires it on the command but §16.2 dropped it; durable outputs are captured by reference (outputArtifactIds/proposedEvidenceIds) but the inline structured result itself was discarded. Contract-drift fix."
+				},
+				{
+					"field": "noOutputResult",
+					"required": false,
+					"type": "NoOutputResult",
+					"note": "JAN-EXECREM WP-1 (F-01). The assertion must be a governed, replayable FACT, not merely a command-time argument — otherwise the stream cannot show why a step succeeded with nothing to assess."
+				},
+				{
+					"field": "selectedTransitionId",
+					"required": false,
+					"type": "string",
+					"note": "JAN-EXECREM WP-1 (F-02/F-07/F-24, F-15/F-21/F-23; settles CONFLICT-4). id-ref: the out-edge this completion SELECTED, recorded once at settlement so the decision is a point-in-time fact rather than re-derived on every read (DWP-09's 'decides once', which the shipped build did not achieve). WP-10 emits it."
 				}
 			]
 		},
