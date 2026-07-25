@@ -28,10 +28,12 @@ import {
 	retryDecision,
 	startStepGate,
 	validateStepCompletion,
+	STEP_COMMAND_SPECS,
 	validateProposedPlan,
 	type AssumptionView,
 	type EdgeGuardEvaluator,
-	type GatePlan
+	type GatePlan,
+	type StepCommandSpec
 } from '@janumipwb/rph-domain';
 import {
 	advanceStatus,
@@ -531,8 +533,13 @@ function advanceStep(
 	command: DomainCommand,
 	args: {
 		readonly stepId: string;
-		readonly target: string;
-		readonly eventType: string;
+		/**
+		 * The command's DECLARED contract (JAN-EXECREM WP-8 / SM-2): its target, its source set, and its event, read
+		 * from `STEP_COMMAND_SPECS` in rph-domain. REQUIRED — the three used to be loose, optional arguments supplied
+		 * per call site and declared nowhere a reader or a test could enumerate, which is why four source sets went
+		 * unkilled and four plan-ACTIVE omissions went unstated. A new step command cannot now be added without a row.
+		 */
+		readonly spec: StepCommandSpec;
 		readonly precheck?: (
 			step: Record<string, unknown>,
 			plan: Record<string, unknown>
@@ -541,22 +548,6 @@ function advanceStep(
 		/** The EVENT payload. Omitted → the raw command payload (the default for the step events DOC-007 leaves
 		 * unschematized). Mirrors kit.advanceStatus's `eventPayload`: the command shape is not the event shape. */
 		readonly eventPayload?: unknown;
-		/**
-		 * The step states this command may be issued FROM — the `drivesFrom` its own vocab entry already declares.
-		 *
-		 * The machine alone is NOT sufficient (DWP-07). It classifies from===to as a NOOP, so a re-issued command was
-		 * absorbed while STILL emitting an event; and it legalises every arrow into the target from ANY source, so
-		 * StartExecutionStep (drivesFrom QUEUED) was happily accepted on a WAITING step because WAITING→RUNNING is a
-		 * legal arrow — silently performing a RESUME, emitting a second ExecutionStepStarted that consumes one of the
-		 * plan's retries (RPH-EXE-008), and bypassing the ExecutionStepWaitResolved event minted so a resume would be
-		 * replayable. Likewise a re-issued Complete on a SUCCEEDED step was absorbed and REWROTE its structuredResult,
-		 * which last-write-wins in the condition subject and can retroactively flip a resolved BRANCH.
-		 *
-		 * So every step command now states its legal source set explicitly, and the handler enforces the contract the
-		 * vocab declares. Genuine transport retries are already absorbed upstream by idempotencyKey dedup, so a command
-		 * that reaches here from the wrong state is a DISTINCT request and rejecting it is the honest answer.
-		 */
-		readonly requireFrom?: readonly string[];
 	}
 ) {
 	const planId = command.targetAggregateId;
@@ -575,21 +566,26 @@ function advanceStep(
 	const step = steps[idx] as Record<string, unknown>;
 	const precheckFailure = args.precheck?.(step, plan);
 	if (precheckFailure) return precheckFailure;
-	if (args.requireFrom && !args.requireFrom.includes(String(step.stepState)))
+	// The source set comes from the DECLARED spec. Evaluation ORDER is deliberately unchanged by WP-8 (precheck ->
+	// sourceStates -> checkTransition): this package is a structural enabler, and reordering would change WHICH
+	// refusal a caller sees for an input that fails both. The pre-landing survey of all 71 refusal assertions
+	// confirmed no site depends on the order today; WP-9 isolates each source set with its own fixture instead.
+	const sourceStates = args.spec.sourceStates;
+	if (!sourceStates.includes(String(step.stepState) as (typeof sourceStates)[number]))
 		return reject(
 			command,
 			'RPH_ILLEGAL_STATE_TRANSITION',
-			`${command.commandType} requires step ${args.stepId} to be ${args.requireFrom.join(' or ')}, but it is ${String(step.stepState)}. The stepState machine may permit that arrow for a DIFFERENT command; this command declares drivesFrom ${args.requireFrom.join('|')}.`,
+			`${command.commandType} requires step ${args.stepId} to be ${sourceStates.join(' or ')}, but it is ${String(step.stepState)}. The stepState machine may permit that arrow for a DIFFERENT command; this command declares drivesFrom ${sourceStates.join('|')}.`,
 			[args.stepId]
 		);
-	const illegal = checkTransition(command, STEP_MACHINE, String(step.stepState), args.target);
+	const illegal = checkTransition(command, STEP_MACHINE, String(step.stepState), args.spec.target);
 	if (illegal) return illegal;
-	const nextStep = { ...(args.mutateStep ? args.mutateStep(step) : step), stepState: args.target };
+	const nextStep = { ...(args.mutateStep ? args.mutateStep(step) : step), stepState: args.spec.target };
 	const newSteps = steps.map((s, i) => (i === idx ? nextStep : s));
 	const newRevision = loaded.revision + 1;
 	const next = { ...nextEnvelope(plan, command, newRevision), steps: newSteps };
 	const event = makeEvent(ctx, command, {
-		eventType: args.eventType,
+		eventType: args.spec.eventType,
 		aggregateType: PLAN,
 		aggregateId: planId,
 		aggregateRevision: newRevision,
@@ -621,12 +617,11 @@ export const startExecutionStep: CommandHandler = (ctx, command) => {
 	const p = command.payload as { stepId: string; runtimeBindingId?: string };
 	return advanceStep(ctx, command, {
 		stepId: p.stepId,
-		target: 'RUNNING',
-		eventType: 'ExecutionStepStarted',
-		// drivesFrom QUEUED. NOT merely "not already RUNNING": the machine also legalises WAITING->RUNNING (the resume
-		// arrow), so without this a Start on a WAITING step performed a resume, burning a retry (RPH-EXE-008) and
-		// skipping the ExecutionStepWaitResolved fact. Resuming is ResolveExecutionStepWait's job.
-		requireFrom: ['QUEUED'],
+		// drivesFrom QUEUED (declared in STEP_COMMAND_SPECS). NOT merely "not already RUNNING": the machine also
+		// legalises WAITING->RUNNING (the resume arrow), so without this narrowing a Start on a WAITING step performed
+		// a resume, burning a retry (RPH-EXE-008) and skipping the ExecutionStepWaitResolved fact. Resuming is
+		// ResolveExecutionStepWait's job.
+		spec: STEP_COMMAND_SPECS.StartExecutionStep,
 		// The event records the RESULTING state, not the command input: ExecutionStepStarted declares `stepState`
 		// (the RUNNING it transitioned to), which `command.payload` ({ stepId }) does not carry — so the default
 		// emitted `{ stepId }` was missing the one field the event exists to record. The event that says "this step
@@ -679,12 +674,11 @@ export const completeExecutionStep: CommandHandler = (ctx, command) => {
 	const p = command.payload as CompleteExecutionStepPayload;
 	return advanceStep(ctx, command, {
 		stepId: p.executionStepId,
-		target: 'SUCCEEDED',
-		eventType: 'ExecutionStepSucceeded',
-		// drivesFrom RUNNING. A re-issued Complete on a SUCCEEDED step used to be NOOP-absorbed while still emitting a
-		// second ExecutionStepSucceeded — and the condition subject folds last-write-wins, so a re-Complete carrying a
-		// different structuredResult could retroactively flip an already-resolved BRANCH.
-		requireFrom: ['RUNNING'],
+		// drivesFrom RUNNING (declared in STEP_COMMAND_SPECS). A re-issued Complete on a SUCCEEDED step used to be
+		// NOOP-absorbed while still emitting a second ExecutionStepSucceeded — and the condition subject folds
+		// last-write-wins, so a re-Complete carrying a different structuredResult could retroactively flip an
+		// already-resolved BRANCH.
+		spec: STEP_COMMAND_SPECS.CompleteExecutionStep,
 		// DWP-09: a BRANCH DECIDES at the moment it succeeds. Record which out-edge it selected, so the decision is a
 		// durable fact rather than something re-derived on every later read. Re-derivation was not stable: a step
 		// reachable only through a not-taken edge can still change state afterwards, and an ATTEMPTS/STEP_STATE guard
@@ -795,9 +789,7 @@ export const failExecutionStep: CommandHandler = (ctx, command) => {
 	const p = command.payload as { stepId: string };
 	return advanceStep(ctx, command, {
 		stepId: p.stepId,
-		target: 'FAILED',
-		eventType: 'ExecutionStepFailed',
-		requireFrom: ['RUNNING'] // drivesFrom RUNNING
+		spec: STEP_COMMAND_SPECS.FailExecutionStep,
 	});
 };
 
@@ -843,9 +835,7 @@ export const retryExecutionStep: CommandHandler = (ctx, command) => {
 	const p = command.payload as { stepId: string };
 	return advanceStep(ctx, command, {
 		stepId: p.stepId,
-		target: 'QUEUED',
-		eventType: 'ExecutionStepRetried',
-		requireFrom: ['FAILED'], // drivesFrom FAILED — a retry re-opens a FAILED attempt, nothing else
+		spec: STEP_COMMAND_SPECS.RetryExecutionStep,
 		precheck: (step, plan) => {
 			if (plan.status !== 'ACTIVE')
 				return reject(
@@ -884,9 +874,7 @@ export const skipExecutionStep: CommandHandler = (ctx, command) => {
 	const p = command.payload as SkipExecutionStepPayload;
 	return advanceStep(ctx, command, {
 		stepId: p.stepId,
-		target: 'SKIPPED',
-		eventType: 'ExecutionStepSkipped',
-		requireFrom: ['READY', 'QUEUED'], // drivesFrom READY|QUEUED
+		spec: STEP_COMMAND_SPECS.SkipExecutionStep,
 		// The event records the RESULTING state + the authorization; `mandatory` is a decision-time assertion, not a
 		// recorded fact (the ratified ExecutionStepSkipped shape carries no `mandatory`), so it does not ride the event.
 		eventPayload: {
@@ -930,14 +918,7 @@ export const cancelExecutionStep: CommandHandler = (ctx, command) => {
 	const p = command.payload as CancelExecutionStepPayload;
 	return advanceStep(ctx, command, {
 		stepId: p.stepId,
-		target: 'CANCELLED',
-		eventType: 'ExecutionStepCancelled',
-		// drivesFrom READY|QUEUED|RUNNING|WAITING|FAILED. FAILED is the JAN-EXECREM WP-5 addition: cancelling a failed
-		// step is how an operator ABANDONS an arm they will not retry, which WP-4 otherwise left with no exit. It is a
-		// governed act — the reason rides the event — so the record shows the arm was abandoned rather than merely
-		// never retried. NOT_READY stays out: the machine declares no arrow, and a step that never became ready is
-		// removed by pruning its dead arm, not by cancelling work that never started.
-		requireFrom: ['READY', 'QUEUED', 'RUNNING', 'WAITING', 'FAILED'],
+		spec: STEP_COMMAND_SPECS.CancelExecutionStep,
 		eventPayload: {
 			stepId: p.stepId,
 			reason: p.reason,
@@ -969,12 +950,7 @@ export const pruneExecutionStep: CommandHandler = (ctx, command) => {
 	};
 	return advanceStep(ctx, command, {
 		stepId: p.stepId,
-		target: 'SKIPPED',
-		eventType: 'ExecutionStepPruned',
-		// drivesFrom NOT_READY|READY|QUEUED. NOT_READY is included because a step on an excluded arm that never became
-		// ready must still be prunable, or the plan can never reach terminal-success and deadlocks (D5). RUNNING and
-		// WAITING are deliberately excluded: live work is CANCELLED, not pruned.
-		requireFrom: ['NOT_READY', 'READY', 'QUEUED'],
+		spec: STEP_COMMAND_SPECS.PruneExecutionStep,
 		eventPayload: {
 			stepId: p.stepId,
 			...(p.selectedByBranchStepId ? { selectedByBranchStepId: p.selectedByBranchStepId } : {}),
@@ -1018,9 +994,7 @@ export const enterExecutionStepWait: CommandHandler = (ctx, command) => {
 	const p = command.payload as { stepId: string; waitReason?: string };
 	return advanceStep(ctx, command, {
 		stepId: p.stepId,
-		target: 'WAITING',
-		eventType: 'ExecutionStepWaiting',
-		requireFrom: ['RUNNING'], // drivesFrom RUNNING
+		spec: STEP_COMMAND_SPECS.EnterExecutionStepWait,
 		// The event records the RESULTING state (mirroring Started/Skipped/Pruned): the command payload carries no
 		// stepState, and the ratified event declares it required.
 		eventPayload: {
@@ -1044,9 +1018,7 @@ export const resolveExecutionStepWait: CommandHandler = (ctx, command) => {
 	const p = command.payload as { stepId: string; resolution?: string };
 	return advanceStep(ctx, command, {
 		stepId: p.stepId,
-		target: 'RUNNING',
-		eventType: 'ExecutionStepWaitResolved',
-		requireFrom: ['WAITING'], // drivesFrom WAITING — an already-RUNNING step never waited, so there is no wait to resolve
+		spec: STEP_COMMAND_SPECS.ResolveExecutionStepWait,
 		eventPayload: {
 			stepId: p.stepId,
 			...(p.resolution ? { resolution: p.resolution } : {}),
