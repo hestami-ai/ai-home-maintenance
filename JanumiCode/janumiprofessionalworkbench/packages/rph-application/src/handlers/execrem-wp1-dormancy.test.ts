@@ -26,13 +26,12 @@ const PLAN = 'plan_01ARZ3NDEKTSV4RRFFQ69GW220';
 const S1 = `${PLAN}-s1`;
 const S2 = `${PLAN}-s2`;
 
-/** Every field WP-1 added. None may appear on an emitted event until its owning WP switches it on. */
-const WP1_FIELDS = [
-	'noOutputResult',
-	'selectedTransitionId',
-	'excludedEdgeId',
-	'retryReason'
-] as const;
+/**
+ * The WP-1 fields still DORMANT. `noOutputResult` has left this list: WP-11 switched it on, so the case below was
+ * converted into that WP's positive assertion exactly as the header promises — a dormancy claim that outlived its
+ * dormancy would be a stale guarantee, which is the thing this program exists to eliminate.
+ */
+const WP1_FIELDS = ['selectedTransitionId', 'excludedEdgeId', 'retryReason'] as const;
 
 describe('JAN-EXECREM WP-1 — the new contract fields are DORMANT (no emitter produces them yet)', () => {
 	let store: SqliteStorageAdapter;
@@ -139,6 +138,7 @@ describe('JAN-EXECREM WP-1 — the new contract fields are DORMANT (no emitter p
 					proposedEvidenceIds: [],
 					detectedAssumptionIds: [],
 					structuredResult: {},
+					noOutputResult: { reason: 'SIDE_EFFECT_ONLY', detail: 'Lifecycle fixture; authors no artifact.' },
 					executionProvenance: { executedBy: actor, originType: 'HUMAN_DECISION' }
 				},
 				PLAN,
@@ -161,6 +161,38 @@ describe('JAN-EXECREM WP-1 — the new contract fields are DORMANT (no emitter p
 					`${event.eventType} must not yet carry '${field}' — if the WP that emits it has landed, convert ` +
 						`this case into that WP's positive assertion rather than deleting it`
 				).toBe(false);
+	});
+
+	// CONVERTED, not deleted (WP-11). This case asserted that `noOutputResult` never reached an emitted event. It
+	// now asserts the opposite, because WP-11 made the field load-bearing: RPH-EXE-006's explicit-no-output arm is a
+	// CALLER ASSERTION, and an assertion the event stream does not carry is one replay cannot distinguish from the
+	// silent omission it exists to rule out. Validating it at the door and dropping it would leave §2.6 half-kept.
+	it('WP-11 POSITIVE: an asserted noOutputResult is CARRIED onto ExecutionStepSucceeded, verbatim', () => {
+		// S1, not S2: `transitions: []` is a LINEAR plan, so a later array-index step cannot start until its
+		// predecessor is terminal-success (RPH-EXE-005).
+		expect(dispatch('StartExecutionStep', { stepId: S1 }, PLAN, 'EXECUTION_PLAN').status).toBe('ACCEPTED');
+		const assertion = { reason: 'SIDE_EFFECT_ONLY', detail: 'Notified the downstream team; produced no artifact.' };
+		const r = dispatch(
+			'CompleteExecutionStep',
+			{
+				executionStepId: S1,
+				executionAttemptId: `${S1}-a1`,
+				resultStatus: 'SUCCEEDED',
+				outputArtifactIds: [],
+				proposedEvidenceIds: [],
+				detectedAssumptionIds: [],
+				structuredResult: {},
+				noOutputResult: assertion,
+				executionProvenance: { executedBy: actor, originType: 'HUMAN_DECISION' }
+			},
+			PLAN,
+			'EXECUTION_PLAN'
+		);
+		expect(r.status, JSON.stringify(r.error)).toBe('ACCEPTED');
+		const succeeded = store.readAllEvents().filter((e) => e.eventType === 'ExecutionStepSucceeded');
+		expect(succeeded).toHaveLength(1);
+		// Both the reason AND the detail: the detail is the record of WHY, which a bare boolean would have lost.
+		expect((succeeded[0]!.payload as { noOutputResult?: unknown }).noOutputResult).toEqual(assertion);
 	});
 
 	it('a SKIPPED step emits no selectedTransitionId (WP-10 switches it on)', () => {

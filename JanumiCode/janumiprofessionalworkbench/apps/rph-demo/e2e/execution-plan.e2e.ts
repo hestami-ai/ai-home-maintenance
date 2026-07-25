@@ -326,6 +326,12 @@ test.describe('Execution Plan view — DWP-03 handler-backed step actions', () =
 		await stageActivePlan(request);
 		// The UI never OFFERS Complete on a QUEUED step (allowlist), so force it through the same command bus and
 		// assert the engine rejects it — the guard the allowlist mirrors is real, not merely a UI convenience.
+		//
+		// JAN-EXECREM WP-11: the payload carries `noOutputResult` so that RPH-EXE-006 is SATISFIED and the refusal
+		// this test asserts is the refusal it names. Without it the completion would now be refused by the result
+		// rule — the test would keep passing while silently ceasing to prove the RUNNING→SUCCEEDED guard it exists
+		// for. `advanceStep` runs `precheck` before the source-state check, so this masking is by construction; the
+		// asserted CODE below is what makes the isolation checkable rather than assumed.
 		const res = await request.post('/test-api/dispatch', {
 			data: {
 				steps: [
@@ -341,6 +347,10 @@ test.describe('Execution Plan view — DWP-03 handler-backed step actions', () =
 							proposedEvidenceIds: [],
 							detectedAssumptionIds: [],
 							structuredResult: {},
+							noOutputResult: {
+								reason: 'NO_DOWNSTREAM_CONSUMABLE_RESULT',
+								detail: 'The step is being completed with no named output.'
+							},
 							executionProvenance: {
 								executedBy: { actorId: 'ui-user', actorType: 'HUMAN', displayName: 'Workbench User' }
 							}
@@ -349,9 +359,15 @@ test.describe('Execution Plan view — DWP-03 handler-backed step actions', () =
 				]
 			}
 		});
-		const body = (await res.json()) as { ok: boolean; results: Array<{ status: string }> };
+		const body = (await res.json()) as {
+			ok: boolean;
+			results: Array<{ status: string; code?: string }>;
+		};
 		expect(body.ok).toBeFalsy();
 		expect(body.results[0]!.status).not.toBe('ACCEPTED');
+		expect(body.results[0]!.code, 'the STEP-STATE guard must be what refused, not the result rule').toBe(
+			'RPH_ILLEGAL_STATE_TRANSITION'
+		);
 		expect(await stepStateOf(request, STEP1)).toBe('QUEUED'); // unchanged
 	});
 });

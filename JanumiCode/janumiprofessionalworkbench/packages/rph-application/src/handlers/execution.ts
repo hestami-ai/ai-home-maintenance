@@ -48,7 +48,13 @@ import {
 	type CommandHandler,
 	type HandlerContext
 } from './kit.js';
-import { floorGateBlock, stepOutputIsAiProduced, stepResultSubjects } from './floor-gate.js';
+import {
+	floorGateBlock,
+	stepOutputIsAiProduced,
+	stepResultSubjects,
+	structuredResultHasContent,
+	unassessableAiContentBlock
+} from './floor-gate.js';
 import { fromStates } from './command-precondition.js';
 
 const PLAN = 'EXECUTION_PLAN';
@@ -720,14 +726,52 @@ export const completeExecutionStep: CommandHandler = (ctx, command) => {
 			detectedAssumptionIds: p.detectedAssumptionIds,
 			resultingExecutionState: 'SUCCEEDED',
 			executionProvenance: p.executionProvenance,
-			...(p.structuredResult !== undefined ? { structuredResult: p.structuredResult } : {})
+			...(p.structuredResult !== undefined ? { structuredResult: p.structuredResult } : {}),
+			// WP-11: the no-output ASSERTION is carried onto the event, not merely validated. Without it the stream
+			// still could not distinguish an explicit no-output from a silent one on replay — the very distinction
+			// §2.6 requires — and RPH-EXE-006 would be enforced at the door but unrecorded thereafter.
+			...(p.noOutputResult !== undefined ? { noOutputResult: p.noOutputResult } : {})
 		} satisfies ExecutionStepSucceededPayload,
 		precheck: (step) => {
+			// RPH-EXE-006 (JAN-EXECREM WP-11 / F-01 limb A). `explicitNoOutput` is now the CALLER'S ASSERTION, read
+			// from the payload — never `!hasOutput`, which made the kernel's disjunction `b || !b` and left a ratified
+			// conformance invariant enforced nowhere while this file's prose claimed it enforced it.
+			//
+			// RESIDUAL, registered rather than carried: an assertion is still a caller's word. `declaresOutputBindings`
+			// is the one limb recorded state can contribute — the authored step's own declaration — but a step
+			// authored with `outputBindings: []` can assert no-output and nothing in state can disagree. That is the
+			// same shape as the `!!waiverOrRevisionId` booleans this programme is elsewhere removing, and it is
+			// narrowed, not closed: the assertion is now recorded WITH its reason and detail, so a false one is a
+			// durable, attributable claim in the governed stream rather than an absence nobody can see.
 			const hasOutput =
 				(p.outputArtifactIds?.length ?? 0) > 0 || (p.proposedEvidenceIds?.length ?? 0) > 0;
-			const check = validateStepCompletion({ hasOutput, explicitNoOutput: !hasOutput });
+			const noOutput = p.noOutputResult;
+			const outputBindings = step.outputBindings;
+			const check = validateStepCompletion({
+				hasOutput,
+				explicitNoOutput: noOutput !== undefined,
+				// TIMEOUT / NO_CANDIDATE_OUTPUT are failure-shaped; the other two reasons are genuine successes that
+				// produced nothing downstream-consumable.
+				noOutputReasonIsSuccessCompatible:
+					noOutput === undefined ||
+					noOutput.reason === 'NO_DOWNSTREAM_CONSUMABLE_RESULT' ||
+					noOutput.reason === 'SIDE_EFFECT_ONLY',
+				// The state-derived corroboration limb: the authored step's own declaration, not the caller's word.
+				declaresOutputBindings: Array.isArray(outputBindings) && outputBindings.length > 0
+			});
 			if (!check.ok)
-				return reject(command, 'RPH_INVARIANT_VIOLATION', check.reason ?? 'step result missing');
+				// MISSING is the ratified invariant's own case (RPH-EXE-006) → INVARIANT_VIOLATION. The other three
+				// mean the payload is internally inconsistent, contradicts the authored step, or names the wrong
+				// command → VALIDATION_SEMANTIC_FAILED. The kernel's code is carried INTO the message so a caller can
+				// tell the four apart, and so a test can name which cell it killed.
+				return reject(
+					command,
+					check.errorCode === 'RPH_STEP_RESULT_MISSING'
+						? 'RPH_INVARIANT_VIOLATION'
+						: 'RPH_VALIDATION_SEMANTIC_FAILED',
+					`CompleteExecutionStep blocked (${check.errorCode}): ${check.reason ?? 'step result missing'}.`,
+					[p.executionStepId]
+				);
 			// Floor gate (§8.4 step 4), plane-agnostic: a step whose OUTPUT has a recorded de minimis assurance floor
 			// must have it SATISFIED (or waived) before the step may SUCCEED — exec != assurance (INV-5); step
 			// success drives the EXECUTION dimension only and never grants assurance.
@@ -763,6 +807,27 @@ export const completeExecutionStep: CommandHandler = (ctx, command) => {
 					[p.executionStepId, ...unresolved]
 				);
 			}
+			// F-01 limb B. The floor gate below is a loop over `subjects`, and a loop over an empty list is not a
+			// gate — it is a no-op wearing one's clothes. An AI-produced step naming ZERO results therefore skipped
+			// §8.4 entirely (reproduced live), while its sibling naming one real artifact was refused. This is the
+			// zero-subject floor: AI-produced content may not enter the governed stream with nothing to assess.
+			//
+			// COMPOSITION WITH LIMB A, which is what makes the bypass closed rather than narrowed: reaching here with
+			// `subjects.length === 0` means the caller ASSERTED no-output (limb A refused the silent case above), so
+			// this rule reads "you may not assert you produced nothing while shipping something". A genuine empty
+			// attempt — Coding Agent Guide L1964's timeout with no candidate output — is untouched.
+			const unassessable = unassessableAiContentBlock({
+				aiProduced,
+				subjectCount: subjects.length,
+				structuredResultHasContent: structuredResultHasContent(p.structuredResult)
+			});
+			if (unassessable)
+				return reject(
+					command,
+					'RPH_INVARIANT_VIOLATION',
+					`CompleteExecutionStep blocked: step ${p.executionStepId} is AI-produced and carries a structuredResult, but names no recorded, assessable result (${unassessable}). Record the content as an Artifact (RecordArtifact) or Evidence (ProposeEvidence) and name it, so its de minimis assurance floor can be judged.`,
+					[p.executionStepId]
+				);
 			for (const subject of subjects) {
 				const blocking = floorGateBlock(ctx, subject.subjectId, {
 					aiProduced,

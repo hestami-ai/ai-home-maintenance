@@ -544,6 +544,10 @@ export const actions: Actions = {
 			// Explicit no-output completion (RPH-EXE-006 permits it) — the demo shows the lifecycle, not artifact
 			// authoring. Non-AI (TRANSFORMATION + HUMAN operator), so the floor gate admits it. executionProvenance is
 			// required (§16.1); recording the human operator keeps the step non-AI.
+			//
+			// JAN-EXECREM WP-11: the no-output result is now ASSERTED rather than inferred from the empty id arrays.
+			// The engine used to infer it, which made RPH-EXE-006 a tautology; this demo path silently depended on
+			// that. Saying it out loud is the honest demo — a step that produced nothing must say so, and say why.
 			[
 				'CompleteExecutionStep',
 				'EXECUTION_PLAN',
@@ -556,6 +560,10 @@ export const actions: Actions = {
 					proposedEvidenceIds: [],
 					detectedAssumptionIds: [],
 					structuredResult: {},
+					noOutputResult: {
+						reason: 'NO_DOWNSTREAM_CONSUMABLE_RESULT',
+						detail: 'Demo lifecycle step: it demonstrates the execution axis and authors no artifact.'
+					},
 					executionProvenance: {
 						executedBy: { actorId: 'ui-user', actorType: 'HUMAN', displayName: 'Workbench User' }
 					}
@@ -676,6 +684,18 @@ export const actions: Actions = {
 			proposedEvidenceIds: [],
 			detectedAssumptionIds: [],
 			structuredResult: {},
+			// WP-11 / RPH-EXE-006: the no-output case must now be ASSERTED, and asserting it alongside a named output
+			// is itself a refusal (the two cannot both be true), so this is conditional on there being no output.
+			// The AI path stays ACCEPTED here only because `structuredResult` is genuinely empty — an AI step that
+			// shipped inline content while naming nothing would be refused by the zero-subject floor.
+			...(outputArtifactId
+				? {}
+				: {
+						noOutputResult: {
+							reason: 'NO_DOWNSTREAM_CONSUMABLE_RESULT',
+							detail: 'Operator completed the step without naming a produced output.'
+						}
+					}),
 			executionProvenance
 		});
 	},

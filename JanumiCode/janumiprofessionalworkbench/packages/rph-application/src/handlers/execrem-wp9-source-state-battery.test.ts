@@ -184,6 +184,11 @@ describe('JAN-EXECREM WP-9 — the source-state battery', () => {
 			// CompleteExecutionStep's payload is a strictObject keyed on `executionStepId` and carries no `stepId`,
 			// so the two shapes are built separately rather than merged — a merged one fails SCHEMA validation before
 			// reaching the guard under test, which would make this case vacuous in a new way.
+			//
+			// WP-11 added `noOutputResult` for the SAME isolation reason: RPH-EXE-006 runs in `precheck`, which
+			// `advanceStep` evaluates BEFORE the source set, so a completion asserting nothing would now be refused by
+			// the result rule and this case would assert a refusal it did not isolate. Fixing the fixture is the
+			// honest move; weakening either rule to keep it green is the inversion this whole program is about.
 			const payload =
 				c.commandType === 'CompleteExecutionStep'
 					? {
@@ -194,6 +199,10 @@ describe('JAN-EXECREM WP-9 — the source-state battery', () => {
 							proposedEvidenceIds: [],
 							detectedAssumptionIds: [],
 							structuredResult: {},
+							noOutputResult: {
+								reason: 'NO_DOWNSTREAM_CONSUMABLE_RESULT',
+								detail: 'Kill-test fixture: every precheck must PASS so the source set is what refuses.'
+							},
 							executionProvenance: { executedBy: actor, originType: 'HUMAN_DECISION' }
 						}
 					: { stepId: sid(1), ...(c.payload ?? {}) };

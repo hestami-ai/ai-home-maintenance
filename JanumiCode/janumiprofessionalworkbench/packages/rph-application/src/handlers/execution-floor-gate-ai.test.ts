@@ -128,6 +128,12 @@ describe('CompleteExecutionStep floor gate — an AI-produced step with NO recor
 		// validateStepCompletion (RPH-EXE-006), AND it gives the floor a legal subject to be MISSING over. Without
 		// it the command now dies earlier, on the unrecorded-result check, and would never reach the floor gate
 		// this test exists to prove.
+		//
+		// THE FIRST HALF OF THAT CLAIM WAS FALSE WHEN WRITTEN, and is true now (JAN-EXECREM WP-11 / F-01). Naming
+		// the artifact could not "satisfy RPH-EXE-006" while the handler passed `explicitNoOutput: !hasOutput`,
+		// because the empty case satisfied it equally — the predicate was `b || !b`. The claim is kept rather than
+		// softened: it says what the test needs to be true, and WP-11 is what made it so. The distinguishing case
+		// is now proved directly in execution-exe006-explicit-result.test.ts.
 		d(
 			'RecordArtifact',
 			{

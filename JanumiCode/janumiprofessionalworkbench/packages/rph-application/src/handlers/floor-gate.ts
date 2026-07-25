@@ -113,9 +113,15 @@ export interface StepResultSubjects {
  * NOT grouped: §8.4 L844 permits an "explicit grouping" only when it "records every subject/version and its
  * rationale". No such grouping record exists in the contract, so each result is judged on its own.
  *
- * DISCLOSED GAP: `structuredResult` is `z.unknown()`, so a step could in principle carry professional content
- * that is neither an Artifact nor Evidence and therefore attracts no subject here. That is the same
- * unschematized-payload gap as `executionProvenance` (§16 item 23); it is not closed by inventing a shape.
+ * PARTLY-CLOSED GAP (JAN-EXECREM WP-11 / F-01 limb B). `structuredResult` is `z.unknown()`, so a step can carry
+ * professional content that is neither an Artifact nor Evidence and therefore attracts no subject here. This
+ * paragraph used to disclose that as wholly unfixed, and it was worse than disclosed: with BOTH id arrays empty,
+ * `resultIds` is `[]`, this function returns zero subjects, and the caller's floor loop then iterates ZERO times —
+ * so an AI-produced step escaped the §8.4 floor entirely by the cheapest possible move, naming nothing. The
+ * zero-subject case is now refused by `unassessableAiContentBlock` below. What REMAINS open is the narrower
+ * individuation residual: a step naming ONE floor-satisfied artifact may still ship additional inline content in
+ * `structuredResult` un-individuated (§8.4 L844). Closing that means requiring such content to be recorded as an
+ * Artifact — a contract change for every AI step, registered as an open question rather than silently carried.
  */
 export function stepResultSubjects(
 	ctx: HandlerContext,
@@ -129,6 +135,73 @@ export function stepResultSubjects(
 		else unresolved.push(id);
 	}
 	return { subjects, unresolved };
+}
+
+/**
+ * Does `structuredResult` carry professional CONTENT, as opposed to being an empty placeholder?
+ *
+ * PINNED DEFINITION, because the design defined it inconsistently and both readings are wrong in opposite
+ * directions. A stricter reading ("anything not undefined is content") refuses the reference seed and the demo,
+ * which both send `structuredResult: {}`. A looser ad-hoc reading (the design's "non-empty object/array/string OR
+ * number OR boolean") calls the number `0` content while calling `''` empty — an arbitrary line that a truth
+ * table would then enshrine as if it meant something.
+ *
+ * So: CONTENT iff (an object with >= 1 own key) OR (an array with length > 0) OR (a string with a non-whitespace
+ * character). EVERYTHING else is EMPTY — including `null`, `undefined`, `0`, `false`, `{}`, `[]`, `''` and `'  '`.
+ *
+ * The rationale for excluding bare scalars is not squeamishness about `0`: `structuredResult` reaches this
+ * predicate as parsed JSON, and a professional result that is a bare scalar carries no field naming what it IS.
+ * Such a value cannot be individuated as a downstream-consumable result under §8.4 L844 anyway, so treating it as
+ * content would refuse a step while naming no content it could plausibly be asked to record.
+ */
+export function structuredResultHasContent(value: unknown): boolean {
+	if (typeof value === 'string') return /\S/.test(value);
+	if (Array.isArray(value)) return value.length > 0;
+	if (typeof value === 'object' && value !== null) return Object.keys(value).length > 0;
+	return false;
+}
+
+/** The inputs to the zero-subject admissibility rule. No `ctx`, so its truth table is unit-testable in isolation. */
+export interface FloorSubjectAdmissibility {
+	/** Is the step's output AI-produced (§8.4 L841)? Derived by `stepOutputIsAiProduced`, never asserted. */
+	readonly aiProduced: boolean;
+	/** How many of the named results resolved to a recorded, assessable Professional Work Object. */
+	readonly subjectCount: number;
+	/** Does the completion carry professional content inline? `structuredResultHasContent(p.structuredResult)`. */
+	readonly structuredResultHasContent: boolean;
+}
+
+/**
+ * §8.4, fail-closed restatement: **AI-produced professional content may not enter the governed stream without an
+ * assessable subject.** Returns the refusal reason, or null when the completion is admissible.
+ *
+ * WHY THIS EXISTS. The floor gate is a `for (const subject of subjects)` loop, and a loop over an empty list is
+ * not a gate — it is a no-op that looks like one. An AI-produced step naming zero results therefore skipped §8.4
+ * entirely (reproduced live: `ACCEPTED | state=SUCCEEDED`), while its sibling naming one real artifact was
+ * REJECTED. The single population the floor exists to catch escaped it by naming nothing.
+ *
+ * WHY IT DOES NOT SIMPLY REFUSE EVERY ZERO-SUBJECT AI COMPLETION. Coding Agent Guide L1964: "A timeout/no-output
+ * Attempt remains recorded but has no candidate output to review." A blanket refusal would over-refuse exactly
+ * that legitimate case. The discriminator is whether the step SHIPPED something: content with no subject is the
+ * defect; nothing with no subject is an honest empty attempt.
+ *
+ * WHY THE CONTENT LIMB MATTERS RATHER THAN BEING BELT-AND-BRACES. `execution.ts` persists `structuredResult`
+ * verbatim onto `ExecutionStepSucceeded`, `condition-grammar.ts` folds it into the condition subject, and
+ * `RESULT_EQUALS` resolves a dot-path over it — so unassessed AI content does not merely sit in the log, it
+ * carries BRANCH-selection authority.
+ *
+ * DELIBERATE DEVIATION FROM THE DESIGN, recorded rather than silently taken: the designed interface carried a
+ * fourth input, `explicitNoOutput`. It is omitted because it cannot change the answer. Composed with WP-11's
+ * RPH-EXE-006 fix, `subjectCount === 0` already IMPLIES the caller asserted no-output (a completion naming
+ * nothing without the assertion is refused before this predicate is reached), so the fourth input would be an
+ * unkillable parameter and a 16-cell table over it would be eight duplicated rows presented as coverage — the
+ * precise shape of vacuity this program exists to remove. The composition is asserted at the call site instead.
+ */
+export function unassessableAiContentBlock(input: FloorSubjectAdmissibility): string | null {
+	if (!input.aiProduced) return null;
+	if (input.subjectCount !== 0) return null;
+	if (!input.structuredResultHasContent) return null;
+	return 'AI-produced content with no assessable subject';
 }
 
 interface FloorRecord {

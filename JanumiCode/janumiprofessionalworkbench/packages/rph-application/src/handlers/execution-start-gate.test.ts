@@ -90,7 +90,16 @@ describe('StartExecutionStep — the linear start-gate (DWP-01, RPH-EXE-005 / fo
 	}
 
 	const start = (i: number) => dispatch('StartExecutionStep', { stepId: stepId(i) }, PLAN, 'EXECUTION_PLAN');
-	/** Complete a RUNNING step with an explicit no-output result (no floor subject → no assurance gate). */
+	/**
+	 * Complete a RUNNING step, ASSERTING an explicit no-output result.
+	 *
+	 * This comment used to read "an explicit no-output result (no floor subject → no assurance gate)" while the
+	 * payload asserted nothing at all — it taught the F-01 bypass as if it were the design. The engine INFERRED the
+	 * assertion from the empty id arrays, which made RPH-EXE-006 the tautology `hasOutput || !hasOutput`, and the
+	 * "no floor subject → no assurance gate" it cheerfully described was the §8.4 escape itself. WP-11 makes the
+	 * assertion real and this helper says it: these steps are sequencing fixtures that author no artifact, and the
+	 * completions are admitted because they SAY SO and carry no content, not because the gate could not see them.
+	 */
 	const complete = (i: number) =>
 		dispatch(
 			'CompleteExecutionStep',
@@ -102,6 +111,10 @@ describe('StartExecutionStep — the linear start-gate (DWP-01, RPH-EXE-005 / fo
 				proposedEvidenceIds: [],
 				detectedAssumptionIds: [],
 				structuredResult: {},
+				noOutputResult: {
+					reason: 'NO_DOWNSTREAM_CONSUMABLE_RESULT',
+					detail: 'Sequencing fixture: the step exercises the start gate and authors no artifact.'
+				},
 				executionProvenance: {}
 			},
 			PLAN,

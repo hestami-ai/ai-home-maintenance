@@ -114,12 +114,51 @@ describe('M11 execution step lifecycle (RPH-EXE-005/006/009; §21.1)', () => {
 		expect(canStartStep({ ...ready, stepState: 'NOT_READY' }).ok).toBe(false);
 	});
 
-	it('RPH-EXE-006: completing a step without output or an explicit no-output result is rejected', () => {
+	// JAN-EXECREM WP-11 / F-01. This used to be three lines proving the two OK cells and the MISSING one. It could
+	// not detect that the APPLICATION passed `explicitNoOutput: !hasOutput`, making the real predicate `b || !b` —
+	// a unit test over a kernel cannot see which arguments its caller supplies. The table is now exhaustive over the
+	// four cells plus the two refinements of the asserted arm, and the application-side isolation lives in
+	// execution-exe006-explicit-result.test.ts, where the caller is the engine itself.
+	it('RPH-EXE-006: the four-cell completion table over (hasOutput, explicitNoOutput)', () => {
 		expect(validateStepCompletion({ hasOutput: true, explicitNoOutput: false }).ok).toBe(true);
 		expect(validateStepCompletion({ hasOutput: false, explicitNoOutput: true }).ok).toBe(true);
-		const r = validateStepCompletion({ hasOutput: false, explicitNoOutput: false });
-		expect(r.ok).toBe(false);
-		expect(r.errorCode).toBe('RPH_STEP_RESULT_MISSING');
+		const missing = validateStepCompletion({ hasOutput: false, explicitNoOutput: false });
+		expect(missing.ok).toBe(false);
+		expect(missing.errorCode).toBe('RPH_STEP_RESULT_MISSING');
+		// The fourth cell was UNREPRESENTABLE while the caller derived one fact from the other: it cannot both
+		// produce a result and assert it produced none.
+		const both = validateStepCompletion({ hasOutput: true, explicitNoOutput: true });
+		expect(both.ok).toBe(false);
+		expect(both.errorCode).toBe('RPH_STEP_RESULT_CONTRADICTORY');
+	});
+
+	it('RPH-EXE-006: a failure-shaped no-output reason cannot reach SUCCEEDED', () => {
+		const shaped = (compatible: boolean) =>
+			validateStepCompletion({
+				hasOutput: false,
+				explicitNoOutput: true,
+				noOutputReasonIsSuccessCompatible: compatible
+			});
+		expect(shaped(true).ok).toBe(true);
+		expect(shaped(false).ok).toBe(false);
+		expect(shaped(false).errorCode).toBe('RPH_STEP_RESULT_NOT_SUCCESS_SHAPED');
+		// Undefined means "no reason supplied", which cannot itself be failure-shaped — the flag never refuses by
+		// absence, only by an explicit false. A `!compatible` mutant would refuse every legacy caller.
+		expect(validateStepCompletion({ hasOutput: false, explicitNoOutput: true }).ok).toBe(true);
+	});
+
+	it('RPH-EXE-006: a step whose own plan declares outputBindings may not assert no-output', () => {
+		// The state-derived corroboration limb. Without it `noOutputResult` is a free caller assertion that nothing
+		// in recorded state can contradict; the authored step's own declaration is the one thing that can.
+		const declared = (declaresOutputBindings: boolean) =>
+			validateStepCompletion({ hasOutput: false, explicitNoOutput: true, declaresOutputBindings });
+		expect(declared(false).ok).toBe(true);
+		expect(declared(true).ok).toBe(false);
+		expect(declared(true).errorCode).toBe('RPH_STEP_RESULT_CONTRADICTS_PLAN');
+		// It constrains ONLY the asserted arm: a step that declares outputs and NAMES one is exactly right.
+		expect(
+			validateStepCompletion({ hasOutput: true, explicitNoOutput: false, declaresOutputBindings: true }).ok
+		).toBe(true);
 	});
 
 	it('§21.1: skipping a MANDATORY step needs an authorized waiver/revision; an optional step may be skipped freely', () => {

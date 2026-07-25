@@ -87,6 +87,11 @@ describe('JAN-EXECREM WP-5 — abandoning a FAILED arm', () => {
 			proposedEvidenceIds: [],
 			detectedAssumptionIds: [],
 			structuredResult: {},
+			// WP-11 / RPH-EXE-006: these diamond arms author no artifact, and now say so explicitly.
+			noOutputResult: {
+				reason: 'NO_DOWNSTREAM_CONSUMABLE_RESULT',
+				detail: 'Diamond fixture: the arm exercises join liveness and authors no artifact.'
+			},
 			executionProvenance: { executedBy: actor, originType: 'HUMAN_DECISION' }
 		});
 

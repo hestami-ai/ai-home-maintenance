@@ -163,21 +163,81 @@ export function canStartStep(input: StepStartInput): Check {
 export interface StepCompletionInput {
 	/** Whether the step recorded at least one output artifact. */
 	readonly hasOutput: boolean;
-	/** Whether the step recorded an EXPLICIT "no output" result (distinct from silently missing output). */
+	/**
+	 * Whether the caller ASSERTED an explicit "no output" result (distinct from silently missing output).
+	 *
+	 * JAN-EXECREM WP-11 / F-01: this must be INDEPENDENT of `hasOutput`. The application layer used to pass
+	 * `explicitNoOutput: !hasOutput`, so the disjunction below evaluated `b || !b` — a tautology, and RPH-EXE-006
+	 * was enforced nowhere in the running engine. The kernel was never wrong; the caller supplied one fact twice
+	 * because the CONTRACT had no field for the second one. WP-1 added `CompleteExecutionStepPayload.noOutputResult`,
+	 * so the two facts can now DISAGREE and this is a real decision (§2.6: state is explicit, never inferred from
+	 * absent output).
+	 */
 	readonly explicitNoOutput: boolean;
+	/**
+	 * Is the asserted no-output REASON compatible with reaching SUCCEEDED? Absent/undefined = yes.
+	 *
+	 * `TIMEOUT` and `NO_CANDIDATE_OUTPUT` are failure-shaped: a timed-out attempt is a FailExecutionStep, not a
+	 * success with an excuse. SUCCEEDED credit is what backs the PWU's execution-success claim, so admitting a
+	 * timeout as SUCCEEDED would let a non-result back it.
+	 */
+	readonly noOutputReasonIsSuccessCompatible?: boolean;
+	/**
+	 * Does the STEP ITSELF declare `outputBindings` (i.e. the authored plan says this step produces something)?
+	 *
+	 * The state-derived corroboration limb. Without it, `noOutputResult` is a FREE CALLER ASSERTION — structurally
+	 * the same shape as the `!!waiverOrRevisionId` booleans this program is elsewhere removing: nothing in recorded
+	 * state can disagree with it. This limb is the one thing state CAN say: a step whose own plan declares outputs
+	 * may not be completed by asserting it produced none. Free for every legitimate caller (the reference seed and
+	 * the demo both author `outputBindings: []`).
+	 */
+	readonly declaresOutputBindings?: boolean;
 }
 
 /**
- * RPH-EXE-006 / §21.1. A succeeded step MUST record outputs or an explicit no-output result; completing a
- * running step with neither is rejected (state is explicit, never inferred from absent output, §2.6).
+ * RPH-EXE-006 / §21.1. A succeeded step MUST record outputs or an explicit no-output result.
+ *
+ * The four cells over (`hasOutput`, `explicitNoOutput`), then two refinements of the asserted case:
+ *
+ * | hasOutput | explicitNoOutput | verdict                                                              |
+ * |-----------|------------------|----------------------------------------------------------------------|
+ * | true      | false            | OK — the completion names a result                                    |
+ * | false     | true             | OK *if* the reason is success-shaped and the step declares no outputs |
+ * | false     | false            | `RPH_STEP_RESULT_MISSING` — the invariant's own case                  |
+ * | true      | true             | `RPH_STEP_RESULT_CONTRADICTORY` — it cannot both produce and not      |
+ *
+ * The contradictory cell is checked FIRST and deliberately: it is the cell the old derived form made
+ * unrepresentable, and it is the one that would otherwise be silently absorbed by the "has output" arm.
  */
 export function validateStepCompletion(input: StepCompletionInput): Check {
-	if (input.hasOutput || input.explicitNoOutput) return { ok: true };
-	return {
-		ok: false,
-		errorCode: 'RPH_STEP_RESULT_MISSING',
-		reason: 'step completion requires recorded output or an explicit no-output result'
-	};
+	if (input.hasOutput && input.explicitNoOutput)
+		return {
+			ok: false,
+			errorCode: 'RPH_STEP_RESULT_CONTRADICTORY',
+			reason:
+				'step completion names a result AND asserts an explicit no-output result; exactly one of the two is true'
+		};
+	if (!input.hasOutput && !input.explicitNoOutput)
+		return {
+			ok: false,
+			errorCode: 'RPH_STEP_RESULT_MISSING',
+			reason: 'step completion requires recorded output or an explicit no-output result'
+		};
+	if (input.explicitNoOutput && input.noOutputReasonIsSuccessCompatible === false)
+		return {
+			ok: false,
+			errorCode: 'RPH_STEP_RESULT_NOT_SUCCESS_SHAPED',
+			reason:
+				'a timed-out or candidate-less attempt is a FAILURE — use FailExecutionStep; SUCCEEDED credit is what backs the PWU execution-success claim'
+		};
+	if (input.explicitNoOutput && input.declaresOutputBindings === true)
+		return {
+			ok: false,
+			errorCode: 'RPH_STEP_RESULT_CONTRADICTS_PLAN',
+			reason:
+				'the step declares outputBindings, so its own plan says it produces a result; asserting no-output contradicts the authored step'
+		};
+	return { ok: true };
 }
 
 export interface StepSkipInput {

@@ -177,6 +177,12 @@ describe('JAN-EXECREM WP-3 — a plan-entry edge through the live bus', () => {
 					proposedEvidenceIds: [],
 					detectedAssumptionIds: [],
 					structuredResult: {},
+					// WP-11 / RPH-EXE-006: the no-output result is ASSERTED, not inferred. These are sequencing steps
+					// that author nothing; the assertion is what makes that a stated fact rather than an omission.
+					noOutputResult: {
+						reason: 'NO_DOWNSTREAM_CONSUMABLE_RESULT',
+						detail: 'Sequencing fixture: the step exercises the entry edge and authors no artifact.'
+					},
 					executionProvenance: { executedBy: actor, originType: 'HUMAN_DECISION' }
 				},
 				PLAN,
