@@ -69,20 +69,114 @@ export type InEdgeDisposition = 'SATISFIED' | 'NEUTRALIZED' | 'PENDING';
  */
 export type EdgeGuardEvaluator = (edge: GateTransition, plan: GatePlan) => boolean;
 
-const stateOf = (plan: GatePlan, stepId: string | undefined): string | undefined =>
-	stepId === undefined ? undefined : plan.steps.find((s) => s.id === stepId)?.stepState;
+// ── GateContext (JAN-EXECREM WP-2 / SM-1) ───────────────────────────────────────────────────────────────────────
+//
+// ONE context per PUBLIC entry point, carrying the adjacency indexes and two memos. This is purely a performance
+// seam: every predicate below computes exactly what it computed before, from the same inputs, in the same order.
+// It lands BEFORE any rule change so that each later diff on this file reads as a rule change rather than a rule
+// change tangled with an indexing change.
+//
+// WHY (F-34). `inEdgeDisposition` called `liveStepIds` afresh for EVERY in-edge — a full BFS per edge — and
+// `liveStepIds` in turn called the O(E) `inEdgesOf`/`outEdgesOf` array filters once per node. So `startableStepIds`
+// over a fan-out of width N ran N steps x N in-edges x BFS(V·E), i.e. cubic, against this module's own O(V+E)
+// header claim, and it re-invoked the CALLER'S guard evaluator once per edge per pass. `prunableStepIds` already
+// hoisted its single `liveStepIds` call correctly, which is what proves the cost was accidental, not inherent.
+interface GateContext {
+	readonly plan: GatePlan;
+	readonly evaluateGuard?: EdgeGuardEvaluator;
+	readonly stepById: ReadonlyMap<string, GateStep>;
+	/** In-edges keyed by targetStepId, authored order. Entry edges (no source) ARE included — they are in-edges. */
+	readonly inEdgesById: ReadonlyMap<string, readonly GateTransition[]>;
+	/** Out-edges keyed by sourceStepId, authored order (= BRANCH first-match order), half-edges EXCLUDED. */
+	readonly outEdgesById: ReadonlyMap<string, readonly GateTransition[]>;
+	/** The live set, computed at most ONCE per context. */
+	live(): ReadonlySet<string>;
+	/** The disposition of one in-edge, memoized on edge identity. */
+	dispositionOf(edge: GateTransition): InEdgeDisposition;
+	/**
+	 * The out-edge a settled BRANCH selected, memoized on SOURCE identity.
+	 *
+	 * This is the memo that actually bounds the guard-evaluator call count. Memoizing the per-edge disposition is
+	 * not enough on its own: `selectBranchEdge` scans a source's out-edges calling the evaluator until one matches,
+	 * so running it once per in-edge of a width-N fan-out is still N x N evaluator calls. The selection depends only
+	 * on the SOURCE (its out-edges and their guards are fixed within a context), so it is computed once per branch —
+	 * which is what makes "at most one evaluation per guarded edge" true.
+	 */
+	selectionOf(source: GateStep, outEdges: readonly GateTransition[]): GateTransition | undefined;
+}
+
+const EMPTY_EDGES: readonly GateTransition[] = [];
+
+function gateContext(plan: GatePlan, evaluateGuard?: EdgeGuardEvaluator): GateContext {
+	// FIRST-wins, exactly matching the `plan.steps.find(...)` lookups this replaces. Duplicate step ids are accepted
+	// at propose today (F-10, fixed in WP-6), so a last-wins Map would silently change which step every predicate
+	// resolves to — a semantic change smuggled in under a "pure refactor".
+	const stepById = new Map<string, GateStep>();
+	for (const s of plan.steps) if (!stepById.has(s.id)) stepById.set(s.id, s);
+
+	const inEdgesById = new Map<string, GateTransition[]>();
+	const outEdgesById = new Map<string, GateTransition[]>();
+	// Single pass in authored array order, so both indexes preserve it (load-bearing for BRANCH first-match).
+	for (const t of plan.transitions ?? []) {
+		if (t.targetStepId === undefined) continue; // a half-edge reaches nothing — see the exclusion note below
+		const into = inEdgesById.get(t.targetStepId);
+		if (into) into.push(t);
+		else inEdgesById.set(t.targetStepId, [t]);
+		if (t.sourceStepId !== undefined) {
+			const outOf = outEdgesById.get(t.sourceStepId);
+			if (outOf) outOf.push(t);
+			else outEdgesById.set(t.sourceStepId, [t]);
+		}
+	}
+
+	let liveMemo: ReadonlySet<string> | undefined;
+	const dispositionMemo = new Map<GateTransition, InEdgeDisposition>();
+	const selectionMemo = new Map<GateStep, GateTransition | undefined>();
+	const ctx: GateContext = {
+		plan,
+		evaluateGuard,
+		stepById,
+		inEdgesById,
+		outEdgesById,
+		live: () => (liveMemo ??= computeLiveStepIds(ctx)),
+		dispositionOf: (edge) => {
+			let d = dispositionMemo.get(edge);
+			if (d === undefined) {
+				d = computeInEdgeDisposition(ctx, edge);
+				dispositionMemo.set(edge, d);
+			}
+			return d;
+		},
+		selectionOf: (source, outEdges) => {
+			// `has` rather than a truthy check: `undefined` (a malformed branch with no matching arm and no default)
+			// is a REAL, cacheable answer, and re-deriving it would restore the quadratic call count in exactly the
+			// case that evaluates every guard.
+			if (selectionMemo.has(source)) return selectionMemo.get(source);
+			const selected = computeBranchSelection(ctx, outEdges, source);
+			selectionMemo.set(source, selected);
+			return selected;
+		}
+	};
+	return ctx;
+}
+
+const stepOf = (ctx: GateContext, stepId: string | undefined): GateStep | undefined =>
+	stepId === undefined ? undefined : ctx.stepById.get(stepId);
+
+const stateOf = (ctx: GateContext, stepId: string | undefined): string | undefined =>
+	stepOf(ctx, stepId)?.stepState;
 
 /** The in-edges of a step = transitions whose targetStepId is this step. */
-const inEdgesOf = (plan: GatePlan, stepId: string): readonly GateTransition[] =>
-	(plan.transitions ?? []).filter((t) => t.targetStepId === stepId);
+const inEdgesOf = (ctx: GateContext, stepId: string): readonly GateTransition[] =>
+	ctx.inEdgesById.get(stepId) ?? EMPTY_EDGES;
 
 /** The out-edges of a step, in authored (array) order — which IS the branch first-match order. A half-edge (a source
  *  with NO target) is excluded: it reaches nothing, so it must not participate in selection. Filtering on source alone
  *  let such an edge win first-match and neutralize every real arm, while validateTransitionGraph's adjacency (which
  *  requires both endpoints) never saw it — the two disagreed and the plan deadlocked. Propose now rejects half-edges
- *  outright; this filter keeps the runtime safe for any that predate that rule. */
-const outEdgesOf = (plan: GatePlan, stepId: string): readonly GateTransition[] =>
-	(plan.transitions ?? []).filter((t) => t.sourceStepId === stepId && t.targetStepId !== undefined);
+ *  outright; this exclusion (applied when the index is built) keeps the runtime safe for any that predate that rule. */
+const outEdgesOf = (ctx: GateContext, stepId: string): readonly GateTransition[] =>
+	ctx.outEdgesById.get(stepId) ?? EMPTY_EDGES;
 
 /** An edge is CONDITIONAL (guarded) if it carries a conditionExpression or is tagged CONDITIONAL. */
 const isConditionalEdge = (e: GateTransition): boolean =>
@@ -96,9 +190,20 @@ const isConditionalEdge = (e: GateTransition): boolean =>
  * regardless of prune timing (closes the double-run window, §10-M-D3).
  */
 function selectBranchEdge(
+	ctx: GateContext,
 	outEdges: readonly GateTransition[],
-	plan: GatePlan,
-	evaluateGuard?: EdgeGuardEvaluator,
+	source?: GateStep
+): GateTransition | undefined {
+	// Route through the per-source memo (see GateContext.selectionOf). Without a source there is nothing to key on.
+	return source === undefined
+		? computeBranchSelection(ctx, outEdges, source)
+		: ctx.selectionOf(source, outEdges);
+}
+
+/** The first-match computation itself. Called at most once per BRANCH source per context. */
+function computeBranchSelection(
+	ctx: GateContext,
+	outEdges: readonly GateTransition[],
 	source?: GateStep
 ): GateTransition | undefined {
 	// A RECORDED decision wins over a re-derived one (DWP-09). A branch is evaluated at a point in time against the
@@ -114,7 +219,7 @@ function selectBranchEdge(
 	}
 	for (const e of outEdges) {
 		if (!isConditionalEdge(e)) return e; // an unconditional edge (the SEQUENTIAL default) always matches
-		if (evaluateGuard?.(e, plan)) return e; // the first true conditional
+		if (ctx.evaluateGuard?.(e, ctx.plan)) return e; // the first true conditional
 	}
 	return undefined;
 }
@@ -132,19 +237,20 @@ function selectBranchEdge(
  * Forward BFS from the entries (the graph is a validated DAG), so this is O(V+E) — the previous nested fixpoint was
  * cubic and re-ran the guard evaluator per edge per pass.
  */
-function liveStepIds(plan: GatePlan, evaluateGuard?: EdgeGuardEvaluator): ReadonlySet<string> {
+function computeLiveStepIds(ctx: GateContext): ReadonlySet<string> {
+	const { plan } = ctx;
 	const transitions = plan.transitions ?? [];
 	if (transitions.length === 0) return new Set(plan.steps.map((s) => s.id)); // linear plan: everything is reachable
 	const live = new Set<string>();
-	const frontier = plan.steps.filter((s) => inEdgesOf(plan, s.id).length === 0).map((s) => s.id);
+	const frontier = plan.steps.filter((s) => inEdgesOf(ctx, s.id).length === 0).map((s) => s.id);
 	while (frontier.length) {
 		const id = frontier.pop()!;
 		if (live.has(id)) continue;
 		live.add(id);
-		for (const e of outEdgesOf(plan, id)) {
+		for (const e of outEdgesOf(ctx, id)) {
 			if (e.targetStepId === undefined || live.has(e.targetStepId)) continue;
 			// The edge carries reachability unless the plan EXCLUDED it — i.e. a resolved BRANCH did not select it.
-			if (!branchExcludes(plan, e, evaluateGuard)) frontier.push(e.targetStepId);
+			if (!branchExcludes(ctx, e)) frontier.push(e.targetStepId);
 		}
 	}
 	return live;
@@ -159,19 +265,15 @@ function liveStepIds(plan: GatePlan, evaluateGuard?: EdgeGuardEvaluator): Readon
  * treats a failed source as NEUTRALIZED so a JOIN cannot wedge behind it — that is a different question with a
  * different answer, and conflating them let a transient failure offer a whole downstream for prune-to-SKIPPED.
  */
-function branchExcludes(
-	plan: GatePlan,
-	edge: GateTransition,
-	evaluateGuard?: EdgeGuardEvaluator
-): boolean {
+function branchExcludes(ctx: GateContext, edge: GateTransition): boolean {
 	if (edge.sourceStepId === undefined) return false;
-	const source = plan.steps.find((s) => s.id === edge.sourceStepId);
+	const source = stepOf(ctx, edge.sourceStepId);
 	if (source === undefined || !TERMINAL_SUCCESS.has(source.stepState)) return false; // unsettled ⇒ excludes nothing
-	const outEdges = outEdgesOf(plan, edge.sourceStepId);
+	const outEdges = outEdgesOf(ctx, edge.sourceStepId);
 	if (source.stepType === 'BRANCH' && outEdges.some(isConditionalEdge))
-		return selectBranchEdge(outEdges, plan, evaluateGuard, source) !== edge;
+		return selectBranchEdge(ctx, outEdges, source) !== edge;
 	if (!isConditionalEdge(edge)) return false;
-	return evaluateGuard?.(edge, plan) !== true;
+	return ctx.evaluateGuard?.(edge, ctx.plan) !== true;
 }
 /**
  * The out-edge a BRANCH step selects RIGHT NOW, by first-match — the decision the handler records when the branch
@@ -184,9 +286,10 @@ export function resolveBranchSelection(
 	stepId: string,
 	evaluateGuard?: EdgeGuardEvaluator
 ): string | undefined {
-	const source = plan.steps.find((s) => s.id === stepId);
+	const ctx = gateContext(plan, evaluateGuard);
+	const source = stepOf(ctx, stepId);
 	if (source?.stepType !== 'BRANCH') return undefined;
-	const outEdges = outEdgesOf(plan, stepId);
+	const outEdges = outEdgesOf(ctx, stepId);
 	if (!outEdges.some(isConditionalEdge)) return undefined;
 	for (const e of outEdges) {
 		if (!isConditionalEdge(e)) return e.id;
@@ -206,32 +309,35 @@ export function inEdgeDisposition(
 	edge: GateTransition,
 	evaluateGuard?: EdgeGuardEvaluator
 ): InEdgeDisposition {
+	return gateContext(plan, evaluateGuard).dispositionOf(edge);
+}
+
+/** The body of `inEdgeDisposition`, over a context so the live set and sibling edges are computed once. */
+function computeInEdgeDisposition(ctx: GateContext, edge: GateTransition): InEdgeDisposition {
 	if (edge.sourceStepId === undefined) return 'SATISFIED'; // a plan-entry edge is always satisfied
-	const source = plan.steps.find((s) => s.id === edge.sourceStepId);
+	const source = stepOf(ctx, edge.sourceStepId);
 	if (source === undefined) return 'PENDING'; // dangling (rejected at propose) — conservative
 	const src = source.stepState;
 	if (!TERMINAL.has(src)) return 'PENDING'; // source not yet done
 	// An UNREACHABLE source satisfies nothing, however it reached its terminal state (DWP-08). Checked BEFORE the
 	// terminal-success test precisely because SKIPPED is IN that set: a step on a not-taken arm is terminal-success
 	// whether it was pruned OR waived away, and treating that as "done, carry on" resurrected the excluded arm.
-	if (!liveStepIds(plan, evaluateGuard).has(source.id)) return 'NEUTRALIZED';
+	if (!ctx.live().has(source.id)) return 'NEUTRALIZED';
 	// A terminal-non-success source (FAILED/CANCELLED/SUPERSEDED) neutralizes the edge regardless of guard, so a barrier
 	// JOIN does not wedge behind a failed arm (D7). NOTE: this is NOT the same as "the plan excluded this path" — see
 	// isDeadForPruning, which deliberately does not treat it as grounds to prune.
 	if (!TERMINAL_SUCCESS.has(src)) return 'NEUTRALIZED';
-	const outEdges = outEdgesOf(plan, edge.sourceStepId);
+	const outEdges = outEdgesOf(ctx, edge.sourceStepId);
 	// EXCLUSIVE first-match belongs to a BRANCH node and to nothing else (D2: a BRANCH is a stepType; parallelism is
 	// topology). Keying this on "the source has ≥1 conditional out-edge" instead made every node with one guarded arm an
 	// exclusive branch — so a PARALLEL_GROUP fan-out mixing a guarded arm with unconditional ones silently lost every arm
 	// but the first match, while propose-time validation (keyed on stepType) never looked. The two planes now agree, and
 	// validateTransitionGraph additionally REFUSES a conditional out-edge from a non-BRANCH step so they cannot drift.
 	if (source.stepType === 'BRANCH' && outEdges.some(isConditionalEdge))
-		return selectBranchEdge(outEdges, plan, evaluateGuard, source) === edge
-			? 'SATISFIED'
-			: 'NEUTRALIZED';
+		return selectBranchEdge(ctx, outEdges, source) === edge ? 'SATISFIED' : 'NEUTRALIZED';
 	// Non-BRANCH source: out-edges are INDEPENDENT. An unconditional edge is taken; a guarded one is taken iff it holds.
 	if (!isConditionalEdge(edge)) return 'SATISFIED';
-	return evaluateGuard?.(edge, plan) === true ? 'SATISFIED' : 'NEUTRALIZED';
+	return ctx.evaluateGuard?.(edge, ctx.plan) === true ? 'SATISFIED' : 'NEUTRALIZED';
 }
 
 /**
@@ -254,16 +360,12 @@ interface BarrierState {
 	readonly anySatisfied: boolean;
 	readonly firstPending?: GateTransition;
 }
-function barrierState(
-	plan: GatePlan,
-	inEdges: readonly GateTransition[],
-	evaluateGuard?: EdgeGuardEvaluator
-): BarrierState {
+function barrierState(ctx: GateContext, inEdges: readonly GateTransition[]): BarrierState {
 	let anyPending = false;
 	let anySatisfied = false;
 	let firstPending: GateTransition | undefined;
 	for (const e of inEdges) {
-		const d = inEdgeDisposition(plan, e, evaluateGuard);
+		const d = ctx.dispositionOf(e);
 		if (d === 'PENDING') {
 			anyPending = true;
 			firstPending ??= e;
@@ -275,15 +377,11 @@ function barrierState(
 }
 
 /** Is a non-terminal step at the startable frontier? Entry (no in-edges) ⇒ yes; else the barrier: no PENDING, ≥1 SATISFIED. */
-function stepAtFrontier(
-	plan: GatePlan,
-	step: GateStep,
-	evaluateGuard?: EdgeGuardEvaluator
-): boolean {
+function stepAtFrontier(ctx: GateContext, step: GateStep): boolean {
 	if (TERMINAL.has(step.stepState)) return false; // already done/failed
-	const inEdges = inEdgesOf(plan, step.id);
+	const inEdges = inEdgesOf(ctx, step.id);
 	if (inEdges.length === 0) return true; // entry step
-	const b = barrierState(plan, inEdges, evaluateGuard);
+	const b = barrierState(ctx, inEdges);
 	return !b.anyPending && b.anySatisfied;
 }
 
@@ -304,7 +402,8 @@ export function startableStepIds(plan: GatePlan, evaluateGuard?: EdgeGuardEvalua
 		const f = linearFrontier(plan);
 		return f === undefined ? [] : [f];
 	}
-	return plan.steps.filter((s) => stepAtFrontier(plan, s, evaluateGuard)).map((s) => s.id);
+	const ctx = gateContext(plan, evaluateGuard);
+	return plan.steps.filter((s) => stepAtFrontier(ctx, s)).map((s) => s.id);
 }
 
 /**
@@ -322,7 +421,7 @@ export function startableStepIds(plan: GatePlan, evaluateGuard?: EdgeGuardEvalua
  */
 export function prunableStepIds(plan: GatePlan, evaluateGuard?: EdgeGuardEvaluator): string[] {
 	if (plan.status !== 'ACTIVE') return [];
-	const live = liveStepIds(plan, evaluateGuard);
+	const live = gateContext(plan, evaluateGuard).live();
 	return plan.steps
 		.filter(
 			(s) =>
@@ -357,7 +456,8 @@ export function startStepGate(
 	// TERMINAL one (stepAtFrontier opens with exactly that test); the authority half used to check neither, so on the
 	// graph path an entry step returned ok unconditionally and on the linear path an unknown id produced an empty
 	// predecessor slice and also returned ok. "The two halves cannot diverge" has to hold in BOTH directions.
-	const target = plan.steps.find((s) => s.id === stepId);
+	const ctx = gateContext(plan, evaluateGuard);
+	const target = stepOf(ctx, stepId);
 	if (target === undefined)
 		return { ok: false, reason: `step ${stepId} is not declared in this plan` };
 	if (TERMINAL.has(target.stepState))
@@ -381,14 +481,14 @@ export function startStepGate(
 				}
 			: { ok: true };
 	}
-	const inEdges = inEdgesOf(plan, stepId);
+	const inEdges = inEdgesOf(ctx, stepId);
 	if (inEdges.length === 0) return { ok: true }; // entry step
-	const b = barrierState(plan, inEdges, evaluateGuard);
+	const b = barrierState(ctx, inEdges);
 	if (b.firstPending)
 		return {
 			ok: false,
 			blockerStepId: b.firstPending.sourceStepId,
-			blockerState: stateOf(plan, b.firstPending.sourceStepId),
+			blockerState: stateOf(ctx, b.firstPending.sourceStepId),
 			reason: 'an in-edge predecessor is not yet terminal'
 		};
 	if (!b.anySatisfied)
