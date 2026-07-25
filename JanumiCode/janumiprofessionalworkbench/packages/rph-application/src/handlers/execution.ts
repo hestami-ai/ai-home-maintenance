@@ -1001,7 +1001,12 @@ export const cancelExecutionStep: CommandHandler = (ctx, command) => {
 		stepId: p.stepId,
 		target: 'CANCELLED',
 		eventType: 'ExecutionStepCancelled',
-		requireFrom: ['READY', 'QUEUED', 'RUNNING', 'WAITING'], // drivesFrom READY|QUEUED|RUNNING|WAITING
+		// drivesFrom READY|QUEUED|RUNNING|WAITING|FAILED. FAILED is the JAN-EXECREM WP-5 addition: cancelling a failed
+		// step is how an operator ABANDONS an arm they will not retry, which WP-4 otherwise left with no exit. It is a
+		// governed act — the reason rides the event — so the record shows the arm was abandoned rather than merely
+		// never retried. NOT_READY stays out: the machine declares no arrow, and a step that never became ready is
+		// removed by pruning its dead arm, not by cancelling work that never started.
+		requireFrom: ['READY', 'QUEUED', 'RUNNING', 'WAITING', 'FAILED'],
 		eventPayload: {
 			stepId: p.stepId,
 			reason: p.reason,

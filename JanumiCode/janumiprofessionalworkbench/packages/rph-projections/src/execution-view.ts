@@ -131,7 +131,7 @@ const ADVANCE_BY_STEP_STATE: Record<StepState, readonly StepAdvanceCommand[]> = 
 
 // The command-backed CONTROL affordances per stepState (DWP-02/03 + DR-004 DWP-04). Derived from the MACHINE's
 // skip/cancel/wait/resume arrows now that every one of them has a command: skip is legal READY|QUEUED→SKIPPED; cancel
-// is legal READY|QUEUED|RUNNING|WAITING→CANCELLED (NOT from NOT_READY — the machine has no such arrow); wait is legal
+// is legal READY|QUEUED|RUNNING|WAITING|FAILED→CANCELLED (NOT from NOT_READY — the machine has no such arrow); wait is legal
 // RUNNING→WAITING; resolve is legal WAITING→RUNNING. Record<StepState, …> forces every value to be classified.
 const CONTROL_BY_STEP_STATE: Record<StepState, readonly StepControlCommand[]> = {
 	NOT_READY: [], // machine: →CANCELLED only from READY/QUEUED/RUNNING/WAITING; →SKIPPED only from READY/QUEUED
@@ -140,7 +140,11 @@ const CONTROL_BY_STEP_STATE: Record<StepState, readonly StepControlCommand[]> = 
 	RUNNING: ['cancel', 'wait'], // a running step can be cancelled or suspended, but not skipped (machine)
 	WAITING: ['cancel', 'resolve'], // resolve is the ONLY way out of WAITING besides cancel (DWP-04)
 	SUCCEEDED: [],
-	FAILED: [], // terminal — no control action (retry is a progress affordance, not control)
+	// JAN-EXECREM WP-5: a FAILED step offers CANCEL — the governed way to abandon an arm nobody will retry. This
+	// entry read [] and `Record<StepState, …>` totality did NOT catch it (an empty array is a valid value), so the
+	// engine capability and the affordance had to be changed together or the UI would silently withhold the only
+	// exit WP-4 leaves for a failed arm. Retry remains a PROGRESS affordance, listed elsewhere, not a control.
+	FAILED: ['cancel'],
 	SKIPPED: [],
 	CANCELLED: [],
 	SUPERSEDED: []

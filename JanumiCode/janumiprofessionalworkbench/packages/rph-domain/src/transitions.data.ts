@@ -1475,6 +1475,7 @@ export const STATE_MACHINES: Record<string, StateMachineSpec> = {
 			{ from: 'QUEUED', to: 'CANCELLED', trigger: 'ExecutionStepCancelled' },
 			{ from: 'RUNNING', to: 'CANCELLED', trigger: 'ExecutionStepCancelled' },
 			{ from: 'WAITING', to: 'CANCELLED', trigger: 'ExecutionStepCancelled' },
+			{ from: 'FAILED', to: 'CANCELLED', trigger: 'cancelExecutionStep / ExecutionStepCancelled' },
 			{ from: 'NOT_READY', to: 'SUPERSEDED', trigger: 'plan revised/superseded' },
 			{ from: 'READY', to: 'SUPERSEDED', trigger: 'plan revised/superseded' },
 			{ from: 'QUEUED', to: 'SUPERSEDED', trigger: 'plan revised/superseded' },

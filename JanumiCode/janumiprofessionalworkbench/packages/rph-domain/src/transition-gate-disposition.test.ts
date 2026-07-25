@@ -39,7 +39,10 @@ describe('WP-4 — the terminal classifications are DERIVED FROM THE MACHINE, no
 	it('FAILED is the ONLY terminal state the machine can leave (so it is the only REOPENABLE one)', () => {
 		const reopenable = machine.terminalStates.filter((st) => outArrowsFrom(st).length > 0);
 		expect(reopenable).toEqual(['FAILED']);
-		expect(outArrowsFrom('FAILED')).toEqual(['QUEUED']);
+		// Both of FAILED's out-arrows are ways to SETTLE it, which is why an edge out of it reads PENDING until one
+		// is taken: QUEUED reopens the attempt (retry), CANCELLED abandons it on the record (WP-5). The second was
+		// added by WP-5 and this pin is why that addition had to be a conscious act — it went RED first.
+		expect([...outArrowsFrom('FAILED')].sort()).toEqual(['CANCELLED', 'QUEUED']);
 	});
 
 	it('CANCELLED and SUPERSEDED have NO out-arrows (so they are irrecoverable)', () => {

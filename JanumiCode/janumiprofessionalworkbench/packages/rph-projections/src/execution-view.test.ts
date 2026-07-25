@@ -126,9 +126,14 @@ describe('controlCommandsFor — the skip/cancel/wait/resolve allowlist (DWP-02/
 		}
 	});
 
-	it('offers NO control action from NOT_READY (machine has no →CANCELLED/→SKIPPED from there) or any terminal state', () => {
-		for (const s of ['NOT_READY', 'SUCCEEDED', 'FAILED', 'SKIPPED', 'CANCELLED', 'SUPERSEDED'])
-			expect(controlCommandsFor(s)).toEqual([]);
+	it('offers NO control action from NOT_READY (machine has no →CANCELLED/→SKIPPED from there) or any SETTLED terminal state', () => {
+		// BEHAVIOUR CHANGED by JAN-EXECREM WP-5: FAILED is no longer in this list. It is terminal but NOT settled —
+		// the machine can leave it (retry to QUEUED, or abandon to CANCELLED) — so it now offers `cancel`, the
+		// governed way to abandon an arm nobody will retry. WP-4 made a FAILED in-edge PENDING so a JOIN cannot
+		// release around a failure; without this affordance the UI would silently withhold the only exit that leaves.
+		for (const s of ['NOT_READY', 'SUCCEEDED', 'SKIPPED', 'CANCELLED', 'SUPERSEDED'])
+			expect(controlCommandsFor(s), s).toEqual([]);
+		expect(controlCommandsFor('FAILED'), 'abandonment is offered, and only abandonment').toEqual(['cancel']);
 	});
 
 	it('yields NO control action for an unknown / off-contract state (never fabricate)', () => {
