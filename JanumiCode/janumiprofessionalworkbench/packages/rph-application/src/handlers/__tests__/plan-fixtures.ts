@@ -170,6 +170,48 @@ export function seedRecordedBranchDecision(
 }
 
 /**
+ * Repoint a stored plan's `workUnitId` at an object that is NOT a PWU.
+ *
+ * WP-12 made `proposeExecutionPlan` assert the object TYPE, so no NEW plan can be minted this way — which means
+ * the fail-closed branch in `pwuOpennessRefusal` is unreachable through the command bus and would otherwise be an
+ * unkillable guard. It is NOT dead code: it is exactly the path a plan STORED BEFORE that rule takes, which is the
+ * "legacy plans are never re-validated" residual this programme disclosed rather than closed. This seam is how
+ * that branch gets a test that can fail.
+ */
+export function seedForeignWorkUnitId_LEGACY_ONLY(
+	store: StorageAdapter,
+	planId: string,
+	foreignId: string
+): void {
+	const stored = store.loadObject(planId);
+	if (!stored) throw new Error(`seedForeignWorkUnitId_LEGACY_ONLY: no stored object for plan ${planId}`);
+	const plan = ExecutionPlanSchema.parse(stored.state);
+	const nextState = ExecutionPlanSchema.parse({ ...plan, workUnitId: foreignId });
+
+	seq += 1;
+	const result = store.commit({
+		aggregateType: 'EXECUTION_PLAN',
+		aggregateId: planId,
+		objectType: 'EXECUTION_PLAN',
+		expectedRevision: stored.revision,
+		newRevision: stored.revision + 1,
+		newSemanticVersion: stored.semanticVersion,
+		currentState: nextState,
+		events: [],
+		receipt: {
+			commandId: `fixture-seedForeignWorkUnit-${seq}`,
+			idempotencyKey: `fixture-seedForeignWorkUnit-${seq}`,
+			commandType: 'FixtureSeedForeignWorkUnit',
+			targetAggregateId: planId,
+			status: 'ACCEPTED',
+			producedEventIds: []
+		}
+	});
+	if (!result.ok)
+		throw new Error(`seedForeignWorkUnitId_LEGACY_ONLY: commit refused for ${planId} (${result.reason})`);
+}
+
+/**
  * Arrange a plan with ZERO steps.
  *
  * WP-6 refuses a step-less proposal (SM-4 rule L1), but `execution-plan-completion.test.ts` legitimately proves

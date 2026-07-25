@@ -21,6 +21,7 @@ import {
 	buildConditionSubject,
 	canActivatePlan,
 	canAuthorizeNewWork,
+	canResumeExecutionOnPwu,
 	canSkipStep,
 	evaluateGuardExpression,
 	planEvidencesExecutionSuccess,
@@ -188,11 +189,15 @@ function proposedPlanEventPayload(p: ProposeExecutionPlanPayload) {
 /** ProposeExecutionPlan — create the plan for a PWU, submitted for review (UNDER_REVIEW). */
 export const proposeExecutionPlan: CommandHandler = (ctx, command, payload) => {
 	const p = payload as ProposeExecutionPlanPayload;
-	if (!ctx.store.loadObject(p.workUnitId)) {
+	// TOTALITY HARDENING (JAN-EXECREM WP-12 / F-28): this asserted only that `workUnitId` RESOLVES, so a plan could
+	// name an Artifact or a Decision as its work unit and every downstream PWU read — including the new openness
+	// gate — would silently find no lifecycle to check. Asserting the TYPE here makes that read total rather than
+	// best-effort. Authoring is not executing, so proposing against an OPEN PWU stays unrestricted (§20.2).
+	if (ctx.store.loadObject(p.workUnitId)?.objectType !== 'PROFESSIONAL_WORK_UNIT') {
 		return reject(
 			command,
 			'RPH_VALIDATION_SEMANTIC_FAILED',
-			`ProposeExecutionPlan requires an existing work unit ${p.workUnitId}`,
+			`ProposeExecutionPlan requires an existing PROFESSIONAL_WORK_UNIT ${p.workUnitId}`,
 			[p.executionPlanId]
 		);
 	}
@@ -354,6 +359,17 @@ export const activateExecutionPlan: CommandHandler = (ctx, command) =>
 			};
 		},
 		guard: (state, hctx) => {
+			// RPH-PWU-010 (JAN-EXECREM WP-12 / F-28). Activation is the command that GRANTS runtime privilege, so
+			// it is the other half of the openness gate — gating the step commands alone would leave the hole where
+			// a plan was activated before the PWU closed and then simply used. `state.workUnitId` is already in hand
+			// for the one-active-plan rule below, so nothing new is loaded.
+			const closed = pwuOpennessRefusal(
+				hctx,
+				command,
+				String(state.workUnitId),
+				command.targetAggregateId
+			);
+			if (closed) return closed;
 			const otherActivePlanExists = otherActivePlanExistsForPwu(
 				hctx,
 				String(state.workUnitId),
@@ -532,6 +548,67 @@ export const applyTacticalChange: CommandHandler = (ctx, command) =>
 	});
 
 /**
+ * The two DECLARED authority limbs, read from the command's spec row (JAN-EXECREM WP-12 / F-26 + F-28).
+ *
+ * Shared by `advanceStep` (all nine step commands) and by `activateExecutionPlan`, which is the OTHER command that
+ * grants runtime privilege. Gating the step commands alone would leave the hole where a plan was activated before
+ * the PWU closed and then simply used; gating activation alone leaves the symmetric one.
+ */
+function stepAuthorityRefusal(
+	ctx: HandlerContext,
+	command: DomainCommand,
+	spec: StepCommandSpec,
+	plan: Record<string, unknown>,
+	stepId: string,
+	planId: string
+): ReturnType<typeof reject> | null {
+	if (spec.planLiveness === 'REQUIRES_ACTIVE_PLAN' && plan.status !== 'ACTIVE')
+		return reject(
+			command,
+			'RPH_ILLEGAL_STATE_TRANSITION',
+			`${command.commandType} requires an ACTIVE plan: ${planId} is ${String(plan.status)} — a superseded or terminal plan mints no new success credit (RPH-EXE-002). ${spec.activePlanRationale} Cancel the step instead.`,
+			[stepId]
+		);
+	if (spec.pwuOpenness === 'REQUIRES_OPEN_PWU') {
+		const refusal = pwuOpennessRefusal(ctx, command, String(plan.workUnitId), stepId);
+		if (refusal) return refusal;
+	}
+	return null;
+}
+
+/**
+ * RPH-PWU-010 / §8.3 — the PWU-openness limb, shared by the step commands and by plan activation.
+ *
+ * Fail-closed on a workUnitId that does not resolve to a PWU: an execution act whose owning unit of work cannot be
+ * READ cannot be authorized by it. `proposeExecutionPlan` now asserts the object TYPE too, so this is a total read
+ * rather than a best-effort one.
+ */
+function pwuOpennessRefusal(
+	ctx: HandlerContext,
+	command: DomainCommand,
+	workUnitId: string,
+	targetId: string
+): ReturnType<typeof reject> | null {
+	const pwu = ctx.store.loadObject(workUnitId);
+	if (pwu?.objectType !== 'PROFESSIONAL_WORK_UNIT')
+		return reject(
+			command,
+			'RPH_VALIDATION_SEMANTIC_FAILED',
+			`${command.commandType} blocked: the plan's workUnitId ${workUnitId} does not resolve to a PROFESSIONAL_WORK_UNIT, so the RPH-PWU-010 openness of the owning work unit cannot be established.`,
+			[targetId]
+		);
+	const lifecycle = String((pwu.state as { workLifecycleState?: unknown }).workLifecycleState);
+	const check = canResumeExecutionOnPwu(lifecycle);
+	if (check.ok) return null;
+	return reject(
+		command,
+		'RPH_INVARIANT_VIOLATION',
+		`${command.commandType} blocked: PWU ${workUnitId} is ${lifecycle} — ${check.reason ?? 'a closed PWU opens no new execution'} (RPH-PWU-010 / §8.3). A successor revision or successor PWU is required; cleanup commands (Cancel / Fail / EnterWait) remain available.`,
+		[targetId, workUnitId]
+	);
+}
+
+/**
  * Advance one embedded step (by id) of a plan's steps[] along the ExecutionStep.stepState machine.
  *
  * Concurrency (DWP-05): several steps of ONE plan may be RUNNING at once (a PARALLEL_GROUP fan-out). Each is advanced
@@ -576,6 +653,22 @@ function advanceStep(
 		);
 	}
 	const step = steps[idx] as Record<string, unknown>;
+	// ── DECLARED AUTHORITY (JAN-EXECREM WP-12 / F-26 + F-28) ────────────────────────────────────────────────────
+	//
+	// Both limbs come from the command's own row in STEP_COMMAND_SPECS, and both are evaluated HERE — ahead of the
+	// per-command precheck — rather than being hand-inlined at five of nine call sites and absent from the other
+	// four with nothing stating which absence was intended.
+	//
+	// F-26: the axis is "MINTS SUCCESS CREDIT", not "opens new work". Skip and Prune open no work at all yet were
+	// both gated, because both mint terminal-success; Complete mints terminal-success AND a durable branch decision
+	// AND is the fact the PWU success claim rests on — and was ACCEPTED on a SUPERSEDED plan, writing
+	// selectedTransitionId onto dead state. Fail/Cancel/EnterWait stay exempt because a system that makes failure
+	// harder to report than success is worse than one that checks neither.
+	//
+	// F-28: RPH-PWU-010 was ratified and enforced NOWHERE — `canResumeExecutionOnPwu` had no production caller at
+	// all, while the conformance manifest certified the rule COVERED on the strength of a pure-predicate unit test.
+	const authorityFailure = stepAuthorityRefusal(ctx, command, args.spec, plan, args.stepId, planId);
+	if (authorityFailure) return authorityFailure;
 	const precheckFailure = args.precheck?.(step, plan);
 	if (precheckFailure) return precheckFailure;
 	// The source set comes from the DECLARED spec. Evaluation ORDER is deliberately unchanged by WP-8 (precheck ->
@@ -705,12 +798,6 @@ export const startExecutionStep: CommandHandler = (ctx, command) => {
 			stepState: 'RUNNING'
 		},
 		precheck: (_step, plan) => {
-			if (plan.status !== 'ACTIVE')
-				return reject(
-					command,
-					'RPH_ILLEGAL_STATE_TRANSITION',
-					`Cannot start a step: plan ${command.targetAggregateId} is not ACTIVE (${String(plan.status)})`
-				);
 			// The linear/graph start-gate — the SAME rph-domain predicate the read-model (execution-view.ts
 			// startableStepIds) uses, so the UI Start affordance and this engine authority cannot diverge (DR-004
 			// §19-M2). Empty transitions[] ⇒ byte-identical linear (every earlier array-index step terminal-success);
@@ -954,12 +1041,6 @@ export const retryExecutionStep: CommandHandler = (ctx, command) => {
 		stepId: p.stepId,
 		spec: STEP_COMMAND_SPECS.RetryExecutionStep,
 		precheck: (step, plan) => {
-			if (plan.status !== 'ACTIVE')
-				return reject(
-					command,
-					'RPH_ILLEGAL_STATE_TRANSITION',
-					`Cannot retry a step: plan ${command.targetAggregateId} is not ACTIVE (${String(plan.status)}) — a superseded/terminal plan creates no new attempts (RPH-EXE-002).`
-				);
 			const attemptsMade = attemptsMadeForStep(ctx, command.targetAggregateId, p.stepId);
 			const maxAttempts = retryCapFor(plan);
 			const decision = retryDecision({
@@ -999,13 +1080,7 @@ export const skipExecutionStep: CommandHandler = (ctx, command) => {
 			...(p.waiverOrRevisionId ? { waiverOrRevisionId: p.waiverOrRevisionId } : {}),
 			stepState: 'SKIPPED'
 		},
-		precheck: (_step, plan) => {
-			if (plan.status !== 'ACTIVE')
-				return reject(
-					command,
-					'RPH_ILLEGAL_STATE_TRANSITION',
-					`Cannot skip a step: plan ${command.targetAggregateId} is not ACTIVE (${String(plan.status)}) — a superseded/terminal plan opens no new work (RPH-EXE-002).`
-				);
+		precheck: () => {
 			// FAIL-CLOSED: an unmarked step defaults to MANDATORY (mandatory ?? true), so it needs an authorized
 			// waiver/revision to be skipped — never fail-open. `canSkipStep` is the ratified kernel (rph-domain).
 			const check = canSkipStep({
@@ -1075,12 +1150,6 @@ export const pruneExecutionStep: CommandHandler = (ctx, command) => {
 			stepState: 'SKIPPED'
 		},
 		precheck: (_step, plan) => {
-			if (plan.status !== 'ACTIVE')
-				return reject(
-					command,
-					'RPH_ILLEGAL_STATE_TRANSITION',
-					`Cannot prune a step: plan ${command.targetAggregateId} is not ACTIVE (${String(plan.status)}) — a prune is within-execution branch resolution.`
-				);
 			const gatePlan = toGatePlan(plan);
 			if (
 				!prunableStepIds(
@@ -1126,8 +1195,8 @@ export const enterExecutionStepWait: CommandHandler = (ctx, command) => {
  * ResolveExecutionStepWait — a step WAITING -> RUNNING (JAN-EXECPLAN-DR-004 DWP-04 / D6). The machine ratifies this
  * arrow but names its trigger only as the bare phrase "wait resolved"; DWP-04 MINTS ExecutionStepWaitResolved so the
  * resume is a governed-stream FACT rather than a state change invisible to replay (the DS-004 F-6 hole). Resuming
- * re-opens RUNNING — the state in which attempts execute — so this DOES apply the plan-ACTIVE precheck, mirroring
- * Start/Retry (RPH-EXE-002 / §35.1); under a superseded plan the correct action is Cancel, not resume. The resume is
+ * re-opens RUNNING — the state in which attempts execute — so it DECLARES planLiveness REQUIRES_ACTIVE_PLAN in
+ * STEP_COMMAND_SPECS (RPH-EXE-002 / §35.1); under a superseded plan the correct action is Cancel, not resume. The resume is
  * NOT a new attempt: attemptsMadeForStep counts ExecutionStepStarted only, so a wait/resume cycle continues the SAME
  * attempt and does not consume the retry cap (RPH-EXE-008). Exec != assurance (INV-5): moves only stepState.
  */
@@ -1141,13 +1210,7 @@ export const resolveExecutionStepWait: CommandHandler = (ctx, command) => {
 			...(p.resolution ? { resolution: p.resolution } : {}),
 			stepState: 'RUNNING'
 		},
-		precheck: (_step, plan) =>
-			plan.status === 'ACTIVE'
-				? null
-				: reject(
-						command,
-						'RPH_ILLEGAL_STATE_TRANSITION',
-						`Cannot resume a waiting step: plan ${command.targetAggregateId} is not ACTIVE (${String(plan.status)}) — resuming re-opens the RUNNING state where attempts execute, and a superseded/terminal plan opens no new work (RPH-EXE-002). Cancel the step instead.`
-					)
+		// The plan-ACTIVE check that used to be inlined here is now its declared row in STEP_COMMAND_SPECS
+		// (planLiveness: REQUIRES_ACTIVE_PLAN), enforced by advanceStep for all nine commands uniformly.
 	});
 };

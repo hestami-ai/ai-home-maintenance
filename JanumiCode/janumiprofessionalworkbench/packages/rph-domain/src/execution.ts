@@ -20,7 +20,7 @@
 //     CLASSIFIED and reconciled — never blindly retried (a reconciled external status dominates stale local
 //     flags); a duplicate command key emits no new events (RPH-PER-002), and a retried side-effecting attempt
 //     with the same ATTEMPT key produces no second external effect (RPH-EXE-007, a distinct §28.2 concern).
-import { canTransition } from './stateMachine.js';
+import { canTransition, isTerminalState } from './stateMachine.js';
 
 // ============================================================================================
 // Execution plan lifecycle (RPH-EXE-001, RPH-EXE-002, RPH-PWU-010; §20.2)
@@ -151,6 +151,21 @@ export function canResumeExecutionOnPwu(pwuLifecycleState: string): Check {
 			ok: false,
 			errorCode: 'RPH_BASELINED_PWU_NO_RESUME',
 			reason: 'a baselined PWU requires a successor revision before new execution'
+		};
+	// GENERALISED to the machine's OWN terminal set (JAN-EXECREM WP-12 / F-28), not to a hardcoded list:
+	// `m2-transitions.json` declares PWU.workLifecycleState.terminalStates = [BASELINED, ABANDONED, SUPERSEDED].
+	// Opening execution on an ABANDONED or SUPERSEDED unit of work is at least as wrong as on a baselined one, and
+	// deriving the set follows this codebase's own stated preference (`otherActivePlanExistsForPwu`: derive from
+	// authoritative state, never from a remembered flag). BASELINED keeps its own ratified code above because
+	// RPH-PWU-010 names it specifically and an existing conformance test asserts that code.
+	//
+	// DISCLOSED as an AUTHORED EXTENSION rather than smuggled: RPH-PWU-010's text names BASELINED only. The
+	// generalisation is registered in the divergence record rather than presented as the ratified rule.
+	if (isTerminalState('PWU.workLifecycleState', pwuLifecycleState))
+		return {
+			ok: false,
+			errorCode: 'RPH_CLOSED_PWU_NO_NEW_EXECUTION',
+			reason: `the PWU is ${pwuLifecycleState}, a terminal workLifecycleState — a closed unit of work opens no new execution`
 		};
 	return { ok: true };
 }

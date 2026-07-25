@@ -46,14 +46,36 @@ export interface StepCommandSpec {
 	/** The event emitted on success. */
 	readonly eventType: string;
 	/**
-	 * Does this command require an ACTIVE plan (RPH-EXE-002: a superseded/terminal plan opens no new work)?
+	 * Does this command require an ACTIVE plan (JAN-EXECREM WP-12 / F-26)?
 	 *
-	 * Declared per command BECAUSE the answer legitimately differs, and the differences were previously invisible.
-	 * `false` here is a positive statement that the omission is intended, not an oversight — see each row.
+	 * THE AXIS IS NOT "OPENS NEW WORK" — IT IS "MINTS SUCCESS CREDIT OR A DURABLE DECISION". The codebase already
+	 * behaved that way and said otherwise: Skip and Prune open no work whatsoever, yet both carried the plan-ACTIVE
+	 * precheck, because both MINT TERMINAL-SUCCESS. Restated canonically: a command that drives a step to terminal
+	 * success, or records a durable branch decision, requires an ACTIVE plan (RPH-EXE-002 / §35.1). A command that
+	 * terminates or suspends already-open work with an honest NON-success record requires no plan status, and MUST
+	 * stay available so a dead plan's live steps are never stranded.
+	 *
+	 * WP-8 declared this column as DESCRIPTION; WP-12 makes it the ENFORCEMENT POINT, evaluated in `advanceStep`
+	 * ahead of every per-command precheck. `CLEANUP_EXEMPT` is therefore a positive claim with its own kill test —
+	 * the declaration F-26 observed that Complete never had.
 	 */
-	readonly requiresActivePlan: boolean;
-	/** Why `requiresActivePlan` is what it is. Prose, so the intent survives the next reader. */
+	readonly planLiveness: PlanLiveness;
+	/** Why `planLiveness` is what it is. Prose, so the intent survives the next reader. */
 	readonly activePlanRationale: string;
+	/**
+	 * Does this command require the owning PWU to be OPEN — not in a terminal `workLifecycleState`
+	 * (RPH-PWU-010 / §8.3; JAN-EXECREM WP-12 / F-28)?
+	 *
+	 * RPH-PWU-010 is ratified and was enforced NOWHERE: `canResumeExecutionOnPwu` had exactly two repo-wide
+	 * references — its own definition and its own unit test — while the conformance manifest certified it COVERED.
+	 * A pure-predicate unit test was accepted as evidence for a rule whose ratified `then` is "the command is
+	 * rejected", which is the same substitution the CMDPRE series found elsewhere.
+	 *
+	 * Cleanup is exempt for the same reason as `planLiveness`: closing a PWU must never strand its live steps.
+	 */
+	readonly pwuOpenness: PwuOpenness;
+	/** Why `pwuOpenness` is what it is. */
+	readonly pwuOpennessRationale: string;
 	/**
 	 * What this command does about a BRANCH decision when it settles a step (JAN-EXECREM WP-10 / CANONICAL RULE B2).
 	 *
@@ -67,6 +89,13 @@ export interface StepCommandSpec {
 	 *  DECLARATION with a reason, or it is indistinguishable from the omission that produced this family. */
 	readonly branchDecisionRationale: string;
 }
+
+/** REQUIRES_ACTIVE_PLAN: mints terminal-success or a durable decision. CLEANUP_EXEMPT: terminates or suspends
+ *  already-open work with an honest non-success record, and must stay available on a dead plan. */
+export type PlanLiveness = 'REQUIRES_ACTIVE_PLAN' | 'CLEANUP_EXEMPT';
+
+/** REQUIRES_OPEN_PWU: grants runtime privilege, mints execution credit, or opens an attempt. CLEANUP_EXEMPT: as above. */
+export type PwuOpenness = 'REQUIRES_OPEN_PWU' | 'CLEANUP_EXEMPT';
 
 /**
  * RECORD_AT_SETTLEMENT   — this command drives a step to TERMINAL_SUCCESS, so if that step is a BRANCH it must take
@@ -84,9 +113,10 @@ const spec = (s: StepCommandSpec): StepCommandSpec => s;
 /**
  * The table. TOTAL over `StepCommandType` — a new step command cannot be added without declaring its contract.
  *
- * NOTE ON `requiresActivePlan`: this field DESCRIBES the shipped prechecks rather than enforcing them; WP-12 makes
- * it the enforcement point after settling which of the four omissions are correct (F-26). Declaring it now is what
- * lets WP-12 argue about a table instead of about nine docblocks.
+ * WP-8 declared the authority columns as DESCRIPTION of the shipped prechecks; WP-12 settled the four undeclared
+ * omissions (F-26) and made the table the ENFORCEMENT POINT — `advanceStep` reads `planLiveness` and `pwuOpenness`
+ * from here and the five hand-inlined `plan.status !== 'ACTIVE'` blocks are gone. Arguing about a table rather than
+ * about nine docblocks is what made the settlement possible.
  */
 export const STEP_COMMAND_SPECS: Readonly<Record<StepCommandType, StepCommandSpec>> = {
 	StartExecutionStep: spec({
@@ -94,8 +124,12 @@ export const STEP_COMMAND_SPECS: Readonly<Record<StepCommandType, StepCommandSpe
 		target: 'RUNNING',
 		sourceStates: ['QUEUED'],
 		eventType: 'ExecutionStepStarted',
-		requiresActivePlan: true,
-		activePlanRationale: 'starting is new work; a superseded plan opens none (RPH-EXE-002).',
+		planLiveness: 'REQUIRES_ACTIVE_PLAN',
+		activePlanRationale:
+			'starting OPENS AN ATTEMPT, which is both new work and the first half of an execution episode; a superseded plan opens none (RPH-EXE-002).',
+		pwuOpenness: 'REQUIRES_OPEN_PWU',
+		pwuOpennessRationale:
+			'a closed PWU (BASELINED / ABANDONED / SUPERSEDED) accepts no new attempt in place — RPH-PWU-010 requires a successor revision or successor PWU.',
 		branchDecision: 'NOT_TERMINAL_SUCCESS',
 		branchDecisionRationale: 'RUNNING is not terminal-success.'
 	}),
@@ -104,9 +138,12 @@ export const STEP_COMMAND_SPECS: Readonly<Record<StepCommandType, StepCommandSpe
 		target: 'SUCCEEDED',
 		sourceStates: ['RUNNING'],
 		eventType: 'ExecutionStepSucceeded',
-		requiresActivePlan: false,
+		planLiveness: 'REQUIRES_ACTIVE_PLAN',
 		activePlanRationale:
-			'UNSETTLED (F-26): completing work already RUNNING is arguably closing out, not opening new work — but the omission carries no written rationale and no positive test. WP-12 decides.',
+			'SETTLED by WP-12 (F-26), and the one row that CHANGES behaviour. Complete mints TERMINAL-SUCCESS and a durable BRANCH decision, and SUCCEEDED is the only step state completeExecutionPlan and rejectUnbackedExecutionSuccess accept as backing — so minting it on a plan the sponsor killed manufactures downstream authority on dead state (verified ACCEPTED, with selectedTransitionId written, before this change). Consistency demanded it too: the surface refused the LESSER act (ResolveWait, whose own message says "a superseded/terminal plan opens no new work") while permitting the greater one on the same plan at the same instant. No deadlock is created — Cancel is the deliberately ungated exit, and is exactly what ResolveWait already prescribes.',
+		pwuOpenness: 'REQUIRES_OPEN_PWU',
+		pwuOpennessRationale:
+			'completion is the fact a PWU execution-success claim rests on; a closed PWU may not accrue more of it.',
 		branchDecision: 'RECORD_AT_SETTLEMENT',
 		branchDecisionRationale:
 			'the primary settling command: a BRANCH decides at the moment it succeeds, against a settlement view that INCLUDES its own result (Rule B1).'
@@ -116,9 +153,12 @@ export const STEP_COMMAND_SPECS: Readonly<Record<StepCommandType, StepCommandSpe
 		target: 'FAILED',
 		sourceStates: ['RUNNING'],
 		eventType: 'ExecutionStepFailed',
-		requiresActivePlan: false,
+		planLiveness: 'CLEANUP_EXEMPT',
 		activePlanRationale:
-			'UNSETTLED (F-26): recording that running work failed is closing out, not opening new work. Same standing as Complete; WP-12 decides both together.',
+			'SETTLED by WP-12 (F-26) as CORRECT, and now DECLARED with a positive test rather than merely omitted. A FAILED step backs no success claim anywhere, and a system that makes FAILURE HARDER TO REPORT THAN SUCCESS is worse than one that checks neither. Its exemption is the mirror of the Complete gate: the axis is credit, and failure mints none.',
+		pwuOpenness: 'CLEANUP_EXEMPT',
+		pwuOpennessRationale:
+			'recording that work failed must never require the PWU to be open, or a closed PWU strands running steps.',
 		branchDecision: 'NOT_TERMINAL_SUCCESS',
 		branchDecisionRationale: 'FAILED is terminal, but not success; the flow does not advance, so no arm is taken.'
 	}),
@@ -127,9 +167,11 @@ export const STEP_COMMAND_SPECS: Readonly<Record<StepCommandType, StepCommandSpe
 		target: 'QUEUED',
 		sourceStates: ['FAILED'],
 		eventType: 'ExecutionStepRetried',
-		requiresActivePlan: true,
+		planLiveness: 'REQUIRES_ACTIVE_PLAN',
 		activePlanRationale:
 			'a retry RE-OPENS the attempt cycle, so it is new work even though the step already exists (RPH-EXE-002).',
+		pwuOpenness: 'REQUIRES_OPEN_PWU',
+		pwuOpennessRationale: 'a retry opens a fresh attempt, which is exactly what RPH-PWU-010 forbids in place.',
 		branchDecision: 'NOT_TERMINAL_SUCCESS',
 		branchDecisionRationale: 'QUEUED re-opens the step; nothing settles.'
 	}),
@@ -138,8 +180,11 @@ export const STEP_COMMAND_SPECS: Readonly<Record<StepCommandType, StepCommandSpe
 		target: 'SKIPPED',
 		sourceStates: ['READY', 'QUEUED'],
 		eventType: 'ExecutionStepSkipped',
-		requiresActivePlan: true,
-		activePlanRationale: 'a skip disposes of work the plan still owns; a superseded plan owns none.',
+		planLiveness: 'REQUIRES_ACTIVE_PLAN',
+		activePlanRationale:
+			'a skip MINTS TERMINAL-SUCCESS under a waiver while opening no work at all — which is precisely why the axis is CREDIT rather than work. Its pre-existing gate is the evidence that the codebase already believed the credit axis.',
+		pwuOpenness: 'REQUIRES_OPEN_PWU',
+		pwuOpennessRationale: 'SKIPPED is terminal-success, so a skip advances a plan on a PWU that must not advance.',
 		branchDecision: 'RECORD_AT_SETTLEMENT',
 		branchDecisionRationale:
 			'SKIPPED is terminal-SUCCESS precisely so the flow ADVANCES past the step, so an arm must be taken and somebody must choose it. Recording nothing here is what let a later guard flip re-resolve a settled branch and run BOTH arms (F-15/21/23). Not fabrication: the same act as at Complete, truthfully evaluated against a step that produced no result.'
@@ -149,9 +194,12 @@ export const STEP_COMMAND_SPECS: Readonly<Record<StepCommandType, StepCommandSpe
 		target: 'CANCELLED',
 		sourceStates: ['READY', 'QUEUED', 'RUNNING', 'WAITING', 'FAILED'],
 		eventType: 'ExecutionStepCancelled',
-		requiresActivePlan: false,
+		planLiveness: 'CLEANUP_EXEMPT',
 		activePlanRationale:
 			'INTENTIONAL: cancel is CLEANUP. It must remain available on a plan that has already been superseded or has failed, or live/failed work would be stranded with no exit. FAILED is in the source set since WP-5 (abandoning an arm nobody will retry).',
+		pwuOpenness: 'CLEANUP_EXEMPT',
+		pwuOpennessRationale:
+			'the exit of last resort, and the one every other refusal message points at; closing a PWU must never strand its live steps.',
 		branchDecision: 'NOT_TERMINAL_SUCCESS',
 		branchDecisionRationale: 'CANCELLED is terminal-non-success; the downstream is not released, so no arm is taken.'
 	}),
@@ -160,9 +208,11 @@ export const STEP_COMMAND_SPECS: Readonly<Record<StepCommandType, StepCommandSpe
 		target: 'SKIPPED',
 		sourceStates: ['NOT_READY', 'READY', 'QUEUED'],
 		eventType: 'ExecutionStepPruned',
-		requiresActivePlan: true,
+		planLiveness: 'REQUIRES_ACTIVE_PLAN',
 		activePlanRationale:
-			'a prune is within-execution branch resolution, which only an ACTIVE plan performs. NOT_READY is in the set so a not-taken arm that never became ready is still clearable (D5 anti-deadlock).',
+			'a prune MINTS TERMINAL-SUCCESS under branch logic, and is within-execution branch resolution, which only an ACTIVE plan performs. NOT_READY is in the source set so a not-taken arm that never became ready is still clearable (D5 anti-deadlock).',
+		pwuOpenness: 'REQUIRES_OPEN_PWU',
+		pwuOpennessRationale: 'pruning drives SKIPPED (terminal-success) and resolves a branch — both execution acts.',
 		branchDecision: 'NONE_STRUCTURALLY_DEAD',
 		branchDecisionRationale:
 			'a prune only ever reaches a step the branch logic ALREADY excluded, so there is no decision left to take. SAFE STRUCTURALLY, not by convention: the disposition ladder tests source liveness before it reaches any branch rung, and the reachability BFS never expands a non-live node. Both are pinned by test rather than assumed.'
@@ -172,9 +222,12 @@ export const STEP_COMMAND_SPECS: Readonly<Record<StepCommandType, StepCommandSpe
 		target: 'WAITING',
 		sourceStates: ['RUNNING'],
 		eventType: 'ExecutionStepWaiting',
-		requiresActivePlan: false,
+		planLiveness: 'CLEANUP_EXEMPT',
 		activePlanRationale:
-			'INTENTIONAL: waiting SUSPENDS work that is already running; it opens nothing. Recorded with a positive test.',
+			'INTENTIONAL: waiting SUSPENDS work that is already running; it mints nothing and opens nothing. Recorded with a positive test.',
+		pwuOpenness: 'CLEANUP_EXEMPT',
+		pwuOpennessRationale:
+			'a running step must be able to record honestly that it is blocked, whatever the PWU is doing; the alternative strips it of that.',
 		branchDecision: 'NOT_TERMINAL_SUCCESS',
 		branchDecisionRationale: 'WAITING suspends; nothing settles.'
 	}),
@@ -183,9 +236,11 @@ export const STEP_COMMAND_SPECS: Readonly<Record<StepCommandType, StepCommandSpe
 		target: 'RUNNING',
 		sourceStates: ['WAITING'],
 		eventType: 'ExecutionStepWaitResolved',
-		requiresActivePlan: true,
+		planLiveness: 'REQUIRES_ACTIVE_PLAN',
 		activePlanRationale:
 			'resuming returns a step to RUNNING, which IS new work on the plan; the WAITING source set is also what keeps Start from performing a silent resume.',
+		pwuOpenness: 'REQUIRES_OPEN_PWU',
+		pwuOpennessRationale: 'a resume re-opens RUNNING, the state in which attempts execute.',
 		branchDecision: 'NOT_TERMINAL_SUCCESS',
 		branchDecisionRationale: 'RUNNING resumes; nothing settles.'
 	})

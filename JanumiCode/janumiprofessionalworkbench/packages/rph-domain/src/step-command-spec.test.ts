@@ -59,29 +59,50 @@ describe('WP-8 — the table is TOTAL and self-consistent', () => {
 		expect(new Set(events).size).toBe(events.length);
 	});
 
-	it('every plan-ACTIVE decision carries a written rationale — an omission must be stated, not discovered', () => {
+	it('every authority decision carries a written rationale — an omission must be stated, not discovered', () => {
 		for (const t of STEP_COMMAND_TYPES) {
 			const s = stepCommandSpec(t);
-			expect(typeof s.requiresActivePlan, t).toBe('boolean');
-			expect(s.activePlanRationale.length, `${t} rationale`).toBeGreaterThan(20);
+			expect(s.activePlanRationale.length, `${t} plan-liveness rationale`).toBeGreaterThan(20);
+			expect(s.pwuOpennessRationale.length, `${t} PWU-openness rationale`).toBeGreaterThan(20);
 		}
 	});
 
-	// F-26 is not fixed here — WP-12 settles it — but the four omissions are now VISIBLE as data instead of being
-	// invisible across nine docblocks. This pins which four they are, so WP-12 argues about a table.
-	it('records exactly which commands do NOT require an ACTIVE plan (F-26, settled by WP-12)', () => {
-		const notRequiring = STEP_COMMAND_TYPES.filter((t) => !stepCommandSpec(t).requiresActivePlan).sort();
-		expect(notRequiring).toEqual([
+	// SETTLED by WP-12 (F-26). The four omissions WP-8 could only make VISIBLE are now DECIDED, and this is the
+	// classification pinned as data. Note this test does not read the table to build its expectation — it states
+	// the answer literally, so mutating a row turns it RED instead of moving the goalposts with it.
+	it('CLASSIFICATION: exactly Fail, Cancel and EnterWait are CLEANUP_EXEMPT on plan liveness', () => {
+		const exempt = STEP_COMMAND_TYPES.filter(
+			(t) => stepCommandSpec(t).planLiveness === 'CLEANUP_EXEMPT'
+		).sort();
+		expect(exempt).toEqual([
 			'CancelExecutionStep',
-			'CompleteExecutionStep',
 			'EnterExecutionStepWait',
 			'FailExecutionStep'
 		]);
-		// Two are INTENTIONAL and say so; two are still unsettled and say that too.
-		expect(stepCommandSpec('CancelExecutionStep').activePlanRationale).toContain('INTENTIONAL');
-		expect(stepCommandSpec('EnterExecutionStepWait').activePlanRationale).toContain('INTENTIONAL');
-		expect(stepCommandSpec('CompleteExecutionStep').activePlanRationale).toContain('UNSETTLED');
-		expect(stepCommandSpec('FailExecutionStep').activePlanRationale).toContain('UNSETTLED');
+		// Complete MOVED to the gated side — the behaviour change F-26 called for.
+		expect(stepCommandSpec('CompleteExecutionStep').planLiveness).toBe('REQUIRES_ACTIVE_PLAN');
+	});
+
+	it('CLASSIFICATION: the same three are CLEANUP_EXEMPT on PWU openness', () => {
+		const exempt = STEP_COMMAND_TYPES.filter(
+			(t) => stepCommandSpec(t).pwuOpenness === 'CLEANUP_EXEMPT'
+		).sort();
+		expect(exempt).toEqual([
+			'CancelExecutionStep',
+			'EnterExecutionStepWait',
+			'FailExecutionStep'
+		]);
+	});
+
+	it('THE AXIS IS CREDIT, NOT WORK: every command whose target is terminal-SUCCESS requires an ACTIVE plan', () => {
+		// The rule that settled F-26, expressed as a property rather than a list. Skip and Prune open no work
+		// whatsoever, yet both were already gated — which is the evidence that the codebase believed the credit
+		// axis while its docblocks said "opens new work".
+		for (const t of STEP_COMMAND_TYPES) {
+			const s = stepCommandSpec(t);
+			if (s.target === 'SUCCEEDED' || s.target === 'SKIPPED')
+				expect(s.planLiveness, `${t} mints terminal-success`).toBe('REQUIRES_ACTIVE_PLAN');
+		}
 	});
 });
 
