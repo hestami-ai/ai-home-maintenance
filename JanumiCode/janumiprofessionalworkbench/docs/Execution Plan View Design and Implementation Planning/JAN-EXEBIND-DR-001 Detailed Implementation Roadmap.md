@@ -61,7 +61,6 @@ kill test would be vacuous, which is the defect class reintroduced by its own fi
 | K3 | binding `REVOKED` | same |
 | K4 | `runtimeBindingId` names no object | `RPH_VALIDATION_SEMANTIC_FAILED` (fail-closed, mirroring `pwuOpennessRefusal`) |
 | K5 | binding `AUTHORIZED` but **∉** `plan.authorizedRuntimeBindingIds` | `RPH_INVARIANT_VIOLATION` + the **allowlist** marker — **the limb-separation proof** |
-
 | **K6** | binding `REQUESTED` **and** ∉ the allowlist — **fails both limbs** | `RPH_INVARIANT_VIOLATION` + the **status** marker, and NOT the allowlist one — **the ORDER proof** |
 | P1 | binding `AUTHORIZED` **and** in the allowlist | **ACCEPTED** |
 | P2 | binding `PARTIALLY_AUTHORIZED` and in the allowlist | **ACCEPTED** (the ratified kernel permits it) |
