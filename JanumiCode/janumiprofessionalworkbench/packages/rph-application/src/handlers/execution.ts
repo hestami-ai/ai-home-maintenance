@@ -59,6 +59,7 @@ import {
 	unassessableAiContentBlock
 } from './floor-gate.js';
 import { fromStates } from './command-precondition.js';
+import { resolveSkipAuthorization } from './skip-authorization.js';
 
 const PLAN = 'EXECUTION_PLAN';
 const MACHINE = 'ExecutionPlan.status';
@@ -1081,8 +1082,32 @@ export const skipExecutionStep: CommandHandler = (ctx, command) => {
 			stepState: 'SKIPPED'
 		},
 		precheck: () => {
+			// §21.1 RESOLVED, not assumed (JAN-EXECREM WP-12 / F-30). `hasAuthorizedWaiverOrRevision` used to be
+			// `!!p.waiverOrRevisionId`, so a governed act was satisfied by ANY NON-EMPTY STRING — `'x'` retired a
+			// mandatory step. The id is now resolved to an EFFECTIVE REPLAN/WAIVER decision that names this plan
+			// and THIS step; see skip-authorization.ts for the six ordered checks and why the authorization is
+			// execution-scoped rather than routed through the assurance plane's WaiverDetail.
+			//
+			// Sited AHEAD of canSkipStep so a supplied-but-invalid id is refused as the category/scope error it is
+			// (RPH_VALIDATION_SEMANTIC_FAILED) rather than surfacing as "you need a waiver" when one was offered.
+			if (p.waiverOrRevisionId) {
+				const authorized = resolveSkipAuthorization(ctx, {
+					planId: command.targetAggregateId,
+					stepId: p.stepId,
+					authorizationId: p.waiverOrRevisionId,
+					now: command.issuedAt
+				});
+				if (!authorized.ok)
+					return reject(
+						command,
+						'RPH_VALIDATION_SEMANTIC_FAILED',
+						`Cannot skip step ${p.stepId}: ${authorized.reason} (§21.1 requires an AUTHORIZED plan revision or waiver — a bare id is not an authorization).`,
+						[p.stepId, p.waiverOrRevisionId]
+					);
+			}
 			// FAIL-CLOSED: an unmarked step defaults to MANDATORY (mandatory ?? true), so it needs an authorized
 			// waiver/revision to be skipped — never fail-open. `canSkipStep` is the ratified kernel (rph-domain).
+			// Its second input is now a RESOLVED fact rather than a truthiness test.
 			const check = canSkipStep({
 				mandatory: p.mandatory ?? true,
 				hasAuthorizedWaiverOrRevision: !!p.waiverOrRevisionId

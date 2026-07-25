@@ -148,11 +148,61 @@ describe('SkipExecutionStep / CancelExecutionStep (DWP-02)', () => {
 		expect(r.error?.code).toBe('RPH_INVARIANT_VIOLATION');
 	});
 
-	it('ALLOWS skipping a MANDATORY step WITH an authorized waiverOrRevisionId → SKIPPED', () => {
+	// REWRITTEN by JAN-EXECREM WP-12c (F-30), and the rewrite is the point. This case passed a LITERAL STRING —
+	// `'dec_waiver_1'` — naming no object anywhere, and it went through, because the handler asked
+	// `!!p.waiverOrRevisionId`. So the test that existed to prove §21.1's authorization worked was in fact the
+	// proof that it did not: it ENSHRINED the fail-open. A real EFFECTIVE decision is minted instead.
+	it('ALLOWS skipping a MANDATORY step WITH a REAL authorized plan revision → SKIPPED', () => {
 		activePlan(['QUEUED']);
-		const r = skip(1, { mandatory: true, waiverOrRevisionId: 'dec_waiver_1' });
+		const decisionId = 'dec_01ARZ3NDEKTSV4RRFFQ69G5M90';
+		expect(
+			dispatch(
+				'ProposeDecision',
+				{
+					decisionType: 'REPLAN',
+					subjectObjectIds: [PLAN],
+					selectedOption: 'skip the step under an authorized plan revision',
+					rationale: 'the step was superseded by a change of approach',
+					authority: actor,
+					executionSkipAuthorization: {
+						executionPlanId: PLAN,
+						executionStepIds: [stepId(1)],
+						rationale: 'this step alone is retired by the revision'
+					}
+				},
+				decisionId,
+				'DECISION'
+			).status
+		).toBe('ACCEPTED');
+		expect(
+			dispatch(
+				'ApproveDecision',
+				{
+					selectedOption: 'skip the step under an authorized plan revision',
+					rationale: 'approved',
+					consideredEvidenceIds: [],
+					consideredObservationIds: [],
+					subjectSemanticVersions: { [PLAN]: 1 }
+				},
+				decisionId,
+				'DECISION'
+			).status
+		).toBe('ACCEPTED');
+
+		const r = skip(1, { mandatory: true, waiverOrRevisionId: decisionId });
 		expect(r.status, JSON.stringify(r.error)).toBe('ACCEPTED');
 		expect(stepStateOf(1)).toBe('SKIPPED');
+	});
+
+	it('REFUSES the literal string this test used to pass — a bare id is not an authorization', () => {
+		// The kill test for the rewrite above. `'dec_waiver_1'` names nothing; under the shipped code it retired a
+		// mandatory step.
+		activePlan(['QUEUED']);
+		const r = skip(1, { mandatory: true, waiverOrRevisionId: 'dec_waiver_1' });
+		expect(r.status).toBe('REJECTED');
+		expect(r.error?.code).toBe('RPH_VALIDATION_SEMANTIC_FAILED');
+		expect(r.error?.message).toContain('names no recorded object');
+		expect(stepStateOf(1)).toBe('QUEUED');
 	});
 
 	it('a SKIPPED step advances the DWP-01 start-gate (the next step becomes startable)', () => {

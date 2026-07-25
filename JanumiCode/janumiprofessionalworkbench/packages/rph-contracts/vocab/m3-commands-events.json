@@ -1310,6 +1310,12 @@
 					"field": "effectiveAt",
 					"required": false,
 					"type": "string"
+				},
+				{
+					"field": "executionSkipAuthorization",
+					"required": false,
+					"type": "ExecutionSkipAuthorization",
+					"note": "JAN-EXECREM WP-12 (F-30). Carries the EXECUTION-plane skip scope on the wire so a REPLAN/WAIVER decision can NAME the plan and the exact steps it authorizes; skipExecutionStep RESOLVES it rather than trusting a bare id (any non-empty string used to satisfy §21.1)."
 				}
 			]
 		},
@@ -4090,6 +4096,12 @@
 					"type": "enum",
 					"enumRef": "DecisionStatusSchema",
 					"note": "=PROPOSED"
+				},
+				{
+					"field": "executionSkipAuthorization",
+					"required": false,
+					"type": "ExecutionSkipAuthorization",
+					"note": "JAN-EXECREM WP-12 (F-30). Carries the EXECUTION-plane skip scope on the wire so a REPLAN/WAIVER decision can NAME the plan and the exact steps it authorizes; skipExecutionStep RESOLVES it rather than trusting a bare id (any non-empty string used to satisfy §21.1)."
 				}
 			]
 		},

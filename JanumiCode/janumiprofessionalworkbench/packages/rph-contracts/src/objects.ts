@@ -227,6 +227,13 @@ export const ExecutionProvenanceSchema = z.strictObject({
 	evaluator: ActorReferenceSchema.optional()
 });
 export type ExecutionProvenance = z.infer<typeof ExecutionProvenanceSchema>;
+export const ExecutionSkipAuthorizationSchema = z.strictObject({
+	executionPlanId: z.string(),
+	executionStepIds: z.array(z.string()),
+	expiresAt: z.string().optional(),
+	rationale: z.string()
+});
+export type ExecutionSkipAuthorization = z.infer<typeof ExecutionSkipAuthorizationSchema>;
 export const ExecutionStepSchema = z.strictObject({
 	id: z.string(),
 	executionPlanId: z.string(),
@@ -567,7 +574,8 @@ export const DecisionObjectSchema = z.strictObject({
 	consideredObservationIds: z.array(z.string()),
 	effectiveAt: z.string().optional(),
 	status: DecisionStatusSchema,
-	waiver: WaiverDetailSchema.optional()
+	waiver: WaiverDetailSchema.optional(),
+	executionSkipAuthorization: ExecutionSkipAuthorizationSchema.optional()
 });
 export type DecisionObject = z.infer<typeof DecisionObjectSchema>;
 

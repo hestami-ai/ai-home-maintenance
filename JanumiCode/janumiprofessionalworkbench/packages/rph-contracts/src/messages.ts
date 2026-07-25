@@ -60,6 +60,7 @@ import {
 	EscalationRuleSchema,
 	EvidenceRequirementSchema,
 	ExecutionProvenanceSchema,
+	ExecutionSkipAuthorizationSchema,
 	ExecutionStepSchema,
 	ExecutionTransitionSchema,
 	FindingDefinitionSchema,
@@ -347,7 +348,8 @@ export const ProposeDecisionPayloadSchema = z.strictObject({
 	authority: ActorReferenceSchema,
 	consideredEvidenceIds: z.array(z.string()).optional(),
 	consideredObservationIds: z.array(z.string()).optional(),
-	effectiveAt: z.string().optional()
+	effectiveAt: z.string().optional(),
+	executionSkipAuthorization: ExecutionSkipAuthorizationSchema.optional()
 });
 export type ProposeDecisionPayload = z.infer<typeof ProposeDecisionPayloadSchema>;
 export const CreateBaselinePayloadSchema = z.strictObject({
@@ -980,7 +982,8 @@ export const DecisionProposedPayloadSchema = z.strictObject({
 	consideredEvidenceIds: z.array(z.string()).optional(),
 	consideredObservationIds: z.array(z.string()).optional(),
 	effectiveAt: z.string().optional(),
-	status: DecisionStatusSchema
+	status: DecisionStatusSchema,
+	executionSkipAuthorization: ExecutionSkipAuthorizationSchema.optional()
 });
 export type DecisionProposedPayload = z.infer<typeof DecisionProposedPayloadSchema>;
 export const DecisionRejectedPayloadSchema = z.strictObject({

@@ -378,6 +378,32 @@
         "reviewConditions"
       ],
       "additionalProperties": false
+    },
+    "executionSkipAuthorization": {
+      "type": "object",
+      "properties": {
+        "executionPlanId": {
+          "type": "string"
+        },
+        "executionStepIds": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "expiresAt": {
+          "type": "string"
+        },
+        "rationale": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "executionPlanId",
+        "executionStepIds",
+        "rationale"
+      ],
+      "additionalProperties": false
     }
   },
   "required": [

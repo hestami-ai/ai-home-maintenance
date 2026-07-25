@@ -133,6 +133,12 @@ export const proposeDecision: CommandHandler = (ctx, command, payload) => {
 		consideredEvidenceIds: p.consideredEvidenceIds ?? [],
 		consideredObservationIds: p.consideredObservationIds ?? [],
 		...(p.effectiveAt ? { effectiveAt: p.effectiveAt } : {}),
+		// JAN-EXECREM WP-12c (F-30). The EXECUTION-plane skip scope, carried onto the object so
+		// `resolveSkipAuthorization` has something to RESOLVE. Validating it at the door and discarding it would
+		// leave §21.1's authorization exactly as unresolvable as the bare id it replaces.
+		...(p.executionSkipAuthorization
+			? { executionSkipAuthorization: p.executionSkipAuthorization }
+			: {}),
 		status: 'PROPOSED'
 	};
 	return createObject(ctx, command, {
@@ -155,6 +161,11 @@ export const proposeDecision: CommandHandler = (ctx, command, payload) => {
 				: {}),
 			...(p.consideredObservationIds?.length
 				? { consideredObservationIds: p.consideredObservationIds }
+				: {}),
+			// The authorization is a governed FACT, so it rides the event too: replay must be able to see WHICH
+			// steps a decision authorized, not merely that some decision existed.
+			...(p.executionSkipAuthorization
+				? { executionSkipAuthorization: p.executionSkipAuthorization }
 				: {}),
 			...(p.effectiveAt ? { effectiveAt: p.effectiveAt } : {})
 		}

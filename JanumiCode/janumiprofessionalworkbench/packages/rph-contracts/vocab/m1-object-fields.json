@@ -860,6 +860,12 @@
           "type": "WaiverDetail",
           "required": false,
           "note": "Present iff decisionType is WAIVER; requestWaiver enforces it. AUTHORED under sponsor grant 2026-07-16 (not derived from a DOC-007 interface). Serializes DOC-004 §12.2's RATIFIED waiver invariants, which DOC-007 never schematized (§16 item 12: 'waiver lacks a complete instance/wire/storage contract'). Object+version+authority+rationale already live on the Decision envelope; these are the remainder."
+        },
+        {
+          "field": "executionSkipAuthorization",
+          "type": "ExecutionSkipAuthorization",
+          "required": false,
+          "note": "JAN-EXECREM WP-12 (F-30). The EXECUTION-plane skip authorization, distinct from `waiver` (assurance plane) by construction. Optional and fail-closed: absent ⇒ authorizes no skip."
         }
       ]
     },
@@ -3009,6 +3015,36 @@
           "type": "string",
           "required": true,
           "note": "minLength 1. The rationale for asserting no output — the record of WHY, not merely THAT."
+        }
+      ]
+    },
+    {
+      "name": "ExecutionSkipAuthorization",
+      "note": "JAN-EXECREM WP-12 (F-30). §21.1 requires an AUTHORIZED plan revision or waiver to skip a mandatory step, and `waiverOrRevisionId` was never RESOLVED — any non-empty string satisfied it, so `hasAuthorizedWaiverOrRevision: !!p.waiverOrRevisionId` made a governed act into a truthiness check. This is the EXECUTION-plane authorization detail. Deliberately NOT WaiverDetail: that shape is the ASSURANCE plane (waivedPolicyId / waivedCriterionId / waivedFindingIds), and routing a step skip through it would let a FLOOR waiver authorize an EXECUTION act — an INV-5 boundary crossing. OPTIONAL on DECISION so existing assurance waivers are unaffected; an ABSENT detail authorizes NO skip, which is the fail-closed default (mirroring how floor-gate treats a WAIVER Decision carrying no `waiver` detail).",
+      "fields": [
+        {
+          "field": "executionPlanId",
+          "type": "string",
+          "required": true,
+          "note": "The plan this authorization is scoped to. An ExecutionStep is not a Professional Work Object — no envelope, no registry row, no semantic version — so the finest governed subject a Decision can NAME is the plan."
+        },
+        {
+          "field": "executionStepIds",
+          "type": "string[]",
+          "required": true,
+          "note": "The exact steps authorized. This supplies the step-exactness RPH-GOV-005 demands (\"a waiver does not bleed to another criterion, another object, or another version\") without inventing a version for a non-object. Without it, ONE decision would retire EVERY mandatory step in the plan — precisely the unscoped waiver REG-Q-012 forbids."
+        },
+        {
+          "field": "expiresAt",
+          "type": "string",
+          "required": false,
+          "note": "RFC3339. Resolved against the COMMAND issuedAt, never a wall clock, so the check replays deterministically (§10.2)."
+        },
+        {
+          "field": "rationale",
+          "type": "string",
+          "required": true,
+          "note": "WHY the skip is authorized. A bare id would record THAT it was authorized without the reasoning — the REG-Q-012 mistake."
         }
       ]
     }
