@@ -147,7 +147,12 @@ async function stageActivePlan(
 					{
 						executionPlanId: PLAN_ID,
 						workUnitId: PWU_ID,
-						steps: [mkStep(STEP1, 'QUEUED'), mkStep(STEP2, 'QUEUED'), mkStep(STEP3, 'NOT_READY')],
+						// All three QUEUED. JAN-EXECREM WP-6 refuses an AUTHORED NOT_READY step (F-09/F-27: nothing
+						// drives one out of NOT_READY and it is not terminal, so the staged plan could never have
+						// completed — this fixture was itself an instance of the defect). The below-the-floor UI note
+						// it used to exercise is pinned at the unit level instead (rph-projections execution-view
+						// `belowQueued`), where the state can still be constructed.
+						steps: [mkStep(STEP1, 'QUEUED'), mkStep(STEP2, 'QUEUED'), mkStep(STEP3, 'QUEUED')],
 						transitions: [],
 						retryPolicy: {},
 						tacticalChangePolicy: {},
@@ -220,16 +225,12 @@ test.describe('Execution Plan view — DWP-03 handler-backed step actions', () =
 		const undertakingId = await stageActivePlan(request);
 		await gotoHydrated(page, `/undertakings/${undertakingId}`);
 		await page.getByRole('button', { name: 'execution' }).click();
-		// Scope to the staged plan (step1/step2 QUEUED, step3 NOT_READY) — the seed's own plans render SUCCEEDED steps.
+		// Scope to the staged plan (all three steps QUEUED) — the seed's own plans render SUCCEEDED steps.
 		const grp = page.getByTestId('exec-pwu-group').filter({ hasText: 'Staged execution PWU' });
 		const steps = grp.getByTestId('exec-step');
 
-		// step3 is NOT_READY → below the domain's driveable floor: the honest note, and NO action at all — NOT_READY
-		// has neither an advance command NOR a control command (the machine has no →SKIPPED/→CANCELLED from it) (F-11).
-		await expect(grp.getByTestId('step-belowqueued')).toBeVisible();
-		await expect(steps.nth(2).getByTestId('step-action-start')).toHaveCount(0);
-		await expect(steps.nth(2).getByTestId('step-action-skip')).toHaveCount(0);
-		await expect(steps.nth(2).getByTestId('step-action-cancel')).toHaveCount(0);
+		// (The below-the-driveable-floor note is no longer exercised here: WP-6 makes NOT_READY unauthorable, so that
+		// population exists only in stored history. `belowQueued` is pinned in rph-projections' unit suite.)
 
 		// Start is offered on exactly the ONE startable step (step1) — never the later QUEUED step2 (start-gate, DWP-01).
 		await expect(grp.getByTestId('step-action-start')).toHaveCount(1);
@@ -239,10 +240,10 @@ test.describe('Execution Plan view — DWP-03 handler-backed step actions', () =
 		// Skip + Cancel ARE now offered on both QUEUED steps (DWP-02/03 command-backed control actions; skip needs an
 		// ACTIVE plan — this plan is ACTIVE). These are real commands now, so the F-11 "no fabricated button" rule is
 		// SATISFIED by them existing, not by their absence.
-		await expect(grp.getByTestId('step-action-skip')).toHaveCount(2);
-		await expect(grp.getByTestId('step-action-cancel')).toHaveCount(2);
+		await expect(grp.getByTestId('step-action-skip')).toHaveCount(3);
+		await expect(grp.getByTestId('step-action-cancel')).toHaveCount(3);
 
-		// DR-004 DWP-04: Wait belongs to RUNNING and Resume to WAITING — neither is offered on a QUEUED/NOT_READY step
+		// DR-004 DWP-04: Wait belongs to RUNNING and Resume to WAITING — neither is offered on a QUEUED step
 		// (the machine has no such arrow, so offering one would be a fabricated button — F-11).
 		await expect(grp.getByTestId('step-action-wait')).toHaveCount(0);
 		await expect(grp.getByTestId('step-action-resolve')).toHaveCount(0);

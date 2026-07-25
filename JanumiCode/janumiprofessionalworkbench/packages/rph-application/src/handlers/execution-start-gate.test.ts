@@ -8,7 +8,7 @@ import type { DomainCommand } from '@janumipwb/rph-contracts';
 import { SqliteStorageAdapter } from '@janumipwb/rph-persistence';
 import { beforeEach, describe, expect, it } from 'vitest';
 import { Engine } from '../index.js';
-import { seedStepStates } from './__tests__/plan-fixtures.js';
+import { seedBelowQueuedStepState_LEGACY_ONLY, seedStepStates } from './__tests__/plan-fixtures.js';
 
 const TS = '2026-07-12T00:00:00Z';
 const actor = { actorId: 'u1', actorType: 'HUMAN' as const, displayName: 'A' };
@@ -814,7 +814,7 @@ describe('StartExecutionStep — the linear start-gate (DWP-01, RPH-EXE-005 / fo
 						{ ...step(1, 'QUEUED'), stepType: 'BRANCH' },
 						step(2, 'QUEUED'),
 						step(3, 'QUEUED'),
-						step(4, 'NOT_READY') // interior of the excluded arm; it never becomes READY
+						step(4, 'QUEUED') // seeded to NOT_READY below — propose now refuses to AUTHOR that state (WP-6)
 					],
 					transitions: [
 						cedge(1, 2, { op: 'ATTEMPTS', stepId: stepId(1), cmp: '>', value: 99 }), // never true → s2 excluded
@@ -834,6 +834,12 @@ describe('StartExecutionStep — the linear start-gate (DWP-01, RPH-EXE-005 / fo
 			expect(
 				dispatch('ActivateExecutionPlan', { authorizedRuntimeBindingIds: [] }, PLAN, 'EXECUTION_PLAN').status
 			).toBe('ACCEPTED');
+
+			// WP-6 refuses an AUTHORED NOT_READY step (F-09/F-27: no command drives one out, so it is a permanent
+			// deadlock). The state is still a real stored population this test must cover, so it is arranged through
+			// the WP-0 seam's loudly-named escape — which exists for exactly this: proving behaviour on a population
+			// propose can no longer create.
+			seedBelowQueuedStepState_LEGACY_ONLY(store, PLAN, ['QUEUED', 'QUEUED', 'QUEUED', 'NOT_READY']);
 
 			expect(start(1).status).toBe('ACCEPTED');
 			expect(complete(1).status).toBe('ACCEPTED'); // guard false → s3 taken; s2 + interior s4 (NOT_READY) excluded

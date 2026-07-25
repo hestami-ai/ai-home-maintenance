@@ -92,7 +92,19 @@ describe('Execution / assurance / governance / decomposition handlers (live)', (
 				{
 					executionPlanId: PLAN,
 					workUnitId: PWU_ID,
-					steps: [],
+					steps: [
+						{
+							id: `${PLAN}-s1`,
+							executionPlanId: PLAN,
+							stepType: 'TRANSFORMATION',
+							purpose: 'work',
+							inputBindings: [],
+							outputBindings: [],
+							preconditions: [],
+							postconditions: [],
+							stepState: 'QUEUED'
+						}
+					],
 					transitions: [],
 					retryPolicy: {},
 					tacticalChangePolicy: {},
@@ -125,7 +137,19 @@ describe('Execution / assurance / governance / decomposition handlers (live)', (
 			{
 				executionPlanId: PLAN,
 				workUnitId: PWU_ID,
-				steps: [],
+				steps: [
+					{
+						id: `${PLAN}-s1`,
+						executionPlanId: PLAN,
+						stepType: 'TRANSFORMATION',
+						purpose: 'work',
+						inputBindings: [],
+						outputBindings: [],
+						preconditions: [],
+						postconditions: [],
+						stepState: 'QUEUED'
+					}
+				],
 				transitions: [],
 				retryPolicy: {},
 				tacticalChangePolicy: {},

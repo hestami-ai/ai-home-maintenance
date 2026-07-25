@@ -23,14 +23,13 @@ import {
 	canAuthorizeNewWork,
 	canSkipStep,
 	ConditionExpressionSchema,
-	conditionStepRefs,
 	evaluateCondition,
 	prunableStepIds,
 	resolveBranchSelection,
 	retryDecision,
 	startStepGate,
 	validateStepCompletion,
-	validateTransitionGraph,
+	validateProposedPlan,
 	type AssumptionView,
 	type EdgeGuardEvaluator,
 	type GatePlan
@@ -122,91 +121,29 @@ function guardEvaluatorFor(
 }
 
 /**
- * DR-004 DWP-01: a malformed transition graph must never reach ACTIVE. A NO-OP for a linear plan (empty
- * transitions[]); a graph plan is validated (dangling ids, one entry, reachability, acyclicity, BRANCH-default).
- * Returns a reject result to short-circuit ProposeExecutionPlan, or null when the graph is well-formed.
+ * Propose-time structural admissibility (JAN-EXECREM WP-6). ONE carrier: `validateProposedPlan` in rph-domain.
+ *
+ * This replaced three private, transition-scoped validators here. The structural one among them short-circuited on
+ * an empty `transitions[]`, so a LINEAR plan received no step validation at all — which is how duplicate step ids
+ * (F-10) and an authored NOT_READY step (F-09/F-27) reached storage. The domain module preserves those three
+ * rules' exact codes and messages, so their rejection tests are unchanged; it adds the step-set rules nothing owned.
  */
-function rejectMalformedTransitionGraph(
+function rejectInadmissiblePlan(
 	command: DomainCommand,
 	p: ProposeExecutionPlanPayload
 ): ReturnType<typeof reject> | null {
-	const graph = validateTransitionGraph(
-		p.steps.map((s) => ({ id: s.id, stepType: s.stepType })),
-		(p.transitions ?? []).map((t) => ({
-			sourceStepId: t.sourceStepId,
-			targetStepId: t.targetStepId,
-			transitionType: t.transitionType,
-			conditionExpression: t.conditionExpression
-		}))
+	const verdict = validateProposedPlan({
+		executionPlanId: p.executionPlanId,
+		steps: p.steps,
+		transitions: p.transitions ?? []
+	});
+	if (verdict.ok) return null;
+	return reject(
+		command,
+		verdict.code ?? 'RPH_VALIDATION_SEMANTIC_FAILED',
+		verdict.message ?? 'ProposeExecutionPlan blocked: the proposed plan is not structurally admissible.',
+		[p.executionPlanId]
 	);
-	if (!graph.ok) {
-		return reject(
-			command,
-			'RPH_VALIDATION_SEMANTIC_FAILED',
-			`ProposeExecutionPlan blocked: malformed transition graph — ${graph.message} (DR-004 DWP-01).`,
-			[p.executionPlanId]
-		);
-	}
-	return null;
-}
-
-/**
- * A BRANCH records its decision AS a transition id (DWP-09), and the transitions view keys its rows on the same id,
- * so a duplicate makes both the recorded selection and the render ambiguous. The contract requires `id` on every
- * transition but nothing enforced UNIQUENESS. Returns a reject on the first duplicate id, or null.
- */
-function rejectDuplicateTransitionId(
-	command: DomainCommand,
-	p: ProposeExecutionPlanPayload
-): ReturnType<typeof reject> | null {
-	const edgeIds = new Set<string>();
-	for (const t of p.transitions ?? []) {
-		const id = (t as { id?: string }).id;
-		if (id === undefined) continue;
-		if (edgeIds.has(id))
-			return reject(
-				command,
-				'RPH_VALIDATION_SEMANTIC_FAILED',
-				`ProposeExecutionPlan blocked: transition id "${id}" is declared more than once — transition ids must be unique (a BRANCH records its decision by transition id).`,
-				[p.executionPlanId]
-			);
-		edgeIds.add(id);
-	}
-	return null;
-}
-
-/**
- * DR-004 DWP-02: each edge's conditionExpression must parse against the hand-authored grammar (reject malformed),
- * and every stepId it references must resolve to a declared step — so a guard is never silently false at runtime.
- * Returns a reject on the first malformed/dangling condition, or null.
- */
-function rejectMalformedTransitionCondition(
-	command: DomainCommand,
-	p: ProposeExecutionPlanPayload
-): ReturnType<typeof reject> | null {
-	const declaredStepIds = new Set(p.steps.map((s) => s.id));
-	for (const t of p.transitions ?? []) {
-		if (t.conditionExpression === undefined) continue;
-		const parsed = ConditionExpressionSchema.safeParse(t.conditionExpression);
-		if (!parsed.success) {
-			return reject(
-				command,
-				'RPH_VALIDATION_SCHEMA_FAILED',
-				`ProposeExecutionPlan blocked: a transition conditionExpression is malformed (DR-004 DWP-02): ${parsed.error.issues[0]?.message ?? 'invalid'}.`,
-				[p.executionPlanId]
-			);
-		}
-		const badRef = conditionStepRefs(parsed.data).find((id) => !declaredStepIds.has(id));
-		if (badRef) {
-			return reject(
-				command,
-				'RPH_VALIDATION_SEMANTIC_FAILED',
-				`ProposeExecutionPlan blocked: a transition condition references step "${badRef}", which is not a declared step in the plan (DR-004 DWP-02).`,
-				[p.executionPlanId]
-			);
-		}
-	}
-	return null;
 }
 
 /**
@@ -247,12 +184,8 @@ export const proposeExecutionPlan: CommandHandler = (ctx, command, payload) => {
 			[p.executionPlanId]
 		);
 	}
-	const graphFailure = rejectMalformedTransitionGraph(command, p);
-	if (graphFailure) return graphFailure;
-	const duplicateIdFailure = rejectDuplicateTransitionId(command, p);
-	if (duplicateIdFailure) return duplicateIdFailure;
-	const conditionFailure = rejectMalformedTransitionCondition(command, p);
-	if (conditionFailure) return conditionFailure;
+	const inadmissible = rejectInadmissiblePlan(command, p);
+	if (inadmissible) return inadmissible;
 	const state: Record<string, unknown> = {
 		...newEnvelope(command, PLAN, p.executionPlanId, {
 			lifecycleStatus: 'UNDER_REVIEW',
