@@ -10,6 +10,7 @@
 // Replay-safe by construction: the grammar is DATA (a discriminated union), never executable code; the evaluator is a
 // pure function of (expr, subject); and the subject is folded ONLY from committed plan state + this plan's own event
 // log (no wall-clock, no random, no cross-aggregate read). INV-5: a condition guards EXECUTION flow, never assurance.
+import { StepStateSchema, type StepState } from '@janumipwb/rph-contracts';
 import { z } from 'zod';
 
 /** The numeric comparators available to count/threshold guards (the gap ApplicabilityExpression could not express). */
@@ -19,7 +20,7 @@ export type NumericComparator = z.infer<typeof NumericComparatorSchema>;
 /** The condition grammar (a discriminated union tagged by `op`). Leaves read a step's committed facts; ALL/ANY/NOT
  *  combine. Recursive — hence the explicit type + `z.lazy`. */
 export type ConditionExpression =
-	| { op: 'STEP_STATE'; stepId: string; state: string }
+	| { op: 'STEP_STATE'; stepId: string; state: StepState }
 	| { op: 'STEP_SUCCEEDED'; stepId: string }
 	| { op: 'OUTPUT_COUNT'; stepId: string; cmp: NumericComparator; value: number }
 	| { op: 'ATTEMPTS'; stepId: string; cmp: NumericComparator; value: number }
@@ -32,7 +33,10 @@ export type ConditionExpression =
  *  recursive discriminated union. Used at proposeExecutionPlan to REJECT a malformed conditionExpression. */
 export const ConditionExpressionSchema: z.ZodType<ConditionExpression> = z.lazy(() =>
 	z.discriminatedUnion('op', [
-		z.strictObject({ op: z.literal('STEP_STATE'), stepId: z.string(), state: z.string() }),
+		// F-22/F-39: `state` was a free string, so a typo'd or off-contract value parsed happily and then compared
+		// unequal to every real stepState — a guard that is PERMANENTLY FALSE and looks authored-on-purpose. The
+		// ratified enum makes it a propose-time rejection instead of a silent dead arm.
+		z.strictObject({ op: z.literal('STEP_STATE'), stepId: z.string(), state: StepStateSchema }),
 		z.strictObject({ op: z.literal('STEP_SUCCEEDED'), stepId: z.string() }),
 		z.strictObject({
 			op: z.literal('OUTPUT_COUNT'),
@@ -52,8 +56,18 @@ export const ConditionExpressionSchema: z.ZodType<ConditionExpression> = z.lazy(
 			path: z.string(),
 			value: z.union([z.string(), z.number(), z.boolean()])
 		}),
-		z.strictObject({ op: z.literal('ALL'), operands: z.array(ConditionExpressionSchema) }),
-		z.strictObject({ op: z.literal('ANY'), operands: z.array(ConditionExpressionSchema) }),
+		// F-41/F-43/F-44: an EMPTY operand list is vacuously TRUE for ALL (`[].every` is true) — a fail-OPEN guard in
+		// a grammar whose every other default is fail-closed, and one the schema happily accepted. `.min(1)` makes an
+		// empty combinator unrepresentable rather than silently permissive. (ANY is vacuously FALSE, which is safe,
+		// but an empty ANY is equally meaningless and is refused for the same reason.)
+		z.strictObject({
+			op: z.literal('ALL'),
+			operands: z.array(ConditionExpressionSchema).min(1)
+		}),
+		z.strictObject({
+			op: z.literal('ANY'),
+			operands: z.array(ConditionExpressionSchema).min(1)
+		}),
 		z.strictObject({ op: z.literal('NOT'), operand: ConditionExpressionSchema })
 	])
 );
@@ -119,6 +133,11 @@ export function evaluateCondition(expr: ConditionExpression, subject: ConditionS
 		case 'STEP_STATE':
 			return step?.stepState === expr.state;
 		case 'STEP_SUCCEEDED':
+			// F-46, DISPOSITIONED: this is deliberately NARROWER than the gate's TERMINAL_SUCCESS, which also counts
+			// SKIPPED. They answer different questions. The gate asks "can this edge conduct?" — a skipped predecessor
+			// is done, so the sequence advances. A guard asks "did that step SUCCEED?" — a step that was skipped
+			// (waived, or pruned off a dead arm) produced no result, so branching as though it had would be a lie.
+			// An author who means "done, however" writes ANY[STEP_SUCCEEDED, STEP_STATE=SKIPPED]. Pinned by test.
 			return step?.stepState === 'SUCCEEDED';
 		case 'OUTPUT_COUNT':
 			return numericCompare(step?.outputArtifactIds.length ?? 0, expr.cmp, expr.value);
@@ -135,6 +154,28 @@ export function evaluateCondition(expr: ConditionExpression, subject: ConditionS
 		default:
 			return assertNever(expr);
 	}
+}
+
+/**
+ * THE one guard-evaluation entry point (JAN-EXECREM WP-7 / SM-5). Both planes call this and nothing else:
+ * `guardEvaluatorFor` (rph-application, the authority) and `conditionEvaluatorFor` (rph-projections, the
+ * read-model). They previously carried byte-identical two-line bodies — two copies of a rule that MUST agree,
+ * with nothing making them agree.
+ *
+ * Fail-closed in three ways, in order:
+ *   1. Unparseable expression -> false. (Was already so, in both copies.)
+ *   2. A referenced step that is NOT in the subject -> false, for the WHOLE expression. This is new and it closes a
+ *      real fail-OPEN: a leaf over a missing step evaluates false, but `NOT` then inverts it to TRUE, so a dangling
+ *      reference could SATISFY a guard. Propose-time rejects dangling refs, but a STORED plan predates that rule,
+ *      and the runtime must not depend on the author having been validated.
+ *   3. Otherwise the pure evaluation.
+ */
+export function evaluateGuardExpression(expression: unknown, subject: ConditionSubject): boolean {
+	const parsed = ConditionExpressionSchema.safeParse(expression);
+	if (!parsed.success) return false;
+	for (const id of conditionStepRefs(parsed.data))
+		if (!Object.hasOwn(subject.steps, id)) return false;
+	return evaluateCondition(parsed.data, subject);
 }
 
 /** The stepId a LEAF references (empty for the combinators, whose steps come from their operands). */

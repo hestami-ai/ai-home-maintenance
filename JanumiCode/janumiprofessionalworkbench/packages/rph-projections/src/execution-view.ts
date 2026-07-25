@@ -24,7 +24,7 @@ import type { StepState } from '@janumipwb/rph-contracts';
 import {
 	buildConditionSubject,
 	ConditionExpressionSchema,
-	evaluateCondition,
+	evaluateGuardExpression,
 	inEdgeDisposition,
 	isTerminalSuccessStepState,
 	prunableStepIds as gatePrunableStepIds,
@@ -261,10 +261,8 @@ export function conditionEvaluatorFor(
 	events: readonly ConditionSubjectEvent[]
 ): EdgeGuardEvaluator {
 	const subject = buildConditionSubject(plan.steps, events, plan.id);
-	return (edge) => {
-		const parsed = ConditionExpressionSchema.safeParse(edge.conditionExpression);
-		return parsed.success && evaluateCondition(parsed.data, subject);
-	};
+	// WP-7/SM-5: ONE evaluation rule, shared with the authority (rph-application's guardEvaluatorFor).
+	return (edge) => evaluateGuardExpression(edge.conditionExpression, subject);
 }
 
 /** The single startable step — back-compat with the Tier-3C scalar frontier: the first of `startableStepIds`, or

@@ -22,8 +22,7 @@ import {
 	canActivatePlan,
 	canAuthorizeNewWork,
 	canSkipStep,
-	ConditionExpressionSchema,
-	evaluateCondition,
+	evaluateGuardExpression,
 	prunableStepIds,
 	resolveBranchSelection,
 	retryDecision,
@@ -114,10 +113,9 @@ function guardEvaluatorFor(
 	);
 	if (!hasGuard) return undefined;
 	const subject = buildConditionSubject(gatePlan.steps, ctx.store.readAllEvents(), planId);
-	return (edge) => {
-		const parsed = ConditionExpressionSchema.safeParse(edge.conditionExpression);
-		return parsed.success && evaluateCondition(parsed.data, subject);
-	};
+	// WP-7/SM-5: ONE evaluation rule, shared with the read-model. This body used to be a byte-identical copy of
+	// rph-projections' — two copies of a rule that must agree, with nothing making them agree.
+	return (edge) => evaluateGuardExpression(edge.conditionExpression, subject);
 }
 
 /**
