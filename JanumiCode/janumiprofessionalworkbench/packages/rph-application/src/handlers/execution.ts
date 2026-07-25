@@ -31,6 +31,7 @@ import {
 	STEP_COMMAND_SPECS,
 	validateProposedPlan,
 	type AssumptionView,
+	type ConditionSubjectEvent,
 	type EdgeGuardEvaluator,
 	type GatePlan,
 	type StepCommandSpec
@@ -96,12 +97,6 @@ function toGatePlan(plan: Record<string, unknown>): GatePlan {
 	};
 }
 
-/** The plan aggregate's current state bag, or an empty one. Used where a mutator needs the WHOLE plan, not just the
- *  step it is rewriting (the branch-selection recording in completeExecutionStep). */
-function loadPlanState(ctx: HandlerContext, planId: string): Record<string, unknown> {
-	return (ctx.store.loadObject(planId)?.state as Record<string, unknown> | undefined) ?? {};
-}
-
 /**
  * The CONDITIONAL-edge guard evaluator for a plan, or `undefined` when the plan has no guarded edge at all.
  *
@@ -110,17 +105,27 @@ function loadPlanState(ctx: HandlerContext, planId: string): Record<string, unkn
  * events whatsoever — O(total events across all aggregates), even for a linear plan whose gate never consults a guard
  * (DWP-07, flagged by the audit's completeness sweep). Returning undefined is not a behaviour change: the gate's
  * evaluator parameter is optional and is only ever called for a CONDITIONAL edge, of which there are none here.
+ *
+ * `pendingEvents` (JAN-EXECREM WP-10 / Rule B1) is what lets a BRANCH see its OWN result. It is the event about to
+ * be committed — the real one, byte-identical to what lands in the log, never a re-derivation from the command
+ * payload (the event renames `executionStepId`, drops `resultStatus`, and adds `resultingExecutionState`, so a
+ * payload-built overlay would be a second, subtly different shape). Empty everywhere except the settlement seam.
  */
 function guardEvaluatorFor(
 	ctx: HandlerContext,
 	planId: string,
-	gatePlan: GatePlan
+	gatePlan: GatePlan,
+	pendingEvents: readonly ConditionSubjectEvent[] = []
 ): EdgeGuardEvaluator | undefined {
 	const hasGuard = (gatePlan.transitions ?? []).some(
 		(t) => t.conditionExpression !== undefined || t.transitionType === 'CONDITIONAL'
 	);
 	if (!hasGuard) return undefined;
-	const subject = buildConditionSubject(gatePlan.steps, ctx.store.readAllEvents(), planId);
+	const subject = buildConditionSubject(
+		gatePlan.steps,
+		[...ctx.store.readAllEvents(), ...pendingEvents],
+		planId
+	);
 	// WP-7/SM-5: ONE evaluation rule, shared with the read-model. This body used to be a byte-identical copy of
 	// rph-projections' — two copies of a rule that must agree, with nothing making them agree.
 	return (edge) => evaluateGuardExpression(edge.conditionExpression, subject);
@@ -550,7 +555,6 @@ function advanceStep(
 			step: Record<string, unknown>,
 			plan: Record<string, unknown>
 		) => ReturnType<typeof reject> | null;
-		readonly mutateStep?: (step: Record<string, unknown>) => Record<string, unknown>;
 		/** The EVENT payload. Omitted → the raw command payload (the default for the step events DOC-007 leaves
 		 * unschematized). Mirrors kit.advanceStatus's `eventPayload`: the command shape is not the event shape. */
 		readonly eventPayload?: unknown;
@@ -586,17 +590,78 @@ function advanceStep(
 		);
 	const illegal = checkTransition(command, STEP_MACHINE, String(step.stepState), args.spec.target);
 	if (illegal) return illegal;
-	const nextStep = { ...(args.mutateStep ? args.mutateStep(step) : step), stepState: args.spec.target };
-	const newSteps = steps.map((s, i) => (i === idx ? nextStep : s));
+
+	// ── THE SETTLEMENT SEAM (JAN-EXECREM WP-10 / CANONICAL RULE B1) ────────────────────────────────────────────
+	//
+	// The event is built HERE, after `checkTransition` (so an illegal move never decides) and before `commitState`
+	// (so the decision and the move commit in one revision). That ordering is the fix: a BRANCH's arm is chosen
+	// against THE PLAN AS OF THE MOVE BEING MADE — the committed steps[] with this step's state replaced by the
+	// target, and the committed log extended by exactly the event about to be written.
+	//
+	// WHAT WAS WRONG. `completeExecutionStep` cloned the gate plan with `stepState: 'SUCCEEDED'`, but the evaluator
+	// it passed had already folded its subject from the COMMITTED log — and `buildConditionSubject` reads
+	// outputArtifactIds/structuredResult ONLY from a committed `ExecutionStepSucceeded`. So a BRANCH guarded on its
+	// own result evaluated PRE-completion facts: RESULT_EQUALS and OUTPUT_COUNT over the completing step were always
+	// false and the DEFAULT arm was always recorded. Patching one plane and not the other is why the state overlay
+	// looked like a fix while the decision stayed wrong.
+	//
+	// THE DECISION-REPLAY IDENTITY this establishes: the recorded selection equals what you get by evaluating the
+	// branch against the plan's committed state and log at the revision this command produces. stepState is written
+	// to exactly `args.spec.target` below; the post-commit log IS `committed ++ [event]`, which is the list passed;
+	// every other step is untouched. Today's value is reproducible from the log at NO prefix, which is precisely how
+	// it can contradict the event it is recorded beside.
 	const newRevision = loaded.revision + 1;
-	const next = { ...nextEnvelope(plan, command, newRevision), steps: newSteps };
-	const event = makeEvent(ctx, command, {
+	// ONE payload object, ONE makeEvent call. If a later edit builds the payload twice — once for the overlay, once
+	// for the commit — they can drift and the identity silently breaks. `execution-branch-settlement.test.ts` asserts
+	// state == event as the standing guard on that.
+	const basePayload = args.eventPayload !== undefined ? args.eventPayload : command.payload;
+	const pendingEvent = makeEvent(ctx, command, {
 		eventType: args.spec.eventType,
 		aggregateType: PLAN,
 		aggregateId: planId,
 		aggregateRevision: newRevision,
-		payload: args.eventPayload !== undefined ? args.eventPayload : command.payload
+		payload: basePayload
 	});
+
+	// The branch decision, keyed on the command's DECLARED policy (WP-8's table) rather than on which handler
+	// happened to remember. `NOT_TERMINAL_SUCCESS` and `NONE_STRUCTURALLY_DEAD` decide nothing, by declaration.
+	let selectedTransitionId: string | undefined;
+	if (
+		args.spec.branchDecision === 'RECORD_AT_SETTLEMENT' &&
+		// Never RE-decide: a branch that already recorded its arm settled once, and that is history.
+		step.selectedTransitionId === undefined
+	) {
+		// The settlement view. `stepState` is the ONLY edit — the acting step's `selectedTransitionId` must NOT be
+		// projected into it, because that is the OUTPUT of this computation, and the fold never reads it either
+		// (pinned in condition-grammar's tests), so no fixpoint can arise.
+		const settlementPlan = toGatePlan({
+			...plan,
+			steps: steps.map((s, i) => (i === idx ? { ...s, stepState: args.spec.target } : s))
+		});
+		selectedTransitionId = resolveBranchSelection(
+			settlementPlan,
+			args.stepId,
+			guardEvaluatorFor(ctx, planId, settlementPlan, [pendingEvent as ConditionSubjectEvent])
+		);
+	}
+
+	const nextStep = {
+		...step,
+		stepState: args.spec.target,
+		...(selectedTransitionId === undefined ? {} : { selectedTransitionId })
+	};
+	const newSteps = steps.map((s, i) => (i === idx ? nextStep : s));
+	const next = { ...nextEnvelope(plan, command, newRevision), steps: newSteps };
+	// BOTH planes carry the SAME computed value, in one atomic commit. The decision is stamped onto the payload
+	// AFTER the subject was folded from it — which is why the folded and committed events differ only on a field
+	// the fold does not read.
+	const event =
+		selectedTransitionId === undefined
+			? pendingEvent
+			: {
+					...pendingEvent,
+					payload: { ...(basePayload as Record<string, unknown>), selectedTransitionId }
+				};
 	return commitState(ctx, command, {
 		objectType: PLAN,
 		aggregateId: planId,
@@ -685,29 +750,14 @@ export const completeExecutionStep: CommandHandler = (ctx, command) => {
 		// last-write-wins, so a re-Complete carrying a different structuredResult could retroactively flip an
 		// already-resolved BRANCH.
 		spec: STEP_COMMAND_SPECS.CompleteExecutionStep,
-		// DWP-09: a BRANCH DECIDES at the moment it succeeds. Record which out-edge it selected, so the decision is a
-		// durable fact rather than something re-derived on every later read. Re-derivation was not stable: a step
-		// reachable only through a not-taken edge can still change state afterwards, and an ATTEMPTS/STEP_STATE guard
-		// over it flips — silently re-resolving a settled branch and making the losing arm live. Unlike reachability
-		// (structural, deliberately NOT persisted), a point-in-time decision cannot be reconstructed later.
-		mutateStep: (step) => {
-			if (step.stepType !== 'BRANCH') return step;
-			const gatePlan = toGatePlan(loadPlanState(ctx, command.targetAggregateId));
-			// Evaluate against the subject as it stands NOW — the step is still RUNNING here, and the gate treats a
-			// non-terminal source as deciding nothing, so ask the plan as if this step had already succeeded.
-			const resolved = {
-				...gatePlan,
-				steps: gatePlan.steps.map((s) =>
-					s.id === String(step.id) ? { ...s, stepState: 'SUCCEEDED' } : s
-				)
-			};
-			const selected = resolveBranchSelection(
-				resolved,
-				String(step.id),
-				guardEvaluatorFor(ctx, command.targetAggregateId, resolved)
-			);
-			return selected === undefined ? step : { ...step, selectedTransitionId: selected };
-		},
+		// DWP-09's branch-decision recording used to live HERE, as a `mutateStep` closure private to this one handler.
+		// It has moved into `advanceStep`'s settlement seam (WP-10), for two reasons that are the finding itself:
+		//   1. It read the plan through a SECOND store load and cloned only the step STATE, while the evaluator it
+		//      passed had already folded its subject from the committed log — so the branch could not see its own
+		//      result and the DEFAULT arm was always recorded (F-02/07/24).
+		//   2. Being private to Complete, it left Skip — the OTHER command that drives a step to terminal-success —
+		//      recording nothing, and Skip's silence was indistinguishable from the bug (F-15/21/23).
+		// The seam is keyed on `spec.branchDecision`, so every settling command's position is declared and total.
 		// DOC-007 §16.2 ExecutionStepSucceededPayload. The five id/ref fields are the command's own (§16.1 and §16.2
 		// share them verbatim); resultingExecutionState is §16.2's const, and is the EXECUTION dimension only —
 		// §16.2 L1244 / INV-5: step success never implies assuranceState=SATISFIED.

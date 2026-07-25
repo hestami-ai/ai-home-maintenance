@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 import {
 	inEdgeDisposition,
 	prunableStepIds,
+	resolveBranchSelection,
 	startableStepIds,
 	startStepGate,
 	validateTransitionGraph,
@@ -23,12 +24,39 @@ const edge = (sourceStepId: string, targetStepId: string, extra: Partial<GateTra
 	targetStepId,
 	...extra
 });
+// Every transition gets a deterministic id if the fixture did not give it one. A BRANCH's decision is RECORDED AS AN
+// ID (JAN-EXECREM WP-10), so an id-less edge can never be named as the selected arm — which would make every branch
+// fixture below silently UNRESOLVED rather than testing what it says it tests.
 const plan = (
 	steps: readonly (GateStep & { stepType?: string })[],
 	transitions: readonly GateTransition[] = [],
 	status = 'ACTIVE'
-): GatePlan => ({ status, steps, transitions });
+): GatePlan => ({
+	status,
+	steps,
+	transitions: transitions.map((t, i) => (t.id === undefined ? { ...t, id: `t${i + 1}` } : t))
+});
 const s = (n: number) => `s${n}`;
+
+/**
+ * SETTLE a BRANCH the way the engine now does: run first-match ONCE (`resolveBranchSelection`, the write path) and
+ * record the result on the step (JAN-EXECREM WP-10 / Rule B1+B2).
+ *
+ * Fixtures used to leave a SUCCEEDED BRANCH with no recorded decision and rely on the READ path re-deriving
+ * first-match on every call. That re-derivation is the defect (F-15/21/23): the condition subject does not stand
+ * still, so a settled branch silently re-resolved and BOTH arms ran. The read path now refuses to invent a decision,
+ * so a fixture that means "a resolved BRANCH" has to actually resolve it.
+ *
+ * Deriving the id here rather than hand-writing it is deliberate: the test still asserts WHICH arm first-match picks,
+ * it just does so through the one function that is allowed to decide.
+ */
+function settled(p: GatePlan, branchId: string, guard?: EdgeGuardEvaluator): GatePlan {
+	const selectedTransitionId = resolveBranchSelection(p, branchId, guard);
+	return {
+		...p,
+		steps: p.steps.map((st) => (st.id === branchId ? { ...st, selectedTransitionId } : st))
+	};
+}
 
 describe('startableStepIds — empty transitions[] is byte-identical to the shipped linear frontier', () => {
 	const linear = (states: string[], status = 'ACTIVE') =>
@@ -136,8 +164,14 @@ describe('PARALLEL_GROUP fan-out + barrier JOIN (DWP-05)', () => {
 		];
 		// s1 is the BRANCH node — exclusive first-match belongs to a BRANCH stepType and nothing else (DWP-07), and
 		// propose-time validation now REFUSES a CONDITIONAL out-edge from any other kind of step.
+		// SETTLED (WP-10): a "resolved BRANCH" now means one that RECORDED its arm. The read path no longer
+		// re-derives first-match, so leaving the decision off would make every case below UNRESOLVED.
 		const p = (states: string[]) =>
-			plan(states.map((st, i) => step(s(i + 1), st, i === 0 ? 'BRANCH' : undefined)), t);
+			settled(
+				plan(states.map((st, i) => step(s(i + 1), st, i === 0 ? 'BRANCH' : undefined)), t),
+				's1',
+				guard
+			);
 
 		it('WEDGES while the not-taken arm sits QUEUED (its in-edge to the join stays PENDING)', () => {
 			const wedged = p(['SUCCEEDED', 'SUCCEEDED', 'QUEUED', 'QUEUED']);
@@ -193,14 +227,14 @@ describe('BRANCH first-match + prune (DWP-03)', () => {
 
 	it('first-match selects exactly ONE arm (the first true conditional); the default is not-taken', () => {
 		const t: GateTransition[] = [{ sourceStepId: 's1', targetStepId: 's2', ...cond(true) }, seq('s1', 's3')];
-		const p = plan([step('s1', 'SUCCEEDED', 'BRANCH'), step('s2', 'QUEUED'), step('s3', 'QUEUED')], t);
+		const p = settled(plan([step('s1', 'SUCCEEDED', 'BRANCH'), step('s2', 'QUEUED'), step('s3', 'QUEUED')], t), 's1', guard);
 		expect(startableStepIds(p, guard)).toEqual(['s2']);
 		expect(inEdgeDisposition(p, t[1]!, guard)).toBe('NEUTRALIZED'); // the default arm is not-taken
 	});
 
 	it('falls to the SEQUENTIAL default when no conditional guard is true', () => {
 		const t: GateTransition[] = [{ sourceStepId: 's1', targetStepId: 's2', ...cond(false) }, seq('s1', 's3')];
-		const p = plan([step('s1', 'SUCCEEDED', 'BRANCH'), step('s2', 'QUEUED'), step('s3', 'QUEUED')], t);
+		const p = settled(plan([step('s1', 'SUCCEEDED', 'BRANCH'), step('s2', 'QUEUED'), step('s3', 'QUEUED')], t), 's1', guard);
 		expect(startableStepIds(p, guard)).toEqual(['s3']);
 	});
 
@@ -210,7 +244,7 @@ describe('BRANCH first-match + prune (DWP-03)', () => {
 			{ sourceStepId: 's1', targetStepId: 's3', ...cond(true) },
 			seq('s1', 's4')
 		];
-		const p = plan([step('s1', 'SUCCEEDED', 'BRANCH'), step('s2', 'QUEUED'), step('s3', 'QUEUED'), step('s4', 'QUEUED')], t);
+		const p = settled(plan([step('s1', 'SUCCEEDED', 'BRANCH'), step('s2', 'QUEUED'), step('s3', 'QUEUED'), step('s4', 'QUEUED')], t), 's1', guard);
 		expect(startableStepIds(p, guard)).toEqual(['s2']); // only the first true conditional
 	});
 
@@ -222,10 +256,7 @@ describe('BRANCH first-match + prune (DWP-03)', () => {
 			seq('s2', 's4'),
 			seq('s3', 's4') // s4 is a JOIN of taken (s2) + not-taken (s3)
 		];
-		const p = plan(
-			[step('s1', 'SUCCEEDED', 'BRANCH'), step('s2', 'QUEUED'), step('s3', 'QUEUED'), step('s4', 'QUEUED'), step('s5', 'QUEUED')],
-			t
-		);
+		const p = settled(plan([step('s1', 'SUCCEEDED', 'BRANCH'), step('s2', 'QUEUED'), step('s3', 'QUEUED'), step('s4', 'QUEUED'), step('s5', 'QUEUED')], t), 's1', guard);
 		const prunable = new Set(prunableStepIds(p, guard));
 		expect(prunable.has('s3')).toBe(true); // not-taken arm
 		expect(prunable.has('s5')).toBe(true); // transitive downstream of s3
@@ -242,10 +273,11 @@ describe('BRANCH first-match + prune (DWP-03)', () => {
 	it('yields NO prunable step under a non-ACTIVE plan, mirroring startableStepIds (authority agreement)', () => {
 		const t: GateTransition[] = [{ sourceStepId: 's1', targetStepId: 's2', ...cond(true) }, seq('s1', 's3')];
 		const steps = [step('s1', 'SUCCEEDED', 'BRANCH'), step('s2', 'QUEUED'), step('s3', 'QUEUED')];
-		expect(prunableStepIds(plan(steps, t, 'ACTIVE'), guard)).toEqual(['s3']);
+		const at = (status: string) => settled(plan(steps, t, status), 's1', guard);
+		expect(prunableStepIds(at('ACTIVE'), guard)).toEqual(['s3']);
 		for (const status of ['SUPERSEDED', 'CANCELLED', 'COMPLETED', 'APPROVED', 'PROPOSED']) {
-			expect(prunableStepIds(plan(steps, t, status), guard), status).toEqual([]);
-			expect(startableStepIds(plan(steps, t, status), guard), status).toEqual([]);
+			expect(prunableStepIds(at(status), guard), status).toEqual([]);
+			expect(startableStepIds(at(status), guard), status).toEqual([]);
 		}
 	});
 });
@@ -366,15 +398,12 @@ describe('DWP-07 — defects found by adversarial audit of the landed increment'
 		// The second parameter is vestigial: DWP-08 removed the persisted flag, so BOTH routes to SKIPPED are
 		// identical state and the gate must reach the same verdict from the graph alone.
 		const p = (s2State: string, _wasPruned = false) =>
-			plan(
-				[
+			settled(plan([
 					step('s1', 'SUCCEEDED', 'BRANCH'),
 					step('s2', s2State),
 					step('s3', 'QUEUED'),
 					step('s4', 'QUEUED')
-				],
-				t
-			);
+				], t), 's1', guard);
 
 		it('offers the whole dead arm for prune before any of it is pruned', () => {
 			expect(prunableStepIds(p('QUEUED'), guard).sort()).toEqual(['s2', 's4']);
@@ -406,15 +435,12 @@ describe('DWP-07 — defects found by adversarial audit of the landed increment'
 				{ sourceStepId: 's1', targetStepId: 's3', transitionType: 'SEQUENTIAL' },
 				edge('s3', 's5')
 			];
-			const live = plan(
-				[
+			const live = settled(plan([
 					step('s1', 'SUCCEEDED', 'BRANCH'),
 					step('s2', 'QUEUED'),
 					step('s3', 'SKIPPED'),
 					step('s5', 'QUEUED')
-				],
-				t2
-			);
+				], t2), 's1', guard);
 			expect(startableStepIds(live, guard)).toContain('s5');
 		});
 	});
@@ -456,16 +482,13 @@ describe('DWP-07 — defects found by adversarial audit of the landed increment'
 			edge('dead2', 'dead3')
 		];
 		// steps[] deliberately lists the dead chain DEEPEST-FIRST.
-		const p = plan(
-			[
+		const p = settled(plan([
 				step('dead3', 'QUEUED'),
 				step('dead2', 'QUEUED'),
 				step('dead1', 'QUEUED'),
 				step('taken', 'QUEUED'),
 				step('s1', 'SUCCEEDED', 'BRANCH')
-			],
-			t
-		);
+			], t), 's1', guard);
 		expect(prunableStepIds(p, guard).sort()).toEqual(['dead1', 'dead2', 'dead3']);
 	});
 

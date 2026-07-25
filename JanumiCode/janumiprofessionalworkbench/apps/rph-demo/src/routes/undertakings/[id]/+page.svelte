@@ -85,8 +85,12 @@
 	// SATISFIED deliberately maps to 'active' (a LIVE edge), NOT 'positive' — the success green in this app is reserved
 	// for QUALIFIED success (execution SUCCEEDED *and* assurance SATISFIED, see toFlow.ts). An edge being taken is a
 	// pure execution fact, so painting it green would read as assurance and violate INV-5.
+	// UNRESOLVED (JAN-EXECREM WP-10) needs its OWN case rather than the `muted` fallback. Muted is the tone for a
+	// NEUTRALIZED edge — an arm the branch decided against — and an unresolved edge is the opposite kind of fact: the
+	// branch settled without recording ANY arm, so the edge is neither taken nor excluded. Letting it fall through
+	// would make the display state, in the only vocabulary the reader has, something that is not true.
 	const dispositionTone = (d: string): string =>
-		d === 'SATISFIED' ? 'active' : d === 'PENDING' ? 'pending' : 'muted';
+		d === 'SATISFIED' ? 'active' : d === 'PENDING' ? 'pending' : d === 'UNRESOLVED' ? 'warn' : 'muted';
 	// DWP-05: attempt-state → tone for the per-step attempt-history rows.
 	const attemptTone = (state: string): string =>
 		state === 'SUCCEEDED'
@@ -906,6 +910,14 @@
 	.st.muted {
 		color: var(--outline);
 		border-color: var(--outline-faint);
+	}
+	/* UNRESOLVED (WP-10): a settled BRANCH that recorded no arm. It is NOT `muted` — muted means "the branch decided
+	   against this edge", and the whole point of the fourth disposition is that no decision exists to have gone
+	   either way. It needs operator action (an authorized plan revision or a waivered Skip), so it reads as an
+	   attention state rather than as a quiet exclusion. */
+	.st.warn {
+		color: var(--error);
+		border-color: var(--error);
 	}
 	.stepacts {
 		display: inline-flex;

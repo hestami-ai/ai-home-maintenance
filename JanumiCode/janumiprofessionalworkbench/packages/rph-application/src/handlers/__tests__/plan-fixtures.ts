@@ -120,6 +120,56 @@ export function seedBelowQueuedStepState_LEGACY_ONLY(
 }
 
 /**
+ * Record a branch decision on a step that has NOT yet settled — the one arrangement that makes WP-10's
+ * "never re-decide an already-decided BRANCH" guard reachable.
+ *
+ * Through the bus that guard is unkillable, and saying so is better than leaving it untested: a BRANCH records its
+ * arm at the instant it reaches terminal-success, and every settling command's source set then refuses a re-issue
+ * (WP-9), so no command can reach a step that is both settle-able AND already decided. The guard is nonetheless a
+ * real invariant — "decides ONCE" — and this seam is how it gets a test that can fail, rather than a comment
+ * asserting it works.
+ */
+export function seedRecordedBranchDecision(
+	store: StorageAdapter,
+	planId: string,
+	stepId: string,
+	selectedTransitionId: string
+): void {
+	const stored = store.loadObject(planId);
+	if (!stored) throw new Error(`seedRecordedBranchDecision: no stored object for plan ${planId}`);
+	const plan = ExecutionPlanSchema.parse(stored.state);
+	const steps = plan.steps ?? [];
+	if (!steps.some((s) => s.id === stepId))
+		throw new Error(`seedRecordedBranchDecision: plan ${planId} declares no step ${stepId}`);
+	const nextState = ExecutionPlanSchema.parse({
+		...plan,
+		steps: steps.map((s) => (s.id === stepId ? { ...s, selectedTransitionId } : s))
+	});
+
+	seq += 1;
+	const result = store.commit({
+		aggregateType: 'EXECUTION_PLAN',
+		aggregateId: planId,
+		objectType: 'EXECUTION_PLAN',
+		expectedRevision: stored.revision,
+		newRevision: stored.revision + 1,
+		newSemanticVersion: stored.semanticVersion,
+		currentState: nextState,
+		events: [],
+		receipt: {
+			commandId: `fixture-seedBranchDecision-${seq}`,
+			idempotencyKey: `fixture-seedBranchDecision-${seq}`,
+			commandType: 'FixtureSeedBranchDecision',
+			targetAggregateId: planId,
+			status: 'ACCEPTED',
+			producedEventIds: []
+		}
+	});
+	if (!result.ok)
+		throw new Error(`seedRecordedBranchDecision: commit refused for ${planId} (${result.reason})`);
+}
+
+/**
  * Arrange a plan with ZERO steps.
  *
  * WP-6 refuses a step-less proposal (SM-4 rule L1), but `execution-plan-completion.test.ts` legitimately proves

@@ -54,9 +54,15 @@ export interface GateStep {
 	/** The node KIND. Load-bearing: exclusive first-match selection belongs to a BRANCH node and nothing else. Absent
 	 *  ⇒ treated as non-BRANCH (independent out-edges), the safe default. */
 	readonly stepType?: string;
-	/** For a RESOLVED BRANCH: the id of the out-edge it actually selected, recorded when the branch reached SUCCEEDED
-	 *  (DWP-09). Absent ⇒ not yet resolved, or a plan authored before the field existed; the gate then falls back to
-	 *  evaluating first-match. See selectBranchEdge for why a recorded decision must win over a re-derived one. */
+	/**
+	 * For a SETTLED BRANCH: the id of the out-edge it actually selected, recorded at the instant it reached
+	 * terminal-success (DWP-09; written by every settling command since JAN-EXECREM WP-10).
+	 *
+	 * Absent on a settled BRANCH ⇒ UNRESOLVED, never "re-derive it". The gate used to fall back to a fresh
+	 * first-match evaluation, which is how an already-settled branch silently re-resolved and ran BOTH arms
+	 * (F-15/21/23): the condition subject does not stand still, so a re-derived answer can contradict what the
+	 * plan already did. See `branchVerdict`.
+	 */
 	readonly selectedTransitionId?: string;
 }
 
@@ -76,7 +82,16 @@ export interface GatePlan {
 	readonly transitions?: readonly GateTransition[];
 }
 
-export type InEdgeDisposition = 'SATISFIED' | 'NEUTRALIZED' | 'PENDING';
+/**
+ * The four answers to "can this in-edge still conduct?" (JAN-EXECREM WP-10 widened it from three).
+ *
+ * UNRESOLVED is the honest fourth: the edge leaves a BRANCH that has SETTLED without recording which arm it chose.
+ * That is not "not taken" and not "taken" — it is a MISSING FACT, and the previous three-valued type had nowhere to
+ * put it, so the gate invented an answer by re-running first-match on every read. `SATISFIED | NEUTRALIZED` are the
+ * two answers a DECIDED branch gives; UNRESOLVED is what an undecided one gives, and it fails closed in BOTH
+ * directions (see `startStepGate` and `prunableStepIds`).
+ */
+export type InEdgeDisposition = 'SATISFIED' | 'NEUTRALIZED' | 'PENDING' | 'UNRESOLVED';
 
 /**
  * DWP-02 hook: evaluate a CONDITIONAL edge's guard. DWP-01 has no evaluator, so a CONDITIONAL edge is treated
@@ -107,18 +122,23 @@ interface GateContext {
 	readonly outEdgesById: ReadonlyMap<string, readonly GateTransition[]>;
 	/** The live set, computed at most ONCE per context. */
 	live(): ReadonlySet<string>;
-	/** The disposition of one in-edge, memoized on edge identity. */
+	/** The EFFECTIVE disposition of one in-edge (stage 2), memoized on edge identity. */
 	dispositionOf(edge: GateTransition): InEdgeDisposition;
 	/**
-	 * The out-edge a settled BRANCH selected, memoized on SOURCE identity.
+	 * The LOCAL disposition of one edge (stage 1), memoized on edge identity.
 	 *
-	 * This is the memo that actually bounds the guard-evaluator call count. Memoizing the per-edge disposition is
-	 * not enough on its own: `selectBranchEdge` scans a source's out-edges calling the evaluator until one matches,
-	 * so running it once per in-edge of a width-N fan-out is still N x N evaluator calls. The selection depends only
-	 * on the SOURCE (its out-edges and their guards are fixed within a context), so it is computed once per branch —
-	 * which is what makes "at most one evaluation per guarded edge" true.
+	 * Memoized because it is reached by TWO paths — directly, and again from inside the reachability BFS — so an
+	 * un-memoized rung 8 evaluates the caller's guard twice per edge. That doubling was previously invisible: the
+	 * only fixture exercising rung 8 went through a BRANCH, whose own `selectionOf` memo absorbed the second call.
+	 * WP-10 deleted that memo along with the re-derivation it bounded, which is how the doubling surfaced.
 	 */
-	selectionOf(source: GateStep, outEdges: readonly GateTransition[]): GateTransition | undefined;
+	localOf(edge: GateTransition): InEdgeDisposition;
+	// WP-2 also carried a THIRD memo, `selectionOf`, keyed on the BRANCH source. It bounded the guard-evaluator call
+	// count for `selectBranchEdge`, which scanned a source's out-edges calling the evaluator until one matched — so
+	// running it once per in-edge of a width-N fan-out was N x N calls. WP-10 DELETED that scan (a settled BRANCH's
+	// arm is now READ from its recorded decision, never re-derived), so the memo bounded something that no longer
+	// exists. It is removed rather than left as a Map lookup over a `find`: the only guard evaluations remaining on
+	// this path are rung 8's, already bounded once per edge by `dispositionOf`.
 }
 
 const EMPTY_EDGES: readonly GateTransition[] = [];
@@ -147,7 +167,7 @@ function gateContext(plan: GatePlan, evaluateGuard?: EdgeGuardEvaluator): GateCo
 
 	let liveMemo: ReadonlySet<string> | undefined;
 	const dispositionMemo = new Map<GateTransition, InEdgeDisposition>();
-	const selectionMemo = new Map<GateStep, GateTransition | undefined>();
+	const localMemo = new Map<GateTransition, InEdgeDisposition>();
 	const ctx: GateContext = {
 		plan,
 		evaluateGuard,
@@ -163,14 +183,13 @@ function gateContext(plan: GatePlan, evaluateGuard?: EdgeGuardEvaluator): GateCo
 			}
 			return d;
 		},
-		selectionOf: (source, outEdges) => {
-			// `has` rather than a truthy check: `undefined` (a malformed branch with no matching arm and no default)
-			// is a REAL, cacheable answer, and re-deriving it would restore the quadratic call count in exactly the
-			// case that evaluates every guard.
-			if (selectionMemo.has(source)) return selectionMemo.get(source);
-			const selected = computeBranchSelection(ctx, outEdges, source);
-			selectionMemo.set(source, selected);
-			return selected;
+		localOf: (edge) => {
+			let d = localMemo.get(edge);
+			if (d === undefined) {
+				d = localEdgeDisposition(ctx, edge);
+				localMemo.set(edge, d);
+			}
+			return d;
 		}
 	};
 	return ctx;
@@ -246,45 +265,75 @@ const isConditionalEdge = (e: GateTransition): boolean =>
 	e.conditionExpression !== undefined || e.transitionType === 'CONDITIONAL';
 
 /**
- * BRANCH first-match (DWP-03/D3): among a source's out-edges (array order) select the FIRST CONDITIONAL edge whose
- * guard is true, else the first unconditional (SEQUENTIAL default) — so exactly ONE arm is ever selected. Returns
- * undefined only if no unconditional default exists and every conditional guard is false (a malformed BRANCH — propose
- * validation forbids it by requiring a SEQUENTIAL default). Evaluated IN the gate so a losing arm is rejected at start
- * regardless of prune timing (closes the double-run window, §10-M-D3).
+ * Does this step REQUIRE a branch decision — i.e. is it a BRANCH with at least one guarded out-edge?
+ *
+ * ONE predicate, used by BOTH planes (JAN-EXECREM WP-10 / CANONICAL RULE B2): the WRITE path asks it to decide
+ * whether a settling command must take and record a decision, and the READ path (`branchVerdict`) asks it to
+ * decide whether a missing decision is a defect or simply not applicable. Two separately-maintained answers to
+ * "is this an exclusive branch?" is the shape that produced this family — a node the writer thought ordinary and
+ * the reader thought exclusive settles with no decision, and the reader then invents one.
  */
-function selectBranchEdge(
-	ctx: GateContext,
-	outEdges: readonly GateTransition[],
-	source?: GateStep
-): GateTransition | undefined {
-	// Route through the per-source memo (see GateContext.selectionOf). Without a source there is nothing to key on.
-	return source === undefined
-		? computeBranchSelection(ctx, outEdges, source)
-		: ctx.selectionOf(source, outEdges);
+export function branchRequiresDecision(plan: GatePlan, stepId: string): boolean {
+	const ctx = gateContext(plan);
+	const step = ctx.stepById.get(stepId);
+	if (step?.stepType !== 'BRANCH') return false;
+	return outEdgesOf(ctx, stepId).some(isConditionalEdge);
 }
 
-/** The first-match computation itself. Called at most once per BRANCH source per context. */
-function computeBranchSelection(
+/**
+ * The three-valued answer to "which arm did this BRANCH take?" (CANONICAL RULE B3 — never invent a decision).
+ *
+ *   NOT_A_BRANCH — the source is not an exclusive branch; its out-edges are independent.
+ *   DECIDED      — a recorded selection resolves to one of its out-edges. That is history, not a computation.
+ *   UNRESOLVED   — it settled without recording, or the recorded id names no out-edge (an incoherent plan).
+ *
+ * WHAT THIS DELETES, AND WHY IT MATTERS. The previous form fell back to a FRESH first-match evaluation whenever no
+ * decision was recorded, which conflated "decided otherwise" with "never decided" and — worse — made "never
+ * decided" produce a *plausible* answer that CHANGES OVER TIME. A step reachable only through a not-taken edge can
+ * still change state, and an ATTEMPTS or STEP_STATE guard over it flips; so a BRANCH settled by Skip (which
+ * recorded nothing) re-resolved on every read, and both arms ran. Deleting the fallback is what makes the missing
+ * fact VISIBLE instead of papered over.
+ *
+ * After this, the condition grammar is evaluated for a BRANCH at exactly ONE site in the whole system —
+ * `resolveBranchSelection`, on the write path, once per branch, at settlement.
+ */
+type BranchVerdict =
+	| { readonly kind: 'NOT_A_BRANCH' }
+	| { readonly kind: 'DECIDED'; readonly edge: GateTransition }
+	| { readonly kind: 'UNRESOLVED'; readonly why: 'NO_RECORDED_DECISION' | 'RECORDED_EDGE_NOT_FOUND' };
+
+const NOT_A_BRANCH: BranchVerdict = { kind: 'NOT_A_BRANCH' };
+
+/**
+ * Is `edge` the arm the branch selected? Compared BY ID, because the decision is recorded as an id.
+ *
+ * This used to be an object-identity test (`selected === edge`), which made every public entry point that accepts
+ * an edge — `inEdgeDisposition(plan, edge, ...)` — silently wrong for a CLONED edge: it would read NEUTRALIZED with
+ * no type error and no failure outside a branch fixture. `execution-view.test.ts` carried a test named for exactly
+ * that trap. Comparing the recorded id to the edge's own id removes the hazard rather than guarding it.
+ *
+ * Identity remains the fallback for an edge carrying no id at all, which is the only case where ids cannot answer.
+ */
+function edgeIsSelected(edge: GateTransition, selected: GateTransition): boolean {
+	return edge.id !== undefined && selected.id !== undefined ? edge.id === selected.id : edge === selected;
+}
+
+function branchVerdict(
 	ctx: GateContext,
-	outEdges: readonly GateTransition[],
-	source?: GateStep
-): GateTransition | undefined {
-	// A RECORDED decision wins over a re-derived one (DWP-09). A branch is evaluated at a point in time against the
-	// plan's then-current condition subject, and that subject does NOT stay still: a step reachable only through a
-	// not-taken edge can still change state, and an ATTEMPTS or STEP_STATE guard over it will flip. Re-deriving on
-	// every read therefore let an already-settled BRANCH silently re-resolve, making the LOSING arm live and running
-	// both. Once the branch has acted, the decision is history, not a computation.
-	if (source?.selectedTransitionId !== undefined) {
-		const recorded = outEdges.find((e) => e.id === source.selectedTransitionId);
-		// If the recorded id no longer matches any out-edge the plan is incoherent; select NOTHING rather than
-		// silently falling back to a fresh evaluation that could contradict what the plan already did.
-		return recorded;
-	}
-	for (const e of outEdges) {
-		if (!isConditionalEdge(e)) return e; // an unconditional edge (the SEQUENTIAL default) always matches
-		if (ctx.evaluateGuard?.(e, ctx.plan)) return e; // the first true conditional
-	}
-	return undefined;
+	source: GateStep,
+	outEdges: readonly GateTransition[]
+): BranchVerdict {
+	// EXCLUSIVE first-match belongs to a BRANCH node and to nothing else (D2: a BRANCH is a stepType; parallelism is
+	// topology). Keying this on "the source has >= 1 conditional out-edge" instead made every node with one guarded
+	// arm an exclusive branch, so a PARALLEL_GROUP fan-out mixing a guarded arm with unconditional ones silently lost
+	// every arm but the first match.
+	if (source.stepType !== 'BRANCH' || !outEdges.some(isConditionalEdge)) return NOT_A_BRANCH;
+	const recorded = source.selectedTransitionId;
+	if (recorded === undefined) return { kind: 'UNRESOLVED', why: 'NO_RECORDED_DECISION' };
+	const edge = outEdges.find((e) => e.id === recorded);
+	return edge === undefined
+		? { kind: 'UNRESOLVED', why: 'RECORDED_EDGE_NOT_FOUND' }
+		: { kind: 'DECIDED', edge };
 }
 
 /**
@@ -316,7 +365,13 @@ function computeLiveStepIds(ctx: GateContext): ReadonlySet<string> {
 			if (e.targetStepId === undefined || live.has(e.targetStepId)) continue;
 			// The edge carries reachability unless it can NEVER conduct. Using the LOCAL disposition (which does not
 			// consult liveness) keeps this a plain O(V+E) walk rather than a mutual recursion.
-			if (localEdgeDisposition(ctx, e) !== 'NEUTRALIZED') frontier.push(e.targetStepId);
+			//
+			// UNRESOLVED deliberately carries reachability (WP-10). The two planes answer an undecided BRANCH
+			// ASYMMETRICALLY and that asymmetry is the fail-closed direction: the arm is NOT startable (the barrier
+			// needs a SATISFIED edge) but IS still live, so it is NOT prunable. A symmetric "exclude everything"
+			// would hand the whole downstream to a waiver-free prune — the §21.1 back door, and the same damage
+			// shape as F-03/F-04. A prune may never be justified by a decision that was never taken.
+			if (ctx.localOf(e) !== 'NEUTRALIZED') frontier.push(e.targetStepId);
 		}
 	}
 	return live;
@@ -360,35 +415,39 @@ function localEdgeDisposition(ctx: GateContext, edge: GateTransition): InEdgeDis
 	// 5. The source is irrecoverably terminal (CANCELLED/SUPERSEDED): the edge can never conduct. This is the F-06
 	//    correction — reachability previously ignored this case entirely.
 	if (IRRECOVERABLE_TERMINAL.has(src)) return 'NEUTRALIZED';
-	// 6. EXCLUSIVE first-match belongs to a BRANCH node and to nothing else (D2: a BRANCH is a stepType; parallelism
-	//    is topology). Keying this on "the source has ≥1 conditional out-edge" instead made every node with one
-	//    guarded arm an exclusive branch, so a PARALLEL_GROUP fan-out mixing a guarded arm with unconditional ones
-	//    silently lost every arm but the first match.
+	// 6. The BRANCH rung — now three-valued (WP-10). A DECIDED branch answers exactly as before; an UNDECIDED one no
+	//    longer gets a re-derived answer invented for it.
 	const outEdges = outEdgesOf(ctx, edge.sourceStepId);
-	if (source.stepType === 'BRANCH' && outEdges.some(isConditionalEdge))
-		return selectBranchEdge(ctx, outEdges, source) === edge ? 'SATISFIED' : 'NEUTRALIZED';
+	const verdict = branchVerdict(ctx, source, outEdges);
+	if (verdict.kind === 'DECIDED') return edgeIsSelected(edge, verdict.edge) ? 'SATISFIED' : 'NEUTRALIZED';
+	if (verdict.kind === 'UNRESOLVED') return 'UNRESOLVED';
 	// 7. Non-BRANCH source: out-edges are INDEPENDENT. An unconditional edge is taken.
 	if (!isConditionalEdge(edge)) return 'SATISFIED';
 	// 8. A guarded edge off a settled non-BRANCH source is taken iff its guard holds.
 	return ctx.evaluateGuard?.(edge, ctx.plan) === true ? 'SATISFIED' : 'NEUTRALIZED';
 }
 /**
- * The out-edge a BRANCH step selects RIGHT NOW, by first-match — the decision the handler records when the branch
- * reaches SUCCEEDED (DWP-09). Returns undefined for a non-BRANCH step, a step with no guarded out-edge, or a
- * malformed branch where no conditional guard holds and no unconditional default exists (propose-time validation
- * forbids the last case). Deliberately ignores any ALREADY-recorded selection: this is the act of deciding.
+ * BRANCH first-match (DWP-03/D3) — THE ACT OF DECIDING, and after WP-10 the ONLY place in the system where the
+ * condition grammar is evaluated for a BRANCH.
+ *
+ * Among the source's out-edges in authored (array) order: the FIRST CONDITIONAL edge whose guard is true, else the
+ * first unconditional (SEQUENTIAL default) — so exactly ONE arm is ever selected. Returns undefined for a
+ * non-BRANCH step, a step with no guarded out-edge, or a malformed branch where no conditional guard holds and no
+ * unconditional default exists (propose-time validation forbids that last case by requiring a default).
+ *
+ * Deliberately ignores any ALREADY-recorded selection — this function IS the decision; `branchVerdict` is how the
+ * decision is later READ. The caller (`advanceStep`) is what refuses to re-decide a branch that already decided.
+ * Its `plan` argument must be the SETTLEMENT VIEW (Rule B1): the plan as of the move being made, or the branch
+ * cannot see its own result.
  */
 export function resolveBranchSelection(
 	plan: GatePlan,
 	stepId: string,
 	evaluateGuard?: EdgeGuardEvaluator
 ): string | undefined {
+	if (!branchRequiresDecision(plan, stepId)) return undefined;
 	const ctx = gateContext(plan, evaluateGuard);
-	const source = stepOf(ctx, stepId);
-	if (source?.stepType !== 'BRANCH') return undefined;
-	const outEdges = outEdgesOf(ctx, stepId);
-	if (!outEdges.some(isConditionalEdge)) return undefined;
-	for (const e of outEdges) {
+	for (const e of outEdgesOf(ctx, stepId)) {
 		if (!isConditionalEdge(e)) return e.id;
 		if (evaluateGuard?.(e, plan)) return e.id;
 	}
@@ -419,7 +478,7 @@ export function inEdgeDisposition(
  * one layer above a local ladder that cannot see liveness, is what makes it structural rather than command-keyed.
  */
 function computeInEdgeDisposition(ctx: GateContext, edge: GateTransition): InEdgeDisposition {
-	const local = localEdgeDisposition(ctx, edge);
+	const local = ctx.localOf(edge);
 	if (edge.sourceStepId === undefined) return local; // an entry edge has no source to be dead
 	const source = stepOf(ctx, edge.sourceStepId);
 	if (source === undefined) return local;
@@ -458,11 +517,14 @@ interface BarrierState {
 	readonly anyPending: boolean;
 	readonly anySatisfied: boolean;
 	readonly firstPending?: GateTransition;
+	/** The first in-edge off an UNDECIDED settled BRANCH (WP-10), so the gate can name the real blocker. */
+	readonly firstUnresolved?: GateTransition;
 }
 function barrierState(ctx: GateContext, inEdges: readonly GateTransition[]): BarrierState {
 	let anyPending = false;
 	let anySatisfied = false;
 	let firstPending: GateTransition | undefined;
+	let firstUnresolved: GateTransition | undefined;
 	for (const e of inEdges) {
 		const d = ctx.dispositionOf(e);
 		if (d === 'PENDING') {
@@ -470,9 +532,13 @@ function barrierState(ctx: GateContext, inEdges: readonly GateTransition[]): Bar
 			firstPending ??= e;
 		} else if (d === 'SATISFIED') {
 			anySatisfied = true;
+		} else if (d === 'UNRESOLVED') {
+			// Neither pending nor satisfied — so `stepAtFrontier`'s `!anyPending && anySatisfied` already returns
+			// false and the arm is correctly NOT startable. This field exists only so the AUTHORITY can say WHY.
+			firstUnresolved ??= e;
 		}
 	}
-	return { anyPending, anySatisfied, firstPending };
+	return { anyPending, anySatisfied, firstPending, firstUnresolved };
 }
 
 /** Is a non-terminal step at the startable frontier? Entry (no in-edges) ⇒ yes; else the barrier: no PENDING, ≥1 SATISFIED. */
@@ -602,6 +668,16 @@ export function startStepGate(
 			blockerStepId: b.firstPending.sourceStepId,
 			blockerState: stateOf(ctx, b.firstPending.sourceStepId),
 			reason: 'an in-edge predecessor is not yet terminal'
+		};
+	// An UNRESOLVED in-edge is checked BEFORE the all-neutralized case, because the two demand opposite remedies and
+	// the generic message would actively mislead: "it should be pruned" is exactly what must NOT happen here. This
+	// arm is neither live nor prunable — §21.1 forbids a waiver-free prune justified by a decision nobody took.
+	if (b.firstUnresolved)
+		return {
+			ok: false,
+			blockerStepId: b.firstUnresolved.sourceStepId,
+			blockerState: stateOf(ctx, b.firstUnresolved.sourceStepId),
+			reason: `the BRANCH ${b.firstUnresolved.sourceStepId} reached terminal-success without recording which arm it selected — its arms are neither live nor prunable. Resolve it with an authorized plan revision or a waivered Skip (§21.1); the gate will not re-derive a decision that was never taken`
 		};
 	if (!b.anySatisfied)
 		return {

@@ -437,38 +437,71 @@ describe('startableStepIds / prunableStepIds — the graph frontier surfaced to 
 		expect(prunableStepIds(v)).toEqual([]); // a linear plan never prunes
 	});
 
-	it('conditionEvaluatorFor folds the event log so the UI first-match MATCHES the engine authority', () => {
-		// s1 BRANCH → s2 (CONDITIONAL: s1 succeeded) | s3 (SEQUENTIAL default). With s1 SUCCEEDED the guard holds, so
-		// s2 is the selected arm and s3 becomes prunable — the same verdict startExecutionStep's precheck reaches.
+	// REWRITTEN by JAN-EXECREM WP-10, and the rewrite IS the fix. This test used to assert that the read-model
+	// re-derived a settled BRANCH's arm by first-match and got the same answer as the engine. That agreement was
+	// coincidental: both planes re-ran the grammar against a subject that does not stand still, so a later guard flip
+	// re-resolved an already-settled branch and BOTH arms ran (F-15/21/23). The read-model no longer decides anything
+	// — it READS the decision the engine recorded, which is the only way the two cannot diverge.
+	it('the UI reads the RECORDED branch decision — it no longer re-derives one', () => {
+		// s1 BRANCH → s2 (CONDITIONAL) | s3 (SEQUENTIAL default), settled with `edge_cond` recorded as its arm.
 		const v = gplan(
-			[step('s1', 'SUCCEEDED', { stepType: 'BRANCH' }), step('s2', 'QUEUED'), step('s3', 'QUEUED')],
+			[
+				step('s1', 'SUCCEEDED', { stepType: 'BRANCH', selectedTransitionId: 'edge_cond' }),
+				step('s2', 'QUEUED'),
+				step('s3', 'QUEUED')
+			],
 			[
 				{
+					id: 'edge_cond',
 					sourceStepId: 's1',
 					targetStepId: 's2',
 					transitionType: 'CONDITIONAL',
 					conditionExpression: { op: 'STEP_SUCCEEDED', stepId: 's1' }
 				},
-				e('s1', 's3')
+				{ ...e('s1', 's3'), id: 'edge_default' }
 			]
 		);
-		const evalGuard = conditionEvaluatorFor(v, []);
-		expect(startableStepIds(v, evalGuard)).toEqual(['s2']);
-		expect(prunableStepIds(v, evalGuard)).toEqual(['s3']);
-		// WITHOUT the evaluator a conditional edge is never satisfied — so the default arm wins instead. This is why
-		// the server must pass the evaluator: omitting it silently changes which arm the UI offers.
-		expect(startableStepIds(v)).toEqual(['s3']);
+		expect(startableStepIds(v, conditionEvaluatorFor(v, []))).toEqual(['s2']);
+		expect(prunableStepIds(v, conditionEvaluatorFor(v, []))).toEqual(['s3']);
+		// AND — the property the old test could not have: the answer no longer depends on the evaluator at all for a
+		// BRANCH. Omitting it used to silently change which arm the UI offered; now the recorded fact decides, so a
+		// read-model with a different subject than the engine's cannot produce a different arm.
+		expect(startableStepIds(v)).toEqual(['s2']);
+		expect(prunableStepIds(v)).toEqual(['s3']);
+	});
+
+	it('a settled BRANCH with NO recorded decision offers NOTHING — neither startable nor prunable', () => {
+		// The fail-closed direction, in both planes at once. Not startable, because no in-edge is SATISFIED. Not
+		// prunable either, because a waiver-free prune may never be justified by a decision nobody took (§21.1) —
+		// which is the asymmetry that keeps this from becoming the F-03/F-04 damage shape.
+		const v = gplan(
+			[step('s1', 'SUCCEEDED', { stepType: 'BRANCH' }), step('s2', 'QUEUED'), step('s3', 'QUEUED')],
+			[
+				{
+					id: 'edge_cond',
+					sourceStepId: 's1',
+					targetStepId: 's2',
+					transitionType: 'CONDITIONAL',
+					conditionExpression: { op: 'STEP_SUCCEEDED', stepId: 's1' }
+				},
+				{ ...e('s1', 's3'), id: 'edge_default' }
+			]
+		);
+		expect(startableStepIds(v, conditionEvaluatorFor(v, []))).toEqual([]);
+		expect(prunableStepIds(v, conditionEvaluatorFor(v, []))).toEqual([]);
 	});
 
 	it('a malformed conditionExpression evaluates FALSE rather than throwing (the UI must not crash)', () => {
+		// The guard is now evaluated only where a guard still decides something — a CONDITIONAL edge off a settled
+		// NON-BRANCH source, where out-edges are independent filters rather than exclusive arms.
 		const v = gplan(
-			[step('s1', 'SUCCEEDED', { stepType: 'BRANCH' }), step('s2', 'QUEUED'), step('s3', 'QUEUED')],
+			[step('s1', 'SUCCEEDED'), step('s2', 'QUEUED'), step('s3', 'QUEUED')],
 			[
 				{ sourceStepId: 's1', targetStepId: 's2', transitionType: 'CONDITIONAL', conditionExpression: { op: 'NONSENSE' } },
 				e('s1', 's3')
 			]
 		);
-		expect(startableStepIds(v, conditionEvaluatorFor(v, []))).toEqual(['s3']); // falls to the default
+		expect(startableStepIds(v, conditionEvaluatorFor(v, []))).toEqual(['s3']); // s2's guard is false, not a throw
 	});
 });
 
@@ -544,12 +577,23 @@ describe('transitionRows — the edge plane of the execution view (DWP-06)', () 
 		expect(transitionRows(v)[0]?.disposition).toBe('PENDING');
 	});
 
-	// THE IDENTITY TRAP: rph-domain's BRANCH first-match decides "is this the selected arm?" by OBJECT IDENTITY against
-	// the elements of plan.transitions. If transitionRows ever cloned an edge before asking, every CONDITIONAL edge
-	// would silently read NEUTRALIZED — no type error, no failure outside a branch fixture. This is that fixture.
-	it('reports the SELECTED branch arm as SATISFIED and the not-taken arm as NEUTRALIZED (by-reference guard)', () => {
+	// THE IDENTITY TRAP, now CLOSED rather than merely guarded (JAN-EXECREM WP-10). rph-domain used to answer "is this
+	// the selected arm?" by OBJECT IDENTITY against the elements of plan.transitions, so if transitionRows ever cloned
+	// an edge before asking, every CONDITIONAL edge would silently read NEUTRALIZED — no type error, no failure
+	// outside a branch fixture. The decision is RECORDED as an id, so it is now COMPARED as an id (`edgeIsSelected`).
+	//
+	// NOTE ON WHAT THIS TEST CAN AND CANNOT PROVE, established by mutation: cloning the WHOLE plan (below) does NOT
+	// detect an identity comparison, because the gate then builds its index from the same cloned objects and identity
+	// holds within the call. This case proves `transitionRows` is stable under a copied plan; the trap itself — an
+	// edge that is not the stored object, handed to `inEdgeDisposition` — is killed in rph-domain's
+	// `transition-gate-branch-verdict.test.ts`, which is where the comparison lives.
+	it('reports the SELECTED branch arm as SATISFIED and the not-taken arm as NEUTRALIZED, over a copied plan', () => {
 		const v = gview(
-			[step('s1', 'SUCCEEDED', { stepType: 'BRANCH' }), step('s2', 'QUEUED'), step('s3', 'QUEUED')],
+			[
+				step('s1', 'SUCCEEDED', { stepType: 'BRANCH', selectedTransitionId: 'edge_cond' }),
+				step('s2', 'QUEUED'),
+				step('s3', 'QUEUED')
+			],
 			[
 				{
 					id: 'edge_cond',
@@ -570,6 +614,12 @@ describe('transitionRows — the edge plane of the execution view (DWP-06)', () 
 		expect(rows.find((r) => r.key === 'edge_default')?.disposition).toBe('NEUTRALIZED');
 		// And the rows agree with the frontier the SAME evaluator produces — one interpreter, two renderings.
 		expect(startableStepIds(v, conditionEvaluatorFor(v, []))).toEqual(['s2']);
+		// THE CLONE, which is the trap itself: the same plan whose edges are structurally equal but are NOT the stored
+		// objects must produce byte-identical dispositions. Under identity comparison both rows read NEUTRALIZED.
+		const cloned = { ...v, transitions: v.transitions!.map((t) => ({ ...t })) };
+		expect(transitionRows(cloned, conditionEvaluatorFor(cloned, [])).map((r) => r.disposition)).toEqual(
+			rows.map((r) => r.disposition)
+		);
 	});
 
 	it('labels a plan-entry edge honestly instead of rendering an empty source', () => {

@@ -157,6 +157,41 @@ describe('WP-7 / F-46 — STEP_SUCCEEDED is deliberately narrower than the gate�
 	});
 });
 
+// JAN-EXECREM WP-10 / KT-5. The branch decision is stamped onto the settling event's payload AFTER the condition
+// subject has been folded from that same event. That ordering is safe ONLY while the fold ignores the field — if a
+// future fold ever read `selectedTransitionId`, the decision would depend on itself and Rule B1's replay identity
+// would become a fixpoint problem rather than a computation. This pins the independence rather than assuming it.
+describe('WP-10 / KT-5 — the subject fold IGNORES selectedTransitionId (no decision-depends-on-itself)', () => {
+	const base = {
+		eventType: 'ExecutionStepSucceeded',
+		aggregateId: 'p1',
+		payload: { executionStepId: 's1', outputArtifactIds: ['a1'], structuredResult: { outcome: 'PASS' } }
+	};
+
+	it('folding with and without the field yields an IDENTICAL subject', () => {
+		const steps = [{ id: 's1', stepState: 'SUCCEEDED' }];
+		const without = buildConditionSubject(steps, [base], 'p1');
+		const withField = buildConditionSubject(
+			steps,
+			[{ ...base, payload: { ...base.payload, selectedTransitionId: 'p1-t1-2' } }],
+			'p1'
+		);
+		expect(withField).toEqual(without);
+	});
+
+	it('and the same holds for the SKIP settling event, which also carries the decision', () => {
+		const steps = [{ id: 's1', stepState: 'SKIPPED' }];
+		const skipped = { eventType: 'ExecutionStepSkipped', aggregateId: 'p1', payload: { stepId: 's1' } };
+		expect(
+			buildConditionSubject(
+				steps,
+				[{ ...skipped, payload: { ...skipped.payload, selectedTransitionId: 'p1-t1-3' } }],
+				'p1'
+			)
+		).toEqual(buildConditionSubject(steps, [skipped], 'p1'));
+	});
+});
+
 describe('WP-7 — the subject fold is unchanged and still replay-pure', () => {
 	it('folds attempts and outputs from this plan’s own events only', () => {
 		const s = buildConditionSubject(
