@@ -66,6 +66,81 @@ export function canStartStepUnderPlan(planStatus: string): Check {
 	};
 }
 
+export interface PlanSuccessEvidenceInput {
+	/** The cited plan's own `status` (ExecutionPlan.status). */
+	readonly planStatus: string;
+	/** Its steps' states, in array order. */
+	readonly stepStates: readonly string[];
+}
+
+export interface PlanSuccessEvidence extends Check {
+	/** The step states that broke the allow-list, so a caller can name them rather than say "some step". */
+	readonly offendingStepStates: readonly string[];
+}
+
+/**
+ * THE ONE DEFINITION OF EXECUTION SUCCESS (JAN-EXECREM WP-12 / F-01... F-08).
+ *
+ * A plan EVIDENCES execution success iff its status is ACTIVE or COMPLETED, it has ≥1 step, EVERY step is
+ * SUCCEEDED or SKIPPED, and ≥1 step is SUCCEEDED.
+ *
+ * WHY THIS EXISTS. The rule was written TWICE and the two copies disagreed. `completeExecutionPlan`'s allow-list
+ * enforced all three step limbs; `rejectUnbackedExecutionSuccess` — the sole guard on the premise the entire
+ * assurance chain rests on — enforced `steps.some(s => s.stepState === 'SUCCEEDED')` and nothing else. So a plan
+ * the engine itself REFUSED to call complete could still back its PWU's `executionState = SUCCEEDED` claim: one
+ * succeeded step out of five, with the other four QUEUED. And with no status term at all, a SUPERSEDED, CANCELLED
+ * or FAILED plan backed it identically to an ACTIVE one — a plan the sponsor explicitly killed, or one the engine
+ * records as FAILED, evidencing that execution succeeded. All three were reproduced live.
+ *
+ * The plan plane's own docstring already claimed the alignment ("so the two planes cannot diverge"). It was
+ * one-directional: the plan plane cited the PWU rule, and the PWU rule cited nothing. Now there is one function.
+ *
+ * WHY `ACTIVE || COMPLETED` AND NOT `COMPLETED` ALONE. The ratified happy path claims PWU success while citing a
+ * plan that is still ACTIVE and never issues CompleteExecutionPlan — the reference seed does exactly this. A
+ * COMPLETED-only rule would break it. COMPLETED is admitted too, because the natural order (finish every step →
+ * CompleteExecutionPlan → claim PWU success) is equally legitimate. The remaining asymmetry is CORRECT and is
+ * DECLARED rather than hidden: `completeExecutionPlan` additionally carries `precondition: fromStates('ACTIVE')`,
+ * so the plan plane refuses a COMPLETED re-issue on the state fact while the PWU plane accepts a COMPLETED plan as
+ * backing. Same predicate, two admissible status sets, one of them narrowed by a precondition.
+ *
+ * WHY `every`, NOT `some`. `some` is what let 1-of-5 back a full success claim. And why an ALLOW-LIST rather than
+ * "terminal ∧ ¬FAILED": the reachable terminal step set includes CANCELLED and SUPERSEDED, which a negation would
+ * silently admit as success (§19 L3-2).
+ */
+export function planEvidencesExecutionSuccess(input: PlanSuccessEvidenceInput): PlanSuccessEvidence {
+	if (input.planStatus !== 'ACTIVE' && input.planStatus !== 'COMPLETED')
+		return {
+			ok: false,
+			errorCode: 'RPH_PLAN_NOT_LIVE_FOR_SUCCESS',
+			reason: `the plan is ${input.planStatus}; only an ACTIVE or COMPLETED plan evidences execution success (a superseded, cancelled or failed plan evidences the opposite)`,
+			offendingStepStates: []
+		};
+	if (input.stepStates.length === 0)
+		return {
+			ok: false,
+			errorCode: 'RPH_PLAN_EMPTY',
+			reason: 'the plan has no steps, so it evidences no work ([].every is vacuously true — §19 L3-1)',
+			offendingStepStates: []
+		};
+	const offendingStepStates = input.stepStates.filter((s) => s !== 'SUCCEEDED' && s !== 'SKIPPED');
+	if (offendingStepStates.length > 0)
+		return {
+			ok: false,
+			errorCode: 'RPH_PLAN_STEPS_NOT_TERMINAL_SUCCESS',
+			reason: `${offendingStepStates.length} step(s) are not in terminal success (${offendingStepStates.join(', ')}); every step must be SUCCEEDED or SKIPPED (§20.1 success allow-list)`,
+			offendingStepStates
+		};
+	if (!input.stepStates.includes('SUCCEEDED'))
+		return {
+			ok: false,
+			errorCode: 'RPH_PLAN_PRODUCED_NOTHING',
+			reason:
+				'every step is SKIPPED, so the plan produced nothing to succeed on; at least one step must have SUCCEEDED (§21.1)',
+			offendingStepStates: []
+		};
+	return { ok: true, offendingStepStates: [] };
+}
+
 /**
  * RPH-PWU-010 / §8.3. A BASELINED PWU cannot resume execution in place against the same semantic version — a
  * successor revision or successor PWU is required. New execution is only legal when the PWU is not baselined.

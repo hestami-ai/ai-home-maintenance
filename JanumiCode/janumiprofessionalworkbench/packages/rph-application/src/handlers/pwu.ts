@@ -28,6 +28,7 @@ import type {
 import {
 	canAdvanceWorkLifecycle,
 	checkPwuShapeReadiness,
+	planEvidencesExecutionSuccess,
 	satisfiesP1,
 	type PwuReadinessFacts
 } from '@janumipwb/rph-domain';
@@ -676,24 +677,42 @@ function rejectUnbackedExecutionSuccess(
 ): CommandResult | undefined {
 	if (p.executionState !== 'SUCCEEDED' || currentExecutionState === 'SUCCEEDED') return undefined;
 	const cited = p.supportingObjectIds ?? [];
+	// JAN-EXECREM WP-12 / F-08. This predicate used to be `steps.some(s => s.stepState === 'SUCCEEDED')` — no
+	// status term, and `some` rather than `every`. It is the SOLE guard on the premise the entire assurance chain
+	// rests on, and it ran a second, strictly weaker definition of "execution succeeded" than the plan plane's own
+	// completion allow-list. Consequences, all three reproduced live: one succeeded step out of five backed a full
+	// success claim while four sat QUEUED; and a SUPERSEDED, CANCELLED or FAILED plan backed it identically to an
+	// ACTIVE one — a plan the sponsor killed, or one the engine records as FAILED, evidencing that execution
+	// succeeded. Both planes now call `planEvidencesExecutionSuccess`, so there is one definition to disagree with.
+	const failures: string[] = [];
 	const backed = cited.some((oid) => {
 		const obj = ctx.store.loadObject(oid);
 		if (obj?.objectType !== 'EXECUTION_PLAN') return false;
 		const s = obj.state as {
 			workUnitId?: string;
+			status?: string;
 			steps?: { stepState?: string }[];
 		};
-		return s.workUnitId === id && (s.steps ?? []).some((step) => step.stepState === 'SUCCEEDED');
+		if (s.workUnitId !== id) return false;
+		const verdict = planEvidencesExecutionSuccess({
+			planStatus: String(s.status),
+			stepStates: (s.steps ?? []).map((step) => String(step.stepState ?? 'undefined'))
+		});
+		// Collected so the refusal can say WHICH limb each cited plan failed, rather than "nothing backed it".
+		if (!verdict.ok) failures.push(`${oid}: ${verdict.reason} (${verdict.errorCode})`);
+		return verdict.ok;
 	});
 	if (backed) return undefined;
+	const detail = failures.length ? ` Cited plan(s) rejected — ${failures.join('; ')}.` : '';
 	return reject(
 		command,
 		'RPH_EVIDENCE_MISSING',
-		`ChangePwuState would set PWU ${id} executionState=SUCCEEDED with no succeeded execution step to back ` +
-			`it. "Execution succeeded" is the premise the whole assurance chain rests on (RPH-PWU-006's Given; ` +
+		`ChangePwuState would set PWU ${id} executionState=SUCCEEDED with no execution plan evidencing it. ` +
+			`"Execution succeeded" is the premise the whole assurance chain rests on (RPH-PWU-006's Given; ` +
 			`§8.1's EXECUTING -> EVIDENCE_PENDING condition), not a status the controller may declare. Cite an ` +
-			`EXECUTION_PLAN in supportingObjectIds whose workUnitId is ${id} and which has a SUCCEEDED step. ` +
-			`Supplied: [${cited.join(', ') || 'nothing'}].`
+			`EXECUTION_PLAN in supportingObjectIds whose workUnitId is ${id}, whose status is ACTIVE or COMPLETED, ` +
+			`every one of whose steps is SUCCEEDED or SKIPPED, and at least one of which SUCCEEDED. ` +
+			`Supplied: [${cited.join(', ') || 'nothing'}].${detail}`
 	);
 }
 

@@ -18,6 +18,7 @@ import {
 	executionAloneSatisfiesAssurance,
 	executionSuccessOutcome,
 	mayReexecuteWithoutReconciliation,
+	planEvidencesExecutionSuccess,
 	resolveIdempotency,
 	retryDecision,
 	stepMayBecomeReady,
@@ -159,6 +160,63 @@ describe('M11 execution step lifecycle (RPH-EXE-005/006/009; §21.1)', () => {
 		expect(
 			validateStepCompletion({ hasOutput: true, explicitNoOutput: false, declaresOutputBindings: true }).ok
 		).toBe(true);
+	});
+
+	// JAN-EXECREM WP-12 / F-08. The pure half of the ONE definition of execution success. The application half —
+	// which proves BOTH planes call it — is execrem-wp12-execution-success.test.ts; a kernel unit test cannot see
+	// which callers exist, which is exactly how the second, weaker copy survived in `rejectUnbackedExecutionSuccess`.
+	describe('planEvidencesExecutionSuccess — every refusal branch, and every admitted shape', () => {
+		const ev = (planStatus: string, stepStates: string[]) =>
+			planEvidencesExecutionSuccess({ planStatus, stepStates });
+
+		it.each([['ACTIVE'], ['COMPLETED']])('%s + all-succeeded is evidence', (status) => {
+			expect(ev(status, ['SUCCEEDED']).ok).toBe(true);
+			expect(ev(status, ['SUCCEEDED', 'SUCCEEDED']).ok).toBe(true);
+		});
+
+		it('SKIPPED alongside SUCCEEDED is evidence — an allow-list, not a negation', () => {
+			expect(ev('ACTIVE', ['SUCCEEDED', 'SKIPPED']).ok).toBe(true);
+			expect(ev('ACTIVE', ['SKIPPED', 'SUCCEEDED']).ok).toBe(true);
+		});
+
+		it.each([['SUPERSEDED'], ['CANCELLED'], ['FAILED'], ['UNDER_REVIEW'], ['APPROVED']])(
+			'%s is NOT a live plan, however complete its steps',
+			(status) => {
+				const r = ev(status, ['SUCCEEDED']);
+				expect(r.ok).toBe(false);
+				expect(r.errorCode).toBe('RPH_PLAN_NOT_LIVE_FOR_SUCCESS');
+			}
+		);
+
+		it('an empty plan evidences nothing ([].every is vacuously true)', () => {
+			const r = ev('ACTIVE', []);
+			expect(r.ok).toBe(false);
+			expect(r.errorCode).toBe('RPH_PLAN_EMPTY');
+		});
+
+		it.each([['QUEUED'], ['RUNNING'], ['FAILED'], ['CANCELLED'], ['SUPERSEDED'], ['NOT_READY']])(
+			'a %s step breaks the allow-list, and is NAMED',
+			(offender) => {
+				const r = ev('ACTIVE', ['SUCCEEDED', offender]);
+				expect(r.ok).toBe(false);
+				expect(r.errorCode).toBe('RPH_PLAN_STEPS_NOT_TERMINAL_SUCCESS');
+				expect(r.offendingStepStates).toEqual([offender]);
+			}
+		);
+
+		it('all-SKIPPED produced nothing', () => {
+			const r = ev('ACTIVE', ['SKIPPED', 'SKIPPED']);
+			expect(r.ok).toBe(false);
+			expect(r.errorCode).toBe('RPH_PLAN_PRODUCED_NOTHING');
+		});
+
+		it('the refusal ORDER is status → emptiness → allow-list → produced-nothing', () => {
+			// Order is message quality, not correctness — but it is asserted so a reorder is a decision rather than
+			// a drift. A SUPERSEDED empty plan reports its status first, because that is the more basic fact.
+			expect(ev('SUPERSEDED', []).errorCode).toBe('RPH_PLAN_NOT_LIVE_FOR_SUCCESS');
+			expect(ev('ACTIVE', []).errorCode).toBe('RPH_PLAN_EMPTY');
+			expect(ev('ACTIVE', ['SKIPPED', 'QUEUED']).errorCode).toBe('RPH_PLAN_STEPS_NOT_TERMINAL_SUCCESS');
+		});
 	});
 
 	it('§21.1: skipping a MANDATORY step needs an authorized waiver/revision; an optional step may be skipped freely', () => {

@@ -23,6 +23,7 @@ import {
 	canAuthorizeNewWork,
 	canSkipStep,
 	evaluateGuardExpression,
+	planEvidencesExecutionSuccess,
 	prunableStepIds,
 	resolveBranchSelection,
 	retryDecision,
@@ -414,32 +415,33 @@ export const completeExecutionPlan: CommandHandler = (ctx, command) =>
 		// RPH_INVARIANT_VIOLATION; the state fact now refuses first with RPH_ILLEGAL_STATE_TRANSITION. The step-success
 		// allow-list guard is retained for the legitimate ACTIVE input (INV-3 non-example).
 		precondition: fromStates('ACTIVE'),
+		// JAN-EXECREM WP-12 / F-08: the three limbs are now `planEvidencesExecutionSuccess` in rph-domain, called
+		// HERE and at `rejectUnbackedExecutionSuccess` in pwu.ts. The alignment claim in the docblock above was
+		// aspirational: this plane cited the PWU rule, and the PWU rule cited nothing and enforced a strictly weaker
+		// one. The rich per-limb messages are preserved — composed from the kernel's verdict rather than restated.
+		//
+		// The status limb is not re-checked here: `precondition: fromStates('ACTIVE')` already refuses anything but
+		// ACTIVE, which is the DECLARED narrowing that distinguishes this site from the PWU one.
 		guard: (state) => {
 			const steps = Array.isArray(state.steps)
 				? (state.steps as Array<{ stepState?: string }>)
 				: [];
-			if (steps.length === 0)
-				return reject(
-					command,
-					'RPH_INVARIANT_VIOLATION',
-					`CompleteExecutionPlan blocked: plan ${command.targetAggregateId} has no steps — an empty plan cannot be COMPLETED (§20.1 requires all required steps to reach terminal success).`
-				);
-			const offenders = steps.filter(
-				(s) => s.stepState !== 'SUCCEEDED' && s.stepState !== 'SKIPPED'
+			const verdict = planEvidencesExecutionSuccess({
+				planStatus: String(state.status),
+				stepStates: steps.map((s) => String(s.stepState ?? 'undefined'))
+			});
+			if (verdict.ok) return null;
+			const remedy =
+				verdict.errorCode === 'RPH_PLAN_STEPS_NOT_TERMINAL_SUCCESS'
+					? ' FailExecutionPlan a plan with a failed step.'
+					: verdict.errorCode === 'RPH_PLAN_PRODUCED_NOTHING'
+						? ' FailExecutionPlan or SupersedeExecutionPlan instead.'
+						: '';
+			return reject(
+				command,
+				'RPH_INVARIANT_VIOLATION',
+				`CompleteExecutionPlan blocked: plan ${command.targetAggregateId} — ${verdict.reason} (${verdict.errorCode}).${remedy}`
 			);
-			if (offenders.length > 0)
-				return reject(
-					command,
-					'RPH_INVARIANT_VIOLATION',
-					`CompleteExecutionPlan blocked: plan ${command.targetAggregateId} has ${offenders.length} step(s) not in terminal success (${offenders.map((s) => s.stepState ?? 'undefined').join(', ')}); COMPLETED requires every step SUCCEEDED or SKIPPED (§20.1 success allow-list). FailExecutionPlan a plan with a failed step.`
-				);
-			if (!steps.some((s) => s.stepState === 'SUCCEEDED'))
-				return reject(
-					command,
-					'RPH_INVARIANT_VIOLATION',
-					`CompleteExecutionPlan blocked: plan ${command.targetAggregateId} has no SUCCEEDED step — every step is SKIPPED, so the plan produced nothing to complete on. At least one step must SUCCEED (aligning the plan-level rule with the ratified PWU-level rejectUnbackedExecutionSuccess, §21.1). FailExecutionPlan or SupersedeExecutionPlan instead.`
-				);
-			return null;
 		}
 	});
 

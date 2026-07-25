@@ -614,7 +614,7 @@ describe('PWU lifecycle handlers (live command drive)', () => {
 		);
 		expect(r.status, 'the controller may not declare work successful').toBe('REJECTED');
 		expect(r.error?.code).toBe('RPH_EVIDENCE_MISSING');
-		expect(r.error?.message).toContain('no succeeded execution step');
+		expect(r.error?.message).toContain('no execution plan evidencing it');
 		const axes = store.loadObject(PWU_ID)?.state as { executionState: string };
 		expect(axes.executionState, 'the axis must not have moved').toBe('RUNNING');
 	});

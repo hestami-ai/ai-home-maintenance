@@ -180,7 +180,9 @@ describe('CompleteExecutionPlan / FailExecutionPlan — plan-terminal lifecycle 
 		const r = complete();
 		expect(r.status).toBe('REJECTED');
 		expect(r.error?.code).toBe('RPH_INVARIANT_VIOLATION');
-		expect(r.error?.message).toContain('no SUCCEEDED step');
+		// WP-12: the message now carries the KERNEL's own code, which is a stronger assertion than the prose —
+		// it names WHICH limb of the one shared definition refused, and cannot drift with the wording.
+		expect(r.error?.message).toContain('RPH_PLAN_PRODUCED_NOTHING');
 		expect(planStatus(PLAN)).toBe('ACTIVE');
 	});
 
