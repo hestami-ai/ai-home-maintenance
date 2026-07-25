@@ -47,9 +47,10 @@ existing refusal changes which code a caller sees. *(The pre-landing survey obli
 applies: grep every `error.code` assertion on `StartExecutionStep` before landing.)*
 
 **The four steps, and why the order is what it is** (DS §5): absent → out of scope (R5); unresolvable →
-fail-closed; status → `RPH_BINDING_NOT_AUTHORIZED` (the **ratified** rule); allowlist → `RPH_INVARIANT_VIOLATION`
-(the **authored** limb). Status before allowlist so the authored rule can never mask the ratified one — if it
-did, RPH-EXE-003's kill test would be vacuous, which is the defect class reintroduced by its own fix.
+`RPH_VALIDATION_SEMANTIC_FAILED`, fail-closed; status → `RPH_INVARIANT_VIOLATION` carrying the kernel's
+`RPH_BINDING_NOT_AUTHORIZED` (the **ratified** rule); allowlist → `RPH_INVARIANT_VIOLATION` (the **authored**
+limb). Status before allowlist so the authored rule can never mask the ratified one — if it did, RPH-EXE-003's
+kill test would be vacuous, which is the defect class reintroduced by its own fix.
 
 **Kill tests — required, each isolating ONE limb:**
 
@@ -61,12 +62,20 @@ did, RPH-EXE-003's kill test would be vacuous, which is the defect class reintro
 | K4 | `runtimeBindingId` names no object | `RPH_VALIDATION_SEMANTIC_FAILED` (fail-closed, mirroring `pwuOpennessRefusal`) |
 | K5 | binding `AUTHORIZED` but **∉** `plan.authorizedRuntimeBindingIds` | `RPH_INVARIANT_VIOLATION` + the **allowlist** marker — **the limb-separation proof** |
 
-**K1–K3 and K5 share a wire code**, so every one of them must assert the **marker**, not the code. That is not
-belt-and-braces: `RPH_INVARIANT_VIOLATION` is returned by the PWU-openness limb, the retry cap, the prunability
-precheck and several others, so a code-only assertion proves that *something* refused — the vacuous negative.
+| **K6** | binding `REQUESTED` **and** ∉ the allowlist — **fails both limbs** | `RPH_INVARIANT_VIOLATION` + the **status** marker, and NOT the allowlist one — **the ORDER proof** |
 | P1 | binding `AUTHORIZED` **and** in the allowlist | **ACCEPTED** |
 | P2 | binding `PARTIALLY_AUTHORIZED` and in the allowlist | **ACCEPTED** (the ratified kernel permits it) |
 | P3 | no `runtimeBindingId` at all | **ACCEPTED** (R5 — and the reference seed's shape) |
+
+**K1–K3, K5 and K6 share a wire code**, so every one of them must assert the **marker**, not the code. That is not
+belt-and-braces: `RPH_INVARIANT_VIOLATION` is returned by the PWU-openness limb, the retry cap, the prunability
+precheck and several others, so a code-only assertion proves that *something* refused — the vacuous negative.
+
+**K6 was ADDED AFTER THE FIRST MUTATION RUN, and its absence is worth recording.** The order mutant — moving the
+allowlist limb ahead of the status check — **survived** the battery as first written, because every other case
+allowlists its binding, so both orders behave identically. The order this roadmap argued for was asserted in prose
+and tested nowhere. Only an input that fails **both** limbs can tell them apart. An argument without a failing
+case is not evidence, and that is the whole discipline restated in one line.
 
 **K5 is the one that matters.** Without it the two limbs are one limb wearing two names: every other negative is
 satisfied by the status check alone. K5 must be arranged so the binding is genuinely `AUTHORIZED` — otherwise it
@@ -77,8 +86,8 @@ refusal-only battery cannot see, and this programme has already produced it once
 first mutation run).
 
 **Declared mutations (all must go RED):** invert `bindingPermitsExecution`'s accept set · delete the allowlist
-limb · move the allowlist limb ahead of the status check (K1 must then report the wrong code) · make the absent
-case refuse (P3 + `rph-engine` 69 must break) · make the unresolvable case fail **open**.
+limb · move the allowlist limb ahead of the status check (K6 must then report the allowlist marker) · make the absent
+case refuse (P3 must fail, AND the reference seed must break — rebuild the mutated package first, or the engine reads a stale dist and reports a false GREEN) · make the unresolvable case fail **open**.
 
 ## 4. WP-B2 — register + manifest
 
