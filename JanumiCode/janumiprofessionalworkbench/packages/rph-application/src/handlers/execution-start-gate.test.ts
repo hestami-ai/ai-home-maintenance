@@ -529,21 +529,50 @@ describe('StartExecutionStep — the linear start-gate (DWP-01, RPH-EXE-005 / fo
 			expect(startedCount(3)).toBe(1);
 		});
 
-		it('the JOIN still fires when one arm FAILED (neutralized, not wedged) — but the PLAN cannot complete', () => {
-			// D7 chose "no PENDING ∧ ≥1 SATISFIED" precisely so a failed arm neutralizes rather than wedging the join
-			// forever. That is not a fabricated success: the plan-completion allow-list independently refuses to close
-			// a plan holding a FAILED step, so the failure still has to be dealt with.
+		// BEHAVIOUR CHANGED by JAN-EXECREM WP-4 (F-16), deliberately and enumerated in the roadmap.
+		//
+		// This test asserted the JOIN fires while one arm is FAILED, on the reasoning that the plan-completion
+		// allow-list independently refuses to close a plan holding a FAILED step, so the failure "still has to be
+		// dealt with". The review refuted exactly that defence: dealing with it is a RETRY, and once the retried arm
+		// reaches SUCCEEDED the allow-list is satisfied — so the plan COMPLETES with a join that provably ran BEFORE
+		// the arm it joins ever delivered. Nothing in the finished record shows the join ignored an arm.
+		//
+		// FAILED is the only terminal state the machine can leave (FAILED -> QUEUED is its single out-arrow), so a
+		// failed arm has NOT settled and its in-edge is PENDING. The join waits. The arm settles either by retry to
+		// SUCCEEDED (below) or by explicit abandonment via CancelExecutionStep (WP-5).
+		it('the JOIN WAITS while one arm is FAILED, and releases only once that arm has settled (causally, not just eventually)', () => {
 			activeParallelPlan();
 			start(2);
 			start(3);
 			expect(complete(2).status).toBe('ACCEPTED');
 			expect(fail(3).status).toBe('ACCEPTED');
+
+			// THE FIX: the join may not start while the failed arm is unsettled.
+			const wedged = start(4);
+			expect(wedged.status).toBe('REJECTED');
+			expect(wedged.error?.code).toBe('RPH_ILLEGAL_STATE_TRANSITION');
+			expect(wedged.error?.message, 'the refusal must name the failed predecessor').toContain(stepId(3));
+			expect(wedged.error?.message).toContain('FAILED');
+
+			// Settle the arm the sanctioned way, and the join releases.
+			expect(retry(3).status).toBe('ACCEPTED');
+			expect(start(3).status).toBe('ACCEPTED');
+			expect(complete(3).status).toBe('ACCEPTED');
 			const joined = start(4);
 			expect(joined.status, JSON.stringify(joined.error)).toBe('ACCEPTED');
 			expect(complete(4).status).toBe('ACCEPTED');
 			const done = dispatch('CompleteExecutionPlan', {}, PLAN, 'EXECUTION_PLAN');
-			expect(done.status, 'a FAILED step is not terminal-success').toBe('REJECTED');
-			expect(done.error?.message).toContain('FAILED');
+			expect(done.status, JSON.stringify(done.error)).toBe('ACCEPTED');
+
+			// CAUSALITY (the assertion the old test could not make): in the finished stream the join's success comes
+			// AFTER the success of every arm it joins. Before WP-4 the join's Succeeded preceded s3's, and the plan
+			// still closed — a completed record whose own event order showed the join had not waited.
+			const succeeded = store
+				.readAllEvents()
+				.filter((e) => e.eventType === 'ExecutionStepSucceeded')
+				.map((e) => (e.payload as { executionStepId: string }).executionStepId);
+			expect(succeeded.indexOf(stepId(4))).toBeGreaterThan(succeeded.indexOf(stepId(3)));
+			expect(succeeded.indexOf(stepId(4))).toBeGreaterThan(succeeded.indexOf(stepId(2)));
 		});
 	});
 

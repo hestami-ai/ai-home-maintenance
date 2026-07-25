@@ -17,6 +17,22 @@
 const TERMINAL_SUCCESS = new Set<string>(['SUCCEEDED', 'SKIPPED']);
 /** The full terminal set of the ExecutionStep.stepState machine. */
 const TERMINAL = new Set<string>(['SUCCEEDED', 'FAILED', 'SKIPPED', 'CANCELLED', 'SUPERSEDED']);
+/**
+ * A terminal state the machine CAN leave — so a source sitting there has NOT settled (JAN-EXECREM WP-4).
+ *
+ * Derived from the ExecutionStep.stepState machine, not chosen: FAILED is the ONLY terminal state with an
+ * out-arrow (FAILED -> QUEUED, retryExecutionStep). SUCCEEDED, SKIPPED, CANCELLED and SUPERSEDED have none.
+ * `transition-gate-disposition.test.ts` pins this against the generated machine, so adding an out-arrow to a
+ * terminal state fails a test instead of silently changing what a barrier means.
+ */
+const REOPENABLE_TERMINAL = new Set<string>(['FAILED']);
+
+/**
+ * A terminal state the machine can NEVER leave, and which is not a success — so an edge out of it can never
+ * conduct, and its downstream is structurally dead (JAN-EXECREM WP-4 / F-06).
+ */
+const IRRECOVERABLE_TERMINAL = new Set<string>(['CANCELLED', 'SUPERSEDED']);
+
 /** The states PruneExecutionStep may be issued FROM (its vocab drivesFrom). The read-model must not offer a prune
  *  outside this set or it tempts a command the engine refuses — the read-model/authority divergence this module
  *  exists to prevent. RUNNING/WAITING are deliberately absent: live work is CANCELLED, never pruned. */
@@ -298,31 +314,63 @@ function computeLiveStepIds(ctx: GateContext): ReadonlySet<string> {
 		live.add(id);
 		for (const e of outEdgesOf(ctx, id)) {
 			if (e.targetStepId === undefined || live.has(e.targetStepId)) continue;
-			// The edge carries reachability unless the plan EXCLUDED it — i.e. a resolved BRANCH did not select it.
-			if (!branchExcludes(ctx, e)) frontier.push(e.targetStepId);
+			// The edge carries reachability unless it can NEVER conduct. Using the LOCAL disposition (which does not
+			// consult liveness) keeps this a plain O(V+E) walk rather than a mutual recursion.
+			if (localEdgeDisposition(ctx, e) !== 'NEUTRALIZED') frontier.push(e.targetStepId);
 		}
 	}
 	return live;
 }
 
 /**
- * Did the plan's own declared logic EXCLUDE this edge? True only for a not-taken arm of a RESOLVED BRANCH (or a
- * guarded edge off a settled non-BRANCH source whose guard is false).
+ * The LOCAL disposition of one in-edge (JAN-EXECREM WP-4 / SM-1) — stage 1 of the canonical answer to ONE question:
+ * **can this edge still conduct?**
  *
- * Deliberately narrow, and deliberately NOT "the source failed": a FAILED step is retryable (FAILED→QUEUED) and a
- * source that has not finished may still take this edge, so neither excludes anything. The barrier-join separately
- * treats a failed source as NEUTRALIZED so a JOIN cannot wedge behind it — that is a different question with a
- * different answer, and conflating them let a transient failure offer a whole downstream for prune-to-SKIPPED.
+ *   SATISFIED   = it HAS conducted, and cannot un-conduct.
+ *   PENDING     = it has not conducted and MAY still.
+ *   NEUTRALIZED = it has not conducted and NEVER will.
+ *
+ * "Local" means it reads only the edge, its source's own state, that source's stepType/out-edges, and the guard —
+ * never liveness. That restriction is what lets the reachability BFS use it without recursing into itself.
+ *
+ * WHAT THIS REPLACES, AND WHY (the root cause of F-06/F-16/F-17/F-20/F-38). The same question previously had THREE
+ * independently-maintained answers — `inEdgeDisposition` (the barrier's), `branchExcludes` (reachability's), and the
+ * entry-degree disagreement fixed in WP-3 — and each new way an edge could die was taught to only one of them.
+ * `branchExcludes` in particular knew about exactly ONE thing (a resolved BRANCH not selecting this arm) and
+ * returned false for everything else, so:
+ *   - a CANCELLED/SUPERSEDED source left its downstream LIVE forever, and the only exit — a waiver-skip — RESURRECTED
+ *     the arm (F-06, the THIRD recurrence of that class); and
+ *   - the barrier called a FAILED source NEUTRALIZED, so a JOIN released on a failed arm and the plan could reach
+ *     COMPLETED with a step that never succeeded (F-16).
+ * Both now fall out of one ladder rather than being patched into one of three.
  */
-function branchExcludes(ctx: GateContext, edge: GateTransition): boolean {
-	if (edge.sourceStepId === undefined) return false;
+function localEdgeDisposition(ctx: GateContext, edge: GateTransition): InEdgeDisposition {
+	// 1. A plan-entry edge: the plan itself grounds it.
+	if (edge.sourceStepId === undefined) return 'SATISFIED';
 	const source = stepOf(ctx, edge.sourceStepId);
-	if (source === undefined || !TERMINAL_SUCCESS.has(source.stepState)) return false; // unsettled ⇒ excludes nothing
+	// 2. Dangling (refused at propose) — conservative: it might yet resolve.
+	if (source === undefined) return 'PENDING';
+	const src = source.stepState;
+	// 3. The source has not finished.
+	if (!TERMINAL.has(src)) return 'PENDING';
+	// 4. The source is in a terminal state the machine CAN leave (FAILED -> QUEUED). It has not settled, so the edge
+	//    has not settled either. This is the F-16 correction: calling it NEUTRALIZED let a JOIN release on a failed
+	//    arm. A join now waits until the arm is retried to success or explicitly abandoned (WP-5's Cancel).
+	if (REOPENABLE_TERMINAL.has(src)) return 'PENDING';
+	// 5. The source is irrecoverably terminal (CANCELLED/SUPERSEDED): the edge can never conduct. This is the F-06
+	//    correction — reachability previously ignored this case entirely.
+	if (IRRECOVERABLE_TERMINAL.has(src)) return 'NEUTRALIZED';
+	// 6. EXCLUSIVE first-match belongs to a BRANCH node and to nothing else (D2: a BRANCH is a stepType; parallelism
+	//    is topology). Keying this on "the source has ≥1 conditional out-edge" instead made every node with one
+	//    guarded arm an exclusive branch, so a PARALLEL_GROUP fan-out mixing a guarded arm with unconditional ones
+	//    silently lost every arm but the first match.
 	const outEdges = outEdgesOf(ctx, edge.sourceStepId);
 	if (source.stepType === 'BRANCH' && outEdges.some(isConditionalEdge))
-		return selectBranchEdge(ctx, outEdges, source) !== edge;
-	if (!isConditionalEdge(edge)) return false;
-	return ctx.evaluateGuard?.(edge, ctx.plan) !== true;
+		return selectBranchEdge(ctx, outEdges, source) === edge ? 'SATISFIED' : 'NEUTRALIZED';
+	// 7. Non-BRANCH source: out-edges are INDEPENDENT. An unconditional edge is taken.
+	if (!isConditionalEdge(edge)) return 'SATISFIED';
+	// 8. A guarded edge off a settled non-BRANCH source is taken iff its guard holds.
+	return ctx.evaluateGuard?.(edge, ctx.plan) === true ? 'SATISFIED' : 'NEUTRALIZED';
 }
 /**
  * The out-edge a BRANCH step selects RIGHT NOW, by first-match — the decision the handler records when the branch
@@ -361,32 +409,34 @@ export function inEdgeDisposition(
 	return gateContext(plan, evaluateGuard).dispositionOf(edge);
 }
 
-/** The body of `inEdgeDisposition`, over a context so the live set and sibling edges are computed once. */
+/**
+ * The EFFECTIVE disposition (stage 2) = the local answer, overridden to NEUTRALIZED when the source is
+ * STRUCTURALLY DEAD — unreachable from any entry, however it reached its own state.
+ *
+ * The override matters because SKIPPED is in TERMINAL_SUCCESS: a step on a not-taken arm is terminal-success
+ * whether it was PRUNED or WAIVED away, so without this a waiver-skip on a dead arm reads "done, carry on" and
+ * resurrects the arm. That is the defect class DWP-07 and DWP-08 each tried to close; keeping the override here,
+ * one layer above a local ladder that cannot see liveness, is what makes it structural rather than command-keyed.
+ */
 function computeInEdgeDisposition(ctx: GateContext, edge: GateTransition): InEdgeDisposition {
-	if (edge.sourceStepId === undefined) return 'SATISFIED'; // a plan-entry edge is always satisfied
+	const local = localEdgeDisposition(ctx, edge);
+	if (edge.sourceStepId === undefined) return local; // an entry edge has no source to be dead
 	const source = stepOf(ctx, edge.sourceStepId);
-	if (source === undefined) return 'PENDING'; // dangling (rejected at propose) — conservative
-	const src = source.stepState;
-	if (!TERMINAL.has(src)) return 'PENDING'; // source not yet done
-	// An UNREACHABLE source satisfies nothing, however it reached its terminal state (DWP-08). Checked BEFORE the
-	// terminal-success test precisely because SKIPPED is IN that set: a step on a not-taken arm is terminal-success
-	// whether it was pruned OR waived away, and treating that as "done, carry on" resurrected the excluded arm.
-	if (!ctx.live().has(source.id)) return 'NEUTRALIZED';
-	// A terminal-non-success source (FAILED/CANCELLED/SUPERSEDED) neutralizes the edge regardless of guard, so a barrier
-	// JOIN does not wedge behind a failed arm (D7). NOTE: this is NOT the same as "the plan excluded this path" — see
-	// isDeadForPruning, which deliberately does not treat it as grounds to prune.
-	if (!TERMINAL_SUCCESS.has(src)) return 'NEUTRALIZED';
-	const outEdges = outEdgesOf(ctx, edge.sourceStepId);
-	// EXCLUSIVE first-match belongs to a BRANCH node and to nothing else (D2: a BRANCH is a stepType; parallelism is
-	// topology). Keying this on "the source has ≥1 conditional out-edge" instead made every node with one guarded arm an
-	// exclusive branch — so a PARALLEL_GROUP fan-out mixing a guarded arm with unconditional ones silently lost every arm
-	// but the first match, while propose-time validation (keyed on stepType) never looked. The two planes now agree, and
-	// validateTransitionGraph additionally REFUSES a conditional out-edge from a non-BRANCH step so they cannot drift.
-	if (source.stepType === 'BRANCH' && outEdges.some(isConditionalEdge))
-		return selectBranchEdge(ctx, outEdges, source) === edge ? 'SATISFIED' : 'NEUTRALIZED';
-	// Non-BRANCH source: out-edges are INDEPENDENT. An unconditional edge is taken; a guarded one is taken iff it holds.
-	if (!isConditionalEdge(edge)) return 'SATISFIED';
-	return ctx.evaluateGuard?.(edge, ctx.plan) === true ? 'SATISFIED' : 'NEUTRALIZED';
+	if (source === undefined) return local;
+	// The override applies only to a source that has SETTLED. A structurally-dead source that is still non-terminal
+	// keeps its PENDING answer ON PURPOSE: the join then WEDGES until the dead arm is explicitly pruned, which is the
+	// governed workflow (the prune read-model names the arm, the controller clears it, the join releases). Silently
+	// releasing the join around a dead-but-unfinished arm would let a plan complete while a step it declared is left
+	// in limbo, with nothing in the record saying the arm was abandoned.
+	//
+	// For a source that HAS settled, deadness wins however it got there — which is the whole point. SKIPPED is in
+	// TERMINAL_SUCCESS, so a step on a not-taken arm is terminal-success whether it was PRUNED or WAIVED away; without
+	// this override a waiver-skip reads "done, carry on" and RESURRECTS the arm. That is the class DWP-07 and DWP-08
+	// each tried to close by keying on which command drove the step; keying on structure instead is what makes it
+	// closed. It also stops a dead FAILED arm wedging a join forever: FAILED is PENDING while live, NEUTRALIZED once
+	// the arm is structurally dead.
+	if (!TERMINAL.has(source.stepState)) return local;
+	return ctx.live().has(edge.sourceStepId) ? local : 'NEUTRALIZED';
 }
 
 /**

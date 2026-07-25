@@ -61,12 +61,25 @@ describe('startableStepIds — the transition graph (unconditional edges)', () =
 		expect(at(['SUCCEEDED', 'SUCCEEDED', 'SUCCEEDED', 'QUEUED'])).toEqual(['s4']); // both done → join fires
 	});
 
-	it('a NEUTRALIZED (FAILED-source) in-edge does not, by itself, make a join startable', () => {
-		// s4 in-edges: s2 SUCCEEDED (SATISFIED), s3 FAILED (NEUTRALIZED). No PENDING, ≥1 SATISFIED → s4 startable
-		// (the barrier neutralizes the failed arm rather than wedging — the DWP-05 semantics, correct here too).
+	// BEHAVIOUR CHANGED by JAN-EXECREM WP-4 (F-16), deliberately and enumerated in the roadmap.
+	//
+	// This test previously asserted that s4 IS startable with the s3 arm FAILED — its own title said the opposite of
+	// its assertion, which is how the defect hid. A FAILED step is the ONLY terminal state the machine can leave
+	// (FAILED -> QUEUED is its single out-arrow), so a failed arm has NOT settled: its in-edge reads PENDING, and the
+	// join WAITS. Releasing on it let a plan reach COMPLETED with a step that never succeeded, because the sanctioned
+	// retry of that arm then satisfied CompleteExecutionPlan's allow-list while the join had already run without it.
+	//
+	// The arm settles one of two ways, and the join releases on either: retry it to SUCCEEDED, or ABANDON it with
+	// CancelExecutionStep (WP-5), which records the abandonment and makes the in-edge NEUTRALIZED.
+	it('a FAILED arm has NOT settled, so the join WAITS (it does not release around the failure)', () => {
 		const t = [edge('s1', 's2'), edge('s1', 's3'), edge('s2', 's4'), edge('s3', 's4')];
-		const states = ['SUCCEEDED', 'SUCCEEDED', 'FAILED', 'QUEUED'];
-		expect(startableStepIds(plan(states.map((st, i) => step(s(i + 1), st)), t))).toEqual(['s4']);
+		const at = (states: string[]) => startableStepIds(plan(states.map((st, i) => step(s(i + 1), st)), t));
+		expect(at(['SUCCEEDED', 'SUCCEEDED', 'FAILED', 'QUEUED'])).not.toContain('s4');
+		// Retried to success, the join releases.
+		expect(at(['SUCCEEDED', 'SUCCEEDED', 'SUCCEEDED', 'QUEUED'])).toEqual(['s4']);
+		// Abandoned (CANCELLED — irrecoverable, the machine has no out-arrow), the join also releases: the other arm
+		// delivered and this one provably never will.
+		expect(at(['SUCCEEDED', 'SUCCEEDED', 'CANCELLED', 'QUEUED'])).toEqual(['s4']);
 	});
 });
 
@@ -238,10 +251,24 @@ describe('BRANCH first-match + prune (DWP-03)', () => {
 });
 
 describe('inEdgeDisposition', () => {
-	const p = plan([step('s1', 'SUCCEEDED'), step('s2', 'FAILED'), step('s3', 'QUEUED')]);
+	const p = plan([
+		step('s1', 'SUCCEEDED'),
+		step('s2', 'FAILED'),
+		step('s3', 'QUEUED'),
+		step('s4', 'CANCELLED'),
+		step('s5', 'SUPERSEDED')
+	]);
 	it('SATISFIED for a terminal-success source', () => expect(inEdgeDisposition(p, edge('s1', 'x'))).toBe('SATISFIED'));
-	it('NEUTRALIZED for a terminal-non-success source', () => expect(inEdgeDisposition(p, edge('s2', 'x'))).toBe('NEUTRALIZED'));
+	// BEHAVIOUR CHANGED by WP-4 (F-16): terminal-non-success is not one class. FAILED is REOPENABLE — the machine's
+	// only out-arrow from a terminal state is FAILED -> QUEUED — so the edge has not settled and may yet conduct.
+	it('PENDING for a FAILED source (reopenable: the machine can leave it, so it has not settled)', () =>
+		expect(inEdgeDisposition(p, edge('s2', 'x'))).toBe('PENDING'));
 	it('PENDING for a non-terminal source', () => expect(inEdgeDisposition(p, edge('s3', 'x'))).toBe('PENDING'));
+	// Only the IRRECOVERABLE terminals neutralize: the machine declares no out-arrow from either.
+	it('NEUTRALIZED for a CANCELLED source (irrecoverable)', () =>
+		expect(inEdgeDisposition(p, edge('s4', 'x'))).toBe('NEUTRALIZED'));
+	it('NEUTRALIZED for a SUPERSEDED source (irrecoverable)', () =>
+		expect(inEdgeDisposition(p, edge('s5', 'x'))).toBe('NEUTRALIZED'));
 	it('SATISFIED for a plan-entry edge (no source)', () => expect(inEdgeDisposition(p, { targetStepId: 'x' })).toBe('SATISFIED'));
 });
 
@@ -412,8 +439,11 @@ describe('DWP-07 — defects found by adversarial audit of the landed increment'
 		const t = [edge('s1', 's2'), edge('s2', 's3')];
 		const p = plan([step('s1', 'SUCCEEDED'), step('s2', 'FAILED'), step('s3', 'QUEUED')], t);
 		expect(prunableStepIds(p, guard), 'a retryable failure must not launder into SKIPPED').toEqual([]);
-		// The barrier still neutralizes the failed edge so a JOIN cannot wedge — the two rules are deliberately different.
-		expect(inEdgeDisposition(p, t[1]!, guard)).toBe('NEUTRALIZED');
+		// BEHAVIOUR CHANGED by WP-4 (F-16). This used to read NEUTRALIZED, and the comment described the barrier and
+		// the prune rule as "deliberately different" — that divergence WAS the defect: it let a JOIN release around a
+		// failure the prune rule correctly refused to write off. They are now the SAME rule. A retryable failure has
+		// not settled, so its edge is PENDING: nothing downstream is pruned, and nothing downstream starts either.
+		expect(inEdgeDisposition(p, t[1]!, guard)).toBe('PENDING');
 	});
 
 	// The MINOR that mattered: the fixpoint was only ever exercised by topologically-ordered fixtures, so a single-pass
