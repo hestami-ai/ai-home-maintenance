@@ -147,11 +147,36 @@ the row to be re-dispositioned as ENFORCED with a probe.
 | # | Rule | Statement | Dead predicate | Note |
 |---|---|---|---|---|
 | N-1 | **RPH-EXE-003** | "Starting execution with a runtime binding still in REQUESTED is rejected." | `bindingPermitsExecution` | `StartExecutionStep` never resolves the step's `runtimeBindingId` to a RUNTIME_BINDING object at all. A step can start against a REQUESTED, DENIED or REVOKED binding. **Buildable today** — WP-14 persisted `authorizedRuntimeBindingIds` on the plan, which is where the check would read from. |
-| N-2 | **RPH-EXE-004** | "Requested capability is not granted capability." | `capabilityAuthorized` | The purest instance: **no reference anywhere** outside its definition and its own unit test, not even an intra-kernel caller. Enforcing it needs a runtime capability plane (a binding's granted set consulted at the point of an operation) that this engine does not have. **Not buildable today**; recorded as such rather than as a task. |
-| N-3 | **RPH-EXE-005** | "Starting a step whose required input artifact is absent leaves the step not ready." | `stepMayBecomeReady` | Reachable only through `canStartStep`, itself uncalled. Also unenforceable as the machine stands: NOT_READY and READY are the command-unreachable population disclosed under F-27, so there is no `NOT_READY → READY` transition for a precondition gate to guard. **Two facts, recorded as one**: the predicate is dead AND the transition it would guard is unreachable. |
+| N-2 | **RPH-EXE-004** | "Requested capability is not granted capability." | `capabilityAuthorized` | The purest instance of a dead predicate: **no reference anywhere** outside its definition and its own unit test, not even an intra-kernel caller. Blocked on **N-5** — the corpus does not define what a capability IS. ~~*"Enforcing it needs a runtime capability plane … that this engine does not have."*~~ **That reason was WRONG — see the correction below.** |
+| N-3 | **RPH-EXE-005** | "Starting a step whose required input artifact is absent leaves the step not ready." | `stepMayBecomeReady` | Blocked on **N-5**: `InputBindingSchema` is `z.record(z.string(), z.unknown())`, so *"the required input artifact"* has nothing to quantify over. The predicate being reachable only through the uncalled `canStartStep`, and `NOT_READY`/`READY` being command-unreachable (F-27), are both true and both **secondary** — the subject gap survives fixing either. |
+| **N-4** | *(no rule id — see note)* | An `AuthorizeRuntimeBinding` may grant a capability the binding **never requested**. | — | **NEW, raised 2026-07-25 (JAN-EXEBIND-DS-001 §3.3).** `authorizeRuntimeBinding`'s `mutate` writes `grantedCapabilities` from the payload **wholesale, unchecked against `requestedCapabilities`**. Its own comment names the hazard and then guards only the RE-authorization case via `fromStates`; the **first** authorization is unconstrained. The ratified machine's guard on `REQUESTED → AUTHORIZED` reads *"requested capability is NOT granted capability; capability scope must be explicit (§22.1)"* — **enforced nowhere.** Deliberately **not** filed under RPH-EXE-004, whose statement is about *operations*: accepting evidence for one rule as evidence for another is the substitution this programme exists to stop. Blocked on N-5. |
+| **N-5** | *(corpus gap)* | Four ratified helper sub-types are **`Source TBD`**. | — | **NEW, and the root cause of N-2, N-3 and N-4.** `InputBinding`, `OutputBinding`, `CapabilityRequest` and `CapabilityGrant` are each declared in `m1-object-fields.json` with `"field": "(undefined)", "type": "—", "note": "… NOT field-defined. Source TBD."`, so `gen-objects.ts` emits `z.record(z.string(), z.unknown())`. Every one is referenced by a ratified rule. The tell nobody noticed: `capabilityAuthorized` takes `string[]` while the contract holds `Record<string,unknown>[]` — **the predicate and the contract it guards do not typecheck against each other.** ESCALATED as a corpus gap; authoring the shapes would invent normative semantics the corpus withholds (JAN-EXEBIND-DS-001 §4-R3). |
+
+> **CORRECTION (2026-07-25) — two entries in this section were WRONG, and wrong in the reassuring direction.**
+>
+> N-2 said enforcing RPH-EXE-004 *"needs a runtime capability plane … that this engine does not have."* **The
+> plane exists.** `RUNTIME_BINDING` is a first-class aggregate with an id prefix, a registry entry and a
+> five-state ratified machine; `RequestRuntimeBinding` / `AuthorizeRuntimeBinding` / `DenyRuntimeBinding` /
+> `RevokeRuntimeCapability` are all live; the object carries both `requestedCapabilities` and
+> `grantedCapabilities`. N-3 named the unreachable transition as its blocker when the subject gap is the one that
+> would survive fixing the machine.
+>
+> **Both are the same error, and it is the one this codebase has now made seven times: I searched, found nothing,
+> and recorded the absence as a property of the world rather than of my search.** It is recorded rather than
+> silently patched because a register whose entries are wrong in the *comfortable* direction is worse than no
+> register — it converts an open hole into a closed one on paper, and the next reader has no reason to look again.
+> Finding N-4 was sitting behind that wrong sentence the whole time.
+>
+> **What was right:** all three rules really are unenforced, and WP-16's gate really did catch them. The error was
+> in the *reasons* — which is precisely the part a gate cannot check, and therefore the part that needs saying out
+> loud.
 
 **Consequence already applied:** the M12 conformance manifest's `RPH-EXE` family row was downgraded from
 `COVERED` ("001..009 by id") to `PARTIAL`. That claim was true of the **predicates** and false of the **engine**.
+
+**N-1 is being closed** by `JAN-EXEBIND-DS-001` / `JAN-EXEBIND-DR-001` (WP-B0…B3): everything RPH-EXE-003
+quantifies over is ratified and typed, so the fix is a load and a call. N-2, N-3, N-4 stay open behind N-5.
+**This register remains the authoritative index for all five** — one register, not two.
 
 ## 6. Deferred, with reasons
 
