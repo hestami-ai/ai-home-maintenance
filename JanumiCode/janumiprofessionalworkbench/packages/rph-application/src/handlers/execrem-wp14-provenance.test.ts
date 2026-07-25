@@ -135,10 +135,49 @@ describe('JAN-EXECREM WP-14 — binding + prune provenance are DERIVED, never as
 
 	// ── F-31: the binding ───────────────────────────────────────────────────────────────────────────────────────
 
+	/**
+	 * Mint the binding this suite's steps name, and AUTHORIZE it.
+	 *
+	 * FIXTURE CORRECTED BY JAN-EXEBIND WP-B1, and the correction is the finding. This suite authored steps naming
+	 * `BINDING` while **no RUNTIME_BINDING of that id ever existed** — which was fine only because nothing resolved
+	 * the field. RPH-EXE-003 now does, and fails closed on an unresolvable authority, so the arrangement stopped
+	 * being legal the moment the ratified rule became enforced.
+	 *
+	 * That is DS-001 §4 item 3 exactly — "tests codified the holes as intent" — and the response is the one this
+	 * lineage has taken every time: MAKE THE FIXTURE HONEST, never weaken the rule to keep a suite green. The
+	 * assertions below are unchanged; only the arrangement is now one the engine could actually produce.
+	 */
+	const mintAuthorizedBinding = () => {
+		ok(
+			dispatch(
+				'RequestRuntimeBinding',
+				{
+					runtimeBindingId: BINDING,
+					executionStepId: sid(1),
+					roleId: 'role-executor',
+					requestedCapabilities: [{ capability: 'fs.read' }]
+				},
+				BINDING,
+				'RUNTIME_BINDING'
+			),
+			'request binding'
+		);
+		ok(
+			dispatch(
+				'AuthorizeRuntimeBinding',
+				{ grantedCapabilities: [{ capability: 'fs.read' }] },
+				BINDING,
+				'RUNTIME_BINDING'
+			),
+			'authorize binding'
+		);
+	};
+
 	it('THE KILL TEST: the Started event records the binding the APPROVED PLAN authored', () => {
 		// RED before WP-14: the emitted payload was byte-for-byte `{stepId, stepState:'RUNNING'}` — the event field
 		// had no producer at all.
-		activate([mkStep(1, { stepType: 'MODEL_INVOCATION', runtimeBindingId: BINDING })]);
+		mintAuthorizedBinding();
+		activate([mkStep(1, { stepType: 'MODEL_INVOCATION', runtimeBindingId: BINDING })], [], [BINDING]);
 		ok(dispatch('StartExecutionStep', { stepId: sid(1) }), 'start');
 		expect(eventsOf('ExecutionStepStarted')[0]!.payload).toEqual({
 			stepId: sid(1),

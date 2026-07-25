@@ -55,11 +55,15 @@ did, RPH-EXE-003's kill test would be vacuous, which is the defect class reintro
 
 | # | Case | Must refuse with |
 |---|---|---|
-| K1 | binding `REQUESTED` | `RPH_BINDING_NOT_AUTHORIZED` |
-| K2 | binding `DENIED` | `RPH_BINDING_NOT_AUTHORIZED` |
-| K3 | binding `REVOKED` | `RPH_BINDING_NOT_AUTHORIZED` |
-| K4 | `runtimeBindingId` names no object | fail-closed refusal |
-| K5 | binding `AUTHORIZED` but **∉** `plan.authorizedRuntimeBindingIds` | `RPH_INVARIANT_VIOLATION` — **the limb-separation proof** |
+| K1 | binding `REQUESTED` | `RPH_INVARIANT_VIOLATION` + the kernel code `RPH_BINDING_NOT_AUTHORIZED` in the message |
+| K2 | binding `DENIED` | same |
+| K3 | binding `REVOKED` | same |
+| K4 | `runtimeBindingId` names no object | `RPH_VALIDATION_SEMANTIC_FAILED` (fail-closed, mirroring `pwuOpennessRefusal`) |
+| K5 | binding `AUTHORIZED` but **∉** `plan.authorizedRuntimeBindingIds` | `RPH_INVARIANT_VIOLATION` + the **allowlist** marker — **the limb-separation proof** |
+
+**K1–K3 and K5 share a wire code**, so every one of them must assert the **marker**, not the code. That is not
+belt-and-braces: `RPH_INVARIANT_VIOLATION` is returned by the PWU-openness limb, the retry cap, the prunability
+precheck and several others, so a code-only assertion proves that *something* refused — the vacuous negative.
 | P1 | binding `AUTHORIZED` **and** in the allowlist | **ACCEPTED** |
 | P2 | binding `PARTIALLY_AUTHORIZED` and in the allowlist | **ACCEPTED** (the ratified kernel permits it) |
 | P3 | no `runtimeBindingId` at all | **ACCEPTED** (R5 — and the reference seed's shape) |

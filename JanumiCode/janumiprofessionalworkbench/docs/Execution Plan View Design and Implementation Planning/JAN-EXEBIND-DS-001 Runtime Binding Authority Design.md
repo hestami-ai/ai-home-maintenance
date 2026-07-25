@@ -158,12 +158,25 @@ One resolution site, `startExecutionStep`'s precheck, evaluated **after** the de
 precheck already occupies, so no existing refusal changes which code a caller sees.
 
 ```
-resolveBindingAuthority(ctx, command, plan, step) : Refusal | null
-  1. step.runtimeBindingId absent            -> null        (R5: outside the rule's antecedent)
-  2. id does not resolve to a RUNTIME_BINDING -> REFUSE      (fail-closed on an unresolvable authority)
-  3. bindingPermitsExecution(status) fails    -> REFUSE      RPH_BINDING_NOT_AUTHORIZED   (R1 / RPH-EXE-003)
-  4. id ∉ plan.authorizedRuntimeBindingIds    -> REFUSE      RPH_INVARIANT_VIOLATION      (R2 / §15.3)
+bindingAuthorityRefusal(ctx, command, plan, step, stepId) : Refusal | null
+  1. step.runtimeBindingId absent/empty       -> null      (R5: outside the rule's antecedent)
+  2. id does not resolve to a RUNTIME_BINDING -> REFUSE    RPH_VALIDATION_SEMANTIC_FAILED  (fail-closed)
+  3. bindingPermitsExecution(status) fails    -> REFUSE    RPH_INVARIANT_VIOLATION         (R1 / RPH-EXE-003)
+  4. id ∉ plan.authorizedRuntimeBindingIds    -> REFUSE    RPH_INVARIANT_VIOLATION         (R2 / §15.3)
 ```
+
+**Correction to an earlier draft of this section, and the reason it is worth stating.** This design first named
+the code for limb 3 as `RPH_BINDING_NOT_AUTHORIZED`. **That is not a ratified wire code** — `RphErrorCodeSchema`
+is a closed 15-value enum and does not contain it. `RPH_BINDING_NOT_AUTHORIZED` is the *kernel's* label, returned
+in `Check.errorCode` by `bindingPermitsExecution`, and the two vocabularies are different things. The established
+pattern (JAN-EXECREM WP-11, `validateStepCompletion`) is to refuse with a **ratified** wire code and carry the
+**kernel** code into the message, so a caller can tell the limbs apart and a test can name which cell it killed.
+Limb 3 therefore returns `RPH_INVARIANT_VIOLATION` with `(RPH_BINDING_NOT_AUTHORIZED)` in the message. Limb 2
+mirrors `pwuOpennessRefusal`'s unresolvable case exactly, code included, because it is the same situation: an
+execution act whose authority cannot be *read* cannot be authorized by it.
+
+Limbs 3 and 4 share a wire code, which is exactly why WP-16's discipline requires **distinct markers** — the code
+alone could never separate them, and a probe asserting only the code would prove that *something* refused.
 
 Ordering rationale: 3 before 4 so the *ratified* rule is what refuses an unauthorized binding, and the authored
 allowlist limb only ever refuses a binding that is otherwise fine. Reversing them would let the authored rule mask
@@ -188,9 +201,10 @@ the COMMAND layer. WP-16's gates then hold this fix the same way they hold WP-12
 ## 7. Enumerated behaviour changes
 
 `StartExecutionStep` on a step whose `runtimeBindingId` names a binding that is `REQUESTED`, `DENIED` or `REVOKED`
-→ **REFUSED** (`RPH_BINDING_NOT_AUTHORIZED`). On a step whose binding id does not resolve → **REFUSED**. On a step
-whose binding is authorized but absent from the plan's activation allowlist → **REFUSED**. Everything else is
-unchanged; `PARTIALLY_AUTHORIZED` remains startable, per the ratified kernel.
+→ **REFUSED** (`RPH_INVARIANT_VIOLATION`, message carrying the kernel's `RPH_BINDING_NOT_AUTHORIZED`). On a step
+whose binding id does not resolve → **REFUSED** (`RPH_VALIDATION_SEMANTIC_FAILED`). On a step whose binding is
+authorized but absent from the plan's activation allowlist → **REFUSED** (`RPH_INVARIANT_VIOLATION`). Everything
+else is unchanged; `PARTIALLY_AUTHORIZED` remains startable, per the ratified kernel.
 
 ## 8. Residuals, disclosed
 

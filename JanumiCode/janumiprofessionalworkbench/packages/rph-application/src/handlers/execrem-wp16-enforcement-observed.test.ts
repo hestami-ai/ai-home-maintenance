@@ -250,7 +250,80 @@ describe('JAN-EXECREM WP-16 (c) — the enforcement register is OBSERVED, not as
 				return { control, observed: start(2) };
 			}
 		},
-		'RPH-EXE-003': null,
+		'RPH-EXE-003': {
+			arrangement: 'a step whose runtimeBindingId names a binding still in REQUESTED',
+			run: () => {
+				// JAN-EXEBIND WP-B1 closed this row, and the register's totality gate is what FORCED this probe: the
+				// map is a total Record over the id union, so flipping RPH-EXE-003 to ENFORCED does not compile until
+				// an observation exists. That is the mechanism working, in the direction it was built for.
+				//
+				// The CONTROL is the same command on the same plan with the binding AUTHORIZED — so the arrangement
+				// (the binding's status) is demonstrably what flips the answer, not the plan, the step or the PWU.
+				const BIND = 'bind_01ARZ3NDEKTSV4RRFFQ69H6140';
+				const requestBinding = () =>
+					ok(
+						dispatch(
+							'RequestRuntimeBinding',
+							{
+								runtimeBindingId: BIND,
+								executionStepId: sid(1),
+								roleId: 'role-architect',
+								requestedCapabilities: [{ capability: 'file-system' }]
+							},
+							BIND,
+							'RUNTIME_BINDING'
+						),
+						'request binding'
+					);
+
+				requestBinding();
+				ok(chg('PROPOSED', 'SHAPING'), 'shaping');
+				ok(chg('SHAPING', 'READY'), 'ready');
+				ok(
+					dispatch('ProposeExecutionPlan', {
+						executionPlanId: PLAN,
+						workUnitId: PWU,
+						steps: [
+							{ ...mkStep(1), runtimeBindingId: BIND },
+							{ ...mkStep(2), runtimeBindingId: BIND }
+						],
+						transitions: [],
+						retryPolicy: {},
+						tacticalChangePolicy: {},
+						escalationPolicy: {},
+						terminationPolicy: {}
+					}),
+					'propose'
+				);
+				ok(dispatch('ApproveExecutionPlan', {}), 'approve');
+				ok(dispatch('ActivateExecutionPlan', { authorizedRuntimeBindingIds: [BIND] }), 'activate');
+
+				// AUTHORIZED -> the control accepts…
+				ok(
+					dispatch(
+						'AuthorizeRuntimeBinding',
+						{ grantedCapabilities: [{ capability: 'file-system' }] },
+						BIND,
+						'RUNTIME_BINDING'
+					),
+					'authorize'
+				);
+				const control = start(1);
+				ok(complete(1), 'complete s1');
+
+				// …and REVOKED, which `bindingPermitsExecution` refuses by the same limb as REQUESTED, refuses s2.
+				ok(
+					dispatch(
+						'RevokeRuntimeCapability',
+						{ reason: 'credential rotated mid-plan' },
+						BIND,
+						'RUNTIME_BINDING'
+					),
+					'revoke'
+				);
+				return { control, observed: start(2) };
+			}
+		},
 		'RPH-EXE-004': null,
 		'RPH-EXE-005': null,
 		'RPH-EXE-006': {

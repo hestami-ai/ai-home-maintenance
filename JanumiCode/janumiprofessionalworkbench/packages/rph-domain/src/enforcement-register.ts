@@ -159,36 +159,54 @@ export const ENFORCEMENT_REGISTER: Readonly<Record<RegisteredRuleId, Enforcement
 		]
 	},
 	'RPH-EXE-003': {
-		kind: 'UNENFORCED_DISCLOSED',
-		why:
-			'A NEW FINDING, surfaced by this gate rather than by the next review. `bindingPermitsExecution` is correct ' +
-			"and unit-tested, and NOTHING asks it: StartExecutionStep never resolves the step's runtimeBindingId to a " +
-			'RUNTIME_BINDING object, so a step can start against a REQUESTED, DENIED or REVOKED binding. This is the ' +
-			'F-28 shape exactly — the shape this register exists to make visible — and it is NOT fixed here: wiring a ' +
-			'new refusal is a behaviour change that belongs in its own work package with its own kill test, not smuggled ' +
-			'into the gate that found it. What WP-16 changes is that the manifest may no longer certify it COVERED.',
-		deadPredicate: 'bindingPermitsExecution',
-		referencedOnlyBy: ['packages/rph-domain/src/execution.ts']
+		kind: 'ENFORCED',
+		// CLOSED BY JAN-EXEBIND WP-B1. This row read UNENFORCED_DISCLOSED for four commits: `bindingPermitsExecution`
+		// was correct, unit-tested and asked by NOTHING, while the manifest certified the whole RPH-EXE family COVERED
+		// "001..009 by id". `startExecutionStep` never resolved the step's runtimeBindingId at all, so a step started
+		// freely against a REQUESTED, DENIED or REVOKED binding. The register found it; the fix got its own work
+		// package rather than being smuggled into the gate that found it.
+		enforcedAt:
+			'packages/rph-application/src/handlers/execution.ts — bindingAuthorityRefusal, in startExecutionStep’s precheck (JAN-EXEBIND WP-B1)',
+		refusalCode: 'RPH_INVARIANT_VIOLATION',
+		// The kernel's own label travels in the MESSAGE: `RPH_BINDING_NOT_AUTHORIZED` is not a member of the ratified
+		// 15-value RphErrorCodeSchema, so it goes there or nowhere (the WP-11 discipline).
+		refusalMarker: 'a step may only execute against an AUTHORIZED or PARTIALLY_AUTHORIZED binding',
+		declaredMutations: [
+			'invert the accept set of bindingPermitsExecution',
+			'delete the bindingAuthorityRefusal call from startExecutionStep’s precheck',
+			'move the §15.3 allowlist limb AHEAD of the status limb — the authored rule then masks the ratified one for a binding that fails BOTH, which is the only input able to tell the two orders apart (this mutant survived the first battery)'
+		]
 	},
 	'RPH-EXE-004': {
 		kind: 'UNENFORCED_DISCLOSED',
 		why:
-			'`capabilityAuthorized` has NO reference anywhere outside its own definition and its own unit test — not ' +
-			'even an intra-kernel caller, which makes it the purest instance of the family. Enforcing it needs a runtime ' +
-			'capability plane (a binding whose granted set is consulted at the point of an operation) that does not ' +
-			'exist in this engine at all, so the honest disposition is unenforced-and-unbuildable-today rather than a ' +
-			'probe against a plane nothing implements.',
+			'BLOCKED ON A CORPUS GAP, NOT ON EFFORT — and the reason recorded here until 2026-07-25 was WRONG. It read ' +
+			'"enforcing it needs a runtime capability plane … that does not exist in this engine at all". THE PLANE ' +
+			'EXISTS: RUNTIME_BINDING is a first-class aggregate with a five-state ratified machine and four live ' +
+			'commands, and the object carries BOTH requestedCapabilities and grantedCapabilities. What does not exist ' +
+			'is the IDENTITY of a capability: CapabilityRequest and CapabilityGrant are declared in m1-object-fields ' +
+			'as "NOT field-defined … Source TBD", so gen-objects emits an opaque record and "granted is a subset of ' +
+			'requested" is not expressible. The tell nobody noticed for four milestones: capabilityAuthorized takes ' +
+			'string[] while the contract holds Record<string,unknown>[] — the predicate and the contract it guards do ' +
+			'not typecheck against each other. Authoring the shape would invent normative semantics the corpus ' +
+			'withholds, so it is ESCALATED (JAN-EXEBIND-DS-001 §4-R3) rather than worked around. SEPARATELY: ' +
+			'authorizeRuntimeBinding writes the granted set WHOLESALE with no comparison against the requested one, so ' +
+			'a FIRST authorization may grant a capability never requested — raised as its own finding (N-4), ' +
+			'deliberately NOT filed under this rule, whose statement is about operations.',
 		deadPredicate: 'capabilityAuthorized',
 		referencedOnlyBy: ['packages/rph-domain/src/execution.ts']
 	},
 	'RPH-EXE-005': {
 		kind: 'UNENFORCED_DISCLOSED',
 		why:
-			'`stepMayBecomeReady` is reachable only through `canStartStep`, which itself has no production caller. It is ' +
-			'also unenforceable through the bus as the machine stands: NOT_READY and READY are the command-unreachable ' +
-			'population this programme disclosed under F-27 (no command drives a step INTO either), so there is no ' +
-			'NOT_READY -> READY transition for a precondition gate to guard. Recorded as one fact rather than two ' +
-			'half-truths: the predicate is dead AND the transition it would guard is unreachable.',
+			'BLOCKED ON THE SAME CORPUS GAP. The reason recorded here until 2026-07-25 named the unreachable ' +
+			'transition (NOT_READY/READY are the command-unreachable population disclosed under F-27) — true, and ' +
+			'SECONDARY. InputBinding is declared "NOT field-defined … Source TBD", so InputBindingSchema is an opaque ' +
+			'record and "a step whose required input artifact is absent" has nothing to quantify over. That blocker ' +
+			'survives fixing the machine; the transition one does not survive fixing this. It is F-01’s mechanism one ' +
+			'level up — a guard cannot be non-vacuous while one of its inputs is unrepresentable — except here the ' +
+			'input is unrepresentable because the CORPUS withholds the shape, not because the vocab forgot a field. ' +
+			'ESCALATED (JAN-EXEBIND-DS-001 §4-R3).',
 		deadPredicate: 'stepMayBecomeReady',
 		referencedOnlyBy: ['packages/rph-domain/src/execution.ts']
 	},

@@ -46,6 +46,9 @@ const COVERED_BY_ID: Readonly<Record<string, string>> = {
 	'RPH-PWU-010': 'packages/rph-application/src/handlers/execrem-wp12-authority.test.ts',
 	'RPH-EXE-001': 'packages/rph-application/src/handlers/execution-plan-activation-guard.test.ts',
 	'RPH-EXE-002': 'packages/rph-application/src/handlers/execution-plan-supersede.test.ts',
+	// JAN-EXEBIND WP-B1. Certified COVERED for four milestones on the strength of a pure-predicate unit test while
+	// `startExecutionStep` never resolved a step's runtimeBindingId at all; now observed refusing through the bus.
+	'RPH-EXE-003': 'packages/rph-application/src/handlers/exebind-wp1-binding-authority.test.ts',
 	'RPH-EXE-006': 'packages/rph-application/src/handlers/execution-exe006-explicit-result.test.ts',
 	'RPH-EXE-008': 'packages/rph-application/src/handlers/execution-retry-cap.test.ts',
 	'RPH-PER-001': 'packages/rph-persistence/src/sqlite-storage-adapter.test.ts',
@@ -95,9 +98,11 @@ const COVERAGE_BY_PREFIX: Readonly<Record<string, Coverage>> = {
 		// the same family. They are disclosed in `enforcement-register.ts` with a checked call-site census rather
 		// than fixed here: wiring a new refusal is a behaviour change owing its own kill test.
 		note:
-			'EXE-001/002/006/008 asserted BY ID AT THE COMMAND LAYER (see COVERED_BY_ID); EXE-007/009 are not command ' +
-			'refusals (dispositioned in enforcement-register.ts); EXE-003/004/005 are UNENFORCED — ratified, ' +
-			'unit-tested in the kernel, and called by no production site. Pending their own work package.'
+			'EXE-001/002/003/006/008 asserted BY ID AT THE COMMAND LAYER (see COVERED_BY_ID); EXE-007/009 are not ' +
+			'command refusals (dispositioned in enforcement-register.ts); EXE-004/005 remain UNENFORCED — and NOT for ' +
+			'want of wiring: their subjects (CapabilityRequest/CapabilityGrant, InputBinding) are declared ' +
+			'"Source TBD" in the ratified corpus, so gen-objects emits opaque records and the rules have nothing to ' +
+			'quantify over. Escalated as a corpus gap (JAN-EXEBIND-DS-001 §4-R3), not scheduled as a task.'
 	},
 	'RPH-CON': {
 		status: 'PARTIAL',

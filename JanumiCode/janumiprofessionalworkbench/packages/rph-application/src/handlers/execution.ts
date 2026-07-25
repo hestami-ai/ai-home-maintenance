@@ -21,6 +21,7 @@ import {
 	buildConditionSubject,
 	canActivatePlan,
 	canAuthorizeNewWork,
+	bindingPermitsExecution,
 	canResumeExecutionOnPwu,
 	canSkipStep,
 	evaluateGuardExpression,
@@ -162,7 +163,8 @@ function rejectInadmissiblePlan(
 	return reject(
 		command,
 		verdict.code ?? 'RPH_VALIDATION_SEMANTIC_FAILED',
-		verdict.message ?? 'ProposeExecutionPlan blocked: the proposed plan is not structurally admissible.',
+		verdict.message ??
+			'ProposeExecutionPlan blocked: the proposed plan is not structurally admissible.',
 		[p.executionPlanId]
 	);
 }
@@ -806,6 +808,92 @@ function advanceStep(
 }
 
 /**
+ * RPH-EXE-003 / §8.1 + §15.3 — the RUNTIME BINDING authority at Start (JAN-EXEBIND WP-B1).
+ *
+ * WHY THIS EXISTS. `bindingPermitsExecution` is ratified, correct and unit-tested, and had — repo-wide — exactly
+ * two references: its own definition and its own unit test. RPH-EXE-003's ratified statement is "starting execution
+ * with a runtime binding still in REQUESTED is REJECTED", and nothing rejected anything: `startExecutionStep` never
+ * resolved the step's `runtimeBindingId` at all, so a step could start against a REQUESTED, DENIED or REVOKED
+ * binding. Meanwhile the M12 conformance manifest certified the whole RPH-EXE family COVERED "001..009 by id" on
+ * the strength of that unit test. This is F-28's shape exactly (RPH-PWU-010, ratified and enforced nowhere while
+ * certified COVERED) — and it was found by the register JAN-EXECREM WP-16 built BECAUSE F-28 happened, which is
+ * the first evidence the anti-recurrence mechanism does the thing it exists for.
+ *
+ * TWO LIMBS, DELIBERATELY SEPARATE, AND THE ORDER IS LOAD-BEARING.
+ *
+ *   3. Is this binding authorized AT ALL?     — RPH-EXE-003, the RATIFIED rule.
+ *   4. Did THIS ACTIVATION authorize it?      — `plan.authorizedRuntimeBindingIds` (§15.3), an AUTHORED limb.
+ *
+ * A binding can be legitimately AUTHORIZED and still not be one the sponsor's activation decision covered, so
+ * these are different questions with different answers. Limb 3 runs FIRST so the ratified rule is what refuses an
+ * unauthorized binding; if the authored limb ran first it would MASK limb 3 for every binding outside the
+ * allowlist, and RPH-EXE-003's kill test would become vacuous — the defect class reintroduced by its own fix.
+ * They share a wire code, which is why each carries its own marker: `RPH_INVARIANT_VIOLATION` is also returned by
+ * the PWU-openness limb, the retry cap and the prunability precheck, so the code alone separates nothing.
+ *
+ * THE KERNEL'S CODE IS CARRIED INTO THE MESSAGE, NOT RETURNED AS ONE. `RPH_BINDING_NOT_AUTHORIZED` is
+ * `bindingPermitsExecution`'s label; the ratified `RphErrorCodeSchema` is a closed 15-value enum that does not
+ * contain it. Same discipline as `validateStepCompletion` (WP-11): refuse with a ratified code, name the kernel's
+ * verdict in the message so a caller can tell the limbs apart.
+ *
+ * AN ABSENT `runtimeBindingId` IS OUT OF SCOPE, NOT A FAIL-OPEN. The rule's antecedent is "WITH a runtime
+ * binding"; a step naming none is not a step whose binding is unauthorized. This is also load-bearing rather than
+ * convenient: the reference seed authors NO RuntimeBinding at all, so refusing the absent case would make every
+ * existing plan unstartable. DISCLOSED (DS-001 §8.1): an AI step running unbound remains governed only by
+ * `executionAttempts`' `aiNoBinding` advisory, which gates nothing. Closing that needs a NEW rule — that AI step
+ * types REQUIRE a binding — not a wider reading of this one.
+ */
+function bindingAuthorityRefusal(
+	ctx: HandlerContext,
+	command: DomainCommand,
+	plan: Record<string, unknown>,
+	step: Record<string, unknown>,
+	stepId: string
+): ReturnType<typeof reject> | null {
+	const bindingId = typeof step.runtimeBindingId === 'string' ? step.runtimeBindingId : '';
+	if (bindingId === '') return null;
+
+	// Fail-closed on an unresolvable authority, mirroring `pwuOpennessRefusal` down to the code: an execution act
+	// whose authority cannot be READ cannot be authorized by it.
+	const binding = ctx.store.loadObject(bindingId);
+	if (binding?.objectType !== 'RUNTIME_BINDING')
+		return reject(
+			command,
+			'RPH_VALIDATION_SEMANTIC_FAILED',
+			`${command.commandType} blocked: step ${stepId} names runtimeBindingId ${bindingId}, which does not resolve to a RUNTIME_BINDING — the authorization required by RPH-EXE-003 cannot be established.`,
+			[stepId, bindingId]
+		);
+
+	const status = String((binding.state as { authorizationStatus?: unknown }).authorizationStatus);
+	const check = bindingPermitsExecution(status);
+	if (!check.ok)
+		return reject(
+			command,
+			'RPH_INVARIANT_VIOLATION',
+			`${command.commandType} blocked (${check.errorCode ?? 'RPH_BINDING_NOT_AUTHORIZED'}): runtime binding ${bindingId} is ${status} — a step may only execute against an AUTHORIZED or PARTIALLY_AUTHORIZED binding (RPH-EXE-003 / §8.1). Authorize the binding before starting the step.`,
+			[stepId, bindingId]
+		);
+
+	// The AUTHORED limb. `authorizedRuntimeBindingIds` is the ratified §15.3 allowlist that JAN-EXECREM WP-14
+	// persisted onto the plan precisely so a rule could read it back — and until now nothing did, which leaves a
+	// written-but-never-read field one refactor away from being deleted as unused.
+	//
+	// ABSENT (not merely empty) means a plan activated BEFORE WP-14 persisted the field. Those are skipped, and that
+	// is the "legacy stored plans are never re-validated" residual this lineage has disclosed throughout — NOT a
+	// silent default: WP-14's `mutate` writes `?? []`, so every plan activated since carries the array, and an EMPTY
+	// array refuses, because an activation that authorized no bindings authorized no bindings.
+	const allowlist = plan.authorizedRuntimeBindingIds;
+	if (Array.isArray(allowlist) && !allowlist.includes(bindingId))
+		return reject(
+			command,
+			'RPH_INVARIANT_VIOLATION',
+			`${command.commandType} blocked: runtime binding ${bindingId} is authorized, but it is not among the bindings THIS ACTIVATION authorized for plan ${String(command.targetAggregateId)} (§15.3 authorizedRuntimeBindingIds: ${allowlist.length === 0 ? 'none' : allowlist.join(', ')}). Re-activate the plan naming this binding, or start a step whose binding it authorized.`,
+			[stepId, bindingId]
+		);
+	return null;
+}
+
+/**
  * StartExecutionStep — a step QUEUED -> RUNNING (only under an ACTIVE plan). Two prechecks, in order:
  *  1. plan-ACTIVE (RPH-EXE-002): a superseded/terminal plan opens no new step (mirrors the retry precheck).
  *  2. Linear start-gate (JAN-EXECPLAN-DR-003 DWP-01 / RPH-EXE-005, Fork F): a step may start ONLY when every EARLIER
@@ -846,7 +934,13 @@ export const startExecutionStep: CommandHandler = (ctx, command) => {
 				: {}),
 			stepState: 'RUNNING'
 		}),
-		precheck: (_step, plan) => {
+		precheck: (step, plan) => {
+			// RPH-EXE-003 / §15.3 (JAN-EXEBIND WP-B1) — sited FIRST among Start's prechecks, and deliberately: a step
+			// whose runtime authority is not established should be refused on THAT ground, not on a sequencing one.
+			// The alternative order would report "a predecessor is QUEUED" for a step that is also unauthorized, and
+			// an operator would fix the wrong thing.
+			const unauthorized = bindingAuthorityRefusal(ctx, command, plan, step, p.stepId);
+			if (unauthorized) return unauthorized;
 			// The linear/graph start-gate — the SAME rph-domain predicate the read-model (execution-view.ts
 			// startableStepIds) uses, so the UI Start affordance and this engine authority cannot diverge (DR-004
 			// §19-M2). Empty transitions[] ⇒ byte-identical linear (every earlier array-index step terminal-success);
@@ -1326,7 +1420,7 @@ export const resolveExecutionStepWait: CommandHandler = (ctx, command) => {
 			stepId: p.stepId,
 			...(p.resolution ? { resolution: p.resolution } : {}),
 			stepState: 'RUNNING'
-		},
+		}
 		// The plan-ACTIVE check that used to be inlined here is now its declared row in STEP_COMMAND_SPECS
 		// (planLiveness: REQUIRES_ACTIVE_PLAN), enforced by advanceStep for all nine commands uniformly.
 	});
