@@ -17,7 +17,9 @@ adversarial review of Tier 3C-ii (40 CONFIRMED including 7 BLOCKERs, 6 PLAUSIBLE
 
 ## 0. THE UNMET EXIT CRITERION — this programme has had no post-build adversarial review
 
-**Owed, not done.** `JAN-EXECREM-DS-001 §4` rules that fixing defects without fixing *how they got in* schedules
+**EXECUTED 2026-07-25 — and it did NOT discharge the exit criteria.** 80 agents, 36 candidates, 24 confirmed (19 distinct: 1 BLOCKER, 10 MAJOR, 8 MINOR), 12 refuted. The BLOCKER and a shipped regression were both introduced the SAME DAY, by the work package closing this lineage's last open finding. Remediation: `JAN-REVREM-DS-001` / `-DR-001`. The section below is kept as written, because its argument was right.
+
+**Was: owed, not done.** `JAN-EXECREM-DS-001 §4` rules that fixing defects without fixing *how they got in* schedules
 the next recurrence. The reason the 46 findings below existed is that `JAN-EXECPLAN-DR-004 §18`'s mandated
 post-build adversarial verification was **never executed** at the time of building. **JAN-EXECREM has not had one
 either.** Recorded here — first, before anything else — because a register of what is owed that omits the largest
@@ -54,6 +56,38 @@ would rank them by where I am least able to check my own work:
 
 ---
 
+## 0b. RECORD CORRECTIONS forced by the post-build review (2026-07-25)
+
+The review ran (80 agents; 19 distinct confirmed defects) and **four claims in this document and in the code's
+own test files were FALSE.** Each is corrected below rather than quietly edited, because a register that
+silently self-heals teaches nothing — and because every one of them was false in the *reassuring* direction.
+
+| # | The claim | The truth | Where |
+|---|---|---|---|
+| **C-1** | §2 recorded the closed-PWU rule as *"derived rather than hardcoded"* | True of the AUTHORITY, **false of the read-model**, which held a hand-copied `new Set(['BASELINED','ABANDONED','SUPERSEDED'])` under a comment calling it "the machine's own terminal set". **Now genuinely derived** (`JAN-REVREM` RW-1, `90d0eddd`) and pinned by a test that asserts EQUALITY with the machine instead of retyping the literals. | `execution-view.ts` |
+| **C-2** | §1 A-3 recorded prune provenance **CLOSED** | **NOT closed.** `pruneProvenance` bails on non-BRANCH sources, so a prune below a CANCELLED step still emits `{stepId, stepState:'SKIPPED'}` — content-identical to a waived skip, which is the sole justification DR-004 §19-M1 gave for minting a separate event. A-3 is re-opened as **N-8**. | `transition-gate.ts:658` |
+| **C-3** | `execrem-wp1-dormancy.test.ts` declared three fields DORMANT with an advertised "tripwire" | All three had producers since WP-10/13/14, and **the tripwire never fired** because the fixture cannot reach any emitter (`transitions: []`, non-BRANCH steps, no `retryReason` passed). A negative claim over a fixture that cannot produce the thing is unfalsifiable by construction — the vacuous-negative shape, applied to this programme's own scaffolding. Replaced by a POSITIVE census. | `execrem-wp1-dormancy.test.ts` |
+| **C-4** | `exebind-wp1` P4 claimed to cover the fail-open allowlist limb | It activated **with** the allowlist and dispatched no Start; inverting the branch left 545/545 green. Moot as of RW-0 — the limb is withdrawn — but recorded because the test was wrong before it was moot. | `exebind-wp1-binding-authority.test.ts` |
+
+### And one finding I could NOT reproduce — recorded as such, not quietly accepted
+
+**Review finding #7** (MAJOR, confirmed by two refuters) claimed `startableStepIds` lacks a graph-incoherence
+floor *and therefore* "an entry-less plan yields `startableStepIds = ['s1']` while `startStepGate` refuses it".
+
+Two of its three claims are true: the function genuinely does not call `graphIsIncoherent` (both its siblings
+do), and the existing coverage genuinely is a vacuous negative. **The failure scenario did not reproduce in four
+shapes**, and the reason is structural: `live()` seeds its walk from `entryStepIds(...)`, the same function
+`graphIsIncoherent` calls — so incoherent ⟹ live set empty ⟹ every real-source edge NEUTRALIZED ⟹ no step
+reaches the frontier. A step whose only in-edges are source-less would escape that, but `entryStepIds` counts
+such a step as an ENTRY, contradicting incoherence.
+
+**No floor was added, and that is the disciplined answer rather than the lazy one.** A `graphIsIncoherent` call
+there could never change the answer — a guard whose inputs cannot disagree, which is F-01's shape and the exact
+defect this lineage exists to eliminate. What was genuinely missing is that the safety is **emergent** and
+nothing asserted it; `revrem-wp2-incoherence-pin.test.ts` now pins the property *and* the shared-entry-definition
+mechanism that produces it, so re-seeding `live()` differently turns the divergence into a failing test rather
+than a silent one.
+
 ## 1. Authored contract additions (`UNRATIFIED-AUTHORED`)
 
 Each is a shape the corpus does not ratify, landed because a ratified RULE was unenforceable without it. All are
@@ -63,7 +97,7 @@ Each is a shape the corpus does not ratify, landed because a ratified RULE was u
 |---|---|---|---|
 | A-1 | `NoOutputResult {reason, detail}` + `CompleteExecutionStep.noOutputResult` | RPH-EXE-006 requires outputs **or** an explicit no-output result — and the explicit case had **no wire representation**, so the handler derived it as `!hasOutput` and the guard evaluated `b \|\| !b`. **A guard cannot be non-vacuous while one of its inputs is unrepresentable.** `detail` is required because a bare boolean records the claim without its justification. | WP-1, WP-11 |
 | A-2 | `ExecutionStepSucceeded.selectedTransitionId`, `ExecutionStepSkipped.selectedTransitionId` | A BRANCH's chosen arm was held only in aggregate state; the event stream could not reconstruct it, so a replay could reach a different arm than the run did. | WP-1, WP-10 |
-| A-3 | `ExecutionStepPruned.excludedEdgeId` (with `selectedByBranchStepId` / `selectedEdgeId` moved from **caller-asserted** to **gate-derived**) | The pruned event's payload was `{stepId, stepState:'SKIPPED'}` — indistinguishable in content from a *waived* skip, which is the exact conflation the separate event type was minted to prevent. | WP-1, WP-14 |
+| A-3 | ~~CLOSED~~ **RE-OPENED as N-8 (see §0b C-2)** — `ExecutionStepPruned.excludedEdgeId` (with `selectedByBranchStepId` / `selectedEdgeId` moved from **caller-asserted** to **gate-derived**) | The pruned event's payload was `{stepId, stepState:'SKIPPED'}` — indistinguishable in content from a *waived* skip, which is the exact conflation the separate event type was minted to prevent. | WP-1, WP-14 |
 | A-4 | `EXECUTION_PLAN.authorizedRuntimeBindingIds` | `ActivateExecutionPlan` carried the ids in its payload and **no ratified object field held them**, so any rule citing "the authorized bindings" was dead on arrival. | WP-14 |
 | A-5 | `ExecutionSkipAuthorization` (a DECISION of type REPLAN\|WAIVER, plan-scoped subject + explicit step list) | §21.1's "an authorized plan revision or waiver" was satisfied by `!!p.waiverOrRevisionId` — **any non-empty string**. Reusing the assurance plane's `WaiverDetail` would let a FLOOR waiver authorize an EXECUTION act: an INV-5 boundary crossing. | WP-12c |
 | A-6 | `ExecutionStepRetried.retryReason` | Optional; a retry recorded no reason at all. | WP-1 |
@@ -150,6 +184,7 @@ the row to be re-dispositioned as ENFORCED with a probe.
 | N-2 | **RPH-EXE-004** | "Requested capability is not granted capability." | `capabilityAuthorized` | The purest instance of a dead predicate: **no reference anywhere** outside its definition and its own unit test, not even an intra-kernel caller. Blocked on **N-5** — the corpus does not define what a capability IS. ~~*"Enforcing it needs a runtime capability plane … that this engine does not have."*~~ **That reason was WRONG — see the correction below.** |
 | N-3 | **RPH-EXE-005** | "Starting a step whose required input artifact is absent leaves the step not ready." | `stepMayBecomeReady` | Blocked on **N-5**: `InputBindingSchema` is `z.record(z.string(), z.unknown())`, so *"the required input artifact"* has nothing to quantify over. The predicate being reachable only through the uncalled `canStartStep`, and `NOT_READY`/`READY` being command-unreachable (F-27), are both true and both **secondary** — the subject gap survives fixing either. |
 | **N-4** | *(no rule id — see note)* | An `AuthorizeRuntimeBinding` may grant a capability the binding **never requested**. | — | **NEW, raised 2026-07-25 (JAN-EXEBIND-DS-001 §3.3).** `authorizeRuntimeBinding`'s `mutate` writes `grantedCapabilities` from the payload **wholesale, unchecked against `requestedCapabilities`**. Its own comment names the hazard and then guards only the RE-authorization case via `fromStates`; the **first** authorization is unconstrained. The ratified machine's guard on `REQUESTED → AUTHORIZED` reads *"requested capability is NOT granted capability; capability scope must be explicit (§22.1)"* — **enforced nowhere.** Deliberately **not** filed under RPH-EXE-004, whose statement is about *operations*: accepting evidence for one rule as evidence for another is the substitution this programme exists to stop. Blocked on N-5. |
+| **N-8** | *(re-opened)* | Prune provenance is **not** closed for the irrecoverable-terminal cut. | — | **A-3 was recorded CLOSED and is not** (review finding #8). `pruneProvenance` (`transition-gate.ts:658`) bails on non-BRANCH sources, so pruning a step below a CANCELLED predecessor emits `{stepId, stepState:'SKIPPED'}` — byte-identical in content to a waived skip, which is precisely the conflation DR-004 §19-M1 minted `ExecutionStepPruned` to prevent. The header claim that the non-BRANCH cut is "unreachable through an authorable plan" is contradicted by a fixture in the same package (`transition-gate-disposition.test.ts:67-82`). Open; the fix needs a ruling on what a non-branch cut should record, which is design work, not a patch. |
 | **N-7** | *(review blindness)* | A **one-arrow** semantic change shipped inside a **4,144-line** diff. | — | **NEW, raised 2026-07-25 while trying to run this programme's own review.** WP-5 (`868f595e`) added exactly one machine arrow (`FAILED → CANCELLED`) to `packages/rph-domain/vocab/m2-transitions.json`, and the committed diff is 4,144 lines because the file's indentation changed wholesale in the same commit. `git diff -w` on it is **81 insertions / 15 deletions**. The cause is not established — the repo's `format` script covers only `**/*.ts`, so it was not `bun run format` — but the effect is the finding: **a semantic edit buried in 4,000 lines of whitespace is how a change rides in unreviewed**, and this one file is 19% of the diff that made `/code-review ultra` refuse the branch as too large (97 files, 22,586 lines vs an 8,000-line limit). Not reverted: restoring the old indentation would only re-churn on the next write. Mitigation is procedural — reformat generated/vocab artifacts in their OWN commit, never alongside a semantic change, and read them with `git diff -w`. |
 | **N-6** | *(dead arrow)* | `RuntimeBinding.authorizationStatus` ratifies `REQUESTED → PARTIALLY_AUTHORIZED`; **no command drives it.** | — | **NEW, raised 2026-07-25 (JAN-EXEBIND WP-B1).** `registry.ts` wires Request / Authorize / Deny / Revoke and nothing else, so a ratified state exists that no command can produce. It matters because `bindingPermitsExecution` **permits** execution on a PARTIALLY_AUTHORIZED binding — RPH-EXE-003 therefore has an *acceptance* limb the bus cannot reach, and without a fixture seam it would go untested while looking covered. Same shape as the `* → SUPERSEDED` step arrows F-26's rider named. Recorded; not this work package's to fix. |
 | **N-5** | *(corpus gap)* | Four ratified helper sub-types are **`Source TBD`**. | — | **NEW, and the root cause of N-2, N-3 and N-4.** `InputBinding`, `OutputBinding`, `CapabilityRequest` and `CapabilityGrant` are each declared in `m1-object-fields.json` with `"field": "(undefined)", "type": "—", "note": "… NOT field-defined. Source TBD."`, so `gen-objects.ts` emits `z.record(z.string(), z.unknown())`. Every one is referenced by a ratified rule. The tell nobody noticed: `capabilityAuthorized` takes `string[]` while the contract holds `Record<string,unknown>[]` — **the predicate and the contract it guards do not typecheck against each other.** ESCALATED as a corpus gap; authoring the shapes would invent normative semantics the corpus withholds (JAN-EXEBIND-DS-001 §4-R3). |
