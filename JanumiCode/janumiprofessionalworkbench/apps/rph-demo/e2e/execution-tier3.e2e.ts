@@ -167,6 +167,32 @@ test.describe('Execution tab — plan-terminal states + attempt history (DWP-05)
 		await expect(err).toContainText('CHANGE_TACTIC'); // a permitted control action, verbatim
 	});
 
+	// JAN-EXECREM WP-15 / F-29. DWP-06 declares "No affordance the engine would reject", and RETRY violated it:
+	// the button was rendered from an unconditional branch while the engine requires an ACTIVE plan. Four sibling
+	// affordances each had their own inline plan-status condition in the template; retry had none.
+	test('a FAILED step under a FAILED plan offers NO retry, but still offers cancel (F-29)', async ({
+		page,
+		request
+	}) => {
+		const undertakingId = await stageActivePlan(request);
+		await gotoHydrated(page, `/undertakings/${undertakingId}`);
+		await page.getByRole('button', { name: 'execution' }).click();
+		const grp = page.getByTestId('exec-pwu-group').filter({ hasText: 'Tier-3 plan PWU' });
+
+		await grp.getByTestId('step-action-start').click();
+		await grp.getByTestId('step-action-fail').click();
+		// The step is FAILED and the plan is still ACTIVE — retry IS offered. Asserting this first is what stops
+		// the negative below passing for the wrong reason (an action column that renders nothing at all).
+		await expect(grp.getByTestId('step-action-retry')).toBeVisible();
+
+		await grp.getByTestId('plan-fail').click();
+
+		// Now the plan is FAILED: the engine would refuse RetryExecutionStep, so the UI must not offer it…
+		await expect(grp.getByTestId('step-action-retry')).toHaveCount(0);
+		// …while CANCEL survives, because abandoning a failed arm is CLEANUP and must never be withheld (WP-12b).
+		await expect(grp.getByTestId('step-action-cancel')).toBeVisible();
+	});
+
 	test('an illegal plan-terminal action (Complete with a non-terminal step) is rejected verbatim', async ({
 		page,
 		request

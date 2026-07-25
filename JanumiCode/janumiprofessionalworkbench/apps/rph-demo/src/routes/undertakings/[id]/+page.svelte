@@ -345,18 +345,19 @@
 												</form>
 											{/if}
 										{/each}
+										<!-- JAN-EXECREM WP-15 (F-29): the plan-status condition that used to live HERE is GONE, and its
+										     deletion is the fix rather than an omission. `controlCommands` is now filtered by the
+										     read-model against the command's own declared `planLiveness` (STEP_COMMAND_SPECS), so
+										     cancel/wait survive a superseded plan and skip/resolve do not — the same rule the engine
+										     enforces, read from the same declaration. Four sibling affordances each grew their own copy
+										     of this condition here; RETRY never got one, and nothing made that omission visible. A
+										     condition in the template is a sixth copy of a rule the engine already owns. -->
 										{#each s.controlCommands as ctl (ctl)}
-											<!-- Skip asserts mandatory:false (optional skip; the fail-closed mandatory/waiver path is
-											     domain-tested, not a demo button) and needs an ACTIVE plan; Resume likewise re-opens the
-											     RUNNING state. Cancel is CLEANUP and Wait SUSPENDS work already running — both are permitted
-											     even under a superseded/terminal plan. So: cancel/wait always; skip/resolve only while ACTIVE. -->
-											{#if ctl === 'cancel' || ctl === 'wait' || pl.status === 'ACTIVE'}
-												<form method="POST" action="?/{STEP_CONTROL_ACTION[ctl]}" use:enhance class="inlineform">
-													<input type="hidden" name="planId" value={pl.id} />
-													<input type="hidden" name="stepId" value={s.id} />
-													<button class="mini" data-testid="step-action-{ctl}">{STEP_CONTROL_LABEL[ctl]}</button>
-												</form>
-											{/if}
+											<form method="POST" action="?/{STEP_CONTROL_ACTION[ctl]}" use:enhance class="inlineform">
+												<input type="hidden" name="planId" value={pl.id} />
+												<input type="hidden" name="stepId" value={s.id} />
+												<button class="mini" data-testid="step-action-{ctl}">{STEP_CONTROL_LABEL[ctl]}</button>
+											</form>
 										{/each}
 										<!-- DR-004 DWP-06 — Prune. NOT a stepState affordance (it is absent from controlCommands by
 										     design): a prune is a SYSTEM consequence of a resolved BRANCH, so it is offered only for a

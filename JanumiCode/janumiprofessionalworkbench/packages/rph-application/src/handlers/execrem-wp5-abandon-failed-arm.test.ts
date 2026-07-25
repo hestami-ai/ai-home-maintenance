@@ -17,7 +17,7 @@
 import type { DomainCommand } from '@janumipwb/rph-contracts';
 import { SqliteStorageAdapter } from '@janumipwb/rph-persistence';
 import { beforeEach, describe, expect, it } from 'vitest';
-import { controlCommandsFor } from '@janumipwb/rph-projections';
+import { planAffordancesFor } from '@janumipwb/rph-projections';
 import { Engine } from '../index.js';
 
 const TS = '2026-07-12T00:00:00Z';
@@ -221,10 +221,10 @@ describe('JAN-EXECREM WP-5 — abandoning a FAILED arm', () => {
 	});
 
 	it('the READ-MODEL offers cancel on a FAILED step, so the affordance matches the authority (F-11)', () => {
-		expect(controlCommandsFor('FAILED')).toContain('cancel');
+		expect(planAffordancesFor('ACTIVE', 'FAILED').control).toContain('cancel');
 		// …and still does not offer it where the machine has no arrow.
-		expect(controlCommandsFor('NOT_READY')).not.toContain('cancel');
-		expect(controlCommandsFor('SUCCEEDED')).toEqual([]);
-		expect(controlCommandsFor('CANCELLED')).toEqual([]);
+		expect(planAffordancesFor('ACTIVE', 'NOT_READY').control).not.toContain('cancel');
+		expect(planAffordancesFor('ACTIVE', 'SUCCEEDED').control).toEqual([]);
+		expect(planAffordancesFor('ACTIVE', 'CANCELLED').control).toEqual([]);
 	});
 });

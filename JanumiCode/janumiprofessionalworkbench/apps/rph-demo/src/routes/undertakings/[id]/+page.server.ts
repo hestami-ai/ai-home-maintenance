@@ -287,7 +287,12 @@ export const load: PageServerLoad = ({ params }) => {
 	// carries no undertakingId — F-1). The pure view (rph-projections) derives each step's tone + command-backed
 	// affordances; this load() only reads.
 	const planRows: ExecutionPlanInput[] = listExecutionPlans(engine).map(shapeExecutionPlanInput);
-	const plans = plansForPwus(planRows, pwuIdSet);
+	// JAN-EXECREM WP-15: supply each PWU's workLifecycleState so the affordance projection can apply RPH-PWU-010
+	// too. WP-12b gave the engine a second authority limb — a closed PWU opens no new execution — and a plan on a
+	// closed PWU keeps status ACTIVE, so without this the UI would offer Start on a plan the engine now refuses:
+	// F-29's own invariant re-broken in a new place by its remedy.
+	const pwuLifecycleById = Object.fromEntries(pwuList.map((p) => [p.id, p.workLifecycleState]));
+	const plans = plansForPwus(planRows, pwuIdSet, pwuLifecycleById);
 
 	// JAN-EXECPLAN-DR-004 DWP-01 — the transition-graph flow gate affordance (set-frontier). For each plan, derive the
 	// SET of steps the engine would currently let start (the graph in-edge barrier; a linear plan yields a singleton).

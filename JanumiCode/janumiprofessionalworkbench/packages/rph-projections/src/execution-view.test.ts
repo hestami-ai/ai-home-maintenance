@@ -1,9 +1,8 @@
 import { describe, expect, it } from 'vitest';
 import {
-	advanceCommandsFor,
 	conditionEvaluatorFor,
-	controlCommandsFor,
 	executionPlanView,
+	planAffordancesFor,
 	isBelowQueued,
 	isTerminalSuccessStep,
 	describeCondition,
@@ -84,45 +83,46 @@ describe('executionPlanView — shaping one aggregate row', () => {
 
 describe('advanceCommandsFor — the F-11 command-backed allowlist (never the machine topology)', () => {
 	it('maps ONLY the four command-backed transitions', () => {
-		expect(advanceCommandsFor('QUEUED')).toEqual(['start']);
-		expect(advanceCommandsFor('RUNNING')).toEqual(['complete', 'fail']); // RUNNING affords BOTH
-		expect(advanceCommandsFor('FAILED')).toEqual(['retry']);
+		expect(planAffordancesFor('ACTIVE', 'QUEUED').advance).toEqual(['start']);
+		expect(planAffordancesFor('ACTIVE', 'RUNNING').advance).toEqual(['complete', 'fail']); // RUNNING affords BOTH
+		expect(planAffordancesFor('ACTIVE', 'FAILED').advance).toEqual(['retry']);
 	});
 
 	it('yields NO affordance for every commandless / terminal stepState (F-11 — no fabricated buttons)', () => {
 		for (const s of ['NOT_READY', 'READY', 'WAITING', 'SUCCEEDED', 'SKIPPED', 'CANCELLED', 'SUPERSEDED']) {
-			expect(advanceCommandsFor(s)).toEqual([]);
+			expect(planAffordancesFor('ACTIVE', s).advance).toEqual([]);
 		}
 	});
 
 	it('yields NO affordance for an unknown / off-contract state (never fabricate)', () => {
-		expect(advanceCommandsFor('NONSENSE')).toEqual([]);
+		expect(planAffordancesFor('ACTIVE', 'NONSENSE').advance).toEqual([]);
 	});
 
 	it('is defined for every one of the 10 StepState values (state-transition totality, EP-TST-5)', () => {
-		for (const s of ALL_STEP_STATES) expect(Array.isArray(advanceCommandsFor(s))).toBe(true);
+		for (const s of ALL_STEP_STATES)
+			expect(Array.isArray(planAffordancesFor('ACTIVE', s).advance)).toBe(true);
 		expect(ALL_STEP_STATES).toHaveLength(10);
 	});
 });
 
 describe('controlCommandsFor — the skip/cancel/wait/resolve allowlist (DWP-02/03 + DWP-04; machine-legal set, EP-TST-5)', () => {
 	it('offers skip+cancel from READY/QUEUED (both →SKIPPED and →CANCELLED are legal there)', () => {
-		expect(controlCommandsFor('READY')).toEqual(['skip', 'cancel']);
-		expect(controlCommandsFor('QUEUED')).toEqual(['skip', 'cancel']);
+		expect(planAffordancesFor('ACTIVE', 'READY').control).toEqual(['skip', 'cancel']);
+		expect(planAffordancesFor('ACTIVE', 'QUEUED').control).toEqual(['skip', 'cancel']);
 	});
 
 	it('offers cancel+wait from RUNNING (a running step cancels or suspends, but does not skip — machine)', () => {
-		expect(controlCommandsFor('RUNNING')).toEqual(['cancel', 'wait']);
+		expect(planAffordancesFor('ACTIVE', 'RUNNING').control).toEqual(['cancel', 'wait']);
 	});
 
 	it('offers cancel+resolve from WAITING — resume is the only non-terminating exit (DWP-04)', () => {
-		expect(controlCommandsFor('WAITING')).toEqual(['cancel', 'resolve']);
+		expect(planAffordancesFor('ACTIVE', 'WAITING').control).toEqual(['cancel', 'resolve']);
 	});
 
 	it('never offers resolve outside WAITING, nor wait outside RUNNING (the arrows exist nowhere else)', () => {
 		for (const s of ALL_STEP_STATES) {
-			if (s !== 'WAITING') expect(controlCommandsFor(s)).not.toContain('resolve');
-			if (s !== 'RUNNING') expect(controlCommandsFor(s)).not.toContain('wait');
+			if (s !== 'WAITING') expect(planAffordancesFor('ACTIVE', s).control).not.toContain('resolve');
+			if (s !== 'RUNNING') expect(planAffordancesFor('ACTIVE', s).control).not.toContain('wait');
 		}
 	});
 
@@ -132,16 +132,17 @@ describe('controlCommandsFor — the skip/cancel/wait/resolve allowlist (DWP-02/
 		// governed way to abandon an arm nobody will retry. WP-4 made a FAILED in-edge PENDING so a JOIN cannot
 		// release around a failure; without this affordance the UI would silently withhold the only exit that leaves.
 		for (const s of ['NOT_READY', 'SUCCEEDED', 'SKIPPED', 'CANCELLED', 'SUPERSEDED'])
-			expect(controlCommandsFor(s), s).toEqual([]);
-		expect(controlCommandsFor('FAILED'), 'abandonment is offered, and only abandonment').toEqual(['cancel']);
+			expect(planAffordancesFor('ACTIVE', s).control, s).toEqual([]);
+		expect(planAffordancesFor('ACTIVE', 'FAILED').control, 'abandonment is offered, and only abandonment').toEqual(['cancel']);
 	});
 
 	it('yields NO control action for an unknown / off-contract state (never fabricate)', () => {
-		expect(controlCommandsFor('NONSENSE')).toEqual([]);
+		expect(planAffordancesFor('ACTIVE', 'NONSENSE').control).toEqual([]);
 	});
 
 	it('is defined for every one of the 10 StepState values (state-transition totality, EP-TST-5)', () => {
-		for (const s of ALL_STEP_STATES) expect(Array.isArray(controlCommandsFor(s))).toBe(true);
+		for (const s of ALL_STEP_STATES)
+			expect(Array.isArray(planAffordancesFor('ACTIVE', s).control)).toBe(true);
 	});
 
 	it('is surfaced on the step view', () => {

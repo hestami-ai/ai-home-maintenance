@@ -21,6 +21,7 @@
 //
 // Pure + browser-safe (type-only contract imports), like the rest of rph-projections.
 import type { StepState } from '@janumipwb/rph-contracts';
+import { STEP_COMMAND_SPECS, type StepCommandType } from '@janumipwb/rph-domain';
 import {
 	buildConditionSubject,
 	ConditionExpressionSchema,
@@ -85,6 +86,20 @@ export interface ExecutionPlanInput {
 	readonly steps: readonly ExecutionStepInput[];
 	/** The transition graph (DR-004 DWP-01); absent/empty ⇒ linear. */
 	readonly transitions?: readonly ExecutionTransitionInput[];
+	/**
+	 * The owning PWU's `workLifecycleState` (JAN-EXECREM WP-15).
+	 *
+	 * Threaded because WP-12b gave the engine a SECOND authority limb — RPH-PWU-010, refusing execution on a
+	 * closed PWU — and a plan on a closed PWU keeps status ACTIVE. Without this the read-model would offer Start
+	 * on a plan the engine now refuses: F-29's invariant re-broken in a new place by its own remedy, which is
+	 * precisely the recurrence this programme is trying to stop.
+	 *
+	 * OPTIONAL, and ABSENT MEANS UNGATED rather than closed — a caller that cannot supply it gets the
+	 * pre-WP-15 behaviour instead of a silently emptied action column. That is a fail-OPEN default and it is
+	 * disclosed rather than hidden: the engine still refuses, so the cost is a rejected click, not an illegal
+	 * act. `plansForPwus` supplies it for the one production caller.
+	 */
+	readonly pwuWorkLifecycleState?: string;
 }
 
 export interface ExecutionStepView {
@@ -165,7 +180,7 @@ const TONE_BY_STEP_STATE: Record<StepState, StepTone> = {
 
 /** The command-backed affordances legal from a stepState — the F-11 allowlist. Unknown/off-contract states → []
  *  (never fabricate an affordance). */
-export function advanceCommandsFor(stepState: string): readonly StepAdvanceCommand[] {
+function advanceCommandsFor(stepState: string): readonly StepAdvanceCommand[] {
 	return ADVANCE_BY_STEP_STATE[stepState as StepState] ?? [];
 }
 
@@ -173,8 +188,89 @@ export function advanceCommandsFor(stepState: string): readonly StepAdvanceComma
  *  allowlist. Unknown/off-contract states → [] (never fabricate). Plan-level gating is applied by the caller — this is
  *  the per-stepState machine-legal set only. (Caller-side: skip and resolve need an ACTIVE plan; cancel is cleanup and
  *  wait suspends already-running work, so neither does.) */
-export function controlCommandsFor(stepState: string): readonly StepControlCommand[] {
+function controlCommandsFor(stepState: string): readonly StepControlCommand[] {
 	return CONTROL_BY_STEP_STATE[stepState as StepState] ?? [];
+}
+
+/**
+ * The affordance -> COMMAND map, so plan-status gating is derived from WP-8's declared table rather than being a
+ * seventh hand-written copy of the rule (JAN-EXECREM WP-15 / F-29).
+ *
+ * `Record<..., StepCommandType>` over BOTH affordance unions: a new affordance cannot ship without naming the
+ * command it dispatches, which is the same totality mechanism the specs table itself uses.
+ */
+const COMMAND_BY_AFFORDANCE: Record<StepAdvanceCommand | StepControlCommand, StepCommandType> = {
+	start: 'StartExecutionStep',
+	complete: 'CompleteExecutionStep',
+	fail: 'FailExecutionStep',
+	retry: 'RetryExecutionStep',
+	skip: 'SkipExecutionStep',
+	cancel: 'CancelExecutionStep',
+	wait: 'EnterExecutionStepWait',
+	resolve: 'ResolveExecutionStepWait'
+};
+
+/** The plan statuses under which an affordance requiring a live plan may be offered. */
+const PLAN_STATUS_ACTIVE = 'ACTIVE';
+
+/** The PWU workLifecycleStates that open no new execution — the machine's own terminal set (RPH-PWU-010). */
+const CLOSED_PWU_STATES: ReadonlySet<string> = new Set(['BASELINED', 'ABANDONED', 'SUPERSEDED']);
+
+/**
+ * Would the ENGINE accept this affordance under a plan in `planStatus`?
+ *
+ * Reads `planLiveness` straight off the command's own spec row. That is the whole point: DWP-06 declares "No
+ * affordance the engine would reject (F-11)", and the only way that survives is for the read-model and the
+ * authority to consult ONE declaration. Four of the five call sites had grown their own inline plan-status
+ * condition and the fifth (retry) had none — which is precisely how the invariant was violated.
+ */
+function planPermitsAffordance(
+	planStatus: string,
+	affordance: StepAdvanceCommand | StepControlCommand,
+	pwuWorkLifecycleState?: string
+): boolean {
+	const spec = STEP_COMMAND_SPECS[COMMAND_BY_AFFORDANCE[affordance]];
+	if (spec.planLiveness === 'REQUIRES_ACTIVE_PLAN' && planStatus !== PLAN_STATUS_ACTIVE) return false;
+	// RPH-PWU-010 (WP-12b's second limb). Only gate when the caller actually TOLD us the PWU's state — see the
+	// disclosure on `ExecutionPlanInput.pwuWorkLifecycleState`.
+	if (
+		spec.pwuOpenness === 'REQUIRES_OPEN_PWU' &&
+		pwuWorkLifecycleState !== undefined &&
+		CLOSED_PWU_STATES.has(pwuWorkLifecycleState)
+	)
+		return false;
+	return true;
+}
+
+/** Both affordance sets for a step, already filtered by what the plan's status permits. */
+export interface StepAffordances {
+	readonly advance: readonly StepAdvanceCommand[];
+	readonly control: readonly StepControlCommand[];
+}
+
+/**
+ * THE plan-aware affordance projection (JAN-EXECREM WP-15 / SM-8, F-29).
+ *
+ * WHAT WAS WRONG. `advanceCommandsFor(stepState)` mirrors a precondition over (planStatus, stepState) but took
+ * only stepState, and the UI rendered its result unconditionally — so Retry was offered on a FAILED step under a
+ * CANCELLED or SUPERSEDED plan and the engine refused it. The plan status was already sitting unused on
+ * `ExecutionPlanInput.status` at the exact construction site. Four sibling affordances had each grown their own
+ * inline plan-status condition in the Svelte template; retry had none, and nothing made the omission visible.
+ *
+ * FAIL-CLOSED on an off-contract status: only the literal 'ACTIVE' opens the gated affordances, so a status this
+ * projection has never heard of offers cleanup only — never the full set.
+ */
+export function planAffordancesFor(
+	planStatus: string,
+	stepState: string,
+	pwuWorkLifecycleState?: string
+): StepAffordances {
+	const permits = (a: StepAdvanceCommand | StepControlCommand) =>
+		planPermitsAffordance(planStatus, a, pwuWorkLifecycleState);
+	return {
+		advance: advanceCommandsFor(stepState).filter(permits),
+		control: controlCommandsFor(stepState).filter(permits)
+	};
 }
 
 /** The semantic tone for a stepState — total over the 10 values; unknown → 'muted'. */
@@ -188,7 +284,12 @@ export function isBelowQueued(stepState: string): boolean {
 	return stepState === 'NOT_READY' || stepState === 'READY';
 }
 
-function stepView(s: ExecutionStepInput): ExecutionStepView {
+function stepView(
+	s: ExecutionStepInput,
+	planStatus: string,
+	pwuWorkLifecycleState?: string
+): ExecutionStepView {
+	const afforded = planAffordancesFor(planStatus, s.stepState, pwuWorkLifecycleState);
 	const base: ExecutionStepView = {
 		id: s.id,
 		stepType: s.stepType,
@@ -196,8 +297,8 @@ function stepView(s: ExecutionStepInput): ExecutionStepView {
 		stepState: s.stepState,
 		...(s.selectedTransitionId === undefined ? {} : { selectedTransitionId: s.selectedTransitionId }),
 		tone: stepStateTone(s.stepState),
-		advanceCommands: advanceCommandsFor(s.stepState),
-		controlCommands: controlCommandsFor(s.stepState),
+		advanceCommands: afforded.advance,
+		controlCommands: afforded.control,
 		belowQueued: isBelowQueued(s.stepState)
 	};
 	// Preserve the optional runtimeBindingId only when present (exactOptionalPropertyTypes-friendly).
@@ -211,7 +312,9 @@ export function executionPlanView(row: ExecutionPlanInput): ExecutionPlanView {
 		id: row.id,
 		workUnitId: row.workUnitId,
 		status: row.status,
-		steps: row.steps.map(stepView),
+		// The plan's status was already sitting HERE, unused, while the UI grew five inline conditions to
+		// reconstruct what it implies. Threading it is the whole fix (JAN-EXECREM WP-15 / F-29).
+		steps: row.steps.map((step) => stepView(step, row.status, row.pwuWorkLifecycleState)),
 		transitions: row.transitions ?? []
 	};
 	return row.planVersion === undefined ? base : { ...base, planVersion: row.planVersion };
@@ -371,10 +474,21 @@ export function transitionRows(
  */
 export function plansForPwus(
 	rows: readonly ExecutionPlanInput[],
-	pwuIds: Iterable<string>
+	pwuIds: Iterable<string>,
+	/** PWU id -> its `workLifecycleState`, so the affordance filter can apply RPH-PWU-010 (WP-15). Omit and the
+	 *  PWU limb simply does not gate — see the disclosure on `ExecutionPlanInput.pwuWorkLifecycleState`. */
+	pwuLifecycleById: Readonly<Record<string, string>> = {}
 ): ExecutionPlanView[] {
 	const scope = pwuIds instanceof Set ? pwuIds : new Set(pwuIds);
-	return rows.filter((r) => scope.has(r.workUnitId)).map(executionPlanView);
+	return rows
+		.filter((r) => scope.has(r.workUnitId))
+		.map((r) =>
+			executionPlanView(
+				r.pwuWorkLifecycleState === undefined && pwuLifecycleById[r.workUnitId] !== undefined
+					? { ...r, pwuWorkLifecycleState: pwuLifecycleById[r.workUnitId] }
+					: r
+			)
+		);
 }
 
 // ── Tier 2: the Undertaking execution SEQUENCE + the layerHandoff advisory constraint-checker (DWP-04, fork C) ──────
