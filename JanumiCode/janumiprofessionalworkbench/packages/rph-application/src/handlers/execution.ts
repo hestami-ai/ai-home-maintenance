@@ -635,9 +635,16 @@ function advanceStep(
 			step: Record<string, unknown>,
 			plan: Record<string, unknown>
 		) => ReturnType<typeof reject> | null;
-		/** The EVENT payload. Omitted → the raw command payload (the default for the step events DOC-007 leaves
-		 * unschematized). Mirrors kit.advanceStatus's `eventPayload`: the command shape is not the event shape. */
-		readonly eventPayload?: unknown;
+		/**
+		 * The EVENT payload. REQUIRED (JAN-EXECREM WP-13 / F-25).
+		 *
+		 * It used to be optional, defaulting to the raw COMMAND payload — and that implicit default is the defect,
+		 * not the two handlers that took it. A command shape is not an event shape: the command says what to DO,
+		 * the event records what HAPPENED, and substituting one for the other silently emitted payloads that failed
+		 * their own declared schemas. Making it required converts "the author forgot" into a compile error, which
+		 * is the only form of that guarantee that survives the next handler.
+		 */
+		readonly eventPayload: unknown;
 	}
 ) {
 	const planId = command.targetAggregateId;
@@ -710,7 +717,7 @@ function advanceStep(
 	// ONE payload object, ONE makeEvent call. If a later edit builds the payload twice — once for the overlay, once
 	// for the commit — they can drift and the identity silently breaks. `execution-branch-settlement.test.ts` asserts
 	// state == event as the standing guard on that.
-	const basePayload = args.eventPayload !== undefined ? args.eventPayload : command.payload;
+	const basePayload = args.eventPayload;
 	const pendingEvent = makeEvent(ctx, command, {
 		eventType: args.spec.eventType,
 		aggregateType: PLAN,
@@ -991,10 +998,22 @@ export const completeExecutionStep: CommandHandler = (ctx, command) => {
 
 /** FailExecutionStep — a step RUNNING -> FAILED. */
 export const failExecutionStep: CommandHandler = (ctx, command) => {
-	const p = command.payload as { stepId: string };
+	const p = command.payload as { stepId: string; failureReason?: string; failureClass?: string };
 	return advanceStep(ctx, command, {
 		stepId: p.stepId,
 		spec: STEP_COMMAND_SPECS.FailExecutionStep,
+		// JAN-EXECREM WP-13 / F-25. This supplied NO eventPayload, so `advanceStep` fell through to the raw COMMAND
+		// payload — which omits `stepState`, a field ExecutionStepFailedPayloadSchema declares REQUIRED. Every
+		// sibling step command supplies it. The consequence is not cosmetic: FAILED and the post-retry QUEUED were
+		// the only two step states in the whole machine a log-driven fold could not observe, and they are exactly
+		// the two RPH-EXE-008's retry cap governs — so a rebuilt aggregate showed a clean run of attempts with no
+		// failures and no retries. `eventPayload` is REQUIRED on advanceStep now, so this cannot recur silently.
+		eventPayload: {
+			stepId: p.stepId,
+			failureReason: p.failureReason ?? 'failed',
+			...(p.failureClass ? { failureClass: p.failureClass } : {}),
+			stepState: 'FAILED'
+		}
 	});
 };
 
@@ -1037,10 +1056,19 @@ function retryCapFor(plan: Record<string, unknown>): number {
  *     refused. Exec ≠ assurance (INV-5): the retry moves only stepState.
  */
 export const retryExecutionStep: CommandHandler = (ctx, command) => {
-	const p = command.payload as { stepId: string };
+	const p = command.payload as { stepId: string; retryReason?: string };
 	return advanceStep(ctx, command, {
 		stepId: p.stepId,
 		spec: STEP_COMMAND_SPECS.RetryExecutionStep,
+		// WP-13 / F-25 (see failExecutionStep). The raw command payload additionally carried `retryReason`, which
+		// the ratified strictObject did not declare — so the emitted event failed its own schema on TWO counts,
+		// silently, because this event is not in RATIFIED_EVENT_PAYLOADS and the (d2) gate never saw it. WP-1 added
+		// `retryReason` to the declared shape; it is now emitted deliberately rather than leaking.
+		eventPayload: {
+			stepId: p.stepId,
+			...(p.retryReason ? { retryReason: p.retryReason } : {}),
+			stepState: 'QUEUED'
+		},
 		precheck: (step, plan) => {
 			const attemptsMade = attemptsMadeForStep(ctx, command.targetAggregateId, p.stepId);
 			const maxAttempts = retryCapFor(plan);

@@ -72,77 +72,136 @@ interface FoldState {
 	current: Map<string, AttemptDraft>; // planId::stepId -> the open/latest attempt
 }
 
-/** ExecutionStepStarted (QUEUED→RUNNING): opens attempt n+1 for the step and records it as the current draft. */
-function applyStepStarted(
+/**
+ * THE ATTEMPT-EFFECT TABLE (JAN-EXECREM WP-13 / F-36 + F-45) — TOTAL over every ExecutionStep* event.
+ *
+ * WHAT WAS WRONG. The fold handled THREE event types (Started, Succeeded, Failed) and silently skipped the other
+ * seven. The header explained only why `ExecutionStepRetried` was absent; `ExecutionStepCancelled` was simply
+ * unconsidered — so cancelling a RUNNING step (a first-class, tested path, legal even under a superseded plan)
+ * left its attempt open forever: `state: 'RUNNING'`, no `completedAt`, on every replay. Deterministic, and
+ * deterministically WRONG: the projection permanently contradicted the aggregate, and the UI rendered a live
+ * in-flight attempt for a step the operator had aborted.
+ *
+ * An event type absent from a `Map` of appliers is INVISIBLE. A table over a closed set is not: NONE is a
+ * DECLARATION with a stated reason rather than an omission, and WP-16's conformance sweep iterates this table
+ * rather than restating it. Same mechanism as `STEP_COMMAND_SPECS`, for the same reason.
+ *
+ * PER-ENTRY KEY EXTRACTORS ARE LOAD-BEARING. These events do not agree on where the step id lives —
+ * `ExecutionStepSucceeded` uses `executionStepId` (the ratified §16.2 shape) and every other uses `stepId` — and
+ * the fields carrying explanatory text differ too (`failureReason` vs `reason`). A table assuming one key would
+ * silently no-op on the events that use the other: the same invisibility, in a new place.
+ */
+type AttemptEffect =
+	/** Opens attempt n+1 and makes it the step's open draft. */
+	| { readonly kind: 'OPEN'; readonly stepIdKey: string }
+	/** Closes the step's OPEN draft (if any) into a terminal state. */
+	| {
+			readonly kind: 'CLOSE';
+			readonly stepIdKey: string;
+			readonly state: string;
+			/** Where this event carries its explanatory text, if anywhere. */
+			readonly errorKey?: string;
+	  }
+	/** Moves an OPEN draft's state WITHOUT closing it — suspension is not termination. */
+	| { readonly kind: 'MARK'; readonly stepIdKey: string; readonly state: string }
+	/** Declares that this event affects no attempt, and why. */
+	| { readonly kind: 'NONE'; readonly why: string };
+
+const ATTEMPT_EFFECTS: Readonly<Record<string, AttemptEffect>> = {
+	// One Started = one RUNNING episode = one attempt (§19 L3-3).
+	ExecutionStepStarted: { kind: 'OPEN', stepIdKey: 'stepId' },
+	// §16.2 names the step `executionStepId` here and nowhere else.
+	ExecutionStepSucceeded: { kind: 'CLOSE', stepIdKey: 'executionStepId', state: 'SUCCEEDED' },
+	ExecutionStepFailed: { kind: 'CLOSE', stepIdKey: 'stepId', state: 'FAILED', errorKey: 'failureReason' },
+	// F-36, the omission: cancelling a RUNNING step left its attempt open forever.
+	ExecutionStepCancelled: { kind: 'CLOSE', stepIdKey: 'stepId', state: 'CANCELLED', errorKey: 'reason' },
+	// F-45: suspension is NOT termination. A WAITING step's attempt has not ended — but reporting it as RUNNING
+	// contradicts the step row on the same page. MARK moves the state and leaves `completedAt` undefined, so it is
+	// still the attempt a later Succeeded/Failed/Cancelled closes.
+	ExecutionStepWaiting: { kind: 'MARK', stepIdKey: 'stepId', state: 'WAITING' },
+	ExecutionStepWaitResolved: { kind: 'MARK', stepIdKey: 'stepId', state: 'RUNNING' },
+	// Declared silences, each with its reason — not omissions.
+	ExecutionStepRetried: {
+		kind: 'NONE',
+		why: 'a re-queue MARKER, not an attempt: counting it would double-count every retry (§19 L3-3). The attempt it re-opens is opened by the NEXT Started, as attempt n+1.'
+	},
+	ExecutionStepSkipped: {
+		kind: 'NONE',
+		why: 'Skip drives READY|QUEUED -> SKIPPED, so the step was never RUNNING and has no open attempt. A step cannot be skipped mid-flight; that is Cancel.'
+	},
+	ExecutionStepPruned: {
+		kind: 'NONE',
+		why: 'Prune drives NOT_READY|READY|QUEUED -> SKIPPED — the same argument as Skip: no attempt was ever opened.'
+	},
+	ExecutionStepReady: {
+		kind: 'NONE',
+		why: 'scheduling only (NOT_READY -> READY); no attempt exists until Started.'
+	}
+};
+
+/** The event types this fold DECLARES an effect for — enumerable, so a sweep can check the table against the
+ *  contract registry instead of trusting that nothing was forgotten. */
+export const ATTEMPT_EFFECT_EVENT_TYPES: readonly string[] = Object.keys(ATTEMPT_EFFECTS);
+
+/**
+ * The step's OPEN attempt, or undefined.
+ *
+ * OPENNESS, NOT PRESENCE — and this is what makes the table above safe to extend. `current` records the step's
+ * LATEST draft and is never cleared, so a CLOSED attempt stays in it. The sequence Start -> Fail -> Retry ->
+ * Cancel is fully legal (Retry drives FAILED -> QUEUED; Cancel's source set includes QUEUED) and produces exactly
+ * ONE Started, hence ONE attempt — already closed as FAILED. A close that looked `current` up by PRESENCE would
+ * find attempt #1 and rewrite it FAILED -> CANCELLED, MOVING its completedAt: the projection would report that
+ * the attempt which failed had in fact been cancelled, and at the wrong time. Testing `completedAt === undefined`
+ * is what makes a close a close rather than an overwrite.
+ */
+function openDraft(
 	state: FoldState,
-	event: DomainEvent,
-	p: Record<string, unknown>,
-	planId: string
-): void {
-	const stepId = str(p.stepId);
-	if (!stepId) return;
-	const k = key(planId, stepId);
-	const n = (state.startedCount.get(k) ?? 0) + 1;
-	state.startedCount.set(k, n);
-	const draft: AttemptDraft = {
-		executionPlanId: planId,
-		stepId,
-		attemptNumber: n,
-		idempotencyKey: `${stepId}#${n}`,
-		state: 'RUNNING',
-		...(str(p.runtimeBindingId) ? { runtimeBindingId: str(p.runtimeBindingId) } : {}),
-		...(str(event.occurredAt) ? { startedAt: str(event.occurredAt) } : {})
-	};
-	state.attempts.push(draft);
-	state.current.set(k, draft);
+	planId: string,
+	stepId: string | undefined
+): AttemptDraft | undefined {
+	if (!stepId) return undefined;
+	const draft = state.current.get(key(planId, stepId));
+	return draft && draft.completedAt === undefined ? draft : undefined;
 }
 
-/** ExecutionStepSucceeded: closes the step's current attempt as SUCCEEDED (§16.2 uses `executionStepId`). */
-function applyStepSucceeded(
+function applyAttemptEffect(
 	state: FoldState,
 	event: DomainEvent,
 	p: Record<string, unknown>,
-	planId: string
+	planId: string,
+	effect: AttemptEffect
 ): void {
-	const stepId = str(p.executionStepId);
-	const draft = stepId ? state.current.get(key(planId, stepId)) : undefined;
+	if (effect.kind === 'NONE') return;
+	const stepId = str(p[effect.stepIdKey]);
+	if (effect.kind === 'OPEN') {
+		if (!stepId) return;
+		const k = key(planId, stepId);
+		const n = (state.startedCount.get(k) ?? 0) + 1;
+		state.startedCount.set(k, n);
+		const draft: AttemptDraft = {
+			executionPlanId: planId,
+			stepId,
+			attemptNumber: n,
+			idempotencyKey: `${stepId}#${n}`,
+			state: 'RUNNING',
+			...(str(p.runtimeBindingId) ? { runtimeBindingId: str(p.runtimeBindingId) } : {}),
+			...(str(event.occurredAt) ? { startedAt: str(event.occurredAt) } : {})
+		};
+		state.attempts.push(draft);
+		state.current.set(k, draft);
+		return;
+	}
+	const draft = openDraft(state, planId, stepId);
 	if (!draft) return;
-	draft.state = 'SUCCEEDED';
+	if (effect.kind === 'MARK') {
+		draft.state = effect.state;
+		return;
+	}
+	draft.state = effect.state;
 	draft.completedAt = str(event.occurredAt);
+	if (effect.errorKey !== undefined) draft.error = str(p[effect.errorKey]) ?? effect.state.toLowerCase();
 	if (p.executionProvenance !== undefined) draft.provenance = p.executionProvenance;
 }
-
-/** ExecutionStepFailed: closes the step's current attempt as FAILED with its failure reason. */
-function applyStepFailed(
-	state: FoldState,
-	event: DomainEvent,
-	p: Record<string, unknown>,
-	planId: string
-): void {
-	const stepId = str(p.stepId);
-	const draft = stepId ? state.current.get(key(planId, stepId)) : undefined;
-	if (!draft) return;
-	draft.state = 'FAILED';
-	draft.completedAt = str(event.occurredAt);
-	draft.error = str(p.failureReason) ?? 'failed';
-}
-
-type StepApplier = (
-	state: FoldState,
-	event: DomainEvent,
-	p: Record<string, unknown>,
-	planId: string
-) => void;
-
-// ExecutionStepRetried is intentionally absent (a re-queue marker; the next Started opens attempt n+1).
-// A Map (not an object literal) so a hostile/degenerate event.eventType — e.g. "__proto__" — resolves to
-// undefined and is ignored, exactly as the original if/else-if chain did (an object literal would surface
-// Object.prototype and throw on the ?.() invocation).
-const STEP_APPLIERS = new Map<string, StepApplier>([
-	['ExecutionStepStarted', applyStepStarted],
-	['ExecutionStepSucceeded', applyStepSucceeded],
-	['ExecutionStepFailed', applyStepFailed]
-]);
 
 /**
  * Fold the Execution* event stream into per-attempt §10.4 records (global event order). `stepTypeById` (from the
@@ -156,7 +215,11 @@ export function executionAttempts(
 	const state: FoldState = { attempts: [], startedCount: new Map(), current: new Map() };
 
 	for (const event of events) {
-		STEP_APPLIERS.get(event.eventType)?.(state, event, asRec(event.payload), event.aggregateId);
+		// `Object.hasOwn` rather than a bare index: a hostile or degenerate eventType — '__proto__' — must
+		// resolve to nothing rather than surfacing Object.prototype (the reason the previous form used a Map).
+		if (!Object.hasOwn(ATTEMPT_EFFECTS, event.eventType)) continue;
+		const effect = ATTEMPT_EFFECTS[event.eventType];
+		if (effect) applyAttemptEffect(state, event, asRec(event.payload), event.aggregateId, effect);
 	}
 
 	return state.attempts.map((a) => ({
