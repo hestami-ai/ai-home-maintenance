@@ -7,6 +7,15 @@
 // HONESTY RULE: a family is COVERED only when EVERY id in it is asserted; if only some ids are asserted the
 // family is PARTIAL (with a note listing what is covered vs pending). This overlay was audited by the M12
 // adversarial review, which downgraded several families that had been over-claimed as COVERED.
+//
+// SECOND HONESTY RULE — THE LAYER (JAN-EXECREM WP-16 / SM-6, DS-001 §4 item 2). "Is it tested?" is not the whole
+// question. A rule whose ratified statement is "the command is rejected" is satisfied only by evidence at the
+// COMMAND layer; a pure-predicate unit test proves the predicate computes the right answer and says nothing about
+// whether anything ASKS it. This manifest certified RPH-PWU-010 COVERED on the strength of a call to a function
+// that had, repo-wide, exactly two references — its own definition and that test. `enforcement-register.ts` adds
+// the missing axis, and `enforcement-register.test.ts` gates it: a rule the register declares ENFORCED must cite a
+// COMMAND-layer file here, and a rule the register discloses as enforced NOWHERE may not be certified COVERED at
+// all. The RPH-EXE family below was downgraded by that gate on its first run.
 
 export type CoverageStatus =
 	| 'COVERED' // every rule in the family is asserted by a concrete unit test
@@ -29,7 +38,16 @@ const COVERED_BY_ID: Readonly<Record<string, string>> = {
 	'RPH-CON-008': 'packages/rph-contracts/src/messages.test.ts',
 	'RPH-PWU-005': 'packages/rph-domain/src/execution.test.ts',
 	'RPH-PWU-007': 'packages/rph-domain/src/pwuGuards.test.ts', // satisfiesP1: rejected assurance can't satisfy
-	'RPH-PWU-010': 'packages/rph-domain/src/execution.test.ts',
+	// ── COMMAND-layer citations (JAN-EXECREM WP-16). Each of these rules states that a COMMAND IS REJECTED, so its
+	// evidence must be a dispatch through the engine. Before WP-12b wired it, PWU-010's cite here was
+	// `rph-domain/src/execution.test.ts` — a pure-predicate call, for a rule enforced nowhere. PWU-009 is new: the
+	// same production site refuses it, and the register gives it its own marker so one arrangement cannot green both.
+	'RPH-PWU-009': 'packages/rph-application/src/handlers/execrem-wp16-enforcement-observed.test.ts',
+	'RPH-PWU-010': 'packages/rph-application/src/handlers/execrem-wp12-authority.test.ts',
+	'RPH-EXE-001': 'packages/rph-application/src/handlers/execution-plan-activation-guard.test.ts',
+	'RPH-EXE-002': 'packages/rph-application/src/handlers/execution-plan-supersede.test.ts',
+	'RPH-EXE-006': 'packages/rph-application/src/handlers/execution-exe006-explicit-result.test.ts',
+	'RPH-EXE-008': 'packages/rph-application/src/handlers/execution-retry-cap.test.ts',
 	'RPH-PER-001': 'packages/rph-persistence/src/sqlite-storage-adapter.test.ts',
 	'RPH-PER-002': 'packages/rph-persistence/src/sqlite-storage-adapter.test.ts',
 	'RPH-PER-007': 'packages/rph-projections/src/work-projection.test.ts',
@@ -65,13 +83,22 @@ const COVERAGE_BY_PREFIX: Readonly<Record<string, Coverage>> = {
 		testFile: 'packages/rph-domain/src/governance.test.ts',
 		note: 'RPH-BAS-002..007 by id; BAS-001 via the item-shape happy path'
 	},
-	'RPH-EXE': {
-		status: 'COVERED',
-		testFile: 'packages/rph-domain/src/execution.test.ts',
-		note: 'RPH-EXE-001..009 by id'
-	},
 
 	// PARTIAL — core asserted, specific ids pending (audited by the M12 review; honest split).
+	'RPH-EXE': {
+		status: 'PARTIAL',
+		testFile: 'packages/rph-domain/src/execution.test.ts',
+		// DOWNGRADED from COVERED by WP-16's layer gate, and the downgrade is the finding. "RPH-EXE-001..009 by id"
+		// was true of the PREDICATES and false of the ENGINE: EXE-003 (binding not authorized), EXE-004 (granted !=
+		// requested capability) and EXE-005 (preconditions before READY) are implemented as correct, unit-tested
+		// kernel functions with NO production caller — the same shape as PWU-010 before WP-12b, three more times, in
+		// the same family. They are disclosed in `enforcement-register.ts` with a checked call-site census rather
+		// than fixed here: wiring a new refusal is a behaviour change owing its own kill test.
+		note:
+			'EXE-001/002/006/008 asserted BY ID AT THE COMMAND LAYER (see COVERED_BY_ID); EXE-007/009 are not command ' +
+			'refusals (dispositioned in enforcement-register.ts); EXE-003/004/005 are UNENFORCED — ratified, ' +
+			'unit-tested in the kernel, and called by no production site. Pending their own work package.'
+	},
 	'RPH-CON': {
 		status: 'PARTIAL',
 		testFile: 'packages/rph-contracts/src/*.test.ts',
