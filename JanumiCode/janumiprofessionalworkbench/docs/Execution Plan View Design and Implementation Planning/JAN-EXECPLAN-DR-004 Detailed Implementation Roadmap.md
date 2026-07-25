@@ -8,7 +8,7 @@
 | :--- | :--- |
 | **Document ID** | `JAN-EXECPLAN-DR-004` |
 | **Version** | `0.2.0` — reconciled against the EXECUTED §19 roadmap self-critique (2 blockers + 5 majors + 4 minors folded into §5/§8/§9). |
-| **Status** | `READY_TO_BUILD` — design-first; DWPs `NOT_STARTED`; sponsor-activated 2026-07-21. |
+| **Status** | `BUILT — SUPERSEDED AS A DELIVERY RECORD` (corrected 2026-07-25, JAN-EXECREM WP-17; previously `READY_TO_BUILD … DWPs NOT_STARTED`). DWP-01…06 all `DELIVERED`; the post-build adversarial verification §18 required was executed late (2026-07-24) and returned 40 CONFIRMED findings, remediated by the JAN-EXECREM program. See the footer. |
 | **Design authority** | `JAN-EXECPLAN-DS-004 v0.2.0` (sponsor-ruled R1 fresh grammar + R2 BRANCH+WAIT+PARALLEL; D1–D8 resolved; §10 self-critique folded). |
 | **Engineering-practice authority** | `JAN-PRPWA-EP-001@0.1.0-draft` (REUSED): BINDING commenting (EP-CMT-1/2/3/**4** — this crosses WORKFLOW-ENGINE SEMANTICS: the graph gate, the condition grammar, branch/wait/parallel/prune); testing-as-evidence (EP-TST-1/2/4/**5**/6/7/**12**); SonarQube (EP-TST-13). **N/A** EP-OBS-*, EP-TST-8/9. |
 | **Governance** | 3C-ii's condition grammar is authored under the **sponsor's 2026-07-21 reopening** (R1) — a fresh grant; all authored shapes `UNRATIFIED-AUTHORED` citing ratified anchors; git-commit + NO-PUSH = ratification control (JAN-ENGC-001 §10.1 — no agent self-approval). `ExecutionTransition` derives from ratified DOC-009 §10.3 columns; `stepType` BRANCH/WAIT/PARALLEL_GROUP are RATIFIED (RPH-DOC-002 §21). |
@@ -28,11 +28,21 @@
 ## 3. Normative-source digest
 
 - **Graph generalizes linear (DS-004 D1/§5).** A step is startable when **no in-edge is PENDING and ≥1 is SATISFIED**; empty `transitions[]` ⇒ implicit `step[i-1]→step[i]` unconditional edges ⇒ byte-identical array-index behavior.
-- **In-edge disposition (D7).** SATISFIED = source terminal-success ∧ guard holds (unconditional; or CONDITIONAL first-match-true off a terminal-success BRANCH). NEUTRALIZED = losing/false CONDITIONAL off a terminal BRANCH, or source SKIPPED/FAILED/CANCELLED/SUPERSEDED. PENDING = source not terminal.
+- **In-edge disposition (D7) — CORRECTED 2026-07-25 (JAN-EXECREM WP-17 / F-38).** This digest previously read
+  "NEUTRALIZED = … source **SKIPPED**/FAILED/CANCELLED/SUPERSEDED. PENDING = source not terminal." Because it is a
+  one-sentence digest with no counterweight, an implementer reading only this line derives "terminal-success =
+  SUCCEEDED only" and builds a predicate that cascade-prunes the downstream of every waived skip and releases a
+  JOIN around an unsettled failure. The shipped rule is **four-valued**: **SATISFIED** = the edge has conducted —
+  a plan-entry edge, or a **LIVE** terminal-success source (SUCCEEDED/**SKIPPED**) whose guard holds (for a
+  CONDITIONAL edge, the arm the BRANCH **recorded** at settlement — read, never re-derived). **PENDING** = it has
+  not conducted and may still — a non-terminal source, **or FAILED**, the one terminal state the machine can leave.
+  **NEUTRALIZED** = it never will — a not-selected arm off a resolved BRANCH, an **IRRECOVERABLE** terminal source
+  (CANCELLED/SUPERSEDED), or a structurally dead source. **UNRESOLVED** = the BRANCH settled without recording its
+  arm; fails closed both ways (not startable, not prunable). Authority: DS-004 §5 as corrected.
 - **First-match in the gate (D3).** Only the winning CONDITIONAL edge is SATISFIED — computed in the `startExecutionStep` precheck, so a losing arm is rejected at start regardless of prune timing. Prune is bookkeeping.
 - **QUEUED-at-rest (D5).** Steps rest QUEUED; the graph gate (not stepState) controls startability; `PruneExecutionStep` drives the ratified QUEUED→SKIPPED (no new arrow). Controller-issued (like Start), idempotent, replay-folds events.
 - **Fresh grammar over a thin subject (D4/R1).** Declarative discriminated union; evaluator pure over `{steps: id → {stepState, outputArtifactIds, attemptsMade, structuredResult}}` folded from committed state + THIS plan's event log — no cross-aggregate/clock/random.
-- **RPH-EXE-002 / INV-5 unchanged:** flow drives the EXECUTION axis only; plan-ACTIVE prechecks on start/skip/retry/wait hold; cancel is cleanup; floor gate + `rejectUnbackedExecutionSuccess` authoritative.
+- **RPH-EXE-002 / INV-5 unchanged:** flow drives the EXECUTION axis only; cancel is cleanup; floor gate + `rejectUnbackedExecutionSuccess` authoritative. *(Corrected 2026-07-25, WP-17/F-42: "plan-ACTIVE prechecks on start/skip/retry/**wait** hold" was wrong — `EnterExecutionStepWait` is deliberately UNGATED, and `CompleteExecutionStep`, which this line omits, is now gated. The authority is `STEP_COMMAND_SPECS.planLiveness` in `rph-domain`, which declares all nine commands with a rationale each; no prose list can drift from it, because the engine reads that table rather than a list.)*
 - **Engineering practice:** EP-CMT-4 boundary comments at the graph gate, grammar evaluator, and prune/wait/parallel seams; EP-TST-5 state-transition ladder (every newly-driveable arrow + rejection); EP-TST-12 no happy-path-only (malformed-graph, double-run-window, barrier-join-neutralized, prune, WAIT-resume-replay).
 
 ## 4. Current-state findings and evidence
@@ -106,7 +116,7 @@ prohibited_shortcuts:
 tests:
   - "unit: empty-transitions linear regression (byte-identical); a 3-step explicit-linear graph ≡ linear; a diamond (A→B,A→C,B→D,C→D) barrier-join fires D when B,C succeed; REJECT at propose for EACH limb — dangling source id, dangling target id, two-entry (>1 entry), unreachable-from-entry, cyclic, BRANCH-no-default (full EP-TST-5 ladder)."
   - "e2e/regression: execution-sequencing + execution-plan + execution-tier3 specs stay green under the set-frontier."
-delivery_state: NOT_STARTED
+delivery_state: DELIVERED
 ```
 
 ```yaml
@@ -138,7 +148,7 @@ prohibited_shortcuts:
 tests:
   - "unit: each leaf op true/false; ALL/ANY/NOT; numeric comparisons; RESULT_PATH over structuredResult; replay-stability (same events → same verdict); unknown-op exhaustiveness."
   - "unit (propose reject): a plan whose conditionExpression is malformed REJECTS (RPH_VALIDATION_SCHEMA_FAILED); one referencing an UNDECLARED stepId REJECTS (RPH_VALIDATION_SEMANTIC_FAILED) — never silently false (EP-TST-5)."
-delivery_state: NOT_STARTED
+delivery_state: DELIVERED
 ```
 
 ```yaml
@@ -167,28 +177,28 @@ prohibited_shortcuts:
   - "Do NOT route system-prune through fail-closed canSkipStep."
 tests:
   - "unit: two-true conditions → first arm startable, second REJECTED at start; zero-true → default; prune drives not-taken → SKIPPED; transitive prune terminates; a shared-target (reachable via a live edge) NOT pruned; a BRANCH plan drives to completeExecutionPlan-satisfiable."
-delivery_state: NOT_STARTED
+delivery_state: DELIVERED
 ```
 
 ```yaml
 id: JAN-EXECPLAN-DWP-04
 title: "WAIT — manual enter/resolve + the missing resume event"
 master_work_packages: [DS-004:D6]
-outcome: "EnterExecutionStepWait (RUNNING→WAITING, reuse ExecutionStepWaiting m3:4891) + ResolveExecutionStepWait (WAITING→RUNNING, MINT the resume event the machine lacks — closes the F-5/DS-004 F-6 replay hole). Both plan-ACTIVE-guarded. The F-11 read-model allowlist gains 'wait'/'resolve' so the UI (DWP-06) can surface them WITHOUT inventing topology (§19-B2). Manual/external-signal resolve only; timer/condition auto-resolve deferred. WAITING→CANCELLED cleanup already ships. Exec ≠ assurance (INV-5)."
+outcome: "EnterExecutionStepWait (RUNNING→WAITING, reuse ExecutionStepWaiting m3:4891) + ResolveExecutionStepWait (WAITING→RUNNING, MINT the resume event the machine lacks — closes the F-5/DS-004 F-6 replay hole). Enter is deliberately UNGATED (suspension mints nothing); Resolve requires an ACTIVE plan — see the RECORD CORRECTION after this block. The F-11 read-model allowlist gains 'wait'/'resolve' so the UI (DWP-06) can surface them WITHOUT inventing topology (§19-B2). Manual/external-signal resolve only; timer/condition auto-resolve deferred. WAITING→CANCELLED cleanup already ships. Exec ≠ assurance (INV-5)."
 knowledge_status: CONFIRMED
 repository_scope:
   files_or_symbols:
     - "packages/rph-contracts/vocab/m3-commands-events.json (EnterExecutionStepWait {stepId, waitReason?}; ResolveExecutionStepWait {stepId, resolutionReason?} + MINT ExecutionStepWaitResolved event) → gen → prettier + validate.test.ts count +3 (2 cmds + 1 event; ExecutionStepWaiting is REUSED, not minted)"
-    - "packages/rph-application/src/handlers/execution.ts (enter/resolveExecutionStepWait via advanceStep, plan-ACTIVE) + registry.ts"
+    - "packages/rph-application/src/handlers/execution.ts (enter/resolveExecutionStepWait via advanceStep; authority per STEP_COMMAND_SPECS.planLiveness — Enter CLEANUP_EXEMPT, Resolve REQUIRES_ACTIVE_PLAN) + registry.ts"
     - "packages/rph-projections/src/execution-view.ts (§19-B2: extend the command-backed affordance allowlist — add 'wait' (from RUNNING) + 'resolve' (from WAITING); update the Record<StepState> totality map + its test — mirroring how skip/cancel were co-landed in Tier-3C)"
 required_changes:
-  - "enterExecutionStepWait: advanceStep(target WAITING, event ExecutionStepWaiting) — OVERRIDE eventPayload to {stepId, ...(waitReason?), stepState:'WAITING'} (§19-m1: ExecutionStepWaitingPayloadSchema is a strictObject REQUIRING stepState; the default command.payload emit is schema-invalid, mirroring startExecutionStep's stepState:'RUNNING' override); plan-ACTIVE precheck."
+  - "enterExecutionStepWait: advanceStep(target WAITING, event ExecutionStepWaiting) — OVERRIDE eventPayload to {stepId, ...(waitReason?), stepState:'WAITING'} (§19-m1: ExecutionStepWaitingPayloadSchema is a strictObject REQUIRING stepState; the default command.payload emit is schema-invalid, mirroring startExecutionStep's stepState:'RUNNING' override); NO plan-ACTIVE precheck — suspension is CLEANUP_EXEMPT (corrected, F-42)."
   - "resolveExecutionStepWait: advanceStep(target RUNNING, event ExecutionStepWaitResolved) — eventPayload {stepId, ...(resolutionReason?), stepState:'RUNNING'} (authored resume event, closing the no-event arrow); plan-ACTIVE precheck."
   - "MINT the resume event + the two commands (UNRATIFIED-AUTHORED under R2 + the ratified WAITING arrows / standing execution grant — NOT R1); gen + prettier + count +3."
   - "execution-view: add 'wait'/'resolve' to the affordance allowlist + the per-stepState map + totality test (so DWP-06 derives the buttons from the read-model, not topology)."
 invariants:
   - "WAITING→RUNNING now emits an event (replayable); RUNNING→WAITING reuses the ratified event with a stepState-complete payload."
-  - "A step can only enter WAIT from RUNNING and resolve from WAITING (checkTransition); plan-ACTIVE required (RPH-EXE-002)."
+  - "A step can only enter WAIT from RUNNING and resolve from WAITING (STEP_COMMAND_SPECS.sourceStates, then checkTransition); plan-ACTIVE required for RESOLVE only (RPH-EXE-002) — corrected, F-42."
   - "The wait/resolve affordances come from the read-model allowlist (F-11), never machine topology."
   - "INV-5 untouched; no timer/clock (replay-safe)."
 prohibited_shortcuts:
@@ -196,9 +206,25 @@ prohibited_shortcuts:
   - "Do NOT leave WAITING→RUNNING event-less (the replay hole must close)."
   - "Do NOT let DWP-06 mint a Wait button from topology — the allowlist entry lands HERE."
 tests:
-  - "unit: enter (RUNNING→WAITING) + resolve (WAITING→RUNNING) round-trip; ExecutionStepWaiting emit carries stepState:'WAITING'; resume event present + replays; enter from non-RUNNING REJECT; resolve from non-WAITING REJECT; wait/resolve under non-ACTIVE plan REJECT; WAITING→CANCELLED still works; the affordance map defines wait/resolve for RUNNING/WAITING + totality."
-delivery_state: NOT_STARTED
+  - "unit: enter (RUNNING→WAITING) + resolve (WAITING→RUNNING) round-trip; ExecutionStepWaiting emit carries stepState:'WAITING'; resume event present + replays; enter from non-RUNNING REJECT; resolve from non-WAITING REJECT; RESOLVE under a non-ACTIVE plan REJECT and ENTER under a non-ACTIVE plan ACCEPT (the declared exemption gets a POSITIVE test — corrected, F-42); WAITING→CANCELLED still works; the affordance map defines wait/resolve for RUNNING/WAITING + totality."
+delivery_state: DELIVERED
 ```
+
+> **RECORD CORRECTION (2026-07-25, JAN-EXECREM WP-17 — finding F-42).** This block asserted "Both
+> plan-ACTIVE-guarded" in four places (`outcome`, `repository_scope`, both `required_changes`, `invariants`,
+> `tests`). The shipped code guards **`ResolveExecutionStepWait` only**, and the shipped code is **right**.
+>
+> Two verifiers converged on it independently: `EnterExecutionStepWait` is escape-complete (Cancel from WAITING
+> is legal even under a CANCELLED plan, probed), it mints no attempt (`attemptsMadeForStep` counts
+> `ExecutionStepStarted` alone), and its ungated-ness was already precedented at four sites including the
+> read-model's own comment. Changing the code to match this prose would have stripped a running step of the
+> ability to record honestly that it is blocked.
+>
+> The rule the engine now enforces is **declared as data**, not prose: `STEP_COMMAND_SPECS` in `rph-domain`
+> carries `planLiveness` + a written rationale for all nine step commands, `advanceStep` reads it, the read-model
+> derives affordances from it, and both the exemptions and the requirements carry their own kill tests
+> (JAN-EXECREM WP-12b, WP-15, WP-16). A prose list in a roadmap can drift from the code; a table the engine reads
+> cannot. **Disposition: code unchanged, record corrected**; registered as a disclosed divergence in §15.
 
 ```yaml
 id: JAN-EXECPLAN-DWP-05
@@ -223,7 +249,7 @@ prohibited_shortcuts:
   - "Do NOT let a neutralized in-edge block a JOIN (barrier rule) nor count as a real contribution."
 tests:
   - "unit: PARALLEL_GROUP fans out 2 startable; both drive independently to SUCCEEDED; JOIN fires; a branch-then-join where one arm is pruned still fires the join; a revision-conflict on concurrent start retries; completeExecutionPlan passes."
-delivery_state: NOT_STARTED
+delivery_state: DELIVERED
 ```
 
 ```yaml
@@ -246,7 +272,7 @@ invariants:
   - "No affordance the engine would reject (F-11); COMPLETED/terminal ≠ green (INV-5)."
 prohibited_shortcuts: ["Do NOT invent affordances from machine topology; derive from the read-models."]
 tests: ["e2e: branch plan (condition selects arm, other pruned to SKIPPED, plan completes); parallel plan (2 concurrent, join, complete); wait plan (pause, resolve, complete)."]
-delivery_state: NOT_STARTED
+delivery_state: DELIVERED
 ```
 
 ## 10. Data and persistence changes
@@ -275,7 +301,26 @@ Each DWP additive + revertible. New events (`ExecutionStepPruned`?, `ExecutionSt
 - **Deferrals:** timer/condition WAIT; assumption-liveness subject; explicit k-of-n join; §10.2 step Condition[]; transition editing.
 - **Assumptions:** steps rest QUEUED (`reference-undertaking.ts:553`); `plan.transitions[]` immutable post-proposal; the evaluator's subject is replay-complete from committed state + this plan's events.
 - **Risk:** authored grammar/commands must annotate `UNRATIFIED-AUTHORED` under the reopening; the graph path ships unexercised by the seed (mitigated by new fixtures).
-- **Divergences from DS-004:** none intended; §19 to disclose any.
+- **Divergences from DS-004 — CORRECTED 2026-07-25 (JAN-EXECREM WP-17).** This line previously read "none
+  intended; §19 to disclose any", and that affirmative certification was **false at the time it was written**.
+  Two divergences shipped, both of them where the CODE is right and this roadmap's prose was wrong:
+  1. **F-38 — the in-edge disposition rule.** §3 and DS-004 §5 said a **SKIPPED** source NEUTRALIZES and that
+     PENDING means only "source not terminal". The engine treats a LIVE SKIPPED source as terminal-**success**
+     (SATISFIED — a waived skip advances the plan) and a FAILED source as **PENDING** (the machine can leave
+     FAILED, so a JOIN must not release around it). Implementing the prose would cascade-prune every waived skip's
+     downstream and release joins on unsettled failures. Both records are now corrected; the rule is pinned by
+     name in `rph-domain/src/transition-gate*.test.ts`.
+  2. **F-42 — the WAIT authority.** DWP-04 asserted "Both plan-ACTIVE-guarded" in four places; only
+     `ResolveExecutionStepWait` is guarded. `EnterExecutionStepWait` is `CLEANUP_EXEMPT` by declaration, because a
+     running step must be able to record honestly that it is blocked whatever the plan's status. Corrected in
+     place, with a POSITIVE test now pinning the exemption.
+
+  Both are carried, with every other divergence and residual raised by the remediation, in
+  **`JAN-EXECREM-RESIDUALS.md`**, which is the authoritative register for this feature from 2026-07-25 onward.
+  The lesson recorded rather than merely fixed: *a document that affirmatively certifies "no divergences" and has
+  no mechanism to detect one is asserting the absence of evidence as evidence of absence.* JAN-EXECREM WP-16
+  replaces that certification with a checked register for the execution rules — see
+  `packages/rph-domain/src/enforcement-register.ts`.
 
 ## 16. Traceability matrix
 
@@ -314,13 +359,15 @@ A **3-lens roadmap-level self-critique was EXECUTED** on v0.1.0 (DWP feasibility
 
 **§3.7 dimensions (post-reconciliation):** coverage (DWP-01…06 → §16); hard-truths (the generator-can't-do-union blocker + the F-11-affordance contradiction surfaced, not glossed); legacy (empty-transitions byte-identical; single gate home); semantic-authority (INV-5/RPH-EXE-002 preserved; hand-authored grammar under R1, Prune/Wait under R2 + machine, all UNRATIFIED-AUTHORED); assurance/evidence (full rejection ladder + replay + back-compat); overengineering (the disposition unified to one home; grammar hand-authored not generator-extended).
 
-**Readiness (post-critique): `READY_TO_BUILD`.** Both blockers were roadmap-level (generator capability + affordance scoping) and are resolved without changing the settled DS-004 D1–D8 or re-consulting the sponsor. Land order 01→06 confirmed dependency-sound (DWP-01 lays the pure gate + set-frontier + schema; DWP-02 adds the hand-authored grammar; DWP-03 branch/prune; DWP-04 wait + affordance; DWP-05 parallel/join; DWP-06 UI). Nothing built; DWP-01…06 `NOT_STARTED`.
+**Readiness (post-critique): `READY_TO_BUILD`.** Both blockers were roadmap-level (generator capability + affordance scoping) and are resolved without changing the settled DS-004 D1–D8 or re-consulting the sponsor. Land order 01→06 confirmed dependency-sound (DWP-01 lays the pure gate + set-frontier + schema; DWP-02 adds the hand-authored grammar; DWP-03 branch/prune; DWP-04 wait + affordance; DWP-05 parallel/join; DWP-06 UI). ~~Nothing built; DWP-01…06 `NOT_STARTED`.~~ *(Struck 2026-07-25, JAN-EXECREM WP-17: this readiness determination was written before the build and never revised after it. DWP-01…06 are `DELIVERED`; see the footer for what that does and does not certify.)*
 
 ---
 
 *`BUILT — RECORD CORRECTED 2026-07-24` / v0.2.1 — the §19 roadmap self-critique is EXECUTED and reconciled (2 blockers + majors folded into §5/§8/§9). Design authority DS-004 v0.2.0.*
 
-> **RECORD CORRECTION (2026-07-24).** This footer previously read “`READY_TO_BUILD`. Nothing built.” and every DWP block below still reads `delivery_state: NOT_STARTED`. **That is false.** Tier 3C-ii was BUILT and committed as nine commits (DWP-01 ExecutionTransition schema + graph-aware start-gate · DWP-02 condition grammar + evaluator · DWP-03 BRANCH first-match + prune · DWP-04 WAIT + resume · DWP-05 PARALLEL fan-out + barrier JOIN · DWP-06/07 execution tab + flow-interpreter repair · DWP-08 structural deadness · DWP-09 resolved-once BRANCH). The per-DWP `delivery_state` markers are left untouched as evidence of the drift.
+> **RECORD CORRECTION (2026-07-24).** This footer previously read “`READY_TO_BUILD`. Nothing built.” and every DWP block below still reads `delivery_state: DELIVERED`. **That is false.** Tier 3C-ii was BUILT and committed as nine commits (DWP-01 ExecutionTransition schema + graph-aware start-gate · DWP-02 condition grammar + evaluator · DWP-03 BRANCH first-match + prune · DWP-04 WAIT + resume · DWP-05 PARALLEL fan-out + barrier JOIN · DWP-06/07 execution tab + flow-interpreter repair · DWP-08 structural deadness · DWP-09 resolved-once BRANCH).
+>
+> **The per-DWP markers now read `DELIVERED` (corrected 2026-07-25, JAN-EXECREM WP-17).** The 2026-07-24 correction left them at `NOT_STARTED` "as evidence of the drift", which meant this document went on carrying six machine-readable fields that said the opposite of the paragraph above them. Two records disagreeing is the shape this whole remediation is about, and a footnote is not a licence to keep the wrong one. The drift is preserved where it belongs — in this prose, which states what the markers used to say and why they were false — while the field itself stops lying. `DELIVERED` here means **built and committed**; it is emphatically not a claim of soundness, which the paragraphs below settle.
 >
 > **The §18 exit criterion “Post-build adversarial verification (ultracode) before the final commit” was NEVER EXECUTED at the time of building.** It has now been executed (2026-07-24): 118 agents, 56 findings raised → **40 CONFIRMED** (7 BLOCKERs), 6 PLAUSIBLE, 10 refuted; no lens returned clean. Register: `JAN-EXECPLAN-T3Cii-review-findings-2026-07-24.md`. Remediation: `JAN-EXECREM-DS-001` + `JAN-EXECREM-DR-001`.
 >

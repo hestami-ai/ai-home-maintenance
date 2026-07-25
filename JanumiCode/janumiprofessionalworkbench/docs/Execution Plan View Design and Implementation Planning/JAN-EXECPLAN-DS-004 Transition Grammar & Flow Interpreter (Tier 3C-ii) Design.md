@@ -37,9 +37,36 @@ Give the `ExecutionPlan.transitions[]` graph — which **nothing reads today** �
 
 **Design spine — the transition graph *generalizes* the linear gate (D1).** A plan's flow is a directed graph of guarded edges over its **QUEUED-at-rest** steps. Each in-edge of a step has a **disposition** derived purely from committed state:
 
-- **SATISFIED** — the edge's `sourceStepId` step is terminal-success (SUCCEEDED/SKIPPED) **and** the edge's guard holds: an unconditional (`SEQUENTIAL`) edge always holds; a `CONDITIONAL` edge holds iff its `conditionExpression` is true **and** it is the **first-match** out-edge among its BRANCH source's out-edges (D3 — evaluated *in the gate*, so exactly one branch arm is ever startable regardless of prune timing).
-- **NEUTRALIZED** — the edge can never become satisfied: a not-first-match/false `CONDITIONAL` edge off a terminal-success BRANCH, or a source that reached SKIPPED or a terminal-non-success state (FAILED/CANCELLED/SUPERSEDED).
-- **PENDING** — the source is not yet terminal.
+> **RECORD CORRECTION (2026-07-25, JAN-EXECREM WP-17 — finding F-38).** The three bullets below previously read
+> "NEUTRALIZED = … a source that reached **SKIPPED** or a terminal-non-success state (FAILED/CANCELLED/SUPERSEDED)"
+> and "PENDING = the source is not yet terminal". **Both were wrong, and wrong on the dangerous side.** Taken
+> literally, "SKIPPED neutralizes" cascade-prunes the entire downstream of every *waived* skip — a skip is
+> terminal-**success** and must ADVANCE the plan — and "FAILED neutralizes" releases a JOIN around an arm that has
+> not settled (F-16), because FAILED is the one terminal state the machine can LEAVE (`FAILED → QUEUED`). The code
+> was on the correct side throughout; this prose was a live, wrong normative statement about shipped behaviour, and
+> a second implementer reading only it would build the opposite predicate. The corrected rule, below, is the one
+> the engine enforces and `transition-gate.ts` tests by name.
+
+The disposition is **four-valued**, and the axis is *has this edge conducted, and can it still*:
+
+- **SATISFIED** — the edge **has conducted**, and cannot un-conduct: a plan-**entry** edge (no source), or a **LIVE**
+  terminal-success source (SUCCEEDED/SKIPPED) whose guard holds. An unconditional (`SEQUENTIAL`) edge always holds;
+  a `CONDITIONAL` edge holds iff it is the arm the BRANCH **recorded** at settlement (D3 — the decision is taken
+  once, at the instant the branch reaches terminal-success, and thereafter READ, never re-derived).
+- **PENDING** — it has not conducted and **may still**: a non-terminal source, **or a source in a REOPENABLE
+  terminal state (FAILED)** — the machine can still leave FAILED, so a failed arm has *not* settled and a barrier
+  must not release around it. Abandoning it is an explicit, governed act (`CancelExecutionStep`), never silence.
+- **NEUTRALIZED** — it has not conducted and **never will**: a not-selected arm off a **resolved** BRANCH; a source
+  in an **IRRECOVERABLE** terminal state (CANCELLED/SUPERSEDED — terminal states the machine gives no out-arrow);
+  or a source that is **structurally dead**, however it reached its state. A LIVE SKIPPED source SATISFIES its
+  out-edges (a waived skip advances the plan); a structurally-dead SKIPPED source satisfies nothing.
+- **UNRESOLVED** — the honest fourth: the edge leaves a BRANCH that has **settled without recording which arm it
+  chose**. It fails closed in BOTH directions — the target is not startable (start needs a SATISFIED edge) and the
+  target is not prunable either (an undecided branch's arms are still live). The gate used to re-run first-match on
+  every read instead, so a plan could contradict its own recorded decision.
+
+**The disposition never depends on WHICH COMMAND produced a state** — only on the state, its recoverability, and
+structural liveness.
 
 **A step is startable when: no in-edge is PENDING, and ≥1 in-edge is SATISFIED** (a *barrier-join*, D7). This one rule unifies every shape: a single-predecessor step (linear), a PARALLEL fan-in (all edges live → all must be SATISFIED), and a BRANCH-merge/JOIN (one edge SATISFIED, the rest NEUTRALIZED → fires). A step **all of whose** in-edges resolve NEUTRALIZED is **unreachable** → pruned to SKIPPED (D5). **The linear plan is the degenerate case**: implicit unconditional edges `step[i-1] → step[i]`; empty `transitions[]` ⇒ the shipped array-index path runs **byte-identical**.
 
@@ -58,8 +85,19 @@ Give the `ExecutionPlan.transitions[]` graph — which **nothing reads today** �
 - **D3 — BRANCH selection = first-match, ENFORCED IN THE GATE (load-bearing).** A BRANCH step's out-edges are evaluated in array order; the **first** whose `conditionExpression` is true is the only SATISFIED CONDITIONAL edge — computed **inside the start-gate precheck**, so a losing arm is rejected at start *regardless of command/prune ordering* (closes the §10 double-run window). A BRANCH step **MUST** declare its last out-edge as an unconditional `SEQUENTIAL` **default** (propose-time validated) → exactly one arm is ever startable; zero-true → default. Prune (D5) is then **bookkeeping**, not the sole guarantor of exactly-one.
 - **D4 — Condition subject = a thin, replay-safe, in-aggregate projection.** `{ steps: Record<stepId, { stepState, outputArtifactIds, attemptsMade, structuredResult }> }` — folded from committed plan state + **this plan's own event log** (`attemptsMade` = count of `ExecutionStepStarted`, mirroring `attemptsMadeForStep`, `execution.ts:596-607`; `structuredResult`/`outputArtifactIds` from `ExecutionStepSucceeded`, `execution.ts:510-515`). This is still **replay-pure and single-aggregate** (no cross-aggregate reads), and it makes the two flagship BRANCH guards expressible — **numeric** (`attemptsMade < cap`, `outputArtifactIds.length ≥ 1`) and **result-conditioned** (`structuredResult.reviewOutcome == 'REJECT' → remediation`), the §10 gaps. Assumption-liveness stays **deferred** (it alone would force a cross-aggregate read).
 - **D5 — Branch-not-taken = system prune → SKIPPED, from QUEUED-at-rest, via a separate controller-issued command.** Steps rest at **QUEUED** (§3 convention; the graph gate — not the stepState — controls startability), so `PruneExecutionStep` drives **QUEUED→SKIPPED**, which the ratified machine permits (the DWP-02 Skip precedent genuinely covers it — the earlier "mirrors DWP-02" anchor is now correct). SKIPPED is the only terminal state satisfying both the completion allow-list and the barrier-join. **Dispatcher:** a pure read-model `prunableStepIds(plan)` (steps all of whose in-edges are NEUTRALIZED) surfaces the work; the **controller issues** `PruneExecutionStep` per step — exactly like Start is controller-issued — so nothing auto-folds into `CompleteExecutionStep` (which would be the forbidden second-event-per-command). **Idempotent** (`checkTransition` no-ops an already-terminal step) and **replay-safe** (prune *events* are folded on replay, never re-dispatched). System-prune does **not** route through fail-closed `canSkipStep` (a not-taken conditional arm is excluded by the plan's own declared logic, not skipped by a controller); its event records `pruned: BRANCH <stepId> selected edge <edgeId>`.
-- **D6 — WAIT = manual-resolve only, authoring the resume event.** `EnterExecutionStepWait` (RUNNING→WAITING, reuse `ExecutionStepWaiting`) + `ResolveExecutionStepWait` (WAITING→RUNNING, **mint the missing resume event** — closes F-6). Both plan-ACTIVE-guarded; `WAITING→CANCELLED` cleanup already ships. Timer/condition auto-resolve deferred (§5).
-- **D7 — PARALLEL_GROUP + JOIN = set-frontier + barrier-join.** `startableStepId → startableStepIds(plan): string[]` (a **set**). A PARALLEL_GROUP node's ≥2 `SEQUENTIAL` out-edges make several targets startable at once; each start is its **own** `StartExecutionStep` command. The starts **serialize on `UNIQUE(aggregate_revision)`** (one plan aggregate → the dispatcher issues them sequentially / with conflict-retry — they are concurrent *in state*, not in commit; §10 fix). JOIN/merge uses the **barrier rule** (§5: no PENDING in-edge, ≥1 SATISFIED), which correctly neutralizes pruned/branch/non-success in-edges rather than wedging on them.
+- **D6 — WAIT = manual-resolve only, authoring the resume event.** `EnterExecutionStepWait` (RUNNING→WAITING, reuse `ExecutionStepWaiting`) + `ResolveExecutionStepWait` (WAITING→RUNNING, **mint the missing resume event** — closes F-6). `WAITING→CANCELLED` cleanup already ships. Timer/condition auto-resolve deferred (§5).
+  > **RECORD CORRECTION (2026-07-25, JAN-EXECREM WP-17 — finding F-42).** This bullet previously read "**Both**
+  > plan-ACTIVE-guarded", and DR-004's DWP-04 block repeated it four times. The shipped code guards **one** of the
+  > two, and the shipped code is **right**. The axis is not "opens new work" — it is **"mints success credit or a
+  > durable decision"** (settled in JAN-EXECREM WP-12b / F-26, now DECLARED as data in `STEP_COMMAND_SPECS`).
+  > `EnterExecutionStepWait` SUSPENDS work that is already running: it mints nothing, opens nothing, and is
+  > `CLEANUP_EXEMPT` by declaration with its own positive test — because a running step must be able to record
+  > honestly that it is blocked, whatever the plan's status, and a system that makes *reporting trouble* harder
+  > than *claiming success* is worse than one that checks neither. `ResolveExecutionStepWait` REQUIRES an ACTIVE
+  > plan: a resume returns the step to RUNNING, which IS new work. Changing the code to match this prose would
+  > have stripped a running step of its only honest exit short of Cancel. **Disposition: code unchanged, record
+  > corrected** — the divergence is registered in DR-004 §15 and `JAN-EXECREM-RESIDUALS.md`.
+- **D7 — PARALLEL_GROUP + JOIN = set-frontier + barrier-join.** `startableStepId → startableStepIds(plan): string[]` (a **set**). A PARALLEL_GROUP node's ≥2 `SEQUENTIAL` out-edges make several targets startable at once; each start is its **own** `StartExecutionStep` command. The starts **serialize on `UNIQUE(aggregate_revision)`** (one plan aggregate → the dispatcher issues them sequentially / with conflict-retry — they are concurrent *in state*, not in commit; §10 fix). JOIN/merge uses the **barrier rule** (§5: no PENDING in-edge, ≥1 SATISFIED), which correctly neutralizes pruned/branch-excluded/**irrecoverable** in-edges rather than wedging on them. *(Corrected 2026-07-25, WP-17/F-38: "non-success" was the wrong set — a FAILED in-edge stays PENDING and DOES wedge its join, deliberately, until the arm is explicitly abandoned. Silence is never taken as abandonment.)*
 - **D8 — Edge condition, not step precondition.** The **edge** `conditionExpression` is the precondition mechanism for graph plans; the shipped Fork-F "predecessor SUCCEEDED" reading is the degenerate unconditional edge. The §10.2 step-level `Condition[]` field stays `Source-TBD`/untouched (disclosed).
 
 ## 7. Ratified-vs-authored disposition

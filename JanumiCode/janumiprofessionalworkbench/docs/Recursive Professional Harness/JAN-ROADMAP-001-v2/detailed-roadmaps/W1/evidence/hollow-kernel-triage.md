@@ -42,8 +42,22 @@ Force-wiring these would duplicate a live gate or decide nothing:
 
 Execution-plane + persistence-recovery, correctly out of the W1 semantic kernel:
 
-- **W2 idempotency / recovery (WP-2-004/007):** `resolveIdempotency`, `attemptWouldDuplicateSideEffect`, `classifyInterruptedAttempt`, `mayReexecuteWithoutReconciliation`, `canResumeExecutionOnPwu`, `assessDecisionRevocation`, `assessAcceptance`, `assessFalsification`.
+- **W2 idempotency / recovery (WP-2-004/007):** `resolveIdempotency`, `attemptWouldDuplicateSideEffect`, `classifyInterruptedAttempt`, `mayReexecuteWithoutReconciliation`, ~~`canResumeExecutionOnPwu`~~, `assessDecisionRevocation`, `assessAcceptance`, `assessFalsification`.
+  > **RECORD CORRECTION (2026-07-25, JAN-EXECREM WP-17).** `canResumeExecutionOnPwu` is **no longer deferred** —
+  > JAN-EXECREM WP-12b (finding F-28) wired it into `pwuOpennessRefusal`, where it gates every `REQUIRES_OPEN_PWU`
+  > step command and `ActivateExecutionPlan`. This entry and `docs/_working/dead-kernel-census.txt` were the two
+  > surviving records still saying the rule was deferred, while the M12 conformance manifest simultaneously
+  > certified RPH-PWU-010 **COVERED** — three artefacts disagreeing about one rule's status, which is precisely
+  > what the register below now prevents. Its live status is `ENFORCED` in
+  > `packages/rph-domain/src/enforcement-register.ts`, observed end-to-end through `Engine.dispatch`.
 - **W3 execution harness (WP-3-005):** `canStartStep`, `canStartStepUnderPlan`, `canSkipStep`, `stepMayBecomeReady`, `bindingPermitsExecution`, `capabilityAuthorized`, `canReuseBindingForNewAttempt`, `assessModelOutput`, `selectControlAction`, `normalizeControlAction`, `blocksIrreversibleWork`, `canAuthorizeNewWork`, `executionSuccessOutcome`.
+  > **NOTE (2026-07-25, JAN-EXECREM WP-17).** Three of these — `bindingPermitsExecution` (RPH-EXE-003),
+  > `capabilityAuthorized` (RPH-EXE-004) and `stepMayBecomeReady` (RPH-EXE-005) — carry **ratified rules whose
+  > statement is a command refusal**, and the M12 manifest was certifying all of RPH-EXE COVERED on the strength
+  > of their unit tests. The deferral itself is unchanged and still correct; what changed is that it is now a
+  > **checked** row (`UNENFORCED_DISCLOSED`) in `packages/rph-domain/src/enforcement-register.ts` rather than a
+  > line in a triage document, and the family's manifest claim has been downgraded to PARTIAL. A deferral nobody
+  > can grep is indistinguishable from an omission.
 - **W2/W3 traceability/impact plane:** `validateLinkDirectionality`, `impactedObjects` (need a TraceLink-minting command surface first).
 - **Blocked on a contract gap:** `validateAssumptionReification` — deferred beyond DWP-004 (needs an assumption-reification surface); recorded, not forced.
 

@@ -1,3 +1,19 @@
+RECORD CORRECTION (2026-07-25, JAN-EXECREM WP-17).
+  canResumeExecutionOnPwu is NO LONGER DEAD. JAN-EXECREM WP-12b (F-28) wired it into
+  pwuOpennessRefusal in packages/rph-application/src/handlers/execution.ts, where it now gates
+  every REQUIRES_OPEN_PWU step command and ActivateExecutionPlan, refusing end-to-end through
+  Engine.dispatch. Its row below is struck.
+
+  THREE ROWS BELOW ARE NOW CHECKED, NOT MERELY LISTED. bindingPermitsExecution (RPH-EXE-003),
+  capabilityAuthorized (RPH-EXE-004) and stepMayBecomeReady (RPH-EXE-005) each implement a
+  RATIFIED rule whose statement is a command refusal, and each is asked by nothing. That is not
+  a tidy-up item: the M12 conformance manifest certified the whole RPH-EXE family COVERED
+  "001..009 by id" on the strength of unit tests over exactly these functions. They are now
+  disposed as UNENFORCED_DISCLOSED in packages/rph-domain/src/enforcement-register.ts, whose
+  gate greps this tree and asserts each one's production reference set — so wiring any of them
+  turns the build RED and forces the row to be re-dispositioned as ENFORCED with a probe.
+  This flat text file is a snapshot; that register is the live record.
+
 FUNCTION                                 STATUS       PRODUCTION CALLERS (outside own file)
 --------------------------------------------------------------------------------------
 prefixOf                                 DEAD         (tests only)
@@ -14,11 +30,11 @@ blocksIrreversibleWork                   DEAD         (tests only)
 canAuthorizeNewWork                      DEAD         (tests only)
 validateDecomposition                    DEAD         (tests only)
 canStartStepUnderPlan                    DEAD         (tests only)
-canResumeExecutionOnPwu                  DEAD         (tests only)
-bindingPermitsExecution                  DEAD         (tests only)
-capabilityAuthorized                     DEAD         (tests only)
+canResumeExecutionOnPwu                  WIRED        execution.ts (pwuOpennessRefusal) — JAN-EXECREM WP-12b
+bindingPermitsExecution                  DEAD         (tests only) — RPH-EXE-003, registered UNENFORCED_DISCLOSED
+capabilityAuthorized                     DEAD         (tests only) — RPH-EXE-004, registered UNENFORCED_DISCLOSED
 canReuseBindingForNewAttempt             DEAD         (tests only)
-stepMayBecomeReady                       DEAD         (tests only)
+stepMayBecomeReady                       DEAD         (tests only) — RPH-EXE-005, registered UNENFORCED_DISCLOSED
 canStartStep                             DEAD         (tests only)
 canSkipStep                              DEAD         (tests only)
 assessModelOutput                        DEAD         (tests only)

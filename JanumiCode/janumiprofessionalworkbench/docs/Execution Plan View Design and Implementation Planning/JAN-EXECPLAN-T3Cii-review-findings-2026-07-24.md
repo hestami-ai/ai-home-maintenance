@@ -2,7 +2,52 @@
 
 *Machine-generated from the BL-1 review run (`wf_afc37ba9-9ff`): **118 agents, 56 findings raised -> 40 CONFIRMED, 6 PLAUSIBLE, 10 refuted; no lens returned clean.** Every finding below survived TWO independent, perspective-diverse refuters (code-semantics + test-evidence) — a finding either verifier refuted is already excluded. Findings are listed as raised; several are the SAME defect seen by different lenses (the remediation design clusters them).*
 
-> **Scope:** the Tier 3C-ii surface — `condition-grammar.ts`, `transition-gate.ts`, the execution kernel, the plan/step handlers, `execution-view`/`execution-attempts`, and the execution tab. This surface shipped as DWP-01..09 while its roadmap (DR-004) still records every DWP `NOT_STARTED` and its required ultracode post-build verification was never executed. **This register IS that verification.**
+> **Scope:** the Tier 3C-ii surface — `condition-grammar.ts`, `transition-gate.ts`, the execution kernel, the plan/step handlers, `execution-view`/`execution-attempts`, and the execution tab. This surface shipped as DWP-01..09 while its roadmap (DR-004) still records every DWP `NOT_STARTED` and its required ultracode post-build verification was never executed. **This register IS that verification.** *(DR-004's markers were corrected on 2026-07-25 by JAN-EXECREM WP-17.)*
+
+---
+
+## DISPOSITION INDEX (added 2026-07-25 by JAN-EXECREM WP-17)
+
+**All 46 findings are closed: 40 CONFIRMED fixed, 6 PLAUSIBLE dispositioned.**
+
+**All BLOCKERs closed — ten by finding id, seven by mechanism.** Both numbers appear in the programme's
+documents and both are right: F-01…F-10 carry `[BLOCKER]`, and three of them (F-03/04/05) are one defect seen by
+three lenses while two more (F-02/07) are another. DS-001 and DR-001 count mechanisms because that is what a work
+package fixes; this register counts findings because that is what it recorded. Stated here so the two are not
+read as a discrepancy.
+
+This index is the **disposition**; the sections below are the **evidence**, unedited as raised. They are
+different content, not two copies of one claim — the findings are a record of what was true on 2026-07-24 and
+must stay legible as such. Design: `JAN-EXECREM-DS-001`. Roadmap + per-WP commits: `JAN-EXECREM-DR-001 §6`.
+Divergences, residuals and the three NEW findings this remediation raised: `JAN-EXECREM-RESIDUALS.md`.
+
+| Findings | Sev | WP | Commit | Disposition |
+|---|---|---|---|---|
+| F-03, F-04, F-05 | BLOCKER ×3 | 3 | `126f0ca3` | **FIXED** — one mechanism behind all three: a plan-entry edge emptied `liveStepIds`. One entry definition + a graph-incoherence fail-closed floor. |
+| F-06 | BLOCKER | 4 | `b2dd71ad` | **FIXED** — one canonical four-valued in-edge disposition; a CANCELLED/SUPERSEDED predecessor no longer leaves its downstream live forever. |
+| F-16, F-17, F-20 | MAJOR ×3 | 4 | `b2dd71ad` | **FIXED** by the same single computation. F-16's causality inversion: a FAILED in-edge is PENDING, so a join wedges rather than releasing around an unsettled arm. |
+| F-38 | MINOR | 4 + **17** | `b2dd71ad` + *this* | **FIXED (code) + RECORD CORRECTED (doc).** The code was the correct side throughout; DS-004 §5 / DR-004 §3 carried a live, wrong normative rule. Registered as a disclosed divergence. |
+| F-46 | PLAUSIBLE | 4, 7 | `b2dd71ad`, `2607f578` | **SETTLED AND PINNED** — the `STEP_SUCCEEDED` / terminal-success asymmetry on SKIPPED is real and correct; the defect was that no test pinned it. |
+| *(capability restored)* | — | 5 | `868f595e` | WP-4 removed the ability to proceed past an arm nobody will retry; WP-5 restores it as an **explicit, governed** act (`FAILED → CANCELLED`), never as silence. Also supplies F-12's positive coverage. |
+| F-09, F-27 | BLOCKER, MAJOR | 6 | `d0ad03ad` | **FIXED** — "steps rest QUEUED" was enforced nowhere; one propose-time validator now enforces it (F-27 by prevention). |
+| F-10 | BLOCKER | 6 | `d0ad03ad` | **FIXED** — duplicate step ids are refused at propose; the anti-vacuity test uses a `transitions: []` plan so no graph rule can mask it. |
+| F-33 | MINOR | 6 | `d0ad03ad` | **FIXED** — absorbed into the one validator. |
+| F-22, F-39 | MAJOR, MINOR | 7 | `2607f578` | **FIXED** — `STEP_STATE.state` was an unvalidated free string: permanently unsatisfiable, and permanently TRUE under `NOT`. |
+| F-32, F-35 | MINOR ×2 | 7, 9 | `2607f578`, `d76aec4a` | **FIXED** — grammar hardening + the truth table. |
+| F-41, F-43, F-44 | PLAUSIBLE ×3 | 7 | `2607f578` | **FIXED** — an empty `ALL`/`ANY` operand list was fail-OPEN (`[].every` is vacuously true); `.min(1)`. |
+| F-34 | MINOR | 2 | `89bfbaa4` | **FIXED** — `GateContext` + memoization; a pure seam, proved by call count, not wall clock. |
+| F-11, F-12, F-13, F-14, F-18, F-19, F-40 | MAJOR ×6, MINOR | 8, 9 | `f27a09e1`, `d76aec4a` | **FIXED** — `STEP_COMMAND_SPECS` makes the contract data; the kill-test battery makes each source set killable. Two of the shipped "negatives" were **vacuous** (a different check refused the same input); those fixtures now isolate the guard. |
+| F-02, F-07, F-24 | BLOCKER ×2, MAJOR | 10 | `92f30710` | **FIXED** — a BRANCH decided against **pre-completion** facts, so a self-referential guard was always false and the DEFAULT arm was always taken. The settlement view includes the move being made. |
+| F-15, F-21, F-23 | MAJOR ×3 | 1, 4, 10 | `96d152cf`, `92f30710` | **FIXED** — one omission wearing three masks: only one of the two commands that mint terminal-success recorded the arm. `branchDecision` is now a **required** column, so silence is a declaration with a reason. |
+| F-01 | BLOCKER | 1, 11 | `cffc796a` | **FIXED (both limbs)** — RPH-EXE-006 evaluated `b \|\| !b`; a guard cannot be non-vacuous while one of its inputs is unrepresentable, so the contract gained the missing second fact. The zero-subject floor bypass is closed with it. |
+| F-08 | BLOCKER | 12a | `32e185b0` | **FIXED** — one definition of execution success. Residual **R-1** disclosed: the guard remains an ENTRY gate. |
+| F-26, F-28 | MAJOR ×2 | 12b | `df570f1f` | **FIXED** — the declared authority table becomes enforcement. F-28's RPH-PWU-010 had **no production caller at all** while the conformance manifest certified it COVERED. |
+| F-30 | MAJOR | 12c | `7da9e961` | **FIXED** — §21.1's authorization was `!!p.waiverOrRevisionId`: any non-empty string. Now resolved against a real EFFECTIVE decision, step-exact. |
+| F-25, F-36, F-45 | MAJOR, MINOR, PLAUSIBLE | 13 | `50cbb468` | **FIXED** — the attempt fold becomes total; emitted payloads conform. **F-25's proposed fix was refused** and a stronger one built (see the residual register §3.1). |
+| F-31, F-37 | MAJOR, MINOR | 14 | `827b13b8` | **FIXED** — two never-populated fields become DERIVED facts, never caller assertions. |
+| F-29 | MAJOR | 15 | `0dea8e6b` | **FIXED** — the plan-status condition moves out of the template into the read-model, reading the same declaration the engine enforces. Residual **R-7** disclosed (fail-open on an absent PWU state). |
+| F-42 | PLAUSIBLE | 12, **17** | `df570f1f` + *this* | **RECORD-ONLY.** The code guards one of the two wait commands and the code is **right**: suspension mints nothing, and a system that makes reporting trouble harder than claiming success is worse than one that checks neither. DS-004 §6 D6 and DR-004's DWP-04 corrected in four places; disclosed in DR-004 §15. |
+| *(anti-recurrence)* | — | 16 | `636894bc` | Registries whose gates make each family's defect shape fail the **build**. On its first run they raised **three new findings** — RPH-EXE-003/004/005, ratified rules enforced nowhere and certified COVERED. Open; see the residual register §5. |
 
 
 ---

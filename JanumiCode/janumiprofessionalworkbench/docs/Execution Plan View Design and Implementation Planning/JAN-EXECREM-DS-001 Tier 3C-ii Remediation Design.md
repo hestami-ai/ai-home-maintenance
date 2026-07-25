@@ -155,6 +155,20 @@ kill test; the three registry-totality gates green; `JAN-EXECPLAN-DR-004`'s stal
 
 ---
 
-*`READY_TO_BUILD` — six family designs adversarially critiqued (all `NEEDS_REVISION`, all reconciled), 14
-cross-family conflicts resolved including two blocking, 8 shared mechanisms adopted, 19 residual risks disclosed.
-Roadmap: `JAN-EXECREM-DR-001`.*
+*`DELIVERED 2026-07-25` (was `READY_TO_BUILD`) — six family designs adversarially critiqued (all
+`NEEDS_REVISION`, all reconciled), 14 cross-family conflicts resolved including two blocking, 8 shared mechanisms
+adopted, 19 residual risks disclosed. Roadmap + delivery record: `JAN-EXECREM-DR-001 §6`. Divergences, residuals
+and the three new findings this programme raised: `JAN-EXECREM-RESIDUALS.md`.*
+
+> **Post-build note (WP-17, 2026-07-25) — the §8 residuals as built.** All eight shared mechanisms landed, three
+> with argued departures from this design (recorded in §3 of the residual register). §8's five disclosed
+> residuals all still stand and are restated there with what the build learned about each; four more were added
+> by the build itself.
+>
+> **§4's ruling turned on itself.** This design's central claim is that fixing defects without fixing *how they
+> got in* schedules the next recurrence, and the reason these 46 findings existed is that DR-004's own mandated
+> post-build adversarial verification was never run. **JAN-EXECREM has not had one either.** WP-16's gates are
+> the structural half of the answer — a rule with no enforcement site, a site with no kill test, and a guard
+> whose inputs cannot disagree are now build failures rather than discoveries — and on their first run they
+> found three more ratified rules (RPH-EXE-003/004/005) enforced nowhere and certified COVERED. That is evidence
+> the mechanism works, and it is not a substitute for the review. The review is owed.

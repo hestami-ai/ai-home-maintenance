@@ -102,5 +102,58 @@ acceptance) → **dispositioned** in WP-12 + recorded in WP-17. F-45 (attempt re
 
 ---
 
-*`READY_TO_BUILD` / v0.1.0 — 18 work packages, 8 shared mechanisms, 14 cross-family conflicts resolved (two
-blocking), 19 residual risks disclosed. Nothing built yet.*
+## 6. Delivery record (WP-17, 2026-07-25)
+
+**WP-0 … WP-17 DELIVERED.** All 40 CONFIRMED findings fixed or explicitly dispositioned; all 6 PLAUSIBLE
+dispositioned; **all seven BLOCKERs closed**. Written here rather than left to be inferred, because the sibling
+roadmap this programme exists to remediate (`JAN-EXECPLAN-DR-004`) had no delivery record at all — which is how
+it went on certifying "nothing built" for a shipped feature and "no divergences" for two that shipped.
+
+| WP | Commit | Landed |
+|---|---|---|
+| 0 — the test seeding seam (SM-7) + fixture migration | `afad2cc4` | behaviour-neutral |
+| 1 — vocab + regeneration batch | `96d152cf` | optional and dormant |
+| 2 — `GateContext` + memoization (F-34) | `89bfbaa4` | a pure seam, proved by call count |
+| 3 — one entry definition + the graph-incoherence floor | `126f0ca3` | closes 3 BLOCKERs (F-03/F-04/F-05) |
+| 4 — one canonical in-edge disposition | `b2dd71ad` | closes F-06 (BLOCKER), F-16, F-17, F-20 |
+| 5 — abandoning a FAILED arm is an explicit, governed act | `868f595e` | restores what WP-4 removed |
+| 6 — one propose-time validator (SM-4) | `d0ad03ad` | closes F-10 + F-09/F-27 (BLOCKERs) + F-33 |
+| 7 — condition-grammar hardening + one fail-closed evaluator (SM-5) | `2607f578` | |
+| 8 — `STEP_COMMAND_SPECS` + `advanceStep` v2 (SM-2/SM-3) | `f27a09e1` | authority becomes declared data |
+| 9 — the source-state kill-test battery | `d76aec4a` | F-11/12/13/14/18/19 + two new gaps |
+| 10 — a BRANCH decides ONCE, against the move it is making | `92f30710` | |
+| 11 — RPH-EXE-006 stops being a tautology; the floor stops skipping empty-handed AI work | `cffc796a` | |
+| 12a — ONE definition of execution success | `32e185b0` | F-08, the last BLOCKER |
+| 12b — the declared authority table becomes ENFORCEMENT | `df570f1f` | F-26 + F-28 |
+| 12c — §21.1's authorization is RESOLVED, not assumed | `7da9e961` | F-30 |
+| 13 — the attempt fold becomes TOTAL; emitted payloads conform | `50cbb468` | F-25, F-36, F-45 |
+| 14 — two never-populated fields become DERIVED facts | `827b13b8` | F-31, F-37 |
+| 15 — "no affordance the engine would reject" becomes STRUCTURAL | `0dea8e6b` | F-29 |
+| 16 — the anti-recurrence gates (SM-6) | `636894bc` | + three NEW findings |
+| 17 — documentation, divergence, residual-record reconciliation | *(this commit)* | F-38, F-42 |
+
+**Series gate `G-EXECREM-001` green** at each landing: check-types · vitest · lint 0 · boundary 0 ·
+svelte-check 0 · Playwright · `rph-engine` 69 (the reference seed drives unchanged, every package) · the
+registry-totality gates · **every new or repaired guard live mutation-red-proofed** by the implementing engineer,
+never delegated.
+
+**The register of what this programme authored, declined, left standing and newly found:
+`JAN-EXECREM-RESIDUALS.md`.** It carries 6 authored contract additions, 2 authored rule extensions, 5 argued
+divergences from this design, 9 disclosed residuals, and **3 new findings** — RPH-EXE-003/004/005, ratified rules
+correctly implemented as pure predicates, asked by nothing, and certified COVERED. Those are open.
+
+**DS-001 §9's exit criteria, item by item:** WP-0…17 delivered ✓ · every CONFIRMED finding fixed or
+dispositioned ✓ · every PLAUSIBLE finding dispositioned ✓ · reference seed drives unchanged (`rph-engine` 69) ✓ ·
+full gate green ✓ · every new/repaired guard live mutation-red-proofed ✓ · the registry-totality gates green ✓ ·
+`JAN-EXECPLAN-DR-004`'s stale delivery record corrected ✓ (WP-17 §7 of the residual register).
+
+**The one exit criterion this programme cannot certify for itself:** DS-001 §4's ruling is that a remediation
+which fixes defects without fixing *how they got in* schedules the next recurrence — and the reason these 46
+findings existed at all is that DR-004's own post-build adversarial verification was never run. **This programme
+has not had one either.** WP-16's gates are the structural half of the answer and they are real; an adversarial
+post-build review of JAN-EXECREM itself is the other half, and it is **owed, not done**.
+
+---
+
+*`DELIVERED` / v0.1.0 — 18 work packages, 8 shared mechanisms, 14 cross-family conflicts resolved (two blocking),
+19 residual risks disclosed. Post-build adversarial verification of this programme: NOT YET EXECUTED.*
