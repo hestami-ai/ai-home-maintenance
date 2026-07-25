@@ -160,6 +160,53 @@ function gateContext(plan: GatePlan, evaluateGuard?: EdgeGuardEvaluator): GateCo
 	return ctx;
 }
 
+/**
+ * The ENTRY steps of a transition graph — the ONE definition, shared by propose-time validation and runtime BFS
+ * seeding so the two planes cannot drift (JAN-EXECREM WP-3 / F-03, F-04, F-05).
+ *
+ * A step is an entry iff it has no in-edge FROM A REAL SOURCE. A plan-entry edge (`sourceStepId` absent,
+ * `targetStepId` present) is contract-legal and explicitly blessed — `checkDanglingIds` says so in as many words:
+ * "A missing SOURCE is legitimate: that is a plan-entry edge" — and it does not make its target a non-entry; it
+ * marks it AS an entry.
+ *
+ * THE DEFECT THIS CLOSES. Propose-time counted in-degree over edges with BOTH endpoints (`buildAdjacency`), so an
+ * entry edge into s1 left s1's in-degree at 0 and the plan validated. The runtime BFS seeded its frontier from
+ * `inEdgesOf(...).length === 0`, which INCLUDES source-less edges, so the same s1 had one in-edge and the frontier
+ * came out EMPTY. With an empty frontier the live set is empty, so every source reads NOT-live, every in-edge
+ * NEUTRALIZED, and every step both unstartable AND waiver-free prunable — i.e. a contract-legal plan turned Prune
+ * into a universal bypass of the mandatory-skip waiver rule, and reported the whole graph unreachable. One
+ * definition, used by both, is why that cannot recur.
+ *
+ * Note the `every` is over in-edges FROM A SOURCE, so a step with no in-edges at all is (still) an entry — the
+ * pre-existing behaviour for every graph plan that declares no entry edge, which is why this change is inert there.
+ */
+export function entryStepIds(
+	steps: readonly { readonly id: string }[],
+	transitions: readonly GateTransition[]
+): string[] {
+	const hasRealSourceInEdge = new Set<string>();
+	for (const t of transitions)
+		if (t.sourceStepId !== undefined && t.targetStepId !== undefined) hasRealSourceInEdge.add(t.targetStepId);
+	return steps.filter((s) => !hasRealSourceInEdge.has(s.id)).map((s) => s.id);
+}
+
+/**
+ * Is the graph INCOHERENT — a non-empty transition graph with no entry at all?
+ *
+ * Propose-time validation refuses this (exactly-one-entry, plus the DAG check), so it can only arrive as stored
+ * history from an earlier build or a plan constructed around the command bus. It matters because the failure mode
+ * is silent and maximally unsafe: no entry ⇒ empty live set ⇒ EVERY step reads unreachable and therefore prunable.
+ * The gate must fail CLOSED here (offer nothing) rather than fail open (offer to prune the entire plan).
+ */
+function graphIsIncoherent(plan: GatePlan): boolean {
+	const transitions = plan.transitions ?? [];
+	return (
+		transitions.length > 0 &&
+		plan.steps.length > 0 &&
+		entryStepIds(plan.steps, transitions).length === 0
+	);
+}
+
 const stepOf = (ctx: GateContext, stepId: string | undefined): GateStep | undefined =>
 	stepId === undefined ? undefined : ctx.stepById.get(stepId);
 
@@ -242,7 +289,9 @@ function computeLiveStepIds(ctx: GateContext): ReadonlySet<string> {
 	const transitions = plan.transitions ?? [];
 	if (transitions.length === 0) return new Set(plan.steps.map((s) => s.id)); // linear plan: everything is reachable
 	const live = new Set<string>();
-	const frontier = plan.steps.filter((s) => inEdgesOf(ctx, s.id).length === 0).map((s) => s.id);
+	// The SHARED entry definition (WP-3). Seeding from `inEdgesOf(...).length === 0` counted a source-less
+	// plan-entry edge as an in-edge, so a contract-legal entry edge emptied the frontier and voided the live set.
+	const frontier = [...entryStepIds(plan.steps, transitions)];
 	while (frontier.length) {
 		const id = frontier.pop()!;
 		if (live.has(id)) continue;
@@ -421,6 +470,10 @@ export function startableStepIds(plan: GatePlan, evaluateGuard?: EdgeGuardEvalua
  */
 export function prunableStepIds(plan: GatePlan, evaluateGuard?: EdgeGuardEvaluator): string[] {
 	if (plan.status !== 'ACTIVE') return [];
+	// FAIL CLOSED on an incoherent graph (WP-3). With no entry the live set is empty, which would otherwise mark
+	// EVERY step unreachable and therefore prunable — turning Prune into a blanket bypass of the mandatory-skip
+	// waiver rule on a plan the gate cannot actually reason about. Offer nothing instead.
+	if (graphIsIncoherent(plan)) return [];
 	const live = gateContext(plan, evaluateGuard).live();
 	return plan.steps
 		.filter(
@@ -481,6 +534,15 @@ export function startStepGate(
 				}
 			: { ok: true };
 	}
+	// FAIL CLOSED before the barrier (WP-3). With no entry the live set is empty, so reachability is undefined for
+	// EVERY step; naming a per-edge blocker here would be a guess, and saying "it should be pruned" would actively
+	// mislead — the remedy for an incoherent plan is supersession, not pruning it step by step.
+	if (graphIsIncoherent(plan))
+		return {
+			ok: false,
+			reason:
+				'the transition graph has no entry step, so reachability cannot be determined — the plan is incoherent and no step may start (it must be superseded, NOT pruned)'
+		};
 	const inEdges = inEdgesOf(ctx, stepId);
 	if (inEdges.length === 0) return { ok: true }; // entry step
 	const b = barrierState(ctx, inEdges);
@@ -573,20 +635,18 @@ function checkDanglingIds(
 	return undefined;
 }
 
-/** In-degree + out-edges over REAL edges (both endpoints present), preserving authored (array) order for out-edges. */
+/** Out-edges over REAL edges (both endpoints present), preserving authored (array) order.
+ *  In-degree is no longer computed here: entries come from the shared `entryStepIds` (WP-3), so there is exactly
+ *  one definition of "entry" in this module and the two planes cannot drift again. */
 function buildAdjacency(
 	stepIds: readonly string[],
 	transitions: readonly GateTransition[]
-): { inCount: Map<string, number>; outEdges: Map<string, GateTransition[]> } {
-	const inCount = new Map<string, number>(stepIds.map((id) => [id, 0]));
+): { outEdges: Map<string, GateTransition[]> } {
 	const outEdges = new Map<string, GateTransition[]>(stepIds.map((id) => [id, []]));
-	for (const t of transitions) {
-		if (t.sourceStepId !== undefined && t.targetStepId !== undefined) {
-			inCount.set(t.targetStepId, (inCount.get(t.targetStepId) ?? 0) + 1);
+	for (const t of transitions)
+		if (t.sourceStepId !== undefined && t.targetStepId !== undefined)
 			outEdges.get(t.sourceStepId)!.push(t);
-		}
-	}
-	return { inCount, outEdges };
+	return { outEdges };
 }
 
 /** Steps NOT reachable from `entry` by forward edge-connectivity. */
@@ -673,9 +733,11 @@ export function validateTransitionGraph(
 	const dangling = checkDanglingIds(transitions, new Set(stepIds));
 	if (dangling) return dangling;
 
-	const { inCount, outEdges } = buildAdjacency(stepIds, transitions);
+	const { outEdges } = buildAdjacency(stepIds, transitions);
 
-	const entries = stepIds.filter((id) => (inCount.get(id) ?? 0) === 0);
+	// The SAME `entryStepIds` the runtime BFS seeds from (WP-3) — previously this plane counted in-degree over
+	// both-endpoint edges while the runtime counted every in-edge, and a plan-entry edge fell into the gap.
+	const entries = entryStepIds(steps, transitions);
 	if (entries.length !== 1) return invalid(entryCountMessage(entries));
 
 	const unreachable = unreachableFrom(entries[0]!, stepIds, outEdges);
