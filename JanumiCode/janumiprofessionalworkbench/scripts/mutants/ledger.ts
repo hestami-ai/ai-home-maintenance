@@ -308,8 +308,25 @@ export const DECLARED_MUTANTS: readonly DeclaredMutant[] = [
 		// precisely what `expectNoCompile` exists to detect: a guarantee downgraded from UNEXPRESSIBLE to merely
 		// tested, silently, by a refactor whose subject was something else. The narrowing was restored.
 		file: 'packages/rph-application/src/handlers/execution.ts',
-		find: "\tif (binding?.objectType !== 'RUNTIME_BINDING')",
-		replace: "\tif (binding !== undefined && binding.objectType === '__never__')",
+		// RE-ANCHORED AGAIN BY JAN-BINDEXCL, and the reason is worth stating because it is the SECOND time this one
+		// anchor has rotted and the two causes are opposite. RW-6 broke it by changing the code it named. This time
+		// the code it names is untouched: `rejectMisboundStep` added a SECOND site that resolves a binding and checks
+		// its objectType, at two tabs instead of one — and the one-tab anchor is a SUBSTRING of the two-tab line, so
+		// it went ambiguous without either site changing a character.
+		//
+		// The collision is legitimate and must not be "fixed" in the production code. Both sites ask the same
+		// question and reach OPPOSITE dispositions on purpose: at Start an unresolvable binding fails CLOSED (an
+		// authority that cannot be read authorizes nothing), while at propose it is ALLOWED THROUGH, because
+		// refusing it there is the wedge N3 exists to catch. Collapsing them into a shared helper would hide exactly
+		// that difference, and renaming a local to protect a test anchor is the tail wagging the dog.
+		//
+		// So the anchor takes the preceding line as context instead. WP14-M7's rule said tabs disambiguate but rot on
+		// reformat; this is its other half — tabs also fail to disambiguate the moment a sibling site appears at a
+		// different depth. CONTENT is what makes an anchor unique, and `const binding = ctx.store.loadObject(...)`
+		// followed at the SAME depth by the type check is content only this site has.
+		find: "\tconst binding = ctx.store.loadObject(bindingId);\n\tif (binding?.objectType !== 'RUNTIME_BINDING')",
+		replace:
+			"\tconst binding = ctx.store.loadObject(bindingId);\n\tif (binding !== undefined && binding.objectType === '__never__')",
 		expectRed: ['packages/rph-application/src/handlers/exebind-wp1-binding-authority.test.ts'],
 		why: 'fail-CLOSED on an unresolvable authority (K4). REFORMULATED by JAN-VERIF V-1: the harvested form deleted the narrowing outright, so `binding` became possibly-undefined and TypeScript rejected it \u2014 NO_COMPILE, proving nothing. This form keeps the narrowing and inverts only the accepted type, so the fail-open path is genuinely reached.',
 		source: 'exebind_mutants.py (reformulated V-1)',
