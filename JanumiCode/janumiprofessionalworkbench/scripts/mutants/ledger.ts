@@ -26,6 +26,18 @@
 //   UNANCHORED  `find` is absent or ambiguous -> the ledger has rotted against the code. Equally a finding:
 //               it means a mutation someone once cited as evidence can no longer be performed at all.
 //   NO_COMPILE  the mutant does not typecheck, so it never reached the code and proves nothing either way.
+//   RETIRED     its target was legitimately removed and the successor mutant is NAMED (`supersededBy`).
+//   TYPE_PREVENTED  it is DECLARED as not compiling, and that refusal IS the guarantee (`expectNoCompile`).
+//   KILLED_UNNAMED  killed, but package-wide, because the declaring work package never named its victim.
+//   ABORTED_DIRTY   the tree was already dirty — EVERY VERDICT FROM HERE ON IS VOID, and the run stops.
+//
+// ON THAT LAST VERDICT. It exists because this harness produced two complete, plausible, entirely worthless
+// verdict tables before it did: once when an external timeout killed a run mid-mutant, and once when a manual
+// check of a single mutant was run CONCURRENTLY with a full run. In both cases a leaked edit became the baseline
+// for every later mutant — their `original` snapshot already contained it, so their "restore" wrote it back — and
+// their typechecks then failed on a line in a file they never touched, reporting NO_COMPILE, which reads exactly
+// like a well-behaved verdict. A short table that says why it stopped is worth far more than a full one that is
+// quietly meaningless.
 //
 // THE DISCLOSED LIMIT (JAN-VERIF-DS-001 §4): a DECLARED ledger is not the possible mutant space. This proves the
 // declared set still bites; it says nothing about operators nobody thought of. Generated mutation (Stryker) is

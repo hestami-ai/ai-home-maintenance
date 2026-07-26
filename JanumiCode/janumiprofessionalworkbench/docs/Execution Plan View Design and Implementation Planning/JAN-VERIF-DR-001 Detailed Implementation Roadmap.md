@@ -116,35 +116,38 @@ SURVIVED and fails the build.** Nothing had recorded that guarantee until someth
 **The runner refuses to start on a dirty tree and aborts if the tree is dirty afterwards** — one of the review
 agents in this repo left a mutant behind mid-run, and a harness that can do that is worse than none.
 
-### V-2a — the older ledger, and why blocking is NOT yet wired
+### V-2a — the older ledger, and TWO RETRACTED RESULTS
 
-90 mutants: **27 KILLED · 34 KILLED_UNNAMED · 21 NO_COMPILE · 3 RETIRED · 2 UNANCHORED · 1 TYPE_PREVENTED ·
-2 SURVIVED.**
+The ledger was expanded 31 → 90 by harvesting the JAN-EXECREM WP-2..WP-15 harnesses. **Two verdict tables were
+then produced and BOTH are void.** They are recorded here rather than deleted, because how they became worthless
+is the most useful thing V-2a produced.
 
-**2 SURVIVED are the first real gaps this instrument has found**, and one is named:
-`WP12B-M3 — Cancel is "hardened" to REQUIRES_OPEN_PWU (live steps get stranded)`. That mutant makes Cancel refuse
-on a closed PWU, which would strand exactly the work revocation exists to release. It **must not be reported as a
-confirmed defect yet**: a survivor from a harvested ledger can equally be a harvest artifact (a mis-transcribed
-anchor landing somewhere harmless). Both need investigation before either is believed — the same discipline that
-caught the finding-#7 refusal being wrong.
+| reported | status |
+|---|---|
+| "2 SURVIVED — the first real gaps this instrument has found" | **RETRACTED.** From a run an external 10-minute timeout killed mid-mutant. The abandoned mutation stayed in the tree and became the baseline for everything after it. |
+| "43 NO_COMPILE, 4 UNANCHORED" | **VOID.** Contaminated by a manual single-mutant check run CONCURRENTLY with the full run — my own doing, one message after warning against exactly that. |
 
-**21 NO_COMPILE** are harvested mutants whose formulation does not typecheck against today's code. Each proves
-nothing until reformulated, and NO_COMPILE exists as a verdict precisely so they cannot be mistaken for kills.
+**THE MECHANISM, which is a genuine design defect and now fixed.** A single leaked mutation poisons everything
+after it, silently and permanently: the next mutant on that file snapshots the ALREADY-MUTATED content as its
+`original`, so its "restore" faithfully writes the mutation back. **One leak becomes the new baseline.** Worse,
+every later mutant's typecheck then fails on the leaked edit — *in a file it never touched* — and reports
+`NO_COMPILE`, which reads exactly like a well-behaved verdict. That is how a full, plausible, entirely worthless
+table gets produced: 43 of the 90 verdicts were the same foreign type error.
 
-**34 KILLED_UNNAMED** is a records defect in the work packages that declared them: they said what to break and
-never said which test catches it. The guard is tested *somewhere*; "somewhere" does not survive a refactor of the
-suite.
+**Three guards now, because one was not enough:**
 
-**`MUTANTS_BLOCKING=1` is deliberately NOT wired yet.** 25 entries need attention, and a gate that fails on day
-one is a gate someone disables on day one — the same argument this roadmap makes against aspirational coverage
-thresholds. It is wired when the count reaches zero, and not before.
+1. **Journalled in-flight mutant.** Written to disk before the edit, cleared after restore; a later run recovers
+   from it. A `finally` is not a guarantee when the process can be killed — a file on disk survives.
+2. **Cleanliness checked before EVERY mutant**, not just at the ends.
+3. **The run STOPS at the first dirty tree** (`ABORTED_DIRTY`). A short table that says why it stopped is worth
+   far more than a full one that is quietly meaningless.
 
-**AND THE RUNNER LOST A MUTANT.** A 10-minute command timeout killed the 90-mutant run mid-flight and left
-`validateStepCompletion`'s contradictory-cell guard mutated to `if (false && …)` in the working tree. Every
-subsequent test run would have been GREEN against a disabled guard — *the exact failure mode this harness exists
-to prevent, produced by the harness itself.* The `finally` and the end-of-run cleanliness check are both defeated
-by external termination. The in-flight mutant is now journalled to disk before it is applied, and a later run
-recovers from it: **a `finally` is not a guarantee when the process can be killed; a file on disk survives.**
+**The one clean measurement remains V-1's 31-mutant run: 27 KILLED, 1 TYPE_PREVENTED, 3 RETIRED, 0 SURVIVED.**
+Everything about the other 59 is currently unmeasured, and saying "unmeasured" is the whole point of the exercise
+— it is the same distinction V-0 drew when it found coverage had never been measured rather than being low.
+
+**`MUTANTS_BLOCKING=1` and the coverage thresholds stay unwired** until a clean 90-mutant run exists. Wiring a
+gate to an instrument that has twice produced void output would be worse than having no gate.
 
 ## 4. V-2b — branch gaps, then the ratchet
 
@@ -175,7 +178,7 @@ The note is not the guarantee; the table is.)*
 |---|---|---|
 | V-0 | *(this commit)* | **DELIVERED.** Merged coverage measurable for the first time: **94.57% stmts / 82.99% branch / 96.69% lines** over 4,501 statements, 1,571 tests, 139 files. Both resolution modes green — **no build/emit divergence found.** |
 | V-1 | *(this commit)* | **DELIVERED.** 31 declared mutants harvested into a re-runnable ledger. First-ever re-run: **27 KILLED · 1 TYPE_PREVENTED · 3 RETIRED · 0 SURVIVED · 0 UNANCHORED · 0 NO_COMPILE.** |
-| V-2a | *(this commit)* | **Ledger expanded 31 → 90** (the JAN-EXECREM WP-2..WP-15 harnesses) + crash recovery. **2 SURVIVED — the first real gaps this instrument has found.** Thresholds and blocking deferred: see below. |
+| V-2a | `b2ff18ca` + *(this commit)* | Ledger expanded 31 → 90; three anti-contamination guards added. **Both of its verdict tables were VOID — retracted below.** The only clean measurement is still V-1's 31. |
 | V-2b | — | not started — the 2 SURVIVED, 21 NO_COMPILE, 34 unnamed victims, then thresholds |
 
 **V-0's measured result, and the artifact hypothesis CONFIRMED.** The per-package figures were lower bounds, exactly as DS §2 predicted:

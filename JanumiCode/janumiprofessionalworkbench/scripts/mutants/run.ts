@@ -30,7 +30,8 @@ type Verdict =
 	| 'RETIRED'
 	| 'TYPE_PREVENTED'
 	| 'NO_COMPILE'
-	| 'KILLED_UNNAMED';
+	| 'KILLED_UNNAMED'
+	| 'ABORTED_DIRTY';
 
 interface Result {
 	readonly mutant: DeclaredMutant;
@@ -57,6 +58,25 @@ function runMutant(m: DeclaredMutant): Result {
 			mutant: m,
 			verdict: 'RETIRED',
 			detail: `superseded by ${m.supersededBy.split(' —')[0]}`
+		};
+
+	// CLEANLINESS IS CHECKED BEFORE **EVERY** MUTANT, not just at the ends — and the reason is a real corruption
+	// this harness suffered.
+	//
+	// A single leaked mutation poisons everything after it, silently and permanently: the next mutant on that file
+	// snapshots the ALREADY-MUTATED content as its `original`, so its "restore" faithfully writes the mutation back.
+	// One leak becomes the new baseline. Worse, every later mutant's typecheck then fails on the LEAKED edit — in a
+	// file it never touched — and reports NO_COMPILE, which reads exactly like a well-behaved verdict.
+	//
+	// That happened here twice: once when an external timeout killed a run mid-mutant, and once when a manual
+	// verification of one mutant was run CONCURRENTLY with a full run. Both produced a full, plausible, entirely
+	// worthless verdict table. Failing loudly at the first sign of dirt is the only way the output means anything.
+	if (!treeIsClean())
+		return {
+			mutant: m,
+			verdict: 'ABORTED_DIRTY',
+			detail:
+				'the tree was already dirty when this mutant began — every verdict after this point is void'
 		};
 
 	const abs = `${ROOT}${m.file}`;
@@ -168,7 +188,20 @@ const results: Result[] = [];
 for (const m of selected) {
 	const r = runMutant(m);
 	results.push(r);
-	console.log(`${r.verdict.padEnd(11)} ${m.id.padEnd(34)} ${r.detail}`);
+	console.log(`${r.verdict.padEnd(14)} ${m.id.padEnd(34)} ${r.detail}`);
+	if (r.verdict === 'ABORTED_DIRTY') {
+		// STOP. Every verdict after a leak is measured against a tree nobody chose, and a full table of plausible
+		// verdicts that happens to be worthless is far more dangerous than a short table that says why it stopped.
+		console.error(
+			[
+				'',
+				'ABORTED: the tree went dirty mid-run. Nothing after this point was measured.',
+				'Restore with `git checkout -- packages`, then re-run with NOTHING else touching the tree —',
+				'in particular, never run a manual mutation while a full run is in flight.'
+			].join('\n')
+		);
+		break;
+	}
 }
 
 if (!treeIsClean()) {
@@ -185,7 +218,8 @@ for (const v of [
 	'SURVIVED',
 	'UNANCHORED',
 	'NO_COMPILE',
-	'KILLED_UNNAMED'
+	'KILLED_UNNAMED',
+	'ABORTED_DIRTY'
 ] as const)
 	console.log(`${v.padEnd(11)} ${by(v).length}`);
 
@@ -208,7 +242,11 @@ ${unnamedVictims} mutant(s) had NO NAMED VICTIM and were run package-wide. That 
 			`caught it", and only the latter survives a refactor of the suite.`
 	);
 
-const failures = by('SURVIVED').length + by('UNANCHORED').length + by('NO_COMPILE').length;
+const failures =
+	by('ABORTED_DIRTY').length +
+	by('SURVIVED').length +
+	by('UNANCHORED').length +
+	by('NO_COMPILE').length;
 if (failures > 0)
 	console.log(
 		`\n${failures} mutant(s) need attention. ${blocking ? 'BLOCKING.' : 'Advisory on this run — see the note in run.ts.'}`
