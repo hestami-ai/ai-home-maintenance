@@ -169,8 +169,13 @@ export const ENFORCEMENT_REGISTER: Readonly<Record<RegisteredRuleId, Enforcement
 		// RW-0 MOVED the limb into `stepAuthorityRefusal` — the register documented a call site that no longer
 		// existed, which is precisely the drift a register exists to prevent. DS-001 §6 C-1 predicted this exact
 		// conflict and required it be fixed in the same commit; it was not.
+		// SITE RE-STATED BY JAN-REVREM RW-6, IN THE SAME COMMIT AS THE MOVE. The DECISION now lives in
+		// `rph-domain`'s `bindingAuthorityVerdict` so the read-model can consult the same declaration (MAJOR #5);
+		// `bindingAuthorityRefusal` resolves the store and renders the verdict. Both halves are named, because
+		// naming only one would leave a reader unable to find either the rule or its enforcement — and this row has
+		// already documented a vanished call site once, for four commits, exactly as DS-001 §6 C-1 predicted.
 		enforcedAt:
-			'packages/rph-application/src/handlers/execution.ts — bindingAuthorityRefusal, invoked from stepAuthorityRefusal on the `bindingAuthority` column (JAN-EXEBIND WP-B1, re-sited by JAN-REVREM RW-0)',
+			'DECISION: packages/rph-domain/src/execution.ts — bindingAuthorityVerdict (the four checks and their order). ENFORCEMENT: packages/rph-application/src/handlers/execution.ts — bindingAuthorityRefusal, invoked from stepAuthorityRefusal on the `bindingAuthority` column (JAN-EXEBIND WP-B1, re-sited by JAN-REVREM RW-0, split by RW-6)',
 		refusalCode: 'RPH_INVARIANT_VIOLATION',
 		// The kernel's own label travels in the MESSAGE: `RPH_BINDING_NOT_AUTHORIZED` is not a member of the ratified
 		// 15-value RphErrorCodeSchema, so it goes there or nowhere (the WP-11 discipline).
@@ -184,7 +189,12 @@ export const ENFORCEMENT_REGISTER: Readonly<Record<RegisteredRuleId, Enforcement
 			'flip StartExecutionStep.bindingAuthority to NOT_EXECUTING in step-command-spec.ts',
 			'flip ResolveExecutionStepWait.bindingAuthority to NOT_EXECUTING — the two-arrows BLOCKER, re-expressed as one character of declaration',
 			'delete the bindingAuthority limb from stepAuthorityRefusal',
-			'delete the SCOPE check (boundStepId !== stepId) — a binding then backs any step in the plan'
+			'delete the SCOPE check (boundStepId !== stepId) in bindingAuthorityVerdict — a binding then backs any step in the plan',
+			// ADDED BY RW-6. The rule is now enforced at TWO layers and the second one is a filter, so it needs its own
+			// act: deleting the read-model limb leaves the engine correct while the UI offers a click the engine
+			// refuses. That is MAJOR #5 itself, and without this entry nothing in the register would say how to
+			// reproduce it.
+			'delete the bindingAuthority limb from planPermitsAffordance in rph-projections/src/execution-view.ts — the engine still refuses, but the UI offers Start again (MAJOR #5)'
 		]
 	},
 	'RPH-EXE-004': {

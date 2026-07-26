@@ -29,6 +29,10 @@ import {
 	inEdgeDisposition,
 	STEP_COMMAND_SPECS,
 	type StepCommandType,
+	// RW-6: the read-model consults the SAME decision the engine does, rather than re-deriving RPH-EXE-003's four
+	// checks and their load-bearing order.
+	bindingAuthorityVerdict,
+	type BindingAuthorityFacts,
 	isTerminalSuccessStepState,
 	prunableStepIds as gatePrunableStepIds,
 	startableStepIds as gateStartableStepIds,
@@ -63,10 +67,36 @@ export interface ExecutionStepInput {
 	readonly purpose: string;
 	readonly stepState: string;
 	readonly runtimeBindingId?: string;
+	/**
+	 * The RESOLVED facts about that binding, when the caller could look them up (JAN-REVREM RW-6 / MAJOR #5).
+	 *
+	 * Threaded because `stepAuthorityRefusal` grew a THIRD authority limb — `bindingAuthority` — and this read-model
+	 * consulted only two, so the UI offered Start on a step whose binding is REQUESTED, DENIED, REVOKED, or
+	 * authorized for a DIFFERENT step, and the engine refused the click. That is F-29's "no affordance the engine
+	 * would reject" broken for the third time by a new engine limb whose read-model counterpart was not added —
+	 * after RPH-PWU-010 (WP-12b) and Prune (RW-0).
+	 *
+	 * ABSENT MEANS UNGATED, not unauthorized, exactly as `pwuWorkLifecycleState` is (DS §6b R9). Note the asymmetry
+	 * that matters: `resolves: false` is a RESOLVED NEGATIVE and gates, while this whole field being absent is NO
+	 * INFORMATION and does not. And a step naming no `runtimeBindingId` at all is OUT OF SCOPE — the reference seed
+	 * authors no RuntimeBinding whatsoever, so gating that case would make every existing plan unstartable.
+	 */
+	readonly runtimeBinding?: StepBindingFacts;
 	/** For a RESOLVED BRANCH: the out-edge it actually selected, recorded when it succeeded (DWP-09). The flow gate
 	 *  honours a recorded decision over a re-derived one, so this MUST reach the read-model or the UI's branch
 	 *  verdict can drift from the engine's the moment a guard's inputs change. */
 	readonly selectedTransitionId?: string;
+}
+
+/** What the caller resolved about a step's runtime binding. The step's own `runtimeBindingId` is not repeated here —
+ *  the projection already has it, and carrying it twice invites the two copies to disagree. */
+export interface StepBindingFacts {
+	/** Did `runtimeBindingId` resolve to a RUNTIME_BINDING? `false` gates; the field's ABSENCE does not. */
+	readonly resolves: boolean;
+	/** The binding's own ratified `executionStepId` — the step it says it authorizes (§8.1). */
+	readonly boundStepId?: string;
+	/** The binding's `authorizationStatus`, fed to the ratified kernel predicate. */
+	readonly authorizationStatus?: string;
 }
 
 /** Pure input: an ExecutionPlan transition (edge) the flow gate reads (DR-004 DWP-01). `conditionExpression` is opaque
@@ -260,7 +290,8 @@ const CLOSED_PWU_STATES: ReadonlySet<string> = new Set(
 function planPermitsAffordance(
 	planStatus: string,
 	affordance: GatedAffordance,
-	pwuWorkLifecycleState?: string
+	pwuWorkLifecycleState?: string,
+	binding?: StepBindingContext
 ): boolean {
 	const spec = STEP_COMMAND_SPECS[COMMAND_BY_AFFORDANCE[affordance]];
 	if (spec.planLiveness === 'REQUIRES_ACTIVE_PLAN' && planStatus !== PLAN_STATUS_ACTIVE)
@@ -273,6 +304,21 @@ function planPermitsAffordance(
 		CLOSED_PWU_STATES.has(pwuWorkLifecycleState)
 	)
 		return false;
+	// ── RPH-EXE-003, the THIRD authority limb (JAN-REVREM RW-6 / MAJOR #5) ──────────────────────────────────────
+	//
+	// GATED ON THE COLUMN, and nothing here names `start` or `resolve`. That is the whole point: `bindingAuthority`
+	// is total over the nine commands with a compile error for a tenth, so a future command that requires an
+	// authorized binding is withheld by this read-model ON THE DAY IT IS DECLARED, with no second edit. Naming the
+	// two commands instead would guarantee a fourth row in DS §6b's table of "engine gained a limb, read-model did
+	// not hear about it" — which is now three entries long.
+	//
+	// The DECISION is `bindingAuthorityVerdict` in rph-domain, called by the engine too. Re-deriving the four checks
+	// here would duplicate an order that is itself load-bearing, and it is precisely the `CLOSED_PWU_STATES` mistake
+	// R3 had to correct one work package ago: a second copy whose comment claims it is derived.
+	if (spec.bindingAuthority === 'REQUIRES_AUTHORIZED_BINDING' && binding !== undefined) {
+		const verdict = bindingAuthorityVerdict(binding.stepId, binding);
+		if (!verdict.ok) return false;
+	}
 	return true;
 }
 
@@ -280,6 +326,34 @@ function planPermitsAffordance(
 export interface StepAffordances {
 	readonly advance: readonly StepAdvanceCommand[];
 	readonly control: readonly StepControlCommand[];
+}
+
+/**
+ * A step's binding facts together with the step they belong to — what `bindingAuthorityVerdict` needs.
+ *
+ * FLAT, and it carries `stepId` because the SCOPE limb compares the binding's declared `executionStepId` against the
+ * step actually being afforded. `planAffordancesFor` receives a stepState rather than a step, so the id has to travel
+ * with the facts; the alternative was a second positional parameter that callers could silently transpose.
+ */
+export interface StepBindingContext extends BindingAuthorityFacts {
+	readonly stepId: string;
+}
+
+/** Assemble the verdict's input from a step. Returns undefined when the caller supplied no facts — which is
+ *  UNGATED, not unauthorized (DS §6b R9). */
+function bindingContextFor(s: ExecutionStepInput): StepBindingContext | undefined {
+	if (s.runtimeBinding === undefined) return undefined;
+	return {
+		stepId: s.id,
+		...(s.runtimeBindingId === undefined ? {} : { bindingId: s.runtimeBindingId }),
+		bindingResolves: s.runtimeBinding.resolves,
+		...(s.runtimeBinding.boundStepId === undefined
+			? {}
+			: { boundStepId: s.runtimeBinding.boundStepId }),
+		...(s.runtimeBinding.authorizationStatus === undefined
+			? {}
+			: { authorizationStatus: s.runtimeBinding.authorizationStatus })
+	};
 }
 
 /**
@@ -297,10 +371,11 @@ export interface StepAffordances {
 export function planAffordancesFor(
 	planStatus: string,
 	stepState: string,
-	pwuWorkLifecycleState?: string
+	pwuWorkLifecycleState?: string,
+	binding?: StepBindingContext
 ): StepAffordances {
 	const permits = (a: StepAdvanceCommand | StepControlCommand) =>
-		planPermitsAffordance(planStatus, a, pwuWorkLifecycleState);
+		planPermitsAffordance(planStatus, a, pwuWorkLifecycleState, binding);
 	return {
 		advance: advanceCommandsFor(stepState).filter(permits),
 		control: controlCommandsFor(stepState).filter(permits)
@@ -323,7 +398,12 @@ function stepView(
 	planStatus: string,
 	pwuWorkLifecycleState?: string
 ): ExecutionStepView {
-	const afforded = planAffordancesFor(planStatus, s.stepState, pwuWorkLifecycleState);
+	const afforded = planAffordancesFor(
+		planStatus,
+		s.stepState,
+		pwuWorkLifecycleState,
+		bindingContextFor(s)
+	);
 	const base: ExecutionStepView = {
 		id: s.id,
 		stepType: s.stepType,
@@ -539,18 +619,51 @@ export function plansForPwus(
 	pwuIds: Iterable<string>,
 	/** PWU id -> its `workLifecycleState`, so the affordance filter can apply RPH-PWU-010 (WP-15). Omit and the
 	 *  PWU limb simply does not gate — see the disclosure on `ExecutionPlanInput.pwuWorkLifecycleState`. */
-	pwuLifecycleById: Readonly<Record<string, string>> = {}
+	pwuLifecycleById: Readonly<Record<string, string>> = {},
+	/**
+	 * RUNTIME_BINDING id -> what the caller resolved about it, so the affordance filter can apply RPH-EXE-003
+	 * (JAN-REVREM RW-6 / MAJOR #5). Omit and the binding limb does not gate — the same disclosed fail-open as above.
+	 *
+	 * Keyed by BINDING id rather than by step id: the binding is the object the caller looks up, and keying by step
+	 * would silently accept a map built for the wrong plan. A binding id absent from the map means "not resolved",
+	 * which is UNGATED — distinct from a present entry carrying `resolves: false`, which gates (DS §6b R9).
+	 */
+	bindingFactsById: Readonly<Record<string, StepBindingFacts>> = {}
 ): ExecutionPlanView[] {
 	const scope = pwuIds instanceof Set ? pwuIds : new Set(pwuIds);
 	return rows
 		.filter((r) => scope.has(r.workUnitId))
-		.map((r) =>
-			executionPlanView(
-				r.pwuWorkLifecycleState === undefined && pwuLifecycleById[r.workUnitId] !== undefined
-					? { ...r, pwuWorkLifecycleState: pwuLifecycleById[r.workUnitId] }
-					: r
-			)
-		);
+		.map((r) => executionPlanView(withResolvedAuthority(r, pwuLifecycleById, bindingFactsById)));
+}
+
+/**
+ * Attach whatever authority facts the caller supplied, WITHOUT overwriting anything the row already carries.
+ *
+ * Extracted so the two limbs are attached the same way. The PWU limb was inlined as a conditional spread and the
+ * binding limb needs a per-STEP rewrite, and writing the second one in the shape of the first would have meant
+ * mapping steps inside a ternary inside a `.map` — where the "did the row already say this?" check is easy to lose.
+ */
+function withResolvedAuthority(
+	r: ExecutionPlanInput,
+	pwuLifecycleById: Readonly<Record<string, string>>,
+	bindingFactsById: Readonly<Record<string, StepBindingFacts>>
+): ExecutionPlanInput {
+	const lifecycle = pwuLifecycleById[r.workUnitId];
+	const withPwu: ExecutionPlanInput =
+		r.pwuWorkLifecycleState === undefined && lifecycle !== undefined
+			? { ...r, pwuWorkLifecycleState: lifecycle }
+			: r;
+	// Nothing to attach unless the caller supplied at least one binding fact — so a caller that passes no map gets
+	// object-identical steps, not a rebuilt array that merely looks the same.
+	if (Object.keys(bindingFactsById).length === 0) return withPwu;
+	return {
+		...withPwu,
+		steps: withPwu.steps.map((s) => {
+			if (s.runtimeBinding !== undefined) return s; // the row already knows better than the map
+			const facts = s.runtimeBindingId === undefined ? undefined : bindingFactsById[s.runtimeBindingId];
+			return facts === undefined ? s : { ...s, runtimeBinding: facts };
+		})
+	};
 }
 
 // ── Tier 2: the Undertaking execution SEQUENCE + the layerHandoff advisory constraint-checker (DWP-04, fork C) ──────

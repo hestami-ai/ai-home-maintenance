@@ -112,6 +112,86 @@ the tests. The gates cannot catch it — a register checks that a claim is *pres
   MAJOR #5 (the UI offering Start on a step the engine now refuses) is **not fully closable** without threading a
   fourth input through the projection. Scoped to RW-1 and disclosed if it does not land there.
 
+## 6b. RW-6 — closing MAJOR #5, the finding C-3 disclosed rather than fixed
+
+C-3 scoped MAJOR #5 as *"not fully closable without threading a fourth input through the projection"* and disclosed
+it. This section rules on how, because the obvious threading would reintroduce the exact defect RW-0 and RW-1 both
+existed to remove.
+
+**The finding restated precisely.** `stepAuthorityRefusal` now consults **three** authority columns —
+`planLiveness`, `pwuOpenness`, `bindingAuthority`. The read-model's `planPermitsAffordance` consults **two.** So the
+UI offers **Start** (and **Resolve**) on a step whose runtime binding is `REQUESTED`, `DENIED`, `REVOKED`, or
+authorized for a *different step*, and the engine refuses the click. This is F-29's invariant — *"no affordance the
+engine would reject"* — broken in a new place **by its own remedy**, for the third time in this lineage:
+
+| when | new engine authority | read-model counterpart | how it was found |
+|---|---|---|---|
+| WP-12b | RPH-PWU-010 (closed PWU) | added late, by WP-15 | F-29 review |
+| RW-0 | `PruneExecutionStep` gating | absent — prune was not even in the affordance map | review #2 finding #4 |
+| RW-0 | `bindingAuthority` column | **absent** | review #2 MAJOR #5 |
+
+Three instances of one mechanism: **an authority limb is added to the engine and the read-model is not told.** The
+fix therefore has to make the *next* limb impossible to forget, not just supply this one.
+
+### Ruling R7 — the read-model gates on the COLUMN, never on a list of affordances
+
+`planPermitsAffordance` already derives plan-status gating from `spec.planLiveness` and PWU gating from
+`spec.pwuOpenness`. It gains a third limb reading `spec.bindingAuthority`, and it reads it **off the same
+`STEP_COMMAND_SPECS` row the engine reads.** Nothing anywhere names `start` and `resolve` as "the two that need a
+binding": the column already says so, totally, over all nine commands, with a compile error for a tenth. A future
+command declaring `REQUIRES_AUTHORIZED_BINDING` is gated in the UI **on the day it is declared**, with no second
+edit — which is the only version of this fix that stops the table above from gaining a fourth row.
+
+### Ruling R8 — the four-check verdict moves to `rph-domain`, and both layers call it
+
+The refusal lives in `rph-application/handlers/execution.ts` as `bindingAuthorityRefusal`, which needs `ctx.store`
+and returns a `reject(...)`. The read-model can use neither. The tempting answer — re-derive the checks in the
+projection — is refused: **its four-check ORDER is itself load-bearing** (scope before status, argued at length in
+that function's header and pinned in both directions by S1 and K1–K3), and an order encoded in one place and
+mirrored by hand in another is precisely the shape that produced the BLOCKER this series opened with. It is also
+literally the `CLOSED_PWU_STATES` mistake R3 corrected: a second copy whose comment claims it is derived.
+
+So the pure core becomes `bindingAuthorityVerdict(stepId, facts)` in `rph-domain`, over a **fact record** the caller
+resolves:
+
+```
+BindingAuthorityFacts = {
+  bindingId?: string            // absent or '' => OUT OF SCOPE, not unauthorized
+  bindingResolves?: boolean      // did the id resolve to a RUNTIME_BINDING?
+  boundStepId?: string           // the binding's own ratified executionStepId
+  authorizationStatus?: string   // fed to the ratified kernel predicate
+}
+```
+
+The handler resolves the facts from the store and renders the verdict as a `reject` with its established message and
+marker; the read-model resolves them from its input and reads `verdict.ok`. **One declaration of the rule, two
+consumers, and the order stated once.** The verdict carries a `limb` discriminator so each existing kill test can go
+on asserting *which* check fired rather than merely that something did.
+
+### Ruling R9 — absent facts fail OPEN, and that is disclosed, not hidden
+
+Two distinct absences, and conflating them would break the reference seed:
+
+- **No `bindingId`** — the step names no binding. The engine returns `null` here (out of scope: the rule's antecedent
+  is *"with a runtime binding"*), and the reference seed authors no `RuntimeBinding` at all, so treating this as
+  unauthorized would make **every existing plan unstartable.** Ledger mutant `B5` exists to prove exactly that, by
+  asserting the reference seed breaks if the absent case is refused.
+- **A `bindingId` the caller could not resolve into facts** — the projection was given no status. This fails **OPEN**,
+  identically to `pwuWorkLifecycleState` and for the same stated reason: a caller who cannot supply it gets the
+  pre-RW-6 behaviour rather than a silently emptied action column. The engine still refuses, so the cost is a
+  rejected click, not an illegal act.
+
+The distinction is in the type: `bindingResolves: false` is a *resolved negative fact* and gates; `bindingResolves`
+absent is *no information* and does not. A single optional boolean could not express both, which is why the facts
+record carries the id separately from the resolution.
+
+### What RW-6 does NOT close
+
+The read-model mirrors the engine; it is not a second authority. A caller that supplies facts inconsistent with the
+store gets an affordance set that disagrees with the engine, and only the engine's answer is binding. That is the
+same trust boundary every other input to this projection sits behind, and it is why the engine check is **not**
+removed — this adds a filter, it does not relocate a guard.
+
 ## 7. Enumerated behaviour changes
 
 `ResolveExecutionStepWait` on a step whose binding is not `AUTHORIZED`/`PARTIALLY_AUTHORIZED` → **REFUSED**

@@ -186,6 +186,99 @@ export function bindingPermitsExecution(authorizationStatus: string): Check {
 	};
 }
 
+/**
+ * The facts about a step's runtime binding that decide whether it may execute. Resolved by the CALLER — from the
+ * store by the command layer, from the projection's input by the read-model — never read here.
+ *
+ * The id is carried SEPARATELY from `resolves` because two absences mean opposite things (JAN-REVREM DS §6b R9):
+ * no id at all is OUT OF SCOPE, while an id that does not resolve is a fail-CLOSED negative fact. A single optional
+ * boolean cannot express both, and collapsing them would make every plan in the reference seed — which authors no
+ * RuntimeBinding whatsoever — permanently unstartable.
+ */
+export interface BindingAuthorityFacts {
+	/** The step's own `runtimeBindingId`. Absent or empty ⇒ the rule does not apply. */
+	readonly bindingId?: string;
+	/** Did `bindingId` resolve to a RUNTIME_BINDING? `false` gates; ABSENT means the caller had no information. */
+	readonly bindingResolves?: boolean;
+	/** The binding's own ratified `executionStepId` — what it says it authorizes. */
+	readonly boundStepId?: string;
+	/** The binding's `authorizationStatus`, for `bindingPermitsExecution`. */
+	readonly authorizationStatus?: string;
+}
+
+/** Which of the four checks decided. Carried so a caller can render the RIGHT refusal, and so a test can assert
+ *  WHICH limb fired rather than merely that something refused — the distinction S1 and K1–K3 pin in both
+ *  directions. */
+export type BindingAuthorityLimb =
+	| 'PERMITTED'
+	| 'OUT_OF_SCOPE'
+	| 'UNRESOLVABLE'
+	| 'WRONG_STEP'
+	| 'NOT_AUTHORIZED';
+
+export interface BindingAuthorityVerdict {
+	/** May the step execute? `OUT_OF_SCOPE` is `ok` — the rule's antecedent is unmet, which is not a refusal. */
+	readonly ok: boolean;
+	readonly limb: BindingAuthorityLimb;
+	/** The kernel's label when the STATUS limb decided, for the message the caller composes. */
+	readonly errorCode?: string;
+	readonly reason?: string;
+	/** What the binding said it authorizes, when WRONG_STEP decided — the caller needs it to name the mismatch. */
+	readonly boundStepId?: string;
+}
+
+/**
+ * RPH-EXE-003 / §8.1 — may `stepId` execute against the binding described by `facts`?
+ *
+ * EXTRACTED HERE (JAN-REVREM RW-6 / DS §6b R8) so the command layer and the READ-MODEL consult ONE declaration.
+ * It previously lived inside `rph-application`'s `bindingAuthorityRefusal`, which needs a store and returns a
+ * rejection — so the projection could use neither, and the UI went on offering Start on a step the engine refuses
+ * (MAJOR #5). Re-deriving the checks in the projection was refused: that is exactly the `CLOSED_PWU_STATES`
+ * mistake — a second copy whose comment claims it is derived — and it would duplicate an ORDER that is itself
+ * load-bearing.
+ *
+ * THE ORDER, and why it is a choice rather than an accident of insertion:
+ *
+ *   1. Is there a binding at all?      — OUT OF SCOPE. The rule says "WITH a runtime binding".
+ *   2. Does it resolve?                — fail CLOSED: authority that cannot be READ cannot authorize.
+ *   3. Is it THIS step's binding?      — SCOPE (§8.1). A privilege-scope hole, not a status one.
+ *   4. Is it AUTHORIZED at all?        — RPH-EXE-003, the ratified rule, via `bindingPermitsExecution`.
+ *
+ * SCOPE RUNS BEFORE STATUS deliberately: a binding granted for other work is not this step's authority at all, so
+ * its status is not the question. Reporting "your binding is REVOKED" for a binding that was never yours names the
+ * wrong defect and sends an operator to re-authorize something that would still be refused.
+ *
+ * STEP 2 IS SKIPPED WHEN THE CALLER SUPPLIED NO RESOLUTION, and that is the disclosed fail-OPEN (R9): a projection
+ * that could not resolve the binding gets the pre-RW-6 answer rather than a silently emptied action column. The
+ * engine still refuses, so the cost is a rejected click and not an illegal act. `bindingResolves === false` is a
+ * different thing entirely — a resolved negative — and it gates.
+ */
+export function bindingAuthorityVerdict(
+	stepId: string,
+	facts: BindingAuthorityFacts
+): BindingAuthorityVerdict {
+	if (facts.bindingId === undefined || facts.bindingId === '')
+		return { ok: true, limb: 'OUT_OF_SCOPE' };
+
+	if (facts.bindingResolves === false) return { ok: false, limb: 'UNRESOLVABLE' };
+
+	// Only when the caller actually told us. An unset `boundStepId` alongside `bindingResolves: true` is a caller
+	// that resolved the object but not this field, so it cannot be read as "authorized for no step" — which would
+	// refuse every step, the over-refusal S2 exists to catch.
+	if (facts.boundStepId !== undefined && facts.boundStepId !== stepId)
+		return { ok: false, limb: 'WRONG_STEP', boundStepId: facts.boundStepId };
+
+	if (facts.authorizationStatus === undefined) return { ok: true, limb: 'PERMITTED' };
+	const check = bindingPermitsExecution(facts.authorizationStatus);
+	if (check.ok) return { ok: true, limb: 'PERMITTED' };
+	return {
+		ok: false,
+		limb: 'NOT_AUTHORIZED',
+		...(check.errorCode === undefined ? {} : { errorCode: check.errorCode }),
+		...(check.reason === undefined ? {} : { reason: check.reason })
+	};
+}
+
 export interface CapabilityCheckInput {
 	readonly grantedCapabilities: readonly string[];
 	readonly requiredCapability: string;

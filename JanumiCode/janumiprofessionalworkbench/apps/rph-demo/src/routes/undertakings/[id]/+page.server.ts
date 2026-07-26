@@ -6,6 +6,7 @@ import {
 	getObject,
 	listAssessments,
 	listBaselines,
+	listByType,
 	listDecisions,
 	listExecutionPlans,
 	listObservations,
@@ -292,7 +293,27 @@ export const load: PageServerLoad = ({ params }) => {
 	// closed PWU keeps status ACTIVE, so without this the UI would offer Start on a plan the engine now refuses:
 	// F-29's own invariant re-broken in a new place by its remedy.
 	const pwuLifecycleById = Object.fromEntries(pwuList.map((p) => [p.id, p.workLifecycleState]));
-	const plans = plansForPwus(planRows, pwuIdSet, pwuLifecycleById);
+	// JAN-REVREM RW-6 / MAJOR #5: supply what each RUNTIME_BINDING says, so the affordance projection can apply the
+	// THIRD authority limb (RPH-EXE-003) too. RW-0 gave the engine a `bindingAuthority` column and this read-model
+	// consulted only two columns, so the UI offered Start on a step whose binding is REQUESTED, DENIED, REVOKED — or
+	// authorized for a DIFFERENT step — and the engine refused the click. Third time this exact mechanism has bitten,
+	// after RPH-PWU-010 above and Prune in RW-0.
+	//
+	// `listByType` rather than a per-step `getObject`: `resolves` must mean "this id IS a RUNTIME_BINDING", and
+	// `getObject` returns a state bag for ANY object type, so it cannot answer that question. Enumerating the type is
+	// what makes the negative fact derivable instead of assumed. A step naming an id absent from this map therefore
+	// gets NO entry, which is UNGATED — the engine still refuses, so the cost is a rejected click.
+	const bindingFactsById = Object.fromEntries(
+		listByType(engine, 'RUNTIME_BINDING').map((b) => [
+			b.id,
+			{
+				resolves: true,
+				boundStepId: String((b.state.executionStepId ?? '') as string),
+				authorizationStatus: String((b.state.authorizationStatus ?? '') as string)
+			}
+		])
+	);
+	const plans = plansForPwus(planRows, pwuIdSet, pwuLifecycleById, bindingFactsById);
 
 	// JAN-EXECPLAN-DR-004 DWP-01 — the transition-graph flow gate affordance (set-frontier). For each plan, derive the
 	// SET of steps the engine would currently let start (the graph in-edge barrier; a linear plan yields a singleton).

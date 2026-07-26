@@ -21,7 +21,10 @@ import {
 	buildConditionSubject,
 	canActivatePlan,
 	canAuthorizeNewWork,
-	bindingPermitsExecution,
+	// RW-6: this layer no longer calls `bindingPermitsExecution` directly. It calls the verdict, which calls the
+	// ratified kernel predicate — so the predicate keeps exactly one production caller and the enforcement
+	// register's call-site census keeps pointing at a site that exists.
+	bindingAuthorityVerdict,
 	canResumeExecutionOnPwu,
 	canSkipStep,
 	evaluateGuardExpression,
@@ -886,10 +889,33 @@ function bindingAuthorityRefusal(
 	const bindingId = typeof step.runtimeBindingId === 'string' ? step.runtimeBindingId : '';
 	if (bindingId === '') return null;
 
+	// ── THE FOUR CHECKS THEMSELVES LIVE IN rph-domain (JAN-REVREM RW-6 / DS §6b R8) ──────────────────────────────
+	//
+	// This function RESOLVES the facts from the store and RENDERS the verdict as a rejection; the decision — and the
+	// order it is made in — is `bindingAuthorityVerdict`. The split exists because the READ-MODEL needs the same
+	// decision and can use neither a store nor a `reject`, so before RW-6 the UI went on offering Start on a step
+	// the engine refuses (MAJOR #5). Re-deriving the checks in the projection was refused: a second copy of a
+	// load-bearing ORDER is the shape that produced this series' BLOCKER.
+	//
+	// The store reads stay here, where the store is. Note both `?? ''`: an absent `executionStepId` becomes `''`,
+	// which cannot equal a real `stepId`, so a binding that names no step refuses rather than passing — the
+	// fail-closed reading, and the one the `(unset)` in the message below describes.
+	const binding = ctx.store.loadObject(bindingId);
+	const resolves = binding?.objectType === 'RUNTIME_BINDING';
+	const state = (binding?.state ?? {}) as {
+		executionStepId?: unknown;
+		authorizationStatus?: unknown;
+	};
+	const verdict = bindingAuthorityVerdict(stepId, {
+		bindingId,
+		bindingResolves: resolves,
+		...(resolves ? { boundStepId: String(state.executionStepId ?? '') } : {}),
+		...(resolves ? { authorizationStatus: String(state.authorizationStatus) } : {})
+	});
+
 	// Fail-closed on an unresolvable authority, mirroring `pwuOpennessRefusal` down to the code: an execution act
 	// whose authority cannot be READ cannot be authorized by it.
-	const binding = ctx.store.loadObject(bindingId);
-	if (binding?.objectType !== 'RUNTIME_BINDING')
+	if (verdict.limb === 'UNRESOLVABLE')
 		return reject(
 			command,
 			'RPH_VALIDATION_SEMANTIC_FAILED',
@@ -908,24 +934,19 @@ function bindingAuthorityRefusal(
 	// being exercised was granted for different work. It is the same shape as an unscoped waiver — REG-Q-012's
 	// concern, and the argument WP-12c already made for skip authorizations, which name their steps explicitly for
 	// exactly this reason. An authorization that does not say WHAT it authorizes is not an authorization.
-	const boundStepId = String(
-		(binding.state as { executionStepId?: unknown }).executionStepId ?? ''
-	);
-	if (boundStepId !== stepId)
+	if (verdict.limb === 'WRONG_STEP')
 		return reject(
 			command,
 			'RPH_INVARIANT_VIOLATION',
-			`${command.commandType} blocked: runtime binding ${bindingId} was authorized for step ${boundStepId || '(unset)'}, not for step ${stepId} — a binding authorizes the step it names and no other (§8.1). Request a binding for this step.`,
+			`${command.commandType} blocked: runtime binding ${bindingId} was authorized for step ${verdict.boundStepId || '(unset)'}, not for step ${stepId} — a binding authorizes the step it names and no other (§8.1). Request a binding for this step.`,
 			[stepId, bindingId]
 		);
 
-	const status = String((binding.state as { authorizationStatus?: unknown }).authorizationStatus);
-	const check = bindingPermitsExecution(status);
-	if (!check.ok)
+	if (verdict.limb === 'NOT_AUTHORIZED')
 		return reject(
 			command,
 			'RPH_INVARIANT_VIOLATION',
-			`${command.commandType} blocked (${check.errorCode ?? 'RPH_BINDING_NOT_AUTHORIZED'}): runtime binding ${bindingId} is ${status} — a step may only execute against an AUTHORIZED or PARTIALLY_AUTHORIZED binding (RPH-EXE-003 / §8.1). Authorize the binding before starting the step.`,
+			`${command.commandType} blocked (${verdict.errorCode ?? 'RPH_BINDING_NOT_AUTHORIZED'}): runtime binding ${bindingId} is ${String(state.authorizationStatus)} — a step may only execute against an AUTHORIZED or PARTIALLY_AUTHORIZED binding (RPH-EXE-003 / §8.1). Authorize the binding before starting the step.`,
 			[stepId, bindingId]
 		);
 

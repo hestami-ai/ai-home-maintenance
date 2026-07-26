@@ -316,9 +316,15 @@ export const DECLARED_MUTANTS: readonly DeclaredMutant[] = [
 		find: "\t\tbindingAuthority: 'REQUIRES_AUTHORIZED_BINDING',\n\t\tbindingAuthorityRationale:\n\t\t\t'THE SECOND ARROW INTO RUNNING",
 		replace:
 			"\t\tbindingAuthority: 'NOT_EXECUTING',\n\t\tbindingAuthorityRationale:\n\t\t\t'THE SECOND ARROW INTO RUNNING",
-		expectRed: ['packages/rph-application/src/handlers/exebind-wp1-binding-authority.test.ts'],
-		why: 'THE BLOCKER, re-expressed as ONE CHARACTER of declaration',
-		source: 'revrem_mutants.py'
+		// TWO VICTIMS SINCE RW-6, and the pair is the point. One character of declaration must redden BOTH the engine's
+		// refusal battery AND the read-model's affordance battery — which is the only way to prove that the column is
+		// genuinely the single source for both layers rather than two implementations that happen to agree today.
+		expectRed: [
+			'packages/rph-application/src/handlers/exebind-wp1-binding-authority.test.ts',
+			'packages/rph-projections/src/revrem-wp6-readmodel-binding-authority.test.ts'
+		],
+		why: 'THE BLOCKER, re-expressed as ONE CHARACTER of declaration — and since RW-6, one character that must move two layers at once',
+		source: 'revrem_mutants.py (second victim added RW-6)'
 	},
 	{
 		id: 'R2-start-not-executing',
@@ -411,6 +417,31 @@ export const DECLARED_MUTANTS: readonly DeclaredMutant[] = [
 		expectRed: ['packages/rph-application/src/handlers/exebind-wp1-binding-authority.test.ts'],
 		why: 'OVER-refusal: scope must not refuse its own step',
 		source: 'RW-3 inline'
+	},
+	// ── JAN-REVREM RW-6: the read-model's THIRD authority limb (MAJOR #5) ─────────────────────────────────────
+	//
+	// Both are CONSEQUENCE mutations rather than condition mutations, for the reason V-2c established: replacing the
+	// `if` with `false` makes the block dead, and `binding` — narrowed by `binding !== undefined` — stops narrowing
+	// inside it, so the mutant would report NO_COMPILE and prove nothing about the limb.
+	{
+		id: 'W5-readmodel-binding-limb-never-withholds',
+		file: 'packages/rph-projections/src/execution-view.ts',
+		find: '\t\tconst verdict = bindingAuthorityVerdict(binding.stepId, binding);\n\t\tif (!verdict.ok) return false;',
+		replace:
+			'\t\tconst verdict = bindingAuthorityVerdict(binding.stepId, binding);\n\t\tif (!verdict.ok) return true;',
+		expectRed: ['packages/rph-projections/src/revrem-wp6-readmodel-binding-authority.test.ts'],
+		why: 'MAJOR #5 ITSELF: the engine still refuses, and the UI offers Start on a step whose binding is REQUESTED, DENIED, REVOKED or scoped to another step',
+		source: 'RW-6 inline'
+	},
+	{
+		id: 'W6-readmodel-binding-limb-always-withholds',
+		file: 'packages/rph-projections/src/execution-view.ts',
+		find: '\t\tconst verdict = bindingAuthorityVerdict(binding.stepId, binding);\n\t\tif (!verdict.ok) return false;',
+		replace:
+			'\t\tconst verdict = bindingAuthorityVerdict(binding.stepId, binding);\n\t\tif (verdict.ok) return false;',
+		expectRed: ['packages/rph-projections/src/revrem-wp6-readmodel-binding-authority.test.ts'],
+		why: 'OVER-refusal: an AUTHORIZED binding stops affording Start, which withholds the action on every correctly-authorized step',
+		source: 'RW-6 inline'
 	},
 	{
 		id: 'F1-remove-incoherence-floor',
