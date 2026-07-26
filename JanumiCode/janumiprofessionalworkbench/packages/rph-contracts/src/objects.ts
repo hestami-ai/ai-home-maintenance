@@ -70,10 +70,6 @@ export const ArtifactReferenceSchema = z.record(z.string(), z.unknown());
 export type ArtifactReference = z.infer<typeof ArtifactReferenceSchema>;
 export const ArtifactRequirementSchema = z.record(z.string(), z.unknown());
 export type ArtifactRequirement = z.infer<typeof ArtifactRequirementSchema>;
-export const CapabilityGrantSchema = z.record(z.string(), z.unknown());
-export type CapabilityGrant = z.infer<typeof CapabilityGrantSchema>;
-export const CapabilityRequestSchema = z.record(z.string(), z.unknown());
-export type CapabilityRequest = z.infer<typeof CapabilityRequestSchema>;
 export const ClaimAssessmentResultSchema = z.record(z.string(), z.unknown());
 export type ClaimAssessmentResult = z.infer<typeof ClaimAssessmentResultSchema>;
 export const ClaimTemplateSchema = z.record(z.string(), z.unknown());
@@ -88,8 +84,6 @@ export const DesiredOutcomeSchema = z.record(z.string(), z.unknown());
 export type DesiredOutcome = z.infer<typeof DesiredOutcomeSchema>;
 export const EscalationPolicySchema = z.record(z.string(), z.unknown());
 export type EscalationPolicy = z.infer<typeof EscalationPolicySchema>;
-export const InputBindingSchema = z.record(z.string(), z.unknown());
-export type InputBinding = z.infer<typeof InputBindingSchema>;
 export const ModelSelectionPolicySchema = z.record(z.string(), z.unknown());
 export type ModelSelectionPolicy = z.infer<typeof ModelSelectionPolicySchema>;
 export const OutputBindingSchema = z.record(z.string(), z.unknown());
@@ -154,6 +148,14 @@ export const BoundaryContractSchema = z.strictObject({
 	applicabilityNote: z.string().optional()
 });
 export type BoundaryContract = z.infer<typeof BoundaryContractSchema>;
+export const CapabilityGrantSchema = z.strictObject({
+	capability: z.string()
+});
+export type CapabilityGrant = z.infer<typeof CapabilityGrantSchema>;
+export const CapabilityRequestSchema = z.strictObject({
+	capability: z.string()
+});
+export type CapabilityRequest = z.infer<typeof CapabilityRequestSchema>;
 export const ConflictResolutionRuleSchema = z.strictObject({
 	conflictType: z.string(),
 	action: z.string()
@@ -234,6 +236,11 @@ export const ExecutionSkipAuthorizationSchema = z.strictObject({
 	rationale: z.string()
 });
 export type ExecutionSkipAuthorization = z.infer<typeof ExecutionSkipAuthorizationSchema>;
+export const InputBindingSchema = z.strictObject({
+	artifactId: z.string().optional(),
+	required: z.boolean().optional()
+});
+export type InputBinding = z.infer<typeof InputBindingSchema>;
 export const ExecutionStepSchema = z.strictObject({
 	id: z.string(),
 	executionPlanId: z.string(),

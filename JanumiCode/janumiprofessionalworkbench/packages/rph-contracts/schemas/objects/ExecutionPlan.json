@@ -269,10 +269,15 @@
             "type": "array",
             "items": {
               "type": "object",
-              "propertyNames": {
-                "type": "string"
+              "properties": {
+                "artifactId": {
+                  "type": "string"
+                },
+                "required": {
+                  "type": "boolean"
+                }
               },
-              "additionalProperties": {}
+              "additionalProperties": false
             }
           },
           "outputBindings": {

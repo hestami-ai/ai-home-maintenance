@@ -99,7 +99,15 @@ const FORCE_FULL = new Set([
 	'AggregationRule',
 	'ConflictResolutionRule',
 	'IntentMapping',
-	'AssumptionPropagation'
+	'AssumptionPropagation',
+	// JAN-CAPBIND (N-5). Both are DELIBERATELY single-field — a capability is an IDENTITY, and its runtime BOUND
+	// lives in the platform's policy plane rather than on the entry (DS-001 §6). Without these two names here the
+	// third limb below would classify them as placeholders and keep emitting `z.record(z.string(), z.unknown())`:
+	// the authoring would appear to land and enforce NOTHING, which is this lineage's signature defect wearing a
+	// contract change. The subset rule that closes N-4 compares these identities, so a permissive record would make
+	// every comparison vacuous.
+	'CapabilityRequest',
+	'CapabilityGrant'
 ]);
 
 const HELPER_NAMES = new Set(spec.helperSubTypes.map((h) => h.name));
@@ -199,7 +207,51 @@ for (const h of placeholders) {
 	);
 }
 body.push('', '// ---- Well-specified helper sub-types. ----');
-fullHelpers.sort((a, b) => a.name.localeCompare(b.name));
+
+/**
+ * Emit full helpers in DEPENDENCY order, alphabetical within a tier.
+ *
+ * THIS WAS A PLAIN `localeCompare` AND IT WAS A LATENT BUG (JAN-CAPBIND WP-0). A full helper that references
+ * another full helper must be emitted AFTER it, because `z.strictObject({...})` evaluates its argument eagerly:
+ * a forward reference is a TDZ `ReferenceError: Cannot access 'XSchema' before initialization` at import time,
+ * not a type error, so it fails the whole package rather than one schema.
+ *
+ * It stayed invisible because every referent happened to be a PLACEHOLDER, and placeholders are emitted first as
+ * a block — so the ordering never mattered. The moment N-5's authoring turned `InputBinding` into a real helper,
+ * `ExecutionStep` (which carries `inputBindings`) sorted before it alphabetically and the generated module
+ * stopped loading. Any future authoring of a placeholder would have hit the same wall.
+ *
+ * Alphabetical is kept as the tiebreak WITHIN a dependency tier so the emitted file stays byte-stable across
+ * runs — a generator whose output reorders on every invocation makes every diff unreviewable.
+ */
+const helperDeps = (h: HelperSpec): string[] =>
+	h.fields
+		.map((f) => (f.type ?? '').replace(/\[\]$/, ''))
+		.filter((t) => fullHelpers.some((x) => x.name === t));
+
+const ordered: HelperSpec[] = [];
+const emitted = new Set<string>();
+const visiting = new Set<string>();
+const visit = (h: HelperSpec): void => {
+	if (emitted.has(h.name)) return;
+	if (visiting.has(h.name))
+		// A cycle needs `z.lazy` to express at all, so emitting anything here would produce a module that throws at
+		// import. Fail the GENERATOR instead: a loud build failure beats a schema file that cannot be loaded.
+		throw new Error(
+			`gen-objects: helper dependency cycle involving ${h.name}. Zod needs z.lazy() for recursive helpers; the emitter does not support it.`
+		);
+	visiting.add(h.name);
+	for (const depName of helperDeps(h).sort((a, b) => a.localeCompare(b))) {
+		const dep = fullHelpers.find((x) => x.name === depName);
+		if (dep) visit(dep);
+	}
+	visiting.delete(h.name);
+	emitted.add(h.name);
+	ordered.push(h);
+};
+for (const h of [...fullHelpers].sort((a, b) => a.name.localeCompare(b.name))) visit(h);
+fullHelpers.length = 0;
+fullHelpers.push(...ordered);
 for (const h of fullHelpers) {
 	const lines = h.fields.map(fieldLine).join(',\n');
 	body.push(

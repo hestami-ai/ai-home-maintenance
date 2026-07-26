@@ -248,20 +248,30 @@
       "type": "array",
       "items": {
         "type": "object",
-        "propertyNames": {
-          "type": "string"
+        "properties": {
+          "capability": {
+            "type": "string"
+          }
         },
-        "additionalProperties": {}
+        "required": [
+          "capability"
+        ],
+        "additionalProperties": false
       }
     },
     "grantedCapabilities": {
       "type": "array",
       "items": {
         "type": "object",
-        "propertyNames": {
-          "type": "string"
+        "properties": {
+          "capability": {
+            "type": "string"
+          }
         },
-        "additionalProperties": {}
+        "required": [
+          "capability"
+        ],
+        "additionalProperties": false
       }
     },
     "sandboxPolicy": {

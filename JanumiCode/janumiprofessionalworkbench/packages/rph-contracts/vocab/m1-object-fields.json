@@ -2392,10 +2392,10 @@
       "name": "CapabilityRequest",
       "fields": [
         {
-          "field": "(undefined)",
-          "type": "—",
-          "required": false,
-          "note": "Referenced by RuntimeBinding.requestedCapabilities. NOT field-defined (persistence: capability_requests §31). Source TBD."
+          "field": "capability",
+          "type": "string",
+          "required": true,
+          "note": "AUTHORED 2026-07-26 under sponsor grant (JAN-CAPBIND-DS-001; closes the CapabilityRequest half of N-5). The capability IDENTITY — what KIND of runtime access is being asked for. Verified genuinely undefined in the corpus before authoring: docs/_working/AUDIT-placeholder-helpers.md audited all 34 opaque helpers against the full 14-file corpus with adversarial refutation and hand re-verification, and confirmed this one undefined; §31 (Canonical Domain Model) is a BARE LIST OF TABLE NAMES with no columns, and §22 declares only `requestedCapabilities: CapabilityRequest[]` — a usage. FIELD NAME NOT DESIGNED: it is the key this repo has already been writing for four milestones (13 literals across 4 test files, all keyed `capability`, e.g. `[{ capability: 'file-system' }]`), so adopting it migrates ZERO fixtures. REQUIRED is safe on evidence rather than hope: no existing element lacks the key, and the remaining sites are empty arrays with no elements to lack it. VALUE DOMAIN DELIBERATELY OPEN (no enum): RPH-EXE-004's ratified statement names `file-system` and `network`, but a closed enum would forbid capabilities the corpus never enumerated, and §22.1's 'secret access must never be inferred from tool availability' is already satisfied STRUCTURALLY by the granted-within-requested rule — access cannot be inferred if it must be separately requested AND separately granted. NO `scope` FIELD, and that is a ruling not an omission: the runtime BOUND lives in the platform's policy plane (Cerbos principal → policy decision → audit event), which the corpus's own pattern already models as policy-by-reference (contextAssemblyPolicyId / observabilityPolicyId / memoryPolicyId are ids). §22.1's 'capability scope must be explicit' is satisfied by that policy being named and resolvable, not by a scope string on this entry."
         }
       ]
     },
@@ -2403,10 +2403,10 @@
       "name": "CapabilityGrant",
       "fields": [
         {
-          "field": "(undefined)",
-          "type": "—",
-          "required": false,
-          "note": "Referenced by RuntimeBinding.grantedCapabilities. NOT field-defined (persistence: capability_grants §31). Source TBD."
+          "field": "capability",
+          "type": "string",
+          "required": true,
+          "note": "AUTHORED 2026-07-26 under sponsor grant (JAN-CAPBIND-DS-001; closes the CapabilityGrant half of N-5). The capability IDENTITY actually CONFERRED. Deliberately the SAME shape and same field name as CapabilityRequest, because §22.1's 'requested capability is not granted capability' has no content unless the two sets are comparable, and RPH-EXE-004's ratified example — 'requests file-system and network access but only file-system is granted' — is an identity comparison. A KNOWN CONSEQUENCE, stated rather than papered over: this type and CapabilityRequest are STRUCTURALLY IDENTICAL, so TypeScript cannot tell a request from a grant. Padding one with an extra optional field would NOT fix that (shapes differing only by optional members stay mutually assignable) and would be invention on top; the actual mitigation is that `grantedWithinRequest` takes NAMED parameters `{requested, granted}`, so swapping them requires a deliberate edit. See CapabilityRequest for the no-scope ruling and the evidence that this type was genuinely undefined."
         }
       ]
     },
@@ -2417,7 +2417,7 @@
           "field": "(undefined)",
           "type": "—",
           "required": false,
-          "note": "Referenced by RuntimeBinding.sandboxPolicy. NOT field-defined. Source TBD."
+          "note": "DEFERRED TO THE PLATFORM POLICY PLANE — dispositioned 2026-07-26 (JAN-CAPBIND-DS-001 §6), not 'Source TBD'. Referenced by RuntimeBinding.sandboxPolicy. This is where a capability's runtime BOUND belongs — not on the CapabilityRequest/CapabilityGrant entries — and the corpus's own pattern says so: three of RuntimeBinding's six policy-ish fields (contextAssemblyPolicyId, observabilityPolicyId, memoryPolicyId) are policy IDS, i.e. references to policies versioned elsewhere. The JanumiCode platform has already ruled that every principal INCLUDING agents resolves to a Cerbos principal → policy decision → audit event, and that the sandbox backend sits behind an abstracted runtime boundary precisely so the concrete tool (OpenSandbox / K8s Jobs+gVisor / a harness's own policy file) stays swappable. Authoring a shape here would therefore either encode one tool's model — the lock-in that boundary exists to prevent — or invent a scope algebra the corpus does not define. Left opaque UNTIL the policy plane's own contract is settled, at which point this becomes a reference rather than an embedded object."
         }
       ]
     },
@@ -2425,10 +2425,16 @@
       "name": "InputBinding",
       "fields": [
         {
-          "field": "(undefined)",
-          "type": "—",
+          "field": "artifactId",
+          "type": "string",
           "required": false,
-          "note": "Referenced by ExecutionStep.inputBindings (DOC-002 §21). NOT field-defined. Source TBD."
+          "note": "AUTHORED 2026-07-26 under sponsor grant (JAN-CAPBIND-DS-001; closes the InputBinding half of N-5). id-ref: the ARTIFACT this input is bound to. Forced by RPH-EXE-005's ratified statement — 'Starting a step whose required input artifact is absent leaves the step not ready and performs no model/tool invocation' — which has no SUBJECT without it: 'the required input artifact' must name something resolvable for absence to be decidable. OPTIONAL deliberately: an input may legitimately be bound to something that is not a recorded Professional Work Object, and a binding carrying no artifactId is NOT 'absent' — it is NOT ARTIFACT-BACKED, which is a different fact. Only artifact-backed inputs are checkable, and conflating the two would refuse steps whose inputs are perfectly well specified in another form. Every inputBindings literal in the repo is currently `[]`, so this migrates nothing."
+        },
+        {
+          "field": "required",
+          "type": "boolean",
+          "required": false,
+          "note": "AUTHORED 2026-07-26 (JAN-CAPBIND-DS-001). Whether this input must be present before the step may start. Forced by RPH-EXE-005 naming the 'REQUIRED input artifact' — requiredness must be expressible or the rule cannot be stated. OPTIONAL on the wire (WP-1's invariant: no stored event may become invalid) but read FAIL-CLOSED as `required ?? true`, mirroring WP-12's `mandatory ?? true`: an unmarked input is treated as needed, because the fail-open reading lets a typo silently downgrade a requirement, which is the F-30 shape. REFUSED alongside it: a `name`/`role` label — nothing reads it and no rule quantifies over it. It is the most plausible invention available here, which is exactly why it is refused; plausibility is not provenance."
         }
       ]
     },
@@ -2439,7 +2445,7 @@
           "field": "(undefined)",
           "type": "—",
           "required": false,
-          "note": "Referenced by ExecutionStep.outputBindings. NOT field-defined. Source TBD."
+          "note": "DELIBERATELY OPAQUE — dispositioned 2026-07-26 (JAN-CAPBIND-DS-001 R-C), NOT 'Source TBD'. Referenced by ExecutionStep.outputBindings. NO RULE QUANTIFIES OVER ITS FIELDS: RPH-EXE-006 ('a succeeded step must record outputs or an explicit no-output result') is about the COMPLETION PAYLOAD — structuredResult / outputArtifactIds / noOutputResult — not about this declaration, and the only thing any code reads is the array's LENGTH (`declaresOutputBindings: Array.isArray(outputBindings) && outputBindings.length > 0`). Authoring fields here would therefore be pure invention with ZERO enforcement value: a shape asserting professional meaning nobody ratified and nothing checks. N-5's harm was that four types were UNDISPOSITIONED, so a reader could not tell an unauthored shape from an unauthorable one; this one is now dispositioned as unauthorable-on-purpose, with the evidence. Revisit only when something actually reads an element."
         }
       ]
     },
