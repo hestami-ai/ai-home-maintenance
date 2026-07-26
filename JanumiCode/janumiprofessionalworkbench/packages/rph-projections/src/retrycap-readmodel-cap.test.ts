@@ -161,3 +161,54 @@ describe('N-12 — the retry cap is mirrored, so the UI stops offering a click t
 		expect(r.advance).toContain('fail');
 	});
 });
+
+// ── N-21 — RPH-EXE-005 IS MIRRORED TOO, AND ITS ABSENCE WAS MINE ────────────────────────────────────────────────
+//
+// JAN-CAPBIND WP-3 gave the engine a fourth authority column (`inputReadiness`) and wired it at BOTH arrows into
+// RUNNING. This read-model was never told. So `start` and `resolve` were offered on a step whose required input
+// artifact does not exist, and the engine refused the click — F-29 on a RATIFIED rule, one work package before I
+// closed the same shape for the retry cap and called that "the fourth instance".
+//
+// The mirror is one line in `planPermitsAffordance` because the limb is gated on the COLUMN, not on a command
+// name: both arrows are covered at once, and a tenth command declaring REQUIRES_PRESENT_INPUTS is withheld here on
+// the day it is declared.
+describe('N-21 — the read-model withholds start when a REQUIRED input does not resolve', () => {
+	const queued = (over: Record<string, unknown> = {}) =>
+		step({ stepState: 'QUEUED', ...over });
+
+	it('THE KILL TEST: an unresolved required input withholds start', () => {
+		const r = affordancesOf(plan({ steps: [queued({ unresolvedRequiredInputs: ['art_missing'] })] }));
+		expect(r.advance).not.toContain('start');
+	});
+
+	it('OFFERS start when every required input resolves — a RESOLVED empty array permits', () => {
+		// The over-refusal half, and the asymmetry that matters: an empty array is "checked, all present" and must
+		// permit; only a NON-EMPTY resolved array gates.
+		const r = affordancesOf(plan({ steps: [queued({ unresolvedRequiredInputs: [] })] }));
+		expect(r.advance).toContain('start');
+	});
+
+	it('treats an ABSENT fact as UNGATED — the same disclosed fail-open as every sibling', () => {
+		const r = affordancesOf(plan({ steps: [queued()] }));
+		expect(r.advance).toContain('start');
+	});
+
+	it('withholds RESUME too — the second arrow into RUNNING, covered by the column not by a name', () => {
+		// The omission that made the binding limb a BLOCKER was exactly this arrow. Gating on `inputReadiness`
+		// rather than on `start` is what makes covering it free.
+		const r = affordancesOf(
+			plan({ steps: [step({ stepState: 'WAITING', unresolvedRequiredInputs: ['art_missing'] })] })
+		);
+		expect(r.control).not.toContain('resolve');
+	});
+
+	it('THE WEDGE GUARD: cancel survives an unresolvable input', () => {
+		// A step whose required artifact can never appear must still have an exit, or an unsatisfiable input strands
+		// the arm permanently — the shape RW-0 withdrew a limb for. `CancelExecutionStep` is CLEANUP_EXEMPT on every
+		// column precisely so this stays true.
+		const r = affordancesOf(
+			plan({ steps: [step({ stepState: 'RUNNING', unresolvedRequiredInputs: ['art_missing'] })] })
+		);
+		expect(r.control).toContain('cancel');
+	});
+});

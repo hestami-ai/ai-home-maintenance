@@ -171,6 +171,47 @@ describe('JAN-PARTAUTH — the authorization outcome is DERIVED from the grant',
 		});
 	});
 
+	describe('R2 — the EVENT records the outcome, not just the grant', () => {
+		const authorizedEvents = () =>
+			store.readAllEvents().filter((e) => e.eventType === 'RuntimeBindingAuthorized');
+
+		it('records PARTIALLY_AUTHORIZED on the event, not only in the aggregate', () => {
+			// Before this, the handler emitted the raw COMMAND payload — so the log carried the grant and NOT the
+			// outcome, and an auditor could not tell a full authorization from a partial one. That is the exact
+			// distinction JAN-PARTAUTH's derivation exists to make, and the vocabulary declares the field REQUIRED on
+			// this very event.
+			ok(request('file-system', 'network'), 'request two');
+			ok(authorize('file-system'), 'grant one');
+			const [e] = authorizedEvents();
+			expect((e!.payload as { authorizationStatus?: string }).authorizationStatus).toBe(
+				'PARTIALLY_AUTHORIZED'
+			);
+			expect((e!.payload as { grantedCapabilities?: unknown[] }).grantedCapabilities).toEqual([
+				cap('file-system')
+			]);
+		});
+
+		it('records AUTHORIZED for a covering grant — the two outcomes are distinguishable in the log', () => {
+			// The control: a field pinned to one constant would satisfy the case above while recording nothing.
+			ok(request('file-system'), 'request one');
+			ok(authorize('file-system'), 'grant it');
+			expect(
+				(authorizedEvents()[0]!.payload as { authorizationStatus?: string }).authorizationStatus
+			).toBe('AUTHORIZED');
+		});
+
+		it('takes the status from the COMMITTED state, so event and aggregate cannot disagree', () => {
+			ok(request('file-system', 'network'), 'request two');
+			ok(authorize('file-system'), 'partial');
+			ok(authorize('file-system', 'network'), 'expand to full');
+			const statuses = authorizedEvents().map(
+				(e) => (e.payload as { authorizationStatus?: string }).authorizationStatus
+			);
+			expect(statuses).toEqual(['PARTIALLY_AUTHORIZED', 'AUTHORIZED']);
+			expect(statuses[statuses.length - 1]).toBe(statusOf());
+		});
+	});
+
 	describe('N-4 still holds — the derivation did not displace it', () => {
 		it('a grant exceeding the request is refused before any outcome is derived', () => {
 			ok(request('file-system'), 'request one');

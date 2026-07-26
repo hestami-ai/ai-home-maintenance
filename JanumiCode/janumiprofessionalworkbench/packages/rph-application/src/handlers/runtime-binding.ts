@@ -201,6 +201,28 @@ export const authorizeRuntimeBinding: CommandHandler = (ctx, command) =>
 			return null;
 		},
 		eventType: 'RuntimeBindingAuthorized',
+		// ── R2 (ruled 2026-07-26): THE EVENT RECORDS THE OUTCOME IT DECLARES ────────────────────────────────────
+		//
+		// These four handlers emitted the raw COMMAND payload, so `RuntimeBindingAuthorized` carried
+		// `grantedCapabilities` and NOT the resulting `authorizationStatus` — while the vocabulary declares that
+		// field REQUIRED on this very event, noted "REQUESTED->AUTHORIZED|PARTIALLY_AUTHORIZED". Before JAN-PARTAUTH
+		// the omission cost nothing, because the outcome was always AUTHORIZED. Now it is derived, and an auditor
+		// reading the log cannot tell a full authorization from a partial one — the exact distinction the derivation
+		// exists to make.
+		//
+		// THE RULING, AND ITS LIMIT. `advanceStatus`'s convention is that callers whose event interface is RATIFIED
+		// supply an `eventPayload`, and this one is UNRATIFIED-AUTHORED ("Do NOT treat this sourceSection as proof
+		// the shape is ratified"). Emitting it anyway is judged correct on three grounds: the event already emits a
+		// strict SUBSET of the declared shape, so adding a declared REQUIRED field increases conformance rather than
+		// inventing any; the VALUE is a fact the engine has just committed, not a semantic; and the audit consumer
+		// has no other way to learn it. DISCLOSED RESIDUAL: if the shape is later ratified differently this field may
+		// have to change — but omitting it does not protect against that, it only loses the fact meanwhile.
+		//
+		// Built from the COMMITTED next state, not from the command, so it can never disagree with the aggregate.
+		eventPayload: (nextState) => ({
+			grantedCapabilities: nextState.grantedCapabilities,
+			authorizationStatus: nextState.authorizationStatus
+		}),
 		mutate: (base) => {
 			const p = command.payload as { grantedCapabilities?: unknown[] };
 			return { ...base, grantedCapabilities: p.grantedCapabilities ?? [] };

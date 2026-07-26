@@ -335,9 +335,25 @@ export interface CapabilityCheckInput {
 }
 
 /**
- * RPH-EXE-004 / §22.1. Requested capability is NOT granted capability: an operation is authorized only when its
- * required capability is in the binding's explicitly granted set. A binding that requested file-system + network
- * but was granted only file-system fails authorization for network operations.
+ * RPH-EXE-004 / §22.1 — the OPERATION-time half, as a pure predicate. A binding that requested file-system +
+ * network but was granted only file-system fails authorization for network operations.
+ *
+ * ── THIS DOCBLOCK OVER-CLAIMED, AND THE OVER-CLAIM WAS QUOTED BACK AT ME AS CORPUS TEXT (N-19) ───────────────
+ *
+ * It used to open with the rule stated flatly — "an operation is authorized only when its required capability is
+ * in the binding's explicitly granted set" — with no indication that this function does not, and cannot, enforce
+ * it. I later cited that sentence to the sponsor as though reading it from the corpus. The ratified statement
+ * lives in the corpus; a kernel docblock paraphrasing it in the present indicative reads as though the engine
+ * does it.
+ *
+ * WHAT THIS FUNCTION IS: a correct decision procedure for one operation against one granted set. WHAT IT IS NOT:
+ * enforcement. It has NO production caller, deliberately — this engine governs plans and is never in the path of
+ * an operation, so there is no site at which to ask the question. The rule's OPERATION tier belongs to the
+ * Platform's Runtime Authorization Service (§33.4); its DECLARATION tier is enforced by `grantedWithinRequest`,
+ * `grantIsMonotone` and `bindingAuthorityVerdict`. See `enforcement-register.ts['RPH-EXE-004']` for the ruling.
+ *
+ * Kept, rather than deleted, because it is the decision a broker will need and because deleting it would erase
+ * the record that the rule's operation half is unenforced HERE by boundary rather than by oversight.
  */
 export function capabilityAuthorized(input: CapabilityCheckInput): Check {
 	if (input.grantedCapabilities.includes(input.requiredCapability)) return { ok: true };

@@ -121,7 +121,8 @@ function buildApplicablePoliciesView(
  */
 function shapeExecutionPlanInput(
 	pl: ReturnType<typeof listExecutionPlans>[number],
-	events: EngineEvents
+	events: EngineEvents,
+	objectExists: (id: string) => boolean
 ): ExecutionPlanInput {
 	const asRec = (v: unknown): Record<string, unknown> =>
 		v && typeof v === 'object' ? (v as Record<string, unknown>) : {};
@@ -144,7 +145,15 @@ function shapeExecutionPlanInput(
 					? { selectedTransitionId: String(s.selectedTransitionId as string) }
 					: {}),
 				// N-12: the count the retry cap is decided against, from the SAME kernel function the engine uses.
-				attemptsMade: attemptsMadeFrom(events, pl.id, String((s.id ?? '') as string))
+				attemptsMade: attemptsMadeFrom(events, pl.id, String((s.id ?? '') as string)),
+				// N-21: RPH-EXE-005's fact — which REQUIRED input artifacts do not resolve. Resolved HERE because only
+				// this layer has a store; the RULE is the engine's and is applied identically (`required` defaults
+				// TRUE, an absent artifactId is out of scope, presence is a store read).
+				unresolvedRequiredInputs: (Array.isArray(s.inputBindings) ? s.inputBindings : [])
+					.map((b) => asRec(b))
+					.filter((b) => (typeof b.required === 'boolean' ? b.required : true))
+					.map((b) => (typeof b.artifactId === 'string' ? b.artifactId : ''))
+					.filter((id) => id !== '' && !objectExists(id))
 			};
 		}),
 		// N-12: the RetryPolicy bag verbatim — `retryCapFrom` in the kernel applies the cap convention, so this
@@ -308,8 +317,11 @@ export const load: PageServerLoad = ({ params }) => {
 	// carries no undertakingId — F-1). The pure view (rph-projections) derives each step's tone + command-backed
 	// affordances; this load() only reads.
 	const planShapingEvents = engine.readAllEvents();
+	// N-21: the artifact-presence resolver. Passed as a predicate rather than handing the shaper the engine, so the
+	// only store access it has is the one RPH-EXE-005 needs.
+	const objectExists = (id: string) => getObject(engine, id) !== undefined;
 	const planRows: ExecutionPlanInput[] = listExecutionPlans(engine).map((pl) =>
-		shapeExecutionPlanInput(pl, planShapingEvents)
+		shapeExecutionPlanInput(pl, planShapingEvents, objectExists)
 	);
 	// JAN-EXECREM WP-15: supply each PWU's workLifecycleState so the affordance projection can apply RPH-PWU-010
 	// too. WP-12b gave the engine a second authority limb — a closed PWU opens no new execution — and a plan on a

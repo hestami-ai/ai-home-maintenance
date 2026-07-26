@@ -197,22 +197,64 @@ export const ENFORCEMENT_REGISTER: Readonly<Record<RegisteredRuleId, Enforcement
 			'delete the bindingAuthority limb from planPermitsAffordance in rph-projections/src/execution-view.ts — the engine still refuses, but the UI offers Start again (MAJOR #5)'
 		]
 	},
+	// ── REASON REWRITTEN 2026-07-26 (N-19). THE DISPOSITION IS UNCHANGED AND THAT IS DELIBERATE ────────────────
+	//
+	// This row is on its THIRD stated reason, and the first two were both falsified rather than merely refined —
+	// which is itself the argument for keeping the row's PROSE under the same scrutiny as its fields. No gate reads
+	// prose: `enforcement-register.test.ts` checks `coverageFor(id).status` and `.testFile`, never a sentence.
+	//
+	//   (1) until 2026-07-25: "enforcing it needs a runtime capability plane … that does not exist in this engine".
+	//       FALSE. RUNTIME_BINDING is a first-class aggregate with a five-state ratified machine and four live
+	//       commands, carrying BOTH requestedCapabilities and grantedCapabilities.
+	//   (2) until 2026-07-26: "what does not exist is the IDENTITY of a capability … Source TBD". FALSE AS OF
+	//       JAN-CAPBIND, which authored `CapabilityRequest`/`CapabilityGrant` as `{ capability: string }` under
+	//       sponsor grant. The set-containment half became expressible and IS now enforced (N-4).
+	//
+	// (3) THE ACTUAL REASON, and it is a BOUNDARY, not a gap. The ratified statement's subject is AN OPERATION AT
+	// OPERATION TIME ("network operations fail authorization"), and JPWB is never in the path of an operation: it
+	// governs plans and does not host tool invocations. The corpus names a different enforcer — §33.4's Runtime
+	// Authorization Service, and the Charter's allocation of tool execution and policy enforcement to the Platform.
+	//
+	// SO THE RULE DECOMPOSES INTO THREE TIERS, and conflating any two is the F-28 shape this register exists to
+	// prevent:
+	//   DECLARATION  granted ⊆ requested, monotone, outcome derived, step runs only on its own live binding
+	//                — JPWB, and ENFORCED (grantedWithinRequest, grantIsMonotone, bindingAuthorityVerdict).
+	//   ADMISSION    a step declares what it will need; is that granted? — NO SUBJECT EXISTS. No ratified
+	//                step-level required-capability declaration. (Note: `requiredCapabilities` DOES exist on
+	//                ValidatorContract/ValidatorRegistryEntry, so the concept is NOT absent from the corpus —
+	//                only from ExecutionStep. Recorded because the opposite was nearly asserted.)
+	//   OPERATION    this connect(), this path — PLATFORM, deferred to M5.
+	//
+	// R1 RULED 2026-07-26: DO NOT build a JPWB-side invocation ledger. It would be a RECORD, not a control — post
+	// hoc, unable to compel disclosure, and blind to the BOUND (path/host is inexpressible under the §22.1
+	// policy-by-reference ruling, so "file-system granted" is satisfied by reading /etc/shadow). Its intended
+	// caller does not exist until M5. Standing it up now would mint a row claiming enforcement that prevents
+	// nothing, which is precisely what this register was built to stop.
+	//
+	// EXIT CRITERION, so this is deferral and not drift: revisit when a broker/sandbox exists to call it, or when
+	// the corpus ratifies a step-level required-capability declaration. Either makes a real guarantee available;
+	// neither is available now.
+	//
+	// `capabilityAuthorized` therefore KEEPS no production caller BY DESIGN. Wiring it to clear the census would be
+	// the substitution this register exists to prevent.
 	'RPH-EXE-004': {
 		kind: 'UNENFORCED_DISCLOSED',
 		why:
-			'BLOCKED ON A CORPUS GAP, NOT ON EFFORT — and the reason recorded here until 2026-07-25 was WRONG. It read ' +
-			'"enforcing it needs a runtime capability plane … that does not exist in this engine at all". THE PLANE ' +
-			'EXISTS: RUNTIME_BINDING is a first-class aggregate with a five-state ratified machine and four live ' +
-			'commands, and the object carries BOTH requestedCapabilities and grantedCapabilities. What does not exist ' +
-			'is the IDENTITY of a capability: CapabilityRequest and CapabilityGrant are declared in m1-object-fields ' +
-			'as "NOT field-defined … Source TBD", so gen-objects emits an opaque record and "granted is a subset of ' +
-			'requested" is not expressible. The tell nobody noticed for four milestones: capabilityAuthorized takes ' +
-			'string[] while the contract holds Record<string,unknown>[] — the predicate and the contract it guards do ' +
-			'not typecheck against each other. Authoring the shape would invent normative semantics the corpus ' +
-			'withholds, so it is ESCALATED (JAN-EXEBIND-DS-001 §4-R3) rather than worked around. SEPARATELY: ' +
-			'authorizeRuntimeBinding writes the granted set WHOLESALE with no comparison against the requested one, so ' +
-			'a FIRST authorization may grant a capability never requested — raised as its own finding (N-4), ' +
-			'deliberately NOT filed under this rule, whose statement is about operations.',
+			'A BOUNDARY, NOT A GAP — and the two reasons recorded here before 2026-07-26 were both FALSIFIED (see the ' +
+			'comment above; neither was caught by a gate, because no gate reads prose). The ratified statement is ' +
+			'about AN OPERATION AT OPERATION TIME, and JPWB is never in the path of an operation: it governs plans ' +
+			'and hosts no tool invocation. The corpus names a different enforcer (§33.4 Runtime Authorization ' +
+			'Service; the Charter allocates tool execution and policy enforcement to the Platform). The rule splits ' +
+			'in three: DECLARATION (granted within requested, monotone, outcome derived, step runs only on its own ' +
+			'live binding) is JPWB\'s and is ENFORCED; ADMISSION (a step declaring what it needs) has NO SUBJECT — ' +
+			'no ratified step-level required-capability declaration exists, though `requiredCapabilities` DOES exist ' +
+			'on ValidatorContract, so the concept is not absent from the corpus, only from ExecutionStep; OPERATION ' +
+			'is the Platform\'s and is deferred to M5. R1 (ruled 2026-07-26): a JPWB-side invocation ledger is NOT ' +
+			'built — it would be a record rather than a control, post hoc, unable to compel disclosure, blind to the ' +
+			'bound, and its caller does not exist yet. EXIT: revisit when a broker exists to call it, or when a ' +
+			'step-level capability declaration is ratified. capabilityAuthorized keeps no production caller BY ' +
+			'DESIGN. SEPARATELY: the FIRST-authorization containment hole is N-4 and is CLOSED, deliberately not ' +
+			'filed under this rule, whose statement is about operations.',
 		deadPredicate: 'capabilityAuthorized',
 		referencedOnlyBy: ['packages/rph-domain/src/execution.ts']
 	},

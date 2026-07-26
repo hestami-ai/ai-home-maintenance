@@ -38,6 +38,8 @@ import {
 	retryDecision,
 	retryCapFrom,
 	type RetryInput,
+	// N-21: RPH-EXE-005's ratified kernel, so the read-model's answer and the engine's are one declaration.
+	stepMayBecomeReady,
 	isTerminalSuccessStepState,
 	prunableStepIds as gatePrunableStepIds,
 	startableStepIds as gateStartableStepIds,
@@ -107,6 +109,20 @@ export interface ExecutionStepInput {
 	 * engine still refuses, so the cost is a rejected click and not an illegal act.
 	 */
 	readonly attemptsMade?: number;
+	/**
+	 * The step's REQUIRED input artifacts that do not resolve — RPH-EXE-005 (N-21).
+	 *
+	 * A LIVE F-29 ON A RATIFIED RULE, AND I CREATED IT. JAN-CAPBIND WP-3 gave the engine a fourth authority column
+	 * (`inputReadiness`) and wired it at both arrows into RUNNING, and this read-model was never told — so `start`
+	 * and `resolve` were offered on a step whose required input is absent and the engine refused the click. One
+	 * work package later I closed the same shape for the retry cap and called it "the fourth instance", without
+	 * noticing the fifth was mine and one commit older.
+	 *
+	 * RESOLVED BY THE CALLER, like every other fact here: this layer has no store and cannot ask whether an
+	 * artifact exists. ABSENT means UNGATED (no information); a RESOLVED EMPTY array means "checked, all present"
+	 * and permits. Only a non-empty resolved array gates.
+	 */
+	readonly unresolvedRequiredInputs?: readonly string[];
 }
 
 /** What the caller resolved about a step's runtime binding. The step's own `runtimeBindingId` is not repeated here —
@@ -343,7 +359,8 @@ function planPermitsAffordance(
 	affordance: GatedAffordance,
 	pwuWorkLifecycleState?: string,
 	binding?: StepBindingContext,
-	retry?: RetryInput
+	retry?: RetryInput,
+	unresolvedRequiredInputs?: readonly string[]
 ): boolean {
 	const spec = STEP_COMMAND_SPECS[COMMAND_BY_AFFORDANCE[affordance]];
 	if (spec.planLiveness === 'REQUIRES_ACTIVE_PLAN' && planStatus !== PLAN_STATUS_ACTIVE)
@@ -387,6 +404,17 @@ function planPermitsAffordance(
 		const decision = retryDecision(retry);
 		if (!decision.mayRetry) return false;
 	}
+	// ── RPH-EXE-005, the FIFTH limb (N-21) ─────────────────────────────────────────────────────────────────────
+	//
+	// Gated on the COLUMN, so both arrows into RUNNING are covered by one line and a tenth command declaring
+	// REQUIRES_PRESENT_INPUTS is withheld here on the day it is declared. The DECISION is `stepMayBecomeReady`,
+	// the ratified kernel the engine calls — this layer re-derives nothing, it only supplies the resolved fact.
+	if (
+		spec.inputReadiness === 'REQUIRES_PRESENT_INPUTS' &&
+		unresolvedRequiredInputs !== undefined &&
+		!stepMayBecomeReady(unresolvedRequiredInputs.length === 0).ok
+	)
+		return false;
 	return true;
 }
 
@@ -447,10 +475,18 @@ export function planAffordancesFor(
 	stepState: string,
 	pwuWorkLifecycleState?: string,
 	binding?: StepBindingContext,
-	retry?: RetryInput
+	retry?: RetryInput,
+	unresolvedRequiredInputs?: readonly string[]
 ): StepAffordances {
 	const permits = (a: StepAdvanceCommand | StepControlCommand) =>
-		planPermitsAffordance(planStatus, a, pwuWorkLifecycleState, binding, retry);
+		planPermitsAffordance(
+			planStatus,
+			a,
+			pwuWorkLifecycleState,
+			binding,
+			retry,
+			unresolvedRequiredInputs
+		);
 	return {
 		advance: advanceCommandsFor(stepState).filter(permits),
 		control: controlCommandsFor(stepState).filter(permits)
@@ -498,7 +534,8 @@ function stepView(
 		s.stepState,
 		pwuWorkLifecycleState,
 		bindingContextFor(s),
-		retry
+		retry,
+		s.unresolvedRequiredInputs
 	);
 	// ── WITHHOLDING THE AFFORDANCE MUST NOT ALSO WITHHOLD THE REASON ───────────────────────────────────────────
 	//

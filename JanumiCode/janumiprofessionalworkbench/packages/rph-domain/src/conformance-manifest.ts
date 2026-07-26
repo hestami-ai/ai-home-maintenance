@@ -97,11 +97,15 @@ const COVERAGE_BY_PREFIX: Readonly<Record<string, Coverage>> = {
 		status: 'PARTIAL',
 		testFile: 'packages/rph-domain/src/execution.test.ts',
 		// DOWNGRADED from COVERED by WP-16's layer gate, and the downgrade is the finding. "RPH-EXE-001..009 by id"
-		// was true of the PREDICATES and false of the ENGINE: ~~EXE-003 (binding not authorized),~~ EXE-004 (granted
-		// != requested capability) and EXE-005 (preconditions before READY) are implemented as correct, unit-tested
-		// kernel functions with NO production caller — the same shape as PWU-010 before WP-12b, and in the same
-		// family. They are disclosed in `enforcement-register.ts` with a checked call-site census rather than fixed
-		// here: wiring a new refusal is a behaviour change owing its own kill test.
+		// was true of the PREDICATES and false of the ENGINE: ~~EXE-003 (binding not authorized),~~ ~~EXE-005
+		// (preconditions before READY)~~ and EXE-004 (granted != requested capability) were implemented as correct,
+		// unit-tested kernel functions with NO production caller — the same shape as PWU-010 before WP-12b, and in
+		// the same family. They are disclosed in `enforcement-register.ts` with a checked call-site census rather
+		// than fixed here: wiring a new refusal is a behaviour change owing its own kill test.
+		//
+		// EXE-005 STRUCK 2026-07-26: CLOSED by JAN-CAPBIND WP-3 (the `inputReadiness` column, enforced at both
+		// arrows into RUNNING) and mirrored in the read-model by N-21. Struck rather than deleted, per the same
+		// standard as EXE-003 below, so a reader sees the claim existed and when it stopped being true.
 		//
 		// EXE-003 STRUCK 2026-07-26 (finding N-13). It was CLOSED by JAN-EXEBIND WP-B1 and re-sited by JAN-REVREM
 		// RW-0/RW-3/RW-6, so this comment had been asserting for several commits that a rule with a live production
@@ -118,11 +122,17 @@ const COVERAGE_BY_PREFIX: Readonly<Record<string, Coverage>> = {
 		// Found by a fresh adversarial review re-deriving what an earlier review's lost MINOR findings might have
 		// been (ruling R13) — not by the gate that certifies this file.
 		note:
-			'EXE-001/002/003/006/008 asserted BY ID AT THE COMMAND LAYER (see COVERED_BY_ID); EXE-007/009 are not ' +
-			'command refusals (dispositioned in enforcement-register.ts); EXE-004/005 remain UNENFORCED — and NOT for ' +
-			'want of wiring: their subjects (CapabilityRequest/CapabilityGrant, InputBinding) are declared ' +
-			'"Source TBD" in the ratified corpus, so gen-objects emits opaque records and the rules have nothing to ' +
-			'quantify over. Escalated as a corpus gap (JAN-EXEBIND-DS-001 §4-R3), not scheduled as a task.'
+			'EXE-001/002/003/005/006/008 asserted BY ID AT THE COMMAND LAYER (see COVERED_BY_ID); EXE-007/009 are ' +
+			'not command refusals (dispositioned in enforcement-register.ts); EXE-004 remains UNENFORCED. THIS NOTE ' +
+			'WAS STALE TWICE and was corrected 2026-07-26 (N-19): it claimed EXE-005 unenforced after JAN-CAPBIND ' +
+			'WP-3 closed it, and gave BOTH rules a reason — "their subjects are declared Source TBD, so the rules ' +
+			'have nothing to quantify over" — that JAN-CAPBIND falsified by authoring InputBinding, ' +
+			'CapabilityRequest and CapabilityGrant under sponsor grant. The real disposition of EXE-004 is a ' +
+			'BOUNDARY, ' +
+			'not a corpus gap: its statement is about an OPERATION AT OPERATION TIME, and this engine is never in ' +
+			'the path of an operation; the corpus names the Runtime Authorization Service (§33.4) as the enforcer. ' +
+			'Its decidable DECLARATION half (granted within requested) is enforced; the OPERATION half is the ' +
+			'Platform. See enforcement-register.ts for the three-tier account and the R1 ruling.'
 	},
 	'RPH-CON': {
 		status: 'PARTIAL',
