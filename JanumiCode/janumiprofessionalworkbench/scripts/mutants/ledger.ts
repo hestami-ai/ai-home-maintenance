@@ -246,9 +246,13 @@ export const DECLARED_MUTANTS: readonly DeclaredMutant[] = [
 		// The guard did not change. Its four checks moved from `bindingAuthorityRefusal` into `bindingAuthorityVerdict`
 		// so the read-model could consult the same declaration (MAJOR #5).
 		file: 'packages/rph-domain/src/execution.ts',
-		find: "\tconst check = bindingPermitsExecution(facts.authorizationStatus);\n\tif (check.ok) return { ok: true, limb: 'PERMITTED' };",
+		// RE-ANCHORED 2026-07-26 (N-18's ruling). The status limb moved inside an `if (authorizationStatus !==
+		// undefined)` block when the NOTHING_GRANTED limb was added after it, so the old single-tab anchor is gone.
+		// Re-expressed as the CONSEQUENCE (the V-2c operator): the check still runs and still decides, and its
+		// refusal is simply not returned.
+		find: "\t\tif (!check.ok)\n\t\t\treturn {\n\t\t\t\tok: false,\n\t\t\t\tlimb: 'NOT_AUTHORIZED',",
 		replace:
-			"\tconst check = bindingPermitsExecution(facts.authorizationStatus);\n\tif (check.ok || facts.authorizationStatus !== '__never__') return { ok: true, limb: 'PERMITTED' };",
+			"\t\tif (!check.ok && (false as boolean))\n\t\t\treturn {\n\t\t\t\tok: false,\n\t\t\t\tlimb: 'NOT_AUTHORIZED',",
 		expectRed: [
 			'packages/rph-application/src/handlers/exebind-wp1-binding-authority.test.ts',
 			'packages/rph-domain/src/revrem-wp6-binding-authority-verdict.test.ts'
@@ -524,8 +528,12 @@ export const DECLARED_MUTANTS: readonly DeclaredMutant[] = [
 		file: 'packages/rph-application/src/handlers/runtime-binding.ts',
 		// THE WIRING, separately from the kernel. The predicate can be correct while nothing asks it — which is the
 		// exact shape (F-28) that left RPH-EXE-003/004/005 certified COVERED and enforced nowhere.
-		find: '\t\t\tif (check.ok) return null;',
-		replace: '\t\t\tif (check.ok || !check.ok) return null;',
+		// RE-ANCHORED 2026-07-26: the N-22 self-arrow limb turned the guard's tail from `if (check.ok) return null`
+		// into `if (!check.ok) return reject(...)` followed by more checks, so the old anchor is gone. Same defect,
+		// expressed as the consequence: the containment check runs and its refusal is discarded.
+		find: "\t\t\tif (!check.ok)\n\t\t\t\t// The kernel's label travels in the MESSAGE",
+		replace:
+			"\t\t\tif (!check.ok && (false as boolean))\n\t\t\t\t// The kernel's label travels in the MESSAGE",
 		expectRed: [
 			'packages/rph-application/src/handlers/capbind-n4-grant-containment.test.ts'
 		],
@@ -1629,8 +1637,8 @@ export const DECLARED_MUTANTS: readonly DeclaredMutant[] = [
 		id: 'X1-a-binding-granting-nothing-authorizes-a-start',
 		file: 'packages/rph-domain/src/execution.ts',
 		// N-18 ITSELF. The sponsor ruled the STATE legitimate and the PREDICATE wrong; this restores the predicate.
-		find: "\t\tif (facts.grantedCapabilities !== undefined && facts.grantedCapabilities.length === 0)",
-		replace: '\t\tif (facts.grantedCapabilities !== undefined && facts.grantedCapabilities.length < 0)',
+		find: "\tif (facts.grantedCapabilities !== undefined && facts.grantedCapabilities.length === 0)",
+		replace: '\tif (facts.grantedCapabilities !== undefined && facts.grantedCapabilities.length < 0)',
 		expectRed: ['packages/rph-application/src/handlers/partauth-derived-outcome.test.ts'],
 		why: 'N-18: a reviewed binding that conferred nothing must not authorize a start — the state is right, the permission was not',
 		source: 'N-18 ruling (R4)'
@@ -1641,8 +1649,8 @@ export const DECLARED_MUTANTS: readonly DeclaredMutant[] = [
 		// THE ASYMMETRY THAT MATTERS, in one clause: ABSENT is "the caller did not resolve it" and must be UNGATED;
 		// only a RESOLVED empty set gates. Collapsing them withholds Start on every step whose binding facts the
 		// caller could not look up — the disclosed fail-open turned into a silent fail-closed.
-		find: '\t\tif (facts.grantedCapabilities !== undefined && facts.grantedCapabilities.length === 0)',
-		replace: '\t\tif ((facts.grantedCapabilities ?? []).length === 0)',
+		find: '\tif (facts.grantedCapabilities !== undefined && facts.grantedCapabilities.length === 0)',
+		replace: '\tif ((facts.grantedCapabilities ?? []).length === 0)',
 		expectRed: ['packages/rph-application/src/handlers/exebind-wp1-binding-authority.test.ts'],
 		why: 'ABSENT means UNGATED, RESOLVED-EMPTY gates — two absences that mean opposite things (DS §6b R9)',
 		source: 'N-18 ruling (R4)'
