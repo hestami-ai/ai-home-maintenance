@@ -1622,5 +1622,103 @@ export const DECLARED_MUTANTS: readonly DeclaredMutant[] = [
 		expectRed: ['packages/rph-contracts/src/json-schema.test.ts'],
 		why: 'the drift check must be TOTAL over the committed artifacts — a shrinking enumeration is how "we check them all" becomes "we check one"',
 		source: 'JAN-BINDEXCL N-14'
+	},
+
+	// ── THE 2026-07-26 RULINGS: N-18 (R4), N-20, N-21, N-22, R2 ───────────────────────────────────────────────
+	{
+		id: 'X1-a-binding-granting-nothing-authorizes-a-start',
+		file: 'packages/rph-domain/src/execution.ts',
+		// N-18 ITSELF. The sponsor ruled the STATE legitimate and the PREDICATE wrong; this restores the predicate.
+		find: "\t\tif (facts.grantedCapabilities !== undefined && facts.grantedCapabilities.length === 0)",
+		replace: '\t\tif (facts.grantedCapabilities !== undefined && facts.grantedCapabilities.length < 0)',
+		expectRed: ['packages/rph-application/src/handlers/partauth-derived-outcome.test.ts'],
+		why: 'N-18: a reviewed binding that conferred nothing must not authorize a start — the state is right, the permission was not',
+		source: 'N-18 ruling (R4)'
+	},
+	{
+		id: 'X2-an-absent-grant-is-read-as-an-empty-one',
+		file: 'packages/rph-domain/src/execution.ts',
+		// THE ASYMMETRY THAT MATTERS, in one clause: ABSENT is "the caller did not resolve it" and must be UNGATED;
+		// only a RESOLVED empty set gates. Collapsing them withholds Start on every step whose binding facts the
+		// caller could not look up — the disclosed fail-open turned into a silent fail-closed.
+		find: '\t\tif (facts.grantedCapabilities !== undefined && facts.grantedCapabilities.length === 0)',
+		replace: '\t\tif ((facts.grantedCapabilities ?? []).length === 0)',
+		expectRed: ['packages/rph-application/src/handlers/exebind-wp1-binding-authority.test.ts'],
+		why: 'ABSENT means UNGATED, RESOLVED-EMPTY gates — two absences that mean opposite things (DS §6b R9)',
+		source: 'N-18 ruling (R4)'
+	},
+	{
+		id: 'X3-the-verdict-renderer-falls-through-again',
+		file: 'packages/rph-application/src/handlers/execution.ts',
+		// THE FINDING INSIDE THE FIX. A limb the renderer has not been taught about must still REFUSE. Without the
+		// totality arm the N-18 verdict fell to `return null` and the engine PERMITTED the start it had just refused.
+		find: "\tif (verdict.limb === 'NOTHING_GRANTED')",
+		replace: "\tif (verdict.limb === '__no_bespoke_arm__' as typeof verdict.limb)",
+		expectRed: [],
+		why: 'A DECLARED CONTROL over defence in depth — see expectSurvive.',
+		source: 'N-18 ruling (R4)',
+		expectSurvive:
+			'IT MUST SURVIVE, AND THAT IS THE PROOF. Removing the BESPOKE NOTHING_GRANTED rendering leaves the ' +
+			'TOTALITY arm below it, which refuses any non-ok limb with the kernel\'s own reason — so the kill test ' +
+			'still passes, and it passes for the RIGHT reason. The two arms are deliberately redundant: the bespoke ' +
+			'one gives the best message, the total one guarantees a limb nobody wrote an `if` for cannot be silently ' +
+			'admitted. A mutant that reddened here would mean the totality arm is not doing its job. Its absence is ' +
+			'what SHOULD redden, and that is a different edit — but the reverse mutation (disabling the totality arm) ' +
+			'is equally covered by this bespoke one, so NEITHER can be measured alone. Declaring one as a control ' +
+			'and stating why is the honest record; declaring a mutant known to survive as a guard test would be the ' +
+			'false record this ledger exists to prevent. THE DEFECT ITSELF IS REAL AND WAS OBSERVED: before the ' +
+			'totality arm existed, the N-18 verdict fell through to `return null` and the engine PERMITTED the start ' +
+			'it had just decided to refuse — caught by the kill test, not by any mutant.'
+	},
+	{
+		id: 'X4-a-vacuous-request-is-accepted-again',
+		file: 'packages/rph-application/src/handlers/runtime-binding.ts',
+		// N-20: it reaches AUTHORIZED, which cannot be re-authorized, so nothing downstream can repair it. The only
+		// point with a remedy is creation.
+		find: '\tif (capabilityIdentities(p.requestedCapabilities).length === 0)',
+		replace: '\tif (capabilityIdentities(p.requestedCapabilities).length < 0)',
+		expectRed: [
+			'packages/rph-application/src/handlers/partauth-derived-outcome.test.ts',
+			'packages/rph-application/src/handlers/capbind-n4-grant-containment.test.ts'
+		],
+		why: 'N-20: a request for nothing becomes an AUTHORIZED binding conferring nothing, with no command able to repair it',
+		source: 'N-20'
+	},
+	{
+		id: 'X5-the-partially-authorized-self-arrow-reopens',
+		file: 'packages/rph-application/src/handlers/runtime-binding.ts',
+		// N-22: the ratified machine declares no PARTIALLY_AUTHORIZED -> PARTIALLY_AUTHORIZED arrow, and
+		// checkTransition admits from === to as a NOOP — so without this an identical re-authorization appends an
+		// event for a change that did not happen.
+		find: '\t\t\tif (from === to)',
+		replace: '\t\t\tif (from === to && false)',
+		expectRed: [
+			'packages/rph-application/src/handlers/partauth-derived-outcome.test.ts',
+			'packages/rph-application/src/handlers/command-reissue-guard.test.ts'
+		],
+		why: 'N-22: an authorization that changes nothing must not be recorded as one — the machine declares no self-arrow',
+		source: 'N-22'
+	},
+	{
+		id: 'X6-the-input-readiness-mirror-goes-silent',
+		file: 'packages/rph-projections/src/execution-view.ts',
+		// N-21 ITSELF: the read-model stops mirroring RPH-EXE-005 and offers start/resolve on a step whose required
+		// input does not resolve — F-29's fifth instance, restored.
+		find: "\t\tspec.inputReadiness === 'REQUIRES_PRESENT_INPUTS' &&",
+		replace: "\t\tspec.inputReadiness === 'NEVER_MATCHES_ANY_ROW' &&",
+		expectRed: ['packages/rph-projections/src/retrycap-readmodel-cap.test.ts'],
+		why: 'N-21: the read-model must withhold what the engine refuses — RPH-EXE-005 is ratified and was mirrored nowhere',
+		source: 'N-21'
+	},
+	{
+		id: 'X7-the-authorization-event-stops-recording-its-outcome',
+		file: 'packages/rph-application/src/handlers/runtime-binding.ts',
+		// R2: the log carries the grant but not the resulting status, so an auditor cannot tell a full authorization
+		// from a partial one — the exact distinction JAN-PARTAUTH's derivation exists to make.
+		find: '\t\t\tauthorizationStatus: nextState.authorizationStatus\n\t\t}),',
+		replace: '\t\t\tauthorizationStatus: undefined\n\t\t}),',
+		expectRed: ['packages/rph-application/src/handlers/partauth-derived-outcome.test.ts'],
+		why: 'R2: the event must record the outcome the vocabulary declares REQUIRED on it, or the audit log cannot distinguish full from partial',
+		source: 'R2 ruling'
 	}
 ];
