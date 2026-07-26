@@ -1651,8 +1651,16 @@ export const DECLARED_MUTANTS: readonly DeclaredMutant[] = [
 		// caller could not look up — the disclosed fail-open turned into a silent fail-closed.
 		find: '\tif (facts.grantedCapabilities !== undefined && facts.grantedCapabilities.length === 0)',
 		replace: '\tif ((facts.grantedCapabilities ?? []).length === 0)',
-		expectRed: ['packages/rph-application/src/handlers/exebind-wp1-binding-authority.test.ts'],
-		why: 'ABSENT means UNGATED, RESOLVED-EMPTY gates — two absences that mean opposite things (DS §6b R9)',
+		// IT SURVIVED FIRST, AND THE VICTIM WAS THE MISTAKE — not the guard. I named the exebind suite, which drives
+		// the ENGINE, and `bindingAuthorityRefusal` ALWAYS supplies `grantedCapabilities` (it resolves them from the
+		// store). So the absent case does not exist on that path and the mutation was invisible there.
+		//
+		// THE ABSENT CASE LIVES ONLY IN THE READ-MODEL, where a caller may know a binding resolves and its status
+		// without having projected its grant — which is exactly the disclosed fail-open. That is where it must be
+		// measured. A mutant is only as good as the suite it is pointed at, and "the suite I happened to think of"
+		// is not the same as "the suite where the case exists".
+		expectRed: ['packages/rph-projections/src/revrem-wp6-readmodel-binding-authority.test.ts'],
+		why: 'ABSENT means UNGATED, RESOLVED-EMPTY gates — two absences that mean opposite things (DS §6b R9), and only the read-model can produce the absent one',
 		source: 'N-18 ruling (R4)'
 	},
 	{
@@ -1713,7 +1721,10 @@ export const DECLARED_MUTANTS: readonly DeclaredMutant[] = [
 		// N-21 ITSELF: the read-model stops mirroring RPH-EXE-005 and offers start/resolve on a step whose required
 		// input does not resolve — F-29's fifth instance, restored.
 		find: "\t\tspec.inputReadiness === 'REQUIRES_PRESENT_INPUTS' &&",
-		replace: "\t\tspec.inputReadiness === 'NEVER_MATCHES_ANY_ROW' &&",
+		// A REAL enum member, not a sentinel: comparing against a non-member is TS2367 and the mutant never runs
+		// (the V-2c lesson, in its other form). `NOT_CONSUMING` points the limb at the wrong commands, so the two
+		// arrows into RUNNING go ungated — which is precisely N-21.
+		replace: "\t\tspec.inputReadiness === 'NOT_CONSUMING' &&",
 		expectRed: ['packages/rph-projections/src/retrycap-readmodel-cap.test.ts'],
 		why: 'N-21: the read-model must withhold what the engine refuses — RPH-EXE-005 is ratified and was mirrored nowhere',
 		source: 'N-21'
