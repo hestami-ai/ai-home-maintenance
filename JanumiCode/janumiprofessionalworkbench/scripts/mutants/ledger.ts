@@ -1556,5 +1556,58 @@ export const DECLARED_MUTANTS: readonly DeclaredMutant[] = [
 		expectRed: ['packages/rph-application/src/handlers/retrycap-engine-readmodel-agree.test.ts'],
 		why: 'the cap must be the PLAN’s; a fixture declaring the default value would hide this entirely',
 		source: 'JAN-RETRYCAP WP-3'
+	},
+
+	// ── JAN-PARTAUTH: PARTIALLY_AUTHORIZED becomes reachable by DERIVATION (N-6) ──────────────────────────────
+	{
+		id: 'PA1-the-outcome-is-always-full-authorization',
+		file: 'packages/rph-domain/src/execution.ts',
+		// N-6 ITSELF, restored: every grant reports AUTHORIZED and the ratified PARTIALLY_AUTHORIZED state goes back
+		// to being unreachable — with a binding that was granted less than it asked for now CLAIMING full authority,
+		// which is worse than the original gap.
+		find: "\treturn input.requested.every((c) => granted.has(c)) ? 'AUTHORIZED' : 'PARTIALLY_AUTHORIZED';",
+		replace: "\treturn input.requested.every(() => true) ? 'AUTHORIZED' : 'PARTIALLY_AUTHORIZED';",
+		expectRed: ['packages/rph-application/src/handlers/partauth-derived-outcome.test.ts'],
+		why: 'N-6 itself: a partial grant must produce PARTIALLY_AUTHORIZED, not a binding claiming authority it was not given',
+		source: 'JAN-PARTAUTH WP-1'
+	},
+	{
+		id: 'PA2-the-outcome-is-always-partial',
+		file: 'packages/rph-domain/src/execution.ts',
+		// The over-refusal half. Reddens ONLY positive cases: every full authorization in the system silently
+		// downgrades to PARTIALLY_AUTHORIZED, which still permits execution — so nothing fails at the point of use
+		// and the defect surfaces only as a wrong record.
+		find: "\treturn input.requested.every((c) => granted.has(c)) ? 'AUTHORIZED' : 'PARTIALLY_AUTHORIZED';",
+		replace: "\treturn input.requested.every((c) => granted.has(c)) ? 'PARTIALLY_AUTHORIZED' : 'PARTIALLY_AUTHORIZED';",
+		expectRed: [
+			'packages/rph-application/src/handlers/partauth-derived-outcome.test.ts',
+			'packages/rph-application/src/handlers/exebind-wp1-binding-authority.test.ts'
+		],
+		why: 'a grant that COVERS the request is full authorization — a rule that always says "partial" satisfies every negative case',
+		source: 'JAN-PARTAUTH WP-1'
+	},
+	{
+		id: 'PA3-an-authorization-may-silently-shrink-the-grant',
+		file: 'packages/rph-domain/src/execution.ts',
+		// THE GUARD N-6's FIX OWES. Reachable only because this work package made PARTIALLY_AUTHORIZED reachable:
+		// a second authorization drops capability and records the removal as an authorization, while
+		// RevokeRuntimeCapability exists to record removal with a reason and drive to a terminal state.
+		find: '\tconst dropped = input.current.filter((c) => !next.has(c));',
+		replace: '\tconst dropped = input.current.filter((c) => !next.has(c) && false);',
+		expectRed: ['packages/rph-application/src/handlers/partauth-derived-outcome.test.ts'],
+		why: 'an authorization EXPANDS a grant (§22.1); a reduction recorded as an authorization is a false entry in an append-only log',
+		source: 'JAN-PARTAUTH WP-2'
+	},
+	{
+		id: 'PA4-the-derived-target-is-ignored-by-the-committed-state',
+		file: 'packages/rph-application/src/handlers/kit.ts',
+		// THE SEAM, not the rule. `target` is derived once and used for the transition check, the status field and
+		// the mirrored lifecycleStatus. Re-deriving — or here, pinning the committed field to the checked arrow's
+		// source — is how an aggregate ends up in a state the machine never validated.
+		find: '\t\t[args.statusField]: target,',
+		replace: '\t\t[args.statusField]: from,',
+		expectRed: ['packages/rph-application/src/handlers/partauth-derived-outcome.test.ts'],
+		why: 'the state that is CHECKED must be the state that is COMMITTED — one derivation, used everywhere',
+		source: 'JAN-PARTAUTH WP-1'
 	}
 ];
