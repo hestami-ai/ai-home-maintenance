@@ -165,16 +165,26 @@ export const ENFORCEMENT_REGISTER: Readonly<Record<RegisteredRuleId, Enforcement
 		// "001..009 by id". `startExecutionStep` never resolved the step's runtimeBindingId at all, so a step started
 		// freely against a REQUESTED, DENIED or REVOKED binding. The register found it; the fix got its own work
 		// package rather than being smuggled into the gate that found it.
+		// SITE CORRECTED BY JAN-REVREM RW-5. This read "in startExecutionStep's precheck" for four commits after
+		// RW-0 MOVED the limb into `stepAuthorityRefusal` — the register documented a call site that no longer
+		// existed, which is precisely the drift a register exists to prevent. DS-001 §6 C-1 predicted this exact
+		// conflict and required it be fixed in the same commit; it was not.
 		enforcedAt:
-			'packages/rph-application/src/handlers/execution.ts — bindingAuthorityRefusal, in startExecutionStep’s precheck (JAN-EXEBIND WP-B1)',
+			'packages/rph-application/src/handlers/execution.ts — bindingAuthorityRefusal, invoked from stepAuthorityRefusal on the `bindingAuthority` column (JAN-EXEBIND WP-B1, re-sited by JAN-REVREM RW-0)',
 		refusalCode: 'RPH_INVARIANT_VIOLATION',
 		// The kernel's own label travels in the MESSAGE: `RPH_BINDING_NOT_AUTHORIZED` is not a member of the ratified
 		// 15-value RphErrorCodeSchema, so it goes there or nowhere (the WP-11 discipline).
 		refusalMarker: 'a step may only execute against an AUTHORIZED or PARTIALLY_AUTHORIZED binding',
+		// MUTATIONS CORRECTED BY RW-5. Two of the three named acts no longer exist: the precheck call was moved, and
+		// the §15.3 allowlist limb was WITHDRAWN. A `declaredMutations` entry that cannot be applied is worse than an
+		// absent one — the field's whole contract is "what to break to make this row's probe go RED", so an
+		// unapplicable entry is an untestable instruction wearing the authority of a checked record.
 		declaredMutations: [
 			'invert the accept set of bindingPermitsExecution',
-			'delete the bindingAuthorityRefusal call from startExecutionStep’s precheck',
-			'move the §15.3 allowlist limb AHEAD of the status limb — the authored rule then masks the ratified one for a binding that fails BOTH, which is the only input able to tell the two orders apart (this mutant survived the first battery)'
+			'flip StartExecutionStep.bindingAuthority to NOT_EXECUTING in step-command-spec.ts',
+			'flip ResolveExecutionStepWait.bindingAuthority to NOT_EXECUTING — the two-arrows BLOCKER, re-expressed as one character of declaration',
+			'delete the bindingAuthority limb from stepAuthorityRefusal',
+			'delete the SCOPE check (boundStepId !== stepId) — a binding then backs any step in the plan'
 		]
 	},
 	'RPH-EXE-004': {

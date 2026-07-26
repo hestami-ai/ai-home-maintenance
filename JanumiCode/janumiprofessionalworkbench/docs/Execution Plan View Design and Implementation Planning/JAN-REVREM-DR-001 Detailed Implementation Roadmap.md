@@ -10,7 +10,9 @@ JAN-EXECREM + JAN-EXEBIND (80 agents; 19 distinct confirmed defects).*
 | **RW-0** | Binding authority becomes a COLUMN; the allowlist limb is withdrawn | **BLOCKER #1**, MAJOR #2, MAJOR #3, MAJOR #9, MINOR #14, MINOR #18 | — |
 | **RW-1** | Read-model fidelity: prune gating, derived closed-PWU set | MAJOR #4, #5, #6 | RW-0 |
 | **RW-2** | The four false records + the vacuous tests | MAJOR #7, #8, #10, #6-record; MINOR #17 | RW-1 |
-| **RW-3** | Remaining MINORs + the completeness-critic gaps | MINOR #12, #13, #15, #16, #19 | RW-2 |
+| **RW-3** | Binding SCOPE (MAJOR #2) + remaining MINORs | MAJOR #2; MINOR #12, #13, #15, #16, #19 | RW-2 |
+| **RW-4** | *(added by the second review)* The finding-#7 floor RW-2 wrongly refused | BLOCKER (2nd review) | RW-3 |
+| **RW-5** | *(added by the second review)* The stale records RW-0/RW-3 left | 16 findings (2nd review) | RW-4 |
 
 **RW-0 first and alone.** It carries the only BLOCKER and the only shipped regression, both introduced the same
 day. Nothing else in this roadmap is urgent; batching them behind it would delay the fix that matters and make
@@ -93,8 +95,26 @@ the registry-totality gates · every new guard live mutation-red-proofed **after
 
 ## 6. Delivery record
 
-*(RW-3 writes this. Empty on purpose, and saying so — the lesson from `JAN-EXECPLAN-DR-004`, which shipped a
-feature under a record reading "Nothing built".)*
+**RW-0 … RW-5 DELIVERED, 2026-07-25.**
+
+| WP | Commit | Outcome |
+|---|---|---|
+| RW-0 | `05518cc3` | BLOCKER closed as a CLASS: `bindingAuthority` becomes a column; the §15.3 wedge withdrawn. |
+| RW-1 | `90d0eddd` | Prune joins the authority filter; the closed-PWU set becomes genuinely derived. |
+| RW-2 | `10351de9` | Four false records corrected. **Its refusal of finding #7 was itself wrong** — see RW-4. |
+| RW-3 | `0c093449` | A binding authorizes the step it NAMES and no other. |
+| RW-4 | `fe109847` | The finding-#7 floor added; the pin test that could not falsify itself, fixed. |
+| RW-5 | *(this commit)* | The stale records RW-0/RW-3 left behind — the second review's other 16 findings. |
+
+**Gate `G-REVREM-001` green** at each landing: check-types 21/21 · vitest 21/21 · lint 0 · boundary 0 ·
+svelte-check 0 · Playwright 50 · **`rph-engine` 69 (the reference seed drives unchanged)** · every new guard live
+mutation-red-proofed **after a rebuild**.
+
+> **This section was empty, under a note saying it was "empty on purpose … the lesson from `JAN-EXECPLAN-DR-004`,
+> which shipped a feature under a record reading 'Nothing built'" — while four work packages had already
+> shipped under it.** The second adversarial review found that, and it is the sharpest single illustration in
+> this lineage: writing the diagnosis is not the same as not having the disease. Recorded rather than quietly
+> filled in.
 
 ## 7. The criterion this series must not repeat
 
@@ -105,4 +125,4 @@ the last one was thin: no browser lens, no branch-coverage census, no re-run of 
 
 ---
 
-*`READY_TO_BUILD` / v0.1.0 — 4 work packages. Nothing built yet.*
+*`DELIVERED` / v0.1.0 — 6 work packages (RW-0..RW-5; RW-4 and RW-5 were added BY the review of RW-0..RW-3). Its own adversarial review is EXECUTED: 30 candidates, 17 confirmed, and it found that RW-2 refused a real BLOCKER.*

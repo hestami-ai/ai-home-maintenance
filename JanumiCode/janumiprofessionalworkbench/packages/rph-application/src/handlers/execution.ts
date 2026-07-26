@@ -844,17 +844,26 @@ function advanceStep(
  * certified COVERED) — and it was found by the register JAN-EXECREM WP-16 built BECAUSE F-28 happened, which is
  * the first evidence the anti-recurrence mechanism does the thing it exists for.
  *
- * TWO LIMBS, DELIBERATELY SEPARATE, AND THE ORDER IS LOAD-BEARING.
+ * THREE CHECKS, IN THIS ORDER (docblock corrected by JAN-REVREM RW-5 — it described TWO limbs, in the opposite
+ * order, for two commits after RW-0 withdrew one and RW-3 inserted another ahead of the rest):
  *
- *   3. Is this binding authorized AT ALL?     — RPH-EXE-003, the RATIFIED rule.
- *   4. Did THIS ACTIVATION authorize it?      — `plan.authorizedRuntimeBindingIds` (§15.3), an AUTHORED limb.
+ *   1. Does the step name a binding at all?   — absent ⇒ OUT OF SCOPE of the rule (see below), not a fail-open.
+ *   2. Does the id resolve?                   — fail-CLOSED; an authority that cannot be READ authorizes nothing.
+ *   3. Is it the binding for THIS step?       — SCOPE (RW-3). `RuntimeBinding.executionStepId` is ratified and
+ *                                               required, and was read by nothing: a binding authorized for step 1
+ *                                               backed any step naming its id.
+ *   4. Is it AUTHORIZED at all?               — RPH-EXE-003, the RATIFIED rule.
  *
- * A binding can be legitimately AUTHORIZED and still not be one the sponsor's activation decision covered, so
- * these are different questions with different answers. Limb 3 runs FIRST so the ratified rule is what refuses an
- * unauthorized binding; if the authored limb ran first it would MASK limb 3 for every binding outside the
- * allowlist, and RPH-EXE-003's kill test would become vacuous — the defect class reintroduced by its own fix.
+ * SCOPE RUNS BEFORE STATUS, and that IS a deliberate choice rather than an accident of insertion: a binding
+ * granted for other work is not this step's authority at all, so its *status* is not the question — reporting
+ * "your binding is REVOKED" for a binding that was never yours would name the wrong defect and send an operator
+ * to re-authorize something that would still be refused. The kill tests pin the split in both directions: S1
+ * asserts the SCOPE marker AND asserts the STATUS marker is ABSENT, and K1-K3 do the converse.
+ *
  * They share a wire code, which is why each carries its own marker: `RPH_INVARIANT_VIOLATION` is also returned by
  * the PWU-openness limb, the retry cap and the prunability precheck, so the code alone separates nothing.
+ *
+ * (The §15.3 allowlist limb that once sat here is WITHDRAWN — see the note at the end of this function.)
  *
  * THE KERNEL'S CODE IS CARRIED INTO THE MESSAGE, NOT RETURNED AS ONE. `RPH_BINDING_NOT_AUTHORIZED` is
  * `bindingPermitsExecution`'s label; the ratified `RphErrorCodeSchema` is a closed 15-value enum that does not
