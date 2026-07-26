@@ -221,7 +221,8 @@ export function entryStepIds(
 ): string[] {
 	const hasRealSourceInEdge = new Set<string>();
 	for (const t of transitions)
-		if (t.sourceStepId !== undefined && t.targetStepId !== undefined) hasRealSourceInEdge.add(t.targetStepId);
+		if (t.sourceStepId !== undefined && t.targetStepId !== undefined)
+			hasRealSourceInEdge.add(t.targetStepId);
 	return steps.filter((s) => !hasRealSourceInEdge.has(s.id)).map((s) => s.id);
 }
 
@@ -300,7 +301,10 @@ export function branchRequiresDecision(plan: GatePlan, stepId: string): boolean 
 type BranchVerdict =
 	| { readonly kind: 'NOT_A_BRANCH' }
 	| { readonly kind: 'DECIDED'; readonly edge: GateTransition }
-	| { readonly kind: 'UNRESOLVED'; readonly why: 'NO_RECORDED_DECISION' | 'RECORDED_EDGE_NOT_FOUND' };
+	| {
+			readonly kind: 'UNRESOLVED';
+			readonly why: 'NO_RECORDED_DECISION' | 'RECORDED_EDGE_NOT_FOUND';
+	  };
 
 const NOT_A_BRANCH: BranchVerdict = { kind: 'NOT_A_BRANCH' };
 
@@ -315,7 +319,9 @@ const NOT_A_BRANCH: BranchVerdict = { kind: 'NOT_A_BRANCH' };
  * Identity remains the fallback for an edge carrying no id at all, which is the only case where ids cannot answer.
  */
 function edgeIsSelected(edge: GateTransition, selected: GateTransition): boolean {
-	return edge.id !== undefined && selected.id !== undefined ? edge.id === selected.id : edge === selected;
+	return edge.id !== undefined && selected.id !== undefined
+		? edge.id === selected.id
+		: edge === selected;
 }
 
 function branchVerdict(
@@ -419,7 +425,8 @@ function localEdgeDisposition(ctx: GateContext, edge: GateTransition): InEdgeDis
 	//    longer gets a re-derived answer invented for it.
 	const outEdges = outEdgesOf(ctx, edge.sourceStepId);
 	const verdict = branchVerdict(ctx, source, outEdges);
-	if (verdict.kind === 'DECIDED') return edgeIsSelected(edge, verdict.edge) ? 'SATISFIED' : 'NEUTRALIZED';
+	if (verdict.kind === 'DECIDED')
+		return edgeIsSelected(edge, verdict.edge) ? 'SATISFIED' : 'NEUTRALIZED';
 	if (verdict.kind === 'UNRESOLVED') return 'UNRESOLVED';
 	// 7. Non-BRANCH source: out-edges are INDEPENDENT. An unconditional edge is taken.
 	if (!isConditionalEdge(edge)) return 'SATISFIED';
@@ -563,6 +570,23 @@ function stepAtFrontier(ctx: GateContext, step: GateStep): boolean {
  */
 export function startableStepIds(plan: GatePlan, evaluateGuard?: EdgeGuardEvaluator): string[] {
 	if (plan.status !== 'ACTIVE') return [];
+	// FAIL CLOSED on an incoherent graph — the floor its two siblings (`prunableStepIds`, `startStepGate`) have
+	// always had, and which this function was missing.
+	//
+	// JAN-REVREM RW-4. The previous work package DECLINED to add this, arguing the guard could never change the
+	// answer: no entry ⇒ empty live set ⇒ every real-source edge NEUTRALIZED ⇒ no step SATISFIED. That argument
+	// was WRONG, and the error was one variable. A source-less (plan-entry) edge returns SATISFIED unconditionally
+	// — it never consults liveness — so a step needs only ONE such edge plus no PENDING real-source edge. And a
+	// real-source edge off a CANCELLED or SUPERSEDED step is IRRECOVERABLE_TERMINAL ⇒ NEUTRALIZED, which is not
+	// PENDING and therefore does not block the barrier.
+	//
+	//   steps [s1 QUEUED, s2 CANCELLED]; edges [(→s1), (s2→s1), (s1→s2)]
+	//   ⇒ entryStepIds [] (incoherent) · startableStepIds ['s1'] · startStepGate(s1) REFUSES
+	//
+	// The read-model offered a Start the engine rejects: the F-29 / F-11 invariant, in the sibling function the
+	// affordance work never reached. Reachable in stored history (propose-time refuses these graphs, which is why
+	// the floor exists at all) by cancelling one arm — Cancel is CLEANUP_EXEMPT, so it is accepted on any plan.
+	if (graphIsIncoherent(plan)) return [];
 	if ((plan.transitions ?? []).length === 0) {
 		const f = linearFrontier(plan);
 		return f === undefined ? [] : [f];

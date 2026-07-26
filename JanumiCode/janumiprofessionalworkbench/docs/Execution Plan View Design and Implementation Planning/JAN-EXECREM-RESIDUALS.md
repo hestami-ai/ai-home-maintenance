@@ -69,24 +69,41 @@ silently self-heals teaches nothing — and because every one of them was false 
 | **C-3** | `execrem-wp1-dormancy.test.ts` declared three fields DORMANT with an advertised "tripwire" | All three had producers since WP-10/13/14, and **the tripwire never fired** because the fixture cannot reach any emitter (`transitions: []`, non-BRANCH steps, no `retryReason` passed). A negative claim over a fixture that cannot produce the thing is unfalsifiable by construction — the vacuous-negative shape, applied to this programme's own scaffolding. Replaced by a POSITIVE census. | `execrem-wp1-dormancy.test.ts` |
 | **C-4** | `exebind-wp1` P4 claimed to cover the fail-open allowlist limb | It activated **with** the allowlist and dispatched no Start; inverting the branch left 545/545 green. Moot as of RW-0 — the limb is withdrawn — but recorded because the test was wrong before it was moot. | `exebind-wp1-binding-authority.test.ts` |
 
-### And one finding I could NOT reproduce — recorded as such, not quietly accepted
+### The finding I refused — AND THE REFUSAL WAS WRONG (corrected by RW-4, 2026-07-25)
 
-**Review finding #7** (MAJOR, confirmed by two refuters) claimed `startableStepIds` lacks a graph-incoherence
-floor *and therefore* "an entry-less plan yields `startableStepIds = ['s1']` while `startStepGate` refuses it".
+**Review finding #7** said `startableStepIds` lacks a graph-incoherence floor *and therefore* offers a Start the
+engine refuses. RW-2 accepted the first half and **refused the second**, writing: *"no floor was added, and that
+is the disciplined answer rather than the lazy one … a guard whose inputs cannot disagree … There is no gap."*
 
-Two of its three claims are true: the function genuinely does not call `graphIsIncoherent` (both its siblings
-do), and the existing coverage genuinely is a vacuous negative. **The failure scenario did not reproduce in four
-shapes**, and the reason is structural: `live()` seeds its walk from `entryStepIds(...)`, the same function
-`graphIsIncoherent` calls — so incoherent ⟹ live set empty ⟹ every real-source edge NEUTRALIZED ⟹ no step
-reaches the frontier. A step whose only in-edges are source-less would escape that, but `entryStepIds` counts
-such a step as an ENTRY, contradicting incoherence.
+**There is a gap.** The second adversarial review found it, and I reproduced it:
 
-**No floor was added, and that is the disciplined answer rather than the lazy one.** A `graphIsIncoherent` call
-there could never change the answer — a guard whose inputs cannot disagree, which is F-01's shape and the exact
-defect this lineage exists to eliminate. What was genuinely missing is that the safety is **emergent** and
-nothing asserted it; `revrem-wp2-incoherence-pin.test.ts` now pins the property *and* the shared-entry-definition
-mechanism that produces it, so re-seeding `live()` differently turns the divergence into a failing test rather
-than a silent one.
+```
+steps [s1 QUEUED, s2 CANCELLED]; edges [(→s1), (s2→s1), (s1→s2)]
+entryStepIds = []          (incoherent)
+startableStepIds = ['s1']  (the read-model offers Start)
+startStepGate(s1).ok = false  (the engine refuses)
+```
+
+**The error was one word.** RW-2 wrote that the escape "requires a step whose ONLY in-edges are source-less,
+[and] `entryStepIds` counts such a step as an ENTRY". It does not. It requires **one source-less in-edge and no
+PENDING real-source in-edge** — and a real-source edge off a CANCELLED or SUPERSEDED step is
+`IRRECOVERABLE_TERMINAL` ⇒ **NEUTRALIZED**, which is not PENDING and does not block the barrier.
+`localEdgeDisposition` returns SATISFIED for a source-less edge unconditionally; it never consults liveness.
+
+**And the pin test was written so it could not notice.** All four of its original fixtures gave `s1` a PENDING
+in-edge, so `!anyPending` failed for a reason unrelated to incoherence. Four probes were run before the refusal
+and **every one used a QUEUED source.** A negative asserted over fixtures that cannot produce the thing is
+unfalsifiable by construction — which is the *exact defect RW-2 corrected in the dormancy register, in the same
+work package, about ninety minutes earlier*.
+
+**Disposition: the floor is added** (`transition-gate.ts`, RW-4) and proved live — removing it turns four named
+cases RED. The pin now carries the CANCELLED and SUPERSEDED shapes plus a case asserting that at least one
+fixture can expose the gap, so the array cannot be quietly narrowed back into agreement with itself.
+
+**The lesson, kept rather than tidied away:** *"I could not construct a counterexample" is a claim about my
+search, not about the world* — see the same failure at N-2/N-3 — **and a test written to confirm that claim
+will confirm it.** Refusing a finding is a real option and RW-2 was right to treat it as one; the discipline it
+skipped was writing the fixture that would have proved itself wrong.
 
 ## 1. Authored contract additions (`UNRATIFIED-AUTHORED`)
 

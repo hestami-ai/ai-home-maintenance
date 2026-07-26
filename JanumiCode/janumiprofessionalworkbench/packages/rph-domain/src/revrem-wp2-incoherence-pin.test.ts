@@ -1,31 +1,31 @@
-// JAN-REVREM RW-2 — pinning the incoherent-graph safety of `startableStepIds`, and the disposition of a review
-// finding I could not reproduce.
+// JAN-REVREM RW-2, CORRECTED BY RW-4 — the incoherent-graph floor on `startableStepIds`.
 //
-// THE FINDING (#7, MAJOR, confirmed by two refuters): "`startableStepIds` has no graph-incoherence floor, and the
-// test asserting it does is a vacuous negative." It cited an executed probe: *an entry-less plan yields
-// `startableStepIds = ['s1']` while `startStepGate` refuses it as incoherent* — a read-model/authority divergence.
+// THIS FILE PREVIOUSLY ARGUED THAT REVIEW FINDING #7 COULD NOT HAPPEN. THAT ARGUMENT WAS WRONG, and the way it
+// was wrong is the most instructive thing in this programme.
 //
-// TWO OF ITS THREE CLAIMS ARE TRUE.
-//   1. `startableStepIds` genuinely does not call `graphIsIncoherent`. Its siblings both do (`prunableStepIds`
-//      and `startStepGate`), so the asymmetry is real and was invisible.
-//   2. The existing coverage IS a vacuous negative: `transition-gate-entry.test.ts`'s 2-cycle is refused by
-//      `stepAtFrontier` on its own, so no floor is under test there.
+// RW-2 declined to add a `graphIsIncoherent` floor here, reasoning: no entry ⇒ empty live set ⇒ every
+// real-source edge NEUTRALIZED ⇒ no step has a SATISFIED in-edge ⇒ no frontier. It then wrote: "a step whose
+// ONLY in-edges are source-less would escape that, but `entryStepIds` counts such a step as an ENTRY,
+// contradicting incoherence. There is no gap."
 //
-// THE THIRD — THE FAILURE SCENARIO — DID NOT REPRODUCE, in four shapes, and the reason is structural rather than
-// lucky: `live()` seeds its walk from `entryStepIds(...)`, the SAME function `graphIsIncoherent` calls. So
-// incoherent ⟺ no entry ⟹ the live set is EMPTY ⟹ `effectiveDisposition` overrides every real-source edge to
-// NEUTRALIZED ⟹ no step has a SATISFIED in-edge ⟹ `stepAtFrontier` is false everywhere ⟹ the set is `[]`.
-// A step whose ONLY in-edges are source-less would escape that, but `entryStepIds` counts such a step as an
-// ENTRY, which contradicts incoherence. There is no gap between the two.
+// THE ESCAPE WAS MIS-STATED BY ONE WORD. It does not require a step whose ONLY in-edges are source-less. It
+// requires a step with ONE source-less in-edge and NO **PENDING** real-source in-edge — and a real-source edge
+// off a CANCELLED or SUPERSEDED step is IRRECOVERABLE_TERMINAL, hence NEUTRALIZED, which is not PENDING and
+// does not block the barrier. `localEdgeDisposition` returns SATISFIED for a source-less edge unconditionally;
+// it never consults liveness.
 //
-// SO NO FLOOR IS ADDED, AND THAT IS THE DISCIPLINED ANSWER, NOT THE LAZY ONE. A `graphIsIncoherent` call here
-// could never change the answer — a guard whose inputs cannot disagree, which is F-01's shape exactly and the
-// single defect this whole lineage exists to eliminate. Adding it would look like diligence and be dead code,
-// and the next reviewer would have to re-derive that it is unreachable.
+//   steps [s1 QUEUED, s2 CANCELLED]; edges [(→s1), (s2→s1), (s1→s2)]
+//   ⇒ entryStepIds [] (incoherent) · startableStepIds ['s1'] · startStepGate(s1) REFUSES.
 //
-// WHAT WAS ACTUALLY MISSING IS THIS FILE. The safety is EMERGENT — a consequence of two functions sharing one
-// entry definition — and nothing asserted it. Change the seeding of `live()` and the divergence the finding
-// described becomes real, silently. These cases pin the property at the level it actually holds.
+// AND THE FIXTURES BELOW WERE CHOSEN SO THEY COULD NOT NOTICE. All four original shapes give s1 a PENDING
+// in-edge from a QUEUED or live source, so `!anyPending` fails for a reason that has nothing to do with
+// incoherence. A negative asserted over fixtures that cannot produce the thing is unfalsifiable by
+// construction — the exact defect RW-2 corrected in the dormancy register, committed by the same author in the
+// same work package, about ninety minutes apart. Four probes were run and every one used a PENDING source.
+//
+// The floor is now in `startableStepIds`, and it is demonstrably NOT dead code: the CANCELLED/SUPERSEDED shapes
+// below fail without it. The lesson kept rather than tidied away: **"I could not construct a counterexample" is
+// a claim about my search, not about the world** — and a test written to confirm that claim will confirm it.
 import { describe, expect, it } from 'vitest';
 import {
 	entryStepIds,
@@ -75,6 +75,34 @@ const INCOHERENT: readonly { readonly why: string; readonly plan: Plan }[] = [
 			[
 				{ id: 's1', stepState: 'QUEUED' },
 				{ id: 's2', stepState: 'QUEUED' }
+			],
+			[
+				{ id: 'tEntry', targetStepId: 's1', transitionType: 'SEQUENTIAL' },
+				{ id: 't21', sourceStepId: 's2', targetStepId: 's1', transitionType: 'SEQUENTIAL' },
+				{ id: 't12', sourceStepId: 's1', targetStepId: 's2', transitionType: 'SEQUENTIAL' }
+			]
+		)
+	},
+	{
+		why: 'THE SHAPE RW-2 MISSED: a source-less entry edge + a CANCELLED real source (NEUTRALIZED, not PENDING)',
+		plan: plan(
+			[
+				{ id: 's1', stepState: 'QUEUED' },
+				{ id: 's2', stepState: 'CANCELLED' }
+			],
+			[
+				{ id: 'tEntry', targetStepId: 's1', transitionType: 'SEQUENTIAL' },
+				{ id: 't21', sourceStepId: 's2', targetStepId: 's1', transitionType: 'SEQUENTIAL' },
+				{ id: 't12', sourceStepId: 's1', targetStepId: 's2', transitionType: 'SEQUENTIAL' }
+			]
+		)
+	},
+	{
+		why: 'the same, with SUPERSEDED — the other irrecoverable terminal state',
+		plan: plan(
+			[
+				{ id: 's1', stepState: 'QUEUED' },
+				{ id: 's2', stepState: 'SUPERSEDED' }
 			],
 			[
 				{ id: 'tEntry', targetStepId: 's1', transitionType: 'SEQUENTIAL' },
@@ -137,7 +165,29 @@ describe('RW-2 / #7 — an incoherent graph offers nothing, and the two planes A
 		expect(startStepGate(coherent, 's1').ok).toBe(true);
 	});
 
-	it('THE MECHANISM, pinned directly: incoherence and the live-set seed share ONE entry definition', () => {
+	it('AT LEAST ONE fixture reaches the frontier WITHOUT the floor — so the floor is not dead code', () => {
+		// The guard RW-2 declined to add on the ground that it "could never change the answer". This case exists to
+		// make that claim falsifiable: remove the `graphIsIncoherent` line from `startableStepIds` and the
+		// CANCELLED/SUPERSEDED shapes above go RED, because their s1 genuinely reaches the barrier.
+		const exposing = INCOHERENT.filter((c) =>
+			c.plan.steps.some((s) => s.stepState === 'CANCELLED' || s.stepState === 'SUPERSEDED')
+		);
+		expect(
+			exposing.length,
+			'the array must contain a shape that can expose the gap'
+		).toBeGreaterThan(0);
+		for (const c of exposing) {
+			// Each such step HAS a source-less in-edge (SATISFIED) and no PENDING real-source in-edge — the
+			// combination the original argument said was impossible.
+			expect(
+				(c.plan.transitions ?? []).some((t) => t.sourceStepId === undefined),
+				c.why
+			).toBe(true);
+			expect(startableStepIds(c.plan), c.why).toEqual([]);
+		}
+	});
+
+	it('THE MECHANISM: incoherence and the live-set seed share ONE entry definition', () => {
 		// This is what makes the agreement above structural rather than lucky, and it is the thing to protect. If
 		// `live()` is ever seeded from a different notion of "entry" than `graphIsIncoherent` tests, the divergence
 		// the finding described becomes real — and the cases above would start failing, which is the point.
