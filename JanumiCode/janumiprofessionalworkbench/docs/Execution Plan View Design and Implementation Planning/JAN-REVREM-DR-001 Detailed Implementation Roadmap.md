@@ -192,6 +192,33 @@ New ledger mutants: make the non-BRANCH arm `continue` again (⇒ 1, 2, 5 RED �
 cannot silently return); report `DEAD_PREDECESSOR` for a BRANCH source (⇒ 3, 4 RED); report `DEAD_PREDECESSOR` for a
 PENDING source (⇒ 6 RED).
 
+**MEASURED:**
+
+| mutant | verdict | |
+|---|---|---|
+| `P1-dead-predecessor-arm-continues-again` | **KILLED** (3 RED) | the pre-RW-7 behaviour cannot silently return |
+| `P2-branch-source-reported-as-dead-predecessor` | **KILLED** (2 RED) | the order proof: a cancelled BRANCH keeps its recorded selection |
+| `P3-pending-source-invents-a-cause` | **CONTROL_HELD** | see below — it survives, and the reason is unreachability, not an untested guard |
+
+**`P3` did not go as planned, twice, and both detours found something.** Its first formulation compared against a
+non-member of `InEdgeDisposition` and would not compile. Making it compile forced the question of what the
+disposition gate guards — and I answered it **wrongly**, concluding the arm's `IRRECOVERABLE_TERMINAL` check merely
+re-derived it, and deleting the check. `localOf` returning NEUTRALIZED says the edge is dead; **it does not say which
+of two reasons killed it**, and off a non-BRANCH source a guard-false CONDITIONAL edge is also neutralized — a case
+that must yield no provenance. The pre-existing WP-14 suite caught the removal on the next run.
+
+Re-aimed at the BRANCH arm, `P3` then **survived** — and that turned out to be correct.
+`computeLiveStepIds` propagates reachability through every edge whose local disposition is not NEUTRALIZED, and
+`pruneProvenance` only examines in-edges of steps already established *not* live. So a dead step reached from a live
+source **must** have a NEUTRALIZED in-edge: were it PENDING or UNRESOLVED, the target would be live and the walk
+would never have visited it. The gate is a local restatement of reachability's own predicate.
+
+It is **not deleted** — it is what stops a fabricated cause if the two ever drift apart, and one question with
+several independently-maintained answers is the F-06 root cause. It is declared `expectSurvive` with the proof
+written down, and the invariant it rests on is now pinned by three assertions (plus a positive half, so they cannot
+be satisfied by a `prunableStepIds` that returns `[]` unconditionally). If reachability stops using that predicate,
+those go RED and `P3` becomes killable — instead of the gate silently becoming load-bearing with nothing watching it.
+
 ## 5. Gate
 
 `G-REVREM-001`: check-types · test · lint 0 · boundary 0 · svelte-check 0 · Playwright · **`rph-engine` 69** ·
@@ -209,7 +236,8 @@ the registry-totality gates · every new guard live mutation-red-proofed **after
 | RW-3 | `0c093449` | A binding authorizes the step it NAMES and no other. |
 | RW-4 | `fe109847` | The finding-#7 floor added; the pin test that could not falsify itself, fixed. |
 | RW-5 | `91794cb8`-series | The stale records RW-0/RW-3 left behind — the second review's other 16 findings. |
-| RW-6 | *(this commit)* | **MAJOR #5 CLOSED** — the read-model's third authority limb, gated on the COLUMN. The four checks moved to `rph-domain`'s `bindingAuthorityVerdict`, so engine and projection consult ONE declaration; the eight engine kill tests passed **unchanged**, which is what makes the extraction a refactor rather than a rewrite. 11 new named kill tests; `R1`'s one-character mutant now has TWO victims, one per layer. Production caller wired via `listByType('RUNTIME_BINDING')` — MAJOR #5 was closable in the projection alone, and closing it there only would have been closing it on paper. |
+| RW-7 | `f02f720d` · `53327dcb` · `35601ef0` | **N-8 CLOSED.** Provenance is cause-discriminated; the non-BRANCH cut is recorded instead of being silently indistinguishable from a waived skip. 11 named tests + an engine-layer payload test; `P1`/`P2` KILLED, `P3` a declared CONTROL over a provably unreachable fail-safe. **Two of my own errors are in the record:** `cause` declared REQUIRED (replay forgotten — WP-1's stored-event test caught it) and the arm's state check deleted as "redundant" (the WP-14 suite caught it). Also closed N-7's standing trap at source: `gen` now formats, so a two-field change no longer produces a 12,000-line diff. |
+| RW-6 | `d18c60ae` · `f550774f` | **MAJOR #5 CLOSED** — the read-model's third authority limb, gated on the COLUMN. The four checks moved to `rph-domain`'s `bindingAuthorityVerdict`, so engine and projection consult ONE declaration; the eight engine kill tests passed **unchanged**, which is what makes the extraction a refactor rather than a rewrite. 11 new named kill tests; `R1`'s one-character mutant now has TWO victims, one per layer. Production caller wired via `listByType('RUNTIME_BINDING')` — MAJOR #5 was closable in the projection alone, and closing it there only would have been closing it on paper. |
 
 **Gate `G-REVREM-001` green** at each landing: check-types 21/21 · vitest 21/21 · lint 0 · boundary 0 ·
 svelte-check 0 · Playwright 50 · **`rph-engine` 69 (the reference seed drives unchanged)** · every new guard live
