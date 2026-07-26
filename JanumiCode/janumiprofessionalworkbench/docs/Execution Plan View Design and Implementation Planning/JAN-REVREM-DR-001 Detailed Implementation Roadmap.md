@@ -141,6 +141,17 @@ New ledger mutants: remove the third limb from `planPermitsAffordance` (⇒ 1, 4
 unconditionally (⇒ 2, 3, 6, 7, 9 RED); flip `ResolveExecutionStepWait`'s column to `NOT_EXECUTING` (⇒ 8 RED, proving
 the column is genuinely the source).
 
+**MEASURED, all three KILLED:**
+
+| mutant | verdict | what it establishes |
+|---|---|---|
+| `W5-readmodel-binding-limb-never-withholds` | **KILLED** | MAJOR #5 itself is caught — the defect cannot silently return |
+| `W6-readmodel-binding-limb-always-withholds` | **KILLED** (7 tests RED) | the over-refusal half; the limb is not `return false` wearing a gate's name |
+| `R1-resolve-not-executing` | **KILLED** in *both* batteries, and **KILLED by the read-model battery alone** under `MUTANTS_TARGET` | one character of declaration moves BOTH layers independently — the actual proof that the column is a single source rather than two implementations that agree today |
+
+That last row is the one worth having. Two implementations that happen to agree are indistinguishable from one shared
+declaration *until something changes*, and a mutation of the declaration is the only thing that asks the question.
+
 ## 5. Gate
 
 `G-REVREM-001`: check-types · test · lint 0 · boundary 0 · svelte-check 0 · Playwright · **`rph-engine` 69** ·
