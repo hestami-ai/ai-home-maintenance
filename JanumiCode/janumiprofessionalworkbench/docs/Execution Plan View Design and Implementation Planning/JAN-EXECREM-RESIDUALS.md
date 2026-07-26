@@ -121,6 +121,17 @@ Each is a shape the corpus does not ratify, landed because a ratified RULE was u
 
 | A-7 | `PruneCause` enum + `ExecutionStepPruned.{cause, deadPredecessorStepId, deadPredecessorStepState}` | A prune cut by an irrecoverably-terminal predecessor had NO vocabulary — provenance was branch-shaped, so the event carried none at all and was byte-identical in content to a waived skip (N-8). | RW-7 |
 
+| A-8 | `CapabilityRequest.capability` | The type was `Source TBD`, so RPH-EXE-004 and §22.1's containment invariant had no comparable identity. | JAN-CAPBIND WP-0 |
+| A-9 | `CapabilityGrant.capability` | Same; deliberately the same shape, because "requested is not granted" has no content unless the two are comparable. | JAN-CAPBIND WP-0 |
+| A-10 | `InputBinding.{artifactId, required}` | RPH-EXE-005's *"required input artifact"* had no subject. Both optional on the wire; `required ?? true` fail-closed at the point of use. | JAN-CAPBIND WP-0 |
+
+**A-8…A-10 were authored under an EXPLICIT sponsor grant** answering the N-5 escalation, and the premise was
+verified three ways first (above). **There are no invented fields**: every one traces to a ratified sentence or to
+existing data, and every candidate that did not — a `kind` enum, `scope`, `justification`, `grantedBy`, `expiresAt`,
+a `name` label — was refused with its reason recorded in the vocab note. The `kind` enum was the tempting one; it
+would have forbidden capabilities the corpus never enumerated while adding nothing, because §22.1's secret-vs-tool
+invariant is satisfied **structurally** by the containment rule.
+
 **A-7 is an extension of an entry that was itself authored, which is why it needed no escalation.**
 `ExecutionStepPruned`'s own `sourceSection` reads `UNRATIFIED-AUTHORED (2026-07-22, JAN-EXECPLAN-DR-004 DWP-03)`, so
 its payload is this lineage's to widen — unlike N-5, escalated precisely because authoring those shapes would invent
@@ -221,6 +232,52 @@ the row to be re-dispositioned as ENFORCED with a probe.
 | **N-7** | *(review blindness)* | A **one-arrow** semantic change shipped inside a **4,144-line** diff. | — | **NEW, raised 2026-07-25 while trying to run this programme's own review.** WP-5 (`868f595e`) added exactly one machine arrow (`FAILED → CANCELLED`) to `packages/rph-domain/vocab/m2-transitions.json`, and the committed diff is 4,144 lines because the file's indentation changed wholesale in the same commit. `git diff -w` on it is **81 insertions / 15 deletions**. The cause is not established — the repo's `format` script covers only `**/*.ts`, so it was not `bun run format` — but the effect is the finding: **a semantic edit buried in 4,000 lines of whitespace is how a change rides in unreviewed**, and this one file is 19% of the diff that made `/code-review ultra` refuse the branch as too large (97 files, 22,586 lines vs an 8,000-line limit). Not reverted: restoring the old indentation would only re-churn on the next write. Mitigation is procedural — reformat generated/vocab artifacts in their OWN commit, never alongside a semantic change, and read them with `git diff -w`. |
 | **N-6** | *(dead arrow)* | `RuntimeBinding.authorizationStatus` ratifies `REQUESTED → PARTIALLY_AUTHORIZED`; **no command drives it.** | — | **NEW, raised 2026-07-25 (JAN-EXEBIND WP-B1).** `registry.ts` wires Request / Authorize / Deny / Revoke and nothing else, so a ratified state exists that no command can produce. It matters because `bindingPermitsExecution` **permits** execution on a PARTIALLY_AUTHORIZED binding — RPH-EXE-003 therefore has an *acceptance* limb the bus cannot reach, and without a fixture seam it would go untested while looking covered. Same shape as the `* → SUPERSEDED` step arrows F-26's rider named. Recorded; not this work package's to fix. |
 | **N-5** | *(corpus gap)* | Four ratified helper sub-types are **`Source TBD`**. | — | **NEW, and the root cause of N-2, N-3 and N-4.** `InputBinding`, `OutputBinding`, `CapabilityRequest` and `CapabilityGrant` are each declared in `m1-object-fields.json` with `"field": "(undefined)", "type": "—", "note": "… NOT field-defined. Source TBD."`, so `gen-objects.ts` emits `z.record(z.string(), z.unknown())`. Every one is referenced by a ratified rule. The tell nobody noticed: `capabilityAuthorized` takes `string[]` while the contract holds `Record<string,unknown>[]` — **the predicate and the contract it guards do not typecheck against each other.** ESCALATED as a corpus gap; authoring the shapes would invent normative semantics the corpus withholds (JAN-EXEBIND-DS-001 §4-R3). |
+
+### JAN-CAPBIND, 2026-07-26 — N-5 answered, and with it N-3 and N-4
+
+The sponsor authorized authoring the four `Source TBD` sub-types, so `escalate it` stopped being an available
+answer. Design: `JAN-CAPBIND-DS-001`. Work packages WP-0…WP-3.
+
+**The premise was verified before anything was authored**, because this repo has a documented instance of the
+opposite error — `m1-object-fields.json` records `ApplicabilityRule` as *"RATIFIED AFTER ALL"*, its note having said
+`NOT field-defined … Source TBD` **while citing the section that defines its nine fields**. My four notes were
+citation-bearing in exactly the same way. Three independent checks confirmed the gap real: the 2026-07-16
+placeholder audit (full 14-file corpus, adversarial refutation, hand re-verification) lists all four as genuinely
+undefined; `§31` is a **bare list of table names** with no columns; `§21`'s `ExecutionStep` declares
+`inputBindings: InputBinding[]` — a **usage**, the category that audit explicitly disqualified.
+
+| # | Was | Now |
+|---|---|---|
+| **N-5** | four sub-types `Source TBD`, three rules with nothing to quantify over | **CLOSED.** `CapabilityRequest`/`CapabilityGrant`/`InputBinding` authored (A-8…A-10); `OutputBinding` and `SandboxPolicy` **dispositioned** rather than authored. |
+| **N-4** | `AuthorizeRuntimeBinding` wrote `grantedCapabilities` wholesale, unchecked | **CLOSED (WP-2).** `grantedWithinRequest` at `advanceStatus`'s `guard` slot. 9 kill tests; mutants `C1`/`C2`/`C3` KILLED. |
+| **N-3** | RPH-EXE-005 unenforceable — `InputBinding` had no shape | **CLOSED (WP-3).** A fourth declared column, `inputReadiness`, total over the nine step commands; `inputReadinessRefusal` as the fourth limb of `stepAuthorityRefusal`. 10 kill tests; `C4`/`C5`/`C6`/`C7` KILLED. |
+| **N-2** | RPH-EXE-004 unenforced, `capabilityAuthorized` dead | **PARTIAL, and stated as such.** Its *decidable core* — a grant may not exceed its request — is now enforced by N-4's fix. Its **operation-level** half ("network operations fail authorization") remains outside an engine that governs plans rather than hosting invocations, and `capabilityAuthorized` still has no production caller **by design**: it answers a different question (single-operation containment), and wiring it merely to clear the census would be the substitution this register exists to prevent. |
+| **N-6** | `PARTIALLY_AUTHORIZED` unreachable | **RE-CLASSIFIED as a PRECONDITION on N-2**, not an adjacent finding. `m2-transitions.json` declares `REQUESTED → PARTIALLY_AUTHORIZED` with its own trigger *"partial grant"*, and `advanceStatus` takes a single `target` — so deriving the status inside `AuthorizeRuntimeBinding` would make one command drive two ratified arrows the machine says are distinct. Needs a real `PartiallyAuthorizeRuntimeBinding` command; scheduled, not absorbed. |
+
+**§22.1's *"Capability scope must be explicit"* is resolved as POLICY-BY-REFERENCE, and no `scope` field was minted.**
+The first design derived one and called it forced; that was **over-authoring**, and the adversarial pass caught it.
+The sentence admits two readings — a distinct `scope` field, or an identity named precisely enough to be explicit —
+and the existing data votes for the second (`fs.read`, `shell.exec` are already scoped identities). Minting the
+field would have picked a side *and* imposed a command-boundary obligation on every caller.
+
+The resolution came from the corpus's own shape plus the platform's: three of `RuntimeBinding`'s policy fields are
+already **ids** (`contextAssemblyPolicyId`, `observabilityPolicyId`, `memoryPolicyId`), and the JanumiCode platform
+has ruled that every principal *including agents* resolves to a Cerbos principal → policy decision → audit event,
+behind an abstracted runtime boundary that exists so the concrete sandbox tool stays swappable. So the runtime bound
+belongs to the policy plane, and `SandboxPolicy` is re-dispositioned from `Source TBD` to **deferred to it**.
+
+> **DISCLOSED COST, so it is not discovered later:** path- or host-limited grants — *"file-system, but only under
+> `/tmp`"* — are **inexpressible**, not merely unenforced. Minting `scope` requires choosing a value domain the
+> corpus does not give, and a string landed today would have to be **replaced** rather than extended if a structured
+> shape were later ratified, with anything written meanwhile unmigratable.
+
+**New findings raised by this series:**
+
+| # | Severity | Statement |
+|---|---|---|
+| **N-10** | MINOR | **Two capability vocabularies in one repo.** Fixtures carry both `file-system`/`network` (verbatim from RPH-EXE-004's ratified statement) and `fs.read`/`shell.exec` (a dotted convention from nowhere). Tidiness while nothing consumed capabilities; a real problem once a broker must map them — and the dotted form encodes a **verb granularity the target platform cannot enforce**. Recommended ruling: the corpus's nouns. |
+| **N-14** | MINOR | `json-schema.test.ts` reads **exactly one** committed artifact (`ObjectEnvelope.json`) while its header claims *"the committed `schemas/` artifacts must not have drifted"*. A missed regeneration of any other artifact is invisible to it. |
+| **N-15** | MINOR | **The generator emitted full helpers in ALPHABETICAL order.** A helper referencing another that sorts later produced a TDZ `ReferenceError` at import — the whole module failing to load. Latent and invisible because every referent had been a placeholder (emitted first as a block); the moment `InputBinding` became real, `ExecutionStep` sorted before it. **Fixed in WP-0** by topological ordering; recorded because it would have hit any future authoring of a placeholder. |
 
 ### Re-derived 2026-07-26 by a fresh review — and these are NOT "the lost 8 MINORs"
 
