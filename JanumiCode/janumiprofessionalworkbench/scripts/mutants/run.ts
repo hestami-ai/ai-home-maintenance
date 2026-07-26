@@ -14,14 +14,23 @@
 // the end — a mutation harness that leaves a mutant behind is worse than none, and one of the review agents in
 // this repo did exactly that mid-run.
 import { spawnSync } from 'node:child_process';
-import { readFileSync, writeFileSync } from 'node:fs';
+import { existsSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { DECLARED_MUTANTS, type DeclaredMutant } from './ledger.js';
 
 const ROOT = fileURLToPath(new URL('../../', import.meta.url));
 
+/** Records the mutant currently applied, so a KILLED run can be recovered from. See `recoverAbandonedMutant`. */
+const JOURNAL = `${ROOT}scripts/mutants/.in-flight`;
+
 type Verdict =
-	'KILLED' | 'SURVIVED' | 'UNANCHORED' | 'RETIRED' | 'TYPE_PREVENTED' | 'NO_COMPILE' | 'NO_TARGET';
+	| 'KILLED'
+	| 'SURVIVED'
+	| 'UNANCHORED'
+	| 'RETIRED'
+	| 'TYPE_PREVENTED'
+	| 'NO_COMPILE'
+	| 'KILLED_UNNAMED';
 
 interface Result {
 	readonly mutant: DeclaredMutant;
@@ -69,13 +78,17 @@ function runMutant(m: DeclaredMutant): Result {
 			detail: hits === 0 ? 'anchor text is GONE' : `anchor occurs ${hits}x — ambiguous`
 		};
 
-	if (m.expectRed.length === 0)
-		return {
-			mutant: m,
-			verdict: 'NO_TARGET',
-			detail: 'declared with no suite it claims to redden'
-		};
+	// A mutant with NO NAMED VICTIM is still worth running, against a weaker claim. Most of the mutants inherited
+	// from JAN-EXECREM WP-2..WP-15 are in this state: their work packages declared the mutation but never said WHICH
+	// test reddens. That is itself a records defect, and it is reported separately in the summary.
+	//
+	// Running the whole PACKAGE tells us whether the guard is tested AT ALL; it cannot say which test does it, so
+	// the verdict is KILLED_UNNAMED rather than KILLED. Weaker evidence, honestly labelled, beats no evidence — and
+	// it beats GUESSING a victim, which is precisely how a mutant comes to "pass" for the wrong reason.
+	const unnamed = m.expectRed.length === 0;
+	const target = unnamed ? [pkgOf(m.file)] : [...m.expectRed];
 
+	writeFileSync(JOURNAL, m.file, 'utf8');
 	writeFileSync(abs, original.replace(m.find, m.replace), 'utf8');
 	try {
 		// Typecheck the mutated tree first. A mutant that does not compile never reached the code, so a RED test
@@ -100,13 +113,13 @@ function runMutant(m: DeclaredMutant): Result {
 				detail: firstLine(types.stdout ?? types.stderr ?? '')
 			};
 
-		const run = sh('bunx', ['vitest', 'run', ...m.expectRed]);
+		const run = sh('bunx', ['vitest', 'run', ...target]);
 		const out = `${run.stdout ?? ''}${run.stderr ?? ''}`;
-		return run.status !== 0
-			? { mutant: m, verdict: 'KILLED', detail: summarise(out) }
-			: { mutant: m, verdict: 'SURVIVED', detail: summarise(out) };
+		if (run.status === 0) return { mutant: m, verdict: 'SURVIVED', detail: summarise(out) };
+		return { mutant: m, verdict: unnamed ? 'KILLED_UNNAMED' : 'KILLED', detail: summarise(out) };
 	} finally {
 		writeFileSync(abs, original, 'utf8');
+		rmSync(JOURNAL, { force: true });
 	}
 }
 
@@ -118,6 +131,29 @@ const summarise = (s: string): string =>
 	(s.split('\n').findLast((l) => l.includes('Tests ')) ?? '')
 		.replaceAll(new RegExp(String.raw`\[[0-9;]*m`, 'g'), '')
 		.trim();
+
+// ── CRASH RECOVERY, added after this runner LOST a mutant ────────────────────────────────────────────────────
+//
+// The `finally` restore and the end-of-run cleanliness check are both defeated by EXTERNAL TERMINATION: a
+// 10-minute command timeout killed a full 90-mutant run mid-mutant and left `validateStepCompletion`'s
+// contradictory-cell guard mutated to `if (false && …)` in the working tree. Every subsequent test run would have
+// been GREEN against a disabled guard — the precise failure mode this harness exists to prevent, produced by the
+// harness itself.
+//
+// So the in-flight mutant is journalled to disk BEFORE it is applied and cleared after it is restored. A later
+// run finds the journal, restores from git, and refuses to continue until the tree is clean. A `finally` is not a
+// guarantee when the process can be killed; a file on disk survives.
+function recoverAbandonedMutant(): void {
+	if (!existsSync(JOURNAL)) return;
+	const file = readFileSync(JOURNAL, 'utf8').trim();
+	console.error(
+		`RECOVERING: a previous run was killed while ${file} was mutated. Restoring from git.`
+	);
+	sh('git', ['checkout', '--', file]);
+	rmSync(JOURNAL, { force: true });
+}
+
+recoverAbandonedMutant();
 
 if (!treeIsClean()) {
 	console.error('ABORT: working tree is not clean — refusing to mutate over uncommitted changes.');
@@ -149,11 +185,11 @@ for (const v of [
 	'SURVIVED',
 	'UNANCHORED',
 	'NO_COMPILE',
-	'NO_TARGET'
+	'KILLED_UNNAMED'
 ] as const)
 	console.log(`${v.padEnd(11)} ${by(v).length}`);
 
-for (const r of [...by('SURVIVED'), ...by('UNANCHORED'), ...by('NO_TARGET'), ...by('NO_COMPILE')])
+for (const r of [...by('SURVIVED'), ...by('UNANCHORED'), ...by('NO_COMPILE')])
 	console.log(
 		`\n${r.verdict}: ${r.mutant.id}\n  guard: ${r.mutant.why}\n  from:  ${r.mutant.source}\n  ${r.detail}`
 	);
@@ -163,11 +199,16 @@ for (const r of [...by('SURVIVED'), ...by('UNANCHORED'), ...by('NO_TARGET'), ...
 // has moved past. Every one gets triaged and recorded, never deleted to make the run green. Set
 // MUTANTS_BLOCKING=1 (and the gate does, from V-2 onward) to make SURVIVED and UNANCHORED fail the build.
 const blocking = process.env.MUTANTS_BLOCKING === '1';
-const failures =
-	by('SURVIVED').length +
-	by('UNANCHORED').length +
-	by('NO_TARGET').length +
-	by('NO_COMPILE').length;
+const unnamedVictims = by('KILLED_UNNAMED').length;
+if (unnamedVictims > 0)
+	console.log(
+		`
+${unnamedVictims} mutant(s) had NO NAMED VICTIM and were run package-wide. That is a records defect in ` +
+			`the work packages that declared them: "something caught it" is a weaker claim than "this named test ` +
+			`caught it", and only the latter survives a refactor of the suite.`
+	);
+
+const failures = by('SURVIVED').length + by('UNANCHORED').length + by('NO_COMPILE').length;
 if (failures > 0)
 	console.log(
 		`\n${failures} mutant(s) need attention. ${blocking ? 'BLOCKING.' : 'Advisory on this run — see the note in run.ts.'}`

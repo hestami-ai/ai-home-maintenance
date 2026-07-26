@@ -361,5 +361,552 @@ export const DECLARED_MUTANTS: readonly DeclaredMutant[] = [
 		expectRed: ['packages/rph-domain/src/revrem-wp2-incoherence-pin.test.ts'],
 		why: 'the floor RW-2 wrongly called dead code (review #2 BLOCKER)',
 		source: 'RW-4 inline'
+	},
+
+	// ── JAN-VERIF V-2: the OLDER ledger, harvested from JAN-EXECREM WP-2..WP-15 ──────────────────────────
+	//
+	// These are the entries most likely to have rotted: the code has moved through fifteen further work packages
+	// since each was written. NONE of them names the test it reddens — their work packages declared the mutation
+	// and never said which suite catches it — so each runs PACKAGE-WIDE and reports KILLED_UNNAMED. That is a
+	// weaker claim, honestly labelled: it establishes the guard is tested somewhere, not that a named test does
+	// it. Guessing a victim would have been worse than admitting the gap, because a guessed victim is how a
+	// mutant comes to pass for the wrong reason.
+	{
+		id: 'WP11-M1 restore the tautology: explicitNoOutput: !hasOutput',
+		file: 'packages/rph-application/src/handlers/execution.ts',
+		find: 'explicitNoOutput: noOutput !== undefined,',
+		replace: 'explicitNoOutput: !hasOutput,',
+		expectRed: [],
+		why: 'harvested from a work-package harness that recorded no one-line rationale',
+		source: 'wp11_mutants.py'
+	},
+	{
+		id: 'WP11-M2 delete the RPH-EXE-006 reject entirely',
+		file: 'packages/rph-application/src/handlers/execution.ts',
+		find: '\t\t\tif (!check.ok)',
+		replace: '\t\t\tif (false && !check.ok)',
+		expectRed: [],
+		why: 'harvested from a work-package harness that recorded no one-line rationale',
+		source: 'wp11_mutants.py'
+	},
+	{
+		id: 'WP11-M3 drop noOutputResult from the emitted event',
+		file: 'packages/rph-application/src/handlers/execution.ts',
+		find: '...(p.noOutputResult !== undefined ? { noOutputResult: p.noOutputResult } : {})',
+		replace: '...({})',
+		expectRed: [],
+		why: 'harvested from a work-package harness that recorded no one-line rationale',
+		source: 'wp11_mutants.py'
+	},
+	{
+		id: 'WP11-M4 admit TIMEOUT as success-compatible',
+		file: 'packages/rph-domain/src/execution.ts',
+		find: 'if (input.explicitNoOutput && input.noOutputReasonIsSuccessCompatible === false)',
+		replace: 'if (false && input.noOutputReasonIsSuccessCompatible === false)',
+		expectRed: [],
+		why: 'harvested from a work-package harness that recorded no one-line rationale',
+		source: 'wp11_mutants.py'
+	},
+	{
+		id: 'WP11-M5 drop the outputBindings corroboration limb',
+		file: 'packages/rph-domain/src/execution.ts',
+		find: 'if (input.explicitNoOutput && input.declaresOutputBindings === true)',
+		replace: 'if (false && input.declaresOutputBindings === true)',
+		expectRed: [],
+		why: 'harvested from a work-package harness that recorded no one-line rationale',
+		source: 'wp11_mutants.py'
+	},
+	{
+		id: 'WP11-M6 contradictory cell folded into the OK arm',
+		file: 'packages/rph-domain/src/execution.ts',
+		find: 'if (input.hasOutput && input.explicitNoOutput)',
+		replace: 'if (false && input.explicitNoOutput)',
+		expectRed: [],
+		why: 'harvested from a work-package harness that recorded no one-line rationale',
+		source: 'wp11_mutants.py'
+	},
+	{
+		id: 'WP11-M7 zero-subject floor never fires (aiProduced -> false)',
+		file: 'packages/rph-application/src/handlers/floor-gate.ts',
+		find: '\tif (!input.aiProduced) return null;',
+		replace: '\tif (true) return null;',
+		expectRed: [],
+		why: 'harvested from a work-package harness that recorded no one-line rationale',
+		source: 'wp11_mutants.py'
+	},
+	{
+		id: 'WP11-M8 structuredResultHasContent is constant TRUE (over-refusal)',
+		file: 'packages/rph-application/src/handlers/floor-gate.ts',
+		find: "\tif (typeof value === 'string') return /\\S/.test(value);",
+		replace: "\tif (true) return true;\n\tif (typeof value === 'string') return /\\S/.test(value);",
+		expectRed: [],
+		why: 'harvested from a work-package harness that recorded no one-line rationale',
+		source: 'wp11_mutants.py'
+	},
+	{
+		id: 'WP11-M9 subjectCount === 0 -> >= 0 (refuse every AI completion)',
+		file: 'packages/rph-application/src/handlers/floor-gate.ts',
+		find: '\tif (input.subjectCount !== 0) return null;',
+		replace: '\tif (input.subjectCount < 0) return null;',
+		expectRed: [],
+		why: 'harvested from a work-package harness that recorded no one-line rationale',
+		source: 'wp11_mutants.py'
+	},
+	{
+		id: 'WP11-M10 declaresOutputBindings never derived (always false)',
+		file: 'packages/rph-application/src/handlers/execution.ts',
+		find: 'declaresOutputBindings: Array.isArray(outputBindings) && outputBindings.length > 0',
+		replace: 'declaresOutputBindings: false',
+		expectRed: [],
+		why: 'harvested from a work-package harness that recorded no one-line rationale',
+		source: 'wp11_mutants.py'
+	},
+	{
+		id: 'WP11-M4 admit TIMEOUT as success-compatible',
+		file: 'packages/rph-domain/src/execution.ts',
+		find: 'if (input.explicitNoOutput && input.noOutputReasonIsSuccessCompatible === false)',
+		replace: 'if (false && input.noOutputReasonIsSuccessCompatible === false)',
+		expectRed: [],
+		why: 'harvested from a work-package harness that recorded no one-line rationale',
+		source: 'wp11_mutants2.py'
+	},
+	{
+		id: 'WP11-M5 drop the outputBindings corroboration limb',
+		file: 'packages/rph-domain/src/execution.ts',
+		find: 'if (input.explicitNoOutput && input.declaresOutputBindings === true)',
+		replace: 'if (false && input.declaresOutputBindings === true)',
+		expectRed: [],
+		why: 'harvested from a work-package harness that recorded no one-line rationale',
+		source: 'wp11_mutants2.py'
+	},
+	{
+		id: 'WP11-M6 contradictory cell folded into the OK arm',
+		file: 'packages/rph-domain/src/execution.ts',
+		find: 'if (input.hasOutput && input.explicitNoOutput)',
+		replace: 'if (false && input.explicitNoOutput)',
+		expectRed: [],
+		why: 'harvested from a work-package harness that recorded no one-line rationale',
+		source: 'wp11_mutants2.py'
+	},
+	{
+		id: 'WP11-M11 kernel MISSING cell never fires',
+		file: 'packages/rph-domain/src/execution.ts',
+		find: 'if (!input.hasOutput && !input.explicitNoOutput)',
+		replace: 'if (false && !input.explicitNoOutput)',
+		expectRed: [],
+		why: 'harvested from a work-package harness that recorded no one-line rationale',
+		source: 'wp11_mutants2.py'
+	},
+	{
+		id: 'WP11-M2 delete the RPH-EXE-006 reject at the CALL SITE',
+		file: 'packages/rph-application/src/handlers/execution.ts',
+		find: '\t\t\tif (!check.ok)\n\t\t\t\t// MISSING is the ratified',
+		replace: '\t\t\tif (false && !check.ok)\n\t\t\t\t// MISSING is the ratified',
+		expectRed: [],
+		why: 'harvested from a work-package harness that recorded no one-line rationale',
+		source: 'wp11_mutants2.py'
+	},
+	{
+		id: 'WP12A-M1 `every` becomes `some` (1-of-5 backs a full claim again)',
+		file: 'packages/rph-domain/src/execution.ts',
+		find: "\tconst offendingStepStates = input.stepStates.filter((s) => s !== 'SUCCEEDED' && s !== 'SKIPPED');",
+		replace:
+			"\tconst offendingStepStates = input.stepStates.some((s) => s === 'SUCCEEDED' || s === 'SKIPPED')\n\t\t? []\n\t\t: input.stepStates.filter((s) => s !== 'SUCCEEDED' && s !== 'SKIPPED');",
+		expectRed: [],
+		why: 'harvested from a work-package harness that recorded no one-line rationale',
+		source: 'wp12a_mutants.py'
+	},
+	{
+		id: 'WP12A-M2 the STATUS term is dropped (a killed plan backs the claim)',
+		file: 'packages/rph-domain/src/execution.ts',
+		find: "\tif (input.planStatus !== 'ACTIVE' && input.planStatus !== 'COMPLETED')",
+		replace: '\tif (false)',
+		expectRed: [],
+		why: 'harvested from a work-package harness that recorded no one-line rationale',
+		source: 'wp12a_mutants.py'
+	},
+	{
+		id: 'WP12A-M3 the >=1-SUCCEEDED limb is dropped (all-skipped backs the claim)',
+		file: 'packages/rph-domain/src/execution.ts',
+		find: "\tif (!input.stepStates.includes('SUCCEEDED'))",
+		replace: '\tif (false)',
+		expectRed: [],
+		why: 'harvested from a work-package harness that recorded no one-line rationale',
+		source: 'wp12a_mutants.py'
+	},
+	{
+		id: 'WP12A-M4 narrowed to COMPLETED-only (breaks the reference seed)',
+		file: 'packages/rph-domain/src/execution.ts',
+		find: "\tif (input.planStatus !== 'ACTIVE' && input.planStatus !== 'COMPLETED')",
+		replace: "\tif (input.planStatus !== 'COMPLETED')",
+		expectRed: [],
+		why: 'harvested from a work-package harness that recorded no one-line rationale',
+		source: 'wp12a_mutants.py'
+	},
+	{
+		id: 'WP12A-M5 the PWU plane stops calling the kernel (restores the weak copy)',
+		file: 'packages/rph-application/src/handlers/pwu.ts',
+		find: '\t\tif (!verdict.ok) failures.push(`${oid}: ${verdict.reason} (${verdict.errorCode})`);\n\t\treturn verdict.ok;',
+		replace:
+			"\t\tif (!verdict.ok) failures.push(`${oid}: ${verdict.reason} (${verdict.errorCode})`);\n\t\treturn (s.steps ?? []).some((step) => step.stepState === 'SUCCEEDED');",
+		expectRed: [],
+		why: 'harvested from a work-package harness that recorded no one-line rationale',
+		source: 'wp12a_mutants.py'
+	},
+	{
+		id: 'WP12B-M3 Cancel is hardened to REQUIRES_OPEN_PWU (live steps get stranded)',
+		file: 'packages/rph-domain/src/step-command-spec.ts',
+		find: "\t\teventType: 'ExecutionStepCancelled',\n\t\tplanLiveness: 'CLEANUP_EXEMPT',",
+		replace: "\t\teventType: 'ExecutionStepCancelled',\n\t\tplanLiveness: 'CLEANUP_EXEMPT_X',",
+		expectRed: [],
+		why: 'harvested from a work-package harness that recorded no one-line rationale',
+		source: 'wp12b_m3m9.py'
+	},
+	{
+		id: 'WP12B-M3b Cancel pwuOpenness hardened to REQUIRES_OPEN_PWU',
+		file: 'packages/rph-domain/src/step-command-spec.ts',
+		find: "\t\tpwuOpenness: 'CLEANUP_EXEMPT',\n\t\tpwuOpennessRationale:\n\t\t\t'the exit of last resort",
+		replace:
+			"\t\tpwuOpenness: 'REQUIRES_OPEN_PWU',\n\t\tpwuOpennessRationale:\n\t\t\t'the exit of last resort",
+		expectRed: [],
+		why: 'harvested from a work-package harness that recorded no one-line rationale',
+		source: 'wp12b_m3m9.py'
+	},
+	{
+		id: 'WP12B-M9 pwuOpennessRefusal admits a WRONG-TYPED work unit',
+		file: 'packages/rph-application/src/handlers/execution.ts',
+		find: "\tif (pwu?.objectType !== 'PROFESSIONAL_WORK_UNIT')",
+		replace: '\tif (pwu === undefined)',
+		expectRed: [],
+		why: 'harvested from a work-package harness that recorded no one-line rationale',
+		source: 'wp12b_m3m9.py'
+	},
+	{
+		id: 'WP12B-M1 Complete reverts to CLEANUP_EXEMPT (the F-26 hole reopens)',
+		file: 'packages/rph-domain/src/step-command-spec.ts',
+		find: "\t\tcommandType: 'CompleteExecutionStep',\n\t\ttarget: 'SUCCEEDED',\n\t\tsourceStates: ['RUNNING'],\n\t\teventType: 'ExecutionStepSucceeded',\n\t\tplanLiveness: 'REQUIRES_ACTIVE_PLAN',",
+		replace:
+			"\t\tcommandType: 'CompleteExecutionStep',\n\t\ttarget: 'SUCCEEDED',\n\t\tsourceStates: ['RUNNING'],\n\t\teventType: 'ExecutionStepSucceeded',\n\t\tplanLiveness: 'CLEANUP_EXEMPT',",
+		expectRed: [],
+		why: 'harvested from a work-package harness that recorded no one-line rationale',
+		source: 'wp12b_mutants.py'
+	},
+	{
+		id: 'WP12B-M2 Fail is "hardened" to REQUIRES_ACTIVE_PLAN (the exemption is killed)',
+		file: 'packages/rph-domain/src/step-command-spec.ts',
+		find: "\t\teventType: 'ExecutionStepFailed',\n\t\tplanLiveness: 'CLEANUP_EXEMPT',",
+		replace: "\t\teventType: 'ExecutionStepFailed',\n\t\tplanLiveness: 'REQUIRES_ACTIVE_PLAN',",
+		expectRed: [],
+		why: 'harvested from a work-package harness that recorded no one-line rationale',
+		source: 'wp12b_mutants.py'
+	},
+	{
+		id: 'WP12B-M3 Cancel is "hardened" to REQUIRES_OPEN_PWU (live steps get stranded)',
+		file: 'packages/rph-domain/src/step-command-spec.ts',
+		find: "\t\teventType: 'ExecutionStepCancelled',\n\t\tplanLiveness: 'CLEANUP_EXEMPT',\n\t\tactivePlanRationale:\n\t\t\t'INTENTIONAL: cancel is CLEANUP.",
+		replace:
+			"\t\teventType: 'ExecutionStepCancelled',\n\t\tplanLiveness: 'CLEANUP_EXEMPT',\n\t\tactivePlanRationale:\n\t\t\t'MUTANT: cancel is CLEANUP.",
+		expectRed: [],
+		why: 'harvested from a work-package harness that recorded no one-line rationale',
+		source: 'wp12b_mutants.py'
+	},
+	{
+		id: 'WP12B-M4 the plan-liveness limb never fires',
+		file: 'packages/rph-application/src/handlers/execution.ts',
+		find: "\tif (spec.planLiveness === 'REQUIRES_ACTIVE_PLAN' && plan.status !== 'ACTIVE')",
+		replace: '\tif (false)',
+		expectRed: [],
+		why: 'harvested from a work-package harness that recorded no one-line rationale',
+		source: 'wp12b_mutants.py'
+	},
+	{
+		id: 'WP12B-M5 the PWU-openness limb never fires',
+		file: 'packages/rph-application/src/handlers/execution.ts',
+		find: "\tif (spec.pwuOpenness === 'REQUIRES_OPEN_PWU') {",
+		replace: '\tif (false) {',
+		expectRed: [],
+		why: 'harvested from a work-package harness that recorded no one-line rationale',
+		source: 'wp12b_mutants.py'
+	},
+	{
+		id: 'WP12B-M6 activation stops checking PWU openness',
+		file: 'packages/rph-application/src/handlers/execution.ts',
+		find: '\t\t\tif (closed) return closed;',
+		replace: '\t\t\tif (false && closed) return closed;',
+		expectRed: [],
+		why: 'harvested from a work-package harness that recorded no one-line rationale',
+		source: 'wp12b_mutants.py'
+	},
+	{
+		id: 'WP12B-M7 canResumeExecutionOnPwu drops the generalised terminal set',
+		file: 'packages/rph-domain/src/execution.ts',
+		find: "\tif (isTerminalState('PWU.workLifecycleState', pwuLifecycleState))",
+		replace: '\tif (false)',
+		expectRed: [],
+		why: 'harvested from a work-package harness that recorded no one-line rationale',
+		source: 'wp12b_mutants.py'
+	},
+	{
+		id: 'WP12B-M8 the non-PWU workUnitId read fails OPEN again',
+		file: 'packages/rph-application/src/handlers/execution.ts',
+		find: "\tif (ctx.store.loadObject(p.workUnitId)?.objectType !== 'PROFESSIONAL_WORK_UNIT') {",
+		replace: '\tif (!ctx.store.loadObject(p.workUnitId)) {',
+		expectRed: [],
+		why: 'harvested from a work-package harness that recorded no one-line rationale',
+		source: 'wp12b_mutants.py'
+	},
+	{
+		id: 'WP12B-M9 pwuOpennessRefusal admits an unresolvable work unit',
+		file: 'packages/rph-application/src/handlers/execution.ts',
+		find: "\tif (pwu?.objectType !== 'PROFESSIONAL_WORK_UNIT')",
+		replace: '\tif (false)',
+		expectRed: [],
+		why: 'harvested from a work-package harness that recorded no one-line rationale',
+		source: 'wp12b_mutants.py'
+	},
+	{
+		id: 'WP12C-M1 the refusal is swallowed (restores the truthiness check)',
+		file: 'packages/rph-application/src/handlers/execution.ts',
+		find: '\t\t\t\tif (!authorized.ok)',
+		replace: '\t\t\t\tif (false && !authorized.ok)',
+		expectRed: [],
+		why: 'harvested from a work-package harness that recorded no one-line rationale',
+		source: 'wp12c_m2.py'
+	},
+	{
+		id: 'WP12C-M2 a nonexistent id is ADMITTED',
+		file: 'packages/rph-application/src/handlers/skip-authorization.ts',
+		find: '\t\treason: `waiverOrRevisionId ${query.authorizationId} names no recorded object`\n\t\t};',
+		replace: '\t\treason: `unused`\n\t\t} && { ok: true };',
+		expectRed: [],
+		why: 'harvested from a work-package harness that recorded no one-line rationale',
+		source: 'wp12c_m2.py'
+	},
+	{
+		id: 'WP12C-M3 the object-KIND check ADMITS',
+		file: 'packages/rph-application/src/handlers/skip-authorization.ts',
+		find: "\tif (stored.objectType !== 'DECISION')\n\t\treturn {",
+		replace: "\tif (stored.objectType !== 'DECISION')\n\t\treturn { ok: true } || {",
+		expectRed: [],
+		why: 'harvested from a work-package harness that recorded no one-line rationale',
+		source: 'wp12c_m2.py'
+	},
+	{
+		id: 'WP12C-M6 a decision with no execution scope ADMITS',
+		file: 'packages/rph-application/src/handlers/skip-authorization.ts',
+		find: '\tif (!auth)\n\t\treturn {',
+		replace: '\tif (!auth)\n\t\treturn { ok: true } || {',
+		expectRed: [],
+		why: 'harvested from a work-package harness that recorded no one-line rationale',
+		source: 'wp12c_m2.py'
+	},
+	{
+		id: 'WP12C-M8 the plan-id scope ADMITS',
+		file: 'packages/rph-application/src/handlers/skip-authorization.ts',
+		find: '\tif (auth.executionPlanId !== query.planId)\n\t\treturn {',
+		replace: '\tif (auth.executionPlanId !== query.planId)\n\t\treturn { ok: true } || {',
+		expectRed: [],
+		why: 'harvested from a work-package harness that recorded no one-line rationale',
+		source: 'wp12c_m2.py'
+	},
+	{
+		id: 'WP12C-M9 the STEP list is IGNORED (one decision retires every step)',
+		file: 'packages/rph-application/src/handlers/skip-authorization.ts',
+		find: '\tif (!auth.executionStepIds.includes(query.stepId))\n\t\treturn {',
+		replace: '\tif (!auth.executionStepIds.includes(query.stepId))\n\t\treturn { ok: true } || {',
+		expectRed: [],
+		why: 'harvested from a work-package harness that recorded no one-line rationale',
+		source: 'wp12c_m2.py'
+	},
+	{
+		id: 'WP12C-M10 expiry is IGNORED',
+		file: 'packages/rph-application/src/handlers/skip-authorization.ts',
+		find: '\tif (auth.expiresAt !== undefined && auth.expiresAt <= query.now)\n\t\treturn {',
+		replace:
+			'\tif (auth.expiresAt !== undefined && auth.expiresAt <= query.now)\n\t\treturn { ok: true } || {',
+		expectRed: [],
+		why: 'harvested from a work-package harness that recorded no one-line rationale',
+		source: 'wp12c_m2.py'
+	},
+	{
+		id: 'WP12C-M1 the resolution never runs (restores the truthiness check)',
+		file: 'packages/rph-application/src/handlers/execution.ts',
+		find: '\t\t\tif (p.waiverOrRevisionId) {',
+		replace: '\t\t\tif (false) {',
+		expectRed: [],
+		why: 'harvested from a work-package harness that recorded no one-line rationale',
+		source: 'wp12c_mutants.py'
+	},
+	{
+		id: 'WP12C-M2 a nonexistent id is admitted',
+		file: 'packages/rph-application/src/handlers/skip-authorization.ts',
+		find: '\tif (!stored)',
+		replace: '\tif (false && !stored)',
+		expectRed: [],
+		why: 'harvested from a work-package harness that recorded no one-line rationale',
+		source: 'wp12c_mutants.py'
+	},
+	{
+		id: 'WP12C-M3 the object-KIND check is dropped',
+		file: 'packages/rph-application/src/handlers/skip-authorization.ts',
+		find: "\tif (stored.objectType !== 'DECISION')",
+		replace: '\tif (false)',
+		expectRed: [],
+		why: 'harvested from a work-package harness that recorded no one-line rationale',
+		source: 'wp12c_mutants.py'
+	},
+	{
+		id: 'WP12C-M4 any decisionType authorizes a skip',
+		file: 'packages/rph-application/src/handlers/skip-authorization.ts',
+		find: '\tif (!AUTHORIZING_DECISION_TYPES.has(decision.decisionType))',
+		replace: '\tif (false)',
+		expectRed: [],
+		why: 'harvested from a work-package harness that recorded no one-line rationale',
+		source: 'wp12c_mutants.py'
+	},
+	{
+		id: 'WP12C-M5 a PROPOSED (unapproved) decision authorizes a skip',
+		file: 'packages/rph-application/src/handlers/skip-authorization.ts',
+		find: "\tif (decision.status !== 'EFFECTIVE')",
+		replace: '\tif (false)',
+		expectRed: [],
+		why: 'harvested from a work-package harness that recorded no one-line rationale',
+		source: 'wp12c_mutants.py'
+	},
+	{
+		id: 'WP12C-M6 a decision with no execution scope authorizes a skip',
+		file: 'packages/rph-application/src/handlers/skip-authorization.ts',
+		find: '\tif (!auth)',
+		replace: '\tif (false && !auth)',
+		expectRed: [],
+		why: 'harvested from a work-package harness that recorded no one-line rationale',
+		source: 'wp12c_mutants.py'
+	},
+	{
+		id: 'WP12C-M7 the plan-subject scope is dropped',
+		file: 'packages/rph-application/src/handlers/skip-authorization.ts',
+		find: '\tif (!decision.subjectObjectIds.includes(query.planId))',
+		replace: '\tif (false)',
+		expectRed: [],
+		why: 'harvested from a work-package harness that recorded no one-line rationale',
+		source: 'wp12c_mutants.py'
+	},
+	{
+		id: 'WP12C-M8 the plan-id scope is dropped',
+		file: 'packages/rph-application/src/handlers/skip-authorization.ts',
+		find: '\tif (auth.executionPlanId !== query.planId)',
+		replace: '\tif (false)',
+		expectRed: [],
+		why: 'harvested from a work-package harness that recorded no one-line rationale',
+		source: 'wp12c_mutants.py'
+	},
+	{
+		id: 'WP12C-M9 the STEP list is ignored (one decision retires every step)',
+		file: 'packages/rph-application/src/handlers/skip-authorization.ts',
+		find: '\tif (!auth.executionStepIds.includes(query.stepId))',
+		replace: '\tif (false)',
+		expectRed: [],
+		why: 'harvested from a work-package harness that recorded no one-line rationale',
+		source: 'wp12c_mutants.py'
+	},
+	{
+		id: 'WP12C-M10 expiry is ignored',
+		file: 'packages/rph-application/src/handlers/skip-authorization.ts',
+		find: '\tif (auth.expiresAt !== undefined && auth.expiresAt <= query.now)',
+		replace: '\tif (false)',
+		expectRed: [],
+		why: 'harvested from a work-package harness that recorded no one-line rationale',
+		source: 'wp12c_mutants.py'
+	},
+	{
+		id: 'WP12C-M11 EVERY dated authorization is treated as expired',
+		file: 'packages/rph-application/src/handlers/skip-authorization.ts',
+		find: '\tif (auth.expiresAt !== undefined && auth.expiresAt <= query.now)',
+		replace: '\tif (auth.expiresAt !== undefined)',
+		expectRed: [],
+		why: 'harvested from a work-package harness that recorded no one-line rationale',
+		source: 'wp12c_mutants.py'
+	},
+	{
+		id: 'WP12C-M12 the authorization is validated then DISCARDED (not persisted)',
+		file: 'packages/rph-application/src/handlers/governance.ts',
+		find: "\t\t...(p.executionSkipAuthorization\n\t\t\t? { executionSkipAuthorization: p.executionSkipAuthorization }\n\t\t\t: {}),\n\t\tstatus: 'PROPOSED'",
+		replace: "\t\tstatus: 'PROPOSED'",
+		expectRed: [],
+		why: 'harvested from a work-package harness that recorded no one-line rationale',
+		source: 'wp12c_mutants.py'
+	},
+	{
+		id: 'WP14-M1 Start stops reading the authored binding (F-31 reopens)',
+		file: 'packages/rph-application/src/handlers/execution.ts',
+		find: "\t\t\t...(typeof step.runtimeBindingId === 'string' && step.runtimeBindingId !== ''",
+		replace:
+			"\t\t\t...(false && typeof step.runtimeBindingId === 'string' && step.runtimeBindingId !== ''",
+		expectRed: [],
+		why: 'harvested from a work-package harness that recorded no one-line rationale',
+		source: 'wp14_mutants.py'
+	},
+	{
+		id: 'WP14-M2 the activation allowlist is emitted but not PERSISTED again',
+		file: 'packages/rph-application/src/handlers/execution.ts',
+		find: '\t\tmutate: (base) => ({\n\t\t\t...base,\n\t\t\tauthorizedRuntimeBindingIds:',
+		replace: '\t\tmutate: (base) => ({\n\t\t\t...base,\n\t\t\t_unusedAuthorizedRuntimeBindingIds:',
+		expectRed: [],
+		why: 'harvested from a work-package harness that recorded no one-line rationale',
+		source: 'wp14_mutants.py'
+	},
+	{
+		id: 'WP14-M3 prune provenance is not derived (F-37 reopens)',
+		file: 'packages/rph-application/src/handlers/execution.ts',
+		find: '\tconst provenance = pruneProvenance(',
+		replace: '\tconst provenance = undefined ?? pruneProvenance0(',
+		expectRed: [],
+		why: 'harvested from a work-package harness that recorded no one-line rationale',
+		source: 'wp14_mutants.py'
+	},
+	{
+		id: 'WP14-M4 provenance reads the step OWN in-edges (transitive case breaks)',
+		file: 'packages/rph-domain/src/transition-gate.ts',
+		find: '\t\t\tif (!seen.has(source)) {',
+		replace: '\t\t\tif (false && !seen.has(source)) {',
+		expectRed: [],
+		why: 'harvested from a work-package harness that recorded no one-line rationale',
+		source: 'wp14_mutants.py'
+	},
+	{
+		id: 'WP14-M5 the CUT predicate drops the live-source requirement (a JOIN is mis-attributed)',
+		file: 'packages/rph-domain/src/transition-gate.ts',
+		find: '\t\t\tif (live.has(source)) {',
+		replace: '\t\t\tif (true) {',
+		expectRed: [],
+		why: 'harvested from a work-package harness that recorded no one-line rationale',
+		source: 'wp14_mutants.py'
+	},
+	{
+		id: 'WP14-M6 provenance attributes a non-BRANCH source',
+		file: 'packages/rph-domain/src/transition-gate.ts',
+		find: "\t\t\t\tif (step?.stepType !== 'BRANCH') continue;",
+		replace: '\t\t\t\tif (false) continue;',
+		expectRed: [],
+		why: 'harvested from a work-package harness that recorded no one-line rationale',
+		source: 'wp14_mutants.py'
+	},
+	{
+		id: 'WP14-M7 the branch decision (selectedEdgeId) is dropped from provenance',
+		file: 'packages/rph-domain/src/transition-gate.ts',
+		find: '\t\t\t\t\t? {}\n\t\t\t\t\t: { selectedEdgeId: step.selectedTransitionId }),',
+		replace: '\t\t\t\t\t? {}\n\t\t\t\t\t: {}),',
+		expectRed: [],
+		why: 'harvested from a work-package harness that recorded no one-line rationale',
+		source: 'wp14_mutants.py'
+	},
+	{
+		id: 'WP14-M8 the CUT edge (excludedEdgeId) is dropped from provenance',
+		file: 'packages/rph-domain/src/transition-gate.ts',
+		find: '\t\t\t\t...(edge.id === undefined ? {} : { excludedEdgeId: edge.id })',
+		replace: '\t\t\t\t...(edge.id === undefined ? {} : {})',
+		expectRed: [],
+		why: 'harvested from a work-package harness that recorded no one-line rationale',
+		source: 'wp14_mutants.py'
 	}
 ];
