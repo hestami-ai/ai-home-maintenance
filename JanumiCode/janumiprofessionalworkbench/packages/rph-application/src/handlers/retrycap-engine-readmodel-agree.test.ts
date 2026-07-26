@@ -160,49 +160,59 @@ describe('N-12 — engine and read-model flip on the SAME attempt', () => {
 
 	beforeEach(() => arrangeActivePlan({ maxAttempts: 3 }));
 
-	it('THE AGREEMENT: at every attempt count, the view offers retry exactly when the engine accepts it', () => {
-		const trace: { attempts: number; offered: boolean; accepted: boolean }[] = [];
-		// Bounded well above any plausible cap, so a limb that never refuses fails on the bound rather than hanging.
-		for (let i = 0; i < 8; i += 1) {
+	/**
+	 * Drive a fresh plan with cap `maxAttempts` to exhaustion, asserting agreement at EVERY step, and return the
+	 * number of run-and-fail CYCLES completed before the engine refused.
+	 *
+	 * ── TWO PROPERTIES OF THIS HELPER ARE LOAD-BEARING, AND BOTH EXIST BECAUSE A MUTANT SURVIVED WITHOUT THEM ──
+	 *
+	 * 1. IT COUNTS ITS OWN CYCLES. The first version asked `attemptsMadeFrom` where the flip landed — measuring the
+	 *    boundary with the very function under test. Mutant `R6` made that counter include `ExecutionStepRetried`,
+	 *    so it double-counted; the flip moved from cycle 3 to cycle 2 and the assertion still read "3" because the
+	 *    yardstick had shrunk with the thing it measured. A test whose expected value is computed by the code it
+	 *    is testing cannot fail. `cycles` is incremented HERE and by nothing else.
+	 *
+	 * 2. IT IS PARAMETERISED BY THE CAP, AND CALLED WITH A NON-DEFAULT ONE. Every case originally ran at
+	 *    maxAttempts 3, which is `DEFAULT_RETRY_CAP` — so mutant `R9`, which stops the plan's own RetryPolicy from
+	 *    reaching the step, was INVISIBLE: the read-model fell back to the default and the default was the right
+	 *    answer. A fixture that happens to declare the default value hides every threading defect on the path.
+	 */
+	function driveToExhaustion(maxAttempts: number): number {
+		arrangeActivePlan({ maxAttempts });
+		let cycles = 0;
+		// Bounded well above any cap used here, so a limb that never refuses fails on the bound rather than hanging.
+		for (let i = 0; i < 12; i += 1) {
 			runAndFailOnce();
-			const attempts = attemptsMadeFrom(store.readAllEvents(), PLAN, STEP);
+			cycles += 1;
 			const offered = viewOffersRetry();
 			const accepted = dispatch('RetryExecutionStep', { stepId: STEP }).status === 'ACCEPTED';
-			trace.push({ attempts, offered, accepted });
-			expect(offered, `attempt ${attempts}: view offered=${offered}, engine accepted=${accepted}`).toBe(
-				accepted
-			);
-			if (!accepted) break;
+			expect(
+				offered,
+				`cap ${maxAttempts}, cycle ${cycles}: view offered=${offered}, engine accepted=${accepted}`
+			).toBe(accepted);
+			if (!accepted) {
+				// ANTI-VACUITY: a run where the engine refused the FIRST retry would satisfy the agreement
+				// trivially, and would also satisfy it if both sides were broken in the same direction.
+				expect(cycles, 'the cap fired on the first attempt — agreement is vacuous').toBeGreaterThan(1);
+				return cycles;
+			}
 		}
-		// ANTI-VACUITY, and it is the assertion that matters most: a loop that never reached the cap would satisfy
-		// the agreement trivially, and so would one where the engine refused from the very first attempt.
-		expect(trace.some((t) => t.offered), 'retry was never offered — the cap fired immediately').toBe(
-			true
-		);
-		expect(trace.some((t) => !t.offered), 'the cap was never reached — agreement is vacuous').toBe(
-			true
-		);
+		throw new Error(`cap ${maxAttempts} never fired — the cap is not being enforced at all`);
+	}
+
+	it('THE AGREEMENT: at every attempt count, the view offers retry exactly when the engine accepts it', () => {
+		// Run at the DEFAULT cap and at a non-default one. The second is what proves the view is reading the PLAN's
+		// policy rather than falling back to a constant that happens to match.
+		driveToExhaustion(DEFAULT_RETRY_CAP);
+		driveToExhaustion(5);
 	});
 
 	it('the flip happens at the plan’s DECLARED cap, not at a number this layer invented', () => {
-		/** The attempt count at which the engine first refuses a retry; -1 if it never did. */
-		const attemptsWhenRefused = () => {
-			for (let i = 0; i < 8; i += 1) {
-				runAndFailOnce();
-				if (dispatch('RetryExecutionStep', { stepId: STEP }).status !== 'ACCEPTED')
-					return attemptsMadeFrom(store.readAllEvents(), PLAN, STEP);
-			}
-			return -1;
-		};
-		// MAX TOTAL ATTEMPTS, 1-based: the refusal lands ON the cap, not one short of it. At maxAttempts=3 two
-		// retries proceed (opening attempts 2 and 3) and the retry at attemptsMade=3 is refused — which is the
-		// engine's own documented reading, asserted here against the DECLARED number rather than a literal.
-		expect(attemptsWhenRefused()).toBe(3);
-
-		// The same, with a different declared cap — so the boundary tracks the plan rather than a constant. If
-		// either side had kept a hardcoded 3, this second case is where it shows.
-		arrangeActivePlan({ maxAttempts: 5 });
-		expect(attemptsWhenRefused()).toBe(5);
+		// MAX TOTAL ATTEMPTS, 1-based: the refusal lands ON the cap. At maxAttempts=3 two retries proceed (opening
+		// attempts 2 and 3) and the retry at attemptsMade=3 is refused — the engine's own documented reading,
+		// asserted against the DECLARED number and counted independently of the code that computes it.
+		expect(driveToExhaustion(3)).toBe(3);
+		expect(driveToExhaustion(5)).toBe(5);
 	});
 
 	it('an absent RetryPolicy falls back to the kernel’s DEFAULT on BOTH sides', () => {
