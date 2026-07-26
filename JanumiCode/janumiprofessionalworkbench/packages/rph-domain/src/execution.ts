@@ -298,6 +298,46 @@ export function capabilityAuthorized(input: CapabilityCheckInput): Check {
 	};
 }
 
+/**
+ * §22.1 — is every GRANTED capability one that was actually REQUESTED (JAN-CAPBIND WP-1, closing N-4)?
+ *
+ * THE RULE THIS ENFORCES, verbatim from §22.1's runtime invariants: *"Requested capability is not granted
+ * capability"* and *"Privilege expansion requires a new authorization event."* Granting a capability nobody asked
+ * for IS expansion — and doing it inside an authorization of something else is expansion **without its own event**,
+ * which is precisely what the second sentence forbids.
+ *
+ * A SEPARATE PREDICATE FROM `capabilityAuthorized`, deliberately, and the distinction is easy to lose. That one
+ * asks *"may this ONE operation proceed against the granted set?"* — single-operation containment, `granted
+ * .includes(required)`. This asks *"is the granted SET within the requested SET?"* — a different question with a
+ * different failure mode. Reusing `capabilityAuthorized` here would be the wrong predicate wearing the right name,
+ * and it would also give it a production caller, tripping the enforcement register's call-site census for a rule
+ * (RPH-EXE-004) that would still be unenforced.
+ *
+ * NAMED PARAMETERS, and that is load-bearing rather than stylistic. With `scope` deliberately not authored,
+ * `CapabilityRequest` and `CapabilityGrant` are STRUCTURALLY IDENTICAL — `{ capability: string }` — so TypeScript
+ * cannot tell one from the other and positional operands could be swapped silently, inverting the rule into
+ * "requested is within granted". Padding one type with an extra optional field would not help: shapes differing
+ * only by optional members stay mutually assignable. A named record makes a swap require a deliberate edit.
+ *
+ * SUBSET, NOT EQUALITY. A grant NARROWER than the request is legal and expected — it is exactly RPH-EXE-004's
+ * example ("requests file-system and network access but only file-system is granted") and the reason the ratified
+ * machine has a PARTIALLY_AUTHORIZED state at all. Refusing a partial grant would strand every legitimate
+ * least-privilege authorization, which is the over-refusal half this rule is most at risk of.
+ */
+export function grantedWithinRequest(input: {
+	readonly requested: readonly string[];
+	readonly granted: readonly string[];
+}): Check {
+	const requested = new Set(input.requested);
+	const excess = input.granted.filter((c) => !requested.has(c));
+	if (excess.length === 0) return { ok: true };
+	return {
+		ok: false,
+		errorCode: 'RPH_CAPABILITY_NOT_REQUESTED',
+		reason: `granted capabilities [${excess.join(', ')}] were never requested — privilege expansion requires a new authorization event (§22.1)`
+	};
+}
+
 /** §22.1. A REVOKED binding cannot back a new attempt (privilege expansion needs a NEW authorization event). */
 export function canReuseBindingForNewAttempt(authorizationStatus: string): boolean {
 	return authorizationStatus !== 'REVOKED' && authorizationStatus !== 'DENIED';

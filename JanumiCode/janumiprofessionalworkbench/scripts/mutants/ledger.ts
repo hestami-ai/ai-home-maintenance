@@ -471,6 +471,51 @@ export const DECLARED_MUTANTS: readonly DeclaredMutant[] = [
 		why: 'OVER-refusal: an AUTHORIZED binding stops affording Start, which withholds the action on every correctly-authorized step',
 		source: 'RW-6 inline'
 	},
+	// ── JAN-CAPBIND WP-2: N-4, a grant may not exceed its request (§22.1) ─────────────────────────────────────
+	{
+		id: 'C1-grant-containment-never-refuses',
+		file: 'packages/rph-domain/src/execution.ts',
+		// N-4 ITSELF: the containment kernel admits everything, so a first authorization may confer any capability
+		// the binding never requested — privilege expansion with no new authorization event.
+		find: '\tconst excess = input.granted.filter((c) => !requested.has(c));\n\tif (excess.length === 0) return { ok: true };',
+		replace:
+			'\tconst excess = input.granted.filter((c) => !requested.has(c));\n\tif (excess.length >= 0) return { ok: true };',
+		expectRed: [
+			'packages/rph-domain/src/capbind-granted-within-request.test.ts',
+			'packages/rph-application/src/handlers/capbind-n4-grant-containment.test.ts'
+		],
+		why: 'N-4: an unrequested capability is granted inside someone else’s authorization — expansion without its own event (§22.1)',
+		source: 'JAN-CAPBIND WP-2'
+	},
+	{
+		id: 'C2-grant-containment-inverted',
+		file: 'packages/rph-domain/src/execution.ts',
+		// THE OPERAND-SWAP, expressed as one character of set membership: this is what a positional signature would
+		// have permitted silently. It still REFUSES things, so it still looks like a working guard — it just refuses
+		// the legal narrow grant and admits the illegal wide one.
+		find: '\tconst excess = input.granted.filter((c) => !requested.has(c));',
+		replace: '\tconst excess = input.requested.filter((c) => !new Set(input.granted).has(c));',
+		expectRed: [
+			'packages/rph-domain/src/capbind-granted-within-request.test.ts',
+			'packages/rph-application/src/handlers/capbind-n4-grant-containment.test.ts'
+		],
+		why: 'OVER-refusal AND under-refusal at once: the legal narrower grant is refused while the illegal wider one is admitted',
+		source: 'JAN-CAPBIND WP-2'
+	},
+	{
+		id: 'C3-n4-guard-unwired',
+		file: 'packages/rph-application/src/handlers/runtime-binding.ts',
+		// THE WIRING, separately from the kernel. The predicate can be correct while nothing asks it — which is the
+		// exact shape (F-28) that left RPH-EXE-003/004/005 certified COVERED and enforced nowhere.
+		find: '\t\t\tif (check.ok) return null;',
+		replace: '\t\t\tif (check.ok || !check.ok) return null;',
+		expectRed: [
+			'packages/rph-application/src/handlers/capbind-n4-grant-containment.test.ts'
+		],
+		why: 'the ENFORCEMENT: a correct kernel asked by nothing is the F-28 shape, and N-4 is that shape at the authorization boundary',
+		source: 'JAN-CAPBIND WP-2'
+	},
+
 	// ── JAN-REVREM RW-7: prune provenance for the NON-BRANCH cut (N-8) ────────────────────────────────────────
 	{
 		id: 'P1-dead-predecessor-arm-continues-again',
