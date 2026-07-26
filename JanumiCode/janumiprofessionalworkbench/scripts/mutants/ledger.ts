@@ -516,6 +516,59 @@ export const DECLARED_MUTANTS: readonly DeclaredMutant[] = [
 		source: 'JAN-CAPBIND WP-2'
 	},
 
+	// ── JAN-CAPBIND WP-3: N-3, RPH-EXE-005 input readiness ───────────────────────────────────────────────────
+	{
+		id: 'C4-input-readiness-limb-unwired',
+		file: 'packages/rph-application/src/handlers/execution.ts',
+		// The DECLARATION can be right while nothing consults it — the F-28 shape, and the exact reason RPH-EXE-005
+		// sat certified-COVERED and enforced nowhere for four milestones.
+		find: "\tif (spec.inputReadiness === 'REQUIRES_PRESENT_INPUTS') {",
+		replace: '\tif (false as boolean) {',
+		expectRed: [
+			'packages/rph-application/src/handlers/capbind-wp3-input-readiness.test.ts',
+			'packages/rph-application/src/handlers/execrem-wp16-enforcement-observed.test.ts'
+		],
+		why: 'N-3 ITSELF: a step whose required input artifact does not resolve starts anyway, and the model/tool invocation the rule forbids is performed',
+		source: 'JAN-CAPBIND WP-3'
+	},
+	{
+		id: 'C5-input-readiness-truthiness-not-resolution',
+		file: 'packages/rph-application/src/handlers/execution.ts',
+		// THE F-30 SHAPE, re-expressed. WP-12 found `hasAuthorizedWaiverOrRevision: !!p.waiverOrRevisionId`, where a
+		// governed act was satisfied by any non-empty string. Passing a COUNT instead of a RESOLUTION is the same
+		// substitution: it answers "were inputs declared?" while the rule asks "do the required ones exist?".
+		find: '\tconst check = stepMayBecomeReady(missing.length === 0);',
+		replace:
+			'\tconst check = stepMayBecomeReady((Array.isArray(step.inputBindings) ? step.inputBindings : []).length >= 0);',
+		expectRed: ['packages/rph-application/src/handlers/capbind-wp3-input-readiness.test.ts'],
+		why: 'a truthiness test standing in for a resolved fact — the rule would pass on a step whose required artifact does not exist',
+		source: 'JAN-CAPBIND WP-3'
+	},
+	{
+		id: 'C6-required-defaults-open-not-closed',
+		file: 'packages/rph-application/src/handlers/execution.ts',
+		// FAIL-OPEN vs FAIL-CLOSED on an unmarked input. A typo in `required` silently downgrades a requirement,
+		// which is how a governed obligation stops being one without anybody deciding.
+		find: "\t\t.filter((b) => (typeof b?.required === 'boolean' ? b.required : true))",
+		replace: "\t\t.filter((b) => (typeof b?.required === 'boolean' ? b.required : false))",
+		expectRed: ['packages/rph-application/src/handlers/capbind-wp3-input-readiness.test.ts'],
+		why: 'the `required ?? true` fail-closed default: an unmarked input must count as REQUIRED, mirroring WP-12’s `mandatory ?? true`',
+		source: 'JAN-CAPBIND WP-3'
+	},
+	{
+		id: 'C7-resolve-arrow-stops-consuming',
+		file: 'packages/rph-domain/src/step-command-spec.ts',
+		// THE TWO-ARROWS OMISSION, re-expressed as one character of declaration — the same shape that made the
+		// binding limb a BLOCKER. If this survives, siting the check per-handler would have been indistinguishable
+		// from declaring it as a column, and the column's whole argument collapses.
+		find: "\t\tinputReadiness: 'REQUIRES_PRESENT_INPUTS',\n\t\tinputReadinessRationale:\n\t\t\t'THE SECOND CONSUMING ARROW",
+		replace:
+			"\t\tinputReadiness: 'NOT_CONSUMING',\n\t\tinputReadinessRationale:\n\t\t\t'THE SECOND CONSUMING ARROW",
+		expectRed: [],
+		why: 'the RESUME arrow must consult input readiness too — a step parked in WAITING and resumed re-enters RUNNING and re-reads the same declared inputs',
+		source: 'JAN-CAPBIND WP-3'
+	},
+
 	// ── JAN-REVREM RW-7: prune provenance for the NON-BRANCH cut (N-8) ────────────────────────────────────────
 	{
 		id: 'P1-dead-predecessor-arm-continues-again',
