@@ -47,6 +47,15 @@ describe('WP-2 / N-4 — AuthorizeRuntimeBinding refuses a grant exceeding its r
 		return engine.dispatch(command);
 	};
 
+	/** Dispatch RequestRuntimeBinding WITHOUT asserting acceptance — for the cases that must be refused (N-20). */
+	const requestRaw = (capabilities: readonly string[]) =>
+		dispatch('RequestRuntimeBinding', {
+			runtimeBindingId: BINDING,
+			executionStepId: STEP,
+			roleId: 'role_engineer',
+			requestedCapabilities: capabilities.map((capability) => ({ capability }))
+		});
+
 	/** Create the binding in REQUESTED asking for exactly `capabilities`. */
 	const request = (capabilities: readonly string[]) => {
 		const r = dispatch('RequestRuntimeBinding', {
@@ -122,19 +131,33 @@ describe('WP-2 / N-4 — AuthorizeRuntimeBinding refuses a grant exceeding its r
 		expect(authorize([]).status).toBe('ACCEPTED');
 	});
 
-	it('CONTROL: the empty-request / empty-grant case stays ACCEPTED — three live dispatches rely on it', () => {
-		// `command-reissue-guard.test.ts` and `execution-detail.test.ts` both authorize with `grantedCapabilities: []`
-		// against a binding requesting []. Breaking that would be a regression dressed as an enforcement.
-		request([]);
-		expect(authorize([]).status).toBe('ACCEPTED');
+	// ── THIS CONTROL WAS OVERTURNED BY N-20, AND THE OVERTURNING IS RECORDED RATHER THAN THE CONTROL DELETED ────
+	//
+	// It used to read: "CONTROL: the empty-request / empty-grant case stays ACCEPTED — three live dispatches rely on
+	// it … Breaking that would be a regression dressed as an enforcement." That was right on the evidence it had:
+	// under N-4 alone, requesting nothing and granting nothing is a harmless no-op, and refusing it is over-refusal.
+	//
+	// WHAT THE CONTROL DID NOT KNOW: an empty request reaches AUTHORIZED — correctly, everything asked for was
+	// granted — and AUTHORIZED permits execution while conferring nothing, and cannot be re-authorized. The case it
+	// protected is not benign; it is the one shape in this aggregate with no remedy at all. And the "three live
+	// dispatches" were three TEST arrangements of convenience, not production callers: the reference seed authors no
+	// RuntimeBinding whatsoever, and repo-wide only two test files ever requested [].
+	//
+	// The lesson worth keeping: a control is only as good as the harms known when it was written. This one was
+	// correct and is now wrong, and saying so is cheaper than discovering later that it silently held a defect open.
+	it('N-20: an EMPTY request is refused at creation, so this control’s case no longer exists', () => {
+		const r = requestRaw([]);
+		expect(r.status).toBe('REJECTED');
+		expect(r.error?.message).toContain('names no capability');
 	});
 
-	it('refuses when the binding requested NOTHING and the grant names something', () => {
-		// The sharpest form of the defect: a binding that asked for no capability at all being handed one.
-		request([]);
-		const r = authorize(['network']);
-		expect(r.status).toBe('REJECTED');
-		expect(r.error?.message).toContain('network');
+	it('…and N-4’s empty-request limb is therefore STRUCTURALLY UNREACHABLE, not merely untested', () => {
+		// This case used to arrange `request([])` then `authorize(['network'])` — "a binding that asked for no
+		// capability at all being handed one", which was N-4's sharpest form. That arrangement can no longer be
+		// built. Pinning the unreachability is the honest replacement: an assertion about a shape nobody can create
+		// would be a test that cannot fail, and deleting it silently would lose the fact that the limb exists.
+		// The rule itself stays covered by the excess battery below, which arranges a REAL request.
+		expect(requestRaw([]).status).toBe('REJECTED');
 	});
 
 	it('names EVERY unrequested capability, not just the first', () => {

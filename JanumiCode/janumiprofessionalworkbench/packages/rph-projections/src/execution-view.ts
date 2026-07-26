@@ -118,6 +118,12 @@ export interface StepBindingFacts {
 	readonly boundStepId?: string;
 	/** The binding's `authorizationStatus`, fed to the ratified kernel predicate. */
 	readonly authorizationStatus?: string;
+	/**
+	 * What the binding actually GRANTS (N-18, sponsor ruling 2026-07-26). A binding may sit in an executable status
+	 * while conferring nothing; the engine refuses Start on it, so this read-model must withhold Start too or it
+	 * offers a click the engine rejects. ABSENT is UNGATED; only a RESOLVED empty set gates.
+	 */
+	readonly grantedCapabilities?: readonly string[];
 }
 
 /** Pure input: an ExecutionPlan transition (edge) the flow gate reads (DR-004 DWP-01). `conditionExpression` is opaque
@@ -414,7 +420,13 @@ function bindingContextFor(s: ExecutionStepInput): StepBindingContext | undefine
 			: { boundStepId: s.runtimeBinding.boundStepId }),
 		...(s.runtimeBinding.authorizationStatus === undefined
 			? {}
-			: { authorizationStatus: s.runtimeBinding.authorizationStatus })
+			: { authorizationStatus: s.runtimeBinding.authorizationStatus }),
+		// N-18: threaded so the NOTHING_GRANTED limb reaches the read-model too. This is the property the ruling was
+		// chosen for — the limb lives inside `bindingAuthorityVerdict`, which `planPermitsAffordance` already
+		// consults, so mirroring it costs one field rather than a new column.
+		...(s.runtimeBinding.grantedCapabilities === undefined
+			? {}
+			: { grantedCapabilities: s.runtimeBinding.grantedCapabilities })
 	};
 }
 

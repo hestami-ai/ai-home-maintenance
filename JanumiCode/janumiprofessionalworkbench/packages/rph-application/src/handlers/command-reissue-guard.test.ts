@@ -249,7 +249,7 @@ describe('JAN-NOOP-01 — a re-issued command cannot append a contradicting fact
 				runtimeBindingId: BINDING,
 				executionStepId: STEP,
 				roleId: 'r',
-				requestedCapabilities: []
+				requestedCapabilities: [{ capability: 'file-system' }]
 			},
 			BINDING,
 			'RUNTIME_BINDING'

@@ -305,7 +305,7 @@ describe('ExecutionStep + RuntimeBinding handlers (live)', () => {
 					runtimeBindingId: BIND,
 					executionStepId: STEP,
 					roleId: 'architect',
-					requestedCapabilities: []
+					requestedCapabilities: [{ capability: 'file-system' }]
 				},
 				BIND,
 				'RUNTIME_BINDING'
@@ -315,7 +315,7 @@ describe('ExecutionStep + RuntimeBinding handlers (live)', () => {
 			(store.loadObject(BIND)?.state as { authorizationStatus: string }).authorizationStatus
 		).toBe('REQUESTED');
 		expect(
-			dispatch('AuthorizeRuntimeBinding', { grantedCapabilities: [] }, BIND, 'RUNTIME_BINDING')
+			dispatch('AuthorizeRuntimeBinding', { grantedCapabilities: [{ capability: 'file-system' }] }, BIND, 'RUNTIME_BINDING')
 				.status
 		).toBe('ACCEPTED');
 		expect(

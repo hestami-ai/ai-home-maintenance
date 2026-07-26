@@ -91,17 +91,23 @@ describe('JAN-PARTAUTH — the authorization outcome is DERIVED from the grant',
 			expect(statusOf()).toBe('AUTHORIZED');
 		});
 
-		it('a vacuous request is fully AUTHORIZED — nothing was asked, so nothing is outstanding', () => {
-			ok(request(), 'request nothing');
-			ok(authorize(), 'grant nothing');
-			expect(statusOf()).toBe('AUTHORIZED');
+		it('N-20: a VACUOUS request is refused at creation, because nothing downstream could repair it', () => {
+			// It would reach AUTHORIZED — correctly, everything asked for was granted — and AUTHORIZED permits
+			// execution while conferring nothing. Refusing it at Start would be a WEDGE: `fromStates` does not admit
+			// AUTHORIZED as a source, so there is no second authorization, and no command re-points a step's
+			// runtimeBindingId. Here, nothing is stored yet and the remedy is to request again.
+			const r = request();
+			expect(r.status).toBe('REJECTED');
+			expect(r.error?.message).toContain('names no capability');
+			expect(r.error?.message).toContain('may not be re-authorized');
+			expect(store.loadObject(BINDING), 'the binding must not exist').toBeUndefined();
 		});
 
-		it('N-18, DISCLOSED: an empty grant against a real request is PARTIALLY_AUTHORIZED, not refused', () => {
-			// Recorded rather than decided. Refusing this and directing the authorizer to DenyRuntimeBinding is an
-			// INFERENCE the corpus does not make, and JAN-CAPBIND's withdrawn `scope` field is the standing lesson
-			// about acting on one. The consequence is stated so it is not discovered later: `bindingPermitsExecution`
-			// PERMITS execution against this binding, which grants nothing.
+		it('N-18 RULED (option C): an empty grant against a real request is PARTIALLY_AUTHORIZED and NOT executable', () => {
+			// The state is RIGHT and is deliberately kept: "reviewed, granted nothing, still live" is a first-class
+			// multi-party position — a first approver in a chain, a tenant policy pending, an auditor's record that a
+			// review happened and produced nothing. It is distinct from REQUESTED (nobody looked) and from DENIED
+			// (refused, terminal). What was wrong was the PREDICATE: the binding permitted execution.
 			ok(request('file-system'), 'request one');
 			ok(authorize(), 'grant nothing');
 			expect(statusOf()).toBe('PARTIALLY_AUTHORIZED');
@@ -181,5 +187,123 @@ describe('JAN-PARTAUTH — the authorization outcome is DERIVED from the grant',
 			expect(authorize('network').status).toBe('REJECTED');
 			expect(statusOf()).toBe('REQUESTED');
 		});
+	});
+});
+
+// ── N-18 (SPONSOR RULING 2026-07-26, option C) + N-22, DRIVEN THROUGH THE BUS ───────────────────────────────────
+//
+// THE RULING. A binding may sit in an executable STATUS while granting NOTHING. The sponsor's correction is what
+// settled it: my argument that such a state "has no consumer in this engine" was engine-local reasoning about a
+// plane of a product that will have multi-party authorization, tenants, delegation and human auditors. "Reviewed,
+// granted nothing, still live" is a first-class position — distinct from REQUESTED (nobody looked) and from DENIED
+// (refused, and TERMINAL, which is why refusing the empty grant would have destroyed the binding outright).
+//
+// So the STATE is right and the PREDICATE was wrong. `NOTHING_GRANTED` is its own limb — not RPH-EXE-003's, which
+// is about status — and it runs LAST, so a DENIED binding still reports DENIED rather than "grants nothing".
+describe('N-18 — a binding that confers nothing does not authorize a start', () => {
+	let store: SqliteStorageAdapter;
+	let engine: Engine;
+	let seq = 0;
+	const INTENT = 'int_01ARZ3NDEKTSV4RRFFQ69HB500';
+	const PWU = 'pwu_01ARZ3NDEKTSV4RRFFQ69HB510';
+	const PLAN = 'plan_01ARZ3NDEKTSV4RRFFQ69HB520';
+	const BIND = 'bind_01ARZ3NDEKTSV4RRFFQ69HB530';
+	const STEP1 = `${PLAN}-s1`;
+
+	function send(commandType: string, payload: unknown, id: string, aggType: string) {
+		const n = ++seq;
+		return engine.dispatch({
+			commandId: `n18-${n}`,
+			commandType,
+			commandSchemaVersion: 1,
+			targetAggregateType: aggType,
+			targetAggregateId: id,
+			issuedAt: TS,
+			issuedBy: actor,
+			correlationId: 'n18',
+			idempotencyKey: `n18k-${n}`,
+			payload
+		} as DomainCommand);
+	}
+	const accept = (r: { status: string; error?: { message?: string } }, what: string) => {
+		expect(r.status, `${what}: ${r.error?.message}`).toBe('ACCEPTED');
+		return r;
+	};
+
+	/** An ACTIVE one-step plan whose step names BIND, with BIND requesting `caps` and granted `granted`. */
+	function arrange(caps: string[], granted: string[]) {
+		store = new SqliteStorageAdapter({ now: () => TS });
+		seq = 0;
+		engine = new Engine({ store, now: () => TS, newEventId: () => `n18e${++seq}` });
+		send('CaptureIntent', { intentId: INTENT, originatingExpression: 'x', ontologyId: 'o', ontologyVersion: '1' }, INTENT, 'INTENT');
+		send('ProposePwu', {
+			pwuId: PWU, pwuKind: 'ARCHITECTURE', title: 'Arch', description: 'd', intentId: INTENT,
+			boundaries: { inScope: [], outOfScope: [], permittedChanges: [], prohibitedChanges: [] },
+			obligationIds: [], constraintIds: [], assumptionIds: [], expectedOutputs: [], assurancePolicyIds: [],
+			riskProfile: { consequence: 'MEDIUM', uncertainty: 'MEDIUM', irreversibility: 'LOW', securitySensitivity: 'LOW', regulatoryExposure: 'NONE' }
+		}, PWU, 'PROFESSIONAL_WORK_UNIT');
+		accept(send('RequestRuntimeBinding', {
+			runtimeBindingId: BIND, executionStepId: STEP1, roleId: 'role-architect',
+			requestedCapabilities: caps.map(cap)
+		}, BIND, 'RUNTIME_BINDING'), 'request');
+		accept(send('AuthorizeRuntimeBinding', { grantedCapabilities: granted.map(cap) }, BIND, 'RUNTIME_BINDING'), 'authorize');
+		accept(send('ProposeExecutionPlan', {
+			executionPlanId: PLAN, workUnitId: PWU,
+			steps: [{ id: STEP1, executionPlanId: PLAN, stepType: 'MODEL_INVOCATION', purpose: 'w', inputBindings: [], outputBindings: [], runtimeBindingId: BIND, preconditions: [], postconditions: [], stepState: 'QUEUED' }],
+			transitions: [], retryPolicy: { maxAttempts: 5 }, tacticalChangePolicy: {}, escalationPolicy: {}, terminationPolicy: {}
+		}, PLAN, 'EXECUTION_PLAN'), 'propose');
+		accept(send('ApproveExecutionPlan', {}, PLAN, 'EXECUTION_PLAN'), 'approve');
+		accept(send('ActivateExecutionPlan', { authorizedRuntimeBindingIds: [] }, PLAN, 'EXECUTION_PLAN'), 'activate');
+	}
+
+	const start = () => send('StartExecutionStep', { stepId: STEP1 }, PLAN, 'EXECUTION_PLAN');
+	const stepState = () =>
+		(store.loadObject(PLAN)!.state as { steps: { id: string; stepState: string }[] }).steps[0]!.stepState;
+
+	it('THE KILL TEST: a PARTIALLY_AUTHORIZED binding granting NOTHING refuses the start', () => {
+		arrange(['file-system'], []);
+		const r = start();
+		expect(r.status).toBe('REJECTED');
+		expect(r.error?.message).toContain('confers NO capability');
+		// …and demonstrably NOT the status limb: the status is executable, which is the whole point of the ruling.
+		expect(r.error?.message).not.toContain(
+			'a step may only execute against an AUTHORIZED or PARTIALLY_AUTHORIZED binding'
+		);
+		expect(stepState()).toBe('QUEUED');
+	});
+
+	it('names a remedy the engine can PERFORM — and the remedy really clears it', () => {
+		// The whole reason option (C) is safe where (B) was not: PARTIALLY_AUTHORIZED can be re-authorized, so the
+		// refusal is curative on the SAME aggregate. This drives the cure rather than asserting it.
+		arrange(['file-system'], []);
+		expect(start().error?.message).toContain('may be expanded');
+		accept(send('AuthorizeRuntimeBinding', { grantedCapabilities: [cap('file-system')] }, BIND, 'RUNTIME_BINDING'), 'expand');
+		accept(start(), 'start after the grant');
+		expect(stepState()).toBe('RUNNING');
+	});
+
+	it('THE OVER-REFUSAL HALF: a binding granting something still starts', () => {
+		arrange(['file-system', 'network'], ['file-system']);
+		accept(start(), 'a partial grant that confers something is executable');
+		expect(stepState()).toBe('RUNNING');
+	});
+
+	it('N-22: a further authorization that changes nothing is refused, not recorded', () => {
+		// The hole JAN-PARTAUTH opened: with the target DERIVED, PARTIALLY_AUTHORIZED -> PARTIALLY_AUTHORIZED became
+		// reachable, and checkTransition admits from === to as a NOOP — so an identical re-authorization would append
+		// an event for a change that did not happen. The ratified machine declares no self-arrow here.
+		arrange(['file-system', 'network'], ['file-system']);
+		const before = store.readAllEvents().length;
+		const r = send('AuthorizeRuntimeBinding', { grantedCapabilities: [cap('file-system')] }, BIND, 'RUNTIME_BINDING');
+		expect(r.status).toBe('REJECTED');
+		expect(r.error?.message).toContain('declares no PARTIALLY_AUTHORIZED -> PARTIALLY_AUTHORIZED arrow');
+		expect(store.readAllEvents().length, 'appended an event for a non-change').toBe(before);
+	});
+
+	it('…and a further authorization that COMPLETES the request is still accepted', () => {
+		// N-22's over-refusal half: the forward arrow the machine does declare must stay open.
+		arrange(['file-system', 'network'], ['file-system']);
+		accept(send('AuthorizeRuntimeBinding', { grantedCapabilities: [cap('file-system'), cap('network')] }, BIND, 'RUNTIME_BINDING'), 'complete');
+		expect((store.loadObject(BIND)!.state as { authorizationStatus: string }).authorizationStatus).toBe('AUTHORIZED');
 	});
 });

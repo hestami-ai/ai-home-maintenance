@@ -34,7 +34,7 @@ import {
 } from '@janumipwb/rph-projections';
 // JAN-RETRYCAP (N-12): the kernel's own attempt counter, so this loader supplies the number the ENGINE would
 // compute rather than one that merely agrees with it today.
-import { attemptsMadeFrom } from '@janumipwb/rph-domain';
+import { attemptsMadeFrom, capabilityIdentities } from '@janumipwb/rph-domain';
 import {
 	buildPwaExport,
 	dispatch,
@@ -332,7 +332,11 @@ export const load: PageServerLoad = ({ params }) => {
 			{
 				resolves: true,
 				boundStepId: String((b.state.executionStepId ?? '') as string),
-				authorizationStatus: String((b.state.authorizationStatus ?? '') as string)
+				authorizationStatus: String((b.state.authorizationStatus ?? '') as string),
+				// N-18 (ruling, option C): what the binding CONFERS, via the kernel's own projection — so the UI and
+				// the engine agree on what counts as a capability, and the UI stops offering Start on a binding that
+				// was reviewed and granted nothing.
+				grantedCapabilities: capabilityIdentities(b.state.grantedCapabilities)
 			}
 		])
 	);

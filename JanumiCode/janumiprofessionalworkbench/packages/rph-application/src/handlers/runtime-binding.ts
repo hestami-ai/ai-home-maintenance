@@ -3,16 +3,51 @@
 // authority (§2.4); requested capability is NOT granted capability (§22.1) — AuthorizeRuntimeBinding records the
 // separately-granted set. A revoked binding cannot back a new attempt (§22.1).
 import type { RequestRuntimeBindingPayload } from '@janumipwb/rph-contracts';
-import { authorizationOutcome, grantIsMonotone, grantedWithinRequest } from '@janumipwb/rph-domain';
+import {
+	authorizationOutcome,
+	capabilityIdentities,
+	grantIsMonotone,
+	grantedWithinRequest
+} from '@janumipwb/rph-domain';
 import { advanceStatus, createObject, newEnvelope, reject, type CommandHandler } from './kit.js';
 import { fromStates } from './command-precondition.js';
 
 const BINDING = 'RUNTIME_BINDING';
 const MACHINE = 'RuntimeBinding.authorizationStatus';
 
-/** RequestRuntimeBinding — create a RuntimeBinding in REQUESTED for an execution step. */
+/**
+ * RequestRuntimeBinding — create a RuntimeBinding in REQUESTED for an execution step.
+ *
+ * ── N-20: A REQUEST FOR NOTHING IS REFUSED HERE, AND ONLY HERE ──────────────────────────────────────────────
+ *
+ * A binding that requests NO capability is answered by `authorizationOutcome` with AUTHORIZED — correctly, since
+ * everything asked for was granted — and that leaves an aggregate which PERMITS EXECUTION while conferring
+ * nothing. N-18's ruling refuses exactly that at Start.
+ *
+ * BUT IT CANNOT BE REFUSED AT START, AND THE ASYMMETRY IS THE WHOLE POINT. N-18's case is repairable: a
+ * PARTIALLY_AUTHORIZED binding can be re-authorized (`grantIsMonotone` forbids only shrinking), so the refusal
+ * names an act that clears it. This one reaches AUTHORIZED, which `fromStates` does not admit as a source — so
+ * there is NO second authorization, no command re-points a step's `runtimeBindingId`, and a refusal at Start
+ * would be a WEDGE of the class this lineage has now shipped and withdrawn twice.
+ *
+ * The only point with a remedy is here, before anything is stored: the remedy is to request again, naming what
+ * the step needs. So the guard sits at the creation, and the limb at Start stays clear of it.
+ *
+ * DISCLOSED AS AN INFERENCE, not a derivation: the corpus declares `requestedCapabilities: CapabilityRequest[]`
+ * REQUIRED but does not say the array must be non-empty. What the corpus DOES supply is the consequence —
+ * §22.1's "requested capability is NOT granted capability" is contentless over an empty request, and a
+ * RuntimeBinding exists to convey runtime capability. Recorded for a sponsor ruling rather than presented as
+ * forced.
+ */
 export const requestRuntimeBinding: CommandHandler = (ctx, command, payload) => {
 	const p = payload as RequestRuntimeBindingPayload;
+	if (capabilityIdentities(p.requestedCapabilities).length === 0)
+		return reject(
+			command,
+			'RPH_VALIDATION_SEMANTIC_FAILED',
+			`RequestRuntimeBinding blocked: the request names no capability. A RuntimeBinding exists to convey runtime capability to a step, and an empty request authorizes nothing while still reaching AUTHORIZED — a state no later command can repair, because a binding may not be re-authorized once AUTHORIZED. Request the capability the step needs (N-20).`,
+			[p.runtimeBindingId]
+		);
 	const state: Record<string, unknown> = {
 		...newEnvelope(command, BINDING, p.runtimeBindingId, {
 			lifecycleStatus: 'REQUESTED',
@@ -100,6 +135,24 @@ export const authorizeRuntimeBinding: CommandHandler = (ctx, command) =>
 		// with a reason. Landing the derivation without this guard would not leave an existing defect alone; it
 		// would CREATE a live one. The machine's own trigger for that arrow reads "new authorization event
 		// (privilege expansion)" — this arrow authorizes EXPANSION.
+		//
+		// ── AND THE SELF-ARROW LIMB (N-22) — A HOLE THIS SERIES OPENED, CAUGHT BY AN EXISTING TEST ────────────
+		//
+		// `fromStates` was written when `target` was the literal AUTHORIZED, so PARTIALLY_AUTHORIZED could only ever
+		// mean a real transition. With the target DERIVED, a second authorization carrying the same partial grant
+		// lands PARTIALLY_AUTHORIZED -> PARTIALLY_AUTHORIZED — and `checkTransition` admits from === to as a NOOP,
+		// so it would commit a revision and append a `RuntimeBindingAuthorized` event for a change that did not
+		// happen. That is precisely what this handler's own precondition docblock says preconditions exist to stop:
+		// "an event for a change that did not happen is a false entry in an append-only record".
+		//
+		// THE RATIFIED MACHINE SETTLES IT, so this is a derivation and not a preference: the arrows out of
+		// PARTIALLY_AUTHORIZED are exactly two — to AUTHORIZED ("new authorization event (privilege expansion)") and
+		// to REVOKED. There is NO self-loop. A further authorization must therefore COMPLETE the request.
+		//
+		// DISCLOSED CONSEQUENCE, recorded as N-22 rather than worked around: this makes INCREMENTAL multi-party
+		// authorization — grant one of three, then a second of three — inexpressible. The ratified machine does not
+		// model it. If the platform needs it (and a two-approver chain is exactly the case that wants it), that is a
+		// new arrow with its own trigger, which is a ratification act and not mine to author.
 		guard: (state) => {
 			const p = command.payload as { grantedCapabilities?: unknown[] };
 			const granted = capabilityIds(p.grantedCapabilities);
@@ -118,15 +171,34 @@ export const authorizeRuntimeBinding: CommandHandler = (ctx, command) =>
 				requested: capabilityIds(state.requestedCapabilities),
 				granted
 			});
-			if (check.ok) return null;
-			// The kernel's label travels in the MESSAGE: `RPH_CAPABILITY_NOT_REQUESTED` is not a member of the
-			// ratified 15-value RphErrorCodeSchema, so it goes there or nowhere (the WP-11 discipline).
-			return reject(
-				command,
-				'RPH_INVARIANT_VIOLATION',
-				`AuthorizeRuntimeBinding blocked (${check.errorCode}): ${check.reason}. Request the additional capability on a new RuntimeBinding, then authorize that.`,
-				[command.targetAggregateId]
-			);
+			if (!check.ok)
+				// The kernel's label travels in the MESSAGE: `RPH_CAPABILITY_NOT_REQUESTED` is not a member of the
+				// ratified 15-value RphErrorCodeSchema, so it goes there or nowhere (the WP-11 discipline).
+				return reject(
+					command,
+					'RPH_INVARIANT_VIOLATION',
+					`AuthorizeRuntimeBinding blocked (${check.errorCode}): ${check.reason}. Request the additional capability on a new RuntimeBinding, then authorize that.`,
+					[command.targetAggregateId]
+				);
+
+			// N-22 RUNS LAST, and the order is the same discipline as SCOPE-before-STATUS in bindingAuthorityVerdict:
+			// report the MOST SPECIFIC defect. A shrink from PARTIALLY_AUTHORIZED is both a reduction and a
+			// self-arrow, and "you dropped `network`; use RevokeRuntimeCapability" is actionable where "grant what is
+			// outstanding" is actively wrong advice for someone trying to reduce. So this limb is the RESIDUAL case:
+			// nothing excessive, nothing dropped, and still nothing changed.
+			const from = String(state.authorizationStatus);
+			const to = authorizationOutcome({
+				requested: capabilityIds(state.requestedCapabilities),
+				granted
+			});
+			if (from === to)
+				return reject(
+					command,
+					'RPH_INVARIANT_VIOLATION',
+					`AuthorizeRuntimeBinding blocked: this authorization leaves the binding in ${from}, and the ratified machine declares no ${from} -> ${from} arrow — so it would append a RuntimeBindingAuthorized event for a change that did not happen. From PARTIALLY_AUTHORIZED the only forward arrow is to AUTHORIZED (privilege expansion): grant the capabilities still outstanding, or revoke the binding (N-22).`,
+					[command.targetAggregateId]
+				);
+			return null;
 		},
 		eventType: 'RuntimeBindingAuthorized',
 		mutate: (base) => {
@@ -135,18 +207,11 @@ export const authorizeRuntimeBinding: CommandHandler = (ctx, command) =>
 		}
 	});
 
-/**
- * Project a persisted capability array onto its comparable IDENTITIES.
- *
- * Defensive about the element shape on purpose: these arrays are read from the STORE, so they include rows written
- * before WP-0 authored `CapabilityRequest`/`CapabilityGrant`, when the contract emitted an opaque record and any
- * object was legal. An element that carries no `capability` contributes no identity rather than throwing — and it
- * cannot be laundered into a match either, because `undefined` is filtered out rather than compared.
- */
-const capabilityIds = (raw: unknown): string[] =>
-	(Array.isArray(raw) ? raw : [])
-		.map((c) => (c as { capability?: unknown })?.capability)
-		.filter((c): c is string => typeof c === 'string');
+// The projection this file used to own moved to rph-domain as `capabilityIdentities` (N-18): the Start-time
+// NOTHING_GRANTED limb is a third reader, and a projection copied per reader is how two readers come to disagree
+// about what counts as a capability. `capabilityIds` is kept as a local alias so the call sites below read the
+// same as they did — the name is this file's, the rule is the kernel's.
+const capabilityIds = capabilityIdentities;
 
 /** DenyRuntimeBinding — REQUESTED -> DENIED. */
 export const denyRuntimeBinding: CommandHandler = (ctx, command) =>

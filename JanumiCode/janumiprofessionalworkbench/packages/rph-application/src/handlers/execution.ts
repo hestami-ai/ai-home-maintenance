@@ -25,6 +25,9 @@ import {
 	// ratified kernel predicate — so the predicate keeps exactly one production caller and the enforcement
 	// register's call-site census keeps pointing at a site that exists.
 	bindingAuthorityVerdict,
+	// N-18 (ruling, option C): the same projection the authorization guards use, so "what counts as a capability"
+	// has one answer at both ends of the binding's life.
+	capabilityIdentities,
 	canResumeExecutionOnPwu,
 	canSkipStep,
 	// JAN-CAPBIND WP-3: the RPH-EXE-005 kernel gains its FIRST production caller. The enforcement register's
@@ -1052,12 +1055,17 @@ function bindingAuthorityRefusal(
 	const state = binding.state as {
 		executionStepId?: unknown;
 		authorizationStatus?: unknown;
+		grantedCapabilities?: unknown;
 	};
 	const verdict = bindingAuthorityVerdict(stepId, {
 		bindingId,
 		bindingResolves: true,
 		boundStepId: String(state.executionStepId ?? ''),
-		authorizationStatus: String(state.authorizationStatus)
+		authorizationStatus: String(state.authorizationStatus),
+		// N-18 (ruling, option C): what the binding actually CONFERS. Resolved rather than assumed — an unreadable
+		// or malformed array yields no identities, which the verdict then reads as "grants nothing" and refuses.
+		// That is the fail-CLOSED direction and matches this function's disposition everywhere else.
+		grantedCapabilities: capabilityIdentities(state.grantedCapabilities)
 	});
 
 	// ── SCOPE: the binding must be the one authorized FOR THIS STEP (JAN-REVREM RW-3, review finding #2) ────────
@@ -1084,6 +1092,37 @@ function bindingAuthorityRefusal(
 			command,
 			'RPH_INVARIANT_VIOLATION',
 			`${command.commandType} blocked (${verdict.errorCode ?? 'RPH_BINDING_NOT_AUTHORIZED'}): runtime binding ${bindingId} is ${String(state.authorizationStatus)} — a step may only execute against an AUTHORIZED or PARTIALLY_AUTHORIZED binding (RPH-EXE-003 / §8.1). Authorize the binding before starting the step.`,
+			[stepId, bindingId]
+		);
+
+	// ── N-18 (SPONSOR RULING 2026-07-26): the binding is executable BY STATUS and confers nothing ───────────────
+	//
+	// Its own limb, not RPH-EXE-003's, and rendered separately so the status battery's marker stays exclusive to
+	// the status limb. The message carries the kernel's reason verbatim, including the remedy — which is reachable
+	// AND curative here, unlike every neighbouring refusal: a PARTIALLY_AUTHORIZED binding can be re-authorized.
+	if (verdict.limb === 'NOTHING_GRANTED')
+		return reject(
+			command,
+			'RPH_INVARIANT_VIOLATION',
+			`${command.commandType} blocked (${verdict.errorCode ?? 'RPH_CAPABILITY_NOT_GRANTED'}): runtime binding ${bindingId} — ${verdict.reason ?? 'it confers no capability'}`,
+			[stepId, bindingId]
+		);
+
+	// ── TOTALITY: A LIMB THIS RENDERER HAS NOT BEEN TAUGHT ABOUT MUST STILL REFUSE ──────────────────────────────
+	//
+	// AND THIS IS HERE BECAUSE ITS ABSENCE JUST BIT. `bindingAuthorityVerdict` gained the N-18 limb and this
+	// function rendered only WRONG_STEP and NOT_AUTHORIZED — so the new verdict fell through to `return null` and
+	// the engine PERMITTED the start it had just decided to refuse. The decision was right, the rendering was
+	// silent, and only the kill test caught it. That is the same shape as every "the engine grew a limb and the
+	// other side was not told" defect in this lineage (F-29's four instances), one layer further in.
+	//
+	// Fail-CLOSED on the unknown: a limb whose `ok` is false refuses with whatever the kernel said, rather than
+	// being silently admitted because nobody wrote its `if`. A future limb is then enforced the day it is declared.
+	if (!verdict.ok)
+		return reject(
+			command,
+			'RPH_INVARIANT_VIOLATION',
+			`${command.commandType} blocked (${verdict.errorCode ?? verdict.limb}): runtime binding ${bindingId} — ${verdict.reason ?? 'the binding does not authorize this step'} [limb ${verdict.limb}].`,
 			[stepId, bindingId]
 		);
 

@@ -204,6 +204,22 @@ export interface BindingAuthorityFacts {
 	readonly boundStepId?: string;
 	/** The binding's `authorizationStatus`, for `bindingPermitsExecution`. */
 	readonly authorizationStatus?: string;
+	/**
+	 * What the binding actually GRANTS, as capability identities (N-18, sponsor ruling 2026-07-26, option C).
+	 *
+	 * A binding may sit in an executable status while granting NOTHING: an authorizer who has reviewed and granted
+	 * none of what was asked leaves it `PARTIALLY_AUTHORIZED` with an empty set, and that is a state the platform
+	 * WANTS — a first approver in a chain, a tenant policy still pending, an auditor's record that a review happened
+	 * and produced nothing. It is materially different from `REQUESTED` (nobody looked) and from `DENIED` (refused,
+	 * and terminal).
+	 *
+	 * So the state is right and the PREDICATE was wrong: `bindingPermitsExecution` admits the status, when the
+	 * executable fact is whether anything was granted at all.
+	 *
+	 * ABSENT means UNGATED, matching every other fact here (DS §6b R9): a caller that did not resolve the grant gets
+	 * the pre-ruling behaviour rather than a silently emptied action column.
+	 */
+	readonly grantedCapabilities?: readonly string[];
 }
 
 /** Which of the four checks decided. Carried so a caller can render the RIGHT refusal, and so a test can assert
@@ -214,7 +230,9 @@ export type BindingAuthorityLimb =
 	| 'OUT_OF_SCOPE'
 	| 'UNRESOLVABLE'
 	| 'WRONG_STEP'
-	| 'NOT_AUTHORIZED';
+	| 'NOT_AUTHORIZED'
+	/** N-18: the binding is in an executable STATUS but confers no capability at all. */
+	| 'NOTHING_GRANTED';
 
 export interface BindingAuthorityVerdict {
 	/** May the step execute? `OUT_OF_SCOPE` is `ok` — the rule's antecedent is unmet, which is not a refusal. */
@@ -243,6 +261,7 @@ export interface BindingAuthorityVerdict {
  *   2. Does it resolve?                — fail CLOSED: authority that cannot be READ cannot authorize.
  *   3. Is it THIS step's binding?      — SCOPE (§8.1). A privilege-scope hole, not a status one.
  *   4. Is it AUTHORIZED at all?        — RPH-EXE-003, the ratified rule, via `bindingPermitsExecution`.
+ *   5. Does it GRANT anything?         — N-18. Content, not status; last, so a DENIED binding reports DENIED.
  *
  * SCOPE RUNS BEFORE STATUS deliberately: a binding granted for other work is not this step's authority at all, so
  * its status is not the question. Reporting "your binding is REVOKED" for a binding that was never yours names the
@@ -268,15 +287,46 @@ export function bindingAuthorityVerdict(
 	if (facts.boundStepId !== undefined && facts.boundStepId !== stepId)
 		return { ok: false, limb: 'WRONG_STEP', boundStepId: facts.boundStepId };
 
-	if (facts.authorizationStatus === undefined) return { ok: true, limb: 'PERMITTED' };
-	const check = bindingPermitsExecution(facts.authorizationStatus);
-	if (check.ok) return { ok: true, limb: 'PERMITTED' };
-	return {
-		ok: false,
-		limb: 'NOT_AUTHORIZED',
-		...(check.errorCode === undefined ? {} : { errorCode: check.errorCode }),
-		...(check.reason === undefined ? {} : { reason: check.reason })
-	};
+	if (facts.authorizationStatus !== undefined) {
+		const check = bindingPermitsExecution(facts.authorizationStatus);
+		if (!check.ok)
+			return {
+				ok: false,
+				limb: 'NOT_AUTHORIZED',
+				...(check.errorCode === undefined ? {} : { errorCode: check.errorCode }),
+				...(check.reason === undefined ? {} : { reason: check.reason })
+			};
+	}
+
+	// ── 5. DOES IT GRANT ANYTHING? — N-18 (sponsor ruling 2026-07-26, option C) ─────────────────────────────────
+	//
+	// LAST, AND DELIBERATELY AFTER STATUS. A DENIED binding that also grants nothing should be reported as DENIED:
+	// "your authorization was refused" sends an operator somewhere useful, "it grants nothing" does not. This limb
+	// is only reached for a binding whose status ALREADY permits execution — so it says the one thing the status
+	// cannot: the review happened and conferred nothing.
+	//
+	// ITS OWN LIMB, NOT RPH-EXE-003'S, and that is the point of the ruling. RPH-EXE-003 is about STATUS; this is
+	// about CONTENT. Folding it into `bindingPermitsExecution` would have widened a ratified kernel's meaning and
+	// blurred the existing kill tests, which assert the status limb by its own marker.
+	//
+	// WHY REFUSING IS SAFE HERE AND WOULD NOT BE ELSEWHERE: the remedy is reachable AND curative. A
+	// PARTIALLY_AUTHORIZED binding can be re-authorized — `grantIsMonotone` forbids only SHRINKING — so granting
+	// the capability clears this refusal on the same aggregate. (The vacuous-REQUEST case reaches AUTHORIZED, which
+	// cannot be re-authorized and would therefore be a wedge; it is refused at RequestRuntimeBinding instead, the
+	// only point where a remedy exists. See N-20.)
+	//
+	// ABSENT FACTS ARE UNGATED, not empty: `grantedCapabilities === undefined` means the caller did not resolve the
+	// grant, which is no information. Only a RESOLVED empty set gates.
+	if (facts.grantedCapabilities !== undefined && facts.grantedCapabilities.length === 0)
+		return {
+			ok: false,
+			limb: 'NOTHING_GRANTED',
+			errorCode: 'RPH_CAPABILITY_NOT_GRANTED',
+			reason:
+				'the binding is authorized but confers NO capability — a review that granted nothing authorizes nothing to run (§22.1). Authorize the capability the step needs on this same binding; a partial authorization may be expanded.'
+		};
+
+	return { ok: true, limb: 'PERMITTED' };
 }
 
 export interface CapabilityCheckInput {
@@ -336,6 +386,25 @@ export function grantedWithinRequest(input: {
 		errorCode: 'RPH_CAPABILITY_NOT_REQUESTED',
 		reason: `granted capabilities [${excess.join(', ')}] were never requested — privilege expansion requires a new authorization event (§22.1)`
 	};
+}
+
+/**
+ * Project a persisted capability array onto its comparable IDENTITIES.
+ *
+ * ONE COPY, because there are now three readers — `authorizeRuntimeBinding`'s two guards and the Start-time
+ * `NOTHING_GRANTED` limb (N-18) — and a projection duplicated per reader is how two of them come to disagree about
+ * what counts as a capability.
+ *
+ * DEFENSIVE ABOUT THE ELEMENT SHAPE ON PURPOSE: these arrays are read from the STORE, so they include rows written
+ * before `CapabilityRequest`/`CapabilityGrant` were authored, when the contract emitted an opaque record and any
+ * object was legal. An element carrying no `capability` contributes NO identity rather than throwing — and it
+ * cannot be laundered into a match either, because `undefined` is filtered out rather than compared. The effect at
+ * the N-18 limb is fail-CLOSED: an unreadable grant grants nothing.
+ */
+export function capabilityIdentities(raw: unknown): string[] {
+	return (Array.isArray(raw) ? raw : [])
+		.map((c) => (c as { capability?: unknown } | null)?.capability)
+		.filter((c): c is string => typeof c === 'string');
 }
 
 /** The two states an accepted authorization can produce. Both are `bindingPermitsExecution`-positive; they differ
