@@ -338,6 +338,68 @@ export function grantedWithinRequest(input: {
 	};
 }
 
+/** The two states an accepted authorization can produce. Both are `bindingPermitsExecution`-positive; they differ
+ *  in whether the request was met IN FULL. */
+export type AuthorizationOutcome = 'AUTHORIZED' | 'PARTIALLY_AUTHORIZED';
+
+/**
+ * Which state does this grant produce — RPH-EXE-003 / §22.1 (JAN-PARTAUTH, closing N-6).
+ *
+ * WHY THIS IS A DERIVATION AND NOT A SECOND COMMAND. The ratified machine declares `REQUESTED →
+ * PARTIALLY_AUTHORIZED` with the trigger *"partial grant"*, and this register once read that as naming a distinct
+ * event that needed its own command. It does not: **206 of the 290 triggers in `transitions.data.ts` are prose**,
+ * not event names, and the authored vocabulary settles it in the other direction — `RuntimeBindingAuthorized`
+ * declares `authorizationStatus` as a REQUIRED payload field noted `"REQUESTED->AUTHORIZED|PARTIALLY_AUTHORIZED"`.
+ * ONE event, TWO outcomes, distinguished by a field the corpus already declares. The resulting status is a
+ * property OF the authorization, not a different act.
+ *
+ * FULL means the grant COVERS the request, not that the two sets are equal. Anything granted beyond the request is
+ * already refused upstream by `grantedWithinRequest`, so by the time this is asked `G ⊆ R` holds and coverage is
+ * the only remaining question — but stating it as coverage rather than equality keeps this function correct on its
+ * own terms rather than correct only because of its caller.
+ *
+ * A VACUOUS REQUEST IS FULLY AUTHORIZED: `R = ∅` yields AUTHORIZED, because a binding that asked for nothing has
+ * had everything it asked for granted. DISCLOSED, and the reverse case is NOT decided here — `G = ∅` with
+ * `R ≠ ∅` yields PARTIALLY_AUTHORIZED with nothing granted, which `bindingPermitsExecution` still permits
+ * execution against. Refusing that and directing the authorizer to `DenyRuntimeBinding` is tempting and is an
+ * INFERENCE the corpus does not make; it is recorded as N-18 for a ruling rather than decided here (DS-001 §4).
+ */
+export function authorizationOutcome(input: {
+	readonly requested: readonly string[];
+	readonly granted: readonly string[];
+}): AuthorizationOutcome {
+	const granted = new Set(input.granted);
+	return input.requested.every((c) => granted.has(c)) ? 'AUTHORIZED' : 'PARTIALLY_AUTHORIZED';
+}
+
+/**
+ * §22.1 — an authorization may EXPAND a grant but never silently reduce it (JAN-PARTAUTH).
+ *
+ * WHY THIS EXISTS, AND WHY IT IS PART OF N-6 RATHER THAN A SEPARATE CONCERN. `AuthorizeRuntimeBinding` writes
+ * `grantedCapabilities` WHOLESALE and its precondition already admits `PARTIALLY_AUTHORIZED`. So the moment that
+ * state becomes reachable, a second authorization carrying a SMALLER set silently drops granted capabilities and
+ * records the removal as a `RuntimeBindingAuthorized` event — while `RevokeRuntimeCapability` exists precisely to
+ * record removal, carries a reason, and drives to a terminal state.
+ *
+ * That path is unreachable today ONLY because `PARTIALLY_AUTHORIZED` is unreachable. Landing the derivation
+ * without this guard would not leave an existing defect alone — it would CREATE a live one. The machine's own
+ * trigger for the arrow reads *"new authorization event (privilege expansion)"*: this arrow authorizes EXPANSION.
+ * Reduction is a different act, with its own command and its own event.
+ */
+export function grantIsMonotone(input: {
+	readonly current: readonly string[];
+	readonly next: readonly string[];
+}): Check {
+	const next = new Set(input.next);
+	const dropped = input.current.filter((c) => !next.has(c));
+	if (dropped.length === 0) return { ok: true };
+	return {
+		ok: false,
+		errorCode: 'RPH_CAPABILITY_SILENTLY_REDUCED',
+		reason: `capabilities [${dropped.join(', ')}] are already granted and this authorization omits them — an authorization expands a grant (§22.1); removing capability is RevokeRuntimeCapability, which records a reason and is auditable as a revocation`
+	};
+}
+
 /** §22.1. A REVOKED binding cannot back a new attempt (privilege expansion needs a NEW authorization event). */
 export function canReuseBindingForNewAttempt(authorizationStatus: string): boolean {
 	return authorizationStatus !== 'REVOKED' && authorizationStatus !== 'DENIED';

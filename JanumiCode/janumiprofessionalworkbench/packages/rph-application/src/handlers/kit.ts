@@ -464,7 +464,20 @@ export function advanceStatus(
 		readonly objectType: string;
 		readonly statusField: string;
 		readonly machine: string;
-		readonly target: string;
+		/**
+		 * The state to advance TO — a literal, or DERIVED from the loaded state (JAN-PARTAUTH, closing N-6).
+		 *
+		 * The deriver exists because one ratified command legitimately drives two arrows: `AuthorizeRuntimeBinding`
+		 * produces AUTHORIZED or PARTIALLY_AUTHORIZED depending on whether the grant covers the request, and the
+		 * authored vocabulary says so itself — `RuntimeBindingAuthorized` declares `authorizationStatus` as a
+		 * REQUIRED payload field noted "REQUESTED->AUTHORIZED|PARTIALLY_AUTHORIZED". Before this, `target: string`
+		 * was read as evidence that the domain required two COMMANDS; it was only ever a property of this helper.
+		 *
+		 * Evaluated ONCE, on the state as loaded, and used for the transition check, the status field and the
+		 * mirrored `lifecycleStatus` alike — so those three can never disagree about where the aggregate went.
+		 * Every literal call site is unaffected.
+		 */
+		readonly target: string | ((state: Record<string, unknown>) => string);
 		readonly eventType: string;
 		readonly setLifecycleStatus?: boolean;
 		readonly guard?: (state: Record<string, unknown>, ctx: HandlerContext) => CommandResult | null;
@@ -525,7 +538,12 @@ export function advanceStatus(
 	const guardFailure = args.guard?.(loaded.state, ctx);
 	if (guardFailure) return guardFailure;
 	const from = String(loaded.state[args.statusField]);
-	const illegal = checkTransition(command, args.machine, from, args.target);
+	// ONCE, before the transition check — so the legality check, the status field and the mirrored lifecycleStatus
+	// below are the SAME answer. Deriving it per use would let a non-deterministic deriver commit an aggregate whose
+	// status contradicts the arrow that was checked.
+	const target =
+		typeof args.target === 'function' ? args.target(structuredClone(loaded.state)) : args.target;
+	const illegal = checkTransition(command, args.machine, from, target);
 	if (illegal) return illegal;
 	const newRevision = loaded.revision + 1;
 	const newSemanticVersion = args.bumpSemanticVersion
@@ -540,8 +558,8 @@ export function advanceStatus(
 	const mutated = args.mutate ? args.mutate(base) : base;
 	const next = {
 		...mutated,
-		[args.statusField]: args.target,
-		...(args.setLifecycleStatus === false ? {} : { lifecycleStatus: args.target })
+		[args.statusField]: target,
+		...(args.setLifecycleStatus === false ? {} : { lifecycleStatus: target })
 	};
 	const event = makeEvent(ctx, command, {
 		eventType: args.eventType,

@@ -252,7 +252,7 @@ undefined; `§31` is a **bare list of table names** with no columns; `§21`'s `E
 | **N-4** | `AuthorizeRuntimeBinding` wrote `grantedCapabilities` wholesale, unchecked | **CLOSED (WP-2).** `grantedWithinRequest` at `advanceStatus`'s `guard` slot. 9 kill tests; mutants `C1`/`C2`/`C3` KILLED. |
 | **N-3** | RPH-EXE-005 unenforceable — `InputBinding` had no shape | **CLOSED (WP-3).** A fourth declared column, `inputReadiness`, total over the nine step commands; `inputReadinessRefusal` as the fourth limb of `stepAuthorityRefusal`. 10 kill tests; `C4`/`C5`/`C6`/`C7` KILLED. |
 | **N-2** | RPH-EXE-004 unenforced, `capabilityAuthorized` dead | **PARTIAL, and stated as such.** Its *decidable core* — a grant may not exceed its request — is now enforced by N-4's fix. Its **operation-level** half ("network operations fail authorization") remains outside an engine that governs plans rather than hosting invocations, and `capabilityAuthorized` still has no production caller **by design**: it answers a different question (single-operation containment), and wiring it merely to clear the census would be the substitution this register exists to prevent. |
-| **N-6** | `PARTIALLY_AUTHORIZED` unreachable | **RE-CLASSIFIED as a PRECONDITION on N-2**, not an adjacent finding. `m2-transitions.json` declares `REQUESTED → PARTIALLY_AUTHORIZED` with its own trigger *"partial grant"*, and `advanceStatus` takes a single `target` — so deriving the status inside `AuthorizeRuntimeBinding` would make one command drive two ratified arrows the machine says are distinct. Needs a real `PartiallyAuthorizeRuntimeBinding` command; scheduled, not absorbed. |
+| **N-6** | `PARTIALLY_AUTHORIZED` unreachable | **[SUPERSEDED 2026-07-26 — the re-classification below is WRONG in its reasoning and its remedy; see JAN-PARTAUTH. Kept verbatim because a diagnosis edited after it is disproved stops being evidence of how it was reached.]** **RE-CLASSIFIED as a PRECONDITION on N-2**, not an adjacent finding. `m2-transitions.json` declares `REQUESTED → PARTIALLY_AUTHORIZED` with its own trigger *"partial grant"*, and `advanceStatus` takes a single `target` — so deriving the status inside `AuthorizeRuntimeBinding` would make one command drive two ratified arrows the machine says are distinct. Needs a real `PartiallyAuthorizeRuntimeBinding` command; scheduled, not absorbed. |
 
 > **SPONSOR RULING, 2026-07-26 — ACCEPTED.** The sponsor confirmed the policy-by-reference resolution below,
 > **with its disclosed cost**. `scope` stays unminted; path- and host-limited grants remain **inexpressible**, not
@@ -461,6 +461,49 @@ different caps so a constant cannot pass.
 | # | Severity | Statement |
 |---|---|---|
 | **N-17** | MINOR | **At the retry cap, `cancel` is the ONLY step-level exit.** RPH-EXE-008 answers an exhausted retry by naming {CHANGE_TACTIC, REPLAN_EXECUTION, ESCALATE, REJECT, ABANDON} — **every one of which is above the step level**. `SkipExecutionStep` declares `sourceStates: [READY, QUEUED]`, so a FAILED step cannot be skipped, and reaching QUEUED requires the very retry the cap refuses. Not a wedge — `cancel` is `CLEANUP_EXEMPT` on every column and stays available — but the step-level ladder has one rung where the rule's own prescribed remedies imply more. **Found by a test assertion that was WRONG:** the wedge guard demanded `skip` at the cap on the reasoning that a REPLAN Decision authorizes one; it failed, and the failure was the domain telling me the path does not exist. The `SkipExecutionStep` rationale had been written on the same false premise and is corrected in the same commit — a rationale is a claim, and this column exists partly to make such claims checkable. |
+
+### JAN-PARTAUTH, 2026-07-26 — N-6 CLOSED, and my diagnosis of it was wrong twice over
+
+Design: `JAN-PARTAUTH-DS-001`.
+
+| # | Was | Now |
+|---|---|---|
+| **N-6** | `PARTIALLY_AUTHORIZED` ratified, `bindingPermitsExecution` permits execution on it, **no command produced it** — so a ratified rule had an acceptance limb the command bus could not reach, covered only by a fixture writing the aggregate | **CLOSED.** `AuthorizeRuntimeBinding` **derives** its target: a grant that COVERS the request → `AUTHORIZED`, otherwise `PARTIALLY_AUTHORIZED`. No new command, no new event, **no vocab change at all**. 10 new cases; `seedRuntimeBindingStatus_FIXTURE` **deleted**. |
+
+**THE PRIOR DIAGNOSIS FAILED ON BOTH ITS PREMISES, AND THE SECOND FAILURE IS THE INSTRUCTIVE ONE.**
+
+| Premise | Verdict |
+|---|---|
+| *"The machine declares the arrow with its own trigger (`partial grant`), so it is a distinct event needing its own command."* | **FALSE.** **206 of the 290 triggers** in `transitions.data.ts` are PROSE, not event names — `Begin discovery`, `Approve plan`, `Missing information`. The prose trigger is the norm and carries no such implication. |
+| *"`advanceStatus` takes a single `target`, so one command cannot drive two arrows."* | **TRUE, AND IRRELEVANT.** That is a property of a helper in `kit.ts`. **I read a limitation of my own tooling as a fact about the domain** — and then wrote it into the register as a scheduling decision. |
+
+**And the corpus answered the question all along, in the place I did not look.**
+`m3-commands-events.json`'s `RuntimeBindingAuthorized` declares `authorizationStatus` as a **REQUIRED payload
+field**, noted `"REQUESTED->AUTHORIZED|PARTIALLY_AUTHORIZED"`. One event, two outcomes, distinguished by a field
+the authored vocabulary already carries. *Fourth instance in this programme of "the corpus does not provide X"
+being a statement about my search — and the standing counter-measure applies unchanged: read the FIELD LISTS, not
+only the section that names the thing.*
+
+**A guard this work package OWES, because it creates the case.** `AuthorizeRuntimeBinding` writes
+`grantedCapabilities` wholesale and its precondition already admits `PARTIALLY_AUTHORIZED`. The moment that state
+becomes reachable, a second authorization carrying a smaller set **silently drops granted capability and records
+the removal as an authorization** — while `RevokeRuntimeCapability` exists to record removal, with a reason, as a
+revocation. Landing the derivation alone would not have left an existing defect alone; it would have **created a
+live one**. `grantIsMonotone` refuses it and names the command that does perform reduction.
+
+> **The kill test for that guard was wrong first, in the way this lineage keeps catching.** It attempted the
+> reduction from `AUTHORIZED`, where `fromStates` refuses first — so it went green on
+> `RPH_ILLEGAL_STATE_TRANSITION`, a refusal, but **not the one the test claimed to be about**. Arranged from
+> `PARTIALLY_AUTHORIZED`, where only the monotonicity limb can refuse, it means what it says.
+
+**The fixture is deleted, and its finding record moves here rather than being lost.**
+`seedRuntimeBindingStatus_FIXTURE` existed *because* this state was unreachable; its header carried N-6's original
+statement. `exebind` P2 now drives PARTIALLY_AUTHORIZED through `Engine.dispatch` — request two capabilities,
+grant one — which is strictly stronger evidence than the seam it replaces.
+
+| # | Severity | Statement |
+|---|---|---|
+| **N-18** | MINOR | **An EMPTY grant against a real request yields `PARTIALLY_AUTHORIZED` with nothing granted, and `bindingPermitsExecution` permits execution against it.** Refusing it and directing the authorizer to `DenyRuntimeBinding` — which *is* reachable from `REQUESTED`, so refusing would not wedge — is tempting and is an **inference the corpus does not make**: *"partial grant" implies granting some* is my reading, not a ratified rule. **Deliberately not decided**, on JAN-CAPBIND's precedent (the withdrawn `scope` field), and asserted as current behaviour in `partauth-derived-outcome.test.ts` so the disposition is visible rather than incidental. Wants a sponsor ruling. Note the exposure is bounded by N-2 being open: nothing yet enforces capability at operation level, so a zero-capability binding is no more permissive today than any other. |
 
 > **CORRECTION (2026-07-25) — two entries in this section were WRONG, and wrong in the reassuring direction.**
 >

@@ -35,7 +35,6 @@ import { SqliteStorageAdapter } from '@janumipwb/rph-persistence';
 import { beforeEach, describe, expect, it } from 'vitest';
 import { STEP_COMMAND_SPECS, STEP_COMMAND_TYPES } from '@janumipwb/rph-domain';
 import { Engine } from '../index.js';
-import { seedRuntimeBindingStatus_FIXTURE } from './__tests__/binding-fixtures.js';
 
 const TS = '2026-07-12T00:00:00Z';
 const actor: ActorReference = { actorId: 'u1', actorType: 'HUMAN', displayName: 'A' };
@@ -261,8 +260,30 @@ describe('JAN-EXEBIND WP-B1 — runtime binding authority at Start', () => {
 			// Request/Authorize/Deny/Revoke and nothing else. So the rule this work package wires has an ACCEPTANCE
 			// limb the command bus cannot reach. Writing it as a pure-function assertion instead would be the exact
 			// substitution WP-16's register exists to stop, so the arrangement is seeded and the acceptance is driven.
-			ok(requestBinding(), 'request binding');
-			seedRuntimeBindingStatus_FIXTURE(store, BINDING, 'PARTIALLY_AUTHORIZED');
+			//
+			// N-6 IS NOW CLOSED (JAN-PARTAUTH) AND THE SEED IS GONE. The outcome is DERIVED — a grant that does not
+			// COVER the request yields PARTIALLY_AUTHORIZED — so the arrangement below is entirely `Engine.dispatch`:
+			// request two capabilities, grant one. That is the evidence the fixture was standing in for, and the
+			// fixture itself is deleted rather than left as an unused seam nobody would notice had gone stale.
+			ok(
+				dispatch(
+					'RequestRuntimeBinding',
+					{
+						runtimeBindingId: BINDING,
+						executionStepId: sid(1),
+						roleId: 'role-architect',
+						requestedCapabilities: [{ capability: 'file-system' }, { capability: 'network' }]
+					},
+					BINDING,
+					'RUNTIME_BINDING'
+				),
+				'request two capabilities'
+			);
+			ok(authorizeBinding(), 'grant only one — a partial authorization');
+			expect(
+				(store.loadObject(BINDING)!.state as { authorizationStatus: string }).authorizationStatus,
+				'the partial grant must produce PARTIALLY_AUTHORIZED with no fixture'
+			).toBe('PARTIALLY_AUTHORIZED');
 			activePlan(BINDING, [BINDING]);
 			ok(dispatch('StartExecutionStep', { stepId: sid(1) }), 'start');
 			expect(stepStateOf(1)).toBe('RUNNING');
