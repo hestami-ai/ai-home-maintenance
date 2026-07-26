@@ -20,8 +20,7 @@
   ],
   "scripts": {
     "build": "tsc -p tsconfig.build.json",
-    "check-types": "tsc --noEmit -p tsconfig.json",
-    "test": "vitest run --passWithNoTests"
+    "check-types": "tsc --noEmit -p tsconfig.json"
   },
   "dependencies": {
     "@janumipwb/rph-contracts": "workspace:*"

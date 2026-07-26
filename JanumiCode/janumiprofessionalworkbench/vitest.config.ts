@@ -26,15 +26,36 @@
 // export map — and source resolution silently stops testing any of it. A bad `tsconfig.build.json` exclude or an
 // export-map typo would go undetected. So both are kept:
 //
-//   bun run test          per-package via turbo, resolves DIST. UNCHANGED. The artifact gate, and the default
-//                         precisely because it is the only thing that tests what ships.
+//   bun run test:dist     `vitest.dist.config.ts`, resolves DIST. The artifact gate — the only thing that tests
+//                         what ships: the emit, the .d.ts boundary, the export map, tsconfig.build's excludes.
 //   bun run test:src      this config, resolves SOURCE. The basis for coverage and mutation, where attribution
 //                         and reachability must be to real source lines.
 //
 // A test that passes under one and fails under the other is a BUILD/EMIT DIVERGENCE — a finding in its own
 // right. The two modes cross-check each other, which the single mode never could.
+//
+// ── WHAT THIS HEADER USED TO SAY, AND WHY THE CORRECTION IS LEFT VISIBLE (N-16) ─────────────────────────────
+//
+// The three lines above replace: "bun run test — per-package via turbo, resolves DIST. UNCHANGED. The artifact
+// gate, and the default precisely because it is the only thing that tests what ships."
+//
+// THAT SENTENCE WAS FALSIFIED BY THE COMMIT THAT WROTE IT. Adding this file gave every package's bare
+// `vitest run` a config to find — this one, whose `projects[]` roots are relative to the REPO root — so from a
+// package directory it resolved no test files for its own CWD, and each package's `--passWithNoTests` turned
+// "observed nothing" into exit 0. For four work packages `bun run test` executed ZERO tests for all ten
+// packages while reporting success, and the artifact half of the cross-check above did not exist.
+//
+// The instrument built to catch precisely this was made unreachable by the same change:
+// `verif/source-resolution.test.ts` carries the mirror assertion "If this ever starts failing, the default
+// `test` has silently stopped validating the shipped artifact — which is the one thing it exists to do",
+// behind `it.runIf(!SOURCE_RESOLVED)`, in a project that existed only in THIS config. It had never run.
+//
+// The correction is recorded here rather than quietly applied because the failure was not a wrong config — it
+// was a CLAIM about a gate that nobody checked. Deleting the claim would leave the next reader with no reason
+// to check the replacement.
 import { fileURLToPath } from 'node:url';
 import { defineConfig } from 'vitest/config';
+import { projectsFor } from './vitest.projects.js';
 
 const PKG_ROOT = fileURLToPath(new URL('./packages', import.meta.url));
 
@@ -55,20 +76,6 @@ const WORKSPACE_ALIAS = [
 	{ find: /^@janumipwb\/([a-z0-9-]+)$/, replacement: `${PKG_ROOT}/$1/src/index.ts` }
 ];
 
-/** The packages that own a test suite. `rph-ports` and the typescript-config package have none of consequence. */
-const PACKAGES = [
-	'rph-contracts',
-	'rph-domain',
-	'rph-application',
-	'rph-projections',
-	'rph-assurance',
-	'rph-persistence',
-	'rph-engine',
-	'rph-authoring',
-	'rph-ports',
-	'rph-product-realization-pwa'
-];
-
 export default defineConfig({
 	resolve: {
 		// THE WHOLE POINT: `@janumipwb/rph-*` must resolve to `src/index.ts`, not `dist/index.js`.
@@ -85,21 +92,11 @@ export default defineConfig({
 		// mode — so the flag is correct by construction and cannot drift from the `resolve.conditions` above it.
 		// Cross-platform env plumbing in npm scripts needs `cross-env`; this needs nothing.
 		env: { RPH_TEST_RESOLVE: 'source' },
-		projects: [
-			// The infrastructure proof (see verif/source-resolution.test.ts). Its own project because it is not part
-			// of any package: it asserts that THIS config's alias is in effect, and it must live outside every
-			// package's rootDir to be able to import across the boundary at all.
-			{ extends: true, test: { name: 'verif', root: '.', include: ['verif/**/*.test.ts'] } },
-			...PACKAGES.map((name) => ({
-				extends: true,
-				test: {
-					name,
-					root: `./packages/${name}`,
-					include: ['src/**/*.test.ts'],
-					passWithNoTests: true
-				}
-			}))
-		],
+		// SHARED WITH `vitest.dist.config.ts` (N-16). The two modes must cover exactly the same files, or the
+		// cross-check above is silently partial; the list is derived from the filesystem rather than enumerated so
+		// a new package cannot be silently unmeasured; and it carries `passWithNoTests: false`, which is the fix
+		// that generalises — a runner that observes NOTHING must fail, not pass.
+		projects: projectsFor(true),
 		coverage: {
 			provider: 'v8',
 			reporter: ['text', 'json-summary', 'html'],
