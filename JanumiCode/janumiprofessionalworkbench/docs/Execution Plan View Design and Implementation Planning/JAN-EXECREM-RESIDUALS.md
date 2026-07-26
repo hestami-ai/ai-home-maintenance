@@ -296,6 +296,30 @@ created by it. A fresh review of a lineage that has just been heavily reworked f
 | # | Severity | Statement |
 |---|---|---|
 | **N-11** | **MAJOR** | **`validateProposedPlan` never checks that a step's `runtimeBindingId` resolves to a binding scoped to THAT step, and no command can rewrite it afterwards — so RW-3's SCOPE limb refuses Start on such a step permanently, and its refusal's remedy is INERT.** `plan-proposal.ts:78-102` checks a step's id, `executionPlanId`, `stepState` and `selectedTransitionId`; `PlanProposalStep` does not even declare `runtimeBindingId`. Two steps may therefore name one binding and the plan ACTIVATES. Start on the second is then refused forever by the RW-3 limb, whose message says *"Request a binding for this step"* — an act that mints a new binding **no step names**, because `ProposeExecutionPlan` is the only writer of `steps[]` (`advanceStep` rewrites only `stepState`/`selectedTransitionId`) and `executionStepId` is written once at `runtime-binding.ts:21`. **This is the near-wedge class RW-0 withdrew the §15.3 allowlist limb for, reintroduced by RW-3 on a different axis** — and `plan-proposal.ts:88-95` already refuses an authored NOT_READY step with the *verbatim* rationale ("can never start … permanently blocks plan completion") that applies here. **Refuter correction, and it matters:** it is *not* a dead aggregate. A REPLAN Decision driven to EFFECTIVE authorizes `SkipExecutionStep` (§21.1), `SKIPPED` is terminal-success, and `Fail`/`Supersede` remain — so the cost is a plan that can only be abandoned or skipped past, plus the loss of the already-executed step's credit. That correction is why this is MAJOR and not a BLOCKER. **Fix belongs in `validateProposedPlan`** (refuse at propose, where it is repairable) rather than in the refusal message. |
+> **N-11 IMPLEMENTATION ANALYSIS (2026-07-26) — attempted, REVERTED, and the attempt is worth more than a partial
+> landing.** The fix was built and backed out; the suite is green at HEAD. What it established:
+>
+> 1. **The pure half is right and small.** Two steps naming one binding is decidable from the proposal ALONE — a
+>    binding names exactly one step — so `checkBindingExclusivity` belongs in `plan-proposal.ts` beside the sibling
+>    rules whose stated harm is verbatim the harm here ("can never start … permanently blocks plan completion"), and
+>    `PlanProposalStep` must declare `runtimeBindingId`, which it currently does not.
+> 2. **The store half must NOT refuse an unresolvable binding, and my first draft did — which was itself a WEDGE.**
+>    `RequestRuntimeBinding` carries an `executionStepId`, so requiring the binding to exist at propose constrains
+>    authoring order and refuses the ordinary case of a plan naming bindings still to be created. **The fix for a
+>    near-wedge nearly shipped a real one**, which is the sharpest possible restatement of why this finding matters.
+>    Only the unrepairable pairing — a binding that RESOLVES and names a different step — may be refused at propose;
+>    the dangling case is already handled fail-closed at Start and is repairable by creating the binding.
+> 3. **It makes RW-3's Start-time SCOPE limb unreachable for NEW plans**, and its two kill tests (`S1`, `S2`) arrange
+>    exactly the shape propose would now refuse — `steps: [mkStep(1, BINDING), mkStep(2, BINDING)]`, which is the
+>    very fixture the re-derivation quoted. The limb still has a real population — **stored plans written before the
+>    guard existed**, which an event-sourced system replays forever — so those tests must arrange a seeded legacy
+>    aggregate rather than route through the bus. That seeding is where the attempt ran out of room: `CommitInput`
+>    needs `aggregateType`, `newRevision`, `newSemanticVersion` and a full `CommandReceiptRecord`, and the seeded plan
+>    state must satisfy `ExecutionPlanSchema` on the next load.
+>
+> **Land it as its own work package**, with the store half restricted per (2) and a `seedLegacyPlan_FIXTURE` helper
+> beside the existing `seedRuntimeBindingStatus_FIXTURE` — the established seam for exactly this.
+
 | **N-12** | **MAJOR** | **F-29's FOURTH instance: the read-model does not mirror the RPH-EXE-008 retry cap.** `planPermitsAffordance` gates on exactly three authority columns; the retry cap is a **fourth, purely state-derived** command-layer refusal the projection cannot see, because `ExecutionPlanInput` carries neither `retryPolicy` nor an attempt count. So `retry` is offered on every FAILED step under an ACTIVE plan and open PWU — including one already at the cap — and the click is refused. **The demo's loader already computes `attemptsByStepId` from the same event stream on the same request** (`+page.server.ts:336`) and never passes it. Sharpens the DS §6b table from three instances of "an authority limb was added to the engine and the read-model was not told" to four, and shows the mechanism is **not** confined to the spec-table columns R7 gates on: a refusal derived from event history is invisible to a column-driven filter by construction. |
 | **N-13** | MINOR | **FALSE RECORD inside one object literal.** `conformance-manifest.ts:94-99`'s RPH-EXE family comment still lists **EXE-003** among rules *"implemented as correct, unit-tested kernel functions with NO production caller"* that are *"disclosed in `enforcement-register.ts` with a checked call-site census"* — while the same file's row at `:51` certifies EXE-003 at the COMMAND layer, the same file's note at `:101` says the opposite of its own comment, and `ENFORCEMENT_REGISTER['RPH-EXE-003'].kind === 'ENFORCED'` with **no `referencedOnlyBy` census at all** (that field exists only on `UnenforcedRule`). Stale since JAN-EXEBIND wired the rule. **No gate can catch it:** `enforcement-register.test.ts` reads `coverageFor(id).status` and `.testFile`, never the prose. §7 below already had to correct three artefacts disagreeing about RPH-PWU-010 in exactly this way — so this is that shape recurring in the artefact whose over-claiming started the family. |
 
