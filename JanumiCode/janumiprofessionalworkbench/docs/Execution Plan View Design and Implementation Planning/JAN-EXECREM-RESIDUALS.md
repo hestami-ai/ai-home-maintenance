@@ -438,6 +438,26 @@ offers `retry` exactly when the engine accepts it, with anti-vacuity assertions 
 the flip. The boundary is nowhere hardcoded: the flip must land on the plan's own declared cap, checked at two
 different caps so a constant cannot pass.
 
+> **TWO MUTANTS SURVIVED THE FIRST RUN, AND BOTH WERE DEFECTS IN THE EVIDENCE RATHER THAN THE FIX.** They are
+> recorded because they are two distinct ways a green test can be worthless, and neither could ever surface from a
+> passing suite.
+>
+> **`R6` — the test measured the boundary with the function under test.** The flip assertion asked
+> `attemptsMadeFrom` where the refusal landed and expected `3`. `R6` makes that counter also count
+> `ExecutionStepRetried`, so it double-counts — the flip moved from the third run-and-fail cycle to the second, and
+> the assertion still read 3 **because the yardstick shrank with the thing it was measuring**. A test whose expected
+> value is computed by the code under test cannot fail. The loop now counts its own cycles.
+>
+> **`R9` — every case ran at a cap that equalled the default.** `maxAttempts` was 3 throughout and
+> `DEFAULT_RETRY_CAP` is 3, so `R9` — which stops the plan's own RetryPolicy reaching the step — left the
+> read-model falling back to the default, **and the default was the right answer in every case**. A fixture that
+> happens to declare the default value hides every threading defect on that path. The agreement loop is now driven
+> at 3 *and* 5.
+>
+> The shared root is worth naming: **an assertion is only as independent as the number it compares against.** One
+> took its expected value from the subject; the other chose an input where the correct and the incorrect answers
+> coincide. Both are invisible to coverage — every line ran.
+
 | # | Severity | Statement |
 |---|---|---|
 | **N-17** | MINOR | **At the retry cap, `cancel` is the ONLY step-level exit.** RPH-EXE-008 answers an exhausted retry by naming {CHANGE_TACTIC, REPLAN_EXECUTION, ESCALATE, REJECT, ABANDON} — **every one of which is above the step level**. `SkipExecutionStep` declares `sourceStates: [READY, QUEUED]`, so a FAILED step cannot be skipped, and reaching QUEUED requires the very retry the cap refuses. Not a wedge — `cancel` is `CLEANUP_EXEMPT` on every column and stays available — but the step-level ladder has one rung where the rule's own prescribed remedies imply more. **Found by a test assertion that was WRONG:** the wedge guard demanded `skip` at the cap on the reasoning that a REPLAN Decision authorizes one; it failed, and the failure was the domain telling me the path does not exist. The `SkipExecutionStep` rationale had been written on the same false premise and is corrected in the same commit — a rationale is a claim, and this column exists partly to make such claims checkable. |
