@@ -17,7 +17,8 @@
 		"format:check": "prettier --check \"**/*.ts\"",
 		"boundary": "depcruise packages --config .dependency-cruiser.cjs",
 		"test:src": "vitest run",
-		"test:coverage": "vitest run --coverage"
+		"test:coverage": "vitest run --coverage",
+		"mutants": "bun run scripts/mutants/run.ts"
 	},
 	"devDependencies": {
 		"@eslint/js": "^9.37.0",

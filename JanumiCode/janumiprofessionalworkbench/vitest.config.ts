@@ -91,14 +91,14 @@ export default defineConfig({
 			// package's rootDir to be able to import across the boundary at all.
 			{ extends: true, test: { name: 'verif', root: '.', include: ['verif/**/*.test.ts'] } },
 			...PACKAGES.map((name) => ({
-			extends: true,
-			test: {
-				name,
-				root: `./packages/${name}`,
-				include: ['src/**/*.test.ts'],
-				passWithNoTests: true
-			}
-		}))
+				extends: true,
+				test: {
+					name,
+					root: `./packages/${name}`,
+					include: ['src/**/*.test.ts'],
+					passWithNoTests: true
+				}
+			}))
 		],
 		coverage: {
 			provider: 'v8',

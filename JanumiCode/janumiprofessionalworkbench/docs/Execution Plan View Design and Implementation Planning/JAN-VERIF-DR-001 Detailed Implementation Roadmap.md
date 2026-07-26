@@ -77,6 +77,45 @@ thereafter. A `SURVIVED` verdict fails the build.
 **The disclosed limit** (DS §4): a declared ledger is not the possible mutant space. Generated mutation (Stryker)
 is the honest successor and is out of scope; recorded so this is not mistaken for completeness.
 
+### V-1's first run, and what it found
+
+**0 SURVIVED is the headline.** Every guard the declared set claims to protect still bites — that is the first time
+any of these mutants has been executed since the day it was written, each originally applied once by hand by the
+author defending the guard.
+
+**But 6 of 31 (19%) did not run as declared**, and the harness found mechanically what the second adversarial
+review had found by reading:
+
+| verdict | n | what it means |
+|---|---|---|
+| KILLED | 27 | the guard is genuinely tested |
+| TYPE_PREVENTED | 1 | **the defect is UNEXPRESSIBLE** — see below |
+| RETIRED | 3 | the target was legitimately removed, and the successor mutant is NAMED |
+| SURVIVED / UNANCHORED / NO_COMPILE | 0 | — |
+
+**The three RETIRED are the rot the review caught by hand.** `B2` and `B7` named the §15.3 allowlist limb and the
+precheck call site that JAN-REVREM RW-0 withdrew and moved; `B3` cannot be *formulated* any more because RW-0 also
+removed `plan` from the resolver's signature. Each now carries a `supersededBy` naming the mutant that proves the
+same guard at its new site. **RETIRED and UNANCHORED are deliberately different verdicts**: retired means somebody
+noticed and said where the guard went; unanchored means a claim once cited as evidence quietly stopped being
+performable. Deleting the entries would have erased the fact that the guard ever needed proving.
+
+**Two mutants were ill-formed rather than obsolete, and saying so mattered.** `M7` added a duplicate object key and
+`M8` re-imported a symbol that JAN-EXEBIND had since legitimately wired — both reported `NO_COMPILE`, which *looks*
+like a passing guard and proves nothing. M7 was reformulated; M8 was **re-pointed** at `capabilityAuthorized`,
+which is still genuinely dead. A mutant that does not compile never reaches the code.
+
+**And one produced a better result than a test.** `B6` probes the fail-open on an unresolvable binding. Two
+formulations were attempted and **both refused to typecheck**: `binding` is `StoredObject | undefined`, and the
+early-return narrowing is what types every use below it, so *any* mutation letting an unresolvable binding through
+leaves the value possibly-undefined and TypeScript rejects it. The fail-closed behaviour is enforced by the **type**,
+not by a test — a stronger guarantee, since a test can be deleted and a type cannot be worked around without a
+deliberate signature change. It is now declared `expectNoCompile`, so **a mutant that suddenly compiles reports
+SURVIVED and fails the build.** Nothing had recorded that guarantee until something tried to mutate it.
+
+**The runner refuses to start on a dirty tree and aborts if the tree is dirty afterwards** — one of the review
+agents in this repo left a mutant behind mid-run, and a harness that can do that is worse than none.
+
 ## 4. V-2 — branch gaps, then the ratchet
 
 Targets, in order of how much authority they carry: `execution.ts` (81.3% branch — the whole step authority
@@ -105,7 +144,7 @@ The note is not the guarantee; the table is.)*
 | WP | Commit | Outcome |
 |---|---|---|
 | V-0 | *(this commit)* | **DELIVERED.** Merged coverage measurable for the first time: **94.57% stmts / 82.99% branch / 96.69% lines** over 4,501 statements, 1,571 tests, 139 files. Both resolution modes green — **no build/emit divergence found.** |
-| V-1 | — | not started |
+| V-1 | *(this commit)* | **DELIVERED.** 31 declared mutants harvested into a re-runnable ledger. First-ever re-run: **27 KILLED · 1 TYPE_PREVENTED · 3 RETIRED · 0 SURVIVED · 0 UNANCHORED · 0 NO_COMPILE.** |
 | V-2 | — | not started |
 
 **V-0's measured result, and the artifact hypothesis CONFIRMED.** The per-package figures were lower bounds, exactly as DS §2 predicted:
