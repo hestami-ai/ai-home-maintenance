@@ -1,0 +1,92 @@
+Work in:
+
+E:\Projects\hestami-ai\JanumiCode\janumiprofessionalworkbench\docs\ASTs and Code Analysis
+
+PART A — SEPARATE SPONSOR AUTHORITY ACT
+
+I, Marshall Hendricks, Architect and accountable sponsor, exercise the accountable-sponsor authority recognized by JPWB-CON-000@1.3.0 B2 and evidenced by JAN-CSAA-000-W017-SPONSOR-RESPONSE-002@0.1.0 and JPWB-REG-005 REG-D-018.
+
+Authority act ID: JAN-CSAA-W1-MANIFEST-001-CONCERN-OWNER-AUTHORITY-001@0.1.0
+Authority act: ASSIGN
+
+I assign Marshall Hendricks as the accountable document-control/manifest concern owner solely for disposition of W1M-CO-01 against:
+
+- JAN-CSAA-W1-MANIFEST-001@0.3.0
+- proposal bytes 50,894
+- proposal SHA-256 45ca6f5bbe7868873eda2d297fad384f8cb01fb261dceaabf8cbabba9b2bc17b
+
+Scope: one concern-owner disposition of the exact W1M-CO-01 subject and its required treatment, opposing-case, and evidence surfaces.
+
+Duration: effective immediately before Part B of this message; expires when the resulting concern-owner determination is recorded, when any bound byte changes, or upon explicit sponsor revocation, whichever occurs first.
+
+Reviewability: the assignment and resulting determination must remain append-only, exactly attributable, digest-bound, and reviewable against this sponsor-originated payload.
+
+Recording mechanism: record this authority act first at records/JAN-CSAA-W1 - Manifest Synchronization Concern-Owner Authority Assignment.md, preserving this message and its authoritative timestamp.
+
+Separation of duties: the assigned concern owner is distinct from the Codex proposal-author identity. This authority act does not dispose any later sponsor-only W1M-MD surface. Any later sponsor disposition remains a separate full-judgment act even if performed by the same human in a different accountable role.
+
+Boundary: this assignment authorizes no proposal mutation, sponsor disposition, register append, README carriage, gap closure, lifecycle promotion, implementation, provider, dependency, experiment, topology, gate, source mutation, oracle change, staging, or commit.
+
+This is a separate accountable-sponsor authority act, not a concern-owner self-assertion. It is effective before and independently of Part B.
+
+PART B — CONCERN-OWNER DISPOSITION
+
+I, Marshall Hendricks, attest that I am the accountable document-control/manifest concern owner authorized to dispose W1M-CO-01 for the exact subject below.
+
+Accountable role: Accountable document-control/manifest concern owner for W1M-CO-01
+Effective authority source: JAN-CSAA-W1-MANIFEST-001-CONCERN-OWNER-AUTHORITY-001@0.1.0, established by Part A of this message
+Role basis: Single-purpose accountable-sponsor assignment effective before this disposition and distinct from the Codex proposal author
+
+Proposal ID: JAN-CSAA-W1-MANIFEST-001@0.3.0
+Proposal path: records/JAN-CSAA-W1 - Exact Manifest Synchronization Proposal.md
+Proposal bytes: 50,894
+Proposal SHA-256: 45ca6f5bbe7868873eda2d297fad384f8cb01fb261dceaabf8cbabba9b2bc17b
+Proposal stored form: UTF-8 without BOM; CRLF only; exactly one terminal CRLF
+
+Validation ID: JAN-CSAA-W1-VALIDATION-002@0.1.0
+Validation path: records/JAN-CSAA-W1 - Defect Resolution Validation Record.md
+Validation bytes: 16,253
+Validation SHA-256: ef3f512afbb55730a00c8e8e5181a09a2e87f3454ed89d575412fc4107038040
+Validation stored form: UTF-8 without BOM; CRLF only; exactly one terminal CRLF
+
+Review instrument ID: JAN-CSAA-W1-MANIFEST-001-CONCERN-OWNER-INSTRUMENT-001@0.1.0
+Review instrument path: records/JAN-CSAA-W1 - Manifest Synchronization Concern-Owner Review Instrument.md
+Review instrument bytes: 22,377
+Review instrument SHA-256: 6a99904355f0354c0e62029d498bf50f05944d2df7f1f8de92951572b6f0266c
+Review instrument stored form: UTF-8 without BOM; CRLF only; exactly one terminal CRLF
+
+Instrument freeze ID: JAN-CSAA-W1-MANIFEST-001-CONCERN-OWNER-INSTRUMENT-FREEZE-001@0.1.0
+Instrument freeze path: records/JAN-CSAA-W1 - Manifest Synchronization Concern-Owner Instrument Freeze.md
+Instrument freeze bytes: 8,596
+Instrument freeze SHA-256: b8ab3239591d4125f5caa39fbe2350f727ea4fb5c9a2fdb40a10c48d27266102
+Instrument freeze stored form: UTF-8 without BOM; CRLF only; exactly one terminal CRLF
+
+Intake protocol ID: JAN-CSAA-W1-MANIFEST-001-CONCERN-OWNER-INTAKE-001@0.1.0
+Intake protocol path: records/JAN-CSAA-W1 - Manifest Synchronization Concern-Owner Intake Protocol.md
+Intake protocol bytes: 14,040
+Intake protocol SHA-256: d15947fa08ebfed69207484616c37783884332c1599610559451375d292bb849
+Intake protocol stored form: UTF-8 without BOM; CRLF only; exactly one terminal CRLF
+
+W1M-CO-01: COMPATIBLE_SAME_VERSION_STATE_ONLY
+
+Treatment of CSAA-000-REQ-150: ADOPT EXACT REVIEW INSTRUMENT §4.1
+Treatment of the four frozen reconciliation artifacts: ADOPT EXACT REVIEW INSTRUMENT §1.2
+Strongest opposing case recorded for this determination: ADOPT EXACT REVIEW INSTRUMENT §4.3
+
+I considered the exact review instrument's treatment of CSAA-000-REQ-150: YES
+I considered and affirm the eight exact member-package identities and frozen lifecycle states in review instrument §1.1: YES
+I considered all four frozen reconciliation-artifact treatments and their historical-only boundaries: YES
+I considered the strongest opposing case in the exact review instrument: YES
+I understand that only COMPATIBLE_SAME_VERSION_STATE_ONLY permits preparation of the separate sponsor presentation: YES
+I understand that this disposition alone performs no register append, README carriage, gap closure, lifecycle promotion, implementation authorization, staging, or commit: YES
+
+Decision time: use the authoritative timestamp of this message and record it in ISO-8601 with timezone
+
+RECORDER INSTRUCTIONS
+
+1. Preserve Parts A and B exactly as sponsor-originated evidence.
+2. Recheck every bound identity, stored form, authority source, repository impact, and prospective-path condition.
+3. Record Part A and make it effective before recording Part B.
+4. If every check passes, create JAN-CSAA-W1-MANIFEST-001-CONCERN-OWNER-001@0.1.0 at records/JAN-CSAA-W1 - Manifest Synchronization Concern-Owner Determination.md.
+5. Because the conclusion is COMPATIBLE_SAME_VERSION_STATE_ONLY, prepare only the separate sponsor presentation required by proposal §5.3.
+6. Do not append REG-D-019, mutate README.md, create the prospective archive or completion record, close a gap, stage, or commit.

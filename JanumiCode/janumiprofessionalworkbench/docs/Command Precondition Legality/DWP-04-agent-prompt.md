@@ -21,6 +21,8 @@ Version pin: the working-tree DR-001 carries uncommitted DWP-03 edits; the DWP-0
 
 **Genre grant.** You are commissioned to write a **normative deep reference specification** — not a design doc, not a decision brief. It is a terminal deliverable: future implementation (starting with Phase 2) will be diffed against it. In this genre, exhaustive is correct and brevity is a defect.
 
+**Method:** Phase 1 follows the deep-spec commission template v2 at `docs/canon/_test/deep-spec-commission-prompt.md` — its horizontal closure matrix, deontic register (every SHALL names its verification), adversarial-economy catalog, controlled-redundancy-with-citation rule, reference case, self-review battery, and stopping condition apply **in addition to** the structure below.
+
 **Authoring grant.** The sponsor authorizes authoring at field/row grain for the command-legality surface. **Recommended scope: every command and state machine in the current registry** (governance, assurance, execution, work, intent, baseline — the full transition surface); **minimum scope: the governance + AssurancePolicy machines** (DWP-04's ground). If full scope proves too large for one pass, complete the minimum scope exhaustively and record the remainder in the Deliberately Unspecified table with a continuation plan — never thin the whole to cover more.
 
 **Output:** `docs/canon/JPWB-SPEC-001 Command Precondition and Transition Legality.md` + `.provenance.md` sidecar. Status block per the canon schema: layer Semantic Model; settledness HYPOTHESIS; status DRAFT — authored under sponsor grant of 2026-07-24, ratification pending per CON-000 B1's SPEC-series rule.

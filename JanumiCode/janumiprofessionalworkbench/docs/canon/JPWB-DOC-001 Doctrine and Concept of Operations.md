@@ -4,7 +4,7 @@ title: Doctrine and Concept of Operations
 layer: Doctrine
 settledness: PRESUMPTIVE
 status: OPERATIVE — ratified as drafted (wholesale interim, REG-D-010, 2026-07-24); Ratify Sheet R1 remains open for clause-level amendment
-version: 1.0.0
+version: 1.1.0 — B5 amendment REG-D-016 (sponsor-confirmed thesis package): §2.4 "Complex, not merely complicated"; §4 preamble names Complex ≠ Complicated as the family's root
 date: 2026-07-16
 governs:
   - Why the Janumi system exists as a coherent whole: the theory of professional work that generates the canonical vocabulary
@@ -65,6 +65,14 @@ The loop is recursive: any requirement, design choice, implementation result, te
 
 Professional reasoning naturally oscillates between synthesis and decomposition. Recursion in this system is not an implementation trick; it is a model of professional thought. Any professionally meaningful piece of work may itself become professional work, with its own uncertainty, evidence needs, and completion meaning. This is the axiom from which PWUs, recursive PWU Types, and the Recursive Professional Harness are derived rather than invented — and it is why decomposition is never free: every act of splitting creates an obligation to put the pieces back together at the parent boundary (Section 4, inequality 6).
 
+### 2.4 Complex, not merely complicated
+
+Complicated and complex differ in kind, and the difference is testable. Complicated work decomposes losslessly: understand every part and the whole is recovered — an aircraft engine, however intricate, yields to expert analysis and reassembly. Complex work fails the test: decompose it, understand every part, recompose it, and something is still missing. **That remainder is the complexity.** What goes missing is enumerable in professional work: legal assumptions, business intent, UX consistency, regulatory consistency, architectural invariants, stakeholder expectations, organizational policy — none survive ordinary decomposition on their own. This is why the ontology carries recomposition contracts, constraint propagation, and assumption objects rather than a task list, and it is the root inequality beneath most of Section 4: **Complex ≠ Complicated** (ledger entry: JPWB-DOC-002 §3).
+
+The distinction also picks out Janumi's true object. An artifact — even an extraordinary one — is complicated: destroy it, and the professional system that produced it can make another. The producing system is the complex thing, and it, not the artifact, is what this system models and preserves.
+
+And complexity is temporal. A complex system is path-dependent: its present state does not explain itself, and its futures are credible rather than arbitrary. The governed stream exists to answer *how did we get to this point*; Narrative Memory and reconciliation exist to answer *where can we credibly go from here* — with "credibly" carrying full assurance weight: futures constrained by standing commitments, open findings, and demonstrated capability, and backed by evidence (sponsor-voiced purpose, REG-D-016; transplanted with provenance from the Complex Systems Management discussion).
+
 ## 3. Why the ontology has its shape
 
 The canonical vocabulary is not a naming exercise. Each major object family answers a question the theory forces. This section carries the derivations; the term ledger and its guards live in JPWB-DOC-002, and the objects' minimum rules live in JPWB-DOC-003.
@@ -112,7 +120,7 @@ This doctrine exists because the alternative failure is empirically common and w
 
 ## 4. The load-bearing inequalities
 
-The full non-equivalence ledger lives beside its terms in JPWB-DOC-002. The inequalities below are the ones the theory itself forces; each is stated with its reason, because an agent that knows *why* an inequality holds can decide cases the ledger does not enumerate.
+The full non-equivalence ledger lives beside its terms in JPWB-DOC-002. The inequalities below are the ones the theory itself forces; each is stated with its reason, because an agent that knows *why* an inequality holds can decide cases the ledger does not enumerate. The root of the family is **Complex ≠ Complicated** (§2.4; ledger entry JPWB-DOC-002 §3) — most of the inequalities below are its consequences: they mark places where a lossless-decomposition assumption would silently equate things that professional complexity keeps distinct.
 
 1. **Outcome ≠ Artifact.** An artifact is a representation; an outcome is a change in reality. Systems that equate them optimize for deliverable production and drift from purpose — the central failure of artifact-centered tooling. Every completion claim in the system is ultimately tested against this inequality.
 

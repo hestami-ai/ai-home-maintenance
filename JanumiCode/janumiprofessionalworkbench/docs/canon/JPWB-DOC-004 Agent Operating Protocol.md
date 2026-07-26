@@ -4,7 +4,7 @@ title: Agent Operating Protocol
 layer: Protocol
 settledness: PRESUMPTIVE
 status: OPERATIVE — ratified as drafted (wholesale interim, REG-D-010, 2026-07-24); Ratify Sheet R1 remains open for clause-level amendment
-version: 1.0.0
+version: 1.3.0 — B5 amendments: REG-D-011 (requirement ledger); REG-D-012 (tests-of-the-tests, §7.6 oracle integrity, changed-module grain); REG-D-014 (Cycle-000 batch under delegated authority: §9.1 SPEC-gap trigger, §9.2 PROPOSED REFINEMENT type, §8.1 tiebreak scope, §7.4 interim mutation default, §7.6 judgment grain + proposed-oracle status + citation fix, §2.1 working-references load rung)
 date: 2026-07-16
 governs: |
   - How an agent reads and consults the canon (load order, precedence by concern, treatment of retired material).
@@ -53,7 +53,8 @@ Before acting on any task, the agent loads, in this order:
 2. **This document** — the operating protocol for the work itself.
 3. **The task-relevant artifacts by concern**: JPWB-DOC-002 for any naming or terminology the task touches; JPWB-DOC-003 for any object, state, invariant, or assurance semantics the task touches; JPWB-DOC-001 when the task requires understanding why the system is shaped as it is, or how humans and agents operate it.
 4. **JPWB-REG-005**, filtered to entries touching the task's subject: open questions supply safe defaults; standing decisions supply rulings that have not yet merged into their governing artifact.
-5. **The repository**, for every exact shape: generated contracts, schemas, migrations, conformance tests, and the code itself.
+5. **Program working references whose registered grants cover the task** (CON-000 B1): design documents, roadmaps, and program-scoped specifications authored under a registered sponsor grant — HYPOTHESIS-grade authority within their program's scope, subordinate to every canon artifact by concern.
+6. **The repository**, for every exact shape: generated contracts, schemas, migrations, conformance tests, and the code itself.
 
 Load order governs which authority is consulted first; it does not obligate re-reading the entire canon for every task. Scope the reading to the concerns the task touches. It also does not permit skipping CON-000: the rule of recognition is small, and every downstream judgment depends on it.
 
@@ -101,6 +102,8 @@ Inspect the actual repository before proposing architecture. Find the governing 
 ### 3.3 The change contract
 
 Restate a compact change contract before implementing: **what will change, what will not, which authority governs it, and how it will be verified.** This contract is the anchor for the handoff report (§6.3); a change that cannot be stated this compactly is not yet understood.
+
+On governed ground, the change contract includes a **requirement ledger**: extract every SHALL and SHALL NOT applicable to the change from the governing SPEC, the canon, and any granted working authority, and map each to its planned implementation site and verifying test. Apparent conflicts and missing information surface here, before code. The ledger's grain is the requirement, not the file: an obligation with no mapped site and test at intake is an obligation the implementation will silently drop. Non-example: this does not require ledgering the entire canon for every change — only the requirements the change's scope actually engages; a one-line fix on ungoverned ground needs no ledger at all.
 
 ### 3.4 Conflicts at intake: adjudicate or escalate
 
@@ -179,6 +182,8 @@ Inspect generated Events, stored rows, audit entries, projection output, negativ
 
 The final report states: the outcome and user-visible behavior; files and contract/schema/migration versions changed; material semantic or architectural choices and the authority for each; tests and checks run with their results; migration, compatibility, and rollback notes; remaining risks, unresolved decisions, and deliberately deferred work; and any REG-005 entries filed.
 
+Where §3.3 produced a requirement ledger, the handoff **closes it**: every ledgered SHALL and SHALL NOT is accounted for — implemented (where), verified (by which test or evidence), or explicitly dispositioned as deferred, waived by cited authority, or divergent (with its filed finding). An unaccounted ledger entry is a concealed gap. Completion claims are made against the closed ledger, never against the diff.
+
 Do not report "done" because code compiles. Completion requires the requested outcome, all applicable invariants intact, reviewable changes, passing proportional evidence, and no concealed gap. A known limitation reported plainly is professional work; a known limitation omitted is a defect in the report.
 
 ## 7. Engineering practice
@@ -231,17 +236,26 @@ The objective of testing is confidence, not coverage percentages. Testing is not
 - Every bug fixed becomes a regression test or replay fixture. Where a faithful reproduction is genuinely infeasible — a timing-dependent external race, for example — the handoff report records the infeasibility and the compensating evidence. The same bug never occurs twice for the same reason. Replay fixtures preserve institutional knowledge.
 - A failing required test is never removed, disabled, or weakened solely to obtain passing status. Changing what a test asserts is a semantic act requiring the same authority as changing the behavior it protects, and is recorded in the handoff.
 - Integration tests never mock internal domain seams. Test doubles stand in for external actors — models, validators, humans, tools — never for the domain's own boundaries; a domain mocked out of its own integration test proves nothing about the domain.
-- Critical domain guard logic is proven by mutation-style evidence: silently removing or inverting a guard must fail a test. Numeric mutation floors remain repository gates; this protocol defines what they are for.
+- Critical domain guard logic is proven by mutation-style evidence: silently removing or inverting a guard must fail a test. Numeric mutation floors remain repository gates; this protocol defines what they are for. Until repository gate encoding is verified (REG-E-020), differential mutation on changed modules is performed by live hand-mutation with the red-run evidence cited in the handoff — an unencoded gate never lowers the floor.
 - For state machines: every legal transition, every illegal transition, every guard — reached, exercised, rejected.
 - AI-specific evidence: prompt changes are evaluated against stable datasets and must not silently degrade behavior — prompts are versioned code requiring regression evidence. Agent tests verify the trajectory, not only the final answer: tool use, search-and-verify behavior, uncertainty handling, bounded authority. Observability itself is a testable requirement: assert that important runtime events emit telemetry.
 - Behavioral tests assert result or error, revision and semantic version, emitted Events, trace links, projection effects, and the absence of prohibited side effects — not final state alone. Fixtures carry stable IDs, times, and seeds, and live beside the versioned schema they prove.
 - Coverage percentages are diagnostics, not goals; 100% line coverage does not imply correctness. Prefer evidence that every business rule, boundary, invariant, transition, contract, and past bug is verified. Repository gates define the numeric floors; this protocol defines what the numbers are for.
+- The adequacy of the tests is itself a claim requiring evidence — assurance-of-assurance at practice grain. On changed modules: differential mutation evidence, with surviving mutants treated as findings; assertion-strength and never-fails detection — a test that cannot fail asserts verification nothing performs (B7), and its discovery is the deliverable, not an embarrassment; isolation and order-independence; and an excessive-mocking check — a test that mocks the fact it exists to verify proves nothing (precedent: an executor agent passed form while mocking the binding facts that were the substance).
 
 A feature is complete only when future humans and future agents can confidently answer: what is this supposed to do; why does it exist; how do we know it works; what assumptions does it depend on; what happens when they fail; how would we detect regressions; how would we debug it in production.
 
 ### 7.5 Quality gates
 
-Address static-analysis, dependency, type, lint, formatting, complexity, and security findings, or record a scoped, justified exception. Never suppress a finding just to make a gate green. Complexity findings in particular are never closed by silence: the default is a full fix; the only alternative is an explicit recorded exception. The intended exception scope is open as REG-Q-041; until it is ruled, that entry's safe default governs. The exact tooling procedure (scanner setup, gate configuration) is repository-operational and lives with the repository, not in the canon.
+Address static-analysis, dependency, type, lint, formatting, complexity, and security findings, or record a scoped, justified exception. Never suppress a finding just to make a gate green. Complexity findings in particular are never closed by silence: the default is a full fix; the only alternative is an explicit recorded exception. The intended exception scope is open as REG-Q-041; until it is ruled, that entry's safe default governs. The exact tooling procedure (scanner setup, gate configuration) is repository-operational and lives with the repository, not in the canon. Gates on changed code bind at the changed-module grain — repository-wide averages dilute accountability and are diagnostics only.
+
+### 7.6 Oracle integrity and the two test streams
+
+Verification artifacts divide into two streams with different authority. The **oracle stream** — spec-derived conformance fixtures, acceptance criteria, gate configurations, reference artifacts — encodes the judgment an implementation must satisfy; it is ratified content under its owning authority. The **implementation stream** — agent-authored unit and integration tests — is evidence the implementer constructs. The oracle stream SHALL NOT be edited to make the implementation stream pass.
+
+**The identity that authors a change SHALL NOT hold, within that change, the authority to alter the artifacts that judge it.** Modifying an oracle — a conformance fixture, an acceptance test, a gate configuration, a reference artifact — is a separately authorized act: declared, attributed, and processed with the same authority grade as changing the behavior it protects. A wrong oracle is a divergence finding (§8), never an inline edit in the change it would have failed. This rule is authority-relative, not person-relative: today the separate authority resolves to the sponsor; in multi-party deployments it resolves through the governing authority model — roles, delegation records, separation of duties — with no change to this text. Non-example: *adding* a new oracle entry for genuinely new behavior within the change that introduces that behavior is authorship, not alteration; this rule governs weakening, rewriting, or removing judgments that predate the change. Alteration is measured at the **judgment grain**, not the file grain: a purely additive insertion that leaves every pre-existing judgment intact is authorship, even within a shared fixture file. Newly authored oracle entries are proposed oracle content until conferral (CON-000 B2): freely revisable within the authoring change, oracle-protected thereafter.
+
+Enforcement boundaries are authoritative, never client-side. A pre-commit hook or local gate run is developer convenience — valuable, and never the guarantee: the binding evaluation happens at a boundary the change's author cannot bypass. Where the platform cannot yet host a control natively, its interim carrier (CI, hooks) executes the same versioned, policy-shaped reference artifacts the platform will later consume, and is recorded in the register as an interim carrier with a planned authority transfer — scaffolding is marked as scaffolding, per CON-000 B6 and DOC-003 §10's single-semantic-authority rule.
 
 ## 8. The Divergence Protocol
 
@@ -260,7 +274,7 @@ Every observed disagreement gets exactly one class:
 | `SEMANTIC_CONFLICT` | Code and canon assert incompatible meanings | Escalate via REG-005; do not resolve by convenience |
 | `IMPLEMENTATION_DEFECT` | Code fails its own evident intent | Fix under normal engineering discipline |
 
-Classification is itself a judgment with a duty of honesty. A tempting misuse: classifying a `SEMANTIC_CONFLICT` as `ACCIDENTAL_CODE_BEHAVIOR` because the fix is then autonomous. When the code's behavior *could* be reality-taught — when someone might have built it that way because the canon's rule fails in practice — the classification is `CODE_BEHAVIOR_UNDOCUMENTED` or `SEMANTIC_CONFLICT`, and the evidence goes to the register. Doubt between an autonomous class and an escalating class resolves toward escalation.
+Classification is itself a judgment with a duty of honesty. A tempting misuse: classifying a `SEMANTIC_CONFLICT` as `ACCIDENTAL_CODE_BEHAVIOR` because the fix is then autonomous. When the code's behavior *could* be reality-taught — when someone might have built it that way because the canon's rule fails in practice — the classification is `CODE_BEHAVIOR_UNDOCUMENTED` or `SEMANTIC_CONFLICT`, and the evidence goes to the register. Doubt between an autonomous class and an escalating class resolves toward escalation **when the doubt concerns meaning** — whether reality has taught something the canon lacks, or two readings genuinely conflict. Non-example: doubt about which classification label fits an already-understood case, where the delegated action is identical either way, is not escalation-grade; take the closer label and record the hesitation in the handoff.
 
 During convergence, the docs-win presumption applies: the canon is the sole semantic authority and the code is the first experiment being brought into conformance. This presumption is what makes `DOCS_STRONGER` and `ACCIDENTAL_CODE_BEHAVIOR` autonomous. It is a property of the phase, not a permanent fact, and it never converts a `SEMANTIC_CONFLICT` into a silent code fix — incompatible meanings are adjudicated, not steamrolled.
 
@@ -293,6 +307,7 @@ File a REG-005 entry when:
 - the Divergence Protocol yields `CODE_BEHAVIOR_UNDOCUMENTED` or `SEMANTIC_CONFLICT`;
 - a task requires an unresolved decision and no recorded safe default covers it;
 - the agent discovers a contradiction between canon artifacts that no artifact resolves;
+- governed ground lacks a governing SPEC (§2.1): file the SPEC-gap with a proposed commission scope; the safe default confines implementation to ground the canon or a granted authority actually covers;
 - the agent proposes a refinement to a PRESUMPTIVE artifact (vocabulary, this protocol);
 - a sponsor makes a ruling in any channel — the agent records it, whether or not asked.
 
@@ -300,7 +315,9 @@ Do not file entries for questions the canon already answers, for stylistic prefe
 
 ### 9.2 Entry discipline
 
-Each entry carries: **id, date, type (`DECISION` | `OPEN QUESTION` | `DIVERGENCE FINDING`), statement, safe default** (for open items), **disposition, merge target, status**.
+Each entry carries: **id, date, type (`DECISION` | `OPEN QUESTION` | `DIVERGENCE FINDING` | `PROPOSED REFINEMENT`), statement, safe default** (for open items), **disposition, merge target, status**.
+
+A PROPOSED REFINEMENT carries: current text, proposed text, motivating evidence, and the safe default that **the current text stands** until ratified. A spec-commission proposal (from a §9.1 SPEC-gap filing) files as an OPEN QUESTION whose safe default confines work to covered ground and whose merge target is the commissioned SPEC (REG-D-009 pipeline).
 
 A DIVERGENCE FINDING additionally carries evidence: the file and location of the code behavior, the canon citation by artifact ID and section, what was observed versus what the canon states, the proposed classification, and — where the agent can see one — the reality-taught rationale candidate. Evidence is observation, not advocacy: report what the code does, not what the agent wishes the ruling to be.
 

@@ -120,3 +120,13 @@ Items 2 and 3 (residual candidates) are routed by DOC-002 §10 to JPWB-REG-005; 
 
 ## Finalizer pass (2026-07-16)
 Cross-artifact residue closed by the program finalizer: Attention Item entries added to DOC-002 §3 and DOC-003 §3 (disposition meanings NEW — REG-E-021); DOC-004 §7.2 exchange-record pointer to DOC-003 PER-9 and §11.4 repointed to PER-12; REG-Q-048 (cross-organization scope) and REG-E-001..022 filed in REG-005 Section E. Conferral instrument: 'JPWB Canon Ratify Sheet (R1).md'.
+
+---
+# MERGED CONTENT from split sidecar JPWB-DOC-002.provenance.md (consolidated by the Cycle-000 regression hygiene pass, 2026-07-24 — provenance had split across two files; this file is the single sidecar henceforth)
+
+
+## Amendment pass 6 (2026-07-24, REG-D-014: Cycle-000 batch under sponsor-delegated authority)
+Dispositions and rationale recorded in REG-D-014 and the full-judgment instrument (_test/cycles/cycle-000-ratify-instrument.md). Applied: CON-000 v1.2.0 (B1 program-working-references class); DOC-002 v1.1.0 (display aliases, §11 canon-governance vocabulary, tail fix); DOC-003 v1.1.0 (ASR-3 grouping legitimacy, ASR-4 retrievable-record); DOC-004 v1.3.0 (§9.1 SPEC-gap trigger, §9.2 PROPOSED REFINEMENT type, §8.1 tiebreak scope, §7.4 interim mutation default, §7.6 grain+status+citation, §2.1 load rung 5); REG-005 (§1 status vocabulary, Q-043/044 closed); Ratify Sheet correction note. Refuted-HIGH amendments deliberately NOT applied; one near-miss (§7.4 weakening clause) caught and reverted during application.
+
+## Amendment pass 8 (2026-07-24, REG-D-016: thesis sponsor-confirmed; the complexity stance merged)
+CON-000 v1.3.0: §3 thesis variant B verbatim (decomposable/recomposable pairing + complex-whole clause) + two-axis gloss (structural: irreversibility-of-reductionism test; temporal: path-dependence, the two questions). DOC-001 v1.1.0: new §2.4 'Complex, not merely complicated' (test, enumerated losses, producing-system-vs-artifact, two questions w/ assurance-weighted 'credibly') + §4 preamble roots the inequality family in Complex ≠ Complicated. DOC-002 v1.2.0: §3 Complicated/Complex entry + root guard. DOC-003 v1.3.0: Narrative Memory row gains its defining question. Sources: sponsor's three session statements (recorded in REG-E-001 evidence trail) + Complex Systems Management discussion (transplant with provenance). REG-E-001 CLOSED — all Section E items disposed.

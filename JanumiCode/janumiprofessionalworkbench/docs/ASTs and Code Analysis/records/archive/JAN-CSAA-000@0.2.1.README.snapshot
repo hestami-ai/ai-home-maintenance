@@ -1,0 +1,1531 @@
+# JPWB TypeScript Codebase Semantic Analysis and Assurance Corpus
+
+## Proposed corpus charter, manifest, and W0-17 candidate
+
+**Document ID:** `JAN-CSAA-000`
+
+**Canonical title:** JPWB TypeScript Codebase Semantic Analysis and Assurance Corpus
+
+**Version:** `0.2.1`
+
+**Status:** Proposed
+
+**Settledness:** HYPOTHESIS candidate; artifact standing not conferred
+
+**Classification:** Program working-reference candidate under the Stage A preparation grant
+
+**Governing status:** `REG-D-017` establishes the CSAA program and permanent identifier reservations; this Proposed member is not adopted and does not govern
+
+**Role:** Proposed corpus entry point, scope and authority-boundary charter, controlled manifest, and staged authoring-commission candidate
+
+**Authority:** None as a CSAA member. `REG-D-017` authorizes preparation, ledger/review work, and a W0-17 adoption package only
+
+**Stage A grant:** `JPWB-REG-005 REG-D-017` — EFFECTIVE; Draft ledger and self-review are closed, while append-only carriage confirmation remains pending
+
+**Stage B gate:** W0-17 not presented; exact-version/digest adoption and Wave 1 activation remain pending
+
+**Scope:** Semantic analysis and conventional software assurance of the manifest-resolved TypeScript, JavaScript, and TypeScript-bearing Svelte implementation in `JanumiCode/janumiprofessionalworkbench`
+
+**Applicability:** This charter candidate and, only after their own commissions and adoptions, the controlled `JAN-CSAA-001` through `JAN-CSAA-011` members and their allocated reference artifacts
+
+**Governs:** If and only if W0-17 later adopts the exact version and digest, the CSAA program boundary, source-of-truth model, semantic baselines, manifest, document responsibilities, staged commissions, and closure rules within the granted scope
+
+**Does not govern:** Canon meaning, professional-work semantics, infrastructure assurance, Janumi product standing, exact executable shapes owned by repository reference artifacts, provider selection, procurement, implementation permission, oracle changes, or any uncommissioned later-wave work
+
+**Parent and inherited authorities:** `JPWB-CON-000`, `JPWB-DOC-001`, `JPWB-DOC-002`, `JPWB-DOC-003`, `JPWB-DOC-004`, and the applicable `JPWB-REG-005` entries, each only for its owned concern
+
+**Precedence and conflict routing:** Canon and recognized enforced reference artifacts retain their concern ownership. Apparent conflict, missing authority, or incompatible meaning SHALL be recorded and routed to `JPWB-REG-005`; this charter SHALL NOT silently reconcile it
+
+**Requirement ledger:** [JAN-CSAA-000 Requirement Ledger](<records/JAN-CSAA-000 - Requirement Ledger.md>)
+
+**Verification owner:** The author owns extraction and self-review evidence; an independent reviewer owns the Proposed-candidate adversarial review; neither may confer Normative status
+
+**Change authority and procedure:** Authors MAY revise Draft text under `REG-D-017`. Draft SHALL advance to Proposed only after ledger closure and self-review. Material Proposed-byte changes SHALL receive affected re-review; Normative status or material Normative change SHALL require an exact-version/digest sponsor act in `JPWB-REG-005`
+
+**Review and evidence companions:** [Preparation Evidence Snapshot](<records/JAN-CSAA-000 - Preparation Evidence Snapshot.md>); [Self-Review](<records/JAN-CSAA-000 - Self Review.md>); [Draft-to-Proposed Promotion Record](<records/JAN-CSAA-000 - Draft-to-Proposed Promotion Record.md>); [Independent Review](<records/JAN-CSAA-000 - Independent Review.md>); [Integrity Manifest](<records/JAN-CSAA-000 - Integrity Manifest.md>); [W0-17 Adoption Instrument](<records/JAN-CSAA-000 - W0-17 Adoption Instrument.md>)
+
+**Companion enforced artifacts:** None at this pre-executable charter stage; see §§9.4, 14, and 18–21 for future commission, authority, and conformance controls
+
+**Conformance-test references:** None currently govern this charter; `JAN-CSAA-006` through `JAN-CSAA-008` are reserved but unauthored and uncommissioned
+
+**Audience:** Coding agents, software architects, implementers, assurance engineers, security reviewers, tool integrators, and maintainers
+
+**Background input:** [Initial Chat](<Initial Chat.md>)
+
+**Structural exemplar:** [Recursive Professional Harness document-set README](<../Recursive Professional Harness/README.md>)
+
+**Supersedes:** None
+
+**Superseded by:** None
+
+**Normative keywords:** SHALL, SHALL NOT, SHOULD, SHOULD NOT, MAY
+
+---
+
+## 1. Proposal in one sentence
+
+Create a controlled, RPH-shaped documentation corpus that specifies how the JPWB TypeScript repository is represented, analyzed, queried, assured, exposed to coding agents, implemented with qualified analysis providers, and verified against independent executable oracles.
+
+The corpus is deliberately limited to conventional software-engineering assurance of the codebase. It does not define infrastructure assurance, professional-work semantics, or intent-to-implementation traceability.
+
+---
+
+## 2. Stage A disposition and remaining decision
+
+`JPWB-REG-005 REG-D-017` records the sponsor's separate **RATIFY** disposition of W0-01 through W0-16. It establishes **Codebase Semantic Analysis and Assurance** (`JAN-CSAA`) as a bounded program working-reference series and permanently reserves `JAN-CSAA-000` through `JAN-CSAA-011`. Reservation does not confer member authority.
+
+Stage A records:
+
+1. the working name, non-product standing, program authority form, scope, and first subject;
+2. the dirty-worktree evidence and read-only execution boundary;
+3. the permanent prefix, identifiers, lifecycle, and document-control rules;
+4. the provider-independent semantic baselines in W0-09 through W0-14;
+5. the concrete provider, architecture, persistence, gate, licensing, deployment, and topology deferrals in W0-15;
+6. the per-member review, oracle, and `JPWB-REG-005` adoption procedure in W0-16;
+7. approval in principle of the W0-08 documentation-only commission for `JAN-CSAA-001`, `JAN-CSAA-002`, and `JAN-CSAA-005`.
+
+### 2.1 Stage A carriage matrix
+
+The table is administrative traceability to the itemized sponsor act in `REG-D-017`; it does not create a second authority source.
+
+| Decision | Sponsor disposition | Charter carriage |
+| --- | --- | --- |
+| W0-01 — working name and product standing | `RATIFY` | Sections 1, 3, 4, and 16 |
+| W0-02 — authority form and standing | `RATIFY` | Metadata; Sections 3, 6, and 9 |
+| W0-03 — program scope and exclusions | `RATIFY` | Sections 1 and 4 |
+| W0-04 — first supported repository subject | `RATIFY` | Section 4.2 |
+| W0-05 — inventory snapshot and execution mode | `RATIFY` | Section 4.2 and the linked Preparation Evidence Snapshot |
+| W0-06 — prefix and identifier allocations | `RATIFY` | Sections 8 and 9 |
+| W0-07 — document control and lifecycle | `RATIFY` | Metadata; Sections 3.3, 5, and 9 |
+| W0-08 — Wave 1 documentation commission and limits | `RATIFY` | Sections 10 and 15 |
+| W0-09 — TypeScript semantic-evidence baseline | `RATIFY` | Section 6.6 |
+| W0-10 — coverage evidence baseline | `RATIFY` | Section 6.6 |
+| W0-11 — runtime-trace evidentiary limit | `RATIFY` | Section 6.6 |
+| W0-12 — finding and disposition history | `RATIFY` | Sections 6.6 and 16 |
+| W0-13 — automated-remediation boundary | `RATIFY` | Sections 4, 6.6, and 16 |
+| W0-14 — incomplete and unsupported result behavior | `RATIFY` | Sections 6.6, 11, 16, and 17 |
+| W0-15 — concrete architecture/provider/gate deferrals | `RATIFY` | Sections 10, 15, and 16 |
+| W0-16 — member adoption, review, and oracle authority | `RATIFY` | Sections 3.3, 5, 9.4, 17, and 18; mandatory templates and review records |
+
+The remaining sponsor decision is W0-17. Until an exact `JAN-CSAA-000` version and SHA-256 digest have a closed requirement ledger, completed self-review, independent adversarial review, and separate sponsor conferral:
+
+- this document SHALL NOT have program authority or leave its recorded pre-adoption lifecycle status;
+- W0-17 SHALL NOT be treated as presented;
+- the W0-08 Wave 1 commission SHALL NOT activate;
+- `JAN-CSAA-001` through `JAN-CSAA-011` SHALL NOT be treated as authored;
+- an analyzer, provider, dependency, experiment, implementation, gate, oracle change, or source mutation SHALL NOT be authorized.
+
+---
+
+## 3. Current governance posture
+
+### 3.1 Stage A does not confer member authority
+
+The operative [JPWB Constitution](<../canon/JPWB-CON-000 Constitution.md>) defines a closed rule of recognition:
+
+- the six named canon artifacts govern their owned concerns;
+- individually ratified `JPWB-SPEC-nnn` deep reference specifications may govern a subsystem at `HYPOTHESIS` settledness;
+- program working references govern only when an explicit registered sponsor grant names their scope and standing;
+- enforced repository reference artifacts own exact executable shapes;
+- unrecognized prose does not govern, regardless of title or deontic voice.
+
+Accordingly:
+
+- `REG-D-017` is the effective registered sponsor grant for the bounded CSAA program;
+- `JAN-CSAA-000@0.2.1` retains only its recorded pre-adoption lifecycle status and remains an unadopted candidate;
+- `JAN-CSAA-000` through `JAN-CSAA-011` are permanent, non-reusable reservations;
+- only `JAN-CSAA-000` is authored;
+- W0-08 is approved in principle but inactive until W0-17;
+- no proposed requirement is binding until the resulting artifact receives its required governance status;
+- a future `JPWB-SPEC-nnn` successor SHALL receive the identifier allocated through the canon process and SHALL record its relationship to this proposal rather than silently changing this proposal's recorded ID.
+
+### 3.2 Relationship to existing authorities
+
+This corpus SHALL specialize, not duplicate or amend, the existing authority stack:
+
+| Concern | Existing owner | CSAA relationship |
+| --- | --- | --- |
+| First principles and rule of recognition | `JPWB-CON-000` | Inherited without restatement or weakening |
+| Reasoning, judgment, operation, and concept of employment | `JPWB-DOC-001` | Specialized only for code-analysis employment |
+| Canonical Janumi vocabulary | `JPWB-DOC-002` | Reused; CSAA terms SHALL remain software-analysis terms |
+| JPWB semantic objects and invariants | `JPWB-DOC-003` | Not redefined; CSAA may evaluate code against separately supplied executable software constraints but does not interpret professional semantics |
+| Coding-agent conduct and process | `JPWB-DOC-004` | `JAN-CSAA-010` becomes a scoped analysis profile, not a replacement protocol |
+| Open decisions and divergence | `JPWB-REG-005` | Used for commissions, rulings, and unresolved semantic conflicts |
+| Engineering practice | Operative `JPWB-DOC-004`, especially Section 7 | Specialized with code-analysis mechanics but not weakened or duplicated |
+| Exact repository shapes | Enforced schemas, generated contracts, migrations, and conformance tests | Read and checked; never redefined by an analyzer |
+| Existing implementation behavior | Source code and observed executions | The factual subject being analyzed, not self-certifying authority over intended meaning |
+
+The [JPWB Agent Operating Protocol](<../canon/JPWB-DOC-004 Agent Operating Protocol.md>) is the operative owner of agent procedure and engineering practice. The [standalone Engineering Constitution](<../Recursive Professional Harness/Janumi Professional Workbench - Engineering Constitution.md>) and the RPH README remain useful structural and historical inputs, but they are outside the live rule of recognition and SHALL NOT be cited as current governing authority. Any durable content reused from them SHALL receive a governed transplant into a recognized artifact; historical material is not reactivated by reference.
+
+### 3.3 Staged authority-transfer lifecycle
+
+The intended paths follow `JPWB-CON-000 B6` and `JPWB-REG-005 REG-D-009`.
+
+For a program working corpus:
+
+```text
+Draft charter proposal
+    ↓ REG-D-017 Stage A program grant and preparation commission
+Draft exact charter + closed ledger + self-review
+    ↓ author advances the reviewed candidate to Proposed
+Proposed exact-version/digest charter + independent review
+    ↓ separate W0-17 sponsor conferral in JPWB-REG-005
+Normative HYPOTHESIS-grade JAN-CSAA-000 + active W0-08 Wave 1 commission
+    ↓ later per-member conferrals and executable discharge
+Enforced schemas, types, rules, fixtures, and conformance tests
+    ↓ recorded program completion, supersession, or retirement
+Durable obligations remain in enforced repository artifacts
+```
+
+For a canon deep reference specification:
+
+```text
+Specification commission
+    ↓ authoring only; no authority conferred
+Draft JPWB-SPEC-nnn
+    ↓ individual ratification in JPWB-REG-005
+HYPOTHESIS-grade subsystem specification
+    ↓ fully performed by enforced artifacts and conformance tests
+Recorded sponsor act transfers authority under B6
+    ↓
+Specification retires; executable obligation surface remains
+```
+
+The corpus SHALL be written for eventual discharge into enforced artifacts, not for permanent prose accretion.
+
+---
+
+## 4. Scope
+
+### 4.1 In scope
+
+The first corpus SHALL cover:
+
+- TypeScript and JavaScript source included by supported project configurations;
+- TypeScript-bearing framework artifacts, initially including `.svelte` files participating in the supported SvelteKit check/build pipeline;
+- TypeScript ASTs;
+- declarations, symbol tables, references, scopes, and name resolution;
+- static types, type relationships, and the type graph;
+- package, module, import, and dependency graphs and their distinct edge taxonomies;
+- call sites and call graphs;
+- control-flow graphs;
+- data-flow and taint-flow graphs;
+- a code property graph or a precisely bounded equivalent composition of semantic graphs;
+- tests and test-to-code relationships;
+- test coverage observations;
+- runtime traces and trace-to-code relationships;
+- repository snapshots and working-tree change sets;
+- architecture rules and dependency constraints;
+- analyzer runs, semantic facts, queries, Analyzer Finding Records, Engineering Evidence Records, uncertainty, and exceptions;
+- change-impact analysis and before/after semantic comparison;
+- coding-agent queries, planning evidence, implementation gates, and completion evidence;
+- later qualification and integration of analysis providers under W0-15; Stage A selects none.
+
+### 4.2 Initial repository subject
+
+The first concrete subject is:
+
+```text
+JanumiCode/janumiprofessionalworkbench
+```
+
+The root manifest, not filesystem proximity, defines the first workspace perimeter.
+
+**Semantically supported project set**
+
+- root discovery and configuration context: `package.json`, `bun.lock`, `bunfig.toml`, `turbo.json`, root `tsconfig.json`, `.gitignore`, ESLint configuration, Prettier configuration and exclusions, dependency-cruiser configuration, and Sonar configuration;
+- shared compiler configuration under `packages/typescript-config`;
+- source and build project configurations for:
+  - `packages/rph-application`;
+  - `packages/rph-assurance`;
+  - `packages/rph-authoring`;
+  - `packages/rph-contracts`;
+  - `packages/rph-domain`;
+  - `packages/rph-engine`;
+  - `packages/rph-persistence`;
+  - `packages/rph-ports`;
+  - `packages/rph-product-realization-pwa`;
+  - `packages/rph-projections`;
+- authored TypeScript, JavaScript, and `.svelte` source in `apps/rph-demo` that participates in its configured SvelteKit check/build pipeline, subject to the generated-context qualification below;
+- included package/app unit tests;
+- generator source and generated TypeScript as distinct artifact classes;
+- workspace manifests, package exports, lockfile-resolved dependencies, and existing architecture rules as contextual graph inputs.
+
+Normal and `tsconfig.build.json` project variants remain distinct because their inclusion boundaries differ.
+
+`apps/rph-demo/tsconfig.json` extends the generated `.svelte-kit/tsconfig.json`. The present generated configuration identifies the app include surface, but its freshness was not established because the write-producing `svelte-kit sync` operation was not authorized. Compiler-confirmed app support therefore SHALL retain the generated configuration's revision-bound provenance, digest, and freshness basis; until that evidence exists, the app project context SHALL be reported as configured-but-unverified or partial rather than compiler-confirmed.
+
+**Inventory-only perimeter**
+
+The corpus inventories, but does not initially claim compiler-complete semantic support for:
+
+- deterministic Playwright tests, configuration, setup, and teardown outside the SvelteKit project include set;
+- live/network Playwright surfaces;
+- executable static JavaScript not included by a declared project context;
+- framework-generated `.svelte-kit` artifacts other than the consumed generated `tsconfig.json` configuration context, which remains explicit and freshness-qualified;
+- any current gate exclusion or executable seam not covered by a declared project configuration.
+
+Each perimeter region SHALL remain labeled supported, partial, unsupported, or not analyzed. No perimeter region SHALL disappear into an implicit empty result.
+
+**First-subject exclusions**
+
+The supported semantic subject excludes:
+
+- `node_modules`, `dist`, `build`, `.turbo`, coverage output, Playwright result output, caches, and temporary databases;
+- TypeScript projects and code prototypes under `docs/**`, except CSAA documents as authoring artifacts;
+- `apps/rph-demo/harness/**` workflow-runtime JavaScript;
+- third-party source beyond identity, manifest, lockfile, advisory, and provenance metadata;
+- live agent/network execution and production trace collection;
+- sibling repositories under `E:/Projects/hestami-ai`.
+
+**Revision and execution mode**
+
+Stage A does not freeze a preparation-time commit as timeless architecture. Every inventory SHALL preserve the received working tree, SHALL bind facts to the parent commit plus explicit worktree/change-set identity and relevant content/configuration digests, SHALL record an observation time, and SHALL reverify at review. A parent commit alone never identifies a dirty subject.
+
+Accordingly, a parent commit alone SHALL NOT be treated as sufficient identity for a dirty subject.
+
+Inspection is read-only by default. Installation, formatting, generation, builds, live/network tests, external scanners, production traces, and any existing command that writes caches or derived artifacts SHALL require separate execution authorization. A configured but unexecuted command SHALL be recorded as unexecuted and SHALL NOT be inferred to pass.
+
+The checked-in execution and tooling surfaces currently include Bun, Turborepo, TypeScript, ESLint, Prettier, dependency-cruiser, Vitest, Vite/SvelteKit and `svelte-check`, Playwright configuration, and Sonar configuration. Those are repository observations, not provider selections or approvals. `JAN-CSAA-005` SHALL verify their exact roles against its analyzed revision and SHALL NOT copy them forward as timeless architecture.
+
+Generated or virtual TypeScript used to analyze a framework artifact SHALL retain provenance and location mappings to the originating authored artifact and SHALL NOT be reported as authored source.
+
+### 4.3 Explicitly out of scope
+
+The first corpus SHALL NOT define:
+
+- Kubernetes, Pulumi, Helm, network-policy, RBAC, cloud, or other infrastructure-graph assurance;
+- PWA, PWU, Undertaking, Professional Work Graph, or professional-cognition semantics;
+- a universal assurance engine spanning code, infrastructure, and professional work;
+- intent-to-implementation or professional-objective traceability;
+- Janumi Platform deployment topology;
+- a new Janumi product, PWA, canonical ontology, or canonical role;
+- embeddings as authoritative semantic facts;
+- automatic governance Decisions, waivers, approvals, or Baseline promotion;
+- source-code rewriting or autonomous remediation as part of the analysis core;
+- language-general semantics beyond what is required to bound TypeScript interoperation.
+
+CSAA MAY consume an externally governed software contract, architecture rule, or invariant as an opaque, identified constraint. It SHALL NOT model, interpret, or assert realization of PWA, PWU, Undertaking, professional objective, or any other professional-semantic object.
+
+Code-to-professional-object traceability SHALL require a separately governed adapter and corpus.
+
+Future integration MAY link code evidence to Janumi professional objects, but that is a separate governed boundary. It SHALL NOT be smuggled into the TypeScript semantic model.
+
+### 4.4 Scope extension rule
+
+A proposed extension to another language, infrastructure representation, or professional-work domain SHALL identify:
+
+1. the new source of factual truth;
+2. the new semantic model;
+3. the new completeness and uncertainty limits;
+4. the new assurance questions;
+5. the adapters that remain reusable;
+6. the concepts that must remain domain-specific.
+
+Shared storage or query machinery alone SHALL NOT justify collapsing distinct semantic universes.
+
+---
+
+## 5. Normative language for the proposed corpus
+
+In each future authorized document `JAN-CSAA-001` through `JAN-CSAA-011`:
+
+- **SHALL** and **SHALL NOT** state mandatory requirements;
+- **SHOULD** and **SHOULD NOT** state strong defaults that require recorded justification when not followed;
+- **MAY** states permission;
+- examples are informative and SHALL NOT narrow a requirement;
+- each mandatory requirement SHALL have a stable requirement ID;
+- requirement IDs SHALL NOT be reused after publication;
+- each mandatory requirement SHALL identify its verification method or an explicit reason verification is deferred.
+
+A sentence lacking a normative keyword or an explicitly ledgered equivalent gate SHALL NOT be treated as a mandatory requirement; it is present-state description, rationale, or other informative context.
+
+While this document is Draft or Proposed, its uppercase clauses are candidate requirements. The W0-01 through W0-16 decisions govern only through `REG-D-017`; their appearance here is administrative carriage, not a second source of authority. Every other clause becomes binding only within the status and authority later conferred on the applicable artifact.
+
+This pre-adoption candidate uses section-scoped SHALL language to state candidate commissioning and closure criteria. Before this document may move to Proposed, every retained mandatory clause SHALL receive a stable requirement ID and verification binding in the charter ledger, and the self-review SHALL close. No implementation SHALL rely on this pre-adoption candidate as authority.
+
+---
+
+## 6. Source-of-truth and authority model
+
+The phrase “the implementation is the source of truth” SHALL NOT be used unless its concern is explicit.
+
+The corpus SHALL use the distinctions below.
+
+### 6.1 Five distinct truth and authority questions
+
+| Question | Source to inspect | What it may establish | What it cannot establish alone |
+| --- | --- | --- | --- |
+| What code exists at this exact subject revision? | Repository content, configuration, generated files, and content digests | Observed implementation fact | Intended behavior, acceptance, or professional authority |
+| What exact governed shape is expected? | Enforced schemas, generated contracts, migrations, and conformance fixtures | Executable reference shape | Meaning outside the shape's governed scope |
+| What is the implementation intended to mean or preserve? | Concern-owning canon, ratified specification, registered working authority, or an ADR incorporated through one of those recognized authority paths | Intended semantics, constraints, and architectural obligations | Whether the current code actually conforms |
+| What did a particular execution do? | Version-bound runtime traces, logs, events, coverage, and test results | Observed behavior for the captured executions | Behavior for unobserved paths or all possible inputs |
+| What does an analyzer conclude? | Revision-bound analysis run with provenance and coverage declaration | Derived evidence, Analyzer Finding Record, or bounded inference | Independent authority, complete truth, approval, or absence of risk |
+
+### 6.2 Controlling source rule
+
+For **facts about the existing implementation**, repository content SHALL be the primary observed source.
+
+For **intended product or software meaning during the current convergence phase**, the concern-owning canon, governed specification, registered working authority, or an ADR incorporated through one of those recognized authority paths SHALL control. An independently “accepted” ADR SHALL NOT have authority under this corpus.
+
+For **exact governed boundary shapes**, enforced repository reference artifacts SHALL control.
+
+For **a concrete execution**, captured runtime evidence SHALL control only for that execution and environment.
+
+Analyzer output SHALL remain derived evidence about an identified subject. It SHALL NOT become a second source tree, silently override an enforced reference artifact, or confer governance authority.
+
+### 6.3 Revision-bound evidence
+
+Every semantic fact, graph element, coverage observation, trace link, query result, and Analyzer Finding Record SHALL be bound to enough subject identity to determine what was analyzed.
+
+For a committed clean tree, subject identity SHOULD include:
+
+- repository identity;
+- commit identifier;
+- relevant submodule or workspace identity;
+- TypeScript project/configuration identity;
+- configuration and lockfile digests;
+- analyzer and rule-set versions.
+
+For a dirty or synthetic working tree, a commit identifier alone is insufficient. Subject identity SHALL additionally include content digests or a reproducible change-set identity covering every analyzed input.
+
+### 6.4 Freshness and invalidation
+
+Evidence SHALL be marked stale or invalidated when a change can affect its conclusion, including changes to:
+
+- source or generated code;
+- TypeScript configuration;
+- package resolution or lockfiles;
+- analyzer configuration or rules;
+- analyzer versions;
+- coverage instrumentation;
+- test selection;
+- runtime build or deployment identity;
+- framework models or semantic adapters.
+
+The absence of an invalidation edge SHALL NOT be interpreted as freshness.
+
+### 6.5 Completeness and uncertainty
+
+The system SHALL distinguish at least:
+
+- confirmed extracted fact;
+- bounded inference;
+- unsupported construct;
+- incomplete analysis;
+- conflicting evidence;
+- stale evidence;
+- not analyzed;
+- no Analyzer Finding Record under the declared analysis coverage.
+
+Exact serialized spellings belong to `JAN-CSAA-007`.
+
+“No Analyzer Finding Record” SHALL NOT be rendered or reported as “no defect” unless the applicable Analysis Rule Profile or governing Assurance Policy defines a complete decision procedure for the exact subject and coverage.
+
+### 6.6 Ratified Stage A semantic baselines
+
+The program SHALL preserve the following effective Stage A semantic baselines exactly as constraints from `REG-D-017`. Their exact technical performance remains allocated to later governed members and enforced artifacts, which SHALL NOT weaken them.
+
+| Decision | Ratified semantic baseline | Deferred ground |
+| --- | --- | --- |
+| W0-09 | A TypeScript or TypeScript-bearing Svelte fact is compiler-confirmed only for the exact source, project configuration, compiler/toolchain version, module-resolution environment, and relevant generated context against which it was derived. Analyzer and adapter output remains derived evidence, never independent semantic authority. | Analyzer-provider selection |
+| W0-10 | Coverage is version-bound evidence that identified code regions were exercised by identified executions under identified instrumentation. A percentage alone is neither a correctness oracle nor evidence about unexecuted behavior. | Provider, metric family, aggregation, exclusions, and thresholds |
+| W0-11 | A runtime trace supports claims only about its identified captured execution, environment, inputs, instrumentation, and observation limits. It does not establish behavior for unobserved paths or all possible inputs. | Production collection, ingestion, retention, privacy, and sampling |
+| W0-12 | Analyzer observations, findings, dispositions, suppressions, and corrections preserve append-only logical history. Corrections cite and supersede prior records; physical compaction must preserve lossless reconstruction. | Physical persistence and retention design |
+| W0-13 | Source rewriting, repair approval, repair application, and automated remediation remain outside the analysis core. Proposed remediation requires a separately authorized change and revalidation workflow. | Concrete remediation orchestration |
+| W0-14 | Unsupported, failed, stale, partially analyzed, excluded, or incomplete regions remain explicit and may not collapse into an empty finding set, passing verdict, or unqualified green result. | Final aggregate and repository-gate presentation rules |
+
+---
+
+## 7. Core non-equivalences
+
+The corpus SHALL preserve these distinctions:
+
+```text
+Source code                  ≠ AST
+AST                          ≠ symbol or type semantics
+Import graph                 ≠ package-manifest dependency graph
+Package-manifest graph       ≠ lockfile-resolved dependency graph
+Lockfile-resolved graph      ≠ inferred or observed runtime dependency graph
+Call graph                   ≠ all possible dynamic dispatch
+CFG                          ≠ runtime trace
+DFG                          ≠ complete information flow
+CPG                          ≠ repository knowledge graph
+Semantic index               ≠ source of authority
+Analyzer                     ≠ canonical Assurance Policy or Analysis Rule Profile
+Analyzer execution           ≠ assurance satisfaction
+Analyzer Finding Record      ≠ governance Decision
+Analyzer-record suppression  ≠ defect removal
+Tool agreement               ≠ correctness
+Test pass                    ≠ behavioral preservation
+Coverage percentage          ≠ correctness
+Observed runtime path        ≠ all reachable behavior
+Repository commit            ≠ Janumi Baseline
+Absence of evidence          ≠ evidence of absence
+```
+
+### 7.1 Canonical assurance boundary and technical analysis records
+
+Canonical **Assurance Policy**, **Assurance Observation**, Assessment, Evidence, and governance meanings remain owned by `JPWB-DOC-002` and `JPWB-DOC-003`. This corpus SHALL reference those meanings where integration is required and SHALL NOT create a parallel canonical `Finding` entity.
+
+Within the technical code-analysis layer, the corpus SHALL use the following definitions:
+
+- an **Analysis Capability** defines a kind of fact or Engineering Evidence Record that can be produced;
+- an **Analyzer Provider** is a concrete tool or adapter that implements one or more capabilities;
+- an **Analysis Rule Profile** is a versioned set of executable or declarative checks for a defined repository scope;
+- an **Analyzer Finding Record** preserves a provider observation or bounded conclusion with subject, provenance, limitations, and disposition history;
+- an **Engineering Evidence Record** is a non-canonical technical record that binds an observed or derived result to its subject, producer, method, coverage, time, and epistemic limits;
+- a **Repository Gate Profile** is a versioned technical definition that selects Analysis Rule Profiles and declares applicability, evidence, criteria, epistemic outcomes, severity, and blocking behavior;
+- a **Repository Gate Evaluation** is a revision-bound execution result produced by applying one identified Repository Gate Profile; it SHALL preserve rather than redefine the profile and SHALL NOT erase its inputs or underlying Analyzer Finding Records;
+- an **Engineering Exception Record** is an explicit, scoped, approved disposition under operative engineering-practice and concern-owning rules; a configuration suppression without that record is not an exception.
+
+These technical records MAY supply Evidence or inputs to canonical assurance only through an explicitly governed mapping. Analyzer execution or a Repository Gate Evaluation SHALL NOT by itself create an Assurance Assessment, resolve an Assurance Observation, exercise governance, or promote a Baseline.
+
+### 7.2 CPG and repository semantic graph
+
+A code property graph MAY be the storage representation for AST, control-flow, data-flow, and call relationships. The corpus SHALL NOT assume that this automatically makes it the complete repository semantic graph.
+
+Coverage, runtime traces, analyzer runs, Analyzer Finding Records, Engineering Evidence Records, project configurations, snapshots, architecture rules, and tool provenance SHALL receive explicit models even when stored in the same graph database.
+
+---
+
+## 8. Proposed corpus progression
+
+```text
+JAN-CSAA-000
+Corpus scope, authority boundaries, vocabulary, and manifest
+    ↓
+JAN-CSAA-001
+Capability architecture and responsibility boundaries
+    ↓
+JAN-CSAA-002
+Program TypeScript semantic model and invariants
+    ↓
+JAN-CSAA-003
+Analysis, enrichment, query, and change-impact semantics
+    ↓
+JAN-CSAA-004
+Analysis-rule, analyzer-finding, provider, and repository-gate catalog
+    ↓
+JAN-CSAA-006
+Independent golden repository and change-scenario fixture
+    ↓
+JAN-CSAA-007
+Versioned machine contracts and adapter interfaces
+    ↓
+JAN-CSAA-008
+Executable analyzer conformance and V&V specification
+    ↓
+JAN-CSAA-009
+Indexing, persistence, incremental update, recovery, and operations
+    ↓
+JAN-CSAA-010
+Coding-agent analysis employment profile
+    ↓
+JAN-CSAA-011
+Qualified TypeScript and tool-integration standard
+    ↓
+Repository-specific implementation roadmap and requirement ledger
+```
+
+`JAN-CSAA-005` is a parallel current-state evidence feed into `JAN-CSAA-001` through `JAN-CSAA-004`, the fixture, and implementation planning. It does not sit downstream as semantic authority: it maps observed code and configuration to concern-owning obligations.
+
+The vertical path is an informative semantic-dependency illustration, not a drafting or commissioning chronology. Concrete-tool conformance obligations are owned by §§10.4 and 10.7–10.8.
+
+### 8.1 Structural role mapping to the RPH exemplar
+
+This is a structural analogy only; it does not import RPH professional-work semantics or authority.
+
+| RPH corpus function | CSAA allocation | Code-analysis adaptation |
+| --- | --- | --- |
+| 000 — product boundary, vocabulary, and manifest | 000 | Scope, authority boundary, technical vocabulary, manifest, and commissions |
+| 001 — capability/product architecture | 001 | Tool-neutral code-analysis capability architecture |
+| 002 — semantic object model and invariants | 002 | TypeScript/repository semantic model and cross-graph invariants |
+| 003 — specialization semantics | 003 | Extraction, enrichment, query, inference, and change-impact semantics |
+| 004 — assurance catalog | 004 | Technical Analysis Rule Profiles, Repository Gate Profiles/Evaluations, and analyzer-provider contract |
+| 005 — current/legacy semantic inventory | 005 | Revision-bound JPWB repository inventory and conformance mapping |
+| 006 — independently reviewable reference fixture | 006 | Golden repository and semantic change scenarios |
+| 007 — machine contracts | 007 | Snapshot, graph, query, analysis-record, and adapter contracts |
+| 008 — executable conformance | 008 | Analyzer, invariant, incremental, security, and trajectory V&V |
+| 009 — persistence and migration | 009 | Index persistence, invalidation, recovery, isolation, and operations |
+| 010 — user-facing employment | 001, 003, 007, and 010 by single-owner concern | Human inspection boundaries plus coding-agent analysis employment |
+| CSAA-specific provider realization | 011 | Qualification and binding of concrete TypeScript and analysis tools |
+
+---
+
+## 9. Controlled manifest — Stage A reservations
+
+`REG-D-017` permanently reserves `JAN-CSAA-000` through `JAN-CSAA-011`. Only `JAN-CSAA-000` is authored. Reservation, a planned filename, or an approved-in-principle commission does not create a document or confer authority.
+
+| Document ID | Planned filename | Artifact state | Commission state | Current authority | Primary responsibility |
+| --- | --- | --- | --- | --- | --- |
+| `JAN-CSAA-000` | `README.md` | `0.2.1` / Proposed / authored | Stage A carriage and W0-17 preparation authorized | None as a member; W0-17 not presented | Manifest, precedence, vocabulary, scope, closure, commission |
+| `JAN-CSAA-001` | `JAN-CSAA-001 - Codebase Semantic Analysis and Assurance Architecture.md` | Unaudited and unauthored; target starts at `0.1.0` / Draft | Wave 1 approved in principle by W0-08; inactive until W0-17 | None | Context, responsibilities, trust boundaries, flows, failure and degradation |
+| `JAN-CSAA-002` | `JAN-CSAA-002 - TypeScript Semantic Model and Invariant Catalog.md` | Unaudited and unauthored; target starts at `0.1.0` / Draft | Wave 1 approved in principle by W0-08; inactive until W0-17 | None | Identity, revisions, AST, symbols, types, graphs, coverage, traces, evidence |
+| `JAN-CSAA-003` | `JAN-CSAA-003 - Analysis Enrichment Query and Change Impact Specification.md` | Unaudited and unauthored | Reserved; later wave not commissioned | None | Extraction, enrichment, soundness, uncertainty, deltas, impact, explanations |
+| `JAN-CSAA-004` | `JAN-CSAA-004 - Code Analysis Rule Gate and Analyzer Provider Contract.md` | Unaudited and unauthored | Reserved; later wave not commissioned | None | Rule profiles, gate profiles/evaluations, Analyzer Finding Records, severity, conflicts, exceptions |
+| `JAN-CSAA-005` | `JAN-CSAA-005 - JPWB TypeScript Repository Semantic Inventory and Conformance Mapping.md` | Unaudited and unauthored; target starts at `0.1.0` / Draft | Wave 1 approved in principle by W0-08; inactive until W0-17 | None | Packages, configs, architecture constraints, tools, tests, traces, unknowns |
+| `JAN-CSAA-006` | `JAN-CSAA-006 - Golden Repository and Change Scenario Fixture.md` | Unaudited and unauthored | Reserved; later wave not commissioned | None | Known facts, known Analyzer Finding Records, mutations, expected deltas, runtime observations |
+| `JAN-CSAA-007` | `JAN-CSAA-007 - Semantic Snapshot Graph Query Analysis Record and Adapter Contract Package.md` | Unaudited and unauthored | Reserved; later wave not commissioned | None | Schemas, APIs, errors, versions, provenance, adapters, compatibility |
+| `JAN-CSAA-008` | `JAN-CSAA-008 - Executable Analyzer Invariant and Conformance Test Specification.md` | Unaudited and unauthored | Reserved; later wave not commissioned | None | Golden, property, mutation, differential, incremental, security, performance tests |
+| `JAN-CSAA-009` | `JAN-CSAA-009 - Index Persistence Incremental Reanalysis Recovery and Operations Design.md` | Unaudited and unauthored | Reserved; later wave not commissioned | None | Atomic snapshots, invalidation, caching, concurrency, migrations, recovery, retention |
+| `JAN-CSAA-010` | `JAN-CSAA-010 - Coding Agent Analysis Employment Profile.md` | Unaudited and unauthored | Reserved; later wave not commissioned | None | Agent invocation, existing gate-profile use, reanalysis, escalation, and reporting |
+| `JAN-CSAA-011` | `JAN-CSAA-011 - TypeScript and Analysis Tool Integration Standard.md` | Unaudited and unauthored | Reserved; later wave not commissioned | None | Provider roles, qualification, licensing, sandboxing, and integration |
+
+### 9.1 Identifier and version rules
+
+`REG-D-017` confirms the family prefix and reservations. For every authored controlled document:
+
+- its permanent document ID SHALL remain unchanged across title, filename, location, version, and status changes;
+- its permanent document ID SHALL NOT be reassigned;
+- versions SHALL use `MAJOR.MINOR.PATCH`;
+- each artifact SHALL carry status, settledness, and authority as separate fields;
+- **Draft** status SHALL mean in authoring with no program authority;
+- **Proposed** status SHALL mean ledger-closed and self-reviewed, ready for independent review/adoption, with no program authority;
+- **Normative** status SHALL mean an active HYPOTHESIS-grade program working reference only after its own exact-version/digest `JPWB-REG-005` sponsor conferral;
+- **Deprecated** status SHALL mean discoverable and temporarily usable only under its stated compatibility rule;
+- **Superseded** status SHALL mean no longer current and identify its successor;
+- status and version SHALL remain independent;
+- manifest metadata and document metadata SHALL change together.
+
+### 9.2 Filename rule
+
+After identifier confirmation, new corpus files SHALL use:
+
+```text
+<PERMANENT-ID> - <Canonical Title>.md
+```
+
+`JAN-CSAA-000` is the explicit manifest exception and remains `README.md`. The convention makes every other controlled identity visible without depending on Git rename detection or title stability.
+
+### 9.3 Required controlled-document metadata
+
+Every authored controlled `JAN-CSAA` document, including this charter, SHALL declare:
+
+- permanent document ID, canonical title, version, controlled status, and settledness;
+- authority status and the exact registered sponsor grant or ratification record;
+- parent and inherited authorities;
+- `Governs` and `Does Not Govern` statements;
+- subject scope and applicability;
+- precedence and conflict-routing rules;
+- normative-language convention;
+- requirement-ledger location and verification owner;
+- change authority and change procedure;
+- supersedes and superseded-by relationships, when any;
+- companion enforced artifacts and conformance-test references.
+
+`JAN-CSAA-005` SHALL additionally declare the analyzed repository revision and worktree state, as-of date, evidence provenance, last verification time, and the condition under which the inventory becomes stale or is superseded.
+
+### 9.4 Per-member adoption, review, and oracle controls
+
+Until a later registered delegation establishes another model:
+
+- the accountable sponsor retains authority to confer Normative program status on each CSAA member;
+- every conferral SHALL be a distinct `JPWB-REG-005` sponsor `DECISION`;
+- an author MAY move a member from Draft to Proposed only after closing its requirement ledger and self-review;
+- an author, reviewer, analyzer, or program-local log SHALL NOT confer Normative status;
+- every Proposed member SHALL receive independent adversarial review;
+- every adoption package SHALL identify the exact document ID, semantic version, SHA-256 digest of the candidate bytes, review identity and method, requirement ledger, verification evidence, unresolved findings, strongest opposing case, consequences of adoption, amendment, rejection, and deferral, and recommendation;
+- every unresolved fork and every material normative change SHALL receive its own full-judgment decision surface and individual sponsor response field;
+- the candidate digest SHALL be rechecked immediately before sponsor recording;
+- one controlled changeset SHALL append the conferral to `JPWB-REG-005` and synchronize member and manifest status, version, and authority fields;
+- a candidate-byte change after sponsor disposition SHALL pause conferral for affected review unless the change is an exactly previewed administrative carriage;
+- pre-existing oracle judgments, acceptance criteria, fixtures, gate configurations, and other judgment-grain reference artifacts SHALL change only through separately authorized review;
+- newly authored oracle content SHALL remain Proposed until conferred;
+- a suspected-wrong oracle SHALL create a divergence record rather than an inline weakening;
+- the Wave 0 ledger and review templates SHALL be used as mandatory starting points, with all required fields preserved.
+
+A synchronized adoption record uses `EFFECTIVE — MERGED`. If synchronized carriage cannot be completed in that controlled changeset, the record SHALL say `EFFECTIVE — MERGE PENDING`; a new append-only entry SHALL later confirm carriage, and the original entry SHALL NOT be rewritten.
+
+---
+
+## 10. Reserved responsibilities and staged document commissions
+
+The sections below reserve semantic ownership and describe candidate deliverables. They do not authorize file creation by themselves.
+
+- W0-08 approves `JAN-CSAA-001`, `JAN-CSAA-002`, and `JAN-CSAA-005` in principle for Wave 1, but that commission is inactive until W0-17.
+- `JAN-CSAA-003`, `JAN-CSAA-004`, and `JAN-CSAA-006` through `JAN-CSAA-011` are reserved for later waves and are not commissioned.
+- No document in this section is authored, adopted, or authoritative merely because its responsibility is described here.
+
+### 10.1 `JAN-CSAA-001` — Capability architecture
+
+This document SHALL define the tool-neutral system context and responsibility boundaries.
+
+It SHALL cover:
+
+- repository acquisition and subject identification;
+- workspace, package, and TypeScript project discovery;
+- source/configuration classification;
+- semantic extraction;
+- graph normalization and composition;
+- test and coverage ingestion;
+- runtime-trace ingestion;
+- analysis scheduling and orchestration;
+- Engineering Evidence Record and Analyzer Finding Record normalization;
+- query and change-impact services;
+- coding-agent and human interfaces;
+- provider/plugin boundaries;
+- sandbox, filesystem, process, and network trust boundaries;
+- secrets, source confidentiality, and retention;
+- degraded operation, partial analysis, timeout, cancellation, and recovery;
+- observability for every material analysis and tool invocation;
+- scalability and responsiveness objectives without choosing a storage engine prematurely.
+
+The architecture SHALL distinguish logical responsibilities from deployable services. It SHALL NOT require a microservice, graph database, daemon, or language-server topology merely because a diagram contains separate boxes.
+
+Acceptance of `JAN-CSAA-001` SHALL require:
+
+- an end-to-end data-flow diagram;
+- a responsibility matrix;
+- a trust-boundary and threat model;
+- defined failure and degraded modes;
+- explicit non-goals;
+- at least two credible architecture alternatives for unresolved storage and orchestration choices.
+
+### 10.2 `JAN-CSAA-002` — TypeScript semantic model and invariants
+
+This document SHALL define the stable semantic objects and relationships independent of provider-specific output.
+
+The object catalog SHALL address at least:
+
+- Repository;
+- Repository Revision and parentage;
+- Repository Snapshot;
+- VCS commit, ref or branch, merge base, candidate merge, and worktree identity;
+- Working Change Set;
+- Workspace;
+- Package;
+- package manifest, lockfile, external component identity, resolved dependency version, advisory, and vulnerability observation;
+- TypeScript Project and configuration;
+- authored Source Artifact, including TypeScript-bearing framework artifacts;
+- Generated or Virtual Artifact and generator/source-origin relation;
+- governed software Contract, schema, API boundary, compatibility rule, and generated-contract artifact;
+- build configuration, build execution, emitted or bundled Build Artifact, and execution-artifact identity;
+- Source Map and generated-to-authored source-location mapping;
+- Module;
+- declaration;
+- symbol;
+- scope;
+- reference;
+- type;
+- type relation;
+- generic or type parameter and constraint;
+- overload set, overload signature, and implementation signature;
+- namespace and module augmentation;
+- decorator or annotation occurrence;
+- class, interface, function, method, parameter, variable, property, and signature;
+- expression, statement, and control-flow node;
+- import/export relation;
+- workspace/package-manifest dependency;
+- lockfile-resolved external dependency and version;
+- inferred runtime dependency and observed runtime load;
+- call site and callable target;
+- data-flow source, transformation, sanitizer, and sink;
+- instrumentation configuration and instrumentation site;
+- test suite, test, test case, test target, test selection, test run, test result, and assertion outcome;
+- coverage observation, coverage region, denominator basis, and measurement granularity;
+- runtime build/environment identity, workload selection, execution, Trace Schema, Trace Collector, trace, span, and event;
+- runtime-artifact and runtime-to-authored-source relation;
+- repository history and change relation;
+- architecture rule;
+- analysis run;
+- semantic fact;
+- query;
+- Analyzer Finding Record;
+- Engineering Evidence Record;
+- exception or suppression reference.
+
+For each object and relationship, the document SHALL define:
+
+- identity;
+- subject revision;
+- provenance;
+- ownership;
+- lifecycle;
+- authority and epistemic limits;
+- required and optional metadata;
+- versioning and invalidation;
+- supported, inferred, unknown, and conflicting states;
+- serialization owner;
+- cross-graph invariants.
+
+Required invariants SHALL include:
+
+- no semantic fact without subject and provenance;
+- no cross-revision edge presented as same-revision fact;
+- no provider-normalized fact that loses its raw provider trace;
+- no coverage observation detached from execution artifact, instrumentation configuration, denominator basis, measurement granularity, and test or workload selection;
+- no runtime observation detached from execution artifact, trace schema and collector configuration, environment, workload selection, and time boundary;
+- no coverage or trace-to-source relation without a source-origin mapping where transformation occurred;
+- no inferred edge presented as compiler-confirmed;
+- no graph completeness claim without a declared coverage basis;
+- no Analyzer Finding Record state change that erases prior Engineering Evidence Records.
+
+Program-dependence graph and static-single-assignment representations MAY be defined as derived optional views when a qualified analysis capability needs them. They SHALL NOT be silently treated as core facts, provider-independent ground truth, or substitutes for their source CFG and DFG provenance.
+
+### 10.3 `JAN-CSAA-003` — Analysis, enrichment, query, and change impact
+
+This document SHALL define the meaning and limits of:
+
+- parsing and AST extraction;
+- symbol and reference resolution;
+- type analysis;
+- dependency analysis;
+- call-graph construction;
+- control-flow construction;
+- data-flow and taint analysis;
+- CPG construction or graph composition;
+- project references, path aliases, conditional exports, declaration files, source maps, module augmentation, decorators, JSX/TSX, and framework-generated TypeScript;
+- test discovery and test-to-code mapping;
+- coverage ingestion and comparison;
+- runtime-trace correlation;
+- generated-code and declaration-file handling;
+- framework and reflection modeling;
+- architecture discovery;
+- semantic enrichment and bounded inference;
+- semantic queries;
+- code slicing;
+- change-impact analysis;
+- before/after graph comparison.
+
+Every capability SHALL state:
+
+- supported subjects and constructs;
+- required inputs;
+- produced fact and edge types;
+- soundness or completeness goal;
+- known false-positive and false-negative classes;
+- unsupported behavior;
+- inference and confidence treatment;
+- incremental invalidation boundary;
+- required provenance;
+- expected failure behavior;
+- declared capability-conformance oracle.
+
+The document SHALL prohibit a query from silently treating unknown, unsupported, stale, or incomplete regions as empty.
+
+### 10.4 `JAN-CSAA-004` — Analysis-rule, repository-gate-profile, and analyzer-provider contract
+
+This document SHALL allocate at least one appropriate technical Analysis Rule Profile to each assurance area below and SHALL define Repository Gate Profiles only for areas separately designated as binding gates. This charter does not designate every area as a repository gate; `JAN-CSAA-004` SHALL record whether each area requires an Analysis Rule Profile, a Repository Gate Profile, or both:
+
+- composite implementation correctness or readiness for a declared obligation scope, aggregating applicable technical profiles while preserving inconclusive, stale, unsupported, conflicting, and unresolved outcomes;
+- syntax and type correctness;
+- contract conformance;
+- architecture-boundary conformance;
+- dependency integrity and cycles;
+- dead or unreachable code;
+- coupling and change amplification;
+- behavioral preservation;
+- test adequacy;
+- security weakness and taint flow;
+- third-party dependency and software-supply-chain exposure;
+- unsafe input and output handling;
+- concurrency and asynchronous-control risks;
+- error and recovery behavior;
+- observability sufficiency;
+- maintainability and complexity;
+- semantic-index freshness and completeness.
+
+Each Analysis Rule Profile or Repository Gate Profile SHALL define:
+
+- stable rule-profile or repository-gate ID and version;
+- purpose and protected engineering decision;
+- subject and applicability;
+- claim evaluated;
+- evidence required;
+- criteria and epistemic outcomes;
+- severity and confidence treatment;
+- blocking and non-blocking conditions;
+- recognized authority owning the binding enforcement obligation;
+- authoritative, non-bypassable enforcement boundary and its versioned enforcement artifact;
+- bypass resistance, failure behavior, and the distinction between binding enforcement and local convenience checks;
+- any registered interim enforcement carrier when the definitive boundary is not yet available;
+- required independence, when any;
+- eligible analyzer capabilities;
+- false-positive and disagreement handling;
+- remediation and reanalysis expectations;
+- exception authority and required record;
+- evidence-retention requirements.
+
+A Repository Gate Evaluation SHALL be a subject- and revision-bound result referencing the exact Repository Gate Profile, rule-profile versions, inputs, Analyzer Finding Records, exceptions, capability coverage, and execution health used. It SHALL NOT contain a second mutable copy of gate criteria.
+
+A Repository Gate Profile SHALL NOT confer its own authority. Local or pre-commit execution MAY provide early feedback but SHALL NOT be described as the binding guarantee; the profile SHALL cite the recognized authority and non-bypassable enforcement boundary that make a result consequential.
+
+Where a technical gate is mapped into canonical assurance, the document SHALL cite the governing `JPWB-DOC-002`/`JPWB-DOC-003` meaning and SHALL define the mapping without duplicating it.
+
+The analyzer-provider contract in `JAN-CSAA-004` owns the tool-neutral capability obligations. It SHALL require every provider to declare:
+
+- capability IDs implemented;
+- supported language and construct versions;
+- inputs and configuration;
+- outputs and raw-result retention;
+- version and rule-set identity;
+- completeness and failure signals;
+- deterministic/reproducible behavior limits;
+- resource and timeout behavior;
+- security and licensing constraints;
+- normalization and deduplication behavior;
+- known semantic loss.
+
+A provider SHALL recommend or report. It SHALL NOT approve its own Analyzer Finding Record, waive a rule or governing Assurance Policy, create a canonical assurance disposition, or mutate source code as an implicit side effect of analysis.
+
+`JAN-CSAA-007` owns the exact adapter shape. `JAN-CSAA-011` selects, versions, configures, secures, and operates concrete providers against this abstract contract; it SHALL NOT redefine capability or evidence meaning.
+
+### 10.5 `JAN-CSAA-005` — Current JPWB repository inventory
+
+This document SHALL be evidence-first and regenerated or revised whenever repository reality changes materially.
+
+It SHALL inventory:
+
+- workspaces, packages, apps, and TypeScript project configurations;
+- package DAG and intended dependency constraints;
+- source/generated/test/configuration/vendor classifications;
+- schema and generated-contract sources;
+- build, lint, type, test, coverage, boundary, and static-analysis commands;
+- architecture rules and accepted exceptions;
+- runtime and test entry points;
+- dynamic loading, reflection, code generation, and framework seams;
+- existing observability and trace sources;
+- existing analyzers and exact checked-in configuration;
+- missing semantic capabilities;
+- representative success and failure paths;
+- current known quality or security Analyzer Finding Records relevant to the tool-suite design;
+- confidence for every current-state claim.
+
+The initial inventory SHALL verify, rather than assume, the roles of:
+
+- the TypeScript compiler;
+- ESLint;
+- dependency-cruiser;
+- Vitest;
+- `svelte-check` and the Svelte compiler;
+- Playwright test, result, and trace evidence, kept distinct from source-coverage evidence;
+- checked-in Sonar configuration and any separately verified runner;
+- repository build orchestration.
+
+The inventory SHALL explicitly record the checked-in analysis exclusions, app-specific gates, and missing repository-wide coverage configuration. Candidate tools absent from the repository SHALL be labeled candidates, not current capabilities.
+
+### 10.6 `JAN-CSAA-006` — Golden fixture
+
+The fixture strategy SHALL contain both:
+
+1. a small synthetic repository whose declared expected semantic facts and Analyzer Finding Records are independently and exhaustively reviewable within a stated coverage boundary; and
+2. selected, version-pinned JPWB scenarios that demonstrate realistic monorepo, generated-contract, architecture-boundary, test, and runtime behavior.
+
+The fixture SHALL include known-positive and known-negative cases for:
+
+- symbol aliasing and re-exports;
+- authored `.svelte` source to generated or virtual TypeScript mapping, including diagnostic-location fidelity and deliberately broken mappings;
+- generics and overload resolution;
+- inheritance and interface implementation;
+- dynamic dispatch;
+- unreachable branches;
+- async and exception control flow;
+- data flow from source through sanitizer to sink;
+- unsafe source-to-sink flow;
+- dependency cycles and forbidden package edges;
+- package-manifest and lockfile changes, resolved-version deltas, and vulnerable dependency/advisory correlation, including unknown or conflicting advisory cases;
+- dead-code candidates with and without dynamic entry points;
+- contract-compatible and incompatible changes;
+- coupling increase and decrease;
+- test-to-code mapping;
+- coverage change;
+- runtime paths that confirm or contradict static candidates;
+- matched and mismatched build-artifact, source-map, instrumentation, test-selection, coverage, trace-schema, collector, workload, and environment provenance;
+- incremental edit, rename, move, configuration change, and deletion;
+- stale-cache and interrupted-index recovery.
+
+Expected results SHALL be authored independently of the analyzer under test. A provider's output SHALL NOT be copied into the golden oracle as the expected judgment.
+
+Fixture and oracle governance SHALL inherit the two-stream and authority-separation rules of `JPWB-DOC-004`: implementation authors MAY propose new cases, but an authorized independent reviewer SHALL confer or change judgment-grain expected results; every oracle change SHALL preserve author, reviewer, rationale, source, subject, and version provenance; unreviewed expectations SHALL remain visibly proposed and SHALL NOT produce a green conformance claim; and a suspected-wrong oracle SHALL create an explicit divergence for adjudication rather than being weakened to fit the implementation.
+
+### 10.7 `JAN-CSAA-007` — Machine contract package
+
+This document SHALL define versioned contracts for:
+
+- subject and snapshot identity;
+- source artifact descriptors;
+- authored/generated/virtual artifact provenance and source-origin mappings;
+- build artifacts, instrumentation or collection configurations, and execution identities;
+- semantic nodes and edges;
+- provenance and epistemic status;
+- analysis requests and runs;
+- provider capabilities and health;
+- query requests, responses, and explanations;
+- change sets and graph deltas;
+- test selections, runs, results, and assertion outcomes;
+- coverage observations, regions, denominator bases, and granularities;
+- runtime-trace observations, schemas, collectors, workload selections, and runtime-artifact mappings;
+- Analyzer Finding Records and Engineering Evidence Records;
+- Analysis Rule Profile results, Repository Gate Evaluations, and governed assurance mappings;
+- exceptions and suppressions;
+- invalidation and freshness;
+- authorization context, repository/worktree scope, and audit references;
+- diagnostics and typed errors;
+- agent-facing tool calls or API operations.
+
+The package SHALL define:
+
+- designated schema source files;
+- generated TypeScript types;
+- schema and contract versions;
+- compatibility and migration rules;
+- unknown-field behavior;
+- pagination and bounded-result behavior;
+- deterministic ordering where required;
+- partial-result semantics;
+- cancellation, timeout, and resource-exhaustion errors;
+- safe redaction;
+- provider raw-result references;
+- validation stages.
+
+Machine contracts SHALL be implemented as enforced repository reference artifacts. Prose examples SHALL NOT become a competing shape authority.
+
+### 10.8 `JAN-CSAA-008` — Executable conformance and V&V
+
+This document SHALL convert the semantic and assurance obligations into an executable acceptance contract.
+
+The test catalog SHALL include:
+
+- schema and generated-type conformance;
+- semantic-model invariant tests;
+- golden AST, symbol, type, dependency, call, CFG, DFG, and CPG tests;
+- authored-framework-to-virtual-source provenance and diagnostic-location fidelity tests;
+- resolved dependency, lockfile-delta, advisory-correlation, and vulnerability-observation tests;
+- cross-graph identity and provenance tests;
+- provider-adapter contract tests;
+- differential tests between overlapping providers;
+- property and metamorphic tests;
+- mutation tests proving rules fail when their target defect is introduced;
+- incremental invalidation and cache-correctness tests;
+- stale, incomplete, unsupported, conflicting, timeout, and partial-result tests;
+- security tests for untrusted repositories and analyzer execution;
+- deterministic replay and reproducibility tests;
+- performance and resource-budget tests;
+- coverage and trace correlation tests;
+- negative build/instrumentation/test/coverage/trace identity and observation-cutoff tests;
+- coding-agent trajectory tests for mandatory analysis use;
+- negative tests proving no false green state is emitted.
+
+Every test SHALL have:
+
+- a stable ID;
+- governing requirement references;
+- fixture and subject version;
+- preconditions;
+- action;
+- expected semantic result;
+- expected evidence and diagnostics;
+- failure meaning.
+
+The suite SHALL test the tests. Critical rules SHALL have mutation or kill tests demonstrating that a vacuous implementation cannot pass.
+
+### 10.9 `JAN-CSAA-009` — Persistence, incrementality, recovery, and operations
+
+This document SHALL define:
+
+- immutable or content-addressed snapshot identity;
+- atomic publication of a complete index revision;
+- incremental invalidation and recomputation;
+- dependency-aware cache invalidation;
+- concurrent reads and writes;
+- worktree and multi-branch isolation;
+- interrupted analysis and restart;
+- provider failure and degraded capability;
+- reindex and rebuild;
+- storage schema evolution;
+- retention, redaction, and source confidentiality;
+- query authorization and least-privilege access;
+- repository, worktree, branch, and tenant isolation where applicable;
+- encryption requirements for persisted and transported sensitive data;
+- integrity, corruption detection, and repair;
+- security-relevant audit events;
+- garbage collection;
+- backup and recovery;
+- telemetry, health, readiness, and capacity;
+- dual-run comparison during engine or provider migration;
+- fallback and cutover;
+- prevention of mixed-revision query results.
+
+A query SHALL resolve against one declared semantic snapshot unless it explicitly requests and labels a cross-snapshot comparison.
+
+An incremental result SHALL be observationally equivalent, within documented ordering rules and inference limits, to a clean full analysis of the same subject.
+
+Static semantic-snapshot identity SHALL remain distinct from execution-evidence-set identity. A query combining static and execution evidence SHALL declare both identities and MAY additionally declare an observation cutoff. Newly arriving test results, coverage, or traces SHALL create an append-only evidence-set revision and SHALL NOT mutate the historical result of a prior query.
+
+### 10.10 `JAN-CSAA-010` — Coding-agent analysis employment profile
+
+This document SHALL specialize `JPWB-DOC-004`; it SHALL NOT restate the general Agent Operating Protocol.
+
+It SHALL map change risk and employment points to the Analysis Rule Profiles and Repository Gate Profiles owned by `JAN-CSAA-004`; it SHALL NOT redefine their evidence criteria, outcomes, severity, or blocking semantics.
+
+It SHALL define the analyses, evidence, stop conditions, and reporting obligations for:
+
+| Employment point | Minimum CSAA purpose |
+| --- | --- |
+| Repository intake | Establish subject, projects, packages, generated boundaries, architecture rules, tool availability, and index freshness |
+| Before design | Locate existing implementations, contracts, callers, dependencies, tests, runtime paths, and constraints |
+| Before planning | Predict affected semantic closure, risk, required tests, gates, migrations, and reanalysis |
+| During implementation | Refresh affected facts; surface new type, dependency, control-flow, data-flow, and security Analyzer Finding Records early |
+| After a coherent increment | Compare semantic delta with planned impact and rerun affected Analysis Rule Profiles and Repository Gate Evaluations |
+| Local pre-commit checkpoint | Run the change-scope checks required for early feedback; reject stale, skipped, or falsely green evidence, but do not describe this bypassable client-side check as the binding guarantee |
+| Before merge | Rebind the subject to the actual target-branch merge state, recompute cross-branch impact, and run the applicable integration and regression gates |
+| Regression analysis | Compare the declared before/after subjects, tests, coverage, traces, Analyzer Finding Records, and behavior or contract evidence without substituting line diffs for semantic change |
+| Before completion | Run the full applicable evidence ladder, close the requirement ledger, and account for every Analyzer Finding Record |
+| Refactoring | Prove intended API, dependency, call, and behavior preservation at the declared boundary |
+| Defect investigation | Join static paths, tests, coverage, traces, failures, and change history without patching by guess |
+| Security work | Run applicable pattern, data-flow, dependency, boundary, and adversarial analyses |
+| Handoff | Report subject revision, analyses run, coverage limits, Analyzer Finding Records, exceptions, residual risk, and unverified areas |
+
+The profile SHALL define:
+
+- mandatory versus discretionary analyses by change risk and affected concern;
+- cheapest-relevant-proof ordering;
+- how an agent queries and cites semantic evidence;
+- how Analyzer Finding Records change a plan;
+- when reanalysis is required;
+- how conflicting analyzer evidence is reconciled or escalated;
+- when an incomplete or stale index blocks work;
+- how approved exceptions are represented;
+- what evidence is sufficient for a completion claim;
+- what must be reported when a capability is unavailable.
+
+Human inspection, explanation, comparison, and adjudication interfaces SHALL remain allocated to `JAN-CSAA-001`, `JAN-CSAA-003`, and `JAN-CSAA-007`. `JAN-CSAA-010` SHALL govern only coding-agent employment of those capabilities.
+
+The agent SHALL NOT:
+
+- treat a semantic index as fresher than its subject binding proves;
+- cite a graph edge without provenance;
+- silently dismiss an analyzer disagreement;
+- suppress an Analyzer Finding Record merely to make a gate green;
+- claim dead code solely from missing static callers when dynamic entry is unresolved;
+- claim behavioral preservation solely from type checking or unchanged line coverage;
+- claim security solely from one tool's absence of Analyzer Finding Records;
+- claim a required check passed when it did not run.
+
+### 10.11 `JAN-CSAA-011` — TypeScript and tool integration
+
+This document SHALL be authored only after a separately authorized Wave 4 commission identifies the exact `JAN-CSAA-002`, `JAN-CSAA-004`, `JAN-CSAA-006`, `JAN-CSAA-007`, and `JAN-CSAA-008` versions that form its qualification baseline and records any permissible unresolved constraints. Without that recorded gate, `JAN-CSAA-011` authoring and provider selection remain blocked.
+
+Provider selection SHALL NOT proceed without that recorded gate.
+
+It SHALL assign a bounded role to each selected provider and SHALL document rejected overlap.
+
+The first qualification set MAY evaluate the candidates below, but Stage A selects or approves none of them:
+
+- TypeScript Compiler API and `ts-morph` for parsing, program structure, symbol resolution, type semantics, ergonomics, and provenance-preserving abstraction;
+- `svelte-check` and Svelte compiler integration for authored `.svelte` TypeScript, generated/virtual-code provenance, and source-location fidelity;
+- dependency-cruiser, ESLint, TypeScript ESLint, and checked-in Sonar configuration as current repository surfaces whose exact capability and evidentiary roles require qualification;
+- Vitest, coverage candidates, and instrumentation configurations for revision-bound test and coverage observations;
+- Playwright for end-to-end observations and candidate trace evidence, kept distinct from source coverage;
+- Semgrep, Tree-sitter, Joern, and CodeQL only as unselected candidates subject to semantic fit, loss, disagreement, licensing, redistribution, privacy, installation, and execution-model review;
+- graph stores or libraries only after query, portability, operations, and cost evaluation.
+
+The standard SHALL decide:
+
+- designated primary extraction or normalization, corroborating, and fallback provider roles per capability and derived fact type, each with bounded coverage, provenance, disagreement retention, and no independent semantic or governance authority;
+- provider overlap and conflict precedence;
+- deduplication without evidence loss;
+- version pinning and reproducibility;
+- local, CI, and isolated execution profiles;
+- licensing and redistribution;
+- sandboxing and network access;
+- source-code confidentiality;
+- installation and update rules;
+- performance budgets;
+- provider health and degraded behavior;
+- qualification and removal criteria.
+
+No provider SHALL be selected because it was named in the background chat. Selection SHALL be supported by a qualification record against `JAN-CSAA-006` and `JAN-CSAA-008`.
+
+---
+
+## 11. Assurance-question closure matrix
+
+The corpus SHALL preserve the assurance-question evidence, corroboration, rule-or-claim owner, and executable-or-corroborating-document mappings below:
+
+| Assurance question | Primary semantic evidence | Required corroboration or boundary | Rule or claim owner | Executable or corroborating documents |
+| --- | --- | --- | --- | --- |
+| Is the implementation correct for the declared obligation scope? | Applicable governed requirements/contracts, compiler evidence, semantic analyses, tests/results, coverage, runtime observations, and unresolved Analyzer Finding Records | Correctness is a composite outcome and MAY remain inconclusive; no analyzer-conformance fixture proves an arbitrary subject correct | Governing obligation owners; 004 owns only a technical aggregation profile | 003, 006, 008, 010 |
+| Is the implementation syntactically and type-correct? | AST, compiler diagnostics, symbols, types | Supported project/config coverage and successful build/type gate | 004 | 002, 003, 008 |
+| Does it violate architectural constraints? | Package/module dependency graph and declared rules | Concern-owning architecture authority, exceptions, and dynamic/runtime dependency limits | Recognized concern-owning authority, including any ADR only through its recognized carrier; 004 maps it into a technical profile | 003, 005, 008 |
+| Is there dead code? | Symbols, references, call graph, CFG, entry-point model | Reflection/framework/generated-code model, tests, coverage, and traces; otherwise report candidate | 004 | 003, 006, 008 |
+| Is a contract violated? | Types, schemas, imports/calls, boundary data flow | Enforced reference artifact, governed compatibility rule, and contract tests | Governing contract owner; 004 operationalizes the technical profile | 002, 007, 008 |
+| Does the change increase coupling? | Before/after dependency and call graphs | Declared metric, architecture meaning, acceptable exception, and affected closure | 004 | 003, 005, 008 |
+| Does it introduce a security vulnerability? | Pattern, dependency, control-flow, data-flow, taint, and boundary evidence | Threat model, capability coverage, exploitability review, adversarial tests, and uncertainty | 004 | 003, 006, 008 |
+| Does it preserve intended behavior? | Semantic delta, tests, coverage, runtime traces | Governed requirement/contract, behavior-level oracle, relevant negative paths, and accepted residual limits | Governing behavior/contract owner; 004 operationalizes the technical profile | 003, 006, 008, 010 |
+| Is the analysis itself trustworthy? | Provider qualification, provenance, golden/differential/mutation results | Fresh subject binding, coverage declaration, health, and no unresolved critical conformance failure | 008 | 004, 006, 009, 011 |
+
+No single row SHALL equate one evidence source with a complete proof.
+
+Each technical Analysis Rule Profile and Repository Gate Profile, and any governed assurance mapping that consumes it, SHALL define applicable supported, violated, inconclusive, stale, and unsupported outcomes.
+
+---
+
+## 12. Horizontal closure matrix
+
+Each concern SHALL have one semantic owner and at least one executable verification target.
+
+| Concern | Semantic owner | Shape owner | Verification owner | Operational owner |
+| --- | --- | --- | --- | --- |
+| Subject and revision identity | 002 | 007 | 008 | 009 |
+| Code object and relation meanings, including AST, symbols, types, dependencies, calls, CFG, DFG, taint, and CPG | 002 | 007 | 006 and 008 | 011 |
+| Test, coverage, runtime, and trace observation meanings | 002 | 007 | 006 and 008 | 009 |
+| Extraction, enrichment, inference, query, slicing, correlation, and semantic-delta meanings | 003 | 007 | 006 and 008 | 009 and 011 |
+| Analysis Rule Profiles, Analyzer Finding Records, Repository Gate Profiles, and Repository Gate Evaluations | 004 | 007 | 008 | 010 and 011 |
+| Intended JPWB architecture obligations | Recognized concern-owning authority, including an ADR only through its canon, ratified-specification, or registered-working-reference carrier | Enforced repository configurations and rules | Existing gates plus 008 | 010 and 011 |
+| Current JPWB implementation inventory and conformance mapping | 005, descriptively only | 005 plus machine inventory contracts in 007 | Repository/configuration inspection and 008 | 005 refresh procedure |
+| Fixture scenarios and expected-result records | 006 | Fixture artifacts | 008 plus independent oracle review | 006 change procedure |
+| Machine serialization and adapter compatibility | 007 | Enforced schemas and generated types | 008 | 009 and 011 |
+| Analyzer conformance and V&V method | 008 | Test catalog and executable tests | Independent review and mutation evidence | CI and qualification runs |
+| Freshness-state meaning | 002 | 007 | 008 | 009 |
+| Invalidation, recomputation, persistence, and recovery behavior | 009 | Storage and operations contracts | 008 | 009 |
+| General coding-agent procedure | `JPWB-DOC-004` | Operative protocol | Operative protocol verification | `JPWB-DOC-004` |
+| CSAA employment-point and gate-profile invocation mapping | 010 | Agent-facing contract in 007 | Trajectory tests in 008 | 010 |
+| Abstract analyzer-provider capability obligations and conflict semantics | 004 | Adapter contracts in 007 | 006 and 008 | 011 |
+| Concrete provider selection, version, configuration, licensing, and execution profile | 011 | Integration configuration | Qualification suite in 006 and 008 | 011 |
+
+A specialization SHALL cite its base semantic owner and SHALL NOT become a co-owner by restating the meaning. If two documents define incompatible meaning for the same concern, that is a corpus defect. It SHALL fail review or conformance rather than be silently reconciled in implementation.
+
+---
+
+## 13. Coding-agent reading sequences
+
+This section allocates CSAA-specific employment requirements to `JAN-CSAA-010` and executable V&V evidence priority to `JAN-CSAA-008`. It specializes no general agent procedure by itself and SHALL NOT displace the concern ownership of `JPWB-DOC-004`.
+
+### 13.1 Before designing the tool suite
+
+```text
+JPWB-CON-000
+→ JPWB-DOC-004
+→ task-relevant JPWB-DOC-001 / JPWB-DOC-002 / JPWB-DOC-003
+→ JPWB-REG-005 filtered to the task, CSAA grant, rulings, and safe defaults
+→ JAN-CSAA-000
+→ JAN-CSAA-001
+→ JAN-CSAA-002
+→ JAN-CSAA-003
+→ JAN-CSAA-004
+→ JAN-CSAA-005
+→ actual repository reference artifacts and implementation
+```
+
+### 13.2 Before planning implementation
+
+```text
+Design sequence
+→ current filtered JPWB-REG-005 entries
+→ JAN-CSAA-006
+→ JAN-CSAA-007
+→ JAN-CSAA-008
+→ JAN-CSAA-009
+→ JAN-CSAA-010
+→ JAN-CSAA-011
+→ actual repository reference artifacts and implementation
+→ repository-specific design
+→ detailed implementation roadmap
+→ requirement ledger
+```
+
+### 13.3 During implementation
+
+`JAN-CSAA-010` SHALL require the coding agent to load:
+
+- the applicable governed CSAA requirements;
+- the current repository inventory rather than an older snapshot;
+- the exact machine contracts and fixtures;
+- the work package's requirement ledger;
+- the relevant provider qualification and limitations;
+- the actual code, tests, configurations, generated-artifact boundaries, and user changes.
+
+### 13.4 During verification and validation
+
+`JAN-CSAA-008` SHALL require its executable evidence to support the following priority order, and `JAN-CSAA-010` SHALL require the coding agent to report against that order during V&V:
+
+```text
+Semantic invariants
+→ independent golden fixture
+→ executable conformance and mutation oracles
+→ provider differential evidence
+→ incremental/full equivalence
+→ agent employment and no-false-green behavior
+→ operational recovery and degraded modes
+```
+
+`JAN-CSAA-008` and `JAN-CSAA-010` SHALL preserve two ordering constraints: implementation convenience SHALL NOT outrank an executable capability-conformance oracle, and a fixture SHALL NOT outrank its governing semantic invariant.
+
+---
+
+## 14. Required companion artifacts
+
+The stable corpus is not the whole delivery package. Each artifact becomes mandatory only in the authorized phase identified below; allocation is not a claim that the artifact exists or that its phase is active.
+
+| Companion artifact | Earliest required authorized phase or owner |
+| --- | --- |
+| Sponsor decision or grant record | Wave 0 Stage A and each later authority-conferring act |
+| Requirement ledger mapping applicable obligations to implementation and verification | Each controlled-document or implementation commission |
+| Alternatives and decision register for unresolved forks | The phase in which a fork blocks the named commission |
+| Analyzer capability and rule registries | Wave 2, owned by `JAN-CSAA-003` and `JAN-CSAA-004` |
+| Golden synthetic and JPWB fixtures | Wave 2, owned by `JAN-CSAA-006` |
+| Machine-readable schemas and generated types | Wave 3, owned by `JAN-CSAA-007` |
+| Conformance-test catalog with stable IDs | Wave 3, owned by `JAN-CSAA-008` |
+| Provider qualification records | Wave 4, owned by `JAN-CSAA-011` |
+| Repository-specific design and detailed implementation roadmap | Wave 4, after a separate commission |
+| Per-work-package evidence; gate and handoff reports; exception and residual-risk records | Separately commissioned implementation |
+| Corpus-to-artifact survivorship matrix | Separately authorized authority-transfer or retirement phase |
+
+The responsible phase owner SHALL produce each allocated companion before claiming that phase's applicable exit or completion condition. No owner SHALL treat an artifact allocated to a later or separately commissioned phase as already performed.
+
+Roadmaps, status trackers, and handoff reports are program state. They SHOULD remain separate from stable semantic specifications so normal progress reporting does not churn the authority corpus.
+
+---
+
+## 15. Recommended production waves
+
+The wave descriptions are commissioning boundaries and exit criteria. A wave's obligations SHALL NOT become performable before its named authorization is effective; planning text alone does not activate a wave.
+
+### Wave 0 — Governance and commission
+
+**Stage A — recorded by `REG-D-017`:**
+
+1. the working name, scope, program authority form, first subject, and evidence mode are ratified;
+2. permanent `JAN-CSAA-000` through `JAN-CSAA-011` reservations and document-control rules are ratified;
+3. the semantic baselines and concrete-choice deferrals are ratified;
+4. the requirement-ledger and review templates are prepared;
+5. `JAN-CSAA-000` preparation, ledger/review work, and W0-17 package preparation are authorized.
+
+**Stage B — pending W0-17:**
+
+Stage B SHALL proceed in this order:
+
+1. incorporate Stage A into the Draft charter;
+2. close its requirement ledger and self-review;
+3. advance the exact candidate to Proposed;
+4. complete independent adversarial review;
+5. freeze an exact version and SHA-256 digest;
+6. obtain a separate itemized sponsor conferral.
+
+Stage A is effective. Stage B has not been presented.
+
+### Wave 1 — Semantic foundation and current truth
+
+**Inactive until W0-17.** Once activated, the Wave 1 author SHALL author and adversarially review:
+
+- `JAN-CSAA-001`;
+- `JAN-CSAA-002`;
+- `JAN-CSAA-005`.
+
+Even after activation, Wave 1 SHALL remain documentation-only and SHALL define subjects, identities, boundaries, current facts, and known unknowns. Wave 1 SHALL NOT:
+
+- implement an analyzer;
+- add or update dependencies;
+- alter application source, tests, or configuration;
+- create final machine schemas, golden fixtures, or executable conformance suites;
+- run a prototype or feasibility experiment under implied permission;
+- decide CLI, IDE, UI, daemon, service, language-server, or microservice topology.
+
+Any experiment SHALL require a separate execution authorization naming tools, dependencies, files, writes, network access, cleanup, and evidentiary limits. An experiment SHALL NOT modify semantic ground or satisfy a Wave 1 deliverable by implication.
+
+Wave 1 SHALL exit only when the responsibility boundaries, semantic identities, current repository map, and known unknowns are explicit enough that analysis algorithms cannot silently invent their subjects.
+
+### Wave 2 — Analysis and assurance closure
+
+**Planned; not commissioned.** When separately authorized, Wave 2 SHALL author and adversarially review:
+
+- `JAN-CSAA-003`;
+- `JAN-CSAA-004`;
+- `JAN-CSAA-006`.
+
+Wave 2 SHALL exit only when every target assurance question has defined evidence, limits, and an independently governed fixture oracle within its declared coverage boundary.
+
+### Wave 3 — Executable contracts and operations
+
+**Planned; not commissioned.** When separately authorized, Wave 3 SHALL author:
+
+- `JAN-CSAA-007`;
+- `JAN-CSAA-008`;
+- `JAN-CSAA-009`.
+
+When separately authorized, Wave 3 SHALL generate the first schemas, types, fixtures, and red-first conformance tests. Wave 3 SHALL exit only when contract shapes and analyzer correctness can fail independently of the implementation under construction.
+
+### Wave 4 — Employment, provider qualification, and roadmap
+
+**Planned; not commissioned.** When separately authorized, Wave 4 SHALL author:
+
+- `JAN-CSAA-010`;
+- `JAN-CSAA-011`;
+- the repository-specific design and detailed implementation roadmap.
+
+When separately authorized, Wave 4 SHALL qualify candidate providers against the golden and conformance suites. Wave 4 SHALL close every planned requirement into a work package and verifying test before implementation begins.
+
+---
+
+## 16. Architecture and governance forks
+
+The table distinguishes ratified semantic ground from concrete choices that remain deferred. A named or checked-in tool is a current fact or qualification candidate, not a selected CSAA provider.
+
+| Decision area | Stage A disposition | Later decision gate |
+| --- | --- | --- |
+| Capability name and product standing | W0-01 ratified **Codebase Semantic Analysis and Assurance** as an engineering capability, not a new Janumi product | New sponsor act for any product-standing change |
+| Authority form | W0-02 ratified a B1 program working-reference series | Separate `JPWB-SPEC-nnn` commission for any future deep specification |
+| First subject and execution mode | W0-03 through W0-05 ratified the manifest-resolved JPWB subject, explicit perimeters, dirty-tree identity, and read-only default | New scope or execution authorization |
+| TypeScript semantics | W0-09 ratified context-bound compiler confirmation and derived-provider evidence | Concrete extractor/provider qualification |
+| Fast edit-time parsing | No parser selected or approved | Later measured capability and provider qualification |
+| CPG strategy | No native or imported CPG composition selected | Semantic/query contract plus loss and qualification evidence |
+| Graph persistence | No persistence engine selected | `JAN-CSAA-009` evidence and later authority |
+| Dependency tooling | Checked-in dependency-cruiser is repository inventory only; no CSAA provider is selected | Provider qualification and non-overlap evidence |
+| Security tooling | Checked-in lint/Sonar configuration is repository inventory only; Semgrep, CodeQL, Joern, and other providers are unselected | Rule/gate semantics, qualification, licensing, and execution authorization |
+| Coverage | W0-10 ratified execution-evidence meaning; no provider, metric, exclusion, or threshold selected | Machine contract and repository-gate decisions |
+| Runtime traces | W0-11 ratified captured-execution limits; production ingestion remains deferred | Trace contract, privacy, retention, and sampling decisions |
+| Repository gate outcomes | W0-14 prohibits false green for unsupported or incomplete analysis | Later severity, suppression, waiver, and blocking profiles |
+| Automated remediation | W0-13 keeps mutation and approval outside the analysis core | Separately authorized change and revalidation workflow |
+| Finding history | W0-12 requires append-only logical history and supersession | Physical persistence, compaction, retention, and redaction design |
+| Provider/topology portfolio | W0-15 defers providers, graph composition, persistence, gates, licensing, installation, deployment, and CLI/IDE/service topology | Owning later document and qualification evidence |
+
+### 16.1 Tool capability and licensing claims
+
+The background chat contains time-sensitive claims about tool support and licensing. A future authorized `JAN-CSAA-011` SHALL verify such claims from current primary sources or installed-tool evidence before they become requirements or procurement decisions.
+
+This pre-adoption candidate and `REG-D-017` SHALL NOT be interpreted to approve TypeScript Compiler API, dependency-cruiser, CodeQL, Joern, Semgrep, Tree-sitter, Sonar, a graph database, or any other concrete provider/dependency as a CSAA implementation choice.
+
+---
+
+## 17. Adversarial review questions
+
+Each authored document SHALL be reviewed against at least these failure modes:
+
+1. Does the document convert derived evidence into authority?
+2. Does it claim completeness where reflection, dynamic loading, unsupported syntax, partial indexing, or missing traces make completeness impossible?
+3. Can stale or mixed-revision facts appear current?
+4. Can a tool fail, time out, or skip files and still produce a green result?
+5. Can two providers disagree without the disagreement remaining visible?
+6. Can normalization erase provider provenance or limitations?
+7. Can an exception be created by configuration silence rather than approved record?
+8. Can the fixture oracle be generated by the same code it judges?
+9. Can the conformance suite pass with an empty graph, empty rule registry, or analyzer that returns no Analyzer Finding Records?
+10. Can an incremental index diverge from a full rebuild without detection?
+11. Can generated code, declaration files, tests, examples, or vendor code be misclassified?
+12. Can a runtime trace from another build or environment be attached to the subject?
+13. Can “no static callers” be reported as proven dead code despite unresolved dynamic entry?
+14. Can unchanged coverage be reported as preserved behavior?
+15. Can a coding agent bypass required analysis, ignore a blocking Analyzer Finding Record, or self-approve an exception?
+16. Can untrusted repository content cause command execution, path escape, network access, secret exposure, or analyzer compromise?
+17. Can a concrete provider or storage choice reshape the semantic model for its convenience?
+18. Can the prose remain “implemented” while no enforced artifact performs its requirements?
+
+---
+
+## 18. Corpus-authoring Definition of Done
+
+Before the broader corpus can begin, the W0-17 charter gate SHALL have:
+
+- an exact `JAN-CSAA-000` version and SHA-256 digest;
+- a closed charter requirement ledger;
+- completed author self-review;
+- independent adversarial review with no unresolved blocker or major finding;
+- a separate itemized `JPWB-REG-005` sponsor conferral.
+
+Until that act, `JAN-CSAA-000` SHALL NOT become Normative and Wave 1 SHALL NOT activate.
+
+The controlled corpus SHALL be considered authoring-complete only when:
+
+- the applicable registered sponsor grant or individual specification ratifications confer the claimed authority; a commission alone leaves a specification Draft and unratified;
+- all documents have confirmed permanent IDs, versions, controlled statuses, settledness, metadata required by Section 9.3, and synchronized manifest entries;
+- authority, precedence, single semantic ownership, specialization, and conflict routing are explicit;
+- every mandatory clause has a stable requirement ID, verification binding, and requirement-ledger entry;
+- all terms and non-equivalences required by implementation are defined without duplicating canon-owned meaning;
+- the semantic object and relationship catalog is complete for the first supported scope;
+- each analysis capability declares support, provenance, soundness/completeness goal, uncertainty, and failure limits;
+- each assurance question maps to a governing obligation or technical Analysis Rule Profile, evidence, criteria, epistemic outcomes, and an executable validation route;
+- the current JPWB inventory is code- and configuration-grounded, revision-bound, dated, and governed by an explicit staleness rule;
+- agent and human use boundaries are explicit;
+- provider choices have qualification criteria but do not precede semantic contracts;
+- unresolved forks have registered decisions or authorized safe defaults;
+- cross-document, adversarial, authority, and terminology reviews pass.
+
+Authoring completion SHALL NOT imply that reference artifacts, tests, analyzers, or operational services exist.
+
+---
+
+## 19. Reference-artifact and red-oracle Definition of Ready
+
+This section SHALL NOT confer implementation authority.
+
+If analyzer, provider, or tool realization is separately commissioned by an applicable sponsor act, that realization SHALL NOT begin until:
+
+- machine contracts exist as enforced schemas and generated types;
+- a requirement ledger binds each implementation obligation to its reference artifact and planned verification;
+- independently governed golden fixture judgments exist within declared coverage boundaries;
+- red-first conformance tests fail for missing, empty, stale, mixed-revision, or vacuous implementations;
+- critical semantic invariants have property, mutation, or differential oracles as applicable;
+- incremental/full equivalence, provider disagreement, partial analysis, and no-false-green behavior have executable oracles;
+- threat-boundary, confidentiality, authorization, and hostile-repository tests exist;
+- provider qualification and removal tests can be run without changing semantic ground;
+- proposed or disputed oracle judgments remain visibly non-conferred and cannot make a gate green.
+
+This readiness gate SHALL NOT prohibit separately commissioned oracle-stream fixture, reference-contract, or red-first conformance-test construction needed to establish the prerequisites. Such construction SHALL receive only the authority and scope of its own commission.
+
+---
+
+## 20. Analyzer and tool implementation Definition of Done
+
+The separately commissioned analyzer and tool implementation SHALL be considered complete only when:
+
+1. every applicable corpus requirement is implemented or explicitly dispositioned;
+2. every semantic fact, Engineering Evidence Record, and Analyzer Finding Record is revision-bound and provenance-bearing;
+3. full and incremental analysis agree within documented semantics;
+4. golden, property, mutation, differential, security, recovery, and agent-trajectory tests pass;
+5. no unsupported or incomplete analysis can report a false green result;
+6. tool failures and disagreements remain observable;
+7. code, generated reference artifacts, configurations, fixtures, and documentation agree;
+8. the coding agent uses the capability at the required lifecycle points and cites its evidence honestly;
+9. every remaining Analyzer Finding Record or tool limitation has a visible disposition and residual-risk statement;
+10. operations meet the declared isolation, integrity, recovery, confidentiality, and resource requirements.
+
+Compilation, indexing, a populated graph, a passing demo, or a high coverage percentage SHALL NOT by itself satisfy the implementation Definition of Done.
+
+---
+
+## 21. Authority-transfer and retirement Definition of Done
+
+Construction prose MAY be retired only when:
+
+1. the complete surviving obligation surface is identified in a corpus-to-artifact survivorship matrix;
+2. every surviving obligation is performed by an enforced schema, generated contract, configuration, executable rule, conformance test, migration, or other recognized reference artifact;
+3. an authority-transfer audit demonstrates that removing the construction prose would not erase, weaken, or make an obligation undiscoverable;
+4. the sponsor records the transfer, completion, supersession, or retirement act required by the governing authority path;
+5. the register and manifest identify the successor artifacts and preserve historical traceability;
+6. any obligation not transferred remains in an authoritative artifact rather than being retired by implication.
+
+Implementation completion SHALL NOT by itself retire a document or transfer authority.
+
+---
+
+## 22. Background-material rule
+
+The [Initial Chat](<Initial Chat.md>) is useful discovery material. Its controlling contribution is the focused TypeScript codebase domain:
+
+- implementation as the factual analysis subject;
+- AST, symbols, types, calls, dependencies, control flow, data flow, CPG, coverage, and traces;
+- assurance of correctness, architecture, dead code, contracts, coupling, security, and behavior preservation.
+
+The chat is not authority for:
+
+- product naming;
+- a universal semantic graph;
+- PWA/PWU semantics;
+- infrastructure assurance;
+- tool capability or licensing claims;
+- provider selection;
+- exact contracts;
+- gate thresholds;
+- governance status.
+
+Where the chat conflicts with the operative canon, current repository evidence, or a later governed CSAA artifact, the conflict SHALL be surfaced and routed by concern. It SHALL NOT be silently harmonized.
+
+---
+
+## 23. Concise commissioning rule
+
+The following blockquote is an informative synopsis of requirements owned and ledgered elsewhere; it creates no additional obligation:
+
+> Define the source and limits of each code fact; define the semantic model and code-assurance questions before choosing providers; define analysis-rule and repository-gate criteria before writing provider rules; build an independent fixture before trusting analyzers; turn every mandatory clause into an enforced contract or test; require the coding agent to use revision-bound evidence throughout design, planning, implementation, verification, and validation; and never allow a derived graph, a tool result, or a green badge to claim more authority or certainty than its provenance and coverage justify.

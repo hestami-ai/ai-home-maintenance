@@ -181,21 +181,46 @@ export const authorizeRuntimeBinding: CommandHandler = (ctx, command) =>
 					[command.targetAggregateId]
 				);
 
-			// N-22 RUNS LAST, and the order is the same discipline as SCOPE-before-STATUS in bindingAuthorityVerdict:
-			// report the MOST SPECIFIC defect. A shrink from PARTIALLY_AUTHORIZED is both a reduction and a
-			// self-arrow, and "you dropped `network`; use RevokeRuntimeCapability" is actionable where "grant what is
-			// outstanding" is actively wrong advice for someone trying to reduce. So this limb is the RESIDUAL case:
-			// nothing excessive, nothing dropped, and still nothing changed.
+			// ── N-22, NARROWED: THE DEFECT IS "NOTHING CHANGED", NOT "THE STATUS STAYED THE SAME" ─────────────────
+			//
+			// RUNS LAST, same discipline as SCOPE-before-STATUS in bindingAuthorityVerdict: report the MOST SPECIFIC
+			// defect. A shrink is both a reduction and a null change, and "you dropped `network`; use
+			// RevokeRuntimeCapability" is actionable where "nothing changed" is not. So this is the RESIDUAL case.
+			//
+			// MY FIRST FORMULATION REFUSED EVERY `from === to`, AND IT WAS OVER-BROAD — recorded because the
+			// over-refusal was disclosed to the sponsor as an unavoidable cost of the ratified machine, and it was
+			// not. The reasoning was: the machine's arrows out of PARTIALLY_AUTHORIZED are to AUTHORIZED and to
+			// REVOKED, with no self-loop, therefore a self-transition is illegal. But `checkTransition` admits
+			// `from === to` as a NOOP by design, and THIS CODEBASE ALREADY HAS TWO GENUINE SAME-STATE HOLDS
+			// (`ApplyTacticalChange` declares fromStates('ACTIVE') -> ACTIVE; the ChangePwuState path likewise) —
+			// they simply declare their target rather than omitting it. A same-state transition is not forbidden
+			// here; it is UNDECLARED, which is a different thing.
+			//
+			// WHAT THE PRECONDITION DOCBLOCK ACTUALLY FORBIDS is "an event for a change THAT DID NOT HAPPEN". A
+			// second authorization that adds a capability IS a change: `grantedCapabilities` differs, the event
+			// records it truthfully, and an auditor reading the log sees a real grant. Only an authorization adding
+			// NOTHING is the false entry.
+			//
+			// SO THE DISCLOSED COST IS WITHDRAWN. Incremental multi-party authorization — approver 1 grants A,
+			// approver 2 adds B, approver 3 completes with C — is EXPRESSIBLE, and it was the case the sponsor's own
+			// correction on N-18 was about. It needs no new arrow and therefore no ratification act. `grantIsMonotone`
+			// above already guarantees the set only ever grows, so "added nothing" is the whole of the residual.
 			const from = String(state.authorizationStatus);
 			const to = authorizationOutcome({
 				requested: capabilityIds(state.requestedCapabilities),
 				granted
 			});
-			if (from === to)
+			const currentlyGranted = new Set(capabilityIds(state.grantedCapabilities));
+			const added = granted.filter((c) => !currentlyGranted.has(c));
+			// BOTH conditions are load-bearing. `added.length === 0` alone would refuse the legitimate FIRST
+			// authorization that deliberately grants nothing (N-18's case: REQUESTED -> PARTIALLY_AUTHORIZED, a
+			// review that conferred nothing), which the sponsor ruled must stay recordable. `from === to` alone is
+			// the over-refusal this comment withdraws.
+			if (from === to && added.length === 0)
 				return reject(
 					command,
 					'RPH_INVARIANT_VIOLATION',
-					`AuthorizeRuntimeBinding blocked: this authorization leaves the binding in ${from}, and the ratified machine declares no ${from} -> ${from} arrow — so it would append a RuntimeBindingAuthorized event for a change that did not happen. From PARTIALLY_AUTHORIZED the only forward arrow is to AUTHORIZED (privilege expansion): grant the capabilities still outstanding, or revoke the binding (N-22).`,
+					`AuthorizeRuntimeBinding blocked: this authorization grants nothing the binding does not already have and leaves it in ${from} — so it would append a RuntimeBindingAuthorized event for a change that did not happen (DOC-002 §27: events record ACCEPTED STATE CHANGES). Grant a capability that is still outstanding, complete the request, or revoke the binding (N-22).`,
 					[command.targetAggregateId]
 				);
 			return null;

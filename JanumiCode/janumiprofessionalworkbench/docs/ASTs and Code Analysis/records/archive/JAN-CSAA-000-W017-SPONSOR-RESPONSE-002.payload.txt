@@ -1,0 +1,110 @@
+Work in:
+
+E:\Projects\hestami-ai\JanumiCode\janumiprofessionalworkbench\docs\ASTs and Code Analysis
+
+I, Marshall Hendricks, attest that I am the accountable sponsor authorized to dispose W0-17.
+
+This is my authoritative, exact-byte sponsor response for:
+
+- Candidate: JAN-CSAA-000@0.3.0 / Proposed
+- Candidate bytes: 101,802
+- Candidate SHA-256: a9e9174b3fb11f6c25c4d6c89db023a0163d781b288fe4045befd537aeb0a8eb
+- Adoption instrument: JAN-CSAA-000-W017-INSTRUMENT-002@0.1.0
+- Adoption instrument bytes: 78,520
+- Adoption instrument SHA-256: 0faf9cc4f50ce813034b19a4a7ef9aab9f10906145164d254c8f9ebfd08afbc5
+- Integrity manifest: JAN-CSAA-000-INTEGRITY-002@0.1.0
+- Integrity manifest bytes: 11,140
+- Integrity manifest SHA-256: d8e7f1ded6b81e803f8911d8734187372beafe68eef01dc5cfe2d62c65c4e872
+- Independent review: JAN-CSAA-000-INDEPENDENT-REVIEW-002@0.1.0
+- Prospective carriage: JAN-CSAA-000-W017-CARRIAGE-002@0.1.0
+
+No response from the historical 0.2.1 package is transferred, inferred, or reused.
+
+The following are 47 distinct, individual, unconditional sponsor dispositions. Each line independently disposes its corresponding full-judgment surface:
+
+W017-002-MD-00: RATIFY
+W017-002-MD-01A: RATIFY
+W017-002-MD-01B: RATIFY
+W017-002-MD-01C: RATIFY
+W017-002-MD-01D: RATIFY
+W017-002-MD-02A: RATIFY
+W017-002-MD-02B: RATIFY
+W017-002-MD-03A: RATIFY
+W017-002-MD-03B: RATIFY
+W017-002-MD-04A: RATIFY
+W017-002-MD-04B: RATIFY
+W017-002-MD-05A: RATIFY
+W017-002-MD-05B: RATIFY
+W017-002-MD-05C: RATIFY
+W017-002-MD-06A: RATIFY
+W017-002-MD-06B: RATIFY
+W017-002-MD-07: RATIFY
+W017-002-MD-08: RATIFY
+W017-002-MD-09A: RATIFY
+W017-002-MD-09B: RATIFY
+W017-002-MD-10A: RATIFY
+W017-002-MD-10B: RATIFY
+W017-002-MD-11A: RATIFY
+W017-002-MD-11B: RATIFY
+W017-002-MD-12A: RATIFY
+W017-002-MD-12B: RATIFY
+W017-002-MD-13A: RATIFY
+W017-002-MD-13B: RATIFY
+W017-002-MD-14A: RATIFY
+W017-002-MD-14B: RATIFY
+W017-002-MD-14C: RATIFY
+W017-002-MD-14D: RATIFY
+W017-002-MD-14E: RATIFY
+W017-002-MD-15A: RATIFY
+W017-002-MD-15B: RATIFY
+W017-002-MD-15C: RATIFY
+W017-002-MD-15D: RATIFY
+W017-002-MD-16: RATIFY
+W017-002-MD-17: RATIFY
+W017-002-MD-18: RATIFY
+W017-002-MD-19: RATIFY
+W017-002-MD-20: RATIFY
+W017-002-MD-21: RATIFY
+W017-002-MD-22: RATIFY
+W017-002-MD-23: RATIFY
+W017-002-MD-24: RATIFY
+W017-002-MD-25: RATIFY
+
+Sponsor-summary entries:
+
+- Every W017-002-MD-01A through W017-002-MD-25 field individually completed: YES
+- Whole-document W017-002-MD-00 field completed: YES
+- Every response compatible with the exact Proposed digest: YES
+- Sponsor identity: Marshall Hendricks, Architect
+- Sponsor decision time: use the authoritative timestamp of this message and record it in ISO-8601 with timezone
+- Recorded JPWB-REG-005 entry: PENDING THE MANDATORY PRE-RECORDING CHECK
+
+I understand and accept the exact RATIFY boundary:
+
+1. JAN-CSAA-000@0.3.0 may become a Normative HYPOTHESIS-grade CSAA program working reference.
+2. Only the documentation-only Wave 1 Draft-authoring and adversarial-review commission for JAN-CSAA-001, JAN-CSAA-002, and JAN-CSAA-005 may activate.
+3. Those three members remain unauthored and non-authoritative until their own controlled drafting, review, and exact conferrals.
+4. No later wave, provider, dependency, procurement, implementation, experiment, topology, gate, source mutation, remediation authority, or oracle change is authorized.
+
+Recorder instructions:
+
+1. Treat the 47 itemized lines above as sponsor-originated responses. Do not replace them with “ratify all,” infer a response, or transfer any historical response.
+2. Before recording, recheck:
+   - candidate bytes and digest;
+   - every one of the 29 integrity-manifest rows;
+   - evidence freshness and current-worktree impact;
+   - all 16 CARRIED_ACCURATELY rows;
+   - all 47 dispositions, all 6 summary entries, and exact-byte compatibility;
+   - the 24-operation prospective carriage calculation;
+   - the next available JPWB-REG-005 identifier, expected to remain REG-D-018.
+3. If any required identity, conclusion, response, register identifier, or carriage result is incompatible, perform no adoption or carriage. Preserve this response append-only and report the blocker.
+4. If every check passes, record this itemized response append-only and execute the synchronized W0-16 procedure:
+   - append the exact REG-D-018 entry defined by JAN-CSAA-000-W017-CARRIAGE-002@0.1.0 using the actual sponsor decision time;
+   - apply exactly the 24 state-only substitutions defined by JAN-CSAA-000-W017-CARRIAGE-002-SUBSTITUTIONS-001@0.1.0;
+   - verify the resulting README is exactly 101,717 bytes with SHA-256 ed2cde24be9ce0a99210644fdf655c192db5ee2c97ce0f587f446a1820ee5710;
+   - record the actual decision time and register entry;
+   - verify that only the bounded documentation-only Wave 1 commission became active.
+5. Preserve both historical 0.2.1 packages, their blank instrument, prior response, blocked recording check, and the exact blank refreshed presentation package. Do not silently overwrite or invalidate their presentation or integrity evidence.
+6. Make no unrelated change, and do not stage or commit repository files unless separately instructed.
+
+The RATIFY dispositions themselves are unqualified. The mandatory pre-recording checks govern whether conferral and administrative carriage can be recorded safely against the exact reviewed package.

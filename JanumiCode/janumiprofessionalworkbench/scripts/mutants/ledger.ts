@@ -1703,17 +1703,34 @@ export const DECLARED_MUTANTS: readonly DeclaredMutant[] = [
 	{
 		id: 'X5-the-partially-authorized-self-arrow-reopens',
 		file: 'packages/rph-application/src/handlers/runtime-binding.ts',
-		// N-22: the ratified machine declares no PARTIALLY_AUTHORIZED -> PARTIALLY_AUTHORIZED arrow, and
-		// checkTransition admits from === to as a NOOP — so without this an identical re-authorization appends an
-		// event for a change that did not happen.
-		find: '\t\t\tif (from === to)',
-		replace: '\t\t\tif (from === to && false)',
+		// N-22: `checkTransition` admits `from === to` as a NOOP, so without this an identical re-authorization
+		// appends an event for a change that did not happen.
+		//
+		// RE-ANCHORED when N-22 was NARROWED — the guard is now `from === to && added.length === 0`, because the
+		// defect is that nothing CHANGED, not that the status stayed the same. See X8 for the over-refusal.
+		find: '\t\t\tif (from === to && added.length === 0)',
+		replace: '\t\t\tif (from === to && added.length === 0 && (false as boolean))',
 		expectRed: [
 			'packages/rph-application/src/handlers/partauth-derived-outcome.test.ts',
 			'packages/rph-application/src/handlers/command-reissue-guard.test.ts'
 		],
-		why: 'N-22: an authorization that changes nothing must not be recorded as one — the machine declares no self-arrow',
+		why: 'N-22: an authorization that grants nothing new must not be recorded as one — events record ACCEPTED STATE CHANGES (§27)',
 		source: 'N-22'
+	},
+	{
+		id: 'X8-n22-over-refuses-every-same-state-authorization',
+		file: 'packages/rph-application/src/handlers/runtime-binding.ts',
+		// THE OVER-REFUSAL I SHIPPED FIRST, AS A MUTANT. Dropping the `added` clause refuses EVERY same-state
+		// authorization — which blocks incremental multi-party authorization (approver 1 grants A, approver 2 adds
+		// B) and was disclosed to the sponsor as an unavoidable cost of the ratified machine. It was not: a
+		// same-state transition here is UNDECLARED, not forbidden, and this codebase already runs two of them
+		// (`ApplyTacticalChange` ACTIVE -> ACTIVE). Reddens ONLY positive cases, which is exactly why the first
+		// formulation looked correct and passed its own battery.
+		find: '\t\t\tif (from === to && added.length === 0)',
+		replace: '\t\t\tif (from === to)',
+		expectRed: ['packages/rph-application/src/handlers/partauth-derived-outcome.test.ts'],
+		why: 'the defect is "nothing changed", NOT "the status stayed the same" — refusing every self-transition makes incremental multi-party authorization inexpressible',
+		source: 'N-22 (narrowed)'
 	},
 	{
 		id: 'X6-the-input-readiness-mirror-goes-silent',

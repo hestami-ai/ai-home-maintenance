@@ -37,8 +37,8 @@ Modeled on the M0 Reconciliation Ratify Sheet: every entry cites its authority, 
 Each entry carries: **id · date · type · statement · safe default** (open items only) **· disposition · merge target · status**.
 
 - **Id series:** `REG-D-nnn` decisions, `REG-Q-nnn` open questions, `REG-F-nnn` divergence findings, `REG-E-nnn` elicitation items.
-- **Type:** `DECISION` | `OPEN QUESTION` | `DIVERGENCE FINDING`.
-- **Status:** `OPEN` (live; any recorded safe default binds) · `DECIDED — MERGE PENDING` (ruled; not yet carried by an EFFECTIVE governing artifact — carriage in an unratified draft does not close an entry) · `MERGED` (closed; an EFFECTIVE, ratified governing artifact carries it) · `SUPERSEDED` (replaced by a later entry, cited).
+- **Type:** `DECISION` | `OPEN QUESTION` | `DIVERGENCE FINDING` | `PROPOSED REFINEMENT` (per DOC-004 §9.2).
+- **Status** (the single normalized enumeration): `OPEN` (live; any recorded safe default binds) · `DECIDED — MERGE PENDING` (ruled; not yet carried by an EFFECTIVE governing artifact — carriage in an unratified draft does not close an entry) · `MERGED` (closed; an EFFECTIVE, ratified governing artifact carries it) · `CLOSED` (resolved without a merge target of its own — e.g., answered by an existing artifact section or mooted by a recorded act, cited in the closure) · `SUPERSEDED` (replaced by a later entry, cited) · `EFFECTIVE` (a conferral, effective on recording; conferrals never merge — §0) · `EFFECTIVE — MERGE PENDING` (effective on recording; incorporation into its named targets pending) · `EFFECTIVE — MERGED` (effective and already incorporated in its targets). *(Vocabulary history, recorded here because §1 predates the entry series and carries no version field: EFFECTIVE variants added by REG-D-014; CLOSED defined and the previously split dual enumeration normalized into this single list by the Cycle-000 micro-hygiene pass — both 2026-07-24.)*
 - A **safe default** permits conservative progress without creating new meaning. It is not a resolution. If requested work requires choosing the unresolved shape itself, the agent files or updates the entry, blocks only the dependent work, and delivers everything the safe default permits (JPWB-DOC-004 §3.4).
 
 Context note: the M0 Reconciliation Ratify Sheet stands as the ENTRY-DISCIPLINE precedent — the model this register imitates; its ratification standing (build-agent self-ratification) and its eleven best-judgment items are themselves open per REG-Q-026. The JPWB Implementation Roadmap and Tracker is a status snapshot, not canon.
@@ -101,6 +101,7 @@ Context note: the M0 Reconciliation Ratify Sheet stands as the ENTRY-DISCIPLINE 
 - **Statement:** Within the repository, shape authority belongs to *reference artifacts* (schemas, generated contracts, conformance fixtures — the "expected"), never to the implementation (the "actual"); the implementation is the experiment and cannot self-certify. Because the source documents' field-level schemas are what made implementation impoverishment detectable (REG-F-005), the cession of shapes to the repository is **conditional and verified**: retirement of any schema-bearing source document (RPH-DOC-000, -002, -004, -007, -008, -009 foremost) additionally requires a **shape-survivorship audit** — for every ratified schema in that document, verify a corresponding *enforced* repository reference artifact exists (real type, real conformance fixture; no placeholder types) and that the implementation either conforms or has a filed divergence finding. Any document failing the audit joins the REG-Q-045 survivorship hold rather than retiring.
 - **Disposition:** Decided; merged into CON-000 B1 (reference-artifact non-example), JPWB-DOC-004 §2.3 (reference/experiment discipline), and Ratify Sheet Part 4 (retirement precondition 4).
 - **Merge target:** CON-000 B1; DOC-004 §2.3; Ratify Sheet Part 4. **Status:** DECIDED — MERGE PENDING (countersign via Ratify Sheet).
+- **Superseding note (2026-07-24, Cycle 000 C000-A-03):** the merge-target's "retirement precondition 4" mis-states the Ratify Sheet as it exists — the shape-survivorship audit is **precondition 2** in Part 4's numbered list. Pointer corrected forward per append-only discipline; original text retained above.
 
 ### REG-D-009 — The three-tier documentation architecture
 - **Date:** 2026-07-16 · **Type:** DECISION (sponsor-directed: "Proceed" on the drafted amendment)
@@ -114,6 +115,51 @@ Context note: the M0 Reconciliation Ratify Sheet stands as the ENTRY-DISCIPLINE 
 - **Statement:** All six canon artifacts are ratified **as drafted**, effective immediately, at version 1.0.0, in wholesale interim mode: every Ratify Sheet R1 item not individually disposed is RATIFY-as-drafted; every elicitation item (REG-E-001..022) is **DEFERRED** — its recorded safe default governs. R1 remains open: clause-level dispositions made after this date are processed as B5 amendments to the operative canon, not as pre-ratification review. Per B1, from this moment every document outside the registry is historical material — the pre-canon corpus is **quarantined by recognition** even though physical retirement awaits its four preconditions (Ratify Sheet Part 4). Physical relocation was originally deferred to retirement execution; by sponsor direction it was executed early on 2026-07-24 — `docs/_canon_draft/` → `docs/canon/` — because the old name misstated operative status. The relocation is separate from retirement, which remains gated by its four preconditions.
 - **Disposition:** Effective. This entry is the ratification record contemplated by the closure-rule exception; it does not itself close by merging.
 - **Merge target:** The six status blocks (applied same date). **Status:** EFFECTIVE.
+
+### REG-D-011 — The requirement ledger (SHALL accounting) and the methodology-source transplant
+- **Date:** 2026-07-24 · **Type:** DECISION (sponsor-directed: "Proceed with both")
+- **Statement:** **(1) Requirement ledger.** On governed ground, intake extracts every applicable SHALL/SHALL NOT from the governing SPEC, canon, and granted working authority into a requirement ledger mapping each obligation to its planned implementation site and verifying test (DOC-004 §3.3); the handoff closes the ledger — every entry implemented+verified or explicitly dispositioned (deferred / waived-by-cited-authority / divergent-with-finding); completion claims are made against the closed ledger, never against the diff (DOC-004 §6.3). Rationale: an omission must be visible as an unmapped obligation, not merely absent from code — the requirement-grain form of the obligation-surface principle (REG-D-009). **(2) Methodology transplant.** The pre-canon corpus generator's methodology account (`docs/Documentation Generation Methodology Discussion/Initial Chat.md` — "Recursive Normative Specification Closure") is recognized as a load-bearing method source; its mechanisms (horizontal closure matrix, sentence-level verification binding, adversarial economy catalog, controlled redundancy-with-citation, reference-case instantiation, self-review battery, normative-density metric) were transplanted 2026-07-24 into the deep-spec commission template v2 (`canon/_test/deep-spec-commission-prompt.md`). Transplant is declared complete; the chat retires with the corpus as historical material, no additional hold — its survivorship check is this entry.
+- **Disposition:** Decided; merged into DOC-004 §3.3/§6.3 (version 1.1.0) and template v2 same date.
+- **Merge target:** JPWB-DOC-004 (applied); template v2 (applied, non-canonical). **Status:** EFFECTIVE — MERGED.
+
+### REG-D-012 — The gauntlet adoption set: oracle integrity, tests-of-the-tests, strategic enforcement design
+- **Date:** 2026-07-24 · **Type:** DECISION (sponsor-directed: "Proceed", incorporating the sponsor's strategic correction on enforcement design)
+- **Statement:** From the constraint-gauntlet method (R. Martin post 2026-07-23 + analysis, archived as `docs/Documentation Generation Methodology Discussion/Gauntlet Constraints Discussion.md`), four adoptions: **(1) Oracle integrity and the two test streams** (DOC-004 §7.6): the oracle stream (spec-derived fixtures, acceptance criteria, gate configurations, reference artifacts) is never edited to make the implementation stream (agent-authored tests) pass; the identity that authors a change never holds, within that change, the authority to alter the artifacts that judge it; a wrong oracle is a divergence finding, never an inline edit. **(2) Tests-of-the-tests** (DOC-004 §7.4): test adequacy is a claim requiring evidence — differential mutation on changed modules, assertion-strength/never-fails detection, isolation, excessive-mocking checks. **(3) Strategic enforcement design (binds PLN-006):** development-control enforcement is designed for the multi-tenant authority model, not the current single-operator repository — the gauntlet is Assurance Engineering, not CI configuration. Gates are authored as versioned, policy-shaped reference artifacts (extending REG-E-020 into a full gate profile: coverage-on-change, complexity/size/duplication ceilings, dependency direction/no-cycles, CRAP-equivalent and mutation at changed-module grain) evaluated at authoritative boundaries the author cannot bypass; client-side execution is never the enforcement boundary; single-operator conveniences (hooks, local CI) are permitted only as **marked interim carriers** executing the same policy artifacts, with a recorded authority-transfer plan to the platform's own assurance machinery (AX-12 self-hosting; exactly-one-authority migration discipline). **(4) Sponsor generalization** (CON-000 B2): "sponsor" reads as the accountable authority under the governing authority model throughout the canon. Production-facing gate families are deferred as REG-Q-049/050, governed rather than silent.
+- **Disposition:** Decided; merged same date — DOC-004 v1.2.0 (§7.4, §7.5 changed-module grain, new §7.6), CON-000 v1.1.0 (B2), deep-spec commission template (property-based fixtures).
+- **Merge target:** DOC-004; CON-000; template (non-canonical); PLN-006 when generated (gate-profile authoring, interim-carrier registration, authority-transfer milestone). **Status:** EFFECTIVE — MERGED (roadmap items pending PLN-006).
+
+### REG-D-013 — Program success metric: guarantee-strength precedes cost
+- **Date:** 2026-07-24 · **Type:** DECISION (sponsor ruling, recorded from the sponsor's own statement)
+- **Statement:** The program's success metric is **guarantee-strength**: a repeatable methodology that ensures what is implemented is complete and correct given a **holistic appreciation of the user's initial underspecified intent**. All Janumi work — legacy JanumiCode, JPWB, the canon, the harness — is in service of that methodology. **Cost optimization — tokens, time, agent effort, and sponsor attention alike — is premature until the guarantees are established**; it is optimization of the wrong metric. Undue economy is the named enemy on *both* sides of the interface: implementation economy (REG-D-009's concern) and **judgment-surface economy** — compressing the sponsor's ratification surface toward assent-by-momentum is the B2 failure mode (status conferred by convenience and fluency rather than judgment) applied to governance itself. Accordingly: ratification interfaces are **full-judgment instruments** — every item carries its proposed change, motivating evidence with verification status, strongest opposing consideration, and consequences; recommendations accompany the material and never substitute for it; there is no bulk disposition. Sponsor attention is *positioned* at the oracle (REG-D-012) and is *thorough* there — positioning economizes location, never depth.
+- **Primary-source note:** the sponsor's statement is direct voice bearing on REG-E-001 (the thesis sentence): "…100% complete and 100% correct given the holistic appreciation of the initial underspecified intent of the user… everything is in service to developing a repeatable methodology that provides those guarantees."
+- **Merge target:** JPWB-DOC-001 (doctrine: the success metric and the dual-economy rule) and JPWB-DOC-004 §9 (ratification-interface discipline) via a future B5 amendment; until merged, this entry governs directly. First conforming instrument: `_test/cycles/cycle-000-ratify-instrument.md`.
+- **Status:** EFFECTIVE — MERGE PENDING.
+
+### REG-D-014 — Cycle-000 refinement batch: sponsor delegation and dispositions
+- **Date:** 2026-07-24 · **Type:** DECISION (sponsor-delegated: "use your judgement and intelligence to make the appropriate decisions on this set of issues"; decisions recorded as delegated authority per the established gate-authority pattern, reviewable by the sponsor at any time via the instrument at `_test/cycles/cycle-000-ratify-instrument.md`)
+- **Sponsor clarification recorded with the delegation:** the REG-D-013 objection targeted *process shortcutting*, not the amount of sponsor labor; the rigor lives in the process and the record — full-judgment instruments document the basis for decisions, and the sponsor delegates disposition where sponsor voice is not itself the required input. Sponsor-voice items (REG-E-001, REG-E-003) remain open: delegation does not authorize fabricating the sponsor's own words.
+- **Dispositions (all 16):** RATIFY S-01 (§9.1 SPEC-gap trigger — belt-and-suspenders per observed 3-probe wobble, over the refuters' anti-restatement position, per the controlled-redundancy rule), S-02 (§8.1 tiebreak scoped + non-example), S-04 (PROPOSED REFINEMENT entry type), S-05 (ASR-3 grouping legitimacy), S-06 (ASR-4 retrievable-record clause), S-07 (CONSTITUTIONAL — B1 program-working-references class + §2.1 load rung; formalizes the DWP-04 grant mechanism), S-08 (§7.4 interim hand-mutation default; cost objection overruled per REG-D-013), S-09 (§7.6 judgment grain), S-10 (§7.6 proposed-oracle status), S-12 (register status vocabulary), S-13 (DOC-002 tail), S-14 (§7.6 ID-routed citation), S-15 (DOC-002 §11 canon-governance vocabulary). **S-03 = option (a)** governed display aliases (product audience includes non-SMEs; a governed channel beats an ungoverned leak; disposes REG-E-011's posture — `Professional Endeavor` stays candidate, aliases give UX its outlet). **S-11 = direction (i)** — Q-043/044 closed citing DOC-003 §11; the register empties into artifacts. **S-16** applied under delegated pen (Ratify Sheet correction note). **Explicitly NOT applied:** the three refuted-HIGH amendments (B7 non-example, §9.1-as-defect framing, §7.4 weakening clause) — delegated judgment does not override the cycle's verification verdicts; one drafting near-miss (the weakening clause) was caught and reverted during application.
+- **Merge targets (applied same date):** CON-000 v1.2.0; DOC-002 v1.1.0; DOC-003 v1.1.0; DOC-004 v1.3.0; this register (§1 vocabulary, Q-043/044 closures); Ratify Sheet correction. **Assure step:** the Cycle-000 regression baseline re-run is queued as the batch's verification.
+- **Status:** EFFECTIVE — MERGED (subject to sponsor review of the recorded dispositions).
+
+### REG-D-015 — The chain-of-thought retention ruling, in sponsor voice (closes REG-E-003, resolves REG-Q-027)
+- **Date:** 2026-07-24 · **Type:** DECISION (sponsor restatement, this session — the awaited voice input; no reconstruction remains load-bearing)
+- **The sponsor's account, recorded:** the ruling arose from wanting to retain LLM/agent reasoning traces. Two pushbacks were raised: (1) that only local models (Ollama-class) provide reasoning traces, not frontier models — which the sponsor assesses as *generally valid* (noting Claude Code exposes traces only under special configuration); and (2) that reasoning traces are not necessarily tied to the final conclusion the model reached — also *generally true*. The agreement, per the sponsor: **"we agreed to retain the reasoning traces (where available) however they wouldn't be used by the assurance policy / assurance engineering tiers but could be used for offline diagnostic purposes (again, where available)."**
+- **Reconciliation with the reconstruction:** the Guide-era/PER-12 reconstruction (retain as typed Artifact; never evidence; never forwarded; evaluator-context = independence violation) matches the ruling's prohibitions. The sponsor's account **adds** the affirmative permitted use (offline diagnostics) and the availability qualifier (provider/configuration-dependent; no obligation to procure), and supplies the ruling's own rationale: trace-conclusion decoupling is *why* traces are excluded from assurance and *why* they remain diagnostically useful. The "origin axis" definition (the term is fixed by origin, not disclosure) stands as compatible Guide-era refinement, unchallenged by the sponsor's account.
+- **Disposition:** Merged into DOC-003 PER-12 (v1.2.0) same date: retain-where-available; quarantined from every assurance tier; offline diagnosis as the sole permitted use; availability nuance recorded; the "operative default pending sponsor ruling" clause retired — the ruling has landed.
+- **Merge target:** JPWB-DOC-003 PER-12 (applied). Closes **REG-E-003**; resolves **REG-Q-027**. **Status:** EFFECTIVE — MERGED.
+
+### REG-D-016 — The thesis confirmed in sponsor voice; the complexity stance merged (closes REG-E-001)
+- **Date:** 2026-07-24 · **Type:** DECISION (sponsor confirmation: "Confirm B", following three recorded sponsor evidence statements this session)
+- **Statement:** The constitution's thesis sentence is ratified **verbatim, variant B**: *"The Janumi Professional Workbench externalizes professional cognition into explicit, recursively decomposable and recomposable, continuously reconciled, governed representations, so that humans and AI can reason together while intent, evidence, authority, and coherence are preserved — managing professional work as the complex whole it is, not the merely complicated sum of its parts."* The confirmation carries the sponsor's two grounding arguments: (1) **structural** — "recursively composable" read against the reductionist default; the pairing states both directions with the recomposition obligation as the distinctive commitment (the irreversibility-of-reductionism test: decompose, understand every part, recompose, still missing something — that remainder is the complexity); (2) **temporal** — "complexity was in part captured by the Governed Stream and Narrative Memories concepts in terms of being able to answer questions like *'How did we get to this point?'* and *'Where can we credibly go from here?'*" — path-dependence as the second axis, with "credibly" carrying assurance weight.
+- **Disposition:** Merged same date: CON-000 §3 (thesis + two-axis gloss) v1.3.0; DOC-001 §2.4 "Complex, not merely complicated" + §4 root-inequality preamble, v1.1.0; DOC-002 §3 Complicated/Complex entry with the **Complex ≠ Complicated** guard, v1.2.0; DOC-003 Narrative Memory row gains its defining question, v1.3.0. Vision-tier altitude above the distinction (Professional Scenario / Professional Capability hierarchy) remains held per the sponsor's prior scoping ruling and REG-Q-039/REG-E-005/E-012.
+- **Merge target:** applied as listed. Closes **REG-E-001** — with which every Section E elicitation item is disposed: twenty deferred to safe defaults (REG-D-010), E-003 by sponsor voice (REG-D-015), E-001 by sponsor voice (this entry). **Status:** EFFECTIVE — MERGED.
+
+### Hygiene passes — 2026-07-24 (ministerial, completing REG-D-014's Assure step)
+Two mechanical passes applied after the Cycle-000 regression re-run, recorded here because in-place mechanical corrections require an application record (the defect class the regression itself surfaced twice): **(1) Regression hygiene pass** — DOC-004 §2.1 duplicate rung renumbered (repository → rung 6); DOC-003 §11 preamble corrected to reflect the Q-043/044 closures; this §1's status vocabulary completed (EFFECTIVE — MERGE PENDING); §1 edit provenance recorded inline; the split DOC-002 provenance sidecar consolidated into "JPWB-DOC-002. Canonical Vocabulary.provenance.md". **(2) Micro-hygiene pass** (after the confirmation re-sweep found one carryover and one reduced-severity recurrence): §1's dual status enumeration normalized into a single list with CLOSED defined; DOC-003 version line advanced to 1.1.1 enumerating its §11 correction; this record itself. No meaning created or changed by either pass; every semantic act traces to REG-D-014.
+
+### Closure sweep — 2026-07-24 (ministerial, per REG-D-010; Cycle 000 item C000-A-01)
+Every closure condition below fired on the recorded ratification act of 2026-07-24; this sweep records the resulting statuses without creating meaning: **REG-D-001..D-009 → MERGED** (their content is effective in the ratified artifacts); **REG-Q-001 → CLOSED** (ratification-status question resolved by REG-D-010 itself); **REG-F-003, REG-F-004 → MERGED** (their merge targets ratified). Entries with genuinely outstanding work retain their statuses (REG-F-001/F-002 OPEN; Section B/C open questions unaffected).
 
 ---
 
@@ -262,7 +308,7 @@ All Section C entries: **Date:** 2026-07-16 · **Type:** OPEN QUESTION · **Disp
 - **Safe default:** The eleven §C resolutions stand as presumptive implementation decisions; C-6 (the authored error-code→category mapping) is the one most needing a sponsor sanity check. The repository's vocabulary registry and fidelity tests govern the counts; `VALIDATOR_FAILED` is not an error code.
 - **Merge target:** Sponsor confirmation recorded here; substance merges to JPWB-DOC-002 (vocabulary items) and the repository (shapes); ratification doctrine to JPWB-CON-000 Part B.
 
-### REG-Q-027 — One canonical chain-of-thought retention rule
+### REG-Q-027 — One canonical chain-of-thought retention rule · **MERGED (REG-D-015, 2026-07-24): the sponsor's restatement arrived and is carried by DOC-003 PER-12 v1.2.0**
 - **Statement:** Sources conflict: transcript-era JEM says the runtime SHALL not require storage of private model chain-of-thought (Janumi Constitution Discussion.md L17594); the record-everything provenance posture and a sponsor conversational ruling (retain-but-never-forward, with an origin axis) imply retention. That ruling was never registered and was lost — the motivating case for this register's closure rule. Guide §9.7 (L1338) drafted a positive retention rule that is the strongest existing synthesis and anchors the elicitation: volunteered reasoning material is redacted at the boundary, retained as a typed Artifact of its producing Attempt under retention/security/access policy, never admitted as Evidence, never supplies another agent's context, never reaches a log or shared projection, never supports a finding; its presence in an evaluator's context is a hidden-context independence violation; it participates in no execution, assurance, governance, Baseline, or traceability, and is purgeable at retention expiry.
 - **Safe default:** Never require private chain-of-thought capture; never forward retained model reasoning to dependent consumption or downstream prompts; preserve observable actions and stated rationale under retention/redaction policy. Pending the sponsor's restatement, the Guide §9.7 mechanics above bind as the interim rule: retain-as-typed-Artifact-of-Attempt, boundary redaction, evaluator-context independence violation, retention-expiry purgeability. Prohibitions on consuming model reasoning do not prohibit enabling it (the §9.7 lesson, JPWB-DOC-004).
 - **Merge target:** JPWB-DOC-003 (stream/evidence semantics) + JPWB-DOC-004 (conduct). **Requires sponsor elicitation:** the exact retain-but-never-forward ruling must be restated by the sponsor before merge.
@@ -342,12 +388,12 @@ All Section C entries: **Date:** 2026-07-16 · **Type:** OPEN QUESTION · **Disp
 - **Safe default:** The repository's seeded PWA ontology (the published PWU Type registry) governs; prose names are display candidates until JPWB-DOC-002 fixes them.
 - **Merge target:** JPWB-DOC-002.
 
-### REG-Q-043 — Unknown enum value from a projection re-entering a canonical write
+### REG-Q-043 — Unknown enum value from a projection re-entering a canonical write · **CLOSED (REG-D-014, 2026-07-24): resolved in-artifact by DOC-003 §11 item 6's safe default (never); the register empties into artifacts — Cycle-000 S-11 direction (i)**
 - **Statement:** Whether an unknown enum value read from a projection may re-enter a canonical write is unresolved (carried from JPWB-DOC-003 §11 item 6, which files it here).
 - **Safe default:** Never — write-side strictness wins.
 - **Merge target:** JPWB-DOC-003.
 
-### REG-Q-044 — Reserved vocabulary for "authoritative": current state versus event history
+### REG-Q-044 — Reserved vocabulary for "authoritative": current state versus event history · **CLOSED (REG-D-014, 2026-07-24): resolved in-artifact by DOC-003 §11 item 7's adopted wording; the register empties into artifacts — Cycle-000 S-11 direction (i)**
 - **Statement:** One word is doing two jobs: current-state tables and the event history are both called "authoritative" (carried from JPWB-DOC-003 §11 item 7, which files it here). Whether the two-word convention becomes canonical vocabulary is unresolved.
 - **Safe default:** Current tables are *authoritative now*; events are the *authoritative account of becoming* (the DOC-003 convention).
 - **Merge target:** JPWB-DOC-002.
@@ -371,6 +417,18 @@ All Section C entries: **Date:** 2026-07-16 · **Type:** OPEN QUESTION · **Disp
 - **Statement:** The Construction discussion surfaces multi-organization undertakings (owner, general contractor, subcontractors, inspectors) as intrinsic to some professions, and the sponsor acknowledged the gap (Construction discussion L253); the canon currently scopes coordination, authority, and tenancy within one organization, and no artifact carries a cross-organization coordination model.
 - **Safe default:** The canon stays silent — single-organization scope holds; agents do not invent cross-organization semantics (federation, shared undertakings, split authority). Cross-organization coordination is vision-tier material (see REG-Q-040's non-foreclosure discipline).
 - **Merge target:** JPWB-DOC-001 (doctrine), if and when adopted via a DECISION.
+
+### REG-Q-049 — Security and supply-chain gate family (production-facing, deferred)
+- **Date:** 2026-07-24 (filed by REG-D-012)
+- **Statement:** SAST, dependency/vulnerability scanning, secret scanning, license policy, SBOM generation, build provenance/attestations, reproducible builds, and adversarial/abuse-case testing beyond the current security invariants are recognized gate families (Gauntlet Constraints Discussion §7) with no current assurance-policy representation.
+- **Safe default:** Not yet applicable — JPWB is pre-production. Becomes mandatory at the first production-facing slice; adoption is by assurance-policy authoring under the REG-D-012 pattern (policy-shaped reference artifacts at authoritative boundaries), never by ad-hoc CI accretion.
+- **Merge target:** The assurance catalog + PLN-006 (a production-readiness milestone gate).
+
+### REG-Q-050 — Operational and nonfunctional gate family (production-facing, deferred)
+- **Date:** 2026-07-24 (filed by REG-D-012)
+- **Statement:** Latency/throughput budgets, load/stress/soak, fault injection and resilience verification, retry/timeout/circuit-breaker/idempotency verification under load, backup-restore and DR/rollback rehearsal, accessibility conformance, telemetry-as-acceptance, and SLO/error-budget checks are recognized gate families (Gauntlet Constraints Discussion §8) with no current assurance-policy representation.
+- **Safe default:** Same pattern as REG-Q-049: not yet applicable; mandatory at the first production-facing slice; adopted as assurance policies. Observability-as-testable-requirement is already DOC-004 §7.4 practice and is not deferred.
+- **Merge target:** The assurance catalog + PLN-006.
 
 ---
 
@@ -448,4 +506,136 @@ Filed by the finalizer from every `[ELICITATION: …]` marker in the drafts and 
 - **REG-E-019** — Post-retirement home of the SonarQube/scanner operating procedure (Engineering Constitution L1186 points into the sibling repo). *Default: repository operations doc; the retirement of that pointer is held until placed.*
 - **REG-E-020** — The numeric coverage/mutation floors (100% guard-logic / 90% projection / risk-based UI) are ceded to repository gate configuration; confirm they are encoded there before retirement, or the numbers are lost. *Default: encode before retirement; verification is a retirement precondition.*
 
+**Section E dispositions (append-only notations):**
+- **REG-E-003 — CLOSED (REG-D-015, 2026-07-24):** the sponsor restated the chain-of-thought ruling in their own voice; merged into DOC-003 PER-12 v1.2.0. The reconstruction is no longer load-bearing.
+- **REG-E-001 — sponsor evidence recorded (2026-07-24), amendment pending confirmation:** the sponsor's substantive input on the thesis sentence — "recursively composable" reads against the more familiar reductionist "recursively decomposable" and needs explanation — is recorded as primary-source voice. A proposed amendment (pairing decomposable/recomposable, with the anti-reductionist asymmetry glossed per Part A §2 and AX-4) is before the sponsor; the item remains OPEN until the sponsor confirms exact wording (CONSTITUTIONAL layer; B5).
+- **REG-E-001 — second sponsor statement (2026-07-24, same session):** the pairing "is coming into view because of the larger discussion and vision of Janumi managing work and complexity — where complexity is differentiated from complicated." This grounds the amendment in the Complex Systems Management thread (source discussion, historical: the irreversibility-of-reductionism as the falsifiable test of complexity — "decompose, understand every part, recompose, still missing something; that remainder is the complexity"; the producing-system-vs-artifact distinction; sponsor's prior wholesale endorsement at that discussion's L1262, scoped near-term to Shape Engineering). Revised proposal package before the sponsor: thesis wording variants + complexity-grounded gloss (CON-000), a "complex, not merely complicated" doctrine passage (DOC-001 §2), and a **Complex ≠ Complicated** guard (DOC-002 §3/DOC-001 §4 inequality family).
+- **REG-E-001 — third sponsor statement (2026-07-24, same session):** "complexity was in part captured by the Governed Stream and Narrative Memories concepts in terms of being able to answer questions like 'How did we get to this point?' and 'Where can we credibly go from here?'" — the **temporal axis** of the complexity stance, in sponsor voice: complex systems are path-dependent; the present state does not explain itself (retrospective question → the governed professional stream, AX-7) and futures are *credible* rather than arbitrary — constrained by accumulated commitments, assumptions, and evidence (prospective question → Narrative Memory, reconciliation, assurance). This supplies the design rationale, at doctrine altitude, for why the stream and Narrative Memory exist — and gives Narrative Memory its defining question, unifying the source corpus's two competing readings (scenario-evolution vs capability-evolution: both serve the prospective question). Package updated accordingly; item remains OPEN pending sponsor confirmation.
+- **REG-E-001 — CLOSED (REG-D-016, 2026-07-24):** the sponsor confirmed variant B verbatim. The thesis now rests on sponsor voice, traced through three recorded evidence statements to the confirmation act. No sponsor-voice elicitation items remain open.
+
 *(This section is the only part of the register the synthesis program may rewrite before ratification; thereafter, append-only discipline applies to it as to all sections.)*
+
+---
+
+## 7. Post-ratification program grants and commission questions
+
+### REG-Q-051 — CSAA program-working-reference grant and Wave 1 commission
+
+- **Date:** 2026-07-25 · **Type:** OPEN QUESTION
+- **Statement:** The `docs/ASTs and Code Analysis/README.md` proposal requests establishment of Codebase Semantic Analysis and Assurance (`JAN-CSAA`) as a bounded program working-reference series for conventional TypeScript/Svelte codebase analysis and software assurance. Direction has been given to proceed with Wave 0 preparation, but no itemized sponsor act yet decides the working name/product standing, program-versus-`JPWB-SPEC-nnn` authority form, exact program scope, first supported repository subject, dirty-worktree inventory mode, permanent prefix and `000`–`011` allocations, lifecycle convention, Wave 1 commission, or adoption/oracle authority. The full judgment surface, verified evidence, strongest opposing considerations, consequences, recommendations, and candidate grant text are recorded in `docs/ASTs and Code Analysis/Wave 0 Sponsor Decision Instrument.md`. Does the accountable sponsor confer the proposed program grant, with what item-by-item dispositions and amendments?
+- **Safe default:** No CSAA authority is conferred. `JAN-CSAA-000` remains a Draft proposal with a provisional ID; `JAN-CSAA-001` through `JAN-CSAA-011` remain unauthored and blocked. Wave 0 may prepare the decision instrument, requirement-ledger/review templates, and read-only evidence. It may not claim a permanent prefix, author governed Wave 1 members, select tools, change implementation or oracle artifacts, or treat a general direction to proceed as a sponsor conferral.
+- **Disposition:** Await the accountable sponsor's separate disposition of W0-01 through W0-09. Before recording the result, recheck the next available `REG-D-nnn`; at filing time it appears to be `REG-D-017`.
+- **Merge target:** A future sponsor-conferral entry in this register; administrative carriage into the CSAA `README.md` status/manifest and every authorized member status block. **Status:** OPEN.
+
+### REG-Q-052 — CSAA two-stage program grant, charter adoption, and Wave 1 activation
+
+- **Date:** 2026-07-25 · **Type:** OPEN QUESTION
+- **Statement:** Independent review of the `REG-Q-051` decision surface found that its nine-item carrier bundled independently contestable semantic baselines and could allow an unconditional grant to contradict a `REJECT` or `DEFER` disposition. The revised `CSAA-W0-INSTRUMENT-2026-07-25@0.2.0` therefore separates W0-01 through W0-16 and requires two sponsor acts: Stage A may establish the bounded program and authorize preparation/review of an exact `JAN-CSAA-000` candidate; Stage B (W0-17) may adopt only an identified version and SHA-256 digest and then activate the three-document Wave 1 commission. Per-member Normative status requires its own `JPWB-REG-005` sponsor conferral and synchronized member/manifest carriage. This entry supersedes `REG-Q-051` only as the requested disposition procedure; its no-authority safe default remains consistent and in force.
+- **Safe default:** No CSAA grant, charter adoption, permanent identifier authority, Normative member status, or Wave 1 commission is effective. Preparation of the itemized instrument, templates, exact evidence, and OPEN register records may continue. No sponsor response to an unseen W0-17 candidate may be inferred.
+- **Disposition:** First await individual sponsor dispositions for W0-01 through W0-16. File no Stage A grant unless every prerequisite is `RATIFY` or a mutually compatible `AMEND`; any `REJECT`, `DEFER`, or unresolved incompatibility preserves the safe default. If Stage A is conferred, prepare and independently review the exact W0-17 candidate, then seek a separate version/digest-bound sponsor disposition. Recheck all identifiers and live evidence before either filing.
+- **Merge target:** A compatible Stage A sponsor-conferral entry, followed by a distinct `JAN-CSAA-000` adoption/Wave 1 activation conferral if W0-17 is later ratified; synchronized administrative carriage into the CSAA member and manifest status blocks. **Status:** OPEN.
+
+### REG-D-017 — JAN-CSAA program-working-reference grant and charter-preparation commission
+
+- **Date:** 2026-07-25 · **Type:** DECISION (sponsor conferral; itemized disposition of `CSAA-W0-INSTRUMENT-2026-07-25@0.2.0`)
+- **Statement:** The accountable sponsor establishes **Codebase Semantic Analysis and Assurance** (`JAN-CSAA`) as a JPWB program working-reference series for the design, specification, fixture, implementation, qualification, operation, and validation of a revision-bound semantic-analysis and conventional software-assurance capability for the root-manifest-resolved TypeScript, JavaScript, and TypeScript-bearing Svelte implementation in `JanumiCode/janumiprofessionalworkbench`. The program is an engineering capability, not a separate Janumi product, PWA, PWU, Undertaking, canonical role, or professional-semantic object. It holds no more than HYPOTHESIS-grade authority within the granted program scope, is subordinate to every canon artifact by concern, and defers exact governed shapes to enforced repository reference artifacts. The permanent, non-reusable `JAN-CSAA-000` through `JAN-CSAA-011` identifiers and the Draft / Proposed / Normative / Deprecated / Superseded lifecycle are confirmed; identifier allocation does not confer member authority. The first supported subject is the root-workspace-resolved JPWB package and `apps/rph-demo` source/configuration perimeter ruled by W0-04, with Playwright and other undeclared-project surfaces inventory-only and with documentation prototypes, workflow harness code, derived/build output, third-party source, live network/agent execution, production traces, and sibling repositories excluded as ruled there. Dirty-worktree inventory is revision/change-set bound and read-only by default; installation, generation, builds, cache-writing commands, live/network tests, external scanners, and production traces require separate execution authorization. Compiler-confirmed TypeScript facts are source/configuration/toolchain bound and provider outputs remain derived evidence; coverage proves identified execution rather than correctness; runtime traces support only their captured execution; findings and dispositions preserve append-only logical history; remediation and source mutation remain outside the analysis core; and unsupported, failed, stale, excluded, partial, or incomplete analysis may never report an unqualified green result. Concrete analyzer providers, graph composition and persistence, coverage provider/thresholds, production trace ingestion, gate/severity profiles, licensing/deployment profiles, and executable topology remain deferred. The W0-08 documentation-only commission for `JAN-CSAA-001`, `JAN-CSAA-002`, and `JAN-CSAA-005` is approved in principle but **is not active** until the exact W0-17 `JAN-CSAA-000` adoption conferral is recorded. Each CSAA member requires its own exact-version/digest `JPWB-REG-005` sponsor conferral and synchronized member/manifest carriage. This Stage A grant authorizes only administrative incorporation of these dispositions into a Draft or Proposed `JAN-CSAA-000`, completion of its requirement ledger and independent review, and preparation of the exact W0-17 adoption package. No CSAA member is Normative; `JAN-CSAA-000` is not adopted; Wave 1 is not active; no provider, implementation, procurement, oracle change, professional-work semantic, infrastructure-assurance rule, or unauthored content receives authority.
+- **Disposition:** `W0-01 RATIFY; W0-02 RATIFY; W0-03 RATIFY; W0-04 RATIFY; W0-05 RATIFY; W0-06 RATIFY; W0-07 RATIFY; W0-08 RATIFY; W0-09 RATIFY; W0-10 RATIFY; W0-11 RATIFY; W0-12 RATIFY; W0-13 RATIFY; W0-14 RATIFY; W0-15 RATIFY; W0-16 RATIFY.` The sponsor expressly made no disposition on W0-17 and directed Stage A only. The live pre-recording evidence was rechecked at `2026-07-25T12:52:23.7902772-04:00`: branch `main`, HEAD `92f30710dd559120af608f84018c33ac5d846f0b`, 35 tracked/untracked porcelain entries, root workspaces `packages/*` and `apps/*`, ten package build configurations, eleven authored `.svelte` files, and no repository-wide coverage-configuration hit in the recorded inspection. Effective on recording as the `JPWB-CON-000 B1` program sponsor grant and charter-preparation commission; confers neither canon nor `JPWB-SPEC-nnn` status.
+- **Merge target:** The conferral itself has no substantive merge target. Administrative carriage remains pending in the Stage A decision instrument, the Draft/Proposed CSAA `README.md` manifest, and the exact W0-17 adoption package. `REG-Q-052` remains OPEN only for Stage B adoption and Wave 1 activation; its former no-grant safe default is superseded by this act, while its no-member-adoption and no-Wave-1 defaults remain in force.
+- **Status:** EFFECTIVE — MERGE PENDING.
+
+**Append-only Stage A progress notation — 2026-07-25 (ministerial carriage of REG-D-017):**
+
+- **REG-Q-051 — SUPERSEDED / CLOSED FOR STAGE A:** `REG-Q-052` superseded its nine-item disposition procedure, and `REG-D-017` now resolves the program-grant question. Its former no-grant safe default no longer controls.
+- **REG-Q-052 — STAGE A SATISFIED; OPEN FOR STAGE B ONLY:** W0-17 remains undisposed. Until a later exact-version/digest sponsor conferral, `JAN-CSAA-000` is not adopted, no CSAA member is Normative, and the W0-08 Wave 1 commission is inactive.
+- **REG-D-017 Draft/Proposed sequencing clarification:** the phrase “Draft or Proposed `JAN-CSAA-000`” names the permitted preparation lifecycle range; it does not permit skipping ratified W0-16. The charter remains Draft through disposition incorporation, requirement-ledger closure, and self-review. Only then may the author advance the exact candidate to Proposed for independent review. This notation creates no new decision.
+
+### REG-D-018 — JAN-CSAA-000@0.3.0 exact adoption and Wave 1 documentation-commission activation
+
+- **Date:** 2026-07-26T10:34:49.3000000-04:00 · **Type:** DECISION (accountable-sponsor conferral:
+  individual RATIFY responses to `W017-002-MD-00`, every `W017-002-MD-01A`
+  through `W017-002-MD-25`, and confirmation that `W017-002-CA-01` through
+  `W017-002-CA-16` are non-dispositive `CARRIED_ACCURATELY` evidence)
+- **Statement:** The accountable sponsor adopts exact `JAN-CSAA-000@0.3.0`,
+  pre-carriage SHA-256 `a9e9174b3fb11f6c25c4d6c89db023a0163d781b288fe4045befd537aeb0a8eb`,
+  as a Normative HYPOTHESIS-grade CSAA program working reference within its
+  stated `Governs` boundary. The sponsor activates only the documentation-only
+  W0-08 Wave 1 Draft-authoring and adversarial-review commission for
+  `JAN-CSAA-001`, `JAN-CSAA-002`, and `JAN-CSAA-005`. Those documents remain
+  unauthored and have no member authority until their own exact conferrals.
+  No later wave, provider, dependency, procurement, experiment, implementation,
+  topology, gate, source mutation, or oracle change is authorized.
+- **Disposition:** Effective only with exact atomic carriage defined by
+  `JAN-CSAA-000-W017-CARRIAGE-002@0.1.0` and its exact-operation attachment.
+  This atomic adoption and synchronized README/package carriage also confirms
+  completion of the outstanding administrative carriage of `REG-D-017`; the
+  original `REG-D-017` entry remains unchanged.
+  Expected post-carriage README: 101,717 bytes, SHA-256
+  `ed2cde24be9ce0a99210644fdf655c192db5ee2c97ce0f587f446a1820ee5710`.
+- **Merge target:** The exact 24 state-only README locations identified by
+  `JAN-CSAA-000-W017-CARRIAGE-002-SUBSTITUTIONS-001@0.1.0`.
+- **Status:** EFFECTIVE — MERGED.
+
+### REG-D-019 — JAN-CSAA-000@0.3.0 Wave 1 authored-Draft manifest synchronization
+
+- **Date:** 2026-07-26T17:35:53.0060000-04:00 · **Type:** DECISION
+- **Sponsor:** Marshall Hendricks, Architect and accountable sponsor
+  (accountable-sponsor disposition of `JAN-CSAA-W1-MANIFEST-001@0.3.0`
+  following `W1M-CO-01 = COMPATIBLE_SAME_VERSION_STATE_ONLY` in
+  `JAN-CSAA-W1-MANIFEST-001-CONCERN-OWNER-001@0.1.0`, with individual
+  compatible responses preserved in
+  `JAN-CSAA-W1-MANIFEST-001-SPONSOR-RESPONSE-001@0.1.0` for `W1M-MD-00`,
+  `W1M-MD-01`, `W1M-MD-02`, `W1M-MD-03A` through `W1M-MD-03E`,
+  `W1M-MD-04A` through `W1M-MD-04C`, and `W1M-MD-05` through
+  `W1M-MD-07`)
+- **Authority evidence:** Validation freeze 16,253 bytes, SHA-256
+  `ef3f512afbb55730a00c8e8e5181a09a2e87f3454ed89d575412fc4107038040`;
+  concern-owner determination 18,301 bytes, SHA-256
+  `f53074db9b44e0674c25dc37ef23883321d1673af80dbdb175b393b1ac718265`;
+  presentation record 21,234 bytes, SHA-256
+  `d85ade1458bdea3f872133b9366c313be8b3a2a3a89168d7fe650ee71606151a`;
+  sponsor-response record 10,150 bytes, SHA-256
+  `bb0410b39a992f99fc76312f06859cc933a09c5f71daca68f6c27635194d5a05`.
+  Each record also retains its exact ID/version, path, encoding/line-ending
+  form, and terminal-newline condition under the proposal's §5 identity rule.
+- **Register preimage:** 101,465 bytes, SHA-256
+  `8e10767517bd98a8808a9d97dfcb6f6d0b6cba134e082b14e41588fbfa544798`;
+  UTF-8 without BOM, LF-only, one terminal LF; final decision identifier
+  `REG-D-018`.
+- **Statement:** The accountable sponsor authorizes exact state-only
+  administrative synchronization of the `JAN-CSAA-000@0.3.0` controlled
+  manifest with three authored, non-authoritative Wave 1 Drafts:
+  `JAN-CSAA-001@0.1.0`, bytes 92,052, SHA-256
+  `84879bbf25a71b1100de9589d975e7baade71a3e05968195db68fb3eba18e1b8`;
+  `JAN-CSAA-002@0.1.0`, bytes 151,503, SHA-256
+  `0b0b1dcc460d6a1432880ee7d4102311edb0e82af4ccf418014f86df3b7aed34`;
+  and `JAN-CSAA-005@0.1.0`, bytes 106,386, SHA-256
+  `8d9873898d119d864903b02b93402b57521922dbc420db8a838c843b969bc593`.
+  Each ledger remains OPEN; formal independent review is not completed;
+  005 remains STALE_FOR_CURRENT_REPOSITORY. No member is adopted or promoted.
+  No later wave, provider, dependency, procurement, experiment,
+  implementation, topology, gate, source mutation, or oracle change is
+  authorized.
+- **Decision boundary:** Authorizes only the exact archive, README result,
+  conditional completion record, recovery rule, and later ministerial
+  confirmation defined by `JAN-CSAA-W1-MANIFEST-001@0.3.0`. The recorder is
+  delegated to append that confirmation at the then-next available register
+  identifier only if every exact predicate passes. The delegation permits no
+  amendment, substitution, waiver, new judgment, or scope expansion.
+- **Disposition:** Exact carriage is defined by
+  `JAN-CSAA-W1-MANIFEST-001@0.3.0` and
+  `JAN-CSAA-W1-MANIFEST-001-SUBSTITUTIONS-001@0.1.0`, including preservation
+  of the pre-carriage README at the proposal's exact archive path.
+  Pre-carriage README: 101,717 bytes, SHA-256
+  `ed2cde24be9ce0a99210644fdf655c192db5ee2c97ce0f587f446a1820ee5710`.
+  Post-carriage README: 102,164 bytes, SHA-256
+  `833b97d9fe12ae5e245b6c2920216ec3271e59f68dc24c54d0efd9a1efdf32a1`.
+- **Pending-state result:** `JAN-CSAA-W1-GAP-001` remains OPEN and
+  `CSAA-000-REQ-150` remains unperformed for this event until exact carriage
+  and the delegated append-only confirmation. Every ledger remains overall
+  OPEN; every verification row remains NOT_RUN; every other gap retains its
+  exact recorded state.
+- **Merge target:** Exact README operations `W1M-C-01` through `W1M-C-05`,
+  the exact pre-carriage preservation snapshot, the itemized sponsor-response
+  record, `JAN-CSAA-W1-MANIFEST-001-COMPLETION-001@0.1.0`, and the delegated
+  then-next append-only confirmation.
+- **Status:** EFFECTIVE — MERGE PENDING.

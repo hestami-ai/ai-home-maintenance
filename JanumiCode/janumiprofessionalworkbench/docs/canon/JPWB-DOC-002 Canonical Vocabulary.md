@@ -4,7 +4,7 @@ title: Canonical Vocabulary
 layer: Vocabulary
 settledness: PRESUMPTIVE
 status: OPERATIVE — ratified as drafted (wholesale interim, REG-D-010, 2026-07-24); Ratify Sheet R1 remains open for clause-level amendment
-version: 1.0.0
+version: 1.2.0 — B5 amendments: REG-D-014 (§9.2 display aliases; §11 canon-governance vocabulary; tail fix); REG-D-016 (§3 Complicated/Complex entry — the root guard of the inequality family)
 date: 2026-07-16
 governs:
   - Naming and meaning of canonical terms across the Janumi product family and the JPWB canon
@@ -144,6 +144,9 @@ These terms carry the epistemic discipline of the canon. Their inequalities are 
 **Attention Item** is durable professional state binding a condition that requires judgment or action to the authority that must address it. It persists until explicit disposition and is ranked by professional consequence, not recency. A notification is a delivery mechanism, not the item; dismissing a notification disposes of nothing.
 > Guards: **Attention Item ≠ notification**. Prevents: professional waiting states silently evaporating on restart or dismissal — ignoring is not a disposition. Object definition and disposition vocabulary: JPWB-DOC-003 §3; doctrine: JPWB-DOC-001 §7.4.
 
+**Complicated** work decomposes losslessly — understand every part and the whole is recovered; expert analysis suffices. **Complex** work fails that test: decomposed, fully understood, and recomposed, something is still missing — the remainder *is* the complexity. Professional work is complex; its artifacts are typically merely complicated (JPWB-DOC-001 §2.4; CON-000 §3).
+> Guards: **Complex ≠ Complicated** — the root of the inequality family. Prevents: managing complex work with tooling adequate only for complicated work (the task-tracker fallacy), and the reductionist assumption that recomposition is free.
+
 **Authoritative semantic state** is the governed graph of professional-work objects. Projections, chat transcripts, repositories, and agent memory are inputs, records, or renderings — never the authority.
 > Guards: **Projection / chat / repository / memory ≠ authoritative semantic state**. Prevents: "the conversation said so" or "it's in the repo" standing in for governed state.
 
@@ -273,6 +276,7 @@ This document holds naming authority for the JPWB canon, inheriting that role fr
 
 - New canonical terms, retirements, and meaning changes are proposed via a JPWB-REG-005 finding, sponsor-ratified, then merged (JPWB-CON-000 Part B); no artifact, agent, or implementation introduces canonical vocabulary as a side effect of writing code or prose. The in-model term **Decision** (Section 3) names governed authority inside the product; it is not the change mechanism for this canon.
 - Compatibility aliases MUST be explicitly marked as such in canon artifacts, contracts, seeded vocabularies, and UI labels. Non-example: Section 8's permitted residual uses — legacy code, migration adapters, historical documents, informal UI wording for viewpoints — need no alias marking.
+- **Display aliases.** A UX boundary MAY present a ratified display alias for a canonical term where a JPWB-REG-005 decision admits it. An alias is recorded and marked as an alias in Section 8, never appears in canon artifacts, contracts, schemas, or register entries, and never redefines the term. Minting an alias is a vocabulary act: proposed via finding, sponsor-ratified. Prevents: two conforming agents diverging on unregulated friendly labels — and the ungoverned-label leak that a blanket prohibition would create under real usability pressure.
 - The machine vocabulary artifact (the contracts package's canonical vocabulary file, from which enums are generated and bound by fidelity test) is a **bound derivative** of this document, not a second authority. Divergence between the prose canon and the machine artifact is a defect in the machine artifact until a Decision says otherwise.
 - Ontology-owned vocabulary (for example PWU kinds of a specific PWA) is versioned data owned by that PWA, validated as strings against the PWA version — never global engine enums. The engine/ontology vocabulary boundary is itself canonical.
 
@@ -293,4 +297,15 @@ The following are vocabulary-adjacent but owned by other canon artifacts; they a
 - Ownership/reference semantics (`Owned<T>` / `Reference<T>`) and aggregate identity rules → JPWB-DOC-003.
 - Candidate vision-tier terms (Professional Scenario, Professional System, Professional Capability, Civilizational Capability) and candidate engineering terms (safe operating envelope, trajectory) → not yet canonical vocabulary; carried as open questions in JPWB-REG-005. The six discipline names themselves, including Shape Engineering, are canonical (Section 4).
 
-*End of JPWB-DOC-002 (DRAFT).*
+## 11. Canon-governance vocabulary (amendment-era terms)
+
+**Sponsor** is the accountable authority under the governing authority model — presently a single human sponsor; in multi-party deployments the same clauses resolve through that deployment's authority model (stipulated in JPWB-CON-000 B2).
+> Guards: **sponsor ≠ a person's name**; the term is authority-relative by constitutional stipulation.
+
+**Oracle stream** comprises the artifacts that judge an implementation — spec-derived conformance fixtures, acceptance criteria, gate configurations, reference artifacts; ratified content under its owning authority. The **implementation stream** comprises agent-authored tests: evidence the implementer constructs (JPWB-DOC-004 §7.6).
+> Guards: **oracle stream ≠ implementation stream** — the former is never edited to make the latter pass.
+
+**Requirement ledger** is the intake extraction of every applicable SHALL and SHALL NOT, each mapped to its planned implementation site and verifying test, closed at handoff (JPWB-DOC-004 §3.3, §6.3).
+> Guards: **completion claim ≠ diff** — completion is claimed against the closed ledger.
+
+*End of JPWB-DOC-002.*

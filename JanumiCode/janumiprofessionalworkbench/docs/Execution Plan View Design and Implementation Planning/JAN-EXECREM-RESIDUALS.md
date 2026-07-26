@@ -554,7 +554,27 @@ machine already had the home: `PARTIALLY_AUTHORIZED`. The **predicate** was wron
 | **N-19** | MINOR | **[CLOSED.]** Three artefacts carried stale reasons for RPH-EXE-004. The register row was on its **third**: *(1)* "no runtime capability plane exists" — false; *(2)* "the capability IDENTITY does not exist — Source TBD" — falsified by JAN-CAPBIND authoring it; *(3)* the real disposition, a **boundary**. The conformance manifest was stale **twice** (claimed EXE-005 unenforced after WP-3 closed it, *and* repeated the dead "Source TBD" reason). And `capabilityAuthorized`'s docblock stated the operation-time rule flatly with nothing to say the engine does not enforce it — **I later quoted that sentence to the sponsor as corpus text.** No gate reads prose; that is the durable part. |
 | **N-20** | MAJOR | **[CLOSED.]** A **vacuous request** (`R = ∅`) reaches `AUTHORIZED` with nothing granted and permits execution — and `fromStates` does not admit `AUTHORIZED` as a source, so **no second authorization exists** and no command re-points a step's `runtimeBindingId`. Strictly worse than N-18: refusing it at Start would be a **wedge**. Refused at `RequestRuntimeBinding`, the only point where a remedy exists. Disclosed as an **inference** — the corpus requires the field, not a non-empty array. |
 | **N-21** | MAJOR | **[CLOSED.]** **RPH-EXE-005 had no read-model mirror — F-29's fifth instance, and I created it.** JAN-CAPBIND WP-3 wired `inputReadiness` at both arrows into RUNNING and never told `planPermitsAffordance`, so `start`/`resolve` were offered on a step whose required input is absent. One work package later I closed the same shape for the retry cap and called that "the fourth instance" without looking one commit back. |
-| **N-22** | MAJOR | **[CLOSED.]** **A hole JAN-PARTAUTH opened, caught by an existing test.** `fromStates` was written when `target` was the literal `AUTHORIZED`; with the target **derived**, an identical re-authorization lands `PARTIALLY_AUTHORIZED → PARTIALLY_AUTHORIZED`, and `checkTransition` admits `from === to` as a NOOP — appending an event for a change that did not happen. The ratified machine declares **no self-arrow** there, so refusing is a derivation. **DISCLOSED CONSEQUENCE:** incremental multi-party authorization (grant one of three, then a second) becomes **inexpressible**. The machine does not model it; adding the arrow is a ratification act. *This is the case the sponsor's multi-party argument most directly touches, and it wants a ruling.* |
+| **N-22** | MAJOR | **[CLOSED.]** **A hole JAN-PARTAUTH opened, caught by an existing test.** `fromStates` was written when `target` was the literal `AUTHORIZED`; with the target **derived**, an identical re-authorization lands `PARTIALLY_AUTHORIZED → PARTIALLY_AUTHORIZED`, and `checkTransition` admits `from === to` as a NOOP — appending an event for a change that did not happen. The ratified machine declares **no self-arrow** there, so refusing is a derivation. ~~**DISCLOSED CONSEQUENCE:** incremental multi-party authorization becomes **inexpressible**; adding the arrow is a ratification act.~~ **THAT DISCLOSURE WAS WITHDRAWN THE SAME DAY — see the narrowing note below. No ratification act is needed and none was taken.** |
+
+> **N-22 WAS NARROWED, AND THE DISCLOSED COST WITHDRAWN — the correction matters more than the fix.** My first
+> guard refused **every** `from === to`, reasoning that the machine's arrows out of `PARTIALLY_AUTHORIZED` are to
+> `AUTHORIZED` and `REVOKED` with no self-loop. **Two things falsify that.** `checkTransition` admits `from === to`
+> as a NOOP *by design*; and **this codebase already runs two genuine same-state HOLDS** — `ApplyTacticalChange`
+> declares `fromStates('ACTIVE') → ACTIVE`, and the `ChangePwuState` path likewise — which simply declare their
+> target rather than omitting it. A same-state transition here is **UNDECLARED, not forbidden**, and those are
+> different things.
+>
+> What the precondition discipline actually forbids is *"an event for a change **that did not happen**"*. An
+> authorization that ADDS a capability **is** a change: `grantedCapabilities` differs and the event records it
+> truthfully. Only one adding nothing is the false entry. The guard is now `from === to && added.length === 0`,
+> and **both clauses are load-bearing** — `added.length === 0` alone would refuse the FIRST authorization that
+> deliberately grants nothing, which is precisely the N-18 case the sponsor ruled must stay recordable.
+>
+> **So incremental multi-party authorization is EXPRESSIBLE** — approver 1 grants A, approver 2 adds B, approver 3
+> completes with C, each act recorded so an auditor can see who added what. That was the case the sponsor's own
+> N-18 correction was about, and I had told them the ratified machine forbade it. It does not. **No ratification
+> act was needed and none was taken.** Mutant `X8` is the over-refusal, declared so it cannot return; it reddens
+> ONLY positive cases, which is exactly why the first formulation looked correct and passed its own battery.
 
 > **AND THE RENDERER FELL THROUGH — the finding inside the fix.** `bindingAuthorityVerdict` gained N-18's limb and
 > `bindingAuthorityRefusal` rendered only `WRONG_STEP` and `NOT_AUTHORIZED`, so the new verdict fell to `return

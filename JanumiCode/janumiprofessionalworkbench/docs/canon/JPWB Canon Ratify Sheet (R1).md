@@ -2,6 +2,8 @@
 
 **Instrument:** This sheet is the conferral act for the JPWB canon. Per CON-000 B2, status is conferred, not authored: none of the six drafted artifacts has authority until the sponsor disposes of the items below. The completed sheet becomes the founding ratification record in JPWB-REG-005, and Section 4's approval triggers retirement of the pre-canon corpus (CON-000 B8).
 
+> **Correction note (2026-07-24, applied under delegated pen — REG-D-014/S-16, Cycle-000 finding F22):** two counts below are wrong as originally drafted: the Part 2 DOC-003 row's "Eight source-contradiction items" should read **seven listed, of which five were filed** (and two have since closed in-artifact per REG-D-014); the Sections B–D row's "4 founding findings" should read **five** (REG-F-001..005). The rows are left as drafted per the sheet's instrument integrity; this note controls.
+
 > **R1 EXECUTED — wholesale interim (REG-D-010, 2026-07-24).** The sponsor ratified all six artifacts as drafted at v1.0.0; every item below not individually disposed stands as RATIFY-as-drafted, and every Part 3 elicitation item is DEFERRED to its safe default. The sheet remains open: any disposition marked after this date is processed as a B5 amendment to the operative canon. Part 4's retirement approval and its four preconditions remain outstanding.
 
 **Dispositions:** mark each item **RATIFY** (text stands), **AMEND** (state the change — applied before effect), **REJECT** (struck; content returns to historical status), or **DEFER** (remains an open REG-005 question with its safe default governing; the artifact is effective around it).

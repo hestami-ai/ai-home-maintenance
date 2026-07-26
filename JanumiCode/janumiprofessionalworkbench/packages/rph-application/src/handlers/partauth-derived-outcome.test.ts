@@ -229,6 +229,59 @@ describe('JAN-PARTAUTH — the authorization outcome is DERIVED from the grant',
 			expect(statusOf()).toBe('REQUESTED');
 		});
 	});
+
+	// ── N-22 NARROWED — INCREMENTAL MULTI-PARTY AUTHORIZATION IS EXPRESSIBLE AFTER ALL ─────────────────────────────
+	//
+	// I disclosed to the sponsor that the ratified machine makes this inexpressible, because it declares no
+	// PARTIALLY_AUTHORIZED self-loop. That was wrong twice over: `checkTransition` admits `from === to` as a NOOP by
+	// design, and this codebase ALREADY runs two genuine same-state HOLDS (`ApplyTacticalChange` ACTIVE -> ACTIVE).
+	// A same-state transition here is UNDECLARED, not forbidden — a different thing.
+	//
+	// What the precondition discipline actually forbids is "an event for a change THAT DID NOT HAPPEN". Adding a
+	// capability IS a change. So the guard now refuses only the genuinely null authorization, and the case the
+	// sponsor's own N-18 correction was about — a two- or three-approver chain — works.
+	describe('N-22 narrowed — a partial grant may be built up, but not re-recorded unchanged', () => {
+		it('THE PLATFORM CASE: three approvers each add a capability, reaching AUTHORIZED', () => {
+			ok(request('file-system', 'network', 'secrets'), 'request three');
+			ok(authorize('file-system'), 'approver 1 grants file-system');
+			expect(statusOf()).toBe('PARTIALLY_AUTHORIZED');
+			expect(grantedOf().sort()).toEqual(['file-system']);
+			ok(authorize('file-system', 'network'), 'approver 2 ADDS network — same status, real change');
+			expect(statusOf()).toBe('PARTIALLY_AUTHORIZED');
+			expect(grantedOf().sort()).toEqual(['file-system', 'network']);
+			ok(authorize('file-system', 'network', 'secrets'), 'approver 3 completes the request');
+			expect(statusOf()).toBe('AUTHORIZED');
+		});
+		it('…and every step of that chain is recorded, so the audit trail shows WHO added WHAT', () => {
+			// The reason the intermediate step must be recordable rather than merely permitted: a multi-party
+			// authorization whose middle act leaves no event is a chain no auditor can reconstruct.
+			ok(request('file-system', 'network', 'secrets'), 'request three');
+			ok(authorize('file-system'), 'first');
+			ok(authorize('file-system', 'network'), 'second');
+			const grants = store
+				.readAllEvents()
+				.filter((e) => e.eventType === 'RuntimeBindingAuthorized')
+				.map((e) => (e.payload as { grantedCapabilities?: { capability: string }[] }).grantedCapabilities?.length);
+			expect(grants).toEqual([1, 2]);
+		});
+		it('THE GUARD SURVIVES THE NARROWING: an authorization adding nothing is still refused', () => {
+			ok(request('file-system', 'network'), 'request two');
+			ok(authorize('file-system'), 'partial');
+			const before = store.readAllEvents().length;
+			const r = authorize('file-system');
+			expect(r.status).toBe('REJECTED');
+			expect(r.error?.message).toContain('grants nothing the binding does not already have');
+			expect(store.readAllEvents().length, 'appended an event for a non-change').toBe(before);
+		});
+		it('the FIRST authorization may still deliberately grant nothing — N-18’s ruled case is untouched', () => {
+			// `added.length === 0` alone would have refused this. Both conditions are load-bearing: this transition
+			// REQUESTED -> PARTIALLY_AUTHORIZED changes the status, and the sponsor ruled that "reviewed, granted
+			// nothing, still live" must stay recordable.
+			ok(request('file-system'), 'request one');
+			ok(authorize(), 'a review that conferred nothing');
+			expect(statusOf()).toBe('PARTIALLY_AUTHORIZED');
+		});
+	});
 });
 
 // ── N-18 (SPONSOR RULING 2026-07-26, option C) + N-22, DRIVEN THROUGH THE BUS ───────────────────────────────────
@@ -332,12 +385,17 @@ describe('N-18 — a binding that confers nothing does not authorize a start', (
 	it('N-22: a further authorization that changes nothing is refused, not recorded', () => {
 		// The hole JAN-PARTAUTH opened: with the target DERIVED, PARTIALLY_AUTHORIZED -> PARTIALLY_AUTHORIZED became
 		// reachable, and checkTransition admits from === to as a NOOP — so an identical re-authorization would append
-		// an event for a change that did not happen. The ratified machine declares no self-arrow here.
+		// an event for a change that did not happen.
+		//
+		// THE ASSERTION WAS NARROWED WITH THE GUARD. It used to demand the message "declares no
+		// PARTIALLY_AUTHORIZED -> PARTIALLY_AUTHORIZED arrow", which was the over-broad reasoning: a same-state
+		// transition is UNDECLARED here, not forbidden, and this codebase already runs two of them. The defect is
+		// that nothing CHANGED, which is what the message and this assertion now say.
 		arrange(['file-system', 'network'], ['file-system']);
 		const before = store.readAllEvents().length;
 		const r = send('AuthorizeRuntimeBinding', { grantedCapabilities: [cap('file-system')] }, BIND, 'RUNTIME_BINDING');
 		expect(r.status).toBe('REJECTED');
-		expect(r.error?.message).toContain('declares no PARTIALLY_AUTHORIZED -> PARTIALLY_AUTHORIZED arrow');
+		expect(r.error?.message).toContain('grants nothing the binding does not already have');
 		expect(store.readAllEvents().length, 'appended an event for a non-change').toBe(before);
 	});
 
