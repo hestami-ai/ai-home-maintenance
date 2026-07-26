@@ -146,8 +146,42 @@ table gets produced: 43 of the 90 verdicts were the same foreign type error.
 Everything about the other 59 is currently unmeasured, and saying "unmeasured" is the whole point of the exercise
 — it is the same distinction V-0 drew when it found coverage had never been measured rather than being low.
 
-**`MUTANTS_BLOCKING=1` and the coverage thresholds stay unwired** until a clean 90-mutant run exists. Wiring a
-gate to an instrument that has twice produced void output would be worse than having no gate.
+### V-2b — the authoritative measurement, at last
+
+**90 mutants, clean, corrected scope: 27 KILLED · 35 KILLED_UNNAMED · 21 NO_COMPILE · 3 RETIRED · 2 UNANCHORED ·
+1 TYPE_PREVENTED · 1 CONTROL_HELD · 0 SURVIVED · 0 ABORTED_DIRTY.** Sums to 90; tree verified clean.
+
+**0 SURVIVED, and this figure is finally trustworthy.** Every declared guard that *can* be exercised, is
+exercised. It took four runs to earn that sentence — two void, one wrongly scoped — which is itself the result:
+the number was never the hard part, the instrument was.
+
+**Both earlier "survivors" were defects in the instrument, not the product:**
+
+- `WP12B-M7` survived its own package and is killed by `rph-application`. The runner scoped unnamed victims to
+  `pkgOf(file)`, but **domain predicates in this codebase are enforced at the COMMAND layer** — so scoping a
+  domain mutant to domain tests is a pure-predicate assertion standing in for a command-layer rule. **F-28's
+  shape, inside the instrument built to detect F-28.** Unnamed victims now run the whole workspace.
+- The other mutated `activePlanRationale` **prose**. Now declared `expectSurvive` — a CONTROL, where survival is
+  the pass and a kill would mean a test asserts on prose.
+
+**What still needs attention (23), and none of it is a product defect:**
+
+| | n | |
+|---|---|---|
+| `NO_COMPILE` | 21 | harvested formulations that no longer typecheck; each proves nothing until reformulated |
+| `UNANCHORED` | 2 | genuine ledger rot: `WP11-M2` (anchor now ambiguous, 3×) and `WP14-M7` (anchor gone) |
+
+**`MUTANTS_BLOCKING=1` and the coverage thresholds remain unwired** until those 23 are cleared. A gate that fails
+on day one is disabled on day one — the same argument this roadmap makes against aspirational thresholds.
+
+### The pattern this work actually exposed
+
+Six defects were found across V-0..V-2, and **five were in the instruments**: per-package coverage artifacts, the
+dist trap, a killed run leaking a mutant, a concurrent run contaminating a table, wrong-package mutant scoping,
+and inert mutants reading as defects. **One was in the product**, and RW-4 had already fixed it.
+
+The sponsor's premise — "coverage is embarrassingly low" — was measurably wrong (94.6% / 83.0%). The instinct
+behind it was right for a different reason: verification here was untrustworthy rather than thin.
 
 ## 4. V-2b — branch gaps, then the ratchet
 
@@ -179,7 +213,8 @@ The note is not the guarantee; the table is.)*
 | V-0 | *(this commit)* | **DELIVERED.** Merged coverage measurable for the first time: **94.57% stmts / 82.99% branch / 96.69% lines** over 4,501 statements, 1,571 tests, 139 files. Both resolution modes green — **no build/emit divergence found.** |
 | V-1 | *(this commit)* | **DELIVERED.** 31 declared mutants harvested into a re-runnable ledger. First-ever re-run: **27 KILLED · 1 TYPE_PREVENTED · 3 RETIRED · 0 SURVIVED · 0 UNANCHORED · 0 NO_COMPILE.** |
 | V-2a | `b2ff18ca` + *(this commit)* | Ledger expanded 31 → 90; three anti-contamination guards added. **Both of its verdict tables were VOID — retracted below.** The only clean measurement is still V-1's 31. |
-| V-2b | — | not started — the 2 SURVIVED, 21 NO_COMPILE, 34 unnamed victims, then thresholds |
+| V-2b | `c2ee9cf5` | **DELIVERED.** Both "survivors" were instrument defects, not code. Clean corrected-scope run: **0 SURVIVED.** |
+| V-2c | — | not started — 21 NO_COMPILE, 2 UNANCHORED, then thresholds + blocking |
 
 **V-0's measured result, and the artifact hypothesis CONFIRMED.** The per-package figures were lower bounds, exactly as DS §2 predicted:
 
