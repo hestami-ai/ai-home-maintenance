@@ -49,6 +49,11 @@ const COVERED_BY_ID: Readonly<Record<string, string>> = {
 	// JAN-EXEBIND WP-B1. Certified COVERED for four milestones on the strength of a pure-predicate unit test while
 	// `startExecutionStep` never resolved a step's runtimeBindingId at all; now observed refusing through the bus.
 	'RPH-EXE-003': 'packages/rph-application/src/handlers/exebind-wp1-binding-authority.test.ts',
+	// JAN-CAPBIND WP-3 (N-3). REQUIRED, not optional: without a per-id row `coverageFor` falls back to
+	// COVERAGE_BY_PREFIX['RPH-EXE'], whose testFile is rph-domain/src/execution.test.ts — PURE_KERNEL — and the
+	// layer gate correctly reddens, because a newly-ENFORCED rule would be citing pure-predicate evidence for a
+	// command refusal. That is the F-28 substitution itself, and the gate caught it on the first run of this WP.
+	'RPH-EXE-005': 'packages/rph-application/src/handlers/capbind-wp3-input-readiness.test.ts',
 	'RPH-EXE-006': 'packages/rph-application/src/handlers/execution-exe006-explicit-result.test.ts',
 	'RPH-EXE-008': 'packages/rph-application/src/handlers/execution-retry-cap.test.ts',
 	'RPH-PER-001': 'packages/rph-persistence/src/sqlite-storage-adapter.test.ts',

@@ -110,6 +110,19 @@ export interface StepCommandSpec {
 	readonly bindingAuthority: BindingAuthority;
 	/** Why `bindingAuthority` is what it is. */
 	readonly bindingAuthorityRationale: string;
+	/**
+	 * RPH-EXE-005: does this command CONSUME the step's declared inputs, so that a required input artifact being
+	 * absent must leave the step not ready (JAN-CAPBIND WP-3, closing N-3)?
+	 *
+	 * A FOURTH DECLARED COLUMN rather than a precheck inside one handler, for the reason the third one exists.
+	 * `bindingAuthority` was added as a column precisely because siting it in `startExecutionStep` missed
+	 * `ResolveExecutionStepWait` — the SECOND arrow into RUNNING — and that omission was a BLOCKER proved live.
+	 * The same two arrows consume inputs, so the same shape of omission is available here; being total over the
+	 * nine commands means a tenth cannot ship without declaring its disposition.
+	 */
+	readonly inputReadiness: InputReadiness;
+	/** Why `inputReadiness` is what it is. */
+	readonly inputReadinessRationale: string;
 }
 
 /** REQUIRES_ACTIVE_PLAN: mints terminal-success or a durable decision. CLEANUP_EXEMPT: terminates or suspends
@@ -122,6 +135,12 @@ export type PwuOpenness = 'REQUIRES_OPEN_PWU' | 'CLEANUP_EXEMPT';
 /** REQUIRES_AUTHORIZED_BINDING: drives the step INTO RUNNING, the state in which attempts execute against the
  *  binding. NOT_EXECUTING: does not open or re-open runtime execution, so the binding's status cannot bear on it. */
 export type BindingAuthority = 'REQUIRES_AUTHORIZED_BINDING' | 'NOT_EXECUTING';
+
+/** REQUIRES_PRESENT_INPUTS: drives the step into RUNNING, where its declared inputs are actually consumed, so a
+ *  required input artifact that does not resolve must leave it not ready (RPH-EXE-005). NOT_CONSUMING: the command
+ *  settles, suspends, abandons or waives the step without reading its inputs, so their presence cannot bear on it —
+ *  and gating them would STRAND a step whose missing input is precisely why it is being cancelled or skipped. */
+export type InputReadiness = 'REQUIRES_PRESENT_INPUTS' | 'NOT_CONSUMING';
 
 /**
  * RECORD_AT_SETTLEMENT   — this command drives a step to TERMINAL_SUCCESS, so if that step is a BRANCH it must take
@@ -158,7 +177,10 @@ export const STEP_COMMAND_SPECS: Readonly<Record<StepCommandType, StepCommandSpe
 		branchDecisionRationale: 'RUNNING is not terminal-success.',
 		bindingAuthority: 'REQUIRES_AUTHORIZED_BINDING',
 		bindingAuthorityRationale:
-			'the FIRST of the two arrows into RUNNING. Starting opens an attempt, and an attempt executes against the binding — RPH-EXE-003 names this case verbatim.'
+			'the FIRST of the two arrows into RUNNING. Starting opens an attempt, and an attempt executes against the binding — RPH-EXE-003 names this case verbatim.',
+		inputReadiness: 'REQUIRES_PRESENT_INPUTS',
+		inputReadinessRationale:
+			'the FIRST consuming arrow. Starting opens an attempt, and an attempt READS the step’s declared inputs — RPH-EXE-005 names this case verbatim: starting a step whose required input artifact is absent must leave it not ready and perform no model/tool invocation.'
 	}),
 	CompleteExecutionStep: spec({
 		commandType: 'CompleteExecutionStep',
@@ -176,7 +198,10 @@ export const STEP_COMMAND_SPECS: Readonly<Record<StepCommandType, StepCommandSpe
 			'the primary settling command: a BRANCH decides at the moment it succeeds, against a settlement view that INCLUDES its own result (Rule B1).',
 		bindingAuthority: 'NOT_EXECUTING',
 		bindingAuthorityRationale:
-			'completion CLOSES an attempt. Refusing it on a revoked binding would strand a step that has already done the work, with no way to record what it produced.'
+			'completion CLOSES an attempt. Refusing it on a revoked binding would strand a step that has already done the work, with no way to record what it produced.',
+		inputReadiness: 'NOT_CONSUMING',
+		inputReadinessRationale:
+			'the attempt has ALREADY read them. Completion records work that was performed, so gating it on input presence would refuse the record of work already done — and an artifact deleted mid-attempt would make the step uncompletable rather than merely unstartable.'
 	}),
 	FailExecutionStep: spec({
 		commandType: 'FailExecutionStep',
@@ -194,7 +219,10 @@ export const STEP_COMMAND_SPECS: Readonly<Record<StepCommandType, StepCommandSpe
 			'FAILED is terminal, but not success; the flow does not advance, so no arm is taken.',
 		bindingAuthority: 'NOT_EXECUTING',
 		bindingAuthorityRationale:
-			'recording failure must never require a live authority — the same argument as its planLiveness and pwuOpenness exemptions. A revoked binding makes failure MORE likely to be the truth, not less reportable.'
+			'recording failure must never require a live authority — the same argument as its planLiveness and pwuOpenness exemptions. A revoked binding makes failure MORE likely to be the truth, not less reportable.',
+		inputReadiness: 'NOT_CONSUMING',
+		inputReadinessRationale:
+			'a missing input is frequently WHY the attempt failed. Refusing the honest non-success record would strand the step in RUNNING and destroy the very account of what went wrong.'
 	}),
 	RetryExecutionStep: spec({
 		commandType: 'RetryExecutionStep',
@@ -211,7 +239,10 @@ export const STEP_COMMAND_SPECS: Readonly<Record<StepCommandType, StepCommandSpe
 		branchDecisionRationale: 'QUEUED re-opens the step; nothing settles.',
 		bindingAuthority: 'NOT_EXECUTING',
 		bindingAuthorityRationale:
-			'retry drives FAILED -> QUEUED, which opens no attempt: the attempt opens at the NEXT Start, which IS gated. Gating here too would double-guard one act and refuse earlier with a less useful message.'
+			'retry drives FAILED -> QUEUED, which opens no attempt: the attempt opens at the NEXT Start, which IS gated. Gating here too would double-guard one act and refuse earlier with a less useful message.',
+		inputReadiness: 'NOT_CONSUMING',
+		inputReadinessRationale:
+			'retry returns the step to QUEUED, not RUNNING — nothing is consumed here. The next Start re-asks the question against the state as it then is, which is the only correct time to ask it.'
 	}),
 	SkipExecutionStep: spec({
 		commandType: 'SkipExecutionStep',
@@ -229,7 +260,10 @@ export const STEP_COMMAND_SPECS: Readonly<Record<StepCommandType, StepCommandSpe
 			'SKIPPED is terminal-SUCCESS precisely so the flow ADVANCES past the step, so an arm must be taken and somebody must choose it. Recording nothing here is what let a later guard flip re-resolve a settled branch and run BOTH arms (F-15/21/23). Not fabrication: the same act as at Complete, truthfully evaluated against a step that produced no result.',
 		bindingAuthority: 'NOT_EXECUTING',
 		bindingAuthorityRationale:
-			'a skip runs nothing; it retires the step under an authorization. No binding is exercised.'
+			'a skip runs nothing; it retires the step under an authorization. No binding is exercised.',
+		inputReadiness: 'NOT_CONSUMING',
+		inputReadinessRationale:
+			'an absent required input is one of the ordinary REASONS to waive a step. Gating the waiver on the condition that motivates it would make the governed exit unreachable exactly when it is needed.'
 	}),
 	CancelExecutionStep: spec({
 		commandType: 'CancelExecutionStep',
@@ -247,7 +281,10 @@ export const STEP_COMMAND_SPECS: Readonly<Record<StepCommandType, StepCommandSpe
 			'CANCELLED is terminal-non-success; the downstream is not released, so no arm is taken.',
 		bindingAuthority: 'NOT_EXECUTING',
 		bindingAuthorityRationale:
-			'cancel is the exit of last resort and is exempt from every authority limb. Gating it on the binding would strand exactly the step whose binding was revoked — the case revocation exists to stop.'
+			'cancel is the exit of last resort and is exempt from every authority limb. Gating it on the binding would strand exactly the step whose binding was revoked — the case revocation exists to stop.',
+		inputReadiness: 'NOT_CONSUMING',
+		inputReadinessRationale:
+			'the exit of last resort. Cancel must stay available on a step that can never become ready, or an unsatisfiable input permanently strands the arm — the wedge shape RW-0 had to withdraw a limb for.'
 	}),
 	PruneExecutionStep: spec({
 		commandType: 'PruneExecutionStep',
@@ -264,7 +301,10 @@ export const STEP_COMMAND_SPECS: Readonly<Record<StepCommandType, StepCommandSpe
 		branchDecisionRationale:
 			'a prune only ever reaches a step the branch logic ALREADY excluded, so there is no decision left to take. SAFE STRUCTURALLY, not by convention: the disposition ladder tests source liveness before it reaches any branch rung, and the reachability BFS never expands a non-live node. Both are pinned by test rather than assumed.',
 		bindingAuthority: 'NOT_EXECUTING',
-		bindingAuthorityRationale: 'prune clears a structurally dead arm; it executes nothing.'
+		bindingAuthorityRationale: 'prune clears a structurally dead arm; it executes nothing.',
+		inputReadiness: 'NOT_CONSUMING',
+		inputReadinessRationale:
+			'a system prune settles a step the plan’s own branch logic already excluded; it never runs, so it never reads. Its inputs are irrelevant by construction.'
 	}),
 	EnterExecutionStepWait: spec({
 		commandType: 'EnterExecutionStepWait',
@@ -281,7 +321,10 @@ export const STEP_COMMAND_SPECS: Readonly<Record<StepCommandType, StepCommandSpe
 		branchDecisionRationale: 'WAITING suspends; nothing settles.',
 		bindingAuthority: 'NOT_EXECUTING',
 		bindingAuthorityRationale:
-			'waiting SUSPENDS execution. A running step must be able to record that it is blocked whatever the binding is doing — and parking a step whose binding was just revoked is the CORRECT response, not one to refuse.'
+			'waiting SUSPENDS execution. A running step must be able to record that it is blocked whatever the binding is doing — and parking a step whose binding was just revoked is the CORRECT response, not one to refuse.',
+		inputReadiness: 'NOT_CONSUMING',
+		inputReadinessRationale:
+			'suspending a RUNNING step reads nothing new — the attempt already consumed its inputs when it started.'
 	}),
 	ResolveExecutionStepWait: spec({
 		commandType: 'ResolveExecutionStepWait',
@@ -297,7 +340,10 @@ export const STEP_COMMAND_SPECS: Readonly<Record<StepCommandType, StepCommandSpe
 		branchDecisionRationale: 'RUNNING resumes; nothing settles.',
 		bindingAuthority: 'REQUIRES_AUTHORIZED_BINDING',
 		bindingAuthorityRationale:
-			'THE SECOND ARROW INTO RUNNING, and the one whose omission was a BLOCKER. A resume re-enters RUNNING, so it re-opens execution against the binding exactly as Start does — this handler’s own docblock already said "resuming re-opens RUNNING, the state in which attempts execute". Anything else makes REVOCATION UNENFORCEABLE for every step that can be parked in WAITING.'
+			'THE SECOND ARROW INTO RUNNING, and the one whose omission was a BLOCKER. A resume re-enters RUNNING, so it re-opens execution against the binding exactly as Start does — this handler’s own docblock already said "resuming re-opens RUNNING, the state in which attempts execute". Anything else makes REVOCATION UNENFORCEABLE for every step that can be parked in WAITING.',
+		inputReadiness: 'REQUIRES_PRESENT_INPUTS',
+		inputReadinessRationale:
+			'THE SECOND CONSUMING ARROW, and the reason this is a column. A resume re-enters RUNNING and the attempt reads the same declared inputs; siting the check in startExecutionStep alone would miss it exactly as the binding limb was missed, which was a BLOCKER proved live.'
 	})
 };
 

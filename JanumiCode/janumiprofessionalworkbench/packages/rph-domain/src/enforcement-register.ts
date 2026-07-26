@@ -217,18 +217,34 @@ export const ENFORCEMENT_REGISTER: Readonly<Record<RegisteredRuleId, Enforcement
 		referencedOnlyBy: ['packages/rph-domain/src/execution.ts']
 	},
 	'RPH-EXE-005': {
-		kind: 'UNENFORCED_DISCLOSED',
-		why:
-			'BLOCKED ON THE SAME CORPUS GAP. The reason recorded here until 2026-07-25 named the unreachable ' +
-			'transition (NOT_READY/READY are the command-unreachable population disclosed under F-27) — true, and ' +
-			'SECONDARY. InputBinding is declared "NOT field-defined … Source TBD", so InputBindingSchema is an opaque ' +
-			'record and "a step whose required input artifact is absent" has nothing to quantify over. That blocker ' +
-			'survives fixing the machine; the transition one does not survive fixing this. It is F-01’s mechanism one ' +
-			'level up — a guard cannot be non-vacuous while one of its inputs is unrepresentable — except here the ' +
-			'input is unrepresentable because the CORPUS withholds the shape, not because the vocab forgot a field. ' +
-			'ESCALATED (JAN-EXEBIND-DS-001 §4-R3).',
-		deadPredicate: 'stepMayBecomeReady',
-		referencedOnlyBy: ['packages/rph-domain/src/execution.ts']
+		// CLOSED 2026-07-26 by JAN-CAPBIND WP-3, and the blocker recorded here was REAL rather than an excuse — which
+		// is why it took an authoring to remove it. This row read UNENFORCED_DISCLOSED because `InputBinding` was
+		// declared "NOT field-defined … Source TBD" in the ratified corpus, so `InputBindingSchema` was an opaque
+		// record and "a step whose required input artifact is absent" HAD NOTHING TO QUANTIFY OVER: F-01's mechanism
+		// one level up, a guard that cannot be non-vacuous while one of its inputs is unrepresentable. WP-0 authored
+		// the shape under sponsor grant (`artifactId?`, `required?`), and only then did wiring become possible.
+		//
+		// ~~ESCALATED (JAN-EXEBIND-DS-001 §4-R3)~~ — the escalation was ANSWERED, not withdrawn. Struck rather than
+		// deleted per the WP-17 standard, so a reader sees that the blocker existed and how it was cleared.
+		//
+		// The earlier reason named the unreachable NOT_READY/READY transition (F-27). That was true and SECONDARY:
+		// the subject gap survives fixing the machine, and the machine gap does not survive fixing the subject. The
+		// enforcement below is on the START and RESUME arrows, which are command-reachable, so F-27 never blocked it.
+		kind: 'ENFORCED',
+		enforcedAt:
+			'DECLARATION: packages/rph-domain/src/step-command-spec.ts — the `inputReadiness` column, total over the nine step commands. ENFORCEMENT: packages/rph-application/src/handlers/execution.ts — inputReadinessRefusal, invoked from stepAuthorityRefusal as the fourth declared limb for both arrows into RUNNING.',
+		refusalCode: 'RPH_INVARIANT_VIOLATION',
+		// The kernel's own label travels in the MESSAGE: RPH_PRECONDITION_UNSATISFIED is not a member of the ratified
+		// 15-value RphErrorCodeSchema (the WP-11 discipline, as with RPH_BINDING_NOT_AUTHORIZED).
+		refusalMarker:
+			'the step is not ready and no model/tool invocation is performed',
+		declaredMutations: [
+			'flip StartExecutionStep.inputReadiness to NOT_CONSUMING in step-command-spec.ts',
+			'flip ResolveExecutionStepWait.inputReadiness to NOT_CONSUMING — the two-arrows omission, re-expressed as one character of declaration',
+			'delete the inputReadiness limb from stepAuthorityRefusal',
+			'make inputReadinessRefusal pass `inputBindings.length > 0` to stepMayBecomeReady instead of resolving each artifact — the F-30 shape, a truthiness test standing in for a resolved fact',
+			'drop the `required ?? true` fail-closed default so an unmarked input is treated as optional'
+		]
 	},
 	'RPH-EXE-006': {
 		kind: 'ENFORCED',

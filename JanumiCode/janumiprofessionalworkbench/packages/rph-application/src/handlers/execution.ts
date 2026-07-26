@@ -27,6 +27,10 @@ import {
 	bindingAuthorityVerdict,
 	canResumeExecutionOnPwu,
 	canSkipStep,
+	// JAN-CAPBIND WP-3: the RPH-EXE-005 kernel gains its FIRST production caller. The enforcement register's
+	// call-site census asserts this predicate's reference set, so this import is what flips its row RED until the
+	// row is re-dispositioned to ENFORCED — deliberately, in this same commit.
+	stepMayBecomeReady,
 	evaluateGuardExpression,
 	planEvidencesExecutionSuccess,
 	pruneProvenance,
@@ -618,7 +622,59 @@ function stepAuthorityRefusal(
 		const refusal = bindingAuthorityRefusal(ctx, command, step, stepId);
 		if (refusal) return refusal;
 	}
+	// RPH-EXE-005, the FOURTH declared limb (JAN-CAPBIND WP-3 / N-3). Same treatment as the third and for the same
+	// reason: the two commands that drive a step into RUNNING are the two that consume its inputs, and siting the
+	// check at one of them is the omission that made the binding limb a BLOCKER.
+	if (spec.inputReadiness === 'REQUIRES_PRESENT_INPUTS') {
+		const refusal = inputReadinessRefusal(ctx, command, step, stepId);
+		if (refusal) return refusal;
+	}
 	return null;
+}
+
+/**
+ * RPH-EXE-005 — *"Starting a step whose required input artifact is absent leaves the step not ready and performs no
+ * model/tool invocation."*
+ *
+ * UNENFORCEABLE UNTIL NOW, and not for want of wiring. `InputBinding` was declared `Source TBD` in the ratified
+ * corpus, so `gen-objects.ts` emitted an opaque record and *"the required input artifact"* had nothing to quantify
+ * over — F-01's mechanism one level up, a guard that cannot be non-vacuous while one of its inputs is
+ * unrepresentable. JAN-CAPBIND WP-0 authored the shape (`artifactId?`, `required?`), which is what makes this
+ * limb expressible at all.
+ *
+ * IT RESOLVES A FACT AND PASSES THAT, never a truthiness test. `stepMayBecomeReady` takes a boolean, and the
+ * tempting shortcut — `inputBindings.length > 0` — would reproduce F-30 exactly: WP-12 found
+ * `hasAuthorizedWaiverOrRevision: !!p.waiverOrRevisionId`, where a governed act was satisfied by ANY non-empty
+ * string and `'x'` retired a mandatory step. So each required binding's `artifactId` is RESOLVED against the store,
+ * and what reaches the kernel is the answer, not the question.
+ *
+ * `required ?? true` is FAIL-CLOSED, mirroring WP-12's `mandatory ?? true`: an unmarked input counts as needed,
+ * because the fail-open reading lets a typo silently downgrade a requirement.
+ *
+ * A binding carrying NO `artifactId` is NOT absent — it is NOT ARTIFACT-BACKED, which is a different fact and one
+ * this rule says nothing about. Conflating them would refuse steps whose inputs are perfectly well specified in
+ * some other form, which is over-refusal dressed as rigour.
+ */
+function inputReadinessRefusal(
+	ctx: HandlerContext,
+	command: DomainCommand,
+	step: Record<string, unknown>,
+	stepId: string
+): ReturnType<typeof reject> | null {
+	const bindings = Array.isArray(step.inputBindings) ? step.inputBindings : [];
+	const missing = bindings
+		.map((raw) => raw as { artifactId?: unknown; required?: unknown })
+		.filter((b) => (typeof b?.required === 'boolean' ? b.required : true))
+		.map((b) => (typeof b.artifactId === 'string' ? b.artifactId : ''))
+		.filter((id) => id !== '' && ctx.store.loadObject(id) === undefined);
+	const check = stepMayBecomeReady(missing.length === 0);
+	if (check.ok) return null;
+	return reject(
+		command,
+		'RPH_INVARIANT_VIOLATION',
+		`${command.commandType} blocked (${check.errorCode ?? 'RPH_PRECONDITION_UNSATISFIED'}): step ${stepId} requires input artifact(s) [${missing.join(', ')}], which do not resolve — the step is not ready and no model/tool invocation is performed (RPH-EXE-005 / §21.1). Record the artifact, or mark the input required:false if it is genuinely optional.`,
+		[stepId, ...missing]
+	);
 }
 
 /**

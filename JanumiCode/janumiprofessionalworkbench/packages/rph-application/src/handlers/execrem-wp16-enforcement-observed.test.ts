@@ -331,7 +331,54 @@ describe('JAN-EXECREM WP-16 (c) — the enforcement register is OBSERVED, not as
 			}
 		},
 		'RPH-EXE-004': null,
-		'RPH-EXE-005': null,
+		// JAN-CAPBIND WP-3 (N-3). This slot was `null` because RPH-EXE-005 was UNENFORCED — its subject
+		// (`InputBinding`) was `Source TBD` in the corpus, so the rule had nothing to quantify over. WP-0 authored
+		// the shape; this is the observation that the wiring actually refuses through `Engine.dispatch`.
+		'RPH-EXE-005': {
+			arrangement:
+				'a QUEUED step on an ACTIVE plan and an OPEN PWU, naming no runtime binding, whose REQUIRED input artifact does not resolve',
+			run: () => {
+				// Every earlier limb is deliberately satisfied so the input-readiness limb is the ONLY thing that can
+				// refuse: ACTIVE plan, open PWU, no binding (out of scope), QUEUED source state, first step so the
+				// start-gate is clear. Reaching this refusal through any other guard would be a vacuous negative.
+				ok(chg('PROPOSED', 'SHAPING'), 'shaping');
+				ok(chg('SHAPING', 'READY'), 'ready');
+				ok(
+					dispatch('ProposeExecutionPlan', {
+						executionPlanId: PLAN,
+						workUnitId: PWU,
+						steps: [
+							mkStep(1),
+							{
+								...mkStep(2),
+								inputBindings: [{ artifactId: 'art_01ARZ3NDEKTSV4RRFFQ69HZZZZ', required: true }]
+							},
+							mkStep(3)
+						],
+						transitions: [],
+						retryPolicy: {},
+						tacticalChangePolicy: {},
+						escalationPolicy: {},
+						terminationPolicy: {}
+					}),
+					'propose'
+				);
+				ok(dispatch('ApproveExecutionPlan', {}), 'approve');
+				ok(dispatch('ActivateExecutionPlan', { authorizedRuntimeBindingIds: [] }), 'activate');
+				// THE CONTROL is step 1 — the SAME command, on the same plan, differing ONLY in that its declared
+				// inputs are empty. Without it the limb could refuse every Start and this probe would still be green,
+				// which is over-refusal wearing the fix's clothes.
+				//
+				// The control must run FIRST and be COMPLETED, because the linear start-gate refuses a step whose
+				// predecessor is not terminal-success — so observing step 2 while step 1 sat QUEUED would produce a
+				// refusal from a DIFFERENT guard, i.e. the vacuous negative this whole probe map exists to prevent.
+				const control = dispatch('StartExecutionStep', { stepId: sid(1) });
+				ok(control, 'control: start s1 with empty inputs');
+				ok(complete(1, true), 'complete s1 so the start-gate is clear for s2');
+				const observed = dispatch('StartExecutionStep', { stepId: sid(2) });
+				return { control, observed };
+			}
+		},
 		'RPH-EXE-006': {
 			arrangement:
 				'a completion carrying neither an output artifact NOR an explicit no-output assertion',
