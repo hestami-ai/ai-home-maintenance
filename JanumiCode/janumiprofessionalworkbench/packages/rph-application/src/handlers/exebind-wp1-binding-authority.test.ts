@@ -292,13 +292,31 @@ describe('JAN-EXEBIND WP-B1 — runtime binding authority at Start', () => {
 
 	// ── SCOPE: WHICH step did this binding authorize? (JAN-REVREM RW-3, review finding #2) ────────────────────
 	describe('limb 2 — the binding must be the one authorized FOR THIS STEP', () => {
-		/** A two-step plan where the binding names step 1. */
-		function planWithBindingForStep1() {
+		// ── WHY THESE TWO WERE RE-ARRANGED (JAN-BINDEXCL / N-11) ────────────────────────────────────────────────
+		//
+		// Both originally arranged their misbinding BEFORE proposing, and propose now REFUSES both arrangements:
+		// S1 named one binding on two steps (L4 exclusivity), and S2 named an already-stored binding scoped to a
+		// different step (the handler's store half). That is the fix working — the misbinding is caught where the
+		// author can still edit the proposal, instead of becoming a step no command can ever start.
+		//
+		// AND THE LIMB IS STILL REACHABLE THROUGH THE BUS, which is the point of the new arrangement and a
+		// CORRECTION to this work package's own recorded analysis. That analysis concluded the SCOPE limb becomes
+		// unreachable for new plans and would need a seeded legacy aggregate to test at all. It does not: propose
+		// deliberately ALLOWS a step to name a binding that does not exist yet (the dangling case — refusing it
+		// would be a wedge, since `RequestRuntimeBinding` needs the step's id), so the misbinding can still be
+		// created AFTER the plan is stored. Both tests now do exactly that, entirely through `Engine.dispatch`,
+		// which is stronger evidence than any fixture would have been — and no fixture was written.
+		//
+		// So the residual population of the Start-time limb is real and reachable, not merely historical: any
+		// binding requested after its plan was proposed can name the wrong step.
+
+		/** A two-step plan: step 1 under BINDING (correctly scoped), step 2 under a binding not yet created. */
+		function planWithLaterBindingForStep2(second: string) {
 			ok(
 				dispatch('ProposeExecutionPlan', {
 					executionPlanId: PLAN,
 					workUnitId: PWU,
-					steps: [mkStep(1, BINDING), mkStep(2, BINDING)],
+					steps: [mkStep(1, BINDING), mkStep(2, second)],
 					transitions: [],
 					retryPolicy: { maxAttempts: 5 },
 					tacticalChangePolicy: {},
@@ -315,9 +333,27 @@ describe('JAN-EXEBIND WP-B1 — runtime binding authority at Start', () => {
 			// Every status check passes — the binding is genuinely AUTHORIZED — and the authority being exercised was
 			// granted for DIFFERENT work, with whatever capabilities that step's risk justified. A privilege-SCOPE
 			// hole, not a privilege-STATUS one, and the same shape as an unscoped waiver.
+			const SECOND = 'bind_01ARZ3NDEKTSV4RRFFQ69HB131';
 			ok(requestBinding(), 'request binding'); // names sid(1)
 			ok(authorizeBinding(), 'authorize');
-			planWithBindingForStep1();
+			planWithLaterBindingForStep2(SECOND); // SECOND does not exist yet — propose allows it
+			// …and NOW the misbinding is created: a second, distinct binding that also names step 1, while step 2 is
+			// what points at it. Distinct ids, so L4 exclusivity is satisfied; the pairing is still wrong.
+			ok(
+				dispatch(
+					'RequestRuntimeBinding',
+					{
+						runtimeBindingId: SECOND,
+						executionStepId: sid(1),
+						roleId: 'role-architect',
+						requestedCapabilities: [{ capability: 'file-system' }]
+					},
+					SECOND,
+					'RUNTIME_BINDING'
+				),
+				'request the second binding, for step 1'
+			);
+			ok(authorizeBinding(SECOND), 'authorize the second binding');
 			ok(dispatch('StartExecutionStep', { stepId: sid(1) }), 'step 1 is in scope');
 			ok(
 				dispatch('CompleteExecutionStep', {
@@ -345,6 +381,10 @@ describe('JAN-EXEBIND WP-B1 — runtime binding authority at Start', () => {
 		});
 
 		it('S2: a binding naming a step that does not exist authorizes nothing', () => {
+			// The plan is proposed FIRST, naming a binding that does not exist yet (allowed — K4 is the Start-time
+			// half of that same disposition). The binding is then created for a phantom step, so the misbinding is
+			// authored after the plan and propose never saw it.
+			activePlan(BINDING, []);
 			ok(
 				dispatch(
 					'RequestRuntimeBinding',
@@ -360,7 +400,6 @@ describe('JAN-EXEBIND WP-B1 — runtime binding authority at Start', () => {
 				'request binding for a phantom step'
 			);
 			ok(authorizeBinding(), 'authorize');
-			activePlan(BINDING, []);
 			const r = dispatch('StartExecutionStep', { stepId: sid(1) });
 			expect(r.status).toBe('REJECTED');
 			expect(r.error?.message).toContain(SCOPE_MARKER);

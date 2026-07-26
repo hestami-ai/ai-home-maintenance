@@ -178,6 +178,65 @@ function rejectInadmissiblePlan(
 }
 
 /**
+ * N-11's STORE half (JAN-BINDEXCL) — a step may not name a binding that ALREADY names a DIFFERENT step.
+ *
+ * `validateProposedPlan`'s L4 decides the half that is decidable from the proposal alone (two steps, one binding).
+ * This decides the half that needs the store: ONE step naming ONE binding is internally consistent, and still
+ * unstartable forever if that binding was requested for somebody else. `executionStepId` is written once by
+ * `RequestRuntimeBinding` and rewritten by nothing, and no command rewrites a step's `runtimeBindingId` after
+ * propose — so the pairing is UNREPAIRABLE the moment the plan is stored, and repairable up to the instant before.
+ *
+ * ── THE LINE THIS FUNCTION MUST NOT CROSS, AND MY FIRST DRAFT CROSSED IT ────────────────────────────────────
+ *
+ * A binding that does NOT resolve is deliberately ALLOWED through. The first attempt at this fix refused it —
+ * "the step names a binding that does not exist" — and that refusal was ITSELF A WEDGE, of exactly the class this
+ * finding is about: `RequestRuntimeBinding` carries an `executionStepId`, so a binding for step 2 of a plan can
+ * only be requested once step 2 has an id, which in practice means once the plan is proposed. Requiring the
+ * binding to exist at propose-time therefore refuses the ORDINARY authoring order and leaves no order that works.
+ * The fix for a near-wedge nearly shipped a real one — which is the sharpest available statement of why the
+ * distinction between "wrong forever" and "not yet right" is the whole content of this rule.
+ *
+ * The dangling case is already handled, correctly, at Start: `bindingAuthorityRefusal` fails CLOSED on an
+ * unresolvable binding (K4), and creating the binding repairs it. Refusing here would gain nothing and cost that.
+ *
+ * ── ONE DECLARATION OF "IS IT THIS STEP'S BINDING" ───────────────────────────────────────────────────────────
+ *
+ * The comparison goes through `bindingAuthorityVerdict` — the same function Start and the read-model consult —
+ * with `authorizationStatus` deliberately OMITTED, because at propose-time the binding is legitimately REQUESTED
+ * and its status is not this rule's business. Re-deriving `boundStepId !== stepId` locally would be a second copy
+ * of a load-bearing decision, which is the F-06 shape this series has now paid for three times. The verdict is
+ * gated on the WRONG_STEP limb specifically rather than on `!ok`, so a limb added later cannot silently acquire
+ * the power to refuse a proposal.
+ */
+function rejectMisboundStep(
+	ctx: HandlerContext,
+	command: DomainCommand,
+	p: ProposeExecutionPlanPayload
+): ReturnType<typeof reject> | null {
+	for (const s of p.steps) {
+		const bindingId = typeof s.runtimeBindingId === 'string' ? s.runtimeBindingId : '';
+		if (bindingId === '') continue;
+		const binding = ctx.store.loadObject(bindingId);
+		// DANGLING — see above. Not yet right is not wrong forever.
+		if (binding?.objectType !== 'RUNTIME_BINDING') continue;
+		const state = binding.state as { executionStepId?: unknown };
+		const verdict = bindingAuthorityVerdict(s.id, {
+			bindingId,
+			bindingResolves: true,
+			boundStepId: String(state.executionStepId ?? '')
+		});
+		if (verdict.limb !== 'WRONG_STEP') continue;
+		return reject(
+			command,
+			'RPH_VALIDATION_SEMANTIC_FAILED',
+			`ProposeExecutionPlan blocked: step "${s.id}" names runtimeBindingId "${bindingId}", but that binding was requested for step "${verdict.boundStepId ?? '(unset)'}" — a binding authorizes the step it names and no other, and neither side can be rewritten once stored, so this step could never start. Request a binding for "${s.id}" (RequestRuntimeBinding carries executionStepId) and name that one, or leave the step unbound.`,
+			[p.executionPlanId, s.id, bindingId]
+		);
+	}
+	return null;
+}
+
+/**
  * The ExecutionPlanProposed event payload — a PROJECTION of the command. It records the RESULTING state:
  * ExecutionPlanProposed declares the plan's identity + `status` (UNDER_REVIEW), and references its steps/transitions
  * by ID (not the full embedded objects the command carries), plus the created status the command omits. The policies
@@ -221,6 +280,10 @@ export const proposeExecutionPlan: CommandHandler = (ctx, command, payload) => {
 	}
 	const inadmissible = rejectInadmissiblePlan(command, p);
 	if (inadmissible) return inadmissible;
+	// N-11's store half runs AFTER the pure rules, so a plan that is malformed on its own terms is reported as
+	// malformed rather than as misbound — and so the store is not read for a proposal that fails without it.
+	const misbound = rejectMisboundStep(ctx, command, p);
+	if (misbound) return misbound;
 	const state: Record<string, unknown> = {
 		...newEnvelope(command, PLAN, p.executionPlanId, {
 			lifecycleStatus: 'UNDER_REVIEW',

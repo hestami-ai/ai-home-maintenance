@@ -14,8 +14,13 @@
 //                   NOT_READY is not terminal, so such a step is a permanent deadlock.
 //   F-33            an edge tagged CONDITIONAL with no conditionExpression — a permanently dead BRANCH arm, since
 //                   first-match can never select it and propose-time never looked.
+//   N-11 (MAJOR)    two steps naming ONE runtimeBindingId. A binding names exactly ONE step (`executionStepId`,
+//                   ratified and required), so at most one of them can ever start: RW-3's Start-time SCOPE limb
+//                   refuses the other permanently, and its refusal's remedy is INERT — no command rewrites a
+//                   step's `runtimeBindingId` after propose, and none rewrites a binding's `executionStepId`
+//                   after request. Same harm, verbatim, as the NOT_READY rule two rules below.
 //
-// The rules are therefore UNCONDITIONAL (L1-L6 run for every plan) and the graph check runs last, where its
+// The rules are therefore UNCONDITIONAL (L1-L7 run for every plan) and the graph check runs last, where its
 // linear-plan short-circuit is harmless because everything structural has already been decided.
 //
 // ONE CARRIER. The three absorbed validators keep their exact codes and messages, so their existing rejection tests
@@ -34,6 +39,12 @@ export interface PlanProposalStep {
 	readonly executionPlanId?: string;
 	/** A BRANCH's recorded decision. Authoring one at propose-time would fabricate a decision never taken. */
 	readonly selectedTransitionId?: string;
+	/**
+	 * The RUNTIME_BINDING this step will execute under. Declared here for L4 (N-11) — until JAN-BINDEXCL this
+	 * interface did not mention the field at all, so the one relation the plan asserts about runtime authority was
+	 * the one relation propose-time could not see.
+	 */
+	readonly runtimeBindingId?: string;
 }
 
 export interface PlanProposalTransition extends GateTransition {
@@ -114,7 +125,43 @@ function checkStepIdUniqueness(input: PlanProposalInput): PlanProposalResult | u
 	return undefined;
 }
 
-/** L4 — per-transition shape, including the CONDITIONAL <-> conditionExpression biconditional (F-33). */
+/**
+ * L4 — RUNTIME BINDING EXCLUSIVITY (N-11). At most one step may name any given `runtimeBindingId`.
+ *
+ * WHY THIS IS DECIDABLE HERE, with nothing but the proposal in hand: `RuntimeBinding.executionStepId` is a
+ * ratified, REQUIRED field written once by `RequestRuntimeBinding` — a binding names exactly ONE step. So two steps
+ * naming one binding is a contradiction the proposal states about ITSELF, and no store read can rescue it: at most
+ * one of the two can match, whichever step the binding turns out to name.
+ *
+ * AND THE OTHER IS THEN PERMANENTLY UNSTARTABLE. RW-3's Start-time SCOPE limb refuses it — correctly — and the
+ * refusal's remedy is INERT: `ProposeExecutionPlan` is the only writer of `steps[]` (`advanceStep` rewrites only
+ * `stepState`/`selectedTransitionId`), and `executionStepId` is written once at request. Requesting a new binding,
+ * which is what the refusal advises, mints one NO STEP NAMES. The plan can then only be abandoned, or the step
+ * skipped past under a REPLAN Decision — the cost being the plan's own account of what it did.
+ *
+ * That is verbatim the harm L2 already refuses an authored NOT_READY step for ("can never start … permanently
+ * blocks plan completion"), reached by a different route. Refusing it HERE — where the author can still edit the
+ * proposal — is the whole difference between a defect and a wedge.
+ */
+function checkBindingExclusivity(input: PlanProposalInput): PlanProposalResult | undefined {
+	const claimedBy = new Map<string, string>();
+	for (const s of input.steps) {
+		const bindingId = s.runtimeBindingId;
+		// An absent binding is OUT OF SCOPE, not a violation — the same disposition the Start-time limb takes, and
+		// load-bearing for the same reason: the reference seed authors no RuntimeBinding at all. `''` is treated as
+		// absent so a step cannot claim exclusivity over the empty string.
+		if (typeof bindingId !== 'string' || bindingId === '') continue;
+		const first = claimedBy.get(bindingId);
+		if (first !== undefined)
+			return semantic(
+				`ProposeExecutionPlan blocked: steps "${first}" and "${s.id}" both name runtimeBindingId "${bindingId}", but a RuntimeBinding names exactly one executionStepId — so at most one of them could ever start, and the other would be refused permanently by a remedy no command can perform (no command rewrites a step's runtimeBindingId, and none rewrites a binding's executionStepId). Give each step its own binding.`
+			);
+		claimedBy.set(bindingId, s.id);
+	}
+	return undefined;
+}
+
+/** L5 — per-transition shape, including the CONDITIONAL <-> conditionExpression biconditional (F-33). */
 function checkTransitionShape(input: PlanProposalInput): PlanProposalResult | undefined {
 	for (const t of input.transitions) {
 		if (t.executionPlanId !== undefined && t.executionPlanId !== input.executionPlanId)
@@ -136,7 +183,7 @@ function checkTransitionShape(input: PlanProposalInput): PlanProposalResult | un
 	return undefined;
 }
 
-/** L5 — transition-id uniqueness. ABSORBED VERBATIM (code + message preserved). */
+/** L6 — transition-id uniqueness. ABSORBED VERBATIM (code + message preserved). */
 function checkTransitionIdUniqueness(input: PlanProposalInput): PlanProposalResult | undefined {
 	const edgeIds = new Set<string>();
 	for (const t of input.transitions) {
@@ -151,7 +198,7 @@ function checkTransitionIdUniqueness(input: PlanProposalInput): PlanProposalResu
 	return undefined;
 }
 
-/** L6 — the condition grammar parses and every stepId it references resolves. ABSORBED VERBATIM. */
+/** L7 — the condition grammar parses and every stepId it references resolves. ABSORBED VERBATIM. */
 function checkConditions(input: PlanProposalInput): PlanProposalResult | undefined {
 	const declaredStepIds = new Set(input.steps.map((s) => s.id));
 	for (const t of input.transitions) {
@@ -170,7 +217,7 @@ function checkConditions(input: PlanProposalInput): PlanProposalResult | undefin
 	return undefined;
 }
 
-/** L7 — the transition GRAPH itself. ABSORBED VERBATIM; still a no-op for a linear plan, now harmlessly so. */
+/** L8 — the transition GRAPH itself. ABSORBED VERBATIM; still a no-op for a linear plan, now harmlessly so. */
 function checkGraph(input: PlanProposalInput): PlanProposalResult | undefined {
 	const graph = validateTransitionGraph(
 		input.steps.map((s) => ({ id: s.id, stepType: s.stepType })),
@@ -200,6 +247,7 @@ export function validateProposedPlan(input: PlanProposalInput): PlanProposalResu
 		checkStepsPresent(input) ??
 		checkStepShape(input) ??
 		checkStepIdUniqueness(input) ??
+		checkBindingExclusivity(input) ??
 		checkTransitionShape(input) ??
 		checkTransitionIdUniqueness(input) ??
 		checkConditions(input) ??

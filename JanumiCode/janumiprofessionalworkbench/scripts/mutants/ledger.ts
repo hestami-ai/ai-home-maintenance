@@ -1340,5 +1340,92 @@ export const DECLARED_MUTANTS: readonly DeclaredMutant[] = [
 		expectRed: [],
 		why: 'harvested from a work-package harness that recorded no one-line rationale',
 		source: 'wp14_mutants.py'
+	},
+
+	// ── JAN-BINDEXCL: propose-time runtime-binding admissibility (N-11) ───────────────────────────────────────
+	//
+	// `plan-proposal.ts` had NO declared mutants before this work package, which is worth saying out loud: it is the
+	// single decision point for whether a plan is structurally executable at all, and every one of its seven rules
+	// was defended only by tests nobody had ever tried to break.
+	//
+	// TWO OF THESE FIVE (N3, N5) MUTATE THE FIX INTO A WEDGE rather than into a fail-open. That is the operator this
+	// finding demanded: N-11 is a defect whose first attempted repair was itself a wedge, so the mutants that matter
+	// are the ones that make the guard refuse TOO MUCH, and the tests that kill them are positive cases.
+	{
+		id: 'N1-exclusivity-ledger-is-never-written',
+		file: 'packages/rph-domain/src/plan-proposal.ts',
+		// THE FINDING ITSELF, restored exactly: the rule still runs, still looks up, and never sees a collision
+		// because nothing is ever recorded. Mutating the CONSEQUENCE rather than the condition, per the V-2c lesson.
+		find: '\t\tclaimedBy.set(bindingId, s.id);',
+		replace: '\t\tclaimedBy.delete(bindingId);',
+		expectRed: [
+			'packages/rph-domain/src/plan-proposal.test.ts',
+			'packages/rph-application/src/handlers/bindexcl-propose-binding-scope.test.ts'
+		],
+		why: 'N-11 itself: two steps may name one binding, so one of them is refused at Start forever by a remedy no command can perform',
+		source: 'JAN-BINDEXCL WP-1'
+	},
+	{
+		id: 'N2-empty-string-becomes-a-claim',
+		file: 'packages/rph-domain/src/plan-proposal.ts',
+		// OVER-refusal. Dropping the empty-string arm lets two steps collide on `''` — a binding nobody named —
+		// which is the reference seed's shape one keystroke away.
+		find: "\t\tif (typeof bindingId !== 'string' || bindingId === '') continue;",
+		replace: "\t\tif (typeof bindingId !== 'string') continue;",
+		expectRed: ['packages/rph-domain/src/plan-proposal.test.ts'],
+		why: 'the empty string is ABSENCE, not a binding id: two unbound steps must not collide on it',
+		source: 'JAN-BINDEXCL WP-1'
+	},
+	{
+		id: 'N3-dangling-binding-is-refused-THE-WEDGE',
+		file: 'packages/rph-application/src/handlers/execution.ts',
+		// THIS IS THE FIRST DRAFT OF THE FIX, RESTORED. It looks strictly safer and it is a WEDGE:
+		// `RequestRuntimeBinding` carries an `executionStepId`, so a binding for step 2 cannot be requested before
+		// step 2 has an id. Refuse the dangling case and there is no authoring order that works at all.
+		//
+		// A mutant that reddens ONLY positive cases. If it survives, the fix for a near-wedge has shipped a real one
+		// and every suite still passes — which is exactly what happened during the first attempt at this finding.
+		find: "\t\tif (binding?.objectType !== 'RUNTIME_BINDING') continue;",
+		replace:
+			"\t\tif (binding?.objectType !== 'RUNTIME_BINDING')\n\t\t\treturn reject(command, 'RPH_VALIDATION_SEMANTIC_FAILED', 'dangling binding', [bindingId]);",
+		expectRed: [
+			'packages/rph-application/src/handlers/bindexcl-propose-binding-scope.test.ts',
+			'packages/rph-application/src/handlers/exebind-wp1-binding-authority.test.ts'
+		],
+		why: 'the dangling binding must PROPOSE: it is "not yet right", not "wrong forever", and refusing it leaves no authoring order that works',
+		source: 'JAN-BINDEXCL WP-1'
+	},
+	{
+		id: 'N4-store-half-compares-the-step-to-itself',
+		file: 'packages/rph-application/src/handlers/execution.ts',
+		// The fail-OPEN half: the verdict is still consulted, still returns, and can never say WRONG_STEP because it
+		// is asked whether the step is itself. Indistinguishable from the fix at every call site and in every type.
+		find: "\t\t\tboundStepId: String(state.executionStepId ?? '')\n\t\t});",
+		replace: '\t\t\tboundStepId: s.id\n\t\t});',
+		expectRed: ['packages/rph-application/src/handlers/bindexcl-propose-binding-scope.test.ts'],
+		why: 'the store half must read what the BINDING says it authorizes — comparing the step to itself makes the check total and vacuous',
+		source: 'JAN-BINDEXCL WP-1'
+	},
+	{
+		id: 'N5-propose-starts-asking-about-authorization-status',
+		file: 'packages/rph-application/src/handlers/execution.ts',
+		// THE SECOND WEDGE, one move further on than N3. Authorization is a LATER act too, so a propose-time check
+		// that consults `authorizationStatus` refuses every plan whose bindings are not yet authorized — and they
+		// cannot be authorized before the plan names the steps they are for.
+		//
+		// TWO LINES, ONE EDIT, DELIBERATELY. The guard is defence in depth — the status is OMITTED from the facts
+		// AND the verdict is gated on the WRONG_STEP limb specifically — so mutating either alone is equivalent to
+		// the fix and would SURVIVE for a correct reason. Declaring a mutant known to survive would be the false
+		// record this ledger exists to prevent, so the mutant removes both guards at once, which is the only edit
+		// that actually expresses the defect.
+		find: "\t\t\tboundStepId: String(state.executionStepId ?? '')\n\t\t});\n\t\tif (verdict.limb !== 'WRONG_STEP') continue;",
+		replace:
+			"\t\t\tboundStepId: String(state.executionStepId ?? ''),\n\t\t\tauthorizationStatus: String((state as { authorizationStatus?: unknown }).authorizationStatus)\n\t\t});\n\t\tif (verdict.ok) continue;",
+		expectRed: [
+			'packages/rph-application/src/handlers/bindexcl-propose-binding-scope.test.ts',
+			'packages/rph-application/src/handlers/exebind-wp1-binding-authority.test.ts'
+		],
+		why: 'propose-time asks exactly ONE question — is this binding somebody else’s? — because every other question it could ask is about an act that has not happened yet',
+		source: 'JAN-BINDEXCL WP-1'
 	}
 ];

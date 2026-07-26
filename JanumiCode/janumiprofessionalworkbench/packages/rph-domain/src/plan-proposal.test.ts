@@ -210,3 +210,92 @@ describe('WP-6 — the three ABSORBED rules keep their exact codes and messages'
 		expect(r.message).toContain('(DR-004 DWP-01)');
 	});
 });
+
+// ── JAN-BINDEXCL / N-11 (MAJOR) — L4, RUNTIME BINDING EXCLUSIVITY ────────────────────────────────────────────
+//
+// THE FINDING. A binding names exactly ONE step (`RuntimeBinding.executionStepId`, ratified and required), so two
+// steps naming one binding is a contradiction the proposal states about ITSELF. At most one of them can start;
+// RW-3's Start-time SCOPE limb then refuses the other FOREVER, and its refusal's remedy is INERT — nothing
+// rewrites a step's `runtimeBindingId` after propose, and nothing rewrites a binding's `executionStepId` after
+// request. So "request a binding for this step" mints one no step names.
+//
+// THIS IS THE ANTI-VACUITY SHAPE OF THE WHOLE FILE, one rule further on: it is decidable from the step set ALONE,
+// and it is asserted on a plan with `transitions: []` for the same reason F-10 is.
+//
+// THE OVER-REFUSAL HALF IS NOT OPTIONAL HERE. This rule can only refuse; a check that refused every plan naming
+// any binding would satisfy every negative case below, and would make the reference seed's own shape unproposable.
+describe('WP-N11 / L4 — at most one step may name any given runtimeBindingId', () => {
+	const bound = (id: string, runtimeBindingId?: string) =>
+		step(id, runtimeBindingId === undefined ? {} : { runtimeBindingId });
+
+	it('REFUSES two steps naming ONE binding — on a LINEAR plan (the anti-vacuity case)', () => {
+		const r = validateProposedPlan(
+			input({ steps: [bound('s1', 'rb_1'), bound('s2', 'rb_1')], transitions: [] })
+		);
+		expect(r.ok).toBe(false);
+		expect(r.code).toBe('RPH_VALIDATION_SEMANTIC_FAILED');
+		// Both steps AND the binding, because an operator repairing this needs to know which three things collide.
+		expect(r.message).toContain('"s1"');
+		expect(r.message).toContain('"s2"');
+		expect(r.message).toContain('rb_1');
+	});
+
+	it('names the harm and the reason the harm is PERMANENT, not just the rule', () => {
+		// The sibling rules in this file all do; the whole argument for refusing at propose rather than at Start is
+		// that the Start-time refusal cannot say anything actionable, so this one must.
+		const r = validateProposedPlan(input({ steps: [bound('s1', 'rb_1'), bound('s2', 'rb_1')] }));
+		expect(r.message).toContain('exactly one executionStepId');
+		expect(r.message).toContain('could ever start');
+		expect(r.message, 'the remedy must be one the engine can actually perform').toContain(
+			'Give each step its own binding'
+		);
+	});
+
+	it('catches a collision between NON-ADJACENT steps — it is a set rule, not a neighbour comparison', () => {
+		const r = validateProposedPlan(
+			input({ steps: [bound('s1', 'rb_1'), bound('s2', 'rb_2'), bound('s3', 'rb_1')] })
+		);
+		expect(r.ok).toBe(false);
+		expect(r.message).toContain('"s1"');
+		expect(r.message).toContain('"s3"');
+	});
+
+	// ── THE OVER-REFUSAL HALF ────────────────────────────────────────────────────────────────────────────────
+	it('ACCEPTS distinct bindings on distinct steps', () => {
+		expect(
+			validateProposedPlan(input({ steps: [bound('s1', 'rb_1'), bound('s2', 'rb_2')] }))
+		).toEqual({ ok: true });
+	});
+
+	it('ACCEPTS a plan whose steps name NO binding at all — the reference seed’s own shape', () => {
+		// Load-bearing, not merely permissive: the reference seed authors no RuntimeBinding whatsoever, so a rule
+		// that treated "no binding" as a shared claim would make every existing plan unproposable. Same disposition
+		// as the Start-time limb, where it is stated as OUT OF SCOPE rather than as a fail-open.
+		expect(validateProposedPlan(input({ steps: [bound('s1'), bound('s2'), bound('s3')] }))).toEqual({
+			ok: true
+		});
+	});
+
+	it('does not let the EMPTY STRING become a claim two steps can collide on', () => {
+		expect(validateProposedPlan(input({ steps: [bound('s1', ''), bound('s2', '')] }))).toEqual({
+			ok: true
+		});
+		expect(validateProposedPlan(input({ steps: [bound('s1', ''), bound('s2')] }))).toEqual({
+			ok: true
+		});
+	});
+
+	it('ACCEPTS one step naming one binding (the ordinary case)', () => {
+		expect(validateProposedPlan(input({ steps: [bound('s1', 'rb_1')] }))).toEqual({ ok: true });
+	});
+
+	// ── ORDER ────────────────────────────────────────────────────────────────────────────────────────────────
+	it('runs AFTER step-id uniqueness, so a duplicate id is reported as a duplicate id', () => {
+		// Two steps with the SAME id sharing a binding is not a binding problem — it is F-10, and reporting the
+		// binding first would send an operator to fix the wrong thing. L3 owns it.
+		const r = validateProposedPlan(input({ steps: [bound('dup', 'rb_1'), bound('dup', 'rb_1')] }));
+		expect(r.ok).toBe(false);
+		expect(r.message).toContain('declared more than once');
+		expect(r.message).not.toContain('exactly one executionStepId');
+	});
+});
