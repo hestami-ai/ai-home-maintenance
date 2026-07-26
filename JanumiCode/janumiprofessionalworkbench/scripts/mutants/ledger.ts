@@ -237,13 +237,24 @@ export const DECLARED_MUTANTS: readonly DeclaredMutant[] = [
 	},
 	{
 		id: 'B1-invert-accept-set',
-		file: 'packages/rph-application/src/handlers/execution.ts',
-		find: '\tconst check = bindingPermitsExecution(status);\n\tif (!check.ok)',
+		// RE-SITED BY RW-6, IN THE COMMIT AFTER THE ONE THAT MOVED IT — which is a miss worth recording. RW-6's own
+		// roadmap step 3 said these anchors must be updated "in the same commit … doing it in a later commit is how
+		// the ledger rots", and I wrote that sentence and then skipped the step. The harness reported UNANCHORED on the
+		// next full run, which is exactly the verdict it exists to produce; the gap between writing the instruction and
+		// following it is the reason the verdict is not optional.
+		//
+		// The guard did not change. Its four checks moved from `bindingAuthorityRefusal` into `bindingAuthorityVerdict`
+		// so the read-model could consult the same declaration (MAJOR #5).
+		file: 'packages/rph-domain/src/execution.ts',
+		find: "\tconst check = bindingPermitsExecution(facts.authorizationStatus);\n\tif (check.ok) return { ok: true, limb: 'PERMITTED' };",
 		replace:
-			"\tconst check = bindingPermitsExecution(status);\n\tif (check.ok && status === '__never__')",
-		expectRed: ['packages/rph-application/src/handlers/exebind-wp1-binding-authority.test.ts'],
-		why: 'the RPH-EXE-003 status limb (K1/K2/K3)',
-		source: 'exebind_mutants.py'
+			"\tconst check = bindingPermitsExecution(facts.authorizationStatus);\n\tif (check.ok || facts.authorizationStatus !== '__never__') return { ok: true, limb: 'PERMITTED' };",
+		expectRed: [
+			'packages/rph-application/src/handlers/exebind-wp1-binding-authority.test.ts',
+			'packages/rph-domain/src/revrem-wp6-binding-authority-verdict.test.ts'
+		],
+		why: 'the RPH-EXE-003 status limb (K1/K2/K3) — now proved at BOTH the decision and the refusal, since RW-6 split them',
+		source: 'exebind_mutants.py (re-sited RW-6)'
 	},
 	{
 		id: 'B2-delete-allowlist-limb',
@@ -290,9 +301,13 @@ export const DECLARED_MUTANTS: readonly DeclaredMutant[] = [
 	},
 	{
 		id: 'B6-unresolvable-fails-open',
+		// RE-SITED BY RW-6 (see B1). The narrowing early-return became a boolean fact handed to the verdict, so the
+		// mutation is now "claim it resolved" rather than "delete the narrowing" — and the TYPE-level guarantee it
+		// declares is UNCHANGED and still checked: `binding.state` reads below still require the narrowing, so a
+		// mutation that lets an unresolvable binding through still cannot be expressed.
 		file: 'packages/rph-application/src/handlers/execution.ts',
-		find: "\tif (binding?.objectType !== 'RUNTIME_BINDING')",
-		replace: "\tif (binding !== undefined && binding.objectType === '__never__')",
+		find: "\tconst resolves = binding?.objectType === 'RUNTIME_BINDING';",
+		replace: "\tconst resolves = binding?.objectType !== '__never__';",
 		expectRed: ['packages/rph-application/src/handlers/exebind-wp1-binding-authority.test.ts'],
 		why: 'fail-CLOSED on an unresolvable authority (K4). REFORMULATED by JAN-VERIF V-1: the harvested form deleted the narrowing outright, so `binding` became possibly-undefined and TypeScript rejected it \u2014 NO_COMPILE, proving nothing. This form keeps the narrowing and inverts only the accepted type, so the fail-open path is genuinely reached.',
 		source: 'exebind_mutants.py (reformulated V-1)',
@@ -402,21 +417,32 @@ export const DECLARED_MUTANTS: readonly DeclaredMutant[] = [
 	},
 	{
 		id: 'S1-delete-scope-limb',
-		file: 'packages/rph-application/src/handlers/execution.ts',
-		find: '\tif (boundStepId !== stepId)',
+		// RE-SITED BY RW-6 (see B1). Same limb, now inside the shared verdict.
+		file: 'packages/rph-domain/src/execution.ts',
+		find: '\tif (facts.boundStepId !== undefined && facts.boundStepId !== stepId)',
 		replace: '\tif (false as boolean)',
-		expectRed: ['packages/rph-application/src/handlers/exebind-wp1-binding-authority.test.ts'],
+		expectRed: [
+			'packages/rph-application/src/handlers/exebind-wp1-binding-authority.test.ts',
+			'packages/rph-domain/src/revrem-wp6-binding-authority-verdict.test.ts'
+		],
 		why: 'the binding SCOPE limb (review #1 finding 2)',
-		source: 'RW-3 inline'
+		source: 'RW-3 inline (re-sited RW-6)'
 	},
 	{
 		id: 'S2-scope-always-refuses',
-		file: 'packages/rph-application/src/handlers/execution.ts',
-		find: '\tif (boundStepId !== stepId)',
-		replace: '\tif (boundStepId === boundStepId)',
-		expectRed: ['packages/rph-application/src/handlers/exebind-wp1-binding-authority.test.ts'],
-		why: 'OVER-refusal: scope must not refuse its own step',
-		source: 'RW-3 inline'
+		file: 'packages/rph-domain/src/execution.ts',
+		find: '\tif (facts.boundStepId !== undefined && facts.boundStepId !== stepId)',
+		// OVER-refusal, and the RW-6 form is STRICTLY SHARPER than the pre-move one. It drops only the
+		// `!== undefined` guard, so a caller that resolved the binding without reading `executionStepId` now has
+		// EVERY step refused — the precise over-refusal the extracted verdict introduced the possibility of, and the
+		// cell `revrem-wp6-binding-authority-verdict.test.ts` was written to pin.
+		replace: '\tif (facts.boundStepId !== stepId)',
+		expectRed: [
+			'packages/rph-application/src/handlers/exebind-wp1-binding-authority.test.ts',
+			'packages/rph-domain/src/revrem-wp6-binding-authority-verdict.test.ts'
+		],
+		why: 'OVER-refusal: scope must not refuse its own step, nor refuse a step whose binding simply did not report one',
+		source: 'RW-3 inline (re-sited and sharpened RW-6)'
 	},
 	// ── JAN-REVREM RW-6: the read-model's THIRD authority limb (MAJOR #5) ─────────────────────────────────────
 	//
@@ -1158,13 +1184,17 @@ export const DECLARED_MUTANTS: readonly DeclaredMutant[] = [
 	},
 	{
 		id: 'WP14-M6 provenance attributes a non-BRANCH source',
+		// RE-ANCHORED BY RW-7. `if (step?.stepType !== 'BRANCH') continue;` became `if (step.stepType === 'BRANCH')` —
+		// a POSITIVE branch, because the non-BRANCH path is now a real arm rather than a `continue`. Mutant P2 already
+		// covers "never report BRANCH_DECISION"; this entry keeps the ORIGINAL intent, which is the converse: report a
+		// BRANCH_DECISION for a source that is not a branch.
 		file: 'packages/rph-domain/src/transition-gate.ts',
 		// REFORMULATED by JAN-VERIF V-2c: keep the EXISTENCE limb, drop only the KIND limb — the same split as
 		// WP12B-M9's sibling pair. `if (false) continue;` cost `step` its narrowing for `step.selectedTransitionId`
 		// two lines down; `if (step === undefined) continue;` keeps `step` proven and admits every non-BRANCH source,
 		// which is precisely what the title claims.
-		find: "\t\t\t\tif (step?.stepType !== 'BRANCH') continue;",
-		replace: '\t\t\t\tif (step === undefined) continue;',
+		find: "\t\t\t\tif (step.stepType === 'BRANCH')",
+		replace: "\t\t\t\tif (step.stepType !== '__never__')",
 		expectRed: [],
 		why: 'a non-BRANCH source is named as the deciding branch — exclusive first-match belongs to a BRANCH and to nothing else (D2)',
 		source: 'wp14_mutants.py (reformulated V-2c)'
@@ -1187,9 +1217,11 @@ export const DECLARED_MUTANTS: readonly DeclaredMutant[] = [
 	},
 	{
 		id: 'WP14-M8 the CUT edge (excludedEdgeId) is dropped from provenance',
+		// RE-ANCHORED BY RW-7: the inline spread became a `const excluded` shared by both provenance arms, so dropping
+		// the field is now one edit that must redden BOTH causes rather than only the BRANCH one.
 		file: 'packages/rph-domain/src/transition-gate.ts',
-		find: '\t\t\t\t...(edge.id === undefined ? {} : { excludedEdgeId: edge.id })',
-		replace: '\t\t\t\t...(edge.id === undefined ? {} : {})',
+		find: '\t\t\t\tconst excluded = edge.id === undefined ? {} : { excludedEdgeId: edge.id };',
+		replace: '\t\t\t\tconst excluded = edge.id === undefined ? {} : {};',
 		expectRed: [],
 		why: 'harvested from a work-package harness that recorded no one-line rationale',
 		source: 'wp14_mutants.py'
