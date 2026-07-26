@@ -366,3 +366,110 @@ the armed thresholds · svelte-check · e2e · `mutants` with **0 SURVIVED and 0
 series: the enforcement register's call-site census will go **RED by design** the moment `capabilityAuthorized` gains
 a production caller, and that row must be re-dispositioned in the **same commit** — the discipline RW-6 wrote down
 and then skipped.
+
+---
+
+## 5. RECONCILIATION — what the adversarial pass changed about the design above
+
+§§2–4 were written from primary sources **before** the verification workflow reported, deliberately, so that it
+would attack an authored design rather than supply one. It did, over 16 agents: six excavation lenses, three
+independent proposals from different priors, three judges on distinct axes, a synthesis, and three adversaries. It
+corrected me on one substantive ruling and out-engineered me on four mechanical points.
+
+### 5a. **R-B IS WITHDRAWN — I over-authored `scope`.**
+
+I derived a `scope` field from §22.1's *"Capability scope must be explicit"*, calling it forced by the corpus. **It is
+not.** That sentence has two readings and I silently took one:
+
+- **(a)** a capability entry must carry a distinct `scope` field — my reading;
+- **(b)** the capability must be *named precisely enough to be explicit*, so the **identity carries the scope**.
+
+The existing data votes for (b): every literal in the repo is a scoped identity — `'fs.read'`, `'shell.exec'` — not a
+bare noun with a separate qualifier. Authoring a `scope` field therefore **picks a side in a question the corpus
+leaves open**, and then makes it a *command-boundary obligation* every caller must satisfy — which is precisely what
+my own adversary lens defines as invented semantics, and I wrote that lens two hours before writing R-B.
+
+**`scope` is not authored.** §22.1's explicitness requirement is recorded as satisfied by (i) `capability` being
+REQUIRED — an unnamed capability cannot be requested at all — and (ii) the subset rule, which makes access
+un-inferable. **The alternative reading is DISCLOSED as an open question**, not resolved: if the sponsor reads §22.1
+as demanding a distinct scope field, that is a ratification decision, and the shape below is designed to accept the
+field later without a migration.
+
+That leaves the authored surface at **one field per capability type** — and it is worth stating plainly that the
+adversarial pass moved this design toward authoring **less**, not more.
+
+### 5b. Four mechanical corrections I would have got wrong
+
+1. **`gen-objects.ts` treats a one-field helper as a placeholder.** `isPlaceholder`'s third limb is
+   `!FORCE_FULL.has(h.name) && h.fields.length < 2`, so a single-field authoring **silently stays a permissive
+   `z.record` and buys no enforcement whatever.** `CapabilityRequest`/`CapabilityGrant` need explicit `FORCE_FULL`
+   entries — whose own comment already sanctions exactly this ("emit as a full helper even with a single field").
+   Without this the whole series would have appeared to land and enforced nothing: **a silent no-op wearing a
+   contract change**, which is this lineage's signature defect.
+2. **Padding to disambiguate would not have worked.** With `scope` refused, `CapabilityRequest` and
+   `CapabilityGrant` are structurally identical, so TypeScript cannot tell a request from a grant. My instinct was to
+   add a distinguishing field — but **shapes differing only by optional members stay mutually assignable**, so
+   padding would be invention *and* ineffective. The real mitigation is that the containment predicate takes
+   **named** parameters `{requested, granted}`, making a swap require a deliberate edit.
+3. **N-4's check belongs in `advanceStatus`'s `guard` slot, not in an `allOf` precondition.** `kit.ts` evaluates
+   precondition → guard → checkTransition, so `fromStates` still wins on a *re*-authorization and
+   `command-reissue-guard.test.ts` stays byte-unchanged — no hand-ordered `allOf` to defend, and the existing
+   vacuity in that file is not deepened.
+4. **`capabilityAuthorized` must NOT be reused for the subset check.** Its input is
+   `{ grantedCapabilities, requiredCapability }` — **single-operation containment**, a different question from
+   set-⊆-set. Reusing it would be the wrong predicate wearing the right name, and — worse — would import it into a
+   handler, tripping the enforcement register's call-site census while the rule it is cited for stayed unenforced.
+   A new `grantedWithinRequest` predicate keeps that census honest.
+
+### 5c. And it found a vacuous test on the way
+
+`json-schema.test.ts` reads **exactly one** committed artifact (`ObjectEnvelope.json`) while its header claims *"the
+committed `schemas/` artifacts must not have drifted"*. A missed regeneration of any other artifact is therefore
+invisible to it. Recorded as **N-14**; the WP-0 gate extends it to the artifacts this series touches, which is the
+minimum honest response to finding it while relying on it.
+
+### 5d. Standing
+
+The corrections are adopted. §3's tables are superseded for `CapabilityRequest`/`CapabilityGrant` (one field,
+`capability`, required, `FORCE_FULL`), and `scope` moves from *authored* to *disclosed open question*. R-C
+(refusing `OutputBinding`) and R-E (resolving a fact rather than a truthiness test for N-3) **survived attack
+unchanged**.
+
+### 5e. **R-D IS SPLIT — its subset half stands; its "closes N-6 as a side effect" half was over-reaching.**
+
+R-D claimed one precondition at `AuthorizeRuntimeBinding` would refuse `granted ⊄ requested` **and** derive
+`AUTHORIZED` vs `PARTIALLY_AUTHORIZED`, closing N-6 for free. **The first half is right and survived. The second is
+wrong**, on evidence I did not check:
+
+`m2-transitions.json` declares `REQUESTED → PARTIALLY_AUTHORIZED` with its **own trigger, "partial grant"** — a
+distinct arrow, not a variant landing of the AUTHORIZED one. And `advanceStatus` takes a **single** `target`, so a
+handler cannot conditionally land on a different state without changing the primitive. Deriving the status inside
+`AuthorizeRuntimeBinding` would therefore make one command drive two ratified arrows while the machine says they have
+different triggers — smuggling a state transition rather than declaring it.
+
+So **N-6 is a PRECONDITION on N-2, not a side effect of it.** Reaching `PARTIALLY_AUTHORIZED` needs a real
+`PartiallyAuthorizeRuntimeBinding` command: a vocab command entry, an event, a handler, and the machine arrow. That
+is its own work package, and it is scheduled as one rather than absorbed. Until it lands, RPH-EXE-004's decidable
+core is the **subset refusal alone** — which is still a genuine closure of N-4, and still more than existed before.
+
+**The pattern in both 5a and 5e is the same and worth naming**: each time, I took a ratified sentence that admits two
+readings and quietly resolved it in the direction that let me close more findings at once. Authoring under a grant
+makes that failure *easier*, not harder, because the thing that would previously have stopped me — "I am not
+authorized to decide this" — is gone, and nothing replaces it except the discipline of checking which readings exist.
+
+### 5f. The open question the sponsor now owns, stated precisely
+
+§22.1's *"Capability scope must be explicit"* is left **inexpressible, not merely unenforced**, and that is a
+deliberate filing rather than an oversight. Minting a `scope` field requires choosing its value domain — a path set?
+a host set? a resource-limit record? a structured object? — **and nothing in the corpus says.** If a `string` or
+`string[]` were landed today and the corpus later ratified a structured object, the field would have to be
+**replaced rather than extended**, and any data written in between is unmigratable. The empty default is the only one
+that is safe in both directions.
+
+The concrete cost, stated so it is not discovered later: **path- or host-limited grants — "file-system, but only
+under `/tmp`" — cannot be expressed**, and that is very likely what §22.1 means.
+
+**Nothing here is implemented yet.** The land order in §4 is superseded by the workflow's five-WP order, which
+sequences the register/manifest/probe re-disposition into the *same commit* as the wiring — because the census
+tripwire fires on the import alone, and shipping that across two commits is exactly the rot RW-6 wrote down and then
+committed anyway.
