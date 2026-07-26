@@ -483,9 +483,22 @@ export const DECLARED_MUTANTS: readonly DeclaredMutant[] = [
 		// The gate's real victim is therefore the BRANCH arm, and the victim named below is the suite that proves it.
 		find: "\t\t\t\tif (ctx.localOf(edge) !== 'NEUTRALIZED') continue;",
 		replace: "\t\t\t\tif (ctx.localOf(edge) === 'SATISFIED') continue;",
-		expectRed: ['packages/rph-domain/src/transition-gate-prune-provenance.test.ts'],
-		why: 'the disposition gate: an UNDECIDED branch must cut nothing, so a PENDING/UNRESOLVED in-edge yields no provenance',
-		source: 'RW-7 inline'
+		expectRed: [],
+		why: 'A DECLARED CONTROL over a PROVABLY UNREACHABLE fail-safe — see expectSurvive. Kept because unreachable-BY-INVARIANT is not the same as unnecessary, and RW-4 already corrected one wrongly-declared-dead floor in this lineage.',
+		source: 'RW-7 inline',
+		expectSurvive:
+			"The gate cannot be reached, and the proof is structural rather than a survey of fixtures. " +
+			"`computeLiveStepIds` propagates reachability through EVERY edge whose local disposition is not NEUTRALIZED " +
+			"(`if (ctx.localOf(e) !== 'NEUTRALIZED') frontier.push(...)`), and `pruneProvenance` only ever examines the " +
+			"in-edges of steps it has already established are NOT live. So a dead target reached from a LIVE source must " +
+			"have a NEUTRALIZED in-edge: were it PENDING or UNRESOLVED, the target would itself be live and the walk " +
+			"would never have visited it. Probes across FAILED / CANCELLED / QUEUED / RUNNING sources and the " +
+			"undecided-BRANCH (UNRESOLVED) case all agree. " +
+			"IT IS NOT DELETED, deliberately: the line is a LOCAL restatement of reachability's own predicate, and it is " +
+			"what stops a fabricated cause if the two ever drift apart — which is exactly how the F-06 class arose (one " +
+			"question, several independently-maintained answers). The invariant it depends on is pinned by " +
+			"`revrem-wp7-prune-provenance-cause.test.ts`'s liveness assertions, so if reachability stops using this " +
+			"predicate those go RED and this mutant becomes killable."
 	},
 	{
 		id: 'F1-remove-incoherence-floor',

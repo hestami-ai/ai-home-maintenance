@@ -162,3 +162,50 @@ describe('RW-7 — no cause is invented where nothing has decided', () => {
 		expect(pruneProvenance(p, 's2', () => false)).toBeUndefined();
 	});
 });
+
+describe('RW-7 — the INVARIANT that makes the walk’s disposition gate unreachable', () => {
+	// WHY THIS BLOCK EXISTS. Mutant P3 weakens `if (ctx.localOf(edge) !== 'NEUTRALIZED') continue;` inside the walk and
+	// SURVIVES. That is not an untested guard: it is an unreachable one, and the difference matters enough to pin.
+	//
+	// `computeLiveStepIds` propagates reachability through every edge whose local disposition is not NEUTRALIZED, and
+	// `pruneProvenance` only examines in-edges of steps already established NOT live. So a dead step reached from a
+	// LIVE source must have a NEUTRALIZED in-edge — were it PENDING or UNRESOLVED the target would be live, and the
+	// walk would never have visited it.
+	//
+	// The gate is therefore a LOCAL restatement of reachability's own predicate, kept as the fail-safe if the two ever
+	// drift apart — one question with two independently-maintained answers being the F-06 root cause. These assertions
+	// pin the invariant that makes it unreachable, so if reachability stops using that predicate they go RED and P3
+	// becomes killable, rather than the gate silently becoming load-bearing with nothing watching it.
+	it('a step whose in-edge is PENDING is LIVE, and therefore never prunable', () => {
+		// FAILED is REOPENABLE — the arm may yet conduct via a retry — so its downstream is not dead.
+		expect(prunableStepIds(deadMid('FAILED'))).toEqual([]);
+		for (const running of ['QUEUED', 'RUNNING', 'WAITING']) {
+			expect(prunableStepIds(deadMid(running)), running).toEqual([]);
+		}
+	});
+
+	it('a step whose in-edge is UNRESOLVED is LIVE too — an undecided branch prunes nothing (WP-10 Rule B3)', () => {
+		// The asymmetry is the fail-CLOSED direction: the arm is not STARTABLE (the barrier needs a SATISFIED edge) but
+		// is still LIVE, so it is not prunable. A symmetric reading would hand the whole downstream to a waiver-free
+		// prune — the §21.1 back door.
+		const undecided: GatePlan = {
+			status: 'ACTIVE',
+			steps: [
+				step('s1', 'SUCCEEDED', { stepType: 'BRANCH' }),
+				step('s2', 'QUEUED'),
+				step('s3', 'QUEUED')
+			],
+			transitions: [
+				edge('s1', 's2', { id: 'ta', transitionType: 'CONDITIONAL', conditionExpression: { a: 1 } }),
+				edge('s1', 's3', { id: 'tb', transitionType: 'CONDITIONAL', conditionExpression: { b: 1 } })
+			]
+		};
+		expect(prunableStepIds(undecided, () => false)).toEqual([]);
+	});
+
+	it('only a NEUTRALIZED in-edge makes a step prunable at all', () => {
+		// The positive half: the same fixture with an IRRECOVERABLE terminal source IS prunable. Without this the two
+		// assertions above would be satisfied by a `prunableStepIds` that returns [] unconditionally.
+		expect(prunableStepIds(deadMid('CANCELLED'))).toEqual(['s3']);
+	});
+});
