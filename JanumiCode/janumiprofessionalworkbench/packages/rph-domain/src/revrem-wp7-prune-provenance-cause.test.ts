@@ -137,4 +137,28 @@ describe('RW-7 — no cause is invented where nothing has decided', () => {
 	it('a still-reachable step gets NO provenance, because nothing cut it off', () => {
 		expect(pruneProvenance(deadMid('SUCCEEDED'), 's3')).toBeUndefined();
 	});
+
+	it('a NEUTRALIZED edge off a non-BRANCH source is NOT a DEAD_PREDECESSOR cut', () => {
+		// THE DISTINCTION THAT CAUGHT ME. Implementing RW-7 I reasoned that `localOf(edge) === 'NEUTRALIZED'` already
+		// implies the source is irrecoverably terminal, so re-checking the state was a duplicated derivation, and I
+		// deleted the check. It is not: off a non-BRANCH source a guard-FALSE conditional edge is also neutralized —
+		// the step is unreachable, but no DECISION excluded it (out-edges off a non-branch step are INDEPENDENT
+		// filters, not exclusive arms), so attributing a cause would put a false justification into the stream.
+		//
+		// The pre-existing WP-14 suite pinned this and went red immediately. It is asserted HERE too, because the
+		// assertion that saved me lived in a file about a different work package, and the next person to have this
+		// idea will be reading this one.
+		const p: GatePlan = {
+			status: 'ACTIVE',
+			steps: [step('s1', 'SUCCEEDED'), step('s2', 'QUEUED')],
+			transitions: [
+				edge('s1', 's2', {
+					id: 't12',
+					transitionType: 'CONDITIONAL',
+					conditionExpression: { kind: 'guard' }
+				})
+			]
+		};
+		expect(pruneProvenance(p, 's2', () => false)).toBeUndefined();
+	});
 });

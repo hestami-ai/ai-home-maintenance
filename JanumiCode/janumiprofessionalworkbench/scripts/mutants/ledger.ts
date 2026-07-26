@@ -447,10 +447,10 @@ export const DECLARED_MUTANTS: readonly DeclaredMutant[] = [
 	{
 		id: 'P1-dead-predecessor-arm-continues-again',
 		file: 'packages/rph-domain/src/transition-gate.ts',
-		// THE PRE-RW-7 BEHAVIOUR, restored exactly: fall through to `continue` instead of reporting the cause. If this
-		// survives, N-8 can return silently — a prune event once again indistinguishable in content from a waived skip.
-		find: "\t\t\t\tif (IRRECOVERABLE_TERMINAL.has(step.stepState))\n\t\t\t\t\treturn {\n\t\t\t\t\t\tcause: 'DEAD_PREDECESSOR',\n\t\t\t\t\t\tdeadStepId: source,\n\t\t\t\t\t\tdeadStepState: step.stepState,\n\t\t\t\t\t\t...excluded\n\t\t\t\t\t};",
-		replace: '\t\t\t\tif (false as boolean) return undefined;',
+		// THE PRE-RW-7 BEHAVIOUR, restored exactly: `continue` instead of reporting the cause. If this survives, N-8
+		// can return silently — a prune event once again indistinguishable in content from a waived skip.
+		find: "\t\t\t\tif (IRRECOVERABLE_TERMINAL.has(step.stepState))\n\t\t\t\t\treturn {\n\t\t\t\t\t\tcause: 'DEAD_PREDECESSOR',\n\t\t\t\t\t\tdeadStepId: source,\n\t\t\t\t\t\tdeadStepState: step.stepState,\n\t\t\t\t\t\t...excluded\n\t\t\t\t\t};\n\t\t\t\tcontinue;",
+		replace: '\t\t\t\tcontinue;',
 		expectRed: ['packages/rph-domain/src/revrem-wp7-prune-provenance-cause.test.ts'],
 		why: 'N-8 ITSELF: a step cut by a CANCELLED/SUPERSEDED predecessor emits provenance-free ExecutionStepPruned, byte-identical in content to a waived skip',
 		source: 'RW-7 inline'
@@ -469,12 +469,22 @@ export const DECLARED_MUTANTS: readonly DeclaredMutant[] = [
 	{
 		id: 'P3-pending-source-invents-a-cause',
 		file: 'packages/rph-domain/src/transition-gate.ts',
-		// OVER-attribution: a FAILED source is REOPENABLE, so its edge is PENDING and it has excluded nothing YET.
-		// Removing the disposition gate names a cause for a decision nobody has made — the fabrication R10 forbids.
+		// OVER-attribution: the disposition gate is what stops an UNDECIDED branch being reported as the cut. Weaken it
+		// and a branch that has resolved nothing yet is recorded as having excluded the step — a decision nobody made.
+		//
+		// REFORMULATED TWICE, and the detour is worth recording. The first form compared against `'__never__'`, not an
+		// `InEdgeDisposition` member, so TypeScript rejected it (TS2367) and the mutant never ran. Making it compile
+		// forced the question of what this gate guards — and I concluded, WRONGLY, that the dead-predecessor arm's
+		// `IRRECOVERABLE_TERMINAL` check merely re-derived it, and deleted the check. `localOf` returning NEUTRALIZED
+		// says the edge is dead, NOT which of two reasons killed it: off a non-BRANCH source a guard-false CONDITIONAL
+		// edge is also neutralized, and that case must yield NO provenance. The pre-existing WP-14 test pinned exactly
+		// that and went red on the next run, so the check was restored.
+		//
+		// The gate's real victim is therefore the BRANCH arm, and the victim named below is the suite that proves it.
 		find: "\t\t\t\tif (ctx.localOf(edge) !== 'NEUTRALIZED') continue;",
-		replace: "\t\t\t\tif (ctx.localOf(edge) === '__never__') continue;",
-		expectRed: ['packages/rph-domain/src/revrem-wp7-prune-provenance-cause.test.ts'],
-		why: 'a PENDING in-edge must yield NO provenance: nothing has decided, so naming a cause would be a fabrication',
+		replace: "\t\t\t\tif (ctx.localOf(edge) === 'SATISFIED') continue;",
+		expectRed: ['packages/rph-domain/src/transition-gate-prune-provenance.test.ts'],
+		why: 'the disposition gate: an UNDECIDED branch must cut nothing, so a PENDING/UNRESOLVED in-edge yields no provenance',
 		source: 'RW-7 inline'
 	},
 	{

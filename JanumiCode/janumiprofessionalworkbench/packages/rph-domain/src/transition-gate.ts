@@ -734,9 +734,21 @@ export function pruneProvenance(
 						...excluded
 					};
 				// THE ARM RW-7 ADDED (N-8). A non-BRANCH source whose edge is NEUTRALIZED reached an irrecoverable
-				// terminal state — that is the only way `localOf` returns NEUTRALIZED for a non-branch real source —
+				// terminal state — that is the ONLY way `localOf` returns NEUTRALIZED for a non-branch real source —
 				// so the subgraph below it is structurally dead. This used to `continue`, walk off the end of the
-				// frontier, and return undefined, leaving the emitted event indistinguishable from a waived skip.
+				// frontier and return undefined, leaving the emitted event indistinguishable from a waived skip.
+				//
+				// THE STATE CHECK IS NOT REDUNDANT, and I briefly removed it believing it was. `localOf` returning
+				// NEUTRALIZED says the edge is DEAD; it does not say WHICH of two reasons killed it. Off a non-BRANCH
+				// source a guard-false CONDITIONAL edge is ALSO neutralized — and that case must yield NO provenance,
+				// because off a non-BRANCH step out-edges are INDEPENDENT filters rather than exclusive arms: the step
+				// is unreachable, but no DECISION excluded it, and inventing one puts a false justification into the
+				// governed stream. `transition-gate-prune-provenance.test.ts` pins exactly that and caught the removal
+				// immediately.
+				//
+				// So the two questions are genuinely distinct and both must be asked: `localOf` decides whether the
+				// edge can still conduct, and the state decides whether a step that can never conduct is what killed
+				// it. That is one question each, not one question twice.
 				if (IRRECOVERABLE_TERMINAL.has(step.stepState))
 					return {
 						cause: 'DEAD_PREDECESSOR',
