@@ -503,7 +503,71 @@ grant one — which is strictly stronger evidence than the seam it replaces.
 
 | # | Severity | Statement |
 |---|---|---|
-| **N-18** | MINOR | **An EMPTY grant against a real request yields `PARTIALLY_AUTHORIZED` with nothing granted, and `bindingPermitsExecution` permits execution against it.** Refusing it and directing the authorizer to `DenyRuntimeBinding` — which *is* reachable from `REQUESTED`, so refusing would not wedge — is tempting and is an **inference the corpus does not make**: *"partial grant" implies granting some* is my reading, not a ratified rule. **Deliberately not decided**, on JAN-CAPBIND's precedent (the withdrawn `scope` field), and asserted as current behaviour in `partauth-derived-outcome.test.ts` so the disposition is visible rather than incidental. Wants a sponsor ruling. Note the exposure is bounded by N-2 being open: nothing yet enforces capability at operation level, so a zero-capability binding is no more permissive today than any other. |
+| **N-18** | MINOR | **[RULED 2026-07-26 — option (C) ADOPTED; statement kept verbatim, see the ruling section below.]** **An EMPTY grant against a real request yields `PARTIALLY_AUTHORIZED` with nothing granted, and `bindingPermitsExecution` permits execution against it.** Refusing it and directing the authorizer to `DenyRuntimeBinding` — which *is* reachable from `REQUESTED`, so refusing would not wedge — is tempting and is an **inference the corpus does not make**: *"partial grant" implies granting some* is my reading, not a ratified rule. **Deliberately not decided**, on JAN-CAPBIND's precedent (the withdrawn `scope` field), and asserted as current behaviour in `partauth-derived-outcome.test.ts` so the disposition is visible rather than incidental. Wants a sponsor ruling. Note the exposure is bounded by N-2 being open: nothing yet enforces capability at operation level, so a zero-capability binding is no more permissive today than any other. |
+
+### 2026-07-26 — the RPH-EXE-004 rulings (R1, R2, R4), and four findings they surfaced
+
+Design input: a 13-agent adversarial exploration (three enforcement designs under distinct priors, each attacked on
+**invention** and on **wedges**, then synthesised). It **killed all three proposals as designs** and produced the
+tier decomposition below plus four findings independent of any ruling.
+
+**RPH-EXE-004 DECOMPOSES INTO THREE TIERS. Conflating any two is the F-28 shape this programme exists to stop.**
+
+| Tier | Who | Status |
+|---|---|---|
+| **Declaration** — granted ⊆ requested, monotone, outcome derived, a step runs only on its own live binding | JPWB | **ENFORCED** |
+| **Admission** — a step declares what it will need; is it granted? | contested | **no subject exists** — no ratified step-level required-capability declaration |
+| **Operation** — *this* `connect()`, *this* path | Platform (§33.4 Runtime Authorization Service) | **deferred to M5** |
+
+**JPWB cannot enforce RPH-EXE-004 as written**, and no design can change that: the statement's subject is an
+operation *at operation time*, and this engine is never in the path of an operation.
+
+> **A CLAIM I MADE TO THE SPONSOR WAS WRONG, AND IT MATTERS BECAUSE IT WOULD HAVE LICENSED AN INVENTION.** I said
+> the corpus has no notion of a step declaring required capabilities. **`requiredCapabilities: CapabilityRequest[]`
+> exists** on `ValidatorContract` and `ValidatorRegistryEntry` (`canonical-vocabulary.json:2249`, `:2500`). The
+> concept is absent from `ExecutionStep`, not from the corpus — and a design flagging it as *invented* would have
+> been a false record of exactly the kind JAN-CAPBIND's withdrawn `scope` field taught us to fear. **Fifth instance**
+> of "the corpus does not provide X" being a statement about my search.
+
+**R1 — no JPWB-side invocation ledger.** It would be a *record*, not a control: post hoc, unable to compel
+disclosure, and blind to the **bound** (path/host is inexpressible under the §22.1 ruling, so *"file-system
+granted"* is satisfied by reading `/etc/shadow`). Its caller does not exist until M5. **Exit criterion**, so this is
+deferral and not drift: revisit when a broker exists to call it, or when a step-level capability declaration is
+ratified.
+
+**R2 — `RuntimeBindingAuthorized` now records its outcome.** The handler emitted the raw command payload, so the
+log held the grant and not the resulting `authorizationStatus` — a field the vocabulary declares REQUIRED on that
+event. Harmless until JAN-PARTAUTH made the outcome derived; after it, no auditor could distinguish a full from a
+partial authorization. Emitting it increases conformance (the event already emitted a strict *subset* of the
+declared shape) and records a committed fact rather than inventing a semantic. **Disclosed residual:** if the shape
+is later ratified differently the field may change — but omitting it protects nothing and loses the fact meanwhile.
+
+**R4 — N-18 adopted as option (C)**, and **the sponsor's correction is what produced it.** My argument for refusing
+the empty grant was *"it has no consumer in this engine and no state to sit in"* — engine-local reasoning about a
+plane of a product that will have multi-party authorization, tenants, delegation and human auditors. *"Reviewed,
+granted nothing, still live"* is a first-class position, distinct from `REQUESTED` and from `DENIED` — which is
+**terminal**, so option (B) would not have lost nuance, it would have **destroyed the binding**. The ratified
+machine already had the home: `PARTIALLY_AUTHORIZED`. The **predicate** was wrong, not the state.
+
+| # | Severity | Statement |
+|---|---|---|
+| **N-19** | MINOR | **[CLOSED.]** Three artefacts carried stale reasons for RPH-EXE-004. The register row was on its **third**: *(1)* "no runtime capability plane exists" — false; *(2)* "the capability IDENTITY does not exist — Source TBD" — falsified by JAN-CAPBIND authoring it; *(3)* the real disposition, a **boundary**. The conformance manifest was stale **twice** (claimed EXE-005 unenforced after WP-3 closed it, *and* repeated the dead "Source TBD" reason). And `capabilityAuthorized`'s docblock stated the operation-time rule flatly with nothing to say the engine does not enforce it — **I later quoted that sentence to the sponsor as corpus text.** No gate reads prose; that is the durable part. |
+| **N-20** | MAJOR | **[CLOSED.]** A **vacuous request** (`R = ∅`) reaches `AUTHORIZED` with nothing granted and permits execution — and `fromStates` does not admit `AUTHORIZED` as a source, so **no second authorization exists** and no command re-points a step's `runtimeBindingId`. Strictly worse than N-18: refusing it at Start would be a **wedge**. Refused at `RequestRuntimeBinding`, the only point where a remedy exists. Disclosed as an **inference** — the corpus requires the field, not a non-empty array. |
+| **N-21** | MAJOR | **[CLOSED.]** **RPH-EXE-005 had no read-model mirror — F-29's fifth instance, and I created it.** JAN-CAPBIND WP-3 wired `inputReadiness` at both arrows into RUNNING and never told `planPermitsAffordance`, so `start`/`resolve` were offered on a step whose required input is absent. One work package later I closed the same shape for the retry cap and called that "the fourth instance" without looking one commit back. |
+| **N-22** | MAJOR | **[CLOSED.]** **A hole JAN-PARTAUTH opened, caught by an existing test.** `fromStates` was written when `target` was the literal `AUTHORIZED`; with the target **derived**, an identical re-authorization lands `PARTIALLY_AUTHORIZED → PARTIALLY_AUTHORIZED`, and `checkTransition` admits `from === to` as a NOOP — appending an event for a change that did not happen. The ratified machine declares **no self-arrow** there, so refusing is a derivation. **DISCLOSED CONSEQUENCE:** incremental multi-party authorization (grant one of three, then a second) becomes **inexpressible**. The machine does not model it; adding the arrow is a ratification act. *This is the case the sponsor's multi-party argument most directly touches, and it wants a ruling.* |
+
+> **AND THE RENDERER FELL THROUGH — the finding inside the fix.** `bindingAuthorityVerdict` gained N-18's limb and
+> `bindingAuthorityRefusal` rendered only `WRONG_STEP` and `NOT_AUTHORIZED`, so the new verdict fell to `return
+> null` and the engine **permitted the start it had just decided to refuse**. The decision was right; the rendering
+> was silent. Only the kill test caught it. The renderer is now **total**: any non-ok limb refuses with the kernel's
+> own reason, so a future limb is enforced the day it is declared.
+
+> **A CONTROL OF MINE WAS OVERTURNED, and is kept rather than deleted.** `capbind-n4` asserted *"the empty-request /
+> empty-grant case stays ACCEPTED — three live dispatches rely on it … breaking that would be a regression dressed
+> as an enforcement."* Correct on the evidence it had; wrong once the unrepairable end state was known. The "three
+> live dispatches" were three **test** arrangements — repo-wide only two files ever requested `[]`, and the
+> reference seed authors no RuntimeBinding at all. **A control is only as good as the harms known when it was
+> written**, and saying so is cheaper than discovering later that it held a defect open.
 
 > **CORRECTION (2026-07-25) — two entries in this section were WRONG, and wrong in the reassuring direction.**
 >
