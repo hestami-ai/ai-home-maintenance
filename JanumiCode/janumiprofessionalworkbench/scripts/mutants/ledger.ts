@@ -301,13 +301,15 @@ export const DECLARED_MUTANTS: readonly DeclaredMutant[] = [
 	},
 	{
 		id: 'B6-unresolvable-fails-open',
-		// RE-SITED BY RW-6 (see B1). The narrowing early-return became a boolean fact handed to the verdict, so the
-		// mutation is now "claim it resolved" rather than "delete the narrowing" — and the TYPE-level guarantee it
-		// declares is UNCHANGED and still checked: `binding.state` reads below still require the narrowing, so a
-		// mutation that lets an unresolvable binding through still cannot be expressed.
+		// RE-ANCHORED BY RW-6, AND IT CAUGHT A REAL REGRESSION ON THE WAY. RW-6's first draft replaced this narrowing
+		// early-return with `const resolves = binding?.objectType === 'RUNTIME_BINDING'` plus `(binding?.state ?? {})`,
+		// so nothing below required `binding` to be PROVEN — the fail-OPEN became expressible for the first time since
+		// JAN-EXEBIND. This entry duly reported SURVIVED ("declared type-prevented, but it COMPILES"), which is
+		// precisely what `expectNoCompile` exists to detect: a guarantee downgraded from UNEXPRESSIBLE to merely
+		// tested, silently, by a refactor whose subject was something else. The narrowing was restored.
 		file: 'packages/rph-application/src/handlers/execution.ts',
-		find: "\tconst resolves = binding?.objectType === 'RUNTIME_BINDING';",
-		replace: "\tconst resolves = binding?.objectType !== '__never__';",
+		find: "\tif (binding?.objectType !== 'RUNTIME_BINDING')",
+		replace: "\tif (binding !== undefined && binding.objectType === '__never__')",
 		expectRed: ['packages/rph-application/src/handlers/exebind-wp1-binding-authority.test.ts'],
 		why: 'fail-CLOSED on an unresolvable authority (K4). REFORMULATED by JAN-VERIF V-1: the harvested form deleted the narrowing outright, so `binding` became possibly-undefined and TypeScript rejected it \u2014 NO_COMPILE, proving nothing. This form keeps the narrowing and inverts only the accepted type, so the fail-open path is genuinely reached.',
 		source: 'exebind_mutants.py (reformulated V-1)',

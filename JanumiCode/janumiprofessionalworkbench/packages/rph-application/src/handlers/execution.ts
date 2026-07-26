@@ -898,31 +898,44 @@ function bindingAuthorityRefusal(
 	// the engine refuses (MAJOR #5). Re-deriving the checks in the projection was refused: a second copy of a
 	// load-bearing ORDER is the shape that produced this series' BLOCKER.
 	//
-	// The store reads stay here, where the store is. Note both `?? ''`: an absent `executionStepId` becomes `''`,
-	// which cannot equal a real `stepId`, so a binding that names no step refuses rather than passing — the
-	// fail-closed reading, and the one the `(unset)` in the message below describes.
-	const binding = ctx.store.loadObject(bindingId);
-	const resolves = binding?.objectType === 'RUNTIME_BINDING';
-	const state = (binding?.state ?? {}) as {
-		executionStepId?: unknown;
-		authorizationStatus?: unknown;
-	};
-	const verdict = bindingAuthorityVerdict(stepId, {
-		bindingId,
-		bindingResolves: resolves,
-		...(resolves ? { boundStepId: String(state.executionStepId ?? '') } : {}),
-		...(resolves ? { authorizationStatus: String(state.authorizationStatus) } : {})
-	});
-
+	// ── THE UNRESOLVABLE LIMB IS AN EARLY RETURN, AND THAT IS A TYPE-LEVEL GUARANTEE, NOT A STYLE CHOICE ─────────
+	//
 	// Fail-closed on an unresolvable authority, mirroring `pwuOpennessRefusal` down to the code: an execution act
 	// whose authority cannot be READ cannot be authorized by it.
-	if (verdict.limb === 'UNRESOLVABLE')
+	//
+	// RW-6'S FIRST DRAFT LOST THIS, AND MUTANT B6 CAUGHT IT. That draft read the state as `(binding?.state ?? {})`
+	// and handed `bindingResolves` to the verdict as a boolean — which meant `binding` no longer had to be PROVEN to
+	// exist for anything below, so the fail-OPEN became EXPRESSIBLE for the first time since JAN-EXEBIND. B6 is
+	// declared `expectNoCompile`, so it reported SURVIVED — "declared type-prevented, but it COMPILES" — which is
+	// exactly the verdict that field exists to produce. A guarantee had been downgraded from unexpressible to merely
+	// tested, silently, by a refactor whose subject was something else.
+	//
+	// So the narrowing is restored: every read below requires `binding` to be a RUNTIME_BINDING, and no mutation can
+	// let an unresolvable one through without a deliberate signature change (REG-D-013 — guarantee-strength over
+	// economy). The verdict still DECLARES the limb, because the read-model has no store and reaches the same
+	// conclusion from `resolves: false`; the handler short-circuits it here for the type, not for the rule.
+	const binding = ctx.store.loadObject(bindingId);
+	if (binding?.objectType !== 'RUNTIME_BINDING')
 		return reject(
 			command,
 			'RPH_VALIDATION_SEMANTIC_FAILED',
 			`${command.commandType} blocked: step ${stepId} names runtimeBindingId ${bindingId}, which does not resolve to a RUNTIME_BINDING — the authorization required by RPH-EXE-003 cannot be established.`,
 			[stepId, bindingId]
 		);
+
+	// The store reads stay here, where the store is. Note the `?? ''`: an absent `executionStepId` becomes `''`,
+	// which cannot equal a real `stepId`, so a binding that names no step refuses rather than passing — the
+	// fail-closed reading, and the one the `(unset)` in the message below describes.
+	const state = binding.state as {
+		executionStepId?: unknown;
+		authorizationStatus?: unknown;
+	};
+	const verdict = bindingAuthorityVerdict(stepId, {
+		bindingId,
+		bindingResolves: true,
+		boundStepId: String(state.executionStepId ?? ''),
+		authorizationStatus: String(state.authorizationStatus)
+	});
 
 	// ── SCOPE: the binding must be the one authorized FOR THIS STEP (JAN-REVREM RW-3, review finding #2) ────────
 	//
