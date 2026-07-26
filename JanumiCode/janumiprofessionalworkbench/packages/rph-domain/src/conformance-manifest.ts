@@ -92,11 +92,26 @@ const COVERAGE_BY_PREFIX: Readonly<Record<string, Coverage>> = {
 		status: 'PARTIAL',
 		testFile: 'packages/rph-domain/src/execution.test.ts',
 		// DOWNGRADED from COVERED by WP-16's layer gate, and the downgrade is the finding. "RPH-EXE-001..009 by id"
-		// was true of the PREDICATES and false of the ENGINE: EXE-003 (binding not authorized), EXE-004 (granted !=
-		// requested capability) and EXE-005 (preconditions before READY) are implemented as correct, unit-tested
-		// kernel functions with NO production caller — the same shape as PWU-010 before WP-12b, three more times, in
-		// the same family. They are disclosed in `enforcement-register.ts` with a checked call-site census rather
-		// than fixed here: wiring a new refusal is a behaviour change owing its own kill test.
+		// was true of the PREDICATES and false of the ENGINE: ~~EXE-003 (binding not authorized),~~ EXE-004 (granted
+		// != requested capability) and EXE-005 (preconditions before READY) are implemented as correct, unit-tested
+		// kernel functions with NO production caller — the same shape as PWU-010 before WP-12b, and in the same
+		// family. They are disclosed in `enforcement-register.ts` with a checked call-site census rather than fixed
+		// here: wiring a new refusal is a behaviour change owing its own kill test.
+		//
+		// EXE-003 STRUCK 2026-07-26 (finding N-13). It was CLOSED by JAN-EXEBIND WP-B1 and re-sited by JAN-REVREM
+		// RW-0/RW-3/RW-6, so this comment had been asserting for several commits that a rule with a live production
+		// caller has none — while `COVERED_BY_ID` forty lines above certifies it at the COMMAND layer, the `note`
+		// immediately below lists it among the command-layer assertions, and
+		// `ENFORCEMENT_REGISTER['RPH-EXE-003'].kind === 'ENFORCED'` carries no `referencedOnlyBy` census at all
+		// (that field exists only on `UnenforcedRule`). Three records inside one object literal disagreeing about one
+		// rule, in the artefact whose over-claiming produced this defect family — and §7 of the residuals register
+		// already had to correct three artefacts disagreeing about RPH-PWU-010 in exactly this way.
+		//
+		// NO GATE CATCHES THIS, and that is the durable part: `enforcement-register.test.ts` asserts
+		// `coverageFor(id).status` and `.testFile`, so it reads the STRUCTURED rows and never the PROSE beside them.
+		// A comment cannot be type-checked, which is precisely why a stale one outlives the condition it describes.
+		// Found by a fresh adversarial review re-deriving what an earlier review's lost MINOR findings might have
+		// been (ruling R13) — not by the gate that certifies this file.
 		note:
 			'EXE-001/002/003/006/008 asserted BY ID AT THE COMMAND LAYER (see COVERED_BY_ID); EXE-007/009 are not ' +
 			'command refusals (dispositioned in enforcement-register.ts); EXE-004/005 remain UNENFORCED — and NOT for ' +
