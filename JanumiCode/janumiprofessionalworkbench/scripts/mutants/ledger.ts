@@ -1444,5 +1444,117 @@ export const DECLARED_MUTANTS: readonly DeclaredMutant[] = [
 		],
 		why: 'propose-time asks exactly ONE question — is this binding somebody else’s? — because every other question it could ask is about an act that has not happened yet',
 		source: 'JAN-BINDEXCL WP-1'
+	},
+
+	// ── JAN-RETRYCAP: the read-model mirrors RPH-EXE-008's retry cap (N-12) ───────────────────────────────────
+	//
+	// THE AGREEMENT SUITE IS THE VICTIM FOR MOST OF THESE, and that is the point. F-29's invariant is not "each
+	// layer is individually right", it is "no affordance the engine would reject" — a statement about the PAIR. A
+	// mutant that breaks one side alone must redden a test that watches both, or the two can drift apart while
+	// every single-layer suite stays green, which is exactly how N-12 survived four work packages.
+	{
+		id: 'R1-readmodel-limb-never-withholds',
+		file: 'packages/rph-projections/src/execution-view.ts',
+		// N-12 ITSELF, restored: the limb runs, decides, and throws the decision away. Mutating the CONSEQUENCE
+		// rather than the condition (the V-2c lesson) — at runtime a fail-open, to the compiler still reachable.
+		find: '\t\tif (!decision.mayRetry) return false;',
+		replace: '\t\tif (!decision.mayRetry) void decision;',
+		expectRed: [
+			'packages/rph-projections/src/retrycap-readmodel-cap.test.ts',
+			'packages/rph-application/src/handlers/retrycap-engine-readmodel-agree.test.ts'
+		],
+		why: 'N-12 itself: retry is offered on an exhausted step and the engine refuses the click — F-29’s fourth instance',
+		source: 'JAN-RETRYCAP WP-3'
+	},
+	{
+		id: 'R2-readmodel-limb-withholds-the-wrong-half',
+		file: 'packages/rph-projections/src/execution-view.ts',
+		// OVER-refusal, the failure a refusal-only battery cannot see: retry withheld exactly while attempts REMAIN.
+		// Every "at the cap" assertion still passes; only the positive half falls.
+		find: '\t\tif (!decision.mayRetry) return false;',
+		replace: '\t\tif (decision.mayRetry) return false;',
+		expectRed: [
+			'packages/rph-projections/src/retrycap-readmodel-cap.test.ts',
+			'packages/rph-application/src/handlers/retrycap-engine-readmodel-agree.test.ts'
+		],
+		why: 'the limb must remove only the ILLEGAL affordance — withholding a legal retry is the same defect wearing the other sign',
+		source: 'JAN-RETRYCAP WP-3'
+	},
+	{
+		id: 'R4-the-shared-default-cap-changes',
+		file: 'packages/rph-domain/src/execution.ts',
+		// If the default lived in two places this would redden only one side. It reddens the AGREEMENT suite, which
+		// is the evidence that both sides now read the same constant.
+		find: 'export const DEFAULT_RETRY_CAP = 3;',
+		replace: 'export const DEFAULT_RETRY_CAP = 99;',
+		expectRed: [
+			'packages/rph-projections/src/retrycap-readmodel-cap.test.ts',
+			'packages/rph-application/src/handlers/retrycap-engine-readmodel-agree.test.ts'
+		],
+		why: 'ONE default for the engine and the read-model — the whole reason the cap convention moved into the kernel',
+		source: 'JAN-RETRYCAP WP-1'
+	},
+	{
+		id: 'R5-a-degenerate-cap-is-taken-literally',
+		file: 'packages/rph-domain/src/execution.ts',
+		// `maxAttempts: 0` would become a real cap and refuse the FIRST retry — a plan made unusable by a typo,
+		// which is fail-DANGEROUS in the direction that looks conservative.
+		find: "\treturn typeof raw === 'number' && Number.isInteger(raw) && raw >= 1 ? raw : DEFAULT_RETRY_CAP;",
+		replace: "\treturn typeof raw === 'number' && Number.isInteger(raw) ? raw : DEFAULT_RETRY_CAP;",
+		expectRed: ['packages/rph-projections/src/retrycap-readmodel-cap.test.ts'],
+		why: 'a degenerate maxAttempts must fall back to the convention, not become a cap of zero',
+		source: 'JAN-RETRYCAP WP-1'
+	},
+	{
+		id: 'R6-a-retry-marker-is-counted-as-an-attempt',
+		file: 'packages/rph-domain/src/execution.ts',
+		// §19 L3-3, as one clause: ExecutionStepRetried is a re-queue MARKER. Counting it double-counts every retry,
+		// so a plan with maxAttempts=3 exhausts after two — and the engine and the view would still AGREE, both
+		// being wrong together. Only the declared-cap assertion catches it, which is why that test asserts the flip
+		// lands on the plan's own number rather than merely that the two sides match.
+		find: "\t\t\te.eventType === 'ExecutionStepStarted' &&",
+		replace:
+			"\t\t\t(e.eventType === 'ExecutionStepStarted' || e.eventType === 'ExecutionStepRetried') &&",
+		expectRed: ['packages/rph-application/src/handlers/retrycap-engine-readmodel-agree.test.ts'],
+		why: 'one Started = one attempt; counting the re-queue marker halves every plan’s effective budget',
+		source: 'JAN-RETRYCAP WP-1'
+	},
+	{
+		id: 'R7-retry-stops-declaring-that-it-spends-budget',
+		file: 'packages/rph-domain/src/step-command-spec.ts',
+		// The column is what tells the read-model WHICH command the cap governs. Flip this and the limb is still
+		// present, still correct, and never consulted — the omission shape that made the binding limb a BLOCKER.
+		find: "\t\tretryBudget: 'CONSUMES_RETRY_BUDGET',",
+		replace: "\t\tretryBudget: 'UNCAPPED',",
+		expectRed: [
+			'packages/rph-projections/src/retrycap-readmodel-cap.test.ts',
+			'packages/rph-application/src/handlers/retrycap-engine-readmodel-agree.test.ts'
+		],
+		why: 'the declared column is the only thing connecting RPH-EXE-008 to the affordance filter',
+		source: 'JAN-RETRYCAP WP-1'
+	},
+	{
+		id: 'R8-a-resume-is-declared-to-spend-budget',
+		file: 'packages/rph-domain/src/step-command-spec.ts',
+		// The asymmetry that matters on this row: Resolve is REQUIRES_* for binding and inputs and UNCAPPED here.
+		// Marking it as spending would let a wait/resume cycle exhaust a plan that had run exactly once.
+		find:
+			"\t\tretryBudget: 'UNCAPPED',\n\t\tretryBudgetRationale:\n\t\t\t'THE SECOND ARROW INTO RUNNING",
+		replace:
+			"\t\tretryBudget: 'CONSUMES_RETRY_BUDGET',\n\t\tretryBudgetRationale:\n\t\t\t'THE SECOND ARROW INTO RUNNING",
+		expectRed: ['packages/rph-projections/src/retrycap-readmodel-cap.test.ts'],
+		why: 'suspension is not an attempt — a resume emits no ExecutionStepStarted and must not be charged',
+		source: 'JAN-RETRYCAP WP-1'
+	},
+	{
+		id: 'R9-the-plans-own-cap-never-reaches-the-step',
+		file: 'packages/rph-projections/src/execution-view.ts',
+		// The threading, not the rule. Drop the plan's RetryPolicy on the way to the step and every cap silently
+		// becomes the default — correct-looking on any plan that happens to declare 3, wrong on every other.
+		find: '\t\t\tstepView(step, row.status, row.pwuWorkLifecycleState, row.retryPolicy)',
+		replace: '\t\t\tstepView(step, row.status, row.pwuWorkLifecycleState, undefined)',
+		expectRed: ['packages/rph-application/src/handlers/retrycap-engine-readmodel-agree.test.ts'],
+		why: 'the cap must be the PLAN’s; a fixture declaring the default value would hide this entirely',
+		source: 'JAN-RETRYCAP WP-3'
 	}
 ];

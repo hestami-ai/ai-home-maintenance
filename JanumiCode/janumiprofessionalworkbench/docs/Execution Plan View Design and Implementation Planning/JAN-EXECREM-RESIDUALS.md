@@ -254,6 +254,18 @@ undefined; `§31` is a **bare list of table names** with no columns; `§21`'s `E
 | **N-2** | RPH-EXE-004 unenforced, `capabilityAuthorized` dead | **PARTIAL, and stated as such.** Its *decidable core* — a grant may not exceed its request — is now enforced by N-4's fix. Its **operation-level** half ("network operations fail authorization") remains outside an engine that governs plans rather than hosting invocations, and `capabilityAuthorized` still has no production caller **by design**: it answers a different question (single-operation containment), and wiring it merely to clear the census would be the substitution this register exists to prevent. |
 | **N-6** | `PARTIALLY_AUTHORIZED` unreachable | **RE-CLASSIFIED as a PRECONDITION on N-2**, not an adjacent finding. `m2-transitions.json` declares `REQUESTED → PARTIALLY_AUTHORIZED` with its own trigger *"partial grant"*, and `advanceStatus` takes a single `target` — so deriving the status inside `AuthorizeRuntimeBinding` would make one command drive two ratified arrows the machine says are distinct. Needs a real `PartiallyAuthorizeRuntimeBinding` command; scheduled, not absorbed. |
 
+> **SPONSOR RULING, 2026-07-26 — ACCEPTED.** The sponsor confirmed the policy-by-reference resolution below,
+> **with its disclosed cost**. `scope` stays unminted; path- and host-limited grants remain **inexpressible**, not
+> merely unenforced, until a broker is chosen. The ruling is recorded HERE rather than as a `JPWB-REG-005` `REG-D`
+> entry because it is an engineering resolution inside this lineage, not a canon act — and because the canon
+> register currently carries uncommitted edits from a separate workstream. **If canon-level status is wanted, it
+> needs its own `REG-D` conferral; this entry does not confer one.**
+>
+> The shape that makes the cost recoverable, and why it was worth ruling now rather than deferring: a structured
+> scope can later be added **beside** the capability identity without a migration, because nothing was minted that
+> would have to be replaced. Deferring the ruling would not have preserved that option — it would have left three
+> rules quantifying over a type with no fields.
+
 **§22.1's *"Capability scope must be explicit"* is resolved as POLICY-BY-REFERENCE, and no `scope` field was minted.**
 The first design derived one and called it forced; that was **over-authoring**, and the adversarial pass caught it.
 The sentence admits two readings — a distinct `scope` field, or an identity named precisely enough to be explicit —
@@ -397,6 +409,38 @@ mistake again.
 > appears at another depth**. The collision is legitimate and was NOT removed from the production code: both sites
 > ask one question and reach opposite dispositions on purpose (fail-CLOSED at Start, allowed through at propose),
 > and collapsing them into a shared helper would hide exactly the asymmetry `N3` exists to protect.
+
+### JAN-RETRYCAP, 2026-07-26 — N-12 CLOSED, and the fix had to remove an older duplication first
+
+| # | Was | Now |
+|---|---|---|
+| **N-12** | `retry` offered on every FAILED step under an ACTIVE plan, including one already at the RPH-EXE-008 cap; the engine refused the click | **CLOSED.** A **fifth** declared column (`retryBudget`) says WHICH commands the cap governs; the FACTS (attempts made, the plan's cap) are resolved by the caller and decided by `retryDecision` — the same ratified kernel the engine calls. 15 new cases across two suites. |
+
+**Why this instance is not just a fourth repetition.** R7's remedy for F-29 was *gate the read-model on the spec
+table's columns*, and it worked for the three limbs decided by **declared state** (plan status, PWU lifecycle,
+binding status). RPH-EXE-008 is decided by a **count over the event stream**. No column can hold a number that
+changes every time a step starts, so a column-driven filter is blind to this refusal **by construction** — the fix
+for the third instance could not have caught the fourth. The column therefore carries only the *question*; the
+*facts* travel separately, exactly as `bindingAuthority` + `bindingAuthorityVerdict` do.
+
+**The fix had to delete a duplication before it could add a consumer, and the duplication said so out loud.** The
+retry cap's two inputs were private to the command handler: `attemptsMadeForStep` walked the event log inline under
+the comment *"Mirrors the execution-attempts projection's attempt_number"*, and `retryCapFor` held the default and
+the validity rules. `retryDecision` was already shared — **but a shared decision fed by re-derived facts is two
+declarations with a function in between making them look like one.** Threading the count out to the read-model
+would have made it three. Both moved to the kernel first (`attemptsMadeFrom`, `retryCapFrom`), and the read-model
+receives the **RetryPolicy bag rather than an extracted number**, so no caller can apply the convention its own way.
+
+**The evidence is an AGREEMENT suite, not two suites.** F-29's invariant — *no affordance the engine would reject*
+— is a statement about the PAIR, and two individually-green layers can still disagree at the boundary. So the test
+drives a real plan to exhaustion through `Engine.dispatch` and asserts, at **every** attempt count, that the view
+offers `retry` exactly when the engine accepts it, with anti-vacuity assertions that the run reached both sides of
+the flip. The boundary is nowhere hardcoded: the flip must land on the plan's own declared cap, checked at two
+different caps so a constant cannot pass.
+
+| # | Severity | Statement |
+|---|---|---|
+| **N-17** | MINOR | **At the retry cap, `cancel` is the ONLY step-level exit.** RPH-EXE-008 answers an exhausted retry by naming {CHANGE_TACTIC, REPLAN_EXECUTION, ESCALATE, REJECT, ABANDON} — **every one of which is above the step level**. `SkipExecutionStep` declares `sourceStates: [READY, QUEUED]`, so a FAILED step cannot be skipped, and reaching QUEUED requires the very retry the cap refuses. Not a wedge — `cancel` is `CLEANUP_EXEMPT` on every column and stays available — but the step-level ladder has one rung where the rule's own prescribed remedies imply more. **Found by a test assertion that was WRONG:** the wedge guard demanded `skip` at the cap on the reasoning that a REPLAN Decision authorizes one; it failed, and the failure was the domain telling me the path does not exist. The `SkipExecutionStep` rationale had been written on the same false premise and is corrected in the same commit — a rationale is a claim, and this column exists partly to make such claims checkable. |
 
 > **CORRECTION (2026-07-25) — two entries in this section were WRONG, and wrong in the reassuring direction.**
 >

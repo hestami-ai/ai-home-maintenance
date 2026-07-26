@@ -33,6 +33,11 @@ import {
 	// checks and their load-bearing order.
 	bindingAuthorityVerdict,
 	type BindingAuthorityFacts,
+	// JAN-RETRYCAP (N-12): same discipline one limb further on — the ratified kernel decides, and `retryCapFrom`
+	// applies the SAME cap convention the engine applies, so neither the default nor the validity rules exist twice.
+	retryDecision,
+	retryCapFrom,
+	type RetryInput,
 	isTerminalSuccessStepState,
 	prunableStepIds as gatePrunableStepIds,
 	startableStepIds as gateStartableStepIds,
@@ -86,6 +91,22 @@ export interface ExecutionStepInput {
 	 *  honours a recorded decision over a re-derived one, so this MUST reach the read-model or the UI's branch
 	 *  verdict can drift from the engine's the moment a guard's inputs change. */
 	readonly selectedTransitionId?: string;
+	/**
+	 * How many attempts this step has already opened — `attemptsMadeFrom` over the event stream (JAN-RETRYCAP,
+	 * closing N-12).
+	 *
+	 * THE FIRST FACT IN THIS INTERFACE THAT IS NOT A PROPERTY OF THE STEP. Every other field is read off the
+	 * aggregate; this one is a COUNT OVER HISTORY, and that is exactly why the affordance filter could not see it.
+	 * RPH-EXE-008's cap is a command-layer refusal derived from the event log, so a projection driven by declared
+	 * state — however complete — is blind to it BY CONSTRUCTION. `retry` was therefore offered on every FAILED step
+	 * under an ACTIVE plan, including one already exhausted, and the engine refused the click: F-29's fourth
+	 * instance, and the one that proves the pattern is not confined to the spec table's columns.
+	 *
+	 * ABSENT MEANS UNGATED, the same disclosed fail-OPEN as `runtimeBinding` and `pwuWorkLifecycleState` (DS §6b
+	 * R9): a caller that cannot count gets the pre-N-12 behaviour rather than a silently emptied action column. The
+	 * engine still refuses, so the cost is a rejected click and not an illegal act.
+	 */
+	readonly attemptsMade?: number;
 }
 
 /** What the caller resolved about a step's runtime binding. The step's own `runtimeBindingId` is not repeated here —
@@ -132,6 +153,17 @@ export interface ExecutionPlanInput {
 	 * act. `plansForPwus` supplies it for the one production caller.
 	 */
 	readonly pwuWorkLifecycleState?: string;
+	/**
+	 * The plan's `RetryPolicy` bag, verbatim (JAN-RETRYCAP / N-12).
+	 *
+	 * THE BAG, NOT A PRE-EXTRACTED NUMBER, and that is the point. `RetryPolicy` has no ratified field list, so
+	 * "what is this plan's cap" is a CONVENTION — a positive integer `maxAttempts`, else a default — and the moment
+	 * a caller extracts the number it is free to apply that convention differently from the engine. Passing the bag
+	 * means `retryCapFrom` in the kernel answers the question ONCE, for the engine and for this projection.
+	 *
+	 * `unknown` because this layer must not pretend to know a shape the corpus has not ratified.
+	 */
+	readonly retryPolicy?: unknown;
 }
 
 export interface ExecutionStepView {
@@ -291,7 +323,8 @@ function planPermitsAffordance(
 	planStatus: string,
 	affordance: GatedAffordance,
 	pwuWorkLifecycleState?: string,
-	binding?: StepBindingContext
+	binding?: StepBindingContext,
+	retry?: RetryInput
 ): boolean {
 	const spec = STEP_COMMAND_SPECS[COMMAND_BY_AFFORDANCE[affordance]];
 	if (spec.planLiveness === 'REQUIRES_ACTIVE_PLAN' && planStatus !== PLAN_STATUS_ACTIVE)
@@ -318,6 +351,22 @@ function planPermitsAffordance(
 	if (spec.bindingAuthority === 'REQUIRES_AUTHORIZED_BINDING' && binding !== undefined) {
 		const verdict = bindingAuthorityVerdict(binding.stepId, binding);
 		if (!verdict.ok) return false;
+	}
+	// ── RPH-EXE-008, the FOURTH authority limb (JAN-RETRYCAP / N-12) ────────────────────────────────────────────
+	//
+	// AND IT IS THE ONE THAT SHOWS THE OTHER THREE WERE NOT ENOUGH. Those three are decided by DECLARED STATE, so
+	// R7's remedy — gate on the spec table's columns — could reach them. This refusal is decided by a COUNT OVER
+	// THE EVENT STREAM, and no column can hold a number that changes every time the step starts. A column-driven
+	// filter is blind to it BY CONSTRUCTION, which is why `retry` was offered on an exhausted step while the engine
+	// refused the click: F-29's fourth instance, in a place the fix for the third could not have covered.
+	//
+	// So the column says WHICH commands the cap governs and the FACTS say WHETHER this one is at it — the same
+	// split as `bindingAuthority` + `bindingAuthorityVerdict`, and for the same reason. The DECISION is
+	// `retryDecision`, the ratified kernel the engine calls; the cap comes from `retryCapFrom`, the same convention
+	// the engine applies. Nothing about RPH-EXE-008 is re-derived here.
+	if (spec.retryBudget === 'CONSUMES_RETRY_BUDGET' && retry !== undefined) {
+		const decision = retryDecision(retry);
+		if (!decision.mayRetry) return false;
 	}
 	return true;
 }
@@ -372,10 +421,11 @@ export function planAffordancesFor(
 	planStatus: string,
 	stepState: string,
 	pwuWorkLifecycleState?: string,
-	binding?: StepBindingContext
+	binding?: StepBindingContext,
+	retry?: RetryInput
 ): StepAffordances {
 	const permits = (a: StepAdvanceCommand | StepControlCommand) =>
-		planPermitsAffordance(planStatus, a, pwuWorkLifecycleState, binding);
+		planPermitsAffordance(planStatus, a, pwuWorkLifecycleState, binding, retry);
 	return {
 		advance: advanceCommandsFor(stepState).filter(permits),
 		control: controlCommandsFor(stepState).filter(permits)
@@ -393,16 +443,36 @@ export function isBelowQueued(stepState: string): boolean {
 	return stepState === 'NOT_READY' || stepState === 'READY';
 }
 
+/**
+ * Assemble `retryDecision`'s input for a step. Returns undefined when the caller supplied no count — UNGATED, not
+ * exhausted, matching `bindingContextFor` (DS §6b R9).
+ *
+ * `lastAttemptFailed` is DERIVED from the step's own state rather than passed as `true`. The affordance list
+ * already restricts `retry` to FAILED, so a literal would be correct today — and it would make this limb's answer
+ * depend on a caller-side invariant instead of on the step in front of it, which is the substitution that turns a
+ * check into a decoration the first time the invariant moves.
+ */
+function retryContextFor(s: ExecutionStepInput, retryPolicy: unknown): RetryInput | undefined {
+	if (s.attemptsMade === undefined) return undefined;
+	return {
+		attemptsMade: s.attemptsMade,
+		maxAttempts: retryCapFrom(retryPolicy),
+		lastAttemptFailed: s.stepState === 'FAILED'
+	};
+}
+
 function stepView(
 	s: ExecutionStepInput,
 	planStatus: string,
-	pwuWorkLifecycleState?: string
+	pwuWorkLifecycleState?: string,
+	retryPolicy?: unknown
 ): ExecutionStepView {
 	const afforded = planAffordancesFor(
 		planStatus,
 		s.stepState,
 		pwuWorkLifecycleState,
-		bindingContextFor(s)
+		bindingContextFor(s),
+		retryContextFor(s, retryPolicy)
 	);
 	const base: ExecutionStepView = {
 		id: s.id,
@@ -435,7 +505,9 @@ export function executionPlanView(row: ExecutionPlanInput): ExecutionPlanView {
 		...(row.pwuWorkLifecycleState === undefined
 			? {}
 			: { pwuWorkLifecycleState: row.pwuWorkLifecycleState }),
-		steps: row.steps.map((step) => stepView(step, row.status, row.pwuWorkLifecycleState)),
+		steps: row.steps.map((step) =>
+			stepView(step, row.status, row.pwuWorkLifecycleState, row.retryPolicy)
+		),
 		transitions: row.transitions ?? []
 	};
 	return row.planVersion === undefined ? base : { ...base, planVersion: row.planVersion };

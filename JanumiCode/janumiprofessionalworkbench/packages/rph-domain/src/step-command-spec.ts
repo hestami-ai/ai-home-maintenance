@@ -123,6 +123,25 @@ export interface StepCommandSpec {
 	readonly inputReadiness: InputReadiness;
 	/** Why `inputReadiness` is what it is. */
 	readonly inputReadinessRationale: string;
+	/**
+	 * RPH-EXE-008: is this command subject to the plan's RetryPolicy cap (JAN-RETRYCAP, closing N-12)?
+	 *
+	 * A FIFTH COLUMN, AND IT ANSWERS A DIFFERENT QUESTION FROM THE OTHER FOUR — which is the reason N-12 exists.
+	 * Those four are decided by DECLARED STATE (plan status, PWU lifecycle, a binding's status, an artifact's
+	 * presence). The retry cap is decided by EVENT HISTORY: how many attempts this step has already opened. A
+	 * read-model driven purely by spec columns is blind to that BY CONSTRUCTION — no column can hold a number that
+	 * changes every time the step starts — so the projection went on offering `retry` on a step already at the cap
+	 * and the engine refused the click. F-29's fourth instance.
+	 *
+	 * The column therefore says only WHICH commands are subject; the FACTS (attempts made, and the plan's cap) are
+	 * resolved by the caller and fed to `retryDecision`, exactly as `bindingAuthority` names the commands while
+	 * `bindingAuthorityVerdict` decides on resolved facts. Being total over the nine means a tenth command that
+	 * opens an attempt cannot ship without declaring its disposition — which is the omission that made the binding
+	 * limb a BLOCKER, and the one this column exists to make impossible for the cap.
+	 */
+	readonly retryBudget: RetryBudget;
+	/** Why `retryBudget` is what it is. */
+	readonly retryBudgetRationale: string;
 }
 
 /** REQUIRES_ACTIVE_PLAN: mints terminal-success or a durable decision. CLEANUP_EXEMPT: terminates or suspends
@@ -141,6 +160,11 @@ export type BindingAuthority = 'REQUIRES_AUTHORIZED_BINDING' | 'NOT_EXECUTING';
  *  settles, suspends, abandons or waives the step without reading its inputs, so their presence cannot bear on it —
  *  and gating them would STRAND a step whose missing input is precisely why it is being cancelled or skipped. */
 export type InputReadiness = 'REQUIRES_PRESENT_INPUTS' | 'NOT_CONSUMING';
+
+/** CONSUMES_RETRY_BUDGET: this command spends one of the plan's finite re-attempts, so RPH-EXE-008's cap governs
+ *  whether it may be issued at all. UNCAPPED: the command does not spend the budget — either it opens no new
+ *  attempt, or the attempt it opens was already paid for by the act that got the step here. */
+export type RetryBudget = 'CONSUMES_RETRY_BUDGET' | 'UNCAPPED';
 
 /**
  * RECORD_AT_SETTLEMENT   — this command drives a step to TERMINAL_SUCCESS, so if that step is a BRANCH it must take
@@ -180,7 +204,10 @@ export const STEP_COMMAND_SPECS: Readonly<Record<StepCommandType, StepCommandSpe
 			'the FIRST of the two arrows into RUNNING. Starting opens an attempt, and an attempt executes against the binding — RPH-EXE-003 names this case verbatim.',
 		inputReadiness: 'REQUIRES_PRESENT_INPUTS',
 		inputReadinessRationale:
-			'the FIRST consuming arrow. Starting opens an attempt, and an attempt READS the step’s declared inputs — RPH-EXE-005 names this case verbatim: starting a step whose required input artifact is absent must leave it not ready and perform no model/tool invocation.'
+			'the FIRST consuming arrow. Starting opens an attempt, and an attempt READS the step’s declared inputs — RPH-EXE-005 names this case verbatim: starting a step whose required input artifact is absent must leave it not ready and perform no model/tool invocation.',
+		retryBudget: 'UNCAPPED',
+		retryBudgetRationale:
+			'Start OPENS the attempt but does not BUY it. Attempt 1 is free; every later one exists only because a Retry re-queued the step, and that Retry was already refused at the cap. So the budget is spent one arrow earlier, and charging it here too would refuse a step whose re-attempt was legitimately purchased. DISCLOSED: this holds because Retry is the ONLY arrow from FAILED back to QUEUED. A future command that re-opens a FAILED step without spending budget — a REPLAN-authorized re-open, say — would make Start the uncapped arrow, and must either consume the budget itself or flip this row.'
 	}),
 	CompleteExecutionStep: spec({
 		commandType: 'CompleteExecutionStep',
@@ -201,7 +228,10 @@ export const STEP_COMMAND_SPECS: Readonly<Record<StepCommandType, StepCommandSpe
 			'completion CLOSES an attempt. Refusing it on a revoked binding would strand a step that has already done the work, with no way to record what it produced.',
 		inputReadiness: 'NOT_CONSUMING',
 		inputReadinessRationale:
-			'the attempt has ALREADY read them. Completion records work that was performed, so gating it on input presence would refuse the record of work already done — and an artifact deleted mid-attempt would make the step uncompletable rather than merely unstartable.'
+			'the attempt has ALREADY read them. Completion records work that was performed, so gating it on input presence would refuse the record of work already done — and an artifact deleted mid-attempt would make the step uncompletable rather than merely unstartable.',
+		retryBudget: 'UNCAPPED',
+		retryBudgetRationale:
+			'completion CLOSES an attempt. A budget governs how many may be opened; refusing to close one because the budget is spent would strand the step in RUNNING and lose the record of work that actually happened.'
 	}),
 	FailExecutionStep: spec({
 		commandType: 'FailExecutionStep',
@@ -222,7 +252,10 @@ export const STEP_COMMAND_SPECS: Readonly<Record<StepCommandType, StepCommandSpe
 			'recording failure must never require a live authority — the same argument as its planLiveness and pwuOpenness exemptions. A revoked binding makes failure MORE likely to be the truth, not less reportable.',
 		inputReadiness: 'NOT_CONSUMING',
 		inputReadinessRationale:
-			'a missing input is frequently WHY the attempt failed. Refusing the honest non-success record would strand the step in RUNNING and destroy the very account of what went wrong.'
+			'a missing input is frequently WHY the attempt failed. Refusing the honest non-success record would strand the step in RUNNING and destroy the very account of what went wrong.',
+		retryBudget: 'UNCAPPED',
+		retryBudgetRationale:
+			'failing CLOSES an attempt, and it is the very act that makes the cap relevant. Gating it on the cap would mean the last permitted attempt could never be recorded as failed — so the step could never reach FAILED, and the exhaustion the cap exists to declare would be unreachable.'
 	}),
 	RetryExecutionStep: spec({
 		commandType: 'RetryExecutionStep',
@@ -242,7 +275,10 @@ export const STEP_COMMAND_SPECS: Readonly<Record<StepCommandType, StepCommandSpe
 			'retry drives FAILED -> QUEUED, which opens no attempt: the attempt opens at the NEXT Start, which IS gated. Gating here too would double-guard one act and refuse earlier with a less useful message.',
 		inputReadiness: 'NOT_CONSUMING',
 		inputReadinessRationale:
-			'retry returns the step to QUEUED, not RUNNING — nothing is consumed here. The next Start re-asks the question against the state as it then is, which is the only correct time to ask it.'
+			'retry returns the step to QUEUED, not RUNNING — nothing is consumed here. The next Start re-asks the question against the state as it then is, which is the only correct time to ask it.',
+		retryBudget: 'CONSUMES_RETRY_BUDGET',
+		retryBudgetRationale:
+			'THE ONE COMMAND THE CAP GOVERNS (RPH-EXE-008). A retry buys the next attempt, so it is refused once attemptsMade has reached the plan’s RetryPolicy cap, and the controller must instead select from {CHANGE_TACTIC, REPLAN_EXECUTION, ESCALATE, REJECT, ABANDON}. Note what makes this column different from the other four: the answer is not in any declared state, it is a COUNT over the event stream — which is exactly why a read-model driven by columns alone offered this affordance on an exhausted step for four work packages (N-12, F-29’s fourth instance).'
 	}),
 	SkipExecutionStep: spec({
 		commandType: 'SkipExecutionStep',
@@ -263,7 +299,10 @@ export const STEP_COMMAND_SPECS: Readonly<Record<StepCommandType, StepCommandSpe
 			'a skip runs nothing; it retires the step under an authorization. No binding is exercised.',
 		inputReadiness: 'NOT_CONSUMING',
 		inputReadinessRationale:
-			'an absent required input is one of the ordinary REASONS to waive a step. Gating the waiver on the condition that motivates it would make the governed exit unreachable exactly when it is needed.'
+			'an absent required input is one of the ordinary REASONS to waive a step. Gating the waiver on the condition that motivates it would make the governed exit unreachable exactly when it is needed.',
+		retryBudget: 'UNCAPPED',
+		retryBudgetRationale:
+			'a skip WAIVES work rather than attempting it, so it spends no budget — that alone settles the row. NOT because "exhaustion is when a waiver is needed": this row first said that, and it is FALSE HERE. Skip declares sourceStates READY|QUEUED, so it is not machine-legal from FAILED at all, and reaching QUEUED needs the very retry the cap refuses. An exhausted step cannot be skipped, only cancelled (N-17). The disposition is right; the tempting reason for it was not, and the difference is exactly the kind of plausible rationale a column like this exists to make checkable.'
 	}),
 	CancelExecutionStep: spec({
 		commandType: 'CancelExecutionStep',
@@ -284,7 +323,10 @@ export const STEP_COMMAND_SPECS: Readonly<Record<StepCommandType, StepCommandSpe
 			'cancel is the exit of last resort and is exempt from every authority limb. Gating it on the binding would strand exactly the step whose binding was revoked — the case revocation exists to stop.',
 		inputReadiness: 'NOT_CONSUMING',
 		inputReadinessRationale:
-			'the exit of last resort. Cancel must stay available on a step that can never become ready, or an unsatisfiable input permanently strands the arm — the wedge shape RW-0 had to withdraw a limb for.'
+			'the exit of last resort. Cancel must stay available on a step that can never become ready, or an unsatisfiable input permanently strands the arm — the wedge shape RW-0 had to withdraw a limb for.',
+		retryBudget: 'UNCAPPED',
+		retryBudgetRationale:
+			'the same argument as every other column on this row, and the same wedge if it were otherwise: a step whose retries are exhausted is exactly the step someone needs to abandon. Gating the exit on the condition that creates the need for it is the shape RW-0 withdrew a limb for.'
 	}),
 	PruneExecutionStep: spec({
 		commandType: 'PruneExecutionStep',
@@ -304,7 +346,10 @@ export const STEP_COMMAND_SPECS: Readonly<Record<StepCommandType, StepCommandSpe
 		bindingAuthorityRationale: 'prune clears a structurally dead arm; it executes nothing.',
 		inputReadiness: 'NOT_CONSUMING',
 		inputReadinessRationale:
-			'a system prune settles a step the plan’s own branch logic already excluded; it never runs, so it never reads. Its inputs are irrelevant by construction.'
+			'a system prune settles a step the plan’s own branch logic already excluded; it never runs, so it never reads. Its inputs are irrelevant by construction.',
+		retryBudget: 'UNCAPPED',
+		retryBudgetRationale:
+			'a pruned step opens no attempt and never will — the branch that would have reached it was cut. There is no budget to spend on work that is structurally unreachable.'
 	}),
 	EnterExecutionStepWait: spec({
 		commandType: 'EnterExecutionStepWait',
@@ -324,7 +369,10 @@ export const STEP_COMMAND_SPECS: Readonly<Record<StepCommandType, StepCommandSpe
 			'waiting SUSPENDS execution. A running step must be able to record that it is blocked whatever the binding is doing — and parking a step whose binding was just revoked is the CORRECT response, not one to refuse.',
 		inputReadiness: 'NOT_CONSUMING',
 		inputReadinessRationale:
-			'suspending a RUNNING step reads nothing new — the attempt already consumed its inputs when it started.'
+			'suspending a RUNNING step reads nothing new — the attempt already consumed its inputs when it started.',
+		retryBudget: 'UNCAPPED',
+		retryBudgetRationale:
+			'suspension is not termination and emits no ExecutionStepStarted, so the SAME attempt continues across the wait. Nothing is bought here, and charging for it would make a long-running step cost more budget than a fast one for doing identical work.'
 	}),
 	ResolveExecutionStepWait: spec({
 		commandType: 'ResolveExecutionStepWait',
@@ -343,7 +391,10 @@ export const STEP_COMMAND_SPECS: Readonly<Record<StepCommandType, StepCommandSpe
 			'THE SECOND ARROW INTO RUNNING, and the one whose omission was a BLOCKER. A resume re-enters RUNNING, so it re-opens execution against the binding exactly as Start does — this handler’s own docblock already said "resuming re-opens RUNNING, the state in which attempts execute". Anything else makes REVOCATION UNENFORCEABLE for every step that can be parked in WAITING.',
 		inputReadiness: 'REQUIRES_PRESENT_INPUTS',
 		inputReadinessRationale:
-			'THE SECOND CONSUMING ARROW, and the reason this is a column. A resume re-enters RUNNING and the attempt reads the same declared inputs; siting the check in startExecutionStep alone would miss it exactly as the binding limb was missed, which was a BLOCKER proved live.'
+			'THE SECOND CONSUMING ARROW, and the reason this is a column. A resume re-enters RUNNING and the attempt reads the same declared inputs; siting the check in startExecutionStep alone would miss it exactly as the binding limb was missed, which was a BLOCKER proved live.',
+		retryBudget: 'UNCAPPED',
+		retryBudgetRationale:
+			'THE SECOND ARROW INTO RUNNING, AND HERE IT IS CORRECTLY UNCAPPED — which is worth stating because the other two columns on this row are the opposite. A resume emits no ExecutionStepStarted, so it continues the attempt the earlier Start already opened and buys nothing. Treating it as an attempt would double-charge every step that ever waited, and would let a wait/resume cycle exhaust a plan that had run once.'
 	})
 };
 

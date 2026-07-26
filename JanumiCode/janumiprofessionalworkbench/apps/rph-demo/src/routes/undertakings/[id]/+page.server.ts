@@ -32,6 +32,9 @@ import {
 	traceabilityProjector,
 	transitionRows
 } from '@janumipwb/rph-projections';
+// JAN-RETRYCAP (N-12): the kernel's own attempt counter, so this loader supplies the number the ENGINE would
+// compute rather than one that merely agrees with it today.
+import { attemptsMadeFrom } from '@janumipwb/rph-domain';
 import {
 	buildPwaExport,
 	dispatch,
@@ -104,9 +107,21 @@ function buildApplicablePoliciesView(
 		.filter((x) => x.rows.length > 0);
 }
 
-/** Shape one EXECUTION_PLAN aggregate into the pure-view ExecutionPlanInput (steps + transition graph). */
+/**
+ * Shape one EXECUTION_PLAN aggregate into the pure-view ExecutionPlanInput (steps + transition graph).
+ *
+ * `events` is threaded for the FOURTH authority limb (JAN-RETRYCAP / N-12): RPH-EXE-008's cap is decided by a
+ * COUNT of `ExecutionStepStarted`, not by anything on the aggregate, so the plan's own state cannot answer it and
+ * the projection had no way to know a step was exhausted.
+ *
+ * `attemptsMadeFrom` is called PER STEP rather than folded into a map here, deliberately: the counting rule
+ * (Started counts, Retried does not, a wait/resume continues the same attempt) is the engine's, and a map built
+ * locally would be a second copy of it — which is exactly the defect this work package removed one layer down.
+ * The scan is O(steps x events); at demo scale that is cheaper than a divergence.
+ */
 function shapeExecutionPlanInput(
-	pl: ReturnType<typeof listExecutionPlans>[number]
+	pl: ReturnType<typeof listExecutionPlans>[number],
+	events: EngineEvents
 ): ExecutionPlanInput {
 	const asRec = (v: unknown): Record<string, unknown> =>
 		v && typeof v === 'object' ? (v as Record<string, unknown>) : {};
@@ -127,9 +142,14 @@ function shapeExecutionPlanInput(
 				// show a different arm than the engine already committed to.
 				...(s.selectedTransitionId
 					? { selectedTransitionId: String(s.selectedTransitionId as string) }
-					: {})
+					: {}),
+				// N-12: the count the retry cap is decided against, from the SAME kernel function the engine uses.
+				attemptsMade: attemptsMadeFrom(events, pl.id, String((s.id ?? '') as string))
 			};
 		}),
+		// N-12: the RetryPolicy bag verbatim — `retryCapFrom` in the kernel applies the cap convention, so this
+		// loader never decides what "no valid maxAttempts" means.
+		...(pl.state.retryPolicy === undefined ? {} : { retryPolicy: pl.state.retryPolicy }),
 		// DR-004 DWP-01 — the transition graph (empty ⇒ linear). Fed to the flow gate + a future graph view.
 		transitions: (Array.isArray(pl.state.transitions) ? pl.state.transitions : []).map((raw) => {
 			const t = asRec(raw);
@@ -287,7 +307,10 @@ export const load: PageServerLoad = ({ params }) => {
 	// pwuIdSet is the two-hop scope: listPwus(engine, params.id) → the PWU ids → plan.workUnitId ∈ that set (a plan
 	// carries no undertakingId — F-1). The pure view (rph-projections) derives each step's tone + command-backed
 	// affordances; this load() only reads.
-	const planRows: ExecutionPlanInput[] = listExecutionPlans(engine).map(shapeExecutionPlanInput);
+	const planShapingEvents = engine.readAllEvents();
+	const planRows: ExecutionPlanInput[] = listExecutionPlans(engine).map((pl) =>
+		shapeExecutionPlanInput(pl, planShapingEvents)
+	);
 	// JAN-EXECREM WP-15: supply each PWU's workLifecycleState so the affordance projection can apply RPH-PWU-010
 	// too. WP-12b gave the engine a second authority limb — a closed PWU opens no new execution — and a plan on a
 	// closed PWU keeps status ACTIVE, so without this the UI would offer Start on a plan the engine now refuses:

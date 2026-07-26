@@ -38,6 +38,10 @@ import {
 	prunableStepIds,
 	resolveBranchSelection,
 	retryDecision,
+	// JAN-RETRYCAP (N-12): the cap convention and the attempt count are kernel declarations now, so the read-model
+	// can consult the SAME ones rather than deriving its own and agreeing by coincidence.
+	retryCapFrom,
+	attemptsMadeFrom,
 	startStepGate,
 	validateStepCompletion,
 	STEP_COMMAND_SPECS,
@@ -1358,32 +1362,13 @@ export const failExecutionStep: CommandHandler = (ctx, command) => {
 	});
 };
 
-/** The default retry cap when the plan's RetryPolicy carries no valid maxAttempts (the Conformance §12 fixture
- *  value; the RetryPolicy shape itself is Source-TBD, so only a conventional `maxAttempts` key is read). */
-const DEFAULT_MAX_ATTEMPTS = 3;
-
-/** Attempts made for a step = count of ExecutionStepStarted events (each Started = one RUNNING episode = one
- *  attempt; ExecutionStepRetried is a re-queue MARKER, NOT an attempt — JAN-EXECPLAN §19 L3-3). Mirrors the
- *  execution-attempts projection's attempt_number, counted here from the authoritative event log (replay-stable). */
-function attemptsMadeForStep(ctx: HandlerContext, planId: string, stepId: string): number {
-	let n = 0;
-	for (const e of ctx.store.readAllEvents()) {
-		if (
-			e.eventType === 'ExecutionStepStarted' &&
-			e.aggregateId === planId &&
-			(e.payload as { stepId?: string })?.stepId === stepId
-		)
-			n += 1;
-	}
-	return n;
-}
-
-/** The retry cap, read as a CONVENTION on the Source-TBD RetryPolicy bag: a valid positive integer `maxAttempts`,
- *  else DEFAULT. Guards the degenerate values (absent/NaN/0/negative/non-integer — §19 L3-6). */
-function retryCapFor(plan: Record<string, unknown>): number {
-	const raw = (plan.retryPolicy as { maxAttempts?: unknown } | undefined)?.maxAttempts;
-	return typeof raw === 'number' && Number.isInteger(raw) && raw >= 1 ? raw : DEFAULT_MAX_ATTEMPTS;
-}
+// THE COUNTER AND THE CAP BOTH MOVED TO rph-domain (JAN-RETRYCAP / N-12). They used to be private to this file:
+// `attemptsMadeForStep` walked the event log inline under a comment reading "Mirrors the execution-attempts
+// projection's attempt_number", and `retryCapFor` held the DEFAULT and the validity rules. Both are now
+// `attemptsMadeFrom` / `retryCapFrom` in the kernel, for the reason N-12 is a finding at all: `retryDecision` was
+// already shared, but its INPUTS were not, so the read-model could not ask the same question without deriving the
+// facts a second time — and a shared decision fed by re-derived facts is two declarations with a function in
+// between making them look like one. A comment asserting that two copies agree is exactly what R3 had to correct.
 
 /**
  * RetryExecutionStep — a FAILED step -> QUEUED (re-attempt). Two prechecks, in order:
@@ -1411,8 +1396,12 @@ export const retryExecutionStep: CommandHandler = (ctx, command) => {
 			stepState: 'QUEUED'
 		},
 		precheck: (step, plan) => {
-			const attemptsMade = attemptsMadeForStep(ctx, command.targetAggregateId, p.stepId);
-			const maxAttempts = retryCapFor(plan);
+			const attemptsMade = attemptsMadeFrom(
+				ctx.store.readAllEvents(),
+				command.targetAggregateId,
+				p.stepId
+			);
+			const maxAttempts = retryCapFrom(plan.retryPolicy);
 			const decision = retryDecision({
 				attemptsMade,
 				maxAttempts,

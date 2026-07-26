@@ -557,6 +557,71 @@ export function retryDecision(input: RetryInput): RetryDecision {
 	};
 }
 
+/**
+ * The retry cap when the plan's RetryPolicy carries no usable `maxAttempts` (the Conformance §12 fixture value).
+ *
+ * MOVED HERE FROM `rph-application` BY JAN-RETRYCAP (N-12), and the move is the point rather than tidiness.
+ * `retryDecision` is only as shared as its INPUTS: while the default and the validity rules lived privately in the
+ * command handler, any second caller — the read-model, a report, a future controller — had to re-derive "what is
+ * this plan's cap", and would have been free to derive it differently. A shared decision fed by a re-derived fact
+ * is not one declaration; it is two, with a function in between making them look like one.
+ */
+export const DEFAULT_RETRY_CAP = 3;
+
+/**
+ * RPH-EXE-008's cap for a plan, read as a CONVENTION on the Source-TBD RetryPolicy bag.
+ *
+ * `RetryPolicy` has no ratified field list (it is one of the deliberately-opaque helpers — see JAN-CAPBIND
+ * DS-001), so only a conventional `maxAttempts` key is read, and every degenerate value (absent, NaN, 0, negative,
+ * non-integer) falls back to the default rather than producing a cap of zero or a NaN comparison. Fail-SAFE rather
+ * than fail-open: a malformed policy yields the conventional cap, not an unbounded one.
+ */
+export function retryCapFrom(retryPolicy: unknown): number {
+	const raw = (retryPolicy as { maxAttempts?: unknown } | undefined)?.maxAttempts;
+	return typeof raw === 'number' && Number.isInteger(raw) && raw >= 1 ? raw : DEFAULT_RETRY_CAP;
+}
+
+/** The minimum an event must expose for `attemptsMadeFrom` to count it. Structural, so both an engine's stored
+ *  event and a projection's input satisfy it without either package importing the other's types. */
+export interface AttemptCountableEvent {
+	readonly eventType: string;
+	readonly aggregateId: string;
+	readonly payload?: unknown;
+}
+
+/**
+ * Attempts made for a step = count of `ExecutionStepStarted` for that step on that plan.
+ *
+ * ONE DERIVATION, AND IT USED TO BE TWO THAT SAID SO. The engine counted these events inline in
+ * `retryExecutionStep`, under a comment reading *"Mirrors the execution-attempts projection's attempt_number"* —
+ * a second copy whose comment claims it is derived, which is verbatim the `CLOSED_PWU_STATES` shape JAN-REVREM RW-3
+ * had to correct. They agreed, and nothing made them agree. Threading the count out to the read-model for N-12
+ * would have made it THREE, so the count moved here first.
+ *
+ * EACH `Started` IS ONE ATTEMPT (§19 L3-3): one QUEUED→RUNNING episode. `ExecutionStepRetried` is a re-queue
+ * MARKER and is NOT counted — counting it would double-count every retry, and the next `Started` after a retry is
+ * what opens attempt n+1. A wait/resume cycle emits no `Started`, so it continues the SAME attempt and does not
+ * consume the cap.
+ *
+ * Counted from the event log rather than from step state so it is REPLAY-STABLE: the answer is a function of the
+ * stream, identical on every rebuild, and independent of whatever the aggregate happens to have been folded to.
+ */
+export function attemptsMadeFrom(
+	events: Iterable<AttemptCountableEvent>,
+	planId: string,
+	stepId: string
+): number {
+	let n = 0;
+	for (const e of events)
+		if (
+			e.eventType === 'ExecutionStepStarted' &&
+			e.aggregateId === planId &&
+			(e.payload as { stepId?: string } | undefined)?.stepId === stepId
+		)
+			n += 1;
+	return n;
+}
+
 // ============================================================================================
 // Exec != assurance at the execution layer (Property P1 / RPH-PWU-005/007; Contract §35.2)
 // ============================================================================================

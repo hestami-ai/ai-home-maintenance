@@ -378,6 +378,15 @@ corrected me on one substantive ruling and out-engineered me on four mechanical 
 
 ### 5a. **R-B IS WITHDRAWN — I over-authored `scope`.**
 
+> **SPONSOR RULING, 2026-07-26 — the open question below is now CLOSED, in favour of reading (b).** The sponsor
+> accepted policy-by-reference **with its disclosed cost**: `scope` stays unminted, and path- or host-limited grants
+> (*"file-system, but only under `/tmp`"*) are **inexpressible** — not merely unenforced — until a broker is chosen.
+>
+> **What the ruling does NOT settle, so it is not read as settling it:** whether a structured scope is eventually
+> needed. It is deferred, not refused. The shape below was built to accept one **beside** the capability identity
+> without a migration, and that property is now load-bearing rather than merely nice — it is the entire reason this
+> could be ruled on before the broker exists. Reopening it is a ratification act, not a code change.
+
 I derived a `scope` field from §22.1's *"Capability scope must be explicit"*, calling it forced by the corpus. **It is
 not.** That sentence has two readings and I silently took one:
 
