@@ -295,9 +295,12 @@ created by it. A fresh review of a lineage that has just been heavily reworked f
 
 | # | Severity | Statement |
 |---|---|---|
-| **N-11** | **MAJOR** | **`validateProposedPlan` never checks that a step's `runtimeBindingId` resolves to a binding scoped to THAT step, and no command can rewrite it afterwards — so RW-3's SCOPE limb refuses Start on such a step permanently, and its refusal's remedy is INERT.** `plan-proposal.ts:78-102` checks a step's id, `executionPlanId`, `stepState` and `selectedTransitionId`; `PlanProposalStep` does not even declare `runtimeBindingId`. Two steps may therefore name one binding and the plan ACTIVATES. Start on the second is then refused forever by the RW-3 limb, whose message says *"Request a binding for this step"* — an act that mints a new binding **no step names**, because `ProposeExecutionPlan` is the only writer of `steps[]` (`advanceStep` rewrites only `stepState`/`selectedTransitionId`) and `executionStepId` is written once at `runtime-binding.ts:21`. **This is the near-wedge class RW-0 withdrew the §15.3 allowlist limb for, reintroduced by RW-3 on a different axis** — and `plan-proposal.ts:88-95` already refuses an authored NOT_READY step with the *verbatim* rationale ("can never start … permanently blocks plan completion") that applies here. **Refuter correction, and it matters:** it is *not* a dead aggregate. A REPLAN Decision driven to EFFECTIVE authorizes `SkipExecutionStep` (§21.1), `SKIPPED` is terminal-success, and `Fail`/`Supersede` remain — so the cost is a plan that can only be abandoned or skipped past, plus the loss of the already-executed step's credit. That correction is why this is MAJOR and not a BLOCKER. **Fix belongs in `validateProposedPlan`** (refuse at propose, where it is repairable) rather than in the refusal message. |
+| **N-11** | **MAJOR** | **[CLOSED 2026-07-26 by JAN-BINDEXCL WP-1 — the statement below is kept VERBATIM, because a finding rewritten after its fix stops being evidence of what was wrong.]** **`validateProposedPlan` never checks that a step's `runtimeBindingId` resolves to a binding scoped to THAT step, and no command can rewrite it afterwards — so RW-3's SCOPE limb refuses Start on such a step permanently, and its refusal's remedy is INERT.** `plan-proposal.ts:78-102` checks a step's id, `executionPlanId`, `stepState` and `selectedTransitionId`; `PlanProposalStep` does not even declare `runtimeBindingId`. Two steps may therefore name one binding and the plan ACTIVATES. Start on the second is then refused forever by the RW-3 limb, whose message says *"Request a binding for this step"* — an act that mints a new binding **no step names**, because `ProposeExecutionPlan` is the only writer of `steps[]` (`advanceStep` rewrites only `stepState`/`selectedTransitionId`) and `executionStepId` is written once at `runtime-binding.ts:21`. **This is the near-wedge class RW-0 withdrew the §15.3 allowlist limb for, reintroduced by RW-3 on a different axis** — and `plan-proposal.ts:88-95` already refuses an authored NOT_READY step with the *verbatim* rationale ("can never start … permanently blocks plan completion") that applies here. **Refuter correction, and it matters:** it is *not* a dead aggregate. A REPLAN Decision driven to EFFECTIVE authorizes `SkipExecutionStep` (§21.1), `SKIPPED` is terminal-success, and `Fail`/`Supersede` remain — so the cost is a plan that can only be abandoned or skipped past, plus the loss of the already-executed step's credit. That correction is why this is MAJOR and not a BLOCKER. **Fix belongs in `validateProposedPlan`** (refuse at propose, where it is repairable) rather than in the refusal message. |
 > **N-11 IMPLEMENTATION ANALYSIS (2026-07-26) — attempted, REVERTED, and the attempt is worth more than a partial
-> landing.** The fix was built and backed out; the suite is green at HEAD. What it established:
+> landing.** **[Point (3) below is WRONG — corrected under JAN-BINDEXCL further down. Points (1) and (2) held, and
+> (2) is what made the fix safe. The whole entry is kept because deleting the false part would also delete the
+> record that a plausible, carefully-argued analysis can be wrong in one limb and right in two.]** The fix was built
+> and backed out; the suite is green at HEAD. What it established:
 >
 > 1. **The pure half is right and small.** Two steps naming one binding is decidable from the proposal ALONE — a
 >    binding names exactly one step — so `checkBindingExclusivity` belongs in `plan-proposal.ts` beside the sibling
@@ -322,6 +325,78 @@ created by it. A fresh review of a lineage that has just been heavily reworked f
 
 | **N-12** | **MAJOR** | **F-29's FOURTH instance: the read-model does not mirror the RPH-EXE-008 retry cap.** `planPermitsAffordance` gates on exactly three authority columns; the retry cap is a **fourth, purely state-derived** command-layer refusal the projection cannot see, because `ExecutionPlanInput` carries neither `retryPolicy` nor an attempt count. So `retry` is offered on every FAILED step under an ACTIVE plan and open PWU — including one already at the cap — and the click is refused. **The demo's loader already computes `attemptsByStepId` from the same event stream on the same request** (`+page.server.ts:336`) and never passes it. Sharpens the DS §6b table from three instances of "an authority limb was added to the engine and the read-model was not told" to four, and shows the mechanism is **not** confined to the spec-table columns R7 gates on: a refusal derived from event history is invisible to a column-driven filter by construction. |
 | **N-13** | MINOR | **FALSE RECORD inside one object literal.** `conformance-manifest.ts:94-99`'s RPH-EXE family comment still lists **EXE-003** among rules *"implemented as correct, unit-tested kernel functions with NO production caller"* that are *"disclosed in `enforcement-register.ts` with a checked call-site census"* — while the same file's row at `:51` certifies EXE-003 at the COMMAND layer, the same file's note at `:101` says the opposite of its own comment, and `ENFORCEMENT_REGISTER['RPH-EXE-003'].kind === 'ENFORCED'` with **no `referencedOnlyBy` census at all** (that field exists only on `UnenforcedRule`). Stale since JAN-EXEBIND wired the rule. **No gate can catch it:** `enforcement-register.test.ts` reads `coverageFor(id).status` and `.testFile`, never the prose. §7 below already had to correct three artefacts disagreeing about RPH-PWU-010 in exactly this way — so this is that shape recurring in the artefact whose over-claiming started the family. |
+
+### JAN-BINDEXCL, 2026-07-26 — N-11 CLOSED, and the analysis that preceded it was itself wrong in one place
+
+| # | Was | Now |
+|---|---|---|
+| **N-11** | a step could name a binding scoped to another step; the plan activated; Start refused it forever with an inert remedy | **CLOSED (WP-1, `4fd5db98`).** Two halves, split by what each needs to know: **L4** in `plan-proposal.ts` (pure — two steps, one binding, decidable from the proposal alone) and **`rejectMisboundStep`** in `execution.ts` (store — one step, somebody else's binding, asked through the same `bindingAuthorityVerdict` Start and the read-model consult). 20 new cases, 11 of them positive. Mutants `N1`…`N5` all **KILLED**. |
+
+**The propose-time check asks exactly ONE question, and both attempts to make it ask a second were wedges.**
+
+1. The first draft also refused a step naming a binding that does **not resolve**. That looks strictly safer and is
+   a wedge: `RequestRuntimeBinding` carries an `executionStepId`, so a binding for step 2 cannot be requested before
+   step 2 has an id. Refusing the dangling case refuses the ordinary authoring order and leaves none that works.
+   **The fix for a near-wedge nearly shipped a real one.**
+2. Consulting `authorizationStatus` at propose is the same mistake one move later — authorization is also a later
+   act. The verdict is therefore called with the status **omitted** *and* gated on the `WRONG_STEP` limb
+   specifically. Both guards are load-bearing: mutating either alone is equivalent to the fix, which is why mutant
+   `N5` is a deliberate two-line edit rather than a mutant declared knowing it would survive.
+
+> **CORRECTION TO THIS REGISTER'S OWN N-11 IMPLEMENTATION ANALYSIS (recorded 2026-07-26, `939fe281`).** That
+> analysis concluded, as its point (3), that the fix *"makes RW-3's Start-time SCOPE limb unreachable for NEW
+> plans"*, that `exebind` S1/S2 *"must arrange a seeded legacy aggregate rather than route through the bus"*, and it
+> specified the `CommitInput` shape a `seedLegacyPlan_FIXTURE` would need. **That was wrong, and no fixture was
+> written.** Because propose deliberately allows a dangling binding — the anti-wedge above — the misbinding can
+> still be authored **after** the plan is stored. S1 now proposes a plan naming a binding that does not exist yet
+> and then requests it for the *wrong* step; S2 does the same with a phantom step. Both run entirely through
+> `Engine.dispatch`.
+>
+> The consequence is not merely that a fixture was avoided. **The Start-time SCOPE limb's population is live, not
+> historical** — any binding requested after its plan was proposed can name the wrong step — so it is a standing
+> guard, and the register should not have implied otherwise.
+>
+> The error's shape is this programme's recurring one, in its third variant: I inferred a property of the world
+> (*the limb is unreachable*) from a property of the only arrangement I had tried (*I could not reach it the way I
+> first wrote it*).
+
+**New findings raised by this work package:**
+
+| # | Severity | Statement |
+|---|---|---|
+| **N-16** | **MAJOR** | **`bun run test` has executed ZERO tests for every one of the ten packages since JAN-VERIF V-0 — and the file that broke it is the file asserting it was left alone.** `vitest.config.ts`'s header declared: *"`bun run test` — per-package via turbo, resolves DIST. **UNCHANGED.** The artifact gate, and the default precisely because it is the only thing that tests what ships."* Adding that root config falsified the sentence in the same commit (`5131fcd1`): each package's script was a bare `vitest run --passWithNoTests`, and invoked from a package directory it now finds the ROOT config, whose `projects[]` are rooted at the repo root, matches no files for its own CWD, and exits 0. Only `apps/rph-demo` — which owns a config — still ran, so `bun run test` was **104 tests where it claimed to be 1673**. **The instrument built for exactly this was made unreachable by the same change:** `verif/source-resolution.test.ts` already carried the mirror assertion *"If this ever starts failing, the default `test` has silently stopped validating the shipped artifact — which is the one thing it exists to do"*, behind `it.runIf(!SOURCE_RESOLVED)` in a project that existed only in the source-mode config. It had never run. **FIXED and instrumented in the same commit (`14061d47`)**; see below. |
+
+**How N-16 surfaced, because the mechanism generalises and the audit that would have found it does not exist.** Not
+by review. The N-11 fix was designed to refuse the exact arrangement two named tests use, so those two *had* to go
+red — and the run came back **silent** instead. **Green is unfalsifiable unless you already know what it should
+say.** That green had been read dozens of times across three work packages, by the same author who wrote the
+sentence it contradicted.
+
+**What was and was not at risk — measured, not assumed.** No test was ever silently skipped: `test:coverage` runs
+the whole suite through the source config and `gate:fast` invokes it. What was lost is the **artifact** half of
+DS §3-R1's two-mode cross-check — the emit, the `.d.ts` boundary, the export map, `tsconfig.build.json`'s excludes,
+unexercised by any test since `5131fcd1`. On restoration that was measured for the first time: **149 files / 1673
+tests pass against `dist`**, so no build/emit divergence had accumulated. *The exposure was real; the damage was
+none* — and the distinction is worth keeping, because the next such window may not be so lucky.
+
+**The fix is the class, not the instance.** `vitest.projects.ts` holds ONE project list, **derived from the
+filesystem**, shared by both modes — so they cover the same set by construction and a new package cannot be
+silently unmeasured. `passWithNoTests: false` on every project is the general repair: *a runner that observes
+nothing must fail*. The ten vacuous package scripts are **deleted** rather than left green.
+`verif/test-modes.test.ts` asserts the discovery is correct and non-empty, that both modes cover the same set, that
+no project may pass on nothing, that the two modes still resolve **differently** (a pair of identical gates is one
+gate wearing two names), and that no package may re-introduce `--passWithNoTests`. Two of those were **proven live
+by forcing each to fail** — an instrument for a silent-green defect that is only ever observed green is the same
+mistake again.
+
+> **A DEFECT THE LEDGER ALSO CAUGHT, and it belongs to N-11's fix rather than to N-16.** `B6-unresolvable-fails-open`
+> reported UNANCHORED — *"anchor occurs 2x — ambiguous"* — **without its target changing a character**.
+> `rejectMisboundStep` added a second site resolving a binding and checking its `objectType`, at two tabs instead of
+> one, and B6's one-tab anchor is a **substring** of the two-tab line. WP14-M7 had recorded half this rule (tabs
+> disambiguate but rot on reformat); this is the other half — **tabs stop disambiguating the moment a sibling site
+> appears at another depth**. The collision is legitimate and was NOT removed from the production code: both sites
+> ask one question and reach opposite dispositions on purpose (fail-CLOSED at Start, allowed through at propose),
+> and collapsing them into a shared helper would hide exactly the asymmetry `N3` exists to protect.
 
 > **CORRECTION (2026-07-25) — two entries in this section were WRONG, and wrong in the reassuring direction.**
 >
