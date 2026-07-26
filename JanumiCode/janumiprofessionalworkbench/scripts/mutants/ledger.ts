@@ -75,6 +75,15 @@ export interface DeclaredMutant {
 	 * compiles reports SURVIVED and fails the build.
 	 */
 	readonly expectNoCompile?: string;
+	/**
+	 * Set when the mutation is expected to SURVIVE, because it edits something behaviour cannot depend on — a
+	 * rationale string, a comment. Such an entry is a CONTROL: its survival proves the suite is not failing
+	 * spuriously, and a KILL is the finding, because a test that reddens on a prose change is asserting on prose.
+	 *
+	 * Without this field an INERT mutation is indistinguishable from an UNTESTED GUARD, and the harvest produced
+	 * several: a rationale-string edit and an invalid-enum edit both reported SURVIVED and both looked like defects.
+	 */
+	readonly expectSurvive?: string;
 }
 
 export const DECLARED_MUTANTS: readonly DeclaredMutant[] = [
@@ -619,8 +628,10 @@ export const DECLARED_MUTANTS: readonly DeclaredMutant[] = [
 		replace:
 			"\t\teventType: 'ExecutionStepCancelled',\n\t\tplanLiveness: 'CLEANUP_EXEMPT',\n\t\tactivePlanRationale:\n\t\t\t'MUTANT: cancel is CLEANUP.",
 		expectRed: [],
-		why: 'harvested from a work-package harness that recorded no one-line rationale',
-		source: 'wp12b_mutants.py'
+		why: 'A CONTROL, not a guard test — see expectSurvive. Its TITLE is the original harness intent, which this mutation never expressed.',
+		source: 'wp12b_mutants.py',
+		expectSurvive:
+			'Edits the activePlanRationale PROSE only (INTENTIONAL -> MUTANT). No behaviour reads that string, so survival is CORRECT and proves the suite is not failing spuriously. Investigated only after it was reported as a SURVIVED defect — it never mutated the guard its title names.'
 	},
 	{
 		id: 'WP12B-M4 the plan-liveness limb never fires',

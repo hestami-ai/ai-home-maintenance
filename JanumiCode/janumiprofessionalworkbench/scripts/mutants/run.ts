@@ -31,7 +31,8 @@ type Verdict =
 	| 'TYPE_PREVENTED'
 	| 'NO_COMPILE'
 	| 'KILLED_UNNAMED'
-	| 'ABORTED_DIRTY';
+	| 'ABORTED_DIRTY'
+	| 'CONTROL_HELD';
 
 interface Result {
 	readonly mutant: DeclaredMutant;
@@ -106,7 +107,22 @@ function runMutant(m: DeclaredMutant): Result {
 	// the verdict is KILLED_UNNAMED rather than KILLED. Weaker evidence, honestly labelled, beats no evidence — and
 	// it beats GUESSING a victim, which is precisely how a mutant comes to "pass" for the wrong reason.
 	const unnamed = m.expectRed.length === 0;
-	const target = unnamed ? [pkgOf(m.file)] : [...m.expectRed];
+	// `MUTANTS_TARGET` overrides the suite selection for an investigation — e.g. asking whether a rph-domain mutant
+	// that survived its OWN package is caught by rph-application's command-layer tests. Kept as an env override
+	// rather than a ledger field so it can never silently become part of a recorded verdict.
+	const override = process.env.MUTANTS_TARGET;
+	let target: string[];
+	if (override !== undefined && override !== '') target = [override];
+	// UNNAMED VICTIMS RUN THE WHOLE WORKSPACE, and the first attempt at this was WRONG in a way worth recording.
+	// It scoped them to `pkgOf(m.file)` — the mutant's own package — and two rph-domain mutants duly "SURVIVED".
+	// Both were then killed immediately by rph-application. Of course they were: THE CENTRAL FACT OF THIS CODEBASE
+	// IS THAT DOMAIN PREDICATES ARE ENFORCED AT THE COMMAND LAYER, so a pure predicate's real tests live in another
+	// package. Scoping a domain mutant to domain tests reproduces F-28 — a pure-predicate assertion accepted as
+	// evidence for a command-layer rule — inside the instrument built to detect F-28.
+	//
+	// An empty target list means "every project", which is slower and correct.
+	else if (unnamed) target = [];
+	else target = [...m.expectRed];
 
 	writeFileSync(JOURNAL, m.file, 'utf8');
 	writeFileSync(abs, original.replace(m.find, m.replace), 'utf8');
@@ -135,6 +151,18 @@ function runMutant(m: DeclaredMutant): Result {
 
 		const run = sh('bunx', ['vitest', 'run', ...target]);
 		const out = `${run.stdout ?? ''}${run.stderr ?? ''}`;
+		// A mutation declared `expectSurvive` is a CONTROL: it edits something behaviour cannot depend on — a
+		// rationale string, a comment — so its survival proves the suite is not failing spuriously. For those,
+		// survival is the PASS and a KILL is the finding, because a test that reddens when only prose changed is
+		// asserting on prose.
+		if (m.expectSurvive !== undefined)
+			return run.status === 0
+				? { mutant: m, verdict: 'CONTROL_HELD', detail: m.expectSurvive.slice(0, 88) }
+				: {
+						mutant: m,
+						verdict: 'SURVIVED',
+						detail: 'declared a CONTROL, but a test FAILED on it — something asserts on prose'
+					};
 		if (run.status === 0) return { mutant: m, verdict: 'SURVIVED', detail: summarise(out) };
 		return { mutant: m, verdict: unnamed ? 'KILLED_UNNAMED' : 'KILLED', detail: summarise(out) };
 	} finally {
@@ -219,7 +247,8 @@ for (const v of [
 	'UNANCHORED',
 	'NO_COMPILE',
 	'KILLED_UNNAMED',
-	'ABORTED_DIRTY'
+	'ABORTED_DIRTY',
+	'CONTROL_HELD'
 ] as const)
 	console.log(`${v.padEnd(11)} ${by(v).length}`);
 
