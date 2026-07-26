@@ -1,0 +1,9 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "type": "string",
+  "enum": [
+    "BRANCH_DECISION",
+    "DEAD_PREDECESSOR"
+  ],
+  "$id": "urn:janumi:rph:schema:enum:PruneCause:1"
+}

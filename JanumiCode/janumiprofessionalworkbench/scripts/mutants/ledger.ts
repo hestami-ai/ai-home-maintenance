@@ -443,6 +443,40 @@ export const DECLARED_MUTANTS: readonly DeclaredMutant[] = [
 		why: 'OVER-refusal: an AUTHORIZED binding stops affording Start, which withholds the action on every correctly-authorized step',
 		source: 'RW-6 inline'
 	},
+	// ── JAN-REVREM RW-7: prune provenance for the NON-BRANCH cut (N-8) ────────────────────────────────────────
+	{
+		id: 'P1-dead-predecessor-arm-continues-again',
+		file: 'packages/rph-domain/src/transition-gate.ts',
+		// THE PRE-RW-7 BEHAVIOUR, restored exactly: fall through to `continue` instead of reporting the cause. If this
+		// survives, N-8 can return silently — a prune event once again indistinguishable in content from a waived skip.
+		find: "\t\t\t\tif (IRRECOVERABLE_TERMINAL.has(step.stepState))\n\t\t\t\t\treturn {\n\t\t\t\t\t\tcause: 'DEAD_PREDECESSOR',\n\t\t\t\t\t\tdeadStepId: source,\n\t\t\t\t\t\tdeadStepState: step.stepState,\n\t\t\t\t\t\t...excluded\n\t\t\t\t\t};",
+		replace: '\t\t\t\tif (false as boolean) return undefined;',
+		expectRed: ['packages/rph-domain/src/revrem-wp7-prune-provenance-cause.test.ts'],
+		why: 'N-8 ITSELF: a step cut by a CANCELLED/SUPERSEDED predecessor emits provenance-free ExecutionStepPruned, byte-identical in content to a waived skip',
+		source: 'RW-7 inline'
+	},
+	{
+		id: 'P2-branch-source-reported-as-dead-predecessor',
+		file: 'packages/rph-domain/src/transition-gate.ts',
+		// THE ORDER PROOF. Never reporting BRANCH_DECISION means a settled branch's recorded selection is discarded and
+		// the cut is attributed to the branch merely being terminal — the more specific fact lost to the less.
+		find: "\t\t\t\tif (step.stepType === 'BRANCH')",
+		replace: '\t\t\t\tif (false as boolean)',
+		expectRed: ['packages/rph-domain/src/revrem-wp7-prune-provenance-cause.test.ts'],
+		why: 'ORDER: BRANCH must be checked FIRST, so a CANCELLED branch still reports its recorded selection rather than being downgraded to DEAD_PREDECESSOR',
+		source: 'RW-7 inline'
+	},
+	{
+		id: 'P3-pending-source-invents-a-cause',
+		file: 'packages/rph-domain/src/transition-gate.ts',
+		// OVER-attribution: a FAILED source is REOPENABLE, so its edge is PENDING and it has excluded nothing YET.
+		// Removing the disposition gate names a cause for a decision nobody has made — the fabrication R10 forbids.
+		find: "\t\t\t\tif (ctx.localOf(edge) !== 'NEUTRALIZED') continue;",
+		replace: "\t\t\t\tif (ctx.localOf(edge) === '__never__') continue;",
+		expectRed: ['packages/rph-domain/src/revrem-wp7-prune-provenance-cause.test.ts'],
+		why: 'a PENDING in-edge must yield NO provenance: nothing has decided, so naming a cause would be a fabrication',
+		source: 'RW-7 inline'
+	},
 	{
 		id: 'F1-remove-incoherence-floor',
 		file: 'packages/rph-domain/src/transition-gate.ts',

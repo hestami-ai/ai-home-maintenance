@@ -54,6 +54,9 @@ const branchPlan = (sourceType = 'BRANCH'): GatePlan => ({
 describe('WP-14 / F-37 — pruneProvenance derives the cut, and refuses to guess', () => {
 	it('names the branch, the arm it TOOK, and the arm that was CUT', () => {
 		expect(pruneProvenance(branchPlan(), 's2', guardFalse)).toEqual({
+			// RW-7 (N-8): provenance now NAMES its cause. Updated because the type changed by DESIGN
+			// (DS-001 §6c R10), and the assertion is stronger for it — a cause going missing now fails here.
+			cause: 'BRANCH_DECISION',
 			branchStepId: 's1',
 			selectedEdgeId: 't13',
 			excludedEdgeId: 't12'
@@ -64,6 +67,9 @@ describe('WP-14 / F-37 — pruneProvenance derives the cut, and refuses to guess
 		// s4's only in-edge comes from s2 — another DEAD step, not from the branch. Reading immediate in-edges
 		// would find provenance for the first step of a dead arm and nothing for the rest of it.
 		expect(pruneProvenance(branchPlan(), 's4', guardFalse)).toEqual({
+			// RW-7 (N-8): provenance now NAMES its cause. Updated because the type changed by DESIGN
+			// (DS-001 §6c R10), and the assertion is stronger for it — a cause going missing now fails here.
+			cause: 'BRANCH_DECISION',
 			branchStepId: 's1',
 			selectedEdgeId: 't13',
 			excludedEdgeId: 't12'

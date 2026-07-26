@@ -4761,6 +4761,26 @@
 					"required": false,
 					"type": "string",
 					"note": "JAN-EXECREM WP-1 (F-37). id-ref: the in-edge whose exclusion made this step unreachable — prune provenance DERIVED by the gate, never asserted by the caller. This is the fact that justifies minting a distinct event instead of reusing ExecutionStepSkipped; the shipped build dropped it. WP-14 emits it."
+				},
+				{
+					"field": "cause",
+					"required": false,
+					"type": "enum",
+					"enumRef": "PruneCauseSchema",
+					"note": "JAN-REVREM RW-7 (N-8). WHY the step became unreachable. Before RW-7 a DEAD_PREDECESSOR prune emitted {stepId, stepState:'SKIPPED'} and nothing else — indistinguishable in content from a waived skip. OPTIONAL, AND THE FIRST RULING GOT THIS WRONG: DS-001 §6c R11 declared it REQUIRED on the reasoning that provenance is derived rather than caller-asserted, so no external producer could break. That overlooked the consumer that matters — REPLAY. Every ExecutionStepPruned already written by an earlier build carries no cause, and a required field makes the schema unable to describe events this system itself wrote. JAN-EXECREM WP-1's invariant says so in as many words ('absent-legal, so no existing caller or STORED EVENT becomes invalid') and its test caught the collision on the first run. The guarantee that every prune WE emit names its cause is enforced at the PRODUCER instead, asserted by execrem-wp14-provenance.test.ts for both causes and proved by ledger mutant P1."
+				},
+				{
+					"field": "deadPredecessorStepId",
+					"required": false,
+					"type": "string",
+					"note": "JAN-REVREM RW-7 (N-8). id-ref, cause=DEAD_PREDECESSOR only: the predecessor that reached an IRRECOVERABLE terminal state and can therefore never conduct, making this step structurally dead. Absent on a BRANCH_DECISION prune (R12: the three BRANCH fields keep their exact meaning and stay absent on the new case, so an existing consumer learns nothing NEW rather than something FALSE)."
+				},
+				{
+					"field": "deadPredecessorStepState",
+					"required": false,
+					"type": "enum",
+					"enumRef": "StepStateSchema",
+					"note": "JAN-REVREM RW-7 (N-8). cause=DEAD_PREDECESSOR only: WHICH irrecoverable terminal state killed the arm — CANCELLED or SUPERSEDED. Carried because it is the auditor's next question and the gate already holds it at the moment it decides; recovering it later means replaying the stream to find out."
 				}
 			]
 		},

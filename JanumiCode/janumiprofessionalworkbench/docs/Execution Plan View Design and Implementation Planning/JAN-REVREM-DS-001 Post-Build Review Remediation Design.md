@@ -192,6 +192,88 @@ store gets an affordance set that disagrees with the engine, and only the engine
 same trust boundary every other input to this projection sits behind, and it is why the engine check is **not**
 removed — this adds a filter, it does not relocate a guard.
 
+## 6c. RW-7 — the N-8 ruling: what a NON-BRANCH cut records
+
+N-8 was re-opened because A-3 was recorded CLOSED and is not. It was left needing *"a ruling on what a non-branch
+cut should record, which is design work, not a patch."* This is that ruling.
+
+**Reproduced live before ruling on it, because the register's own note says the reachability claim was contested:**
+
+```
+plan: s1 --t12--> s2(CANCELLED) --t23--> s3(QUEUED)
+prunableStepIds(plan)  -> ['s3']          the gate offers the prune
+pruneProvenance(s3)    -> undefined       and can say nothing about why
+```
+
+So `ExecutionStepPruned` for `s3` carries `{ stepId, stepState: 'SKIPPED' }` — **byte-identical in content to a
+waived skip**, which is precisely the conflation DR-004 §19-M1 minted a distinct event to prevent (*"do not conflate
+a system prune with a user waiver"*). The header claim that a non-BRANCH cut is "unreachable through an authorable
+plan" is false: `CancelExecutionStep` is a live command and `transition-gate-disposition.test.ts:67-82` builds this
+exact plan to assert the prune is offered. **The fixture proving reachability and the comment denying it are in the
+same package.**
+
+### The actual defect is the TYPE, not the walk
+
+`PruneProvenance` is `{ branchStepId, selectedEdgeId?, excludedEdgeId? }` — **branch-shaped**. A non-branch cut has
+no branch and no selected edge; it has a *predecessor that can never conduct*. `pruneProvenance` correctly declines
+to fabricate a `branchStepId` for it, and then has nothing it is allowed to say. The walk is not wrong; the vocabulary
+it must speak in cannot express what happened.
+
+### Ruling R10 — provenance becomes CAUSE-discriminated, and the cause is named
+
+```
+PruneProvenance =
+  | { cause: 'BRANCH_DECISION';  branchStepId: string; selectedEdgeId?: string; excludedEdgeId?: string }
+  | { cause: 'DEAD_PREDECESSOR'; deadStepId: string;   deadStepState: string;   excludedEdgeId?: string }
+```
+
+`DEAD_PREDECESSOR` carries `deadStepState` — `CANCELLED` or `SUPERSEDED` — because *which* irrecoverable terminal
+state killed the arm is the auditor's next question, and it is already in the gate's hands at the moment it decides.
+
+**Rejected: reusing `branchStepId` for the dead predecessor.** It is the cheap fix and it makes the record lie — a
+field named `branchStepId`, read by every consumer as a branch, holding a step that is not one. That is the
+`CLOSED_PWU_STATES` failure in record form: a name asserting something the value does not honour. Worse here,
+because an event stream is the audit trail, and a misnamed field in it is undetectable after the fact.
+
+**Rejected: emitting nothing and disclosing it.** That is the status quo, and the status quo is the finding. A prune
+event indistinguishable from a waived skip defeats the only reason the event type exists.
+
+### Ruling R11 — the event gains the two fields, as an AUTHORED extension, recorded
+
+`ExecutionStepPruned` is `UNRATIFIED-AUTHORED` by this lineage (m3 `sourceSection`, 2026-07-22, DR-004 DWP-03), so
+extending its payload is within this programme's authority rather than a corpus question — unlike N-5, which is
+escalated precisely because it would invent semantics the corpus withholds. It gains `cause` (required),
+`deadPredecessorStepId` and `deadPredecessorStepState` (both optional). Recorded in `JAN-EXECREM-RESIDUALS.md` §1 as
+an authored contract addition, with the reason.
+
+~~`cause` is **required** deliberately. Optional would let a producer emit provenance that names no cause — which is
+the shape this whole finding is about — and `PruneProvenance` is DERIVED by the gate, never asserted by a caller, so
+there is no external producer to break.~~
+
+**CORRECTED DURING IMPLEMENTATION — the ruling above was wrong, and an existing test caught it on the first run.**
+`cause` is **OPTIONAL**. The argument for required considered producers and forgot the consumer that matters:
+**replay.** Every `ExecutionStepPruned` already written by an earlier build carries no `cause`, so a required field
+makes the schema unable to describe events *this system itself wrote*. JAN-EXECREM WP-1 states the invariant in as
+many words — *"absent-legal, so no existing caller or **stored event** becomes invalid"* — and
+`execrem-wp1-fields.test.ts` went red immediately.
+
+The guarantee is not weakened, only relocated: **the schema describes what a valid event may look like across every
+version of the system; the producer guarantees what THIS version emits.** Every prune this engine emits names its
+cause, asserted at the engine layer for both causes in `execrem-wp14-provenance.test.ts` and proved by ledger mutant
+`P1`. Enforcing it in the schema instead would have bought nothing that the producer test does not already buy, at
+the price of making historical streams unreadable.
+
+Recorded rather than quietly amended, because "I reasoned about producers and forgot replay" is the same shape as
+the absence-of-evidence error this lineage has now made eight times — a conclusion drawn from the part of the system
+I was looking at.
+
+### Ruling R12 — the existing three provenance fields keep their meaning exactly
+
+`selectedByBranchStepId` / `selectedEdgeId` / `excludedEdgeId` continue to mean what they mean, and remain absent on a
+`DEAD_PREDECESSOR` prune. Any consumer reading them today keeps working; it simply learns nothing about the new case,
+which is strictly better than learning something false. This is the constraint that makes R10 an extension rather
+than a migration.
+
 ## 7. Enumerated behaviour changes
 
 `ResolveExecutionStepWait` on a step whose binding is not `AUTHORIZED`/`PARTIALLY_AUTHORIZED` → **REFUSED**

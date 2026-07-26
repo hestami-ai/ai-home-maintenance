@@ -32,6 +32,7 @@ import {
 	ObservationDispositionSchema,
 	ObservationTypeSchema,
 	ProfessionalWorkObjectTypeSchema,
+	PruneCauseSchema,
 	RecompositionContractStatusSchema,
 	ShapeIntegrityStateSchema,
 	StepStateSchema,
@@ -1131,7 +1132,10 @@ export const ExecutionStepPrunedPayloadSchema = z.strictObject({
 	selectedByBranchStepId: z.string().optional(),
 	selectedEdgeId: z.string().optional(),
 	stepState: StepStateSchema,
-	excludedEdgeId: z.string().optional()
+	excludedEdgeId: z.string().optional(),
+	cause: PruneCauseSchema.optional(),
+	deadPredecessorStepId: z.string().optional(),
+	deadPredecessorStepState: StepStateSchema.optional()
 });
 export type ExecutionStepPrunedPayload = z.infer<typeof ExecutionStepPrunedPayloadSchema>;
 export const ExecutionStepFailedPayloadSchema = z.strictObject({

@@ -14,6 +14,7 @@ JAN-EXECREM + JAN-EXEBIND (80 agents; 19 distinct confirmed defects).*
 | **RW-4** | *(added by the second review)* The finding-#7 floor RW-2 wrongly refused | BLOCKER (2nd review) | RW-3 |
 | **RW-5** | *(added by the second review)* The stale records RW-0/RW-3 left | 16 findings (2nd review) | RW-4 |
 | **RW-6** | *(added 2026-07-26)* The read-model's THIRD authority limb — MAJOR #5, which C-3 disclosed rather than closed | MAJOR #5 | RW-5 |
+| **RW-7** | *(added 2026-07-26)* Prune provenance for the NON-BRANCH cut — N-8, re-opened because A-3 was recorded closed and is not | N-8 | RW-6 |
 
 **RW-0 first and alone.** It carries the only BLOCKER and the only shipped regression, both introduced the same
 day. Nothing else in this roadmap is urgent; batching them behind it would delay the fix that matters and make
@@ -151,6 +152,45 @@ the column is genuinely the source).
 
 That last row is the one worth having. Two implementations that happen to agree are indistinguishable from one shared
 declaration *until something changes*, and a mutation of the declaration is the only thing that asks the question.
+
+## 4c. RW-7 — prune provenance for the non-BRANCH cut (DS §6c, R10–R12)
+
+**Step 1 — the contract.** `m3-commands-events.json`, `ExecutionStepPruned`: add `cause` (required, enum
+`BRANCH_DECISION | DEAD_PREDECESSOR`), `deadPredecessorStepId` and `deadPredecessorStepState` (optional). Add the
+`PruneCause` enum to `canonical-vocabulary.json`. `bun run gen`. The `sourceSection` note gains the RW-7 rationale —
+the field is authored, and the record has to say by whom and why.
+
+**Step 2 — the type.** `PruneProvenance` in `transition-gate.ts` becomes the two-arm union of R10. This is a
+**breaking type change** for its one consumer (`execution.ts`'s prune handler), which is the point: the compiler
+enumerates every site that assumed a branch.
+
+**Step 3 — the walk.** `pruneProvenance` currently `continue`s past a non-BRANCH source. It instead returns
+`{ cause: 'DEAD_PREDECESSOR', deadStepId: source, deadStepState, excludedEdgeId }` when the live source is
+irrecoverably terminal. The BRANCH arm returns `cause: 'BRANCH_DECISION'` and is otherwise untouched (R12).
+
+Note the ORDER: a BRANCH source is checked FIRST, so a cancelled BRANCH still reports `BRANCH_DECISION` with its
+recorded selection — the more specific fact, and the one an auditor can act on.
+
+**Step 4 — the handler.** Switch on `cause` when composing the event payload. `excludedEdgeId` stays where it is.
+
+### Kill tests — `revrem-wp7-prune-provenance-cause.test.ts` (rph-domain)
+
+1. The N-8 repro (`s1 → s2(CANCELLED) → s3`): provenance is `DEAD_PREDECESSOR`, `deadStepId: 's2'`,
+   `deadStepState: 'CANCELLED'`, `excludedEdgeId: 't23'`. **Currently `undefined` — this is the finding.**
+2. Same with `s2` SUPERSEDED ⇒ `deadStepState: 'SUPERSEDED'`. The state is reported, not assumed.
+3. The BRANCH case is **unchanged**: `cause: 'BRANCH_DECISION'`, same `branchStepId` / `selectedEdgeId` /
+   `excludedEdgeId` as before RW-7 (R12).
+4. A **cancelled BRANCH** reports `BRANCH_DECISION`, not `DEAD_PREDECESSOR` — the order proof.
+5. A step cut TWO hops below a cancelled predecessor still reports it (the transitive walk, which mutant `WP14-M4`
+   guards).
+6. A step excluded by a PENDING source gets **no** provenance — nothing has decided yet, and inventing a cause here
+   would be the fabrication R10 exists to avoid.
+7. The emitted `ExecutionStepPruned` event carries `cause` (an engine-level test, so the payload is proved rather
+   than the derivation alone) — otherwise this is F-31's shape again: derived correctly, dropped on the way out.
+
+New ledger mutants: make the non-BRANCH arm `continue` again (⇒ 1, 2, 5 RED — the pre-RW-7 behaviour, so the finding
+cannot silently return); report `DEAD_PREDECESSOR` for a BRANCH source (⇒ 3, 4 RED); report `DEAD_PREDECESSOR` for a
+PENDING source (⇒ 6 RED).
 
 ## 5. Gate
 

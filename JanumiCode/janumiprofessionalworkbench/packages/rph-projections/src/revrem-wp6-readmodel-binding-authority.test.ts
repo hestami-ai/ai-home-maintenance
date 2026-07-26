@@ -14,6 +14,7 @@
 import { describe, expect, it } from 'vitest';
 import {
 	planAffordancesFor,
+	plansForPwus,
 	executionPlanView,
 	type ExecutionStepInput,
 	type StepBindingFacts
@@ -139,6 +140,61 @@ describe('RW-6 — the gate follows the COLUMN, not a hardcoded pair of affordan
 		expect(
 			controlFor(queuedStep({ resolves: true, boundStepId: STEP, authorizationStatus: 'DENIED' }))
 		).toEqual(['skip', 'cancel']);
+	});
+});
+
+describe('RW-6 — plansForPwus ATTACHES the facts, which is how the production caller supplies them', () => {
+	// The projection gating correctly is worth nothing if the caller never hands it the facts — that would be closing
+	// MAJOR #5 on paper. `plansForPwus` is the seam the demo's load() goes through, keyed by BINDING id because the
+	// binding is the object the caller looks up.
+	const row = (runtimeBindingId?: string, runtimeBinding?: StepBindingFacts) => ({
+		id: 'exp_1',
+		workUnitId: 'pwu_1',
+		status: 'ACTIVE',
+		steps: [
+			{
+				id: STEP,
+				stepType: 'AI_TASK',
+				purpose: 'p',
+				stepState: 'QUEUED',
+				...(runtimeBindingId === undefined ? {} : { runtimeBindingId }),
+				...(runtimeBinding === undefined ? {} : { runtimeBinding })
+			}
+		]
+	});
+	const advance = (
+		r: ReturnType<typeof row>,
+		facts: Readonly<Record<string, StepBindingFacts>> = {}
+	) => plansForPwus([r], ['pwu_1'], {}, facts)[0]!.steps[0]!.advanceCommands;
+
+	it('attaches a matching binding’s facts and gates on them', () => {
+		expect(
+			advance(row('bind_x'), {
+				bind_x: { resolves: true, boundStepId: STEP, authorizationStatus: 'REQUESTED' }
+			})
+		).not.toContain('start');
+	});
+
+	it('leaves a step whose binding is ABSENT FROM THE MAP ungated — not resolved is not unauthorized', () => {
+		expect(advance(row('bind_unknown'), { bind_x: { resolves: true } })).toEqual(['start']);
+	});
+
+	it('does not invent facts for a step naming no binding', () => {
+		expect(advance(row(undefined), { bind_x: { resolves: false } })).toEqual(['start']);
+	});
+
+	it('lets the ROW win over the map, so an explicit fact is never overwritten by a lookup', () => {
+		// The row is the more specific statement. If the map could override it, a caller could not express "I have
+		// already resolved this one differently" — and the two sources would silently disagree.
+		expect(
+			advance(row('bind_x', { resolves: true, boundStepId: STEP, authorizationStatus: 'AUTHORIZED' }), {
+				bind_x: { resolves: false }
+			})
+		).toEqual(['start']);
+	});
+
+	it('passing NO map changes nothing, including for steps that name bindings', () => {
+		expect(advance(row('bind_x'))).toEqual(['start']);
 	});
 });
 

@@ -94,6 +94,10 @@ describe('validate', () => {
 		// DR-004 DWP-04 (Tier 3C-ii): EnterExecutionStepWait + ResolveExecutionStepWait commands and the MINTED
 		// ExecutionStepWaitResolved event — the WAITING state and its RUNNING resume become reachable and replayable
 		// (ExecutionStepWaiting already existed with no command able to emit it). (+3 → 322.)
-		expect(buildContractRegistry().ids()).toHaveLength(322);
+		// then +1 for JAN-REVREM RW-7 (N-8): +1 enum PruneCause, discriminating prune provenance so a DEAD_PREDECESSOR
+		// cut is distinguishable from a BRANCH_DECISION one — and from a waived skip, which was the finding. No new
+		// command or event: ExecutionStepPruned gains three payload fields, which do not carry their own registry ids.
+		// (+1 → 323.)
+		expect(buildContractRegistry().ids()).toHaveLength(323);
 	});
 });

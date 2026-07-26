@@ -30,6 +30,7 @@ import {
 	evaluateGuardExpression,
 	planEvidencesExecutionSuccess,
 	pruneProvenance,
+	type PruneProvenance,
 	prunableStepIds,
 	resolveBranchSelection,
 	retryDecision,
@@ -1395,6 +1396,39 @@ export const cancelExecutionStep: CommandHandler = (ctx, command) => {
  * cannot be bypassed by reaching SKIPPED through some other command, and needs no persisted flag (which also means
  * plans written by earlier builds read correctly). Exec != assurance (INV-5): the prune moves only stepState.
  */
+/**
+ * Render derived prune provenance into event-payload fields, switching on its CAUSE (JAN-REVREM RW-7 / N-8).
+ *
+ * A SWITCH RATHER THAN A SPREAD, because the two causes carry disjoint fields and the discriminated union is what
+ * makes the compiler say so. Before RW-7 this was an inline spread reading `provenance.branchStepId`, which is
+ * precisely why the DEAD_PREDECESSOR case could not be added without the type being widened first: there was nowhere
+ * to put it, so `pruneProvenance` returned `undefined` and the emitted event carried no provenance at all —
+ * indistinguishable in content from a waived skip.
+ *
+ * R12: the three BRANCH fields keep their exact meaning and stay ABSENT on a DEAD_PREDECESSOR prune. An existing
+ * consumer therefore learns nothing NEW about the new case rather than something FALSE about it.
+ */
+function prunePayloadProvenance(provenance: PruneProvenance | undefined): Record<string, unknown> {
+	if (provenance === undefined) return {};
+	const excluded =
+		provenance.excludedEdgeId === undefined ? {} : { excludedEdgeId: provenance.excludedEdgeId };
+	if (provenance.cause === 'BRANCH_DECISION')
+		return {
+			cause: provenance.cause,
+			selectedByBranchStepId: provenance.branchStepId,
+			...(provenance.selectedEdgeId === undefined
+				? {}
+				: { selectedEdgeId: provenance.selectedEdgeId }),
+			...excluded
+		};
+	return {
+		cause: provenance.cause,
+		deadPredecessorStepId: provenance.deadStepId,
+		deadPredecessorStepState: provenance.deadStepState,
+		...excluded
+	};
+}
+
 export const pruneExecutionStep: CommandHandler = (ctx, command) => {
 	const p = command.payload as { stepId: string };
 	// JAN-EXECREM WP-14 / F-37 — prune provenance is DERIVED from the graph that AUTHORIZED the prune.
@@ -1420,17 +1454,7 @@ export const pruneExecutionStep: CommandHandler = (ctx, command) => {
 		spec: STEP_COMMAND_SPECS.PruneExecutionStep,
 		eventPayload: {
 			stepId: p.stepId,
-			...(provenance === undefined
-				? {}
-				: {
-						selectedByBranchStepId: provenance.branchStepId,
-						...(provenance.selectedEdgeId === undefined
-							? {}
-							: { selectedEdgeId: provenance.selectedEdgeId }),
-						...(provenance.excludedEdgeId === undefined
-							? {}
-							: { excludedEdgeId: provenance.excludedEdgeId })
-					}),
+			...prunePayloadProvenance(provenance),
 			stepState: 'SKIPPED'
 		},
 		precheck: (_step, plan) => {

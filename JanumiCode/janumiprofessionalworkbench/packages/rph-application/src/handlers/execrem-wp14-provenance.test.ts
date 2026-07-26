@@ -273,6 +273,10 @@ describe('JAN-EXECREM WP-14 — binding + prune provenance are DERIVED, never as
 		ok(dispatch('PruneExecutionStep', { stepId: sid(2) }), 'prune the dead arm');
 		expect(eventsOf('ExecutionStepPruned')[0]!.payload).toEqual({
 			stepId: sid(2),
+			// JAN-REVREM RW-7 (N-8): the payload now NAMES its cause. This assertion changed because the contract
+			// changed by design (DS-001 §6c R11), not to make a red test go away — and it is stronger for it: a prune
+			// whose cause went missing would now fail here rather than pass with three of four fields.
+			cause: 'BRANCH_DECISION',
 			selectedByBranchStepId: sid(1),
 			selectedEdgeId: tid(1, 3), // the arm the branch TOOK
 			excludedEdgeId: tid(1, 2), // the arm that was CUT — the one s2 hangs off
@@ -288,11 +292,54 @@ describe('JAN-EXECREM WP-14 — binding + prune provenance are DERIVED, never as
 		ok(dispatch('PruneExecutionStep', { stepId: sid(4) }), 'prune the downstream');
 		expect(eventsOf('ExecutionStepPruned')[0]!.payload).toEqual({
 			stepId: sid(4),
+			cause: 'BRANCH_DECISION',
 			selectedByBranchStepId: sid(1),
 			selectedEdgeId: tid(1, 3),
 			excludedEdgeId: tid(1, 2),
 			stepState: 'SKIPPED'
 		});
+	});
+
+	it('RW-7 / N-8: a step cut by a CANCELLED predecessor records DEAD_PREDECESSOR, through the ENGINE', () => {
+		// TEST 7 OF THE RW-7 BATTERY, and it is at the engine layer on purpose. The domain battery proves the walk
+		// DERIVES the new cause; this proves the handler EMITS it. Keeping only the first would be F-31's exact shape
+		// — provenance derived correctly and dropped on the way out — which is a defect this very file exists to have
+		// closed once already.
+		//
+		// A LINEAR plan, not `branchPlan()`: no BRANCH anywhere, so nothing can supply a BRANCH_DECISION and the
+		// DEAD_PREDECESSOR arm is the only thing that could possibly answer.
+		activate(
+			[mkStep(1), mkStep(2), mkStep(3)],
+			[
+				{
+					id: tid(1, 2),
+					executionPlanId: PLAN,
+					sourceStepId: sid(1),
+					targetStepId: sid(2),
+					transitionType: 'SEQUENTIAL'
+				},
+				{
+					id: tid(2, 3),
+					executionPlanId: PLAN,
+					sourceStepId: sid(2),
+					targetStepId: sid(3),
+					transitionType: 'SEQUENTIAL'
+				}
+			]
+		);
+		ok(
+			dispatch('CancelExecutionStep', { stepId: sid(2), reason: 'abandoning this arm' }),
+			'cancel the middle step'
+		);
+		ok(dispatch('PruneExecutionStep', { stepId: sid(3) }), 'prune below the cancelled step');
+		const payload = eventsOf('ExecutionStepPruned')[0]!.payload as Record<string, unknown>;
+		expect(payload.cause).toBe('DEAD_PREDECESSOR');
+		expect(payload.deadPredecessorStepId).toBe(sid(2));
+		expect(payload.deadPredecessorStepState).toBe('CANCELLED');
+		expect(payload.excludedEdgeId).toBe(tid(2, 3));
+		// R12: the BRANCH fields stay ABSENT rather than being filled with something false.
+		expect(Object.hasOwn(payload, 'selectedByBranchStepId')).toBe(false);
+		expect(Object.hasOwn(payload, 'selectedEdgeId')).toBe(false);
 	});
 
 	it('THE ARGUED DISPOSITION, PINNED: a caller may NOT assert prune provenance either', () => {

@@ -74,6 +74,16 @@
       "note": "M1 mandatory-exactly-one; M+ mandatory-one-or-more; C1 conditional-zero-or-one; C+ conditional-zero-or-more. Presentation shorthands with executable min/max semantics; the structured applicability predicate for C* is deferred (free-text note for now)."
     },
     {
+      "name": "PruneCause",
+      "appliesTo": "ExecutionStepPruned.cause — WHY a step became unreachable, discriminating the provenance the gate derives (PruneProvenance)",
+      "values": [
+        "BRANCH_DECISION",
+        "DEAD_PREDECESSOR"
+      ],
+      "canonicalSource": "UNRATIFIED-AUTHORED (2026-07-26, JAN-REVREM RW-7 / DS-001 §6c R10-R11). ExecutionStepPruned is itself UNRATIFIED-AUTHORED by this lineage (2026-07-22, JAN-EXECPLAN-DR-004 DWP-03), so extending its payload is within this programme's authority rather than a corpus question. Ratification pending. Cited: DOC-002 §26.4, ExecutionStep.stepState machine.",
+      "note": "BRANCH_DECISION: a settled BRANCH's recorded selection excluded this step — carries selectedByBranchStepId / selectedEdgeId. DEAD_PREDECESSOR: a predecessor reached an IRRECOVERABLE terminal state (CANCELLED / SUPERSEDED) and can never conduct, so the arm below it is structurally dead — carries deadPredecessorStepId / deadPredecessorStepState. ADDED BECAUSE THE SECOND CASE HAD NO VOCABULARY: pruneProvenance returned undefined for it, so the event carried only {stepId, stepState:'SKIPPED'} — byte-identical in CONTENT to a waived skip, which is exactly the conflation DR-004 §19-M1 minted a distinct event to prevent (finding N-8). Reusing selectedByBranchStepId for a non-BRANCH predecessor was rejected: a field named for a branch, holding a step that is not one, makes the audit trail lie."
+    },
+    {
       "name": "ExecutionBoundary",
       "appliesTo": "PwuType.executionBoundary — where a PWU Type's work is discharged relative to the authoring organization's accountability scope (JAN-PRPWA-DS-001 STD-2, R-9)",
       "values": [

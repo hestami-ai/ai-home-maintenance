@@ -633,7 +633,9 @@ export function prunableStepIds(plan: GatePlan, evaluateGuard?: EdgeGuardEvaluat
  * which is what actually cut it. On a two-armed branch they are complementary; on a wider one they are not, and
  * an auditor needs both to reconstruct the decision from the stream alone.
  */
-export interface PruneProvenance {
+export interface BranchDecisionProvenance {
+	/** WHY: a settled BRANCH's recorded decision excluded this step. */
+	readonly cause: 'BRANCH_DECISION';
 	/** The settled BRANCH whose recorded decision cut this step off. */
 	readonly branchStepId: string;
 	/** The out-edge that BRANCH actually selected — its recorded decision. */
@@ -641,6 +643,43 @@ export interface PruneProvenance {
 	/** The not-taken out-edge on whose subgraph this step sits — the CUT. */
 	readonly excludedEdgeId?: string;
 }
+
+/**
+ * WHY: a predecessor reached an IRRECOVERABLE terminal state and can therefore never conduct, so everything below it
+ * is structurally dead (JAN-REVREM RW-7 / finding N-8).
+ *
+ * THIS ARM DID NOT EXIST, and its absence was the finding. `pruneProvenance` bailed on any non-BRANCH source, so
+ * pruning a step below a CANCELLED predecessor emitted `{ stepId, stepState: 'SKIPPED' }` and nothing else —
+ * byte-identical in CONTENT to a waived skip, which is exactly the conflation DR-004 §19-M1 minted a distinct event
+ * to prevent. The walk was not wrong; the vocabulary it had to speak in could not express what happened.
+ *
+ * The header claim that this case is "unreachable through an authorable plan" was FALSE:
+ * `transition-gate-disposition.test.ts` builds `s1 → s2(CANCELLED) → s3` and asserts the prune IS offered. The
+ * fixture proving reachability and the comment denying it were in the same package.
+ */
+export interface DeadPredecessorProvenance {
+	readonly cause: 'DEAD_PREDECESSOR';
+	/** The predecessor that can never conduct — CANCELLED or SUPERSEDED. */
+	readonly deadStepId: string;
+	/** WHICH irrecoverable terminal state killed the arm. Carried because it is the auditor's next question, and the
+	 *  gate holds it at the moment it decides — recovering it later means replaying the stream to find out. */
+	readonly deadStepState: string;
+	/** The in-edge off that dead predecessor — the CUT. */
+	readonly excludedEdgeId?: string;
+}
+
+/**
+ * DISCRIMINATED BY CAUSE (RW-7 / DS-001 §6c R10), because the two cuts are not the same fact wearing different
+ * fields. A branch cut has a decision and a taken arm; a dead-predecessor cut has neither — it has a step that can
+ * never conduct.
+ *
+ * REUSING `branchStepId` FOR THE DEAD PREDECESSOR WAS REJECTED, and that is the whole ruling. It is the cheap fix
+ * and it makes the record LIE: a field named for a branch, read by every consumer as a branch, holding a step that
+ * is not one. That is the `CLOSED_PWU_STATES` failure in record form — a name asserting something the value does not
+ * honour — and it is worse here, because an event stream IS the audit trail and a misnamed field in it is
+ * undetectable after the fact.
+ */
+export type PruneProvenance = BranchDecisionProvenance | DeadPredecessorProvenance;
 
 /**
  * WHY is `stepId` prunable — which branch decision excluded it, and through which edge (JAN-EXECREM WP-14 / F-37)?
@@ -676,17 +715,36 @@ export function pruneProvenance(
 			if (source === undefined) continue; // a plan-entry edge cuts nothing
 			if (live.has(source)) {
 				// A live source with a dead target: this edge is a CUT. Attribute it only when the source actually
-				// DECIDED — a PENDING or non-branch source has excluded nothing yet.
+				// DECIDED — a PENDING source has excluded nothing yet, so naming a cause here would be a fabrication.
 				if (ctx.localOf(edge) !== 'NEUTRALIZED') continue;
 				const step = stepOf(ctx, source);
-				if (step?.stepType !== 'BRANCH') continue;
-				return {
-					branchStepId: source,
-					...(step.selectedTransitionId === undefined
-						? {}
-						: { selectedEdgeId: step.selectedTransitionId }),
-					...(edge.id === undefined ? {} : { excludedEdgeId: edge.id })
-				};
+				if (step === undefined) continue;
+				const excluded = edge.id === undefined ? {} : { excludedEdgeId: edge.id };
+				// BRANCH IS CHECKED FIRST, deliberately (RW-7): a CANCELLED **branch** still reports
+				// BRANCH_DECISION with its recorded selection, because that is the more specific fact and the one an
+				// auditor can act on. Ordering it the other way would silently downgrade every branch cut whose branch
+				// was later cancelled.
+				if (step.stepType === 'BRANCH')
+					return {
+						cause: 'BRANCH_DECISION',
+						branchStepId: source,
+						...(step.selectedTransitionId === undefined
+							? {}
+							: { selectedEdgeId: step.selectedTransitionId }),
+						...excluded
+					};
+				// THE ARM RW-7 ADDED (N-8). A non-BRANCH source whose edge is NEUTRALIZED reached an irrecoverable
+				// terminal state — that is the only way `localOf` returns NEUTRALIZED for a non-branch real source —
+				// so the subgraph below it is structurally dead. This used to `continue`, walk off the end of the
+				// frontier, and return undefined, leaving the emitted event indistinguishable from a waived skip.
+				if (IRRECOVERABLE_TERMINAL.has(step.stepState))
+					return {
+						cause: 'DEAD_PREDECESSOR',
+						deadStepId: source,
+						deadStepState: step.stepState,
+						...excluded
+					};
+				continue;
 			}
 			if (!seen.has(source)) {
 				seen.add(source);

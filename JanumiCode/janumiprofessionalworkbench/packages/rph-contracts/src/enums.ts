@@ -609,6 +609,10 @@ export const ProfessionalWorkObjectTypeSchema = z.enum([
 ]);
 export type ProfessionalWorkObjectType = z.infer<typeof ProfessionalWorkObjectTypeSchema>;
 
+/** ExecutionStepPruned.cause — WHY a step became unreachable, discriminating the provenance the gate derives (PruneProvenance) — UNRATIFIED-AUTHORED (2026-07-26, JAN-REVREM RW-7 / DS-001 §6c R10-R11). ExecutionStepPruned is itself UNRATIFIED-AUTHORED by this lineage (2026-07-22, JAN-EXECPLAN-DR-004 DWP-03), so extending its payload is within this programme's authority rather than a corpus question. Ratification pending. Cited: DOC-002 §26.4, ExecutionStep.stepState machine. */
+export const PruneCauseSchema = z.enum(['BRANCH_DECISION', 'DEAD_PREDECESSOR']);
+export type PruneCause = z.infer<typeof PruneCauseSchema>;
+
 /** RecompositionContract.status — RPH-DOC-002 §14 (8 values) */
 export const RecompositionContractStatusSchema = z.enum([
 	'DRAFT',
@@ -861,6 +865,7 @@ export const CANONICAL_ENUM_SCHEMAS = {
 	OriginType: OriginTypeSchema,
 	OutboxStatus: OutboxStatusSchema,
 	ProfessionalWorkObjectType: ProfessionalWorkObjectTypeSchema,
+	PruneCause: PruneCauseSchema,
 	RecompositionContractStatus: RecompositionContractStatusSchema,
 	RequiredForDispositions: RequiredForDispositionsSchema,
 	'WorkRiskProfile.consequence': RiskConsequenceSchema,

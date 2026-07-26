@@ -29,7 +29,8 @@
     "build": "tsc -p tsconfig.build.json",
     "check-types": "tsc --noEmit -p tsconfig.json",
     "test": "vitest run --passWithNoTests",
-    "gen": "bun run src/gen/gen-enums.ts && bun run src/gen/gen-objects.ts && bun run src/gen/gen-messages.ts && bun run src/gen/emit.ts",
+    "gen": "bun run src/gen/gen-enums.ts && bun run src/gen/gen-objects.ts && bun run src/gen/gen-messages.ts && bun run src/gen/emit.ts && bun run gen:format",
+    "gen:format": "prettier --write --log-level warn src/enums.ts src/messages.ts src/objects.ts",
     "gen:enums": "bun run src/gen/gen-enums.ts",
     "gen:objects": "bun run src/gen/gen-objects.ts",
     "gen:messages": "bun run src/gen/gen-messages.ts"
