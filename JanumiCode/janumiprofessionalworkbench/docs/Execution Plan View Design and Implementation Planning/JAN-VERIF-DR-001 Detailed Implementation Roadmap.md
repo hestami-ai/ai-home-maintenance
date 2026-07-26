@@ -369,6 +369,29 @@ The last one is the reason the proof asserts **module identity**: two copies of 
 
 ---
 
-*`DELIVERED` / v1.0.0 — V-0, V-1, V-2a, V-2b, V-2b′, V-2c all landed. Both ratchets armed and proven live. The one
-work package still open is **V-2d (branch gaps)**, which is deliberately last: not one of the 36 findings confirmed
-across two adversarial reviews was a coverage gap.*
+## 7. What the armed instrument found in its first day of real use
+
+The ratchets went live mid-session and were immediately exercised by JAN-REVREM RW-6/RW-7. **Both fired, and both
+were right** — which is the only evidence that matters about a gate:
+
+| fired | on | verdict |
+|---|---|---|
+| coverage | 94.47% vs the 94.5% floor | **Correct.** Three uncovered paths in code written minutes earlier, including `facts.authorizationStatus === undefined` in RW-6's extracted verdict — a cell **neither caller can reach**, because both always pass a string. The floor was not lowered; the paths were covered, and merged coverage ended *higher* than before (94.60 / 83.13). |
+| mutation | 6 `UNANCHORED` | **Correct, and the rot was mine.** RW-6's own roadmap step 3 says these anchors must move "in the same commit … doing it in a later commit is how the ledger rots." I wrote that and skipped it. |
+| mutation | `B6` `SURVIVED` | **The most valuable single verdict this instrument has produced.** RW-6 replaced a narrowing early-return with `(binding?.state ?? {})`, so nothing below required `binding` to be *proven* — and the fail-OPEN on an unresolvable authority became **expressible** for the first time since JAN-EXEBIND. No test failed. Nothing else on any axis was red. A guarantee had silently gone from *cannot be written* to *is currently tested*. |
+
+`B6` is the entry V-1 created after noticing that a mutant which refuses to compile is **evidence** rather than a
+broken mutant. `expectNoCompile` has now paid for itself twice: once by recording a type-level guarantee nobody had
+written down, and once by catching its removal in a commit that was green everywhere else.
+
+**Authoritative measurement after all of it:** `96 entries → 82 distinct mutations · KILLED 32 · KILLED_UNNAMED 46 ·
+TYPE_PREVENTED 2 · CONTROL_HELD 2 · DUPLICATE 10 · RETIRED 4 · SURVIVED 0 · UNANCHORED 0 · NO_COMPILE 0 ·
+ABORTED_DIRTY 0.` Tree verified clean.
+
+---
+
+*`DELIVERED` / v1.1.0 — V-0, V-1, V-2a, V-2b, V-2b′, V-2c all landed. Both ratchets armed, proven live by forcing
+each to fail, and since validated by firing correctly three times on real work. The one work package still open is
+**V-2d (branch gaps)**, deliberately last: not one of the 36 findings confirmed across two adversarial reviews was a
+coverage gap — and the three defects the armed instrument found in its first day were a missing test, ledger rot, and
+a lost type guarantee, none of them a coverage gap either.*
