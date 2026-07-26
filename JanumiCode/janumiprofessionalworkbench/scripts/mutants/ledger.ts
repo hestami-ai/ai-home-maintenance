@@ -1609,5 +1609,18 @@ export const DECLARED_MUTANTS: readonly DeclaredMutant[] = [
 		expectRed: ['packages/rph-application/src/handlers/partauth-derived-outcome.test.ts'],
 		why: 'the state that is CHECKED must be the state that is COMMITTED — one derivation, used everywhere',
 		source: 'JAN-PARTAUTH WP-1'
+	},
+	{
+		id: 'S1-the-schema-manifest-silently-shrinks',
+		file: 'packages/rph-contracts/src/gen/schema-manifest.ts',
+		// N-14's shape as a mutation: the enumeration quietly covers fewer artifacts. Before the manifest was shared,
+		// this was UNDETECTABLE — the drift suite read one file out of 107 and would have passed on any subset. It is
+		// caught in two independent ways now: the count floor, and the stale-artifact check, which sees 90-odd
+		// committed files the manifest no longer claims.
+		find: '\tfor (const entry of Object.values(OBJECT_SCHEMAS))',
+		replace: '\tfor (const entry of Object.values(OBJECT_SCHEMAS).slice(0, 0))',
+		expectRed: ['packages/rph-contracts/src/json-schema.test.ts'],
+		why: 'the drift check must be TOTAL over the committed artifacts — a shrinking enumeration is how "we check them all" becomes "we check one"',
+		source: 'JAN-BINDEXCL N-14'
 	}
 ];
