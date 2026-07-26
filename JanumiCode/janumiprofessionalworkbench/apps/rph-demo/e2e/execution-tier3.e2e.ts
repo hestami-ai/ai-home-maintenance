@@ -156,15 +156,45 @@ test.describe('Execution tab — plan-terminal states + attempt history (DWP-05)
 		};
 		await cycle(); // retry 1 (attemptsMade=1) → proceeds
 		await cycle(); // retry 2 (attemptsMade=2) → proceeds
-		// 3rd cycle: start+fail, then the retry is refused with the exhaustion actions.
+		// 3rd cycle: start+fail. The step is now AT the cap.
 		await grp.getByTestId('step-action-start').click();
 		await grp.getByTestId('step-action-fail').click();
-		await grp.getByTestId('step-action-retry').click();
 
-		const err = page.getByTestId('exec-error');
-		await expect(err).toBeVisible();
-		await expect(err).toContainText('RPH-EXE-008');
-		await expect(err).toContainText('CHANGE_TACTIC'); // a permitted control action, verbatim
+		// ── REWRITTEN BY JAN-RETRYCAP (N-12), AND THE REWRITE IS THE POINT ────────────────────────────────────
+		//
+		// This case used to CLICK retry here and assert the engine's rejection text. That click was N-12 itself:
+		// the read-model offered an affordance the engine refuses, and this test encoded the violation as its
+		// evidence. The button is now correctly withheld, so the click cannot be made.
+		//
+		// But withholding the button also withheld the EXPLANATION — those actions were named only in the refusal
+		// nobody now sees. So the view carries them, and this asserts them WITHOUT a rejected dispatch, which is
+		// strictly better evidence: it no longer requires the engine to refuse a click that should never have been
+		// offered.
+		await expect(grp.getByTestId('step-action-retry')).toHaveCount(0);
+		const note = grp.getByTestId('step-retry-exhausted');
+		await expect(note).toBeVisible();
+		await expect(note).toContainText('RPH-EXE-008');
+		await expect(note).toContainText('CHANGE_TACTIC'); // a permitted control action, verbatim
+		// …and the exit survives: cancel is CLEANUP_EXEMPT on every column, so exhaustion never strands the step.
+		await expect(grp.getByTestId('step-action-cancel')).toBeVisible();
+	});
+
+	test('below the cap, no exhaustion notice is shown — the notice is not decoration', async ({
+		page,
+		request
+	}) => {
+		// The over-refusal half. A template that rendered the notice unconditionally would satisfy the case above
+		// while telling every operator their retries are exhausted from the first failure.
+		const undertakingId = await stageActivePlan(request);
+		await gotoHydrated(page, `/undertakings/${undertakingId}`);
+		await page.getByRole('button', { name: 'execution' }).click();
+		const grp = page.getByTestId('exec-pwu-group').filter({ hasText: 'Tier-3 plan PWU' });
+
+		await grp.getByTestId('step-action-start').click();
+		await grp.getByTestId('step-action-fail').click();
+
+		await expect(grp.getByTestId('step-action-retry')).toBeVisible();
+		await expect(grp.getByTestId('step-retry-exhausted')).toHaveCount(0);
 	});
 
 	// JAN-EXECREM WP-15 / F-29. DWP-06 declares "No affordance the engine would reject", and RETRY violated it:

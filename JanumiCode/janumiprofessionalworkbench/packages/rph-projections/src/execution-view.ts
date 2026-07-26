@@ -181,6 +181,19 @@ export interface ExecutionStepView {
 	readonly controlCommands: readonly StepControlCommand[];
 	/** Below the domain's driveable floor (NOT_READY/READY — the initial state, no advance command) — F-11. */
 	readonly belowQueued: boolean;
+	/**
+	 * Present when RPH-EXE-008's retry cap is REACHED — the actions the controller must choose among instead.
+	 *
+	 * WHY THE VIEW CARRIES THIS AT ALL. N-12's fix stops offering `retry` at the cap, and those actions were named
+	 * ONLY inside the engine's rejection message — which an operator now never sees, because the click that
+	 * produced it is gone. A button that silently vanishes is a worse answer than one that refuses with a reason.
+	 * The actions come from the same `retryDecision` call that withheld the affordance, so the notice and the
+	 * withholding can never disagree.
+	 *
+	 * ABSENT means NOT EXHAUSTED — including "the caller supplied no attempt count", which is the same disclosed
+	 * fail-open as the affordance itself. It never means "unknown, render a warning anyway".
+	 */
+	readonly retryExhaustion?: { readonly permittedControlActions: readonly string[] };
 }
 
 export interface ExecutionPlanView {
@@ -467,13 +480,25 @@ function stepView(
 	pwuWorkLifecycleState?: string,
 	retryPolicy?: unknown
 ): ExecutionStepView {
+	const retry = retryContextFor(s, retryPolicy);
 	const afforded = planAffordancesFor(
 		planStatus,
 		s.stepState,
 		pwuWorkLifecycleState,
 		bindingContextFor(s),
-		retryContextFor(s, retryPolicy)
+		retry
 	);
+	// ── WITHHOLDING THE AFFORDANCE MUST NOT ALSO WITHHOLD THE REASON ───────────────────────────────────────────
+	//
+	// N-12's fix removes `retry` at the cap — and the exhaustion actions RPH-EXE-008 prescribes were named ONLY in
+	// the engine's rejection message, which an operator now never sees, because the click that produced it is gone.
+	// A silently vanishing button is a worse answer than a refused one: it tells the operator nothing about what to
+	// do instead, and this codebase's standing rule is that a refusal names a remedy the engine can perform.
+	//
+	// So the view carries what the refusal used to say. Same `retryDecision` call, same permitted actions, sourced
+	// from the ratified kernel rather than restated in a template — and available WITHOUT requiring the engine to
+	// reject a click the read-model should never have offered.
+	const exhausted = retry ? retryDecision(retry) : undefined;
 	const base: ExecutionStepView = {
 		id: s.id,
 		stepType: s.stepType,
@@ -485,7 +510,12 @@ function stepView(
 		tone: stepStateTone(s.stepState),
 		advanceCommands: afforded.advance,
 		controlCommands: afforded.control,
-		belowQueued: isBelowQueued(s.stepState)
+		belowQueued: isBelowQueued(s.stepState),
+		// Present ONLY when the cap has actually been reached — absent means "not exhausted", never "unknown", so a
+		// caller cannot render an exhaustion notice for a step that still has attempts left.
+		...(exhausted?.mustSelectAlternateAction
+			? { retryExhaustion: { permittedControlActions: exhausted.permittedControlActions } }
+			: {})
 	};
 	// Preserve the optional runtimeBindingId only when present (exactOptionalPropertyTypes-friendly).
 	return s.runtimeBindingId === undefined

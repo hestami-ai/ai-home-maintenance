@@ -352,6 +352,19 @@
 										     enforces, read from the same declaration. Four sibling affordances each grew their own copy
 										     of this condition here; RETRY never got one, and nothing made that omission visible. A
 										     condition in the template is a sixth copy of a rule the engine already owns. -->
+										<!-- RPH-EXE-008 (JAN-RETRYCAP / N-12). The retry button is withheld at the cap because the
+										     engine would refuse it — and these actions used to be named ONLY in that refusal, which
+										     nobody sees now that the click is gone. The list comes from the read-model, which got it
+										     from the same `retryDecision` that withheld the button, so the notice and the withholding
+										     cannot disagree. Not a condition on stepState or attempt counts: the presence of the
+										     field IS the condition. -->
+										{#if s.retryExhaustion}
+											<span class="mini muted" data-testid="step-retry-exhausted">
+												RPH-EXE-008: retry cap reached — select {s.retryExhaustion.permittedControlActions.join(
+													', '
+												)}
+											</span>
+										{/if}
 										{#each s.controlCommands as ctl (ctl)}
 											<form method="POST" action="?/{STEP_CONTROL_ACTION[ctl]}" use:enhance class="inlineform">
 												<input type="hidden" name="planId" value={pl.id} />
