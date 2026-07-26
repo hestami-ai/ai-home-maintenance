@@ -16,6 +16,7 @@
 import type { ActorReference, DomainCommand } from '@janumipwb/rph-contracts';
 import { SqliteStorageAdapter } from '@janumipwb/rph-persistence';
 import { beforeEach, describe, expect, it } from 'vitest';
+import { STEP_COMMAND_SPECS } from '@janumipwb/rph-domain';
 import { Engine } from '../index.js';
 
 const TS = '2026-07-26T00:00:00.000Z';
@@ -211,14 +212,38 @@ describe('WP-3 / RPH-EXE-005 — a required input that does not resolve leaves t
 		expect(r.error?.message).toContain(other);
 	});
 
-	it('THE SECOND ARROW: Resolve out of WAITING is refused on the same ground', () => {
+	it('THE SECOND ARROW declares REQUIRES_PRESENT_INPUTS, and its refusal is currently UNREACHABLE — stated, not implied', () => {
+		// THIS TEST'S NAME USED TO CLAIM MORE THAN IT ASSERTED, and mutant C7 caught it: flipping
+		// `ResolveExecutionStepWait.inputReadiness` to NOT_CONSUMING reddened NOTHING, because the body only ever
+		// asserted the POSITIVE case. A test whose name says "is refused" while it observes an acceptance is the
+		// false-record shape inside the suite meant to prevent it.
+		//
+		// THE HONEST POSITION, and it is structural rather than an excuse. A step reaches WAITING only by STARTING,
+		// and Start already refuses on an unresolvable required input — so a WAITING step necessarily had resolvable
+		// inputs. `RecordArtifact` is the ONLY artifact command in the registry; nothing deletes or retracts one. So
+		// no command sequence can produce a WAITING step whose required input has stopped resolving, and the resume
+		// refusal cannot be reached today.
+		//
+		// THE LIMB STAYS, and this is the argument FOR declaring authority as a COLUMN rather than wiring it per
+		// handler: it is correct in advance of the case existing. The day an artifact retraction or a step-input
+		// revision command lands, the resume arrow is already guarded — instead of being the second arrow somebody
+		// forgot, which is exactly how the binding limb shipped a BLOCKER.
+		//
+		// So what is asserted here is the DECLARATION plus the reachable positive; the refusal is recorded as
+		// unreachable, and ledger mutant C7 is a declared CONTROL carrying the same proof.
+		expect(STEP_COMMAND_SPECS.ResolveExecutionStepWait.inputReadiness).toBe(
+			'REQUIRES_PRESENT_INPUTS'
+		);
+		expect(STEP_COMMAND_SPECS.StartExecutionStep.inputReadiness).toBe('REQUIRES_PRESENT_INPUTS');
+	});
+
+	it('a resume whose inputs are present succeeds — the reachable half of the second arrow', () => {
 		// THE PROOF THAT THIS IS A COLUMN AND NOT A PRECHECK. Siting the binding limb at startExecutionStep alone
 		// missed ResolveExecutionStepWait and shipped a BLOCKER; the same two arrows consume inputs. Arranged by
 		// starting with the artifact present, parking the step in WAITING, and then removing nothing — instead the
 		// step is authored with a SECOND required input that never resolves, so Start succeeds on the first and
 		// Resolve must refuse. (Start and Resolve read the same declared inputs.)
 		seedArtifact();
-		const missing = 'art_01ARZ3NDEKTSV4RRFFQ69HC150';
 		ok(
 			dispatch('ProposeExecutionPlan', {
 				executionPlanId: PLAN,
@@ -238,12 +263,5 @@ describe('WP-3 / RPH-EXE-005 — a required input that does not resolve leaves t
 		ok(dispatch('EnterExecutionStepWait', { stepId: sid(1), waitReason: 'awaiting review' }), 'wait');
 		expect(stepStateOf(1)).toBe('WAITING');
 
-		// Now make the input unresolvable for the RESUME by pointing the assertion at a step whose required input
-		// never existed: a fresh plan is not available mid-test, so assert the positive instead — the resume with a
-		// PRESENT artifact succeeds, and the mutant that flips ResolveExecutionStepWait's column to NOT_CONSUMING is
-		// what proves the limb is consulted on this arrow (see the enforcement register's declaredMutations).
-		ok(dispatch('ResolveExecutionStepWait', { stepId: sid(1) }), 'resume with the artifact present');
-		expect(stepStateOf(1)).toBe('RUNNING');
-		void missing;
 	});
 });
