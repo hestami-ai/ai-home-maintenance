@@ -10,7 +10,7 @@ JAN-EXECREM + JAN-EXEBIND (80 agents; 19 distinct confirmed defects).*
 | **RW-0** | Binding authority becomes a COLUMN; the allowlist limb is withdrawn | **BLOCKER #1**, MAJOR #2, MAJOR #3, MAJOR #9, MINOR #14, MINOR #18 | — |
 | **RW-1** | Read-model fidelity: prune gating, derived closed-PWU set | MAJOR #4, #5, #6 | RW-0 |
 | **RW-2** | The four false records + the vacuous tests | MAJOR #7, #8, #10, #6-record; MINOR #17 | RW-1 |
-| **RW-3** | Binding SCOPE (MAJOR #2) + remaining MINORs | MAJOR #2; MINOR #12, #13, #15, #16, #19 | RW-2 |
+| **RW-3** | Binding SCOPE (MAJOR #2) ~~+ remaining MINORs~~ | MAJOR #2; ~~MINOR #12, #13, #15, #16, #19~~ | RW-2 |
 | **RW-4** | *(added by the second review)* The finding-#7 floor RW-2 wrongly refused | BLOCKER (2nd review) | RW-3 |
 | **RW-5** | *(added by the second review)* The stale records RW-0/RW-3 left | 16 findings (2nd review) | RW-4 |
 | **RW-6** | *(added 2026-07-26)* The read-model's THIRD authority limb — MAJOR #5, which C-3 disclosed rather than closed | MAJOR #5 | RW-5 |
@@ -19,6 +19,29 @@ JAN-EXECREM + JAN-EXEBIND (80 agents; 19 distinct confirmed defects).*
 **RW-0 first and alone.** It carries the only BLOCKER and the only shipped regression, both introduced the same
 day. Nothing else in this roadmap is urgent; batching them behind it would delay the fix that matters and make
 the diff unreviewable — which is finding N-7's lesson from four hours ago.
+
+### CORRECTION (2026-07-26) — the MINOR row above was a FALSE RECORD, and the MINORs are worse than open
+
+RW-3's row claimed `MINOR #12, #13, #15, #16, #19`. **RW-3's own commit message (`0c093449`) says the opposite:**
+*"STILL OPEN and not silently dropped: MAJOR #5 …; **the 8 MINORs**; N-8 …"*. The plan said RW-3 would carry them,
+RW-3 said it had not, and the plan was never corrected — so this table has read as five closed MINORs for three
+commits. That is the fifth-plus false record in this lineage, and the first one produced by the *planning* table
+rather than by a work package's own claim.
+
+**And the MINORs cannot be worked, because they have no statements.** Searching the whole corpus for `MINOR #12`…
+`#19` returns exactly three hits, all of them *this table* and one aside in DS-001 §6 about `#14`. The review that
+found them recorded *counts* — "24 confirmed (19 distinct: 1 BLOCKER, 10 MAJOR, 8 MINOR)" — and the eight MINOR
+findings themselves were never written down anywhere. Eight ordinals with no content is not a backlog; it is the
+memory of having had one.
+
+**Ruling R13 — do not guess them, and do not carry them as if they were actionable.** Reconstructing eight findings
+from their numbers would produce eight plausible items unrelated to what was actually found, and closing *those*
+would retire the ordinals while leaving the real defects in place — the exact substitution this programme exists to
+stop, applied to its own backlog. The ordinals are struck from the plan and the disposition is recorded honestly:
+**whatever those eight were, they must be RE-DERIVED by a fresh adversarial review, not remembered.**
+
+The mitigation is procedural and belongs with N-7's: **a review's findings are written into the register before its
+counts are quoted anywhere.** A count is a summary of a record; here the summary outlived the record.
 
 ## 2. RW-0 — the fix, and why it is a column and not a second call site
 
