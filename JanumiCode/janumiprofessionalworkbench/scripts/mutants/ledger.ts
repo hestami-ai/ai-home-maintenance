@@ -564,24 +564,24 @@ export const DECLARED_MUTANTS: readonly DeclaredMutant[] = [
 		find: "\t\tinputReadiness: 'REQUIRES_PRESENT_INPUTS',\n\t\tinputReadinessRationale:\n\t\t\t'THE SECOND CONSUMING ARROW",
 		replace:
 			"\t\tinputReadiness: 'NOT_CONSUMING',\n\t\tinputReadinessRationale:\n\t\t\t'THE SECOND CONSUMING ARROW",
-		expectRed: [],
-		why: 'A DECLARED CONTROL over a structurally unreachable fail-safe — see expectSurvive. Kept because a limb that is correct IN ADVANCE of its case existing is the entire argument for declaring authority as a column.',
-		source: 'JAN-CAPBIND WP-3',
-		expectSurvive:
-			'The resume refusal cannot be reached, and the proof is structural. A step reaches WAITING only by ' +
-			'STARTING, and Start already refuses on an unresolvable required input — so a WAITING step necessarily ' +
-			'had resolvable inputs. `RecordArtifact` is the ONLY artifact command in the registry (verified against ' +
-			'registry.ts): nothing deletes, retracts or supersedes one, and no command rewrites a step’s ' +
-			'inputBindings after propose. So no sequence produces a WAITING step whose required input has stopped ' +
-			'resolving. ' +
-			'THIS MUTANT EARNED ITS KEEP BY SURVIVING: my WP-3 battery had a case NAMED "Resolve out of WAITING is ' +
-			'refused on the same ground" whose body only asserted the POSITIVE resume — a test claiming more than it ' +
-			'observed, which is the false-record shape inside the suite meant to prevent it. C7 reddened nothing and ' +
-			'exposed it. The case is now named for what it checks and asserts the DECLARATION on STEP_COMMAND_SPECS ' +
-			'instead. ' +
-			'NOT DELETED: the day an artifact retraction or a step-input revision command lands, the resume arrow is ' +
-			'already guarded — rather than being the second arrow somebody forgot, which is precisely how the ' +
-			'binding limb shipped a BLOCKER.'
+		// IT SURVIVED AT FIRST, AND THAT WAS THE FINDING. My WP-3 battery had a case NAMED "Resolve out of WAITING is
+		// refused on the same ground" whose body only asserted the POSITIVE resume — a test claiming more than it
+		// observed, which is the false-record shape inside the suite meant to prevent it. C7 reddened nothing and
+		// exposed it.
+		//
+		// THE REFUSAL IS GENUINELY UNREACHABLE, structurally: a step reaches WAITING only by STARTING; Start already
+		// refuses an unresolvable required input; `RecordArtifact` is the ONLY artifact command in the registry
+		// (nothing deletes, retracts or supersedes one); and no command rewrites a step's inputBindings after
+		// propose. So no sequence produces a WAITING step whose required input has stopped resolving.
+		//
+		// SO THE DECLARATION IS WHAT IS PINNED — and pinning it is what makes this mutant KILLABLE rather than a
+		// control. The battery now asserts `STEP_COMMAND_SPECS.ResolveExecutionStepWait.inputReadiness` directly.
+		// That is the stronger arrangement: an unreachable-today guard whose DECLARATION is nevertheless enforced,
+		// so the limb is already correct the day an artifact retraction or step-input revision command lands —
+		// instead of being the second arrow somebody forgot, which is how the binding limb shipped a BLOCKER.
+		expectRed: ['packages/rph-application/src/handlers/capbind-wp3-input-readiness.test.ts'],
+		why: 'the RESUME arrow must DECLARE that it consumes inputs — the refusal is unreachable today, but the declaration is what makes the limb correct in advance of its case existing',
+		source: 'JAN-CAPBIND WP-3'
 	},
 
 	// ── JAN-REVREM RW-7: prune provenance for the NON-BRANCH cut (N-8) ────────────────────────────────────────
