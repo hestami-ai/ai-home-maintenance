@@ -29,7 +29,31 @@
 //   RETIRED     its target was legitimately removed and the successor mutant is NAMED (`supersededBy`).
 //   TYPE_PREVENTED  it is DECLARED as not compiling, and that refusal IS the guarantee (`expectNoCompile`).
 //   KILLED_UNNAMED  killed, but package-wide, because the declaring work package never named its victim.
+//   DUPLICATE   another entry declares the SAME mutation and is NAMED (`duplicateOf`).
 //   ABORTED_DIRTY   the tree was already dirty — EVERY VERDICT FROM HERE ON IS VOID, and the run stops.
+//
+// ── THE V-2c LESSON: WHY SO MANY HARVESTED MUTANTS DID NOT COMPILE ──────────────────────────────────────────
+//
+// Of 90 entries, 21 reported NO_COMPILE and 2 UNANCHORED. Almost all 21 failed for ONE reason, and it is a property
+// of the MUTATION OPERATOR rather than of any guard:
+//
+//   `if (cond)` -> `if (false)` (or `if (false && cond)`) MAKES THE GUARDED BLOCK STATICALLY DEAD, AND TYPESCRIPT
+//   DOES NOT NARROW INSIDE DEAD CODE. So every use of a narrowed variable in the refusal it guards — `stored.
+//   objectType`, `auth.executionPlanId`, `authorized.reason`, `step.selectedTransitionId` — loses its narrowing and
+//   fails to typecheck. The mutation never reached the code.
+//
+// The systemic repair is to stop mutating the CONDITION and mutate the CONSEQUENCE: keep the check exactly as
+// written and replace the refusal it returns with an admission (`return null`, `return { ok: true }`). At runtime
+// that is the same fail-open; to the compiler the branch is still reachable and still narrows, so the defect is
+// EXPRESSIBLE and therefore measurable. It is also the sharper operator for refusal-shaped code, because it
+// separates "the check ran and decided wrongly" from "the check was deleted".
+//
+// AND THE DISTINCTION THAT MATTERS MOST HERE: a mutation that fails to compile because it made code unreachable
+// looks IDENTICAL to one that fails because the guard IS the narrowing (`if (!stored) return` — remove it and
+// nothing below can prove `stored` exists). The second is a genuine type-level guarantee and belongs in
+// `expectNoCompile`; the first is an artifact. Declaring an artifact as TYPE_PREVENTED would be the worst instance
+// of this programme's recurring defect yet, because TYPE_PREVENTED reads as STRONGER than KILLED. Every one of the
+// 21 was therefore re-formulated and re-measured rather than reclassified — and every one turned out expressible.
 //
 // ON THAT LAST VERDICT. It exists because this harness produced two complete, plausible, entirely worthless
 // verdict tables before it did: once when an external timeout killed a run mid-mutant, and once when a manual
@@ -84,6 +108,20 @@ export interface DeclaredMutant {
 	 * several: a rationale-string edit and an invalid-enum edit both reported SURVIVED and both looked like defects.
 	 */
 	readonly expectSurvive?: string;
+	/**
+	 * Set when ANOTHER entry declares the same mutation of the same guard, naming it. Reports DUPLICATE, decided
+	 * before anything is applied.
+	 *
+	 * DISTINCT FROM `supersededBy`, which means the code MOVED and the guard's proof went elsewhere. This means two
+	 * work packages independently declared the same mutation and the harvest merged both — so running it twice
+	 * measures nothing new while inflating the ledger's apparent size. That inflation is not hypothetical: the first
+	 * authoritative run reported "90 mutants, 0 SURVIVED" when three of the ninety were byte-identical copies, so
+	 * three of its 35 KILLED_UNNAMED verdicts were the same three kills counted twice.
+	 *
+	 * Recorded rather than deleted because "two work packages thought this guard needed proving" is itself a fact
+	 * about which guards were felt to be load-bearing, and deleting the entry erases it.
+	 */
+	readonly duplicateOf?: string;
 }
 
 export const DECLARED_MUTANTS: readonly DeclaredMutant[] = [
@@ -402,13 +440,15 @@ export const DECLARED_MUTANTS: readonly DeclaredMutant[] = [
 		source: 'wp11_mutants.py'
 	},
 	{
-		id: 'WP11-M2 delete the RPH-EXE-006 reject entirely',
+		id: 'WP11-M2 delete the RPH-EXE-006 reject entirely [wp11_mutants.py harvest]',
 		file: 'packages/rph-application/src/handlers/execution.ts',
 		find: '\t\t\tif (!check.ok)',
 		replace: '\t\t\tif (false && !check.ok)',
 		expectRed: [],
 		why: 'harvested from a work-package harness that recorded no one-line rationale',
-		source: 'wp11_mutants.py'
+		source: 'wp11_mutants.py',
+		duplicateOf:
+			'WP11-M2 delete the RPH-EXE-006 reject at the CALL SITE — the same mutation of the same site, differing only in that the twin\'s anchor carries the following comment line and is therefore UNAMBIGUOUS. This bare `if (!check.ok)` now matches THREE guards (plan activation, RPH-EXE-006 completion, and the §21.1 skip) because two more were added after the harvest, so it would land on whichever came first — a site nobody chose. The twin is the same mutation, correctly aimed.'
 	},
 	{
 		id: 'WP11-M3 drop noOutputResult from the emitted event',
@@ -458,11 +498,25 @@ export const DECLARED_MUTANTS: readonly DeclaredMutant[] = [
 	{
 		id: 'WP11-M8 structuredResultHasContent is constant TRUE (over-refusal)',
 		file: 'packages/rph-application/src/handlers/floor-gate.ts',
-		find: "\tif (typeof value === 'string') return /\\S/.test(value);",
-		replace: "\tif (true) return true;\n\tif (typeof value === 'string') return /\\S/.test(value);",
-		expectRed: [],
-		why: 'harvested from a work-package harness that recorded no one-line rationale',
-		source: 'wp11_mutants.py'
+		// REFORMULATED by JAN-VERIF V-2c, and this is the clearest instance of the dead-code trap in the ledger.
+		//
+		// The harvested form PREPENDED `if (true) return true;`. That made all three arms below unreachable, and
+		// TypeScript does not narrow inside unreachable code — so `value`, declared `unknown`, stopped being a
+		// `string` inside `/\S/.test(value)` and the mutant failed to compile without ever running.
+		//
+		// Replacing the WHOLE body says the same thing with nothing unreachable. `value` goes unused, which is fine:
+		// the base tsconfig sets neither `noUnusedLocals` nor `noUnusedParameters`.
+		find:
+			"\tif (typeof value === 'string') return /\\S/.test(value);\n" +
+			'\tif (Array.isArray(value)) return value.length > 0;\n' +
+			"\tif (typeof value === 'object' && value !== null) return Object.keys(value).length > 0;\n" +
+			'\treturn false;',
+		replace: '\treturn true;',
+		// NAMED VICTIM, newly possible: the emptiness line is pinned by an explicit truth table, so the ten EMPTY
+		// rows (`{}`, `[]`, `''`, whitespace, undefined, null, 0, 42, false, true) all redden at once.
+		expectRed: ['packages/rph-application/src/handlers/floor-gate-admissibility.test.ts'],
+		why: 'the PINNED emptiness line: every EMPTY row becomes content, which over-refuses every AI completion carrying no assessable subject',
+		source: 'wp11_mutants.py (reformulated V-2c)'
 	},
 	{
 		id: 'WP11-M9 subjectCount === 0 -> >= 0 (refuse every AI completion)',
@@ -482,32 +536,43 @@ export const DECLARED_MUTANTS: readonly DeclaredMutant[] = [
 		why: 'harvested from a work-package harness that recorded no one-line rationale',
 		source: 'wp11_mutants.py'
 	},
+	// ── THREE BYTE-IDENTICAL COPIES, and they are why `duplicateOf` exists ────────────────────────────────────
+	//
+	// wp11_mutants.py and wp11_mutants2.py both declared M4, M5 and M6 with the same id, file, anchor, replacement
+	// and (absent) victim. The harvest merged both without deduplicating, so the first authoritative run's "90
+	// mutants" was really 87 distinct mutations and three of its 35 KILLED_UNNAMED verdicts were the same three
+	// kills counted twice. The figure was overstated; the guarantee was not, since each was killed on its own.
 	{
-		id: 'WP11-M4 admit TIMEOUT as success-compatible',
+		id: 'WP11-M4 admit TIMEOUT as success-compatible [wp11_mutants2.py harvest]',
 		file: 'packages/rph-domain/src/execution.ts',
 		find: 'if (input.explicitNoOutput && input.noOutputReasonIsSuccessCompatible === false)',
 		replace: 'if (false && input.noOutputReasonIsSuccessCompatible === false)',
 		expectRed: [],
 		why: 'harvested from a work-package harness that recorded no one-line rationale',
-		source: 'wp11_mutants2.py'
+		source: 'wp11_mutants2.py',
+		duplicateOf: 'WP11-M4 admit TIMEOUT as success-compatible (source wp11_mutants.py) — byte-identical'
 	},
 	{
-		id: 'WP11-M5 drop the outputBindings corroboration limb',
+		id: 'WP11-M5 drop the outputBindings corroboration limb [wp11_mutants2.py harvest]',
 		file: 'packages/rph-domain/src/execution.ts',
 		find: 'if (input.explicitNoOutput && input.declaresOutputBindings === true)',
 		replace: 'if (false && input.declaresOutputBindings === true)',
 		expectRed: [],
 		why: 'harvested from a work-package harness that recorded no one-line rationale',
-		source: 'wp11_mutants2.py'
+		source: 'wp11_mutants2.py',
+		duplicateOf:
+			'WP11-M5 drop the outputBindings corroboration limb (source wp11_mutants.py) — byte-identical'
 	},
 	{
-		id: 'WP11-M6 contradictory cell folded into the OK arm',
+		id: 'WP11-M6 contradictory cell folded into the OK arm [wp11_mutants2.py harvest]',
 		file: 'packages/rph-domain/src/execution.ts',
 		find: 'if (input.hasOutput && input.explicitNoOutput)',
 		replace: 'if (false && input.explicitNoOutput)',
 		expectRed: [],
 		why: 'harvested from a work-package harness that recorded no one-line rationale',
-		source: 'wp11_mutants2.py'
+		source: 'wp11_mutants2.py',
+		duplicateOf:
+			'WP11-M6 contradictory cell folded into the OK arm (source wp11_mutants.py) — byte-identical'
 	},
 	{
 		id: 'WP11-M11 kernel MISSING cell never fires',
@@ -581,7 +646,28 @@ export const DECLARED_MUTANTS: readonly DeclaredMutant[] = [
 		replace: "\t\teventType: 'ExecutionStepCancelled',\n\t\tplanLiveness: 'CLEANUP_EXEMPT_X',",
 		expectRed: [],
 		why: 'harvested from a work-package harness that recorded no one-line rationale',
-		source: 'wp12b_m3m9.py'
+		source: 'wp12b_m3m9.py',
+		supersededBy:
+			"WP12B-M3b Cancel pwuOpenness hardened to REQUIRES_OPEN_PWU — this entry never expressed the mutation its title names. `CLEANUP_EXEMPT_X` is not a PlanLiveness member, so the harvested form was a TYPO that the closed union rejected; it says nothing about whether hardening Cancel is caught, because hardening Cancel was never applied. M3b performs the actual hardening. The separate fact this stumbled into — that a bogus liveness value is UNWRITABLE — is worth proving on purpose, and now is: see 'V2C-T1'."
+	},
+	{
+		// PROMOTED FROM AN ACCIDENT. WP12B-M3's typo revealed a real type-level guarantee nobody had recorded: the
+		// authority columns are CLOSED unions, so an unrecognised value cannot be declared at all. That matters more
+		// than it sounds — every one of the three columns is consumed by an exhaustive `switch`-free lookup in
+		// `stepAuthorityRefusal`, and a value outside the union would silently match no limb and gate NOTHING.
+		//
+		// Declared `expectNoCompile` deliberately, because here the refusal IS the guarantee: no test can be deleted
+		// to lose it. Contrast the 21 NO_COMPILE entries V-2c reformulated, where the compiler was objecting to the
+		// mutation operator rather than defending a rule.
+		id: 'V2C-T1 PlanLiveness is a closed union — an unrecognised authority value is UNWRITABLE',
+		file: 'packages/rph-domain/src/step-command-spec.ts',
+		find: "\t\teventType: 'ExecutionStepCancelled',\n\t\tplanLiveness: 'CLEANUP_EXEMPT',",
+		replace: "\t\teventType: 'ExecutionStepCancelled',\n\t\tplanLiveness: 'CLEANUP_EXEMPT_X',",
+		expectRed: [],
+		why: 'a spec row cannot declare an authority value outside the union, so no command can be gated by a limb that matches nothing',
+		source: 'JAN-VERIF V-2c (promoted from WP12B-M3’s typo)',
+		expectNoCompile:
+			"`planLiveness` is `PlanLiveness = 'REQUIRES_ACTIVE_PLAN' | 'CLEANUP_EXEMPT'`, and STEP_COMMAND_SPECS is a total `Readonly<Record<StepCommandType, StepCommandSpec>>`. A row declaring `CLEANUP_EXEMPT_X` is TS2820 at the declaration site. The consequence being prevented is specific: `stepAuthorityRefusal` tests each column by equality, so a fourth value would match no limb and the command would be gated by nothing at all — a fail-OPEN produced by a typo. The type forecloses it; nothing else does."
 	},
 	{
 		id: 'WP12B-M3b Cancel pwuOpenness hardened to REQUIRES_OPEN_PWU',
@@ -681,102 +767,162 @@ export const DECLARED_MUTANTS: readonly DeclaredMutant[] = [
 	{
 		id: 'WP12B-M9 pwuOpennessRefusal admits an unresolvable work unit',
 		file: 'packages/rph-application/src/handlers/execution.ts',
-		find: "\tif (pwu?.objectType !== 'PROFESSIONAL_WORK_UNIT')",
-		replace: '\tif (false)',
+		// REFORMULATED by JAN-VERIF V-2c — the CONSEQUENCE, not the condition.
+		//
+		// `if (false)` could not compile: the guard's `return` is what proves `pwu` exists for `pwu.state` on the very
+		// next line, so deleting the condition left `pwu` possibly-undefined. Keeping the check and admitting instead
+		// of refusing is the same fail-open at runtime and preserves the narrowing, so it actually reaches the code.
+		//
+		// Its sibling — 'admits a WRONG-TYPED work unit' — weakens the condition to `pwu === undefined`, which keeps
+		// the existence limb and drops only the KIND limb. Between them the two cells are separated: one guard doing
+		// double duty, one mutant per duty.
+		find:
+			"\t\treturn reject(\n\t\t\tcommand,\n\t\t\t'RPH_VALIDATION_SEMANTIC_FAILED',\n\t\t\t`${command.commandType} blocked: the plan's workUnitId ${workUnitId} does not resolve to a " +
+			'PROFESSIONAL_WORK_UNIT, so the RPH-PWU-010 openness of the owning work unit cannot be established.`,\n\t\t\t[targetId]\n\t\t);',
+		replace: '\t\treturn null;',
 		expectRed: [],
-		why: 'harvested from a work-package harness that recorded no one-line rationale',
-		source: 'wp12b_mutants.py'
+		why: 'an unresolvable workUnitId is ADMITTED rather than refused, so RPH-PWU-010 openness is never established for it',
+		source: 'wp12b_mutants.py (reformulated V-2c)'
 	},
 	{
 		id: 'WP12C-M1 the refusal is swallowed (restores the truthiness check)',
 		file: 'packages/rph-application/src/handlers/execution.ts',
-		find: '\t\t\t\tif (!authorized.ok)',
-		replace: '\t\t\t\tif (false && !authorized.ok)',
+		// REFORMULATED by JAN-VERIF V-2c. `if (false && !authorized.ok)` made the reject unreachable, and inside dead
+		// code `authorized` is no longer narrowed to the `{ ok: false; reason }` member — so `authorized.reason` was a
+		// type error and the mutant never ran. Swallowing the refusal outright says the same thing and compiles.
+		find:
+			"\t\t\t\tif (!authorized.ok)\n\t\t\t\t\treturn reject(\n\t\t\t\t\t\tcommand,\n\t\t\t\t\t\t'RPH_VALIDATION_SEMANTIC_FAILED',\n\t\t\t\t\t\t`Cannot skip step ${p.stepId}: ${authorized.reason} " +
+			'(§21.1 requires an AUTHORIZED plan revision or waiver — a bare id is not an authorization).`,\n\t\t\t\t\t\t[p.stepId, p.waiverOrRevisionId]\n\t\t\t\t\t);',
+		replace: '\t\t\t\tif (!authorized.ok) return null;',
 		expectRed: [],
-		why: 'harvested from a work-package harness that recorded no one-line rationale',
-		source: 'wp12c_m2.py'
+		why: 'the resolution runs and its REFUSAL is discarded — §21.1 resolved, then ignored',
+		source: 'wp12c_m2.py (reformulated V-2c)'
 	},
+	// ── THE wp12c_m2.py HARVEST: SIX ENTRIES, ALL RETIRED AS DUPLICATE FORMULATIONS ───────────────────────────
+	//
+	// This harness attempted the RIGHT operator — mutate the returned VERDICT so the check admits — and expressed it
+	// as `return { ok: true } || { …the real refusal }`. TypeScript rejects that outright (TS2872, "this kind of
+	// expression is always truthy"), so all six failed to compile and none ever ran.
+	//
+	// Their instinct was sound and their syntax was not. The six WP-12C entries from wp12c_mutants.py cover the same
+	// six guards and V-2c reformulated each to the clean form (`return { ok: true };`), which is precisely what these
+	// were reaching for. Retiring these rather than deleting them keeps the record that two harnesses independently
+	// judged these six checks worth proving.
 	{
-		id: 'WP12C-M2 a nonexistent id is ADMITTED',
+		id: 'WP12C-M2 a nonexistent id is ADMITTED [wp12c_m2.py harvest]',
 		file: 'packages/rph-application/src/handlers/skip-authorization.ts',
 		find: '\t\treason: `waiverOrRevisionId ${query.authorizationId} names no recorded object`\n\t\t};',
 		replace: '\t\treason: `unused`\n\t\t} && { ok: true };',
 		expectRed: [],
 		why: 'harvested from a work-package harness that recorded no one-line rationale',
-		source: 'wp12c_m2.py'
+		source: 'wp12c_m2.py',
+		duplicateOf:
+			'WP12C-M2 a nonexistent id is admitted (source wp12c_mutants.py) — same guard, same intent; the twin now carries the compiling formulation'
 	},
 	{
-		id: 'WP12C-M3 the object-KIND check ADMITS',
+		id: 'WP12C-M3 the object-KIND check ADMITS [wp12c_m2.py harvest]',
 		file: 'packages/rph-application/src/handlers/skip-authorization.ts',
 		find: "\tif (stored.objectType !== 'DECISION')\n\t\treturn {",
 		replace: "\tif (stored.objectType !== 'DECISION')\n\t\treturn { ok: true } || {",
 		expectRed: [],
 		why: 'harvested from a work-package harness that recorded no one-line rationale',
-		source: 'wp12c_m2.py'
+		source: 'wp12c_m2.py',
+		duplicateOf:
+			'WP12C-M3 the object-KIND check is dropped (source wp12c_mutants.py) — same guard, same intent; the twin now carries the compiling formulation'
 	},
 	{
-		id: 'WP12C-M6 a decision with no execution scope ADMITS',
+		id: 'WP12C-M6 a decision with no execution scope ADMITS [wp12c_m2.py harvest]',
 		file: 'packages/rph-application/src/handlers/skip-authorization.ts',
 		find: '\tif (!auth)\n\t\treturn {',
 		replace: '\tif (!auth)\n\t\treturn { ok: true } || {',
 		expectRed: [],
 		why: 'harvested from a work-package harness that recorded no one-line rationale',
-		source: 'wp12c_m2.py'
+		source: 'wp12c_m2.py',
+		duplicateOf:
+			'WP12C-M6 a decision with no execution scope authorizes a skip (source wp12c_mutants.py) — same guard, same intent; the twin now carries the compiling formulation'
 	},
 	{
-		id: 'WP12C-M8 the plan-id scope ADMITS',
+		id: 'WP12C-M8 the plan-id scope ADMITS [wp12c_m2.py harvest]',
 		file: 'packages/rph-application/src/handlers/skip-authorization.ts',
 		find: '\tif (auth.executionPlanId !== query.planId)\n\t\treturn {',
 		replace: '\tif (auth.executionPlanId !== query.planId)\n\t\treturn { ok: true } || {',
 		expectRed: [],
 		why: 'harvested from a work-package harness that recorded no one-line rationale',
-		source: 'wp12c_m2.py'
+		source: 'wp12c_m2.py',
+		duplicateOf:
+			'WP12C-M8 the plan-id scope is dropped (source wp12c_mutants.py) — same guard, same intent; the twin now carries the compiling formulation'
 	},
 	{
-		id: 'WP12C-M9 the STEP list is IGNORED (one decision retires every step)',
+		id: 'WP12C-M9 the STEP list is IGNORED (one decision retires every step) [wp12c_m2.py harvest]',
 		file: 'packages/rph-application/src/handlers/skip-authorization.ts',
 		find: '\tif (!auth.executionStepIds.includes(query.stepId))\n\t\treturn {',
 		replace: '\tif (!auth.executionStepIds.includes(query.stepId))\n\t\treturn { ok: true } || {',
 		expectRed: [],
 		why: 'harvested from a work-package harness that recorded no one-line rationale',
-		source: 'wp12c_m2.py'
+		source: 'wp12c_m2.py',
+		duplicateOf:
+			'WP12C-M9 the STEP list is ignored (one decision retires every step) (source wp12c_mutants.py) — same guard, same intent; the twin now carries the compiling formulation'
 	},
 	{
-		id: 'WP12C-M10 expiry is IGNORED',
+		id: 'WP12C-M10 expiry is IGNORED [wp12c_m2.py harvest]',
 		file: 'packages/rph-application/src/handlers/skip-authorization.ts',
 		find: '\tif (auth.expiresAt !== undefined && auth.expiresAt <= query.now)\n\t\treturn {',
 		replace:
 			'\tif (auth.expiresAt !== undefined && auth.expiresAt <= query.now)\n\t\treturn { ok: true } || {',
 		expectRed: [],
 		why: 'harvested from a work-package harness that recorded no one-line rationale',
-		source: 'wp12c_m2.py'
+		source: 'wp12c_m2.py',
+		duplicateOf:
+			'WP12C-M10 expiry is ignored (source wp12c_mutants.py) — same guard, same intent; the twin now carries the compiling formulation'
 	},
 	{
 		id: 'WP12C-M1 the resolution never runs (restores the truthiness check)',
 		file: 'packages/rph-application/src/handlers/execution.ts',
-		find: '\t\t\tif (p.waiverOrRevisionId) {',
-		replace: '\t\t\tif (false) {',
+		// REFORMULATED by JAN-VERIF V-2c. `if (false) {` killed the whole block, and inside it neither
+		// `p.waiverOrRevisionId` (string | undefined) nor `authorized.reason` narrowed any more — three type errors,
+		// none of them about the guard. Replacing the resolution with a hardcoded PASS is exactly F-30's original
+		// defect: the id is never resolved, so any non-empty string authorizes a mandatory skip again.
+		find:
+			'\t\t\t\tconst authorized = resolveSkipAuthorization(ctx, {\n\t\t\t\t\tplanId: command.targetAggregateId,\n\t\t\t\t\tstepId: p.stepId,\n\t\t\t\t\tauthorizationId: p.waiverOrRevisionId,\n\t\t\t\t\tnow: command.issuedAt\n\t\t\t\t});',
+		// A STUB FUNCTION, not a literal, and the reason is instructive. The first formulation was
+		// `const authorized: { ok: true } | { ok: false; reason: string } = { ok: true };` — which TypeScript narrows
+		// BY ITS INITIALIZER regardless of the annotation, so `!authorized.ok` became `never` and `.reason` did not
+		// exist. Annotating a RETURN TYPE instead gives the union at the call, where nothing narrows it.
+		replace:
+			'\t\t\t\tconst authorized = ((): { ok: true } | { ok: false; reason: string } => ({ ok: true }))();',
 		expectRed: [],
-		why: 'harvested from a work-package harness that recorded no one-line rationale',
-		source: 'wp12c_mutants.py'
+		why: 'F-30 ITSELF: the §21.1 authorization is never resolved, so `!!waiverOrRevisionId` is back and any non-empty id retires a mandatory step',
+		source: 'wp12c_mutants.py (reformulated V-2c)'
 	},
+	// ── THE SIX §21.1 CHECKS, REFORMULATED AS VERDICT MUTATIONS (JAN-VERIF V-2c) ───────────────────────────────
+	//
+	// Each of these six previously read `if (<check>)` -> `if (false)`, and each failed to compile for the same
+	// reason: the guard's early return is what narrows `stored` / `auth` for the refusal message it guards, and
+	// TypeScript abandons narrowing inside statically dead code. So the mutation objected to itself.
+	//
+	// Each now keeps the check verbatim and turns its REFUSAL into an ADMISSION. Runtime behaviour is the intended
+	// fail-open; the compiler still sees a reachable, narrowed branch. `SkipAuthorizationVerdict` is
+	// `{ ok: true } | { ok: false; reason: string }`, so `return { ok: true };` is the exact admission — no cast, no
+	// excess property, nothing that could make the mutant pass for a syntactic reason.
 	{
 		id: 'WP12C-M2 a nonexistent id is admitted',
 		file: 'packages/rph-application/src/handlers/skip-authorization.ts',
-		find: '\tif (!stored)',
-		replace: '\tif (false && !stored)',
+		find: '\t\t\tok: false,\n\t\t\treason: `waiverOrRevisionId ${query.authorizationId} names no recorded object`\n\t\t};',
+		replace: '\t\t\tok: true\n\t\t};',
 		expectRed: [],
-		why: 'harvested from a work-package harness that recorded no one-line rationale',
-		source: 'wp12c_mutants.py'
+		why: 'check 1 (existence): a dangling id — "the cheapest possible forgery" — is ADMITTED',
+		source: 'wp12c_mutants.py (reformulated V-2c)'
 	},
 	{
 		id: 'WP12C-M3 the object-KIND check is dropped',
 		file: 'packages/rph-application/src/handlers/skip-authorization.ts',
-		find: "\tif (stored.objectType !== 'DECISION')",
-		replace: '\tif (false)',
+		find:
+			'\t\t\tok: false,\n\t\t\treason: `waiverOrRevisionId ${query.authorizationId} is a ${stored.objectType}, not a DECISION — only a governed decision ' +
+			'authorizes a mandatory skip (§21.1)`\n\t\t};',
+		replace: '\t\t\tok: true\n\t\t};',
 		expectRed: [],
-		why: 'harvested from a work-package harness that recorded no one-line rationale',
-		source: 'wp12c_mutants.py'
+		why: 'check 2 (kind): naming an Artifact or a PWU authorizes a mandatory skip',
+		source: 'wp12c_mutants.py (reformulated V-2c)'
 	},
 	{
 		id: 'WP12C-M4 any decisionType authorizes a skip',
@@ -799,11 +945,13 @@ export const DECLARED_MUTANTS: readonly DeclaredMutant[] = [
 	{
 		id: 'WP12C-M6 a decision with no execution scope authorizes a skip',
 		file: 'packages/rph-application/src/handlers/skip-authorization.ts',
-		find: '\tif (!auth)',
-		replace: '\tif (false && !auth)',
+		find:
+			'\t\t\tok: false,\n\t\t\treason: `decision ${query.authorizationId} carries no executionSkipAuthorization, so it authorizes no step skip ' +
+			'(an assurance-plane waiver does not reach the execution plane — INV-5)`\n\t\t};',
+		replace: '\t\t\tok: true\n\t\t};',
 		expectRed: [],
-		why: 'harvested from a work-package harness that recorded no one-line rationale',
-		source: 'wp12c_mutants.py'
+		why: 'check 5 (scope, fail-closed default): a Decision carrying NO execution-skip detail authorizes a skip — the INV-5 plane crossing',
+		source: 'wp12c_mutants.py (reformulated V-2c)'
 	},
 	{
 		id: 'WP12C-M7 the plan-subject scope is dropped',
@@ -817,29 +965,31 @@ export const DECLARED_MUTANTS: readonly DeclaredMutant[] = [
 	{
 		id: 'WP12C-M8 the plan-id scope is dropped',
 		file: 'packages/rph-application/src/handlers/skip-authorization.ts',
-		find: '\tif (auth.executionPlanId !== query.planId)',
-		replace: '\tif (false)',
+		find: '\t\t\tok: false,\n\t\t\treason: `decision ${query.authorizationId} authorizes skips on plan ${auth.executionPlanId}, not ${query.planId}`\n\t\t};',
+		replace: '\t\t\tok: true\n\t\t};',
 		expectRed: [],
-		why: 'harvested from a work-package harness that recorded no one-line rationale',
-		source: 'wp12c_mutants.py'
+		why: 'check 5 (plan scope): an authorization written for ANOTHER plan authorizes a skip on this one',
+		source: 'wp12c_mutants.py (reformulated V-2c)'
 	},
 	{
 		id: 'WP12C-M9 the STEP list is ignored (one decision retires every step)',
 		file: 'packages/rph-application/src/handlers/skip-authorization.ts',
-		find: '\tif (!auth.executionStepIds.includes(query.stepId))',
-		replace: '\tif (false)',
+		find:
+			"\t\t\tok: false,\n\t\t\treason: `decision ${query.authorizationId} authorizes skipping [${auth.executionStepIds.join(', ') || 'no steps'}], which does not include ${query.stepId} " +
+			'— an authorization does not bleed to another step (RPH-GOV-005)`\n\t\t};',
+		replace: '\t\t\tok: true\n\t\t};',
 		expectRed: [],
-		why: 'harvested from a work-package harness that recorded no one-line rationale',
-		source: 'wp12c_mutants.py'
+		why: 'check 5 (step exactness): ONE decision retires EVERY mandatory step in the plan — the unscoped waiver REG-Q-012 forbids',
+		source: 'wp12c_mutants.py (reformulated V-2c)'
 	},
 	{
 		id: 'WP12C-M10 expiry is ignored',
 		file: 'packages/rph-application/src/handlers/skip-authorization.ts',
-		find: '\tif (auth.expiresAt !== undefined && auth.expiresAt <= query.now)',
-		replace: '\tif (false)',
+		find: '\t\t\tok: false,\n\t\t\treason: `decision ${query.authorizationId} expired at ${auth.expiresAt} (command issued ${query.now})`\n\t\t};',
+		replace: '\t\t\tok: true\n\t\t};',
 		expectRed: [],
-		why: 'harvested from a work-package harness that recorded no one-line rationale',
-		source: 'wp12c_mutants.py'
+		why: 'check 6 (expiry, against the command’s issuedAt): a lapsed authorization still authorizes',
+		source: 'wp12c_mutants.py (reformulated V-2c)'
 	},
 	{
 		id: 'WP12C-M11 EVERY dated authorization is treated as expired',
@@ -881,47 +1031,71 @@ export const DECLARED_MUTANTS: readonly DeclaredMutant[] = [
 	{
 		id: 'WP14-M3 prune provenance is not derived (F-37 reopens)',
 		file: 'packages/rph-application/src/handlers/execution.ts',
-		find: '\tconst provenance = pruneProvenance(',
-		replace: '\tconst provenance = undefined ?? pruneProvenance0(',
+		// REFORMULATED by JAN-VERIF V-2c. The harvested form was `undefined ?? pruneProvenance0(` — a name that does
+		// not exist, plus TS2871 for a `??` whose left side is literally `undefined`. It could never have run; it was
+		// a sketch of an intention, recorded as if it were evidence. Declaring the variable undefined outright is the
+		// intention, expressed. `gatePlanForPrune` then goes unused, which the base tsconfig permits.
+		find: '\tconst provenance = pruneProvenance(\n\t\tgatePlanForPrune,\n\t\tp.stepId,\n\t\tguardEvaluatorFor(ctx, command.targetAggregateId, gatePlanForPrune)\n\t);',
+		replace: '\tconst provenance = undefined as ReturnType<typeof pruneProvenance>;',
 		expectRed: [],
-		why: 'harvested from a work-package harness that recorded no one-line rationale',
-		source: 'wp14_mutants.py'
+		why: 'F-37: ExecutionStepPruned carries no provenance, so it differs from a waived skip only by TYPE and never by CONTENT',
+		source: 'wp14_mutants.py (reformulated V-2c)'
 	},
 	{
 		id: 'WP14-M4 provenance reads the step OWN in-edges (transitive case breaks)',
 		file: 'packages/rph-domain/src/transition-gate.ts',
-		find: '\t\t\tif (!seen.has(source)) {',
-		replace: '\t\t\tif (false && !seen.has(source)) {',
+		// REFORMULATED by JAN-VERIF V-2c: mutate the EFFECT, not the condition. `if (false && !seen.has(source))` made
+		// the block dead, so `source` (string | undefined) stopped narrowing inside it — three type errors about the
+		// mutation, none about the walk. Dropping only the `frontier.push` keeps the visited-set bookkeeping and stops
+		// the backward walk after one hop, which is exactly "reads the step's OWN in-edges".
+		find: '\t\t\tif (!seen.has(source)) {\n\t\t\t\tseen.add(source);\n\t\t\t\tfrontier.push(source); // keep walking back through the dead subgraph\n\t\t\t}',
+		replace: '\t\t\tif (!seen.has(source)) {\n\t\t\t\tseen.add(source);\n\t\t\t}',
 		expectRed: [],
-		why: 'harvested from a work-package harness that recorded no one-line rationale',
-		source: 'wp14_mutants.py'
+		why: 'the TRANSITIVE case: a step cut off two or more hops below the branch gets no provenance at all',
+		source: 'wp14_mutants.py (reformulated V-2c)'
 	},
 	{
 		id: 'WP14-M5 the CUT predicate drops the live-source requirement (a JOIN is mis-attributed)',
 		file: 'packages/rph-domain/src/transition-gate.ts',
+		// REFORMULATED by JAN-VERIF V-2c. `if (true)` made everything after the block unreachable and cost `source` its
+		// narrowing there. The live-source requirement IS the condition, so this one has to stay a condition mutation:
+		// a comparison of two identical calls is always true at runtime and is NOT constant-folded by the compiler, so
+		// the code below stays reachable and narrowed. Deliberately degenerate — a mutant should read as obviously
+		// wrong; the point is that a test must notice.
 		find: '\t\t\tif (live.has(source)) {',
-		replace: '\t\t\tif (true) {',
+		replace: '\t\t\tif (live.has(source) === live.has(source)) {',
 		expectRed: [],
-		why: 'harvested from a work-package harness that recorded no one-line rationale',
-		source: 'wp14_mutants.py'
+		why: 'a DEAD source is attributed as the cut, so a JOIN below two dead branches names the wrong decision',
+		source: 'wp14_mutants.py (reformulated V-2c)'
 	},
 	{
 		id: 'WP14-M6 provenance attributes a non-BRANCH source',
 		file: 'packages/rph-domain/src/transition-gate.ts',
+		// REFORMULATED by JAN-VERIF V-2c: keep the EXISTENCE limb, drop only the KIND limb — the same split as
+		// WP12B-M9's sibling pair. `if (false) continue;` cost `step` its narrowing for `step.selectedTransitionId`
+		// two lines down; `if (step === undefined) continue;` keeps `step` proven and admits every non-BRANCH source,
+		// which is precisely what the title claims.
 		find: "\t\t\t\tif (step?.stepType !== 'BRANCH') continue;",
-		replace: '\t\t\t\tif (false) continue;',
+		replace: '\t\t\t\tif (step === undefined) continue;',
 		expectRed: [],
-		why: 'harvested from a work-package harness that recorded no one-line rationale',
-		source: 'wp14_mutants.py'
+		why: 'a non-BRANCH source is named as the deciding branch — exclusive first-match belongs to a BRANCH and to nothing else (D2)',
+		source: 'wp14_mutants.py (reformulated V-2c)'
 	},
 	{
 		id: 'WP14-M7 the branch decision (selectedEdgeId) is dropped from provenance',
 		file: 'packages/rph-domain/src/transition-gate.ts',
-		find: '\t\t\t\t\t? {}\n\t\t\t\t\t: { selectedEdgeId: step.selectedTransitionId }),',
-		replace: '\t\t\t\t\t? {}\n\t\t\t\t\t: {}),',
+		// RE-ANCHORED by JAN-VERIF V-2c. The harvested anchor carried FIVE leading tabs; the code now sits at SIX,
+		// so the mutant reported "anchor text is GONE" — nothing about this guard changed, only its indentation.
+		//
+		// THE RULE THIS ESTABLISHES: anchor on CONTENT, and include leading whitespace only when content alone is
+		// ambiguous. Indentation both disambiguates (see WP11-M2, where three sites share `if (!check.ok)` and only
+		// the tab depth told them apart) and rots on any reformat or renesting. Content first, tabs only as a
+		// tiebreak, and never a tab the anchor does not need.
+		find: '{ selectedEdgeId: step.selectedTransitionId }',
+		replace: '{}',
 		expectRed: [],
 		why: 'harvested from a work-package harness that recorded no one-line rationale',
-		source: 'wp14_mutants.py'
+		source: 'wp14_mutants.py (re-anchored V-2c)'
 	},
 	{
 		id: 'WP14-M8 the CUT edge (excludedEdgeId) is dropped from provenance',

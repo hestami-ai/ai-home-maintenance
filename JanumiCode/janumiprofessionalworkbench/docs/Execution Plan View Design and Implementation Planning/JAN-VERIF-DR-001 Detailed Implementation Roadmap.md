@@ -183,6 +183,104 @@ and inert mutants reading as defects. **One was in the product**, and RW-4 had a
 The sponsor's premise — "coverage is embarrassingly low" — was measurably wrong (94.6% / 83.0%). The instinct
 behind it was right for a different reason: verification here was untrustworthy rather than thin.
 
+### V-2c — clearing the 23, and a correction to my own denominator
+
+V-2b's clean run left **23 entries needing attention: 21 `NO_COMPILE`, 2 `UNANCHORED`.** None was a product
+defect, and none proved anything until repaired: a mutant that does not compile never reached the code, and a
+mutant that does not anchor cannot be performed at all.
+
+**A preflight mode was built first** (`bun run mutants:preflight`, `MUTANTS_PREFLIGHT=1`). Both rot verdicts are
+decided *before any test runs* — anchor uniqueness, then typecheck — yet finding them had cost a full ~40-minute
+run. Preflight does the same triage in about six minutes and prints up to three real `tsc` diagnostics per entry,
+because a reformulation written against the first line of a cascade is just a second broken formulation.
+
+It reports `APPLICABLE`, which is deliberately **not a verdict about any guard**, and it prints **no verdict
+summary** — a table of `APPLICABLE` rows under the same heading a real run uses would be indistinguishable at a
+glance from a measurement, and this harness has already shipped two tables that were quietly worthless.
+
+**Almost all 21 failed for ONE reason, and it is a property of the mutation OPERATOR rather than of any guard:**
+
+> `if (cond)` → `if (false)` **makes the guarded block statically dead, and TypeScript does not narrow inside dead
+> code.** So every use of a narrowed variable in the refusal it guards — `stored.objectType`,
+> `auth.executionPlanId`, `authorized.reason`, `step.selectedTransitionId` — lost its narrowing and failed to
+> typecheck. The mutation objected to itself and never reached the code.
+
+The systemic repair is to stop mutating the **condition** and mutate the **consequence**: keep the check exactly as
+written and replace the refusal it returns with an admission (`return null`, `return { ok: true }`). At runtime that
+is the same fail-open; to the compiler the branch is still reachable and still narrows. It is also the sharper
+operator for refusal-shaped code, because it separates *"the check ran and decided wrongly"* from *"the check was
+deleted"*. That single change repaired **14 of the 21**.
+
+**And the distinction that mattered most.** A mutation that fails to compile *because it made code unreachable*
+looks identical to one that fails *because the guard IS the narrowing* — `if (!stored) return …`, remove it and
+nothing below can prove `stored` exists. The second is a genuine type-level guarantee and belongs in
+`expectNoCompile`; the first is an artifact of the operator. **Reclassifying an artifact as `TYPE_PREVENTED` would
+have been the worst instance of this programme's recurring defect yet, because `TYPE_PREVENTED` reads as *stronger*
+than `KILLED`** — an unrunnable mutant would have been promoted to the strongest evidence in the ledger. Every one
+of the 21 was therefore re-formulated and re-measured rather than reclassified, and **every one turned out to be
+expressible.**
+
+**The 2 `UNANCHORED`, and the anchoring rule they establish.**
+
+- `WP14-M7`'s anchor carried **five leading tabs; the code now sits at six**. Nothing about the guard changed — only
+  its indentation. Re-anchored on content alone (`{ selectedEdgeId: step.selectedTransitionId }`).
+- `WP11-M2`'s bare `if (!check.ok)` had come to match **three** guards, because two more were added after the
+  harvest. It would have landed on whichever came first — a site nobody chose. Its twin from the second harvest
+  carries the following comment line and is unambiguous, so this one is now `duplicateOf` that twin.
+
+Together: **anchor on CONTENT, and include leading whitespace only when content alone is ambiguous.** Indentation
+both disambiguates (WP11-M2) and rots (WP14-M7), so it is a tiebreak, never a default.
+
+**A correction to a figure I reported.** The ledger had **three byte-identical duplicate entries** — WP11-M4, M5
+and M6, declared by two harvest scripts and merged without deduplication. So *"90 mutants, 0 SURVIVED"* was
+**87 distinct mutations**, and three of its 35 `KILLED_UNNAMED` verdicts were the same three kills counted twice.
+The guarantee was unaffected — each was killed on its own — but a mutation score is a ratio and its denominator was
+overstated. Six more entries (the whole `wp12c_m2.py` harvest) turned out to duplicate the intent of their
+`wp12c_mutants.py` twins once both were made to compile.
+
+Three instruments now prevent a recurrence, because "I will remember to deduplicate" is not one:
+
+1. **`duplicateOf`** — a new field with its own `DUPLICATE` verdict, decided before anything is applied.
+   Distinct from `supersededBy`, which means the code *moved*; this means two work packages *independently declared
+   the same edit*. Recorded rather than deleted, because which guards were felt to be load-bearing is itself a fact.
+2. **`verif/mutant-ledger.test.ts`** — the ledger's own integrity: unique ids; every distinct mutation declared once
+   *or* positively excused (as `duplicateOf`, as retired, or by asserting different victims — which is what makes
+   `B4`/`B5` legitimate, one mutation asked of the unit suite *and* of the reference seed); and **every
+   `supersededBy`/`duplicateOf` resolving to an entry that exists.** That last check is the load-bearing one:
+   retiring an entry into a *void* leaves the guard unproven with no verdict saying so, which is strictly worse
+   than leaving the entry broken, because a broken entry at least reports.
+3. **The runner prints the honest denominator** — entries *and* distinct mutations measured. Printing the entry
+   count alone is exactly how the overstatement happened.
+
+**One accident was promoted rather than discarded.** `WP12B-M3`'s harvested form set `planLiveness:
+'CLEANUP_EXEMPT_X'` — not a member of the union, so it was a **typo, not a mutation**, and said nothing about
+whether hardening Cancel is caught (`WP12B-M3b` does that, and is retained). But it stumbled onto a real
+guarantee nobody had recorded: an authority column cannot hold an unrecognised value. That matters concretely —
+`stepAuthorityRefusal` tests each column by equality, so a fourth value would match **no limb and gate nothing**, a
+fail-open produced by a typo. It is now `V2C-T1`, declared `expectNoCompile` on purpose.
+
+**An incidental find, and it is the most quietly serious thing in this work package.** While staging V-2c, git
+reported the new ledger test as `Bin 0 -> 4957 bytes` — I had written a raw NUL byte where I meant a key separator.
+**A single NUL makes git classify the entire file as binary**, so `git diff` prints `Binary files … differ` and
+nothing else: no hunks, no line numbers, no review. The file still compiles, still passes, still appears in the
+commit. Nothing announces that it has left the review process.
+
+Sweeping every tracked source file found **a second, pre-existing instance**:
+`apps/rph-demo/src/lib/server/assurance/reasoning-review-validator.ts` used a literal NUL as its prompt-measuring
+sentinel. It has been there since the file was authored — which means **no diff of the Reasoning-Review validator has
+ever been renderable, including for the two adversarial reviews that read that package.** Nothing was wrong with the
+code; the point is that nobody could have seen if there had been. Both are now the escape `'\u0000'` — byte-identical
+at runtime, text on disk — and `verif/source-is-reviewable.test.ts` fails the gate on the next one. That test is
+itself guarded against being vacuous: it asserts it found >200 files to check, because an empty file list satisfies
+"no file contains a NUL" perfectly, and it was verified by planting a NUL and watching it name the file.
+
+I found the second instance only because I had just made the first. That is not a method, which is why it is now a test.
+
+**Also relaxed:** the cleanliness guard now uses `--untracked-files=no`. A leaked mutation is *necessarily* a
+modification to a tracked file — the runner reads `m.file` before it writes, so it cannot create one — so counting
+untracked files as dirt blocked nothing dangerous and blocked something ordinary: adding a test in the same change
+as the mutant that proves it. A harness that demands a pristine tree is a harness that gets run less often.
+
 ## 4. V-2b — branch gaps, then the ratchet
 
 Targets, in order of how much authority they carry: `execution.ts` (81.3% branch — the whole step authority
@@ -202,6 +300,16 @@ tightens. An aspirational threshold gets disabled the first time it blocks someo
 `G-VERIF-001`: check-types · **test (dist)** · **test:src** · coverage thresholds met · `mutants` (advisory in
 V-0/V-1, blocking after) · lint 0 · boundary 0 · svelte-check 0 · Playwright · **`rph-engine` 69**.
 
+**As of V-2c this is `bun run gate`, not a list to work through by hand:**
+
+```
+check-types → lint → boundary → build → test (dist) → test:coverage (src + ratchet) → svelte-check → e2e → mutants
+```
+
+`gate:fast` is the same minus `mutants`, for the inner loop, and is documented as **not** the gate. `test:src` is
+subsumed by `test:coverage`, which runs the identical suites under source resolution and adds the ratchet — running
+both was measuring the same thing twice.
+
 ## 6. Delivery record
 
 *(Written by each WP as it lands. Empty means nothing has landed — and this sentence exists because
@@ -214,7 +322,31 @@ The note is not the guarantee; the table is.)*
 | V-1 | *(this commit)* | **DELIVERED.** 31 declared mutants harvested into a re-runnable ledger. First-ever re-run: **27 KILLED · 1 TYPE_PREVENTED · 3 RETIRED · 0 SURVIVED · 0 UNANCHORED · 0 NO_COMPILE.** |
 | V-2a | `b2ff18ca` + *(this commit)* | Ledger expanded 31 → 90; three anti-contamination guards added. **Both of its verdict tables were VOID — retracted below.** The only clean measurement is still V-1's 31. |
 | V-2b | `c2ee9cf5` | **DELIVERED.** Both "survivors" were instrument defects, not code. Clean corrected-scope run: **0 SURVIVED.** |
-| V-2c | — | not started — 21 NO_COMPILE, 2 UNANCHORED, then thresholds + blocking |
+| V-2b′ | `91794cb8` | The authoritative 90-entry run: **0 SURVIVED**, 23 needing attention. Its denominator is corrected by V-2c below — 90 entries were 87 distinct mutations. |
+| V-2c | *(this commit)* | **DELIVERED.** All 23 cleared and re-measured; **every one killed.** `91 entries → 77 distinct mutations: 28 KILLED · 46 KILLED_UNNAMED · 2 TYPE_PREVENTED · 1 CONTROL_HELD · 10 DUPLICATE · 4 RETIRED · 0 SURVIVED · 0 UNANCHORED · 0 NO_COMPILE · 0 ABORTED_DIRTY.` **Both ratchets wired AND proven live.** |
+
+**V-2c's measurement, and the fact it establishes.** The 21 `NO_COMPILE` entries were unmeasurable, so what they
+guarded was *unknown* — not weak, unknown. All 21 now run and **all 21 are killed.** Nothing was hiding behind the
+compiler: the §21.1 skip-authorization chain (all six ordered checks), the prune-provenance walk, the PWU-openness
+resolution and the pinned emptiness line are each genuinely defended by a test that fails when the guard is weakened.
+
+**The ratchet, armed and demonstrated.** Both halves were verified by forcing each to fail, because *a threshold that
+is silently ignored reads exactly like a threshold that passes*:
+
+| | wired at | proven live by | result |
+|---|---|---|---|
+| coverage | 94.5 / 82.5 / 95.5 / 96.5 (measured, rounded down half a point) | `--coverage.thresholds.statements=99` | `ERROR: … does not meet global threshold` — exit 1 |
+| mutation | **blocking by DEFAULT**; `MUTANTS_ADVISORY=1` to opt out | `MUTANTS_TARGET=packages/rph-contracts` on a known-killed mutant | `SURVIVED … 1 mutant(s) need attention. BLOCKING.` — exit 1 |
+
+The polarity flip matters more than the numbers. It used to take `MUTANTS_BLOCKING=1` to fail a build, so the gate
+was armed only by remembering to arm it — **an opt-in gate is a suggestion with an exit code.** Any `SURVIVED`,
+`UNANCHORED`, `NO_COMPILE` or `ABORTED_DIRTY` now fails by default, and the escape hatch is a triage tool that names
+itself in the output.
+
+**And the gate is now a script rather than a remembered sequence** — `bun run gate` (`gate:fast` omits the ~40-minute
+mutation run for the inner loop, and is labelled as *not* the gate). A gate that lives only in a document is a gate
+whose steps get dropped one at a time, which is how `JAN-REVREM-DR-001 §6` came to carry a "nothing has landed" note
+while four work packages had shipped under it.
 
 **V-0's measured result, and the artifact hypothesis CONFIRMED.** The per-package figures were lower bounds, exactly as DS §2 predicted:
 
@@ -237,4 +369,6 @@ The last one is the reason the proof asserts **module identity**: two copies of 
 
 ---
 
-*`READY_TO_BUILD` / v0.1.0 — 3 work packages. Nothing built yet.*
+*`DELIVERED` / v1.0.0 — V-0, V-1, V-2a, V-2b, V-2b′, V-2c all landed. Both ratchets armed and proven live. The one
+work package still open is **V-2d (branch gaps)**, which is deliberately last: not one of the 36 findings confirmed
+across two adversarial reviews was a coverage gap.*

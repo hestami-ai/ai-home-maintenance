@@ -32,7 +32,22 @@ type Verdict =
 	| 'NO_COMPILE'
 	| 'KILLED_UNNAMED'
 	| 'ABORTED_DIRTY'
-	| 'CONTROL_HELD';
+	| 'CONTROL_HELD'
+	| 'DUPLICATE'
+	// PREFLIGHT ONLY, and deliberately not a measurement. See `PREFLIGHT` below.
+	| 'APPLICABLE';
+
+// ── PREFLIGHT (`MUTANTS_PREFLIGHT=1`) ────────────────────────────────────────────────────────────────────────
+//
+// Checks ONLY that each mutant still ANCHORS and still COMPILES, and runs no tests at all. It exists because the
+// two verdicts that mean "the ledger has rotted" — UNANCHORED and NO_COMPILE — are both decided before a single
+// test runs, yet finding them cost a full ~40-minute run. Triaging rot against a fast loop is the difference
+// between a ledger that gets repaired and one that accumulates.
+//
+// IT IS NOT A WEAKER FULL RUN. A mutant that anchors and compiles reports `APPLICABLE`, which says only that it
+// COULD be measured — never that it was. Preflight refuses to print a verdict summary for exactly that reason: a
+// table of APPLICABLE rows must not be readable as evidence about any guard.
+const PREFLIGHT = process.env.MUTANTS_PREFLIGHT === '1';
 
 interface Result {
 	readonly mutant: DeclaredMutant;
@@ -43,22 +58,59 @@ interface Result {
 const sh = (cmd: string, args: readonly string[]) =>
 	spawnSync(cmd, args, { cwd: ROOT, encoding: 'utf8', shell: true });
 
-/** Is the working tree clean? The harness must never leave a mutant behind. */
+/**
+ * Is the working tree free of MODIFICATIONS? The harness must never leave a mutant behind.
+ *
+ * `--untracked-files=no` deliberately. What this guard exists to catch is a leaked mutation, and a mutation is always
+ * an edit to an existing tracked file — the runner reads `m.file` before it writes, so it cannot create one. Counting
+ * untracked files as dirt therefore blocks nothing dangerous and blocks something ordinary: adding a test in the same
+ * change as the mutant that proves it. That is a bad trade, because a harness which refuses to run until the tree is
+ * pristine is a harness that gets run less often, and this one earns its keep by being run.
+ */
 function treeIsClean(): boolean {
-	const r = sh('git', ['status', '--porcelain', '--', 'packages', 'apps', 'verif']);
+	const r = sh('git', [
+		'status',
+		'--porcelain',
+		'--untracked-files=no',
+		'--',
+		'packages',
+		'apps',
+		'verif'
+	]);
 	return (r.stdout ?? '').trim() === '';
 }
 
-function runMutant(m: DeclaredMutant): Result {
+/**
+ * Everything decidable WITHOUT applying the mutation: history, contamination, and ledger rot. Returns either the
+ * settled verdict or the pristine file content the caller must restore.
+ *
+ * Split out from `runMutant` so that the three "the ledger has rotted" paths are readable as one group — they are
+ * the verdicts this instrument exists to surface, and they must be decided before anything is written to disk.
+ */
+function preApplyVerdict(m: DeclaredMutant): { result: Result } | { original: string } {
 	// RETIRED is decided BEFORE anything is applied. A mutant whose target the code legitimately removed is
 	// history, not a run: attempting it would report UNANCHORED or NO_COMPILE depending on whether its `find` or
 	// its `replace` referenced the removed code, which is an implementation detail of the rot rather than a fact
 	// about the guard.
 	if (m.supersededBy !== undefined)
 		return {
-			mutant: m,
-			verdict: 'RETIRED',
-			detail: `superseded by ${m.supersededBy.split(' —')[0]}`
+			result: {
+				mutant: m,
+				verdict: 'RETIRED',
+				detail: `superseded by ${m.supersededBy.split(' —')[0]}`
+			}
+		};
+
+	// DUPLICATE, likewise decided before anything is applied. Running a byte-identical copy re-measures a guard
+	// already measured and, worse, counts the same kill twice — which is exactly how "90 mutants" came to be reported
+	// for 87 distinct mutations.
+	if (m.duplicateOf !== undefined)
+		return {
+			result: {
+				mutant: m,
+				verdict: 'DUPLICATE',
+				detail: `same mutation as ${m.duplicateOf.split(' —')[0]}`
+			}
 		};
 
 	// CLEANLINESS IS CHECKED BEFORE **EVERY** MUTANT, not just at the ends — and the reason is a real corruption
@@ -74,18 +126,19 @@ function runMutant(m: DeclaredMutant): Result {
 	// worthless verdict table. Failing loudly at the first sign of dirt is the only way the output means anything.
 	if (!treeIsClean())
 		return {
-			mutant: m,
-			verdict: 'ABORTED_DIRTY',
-			detail:
-				'the tree was already dirty when this mutant began — every verdict after this point is void'
+			result: {
+				mutant: m,
+				verdict: 'ABORTED_DIRTY',
+				detail:
+					'the tree was already dirty when this mutant began — every verdict after this point is void'
+			}
 		};
 
-	const abs = `${ROOT}${m.file}`;
 	let original: string;
 	try {
-		original = readFileSync(abs, 'utf8');
+		original = readFileSync(`${ROOT}${m.file}`, 'utf8');
 	} catch {
-		return { mutant: m, verdict: 'UNANCHORED', detail: `file not found: ${m.file}` };
+		return { result: { mutant: m, verdict: 'UNANCHORED', detail: `file not found: ${m.file}` } };
 	}
 
 	// The anchor must be UNIQUE. Zero occurrences means the code moved out from under a declared mutation;
@@ -94,60 +147,98 @@ function runMutant(m: DeclaredMutant): Result {
 	const hits = original.split(m.find).length - 1;
 	if (hits !== 1)
 		return {
-			mutant: m,
-			verdict: 'UNANCHORED',
-			detail: hits === 0 ? 'anchor text is GONE' : `anchor occurs ${hits}x — ambiguous`
+			result: {
+				mutant: m,
+				verdict: 'UNANCHORED',
+				detail: hits === 0 ? 'anchor text is GONE' : `anchor occurs ${hits}x — ambiguous`
+			}
 		};
+	return { original };
+}
 
-	// A mutant with NO NAMED VICTIM is still worth running, against a weaker claim. Most of the mutants inherited
-	// from JAN-EXECREM WP-2..WP-15 are in this state: their work packages declared the mutation but never said WHICH
-	// test reddens. That is itself a records defect, and it is reported separately in the summary.
-	//
-	// Running the whole PACKAGE tells us whether the guard is tested AT ALL; it cannot say which test does it, so
-	// the verdict is KILLED_UNNAMED rather than KILLED. Weaker evidence, honestly labelled, beats no evidence — and
-	// it beats GUESSING a victim, which is precisely how a mutant comes to "pass" for the wrong reason.
-	const unnamed = m.expectRed.length === 0;
+/**
+ * Which suites this mutant claims it reddens.
+ *
+ * A mutant with NO NAMED VICTIM is still worth running, against a weaker claim. Most of the mutants inherited
+ * from JAN-EXECREM WP-2..WP-15 are in this state: their work packages declared the mutation but never said WHICH
+ * test reddens. That is itself a records defect, and it is reported separately in the summary.
+ *
+ * Running the whole workspace tells us whether the guard is tested AT ALL; it cannot say which test does it, so
+ * the verdict is KILLED_UNNAMED rather than KILLED. Weaker evidence, honestly labelled, beats no evidence — and it
+ * beats GUESSING a victim, which is precisely how a mutant comes to "pass" for the wrong reason.
+ *
+ * An empty result means "every project", which is slower and correct.
+ */
+function targetSuites(m: DeclaredMutant): string[] {
 	// `MUTANTS_TARGET` overrides the suite selection for an investigation — e.g. asking whether a rph-domain mutant
 	// that survived its OWN package is caught by rph-application's command-layer tests. Kept as an env override
 	// rather than a ledger field so it can never silently become part of a recorded verdict.
 	const override = process.env.MUTANTS_TARGET;
-	let target: string[];
-	if (override !== undefined && override !== '') target = [override];
+	if (override !== undefined && override !== '') return [override];
 	// UNNAMED VICTIMS RUN THE WHOLE WORKSPACE, and the first attempt at this was WRONG in a way worth recording.
 	// It scoped them to `pkgOf(m.file)` — the mutant's own package — and two rph-domain mutants duly "SURVIVED".
 	// Both were then killed immediately by rph-application. Of course they were: THE CENTRAL FACT OF THIS CODEBASE
 	// IS THAT DOMAIN PREDICATES ARE ENFORCED AT THE COMMAND LAYER, so a pure predicate's real tests live in another
 	// package. Scoping a domain mutant to domain tests reproduces F-28 — a pure-predicate assertion accepted as
 	// evidence for a command-layer rule — inside the instrument built to detect F-28.
-	//
-	// An empty target list means "every project", which is slower and correct.
-	else if (unnamed) target = [];
-	else target = [...m.expectRed];
+	return [...m.expectRed];
+}
+
+/**
+ * The decisions the COMPILER alone settles, with the mutation already on disk. Returns null when the mutated tree
+ * builds and there is real work left for the test run.
+ *
+ * Typechecking comes first because a mutant that does not compile never reached the code, so a RED test run would
+ * be measuring the compiler rather than the guard — an easy and flattering mistake.
+ */
+function compileVerdict(m: DeclaredMutant, target: readonly string[]): Result | null {
+	const types = sh('bunx', ['tsc', '--noEmit', '-p', `${pkgOf(m.file)}/tsconfig.json`]);
+	const compiles = types.status === 0;
+	// A mutant may be declared as EXPECTED not to compile (`expectNoCompile`). For those, refusing to typecheck IS
+	// the guarantee: the defect is UNEXPRESSIBLE rather than merely caught, which is stronger — a test can be
+	// deleted, a type cannot be worked around without a deliberate signature change. A mutant that suddenly
+	// COMPILES is then the finding, because the type-level guarantee has been lost.
+	if (m.expectNoCompile !== undefined)
+		return compiles
+			? {
+					mutant: m,
+					verdict: 'SURVIVED',
+					detail: 'declared type-prevented, but it COMPILES — the type-level guarantee is gone'
+				}
+			: { mutant: m, verdict: 'TYPE_PREVENTED', detail: `${m.expectNoCompile.slice(0, 88)}…` };
+	if (!compiles) {
+		const out = types.stdout ?? types.stderr ?? '';
+		// Preflight prints SEVERAL error lines, because reformulating a rotted mutant needs the actual diagnostic
+		// and the first line is often only the outermost of a cascade.
+		return {
+			mutant: m,
+			verdict: 'NO_COMPILE',
+			detail: PREFLIGHT ? errorLines(out) : firstLine(out)
+		};
+	}
+	// Preflight stops HERE, before any test runs. `APPLICABLE` is the honest label for what has been established:
+	// the mutant still lands somewhere, and the mutated tree still builds. Nothing more.
+	if (PREFLIGHT)
+		return {
+			mutant: m,
+			verdict: 'APPLICABLE',
+			detail: `would run: ${target.length > 0 ? target.join(', ') : 'workspace'}`
+		};
+	return null;
+}
+
+function runMutant(m: DeclaredMutant): Result {
+	const pre = preApplyVerdict(m);
+	if ('result' in pre) return pre.result;
+	const { original } = pre;
+	const target = targetSuites(m);
+	const unnamed = m.expectRed.length === 0;
 
 	writeFileSync(JOURNAL, m.file, 'utf8');
-	writeFileSync(abs, original.replace(m.find, m.replace), 'utf8');
+	writeFileSync(`${ROOT}${m.file}`, original.replace(m.find, m.replace), 'utf8');
 	try {
-		// Typecheck the mutated tree first. A mutant that does not compile never reached the code, so a RED test
-		// run would be measuring the compiler, not the guard — an easy and flattering mistake.
-		const types = sh('bunx', ['tsc', '--noEmit', '-p', `${pkgOf(m.file)}/tsconfig.json`]);
-		// A mutant may be declared as EXPECTED not to compile (`expectNoCompile`). For those, refusing to typecheck
-		// IS the guarantee: the defect is UNEXPRESSIBLE rather than merely caught, which is stronger — a test can be
-		// deleted, a type cannot be worked around without a deliberate signature change. A mutant that suddenly
-		// COMPILES is then the finding, because the type-level guarantee has been lost.
-		if (m.expectNoCompile !== undefined)
-			return types.status !== 0
-				? { mutant: m, verdict: 'TYPE_PREVENTED', detail: `${m.expectNoCompile.slice(0, 88)}…` }
-				: {
-						mutant: m,
-						verdict: 'SURVIVED',
-						detail: 'declared type-prevented, but it COMPILES — the type-level guarantee is gone'
-					};
-		if (types.status !== 0)
-			return {
-				mutant: m,
-				verdict: 'NO_COMPILE',
-				detail: firstLine(types.stdout ?? types.stderr ?? '')
-			};
+		const settled = compileVerdict(m, target);
+		if (settled) return settled;
 
 		const run = sh('bunx', ['vitest', 'run', ...target]);
 		const out = `${run.stdout ?? ''}${run.stderr ?? ''}`;
@@ -166,7 +257,7 @@ function runMutant(m: DeclaredMutant): Result {
 		if (run.status === 0) return { mutant: m, verdict: 'SURVIVED', detail: summarise(out) };
 		return { mutant: m, verdict: unnamed ? 'KILLED_UNNAMED' : 'KILLED', detail: summarise(out) };
 	} finally {
-		writeFileSync(abs, original, 'utf8');
+		writeFileSync(`${ROOT}${m.file}`, original, 'utf8');
 		rmSync(JOURNAL, { force: true });
 	}
 }
@@ -175,6 +266,20 @@ function runMutant(m: DeclaredMutant): Result {
 const pkgOf = (file: string): string => file.split('/').slice(0, 2).join('/');
 const firstLine = (s: string): string =>
 	(s.split('\n').find((l) => l.includes('error')) ?? s).trim().slice(0, 160);
+/**
+ * Up to three `error TSxxxx` lines, for preflight.
+ *
+ * Reformulating a rotted mutant is done AGAINST the diagnostic, and the first line is frequently only the outermost
+ * of a cascade — a mutant that broke a narrowing reports the narrowing site, not the eight later uses that made it
+ * fail. Guessing from one line is how a "reformulation" turns into a second broken formulation.
+ */
+const errorLines = (s: string): string =>
+	s
+		.split('\n')
+		.filter((l) => / error TS\d+/.test(l))
+		.slice(0, 3)
+		.map((l) => l.trim().slice(0, 150))
+		.join(' ⏎ ');
 const summarise = (s: string): string =>
 	(s.split('\n').findLast((l) => l.includes('Tests ')) ?? '')
 		.replaceAll(new RegExp(String.raw`\[[0-9;]*m`, 'g'), '')
@@ -210,7 +315,11 @@ if (!treeIsClean()) {
 
 const only = process.argv[2];
 const selected = only ? DECLARED_MUTANTS.filter((m) => m.id.includes(only)) : DECLARED_MUTANTS;
-console.log(`Running ${selected.length} declared mutant(s) under SOURCE resolution.\n`);
+console.log(
+	PREFLIGHT
+		? `PREFLIGHT over ${selected.length} declared mutant(s): anchors and typecheck ONLY, no tests run.\n`
+		: `Running ${selected.length} declared mutant(s) under SOURCE resolution.\n`
+);
 
 const results: Result[] = [];
 for (const m of selected) {
@@ -238,6 +347,27 @@ if (!treeIsClean()) {
 }
 
 const by = (v: Verdict) => results.filter((r) => r.verdict === v);
+
+// PREFLIGHT PRINTS NO VERDICT SUMMARY, deliberately.
+//
+// Every row it produced is either APPLICABLE — which asserts nothing about any guard — or one of the two rot
+// verdicts. Printing those under the same "MUTATION LEDGER SUMMARY" heading a real run uses would make a
+// no-tests-were-run table indistinguishable at a glance from a measurement, and this harness has already shipped
+// two full tables that were quietly worthless. The rot rows are listed below on their own terms.
+if (PREFLIGHT) {
+	const rot = [...by('UNANCHORED'), ...by('NO_COMPILE')];
+	console.log(
+		`\n=== PREFLIGHT: ${by('APPLICABLE').length} applicable, ${rot.length} rotted, ` +
+			`${by('RETIRED').length} retired, ${by('DUPLICATE').length} duplicate, ` +
+			`${by('TYPE_PREVENTED').length} type-prevented ===\n` +
+			'NOT A MEASUREMENT. No test ran; APPLICABLE means only that the mutant still lands and still builds.'
+	);
+	for (const r of rot) console.log(`\n${r.verdict}: ${r.mutant.id}\n  ${r.detail}`);
+	// Preflight blocks on rot too, by the same default. Rot is the one thing preflight can establish on its own
+	// authority — an entry that does not anchor or does not compile is broken regardless of any test.
+	process.exit(rot.length > 0 && process.env.MUTANTS_ADVISORY !== '1' ? 1 : 0);
+}
+
 console.log('\n=== MUTATION LEDGER SUMMARY ===');
 for (const v of [
 	'KILLED',
@@ -248,20 +378,34 @@ for (const v of [
 	'NO_COMPILE',
 	'KILLED_UNNAMED',
 	'ABORTED_DIRTY',
-	'CONTROL_HELD'
+	'CONTROL_HELD',
+	'DUPLICATE'
 ] as const)
 	console.log(`${v.padEnd(11)} ${by(v).length}`);
+
+// THE HONEST DENOMINATOR. `DECLARED_MUTANTS.length` counts ENTRIES; what a reader wants is how many DISTINCT
+// mutations were measured. Printing the entry count alone is how "90 mutants, 0 SURVIVED" was reported for 87.
+console.log(
+	`\n${selected.length} entries -> ${selected.length - by('DUPLICATE').length - by('RETIRED').length} distinct mutations measured ` +
+		`(${by('DUPLICATE').length} duplicate, ${by('RETIRED').length} retired).`
+);
 
 for (const r of [...by('SURVIVED'), ...by('UNANCHORED'), ...by('NO_COMPILE')])
 	console.log(
 		`\n${r.verdict}: ${r.mutant.id}\n  guard: ${r.mutant.why}\n  from:  ${r.mutant.source}\n  ${r.detail}`
 	);
 
-// ADVISORY on this first run, by explicit decision (JAN-VERIF-DR-001 §3): the point of building it was to SIZE
-// the rot honestly, and a ledger inherited from eighteen work packages is expected to contain entries the code
-// has moved past. Every one gets triaged and recorded, never deleted to make the run green. Set
-// MUTANTS_BLOCKING=1 (and the gate does, from V-2 onward) to make SURVIVED and UNANCHORED fail the build.
-const blocking = process.env.MUTANTS_BLOCKING === '1';
+// BLOCKING BY DEFAULT since JAN-VERIF V-2c, and the polarity is the point.
+//
+// V-0..V-2b ran ADVISORY on purpose: the job was to SIZE the rot honestly, and a ledger inherited from eighteen work
+// packages was expected to contain entries the code had moved past. That is done — all 23 are cleared, the ledger is
+// at 0 SURVIVED / 0 UNANCHORED / 0 NO_COMPILE — so the question is now what happens to the NEXT one.
+//
+// It used to take `MUTANTS_BLOCKING=1` to fail the build, which means the gate was armed only by remembering to arm
+// it. An opt-in gate is not a gate; it is a suggestion with an exit code. So the default is inverted: any SURVIVED,
+// UNANCHORED, NO_COMPILE or ABORTED_DIRTY fails, and `MUTANTS_ADVISORY=1` is the deliberate, visible way to look at
+// a table without being blocked by it — a triage tool, never something a gate can be configured into.
+const blocking = process.env.MUTANTS_ADVISORY !== '1';
 const unnamedVictims = by('KILLED_UNNAMED').length;
 if (unnamedVictims > 0)
 	console.log(
@@ -278,6 +422,6 @@ const failures =
 	by('NO_COMPILE').length;
 if (failures > 0)
 	console.log(
-		`\n${failures} mutant(s) need attention. ${blocking ? 'BLOCKING.' : 'Advisory on this run — see the note in run.ts.'}`
+		`\n${failures} mutant(s) need attention. ${blocking ? 'BLOCKING.' : 'ADVISORY — MUTANTS_ADVISORY=1 was set, so this run cannot fail the gate.'}`
 	);
 process.exit(blocking && failures > 0 ? 1 : 0);

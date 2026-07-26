@@ -118,9 +118,31 @@ export default defineConfig({
 				'**/*.d.ts',
 				'**/index.ts'
 			],
-			// Thresholds land in V-2, set at MEASURED values so the gate ratchets and cannot silently regress.
-			// Deliberately absent here: an aspirational threshold gets disabled the first time it blocks someone.
-			thresholds: undefined
+			// ── THE RATCHET (JAN-VERIF V-2c) ─────────────────────────────────────────────────────────────
+			//
+			// Set from the MEASURED merged figures — 94.57% statements / 82.99% branches / 95.72% functions /
+			// 96.69% lines — rounded DOWN to the nearest half point. Never aspirational: an aspirational threshold
+			// gets disabled the first time it blocks someone, and then it measures nothing at all.
+			//
+			// WHY A HALF-POINT OF SLACK RATHER THAN THE EXACT NUMBER. A threshold pinned to 94.57 fails on a wobble
+			// of one statement — adding a defensive `default:` arm, or a legitimately untestable `catch` — and that
+			// gate gets switched off just as surely as an aspirational one. Half a point is roughly 22 statements or
+			// 17 branches here: far too small to hide a regression anyone would care about, and large enough that
+			// the gate only ever fires on a real one.
+			//
+			// GLOBAL, NOT `perFile`. A per-file floor would fail on day one — `sqlite-storage-adapter.ts` sits at
+			// 62% because most of it is error paths behind a driver this suite fakes — and a day-one failure is a
+			// day-one disablement. Per-file gaps are argued individually in DR-001 §4, where the rule is that an
+			// unreachable branch is DELETED or DECLARED, never coloured green.
+			//
+			// `autoUpdate` stays off, deliberately: a threshold that rewrites itself downward is not a ratchet.
+			thresholds: {
+				statements: 94.5,
+				branches: 82.5,
+				functions: 95.5,
+				lines: 96.5,
+				autoUpdate: false
+			}
 		}
 	}
 });
