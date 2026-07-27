@@ -27,3 +27,5 @@ coverage/
 /packages/**/dist/
 /packages/**/.turbo/
 scripts/mutants/.in-flight
+scripts/mutants/.harvest.json
+scripts/mutants/.harvest-run.json

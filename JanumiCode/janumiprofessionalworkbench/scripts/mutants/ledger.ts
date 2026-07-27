@@ -534,9 +534,7 @@ export const DECLARED_MUTANTS: readonly DeclaredMutant[] = [
 		find: "\t\t\tif (!check.ok)\n\t\t\t\t// The kernel's label travels in the MESSAGE",
 		replace:
 			"\t\t\tif (!check.ok && (false as boolean))\n\t\t\t\t// The kernel's label travels in the MESSAGE",
-		expectRed: [
-			'packages/rph-application/src/handlers/capbind-n4-grant-containment.test.ts'
-		],
+		expectRed: ['packages/rph-application/src/handlers/capbind-n4-grant-containment.test.ts'],
 		why: 'the ENFORCEMENT: a correct kernel asked by nothing is the F-28 shape, and N-4 is that shape at the authorization boundary',
 		source: 'JAN-CAPBIND WP-2'
 	},
@@ -653,18 +651,18 @@ export const DECLARED_MUTANTS: readonly DeclaredMutant[] = [
 		why: 'A DECLARED CONTROL over a PROVABLY UNREACHABLE fail-safe — see expectSurvive. Kept because unreachable-BY-INVARIANT is not the same as unnecessary, and RW-4 already corrected one wrongly-declared-dead floor in this lineage.',
 		source: 'RW-7 inline',
 		expectSurvive:
-			"The gate cannot be reached, and the proof is structural rather than a survey of fixtures. " +
-			"`computeLiveStepIds` propagates reachability through EVERY edge whose local disposition is not NEUTRALIZED " +
+			'The gate cannot be reached, and the proof is structural rather than a survey of fixtures. ' +
+			'`computeLiveStepIds` propagates reachability through EVERY edge whose local disposition is not NEUTRALIZED ' +
 			"(`if (ctx.localOf(e) !== 'NEUTRALIZED') frontier.push(...)`), and `pruneProvenance` only ever examines the " +
-			"in-edges of steps it has already established are NOT live. So a dead target reached from a LIVE source must " +
-			"have a NEUTRALIZED in-edge: were it PENDING or UNRESOLVED, the target would itself be live and the walk " +
-			"would never have visited it. Probes across FAILED / CANCELLED / QUEUED / RUNNING sources and the " +
-			"undecided-BRANCH (UNRESOLVED) case all agree. " +
+			'in-edges of steps it has already established are NOT live. So a dead target reached from a LIVE source must ' +
+			'have a NEUTRALIZED in-edge: were it PENDING or UNRESOLVED, the target would itself be live and the walk ' +
+			'would never have visited it. Probes across FAILED / CANCELLED / QUEUED / RUNNING sources and the ' +
+			'undecided-BRANCH (UNRESOLVED) case all agree. ' +
 			"IT IS NOT DELETED, deliberately: the line is a LOCAL restatement of reachability's own predicate, and it is " +
-			"what stops a fabricated cause if the two ever drift apart — which is exactly how the F-06 class arose (one " +
-			"question, several independently-maintained answers). The invariant it depends on is pinned by " +
+			'what stops a fabricated cause if the two ever drift apart — which is exactly how the F-06 class arose (one ' +
+			'question, several independently-maintained answers). The invariant it depends on is pinned by ' +
 			"`revrem-wp7-prune-provenance-cause.test.ts`'s liveness assertions, so if reachability stops using this " +
-			"predicate those go RED and this mutant becomes killable."
+			'predicate those go RED and this mutant becomes killable.'
 	},
 	{
 		id: 'F1-remove-incoherence-floor',
@@ -689,7 +687,7 @@ export const DECLARED_MUTANTS: readonly DeclaredMutant[] = [
 		file: 'packages/rph-application/src/handlers/execution.ts',
 		find: 'explicitNoOutput: noOutput !== undefined,',
 		replace: 'explicitNoOutput: !hasOutput,',
-		expectRed: [],
+		expectRed: ['packages/rph-application/src/handlers/execution-exe006-explicit-result.test.ts'],
 		why: 'harvested from a work-package harness that recorded no one-line rationale',
 		source: 'wp11_mutants.py'
 	},
@@ -702,14 +700,14 @@ export const DECLARED_MUTANTS: readonly DeclaredMutant[] = [
 		why: 'harvested from a work-package harness that recorded no one-line rationale',
 		source: 'wp11_mutants.py',
 		duplicateOf:
-			'WP11-M2 delete the RPH-EXE-006 reject at the CALL SITE — the same mutation of the same site, differing only in that the twin\'s anchor carries the following comment line and is therefore UNAMBIGUOUS. This bare `if (!check.ok)` now matches THREE guards (plan activation, RPH-EXE-006 completion, and the §21.1 skip) because two more were added after the harvest, so it would land on whichever came first — a site nobody chose. The twin is the same mutation, correctly aimed.'
+			"WP11-M2 delete the RPH-EXE-006 reject at the CALL SITE — the same mutation of the same site, differing only in that the twin's anchor carries the following comment line and is therefore UNAMBIGUOUS. This bare `if (!check.ok)` now matches THREE guards (plan activation, RPH-EXE-006 completion, and the §21.1 skip) because two more were added after the harvest, so it would land on whichever came first — a site nobody chose. The twin is the same mutation, correctly aimed."
 	},
 	{
 		id: 'WP11-M3 drop noOutputResult from the emitted event',
 		file: 'packages/rph-application/src/handlers/execution.ts',
 		find: '...(p.noOutputResult !== undefined ? { noOutputResult: p.noOutputResult } : {})',
 		replace: '...({})',
-		expectRed: [],
+		expectRed: ['packages/rph-application/src/handlers/execrem-wp1-dormancy.test.ts'],
 		why: 'harvested from a work-package harness that recorded no one-line rationale',
 		source: 'wp11_mutants.py'
 	},
@@ -718,7 +716,7 @@ export const DECLARED_MUTANTS: readonly DeclaredMutant[] = [
 		file: 'packages/rph-domain/src/execution.ts',
 		find: 'if (input.explicitNoOutput && input.noOutputReasonIsSuccessCompatible === false)',
 		replace: 'if (false && input.noOutputReasonIsSuccessCompatible === false)',
-		expectRed: [],
+		expectRed: ['packages/rph-application/src/handlers/execution-exe006-explicit-result.test.ts'],
 		why: 'harvested from a work-package harness that recorded no one-line rationale',
 		source: 'wp11_mutants.py'
 	},
@@ -727,7 +725,7 @@ export const DECLARED_MUTANTS: readonly DeclaredMutant[] = [
 		file: 'packages/rph-domain/src/execution.ts',
 		find: 'if (input.explicitNoOutput && input.declaresOutputBindings === true)',
 		replace: 'if (false && input.declaresOutputBindings === true)',
-		expectRed: [],
+		expectRed: ['packages/rph-application/src/handlers/execution-exe006-explicit-result.test.ts'],
 		why: 'harvested from a work-package harness that recorded no one-line rationale',
 		source: 'wp11_mutants.py'
 	},
@@ -736,7 +734,7 @@ export const DECLARED_MUTANTS: readonly DeclaredMutant[] = [
 		file: 'packages/rph-domain/src/execution.ts',
 		find: 'if (input.hasOutput && input.explicitNoOutput)',
 		replace: 'if (false && input.explicitNoOutput)',
-		expectRed: [],
+		expectRed: ['packages/rph-application/src/handlers/execution-exe006-explicit-result.test.ts'],
 		why: 'harvested from a work-package harness that recorded no one-line rationale',
 		source: 'wp11_mutants.py'
 	},
@@ -745,7 +743,7 @@ export const DECLARED_MUTANTS: readonly DeclaredMutant[] = [
 		file: 'packages/rph-application/src/handlers/floor-gate.ts',
 		find: '\tif (!input.aiProduced) return null;',
 		replace: '\tif (true) return null;',
-		expectRed: [],
+		expectRed: ['packages/rph-application/src/handlers/execution-floor-zero-subject.test.ts'],
 		why: 'harvested from a work-package harness that recorded no one-line rationale',
 		source: 'wp11_mutants.py'
 	},
@@ -777,7 +775,7 @@ export const DECLARED_MUTANTS: readonly DeclaredMutant[] = [
 		file: 'packages/rph-application/src/handlers/floor-gate.ts',
 		find: '\tif (input.subjectCount !== 0) return null;',
 		replace: '\tif (input.subjectCount < 0) return null;',
-		expectRed: [],
+		expectRed: ['packages/rph-application/src/handlers/floor-gate-admissibility.test.ts'],
 		why: 'harvested from a work-package harness that recorded no one-line rationale',
 		source: 'wp11_mutants.py'
 	},
@@ -786,7 +784,7 @@ export const DECLARED_MUTANTS: readonly DeclaredMutant[] = [
 		file: 'packages/rph-application/src/handlers/execution.ts',
 		find: 'declaresOutputBindings: Array.isArray(outputBindings) && outputBindings.length > 0',
 		replace: 'declaresOutputBindings: false',
-		expectRed: [],
+		expectRed: ['packages/rph-application/src/handlers/execution-exe006-explicit-result.test.ts'],
 		why: 'harvested from a work-package harness that recorded no one-line rationale',
 		source: 'wp11_mutants.py'
 	},
@@ -804,7 +802,8 @@ export const DECLARED_MUTANTS: readonly DeclaredMutant[] = [
 		expectRed: [],
 		why: 'harvested from a work-package harness that recorded no one-line rationale',
 		source: 'wp11_mutants2.py',
-		duplicateOf: 'WP11-M4 admit TIMEOUT as success-compatible (source wp11_mutants.py) — byte-identical'
+		duplicateOf:
+			'WP11-M4 admit TIMEOUT as success-compatible (source wp11_mutants.py) — byte-identical'
 	},
 	{
 		id: 'WP11-M5 drop the outputBindings corroboration limb [wp11_mutants2.py harvest]',
@@ -833,7 +832,7 @@ export const DECLARED_MUTANTS: readonly DeclaredMutant[] = [
 		file: 'packages/rph-domain/src/execution.ts',
 		find: 'if (!input.hasOutput && !input.explicitNoOutput)',
 		replace: 'if (false && !input.explicitNoOutput)',
-		expectRed: [],
+		expectRed: ['packages/rph-application/src/handlers/execution-exe006-explicit-result.test.ts'],
 		why: 'harvested from a work-package harness that recorded no one-line rationale',
 		source: 'wp11_mutants2.py'
 	},
@@ -842,7 +841,7 @@ export const DECLARED_MUTANTS: readonly DeclaredMutant[] = [
 		file: 'packages/rph-application/src/handlers/execution.ts',
 		find: '\t\t\tif (!check.ok)\n\t\t\t\t// MISSING is the ratified',
 		replace: '\t\t\tif (false && !check.ok)\n\t\t\t\t// MISSING is the ratified',
-		expectRed: [],
+		expectRed: ['packages/rph-application/src/handlers/execrem-wp16-enforcement-observed.test.ts'],
 		why: 'harvested from a work-package harness that recorded no one-line rationale',
 		source: 'wp11_mutants2.py'
 	},
@@ -852,7 +851,7 @@ export const DECLARED_MUTANTS: readonly DeclaredMutant[] = [
 		find: "\tconst offendingStepStates = input.stepStates.filter((s) => s !== 'SUCCEEDED' && s !== 'SKIPPED');",
 		replace:
 			"\tconst offendingStepStates = input.stepStates.some((s) => s === 'SUCCEEDED' || s === 'SKIPPED')\n\t\t? []\n\t\t: input.stepStates.filter((s) => s !== 'SUCCEEDED' && s !== 'SKIPPED');",
-		expectRed: [],
+		expectRed: ['packages/rph-application/src/handlers/execrem-wp12-execution-success.test.ts'],
 		why: 'harvested from a work-package harness that recorded no one-line rationale',
 		source: 'wp12a_mutants.py'
 	},
@@ -861,7 +860,7 @@ export const DECLARED_MUTANTS: readonly DeclaredMutant[] = [
 		file: 'packages/rph-domain/src/execution.ts',
 		find: "\tif (input.planStatus !== 'ACTIVE' && input.planStatus !== 'COMPLETED')",
 		replace: '\tif (false)',
-		expectRed: [],
+		expectRed: ['packages/rph-application/src/handlers/execrem-wp12-execution-success.test.ts'],
 		why: 'harvested from a work-package harness that recorded no one-line rationale',
 		source: 'wp12a_mutants.py'
 	},
@@ -870,7 +869,7 @@ export const DECLARED_MUTANTS: readonly DeclaredMutant[] = [
 		file: 'packages/rph-domain/src/execution.ts',
 		find: "\tif (!input.stepStates.includes('SUCCEEDED'))",
 		replace: '\tif (false)',
-		expectRed: [],
+		expectRed: ['packages/rph-application/src/handlers/execrem-wp12-execution-success.test.ts'],
 		why: 'harvested from a work-package harness that recorded no one-line rationale',
 		source: 'wp12a_mutants.py'
 	},
@@ -879,7 +878,7 @@ export const DECLARED_MUTANTS: readonly DeclaredMutant[] = [
 		file: 'packages/rph-domain/src/execution.ts',
 		find: "\tif (input.planStatus !== 'ACTIVE' && input.planStatus !== 'COMPLETED')",
 		replace: "\tif (input.planStatus !== 'COMPLETED')",
-		expectRed: [],
+		expectRed: ['packages/rph-application/src/handlers/execrem-wp12-execution-success.test.ts'],
 		why: 'harvested from a work-package harness that recorded no one-line rationale',
 		source: 'wp12a_mutants.py'
 	},
@@ -889,7 +888,7 @@ export const DECLARED_MUTANTS: readonly DeclaredMutant[] = [
 		find: '\t\tif (!verdict.ok) failures.push(`${oid}: ${verdict.reason} (${verdict.errorCode})`);\n\t\treturn verdict.ok;',
 		replace:
 			"\t\tif (!verdict.ok) failures.push(`${oid}: ${verdict.reason} (${verdict.errorCode})`);\n\t\treturn (s.steps ?? []).some((step) => step.stepState === 'SUCCEEDED');",
-		expectRed: [],
+		expectRed: ['packages/rph-application/src/handlers/execrem-wp12-execution-success.test.ts'],
 		why: 'harvested from a work-package harness that recorded no one-line rationale',
 		source: 'wp12a_mutants.py'
 	},
@@ -929,7 +928,7 @@ export const DECLARED_MUTANTS: readonly DeclaredMutant[] = [
 		find: "\t\tpwuOpenness: 'CLEANUP_EXEMPT',\n\t\tpwuOpennessRationale:\n\t\t\t'the exit of last resort",
 		replace:
 			"\t\tpwuOpenness: 'REQUIRES_OPEN_PWU',\n\t\tpwuOpennessRationale:\n\t\t\t'the exit of last resort",
-		expectRed: [],
+		expectRed: ['packages/rph-application/src/handlers/execrem-wp12-authority.test.ts'],
 		why: 'harvested from a work-package harness that recorded no one-line rationale',
 		source: 'wp12b_m3m9.py'
 	},
@@ -938,7 +937,7 @@ export const DECLARED_MUTANTS: readonly DeclaredMutant[] = [
 		file: 'packages/rph-application/src/handlers/execution.ts',
 		find: "\tif (pwu?.objectType !== 'PROFESSIONAL_WORK_UNIT')",
 		replace: '\tif (pwu === undefined)',
-		expectRed: [],
+		expectRed: ['packages/rph-application/src/handlers/execrem-wp12-authority.test.ts'],
 		why: 'harvested from a work-package harness that recorded no one-line rationale',
 		source: 'wp12b_m3m9.py'
 	},
@@ -948,7 +947,7 @@ export const DECLARED_MUTANTS: readonly DeclaredMutant[] = [
 		find: "\t\tcommandType: 'CompleteExecutionStep',\n\t\ttarget: 'SUCCEEDED',\n\t\tsourceStates: ['RUNNING'],\n\t\teventType: 'ExecutionStepSucceeded',\n\t\tplanLiveness: 'REQUIRES_ACTIVE_PLAN',",
 		replace:
 			"\t\tcommandType: 'CompleteExecutionStep',\n\t\ttarget: 'SUCCEEDED',\n\t\tsourceStates: ['RUNNING'],\n\t\teventType: 'ExecutionStepSucceeded',\n\t\tplanLiveness: 'CLEANUP_EXEMPT',",
-		expectRed: [],
+		expectRed: ['packages/rph-application/src/handlers/execrem-wp12-authority.test.ts'],
 		why: 'harvested from a work-package harness that recorded no one-line rationale',
 		source: 'wp12b_mutants.py'
 	},
@@ -957,7 +956,7 @@ export const DECLARED_MUTANTS: readonly DeclaredMutant[] = [
 		file: 'packages/rph-domain/src/step-command-spec.ts',
 		find: "\t\teventType: 'ExecutionStepFailed',\n\t\tplanLiveness: 'CLEANUP_EXEMPT',",
 		replace: "\t\teventType: 'ExecutionStepFailed',\n\t\tplanLiveness: 'REQUIRES_ACTIVE_PLAN',",
-		expectRed: [],
+		expectRed: ['packages/rph-application/src/handlers/execrem-wp12-authority.test.ts'],
 		why: 'harvested from a work-package harness that recorded no one-line rationale',
 		source: 'wp12b_mutants.py'
 	},
@@ -978,7 +977,7 @@ export const DECLARED_MUTANTS: readonly DeclaredMutant[] = [
 		file: 'packages/rph-application/src/handlers/execution.ts',
 		find: "\tif (spec.planLiveness === 'REQUIRES_ACTIVE_PLAN' && plan.status !== 'ACTIVE')",
 		replace: '\tif (false)',
-		expectRed: [],
+		expectRed: ['packages/rph-application/src/handlers/execrem-wp12-authority.test.ts'],
 		why: 'harvested from a work-package harness that recorded no one-line rationale',
 		source: 'wp12b_mutants.py'
 	},
@@ -987,7 +986,7 @@ export const DECLARED_MUTANTS: readonly DeclaredMutant[] = [
 		file: 'packages/rph-application/src/handlers/execution.ts',
 		find: "\tif (spec.pwuOpenness === 'REQUIRES_OPEN_PWU') {",
 		replace: '\tif (false) {',
-		expectRed: [],
+		expectRed: ['packages/rph-application/src/handlers/execrem-wp12-authority.test.ts'],
 		why: 'harvested from a work-package harness that recorded no one-line rationale',
 		source: 'wp12b_mutants.py'
 	},
@@ -996,7 +995,7 @@ export const DECLARED_MUTANTS: readonly DeclaredMutant[] = [
 		file: 'packages/rph-application/src/handlers/execution.ts',
 		find: '\t\t\tif (closed) return closed;',
 		replace: '\t\t\tif (false && closed) return closed;',
-		expectRed: [],
+		expectRed: ['packages/rph-application/src/handlers/execrem-wp12-authority.test.ts'],
 		why: 'harvested from a work-package harness that recorded no one-line rationale',
 		source: 'wp12b_mutants.py'
 	},
@@ -1005,7 +1004,7 @@ export const DECLARED_MUTANTS: readonly DeclaredMutant[] = [
 		file: 'packages/rph-domain/src/execution.ts',
 		find: "\tif (isTerminalState('PWU.workLifecycleState', pwuLifecycleState))",
 		replace: '\tif (false)',
-		expectRed: [],
+		expectRed: ['packages/rph-application/src/handlers/execrem-wp12-authority.test.ts'],
 		why: 'harvested from a work-package harness that recorded no one-line rationale',
 		source: 'wp12b_mutants.py'
 	},
@@ -1014,7 +1013,7 @@ export const DECLARED_MUTANTS: readonly DeclaredMutant[] = [
 		file: 'packages/rph-application/src/handlers/execution.ts',
 		find: "\tif (ctx.store.loadObject(p.workUnitId)?.objectType !== 'PROFESSIONAL_WORK_UNIT') {",
 		replace: '\tif (!ctx.store.loadObject(p.workUnitId)) {',
-		expectRed: [],
+		expectRed: ['packages/rph-application/src/handlers/execrem-wp12-authority.test.ts'],
 		why: 'harvested from a work-package harness that recorded no one-line rationale',
 		source: 'wp12b_mutants.py'
 	},
@@ -1034,7 +1033,7 @@ export const DECLARED_MUTANTS: readonly DeclaredMutant[] = [
 			"\t\treturn reject(\n\t\t\tcommand,\n\t\t\t'RPH_VALIDATION_SEMANTIC_FAILED',\n\t\t\t`${command.commandType} blocked: the plan's workUnitId ${workUnitId} does not resolve to a " +
 			'PROFESSIONAL_WORK_UNIT, so the RPH-PWU-010 openness of the owning work unit cannot be established.`,\n\t\t\t[targetId]\n\t\t);',
 		replace: '\t\treturn null;',
-		expectRed: [],
+		expectRed: ['packages/rph-application/src/handlers/execrem-wp12-authority.test.ts'],
 		why: 'an unresolvable workUnitId is ADMITTED rather than refused, so RPH-PWU-010 openness is never established for it',
 		source: 'wp12b_mutants.py (reformulated V-2c)'
 	},
@@ -1048,7 +1047,7 @@ export const DECLARED_MUTANTS: readonly DeclaredMutant[] = [
 			"\t\t\t\tif (!authorized.ok)\n\t\t\t\t\treturn reject(\n\t\t\t\t\t\tcommand,\n\t\t\t\t\t\t'RPH_VALIDATION_SEMANTIC_FAILED',\n\t\t\t\t\t\t`Cannot skip step ${p.stepId}: ${authorized.reason} " +
 			'(§21.1 requires an AUTHORIZED plan revision or waiver — a bare id is not an authorization).`,\n\t\t\t\t\t\t[p.stepId, p.waiverOrRevisionId]\n\t\t\t\t\t);',
 		replace: '\t\t\t\tif (!authorized.ok) return null;',
-		expectRed: [],
+		expectRed: ['packages/rph-application/src/handlers/execrem-wp12-skip-authorization.test.ts'],
 		why: 'the resolution runs and its REFUSAL is discarded — §21.1 resolved, then ignored',
 		source: 'wp12c_m2.py (reformulated V-2c)'
 	},
@@ -1136,15 +1135,14 @@ export const DECLARED_MUTANTS: readonly DeclaredMutant[] = [
 		// `p.waiverOrRevisionId` (string | undefined) nor `authorized.reason` narrowed any more — three type errors,
 		// none of them about the guard. Replacing the resolution with a hardcoded PASS is exactly F-30's original
 		// defect: the id is never resolved, so any non-empty string authorizes a mandatory skip again.
-		find:
-			'\t\t\t\tconst authorized = resolveSkipAuthorization(ctx, {\n\t\t\t\t\tplanId: command.targetAggregateId,\n\t\t\t\t\tstepId: p.stepId,\n\t\t\t\t\tauthorizationId: p.waiverOrRevisionId,\n\t\t\t\t\tnow: command.issuedAt\n\t\t\t\t});',
+		find: '\t\t\t\tconst authorized = resolveSkipAuthorization(ctx, {\n\t\t\t\t\tplanId: command.targetAggregateId,\n\t\t\t\t\tstepId: p.stepId,\n\t\t\t\t\tauthorizationId: p.waiverOrRevisionId,\n\t\t\t\t\tnow: command.issuedAt\n\t\t\t\t});',
 		// A STUB FUNCTION, not a literal, and the reason is instructive. The first formulation was
 		// `const authorized: { ok: true } | { ok: false; reason: string } = { ok: true };` — which TypeScript narrows
 		// BY ITS INITIALIZER regardless of the annotation, so `!authorized.ok` became `never` and `.reason` did not
 		// exist. Annotating a RETURN TYPE instead gives the union at the call, where nothing narrows it.
 		replace:
 			'\t\t\t\tconst authorized = ((): { ok: true } | { ok: false; reason: string } => ({ ok: true }))();',
-		expectRed: [],
+		expectRed: ['packages/rph-application/src/handlers/execrem-wp12-skip-authorization.test.ts'],
 		why: 'F-30 ITSELF: the §21.1 authorization is never resolved, so `!!waiverOrRevisionId` is back and any non-empty id retires a mandatory step',
 		source: 'wp12c_mutants.py (reformulated V-2c)'
 	},
@@ -1163,7 +1161,7 @@ export const DECLARED_MUTANTS: readonly DeclaredMutant[] = [
 		file: 'packages/rph-application/src/handlers/skip-authorization.ts',
 		find: '\t\t\tok: false,\n\t\t\treason: `waiverOrRevisionId ${query.authorizationId} names no recorded object`\n\t\t};',
 		replace: '\t\t\tok: true\n\t\t};',
-		expectRed: [],
+		expectRed: ['packages/rph-application/src/handlers/execrem-wp12-skip-authorization.test.ts'],
 		why: 'check 1 (existence): a dangling id — "the cheapest possible forgery" — is ADMITTED',
 		source: 'wp12c_mutants.py (reformulated V-2c)'
 	},
@@ -1174,7 +1172,7 @@ export const DECLARED_MUTANTS: readonly DeclaredMutant[] = [
 			'\t\t\tok: false,\n\t\t\treason: `waiverOrRevisionId ${query.authorizationId} is a ${stored.objectType}, not a DECISION — only a governed decision ' +
 			'authorizes a mandatory skip (§21.1)`\n\t\t};',
 		replace: '\t\t\tok: true\n\t\t};',
-		expectRed: [],
+		expectRed: ['packages/rph-application/src/handlers/execrem-wp12-skip-authorization.test.ts'],
 		why: 'check 2 (kind): naming an Artifact or a PWU authorizes a mandatory skip',
 		source: 'wp12c_mutants.py (reformulated V-2c)'
 	},
@@ -1183,7 +1181,7 @@ export const DECLARED_MUTANTS: readonly DeclaredMutant[] = [
 		file: 'packages/rph-application/src/handlers/skip-authorization.ts',
 		find: '\tif (!AUTHORIZING_DECISION_TYPES.has(decision.decisionType))',
 		replace: '\tif (false)',
-		expectRed: [],
+		expectRed: ['packages/rph-application/src/handlers/execrem-wp12-skip-authorization.test.ts'],
 		why: 'harvested from a work-package harness that recorded no one-line rationale',
 		source: 'wp12c_mutants.py'
 	},
@@ -1192,7 +1190,7 @@ export const DECLARED_MUTANTS: readonly DeclaredMutant[] = [
 		file: 'packages/rph-application/src/handlers/skip-authorization.ts',
 		find: "\tif (decision.status !== 'EFFECTIVE')",
 		replace: '\tif (false)',
-		expectRed: [],
+		expectRed: ['packages/rph-application/src/handlers/execrem-wp12-skip-authorization.test.ts'],
 		why: 'harvested from a work-package harness that recorded no one-line rationale',
 		source: 'wp12c_mutants.py'
 	},
@@ -1203,7 +1201,7 @@ export const DECLARED_MUTANTS: readonly DeclaredMutant[] = [
 			'\t\t\tok: false,\n\t\t\treason: `decision ${query.authorizationId} carries no executionSkipAuthorization, so it authorizes no step skip ' +
 			'(an assurance-plane waiver does not reach the execution plane — INV-5)`\n\t\t};',
 		replace: '\t\t\tok: true\n\t\t};',
-		expectRed: [],
+		expectRed: ['packages/rph-application/src/handlers/execrem-wp12-skip-authorization.test.ts'],
 		why: 'check 5 (scope, fail-closed default): a Decision carrying NO execution-skip detail authorizes a skip — the INV-5 plane crossing',
 		source: 'wp12c_mutants.py (reformulated V-2c)'
 	},
@@ -1212,7 +1210,7 @@ export const DECLARED_MUTANTS: readonly DeclaredMutant[] = [
 		file: 'packages/rph-application/src/handlers/skip-authorization.ts',
 		find: '\tif (!decision.subjectObjectIds.includes(query.planId))',
 		replace: '\tif (false)',
-		expectRed: [],
+		expectRed: ['packages/rph-application/src/handlers/execrem-wp12-skip-authorization.test.ts'],
 		why: 'harvested from a work-package harness that recorded no one-line rationale',
 		source: 'wp12c_mutants.py'
 	},
@@ -1221,7 +1219,7 @@ export const DECLARED_MUTANTS: readonly DeclaredMutant[] = [
 		file: 'packages/rph-application/src/handlers/skip-authorization.ts',
 		find: '\t\t\tok: false,\n\t\t\treason: `decision ${query.authorizationId} authorizes skips on plan ${auth.executionPlanId}, not ${query.planId}`\n\t\t};',
 		replace: '\t\t\tok: true\n\t\t};',
-		expectRed: [],
+		expectRed: ['packages/rph-application/src/handlers/execrem-wp12-skip-authorization.test.ts'],
 		why: 'check 5 (plan scope): an authorization written for ANOTHER plan authorizes a skip on this one',
 		source: 'wp12c_mutants.py (reformulated V-2c)'
 	},
@@ -1232,7 +1230,7 @@ export const DECLARED_MUTANTS: readonly DeclaredMutant[] = [
 			"\t\t\tok: false,\n\t\t\treason: `decision ${query.authorizationId} authorizes skipping [${auth.executionStepIds.join(', ') || 'no steps'}], which does not include ${query.stepId} " +
 			'— an authorization does not bleed to another step (RPH-GOV-005)`\n\t\t};',
 		replace: '\t\t\tok: true\n\t\t};',
-		expectRed: [],
+		expectRed: ['packages/rph-application/src/handlers/execrem-wp12-skip-authorization.test.ts'],
 		why: 'check 5 (step exactness): ONE decision retires EVERY mandatory step in the plan — the unscoped waiver REG-Q-012 forbids',
 		source: 'wp12c_mutants.py (reformulated V-2c)'
 	},
@@ -1241,7 +1239,7 @@ export const DECLARED_MUTANTS: readonly DeclaredMutant[] = [
 		file: 'packages/rph-application/src/handlers/skip-authorization.ts',
 		find: '\t\t\tok: false,\n\t\t\treason: `decision ${query.authorizationId} expired at ${auth.expiresAt} (command issued ${query.now})`\n\t\t};',
 		replace: '\t\t\tok: true\n\t\t};',
-		expectRed: [],
+		expectRed: ['packages/rph-application/src/handlers/execrem-wp12-skip-authorization.test.ts'],
 		why: 'check 6 (expiry, against the command’s issuedAt): a lapsed authorization still authorizes',
 		source: 'wp12c_mutants.py (reformulated V-2c)'
 	},
@@ -1250,7 +1248,7 @@ export const DECLARED_MUTANTS: readonly DeclaredMutant[] = [
 		file: 'packages/rph-application/src/handlers/skip-authorization.ts',
 		find: '\tif (auth.expiresAt !== undefined && auth.expiresAt <= query.now)',
 		replace: '\tif (auth.expiresAt !== undefined)',
-		expectRed: [],
+		expectRed: ['packages/rph-application/src/handlers/execrem-wp12-skip-authorization.test.ts'],
 		why: 'harvested from a work-package harness that recorded no one-line rationale',
 		source: 'wp12c_mutants.py'
 	},
@@ -1259,7 +1257,7 @@ export const DECLARED_MUTANTS: readonly DeclaredMutant[] = [
 		file: 'packages/rph-application/src/handlers/governance.ts',
 		find: "\t\t...(p.executionSkipAuthorization\n\t\t\t? { executionSkipAuthorization: p.executionSkipAuthorization }\n\t\t\t: {}),\n\t\tstatus: 'PROPOSED'",
 		replace: "\t\tstatus: 'PROPOSED'",
-		expectRed: [],
+		expectRed: ['packages/rph-application/src/handlers/execrem-wp12-skip-authorization.test.ts'],
 		why: 'harvested from a work-package harness that recorded no one-line rationale',
 		source: 'wp12c_mutants.py'
 	},
@@ -1269,7 +1267,7 @@ export const DECLARED_MUTANTS: readonly DeclaredMutant[] = [
 		find: "\t\t\t...(typeof step.runtimeBindingId === 'string' && step.runtimeBindingId !== ''",
 		replace:
 			"\t\t\t...(false && typeof step.runtimeBindingId === 'string' && step.runtimeBindingId !== ''",
-		expectRed: [],
+		expectRed: ['packages/rph-application/src/handlers/execrem-wp14-provenance.test.ts'],
 		why: 'harvested from a work-package harness that recorded no one-line rationale',
 		source: 'wp14_mutants.py'
 	},
@@ -1278,7 +1276,7 @@ export const DECLARED_MUTANTS: readonly DeclaredMutant[] = [
 		file: 'packages/rph-application/src/handlers/execution.ts',
 		find: '\t\tmutate: (base) => ({\n\t\t\t...base,\n\t\t\tauthorizedRuntimeBindingIds:',
 		replace: '\t\tmutate: (base) => ({\n\t\t\t...base,\n\t\t\t_unusedAuthorizedRuntimeBindingIds:',
-		expectRed: [],
+		expectRed: ['packages/rph-application/src/handlers/execrem-wp14-provenance.test.ts'],
 		why: 'harvested from a work-package harness that recorded no one-line rationale',
 		source: 'wp14_mutants.py'
 	},
@@ -1291,7 +1289,7 @@ export const DECLARED_MUTANTS: readonly DeclaredMutant[] = [
 		// intention, expressed. `gatePlanForPrune` then goes unused, which the base tsconfig permits.
 		find: '\tconst provenance = pruneProvenance(\n\t\tgatePlanForPrune,\n\t\tp.stepId,\n\t\tguardEvaluatorFor(ctx, command.targetAggregateId, gatePlanForPrune)\n\t);',
 		replace: '\tconst provenance = undefined as ReturnType<typeof pruneProvenance>;',
-		expectRed: [],
+		expectRed: ['packages/rph-application/src/handlers/execrem-wp14-provenance.test.ts'],
 		why: 'F-37: ExecutionStepPruned carries no provenance, so it differs from a waived skip only by TYPE and never by CONTENT',
 		source: 'wp14_mutants.py (reformulated V-2c)'
 	},
@@ -1304,7 +1302,7 @@ export const DECLARED_MUTANTS: readonly DeclaredMutant[] = [
 		// the backward walk after one hop, which is exactly "reads the step's OWN in-edges".
 		find: '\t\t\tif (!seen.has(source)) {\n\t\t\t\tseen.add(source);\n\t\t\t\tfrontier.push(source); // keep walking back through the dead subgraph\n\t\t\t}',
 		replace: '\t\t\tif (!seen.has(source)) {\n\t\t\t\tseen.add(source);\n\t\t\t}',
-		expectRed: [],
+		expectRed: ['packages/rph-domain/src/transition-gate-prune-provenance.test.ts'],
 		why: 'the TRANSITIVE case: a step cut off two or more hops below the branch gets no provenance at all',
 		source: 'wp14_mutants.py (reformulated V-2c)'
 	},
@@ -1318,7 +1316,7 @@ export const DECLARED_MUTANTS: readonly DeclaredMutant[] = [
 		// wrong; the point is that a test must notice.
 		find: '\t\t\tif (live.has(source)) {',
 		replace: '\t\t\tif (live.has(source) === live.has(source)) {',
-		expectRed: [],
+		expectRed: ['packages/rph-domain/src/transition-gate-prune-provenance.test.ts'],
 		why: 'a DEAD source is attributed as the cut, so a JOIN below two dead branches names the wrong decision',
 		source: 'wp14_mutants.py (reformulated V-2c)'
 	},
@@ -1335,7 +1333,7 @@ export const DECLARED_MUTANTS: readonly DeclaredMutant[] = [
 		// which is precisely what the title claims.
 		find: "\t\t\t\tif (step.stepType === 'BRANCH')",
 		replace: "\t\t\t\tif (step.stepType !== '__never__')",
-		expectRed: [],
+		expectRed: ['packages/rph-domain/src/transition-gate-prune-provenance.test.ts'],
 		why: 'a non-BRANCH source is named as the deciding branch — exclusive first-match belongs to a BRANCH and to nothing else (D2)',
 		source: 'wp14_mutants.py (reformulated V-2c)'
 	},
@@ -1351,7 +1349,7 @@ export const DECLARED_MUTANTS: readonly DeclaredMutant[] = [
 		// tiebreak, and never a tab the anchor does not need.
 		find: '{ selectedEdgeId: step.selectedTransitionId }',
 		replace: '{}',
-		expectRed: [],
+		expectRed: ['packages/rph-domain/src/transition-gate-prune-provenance.test.ts'],
 		why: 'harvested from a work-package harness that recorded no one-line rationale',
 		source: 'wp14_mutants.py (re-anchored V-2c)'
 	},
@@ -1362,7 +1360,7 @@ export const DECLARED_MUTANTS: readonly DeclaredMutant[] = [
 		file: 'packages/rph-domain/src/transition-gate.ts',
 		find: '\t\t\t\tconst excluded = edge.id === undefined ? {} : { excludedEdgeId: edge.id };',
 		replace: '\t\t\t\tconst excluded = edge.id === undefined ? {} : {};',
-		expectRed: [],
+		expectRed: ['packages/rph-domain/src/transition-gate-prune-provenance.test.ts'],
 		why: 'harvested from a work-package harness that recorded no one-line rationale',
 		source: 'wp14_mutants.py'
 	},
@@ -1546,8 +1544,7 @@ export const DECLARED_MUTANTS: readonly DeclaredMutant[] = [
 		file: 'packages/rph-domain/src/step-command-spec.ts',
 		// The asymmetry that matters on this row: Resolve is REQUIRES_* for binding and inputs and UNCAPPED here.
 		// Marking it as spending would let a wait/resume cycle exhaust a plan that had run exactly once.
-		find:
-			"\t\tretryBudget: 'UNCAPPED',\n\t\tretryBudgetRationale:\n\t\t\t'THE SECOND ARROW INTO RUNNING",
+		find: "\t\tretryBudget: 'UNCAPPED',\n\t\tretryBudgetRationale:\n\t\t\t'THE SECOND ARROW INTO RUNNING",
 		replace:
 			"\t\tretryBudget: 'CONSUMES_RETRY_BUDGET',\n\t\tretryBudgetRationale:\n\t\t\t'THE SECOND ARROW INTO RUNNING",
 		expectRed: ['packages/rph-projections/src/retrycap-readmodel-cap.test.ts'],
@@ -1586,7 +1583,8 @@ export const DECLARED_MUTANTS: readonly DeclaredMutant[] = [
 		// downgrades to PARTIALLY_AUTHORIZED, which still permits execution — so nothing fails at the point of use
 		// and the defect surfaces only as a wrong record.
 		find: "\treturn input.requested.every((c) => granted.has(c)) ? 'AUTHORIZED' : 'PARTIALLY_AUTHORIZED';",
-		replace: "\treturn input.requested.every((c) => granted.has(c)) ? 'PARTIALLY_AUTHORIZED' : 'PARTIALLY_AUTHORIZED';",
+		replace:
+			"\treturn input.requested.every((c) => granted.has(c)) ? 'PARTIALLY_AUTHORIZED' : 'PARTIALLY_AUTHORIZED';",
 		expectRed: [
 			'packages/rph-application/src/handlers/partauth-derived-outcome.test.ts',
 			'packages/rph-application/src/handlers/exebind-wp1-binding-authority.test.ts'
@@ -1637,8 +1635,9 @@ export const DECLARED_MUTANTS: readonly DeclaredMutant[] = [
 		id: 'X1-a-binding-granting-nothing-authorizes-a-start',
 		file: 'packages/rph-domain/src/execution.ts',
 		// N-18 ITSELF. The sponsor ruled the STATE legitimate and the PREDICATE wrong; this restores the predicate.
-		find: "\tif (facts.grantedCapabilities !== undefined && facts.grantedCapabilities.length === 0)",
-		replace: '\tif (facts.grantedCapabilities !== undefined && facts.grantedCapabilities.length < 0)',
+		find: '\tif (facts.grantedCapabilities !== undefined && facts.grantedCapabilities.length === 0)',
+		replace:
+			'\tif (facts.grantedCapabilities !== undefined && facts.grantedCapabilities.length < 0)',
 		expectRed: ['packages/rph-application/src/handlers/partauth-derived-outcome.test.ts'],
 		why: 'N-18: a reviewed binding that conferred nothing must not authorize a start — the state is right, the permission was not',
 		source: 'N-18 ruling (R4)'
@@ -1675,7 +1674,7 @@ export const DECLARED_MUTANTS: readonly DeclaredMutant[] = [
 		source: 'N-18 ruling (R4)',
 		expectSurvive:
 			'IT MUST SURVIVE, AND THAT IS THE PROOF. Removing the BESPOKE NOTHING_GRANTED rendering leaves the ' +
-			'TOTALITY arm below it, which refuses any non-ok limb with the kernel\'s own reason — so the kill test ' +
+			"TOTALITY arm below it, which refuses any non-ok limb with the kernel's own reason — so the kill test " +
 			'still passes, and it passes for the RIGHT reason. The two arms are deliberately redundant: the bespoke ' +
 			'one gives the best message, the total one guarantees a limb nobody wrote an `if` for cannot be silently ' +
 			'admitted. A mutant that reddened here would mean the totality arm is not doing its job. Its absence is ' +

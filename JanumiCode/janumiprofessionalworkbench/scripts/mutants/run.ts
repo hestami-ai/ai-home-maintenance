@@ -22,6 +22,10 @@ const ROOT = fileURLToPath(new URL('../../', import.meta.url));
 
 /** Records the mutant currently applied, so a KILLED run can be recovered from. See `recoverAbandonedMutant`. */
 const JOURNAL = `${ROOT}scripts/mutants/.in-flight`;
+/** Where HARVEST writes its candidate victims. Gitignored: it is an input to a judgment, never a record. */
+const HARVEST_OUT = `${ROOT}scripts/mutants/.harvest.json`;
+/** Vitest's machine-readable run report, read back by HARVEST. Also gitignored, also never a record. */
+const HARVEST_REPORT = `${ROOT}scripts/mutants/.harvest-run.json`;
 
 type Verdict =
 	| 'KILLED'
@@ -49,10 +53,27 @@ type Verdict =
 // table of APPLICABLE rows must not be readable as evidence about any guard.
 const PREFLIGHT = process.env.MUTANTS_PREFLIGHT === '1';
 
+// ── HARVEST (`MUTANTS_HARVEST=1`) ────────────────────────────────────────────────────────────────────────────
+//
+// Runs ONLY the mutants that have no named victim, and records WHICH test files actually reddened. It exists
+// because the summary below has been reporting the same records defect for every run since V-1 — 46 mutants
+// killed "package-wide", i.e. by something — with no cheap way to convert that into the stronger claim.
+//
+// THE HONEST LIMIT, and it is the reason this mode WRITES NOTHING INTO THE LEDGER. What a harvest observes is
+// every suite that FAILED, which is not the same as every suite that TESTS THE GUARD. A broad integration test
+// reddens on almost any mutation; recording it as the victim would produce a ledger that reports KILLED while the
+// guard is untested — the exact shape (F-28) this programme keeps finding, manufactured by its own instrument.
+// So the output is CANDIDATES, the choice among them is a judgment made against the suites' actual assertions,
+// and the choice is then PROVED by a normal run: a wrongly-named victim no longer reddens, so the mutant reports
+// SURVIVED and the gate fails. The harvest proposes; the gate disposes.
+const HARVEST = process.env.MUTANTS_HARVEST === '1';
+
 interface Result {
 	readonly mutant: DeclaredMutant;
 	readonly verdict: Verdict;
 	readonly detail: string;
+	/** HARVEST only: the test files that actually reddened, repo-relative. Candidates, never a conclusion. */
+	readonly victims?: readonly string[];
 }
 
 const sh = (cmd: string, args: readonly string[]) =>
@@ -240,8 +261,23 @@ function runMutant(m: DeclaredMutant): Result {
 		const settled = compileVerdict(m, target);
 		if (settled) return settled;
 
-		const run = sh('bunx', ['vitest', 'run', ...target]);
+		// HARVEST asks vitest for the machine-readable report as WELL as the human one, so `summarise` keeps
+		// working unchanged and the two views cannot disagree about the same run.
+		const run = sh(
+			'bunx',
+			HARVEST
+				? [
+						'vitest',
+						'run',
+						'--reporter=default',
+						'--reporter=json',
+						`--outputFile=${HARVEST_REPORT}`,
+						...target
+					]
+				: ['vitest', 'run', ...target]
+		);
 		const out = `${run.stdout ?? ''}${run.stderr ?? ''}`;
+		const victims = HARVEST ? readVictims() : undefined;
 		// A mutation declared `expectSurvive` is a CONTROL: it edits something behaviour cannot depend on — a
 		// rationale string, a comment — so its survival proves the suite is not failing spuriously. For those,
 		// survival is the PASS and a KILL is the finding, because a test that reddens when only prose changed is
@@ -254,8 +290,14 @@ function runMutant(m: DeclaredMutant): Result {
 						verdict: 'SURVIVED',
 						detail: 'declared a CONTROL, but a test FAILED on it — something asserts on prose'
 					};
-		if (run.status === 0) return { mutant: m, verdict: 'SURVIVED', detail: summarise(out) };
-		return { mutant: m, verdict: unnamed ? 'KILLED_UNNAMED' : 'KILLED', detail: summarise(out) };
+		if (run.status === 0)
+			return { mutant: m, verdict: 'SURVIVED', detail: summarise(out), victims };
+		return {
+			mutant: m,
+			verdict: unnamed ? 'KILLED_UNNAMED' : 'KILLED',
+			detail: summarise(out),
+			victims
+		};
 	} finally {
 		writeFileSync(`${ROOT}${m.file}`, original, 'utf8');
 		rmSync(JOURNAL, { force: true });
@@ -264,6 +306,43 @@ function runMutant(m: DeclaredMutant): Result {
 
 /** `packages/rph-domain/src/x.ts` -> `packages/rph-domain`. */
 const pkgOf = (file: string): string => file.split('/').slice(0, 2).join('/');
+
+/**
+ * HARVEST: which test FILES failed, from vitest's JSON report, repo-relative and POSIX.
+ *
+ * Read from the report file rather than scraped from the console output, and the difference is not cosmetic: the
+ * human reporter prints a `FAIL` line per failing TEST, truncates, colours, and interleaves stderr from other
+ * workers — parsing it would silently drop victims, and a harvest that drops a victim is worse than none because
+ * the survivor it hides looks like a clean result.
+ *
+ * Returns `[]` on a missing or unreadable report, which is honest: the caller records "no candidates observed",
+ * not "no candidates exist".
+ */
+function readVictims(): readonly string[] {
+	let raw: string;
+	try {
+		raw = readFileSync(HARVEST_REPORT, 'utf8');
+	} catch {
+		return [];
+	}
+	rmSync(HARVEST_REPORT, { force: true });
+	const report = JSON.parse(raw) as {
+		testResults?: { name?: string; status?: string }[];
+	};
+	const rootPosix = ROOT.replaceAll('\\', '/');
+	const rel = (abs: string): string => {
+		const p = abs.replaceAll('\\', '/');
+		// Case-insensitively rooted on Windows, where vitest reports `E:/…` and `ROOT` may be `e:/…`.
+		return p.toLowerCase().startsWith(rootPosix.toLowerCase()) ? p.slice(rootPosix.length) : p;
+	};
+	return [
+		...new Set(
+			(report.testResults ?? [])
+				.filter((t) => t.status === 'failed' && typeof t.name === 'string')
+				.map((t) => rel(t.name as string))
+		)
+	].sort((a, b) => a.localeCompare(b));
+}
 const firstLine = (s: string): string =>
 	(s.split('\n').find((l) => l.includes('error')) ?? s).trim().slice(0, 160);
 /**
@@ -314,12 +393,32 @@ if (!treeIsClean()) {
 }
 
 const only = process.argv[2];
-const selected = only ? DECLARED_MUTANTS.filter((m) => m.id.includes(only)) : DECLARED_MUTANTS;
-console.log(
-	PREFLIGHT
-		? `PREFLIGHT over ${selected.length} declared mutant(s): anchors and typecheck ONLY, no tests run.\n`
-		: `Running ${selected.length} declared mutant(s) under SOURCE resolution.\n`
-);
+const chosen = only ? DECLARED_MUTANTS.filter((m) => m.id.includes(only)) : DECLARED_MUTANTS;
+// HARVEST narrows to exactly the population the summary complains about: measurable mutants with no named victim.
+// A mutant declared `expectSurvive` or `expectNoCompile` is NOT in that population — an empty `expectRed` is CORRECT
+// for both (one must redden nothing, the other never reaches a test run), and harvesting a "victim" for either would
+// invent a defect to fix.
+const selected = HARVEST
+	? chosen.filter(
+			(m) =>
+				m.expectRed.length === 0 &&
+				m.supersededBy === undefined &&
+				m.duplicateOf === undefined &&
+				m.expectSurvive === undefined &&
+				m.expectNoCompile === undefined
+		)
+	: chosen;
+function banner(): string {
+	if (PREFLIGHT)
+		return `PREFLIGHT over ${selected.length} declared mutant(s): anchors and typecheck ONLY, no tests run.\n`;
+	if (HARVEST)
+		return (
+			`HARVEST over ${selected.length} mutant(s) with NO NAMED VICTIM: recording which suites redden.\n` +
+			'This proposes CANDIDATES and writes nothing into the ledger — see the HARVEST note in this file.\n'
+		);
+	return `Running ${selected.length} declared mutant(s) under SOURCE resolution.\n`;
+}
+console.log(banner());
 
 const results: Result[] = [];
 for (const m of selected) {
@@ -347,6 +446,43 @@ if (!treeIsClean()) {
 }
 
 const by = (v: Verdict) => results.filter((r) => r.verdict === v);
+
+// HARVEST PRINTS NO VERDICT SUMMARY EITHER, and for a stronger reason than preflight's.
+//
+// Every row here is KILLED_UNNAMED by construction — that is the population it selected — so a summary would say
+// only what the selection already said. What it emits instead is the candidate table and a JSON file, both of which
+// are INPUTS TO A JUDGMENT. It exits 0 whatever it finds: a harvest that could fail the build would eventually be
+// run to make the build pass, and the one thing that must not happen is a victim chosen to satisfy a gate.
+if (HARVEST) {
+	const rows = results.filter((r) => r.victims !== undefined);
+	const surprises = results.filter((r) => r.verdict !== 'KILLED_UNNAMED');
+	writeFileSync(
+		HARVEST_OUT,
+		`${JSON.stringify(
+			rows.map((r) => ({ id: r.mutant.id, file: r.mutant.file, victims: r.victims })),
+			null,
+			'\t'
+		)}\n`,
+		'utf8'
+	);
+	for (const r of rows) {
+		console.log(`\n${r.mutant.id}\n  ${r.mutant.file}`);
+		// A mutant reddening ONE suite is the easy case and the strongest: there is no judgment left to make. Many
+		// suites is where the judgment lives, and where naming the wrong one manufactures a false KILLED.
+		for (const v of r.victims ?? []) console.log(`    ${v}`);
+		if ((r.victims ?? []).length === 0)
+			console.log('    (none observed — the JSON report was missing or the run reddened nothing)');
+	}
+	console.log(
+		`\n=== HARVEST: ${rows.length} mutant(s), ${rows.filter((r) => (r.victims ?? []).length === 1).length} with a SINGLE candidate ===\n` +
+			`Written to ${HARVEST_OUT.replace(ROOT, '')}. NOT A MEASUREMENT of any guard: these are the suites that\n` +
+			'FAILED, not the suites that TEST the guard. Choose against the assertions, then prove the choice with a\n' +
+			'normal run — a wrongly-named victim reports SURVIVED.'
+	);
+	for (const r of surprises)
+		console.log(`\nUNEXPECTED VERDICT: ${r.mutant.id} -> ${r.verdict}\n  ${r.detail}`);
+	process.exit(0);
+}
 
 // PREFLIGHT PRINTS NO VERDICT SUMMARY, deliberately.
 //
@@ -406,20 +542,40 @@ for (const r of [...by('SURVIVED'), ...by('UNANCHORED'), ...by('NO_COMPILE')])
 // UNANCHORED, NO_COMPILE or ABORTED_DIRTY fails, and `MUTANTS_ADVISORY=1` is the deliberate, visible way to look at
 // a table without being blocked by it — a triage tool, never something a gate can be configured into.
 const blocking = process.env.MUTANTS_ADVISORY !== '1';
+
+// KILLED_UNNAMED IS NOW A FAILURE (JAN-VERIF V-3c), and the polarity change is the whole point of V-3.
+//
+// It was reported-but-tolerated for every run from V-1 to V-3, because 46 mutants inherited from JAN-EXECREM
+// WP-2..WP-15 arrived with an empty `expectRed` and a blocking gate would have meant a build nobody could make
+// green. That is now settled: `MUTANTS_HARVEST=1` measured the candidates, each victim was CHOSEN against what
+// the candidate suites assert, and the choice was proved by this very runner — a wrongly-named victim no longer
+// reddens, so it reports SURVIVED. The count is 0.
+//
+// So the question is what happens to the FORTY-SEVENTH, and the answer must not be "someone notices the summary
+// line". A records defect that is merely PRINTED is a records defect that accumulates: this one accumulated for
+// eighteen work packages while being truthfully reported every single run.
+//
+// WHAT THIS COSTS, disclosed rather than discovered: a genuinely diffuse mutant — one whose kill really is spread
+// across many suites — now costs its author an argument instead of a blank field. Intended. The `expectSurvive`
+// and `expectNoCompile` arms are untouched, because an empty `expectRed` is CORRECT for both: a control must
+// redden nothing, and a type-prevented mutant never reaches a test run.
 const unnamedVictims = by('KILLED_UNNAMED').length;
 if (unnamedVictims > 0)
 	console.log(
 		`
 ${unnamedVictims} mutant(s) had NO NAMED VICTIM and were run package-wide. That is a records defect in ` +
 			`the work packages that declared them: "something caught it" is a weaker claim than "this named test ` +
-			`caught it", and only the latter survives a refactor of the suite.`
+			`caught it", and only the latter survives a refactor of the suite.\n` +
+			'Run `bun run mutants:harvest` to measure the candidate suites, then CHOOSE against what they assert — ' +
+			'never paste the whole list, which records the suites that FAILED rather than the ones that TEST the guard.'
 	);
 
 const failures =
 	by('ABORTED_DIRTY').length +
 	by('SURVIVED').length +
 	by('UNANCHORED').length +
-	by('NO_COMPILE').length;
+	by('NO_COMPILE').length +
+	unnamedVictims;
 if (failures > 0)
 	console.log(
 		`\n${failures} mutant(s) need attention. ${blocking ? 'BLOCKING.' : 'ADVISORY — MUTANTS_ADVISORY=1 was set, so this run cannot fail the gate.'}`
