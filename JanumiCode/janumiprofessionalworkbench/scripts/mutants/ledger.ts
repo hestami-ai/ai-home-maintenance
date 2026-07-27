@@ -1771,5 +1771,37 @@ export const DECLARED_MUTANTS: readonly DeclaredMutant[] = [
 		expectRed: ['packages/rph-product-realization-pwa/src/verif-2d-ontology-validator.test.ts'],
 		why: 'a validator must judge the ontology it was GIVEN — resolving against the shipped set makes a broken subject look partly valid',
 		source: 'JAN-VERIF V-2d'
+	},
+	{
+		id: 'V4-a-carriage-claim-cites-text-that-is-not-in-canon',
+		file: 'packages/rph-domain/src/enforcement-register.ts',
+		// THE GATE V-4a EXISTS FOR. A carriage claim is a citation, and a citation nobody resolves is exactly the
+		// kind of true-sounding sentence this whole programme keeps finding: it reads as evidence that the rule
+		// survives retirement, while pointing at text that is not there.
+		//
+		// This mutation stands in for the REAL event it guards against, which is not someone mistyping an anchor —
+		// it is a canon AMENDMENT that reworks STA-8 and quietly leaves three rules citing a sentence that no longer
+		// exists. The register would keep reporting CARRIED, and the retirement decision would be taken on it.
+		find: "\t\t\tcanonAnchor: 'A PWU has at most one active Execution Plan',",
+		replace: "\t\t\tcanonAnchor: 'A PWU has at most three active Execution Plans',",
+		expectRed: ['packages/rph-domain/src/enforcement-register.test.ts'],
+		why: 'V-4a: a CARRIED claim whose anchor is absent from the six canon artifacts must fail, or the register reports carriage it does not have',
+		source: 'JAN-VERIF V-4a'
+	},
+	{
+		id: 'V4-a-provenance-sidecar-satisfies-a-carriage-claim',
+		file: 'packages/rph-domain/src/enforcement-register.test.ts',
+		// MUTATES THE GATE ITSELF, deliberately — this file's standing rule is that a gate mechanism must be proved,
+		// and the sidecar exclusion is the subtle half of the mechanism. `.provenance.md` records where canon text
+		// CAME FROM. If a sidecar could satisfy an anchor, the map would impersonate the territory: a rule could be
+		// certified as carried by a file whose entire content is a list of the sources canon was drawn FROM.
+		//
+		// Two gates catch it, which is the intended redundancy — the artifact COUNT goes from six to twelve, and the
+		// provenance selftest resolves a string that exists in exactly one sidecar and in no artifact.
+		find: "\t\t\t\tf.endsWith('.md') &&\n\t\t\t\t!f.includes('.provenance.')",
+		replace: "\t\t\t\tf.endsWith('.md')",
+		expectRed: ['packages/rph-domain/src/enforcement-register.test.ts'],
+		why: 'V-4a: a provenance sidecar is NOT canon, and the exclusion that says so must be load-bearing rather than decorative',
+		source: 'JAN-VERIF V-4a'
 	}
 ];
