@@ -656,6 +656,80 @@ as the one it replaces:
   the engine and the read-model derive from that one declaration.
 - The gate's own analysis primitives are selftested against literal synthetic input and required to **report
   failure**.
+- Every registered rule disposes **canon carriage**, and every `CARRIED` citation is resolved against the six canon
+  artifacts (JAN-VERIF V-4a, added 2026-07-26).
+
+---
+
+## 9. Canon carriage — and a correction to how I closed this programme out
+
+### 9.1 The claim I made, and why it was wrong
+
+At the close of JAN-EXECREM I recorded, as the natural next candidate:
+
+> *"the §22.1 canon-carrier question — six of its seven invariants have no canon carrier; if RPH-DOC-002 retires
+> as-is, RPH-EXE-004 loses its only textual home."*
+
+**Three of those seven are carried, and RPH-EXE-004 is one of them.** The sentence was written from recall rather
+than from a search of `docs/canon/`, which makes it this lineage's recurring error running the *other* way: for
+seven instances the mistake was reporting *"the corpus does not provide X"* when the corpus did; here it was
+reporting *"canon does not carry X"* when canon does. **Both are a claim about my search reported as a claim about
+the world**, and the direction only changes who is inconvenienced by it. An overstated alarm is not the harmless
+side of that error: it spends the reader's attention on a hole that is not there, and it makes the two real ones
+look like part of a general problem rather than the specific findings they are.
+
+Measured, sentence by sentence, against the six artifacts:
+
+| §22.1 sentence | Carriage | Where |
+|---|---|---|
+| Requested capability is not granted capability | **CARRIED** | DOC-001 §5 pr. 3 — *"a PWA, plan, prompt, or agent may request a capability; only runtime policy grants it"* |
+| Capability scope must be explicit | GENERAL RULE ONLY | OBJ-1. Canon never names capability scope. |
+| Secret access must never be inferred from tool availability | **NONE** | DOC-004 governs secret *references in records* — a different rule |
+| Runtime Binding changes increment revision but not necessarily PWU semantic version | GENERAL RULE ONLY | OBJ-2 (`revision` vs `semanticVersion`); the RuntimeBinding instance is unstated |
+| Privilege expansion requires a new authorization event | **NONE** | STA-8's *"cannot grant its own privilege"* is adjacent, not equivalent |
+| Revoked bindings cannot be used for new attempts | **CARRIED** | STA-8 — *"Execution requires an approved plan and authorized Runtime Bindings"* |
+| Model output is treated as untrusted external input | **CARRIED (verbatim)** | PER-10 |
+
+### 9.2 What is now checked instead of remembered
+
+The repair is not a better paragraph. A prose audit answers the question once, for today's canon — it would not
+notice an amendment that reworks STA-8, and it would not notice a rule added to the register with no carriage at
+all. This repository has a specific reason to distrust that arrangement: **the enforcement register exists because
+a manifest row certified RPH-PWU-010 as covered while nothing enforced it.**
+
+So carriage is a fourth axis on `ENFORCEMENT_REGISTER`, total by TYPE (the compiler refuses a row without it) and
+resolved by GATE (every anchor must occur in one of the six artifacts, `.provenance.md` sidecars excluded, with the
+artifact count asserted so a rename cannot silently shrink the search set). Two mutants prove it fails: a rotted
+anchor, and the removal of the sidecar exclusion.
+
+Across the **eleven registered rules**: eight CARRIED, one CARRIED_BY_GENERAL_RULE, **two with no carrier at all**.
+
+### 9.3 The two findings, filed against the retirement decision
+
+Both are **for the sponsor's Part 4 decision**, not defects in this engine — the enforcement is correct and
+proved; what is missing is a ratified sentence that survives the archive.
+
+| # | Rule | Finding |
+|---|---|---|
+| **C-1** | RPH-EXE-005 | *"Starting a step whose required input artifact is absent leaves the step not ready."* The nearest canon rule, STA-5, does list *"required inputs, expected outputs"* — but as part of the **PWU's** shape readiness profile. This rule's subject is an **execution step** at start time and an input **artifact** that must resolve. Accepting STA-5 as the carrier would be the same layer substitution as accepting a pure-predicate test for a command-layer rule. |
+| **C-2** | RPH-EXE-008 | *"After a retry policy's third attempt fails, the controller must not issue a fourth retry."* Canon carries the **consequence** — AX-8 (fail closed; escalate rather than invent) and V1 (budget exhaustion is declared as what it is) both require the exhaustion to be surfaced — but **no canon sentence says a retry budget exists, that attempts are counted, or that a controller must stop.** `DEFAULT_RETRY_CAP` is correctly a repository shape; a repository shape still needs a ratified rule to be a shape *of*. |
+
+Two §22.1 sentences correspond to **no registered rule**, so they get no register row and are recorded only here:
+
+- *"Secret access must never be inferred from tool availability"* and *"Privilege expansion requires a new
+  authorization event"* are **Platform-plane** rules whose enforcer is deferred to M5 — the same boundary the R1
+  ruling drew for RPH-EXE-004's OPERATION tier.
+- *"Capability scope must be explicit"* is resolved as **policy-by-reference** (sponsor ruling, 2026-07-26), which
+  makes the runtime bound inexpressible in JPWB by that ruling; there is nothing here to enforce.
+
+Minting register rows for rules this engine does not enforce would be **CON-000 B7's hollow-governed-layer failure
+in miniature** — asserted status that is not performed status — which is the one thing the register was built to
+refuse.
+
+> **Relation to Ratify Sheet Part 4.** Precondition 2 requires a shape-survivorship audit over the schema-bearing
+> source documents, *"RPH-DOC-000, -002, -004, -007, -008, -009 foremost"* — and §22.1 lives in **RPH-DOC-002**,
+> inside that set. This section is the execution family's contribution to that audit. It does not discharge the
+> precondition, which is wider than these eleven rules and is a sponsor act besides.
 
 ---
 
