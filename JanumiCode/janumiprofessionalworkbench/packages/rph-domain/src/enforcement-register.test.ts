@@ -73,6 +73,36 @@ function productionSourceFiles(): string[] {
  */
 const REGISTER_MODULE = 'packages/rph-domain/src/enforcement-register.ts';
 
+/**
+ * The SIX canon artifacts, per JPWB-CON-000 B1: "The recognized corpus is exactly: JPWB-CON-000, JPWB-DOC-001,
+ * JPWB-DOC-002, JPWB-DOC-003, JPWB-DOC-004, JPWB-REG-005."
+ *
+ * DERIVED FROM THE FILESYSTEM AGAINST THAT CLAUSE, rather than enumerated as paths, so a retitled artifact still
+ * resolves — but COUNTED by the gate above, so a RENAMED or DELETED one cannot silently shrink the search set.
+ *
+ * TWO EXCLUSIONS, both load-bearing. `.provenance.md` sidecars record where canon text came from and are NOT
+ * canon; letting one satisfy a carriage claim would let the map impersonate the territory. The Ratify Sheet is
+ * the CONFERRAL INSTRUMENT, not an artifact — B1 lists six, and a sheet that quotes a rule while disposing of it
+ * is not a home for that rule.
+ */
+function canonArtifacts(): string[] {
+	return readdirSync(`${REPO_ROOT}docs/canon`)
+		.filter(
+			(f) =>
+				/^JPWB-(CON-000|DOC-00[1-4]|REG-005)\b/.test(f) &&
+				f.endsWith('.md') &&
+				!f.includes('.provenance.')
+		)
+		.sort((a, b) => a.localeCompare(b));
+}
+
+/** Which canon artifacts contain `anchor` verbatim. Empty means the citation does not resolve. */
+function canonFilesContaining(anchor: string): string[] {
+	return canonArtifacts().filter((f) =>
+		readFileSync(`${REPO_ROOT}docs/canon/${f}`, 'utf8').includes(anchor)
+	);
+}
+
 /** The production files that mention `symbol` as a whole word. */
 function productionReferencesTo(symbol: string): string[] {
 	const pattern = new RegExp(`\\b${symbol}\\b`);
@@ -125,6 +155,73 @@ describe('WP-16 (c) — the register is TOTAL over the ratified RPH-EXE family',
 				);
 			}
 		}
+	});
+});
+
+// ── JAN-VERIF V-4a — THE CANON CARRIAGE GATE ─────────────────────────────────────────────────────────────────
+//
+// Every rule in this register is ratified in the PRE-CANON corpus, and Ratify Sheet Part 4 approves retiring that
+// corpus to an archive outside the agent-visible tree. Without this gate a rule can lose its only readable
+// statement and nothing reports it — the same laundering the register was built to stop, one layer out at the
+// rule's TEXT rather than its enforcement.
+describe('V-4a — every rule disposes CANON CARRIAGE, and every citation resolves', () => {
+	it('the six canon artifacts are found — a rename must fail here, not shrink the search set in silence', () => {
+		// DERIVED, then COUNTED. Deriving alone is not enough: if an artifact were renamed, the filter would return
+		// five files, every anchor would still be searched against the remaining five, and a carriage claim could
+		// pass while its carrier had vanished. The count is what makes the derivation honest.
+		expect(canonArtifacts().map((f) => f.replace(/ .*/, ''))).toEqual([
+			'JPWB-CON-000',
+			'JPWB-DOC-001',
+			'JPWB-DOC-002',
+			'JPWB-DOC-003',
+			'JPWB-DOC-004',
+			'JPWB-REG-005'
+		]);
+	});
+
+	it('every canonAnchor occurs in a canon artifact', () => {
+		const unresolved: string[] = [];
+		for (const id of REGISTERED_RULE_IDS) {
+			const carriage = ENFORCEMENT_REGISTER[id].canonCarriage;
+			if (carriage.kind === 'NO_CANON_CARRIER') continue;
+			if (canonFilesContaining(carriage.canonAnchor).length === 0)
+				unresolved.push(`${id}: ${carriage.canonAnchor}`);
+		}
+		expect(unresolved, 'carriage claim(s) citing text that is NOT in canon').toEqual([]);
+	});
+
+	it('a NO_CANON_CARRIER disposition is argued, never asserted', () => {
+		// Same >80-character discipline the register's other reasoned arms carry. "Not in canon" is the easiest
+		// disposition to reach for and the one most in need of an argument, because it is indistinguishable from
+		// "I did not look" — which is exactly the error that produced V-4's first, overstated statement.
+		for (const id of REGISTERED_RULE_IDS) {
+			const carriage = ENFORCEMENT_REGISTER[id].canonCarriage;
+			if (carriage.kind !== 'NO_CANON_CARRIER') continue;
+			expect(carriage.why.length, `${id}'s NO_CANON_CARRIER must be argued`).toBeGreaterThan(80);
+		}
+	});
+
+	it('the axis carries more than one verdict — a register that says CARRIED everywhere checks nothing', () => {
+		// The same argument as the three-dispositions gate above. If every row read CARRIED the axis would be a
+		// decoration; the point is that it is currently carrying a real NO_CANON_CARRIER finding.
+		const kinds = new Set(
+			REGISTERED_RULE_IDS.map((id) => ENFORCEMENT_REGISTER[id].canonCarriage.kind)
+		);
+		expect(kinds.size).toBeGreaterThan(1);
+		expect([...kinds]).toContain('NO_CANON_CARRIER');
+	});
+
+	it('SELFTEST: the resolver reports failure on text absent from canon', () => {
+		expect(canonFilesContaining('this sentence appears in no canon artifact whatsoever')).toEqual(
+			[]
+		);
+	});
+
+	it('SELFTEST: a PROVENANCE SIDECAR does not satisfy a carriage claim', () => {
+		// The sharpest failure this gate must not have. `.provenance.md` records where canon text CAME FROM; if a
+		// sidecar could satisfy an anchor, the map would impersonate the territory and a rule could be certified as
+		// carried by a file that carries nothing. This string exists in exactly one sidecar and in no artifact.
+		expect(canonFilesContaining('extract-doc008-a.md RPH-EXE-009')).toEqual([]);
 	});
 });
 

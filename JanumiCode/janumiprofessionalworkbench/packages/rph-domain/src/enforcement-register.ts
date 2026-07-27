@@ -78,9 +78,64 @@ export function layerOfTestFile(testFile: string): CoverageLayer {
 	return 'UNKNOWN';
 }
 
+/**
+ * Whether the CANON carries a registered rule's statement — the axis that decides what survives retirement.
+ *
+ * WHY THIS EXISTS. Every rule in this register is ratified in the PRE-CANON corpus: the statements come from the
+ * Executable Invariant and Conformance Test Specification (`m12-conformance.json`, `sourceRef` §12 for RPH-EXE and
+ * §8 for RPH-PWU), and the runtime invariants behind several of them come from RPH-DOC-002 §22.1. **The Canon
+ * Ratify Sheet Part 4 approves retiring that entire corpus** — everything under `docs/` except `canon/` — to an
+ * archive outside the agent-visible tree, subject to four preconditions, the second of which is a
+ * shape-survivorship audit motivated by REG-F-005: *the source schemas are the independent "expected" that made
+ * the gap detectable; they retire only after a verified transplant*.
+ *
+ * So a rule this engine enforces can lose its only readable statement, and NOTHING would report it. The register
+ * already refuses to let an unenforced rule be laundered into a green build; this is the same refusal aimed one
+ * layer out, at the rule's TEXT rather than at its enforcement.
+ *
+ * WHAT THE GATE CHECKS AND WHAT IT DELIBERATELY DOES NOT. It checks that `canonAnchor` OCCURS in one of the six
+ * canon artifacts (`docs/canon/JPWB-{CON-000,DOC-001..004,REG-005}`, sidecars excluded — a `.provenance.md`
+ * records where text came from, and letting provenance satisfy a carriage claim would let the map impersonate the
+ * territory). It does NOT check that the anchor MEANS the rule: that is a judgment, and a gate pretending to make
+ * it would be the vacuous assertion this whole programme is about. What it buys is exact: a canon edit that
+ * removes a carrier turns the build RED, and no rule can enter the register without disposing its carriage.
+ *
+ * THE DISCLOSED COST: anchors are substrings, so a canon edit that REWORDS a carrier without changing its meaning
+ * also goes red. That is the right polarity — a reworded carrier deserves a human confirming it still carries —
+ * but it is a real maintenance cost, recorded here rather than discovered later.
+ */
+export type CanonCarriage =
+	| {
+			/** A canon sentence states this rule — in different words, perhaps, but the same rule. */
+			readonly kind: 'CARRIED';
+			readonly canonAnchor: string;
+			readonly note: string;
+	  }
+	| {
+			/**
+			 * Canon states a strictly MORE GENERAL rule of which this is an instance, and names this subject
+			 * nowhere. Kept distinct from CARRIED because the difference is exactly what a reader may conclude: a
+			 * general rule survives retirement, the specific application does not, and silently upgrading one to the
+			 * other is how a register comes to report carriage it does not have.
+			 */
+			readonly kind: 'CARRIED_BY_GENERAL_RULE';
+			readonly canonAnchor: string;
+			readonly note: string;
+	  }
+	| {
+			/** Nothing in canon states or generalises it. Retirement loses the rule's only textual home. */
+			readonly kind: 'NO_CANON_CARRIER';
+			readonly why: string;
+	  };
+
 /** A rule a named production site refuses, proved by observing that refusal through `Engine.dispatch`. */
 export interface EnforcedRule {
 	readonly kind: 'ENFORCED';
+	/**
+	 * Carriage is declared on ALL THREE arms, not on a shared base, so the COMPILER refuses a row that omits it.
+	 * Totality by type beats totality by test here: a test can be skipped, a missing required field cannot be.
+	 */
+	readonly canonCarriage: CanonCarriage;
 	/** The production module that performs the refusal. Prose, checked by a reader, not by the gate. */
 	readonly enforcedAt: string;
 	/** The `error.code` the refusal carries. */
@@ -100,6 +155,7 @@ export interface EnforcedRule {
 /** A rule whose statement IS a command refusal and which NOTHING in production enforces. */
 export interface UnenforcedRule {
 	readonly kind: 'UNENFORCED_DISCLOSED';
+	readonly canonCarriage: CanonCarriage;
 	readonly why: string;
 	/** The kernel predicate that implements the rule correctly but is never asked. */
 	readonly deadPredicate: string;
@@ -116,6 +172,7 @@ export interface UnenforcedRule {
 /** A rule whose statement asserts an outcome, a permission, or a plane that does not exist. */
 export interface NotACommandRefusal {
 	readonly kind: 'NOT_A_COMMAND_REFUSAL';
+	readonly canonCarriage: CanonCarriage;
 	readonly why: string;
 }
 
@@ -138,6 +195,11 @@ export type RegisteredRuleId =
 export const ENFORCEMENT_REGISTER: Readonly<Record<RegisteredRuleId, EnforcementDisposition>> = {
 	'RPH-EXE-001': {
 		kind: 'ENFORCED',
+		canonCarriage: {
+			kind: 'CARRIED',
+			canonAnchor: 'A PWU has at most one active Execution Plan',
+			note: 'JPWB-DOC-003 §6 STA-8 (Execution Plans are governed strategy) states the uniqueness rule directly.'
+		},
 		enforcedAt:
 			'packages/rph-application/src/handlers/execution.ts — activateExecutionPlan / canActivatePlan',
 		refusalCode: 'RPH_INVARIANT_VIOLATION',
@@ -149,6 +211,11 @@ export const ENFORCEMENT_REGISTER: Readonly<Record<RegisteredRuleId, Enforcement
 	},
 	'RPH-EXE-002': {
 		kind: 'ENFORCED',
+		canonCarriage: {
+			kind: 'CARRIED',
+			canonAnchor: 'a superseded plan spawns no new steps and no new execution attempts',
+			note: 'JPWB-DOC-003 §6 STA-8. The canon sentence is broader than the rule (it covers attempts as well as steps), which is carriage, not a gap.'
+		},
 		enforcedAt:
 			'packages/rph-application/src/handlers/execution.ts — stepAuthorityRefusal, reading STEP_COMMAND_SPECS.planLiveness (WP-12b)',
 		refusalCode: 'RPH_ILLEGAL_STATE_TRANSITION',
@@ -160,6 +227,11 @@ export const ENFORCEMENT_REGISTER: Readonly<Record<RegisteredRuleId, Enforcement
 	},
 	'RPH-EXE-003': {
 		kind: 'ENFORCED',
+		canonCarriage: {
+			kind: 'CARRIED',
+			canonAnchor: 'Execution requires an approved plan and authorized Runtime Bindings',
+			note: 'JPWB-DOC-003 §6 STA-8. Also the carrier for §22.1\'s "Revoked bindings cannot be used for new attempts": a REVOKED binding is not an authorized one, and the verdict\'s accept set is exactly AUTHORIZED | PARTIALLY_AUTHORIZED.'
+		},
 		// CLOSED BY JAN-EXEBIND WP-B1. This row read UNENFORCED_DISCLOSED for four commits: `bindingPermitsExecution`
 		// was correct, unit-tested and asked by NOTHING, while the manifest certified the whole RPH-EXE family COVERED
 		// "001..009 by id". `startExecutionStep` never resolved the step's runtimeBindingId at all, so a step started
@@ -239,6 +311,17 @@ export const ENFORCEMENT_REGISTER: Readonly<Record<RegisteredRuleId, Enforcement
 	// the substitution this register exists to prevent.
 	'RPH-EXE-004': {
 		kind: 'UNENFORCED_DISCLOSED',
+		// THE ROW THAT RAISED V-4, AND THE ALARM WAS OVERSTATED — recorded because the correction matters more than
+		// the finding. It was closed out as "§22.1's invariants have no canon carrier, so RPH-EXE-004 loses its only
+		// textual home on retirement". That was written from RECALL rather than from a search of docs/canon/, which
+		// is this lineage's recurring error pointed the other way: a claim about my search reported as a claim about
+		// the world. Measured, §22.1's seven sentences are THREE carried, TWO carried only by a general rule, and
+		// TWO carried nowhere — and this rule is one of the carried ones.
+		canonCarriage: {
+			kind: 'CARRIED',
+			canonAnchor: 'only runtime policy grants it',
+			note: 'JPWB-DOC-001 §5 principle 3 (Capability is not Authority): "a PWA, plan, prompt, or agent may request a capability; only runtime policy grants it." That IS §22.1\'s request/grant distinction, in canon, and it survives retirement. What canon does NOT carry is the OPERATION tier below — which is consistent with the disposition here, since that tier is the Platform\'s.'
+		},
 		why:
 			'A BOUNDARY, NOT A GAP — and the two reasons recorded here before 2026-07-26 were both FALSIFIED (see the ' +
 			'comment above; neither was caught by a gate, because no gate reads prose). The ratified statement is ' +
@@ -246,10 +329,10 @@ export const ENFORCEMENT_REGISTER: Readonly<Record<RegisteredRuleId, Enforcement
 			'and hosts no tool invocation. The corpus names a different enforcer (§33.4 Runtime Authorization ' +
 			'Service; the Charter allocates tool execution and policy enforcement to the Platform). The rule splits ' +
 			'in three: DECLARATION (granted within requested, monotone, outcome derived, step runs only on its own ' +
-			'live binding) is JPWB\'s and is ENFORCED; ADMISSION (a step declaring what it needs) has NO SUBJECT — ' +
+			"live binding) is JPWB's and is ENFORCED; ADMISSION (a step declaring what it needs) has NO SUBJECT — " +
 			'no ratified step-level required-capability declaration exists, though `requiredCapabilities` DOES exist ' +
 			'on ValidatorContract, so the concept is not absent from the corpus, only from ExecutionStep; OPERATION ' +
-			'is the Platform\'s and is deferred to M5. R1 (ruled 2026-07-26): a JPWB-side invocation ledger is NOT ' +
+			"is the Platform's and is deferred to M5. R1 (ruled 2026-07-26): a JPWB-side invocation ledger is NOT " +
 			'built — it would be a record rather than a control, post hoc, unable to compel disclosure, blind to the ' +
 			'bound, and its caller does not exist yet. EXIT: revisit when a broker exists to call it, or when a ' +
 			'step-level capability declaration is ratified. capabilityAuthorized keeps no production caller BY ' +
@@ -273,13 +356,23 @@ export const ENFORCEMENT_REGISTER: Readonly<Record<RegisteredRuleId, Enforcement
 		// the subject gap survives fixing the machine, and the machine gap does not survive fixing the subject. The
 		// enforcement below is on the START and RESUME arrows, which are command-reachable, so F-27 never blocked it.
 		kind: 'ENFORCED',
+		canonCarriage: {
+			kind: 'NO_CANON_CARRIER',
+			why:
+				'The nearest canon rule is JPWB-DOC-003 STA-5 (readiness is a substantive shape gate), whose list of ' +
+				'admission requirements does include "required inputs, expected outputs" — but its SUBJECT is the PWU\'s ' +
+				"shape readiness profile, a definitional obligation on the unit of work. This rule's subject is an " +
+				'EXECUTION STEP at start time, and an input ARTIFACT that must RESOLVE. The two quantify over different ' +
+				'objects, and accepting STA-5 as the carrier would be precisely the layer substitution this register ' +
+				'exists to prevent — the same move as accepting a pure-predicate test for a command-layer rule. So the ' +
+				"rule's only textual home is the pre-canon conformance specification (§12), and retirement loses it."
+		},
 		enforcedAt:
 			'DECLARATION: packages/rph-domain/src/step-command-spec.ts — the `inputReadiness` column, total over the nine step commands. ENFORCEMENT: packages/rph-application/src/handlers/execution.ts — inputReadinessRefusal, invoked from stepAuthorityRefusal as the fourth declared limb for both arrows into RUNNING.',
 		refusalCode: 'RPH_INVARIANT_VIOLATION',
 		// The kernel's own label travels in the MESSAGE: RPH_PRECONDITION_UNSATISFIED is not a member of the ratified
 		// 15-value RphErrorCodeSchema (the WP-11 discipline, as with RPH_BINDING_NOT_AUTHORIZED).
-		refusalMarker:
-			'the step is not ready and no model/tool invocation is performed',
+		refusalMarker: 'the step is not ready and no model/tool invocation is performed',
 		declaredMutations: [
 			'flip StartExecutionStep.inputReadiness to NOT_CONSUMING in step-command-spec.ts',
 			'flip ResolveExecutionStepWait.inputReadiness to NOT_CONSUMING — the two-arrows omission, re-expressed as one character of declaration',
@@ -290,6 +383,12 @@ export const ENFORCEMENT_REGISTER: Readonly<Record<RegisteredRuleId, Enforcement
 	},
 	'RPH-EXE-006': {
 		kind: 'ENFORCED',
+		canonCarriage: {
+			kind: 'CARRIED_BY_GENERAL_RULE',
+			canonAnchor:
+				'No semantic state may be inferred from null values, empty arrays, missing rows, absent output',
+			note: 'JPWB-DOC-003 §4 OBJ-1 (semantic state is always explicit) forbids reading meaning out of ABSENT OUTPUT by name, which is exactly what "step success requires an explicit result" enforces. GENERAL rather than CARRIED because OBJ-1 never mentions steps or completion: the general rule survives retirement, the step-level application does not.'
+		},
 		enforcedAt:
 			'packages/rph-application/src/handlers/execution.ts — completeExecutionStep / validateStepCompletion (WP-11)',
 		refusalCode: 'RPH_INVARIANT_VIOLATION',
@@ -301,6 +400,15 @@ export const ENFORCEMENT_REGISTER: Readonly<Record<RegisteredRuleId, Enforcement
 	},
 	'RPH-EXE-007': {
 		kind: 'NOT_A_COMMAND_REFUSAL',
+		// CARRIAGE AND ENFORCEMENT ARE INDEPENDENT AXES, and this row is the clearest demonstration: canon states the
+		// rule more strongly than the pre-canon corpus did, while this engine still refuses nothing. "Ratified
+		// somewhere readable" and "enforced here" are different questions, and conflating them is how a register comes
+		// to report a guarantee that is only a sentence.
+		canonCarriage: {
+			kind: 'CARRIED',
+			canonAnchor: 'Retries must never duplicate commits',
+			note: 'JPWB-DOC-003 §9 PER-5 (idempotency at the business-effect level) names source-control commits explicitly, alongside external API mutations, baseline promotions, approval decisions and evidence records.'
+		},
 		why:
 			'"produces no second commit" is a statement about an EXTERNAL side effect (a source-control commit) under ' +
 			'a repeated idempotency key. No command is refused; the engine has no source-control plane to make one in. ' +
@@ -309,6 +417,18 @@ export const ENFORCEMENT_REGISTER: Readonly<Record<RegisteredRuleId, Enforcement
 	},
 	'RPH-EXE-008': {
 		kind: 'ENFORCED',
+		canonCarriage: {
+			kind: 'NO_CANON_CARRIER',
+			why:
+				'Canon carries the CONSEQUENCE and not the RULE. JPWB-CON-000 AX-8 (fail closed; escalate rather than ' +
+				'invent) and V1 (budget exhaustion is declared as what it is) both require an exhausted budget to be ' +
+				"surfaced and escalated rather than papered over — which is this rule's SECOND clause, the tactic " +
+				'selection. Its FIRST clause has no canon sentence at all: nothing in the six artifacts says a retry ' +
+				'budget exists, that attempts are counted, or that a controller must stop issuing them. The cap itself ' +
+				'(DEFAULT_RETRY_CAP) is a repository shape, correctly, but a repository shape needs a ratified rule to ' +
+				'be a shape OF; that rule lives only in the pre-canon conformance specification (§12). On retirement ' +
+				'the enforcement stands with nothing to cite.'
+		},
 		enforcedAt:
 			'packages/rph-application/src/handlers/execution.ts — retryExecutionStep / retryDecision',
 		refusalCode: 'RPH_INVARIANT_VIOLATION',
@@ -320,6 +440,11 @@ export const ENFORCEMENT_REGISTER: Readonly<Record<RegisteredRuleId, Enforcement
 	},
 	'RPH-EXE-009': {
 		kind: 'NOT_A_COMMAND_REFUSAL',
+		canonCarriage: {
+			kind: 'CARRIED',
+			canonAnchor: 'Malformed output creates no authoritative object',
+			note: 'JPWB-DOC-003 §9 PER-10 (untrusted until admitted) carries this rule AND §22.1\'s "Model output is treated as untrusted external input" verbatim — "Model output is untrusted external input; the system\'s own agents have no privileged bypass."'
+		},
 		why:
 			'A disposition rule for a malformed MODEL result: retain the raw output, fail boundary validation, create no ' +
 			'authoritative objects. Its subject is the validator boundary, not a command envelope, and its operative ' +
@@ -328,6 +453,11 @@ export const ENFORCEMENT_REGISTER: Readonly<Record<RegisteredRuleId, Enforcement
 	},
 	'RPH-PWU-009': {
 		kind: 'ENFORCED',
+		canonCarriage: {
+			kind: 'CARRIED',
+			canonAnchor: 'superseded work cannot execute',
+			note: 'JPWB-DOC-003 §5 STA-4 (the illegal-transition set is absolute) states it as one of the named laundering paths.'
+		},
 		enforcedAt:
 			'packages/rph-application/src/handlers/execution.ts — pwuOpennessRefusal / canResumeExecutionOnPwu (WP-12b)',
 		refusalCode: 'RPH_INVARIANT_VIOLATION',
@@ -339,6 +469,12 @@ export const ENFORCEMENT_REGISTER: Readonly<Record<RegisteredRuleId, Enforcement
 	},
 	'RPH-PWU-010': {
 		kind: 'ENFORCED',
+		canonCarriage: {
+			kind: 'CARRIED',
+			canonAnchor:
+				'baselined work cannot re-enter execution without a successor revision or successor PWU',
+			note: 'JPWB-DOC-003 §5 STA-4, near-verbatim against the ratified statement — including the successor-revision-or-successor-PWU disjunction, which is the part an implementation is most tempted to drop.'
+		},
 		enforcedAt:
 			'packages/rph-application/src/handlers/execution.ts — pwuOpennessRefusal / canResumeExecutionOnPwu (WP-12b)',
 		refusalCode: 'RPH_INVARIANT_VIOLATION',
