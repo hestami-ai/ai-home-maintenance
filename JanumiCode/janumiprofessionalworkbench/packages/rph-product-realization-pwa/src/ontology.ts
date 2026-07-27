@@ -50,9 +50,42 @@ export interface OntologyIssue {
 	readonly detail: string;
 }
 
+/**
+ * The ontology a validation pass runs against — SUPPLIED rather than read from module scope (JAN-VERIF V-2d).
+ *
+ * WHY THIS IS A PARAMETER NOW. Every check below closed over the module-level `pwuTemplates`, `seedPolicies` and
+ * `conformanceProfiles`, so the only ontology it could ever validate was the shipped one — which is well-formed.
+ * Its five issue kinds had therefore **never been observed to fire**: the suite asserts `validateOntology()`
+ * returns no structural issues, and that is satisfied equally by a working validator and by one that always
+ * returns `[]`.
+ *
+ * That is this programme's recurring defect one layer out — an instrument only ever observed green is
+ * unfalsifiable — and V-2d surfaced it by asking why this file's BRANCH coverage sat at 55%. The uncovered
+ * branches were the validator's negative arms, and they were uncoverable BY CONSTRUCTION.
+ *
+ * The zero-argument call still means "validate what ships"; the parameter exists so a test can hand it a
+ * deliberately broken ontology and watch each kind fire.
+ */
+export interface OntologySubject {
+	readonly pwuTemplates: readonly PwuTemplate[];
+	readonly seedPolicies: readonly SeedPolicy[];
+	readonly conformanceProfiles: readonly ConformanceProfile[];
+}
+
+/** What ships — the default subject, so `validateOntology()` keeps its meaning and every caller is unchanged. */
+const SHIPPED: OntologySubject = { pwuTemplates, seedPolicies, conformanceProfiles };
+
+/** Resolve a policy id WITHIN a given subject (version-stripped) rather than against the shipped set. Using the
+ *  module-level `getSeedPolicy` here would have made the reference checks validate the subject's templates against
+ *  the SHIPPED policies — a broken ontology would then look partly fine, which is worse than not checking. */
+const policyIn = (subject: OntologySubject, policyId: string): SeedPolicy | undefined => {
+	const target = stripVersion(policyId);
+	return subject.seedPolicies.find((p) => stripVersion(p.policyId) === target);
+};
+
 // OVR: exactly one root PWU template.
-function checkRootCardinality(issues: OntologyIssue[]): void {
-	const roots = pwuTemplates.filter((t) => t.isRoot);
+function checkRootCardinality(subject: OntologySubject, issues: OntologyIssue[]): void {
+	const roots = subject.pwuTemplates.filter((t) => t.isRoot);
 	if (roots.length !== 1)
 		issues.push({
 			kind: 'ROOT_CARDINALITY',
@@ -61,8 +94,8 @@ function checkRootCardinality(issues: OntologyIssue[]): void {
 }
 
 // OVR: every seed policy has criteria + an independence requirement + a failure severity.
-function checkSeedPolicies(issues: OntologyIssue[]): void {
-	for (const p of seedPolicies) {
+function checkSeedPolicies(subject: OntologySubject, issues: OntologyIssue[]): void {
+	for (const p of subject.seedPolicies) {
 		if (!p.criteria || p.criteria.length === 0)
 			issues.push({ kind: 'POLICY_NO_CRITERIA', detail: p.policyId });
 		if (!p.independenceRequirement)
@@ -72,31 +105,31 @@ function checkSeedPolicies(issues: OntologyIssue[]): void {
 }
 
 // OVR: every template default policy resolves to a known seed policy.
-function checkTemplatePolicies(issues: OntologyIssue[]): void {
-	for (const t of pwuTemplates) {
+function checkTemplatePolicies(subject: OntologySubject, issues: OntologyIssue[]): void {
+	for (const t of subject.pwuTemplates) {
 		for (const pid of t.defaultPolicyIds ?? []) {
-			if (!getSeedPolicy(pid))
+			if (!policyIn(subject, pid))
 				issues.push({ kind: 'TEMPLATE_UNKNOWN_POLICY', detail: `${t.pwuKind} -> ${pid}` });
 		}
 	}
 }
 
 // OVR: every conformance-profile mandatory policy resolves.
-function checkProfilePolicies(issues: OntologyIssue[]): void {
-	for (const c of conformanceProfiles) {
+function checkProfilePolicies(subject: OntologySubject, issues: OntologyIssue[]): void {
+	for (const c of subject.conformanceProfiles) {
 		for (const pid of c.mandatoryPolicyIds ?? []) {
-			if (!getSeedPolicy(pid))
+			if (!policyIn(subject, pid))
 				issues.push({ kind: 'PROFILE_UNKNOWN_POLICY', detail: `${c.profile} -> ${pid}` });
 		}
 	}
 }
 
 /** Ontology validation (DOC-003 OVR-1..10). Structural integrity the engine relies on before loading a PWA. */
-export function validateOntology(): OntologyIssue[] {
+export function validateOntology(subject: OntologySubject = SHIPPED): OntologyIssue[] {
 	const issues: OntologyIssue[] = [];
-	checkRootCardinality(issues);
-	checkSeedPolicies(issues);
-	checkTemplatePolicies(issues);
-	checkProfilePolicies(issues);
+	checkRootCardinality(subject, issues);
+	checkSeedPolicies(subject, issues);
+	checkTemplatePolicies(subject, issues);
+	checkProfilePolicies(subject, issues);
 	return issues;
 }

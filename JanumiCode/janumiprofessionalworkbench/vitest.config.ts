@@ -133,9 +133,12 @@ export default defineConfig({
 			// unreachable branch is DELETED or DECLARED, never coloured green.
 			//
 			// `autoUpdate` stays off, deliberately: a threshold that rewrites itself downward is not a ratchet.
+			// BRANCHES RATCHETED 82.5 -> 83.0 on 2026-07-26 (V-2d). Measured 83.34 after the ontology validator's
+			// five failure kinds became reachable; rounded DOWN to the nearest half point, per the rule above. A
+			// ratchet that is not tightened when the measurement supports it is a ratchet in name only.
 			thresholds: {
 				statements: 94.5,
-				branches: 82.5,
+				branches: 83,
 				functions: 95.5,
 				lines: 96.5,
 				autoUpdate: false

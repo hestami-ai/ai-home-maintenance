@@ -1756,5 +1756,21 @@ export const DECLARED_MUTANTS: readonly DeclaredMutant[] = [
 		expectRed: ['packages/rph-application/src/handlers/partauth-derived-outcome.test.ts'],
 		why: 'R2: the event must record the outcome the vocabulary declares REQUIRED on it, or the audit log cannot distinguish full from partial',
 		source: 'R2 ruling'
+	},
+	{
+		id: 'V1-ontology-references-resolve-against-the-SHIPPED-set',
+		file: 'packages/rph-product-realization-pwa/src/ontology.ts',
+		// THE TRAP THE V-2d PARAMETERISATION COULD EASILY HAVE WALKED INTO. If the reference checks resolve against
+		// the module-level SHIPPED policies instead of the SUBJECT's, an ontology whose policies were removed still
+		// validates clean — its templates resolve against a set it does not contain. The validator then reports a
+		// verdict it did not earn, which is worse than not checking: a broken ontology looks partly fine.
+		//
+		// Same shape as every "second copy that claims to be derived" defect in this lineage, expressed as a scope
+		// slip rather than a duplication.
+		find: '\treturn subject.seedPolicies.find((p) => stripVersion(p.policyId) === target);',
+		replace: '\treturn seedPolicies.find((p) => stripVersion(p.policyId) === target);',
+		expectRed: ['packages/rph-product-realization-pwa/src/verif-2d-ontology-validator.test.ts'],
+		why: 'a validator must judge the ontology it was GIVEN — resolving against the shipped set makes a broken subject look partly valid',
+		source: 'JAN-VERIF V-2d'
 	}
 ];
