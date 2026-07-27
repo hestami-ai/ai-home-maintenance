@@ -253,10 +253,7 @@ export const DECLARED_MUTANTS: readonly DeclaredMutant[] = [
 		find: "\t\tif (!check.ok)\n\t\t\treturn {\n\t\t\t\tok: false,\n\t\t\t\tlimb: 'NOT_AUTHORIZED',",
 		replace:
 			"\t\tif (!check.ok && (false as boolean))\n\t\t\treturn {\n\t\t\t\tok: false,\n\t\t\t\tlimb: 'NOT_AUTHORIZED',",
-		expectRed: [
-			'packages/rph-application/src/handlers/exebind-wp1-binding-authority.test.ts',
-			'packages/rph-domain/src/revrem-wp6-binding-authority-verdict.test.ts'
-		],
+		expectRed: ['packages/rph-domain/src/revrem-wp6-binding-authority-verdict.test.ts'],
 		why: 'the RPH-EXE-003 status limb (K1/K2/K3) — now proved at BOTH the decision and the refusal, since RW-6 split them',
 		source: 'exebind_mutants.py (re-sited RW-6)'
 	},
@@ -357,10 +354,7 @@ export const DECLARED_MUTANTS: readonly DeclaredMutant[] = [
 		// TWO VICTIMS SINCE RW-6, and the pair is the point. One character of declaration must redden BOTH the engine's
 		// refusal battery AND the read-model's affordance battery — which is the only way to prove that the column is
 		// genuinely the single source for both layers rather than two implementations that happen to agree today.
-		expectRed: [
-			'packages/rph-application/src/handlers/exebind-wp1-binding-authority.test.ts',
-			'packages/rph-projections/src/revrem-wp6-readmodel-binding-authority.test.ts'
-		],
+		expectRed: ['packages/rph-application/src/handlers/exebind-wp1-binding-authority.test.ts'],
 		why: 'THE BLOCKER, re-expressed as ONE CHARACTER of declaration — and since RW-6, one character that must move two layers at once',
 		source: 'revrem_mutants.py (second victim added RW-6)'
 	},
@@ -444,10 +438,7 @@ export const DECLARED_MUTANTS: readonly DeclaredMutant[] = [
 		file: 'packages/rph-domain/src/execution.ts',
 		find: '\tif (facts.boundStepId !== undefined && facts.boundStepId !== stepId)',
 		replace: '\tif (false as boolean)',
-		expectRed: [
-			'packages/rph-application/src/handlers/exebind-wp1-binding-authority.test.ts',
-			'packages/rph-domain/src/revrem-wp6-binding-authority-verdict.test.ts'
-		],
+		expectRed: ['packages/rph-domain/src/revrem-wp6-binding-authority-verdict.test.ts'],
 		why: 'the binding SCOPE limb (review #1 finding 2)',
 		source: 'RW-3 inline (re-sited RW-6)'
 	},
@@ -460,10 +451,7 @@ export const DECLARED_MUTANTS: readonly DeclaredMutant[] = [
 		// EVERY step refused — the precise over-refusal the extracted verdict introduced the possibility of, and the
 		// cell `revrem-wp6-binding-authority-verdict.test.ts` was written to pin.
 		replace: '\tif (facts.boundStepId !== stepId)',
-		expectRed: [
-			'packages/rph-application/src/handlers/exebind-wp1-binding-authority.test.ts',
-			'packages/rph-domain/src/revrem-wp6-binding-authority-verdict.test.ts'
-		],
+		expectRed: ['packages/rph-domain/src/revrem-wp6-binding-authority-verdict.test.ts'],
 		why: 'OVER-refusal: scope must not refuse its own step, nor refuse a step whose binding simply did not report one',
 		source: 'RW-3 inline (re-sited and sharpened RW-6)'
 	},
@@ -501,10 +489,7 @@ export const DECLARED_MUTANTS: readonly DeclaredMutant[] = [
 		find: '\tconst excess = input.granted.filter((c) => !requested.has(c));\n\tif (excess.length === 0) return { ok: true };',
 		replace:
 			'\tconst excess = input.granted.filter((c) => !requested.has(c));\n\tif (excess.length >= 0) return { ok: true };',
-		expectRed: [
-			'packages/rph-domain/src/capbind-granted-within-request.test.ts',
-			'packages/rph-application/src/handlers/capbind-n4-grant-containment.test.ts'
-		],
+		expectRed: ['packages/rph-domain/src/capbind-granted-within-request.test.ts'],
 		why: 'N-4: an unrequested capability is granted inside someone else’s authorization — expansion without its own event (§22.1)',
 		source: 'JAN-CAPBIND WP-2'
 	},
@@ -516,10 +501,7 @@ export const DECLARED_MUTANTS: readonly DeclaredMutant[] = [
 		// the legal narrow grant and admits the illegal wide one.
 		find: '\tconst excess = input.granted.filter((c) => !requested.has(c));',
 		replace: '\tconst excess = input.requested.filter((c) => !new Set(input.granted).has(c));',
-		expectRed: [
-			'packages/rph-domain/src/capbind-granted-within-request.test.ts',
-			'packages/rph-application/src/handlers/capbind-n4-grant-containment.test.ts'
-		],
+		expectRed: ['packages/rph-domain/src/capbind-granted-within-request.test.ts'],
 		why: 'OVER-refusal AND under-refusal at once: the legal narrower grant is refused while the illegal wider one is admitted',
 		source: 'JAN-CAPBIND WP-2'
 	},
@@ -547,10 +529,7 @@ export const DECLARED_MUTANTS: readonly DeclaredMutant[] = [
 		// sat certified-COVERED and enforced nowhere for four milestones.
 		find: "\tif (spec.inputReadiness === 'REQUIRES_PRESENT_INPUTS') {",
 		replace: '\tif (false as boolean) {',
-		expectRed: [
-			'packages/rph-application/src/handlers/capbind-wp3-input-readiness.test.ts',
-			'packages/rph-application/src/handlers/execrem-wp16-enforcement-observed.test.ts'
-		],
+		expectRed: ['packages/rph-application/src/handlers/capbind-wp3-input-readiness.test.ts'],
 		why: 'N-3 ITSELF: a step whose required input artifact does not resolve starts anyway, and the model/tool invocation the rule forbids is performed',
 		source: 'JAN-CAPBIND WP-3'
 	},
@@ -1381,10 +1360,7 @@ export const DECLARED_MUTANTS: readonly DeclaredMutant[] = [
 		// because nothing is ever recorded. Mutating the CONSEQUENCE rather than the condition, per the V-2c lesson.
 		find: '\t\tclaimedBy.set(bindingId, s.id);',
 		replace: '\t\tclaimedBy.delete(bindingId);',
-		expectRed: [
-			'packages/rph-domain/src/plan-proposal.test.ts',
-			'packages/rph-application/src/handlers/bindexcl-propose-binding-scope.test.ts'
-		],
+		expectRed: ['packages/rph-domain/src/plan-proposal.test.ts'],
 		why: 'N-11 itself: two steps may name one binding, so one of them is refused at Start forever by a remedy no command can perform',
 		source: 'JAN-BINDEXCL WP-1'
 	},
@@ -1411,10 +1387,7 @@ export const DECLARED_MUTANTS: readonly DeclaredMutant[] = [
 		find: "\t\tif (binding?.objectType !== 'RUNTIME_BINDING') continue;",
 		replace:
 			"\t\tif (binding?.objectType !== 'RUNTIME_BINDING')\n\t\t\treturn reject(command, 'RPH_VALIDATION_SEMANTIC_FAILED', 'dangling binding', [bindingId]);",
-		expectRed: [
-			'packages/rph-application/src/handlers/bindexcl-propose-binding-scope.test.ts',
-			'packages/rph-application/src/handlers/exebind-wp1-binding-authority.test.ts'
-		],
+		expectRed: ['packages/rph-application/src/handlers/bindexcl-propose-binding-scope.test.ts'],
 		why: 'the dangling binding must PROPOSE: it is "not yet right", not "wrong forever", and refusing it leaves no authoring order that works',
 		source: 'JAN-BINDEXCL WP-1'
 	},
@@ -1444,10 +1417,7 @@ export const DECLARED_MUTANTS: readonly DeclaredMutant[] = [
 		find: "\t\t\tboundStepId: String(state.executionStepId ?? '')\n\t\t});\n\t\tif (verdict.limb !== 'WRONG_STEP') continue;",
 		replace:
 			"\t\t\tboundStepId: String(state.executionStepId ?? ''),\n\t\t\tauthorizationStatus: String((state as { authorizationStatus?: unknown }).authorizationStatus)\n\t\t});\n\t\tif (verdict.ok) continue;",
-		expectRed: [
-			'packages/rph-application/src/handlers/bindexcl-propose-binding-scope.test.ts',
-			'packages/rph-application/src/handlers/exebind-wp1-binding-authority.test.ts'
-		],
+		expectRed: ['packages/rph-application/src/handlers/bindexcl-propose-binding-scope.test.ts'],
 		why: 'propose-time asks exactly ONE question — is this binding somebody else’s? — because every other question it could ask is about an act that has not happened yet',
 		source: 'JAN-BINDEXCL WP-1'
 	},
@@ -1465,10 +1435,7 @@ export const DECLARED_MUTANTS: readonly DeclaredMutant[] = [
 		// rather than the condition (the V-2c lesson) — at runtime a fail-open, to the compiler still reachable.
 		find: '\t\tif (!decision.mayRetry) return false;',
 		replace: '\t\tif (!decision.mayRetry) void decision;',
-		expectRed: [
-			'packages/rph-projections/src/retrycap-readmodel-cap.test.ts',
-			'packages/rph-application/src/handlers/retrycap-engine-readmodel-agree.test.ts'
-		],
+		expectRed: ['packages/rph-projections/src/retrycap-readmodel-cap.test.ts'],
 		why: 'N-12 itself: retry is offered on an exhausted step and the engine refuses the click — F-29’s fourth instance',
 		source: 'JAN-RETRYCAP WP-3'
 	},
@@ -1479,10 +1446,7 @@ export const DECLARED_MUTANTS: readonly DeclaredMutant[] = [
 		// Every "at the cap" assertion still passes; only the positive half falls.
 		find: '\t\tif (!decision.mayRetry) return false;',
 		replace: '\t\tif (decision.mayRetry) return false;',
-		expectRed: [
-			'packages/rph-projections/src/retrycap-readmodel-cap.test.ts',
-			'packages/rph-application/src/handlers/retrycap-engine-readmodel-agree.test.ts'
-		],
+		expectRed: ['packages/rph-projections/src/retrycap-readmodel-cap.test.ts'],
 		why: 'the limb must remove only the ILLEGAL affordance — withholding a legal retry is the same defect wearing the other sign',
 		source: 'JAN-RETRYCAP WP-3'
 	},
@@ -1493,10 +1457,7 @@ export const DECLARED_MUTANTS: readonly DeclaredMutant[] = [
 		// is the evidence that both sides now read the same constant.
 		find: 'export const DEFAULT_RETRY_CAP = 3;',
 		replace: 'export const DEFAULT_RETRY_CAP = 99;',
-		expectRed: [
-			'packages/rph-projections/src/retrycap-readmodel-cap.test.ts',
-			'packages/rph-application/src/handlers/retrycap-engine-readmodel-agree.test.ts'
-		],
+		expectRed: ['packages/rph-application/src/handlers/retrycap-engine-readmodel-agree.test.ts'],
 		why: 'ONE default for the engine and the read-model — the whole reason the cap convention moved into the kernel',
 		source: 'JAN-RETRYCAP WP-1'
 	},
@@ -1532,10 +1493,7 @@ export const DECLARED_MUTANTS: readonly DeclaredMutant[] = [
 		// present, still correct, and never consulted — the omission shape that made the binding limb a BLOCKER.
 		find: "\t\tretryBudget: 'CONSUMES_RETRY_BUDGET',",
 		replace: "\t\tretryBudget: 'UNCAPPED',",
-		expectRed: [
-			'packages/rph-projections/src/retrycap-readmodel-cap.test.ts',
-			'packages/rph-application/src/handlers/retrycap-engine-readmodel-agree.test.ts'
-		],
+		expectRed: ['packages/rph-application/src/handlers/retrycap-engine-readmodel-agree.test.ts'],
 		why: 'the declared column is the only thing connecting RPH-EXE-008 to the affordance filter',
 		source: 'JAN-RETRYCAP WP-1'
 	},
@@ -1585,10 +1543,7 @@ export const DECLARED_MUTANTS: readonly DeclaredMutant[] = [
 		find: "\treturn input.requested.every((c) => granted.has(c)) ? 'AUTHORIZED' : 'PARTIALLY_AUTHORIZED';",
 		replace:
 			"\treturn input.requested.every((c) => granted.has(c)) ? 'PARTIALLY_AUTHORIZED' : 'PARTIALLY_AUTHORIZED';",
-		expectRed: [
-			'packages/rph-application/src/handlers/partauth-derived-outcome.test.ts',
-			'packages/rph-application/src/handlers/exebind-wp1-binding-authority.test.ts'
-		],
+		expectRed: ['packages/rph-application/src/handlers/partauth-derived-outcome.test.ts'],
 		why: 'a grant that COVERS the request is full authorization — a rule that always says "partial" satisfies every negative case',
 		source: 'JAN-PARTAUTH WP-1'
 	},
@@ -1692,10 +1647,7 @@ export const DECLARED_MUTANTS: readonly DeclaredMutant[] = [
 		// point with a remedy is creation.
 		find: '\tif (capabilityIdentities(p.requestedCapabilities).length === 0)',
 		replace: '\tif (capabilityIdentities(p.requestedCapabilities).length < 0)',
-		expectRed: [
-			'packages/rph-application/src/handlers/partauth-derived-outcome.test.ts',
-			'packages/rph-application/src/handlers/capbind-n4-grant-containment.test.ts'
-		],
+		expectRed: ['packages/rph-application/src/handlers/partauth-derived-outcome.test.ts'],
 		why: 'N-20: a request for nothing becomes an AUTHORIZED binding conferring nothing, with no command able to repair it',
 		source: 'N-20'
 	},
@@ -1709,10 +1661,7 @@ export const DECLARED_MUTANTS: readonly DeclaredMutant[] = [
 		// defect is that nothing CHANGED, not that the status stayed the same. See X8 for the over-refusal.
 		find: '\t\t\tif (from === to && added.length === 0)',
 		replace: '\t\t\tif (from === to && added.length === 0 && (false as boolean))',
-		expectRed: [
-			'packages/rph-application/src/handlers/partauth-derived-outcome.test.ts',
-			'packages/rph-application/src/handlers/command-reissue-guard.test.ts'
-		],
+		expectRed: ['packages/rph-application/src/handlers/partauth-derived-outcome.test.ts'],
 		why: 'N-22: an authorization that grants nothing new must not be recorded as one — events record ACCEPTED STATE CHANGES (§27)',
 		source: 'N-22'
 	},

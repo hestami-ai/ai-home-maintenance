@@ -71,7 +71,9 @@ describe('the mutant ledger is internally coherent', () => {
 			[m.supersededBy, m.duplicateOf].flatMap((ref) => {
 				if (ref === undefined) return [];
 				const named = ref.split(' —')[0]!.trim();
-				return ids.some((id) => id.includes(named) || named.includes(id)) ? [] : [`${m.id} -> ${named}`];
+				return ids.some((id) => id.includes(named) || named.includes(id))
+					? []
+					: [`${m.id} -> ${named}`];
 			})
 		);
 		expect(dangling).toEqual([]);
@@ -79,15 +81,58 @@ describe('the mutant ledger is internally coherent', () => {
 
 	it('never marks one entry as both retired and duplicate, which would say the guard moved AND did not', () => {
 		expect(
-			DECLARED_MUTANTS.filter((m) => m.supersededBy !== undefined && m.duplicateOf !== undefined).map(
-				(m) => m.id
-			)
+			DECLARED_MUTANTS.filter(
+				(m) => m.supersededBy !== undefined && m.duplicateOf !== undefined
+			).map((m) => m.id)
 		).toEqual([]);
 	});
 
 	it('gives every entry a rationale and a provenance, because an unexplained mutant cannot be triaged', () => {
 		expect(
 			DECLARED_MUTANTS.filter((m) => m.why.trim() === '' || m.source.trim() === '').map((m) => m.id)
+		).toEqual([]);
+	});
+
+	// ── V-3c: THE UNNAMED-VICTIM RATCHET, CHECKED IN SECONDS RATHER THAN IN THIRTY MINUTES ───────────────────
+	//
+	// `run.ts` also fails on KILLED_UNNAMED, and that is the authoritative gate — it observes the mutant actually
+	// being killed by the suite it names. But it is a ~30-minute run, so it is the WRONG place to learn that a
+	// field was left blank: the feedback arrives long after the commit that caused it, which is how a records
+	// defect accumulates for eighteen work packages while being truthfully reported every single run.
+	//
+	// This is the same claim decided from the DATA, in the ordinary `test` run. Two gates for one rule is
+	// deliberate here — they fail at different times and neither subsumes the other.
+	it('names a victim for every MEASURABLE mutant — "something caught it" is not a record', () => {
+		// The exclusions are not leniency, they are correctness. An empty `expectRed` is CORRECT for a control (it
+		// must redden NOTHING), for a type-prevented mutant (it never reaches a test run), and for entries decided
+		// before they are applied. Demanding a victim from any of them would invent a defect to fix — and the set
+		// is written to match `run.ts`'s HARVEST selection exactly, so the two instruments cannot disagree about
+		// which population the rule governs.
+		const measurable = DECLARED_MUTANTS.filter(
+			(m) =>
+				m.supersededBy === undefined &&
+				m.duplicateOf === undefined &&
+				m.expectSurvive === undefined &&
+				m.expectNoCompile === undefined
+		);
+		expect(
+			measurable.length,
+			'the ledger must actually contain measurable mutants'
+		).toBeGreaterThan(50);
+		expect(
+			measurable.filter((m) => m.expectRed.length === 0).map((m) => m.id),
+			'mutant(s) with NO NAMED VICTIM — run `bun run mutants:harvest`, then CHOOSE against what the candidate suites assert'
+		).toEqual([]);
+	});
+
+	it('names exactly ONE victim per mutant, because a longer list is a LOWER bar', () => {
+		// THE COUNTER-INTUITIVE HALF, and the reason it is gated rather than written in a comment. `run.ts` invokes
+		// vitest ONCE with every named suite and fails if the run fails — so naming a second suite means "any of
+		// these reddens", which is WEAKER than naming the first alone. The instinct to add another name for safety
+		// makes the claim smaller, and nothing about the green output would say so.
+		expect(
+			DECLARED_MUTANTS.filter((m) => m.expectRed.length > 1).map((m) => m.id),
+			'mutant(s) naming several victims — pick the suite whose assertions are about the guard'
 		).toEqual([]);
 	});
 });
