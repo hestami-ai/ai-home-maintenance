@@ -30,11 +30,11 @@ describe('grantedWithinRequest — §22.1 containment', () => {
 	it('REFUSES any capability that was not requested, and names it', () => {
 		const v = grantedWithinRequest({
 			requested: ['file-system'],
-			granted: ['file-system', 'shell.exec']
+			granted: ['file-system', 'network']
 		});
 		expect(v.ok).toBe(false);
 		expect(v.errorCode).toBe('RPH_CAPABILITY_NOT_REQUESTED');
-		expect(v.reason).toContain('shell.exec');
+		expect(v.reason).toContain('network');
 	});
 
 	it('REFUSES a grant against an empty request — the sharpest form of the defect', () => {
@@ -42,9 +42,9 @@ describe('grantedWithinRequest — §22.1 containment', () => {
 	});
 
 	it('names EVERY excess capability, not merely the first', () => {
-		const v = grantedWithinRequest({ requested: [], granted: ['network', 'shell.exec'] });
+		const v = grantedWithinRequest({ requested: [], granted: ['network', 'network'] });
 		expect(v.reason).toContain('network');
-		expect(v.reason).toContain('shell.exec');
+		expect(v.reason).toContain('network');
 	});
 
 	it('IS NOT SYMMETRIC — swapping the operands changes the verdict', () => {

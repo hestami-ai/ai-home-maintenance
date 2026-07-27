@@ -155,7 +155,7 @@ describe('JAN-EXECREM WP-14 — binding + prune provenance are DERIVED, never as
 					runtimeBindingId: BINDING,
 					executionStepId: sid(1),
 					roleId: 'role-executor',
-					requestedCapabilities: [{ capability: 'fs.read' }]
+					requestedCapabilities: [{ capability: 'file-system' }]
 				},
 				BINDING,
 				'RUNTIME_BINDING'
@@ -165,7 +165,7 @@ describe('JAN-EXECREM WP-14 — binding + prune provenance are DERIVED, never as
 		ok(
 			dispatch(
 				'AuthorizeRuntimeBinding',
-				{ grantedCapabilities: [{ capability: 'fs.read' }] },
+				{ grantedCapabilities: [{ capability: 'file-system' }] },
 				BINDING,
 				'RUNTIME_BINDING'
 			),

@@ -97,9 +97,16 @@ describe('WP-0 — OutputBinding stays deliberately opaque, and that is asserted
 });
 
 describe('WP-0 — the existing fixture corpus still parses', () => {
-	it('accepts every capability literal currently written in this repo', () => {
-		// Mechanically harvested: `grep -rn "capability: '"` over packages and apps returns 13 lines across 4 files,
-		// every one keyed `capability`. These are the exact values.
+	it('accepts capability literals in BOTH dialects — the value domain is deliberately open', () => {
+		// Mechanically harvested at WP-0: `grep -rn "capability: '"` returned 13 lines across 4 files, in two
+		// dialects — the corpus's own nouns (`file-system`, `network`, verbatim from RPH-EXE-004's statement) and a
+		// dotted convention from nowhere (`fs.read`, `shell.exec`).
+		//
+		// N-10 NORMALISED THE FIXTURES TO THE CORPUS NOUNS, AND THIS CASE DELIBERATELY KEEPS BOTH. Its subject is
+		// not which dialect we write; it is that the schema imposes NO closed enum — the §22.1 ruling left the value
+		// domain open on purpose, because a closed set would forbid capabilities the corpus never enumerated.
+		// Rewriting these literals to the house dialect would quietly convert an openness assertion into a
+		// house-style one, and the next reader would have no way to tell the schema still accepts anything.
 		for (const capability of ['fs.read', 'shell.exec', 'file-system']) {
 			expect(CapabilityRequestSchema.safeParse({ capability }).success, capability).toBe(true);
 			expect(CapabilityGrantSchema.safeParse({ capability }).success, capability).toBe(true);

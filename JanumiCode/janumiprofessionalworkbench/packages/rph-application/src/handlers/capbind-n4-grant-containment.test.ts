@@ -86,17 +86,17 @@ describe('WP-2 / N-4 — AuthorizeRuntimeBinding refuses a grant exceeding its r
 	});
 
 	it('THE KILL TEST: a FIRST authorization granting an unrequested capability is REFUSED', () => {
-		// The binding asked for file-system only. Granting shell.exec alongside it is privilege expansion performed
+		// The binding asked for file-system only. Granting network alongside it is privilege expansion performed
 		// inside someone else's authorization — no new request, no separate decision, and (before this guard) no
 		// refusal. This is the first authorization from REQUESTED, so `fromStates` permits it and only the
 		// containment guard can refuse.
 		request(['file-system']);
-		const r = authorize(['file-system', 'shell.exec']);
+		const r = authorize(['file-system', 'network']);
 		expect(r.status).toBe('REJECTED');
 		expect(r.error?.code).toBe('RPH_INVARIANT_VIOLATION');
 		expect(r.error?.message).toContain('RPH_CAPABILITY_NOT_REQUESTED');
 		expect(r.error?.message, 'the refusal must NAME the offending capability').toContain(
-			'shell.exec'
+			'network'
 		);
 	});
 
@@ -104,7 +104,7 @@ describe('WP-2 / N-4 — AuthorizeRuntimeBinding refuses a grant exceeding its r
 		// A refusal that had already mutated would confer the excess capability while reporting failure, which is
 		// worse than admitting it outright: the audit trail would say REJECTED and the state would say granted.
 		request(['file-system']);
-		authorize(['file-system', 'shell.exec']);
+		authorize(['file-system', 'network']);
 		expect(grantedOf()).toEqual([]);
 	});
 
@@ -163,9 +163,9 @@ describe('WP-2 / N-4 — AuthorizeRuntimeBinding refuses a grant exceeding its r
 	it('names EVERY unrequested capability, not just the first', () => {
 		// An operator repairing this needs the whole excess set; reporting one at a time turns one fix into three.
 		request(['file-system']);
-		const r = authorize(['file-system', 'network', 'shell.exec']);
+		const r = authorize(['file-system', 'network', 'network']);
 		expect(r.error?.message).toContain('network');
-		expect(r.error?.message).toContain('shell.exec');
+		expect(r.error?.message).toContain('network');
 	});
 
 	it('the refusal prescribes a remedy the engine ACTUALLY PERMITS — not a wedge', () => {

@@ -74,7 +74,7 @@ describe('JAN-NOOP-01 — a re-issued command cannot append a contradicting fact
 					runtimeBindingId: BINDING,
 					executionStepId: STEP,
 					roleId: 'role-executor',
-					requestedCapabilities: [{ capability: 'fs.read' }]
+					requestedCapabilities: [{ capability: 'file-system' }]
 				},
 				BINDING,
 				'RUNTIME_BINDING'
@@ -85,7 +85,7 @@ describe('JAN-NOOP-01 — a re-issued command cannot append a contradicting fact
 			expect(
 				dispatch(
 					'AuthorizeRuntimeBinding',
-					{ grantedCapabilities: [{ capability: 'fs.read' }] },
+					{ grantedCapabilities: [{ capability: 'file-system' }] },
 					BINDING,
 					'RUNTIME_BINDING'
 				).status
@@ -94,7 +94,7 @@ describe('JAN-NOOP-01 — a re-issued command cannot append a contradicting fact
 			// A DIFFERENT actor now tries to widen the grant with no new request and no new authorization decision.
 			const escalation = dispatch(
 				'AuthorizeRuntimeBinding',
-				{ grantedCapabilities: [{ capability: 'fs.read' }, { capability: 'shell.exec' }] },
+				{ grantedCapabilities: [{ capability: 'file-system' }, { capability: 'network' }] },
 				BINDING,
 				'RUNTIME_BINDING',
 				USER_2
@@ -102,7 +102,7 @@ describe('JAN-NOOP-01 — a re-issued command cannot append a contradicting fact
 			expect(escalation.status).toBe('REJECTED');
 			expect(escalation.error?.code).toBe('RPH_ILLEGAL_STATE_TRANSITION');
 
-			expect(stateOf(BINDING).grantedCapabilities).toEqual([{ capability: 'fs.read' }]);
+			expect(stateOf(BINDING).grantedCapabilities).toEqual([{ capability: 'file-system' }]);
 			expect(eventsOfType('RuntimeBindingAuthorized')).toHaveLength(1);
 		});
 
@@ -110,7 +110,7 @@ describe('JAN-NOOP-01 — a re-issued command cannot append a contradicting fact
 			request();
 			dispatch(
 				'AuthorizeRuntimeBinding',
-				{ grantedCapabilities: [{ capability: 'fs.read' }] },
+				{ grantedCapabilities: [{ capability: 'file-system' }] },
 				BINDING,
 				'RUNTIME_BINDING'
 			);
@@ -141,7 +141,7 @@ describe('JAN-NOOP-01 — a re-issued command cannot append a contradicting fact
 			expect(
 				dispatch(
 					'AuthorizeRuntimeBinding',
-					{ grantedCapabilities: [{ capability: 'fs.read' }] },
+					{ grantedCapabilities: [{ capability: 'file-system' }] },
 					BINDING,
 					'RUNTIME_BINDING'
 				).status
