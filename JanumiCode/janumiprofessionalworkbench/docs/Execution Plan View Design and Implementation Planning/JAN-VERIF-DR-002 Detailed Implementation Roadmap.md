@@ -10,6 +10,7 @@ author solutions to the residual items with rigor; authorization is conferred by
 | **V-3a** | The harvest affordance | `MUTANTS_HARVEST=1` — measured victim candidates, written nowhere | — |
 | **V-3b** | Name the 46 victims | `expectRed` populated; every choice proved by a normal run | V-3a |
 | **V-3c** | Arm the ratchet | `KILLED_UNNAMED` blocks; the 47th unnamed mutant fails on day one | V-3b |
+| **V-3d** | *(unplanned — a finding V-3c produced)* | exactly ONE victim per mutant; three inert victims removed | V-3c |
 | **V-4a** | The carriage axis | `canonCarriage` on all 11 register rows + the resolution gate | — |
 | **V-4b** | Record the corpus-level residual | §22.1's two uncarried sentences filed for the retirement decision | V-4a |
 
@@ -60,6 +61,41 @@ Two shapes get recorded rather than silently absorbed:
    witness asserts on a table, not on behaviour.
 2. **A mutant whose candidates are all in a different package from the mutated file.** Expected and correct here
    (domain predicates are enforced at the command layer), but worth seeing where it happens.
+
+---
+
+## 3b. V-3d — the finding V-3c produced, fixed where it was found
+
+Writing the V-3c rule a *second* time as a fast ledger-data check — seconds, inside `bun run test`, rather than
+thirty minutes inside the mutation run — surfaced a defect nobody had looked for.
+
+**The mechanism.** `run.ts` invokes vitest ONCE with every named suite and calls the mutant KILLED if the run
+fails. So a second name does not strengthen the claim; it means *"at least one of these reddens"*, which is a
+**lower** bar than naming either alone. **The instinct to add a name for safety makes the claim smaller, and
+nothing in the green output says so.**
+
+17 entries named two victims each. Probing all 34 (entry, victim) pairs individually with the runner's own
+`MUTANTS_TARGET` override found **three recorded victims that do not redden at all**:
+
+| Entry | Inert victim |
+|---|---|
+| `S2-scope-always-refuses` | `exebind-wp1-binding-authority.test.ts` |
+| `R4-the-shared-default-cap-changes` | `retrycap-readmodel-cap.test.ts` |
+| `PA2-the-outcome-is-always-partial` | `exebind-wp1-binding-authority.test.ts` |
+
+Each was recorded as evidence and supplied none; each entry was green only because its co-named suite did the
+work. **Structurally invisible** — no possible outcome of the mutation run could distinguish "both suites catch
+it" from "one does and the other is decoration".
+
+All 17 narrowed to the single suite that measurably earns the claim. Three choices forced by the measurement; for
+the other fourteen both kill, and the tiebreak is recorded in the ledger: subject-named beats general or probe
+suite; where both name the subject, the one in the **mutated file's own package**; where the rule's statement is a
+command refusal, the command-layer suite.
+
+**Two gates now carry the rule and neither subsumes the other.** `run.ts` observes the kill (authoritative, slow);
+`verif/mutant-ledger.test.ts` decides it from the data (fast, and the right place to learn that a field was left
+blank). The exclusion set is written to match the harvest's selection exactly, so the two cannot disagree about
+which population the rule governs.
 
 ---
 
