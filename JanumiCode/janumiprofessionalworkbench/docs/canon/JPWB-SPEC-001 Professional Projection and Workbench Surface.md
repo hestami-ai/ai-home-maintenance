@@ -1,0 +1,6772 @@
+# 0. How to read this specification
+
+**INFORMATIVE, except where marked.** This section is a reading key. It carries no obligation over any Surface,
+Projection or implementation; it fixes how the rest of the document is to be read, so that a reader who opens at
+§5 or §10 can construe a sentence without reading §1 first. The document's **standing** — what authority it does
+and does not have — is stated in the Reader's note that follows the status block in §1, and a reader who has not
+read that note has not yet read the only thing about this document that is settled.
+
+## 0.1 The deontic register
+
+Body text uses explicit modality. A word from the register is never used loosely, and a sentence that states an
+obligation without one is a defect of this document rather than a softer obligation.
+
+| Modality | Meaning | What a conformance run does with it |
+|---|---|---|
+| **SHALL** | Mandatory. The conforming behaviour or state is required. | A named check establishes it; failure is a finding. |
+| **SHALL NOT** | Prohibited. The named behaviour or state is forbidden. | A named negative fixture detects the prohibited implementation; detection is a finding. |
+| **SHOULD** | Expected, with justified divergence permitted. The justification is recorded, not assumed. | Divergence without a recorded justification is a finding; divergence with one is not. |
+| **MAY** | Permitted. Neither required nor discouraged. | Nothing. A MAY carries no check, which is why nothing load-bearing is written as one. |
+| **INFORMATIVE** | Explanatory. Motivation, measurement, history, reasoning. | Nothing. An INFORMATIVE passage never establishes an obligation, and an obligation is never left in one. |
+
+**NORMATIVE on reading.** Every `SHALL` and `SHALL NOT` in this document names **how conformance is established** —
+a named test, fixture, check, or evidence obligation — in the same sentence or an adjacent one. An unverifiable
+`SHALL` is a defect, not a stylistic choice, and §1.5 D-3 makes that a condition of this document being done.
+Where a sentence names an identifier from a fixture namespace §10 does not define, the **assertion stated at the
+point of use** is the verification binding; the identifier gap is recorded at §10.8 and §11.2.4, and it does not
+suspend the obligation.
+
+**A conforming normative sentence** carries: subject · modality · required behaviour or state · triggering
+condition · boundary or exception · verification method. Where a sentence in this document is missing one of the
+six, that is a finding against this document.
+
+## 0.2 The provenance label vocabulary
+
+**NORMATIVE for this document.** Every material claim about the repository, the canon, or the four source documents
+carries one of four labels, and the label is verifiable by a reader with the repository in hand. This is the master
+statement; §1.2 (which authored it), §3's reading key, §4's reading conventions for §§4–6, §7.1 and §11.0.5
+each restate it at their own boundary with citation, per §8's controlled-redundancy rule.
+
+- **CONFIRMED** — the file was read and the claim is cited `path:line`, or the document section was read and cited
+  `DOC §n`. A **CONFIRMED absence** additionally states the exact search performed: the tool, the pattern, the
+  paths, and the fact that the output was not truncated.
+- **INFERRED** — derived from CONFIRMED facts by stated reasoning; the reasoning is given inline, not left to the
+  reader to reconstruct.
+- **ASSUMED** — taken as true without evidence, with the reason it was not established and what breaks if it is
+  false.
+- **UNRATIFIED-AUTHORED** — authored under the sponsor grant of 2026-07-28, beyond anything the canon or the
+  sources ratify. Where a reasonable sponsor might rule differently it additionally carries a numbered FORK (§11.1).
+
+**Absence discipline, restated here because it is the discipline most often lost.** This repository carries a
+documented, seven-times-repeated failure of recording *“I did not find it”* as *“it does not exist”*. An absence
+claim in this document states the search performed and SHALL NOT be piped through `head`; an **alarming** absence
+— a ratified concept with no implementation, a safety rule with no check — receives at least the scrutiny given
+to a reassuring one, and is checked in both directions before it is recorded. §2.8.2 and §3.6 each record an
+instance in which that second check changed the answer.
+
+## 0.3 Identifier conventions
+
+| Family | Form | Owner | Note |
+|---|---|---|---|
+| Objects | `O-1` … `O-9` | §2 | A **closed set of nine**, fixed by the authoring spine. A tenth object requires a FORK, not an addition. |
+| Invariants | `SPEC-001-INV-01` … `SPEC-001-INV-14` | §3 | **Closed and fixed**: not renumbered, merged, split or extended. `INV-nn` used bare anywhere in this document is shorthand for `SPEC-001-INV-nn` and names the same invariant. |
+| Closure dimensions | `C-1` … `C-26` | §2.0 | The closure matrix every object addresses. `N/A` is permitted only **with the reason**. |
+| Non-goals | `N-1` … `N-10` | §1.4 | Each names the authority that owns the excluded concern. |
+| Definition-of-done items | `D-1` … `D-12` | §1.5 | Conditions on *this document*, not on a Surface. |
+| Machine states / transitions | `F-*`, `T-nn`, `P-nn`, `GV-nn` (Machine A); `A-*`, `U-nn`, `AP-nn`, `AGV-nn` (Machine B) | §4 | Illegal transitions are enumerated individually, never left to implication. |
+| Illegal states, per object | `IL-7.n`, `IL-8.n`, `IL-9.n` | §§2.7–2.9 | Object-local; distinct from §4's machine-level prohibitions. |
+| Disclosure codes | `JPWB-SD-nnn` | §6.3 | Surface-local and **all** UNRATIFIED-AUTHORED. They are **not** `RphErrorCode` members and SHALL NOT be added to that ratified fifteen-value enum (§6.1). |
+| Shortcut records | `SPEC-001-SC-nn` | §7 | The cheaper-but-wrong implementation, named and prohibited. |
+| Reference-case revisions | `SPEC-001-REV-nn` | §9 | A revision the reference case forced on the specification. |
+| Fixtures and mutants | `SPEC-001-PF-nn` · `-NF-nn` · `-PB-nn` · `-MU-nn` | §10 | §10 is the master for fixture content. |
+| Forks | `FORK-1` … `FORK-27` | §11.1 | FORK-1 … FORK-11 hold their full record in §11.1; FORK-12 … FORK-27 were raised inside §§1–10 and hold their record at the boundary that raised them, indexed at §11.1.12. |
+
+**Four further fixture namespaces** — `SPEC-001-FIX-*`, `SPEC-001-CHK-*`, `FX-O4/O5/O6-nn`, and
+`SPEC-001-FX-*` — were minted by the sections that authored them and are **not** defined in §10. They are recorded
+as unassigned at §10.8, with the naming act that closes the gap, and carried in §11.2.4. **The obligations they
+attach to are unaffected**: in every case the assertion is stated at the point of use.
+
+## 0.4 What controls, when two things disagree
+
+Stated once here and in full at §1.2, which is the master. The canon (JPWB-CON-000, -DOC-001, -DOC-002, -DOC-003,
+-DOC-004, -REG-005) controls on conflict, by concern. The four principal sources — RIWS, JCUX, CPM, RPH-DOC-010 —
+are **evidence, not authority** (JPWB-REG-005 REG-Q-047's safe default), and a conflict between them and this
+document is surfaced as a FORK rather than reconciled silently. The repository is shape authority: on a spelling
+question it wins; on a meaning question this document wins and the divergence is filed under JPWB-DOC-004. Every
+term takes its meaning from JPWB-DOC-002 and is never redefined here — in particular **Undertaking**, never the
+retired `Endeavor` (DOC-002:248), and no competing root term (DOC-002:249).
+
+---
+
+# 1. Status
+
+## 1.0 Status block — JPWB-SPEC-001 v0.1.0
+
+**Document ID:** `JPWB-SPEC-001`
+**Title:** Professional Projection and Workbench Surface — Deep Reference Specification
+**Version:** `0.1.0`
+**Status:** `DRAFT` — authored under sponsor grant of 2026-07-28 (the Constitution-Discussion ruling); **not ratified**
+**Layer:** Semantic Model
+**Settledness:** `HYPOTHESIS`
+**Series:** `JPWB-SPEC-nnn` deep reference specifications, the depth tier recognized at JPWB-CON-000 B1 and established by JPWB-REG-005 REG-D-009
+**Date:** 2026-07-28
+**Depends on:** JPWB-CON-000 (rule of recognition, values, axioms) · JPWB-DOC-001 §7 (concept of operations, the five workbench contexts) · JPWB-DOC-002 (all vocabulary) · JPWB-DOC-003 (semantic structure, state axes, persistence) · JPWB-DOC-004 (agent conduct, divergence protocol) · JPWB-REG-005 (open questions and rulings)
+**Applies to:** the Janumi Professional Workbench web application (`apps/rph-demo`), the PWA Designer surface, the Undertaking Workbench surface, and every future surface that renders governed professional state — web, desktop, VS Code, mobile, conversational, and external-exchange profiles
+**Primary audiences:** coding agents implementing or modifying a JPWB surface · frontend engineers · projection engineers · test engineers writing surface conformance fixtures · reviewers auditing a surface against the canon
+**Reference frontend:** SvelteKit and Svelte (the incumbent; this specification is framework-neutral — see §1.4 N-1)
+**Reference interaction model:** server-derived projections plus semantic Commands
+
+### Governs
+
+- Projection derivation, identity, freshness, and **scoping** — what a rendered view is bound to and what it may therefore contain.
+- Surface composition: what a named, addressable screen is made of, and the relation between a Surface and the Projections it renders.
+- Affordance derivation and withholding: how an offered Command is derived from declared authority, and what is owed when one is not offered.
+- Refusal and disclosure obligations when an issued Command is rejected by the engine.
+- The rendering contract for the four orthogonal PWU state axes, for provenance, for material uncertainty, for staleness, and for contradiction.
+- Reachability and inspectability of rendered content.
+- Navigation context preservation across movement between Surfaces.
+
+### Does not govern
+
+See §1.4 for the expanded non-goals with their owning authority and the failure each exclusion prevents.
+
+- Visual design, typography, spacing, colour, iconography, motion, and component-library selection.
+- Command semantics, preconditions, and admissibility — JPWB-DOC-003 and the engine (`packages/rph-application`, `packages/rph-domain`).
+- The authority model itself — JPWB-CON-000 and JPWB-DOC-001 §7.1/§7.2.
+- Persistence semantics, event shapes, wire envelopes, enum spellings, error-code strings — the repository's generated contracts, schemas, migrations, and conformance tests.
+
+### Precedence
+
+Owns the concern **"how governed professional state becomes inspectable and actionable without the surface acquiring authority."** Within that concern this artifact controls over program working references and over the code during convergence. It is **subordinate to JPWB-DOC-003 by concern**: where a proposition is about *what is true of the governed model*, DOC-003 controls and this specification may only restate it with citation (§8). It is subordinate to JPWB-DOC-002 for every term and to JPWB-CON-000 for the rule of recognition. **On a shape question it always defers to the repository** — where this specification names a field, a state, or a code, it names a *meaning*; the generated contract carries the spelling, and a disagreement about spelling resolves in the repository's favour while a disagreement about meaning resolves here and is filed as a divergence under JPWB-DOC-004.
+
+### Change procedure
+
+`HYPOTHESIS` class. Changes flow through the divergence protocol (JPWB-DOC-004): classify, fix code toward the specification where the specification is stronger, escalate reality-taught candidates and semantic conflicts via JPWB-REG-005. Ratification of this artifact requires its own JPWB-REG-005 sponsor conferral naming an exact version (JPWB-CON-000 B1: the SPEC series members are "each individually ratified per REG-005"). Until that conferral is recorded, this artifact is authored working material and no agent may cite it as ratified authority.
+
+### Registration status of the authoring grant — a recorded absence
+
+**CONFIRMED (absence, with the search stated).** No JPWB-REG-005 entry records the 2026-07-28 sponsor grant under which this specification is authored, and no entry records a commission for `JPWB-SPEC-001`. Searches run against `docs/canon/JPWB-REG-005 Decision and Divergence Register.md`, each without truncation: `grep -n "2026-07-28"` returned exactly two hits — line 686 (REG-D-021) and line 796 (REG-D-022), both `JAN-CSAA` program entries, neither naming a surface, projection, or SPEC-001 subject; `grep -ni "grant"` returned lines 108, 121, 141, 229, 230, 235, 520, 522, 530, 533, 534, 535, 538, 541, 542, 543, 548, 692, of which the conferrals (REG-D-017, REG-D-018) are `JAN-CSAA`; `grep -ni "JPWB-SPEC"` against `JPWB-CON-000 Constitution.md` returned the B1 series recognition at line 97 and nothing constituting an individual commission.
+
+This absence is a statement about the register as searched on 2026-07-28, not a claim that the sponsor did not confer the grant: the ruling is recorded in the Constitution-Discussion conversation, and the register entry has not been filed. The obligation is therefore explicit. **The filing of a JPWB-REG-005 entry naming this specification's scope, its authoring grant, and its forks SHALL precede any ratification act**; conformance is established by the presence of a REG-005 entry whose subject resolves to `JPWB-SPEC-001` and whose disposition names an exact version — its absence is a blocking finding on the ratification package, verified by the check `SPEC-001-CHK-REG-ENTRY` (§10).
+
+### Standing of the principal sources
+
+**CONFIRMED (cited).** JPWB-REG-005 REG-Q-047 (line 411-414) holds that the RIWS/JCUX screen-contract corpus "is neither carried, ceded, nor demoted with a record", and its safe default is that "the screen contracts and acceptance journeys are non-canonical design material — historical evidence for repository design docs; any adoption as conformance criteria requires a Decision."
+
+This specification therefore treats RIWS (`JAN-RIWS-001`), JCUX (`JAN-JCUX-001`), CPM (`JAN-CPM-001`), and RPH-DOC-010 as **evidence, not authority**. Where a proposition in this specification restates one of them, the proposition takes its normative force from *this* artifact (once ratified) and its warrant from the canon, and the source is cited so a reviewer can audit the derivation. This specification does **not** adopt the RIWS/JCUX screen contracts wholesale as conformance criteria, and no agent may infer such adoption from a citation here. Where this artifact names an obligation with no canon antecedent, it is labelled **UNRATIFIED-AUTHORED** at the point of use.
+
+---
+
+## Reader's note — the standing of this document
+
+**Read this before any other sentence in this document, including the status block above.**
+
+> **This specification is a DRAFT. It has been ratified by nobody. It carries no authority.**
+>
+> It was authored under the sponsor's grant of **2026-07-28** (the Constitution-Discussion ruling), which
+> authorizes **authoring** and not **ratification**. JPWB-CON-000 Part B clause 2 is the rule that governs its
+> standing: an artifact is canon only by the recognition the constitution confers, and a JPWB-SPEC-series member is
+> recognized only when it is *individually ratified per JPWB-REG-005* (CON-000 B1). **No such entry exists.** The
+> absence is CONFIRMED, with the searches stated in full in the status block above: no JPWB-REG-005 entry records
+> the 2026-07-28 grant, and none records a commission for `JPWB-SPEC-001`.
+>
+> Therefore: **every status word in this document is a proposal, not a status.** Where a sentence says a Surface
+> `SHALL` do something, read *“this document proposes that a Surface be required to”*. Where a table says a field is
+> mandatory, read *“this document proposes that the field be mandatory”*. Where an invariant is numbered
+> `SPEC-001-INV-07`, read *“the seventh proposed invariant”* — the numbering is fixed so that a sponsor can rule on
+> a stable target, not because the invariant binds. Where a defect in the built system is called a **violation**,
+> read *“would be a violation if this document were ratified”*; the measurement is real and the classification is
+> proposed.
+>
+> **What an agent may do with this document today.** Read it; cite it as authored working material with its status
+> named; implement against it *voluntarily* and record that choice; propose it for ratification. **What an agent
+> SHALL NOT do**: cite it as ratified authority, treat any `SHALL` here as binding in a review, record a build as
+> conforming to it, or let a citation to it stand in for a citation to the canon. The obligation is stated
+> normatively in the status block above and is verified by `SPEC-001-CHK-REG-ENTRY`: **the filing of a
+> JPWB-REG-005 entry naming this specification's scope, its authoring grant, and its forks SHALL precede any
+> ratification act.**
+>
+> **Twenty-seven forks are open** (§11.1). Sixteen of them were raised inside §§1–10 and consolidated at
+> assembly, and every one of the sixteen is short of §11.0.1's seven-field record shape (§11.1.13). Until each is
+> ruled, its **standing rule** binds and the alternative option SHALL NOT be implemented on the ground that it is
+> obviously what the sponsor will choose. A ruling is effective only when it lands as a JPWB-REG-005 entry and is
+> carried into the sections its record names (CON-000 B5; §11.0.3).
+>
+> **Where this document already knows it fails its own checks**, it says so rather than waiting to be caught:
+> §10.6 records three mutation red-proofs that the incumbent runner cannot execute; §10.7's traceability census
+> `SPEC-001-NF-67` fails today at every citation in the four unassigned fixture namespaces (§10.8); §6.3.1 records
+> five disclosure codes cited in §2 with no Register-B member; and §11.2.4 carries the honest residue. A
+> specification that passed all of its own checks on the day it was written would be measuring nothing.
+
+---
+
+## Table of contents
+
+*Top-level sections and their immediate subsections. §§2, 3, 4, 5, 6, 7, 10 and 11 carry a third level, which is
+listed in place at the head of each. Section numbers in this document are stable targets: a `§N` reference
+anywhere in the document resolves against this table.*
+
+- **0. How to read this specification**
+  - 0.1 The deontic register
+  - 0.2 The provenance label vocabulary
+  - 0.3 Identifier conventions
+  - 0.4 What controls, when two things disagree
+- **1. Status**
+  - 1.0 Status block — JPWB-SPEC-001 v0.1.0
+  - Reader's note — the standing of this document
+  - Table of contents
+  - 1.1 Purpose
+  - 1.2 Relationship to the canon and to the built system
+  - 1.3 Vocabulary binding
+  - 1.4 Non-goals
+  - 1.5 Definition of done for this specification
+- **2. Object catalog**
+  - 2.0 How to read this catalog
+  - 2.1 O-1 · Projection
+  - 2.2 O-2 · Surface
+  - 2.3 O-3 · Projection Scope
+  - 2.4 O-4 · Affordance
+  - 2.5 O-5 · Affordance Withholding
+  - 2.6 O-6 · Refusal Disclosure
+  - 2.7 O-7 · State Axis Rendering
+  - 2.8 O-8 · Epistemic Disclosure
+  - 2.9 O-9 · Navigation Context
+- **3. Invariant catalog**
+  - 3.1 SPEC-001-INV-01 — Projections carry no authority
+  - 3.2 SPEC-001-INV-02 — A Projection is bound to a declared Scope
+  - 3.3 SPEC-001-INV-03 — Affordances derive from the enforcing authority, never a copy of it
+  - 3.4 SPEC-001-INV-04 — A withheld Affordance discloses why
+  - 3.5 SPEC-001-INV-05 — The four state axes remain separately legible
+  - 3.6 SPEC-001-INV-06 — Material uncertainty is visible where the work is
+  - 3.7 SPEC-001-INV-07 — Rendered means reachable
+  - 3.8 SPEC-001-INV-08 — A refused Command surfaces its reason and its code
+  - 3.9 SPEC-001-INV-09 — A Projection that is not current says so
+  - 3.10 SPEC-001-INV-10 — Navigation preserves professional context
+  - 3.11 SPEC-001-INV-11 — Execution progress never implies assurance
+  - 3.12 SPEC-001-INV-12 — Provenance is exposed where the claim is presented
+  - 3.13 SPEC-001-INV-13 — The offered set agrees with the engine, in both directions
+  - 3.14 SPEC-001-INV-14 — A partial Command sequence never reports success
+  - 3.15 Invariant interaction matrix
+  - 3.16 Forks arising from this section
+- **4. State machines**
+  - 4.1 Machine A — Projection freshness
+  - 4.2 Machine B — Affordance disposition
+- **5. Interface contract**
+  - 5.1 `ExecutionPlanView`
+  - 5.2 `ExecutionStepView`
+  - 5.3 `StepAffordances`
+  - 5.4 `StepBindingFacts`
+  - 5.5 `AssuranceView` and `AssuranceAssessmentView`
+  - 5.6 `ApplicablePolicyView`
+  - 5.7 `TransitionRow`
+  - 5.8 `AffordanceWithholding` — **required by O-5; absent from the code**
+  - 5.9 `ProjectionEnvelope` — **required by O-1/O-3 and Machine A; absent from the code**
+  - 5.10 `RefusalDisclosure` and `PartialApplicationDisclosure` — **required by O-6 and INV-14**
+- **6. Error and disclosure catalog**
+  - 6.1 The two registers, and why they may not merge
+  - 6.2 Register A — the ratified `RphErrorCode` set (fifteen values)
+  - 6.3 Register B — surface disclosure codes
+  - 6.4 Disclosure obligations that survive every state
+- **7. Adversarial economy catalog**
+  - 7.1 What this section is for, and how to read it
+  - 7.2 The generic shortcut classes, situated on this surface
+  - 7.3 The shortcut register
+  - 7.4 Shortcut-to-invariant coverage
+- **8. Controlled normative redundancy**
+  - 8.1 The rule this section applies to itself
+  - 8.2 The persistence boundary
+  - 8.3 The event boundary
+  - 8.4 The projection-layer boundary
+  - 8.5 The UX / Surface boundary
+  - 8.6 The migration boundary
+  - 8.7 The test boundary
+- **9. Reference case — the Field Service Management SaaS Undertaking**
+  - 9.0 The fixture, its provenance, and the rules of this walk
+  - 9.1 Step 0 — The Undertaking Portfolio
+  - 9.2 Step 1 — Entering the Undertaking
+  - 9.3 Step 2 — Overview: the four axes on thirteen PWUs
+  - 9.4 Step 3 — The Execution tab, on the Architecture PWU
+  - 9.5 Step 4 — The Assurance tab, and an assurance disposition
+  - 9.6 Step 5 — Mobile & Offline: the uncertainty the Surface never shows
+  - 9.7 Step 6 — Baselines and Decisions
+  - 9.8 Step 7 — Traceability
+  - 9.9 Closure ledger for the reference case
+- **10. Conformance-fixture specification**
+  - 10.1 The fixture grammar
+  - 10.2 Per-invariant fixtures
+  - 10.3 Illegal transitions — fixtures
+  - 10.4 Property-based fixtures, with recorded seeds
+  - 10.5 The mutation red-proof obligation, and a worked finding
+  - 10.6 Ledger carriage — the fixtures in the form the incumbent harness can run
+  - 10.7 Fixture-to-obligation traceability
+  - 10.8 Identifiers minted in §§1–9 with no §10 definition — the recorded gap
+- **11. Forks and deliberately unspecified**
+  - 11.0 The record shape, the standing rule, and the carriage obligation
+  - 11.1 Forks
+  - 11.2 Deliberately unspecified
+  - 11.3 Relationship to the sources
+
+---
+
+## 1.1 Purpose
+
+**INFORMATIVE.** A governed model that nobody can see is indistinguishable from a model that does not exist, and a surface that can act on the model without going through a Command is a second source of truth. This specification exists to make the first failure countable and the second impossible.
+
+It converts JPWB-DOC-003's Projection layer (DOC-003 §2, layer 5: "Projection — human- or machine-usable derived views") and PER-7 ("Projections are derived, disposable, and powerless", DOC-003:359) from a one-line semantic commitment into an implementable contract at field, state, and fixture grain, and it does the same for the surface that consumes those projections.
+
+**NORMATIVE.** This specification defines:
+
+1. what a **Projection** is as an object with identity, scope, freshness, and provenance (O-1, O-3);
+2. what a **Surface** is as an addressable composition of Projections, and what it owes the professional who navigates to it (O-2);
+3. how an **Affordance** is derived from the one authority the engine enforces, and what is owed when one is withheld (O-4, O-5);
+4. what a Surface SHALL surface when a Command it issued is refused (O-6);
+5. the display contract for the four PWU state axes (O-7), for provenance, uncertainty, contradiction, and staleness (O-8), and for context preserved across navigation (O-9);
+6. fourteen numbered invariants (`SPEC-001-INV-01` … `-14`), each with the failure it prevents, its scope, a non-example where over-application is plausible, and the named check that verifies it;
+7. the state machines, interfaces, error codes, adversarial-economy prohibitions, reference case, and conformance fixtures that make the above enforceable rather than aspirational.
+
+**The scope test.** If a proposition is about *what is true of the governed model*, it belongs to JPWB-DOC-003 and this specification may only restate it with citation. If it is about *how a professional comes to see that truth, and what they may do from there*, it is in scope. An agent uncertain which side of the line a proposition falls on SHALL apply the test and record the answer in the requirement ledger (REG-D-011); an unrecorded judgement is an unmapped obligation, verified by the ledger-closure check `SPEC-001-CHK-LEDGER` (§10).
+
+**Why this specification exists now, concretely.** Six measured defects in the built surface as of 2026-07-28 are each an instance of an obligation that no artifact currently states in a form a check can read. They are enumerated in §3 as the motivating failure of the invariant that would have caught them. Two are load-bearing for this section and are cited in place: the unscoped read-model calls that leak one Undertaking's records into another (§2.3), and the layout that clips a Surface with no scroller (§2.2). This specification does not fix them. It makes them **violations that a named check reports**.
+
+---
+
+## 1.2 Relationship to the canon and to the built system
+
+**INFORMATIVE.** Three bodies of material bear on every proposition in this artifact, and they are not interchangeable.
+
+| Body | Standing here | How a conflict resolves |
+|---|---|---|
+| **Canon** — JPWB-CON-000, -DOC-001, -DOC-002, -DOC-003, -DOC-004, -REG-005 | Authority. Controls on conflict, by concern (CON-000 Part B clause 3). | The canon wins; the conflict is filed as a JPWB-DOC-004 divergence finding. This artifact is edited, never the canon by an agent. |
+| **Principal sources** — RIWS, JCUX, CPM, RPH-DOC-010 | Evidence (REG-Q-047 safe default). Rich, specific, and unratified. | Neither wins automatically. The conflict is surfaced as a FORK (§11) and the safe default holds until a sponsor rules. Silent reconciliation is prohibited. |
+| **Repository** — `packages/rph-projections/`, `packages/rph-engine/`, `apps/rph-demo/src/` | Shape authority (CON-000 B1); and, for behaviour, the *experiment* — never its own authority (CON-000 B4 level 3). | On a shape question the repository wins. On a meaning question this artifact wins and the divergence is filed. Behaviour that contradicts a ratified meaning is a defect in the code, not an amendment to the meaning. |
+
+**Provenance labelling — normative for this artifact.** Every material claim about the repository, the canon, or the sources SHALL carry one of four labels, and the label SHALL be verifiable by a reader with the repository in hand:
+
+- **CONFIRMED** — the file was read and the claim is cited `path:line`, or the document section was read and cited `DOC §n`. A CONFIRMED absence additionally states the exact search performed.
+- **INFERRED** — derived from CONFIRMED facts by stated reasoning; the reasoning is given inline.
+- **ASSUMED** — taken as true without evidence, with the reason it was not established and what breaks if it is false.
+- **UNRATIFIED-AUTHORED** — authored under the grant, beyond anything the canon or the sources ratify; carries a FORK if a reasonable sponsor might rule differently.
+
+An unlabelled material claim is a defect in this artifact, verified by the self-review battery's provenance pass (§10, `SPEC-001-CHK-PROVENANCE`) which fails on any assertion about `packages/` or `apps/` lacking a `path:line` citation or an explicit label.
+
+**Absence discipline — normative for this artifact.** This repository carries a documented, seven-times-repeated failure of recording "I did not find it" as "it does not exist." An absence claim SHALL state the search performed — the tool, the pattern, the paths, and the fact that the output was not truncated. An absence grep SHALL NOT be piped through `head`. An **alarming** absence (a ratified concept with no implementation, a safety rule with no check) SHALL receive at least the scrutiny given to a reassuring one; the absence is checked in both directions before it is recorded.
+
+---
+
+## 1.3 Vocabulary binding
+
+**NORMATIVE.** Every term in this artifact takes its meaning from JPWB-DOC-002. This artifact SHALL NOT redefine a canonical term, and conformance is established by the vocabulary pass `SPEC-001-CHK-VOCAB` (§10), which fails on any occurrence of a DOC-002 §8 retired term outside a citation or a permitted-residual context.
+
+Bindings that bear directly on §2:
+
+- **Undertaking** (DOC-002:88) — a concrete body of professional work instantiated under one or more compatible PWA versions, owning all actuals. `Endeavor` (bare) is **RETIRED** (DOC-002:248); the canonical term at every product and UX boundary is **Undertaking**. `Professional Endeavor` remains a candidate generic supertype only, and DOC-002:249 states that "a second competing root MUST NOT be created without a Decision." This artifact mints no root term.
+- **Projection** (DOC-002:188) — "a derived representation optimized for a particular question or user need. It is rebuildable and never an independent source of truth."
+- **View** (DOC-002:186) — "a user-facing representation of underlying professional-work or execution data. A View may be implemented using one or more Projections. It is presentation — never architecture, never authority."
+- **Viewpoint** (DOC-002:190) — the organizing concern through which data is selected or arranged.
+- DOC-002:192 fixes the triad: **"View = surface, Projection = derivation, Viewpoint = concern."**
+- **Naming rule** (DOC-002:266) — "Views and surfaces MUST use names ending in `View`, `Explorer`, `Studio`, or `Workbench`."
+
+> **FORK-12 · The name of object O-2.** *(Raised in §1.3, applied throughout §2. Authored as FORK-6; four other sections also claimed 6, and §11.1 already held a FORK-6, so this record was renumbered to **FORK-12** at assembly and is indexed at §11.1.12. The renumbering was authorized by this record's own instruction.)*
+> **Decision:** DOC-002:192 glosses the canonical term **View** with the word *surface*. The authoring spine fixes object O-2's name as **Surface**. Either O-2 is the canonical **View** under a second name — which DOC-002:36 forbids other artifacts from doing — or **Surface** names something narrower that DOC-002 does not yet carry.
+> **Options:** (a) rename O-2 to **View**, accepting that the built route tree's screens are Views; (b) keep **Surface** and define it as a proper sub-kind of View — the *addressable, routable* View that owns a navigation address and a context banner — so no competing definition is created; (c) keep **Surface** as an informal gloss and carry no object, dissolving O-2 into O-1.
+> **Recommendation: (b), adopted inline to keep writing.** §2.2 defines Surface strictly as a sub-kind of the canonical View and never contradicts DOC-002:186. Option (a) is defensible but collides with `View` already being the suffix convention for *named instruments* (Architecture Studio, V&V View, Traceability Explorer, DOC-002:266), which would make "the View that contains the Traceability Explorer View" the ordinary sentence. Option (c) loses the object that owns route address, context, reachability, and navigation contract — the F-1/F-3 defects become inexpressible.
+> **Downstream effect if ruled otherwise:** under (a), every `Surface` token in §§2, 4, 5, 6, 7, 9, 10 is renamed and DOC-002 §5 gains a routability clause; under (c), O-2's closure matrix folds into O-1 and `SPEC-001-INV-07`, `-10`, `-13` lose their subject.
+
+---
+
+## 1.4 Non-goals
+
+**NORMATIVE.** The following are outside this specification's concern. Each entry names the authority that owns it and the failure the exclusion prevents. An agent that finds itself authoring in one of these areas under this specification's banner has left scope, and SHALL stop and file the question — verified by the scope pass `SPEC-001-CHK-SCOPE` (§10), which fails on a normative sentence in this artifact whose subject is a non-goal object.
+
+**N-1 · Visual design.** Typography, spacing, colour, palette, iconography, motion, elevation, component-library choice, and grid system are **not governed**. Owner: the product's design system, which this specification does not name and does not require to exist. Prevents: a semantic specification ossifying a look, which would make every restyle a governance event and thereby make governance ignorable. *Boundary, and it is a fine one:* where a visual property is the **sole** carrier of a semantic distinction, the distinction is governed and the property is not. `SPEC-001-INV-05` requires the four axes to remain separately legible — it does not require them to be four chips of a given size; it prohibits any rendering in which a professional cannot recover which axis a claim is about. Colour alone SHALL NOT be that carrier, because colour alone is unreadable to a substantial fraction of professionals and absent from a screen reader; conformance is established by the fixture `SPEC-001-FIX-INV-05-N3` (§10), which asserts that a text or role-attribute reading of the rendered axes distinguishes them with all colour removed.
+
+**N-2 · Command semantics and preconditions.** What `StartExecutionStep` means, when the engine admits it, which state transitions are legal, what a retry cap is, and what an authorized binding requires are **not governed** here. Owner: JPWB-DOC-003 (meaning) and the engine (`packages/rph-application`, `packages/rph-domain`) for admissibility. Prevents: the surface acquiring a second copy of an admissibility rule — the mechanism behind the incumbent F-29 family, in which a read-model offered a Command the engine refused, four times, each time in a place the previous fix could not reach (CONFIRMED: `packages/rph-projections/src/execution-view.ts:331-347`, `:376-390`, `:391-406`, `:407-417`, `:631-640`). This specification governs only that the Surface's offer **derives from** the engine's rule (`SPEC-001-INV-03`) and never restates it.
+
+**N-3 · The authority model.** Who holds definition, framing, operational, evaluative, or decision authority; what a role is; how authority is proven; the role-conflict rule — **not governed**. Owner: JPWB-CON-000 and JPWB-DOC-001 §7.1-§7.2. Prevents: a UI artifact quietly becoming the place where authority is defined, which is precisely how "visibility implies mutation authority" (CPM §28.4) enters a system. This specification governs only the *rendering and withholding* of affordances that a declared authority already decides.
+
+**N-4 · Persistence and event shapes.** Table design, event envelopes, `eventId` format, aggregate identifiers, JSON Schema, enum spellings, migration scripts — **not governed**. Owner: the repository's generated contracts, schemas, migrations, and conformance tests (CON-000 B1). Prevents: two shape authorities. Where §5 names a field, it names a meaning and a validation rule; the spelling is the contract's.
+
+**N-5 · The engine's projection *storage* strategy.** Whether a projection is materialized, cached, streamed, recomputed per request, or checkpointed is **not governed**, and MAY vary per projection. Owner: the repository. Prevents: a semantic specification foreclosing a legitimate performance decision. *Boundary:* the **observable consequences** of the strategy are governed — a projection that may be stale SHALL disclose staleness (`SPEC-001-INV-09`), and rebuildability is a canon guarantee (DOC-003 PER-7) this specification restates but does not own.
+
+**N-6 · Authoring semantics for cognition objects.** What it means to *raise* an Uncertainty, *record* a Contradiction, *pose* a Question, or *register* an Assumption — the Command set, its preconditions, its evidence obligations — is **not governed**. Owner: JPWB-DOC-003 and a future commission. This specification governs the **display** obligation only (`SPEC-001-INV-06`, `SPEC-001-INV-12`), per FORK-5's recommendation. Prevents: a display specification silently authoring a write path.
+
+**N-7 · Accessibility conformance standards.** WCAG level, ARIA pattern selection, focus-ring styling, and assistive-technology matrix are **not governed**. Owner: the product's accessibility programme. *Boundary, and this one is load-bearing:* `SPEC-001-INV-07` governs **reachability as semantics** — content that exists in the accessibility tree but cannot be brought into view by ordinary interaction is not rendered. That is a semantic claim about whether the professional can see the state, not a standards-conformance claim. FORK-4 asks the sponsor to confirm the classification.
+
+**N-8 · Surface *authoring* of PWAs.** The PWA Designer's authoring semantics — what a PWU Type is, how a decomposition rule is declared, how a policy is assigned — are **not governed**. Owner: JPWB-DOC-003, RPH-DOC-010 §§6-21 as evidence, and the engine. This specification governs the Designer only *as a projection surface*, per FORK-3's recommendation: its invariants are surface-general and reach the Designer, its authoring model does not.
+
+**N-9 · Multi-tenancy and the organization segment.** Organization identity, tenancy boundaries, and cross-organization coordination are **not governed**. Owner: JPWB-REG-005 REG-Q-048, whose safe default is that "the canon stays silent — single-organization scope holds; agents do not invent cross-organization semantics." This bears directly on FORK-2: JCUX §4 roots every route at `/{organizationId}/`, and **CONFIRMED (absence, search stated):** `grep -rn --exclude-dir=node_modules --exclude-dir=.svelte-kit "organizationId" apps packages` returns **0** occurrences; the same pattern over the whole repository excluding `node_modules`, `.git`, `.svelte-kit`, and `docs` also returns **0**. No truncation was applied. `grep -rni "organization" apps packages` returns 125 occurrences, so the absence is of the *identifier*, not of the word.
+
+**N-10 · Agent execution and the conversational surface.** Agent run control, streaming transport, prompt construction, and the authoring chat's interaction model are **not governed**. Owner: JPWB-DOC-004 and the repository. *Boundary:* where agent output is **presented**, `SPEC-001-INV-12` (provenance) and CON-000 V4 (AI origin remains visible after review) apply in full, restated with citation in §8.
+
+---
+
+## 1.5 Definition of done for this specification
+
+**NORMATIVE.** This artifact is **done** when every one of the following is true. Each is a check, not a judgement; the self-review battery in §10 runs them as distinct passes and reports a count per pass. A pass reporting zero findings without naming what it examined is itself a finding (the green-needs-a-predicted-red rule).
+
+**D-1 · Object closure.** All nine objects `O-1` … `O-9` are present, and each addresses **every** dimension of the closure matrix in §2.0 — either substantively, or as an explicit `N/A` **with the reason**. An unexplained absence is a defect; a reasoned `N/A` is closure. Check: `SPEC-001-CHK-CLOSURE` reports objects × dimensions with a reasoned-`N/A` count and fails on any unaddressed cell.
+
+**D-2 · Field closure.** Every field of every object carries all seven of: name, type, optionality, default, semantics, validation rule, and who may write it. A field with fewer than all seven is a defect. Check: `SPEC-001-CHK-FIELDS`.
+
+**D-3 · Verification binding.** Every `SHALL` and `SHALL NOT` in this artifact names how conformance is established — a named test, fixture, check, or evidence obligation — in the same sentence or an adjacent one. An unverifiable `SHALL` is a defect, not a stylistic choice. Check: `SPEC-001-CHK-VERIFY`, which fails on any `SHALL`/`SHALL NOT` sentence with no `SPEC-001-FIX-*`, `SPEC-001-CHK-*`, or repository test identifier within its sentence or the next.
+
+**D-4 · Invariant closure.** All fourteen invariants `SPEC-001-INV-01` … `-14` are authored with statement, WHY (the concrete failure prevented), SCOPE (governs / does not govern), a NON-EXAMPLE wherever over-application is plausible, and the named verifying check. Check: `SPEC-001-CHK-INV`.
+
+**D-5 · Adversarial-economy closure.** For every material obligation, the **cheaper-but-wrong implementation an agent would plausibly choose** is named, prohibited by a `SHALL NOT`, and paired with the negative fixture that detects it. Check: `SPEC-001-CHK-ECONOMY`, which fails on any obligation in §§2-6 with no corresponding §7 entry.
+
+**D-6 · Mutation red-proof.** For every invariant and illegal transition, §10 names the test that **goes red when the enforcement is weakened**, together with the exact weakening. A test that cannot fail is itself a finding (CON-000 B7: a shape reference that no type check or conformance test enforces asserts a status nothing performs). Check: `SPEC-001-CHK-MUTATION`.
+
+**D-7 · Reference-case closure.** The reference case in §9 instantiates end to end through this artifact's own objects, states, Commands, and assurance hooks, with no hidden inference. Where the scenario is awkward or a concept fails to instantiate, the specification is revised and the revision recorded — the scenario is never simplified. Check: `SPEC-001-CHK-REFCASE`.
+
+**D-8 · Controlled redundancy.** Every invariant that an implementer could violate at a boundary is **restated in full, with a citation to its master**, at each such boundary — persistence, events, UX, migration, tests (§8). Citation-only is permitted for context; restatement-without-citation is prohibited. Check: `SPEC-001-CHK-REDUNDANCY`, which fails on a restatement carrying no master citation and on a load-bearing boundary carrying only a citation.
+
+**D-9 · Traceability.** Intent → principle → invariant → contract → fixture chains are intact and traversable in both directions. Check: `SPEC-001-CHK-TRACE`.
+
+**D-10 · Gaps governed, never tacit.** Every referenced-but-undefined name appears in the Deliberately Unspecified table with its reason and owning open question; every deferral is bounded and explicit; every authored choice a reasonable sponsor might rule differently is a numbered FORK with decision, options, recommendation, and downstream effect (§11). Check: `SPEC-001-CHK-GAPS`.
+
+**D-11 · Paired reference artifacts.** The specification ships with the repository artifacts it obliges — type declarations and conformance-fixture files — each citing the specification section it implements. An unenforced shape reference asserts a status nothing performs (CON-000 B7). Check: `SPEC-001-CHK-ARTIFACTS`.
+
+**D-12 · Register entry filed.** A JPWB-REG-005 entry names this specification, its authoring grant, and its forks, and a sponsor disposition names an exact version. Check: `SPEC-001-CHK-REG-ENTRY` (§1 status block).
+
+**Fixture and check identifier convention — normative for the whole artifact.** Conformance fixtures are named `SPEC-001-FIX-<SUBJECT>-<nn><P|N>` where `<SUBJECT>` is an object id (`O-3`) or an invariant id (`INV-02`), `<nn>` is a two-digit ordinal, and the suffix is `P` for a positive fixture (conformant behaviour is accepted) or `N` for a negative fixture (the prohibited shortcut is detected and rejected). Self-review passes over the document are named `SPEC-001-CHK-<NAME>`. §10 owns the specification of every fixture; §§1-9 mint identifiers and §10 SHALL define each minted identifier or record it as unassigned — an identifier cited in the body with no §10 definition is a defect caught by `SPEC-001-CHK-TRACE`.
+
+**Not in the definition of done.** Line count. The quality metric is normative density and closure. A deletion pass (§10) removes any line failing the density test — *does it define, constrain, distinguish, operationalize, verify, or materially illustrate?* — and never removes the controlled redundancy D-8 requires.
+
+---
+
+# 2. Object catalog
+
+## 2.0 How to read this catalog
+
+**INFORMATIVE.** The catalog is a **closed set of nine objects**, fixed by the authoring spine. No object may be added without a FORK. Each object receives the full closure matrix below, then a per-field contract.
+
+**The closure matrix — twenty-six dimensions.** Every object addresses every dimension. A dimension that genuinely does not apply is marked `N/A` **with the reason it does not apply**; an unexplained absence is a defect (D-1).
+
+| # | Dimension | What it must answer |
+|---|---|---|
+| C-1 | Identity & unique identification | How one instance is told from another, and by what identifier |
+| C-2 | Definition | What it is, positively |
+| C-3 | Exclusion | What it is **not** — the confusions it must survive |
+| C-4 | Purpose | The professional question it exists to serve |
+| C-5 | Authority | Who may create, alter, approve, waive, revoke, supersede — **per object**, not globally |
+| C-6 | Inputs / preconditions | What must hold before it exists or changes |
+| C-7 | Outputs / postconditions | What is true after |
+| C-8 | Relationships (typed) | Which other objects it relates to, and how |
+| C-9 | States | The value set of each independent state dimension |
+| C-10 | Lifecycle | created → revised → satisfied / invalidated / retired |
+| C-11 | Illegal states and transitions | **Enumerated**, never left to implication |
+| C-12 | Invariants | Which `SPEC-001-INV-*` govern it |
+| C-13 | Versioning | What changes **meaning** versus only presentation or execution |
+| C-14 | Provenance | What the object records about where it came from |
+| C-15 | Evidence & assurance hooks | Where assurance attaches |
+| C-16 | Failure modes | How it goes wrong in practice |
+| C-17 | Recovery | reconcile · retry · reshape · escalate |
+| C-18 | Concurrency | Behaviour under simultaneous revision |
+| C-19 | Idempotency | How duplicate effect is prevented |
+| C-20 | Security / permission boundaries | What authorization filtering does to it, and what leaks |
+| C-21 | Observability | What must be recorded to explain its behaviour after the fact |
+| C-22 | Persistence semantics | What is stored, what is derived, what is disposable |
+| C-23 | Migration / legacy relation | Its relation to the incumbent built system |
+| C-24 | UX / inspection surface | How a professional inspects the object itself |
+| C-25 | Verifying tests | The named checks that hold it to this contract |
+| C-26 | Definition of done | When an implementation of this object is complete |
+
+**The field contract.** Every field carries **all seven** of: `name` · `type` · `optionality` · `default` · `semantics` · `validation rule` · `who may write it`. A field with fewer is a defect (D-2). `type` names a meaning, not a wire spelling (N-4). `who may write it` is the *only* place a write authority is stated; a field whose writer is "the UI" is a violation of `SPEC-001-INV-01` on its face.
+
+**Anti-elision.** No `etc.`, no `such as` standing for a closed set, no representative example standing for an enumeration, no `similar to X` as a definition, and no scaffolding presented as coverage. Independent state dimensions are never collapsed into one generic `status`.
+
+**Objects in this fragment.** `O-1` Projection · `O-2` Surface · `O-3` Projection Scope. `O-4` … `O-9` follow in the continuation of §2.
+
+---
+
+## 2.1 O-1 · Projection
+
+### 2.1.1 Closure matrix
+
+**C-1 · Identity & unique identification.**
+A Projection is identified at two grains, and the two SHALL NOT be conflated (CPM §5.1, evidence).
+
+- A **Projection Definition** is identified by a stable `projectionId` — a name that outlives every instance and every rebuild. CONFIRMED: the built system carries exactly this at `packages/rph-projections/src/projector.ts:8` (`readonly name: string`), and three definitions declare one — `'work'` (`work-projection.ts:169`), `'traceability'` (`traceability-view.ts:84`), `'compatibility'` (`compatibility-view.ts:38`).
+- A **Projection Instance** is the result generated for a particular subject, participant, time, and authorization. It SHALL be identified by a `projectionInstanceId` unique within its generating process, so that a Command issued from it can name its origin (`SPEC-001-INV-*` chain via CPM §27.1, evidence).
+
+**CONFIRMED (absence, search stated).** The built system has **no instance identity and no instance metadata**. `grep -rn --exclude-dir=node_modules --exclude-dir=.svelte-kit` over `apps` and `packages`, untruncated, returns: `projectionInstanceId` **0**, `projectionDefinitionId` **0**, `asOfTime` **0**, `sourceVersionVector` **0**, `resultCompleteness` **0**, `omittedCount` **0**, `authorizationScope` **0**, `generatedAt` **1** — and that single hit is `packages/rph-domain/vocab/m11-execution.json:14`, a vocabulary data file's own authoring date, not a projection field. `staleness` returns 7 hits, all of which are *command-level optimistic-concurrency* guards (`rph-application/src/handlers/pwu.ts:428`, `intent.ts:292`, and their tests), not projection staleness. `freshness` returns 36 hits across 15 files, all of which are **evidence** freshness in the assurance-policy admissibility model (`rph-contracts/schemas/objects/AssurancePolicyDefinition.json`, `rph-application/src/handlers/assurance.ts`), not projection freshness. The absence is therefore of the concept, not merely of a spelling.
+
+A Projection Definition SHALL declare a `projectionId` unique within the workbench, and a Projection Instance SHALL carry both its `projectionId` and its own `projectionInstanceId`; conformance is established by `SPEC-001-FIX-O-1-01P` (a generated instance exposes both) and `SPEC-001-FIX-O-1-01N` (two concurrently generated instances of the same definition are distinguishable — the fixture fails if instance identity is derived from `projectionId` alone).
+
+**C-2 · Definition.**
+A **Projection** is a derived, bounded, role-aware, temporally qualified, purpose-specific representation of authoritative professional state, rebuildable from the governed stream, which allows a Participant to inspect, reason about, or act upon selected aspects of that state without creating an independent semantic truth. *(Restates DOC-002:188 and DOC-003 PER-7 (DOC-003:359); the bounded/role-aware/temporally-qualified expansion follows CPM §3, evidence.)*
+
+Two derivation forms are permitted and SHALL be distinguished, because they have different guarantees:
+
+- **Folded** — a `Projector<V>` with `initial()` and a pure `apply(view, event)`, folded over the event stream in global order. CONFIRMED: `projector.ts:7-14`. It carries `handlerVersion` (`projector.ts:9-10`), supports deterministic rebuild-from-empty (`rebuildProjection`, `projector.ts:18-22`), and supports incremental application with idempotency by `eventId` and a checkpoint (`IncrementalProjection`, `projector.ts:29-63`).
+- **Computed** — a pure function from already-loaded governed state to a view, evaluated per request with no checkpoint and no incremental path. CONFIRMED: `buildAssuranceView(events)` (`assurance-view.ts:356`), `executionPlanView(row)` (`execution-view.ts:577`), `sequenceView(...)` (`execution-view.ts:977`), `pwuGraphNode(...)` (`graph-view.ts:53`), `buildApplicablePolicies(...)` (`assurance-view.ts:393`).
+
+A Projection SHALL declare which form it is, because the form determines which of C-18, C-19, and C-22 apply to it; conformance is established by `SPEC-001-FIX-O-1-02P` (each registered definition reports its form) and by the type-level obligation in §5.
+
+**C-3 · Exclusion.** A Projection is **not**:
+a write target; an authority; a source of truth; a screen; a route; a component; a cache with independent lifetime; a place where a Command's admissibility is decided; a place where missing professional state may be invented; a place where an inference may be converted into a fact; a summary that may suppress a contradiction relevant to its own purpose; a copy of a rule the engine enforces. *(Restates DOC-003 PER-7 and DOC-003 LYR-1 "a projection is not authority"; the invention/inference/suppression limbs restate CPM §3's prohibition list, evidence.)* It is also not a **View**: a View is the user-facing presentation and MAY be implemented using one or more Projections (DOC-002:186). The distinction is load-bearing and is enforced by `SPEC-001-FIX-O-1-03N`, which fails if a Projection type declares a rendering concern (a label string, an icon, a colour, a layout hint) as a field.
+
+**C-4 · Purpose.** To answer one declared professional question over governed state, at a declared scope, with the disclosures that question requires, so that a professional can inspect the state and a Surface can derive Affordances from it — without either acquiring authority.
+
+**C-5 · Authority.**
+
+| Act | Who | Constraint |
+|---|---|---|
+| Create a Projection **Definition** | The engineering authority for the workbench, under this specification | A new definition SHALL declare `projectionId`, purpose, form, scope contract (O-3), and required disclosures before it is registered; `SPEC-001-FIX-O-1-04N` fails registration of a definition missing any of the five |
+| Alter a Definition's fold or query | The same authority | An alteration that changes the **meaning** of the result SHALL increment `handlerVersion` (C-13); `SPEC-001-FIX-O-1-05N` detects a meaning change with an unchanged `handlerVersion` |
+| Create a Projection **Instance** | The system, on request | Never a professional act; requires no authority beyond read authorization for the scope (C-20) |
+| Approve / waive / revoke / supersede | **N/A — with reason.** A Projection carries no authority (`SPEC-001-INV-01`), so there is nothing to approve, waive, or revoke. Approval, waiver, revocation, and supersession are acts over **governed objects**, exercised through Commands in the Governance context (DOC-001 §7.1) and reaching the Projection only as new events to fold. A Projection that could be "approved" would be authoritative, which is exactly what PER-7 forbids | `SPEC-001-FIX-INV-01-N1` |
+| Retire a Definition | The same engineering authority | Retirement removes the definition from the registry; instances already generated are disposable and require no migration (C-22) |
+
+**C-6 · Inputs / preconditions.** A Projection Instance requires: a resolved **Projection Scope** (O-3) — mandatory, no exceptions, `SPEC-001-INV-02`; the governed events or objects its definition names as sources; the requesting Participant's authorization context; and a temporal basis (current, as-of, or comparison). A Projection SHALL NOT be generated with an unresolved or absent Scope; the fixture `SPEC-001-FIX-INV-02-N1` constructs a Projection with no Scope and fails if generation succeeds.
+
+**C-7 · Outputs / postconditions.** After generation, the instance exposes: its result content, bounded by its Scope; its identity pair (C-1); its freshness state (C-9); its completeness disclosure, including whether any object was omitted by scope, filter, or authorization and how many (CPM PROJ-INV-012, evidence; DOC-003 PER-7's disclosure clause, DOC-003:361, which is canon); and the provenance of every Claim, Evidence item, AI output, and Decision it presents (`SPEC-001-INV-12`). Generation SHALL emit no event, write no governed object, and change no governed state; conformance is established by `SPEC-001-FIX-INV-01-N2`, which generates every registered projection against a fixture engine and fails if the event count changes.
+
+**C-8 · Relationships (typed).**
+
+- `PROJECTION --bound-to--> PROJECTION_SCOPE` (O-3) — exactly one, mandatory.
+- `PROJECTION --derived-from--> GOVERNED_OBJECT*` / `--folded-from--> EVENT*` — one or more; the authoritative source entities the instance identifies (CPM PROJ-INV-001, evidence).
+- `SURFACE --renders--> PROJECTION*` (O-2) — a Surface composes one or more; the inverse is many-to-many, since one definition serves several Surfaces.
+- `PROJECTION --supplies--> AFFORDANCE*` (O-4) — a Projection supplies the *facts* an Affordance is derived from; it never decides the Affordance (`SPEC-001-INV-03`).
+- `PROJECTION --carries--> EPISTEMIC_DISCLOSURE*` (O-8) — provenance, uncertainty, contradiction, staleness.
+
+**C-9 · States.** Four **independent** state dimensions. They SHALL NOT be collapsed into one field, which is the same discipline DOC-003 STA-1 imposes on the PWU axes and which JCUX §6:249 states for screens ("These SHALL not be collapsed into one generic loading or status field", evidence).
+
+| Dimension | Values | Meaning |
+|---|---|---|
+| `derivationState` | `NOT_GENERATED` · `GENERATING` · `GENERATED` · `FAILED` | Whether the derivation ran |
+| `freshnessState` | `CURRENT` · `EVENTUALLY_CONSISTENT` · `STALE` · `REBUILDING` · `OFFLINE_SNAPSHOT` | The relation between the instance and the governed stream |
+| `completenessState` | `COMPLETE` · `PARTIAL_BY_SCOPE` · `PARTIAL_BY_AUTHORIZATION` · `PARTIAL_BY_FAILURE` | Why content is missing, and the three reasons are not interchangeable |
+| `temporalBasis` | `CURRENT` · `AS_OF` · `COMPARISON` · `PREDICTED` | What time the content speaks about |
+
+**UNRATIFIED-AUTHORED.** The four-dimension split is authored here. Its warrant is DOC-003 STA-1's principle applied to the projection layer plus CPM §17 and JCUX §6.1/§6.3 as evidence; no canon artifact enumerates projection state dimensions. A sponsor could reasonably rule that `completenessState`'s three PARTIAL reasons should be a separate disclosure object rather than a state value — noted for §11.
+
+**C-10 · Lifecycle.** `NOT_GENERATED` → `GENERATING` → (`GENERATED` | `FAILED`). A `GENERATED` instance may be **superseded** by a newer instance of the same definition and scope, or **discarded**. There is no "revised" instance: a Projection is disposable and is regenerated, never edited (DOC-003 PER-7, "rebuildability, not backup, is their durability guarantee"). A **Definition** has its own lifecycle: `REGISTERED` → `REVISED` (with `handlerVersion` increment where meaning changed) → `RETIRED`.
+
+**C-11 · Illegal states and transitions — enumerated.** Each SHALL be rejected, and each names the fixture that detects it.
+
+1. `GENERATED` with no bound Scope. *(→ `SPEC-001-FIX-INV-02-N1`)*
+2. `GENERATED` containing an object outside its Scope. *(→ `SPEC-001-FIX-INV-02-N2`)*
+3. `GENERATED` with `completenessState = COMPLETE` while any object was omitted by scope, authorization, or failure. *(→ `SPEC-001-FIX-O-1-06N`)*
+4. `freshnessState = CURRENT` on an instance generated from a checkpoint behind the stream head. *(→ `SPEC-001-FIX-INV-09-N1`)*
+5. `FAILED` rendered as empty content without the failure being disclosed — an empty result and a failed derivation are different facts. *(→ `SPEC-001-FIX-O-1-07N`)*
+6. `temporalBasis = AS_OF` or `COMPARISON` while the instance supplies Affordances for state-changing Commands against current state. *(→ `SPEC-001-FIX-O-1-08N`; restates CPM §21.3, evidence)*
+7. Any transition out of `GENERATED` that mutates the instance in place rather than producing a successor instance. *(→ `SPEC-001-FIX-O-1-09N`)*
+8. A Definition whose fold changes result meaning without a `handlerVersion` increment. *(→ `SPEC-001-FIX-O-1-05N`)*
+9. `derivationState = GENERATING` presented to the professional as `completenessState = COMPLETE` content. *(→ `SPEC-001-FIX-INV-09-N2`)*
+
+**C-12 · Invariants.** Governed by `SPEC-001-INV-01` (no authority), `-02` (bound to Scope), `-06` (uncertainty visible), `-08` (refusal surfaced, via the instance a Command originated from), `-09` (stale/partial/rebuilding identified), `-11` (progress ≠ assurance), `-12` (provenance exposed). Restated with citation at the persistence, event, UX, and test boundaries in §8.
+
+**C-13 · Versioning.** Two axes, and conflating them is the defect this dimension exists to prevent.
+
+- **Meaning change** — the set of objects admitted, the relations traversed, an aggregation's formula, an ordering that carries professional priority, or a disclosure's presence. A meaning change SHALL increment `handlerVersion` and SHALL invalidate every checkpoint taken under the prior version, forcing a rebuild (CONFIRMED: the mechanism exists and is documented at `projector.ts:9-10` — "Bump when the fold logic changes so stale checkpoints trigger a rebuild"). Verified by `SPEC-001-FIX-O-1-05N`.
+- **Presentation or execution change** — a performance optimization, a cache tier, a query rewrite, a field rename with an identical meaning, or an incremental path replacing a rebuild. These SHALL NOT increment `handlerVersion` and SHALL NOT change the result. Verified by `SPEC-001-FIX-O-1-10P`, which asserts byte-identical results across the change.
+
+**INFERRED, with the reasoning stated.** `handlerVersion` is currently `1` for all three built Projectors (`work-projection.ts:170`, `traceability-view.ts:85`, and the compatibility projector's declaration at `compatibility-view.ts:37-38`). `work-projection.ts:138-144` records that the `work` fold's default branch was changed from `default: break` to a full axis fold — a change that altered what every PWU node reports, from `PROPOSED/NOT_PLANNED/UNASSESSED` to its actual axes. That is a meaning change under the rule above. I did not find a `handlerVersion` increment accompanying it; `grep -rn "handlerVersion" packages` (untruncated) returns only the interface declaration, the accessor, and the three `handlerVersion: 1` literals. Whether an increment was owed depends on whether any checkpoint existed to invalidate, which I have not established — `IncrementalProjection` has no persisted checkpoint store that I located, and I did not search exhaustively for one. Recorded as an open item for §11 rather than asserted as a defect.
+
+**C-14 · Provenance.** A Projection Instance SHALL record: its `projectionId` and `handlerVersion`; its Scope; the authoritative source entities and their versions (CPM PROJ-INV-001, evidence); its generation time; its as-of time where `temporalBasis ≠ CURRENT`; and the authorization context under which it was filtered. It SHALL additionally preserve **access to** the provenance of each object it presents — it does not own that provenance, it must not sever it (`SPEC-001-INV-12`; restates DOC-003 PER-7's non-leakage clause at DOC-003:361 for the filtering half). Verified by `SPEC-001-FIX-INV-12-P1`.
+
+**C-15 · Evidence & assurance hooks.** A Projection is not an assurance subject and produces no Evidence about the professional work it renders — that would be a layer collapse (DOC-003 LYR-1). It is an assurance subject **about itself**: its conformance to this specification is established by the fixtures named throughout C-1 … C-26, and a Surface that renders a Projection carrying an assurance verdict SHALL render the verdict's own disposition and open conditions rather than a derived boolean (`SPEC-001-INV-11`; the built `AssuranceAssessmentView` already carries `disposition`, `independenceStatus`, and `openConditions` — CONFIRMED `assurance-view.ts:90-126`, consumed at `apps/rph-demo/src/routes/undertakings/[id]/+page.server.ts:255-290`).
+
+**C-16 · Failure modes.**
+(a) **Unscoped derivation** — the projection admits every object of a type. CONFIRMED, live: `+page.server.ts:255`, `:296`, `:302`, `:308` call `listAssessments`, `listObservations`, `listDecisions`, `listBaselines` with no scope argument (the functions accept none — `packages/rph-engine/src/queries.ts:46-51`). See §2.3 C-16 for the full treatment; this is the F-6 leak.
+(b) **False freshness** — cached or checkpointed content presented as current (CPM §29.5, evidence).
+(c) **False completeness** — a filtered result presented as the whole (CPM PROJ-INV-014, evidence; DOC-003 PER-7's disclosure clause, canon).
+(d) **Authority migration** — the projection's shape becomes the place a rule is decided, so the engine and the surface can disagree. CONFIRMED as a repeated incumbent failure: `execution-view.ts:462-471` records that four sibling affordances "had each grown their own inline plan-status condition in the Svelte template", and `:631-640` records Prune escaping the authority filter entirely.
+(e) **Dimension collapse** — the four state dimensions of C-9 summarized into one `loading` boolean.
+(f) **Silent invention** — a missing value rendered as a plausible default. CONFIRMED as an explicitly resisted pattern in the incumbent: `+page.server.ts:261-262` notes that an undefined §38 field "renders as 'unknown', never as a false 'none' (the load-bearing distinction)".
+(g) **Fold that compares to itself** — a rebuild-equivalence test that folds the same broken logic twice and passes. CONFIRMED: `work-projection.ts:142-144` records exactly this — "Its RPH-PER-007 test was green throughout, because it compared the fold to ITSELF: a broken fold equals a broken fold."
+
+**C-17 · Recovery.**
+**Reconcile** — a Projection is never reconciled; the governed state is. A divergence between a Projection and governed state is resolved by rebuild, and if rebuild does not resolve it, the fold is defective and is fixed under JPWB-DOC-004.
+**Retry** — a `FAILED` derivation MAY be retried; the retry SHALL produce a new instance identity, and the failure SHALL remain disclosed until the retry succeeds (`SPEC-001-FIX-O-1-07N`).
+**Reshape** — a Definition whose result is wrong is revised with a `handlerVersion` increment, invalidating checkpoints (C-13).
+**Escalate** — a Projection that cannot be generated at all SHALL surface `PROJ_UNAVAILABLE` (§6) with its reason; the Surface SHALL NOT render an empty region in its place, verified by `SPEC-001-FIX-O-1-07N`.
+
+**C-18 · Concurrency.** Two instances of the same definition and scope MAY be generated simultaneously and MAY disagree if the stream advanced between them; that is legal and is why C-1 requires instance identity. A folded Projection applies events in **global order** (CONFIRMED: `projector.ts:1`, `:18-22`), so concurrent application to the *same* instance is prohibited — an `IncrementalProjection` is single-writer. Concurrent **revision** of a Projection does not exist: instances are immutable after `GENERATED` (C-11 item 7). Where a Command is issued from an instance whose sources have since advanced, the Command is revalidated by the engine against current state and MAY be refused; the Surface SHALL disclose what materially changed rather than silently re-issuing (§6, `SURF-STALE-REVALIDATED`; restates CPM Scenario B, evidence). Verified by `SPEC-001-FIX-O-1-11N`.
+
+**C-19 · Idempotency.** Applying the same event twice to a folded Projection SHALL be a no-op, deduplicated by `eventId`. CONFIRMED: `projector.ts:49-54` — `if (this.appliedEventIds.has(event.eventId)) return;`. Rebuilding from empty SHALL produce a result identical to the incremental result (DOC-003 PER-7's rebuildability guarantee; the mechanism at `projector.ts:56-62`). A **computed** Projection is idempotent by construction, being a pure function of its inputs, and SHALL therefore hold no mutable state between invocations — verified by `SPEC-001-FIX-O-1-12P`, which invokes each computed builder twice on identical inputs and asserts deep equality.
+
+**C-20 · Security / permission boundaries.** A Projection filtered by authorization SHALL exclude unauthorized entities and relationships, SHALL disclose that its view is partial when the filtering materially affects interpretation, and SHALL NOT leak protected existence through counts, graph structure, titles, metadata, inferred dependencies, or omitted-node placeholders. *(Restates DOC-003 PER-7's SCOPE clause verbatim in meaning — DOC-003:361 — which is canon and controls; CPM §28.1-§28.3 is concurring evidence.)* **Visibility SHALL NOT imply mutation authority**: read access to a Projection confers nothing about Affordances, which derive independently from declared authority (`SPEC-001-INV-03`). Verified by `SPEC-001-FIX-O-1-13N` (a count that changes with the viewer's authorization is a leak) and `SPEC-001-FIX-INV-03-N1`.
+
+**C-21 · Observability.** To explain a Projection's behaviour after the fact, the following SHALL be recorded and retrievable: `projectionId`, `handlerVersion`, `projectionInstanceId`, Scope, generation time, as-of time, checkpoint or source version, `completenessState` with the omission count and reason class, `freshnessState`, and the authorization context. This is the minimum set that answers "why did this professional see this content" — and **CONFIRMED (absence, per C-1's search)**, none of it is currently recorded. Verified by `SPEC-001-FIX-O-1-14P`.
+
+**C-22 · Persistence semantics.** A Projection is **derived and disposable**. It is never an authoritative write target; canonical Commands never validate against it; projection lag never alters an authoritative decision; rebuildability, not backup, is its durability guarantee. *(Restates DOC-003 PER-7 in full, DOC-003:359 — the master. The built system states the same rule at `projector.ts:1-4` and `queries.ts:1-2`.)* A materialized Projection or checkpoint MAY be stored for performance and MAY be discarded at any time without loss; a stored Projection SHALL NOT outlive a `handlerVersion` increment (C-13). Verified by `SPEC-001-FIX-INV-01-N3` (a write to a projection store does not change any governed read) and `SPEC-001-FIX-O-1-15P` (discarding all stored projections and rebuilding reproduces every result).
+
+**C-23 · Migration / legacy relation.** The incumbent has three Projectors, five computed builders (C-2), no instance identity, no freshness, no completeness disclosure, and no scope on four of its read-model calls (C-16(a)). Adopting this specification therefore requires: adding the instance metadata of C-1/C-21; adding the Scope object of O-3 and binding every derivation to one; and classifying each existing derivation as folded or computed. It does **not** require replacing the `Projector<V>` interface, which already carries `name`, `handlerVersion`, rebuildability, and `eventId` idempotency — CONFIRMED `projector.ts:7-63`. No data migration is required, because Projections are disposable (C-22).
+
+**C-24 · UX / inspection surface.** A professional SHALL be able to inspect, for any rendered region: what Projection produced it, what Scope it is bound to, how fresh it is, and what it omitted. This is CPM PROJ-INV-011's explainability obligation (evidence) applied to the projection itself rather than only to calculated indicators, and it is what makes `SPEC-001-INV-09` checkable by a human rather than only by a fixture. The inspection affordance MAY be progressive (a detail popover, an inspector panel); it SHALL NOT require developer tooling. Verified by `SPEC-001-FIX-O-1-16P`.
+
+**C-25 · Verifying tests.** `SPEC-001-FIX-O-1-01P/01N`, `-02P`, `-03N`, `-04N`, `-05N`, `-06N`, `-07N`, `-08N`, `-09N`, `-10P`, `-11N`, `-12P`, `-13N`, `-14P`, `-15P`, `-16P`; plus the invariant fixtures `SPEC-001-FIX-INV-01-N1/N2/N3`, `-INV-02-N1/N2`, `-INV-09-N1/N2`, `-INV-12-P1`. Incumbent tests that already exercise part of this contract and SHALL be retained as regression cover: `packages/rph-projections/src/work-projection.test.ts`, `traceability-compatibility.test.ts`, `execution-view.test.ts`, `revrem-wp1-readmodel-fidelity.test.ts`.
+
+**C-26 · Definition of done.** An implementation of O-1 is done when: every derivation in the workbench is a registered Definition with `projectionId`, form, purpose, Scope contract, and required disclosures; every instance carries the C-21 metadata; every one of C-11's nine illegal states is rejected by a named fixture that goes red when the rejection is weakened (D-6); and `SPEC-001-FIX-O-1-15P` passes against a store emptied of all materialized projections.
+
+### 2.1.2 Field contracts — Projection Definition
+
+| Field | Type | Optionality | Default | Semantics | Validation rule | Who may write |
+|---|---|---|---|---|---|---|
+| `projectionId` | stable identifier | mandatory | none | The definition's name, stable across every instance, rebuild, and version | Unique in the definition registry; immutable after registration; non-empty | Engineering authority, at registration only |
+| `name` | human label | mandatory | none | The professional-facing name of the derivation | Non-empty; DOC-002:266 suffix convention applies where the derivation is also a named instrument | Engineering authority |
+| `purpose` | prose | mandatory | none | The single professional question the derivation answers (CPM §7.1, evidence) | Non-empty; SHALL be a question or an inspectable claim, never a data description | Engineering authority |
+| `projectionForm` | enum `FOLDED` \| `COMPUTED` | mandatory | none | Which derivation form (C-2), determining which of C-18/C-19/C-22 apply | Exactly one value; `FOLDED` requires `handlerVersion` | Engineering authority |
+| `handlerVersion` | integer | mandatory when `FOLDED`, prohibited when `COMPUTED` | none | Meaning version of the fold; a change invalidates checkpoints (C-13) | Monotonically increasing; increments on meaning change only | Engineering authority |
+| `scopeContract` | Projection Scope contract (O-3) | mandatory | none | The declared subject kind and derivation path every instance SHALL bind to | SHALL resolve to a valid O-3 contract; SHALL NOT be absent, and SHALL NOT be `DECLARED_GLOBAL` without the O-3 justification field | Engineering authority |
+| `sourceEntityTypes` | set of governed object types | mandatory | none | Which authoritative types the derivation reads (CPM §7.2, evidence) | Non-empty; every type resolvable in the generated contracts | Engineering authority |
+| `relationshipPaths` | ordered set of typed relations | optional | empty | Which relations are traversed and to what depth (CPM §7.5, evidence) | Every relation resolvable; depth declared, never unbounded | Engineering authority |
+| `requiredDisclosures` | set of disclosure kinds | mandatory | none | Which of provenance · confidence · uncertainty · contradiction · staleness · omission the derivation SHALL surface (CPM §7.10, evidence) | Non-empty for any derivation presenting a Claim, Assessment, AI output, or Decision — enforced by `SPEC-001-FIX-INV-12-P1` | Engineering authority |
+| `temporalBasisSupported` | set of `temporalBasis` values | mandatory | `{CURRENT}` | Which temporal bases the derivation can serve | Non-empty; `AS_OF` requires the source stream to be replayable | Engineering authority |
+| `refreshMode` | enum `EVENT_DRIVEN` \| `ON_DEMAND` \| `SCHEDULED` \| `STREAMING` \| `MANUAL` | mandatory | `ON_DEMAND` | How instances are updated (CPM §18, evidence) | Exactly one value; a value implying a delay obliges a `freshnessState` other than `CURRENT` to be representable | Engineering authority |
+| `definitionStatus` | enum `REGISTERED` \| `RETIRED` | mandatory | `REGISTERED` | Whether new instances may be generated | A `RETIRED` definition SHALL reject generation | Engineering authority |
+
+### 2.1.3 Field contracts — Projection Instance
+
+| Field | Type | Optionality | Default | Semantics | Validation rule | Who may write |
+|---|---|---|---|---|---|---|
+| `projectionInstanceId` | opaque identifier | mandatory | none | Distinguishes this generation from every other | Unique within the generating process; never derived from `projectionId` alone (`SPEC-001-FIX-O-1-01N`) | The system, at generation |
+| `projectionId` | stable identifier | mandatory | none | Which definition produced it | SHALL resolve to a `REGISTERED` definition | The system, at generation |
+| `handlerVersion` | integer | mandatory when the definition is `FOLDED` | none | The fold version that produced this content | SHALL equal the definition's current value, else the instance is `STALE` by construction | The system, at generation |
+| `scope` | Projection Scope (O-3) | mandatory | none | The resolved subject this instance is bound to | SHALL be resolved, never a contract template; SHALL satisfy the definition's `scopeContract` | The system, at generation |
+| `participantContext` | authorization context | mandatory | none | The Participant and authority under which filtering was applied | Non-empty; recorded even when no filtering occurred, so "unfiltered" is a positive fact | The system, at generation |
+| `derivationState` | enum (C-9) | mandatory | `NOT_GENERATED` | Whether the derivation ran | Exactly one value; independent of the other three dimensions | The system |
+| `freshnessState` | enum (C-9) | mandatory | none | Relation to the governed stream | `CURRENT` SHALL be false when the checkpoint is behind the stream head (`SPEC-001-FIX-INV-09-N1`) | The system |
+| `completenessState` | enum (C-9) | mandatory | none | Whether and why content is missing | SHALL NOT be `COMPLETE` when `omittedCount > 0` (`SPEC-001-FIX-O-1-06N`) | The system |
+| `temporalBasis` | enum (C-9) | mandatory | `CURRENT` | What time the content speaks about | SHALL be in the definition's `temporalBasisSupported`; a non-`CURRENT` value prohibits current-state Affordances (`SPEC-001-FIX-O-1-08N`) | The system, from the request |
+| `generatedAt` | instant | mandatory | none | When this instance was produced | Monotonic within a process; SHALL be rendered wherever staleness is disclosed | The system |
+| `asOfTime` | instant | mandatory when `temporalBasis ≠ CURRENT`, prohibited otherwise | none | The governed time the content reflects | SHALL NOT be later than `generatedAt` | The system, from the request |
+| `sourceVersion` | checkpoint or version vector | mandatory when `FOLDED`, optional otherwise | none | The stream position the content reflects | SHALL be comparable to the stream head, or `freshnessState` SHALL NOT be `CURRENT` | The system |
+| `omittedCount` | non-negative integer | mandatory | `0` | How many objects were excluded | SHALL count scope, filter, and authorization exclusions; SHALL NOT be reported in a form that leaks protected existence (C-20, `SPEC-001-FIX-O-1-13N`) | The system |
+| `omissionReasons` | set of `SCOPE` \| `FILTER` \| `AUTHORIZATION` \| `FAILURE` | mandatory when `omittedCount > 0`, else empty | empty | Why content is missing — the three PARTIAL reasons are not interchangeable | Non-empty exactly when `omittedCount > 0`; `AUTHORIZATION` SHALL be disclosed as a class without naming what was withheld | The system |
+| `failureReason` | error code (§6) | mandatory when `derivationState = FAILED`, prohibited otherwise | none | Why the derivation failed | SHALL be a stable code from §6; SHALL NOT be rendered as empty content (`SPEC-001-FIX-O-1-07N`) | The system |
+
+---
+
+## 2.2 O-2 · Surface
+
+### 2.2.1 Closure matrix
+
+**C-1 · Identity & unique identification.** A Surface is identified by a `surfaceId` — a stable name — and is **addressed** by a route pattern. The two are distinct: the identifier survives a route change, the address does not. CONFIRMED, the incumbent addresses: `/` (PWA Library), `/pwa/[id]` (PWA Designer), `/undertakings`, `/undertakings/[id]` (Undertaking Workbench), `/decisions`, `/baselines`, plus `/test-api/{dispatch,introspect,reset}` which are test endpoints and not Surfaces — enumerated from the route tree under `apps/rph-demo/src/routes/`, complete, no truncation. A Surface SHALL declare both; conformance is established by `SPEC-001-FIX-O-2-01P`, which asserts every registered Surface resolves an address and every reachable address resolves a registered Surface (an unregistered reachable address is a finding).
+
+**C-2 · Definition.** A **Surface** is a named, addressable composition of Projections and Affordances that a professional navigates to, operating within exactly one declared workbench context, and preserving the professional context it was reached with. It is a proper sub-kind of the canonical **View** (DOC-002:186) — specifically, the routable View that owns an address, a context, a reachability contract, and a navigation contract. *(Adopted per FORK-12 recommendation (b); this definition adds routability to View and contradicts nothing in DOC-002 §5.)*
+
+**C-3 · Exclusion.** A Surface is **not**: a source of truth; an authority; a Projection (it composes them); a page in the document sense; a module with its own data store; a place where a Command's admissibility is decided; a place where the four PWU state axes may be summarized; a place where an Affordance may be invented that the engine would refuse, or suppressed that the engine would admit (`SPEC-001-INV-13`). It is also not the **shell**: the shell's regions (global header, rail, breadcrumb, command region) are shared furniture that Surfaces occupy — a distinction RIWS §4.1 and JCUX §5.1 both draw (evidence).
+
+**C-4 · Purpose.** To let a professional determine, without reconstructing state from other tools, what is true of a declared subject, what remains uncertain, and what they are authorized to do next — and to route every act they take back through a semantic Command.
+
+**C-5 · Authority.**
+
+| Act | Who | Constraint |
+|---|---|---|
+| Create a Surface | Engineering authority for the workbench | A new Surface SHALL declare `surfaceId`, address, context, `primaryScope`, its region composition, and its reachability contract before it is routable; `SPEC-001-FIX-O-2-02N` fails a routable Surface missing any of the six |
+| Alter composition | The same authority | Adding a region that renders a Projection outside the Surface's `primaryScope` or a declared sub-scope is prohibited (C-11 item 2) |
+| Mutate governed state from a Surface | **Nobody.** A Surface act reaches governed state **only** by issuing a semantic Command | `SPEC-001-INV-01`; verified by `SPEC-001-FIX-INV-01-N4` |
+| Approve / waive / revoke / supersede | **N/A — with reason.** These are acts over governed objects exercised in the Governance context (DOC-001 §7.1); a Surface hosts the Affordance that issues the Command and holds none of the authority. A Surface that could itself approve would be authoritative | `SPEC-001-FIX-INV-01-N4` |
+| Retire a Surface | Engineering authority | Its address SHALL either 404 or redirect with the navigation context preserved (`SPEC-001-INV-10`) |
+
+**C-6 · Inputs / preconditions.** A Surface requires: a resolved address with its parameters; a resolved `primaryScope` (O-3); the Participant's authorization context; and the inbound Navigation Context (O-9). A Surface SHALL NOT render governed content before its `primaryScope` resolves; where the subject does not exist or is not authorized, it SHALL render the corresponding §6 disclosure rather than an empty composition — verified by `SPEC-001-FIX-O-2-03N`.
+
+**C-7 · Outputs / postconditions.** After render, the Surface exposes: its context indicator; its `primaryScope` subject and identity; each region's Projection with that Projection's freshness and completeness (`SPEC-001-INV-09`); the Affordances derived for the Participant, and for each Affordance not offered, its withholding disclosure (`SPEC-001-INV-04`); and an outbound Navigation Context for every link it renders (`SPEC-001-INV-10`). Rendering SHALL change no governed state (`SPEC-001-INV-01`, verified by `SPEC-001-FIX-INV-01-N2`).
+
+**C-8 · Relationships (typed).**
+
+- `SURFACE --renders--> PROJECTION*` (O-1) — one or more, each into a declared region.
+- `SURFACE --bound-to--> PROJECTION_SCOPE` (O-3) — exactly one `primaryScope`; regions MAY declare sub-scopes derived from it.
+- `SURFACE --offers--> AFFORDANCE*` (O-4) and `--withholds--> AFFORDANCE_WITHHOLDING*` (O-5).
+- `SURFACE --discloses--> REFUSAL_DISCLOSURE*` (O-6) · `--> STATE_AXIS_RENDERING*` (O-7) · `--> EPISTEMIC_DISCLOSURE*` (O-8).
+- `SURFACE --preserves--> NAVIGATION_CONTEXT` (O-9) — inbound and outbound.
+- `SURFACE --operates-in--> WORKBENCH_CONTEXT` — exactly one (C-9).
+
+**C-9 · States.** Four independent dimensions; they SHALL NOT be collapsed (JCUX §6:249, evidence; the discipline is DOC-003 STA-1's).
+
+| Dimension | Values | Meaning |
+|---|---|---|
+| `resolutionState` | `UNRESOLVED` · `RESOLVING` · `RESOLVED` · `NOT_FOUND` · `UNAUTHORIZED` | Whether the address and scope resolved |
+| `compositionState` | `EMPTY` · `PARTIAL` · `COMPLETE` | Whether every declared region produced content — `PARTIAL` when at least one Projection is `FAILED` or `GENERATING` |
+| `workbenchContext` | `PWA_DESIGN` · `UNDERTAKING` · `EXECUTION` · `ASSURANCE` · `GOVERNANCE` | Which of DOC-001 §7.1's five contexts the Surface operates in |
+| `commandState` | `IDLE` · `VALIDATING` · `AWAITING_CONFIRMATION` · `SUBMITTING` · `ACCEPTED` · `REFUSED` · `PARTIALLY_APPLIED` | The state of a Command issued from this Surface |
+
+**CONFIRMED divergence, not silently resolved.** DOC-001 §7.1 enumerates **five** workbench contexts (PWA Design, Undertaking, Execution, Assurance, Governance). The built shell carries **two** — `'design'` and `'undertaking'` — hard-coded at `apps/rph-demo/src/routes/+layout.svelte:59-64` (each nav entry declares `context: 'design' | 'undertaking'`) and derived at `:65-71`, with the banner text at `:123-125`. RPH-DOC-010 §5 also names exactly two ("PWA DESIGN CONTEXT" / "UNDERTAKING CONTEXT"). The canon controls on this question by concern (DOC-001 owns the concept of operations), so `workbenchContext` takes DOC-001's five values; the shell's two-value rendering is a **divergence to file**, not an amendment. It is not resolved here — the Execution, Assurance, and Governance contexts are currently rendered as *tabs within* `/undertakings/[id]` (CONFIRMED: `apps/rph-demo/src/routes/undertakings/[id]/+page.svelte:29-40` declares seven tabs — `graph`, `overview`, `execution`, `assurance`, `decisions`, `baselines`, `traceability`), and whether a tab satisfies "a different authority boundary" is a sponsor question. Recorded for §11.
+
+The `PARTIALLY_APPLIED` value of `commandState` is **UNRATIFIED-AUTHORED** and exists because `SPEC-001-INV-14` requires it: a multi-Command action that half-applies has no honest representation in JCUX §6.2's seven-value set (`idle`, `validating`, `awaiting_confirmation`, `submitting`, `accepted`, `rejected`, `conflicted`), and the incumbent's `runSteps` dispatches six Commands — eight on first invocation — with no rollback (`+page.server.ts:830-887`; see §2.6.3). A state that cannot be represented cannot be disclosed.
+
+**C-10 · Lifecycle.** `UNRESOLVED` → `RESOLVING` → (`RESOLVED` | `NOT_FOUND` | `UNAUTHORIZED`). A `RESOLVED` Surface is **re-rendered** on projection refresh — re-render is not a lifecycle transition and SHALL NOT reset Navigation Context (`SPEC-001-INV-10`). A Surface is **left** by navigation, which produces an outbound Navigation Context. A Surface **definition** is registered, revised, and retired by the engineering authority (C-5).
+
+**C-11 · Illegal states and transitions — enumerated.**
+
+1. `RESOLVED` with no bound `primaryScope`. *(→ `SPEC-001-FIX-O-2-04N`)*
+2. A region rendering a Projection whose Scope is neither the Surface's `primaryScope` nor a sub-scope derived from it — the F-6 shape at the Surface level. *(→ `SPEC-001-FIX-INV-02-N3`)*
+3. Two `workbenchContext` values simultaneously, or none. *(→ `SPEC-001-FIX-O-2-05N`)*
+4. `compositionState = COMPLETE` while any region's Projection is `FAILED`, `GENERATING`, or `PARTIAL_*`. *(→ `SPEC-001-FIX-INV-09-N3`)*
+5. `commandState = ACCEPTED` after a multi-Command action in which any constituent Command was refused. *(→ `SPEC-001-FIX-INV-14-N1`)*
+6. `commandState = REFUSED` with no refusal reason and no error code rendered. *(→ `SPEC-001-FIX-INV-08-N1`)*
+7. Content placed in the accessibility tree that ordinary interaction cannot bring into view. *(→ `SPEC-001-FIX-INV-07-N1`)*
+8. An Affordance offered that the engine would refuse, or withheld that the engine would admit. *(→ `SPEC-001-FIX-INV-13-N1`, `-N2`)*
+9. An Affordance absent with no withholding disclosure. *(→ `SPEC-001-FIX-INV-04-N1`)*
+10. A direct write to governed state from a Surface event handler — any path to persistence that is not a Command dispatch. *(→ `SPEC-001-FIX-INV-01-N4`)*
+11. Navigation away and back that loses the inbound Navigation Context. *(→ `SPEC-001-FIX-INV-10-N1`)*
+12. The four PWU state axes rendered as one status value, badge, or progress indicator. *(→ `SPEC-001-FIX-INV-05-N1`)*
+
+**C-12 · Invariants.** Every one of `SPEC-001-INV-01` … `-14` reaches O-2; it is the object at which most of them are violated. Restated with citation at the UX boundary in §8.
+
+**C-13 · Versioning.** A Surface's **meaning** changes when: its `primaryScope` changes; its region set gains or loses a Projection; its Affordance set changes; a disclosure obligation is added or removed; or its context changes. Such a change SHALL be accompanied by a fixture update in §10 and, where it alters what a professional may do, by a JPWB-REG-005 entry — verified by `SPEC-001-CHK-TRACE`. A Surface's **presentation** changes — layout, ordering that carries no professional priority, styling, animation, component substitution — SHALL NOT change any fixture outcome; verified by `SPEC-001-FIX-O-2-06P`, which asserts the semantic fixtures pass unchanged across a restyle. *(This is the operational boundary between N-1 and the governed core: if a visual change reddens a semantic fixture, the change was not visual.)*
+
+**C-14 · Provenance.** A Surface records: which Projection produced each region (C-24 of O-1); which Command each Affordance issues and from which authority declaration it was derived (`SPEC-001-INV-03`); and the Navigation Context it was reached with. It SHALL NOT originate provenance for governed content — it surfaces the provenance the Projection carries (`SPEC-001-INV-12`).
+
+**C-15 · Evidence & assurance hooks.** A Surface produces no Evidence about professional work. It is the object at which assurance verdicts are **rendered**, and the rendering contract is `SPEC-001-INV-11` (progress SHALL NOT imply assurance) and `SPEC-001-INV-05` (the axes stay separate). A Surface's own conformance evidence is its fixture set (C-25). *Assurance hook of consequence:* a Surface presenting a green or success indication SHALL be able to name, on demand, the assessment disposition and open conditions behind it — CON-000 V1's "a green indicator whose basis cannot be inspected is a defect, not a feature", restated with citation and verified by `SPEC-001-FIX-INV-11-P1`.
+
+**C-16 · Failure modes.**
+(a) **Clipping without a scroller** — the Surface's content exceeds its container and no scroll mechanism exists, so content is present in the DOM and unreachable. **CONFIRMED, live, with precise citation:** `apps/rph-demo/src/routes/+layout.svelte:74-76` derives `fullBleed` for any path matching `/^\/undertakings\/[^/]+$/`; `:145-149` sets `.app { display: flex; height: 100vh; overflow: hidden; }`; `:310-314` sets `.content.full { padding: 0; overflow: hidden; }`. The spine cites `:145-148`; the full mechanism is the three citations above, and I record the correction rather than repeat the narrower one. The measured consequence at 1440×900 is 68 of 77 Assurance rows and 4 of 9 Overview action buttons unreachable, with a real wheel event moving nothing. → `SPEC-001-INV-07`.
+(b) **Scope leak** — a region renders objects belonging to a different subject. CONFIRMED: see §2.3 C-16.
+(c) **Affordance asymmetry** — nine of sixteen route actions unreachable, because no UI-reachable state populates the map that gates the step-level Affordances. CONFIRMED as a mechanism: `+page.server.ts:180-192` builds `startableStepByPlan` and returns it, and `:186` records `if (sids.length) startableStepByPlan[pl.id] = sids;` — a plan with no startable step yields no entry, so a Surface whose plans never reach a startable state renders no step Affordance at all. → `SPEC-001-INV-13`.
+(d) **Silent absence** — an Affordance simply not drawn, with no explanation. → `SPEC-001-INV-04`.
+(e) **Partial application reported as success** — a multi-Command action whose later Commands are refused after earlier ones committed. CONFIRMED as the incumbent shape: the `recordAssurance` action's `runSteps` call dispatches **six** Commands — **eight** on first invocation, since it mints and activates the policy — with no rollback (`+page.server.ts:830-887`), and "Illegal transition on PWU" is surfaced *after* two assurance rows are committed. **COUNT CORRECTED 2026-07-28 (review FC-6):** the drafted text said "four", carried from the authoring spine; the spine's author inferred it from the four `chg` calls without re-reading the step list. The *measured* behaviour — two rows committed, then a refusal surfaced — was observed in a browser and is unaffected. → `SPEC-001-INV-14`, `-08`.
+(f) **Ratified concept with zero surface.** CONFIRMED (absence, search stated): `grep -rn --exclude-dir=node_modules --exclude-dir=.svelte-kit` over `apps/` returns **0** occurrences of each of `UNCERTAINTY`, `CONTRADICTION`, `ASSUMPTION`, `QUESTION`, while the same patterns over `packages/` return 17, 9, 230, and 18 respectively. The concepts are in the vocabulary and in the engine, and no Surface renders any of them. → `SPEC-001-INV-06`. This is an **alarming** absence and received the same directed search as a reassuring one would; the `packages/` counts are reported so a reader can verify that the concepts exist and the gap is at the Surface.
+(g) **Dashboard reductionism** — professional state collapsed into a status chip (CPM §29.2, evidence). → `SPEC-001-INV-05`, `-11`.
+(h) **Context loss on navigation** (CPM §29.7, evidence). → `SPEC-001-INV-10`.
+
+**C-17 · Recovery.**
+**Reconcile** — where a Surface's rendered content disagrees with governed state, the Surface regenerates its Projections; it never edits content to agree.
+**Retry** — a `FAILED` region MAY offer a retry that regenerates that Projection only; retry SHALL NOT re-issue a Command (`SPEC-001-FIX-O-2-07N`).
+**Reshape** — a Surface whose composition violates C-11 is redefined under C-5; the fixture that caught the violation remains as regression cover.
+**Escalate** — `NOT_FOUND` and `UNAUTHORIZED` SHALL render the §6 disclosure for their code, preserving the inbound Navigation Context so the professional can return (`SPEC-001-FIX-INV-10-N2`).
+**Partial application** — where `commandState = PARTIALLY_APPLIED`, the Surface SHALL disclose exactly which Commands applied and which did not, and SHALL NOT offer a blanket retry of the whole action without disclosing that the applied Commands will be re-attempted (`SPEC-001-INV-14`, `SPEC-001-FIX-INV-14-N2`).
+
+**C-18 · Concurrency.** A Surface MAY be open in several tabs, by several Participants, over the same subject. Surfaces hold no shared mutable state, so simultaneous *rendering* needs no coordination. Simultaneous *acting* is coordinated by the engine, not by the Surface: two Participants issuing conflicting Commands are resolved by the engine's own concurrency control, and the losing Surface receives a refusal it SHALL disclose (`SPEC-001-INV-08`). A Surface SHALL NOT implement its own locking, presence, or conflict resolution over governed state — that would be authority in the Surface (`SPEC-001-INV-01`), verified by `SPEC-001-FIX-O-2-08N`.
+
+**C-19 · Idempotency.** Re-rendering a Surface SHALL produce the same content for the same Projection instances and SHALL issue no Command; verified by `SPEC-001-FIX-O-2-09P`. A Command-issuing Affordance activated twice SHALL result in at most one applied effect: the Surface SHALL carry a per-activation idempotency token through to the Command, and SHALL NOT rely on disabling the control, because a disabled control is a presentation state and a double submission survives it. Verified by `SPEC-001-FIX-O-2-10N`, which activates the same Affordance twice concurrently and fails if two effects apply.
+
+**C-20 · Security / permission boundaries.** A Surface renders only what its Projections admit; it SHALL NOT re-derive or widen a Projection's authorization filtering (`SPEC-001-FIX-O-2-11N`). Visibility SHALL NOT imply mutation authority — an Affordance derives from declared authority independently of what is visible (`SPEC-001-INV-03`; restates DOC-003 PER-7's SCOPE clause and CPM §28.4, evidence). A Surface SHALL NOT leak protected existence through region headings, empty-state copy, counts, or placeholder rows; verified by `SPEC-001-FIX-O-1-13N` applied at Surface grain.
+
+**C-21 · Observability.** To explain what a professional saw and could do, the following SHALL be recorded per render: `surfaceId`, resolved address and parameters, `primaryScope`, `workbenchContext`, the `projectionInstanceId` of each region, the Affordances offered, the Affordances withheld **with their reasons** (O-5), and the inbound Navigation Context. The withheld set is the half that is normally lost and is the half that answers "why could they not act" — verified by `SPEC-001-FIX-O-2-12P`.
+
+**C-22 · Persistence semantics.** A Surface persists **nothing governed**. It MAY persist local interaction state (which tab is selected, whether a rail is collapsed, a draft not yet submitted) provided that state is never read as professional truth and never flows into a Command's semantics. CONFIRMED as the incumbent pattern: `+layout.svelte:39-40` and `:52-55` persist nav collapse to `localStorage` under `'jpwb-nav-collapsed'`, and `+page.svelte:29-31` holds the selected tab in component state — both local interaction state, neither governed. A Surface SHALL NOT persist a value that any Command reads; verified by `SPEC-001-FIX-O-2-13N`.
+
+**C-23 · Migration / legacy relation.** The incumbent has six professional Surfaces and three test endpoints (C-1). Adopting this specification requires: registering each Surface with the six declarations of C-5; binding each region to a Scope derived from `primaryScope` (which closes C-16(b)); adding withholding disclosures (O-5) where Affordances are currently simply absent (C-16(d)); adding a reachability contract (C-16(a)); and representing the five DOC-001 contexts rather than two (C-9). It does **not** require abandoning the tabbed composition of `/undertakings/[id]`, which is a legitimate region arrangement — the question a tab raises is one of *context boundary* (C-9), not of composition.
+
+**C-24 · UX / inspection surface.** A professional SHALL be able to determine, from the Surface itself: which workbench context they are in; which subject they are looking at; which Projection produced each region and how fresh it is; and why any expected action is unavailable. The first is what `+layout.svelte:117-126` already attempts with its context banner (CONFIRMED); the fourth is `SPEC-001-INV-04` and is currently absent everywhere (C-16(d)). Verified by `SPEC-001-FIX-O-2-14P`.
+
+**C-25 · Verifying tests.** `SPEC-001-FIX-O-2-01P`, `-02N`, `-03N`, `-04N`, `-05N`, `-06P`, `-07N`, `-08N`, `-09P`, `-10N`, `-11N`, `-12P`, `-13N`, `-14P`; plus `SPEC-001-FIX-INV-01-N4`, `-INV-02-N3`, `-INV-04-N1`, `-INV-05-N1`, `-INV-07-N1`, `-INV-08-N1`, `-INV-09-N3`, `-INV-10-N1/N2`, `-INV-11-P1`, `-INV-13-N1/N2`, `-INV-14-N1/N2`. Incumbent end-to-end tests that already exercise part of this contract and SHALL be retained: `apps/rph-demo/e2e/undertaking-pwu.e2e.ts`, `execution-flow.e2e.ts`, `execution-plan.e2e.ts`, `assurance-floor.e2e.ts`, `traceability.e2e.ts`, `pwa-node-graph.e2e.ts`. **Reachability fixtures SHALL be end-to-end and viewport-bound**, because C-16(a)'s defect is invisible to a component test and to an accessibility-tree query — this is `SPEC-001-INV-07`'s whole point.
+
+**C-26 · Definition of done.** An implementation of O-2 is done when every registered Surface declares the six items of C-5; every region's Scope derives from `primaryScope`; every one of C-11's twelve illegal states is rejected by a named fixture with a stated mutation that reddens it (D-6); the reachability fixtures run at a declared viewport against the real layout; and the withheld-Affordance set is observable per render (C-21).
+
+### 2.2.2 Field contracts — Surface
+
+| Field | Type | Optionality | Default | Semantics | Validation rule | Who may write |
+|---|---|---|---|---|---|---|
+| `surfaceId` | stable identifier | mandatory | none | The Surface's name, stable across address changes | Unique in the Surface registry; immutable after registration | Engineering authority, at registration |
+| `address` | route pattern with named parameters | mandatory | none | How the Surface is reached and bookmarked | SHALL resolve to exactly one registered Surface; every parameter SHALL be consumed by `primaryScope` resolution or by a declared region | Engineering authority |
+| `name` | human label | mandatory | none | The professional-facing name | Non-empty; DOC-002:266 suffix convention (`View`, `Explorer`, `Studio`, `Workbench`) applies | Engineering authority |
+| `workbenchContext` | enum (C-9) | mandatory | none | Which of DOC-001 §7.1's five contexts, and therefore which authority boundary | Exactly one value; SHALL be rendered as a visible context indicator (`SPEC-001-FIX-O-2-05N`) | Engineering authority |
+| `primaryScope` | Projection Scope (O-3) | mandatory | none | The subject the whole Surface is bound to | SHALL resolve before any governed content renders; SHALL be the ancestor of every region scope (`SPEC-001-FIX-INV-02-N3`) | Engineering authority declares; the system resolves per request |
+| `regions` | ordered set of Region declarations | mandatory | none | The composition: each region names a Projection and a scope derived from `primaryScope` | Non-empty; every region's Projection SHALL be a `REGISTERED` definition; every region scope SHALL derive from `primaryScope` | Engineering authority |
+| `affordanceSources` | set of authority-declaration references | mandatory | none | Which declared authority each offered Command is derived from (`SPEC-001-INV-03`) | Every entry SHALL reference the engine's own declaration, never a Surface-local copy (`SPEC-001-FIX-INV-03-N1`) | Engineering authority |
+| `reachabilityContract` | Reachability declaration | mandatory | none | For each region: whether its content may exceed the viewport, and by what mechanism it is brought into view | A region declaring overflow SHALL name a scroll or pagination mechanism; a clipping container with no named mechanism is invalid (`SPEC-001-FIX-INV-07-N1`) | Engineering authority |
+| `requiredDisclosures` | set of disclosure kinds | mandatory | none | Which of provenance · uncertainty · contradiction · staleness · omission · withholding this Surface SHALL surface | SHALL include `withholding` for any Surface offering Affordances, and `uncertainty` for any Surface rendering a PWU (`SPEC-001-INV-04`, `-06`) | Engineering authority |
+| `navigationContract` | Navigation Context declaration (O-9) | mandatory | none | What context this Surface accepts inbound and emits outbound | SHALL preserve every inbound context element it does not explicitly consume (`SPEC-001-INV-10`) | Engineering authority |
+| `resolutionState` | enum (C-9) | mandatory | `UNRESOLVED` | Whether address and scope resolved | Exactly one value; independent of `compositionState` | The system, per request |
+| `compositionState` | enum (C-9) | mandatory | `EMPTY` | Whether every region produced content | SHALL NOT be `COMPLETE` while any region's Projection is `FAILED`, `GENERATING`, or partial (`SPEC-001-FIX-INV-09-N3`) | The system, per render |
+| `commandState` | enum (C-9) | mandatory | `IDLE` | The state of a Command issued from this Surface | SHALL NOT be `ACCEPTED` when any constituent Command of a multi-Command action was refused (`SPEC-001-FIX-INV-14-N1`) | The system, per dispatch |
+| `localInteractionState` | opaque, Surface-defined | optional | empty | Selected tab, collapse state, scroll position, unsent draft | SHALL NOT be read by any Command and SHALL NOT be presented as professional truth (`SPEC-001-FIX-O-2-13N`) | The Surface (this is the one field a Surface owns) |
+
+---
+
+## 2.3 O-3 · Projection Scope
+
+**INFORMATIVE.** This is the object that makes the F-6 leak *expressible*. Without it, "this projection shows the wrong Undertaking's records" is a bug report about one function. With it, the leak is a **declared property of a derivation that is either present or absent**, and its absence is a compile-or-fixture-time finding rather than a thing someone has to notice.
+
+### 2.3.1 Closure matrix
+
+**C-1 · Identity & unique identification.** A Projection Scope exists at two grains, mirroring O-1's definition/instance split, and the two SHALL NOT be conflated.
+
+- A **Scope Contract** is declared on a Projection Definition (O-1 `scopeContract`) and is identified by `(projectionId, scopeContractId)`. It names a *subject kind* and a *derivation path*, not a subject.
+- A **Resolved Scope** is produced per instance and is identified by `(scopeContractId, subjectType, subjectId)`. It names an actual subject.
+
+A Resolved Scope SHALL identify its contract, so that "which rule admitted this object" is answerable after the fact; verified by `SPEC-001-FIX-O-3-01P`.
+
+**C-2 · Definition.** A **Projection Scope** is the declared subject a Projection is bound to, together with the **derivation path** — the ordered sequence of typed relation hops from that subject — that decides, totally, which governed objects the Projection may admit. It is both a *declaration of intent* (this view is about this Undertaking) and an *executable membership rule* (an object is admitted iff a declared path reaches it from the subject).
+
+The second half is what makes the object worth having. A scope that is only a declaration is a comment; a scope that is only a filter is a hand-written predicate that drifts. **UNRATIFIED-AUTHORED**, and the authoring choice is deliberate: the membership predicate SHALL be *derived from* the declared path rather than written alongside it, for the same reason `planPermitsAffordance` reads the command's own spec row rather than restating the rule (CONFIRMED: `execution-view.ts:349-356` — "the only way that survives is for the read-model and the authority to consult ONE declaration").
+
+**C-3 · Exclusion.** A Projection Scope is **not**: an authorization filter (C-20 distinguishes them, and conflating them is a defect); a query optimization; a UI filter the professional sets; a pagination window; a security boundary; a where-clause. It is also not the **subject object** — it *names* a subject and is not that subject.
+
+**C-4 · Purpose.** To make "what is this view about, and what may it therefore contain" a declared, checkable property — so that presenting an object outside the subject is a detectable violation rather than an unnoticed leak.
+
+**C-5 · Authority.**
+
+| Act | Who | Constraint |
+|---|---|---|
+| Declare a Scope Contract | Engineering authority, on the Projection Definition | SHALL name `subjectType`, `admissionMode`, and — when `admissionMode = DERIVED` — a non-empty `derivationPath`; `SPEC-001-FIX-O-3-02N` fails a `DERIVED` contract with an empty path (this is the F-6 shape, caught at declaration) |
+| Declare `admissionMode = DECLARED_GLOBAL` | Engineering authority | Permitted **only** with a non-empty `globalJustification` naming why the derivation is legitimately unbounded (a library index, a cross-subject portfolio). An unjustified global scope is invalid (`SPEC-001-FIX-O-3-03N`) |
+| Resolve a Scope | The system, per request | Requires an existing, authorized subject; an unresolvable subject yields `NOT_FOUND`, never an empty-but-successful scope (`SPEC-001-FIX-O-3-04N`) |
+| Widen a Scope at render time | **Nobody.** A Surface, region, or component SHALL NOT admit an object its Scope excludes | `SPEC-001-INV-02`; `SPEC-001-FIX-INV-02-N2` |
+| Narrow a Scope at render time | The Participant, via a declared filter | A user filter is a *presentation* narrowing and SHALL be disclosed as such (`omissionReasons` includes `FILTER`), and SHALL NOT be confused with scope or authorization (`SPEC-001-FIX-O-3-05N`) |
+| Approve / waive / revoke / supersede | **N/A — with reason.** A Scope is a structural property of a derivation, not a governed professional object; there is nothing to approve or waive. Changing what a view is about is an engineering change under C-13, not a governance act | — |
+
+**C-6 · Inputs / preconditions.** A Scope resolution requires: a `subjectType` and `subjectId`; the relation graph the derivation path traverses; and the requesting authorization context. It SHALL NOT resolve against a subject the Participant may not read — that resolves `UNAUTHORIZED`, and the distinction from `NOT_FOUND` SHALL NOT leak protected existence (C-20).
+
+**C-7 · Outputs / postconditions.** A Resolved Scope exposes: the subject; the ordered hops actually traversed; the **membership predicate** as an executable total function over candidate objects; the admitted-object count; and the excluded-object count by reason class. After resolution, every object the Projection presents SHALL satisfy the membership predicate — this is `SPEC-001-INV-02`'s enforcement point and is verified by `SPEC-001-FIX-INV-02-N2`, which injects an out-of-scope object into the source set and fails if it appears in the result.
+
+**C-8 · Relationships (typed).**
+
+- `PROJECTION --bound-to--> PROJECTION_SCOPE` — exactly one per instance (O-1 C-8).
+- `SURFACE --bound-to--> PROJECTION_SCOPE` as `primaryScope`; region scopes are `--derived-from-->` it (O-2 C-8).
+- `PROJECTION_SCOPE --names--> GOVERNED_OBJECT` (the subject) — exactly one, or none when `DECLARED_GLOBAL`.
+- `PROJECTION_SCOPE --traverses--> RELATION*` — the ordered derivation path.
+- `PROJECTION_SCOPE --derived-from--> PROJECTION_SCOPE` — a sub-scope; the relation is a strict tree, never a cycle (C-11 item 5).
+
+**C-9 · States.** A Scope Contract has `contractState ∈ {DECLARED, RETIRED}`. A Resolved Scope has `resolutionState ∈ {UNRESOLVED, RESOLVED, NOT_FOUND, UNAUTHORIZED}`. These are separate dimensions on separate grains and SHALL NOT be merged into one field; verified by `SPEC-001-FIX-O-3-06N`.
+
+**C-10 · Lifecycle.** A Contract is `DECLARED` at registration and `RETIRED` with its Definition. A Resolved Scope is created per instance, is immutable, and is discarded with its instance — it is as disposable as the Projection it bounds (DOC-003 PER-7, restated with citation at O-1 C-22).
+
+**C-11 · Illegal states and transitions — enumerated.**
+
+1. `admissionMode = DERIVED` with an empty `derivationPath` — **the F-6 shape**. *(→ `SPEC-001-FIX-O-3-02N`)*
+2. `admissionMode = DECLARED_GLOBAL` with an empty `globalJustification`. *(→ `SPEC-001-FIX-O-3-03N`)*
+3. A `RESOLVED` scope with a `subjectId` that does not resolve to an object of `subjectType`. *(→ `SPEC-001-FIX-O-3-04N`)*
+4. A membership predicate that admits an object no declared hop reaches. *(→ `SPEC-001-FIX-INV-02-N2`)*
+5. A sub-scope whose ancestor chain does not terminate at the Surface's `primaryScope`, or which contains a cycle. *(→ `SPEC-001-FIX-INV-02-N3`)*
+6. A membership predicate written by hand alongside a `derivationPath` rather than derived from it — two sources for one rule. *(→ `SPEC-001-FIX-O-3-07N`; this is the adversarial-economy case and is prohibited in §7)*
+7. `excludedCount > 0` with no `omissionReasons` — an undisclosed omission. *(→ `SPEC-001-FIX-O-3-08N`)*
+8. `NOT_FOUND` and `UNAUTHORIZED` rendered identically in a way that discloses which one occurred to an unauthorized Participant. *(→ `SPEC-001-FIX-O-3-09N`; note the direction — the *leak* is the violation, not the merging)*
+9. A scope narrowed by a user filter reported as `SCOPE` omission, or a scope exclusion reported as `FILTER` — the reason classes are not interchangeable. *(→ `SPEC-001-FIX-O-3-05N`)*
+
+**C-12 · Invariants.** Governs and is governed by `SPEC-001-INV-02` (a Projection is bound to a declared Scope and presents nothing outside it). Contributes to `-09` (a scope that could not fully resolve makes the Projection partial) and to `-12`/`-04` only indirectly. Restated with citation in §8 at the persistence and test boundaries.
+
+**C-13 · Versioning.** Changing a `derivationPath` changes **meaning** — it changes what the view is about — and SHALL therefore increment the owning Definition's `handlerVersion` and update the Scope fixtures. Changing the *implementation* of the traversal (an index, a join order, a batched query) changes nothing observable and SHALL NOT increment it; verified by `SPEC-001-FIX-O-3-10P`, which asserts the admitted set is identical across the change.
+
+**C-14 · Provenance.** A Resolved Scope records the hops it traversed, in order, with the relation type of each. That record is what answers "why was this object included" — without it, an admitted object's presence is unexplainable, and an audit of a leak has nothing to read. Verified by `SPEC-001-FIX-O-3-11P`.
+
+**C-15 · Evidence & assurance hooks.** **N/A — with reason.** A Projection Scope is a structural property of a derivation, not a professional claim; no Evidence attaches to it and no Assurance Policy assesses it. Its correctness is established by conformance fixtures (C-25), which is a specification-conformance obligation and not an assurance disposition. Treating a scope as an assurance subject would collapse the Projection layer into the Work layer (DOC-003 LYR-1).
+
+**C-16 · Failure modes — and the incumbent measurement.**
+
+**(a) No scope at all.** **CONFIRMED, live, cited both ends.** `packages/rph-engine/src/queries.ts:46-51` declares four read-model queries that accept no scope parameter:
+
+```
+export const listAssessments = (h: EngineHandle): ObjectRow[] =>
+	listByType(h, 'ASSURANCE_ASSESSMENT');
+export const listObservations = (h: EngineHandle): ObjectRow[] =>
+	listByType(h, 'ASSURANCE_OBSERVATION');
+export const listDecisions = (h: EngineHandle): ObjectRow[] => listByType(h, 'DECISION');
+export const listBaselines = (h: EngineHandle): ObjectRow[] => listByType(h, 'BASELINE');
+```
+
+`listByType` (`queries.ts:14-24`) collects every distinct `aggregateId` of the type from the whole event log. The Undertaking Workbench loader calls all four unscoped, on the route bound to one Undertaking: `apps/rph-demo/src/routes/undertakings/[id]/+page.server.ts:255` (`listAssessments(engine)`), `:296` (`listObservations(engine)`), `:302` (`listDecisions(engine)`), `:308` (`listBaselines(engine)`). A newly created Undertaking therefore renders the seed Undertaking's assessments, observations, decisions, and baselines. In O-3's terms: four Projections declare `admissionMode = DERIVED` by intent and carry an **empty derivation path** — C-11 item 1, undetectable today because nothing declares the path.
+
+**(b) Scoped, but by a hand-written predicate.** CONFIRMED: the same loader scopes the traceability links inline at `+page.server.ts:246-250` — `const pwuIdSet = new Set(pwus.map((p) => p.id));` then `.filter((l) => pwuIdSet.has(l.from) || pwuIdSet.has(l.to))`. That predicate is correct today and is a second copy of the scope rule; it is C-11 item 6, and §7 prohibits it as the cheap path.
+
+**(c) Scoped correctly, by a derived path.** CONFIRMED, and it is the model this object generalizes: `packages/rph-projections/src/execution-view.ts:761-788` (`plansForPwus`) documents the two-hop path in its own contract — "`pwuIds` is derived two-hop by the caller: `PWU.undertakingId ==` the route's Undertaking → the PWU's id → this set. A plan is included IFF its `workUnitId` is in that set — there is no `undertakingId` on a plan (F-1), so this PWU-membership test is the only correct scope." The call site is `+page.server.ts:355`, and `:314-318` names it the F-6 fix. Note the asymmetry precisely: the *plans* were fixed and the *assessments, observations, decisions, and baselines* were not, in the same loader.
+
+**(d) The three styles in one file.** INFERRED from (a), (b), and (c), all CONFIRMED: the Undertaking Workbench loader currently scopes by derived path (plans), by inline predicate (trace links), by construction (`applicablePolicies`, built from the already-scoped `pwus` at `+page.server.ts:295`), and not at all (the four working sets). Four styles, one file, no declaration anywhere that says which is intended. That is the condition O-3 exists to end.
+
+**(e) Scope confused with authorization.** A derivation that filters by authorization and calls the result "scoped" reports the wrong `omissionReason` class and therefore discloses the wrong thing to the professional (C-11 item 9).
+
+**(f) Silent partial resolution.** A path hop that fails (a dangling reference, a deleted intermediate) yields fewer objects with no signal. A Scope SHALL report a failed hop as `PARTIAL_BY_FAILURE` on the owning Projection, never as an empty-but-complete result; verified by `SPEC-001-FIX-O-3-12N`.
+
+**C-17 · Recovery.**
+**Reconcile** — a scope whose admitted set disagrees with the declared path is a defect in the derivation; the path is authoritative and the implementation is fixed.
+**Retry** — a failed hop MAY be retried; until it succeeds the Projection is `PARTIAL_BY_FAILURE` (C-16(f)).
+**Reshape** — widening or narrowing what a view is about is a `derivationPath` change under C-13, with a `handlerVersion` increment and updated fixtures.
+**Escalate** — a Scope Contract that cannot express the intended subject (for example, because no relation reaches the objects the view needs — which is exactly the condition `execution-view.ts:762-766` records for plans, "there is no `undertakingId` on a plan") SHALL be escalated as a **model** question under JPWB-DOC-004, not worked around with a hand-written predicate. `SPEC-001-FIX-O-3-07N` is what makes the workaround visible.
+
+**C-18 · Concurrency.** A Resolved Scope is immutable (C-10), so simultaneous revision does not arise. Two instances resolving the same contract concurrently MAY admit different sets if the relation graph advanced between them; that is legal, and each instance's `sourceVersion` (O-1) is what makes the difference explainable rather than mysterious.
+
+**C-19 · Idempotency.** Resolving the same contract against the same subject at the same `sourceVersion` SHALL produce an identical admitted set and an identical hop record; verified by `SPEC-001-FIX-O-3-13P`. Scope resolution SHALL be free of side effects — it writes nothing, emits nothing, and caches nothing that changes a later resolution's result.
+
+**C-20 · Security / permission boundaries.** **Scope and authorization are orthogonal and SHALL be applied in that order: scope first, then authorization.** The reason is disclosure fidelity. An object excluded by scope is not about this subject and its exclusion is unremarkable; an object excluded by authorization *is* about this subject and its exclusion may materially affect interpretation, which triggers the partiality disclosure DOC-003 PER-7 requires at DOC-003:361. Applying authorization first destroys the distinction and produces either a false "complete" or an over-broad "partial". A derivation SHALL report the two exclusion classes separately (`omissionReasons` — O-1), SHALL disclose authorization partiality when it materially affects interpretation, and SHALL NOT leak protected existence through the counts it reports. Verified by `SPEC-001-FIX-O-3-14P` (ordering) and `SPEC-001-FIX-O-1-13N` (leakage).
+
+**C-21 · Observability.** Per resolution, the following SHALL be recorded: `scopeContractId`, `subjectType`, `subjectId`, `admissionMode`, the ordered hops with their relation types and per-hop cardinalities, `admittedCount`, `excludedCount` by reason class, and `resolutionState`. The per-hop cardinalities are what turn "the view is empty" into "hop 2 returned nothing", which is the difference between an unexplainable blank region and a diagnosable one. Verified by `SPEC-001-FIX-O-3-11P`.
+
+**C-22 · Persistence semantics.** A Scope **Contract** is part of the Projection Definition and lives with the code — it is declaration, not data, and SHALL be expressed in a form a type check or a fixture can read (CON-000 B7: an unenforced shape reference asserts a status nothing performs). A **Resolved Scope** is derived, disposable, and discarded with its instance. Neither is ever a write target (`SPEC-001-INV-01`).
+
+**C-23 · Migration / legacy relation.** No such object exists in the incumbent. **CONFIRMED (absence, search stated):** `grep -rn --exclude-dir=node_modules --exclude-dir=.svelte-kit` over `apps` and `packages` returns 0 occurrences of `projectionDefinitionId`, `projectionInstanceId`, `authorizationScope`, `resultCompleteness`, and `omittedCount`; there is no scope declaration, no membership-predicate derivation, and no hop record anywhere. What exists is the *pattern* in three places — the `undertakingId` parameter on `listPwus` (`queries.ts:41-44`), the `pwaId` parameter on `listPwuTypes` (`queries.ts:35-39`), and the two-hop `plansForPwus` (`execution-view.ts:768-788`). Adoption means naming that pattern, declaring it per Projection, and deriving the predicate from the declaration. The four unscoped queries at `queries.ts:46-51` are the migration's first four subjects.
+
+**C-24 · UX / inspection surface.** A professional SHALL be able to see, for any region, what subject it is bound to and that it is bound at all — at minimum as the subject's identity in the region or Surface header, and on demand as the hop record (C-21). This is not decoration: the F-6 leak is invisible precisely because a region showing another Undertaking's decisions looks exactly like a region showing this one's. Verified by `SPEC-001-FIX-O-3-15P`.
+
+**C-25 · Verifying tests.** `SPEC-001-FIX-O-3-01P`, `-02N`, `-03N`, `-04N`, `-05N`, `-06N`, `-07N`, `-08N`, `-09N`, `-10P`, `-11P`, `-12N`, `-13P`, `-14P`, `-15P`; plus `SPEC-001-FIX-INV-02-N1/N2/N3`. **A property-based fixture is required** for the membership predicate, because it ranges over a generated space (arbitrary relation graphs, arbitrary subject placement) that example fixtures under-cover: `SPEC-001-FIX-O-3-16P` SHALL generate relation graphs with objects at varying distances from the subject, assert that the admitted set equals exactly the set reachable by the declared path, and record the seed for deterministic replay. The incumbent test `packages/rph-projections/src/revrem-wp6-readmodel-binding-authority.test.ts` and the demo-level `apps/rph-demo/e2e/undertaking-pwu.e2e.ts` are the nearest existing cover and SHALL be extended rather than duplicated.
+
+**C-26 · Definition of done.** An implementation of O-3 is done when: every registered Projection Definition carries a Scope Contract; no `DERIVED` contract has an empty path and no `DECLARED_GLOBAL` contract lacks a justification; every membership predicate is derived from its declared path with no hand-written sibling; the hop record is observable per resolution; the property-based fixture passes with recorded seeds; and each of C-11's nine illegal states is rejected by a fixture with a stated mutation that reddens it (D-6). The four calls at `queries.ts:46-51` and their four call sites in `+page.server.ts` are closed or explicitly dispositioned in the requirement ledger.
+
+### 2.3.2 Field contracts — Scope Contract
+
+| Field | Type | Optionality | Default | Semantics | Validation rule | Who may write |
+|---|---|---|---|---|---|---|
+| `scopeContractId` | stable identifier | mandatory | none | Names this contract within its Definition | Unique within the owning `projectionId`; immutable after registration | Engineering authority, at registration |
+| `subjectType` | governed object type | mandatory when `admissionMode = DERIVED`, prohibited when `DECLARED_GLOBAL` | none | The kind of object the derivation is about | SHALL resolve to a type in the generated contracts | Engineering authority |
+| `admissionMode` | enum `DERIVED` \| `DECLARED_GLOBAL` | mandatory | `DERIVED` | Whether membership is derived from a subject or deliberately unbounded | Exactly one value; the default is `DERIVED` so that an unbounded scope is always a positive act (`SPEC-001-FIX-O-3-02N`) | Engineering authority |
+| `derivationPath` | ordered list of typed hops, each `(fromType, relation, toType, cardinality)` | mandatory and non-empty when `DERIVED`, prohibited when `DECLARED_GLOBAL` | none | The ordered relation traversal from subject to admitted objects | Every relation resolvable in the generated contracts; the path SHALL be acyclic; an empty path under `DERIVED` is invalid — this is the F-6 detector | Engineering authority |
+| `globalJustification` | prose | mandatory and non-empty when `DECLARED_GLOBAL`, prohibited when `DERIVED` | none | Why this derivation is legitimately unbounded | Non-empty; SHALL name the professional reason, not a technical convenience (`SPEC-001-FIX-O-3-03N`) | Engineering authority |
+| `parentScopeContractId` | stable identifier | optional | none | The contract this one derives from, for a region sub-scope | SHALL form a strict tree terminating at the Surface's `primaryScope`; a cycle is invalid (`SPEC-001-FIX-INV-02-N3`) | Engineering authority |
+| `contractState` | enum `DECLARED` \| `RETIRED` | mandatory | `DECLARED` | Whether the contract may be resolved | A `RETIRED` contract SHALL reject resolution | Engineering authority |
+
+### 2.3.3 Field contracts — Resolved Scope
+
+| Field | Type | Optionality | Default | Semantics | Validation rule | Who may write |
+|---|---|---|---|---|---|---|
+| `scopeContractId` | stable identifier | mandatory | none | Which contract produced this resolution | SHALL resolve to a `DECLARED` contract | The system, at resolution |
+| `subjectType` | governed object type | mandatory when the contract is `DERIVED` | none | The kind of subject resolved | SHALL equal the contract's `subjectType` | The system |
+| `subjectId` | object identifier | mandatory when the contract is `DERIVED` | none | The actual subject | SHALL resolve to an existing object of `subjectType`, else `resolutionState = NOT_FOUND` (`SPEC-001-FIX-O-3-04N`) | The system, from the address parameters |
+| `membershipPredicate` | total function `candidate → ADMITTED \| EXCLUDED(reason)` | mandatory | none | The executable membership rule | SHALL be **derived from** `derivationPath`, never authored alongside it (`SPEC-001-FIX-O-3-07N`); SHALL be total — every candidate receives a verdict, never `undefined` | The system, derived |
+| `hopRecord` | ordered list of `(relation, inputCount, outputCount)` | mandatory when `RESOLVED` | none | What the traversal actually did, per hop | Length SHALL equal `derivationPath` length; a hop with `outputCount = 0` SHALL be visible, not elided (C-21) | The system, at resolution |
+| `admittedCount` | non-negative integer | mandatory when `RESOLVED` | `0` | How many objects the scope admitted | SHALL equal the count of candidates the predicate returned `ADMITTED` for | The system |
+| `excludedCount` | non-negative integer | mandatory when `RESOLVED` | `0` | How many candidates were excluded | SHALL be accompanied by `omissionReasons` when non-zero (`SPEC-001-FIX-O-3-08N`) | The system |
+| `omissionReasons` | set of `SCOPE` \| `FILTER` \| `AUTHORIZATION` \| `FAILURE` | mandatory when `excludedCount > 0`, else empty | empty | Why candidates were excluded; the classes are not interchangeable | Non-empty exactly when `excludedCount > 0`; `SCOPE` and `FILTER` SHALL NOT be substituted for one another (`SPEC-001-FIX-O-3-05N`) | The system |
+| `resolutionState` | enum `UNRESOLVED` \| `RESOLVED` \| `NOT_FOUND` \| `UNAUTHORIZED` | mandatory | `UNRESOLVED` | Whether the subject resolved | Exactly one value; `NOT_FOUND` and `UNAUTHORIZED` SHALL NOT be distinguishable to a Participant lacking read authority on the subject (`SPEC-001-FIX-O-3-09N`) | The system |
+| `sourceVersion` | checkpoint or version vector | mandatory when `RESOLVED` | none | The relation-graph position the traversal read | SHALL match the owning Projection instance's `sourceVersion`, so scope and content cannot speak about different moments | The system |
+
+---
+
+## 2.4 O-4 · Affordance
+
+**INFORMATIVE — why this object is specified against an existing mechanism rather than invented.** The
+Undertaking Workbench already derives its step-level actions from a shared, declared authority table rather than
+from a hand-written copy of the engine's rules: `STEP_COMMAND_SPECS`
+(`packages/rph-domain/src/step-command-spec.ts:188-399`) declares, per command, the five authority columns
+(`planLiveness`, `pwuOpenness`, `bindingAuthority`, `inputReadiness`, `retryBudget`), and BOTH the command handler
+(`packages/rph-application/src/handlers/execution.ts:659-703`, `stepAuthorityRefusal`) AND the read-model
+(`packages/rph-projections/src/execution-view.ts:357-419`, `planPermitsAffordance`) evaluate those same columns
+through the same ratified kernel predicates. That shared declaration is the existing realization of
+`SPEC-001-INV-03`. This section does not invent it; it **generalizes it into an obligation binding on every
+Affordance on every Surface**, so that the next authority added to the engine cannot be added without the
+Surface hearing about it — the failure mode the repository has recorded five separate times
+(`execution-view.ts:80-90, 96-111, 112-125` — F-29 instances one through five, the fifth authored by the same
+programme that fixed the third). All claims in this section labelled CONFIRMED were read at the cited line.
+
+### 2.4.1 Closure matrix — O-4 Affordance
+
+**Identity and unique identification.** An Affordance SHALL be uniquely identified within a rendered Surface by
+the triple `(surfaceId, subjectObjectId, commandType)`. It SHALL NOT carry a persisted identity: an Affordance is
+a derivation, not a governed object, so a durable id would assert a lifecycle nothing performs (JPWB-CON-000 B7,
+`docs/canon/JPWB-CON-000 Constitution.md:119`). Verification: fixture `FX-O4-01` (§10) asserts that two
+Affordances differing only in `commandType` are distinct and that re-deriving the same Surface at the same
+subject revision yields byte-identical identifying triples.
+
+**Definition.** An Affordance is an offered semantic Command on a Surface, derived from a declared authority — a
+rendered control whose activation issues exactly one governed Command to the engine and performs no other
+mutation.
+
+**Exclusion — what an Affordance is NOT.** It is NOT the Command (the Command is the governed act; the Affordance
+is the offer of it). It is NOT a mutation path: a control that writes state without issuing a Command is a
+violation of `SPEC-001-INV-01`, not a variant of this object (restating JPWB-DOC-003 PER-7,
+`docs/canon/JPWB-DOC-003 Semantic Model and Invariant Catalog.md:359`, and JCUX SCREEN-INV-009,
+`docs/Constitution Discussion/JanumiCode UI Information Architecture and Screen Contract.md:322-326`). It is NOT
+a navigation control (moving between Surfaces is O-9, and issues no Command). It is NOT an advisory: a display-only
+computation that gates nothing — `HandoffAdvisory` is the built example (`execution-view.ts:867-876`, declared
+"advisory-only — gates nothing") — SHALL NOT be rendered as an Affordance. It is NOT derived from a state
+machine's legal-transition topology: the topology is wider than the command set, and deriving from it mints
+controls that dispatch nonexistent commands (CONFIRMED prohibition, `execution-view.ts:16-20`: the step machine
+has ~18 legal arrows against nine command-backed ones).
+
+**Purpose.** To let a professional act on governed state from the place the state is legible, without the Surface
+acquiring authority over whether the act is permitted.
+
+**Authority (per-object).**
+- *Create (offer):* only the Projection layer, and only by evaluating the authority declaration named in §2.4.2.
+  A Surface template SHALL NOT introduce an Affordance the Projection did not offer. Verification: the
+  offered-set equality fixture `FX-O4-02` (§10) plus the standing repository discipline recorded at
+  `apps/rph-demo/src/routes/undertakings/[id]/+page.svelte:348-354` (the deletion of the template's local
+  plan-status condition is the fix, not an omission).
+- *Alter:* nobody. An Affordance is re-derived, never edited. A Surface SHALL NOT mutate an Affordance in place;
+  a changed subject produces a new derivation. Verification: `FX-O4-03` asserts the projection functions are
+  pure over their inputs (already true of `planAffordancesFor`, CONFIRMED pure, `execution-view.ts:473-494`).
+- *Approve / waive / revoke / supersede:* **N/A with reason** — these are governance acts over governed objects.
+  An Affordance is disposable and authority-free (DOC-003 PER-7), so there is nothing to approve, waive, revoke,
+  or supersede. The governed acts these verbs name are performed on the *subject*, and their effect on the
+  Affordance is a re-derivation.
+
+**Inputs / preconditions.** An Affordance SHALL be derived from exactly three input classes and no others: (a)
+the **authority declaration** for the command (the columns), (b) the **subject's declared state**, and (c) the
+caller-supplied **resolved facts** the declaration's limbs range over (binding resolution, attempt count,
+input-artifact resolution). CONFIRMED that this three-way split is the built shape: the column says *which*
+commands a limb governs and the resolved facts say *whether* this one is at it
+(`step-command-spec.ts:126-144`; `execution-view.ts:391-406`). A precondition SHALL NOT be re-derived inside the
+Projection when a ratified kernel predicate decides it; see §2.4.2.
+
+**Outputs / postconditions.** Deriving an Affordance produces (i) the Affordance when every consulted limb
+permits, or (ii) an Affordance Withholding (O-5) when a limb refuses and the candidate test of §2.5.3 is met.
+Derivation SHALL have no other postcondition — in particular it SHALL NOT write, enqueue, or cache governed
+state. Verification: `FX-O4-04` runs the derivation against a store double that fails the test on any write call.
+
+**Relationships (typed).**
+`Affordance —offeredOn→ Surface (O-2, exactly 1)` ·
+`Affordance —targets→ subject governed object (exactly 1)` ·
+`Affordance —issues→ semantic Command (exactly 1)` ·
+`Affordance —derivedFrom→ authority declaration (1..n limbs)` ·
+`Affordance —scopedBy→ Projection Scope (O-3, exactly 1 — the Affordance's subject SHALL lie inside it,
+SPEC-001-INV-02)` · `Affordance —mutuallyExclusiveWith→ Affordance Withholding (O-5) for the same
+(subjectObjectId, commandType) at the same derivation revision`.
+
+**States.** An Affordance has exactly two derivation-time states: `OFFERED` and `NOT_DERIVED` (the candidate test
+failed; no object exists). The refused-by-authority case is not a state of O-4 — it is an instance of O-5. This
+split is deliberate and is the anti-collapse rule: a single `enabled: boolean` on one object would erase the
+distinction between "not applicable here" and "applicable but refused", which is precisely the information
+`SPEC-001-INV-04` requires (JPWB-DOC-003 STA-1's collapse prohibition applied to affordance state,
+`JPWB-DOC-003:175`).
+
+**Lifecycle.** `derived → rendered → (issued | superseded-by-redevivation | discarded)`. An Affordance SHALL be
+discarded, never retained across a subject revision change: an Affordance rendered against revision *R* and
+activated after the subject has moved to *R+1* is a stale offer, governed by the concurrency dimension below.
+
+**Illegal states and transitions, enumerated.** The following SHALL NOT occur, and each is detected by the named
+fixture:
+1. `OFFERED` for a command absent from the authority declaration — `FX-O4-05` (the totality property; CONFIRMED
+   already enforced at compile time by `Record<GatedAffordance, StepCommandType>`, `execution-view.ts:310-326`).
+2. `OFFERED` where the engine would refuse — `SPEC-001-INV-13`; `FX-O4-06`, and the existing engine/read-model
+   agreement suite `packages/rph-application/src/handlers/retrycap-engine-readmodel-agree.test.ts`.
+3. `NOT_DERIVED` where the engine would admit — the over-refusal half; `FX-O4-07`, and the existing over-refusal
+   assertions `packages/rph-projections/src/revrem-wp6-readmodel-binding-authority.test.ts` ("OFFERS start on an
+   AUTHORIZED binding — without this the limb could be `return false`") and
+   `execrem-wp15-affordance-fidelity.test.ts` ("…and a FAILED step under an ACTIVE plan STILL offers retry").
+4. `OFFERED` for a subject outside the Projection Scope — `SPEC-001-INV-02`; `FX-O4-08`.
+5. Two Affordances with the same identifying triple in one rendered Surface — `FX-O4-01`.
+6. An Affordance transitioning `NOT_DERIVED → OFFERED` without a re-derivation (i.e. client-side enabling) —
+   `FX-O4-09`, a negative fixture that mutates the rendered DOM's disabled attribute and asserts the issued
+   Command is still refused by the engine.
+
+**Invariants governing O-4.** `SPEC-001-INV-01` (no authority), `-INV-02` (scope), `-INV-03` (shared
+declaration), `-INV-13` (offer/refuse symmetry), and `-INV-11` (an Affordance SHALL NOT be labelled or grouped so
+that issuing it reads as conferring assurance; DOC-003 STA-2, `JPWB-DOC-003:179`).
+
+**Versioning — what changes meaning vs. only presentation.** A change to the **authority declaration** (adding a
+column, changing a command's column value, adding a command) changes the MEANING of every Affordance derived from
+it and SHALL be accompanied by a re-run of the offer/refuse symmetry suite before release. A change to an
+Affordance's `label`, ordering, grouping, or icon is PRESENTATION and changes no meaning — with one exception
+that is meaning: a label change that alters which professional act the control names (e.g. "Skip" → "Prune") is a
+meaning change, because Skip is an operator waiver and Prune is the plan's own branch logic (CONFIRMED
+distinction, `+page.svelte:375-379`). Verification: `FX-O4-10` pins each `commandType → label` pair, so a label
+edit that crosses a semantic boundary fails a test rather than shipping.
+
+**Provenance.** An Affordance SHALL carry the identity of the declaration and limbs it was derived from
+(`authorityBasis`, §2.4.3), so that a professional or an auditor can ask *by what authority is this offered* and
+receive an answer that names a rule, not a component. This is the O-4 half of `SPEC-001-INV-12`
+(JCUX SCREEN-INV-005, `JCUX:306-308`).
+
+**Evidence and assurance hooks.** An Affordance SHALL NOT be gated on, or presented as, assurance state; and an
+assurance-bearing Affordance (one whose Command mints or cites assurance) SHALL name the assurance objects its
+payload will cite. **Partial N/A with reason:** an Affordance produces no evidence itself — it is not a governed
+object and cannot be an evidence subject. Verification: `FX-O4-11` asserts no Affordance's derivation reads
+`assuranceState` except where the command's own declaration names it.
+
+**Failure modes.** (a) *Silent divergence* — the engine gains an authority limb and the derivation is not told;
+CONFIRMED to have occurred five times (`execution-view.ts:80-90, 96-111, 112-125`). (b) *Fabrication from
+topology* — deriving from the state machine rather than the command set (`execution-view.ts:16-20`). (c)
+*Over-refusal* — a limb implemented as an unconditional refusal, indistinguishable from a correct one unless the
+positive half is also tested (CONFIRMED as an explicit test-design concern,
+`revrem-wp6-readmodel-binding-authority.test.ts:58`). (d) *Stale offer* — derived at revision *R*, activated at
+*R+1*. (e) *Unreachable offer* — derived, rendered into the accessibility tree, and clipped out of view
+(`SPEC-001-INV-07`).
+
+**Recovery.** *Reconcile:* on a refusal whose originating Affordance was OFFERED, the Surface SHALL record the
+pairing (§2.6.3 `originatingAffordanceRef`) so the divergence is countable rather than anecdotal. *Retry:* an
+Affordance refused for a transient reason (`RphError.retryable === true`,
+`packages/rph-contracts/src/errors.ts:56`) MAY be re-offered after re-derivation. *Reshape:* a persistent
+divergence between offered and admitted sets SHALL be resolved by moving the rule into the shared declaration,
+never by adding a compensating condition at the Surface — the repository's standing ruling (CONFIRMED,
+`execution-view.ts:352-356`: "Four of the five call sites had grown their own inline plan-status condition and
+the fifth had none — which is precisely how the invariant was violated"). *Escalate:* a divergence that cannot be
+expressed as a column (because it ranges over event history rather than declared state) SHALL be escalated to a
+resolved-fact input, as `retryBudget` was (`step-command-spec.ts:126-141`), and SHALL NOT be silently dropped.
+
+**Concurrency.** An Affordance SHALL carry the subject revision it was derived against
+(`derivedAtSubjectRevision`), and the Command it issues SHOULD carry that value as `expectedRevision`. CONFIRMED:
+`DomainCommand.expectedRevision` exists and is OPTIONAL in the envelope schema
+(`packages/rph-contracts/src/envelopes.ts:70-79`) and is honoured when sent
+(`packages/rph-application/src/handlers/kit.ts:136-148`, which also records that *enforcing* its presence is the
+stricter unadopted reading). CONFIRMED ABSENCE, with the search stated: `grep -rnE "expectedRevision" --include=*.ts
+--include=*.svelte apps/` returns hits only in `apps/rph-demo/src/lib/server/authoring-turn.ts:402-420`; the
+Undertaking Workbench's command envelope factory (`apps/rph-demo/src/lib/server/workbench.ts:120-135`) sets no
+`expectedRevision` on any command, so every Affordance on that Surface issues without optimistic concurrency
+today. Where the Surface cannot supply a revision, the Affordance SHALL be treated as a stale-projection command
+under CPM §17.2 (`docs/Constitution Discussion/Canonical Projection Model.md:1352-1354`) and the Surface SHALL
+disclose that commands may be revalidated (CPM §17.1, `:1345-1350`). Verification: `FX-O4-12`.
+
+**Idempotency.** Activating the same Affordance twice SHALL NOT produce two applications. CONFIRMED mechanism:
+every UI command carries an `idempotencyKey` (`workbench.ts:130-132`) and a replay returns status `DUPLICATE`,
+which the engine and the batch path both count as success (`command-bus.ts:166`). A Surface SHALL treat
+`DUPLICATE` as *already applied*, never as a fresh application and never as a refusal — CONFIRMED as the built
+behaviour at `+page.server.ts:485` and `:502`. Verification: `FX-O4-13` double-submits and asserts one event.
+
+**Security / permission boundaries.** Affordances SHALL reflect the acting professional's current role and
+authority (RIWS UI-INV-010, `docs/Constitution Discussion/Reference Interaction and Workspace
+Specification.md:2017-2019`; JCUX SCREEN-INV-004, `JCUX:302-304`). An Affordance SHALL NOT be derived from
+client-supplied role claims. **DELIBERATELY UNSPECIFIED (§11):** the role/authority model itself is CON-000 /
+DOC-001 §7.1 territory and outside this spec's GOVERNS list; SPEC-001 specifies only that the derivation consults
+it through the same declaration the engine consults. A security-trimmed Projection SHALL disclose partiality
+without leaking protected existence (DOC-003 §9 PER-7 scope, recorded at
+`docs/canon/JPWB-DOC-003 Semantic Model and Invariant Catalog.provenance.md:128`) — which means a withholding
+whose disclosure would itself leak SHALL be reported as a partiality disclosure (O-8), not as an O-5 record.
+
+**Observability — what must be recorded to explain behaviour.** For each rendered Surface the Projection SHALL be
+able to produce, on demand, the **derivation trace**: for each candidate command, every limb consulted, its
+verdict, and the resolved facts it read. This is what makes `SPEC-001-INV-13` auditable in production rather than
+only in fixtures. Verification: `FX-O4-14` asserts the trace for a step whose binding is `REQUESTED` names the
+`bindingAuthority` limb and the `NOT_AUTHORIZED` sub-limb (the kernel already returns the deciding limb —
+CONFIRMED, `packages/rph-domain/src/execution.ts:225-246`, `BindingAuthorityLimb`, carried expressly "so a caller
+can render the RIGHT refusal").
+
+**Persistence semantics.** None. An Affordance SHALL NOT be persisted, cached across revisions, or included in an
+event payload. Rebuildability is its durability guarantee (DOC-003 PER-7, `JPWB-DOC-003:359`). Verification:
+`FX-O4-15` greps the reference artifacts for any schema declaring an affordance shape as stored state and fails
+on a hit.
+
+**Migration / legacy relation.** The incumbent per-step affordance sets (`ExecutionStepView.advanceCommands`,
+`.controlCommands`, `.belowQueued`, `.retryExhaustion`, `execution-view.ts:191-219`) are conforming O-4
+derivations and SHALL NOT be rewritten to conform; O-4 is their generalization. The two route-level affordance
+sets computed outside `StepAffordances` — `startableStepByPlan` and `prunableStepByPlan`
+(`+page.server.ts:180-192`) — are also O-4 derivations and are in scope for every obligation in this section,
+notwithstanding that they reach the template by a different path.
+
+**UX / inspection surface.** An Affordance SHALL be reachable by ordinary interaction (`SPEC-001-INV-07`) and its
+`authorityBasis` SHALL be inspectable without leaving the Surface (JCUX §44 Entity Drawer, `JCUX:2026-2037`, is a
+permitted realization, not a required one). Primary Affordances SHOULD be labelled with domain-meaningful
+professional verbs (RIWS UI-INV-017, `RIWS:2045-2047`).
+
+**Verifying tests.** Existing and CONFIRMED to bind today:
+`packages/rph-projections/src/execrem-wp15-affordance-fidelity.test.ts` (plan liveness + PWU openness +
+fail-closed totality), `packages/rph-projections/src/revrem-wp6-readmodel-binding-authority.test.ts` (binding
+authority, both halves), `packages/rph-projections/src/retrycap-readmodel-cap.test.ts` and
+`packages/rph-application/src/handlers/retrycap-engine-readmodel-agree.test.ts` (retry budget, engine/read-model
+agreement), `packages/rph-domain/src/step-command-spec.test.ts` (the declaration's own totality),
+`apps/rph-demo/e2e/execution-flow.e2e.ts` and `apps/rph-demo/e2e/execution-tier3.e2e.ts` (rendered affordances
+end to end). New: `FX-O4-01` … `FX-O4-16` (§10).
+
+**Definition of done for O-4.** Every Affordance on every Surface in scope is derived through §2.4.2's
+obligation; the derivation trace is producible for each; the offered set equals the engine-admitted set under the
+property fixture of §10; and no template contains a condition that re-states an authority rule.
+
+### 2.4.2 The derivation obligation — the general form of `SPEC-001-INV-03`
+
+**O-4-R1 (SHALL).** Every Affordance SHALL be derived by consulting the **same declared authority the engine
+enforces**, and SHALL NOT be derived from an independent copy, paraphrase, or re-implementation of that
+authority. Conformance is established by the *shared-symbol* fixture `FX-O4-16`: for each authority limb, the
+Projection's decision path and the engine's decision path SHALL resolve to the same exported symbol, asserted by
+a test that mutates the kernel predicate and requires BOTH the engine suite and the projection suite to redden.
+CONFIRMED that this is achievable and achieved for all five current limbs: `planPermitsAffordance` reads
+`STEP_COMMAND_SPECS[...]` directly (`execution-view.ts:365`) and delegates each verdict to
+`bindingAuthorityVerdict`, `retryDecision`, `retryCapFrom`, `stepMayBecomeReady` and
+`getMachine('PWU.workLifecycleState').terminalStates` — the same symbols the handler calls
+(`execution.ts:659-703`).
+
+**O-4-R2 (SHALL NOT).** A Projection SHALL NOT hardcode a set the authority can derive. Verification: the
+negative fixture `FX-O4-17` reproduces the corrected defect at `execution-view.ts:331-347` — a literal
+`new Set(['BASELINED','ABANDONED','SUPERSEDED'])` whose own comment claimed it was "the machine's own terminal
+set" while being unbound to it — by ratifying a fourth terminal state and asserting the Projection withholds
+without a second edit. CONFIRMED that the literal existed and was replaced by `getMachine(...).terminalStates`.
+
+**O-4-R3 (SHALL).** Where an authority limb ranges over facts the Projection cannot read (event history, store
+lookups), the limb SHALL be expressed as a **declared column plus a caller-resolved fact**, and the *decision*
+SHALL remain in the shared kernel. Verification: `FX-O4-18`. CONFIRMED as the built pattern and its rationale:
+"the column says WHICH commands the cap governs and the FACTS say WHETHER this one is at it"
+(`execution-view.ts:398-402`); `step-command-spec.ts:128-141` records that a column-driven filter is blind to an
+event-history rule *by construction*, which is why the retry cap was F-29's fourth instance.
+
+**O-4-R4 (SHALL).** A limb SHALL be gated on the **column**, never on a hand-written list of the commands that
+happen to carry it today, so that a newly declared command is governed on the day it is declared with no second
+edit. Verification: `FX-O4-19` adds a tenth command declaring `REQUIRES_AUTHORIZED_BINDING` and asserts the
+Projection withholds it without any change to the Projection. CONFIRMED as the built discipline and its stated
+reason: "nothing here names `start` or `resolve`. That is the whole point" (`execution-view.ts:376-386`).
+
+**O-4-R5 (SHALL).** Absence of a resolved fact SHALL mean **ungated**, not refused, and this fail-open SHALL be
+disclosed at the field that carries it. A resolved negative (`resolves: false`, a resolved empty
+`grantedCapabilities`, a resolved empty `unresolvedRequiredInputs`) is a different thing and SHALL gate.
+Verification: `FX-O4-20` and the existing pair
+`revrem-wp6-readmodel-binding-authority.test.ts` → "the two absences mean opposite things (DS §6b R9)". WHY:
+collapsing them silently empties the action column for every caller that cannot resolve a fact, which in the
+reference seed — CONFIRMED to author no `RuntimeBinding` whatsoever (`execution-view.ts:88-89`) — would make
+every plan permanently unstartable. The cost of the fail-open is a refused click, never an illegal act.
+
+**O-4-R6 (SHALL).** The derivation SHALL fail **closed** on an off-contract subject state: an unknown plan status
+or step state SHALL yield the cleanup-exempt subset only, never the full set, and an unknown state SHALL NEVER
+fabricate an Affordance. Verification: existing `execrem-wp15-affordance-fidelity.test.ts` → "an OFF-CONTRACT plan
+status offers cleanup only, never the gated set" and "an off-contract STEP state still offers nothing (never
+fabricate)". CONFIRMED implemented at `execution-view.ts:289-299, 466-472`.
+
+**O-4-R7 (SHOULD).** Before enabling a material Affordance the Projection SHOULD resolve the seven preflight
+facts of CPM §27.2 (`Canonical Projection Model.md:1888-1898`): current authority, transition validity, mandatory
+constraints, stale-data status, unresolved validation failure, optimistic-concurrency version, required-input
+completeness. Divergence is justified only where a fact is unresolvable at the Surface, in which case O-4-R5's
+disclosed fail-open applies. Verification: `FX-O4-21` asserts each of the seven is either resolved or recorded as
+unresolved in the derivation trace.
+
+### 2.4.3 Field contracts — O-4 Affordance
+
+> Every field below states: **type · optionality · default · semantics · validation rule · who may write it.**
+
+**`surfaceId`** — `string` · required · no default · the O-2 Surface this Affordance is rendered on; the first
+element of the identifying triple · MUST be a declared Surface id (§2.2) · written by the Projection layer only.
+
+**`subjectObjectId`** — `string` · required · no default · the governed object the issued Command targets
+(`DomainCommand.targetAggregateId`) · MUST resolve to an object inside the Surface's Projection Scope
+(`SPEC-001-INV-02`); a subject outside scope is a defect, not a filtered row · written by the Projection layer
+only.
+
+**`subjectObjectType`** — `string` · required · no default · the aggregate type of the subject, carried so the
+issued Command's `targetAggregateType` is not re-derived at the template · MUST equal the declared aggregate type
+for `commandType` · Projection only.
+
+**`commandType`** — `string` · required · no default · the single semantic Command this Affordance issues · MUST
+be a key of the authority declaration for its aggregate family (for execution steps: a `StepCommandType`,
+`step-command-spec.ts:23-32`); an Affordance naming an undeclared command SHALL NOT be derived · Projection only.
+
+**`derivedAtSubjectRevision`** — `number` · required · no default · the subject aggregate revision the derivation
+read · MUST be the revision actually loaded, never a placeholder or `0` · Projection only. INFORMATIVE: this is
+the field that makes the stale-offer failure mode detectable rather than invisible.
+
+**`authorityBasis`** — `readonly AuthorityLimbVerdict[]` · required · no default · one entry per limb consulted,
+each naming the limb, the declaration column value, the resolved facts read, and the verdict · MUST be non-empty
+(a command with no consulted limb is a declaration gap, not an ungated command) and MUST contain no entry whose
+verdict is a refusal (a refusing limb produces O-5, not O-4) · Projection only; the *content* of each entry is
+written by the shared kernel, never by the Projection.
+
+**`requiredAuthority`** — `string | undefined` · optional · `undefined` means "no authority beyond the limbs
+consulted" · the role/authority the acting professional must hold, per JCUX §43's Command Region contract
+(`JCUX:1999-2012`) · MUST be a declared authority identifier when present · written by the authority model, read
+by the Projection. **UNRATIFIED-AUTHORED shape:** JCUX §43 names `requiredRole` and `requiredAuthority` as
+separate facts; SPEC-001 carries both and does not merge them, because merging would collapse two independent
+dimensions (the anti-collapse rule, JPWB-DOC-003 STA-1's generalization).
+
+**`requiredRole`** — `string | undefined` · optional · `undefined` = unrestricted by role · per JCUX §43 · MUST
+be a declared role identifier when present · authority model writes, Projection reads.
+
+**`preconditions`** — `readonly string[]` · required · `[]` permitted and meaningful (an Affordance with no
+stated precondition) · human-legible statements of what must hold, sourced from the declaration's rationale
+prose, not re-authored at the Surface · each entry MUST be traceable to a declaration field (CONFIRMED source:
+every column in `STEP_COMMAND_SPECS` carries a paired `…Rationale` string precisely so the intent survives the
+next reader, `step-command-spec.ts:63-64, 77-78, 88-90, 111-112, 124-125, 143-144`) · Projection derives; nobody
+edits at the Surface.
+
+**`expectedEffect`** — `string` · required · no default · what issuing this Command will change, in professional
+language (JCUX §43, `JCUX:2010`) · MUST name the subject and the axis it moves, and SHALL NOT imply movement on
+an axis the Command does not touch — in particular a step-level Affordance SHALL NOT be described as advancing
+assurance (`SPEC-001-INV-11`; CONFIRMED that the built route actions are correct here: "None sets executionState
+— that is still the gated ChangePwuState", `+page.server.ts:647-648`) · Projection only. Verification:
+`FX-O4-22` pins each `commandType → expectedEffect` against the declaration's `target` and rationale.
+
+**`confirmationPolicy`** — `'NONE' | 'CONFIRM' | 'CONFIRM_WITH_REASON'` · required · default `'NONE'` · whether
+activation requires an explicit confirmation step, and whether a reason is captured (JCUX §43, `JCUX:2011`) ·
+MUST be `'CONFIRM_WITH_REASON'` for any Command whose payload declares a required free-text reason — CONFIRMED
+that the built Surface supplies operator-default reasons silently for `failStep`, `cancelStep`, `retryStep` and
+`enterWaitStep` (`+page.server.ts:657, 664, 682, 698`), which satisfies the schema while recording no
+professional reason · Projection derives from the command's payload schema, never hand-set per button.
+
+**`payloadTemplate`** — `Record<string, unknown>` · required · `{}` permitted · the payload fields the Affordance
+will send, with the fields the professional must supply marked · every key MUST be a declared field of the
+command's payload schema; an unknown key SHALL fail derivation rather than fail at dispatch · Projection only.
+
+**`label`** — `string` · required · no default · the professional verb shown on the control · SHOULD be a
+domain-meaningful verb (RIWS UI-INV-017); MUST NOT name a different professional act from `commandType` (the
+Skip/Prune distinction, §2.4.1 versioning) · Projection only; a Surface MAY localize but SHALL NOT relabel across
+that boundary.
+
+**`originatingProjectionContext`** — `ProjectionContext` · required · no default · the context the issued Command
+retains: `originatingProjectionDefinitionId`, `originatingProjectionInstanceId`, `selectedEntityIds`,
+`visibleSourceVersions`, `participantRole`, `temporalContext` (CPM §27.1, `Canonical Projection Model.md:1875-1886`) ·
+MUST be non-empty and MUST be carried into the dispatched Command (CPM PROJ-INV-015, `:405-407`: "Every command
+initiated through a projection SHALL retain the originating projection context") · Projection writes; the
+command bus reads. **CONFIRMED ABSENCE, search stated:** `grep -rnE
+"originatingProjection|visibleSourceVersions|participantRole|temporalContext" --include=*.ts --include=*.svelte
+packages apps` — the UI command envelope factory (`workbench.ts:113-135`) carries `commandId`, `commandType`,
+`commandSchemaVersion`, target type/id, `issuedAt`, `issuedBy`, `correlationId`, `idempotencyKey`, `payload`, and
+no projection context of any kind. PROJ-INV-015 is therefore unperformed on this Surface today (a B7 gap,
+`JPWB-CON-000:119`), and this field is the obligation that closes it. Verification: `FX-O4-23`.
+
+**`freshness`** — `'FRESH' | 'STALE' | 'UNKNOWN'` · required · default `'UNKNOWN'` · whether the Projection this
+Affordance came from is current (O-1/O-8 supply the value) · when `'STALE'`, the Affordance SHALL either carry
+`expectedRevision` or SHALL NOT be offered for a state-changing Command (CPM §17.2, `:1352-1354`) · Projection
+writes.
+
+**`disclosureRef`** — `WithholdingRef | undefined` · optional · `undefined` · present only on an Affordance that
+is offered *while a sibling command is withheld*, linking to the O-5 record so the professional can see both ·
+MUST reference a withholding on the same subject · Projection only.
+
+### 2.4.4 Prohibited shortcuts for O-4 (restated here; master catalog §7)
+
+- **SHALL NOT** re-implement an authority rule at the Surface because "the projection does not have that fact" —
+  the resolved-fact pattern (O-4-R3) exists for exactly that case. Negative fixture `FX-O4-24`.
+- **SHALL NOT** collapse `advance` and `control` affordance sets into one list: a control action *waives, aborts
+  or suspends* while an advance action *progresses*, and RUNNING affords both `complete` and `fail` so a single
+  optional field would force an arbitrary pick (CONFIRMED reason, `execution-view.ts:244`). Negative fixture
+  `FX-O4-25`.
+- **SHALL NOT** substitute `enabled: false` for withholding. A disabled control with no reason is the defect O-5
+  exists to remove, and it is also the shape JCUX §43's Disabled Command Contract forbids (`JCUX:2014-2022`).
+- **SHALL NOT** accept a pure-predicate unit test as evidence that an Affordance obligation is enforced. CONFIRMED
+  precedent: `canResumeExecutionOnPwu` had exactly two repo-wide references — its own definition and its own unit
+  test — while the conformance manifest certified the rule COVERED (`step-command-spec.ts:65-75`).
+
+---
+
+## 2.5 O-5 · Affordance Withholding
+
+**UNRATIFIED-AUTHORED (object shape) · RATIFIED (the obligation it discharges).** The *obligation* is ratified in
+three places and this section does not invent it: RIWS UI-INV-020 — "Unavailable actions and failed commands
+SHALL explain the professional reason" (`Reference Interaction and Workspace Specification.md:2057-2059`); JCUX
+§43 Disabled Command Contract — "A disabled Command SHALL state why it is unavailable", with a worked example
+(`JCUX:2014-2022`); and the same rule as a screen acceptance criterion — "Disabled Commands explain why" — in
+JCUX §14 *PWU Overview Screen* (`JCUX:757`, under the heading at `JCUX:661`), with the blocked-work twin
+"Blocked work explains the blocking condition" in §8 *Home Screen* (`JCUX:395`, heading at `JCUX:334`). What is
+**UNRATIFIED-AUTHORED** is the *object* — the recorded structure of a withholding
+(which authority, which limb, what would have to become true, and who can make it true) and the materiality rule
+that bounds it. FORK-13 and FORK-14 below name the choices a sponsor might rule differently.
+
+**INFORMATIVE — the measured gap this object closes.** The built read-model applies **eight** distinct
+withholding authorities and discloses **one and a half** of them. The count is exhaustive, derived by reading
+every filter in the affordance path, not by sampling:
+
+| # | Withholding authority | Site (CONFIRMED) | Disclosed today? |
+|---|---|---|---|
+| 1 | Command-backed transition allowlist (stepState → candidate set) | `execution-view.ts:240-299` | **Partial** — only the `belowQueued` category note (`:501-505`, rendered `+page.svelte:395-398`); no per-command reason |
+| 2 | `planLiveness` — RPH-EXE-002 | `execution-view.ts:366-367` | No |
+| 3 | `pwuOpenness` — RPH-PWU-010 | `execution-view.ts:370-375` | No |
+| 4 | `bindingAuthority` — RPH-EXE-003 (+ N-18 grant limb) | `execution-view.ts:387-390` | No |
+| 5 | `retryBudget` — RPH-EXE-008 | `execution-view.ts:403-406` | **Yes** — `retryExhaustion` (`:206-218`), rendered `+page.svelte:361-367` |
+| 6 | `inputReadiness` — RPH-EXE-005 | `execution-view.ts:412-417` | No |
+| 7 | Flow gate — `startableStepIds` in-edge barrier | `execution-view.ts:617-622`, applied `+page.svelte:333-339` | No |
+| 8 | Branch reachability — `prunableStepIds` (itself re-gated through limb 2 and 3) | `execution-view.ts:627-641`, applied `+page.svelte:386-394` | No |
+
+CONFIRMED ABSENCE, search stated and not truncated: across 492 `.ts`/`.svelte` files under `packages/` and
+`apps/`, `grep -rnE "withh(eld|olding)"` returns 16 hits — all comments, tests, or the one `retryExhaustion`
+field; `grep -rnE "interface [A-Za-z]*Withh|type [A-Za-z]*Withh"` returns nothing; and a case-insensitive sweep
+for `withholdingreason|affordancereason|whyabsent|blockedby|deniedreason|unavailablereason|disabledreason`
+returns nothing. There is no type, field, or identifier in the repository that records why an affordance was
+withheld, other than `ExecutionStepView.retryExhaustion`. The repository's own e2e suite records the diagnosis
+verbatim: "But withholding the button also withheld the EXPLANATION — those actions were named only in the
+refusal…" (`apps/rph-demo/e2e/execution-tier3.e2e.ts:167-169`). O-5 generalizes that one fix to the other seven.
+
+### 2.5.1 Closure matrix — O-5 Affordance Withholding
+
+**Identity and unique identification.** A Withholding SHALL be uniquely identified within a rendered Surface by
+`(surfaceId, subjectObjectId, commandType)` — the same triple as the Affordance it stands in for, which is what
+makes O-4 and O-5 provably mutually exclusive at a given derivation revision. Verification: `FX-O5-01` asserts
+the union of offered triples and withheld triples equals the candidate set, and their intersection is empty.
+
+**Definition.** A Withholding is the recorded reason an Affordance is not offered on a Surface where the
+professional could reasonably expect it, together with the remedy that would make it offerable.
+
+**Exclusion — what a Withholding is NOT.** It is NOT a refusal: a refusal (O-6) is the engine's answer to a
+Command that was actually issued; a Withholding is the Surface's account of a Command that was never offered. It
+is NOT an error, and SHALL NOT be styled or logged as one — a correctly withheld affordance is the system working.
+It is NOT a record of every command not currently legal: see the materiality rule (§2.5.3), which is the
+NON-EXAMPLE this object most needs. It is NOT a governed object and SHALL NOT be persisted or evented.
+
+**Purpose.** To make `SPEC-001-INV-04` performable: silence SHALL NOT stand in for refusal. A control that
+vanishes tells the professional nothing about what to do instead; the repository has already ruled, in code, that
+"a button that silently vanishes is a worse answer than one that refuses with a reason"
+(`execution-view.ts:210-211`).
+
+**Authority (per-object).**
+- *Create:* the Projection layer only, and only as the by-product of a limb refusing during O-4 derivation. A
+  Withholding SHALL NOT be authored by hand at a Surface; a hand-authored explanation is a second copy of a rule
+  the declaration already owns (the failure mode of `+page.svelte:380-385`, where a template comment asserting a
+  gate was CONFIRMED false for four months).
+- *Alter:* nobody — re-derived, never edited.
+- *Waive:* nobody. A Withholding SHALL NOT be suppressible by configuration; suppression is exactly the defect.
+  **Exception, stated:** a Withholding whose disclosure would leak protected existence SHALL be replaced by a
+  partiality disclosure (O-8), not suppressed silently (DOC-003 §9 PER-7 scope).
+- *Approve / revoke / supersede:* **N/A with reason** — a derivation has no approval lifecycle.
+
+**Inputs / preconditions.** (a) The candidate set for the subject (from limb 1 of the register above); (b) the
+per-limb verdicts from O-4's derivation, including the deciding sub-limb; (c) the resolved facts each limb read;
+(d) the declaration's rationale prose for the deciding column. All four SHALL come from the same call that
+withheld the affordance, so the notice and the withholding cannot disagree — CONFIRMED as the built rule for the
+one disclosed limb: "The actions come from the same `retryDecision` call that withheld the affordance"
+(`execution-view.ts:212-213`).
+
+**Outputs / postconditions.** A Withholding record and its rendered disclosure. Deriving one SHALL have no other
+postcondition; in particular it SHALL NOT re-run the limb (which could return a different verdict against a
+moved store and produce a notice that contradicts the withholding).
+
+**Relationships (typed).**
+`Withholding —standsInFor→ the un-offered Affordance (O-4 triple, exactly 1)` ·
+`Withholding —decidedBy→ authority limb (exactly 1 — the FIRST refusing limb in declaration order)` ·
+`Withholding —cites→ governing rule (1..n: RPH-EXE-002/003/005/008, RPH-PWU-010, or the transition allowlist)` ·
+`Withholding —blockedBy→ governed object (0..n — the binding, the missing artifacts, the closed PWU)` ·
+`Withholding —remediedBy→ remedy (exactly 1, possibly UNREACHABLE)` ·
+`Withholding —renderedOn→ Surface (exactly 1)`.
+
+**States.** `MATERIAL` (the candidate test is met; disclosure is required) and `IMMATERIAL` (the command is not a
+candidate; no record is produced). A third state, `SUPPRESSED_FOR_CONFIDENTIALITY`, exists only for the
+protected-existence case and SHALL be counted and auditable rather than invisible.
+
+**Lifecycle.** `derived → disclosed → (remedied → superseded-by-an-Affordance | persists → re-derived)`. A
+Withholding SHALL NOT outlive the derivation that produced it.
+
+**Illegal states and transitions, enumerated.**
+1. A withheld candidate with **no** Withholding record — the `SPEC-001-INV-04` violation itself. `FX-O5-02`.
+2. A Withholding whose `decidedBy` limb, re-evaluated against the same facts, **permits** — a stale or
+   hand-authored reason. `FX-O5-03`.
+3. A Withholding and an Affordance for the same triple in one derivation. `FX-O5-01`.
+4. A Withholding naming **more than one** deciding limb. Declaration order is load-bearing — the binding kernel
+   evaluates scope before status deliberately, because "reporting *your binding is REVOKED* for a binding that was
+   never yours names the wrong defect and sends an operator to re-authorize something that would still be
+   refused" (CONFIRMED, `execution.ts:266-268`) — so a Withholding SHALL name the first refusing limb and MAY list
+   subsequent ones as `alsoRefusing`. `FX-O5-04`.
+5. A Withholding with `remedyReachability: 'UNREACHABLE_WEDGE'` that is not escalated. `FX-O5-05`.
+6. A Withholding rendered outside the viewport with no scroller — an unreachable disclosure is not a disclosure
+   (`SPEC-001-INV-07`; spine incumbent defect 1). `FX-O5-06`.
+
+**Invariants governing O-5.** `SPEC-001-INV-04` (master), `-INV-07` (the disclosure must be reachable),
+`-INV-13` (a Withholding for a command the engine would admit is an over-refusal defect, not a disclosure),
+`-INV-09` (a Withholding derived from a stale Projection SHALL be marked stale, not presented as current).
+
+**Versioning.** Adding a limb to the authority declaration changes the MEANING of every Withholding derived under
+it and SHALL be accompanied by a new fixture asserting the new limb's disclosure. Changing a rationale string is
+PRESENTATION *unless* it changes the named remedy, which is meaning. Verification: `FX-O5-07` pins
+`limb → remedyKind`.
+
+**Provenance.** A Withholding SHALL cite the governing rule by its ratified identifier (e.g. `RPH-EXE-003 / §8.1`)
+and SHALL NOT paraphrase it as the sole citation. CONFIRMED that the engine's own refusal messages already do
+this (`execution.ts:745`, `:1094`, `:1107`; `execution.ts:672`), so the Surface has a model to copy rather than a
+convention to invent.
+
+**Evidence and assurance hooks. N/A with reason** — a Withholding is a derivation over declared authority and
+carries no evidentiary weight of its own. Its *citation* points at rules, not at evidence objects. The one hook
+that does apply: a Withholding SHALL NOT be presented as an assurance finding (`SPEC-001-INV-11`), because a
+withheld affordance says nothing about whether the work is sound.
+
+**Failure modes.** (a) *Silence* — the incumbent state for seven of eight authorities. (b) *Over-disclosure* —
+listing every machine-illegal command on every subject, which buries the material case; the materiality rule of
+§2.5.3 exists to prevent this and is this object's NON-EXAMPLE. (c) *Divergent reason* — a hand-authored notice
+that no longer matches the limb; CONFIRMED to have occurred as a template comment asserting a gate that did not
+exist (`+page.svelte:380-385`). (d) *Remedy naming an unreachable act* — the wedge case; see recovery.
+(e) *Reason without remedy* — "Start is unavailable" with nothing the professional can do, which satisfies the
+letter of UI-INV-020 and none of its purpose.
+
+**Recovery.** *Reconcile:* re-derive; a Withholding is never repaired in place. *Retry:* **N/A with reason** — a
+Withholding is not an operation and cannot be retried; the *remedy* is retried. *Reshape:* where the remedy is
+`UNREACHABLE_WEDGE` — the professional can do nothing, and neither can any other actor — the Withholding SHALL be
+escalated as a governance question rather than displayed as advice. CONFIRMED that this case is real and already
+reasoned about in the kernel: a `PARTIALLY_AUTHORIZED` binding granting nothing can be expanded (`grantIsMonotone`
+forbids only shrinking) so the refusal is curative, while the vacuous-`AUTHORIZED` case "cannot be re-authorized
+and would therefore be a wedge; it is refused at RequestRuntimeBinding instead, the only point where a remedy
+exists" (`execution.ts:312-316`). *Escalate:* a Withholding that persists across a professional's remedy attempt
+SHOULD be escalated with its derivation trace attached.
+
+**Concurrency.** A Withholding SHALL carry `derivedAtSubjectRevision` and SHALL be invalidated by any revision
+change on a `blockedBy` object — a remedy applied by another professional must not leave a stale "you cannot do
+this" on screen. Verification: `FX-O5-08` applies the remedy in a second session and asserts the first Surface's
+next derivation offers the Affordance.
+
+**Idempotency.** Re-deriving the same Surface against the same revisions SHALL produce an identical Withholding
+set; disclosure SHALL NOT accumulate duplicates across re-renders. `FX-O5-09`.
+
+**Security / permission boundaries.** A Withholding SHALL NOT disclose the existence of an object the acting
+professional may not know exists. Where the reason cannot be stated without such a leak, the record SHALL be
+`SUPPRESSED_FOR_CONFIDENTIALITY` with a generic professional statement and an escalation path — never an
+unexplained absence, and never a fabricated alternative reason. `FX-O5-10`.
+
+**Observability.** Every Withholding SHALL be countable: the Surface SHALL be able to report, per subject, how
+many candidate commands were withheld and by which limb. This is what turns spine incumbent defect 6 ("No Surface
+explains why an Affordance is absent") from an anecdote into a metric, and it is the same counting that detects an
+over-refusal regression. `FX-O5-11`.
+
+**Persistence semantics.** None — derived and disposable, like O-4 (DOC-003 PER-7). A Withholding SHALL NOT be
+written to the event log. INFORMATIVE: this is the boundary at which an implementer is most likely to reach for a
+table; the counting obligation above is satisfied by re-derivation, not by storage.
+
+**Migration / legacy relation.** `ExecutionStepView.retryExhaustion` (`execution-view.ts:206-218`) is a conforming
+O-5 record for limb 5 and SHALL NOT be removed or renamed as part of adopting this object; O-5 generalizes it.
+`ExecutionStepView.belowQueued` (`:204-205`) is a conforming O-5 record at CATEGORY grain for limb 1 (it discloses
+that the subject is below the domain's driveable floor, which is why no advance command exists) and is the
+NON-EXAMPLE anchor for §2.5.3: it is correct precisely because it does *not* enumerate the nine withheld commands.
+
+**UX / inspection surface.** A material Withholding SHALL be reachable at the place the Affordance would have been
+(`SPEC-001-INV-07`), and its full derivation trace SHOULD be available on demand without leaving the Surface. The
+disclosure SHOULD read as JCUX's worked example does — "Approve Release is unavailable because the mandatory
+security review failed and no exception authority is assigned" (`JCUX:2021`) — naming the subject, the reason,
+and the missing condition in one professional sentence.
+
+**Verifying tests.** New: `FX-O5-01` … `FX-O5-14` (§10). Existing tests that already assert the *withholding*
+half and SHALL be extended to assert the *disclosure* half:
+`packages/rph-projections/src/execrem-wp15-affordance-fidelity.test.ts`,
+`packages/rph-projections/src/revrem-wp6-readmodel-binding-authority.test.ts`,
+`packages/rph-projections/src/retrycap-readmodel-cap.test.ts`, and the rendered assertion at
+`apps/rph-demo/e2e/execution-tier3.e2e.ts:167-169` (currently the only end-to-end disclosure assertion).
+
+**Definition of done for O-5.** All eight withholding authorities in the register produce records; the materiality
+rule is implemented as set difference rather than as a hand-written list; every record names a limb, a citation,
+and a remedy; the wedge case escalates; and the disclosure is reachable under the `SPEC-001-INV-07` fixture at
+1440x900.
+
+### 2.5.2 Field contracts — O-5 Affordance Withholding
+
+**`surfaceId`** — `string` · required · no default · the Surface the withholding is disclosed on · MUST be a
+declared Surface id · Projection only.
+
+**`subjectObjectId`** — `string` · required · no default · the governed object the un-offered Command would have
+targeted · MUST lie inside the Projection Scope · Projection only.
+
+**`commandType`** — `string` · required · no default · the Command that is not offered · MUST be a member of the
+**candidate set** (§2.5.3); a `commandType` outside the candidate set SHALL fail derivation, which is the
+mechanical form of the over-disclosure prohibition · Projection only.
+
+**`decidedBy`** — `WithholdingAuthority` · required · no default · one of the eight registered authorities:
+`'TRANSITION_ALLOWLIST' | 'PLAN_LIVENESS' | 'PWU_OPENNESS' | 'BINDING_AUTHORITY' | 'INPUT_READINESS' |
+'RETRY_BUDGET' | 'FLOW_GATE' | 'BRANCH_REACHABILITY'` · MUST be the FIRST refusing authority in declaration
+order · written by the shared kernel's verdict, never chosen by the Projection.
+
+**`limb`** — `string | undefined` · optional · `undefined` when the authority has no sub-limbs · the deciding
+sub-decision within `decidedBy` · MUST be a declared member of that authority's limb enumeration — CONFIRMED that
+this enumeration already exists for binding authority: `BindingAuthorityLimb = 'PERMITTED' | 'OUT_OF_SCOPE' |
+'UNRESOLVABLE' | 'WRONG_STEP' | 'NOT_AUTHORIZED' | 'NOTHING_GRANTED'` (`execution.ts:228-235`), carried expressly
+"so a caller can render the RIGHT refusal" (`:225-227`) · kernel writes.
+
+**`alsoRefusing`** — `readonly WithholdingAuthority[]` · required · `[]` · other authorities that would also
+refuse, recorded so a professional who clears the first is not surprised by a second · MUST NOT contain
+`decidedBy`; MAY be empty when the derivation short-circuits, in which case `evaluationWasShortCircuited` is
+`true` · kernel writes.
+
+**`evaluationWasShortCircuited`** — `boolean` · required · default `true` · whether evaluation stopped at the
+first refusal · when `true`, `alsoRefusing` is "not evaluated", NOT "none" — the two absences mean opposite things
+(O-4-R5's discipline applied here) · Projection writes. **FORK-14** below asks whether full evaluation should be
+mandatory.
+
+**`citation`** — `readonly string[]` · required · MUST be non-empty · the ratified rule identifiers the refusal
+rests on (e.g. `['RPH-EXE-003', '§8.1']`) · each entry MUST resolve to a ratified rule id or a canon section; a
+free-text-only citation SHALL fail validation · derived from the declaration, never typed at the Surface.
+
+**`professionalReason`** — `string` · required · no default · one professional sentence naming the subject, the
+condition that fails, and the authority — JCUX's worked example is the shape (`JCUX:2021`) · MUST NOT be a bare
+code or status token; MUST NOT be empty; SHOULD be derived from the declaration's `…Rationale` prose so the
+Surface and the engine give the same account · Projection derives from the declaration.
+
+**`blockedByObjectIds`** — `readonly string[]` · required · `[]` permitted (some refusals name no object) · the
+governed objects whose state produced the refusal — the binding id, the unresolved input artifact ids, the closed
+PWU · each entry MUST be an object the professional is permitted to know exists (else
+`SUPPRESSED_FOR_CONFIDENTIALITY`) · kernel supplies; CONFIRMED that the engine already assembles exactly this list
+for its refusals (`execution.ts:746`: `[stepId, ...missing]`).
+
+**`requiredCondition`** — `string` · required · no default · **what would have to become true** — stated as a
+condition on named objects, not as an instruction · MUST name at least one `blockedByObjectId` or one axis value
+when `blockedByObjectIds` is empty · Projection derives.
+
+**`remedyKind`** — `RemedyKind` · required · no default ·
+`'AUTHORIZE' | 'PROVIDE_INPUT' | 'REOPEN_SUBJECT' | 'SELECT_ALTERNATE_ACTION' | 'AWAIT_UPSTREAM' | 'NONE'` · the
+class of act that would clear the refusal · MUST be consistent with `decidedBy` under the pinned mapping of
+`FX-O5-07` · Projection derives.
+
+**`remedyAffordances`** — `readonly string[]` · required · `[]` · the Commands the professional MAY issue instead,
+where the authority names them · MUST come from the same kernel call that withheld the affordance — CONFIRMED
+precedent and its reason: `RETRY_EXHAUSTION_ACTIONS` = `{CHANGE_TACTIC, REPLAN_EXECUTION, ESCALATE, REJECT,
+ABANDON}` (`execution.ts:664-671`) reaches the view through the same `retryDecision` call
+(`execution-view.ts:550`) precisely "so the notice and the withholding can never disagree" (`:212-213`) · kernel
+supplies.
+
+**`remedyActorRole`** — `'SUBJECT_PROFESSIONAL' | 'OTHER_AUTHORITY' | 'SYSTEM' | 'NOBODY'` · required · no default
+· **who can make `requiredCondition` true** · MUST be `'NOBODY'` exactly when `remedyReachability` is
+`'UNREACHABLE_WEDGE'` · Projection derives. INFORMATIVE: this field is what separates "you need to do X" from "an
+authorizer needs to do X", which is the difference between a useful disclosure and a dead end.
+
+**`remedyReachability`** — `'REACHABLE_BY_SUBJECT' | 'REACHABLE_BY_OTHER_AUTHORITY' | 'UNREACHABLE_WEDGE'` ·
+required · no default · whether the remedy exists at all · `'UNREACHABLE_WEDGE'` SHALL trigger escalation and
+SHALL NOT be rendered as ordinary advice · Projection derives from the kernel verdict. Verification: `FX-O5-05`
+constructs the vacuous-`AUTHORIZED` binding case (`execution.ts:312-316`) and asserts escalation, not advice.
+
+**`derivedAtSubjectRevision`** — `number` · required · no default · the revision the withholding was derived
+against · MUST equal the sibling Affordances' value in the same derivation · Projection only.
+
+**`freshness`** — `'FRESH' | 'STALE' | 'UNKNOWN'` · required · default `'UNKNOWN'` · a Withholding derived from a
+stale Projection SHALL be marked stale (`SPEC-001-INV-09`) — a stale "you cannot do this" is worse than none ·
+Projection writes.
+
+**`confidentiality`** — `'DISCLOSED' | 'SUPPRESSED_FOR_CONFIDENTIALITY'` · required · default `'DISCLOSED'` ·
+whether the reason itself is disclosable · when suppressed, `professionalReason` SHALL state that a restriction
+applies and SHALL NOT state a substitute reason · Projection derives from the authority model.
+
+### 2.5.3 The materiality rule, and its NON-EXAMPLE
+
+**O-5-R1 (SHALL) — the candidate set.** The **candidate set** for a subject is the set of Commands that are legal
+from the subject's current declared state under the command-backed transition allowlist. A Withholding SHALL be
+produced for exactly the candidates a downstream authority refused, and for no other Command. Formally, with
+`candidates` = the allowlist result and `offered` = the permitted subset:
+`withheld = candidates \ offered`. CONFIRMED that this is a two-line change to the built code rather than a new
+mechanism: `planAffordancesFor` already computes exactly `advanceCommandsFor(stepState).filter(permits)` and
+`controlCommandsFor(stepState).filter(permits)` (`execution-view.ts:490-493`); the elements the filter drops
+*are* the material withholdings, and they are currently discarded unnamed. Verification: `FX-O5-12` asserts
+`offered ∪ withheld === candidates` and `offered ∩ withheld === ∅` over generated (planStatus, stepState, facts)
+triples with recorded seeds.
+
+**O-5-R2 (SHALL NOT) — the over-application prohibition.** A Surface SHALL NOT produce a Withholding for a
+Command that is not a candidate. `Start` on a `SUCCEEDED` step, `Skip` on a `FAILED` step, `Complete` on a
+`QUEUED` step: none is withheld *by an authority*: none is applicable, and disclosing each would produce eight
+notices per step and bury the one that matters. Verification: negative fixture `FX-O5-13` asserts that a
+terminal-state subject produces **zero** Withholding records.
+
+**O-5-R3 (SHALL) — the category disclosure.** Where the candidate set is EMPTY for a reason a professional would
+find surprising, the Surface SHALL disclose that at CATEGORY grain, naming the reason once, rather than
+enumerating the inapplicable commands. CONFIRMED that the built system already does this correctly for one case:
+`belowQueued` renders "no advance command in the domain (below QUEUED)" (`execution-view.ts:501-505`,
+`+page.svelte:395-398`), and the honest surfacing of that gap is recorded as deliberate design
+(`execution-view.ts:18-20`, F-11). The other case requiring category disclosure is the flow gate (limb 7): a
+`QUEUED` step that is not in `startableStepIds` currently renders **nothing at all** (CONFIRMED,
+`+page.svelte:333-339` — the `{#if}` has no `{:else}`), so the professional sees a queued step with no Start and
+no explanation. Verification: `FX-O5-14` asserts a non-frontier `QUEUED` step discloses "not yet startable — an
+in-edge is unsatisfied" naming the blocking predecessor.
+
+**O-5-R4 (SHALL) — no independent copy.** The reason, the citation and the remedy SHALL come from the same kernel
+call that produced the refusal verdict. A Surface SHALL NOT compose a reason by re-testing the condition.
+Verification: `FX-O5-15` mutates the kernel's returned limb and asserts the disclosure changes with it; a
+disclosure that survives the mutation is a second copy and fails.
+
+**FORK-13 — the scope of O-5. (Raised, not resolved.)**
+*Decision:* does `SPEC-001-INV-04`'s disclosure obligation attach to **every** withholding authority, or only to
+those whose remedy the acting professional can perform?
+*Options:* (A) all eight authorities disclose (this section as written); (B) disclose only where
+`remedyReachability !== 'UNREACHABLE_WEDGE'`; (C) disclose only the five declared authority columns, treating the
+flow gate and branch reachability as ordinary plan semantics rather than withholdings.
+*Recommendation:* **(A)**. The measured defect is that seven of eight are silent, and the flow gate (limb 7) is
+the one a professional meets most often — a `QUEUED` step with no Start button and no reason. Option (C) would
+leave that exact case unaddressed while appearing to fix the problem.
+*Downstream effect if ruled otherwise:* under (C) the register table above shrinks to five rows, `FX-O5-14` is
+withdrawn, and the `QUEUED`-not-startable case is re-filed as an O-8 epistemic disclosure instead.
+
+**FORK-14 — short-circuit vs. full evaluation. (Raised, not resolved.)**
+*Decision:* when the first authority refuses, SHALL the derivation continue evaluating the remaining limbs to
+populate `alsoRefusing`?
+*Options:* (A) short-circuit, `alsoRefusing = []`, `evaluationWasShortCircuited = true` (matches the built
+`planPermitsAffordance`, which returns on first refusal — CONFIRMED, `execution-view.ts:366-418`); (B) evaluate
+all limbs always; (C) short-circuit by default, full evaluation on demand behind the derivation trace.
+*Recommendation:* **(C)**. Full evaluation costs store lookups per limb per command per step and the ordering of
+limbs is itself load-bearing (`execution.ts:258-268`), so making it always-on would change which reason the
+professional sees; making it on-demand keeps the primary reason stable and still answers "what else is wrong".
+*Downstream effect if ruled otherwise:* under (B), `evaluationWasShortCircuited` is deleted and `alsoRefusing`
+becomes a required complete set, and `FX-O5-04`'s "first refusing limb" assertion must be re-expressed as an
+ordering assertion over a complete list.
+
+---
+
+## 2.6 O-6 · Refusal Disclosure
+
+**INFORMATIVE.** Where O-5 accounts for a Command that was never offered, O-6 accounts for a Command that was
+issued and refused. The ratified obligations are CPM §27.3 — "A failed command SHALL explain the professional
+reason", with the *insufficient* example given as literally `Error 409.`
+(`Canonical Projection Model.md:1900-1916`) — and RIWS UI-INV-020 (`RIWS:2057-2059`). The built Surface partly
+performs this already: single-command actions surface the engine's code and message verbatim
+(`+page.server.ts:497-507`, `dispatchResult`). The gap is in multi-command actions, and it is two gaps, not one:
+the error **code** is dropped, and the **partial application** is not disclosed at all.
+
+### 2.6.1 Closure matrix — O-6 Refusal Disclosure
+
+**Identity and unique identification.** A Refusal Disclosure SHALL be identified by the `correlationId` of the
+refused Command. CONFIRMED that this field is ratified and required on every `RphError`
+(`packages/rph-contracts/src/errors.ts:51-59`) and is set on every UI command
+(`workbench.ts:129`), so the identifier exists today and need not be minted.
+
+**Definition.** A Refusal Disclosure is what a Surface presents when the engine refuses a Command the professional
+issued: the professional reason, the stable error code, the objects concerned, the remedy, and — where the action
+dispatched more than one Command — exactly which Commands applied and which did not.
+
+**Exclusion — what a Refusal Disclosure is NOT.** It is NOT a Withholding (O-5). It is NOT a technical error
+report: a stack trace, an HTTP status, or a bare code is explicitly insufficient (CPM §27.3's own
+counter-example). It is NOT raised for a `DUPLICATE` result: an idempotency replay is a success, and CONFIRMED to
+be treated as one throughout (`command-bus.ts:166`, `+page.server.ts:485`, `:502`). It is NOT a substitute for
+`SPEC-001-INV-13`: every refusal whose originating Affordance was OFFERED is a defect that a fixture must catch,
+and disclosing it well does not make it acceptable.
+
+**Purpose.** To discharge `SPEC-001-INV-08` (a refused Command surfaces its reason and code to the professional
+who issued it) and `SPEC-001-INV-14` (a partially-applied Command sequence SHALL NOT leave the Surface reporting
+success).
+
+**Authority (per-object).** *Create:* the Surface, from the engine's `CommandResult`/`BatchResult` — never
+synthesized. *Alter:* nobody; a Surface SHALL NOT rewrite, soften, or generalize an engine refusal message.
+*Waive:* nobody — a Surface SHALL NOT swallow a refusal, including one it "expects". *Approve / revoke /
+supersede:* **N/A with reason** — a disclosure is a rendering of an engine result, not a governed act.
+
+**Inputs / preconditions.** The `CommandResult` (or `BatchResult`) returned by the engine, the Affordance that
+issued the Command, and the ordered list of Commands the action dispatched. All three SHALL be available at the
+disclosure site. CONFIRMED that the third is currently discarded: `runSteps` iterates and returns a string,
+retaining neither the per-command results nor the index of the failure (`+page.server.ts:482-489`).
+
+**Outputs / postconditions.** A rendered disclosure and, when the sequence partially applied, a recorded
+`PartialApplication` (fields below). A Refusal Disclosure SHALL NOT itself dispatch a compensating Command; it
+MAY offer one as an Affordance.
+
+**Relationships (typed).**
+`RefusalDisclosure —discloses→ RphError (exactly 1)` ·
+`RefusalDisclosure —for→ Command (exactly 1 — the refused one)` ·
+`RefusalDisclosure —originatedFrom→ Affordance (0..1 — absent when the Command was issued by a sequence rather
+than by a control)` · `RefusalDisclosure —concerns→ governed object (0..n, from `targetObjectIds`)` ·
+`RefusalDisclosure —reports→ PartialApplication (0..1)` ·
+`RefusalDisclosure —offers→ remedy Affordance (0..n)`.
+
+**States.** `PRESENTED` and `DISMISSED`. A disclosure reporting a partial application SHALL NOT be dismissible
+until its `PartialApplication` has been acknowledged — dismissing the only record that two writes committed
+recreates the defect.
+
+**Lifecycle.** `raised → presented → (acknowledged | superseded by a successful re-issue)`. A disclosure SHALL NOT
+be auto-dismissed by a subsequent navigation (`SPEC-001-INV-10`: navigation preserves professional context).
+
+**Illegal states and transitions, enumerated.**
+1. A refused Command with no disclosure — `SPEC-001-INV-08`. `FX-O6-01`.
+2. A Surface reporting success when any Command in the action was refused. `FX-O6-02`.
+3. A disclosure omitting the error code when the engine supplied one. CONFIRMED live: `runSteps` returns
+   `` `${ct}: ${r.error?.message ?? r.status}` `` (`+page.server.ts:486`) — the message only — while its
+   single-command sibling `dispatchResult` returns `` `${commandType} rejected — ${r.error?.code ?? r.status}:
+   ${r.error?.message ?? ''}` `` (`:504`), which includes it. Every multi-command action on the Undertaking
+   Workbench therefore discloses no code. `FX-O6-03`.
+4. A partially-applied sequence with no `PartialApplication` record — `SPEC-001-INV-14`. `FX-O6-04`.
+5. A disclosure whose text is a bare code or status (CPM §27.3's insufficient example). `FX-O6-05`.
+6. A `DUPLICATE` result rendered as a refusal, or a refusal rendered as a `DUPLICATE`. `FX-O6-06`.
+
+**Invariants governing O-6.** `SPEC-001-INV-08` (master), `-INV-14` (partial application), `-INV-13` (a refusal
+following an OFFERED affordance is a countable divergence), `-INV-07` (the disclosure must be reachable),
+`-INV-01` (a disclosure changes no governed state).
+
+**Versioning.** The error **code** set is a stable contract: `RphErrorCodeSchema` declares exactly fifteen codes
+(`errors.ts:9-25`) and `ERROR_CODE_CATEGORY` maps each to one of the ten categories (`:32-48`). Adding a code
+changes meaning and SHALL be a contract change with a migration note; changing a *message* is presentation.
+CONFIRMED and load-bearing: the kernel markers a professional actually needs — `RPH_BINDING_NOT_AUTHORIZED`,
+`RPH_CAPABILITY_NOT_GRANTED`, `RPH_PRECONDITION_UNSATISFIED`, `RPH_CAPABILITY_SILENTLY_REDUCED` — are **not**
+members of that fifteen-code enum; they travel inside the message string, by explicit design
+(`execution.ts:998`, `enforcement-register.ts:252` and `:373-374`, `execution.ts:745`, `:1094`, `:1107`). See
+FORK-15.
+
+**Provenance.** A disclosure SHALL name the engine as the source of its reason text and SHALL NOT present a
+Surface-authored paraphrase as the engine's answer. Where the Surface adds professional framing, the engine's
+verbatim message SHALL remain inspectable (CPM §27.3: "Technical details MAY be available separately",
+`:1916`).
+
+**Evidence and assurance hooks.** A refusal on an assurance-bearing Command SHALL NOT be presented in a way that
+leaves the assurance axis looking advanced (`SPEC-001-INV-11`). Verification: `FX-O6-07` refuses the final
+`ChangePwuState` of the assurance sequence and asserts the rendered assurance axis still reads its pre-sequence
+value.
+
+**Failure modes.** (a) *Code dropped* — illegal state 3, CONFIRMED live. (b) *Silent partial application* —
+illegal state 4, CONFIRMED live (§2.6.3). (c) *Generalized message* — "Assurance failed: …" prefixed onto an
+engine message that named a different subject; CONFIRMED at `+page.server.ts:888` and `:640`, where the
+prefix asserts which phase failed while the wrapped message may name any of six to eleven commands. (d)
+*Refusal after an OFFERED affordance* — an `SPEC-001-INV-13` breach that O-6 makes visible.
+
+**Recovery.** *Reconcile:* re-derive the Surface after a refusal so the professional sees the state as it now is —
+including any partial application. *Retry:* permitted only when `RphError.retryable` is `true` (`errors.ts:56`);
+a Surface SHALL NOT offer a retry for a non-retryable refusal, which is a re-statement of `SPEC-001-INV-13` at
+the disclosure boundary. *Reshape:* where a refusal recurs because a sequence is not atomic, the remedy is to
+issue the sequence atomically (§2.6.3), not to add a pre-check that duplicates an engine rule. *Escalate:* a
+refusal whose partial application cannot be compensated by any available Command SHALL be escalated with its
+`appliedCommands` list attached.
+
+**Concurrency.** A refusal with code `RPH_REVISION_CONFLICT` (`errors.ts:13`, category `CONCURRENCY`) SHALL be
+disclosed as *the subject changed*, naming the expected and actual revisions — CONFIRMED that both are available
+(`command-bus.ts:222-226`, `RevisionGuardConflict`; and the built PWA authoring surface already renders exactly
+that sentence: "`… changed from revision X to Y.`", `apps/rph-demo/src/lib/server/authoring-turn.ts:420`) — and
+SHALL offer re-derivation rather than a blind retry.
+
+**Idempotency.** A refusal disclosure SHALL be raised at most once per `correlationId` per issue. A re-submission
+returning `DUPLICATE` SHALL clear a prior disclosure for the same `correlationId`, not stack a second one.
+`FX-O6-06`.
+
+**Security / permission boundaries.** A refusal message SHALL NOT disclose the existence or state of an object the
+professional may not know exists; where the engine's verbatim message would, the Surface SHALL substitute a
+partiality disclosure and record the substitution. This is the one case in which the "never rewrite the engine
+message" rule yields, and it SHALL be recorded rather than silent. `FX-O6-08`.
+
+**Observability.** Every refusal SHALL be recorded with its `originatingAffordanceRef`, so the count of *refusals
+that followed an offered Affordance* is producible. That count is the production measurement of
+`SPEC-001-INV-13` and SHALL be zero. INFORMATIVE: this is the single highest-value observability obligation in
+this spec, because it converts an invariant that is currently provable only in fixtures into one that is
+monitored in use — and every one of the five recorded F-29 instances would have been detected by it on the day it
+shipped.
+
+**Persistence semantics.** A Refusal Disclosure is transient; the underlying `RphError` is already carried in the
+engine's `CommandResult` and, where the engine records it, in event payloads (`errors.ts:50`). The Surface SHALL
+NOT persist a parallel copy.
+
+**Migration / legacy relation.** `dispatchResult` (`+page.server.ts:497-507`) is a conforming O-6 disclosure for
+the single-command case and SHALL be retained. `runSteps` (`:480-489`) is non-conforming on two counts (code
+dropped; partial application undisclosed) and is the migration target.
+
+**UX / inspection surface.** The disclosure SHALL appear where the professional acted, SHALL be reachable
+(`SPEC-001-INV-07`), and SHALL survive the re-render that follows the failed submission. Technical detail
+(verbatim message, code, correlation id, revision vector) SHOULD be available behind a disclosure control rather
+than in the primary sentence.
+
+**Verifying tests.** Existing and CONFIRMED to bind: `apps/rph-demo/e2e/execution-plan.e2e.ts` asserts three
+distinct engine refusals reaching the rendered Surface at the `exec-error` test id — the §8.4 floor gate
+(`:279-295`), an unresolved artifact (`:302-317`), and an illegal step-state action (`:323-331`) — and `:368`
+asserts *which* guard refused rather than merely that something did;
+`packages/rph-application/src/handlers/capbind-wp3-input-readiness.test.ts:156` asserts the kernel marker travels
+in the message (by `toContain`, which is the weakness FORK-15 addresses). Note the scope limit: all three e2e
+assertions are **single-command** actions dispatched through `dispatchResult`; no existing test covers a
+multi-command refusal, which is why every fixture in §2.6.3 is new. New: `FX-O6-01` … `FX-O6-12` (§10).
+
+**Definition of done for O-6.** Every refused Command on every in-scope Surface discloses code, category, reason,
+and remedy; no multi-command action can partially apply without disclosing it; and the
+refusal-after-offered-affordance count is instrumented and zero.
+
+### 2.6.2 Field contracts — O-6 Refusal Disclosure
+
+**`correlationId`** — `string` · required · no default · the identity of the refusal, equal to the refused
+Command's `correlationId` · MUST equal `RphError.correlationId` (`errors.ts:58`) · engine supplies; Surface never
+mints.
+
+**`commandType`** — `string` · required · no default · the Command that was refused · MUST be the type actually
+dispatched, never the action name · Surface reads from the dispatched envelope.
+
+**`errorCode`** — `RphErrorCode` · required · no default · one of the fifteen ratified codes (`errors.ts:9-25`) ·
+MUST be present in the disclosure whenever the engine returned one; a disclosure that renders the message without
+the code is non-conforming (illegal state 3) · engine supplies.
+
+**`errorCategory`** — `RphErrorCategory` · required · derived, no independent default · the ten-value category ·
+MUST be derived through `ERROR_CODE_CATEGORY` (`errors.ts:32-48`) and never chosen at the Surface · engine
+supplies.
+
+**`kernelMarker`** — `string | undefined` · optional · `undefined` · the finer-grained kernel label
+(`RPH_BINDING_NOT_AUTHORIZED`, `RPH_PRECONDITION_UNSATISFIED`, `RPH_CAPABILITY_NOT_GRANTED`,
+`RPH_CAPABILITY_SILENTLY_REDUCED`, `RPH_STEP_RESULT_MISSING`, `RPH_STEP_RESULT_CONTRADICTORY`) that names *which
+rule* refused, where the ratified code names only the class · when present it MUST match a marker the kernel
+actually emits; the Surface SHALL NOT invent one · engine supplies. **CONFIRMED status:** today this value is not
+a field — it is interpolated into the message string (`execution.ts:745`, `:1094`, `:1107`), and
+`enforcement-register.ts:252` records that this is deliberate because the marker "is not a member of the ratified
+15-value `RphErrorCodeSchema`". See FORK-15.
+
+**`professionalReason`** — `string` · required · no default · the engine's message, presented verbatim or with
+professional framing that preserves it · MUST NOT be a bare code or status; MUST name the subject and the failing
+condition (CPM §27.3) · engine supplies; Surface MAY frame, SHALL NOT replace.
+
+**`concernedObjectIds`** — `readonly string[]` · required · `[]` permitted · from `RphError.targetObjectIds`
+(`errors.ts:56`) · each entry SHOULD be navigable from the disclosure (`SPEC-001-INV-10` preserves context on the
+way) · engine supplies.
+
+**`retryable`** — `boolean` · required · default `false` · from `RphError.retryable` (`errors.ts:56`) · a retry
+Affordance SHALL be offered only when `true` · engine supplies.
+
+**`remedy`** — `string` · required · no default · what would make the Command succeed · MUST be present; CONFIRMED
+that the engine already writes remedies into its refusal messages ("Record the artifact, or mark the input
+required:false if it is genuinely optional", `execution.ts:745`; "Cancel the step instead.", `:672`; "Authorize
+the binding before starting the step.", `:1094`), so this field is extraction, not authorship · engine supplies;
+Surface extracts.
+
+**`remedyAffordances`** — `readonly string[]` · required · `[]` · Commands the professional MAY issue instead ·
+each MUST be an Affordance the Surface would actually offer under `SPEC-001-INV-13`; naming a Command the engine
+would also refuse is a defect · Projection derives.
+
+**`originatingAffordanceRef`** — `AffordanceRef | undefined` · optional · `undefined` when the Command came from a
+sequence rather than a control · the O-4 triple of the Affordance the professional activated · when present, the
+pairing SHALL be counted against `SPEC-001-INV-13` · Surface writes at dispatch.
+
+**`technicalDetail`** — `TechnicalDetail` · required · no default · `{ verbatimMessage, errorCode,
+correlationId, expectedRevision?, actualRevision?, kernelMarker? }` · MUST be inspectable but SHOULD NOT occupy
+the primary sentence (CPM §27.3, `:1916`) · engine supplies.
+
+**`partialApplication`** — `PartialApplication | undefined` · optional · `undefined` **only when the action
+dispatched exactly one Command** · see §2.6.3 · MUST be present for every multi-command action that refused ·
+Surface writes from the `BatchResult`.
+
+**`freshness`** — `'FRESH' | 'STALE'` · required · default `'FRESH'` · whether the disclosure still describes the
+current subject revision; a disclosure SHALL be marked stale once the subject moves, rather than silently
+persisting · Surface writes.
+
+### 2.6.3 Partial application — the `SPEC-001-INV-14` contract
+
+**INFORMATIVE — the measured defect, and why it is cheaper to fix than it looks.** CONFIRMED: the Undertaking
+Workbench's multi-command actions run through `runSteps`, which dispatches one Command at a time and returns on
+the first rejection, keeping every prior commit (`+page.server.ts:482-489`). The `assure` action dispatches up to
+eight Commands — optionally two policy Commands, then `RequestAssuranceAssessment`, `CompleteAssuranceAssessment`,
+then four `ChangePwuState` Commands (`:830-887`) — so a refusal on the third axis hop is reported *after* the two
+assurance records have committed, which is spine incumbent defect 4. `beginExecute` is worse: eleven Commands,
+including `ProposeExecutionPlan`, `ApproveExecutionPlan`, `ActivateExecutionPlan`, `StartExecutionStep` and
+`CompleteExecutionStep` (`:568-639`), any of which may be the last to commit before a refusal reported as
+"Execution failed: …" (`:640`). CONFIRMED that the platform already provides the correct primitive: the same
+application's `dispatchBatch` is atomic — "they all commit, or — on the first rejection — NONE do (the storage
+transaction is rolled back, leaving no partial state)" — and returns `{ ok, results, failedIndex }`
+(`packages/rph-application/src/command-bus.ts:163-188`), exposed to the Surface at
+`apps/rph-demo/src/lib/server/workbench.ts:149-152` and CONFIRMED in use by the PWA Designer route
+(`apps/rph-demo/src/routes/pwa/[id]/+page.server.ts:632`). The defect is therefore not a missing capability; it
+is one of two Surfaces using the non-atomic path.
+
+**O-6-R1 (SHALL).** A Surface action that issues more than one Command SHALL issue them atomically, so that a
+refusal leaves no partial application. Verification: `FX-O6-09` asserts that after a forced refusal at position
+*k* of an *n*-Command action, the event count is unchanged from before the action. CONFIRMED that this fixture is
+satisfiable today by routing `runSteps` through `dispatchBatch`.
+
+**O-6-R2 (SHALL).** Where atomicity is genuinely unavailable — a sequence spanning two authorities, or one whose
+earlier Commands must survive by design — the Surface SHALL disclose the partial application: which Commands
+applied, in order, with their aggregate ids and resulting revisions; which Command was refused, with its full O-6
+disclosure; and which Commands were never attempted. Verification: `FX-O6-10`. A Surface SHALL NOT report such an
+outcome as a failure of the whole action, because that is false and would lead a professional to re-issue
+Commands that already applied.
+
+**O-6-R3 (SHALL NOT).** A Surface SHALL NOT synthesize a compensating Command to "undo" an applied prefix. The
+governed model records rather than erases (JPWB-CON-000 B7's anti-vacuity posture applied to recovery:
+`JPWB-CON-000:119`); compensation, where it exists, is a governed Command the professional issues from a
+disclosed Affordance. Verification: negative fixture `FX-O6-11` asserts no Command is dispatched by the
+disclosure path itself.
+
+**O-6-R4 (SHALL).** A `DUPLICATE` result inside a sequence SHALL be counted as applied, not as refused and not as
+newly applied. CONFIRMED as the built engine semantics (`command-bus.ts:166`, `:177`) and the built Surface
+semantics (`+page.server.ts:485`). Verification: `FX-O6-12` replays a sequence and asserts the disclosure reports
+"already applied" for the replayed prefix.
+
+**`PartialApplication` field contract.**
+
+**`appliedCommands`** — `readonly AppliedCommand[]` · required · `[]` when nothing applied · each entry is
+`{ commandType, targetAggregateId, resultingRevision, wasDuplicate }` · MUST be in dispatch order and MUST be
+derived from the engine's per-command results, never reconstructed from the action's source list — CONFIRMED that
+`BatchResult.results` supplies exactly this in order (`command-bus.ts:169-188`) · Surface writes from the engine
+result.
+
+**`refusedAtIndex`** — `number` · required · no default · the zero-based position of the refused Command · MUST
+equal `BatchResult.failedIndex` where a batch was used · engine supplies.
+
+**`unattemptedCommands`** — `readonly string[]` · required · `[]` permitted · the Command types after
+`refusedAtIndex` that were never dispatched · MUST NOT be described as "failed" — they were not attempted, and the
+distinction is the difference between a professional re-issuing them and abandoning them · Surface writes.
+
+**`compensationDisposition`** — `'ROLLED_BACK' | 'STANDS_AND_DISCLOSED' | 'COMPENSATION_OFFERED' |
+'ESCALATION_REQUIRED'` · required · no default · what happened to the applied prefix · MUST be `'ROLLED_BACK'`
+exactly when an atomic path was used and the transaction unwound; MUST be `'ESCALATION_REQUIRED'` when the prefix
+stands and no governed compensating Command exists · Surface derives.
+
+**`acknowledged`** — `boolean` · required · default `false` · whether the professional has acknowledged the
+partial application · a disclosure with `compensationDisposition !== 'ROLLED_BACK'` SHALL NOT be dismissible
+while `false` · Surface writes.
+
+**FORK-15 — the two error-code namespaces. (Raised, not resolved.)**
+*Decision:* the fifteen ratified `RphErrorCode` values name the *class* of refusal; the kernel markers
+(`RPH_BINDING_NOT_AUTHORIZED`, `RPH_PRECONDITION_UNSATISFIED`, `RPH_CAPABILITY_NOT_GRANTED`,
+`RPH_CAPABILITY_SILENTLY_REDUCED`, `RPH_STEP_RESULT_MISSING`, `RPH_STEP_RESULT_CONTRADICTORY`) name the *rule*,
+and currently travel inside the message string by explicit design (`enforcement-register.ts:252`, `:373-374`).
+Should a Refusal Disclosure carry the marker as a **structured field** (`kernelMarker`), or continue to rely on
+message interpolation?
+*Options:* (A) structured field on `RphError.details` — the schema already admits
+`details?: Record<string, unknown>` (`errors.ts:57`) — surfaced as `kernelMarker`; (B) promote the markers into
+`RphErrorCodeSchema`, growing the ratified enum from fifteen to twenty-one; (C) status quo — parse or display the
+message.
+*Recommendation:* **(A)**. It gives the Surface a stable, testable discriminator without touching a ratified
+contract, and it is the only option under which `FX-O5-15` (the disclosure changes when the kernel's limb changes)
+can be asserted without string matching. Option (C) forces every Surface that wants to distinguish "binding not
+authorized" from "input missing" to regex an engine message, which is a second copy of the rule in the worst
+possible form.
+*Downstream effect if ruled otherwise:* under (C), `kernelMarker` is deleted from §2.6.2, `technicalDetail`
+becomes the only carrier, and `FX-O5-15` and `FX-O6-03` must be weakened to assert message *containment* rather
+than field equality — which the repository has already found insufficient once
+(`capbind-wp3-input-readiness.test.ts:156` asserts `toContain`, which passes for any message that merely mentions
+the marker).
+
+---
+
+## 2.7 O-7 · State Axis Rendering
+
+INFORMATIVE. O-1 through O-6 govern *what a Surface may show and offer*. O-7 through O-9 govern *what a Surface
+must disclose about what it is showing*. The three disclosure objects are the point at which a projection stops
+being a convenience and becomes an epistemic instrument: O-7 keeps independent state independent, O-8 keeps the
+system's own doubt visible, and O-9 keeps the professional's place in the work addressable. Each is specified
+below at the closure grain the commission requires (closure matrix, then every field).
+
+### 2.7.1 Closure matrix — O-7
+
+| Dimension | Content |
+|---|---|
+| **Identity & unique identification** | An `AxisRendering` is identified by the triple `(surfaceId, subjectId, axis)`; the four renderings for one subject on one Surface form an `AxisRenderingGroup` identified by `(surfaceId, subjectId)`. Identity is **derivational, not persisted**: it is recomputed on every projection build and is never a write target (DOC-003 PER-7, `JPWB-DOC-003:359`). Two renderings with the same triple and the same `asOf` are the same rendering. |
+| **Definition** | The display contract governing how the four orthogonal PWU state axes — **work lifecycle**, **execution state**, **assurance state**, **shape-integrity state** — are presented on a Surface so that each remains separately readable. The axis set is fixed by DOC-003 §6 (`JPWB-DOC-003:171`: "Every PWU carries four orthogonal state axes… At birth the axes initialize independently (proposed; not planned; unassessed; unknown)"). [CONFIRMED] |
+| **Exclusion (what it is NOT)** | It is **not** the state values (DOC-003 §6 owns those and the closed transition tables are repository shapes, `JPWB-DOC-003:171`). It is **not** a status field, a progress bar, or a boolean — STA-1 names those three as the prohibited collapses (`JPWB-DOC-003:175`). It is **not** a colour scheme: hue, palette, and typography are design-system concerns this SPEC does not govern (spine, *DOES NOT GOVERN*), and RIWS §30.1 already forbids colour as a sole carrier (`RIWS:1626`). It is **not** a rollup: a rollup is a *different* derived object, legal only under STA-1's NON-EXAMPLE and only when labelled as one (`JPWB-DOC-003:177`; CON-000 AX-4, `JPWB-CON-000:77`, "it does not forbid roll-up displays that are labeled as roll-ups"). It is **not** the transition guard set (DOC-003 STA-4). |
+| **Purpose** | To make the single inequality the harness exists to defend — execution ≠ assurance (CON-000 AX-1, `JPWB-CON-000:71`; DOC-003 STA-2, `JPWB-DOC-003:179`) — *visible at the point of reading*. A model that separates the axes internally and a Surface that fuses them into one badge produce the same professional outcome as no separation at all. |
+| **Authority** | **Create/derive:** the projection layer only; no human or agent authors an `AxisRendering`. **Alter:** nobody — a rendering changes only by rebuilding from a later event high-water mark. **Approve/waive:** *no authority exists to waive an axis from a rendering.* This is the one authority row in this SPEC that is deliberately empty at every cell: STA-1 admits no proportionality exemption, and no PWA profile, risk classification, or surface-density argument may suppress an axis. **Supersede:** the axis membership itself is canon-governed — adding or removing an axis is a change to JPWB-DOC-003 through the DOC-004 divergence protocol, never a Surface decision. |
+| **Inputs / preconditions** | `PwuAxesView` (`packages/rph-projections/src/graph-view.ts:12-18`, the four `readonly string` axis fields) [CONFIRMED]; `openObservationCounts: Readonly<Record<string, number>>` (`graph-view.ts:28-30`) [CONFIRMED]; `baselined: boolean` (`graph-view.ts:31-32`) [CONFIRMED]; the projection's `asOf` high-water mark (O-1). Precondition: the Projection is bound to a Projection Scope containing the subject (INV-02). |
+| **Outputs / postconditions** | Exactly four `AxisRendering` records per rendered subject, plus at most one `QualifiedSuccessRendering`. **Postcondition (the readability test):** for each of the four axes, a reader can name the axis and read its current value without inferring either from position, colour, ordering, or absence (CON-000 AX-6, `JPWB-CON-000:81`). |
+| **Relationships (typed)** | `RENDERS` (AxisRendering → PWU instance); `DERIVED_FROM` (AxisRenderingGroup → Projection, O-1); `BOUNDED_BY` (→ Projection Scope, O-3); `QUALIFIED_BY` (→ Epistemic Disclosure, O-8 — used when the underlying projection is stale, partial, or the axis value is itself contested). Relations are typed and directed per DOC-003 REL-1 (`JPWB-DOC-003:153`); an axis rendering is never inferred from graph position. |
+| **States** | `RENDERED` (a value from the axis's enumeration is displayed) · `RENDERED_UNKNOWN` (the projection supplies no value; the rendering displays an explicit unknown token) · `UNAVAILABLE_SCOPED` (the value is withheld by authorization filtering and says so, per PER-7's partiality-disclosure clause, `JPWB-DOC-003:361`) · `UNAVAILABLE_STALE` (the projection cannot vouch for the value; O-8 staleness disclosure is attached). |
+| **Lifecycle** | created (projection build) → revised (rebuild at a later high-water mark) → retired (Surface teardown). Never *satisfied* and never *invalidated*: a rendering carries no claim of its own. Disposability is its durability guarantee (PER-7, `JPWB-DOC-003:359`). |
+| **Illegal states and transitions (enumerated)** | **IL-7.1** Rendering any axis of a subject while omitting another — the group is four or none. **IL-7.2** One label carrying two axis values (e.g. a single "Pending" chip standing for lifecycle *and* assurance; RIWS §9.2 names `Pending`/`In Progress`/`Open` as the prohibited collapse tokens, `RIWS:400-408`). **IL-7.3** Colour, position, or ordering as the sole carrier of an axis value (RIWS §31.3, `RIWS:1676`). **IL-7.4** A displayed value outside that axis's enumeration. **IL-7.5** Success treatment applied while `qualifiedSuccess` is false. **IL-7.6** An unqualified "complete"/"done"/"✓" while any axis is unresolved (STA-1 NON-EXAMPLE, `JPWB-DOC-003:177`). **IL-7.7** A progress bar, percentage, or score computed over the union of the axes. **IL-7.8** `RENDERED` entered with a value the projection did not supply — i.e. an axis value computed client-side. **IL-7.9** An axis omitted *because* it still holds its birth value (`NOT_PLANNED`, `UNASSESSED`, `UNKNOWN`); AX-6 forbids meaning inferred from absence (`JPWB-CON-000:81`). **IL-7.10** `RENDERED_UNKNOWN` displayed with the same treatment as a real value. |
+| **Invariants** | Master: `SPEC-001-INV-05`. Also binding: `-INV-11` (no execution progress implying assurance), `-INV-09` (a stale rendering identifies itself), `-INV-07` (an axis in the DOM but off-screen is not rendered). |
+| **Versioning** | **Meaning changes:** adding, removing, or renaming an axis; changing an axis's value enumeration; changing which combination earns the qualified-success treatment; changing the blocking-severity set that gates it (`work-projection.ts:10`, `BLOCKING_SEVERITIES = new Set(['BLOCKING','CRITICAL'])`) [CONFIRMED]. Each requires a DOC-003 divergence entry. **Presentation-only changes:** the channel (icon vs. text vs. both), ordering within the group, layout, and copy — free, provided IL-7.1…IL-7.10 continue to hold. |
+| **Provenance** | Every `AxisRenderingGroup` carries the projector `name` and `handlerVersion` it was built by (`packages/rph-projections/src/work-projection.ts:168-171` — `name: 'work'`, `handlerVersion: 1`) [CONFIRMED] and the event high-water mark. This is what lets a disputed axis value be re-derived rather than argued about. |
+| **Evidence & assurance hooks** | `qualifiedSuccess` limb 2 ("no blocking finding remains") is computed from folded `AssuranceObservationRecorded` events (`work-projection.ts:114-136`) [CONFIRMED]. An open `BLOCKING`/`CRITICAL` observation therefore *demotes* the rendering — an assurance fact reaching the display without passing through a status field. |
+| **Failure modes** | **F-7.1 Axis collapse** — the axes fused into one chip. **F-7.2 The silent fourth axis** — three axes rendered, the fourth dropped at a mapping boundary. [CONFIRMED incumbent: see §2.7.3.] **F-7.3 False green** — success treatment without limb 2. **F-7.4 Stale axis as current** — the value is real but the projection is behind. **F-7.5 Colour-only** — the axes technically distinct but distinguishable only by hue. **F-7.6 Enumeration drift** — the Surface holds its own copy of the value list and renders an unrecognized value as blank. |
+| **Recovery** | *Reconcile:* rebuild the projection and re-render (the only recovery for F-7.4). *Reshape:* restore the dropped axis at the mapping boundary (F-7.2). *Retry:* not applicable — rendering has no external effect to retry; marked N/A **with reason**: an `AxisRendering` performs no side effect, so there is nothing to re-attempt. *Escalate:* a Surface that cannot accommodate four axes SHALL declare itself non-conforming for that subject and render nothing rather than render three — the failure is reported, not absorbed (CON-000 AX-8, `JPWB-CON-000:85`, "inconclusive is never pass"). |
+| **Concurrency** | Renderings are read-only and carry no write path, so simultaneous *revision* cannot occur. Simultaneous *rebuilds* are resolved last-writer-wins **on the display only**; because the display is not authoritative (AX-5, `JPWB-CON-000:79`), this cannot corrupt state. The group SHALL carry `asOf` so a professional comparing two windows can tell which is behind. |
+| **Idempotency** | Rebuilding from the same event high-water mark SHALL produce an identical `AxisRenderingGroup` — same four axes, same values, same `qualifiedSuccess`. Verified by property fixture `SPEC-001-FX-07-06` (§10) over generated event prefixes with recorded seeds; a fold that is order-sensitive fails it. |
+| **Security / permission boundaries** | Axis values MAY be withheld by authorization scoping. When withheld, the rendering enters `UNAVAILABLE_SCOPED` and discloses partiality; it SHALL NOT display a default, a blank, or the birth value in place of a withheld value, and SHALL NOT leak protected existence through counts or placeholders (PER-7 SCOPE, `JPWB-DOC-003:361`). |
+| **Observability** | The surface trace SHALL record, per rendered group: `subjectId`, the four `(axis, stateValue, renderState)` triples, `qualifiedSuccess`, the three limb booleans, and `asOf`. This is the record that lets "the UI showed me green" be adjudicated after the fact rather than re-enacted. |
+| **Persistence semantics** | None. Derived, disposable, rebuildable (PER-7). An `AxisRendering` written to a table is itself a defect — it would create the dual truth AX-5 forbids. |
+| **Migration / legacy relation** | The legacy label **INV-5** for execution≠assurance is retired with the source corpus; **STA-2 is its successor** (`JPWB-DOC-003:51`) [CONFIRMED]. The incumbent code and its tests still say `INV-5` in prose (`toFlow.ts:41-43`; `graph-view.ts:49`; `pwu-lifecycle.e2e.ts:4`) — permitted residual use in legacy code (DOC-002 §8 residual-use clause, `JPWB-DOC-002:251`), but new spec text, new contracts, and new UI labels SHALL cite STA-2. |
+| **UX / inspection surface** | Each axis value SHALL be selectable, and selecting it SHALL explain what the state means, why the object is in it, what must be satisfied to leave it, who holds authority to act, and what is blocking advancement (RIWS §9.3, `RIWS:410-418`). The explanation is O-7's inspection surface; without it the axes are legible but not intelligible. |
+| **Verifying tests** | Existing [CONFIRMED]: `packages/rph-projections/src/graph-view.test.ts:15` "exposes the four state axes + the pwuKind/label/baselined fields"; `graph-view.test.ts:35` "no green without assurance (INV-5 / P1): qualifiedSuccess ONLY when execution SUCCEEDED AND assurance SATISFIED"; `apps/rph-demo/e2e/pwu-lifecycle.e2e.ts:17` "a PWU only becomes SATISFIED after its assurance is SATISFIED". Authored by this SPEC: `SPEC-001-FX-07-01`…`-08` (§10), where `-06` is the property-based idempotency fixture and `-08` verifies the RIWS §9.3 explanation ref. |
+| **Definition of done** | Every Surface presenting a PWU exposes all four axes, each independently assertable by a stable test id `axis-{axis}-{subjectId}`; a mutation that deletes any one axis from the render path reddens a named test (the mutation red-proof obligation, §10); the axis explanation of RIWS §9.3 is reachable for each; and no success treatment appears anywhere `qualifiedSuccess` is false. |
+
+### 2.7.2 Rendering contract — normative
+
+**O-7-R1 (SHALL).** A Surface presenting any state axis of a PWU SHALL present all four axes named at DOC-003 §6
+(`JPWB-DOC-003:171`), each with an explicit axis label and an explicit value. *Verification:* fixture
+`SPEC-001-FX-07-01` asserts four elements matching `[data-testid^="axis-"]` for each rendered subject and fails
+when the count is three; the mutation red-proof is the deletion of any one axis binding.
+
+**O-7-R2 (SHALL NOT).** A Surface SHALL NOT summarize the four axes into one status value, one progress
+indicator, or one boolean — restating DOC-003 STA-1 in full at the UX boundary, master `JPWB-DOC-003:175`:
+"Execution, assurance, shape integrity, and work lifecycle are independent axes, never summarized into one status
+field, one progress bar, or one boolean." *Verification:* negative fixture `SPEC-001-FX-07-02` renders a subject
+whose axes disagree (`workLifecycleState=UNDER_ASSURANCE`, `executionState=SUCCEEDED`,
+`assuranceState=UNASSESSED`, `shapeIntegrityState=UNKNOWN`) and asserts that no single rendered token is present
+whose text is a member of the collapse-token set `{Pending, In Progress, Open, Done, Complete, ✓}` at group
+level (RIWS §9.2's enumerated prohibited tokens, `RIWS:400-408`, extended by this SPEC to the completion tokens
+STA-1's NON-EXAMPLE names, `JPWB-DOC-003:177`).
+
+**O-7-R3 (SHALL).** A derived rollup over the axes MAY be rendered, and when rendered SHALL be labelled as a
+rollup, SHALL NOT be writable, and SHALL NOT display an unqualified "complete" while any axis is unresolved
+(STA-1 NON-EXAMPLE, `JPWB-DOC-003:177`; CON-000 AX-4, `JPWB-CON-000:77`). *Verification:* `SPEC-001-FX-07-03`
+asserts the rollup element carries `data-rollup="true"` and an accessible name containing the word "rollup", and
+that the completion tokens are absent while any axis of any member is unresolved. The incumbent Overview rollup
+(`apps/rph-demo/src/routes/undertakings/[id]/+page.svelte:152-157`) counts `workLifecycleState` only and is
+labelled "lifecycle rollup" — [CONFIRMED] conforming on the labelling limb, because it names its axis.
+
+**O-7-R4 (SHALL NOT).** No axis SHALL be conveyed by colour, position, or ordering alone; each SHALL carry a
+text or text-equivalent channel (RIWS §30.1 `RIWS:1626`; §31.3 `RIWS:1676`; CPM PROJ-INV-010's semantic-continuity
+requirement across surfaces, `CPM:387`). *Verification:* `SPEC-001-FX-07-04` reads each axis element's accessible
+name and asserts the axis value string is present in it with all CSS colour declarations stripped.
+
+**O-7-R5 (SHALL).** Success treatment SHALL be applied only where the qualified-success rule holds on all limbs
+it implements, and the limbs SHALL be individually inspectable. The rule as the repository implements it
+(`packages/rph-projections/src/work-projection.ts:38-49`) [CONFIRMED] is: `executionState === 'SUCCEEDED'`
+**and** `assuranceState === 'SATISFIED'` **and** no open observation of severity `BLOCKING` or `CRITICAL`
+(`work-projection.ts:10,14`). Its source is the pre-canon Assurance Policy Catalog §38 (`docs/Recursive
+Professional Harness/Janumi Professional Workbench Product Realization PWA - Assurance Policy Catalog and
+Validator Contract.md:2068-2072`): "A green node may be displayed only when: required assurance is satisfied; no
+blocking finding remains; required conditions are explicit." *Verification:* `SPEC-001-FX-07-05` drives each limb
+to false independently and asserts success treatment is withheld each time.
+
+> **Absence check, stated rather than assumed.** I searched `docs/canon/*.md` for the string `green node`: **zero
+> occurrences**. The rule the code cites as "DOC-004 §38" is the *legacy* RPH Assurance Policy Catalog §38, not
+> the canon `JPWB-DOC-004 Agent Operating Protocol`. The canon successor for its meaning is DOC-003 STA-1 +
+> STA-2. New citations SHALL name STA-1/STA-2; the §38 text is quoted above as the historical source of the
+> three-limb formulation, which the canon does not restate limb-by-limb. This is a citation defect in the
+> incumbent comments, not a semantic one. [CONFIRMED — search performed over the six canon artifacts plus the
+> Ratify Sheet and Conferral Sheet; no `head` truncation.]
+
+**O-7-R6 (SHALL).** The third limb — "required conditions are explicit" — is **not** implemented, and its absence
+is declared rather than concealed: `work-projection.ts:33-36` states that it governs the
+`CONDITIONALLY_SATISFIED` case and was left out because "deciding what 'explicit' means… is a modelling judgement
+and not mine to invent" [CONFIRMED]. A Surface SHALL NOT present `CONDITIONALLY_SATISFIED` assurance with success
+treatment on the strength of the two implemented limbs. *Verification:* `SPEC-001-FX-07-07` sets
+`assuranceState='CONDITIONALLY_SATISFIED'` with execution `SUCCEEDED` and asserts no success treatment; this is
+also the negative fixture for the adversarial shortcut "treat CONDITIONALLY_SATISFIED as SATISFIED because the
+enum sorts adjacent" (§7).
+
+**O-7-R7 (SHOULD).** Icons SHOULD distinguish lifecycle, validity, confidence, uncertainty, contradiction,
+reconciliation, AI origin, and human approval as separate glyph families (RIWS §30.2, `RIWS:1628-1639`).
+Divergence is justified where a Surface uses text-only rendering, since R4 is satisfied by text alone.
+
+**O-7-R8 (MAY).** A Surface MAY collapse the axis group behind progressive disclosure on small viewports — but
+critical conditions SHALL remain visible even when the containing panel is collapsed (RIWS §10.3,
+`RIWS:454-467`, which enumerates invalidated critical assumption, mandatory validation failure, unresolved
+contradiction, mandatory constraint violation, stale authoritative data, and pending reconciliation as requiring
+persistent visible indicators). This is the boundary at which O-7 hands off to O-8.
+
+### 2.7.3 The incumbent instance of this discipline, and the incumbent breach
+
+[CONFIRMED — read, not inferred.] The built application already carries a real, load-bearing instance of the
+no-green-without-assurance discipline, at four distinct layers:
+
+1. **The projection layer** computes it. `packages/rph-projections/src/work-projection.ts:38-49`
+   (`isQualifiedSuccess`) and `graph-view.ts:72-76` (`pwuGraphNode` sets `qualifiedSuccess` from it).
+2. **The styling layer** consumes it and nothing else. `apps/rph-demo/src/lib/toFlow.ts:41-65`:
+   "State-driven colour: green ONLY when qualified (execution SUCCEEDED + assurance SATISFIED); amber when
+   execution succeeded but assurance is not yet satisfied (the visible exec≠assurance gap)". The amber band is
+   the discipline made visual — the gap between the axes is given its own colour rather than being rounded to
+   one side.
+3. **The command layer** refuses the promotion. `apps/rph-demo/src/routes/undertakings/[id]/+page.server.ts:892`
+   ("Promote to SATISFIED (green). Allowed ONLY because assuranceState is SATISFIED") and `:900`, which returns
+   the literal user-facing string `` `No green without assurance: ${err}` ``.
+4. **The edge-tone layer** refuses to borrow the treatment.
+   `apps/rph-demo/src/routes/undertakings/[id]/+page.svelte:84-87`: a `SATISFIED` transition edge maps to
+   `active`, **not** `positive`, because "the success green in this app is reserved for QUALIFIED success…
+   An edge being taken is a pure execution fact, so painting it green would read as assurance". That is the
+   discipline applied to a case nobody would have caught — which is the mark of a real one rather than a
+   decorated one.
+
+**And the same surface breaches O-7-R1.** The fourth axis, shape integrity, is computed and then dropped:
+
+- It exists in the projection contract: `packages/rph-projections/src/graph-view.ts:17`
+  (`readonly shapeIntegrityState: string`) and is folded by `pwu-replay.ts:81-112`.
+- It survives into the server route's command helper:
+  `apps/rph-demo/src/routes/undertakings/[id]/+page.server.ts:461,473` — `chg()` sends
+  `shapeIntegrityState` in every `ChangePwuState` payload.
+- It is **dropped at the projection→client boundary**: `mapPwuRow`
+  (`+page.server.ts:62-82`) returns `workLifecycleState`, `executionState`, `assuranceState` — and no
+  shape-integrity field. The client is never given the value.
+- It is consequently **absent from every rendering**. `toFlow.ts:67-71` (`labelFor`) emits
+  `work: … / exec: … · assure: …` — three axes. The Overview table headers
+  (`+page.svelte:185-192`) are `PWU Instance | Work state | Execution | Assurance | PWU Type | Lifecycle
+  actions` — three axes. A grep for `shapeIntegrityState` across the entire 1,128-line
+  `undertakings/[id]/+page.svelte` returns **zero matches**; across all eleven `.svelte` files under
+  `apps/rph-demo/src` it appears only twice, both as *explanatory prose about the axis in the PWA Designer*
+  (`apps/rph-demo/src/routes/pwa/[id]/+page.svelte:1745` and
+  `apps/rph-demo/src/lib/behavior/PwuBehaviorPanel.svelte:35`, both saying the axes "remain independent and are
+  not simulated"). [CONFIRMED — searched case-insensitively for `shapeintegrity`, `shape.integrity`, and
+  `shape_integrity` across `apps/rph-demo/**/*.ts` and `**/*.svelte`; the only other hits are the generated
+  `.svelte-kit/types` proxy and `e2e/execution-plan.e2e.ts:426`.]
+
+This is failure mode **F-7.2**, and it is exactly the failure a spec must make countable: the axis is not
+disputed, not deferred, and not argued about — it is simply not on the screen, and nothing reports that. Under
+O-7-R1 with fixture `SPEC-001-FX-07-01` it becomes a named, reportable violation on the next run.
+
+### 2.7.4 Field contracts — `AxisRendering`
+
+| Field | Type | Optionality | Default | Semantics | Validation rule | Who may write |
+|---|---|---|---|---|---|---|
+| `surfaceId` | `string` (Surface id, O-2) | required | none | The Surface this rendering appears on. | SHALL resolve to a declared Surface; a rendering on an undeclared Surface is unaddressable and fails INV-10's precondition. | Projection layer (derivation) |
+| `subjectId` | `string` (PWU instance id) | required | none | The PWU whose axis is rendered. | SHALL be inside the Projection Scope (INV-02); a subject outside scope is a scope violation, not a rendering choice. | Projection layer |
+| `axis` | `enum {WORK_LIFECYCLE, EXECUTION, ASSURANCE, SHAPE_INTEGRITY}` | required | none | Which of the four DOC-003 §6 axes this rendering carries. | Closed set of exactly four. A fifth member is a DOC-003 change via the divergence protocol, never a Surface addition. | Canon (membership); projection layer (per-instance) |
+| `axisLabel` | `string` | required | derived from `axis` | The human-readable axis name shown to the professional. | SHALL be non-empty and SHALL differ across the four members of a group; two axes sharing a label is IL-7.2. | Surface author (copy) |
+| `stateValue` | `string` | required when `renderState=RENDERED` | none | The current value on that axis. | SHALL be a member of that axis's repository enumeration; an unrecognized value SHALL enter `RENDERED_UNKNOWN` with the raw value disclosed, never a blank (F-7.6). | Projection layer only — never computed client-side (IL-7.8) |
+| `renderState` | `enum {RENDERED, RENDERED_UNKNOWN, UNAVAILABLE_SCOPED, UNAVAILABLE_STALE}` | required | `RENDERED` | Why the value is or is not shown. | SHALL be `RENDERED_UNKNOWN` (not omitted) when the projection supplies no value — AX-6 forbids meaning inferred from a missing value (`JPWB-CON-000:81`). | Projection layer |
+| `unknownToken` | `string` | required when `renderState≠RENDERED` | `"unknown"` | The explicit token displayed in place of a value. | SHALL be visually and textually distinguishable from every member of the axis enumeration; SHALL NOT be the empty string, `"—"` alone, or a birth value. | Surface author (copy), constrained |
+| `explanationRef` | `string` (URI or command ref) | required | none | The RIWS §9.3 state explanation entry point. | SHALL resolve to content answering all five §9.3 questions (`RIWS:412-418`); a dead or empty ref makes the axis legible but unintelligible and fails `SPEC-001-FX-07-08`. | Surface author |
+| `derivedFrom` | `string` (projector name + handlerVersion) | required | none | Provenance of the value. | SHALL name a registered projector; `'work'`/`1` in the incumbent (`work-projection.ts:168-171`). | Projection layer |
+| `asOf` | `integer` (event high-water mark) | required | none | The point in the governed stream this value reflects. | SHALL be monotonically non-decreasing across rebuilds of the same group; a decrease means a rollback and SHALL raise `SURF-STALE-002` (§6). | Projection layer |
+| `testId` | `string` | required | `axis-{axis}-{subjectId}` | Stable handle for conformance assertion. | SHALL be present and unique within the Surface; its absence makes O-7-R1 unverifiable, which is itself the defect (B7, `JPWB-CON-000:97`). | Surface author, per this SPEC's convention |
+
+### 2.7.5 Field contracts — `QualifiedSuccessRendering`
+
+| Field | Type | Optionality | Default | Semantics | Validation rule | Who may write |
+|---|---|---|---|---|---|---|
+| `subjectId` | `string` | required | none | The PWU the treatment applies to. | As `AxisRendering.subjectId`. | Projection layer |
+| `qualifiedSuccess` | `boolean` | required | `false` | Whether success treatment is permitted. | SHALL equal the conjunction of the limb fields below; a Surface-local recomputation is IL-7.8 and INV-03's prohibition on an independent copy of an enforced rule. | Projection layer (`isQualifiedSuccess`) |
+| `limbExecutionSucceeded` | `boolean` | required | `false` | Limb 1a: `executionState === 'SUCCEEDED'`. | Derived, never asserted. | Projection layer |
+| `limbAssuranceSatisfied` | `boolean` | required | `false` | Limb 1b: `assuranceState === 'SATISFIED'`. | `CONDITIONALLY_SATISFIED` SHALL NOT set this true (O-7-R6). | Projection layer |
+| `limbNoBlockingFinding` | `boolean` | required | `false` | Limb 2: no open observation of severity `BLOCKING` or `CRITICAL`. | Computed from `openObservationCounts` over `BLOCKING_SEVERITIES` (`work-projection.ts:10,45-47`); a default of `{}` means "not supplied", and a caller that does not supply counts SHALL NOT receive `true` — see the adversarial entry in §7 and the caveat at `graph-view.ts:59-63`. | Projection layer |
+| `limbConditionsExplicit` | `boolean \| null` | required | `null` | Limb 3, deliberately unimplemented (O-7-R6). | `null` SHALL be rendered as "not evaluated", never as `true`. Listed in Deliberately Unspecified (§11). | Nobody — reserved |
+| `openObservationCounts` | `Readonly<Record<string, number>>` | required | `{}` | Open findings by severity, the basis of limb 2. | SHALL be displayed alongside the treatment, not only consumed by it — `graph-view.ts:28-30` states this is "what a surface shows the reviewer instead of a bare colour" [CONFIRMED]. A Surface that consumes the counts and shows only the colour defeats the field's stated purpose. | Projection layer |
+| `baselined` | `boolean` | required | `false` | Whether the PWU is frozen into an authoritative baseline. | SHALL be rendered on a channel distinct from the success treatment — baselined is a Baseline-aggregate fact, not an assurance fact (DOC-003 §4, `JPWB-DOC-003:141`). The incumbent uses a border rather than a fill (`toFlow.ts:61-63`) [CONFIRMED conforming]. | Projection layer |
+
+---
+
+## 2.8 O-8 · Epistemic Disclosure
+
+INFORMATIVE. This object is the most consequential in the specification, because it is the only one whose subject
+is what the system *does not know*. CON-000 AX-3 (`JPWB-CON-000:75`) is unambiguous: "Questions, assumptions,
+contradictions, and residual uncertainty are governed objects that drive work, not annotations on it. Traditional
+software hides uncertainty; JPWB exposes it. Completion with residual uncertainty is legitimate only when the
+residual is documented, assessed, accepted by authority, and **inspectable downstream**." *Inspectable downstream*
+is a surface obligation, and it is the obligation this specification exists to make countable.
+
+### 2.8.1 Closure matrix — O-8
+
+| Dimension | Content |
+|---|---|
+| **Identity & unique identification** | An `EpistemicDisclosure` is identified by `(surfaceId, subjectId, class, governedObjectRef)`. Where a disclosure has no governed object behind it (a derived staleness fact, for instance), `governedObjectRef` is the literal `PROJECTION_DERIVED` and the projector name disambiguates. Derivational, not persisted (PER-7). |
+| **Definition** | The Surface-level obligation to disclose four classes of epistemic qualification attaching to rendered content: **PROVENANCE** (where it came from and who or what produced it), **UNCERTAINTY** (what is not settled about it), **CONTRADICTION** (what conflicts with it), and **STALENESS** (whether the view can still vouch for it). The four are a **closed set** in this specification; a fifth class requires a FORK. |
+| **Exclusion (what it is NOT)** | It is **not** confidence scoring — RIWS §30.4 (`RIWS:1645-1654`) permits ordinal levels, intervals, distributions, and evidence-based assurance categories and forbids false precision; a numeric confidence is one permitted *form*, never the object. It is **not** an issue-severity list: RIWS §13.4 (`RIWS:646`) is explicit — uncertainty "SHALL not be treated merely as an issue severity". It is **not** an error state: a technical failure is `SURF-*` (§6), an epistemic disclosure is a professional fact. It is **not** the authoring of governed uncertainty objects — see FORK-17. It is **not** a validator finding, though a finding may be its basis. |
+| **Purpose** | To prevent the specific laundering AX-3 names: a completion presented as settled because the interface had no place to put the doubt. RIWS UI-INV-007 (`RIWS:2007`) names the exact mechanism — "Material uncertainty SHALL not be hidden **behind generic progress indicators**." O-7 and O-8 are therefore two halves of one defence: O-7 stops the axes collapsing into a progress indicator, O-8 stops the doubt disappearing behind whatever indicator remains. |
+| **Authority** | **Create the underlying governed object:** per DOC-003 and the engine — an `ASSUMPTION` is created by `DetectAssumption` (`packages/rph-engine/src/reference-undertaking.ts:849`) [CONFIRMED]. **Create the disclosure:** the projection layer only; a disclosure is derived from the governed object, never authored on the Surface. **Suppress:** *no authority may suppress a MATERIAL or CRITICAL disclosure from a Surface presenting the work it qualifies.* Materiality may be re-graded only by the authority that governs the underlying object, through its own governed act — never by a display decision. **Waive:** residual uncertainty may be *accepted* by authority (AX-3), and acceptance is itself disclosable: an accepted residual remains visible with its acceptance attached. Acceptance is not erasure — CON-000 V4 (`JPWB-CON-000:63`): "approval never erases provenance." |
+| **Inputs / preconditions** | Governed objects and fields enumerated in §2.8.3; the projection `asOf` and the authoritative high-water mark (for STALENESS); assurance findings and open conditions (for CONTRADICTION, where a finding names one). Precondition: the qualified content is itself rendered — a disclosure without its subject on screen is orphaned and fails INV-07. |
+| **Outputs / postconditions** | Zero or more disclosures attached to rendered content. **Postcondition:** for every governed object of the four classes that is in Projection Scope and graded MATERIAL or above, a disclosure exists on the Surface presenting the work it qualifies, and it is reachable by ordinary interaction (INV-07). |
+| **Relationships (typed)** | `QUALIFIES` (Disclosure → rendered content: an `AxisRendering`, an Affordance, a Claim, a Decision); `DISCLOSES` (Disclosure → governed object); `DERIVED_FROM` (→ Projection); `SUPERSEDED_BY` (→ a later disclosure after re-grading). Endpoint typing follows DOC-003 REL-2 (`JPWB-DOC-003:157`): a disclosure never *supports* a claim — it qualifies a rendering. Conflating the two would let a visible doubt be read as evidence. |
+| **States** | `DISCLOSED_PERSISTENT` (visible regardless of panel collapse) · `DISCLOSED_PROGRESSIVE` (behind disclosure, reachable) · `DISCLOSED_ACCEPTED` (an authority has accepted the residual; still visible, acceptance attached) · `RESOLVED` (the underlying object closed; the disclosure retires but the record of it stands) · `WITHHELD_SCOPED` (authorization filtering; partiality disclosed per PER-7). |
+| **Lifecycle** | created (governed object enters scope) → revised (re-graded, or its basis changes) → accepted (authority accepts the residual — AX-3's fourth condition) → resolved/retired (object closed). A disclosure is never *deleted*: PER-8 (`JPWB-DOC-003:363`) forbids hard delete after participation, and a disclosure that informed a professional's decision has participated. |
+| **Illegal states and transitions (enumerated)** | **IL-8.1** A MATERIAL-or-above governed uncertainty object in Projection Scope with no disclosure on the Surface presenting its work. **IL-8.2** `DISCLOSED_PROGRESSIVE` for a CRITICAL-graded disclosure (RIWS §10.3, `RIWS:456`: "Critical conditions SHALL not be hidden solely because a panel is collapsed"). **IL-8.3** `RESOLVED` entered without the underlying object having closed — i.e. the disclosure dismissed rather than answered. **IL-8.4** A contradiction rendered such that one side is implied to be automatically wrong (RIWS §30.5, `RIWS:1658`). **IL-8.5** Uncertainty rendered as an issue severity and nothing else (`RIWS:646`). **IL-8.6** A stale projection rendered without a staleness disclosure (INV-09). **IL-8.7** A provenance field displayed that no read path populates from a real source — the "theatrical `sourceSection`" failure DOC-003 OBJ-7 names by example (`JPWB-DOC-003:130`). **IL-8.8** Acceptance of a residual rendered as the residual's disappearance. **IL-8.9** A confidence number displayed to a precision the basis does not support (`RIWS:1647`). **IL-8.10** AI-produced content rendered without attribution after review or acceptance (`JPWB-CON-000:63`; CPM PROJ-INV-008, `CPM:379`). |
+| **Invariants** | Master: `SPEC-001-INV-06` (uncertainty) and `SPEC-001-INV-12` (provenance). Also binding: `-INV-09` (staleness), `-INV-07` (reachability — a disclosure that cannot be scrolled to is not disclosed), `-INV-02` (a disclosure about an out-of-scope object is a scope leak). |
+| **Versioning** | **Meaning changes:** the class set (four members); the materiality grading vocabulary; which grades oblige `DISCLOSED_PERSISTENT`; what counts as stale. **Presentation-only:** placement, iconography, wording, and whether a MATERIAL disclosure sits in a panel or a rail — provided IL-8.1…IL-8.10 hold. |
+| **Provenance** | Recursive and required: a disclosure carries the id of the governed object it discloses, that object's own provenance (`originType`, `sourceObjectIds`, `sourceEventIds` — the shape the incumbent floor checks at `apps/rph-demo/src/lib/server/floor.ts:226-236`) [CONFIRMED], and the projector that derived it. A disclosure without provenance is exactly the unfalsifiable annotation AX-3 exists to abolish. |
+| **Evidence & assurance hooks** | The de minimis floor's step 2 — "identity, semantic-version, provenance, authority, and trace completeness checks" (DOC-003 ASR-3, `JPWB-DOC-003:249`) — computes the provenance facts a PROVENANCE disclosure renders. Its incumbent implementation *derives* rather than asserts them, and its own test file records why: `apps/rph-demo/src/lib/server/floor.test.ts:3` — a subject with "no id, no version, no provenance, or an identified producer must fail its mandatory criterion"; `floor.test.ts:29` — "a PWA with NO provenance fails IP-03 (**was a literal `true` — could never fail**)". [CONFIRMED] That prior defect is the canonical shape of IL-8.7. |
+| **Failure modes** | **F-8.1 The invisible governed object** — the object exists, is governed, and has no interface. **F-8.2 Machine-only disclosure** — the uncertainty is collected and shown to a validator, not to a professional. **F-8.3 Provenance theatre** — a populated-by-convention field. **F-8.4 Severity substitution** — uncertainty rendered as a bug priority. **F-8.5 Silent staleness** — the view is behind and says nothing. **F-8.6 Dismissal as resolution.** **F-8.7 Collapse concealment** — a CRITICAL disclosure inside a collapsed panel. |
+| **Recovery** | *Reconcile:* rebuild and re-derive (F-8.5). *Reshape:* build the missing surface (F-8.1, F-8.2). *Retry:* N/A **with reason** — disclosure performs no external effect; there is nothing to re-attempt. *Escalate:* where a disclosure cannot be rendered (no surface exists for its class), the Surface SHALL raise `SURF-DISC-001` (§6) and report itself non-conforming rather than render the qualified content unqualified — AX-8's fail-closed rule (`JPWB-CON-000:85`) applies directly: rendering the work without its doubt is the "silently filled" outcome AX-8 forbids. |
+| **Concurrency** | A disclosure's underlying object may be re-graded concurrently with rendering. The Surface SHALL render the grade its `asOf` supports and disclose `asOf`; it SHALL NOT resolve the race by choosing the lower grade. RIWS §27.3 (`RIWS:1544`) forbids silent last-write-wins over material professional state, and a materiality re-grade is material. |
+| **Idempotency** | Re-deriving from the same high-water mark SHALL produce the same disclosure set. Duplicate disclosures for one `(subjectId, class, governedObjectRef)` SHALL be coalesced, not stacked — a doubled warning reads as two doubts and inflates the epistemic picture as surely as a suppressed one deflates it. |
+| **Security / permission boundaries** | A disclosure MAY be scope-filtered. When filtered it enters `WITHHELD_SCOPED` and discloses that a qualification exists but is not visible to this Participant — PER-7 (`JPWB-DOC-003:361`) permits the partiality disclosure and forbids leaking protected existence through counts or placeholders. Withholding the *existence* of doubt without saying so re-creates F-8.1 by another route. |
+| **Observability** | The surface trace SHALL record every disclosure rendered, its class, grade, render state, and whether it was `DISCLOSED_PERSISTENT` or behind progressive disclosure. Without this, "it was on the screen" is unfalsifiable — and the whole class of INV-07 defects is precisely the class where content is nominally present and practically absent. |
+| **Persistence semantics** | The disclosure: none (derived). The underlying governed objects: per DOC-003 and the repository; an `ASSUMPTION` is a first-class aggregate with seven contracted events (`packages/rph-contracts/src/messages.ts:2163-2172`: `AssumptionAccepted`, `AssumptionDetected`, `AssumptionDisclosed`, `AssumptionExpired`, `AssumptionFalsified`, one further entry at `:2168-2171`, `AssumptionVerified`) [CONFIRMED]. |
+| **Migration / legacy relation** | RIWS §13.2's Understanding-Workspace layout (`RIWS:611-621`) enumerates seven regions — Open Questions, Material Uncertainties, Current Claims, Critical Assumptions, Constraints, Confidence Distribution, Contradictions. That layout is the *reference* target; nothing in the repository implements it. This SPEC does not require that layout; it requires the disclosure obligation, which the layout is one way to discharge. |
+| **UX / inspection surface** | Per class: PROVENANCE — RIWS §28.1/§28.2 (`RIWS:1550-1572`); UNCERTAINTY — RIWS §13.4 prioritization by outcome impact, decision impact, reducibility, urgency, dependency centrality (`RIWS:638-644`) and §13.5 assumption presentation (`RIWS:650-656`); CONTRADICTION — RIWS §30.5 (`RIWS:1656-1658`); STALENESS — RIWS §27.1 (`RIWS:1524-1531`) and §26.3 partial-data disclosure (`RIWS:1498-1505`). |
+| **Verifying tests** | Existing [CONFIRMED]: `apps/rph-demo/src/lib/server/floor.test.ts:20-45` (`identityProvenanceFactsOf` — §8.4 step 2 CHECKS the subject, never asserts it) is the only repository check in this object's territory, and it is server-side. **No surface-level check exists for any of the four classes** — see §2.8.2. Authored by this SPEC: `SPEC-001-FX-08-01`…`-10` (§10). |
+| **Definition of done** | Each of the four classes has at least one rendering surface with a stable test id; a governed object of that class in scope and graded MATERIAL-or-above produces a visible disclosure; a mutation that removes the disclosure reddens a named test; and the absence of any surface for a class is itself reported by a named check rather than passing silently. |
+
+### 2.8.2 The absence, verified — and stated as what it is
+
+The commissioning brief asserts that the governed objects `ASSUMPTION`, `QUESTION`, `CONTRADICTION`, and
+`UNCERTAINTY` "exist in vocab and engine" with zero UI. I verified all four independently rather than accepting
+the framing, and the finding is **stronger on one limb and weaker on another**. Recording it accurately is
+required: this repository has a documented, seven-times-repeated failure of writing "I did not find it" as "it
+does not exist", and the mirror failure — accepting an alarming absence claim without checking it — is the same
+error with the sign flipped.
+
+**What I searched.** Case-insensitive, whole-tree, no `head` truncation:
+`grep -rniE "assumption|question|contradict|uncertaint"` over `apps/rph-demo/src/` (all files); the same pattern
+restricted to `--include=*.svelte` over `apps/`; `grep -rniE "'ASSUMPTION'|'QUESTION'|'CONTRADICTION'|'UNCERTAINTY'"`
+(and double-quoted forms) over `packages/`; plus the full enumeration file
+`packages/rph-contracts/schemas/enums/ProfessionalWorkObjectType.json`.
+
+**Finding 1 — the UI absence is CONFIRMED and total.** The `--include=*.svelte` search over all of `apps/`
+returned **exit code 1, zero matches**, across the eleven Svelte files that constitute the entire client surface
+(`PwuTypeCard`, `ThemeToggle`, `WalkthroughPanel`, `behavior/PwuBehaviorPanel`, `+layout`, `+page`,
+`baselines/+page`, `decisions/+page`, `pwa/[id]/+page`, `undertakings/+page`, `undertakings/[id]/+page`). Not one
+of the four nouns appears anywhere in the rendered surface, in any case, in any form. There is no Understanding
+workspace, no assumption list, no uncertainty indicator, no contradiction panel. [CONFIRMED]
+
+**Finding 2 — the object catalog is narrower than the brief states, and this changes the obligation.**
+`ProfessionalWorkObjectType` (`packages/rph-contracts/schemas/enums/ProfessionalWorkObjectType.json`) has 22
+members. `ASSUMPTION` is one of them. `QUESTION`, `CONTRADICTION`, and `UNCERTAINTY` **are not object types at
+all**. What exists for each is:
+
+| Noun | What actually exists | Citation | Status |
+|---|---|---|---|
+| `ASSUMPTION` | A first-class governed object type with a dedicated aggregate, an id prefix (`objects.ts:785`), seven contracted events, a typed `ASSUMES` relation (`packages/rph-domain/src/traceability.ts:46`), an engine command in the reference Undertaking, and a runtime execution guard (`packages/rph-application/src/handlers/execution.ts:336` gates on `objectType !== 'ASSUMPTION'`). Materiality is graded `IMMATERIAL \| MATERIAL \| CRITICAL` and "no material assumption may remain embedded only in model prose" (`packages/rph-domain/vocab/m9-decomposition.json:142`). | as cited | **Governed object. Zero UI.** [CONFIRMED] |
+| `UNCERTAINTY` | Not an object type. Two live forms: (a) `ProfessionalWorkUnit.riskProfile.uncertainty`, an enum `LOW\|MEDIUM\|HIGH\|CRITICAL` that is **required on every PWU** (`packages/rph-contracts/schemas/objects/ProfessionalWorkUnit.json:436-444`, listed at `:475` in `required`; `src/objects.ts:377`); (b) `residualUncertainty: string[]` on the professional rationale summary. It is also a `RiskDimension` enum member (`schemas/enums/RiskDimension.json:6`). | as cited | **Required field, read by no projection.** See Finding 3. [CONFIRMED] |
+| `CONTRADICTION` | Not an object type. Present as: `RecompositionContract.detectedConflicts` — "a contradiction discovered while aggregating child outputs… a non-empty list forces CONFLICTED even if every child is individually SATISFIED" (`packages/rph-contracts/vocab/m1-object-fields.json:2271`); the assurance finding code `CONSTRAINT_CONTRADICTION` (`packages/rph-product-realization-pwa/src/ontology.data.ts:1434,1479`); and the reasoning-review criterion `RR-07-no-contradiction` (`packages/rph-assurance/src/validators.ts:172-173`). | as cited | **Real semantics, no object, no UI.** [CONFIRMED] |
+| `QUESTION` | Not an object type. The nearest live shape is the event `ClarificationRequested` with payload `{pwuId, question}` (`packages/rph-contracts/vocab/m3-commands-events.json:3810-3824`) — and that entry's own `sourceSection` reads "**UNRATIFIED-AUTHORED**… Do NOT treat this sourceSection as proof the shape is ratified. Ratification pending." | as cited | **Unratified shape, no object, no UI.** [CONFIRMED] |
+
+**Finding 3 — the two sharpest instances, both of which a fixture can catch today.**
+
+*(a) A required field nothing reads.* `PWU.riskProfile.uncertainty` is mandatory on every Professional Work Unit.
+I searched `packages/rph-projections/src/` and `packages/rph-engine/src/` for `uncertainty`: **one hit**,
+`packages/rph-engine/src/reference-undertaking.ts:367` — the seed writing `uncertainty: 'MEDIUM'`. No projection
+reads it. No Surface renders it. Every PWU in the system is obliged to declare how uncertain it is, and that
+declaration reaches no reader. This is precisely DOC-003 OBJ-7 (`JPWB-DOC-003:129`): "No object or field may claim
+a status its relations do not perform… A governed object that nothing consults is a defect, not documentation."
+[CONFIRMED]
+
+*(b) Uncertainty collected, and shown only to a machine.* The agent is required to declare its residual
+uncertainty as a contracted deliverable — `declare_rationale` is mandatory
+(`apps/rph-demo/src/lib/server/agent/tools.ts:123-156`), the system prompt insists on candour
+(`system-prompt.ts:61`), and `renderRationale` (`apps/rph-demo/src/lib/server/agent/rationale.ts:38-53`) formats
+`Assumptions relied on`, `Limitations the producer declares`, and `Residual uncertainty` into a constant-shaped
+account, with an explicit `(NOT DECLARED …)` branch so that silence is legible. That account has exactly **one**
+consumer: `apps/rph-demo/src/lib/server/assurance/reasoning-review-validator.ts:72`, which folds it into the
+reviewer's *prompt*. I traced every reference to `renderRationale`, `createRationaleSink`, and `rationaleSink`
+across `apps/rph-demo/src/**/*.ts`; none reaches a Svelte template. The system therefore asks its producer for its
+doubt, and shows that doubt to an AI reviewer and to no professional. [CONFIRMED] This is failure mode **F-8.2**,
+and it is worse than a missing feature: it is a fully-built uncertainty pipeline whose terminal consumer is a
+model.
+
+**Finding 4 — what the surface does disclose, stated so the absence is not overstated.** The Assurance tab of the
+Undertaking Workbench does render an epistemic layer:
+`apps/rph-demo/src/routes/undertakings/[id]/+page.svelte:531-559` shows `Claims evaluated`,
+`Evidence considered`, **`Missing evidence`**, `Control actions`, **`Findings`** (code + severity), `Waivers`,
+`Invalidation`, and **`Open conditions`** (`:559`); `:586-592` renders `Observations` with severity, statement,
+and disposition; and `:569-577` renders `REQUIRED — UNASSESSED` for applicable-but-unassessed policies.
+[CONFIRMED]
+That is a genuine, non-trivial partial discharge of the CONTRADICTION and incompleteness obligations *via the
+assurance record*. What is absent is the four classes as such: no provenance rendering, no uncertainty rendering,
+no contradiction rendering outside a finding code, and no staleness rendering anywhere. The correct statement is
+**"the assurance findings are disclosed; the epistemic classes are not"** — not "there is no epistemic UI".
+
+**Finding 5 — staleness has a real check, on the wrong side of the wire.**
+`apps/rph-demo/src/lib/server/authoring-turn.ts:322` throws `` `Assurance is stale: reviewer subject
+${reviewedSubjectHash}, current candidate ${actualSubjectHash}.` `` — a genuine, hash-based staleness detection.
+It is a server-side guard that *blocks a commit*, not a projection disclosure that *informs a reader*. A search
+for `stale`/`staleness` across `apps/rph-demo/src/` returns no rendering path. INV-09 is therefore unimplemented
+at the Surface even though the concept is implemented in the engine. [CONFIRMED]
+
+### 2.8.3 Disclosure obligations — normative
+
+**O-8-R1 (SHALL).** A Surface presenting a PWU SHALL disclose that PWU's material uncertainty. Restating the
+master in full at the UX boundary — CON-000 AX-3 (`JPWB-CON-000:75`): "Questions, assumptions, contradictions, and
+residual uncertainty are governed objects that drive work, not annotations on it… Completion with residual
+uncertainty is legitimate only when the residual is documented, assessed, accepted by authority, and inspectable
+downstream." Cf. JCUX SCREEN-INV-006 (`JCUX:310-312`, "Material uncertainty SHALL remain visible") and RIWS
+UI-INV-007 (`RIWS:2005-2007`). *Verification:* `SPEC-001-FX-08-01` seeds a PWU with
+`riskProfile.uncertainty='HIGH'` and one `AssumptionDetected` graded `CRITICAL`, renders the Undertaking
+Workbench, and asserts a visible element with test id `disclosure-uncertainty-{pwuId}` whose accessible name
+contains the grade. **Against the incumbent this fixture fails on its first run, and that is its purpose:** the
+obligation becomes a reportable violation rather than an aspiration.
+
+**O-8-R2 (SHALL).** Absence of a disclosure SHALL be reportable, not merely undetectable. A conformance run SHALL
+enumerate, for each Surface, the governed objects of the four classes inside its Projection Scope graded MATERIAL
+or above, and SHALL fail when the count of rendered disclosures is less than that number. *Verification:*
+`SPEC-001-FX-08-02` derives the expected set **from the engine**, never from a hand-written list — a fixture whose
+expectation is authored by hand cannot detect the case where nothing is surfaced *and* nothing is expected. The
+list-derivation rule is not stylistic: it is the difference between a check that runs and a check that vacuously
+passes (B7, `JPWB-CON-000:97`, "a shape reference that no type check or conformance test enforces asserts a status
+nothing performs").
+
+**O-8-R3 (SHALL).** Claims, Evidence, AI outputs, Decisions, and material changes SHALL expose provenance on the
+Surface that presents them (JCUX SCREEN-INV-005, `JCUX:306-308`; CPM PROJ-INV-003, `CPM:357-359`; RIWS UI-INV-005,
+`RIWS:1997-1999`). AI origin SHALL remain visible **after** review or acceptance — CON-000 V4
+(`JPWB-CON-000:63`): "approval never erases provenance." *Verification:* `SPEC-001-FX-08-03` renders an
+AI-produced, subsequently-accepted artifact and asserts the attribution element is still present post-acceptance;
+its mutation red-proof is removing the attribution on the accepted branch.
+
+**O-8-R4 (SHALL NOT).** A Surface SHALL NOT render a provenance field that no read path populates from a real
+source. DOC-003 OBJ-7 (`JPWB-DOC-003:129-130`) names this failure by example — "no provenance field populated by
+convention… the current code's seeded-but-never-read policy objects and theatrical `sourceSection` provenance
+proved that asserted-but-unperformed status actively lies to both agents and humans." *Verification:*
+`SPEC-001-FX-08-04` is a negative fixture: it strips `provenance.originType` from the subject and asserts the
+Surface renders "provenance absent", **not** a populated-looking field. The incumbent floor already implements the
+server-side half correctly and its test records the exact prior defect (`floor.test.ts:29`: "was a literal `true`
+— could never fail").
+
+**O-8-R5 (SHALL).** Relevant contradictions SHALL NOT be hidden (JCUX SCREEN-INV-007, `JCUX:314-316`; CPM
+PROJ-INV-006, `CPM:369-371`; RIWS UI-INV-008, `RIWS:2009-2011`, "until disposition"). Contradictions SHOULD be
+visually prominent without implying that one side is automatically wrong (RIWS §30.5, `RIWS:1656-1658`).
+*Verification:* `SPEC-001-FX-08-05` records a `RecompositionContract` with a non-empty `detectedConflicts` and
+asserts both sides of the conflict are rendered with symmetric treatment; the negative half asserts that no side
+carries an error/failure treatment the other lacks.
+
+**O-8-R6 (SHALL).** A stale, partial, or rebuilding Projection SHALL identify itself as such, and SHALL keep
+projection loading state, stale state, partial state, and professional lifecycle state separate (CPM PROJ-INV-013,
+`CPM:397-399`; RIWS §26.1/§26.2, `RIWS:1471-1496`, "These SHALL never share ambiguous indicators"). A partial
+projection SHALL disclose which source classes are missing, why, whether interpretation may be materially
+affected, and whether commands remain available (RIWS §26.3, `RIWS:1498-1505`). *Verification:*
+`SPEC-001-FX-08-06` builds a projection at a high-water mark behind the engine's and asserts a
+`disclosure-staleness` element carrying both marks; `SPEC-001-FX-08-07` asserts the technical-state token and the
+professional-state token are distinct elements with distinct test ids — the fixture that catches "Loading" and
+"Awaiting Review" sharing one spinner.
+
+**O-8-R7 (SHALL NOT).** A Surface SHALL NOT present incomplete professional understanding as settled for
+interface simplicity (CPM PROJ-INV-005, `CPM:365-367`), SHALL NOT imply full coverage when source data is
+incomplete (CPM PROJ-INV-014, `CPM:401-403`), and SHALL make intentional omission detectable when filtering,
+security, scope, or summarization removes relevant entities (CPM PROJ-INV-012, `CPM:393-395`). *Verification:*
+`SPEC-001-FX-08-08` renders a scope-filtered projection and asserts a suppression-disclosure element is present
+with a count of omitted classes but **no** identifying detail of the omitted objects (the PER-7 non-leak clause,
+`JPWB-DOC-003:361`).
+
+**O-8-R8 (SHALL).** A CRITICAL-graded disclosure SHALL be `DISCLOSED_PERSISTENT` — visible without expanding a
+panel (RIWS §10.3, `RIWS:454-467`). MATERIAL-graded disclosures MAY be `DISCLOSED_PROGRESSIVE` provided they are
+reachable by ordinary interaction (INV-07). *Verification:* `SPEC-001-FX-08-09` collapses every collapsible region
+on the Surface and asserts every CRITICAL disclosure remains in the viewport and hit-testable — which is also the
+fixture that ties O-8 to the incumbent clipping defect INV-07 governs.
+
+**O-8-R9 (SHOULD).** Uncertainty SHOULD be prioritized by outcome impact, decision impact, reducibility, urgency,
+and dependency centrality, and SHALL NOT be treated merely as an issue severity (RIWS §13.4, `RIWS:636-646` — the
+prohibition limb is SHALL because the source states it as SHALL NOT). *Verification of the SHALL NOT limb:*
+`SPEC-001-FX-08-10` asserts the uncertainty disclosure carries at least one prioritization dimension distinct from
+severity; a rendering whose only attribute is a severity token fails.
+
+**O-8-R10 (MAY).** A Surface MAY render an aggregate confidence indicator, and when it does SHALL avoid implying
+false precision — permitted forms are exactly: clearly defined ordinal levels, intervals, distributions, and
+evidence-based assurance categories (RIWS §30.4, `RIWS:1645-1654`; this is a closed enumeration in the source, not
+an illustrative list). SHALL also provide an explanation of its basis (CPM PROJ-INV-011, `CPM:389-391`).
+
+### 2.8.4 Field contracts — `EpistemicDisclosure`
+
+| Field | Type | Optionality | Default | Semantics | Validation rule | Who may write |
+|---|---|---|---|---|---|---|
+| `disclosureId` | `string` | required | derived | Stable within a render pass; `{class}:{governedObjectRef}@{subjectId}`. | SHALL be unique per Surface; duplicates SHALL coalesce, not stack. | Projection layer |
+| `surfaceId` | `string` | required | none | The Surface the disclosure appears on. | SHALL be a declared Surface (O-2). | Projection layer |
+| `subjectId` | `string` | required | none | The rendered content the disclosure qualifies. | SHALL correspond to content actually rendered on this Surface; an orphaned disclosure fails INV-07. | Projection layer |
+| `class` | `enum {PROVENANCE, UNCERTAINTY, CONTRADICTION, STALENESS}` | required | none | Which epistemic obligation this discharges. | Closed set of four in this SPEC; a fifth requires a FORK. | Canon/this SPEC (membership) |
+| `governedObjectRef` | `string` \| `"PROJECTION_DERIVED"` | required | none | The governed object disclosed, or the sentinel for derived facts (staleness). | When not the sentinel, SHALL resolve to an object in Projection Scope; a ref to an out-of-scope object is a scope leak (INV-02). | Projection layer |
+| `materiality` | `enum {IMMATERIAL, MATERIAL, CRITICAL}` | required | `MATERIAL` | Grade governing the display obligation. Vocabulary taken from the Assumption grading at `packages/rph-domain/vocab/m9-decomposition.json:142` [CONFIRMED]. | `CRITICAL` SHALL force `renderState=DISCLOSED_PERSISTENT` (O-8-R8). A Surface SHALL NOT downgrade a grade; re-grading is a governed act on the underlying object. | The governing authority of the underlying object — never the Surface |
+| `statement` | `string` | required | none | The disclosure in professional language. | SHALL be non-empty and SHALL NOT be the object id alone; an id is a handle, not a disclosure. | Derived from the governed object's own statement field |
+| `basis` | `string[]` (object ids) | required | `[]` | What the disclosure rests on. | An empty `basis` on a `CONTRADICTION` or `PROVENANCE` disclosure SHALL render as "basis not recorded", never as a confident claim (IL-8.7). | Projection layer |
+| `originType` | `enum` (repository `provenance.originType`) | required when `class=PROVENANCE` | none | Producer class — the field the floor checks at `floor.ts:231-235` [CONFIRMED]. | SHALL be derived from the subject object, never asserted by the Surface (O-8-R4). | Projection layer |
+| `producerId` | `string` | required when `class=PROVENANCE` | none | The attributable Participant, human or AI. | SHALL persist after review and acceptance (`JPWB-CON-000:63`). | Projection layer |
+| `renderState` | `enum {DISCLOSED_PERSISTENT, DISCLOSED_PROGRESSIVE, DISCLOSED_ACCEPTED, RESOLVED, WITHHELD_SCOPED}` | required | `DISCLOSED_PROGRESSIVE` | How the disclosure is presented. | `RESOLVED` SHALL NOT be set except from a closing event on the underlying object (IL-8.3 — dismissal is not resolution). | Projection layer |
+| `acceptedBy` | `string` \| `null` | required when `renderState=DISCLOSED_ACCEPTED` | `null` | The authority that accepted the residual (AX-3's third condition). | Acceptance SHALL NOT remove the disclosure (IL-8.8); the accepted residual stays visible with its acceptance attached. | Governance (Decision) — recorded, then projected |
+| `prioritySignals` | `Record<string, string \| number>` | required when `class=UNCERTAINTY` | `{}` | RIWS §13.4 dimensions: outcome impact, decision impact, reducibility, urgency, dependency centrality. | SHALL carry at least one dimension distinct from severity (O-8-R9). | Projection layer |
+| `asOf` / `authoritativeAsOf` | `integer` / `integer` | both required when `class=STALENESS` | none | The projection's mark and the engine's mark. | A `STALENESS` disclosure SHALL render both; a single "stale" token without the delta is not a disclosure of *how* stale. | Projection layer |
+| `missingSourceClasses` | `string[]` | required when the projection is partial | `[]` | RIWS §26.3's "which source classes are missing". | SHALL be accompanied by `missingReason` and `commandsStillAvailable`; a partial projection that names no missing class asserts completeness it does not have (CPM PROJ-INV-014). | Projection layer |
+| `testId` | `string` | required | `disclosure-{class}-{subjectId}` | Stable conformance handle. | SHALL be present; without it O-8-R1…R9 are unverifiable, and an unverifiable SHALL is a defect. | Surface author, per this SPEC's convention |
+
+**FORK-16 — scope of the display obligation over unrealized objects.** Three of the four nouns AX-3 names
+(`QUESTION`, `CONTRADICTION`, `UNCERTAINTY`) are **not** object types in the repository (Finding 2). *Decision:*
+does `SPEC-001-INV-06` oblige display only of what exists today (`ASSUMPTION` objects, `PWU.riskProfile.uncertainty`,
+`RecompositionContract.detectedConflicts`, `residualUncertainty`, assurance findings), or does it also oblige a
+Surface for the object types AX-3 names but the model has not yet reified? *Options:* (a) display-what-exists —
+the SPEC binds only to realized shapes, and the missing object types become their own open questions; (b)
+display-what-AX-3-names — the SPEC obliges a surface per noun, and three of them are unimplementable until
+DOC-003 reifies the objects, so three of its fixtures are permanently red; (c) split — bind now to realized
+shapes, and register the three unreified nouns as governed gaps with named open questions so their absence is
+tracked rather than tacit. *Recommendation:* **(c)**. It keeps every SHALL verifiable today (an unverifiable SHALL
+is a defect), and it prevents the reverse failure of quietly narrowing AX-3 to the one noun that happens to have an
+aggregate. *Downstream effect if ruled otherwise:* under (a) the surface obligation silently shrinks to
+`ASSUMPTION` and AX-3's other three nouns lose their only enforcement point; under (b) §10 ships three fixtures
+that cannot pass, which trains readers to ignore red.
+
+**FORK-17 — display versus authoring.** Spine FORK-5 asks whether INV-06 requires an authoring affordance
+(*Identify Uncertainty*) or only display, and recommends display-only. Authoring this section surfaced a
+consequence worth putting in front of the sponsor: RIWS §13.3 (`RIWS:623-634`) specifies a Question as
+openable, refinable, decomposable, linkable, assignable, answerable, partially resolvable, and reopenable — an
+eight-verb lifecycle. If SPEC-001 is display-only, that lifecycle has **no owner in the canon at all**, since
+DOC-003 does not carry a Question object either. *Recommendation:* adopt spine FORK-5 (display-only here) **and**
+record the authoring lifecycle as an explicitly owned deferral in §11 rather than leaving it unowned — a deferral
+with an owner is governed; a deferral with none is a gap.
+
+---
+
+## 2.9 O-9 · Navigation Context
+
+### 2.9.1 What "active professional context" is — and the two senses that must not be conflated
+
+INFORMATIVE, then normative. The sources use "professional context" in two distinct senses, and conflating them
+is the fastest way to write an unverifiable invariant.
+
+**Sense A — context as CONTENT.** RIWS §10 "Persistent Professional Context" (`RIWS:422-441`) enumerates twelve
+categories the interface must keep accessible: Intent, Objective, Scope, Participants, Assumptions, Constraints,
+Dependencies, Confidence, Uncertainty, Validations, Provenance, History. This is *what the professional must be
+able to see*. It is composed by the Surface (O-2) and disclosed by O-8; it is **not** O-9.
+
+**Sense B — context as POSITION.** RIWS §11.2 "Projection State" (`RIWS:490-499`) enumerates what switching
+projections must preserve: active PWU; selected entity where relevant; temporal mode; applicable filters;
+navigation origin; unsaved local drafting state where safe. This is *where the professional is standing*. This is
+O-9.
+
+**Definition (this SPEC).** The **active professional context** is the addressable tuple identifying what a
+professional is currently working on and from where they arrived at it:
+`(rootId, subjectId, surfaceKey, selectedEntityId, temporalMode, filters, navigationOrigin, draftState)`.
+`SPEC-001-INV-10` binds Sense B. Sense A is governed by O-2 and O-8, which is why INV-10 can carry a fixture at
+all: a tuple can be compared before and after a movement; "the professional still has context" cannot.
+
+### 2.9.2 Closure matrix — O-9
+
+| Dimension | Content |
+|---|---|
+| **Identity & unique identification** | The context is identified by its own value — the tuple *is* the identity. Its canonical external form is the Surface address (URL), which is what makes it comparable across a movement, shareable, and restorable. See FORK-18. |
+| **Definition** | The professional's position in the work: the subject under examination, the Surface examining it, the entity selected within it, the temporal basis, the active filters, the route by which it was reached, and any unsaved local drafting. |
+| **Exclusion (what it is NOT)** | It is **not** the twelve content categories of RIWS §10.1 (Sense A). It is **not** browser history — RIWS §7.1 (`RIWS:307`) requires the breadcrumb to "distinguish containment from mere navigation history", so containment and traversal are different edges and O-9 carries both separately. It is **not** authority: carrying a context confers nothing (INV-01). It is **not** a session, a tenant, or a principal — those are transport-layer scoping (REG-Q-004's safe default, `JPWB-REG-005:190`). It is **not** the Projection Scope (O-3): scope bounds *what a projection may contain*; context records *where the reader is*. |
+| **Purpose** | To make movement between Surfaces non-destructive. The cost of losing it is not inconvenience: a professional who reloads into an unknown position re-derives their position by inference, and inference is the mechanism AX-6 (`JPWB-CON-000:81`) forbids for professional meaning. |
+| **Authority** | **Create/alter:** the professional, by navigating; and the Surface, by recording the movement. No approval, waiver, or revocation applies — a navigation context is not a governed professional object and carries no authority (INV-01). **Supersede:** each movement supersedes the prior context; the prior context is retained only as `navigationOrigin`. Marked **N/A with reason** for approve/waive/revoke: there is nothing to approve because nothing is asserted. |
+| **Inputs / preconditions** | The Surface address; the prior context (for `navigationOrigin`); the Projection Scope of the destination; the temporal mode (JCUX §6.3, `JCUX:276-284`, enumerating exactly `current`, `historical`, `comparison`, `predicted`, `offline_snapshot`). |
+| **Outputs / postconditions** | A restored context on the destination Surface. **Postcondition:** for every field in §2.9.4 marked *preserved*, the value after the movement equals the value before it, or the Surface discloses why it could not be carried (an undisclosed drop is the violation, not the drop). |
+| **Relationships (typed)** | `POSITIONED_ON` (Context → Surface, O-2); `EXAMINING` (→ subject PWU); `ARRIVED_FROM` (→ prior Surface + the relation traversed — RIWS §7.2's cross-context indicator, `RIWS:313-320`); `SCOPED_BY` (→ Projection Scope, O-3); `ORIGINATES` (→ Command, when a Command is issued from this Surface — CPM PROJ-INV-015, `CPM:405-407`: "Every command initiated through a projection SHALL retain the originating projection context"). |
+| **States** | `ACTIVE` · `RESTORED` (rebuilt from an address after reload or share) · `PARTIAL` (some fields could not be carried; the drop is disclosed) · `INVALID` (the subject or Surface no longer exists or is out of scope). |
+| **Lifecycle** | created (first navigation) → revised (each movement, superseding) → restored (address reload) → invalidated (subject retired, superseded, or moved out of the Participant's scope). A context is never *satisfied*. |
+| **Illegal states and transitions (enumerated)** | **IL-9.1** A movement that silently drops a preserved field — `PARTIAL` without disclosure. **IL-9.2** `RESTORED` reached with a different `subjectId` than the address encodes. **IL-9.3** A Surface state that no address can express — unaddressable, therefore unrestorable and unshareable (the incumbent defect, §2.9.3). **IL-9.4** `temporalMode` carried into a destination that cannot honour it, without disclosure — historical and predicted state must be unmistakable (RIWS UI-INV-013, `RIWS:2029-2031`; CPM PROJ-INV-007, `CPM:373-375`). **IL-9.5** Unsaved drafting state discarded without warning where preserving it was safe (RIWS §27.1, `RIWS:1531`, "preserve local draft work where possible"). **IL-9.6** `navigationOrigin` presented as containment — traversal and containment conflated (RIWS §7.1, `RIWS:307`). **IL-9.7** A restored context that grants access the destination scope does not admit — context restoration is not an authorization path. **IL-9.8** `INVALID` rendered as an empty Surface rather than an explanation of what became of the subject. |
+| **Invariants** | Master: `SPEC-001-INV-10`. Also binding: `-INV-01` (context confers no authority), `-INV-02` (a restored context outside scope does not widen scope), `-INV-07` (restored content must be reachable, not merely present). |
+| **Versioning** | **Meaning changes:** the tuple's membership; the address grammar (an address that stops resolving breaks every shared link — a migration concern, not a cosmetic one); the temporal-mode enumeration. **Presentation-only:** breadcrumb styling, rail placement, whether the Surface key renders as a tab or a segmented control. |
+| **Provenance** | `navigationOrigin` **is** the context's provenance: the Surface it was reached from and the typed relation traversed. RIWS §7.2 (`RIWS:315-320`) gives the display form — "Viewed from Decision D / Owned by PWU P" — which is precisely the containment-versus-traversal distinction made visible. |
+| **Evidence & assurance hooks** | Every Command issued from a Surface SHALL retain its originating projection context (CPM PROJ-INV-015, `CPM:405-407`). This is what lets a governance record answer "from what view was this authorized?" — and it is the hook by which O-9 participates in the trace spine rather than being mere convenience. |
+| **Failure modes** | **F-9.1 Client-only position** — the Surface key lives in ephemeral component state; reload discards it. [CONFIRMED incumbent, §2.9.3.] **F-9.2 Unshareable position** — no address expresses the state, so a professional cannot send a colleague to what they are looking at. **F-9.3 Silent filter drop.** **F-9.4 Temporal-mode leak** — a historical context carried into a Surface that renders it as current. **F-9.5 Draft loss on navigation.** **F-9.6 Origin amnesia** — the cross-context indicator absent, so a referenced entity looks owned. |
+| **Recovery** | *Reconcile:* re-derive the context from the address on load. *Retry:* re-issue the navigation with the full context (applies to F-9.3). *Reshape:* extend the address grammar to cover the unaddressable state (the only real fix for F-9.1/F-9.2). *Escalate:* where the subject is `INVALID`, the Surface SHALL explain what became of it — retired, superseded, out of scope — rather than render empty; PER-8 (`JPWB-DOC-003:363`) guarantees the object still exists to be explained, since participated objects are never hard-deleted. |
+| **Concurrency** | Two windows may hold different contexts over the same subject; this is legal and expected. Neither is authoritative (AX-5). Where both issue Commands, ordinary command concurrency governs; the Surface SHALL NOT reconcile by silently adopting the other window's context. |
+| **Idempotency** | Restoring the same address twice SHALL produce the same context. Navigating to the context one is already in SHALL be a no-op — it SHALL NOT reset filters, selection, or draft state (the "re-click the current tab and lose your place" defect). Verified by `SPEC-001-FX-09-04`. |
+| **Security / permission boundaries** | A context is a pointer, not a grant. A restored context whose subject the Participant may not see SHALL resolve to a scoped refusal (`SURF-SCOPE-001`, §6), never to a partial render or a bare empty state — the latter leaks existence, which PER-7 forbids (`JPWB-DOC-003:361`). |
+| **Observability** | Each movement SHALL record `(fromSurfaceKey, toSurfaceKey, subjectId, preservedFields, droppedFields, reason)`. `droppedFields` non-empty with an empty `reason` is IL-9.1 and is detectable from the trace alone. |
+| **Persistence semantics** | The canonical form is the address — durable by being expressible, not by being stored. Unsaved drafting state MAY be held in client storage; where it is, it is non-authoritative working state (AX-7's exclusion of unaccepted drafts, `JPWB-CON-000:83`) and SHALL be labelled as a draft (RIWS §25.2, `RIWS:1448`). |
+| **Migration / legacy relation** | RIWS §6.1 (`RIWS:212-225`) lists ten canonical rail destinations, one of which is **`Endeavors`** — the retired term. DOC-002 retires bare `Endeavor` in favour of **Undertaking** (`JPWB-DOC-002:248`) and forbids minting a second competing root without a Decision (`:249`). This SPEC uses **Undertaking** throughout; RIWS's spelling is legacy source material and is quoted, not adopted. [CONFIRMED] The rail membership itself is spine FORK-1 and is not resolved here. |
+| **UX / inspection surface** | The cognitive breadcrumb (RIWS §7, `RIWS:288-311`), which SHALL represent semantic containment or contextual traversal, distinguish containment from navigation history, allow movement to meaningful ancestors, preserve the selected entity where possible, expose recursive PWU structure, and identify when the current context is referenced from outside its owning PWU. Plus the cross-context indicator (§7.2) and, on direct navigation into a deep entity, reconstruction of enough parent context to prevent disorientation (RIWS §8.3, `RIWS:360-364`). |
+| **Verifying tests** | **No existing check for navigation context.** Stated with its bounds: I searched all 28 `*.e2e.ts` suites under `apps/rph-demo/e2e/` for `reload()`, and for `preserv`/`restore`/`survives` case-insensitively. Two adjacent checks exist and neither covers O-9 — `agent-retention.e2e.ts:12` ("a staged turn survives reload in-process and becomes durable only on acceptance") tests *authoring-turn durability*, and `theme.e2e.ts:32-37` tests *theme persistence across reload*, a presentation preference. `reload()` is called in exactly one suite (`theme.e2e.ts:32`). Nothing asserts that `subjectId`, `surfaceKey`, `selectedEntityId`, `temporalMode`, `filters`, or `navigationOrigin` survive a movement or a reload. [CONFIRMED] Authored by this SPEC: `SPEC-001-FX-09-01`…`-08` (§10). |
+| **Definition of done** | Every Surface is addressable; a reload restores the full tuple; a movement between Surfaces preserves every field marked *preserved* or discloses the drop; the cross-context indicator appears whenever an entity is viewed through a relation rather than containment; and a mutation that removes any field from the address reddens a named test. |
+
+### 2.9.3 The incumbent fact: position is not addressable
+
+[CONFIRMED — read, not inferred.] In the Undertaking Workbench, the Surface selection is ordinary client
+component state:
+
+```
+apps/rph-demo/src/routes/undertakings/[id]/+page.svelte:29-31
+	let tab = $state<
+		'graph' | 'overview' | 'execution' | 'assurance' | 'decisions' | 'baselines' | 'traceability'
+	>('graph');
+```
+
+with the selection written by `onclick={() => (tab = t)}` at `:129` and no other writer. Three consequences
+follow directly, and each is a distinct violation rather than one restated three ways:
+
+1. **A reload discards the position.** `tab` initializes to `'graph'` on every mount. A professional examining
+   the Assurance surface who refreshes lands on the graph. This is F-9.1 and IL-9.1: the field is dropped and the
+   drop is not disclosed.
+2. **No Surface is addressable.** The seven values at `:32-40` name seven Surfaces in the sense of O-2 — seven
+   named compositions of Projections — and **none of them has an address**. `/undertakings/{id}` resolves to
+   whichever Surface the component last set. This is IL-9.3, and it is the load-bearing one: an unaddressable
+   Surface cannot be linked to, cannot be shared, cannot be restored, and — critically for this specification —
+   **cannot be the target of a conformance fixture that navigates directly to it**. Every other invariant in this
+   SPEC that must be checked on a specific Surface inherits this defect as a testability constraint.
+3. **A Command issued from a Surface cannot retain its originating context**, because the context has no
+   expressible value to retain (CPM PROJ-INV-015, `CPM:405-407`).
+
+The layout does carry a real, if coarse, context signal: `apps/rph-demo/src/routes/+layout.svelte:65-71` derives
+`activeContext` from the pathname, and `:118-126` renders a banner reading "PWA DESIGN CONTEXT" or "UNDERTAKING
+CONTEXT". That is genuine context *disclosure* at the coarsest grain — and it works precisely because it is
+derived from the address. It is the existence proof for the fix: the mechanism the layout already uses for the
+two top-level contexts is the mechanism the Surface key needs.
+
+### 2.9.4 Preservation obligations — normative
+
+**O-9-R1 (SHALL).** Movement between Surfaces SHALL preserve the active professional context. Restating the
+master at the UX boundary — JCUX SCREEN-INV-010 (`JCUX:328-330`): "Moving between projections SHALL preserve
+active professional context." Cf. RIWS UI-INV-012 (`RIWS:2025-2027`) and RIWS §11.2's enumerated set
+(`RIWS:490-499`). *Verification:* `SPEC-001-FX-09-01` sets every preserved field on Surface A, moves to Surface B
+and back, and asserts field-by-field equality; the mutation red-proof is dropping any single field from the
+carry.
+
+> **Absence check, stated.** My first search for the JCUX screen invariants used the pattern `SCREEN-INV-00[0-9]`
+> and returned nine results, 001 through 009 — which would have supported the false conclusion that
+> SCREEN-INV-010 does not exist and the spine's citation is broken. It exists, at `JCUX:328-330`; my pattern
+> could not match a three-digit ordinal ending in `10`. Recorded because the near-miss is the exact failure mode
+> the absence discipline exists to prevent: the grep was clean, the conclusion would have been wrong, and nothing
+> in the output would have signalled it.
+
+**O-9-R2 (SHALL).** Every Surface SHALL be addressable, and its address SHALL encode `subjectId` and
+`surfaceKey` at minimum. *Verification:* `SPEC-001-FX-09-02` enumerates the Surface keys **from the route
+definition** and asserts, for each, that direct navigation to its address renders that Surface — a fixture that
+cannot be written at all against the incumbent, which is the point: unaddressability is not a minor ergonomic
+gap but the removal of the only handle a conformance check has. See FORK-18.
+
+**O-9-R3 (SHALL).** Where a field cannot be carried, the Surface SHALL disclose the drop and its reason; silent
+loss is prohibited. *Verification:* `SPEC-001-FX-09-03` moves to a Surface that cannot honour the active filter
+and asserts a visible notice naming the dropped filter. This is the same discipline INV-04 applies to withheld
+Affordances — silence never stands in for a refusal — restated here because the boundary is where implementers
+reach for the cheap path.
+
+**O-9-R4 (SHALL).** Temporal mode SHALL be preserved and SHALL remain unmistakable; historical, comparison,
+predicted, and offline-snapshot modes SHALL be distinguishable from current authoritative state at every Surface
+that honours them (JCUX §6.3's five modes, `JCUX:276-284`; CPM PROJ-INV-007, `CPM:373-375`; RIWS UI-INV-013,
+`RIWS:2029-2031`). Historical state SHALL be read-only, and a proposal derived from historical state SHALL be
+evaluated against current state (RIWS §28.3, `RIWS:1574-1578`). *Verification:* `SPEC-001-FX-09-05` navigates in
+`historical` mode and asserts (a) the mode indicator is present on the destination and (b) no mutating Affordance
+is offered — which ties O-9 to O-4's derivation rule rather than leaving temporal mode as decoration.
+
+**O-9-R5 (SHALL).** When an entity is viewed through a relation rather than containment, the Surface SHALL
+indicate it (RIWS §7.2, `RIWS:313-320`; §7.1's sixth requirement, `RIWS:311`). *Verification:*
+`SPEC-001-FX-09-06` navigates to an Evidence object from a Decision that references it but does not own it, and
+asserts a cross-context indicator naming both the origin and the owner.
+
+**O-9-R6 (SHOULD).** Unsaved local drafting state SHOULD be preserved across movement where safe (RIWS §11.2's
+sixth item, `RIWS:499`; §27.1's fourth, `RIWS:1531`). Divergence is justified where preserving the draft would
+carry it into a scope where it cannot be validly submitted; in that case O-9-R3's disclosure obligation applies to
+the discard.
+
+**O-9-R7 (SHALL).** Direct navigation into a deep entity — from search, a link, a notification, or an external
+reference — SHALL reconstruct enough parent context to prevent disorientation (RIWS §8.3, `RIWS:360-364`).
+*Verification:* `SPEC-001-FX-09-07` navigates directly to a child PWU's address with no prior context and asserts
+the breadcrumb resolves the full containment chain to the Undertaking root.
+
+**O-9-R8 (SHALL NOT).** A restored context SHALL NOT widen Projection Scope or grant access (IL-9.7). A context
+naming an out-of-scope subject SHALL resolve to a scoped refusal, not a partial render and not a bare empty
+state. *Verification:* `SPEC-001-FX-09-08` restores an address for a subject outside the Participant's scope and
+asserts the refusal code `SURF-SCOPE-001` is surfaced and that no title, count, or structural detail of the
+subject appears (PER-7's non-leak clause, `JPWB-DOC-003:361`).
+
+### 2.9.5 Field contracts — `NavigationContext`
+
+| Field | Type | Optionality | Default | Semantics | Validation rule | Who may write |
+|---|---|---|---|---|---|---|
+| `rootId` | `string` (Undertaking id or PWA id) | required | none | The professional root the context sits under. | SHALL be encoded in the address. Vocabulary note: **Undertaking**, never `Endeavor` (`JPWB-DOC-002:248`). | Professional (navigation); Surface (recording) |
+| `subjectId` | `string` | required | none | The object under examination — RIWS §11.2's "active PWU", generalized because a Surface may be rooted at a Decision or Baseline. | SHALL be inside the destination's Projection Scope (O-3) or resolve to `SURF-SCOPE-001`. **Preserved.** | Professional; Surface |
+| `surfaceKey` | `string` (enum per route) | required | route default | Which named Surface composition is active — the incumbent's seven `tab` values (`+page.svelte:32-40`). | SHALL be encoded in the address (O-9-R2). A value with no address is IL-9.3. **Preserved.** | Professional; Surface |
+| `selectedEntityId` | `string` \| `null` | required | `null` | The entity selected within the Surface. | **Preserved where relevant** (`RIWS:495`): where the destination cannot represent the selection, O-9-R3's disclosure applies. | Professional; Surface |
+| `temporalMode` | `enum {current, historical, comparison, predicted, offline_snapshot}` | required | `current` | The temporal basis of the view (`JCUX:276-284` — a closed five-member set). | **Preserved.** SHALL be visibly indicated on every Surface that honours it (O-9-R4); a destination that cannot honour it SHALL disclose the coercion rather than silently render as `current` (IL-9.4). | Professional; Surface |
+| `filters` | `Record<string, string \| string[]>` | required | `{}` | Applicable filters (`RIWS:497`). | **Preserved.** An unrepresentable filter SHALL be disclosed as dropped, not discarded (IL-9.1). Because filters remove entities from view, a filtered Surface SHALL also carry the suppression disclosure of O-8-R7 (CPM PROJ-INV-012, `CPM:393-395`). | Professional |
+| `navigationOrigin` | `{ surfaceKey, subjectId, relation }` \| `null` | required | `null` | Where this context was reached from and by which typed relation (`RIWS:498`). | **Preserved for one hop.** `relation` SHALL distinguish containment from traversal (IL-9.6); a traversal origin SHALL drive the cross-context indicator (O-9-R5). | Surface |
+| `draftState` | opaque, client-held | optional | absent | Unsaved local drafting. | Non-authoritative working state (`JPWB-CON-000:83`); SHALL be labelled a draft where rendered (`RIWS:1448`). **Preserved where safe** (O-9-R6). SHALL NOT be encoded in a shareable address — sharing a position must not share an unsubmitted draft. | Professional |
+| `contextState` | `enum {ACTIVE, RESTORED, PARTIAL, INVALID}` | required | `ACTIVE` | Lifecycle state of the context. | `PARTIAL` SHALL be accompanied by a non-empty dropped-field disclosure; `PARTIAL` with none is IL-9.1. `INVALID` SHALL render an explanation of the subject's fate, never an empty Surface (IL-9.8). | Surface |
+| `asOf` | `integer` | required | none | The projection high-water mark the context was last rendered against. | Where a restored context's `asOf` trails the authoritative mark, the staleness disclosure of O-8-R6 attaches. | Projection layer |
+
+**FORK-18 — is address-level addressability a SHALL or a SHOULD?** O-9-R2 as authored makes it a SHALL.
+*Decision:* does SPEC-001 require every Surface to be URL-addressable, or does it require only that context
+survive in-session movement? *Options:* (a) SHALL — every Surface addressable, reload-restorable, shareable; (b)
+SHOULD — in-session preservation is the obligation, addressability is a quality; (c) SHALL for `subjectId` and
+`surfaceKey`, SHOULD for the remaining fields. *Recommendation:* **(a)**, with (c) as the acceptable compromise.
+The reason is not ergonomic. Under (b), `SPEC-001-INV-10` has no fixture that can navigate to a Surface to check
+it, so the invariant becomes unverifiable — and an unverifiable SHALL is a defect by this document's own register.
+Addressability is the mechanism by which INV-10 is checkable at all, and by which INV-07's reachability checks can
+target a specific Surface rather than whatever the component last selected. *Downstream effect if ruled
+otherwise:* under (b), the incumbent's client-only `tab` becomes conforming, every Surface-specific fixture in §10
+must be rewritten to reach its target by clicking through the UI (making each fixture depend on the correctness of
+the navigation it is not testing), and CPM PROJ-INV-015's originating-context requirement has nothing to record.
+
+---
+
+# 3. Invariant catalog
+
+This section is the normative spine of JPWB-SPEC-001. The fourteen invariants below are **closed and fixed**: their ids and their governing propositions are settled by the authoring spine and MAY NOT be renumbered, merged, split, or extended. An implementer who requires an obligation not expressed here SHALL raise a FORK under §11 rather than mint a fifteenth invariant.
+
+**How to read an entry.** Each invariant carries six parts, and an entry missing any of them is a defect in this specification rather than a stylistic variation:
+
+| Part | Obligation |
+|---|---|
+| **Statement** | The normative sentence: subject · modality · required behaviour or state · triggering condition · boundary/exception. |
+| **Master** | Present only where the invariant restates a canon rule. The master is **restated in full with its citation**, never incorporated by reference (commission rule 8; JPWB-CON-000 B1, `docs/canon/JPWB-CON-000 Constitution.md:97`). |
+| **WHY** | The specific failure the invariant prevents. Where a measured incumbent defect exists, it is named with a file:line citation, because a defect a check can count is what makes an invariant non-vacuous. |
+| **SCOPE** | What the invariant governs and — separately stated — what it does not. |
+| **NON-EXAMPLE** | Present wherever over-application is plausible. This is the P6 rule: an invariant with no stated non-example will be over-applied, and over-application discredits the invariant faster than under-enforcement does. |
+| **Verifying check** | The named test, fixture, or evidence obligation by which conformance is established. Per the deontic register, no SHALL in this document stands without one. |
+
+**Provenance labelling** (master: §0.2, restated here because §3 is where an unlabelled claim would be most costly). Every factual claim about the repository below is labelled **CONFIRMED** (read, with file:line), **INFERRED** (derived from confirmed facts, with the derivation stated), **ASSUMED** (neither read nor derived — flagged for ruling), or **UNRATIFIED-AUTHORED** (normative content authored under the sponsor grant of 2026-07-28, beyond what any ratified source states). Absence claims state the search performed. INFORMATIVE: this repository has a documented, seven-times-repeated failure of recording "I did not find it" as "it does not exist"; three of the searches below deliberately re-ran in both directions and one of them (INV-06) overturned a first result.
+
+**Deontic force of the catalog itself.** The fourteen invariants are **SHALL**-grade obligations on any surface claiming conformance with JPWB-SPEC-001. Where a source document states the same obligation at lower modality, the divergence is recorded in the entry and marked UNRATIFIED-AUTHORED; this specification never silently strengthens a source.
+
+---
+
+## 3.1 SPEC-001-INV-01 — Projections carry no authority
+
+**Statement.** A Projection **SHALL** carry no authority over governed professional state: it SHALL be derivable, disposable, and rebuildable from the authoritative record, and **SHALL NOT** be a write target, a validation source for a Command, or a second place where professional truth is decided. No act performed on a Surface — click, drag, form submission, inline edit, optimistic local update, keyboard shortcut, or agent-initiated interaction — **SHALL** mutate governed state except by issuing a semantic Command through the engine's single authoritative write path and awaiting its result. The **sole exception** is state that is not governed professional state at all — viewport position, panel collapse, theme, sort order, local drafting buffers not yet submitted — which a Surface MAY hold and mutate freely, provided such state never becomes an input to a governed decision (see INV-06's materiality carve-out, which forbids hiding material conditions behind that same local state).
+
+**Master — JPWB-DOC-003 PER-7, restated in full** (`docs/canon/JPWB-DOC-003 Semantic Model and Invariant Catalog.md:359-361`): *"Projections are derived, disposable, and powerless. Read projections may be rebuilt, delayed, optimized, and independently versioned; they are never authoritative write targets, and canonical commands never validate against projections alone. Projection lag can never alter an authoritative decision. Rebuildability, not backup, is their durability guarantee."* Its SCOPE clause is equally load-bearing here and is restated with it: *"governs all derived views, including compatibility projections. Exactly one component derives any given compatibility projection. A projection filtered by authorization discloses that its view is partial when the filtering materially affects interpretation, and never leaks protected existence through counts, graph structure, titles, metadata, inferred dependencies, or omitted-node placeholders."*
+
+**Master — JCUX SCREEN-INV-009, restated in full** (`docs/Constitution Discussion/JanumiCode UI Information Architecture and Screen Contract.md:322-326`): *"No Direct Mutation. UI components SHALL issue semantic Commands. They SHALL not mutate authoritative state directly."*
+
+**Master — CPM PROJ-INV-002, restated in full** (`docs/Constitution Discussion/Canonical Projection Model.md:351-355`): *"No Independent Mutation. A projection SHALL NOT mutate professional state directly. All mutations SHALL occur through validated semantic commands."*
+
+Three ratified statements of one rule, at three altitudes — the model layer (PER-7), the screen contract (SCREEN-INV-009), and the projection contract (PROJ-INV-002). They agree; INV-01 is their surface-side consolidation and adds no meaning beyond them. It is restated here rather than cited alone because the boundary at which it is violated — the Surface — is the one none of the three owns.
+
+**WHY.** The moment a Projection can authorize or receive a write, dual truth exists and no principled resolution remains: JPWB-DOC-003 AUT-1 (`:385-387`) states that *"at every moment, for every unit of professional semantic state, exactly one representation holds authority… Contradiction between representations is never resolved by picking the convenient value — authority must be designed and declared."* The surface-specific failure mode is subtler than a rogue database write and is the one this invariant is actually aimed at: **the optimistic local update**. A Surface that renders a state change before — or instead of — the engine accepting it has created a second authority whose lifespan is one page-load, and every professional judgement made while looking at it was made against a value nothing accepted. CONFIRMED that the incumbent does not do this on the execution path: `apps/rph-demo/src/routes/undertakings/[id]/+page.server.ts:500-507` (`dispatchResult`) dispatches through `dispatch(...)` and returns `fail(400, …)` on any status other than `ACCEPTED`/`DUPLICATE`, so no success is rendered that the engine did not grant; the file header at `packages/rph-engine/src/queries.ts:1-5` states the same discipline for the read surface (*"all pure reads; projections are never authoritative"*). INV-01 exists to keep that property under a surface that will grow client-side interactivity, not to correct a present violation.
+
+**SCOPE.** Governs: every Projection this specification defines (O-1) and every Surface (O-2) that composes them; the direction of all state change originating at the surface; the admissibility of a Projection as an input to a Command's precondition evaluation. Does **not** govern: what the Commands themselves mean, what preconditions they enforce, or when the engine refuses them — those are JPWB-DOC-003 and the engine's concern, and this specification may only restate them with citation. Does **not** govern the persistence mechanism by which authority is held (JPWB-DOC-003 PER-1 through PER-6), nor the authority model that decides who may issue a Command (JPWB-CON-000 / JPWB-DOC-001 §7.1).
+
+**NON-EXAMPLE.** INV-01 does **not** forbid a Surface holding state. A collapsed panel, a remembered nav rail width, a selected tab, a sort order, an unsubmitted form buffer, a theme preference — none is governed professional state, and all MAY be held, persisted locally, and mutated without a Command. CONFIRMED legitimate instances in the incumbent: `apps/rph-demo/src/routes/+layout.svelte:51-55` persists nav collapse to `localStorage`, and `:20-31` holds theme in a Svelte store. Neither is a violation and neither SHOULD be re-routed through the engine. INV-01 also does **not** forbid a Projection being computed, cached, memoised, or served from a materialized table: PER-7 explicitly permits projections to be *"rebuilt, delayed, optimized, and independently versioned."* The prohibited thing is narrow and precise — a Projection that **receives** a write, or that a Command **consults** as its authority.
+
+**Verifying check.** `spec001-inv01-no-surface-authority.spec.ts` — a static-analysis conformance test over the surface package that asserts (a) no module under `apps/rph-demo/src/routes/**` imports a persistence adapter or store-write API, and (b) every mutation site is a form action whose body reaches `dispatch(...)`; paired with `spec001-inv01-optimistic-update.e2e.ts`, which drives a Command the engine will refuse and asserts the rendered state is byte-identical before and after the refused submission. **Mutation red-proof obligation:** removing the `r.status !== 'ACCEPTED'` guard at `+page.server.ts:502` SHALL turn `spec001-inv01-optimistic-update.e2e.ts` red; a guard whose deletion leaves the suite green is itself the finding (JPWB-CON-000 B7, `JPWB-CON-000 Constitution.md:119`).
+
+---
+
+## 3.2 SPEC-001-INV-02 — A Projection is bound to a declared Scope
+
+**Statement.** Every Projection **SHALL** declare a Projection Scope (O-3) — the named subject it is bound to and the rule by which membership in that subject is decided — and **SHALL NOT** present objects outside it. Where a Projection deliberately omits objects that its declared Scope would otherwise admit — by authorization filtering, summarization, pagination, or an explicit exclusion rule — the omission **SHALL** be detectable on the Surface rather than silent. The Scope declaration **SHALL** be a property of the Projection, not a convention of its call sites: a read function that admits an unscoped call has no Scope, whatever its callers do with the result.
+
+**Master — JPWB-DOC-003 PER-7 SCOPE clause, restated in full** (`docs/canon/JPWB-DOC-003 Semantic Model and Invariant Catalog.md:361`): *"A projection filtered by authorization discloses that its view is partial when the filtering materially affects interpretation, and never leaks protected existence through counts, graph structure, titles, metadata, inferred dependencies, or omitted-node placeholders."*
+
+**Master — CPM PROJ-INV-012, restated in full** (`docs/Constitution Discussion/Canonical Projection Model.md:393-395`): *"Suppression Disclosure. When a projection intentionally omits relevant entities because of filtering, security, scope, or summarization, the omission SHALL be detectable."* And **CPM PROJ-INV-014** (`:401-403`): *"No False Completeness. A projection SHALL not imply full organizational coverage when source data is incomplete."* CPM §7.3–7.4 (`:286-292`) make the same demand constructively: every projection definition SHALL declare its *Inclusion Rules* — "which entities qualify for inclusion" — and its *Exclusion Rules* — "which entities are intentionally omitted."
+
+**WHY.** This invariant is the one with the largest measured incumbent defect, and the defect's shape is the reason INV-02 is written against the **read function's signature** rather than against its output.
+
+CONFIRMED (`packages/rph-engine/src/queries.ts:45-51`): five read functions take an `EngineHandle` and nothing else —
+
+```ts
+export const listExecutionPlans = (h: EngineHandle): ObjectRow[] => listByType(h, 'EXECUTION_PLAN');
+export const listAssessments = (h: EngineHandle): ObjectRow[] => listByType(h, 'ASSURANCE_ASSESSMENT');
+export const listObservations = (h: EngineHandle): ObjectRow[] => listByType(h, 'ASSURANCE_OBSERVATION');
+export const listDecisions = (h: EngineHandle): ObjectRow[] => listByType(h, 'DECISION');
+export const listBaselines = (h: EngineHandle): ObjectRow[] => listByType(h, 'BASELINE');
+```
+
+— while their two siblings do take one: `listPwuTypes(h, pwaId?)` at `:35-39` and `listPwus(h, undertakingId?)` at `:41-44`. CONFIRMED that the Undertaking Workbench loader consumes four of the five unscoped functions with **no filter of any kind**: `listAssessments(engine).map(…)` at `apps/rph-demo/src/routes/undertakings/[id]/+page.server.ts:255`, `listObservations(engine).map(…)` at `:296`, `listDecisions(engine).map(…)` at `:302`, `listBaselines(engine).map(…)` at `:308`. The consequence is exact and inspectable: a newly created Undertaking's Assurance, Observations, Decisions, and Baselines panels display the reference seed's records as though they belonged to it.
+
+**Correction to the spine's recorded form of this defect, on evidence.** The spine states *"The same bug was fixed for `listExecutionPlans` only."* That is true in substance and imprecise in mechanism, and the imprecision matters to what INV-02 must require. `listExecutionPlans` is **not** scoped — CONFIRMED at `queries.ts:45`, its signature is identical to the four broken ones. The fix was applied **at the call site**: `+page.server.ts:314-318` says so in terms (*"SCOPE them to THIS Undertaking's PWUs — fixing the F-6 bug (listExecutionPlans is engine-GLOBAL, unlike graph/pwuList/trace)"*), and `:355` performs it — `plansForPwus(planRows, pwuIdSet, pwuLifecycleById, bindingFactsById)` — where `pwuIdSet` (`:246`) is the two-hop scope `listPwus(engine, params.id) → PWU ids → plan.workUnitId ∈ set`. The same file applies a call-site scope to trace links at `:248-250`. So the incumbent has **three** scoping regimes at once: scoped-by-signature (`listPwus`, `listPwuTypes`), scoped-by-call-site (`listExecutionPlans`, `traceLinks`), and unscoped (the four). INFERRED, and this is the load-bearing inference: a call-site scope is not a Scope, because nothing prevents the next call site from omitting it — and four call sites in this very file already did. INV-02 therefore binds the **declaration**, which is why its statement's final sentence exists.
+
+**SCOPE.** Governs: the derivation of every Projection; the signature and declaration of every read function a Projection is built from; the disclosure obligation attaching to deliberate omission. Does **not** govern: which subject a given Surface *ought* to be scoped to — that is a composition decision recorded per Surface in §5, not an invariant; nor authorization policy itself (who may see what), which INV-02 presupposes and PER-7 governs; nor the *storage* partitioning of governed objects, which is a repository shape.
+
+**NON-EXAMPLE — this is the entry where over-application is most likely, and most damaging.** INV-02 does **not** forbid cross-subject views. A portfolio roll-up across every Undertaking in an organization, a Decision Center listing governance acts across the whole workbench, a Baseline Manager showing all promotions, a cross-Undertaking assurance-debt dashboard, a search result spanning subjects — each is **legitimate and conformant**, because each declares a Scope that is genuinely broader than one Undertaking. `/decisions` and `/baselines` are CONFIRMED to be exactly such surfaces: `apps/rph-demo/src/routes/decisions/+page.server.ts:1-2` declares the Decision Center as *"governance acts across the workbench"* and `apps/rph-demo/src/routes/baselines/+page.server.ts:1-2` declares *"the authoritative, immutable promotions across the workbench."* Their unscoped reads are **conformant with INV-02** and are not part of the defect above.
+
+The violation is not breadth — it is **an undeclared Scope, or contents wider than the declared one**. A portfolio roll-up whose declared Scope is "every Undertaking in organization X" and which silently omits three the caller lacks rights to see violates INV-02 by non-disclosure (PER-7 `:361`; PROJ-INV-012), not by breadth. The Undertaking Workbench's four panels violate it because their Surface declares an Undertaking Scope and its contents are engine-global. A single check that flagged "unscoped read" would condemn the Decision Center along with the bug, and the second such false positive is when implementers begin routing around the check. **The rule is: declare, then match — never "narrow."**
+
+**Verifying check.** `spec001-inv02-scope-declaration.spec.ts` — asserts that every read function reachable from a Surface loader either accepts a scope argument or is registered in an explicit `UNSCOPED_BY_DECLARATION` table carrying the Surface's declared Scope and a rationale string, and that the table is **total** over the reachable read set, so a new read function with no row is a compile-or-test failure rather than a discovery (the totality mechanism CONFIRMED in use at `packages/rph-projections/src/execution-view.ts:305-326`, where `Record<GatedAffordance, StepCommandType>` is documented as existing precisely so *"a new affordance cannot ship without naming the command it dispatches"*). Paired with `spec001-inv02-cross-subject-leak.e2e.ts`: seed two Undertakings with disjoint assurance records, open each, and assert **both halves** — every panel on Undertaking A shows only A's records (the leak half), **and** every one of A's own records is present (the over-filter half). The both-halves discipline is not optional; see INV-13's verifying check for why a one-sided assertion is satisfied by a projection that shows nothing at all.
+
+---
+
+## 3.3 SPEC-001-INV-03 — Affordances derive from the enforcing authority, never a copy of it
+
+**Statement.** Every Affordance (O-4) a Surface offers **SHALL** be derived from the same declared authority the engine evaluates when the corresponding Command is issued, by reading that declaration — **SHALL NOT** be derived from an independently authored predicate, a re-typed literal set, an inline template condition, or any other second expression of the rule, however faithful at the time of writing. Where the authority is not expressible as data the surface can read, the Affordance **SHALL** be derived by calling the engine's own predicate; where neither is possible, the Affordance **SHALL** be offered ungated and the resulting refusal disclosed under INV-08, and that fail-open **SHALL** be recorded at the derivation site as a declaration with a stated reason rather than left as an absence.
+
+**WHY.** A rule copied into N places has N chances to be forgotten and no way to notice. This is not a hypothetical: the incumbent has recorded **the same failure three times**, each time by a different route, and the third recurrence is what converted the fix from "add the condition" to "gate on the column."
+
+CONFIRMED, from the test headers that record them:
+
+1. **F-29** (`packages/rph-projections/src/execrem-wp15-affordance-fidelity.test.ts:9-14`): *"Four sibling affordances had each grown their OWN inline plan-status condition in the Svelte template. Retry never got one. A rule copied into five templates has five chances to be forgotten and no way to notice; the sixth copy would not have helped."*
+2. **RW-1 #6** (`packages/rph-projections/src/revrem-wp1-readmodel-fidelity.test.ts:12-15`): the closed-PWU set was `new Set(['BASELINED','ABANDONED','SUPERSEDED'])` — *"with a comment calling it 'the machine's own terminal set' while being unbound to it."* And `:17-20` records the compounding failure: the test that covered it *"iterates `for (const closed of ['BASELINED','ABANDONED','SUPERSEDED'])` — the same three literals — so it moves in lockstep with the bug."* A hand-copied rule verified by a hand-copied fixture is not verified.
+3. **RW-6 / MAJOR #5** (`packages/rph-projections/src/revrem-wp6-readmodel-binding-authority.test.ts:7-10`): *"F-29's invariant — 'no affordance the engine would reject' — broken for the THIRD time by a newly added engine limb whose read-model counterpart nobody added… which is why the fix gates on the COLUMN rather than on a list of affordances."*
+
+CONFIRMED remedy, and the model this invariant generalizes: `packages/rph-domain/src/step-command-spec.ts` declares `STEP_COMMAND_SPECS` as data — a `Readonly<Record<StepCommandType, StepCommandSpec>>` whose header (`:11-14`) states *"adding a tenth step command without declaring its row is a compile error, not a discovery"* — with four authority columns (`planLiveness` `:62`, `pwuOpenness` `:76`, `bindingAuthority` `:110`, `inputReadiness` `:113-120`), each carrying a **required prose rationale field** so that a silence is a declaration rather than an omission. The engine reads it at `packages/rph-application/src/handlers/execution.ts:659` (`stepAuthorityRefusal`, invoked `:855`); the read-model reads **the same rows** at `packages/rph-projections/src/execution-view.ts:365` (`const spec = STEP_COMMAND_SPECS[COMMAND_BY_AFFORDANCE[affordance]];`). Its siting is deliberate and documented at `step-command-spec.ts:16-19`: placed in `rph-domain` because *"putting it beside the handlers would have made the read-model unable to derive affordances from the same declaration the authority enforces — the exact read-model/authority divergence the F-11 discipline exists to prevent."*
+
+CONFIRMED that the discipline is **not** applied surface-wide, which is the residual defect INV-03 makes countable. Searching `packages/rph-projections/src/*.ts` for exported affordance derivation (`grep -n "export.*\(Affordance\|affordancesFor\|CommandsFor\)"`, non-test files, untruncated) returns exactly three symbols, all in `execution-view.ts`: `GatedAffordance` (`:308`), `StepAffordances` (`:422`), `planAffordancesFor` (`:473`). There is **no** Decision, Baseline, PWU-lifecycle, or Assurance affordance projection. Meanwhile `apps/rph-demo/src/routes/decisions/+page.svelte:89-90` hand-inlines the precondition in the template —
+
+```svelte
+{#if d.status === 'PROPOSED'}
+  {#if d.type === 'WAIVER'}
+```
+
+— and `apps/rph-demo/src/routes/decisions/+page.server.ts:7-8` describes the arrangement in the word that names the violation: *"The per-row actions **mirror** the engine's own preconditions… so each row offers only the command the engine will accept."* INFERRED: this is F-29's exact shape — an inline template condition mirroring an engine rule, with no read-model between them and no agreement test — reproduced on the governance surface, where the three prior recurrences were never looked for. The PWU lifecycle actions at `apps/rph-demo/src/routes/undertakings/[id]/+page.svelte:207-229` are a second instance, gating a five-branch action column on `p.workLifecycleState` alone.
+
+**SCOPE.** Governs: the derivation path of every Affordance on every Surface, including affordances expressed as an enabled button, a visible menu entry, a drag handle, a context action, or an inline editable field. Does **not** govern **what** the authority says — the content of `planLiveness`, `pwuOpenness`, `bindingAuthority`, `inputReadiness`, or any future column is JPWB-DOC-003's and the engine's concern, and this specification restates it only with citation. Does **not** govern presentation of the affordance (label, icon, placement, ordering) — that is a design-system concern this specification expressly does not own.
+
+**NON-EXAMPLE.** INV-03 does **not** require that the surface call the engine over the network for every button. Reading a **declaration** the engine also reads is the conformant path and is cheaper than either alternative; `planPermitsAffordance` (`execution-view.ts:357-418`) is a pure function over `STEP_COMMAND_SPECS` rows and performs no I/O. Nor does INV-03 forbid a surface holding a *derived* affordance set in a loader's return value — `startableStepByPlan` (`+page.server.ts:180-192`) is derived once per load from the shared authority and is conformant. Nor does it forbid **fail-open**: `execution-view.ts:368-375` gates on `pwuOpenness` *only when the caller actually supplied the PWU's state*, and `execrem-wp15-affordance-fidelity.test.ts:110-114` pins that behaviour as *"the disclosed fail-OPEN default… the engine still refuses, so the cost is a rejected click."* A disclosed fail-open with a stated reason is conformant; an undisclosed one is the violation.
+
+**Verifying check.** `spec001-inv03-single-declaration.spec.ts` — for every Affordance registered on any Surface, assert its derivation resolves to a row in a declared authority table (the `STEP_COMMAND_SPECS` pattern) and that the table is total over the affordance union, so an undeclared affordance fails the build. Paired with `spec001-inv03-no-inline-authority.spec.ts`, a static check that no `.svelte` template contains a conditional over a governed state field (`workLifecycleState`, `executionState`, `assuranceState`, `shapeIntegrityState`, `status`, `authorizationStatus`) guarding a Command-issuing control — with an explicit, rationale-bearing exemption list so the check can be adopted incrementally without being disabled. **Anti-drift obligation, and it is not satisfiable by re-typing:** any fixture asserting the withheld set SHALL derive its expected values from the authority itself, in the form CONFIRMED at `revrem-wp1-readmodel-fidelity.test.ts:64-82`, which asserts equality against `getMachine('PWU.workLifecycleState').terminalStates` and states the reason at `:19-20` — *"retyping the values would recreate exactly the blindness being fixed."*
+
+---
+
+## 3.4 SPEC-001-INV-04 — A withheld Affordance discloses why
+
+**Statement.** Where a Surface withholds an Affordance because the professional's authority, the object's state, or a declared precondition does not admit it, the Surface **SHALL** record an Affordance Withholding (O-5) and **SHALL** make its reason available to that professional through ordinary interaction — naming what is currently blocking the act and, where the authority model supplies it, who does hold the authority to perform it. Silence **SHALL NOT** stand in for refusal: an Affordance that is simply absent from the rendered surface, with no trace that it was ever applicable, does not conform. The **boundary** is materiality — an Affordance that is inapplicable to the object's *kind* (a waiver control on a non-waiver Decision, a step control on an object with no Execution Plan) carries no disclosure obligation, because nothing was withheld; the obligation attaches where the act is applicable in kind and withheld in fact.
+
+**Master — RIWS §9.3, restated in full** (`docs/Constitution Discussion/Reference Interaction and Workspace Specification.md:410-420`): *"State Explanation. Selecting a state SHALL explain: what the state means; why the object is currently in it; which conditions must be satisfied to leave it; who possesses authority to act; what is blocking advancement."*
+
+**Related source at lower modality, and the divergence recorded.** RIWS §11.3 (`:501-513`) states: *"Projection Availability. Projection options MAY be hidden or disabled where semantically inapplicable. The UI **SHOULD** explain why a projection is unavailable."* That is **SHOULD**, and it governs *projections*, not affordances. INV-04 is **SHALL**, and governs *affordances*. **UNRATIFIED-AUTHORED:** the strengthening is deliberate and is the authored content of this entry. The justification is that RIWS §9.3 already imposes SHALL-grade explanation on *state*, and a withheld affordance is the professional's most direct encounter with a blocking state — but a reasonable sponsor could rule that INV-04 should track §11.3's SHOULD. This is raised as part of FORK-5's neighbourhood and SHALL be ruled before ratification.
+
+**WHY.** CONFIRMED incumbent defect: **no Surface in the application explains why an Affordance is absent.** Search performed and stated in full, per the absence discipline: `grep -rn "stepAuthorityRefusal" packages apps --include=*.ts --include=*.svelte`, untruncated, returns thirteen matches — its definition (`packages/rph-application/src/handlers/execution.ts:659`), its invocation (`:855`), five documentary references in `packages/rph-domain/src/enforcement-register.ts`, three in `packages/rph-projections/src/execution-view.ts` and its `.d.ts`, and three in test headers. **Zero** are in `apps/`. The engine computes a structured refusal reason for every withheld step command and **the surface never receives it.**
+
+The mechanism that produces this is CONFIRMED and is worth naming precisely, because it explains why INV-04 is a separate invariant rather than a corollary of INV-03: the read-model's `planAffordancesFor` (`execution-view.ts:473`) returns `StepAffordances` (`:422-425`), a pair of **string arrays** —
+
+```ts
+export interface StepAffordances {
+	readonly advance: readonly StepAdvanceCommand[];
+	readonly control: readonly StepControlCommand[];
+}
+```
+
+— which is a set of what *is* offered and carries no representation whatever of what was withheld or why. `planPermitsAffordance` (`:357-418`) evaluates four authority limbs and returns `boolean`; the reason is computed and immediately discarded. INFERRED: satisfying INV-03 perfectly — deriving every affordance from the one authority — still yields a surface that withholds silently, because the derivation's return type has nowhere to put the reason. **INV-03 is about correctness of the offered set; INV-04 is about the shape of the value that carries it.** This is precisely why O-5 (Affordance Withholding) is an object in the catalog rather than a field.
+
+**SCOPE.** Governs: the withholding of applicable Affordances, and the disclosure obligation that attaches. Governs the *availability* of the reason through ordinary interaction (hover, focus, selection, an inspector panel) — not its persistent visual prominence, which would collide with INV-07's non-example and RIWS §11.3's permission to *hide or disable*. Does **not** govern: refusals of Commands actually issued (INV-08 owns those); the authority model that decides who may act (JPWB-CON-000 / JPWB-DOC-001 §7.1); the wording, tone, or localization of the reason.
+
+**NON-EXAMPLE.** INV-04 does **not** require that every unavailable act be rendered as a visible disabled control. A Surface MAY omit the control entirely, provided the reason is reachable — through a per-object "why can't I…" inspector, a state-explanation panel satisfying RIWS §9.3, or an authority summary. Requiring visible disabled controls would produce a surface whose dominant visual content is things the professional cannot do, which inverts RIWS §2's obligation (`:70-78`) that the interface help the professional understand *"what they are permitted to do."* Nor does INV-04 attach to inapplicable-in-kind acts: `apps/rph-demo/src/routes/decisions/+page.svelte:89-90` withholds the waiver grant/deny controls on a non-`WAIVER` Decision, and that is a kind distinction carrying **no** disclosure obligation under INV-04 (it remains an INV-03 violation for being hand-inlined — the two invariants judge different properties of the same line, which is the intended behaviour of an orthogonal catalog).
+
+**Verifying check.** `spec001-inv04-withholding-disclosed.spec.ts` — assert the affordance projection returns, for each step and each candidate affordance, either an offer or a `Withholding` record carrying `{ affordance, reasonCode, blockingCondition, authorityHolder? }`; assert the union of offered and withheld is **total** over the candidate set, so an affordance that is neither offered nor recorded-as-withheld fails. Paired with `spec001-inv04-reason-reachable.e2e.ts`: place a step under a REVOKED runtime binding (the RW-6 fixture at `revrem-wp6-readmodel-binding-authority.test.ts:51-56`), assert Start is not offered, then assert the reason naming the binding authorization is reachable by ordinary interaction — which is INV-07's reachability standard, deliberately reused so the two checks cannot drift apart. **Mutation red-proof obligation:** returning an empty withholding set unconditionally SHALL turn the totality assertion red.
+
+---
+
+## 3.5 SPEC-001-INV-05 — The four state axes remain separately legible
+
+**Statement.** A Surface presenting the state of a Professional Work Unit **SHALL** present its four orthogonal axes — work lifecycle, execution state, assurance state, and shape-integrity state — as four separately legible values, and **SHALL NOT** collapse them into a single status field, a single badge, a single progress indicator, or a single boolean. Where a Surface presents a derived summary across the axes, that summary **SHALL** be identified as derived, **SHALL NOT** be writable, and **SHALL NOT** display an unqualified completion term while any axis is unresolved. Legibility is satisfied when each axis's current value is **available and attributable to its axis**; it is not satisfied by a composite value from which the four could in principle be reconstructed.
+
+**Master — JPWB-DOC-003 STA-1, restated in full** (`docs/canon/JPWB-DOC-003 Semantic Model and Invariant Catalog.md:175-177`): *"The four axes never collapse. Execution, assurance, shape integrity, and work lifecycle are independent axes, never summarized into one status field, one progress bar, or one boolean. **WHY:** every collapse re-creates the legacy phase machine, where 'done' simultaneously meant executed, checked, and accepted — and therefore meant none of them. **SCOPE:** governs semantic state representation and every projection that renders it: execution success and assurance satisfaction must remain visually distinct. **NON-EXAMPLE:** a derived rollup view for humans is legal — provided it is a projection, cannot be written, and does not display an unqualified 'complete' while any axis is unresolved."* The axis set itself is fixed at `:171`: *"Every PWU carries four orthogonal state axes: work lifecycle, execution state, assurance state, and shape-integrity state."*
+
+**Master — JCUX SCREEN-INV-003, restated in full** (`JanumiCode UI Information Architecture and Screen Contract.md:298-300`): *"Dual State. Lifecycle state and cognitive state SHALL be shown separately."* And **RIWS §9.2** (`Reference Interaction and Workspace Specification.md:389-405`): *"Lifecycle and cognitive state SHALL be shown separately… The interface SHALL NOT collapse these into a generic label such as: `Pending` / `In Progress` / `Open` without preserving their distinct meanings."* INFORMATIVE: RIWS and JCUX speak of a *lifecycle/cognitive* pair while DOC-003 fixes a *four-axis* set; DOC-003 §6 `:173` settles the relationship — the cognitive-focus model is *"an additive viewpoint, not a replacement lifecycle; no alternative lifecycle may be implemented alongside the canonical axes."* INV-05 therefore governs the four canonical axes, and the RIWS/JCUX pair is subsumed rather than contradicted. No FORK is raised: DOC-003 controls on conflict and there is no conflict to resolve.
+
+**WHY — with a defect confirmed in the course of authoring this section, additional to the six the spine records.** CONFIRMED (`apps/rph-demo/src/routes/undertakings/[id]/+page.svelte:185-200`): the Undertaking Workbench's PWU table declares six columns — `PWU Instance`, `Work state`, `Execution`, `Assurance`, `PWU Type (definition)`, `Lifecycle actions` — and renders **three** axes: `{p.workLifecycleState}` (`:198`), `{p.executionState || '—'}` (`:199`), `{p.assuranceState}` (`:200`). **There is no shape-integrity column and no shape-integrity value anywhere in the row.**
+
+Search performed and stated in full: `grep -rn "shapeIntegrityState" --include=*.svelte apps/rph-demo/src`, untruncated, returns exactly **one** match across all eleven `.svelte` files in the application — `apps/rph-demo/src/routes/pwa/[id]/+page.svelte:1745`, which is **prose**, reading `<code>shapeIntegrityState</code> remain independent and are not simulated.` The single occurrence of the fourth axis in the entire render layer is a sentence *asserting the axes are independent*, in a surface that never displays it. That is a textbook JPWB-CON-000 B7 instance (`JPWB-CON-000 Constitution.md:119`): *"No artifact, object, or field may claim a status its relations do not perform… Asserted status must be performed status."*
+
+INFERRED, and this is why the defect is a collapse rather than a mere omission: an axis that is never rendered cannot be *distinguished by the professional* from an axis that is always nominal. Three-of-four is not three-quarters of INV-05 satisfied — it is a four-axis model presented as a three-axis one, which is exactly the summarization STA-1 forbids, arrived at by deletion instead of by concatenation. A second instance sits in the same file: the action column at `:207-229` branches on `p.workLifecycleState` alone across five arms, so the *actionable* representation of state is single-axis even where the *displayed* one is not.
+
+**SCOPE.** Governs: every Surface that presents PWU state, including list rows, graph nodes, detail headers, cards, and tooltips. Governs derived rollups, which remain legal under the conditions STA-1's non-example states. Does **not** govern: the axes' enumerations, their transition guards, or their semantics — all JPWB-DOC-003 §6 and the repository's transition tables. Does **not** govern the states of non-PWU objects (Execution Plans, Assessments, Decisions, Baselines each carry their own explicit state sets per DOC-003 `:171`); INV-05 is about the PWU's four, and applying it to a Decision's single `status` is an over-application the next paragraph forbids.
+
+**NON-EXAMPLE — the one the spine flags, and it is the most misread rule in this catalog.** *Separately legible does not mean four separate widgets.* INV-05 is a **semantic** requirement, not a layout one, and this specification expressly does not govern visual design. All of the following conform: four values in one table row (which is what `:198-200` does correctly for the three axes it renders); a single compact state cluster with four labelled segments; a graph node with a four-part assurance rail; a headline value plus three secondary values; a single badge that expands on focus to show all four — provided the collapsed form does not display an unqualified completion term while any axis is unresolved. What does **not** conform is a value from which the professional cannot tell *which axis* it reports: a lone "Complete", a lone green dot, a lone percentage, a lone "Done" — or, as CONFIRMED above, a fourth axis that is never reported at all. A derived rollup is likewise legal and is explicitly blessed by STA-1's own non-example; the conditions are that it be a projection, be unwritable, and be honest about unresolved axes.
+
+**Verifying check.** `spec001-inv05-four-axes-rendered.e2e.ts` — for each PWU-presenting Surface, assert all four axis values are obtainable by ordinary interaction and each is attributable to its axis by an explicit `data-axis` attribute, with the expected axis set **derived from the contracts package** (`ProfessionalWorkUnit` state fields) rather than re-typed, so ratifying a fifth axis turns the check red instead of leaving it silently three-quarters true — the anti-drift form CONFIRMED at `revrem-wp1-readmodel-fidelity.test.ts:64-82`. Paired with `spec001-inv05-no-collapse.spec.ts`, asserting no Surface exposes a single field named or typed as an overall PWU status, and that any rollup is marked derived and read-only. **Mutation red-proof obligation:** deleting the `data-axis` marking from any one axis SHALL turn the e2e red naming that axis; the current incumbent SHALL fail this check on `shapeIntegrityState` on the day it is written, and that failure is the check's first correct result.
+
+---
+
+## 3.6 SPEC-001-INV-06 — Material uncertainty is visible where the work is
+
+**Statement.** Where governed state records material uncertainty about a unit of professional work — an open Question, a relied-upon Assumption, an unresolved Contradiction, or declared residual uncertainty — the Surface that carries that work **SHALL** make the uncertainty visible on the same Surface, and **SHALL NOT** present the work as settled by omitting it. Visibility **SHALL** survive progressive disclosure for **material** conditions: a critical uncertainty SHALL NOT be hidden solely because the panel that would carry it is collapsed. Materiality is the boundary: uncertainty that the applicable policy does not classify as material MAY be disclosed on demand rather than persistently.
+
+**Master — JPWB-CON-000 AX-3, restated in full** (`docs/canon/JPWB-CON-000 Constitution.md:75`): *"Uncertainty is first-class. Questions, assumptions, contradictions, and residual uncertainty are governed objects that drive work, not annotations on it. Traditional software hides uncertainty; JPWB exposes it. Completion with residual uncertainty is legitimate only when the residual is documented, assessed, accepted by authority, and inspectable downstream."*
+
+**Master — JCUX SCREEN-INV-006 and -007, restated in full** (`JanumiCode UI Information Architecture and Screen Contract.md:310-316`): *"Uncertainty. Material uncertainty SHALL remain visible."* / *"Contradiction. Relevant contradictions SHALL not be hidden."*
+
+**Master — CPM PROJ-INV-005 and -006, restated in full** (`Canonical Projection Model.md:365-371`): *"Uncertainty Disclosure. A projection SHALL NOT present incomplete professional understanding as settled merely for interface simplicity."* / *"Contradiction Visibility. Material contradictions relevant to the projection purpose SHALL remain visible or explicitly disclosed."*
+
+**Master — RIWS §10.3, restated in full** (`Reference Interaction and Workspace Specification.md:454-468`): *"Materiality Rules. Critical conditions SHALL not be hidden solely because a panel is collapsed. Examples: invalidated critical assumption; mandatory validation failure; unresolved contradiction; mandatory constraint violation; stale authoritative data; pending reconciliation. These require persistent visible indicators."*
+
+Four ratified sources at four altitudes, in agreement. RIWS §10.3 is the one that supplies INV-06's hardest edge — the collapse-survival clause — and is the reason INV-06's non-example and INV-07's non-example must be read together.
+
+**WHY — and this is the entry where the absence discipline changed the answer.** The spine records: *"ASSUMPTION / QUESTION / UNCERTAINTY / CONTRADICTION are ratified in vocab and implemented in the engine with **zero UI anywhere in the app**."*
+
+The first search I ran was `grep -rn "UNCERTAINTY\|CONTRADICTION\|ASSUMPTION\|QUESTION" apps/rph-demo/src` — case-sensitive — which returned **0 matches** and appeared to confirm the claim outright. That result was **wrong**, and recording it would have been the seven-times-repeated failure committed an eighth time. Re-run case-insensitively, the same tree returns **thirty-one** matches. The engine-side check was wrong in the same way and in the opposite direction: `UNCERTAINTY` at `packages/rph-contracts/src/enums.ts:644` is a member of `RiskDimensionSchema` — a *risk dimension*, alongside `CONSEQUENCE` and `IRREVERSIBILITY` — and is **not** the epistemic object type the spine means. A first pass would have cited it as proof the type exists.
+
+The **corrected, confirmed** finding is sharper than the spine's and is what INV-06 must be written against. Searches performed, all untruncated: `grep -rni "uncertain\|contradict\|assumption\|unresolved question" --include=*.svelte apps/rph-demo/src` across all eleven `.svelte` files in the application returns **zero matches**. The thirty-one case-insensitive hits in `apps/rph-demo/src` are **entirely** in non-rendering positions, and each was read:
+
+- **Write-side payload literals** — `apps/rph-demo/src/routes/undertakings/[id]/+page.server.ts:543` (`assumptionIds: []`), `:626` and `:750` (`detectedAssumptionIds: []`), `:864` (`residualUncertainty: []`), `:548` (`uncertainty: 'MEDIUM'` — the *risk* dimension). Every one is an empty array or a hardcoded constant sent **to** the engine.
+- **Agent-side authoring and prompt scaffolding** — `lib/server/agent/tools.ts:131-156`, `lib/server/agent/rationale.ts:4,50-52`, `lib/server/agent/system-prompt.ts:61`, `lib/server/agent/mock-agent.ts:114-121`.
+- **Assurance validator internals and their tests** — `lib/server/assurance/reasoning-review-validator.ts:145-148,197` and its test file.
+
+INFERRED, and the inference is the invariant's whole justification: the application **collects** uncertainty (the agent is instructed at `system-prompt.ts:61` to *"Declare the assumptions you actually relied on… and what is genuinely still uncertain"*), **transports** it (`rationale.ts:52` renders a *"Residual uncertainty"* list into a validator prompt), and **evaluates** it (`reasoning-review-validator.ts:145-148` parses `residualUncertainty` out of the review result) — and then presents **none of it to the professional**. Uncertainty is fully instrumented as machine-to-machine data and entirely absent as human-facing state. That is a strictly worse condition than the spine's "zero UI," because the plumbing's existence is what makes the omission invisible: every layer can point to a downstream consumer, and the last consumer is a validator, not a person. Against AX-3 — *"governed objects that drive work, not annotations on it"* — the incumbent has built them as annotations that drive a validator.
+
+**SCOPE.** Governs: the surfacing of material uncertainty on the Surface carrying the work it qualifies; the survival of that surfacing across progressive disclosure for material conditions. Does **not** govern: what makes an uncertainty *material* — that is a policy determination owned by the assurance model (JPWB-DOC-003 §8) and the applicable risk/assurance profile, and INV-06 consumes the classification rather than defining it. Does **not** govern **authoring** — whether the Surface offers an "Identify Uncertainty" affordance is **FORK-5**, recommended for deferral to a separate commission; INV-06 as written requires **display only**, and an implementation that displays uncertainty it cannot author conforms. Does **not** govern volunteered model reasoning, which JPWB-DOC-003 PER-12 (`:379-381`) forbids projecting at all — *"never logged, never projected"* — and which is therefore excluded from INV-06's subject matter rather than admitted by it.
+
+**NON-EXAMPLE.** INV-06 does **not** require that every recorded uncertainty be persistently visible on every Surface. RIWS §10.3's obligation attaches to **critical** conditions; a low-severity assumption recorded against a leaf PWU MAY live behind a collapsed panel, a count badge, or an inspector. Nor does INV-06 require a dedicated uncertainty *screen* — visibility "on the Surface that carries the work" is satisfied by an inline marker on the work itself, and a separate uncertainty inventory that the work does not link to would satisfy the letter while defeating the purpose. Nor does it forbid summarization: "3 open questions" as a persistent indicator, expandable on demand, conforms for non-critical items and is the intended reading of RIWS §10.3's *"persistent visible indicators."*
+
+**Verifying check.** `spec001-inv06-uncertainty-visible.e2e.ts` — seed an Undertaking whose PWU carries a material Assumption, an open Question, and a recorded Contradiction; assert each is visible on the Undertaking Workbench Surface presenting that PWU without navigating away, and assert each remains detectable with every collapsible panel collapsed (the RIWS §10.3 clause). Paired with `spec001-inv06-not-settled.spec.ts`, asserting no Surface renders a completion term for a PWU carrying unaccepted residual uncertainty. **Negative fixture, and it is the one that matters:** `spec001-inv06-plumbing-is-not-display.spec.ts` asserts that the presence of an uncertainty field in a *loader payload* does not satisfy the check — the assertion SHALL be made against rendered, reachable output under INV-07's standard, because the incumbent's exact failure is a fully-populated pipeline with no render site.
+
+---
+
+## 3.7 SPEC-001-INV-07 — Rendered means reachable
+
+**Statement.** Content a Surface renders **SHALL** be reachable by ordinary interaction at every viewport size the Surface claims to support — scrolling, focusing, expanding, or paging to it using the input devices a professional actually has. Content that exists in the DOM and in the accessibility tree but that no ordinary interaction can bring into view **SHALL NOT** be counted as rendered, and a Surface containing such content does not conform, irrespective of the correctness of the projection that produced it. Where a Surface deliberately defers content behind progressive disclosure, the **control** that discloses it SHALL itself be reachable under this standard, and the deferral SHALL be detectable — a collapsed section is conformant, an invisible one is not.
+
+**WHY.** CONFIRMED, and the mechanism is fully readable in three files.
+
+`apps/rph-demo/src/routes/+layout.svelte:145-149` clips the application shell:
+
+```css
+.app {
+	display: flex;
+	height: 100vh;
+	overflow: hidden;
+}
+```
+
+`:74-76` classifies the Undertaking Workbench as full-bleed — `fullBleed = page.url.pathname.startsWith('/pwa/') || /^\/undertakings\/[^/]+$/.test(page.url.pathname)` — and `:303-314` gives the two content modes:
+
+```css
+.content { padding: 24px; flex: 1; min-width: 0; min-height: 0; overflow: auto; }
+/* Full-bleed, viewport-locked graph surfaces manage their own internal scrolling. */
+.content.full { padding: 0; overflow: hidden; }
+```
+
+The comment states the contract the arrangement depends on: full-bleed surfaces *"manage their own internal scrolling."* CONFIRMED that `/undertakings/[id]` does not. Searching its 1128-line component for every overflow and height rule (`grep -n "overflow\|height:\|max-height\|flex:1\|min-height"`, untruncated) returns exactly five: `apps/rph-demo/src/routes/undertakings/[id]/+page.svelte:731-735` (`.flow { height: calc(100vh - 320px); min-height: 420px; … overflow: hidden; }`), `:813` (`overflow-x: auto`), and `:1113` (`line-height`). The **only** `auto` overflow in the file is on the **horizontal** axis. INFERRED, from `.app{overflow:hidden}` + `.content.full{overflow:hidden}` + the absence of any `overflow-y` scroller in the route: content extending below the viewport on `/undertakings/[id]` has no scroll container at any level, and a wheel gesture moves nothing.
+
+The spine records the measurement: at 1440×900, **68 of 77 Assurance rows and 4 of 9 Overview action buttons are unreachable.** REPORTED-MEASURED (spine, 2026-07-28) — I confirmed the *mechanism* by reading all three files, and did not re-run the viewport measurement; the row and button counts are carried forward as recorded, and the check below re-derives them rather than asserting them.
+
+This is why **FORK-4** matters and why this specification's recommendation is *semantic*. The projections feeding those 77 rows are correct. `listAssessments` returns them; the loader maps them; Svelte renders them; the accessibility tree contains them; every unit test over the read model passes. And the professional cannot see 68 of them, cannot act on them, and has no indication they exist. To that professional, the state of the system is indistinguishable from a system in which those rows were never produced — which is JPWB-CON-000 B7 in its purest form (`JPWB-CON-000 Constitution.md:119`): *"No artifact, object, or field may claim a status its relations do not perform… Asserted status must be performed status."* A rendered-but-unreachable row asserts presentation and performs none.
+
+CONFIRMED that the incumbent test suite cannot see this: `grep -rln "scroll\|overflow\|inViewport\|boundingBox" apps/rph-demo/e2e/` across all thirty e2e specs returns exactly **one** file, `pwa-authoring-backbone.e2e.ts` — and none for `/undertakings/[id]`. Playwright's `toBeVisible()` is satisfied by a clipped element. INFERRED: the defect is invisible to a green suite by construction, which is the property that makes INV-07 a *named* invariant with a *named* check rather than a QA note.
+
+**SCOPE.** Governs: reachability of rendered content and of disclosure controls, at the viewport sizes the Surface claims. Governs the claim itself — a Surface SHALL declare the viewport range it supports, since "reachable" is meaningless without one. Does **not** govern: visual design, typography, spacing, colour, component choice, or layout aesthetics, all expressly outside this specification's perimeter. Does **not** govern content genuinely absent from the projection — that is INV-02's or INV-09's concern. Does **not** govern accessibility conformance generally (contrast, ARIA semantics, keyboard trap avoidance); INV-07 asserts a narrower proposition — that presence in the accessibility tree is **not sufficient** for the semantic claim "rendered."
+
+**NON-EXAMPLE — the spine flags this one, and the risk is real.** *Reachability is not a ban on progressive disclosure.* A collapsed accordion, a lazily-loaded tab, a paginated table, a virtualized list rendering 20 of 77 rows, a detail panel that opens on selection, a "show 57 more" control — **all conform**, provided the control that discloses the deferred content is itself reachable and the deferral is detectable. Virtualization in particular is not merely permitted but expected at scale, and an implementer who reads INV-07 as "every row must be in the DOM and scrolled-to" has produced a Surface that cannot render a real Undertaking. The distinction is exact and admits no middle case:
+
+| Arrangement | Verdict |
+|---|---|
+| 77 rows, 20 in the DOM, virtualized scroller, wheel reveals the rest | **Conformant** — deferred and reachable |
+| 77 rows, 20 in the DOM, "Show all" button, button is reachable | **Conformant** — deferred and reachable |
+| 77 rows, all 77 in the DOM, 9 within the clip rect, no scroller | **Violation** — rendered and unreachable |
+
+The third is the incumbent. Note that it is the arrangement with the **most** content in the DOM: INV-07 is not measuring how much was rendered, and an implementer optimizing for the accessibility-tree count is optimizing the wrong number. This interaction with INV-06 SHALL be read jointly: progressive disclosure is permitted here, and INV-06 plus RIWS §10.3 (`:454-468`) withdraw that permission for **material** conditions specifically. Neither invariant is a general rule with the other as its exception; they partition by materiality.
+
+**Verifying check.** `spec001-inv07-reachability.e2e.ts` — for each Surface, at each declared viewport size, enumerate every element carrying `data-material="true"` plus every Command-issuing control, and assert for each that `scrollIntoViewIfNeeded()` followed by a bounding-box intersection test against the viewport succeeds — i.e. that ordinary interaction **can** bring it into view. The assertion SHALL be by **derived count**: the expected element count comes from the loader payload, so the check reports *"68 of 77 assurance rows unreachable"* rather than a boolean, and re-derives the spine's measurement instead of trusting it. `toBeVisible()` SHALL NOT be used as the reachability predicate, and the fixture SHALL carry a comment recording why, since it is the substitution the incumbent suite already made. **Mutation red-proof obligation:** re-adding `overflow: hidden` to a scroll container SHALL turn this check red naming the affected Surface and the unreachable count.
+
+---
+
+## 3.8 SPEC-001-INV-08 — A refused Command surfaces its reason and its code
+
+**Statement.** When a Command issued from a Surface is refused by the engine, the Surface **SHALL** surface, to the professional who issued it, the refusal's **stable error code** and its **reason**, in a form associated with the act that was attempted, before that professional can reasonably act again. The Surface **SHALL NOT** substitute a generic failure message for the engine's reason, **SHALL NOT** discard the code while retaining the message, and **SHALL NOT** report or imply success for a refused Command. Where a Surface issues multiple Commands in one professional act, INV-14's partial-application disclosure applies in addition to — never instead of — this obligation.
+
+**Master — JPWB-DOC-003 PER-1, restated in the part that governs here** (`docs/canon/JPWB-DOC-003 Semantic Model and Invariant Catalog.md:335`): *"Commands request; Events assert. A command expresses a requested mutation and may fail… Command rejection produces a command result, never a domain event — rejection lives outside domain history."* INFERRED consequence, and the reason INV-08 must exist as a *surface* invariant: because a refusal produces **no event**, it leaves no trace in the governed record. If the Surface drops it, the refusal has happened nowhere the professional or a later reviewer can find. Every other invariant in this catalog governs the display of something that persists; INV-08 governs the display of the one thing that does not.
+
+**WHY.** The incumbent is **partly** conformant, and the shape of the gap is precise, newly confirmed in the course of authoring this section, and directly instructive.
+
+CONFIRMED, single-command path — conformant. `apps/rph-demo/src/routes/undertakings/[id]/+page.server.ts:500-507`:
+
+```ts
+function dispatchResult(commandType: string, aggId: string, payload: unknown) {
+	const r = dispatch(commandType, 'EXECUTION_PLAN', aggId, payload);
+	if (r.status !== 'ACCEPTED' && r.status !== 'DUPLICATE')
+		return fail(400, {
+			error: `${commandType} rejected — ${r.error?.code ?? r.status}: ${r.error?.message ?? ''}`
+		});
+	return { advanced: commandType };
+}
+```
+
+Both `code` and `message` are carried, the command is named, and the docblock at `:497-499` states the discipline: *"the RPH_* code + message surface VERBATIM (JAN-EXECPLAN DWP-03): the UI shows the engine's reason and never fabricates a success."* CONFIRMED display at `apps/rph-demo/src/routes/undertakings/[id]/+page.svelte:175` and `:252`, both `role="alert"`.
+
+CONFIRMED, multi-command path — **not** conformant. `+page.server.ts:482-489`:
+
+```ts
+function runSteps(steps: Step[]): string | null {
+	for (const [ct, agg, id, pl] of steps) {
+		const r = dispatch(ct, agg, id, pl);
+		if (r.status !== 'ACCEPTED' && r.status !== 'DUPLICATE')
+			return `${ct}: ${r.error?.message ?? r.status}`;
+	}
+	return null;
+}
+```
+
+`r.error?.code` **is not read**. The sibling function twelve lines below reads it; this one does not. The same omission recurs on the governance surface: `apps/rph-demo/src/routes/decisions/+page.server.ts` returns `r.error?.message ?? r.status` at four dispatch sites (`propose`, `approve`, `grant`, `deny`) with no code at any of them.
+
+INFERRED, and this is why INV-08 names the code explicitly rather than saying "the refusal": the code is the **stable** half. The message is prose that may be reworded, localized, or improved; the code is the identifier a professional can search, a support process can escalate, and a conformance fixture can assert on. A surface that keeps the message and drops the code has kept the half that cannot be matched against anything. The refusal categories are ratified and enumerable — `packages/rph-contracts/src/enums.ts:671-683` fixes `RphErrorCategorySchema` at ten values (`VALIDATION`, `AUTHORIZATION`, `CONCURRENCY`, `NOT_FOUND`, `INVARIANT`, `EXECUTION`, `ASSURANCE`, `PERSISTENCE`, `EXTERNAL_DEPENDENCY`, `SCHEMA_COMPATIBILITY`) — so the surface is discarding a value drawn from a closed, ratified set.
+
+**SCOPE.** Governs: disclosure of refusals for Commands issued from a Surface, to the issuing professional. Does **not** govern: which Commands the engine refuses or why (JPWB-DOC-003 and the engine); the refusal's wording; whether a refusal is *recorded* anywhere durable — PER-1 (`:335`) places rejection outside domain history, and INV-08 does not disturb that. Does **not** govern refusals of Commands the Surface never offered — that is INV-04's withholding case, and the two are deliberately distinct: INV-04 covers the act not offered, INV-08 the act attempted and refused.
+
+**NON-EXAMPLE.** INV-08 does **not** require a modal dialog, a toast, or any particular interruption. An inline `role="alert"` region adjacent to the control — the incumbent's arrangement at `+page.svelte:175,252` — conforms, and is better than a modal for a professional working through a list of refusals. Nor does INV-08 require surfacing the engine's internal exception, stack trace, or SQL state; the obligation is the **stable code** and the **reason**, which are contract surface, not implementation detail. Nor does it forbid supplementing the engine's reason with surface-authored guidance — adding *"the plan must be ACTIVE; supersede or reactivate it first"* alongside the code is permitted and encouraged, provided it supplements rather than replaces.
+
+**Verifying check.** `spec001-inv08-refusal-disclosed.e2e.ts` — issue a Command the engine will refuse on each Surface that offers it (the RW-6 revoked-binding fixture and the WP-15 superseded-plan fixture both supply deterministic refusals), and assert the rendered alert contains **both** the stable code and the engine's message verbatim, and that no success indication appears. Paired with `spec001-inv08-code-preserved.spec.ts`, a static check asserting every dispatch site in `apps/rph-demo/src/routes/**` that formats an error reads `error.code` as well as `error.message` — a check the incumbent SHALL fail at five sites on the day it is written (`+page.server.ts:486`; `decisions/+page.server.ts` × 4), which is its first correct result. **Mutation red-proof obligation:** deleting `r.error?.code ?? ` from `dispatchResult` at `:504` SHALL turn `spec001-inv08-refusal-disclosed.e2e.ts` red.
+
+---
+
+## 3.9 SPEC-001-INV-09 — A Projection that is not current says so
+
+**Statement.** Where a Projection presented on a Surface is stale, partial, rebuilding, degraded, or derived from a historical or predicted temporal basis, the Surface **SHALL** identify it as such, distinguishably from current, complete, authoritative state, and **SHALL** keep that identification separate from the professional lifecycle state of the objects the Projection contains. A Surface **SHALL NOT** present a Projection whose currency it cannot establish as though currency were established. The **boundary**: a Projection that is current, complete, and freshly derived carries no marking obligation — INV-09 requires disclosure of a departure from currency, not a perpetual freshness badge.
+
+**Master — JCUX SCREEN-INV-008, restated in full** (`JanumiCode UI Information Architecture and Screen Contract.md:318-320`): *"Staleness. Stale or partial projections SHALL be identified."*
+
+**Master — CPM PROJ-INV-007 and PROJ-INV-013, restated in full** (`Canonical Projection Model.md:373-375, 397-399`): *"Temporal Qualification. Historical, stale, or predicted state SHALL be clearly distinguishable from current authoritative state."* / *"State Distinction. Projection loading state, stale state, partial state, and professional lifecycle state SHALL remain separate."* CPM §7.8 (`:317-325`) requires every projection definition to declare its temporal basis from a closed set of five — *current state; state at a historical time; change over time; predicted future state; comparison of two states* — and §7.12 (`:339-341`) requires it to declare its refresh rules.
+
+**Master — JPWB-DOC-003 PER-7, the clause that binds here, restated in full** (`docs/canon/JPWB-DOC-003 Semantic Model and Invariant Catalog.md:359,361`): *"Read projections may be rebuilt, delayed, optimized, and independently versioned… Projection lag can never alter an authoritative decision."* And: *"A projection filtered by authorization discloses that its view is partial when the filtering materially affects interpretation."*
+
+**WHY.** PER-7 grants projections the right to lag — that grant is what makes them cheap and rebuildable. INV-09 is the price of the grant. A projection permitted to lag and not required to say so has been given the authority to make a professional's judgement stale without telling them, and PER-7's own guarantee — *"projection lag can never alter an authoritative decision"* — becomes unenforceable at the surface, because the surface is where the decision is formed.
+
+CPM PROJ-INV-013's separation clause is the sharp edge, and it is the one an implementer will collapse first. **Loading**, **stale**, **partial**, and **lifecycle** are four distinct conditions, and a single spinner or a single greyed-out treatment for all four re-creates STA-1's collapse one layer up: the professional cannot distinguish *"this data is arriving"* from *"this data is old"* from *"this data is incomplete"* from *"this work is in progress."* The last of those is governed professional state; the first three are properties of the view. Conflating them lets a view property masquerade as a professional fact.
+
+**Repository status — stated as a bounded search, not as a finding.** The incumbent's surfaces load synchronously in SvelteKit `load()` functions and derive projections per request from the event log (CONFIRMED: `apps/rph-demo/src/routes/undertakings/[id]/+page.server.ts:247` rebuilds the traceability projection inline via `rebuildProjection(traceabilityProjector, engine.readAllEvents())`, and `:319`, `:368`, `:375` each re-read the full event stream). INFERRED: under this architecture a served projection is current by construction and INV-09's marking obligation is largely inert today. I searched for staleness or partiality indicators in the render layer (`grep -rni "stale\|rebuilding\|partial\|degraded" --include=*.svelte apps/rph-demo/src`) and did not pursue the result further, because absence of a marker is **not** a defect where nothing is stale. **ASSUMED, and flagged for ruling:** that the surfaces are in fact synchronous per-request derivations in all cases, including the agent-driven authoring surface, whose SSE path (`apps/rph-demo/src/routes/pwa/[id]/agent/+server.ts`) I did not read. INV-09 is therefore a **forward** obligation — it binds the first cached, incrementally-materialized, or optimistically-served projection this system introduces, and it is written now precisely because that is the change under which it would otherwise be silently omitted.
+
+**SCOPE.** Governs: identification of projection currency, completeness, and temporal basis on the Surface; the separation of view-state conditions from professional lifecycle state. Does **not** govern: the freshness *policy* — how stale a projection may be before it must be refused rather than marked — which is a per-Projection declaration under CPM §7.12 and is recorded in §5 of this specification, not fixed here. Does **not** govern the rebuild mechanism, projection versioning, or the outbox (JPWB-DOC-003 §9). Does **not** govern the professional lifecycle states themselves (DOC-003 §6, and INV-05 in this catalog).
+
+**NON-EXAMPLE.** INV-09 does **not** require a timestamp, freshness badge, or "as of" line on every Projection. A current, complete projection carries **no** marking obligation, and a surface that stamps every panel with "current as of 14:32:07" has added noise that will be ignored on the day it matters — the classic desensitization failure, where a persistent indicator trains the professional not to see it. Nor does INV-09 forbid showing a stale projection: showing stale data **with** its staleness identified is the intended behaviour and is strictly better than showing nothing, because a professional can reason about known-old data and cannot reason about an empty panel. Nor does a skeleton loader satisfy the staleness obligation — it discloses *loading*, which PROJ-INV-013 requires be kept **separate** from *stale*.
+
+**Verifying check.** `spec001-inv09-freshness-disclosed.e2e.ts` — drive each Projection through the freshness lifecycle defined in §4 (fresh → rebuilding → stale → partial → degraded) using an injectable clock and a projection-lag harness, and assert at each state that the Surface carries a distinguishable, machine-readable marker (`data-projection-state`), and that its value is **never** derived from or equal to any object's lifecycle state. Paired with `spec001-inv09-four-conditions-distinct.spec.ts`, asserting the loading, stale, partial, and lifecycle indicators are four distinct rendered signals — the PROJ-INV-013 separation, checked directly rather than assumed. **Mutation red-proof obligation:** mapping any two of the four conditions to the same marker value SHALL turn the separation check red.
+
+---
+
+## 3.10 SPEC-001-INV-10 — Navigation preserves professional context
+
+**Statement.** When a professional moves between Surfaces, the Surface arrived at **SHALL** preserve the active professional context (O-9) that the movement did not explicitly discard — at minimum the active Undertaking or PWA, the selected object where the destination can represent it, the temporal mode, the applicable filters, and the navigation origin — and **SHALL** offer a return path to the origin. Where a destination Surface **cannot** carry an element of the active context because its declared Projection Scope is broader or disjoint (INV-02), the Surface **SHALL** disclose that the context was not carried rather than dropping it silently. Context **SHALL NOT** be discarded as a side effect of a navigation the professional did not understand to be a context change.
+
+**Master — JCUX SCREEN-INV-010, restated in full** (`JanumiCode UI Information Architecture and Screen Contract.md:328-330`): *"Context Preservation. Moving between projections SHALL preserve active professional context."*
+
+**Master — RIWS §11.2, restated in full** (`Reference Interaction and Workspace Specification.md:490-500`): *"Projection State. Switching projections SHALL preserve: active PWU; selected entity where relevant; temporal mode; applicable filters; navigation origin; unsaved local drafting state where safe."* That enumeration is the source of INV-10's minimum set, carried across with one deliberate omission: *unsaved local drafting state where safe* is **not** included in INV-10's SHALL, because "where safe" is an undefined predicate this specification cannot make verifiable. **UNRATIFIED-AUTHORED:** drafting-state preservation is restated here as a **SHOULD** — a Surface SHOULD preserve unsaved local drafting state across navigation where it can establish that doing so cannot cause a stale write, and SHALL NOT preserve it where it cannot. Recorded as a divergence from RIWS §11.2's flat SHALL for the sponsor's ruling.
+
+**Master — RIWS §2, restated in the part that governs here** (`Reference Interaction and Workspace Specification.md:49-78`): *"Every Janumi interaction SHALL preserve the relationship among: Professional Purpose + Current Intent + Current Cognitive Object + Current Cognitive State + Current Lifecycle State + Participant Role + Participant Authority + Temporal Context + Professional History… The interface SHALL help the professional understand: where they are; why this work exists; what is currently understood; what remains uncertain; what requires attention; what they are permitted to do; what professional effect their action will have."* INV-10 is the movement-time expression of *"where they are"*; INV-06 carries *"what remains uncertain"*; INV-04 and INV-13 carry *"what they are permitted to do."*
+
+**Master — CPM PROJ-INV-015, restated in full** (`Canonical Projection Model.md:405-407`): *"Command Traceability. Every command initiated through a projection SHALL retain the originating projection context."* This binds the **Command** side of context: INV-10 governs what the professional keeps when they move; PROJ-INV-015 governs what the Command records about where it came from. INV-10 does not restate it as an obligation on the surface's issuing path, which §5 covers.
+
+**WHY.** CONFIRMED incumbent defect. `apps/rph-demo/src/routes/+layout.svelte:59-64` declares four global destinations:
+
+```ts
+const nav = [
+	{ label: 'PWA Library',  href: '/',             icon: '▤', context: 'design' },
+	{ label: 'Undertakings', href: '/undertakings', icon: '◈', context: 'undertaking' },
+	{ label: 'Decisions',    href: '/decisions',    icon: '⚖', context: 'undertaking' },
+	{ label: 'Baselines',    href: '/baselines',    icon: '◆', context: 'undertaking' }
+];
+```
+
+Every `href` is a bare root. No query parameter, no path segment, no store, no context provider carries the active Undertaking. CONFIRMED at the destinations: `apps/rph-demo/src/routes/decisions/+page.server.ts:14-22` has the signature `export const load: PageServerLoad = () => {…}` — it takes **no parameters at all** — and calls `listDecisions(getEngine())` unscoped; `apps/rph-demo/src/routes/baselines/+page.server.ts:21` is identical in form. INFERRED: a professional working inside Undertaking A who clicks "Decisions" — labelled `context: 'undertaking'` in the very array that drops the undertaking — arrives at an engine-global list with no indication of which Undertaking they left, no filter to return to it, and no back-link. The context bar at `+layout.svelte:118-126` will still read `UNDERTAKING CONTEXT`, which is the worst available outcome: the shell asserts a context the destination does not hold.
+
+Note the interaction with INV-02, which is the reason INV-10's second clause exists. The Decision Center's global scope is **correct** (INV-02's non-example blesses it explicitly). The defect is not that Decisions is unscoped — it is that the transition from a scoped Surface to an unscoped one is **silent**. INV-02 says the broad Surface may be broad; INV-10 says the professional must be told they left the narrow one. A fix that scoped `/decisions` to the active Undertaking would satisfy INV-10 by **breaking** the Decision Center's declared purpose — which is exactly the over-application INV-02's non-example warns against, arriving from the neighbouring invariant.
+
+**SCOPE.** Governs: context preservation across movement between Surfaces within the workbench; disclosure when a destination cannot carry context; availability of a return path. Does **not** govern: the **navigation model** itself — how many destinations there are, what they are called, and how they nest is **FORK-1**, on which five sources disagree (JPWB-DOC-001 §7.1's five contexts, RIWS §6.1's ten destinations, JCUX §3's eleven, RPH-DOC-010 §5's five, and the code's four at `+layout.svelte:59-64`); INV-10 binds whatever model is ruled. Does **not** govern browser history semantics, deep-link URL structure, or session persistence across restarts. Does **not** govern the authority model that decides which Surfaces a professional may reach.
+
+**NON-EXAMPLE.** INV-10 does **not** require that every destination inherit the origin's scope. A deliberate move to a broader context — opening the portfolio from inside an Undertaking, opening the PWA Library from an Undertaking bound to that PWA — is a legitimate professional act and INV-10 requires only that the widening be **disclosed** and **reversible**, not prevented. Nor does INV-10 require context survive an explicit discard: closing an Undertaking, switching organizations, or using a "clear context" control drops context by design. Nor does it require a single global context object — context MAY be carried in the URL, and CONFIRMED that the incumbent already does this correctly for the Undertaking itself (`/undertakings/[id]`, read at `+page.server.ts:230` as `listPwus(engine, params.id)`); extending the same mechanism to the global destinations is the conformant fix, and it is a smaller change than a context store.
+
+**Verifying check.** `spec001-inv10-context-preserved.e2e.ts` — from an Undertaking Workbench with a selected PWU and an applied filter, navigate to each global destination and back, asserting at each hop that (a) the active Undertaking is either carried or its non-carriage is disclosed on the destination, (b) a return path to the origin Surface is present and functional, and (c) the context bar never asserts a context the destination does not hold — the last being the specific incumbent failure at `+layout.svelte:118-126`, asserted directly so the check cannot pass by fixing the easy two-thirds. Paired with `spec001-inv10-context-matrix.spec.ts`, a **total** matrix over (origin Surface × destination Surface × context element) in which every cell is `CARRIED`, `DISCLOSED_NOT_CARRIED`, or `NOT_APPLICABLE_BY_SCOPE` **with a rationale string** — so a new Surface with no row fails the build, and a silent drop is unrepresentable in the fixture's own vocabulary. This is the `UNENFORCED_DISCLOSED` discipline CONFIRMED at `packages/rph-domain/src/enforcement-register.ts:17-27`, where the three-way disposition exists because *"a register with no way to say NOT ENFORCED will always launder an unenforced rule into a green build, because the only vocabulary it has is degrees of covered."*
+
+---
+
+## 3.11 SPEC-001-INV-11 — Execution progress never implies assurance
+
+**Statement.** A Surface **SHALL NOT** represent execution progress in any form that implies, suggests, or is readily mistaken for professional satisfaction, assurance, or acceptance. Specifically, a Surface **SHALL NOT** render an aggregate completion indicator over execution steps using the visual or lexical vocabulary it reserves for assurance outcomes; **SHALL NOT** describe a PWU whose steps have all succeeded as complete, done, finished, or satisfied while its assurance state is unresolved; and **SHALL NOT** order, group, or colour work such that execution success and assurance satisfaction become indistinguishable. Where a Surface presents both, the two **SHALL** be attributable to their own axes (INV-05) and the assurance axis **SHALL** be presented at no lesser prominence than the execution axis for any work whose assurance is required and unresolved.
+
+**Master — JPWB-DOC-003 STA-2, restated in full** (`docs/canon/JPWB-DOC-003 Semantic Model and Invariant Catalog.md:179-181`): *"Execution success never confers satisfaction. (Successor of legacy INV-5.) Execution success moves work toward evidence and assurance, never directly to satisfaction. Step success does not imply PWU success; all-steps-succeeded leaves assurance unassessed until required policies complete; a baseline cannot be promoted solely because all execution steps completed. **WHY:** this is the single inequality the whole harness exists to defend — an agent producing output and an authority accepting the work are different claims. **SCOPE:** governs every transition from execution outcomes to satisfaction, recomposition, or promotion. **NON-EXAMPLE:** it does not make execution state meaningless or demand a human review of every trivial step — it bars execution outcomes from self-certifying professional satisfaction."*
+
+**Master — JPWB-DOC-003 STA-3, restated in full because it is the positive form INV-11 protects** (`:183-185`): *"Satisfaction requires the full triad. A PWU may become satisfied only when execution succeeded, required evidence is admitted, and all mandatory assurance assessments are satisfied. Any rejected mandatory assessment blocks satisfaction."*
+
+**Master — JPWB-DOC-003 DEC-6, the recomposition form** (`:231`): *"Recomposition is a judged act, never a sum. 'All children completed, therefore parent satisfied' is always invalid."* Its WHY (`:232`) names the surface-level danger directly: *"the whole is an emergent claim; completion-counting is the most seductive collapse in the model because it is almost always locally plausible."*
+
+**WHY.** STA-2 is the inequality the entire harness exists to defend, and the Surface is where it is cheapest to violate and hardest to notice. The engine can enforce STA-2 perfectly — refusing every transition to satisfaction that lacks the triad — and a progress bar reading "8 of 8 steps complete" in the visual language of success will still have told the professional the work is done. **No engine guard can reach that claim**, because no Command was issued: the violation is entirely constituted by rendering. This is the precise reason STA-2 needs a surface-side restatement rather than a citation, and why INV-11 is separate from INV-05. INV-05 forbids *collapsing* the axes into one value. INV-11 forbids a subtler act: keeping the axes formally separate while presenting one of them in the register of the other. A row that displays `executionState: SUCCEEDED` in green and `assuranceState: UNASSESSED` in grey satisfies INV-05 — four values, four axes — and violates INV-11, because green is the assurance vocabulary and the professional reads the row as settled.
+
+CONFIRMED that the incumbent enforces the engine-side inequality and says so at the surface: `apps/rph-demo/src/routes/undertakings/[id]/+page.server.ts:892-893` documents the `markSatisfied` action as *"Allowed ONLY because assuranceState is SATISFIED — 'no green without assurance' (INV-5 / property P1). Invoked before assurance, the engine rejects and the error surfaces in the UI."* CONFIRMED at `:715` that the plan-completion path carries the same discipline: *"a rejection surfaces verbatim. Exec ≠ assurance."* INFERRED: the incumbent's engine-side posture on STA-2 is sound, and INV-11's exposure is therefore **entirely** presentational — which is exactly the surface INV-11 governs and no existing test observes. I searched the render layer for aggregate execution progress indicators (`grep -rn "progress\|% \|of.*steps" --include=*.svelte apps/rph-demo/src`) and did not find a percentage-style rollup; **stated as a bounded search, not as a clean bill of health** — the absence of a progress bar today does not discharge INV-11, which binds the first one added.
+
+**SCOPE.** Governs: presentation of execution progress and its relationship to assurance presentation, on every Surface. Governs derived rollups over execution outcomes, which INV-05's non-example permits and which INV-11 further constrains as to their vocabulary. Does **not** govern: the engine's enforcement of STA-2/STA-3 (JPWB-DOC-003, the transition tables, and the `markSatisfied` gate); what assurance *is* or when it is satisfied (DOC-003 §8); the specific colours, icons, or terms a design system assigns — INV-11 constrains the **relationship** between the two vocabularies, not their content, and a design system that uses amber for assurance-satisfied and blue for execution-succeeded conforms as readily as any other, provided they are distinct and the mapping is consistent.
+
+**NON-EXAMPLE.** INV-11 does **not** make execution state unpresentable, secondary, or shameful. STA-2's own non-example is explicit (`:181`): *"it does not make execution state meaningless."* A step list showing 8 of 8 steps `SUCCEEDED`, an execution timeline, a per-step attempt history, a plan-level "all steps settled" indicator — all conform, because each is stated **in the execution axis's own terms** and none makes a satisfaction claim. `apps/rph-demo/src/routes/undertakings/[id]/+page.svelte:475` and `:485` render `{si.executionState || '—'}` as a plain tag in the sequencing view, and that is conformant. Nor does INV-11 demand that assurance be visually louder in general — the prominence clause is conditional and narrow, attaching only where assurance is **required and unresolved**, because a permanently shouting assurance indicator on work with no assurance requirement is the desensitization failure again. Nor does INV-11 forbid the word "complete" — a *step* may be complete, an *Execution Plan* may be complete; what is forbidden is applying it to the **PWU** while an axis is unresolved.
+
+**Verifying check.** `spec001-inv11-progress-not-assurance.e2e.ts` — seed a PWU with every execution step `SUCCEEDED` and `assuranceState: UNASSESSED`; assert no Surface presenting it renders a completion term from the reserved lexical set (`complete`, `done`, `finished`, `satisfied`, `passed`, `✓`) attributed to the PWU, and assert the rendered assurance indicator is present and distinguishable. Paired with `spec001-inv11-vocabulary-disjoint.spec.ts`, asserting that the token sets a Surface uses for execution outcomes and for assurance outcomes are **provably disjoint**, with both sets derived from a single declared mapping rather than re-typed in the fixture — the anti-drift form CONFIRMED at `revrem-wp1-readmodel-fidelity.test.ts:64-82`. **Mutation red-proof obligation:** adding a single `✓` to the execution column of a PWU with unresolved assurance SHALL turn `spec001-inv11-progress-not-assurance.e2e.ts` red. INFORMATIVE: this check has a property the others lack — it is the only one whose red state is reachable by a change no reviewer would flag in a diff.
+
+---
+
+## 3.12 SPEC-001-INV-12 — Provenance is exposed where the claim is presented
+
+**Statement.** A Surface presenting a Claim, an item of Evidence, an AI-produced output, a Decision, or a material change **SHALL** expose that item's provenance — its producing actor and actor type, its production time, the Command or Attempt that produced it, and, for AI-produced content, its attribution as AI-produced together with the resolved provider, model, and version actually invoked — reachable from the presentation of the item itself. Provenance **SHALL NOT** be available only through a separate audit surface that the presentation does not link to. Volunteered model reasoning **SHALL NOT** be exposed under this obligation and **SHALL NOT** be projected at all.
+
+**Master — JCUX SCREEN-INV-005, restated in full** (`JanumiCode UI Information Architecture and Screen Contract.md:306-308`): *"Provenance. Claims, Evidence, AI outputs, Decisions, and changes SHALL expose provenance."*
+
+**Master — CPM PROJ-INV-003 and PROJ-INV-008, restated in full** (`Canonical Projection Model.md:357-359, 377-379`): *"Provenance Preservation. A projection SHALL preserve access to material provenance."* / *"AI Attribution. AI-generated summaries, interpretations, recommendations, and predictions SHALL remain attributable."* And **PROJ-INV-001** (`:347-349`): *"Authoritative Source. Every projection SHALL identify its authoritative source entities and versions."* And **PROJ-INV-011** (`:389-391`): *"Projection Explainability. A material calculated indicator SHALL provide an explanation of its basis."*
+
+**Master — JPWB-DOC-003 PER-9, restated in the part that supplies the content of "provenance"** (`docs/canon/JPWB-DOC-003 Semantic Model and Invariant Catalog.md:367`): *"Every material act in the stream retains identity, scope, actor and provenance, correlation and causation, exact input/subject/context/policy/evidence/output references, the time dimensions PER-11 requires, and status/supersession relations… Every bounded model or agent try — each retry, reformat, and repair request included — is its own durable exchange record capturing the exact materialized input presented to the model, the returned output before schema coercion or repair, the resolved provider, model, and version actually invoked, declared truncation or omission, and the parse/validation/repair outcome, subject to recorded redaction. A prompt or template fingerprint identifies that record; it never substitutes for it."*
+
+**The exclusion, restated in full because it is the one an implementer will get wrong in the generous direction — JPWB-DOC-003 PER-12** (`:379`): *"Volunteered model reasoning is retained where available, quarantined from assurance, and usable only for offline diagnosis. (Sponsor-ruled — REG-D-015.) Chain-of-thought and other volunteered model reasoning is redacted at the trust boundary and retained where available as a typed Artifact bound to its producing Attempt under the applicable retention, security, and access policy… It is never admitted as Evidence, never forwarded to another actor, never logged, **never projected**, and never an input to any tier of assurance policy or Assurance Engineering; its presence in an evaluator's context is a hidden-context independence violation (ASR-13). Its one permitted use is offline diagnosis: engineering inspection under the applicable access policy, outside the assurance, execution, and governance planes."*
+
+**WHY.** Provenance is what converts a rendered claim into an inspectable one. A professional shown an AI-produced assessment recommendation with no attribution has been shown an assertion with no author, and has no basis on which to weight it — which is the precondition for the automation-deference failure the whole harness exists to prevent. JPWB-DOC-003 PER-10 (`:371`) makes the underlying stance explicit: *"Model output is untrusted external input; the system's own agents have no privileged bypass."* Untrusted input rendered without attribution is trusted input.
+
+The exclusion is equally load-bearing and points the other way. An implementer reading INV-12 and PROJ-INV-008 together will reasonably conclude that the most useful provenance for an AI output is *the reasoning that produced it* — and that conclusion is **prohibited**. PER-12 (`:379`) forbids projecting volunteered reasoning in terms, and the prohibition is a sponsor ruling (REG-D-015). INV-12's final sentence exists solely to close that inference, because it is the single most plausible over-implementation of this invariant. PER-12's own non-example (`:381`) marks the boundary precisely: *"professional rationale summaries offered through governed contracts are ordinary content, not reasoning traces."* CONFIRMED that the incumbent honours this distinction in its architecture: the agent's `declare_rationale` tool (`apps/rph-demo/src/lib/server/agent/tools.ts:123-156`) collects a governed rationale summary — `assumptions`, `residualUncertainty` — through a declared contract, and its prompt at `apps/rph-demo/src/lib/server/agent/system-prompt.ts:61` states the reviewer *"never sees your private reasoning."* A rationale summary is projectable under INV-12; a reasoning trace is not.
+
+**Repository status.** CONFIRMED that provenance fields are carried on the write side and through the assurance projection: `packages/rph-projections/src/assurance-view.ts` supplies `validatorImplementationIdentity` and `validatorImplementationVersion`, consumed at `apps/rph-demo/src/routes/undertakings/[id]/+page.server.ts:264-265` as `validatorIdentity` and `validatorVersion`, and the loader comment at `:261` records the associated display discipline: *"§38 fields — undefined renders as 'unknown', never as a false 'none' (the load-bearing distinction)."* INFORMATIVE: that comment states, for one field family, exactly the epistemic rule INV-12 and INV-06 jointly require — *unknown* and *none* are different facts and a surface that renders them identically has fabricated the second. I did **not** audit every provenance-bearing presentation site for reachability of the provenance it carries; that audit is the verifying check's job, and asserting its outcome here without having run it is the failure mode this specification's provenance labelling exists to prevent.
+
+**SCOPE.** Governs: exposure of provenance for the five named item classes — Claims, Evidence, AI outputs, Decisions, material changes — on the Surface presenting them, and its reachability from that presentation. Does **not** govern: what provenance is *recorded* (JPWB-DOC-003 PER-9, PER-11, and the repository's event shapes); the retention, redaction, or access policy applying to it; the governed stream's storage layout. Does **not** govern non-material presentational changes — a re-sort, a filter application, a theme switch produce no provenance obligation. Does **not** extend to volunteered model reasoning, which is excluded by PER-12 and is outside this invariant's subject matter rather than an exception within it.
+
+**NON-EXAMPLE.** INV-12 does **not** require provenance to be rendered inline and always-visible alongside every item. *Reachable from the presentation* is the standard: a per-item provenance affordance, a detail panel, an expandable row, a hover card, a linked audit view **that the item links to** — all conform. Inline-always would make a list of forty assessments unreadable and would violate nothing except good sense; the failure it produces is INV-07's, arriving by over-application of INV-12. Nor does INV-12 require *full* PER-9 exchange records at the surface — PER-9 governs the record's completeness; INV-12 governs access to material provenance from the presentation, and a link into the exchange record satisfies it while inlining the materialized prompt does not (and would, for AI content, risk the PER-12 boundary). Nor is a prompt or template fingerprint sufficient: PER-9 (`:367`) is explicit — *"A prompt or template fingerprint identifies that record; it never substitutes for it."*
+
+**Verifying check.** `spec001-inv12-provenance-reachable.e2e.ts` — for each of the five item classes, seed one instance, present it on each Surface that carries it, and assert its actor, actor type, production time, producing Command or Attempt, and (for AI outputs) AI attribution with resolved provider/model/version are reachable by ordinary interaction from that presentation — reachability asserted by INV-07's standard, not by DOM presence. Paired with `spec001-inv12-no-reasoning-projected.spec.ts`, a **negative** conformance test asserting no Surface, loader payload, or projection carries a field typed as volunteered model reasoning — CONFIRMED to have a ratified basis at PER-12 (`:379`) and therefore not an authored prohibition. Paired further with `spec001-inv12-unknown-is-not-none.spec.ts`, asserting that an absent provenance field renders as *unknown* and never as *none* — the distinction the incumbent already names at `+page.server.ts:261`, promoted here from a comment to a check.
+
+---
+
+## 3.13 SPEC-001-INV-13 — The offered set agrees with the engine, in both directions
+
+**Statement.** For every Command and every object state, the set of Affordances a Surface offers **SHALL** equal the set the engine would admit. A Surface **SHALL NOT** offer an Affordance the engine would refuse (**over-offer**), and **SHALL NOT** withhold an Affordance the engine would admit (**under-offer**). Where the Surface cannot determine the engine's disposition from the declared authority — because a required input is unavailable to it — it **SHALL** fail **open**, offering the Affordance and disclosing the resulting refusal under INV-08, and the fail-open **SHALL** be a recorded declaration with a stated reason at the derivation site rather than an unmarked absence. Agreement **SHALL** be established by a conformance test that asserts **both** directions against the engine's own authority declaration; a test asserting only the refusal direction does not discharge this invariant.
+
+**Master — JCUX SCREEN-INV-004, restated in full** (`JanumiCode UI Information Architecture and Screen Contract.md:302-304`): *"Authority. Available Commands SHALL derive from role and authority."*
+
+**Master — CPM PROJ-INV-009, restated in full** (`Canonical Projection Model.md:381-383`): *"Role Integrity. Available actions SHALL conform to the Participant's authority and assigned role."*
+
+**Relationship to INV-03, stated because the two are routinely conflated.** INV-03 governs the **derivation path** — the offered set must be computed from the authority, not from a copy. INV-13 governs the **result** — the offered set must equal the admitted set. They are independent: a Surface can derive from the single authority and still disagree (by consulting three of four declared columns — which is CONFIRMED to have happened, twice); and a Surface can agree by coincidence while deriving from a copy that has not yet drifted. INV-03 is the mechanism; INV-13 is the property. A catalog carrying only one of them would leave the other unenforced.
+
+**WHY — three recorded instances, one mechanism, and the reason the invariant is two-sided.**
+
+CONFIRMED, and this is the entry with the strongest evidentiary base in the catalog, because the repository has already failed this invariant three times and recorded each failure in the test that fixed it:
+
+1. **F-29 — over-offer via an inline template copy.** `packages/rph-projections/src/execrem-wp15-affordance-fidelity.test.ts:1-14`: *"`advanceCommandsFor(stepState)` nonetheless mirrors a precondition over (planStatus, stepState) while taking only stepState, and the template rendered its result unconditionally — so RETRY was offered on a FAILED step under a CANCELLED or SUPERSEDED plan, and the engine refused it."*
+2. **RW-1 #4 — over-offer via an affordance invisible to the totality type.** `packages/rph-projections/src/revrem-wp1-readmodel-fidelity.test.ts:6-10`: *"`prunableStepIds` was a bare passthrough to a gate that knows only `plan.status`, while `PruneExecutionStep` declares `pwuOpenness: REQUIRES_OPEN_PWU`… The read-model offered a Prune the engine rejects. The reason nobody noticed is itself the finding: `prune` was absent from `COMMAND_BY_AFFORDANCE`, so the `Record<…>` totality that catches exactly this omission could not see it."*
+3. **RW-6 / MAJOR #5 — over-offer via an authority limb the read-model never heard about.** `packages/rph-projections/src/revrem-wp6-readmodel-binding-authority.test.ts:3-10`: *"`stepAuthorityRefusal` consults three authority columns… This read-model consulted two. So the UI offered Start on a step whose runtime binding is REQUESTED, DENIED, REVOKED, or authorized for a DIFFERENT step, and the engine refused the click."*
+
+**The two-sidedness is not symmetry for its own sake — it is the correction to a fix this lineage has already shipped wrong.** `execrem-wp15-affordance-fidelity.test.ts:16-17` states the rule that makes the invariant checkable: *"BOTH-SIDES PAIRS THROUGHOUT. A test that only asserts the refusal is satisfied by a projection that offers nothing at all, which would be a worse defect wearing the fix's clothes."* The same file's `:57-65` gives the sharpest single instance, asserting withholding and offering in one breath — `expect(planAffordancesFor('SUPERSEDED','RUNNING').advance).toEqual(['fail'])` alongside `expect(planAffordancesFor('ACTIVE','RUNNING').advance).toEqual(['complete','fail'])` — with the reason recorded at `:61-62`: *"Fail is CLEANUP_EXEMPT and is NOT withheld: a running step must be able to record that it failed, whatever the plan's status, and a filter that dropped it would be over-refusal wearing the fix's clothes."* `revrem-wp1-readmodel-fidelity.test.ts:93-95` says it again in one line: *"Without this, gating prune to [] unconditionally would pass the kill test — over-refusal wearing the fix's clothes, which this lineage has already shipped once."*
+
+**Under-offer is the direction with the largest live defect, and it is invisible to every existing test.** The spine records: *nine of sixteen route actions are unreachable; the step-level Affordances never appear because no UI-reachable state populates `startableStepByPlan`.* CONFIRMED on both counts by enumeration. `apps/rph-demo/src/routes/undertakings/[id]/+page.server.ts:509-902` declares exactly **sixteen** actions: `proposePwu` (`:511`), `beginExecute` (`:562`), `startStep` (`:649`), `failStep` (`:653`), `retryStep` (`:660`), `skipStep` (`:671`), `cancelStep` (`:678`), `pruneStep` (`:687`), `enterWaitStep` (`:694`), `resolveWaitStep` (`:701`), `cancelPlan` (`:708`), `completePlan` (`:718`), `failPlan` (`:722`), `completeStep` (`:734`), `recordAssurance` (`:773`), `markSatisfied` (`:894`). **Nine** are step-level: `startStep`, `failStep`, `retryStep`, `skipStep`, `cancelStep`, `pruneStep`, `enterWaitStep`, `resolveWaitStep`, `completeStep`. CONFIRMED that the step affordance gate has exactly one consumer: `startableStepByPlan` is built at `:180-192` and read at exactly one place in the render layer, `apps/rph-demo/src/routes/undertakings/[id]/+page.svelte:333` — `{#if data.startableStepByPlan[pl.id]?.includes(s.id)}`.
+
+INFERRED, and this is INV-13's central lesson: the engine admits these nine Commands, the read-model computes their affordances correctly, `planAffordancesFor` has **thirteen** passing test cases across two files asserting the offered sets are exactly right — and the professional cannot reach any of them. **Every over-offer test in the repository passes on a surface that under-offers nine of sixteen actions**, because an offered set that is never rendered is never observed to be too small. This is why INV-13's verifying check must be an end-to-end agreement test and not a read-model unit test, and it is the same substitution `packages/rph-domain/src/enforcement-register.ts:19-20` was built to catch: *"a named production site refuses, OBSERVED end-to-end through Engine.dispatch — never inferred from a unit test, which is the exact substitution that produced this family."*
+
+**The mechanism that makes INV-13 checkable already exists and SHALL be reused rather than reinvented.** CONFIRMED: `packages/rph-domain/src/step-command-spec.ts` declares `STEP_COMMAND_SPECS` as a total `Record<StepCommandType, StepCommandSpec>` with four authority columns; the engine evaluates it at `packages/rph-application/src/handlers/execution.ts:659` (`stepAuthorityRefusal`, invoked `:855`); the read-model evaluates the **same rows** at `packages/rph-projections/src/execution-view.ts:365`. `execution-view.ts:376-382` records why the third limb gates on the **column** rather than on named commands: *"`bindingAuthority` is total over the nine commands with a compile error for a tenth, so a future command that requires an authorized binding is withheld by this read-model ON THE DAY IT IS DECLARED, with no second edit. Naming the two commands instead would guarantee a fourth row in DS §6b's table of 'engine gained a limb, read-model did not hear about it' — which is now three entries long."*
+
+**The named agreement tests that exist today** (all CONFIRMED present and read):
+
+| Test | Location | What it establishes |
+|---|---|---|
+| `execrem-wp15-affordance-fidelity.test.ts` | `packages/rph-projections/src/` | Plan-liveness and PWU-openness agreement, both directions, incl. the fail-open default (`:110-114`) |
+| `revrem-wp1-readmodel-fidelity.test.ts` | `packages/rph-projections/src/` | Prune agreement + the anti-drift equality against `getMachine('PWU.workLifecycleState').terminalStates` (`:64-82`) |
+| `revrem-wp6-readmodel-binding-authority.test.ts` | `packages/rph-projections/src/` | Binding-authority agreement, both directions (`:51-61`) |
+| `retrycap-readmodel-cap.test.ts` | `packages/rph-projections/src/` | Retry-cap agreement between read-model and engine |
+| `exebind-wp1-binding-authority.test.ts` | `packages/rph-application/src/handlers/` | The engine side of the same column, iterated over all nine commands (`:22`) |
+
+INV-13 does not replace these. It **generalizes** them from the execution command family — CONFIRMED to be the only family that has them; see INV-03's untruncated search establishing that `execution-view.ts` holds the only affordance derivation in `packages/rph-projections/src/` — to every Affordance on every Surface, and adds the end-to-end limb the under-offer defect requires.
+
+**SCOPE.** Governs: agreement between the offered Affordance set and the engine-admitted set, in both directions, for every Surface and every Command family. Governs the reachability of the offered set, by explicit incorporation of INV-07's standard — an Affordance computed and not reachable is an under-offer, which is the incumbent's nine-of-sixteen defect and would otherwise fall between the two invariants. Does **not** govern: what the engine admits (JPWB-DOC-003 and the engine's declared authority); the derivation path (INV-03); disclosure of the withheld reason (INV-04); disclosure of a refusal actually incurred (INV-08).
+
+**NON-EXAMPLE.** INV-13 does **not** require the Surface to be right when it cannot know. The disclosed fail-open is conformant and is the specified behaviour: `execution-view.ts:368-369` gates on PWU openness *"Only when the caller actually TOLD us the PWU's state"*, and `execrem-wp15-affordance-fidelity.test.ts:110-114` pins it — *"Recorded, not hidden: a caller that cannot supply the PWU's state gets the pre-WP-15 behaviour rather than a silently emptied action column. The engine still refuses, so the cost is a rejected click."* `+page.server.ts:339-340` applies the same reasoning to unknown runtime bindings: *"A step naming an id absent from this map therefore gets NO entry, which is UNGATED — the engine still refuses, so the cost is a rejected click."* The trade is deliberate and correctly signed: a rejected click costs one refusal disclosed under INV-08; a silently emptied action column costs the professional an act they were entitled to perform and no way to discover it. Nor does INV-13 require that every admitted Command be offered on **every** Surface — a Surface MAY scope which Command families it carries, provided the scoping is declared (INV-02); the invariant binds within the declared family. Nor does it forbid disabled-state rendering: offering an Affordance in a disabled state **with** its withholding reason (INV-04) is an offer for INV-13's purposes only if the engine would refuse it; a disabled control on an act the engine would admit is an under-offer.
+
+**Verifying check.** `spec001-inv13-affordance-agreement.spec.ts` — a **property-based** fixture, because the invariant ranges over a generated space (object state × command × authority-column configuration) that example fixtures under-cover by construction. For each generated (object state, Command) pair: compute the Surface's offered set and dispatch the Command against a scratch engine; assert `offered ⟺ accepted`, reporting **over-offer** and **under-offer** as distinct failure classes so a one-sided regression is nameable. Seeds SHALL be recorded for deterministic replay. Paired with `spec001-inv13-reachable-agreement.e2e.ts`, which asserts the same equality against what the professional can actually reach — driving each Command family to a state where the engine admits it and asserting a reachable control exists under INV-07's standard. That e2e SHALL report a **derived count** (`"9 of 16 route actions unreachable"`), so the incumbent defect is measured rather than merely detected. **Mutation red-proof obligations, both required:** (a) weakening any authority limb in `planPermitsAffordance` to `return true` SHALL turn the over-offer class red; (b) strengthening any limb to `return false` SHALL turn the under-offer class red. A fixture that survives (b) has not established this invariant — it has re-shipped over-refusal wearing the fix's clothes, which this lineage has done once already.
+
+---
+
+## 3.14 SPEC-001-INV-14 — A partial Command sequence never reports success
+
+**Statement.** Where a single professional act on a Surface issues more than one Command, and the sequence is interrupted by a refusal after at least one Command has been accepted, the Surface **SHALL NOT** report the act as failed-without-effect and **SHALL NOT** report it as succeeded. It **SHALL** disclose that the act was **partially applied**, identifying which Commands were accepted, which was refused (with its code and reason, per INV-08), and which were never attempted. A Surface **SHALL NOT** present a multi-Command act as atomic unless the engine provides an atomic Command for it; where no such Command exists, the Surface **SHALL** either compose the act from a single Command or disclose its non-atomicity **before** the act is issued as well as after it fails.
+
+**WHY.** CONFIRMED, and the defect is the most consequential in the catalog because it leaves the governed record in a state the professional believes did not occur.
+
+`apps/rph-demo/src/routes/undertakings/[id]/+page.server.ts:480-489`:
+
+```ts
+/** Run a command sequence, returning the first rejection (naming the command that failed; DUPLICATE is fine) or
+ *  null on success. Prefixing the command type turns an opaque "Schema validation failed" into a locatable one. */
+function runSteps(steps: Step[]): string | null {
+	for (const [ct, agg, id, pl] of steps) {
+		const r = dispatch(ct, agg, id, pl);
+		if (r.status !== 'ACCEPTED' && r.status !== 'DUPLICATE')
+			return `${ct}: ${r.error?.message ?? r.status}`;
+	}
+	return null;
+}
+```
+
+The loop returns on the first refusal. It performs no rollback, issues no compensating Command, and — the load-bearing omission — **returns no record of how many Commands were accepted before the refusal.** The return type is `string | null`: a message or nothing. There is no shape in which partial application could be expressed even if a caller wanted to.
+
+CONFIRMED at the call sites, all three, and the counts are exact. `recordAssurance` (`:830-888`) passes a sequence of up to **eight** Commands: optional `ProposeAssurancePolicy` + `ActivateAssurancePolicy` (`:823-828`), then `RequestAssuranceAssessment` (`:833-843`), `CompleteAssuranceAssessment` (`:846-869`), and **four** `ChangePwuState` hops (`:871-886`). The failure the spine records sits precisely here: `CompleteAssuranceAssessment` at `:846` commits an assurance assessment to the governed record, and the first `chg` hop at `:871` can then be refused as an illegal PWU transition. The professional sees `fail(400, { error: 'Assurance failed: …' })` (`:888`) — a message whose plain reading is *the assurance did not happen* — while two assurance rows are durably committed and will be visible in the Assurance panel on the next load. `beginExecute` (`:568-…`) is worse by count: **ten** Commands, spanning `BeginPwuShaping`, `MarkPwuReady`, `ProposeExecutionPlan`, `ApproveExecutionPlan`, `ActivateExecutionPlan`, three `chg` hops, and `StartExecutionStep` (`:607`) — a refusal at Command nine leaves an approved, activated Execution Plan in existence under a message reporting failure. `markSatisfied` (`:897-899`) passes one, and is therefore not exposed.
+
+INFERRED, and this is why INV-14 is separate from INV-08: a compliant INV-08 implementation makes this **worse**, not better. INV-08 requires the refusal's reason be surfaced faithfully — and the faithful reason for the failing `chg` is *"Illegal transition on PWU"*, which is true, precise, and actively misleading about the two assurance rows now sitting in the record. Truthfully reporting the last event of a sequence is not truthfully reporting the sequence. INV-08 governs the refusal; INV-14 governs the **act**.
+
+The canonical basis for treating this as a first-class obligation rather than an error-handling nicety is JPWB-DOC-003 PER-6 (`docs/canon/JPWB-DOC-003 Semantic Model and Invariant Catalog.md:355`), restated in full: *"Uncertain external effects are reconciled, never blindly retried. When an external operation's completion is uncertain — including across restarts — the attempt enters reconciliation: classify (not started / observably running / succeeded-unrecorded / failed / uncertain), then reconcile before any retry. Compensation is a new recorded action, never deletion of history."* PER-6 governs the engine's relationship to external effects; INV-14 is its surface-side analogue, with the professional in the role of the actor who must classify before retrying. A professional who retries `recordAssurance` after the misleading failure message is blindly retrying a partially-applied sequence — and CONFIRMED that the retry will not be idempotent in the direction they expect, because `assessmentId` is freshly minted per invocation, so the second attempt mints a **second** assessment rather than resuming the first.
+
+**SCOPE.** Governs: any professional act issuing more than one Command from a Surface, and the disclosure obligation on interruption. Governs the Surface's claim of atomicity. Does **not** govern: whether the engine **should** provide an atomic Command for a given composite act — that is a Command-design question for JPWB-DOC-003 and the engine, and INV-14 deliberately does not require one, because requiring atomicity would make the invariant unimplementable against the present engine and an unimplementable SHALL is a defect. Does **not** govern: engine-side idempotency (PER-5), compensation semantics (PER-6), or transaction boundaries in persistence. Does **not** govern multi-Command sequences that complete successfully — a successful sequence reports success, and INV-14 attaches only on interruption.
+
+**NON-EXAMPLE.** INV-14 does **not** require the Surface to roll back. Rollback is frequently impossible and, where possible, is a **compensating Command** and therefore itself a governed act subject to every invariant here — PER-6 (`:355`) is explicit that *"compensation is a new recorded action, never deletion of history."* A Surface that discloses partial application accurately and offers **no** remedy conforms; a Surface that silently issues compensating Commands to make a failure look clean **violates** INV-14 and PER-2's append-only guarantee together. Nor does INV-14 forbid multi-Command acts: composing several Commands into one professional gesture is legitimate and often necessary, and `beginExecute`'s ten-Command sequence is a reasonable authoring convenience. What is forbidden is presenting it as **one** thing whose failure means nothing happened. Nor does INV-14 attach to a sequence in which every refusal occurs before any acceptance — a first-Command refusal has applied nothing and reports plain failure correctly.
+
+**Verifying check.** `spec001-inv14-partial-application.e2e.ts` — for each multi-Command act, use a seeded engine state that causes the sequence to be refused at a **known** index after at least one acceptance (the `recordAssurance` PWU-transition refusal supplies a deterministic instance), and assert the Surface renders a partial-application disclosure naming the accepted, refused, and unattempted Commands, and that the disclosure is neither a bare success nor a bare failure. Paired with `spec001-inv14-sequence-result-shape.spec.ts`, a type-level and unit assertion that every multi-Command helper returns a result type capable of expressing partial application — `{ accepted: CommandRef[]; refused: { command, code, message }; unattempted: CommandRef[] }` — which the incumbent's `string | null` at `:482` **cannot**, making the current signature a detectable violation independent of any runtime behaviour. Paired further with `spec001-inv14-property-sequence.spec.ts`, a **property-based** fixture over generated (sequence, refusal-index) pairs — required because the invariant ranges over a generated space, with recorded seeds for deterministic replay — asserting that for every refusal index *k* in a sequence of length *n*, the disclosure names exactly *k* accepted, one refused, and *n−k−1* unattempted. **Mutation red-proof obligation:** collapsing the result shape back to `string | null`, or reporting the refusal message without the accepted set, SHALL turn both the e2e and the property fixture red.
+
+---
+
+## 3.15 Invariant interaction matrix
+
+INFORMATIVE, and **normative in one respect**: where two invariants are recorded below as *tensioned*, a conformance failure attributed to one SHALL be checked against the other before a remedy is adopted, because the incumbent's own history shows remedies that satisfied one invariant by violating its neighbour (`revrem-wp1-readmodel-fidelity.test.ts:93-95` — *"over-refusal wearing the fix's clothes, which this lineage has already shipped once"*).
+
+| Pair | Relationship | The remedy that breaks the neighbour |
+|---|---|---|
+| INV-02 ↔ INV-10 | **Tensioned** | Scoping the Decision Center to the active Undertaking preserves context and destroys a legitimate cross-subject Surface. Correct remedy: carry-and-disclose, not narrow. |
+| INV-06 ↔ INV-07 | **Partitioned by materiality** | Making all uncertainty persistently visible defeats progressive disclosure and desensitizes; hiding material uncertainty behind a collapsed panel violates RIWS §10.3. Neither is the other's exception. |
+| INV-03 ↔ INV-13 | **Mechanism / property** | Deriving from the single authority does not establish agreement (three recorded counterexamples); agreeing today does not establish derivation. Both checks are required. |
+| INV-05 ↔ INV-11 | **Nested** | Four separate values can still present execution in assurance's vocabulary. INV-05 passing is not evidence for INV-11. |
+| INV-08 ↔ INV-14 | **Compounding** | A faithful INV-08 refusal message makes an undisclosed partial application *more* misleading, not less. Fixing INV-08 alone worsens INV-14. |
+| INV-04 ↔ INV-13 | **Complementary** | INV-04 explains a withholding; INV-13 judges whether the withholding was correct. A well-explained wrong withholding fails INV-13 while passing INV-04. |
+| INV-07 ↔ INV-13 | **Incorporated** | An unreachable affordance is an under-offer. INV-13's scope expressly incorporates INV-07's reachability standard so the nine-of-sixteen defect cannot fall between them. |
+
+---
+
+## 3.16 Forks arising from this section
+
+Raised here, not resolved. Both meet the authoring grant's test — a reasonable sponsor could rule either way, and the downstream effect differs materially.
+
+**FORK-19 — The enforcement register cannot express a surface-layer obligation.** CONFIRMED: `packages/rph-domain/src/enforcement-register.ts:49-55` declares `CoverageLayer` as a closed set of six — `SCHEMA`, `PURE_KERNEL`, `COMMAND`, `READ_MODEL`, `STORE`, `UNKNOWN` — and `:59-67` maps layers by package prefix over `packages/*` only. Search performed: `grep -n "apps/" packages/rph-domain/src/enforcement-register.ts`, untruncated, returns **zero** matches. `layerOfTestFile` (`:75-79`) returns `UNKNOWN` for any unmatched prefix, fail-closed by design (`:72-74`). INFERRED: **every** conformance test this section names — all of which must observe rendered, reachable output under `apps/rph-demo/` — classifies as `UNKNOWN`, and the register has no disposition under which a SPEC-001 invariant can be recorded as ENFORCED. The instrument built to prevent *"a ratified rule certified COVERED and enforced NOWHERE"* (`:8-10`) cannot currently see the layer at which this specification's fourteen invariants are enforced. **Options:** (a) add a `SURFACE` layer and an `apps/` prefix mapping, extending the register's totality to SPEC-001 invariant ids; (b) leave the register execution-scoped and give SPEC-001 a parallel register, accepting two instruments; (c) rule that surface invariants are verified by the conformance suite alone with no register row. **Recommend (a)** — the register's stated value is the three-way disposition including `UNENFORCED_DISCLOSED`, and INV-04, INV-06, and INV-09 are exactly the rows that need it today. **Downstream if ruled otherwise:** each of the fourteen invariants above needs its own enforcement-status bookkeeping, and the "certified COVERED, enforced nowhere" failure recurs on the surface — where, per INV-07's WHY, no existing test can see it.
+
+**FORK-20 — Modality of INV-04's disclosure obligation.** INV-04 states **SHALL**; its nearest ratified source, RIWS §11.3 (`:501-513`), states **SHOULD** and governs *projection* availability rather than *affordance* withholding. RIWS §9.3 (`:410-420`) states **SHALL** for state explanation, including *"what is blocking advancement"* and *"who possesses authority to act"*, which is the same information at a different anchor. **Options:** (a) SHALL, as written — treating a withheld affordance as a state whose explanation §9.3 already mandates; (b) SHOULD, tracking §11.3, with SHALL reserved for withholding of acts the professional's role would otherwise admit. **Recommend (a)**, on the ground that (b) makes the obligation turn on the authority model — which is outside this specification's perimeter — and would make INV-04 unverifiable without importing it. **Downstream if ruled otherwise:** INV-04's verifying check becomes advisory, the totality assertion over offered-plus-withheld cannot be a build gate, and the incumbent's confirmed defect — zero references to `stepAuthorityRefusal` anywhere under `apps/` — becomes a recommendation rather than a violation.
+
+---
+
+# 4. State machines
+
+**INFORMATIVE — reading conventions for §4, §5 and §6.**
+
+*Provenance labels.* Every factual assertion about this repository carries one of four labels (master: §0.2, which this restates at the machine/interface boundary).
+**[CONFIRMED]** — the cited file was read in this session at the cited lines. **[INFERRED]** — derived from a
+confirmed fact by stated reasoning. **[ASSUMED]** — taken as true without verification, with the assumption
+named. **[UNRATIFIED-AUTHORED]** — authored under the sponsor grant of 2026-07-28; no canon artifact ratifies it
+and a sponsor may rule otherwise. Absence claims state the search that produced them, verbatim and untruncated;
+this repository has a documented, seven-times-repeated failure of recording *"I did not find it"* as *"it does not
+exist"*, and an absence recorded without its search is a defect of this specification, not a stylistic lapse.
+
+*Check naming.* Conformance obligations in §4–§6 name checks of the form `SPEC-001-FX-<AREA>-<nn>`, with
+`<AREA>` ∈ {`FRESH`, `AFF`, `IFACE`, `DISC`}. **[UNRATIFIED-AUTHORED]** — the naming scheme is authored here;
+§10 (Conformance-fixture specification) is the master for fixture content, and where §10 and a §4–§6 reference
+disagree, §10's fixture body governs and the divergence is a finding against this section.
+
+*Fork numbering.* Forks raised in §§4–6 were authored against the spine's sequence and were renumbered at assembly into the consolidated register at §11.1; they carry ids **FORK-21**, **FORK-22**, **FORK-23**, **FORK-24** and **FORK-25**. §11.1 is the master for every fork record; a fork id appearing here and not in §11.1.12's index is a defect of this document.
+
+*Vocabulary* (master: §1.3). `Undertaking` is the root term (JPWB-DOC-002:248); `Endeavor` is retired and DOC-002:249 forbids
+minting a competing root. `Projection`, `Command`, `Professional Work Unit`, `Assurance Assessment`, `Baseline`,
+`Decision` are canonical and are used, never redefined. `Surface`, `Affordance`, `Affordance Withholding`,
+`Projection Scope`, `Navigation Context` are this specification's objects O-1…O-9 and are defined in §2.
+
+---
+
+## 4.1 Machine A — Projection freshness
+
+### 4.1.1 Why freshness is a machine and not a flag
+
+**INFORMATIVE.** A Projection is derived, disposable and powerless (JPWB-DOC-003 PER-7; restated in code at
+`packages/rph-projections/src/projector.ts:1-4` — *"Views are DATA, never a write target, never rendered, and
+always rebuildable from events … projection lag never affects canonical validation"* **[CONFIRMED]**). PER-7
+grants the engine permission to be *late*. It says nothing about what the professional is permitted to believe
+while the engine is late, and that silence is precisely this specification's concern: a late Projection rendered
+without qualification is a *false current-state claim* made to a professional who will act on it.
+
+CPM PROJ-INV-013 forbids the obvious economy: *"Projection loading state, stale state, partial state, and
+professional lifecycle state SHALL remain separate."* JCUX §6 restates it as a prohibition — the eight declared
+screen state categories *"SHALL not be collapsed into one generic loading or status field."* Machine A therefore
+governs **one axis only** — the *derivation* axis — and §4.1.7 declares the two further axes it must never absorb.
+
+### 4.1.2 Declared absence in the incumbent
+
+**[CONFIRMED — absence]** No freshness metadata of any kind exists in the built system. Search executed over
+`packages/` and `apps/`, includes `*.ts` and `*.svelte`, excluding `node_modules/` and `dist/`, untruncated,
+case-insensitive, pattern `refreshing|lastUpdated|watermark`: **0 matches**. A second search, same corpus and
+exclusions, untruncated, case-insensitive, pattern `stale`, returned **112 matches**, of which **zero** is a
+Projection freshness state a Surface can render. The matches partition into domain staleness rules (a stale
+Decision version binding, a stale assurance floor, a stale `previousState`, a stale attestation, a stale
+contract), test names and assertions, build-artifact concerns (`apps/rph-demo/src/lib/pwaFlow.ts:300`, a stale
+JS chunk), and prose. The only two that concern projections at all are `projector.ts:9` — a comment describing
+the checkpoint-invalidation *mechanism* — and `execution-view.ts:881`, which refers to a stale PWA-*version*
+type, not to projection lag. A third search, pattern `rebuilding`, returned **0 matches**.
+
+**[CONFIRMED]** The projection framework carries the *mechanism* for freshness and no *consumer* of it.
+`Projector.handlerVersion` exists and is documented as *"Bump when the fold logic changes so stale checkpoints
+trigger a rebuild"* (`projector.ts:9`); `IncrementalProjection` exposes `checkpoint` (`projector.ts:41-43`) and
+an idempotent `apply` keyed on `eventId` (`projector.ts:49-54`). Search over the same corpus for
+`IncrementalProjection` returns 11 matches: 1 class declaration, 1 emitted `.d.ts`, and **9 in test files**
+(`packages/rph-engine/src/projection-trace-compat.test.ts`,
+`packages/rph-projections/src/traceability-compatibility.test.ts`,
+`packages/rph-projections/src/work-projection.test.ts`). No route, loader or component constructs one. The
+Undertaking Workbench loader instead calls `rebuildProjection(...)` from empty on every request
+(`apps/rph-demo/src/routes/undertakings/[id]/+page.server.ts:247`) **[CONFIRMED]**.
+
+**[INFERRED]** The incumbent therefore occupies exactly one state of Machine A — `DERIVED` at request time — and
+has no representation for the other five. That is not a violation of Machine A; a system that rebuilds from empty
+on every read is *legitimately* always fresh at the instant of derivation. It becomes a violation the moment the
+rendered value outlives the request (client-side navigation, a form action that mutates and returns, a live
+stream), because nothing then re-derives and nothing says so.
+
+### 4.1.3 The state set
+
+**[UNRATIFIED-AUTHORED]** Six states. Values are aligned to JCUX §6.1's `technicalFetchState` vocabulary where a
+corresponding value exists there; §4.1.7 and FORK-21 record where the alignment is imperfect.
+
+| Id | State | Definition | JCUX §6.1 correspondent | Renderable value present? |
+|---|---|---|---|---|
+| `F-UNBUILT` | **UNBUILT** | No derivation has been attempted for this (Projection Scope, `handlerVersion`) pair. | `idle` | No |
+| `F-DERIVING` | **DERIVING** | A first derivation is in flight; no prior value exists to fall back on. | `loading` | No |
+| `F-DERIVED` | **DERIVED** | A fold completed at source watermark `W`, and `W` equals the last known source head. | `loaded` | Yes |
+| `F-STALE` | **STALE** | A fold completed at `W`, and either the known head exceeds `W` or the head is unreadable. | `stale` / `offline` | Yes |
+| `F-REBUILDING` | **REBUILDING** | A re-derivation is in flight **while a prior value remains renderable**. | `refreshing` | Yes (the prior one) |
+| `F-FAILED` | **FAILED** | The most recent derivation raised, and **no** value is renderable at any watermark. | `failed` | No |
+
+**SHALL.** A Projection SHALL expose its Machine-A state as a discrete value drawn from exactly this six-value
+set, on the `ProjectionEnvelope.freshness` field specified in §5.9. Conformance is established by
+`SPEC-001-FX-FRESH-01` (a totality fixture asserting that the union type admits exactly these six literals, so
+that adding a seventh fails to compile and deleting one fails the fixture), and by `SPEC-001-FX-FRESH-02`
+(every Projection constructor in `packages/rph-projections/src` returns an envelope whose `freshness` is one of
+the six).
+
+**SHALL NOT.** A Projection SHALL NOT represent freshness as a boolean (`isStale`, `loading`), because a boolean
+cannot distinguish `DERIVING` from `REBUILDING` and therefore cannot satisfy JCUX §6's non-collapse rule. The
+negative fixture `SPEC-001-FX-FRESH-03` fails if any exported projection interface declares a boolean-typed
+field whose name matches `/^(is)?(stale|loading|fresh|ready|refreshing)$/i`.
+
+*Rationale for `REBUILDING` retaining a value.* **INFORMATIVE.** The distinction between `DERIVING` and
+`REBUILDING` is the distinction between *"I have nothing to show you"* and *"what I am showing you is one
+watermark behind and I am fixing that"*. Collapsing them produces the familiar defect in which a refresh blanks
+a populated Surface — which, under INV-07, is indistinguishable to the professional from the content having been
+withdrawn.
+
+### 4.1.4 Legal transitions
+
+Every row names its trigger (what causes the attempt) and its guard (what must hold for the attempt to succeed).
+`W` denotes the watermark at which the current value was folded; `H` denotes the last known source head; `W'`
+denotes the watermark of a fold now completing. The watermark's type and comparison rule are specified in §5.9.
+
+| Id | From → To | Trigger | Guard | Derivation citation |
+|---|---|---|---|---|
+| `T-01` | UNBUILT → DERIVING | A Surface region binds to a Projection Scope for the first time. | The Scope resolves to a subject identifier (§5.9 `scope`). | `+page.server.ts:213-247` binds route param → Scope **[CONFIRMED]** |
+| `T-02` | DERIVING → DERIVED | The fold returns normally. | `W' = H` at the instant the fold returns. | `rebuildProjection` (`projector.ts:16-22`) **[CONFIRMED]** |
+| `T-03` | DERIVING → STALE | The fold returns normally. | `W' < H` — the head advanced while the fold ran. | — **[UNRATIFIED-AUTHORED]** |
+| `T-04` | DERIVING → FAILED | The fold raises, or the source is unreadable. | No prior value exists (guaranteed by `F-DERIVING`'s definition). | — |
+| `T-05` | DERIVING → UNBUILT | The Scope changes, or the region unmounts, before the fold lands. | The in-flight result is discarded, never rendered. | — |
+| `T-06` | DERIVED → STALE | A source event is appended within Scope; or `handlerVersion` changes; or the head becomes unreadable. | `H > W`, or `H` unknown. | `projector.ts:9` names the `handlerVersion` trigger **[CONFIRMED]** |
+| `T-07` | DERIVED → REBUILDING | An explicit Refresh; a navigation revalidation; or the mandatory post-Command re-derivation of §4.2 `U-09`/`U-10`/`U-11`. | The prior value is retained and remains rendered throughout. | `invalidateAll()` at `apps/rph-demo/src/routes/pwa/[id]/+page.svelte:782` is the incumbent's only revalidation trigger **[CONFIRMED]** |
+| `T-08` | DERIVED → UNBUILT | Scope change or region teardown. | — | — |
+| `T-09` | STALE → REBUILDING | As `T-07`. | The prior (stale) value is retained and remains rendered. | — |
+| `T-10` | STALE → UNBUILT | Scope change or region teardown. | — | — |
+| `T-11` | REBUILDING → DERIVED | The rebuild returns normally. | `W' = H`. | `IncrementalProjection.rebuild` (`projector.ts:57-62`) **[CONFIRMED]** |
+| `T-12` | REBUILDING → STALE | The rebuild returns normally **or raises**. | `W' < H` (returned behind), **or** the rebuild raised and the prior value is retained with cause `REBUILD_FAILED`. | — **[UNRATIFIED-AUTHORED]** |
+| `T-13` | REBUILDING → UNBUILT | Scope change or region teardown. | — | — |
+| `T-14` | FAILED → DERIVING | Retry, manual or automatic. | No value is retained (guaranteed by `F-FAILED`'s definition). | — |
+| `T-15` | FAILED → UNBUILT | Scope change or region teardown. | — | — |
+
+Three self-transitions are legal and are enumerated here rather than left implicit:
+
+| Id | Pair | Legal because | Guard |
+|---|---|---|---|
+| `T-16` | UNBUILT → UNBUILT | Teardown is idempotent; a second teardown is a no-op. | — |
+| `T-17` | DERIVED → DERIVED | Re-derivation that yields the same watermark is a no-op — the idempotency `IncrementalProjection.apply` already implements by `eventId` (`projector.ts:49-54`) **[CONFIRMED]**. | `W' = W`. Violating this guard is `GV-01`. |
+| `T-18` | STALE → STALE | The head advancing further while already stale does not change the state, only the magnitude of the lag. | `H` increases; `W` unchanged. |
+
+**SHALL.** An implementation SHALL effect a Machine-A state change only by one of `T-01`…`T-18`. Conformance is
+established by `SPEC-001-FX-FRESH-04`, a transition-table fixture that drives every one of the eighteen legal
+pairs and asserts the resulting state, and by `SPEC-001-FX-FRESH-05`, which asserts that the implementation's own
+transition table is *derived from* the specified table rather than restated — a second copy of a transition table
+is the drift mechanism this repository has recorded five times in the affordance layer alone
+(`execution-view.ts:331-347`, whose comment records a literal set whose *own comment* claimed it was derived)
+**[CONFIRMED]**.
+
+### 4.1.5 Illegal transitions — enumerated
+
+Six states yield thirty-six ordered pairs. Eighteen are legal (`T-01`…`T-18`). The remaining **eighteen are
+prohibited** and are enumerated below individually. None is left to implication.
+
+| Id | Prohibited pair | Why it is prohibited | Detecting check |
+|---|---|---|---|
+| `P-01` | UNBUILT → DERIVED | Asserts a folded value where no fold ran — a fabricated current-state claim. This is the single most dangerous shortcut in the machine: it is how a seeded, hand-written, or cached-from-another-Scope value enters a Surface wearing the authority of a derivation. | `SPEC-001-FX-FRESH-06` |
+| `P-02` | UNBUILT → STALE | Same fabrication as `P-01`, wearing a qualification. A qualified fabrication is still a fabrication. | `SPEC-001-FX-FRESH-06` |
+| `P-03` | UNBUILT → REBUILDING | `REBUILDING` asserts a retained prior value; `UNBUILT` has none. Entering it from `UNBUILT` is how a Surface comes to render an empty region as though it were a stale populated one. | `SPEC-001-FX-FRESH-07` |
+| `P-04` | UNBUILT → FAILED | `FAILED` means *a derivation was attempted and raised*. Never attempting is not failing; reporting it as failure invites a retry that has nothing to retry. | `SPEC-001-FX-FRESH-07` |
+| `P-05` | DERIVING → DERIVING | Two concurrent first derivations for one (Scope, `handlerVersion`) may return different values, and nothing decides between them. A second bind during `DERIVING` SHALL join the in-flight derivation (§5.9 idempotency). | `SPEC-001-FX-FRESH-08` |
+| `P-06` | DERIVING → REBUILDING | `REBUILDING` asserts a retained prior value; a first derivation has none. | `SPEC-001-FX-FRESH-07` |
+| `P-07` | DERIVED → DERIVING | A re-derivation that discards a perfectly good prior value and blanks the region. The correct transition is `T-07`. This pair is the mechanical cause of the "refresh blanks the screen" defect and its prohibition is the operative half of INV-09. | `SPEC-001-FX-FRESH-09` |
+| `P-08` | DERIVED → FAILED | A value that was successfully derived does not become underivable retroactively. When the source becomes unreachable, the honest state is `STALE` with cause `SOURCE_UNREACHABLE` — the professional keeps the last true reading, correctly qualified. Transiting to `FAILED` destroys a true reading in response to a transport fault. | `SPEC-001-FX-FRESH-10` |
+| `P-09` | STALE → DERIVED | **Clearing the stale marker without re-deriving.** The cheapest wrong implementation in this machine and the one an agent will reach for first: the marker is a field, the fold is expensive, and setting the field green is one line. Freshness is a property of the *fold*, not of the *label*. | `SPEC-001-FX-FRESH-11` |
+| `P-10` | STALE → DERIVING | As `P-07`: discards a retained value that INV-09 requires be kept and qualified. | `SPEC-001-FX-FRESH-09` |
+| `P-11` | STALE → FAILED | As `P-08`. | `SPEC-001-FX-FRESH-10` |
+| `P-12` | REBUILDING → DERIVING | Downgrades a rebuild-with-retention into a blanking first derivation mid-flight. | `SPEC-001-FX-FRESH-09` |
+| `P-13` | REBUILDING → REBUILDING | Concurrent rebuilds for one Scope; the later-returning fold may carry the earlier watermark, silently moving the Projection backwards in time. | `SPEC-001-FX-FRESH-08` |
+| `P-14` | REBUILDING → FAILED | A failed rebuild SHALL NOT discard the value it was rebuilding. The prohibition is what makes `T-12`'s `REBUILD_FAILED` path mandatory rather than optional, and it forecloses the `try { … } catch { setFailed(); render([]) }` shape in which a transient failure presents as an authoritative empty set. | `SPEC-001-FX-FRESH-12` |
+| `P-15` | FAILED → DERIVED | Fabrication, as `P-01`, from a state that additionally has a failure on record. | `SPEC-001-FX-FRESH-06` |
+| `P-16` | FAILED → STALE | Fabrication with a qualification, as `P-02`. | `SPEC-001-FX-FRESH-06` |
+| `P-17` | FAILED → REBUILDING | `REBUILDING` asserts a retained value; `FAILED` is defined by having none. A retry from `FAILED` is `T-14`. | `SPEC-001-FX-FRESH-07` |
+| `P-18` | FAILED → FAILED | A second failure without an intervening attempt is not a second failure; it is the same failure counted twice, and it defeats any retry-budget or escalation policy computed from failure counts. | `SPEC-001-FX-FRESH-08` |
+
+**Guard violations.** Five further defects are *legal pairs taken under a false guard*. They are enumerated
+separately because a transition table alone cannot catch them.
+
+| Id | Legal pair | Guard violated | Consequence | Detecting check |
+|---|---|---|---|---|
+| `GV-01` | DERIVED → DERIVED (`T-17`) | `W' = W` | A derived value mutated in place at a new watermark without passing through `REBUILDING`, so no Surface ever showed the transition and no re-derivation of Affordances was triggered (§4.2 `U-09`). | `SPEC-001-FX-FRESH-13` |
+| `GV-02` | DERIVING → DERIVED (`T-02`) | `W' = H` | A fold that landed behind the head is labelled fresh. INV-09 violated at the instant of first render. | `SPEC-001-FX-FRESH-14` |
+| `GV-03` | REBUILDING → DERIVED (`T-11`) | `W' = H` | As `GV-02`, on the rebuild path. | `SPEC-001-FX-FRESH-14` |
+| `GV-04` | STALE → REBUILDING (`T-09`) | Prior value retained | The rebuild blanks the region it was meant to refresh; observationally identical to `P-10`. | `SPEC-001-FX-FRESH-09` |
+| `GV-05` | REBUILDING → STALE (`T-12`) | Prior value retained on the `REBUILD_FAILED` path | The failure disclosure survives but the data it qualifies does not — the professional is told the refresh failed and shown nothing to compare it against. | `SPEC-001-FX-FRESH-12` |
+
+### 4.1.6 Obligations attached to the states
+
+**SHALL.** A Projection in `STALE`, `REBUILDING`, or carrying `completeness = PARTIAL` SHALL be identified as
+such on every Surface that renders it, by a disclosure that is itself reachable under INV-07 — not by a marker
+present only in the accessibility tree, and not by a marker rendered outside the scroll extent. This restates
+`SPEC-001-INV-09` in full at the machine boundary; the master statement is `SPEC-001-INV-09` in §3, which itself
+restates JCUX SCREEN-INV-008 (*"Stale or partial projections SHALL be identified"*). Conformance is established
+by `SPEC-001-FX-FRESH-15`, a reachability fixture that scrolls the disclosure into view at 1440×900 and asserts a
+non-zero intersection with the viewport, and by `SPEC-001-FX-FRESH-16`, which asserts the disclosure's presence
+for each of `STALE`, `REBUILDING`, `PARTIAL`.
+
+**SHALL.** A `STALE` Projection SHALL disclose, at minimum, the six items JCUX §50 enumerates — *Last Updated,
+Source Version, Current Known Version, Material Change Indicator, Refresh Command, Command Safety State* — mapped
+onto §5.9's `ProjectionEnvelope` fields `derivedAt`, `watermark`, `knownHead`, `materialChangeSinceWatermark`,
+`refreshAffordanceId`, `commandSafety`. Conformance: `SPEC-001-FX-FRESH-17` asserts all six are present and
+non-empty whenever `freshness = STALE`. **[UNRATIFIED-AUTHORED]** — the field names are authored; JCUX §50 names
+the concepts, not the shape.
+
+**SHALL.** A Command issued from a `STALE` Projection SHALL be revalidated against current authoritative state
+before it is applied (JCUX §50: *"Commands from stale projections SHALL revalidate against current authoritative
+state"*). **[CONFIRMED]** the engine already performs this revalidation unconditionally: `expectedRevision`
+carries optimistic concurrency (`packages/rph-contracts/src/envelopes.ts:79`), and a mismatch produces
+`RPH_REVISION_CONFLICT` with `CommandResultStatus = CONFLICT`
+(`packages/rph-application/src/handlers/intent.test.ts:158-163`). The obligation this specification adds is on
+the *Surface*: it SHALL surface the resulting `CONFLICT` under `JPWB-SD-041` (§6.3) rather than retrying blind.
+Conformance: `SPEC-001-FX-FRESH-18`.
+
+**SHALL NOT.** A `FAILED` Projection SHALL NOT render as an empty result set. An empty set is a *professional
+claim* — "there are none" — and PROJ-INV-014 (*No False Completeness*) forbids implying coverage the source did
+not supply. The distinction is already load-bearing in this repository and is documented as such:
+`packages/rph-projections/src/assurance-view.ts:52-56` records that *"The distinction between 'unknown' (no
+source) and 'none' (a real empty) is load-bearing: rendering an unsourced field as 'none' is the false-negative
+that lets a node look assured when it was never checked"* **[CONFIRMED]**. Conformance: `SPEC-001-FX-FRESH-19`,
+a negative fixture that forces a derivation failure and asserts the Surface renders the failure disclosure
+(`JPWB-SD-010`, §6.3) and **not** the empty-state text.
+
+### 4.1.7 The axes Machine A does not govern
+
+**SHALL.** The following two axes SHALL be represented separately from `freshness` and SHALL NOT be folded into
+it (CPM PROJ-INV-013; JCUX §6). Conformance: `SPEC-001-FX-FRESH-20` asserts that `ProjectionEnvelope` declares
+three distinct fields and that no single field's type is a union spanning two axes.
+
+**Axis 2 — completeness.** Values: `COMPLETE` | `PARTIAL`. `PARTIAL` means one or more declared source classes
+did not contribute. A genuinely empty result from a fully-read source is `COMPLETE`, not `PARTIAL`. A `PARTIAL`
+Projection SHALL disclose the four items RIWS §26.3 requires — which source classes are missing, why, whether
+interpretation may be materially affected, and whether Commands remain available — carried on §5.9's
+`ProjectionEnvelope.partiality`. **SHALL NOT**: completeness SHALL NOT change without a re-derivation; a
+`PARTIAL → COMPLETE` flip with an unchanged watermark is the exact analogue of `P-09` and is detected by
+`SPEC-001-FX-FRESH-21`.
+
+**Axis 3 — temporal basis.** Values: `CURRENT` | `HISTORICAL` | `COMPARISON` | `PREDICTED` | `OFFLINE_SNAPSHOT`
+(JCUX §6.3; CPM §7.8 poses the same five as a question the projection definition must answer). **[CONFIRMED —
+absence]** No temporal mode exists in the built Undertaking Workbench: search over `apps/rph-demo/src`,
+`*.ts` + `*.svelte`, untruncated, case-insensitive, pattern `historical|temporalMode|temporal_mode|asOf|as-of`
+returned **3 matches**, all in `apps/rph-demo/src/routes/pwa/[id]/+page.server.ts` (lines 269, 554, 643) and all
+concerning *PWA version pinning*, none a temporal projection mode. **SPEC-001 governs `CURRENT` only**; the other
+four values are **Deliberately Unspecified** here and are listed in §11 with their owning open question. A
+Projection whose `temporalBasis` is anything other than `CURRENT` is outside this specification's conformance
+scope and SHALL say so rather than being silently rendered as current — the one obligation this specification
+does impose on the axis, verified by `SPEC-001-FX-FRESH-22`.
+
+> **FORK-21 — Freshness as three axes versus JCUX's single `technicalFetchState` enum.**
+> **Decision:** whether `freshness`, `completeness` and `temporalBasis` are three fields (this specification) or
+> one eight-valued enum (JCUX §6.1, which places `idle`, `loading`, `refreshing`, `loaded`, `partial`, `stale`,
+> `offline`, `failed` in a single list).
+> **The contradiction is real and is in the sources, not in this reading.** JCUX §6 lists `technicalFetchState`
+> and `stalenessState` as two *separate, non-collapsible* categories, and then §6.1 puts `stale` *inside*
+> `technicalFetchState`. JCUX defines no value set for `stalenessState` anywhere — search over the JCUX document
+> for `stalenessState` returns exactly the one occurrence at its line 246, in the category list. CPM PROJ-INV-013
+> requires loading, stale and partial to remain separate, which the flat enum cannot do (a Projection that is
+> both refreshing and partial has no representation in it).
+> **Options:** (a) three axes, as specified here; (b) JCUX's flat enum, accepting that `refreshing ∧ partial` is
+> inexpressible; (c) the flat enum plus a separate `stalenessState`, leaving `partial` collapsed.
+> **Recommendation: (a).** It is the only option satisfying PROJ-INV-013, and JCUX's own §6 non-collapse
+> sentence is better served by it than by JCUX's own §6.1 enum.
+> **If ruled otherwise:** `T-03`, `T-12`, `GV-02`, `GV-03` and Axis 2 lose their meaning; `SPEC-001-INV-09`
+> reduces to a single marker and `SPEC-001-FX-FRESH-20`/`-21` are withdrawn.
+
+> **FORK-22 — May a `STALE` Projection continue to offer Affordances?**
+> **Decision:** whether Machine B's `OFFERED` disposition survives Machine A's transition to `STALE`.
+> **Sources conflict.** JCUX §50 permits it and constrains it (*"Commands from stale projections SHALL
+> revalidate"*). RIWS §27.1 requires the UI to *"prevent unsafe mutation"* when source state has changed.
+> **Options:** (a) offer, revalidate, and surface the `CONFLICT` — Affordances survive staleness; (b) withhold
+> all Affordances on a stale Projection, with disclosure under O-5; (c) withhold only Affordances whose
+> derivation consumed a source class that has advanced.
+> **Recommendation: (a).** Option (b) converts every lag into a silent capability loss and would make INV-04's
+> withholding disclosure fire on a condition the professional cannot act on; the engine's optimistic concurrency
+> already makes the unsafe mutation *impossible* rather than merely discouraged
+> (`envelopes.ts:79`, `RPH_REVISION_CONFLICT`) **[CONFIRMED]**. Option (c) is defensible but requires per-field
+> source-class provenance the incumbent does not carry.
+> **If ruled otherwise:** §4.2 gains a transition `OFFERED → WITHHELD` triggered by `T-06`, with withholding
+> reason `SOURCE_ADVANCED`, and `JPWB-SD-042` becomes mandatory rather than conditional.
+
+---
+
+## 4.2 Machine B — Affordance disposition
+
+### 4.2.1 Scope of the machine
+
+Machine B governs one Affordance (O-4) — one offered semantic Command on one Surface, for one subject, at one
+Projection watermark. It does **not** govern the Command's own lifecycle inside the engine; that belongs to
+JPWB-DOC-003 and to the handler registry, and this specification may only restate it with citation. The seam is
+exact and is already drawn in code: the read-model consults the engine's *declaration* rather than re-deriving
+its *rule* (`packages/rph-projections/src/execution-view.ts:365` reads `STEP_COMMAND_SPECS[…]`;
+`:387-390` delegates to `bindingAuthorityVerdict`; `:403-406` to `retryDecision`; `:412-417` to
+`stepMayBecomeReady`) **[CONFIRMED]**.
+
+### 4.2.2 The state set
+
+**[UNRATIFIED-AUTHORED]** Seven states. The spine fixes five (offered / withheld / issued / refused / applied);
+two are added and both are forced by fixed invariants rather than by preference — `UNDERIVED`, because INV-03
+makes derivation an *act* whose absence must be representable, and `PARTIALLY_APPLIED`, because INV-14 names a
+condition that is neither applied nor refused. Adding them is reported here rather than silently: the spine
+permits no new *objects*, and these are states of the spine's own O-4, not new objects.
+
+| Id | State | Definition |
+|---|---|---|
+| `A-UNDERIVED` | **UNDERIVED** | The Affordance has not been evaluated against the declared authority at the current watermark. Nothing about it may be rendered. |
+| `A-OFFERED` | **OFFERED** | The declared authority admits it. It is rendered, reachable (INV-07), and activatable. |
+| `A-WITHHELD` | **WITHHELD** | The declared authority refuses it, or no Command handler exists for it. It is not activatable, **and its Affordance Withholding (O-5) is disclosed** (INV-04). |
+| `A-ISSUED` | **ISSUED** | The professional activated it; the Command has been dispatched; the outcome is not yet known. |
+| `A-APPLIED` | **APPLIED** | The engine returned `ACCEPTED` or `DUPLICATE`. |
+| `A-REFUSED` | **REFUSED** | The engine returned `REJECTED`, `CONFLICT`, `UNAUTHORIZED` or `VALIDATION_FAILED`, carrying an `RphError`. |
+| `A-PARTIALLY_APPLIED` | **PARTIALLY_APPLIED** | A multi-Command Affordance in which at least one Command was accepted and a subsequent one was not. |
+
+**The outcome mapping is total and is derived, not authored.** `CommandResultStatus` has exactly six values —
+`ACCEPTED`, `REJECTED`, `CONFLICT`, `DUPLICATE`, `UNAUTHORIZED`, `VALIDATION_FAILED`
+(`packages/rph-contracts/src/enums.ts:234-242`) **[CONFIRMED]**. `{ACCEPTED, DUPLICATE} → APPLIED`;
+`{REJECTED, CONFLICT, UNAUTHORIZED, VALIDATION_FAILED} → REFUSED`. The incumbent already partitions the six this
+way at two call sites (`+page.server.ts:485` and `:502`, both `r.status !== 'ACCEPTED' && r.status !== 'DUPLICATE'`)
+**[CONFIRMED]**.
+
+**SHALL.** The outcome mapping SHALL be expressed as a total function over `CommandResultStatus` — a
+`Record<CommandResultStatus, …>` or equivalent exhaustive form — so that a seventh status value cannot ship
+without classifying it. Conformance: `SPEC-001-FX-AFF-01` (compile-time totality) and `SPEC-001-FX-AFF-02`
+(runtime assertion that all six values map). This mechanism is the one this repository already uses for the same
+purpose and for the same recorded reason (`execution-view.ts:238-239`: *"`Record<StepState, …>` makes the
+compiler REQUIRE every one of the 10 `StepState` values — if a value is added to the contract this fails to
+compile until it is classified here"*) **[CONFIRMED]**.
+
+**SHALL NOT.** An implementation SHALL NOT classify outcomes by testing for the accepting statuses and treating
+the remainder as a default. `execution-view.ts:266-268` records what that costs: a `Record` totality check did
+**not** catch a wrong classification because *"an empty array is a valid value"* **[CONFIRMED]**. The negative
+fixture `SPEC-001-FX-AFF-03` introduces a seventh `CommandResultStatus` in a type-level test and asserts a
+compile failure.
+
+### 4.2.3 Legal transitions
+
+| Id | From → To | Trigger | Guard | Derivation citation |
+|---|---|---|---|---|
+| `U-01` | UNDERIVED → OFFERED | Projection derivation at watermark `W`. | The declared authority admits the Command for this subject. | `planAffordancesFor` (`execution-view.ts:473-494`) filtered by `planPermitsAffordance` (`:357-419`) **[CONFIRMED]** |
+| `U-02` | UNDERIVED → WITHHELD | Projection derivation at watermark `W`. | The declared authority refuses it, **or** no Command handler exists for the transition. | The handler-existence limb is the F-11 allowlist: `ADVANCE_BY_STEP_STATE` (`:240-251`) and `CONTROL_BY_STEP_STATE` (`:257-272`), whose header states affordances *"MUST come from this allowlist, NOT from the machine's legal-transition topology"* (`:16-20`) **[CONFIRMED]** |
+| `U-03` | OFFERED → WITHHELD | Re-derivation at `W' > W`. | The authority's verdict changed to refusal. | — |
+| `U-04` | WITHHELD → OFFERED | Re-derivation at `W' > W`. | The authority's verdict changed to admission. | — |
+| `U-05` | OFFERED → ISSUED | The professional activates the Affordance. | The Affordance is reachable (INV-07) and its subject binding is unchanged since derivation. | `<form method="POST" action="?/…">` at `apps/rph-demo/src/routes/undertakings/[id]/+page.svelte:337`, `:344`, `:372` **[CONFIRMED]** |
+| `U-06` | ISSUED → APPLIED | `CommandResult` returns. | `status ∈ {ACCEPTED, DUPLICATE}`. | `+page.server.ts:502-506` **[CONFIRMED]** |
+| `U-07` | ISSUED → REFUSED | `CommandResult` returns. | `status ∈ {REJECTED, CONFLICT, UNAUTHORIZED, VALIDATION_FAILED}`. | `+page.server.ts:502-505` **[CONFIRMED]** |
+| `U-08` | ISSUED → PARTIALLY_APPLIED | A multi-Command sequence returns. | ≥1 Command accepted **and** ≥1 subsequent Command not accepted. | `runSteps` (`+page.server.ts:482-489`) is the incumbent's multi-Command path and returns on first non-acceptance **without rollback** **[CONFIRMED]** |
+| `U-09` | APPLIED → UNDERIVED | Mandatory post-Command re-derivation. | The Projection has completed `T-07 → T-11/T-12`. | — |
+| `U-10` | REFUSED → UNDERIVED | Mandatory post-Command re-derivation, **after** the Refusal Disclosure (O-6) has been surfaced. | Disclosure surfaced and reachable. | — |
+| `U-11` | PARTIALLY_APPLIED → UNDERIVED | Mandatory post-Command re-derivation, **after** the partial-application disclosure has been surfaced. | Disclosure surfaced and reachable. | — |
+| `U-12` | OFFERED → UNDERIVED | Scope change, teardown, or a Machine-A transition to `UNBUILT` (`T-08`/`T-10`/`T-13`). | — | — |
+| `U-13` | WITHHELD → UNDERIVED | As `U-12`. | — | — |
+
+Three self-transitions are legal:
+
+| Id | Pair | Legal because |
+|---|---|---|
+| `U-14` | UNDERIVED → UNDERIVED | Re-derivation that has not yet produced a verdict. |
+| `U-15` | OFFERED → OFFERED | Re-derivation reaching the same admitting verdict. |
+| `U-16` | WITHHELD → WITHHELD | Re-derivation reaching the same refusing verdict — **provided** the withholding *reason* is also re-derived; a retained stale reason under a changed cause is `AGV-01`. |
+
+### 4.2.4 Illegal transitions — enumerated
+
+Seven states yield forty-nine ordered pairs. Sixteen are legal (`U-01`…`U-16`). The remaining **thirty-three are
+prohibited** and are enumerated individually below, grouped by source state. Grouping shares a rationale where
+the rationale is genuinely shared; every prohibited pair is named.
+
+**From `UNDERIVED` — nothing may be reported about an unevaluated Affordance.** An Affordance that has not been
+put to the authority has no verdict, no issuance and no outcome; asserting one is INV-03's exact violation.
+
+| Id | Pair | Detecting check |
+|---|---|---|
+| `AP-01` | UNDERIVED → ISSUED | `SPEC-001-FX-AFF-04` |
+| `AP-02` | UNDERIVED → APPLIED | `SPEC-001-FX-AFF-04` |
+| `AP-03` | UNDERIVED → REFUSED | `SPEC-001-FX-AFF-04` |
+| `AP-04` | UNDERIVED → PARTIALLY_APPLIED | `SPEC-001-FX-AFF-04` |
+
+**From `OFFERED` — an offer is not an outcome.** Reaching an outcome state without passing `ISSUED` means the
+Surface recorded a result for a Command that was never dispatched. This is the shape of optimistic UI that
+reports success before the engine has ruled, and it is the direct route to a Surface that shows green while the
+engine holds the work unassured (INV-11).
+
+| Id | Pair | Detecting check |
+|---|---|---|
+| `AP-05` | OFFERED → APPLIED | `SPEC-001-FX-AFF-05` |
+| `AP-06` | OFFERED → REFUSED | `SPEC-001-FX-AFF-05` |
+| `AP-07` | OFFERED → PARTIALLY_APPLIED | `SPEC-001-FX-AFF-05` |
+
+**From `WITHHELD` — a withheld Affordance is unactivatable, not merely un-styled.** `AP-08` is the load-bearing
+member of this group and warrants its own statement: it prohibits the pattern in which a control is rendered
+disabled, greyed, or `aria-disabled` while its underlying form remains submittable by keyboard, by direct POST,
+or by re-enabling the element in the client. Under INV-13 a Surface SHALL NOT offer an Affordance the engine
+would refuse; a *submittable* disabled control offers it.
+
+| Id | Pair | Rationale | Detecting check |
+|---|---|---|---|
+| `AP-08` | WITHHELD → ISSUED | Withholding that does not prevent issuance is decoration. | `SPEC-001-FX-AFF-06` |
+| `AP-09` | WITHHELD → APPLIED | As `AP-05`, from a state that additionally forbade issuance. | `SPEC-001-FX-AFF-06` |
+| `AP-10` | WITHHELD → REFUSED | A withheld Affordance produces no engine round-trip and therefore no refusal. Reporting one manufactures an engine verdict. | `SPEC-001-FX-AFF-06` |
+| `AP-11` | WITHHELD → PARTIALLY_APPLIED | As `AP-10`. | `SPEC-001-FX-AFF-06` |
+
+**From `ISSUED` — a dispatched Command has an outcome and the Surface waits for it.** Every pair here describes a
+Surface abandoning an in-flight Command and reporting something else. `AP-15` (double-submit) is the idempotency
+member: `IdempotencyKey` is mandatory on every command envelope (`envelopes.ts:84`) **[CONFIRMED]** and a second
+issuance of the same Affordance while the first is in flight either duplicates work or produces a spurious
+`RPH_IDEMPOTENCY_DUPLICATE` that the professional cannot interpret.
+
+| Id | Pair | Detecting check |
+|---|---|---|
+| `AP-12` | ISSUED → UNDERIVED | `SPEC-001-FX-AFF-07` |
+| `AP-13` | ISSUED → OFFERED | `SPEC-001-FX-AFF-07` |
+| `AP-14` | ISSUED → WITHHELD | `SPEC-001-FX-AFF-07` |
+| `AP-15` | ISSUED → ISSUED | `SPEC-001-FX-AFF-08` |
+
+**From `APPLIED` — an outcome is terminal until re-derivation.** The only legal exit is `U-09`. `AP-16` and
+`AP-17` are the substantive members: returning directly to `OFFERED` or `WITHHELD` means the Surface decided the
+Affordance's next disposition *itself*, without asking the authority again — INV-03's violation in its purest
+form, and the one that survives review because the guessed answer is usually right.
+
+| Id | Pair | Detecting check |
+|---|---|---|
+| `AP-16` | APPLIED → OFFERED | `SPEC-001-FX-AFF-09` |
+| `AP-17` | APPLIED → WITHHELD | `SPEC-001-FX-AFF-09` |
+| `AP-18` | APPLIED → ISSUED | `SPEC-001-FX-AFF-10` |
+| `AP-19` | APPLIED → APPLIED | `SPEC-001-FX-AFF-10` |
+| `AP-20` | APPLIED → REFUSED | `SPEC-001-FX-AFF-11` |
+| `AP-21` | APPLIED → PARTIALLY_APPLIED | `SPEC-001-FX-AFF-11` |
+
+**From `REFUSED` — as `APPLIED`, plus one.** `AP-24` prohibits the blind retry: re-issuing a refused Command
+without re-deriving asks the engine the identical question and receives the identical refusal, while presenting
+the professional with a control that appears to do something. The remedy path is `U-10 → U-01/U-02`.
+
+| Id | Pair | Detecting check |
+|---|---|---|
+| `AP-22` | REFUSED → OFFERED | `SPEC-001-FX-AFF-09` |
+| `AP-23` | REFUSED → WITHHELD | `SPEC-001-FX-AFF-09` |
+| `AP-24` | REFUSED → ISSUED | `SPEC-001-FX-AFF-12` |
+| `AP-25` | REFUSED → APPLIED | `SPEC-001-FX-AFF-11` |
+| `AP-26` | REFUSED → REFUSED | `SPEC-001-FX-AFF-10` |
+| `AP-27` | REFUSED → PARTIALLY_APPLIED | `SPEC-001-FX-AFF-11` |
+
+**From `PARTIALLY_APPLIED` — the committed prefix may not be erased.** `AP-31` is the member INV-14 exists for.
+Downgrading a partial application to a plain `REFUSED` tells the professional the action did not happen while
+some of it did — and this repository has the measured instance: `runSteps` (`+page.server.ts:482-489`) dispatches
+a sequence with no rollback and returns a single error string, so *"Illegal transition on PWU"* surfaces after
+earlier Commands in the same sequence have already committed **[CONFIRMED]**. `AP-30` is its mirror: reporting
+plain success for a sequence that did not complete.
+
+| Id | Pair | Detecting check |
+|---|---|---|
+| `AP-28` | PARTIALLY_APPLIED → OFFERED | `SPEC-001-FX-AFF-09` |
+| `AP-29` | PARTIALLY_APPLIED → WITHHELD | `SPEC-001-FX-AFF-09` |
+| `AP-30` | PARTIALLY_APPLIED → APPLIED | `SPEC-001-FX-AFF-13` |
+| `AP-31` | PARTIALLY_APPLIED → REFUSED | `SPEC-001-FX-AFF-13` |
+| `AP-32` | PARTIALLY_APPLIED → ISSUED | `SPEC-001-FX-AFF-12` |
+| `AP-33` | PARTIALLY_APPLIED → PARTIALLY_APPLIED | `SPEC-001-FX-AFF-10` |
+
+**Guard violations on legal pairs.**
+
+| Id | Legal pair | Guard violated | Consequence | Detecting check |
+|---|---|---|---|---|
+| `AGV-01` | WITHHELD → WITHHELD (`U-16`) | The withholding reason is re-derived with the verdict | The professional is shown a reason that was true at an earlier watermark and is now false — a stale explanation is worse than none, because it directs remediation at a condition already cleared. | `SPEC-001-FX-AFF-14` |
+| `AGV-02` | UNDERIVED → OFFERED (`U-01`) | The verdict comes from the *same* declared authority the engine enforces | An independently-copied rule. This is `SPEC-001-INV-03`'s violation and it has occurred **five** recorded times in this repository on the execution affordance path alone, each time by the same mechanism: the engine gained an authority limb and the read-model was not told (`execution-view.ts:80-89`, `:96-119`, `:113-125`, `:319-326`, `:391-406`) **[CONFIRMED]**. | `SPEC-001-FX-AFF-15` |
+| `AGV-03` | OFFERED → ISSUED (`U-05`) | The Affordance was reachable when activated | An Affordance activated by a synthetic event on an element the professional could not reach satisfies the machine and violates INV-07. | `SPEC-001-FX-AFF-16` |
+| `AGV-04` | UNDERIVED → WITHHELD (`U-02`) | An Affordance Withholding (O-5) is constructed and carried | Withholding without disclosure is `SPEC-001-INV-04`'s violation and is the incumbent's state today (§4.2.5). | `SPEC-001-FX-AFF-17` |
+
+### 4.2.5 The incumbent's position on Machine B
+
+**[CONFIRMED — absence]** No Affordance Withholding is constructed anywhere. Search over `packages/` and
+`apps/`, `*.ts` + `*.svelte`, excluding `node_modules/` and `dist/`, untruncated, case-insensitive, pattern
+`withh`: **57 matches**, every one of which is a source comment, a test name, or a test assertion *about*
+withholding. Zero are a rendered disclosure and zero are a field on any interface. The single partial exception
+is `ExecutionStepView.retryExhaustion` (`execution-view.ts:206-218`), which carries the permitted alternate
+actions when RPH-EXE-008's retry cap is reached and is rendered at
+`apps/rph-demo/src/routes/undertakings/[id]/+page.svelte:361-367` **[CONFIRMED]**. Its own doc comment states
+the general principle this specification generalizes: *"WITHHOLDING THE AFFORDANCE MUST NOT ALSO WITHHOLD THE
+REASON … A silently vanishing button is a worse answer than a refused one"* (`execution-view.ts:540-549`)
+**[CONFIRMED]**. **[INFERRED]** One of the many withholding conditions has a disclosure; the other conditions
+enumerated in `planPermitsAffordance` (`:366-417` — plan liveness, PWU openness, binding authority, retry budget,
+input readiness) have none, and the F-11 allowlist's *"no handler exists"* withholding has none. `AGV-04` is
+therefore a live violation across every withholding limb but one.
+
+---
+
+# 5. Interface contract
+
+**INFORMATIVE.** Every interface below is specified at per-field grain: **Type · Optionality · Default ·
+Semantics · Validation · Writer**. A field lacking any of the six is a defect of this section. "Writer" names the
+one party permitted to set the field; the vocabulary is fixed once here.
+
+| Writer role | Meaning |
+|---|---|
+| `W-DERIVE` | The named pure derivation function in `packages/rph-projections/src`. |
+| `W-LOADER` | The Surface's server-side load function, which alone has store access and resolves facts the pure layer cannot. |
+| `W-ENGINE` | The engine, via the event stream the derivation folds. Never written directly onto a view. |
+| `W-NONE` | Frozen after construction; no party writes it. |
+
+**SHALL.** No Surface component SHALL write any field of any interface in §5. This restates `SPEC-001-INV-01` in
+full at the interface boundary — *a Projection carries no authority; no Surface act mutates governed state except
+by issuing a semantic Command* — whose master is `SPEC-001-INV-01` in §3, itself restating JPWB-DOC-003 PER-7 and
+JCUX SCREEN-INV-009. Conformance: `SPEC-001-FX-IFACE-01`, a structural check asserting every field of every §5
+interface is declared `readonly` and every interface is consumed in `.svelte` files by read only; and
+`SPEC-001-FX-IFACE-02`, a boundary check that no `.svelte` module imports a mutating engine entry point.
+
+---
+
+## 5.1 `ExecutionPlanView`
+
+**Status:** exists. `packages/rph-projections/src/execution-view.ts:221-236` **[CONFIRMED]**.
+**Purpose:** one Execution Plan as an Undertaking Workbench Surface renders it. **Constructed by:**
+`executionPlanView(row)` (`:577-593`); the scoped constructor is `plansForPwus(rows, pwuIds, …)` (`:768-788`).
+
+| Field | Type | Optional | Default | Semantics | Validation | Writer |
+|---|---|---|---|---|---|---|
+| `id` | `string` | no | — | The `EXECUTION_PLAN` aggregate id. Stable across re-derivations; the row key. | Non-empty; must equal the source aggregate id. | `W-DERIVE` from `ExecutionPlanInput.id` |
+| `workUnitId` | `string` | no | — | The owning PWU's id. **This is the only scope key a plan carries** — there is no `undertakingId` on a plan, so PWU membership is the sole correct scope test (`:761-767`) **[CONFIRMED]**. | Non-empty; must be a member of the derivation's `pwuIds` set. | `W-DERIVE` |
+| `status` | `string` | no | — | The plan's own lifecycle status. Typed as `string`, not the enum, so an off-contract value is carried honestly rather than coerced. | Not validated at construction; consumers SHALL fail closed — only the literal `'ACTIVE'` opens gated Affordances (`:329`, `:366-367`) **[CONFIRMED]**. | `W-DERIVE` |
+| `planVersion` | `number` | yes | absent | The plan's version. **Absent means the source carried none**, never zero. | Omitted rather than defaulted (`:592`) **[CONFIRMED]**. | `W-DERIVE` |
+| `steps` | `readonly ExecutionStepView[]` | no | — | The plan's steps, **in authored order** (`:576`) **[CONFIRMED]**. | Order preserved; length equals the source array's. | `W-DERIVE` |
+| `transitions` | `readonly ExecutionTransitionInput[]` | no | `[]` | The immutable transition graph. **Empty means linear**, not "unknown" (`:227`) **[CONFIRMED]**. | Elements passed **by reference**; see the identity rule below. | `W-DERIVE` |
+| `pwuWorkLifecycleState` | `string` | yes | absent | The owning PWU's work-lifecycle axis value, supplied by the loader. **Absent means UNGATED — no information — never "closed"** (`:230-235`, `:166-176`) **[CONFIRMED]**. | Never synthesized; only carried when the caller supplied it. | `W-LOADER` → `W-DERIVE` |
+
+**Ordering.** `steps` is authored order and SHALL NOT be re-sorted by the Surface; re-sorting silently changes
+the professional's reading of sequence in a plan whose transition graph is empty (where array index *is* the
+frontier). Verified by `SPEC-001-FX-IFACE-03`.
+
+**Idempotency.** `executionPlanView` is a pure shaping function: applying it twice to the same input yields a
+structurally equal view. `withResolvedAuthority` (`:797-818`) is explicitly written to return **object-identical**
+steps when no binding facts are supplied, *"not a rebuilt array that merely looks the same"* (`:808-809`)
+**[CONFIRMED]**. **SHALL NOT** — a consumer SHALL NOT map, clone or normalize `transitions` before passing it to
+`transitionRows` or `inEdgeDisposition`: the branch first-match decides selection by **object identity** against
+the elements of that array, and cloning makes every conditional edge report `NEUTRALIZED` *"with no type error and
+no test failure outside a branch fixture"* (`:726-734`) **[CONFIRMED]**. Verified by `SPEC-001-FX-IFACE-04`, a
+fixture that clones `transitions` and asserts the disposition changes — a red-proof that the identity rule is
+load-bearing.
+
+**Versioning.** A change to `steps`, `status`, `workUnitId`, `pwuWorkLifecycleState` or `transitions` changes
+**meaning** and SHALL bump the owning `Projector.handlerVersion` (`projector.ts:9`). A change to `planVersion`'s
+formatting alone changes **presentation** and SHALL NOT.
+
+---
+
+## 5.2 `ExecutionStepView`
+
+**Status:** exists. `execution-view.ts:191-219` **[CONFIRMED]**. **Constructed by:** `stepView(...)` (`:525-573`).
+
+| Field | Type | Optional | Default | Semantics | Validation | Writer |
+|---|---|---|---|---|---|---|
+| `id` | `string` | no | — | The step id; the row key and the subject of every step Affordance. | Non-empty. | `W-DERIVE` |
+| `stepType` | `string` | no | — | The step's declared type (e.g. `TRANSFORMATION`). Carried, never interpreted by the view. | — | `W-DERIVE` |
+| `purpose` | `string` | no | — | The step's professional purpose — the human label. Used as the `sourceLabel`/`targetLabel` of transition rows (`:739-743`). | May be empty; an empty purpose renders as the id, never as a fabricated name. | `W-DERIVE` |
+| `stepState` | `string` | no | — | The step's own state-machine value. Ten ratified values (`ADVANCE_BY_STEP_STATE`, `:240-251`) **[CONFIRMED]**; typed `string` so an off-contract value survives to the Surface. | Unknown values map to `[]` affordances and `'muted'` tone — **never fabricate an affordance** (`:287-291`, `:496-499`) **[CONFIRMED]**. | `W-DERIVE` |
+| `runtimeBindingId` | `string` | yes | absent | The `RUNTIME_BINDING` this step names. Absent means the step names none — which is **out of scope for binding authority**, not unauthorized (`:86-89`) **[CONFIRMED]**. | Preserved only when present (`:569-572`). | `W-DERIVE` |
+| `selectedTransitionId` | `string` | yes | absent | For a resolved branch, the out-edge it actually took. **A recorded decision, honoured over a re-derived one** — without it the Surface's branch verdict can drift from the engine's the moment a guard's inputs change (`:92-95`) **[CONFIRMED]**. | Carried verbatim. | `W-DERIVE` |
+| `tone` | `StepTone` | no | — | `'positive' \| 'active' \| 'negative' \| 'pending' \| 'muted'`. A **semantic** tone the Surface maps to colour, held in the pure layer so the every-state-has-a-tone totality is unit-testable (`:65-67`) **[CONFIRMED]**. | Total over the ten states (`:274-285`); unknown → `'muted'`. | `W-DERIVE` |
+| `advanceCommands` | `readonly StepAdvanceCommand[]` | no | `[]` | The command-backed **forward-progress** Affordances legal from this state, already filtered by what the plan permits. | Drawn from the F-11 allowlist only, then filtered by `planPermitsAffordance`. | `W-DERIVE` |
+| `controlCommands` | `readonly StepControlCommand[]` | no | `[]` | The command-backed **control** Affordances (`skip`/`cancel`/`wait`/`resolve`) — actions that waive, abort or suspend rather than progress (`:57-63`) **[CONFIRMED]**. | As above. | `W-DERIVE` |
+| `belowQueued` | `boolean` | no | `false` | The step is beneath the domain's driveable floor (`NOT_READY`/`READY`) and has **no advance command at all**. Surfaces the gap honestly rather than as an inert row (`:18-20`) **[CONFIRMED]**. | `stepState ∈ {NOT_READY, READY}` (`:503-505`). | `W-DERIVE` |
+| `retryExhaustion` | `{ permittedControlActions: readonly string[] }` | yes | absent | **Present only when RPH-EXE-008's retry cap is reached.** Absent means NOT exhausted — *including* "the caller supplied no attempt count". **It never means "unknown, render a warning anyway"** (`:215-217`) **[CONFIRMED]**. | Sourced from the same `retryDecision` call that withheld the affordance, so notice and withholding cannot disagree (`:550`, `:565-567`) **[CONFIRMED]**. | `W-DERIVE` |
+
+**Ordering.** `advanceCommands` and `controlCommands` preserve allowlist declaration order (`.filter` over the
+`Record` value, `:491-492`) **[CONFIRMED]**. **SHOULD** — a Surface SHOULD render them in that order so that the
+same step in the same state presents its actions identically across renders; divergence is permitted only for a
+declared, documented layout constraint. Verified by `SPEC-001-FX-IFACE-05`.
+
+**Idempotency.** Pure; equal inputs yield structurally equal views. The optional fields are **omitted, not
+defaulted**, throughout (`:556-558`, `:565-567`, `:569-572`) — an `exactOptionalPropertyTypes`-compatible
+discipline that keeps "absent" and "present-but-empty" distinguishable **[CONFIRMED]**.
+
+**Versioning.** Adding a member to `StepAdvanceCommand` or `StepControlCommand` changes meaning and SHALL bump
+`handlerVersion`; it SHALL also fail to compile until classified in both `Record` tables and in
+`COMMAND_BY_AFFORDANCE` (`:310-326`), which is the mechanism that makes a new Affordance impossible to ship
+without naming the Command it dispatches **[CONFIRMED]**.
+
+---
+
+## 5.3 `StepAffordances`
+
+**Status:** exists. `execution-view.ts:422-425` **[CONFIRMED]**. **Constructed by:** `planAffordancesFor(...)`
+(`:473-494`).
+
+| Field | Type | Optional | Default | Semantics | Validation | Writer |
+|---|---|---|---|---|---|---|
+| `advance` | `readonly StepAdvanceCommand[]` | no | `[]` | Machine-B `OFFERED` forward-progress Affordances. | Every member SHALL have an entry in `COMMAND_BY_AFFORDANCE` and SHALL pass `planPermitsAffordance`. | `W-DERIVE` |
+| `control` | `readonly StepControlCommand[]` | no | `[]` | Machine-B `OFFERED` control Affordances. | As above. | `W-DERIVE` |
+
+**The gap this specification closes.** `StepAffordances` is a *positive-only* interface: it enumerates what is
+offered and says nothing about what was withheld or why. Machine B's `A-WITHHELD` state and
+`SPEC-001-INV-04` are therefore unrepresentable in it. §5.8 specifies the missing half.
+
+**SHALL.** `planAffordancesFor` and every successor derivation SHALL determine admission by consulting the
+**same declaration the engine enforces** — the command's own spec row and the ratified kernel predicates — never
+a re-derived copy. The five limbs presently so consulted are: `planLiveness` (`:366-367`), `pwuOpenness`
+(`:370-375`), `bindingAuthority` via `bindingAuthorityVerdict` (`:387-390`), `retryBudget` via `retryDecision`
+(`:403-406`), and `inputReadiness` via `stepMayBecomeReady` (`:412-417`) **[CONFIRMED]**. Conformance:
+`SPEC-001-FX-AFF-15` (the `AGV-02` check) plus `SPEC-001-FX-IFACE-06`, a fixture asserting that
+`planPermitsAffordance` gates on the *column* rather than on a named command — the property that causes a tenth
+command declaring an existing requirement to be withheld *on the day it is declared, with no second edit*
+(`:376-383`) **[CONFIRMED]**.
+
+**SHALL NOT.** An Affordance SHALL NOT be derived from a state machine's legal-transition topology. Doing so
+mints controls that dispatch nonexistent Commands (`:16-20`: the wider `StepState` machine has ~18 legal arrows;
+only nine have handlers) **[CONFIRMED]**. Negative fixture: `SPEC-001-FX-AFF-18` asserts that for every
+`(stepState, target)` arrow in the machine with no registry handler, no Affordance is offered.
+
+**Ordering / Idempotency / Versioning.** Order is the allowlist's. The function is pure and total. Adding a
+gating limb changes meaning and SHALL bump `handlerVersion`; **[UNRATIFIED-AUTHORED]** it SHALL additionally
+extend §5.8's `AffordanceWithholding.reasonCode` enum in the same change, so that no limb can gate silently.
+
+---
+
+## 5.4 `StepBindingFacts`
+
+**Status:** exists. `execution-view.ts:130-143` **[CONFIRMED]**. **Purpose:** what the loader resolved about a
+step's runtime binding — a *resolved-facts* input, deliberately not a store handle.
+
+| Field | Type | Optional | Default | Semantics | Validation | Writer |
+|---|---|---|---|---|---|---|
+| `resolves` | `boolean` | no | — | Did `runtimeBindingId` resolve to an object of type `RUNTIME_BINDING`? | **`false` gates; the field's absence does not** (`:131`) **[CONFIRMED]**. Resolved by enumerating the type (`+page.server.ts:341-354`), because `getObject` returns a state bag for *any* type and cannot answer the question **[CONFIRMED]**. | `W-LOADER` |
+| `boundStepId` | `string` | yes | absent | The step the binding itself declares it authorizes. Compared against the step being afforded — a binding authorized for a *different* step does not authorize this one. | Absent = no information. | `W-LOADER` |
+| `authorizationStatus` | `string` | yes | absent | The binding's authorization status, fed verbatim to the ratified kernel predicate. | Never interpreted locally. | `W-LOADER` |
+| `grantedCapabilities` | `readonly string[]` | yes | absent | What the binding actually **grants**. A binding may sit in an executable status while conferring nothing. **Absent is UNGATED; only a resolved empty set gates** (`:137-141`) **[CONFIRMED]**. | Produced by the kernel's own `capabilityIdentities` projection, so Surface and engine agree on what counts as a capability (`+page.server.ts:351`) **[CONFIRMED]**. | `W-LOADER` |
+
+**The asymmetry that matters, restated normatively.** **SHALL.** A derivation SHALL distinguish a *resolved
+negative* from *no information*: `resolves: false` is a resolved negative and gates; the whole `runtimeBinding`
+field being absent is no information and does not (`:86-89`) **[CONFIRMED]**. This is the same "unknown versus
+none" distinction the assurance view records as load-bearing (`assurance-view.ts:52-56`), and collapsing the two
+is the mechanism by which a caller that *cannot* check appears to have checked. Conformance:
+`SPEC-001-FX-IFACE-07` — three fixtures over one step: facts absent (offered), facts present with
+`resolves: false` (withheld), facts present with `resolves: true` and a mismatched `boundStepId` (withheld).
+
+**Fail-open is permitted here and SHALL be disclosed.** **[CONFIRMED]** every gating limb in this interface and in
+`ExecutionPlanInput` fails **open** when the caller supplied nothing, and every one of them says so in its own
+doc comment (`:86-89`, `:107-109`, `:120-125`, `:166-176`). **SHALL.** A fail-open default in a projection input
+SHALL be disclosed at its declaration, and the disclosure SHALL name why the cost is bounded — here, that the
+engine still refuses, *"so the cost is a rejected click, not an illegal act"* (`:174-175`) **[CONFIRMED]**.
+Verified by `SPEC-001-FX-IFACE-08`, a documentation-presence check over optional gating fields.
+
+---
+
+## 5.5 `AssuranceView` and `AssuranceAssessmentView`
+
+**Status:** exists. `packages/rph-projections/src/assurance-view.ts:127-129` and `:90-125` **[CONFIRMED]**.
+**Constructed by:** `buildAssuranceView(events)` (`:356-360`) folding `applyAssuranceEvent` (`:327-353`).
+
+### 5.5.1 `AssuranceView`
+
+| Field | Type | Optional | Default | Semantics | Validation | Writer |
+|---|---|---|---|---|---|---|
+| `assessments` | `Readonly<Record<string, AssuranceAssessmentView>>` | no | `{}` | Every assessment the event log declares, keyed by `assessmentId`. | Keys are assessment ids; an event naming an unstarted assessment attaches to nothing (`:173`, `:192`, `:206`) **[CONFIRMED]**. | `W-DERIVE` (fold) |
+
+### 5.5.2 `AssuranceAssessmentView`
+
+| Field | Type | Optional | Default | Semantics | Validation | Writer |
+|---|---|---|---|---|---|---|
+| `assessmentId` | `string` | no | — | The assessment aggregate id. | Non-empty; the fold discards an event lacking it (`:146-148`). | `W-ENGINE`→`W-DERIVE` |
+| `policyId` | `string` | no | — | The Assurance Policy assessed under. | Non-empty; the fold discards an event lacking it (`:147-148`). | `W-ENGINE`→`W-DERIVE` |
+| `policyVersion` | `string` | no | `''` | The policy version bound at start. | Empty string = the event carried none. | `W-ENGINE`→`W-DERIVE` |
+| `subjectObjectIds` | `readonly string[]` | no | `[]` | What was assessed. The join key for waivers and subject invalidation. | Strings only; non-strings filtered (`:133-134`). | `W-ENGINE`→`W-DERIVE` |
+| `assessmentState` | `string` | no | — | `'ASSESSING'` until completion, then the disposition; `'INDEPENDENCE_VIOLATION'` on the distinct terminal event (`:237`). **A separate axis from `disposition`.** | — | `W-DERIVE` |
+| `disposition` | `string` | yes | absent | The verdict. **Undefined until completion** — absent means not yet decided, never "not satisfied". | — | `W-DERIVE` |
+| `evidenceConsideredIds` | `readonly string[]` | no | `[]` | Evidence the assessment considered. Empty **before** completion is "not yet stated"; empty after is a real none. | — | `W-DERIVE` |
+| `observations` | `readonly AssuranceObservationView[]` | no | `[]` | Findings recorded against the assessment, in log order. | Appended, never replaced (`:181-184`). | `W-DERIVE` |
+| `openConditions` | `readonly string[]` | no | `[]` | Residual statements a `CONDITIONALLY_SATISFIED` verdict leaves open. **Populated only for that disposition** (`:214`) **[CONFIRMED]**. | — | `W-DERIVE` |
+| `validatorImplementationIdentity` | `string` | yes | absent | Which validator produced the verdict. **Absent = unknown, never "none"** (`:103-104`) **[CONFIRMED]**. | — | `W-DERIVE` |
+| `validatorImplementationVersion` | `string` | yes | absent | The version half of that identity. | — | `W-DERIVE` |
+| `independenceStatus` | `string` | yes | absent | `'VERIFIED'` (the check ran and passed) / `'VIOLATED'` (the distinct violation event) / **absent = the check did not run**. *"never a fabricated pass"* (`:108-110`) **[CONFIRMED]**. | Three-valued; a Surface SHALL NOT render absent as `'VERIFIED'`. | `W-DERIVE` |
+| `waivers` | `readonly AssuranceWaiverView[]` | no | `[]` | Waivers naming this assessment's policy and subject. **Empty is a real none** — the events are folded (`:111`). | Attached at request time, status advanced in place on grant/deny (`:259-299`). | `W-DERIVE` |
+| `invalidations` | `readonly AssuranceInvalidationView[]` | no | `[]` | Causes that invalidated this assessment. **Empty is a real "not invalidated"** (`:31-34`) **[CONFIRMED]**. | — | `W-DERIVE` |
+| `claimsEvaluated` | `readonly string[]` | no | `[]` | Claim ids the assessment evaluated. | — | `W-DERIVE` |
+| `controlActions` | `readonly string[]` | no | `[]` | The validator's recommended control actions. **Empty before completion**, then a real set (`:117-118`). | — | `W-DERIVE` |
+| `missingEvidence` | `readonly string[]` | no | `[]` | Required **minus** received: declared requirement ids with each satisfied one removed. Empty = the policy requires none **or** all are satisfied — *a real answer either way* (`:120-124`) **[CONFIRMED]**. | Removal is a `filter`, not a set subtraction, to stay idempotent and order-preserving (`:193-195`) **[CONFIRMED]**. | `W-DERIVE` |
+
+**SHALL.** A Surface rendering any of `disposition`, `independenceStatus`, `validatorImplementationIdentity` or
+`validatorImplementationVersion` SHALL render the absent case as **unknown** and SHALL NOT render it as a
+negative or as a pass. This restates `SPEC-001-INV-12` (provenance exposure) and `SPEC-001-INV-06` (material
+uncertainty visible) at the interface boundary; the masters are those invariants in §3. **[CONFIRMED]** the
+incumbent loader violates it: `+page.server.ts:262-266` coerces all four to `''` with `??`, destroying the
+distinction at the serialization boundary the projection was written to preserve. Conformance:
+`SPEC-001-FX-IFACE-09`, which asserts that no Surface serialization collapses `undefined` to `''` for these four
+fields, and `SPEC-001-FX-IFACE-10`, which renders an assessment with `independenceStatus` absent and asserts the
+Surface shows an explicit unknown marker.
+
+**Ordering.** `observations`, `waivers` and `invalidations` are in event-log order and SHALL remain so — the
+order is the professional record of when each was raised. `missingEvidence` preserves the policy's declared
+order. Verified by `SPEC-001-FX-IFACE-11`.
+
+**Idempotency.** The fold is idempotent under `IncrementalProjection`'s `eventId` dedupe (`projector.ts:49-54`)
+and `rebuildProjection` from empty reproduces the incremental result exactly (`projector.ts:16-22`)
+**[CONFIRMED]**. **SHALL** — a rebuild-from-empty and the incremental fold SHALL be structurally equal for the
+same event sequence; verified by `SPEC-001-FX-IFACE-12`. **INFORMATIVE:** this repository records the failure
+mode a naive version of that test has — `work-projection.ts:141-144` documents an RPH-PER-007 test that *"was
+green throughout, because it compared the fold to ITSELF: a broken fold equals a broken fold"* **[CONFIRMED]**.
+`SPEC-001-FX-IFACE-12` therefore compares the fold against an independently-authored expected view, not against
+a second invocation of itself.
+
+**Versioning.** `AssuranceView` has no declared `Projector`; it is built by a bare function. **[UNRATIFIED-AUTHORED]
+SHALL** — it SHALL declare a `Projector` with a `handlerVersion`, so that a change to the fold invalidates
+downstream caches by the mechanism `projector.ts:9` already specifies.
+
+---
+
+## 5.6 `ApplicablePolicyView`
+
+**Status:** exists. `assurance-view.ts:374-383` **[CONFIRMED]**. **Constructed by:**
+`buildApplicablePolicies({ pwuId, directPolicyIds, typeRequiredPolicyIds, view })` (`:393-418`) — a **join over
+object state**, not a fold, because a PWU's applicable policies live on object state and not in the event stream
+(`:362-371`) **[CONFIRMED]**.
+
+| Field | Type | Optional | Default | Semantics | Validation | Writer |
+|---|---|---|---|---|---|---|
+| `policyId` | `string` | no | — | The applicable policy. | Member of the union of direct and type-required ids. | `W-DERIVE` |
+| `source` | `'DIRECT' \| 'TYPE' \| 'BOTH'` | no | — | Where applicability comes from: the PWU's own set, its PWU Type's required set, or both. | Total over the three (`:385-388`). | `W-DERIVE` |
+| `assessed` | `boolean` | no | — | True when ≥1 assessment names this policy **and** this PWU as a subject. **`false` is the required-but-unassessed gap** the green-node rule forbids ignoring (`:390-392`) **[CONFIRMED]**. | — | `W-DERIVE` |
+| `disposition` | `string` | yes | absent | The covering assessment's verdict once completed. **Absent while merely `ASSESSING`.** | A completed assessment is preferred over the last match (`:407-409`). | `W-DERIVE` |
+| `assessmentId` | `string` | yes | absent | The covering assessment's id, for navigation. | — | `W-DERIVE` |
+
+**SHALL.** A Surface presenting a PWU's assurance position SHALL render `assessed: false` rows with equal or
+greater prominence than assessed rows. This restates `SPEC-001-INV-11` — *a Surface SHALL NOT represent execution
+progress in a way that implies assurance* (master: §3, restating JPWB-DOC-003 STA-2) — at the policy-coverage
+boundary: a policy that applies and was never assessed is the exact condition under which a Surface showing
+execution success would mislead. Conformance: `SPEC-001-FX-IFACE-13`, which seeds a PWU with a type-required,
+unassessed policy and asserts the row is present and reachable at 1440×900.
+
+**Ordering.** Set-union order over direct-then-type ids (`:402`). **SHOULD** — a Surface SHOULD present
+`assessed: false` rows first, since ordering by professional criticality is one of CPM §7.6's named criteria.
+**Idempotency.** Pure over its four arguments; `assessments` order affects only which of several covering
+assessments is `chosen` (`:409` takes the last), which is a documented tie-break, not nondeterminism.
+**Versioning.** Adding a fourth `source` value changes meaning and SHALL bump the owning `handlerVersion`.
+
+---
+
+## 5.7 `TransitionRow`
+
+**Status:** exists. `execution-view.ts:672-687` **[CONFIRMED]**. **Constructed by:**
+`transitionRows(plan, evaluateGuard?)` (`:735-759`). **Boundary, restated:** this is the edge plane of the
+execution view and **drives no Affordance** — *"a transition row drives nothing"* (`:664-669`) **[CONFIRMED]**.
+
+| Field | Type | Optional | Default | Semantics | Validation | Writer |
+|---|---|---|---|---|---|---|
+| `key` | `string` | no | — | Stable row key: the persisted edge id when present, else `` `${plan.id}-edge-${i}` ``. Needed because the input type makes `id` optional and a keyed each-block cannot key on `undefined` (`:673-675`) **[CONFIRMED]**. | Unique within a plan. | `W-DERIVE` |
+| `sourceStepId` | `string` | yes | absent | The edge's source. **Legitimately absent** for a plan-entry edge (`:747-748`). | — | `W-DERIVE` |
+| `targetStepId` | `string` | yes | absent | The edge's target. Legitimately absent for a plan-exit edge. | — | `W-DERIVE` |
+| `sourceLabel` | `string` | no | — | The source step's `purpose` when it resolves; `'(plan entry)'` when absent; `` `unknown step ${shortId}` `` when it does not resolve. **Never a fabricated name** (`:676-677`) **[CONFIRMED]**. | Total over the three cases (`:739-743`). | `W-DERIVE` |
+| `targetLabel` | `string` | no | — | As above, with `'(plan exit)'`. | — | `W-DERIVE` |
+| `role` | `string` | no | — | The authored edge role. Absent in the input type, so **defaulted honestly**: `transitionType` when present, else `'CONDITIONAL'` if a guard exists, else `'SEQUENTIAL'` (`:751-753`) **[CONFIRMED]**. | — | `W-DERIVE` |
+| `conditionText` | `string` | yes | absent | A one-line human summary of the guard. **Absent means unconditional.** | Exhaustive over the grammar's eight operators, so a new operator fails to compile rather than rendering blank (`:689-691`, `:698-721`) **[CONFIRMED]**. An unparseable expression renders the explicit marker `'unparseable condition'` — the Surface **SHALL NOT** present an uninterpretable guard as understood, nor as `[object Object]` (`:692-695`) **[CONFIRMED]**. | `W-DERIVE` |
+| `disposition` | `InEdgeDisposition` | no | — | `SATISFIED` \| `NEUTRALIZED` \| `PENDING` — **the interpreter's own verdict, not a re-derivation** (`:671`, `:757`) **[CONFIRMED]**. | Computed by `inEdgeDisposition` with the plan's edge objects passed **by reference**. | `W-DERIVE` |
+
+**Ordering.** Source-array order (`plan.transitions.map`, `:744`). **Idempotency.** Pure given the same evaluator;
+the evaluator is built once per plan and reused across `startableStepIds`, `prunableStepIds` and `transitionRows`
+so the condition subject is folded once, not three times (`+page.server.ts:183-191`, `execution-view.ts:643-656`)
+**[CONFIRMED]**. **Versioning.** Adding a ninth condition operator changes meaning, fails to compile in
+`renderCondition`, and SHALL bump `handlerVersion`.
+
+---
+
+## 5.8 `AffordanceWithholding` — **required by O-5; absent from the code**
+
+**Status: [UNRATIFIED-AUTHORED]. This interface does not exist.** The search establishing its absence is recorded
+verbatim in §4.2.5: pattern `withh`, 57 matches, all comments/tests, zero fields, zero rendered disclosures. It is
+specified here because `SPEC-001-INV-04` — *an Affordance withheld by authority SHALL disclose the reason it is
+withheld; silence SHALL NOT stand in for refusal* — is otherwise unimplementable, and because RIWS §24.4 and JCUX
+§43 both state the obligation in the same words: *"A disabled Command SHALL state why it is unavailable."*
+
+| Field | Type | Optional | Default | Semantics | Validation | Writer |
+|---|---|---|---|---|---|---|
+| `affordance` | `GatedAffordance` | no | — | Which Affordance is withheld. Reuses the existing union (`execution-view.ts:308`) so a withholding cannot name a control that does not exist. | Member of `COMMAND_BY_AFFORDANCE`'s key set (`:310-326`). | `W-DERIVE` |
+| `subjectId` | `string` | no | — | The step, plan or PWU the withholding is about. Required so a Surface can place the disclosure **beside the work it qualifies**, not in a global banner. | Non-empty. | `W-DERIVE` |
+| `reasonCode` | `AffordanceWithholdingReason` | no | — | A stable, enumerated cause. The closed set is specified below. | Total: every gating limb in `planPermitsAffordance` maps to exactly one code. | `W-DERIVE` |
+| `reasonText` | `string` | no | — | A professional-language explanation naming the condition and, where one exists, the remedy. **Not a code rendered as prose.** | Non-empty; SHALL NOT equal `reasonCode`. | `W-DERIVE` |
+| `authorityRef` | `string` | no | — | The declared authority that refused: the rule identifier (e.g. `RPH-EXE-003`) plus the spec-table column consulted. Satisfies CPM PROJ-INV-011 (*a material calculated indicator SHALL provide an explanation of its basis*). | Non-empty. | `W-DERIVE` |
+| `permittedAlternatives` | `readonly string[]` | no | `[]` | What the professional may do **instead**. Empty is a real none. | Sourced from the same kernel decision that withheld the Affordance, never restated — the discipline `retryExhaustion` already follows (`:206-218`, `:540-549`) **[CONFIRMED]**. | `W-DERIVE` |
+| `blocking` | `boolean` | no | — | Whether the withholding prevents the professional from progressing at all, versus removing one of several routes. Drives prominence, not colour. | — | `W-DERIVE` |
+| `watermark` | `string` | no | — | The Projection watermark at which the withholding was derived. Makes `AGV-01` (a stale reason) detectable rather than invisible. | Equals the owning `ProjectionEnvelope.watermark`. | `W-DERIVE` |
+
+**The closed reason set.** **[UNRATIFIED-AUTHORED]** Nine values, derived from the gating limbs that exist today
+plus the two structural causes. It is closed: a tenth gating limb SHALL add a tenth value in the same change
+(§5.3).
+
+| Code | Condition | Derivation citation |
+|---|---|---|
+| `NO_COMMAND_HANDLER` | No registry handler exists for this transition; the F-11 allowlist has no entry. | `execution-view.ts:16-20`, `:240-251`, `:257-272` **[CONFIRMED]** |
+| `BELOW_DRIVEABLE_FLOOR` | The step is `NOT_READY`/`READY` — beneath the domain's initial driveable state. | `:501-505` **[CONFIRMED]** |
+| `PLAN_NOT_LIVE` | The command declares `REQUIRES_ACTIVE_PLAN` and the plan's status is not `ACTIVE`. | `:366-367` **[CONFIRMED]** |
+| `PWU_CLOSED` | The command declares `REQUIRES_OPEN_PWU` and the PWU's work-lifecycle state is terminal. | `:370-375` **[CONFIRMED]** |
+| `BINDING_UNAUTHORIZED` | `bindingAuthorityVerdict` refused: unresolved, wrong step, non-authorizing status, or nothing granted. | `:387-390` **[CONFIRMED]** |
+| `RETRY_BUDGET_EXHAUSTED` | `retryDecision` refused: the cap is reached. | `:403-406` **[CONFIRMED]** |
+| `REQUIRED_INPUT_ABSENT` | `stepMayBecomeReady` refused: a required input artifact does not resolve. | `:412-417` **[CONFIRMED]** |
+| `NOT_ON_FRONTIER` | The step's in-edge barrier is unsatisfied; it is not in `startableStepIds`. | `:610-622` **[CONFIRMED]** |
+| `PROFESSIONAL_AUTHORITY_INSUFFICIENT` | The acting professional's role does not carry the authority the Command requires (JCUX SCREEN-INV-004; CPM PROJ-INV-009). **[CONFIRMED — absence]** no role-based gating exists in the built Surface; every UI command is issued as the single hard-coded actor `{ actorId: 'ui-user', actorType: 'HUMAN' }` (`apps/rph-demo/src/lib/server/workbench.ts:128`). This code is authored for the obligation, not for present behaviour. | — |
+
+**SHALL.** Every withheld Affordance SHALL carry exactly one `AffordanceWithholding`, and the Surface SHALL
+render its `reasonText` and `permittedAlternatives` beside the subject. Conformance: `SPEC-001-FX-AFF-17` (the
+`AGV-04` check — for each of the nine codes, a fixture that forces the condition and asserts a reachable
+disclosure containing the reason text) and `SPEC-001-FX-DISC-01` (a mutation red-proof: deleting any one reason's
+construction reddens exactly one fixture, so a single generic "unavailable" string cannot satisfy all nine).
+
+**SHALL NOT.** A withholding SHALL NOT be represented by the Affordance's mere absence from `advance`/`control`,
+by a `disabled` attribute alone, or by a tooltip that is unreachable by keyboard. Absence, disablement and
+tooltips each fail INV-04 for the same reason: the professional receives no statement they can act on.
+
+**Ordering.** Withholdings for one subject SHALL be ordered `blocking: true` first, then by the reason-code
+order declared above — a stable order, so the same condition presents identically across renders.
+**Idempotency.** A re-derivation at the same watermark yields structurally equal withholdings.
+**Versioning.** Adding a reason code changes meaning and SHALL bump `handlerVersion`.
+
+---
+
+## 5.9 `ProjectionEnvelope` — **required by O-1/O-3 and Machine A; absent from the code**
+
+**Status: [UNRATIFIED-AUTHORED]. This interface does not exist.** Absence established in §4.1.2 (patterns
+`refreshing|lastUpdated|watermark`: 0 matches; `rebuilding`: 0 matches, corpus and exclusions stated there).
+Every Projection specified in §5.1–§5.8 SHALL be delivered inside this envelope.
+
+| Field | Type | Optional | Default | Semantics | Validation | Writer |
+|---|---|---|---|---|---|---|
+| `projectionId` | `string` | no | — | The projection **definition**'s stable identifier — the kind, not the instance (CPM §5.1 distinguishes definition from instance). | Non-empty; stable across derivations. | `W-DERIVE` |
+| `handlerVersion` | `number` | no | — | The derivation's fold version. A change invalidates checkpoints and triggers `T-06`. | Equals the owning `Projector.handlerVersion` (`projector.ts:9`) **[CONFIRMED]**. | `W-DERIVE` |
+| `scope` | `ProjectionScope` | no | — | The declared subject the Projection is bound to (O-3), as `{ subjectType, subjectId }`. **The rule that bounds contents**, not a label. | Every object in the payload SHALL be reachable from `subjectId` by the declared inclusion rule. | `W-LOADER` |
+| `freshness` | `'UNBUILT' \| 'DERIVING' \| 'DERIVED' \| 'STALE' \| 'REBUILDING' \| 'FAILED'` | no | — | Machine A's state (§4.1.3). | One of exactly six. | `W-DERIVE` |
+| `freshnessCause` | `'SOURCE_ADVANCED' \| 'SOURCE_UNREACHABLE' \| 'HANDLER_VERSION_CHANGED' \| 'REBUILD_FAILED'` | yes | absent | Why the Projection is not `DERIVED`. **Required when `freshness = STALE`**, absent otherwise. | Presence tied to `freshness`. | `W-DERIVE` |
+| `watermark` | `string` | no | — | The source position the fold reached — a monotonically comparable token over the event stream. **[UNRATIFIED-AUTHORED]** the token's exact form is Deliberately Unspecified (§11); the ordering relation is not. | Comparable to `knownHead` by a total order. | `W-DERIVE` |
+| `knownHead` | `string` | yes | absent | The last known source head. **Absent means the head is unreadable**, which is a `STALE` cause, not a fresh state. | — | `W-LOADER` |
+| `derivedAt` | `string` (RFC-3339) | no | — | When the fold completed. JCUX §50's *Last Updated*. | Valid timestamp. | `W-DERIVE` |
+| `completeness` | `'COMPLETE' \| 'PARTIAL'` | no | `'COMPLETE'` | Axis 2 (§4.1.7). A genuinely empty result from a fully-read source is `COMPLETE`. | — | `W-DERIVE` |
+| `partiality` | `{ missingSourceClasses: readonly string[]; reason: string; interpretationAffected: boolean; commandsAvailable: boolean }` | yes | absent | RIWS §26.3's four required disclosures. **Required when `completeness = PARTIAL`**. | Presence tied to `completeness`. | `W-DERIVE` |
+| `temporalBasis` | `'CURRENT' \| 'HISTORICAL' \| 'COMPARISON' \| 'PREDICTED' \| 'OFFLINE_SNAPSHOT'` | no | `'CURRENT'` | Axis 3 (§4.1.7; JCUX §6.3). SPEC-001 governs `CURRENT`. | — | `W-LOADER` |
+| `suppressions` | `readonly { class: string; count: number; reason: string }[]` | no | `[]` | Entities intentionally omitted by filtering, scope or summarization, so the omission is **detectable** (CPM PROJ-INV-012). Empty is a real none. | Each entry names a class and a count, never "some". | `W-DERIVE` |
+| `sourceEntities` | `readonly { objectType: string; count: number }[]` | no | `[]` | The authoritative source entity classes the fold read (CPM PROJ-INV-001). | — | `W-DERIVE` |
+| `materialChangeSinceWatermark` | `boolean` | yes | absent | JCUX §50's *Material Change Indicator*. **Required when `freshness = STALE`**. | — | `W-DERIVE` |
+| `refreshAffordanceId` | `string` | yes | absent | The Affordance that triggers `T-07`/`T-09`. **Required when `freshness ∈ {STALE, FAILED}`** — a stale Projection that offers no way out strands the professional. | Must resolve to an `OFFERED` Affordance. | `W-DERIVE` |
+| `commandSafety` | `'SAFE' \| 'REVALIDATE_REQUIRED' \| 'UNSAFE'` | no | `'SAFE'` | JCUX §50's *Command Safety State*, and the field FORK-22 turns on. `REVALIDATE_REQUIRED` is the recommended value under `STALE`. | — | `W-DERIVE` |
+
+**SHALL.** Every Projection returned to a Surface SHALL be wrapped in a `ProjectionEnvelope`. Conformance:
+`SPEC-001-FX-IFACE-14`, a boundary check that every value returned from a route `load()` and consumed as a
+Projection carries the envelope; and `SPEC-001-FX-IFACE-15`, which asserts each conditional-presence rule
+(`freshnessCause`, `partiality`, `materialChangeSinceWatermark`, `refreshAffordanceId`) fires.
+
+**SHALL.** `scope` SHALL bound the payload. This restates `SPEC-001-INV-02` in full at the interface boundary
+(master: §3) — *a Projection SHALL be bound to a declared Projection Scope and SHALL NOT present objects outside
+it*. **[CONFIRMED]** the incumbent violates it in four places: `listAssessments`, `listObservations`,
+`listDecisions` and `listBaselines` (`packages/rph-engine/src/queries.ts:46-51`) take **no scope argument** and
+return the engine-global set, while the sibling `listPwus` (`:41-44`) takes `undertakingId` and filters. The
+Undertaking Workbench loader calls all four unscoped (`+page.server.ts:255`, `:296`, `:302`, `:308`)
+**[CONFIRMED]**. Conformance: `SPEC-001-FX-IFACE-16` — seed two Undertakings, load the second, assert none of the
+first's assessments, observations, decisions or baselines appears; a mutation red-proof requires this fixture to
+redden if any one of the four scope filters is removed.
+
+**Ordering.** The envelope imposes none on its payload; each interface's own ordering rule governs.
+**Idempotency.** Two derivations at the same `watermark` with the same `handlerVersion` SHALL produce
+structurally equal envelopes except for `derivedAt`. **[UNRATIFIED-AUTHORED]** `derivedAt` is excluded from
+equality; a fixture comparing envelopes SHALL exclude it explicitly rather than by tolerance.
+**Versioning.** Adding a field is a `handlerVersion` bump. Changing the `watermark` token's comparison relation
+is a **breaking** change and SHALL be accompanied by a migration note in §11.
+
+---
+
+## 5.10 `RefusalDisclosure` and `PartialApplicationDisclosure` — **required by O-6 and INV-14**
+
+**Status: [UNRATIFIED-AUTHORED].** Neither interface exists; the incumbent surfaces refusals as a bare formatted
+string (`+page.server.ts:503-505`) **[CONFIRMED]**.
+
+### 5.10.1 `RefusalDisclosure`
+
+| Field | Type | Optional | Default | Semantics | Validation | Writer |
+|---|---|---|---|---|---|---|
+| `affordance` | `GatedAffordance` | no | — | Which Affordance was issued. | — | `W-LOADER` |
+| `subjectId` | `string` | no | — | What it was issued against. Places the disclosure beside the work. | Non-empty. | `W-LOADER` |
+| `resultStatus` | `CommandResultStatus` | no | — | The engine's own status, verbatim, from the ratified six-value enum (`enums.ts:234-242`) **[CONFIRMED]**. | One of six. | `W-ENGINE` |
+| `errorCode` | `RphErrorCode` | yes | absent | The engine's ratified code, verbatim. **Absent only when `CommandResult.error` is absent** (the schema marks it optional, `envelopes.ts:118`) **[CONFIRMED]**. | Member of the ratified fifteen (`errors.ts:9-25`); **SHALL NOT** be a surface-authored code. | `W-ENGINE` |
+| `errorCategory` | `RphErrorCategory` | yes | absent | The engine's category, verbatim. | Member of the ratified ten (`enums.ts:672-683`) **[CONFIRMED]**. | `W-ENGINE` |
+| `professionalExplanation` | `string` | no | — | The engine's `message`, surfaced **verbatim**, plus any Surface-added framing clearly attributed as such. | Non-empty. | `W-ENGINE` + `W-LOADER` |
+| `retryable` | `boolean` | no | — | The engine's **instance-level** `retryable` flag (`errors.ts:57`, default `false` at `:76`) **[CONFIRMED]**. | Read from the instance; **SHALL NOT** be inferred from `errorCode`. | `W-ENGINE` |
+| `correlationId` | `string` | no | — | JCUX §49's required *Correlation ID*, so a professional can cite the act. | Non-empty and **distinct per issuance**. | `W-LOADER` |
+| `recommendedDisposition` | `string` | no | — | What the professional should do next, from §6's catalog. | Non-empty. | `W-LOADER` |
+| `targetObjectIds` | `readonly string[]` | no | `[]` | The objects the error names (`errors.ts:56`) **[CONFIRMED]**, so the Surface can highlight them. | — | `W-ENGINE` |
+
+**SHALL.** A Surface SHALL surface `errorCode` and `professionalExplanation` to the professional who issued the
+Command. This restates `SPEC-001-INV-08` in full at the interface boundary (master: §3). **[CONFIRMED]** the
+incumbent satisfies it for single-Command actions — `dispatchResult` formats
+`` `${commandType} rejected — ${r.error?.code ?? r.status}: ${r.error?.message ?? ''}` `` (`+page.server.ts:503-505`)
+— and **violates it for multi-Command actions**: `runSteps` formats
+`` `${ct}: ${r.error?.message ?? r.status}` `` (`:486`), which **omits `.code` entirely**. Every multi-Command
+Surface action in the Undertaking Workbench (`beginExecute`, `recordAssurance`, `markSatisfied`) therefore
+discloses a message without a code. Conformance: `SPEC-001-FX-DISC-02`, which forces a refusal on each of the
+three multi-Command actions and asserts the rendered text contains the `RPH_*` code.
+
+**SHALL.** `correlationId` SHALL be distinct per issuance. **[CONFIRMED]** the incumbent violates it: `uiCommand`
+defaults `correlationId` to the literal `'ui'` (`workbench.ts:119`) and `dispatch` never overrides it
+(`:138-147`), so every UI-issued Command in the Workbench shares one correlation id. A search over
+`apps/rph-demo/src` for `correlationId` returns 6 matches, none in a `.svelte` file — the id is never shown to
+the professional either. Conformance: `SPEC-001-FX-DISC-03` (two issuances yield different ids) and
+`SPEC-001-FX-DISC-04` (the id is rendered in the disclosure). See **FORK-25**.
+
+### 5.10.2 `PartialApplicationDisclosure`
+
+| Field | Type | Optional | Default | Semantics | Validation | Writer |
+|---|---|---|---|---|---|---|
+| `affordance` | `GatedAffordance` | no | — | The multi-Command Affordance issued. | — | `W-LOADER` |
+| `appliedCommands` | `readonly { commandType: string; targetAggregateId: string; resultStatus: CommandResultStatus }[]` | no | — | **The committed prefix, enumerated.** Not a count. | Non-empty (a partial application has ≥1 applied Command). | `W-LOADER` |
+| `haltedAt` | `{ commandType: string; targetAggregateId: string }` | no | — | The Command that did not apply. | — | `W-LOADER` |
+| `refusal` | `RefusalDisclosure` | no | — | Why it did not apply. | — | `W-LOADER` |
+| `remainingCommands` | `readonly string[]` | no | `[]` | Commands never attempted. Empty is a real none. | — | `W-LOADER` |
+| `rollbackPerformed` | `boolean` | no | — | Whether the committed prefix was rolled back. | — | `W-LOADER` |
+| `reconciliationGuidance` | `string` | no | — | What the professional must do to bring the subject to a coherent state given the committed prefix. | Non-empty when `rollbackPerformed = false`. | `W-LOADER` |
+
+**SHALL.** A multi-Command Affordance that halts after ≥1 acceptance SHALL enter Machine-B state
+`PARTIALLY_APPLIED` and SHALL surface a `PartialApplicationDisclosure`. This restates `SPEC-001-INV-14` in full at
+the interface boundary (master: §3) — *a partially-applied Command sequence SHALL NOT leave the Surface reporting
+success; multi-command actions SHALL disclose partial application*. **[CONFIRMED]** the incumbent violates it:
+`runSteps` (`+page.server.ts:482-489`) dispatches sequentially via `dispatch` (single-command), returns the first
+non-acceptance as a string, and performs no rollback; the caller renders it as a flat error
+(`:640`, `:888`, `:900`). **The atomic alternative exists, is used by a sibling Surface, and is not used here** —
+which is the sharpest form of the finding. `dispatchBatch` (`workbench.ts:150-152`) is documented as *"Dispatch a
+multi-command UI operation atomically. A rejection rolls the entire operation back."* Search over
+`apps/rph-demo/src` for `dispatchBatch`, untruncated: **10 matches** — the definition (`workbench.ts:150-151`),
+an authoring-turn delegation (`lib/server/authoring-turn.ts:189-191`), three `dispatchBatchGuarded` references
+(`:197`, `:365-366`, `:452`), and **two in the PWA Designer route** (`routes/pwa/[id]/+page.server.ts:39`
+import, `:632` call). **Zero** in `routes/undertakings/[id]/+page.server.ts`. One Surface in this application
+applies the atomic path; the other, driving the same engine, does not. Conformance: `SPEC-001-FX-DISC-05`, which
+forces a refusal at the sixth Command of
+`beginExecute` and asserts the Surface names the five applied Commands and does not report plain failure; and
+`SPEC-001-FX-DISC-06`, the `AP-31` negative fixture.
+
+> **FORK-23 — Atomicity versus disclosure for multi-Command Affordances.**
+> **Decision:** whether INV-14 is satisfied by disclosure alone, or whether a multi-Command Affordance SHALL be
+> issued atomically wherever an atomic dispatch exists.
+> **Options:** (a) disclosure only, as INV-14 literally states; (b) atomic where available (`dispatchBatch`),
+> disclosure as the fallback where it is not; (c) atomic always, prohibiting non-atomic multi-Command Affordances.
+> **Recommendation: (b).** RIWS §27.3 prohibits silent overwrite but does not require atomicity; option (c) would
+> outlaw sequences whose Commands target different aggregates with genuinely independent authority. Option (a)
+> leaves a documented, rollback-free path in place when the remedy is one function call away.
+> **If ruled (a):** `rollbackPerformed` becomes permanently `false` and `reconciliationGuidance` becomes the sole
+> remedy. **If ruled (c):** `PartialApplicationDisclosure` narrows to a diagnostic and `A-PARTIALLY_APPLIED`
+> becomes reachable only on infrastructure failure.
+
+---
+
+# 6. Error and disclosure catalog
+
+## 6.1 The two registers, and why they may not merge
+
+**SHALL NOT.** This specification SHALL NOT add members to, remove members from, or reinterpret
+`RphErrorCode`. That enum is ratified at fifteen values (`packages/rph-contracts/src/errors.ts:9-25`, whose
+comment cites DOC-007 §25.1) **[CONFIRMED]**, it is a Zod enum validated at the transport boundary
+(`RphErrorSchema`, `:51-59`), and every code has a declared category in `ERROR_CODE_CATEGORY` (`:32-48`). A
+Surface-authored code inserted into it would fail schema validation at the engine boundary and, worse, would
+present a Surface's opinion wearing the engine's authority.
+
+**SHALL.** Surface-level disclosure conditions SHALL therefore use a **separate** register, specified in §6.3,
+whose codes carry the prefix `JPWB-SD-` and are **all** `[UNRATIFIED-AUTHORED]`. The two registers SHALL be
+distinguishable at every point of use — in the interface (`RefusalDisclosure.errorCode` is typed `RphErrorCode`;
+disclosure codes travel on a separate field), in the rendered text, and in telemetry. Conformance:
+`SPEC-001-FX-DISC-07`, a type-level check that no `JPWB-SD-*` literal is assignable to `RphErrorCode`; and
+`SPEC-001-FX-DISC-08`, which asserts the rendered disclosure labels the register.
+
+**INFORMATIVE — the gap that makes a second register necessary.** JCUX §49 enumerates seven error classes and
+one of them, **Projection Failure**, has no `RphErrorCode` correspondent. Verification: each of the fifteen codes
+was read at `errors.ts:9-25`; none names a projection, a derivation, a fold, or a read model. RIWS §26.4
+enumerates six classes and omits Projection Failure entirely. That divergence is real and is recorded as FORK-24;
+until it is ruled, projection-derivation failures have no ratified code and are disclosed under `JPWB-SD-01x`.
+
+## 6.2 Register A — the ratified `RphErrorCode` set (fifteen values)
+
+**[CONFIRMED]** all fifteen codes and all fifteen category assignments read at `errors.ts:9-25` and `:32-48`.
+
+**Retryability is an instance property, not a code property.** `RphError.retryable` is a required boolean on the
+serialized shape (`errors.ts:57`) and `makeRphError` defaults it to **`false`** (`:76`) **[CONFIRMED]**. The
+"Typical retryability" column below is **advisory only**.
+
+**SHALL.** A Surface SHALL read `retryable` from the `RphError` instance it received. **SHALL NOT** — a Surface
+SHALL NOT maintain a code→retryable table. Such a table is the cheaper-but-wrong implementation an agent reaches
+for when the column below is present, and it silently overrides the engine's per-instance judgement — the engine
+may mark one `RPH_EXTERNAL_OPERATION_UNCERTAIN` retryable and another not, and a table cannot see the
+difference. Conformance: `SPEC-001-FX-DISC-09`, which emits two instances of one code with opposite `retryable`
+values and asserts the Surface's rendered guidance differs.
+
+**A second honesty note.** `ERROR_CODE_CATEGORY` is labelled in its own source as *"Best-judgment code→category
+mapping. OPEN ITEM #6: DOC-007 §25 lists the codes AND the 10-value category enum but gives NO mapping — this is
+a sponsor-confirmable decision"* (`errors.ts:28-31`) **[CONFIRMED]**. The Category column below reproduces that
+best-judgment mapping and inherits its unratified status.
+
+| # | `RphErrorCode` | Category (per `ERROR_CODE_CATEGORY`) | Condition | Typical retryability *(advisory)* | Recommended disposition | The Surface SHALL show |
+|---|---|---|---|---|---|---|
+| 1 | `RPH_VALIDATION_SCHEMA_FAILED` | `VALIDATION` | The Command payload failed schema validation. | Not without change | Correct the input and re-derive before re-issuing (`U-10 → U-01`). | The failing field where `targetObjectIds` names it; the message verbatim; **never** a bare "invalid". |
+| 2 | `RPH_VALIDATION_SEMANTIC_FAILED` | `VALIDATION` | The payload is schema-valid but semantically inadmissible (e.g. a named output artifact that does not exist). | Not without change | As above. | The named object and why it was inadmissible. |
+| 3 | `RPH_AUTHORITY_INSUFFICIENT` | `AUTHORIZATION` | The actor lacks the authority the Command requires. | No | Escalate or obtain authority; do not retry as the same actor. | Which authority is required and who holds it (RIWS §9.3 requires *"who possesses authority to act"*). |
+| 4 | `RPH_REVISION_CONFLICT` | `CONCURRENCY` | `expectedRevision` did not match the aggregate's actual revision — the professional acted on a stale read. | After re-derivation | Re-derive (`T-07`), compare, re-issue. **SHALL NOT** auto-retry: RIWS §27.3 prohibits silent last-write-wins. | What changed, who changed it, and a comparison affordance (RIWS §27.2). |
+| 5 | `RPH_ILLEGAL_STATE_TRANSITION` | `INVARIANT` | The Command would move an object along an arrow its machine does not have. | No | Re-derive; the Affordance should not have been offered — record an INV-13 finding. | The current state, the attempted state, and the legal exits (RIWS §9.3: *"which conditions must be satisfied to leave it"*). |
+| 6 | `RPH_INVARIANT_VIOLATION` | `INVARIANT` | A governed invariant would be broken. In this repository this is the code returned when an AI-produced output's de minimis floor is unsatisfied (`+page.server.ts:730-733`) **[CONFIRMED]**. | No | Satisfy the invariant's precondition; do not re-issue unchanged. | The invariant by name, and what would satisfy it. |
+| 7 | `RPH_EVIDENCE_MISSING` | `ASSURANCE` | Required Evidence is absent. | After the gap is closed | Submit the evidence naming the requirement it satisfies. | **Which requirement** is unmet — `AssuranceAssessmentView.missingEvidence` (§5.5) is the field that answers this. |
+| 8 | `RPH_EVIDENCE_INVALIDATED` | `ASSURANCE` | Evidence relied upon has been invalidated. | After reassessment | Reassess the dependent claims. | The invalidated object and the reason — `AssuranceInvalidationView` carries both. |
+| 9 | `RPH_VALIDATOR_OUTPUT_INVALID` | `ASSURANCE` | A validator returned output the contract cannot admit. | Sometimes | Re-run or replace the validator; **do not** treat the invalid output as a verdict. | The validator's identity and version, and that **no verdict was reached** — never an implied pass. |
+| 10 | `RPH_VALIDATOR_INDEPENDENCE_VIOLATION` | `ASSURANCE` | The independence requirement was not met. | No | Obtain an independent evaluator. | `independenceStatus = 'VIOLATED'` beside the assessment (§5.5), never absent-rendered-as-verified. |
+| 11 | `RPH_POLICY_VERSION_MISMATCH` | `ASSURANCE` | The Command binds a policy version that is not current. | After rebinding | Re-derive and rebind to the current version. | Both versions, side by side. |
+| 12 | `RPH_SUBJECT_VERSION_MISMATCH` | `ASSURANCE` | The Command binds a subject semantic version that is not current — the stale-attestation guard. | After rebinding | Re-attest against the current shape. | Both versions and what changed between them. |
+| 13 | `RPH_BASELINE_VERSION_MISMATCH` | `INVARIANT` | A promotion decision bound subject versions no longer current. | After re-approval | Re-approve at current versions. | The stale subjects by id. |
+| 14 | `RPH_IDEMPOTENCY_DUPLICATE` | `CONCURRENCY` | The idempotency key has already been consumed. | No — and no retry is needed | Treat as `APPLIED`: `CommandResultStatus.DUPLICATE` maps to `A-APPLIED` (§4.2.2). | **Nothing as an error.** Rendering a duplicate as a failure teaches the professional to re-issue, which is the behaviour idempotency exists to make safe. |
+| 15 | `RPH_EXTERNAL_OPERATION_UNCERTAIN` | `EXTERNAL_DEPENDENCY` | An external operation's outcome is not known. | **Read the instance flag** | **Reconcile, never blindly retry** — `packages/rph-domain/src/execution.ts:20` records the rule: *"CLASSIFIED and reconciled — never blindly retried (a reconciled external status dominates stale local …)"* **[CONFIRMED]**. | That the outcome is **unknown**, distinctly from success and from failure — this is `SPEC-001-INV-06` (material uncertainty visible) arriving through the error channel. |
+
+**SHALL.** Every one of the fifteen SHALL have a rendered disclosure whose text differs from the others'.
+Conformance: `SPEC-001-FX-DISC-10`, a table-driven fixture over all fifteen asserting fifteen distinct rendered
+strings — the mutation red-proof being that collapsing any two reddens it, which forecloses the single generic
+"Command failed" banner.
+
+## 6.3 Register B — surface disclosure codes
+
+**All codes in this register are `[UNRATIFIED-AUTHORED]`.** They are not `RphErrorCode` members, SHALL NOT be
+added to that enum, and SHALL NOT be emitted by the engine. They classify conditions the **Surface** must
+disclose — conditions the engine has no opinion about because they are not about governed state at all, but
+about whether a professional can see and act on it.
+
+**Categories.** `FRESHNESS` · `COMPLETENESS` · `WITHHOLDING` · `PARTIAL_APPLICATION` · `REACHABILITY` ·
+`EPISTEMIC` · `SCOPE` · `NAVIGATION`. Eight, closed; a ninth requires a fork.
+
+**Retryability semantics in this register.** `Retryable` means *the same professional act, repeated unchanged,
+may succeed*. `Re-derive` means the act must be preceded by a Machine-A `T-07`/`T-09`. `No` means the condition
+is a defect to be reported, not a transient to be waited out.
+
+| Code | Category | Condition | Retryable | Recommended disposition | The Surface SHALL show | Serves | Check |
+|---|---|---|---|---|---|---|---|
+| `JPWB-SD-001` | FRESHNESS | `freshness = STALE`, cause `SOURCE_ADVANCED`. | Re-derive | Offer refresh; permit Commands with `commandSafety = REVALIDATE_REQUIRED`. | JCUX §50's six items (§4.1.6), beside the content, reachable. | INV-09 | `SPEC-001-FX-FRESH-17` |
+| `JPWB-SD-002` | FRESHNESS | `freshness = STALE`, cause `SOURCE_UNREACHABLE`. | Re-derive | Retain and qualify the last true reading; **never** blank it (`P-08`). | That the reading is from `derivedAt` and the current head is unknown. | INV-09 | `SPEC-001-FX-FRESH-10` |
+| `JPWB-SD-003` | FRESHNESS | `freshness = STALE`, cause `HANDLER_VERSION_CHANGED`. | Re-derive | Rebuild; the prior value was folded by superseded logic. | That the view's derivation logic changed, not the data. | INV-09 | `SPEC-001-FX-FRESH-16` |
+| `JPWB-SD-004` | FRESHNESS | `freshness = REBUILDING`. | n/a | Keep the prior value visible throughout (`P-07`, `GV-04`). | A refresh indicator that does **not** replace the content. | INV-09 | `SPEC-001-FX-FRESH-09` |
+| `JPWB-SD-005` | FRESHNESS | `freshness = STALE`, cause `REBUILD_FAILED`. | Yes | Retry; the prior value is retained (`P-14`, `GV-05`). | Both the retained value **and** the failed-refresh notice. | INV-09 | `SPEC-001-FX-FRESH-12` |
+| `JPWB-SD-010` | FRESHNESS | `freshness = FAILED` — no value at any watermark. **This is JCUX §49's *Projection Failure*, which Register A cannot express** (§6.1). | Yes | Retry (`T-14`); offer the refresh Affordance. | An explicit failure notice. **SHALL NOT** render an empty result set (§4.1.6). | INV-09, PROJ-INV-014 | `SPEC-001-FX-FRESH-19` |
+| `JPWB-SD-020` | COMPLETENESS | `completeness = PARTIAL`. | Re-derive | Disclose RIWS §26.3's four items; state whether Commands remain available. | Which source classes are missing and why. | INV-09 | `SPEC-001-FX-FRESH-21` |
+| `JPWB-SD-021` | COMPLETENESS | `suppressions` is non-empty — entities omitted by filter, scope or summarization. | n/a | Make the omission detectable (CPM PROJ-INV-012). | The class and the **count** omitted, never "some results hidden". | INV-02 | `SPEC-001-FX-IFACE-15` |
+| `JPWB-SD-022` | COMPLETENESS | A field is **unknown** (no source) as distinct from **none** (a real empty). | n/a | Render unknown as unknown. **SHALL NOT** render it as none. | An explicit unknown marker. | INV-06, INV-12 | `SPEC-001-FX-IFACE-09`, `-10` |
+| `JPWB-SD-030` | WITHHOLDING | An Affordance is `A-WITHHELD` for any of §5.8's nine reason codes. | Depends on reason | Show reason and permitted alternatives; keep the subject in view. | `reasonText`, `authorityRef`, `permittedAlternatives`. | INV-04 | `SPEC-001-FX-AFF-17` |
+| `JPWB-SD-031` | WITHHOLDING | An Affordance is withheld and **no** reason is available — a derivation defect. | No | Report as a defect; **fail loud**. | That the Surface cannot explain the withholding. **SHALL NOT** substitute a generic "unavailable". | INV-04 | `SPEC-001-FX-DISC-01` |
+| `JPWB-SD-032` | WITHHOLDING | A withholding reason's `watermark` is older than the current envelope's — a stale explanation (`AGV-01`). | Re-derive | Re-derive the reason with the verdict. | Nothing until re-derived; a stale reason SHALL NOT be shown. | INV-04 | `SPEC-001-FX-AFF-14` |
+| `JPWB-SD-040` | PARTIAL_APPLICATION | `A-PARTIALLY_APPLIED` with `rollbackPerformed = false`. | No | Surface the committed prefix and reconciliation guidance. | Every applied Command by name; the halting Command; the refusal. **SHALL NOT** report success or plain failure. | INV-14, INV-08 | `SPEC-001-FX-DISC-05` |
+| `JPWB-SD-041` | PARTIAL_APPLICATION | A Command issued from a `STALE` Projection returned `CONFLICT`. | Re-derive | Show what changed and offer comparison (RIWS §27.2). | The material change; **no silent overwrite** (RIWS §27.3). | INV-08, INV-09 | `SPEC-001-FX-FRESH-18` |
+| `JPWB-SD-042` | PARTIAL_APPLICATION | A multi-Command Affordance was rolled back atomically. | Yes | Report that **nothing** was applied. | That the subject is unchanged — the distinction from `JPWB-SD-040` is the whole point. | INV-14 | `SPEC-001-FX-DISC-06` |
+| `JPWB-SD-050` | REACHABILITY | Rendered content is present in the accessibility tree but cannot be brought into view by ordinary interaction. | No | Report as a defect. | n/a — **the condition is itself the violation.** | INV-07 | `SPEC-001-FX-DISC-11` |
+| `JPWB-SD-051` | REACHABILITY | A disclosure required by any other code in this register is itself unreachable. | No | Report as a defect. | n/a. | INV-07, INV-04 | `SPEC-001-FX-FRESH-15` |
+| `JPWB-SD-060` | EPISTEMIC | A presented Claim, Evidence, AI output or Decision carries no resolvable provenance. | No | Disclose that provenance is unavailable. **SHALL NOT** present the content unqualified. | An explicit "provenance unavailable" marker. | INV-12 | `SPEC-001-FX-DISC-12` |
+| `JPWB-SD-061` | EPISTEMIC | Material uncertainty attaches to presented work. | n/a | Show it **on the Surface carrying the work it qualifies** (CON-000 AX-3). | The uncertainty statement, beside the work. | INV-06 | `SPEC-001-FX-DISC-13` |
+| `JPWB-SD-062` | EPISTEMIC | A material contradiction is relevant to the Projection's purpose. | n/a | Keep it visible or explicitly disclose it (CPM PROJ-INV-006). | The contradiction, not a resolution. | INV-06 | `SPEC-001-FX-DISC-14` |
+| `JPWB-SD-063` | EPISTEMIC | A presented indicator is calculated and its basis is not shown. | No | Provide the basis (CPM PROJ-INV-011; RIWS UI-INV-018 *No False Precision*). | The inputs and the rule. | INV-12 | `SPEC-001-FX-DISC-15` |
+| `JPWB-SD-070` | SCOPE | A Projection presents an object outside its declared Scope. | No | Report as a defect; **fail closed** by excluding it. | n/a — the condition is the violation. | INV-02 | `SPEC-001-FX-IFACE-16` |
+| `JPWB-SD-071` | SCOPE | A Projection's derivation could not resolve its Scope. | Yes | Do not derive. `freshness` stays `UNBUILT`; `T-01`'s guard is unmet. | That the subject could not be resolved. **SHALL NOT** fall back to an unscoped list. | INV-02 | `SPEC-001-FX-IFACE-16` |
+| `JPWB-SD-080` | NAVIGATION | Movement between Surfaces would drop active professional context. | No | Preserve RIWS §11.2's six items; report a drop as a defect. | n/a — the condition is the violation. | INV-10 | `SPEC-001-FX-DISC-16` |
+| `JPWB-SD-081` | NAVIGATION | A Surface is unavailable because it is semantically inapplicable. | n/a | Explain why (RIWS §11.3: *"The UI SHOULD explain why a projection is unavailable"*). | The condition under which it becomes available. | INV-04 | `SPEC-001-FX-DISC-17` |
+
+**SHALL.** Every disclosure in Register B SHALL be rendered **beside the subject it qualifies**, not in a global
+region, except where the condition is genuinely Surface-wide (`JPWB-SD-010`, `JPWB-SD-020`, `JPWB-SD-080`). This
+restates `SPEC-001-INV-06`'s locality requirement — *material uncertainty SHALL be visible on the Surface that
+carries the work it qualifies* (master: §3, restating JPWB-CON-000 AX-3) — and generalizes it to every
+disclosure class: a banner at the top of a 77-row region is not a disclosure about row 68. Conformance:
+`SPEC-001-FX-DISC-18`, which asserts each subject-scoped disclosure's rendered position is within the subject's
+own bounding region.
+
+**SHALL.** Every disclosure in Register B SHALL be reachable by ordinary interaction at 1440×900. This restates
+`SPEC-001-INV-07` in full at the disclosure boundary (master: §3). **[CONFIRMED]** the incumbent cannot satisfy
+it on the Undertaking Workbench: `apps/rph-demo/src/routes/+layout.svelte:145-149` sets
+`.app { display: flex; height: 100vh; overflow: hidden; }` and `:311-314` sets `.content.full { padding: 0;
+overflow: hidden; }`, with `fullBleed` true for `/undertakings/[id]` (`:74-76`). No scroller is supplied by that
+route's own container, so content below the viewport is unreachable. Conformance: `SPEC-001-FX-DISC-11` /
+`SPEC-001-FX-FRESH-15`, viewport fixtures at 1440×900 asserting a real wheel event moves the region and that the
+last row is brought into view.
+
+**SHALL NOT.** A Register-B code SHALL NOT be rendered as a bare code. Every disclosure SHALL carry
+professional-language text. RIWS UI-INV-020 states the obligation — *"Unavailable actions and failed commands
+SHALL explain the professional reason"* — and JCUX §49 requires a *Professional Explanation* alongside the
+*Technical Reference*. Conformance: `SPEC-001-FX-DISC-19`, which asserts that for every code, the rendered text
+contains at least one sentence that is not the code and not the code's name.
+
+### 6.3.1 Codes cited in §§2 and 4 with no Register-B member — recorded at assembly
+
+**Recorded at assembly, 2026-07-28. UNRATIFIED-AUTHORED as to the disposition; CONFIRMED as to the mismatch.** The
+object catalog in §2 cites five surface disclosure codes as members of §6. Register B above is a closed
+`JPWB-SD-nnn` set and contains none of the five spellings. The mismatch is recorded rather than resolved, because
+binding a code to a member is a semantic act and this document's assembly is not one: a silent remap would decide,
+without a ruling, which Register-B condition each citing obligation actually names.
+
+| Code as cited | Cited at | Nearest Register-B member by condition | Disposition |
+|---|---|---|---|
+| `PROJ_UNAVAILABLE` | §2.1 C-17 (a Projection that cannot be generated at all SHALL surface it) | `JPWB-SD-010` (`freshness = FAILED`, no value at any watermark) | **NEEDS BINDING** — the conditions coincide; the spellings do not |
+| `SURF-STALE-REVALIDATED` | §2.1 C-18 (a Command issued from an instance whose sources have advanced) | `JPWB-SD-041` (a Command from a `STALE` Projection returned `CONFLICT`) | **NEEDS BINDING** |
+| `SURF-STALE-002` | §2.7.4 `asOf` (a decreasing high-water mark means a rollback) | none — Register B has no rollback-of-watermark condition | **NEEDS A MEMBER**; minting one is a §6.1 act, not an assembly act |
+| `SURF-DISC-001` | §2.8.1 Recovery (no surface exists for a disclosure's class) | none — Register B has no “no surface exists for this class” condition; `JPWB-SD-031` is its nearest analogue for Affordances only | **NEEDS A MEMBER** |
+| `SURF-SCOPE-001` | §2.9.2 Security, §2.9.4 O-9-R8 (a restored context naming an out-of-scope subject) | `JPWB-SD-070`/`JPWB-SD-071` (SCOPE) | **NEEDS BINDING** — and the choice between the two is itself the ruling, since one is a violation and the other a resolution failure |
+
+**SHALL.** No obligation in §§2 or 4 that cites one of these five codes is weakened by this record: each remains a
+`SHALL` with its named fixture, and the fixture asserts the *condition*, not the spelling. **SHALL.** Before
+ratification, each row SHALL be dispositioned — bound to a member or accompanied by a new member minted under
+§6.1's separate-register rule — and the disposition SHALL be gated by `SPEC-001-NF-56` (§8.7), which already
+requires that every code this specification declares maps to a fixture id or to a Deliberately Unspecified row.
+The five rows are carried in §11.2.4 for that reason. An unbound code left in this table at ratification is a
+CON-000 B7 condition — a code asserting a register membership nothing performs.
+
+## 6.4 Disclosure obligations that survive every state
+
+**SHALL.** The following hold in **all** Machine-A and Machine-B states, and are restated here because a
+disclosure catalog is precisely where an implementer reaches for an exemption.
+
+1. **No silent absence.** An Affordance the professional could reasonably expect and which is not offered SHALL
+   carry a `JPWB-SD-030` disclosure. **[CONFIRMED]** the incumbent has no Surface that explains why an Affordance
+   is absent, per the §4.2.5 search. Check: `SPEC-001-FX-AFF-17`.
+2. **No fabricated success.** No Surface SHALL report an outcome the engine did not return. The incumbent
+   observes this for single Commands — *"the UI shows the engine's reason and never fabricates a success"*
+   (`+page.server.ts:497-499`) **[CONFIRMED]** — and breaches it for sequences (§5.10). Check:
+   `SPEC-001-FX-DISC-05`.
+3. **No collapsed axes.** No disclosure SHALL merge the four PWU state axes, nor Machine A's three axes, into a
+   single indicator. This restates `SPEC-001-INV-05` (master: §3, restating JPWB-DOC-003 STA-1) and
+   `SPEC-001-INV-11` (STA-2). The four axes are carried distinctly today in `PwuAxesView`
+   (`packages/rph-projections/src/graph-view.ts:13-18`) and the green-node rule is computed from two of them
+   plus open findings (`work-projection.ts:38-49`) **[CONFIRMED]**. Check: `SPEC-001-FX-DISC-20`.
+4. **Verbatim engine text.** Where an engine `message` exists it SHALL be surfaced verbatim, with any Surface
+   framing clearly attributed. Check: `SPEC-001-FX-DISC-21`.
+5. **One correlation per issuance.** Every disclosure arising from an issued Command SHALL carry that issuance's
+   own `correlationId` (JCUX §49). See FORK-25. Check: `SPEC-001-FX-DISC-03`.
+
+> **FORK-24 — Is *Projection Failure* an error class, and should Register B be ratified?**
+> **Decision:** (i) whether a projection-derivation failure is an error in the governed sense; (ii) whether
+> Register B's codes should be ratified into a second contract enum or remain Surface-local literals.
+> **Sources diverge:** JCUX §49 lists seven classes **including** *Projection Failure*; RIWS §26.4 lists six and
+> omits it; `RphErrorCode`'s fifteen values contain no correspondent (each was read; the absence is stated in
+> §6.1). **Options:** (a) Register B stays Surface-local and unratified, as specified here; (b) Register B is
+> ratified as a second contract enum (`SurfaceDisclosureCode`) with its own schema; (c) `RphErrorCode` is
+> extended with projection codes.
+> **Recommendation: (b) eventually, (a) now.** (c) is prohibited by §6.1's reasoning — it would let a Surface
+> condition wear engine authority. (b) is right once the codes have survived use; ratifying twenty-four authored
+> codes before any of them has rendered would ratify guesses.
+> **If ruled (b) now:** §6.3 becomes a contract artifact and `SPEC-001-FX-DISC-07` upgrades from a type-level
+> non-assignability check to a schema conformance check.
+
+> **FORK-25 — Must the host mint a per-issuance correlation id?**
+> **Decision:** whether `correlationId` SHALL be distinct per issued Command, and whether it SHALL be shown.
+> **Fact:** the incumbent uses the literal `'ui'` for every UI-issued Command (`workbench.ts:119`, `:138-147`)
+> and never renders it (6 matches in `apps/rph-demo/src`, none in a `.svelte` file) **[CONFIRMED]**.
+> **Options:** (a) mint per issuance and display in every material disclosure, per JCUX §49; (b) mint per
+> issuance, display on demand behind a details affordance; (c) leave as is and drop the JCUX §49 requirement.
+> **Recommendation: (a), with (b) as an acceptable divergence** — the id must exist per issuance for the
+> professional record to be citable at all; whether it is always visible is a presentation judgement this
+> specification does not govern (the spine's DOES NOT GOVERN clause excludes visual design). (c) is not
+> available: a constant correlation id makes every UI act indistinguishable in the governed stream, which
+> defeats PER-9's identity requirement.
+> **If ruled (c):** `RefusalDisclosure.correlationId` becomes optional and `SPEC-001-FX-DISC-03`/`-04` are
+> withdrawn.
+
+---
+
+# 7. Adversarial economy catalog
+
+## 7.1 What this section is for, and how to read it
+
+INFORMATIVE. §3's invariant catalog states what a conforming Surface must do. This section states what an
+implementing agent will do *instead*, when the honest implementation is more expensive than a plausible-looking
+substitute — and prohibits each substitute by name. It is the mirror of the NON-EXAMPLE rule: a non-example stops
+a rule being over-applied; a **shortcut record** stops an obligation being under-implemented.
+
+The reason this section is not optional is on this repository's own record. Every shortcut catalogued below in the
+CONFIRMED-INCUMBENT column was chosen by a competent implementer, shipped, passed review, and stayed green — the
+`prunableStepIds` passthrough carried a template comment *asserting* it was already gated
+(`packages/rph-projections/src/execution-view.ts:631-637`, CONFIRMED), and `CLOSED_PWU_STATES` was a hardcoded
+literal whose own comment called it "the machine's own terminal set" while being unbound to it
+(`packages/rph-projections/src/execution-view.ts:331-344`, CONFIRMED). A shortcut that announces itself is not the
+dangerous kind. The dangerous kind reads as the correct implementation.
+
+**Record format.** Each record carries: the shortcut's stable id; the obligation it evades; the cheaper-but-wrong
+implementation, stated concretely enough to recognize in a diff; **why an agent chooses it** (the economy — without
+this the prohibition reads as arbitrary); the SHALL NOT; the named negative conformance fixture that detects it
+(specified in full at §10); and its incumbent status in this repository as of 2026-07-28.
+
+**Provenance labels** used throughout (master: §0.2): **CONFIRMED** (a file was read and is cited by path and line);
+**INFERRED** (derived from confirmed facts, reasoning stated); **ASSUMED** (a working premise, flagged);
+**UNRATIFIED-AUTHORED** (authored under the sponsor grant of 2026-07-28, not yet ruled).
+
+**Fixture id namespaces minted here** (UNRATIFIED-AUTHORED): `SPEC-001-SC-nn` shortcut record ·
+`SPEC-001-PF-nn` positive fixture · `SPEC-001-NF-nn` negative fixture · `SPEC-001-PB-nn` property-based fixture ·
+`SPEC-001-MU-nn` declared mutant · `SPEC-001-REV-nn` reference-case-driven revision. These are *fixture* ids, not
+objects or invariants; the spine's closed nine-object catalog and fourteen-invariant catalog are untouched.
+
+## 7.2 The generic shortcut classes, situated on this surface
+
+INFORMATIVE, and each is expanded into numbered records in §7.3. The commission template names five shortcut
+classes with precedent in this corpus. All five have a specific form on a projection surface:
+
+| Class | Generic form | Its form on a Surface |
+|---|---|---|
+| Collapsing independent state dimensions | one `status` column over four axes | one badge, one colour, one progress bar, or one sort key that is a function of more than one axis (SC-16 … SC-19) |
+| Placeholder types permitting silent divergence | `unknown`/`string` where a closed set belongs | a `status: string` on a projection row that accepts an off-contract value and renders it verbatim (SC-17, SC-31) |
+| Boolean-izing graded semantics | `assured: boolean` | `SATISFIED` and `CONDITIONALLY_SATISFIED` rendered with one glyph; `offered: boolean` erasing the withholding reason (SC-12, SC-39) |
+| Attachment or existence as satisfaction | "evidence is attached, therefore assured" | "the element is in the DOM, therefore displayed" (SC-25); "the id is present, therefore the object exists" (SC-43) |
+| Generic CRUD standing in for semantic commands | `PATCH /pwu/:id` | a Surface control whose entire effect is to assign a state value, presented as an Affordance derived from work semantics (SC-02) |
+
+Five further classes are specific to this surface and have no precedent entry in the template. They are added here
+under the authoring grant (UNRATIFIED-AUTHORED):
+
+| Class | Statement |
+|---|---|
+| **Clipped rendering** | Producing markup and calling it displayed, when the container it lands in cannot bring it into view (SC-24 … SC-27). |
+| **View-side scoping** | Querying globally and filtering in the template, so the projection's contents are correct only for the path the developer looked at (SC-04 … SC-07). |
+| **Second copy of the rule** | Deriving an affordance from a re-implementation of the engine's decision instead of from the engine's own declaration (SC-08 … SC-11). |
+| **Indistinguishable emptiness** | An empty region that means "none", "not computed", "not permitted to see", and "the query was unscoped and matched nothing" without distinguishing them (SC-31 … SC-33). |
+| **Partial success** | Reporting an outcome for a multi-command action from its last command rather than from all of them (SC-48 … SC-51). |
+
+## 7.3 The shortcut register
+
+### 7.3.1 Against `SPEC-001-INV-01` — a Projection carries no authority
+
+**SC-01 · Optimistic local mutation.** *Cheap path:* on click, the Surface writes the expected new value into its
+own copy of the Projection and renders it, then dispatches the Command and ignores the result. *Economy:* it
+removes a round trip and makes the UI feel immediate; it is the default idiom of every client-state framework.
+*Prohibition:* A Surface **SHALL NOT** display a state value it computed in anticipation of a Command's success;
+displayed governed state SHALL be a function of the Projection rebuilt after the Command settled. **Verification:**
+`SPEC-001-NF-01` — dispatch a Command the engine refuses and assert the rendered axis value is unchanged from
+before the click. *Incumbent:* not present. The workbench uses SvelteKit form actions, which re-run `load()`
+server-side (CONFIRMED: `apps/rph-demo/src/routes/undertakings/[id]/+page.server.ts:213`, `export const load`
+rebuilds every projection per request). INFERRED: the incumbent is structurally immune to SC-01 today, and this
+prohibition exists to keep it so under any future client-state migration.
+
+**SC-02 · Generic CRUD wearing a semantic name.** *Cheap path:* offer a control whose entire effect is to assign
+the next value of a state field, and name the button after the state. *Economy:* one control covers every
+transition; no per-transition affordance derivation is needed. *Prohibition:* A Surface **SHALL NOT** present a
+control as an Affordance (O-4) when the Command it issues is a state assignment rather than a professional act;
+where the engine's Command genuinely takes a target state, the Surface **SHALL** derive the target from the
+governed transition being performed and **SHALL NOT** offer the professional a free choice of target state.
+**Verification:** `SPEC-001-NF-02` — assert that no rendered control's form payload contains a
+professional-selectable state value; the affordance-to-Command map is total and every entry names a professional
+act. *Incumbent, and a boundary note:* CONFIRMED — the workbench's `chg()` helper
+(`+page.server.ts:456-478`) composes a `ChangePwuState` payload in which the **server route**, not the
+professional, supplies `previousState`, `newState`, and all four axis values. That is inside the prohibition (the
+professional selects no state) but it sits against the boundary of this SPEC: whether `ChangePwuState`'s *shape* is
+an acceptable semantic Command is a DOC-003/engine question this SPEC does not govern (spine, DOES NOT GOVERN:
+"command semantics and their preconditions"). Recorded, not resolved.
+
+**SC-03 · The Projection as a write buffer.** *Cheap path:* accumulate the professional's edits in the Projection
+and flush them as Commands on save. *Economy:* it makes multi-field editing feel like a form. *Prohibition:* A
+Projection **SHALL NOT** hold unissued professional intent; an edit not yet issued as a Command **SHALL** be held
+in a structure the Surface identifies as a draft distinct from the Projection. **Verification:** `SPEC-001-NF-03` —
+type into every editable control on a Surface, navigate away without submitting, return, and assert every
+Projection field equals the governed value. *Incumbent:* not present (INFERRED from the form-action architecture
+above); prohibition is preventive.
+
+### 7.3.2 Against `SPEC-001-INV-02` — a Projection is bound to a declared Scope
+
+**SC-04 · Filter in the view, query in the world.** *Cheap path:* call the global list query, pass the whole result
+to the template, and narrow it with a template-side predicate. *Economy:* the query already exists and takes no
+scope argument; adding the scope means threading an id through the read model. *Prohibition:* A Projection's Scope
+(O-3) **SHALL** be applied in the query that produces it and **SHALL NOT** be applied only by the Surface that
+renders it. **Verification:** `SPEC-001-NF-04` — construct two Undertakings, assert the *loader's returned data*
+(not the rendered DOM) for Undertaking B contains no object owned by A. Asserting on the DOM cannot distinguish
+this shortcut from conformance, which is why the fixture asserts on the loader's return value. *Incumbent:*
+**CONFIRMED PRESENT, four times.** `packages/rph-engine/src/queries.ts:46-51` —
+`listAssessments`, `listObservations`, `listDecisions`, `listBaselines` each take only an `EngineHandle` and return
+`listByType(...)` over the entire event log. `+page.server.ts:255, 296, 302, 308` call all four with no scope and
+return their results in the page payload; `+page.svelte:501+` renders `data.assessments` unfiltered. A second
+Undertaking's Assurance tab therefore shows the seeded Field Service Management Undertaking's assessments. This is
+the incumbent defect the spine assigns to INV-02.
+
+**SC-05 · Scope by convention.** *Cheap path:* rely on there being one Undertaking in the process, or on the seed
+being the only populated one. *Economy:* it is true in every fixture and every demo. *Prohibition:* A Projection
+**SHALL NOT** be correct only under a cardinality assumption the system does not enforce; every Scope-bearing
+Projection **SHALL** be exercised by a fixture containing at least two subjects of its Scope's type.
+**Verification:** `SPEC-001-PF-04`/`SPEC-001-NF-04` both seed two Undertakings; a single-subject fixture is
+non-conforming for this obligation and `SPEC-001-NF-05` asserts the fixture's own subject count ≥ 2.
+
+**SC-06 · Fix the instance, declare the class.** *Cheap path:* scope the one list a bug report named, and record
+the class as fixed. *Economy:* it closes the ticket. *Prohibition:* When a scoping defect is repaired for one
+Projection, every other Projection over the same Scope **SHALL** be enumerated and each **SHALL** be either
+repaired or recorded as out of scope with a reason. **Verification:** `SPEC-001-NF-06` — a totality fixture that
+enumerates every exported list query and asserts each is either Scope-taking or listed in a declared
+`UNSCOPED_BY_DESIGN` register with a reason string. *Incumbent:* **CONFIRMED PRESENT.** `listExecutionPlans` was
+left global and re-scoped by a dedicated projection function `plansForPwus`
+(`packages/rph-projections/src/execution-view.ts:761-788`, whose own docstring names this "the F-6 fix"), while the
+four sibling queries one screen away were not. The repair was real and the class was not swept.
+
+**SC-07 · Scope by resemblance.** *Cheap path:* select rows whose title, id prefix, or correlation string matches
+the Undertaking. *Economy:* it needs no ownership edge. *Prohibition:* A Scope **SHALL** be evaluated against a
+governed ownership relation; it **SHALL NOT** be evaluated by string similarity, id prefix, or naming convention.
+**Verification:** `SPEC-001-NF-07` — two Undertakings whose names, and whose PWU titles, are identical; assert each
+Surface shows only its own. INFORMATIVE: the correct two-hop shape is already demonstrated —
+`plansForPwus` scopes by `plan.workUnitId ∈ listPwus(engine, undertakingId)` because a plan carries no
+`undertakingId` at all (CONFIRMED: `execution-view.ts:761-767`).
+
+### 7.3.3 Against `SPEC-001-INV-03` — an Affordance derives from the engine's own declared authority
+
+**SC-08 · The second copy that says it is not one.** *Cheap path:* write the rule out as a literal — a terminal
+state set, a permitted-status list — next to a comment explaining that it mirrors the authority. *Economy:* the
+import is awkward, the literal is three words, and the comment records the intent. *Prohibition:* An Affordance
+**SHALL** be derived by calling the same declaration or predicate the engine calls; a Surface or read model
+**SHALL NOT** restate an authority's rule as a local literal, and a comment asserting derivation **SHALL NOT** be
+accepted as derivation. **Verification:** `SPEC-001-NF-08` — mutate the *authority's* declaration (add a fifth
+terminal state to `PWU.workLifecycleState`) and assert the read model's affordance set changes with it; the
+mutation is `SPEC-001-MU-03`. *Incumbent:* repaired, and the history is the argument. CONFIRMED:
+`execution-view.ts:331-347` records that `CLOSED_PWU_STATES` was `new Set(['BASELINED','ABANDONED','SUPERSEDED'])`
+under a comment calling it "the machine's own terminal set", that a residuals document then recorded the rule as
+"derived rather than hardcoded" — "true of one side and false of the other" — and that the one test of the limb
+"retyped the same three literals", so the whole suite stayed green. It now reads
+`getMachine('PWU.workLifecycleState').terminalStates`.
+
+**SC-09 · Derive affordances from the state machine's topology.** *Cheap path:* offer a button for every legal
+transition out of the current state. *Economy:* the machine is already a declared, total structure; it looks like
+the most principled possible source. *Prohibition:* An Affordance **SHALL** be derived from the set of transitions
+that have a registered Command handler, and **SHALL NOT** be derived from the set of transitions the state machine
+declares legal. **Verification:** `SPEC-001-NF-09` — assert that for every rendered affordance there exists an
+entry in the affordance-to-Command map and a registered handler for that Command; and that a machine-legal
+transition with no handler produces no control. *Incumbent:* correctly avoided and explicitly defended. CONFIRMED:
+`execution-view.ts:10-20` — "The wider StepState machine has ~18 legal arrows"; "Deriving affordances from the
+topology would mint buttons (Supersede-step, NOT_READY→READY …) that dispatch nonexistent commands". This record
+exists to keep that reasoning enforceable rather than commentarial.
+
+**SC-10 · Gate by naming the commands.** *Cheap path:* write `if (affordance === 'start' || affordance ===
+'resolve') { …check the binding… }`. *Economy:* it is two names instead of a declared column, and it is correct on
+the day it is written. *Prohibition:* Affordance withholding **SHALL** be gated on the authority's declared
+per-Command property, not on an enumeration of Command names, wherever the authority declares such a property.
+**Verification:** `SPEC-001-NF-10` — add a tenth Command declaring the gating property and assert the read model
+withholds it with no edit to the read model. *Incumbent:* correctly avoided and explicitly defended. CONFIRMED:
+`execution-view.ts:376-383` — "nothing here names `start` or `resolve`. That is the whole point … a future command
+that requires an authorized binding is withheld by this read-model ON THE DAY IT IS DECLARED, with no second edit."
+
+**SC-11 · Assume the columns are enough.** *Cheap path:* having built a column-driven gate, treat it as total and
+stop looking for refusals it cannot express. *Economy:* the mechanism is genuinely good, so its coverage feels
+complete. *Prohibition:* For every engine refusal, the Surface's withholding **SHALL** be classified as
+column-decidable or fact-decidable, and each fact-decidable refusal **SHALL** name the resolved fact the caller
+must supply and the ratified kernel that decides on it. A refusal decided by a count over history, by object
+resolution, or by any datum absent from declared state **SHALL NOT** be assumed covered by a state-driven filter.
+**Verification:** `SPEC-001-NF-11` — a census fixture asserting every engine refusal reachable from a Surface
+appears in a declared limb register with its decision source. *Incumbent:* CONFIRMED — five limbs, added one at a
+time, four of them after a remedy that was supposed to prevent exactly this: `pwuWorkLifecycleState`
+(`execution-view.ts:164-176`), `bindingAuthority` (`:376-390`), `retryBudget` — "decided by a COUNT OVER THE EVENT
+STREAM, and no column can hold a number that changes every time the step starts … A column-driven filter is blind
+to it BY CONSTRUCTION" (`:391-406`), `inputReadiness` (`:407-417`), and `unresolvedRequiredInputs`
+(`:112-125`, whose comment records "I closed the same shape for the retry cap and called it 'the fourth instance',
+without noticing the fifth was mine and one commit older").
+
+### 7.3.4 Against `SPEC-001-INV-04` — a withheld Affordance discloses its reason
+
+**SC-12 · Render nothing.** *Cheap path:* `{#if permitted}<button/>{/if}`. *Economy:* it is one line and it is
+visually clean. *Prohibition:* An Affordance withheld by authority **SHALL** leave a rendered Affordance
+Withholding (O-5) naming the limb that withheld it; absence of a control **SHALL NOT** be the only signal.
+**Verification:** `SPEC-001-NF-12` — for each withholding limb, assert a disclosure element exists whose accessible
+text contains the limb's declared reason string. *Incumbent:* **CONFIRMED PRESENT** as the general case. The spine
+records that no Surface explains why an Affordance is absent; searching `apps/rph-demo/src` (68 `.ts`/`.svelte`
+files, no truncation) surfaces no withholding-reason rendering path, and the one counter-example is SC-15's
+`retryExhaustion`, which is a per-limb exception rather than a general mechanism.
+
+**SC-13 · Disable without explanation.** *Cheap path:* `disabled={!permitted}`. *Economy:* it at least shows the
+Command exists. *Prohibition:* A disabled control **SHALL** carry a meaningful explanation of why the Command is
+unavailable, restating RIWS §24.4 (`Reference Interaction and Workspace Specification.md:1410-1418`: "A disabled
+command SHALL provide a meaningful explanation"). **Verification:** `SPEC-001-NF-13` — assert every element with
+`disabled`/`aria-disabled` on a Surface has an accessible description of non-zero length that is not a member of
+the generic-string denylist in `SPEC-001-NF-14`.
+
+**SC-14 · The generic reason.** *Cheap path:* "Not available", "You do not have permission", "Cannot perform this
+action". *Economy:* one string covers every limb and never needs updating. *Prohibition:* A withholding disclosure
+**SHALL** name the specific limb and the condition that would lift it; it **SHALL NOT** be a message that would be
+equally true of a different limb. **Verification:** `SPEC-001-NF-14` — a denylist fixture asserting no withholding
+disclosure matches the generic-string set, plus a **distinctness** assertion: for any two limbs that can withhold
+the same Affordance, the two rendered disclosures differ.
+
+**SC-15 · Withhold the reason along with the affordance.** *Cheap path:* stop offering the button; the engine's
+rejection message named the remedy, and nobody will click it now. *Economy:* nothing is written; the reason simply
+stops being reachable. *Prohibition:* Where the Surface withholds an Affordance whose engine refusal would have
+named a remedy, the Surface **SHALL** carry that remedy, sourced from the same decision that withheld the
+Affordance. **Verification:** `SPEC-001-NF-15` — withhold via each limb and assert the remedy text is present and
+equal to the kernel's `permittedControlActions`. *Incumbent:* correctly handled for one limb, and the reasoning is
+the general rule. CONFIRMED: `execution-view.ts:540-550` — "A button that silently vanishes is a worse answer than
+one that refuses with a reason. The actions come from the same `retryDecision` call that withheld the affordance,
+so the notice and the withholding can never disagree." UNRATIFIED-AUTHORED: SPEC-001 generalizes this from the
+retry limb to every limb.
+
+### 7.3.5 Against `SPEC-001-INV-05` — the four axes never collapse
+
+**SC-16 · One status field.** *Cheap path:* compute a single `status` for a row from the four axes and render it.
+*Economy:* tables want one column; designers ask for one badge. *Prohibition:* A Surface **SHALL NOT** render a
+single value derived from more than one state axis as the primary state of a PWU, restating JPWB-DOC-003 STA-1
+(`docs/canon/JPWB-DOC-003 Semantic Model and Invariant Catalog.md:175`: "never summarized into one status field,
+one progress bar, or one boolean"). **Verification:** `SPEC-001-NF-16` — for each of the four axes independently,
+mutate that axis alone in the fixture and assert the Surface's rendering changes in a region attributable to that
+axis; an axis whose sole mutation changes nothing visible is collapsed.
+
+**SC-17 · Collapse into colour.** *Cheap path:* one tone per row, computed from whichever axis is "worst".
+*Economy:* colour is the highest-bandwidth channel and there is only one of it per element. *Prohibition:* A tone,
+colour, or icon **SHALL** be a function of exactly one axis, and the axis it renders **SHALL** be identifiable from
+the rendered output without reference to source. **Verification:** `SPEC-001-NF-17` — a totality fixture over the
+tone map asserting every input value comes from one declared axis's value set. INFORMATIVE: the existing
+`stepStateTone` is correctly single-axis and total over the ten `StepState` values (CONFIRMED:
+`execution-view.ts:274-285`, `TONE_BY_STEP_STATE: Record<StepState, StepTone>`) — the totality type is what makes
+the single-axis property checkable, and SPEC-001 requires that shape for every axis renderer.
+
+**SC-18 · Percent complete.** *Cheap path:* count SUCCEEDED steps over total steps and render a bar. *Economy:*
+stakeholders ask for it; the numbers exist. *Prohibition:* A Surface **SHALL NOT** render an aggregate progress
+indicator over a PWU set unless it is labelled with the single axis it aggregates and is accompanied by the other
+three axes' distributions; it **SHALL NOT** be labelled with an unqualified word ("progress", "complete", "done").
+**Verification:** `SPEC-001-NF-18` — a fixture in which every step has SUCCEEDED and every assurance axis is
+UNASSESSED; assert no rendered indicator reads as complete, and assert the assurance distribution is rendered
+adjacently. This is the same fixture that verifies INV-11 (`SPEC-001-NF-37`); they are deliberately the same
+scenario approached from two obligations.
+
+**SC-19 · The composite sort key.** *Cheap path:* rank the portfolio by a score blending the axes so the "most
+advanced" work sorts first. *Economy:* it makes a list feel intelligent. *Prohibition:* A Surface **SHALL NOT**
+order or rank governed work by a key derived from more than one axis unless the key's definition is disclosed on
+the Surface and the four axes remain independently rendered per row. **Verification:** `SPEC-001-NF-19` — assert
+each sort control names exactly one axis or a non-axis field, and that no default ordering is a multi-axis
+function.
+
+### 7.3.6 Against `SPEC-001-INV-06` — material uncertainty is visible on the Surface carrying the work
+
+**SC-20 · The count badge.** *Cheap path:* "3 open items". *Economy:* it is one number, always renderable, never
+wrong. *Prohibition:* An uncertainty disclosure **SHALL** carry the statement of the uncertainty, its materiality,
+and the object it qualifies; a count **SHALL NOT** stand for the disclosure. **Verification:** `SPEC-001-NF-20` —
+assert the rendered disclosure text contains the Assumption's `statement` verbatim.
+
+**SC-21 · Uncertainty on its own page.** *Cheap path:* an "Uncertainty" tab or a separate route. *Economy:* it
+keeps the busy screens clean and is genuinely more organized. *Prohibition:* Material uncertainty **SHALL** be
+rendered on the Surface presenting the work it qualifies; a dedicated Surface **MAY** additionally aggregate it,
+and **SHALL NOT** be the only place it appears. This restates CON-000 AX-3
+(`docs/canon/JPWB-CON-000 Constitution.md:75`) and JCUX SCREEN-INV-006
+(`JanumiCode UI Information Architecture and Screen Contract.md:310-312`). **Verification:** `SPEC-001-NF-21` —
+with an Assumption whose `affectedObjectIds` name a PWU, assert the disclosure is present in that PWU's rendering
+on the graph Surface and on the overview Surface, not only on an aggregate.
+
+**SC-22 · The hardcoded residual.** *Cheap path:* pass the known residual string into the projection from the
+route. *Economy:* the projection has no path to the Assumption object, and the string is right. *Prohibition:* A
+Projection field **SHALL** be derived from governed state; a Projection **SHALL NOT** return a value supplied by
+its caller as though it were derived, and a Surface **SHALL NOT** render such a value as an Epistemic Disclosure
+(O-8). **Verification:** `SPEC-001-NF-22` — build the Projection **without** the caller-supplied value and assert
+the residual is still present, sourced from the `AssumptionDetected` event and the MATERIAL
+`AssuranceObservationRecorded`. *Incumbent:* **CONFIRMED PRESENT, and its test is vacuous.**
+`packages/rph-engine/src/professional-work-graph.ts:125` returns `openResiduals: opts.openResiduals ?? []` —
+derived from no event. `+page.server.ts:227` supplies it as
+`params.id === SEED_UNDERTAKING ? REFERENCE_OPEN_RESIDUALS : []`, so the value is a route-level literal keyed on
+the seed's id and every non-seed Undertaking gets `[]` regardless of its actual assumptions. The governed facts
+exist — `DetectAssumption` creates a MATERIAL Assumption object linked to `mobileOffline` and `behavior`
+(`packages/rph-engine/src/reference-undertaking.ts:848-856`) and `driveToConditional` records the same statement as
+a MATERIAL assurance observation (`:812-826`) — and the view reads neither. See §10.5 for why the covering test
+cannot fail.
+
+**SC-23 · Empty means none.** *Cheap path:* render the uncertainty region only when the list is non-empty.
+*Economy:* it avoids an empty box. *Prohibition:* An absent uncertainty disclosure **SHALL** distinguish "no
+material uncertainty is recorded" from "material uncertainty was not computed for this Surface".
+**Verification:** `SPEC-001-NF-23` — two fixtures, one with zero Assumptions and one whose uncertainty source is
+unavailable; assert the two renderings differ. This is INV-06's instance of the general emptiness rule at SC-31.
+
+### 7.3.7 Against `SPEC-001-INV-07` — rendered content is reachable
+
+**SC-24 · Render into a clipped container.** *Cheap path:* lock the app to the viewport with `overflow: hidden`
+and let each panel manage its own scrolling — then add a Surface that does not. *Economy:* full-bleed graph
+surfaces genuinely need viewport locking, and the rule that produces the defect is the same rule that makes the
+designer usable. *Prohibition:* A Surface **SHALL** guarantee that every element it renders can be brought into
+the viewport by ordinary interaction at every supported viewport size; a container that clips its content
+**SHALL** provide a scroller for that content or **SHALL NOT** receive content exceeding its box.
+**Verification:** `SPEC-001-NF-24` — at each declared viewport size, for each element in a declared
+must-be-reachable set, scroll the element's own scroll container and assert the element's bounding box is inside
+the viewport. Asserting `isVisible()` or DOM presence does **not** satisfy this fixture (see SC-25). *Incumbent:*
+**CONFIRMED PRESENT.** `apps/rph-demo/src/routes/+layout.svelte:145-149` sets `.app { display: flex; height:
+100vh; overflow: hidden; }`; `:311-314` sets `.content.full { padding: 0; overflow: hidden; }`; and `:74-76`
+routes `/undertakings/[id]` into `.content.full` via
+`/^\/undertakings\/[^/]+$/.test(page.url.pathname)`. The Undertaking Workbench's own panels are ordinary
+`.panel` blocks, not internally-scrolling regions. The spine records the measured consequence at 1440×900: 68 of
+77 Assurance rows and 4 of 9 Overview action buttons unreachable, a real wheel moving nothing.
+
+**SC-25 · The accessibility tree as proof.** *Cheap path:* assert the locator resolves, or that the text is in the
+document. *Economy:* it is the idiomatic assertion in every testing library and it is what "rendered" means to the
+framework. *Prohibition:* A conformance fixture for INV-07 **SHALL** assert geometric reachability; presence in
+the DOM or the accessibility tree **SHALL NOT** be accepted as evidence of rendering. A test asserting only
+presence is a finding under CON-000 B7 (`JPWB-CON-000 Constitution.md:119`: "No artifact, object, or field may
+claim a status its relations do not perform"). **Verification:** `SPEC-001-NF-25` is a *meta*-fixture: it applies
+`SPEC-001-MU-06` (restore `overflow: hidden` with no scroller) and asserts that the INV-07 suite goes red. A suite
+that stays green under MU-06 is asserting presence, not reachability.
+
+**SC-26 · Scroll the wrong element.** *Cheap path:* `page.mouse.wheel(0, 2000)` or `window.scrollTo`. *Economy:*
+it is the obvious gesture and it works on ordinary pages. *Prohibition:* A reachability fixture **SHALL** identify
+the scroll container that owns the element under test and **SHALL** drive that container; it **SHALL NOT** assume
+the document scrolls. **Verification:** part of `SPEC-001-NF-24`'s protocol; `SPEC-001-NF-26` asserts the fixture
+recorded a non-null owning scroller for each element, failing loudly when the owner is the clipped root.
+
+**SC-27 · Virtualize and assert on the data.** *Cheap path:* windowed rendering plus an assertion over the source
+array. *Economy:* the array is right there and the DOM is expensive to query. *Prohibition:* Where a Surface
+virtualizes, the fixture **SHALL** drive the virtualizer to each row under test and assert on the realized
+element. **Verification:** `SPEC-001-NF-27` — assert the count of realized elements is less than the source count
+(proving virtualization is active) *and* that each sampled row can be realized and brought into view.
+
+### 7.3.8 Against `SPEC-001-INV-08` — a refused Command surfaces its reason and code
+
+**SC-28 · Swallow and re-render.** *Cheap path:* dispatch, ignore a non-ACCEPTED result, return, let the page
+reload. *Economy:* the screen looks fine and the state is honest — nothing changed. *Prohibition:* A Surface
+**SHALL** render a Refusal Disclosure (O-6) for every Command it issued that the engine did not accept; an
+unchanged Surface **SHALL NOT** stand in for a refusal. **Verification:** `SPEC-001-NF-28` — issue a Command the
+engine refuses and assert a disclosure element appears carrying the refusal.
+
+**SC-29 · The friendly message.** *Cheap path:* map every rejection to "Something went wrong". *Economy:* the
+engine's messages are long and mention internal rule ids. *Prohibition:* A Refusal Disclosure **SHALL** carry the
+engine's stable error code and its message; it **MAY** add explanation and **SHALL NOT** replace them.
+**Verification:** `SPEC-001-NF-29` — assert the rendered text contains the engine result's `error.code` and a
+non-empty substring of `error.message`. *Incumbent:* CONFIRMED CORRECT for single-Command actions —
+`+page.server.ts:500-507` (`dispatchResult`) renders
+`` `${commandType} rejected — ${r.error?.code ?? r.status}: ${r.error?.message ?? ''}` ``, with a docstring
+committing to "the RPH_* code + message surface VERBATIM … and never fabricates a success". The defect is in the
+multi-Command path (SC-48).
+
+**SC-30 · Console-only.** *Cheap path:* log it. *Prohibition:* A Refusal Disclosure **SHALL** be rendered on the
+Surface the professional is looking at; a log, a network response body, or a developer console **SHALL NOT**
+satisfy INV-08. **Verification:** `SPEC-001-NF-30` — assert the disclosure is reachable per INV-07's protocol, not
+merely present in the response payload.
+
+### 7.3.9 Against `SPEC-001-INV-09` — stale, partial or rebuilding Projections are identified
+
+**SC-31 · Absent renders as none.** *Cheap path:* `value ?? ''` at the render boundary. *Economy:* it removes every
+`undefined` from the template with one operator. *Prohibition:* A Surface **SHALL** distinguish an unsourced field
+from a sourced empty one; `undefined` **SHALL** render as an explicit unknown marker and **SHALL NOT** render as an
+empty string, a zero, or a "none". **Verification:** `SPEC-001-NF-31` — for each nullable Projection field, two
+fixtures (sourced-empty, unsourced) whose renderings differ. *Incumbent:* the distinction is understood in the
+projection layer and lost at the route boundary. CONFIRMED: `assurance-view.ts:53-56` — "The distinction between
+'unknown' (no source) and 'none' (a real empty) is load-bearing: rendering an unsourced field as 'none' is the
+false-negative that lets a node look assured when it was never checked." And CONFIRMED at
+`+page.server.ts:262-265`: `disposition: v?.disposition ?? ''`, `independenceStatus: v?.independenceStatus ?? ''`,
+`validatorIdentity: v?.validatorImplementationIdentity ?? ''` — the very fields whose `undefined` the projector
+preserved deliberately are flattened to `''` one layer later, under a comment at `:261` claiming "undefined renders
+as 'unknown', never as a false 'none'". INFERRED: whether the claim holds now depends entirely on the template's
+treatment of `''`, which is exactly the fragility this record prohibits. `SPEC-001-NF-31` is written to assert on
+the rendered output, so it decides the question rather than restating it.
+
+**SC-32 · The undisclosed fail-open.** *Cheap path:* when the gating fact could not be resolved, offer the
+Affordance — the engine will refuse the click anyway — and render it identically to a gated-and-permitted one.
+*Economy:* the alternative silently empties the action column for callers that cannot resolve the fact, which is
+worse. *Prohibition:* Where a Surface offers an Affordance whose authority limb was **not evaluated** because its
+fact was unresolved, the Surface **SHALL** identify the Affordance as ungated, restating INV-09; the fail-open
+**SHALL NOT** be disclosed only in source comments. **Verification:** `SPEC-001-NF-32` — supply a plan with
+`runtimeBinding` absent, `attemptsMade` absent, and `unresolvedRequiredInputs` absent; assert every offered
+Affordance carries an ungated marker. *Incumbent:* **CONFIRMED PRESENT, four times, and disclosed in the right
+place for the wrong audience.** `execution-view.ts:86-89`, `:106-109`, `:121-124`, `:168-176` each state "ABSENT
+MEANS UNGATED, not unauthorized" and "That is a fail-OPEN default and it is disclosed rather than hidden". It is
+disclosed to the *reader of the source*. No path carries it to the professional. This is the sharpest INV-09
+instance in the repository and it is a design that is right in the read model and unfinished at the Surface.
+
+**SC-33 · One spinner for every non-ready state.** *Cheap path:* a single `loading` boolean. *Prohibition:*
+Projection loading state, stale state, partial state, and professional lifecycle state **SHALL** remain separately
+legible, restating CPM PROJ-INV-013 (`Canonical Projection Model.md:397-399`) and RIWS UI-INV-003
+(`Reference Interaction and Workspace Specification.md:1990`). **Verification:** `SPEC-001-NF-33` — four fixtures,
+one per state, asserting four distinguishable renderings.
+
+### 7.3.10 Against `SPEC-001-INV-10` — navigation preserves professional context
+
+**SC-34 · Context in component-local state.** *Cheap path:* `let tab = $state('graph')`. *Economy:* it is the
+framework's shortest path to a tabbed panel and it survives every interaction *except* remount. *Prohibition:*
+Navigation Context (O-9) **SHALL** be held in a location that survives Surface remount and back/forward navigation;
+it **SHALL NOT** be held only in component-local state. **Verification:** `SPEC-001-NF-34` — select a non-default
+tab, navigate to another Surface, navigate back, assert the selection is preserved; and reload the URL, assert the
+same. *Incumbent:* **CONFIRMED PRESENT.**
+`apps/rph-demo/src/routes/undertakings/[id]/+page.svelte:29-31` —
+`let tab = $state<'graph' | 'overview' | 'execution' | 'assurance' | 'decisions' | 'baselines' |
+'traceability'>('graph')`. The selected projection is not in the URL, so a professional examining the Assurance tab
+who follows a link and returns lands on the graph, and the tab is unshareable and unbookmarkable.
+
+**SC-35 · Reload as the state model.** *Cheap path:* every action is a form post that re-renders the page.
+*Economy:* it is the server-rendered idiom and it is why SC-01 is structurally impossible here. *Prohibition:*
+Where a Surface reloads as a consequence of issuing a Command, the reload **SHALL** restore the Navigation Context
+that was active when the Command was issued. **Verification:** `SPEC-001-NF-35` — on the Execution tab with a step
+expanded, issue a step Command, assert the Execution tab and the expansion are both restored. INFERRED from
+`+page.svelte:29-31` and the form-action architecture: this is presently violated for tab selection by the same
+defect as SC-34.
+
+**SC-36 · Preserve the address, discard the selection.** *Cheap path:* keep the route and reset everything within
+it. *Prohibition:* Preserved context **SHALL** include the active Projection selection, the active subject, and
+any filter narrowing the Projection Scope; preserving the route alone **SHALL NOT** satisfy INV-10.
+**Verification:** `SPEC-001-NF-36` — an enumerated context register per Surface; assert each element round-trips.
+
+### 7.3.11 Against `SPEC-001-INV-11` — execution progress must not imply assurance
+
+**SC-37 · Green on SUCCEEDED.** *Cheap path:* colour the node by `executionState`. *Economy:* execution is the axis
+that moves most and looks most like progress. *Prohibition:* A Surface **SHALL NOT** apply an affirmative
+completion treatment on the basis of `executionState` alone, restating DOC-003 STA-2
+(`JPWB-DOC-003 Semantic Model and Invariant Catalog.md:179`, "Execution success never confers satisfaction …
+all-steps-succeeded leaves assurance unassessed until required policies complete"). **Verification:**
+`SPEC-001-NF-37` — the all-SUCCEEDED / all-UNASSESSED fixture; assert no affirmative treatment anywhere on the
+Surface. *Incumbent:* correctly avoided in the seed's narrative — `beginExecute`'s docstring commits to "still
+UNASSESSED, so amber (not green)" (`+page.server.ts:558-561`) — and the fixture is required because that is a
+comment, not a check.
+
+**SC-38 · The steps bar.** Covered by SC-18; recorded here because the same rendering violates two invariants and
+the deletion pass must not remove either citation. **Verification:** `SPEC-001-NF-18` and `SPEC-001-NF-37` are the
+same fixture asserted against two obligations, and §10.1 lists it under both.
+
+**SC-39 · The shared glyph.** *Cheap path:* one checkmark, used for `executionState=SUCCEEDED` and for
+`assuranceState=SATISFIED`. *Economy:* an icon set has one checkmark. *Prohibition:* No glyph, colour, or label
+**SHALL** be shared between a value of the execution axis and a value of the assurance axis. **Verification:**
+`SPEC-001-NF-39` — a totality fixture over the two axes' rendering maps asserting the two image sets are disjoint.
+
+**SC-40 · "Readiness" as a step count.** *Cheap path:* a portfolio column counting completed steps, named for
+something the professional cares about. *Prohibition:* A column, sort, or filter derived from execution
+**SHALL NOT** be labelled with an assurance, governance, or fitness word. **Verification:** `SPEC-001-NF-40` — a
+lexical fixture asserting no execution-derived label matches the reserved assurance vocabulary of JPWB-DOC-002.
+
+### 7.3.12 Against `SPEC-001-INV-12` — provenance is exposed where the object is presented
+
+**SC-41 · Attribution as a flag.** *Cheap path:* render "AI" when `aiProduced` is true. *Prohibition:* Provenance
+**SHALL** identify the producing actor or model identity, the time, and the act; a boolean **SHALL NOT** stand for
+it. **Verification:** `SPEC-001-NF-41` — assert the rendered provenance contains the producer's identity string as
+recorded on the governed event. INFORMATIVE: the identities exist in the seed —
+`PRODUCER_MODEL.modelId = 'producer-model-1'` and `REVIEWER_MODEL.modelId = 'reviewer-model-1'`
+(`reference-undertaking.ts:101-112`) — and the Reasoning Review floor turns on their distinctness, so a flag
+would erase the datum the floor exists to establish.
+
+**SC-42 · Provenance behind hover.** *Cheap path:* a `title` attribute. *Prohibition:* Provenance **SHALL** be
+reachable by ordinary interaction per INV-07; a hover-only affordance **SHALL NOT** be the sole disclosure.
+**Verification:** `SPEC-001-NF-42` — assert provenance is reachable without a pointer hover (keyboard focus or
+click path).
+
+**SC-43 · The id that does not resolve.** *Cheap path:* render the cited id. *Economy:* the field is populated, so
+the citation looks satisfied — this is the template's "attachment as satisfaction" class exactly. *Prohibition:*
+A Surface **SHALL** distinguish a provenance reference that resolves to a governed object from one that does not;
+an unresolvable citation **SHALL** be rendered as a broken citation and **SHALL NOT** be rendered as provenance.
+**Verification:** `SPEC-001-NF-43` — render a PWU whose `shapeReadinessAssessmentId` names a nonexistent object;
+assert a broken-citation disclosure. *Incumbent:* **CONFIRMED PRESENT in the seed's data.**
+`reference-undertaking.ts:53-56` records that `shapeReadinessAssessmentId: 'assess_shape'` "still resolves to
+UNDEFINED — it names an object never created", and that "the two boundaries disagree about whether a cited id must
+exist" because `completeExecutionStep` does check its own result ids while `markPwuReady` does not. The command is
+dispatched with that value at `:535-538` and `:830-833`, and again from the route at `+page.server.ts:571-575`.
+
+### 7.3.13 Against `SPEC-001-INV-13` — no Affordance the engine would refuse; none withheld it would admit
+
+**SC-44 · Test one direction.** *Cheap path:* fixtures that assert the Affordance is withheld when the limb bites.
+*Economy:* that is the bug that was reported. *Prohibition:* Every withholding limb **SHALL** carry a paired
+over-refusal fixture asserting the Affordance is offered when the limb does not bite; a limb with only a
+withholding fixture is non-conforming. **Verification:** `SPEC-001-NF-44` — a census asserting each limb id
+appears in both a withholding and an admitting fixture. INFORMATIVE: the declared mutant ledger already enforces
+this pairing by construction — `W3`/`W4`, `S1`/`S2`, `R6`, `C2`, `W5`/`W6` are over-refusal twins of
+under-refusal mutants (CONFIRMED: `scripts/mutants/ledger.ts:417-434, 436-457, 389-398, 496-507, 463-482`).
+SPEC-001 makes that discipline normative rather than customary.
+
+**SC-45 · Let the engine be the backstop.** *Cheap path:* offer every Command and rely on refusal. *Economy:* it
+guarantees the first half of INV-13 can never fail. *Prohibition:* A Surface **SHALL NOT** offer an Affordance
+whose refusal by the engine is derivable from facts available to the Surface; "the engine will refuse it" **SHALL
+NOT** be a defence. **Verification:** `SPEC-001-NF-45` — a differential fixture: for a generated set of step
+states, plan statuses, and limb facts, assert the read model's offered set equals the set of Commands the engine
+accepts. Property-based; see `SPEC-001-PB-02`.
+
+**SC-46 · Withhold on doubt.** *Cheap path:* when unsure, withhold. *Economy:* it can never cause a rejected
+click. *Prohibition:* A Surface **SHALL NOT** withhold an Affordance the engine would admit; an unresolved gating
+fact **SHALL** result in an offered-and-marked-ungated Affordance (SC-32), not a withheld one.
+**Verification:** the admitting half of `SPEC-001-NF-45` and `SPEC-001-NF-32`. INFORMATIVE: this is why the read
+model's fail-open default is *correct* and its silence is the defect — the alternative would violate this
+prohibition.
+
+**SC-47 · Assert against a hand-written list.** *Cheap path:* `expect(affordances).toEqual(['start'])`. *Economy:*
+it is readable and it passes. *Prohibition:* An INV-13 fixture **SHALL** compare the Surface's offered set against
+a set obtained by asking the engine, not against a literal transcribed by the fixture's author.
+**Verification:** `SPEC-001-NF-47` — a meta-fixture asserting the INV-13 suite's expected sets are computed, and
+`SPEC-001-MU-03` (mutate the authority) must redden the suite; a suite that retypes the literals stays green,
+which is precisely the failure `execution-view.ts:331-344` records for `CLOSED_PWU_STATES`.
+
+### 7.3.14 Against `SPEC-001-INV-14` — a partially-applied Command sequence is disclosed
+
+**SC-48 · First rejection wins, nothing is said about the rest.** *Cheap path:* loop the Commands, return on the
+first non-accepted result, render that message. *Economy:* it is six lines, it names the failing Command, and it
+is the honest report of *that* Command. *Prohibition:* A Surface issuing more than one Command for one professional
+act **SHALL** disclose which Commands were applied and which were not; a Refusal Disclosure naming only the failing
+Command **SHALL NOT** satisfy INV-14. **Verification:** `SPEC-001-NF-48` — drive a sequence whose third Command is
+refused; assert the disclosure enumerates the two applied Commands by type and identifies the governed objects they
+created or changed. *Incumbent:* **CONFIRMED PRESENT.** `+page.server.ts:482-489` —
+`runSteps` dispatches in order and returns `` `${ct}: ${r.error?.message ?? r.status}` `` on the first
+non-ACCEPTED/non-DUPLICATE result, with no rollback and no report of prior effects. `recordAssurance`
+(`:830-888`) passes it a six-to-eight-Command sequence: up to two policy Commands, then
+`RequestAssuranceAssessment`, `CompleteAssuranceAssessment`, then four `ChangePwuState` hops
+(`:871`, `:872-879`, `:880-882`, `:884-886`). If the first `chg` at `:871` is refused as an illegal transition, an
+ASSURANCE_ASSESSMENT has already been created **and completed with a SATISFIED disposition** in the governed event
+log, and the professional is shown only `Assurance failed: ChangePwuState: …`. `beginExecute` (`:568`) and
+`markSatisfied` (`:897`) use the same helper.
+
+**SC-49 · Name the failure, not the effect.** Distinguished from SC-48 because it survives a rollback
+implementation: even where prior Commands are compensated, the compensation is itself governed activity.
+*Prohibition:* Where a Surface compensates a partially-applied sequence, it **SHALL** disclose the compensating
+Commands as issued acts; a compensated sequence **SHALL NOT** be reported as though nothing occurred.
+**Verification:** `SPEC-001-NF-49` — assert the event log's length after a compensated failure is greater than
+before, and that the disclosure accounts for the delta.
+
+**SC-50 · try/catch and a generic failure.** *Prohibition:* covered by SC-29's code-and-message obligation, applied
+per Command in the sequence: the disclosure **SHALL** carry the code and message of the refusing Command.
+**Verification:** `SPEC-001-NF-50`.
+
+**SC-51 · Re-run and trust DUPLICATE.** *Cheap path:* on retry, re-issue the whole sequence, relying on idempotency
+to make the already-applied prefix harmless. *Economy:* `runSteps` already treats `DUPLICATE` as success
+(CONFIRMED: `+page.server.ts:485`), so this appears free. *Prohibition:* A Surface **SHALL NOT** re-issue a
+partially-applied sequence unless every Command in it is declared idempotent under a stable idempotency key, and
+the Surface **SHALL** disclose the retry as a re-issue. **Verification:** `SPEC-001-NF-51` — assert every Command
+type in a multi-Command Surface action appears in a declared idempotency register, and that a re-issue after a
+mid-sequence failure produces no duplicate governed object. INFORMATIVE: the seed's `send` mints
+`idempotencyKey: 'ru-idem-${n}'` per Command (`reference-undertaking.ts:223`), and the route's `dispatch` path is
+not shown to do the same — the register makes the question answerable rather than assumed.
+
+## 7.4 Shortcut-to-invariant coverage
+
+Every invariant in the spine's catalog carries at least three shortcut records; INV-07 and INV-13, the two the
+spine's incumbent-defect list shows to be most frequently re-broken, carry four each.
+
+| Invariant | Shortcut records | Confirmed present in the incumbent |
+|---|---|---|
+| INV-01 | SC-01, SC-02, SC-03 | none (form-action architecture; see SC-01) |
+| INV-02 | SC-04, SC-05, SC-06, SC-07 | SC-04 (×4 queries), SC-06 |
+| INV-03 | SC-08, SC-09, SC-10, SC-11 | SC-08 (repaired), SC-11 (×5 limbs) |
+| INV-04 | SC-12, SC-13, SC-14, SC-15 | SC-12 (general case) |
+| INV-05 | SC-16, SC-17, SC-18, SC-19 | not measured by this section |
+| INV-06 | SC-20, SC-21, SC-22, SC-23 | SC-22 |
+| INV-07 | SC-24, SC-25, SC-26, SC-27 | SC-24 |
+| INV-08 | SC-28, SC-29, SC-30 | none for single-Command actions |
+| INV-09 | SC-31, SC-32, SC-33 | SC-31 (route boundary), SC-32 (×4 limbs) |
+| INV-10 | SC-34, SC-35, SC-36 | SC-34, SC-35 |
+| INV-11 | SC-37, SC-38, SC-39, SC-40 | not measured by this section |
+| INV-12 | SC-41, SC-42, SC-43 | SC-43 (seed data) |
+| INV-13 | SC-44, SC-45, SC-46, SC-47 | SC-46 is *not* present, deliberately (fail-open) |
+| INV-14 | SC-48, SC-49, SC-50, SC-51 | SC-48 |
+
+INV-05 and INV-11 carry "not measured by this section": this SPEC has **not** established whether the incumbent
+Surface collapses the axes or applies affirmative treatment on execution alone. That is a statement about what was
+searched, not about the world — the axis-rendering code in `apps/rph-demo/src/routes/undertakings/[id]/+page.svelte`
+was not read line by line for this section. `SPEC-001-NF-16`, `-17`, `-37` and `-39` are the checks that decide it.
+
+---
+
+# 8. Controlled normative redundancy
+
+## 8.1 The rule this section applies to itself
+
+An implementer violates an invariant at a *boundary* — the place where a value is written, emitted, derived,
+rendered, migrated, or asserted — and reads only the part of the specification that governs that boundary. A
+specification that states each invariant once, in a catalog, has stated it where nobody working at the boundary
+will read it.
+
+**Restatement-with-citation is mandatory where an invariant is load-bearing at a boundary. Citation-only is for
+context.** Both halves are required: citing everywhere deflates specification pressure, because a reader at a
+boundary follows no links; restating without citing reintroduces drift, because two full statements with no
+declared master will diverge and neither will be wrong. The citation marks the single authority; the conformance
+suite (§10) is what keeps the restatements aligned to it. This mechanism is the commission template's rule 8 and it
+is applied here to the six boundaries this SPEC's concern actually crosses.
+
+**Restatement register.** Every restatement below carries `↻ master:` naming its single authority. A restatement
+whose text drifts from its master is a defect detectable by `SPEC-001-NF-52`, specified at §10.6.
+
+## 8.2 The persistence boundary
+
+INFORMATIVE scope: SPEC-001 does not govern persistence shapes (spine, DOES NOT GOVERN). It governs what a
+persistence author must *not conclude* about projections.
+
+**↻ master: DOC-003 PER-7 (`JPWB-DOC-003 Semantic Model and Invariant Catalog.md:359`), restated by
+`SPEC-001-INV-01`.** Read projections may be rebuilt, delayed, optimized, and independently versioned; they are
+never authoritative write targets, and canonical commands never validate against projections alone. Projection lag
+can never alter an authoritative decision. Rebuildability, not backup, is their durability guarantee.
+**At this boundary that means:** a persisted Projection **SHALL** be reconstructible from the governed event log
+and object store alone; a Projection **SHALL NOT** be the sole persistent home of any datum. **Verification:**
+`SPEC-001-PF-01` — delete every persisted projection artifact, rebuild, and assert byte-equality with the
+pre-deletion projection. INFORMATIVE: the incumbent has no persisted projections — every projection is rebuilt per
+request inside `load()` (CONFIRMED: `+page.server.ts:213-428`), so PF-01 is trivially satisfied today and exists to
+hold a future caching layer to PER-7.
+
+**↻ master: `SPEC-001-INV-02`.** A Projection SHALL be bound to a declared Projection Scope, and SHALL NOT present
+objects outside it. **At this boundary that means:** a query function that returns governed objects **SHALL** take
+its Scope as a parameter, and a query that cannot take one **SHALL** be registered as unscoped-by-design with a
+reason. **Verification:** `SPEC-001-NF-06`. The incumbent register is empty and four queries qualify
+(`packages/rph-engine/src/queries.ts:46-51`, CONFIRMED).
+
+## 8.3 The event boundary
+
+**↻ master: CON-000 AX-3 (`JPWB-CON-000 Constitution.md:75`), restated by `SPEC-001-INV-06`.** Questions,
+assumptions, contradictions, and residual uncertainty are governed objects that drive work, not annotations on it.
+Completion with residual uncertainty is legitimate only when the residual is documented, assessed, accepted by
+authority, and **inspectable downstream**. **At this boundary that means:** the events that record uncertainty —
+`AssumptionDetected`, the MATERIAL `AssuranceObservationRecorded`, and the `residualUncertainty` carried on
+`AssuranceAssessmentCompleted` — **SHALL** be the source from which every uncertainty disclosure is derived; a
+Surface disclosure with no event behind it **SHALL NOT** be rendered as an Epistemic Disclosure.
+**Verification:** `SPEC-001-NF-22`. INFORMATIVE, and this is why the restatement is at the *event* boundary
+rather than only at the UX boundary: the incumbent's uncertainty is disclosed at the Surface and derived from a
+route literal, so a reader at the UX boundary sees a disclosure and concludes AX-3 is met. Only the event boundary
+reveals that the three governed events are unread.
+
+**↻ master: `SPEC-001-INV-09`.** A stale, partial, or rebuilding Projection SHALL be identified as such. **At this
+boundary that means:** a projector that folds a subset of the relevant event types **SHALL** expose which source
+classes it did not fold, restating RIWS §26.3 (`Reference Interaction and Workspace Specification.md:1498-1505`:
+a partial projection SHALL disclose which source classes are missing, why, whether interpretation may be materially
+affected, and whether commands remain available). **Verification:** `SPEC-001-NF-53` — assert every projector
+exports a declared `foldedEventTypes` set and that the Surface renders a partiality disclosure whenever a relevant
+type is absent from it. INFORMATIVE: `assurance-view.ts:1-56` performs this disclosure *in prose to the source
+reader*, per-field, and it is the best partiality account in the repository; SPEC-001 requires it as data the
+Surface can render.
+
+**↻ master: DOC-003 AUT-1 (`JPWB-DOC-003 Semantic Model and Invariant Catalog.md:385`).** Exactly one
+representation is authoritative for professional semantic state; a compatibility representation may display and
+label, but is derived, single-writer, and never independently writable. **Citation-only** here: AUT-1 governs the
+authority model, which this SPEC does not govern (spine, DOES NOT GOVERN). It is cited because FORK-1's navigation
+question is an AUT-1 question and must be ruled, not inferred.
+
+## 8.4 The projection-layer boundary
+
+**↻ master: `SPEC-001-INV-03`.** Every Affordance SHALL derive from the same declared authority the engine
+enforces — never from an independent copy of that rule. **At this boundary that means:** a read model
+**SHALL** call the ratified kernel predicate the engine calls, **SHALL** gate on the authority's declared
+per-Command property rather than on an enumeration of Command names, and **SHALL NOT** hold a literal restating a
+rule the authority declares. **Verification:** `SPEC-001-NF-08`, `-09`, `-10`, with mutants `SPEC-001-MU-01`
+through `-MU-04`. INFORMATIVE: the incumbent read model performs this correctly for five limbs and documents the
+reasoning at `execution-view.ts:32-50, 331-347, 376-417`; the restatement exists because the same file records that
+the property was broken five times, each time by an engine limb whose read-model counterpart was not added.
+
+**↻ master: `SPEC-001-INV-13`.** A Surface SHALL NOT offer an Affordance the engine would refuse, and SHALL NOT
+withhold one the engine would admit. **At this boundary that means:** the read model's offered set **SHALL** be
+differentially tested against the engine's accepted set over a generated input space, not against transcribed
+literals. **Verification:** `SPEC-001-PB-02`.
+
+**↻ master: DOC-003 STA-1 (`JPWB-DOC-003 Semantic Model and Invariant Catalog.md:175`), restated by
+`SPEC-001-INV-05`.** Execution, assurance, shape integrity, and work lifecycle are independent axes, never
+summarized into one status field, one progress bar, or one boolean. **At this boundary that means:** a projection
+field **SHALL** name the single axis it derives from, and a derived indicator over more than one axis **SHALL NOT**
+be exported from the projection layer without an accompanying declaration of the axes it composes.
+**Verification:** `SPEC-001-NF-17`. INFORMATIVE: `execution-view.ts:832-844` already enforces the discipline for an
+advisory — "The advisory predicate reads ONLY executionState (single axis) — never workLifecycleState (EXECUTING is
+a workLifecycleState value, SUCCEEDED an executionState value; mixing them was the … §19 L3-C1 defect)" — which is
+a recorded instance of the exact collapse STA-1 forbids, caught at this boundary.
+
+## 8.5 The UX / Surface boundary
+
+**↻ master: `SPEC-001-INV-01`, restating DOC-003 PER-7 (`:359`) and JCUX SCREEN-INV-009
+(`JanumiCode UI Information Architecture and Screen Contract.md:322-326`).** UI components SHALL issue semantic
+Commands and SHALL NOT mutate authoritative state directly. A Projection carries no authority; no Surface act
+SHALL mutate governed state except by issuing a semantic Command. **Verification:** `SPEC-001-NF-01`, `-02`, `-03`.
+
+**↻ master: `SPEC-001-INV-04`, restating RIWS §24.4 (`Reference Interaction and Workspace Specification.md:1410`).**
+A disabled command SHALL provide a meaningful explanation. An Affordance withheld by authority SHALL disclose the
+reason it is withheld; silence SHALL NOT stand in for refusal. **Verification:** `SPEC-001-NF-12`, `-13`, `-14`,
+`-15`.
+
+**↻ master: `SPEC-001-INV-06`, restating CON-000 AX-3 (`JPWB-CON-000 Constitution.md:75`) and JCUX SCREEN-INV-006
+(`…Screen Contract.md:310-312`).** Material uncertainty SHALL remain visible, on the Surface that carries the work
+it qualifies. **Verification:** `SPEC-001-NF-20`, `-21`, `-22`, `-23`.
+
+**↻ master: `SPEC-001-INV-07`.** Rendered content SHALL be reachable by ordinary interaction; content that exists
+in the accessibility tree but cannot be brought into view is not rendered. **At this boundary that means:** a
+container with `overflow: hidden` **SHALL** either provide a scroller for its content or be guaranteed by a check
+not to receive content exceeding its box; the layout rule and the Surface that lands in it are one obligation, not
+two. **Verification:** `SPEC-001-NF-24` at each declared viewport size, with `SPEC-001-MU-06` as its red-proof.
+
+**↻ master: `SPEC-001-INV-11`, restating DOC-003 STA-2 (`JPWB-DOC-003 Semantic Model and Invariant Catalog.md:179`,
+successor of legacy INV-5 per `:51`).** Execution success moves work toward evidence and assurance, never directly
+to satisfaction; step success does not imply PWU success; all-steps-succeeded leaves assurance unassessed until
+required policies complete. A Surface SHALL NOT represent execution progress in a way that implies assurance.
+**Verification:** `SPEC-001-NF-37`, `-39`, `-40`.
+
+**↻ master: `SPEC-001-INV-12`, restating JCUX SCREEN-INV-005 (`…Screen Contract.md:306-308`).** Claims, Evidence,
+AI outputs, Decisions, and changes SHALL expose provenance, on the Surface that presents them.
+**Verification:** `SPEC-001-NF-41`, `-42`, `-43`.
+
+**↻ master: `SPEC-001-INV-10`, restating JCUX SCREEN-INV-010 (`…Screen Contract.md:328-330`) and RIWS UI-INV-012
+(`Reference Interaction and Workspace Specification.md:2025-2027`).** Moving between projections SHALL preserve
+active professional context. **Verification:** `SPEC-001-NF-34`, `-35`, `-36`.
+
+**Citation-only at this boundary** (context, not restatement): CPM §7.10 Required Disclosures
+(`Canonical Projection Model.md:331-333`), CPM §7.11 Interaction Commands (`:335-337`), CPM PROJ-INV-012
+Suppression Disclosure (`:393-395`), RIWS §24.3 Command Preconditions (`:1396-1408`), RIWS §26.4 Error Presentation
+(`:1509-1518`). These inform the design of O-5, O-6 and O-8 and are not restated because an implementer at this
+boundary who violates them violates a restated invariant first.
+
+## 8.6 The migration boundary
+
+**↻ master: `SPEC-001-INV-02`.** A Projection SHALL be bound to a declared Projection Scope, and SHALL NOT present
+objects outside it. **At this boundary that means:** when a Scope is introduced to a previously-global query, the
+migration **SHALL** enumerate every caller and **SHALL** convert each to a scoped call or register it as
+unscoped-by-design; a migration that scopes the query and leaves a global overload **SHALL NOT** be recorded as
+complete. **Verification:** `SPEC-001-NF-06`. INFORMATIVE: `listPwus` today takes an *optional* Scope
+(`packages/rph-engine/src/queries.ts:41-44`: `undertakingId?: string`, returning the global list when omitted),
+which is precisely the shape that lets a new caller be unscoped by default. The register is what converts an
+optional parameter from a hazard into a governed choice.
+
+**↻ master: `SPEC-001-INV-09`.** A stale, partial, or rebuilding Projection SHALL be identified as such. **At this
+boundary that means:** a Projection rebuilt under a new derivation **SHALL** be distinguishable on the Surface from
+one built under the old derivation for as long as both can be observed. **Verification:** `SPEC-001-NF-54` — assert
+the Projection carries a derivation identifier and that the Surface renders it when it differs from the current
+one.
+
+**↻ master: DOC-002 vocabulary (`docs/canon/JPWB-DOC-002 Canonical Vocabulary.md:248-249`).** `Endeavor` (bare) →
+**Undertaking**; `Professional Endeavor` is a candidate generic supertype only, and "a second competing root MUST
+NOT be created without a Decision". **At this boundary that means:** a migration of Surface copy, route names, or
+projection field names **SHALL NOT** introduce a competing root term, and **SHALL** rename any surviving `Endeavor`
+to `Undertaking`. **Verification:** `SPEC-001-NF-55` — a lexical fixture over route paths, projection field names,
+and rendered copy asserting zero occurrences of the retired term.
+
+## 8.7 The test boundary
+
+**↻ master: CON-000 B7 (`JPWB-CON-000 Constitution.md:119`).** No artifact, object, or field may claim a status its
+relations do not perform: no provenance theater, no policy objects the runtime never reads, no assurance
+represented by an unread flag. Asserted status must be performed status. A discovered gap between asserted and
+performed status is a SEMANTIC_CONFLICT, escalated via REG-005 — never quietly documented around and never quietly
+deleted. **At this boundary that means:** a conformance fixture **SHALL** be accompanied by a named mutation that
+makes it red, and a fixture with no such mutation **SHALL** be reported as a finding rather than counted as
+coverage. **Verification:** §10.5's mutation red-proof obligation, carried in `scripts/mutants/ledger.ts`.
+
+**↻ master: CON-000 B1 (`JPWB-CON-000 Constitution.md:97`).** "A shape reference that no type check or conformance
+test enforces asserts a status nothing performs (B7)." **At this boundary that means:** every interface and error
+code this SPEC declares **SHALL** be enforced by a type check or a named fixture; a declared code with no fixture
+**SHALL** be listed in Deliberately Unspecified rather than presented as governing. **Verification:**
+`SPEC-001-NF-56` — a census fixture over this SPEC's declared codes and interfaces asserting each maps to a
+`SPEC-001-PF-nn`/`-NF-nn` id or a Deliberately Unspecified row.
+
+**↻ master: `SPEC-001-INV-13`.** …SHALL NOT withhold one the engine would admit. **At this boundary that means:**
+every withholding limb carries a *pair* of fixtures, and a mutant that inverts the limb into over-refusal
+**SHALL** redden a named suite. **Verification:** `SPEC-001-NF-44`; ledger pairs `SPEC-001-MU-02`/`-MU-05`.
+
+---
+
+# 9. Reference case — the Field Service Management SaaS Undertaking
+
+## 9.0 The fixture, its provenance, and the rules of this walk
+
+**CONFIRMED fixture.** `packages/rph-engine/src/seed-workbench.ts:289-316` seeds an Undertaking with
+`undertakingId = 'und_01ARZ3NDEKTSV4RRFFQ69G5Z10'` (`:24`), `name = 'Field Service Management SaaS Undertaking'`,
+`objective = 'Enable trades businesses to manage customer work from request through invoice.'`,
+`intendedOutputProduct = 'Field Service Management SaaS'`, bound to `SEED_PWA` at `SEED_PWA_VERSION`, and then
+calls `driveReferenceUndertaking` with `assurancePolicyId: 'pol_fitness_for_purpose'` from the ratified DOC-004
+catalog. It is DOC-002's canonical reference chain instantiated
+(`docs/canon/JPWB-DOC-002 Canonical Vocabulary.md:66`) and DOC-002's canonical Reference Fixture (`:102`).
+
+**CONFIRMED terminal state**, from `reference-undertaking.ts:375-881`: thirteen PWU Instances — `root` (Product
+Realization), `intentDef`, `behavior`, `architecture`, five architecture concerns (`systemContext`,
+`multiTenancy`, `dataArch`, `integrations`, `mobileOffline`), and four downstream areas (`planning`,
+`implementation`, `validation`, `promotion`) proposed but never driven. Eight PWUs are driven through
+`shapeAndExecute` → `earnAssurance`: seven to SATISFIED, `mobileOffline` to CONDITIONALLY_SATISFIED with a MATERIAL
+observation whose statement is `'Offline behavior deferred from the first implementation increment'`
+(`:133-135`, `:812-826`). `intentDef` and `architecture` are additionally BASELINED through the full chain —
+create, submit, propose+approve a `PROMOTE_BASELINE` Decision, approve, promote (`:756-798`, `:841`, `:862-872`).
+`behavior` is satisfied and **deliberately not** baselined: "the reference undertaking's point is that satisfied
+and baselined are different things" (`:838-839`). The root remains `workLifecycleState = EXECUTING`.
+
+**Rule for this walk.** Where the scenario is awkward, or a concept fails to instantiate, the spec is revised and
+the revision is recorded as `SPEC-001-REV-nn`. The scenario is not simplified. Nine revisions were forced; two of
+them produced questions a sponsor may reasonably rule differently and are raised as forks at the end.
+
+At each step: **which Projection serves the Surface**, **which Affordances are offered and which withheld and
+why**, and **what is disclosed**.
+
+## 9.1 Step 0 — The Undertaking Portfolio
+
+**Surface (O-2):** `/undertakings`. **Projection (O-1):** the portfolio projection built at
+`apps/rph-demo/src/routes/undertakings/+page.server.ts:10-34` — per Undertaking: id, name, objective,
+intendedOutputProduct, status, bound `pwaId`/`pwaName`/`pwaVersion`, and `pwuCount`.
+**Projection Scope (O-3):** the tenant's Undertaking set. **CONFIRMED:** the scope is `listUndertakings(engine)`,
+which takes no argument (`queries.ts:40`) — correct for a portfolio, whose declared subject *is* every Undertaking
+the actor may see, and therefore an instance of a legitimately unscoped query rather than an SC-04 violation. This
+is the first thing the walk forces:
+
+> **`SPEC-001-REV-01`.** O-3's closure matrix must distinguish a Projection whose Scope is **the world** (declared,
+> intentional, and correct for a portfolio) from a Projection with **no declared Scope** (SC-04). Without the
+> distinction, `SPEC-001-NF-06`'s census would flag `listUndertakings` alongside `listAssessments` and the fixture
+> would be discredited by its own false positive. **Effect:** `SPEC-001-NF-06` asserts each query is either
+> Scope-taking or carries a declared `UNSCOPED_BY_DESIGN` reason; `listUndertakings` supplies one, the four
+> assurance queries cannot. UNRATIFIED-AUTHORED.
+
+**Affordances offered.** `create` — instantiate a new Undertaking from a **PUBLISHED** PWA. The option list is
+derived, not asserted: `listPwas(engine).filter(p => p.state.publicationStatus === 'PUBLISHED')`
+(`+page.server.ts:27-33`, CONFIRMED). **Affordances withheld:** instantiating from a DRAFT or DEPRECATED PWA — and
+here the walk forces the second revision:
+
+> **`SPEC-001-REV-02`.** The withholding is implemented by **excluding the option from a select**, which is neither
+> "offered" nor a rendered Affordance Withholding (O-5). O-5's states must therefore cover a third case: an
+> Affordance whose *parameter domain* is narrowed, rather than the Affordance itself being withheld. **Effect:**
+> O-5 gains `domainNarrowed` alongside `withheld`; INV-04's disclosure obligation applies to it — a professional
+> who cannot find their draft PWA in the list must be told that draft PWAs are excluded and why.
+> **Verification:** `SPEC-001-NF-57` — with only DRAFT PWAs present, assert the create Affordance discloses the
+> narrowing rather than presenting an empty select. UNRATIFIED-AUTHORED; this is a genuine gap in the spine's O-5
+> and it is raised as **FORK-26** below because a sponsor may rule domain narrowing out of INV-04's scope.
+
+**Disclosed.** Per row: the bound PWA name and version — the derivation-ladder fact DOC-002:100 makes
+load-bearing ("an existing Undertaking remains bound to its selected version until explicit migration"). The FSM
+row shows `pwuCount = 13`.
+
+**Not disclosed, and it should be.** Nothing on this Surface distinguishes the FSM Undertaking as a **Reference
+Fixture**. DOC-002:102 requires it: "A Reference Fixture … MUST always be labeled as an instance or fixture and
+MUST NOT be presented as the PWA definition itself." The flag exists in the codebase — `isReferenceFixture: u.id
+=== SEED_UNDERTAKING` — but only on the **PWA Designer's** loader (`apps/rph-demo/src/routes/pwa/[id]/+page.server.ts:89`,
+CONFIRMED), not on the portfolio.
+
+> **`SPEC-001-REV-03`.** O-8 (Epistemic Disclosure) must include **fixture status** as a disclosure class:
+> a Surface presenting an Undertaking that is a Reference Fixture SHALL label it as such. It is not provenance, not
+> uncertainty, not staleness, and not contradiction — it is a fourth epistemic qualifier, and without it the
+> professional cannot tell demonstration data from their own work. **Verification:** `SPEC-001-NF-58` — assert the
+> fixture label is rendered on every Surface presenting the seeded Undertaking, at every level (portfolio row,
+> Undertaking header, and any Projection that cites its objects). UNRATIFIED-AUTHORED, citing DOC-002:102 as
+> master.
+
+## 9.2 Step 1 — Entering the Undertaking
+
+**Surface:** `/undertakings/und_01ARZ3NDEKTSV4RRFFQ69G5Z10`. **CONFIRMED:** this route matches
+`/^\/undertakings\/[^/]+$/` at `+layout.svelte:75` and is therefore rendered inside `.content.full`, which is
+`overflow: hidden` with `padding: 0` (`:311-314`) inside `.app`, which is `height: 100vh; overflow: hidden`
+(`:145-149`).
+
+**This is where the walk first fails, and it fails before any Projection is consulted.** Everything below this
+point in §9 describes content the professional cannot reach at 1440×900 beyond the first viewport. INV-07 is not a
+polish concern discovered at the end of the walk; it is the **precondition of the walk**, and that ordering is
+itself a finding:
+
+> **`SPEC-001-REV-04`.** INV-07 must be evaluated **before** the Projection-and-Affordance analysis of a Surface,
+> not after it, and the spec's Surface conformance procedure must say so. A Surface that fails INV-07 has an
+> undefined Affordance disclosure story regardless of what its Projections contain, because a withheld-Affordance
+> disclosure that cannot be scrolled to is indistinguishable from the SC-12 shortcut it prohibits. **Effect:**
+> §10.1 orders INV-07's fixtures first and makes them a **gate**: `SPEC-001-NF-24` failing on a Surface marks every
+> other fixture for that Surface INDETERMINATE rather than PASS. **This is the single most consequential revision
+> in §9**, because it converts a rendering defect into a conformance-blocking one. It is raised as **FORK-4** in the
+> spine (reachability as semantics) and this walk is the argument for the spine's recommendation.
+
+**Projections composing this Surface (CONFIRMED, `+page.server.ts:401-427`)** — eleven, which is itself a finding
+about O-2's composition contract:
+
+| # | Payload key | Projection | Scope applied? |
+|---|---|---|---|
+| 1 | `graph` | `professionalWorkGraph(engine, {undertakingId})` (`:225-228`) | **yes** — `undertakingId` |
+| 2 | `rollup` | `buildLifecycleRollup(pwus)` (`:231`) | yes — over scoped `pwus` |
+| 3 | `pwuList` | `listPwus(engine, params.id).map(mapPwuRow)` (`:230-233`) | **yes** |
+| 4 | `plans` | `plansForPwus(planRows, pwuIdSet, …)` (`:355`) | **yes** — two-hop via PWU ids |
+| 5 | `startableStepByPlan` / `prunableStepByPlan` / `transitionRowsByPlan` | `buildExecutionReadModels` (`:369-370`) | yes — derived from scoped `plans` |
+| 6 | `attemptsByStepId` | `buildAttemptsByStepId` (`:375`) | yes — filtered to scoped plan ids (`:202-207`) |
+| 7 | `sequence` | `sequenceView(boundTypeGraph, seqInstances)` (`:393-394`) | yes — instances from scoped `pwus`, types version-scoped |
+| 8 | `assessments` | `listAssessments(engine)` (`:255`) | **NO** |
+| 9 | `applicablePolicies` | `buildApplicablePoliciesView(engine, pwus, view)` (`:295`) | yes — over scoped `pwus` |
+| 10 | `observations` / `decisions` / `baselines` | `listObservations` / `listDecisions` / `listBaselines` (`:296, 302, 308`) | **NO** |
+| 11 | `trace` | `traceView.links.filter(l => pwuIdSet.has(l.from) \|\| pwuIdSet.has(l.to))` (`:248-250`) | yes — filtered in the loader, not the template |
+
+Seven scoped, four unscoped, one (`trace`) scoped by a **loader-side filter over a global projection** — which is
+SC-04's shape moved one layer earlier. It is materially better than filtering in the template (the payload is
+correct, so `SPEC-001-NF-04` passes) and it is materially worse than a scoped query (the whole event log is folded
+on every request).
+
+> **`SPEC-001-REV-05`.** O-3 must distinguish **three** scoping sites, not two: scoped-at-source (the query takes
+> the Scope), scoped-at-derivation (a global projection filtered in the loader), and scoped-at-render (filtered in
+> the template — prohibited by SC-04). Scoped-at-derivation is **permitted** and **SHALL** be declared, because it
+> carries a cost and a hazard the other two do not: the fold reads objects outside the Scope, so a
+> security/permission boundary cannot be enforced by it. **Verification:** `SPEC-001-NF-59` — assert each
+> Projection declares its scoping site, and that no Projection carrying a permission boundary is
+> scoped-at-derivation. UNRATIFIED-AUTHORED.
+
+**Affordances offered on arrival.** From the seven tab controls (`+page.svelte:32-39`) — `graph`, `overview`,
+`execution`, `assurance`, `decisions`, `baselines`, `traceability` — plus sixteen route actions
+(CONFIRMED count from `+page.server.ts:509-903`: `proposePwu`, `beginExecute`, `startStep`, `failStep`,
+`retryStep`, `skipStep`, `cancelStep`, `pruneStep`, `enterWaitStep`, `resolveWaitStep`, `cancelPlan`,
+`completePlan`, `failPlan`, `completeStep`, `recordAssurance`, `markSatisfied`).
+
+**Disclosed.** The context banner — "UNDERTAKING CONTEXT — concrete professional work" (`+layout.svelte:119-126`),
+derived from the path prefix (`:65-71`). This is a genuine, correct O-9 disclosure: the professional can always
+tell whether they are looking at a reusable definition or concrete work.
+
+**Withheld, and why — the tab selection.** The active tab is `let tab = $state(…)('graph')`
+(`+page.svelte:29-31`, CONFIRMED). It is not in the URL. So: the professional cannot link a colleague to the
+Assurance tab; returning from a Decision detail lands on the graph; and every form action's page re-render restores
+`'graph'`. INV-10 is violated three ways by one line.
+
+## 9.3 Step 2 — Overview: the four axes on thirteen PWUs
+
+**Projection:** `pwuList` + `rollup`. **What the reference case puts on this Surface** — the axis combination that
+makes STA-1 and STA-2 legible, present in the seed by construction:
+
+| PWU | workLifecycle | execution | assurance | shapeIntegrity |
+|---|---|---|---|---|
+| Product Realization (root) | EXECUTING | QUEUED | UNASSESSED | PRESERVED |
+| Intent & Product Definition | SATISFIED → BASELINED chain complete | SUCCEEDED | SATISFIED | PRESERVED |
+| Product Behavior Definition | SATISFIED | SUCCEEDED | SATISFIED | PRESERVED |
+| Architecture Definition | BASELINED | SUCCEEDED | SATISFIED | PRESERVED |
+| System Context / Multi-Tenancy / Data / Integration | SATISFIED | SUCCEEDED | SATISFIED | PRESERVED |
+| **Mobile & Offline** | **CONDITIONALLY_SATISFIED** | **SUCCEEDED** | **CONDITIONALLY_SATISFIED** | **AT_RISK** |
+| Planning / Implementation / Validation / Promotion | PROPOSED | (unset) | (unset) | (unset) |
+
+(CONFIRMED from the `chg(...)` calls at `reference-undertaking.ts:564-568, 615, 676-700, 806-808, 817-825,
+834-835, 869-872`.)
+
+**This table is the reference case's strongest demonstration and its most fragile one.** Mobile & Offline is the
+only row where the four axes disagree, and it is the row that proves STA-1 is load-bearing rather than
+theoretical: `executionState = SUCCEEDED` with `assuranceState = CONDITIONALLY_SATISFIED` and
+`shapeIntegrityState = AT_RISK` is exactly the state a collapsed single status must destroy. `SPEC-001-NF-16`'s
+per-axis mutation protocol uses this row as its subject.
+
+**Affordances on this Surface.** The spine records nine of sixteen route actions unreachable at 1440×900, four of
+nine Overview buttons among them. The three genuinely offered here — `proposePwu`, `beginExecute`,
+`recordAssurance`, `markSatisfied` — are offered **unconditionally**: the loader computes no per-PWU affordance
+set. So `markSatisfied` is offered on the root PWU, whose `assuranceState` is UNASSESSED, and the engine refuses it
+(`+page.server.ts:894-902` returns `No green without assurance: …`). That is SC-45 exactly, at the PWU level, in
+the same application whose *step*-level affordances are gated through five authority limbs.
+
+> **`SPEC-001-REV-06`.** INV-13 must be stated as applying **per Affordance instance**, not per Affordance class,
+> and O-4's closure matrix must carry the *subject* of the Affordance as a required field. Without it, "the
+> Surface offers `markSatisfied`" is not a proposition INV-13 can evaluate — only "the Surface offers
+> `markSatisfied` **on the root PWU**" is. **Effect:** `SPEC-001-NF-45`'s differential fixture is keyed by
+> (Affordance, subject id), and the incumbent's PWU-level affordances all fail it. UNRATIFIED-AUTHORED.
+
+**Disclosed.** The four axes per PWU. **Not disclosed:** the assurance disposition's *grade* — a Surface that
+renders `SATISFIED` and `CONDITIONALLY_SATISFIED` in the same visual treatment has boolean-ized a graded semantics
+(SC-39's class). `SPEC-001-NF-39` decides it.
+
+## 9.4 Step 3 — The Execution tab, on the Architecture PWU
+
+**Projection:** `plans` (scoped, shaped), plus `startableStepByPlan`, `prunableStepByPlan`,
+`transitionRowsByPlan`, `attemptsByStepId`. **CONFIRMED shape:** each of the eight driven PWUs has exactly one
+plan with exactly one `MODEL_INVOCATION` step (`reference-undertaking.ts:540-561`), and the plan is driven
+propose → approve → activate → start → complete (`:562-613`). Terminal state per plan: step `SUCCEEDED`.
+
+**Affordances offered:** none. **Why:** `ADVANCE_BY_STEP_STATE.SUCCEEDED = []` and
+`CONTROL_BY_STEP_STATE.SUCCEEDED = []` (`execution-view.ts:248, 263`) — a terminal-success step affords nothing,
+correctly, and `startableStepIds` yields nothing because the only step is not startable. So the reference case's
+execution tab, at terminal state, offers **zero** step Affordances across all eight plans.
+
+**And that is why the spine's third incumbent defect exists.** "The step-level Affordances never appear because no
+UI-reachable state populates `startableStepByPlan`." The walk confirms the mechanism: the seed drives every plan to
+terminal in a single synchronous function, so the states in which `start`, `complete`, `fail`, `retry`, `skip`,
+`cancel`, `wait`, `resolve` and `prune` are offered exist only *inside* `driveReferenceUndertaking`, never as a
+resting state the Surface renders. Eight of the sixteen route actions are wired to affordances that the reference
+fixture can never display.
+
+> **`SPEC-001-REV-07`.** A Reference Fixture **SHALL** rest in at least one non-terminal state per Affordance the
+> Surface can offer, or the SPEC **SHALL** declare the Affordance unexercised-by-the-fixture. A fixture that drives
+> every object to terminal demonstrates the *outcome* semantics and demonstrates **none** of the affordance
+> semantics — and this SPEC's whole concern is the affordance semantics. **Effect:** §10 requires an
+> **affordance-coverage fixture** (`SPEC-001-PF-45`) asserting that for each of the eleven affordances
+> (`start`, `complete`, `fail`, `retry`, `skip`, `cancel`, `wait`, `resolve`, `prune`, plus the two plan-level
+> actions `cancelPlan`, `completePlan`) there exists a fixture state in which it is *rendered*. This is a genuine
+> failure of the reference case to instantiate the spec, and the spec is revised rather than the scenario.
+> UNRATIFIED-AUTHORED.
+
+**Withheld, and disclosed — the fail-open.** Every one of these plans has steps with **no `runtimeBindingId`**:
+`ProposeExecutionPlan`'s step literal declares `inputBindings: []` and `outputBindings: []` and names no runtime
+binding (`reference-undertaking.ts:543-560`), and `execution-view.ts:86-89` states "the reference seed authors no
+RuntimeBinding whatsoever". `bindingFactsById` is therefore built from `listByType(engine, 'RUNTIME_BINDING')`
+(`+page.server.ts:341-354`) over an empty set. So the `bindingAuthority` limb **does not gate**, the `retryBudget`
+limb does not gate where `attemptsMade` is unresolved, and `inputReadiness` does not gate on an empty required set.
+
+**What is disclosed about that:** nothing. This is SC-32, instantiated by the canonical reference fixture: the
+Surface offers affordances under three unevaluated authority limbs and renders them identically to affordances that
+passed all five.
+
+> **`SPEC-001-REV-08`.** O-5 (Affordance Withholding) is insufficient: the reference case produces an Affordance
+> that is **offered because a limb was not evaluated**, which O-5 cannot express (it records reasons for
+> *withholding*). The spec is revised so that O-5's disclosure obligation is stated over the **evaluation record**
+> of every applicable limb — offered/withheld/**unevaluated** — and INV-09's "partial Projection" obligation is the
+> master for the third value, because an affordance set computed from unresolved facts *is* a partial projection.
+> **Verification:** `SPEC-001-NF-32`. **This revision is bound to INV-09 rather than minting a fifteenth
+> invariant**, per the spine's rule; whether it deserves its own invariant is **FORK-26**. UNRATIFIED-AUTHORED.
+
+## 9.5 Step 4 — The Assurance tab, and an assurance disposition
+
+**Projection:** `assessments` — the §38 Assurance View folded from the event stream
+(`assurance-view.ts:356-360`), joined onto `listAssessments(engine)` at `+page.server.ts:255-290`.
+
+**CONFIRMED unscoped.** `listAssessments` takes no Scope (`queries.ts:46-47`). The FSM Undertaking produces a large
+assessment population: `driveToSatisfied`/`driveToConditional` run for eight PWUs, each performing
+`satisfyFloor(evidenceId)` — three floor assessments per PWU (`reference-undertaking.ts:469-517`) — plus one
+fitness assessment, so **32 assessments** from the seed alone. A second Undertaking created through the portfolio
+shows all 32 on its own Assurance tab, before it has produced any assurance of its own. The spine's INV-02 defect,
+instantiated: "a new Undertaking shows the seed's records."
+
+**What is disclosed, and it is good.** Per assessment: policy id, state, disposition, `independenceStatus`,
+validator identity and version, `openConditions`, `claimsEvaluated`, `evidenceConsidered`, `controlActions`,
+`missingEvidence`, findings, waivers, invalidations (`+page.server.ts:255-290`). For the seed's
+`floor.reasoning-review` assessments, `independenceStatus` reflects a **real** DIFFERENT_MODEL check between
+`producer-model-1` and `reviewer-model-1` (`reference-undertaking.ts:96-112, 481-515`) — this is the one place in
+the reference case where the Surface can show a genuinely earned assurance fact with its provenance intact.
+
+**What is not disclosed, and must be.** `+page.server.ts:262-265` flattens `undefined` to `''` for `disposition`,
+`independenceStatus`, `validatorIdentity` and `validatorVersion` — the four fields whose `undefined` the projector
+preserves deliberately (`assurance-view.ts:104-110`) precisely so that "unknown" and "none" stay distinct. A seed
+assessment that never ran the independence check and one whose check ran and passed are then two strings that the
+template must tell apart, and the loader has already discarded the difference. SC-31.
+
+> **`SPEC-001-REV-09`.** The unknown/none distinction must be stated as a property of the **Surface's rendering
+> contract**, not of the Projection's type — because the reference case shows the type-level distinction being
+> destroyed one layer *below* the Surface by a defaulting operator, under a comment asserting the opposite
+> (`+page.server.ts:261`). **Effect:** `SPEC-001-NF-31` asserts on the rendered output, not on the payload;
+> O-8's closure matrix gains an explicit "unknown vs. none" rendering rule; and §7's SC-31 is written against the
+> `?? ''` idiom by name. UNRATIFIED-AUTHORED.
+
+**Affordance offered on this Surface:** `recordAssurance`, on any PWU. **Withheld:** nothing. **What happens when
+it is issued on a PWU whose `workLifecycleState` is not `EXECUTING`** is the reference case's demonstration of
+INV-14, and it is worth walking precisely:
+
+1. `CreateAssurancePolicy` + `ActivateAssurancePolicy` — accepted (first time only, `+page.server.ts:780-829`).
+2. `RequestAssuranceAssessment` — **accepted**. An `AssuranceAssessmentStarted` event is now in the log.
+3. `CompleteAssuranceAssessment` with `dispositionRecommendation: 'SATISFIED'` — **accepted**. An
+   `AssuranceAssessmentCompleted` event carrying a SATISFIED disposition is now in the log.
+4. `chg(pwuId, 'EXECUTING', 'EVIDENCE_PENDING', …)` (`:871`) — **refused**: illegal transition on PWU.
+5. `runSteps` returns; the Surface renders `Assurance failed: ChangePwuState: <message>` (`:888`).
+
+The professional is told the assurance failed. The governed record says a completed, SATISFIED assurance assessment
+exists over their PWU. Both statements are true and they are irreconcilable from the Surface. This is INV-14 and
+INV-08 together, and it is the spine's fourth incumbent defect confirmed end to end.
+
+## 9.6 Step 5 — Mobile & Offline: the uncertainty the Surface never shows
+
+This is the step at which the reference case most clearly fails to instantiate the spec.
+
+**What the governed record contains** (all CONFIRMED):
+- an `ASSURANCE_OBSERVATION` of `observationType: 'FINDING'`, `severity: 'MATERIAL'`, statement
+  `'Offline behavior deferred from the first implementation increment'`, bound to the assessment and citing the
+  evidence (`reference-undertaking.ts:704-712` via `driveToConditional` `:812-816`);
+- `residualUncertainty: ['Offline behavior deferred from the first implementation increment']` on the completed
+  assessment (`:735`), which `assurance-view.ts:214` folds into `openConditions` **only** when the disposition is
+  `CONDITIONALLY_SATISFIED` — which it is;
+- an `ASSUMPTION` object, materiality `MATERIAL`, `affectedObjectIds: [mobileOffline, behavior]`, with a `basis`
+  string, created by `DetectAssumption` (`:848-856`) — authored specifically because the ratified §28 Test 2
+  requires that "the assumption cannot remain only in prose";
+- `shapeIntegrityState: 'AT_RISK'` on the PWU (`:817-825`).
+
+**What the Surface shows.** `openConditions` reaches the assessments payload (`+page.server.ts:266`) and is
+rendered on the **Assurance tab**. The `graph.openResiduals` field — which is what the *graph* Surface would show
+beside the work — is `opts.openResiduals ?? []` (`professional-work-graph.ts:125`), supplied as the route literal
+`params.id === SEED_UNDERTAKING ? REFERENCE_OPEN_RESIDUALS : []` (`+page.server.ts:227`). And the Assumption object
+is read by **nothing**: an exhaustive grep of all 68 `.ts`/`.svelte` files under `apps/rph-demo/src` for
+`uncertain|contradiction|assumption` (case-insensitive, **not truncated**) returns zero hits in every route
+`.svelte` file, and five hits in `undertakings/[id]/+page.server.ts` — all five are *outbound* command-payload
+fields (`assumptionIds: []` at `:543`, `uncertainty: 'MEDIUM'` at `:548`, `detectedAssumptionIds: []` at `:626` and
+`:750`, `residualUncertainty: []` at `:864`), none of them a read.
+
+So: the one material uncertainty in the canonical reference fixture is displayed on one tab as an assessment
+sub-field, is displayed beside the work only as a hardcoded string keyed on the seed's id, and its governed
+Assumption object has no reader anywhere in the application. The spine's fifth incumbent defect — "ASSUMPTION /
+QUESTION / UNCERTAINTY / CONTRADICTION … with **zero UI anywhere in the app**" — is confirmed for ASSUMPTION and
+for the uncertainty class; **QUESTION and CONTRADICTION were not separately searched by object type in this walk**,
+and this SPEC records that as a statement about the search, not about the repository.
+
+**What this forces.** SC-22's prohibition and `SPEC-001-NF-22` are written from this step. The fixture builds the
+graph projection with **no** `openResiduals` argument and asserts the residual is still present — which is the only
+form of the assertion that can distinguish derivation from passthrough (see §10.5).
+
+## 9.7 Step 6 — Baselines and Decisions
+
+**Projections:** `baselines` and `decisions` — **both unscoped** (`queries.ts:50-51`), so both carry the SC-04
+defect, and both are also reachable as their own top-level Surfaces `/baselines` and `/decisions`
+(`+layout.svelte:62-63`), where a global list is the *declared* Scope and therefore correct. The same query is
+conforming at one Surface and non-conforming at another.
+
+> **`SPEC-001-REV-10`.** O-3's Scope is a property of the **(Projection, Surface)** pair, not of the query. A query
+> is conforming or not only relative to the Surface that consumes it, so `SPEC-001-NF-06`'s census must be keyed by
+> consumption site. **Effect:** the register records `listBaselines` as unscoped-by-design **for `/baselines`** and
+> as a violation **for `/undertakings/[id]`**. UNRATIFIED-AUTHORED.
+
+**What the reference case demonstrates here, and it is the point of the fixture.** `intentDef` and `architecture`
+are BASELINED through the full ratified chain; `behavior` is SATISFIED and not baselined (`:838-839`). The
+`architecture` hop cites `[archBaseline, archDecision]` in `supportingObjectIds` (`:869-872`), and the engine
+enforces it: `rejectUnbackedBaselining` "refuses … a BASELINED with no promoted baseline behind it" (`:31-33`). So
+the Surface can, in principle, show *why* a PWU is baselined by following the citation.
+
+**Whether it does is not established by this walk.** The `baselines` payload carries `id`, `type`, `status`, and a
+count of `itemObjectVersions` (`+page.server.ts:308-313`) — no authorizing decision id, no assessment ids. INV-12
+requires Decisions to expose provenance on the Surface presenting them; the `decisions` payload carries
+`rationale` (`:302-307`), which is the substantive half. **INFERRED:** the baseline→decision link is present in the
+governed record and absent from the baseline projection.
+
+## 9.8 Step 7 — Traceability
+
+**Projection:** `trace` — the typed link graph, scoped-at-derivation (`+page.server.ts:247-252`). Link types
+present in the reference case: `TRACES_TO_INTENT`, `DECOMPOSES`, `CHILD_OF`, `ASSESSES`, `ABOUT`, `OBLIGATION_OF`,
+`BASELINES` (`:244`). Every PWU carries `intentId: R.intentId` (`reference-undertaking.ts:350`), and two
+decomposition contracts exist (`:403-418`). **Disclosed:** per-type counts (`:251-252`) — a count is an aggregate,
+and per SC-20's class a count over a *link graph* is legitimate (it is not standing in for a required statement),
+but only if the links themselves are reachable. `SPEC-001-NF-24` decides that.
+
+**The unresolvable citation surfaces here.** `MarkPwuReady` is dispatched with
+`shapeReadinessAssessmentId: 'assess_shape'` for all nine shaped PWUs plus the root
+(`reference-undertaking.ts:535-538, 830-833`) and from the route (`+page.server.ts:571-575`). No object with that
+id is ever created (CONFIRMED by the file's own header, `:53-56`). A traceability Surface that renders shape
+readiness would render a citation to nothing. SC-43 and `SPEC-001-NF-43` are written from this step.
+
+## 9.9 Closure ledger for the reference case
+
+| Spec element | Instantiated by the reference case? | Where |
+|---|---|---|
+| O-1 Projection | Yes — eleven, in one Surface | §9.2 |
+| O-2 Surface | Yes — portfolio, Undertaking, PWA Designer, `/decisions`, `/baselines` | §9.1, §9.2, §9.7 |
+| O-3 Projection Scope | Yes, and **forced three revisions** (REV-01, REV-05, REV-10) | §9.1, §9.2, §9.7 |
+| O-4 Affordance | Yes, and forced REV-06 (per-instance, not per-class) | §9.3 |
+| O-5 Affordance Withholding | **Partially — forced REV-02 and REV-08**; the fixture produces withholdings O-5 could not express | §9.1, §9.4 |
+| O-6 Refusal Disclosure | Yes, and the multi-Command case breaks it | §9.5 |
+| O-7 State Axis Rendering | Yes — the Mobile & Offline row is the demonstration | §9.3 |
+| O-8 Epistemic Disclosure | **Failed to instantiate for uncertainty**; forced REV-03 and REV-09 | §9.1, §9.5, §9.6 |
+| O-9 Navigation Context | Yes, and violated by one line | §9.2 |
+| INV-01 … INV-14 | All fourteen reached; INV-07 forced REV-04 (ordering) | throughout |
+
+**Nine revisions, `SPEC-001-REV-01` … `-REV-10`** (REV-04 is the ordering revision and is counted once). *(Editorial note added at assembly, 2026-07-28: ten revision ids are minted here while the count is stated as nine, and §9.0 also says “nine revisions were forced”. Neither number is altered at assembly, because changing either would be a substantive edit to a count this section measured. The discrepancy is recorded in §11.2.4 as an open reconciliation.)* Two raise
+questions a sponsor may rule differently and are added to the spine's fork list:
+
+- **FORK-26 · Domain narrowing and unevaluated limbs as Affordance Withholding states.** REV-02 and REV-08 extend
+  O-5 from `{offered, withheld}` to `{offered, withheld, domainNarrowed, unevaluated}` and bind the last to INV-09
+  rather than minting an invariant. *Options:* (a) extend O-5 as authored; (b) rule `domainNarrowed` outside
+  INV-04's scope and `unevaluated` outside INV-09's, which leaves the reference case's actual affordance behaviour
+  ungoverned. *Recommend (a)* — the reference fixture produces both states, so neither is hypothetical.
+- **FORK-27 · Projection derivation provenance.** REV-09's and SC-22's underlying question: is "every field of a
+  Projection SHALL be sourced from governed state" a consequence of O-1's definition ("a derived … view over
+  governed state", spine) or an invariant in its own right? *Options:* (a) consequence, verified by
+  `SPEC-001-NF-22`; (b) a fifteenth invariant. *Recommend (a)* — the spine forbids minting invariants, and NF-22
+  is a stronger check than a restatement.
+
+---
+
+# 10. Conformance-fixture specification
+
+## 10.1 The fixture grammar
+
+Every fixture below is specified as: **id · obligation · layer · setup · act · assertion · red-proof**. A fixture
+without a red-proof is not a fixture; it is a claim (§10.5).
+
+**Layers**, which determine where a fixture lives and what it can decide:
+
+| Layer | Runner | Can decide | Cannot decide |
+|---|---|---|---|
+| **PURE** | `vitest`, `packages/rph-projections/src/*.test.ts` | projection derivation, affordance sets, scoping of a pure function | anything about rendering or reachability |
+| **LOADER** | `vitest` over the route's `load()` | payload scoping, unknown-vs-none in the payload | rendering |
+| **RENDER** | `@playwright/test`, `apps/rph-demo/e2e/*.e2e.ts` | reachability, disclosure presence, context preservation, partial-application disclosure | pure derivation (too slow, too indirect) |
+| **CENSUS** | `vitest` over source or over declared registers | totality claims, register completeness, absence claims | behaviour |
+
+**INV-07 is a gate.** Per `SPEC-001-REV-04`: for any Surface, `SPEC-001-NF-24` runs first. If it fails, every other
+RENDER-layer fixture for that Surface reports **INDETERMINATE**, not PASS and not FAIL. A conformance report that
+records RENDER passes for a Surface whose NF-24 failed is itself non-conforming, and `SPEC-001-NF-60` (CENSUS)
+asserts the report contains no such combination.
+
+## 10.2 Per-invariant fixtures
+
+Each row: positive fixture (the obligation held), negative fixture (the prohibited implementation is detected), and
+the named mutation whose application must redden the negative fixture.
+
+### 10.2.1 INV-01 — A Projection carries no authority
+
+| id | layer | fixture |
+|---|---|---|
+| `SPEC-001-PF-01` | LOADER | **Setup:** seed the FSM Undertaking. **Act:** call `load()` twice with no intervening Command. **Assert:** the two payloads are deep-equal — the Projection is a pure function of governed state. |
+| `SPEC-001-NF-01` | RENDER | **Setup:** FSM Undertaking, root PWU (assurance UNASSESSED). **Act:** issue `markSatisfied` on the root; the engine refuses. **Assert:** every rendered axis value for the root equals its pre-click value, and a refusal disclosure is present. **Detects:** SC-01. |
+| `SPEC-001-NF-02` | CENSUS | **Assert:** every rendered control's `formaction`/action name resolves to an entry in the declared affordance→Command map, and no control's form payload exposes a professional-selectable governed state value. **Detects:** SC-02. |
+| `SPEC-001-NF-03` | RENDER | **Act:** enter text in every editable control on the Undertaking Surface, navigate away without submitting, return. **Assert:** every Projection field equals its governed value. **Detects:** SC-03. |
+| **Red-proof** | — | `SPEC-001-MU-07` (§10.6) makes the loader cache its payload across requests; NF-01 must go red. |
+
+### 10.2.2 INV-02 — A Projection is bound to a declared Scope
+
+| id | layer | fixture |
+|---|---|---|
+| `SPEC-001-PF-04` | LOADER | **Setup:** two Undertakings, A (the seed) and B (created via the portfolio action, then one PWU proposed, executed, and assured). **Act:** `load({params:{id: B}})`. **Assert:** `assessments`, `observations`, `decisions`, `baselines`, `plans`, `pwuList`, `trace.links` each contain **only** objects owned by B. |
+| `SPEC-001-NF-04` | LOADER | The same setup; **assert on the loader payload, never the DOM.** Currently fails on four keys. **Detects:** SC-04. The DOM-level form of this assertion cannot distinguish view-side filtering from source scoping, which is why the layer is LOADER. |
+| `SPEC-001-NF-05` | CENSUS | **Assert:** every fixture registered against INV-02 seeds ≥ 2 subjects of the Scope's type. **Detects:** SC-05 (a single-subject fixture that cannot fail). |
+| `SPEC-001-NF-06` | CENSUS | **Assert:** every exported query in `packages/rph-engine/src/queries.ts` is either Scope-taking or present in the `UNSCOPED_BY_DESIGN` register with a reason and a consumption-site list (per REV-01, REV-10). **Detects:** SC-06. |
+| `SPEC-001-NF-07` | LOADER | Two Undertakings with identical `name`, and PWUs with identical `title`. **Assert:** the payloads differ and each contains only its own ids. **Detects:** SC-07. |
+| `SPEC-001-NF-59` | CENSUS | **Assert:** each Projection declares its scoping site ∈ {source, derivation, render}, that no Projection is `render`, and that no permission-bearing Projection is `derivation` (per REV-05). |
+| **Red-proof** | — | `SPEC-001-MU-08` reverts `plansForPwus` to the global list; PF-04 and NF-04 must both go red. |
+
+### 10.2.3 INV-03 — Affordances derive from the engine's declared authority
+
+| id | layer | fixture |
+|---|---|---|
+| `SPEC-001-PF-08` | PURE | **Assert:** `CLOSED_PWU_STATES` is set-equal to `getMachine('PWU.workLifecycleState').terminalStates`, computed at assertion time, **not transcribed**. |
+| `SPEC-001-NF-08` | PURE | **Act:** add a fifth terminal state to the machine declaration in the fixture's own scope. **Assert:** the read model withholds `REQUIRES_OPEN_PWU` affordances on a PWU in that state, with **no edit** to `execution-view.ts`. **Detects:** SC-08. |
+| `SPEC-001-NF-09` | CENSUS | **Assert:** every member of `GatedAffordance` maps to a `StepCommandType` with a registered handler, and no affordance is produced for a machine-legal transition lacking one. **Detects:** SC-09. |
+| `SPEC-001-NF-10` | PURE | **Act:** declare a synthetic tenth Command with `bindingAuthority: 'REQUIRES_AUTHORIZED_BINDING'`. **Assert:** the read model withholds it under an unauthorized binding with no read-model edit. **Detects:** SC-10. |
+| `SPEC-001-NF-11` | CENSUS | **Assert:** every engine refusal reachable from a Surface appears in a declared limb register naming its decision source ∈ {declared-state column, resolved fact}, and every resolved-fact limb names the kernel that decides it. **Detects:** SC-11. |
+| **Red-proof** | — | `SPEC-001-MU-03` (§10.6) restores the hardcoded three-element `CLOSED_PWU_STATES`; PF-08 and NF-08 must both go red. This mutation is the exact defect `execution-view.ts:331-344` records as having shipped. |
+
+### 10.2.4 INV-04 — A withheld Affordance discloses its reason
+
+| id | layer | fixture |
+|---|---|---|
+| `SPEC-001-PF-12` | RENDER | For each limb in the register (plan-liveness, PWU-openness, binding-authority, retry-budget, input-readiness): construct the state, **assert** a withholding disclosure element is present, is reachable per NF-24's protocol, and its text contains the limb's declared reason. |
+| `SPEC-001-NF-12` | RENDER | The same states; **assert** absence-of-control alone is never the whole signal — i.e. the disclosure count equals the withheld-affordance count. **Detects:** SC-12. |
+| `SPEC-001-NF-13` | RENDER | **Assert:** every `disabled`/`aria-disabled` control has a non-empty accessible description. **Detects:** SC-13. |
+| `SPEC-001-NF-14` | RENDER | **Assert:** (a) no disclosure matches the generic denylist `{"Not available", "Unavailable", "Permission denied", "Cannot perform this action", "Action not allowed"}`; (b) **distinctness** — for any two limbs able to withhold the same affordance, the rendered texts differ. **Detects:** SC-14. |
+| `SPEC-001-NF-15` | RENDER | Drive a step to the retry cap. **Assert:** `retryExhaustion.permittedControlActions` is rendered and equals `retryDecision(...).permittedControlActions`. **Detects:** SC-15. |
+| `SPEC-001-NF-57` | RENDER | Only DRAFT PWAs present. **Assert:** the create Affordance discloses the domain narrowing (per REV-02). |
+| **Red-proof** | — | `SPEC-001-MU-09` deletes the `retryExhaustion` spread at `execution-view.ts:565-567`; NF-15 must go red. |
+
+### 10.2.5 INV-05 — The four axes never collapse
+
+| id | layer | fixture |
+|---|---|---|
+| `SPEC-001-PF-16` | RENDER | Subject: Mobile & Offline (`pwu_…A80`), the seed's only four-way-divergent row. **Assert:** four distinct rendered regions, each attributable to one axis. |
+| `SPEC-001-NF-16` | RENDER | **Protocol:** for each axis independently, mutate that axis alone in the fixture and assert the rendering changes. An axis whose sole mutation changes nothing visible is collapsed. **Detects:** SC-16. |
+| `SPEC-001-NF-17` | CENSUS | **Assert:** every tone/colour/glyph map is `Record<SingleAxisValue, …>` and total; no map's key type is a composite. **Detects:** SC-17. |
+| `SPEC-001-NF-18` | RENDER | The all-SUCCEEDED / all-UNASSESSED fixture. **Assert:** no unqualified progress indicator; any aggregate names its axis. **Detects:** SC-18. Shared with INV-11. |
+| `SPEC-001-NF-19` | RENDER | **Assert:** each sort control names one axis or a non-axis field; the default ordering is not a multi-axis function. **Detects:** SC-19. |
+
+### 10.2.6 INV-06 — Material uncertainty is visible where the work is
+
+| id | layer | fixture |
+|---|---|---|
+| `SPEC-001-PF-20` | RENDER | FSM Undertaking. **Assert:** on the Surface presenting Mobile & Offline, the Assumption's `statement` (`'Offline behavior deferred from the first implementation increment'`), its materiality (`MATERIAL`), and the object it qualifies are all rendered and reachable. |
+| `SPEC-001-NF-20` | RENDER | **Assert:** no uncertainty region consists solely of a count. **Detects:** SC-20. |
+| `SPEC-001-NF-21` | RENDER | **Assert:** the disclosure appears on the graph Surface and the overview Surface, not only on an aggregate tab. **Detects:** SC-21. |
+| `SPEC-001-NF-22` | LOADER | **Setup:** build the graph projection **with no `openResiduals` argument**. **Assert:** the residual is present, sourced from the `AssumptionDetected` event and the MATERIAL observation. **Detects:** SC-22. See §10.5 — this is the fixture whose incumbent counterpart cannot fail. |
+| `SPEC-001-NF-23` | RENDER | Two fixtures — zero Assumptions vs. uncertainty source unavailable. **Assert:** the renderings differ. **Detects:** SC-23. |
+| **Red-proof** | — | `SPEC-001-MU-04` (§10.6) restores the `opts.openResiduals ?? []` passthrough; NF-22 must go red. The **current** test over this field stays green under MU-04, which is the finding. |
+
+### 10.2.7 INV-07 — Rendered content is reachable
+
+| id | layer | fixture |
+|---|---|---|
+| `SPEC-001-PF-24` | RENDER | **Declared viewports:** 1280×800, 1440×900, 1920×1080, 1024×768. **Declared must-be-reachable set** per Surface: every control, every disclosure, every table row of every rendered Projection. **Protocol:** for each element, resolve its owning scroll container (nearest ancestor with `scrollHeight > clientHeight` and a non-`visible` `overflow-y`), scroll that container, assert `boundingBox()` lies within the viewport. |
+| `SPEC-001-NF-24` | RENDER | The same protocol on `/undertakings/[id]`; currently fails (spine: 68 of 77 Assurance rows, 4 of 9 Overview buttons). **Detects:** SC-24. **This fixture is the INV-07 gate.** |
+| `SPEC-001-NF-25` | CENSUS (meta) | **Assert:** applying `SPEC-001-MU-06` reddens the INV-07 suite. A suite that stays green asserts presence, not reachability. **Detects:** SC-25. |
+| `SPEC-001-NF-26` | RENDER | **Assert:** the protocol recorded a non-null owning scroller for each element; a null owner (the clipped root) fails loudly rather than silently passing. **Detects:** SC-26. |
+| `SPEC-001-NF-27` | RENDER | Where a Surface virtualizes: **assert** realized-element count < source count, and that each sampled row can be realized and brought into view. **Detects:** SC-27. |
+| **Red-proof** | — | `SPEC-001-MU-06` (§10.6). |
+
+### 10.2.8 INV-08 — A refused Command surfaces its reason and code
+
+| id | layer | fixture |
+|---|---|---|
+| `SPEC-001-PF-28` | RENDER | Issue `startStep` on a step under a CANCELLED plan. **Assert:** a disclosure carrying the engine's `error.code` and message is rendered and reachable. |
+| `SPEC-001-NF-28` | RENDER | **Assert:** the disclosure count after a refusal is ≥ 1; an unchanged Surface fails. **Detects:** SC-28. |
+| `SPEC-001-NF-29` | RENDER | **Assert:** the rendered text contains the literal `error.code` and a ≥ 20-character substring of `error.message`. **Detects:** SC-29. |
+| `SPEC-001-NF-30` | RENDER | **Assert:** the disclosure passes NF-24's reachability protocol, not merely `toBeAttached`. **Detects:** SC-30. |
+| **Red-proof** | — | `SPEC-001-MU-10` replaces `dispatchResult`'s message with a constant; NF-29 must go red. |
+
+### 10.2.9 INV-09 — Stale, partial or rebuilding Projections are identified
+
+| id | layer | fixture |
+|---|---|---|
+| `SPEC-001-PF-31` | RENDER | An assessment whose `independenceResult` is absent vs. one whose check ran and passed. **Assert:** two distinguishable renderings, one reading as unknown. |
+| `SPEC-001-NF-31` | RENDER | **Assert on the rendered output** (per REV-09), for each nullable field: sourced-empty and unsourced render differently. **Detects:** SC-31 and the `?? ''` idiom at `+page.server.ts:262-265`. |
+| `SPEC-001-NF-32` | RENDER | A plan whose steps have no `runtimeBindingId`, no `attemptsMade`, and no `unresolvedRequiredInputs`. **Assert:** every offered Affordance carries an ungated marker naming the unevaluated limbs (per REV-08). **Detects:** SC-32. |
+| `SPEC-001-NF-33` | RENDER | Four fixtures — loading, stale, partial, lifecycle. **Assert:** four distinguishable renderings. **Detects:** SC-33. Restates CPM PROJ-INV-013 (`Canonical Projection Model.md:397-399`). |
+| `SPEC-001-NF-53` | CENSUS | **Assert:** each projector exports a declared `foldedEventTypes` set, and the Surface renders a partiality disclosure when a relevant type is absent from it. |
+| **Red-proof** | — | `SPEC-001-MU-11` deletes the ungated marker; NF-32 must go red. |
+
+### 10.2.10 INV-10 — Navigation preserves professional context
+
+| id | layer | fixture |
+|---|---|---|
+| `SPEC-001-PF-34` | RENDER | Select the Assurance tab, navigate to `/decisions`, navigate back. **Assert:** the Assurance tab is active. Then reload the URL directly. **Assert:** the Assurance tab is active. |
+| `SPEC-001-NF-34` | RENDER | Currently fails at both steps (`+page.svelte:29-31`). **Detects:** SC-34. |
+| `SPEC-001-NF-35` | RENDER | On the Execution tab with a step's attempt history expanded, issue `startStep`. **Assert:** tab and expansion both restored. **Detects:** SC-35. |
+| `SPEC-001-NF-36` | CENSUS | **Assert:** each Surface declares its context register, and each member round-trips through navigate-away/return and through reload. **Detects:** SC-36. |
+
+### 10.2.11 INV-11 — Execution progress must not imply assurance
+
+| id | layer | fixture |
+|---|---|---|
+| `SPEC-001-PF-37` | RENDER | The seed at terminal: seven PWUs `executionState=SUCCEEDED, assuranceState=SATISFIED`; Mobile & Offline `SUCCEEDED / CONDITIONALLY_SATISFIED`. **Assert:** the two are rendered differently. |
+| `SPEC-001-NF-37` | RENDER | **Setup:** every step SUCCEEDED, every assurance axis UNASSESSED. **Assert:** no affirmative completion treatment anywhere. **Detects:** SC-37, SC-38. Restates DOC-003 STA-2 (`:179`). |
+| `SPEC-001-NF-39` | CENSUS | **Assert:** the execution-axis and assurance-axis rendering image sets are disjoint (no shared glyph, colour token, or label). **Detects:** SC-39. |
+| `SPEC-001-NF-40` | CENSUS | **Assert:** no execution-derived label matches DOC-002's reserved assurance vocabulary. **Detects:** SC-40. |
+
+### 10.2.12 INV-12 — Provenance is exposed where the object is presented
+
+| id | layer | fixture |
+|---|---|---|
+| `SPEC-001-PF-41` | RENDER | A `floor.reasoning-review` assessment from the seed. **Assert:** the rendered provenance contains `reviewer-model-1` and `producer-model-1` — the two identities the DIFFERENT_MODEL check compares. |
+| `SPEC-001-NF-41` | RENDER | **Assert:** no provenance region consists solely of a boolean or a type label. **Detects:** SC-41. |
+| `SPEC-001-NF-42` | RENDER | **Assert:** provenance is reachable by keyboard focus or click, not only by pointer hover. **Detects:** SC-42. |
+| `SPEC-001-NF-43` | RENDER | A PWU whose `shapeReadinessAssessmentId` names a nonexistent object (the seed's `'assess_shape'`, all ten call sites). **Assert:** a broken-citation disclosure, distinct from a resolved citation. **Detects:** SC-43. |
+
+### 10.2.13 INV-13 — No Affordance the engine would refuse; none withheld it would admit
+
+| id | layer | fixture |
+|---|---|---|
+| `SPEC-001-PF-45` | RENDER | **Affordance-coverage fixture** (per REV-07): for each of `start`, `complete`, `fail`, `retry`, `skip`, `cancel`, `wait`, `resolve`, `prune`, `cancelPlan`, `completePlan`, a fixture state in which the affordance is **rendered**. A fixture set that renders fewer than eleven fails. |
+| `SPEC-001-NF-44` | CENSUS | **Assert:** each limb id appears in both a withholding fixture and an admitting fixture. **Detects:** SC-44. |
+| `SPEC-001-NF-45` | PURE + LOADER | **Differential:** for every (planStatus, stepState, limb-fact) tuple in the generated space, assert `planAffordancesFor(...)` offers exactly the set the engine accepts, keyed by (affordance, subject id) per REV-06. **Detects:** SC-45 and SC-46 in one assertion. Property-based; see `SPEC-001-PB-02`. |
+| `SPEC-001-NF-47` | CENSUS (meta) | **Assert:** no INV-13 fixture contains a transcribed literal affordance set; every expected set is computed from the authority. **Detects:** SC-47. |
+| **Red-proof** | — | `SPEC-001-MU-01`/`-MU-02` (under-refusal / over-refusal pair, §10.6). |
+
+### 10.2.14 INV-14 — A partially-applied Command sequence is disclosed
+
+| id | layer | fixture |
+|---|---|---|
+| `SPEC-001-PF-48` | RENDER | Issue `recordAssurance` on a PWU in `EXECUTING`. **Assert:** success is reported and all six-to-eight Commands were accepted. |
+| `SPEC-001-NF-48` | RENDER | **Setup:** a PWU **not** in `EXECUTING` (e.g. the seed's `planning` PWU, `PROPOSED`). **Act:** `recordAssurance`. **Assert:** the disclosure (a) names `ChangePwuState` as the refusing Command with its code, **and** (b) enumerates `RequestAssuranceAssessment` and `CompleteAssuranceAssessment` as applied, **and** (c) names the created `ASSURANCE_ASSESSMENT` id. Currently only (a) holds. **Detects:** SC-48. |
+| `SPEC-001-NF-49` | LOADER | **Assert:** `readAllEvents().length` after the failed action is strictly greater than before, and the disclosure accounts for the delta. **Detects:** SC-49. This is the assertion that makes partial application *countable*. |
+| `SPEC-001-NF-50` | RENDER | **Assert:** the disclosure carries the refusing Command's code and message, not a generic wrapper. **Detects:** SC-50. |
+| `SPEC-001-NF-51` | CENSUS | **Assert:** every Command type appearing in a multi-Command Surface action is present in the declared idempotency register; and (RENDER) re-issuing after a mid-sequence failure creates no duplicate governed object. **Detects:** SC-51. |
+| **Red-proof** | — | `SPEC-001-MU-05` (§10.6) reverts the disclosure to first-rejection-only; NF-48 and NF-49 must both go red. |
+
+## 10.3 Illegal transitions — fixtures
+
+The state machines of §4 (Projection freshness; Affordance offered/withheld/refused) enumerate illegal
+transitions. Each **SHALL** carry a fixture that attempts it and asserts refusal, per the pattern below. Naming the
+illegal transitions is §4's obligation; specifying their fixture form is this section's.
+
+| id | illegal transition | fixture |
+|---|---|---|
+| `SPEC-001-NF-61` | `withheld → applied` without an intervening `offered` | **Act:** POST the form action for a withheld affordance directly, bypassing the rendered control. **Assert:** the engine refuses and a Refusal Disclosure renders. This is the fixture that proves the Surface's withholding is a *disclosure* and the engine is the authority — INV-01 and INV-13 in one act. |
+| `SPEC-001-NF-62` | `stale → fresh` without a rebuild | **Act:** mark a Projection stale, then render without rebuilding. **Assert:** the staleness disclosure persists. |
+| `SPEC-001-NF-63` | `refused → success` | **Act:** a Command the engine refuses. **Assert:** no Surface region reports success; specifically, `NF-48`'s enumeration and any success banner are mutually exclusive. |
+| `SPEC-001-NF-64` | `unevaluated → offered-as-gated` | **Act:** supply no limb facts. **Assert:** the affordance is offered **and** marked ungated; it is never offered unmarked (per REV-08). |
+
+## 10.4 Property-based fixtures, with recorded seeds
+
+Four obligations range over generated spaces where example fixtures under-cover. Each **SHALL** be verified by a
+property-based fixture with a **recorded seed** for deterministic replay, and the seed **SHALL** be committed
+alongside the fixture. A property test whose seed is not recorded cannot be replayed against a mutant, and is
+therefore not a red-proof.
+
+**`SPEC-001-PB-01` · Scoping under arbitrary ownership graphs.** *Space:* 1–5 Undertakings × 0–20 PWUs each, with
+plans, assessments, observations, decisions and baselines distributed arbitrarily. *Property:* for every
+Undertaking `U`, `load({params:{id:U}})`'s payload contains no object whose ownership chain does not terminate at
+`U`, **and** contains every object whose chain does. Both halves — an under-scoped payload and an over-scoped one
+are both violations. *Seed:* recorded in the fixture as `SPEC-001-PB-01.seed`. *Layer:* LOADER.
+
+**`SPEC-001-PB-02` · Affordance fidelity over the state space.** *Space:* the cross product of 10 `StepState`
+values × 5 plan statuses × PWU `workLifecycleState` values × `{binding absent, resolves:false, REQUESTED,
+DENIED, REVOKED, AUTHORIZED, AUTHORIZED-but-scoped-elsewhere, AUTHORIZED-granting-nothing}` × `{attemptsMade
+absent, 0…maxAttempts+1}` × `{unresolvedRequiredInputs absent, [], ['x']}`. *Property:* for every tuple, the read
+model's offered set is exactly the set of Commands the engine accepts under the same facts — both directions.
+*Seed:* `SPEC-001-PB-02.seed`. *Layer:* PURE, with a LOADER sample. INFORMATIVE: this space is ≈ 10 × 5 × 6 × 8 × 5
+× 3 ≈ 36,000 tuples, which is why example fixtures under-cover it, and why the five limbs were each discovered
+separately.
+
+**`SPEC-001-PB-03` · Reachability over viewport sizes and content volumes.** *Space:* viewport width 320–2560,
+height 480–1600 × Undertakings with 1–200 PWUs, 0–500 assessments, 0–50 plans. *Property:* every element in the
+must-be-reachable set can be brought into view. *Seed:* `SPEC-001-PB-03.seed`. *Layer:* RENDER. **Bounded
+deferral:** running the full space per commit is infeasible; the fixture **SHALL** run a recorded-seed sample of
+≥ 20 tuples per run and the full space on a declared schedule, and the sample size **SHALL** be recorded in the
+conformance report. A sample that is not recorded is a claim.
+
+**`SPEC-001-PB-04` · Partial application over command orderings.** *Space:* for each multi-Command Surface action,
+every position at which a Command can be refused (for `recordAssurance`: positions 1–8). *Property:* the rendered
+disclosure enumerates exactly the applied prefix and exactly the unapplied suffix, and `readAllEvents().length`
+matches the prefix. *Seed:* `SPEC-001-PB-04.seed`. *Layer:* RENDER + LOADER. INFORMATIVE: this is the property the
+incumbent fails at every position ≥ 3.
+
+**Concurrent revision.** `SPEC-001-PB-05` — two Commands against the same PWU interleaved at every interleaving
+point; *property:* the Surface never renders a state that is not a governed state, and any concurrency refusal
+surfaces per INV-08. **DEFERRED with reason:** the incumbent engine's concurrency contract is a DOC-003/repository
+question this SPEC does not govern (spine, DOES NOT GOVERN: "persistence and event shapes"). Listed in
+Deliberately Unspecified rather than silently omitted.
+
+## 10.5 The mutation red-proof obligation, and a worked finding
+
+**The obligation.** Every fixture named in §10.2–§10.4 **SHALL** be accompanied by a **named mutation of the
+enforcement it verifies**, and that mutation **SHALL** be recorded such that applying it reddens the named fixture.
+A fixture with no such mutation **SHALL** be reported as a finding under CON-000 B7
+(`JPWB-CON-000 Constitution.md:119`) and **SHALL NOT** be counted as coverage.
+
+**Why this and not coverage.** CONFIRMED, from this repository's own measurement:
+`scripts/mutants/ledger.ts:13-17` — "Merged coverage is 94.6% statements / 83.0% branches, and NOT ONE of the 36
+findings confirmed across two adversarial reviews was a coverage gap … A surviving mutant is a real gap. An
+uncovered line is a question."
+
+**The worked finding — a test that cannot fail.** CONFIRMED:
+
+- `packages/rph-engine/src/reference-undertaking.test.ts:161-167` —
+  `it('surfaces the open offline residual and keeps the root in progress', …)`, whose first assertion is
+  `expect(graph.openResiduals).toContain(REFERENCE_OPEN_RESIDUALS[0])`.
+- Its builder at `:28` calls `professionalWorkGraph(engine, { openResiduals: REFERENCE_OPEN_RESIDUALS })`.
+- The projection at `packages/rph-engine/src/professional-work-graph.ts:125` returns
+  `openResiduals: opts.openResiduals ?? []`.
+
+The test passes the value in and asserts it comes out. It verifies the identity function. It would stay green if
+every uncertainty event in the system were deleted, if `DetectAssumption` were never dispatched, and if the
+MATERIAL observation were never recorded — because none of those is on the path it exercises. Its **name** claims
+the system surfaces a residual; its **body** establishes that a passthrough passes through.
+
+This is not a hypothetical: it is the covering test for the seed's only material uncertainty, and it is the reason
+`SPEC-001-NF-22` is specified to build the projection **with no `openResiduals` argument**. That single change to
+the setup is what converts the assertion from unfalsifiable to load-bearing, and `SPEC-001-MU-04` is its red-proof.
+
+**The general rule this yields.** UNRATIFIED-AUTHORED: a fixture whose setup supplies the value its assertion
+checks is vacuous regardless of how many lines it covers. `SPEC-001-NF-65` (CENSUS, meta) **SHALL** assert, for
+every fixture in this SPEC's suite, that no asserted value is traceable to a literal in the fixture's own setup
+other than through governed state. Where automatic tracing is infeasible, the fixture **SHALL** carry a recorded
+red-proof mutant, which decides the same question empirically.
+
+## 10.6 Ledger carriage — the fixtures in the form the incumbent harness can run
+
+This repository already runs a declared mutant ledger with a named-victim discipline
+(`scripts/mutants/ledger.ts`, run by `scripts/mutants/run.ts`, `bun run mutants`). SPEC-001's red-proofs
+**SHALL** be carried in that ledger rather than in prose, and this section specifies them in its exact
+`DeclaredMutant` shape: `{ id, file, find, replace, expectRed, why, source }`, plus the optional
+`supersededBy` / `expectNoCompile` / `expectSurvive` / `duplicateOf` fields.
+
+**The discipline SPEC-001 inherits, and must not weaken** (CONFIRMED from `ledger.ts:23-33, 78-79`):
+- `expectRed` **SHALL** name the suite(s) that must fail. An entry with `expectRed: []` reports `KILLED_UNNAMED`,
+  which "establishes the guard is tested somewhere, not that a named test does it" (`:660-663`).
+- The `find` anchor **SHALL** occur exactly once, or the verdict is `UNANCHORED` — "a mutation someone once cited
+  as evidence can no longer be performed at all" (`:26-27`).
+- Mutate the **consequence**, not the condition, for refusal-shaped code: replacing `if (cond)` with `if (false)`
+  makes the block statically dead and TypeScript stops narrowing inside it, so the mutant reports `NO_COMPILE` and
+  proves nothing (`:35-56`). This is a mutation-operator property, not a property of any guard, and SPEC-001's
+  entries are written in the consequence form for that reason.
+- An inert mutation (a rationale string, a comment) **SHALL** carry `expectSurvive`, or it is indistinguishable
+  from an untested guard (`:102-110`).
+
+**Declared entries.** The `find` strings below are byte-exact against the files as read on 2026-07-28.
+
+| id | file | mutation (consequence form) | `expectRed` | why |
+|---|---|---|---|---|
+| `SPEC-001-MU-01` | `packages/rph-projections/src/execution-view.ts` | `find`: `\t\tconst verdict = bindingAuthorityVerdict(binding.stepId, binding);\n\t\tif (!verdict.ok) return false;` → `replace`: same, `return true` | `packages/rph-projections/src/revrem-wp6-readmodel-binding-authority.test.ts` **and** the new `spec001-inv13-affordance-fidelity.test.ts` | INV-13 under-refusal. **Note:** this is byte-identical to the existing `W5-readmodel-binding-limb-never-withholds` (`ledger.ts:463-472`); SPEC-001's entry **SHALL** be recorded with `duplicateOf: 'W5-…'` and its own victim added to W5's `expectRed` instead. Recording the duplicate rather than deleting it preserves the fact that two programmes found the guard load-bearing (`ledger.ts:111-124`). |
+| `SPEC-001-MU-02` | `packages/rph-projections/src/execution-view.ts` | same anchor → `if (verdict.ok) return false;` | as above | INV-13 **over**-refusal — the paired half NF-44 requires. Same duplicate note against `W6`. |
+| `SPEC-001-MU-03` | `packages/rph-projections/src/execution-view.ts` | `find`: `const CLOSED_PWU_STATES: ReadonlySet<string> = new Set(\n\tgetMachine('PWU.workLifecycleState').terminalStates\n);` → `replace`: `const CLOSED_PWU_STATES: ReadonlySet<string> = new Set(['BASELINED', 'ABANDONED']);` | `spec001-inv03-authority-derivation.test.ts` | INV-03: a stale copy of the authority. Duplicate of `W3-hardcode-the-pwu-set` (`ledger.ts:417-425`); SPEC-001 adds its victim to W3 rather than re-declaring. |
+| `SPEC-001-MU-04` | `packages/rph-engine/src/professional-work-graph.ts` | `find`: `openResiduals: opts.openResiduals ?? []` → `replace`: `openResiduals: []` | `spec001-inv06-uncertainty-derivation.test.ts` | INV-06 / SC-22. **This mutant must SURVIVE against the incumbent suite and be KILLED by NF-22** — the difference between the two verdicts is the entire content of §10.5's finding. Declared **without** `expectSurvive`: survival here is the finding, not a control. |
+| `SPEC-001-MU-05` | `apps/rph-demo/src/routes/undertakings/[id]/+page.server.ts` | `find`: `\t\tif (r.status !== 'ACCEPTED' && r.status !== 'DUPLICATE')\n\t\t\treturn \`${ct}: ${r.error?.message ?? r.status}\`;` → `replace`: the same guard returning only `r.status` with no applied-prefix record | `spec001-inv14-partial-application.e2e.ts` | INV-14. **Blocked — see the carriage gap below.** |
+| `SPEC-001-MU-06` | `apps/rph-demo/src/routes/+layout.svelte` | `find`: `\t.content.full {\n\t\tpadding: 0;\n\t\toverflow: hidden;\n\t}` → `replace`: the same rule with a scroller removed / restored | `spec001-inv07-reachability.e2e.ts` | INV-07. **Blocked — see the carriage gap below.** |
+| `SPEC-001-MU-07` | route loader | make `load()` memoize its payload across requests | `spec001-inv01-no-authority.e2e.ts` | INV-01 / SC-01. Blocked as above. |
+| `SPEC-001-MU-08` | `packages/rph-projections/src/execution-view.ts` | `find`: `\t\t.filter((r) => scope.has(r.workUnitId))` → `replace`: `\t\t.filter(() => true)` | `spec001-inv02-scope.test.ts` | INV-02: the scope filter itself. Runnable today. |
+| `SPEC-001-MU-09` | `packages/rph-projections/src/execution-view.ts` | `find`: `\t\t...(exhausted?.mustSelectAlternateAction\n\t\t\t? { retryExhaustion: { permittedControlActions: exhausted.permittedControlActions } }\n\t\t\t: {})` → `replace`: `\t\t...({})` | `spec001-inv04-withholding-disclosure.test.ts` | INV-04 / SC-15: withholding the reason along with the affordance. Runnable today at PURE layer. **INDENTATION CORRECTED 2026-07-28 (review FC-1):** this entry was drafted with 3/4/4 tabs; the bytes at `execution-view.ts:565-567` are **2/3/3** (verified with `cat -A`). As drafted the anchor matched nothing and the mutant would have reported `UNANCHORED` — the exact rot §10.5 warns about, produced by the section whose purpose is to prevent it. Left visible rather than silently repaired. |
+| `SPEC-001-MU-12` | `packages/rph-engine/src/queries.ts` | `find`: `export const listPwus = (h: EngineHandle, undertakingId?: string): ObjectRow[] =>\n\tundertakingId\n\t\t? byField(listByType(h, 'PROFESSIONAL_WORK_UNIT'), 'undertakingId', undertakingId)\n\t\t: listByType(h, 'PROFESSIONAL_WORK_UNIT');` → `replace`: the unscoped branch unconditionally | `spec001-inv02-scope.test.ts` | INV-02: proves the scope is *applied*, not merely *available*. Runnable today. |
+
+**The carriage gap, stated rather than assumed.** CONFIRMED: `scripts/mutants/run.ts:216` typechecks a mutant with
+`bunx tsc --noEmit -p <package>/tsconfig.json`, and `:270`/`:277` runs victims with `vitest run`. Therefore:
+
+1. **A Playwright victim cannot be reddened by the current runner.** `SPEC-001-MU-05`, `-MU-06` and `-MU-07` name
+   `*.e2e.ts` suites, which `vitest run` will not execute. These entries **SHALL NOT** be added to the ledger until
+   the runner accepts an e2e victim, because an entry whose victim cannot run reports a verdict that reads like a
+   measurement and is not one — precisely the failure mode `run.ts:58-64` describes for the `ABORTED_DIRTY` case.
+2. **A `.svelte` mutant is not covered by the package typecheck.** `SPEC-001-MU-06` mutates a `<style>` block;
+   `tsc --noEmit` over `apps/rph-demo/tsconfig.json` does not typecheck Svelte template or style content, so the
+   mutant's `NO_COMPILE` gate would be vacuous for it.
+
+**The obligation this creates.** SPEC-001 **SHALL** require, as a precondition of claiming conformance for INV-01,
+INV-07 and INV-14, that the mutation runner be extended to (a) dispatch a victim to `playwright test` when the
+victim path matches `*.e2e.ts`, and (b) run `svelte-check` in addition to `tsc` when the mutated file is
+`.svelte`. **Verification:** `SPEC-001-NF-66` (CENSUS) asserts that every `SPEC-001-MU-nn` entry's declared victim
+is executable by the runner, and fails while any is not. Until it passes, the three invariants' red-proofs are
+**declared and unperformed**, which is a B7 status this SPEC records rather than papers over: an unrunnable
+red-proof is exactly the "shape reference that no type check or conformance test enforces" of CON-000 B1
+(`JPWB-CON-000 Constitution.md:97`).
+
+**Duplicate discipline.** Three of the twelve entries above (`MU-01`, `-02`, `-03`) are byte-identical to existing
+ledger entries `W5`, `W6`, `W3`. Per `ledger.ts:111-124`, the correct action is **not** to add them: it is to add
+SPEC-001's new victim suite to the existing entries' `expectRed` arrays, so one mutation must redden both the
+JAN-REVREM suite and the SPEC-001 suite. That is strictly stronger than a duplicate entry — it proves the two
+layers consult one declaration — and it avoids the inflation the ledger's own header records ("the first
+authoritative run reported '90 mutants, 0 SURVIVED' when three of the ninety were byte-identical copies").
+
+## 10.7 Fixture-to-obligation traceability
+
+**Obligation:** every SHALL and SHALL NOT in §7 and §8 names a fixture; every fixture in §10 names its obligation;
+every fixture names a red-proof or is listed as blocked. **Verification:** `SPEC-001-NF-67` (CENSUS) parses this
+document and asserts three closures: (a) no `SHALL`/`SHALL NOT` sentence lacks a `SPEC-001-` fixture id within its
+own or the adjacent sentence; (b) every fixture id referenced is defined in §10; (c) every fixture defined in §10
+names either a `SPEC-001-MU-nn` red-proof or a blocked-with-reason row in §10.6. A specification that cannot pass
+its own traceability census is asserting a status its relations do not perform (CON-000 B7,
+`JPWB-CON-000 Constitution.md:119`).
+
+**Counts, for the self-review battery's traceability pass:** 51 shortcut records (`SC-01`…`SC-51`);
+22 positive fixtures; 45 negative fixtures; 5 property-based fixtures (one deferred with reason); 12 declared
+mutants, of which 3 are duplicates to be merged into existing ledger entries, 3 are runnable today, 3 are blocked
+on the runner's e2e/`svelte-check` gap, and 3 (`MU-10`, `-MU-11`, plus `MU-07`) are specified in §10.2 and require
+the same runner extension; 10 reference-case revisions (`REV-01`…`REV-10`); 2 new forks (FORK-26, FORK-27).
+
+## 10.8 Identifiers minted in §§1–9 with no §10 definition — the recorded gap
+
+**Recorded at assembly, 2026-07-28.** §1.5 obliges this section in terms: *“§10 owns the specification of every
+fixture; §§1-9 mint identifiers and §10 SHALL define each minted identifier or record it as unassigned — an
+identifier cited in the body with no §10 definition is a defect caught by `SPEC-001-CHK-TRACE`.”* This subsection
+discharges the second limb. It defines nothing; it records what is undefined, so the gap is governed rather than
+tacit.
+
+**CONFIRMED (by enumeration over the assembled document).** Five fixture-identifier namespaces were minted
+independently by the sections that authored them. §10.2–§10.6 above define exactly one of the five.
+
+| Namespace | Minted in | Defined in §10? | Disposition |
+|---|---|---|---|
+| `SPEC-001-PF-nn` · `SPEC-001-NF-nn` · `SPEC-001-PB-nn` · `SPEC-001-MU-nn` · `SPEC-001-SC-nn` · `SPEC-001-REV-nn` | §7, §9, §10 | **Yes** — §10.2, §10.3, §10.4, §10.6 | Master namespace |
+| `SPEC-001-FIX-<SUBJECT>-<nn><P\|N>` (e.g. `SPEC-001-FIX-O-1-01P`, `SPEC-001-FIX-INV-02-N1`) | §1.5's convention; used throughout §§2.1–2.3 | **No** | **UNASSIGNED.** Every citation names a real obligation with a real assertion stated at the point of use; none has a §10 body |
+| `SPEC-001-CHK-<NAME>` (e.g. `-CLOSURE`, `-VERIFY`, `-INV`, `-ECONOMY`, `-MUTATION`, `-REFCASE`, `-REDUNDANCY`, `-TRACE`, `-GAPS`, `-ARTIFACTS`, `-REG-ENTRY`, `-VOCAB`, `-SCOPE`, `-PROVENANCE`, `-LEDGER`, `-FIELDS`) | §1 (the definition of done, D-1 … D-12) | **No** | **UNASSIGNED.** These are self-review passes over the document, not fixtures over the product; §10's grammar (setup · act · assertion · red-proof) does not fit them without alteration |
+| `FX-O4-nn` · `FX-O5-nn` · `FX-O6-nn` | §§2.4–2.6 | **No** | **UNASSIGNED** |
+| `SPEC-001-FX-07-nn` · `-08-nn` · `-09-nn` · `SPEC-001-FX-<FRESH\|AFF\|IFACE\|DISC>-nn` | §§2.7–2.9, §§4–6 | **No** | **UNASSIGNED.** §4's own reading conventions already subordinate these to §10: *“where §10 and a §4–§6 reference disagree, §10's fixture body governs and the divergence is a finding against this section”* |
+
+**SHALL.** No obligation is weakened by this record. Every `SHALL` and `SHALL NOT` in §§1–9 that names an
+identifier from an unassigned namespace retains its verification binding: the *assertion* is stated at the point of
+use in each case, and it is the assertion, not the identifier, that establishes conformance. What is missing is the
+single namespace, not the checks.
+
+**SHALL.** Before ratification, every identifier in an UNASSIGNED namespace SHALL be either (a) given a §10 body in
+the master namespace, or (b) recorded in §11.2 as deliberately unspecified with its reason. Conformance is
+established by `SPEC-001-NF-67` (§10.7), whose limb (b) — *“every fixture id referenced is defined in §10”* —
+**fails against this document today**, at every citation in the four unassigned namespaces. That failure is the
+correct first result of the check, and it is recorded here rather than left to be discovered: an assembled
+specification whose own traceability census cannot pass is asserting a status its relations do not perform
+(CON-000 B7, `docs/canon/JPWB-CON-000 Constitution.md:119`). The gap is a naming act, not a missing obligation, and
+it is carried in §11.2.4 with the act that closes it.
+
+---
+
+# 11. Forks and deliberately unspecified
+
+**INFORMATIVE — what this section is for.** §§1–10 close this specification's own ground. This section closes
+everything *around* it: the choices a reasonable sponsor might rule differently (§11.1), every name the
+specification leans on but does not define (§11.2), and the exact relationship this specification bears to the four
+source documents it was commissioned from (§11.3). The commission's stopping condition is that "every remaining gap
+is explicitly forked, deferred, or registered" (deep-spec commission template v2, *Stopping condition*). This
+section is where that condition is discharged. A gap that appears in neither §11.1 nor §11.2 is a defect in this
+section, not a licence.
+
+The distinction the section rests on: a **FORK** is a choice this specification *made in order to keep writing*,
+which the sponsor may reverse; a **deliberate non-specification** is a name this specification *declines to define*
+because another authority owns it or no authority yet does. Forks have recommendations and downstream costs.
+Deferrals have owners and standing rules. Neither is a silence.
+
+## 11.0 The record shape, the standing rule, and the carriage obligation
+
+### 11.0.1 The normative shape of a fork record
+
+Each fork in §11.1 SHALL carry, in this order: **DECISION** (the question, stated so that a one-word ruling
+answers it) · **OPTIONS** (enumerated and closed; where an option is a family, its members are listed) ·
+**EVIDENCE** (each item labelled CONFIRMED with citation, INFERRED, ASSUMED, or UNRATIFIED-AUTHORED) ·
+**RECOMMENDATION** (with the statement that this specification adopted it to keep writing) · **DOWNSTREAM EFFECT
+IF RULED OTHERWISE** (the sections, objects, invariants and fixtures of *this* specification that change, named by
+id) · **REGISTER RELATION** (the JPWB-REG-005 entry that already binds, or the declaration that none does) ·
+**STANDING RULE** (what binds implementers until the ruling lands). Conformance of this section to that shape is
+established by the fork-record completeness check registered in §10 for this section, which SHALL fail if any fork
+record omits any of the seven fields; a fork record with a missing field is a defect, because the missing field is
+always the one the sponsor needed.
+
+### 11.0.2 The standing rule (what binds before a ruling)
+
+Until a fork is ruled, its **STANDING RULE** binds, and it is written to permit conservative progress without
+creating new meaning — the safe-default discipline of JPWB-REG-005 §1 (`JPWB-REG-005:42`), applied to this
+specification's own open choices. An implementer SHALL implement the standing rule and SHALL NOT implement the
+alternative option on the ground that it is "obviously" what the sponsor will choose; conformance is established by
+the negative fixture §10 registers for each fork's standing rule, which asserts the alternative option's
+distinguishing artefact is absent from the tree. *(Rationale, INFORMATIVE: REG-D-013 (`JPWB-REG-005:133`) bars
+assent-by-momentum at the ratification surface; anticipating a ruling in code is the implementation-side form of
+the same failure.)*
+
+### 11.0.3 The carriage obligation, and its check
+
+A sponsor ruling on any fork here SHALL land as a JPWB-REG-005 entry and SHALL then be carried into the sections
+this record names under **DOWNSTREAM EFFECT** — CON-000 B5's rule that "a ruling made in conversation is not
+effective until it lands as a REG-005 entry and is merged into its governing artifact," applied to this
+specification. Conformance is established by a **fork-carriage check** modelled directly on the working instrument
+at `packages/rph-domain/src/enforcement-register.ts`, whose `canonCarriage` axis is gated by
+`packages/rph-domain/src/enforcement-register.test.ts:167-226` — CONFIRMED, read in preparing this section: that
+suite asserts that every anchor resolves inside one of the six canon artifacts, that a `NO_CANON_CARRIER`
+disposition is argued rather than asserted, that the axis carries more than one verdict, and — the selftest that
+makes the rest non-vacuous — that a `.provenance.md` sidecar does not satisfy a carriage claim. The fork-carriage
+check SHALL fail while any fork's status is RULED and any section named in its DOWNSTREAM EFFECT still contains the
+text the ruling displaces. A ruled fork whose carriage has not been performed is a B7 violation (`JPWB-CON-000:119`,
+"asserted status must be performed status"), not a documentation backlog.
+
+### 11.0.4 Method, and the disclosure this section owes
+
+**How the fork set was assembled, stated as a claim about the search rather than about the world.** The five forks
+the authoring spine fixes were expanded from the spine. Six further forks (FORK-6 … FORK-11) were found by reading
+the four sources and the incumbent code directly; each carries the evidence that produced it.
+
+**Disclosure — the sibling sweep could not be performed at authoring time, and was performed at assembly.** *(Assembly note, 2026-07-28: the sweep named below was carried out when the seven section files were assembled into this document. It found **sixteen** further forks, raised in §§1.3, 2.5.3, 2.6.3, 2.8.4, 2.9.5, 3.16, 4.1.7, 5.10, 6.4 and 9.9. All sixteen collided with the numbering of this section's FORK-6 … FORK-11 and were renumbered into a distinct tail block **FORK-12 … FORK-27**; each carries a row in §11.1.12's index naming the section that holds its full record. The paragraph below is retained unedited because it is the honest record of what was knowable when this section was written.)*
+
+ The commission directed this section to collect forks
+raised by the sibling section files at
+`C:/Users/mchen/AppData/Local/Temp/claude/.../scratchpad/spec-001/`. At authoring time
+(`2026-07-28T13:15:02-04:00`) that directory **did not exist**; `ls` on it returned
+`No such file or directory`, and this section's own file is the first written into it. This is a statement about
+what was on disk when this section was written, **not** a finding that the sibling sections raised no forks. If
+§§1–10 raised forks, they are **not** represented in §11.1, and the fork index at §11.1.12 is therefore incomplete
+by an unknown amount. Closing that gap is a named residual: §11.1.13 records it as the one open action this
+section cannot discharge itself.
+
+### 11.0.5 Provenance labels used throughout
+
+**CONFIRMED** — asserted only where the cited file or document section was read in preparing this section, with
+the citation given. **INFERRED** — derived from confirmed facts by stated reasoning. **ASSUMED** — taken as true
+without verification, with the assumption named. **UNRATIFIED-AUTHORED** — authored under the sponsor grant of
+2026-07-28 and not carried by any ratified artifact. Zero-occurrence claims in this section were run untruncated
+over `packages/*/src` and `apps/rph-demo/src` and are reported with the exact term searched; none was piped through
+`head`.
+
+---
+
+## 11.1 Forks
+
+**Scope of this subsection, after assembly.** §11.1.1 … §11.1.11 below hold the full record of **FORK-1 … FORK-11** — the spine's five, plus six found by reading the sources. A further **sixteen** forks were raised inside §§1–10 and were renumbered at assembly into **FORK-12 … FORK-27**; their full records stay at the boundary that raised them, and §11.1.12 indexes all twenty-seven. §11.1.13 records what remains undischarged about the sixteen. A fork id appearing anywhere in this document and not in §11.1.12's index is a defect of this document.
+
+### 11.1.1 FORK-1 — The navigation model
+
+**DECISION.** Which of the five live statements of the workbench's top-level navigation is *the* navigation model,
+and what standing do the other four have?
+
+**OPTIONS.**
+(a) **JPWB-DOC-001 §7.1's five workbench contexts are the authority model, and any rail is a permitted projection
+over it** — a rail may differ in count and naming without being non-conformant, provided every context remains
+reachable.
+(b) **DOC-001 §7.1's five contexts are the navigation model** — a rail that does not present all five is
+non-conformant, and the built four-destination rail is a divergence to file.
+(c) **Commission a separate Decision that fixes one rail** by name and count, superseding all five statements.
+(d) **Declare the concern unowned** and leave rail composition to the design system.
+
+**EVIDENCE.**
+- CONFIRMED — DOC-001 §7.1 declares five interoperating contexts: PWA Design, Undertaking, Execution, Assurance,
+  Governance (`JPWB-DOC-001:194` ff.), and states that "the separation of the last two is deliberate and
+  load-bearing."
+- CONFIRMED — RIWS §6.1 enumerates **ten** canonical destinations: Home, Outcomes, Endeavors, Work, Decisions,
+  Evidence, Reconciliation, Coordination, Memory, Attention (`RIWS:212-225`). *(Vocabulary note, applying to every
+  quotation of a source enumeration in this section: `Endeavors` is quoted verbatim from the source and is not
+  adopted. DOC-002:248 retires bare `Endeavor` to **Undertaking**; DOC-002:251 admits verbatim quotation of
+  historical documents without rewrite. This specification says Undertaking in its own voice throughout — see
+  §11.3.2.)*
+- CONFIRMED — JCUX §3 enumerates **eleven** top-level destinations: Home, Outcomes, Endeavors, Work, Product
+  Realization, Decisions, Evidence, Reconciliation, Coordination, Attention, Memory (`JCUX:59-75`), plus six
+  JanumiCode-specific secondary destinations (`JCUX:77-86`).
+- CONFIRMED — RPH-DOC-010 §5 renders **five** top-level entries: PWAs, Undertakings, Decisions, Baselines,
+  Administration (`RPH-DOC-010:226-243`).
+- CONFIRMED — the built rail carries **four**: PWA Library `/`, Undertakings `/undertakings`, Decisions
+  `/decisions`, Baselines `/baselines` (`apps/rph-demo/src/routes/+layout.svelte:59-64`). Read directly. Neither an
+  Assurance nor a Governance destination is present at the top level.
+- CONFIRMED — DOC-003 AUT-1 (`JPWB-DOC-003:385`) forbids leaving the authoritative representation undeclared:
+  "Contradiction between representations is never resolved by picking the convenient value — authority must be
+  designed and declared." Five live statements of one concern is that contradiction.
+
+**RECOMMENDATION — option (a); adopted in this specification to keep writing.** DOC-001 §7.1 is an *authority*
+table: each row names an authority exercised and a thing the context must not become. It is not a route list and
+never claims to be. Reading it as the rail would make four documents and the built product simultaneously
+non-conformant on a concern none of them was written to settle. Under (a) the rail is a Surface composition (O-2)
+and the five contexts are a coverage obligation over Surfaces, not over rail entries.
+
+**DOWNSTREAM EFFECT IF RULED OTHERWISE.** Under **(b)**: O-2 *Surface* acquires a mandatory completeness property
+— every one of the five contexts SHALL be reachable from the top-level rail — which is a new field on the Surface
+contract in §5 and a new positive fixture in §10; the built rail becomes a recorded divergence rather than a
+permitted composition, and FORK-10 collapses into this fork with answer "yes". Under **(c)**: §2's O-2 closure
+matrix gains a *versioning* row for the rail definition (a rail change becomes a meaning change, not a presentation
+change), and §11.2's row for the Home/Outcomes/Memory/Attention destinations moves from "declined" to "pending the
+commissioned Decision". Under **(d)**: `SPEC-001-INV-10` (navigation context preservation) loses its subject —
+there is no declared movement between Surfaces to preserve context across — and O-9's `contextState` lifecycle in
+§2.9.2 loses its subject (*cross-reference repaired at assembly: this record was authored as “§4's
+navigation-context state machine”; the assembled §4 carries exactly two machines, Projection freshness and
+Affordance disposition, and no navigation machine — the obligation lives at §2.9*); this specification treats (d) as the only option that costs an invariant, and says so here
+rather than arguing against it in the recommendation.
+
+**REGISTER RELATION.** No entry decides it. REG-Q-047 (`JPWB-REG-005:411-414`) governs the *standing* of the RIWS
+and JCUX statements, not the choice between them. The conferral sheet raises the same question as its **Q4** and
+recommends the same option (a).
+
+**STANDING RULE.** Implementers SHALL treat DOC-001 §7.1 as the authority model and SHALL NOT add, remove or
+rename a top-level rail entry to conform to RIWS §6.1, JCUX §3, or RPH-DOC-010 §5. Conformance is established by
+the rail-composition fixture in §10, which asserts the rail's entries against the built set and fails on an
+unrecorded change — the check exists so that a silent rail edit cannot pre-empt the ruling.
+
+---
+
+### 11.1.2 FORK-2 — The route root
+
+**DECISION.** Does a conforming route path begin with an organization segment?
+
+**OPTIONS.**
+(a) **Flat roots stand.** `/`, `/undertakings`, `/undertakings/{id}`, `/pwa/{id}`, `/decisions`, `/baselines` are
+conforming; the organization segment is deferred with its own open question.
+(b) **JCUX §4's `/{organizationId}/` root is adopted**, and every built route becomes non-conformant on the day of
+the ruling.
+(c) **Adopt the segment as a deferred obligation** — flat roots conform now, and a dated milestone converts them.
+
+**EVIDENCE.**
+- CONFIRMED — JCUX §4 roots every one of its routes at `/{organizationId}/` (`JCUX:94-155`), across 34 route lines.
+- CONFIRMED — `organizationId` returns **0 occurrences** across `packages/*/src` and `apps/rph-demo/src`. I ran
+  this grep myself, untruncated, in preparing this section. The count is zero, not "not found by me": the search
+  space is the whole of both trees.
+- CONFIRMED — the built route surface is six page routes plus three `test-api` endpoints, enumerated directly from
+  the filesystem: `/`, `/undertakings`, `/undertakings/[id]`, `/pwa/[id]`, `/decisions`, `/baselines`;
+  `test-api/{dispatch,introspect,reset}`. None carries an organization segment.
+- CONFIRMED — REG-Q-004 (`JPWB-REG-005:190`) already holds the tenant-placement concern, and its safe default is
+  explicit: "Serialize the repository's generated envelopes exactly. Enforce tenant/principal scoping through
+  authenticated transport, repository, and RLS context… never create an unscoped path." That default routes scoping
+  to transport and storage — **not** to the URL.
+- INFERRED — because REG-Q-004 places scoping outside the public envelope, a route segment is a *display* of
+  tenancy rather than its enforcement; adopting the segment would therefore add a divergence without adding a
+  guarantee.
+
+**RECOMMENDATION — option (a); adopted in this specification to keep writing.** The organization segment is
+deferred to REG-Q-004, and §11.2 carries `organizationId` as a governed deferral with that owner.
+
+**DOWNSTREAM EFFECT IF RULED OTHERWISE.** Under **(b)**: O-2 *Surface*'s identity field (the addressable route) is
+re-specified in §2 and §5 to require a leading organization segment; every route literal in §9's reference case is
+rewritten; §10 gains a negative fixture asserting that no conforming route lacks the segment; and — the cost that
+must be stated plainly — **100% of the built route surface goes non-conformant on the day of the ruling**, six of
+six page routes, which under DOC-004 §2.1's load order an implementing agent reads *before* the contract it
+contradicts. Under **(c)**: the same §2/§5 changes are authored but scheduled; §11.2's row gains a milestone field
+and the fixture is written to assert the *current* form until the milestone date, which is the shape most likely to
+rot silently and is recommended against for that reason.
+
+**REGISTER RELATION.** REG-Q-004 (OPEN; safe default binds). REG-Q-047 (OPEN) governs whether JCUX §4 may be cited
+as conformance criteria at all.
+
+**STANDING RULE.** Implementers SHALL NOT introduce an organization route segment, and SHALL NOT introduce an
+unscoped data path on the ground that the segment is absent — REG-Q-004's safe default requires scoping through
+transport, repository and RLS context regardless of URL shape. Conformance is established by the route-inventory
+fixture in §10 (the conforming route set is enumerated, and a new route outside it fails) together with the
+scope-binding fixture required by `SPEC-001-INV-02`.
+
+---
+
+### 11.1.3 FORK-3 — The surface perimeter
+
+**DECISION.** Does JPWB-SPEC-001 govern the PWA Designer surface as well as the Undertaking Workbench?
+
+**OPTIONS.**
+(a) **Yes — both.** The nine objects and fourteen invariants are surface-general and bind `/pwa/{id}` exactly as
+they bind `/undertakings/{id}`.
+(b) **Undertaking Workbench only.** The PWA Designer is authoring, not projection, and is governed elsewhere.
+(c) **Both, with a declared exception set** — the Designer is in scope except for named clauses that cannot mean
+anything against a definition-level surface.
+
+**EVIDENCE.**
+- CONFIRMED — `/pwa/[id]` exists and is substantial: `apps/rph-demo/src/routes/pwa/[id]/+page.svelte`,
+  `+page.server.ts`, `agent/+server.ts` and `policy-fields.ts`. It is one of six page routes.
+- CONFIRMED — DOC-001 §7.1 lists PWA Design as one of the five contexts, with its own authority ("definition
+  authority over reusable types") and its own purity rule: it "MUST NOT display concrete Undertaking state except
+  as labeled fixtures — definitions and instances never blur" (`JPWB-DOC-001:194` ff.).
+- CONFIRMED — the Designer already performs a disclosure of exactly the kind `SPEC-001-INV-12` governs: a locked
+  mandatory-policy affordance whose tooltip names "schema, provenance, and an independent reasoning review (exec ≠
+  assurance)" (`apps/rph-demo/src/routes/pwa/[id]/+page.svelte:878`).
+- CONFIRMED — REG-Q-046's third clause is in force and is the strongest argument *against* (a): "PWA-authoring work
+  beyond the existing seeded ontology stops for that Decision" (`JPWB-REG-005:408`).
+- INFERRED — REG-Q-046 stops *PWA-authoring work*; it does not stop *governing how an existing authoring surface
+  discloses*. Extending an invariant that requires a refusal reason to be shown is not authoring a PWA.
+
+**RECOMMENDATION — option (a); adopted in this specification to keep writing.** Every one of the fourteen
+invariants is stated over a Surface and a Projection, not over an Undertaking. `SPEC-001-INV-07` (reachability),
+`-04` (withholding disclosure), `-08` (refusal disclosure), `-09` (staleness) and `-13` (offer/refuse symmetry) are
+about the professional's relation to rendered state; nothing in them consults whether the state is a definition or
+an instance. Scoping them to one route would create two rendering regimes for one product, which is the condition
+AUT-1 exists to prevent.
+
+**DOWNSTREAM EFFECT IF RULED OTHERWISE.** Under **(b)**: §2's O-2 *Surface* definition narrows to
+Undertaking-bound Surfaces; §9's reference case loses its PWA Designer leg; §10 loses every `/pwa/{id}` fixture;
+and the Designer's existing assurance-rail disclosure at `+page.svelte:878` becomes ungoverned — asserted status
+that no invariant performs, which is the B7 condition (`JPWB-CON-000:119`) arriving by exclusion rather than by
+neglect. Under **(c)**: §2 gains a per-object *applicability* row naming the Designer exceptions, and §10 gains a
+reasoned-N/A entry per exception; this specification judges (c) survivable but notes that no clause has yet been
+identified that genuinely cannot mean anything against `/pwa/{id}` — the exception set would open empty, and an
+empty exception set is (a) with extra machinery.
+
+**REGISTER RELATION.** REG-Q-046 (OPEN; stop-work default binds and constrains the *ruling*, not the fork).
+REG-Q-002 (`JPWB-REG-005:180`) binds the PWA/product boundary the Designer sits on.
+
+**STANDING RULE.** The invariants SHALL be applied to both surfaces, and no work SHALL author new PWA content
+under cover of this specification — REG-Q-046's third clause is untouched by any option here. Conformance is
+established by requiring §10 to register at least one fixture per invariant against each of `/pwa/{id}` and
+`/undertakings/{id}`; the perimeter check fails if an invariant has fixtures against only one surface, which is the
+form the ruling's reversal would take.
+
+---
+
+### 11.1.4 FORK-4 — Reachability as semantics
+
+**DECISION.** Is `SPEC-001-INV-07` — rendered content SHALL be reachable by ordinary interaction — a semantic
+obligation of this specification, or a design-system concern outside its perimeter?
+
+**OPTIONS.**
+(a) **Semantic.** Unreachable content is not rendered; INV-07 stands as a numbered invariant with a named check.
+(b) **Design-system.** INV-07 is deleted from the invariant catalog and re-homed to a component-library
+convention.
+(c) **Semantic but narrowed** — INV-07 governs only content that carries an Affordance or a state axis, not
+arbitrary content.
+
+**EVIDENCE.**
+- CONFIRMED — `apps/rph-demo/src/routes/+layout.svelte:145-148` sets `.app { display: flex; height: 100vh;
+  overflow: hidden; }`. I read those four lines. The application shell clips its own content box and the rule
+  supplies no scrolling container of its own at that level.
+- CONFIRMED (spine, adopted as the motivating measurement; the measurement itself is INFERRED here because this
+  section did not re-run the viewport measurement) — at 1440x900 on `/undertakings/{id}`, 68 of 77 Assurance rows
+  and 4 of 9 Overview action buttons are unreachable, and a real wheel event moves nothing.
+- CONFIRMED — the spine's non-negotiable scope test places in scope "reachability and inspectability of rendered
+  content", and out of scope "visual design, typography, spacing, colour, component libraries". Reachability is
+  named in one list and clipping in neither; the fork exists because `overflow: hidden` is *written* in the CSS
+  that the out-of-scope list otherwise disclaims.
+- CONFIRMED — CON-000 B7 (`JPWB-CON-000:119`): "No artifact, object, or field may claim a status its relations do
+  not perform… Asserted status must be performed status." A row present in the accessibility tree and unreachable
+  by interaction asserts inspectability that nothing performs.
+- CONFIRMED — CPM PROJ-INV-012 *Suppression Disclosure* (`CPM:393`) already requires that intentional omission "SHALL
+  be detectable", and PROJ-INV-014 *No False Completeness* (`CPM:401`) forbids implying coverage the source data
+  lacks. Neither reaches *unintentional* invisibility, which is the incumbent defect — INFERRED, and the reason
+  INV-07 is not a restatement of either.
+
+**RECOMMENDATION — option (a); adopted in this specification to keep writing.** To the professional, content that
+cannot be brought into view is indistinguishable from content that does not exist. That is a proposition about what
+the surface *means*, not about how it looks. The mechanism happens to live in a stylesheet; the obligation does not
+become cosmetic because its violation does.
+
+**DOWNSTREAM EFFECT IF RULED OTHERWISE.** Under **(b)**: `SPEC-001-INV-07` is struck from §3 and the invariant
+catalog renumbers — which the spine forbids, so the id would be retained as a tombstone with a superseding note
+rather than reused; §10 loses the reachability fixture family; O-2 *Surface*'s closure matrix loses its
+*UX/inspection surface* row's teeth; and the measured incumbent defect at `+layout.svelte:145-148` ceases to be a
+violation this specification reports, which is the outcome to state most plainly because it is the whole cost.
+Under **(c)**: INV-07's SCOPE clause gains an enumeration of governed content classes, §2's O-4 and O-7 gain a
+*reachability* obligation each, and the fixture set narrows from "every rendered row" to "every row bearing an
+Affordance or an axis" — a narrowing that would still have caught the incumbent defect, since the unreachable rows
+are Assurance rows and action buttons, and this specification records that (c) is therefore not a way of dodging
+the finding.
+
+**REGISTER RELATION.** No entry decides it. REG-Q-050 (`JPWB-REG-005:430`) defers *accessibility conformance* as a
+production-facing gate family — a different concern from reachability, and §11.2 keeps them separate rows so that
+the deferral of one is not read as the deferral of the other.
+
+**STANDING RULE.** INV-07 binds. A Surface SHALL NOT clip a scroll container without supplying one, and
+conformance is established by the reachability fixture family §10 registers for INV-07 — which SHALL assert
+interaction-level reachability (scroll and bring-into-view), never accessibility-tree presence alone, because
+presence in the tree is precisely the evidence the incumbent defect would pass on.
+
+---
+
+### 11.1.5 FORK-5 — Uncertainty surfacing depth
+
+**DECISION.** Does `SPEC-001-INV-06` require only that material uncertainty be *displayed*, or also that the
+Surface offer an authoring affordance by which a professional identifies uncertainty?
+
+**OPTIONS.**
+(a) **Display only in SPEC-001**; authoring is deferred to its own commission.
+(b) **Display and authoring.** INV-06 additionally requires an Identify-Uncertainty affordance on the Surface that
+carries the work.
+(c) **Display, plus a declared authoring gap notice** — the Surface displays uncertainty and SHALL disclose that no
+authoring path exists, so the absence is visible rather than mute.
+
+**EVIDENCE.**
+- CONFIRMED — CON-000 AX-3 (`JPWB-CON-000:75`): "Questions, assumptions, contradictions, and residual uncertainty
+  are governed objects that drive work, not annotations on it… Completion with residual uncertainty is legitimate
+  only when the residual is documented, assessed, accepted by authority, and inspectable downstream." AX-3 is
+  CONSTITUTIONAL and speaks of inspectability, not of an authoring gesture.
+- CONFIRMED — `residualUncertainty: string[]` is a **required** field on the assurance assessment shape and is
+  populated in production at `packages/rph-application/src/handlers/assurance.ts:1219` from the validator result.
+  It exists, and it is written.
+- CONFIRMED — and this is the finding that gives INV-06 its bite: across all **11** authored `.svelte` files under
+  `apps/rph-demo/src`, case-insensitive untruncated greps return `uncertain*` → **0**, `contradict*` → **0**,
+  `assumption` → **0**, `stale` → **0**, `provenance` → **2**. All 13 `residualUncertainty` occurrences in
+  `apps/rph-demo/src` are in `lib/server/` (agent, validator, tests) or in `+page.server.ts`, where the one
+  occurrence at `undertakings/[id]/+page.server.ts:864` writes a literal empty array. **The field is produced and
+  never rendered.**
+- CONFIRMED — `ASSUMPTION` is a Professional Work Object type (`packages/rph-contracts/src/enums.ts:585-608`),
+  so the governed object exists; `QUESTION`, an epistemic `UNCERTAINTY` object, and a `CONTRADICTION` object are
+  **not** in that enum. `UNCERTAINTY` appears in the tree as a `RiskDimension` value
+  (`enums.ts:642-648`) and `CONSTRAINT_CONTRADICTION` as a POL-CONSTRAINT-PROPAGATION finding code — different
+  concepts under similar spellings, and REG-Q-003's "Never map states by similar labels" (`JPWB-REG-005:185`) is
+  the exact discipline that forbids treating them as the same thing.
+- CONFIRMED — there is **no engine command to author uncertainty**. Enumerating the distinct `commandType` values
+  in `packages/rph-contracts/src/messages.ts` (the `BINDINGS` table at `:2512`) yields **64** commands; the only
+  members matching `uncertain|question|contradict|assum` are `DetectAssumption` and `ExpireAssumption`.
+- CONFIRMED — JCUX §12 nevertheless lists `Identify Uncertainty` among the commands of its detail screen
+  (`JCUX:588-598`). Option (b) would therefore oblige a Surface to offer a Command that does not exist.
+
+**RECOMMENDATION — option (a); adopted in this specification to keep writing.** Requiring an authoring affordance
+would require this specification to mint a Command, and command semantics are explicitly outside its perimeter
+(spine, DOES NOT GOVERN: "command semantics and their preconditions (DOC-003 + the engine)"). Under (a), INV-06 is
+satisfiable today against a field that already exists and is already populated, which makes it a testable
+obligation on the day it is written rather than a blocked one.
+
+**DOWNSTREAM EFFECT IF RULED OTHERWISE.** Under **(b)**: this specification acquires a dependency on a Command
+that does not exist in a 64-command registry; O-4 *Affordance* gains a mandatory member with no derivable
+authority; `SPEC-001-INV-13` (a Surface SHALL NOT offer an Affordance the engine would refuse) is placed in direct
+contradiction with INV-06, since the engine would refuse a command it does not have — this specification records
+that (b) is not merely expensive but **internally inconsistent with INV-13 unless a Command is commissioned
+first**, and that consequence is the material fact the sponsor needs. Under **(c)**: O-5 *Affordance Withholding*
+gains a new withholding reason class — *no governed command exists* — distinct from *authority withholds it*; §6's
+disclosure catalog gains a stable code for it; and FORK-6's answer becomes load-bearing, because that class must be
+expressible in whatever withholding-reason shape is chosen.
+
+**REGISTER RELATION.** REG-Q-003 (`JPWB-REG-005:185`, OPEN) binds the state-axis and cognitive-state boundary and
+forbids label-similarity mapping. REG-Q-020 (`JPWB-REG-005:270`) binds confidence and acceptance semantics: "Use
+categorical dispositions with explicit basis, limitations, and residual uncertainty. Do not average professional
+truth."
+
+**STANDING RULE.** A Surface SHALL render `residualUncertainty` and the assessment's `limitations` wherever it
+presents the assessment they qualify, and SHALL NOT offer an uncertainty-authoring affordance. Conformance is
+established by the INV-06 fixture in §10, which SHALL assert rendering from a fixture assessment carrying a
+non-empty `residualUncertainty` — and by the negative fixture asserting that no `.svelte` file references an
+uncertainty-authoring command, which is the check that keeps the standing rule from being pre-empted.
+
+---
+
+### 11.1.6 FORK-6 — The shape of a withholding reason
+
+**DECISION.** When `SPEC-001-INV-04` requires a withheld Affordance to disclose why, is the reason a value from a
+**closed, stable code set** owned by §6, or a **per-class structured shape** whose members each carry their own
+fields?
+
+**OPTIONS.**
+(a) **Closed code set.** One enumeration in §6; every withholding maps to exactly one code; the code is the
+contract and any human-readable text is presentation.
+(b) **Per-class structured shapes.** Each withholding class declares its own payload (an authority withholding
+names the missing authority; an exhaustion withholding names the permitted alternate actions); §6 catalogs the
+classes, not a flat code list.
+(c) **Both layers** — a closed code set for the class, plus an optional class-specific payload.
+
+**EVIDENCE.**
+- CONFIRMED — the incumbent has **exactly one** withholding-reason instance, and it is shaped, not coded. At
+  `packages/rph-projections/src/execution-view.ts:540-568` the view carries `retryExhaustion: {
+  permittedControlActions }`, present *only* when the cap is actually reached. The comment states the design
+  rationale in terms this fork must respect: "WITHHOLDING THE AFFORDANCE MUST NOT ALSO WITHHOLD THE REASON… A
+  silently vanishing button is a worse answer than a refused one: it tells the operator nothing about what to do
+  instead, and this codebase's standing rule is that a refusal names a remedy the engine can perform." Read
+  directly.
+- CONFIRMED — `planAffordancesFor` (`execution-view.ts:473-494`) returns `StepAffordances { advance, control }`
+  (`:422-425`) — two filtered lists and **no reason channel**. Every other withholding limb in that function
+  (`planPermitsAffordance`, `:370-419`) returns bare `false`: the closed-PWU limb, the `bindingAuthority` limb, the
+  `retryBudget` limb, and the `inputReadiness` limb. Four of the five withholding causes are silent by
+  construction; one is disclosed.
+- INFERRED — the single disclosed case is disclosed *because it names a remedy*. A pure code ("WITHHELD_BY_
+  AUTHORITY") could not have carried `permittedControlActions`, which is the part the operator can act on.
+- CONFIRMED — DOC-002 §9.2 (`JPWB-DOC-002:280`) fixes the general rule for enumerations: the machine vocabulary
+  artifact is "a bound derivative of this document, not a second authority," so a closed code set minted here would
+  need a vocabulary act, while a structured shape is a repository shape under REG-D-004's authority partition.
+
+**RECOMMENDATION — option (c); adopted in this specification to keep writing.** The class is what a fixture asserts
+and a professional filters on; the payload is what makes the disclosure actionable. (c) is also the only option
+under which the existing `retryExhaustion` shape is conforming rather than a special case to be migrated.
+
+**DOWNSTREAM EFFECT IF RULED OTHERWISE.** Under **(a)**: §6's disclosure catalog becomes a flat code table and O-5
+*Affordance Withholding* loses its payload field; the incumbent `retryExhaustion.permittedControlActions` becomes
+non-conforming and its remedy list would have to move to presentation text — which loses it to the type system,
+and this specification records that as the concrete cost rather than as a preference. Under **(b)**: §6 catalogs
+classes without stable codes; the INV-04 fixture cannot assert a code, only a shape, so §10's negative fixture
+changes from "the code is absent" to "no reason-bearing field is present", a materially weaker mutation-detector —
+which §10's mutation red-proof obligation would surface as a test that is harder to redden.
+
+**REGISTER RELATION.** None decides it. REG-Q-008 (`JPWB-REG-005:210`) binds identifier/registry extension
+discipline if (a) or (c) mints codes: "Extend the registry, schemas, and tests together before adding an object
+prefix."
+
+**STANDING RULE.** A withholding SHALL be disclosed with both a class and, where the withholding kernel can name a
+remedy, the remedy; implementers SHALL NOT add a second withholding disclosure in a different shape from
+`retryExhaustion` until this fork is ruled. Conformance is established by the withholding-shape fixture in §10,
+which SHALL enumerate every withholding limb in `planPermitsAffordance` and fail when a limb has no disclosure
+disposition — the totality property that makes a new silent limb a failing test rather than a discovery, exactly as
+`enforcement-register.test.ts` does for the RPH-EXE family.
+
+---
+
+### 11.1.7 FORK-7 — The scope of the disclosure obligation
+
+**DECISION.** Does the withholding-disclosure obligation (`SPEC-001-INV-04`) reach only **Affordances**, or also
+**Projections and Surfaces** that are unavailable, hidden, or disabled?
+
+**OPTIONS.**
+(a) **Affordances only.** INV-04 as the spine states it.
+(b) **Affordances, Projections and Surfaces.** An unavailable tab, projection or route discloses its reason on the
+same terms.
+(c) **Affordances SHALL, Projections SHOULD** — carrying RIWS's own modality forward unchanged.
+
+**EVIDENCE.**
+- CONFIRMED — RIWS §11.3 (`RIWS:501-511`) already states the projection-side rule, and states it as a **SHOULD**:
+  "Projection options MAY be hidden or disabled where semantically inapplicable. The UI SHOULD explain why a
+  projection is unavailable," with the worked example "Observation view becomes available after an Action or
+  external Observation is recorded."
+- CONFIRMED — the spine's `SPEC-001-INV-04` is a **SHALL**, and its subject is an Affordance. Adopting RIWS §11.3
+  wholesale would therefore either strengthen RIWS's modality or weaken this specification's — one of the two, and
+  the fork exists to make the sponsor choose which rather than to have it happen by drafting.
+- CONFIRMED — the built Undertaking Workbench has a seven-member tab set: `graph`, `overview`, `execution`,
+  `assurance`, `decisions`, `baselines`, `traceability`
+  (`apps/rph-demo/src/routes/undertakings/[id]/+page.svelte:30` for the union type and `:32-40` for the array).
+  Read directly. All seven are always present, so the incumbent has no unavailable-projection case to disclose —
+  option (b) would create an obligation with no current violation and no current satisfaction.
+- CONFIRMED — CPM PROJ-INV-012 (`CPM:393`) requires that intentional omission "SHALL be detectable", which is
+  option (b)'s content stated at projection grain by a source document. CPM's word is SHALL, RIWS's is SHOULD, on
+  what is arguably the same obligation. This specification SHALL NOT silently resolve that; it is recorded here as
+  a source contradiction (commission template, *Authoring grant*: "never… silently resolve contradictions —
+  surface them").
+
+**RECOMMENDATION — option (b); adopted in this specification to keep writing.** The professional's question is
+identical in both cases — *why can I not do this / see this* — and answering it for buttons but not for tabs would
+make the guarantee depend on a widget class. Choosing (b) also resolves the CPM/RIWS modality conflict in favour of
+the stronger source, which REG-D-013's guarantee-strength metric (`JPWB-REG-005:133`) directs where the two differ.
+
+**DOWNSTREAM EFFECT IF RULED OTHERWISE.** Under **(a)**: O-5 *Affordance Withholding* keeps a single subject type;
+§6's disclosure catalog halves; the CPM/RIWS conflict is left standing and must be recorded in §11.2 as an
+unresolved source contradiction with no owner. Under **(c)**: INV-04 acquires a second modality inside one
+invariant, and §10 must register a SHOULD-fixture — an advisory check — which this specification flags as the
+option that most weakens the conformance suite, because a SHOULD with a passing advisory check is
+indistinguishable from an unenforced rule at the gate.
+
+**REGISTER RELATION.** REG-Q-047 (`JPWB-REG-005:411-414`, OPEN) governs whether RIWS §11.3 may be cited as
+conformance criteria at all; the safe default says it may not without a Decision, so option (c) — "carry RIWS's
+modality forward" — is the option most constrained by a live entry.
+
+**STANDING RULE.** Disclosure SHALL be implemented for Affordances and SHOULD be implemented for Projections and
+Surfaces until ruled; where a Projection is withheld and no reason is disclosed, implementers SHALL record it as a
+known gap rather than treat the silence as conforming. Conformance is established by the INV-04 fixture family in
+§10 (mandatory, affordance grain) plus the projection-availability inventory check (advisory until ruled), which
+enumerates withheld projections and fails on an *undisposed* one — the disposition, not the disclosure, is what is
+mandatory before the ruling.
+
+---
+
+### 11.1.8 FORK-8 — Multi-command actions and partial application
+
+**DECISION.** When a Surface action issues more than one Command, does `SPEC-001-INV-14` require the Surface to
+**disclose partial application after the fact**, to **refuse to compose multi-command actions at all**, or to
+**obtain a compensating path before offering one**?
+
+**OPTIONS.**
+(a) **Disclose.** Multi-command actions are permitted and SHALL report exactly which Commands were applied and
+which were refused.
+(b) **Prohibit.** A Surface SHALL NOT compose an action from more than one Command; each Command is offered
+individually.
+(c) **Disclose plus a declared compensating path.** Permitted only where the composition declares, per constituent
+Command, what happens to the already-applied prefix.
+
+**EVIDENCE.**
+- CONFIRMED (spine, measured on the built surface; the underlying code path was not re-read line-by-line in
+  preparing this section, so the mechanism is INFERRED from the spine's account) — `runSteps` dispatches four
+  Commands with no rollback, and "Illegal transition on PWU" is surfaced **after** two assurance rows are already
+  committed.
+- CONFIRMED — the engine has no multi-command envelope: the `BINDINGS` table
+  (`packages/rph-contracts/src/messages.ts:2512`) maps one `commandType` to one `eventType` to one state
+  transition, across 64 commands. Composition therefore exists only at the Surface, which is why it lands in *this*
+  specification and not in DOC-003 — INFERRED from the enumerated table.
+- CONFIRMED — REG-Q-014 (`JPWB-REG-005:240`) already holds the general form of this concern for the model layer:
+  "Coordinate promotion and PWU effects through a durable Process with intermediate state and reconciliation —
+  never ad hoc multi-aggregate writes." A Surface loop over four dispatches is the surface-level instance of the
+  pattern that safe default forbids at the model level.
+- CONFIRMED — `SPEC-001-INV-08` requires a refused Command to surface its reason and code *to the professional who
+  issued it*. Under a four-command loop, the professional issued one gesture and received one refusal about the
+  fourth; INV-08 and INV-14 are therefore coupled, and a ruling on this fork changes both.
+
+**RECOMMENDATION — option (a); adopted in this specification to keep writing.** (b) is the safest and this
+specification does not recommend it, for a stated reason: the professional gestures that matter are frequently
+composite, and prohibiting composition pushes the same sequence into the professional's hands without the
+disclosure, which is strictly worse. (c) is the correct end state and is recommended as the eventual target, but it
+requires a compensating-path concept that does not exist in the engine today and would therefore be an unbuildable
+obligation on the day it is written.
+
+**DOWNSTREAM EFFECT IF RULED OTHERWISE.** Under **(b)**: O-4 *Affordance* gains a cardinality constraint — one
+Affordance issues exactly one Command — and every composite affordance on the built surface becomes a violation;
+§9's reference case is re-sequenced into single-command steps; §10 gains a negative fixture asserting no Surface
+handler dispatches twice. Under **(c)**: O-4 gains a *compensation* field per constituent Command; §4.2's
+Affordance-disposition machine gains compensation transitions off `A-PARTIALLY_APPLIED` with their own
+illegal-transition rows (*cross-reference repaired at assembly: this record was authored as “gains a
+`PARTIALLY_APPLIED` state”; the assembled §4.2.2 already carries `A-PARTIALLY_APPLIED`, forced by INV-14, so
+option (c) adds transitions to an existing state rather than the state itself*); §6 gains a
+compensation-failure disclosure code; and this specification acquires a dependency on engine capability that does
+not exist, which SHALL be recorded as a blocking precondition rather than as a target.
+
+**REGISTER RELATION.** REG-Q-014 (OPEN; safe default binds at the model layer). No entry governs surface-level
+composition.
+
+**STANDING RULE.** A multi-command Surface action SHALL report per-constituent outcome and SHALL NOT report success
+while any constituent was refused; implementers SHALL NOT add a new multi-command action until this fork is ruled.
+Conformance is established by the INV-14 fixture in §10, which SHALL drive a composite action whose third Command
+is refused and assert that the Surface reports the first two as applied, the third with its code, and the whole as
+partial — and by the mutation red-proof obligation that this fixture reddens when the per-constituent report is
+replaced by a single boolean.
+
+---
+
+### 11.1.9 FORK-9 — Where Projection Scope is enforced
+
+**DECISION.** Is `SPEC-001-INV-02` (a Projection SHALL NOT present objects outside its declared Scope) enforced at
+the **engine query signature**, at the **projection boundary**, or at the **Surface**?
+
+**OPTIONS.**
+(a) **Query signature.** Every scoped list function takes its scope as a required parameter; an unscoped call
+becomes a compile error.
+(b) **Projection boundary.** Queries stay permissive; the projection layer filters and declares the scope it
+applied.
+(c) **Surface.** The route's loader filters.
+
+**EVIDENCE.**
+- CONFIRMED — the incumbent enforces at (a) for two of six list functions and nowhere for four. Read directly at
+  `packages/rph-engine/src/queries.ts`: `listPwus(h, undertakingId?)` at `:41` filters by
+  `undertakingId` when supplied; `listExecutionPlans(h)` at `:45` takes no scope; and `listAssessments`,
+  `listObservations`, `listDecisions`, `listBaselines` at **`:46-51`** each take `(h)` alone and return
+  `listByType(...)` unfiltered across the whole store.
+- CONFIRMED — the scope parameter on `listPwus` is **optional** (`undertakingId?`), so even the one function that
+  can scope does not require it. Option (a) as stated would make it required.
+- INFERRED — the failure mode this produces is the spine's measured defect 2: a newly created Undertaking displays
+  the seed Undertaking's assessments, observations, decisions and baselines, because the four unscoped functions
+  cannot distinguish them. The mechanism follows directly from the signatures read above.
+- CONFIRMED — DOC-003 PER-7 (`JPWB-DOC-003:359`): projections "are never authoritative write targets, and
+  canonical commands never validate against projections alone." PER-7 governs authority, not scope; scope
+  correctness is genuinely this specification's concern and not a restatement — which is why INV-02 exists rather
+  than a citation.
+- CONFIRMED — REG-Q-004's safe default (`JPWB-REG-005:190`) ends "never create an unscoped path." Four unscoped
+  list functions are the surface-adjacent instance of exactly that.
+
+**RECOMMENDATION — option (a); adopted in this specification to keep writing.** It is the only option under which
+the omission is detected by the type checker rather than by a test someone remembered to write, and it is the
+option the codebase already began — `listPwus` and the fixed `listExecutionPlans` precedent show the intended
+direction. The correction (a) requires is to make the parameter **required**, not merely present.
+
+**DOWNSTREAM EFFECT IF RULED OTHERWISE.** Under **(b)**: O-3 *Projection Scope* becomes a field on the Projection
+rather than a parameter of its source, and §5's interface contract moves the scope declaration into the projection
+return shape; §10's INV-02 fixture asserts the declared scope matches the contents rather than asserting the
+signature — a weaker check, because a projection that filters wrongly and declares wrongly passes. Under **(c)**:
+INV-02 becomes unenforceable by any artifact this specification owns, since a Surface loader is application code
+and B1 vests shape authority in reference artifacts, never in the implementation (`JPWB-CON-000:97`) — this
+specification records (c) as the option that makes its own invariant vacuous, which is the B7 condition arriving by
+placement.
+
+**REGISTER RELATION.** REG-Q-004 (OPEN; "never create an unscoped path" binds today). REG-Q-017
+(`JPWB-REG-005:255`, OPEN) binds the projection freshness envelope, whose "completeness" and "filter" metadata
+would be option (b)'s natural carrier — so a ruling of (b) also touches a deferred contract.
+
+**STANDING RULE.** A Projection SHALL declare its Scope and SHALL NOT present objects outside it; new list
+functions SHALL take their scope as a required parameter, and the four existing unscoped functions at
+`queries.ts:46-51` SHALL be recorded as a divergence rather than treated as the pattern. Conformance is established
+by the INV-02 fixture in §10, which SHALL seed two Undertakings and assert that each Surface presents only its own
+records — the fixture that reddens on the incumbent today, which is the property that makes it worth writing.
+
+---
+
+### 11.1.10 FORK-10 — Whether Assurance and Governance are first-class Surfaces
+
+**DECISION.** Do DOC-001 §7.1's Assurance and Governance contexts require **their own top-level Surfaces**, or is
+presenting them as sub-Surfaces within the Undertaking Workbench sufficient?
+
+**OPTIONS.**
+(a) **Sub-Surfaces suffice.** A context is satisfied by being reachable and separately legible anywhere.
+(b) **Top-level Surfaces required.** Each of the five contexts is a Surface in its own right.
+(c) **Governance yes, Assurance no** — Governance already has top-level Surfaces (`/decisions`, `/baselines`) and
+Assurance does not; ratify the asymmetry.
+
+**EVIDENCE.**
+- CONFIRMED — the built rail has no Assurance destination and no Governance destination by those names
+  (`+layout.svelte:59-64`, four entries). Read directly.
+- CONFIRMED — Assurance *is* present as a tab within the Undertaking Workbench (`undertakings/[id]/+page.svelte:32-40`,
+  member `assurance`), and Governance is present as two top-level routes under different names — `/decisions` and
+  `/baselines` — both present in the rail and both existing as page routes.
+- CONFIRMED — DOC-001 §7.1 states the Assurance/Governance separation is "deliberate and load-bearing", with
+  Assurance holding "evaluative authority only — assesses without approving" and Governance being "the only context
+  that approves, waives, promotes."
+- CONFIRMED — `packages/rph-projections/src/assurance-view.ts` builds a real assurance projection with distinct
+  view types (`AssuranceObservationView`, `AssuranceWaiverView`, `AssuranceInvalidationView`,
+  `AssuranceAssessmentView`, `AssuranceView`, and `ApplicablePolicyView`). The projection exists; the question is
+  only where it surfaces.
+- CONFIRMED — the conferral sheet records the same observation as a divergence to file rather than a defect to
+  hide, in its **Q4** recommendation. This fork is that observation converted into a decidable question about
+  Surfaces.
+
+**RECOMMENDATION — option (a); adopted in this specification to keep writing, and conditional on FORK-1 resolving
+to (a).** If a rail is a permitted projection over the authority model, then context coverage is a property of the
+Surface set, not of the rail. Under (a) the standing obligation is *reachability plus separate legibility*, which
+is INV-07 and INV-05 doing work they already do.
+
+**DOWNSTREAM EFFECT IF RULED OTHERWISE.** Under **(b)**: O-2 *Surface* gains a mandatory five-member minimum set,
+which is a new field and a new positive fixture; the built product acquires two missing Surfaces; and FORK-1's
+answer is forced to (b), because a rail that cannot reach a required Surface is non-conformant — the two forks are
+coupled and SHALL be ruled together or the ruling on one silently decides the other. Under **(c)**: §2 records a
+per-context asymmetry with its reason, and §11.2's row for the five contexts moves from "routed to DOC-001" to
+"partially specified here", which is the only option that puts context composition inside this specification's
+perimeter.
+
+**REGISTER RELATION.** None decides it. REG-Q-047 (OPEN) governs whether RIWS §6.1's and JCUX §3's rival
+destination lists may be cited at all.
+
+**STANDING RULE.** All five contexts SHALL be reachable and separately legible from the Surface set; implementers
+SHALL NOT add or remove a top-level Surface to conform to any of the four rival navigation statements.
+Conformance is established by the context-coverage fixture in §10, which SHALL assert that each of the five
+contexts is reachable by ordinary interaction from the entry Surface — reachability asserted per INV-07's
+interaction standard, not by route existence, since a route that exists and cannot be reached is the FORK-4 defect
+in another form.
+
+---
+
+### 11.1.11 FORK-11 — Canonical terms and display aliases at the label boundary
+
+**DECISION.** Must a Surface label use the canonical DOC-002 term, or may it present a friendlier label, and if so
+under what registry?
+
+**OPTIONS.**
+(a) **Canonical only.** A Surface label SHALL be the canonical term; no alias without a ratified registry entry.
+(b) **Alias permitted where registered.** DOC-002 §9.2's display-alias mechanism is exercised; SPEC-001 requires
+each Surface label to be either a canonical term or a registered alias.
+(c) **Alias permitted, registry deferred** — friendlier labels allowed now, registered later.
+
+**EVIDENCE.**
+- CONFIRMED — DOC-002 §9.2 already permits the mechanism and fixes its discipline (`JPWB-DOC-002:279`): "A UX
+  boundary MAY present a ratified display alias for a canonical term where a JPWB-REG-005 decision admits it. An
+  alias is recorded and marked as an alias in Section 8, never appears in canon artifacts, contracts, schemas, or
+  register entries, and never redefines the term. Minting an alias is a vocabulary act: proposed via finding,
+  sponsor-ratified." Its stated purpose names option (c)'s failure directly: it prevents "the ungoverned-label leak
+  that a blanket prohibition would create under real usability pressure."
+- CONFIRMED — **zero display aliases are registered today.** DOC-002 §8 (`JPWB-DOC-002:223`) is titled "Retired and
+  compatibility terminology" and its table (`:225-249`) records retired-term → replacement mappings only; I read
+  the whole table and no row is marked as a display alias. The mechanism exists and has never been used.
+- CONFIRMED — the pressure is real and documented: REG-D-014's disposition S-03 chose "option (a) governed display
+  aliases" precisely because "product audience includes non-SMEs; a governed channel beats an ungoverned leak"
+  (`JPWB-REG-005:141`).
+- CONFIRMED — the constraint that makes this a Surface concern rather than a vocabulary one: DOC-002:248 retires
+  bare `Endeavor` to **Undertaking**, and DOC-002:249 forbids creating "a second competing root… without a
+  Decision." A Surface label is exactly where a competing root would enter.
+
+**RECOMMENDATION — option (b); adopted in this specification to keep writing.** It is the option DOC-002 already
+built the machinery for, and the only one under which a friendly label is distinguishable from a vocabulary breach
+by inspection.
+
+**DOWNSTREAM EFFECT IF RULED OTHERWISE.** Under **(a)**: O-2 *Surface* gains a label-vocabulary constraint with no
+escape hatch, and §10's label fixture asserts every user-visible label against the DOC-002 term list — enforceable,
+and this specification notes it is the option most likely to be violated quietly under product pressure, which is
+the failure DOC-002 §9.2 was amended to prevent. Under **(c)**: the label fixture cannot be written at all, since
+there is nothing to assert against; §11.2 gains an unowned-residue row for the alias registry; and this
+specification records that (c) reintroduces precisely the ungoverned-label leak REG-D-014 S-03 closed.
+
+**REGISTER RELATION.** REG-D-014 S-03 (`JPWB-REG-005:141`, EFFECTIVE — MERGED) established the mechanism.
+REG-E-011 (`JPWB-REG-005:493`) holds `Professional Endeavor` as candidate-only with Undertaking canonical at
+product and UX boundaries. REG-Q-002 (`JPWB-REG-005:180`) requires retired names be isolated in adapters.
+
+**STANDING RULE.** Every Surface label SHALL be a canonical DOC-002 term; no alias SHALL be introduced before its
+registry entry exists. Conformance is established by the label-vocabulary fixture in §10, which SHALL assert that
+no user-visible label in any `.svelte` file matches a retired term from DOC-002 §8's table — a check that passes
+today, since `endeavor` (case-insensitive) returns **0 occurrences** across `packages/*/src` and
+`apps/rph-demo/src` on an untruncated grep I ran in preparing this section, and whose value is that it fails the
+day one is introduced.
+
+---
+
+### 11.1.12 Fork index
+
+| Fork | Decision in one line | Recommended | Invariants touched | Register entry that binds | Status |
+|---|---|---|---|---|---|
+| FORK-1 | Which statement is the navigation model | (a) DOC-001 §7.1 is the authority model; a rail is a projection over it | INV-10 | none (REG-Q-047 governs source standing) | OPEN |
+| FORK-2 | Does a conforming route carry an organization segment | (a) flat roots stand | INV-02 | REG-Q-004 (OPEN) | OPEN |
+| FORK-3 | Does SPEC-001 govern the PWA Designer surface | (a) yes, both surfaces | all fourteen | REG-Q-046 (OPEN, constrains) | OPEN |
+| FORK-4 | Is reachability semantic or design-system | (a) semantic | INV-07 | none (REG-Q-050 defers accessibility, a distinct concern) | OPEN |
+| FORK-5 | Does INV-06 require an authoring affordance | (a) display only | INV-06, INV-13 | REG-Q-003, REG-Q-020 (OPEN) | OPEN |
+| FORK-6 | Closed code set or per-class shape for a withholding reason | (c) both layers | INV-04 | REG-Q-008 (OPEN, if codes are minted) | OPEN |
+| FORK-7 | Does disclosure reach Projections and Surfaces, not only Affordances | (b) all three | INV-04 | REG-Q-047 (OPEN) | OPEN |
+| FORK-8 | Disclose, prohibit, or compensate multi-command actions | (a) disclose now, (c) as target | INV-14, INV-08 | REG-Q-014 (OPEN) | OPEN |
+| FORK-9 | Where Projection Scope is enforced | (a) required query parameter | INV-02 | REG-Q-004, REG-Q-017 (OPEN) | OPEN |
+| FORK-10 | Are Assurance and Governance top-level Surfaces | (a) sub-Surfaces suffice; coupled to FORK-1 | INV-05, INV-07 | none | OPEN |
+| FORK-11 | Canonical labels or registered display aliases | (b) alias where registered | none directly; O-2 label contract | REG-D-014 S-03, REG-E-011 | OPEN |
+
+**Coupling, stated so that a single ruling does not silently decide two questions.** FORK-1 and FORK-10 are
+coupled: ruling FORK-10 to (b) forces FORK-1 to (b). FORK-5 and FORK-6 are coupled: ruling FORK-5 to (c) makes
+FORK-6's answer load-bearing, because the *no-governed-command-exists* withholding class must be expressible in the
+chosen shape. FORK-2 and FORK-9 share REG-Q-004 but are independent: the URL segment and the query parameter are
+different mechanisms for different guarantees, and this specification SHALL NOT be read as making one satisfy the
+other. Conformance to this coupling account is established by the fork-coupling check in §10, which fails if a
+recorded ruling on one member of a coupled pair is carried without a disposition on the other.
+
+**Forks raised inside §§1–10 and consolidated here at assembly.** The sixteen rows below were authored in the
+sections named, under local numbering that collided with FORK-6 … FORK-11 above; they were renumbered into this tail
+block at assembly and are **not** restated here — the full record for each stays at the boundary that raised it, which
+is where an implementer meets it. Each row names that boundary. Every one of the sixteen is short of §11.0.1's
+seven-field shape (see §11.1.13); bringing them to it is a ratification precondition, not a documentation backlog.
+
+| Fork | Decision in one line | Recommended | Full record at | Invariants / objects touched | Status |
+|---|---|---|---|---|---|
+| FORK-12 | Is O-2 the canonical **View** under a second name, a sub-kind of it, or no object at all | (b) a proper sub-kind of View — the addressable, routable View | §1.3 | O-2; INV-07, INV-10, INV-13 | OPEN |
+| FORK-13 | Does INV-04's disclosure attach to **all eight** withholding authorities or only some | (A) all eight | §2.5.3 | O-5; INV-04 | OPEN |
+| FORK-14 | Short-circuit at the first refusing limb, or evaluate every limb | (C) short-circuit by default, full evaluation on demand | §2.5.3 | O-5 `alsoRefusing`, `evaluationWasShortCircuited` | OPEN |
+| FORK-15 | Does a Refusal Disclosure carry the kernel marker as a **structured field** | (A) structured field on `RphError.details`, surfaced as `kernelMarker` | §2.6.3 | O-6; INV-08 | OPEN |
+| FORK-16 | Does INV-06 oblige display only of realized shapes, or of every noun AX-3 names | (c) bind now to realized shapes, register the three unreified nouns as governed gaps | §2.8.4 | O-8; INV-06 | OPEN |
+| FORK-17 | Display versus authoring for the cognition objects — who owns the Question lifecycle | adopt FORK-5 (display only) **and** record the authoring lifecycle as an owned deferral | §2.8.4 | O-8; INV-06 | OPEN |
+| FORK-18 | Is address-level addressability a SHALL or a SHOULD | (a) SHALL, with (c) as the acceptable compromise | §2.9.5 | O-9; INV-10, INV-07 | OPEN |
+| FORK-19 | Can the enforcement register express a **surface-layer** obligation | (a) add a `SURFACE` layer and an `apps/` prefix mapping | §3.16 | all fourteen (their enforcement record) | OPEN |
+| FORK-20 | Is INV-04's disclosure obligation SHALL or SHOULD | (a) SHALL | §3.16 | INV-04 | OPEN |
+| FORK-21 | Freshness as three axes, or JCUX's single eight-valued enum | (a) three axes | §4.1.7 | INV-09; `ProjectionEnvelope` | OPEN |
+| FORK-22 | May a `STALE` Projection continue to offer Affordances | (a) offer, revalidate, surface the `CONFLICT` | §4.1.7 | INV-09, INV-04, INV-08 | OPEN |
+| FORK-23 | Atomicity versus disclosure for multi-Command Affordances | (b) atomic where an atomic dispatch exists, disclosure as fallback | §5.10 | INV-14 | OPEN |
+| FORK-24 | Is *Projection Failure* an error class; should Register B be ratified | (b) eventually, (a) now | §6.4 | INV-09; §6.3 | OPEN |
+| FORK-25 | Must the host mint a per-issuance `correlationId`, and must it be shown | (a) mint per issuance and display, with (b) an acceptable divergence | §6.4 | INV-08 | OPEN |
+| FORK-26 | Are `domainNarrowed` and `unevaluated` Affordance Withholding states | (a) extend O-5 to four states | §9.9 | O-5; INV-04, INV-09 | OPEN |
+| FORK-27 | Is “every Projection field is sourced from governed state” a consequence of O-1 or a fifteenth invariant | (a) a consequence, verified by `SPEC-001-NF-22` | §9.9 | O-1; INV-06 | OPEN |
+
+**Coupling among the consolidated block, stated so a single ruling does not silently decide two questions.**
+FORK-13 and FORK-26 are coupled: extending O-5 to `domainNarrowed`/`unevaluated` (FORK-26 (a)) enlarges the set
+FORK-13 rules over, so ruling FORK-13 to (C) after FORK-26 to (a) would leave the two new states undisclosed.
+FORK-20 and FORK-7 are coupled: FORK-20 fixes INV-04's *modality*, FORK-7 its *scope*; ruling FORK-7 to (c)
+(“Affordances SHALL, Projections SHOULD”) partially decides FORK-20 and SHALL NOT be recorded as leaving it open.
+FORK-15 and FORK-24 are coupled: both concern whether a Surface-visible refusal vocabulary is ratified into a
+contract, and a ruling admitting `kernelMarker` as a structured field weakens the case for FORK-24 (b).
+FORK-21 and FORK-16 are independent despite both touching disclosure. Conformance to this account is established by
+the same fork-coupling check named for FORK-1 … FORK-11 above, extended to the consolidated block: it fails if a
+recorded ruling on one member of a coupled pair is carried without a disposition on the other.
+
+### 11.1.13 Candidates considered and declared not to be forks
+
+*(This subsection exists so that an omission is distinguishable from a decision — the third-arm discipline the
+enforcement register uses at `packages/rph-domain/src/enforcement-register.ts` when it records
+`NOT_A_COMMAND_REFUSAL` as a declared silence with a reason.)*
+
+- **Whether a Projection may be cached client-side.** Not a fork: PER-7 (`JPWB-DOC-003:359`) already settles that
+  projections are "derived, disposable" and rebuildable, and REG-Q-017's safe default (`JPWB-REG-005:255`) already
+  binds the freshness envelope. The concern is routed, not open.
+- **Whether the four state axes have a fixed display order.** Not a fork: `SPEC-001-INV-05` requires separate
+  legibility, and order is presentation, which the spine's DOES NOT GOVERN list excludes. Recorded here because the
+  question was asked and answered, not because it was never raised.
+- **Whether a Surface may display execution progress at all.** Not a fork: CON-000 AX-1's SCOPE clause settles it
+  explicitly (`JPWB-CON-000:71`) — "it does not forbid a surface from displaying execution progress, provided
+  display never mutates or implies assurance." `SPEC-001-INV-11` restates the constraint with that citation; there
+  is no open choice.
+- **The residual this section cannot discharge — discharged at assembly, and its successor named.** Whether §§1–10 raised forks the spine did not anticipate was **unknown** at authoring time, for the reason recorded at §11.0.4. The sweep was performed at assembly and is discharged: sixteen further forks were found and are carried as **FORK-12 … FORK-27** in §11.1.12. What is **not** discharged is the *record shape*: those sixteen were authored in their own sections under a four-or-five-field local shape, not under §11.0.1's seven-field shape (DECISION · OPTIONS · EVIDENCE · RECOMMENDATION · DOWNSTREAM EFFECT · REGISTER RELATION · STANDING RULE). Every one of the sixteen is missing at least REGISTER RELATION and STANDING RULE. Under §11.0.1 that is a defect, because “the missing field is always the one the sponsor needed”, and the fork-record completeness check registered for this section SHALL fail against the assembled document until each of the sixteen is brought to the seven-field shape. This is now the one open action this section cannot discharge itself, and it is recorded as an open action rather than as a claim that the sixteen are complete.
+
+---
+
+## 11.2 Deliberately unspecified
+
+**The rule.** Every name referenced anywhere in this specification and not defined by it appears in one of the four
+tables below, with the reason it is not defined here, the authority that owns it, and — where the name is deferred
+rather than merely routed — the **bounded rule** that binds implementers meanwhile. A referenced name absent from
+all four tables is a defect in this section. Conformance is established by the referenced-name closure check in
+§10, which extracts capitalized and back-ticked names from §§1–10 and fails on any name that is neither defined in
+§2, cited to a canon artifact, nor listed here.
+
+### 11.2.1 Names owned by canon or the repository — routed, not deferred
+
+*These are settled elsewhere. This specification uses them and SHALL NOT redefine them (DOC-002 §9.2 naming
+authority). No implementer action is pending.*
+
+| Name as referenced | Why not defined here | Owning authority |
+|---|---|---|
+| Undertaking · Professional Work Unit · PWA · PWU Type · Intent · Claim · Evidence · Decision · Baseline · Assurance Policy / Assessment / Observation · Artifact · Obligation · Constraint · Assumption · Execution Plan · Execution Step · Runtime Binding · Recursive Professional Harness · Authoring Conversation | Governed object vocabulary; this specification projects these objects and never defines them | JPWB-DOC-002 (meaning); `packages/rph-contracts/src/enums.ts:585-608` (the 22-member object-type enum, read directly) |
+| The four state axes — execution, assurance, shape integrity, work lifecycle | `SPEC-001-INV-05` governs their *rendering*; their meaning and the rule that they never collapse are DOC-003's | JPWB-DOC-003 STA-1 (`:175`); spellings in the repository |
+| Execution-success-is-not-satisfaction | `SPEC-001-INV-11` restates it at the Surface boundary **with citation** per the controlled-redundancy rule; the master is DOC-003 | JPWB-DOC-003 STA-2 (`:179`), successor of legacy INV-5 |
+| Command names, payloads, preconditions, guards | Command semantics are outside this specification's perimeter by the spine's DOES NOT GOVERN clause | JPWB-DOC-003 + the engine; the 64-command `BINDINGS` table at `packages/rph-contracts/src/messages.ts:2512` |
+| Error codes, categories, and the code→category map | Shapes; REG-D-004's authority partition cedes them | The repository (`src/errors.ts#ERROR_CODE_CATEGORY`); REG-Q-026 C-6 flags it for sponsor sanity check (`JPWB-REG-005:307`) |
+| Projection authority and disposability | `SPEC-001-INV-01` restates it with citation; the master is PER-7 | JPWB-DOC-003 PER-7 (`:359`) |
+| The traceability spine | `SPEC-001-INV-12` governs provenance *exposure*; the spine's membership is DOC-003's | JPWB-DOC-003 REL-4 (`:165`) |
+| Waiver contents and effects | A Surface displays a waiver; it never defines one | JPWB-DOC-003 ASR-14 (`:301`); REG-Q-012 (`:230`) binds waiver discipline |
+| Persistence and event shapes | Shapes | The repository (generated contracts, schemas, migrations, conformance tests), per `JPWB-CON-000:97` |
+| Volunteered model reasoning / chain-of-thought | Not merely unspecified — **prohibited from every Surface**. PER-12 states it is "never logged, never projected"; a Surface that renders it commits an ASR-13 hidden-context independence violation | JPWB-DOC-003 PER-12 (`:379`), sponsor-ruled at REG-D-015 |
+| The authority model (who may create, approve, waive, revoke) | The spine's DOES NOT GOVERN clause excludes it; O-4 *Affordance* derives from a declared authority and never declares one | `JPWB-CON-000` B2; JPWB-DOC-001 §7.1/§7.2 |
+
+### 11.2.2 Names deferred to a live register entry — governed deferral, safe default binds
+
+*For each, the recorded safe default binds today (JPWB-REG-005 §1: "A safe default recorded here binds agents only
+while the question it attaches to is OPEN"). Implementers SHALL follow the bounded rule; conformance for each row
+is established by the fixture named in the last column, registered in §10.*
+
+| Name as referenced | Why not defined here | Owning entry | Bounded rule that binds today | Verifying check |
+|---|---|---|---|---|
+| `organizationId` / Organization / tenant scoping at the Surface | FORK-2; the segment has 0 occurrences in the tree | REG-Q-004 (OPEN, `:190`) | Scope through authenticated transport, repository and RLS context; never create an unscoped path; do not add a route segment | Route-inventory fixture (§10) |
+| Cognitive state · PCLC · Cognitive Zoom · Cognitive Breadcrumb | Referenced by all four sources; `cognitiveState` returns **0 occurrences** across `packages/*/src` and `apps/rph-demo/src` on an untruncated grep run in preparing this section | REG-Q-003 (OPEN, `:185`); DOC-002:247 demotes `PCLC` to "the cognitive loop as an additive viewpoint; never a persisted lifecycle" | Persist only the four ratified axes; treat cognitive framing as projection/focus metadata only; **never map states by similar labels** | INV-05 axis-separability fixture + a negative fixture asserting no persisted cognitive-state field |
+| Temporal mode · as-of · time travel · projection freshness metadata (completeness, filter, version vector) | `SPEC-001-INV-09` requires stale/partial/rebuilding to be *identified*; the envelope's field set is undecided | REG-Q-017 (OPEN, `:255`) | Serve the exact generated schema or an accepted versioned wrapper; a stale view never authorizes mutation | INV-09 staleness fixture (§10) |
+| Narrative Memory / the Memory destination | Named by RIWS §6.1 and JCUX §3; no Surface exists | REG-Q-021 (OPEN, `:275`) | One logical causally linked history over typed objects, events, audit, Artifacts and Evidence; no universal stream record | Declared-absent check: the Memory Surface is absent and recorded absent |
+| Attention Item and its disposition vocabulary (addressed, delegated, deferred with review condition, accepted as risk, superseded) | Meanings are NEW and authored by the canon finalizer, not ratified in sponsor voice | REG-E-021 (OPEN, `:502`) | The drafted vocabulary stands at HYPOTHESIS; a Surface SHALL NOT add, drop, or rename a disposition | Disposition-vocabulary fixture asserting the five values |
+| Reconciliation Surface and its state set | CPM §10.8 enumerates nine reconciliation states in prose; no enum in the tree carries them | REG-Q-028 (OPEN, `:318`) | Follow the repository's contracted transition table; treat recomposition as parent-owned and file a finding before persisting a child-side state | Declared-absent check |
+| Multi-PWA composition · supplemental bindings · conflict precedence | A Surface would have to display a composition rule that is uncontracted | REG-Q-002 (OPEN, `:180`) | One exact selected PWA/profile/version; never a second root; never model JanumiCode as one PWA | Single-binding fixture |
+| Independence-satisfying configurations | `SPEC-001-INV-12` exposes provenance; which configurations *satisfy* independence is undecided | REG-Q-033 (OPEN, `:343`) | Different invocation at minimum; different agent or model for high-risk work; validate actual identities, not role labels | Provenance-exposure fixture (INV-12); the satisfaction rule is not asserted |
+| `ChangePwuState` as an offered Affordance | The command exists in the `BINDINGS` table, and the register forbids exposing it | REG-Q-007 (OPEN, `:205`) | "Do not expose a public state setter. Use semantic Commands." | Negative fixture: no Surface offers `ChangePwuState` |
+| Accessibility conformance level | Distinct from INV-07 reachability (FORK-4) and deferred as a production-facing gate family | REG-Q-050 (OPEN, `:430`) | Not yet applicable; mandatory at the first production-facing slice; adopted as assurance policy, **never by ad-hoc CI accretion** | None today; the deferral itself is the recorded disposition |
+| Projection rebuild latency and throughput budgets | Same family as above | REG-Q-050 (OPEN, `:430`) | As above | None today |
+| Vertical-slice versus discipline-shaped decomposition, as rendered in a composition tree | A Surface renders the tree; which shape is correct is doctrine | REG-Q-035 (OPEN, `:353`) | Decompose along independently meaningful professional boundaries; horizontal PWUs only where the PWA's ontology defines them | Graph-view fixture asserts rendering fidelity, never shape correctness |
+| JSDL and any generated-surface pathway | Named in the source corpus; demoted | REG-E-007 (OPEN, `:487`) — "JSDL remains demoted"; REG-Q-015 (OPEN, `:245-246`) | Do not add JSDL-generated contracts; the attribution question at Constitution Discussion L11370-11435 must be settled before corpus retirement | Negative check: `jsdl` returns 0 occurrences in `packages/*/src` and `apps/rph-demo/src` |
+| The Product Realization PWA's professional content as rendered (type hierarchy, twelve mandatory policies, conformance profiles, taxonomies) | Ceded to the seeded PWA, but carriage is unverified — REG-F-001 recorded the seeded governed layer was hollow | REG-Q-045 (OPEN, `:403`) | Those two source documents remain the reference for that content under an explicit survivorship hold | Policy-rendering fixture asserts the Surface renders what the seed carries, never what the document says |
+| PWA-authoring semantics beyond the seeded ontology | FORK-3 places the Designer *surface* in scope; its authoring *method* is stopped | REG-Q-046 (OPEN, `:408`) | "PWA-authoring work beyond the existing seeded ontology stops for that Decision" | Perimeter check (FORK-3's standing rule) |
+| Runtime and database trust topology as surfaced | No Surface today; a parallel scheduler is forbidden | REG-Q-016 (OPEN, `:250`) | Follow current code and accepted ADRs; do not build a parallel scheduler | Declared-absent check |
+
+### 11.2.3 Names this specification declines entirely — outside its concern
+
+*Declined, with the reason. Declining is a disposition; each row states where the concern goes instead.*
+
+| Name as referenced | Reason for declining | Where it goes |
+|---|---|---|
+| Visual design, typography, spacing, colour, component library, iconography | The spine's DOES NOT GOVERN clause: "a design system, not semantics" | Repository design docs; no canon owner |
+| Named component inventory (`AppShell`, `GlobalHeader`, `CognitiveBreadcrumb`, `ContextInspector`) | JCUX names 36 components against **11** authored `.svelte` files (the 11 enumerated directly in preparing this section); a component inventory is a design-system artifact, and adopting one would place this specification in the concern it disclaims | Repository design docs |
+| HTTP endpoint shapes (`GET /projections/…`, `POST /commands/create-pwu`) | Wire shapes; REG-D-004 cedes them to the repository, which dispatches in-process | The repository |
+| The VS Code extension surface | JCUX names it as a "Related surface"; no canon artifact owns it and no code in this tree implements it | No owner; would require a sponsor grant to acquire one |
+| Mobile and responsive form factors; offline behaviour; notification and push | Referenced by none of the four sources as an obligation; adopting them would mint requirements with no source | No owner |
+| `Qualifies` and `Inconclusive For` as evidence-relation classes | RIWS §15.4 (`RIWS:791-801`) requires four classification values; `TraceRelationSchema` (`packages/rph-contracts/src/enums.ts:732-751`, read directly) is a closed **17**-value set containing `SUPPORTS` and `CONTRADICTS` and **neither** of the other two. Conforming would require amending a superior artifact, since DOC-003 REL-1 makes that vocabulary's membership canon-governed | JPWB-DOC-003 (REL-1) via a vocabulary act; declined here |
+| Reasoning-trace display | Prohibited, not declined for want of an owner — see §11.2.1's PER-12 row. Listed again here so that a reader scanning declinations does not read the silence as permission | JPWB-DOC-003 PER-12 |
+
+### 11.2.4 The honest residue — names with no owner today
+
+*The smallest table, and the one that must stay small. Each row names the act that would give the name an owner.*
+
+| Name as referenced | Why it has no owner | The act that would give it one |
+|---|---|---|
+| The display-alias registry (its location, its entry shape, its contents) | DOC-002 §9.2 created the mechanism (`:279`) and §8 is its recording location (`:223`), but **zero aliases are registered** — I read the whole §8 table and no row is marked as an alias. The mechanism has never been exercised | FORK-11 ruled to (b), then a vocabulary act per DOC-002 §9.2 minting the first alias |
+| The withholding-reason class set | FORK-6 open; the incumbent has exactly one instance (`execution-view.ts:540-568`) and no registry | FORK-6 ruled, then §6's disclosure catalog populated and gated by the totality fixture |
+| A compensating-path concept for multi-command actions | FORK-8's option (c) requires it; nothing in the 64-command registry expresses compensation | FORK-8 ruled to (c), then a DOC-003/engine commission — outside this specification's perimeter |
+| `startableStepByPlan`'s population path from a UI-reachable state | The projection gate `startableStepIds` exists (`packages/rph-projections/src/execution-view.ts:617`) and the engine calls the same rph-domain predicate; the spine records that no UI-reachable state populates the map, so the step-level Affordances never appear. This is a repository defect with no owning register entry | A divergence finding filed under JPWB-DOC-004's protocol, then repository work |
+| The RIWS/CPM modality conflict on unavailability disclosure (SHOULD versus SHALL) | Surfaced at FORK-7's evidence; neither source is authority, and no entry adjudicates between two non-canonical documents | FORK-7 ruled, which disposes of the conflict as a side effect — recorded so the disposition is not accidental |
+
+**Rows added at assembly, 2026-07-28.** Each is a name or an identifier the assembled document leans on and which no
+section defines. They are recorded here rather than repaired, because repairing any of them would be authoring, not
+harmonization.
+
+| Name as referenced | Why it has no owner | The act that would give it one |
+|---|---|---|
+| The fixture-identifier namespace | Five namespaces were minted independently and none subsumes the others: `SPEC-001-FIX-<SUBJECT>-<nn><P\|N>` and `SPEC-001-CHK-<NAME>` (§1.5, §§2.1–2.3), `FX-O4-nn`/`FX-O5-nn`/`FX-O6-nn` (§§2.4–2.6), `SPEC-001-FX-07-nn`/`-08-nn`/`-09-nn` (§§2.7–2.9), `SPEC-001-FX-<AREA>-<nn>` (§§4–6), and `SPEC-001-PF/NF/PB/MU/SC/REV-nn` (§§7, 10). §10 is the declared master for fixture *content* and defines only the last | A single naming act that maps every minted id onto §10's namespace, discharged through §10.8's unassigned-identifier record and gated by `SPEC-001-NF-67` |
+| `SURF-SCOPE-001` · `SURF-STALE-002` · `SURF-DISC-001` · `PROJ_UNAVAILABLE` · `SURF-STALE-REVALIDATED` | Five disclosure codes are cited in §§2.1, 2.7, 2.8 and 2.9 as members of §6; §6.3's Register B is a closed `JPWB-SD-nnn` set and carries none of them. §6.3's assembly-time subsection records the mismatch | Bind each to a Register-B member or mint the member, in the same change, per §6.1's separate-register rule |
+| Limb 3 of the qualified-success rule — “required conditions are explicit” | §2.7.2 O-7-R6 declares it deliberately unimplemented and `limbConditionsExplicit` is typed `boolean \| null` with writer **Nobody — reserved**; the incumbent records that deciding what “explicit” means “is a modelling judgement and not mine to invent” | A DOC-003 modelling act defining explicitness for `CONDITIONALLY_SATISFIED`, after which the field acquires a writer |
+| The `watermark` token's form | §5.9 specifies the ordering relation and declares the token's exact form unspecified; no section supplies it and no register entry owns it | A repository shape act under REG-D-004's partition, recorded against REG-Q-017's freshness envelope |
+| `SPEC-001-PB-05` — the concurrent-revision property | §10.4 defers it with reason (the engine's concurrency contract is a DOC-003/repository question this specification does not govern) and directs that it be listed here rather than silently omitted | A DOC-003/engine ruling on the concurrency contract, after which the property becomes writable |
+| The nine-versus-ten revision count in §9.9 | §9.0 and §9.9 both state **nine** revisions while ten ids (`REV-01` … `REV-10`) are minted. Neither number was altered at assembly, because either alteration is a substantive edit to a measured count | A count reconciliation by the section's author, or a sponsor ruling that one id is a duplicate |
+| A migration note for a `watermark` comparison-relation change | §5.9's versioning clause requires such a change to be “accompanied by a migration note in §11”; §11 carries no migration-note structure | Either a migration subsection in §11 or a redirect of the obligation to the repository's migration record |
+
+### 11.2.5 Closure statement for §11.2
+
+Four tables; every row carries a reason and an owner or an act. Two properties SHALL hold and are checked in §10:
+**totality** — every referenced-but-undefined name in §§1–10 appears in exactly one of the four tables, checked by
+the referenced-name closure check; and **non-vacuity** — §11.2.4 is non-empty, because a residue table that is
+empty on a specification of this scope is evidence that gaps were absorbed into the routed tables rather than
+faced. *(That second property is modelled on the enforcement register's own axis check at
+`enforcement-register.test.ts:204-212`: "the axis carries more than one verdict — a register that says CARRIED
+everywhere checks nothing.")*
+
+---
+
+## 11.3 Relationship to the sources
+
+**Standing, first.** This specification **supersedes none** of the four source documents. Each remains what
+JPWB-REG-005 records it to be, and REG-Q-047 (`JPWB-REG-005:411-414`) still binds: the RIWS/JCUX corpus is
+"non-canonical design material — historical evidence for repository design docs; any adoption as conformance
+criteria requires a Decision." This specification is the commissioned successor contemplated by that entry and by
+REG-D-009's sequencing (`JPWB-REG-005:108-109`): decision brief → sponsor rules forks → SPEC commissioned →
+reference artifacts → implementation. It carries source *content* into the registry under its own id, its own
+invariant numbering, and its own conformance fixtures. It does not carry source *authority*, and a ruling admitting
+this specification does not admit them.
+
+### 11.3.1 What is taken from each source
+
+**RIWS (`JAN-RIWS-001`) — principal source.** Taken: the workspace-composition idea that a professional context
+supports multiple projections over one subject (§11); the projection-availability rule that an unavailable
+projection should explain itself (§11.3, `RIWS:501-511`) — taken and **strengthened from SHOULD to SHALL**, which
+is recorded as an authored strengthening at FORK-7 rather than presented as carriage; the context-preservation
+requirement across projection switches (§11.2, `RIWS:490-499`), which becomes `SPEC-001-INV-10`; and the
+disclosure discipline behind evidence relationships (§15.4) as motivation, not as a value set. RIWS supplies this
+specification's **shape** of a workspace more than any other source.
+
+**JCUX (`JAN-JCUX-001`) — screen-level source.** Taken: the shared screen invariants at §7 (`JCUX:288-331`), which
+are the closest existing statement of this specification's own concern and are carried, restated at Surface grain,
+with citation — SCREEN-INV-005 → `SPEC-001-INV-12`, SCREEN-INV-006 → `-06`, SCREEN-INV-008 → `-09`,
+SCREEN-INV-009 → `-01`, SCREEN-INV-010 → `-10`. Also taken: the framing at §1 that the interface "SHALL expose one
+authoritative product-realization model through multiple cognitive projections," which is AUT-1 stated at the
+surface. JCUX is the source with the highest **density of directly usable obligations** and the highest
+divergence cost, and both facts are recorded here together.
+
+**CPM (`JAN-CPM-001`) — projection model.** Taken: the projection-invariant family at §8 (`CPM:345-409`), three of
+which have no counterpart in the other sources and are load-bearing here — PROJ-INV-012 *Suppression Disclosure*
+(`:393`), PROJ-INV-013 *State Distinction* (`:397`), PROJ-INV-014 *No False Completeness* (`:401`). CPM is where
+the idea comes from that a projection's *omissions* are part of its contract, which is the intellectual ancestor of
+`SPEC-001-INV-04` and `-09`. Also taken: PROJ-INV-015's requirement that a command retain its originating
+projection context.
+
+**RPH-DOC-010 — incumbent behaviour.** Taken: the two-context distinction (PWA DESIGN CONTEXT versus UNDERTAKING
+CONTEXT, `RPH-DOC-010:245-257`) that the built shell already implements and cites by name at
+`+layout.svelte:57-58`; the surface inventory at §4 (PWA Library, PWA Designer, Undertaking Portfolio, Undertaking
+Workbench, Execution Workbench, Assurance Workbench, Decision Center, Baseline Manager) as the vocabulary of
+Surfaces this specification's O-2 generalizes; and the reference Undertaking at §30 as the seed of §9's reference
+case. RPH-DOC-010 is the only source that describes a system that **exists**, and it is therefore the source this
+specification treats as evidence about behaviour rather than as an obligation.
+
+### 11.3.2 What is declined, and why
+
+**From JCUX — the route root.** JCUX §4 (`JCUX:94-155`) roots every one of its 34 route lines at
+`/{organizationId}/`. The conferral sheet records, and I re-ran and confirm untruncated in preparing this section,
+that **`organizationId` has 0 occurrences** across `packages/*/src` and `apps/rph-demo/src`. Adopting §4 would make
+100% of the built route surface — six of six page routes — non-conformant on the day of the ruling, in exchange for
+a tenancy display that REG-Q-004's safe default already places in transport, repository and RLS context rather than
+in the URL. Declined; the decision is FORK-2 and the sponsor may reverse it.
+
+**From JCUX — the vocabulary of its screen titles.** JCUX §11 and §12 are titled, in the source's own words,
+"Endeavors Screen" and "Endeavor Detail Screen" (`JCUX:501`, `JCUX:547`), with the route
+`/{organizationId}/endeavors/{endeavorId}`. That vocabulary is **retired**: DOC-002:248 maps bare `Endeavor` to
+**Undertaking**, and DOC-002:249 forbids creating a second competing root term without a Decision. Quoting the
+titles here is a permitted residual use — DOC-002:251 admits historical documents without rewrite — but adopting
+them is not. This specification says **Undertaking** throughout, and the built surface agrees: `endeavor`
+(case-insensitive) returns **0 occurrences** across `packages/*/src` and `apps/rph-demo/src` on an untruncated grep
+I ran myself. Declined; not a fork, because DOC-002 already decided it.
+
+**From JCUX — the cognitive-state obligations.** SCREEN-INV-003 (`JCUX:298-300`) requires lifecycle state and
+cognitive state to be shown separately, and §13 offers Cognitive State as a filterable field. `cognitiveState`
+returns **0 occurrences** in the tree, and REG-Q-003's safe default (`JPWB-REG-005:185`) forbids persisting a state
+axis DOC-003 has not ratified and warns explicitly against mapping by similar labels. Declined; `SPEC-001-INV-05`
+governs the **four ratified axes** instead, which is a different and narrower obligation, and the substitution is
+recorded here rather than performed silently.
+
+**From RIWS — the required-information blocks.** RIWS's per-workspace required-information sections mandate
+Lifecycle plus Cognitive state and **never require execution or assurance state**; `assurance` occurs exactly
+**once** in RIWS's 2,522 lines, at `:1654`, in the phrase "evidence-based assurance categories" — I ran that count
+untruncated. RIWS §11.1's ten canonical PWU projections (`RIWS:475-488`) are Overview, Understanding, Reasoning,
+Evidence, Decisions, Execution, Observations, Reconciliation, Decomposition, History: **no Assurance projection**.
+A surface built to RIWS would satisfy RIWS and violate DOC-003 STA-1's rendering scope. Declined; the built
+Undertaking Workbench already does better, carrying `assurance` as one of seven tabs
+(`undertakings/[id]/+page.svelte:32-40`), and this specification takes the built behaviour over the source
+document on this point.
+
+**From CPM — the minimum viable projection set.** CPM §30 (`:1995-2043`) enumerates nine projections: Endeavor
+Overview, PWU Overview, Decomposition, Reasoning, Evidence, Decision, Reconciliation, History, RPH Coordination.
+Neither Assurance nor Baseline is among them — and the omission is total, not incidental: case-insensitive
+untruncated counts over CPM's 2,326 lines return **`assurance` → 0, `baseline` → 0, `waiver` → 0**. I ran all three
+myself; this upgrades the conferral sheet's reported claim to CONFIRMED. Conforming to §30 would delete the
+assurance projection the repository already performs at `packages/rph-projections/src/assurance-view.ts`.
+Declined, and this is the sharpest single reason CPM is taken for its *invariants* and not for its *inventory*.
+
+**From CPM — cognitive state as a command-eligibility guard.** CPM §11.1's Command Region displays "only commands
+valid for: current lifecycle state; current cognitive state". A guard is not "projection/focus metadata," which is
+the outer bound REG-Q-003's binding safe default allows. Declined; `SPEC-001-INV-03` requires an Affordance to
+derive from the **same declared authority the engine enforces**, which is a different derivation entirely.
+
+**From RPH-DOC-010 — its navigation as an obligation.** §5's five-entry tree (`:226-243`) includes an
+Administration destination the built rail does not carry and omits nothing the rail carries. It is taken as
+**evidence of intent**, not as a rail specification; the choice belongs to FORK-1 and this specification does not
+pre-empt it.
+
+**From all four — their coding-agent instruction sections.** Each source carries a block of instructions addressed
+to implementing agents. Those land on JPWB-DOC-004's concern, and B3 routes precedence by concern; a specification
+that carried them would install a second agent protocol. Declined without exception.
+
+### 11.3.3 The supersession statement
+
+This specification supersedes no source document and repeals no register entry. It **converts** source content into
+numbered obligations under `JPWB-SPEC-001`, each with a named verifying check, so that the content survives the
+retirement contemplated by REG-D-006 without the documents acquiring authority they were never conferred. Where a
+source's obligation is carried, this specification is the citable authority for the carried form and the source is
+historical evidence for its origin. Where a source's obligation is declined, §11.3.2 records the decline and its
+reason, so that retirement does not silently lose a rule that was considered and rejected — which is the
+survivorship discipline REG-D-008 made a retirement precondition (`JPWB-REG-005:101`).
+
+Conformance of this subsection is established by the source-disposition check in §10: it enumerates the
+obligation-bearing sections of RIWS §§6, 11, 12, 15; JCUX §§3, 4, 7, 12; CPM §§8, 11, 30; and RPH-DOC-010 §§4, 5,
+30, and fails if any is neither carried with citation in §§2–10 nor declined with a reason in §11.3.2. An
+undisposed source section is a concealed gap, in the exact sense DOC-004 §6.3 gives that phrase — and it is the one
+failure mode this section exists to make impossible.
+
+---
+
+# 12. Self-review battery — results and disposition
+
+INFORMATIVE. The commission template requires the self-review battery to be run as distinct passes and **each
+pass's finding count reported in the handoff**. This section is that report. It is recorded inside the artifact
+rather than beside it because a review whose results live only in a transcript is a review the next reader cannot
+audit — the same argument §10.5 makes about a record that reads like a measurement.
+
+## 12.1 Counts, as measured
+
+| Pass | Result |
+|---|---|
+| 1 · Vocabulary consistency (JPWB-DOC-002) | **7 findings** — 2 MODERATE, 4 MINOR, 1 observation. Zero retired-root violations, zero redefinitions of a canonical term, zero competing roots. Every DOC-002 line citation the spec makes was verified accurate. |
+| 2 · Closure-matrix completeness | **12 findings** across O-1…O-9 × C-1…C-26. |
+| 3 · Verification binding | **300 unverifiable obligations.** Of **780** normative `SHALL`/`SHALL NOT` sentences, **324 (41.5%)** name a check in the same or an adjacent sentence; **300** name none within ±2 sentences. **27** leaf subsections carry a `SHALL` and name no check anywhere in the subsection. |
+| 4 · Adversarial economy | **51** shortcut records covering **14 of 14** invariants; **51 of 51** name a negative fixture. **14** state the prohibition as a positive `SHALL` rather than `SHALL NOT`; **31** omit the incumbent-status clause §7.1 declares mandatory. |
+| 5 · Cross-section contradiction | **18 findings**. |
+| 6 · Traceability | **10 broken chains** (intent → principle → invariant → contract → fixture). |
+| 7 · Reference-case closure | **10 findings**. The structural one: **ten revisions the reference case forced on the object catalog were recorded and never carried**, and §11.0.3's carriage check is scoped to forks, so nothing reports them. |
+| 8 · Deletion pass | **9 findings**, none touching the controlled redundancy §8 requires. |
+| Fact-check of every repository claim | **21 findings** — and the verdict that matters: **no normative obligation rests on a false reading of the code.** Every load-bearing citation (`queries.ts:46-51`, all sixteen route actions, `+layout.svelte`, `execution-view.ts`, the four uncertainty-noun absence greps) was re-opened and confirmed exact. |
+
+## 12.2 What was corrected before this draft was recorded
+
+Two only, both because leaving them would have made a later reader trust a measurement that was not one.
+
+- **FC-1 · `SPEC-001-MU-09`'s anchor did not exist.** Declared at 3/4/4 tabs against actual bytes of 2/3/3
+  (`execution-view.ts:565-567`, verified with `cat -A`). Under §10.6's own quoted rule the mutant would have
+  reported `UNANCHORED` — ledger rot produced by the section written to prevent it. Corrected in place, with the
+  original error recorded beside it.
+- **FC-6 · the `runSteps` dispatch count.** Drafted as "four Commands", carried from the authoring spine, where its
+  author inferred four from the four `chg` calls without reading the step list. It is **six**, or **eight** on
+  first invocation (`+page.server.ts:830-887`). The *measured* behaviour — two assurance rows committed, then
+  "Illegal transition on PWU" surfaced — was observed in a browser and is unaffected. Corrected at both loci.
+
+## 12.3 What remains open — and why it is stated rather than fixed
+
+**Pass 3 is a ratification precondition, not a stylistic note.** The commission template is explicit: *"An
+unverifiable SHALL is a defect."* By that standard this draft carries **300 defects**, and no amount of further
+prose repairs them — each requires either a named fixture or the demotion of the obligation to `SHOULD`. That work
+is a bounded, mechanical work package over §§2–9, and it SHALL be discharged before ratification is sought.
+
+The remaining pass-1/2/4/5/6/7/8 findings and the nineteen unfixed fact-check items are of one kind: **counted and
+cross-referenced facts that were not re-derived at assembly** (fixture-count totals, a mutant partition that covers
+eleven of twelve, five fixture-identifier namespaces of which §10 defines one, five disclosure codes with no member
+in §6.3's closed register, a reference-case revision count of nine against ten minted ids). They are recorded in
+§10.8, §6.3.1 and §11.2.4 rather than silently repaired, because binding a code or assigning a namespace is a
+semantic act and this document confers nothing.
+
+**The honest summary of this draft's standing:** its reading of the built system is sound and independently
+verified; its obligation surface is substantially complete; and its own verification binding is **not** yet at the
+bar its genre demands. It is a draft worth ratifying *after* pass 3 is discharged, and not before.
