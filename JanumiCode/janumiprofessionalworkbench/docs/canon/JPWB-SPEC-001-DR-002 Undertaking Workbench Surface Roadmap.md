@@ -56,6 +56,7 @@ record is re-derived before it is acted on. Doing so **withdrew one finding enti
 | **F-F** | Persistence is in-memory only | **CONFIRMED, and smaller than recorded** |
 | **F-G** | `/favicon.png` 404s on every page load | **CONFIRMED** |
 | **F-H** | The help / "Rosetta" system | **NOT A BACKLOG ITEM — it does not exist anywhere** |
+| **F-I** | `ReviseDecomposition` discards three declared payload fields | **NEW — found while planning W-3** |
 
 ### F-A — the workbench cannot scroll (CONFIRMED)
 
@@ -166,6 +167,33 @@ started-and-abandoned item; it exists only in an agent's memory of a conversatio
 into this roadmap** — it is unstarted design work, and design work enters through a design note, not a remediation
 roadmap. Recorded here so the absence is deliberate rather than an oversight.
 
+### F-I — a command advertises three fields its handler never reads (NEW)
+
+`ReviseDecompositionPayloadSchema` (`packages/rph-contracts/src/messages.ts:406-411`) declares:
+
+```ts
+export const ReviseDecompositionPayloadSchema = z.strictObject({
+	rationale: z.string(),
+	childWorkUnitIds: z.array(z.string()).optional(),
+	obligationAllocations: z.array(ObligationAllocationSchema).optional(),
+	constraintPropagations: z.array(ConstraintPropagationSchema).optional()
+});
+```
+
+The handler is `export const reviseDecomposition: CommandHandler = (ctx, command) =>` — it **takes no payload
+parameter at all** (`packages/rph-application/src/handlers/decomposition.ts:277`). It advances status to
+`SUPERSEDED` and bumps `semanticVersion`. A caller supplying revised `childWorkUnitIds` gets `ACCEPTED` and
+**nothing happens to them**.
+
+This is CON-000 B7 at the command boundary: the schema is an asserted capability that nothing performs, and it
+asserts it in the most convincing possible form — a typed, validated, accepted payload. It is worse than an
+absent field, because an absent field is visible to the caller and a discarded one is not.
+
+**Not repaired by W-3**, which only needs to know the capability is unavailable. Recorded here so the repair is
+scoped deliberately rather than discovered again: either the handler reads the payload, or the schema stops
+declaring what it cannot honour, and that is a decision about the decomposition model rather than about the
+surface.
+
 ---
 
 ## 2. Land order
@@ -226,18 +254,71 @@ binds.** No work package is complete on a green that was not preceded by a named
 
 ### W-3 — the PWA instantiates
 
-- **Red first.** An e2e that creates an Undertaking from a published PWA whose root type declares permitted
-  children, and asserts — against `/test-api/introspect` engine ground truth, not the DOM — that the Undertaking's
-  PWU set matches the PWA's composition tree, with each child's cardinality honoured. Fails today: the set is empty.
-  **Plus a CONTROL**: a PWA whose root permits no children must instantiate exactly one PWU, not zero and not a
-  fabricated child.
-- **Change.** Wire `ProposeDecomposition` / `ValidateDecomposition` to the surface. `M1`/`C1` instantiate one;
-  `M+`/`C+` instantiate one and offer more; `C*` conditional children are offered, not created. Dispatch through
-  `dispatchBatch` so a partial tree is impossible — the same atomicity defect `runSteps` had, and the envelope
-  already exists at `engine.ts:91`.
-- **Mutants.** `W3-cardinality-is-ignored-every-child-is-instantiated`,
-  `W3-conditional-children-are-instantiated-unconditionally`, `W3-the-tree-is-dispatched-non-atomically`.
+> **AMENDED 2026-07-28, BEFORE ANY CODE WAS WRITTEN. The paragraph this replaces was wrong in three ways, and
+> each was verified against the source rather than taken on report.** The original text is preserved in
+> `git show 69b6f6f5`. It was written from the *names* of three commands and the *existence* of a cardinality
+> enum, without reading either implementation — the same method that produced F-B's withdrawn finding two
+> sections above, and it failed the same way.
+
+**Correction 1 — `ProposeDecomposition` does not instantiate anything.** The original text said "wire
+`ProposeDecomposition` / `ValidateDecomposition` to the surface" and expected PWUs to appear.
+`packages/rph-application/src/handlers/decomposition.ts:39-72` calls `createObject` exactly once, with
+`objectType: DECOMPOSITION_CONTRACT`. `childWorkUnitIds` is copied into contract state and into the event payload
+and **is never iterated**. The handler in fact *requires the parent to exist already*
+(`decomposition.ts:41-48`), which is the tell: a contract is written **over ids that already exist**.
+
+The kernel's real order is the reverse of the roadmap's. Child PWUs are created **first**, by `ProposePwu`, each
+carrying its own `parentWorkUnitId`; the contract is recorded afterwards. So W-3 is:
+
+1. Walk the published PWA's composition tree and emit one `ProposePwu` per planned instance, children carrying
+   `parentWorkUnitId`.
+2. Then one `ProposeDecomposition` + `ValidateDecomposition` per parent that actually gained children.
+3. All of it inside **one `dispatchBatch`**, so a partial tree is impossible.
+
+**Correction 2 — the cardinality rule as written contradicted itself.** "`M1`/`C1` instantiate one … `C*`
+conditional children are offered, not created" says two different things about `C1`. The ratified semantics are in
+`packages/rph-contracts/vocab/canonical-vocabulary.json:65-75`: *"M1 mandatory-exactly-one; M+
+mandatory-one-or-more; C1 conditional-zero-or-one; C+ conditional-zero-or-more."* The mandatory minimum is **1 for
+M1 and M+, 0 for C1 and C+**. W-3 instantiates M1→1, M+→1, C1→0, C+→0, and a permitted child carrying no rule
+defaults to M1.
+
+**Correction 3 — one clause is not buildable at all, and the reason is a defect.** "M+/C+ instantiate one and
+**offer more**" cannot amend a contract once it exists. `reviseDecomposition` is declared
+`(ctx, command)` — **no payload parameter** (`decomposition.ts:277-289`) — while
+`ReviseDecompositionPayloadSchema` declares `childWorkUnitIds`, `obligationAllocations` and
+`constraintPropagations` (`packages/rph-contracts/src/messages.ts:406-411`). All three are **silently discarded**;
+the handler only advances status to `SUPERSEDED` and bumps `semanticVersion`. So W-3 offers further children as an
+affordance that records the parent link **on the PWU** (`parentWorkUnitId`, already folded by
+`professional-work-graph.ts`) and does not amend the contract. **This is recorded as finding F-I below, not
+skipped** — a command whose schema advertises three fields its handler never reads asserts a capability nothing
+performs, which is CON-000 B7 exactly.
+
+- **Red first.** An e2e that creates an Undertaking from the seeded published PWA and asserts — against
+  `/test-api/introspect` engine ground truth, not the DOM — that the Undertaking owns **8** PWUs. The seeded root
+  permits seven children, every one `M1` (`seed-workbench.ts:62-70`), so root + 7 = 8. **The seed is a
+  discriminating fixture and that is why the number matters**: `Architecture Definition` permits one child at `C+`
+  (`seed-workbench.ts:92`), so an implementation that instantiates everything permitted reports **9**, and one
+  that ignores cardinality entirely also reports 9. Fails today reporting **0**.
+- **Controls.** Three, because the roadmap's single control is too weak to kill the mutants: (a) a PWA whose root
+  permits no children instantiates exactly one PWU — not zero, not a fabricated child; (b) a depth-2 fixture with
+  an `M+` and a `C1`, proving the walk recurses and that `M+` yields one rather than zero or many; (c) a PWA whose
+  root permits a child type that does not resolve — which **publishes cleanly today**, because `definePwuType`
+  never checks that `permittedChildTypeIds` resolve — proving the batch is atomic when `ProposePwu` refuses
+  mid-tree.
+- **Mutants.** `W3-cardinality-is-ignored-every-permitted-child-is-instantiated` (reports 9),
+  `W3-the-walk-does-not-recurse`, `W3-the-tree-is-dispatched-non-atomically`. **One victim each** — and no mutant
+  may name a unit spec and an e2e spec together: `isE2eTarget` (`scripts/mutants/run.ts:333-341`) treats a mixed
+  set as a declared error and throws, aborting the whole run.
+- **Known collateral, to be amended in the same change.** Four existing e2e specs assume a new Undertaking owns
+  either nothing or one PWU. `undertaking-pwu.e2e.ts` asserts `toHaveLength(1)` and then indexes `pwus[0]`, which
+  becomes the auto-instantiated root; `undertaking-scope.e2e.ts` asserts its probe shows "No traceability links",
+  false once it owns PWUs; `pwu-lifecycle.e2e.ts` and `undertaking-atomicity.e2e.ts` use bare
+  `Begin & Execute` locators that go strict-mode-ambiguous against eight PROPOSED rows.
 - **Binds.** The `O-4` closure matrix (§2.4.1, 18 unbound) and §2.4.2's derivation obligations.
+- **Does NOT bind the conservation obligations, and W-3 must say so.** `ValidateDecomposition`'s P2/P3 guard reads
+  the parent's `obligationIds` / `constraintIds` (`decomposition.ts:147,176`), and every surface path hardcodes
+  both to `[]`. The validation will pass trivially on every tree W-3 can build. That is acceptable for W-3 and it
+  is **vacuous**, so `decomposition-conservation.test.ts` being green must not be read as covering the surface.
 
 ### W-4 — the risk profile is authored
 
