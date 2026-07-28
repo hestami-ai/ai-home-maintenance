@@ -52,10 +52,21 @@ export type CoverageLayer =
 	| 'COMMAND' // rph-application, rph-engine — Engine.dispatch, the running surface
 	| 'READ_MODEL' // rph-projections — folds over the event stream
 	| 'STORE' // rph-persistence — the adapter
+	| 'SURFACE' // apps/* — the projection surface a professional drives, observed end to end
 	| 'UNKNOWN'; // an unrecognised path: fail closed, never assume COMMAND
 
-/** Package path prefix -> the layer its tests observe. Ordered longest-first is unnecessary: the prefixes are
- *  disjoint by construction (one package each). */
+/**
+ * Path prefix -> the layer its tests observe. Ordered longest-first is unnecessary: the prefixes are disjoint by
+ * construction (one package or app each).
+ *
+ * `apps/` ADDED 2026-07-28 (JPWB-SPEC-001 FORK-19, roadmap S-3). Until then this table mapped `packages/` only, so
+ * `layerOfTestFile` fail-closed EVERY app path to `UNKNOWN` and no surface-layer obligation could be recorded as
+ * enforced at all. That was not a policy — SPEC-001's fourteen invariants are surface obligations, and the
+ * register that exists to say where a rule is enforced could not express their layer.
+ *
+ * WIDENING WHAT IS RECOGNISED IS NOT WIDENING WHAT IS ASSUMED. The fail-closed default below stays `UNKNOWN`; this
+ * adds one more prefix that is positively recognised, and nothing else.
+ */
 const LAYER_BY_PACKAGE: readonly (readonly [string, CoverageLayer])[] = [
 	['packages/rph-contracts/', 'SCHEMA'],
 	['packages/rph-domain/', 'PURE_KERNEL'],
@@ -63,7 +74,8 @@ const LAYER_BY_PACKAGE: readonly (readonly [string, CoverageLayer])[] = [
 	['packages/rph-application/', 'COMMAND'],
 	['packages/rph-engine/', 'COMMAND'],
 	['packages/rph-projections/', 'READ_MODEL'],
-	['packages/rph-persistence/', 'STORE']
+	['packages/rph-persistence/', 'STORE'],
+	['apps/rph-demo/', 'SURFACE']
 ];
 
 /**

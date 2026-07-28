@@ -76,8 +76,9 @@ interface Result {
 	readonly victims?: readonly string[];
 }
 
-const sh = (cmd: string, args: readonly string[]) =>
-	spawnSync(cmd, args, { cwd: ROOT, encoding: 'utf8', shell: true });
+/** `cwd` defaults to the repo root; an e2e victim overrides it with the app that owns the Playwright config. */
+const sh = (cmd: string, args: readonly string[], cwd: string = ROOT) =>
+	spawnSync(cmd, args, { cwd, encoding: 'utf8', shell: true });
 
 /**
  * Is the working tree free of MODIFICATIONS? The harness must never leave a mutant behind.
@@ -263,19 +264,21 @@ function runMutant(m: DeclaredMutant): Result {
 
 		// HARVEST asks vitest for the machine-readable report as WELL as the human one, so `summarise` keeps
 		// working unchanged and the two views cannot disagree about the same run.
-		const run = sh(
-			'bunx',
-			HARVEST
-				? [
-						'vitest',
-						'run',
-						'--reporter=default',
-						'--reporter=json',
-						`--outputFile=${HARVEST_REPORT}`,
-						...target
-					]
-				: ['vitest', 'run', ...target]
-		);
+		const run = isE2eTarget(target)
+			? runPlaywright(target)
+			: sh(
+					'bunx',
+					HARVEST
+						? [
+								'vitest',
+								'run',
+								'--reporter=default',
+								'--reporter=json',
+								`--outputFile=${HARVEST_REPORT}`,
+								...target
+							]
+						: ['vitest', 'run', ...target]
+				);
 		const out = `${run.stdout ?? ''}${run.stderr ?? ''}`;
 		const victims = HARVEST ? readVictims() : undefined;
 		// A mutation declared `expectSurvive` is a CONTROL: it edits something behaviour cannot depend on — a
@@ -306,6 +309,48 @@ function runMutant(m: DeclaredMutant): Result {
 
 /** `packages/rph-domain/src/x.ts` -> `packages/rph-domain`. */
 const pkgOf = (file: string): string => file.split('/').slice(0, 2).join('/');
+
+/** The app that owns the Playwright project. Its config, its webServer, its `bunx playwright test`. */
+const E2E_APP = 'apps/rph-demo';
+
+/**
+ * Does this victim set belong to Playwright rather than vitest? (JPWB-SPEC-001 FORK-19, roadmap S-3.)
+ *
+ * WHY THIS EXISTS. Until 2026-07-28 the runner always invoked `bunx vitest run <victim>`, so **no guard whose only
+ * red-proof is an e2e could be carried by this ledger** — the census was zero `apps/` entries and zero `*.e2e.ts`
+ * victims. That is a gap and not a policy: SPEC-001's invariants are surface obligations, and the instrument that
+ * measures whether a guard is tested could not reach the surface at all.
+ *
+ * THE TRAP THIS CLOSES, and it is why the gap could not simply be ignored. Naming an e2e victim under the old
+ * runner did NOT fail cleanly: vitest matched no spec, exited non-zero under `passWithNoTests: false`, and the
+ * runner recorded **KILLED** — a verdict produced by the file-matcher rather than by any guard, and indistinguishable
+ * in the summary from a real kill. A fake measurement is worse than a declared absence, which is why the atomicity
+ * guard shipped with no ledger entry and a comment saying so.
+ *
+ * A MIXED SET IS A DECLARED ERROR, never a silent partial run: one mutant cannot be measured half by Playwright and
+ * half by vitest without the verdict meaning two different things at once.
+ */
+function isE2eTarget(target: readonly string[]): boolean {
+	const e2e = target.filter((t) => t.endsWith('.e2e.ts'));
+	if (e2e.length === 0) return false;
+	if (e2e.length !== target.length)
+		throw new Error(
+			`mutant victim set mixes e2e and unit specs, which cannot be run as one measurement: ${target.join(', ')}`
+		);
+	return true;
+}
+
+/**
+ * Run an e2e victim through Playwright, from the app that owns the config.
+ *
+ * Paths are made app-relative because the ledger records repo-relative victims (so every entry reads the same way)
+ * while `playwright test` resolves against its own config root. The translation is done here rather than in the
+ * ledger so that a future second Playwright app needs a table entry, not a different victim spelling.
+ */
+function runPlaywright(target: readonly string[]): ReturnType<typeof sh> {
+	const rel = target.map((t) => (t.startsWith(`${E2E_APP}/`) ? t.slice(E2E_APP.length + 1) : t));
+	return sh('bunx', ['playwright', 'test', ...rel, '--reporter=line'], `${ROOT}${E2E_APP}`);
+}
 
 /**
  * HARVEST: which test FILES failed, from vitest's JSON report, repo-relative and POSIX.

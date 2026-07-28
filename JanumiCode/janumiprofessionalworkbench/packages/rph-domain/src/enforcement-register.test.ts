@@ -315,9 +315,15 @@ describe('WP-16 selftest — layerOfTestFile', () => {
 		expect(layerOfTestFile('packages/rph-projections/src/x.test.ts')).toBe('READ_MODEL');
 		expect(layerOfTestFile('packages/rph-persistence/src/x.test.ts')).toBe('STORE');
 		expect(layerOfTestFile('packages/rph-contracts/src/x.test.ts')).toBe('SCHEMA');
-		// The literal failing inputs: an app-level path, an unknown package, and an empty string must NOT read as
-		// COMMAND. A gate that guessed COMMAND here would certify exactly the claims it exists to check.
-		expect(layerOfTestFile('apps/rph-demo/e2e/x.e2e.ts')).toBe('UNKNOWN');
+		// SURFACE, added 2026-07-28 (SPEC-001 FORK-19). This assertion previously read `…'apps/rph-demo/e2e/x.e2e.ts'
+		// -> UNKNOWN`, and that was correct at the time: the register could not express a surface-layer obligation
+		// at all, so every app path fail-closed. It is now RECOGNISED — which is a different thing from being
+		// ASSUMED, and the unrecognised cases below still fail closed exactly as before.
+		expect(layerOfTestFile('apps/rph-demo/e2e/x.e2e.ts')).toBe('SURFACE');
+		expect(layerOfTestFile('apps/rph-demo/src/routes/x.test.ts')).toBe('SURFACE');
+		// The literal failing inputs: an unknown app, an unknown package, and an empty string must NOT read as
+		// COMMAND — nor as SURFACE. A gate that guessed either would certify exactly the claims it exists to check.
+		expect(layerOfTestFile('apps/some-other-app/e2e/x.e2e.ts')).toBe('UNKNOWN');
 		expect(layerOfTestFile('packages/rph-something-new/src/x.test.ts')).toBe('UNKNOWN');
 		expect(layerOfTestFile('')).toBe('UNKNOWN');
 		// …and a path that merely CONTAINS the package name is not the package.

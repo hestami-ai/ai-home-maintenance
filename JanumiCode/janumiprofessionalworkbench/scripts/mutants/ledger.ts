@@ -1804,5 +1804,44 @@ export const DECLARED_MUTANTS: readonly DeclaredMutant[] = [
 		expectRed: ['packages/rph-engine/src/query-scope.test.ts'],
 		why: 'INV-02: a Baseline is subject-bound through itemObjectVersions[].objectId, and stringifying the record admits it to no Undertaking at all',
 		source: 'JPWB-SPEC-001-DR-001 S-1'
+	},
+	{
+		id: 'S3-runSteps-loses-atomicity',
+		file: 'apps/rph-demo/src/routes/undertakings/[id]/+page.server.ts',
+		// THE FIRST LEDGER ENTRY WITH AN E2E VICTIM, and the first with a file under `apps/`. Both were impossible
+		// until S-3 taught the runner to dispatch `*.e2e.ts` to Playwright — see `isE2eTarget` in run.ts for why
+		// naming one before that would have recorded a FALSE `KILLED` from the file-matcher rather than a real one.
+		//
+		// The mutation restores the pre-2026-07-28 shape: dispatch each command singly and return on the first
+		// refusal, leaving everything before it committed. That is the defect the sponsor actually hit — clicking
+		// Record Assurance on the seeded root PWU minted two orphan assessments and THEN reported "Illegal
+		// transition on PWU".
+		find: '\tif (batch.ok) return null;',
+		replace:
+			'\tif (batch.ok) return null;\n\tif (batch.failedIndex !== undefined) return null; // MUTANT: swallow the refusal',
+		expectRed: ['apps/rph-demo/e2e/undertaking-atomicity.e2e.ts'],
+		why: 'INV-14: a refused multi-Command action must commit nothing — and a Surface must not report success for a sequence the engine refused',
+		source: 'JPWB-SPEC-001-DR-001 S-3'
+	},
+	{
+		id: 'S3-CONTROL-e2e-victim-is-actually-run',
+		file: 'packages/rph-domain/src/enforcement-register.ts',
+		// A CONTROL OVER THE NEW RUNNER PATH ITSELF, not over any guard.
+		//
+		// Without it, a Playwright dispatch that silently failed to run anything — wrong cwd, unresolved spec path,
+		// a webServer that never started — would exit non-zero and be recorded as KILLED for EVERY e2e victim. A
+		// runner that reports KILLED unconditionally is indistinguishable from one that works, which is the exact
+		// vacuity this ledger exists to detect. So: mutate something the atomicity spec cannot possibly observe (a
+		// comment word in a different package) and require it to SURVIVE. If this ever reports KILLED, the e2e
+		// dispatch is reddening on something other than the guard and every e2e verdict above it is void.
+		find: '// apps/* — the projection surface a professional drives, observed end to end',
+		replace: '// apps/* — the projection surface a professional drives, observed end-to-end',
+		expectRed: ['apps/rph-demo/e2e/undertaking-atomicity.e2e.ts'],
+		expectSurvive:
+			'A DECLARED CONTROL over the Playwright dispatch path (S-3). It edits a COMMENT in rph-domain, which no ' +
+			'e2e can observe. Its survival proves the e2e victim is genuinely executed and genuinely passes; a KILL ' +
+			'would mean the runner reddens on something other than the mutation, voiding every e2e verdict.',
+		why: 'S-3: proves the new Playwright dispatch distinguishes a real kill from a runner that always fails',
+		source: 'JPWB-SPEC-001-DR-001 S-3'
 	}
 ];
