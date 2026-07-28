@@ -23,6 +23,7 @@
     "@earendil-works/pi-coding-agent": "0.80.6",
     "@janumipwb/rph-authoring": "workspace:*",
     "@janumipwb/rph-engine": "workspace:*",
+    "@janumipwb/rph-persistence": "workspace:*",
     "@janumipwb/rph-product-realization-pwa": "workspace:*",
     "@janumipwb/rph-projections": "workspace:*",
     "@statelyai/graph": "2.1.0",

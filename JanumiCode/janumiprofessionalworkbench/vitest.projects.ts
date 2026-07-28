@@ -43,6 +43,20 @@ export function packagesWithTests(): string[] {
 }
 
 /**
+ * The apps that own at least one test file — discovered, for the same reason packages are.
+ *
+ * An app is a first-class subject here: `apps/rph-demo` is the SURFACE coverage layer the enforcement register
+ * gained in DR-001 S-3, and a layer the instruments cannot see is a layer nothing is claimed about.
+ */
+export function appsWithTests(): string[] {
+	const appDir = join(ROOT, 'apps');
+	if (!existsSync(appDir)) return [];
+	return readdirSync(appDir)
+		.filter((name) => countTests(join(appDir, name, 'src')) > 0)
+		.sort();
+}
+
+/**
  * The project list for one resolution mode.
  *
  * `passWithNoTests: false` IS THE FIX FOR N-16, and it is the part that generalises. The defect was not that a
@@ -65,6 +79,38 @@ export function projectsFor(extendsConfig: true): Array<Record<string, unknown>>
 			test: {
 				name,
 				root: `./packages/${name}`,
+				include: ['src/**/*.test.ts'],
+				passWithNoTests: false
+			}
+		})),
+		// THE APPS, and the blind spot they were in until DR-002 W-2 tried to use the ledger on one.
+		//
+		// `packagesWithTests()` scans `packages/` only, so twenty test files under `apps/rph-demo` ran ONLY under
+		// `turbo run test` (each app's own vitest, its own config) and were absent from BOTH modes here. Three
+		// consequences, and the third is the dangerous one:
+		//
+		//   1. No source resolution — so an app test exercising engine source measured the built dist instead.
+		//   2. No presence in the two-mode cross-check that DS §3-R1 exists to buy.
+		//   3. THE MUTATION LEDGER COULD NOT NAME THEM. `scripts/mutants/run.ts` invokes `bunx vitest run <victim>`
+		//      from the repo root, against THIS project list. A victim under `apps/` matched no project, vitest
+		//      exited non-zero for "no test files found", and the runner would have recorded a **KILLED that no
+		//      mutation caused** — the same vacuity `S3-CONTROL-e2e-victim-is-actually-run` was added to detect on
+		//      the Playwright path, waiting on the vitest one.
+		//
+		// S-3 taught the runner to reach `apps/` through Playwright. This is the other half: the unit path.
+		...appsWithTests().map((name) => ({
+			extends: extendsConfig,
+			// ONLY `$lib` — SvelteKit's own alias, which nothing outside an app declares. The `@janumipwb/*`
+			// resolution is deliberately NOT restated here: it is what DISTINGUISHES the two modes, and pinning it
+			// at project level would resolve app tests to source even under `test:dist`, quietly exempting the apps
+			// from the artifact half of the cross-check. Vite concatenates alias arrays when a project extends a
+			// config, so this adds to the mode's resolution rather than replacing it.
+			resolve: {
+				alias: [{ find: /^\$lib\/(.*)$/, replacement: `${join(ROOT, 'apps', name, 'src', 'lib')}/$1` }]
+			},
+			test: {
+				name: `app:${name}`,
+				root: `./apps/${name}`,
 				include: ['src/**/*.test.ts'],
 				passWithNoTests: false
 			}

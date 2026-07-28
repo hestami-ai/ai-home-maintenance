@@ -17,6 +17,7 @@ import {
 	type EngineHandle
 } from '@janumipwb/rph-engine';
 import { ontology, validateOntology } from '@janumipwb/rph-product-realization-pwa';
+import { SqliteStorageAdapter } from '@janumipwb/rph-persistence';
 import { PwaAuthoringBroker } from '@janumipwb/rph-authoring';
 import { buildPwaGraphExport, type PwaGraphExport } from '@janumipwb/rph-projections';
 import type { DomainCommand } from '@janumipwb/rph-contracts';
@@ -24,6 +25,15 @@ import { monotonicFactory } from 'ulid';
 
 const TEST_MODE = process.env.RPH_DEMO_MODE === 'test';
 const productionUlid = monotonicFactory();
+
+/**
+ * Where the durable store lives, or undefined for the in-memory one.
+ *
+ * TEST MODE IGNORES IT UNCONDITIONALLY. The E2E harness resets the engine between specs and depends on each spec
+ * starting from a known state; a durable store shared across specs would make them order-dependent, which is the
+ * failure mode `resetEngine` exists to prevent. So test mode is in-memory by construction, not by configuration.
+ */
+const DB_PATH = TEST_MODE ? undefined : process.env.JPWB_DEMO_DB;
 
 let handle: EngineHandle | null = null;
 let cmdSeq = 0;
@@ -71,17 +81,45 @@ export function hostNow(): string {
  * profile/template reference to one that does not exist, now fails engine construction rather than silently
  * producing an unsatisfiable profile.
  */
-function newEngine(): EngineHandle {
-	const base = { ontology, validateOntology };
+function newEngine(dbPath?: string): EngineHandle {
+	const base = {
+		ontology,
+		validateOntology,
+		...(dbPath ? { store: new SqliteStorageAdapter({ filename: dbPath }) } : {})
+	};
 	return createEngine(TEST_MODE ? { ...base, now: testNow } : base);
+}
+
+/**
+ * Open the workbench engine, seeding it ONLY if its store is empty (DR-002 W-2).
+ *
+ * `dbPath` undefined keeps the pre-W-2 behaviour exactly: an in-memory store, seeded on creation. Given a path,
+ * the store is a file and everything a professional authors survives a restart — which is what `recordConversation`
+ * below has promised in a comment since it was written ("survives reloads and, when the engine is backed by a
+ * durable store, restarts").
+ *
+ * THE SEED GUARD IS THE LOAD-BEARING HALF, and it is easy to omit because omitting it still passes a round-trip
+ * test: `getEngine()` seeded unconditionally on first use, so making the store durable without this check would
+ * mint a whole second reference workbench on every boot, and the authored object a round-trip looks for would
+ * still be there — among the duplicates. A store that doubles its seed each restart is a worse defect than the
+ * volatile one it replaces. `workbench-durability.test.ts` names it as a CONTROL for that reason.
+ */
+export function openWorkbench(dbPath?: string): EngineHandle {
+	const engine = newEngine(dbPath);
+	if (engine.readAllEvents().length === 0) seedWorkbench(engine);
+	// A DURABLE HOST SHALL RECOVER ITS PENDING OUTBOX AT STARTUP — `EngineHandle.recoverOutbox`, WP-2-007. The
+	// obligation has existed since the engine gained a durable store; until W-2 the demo had none, so it bound
+	// nothing and no one noticed. Measured before this line existed: a restart left **300** entries PENDING and
+	// never re-drove them. Guarded on `dbPath` because only a durable store carries work across a restart — a
+	// fresh in-memory store has nothing to recover, and draining the seed's own enqueue at construction would
+	// change the in-memory host's behaviour to no purpose.
+	if (dbPath) engine.recoverOutbox();
+	return engine;
 }
 
 /** The shared, seeded engine (created + seeded once per server process). */
 export function getEngine(): EngineHandle {
-	if (!handle) {
-		handle = newEngine();
-		seedWorkbench(handle);
-	}
+	handle ??= openWorkbench(DB_PATH);
 	return handle;
 }
 

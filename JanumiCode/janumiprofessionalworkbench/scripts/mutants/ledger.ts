@@ -1875,5 +1875,42 @@ export const DECLARED_MUTANTS: readonly DeclaredMutant[] = [
 		expectRed: ['apps/rph-demo/e2e/undertaking-scroll.e2e.ts'],
 		why: 'DR-002 W-1: the CONTROL case is load-bearing — a repair that makes EVERYTHING scroll is not a repair',
 		source: 'JPWB-SPEC-001-DR-002 W-1'
+	},
+	{
+		id: 'W2-a-the-store-path-is-ignored',
+		file: 'apps/rph-demo/src/lib/server/workbench.ts',
+		// THE FIRST UNIT VICTIM UNDER `apps/`, and it was unreachable until the same work package fixed the runner.
+		// `packagesWithTests()` scanned `packages/` only, so a victim here matched no vitest project, the run exited
+		// non-zero for "no test files found", and this entry would have been recorded KILLED WITH NO MUTATION
+		// APPLIED — the vacuity `S3-CONTROL-e2e-victim-is-actually-run` catches on the Playwright path, lying in
+		// wait on the vitest one. See `vitest.projects.ts` → `appsWithTests()`.
+		//
+		// The mutation restores the pre-W-2 host: construct the engine with no store, so `createEngine` falls back
+		// to its documented in-memory default and every authored Undertaking, Decision and Baseline dies with the
+		// server process.
+		find: '\t\t...(dbPath ? { store: new SqliteStorageAdapter({ filename: dbPath }) } : {})',
+		replace: '\t\t...(dbPath ? {} : {}) // MUTANT: the path is accepted and discarded',
+		expectRed: ['apps/rph-demo/src/lib/server/workbench-durability.test.ts'],
+		why: 'DR-002 W-2: professional work that does not survive a restart was never recorded, only displayed',
+		source: 'JPWB-SPEC-001-DR-002 W-2'
+	},
+	{
+		id: 'W2-b-the-durable-host-never-recovers-its-outbox',
+		file: 'apps/rph-demo/src/lib/server/workbench.ts',
+		// THE OBLIGATION THAT BECOMING DURABLE ACTIVATES. `EngineHandle.recoverOutbox` states it in its own doc
+		// comment — "re-drive PENDING outbox on (re)open of a durable store … A DURABLE HOST SHALL CALL THIS AT
+		// STARTUP" — and it had bound nothing here because there was no durable store to bind. Measured before the
+		// call existed: a restart left **300** entries PENDING and never re-drove them.
+		//
+		// THIS ENTRY REPLACED ONE THAT DID NOT REDDEN. W-2's first candidate mutated the seed guard, on the
+		// reasoning that a durable store without it would re-seed every boot. It left all victims GREEN: the seed
+		// dispatches fixed aggregate ids, so the engine's own idempotency already prevents the duplicate, and the
+		// guard is defence in depth rather than the mechanism. Under V-3d a victim that never reddens must not be
+		// recorded, so it is not — and the reasoning is kept here because the next person will have the same idea.
+		find: '\tif (dbPath) engine.recoverOutbox();',
+		replace: '\t// MUTANT: startup recovery is skipped',
+		expectRed: ['apps/rph-demo/src/lib/server/workbench-durability.test.ts'],
+		why: 'DR-002 W-2: work enqueued before a restart must be re-driven after it, not stranded PENDING forever',
+		source: 'JPWB-SPEC-001-DR-002 W-2'
 	}
 ];
