@@ -136,11 +136,38 @@ export default defineConfig({
 			// BRANCHES RATCHETED 82.5 -> 83.0 on 2026-07-26 (V-2d). Measured 83.34 after the ontology validator's
 			// five failure kinds became reachable; rounded DOWN to the nearest half point, per the rule above. A
 			// ratchet that is not tightened when the measurement supports it is a ratchet in name only.
+			//
+			// THREE OF FOUR RATCHETED on 2026-07-28 (DR-002 W-2), and the CAUSE matters more than the numbers. W-2
+			// added `apps/*` to the vitest project list: twenty app test files had been absent from BOTH resolution
+			// modes, so the engine source they exercise was attributed to nothing. Bringing them in did not make the
+			// code better — it revealed coverage that had always existed and was never counted, exactly as the
+			// header above says per-package numbers were LOWER BOUNDS. Measured 95.22 / 83.53 / 97.00 / 97.16.
+			//
+			//   statements  94.5 -> 95.0   (measured 95.22, slack 0.22 ≈ 10 statements)
+			//   functions   95.5 -> 96.5   (measured 97.00 — see below)
+			//   lines       96.5 -> 97.0   (measured 97.16, slack 0.16 ≈ 6 lines)
+			//   branches    83.0 UNCHANGED (measured 83.53 — see below)
+			//
+			// THE RULE IS "ROUND DOWN TO THE NEAREST HALF POINT", AND FOLLOWING ITS LETTER HERE WOULD HAVE BROKEN
+			// ITS PURPOSE. That rule exists to leave slack, because "a threshold pinned to 94.57 fails on a wobble
+			// of one statement, and that gate gets switched off just as surely as an aspirational one" (above). It
+			// produces slack only when the measurement sits comfortably above a half-point boundary. These two do
+			// not: branches at 83.53 would leave 0.03 — ONE branch — and functions at exactly 97.00 would leave
+			// NOTHING AT ALL. A threshold one uncovered branch away from failing is not a ratchet, it is a tripwire,
+			// and W-3/W-4/W-5 land new code behind it. So each steps down one further half point, and branches
+			// therefore does not move at all: the measurement does not support tightening it with adequate slack.
+			//
+			// Recorded rather than quietly applied, because a reader comparing 83.53 against 83.0 will otherwise
+			// conclude the ratchet was simply forgotten.
+			//
+			// LOAD-BEARING IN A SECOND WAY: these floors now also pin the apps INTO the measurement. Dropping
+			// `appsWithTests()` from the project list would take coverage back below them and fail the gate, rather
+			// than silently un-measuring 108 tests the way their absence did for months.
 			thresholds: {
-				statements: 94.5,
+				statements: 95,
 				branches: 83,
-				functions: 95.5,
-				lines: 96.5,
+				functions: 96.5,
+				lines: 97,
 				autoUpdate: false
 			}
 		}
