@@ -106,553 +106,574 @@
 
 <svelte:head><title>{data.undertaking.name} — Workbench</title></svelte:head>
 
-<nav class="crumbs"
-	><a href="/undertakings">Undertaking Portfolio</a> › <span>{data.undertaking.name}</span></nav
->
+<!-- The workbench owns its own scrolling. `+layout.svelte` clips this route (`.content.full`) on the strength
+     of a comment promising full-bleed surfaces manage it themselves; until DR-002 W-1 this page did not, and
+     every tab but `graph` was unreachable below the fold. -->
+<div class="workbench">
+	<nav class="crumbs"
+		><a href="/undertakings">Undertaking Portfolio</a> › <span>{data.undertaking.name}</span></nav
+	>
 
-<header class="uhead">
-	<div>
-		<h1>{data.undertaking.name}</h1>
-		<p class="binding">
-			Instantiated from <strong>{data.undertaking.pwaName} v{data.undertaking.pwaVersion}</strong> ·
-			status <span class="pill">{data.undertaking.status}</span>
-		</p>
-		<p class="obj">
-			{data.undertaking.objective}
-			<span class="product">→ {data.undertaking.intendedOutputProduct}</span>
-		</p>
-	</div>
-</header>
-
-<div class="tabs">
-	{#each tabs as t (t)}
-		<button class:sel={tab === t} onclick={() => (tab = t)}>{t}</button>
-	{/each}
-</div>
-
-{#if tab === 'graph'}
-	<p class="legend">
-		Live Professional Work Graph — a <em>projection</em> (View) of the Undertaking's PWU Instances; the
-		engine never renders. <b class="g">Green</b> = execution SUCCEEDED <em>and</em> assurance SATISFIED
-		(no green without assurance). <b class="a">Amber</b> = succeeded but not yet assured.
-		<b class="i">Indigo border</b> = baselined.
-	</p>
-	{#if flow.openResiduals.length}
-		<p class="residual">⚠ Open residual: {flow.openResiduals.join('; ')}</p>
-	{/if}
-	<div class="flow">
-		<SvelteFlow bind:nodes bind:edges colorMode={$colorTheme} fitView>
-			<Background />
-			<Controls />
-			<MiniMap />
-		</SvelteFlow>
-	</div>
-{:else if tab === 'overview'}
-	<div class="panel">
-		<h2>Professional Work Graph — lifecycle rollup</h2>
-		<div class="rollup">
-			{#each Object.entries(data.rollup) as [state, n] (state)}
-				<div class="chip"><span class="num">{n}</span> {state}</div>
-			{/each}
+	<header class="uhead">
+		<div>
+			<h1>{data.undertaking.name}</h1>
+			<p class="binding">
+				Instantiated from <strong>{data.undertaking.pwaName} v{data.undertaking.pwaVersion}</strong> ·
+				status <span class="pill">{data.undertaking.status}</span>
+			</p>
+			<p class="obj">
+				{data.undertaking.objective}
+				<span class="product">→ {data.undertaking.intendedOutputProduct}</span>
+			</p>
 		</div>
-		{#if data.pwuTypeOptions.length}
-			<div class="instwrap">
-				<h3>Instantiate a PWU</h3>
-				<p class="hint">
-					Select a PWU Type from the bound PWA to instantiate it as a PWU Instance in this Undertaking
-					(the instance realizes that type — CON-009 ownership).
-				</p>
-				<form method="POST" action="?/proposePwu" use:enhance class="instform">
-					<select name="pwuTypeId" required>
-						<option value="" disabled selected>Select a PWU Type…</option>
-						{#each data.pwuTypeOptions as o (o.id)}<option value={o.id}>{o.name}</option>{/each}
-					</select>
-					<input name="title" placeholder="Instance title (optional)" />
-					<button class="primary" type="submit">Instantiate PWU</button>
-				</form>
-			</div>
-		{/if}
-		{#if form?.error}<p class="err" role="alert">{form.error}</p>{/if}
-		<h3>PWU Instances → PWU Types</h3>
-		<p class="hint">
-			Each PWU Instance realizes a PWU Type defined by the PWA (or is a declared local extension), and
-			carries its own four-axis state. Drive its lifecycle with the actions column — a PWU only turns
-			green (SATISFIED) once its assurance is SATISFIED (no green without assurance / INV-5).
+	</header>
+
+	<div class="tabs">
+		{#each tabs as t (t)}
+			<button class:sel={tab === t} onclick={() => (tab = t)}>{t}</button>
+		{/each}
+	</div>
+
+	{#if tab === 'graph'}
+		<p class="legend">
+			Live Professional Work Graph — a <em>projection</em> (View) of the Undertaking's PWU Instances; the
+			engine never renders. <b class="g">Green</b> = execution SUCCEEDED <em>and</em> assurance SATISFIED
+			(no green without assurance). <b class="a">Amber</b> = succeeded but not yet assured.
+			<b class="i">Indigo border</b> = baselined.
 		</p>
-		<div class="tablewrap">
-			<table>
-				<thead>
-					<tr>
-						<th>PWU Instance</th>
-						<th>Work state</th>
-						<th>Execution</th>
-						<th>Assurance</th>
-						<th>PWU Type (definition)</th>
-						<th>Lifecycle actions</th>
-					</tr>
-				</thead>
-				<tbody>
-					{#each data.pwuList as p (p.id)}
+		{#if flow.openResiduals.length}
+			<p class="residual">⚠ Open residual: {flow.openResiduals.join('; ')}</p>
+		{/if}
+		<div class="flow">
+			<SvelteFlow bind:nodes bind:edges colorMode={$colorTheme} fitView>
+				<Background />
+				<Controls />
+				<MiniMap />
+			</SvelteFlow>
+		</div>
+	{:else if tab === 'overview'}
+		<div class="panel">
+			<h2>Professional Work Graph — lifecycle rollup</h2>
+			<div class="rollup">
+				{#each Object.entries(data.rollup) as [state, n] (state)}
+					<div class="chip"><span class="num">{n}</span> {state}</div>
+				{/each}
+			</div>
+			{#if data.pwuTypeOptions.length}
+				<div class="instwrap">
+					<h3>Instantiate a PWU</h3>
+					<p class="hint">
+						Select a PWU Type from the bound PWA to instantiate it as a PWU Instance in this Undertaking
+						(the instance realizes that type — CON-009 ownership).
+					</p>
+					<form method="POST" action="?/proposePwu" use:enhance class="instform">
+						<select name="pwuTypeId" required>
+							<option value="" disabled selected>Select a PWU Type…</option>
+							{#each data.pwuTypeOptions as o (o.id)}<option value={o.id}>{o.name}</option>{/each}
+						</select>
+						<input name="title" placeholder="Instance title (optional)" />
+						<button class="primary" type="submit">Instantiate PWU</button>
+					</form>
+				</div>
+			{/if}
+			{#if form?.error}<p class="err" role="alert">{form.error}</p>{/if}
+			<h3>PWU Instances → PWU Types</h3>
+			<p class="hint">
+				Each PWU Instance realizes a PWU Type defined by the PWA (or is a declared local extension), and
+				carries its own four-axis state. Drive its lifecycle with the actions column — a PWU only turns
+				green (SATISFIED) once its assurance is SATISFIED (no green without assurance / INV-5).
+			</p>
+			<div class="tablewrap">
+				<table>
+					<thead>
 						<tr>
-							<td>{p.title}</td>
-							<td><span class="tag">{p.workLifecycleState}</span></td>
-							<td>{p.executionState || '—'}</td>
-							<td>{p.assuranceState}</td>
-							<td>
-								{#if p.typePwaId}<a href={`/pwa/${p.typePwaId}`}>{p.typeName} ↗</a
-									>{:else}{p.typeName}{/if}
-							</td>
-							<td>
-								<div class="acts">
-									{#if p.workLifecycleState === 'PROPOSED'}
-										<form method="POST" action="?/beginExecute" use:enhance>
-											<input type="hidden" name="pwuId" value={p.id} />
-											<button class="mini" type="submit">Begin &amp; Execute</button>
-										</form>
-									{:else if p.workLifecycleState === 'EXECUTING'}
-										<form method="POST" action="?/recordAssurance" use:enhance>
-											<input type="hidden" name="pwuId" value={p.id} />
-											<button class="mini" type="submit">Record Assurance</button>
-										</form>
-										<form method="POST" action="?/markSatisfied" use:enhance>
-											<input type="hidden" name="pwuId" value={p.id} />
-											<button class="mini" type="submit">Mark Satisfied</button>
-										</form>
-									{:else if p.workLifecycleState === 'UNDER_ASSURANCE'}
-										<form method="POST" action="?/markSatisfied" use:enhance>
-											<input type="hidden" name="pwuId" value={p.id} />
-											<button class="mini primary" type="submit">Mark Satisfied</button>
-										</form>
-									{:else if p.workLifecycleState === 'SATISFIED'}
-										<span class="done">✓ satisfied</span>
-									{:else}
-										<span class="muted">{p.workLifecycleState}</span>
-									{/if}
+							<th>PWU Instance</th>
+							<th>Work state</th>
+							<th>Execution</th>
+							<th>Assurance</th>
+							<th>PWU Type (definition)</th>
+							<th>Lifecycle actions</th>
+						</tr>
+					</thead>
+					<tbody>
+						{#each data.pwuList as p (p.id)}
+							<tr>
+								<td>{p.title}</td>
+								<td><span class="tag">{p.workLifecycleState}</span></td>
+								<td>{p.executionState || '—'}</td>
+								<td>{p.assuranceState}</td>
+								<td>
+									{#if p.typePwaId}<a href={`/pwa/${p.typePwaId}`}>{p.typeName} ↗</a
+										>{:else}{p.typeName}{/if}
+								</td>
+								<td>
+									<div class="acts">
+										{#if p.workLifecycleState === 'PROPOSED'}
+											<form method="POST" action="?/beginExecute" use:enhance>
+												<input type="hidden" name="pwuId" value={p.id} />
+												<button class="mini" type="submit">Begin &amp; Execute</button>
+											</form>
+										{:else if p.workLifecycleState === 'EXECUTING'}
+											<form method="POST" action="?/recordAssurance" use:enhance>
+												<input type="hidden" name="pwuId" value={p.id} />
+												<button class="mini" type="submit">Record Assurance</button>
+											</form>
+											<form method="POST" action="?/markSatisfied" use:enhance>
+												<input type="hidden" name="pwuId" value={p.id} />
+												<button class="mini" type="submit">Mark Satisfied</button>
+											</form>
+										{:else if p.workLifecycleState === 'UNDER_ASSURANCE'}
+											<form method="POST" action="?/markSatisfied" use:enhance>
+												<input type="hidden" name="pwuId" value={p.id} />
+												<button class="mini primary" type="submit">Mark Satisfied</button>
+											</form>
+										{:else if p.workLifecycleState === 'SATISFIED'}
+											<span class="done">✓ satisfied</span>
+										{:else}
+											<span class="muted">{p.workLifecycleState}</span>
+										{/if}
+									</div>
+								</td>
+							</tr>
+						{/each}
+					</tbody>
+				</table>
+			</div>
+		</div>
+	{:else if tab === 'execution'}
+		<div class="panel">
+			<h2>Execution — plans that perform PWU Instances</h2>
+			<p class="hint">
+				An Execution Plan is a distinct object that <em>performs</em> a PWU Instance through temporal steps.
+				It is not the Professional Work Graph, and it is not named a "workflow" here except for temporal execution
+				machinery.
+			</p>
+			<p class="hint dim" data-testid="exec-plan-actions-note">
+				Plans are driven step-by-step (Start · Complete · Fail · Retry) and completed / failed / cancelled as a
+				whole. A COMPLETED plan is an <b>execution-axis</b> fact — never assurance: a PWU turns green only when its
+				assurance is SATISFIED (INV-5). Each step shows its attempt history (JAN-EXECPLAN Tier 3).
+			</p>
+			{#if form?.error}<p class="err" role="alert" data-testid="exec-error">{form.error}</p>{/if}
+			{#if !plansByPwu.length}
+				<p class="none" data-testid="exec-empty">No execution plans for this undertaking.</p>
+			{/if}
+			{#each plansByPwu as group (group.pwuId)}
+				<div class="planpwu" data-testid="exec-pwu-group">
+					<h3 class="pwuhead">
+						{group.title} <span class="mono dim">{group.pwuId.slice(0, 14)}…</span>
+					</h3>
+					{#each group.plans as pl (pl.id)}
+						<div class="plancard" data-testid="exec-plan">
+							<div class="planhead">
+								<span class="mono">{pl.id.slice(0, 14)}…</span>
+								<span class="tag" data-testid="plan-status">{pl.status}</span>
+								{#if pl.planVersion !== undefined}<span class="dim">v{pl.planVersion}</span>{/if}
+								{#if pl.status === 'ACTIVE'}
+									<!-- Plan-terminal actions (DWP-05). CompleteExecutionPlan's engine guard is the success
+									     allow-list; a rejection surfaces verbatim above. COMPLETED ≠ green (INV-5). -->
+									<form method="POST" action="?/completePlan" use:enhance class="inlineform">
+										<input type="hidden" name="planId" value={pl.id} />
+										<button class="mini" data-testid="plan-complete">Complete plan</button>
+									</form>
+									<form method="POST" action="?/failPlan" use:enhance class="inlineform">
+										<input type="hidden" name="planId" value={pl.id} />
+										<button class="mini" data-testid="plan-fail">Fail plan</button>
+									</form>
+								{/if}
+								{#if pl.status === 'ACTIVE' || pl.status === 'APPROVED'}
+									<!-- Cancel plan is offered ONLY where the ExecutionPlan.status machine permits →CANCELLED — from
+									     APPROVED or ACTIVE (transitions.data.ts). The prior `!== 'CANCELLED'` gate tempted a
+									     machine-forbidden CancelExecutionPlan on a COMPLETED/FAILED/SUPERSEDED/PROPOSED plan (the engine
+									     would reject it); this is the same command-backed-allowlist discipline as the step actions (F-11). -->
+									<form method="POST" action="?/cancelPlan" use:enhance class="inlineform">
+										<input type="hidden" name="planId" value={pl.id} />
+										<button class="mini" data-testid="plan-cancel">Cancel plan</button>
+									</form>
+								{/if}
+							</div>
+							{#if !pl.steps.length}<p class="none">No steps.</p>{/if}
+							<ol class="steps">
+								{#each pl.steps as s (s.id)}
+									<li class="step" data-testid="exec-step">
+										<span class="st {s.tone}" data-testid="step-state">{s.stepState}</span>
+										<span class="stype">{s.stepType}</span>
+										<span class="spurpose">{s.purpose}</span>
+										{#if s.runtimeBindingId}<span class="dim mono">rb {s.runtimeBindingId.slice(0, 10)}…</span
+											>{/if}
+										<span class="stepacts">
+											{#each s.advanceCommands as cmd (cmd)}
+												{#if cmd === 'complete'}
+													<!-- Complete names its produced output + provenance. Empty + non-AI = a HUMAN no-output
+													     completion the floor gate admits; an AI-produced output whose floor is unsatisfied is
+													     REJECTED by the §8.4 gate (surfaced verbatim above). -->
+													<form
+														method="POST"
+														action="?/completeStep"
+														use:enhance
+														class="inlineform completeform"
+													>
+														<input type="hidden" name="planId" value={pl.id} />
+														<input type="hidden" name="stepId" value={s.id} />
+														<input
+															name="outputArtifactId"
+															placeholder="output id"
+															class="tinyinput"
+															data-testid="complete-output"
+														/>
+														<label class="ailbl"
+															><input
+																type="checkbox"
+																name="aiProduced"
+																value="true"
+																data-testid="complete-ai"
+															/> AI</label
+														>
+														<button class="mini" data-testid="step-action-complete">Complete</button>
+													</form>
+												{:else if cmd === 'start'}
+													<!-- Start ONLY on the startable step (DWP-01 start-gate): the first non-terminal step whose
+													     predecessors are all terminal-success. A later QUEUED step is not startable → no Start (the
+													     engine's startExecutionStep gate would reject an out-of-order start; the UI does not tempt it). -->
+													{#if data.startableStepByPlan[pl.id]?.includes(s.id)}
+														<form method="POST" action="?/startStep" use:enhance class="inlineform">
+															<input type="hidden" name="planId" value={pl.id} />
+															<input type="hidden" name="stepId" value={s.id} />
+															<button class="mini" data-testid="step-action-start">Start</button>
+														</form>
+													{/if}
+												{:else}
+													<form method="POST" action="?/{STEP_ACTION[cmd]}" use:enhance class="inlineform">
+														<input type="hidden" name="planId" value={pl.id} />
+														<input type="hidden" name="stepId" value={s.id} />
+														<button class="mini" data-testid="step-action-{cmd}">{STEP_LABEL[cmd]}</button>
+													</form>
+												{/if}
+											{/each}
+											<!-- JAN-EXECREM WP-15 (F-29): the plan-status condition that used to live HERE is GONE, and its
+											     deletion is the fix rather than an omission. `controlCommands` is now filtered by the
+											     read-model against the command's own declared `planLiveness` (STEP_COMMAND_SPECS), so
+											     cancel/wait survive a superseded plan and skip/resolve do not — the same rule the engine
+											     enforces, read from the same declaration. Four sibling affordances each grew their own copy
+											     of this condition here; RETRY never got one, and nothing made that omission visible. A
+											     condition in the template is a sixth copy of a rule the engine already owns. -->
+											<!-- RPH-EXE-008 (JAN-RETRYCAP / N-12). The retry button is withheld at the cap because the
+											     engine would refuse it — and these actions used to be named ONLY in that refusal, which
+											     nobody sees now that the click is gone. The list comes from the read-model, which got it
+											     from the same `retryDecision` that withheld the button, so the notice and the withholding
+											     cannot disagree. Not a condition on stepState or attempt counts: the presence of the
+											     field IS the condition. -->
+											{#if s.retryExhaustion}
+												<span class="mini muted" data-testid="step-retry-exhausted">
+													RPH-EXE-008: retry cap reached — select {s.retryExhaustion.permittedControlActions.join(
+														', '
+													)}
+												</span>
+											{/if}
+											{#each s.controlCommands as ctl (ctl)}
+												<form method="POST" action="?/{STEP_CONTROL_ACTION[ctl]}" use:enhance class="inlineform">
+													<input type="hidden" name="planId" value={pl.id} />
+													<input type="hidden" name="stepId" value={s.id} />
+													<button class="mini" data-testid="step-action-{ctl}">{STEP_CONTROL_LABEL[ctl]}</button>
+												</form>
+											{/each}
+											<!-- DR-004 DWP-06 — Prune. NOT a stepState affordance (it is absent from controlCommands by
+											     design): a prune is a SYSTEM consequence of a resolved BRANCH, so it is offered only for a
+											     step the read-model computed as unreachable. Semantically distinct from the Skip two lines
+											     above: Skip is an operator waiver, this is the plan's own declared branch logic excluding
+											     the step.
+											     CORRECTED 2026-07-25 (JAN-REVREM RW-1). This comment used to claim "prunableStepIds is
+											     itself plan-ACTIVE-gated, so this set never tempts a prune the engine would reject". The
+											     first clause was true and the CONCLUSION was false: WP-12b also gave Prune a PWU-openness
+											     limb (it declares REQUIRES_OPEN_PWU), and a plan on a closed PWU keeps status ACTIVE — so
+											     this button was offered for a prune the engine refuses. `prunableStepIds` now routes through
+											     the same `planPermitsAffordance` every other affordance uses, reading Prune's own spec row. -->
+											{#if data.prunableStepByPlan[pl.id]?.includes(s.id)}
+												<form method="POST" action="?/pruneStep" use:enhance class="inlineform">
+													<input type="hidden" name="planId" value={pl.id} />
+													<input type="hidden" name="stepId" value={s.id} />
+													<button class="mini" data-testid="step-action-prune" title="Not reachable — the branch went the other way"
+														>Prune</button
+													>
+												</form>
+											{/if}
+											{#if s.belowQueued}
+												<span class="dim" data-testid="step-belowqueued"
+													>no advance command in the domain (below QUEUED)</span
+												>
+											{/if}
+										</span>
+										{#if data.attemptsByStepId[s.id]?.length}
+											<ol class="attempts" data-testid="step-attempts">
+												{#each data.attemptsByStepId[s.id] as at (at.idempotencyKey)}
+													<li class="attempt" data-testid="step-attempt">
+														<span class="dim">#{at.attemptNumber}</span>
+														<span class="st {attemptTone(at.state)}">{at.state}</span>
+														{#if at.runtimeBindingId}<span class="dim mono"
+																>rb {at.runtimeBindingId.slice(0, 8)}…</span
+															>{/if}
+														{#if at.error}<span class="dim">{at.error}</span>{/if}
+														{#if at.aiNoBinding}<span class="advisory" data-testid="attempt-ai-nobinding"
+																>⚠ AI step, no runtime binding</span
+															>{/if}
+													</li>
+												{/each}
+											</ol>
+										{/if}
+									</li>
+								{/each}
+							</ol>
+							<!-- DR-004 DWP-06 — the transitions (edge) plane. READ-ONLY: it EXPLAINS the affordances derived
+							     above and drives nothing itself (F-11). Transitions are immutable after propose (DS-004 F-4),
+							     so there is deliberately no edit control. A linear plan has no transitions[] and renders no
+							     panel at all — the D1 back-compat degenerate must look exactly as it did before this DWP.
+							     Dispositions are the interpreter's own verdict in EXECUTION vocabulary only: SATISFIED means
+							     "this edge is live", never "assured" (INV-5), hence the neutral tone rather than success. -->
+							{#if data.transitionRowsByPlan[pl.id]?.length}
+								<div class="flowgraph" data-testid="plan-transitions">
+									<h4 class="flowhead">
+										Flow <span class="dim"
+											>— {data.transitionRowsByPlan[pl.id].length} transition(s); an edge is live when SATISFIED</span
+										>
+									</h4>
+									<ol class="edges">
+										{#each data.transitionRowsByPlan[pl.id] as t (t.key)}
+											<li class="edge" data-testid="plan-transition">
+												<span class="edgeends"
+													>{t.sourceLabel} <span class="arrow">→</span> {t.targetLabel}</span
+												>
+												<span class="tag" data-testid="transition-role">{t.role}</span>
+												<span
+													class="st {dispositionTone(t.disposition)}"
+													data-testid="transition-disposition">{t.disposition}</span
+												>
+												{#if t.conditionText}
+													<span class="cond dim" data-testid="transition-condition">when {t.conditionText}</span
+													>
+												{/if}
+											</li>
+										{/each}
+									</ol>
 								</div>
+							{/if}
+						</div>
+					{/each}
+				</div>
+			{/each}
+
+			<!-- DWP-04 (Tier 2, fork C): the Undertaking execution SEQUENCE + the layerHandoff advisory. Instances are
+			     arranged by their TYPES' hand-off DEPENDENCY (a partial order — a shared layer is concurrent), NOT an
+			     execution schedule (§9.1). The advisory is a coherence check that gates NOTHING. -->
+			<h3 class="t2head">Execution sequence — hand-off dependency</h3>
+			<p class="hint dim" data-testid="seq-caveat">
+				Instances arranged by their PWU Types' hand-off dependency — a partial order (a shared layer runs
+				independently), NOT an execution schedule (§9.1). The advisory below is a coherence surface; it gates
+				nothing (fork C).
+			</p>
+			{#each data.sequence.layers as layer (layer.index)}
+				<div class="seqlayer" data-testid="seq-layer">
+					<span class="dim seqlabel">dep {layer.index + 1}</span>
+					{#each layer.instances as si (si.id)}
+						<span
+							class="seqinst"
+							class:flagged={advisoryConsumerIds.has(si.id)}
+							data-testid="seq-instance">{si.title} <span class="tag">{si.executionState || '—'}</span></span
+						>
+					{/each}
+				</div>
+			{/each}
+			{#if data.sequence.unplaced.length}
+				<div class="seqlayer">
+					<span class="dim seqlabel">unplaced</span>
+					{#each data.sequence.unplaced as si (si.id)}
+						<span class="seqinst" data-testid="seq-unplaced"
+							>{si.title} <span class="tag">{si.executionState || '—'}</span>
+							<span class="dim">({si.reason})</span></span
+						>
+					{/each}
+				</div>
+			{/if}
+			{#if data.sequence.advisories.length}
+				<div class="advisories" data-testid="seq-advisories">
+					{#each data.sequence.advisories as a (a.consumerInstanceId + a.producerTypeId + a.artifact)}
+						<p class="advisory" data-testid="seq-advisory">⚠ {a.consumerTitle}: {a.detail}</p>
+					{/each}
+				</div>
+			{:else}
+				<p class="dim" data-testid="seq-noadvisory">No hand-off coherence advisories.</p>
+			{/if}
+		</div>
+	{:else if tab === 'assurance'}
+		<div class="panel">
+			<h2>Assurance — §38 Assurance Workbench</h2>
+			<p class="hint">
+				The §38 Assurance View — folded from the governed event stream, not the object store. Every §38 field is
+				sourced except <b>missing evidence</b> (its events are unbuilt); unsourced fields read <b>unknown</b>,
+				never a false “none”.
+			</p>
+			<table>
+				<thead
+					><tr
+						><th>Assessment</th><th>Policy</th><th>State</th><th>Disposition</th><th>Independence</th><th
+							>Validator</th
+						></tr
+					></thead
+				>
+				<tbody>
+					{#each data.assessments as a (a.id)}
+						<tr
+							><td class="mono">{a.id.slice(0, 14)}…</td><td>{a.policy}</td><td
+								><span class="tag">{a.state}</span></td
+							><td>{a.disposition || '—'}</td><td
+								><span class="tag">{a.independenceStatus || 'unknown'}</span></td
+							><td class="mono"
+								>{a.validatorIdentity ? `${a.validatorIdentity}@${a.validatorVersion}` : 'unknown'}</td
+							></tr
+						>
+						<tr class="detail">
+							<td></td>
+							<td colspan="5">
+								<div class="kv"><span>Claims evaluated</span><b>{a.claimsEvaluated.join(', ') || 'none'}</b></div>
+								<div class="kv">
+									<span>Evidence considered</span><b>{a.evidenceConsidered.join(', ') || 'none'}</b>
+								</div>
+								<div class="kv">
+									<span>Missing evidence</span><b
+										>{a.missingEvidence.length ? a.missingEvidence.join(', ') : 'none'}</b
+									>
+								</div>
+								<div class="kv"><span>Control actions</span><b>{a.controlActions.join(', ') || 'none'}</b></div>
+								<div class="kv">
+									<span>Findings</span><b
+										>{a.findings.length
+											? a.findings.map((f) => `${f.code} [${f.severity}]`).join('; ')
+											: 'none'}</b
+									>
+								</div>
+								<div class="kv">
+									<span>Waivers</span><b
+										>{a.waivers.length ? a.waivers.map((w) => w.status).join('; ') : 'none'}</b
+									>
+								</div>
+								<div class="kv">
+									<span>Invalidation</span><b
+										>{a.invalidations.length ? a.invalidations.map((i) => i.status).join('; ') : 'valid'}</b
+									>
+								</div>
+								{#if a.openConditions.length}
+									<div class="kv"><span>Open conditions</span><b>{a.openConditions.join('; ')}</b></div>
+								{/if}
 							</td>
 						</tr>
 					{/each}
+					{#if !data.assessments.length}<tr><td colspan="6" class="none">No assessments.</td></tr>{/if}
 				</tbody>
 			</table>
-		</div>
-	</div>
-{:else if tab === 'execution'}
-	<div class="panel">
-		<h2>Execution — plans that perform PWU Instances</h2>
-		<p class="hint">
-			An Execution Plan is a distinct object that <em>performs</em> a PWU Instance through temporal steps.
-			It is not the Professional Work Graph, and it is not named a "workflow" here except for temporal execution
-			machinery.
-		</p>
-		<p class="hint dim" data-testid="exec-plan-actions-note">
-			Plans are driven step-by-step (Start · Complete · Fail · Retry) and completed / failed / cancelled as a
-			whole. A COMPLETED plan is an <b>execution-axis</b> fact — never assurance: a PWU turns green only when its
-			assurance is SATISFIED (INV-5). Each step shows its attempt history (JAN-EXECPLAN Tier 3).
-		</p>
-		{#if form?.error}<p class="err" role="alert" data-testid="exec-error">{form.error}</p>{/if}
-		{#if !plansByPwu.length}
-			<p class="none" data-testid="exec-empty">No execution plans for this undertaking.</p>
-		{/if}
-		{#each plansByPwu as group (group.pwuId)}
-			<div class="planpwu" data-testid="exec-pwu-group">
-				<h3 class="pwuhead">
-					{group.title} <span class="mono dim">{group.pwuId.slice(0, 14)}…</span>
-				</h3>
-				{#each group.plans as pl (pl.id)}
-					<div class="plancard" data-testid="exec-plan">
-						<div class="planhead">
-							<span class="mono">{pl.id.slice(0, 14)}…</span>
-							<span class="tag" data-testid="plan-status">{pl.status}</span>
-							{#if pl.planVersion !== undefined}<span class="dim">v{pl.planVersion}</span>{/if}
-							{#if pl.status === 'ACTIVE'}
-								<!-- Plan-terminal actions (DWP-05). CompleteExecutionPlan's engine guard is the success
-								     allow-list; a rejection surfaces verbatim above. COMPLETED ≠ green (INV-5). -->
-								<form method="POST" action="?/completePlan" use:enhance class="inlineform">
-									<input type="hidden" name="planId" value={pl.id} />
-									<button class="mini" data-testid="plan-complete">Complete plan</button>
-								</form>
-								<form method="POST" action="?/failPlan" use:enhance class="inlineform">
-									<input type="hidden" name="planId" value={pl.id} />
-									<button class="mini" data-testid="plan-fail">Fail plan</button>
-								</form>
-							{/if}
-							{#if pl.status === 'ACTIVE' || pl.status === 'APPROVED'}
-								<!-- Cancel plan is offered ONLY where the ExecutionPlan.status machine permits →CANCELLED — from
-								     APPROVED or ACTIVE (transitions.data.ts). The prior `!== 'CANCELLED'` gate tempted a
-								     machine-forbidden CancelExecutionPlan on a COMPLETED/FAILED/SUPERSEDED/PROPOSED plan (the engine
-								     would reject it); this is the same command-backed-allowlist discipline as the step actions (F-11). -->
-								<form method="POST" action="?/cancelPlan" use:enhance class="inlineform">
-									<input type="hidden" name="planId" value={pl.id} />
-									<button class="mini" data-testid="plan-cancel">Cancel plan</button>
-								</form>
-							{/if}
-						</div>
-						{#if !pl.steps.length}<p class="none">No steps.</p>{/if}
-						<ol class="steps">
-							{#each pl.steps as s (s.id)}
-								<li class="step" data-testid="exec-step">
-									<span class="st {s.tone}" data-testid="step-state">{s.stepState}</span>
-									<span class="stype">{s.stepType}</span>
-									<span class="spurpose">{s.purpose}</span>
-									{#if s.runtimeBindingId}<span class="dim mono">rb {s.runtimeBindingId.slice(0, 10)}…</span
-										>{/if}
-									<span class="stepacts">
-										{#each s.advanceCommands as cmd (cmd)}
-											{#if cmd === 'complete'}
-												<!-- Complete names its produced output + provenance. Empty + non-AI = a HUMAN no-output
-												     completion the floor gate admits; an AI-produced output whose floor is unsatisfied is
-												     REJECTED by the §8.4 gate (surfaced verbatim above). -->
-												<form
-													method="POST"
-													action="?/completeStep"
-													use:enhance
-													class="inlineform completeform"
-												>
-													<input type="hidden" name="planId" value={pl.id} />
-													<input type="hidden" name="stepId" value={s.id} />
-													<input
-														name="outputArtifactId"
-														placeholder="output id"
-														class="tinyinput"
-														data-testid="complete-output"
-													/>
-													<label class="ailbl"
-														><input
-															type="checkbox"
-															name="aiProduced"
-															value="true"
-															data-testid="complete-ai"
-														/> AI</label
-													>
-													<button class="mini" data-testid="step-action-complete">Complete</button>
-												</form>
-											{:else if cmd === 'start'}
-												<!-- Start ONLY on the startable step (DWP-01 start-gate): the first non-terminal step whose
-												     predecessors are all terminal-success. A later QUEUED step is not startable → no Start (the
-												     engine's startExecutionStep gate would reject an out-of-order start; the UI does not tempt it). -->
-												{#if data.startableStepByPlan[pl.id]?.includes(s.id)}
-													<form method="POST" action="?/startStep" use:enhance class="inlineform">
-														<input type="hidden" name="planId" value={pl.id} />
-														<input type="hidden" name="stepId" value={s.id} />
-														<button class="mini" data-testid="step-action-start">Start</button>
-													</form>
-												{/if}
-											{:else}
-												<form method="POST" action="?/{STEP_ACTION[cmd]}" use:enhance class="inlineform">
-													<input type="hidden" name="planId" value={pl.id} />
-													<input type="hidden" name="stepId" value={s.id} />
-													<button class="mini" data-testid="step-action-{cmd}">{STEP_LABEL[cmd]}</button>
-												</form>
-											{/if}
-										{/each}
-										<!-- JAN-EXECREM WP-15 (F-29): the plan-status condition that used to live HERE is GONE, and its
-										     deletion is the fix rather than an omission. `controlCommands` is now filtered by the
-										     read-model against the command's own declared `planLiveness` (STEP_COMMAND_SPECS), so
-										     cancel/wait survive a superseded plan and skip/resolve do not — the same rule the engine
-										     enforces, read from the same declaration. Four sibling affordances each grew their own copy
-										     of this condition here; RETRY never got one, and nothing made that omission visible. A
-										     condition in the template is a sixth copy of a rule the engine already owns. -->
-										<!-- RPH-EXE-008 (JAN-RETRYCAP / N-12). The retry button is withheld at the cap because the
-										     engine would refuse it — and these actions used to be named ONLY in that refusal, which
-										     nobody sees now that the click is gone. The list comes from the read-model, which got it
-										     from the same `retryDecision` that withheld the button, so the notice and the withholding
-										     cannot disagree. Not a condition on stepState or attempt counts: the presence of the
-										     field IS the condition. -->
-										{#if s.retryExhaustion}
-											<span class="mini muted" data-testid="step-retry-exhausted">
-												RPH-EXE-008: retry cap reached — select {s.retryExhaustion.permittedControlActions.join(
-													', '
-												)}
-											</span>
-										{/if}
-										{#each s.controlCommands as ctl (ctl)}
-											<form method="POST" action="?/{STEP_CONTROL_ACTION[ctl]}" use:enhance class="inlineform">
-												<input type="hidden" name="planId" value={pl.id} />
-												<input type="hidden" name="stepId" value={s.id} />
-												<button class="mini" data-testid="step-action-{ctl}">{STEP_CONTROL_LABEL[ctl]}</button>
-											</form>
-										{/each}
-										<!-- DR-004 DWP-06 — Prune. NOT a stepState affordance (it is absent from controlCommands by
-										     design): a prune is a SYSTEM consequence of a resolved BRANCH, so it is offered only for a
-										     step the read-model computed as unreachable. Semantically distinct from the Skip two lines
-										     above: Skip is an operator waiver, this is the plan's own declared branch logic excluding
-										     the step.
-										     CORRECTED 2026-07-25 (JAN-REVREM RW-1). This comment used to claim "prunableStepIds is
-										     itself plan-ACTIVE-gated, so this set never tempts a prune the engine would reject". The
-										     first clause was true and the CONCLUSION was false: WP-12b also gave Prune a PWU-openness
-										     limb (it declares REQUIRES_OPEN_PWU), and a plan on a closed PWU keeps status ACTIVE — so
-										     this button was offered for a prune the engine refuses. `prunableStepIds` now routes through
-										     the same `planPermitsAffordance` every other affordance uses, reading Prune's own spec row. -->
-										{#if data.prunableStepByPlan[pl.id]?.includes(s.id)}
-											<form method="POST" action="?/pruneStep" use:enhance class="inlineform">
-												<input type="hidden" name="planId" value={pl.id} />
-												<input type="hidden" name="stepId" value={s.id} />
-												<button class="mini" data-testid="step-action-prune" title="Not reachable — the branch went the other way"
-													>Prune</button
-												>
-											</form>
-										{/if}
-										{#if s.belowQueued}
-											<span class="dim" data-testid="step-belowqueued"
-												>no advance command in the domain (below QUEUED)</span
-											>
-										{/if}
-									</span>
-									{#if data.attemptsByStepId[s.id]?.length}
-										<ol class="attempts" data-testid="step-attempts">
-											{#each data.attemptsByStepId[s.id] as at (at.idempotencyKey)}
-												<li class="attempt" data-testid="step-attempt">
-													<span class="dim">#{at.attemptNumber}</span>
-													<span class="st {attemptTone(at.state)}">{at.state}</span>
-													{#if at.runtimeBindingId}<span class="dim mono"
-															>rb {at.runtimeBindingId.slice(0, 8)}…</span
-														>{/if}
-													{#if at.error}<span class="dim">{at.error}</span>{/if}
-													{#if at.aiNoBinding}<span class="advisory" data-testid="attempt-ai-nobinding"
-															>⚠ AI step, no runtime binding</span
-														>{/if}
-												</li>
-											{/each}
-										</ol>
-									{/if}
-								</li>
-							{/each}
-						</ol>
-						<!-- DR-004 DWP-06 — the transitions (edge) plane. READ-ONLY: it EXPLAINS the affordances derived
-						     above and drives nothing itself (F-11). Transitions are immutable after propose (DS-004 F-4),
-						     so there is deliberately no edit control. A linear plan has no transitions[] and renders no
-						     panel at all — the D1 back-compat degenerate must look exactly as it did before this DWP.
-						     Dispositions are the interpreter's own verdict in EXECUTION vocabulary only: SATISFIED means
-						     "this edge is live", never "assured" (INV-5), hence the neutral tone rather than success. -->
-						{#if data.transitionRowsByPlan[pl.id]?.length}
-							<div class="flowgraph" data-testid="plan-transitions">
-								<h4 class="flowhead">
-									Flow <span class="dim"
-										>— {data.transitionRowsByPlan[pl.id].length} transition(s); an edge is live when SATISFIED</span
-									>
-								</h4>
-								<ol class="edges">
-									{#each data.transitionRowsByPlan[pl.id] as t (t.key)}
-										<li class="edge" data-testid="plan-transition">
-											<span class="edgeends"
-												>{t.sourceLabel} <span class="arrow">→</span> {t.targetLabel}</span
-											>
-											<span class="tag" data-testid="transition-role">{t.role}</span>
-											<span
-												class="st {dispositionTone(t.disposition)}"
-												data-testid="transition-disposition">{t.disposition}</span
-											>
-											{#if t.conditionText}
-												<span class="cond dim" data-testid="transition-condition">when {t.conditionText}</span
-												>
-											{/if}
-										</li>
-									{/each}
-								</ol>
-							</div>
-						{/if}
-					</div>
-				{/each}
-			</div>
-		{/each}
 
-		<!-- DWP-04 (Tier 2, fork C): the Undertaking execution SEQUENCE + the layerHandoff advisory. Instances are
-		     arranged by their TYPES' hand-off DEPENDENCY (a partial order — a shared layer is concurrent), NOT an
-		     execution schedule (§9.1). The advisory is a coherence check that gates NOTHING. -->
-		<h3 class="t2head">Execution sequence — hand-off dependency</h3>
-		<p class="hint dim" data-testid="seq-caveat">
-			Instances arranged by their PWU Types' hand-off dependency — a partial order (a shared layer runs
-			independently), NOT an execution schedule (§9.1). The advisory below is a coherence surface; it gates
-			nothing (fork C).
-		</p>
-		{#each data.sequence.layers as layer (layer.index)}
-			<div class="seqlayer" data-testid="seq-layer">
-				<span class="dim seqlabel">dep {layer.index + 1}</span>
-				{#each layer.instances as si (si.id)}
-					<span
-						class="seqinst"
-						class:flagged={advisoryConsumerIds.has(si.id)}
-						data-testid="seq-instance">{si.title} <span class="tag">{si.executionState || '—'}</span></span
-					>
-				{/each}
-			</div>
-		{/each}
-		{#if data.sequence.unplaced.length}
-			<div class="seqlayer">
-				<span class="dim seqlabel">unplaced</span>
-				{#each data.sequence.unplaced as si (si.id)}
-					<span class="seqinst" data-testid="seq-unplaced"
-						>{si.title} <span class="tag">{si.executionState || '—'}</span>
-						<span class="dim">({si.reason})</span></span
-					>
-				{/each}
-			</div>
-		{/if}
-		{#if data.sequence.advisories.length}
-			<div class="advisories" data-testid="seq-advisories">
-				{#each data.sequence.advisories as a (a.consumerInstanceId + a.producerTypeId + a.artifact)}
-					<p class="advisory" data-testid="seq-advisory">⚠ {a.consumerTitle}: {a.detail}</p>
-				{/each}
-			</div>
-		{:else}
-			<p class="dim" data-testid="seq-noadvisory">No hand-off coherence advisories.</p>
-		{/if}
-	</div>
-{:else if tab === 'assurance'}
-	<div class="panel">
-		<h2>Assurance — §38 Assurance Workbench</h2>
-		<p class="hint">
-			The §38 Assurance View — folded from the governed event stream, not the object store. Every §38 field is
-			sourced except <b>missing evidence</b> (its events are unbuilt); unsourced fields read <b>unknown</b>,
-			never a false “none”.
-		</p>
-		<table>
-			<thead
-				><tr
-					><th>Assessment</th><th>Policy</th><th>State</th><th>Disposition</th><th>Independence</th><th
-						>Validator</th
-					></tr
-				></thead
-			>
-			<tbody>
-				{#each data.assessments as a (a.id)}
-					<tr
-						><td class="mono">{a.id.slice(0, 14)}…</td><td>{a.policy}</td><td
-							><span class="tag">{a.state}</span></td
-						><td>{a.disposition || '—'}</td><td
-							><span class="tag">{a.independenceStatus || 'unknown'}</span></td
-						><td class="mono"
-							>{a.validatorIdentity ? `${a.validatorIdentity}@${a.validatorVersion}` : 'unknown'}</td
-						></tr
-					>
-					<tr class="detail">
-						<td></td>
-						<td colspan="5">
-							<div class="kv"><span>Claims evaluated</span><b>{a.claimsEvaluated.join(', ') || 'none'}</b></div>
-							<div class="kv">
-								<span>Evidence considered</span><b>{a.evidenceConsidered.join(', ') || 'none'}</b>
-							</div>
-							<div class="kv">
-								<span>Missing evidence</span><b
-									>{a.missingEvidence.length ? a.missingEvidence.join(', ') : 'none'}</b
-								>
-							</div>
-							<div class="kv"><span>Control actions</span><b>{a.controlActions.join(', ') || 'none'}</b></div>
-							<div class="kv">
-								<span>Findings</span><b
-									>{a.findings.length
-										? a.findings.map((f) => `${f.code} [${f.severity}]`).join('; ')
-										: 'none'}</b
-								>
-							</div>
-							<div class="kv">
-								<span>Waivers</span><b
-									>{a.waivers.length ? a.waivers.map((w) => w.status).join('; ') : 'none'}</b
-								>
-							</div>
-							<div class="kv">
-								<span>Invalidation</span><b
-									>{a.invalidations.length ? a.invalidations.map((i) => i.status).join('; ') : 'valid'}</b
-								>
-							</div>
-							{#if a.openConditions.length}
-								<div class="kv"><span>Open conditions</span><b>{a.openConditions.join('; ')}</b></div>
-							{/if}
-						</td>
-					</tr>
-				{/each}
-				{#if !data.assessments.length}<tr><td colspan="6" class="none">No assessments.</td></tr>{/if}
-			</tbody>
-		</table>
-
-		{#each data.applicablePolicies as ap (ap.pwuId)}
-			<h3>Applicable policies — {ap.pwuTitle}</h3>
-			<table>
-				<thead><tr><th>Policy</th><th>Applies via</th><th>Assessment</th></tr></thead>
-				<tbody>
-					{#each ap.rows as r (r.policyId)}
-						<tr
-							><td class="mono">{r.policyId}</td><td><span class="tag">{r.source}</span></td><td
-								>{#if r.assessed}{r.disposition || 'ASSESSING'}{:else}<span class="req"
-										>REQUIRED — UNASSESSED</span
-									>{/if}</td
-							></tr
-						>
-					{/each}
-				</tbody>
-			</table>
-		{/each}
-
-		{#if data.observations.length}
-			<h3>Observations</h3>
-			{#each data.observations as o (o.id)}<div class="obs">
-					<span class="sev">{o.severity}</span>
-					{o.statement} <span class="disp">({o.disposition})</span>
-				</div>{/each}
-		{/if}
-	</div>
-{:else if tab === 'decisions'}
-	<div class="panel">
-		<h2>Decisions — governance acts</h2>
-		<table>
-			<thead><tr><th>Decision</th><th>Type</th><th>Status</th><th>Rationale</th></tr></thead>
-			<tbody>
-				{#each data.decisions as dc (dc.id)}<tr><td class="mono">{dc.id.slice(0, 14)}…</td><td
-							>{dc.type}</td
-						><td><span class="tag">{dc.status}</span></td><td>{dc.rationale}</td></tr
-					>{/each}
-				{#if !data.decisions.length}<tr><td colspan="4" class="none">No decisions.</td></tr>{/if}
-			</tbody>
-		</table>
-	</div>
-{:else if tab === 'baselines'}
-	<div class="panel">
-		<h2>Baselines — authoritative promotions</h2>
-		<table>
-			<thead><tr><th>Baseline</th><th>Type</th><th>Status</th><th>Items</th></tr></thead>
-			<tbody>
-				{#each data.baselines as b (b.id)}<tr><td class="mono">{b.id.slice(0, 14)}…</td><td>{b.type}</td
-						><td><span class="tag" class:auth={b.status === 'AUTHORITATIVE'}>{b.status}</span></td><td
-							>{b.items}</td
-						></tr
-					>{/each}
-				{#if !data.baselines.length}<tr><td colspan="4" class="none">No baselines.</td></tr>{/if}
-			</tbody>
-		</table>
-	</div>
-{:else}
-	<!-- W4-INC-1 (WP-4-007): the intent-to-baseline TRACEABILITY surface, consuming the rph-projections
-	     traceabilityProjector (W2-INC-3). A derived, read-only typed-link view — never authoritative state. -->
-	<div class="panel" data-testid="traceability-panel">
-		<h2>Traceability — typed intent-to-baseline links</h2>
-		<p class="hint">
-			Derived from the event log (rebuildable projection); scoped to this Undertaking's PWUs. Carries no
-			authority.
-		</p>
-		<div class="trace-counts">
-			{#each Object.entries(data.trace.counts) as [type, n] (type)}
-				<span class="tag" data-trace-type={type}>{type} · {n}</span>
+			{#each data.applicablePolicies as ap (ap.pwuId)}
+				<h3>Applicable policies — {ap.pwuTitle}</h3>
+				<table>
+					<thead><tr><th>Policy</th><th>Applies via</th><th>Assessment</th></tr></thead>
+					<tbody>
+						{#each ap.rows as r (r.policyId)}
+							<tr
+								><td class="mono">{r.policyId}</td><td><span class="tag">{r.source}</span></td><td
+									>{#if r.assessed}{r.disposition || 'ASSESSING'}{:else}<span class="req"
+											>REQUIRED — UNASSESSED</span
+										>{/if}</td
+								></tr
+							>
+						{/each}
+					</tbody>
+				</table>
 			{/each}
+
+			{#if data.observations.length}
+				<h3>Observations</h3>
+				{#each data.observations as o (o.id)}<div class="obs">
+						<span class="sev">{o.severity}</span>
+						{o.statement} <span class="disp">({o.disposition})</span>
+					</div>{/each}
+			{/if}
 		</div>
-		<table>
-			<thead><tr><th>From</th><th>Link</th><th>To</th></tr></thead>
-			<tbody>
-				{#each data.trace.links as l, i (i)}
-					<tr>
-						<td class="mono">{l.from.slice(0, 16)}…</td>
-						<td><span class="tag">{l.type}</span></td>
-						<td class="mono">{l.to.slice(0, 16)}…</td>
-					</tr>
+	{:else if tab === 'decisions'}
+		<div class="panel">
+			<h2>Decisions — governance acts</h2>
+			<table>
+				<thead><tr><th>Decision</th><th>Type</th><th>Status</th><th>Rationale</th></tr></thead>
+				<tbody>
+					{#each data.decisions as dc (dc.id)}<tr><td class="mono">{dc.id.slice(0, 14)}…</td><td
+								>{dc.type}</td
+							><td><span class="tag">{dc.status}</span></td><td>{dc.rationale}</td></tr
+						>{/each}
+					{#if !data.decisions.length}<tr><td colspan="4" class="none">No decisions.</td></tr>{/if}
+				</tbody>
+			</table>
+		</div>
+	{:else if tab === 'baselines'}
+		<div class="panel">
+			<h2>Baselines — authoritative promotions</h2>
+			<table>
+				<thead><tr><th>Baseline</th><th>Type</th><th>Status</th><th>Items</th></tr></thead>
+				<tbody>
+					{#each data.baselines as b (b.id)}<tr><td class="mono">{b.id.slice(0, 14)}…</td><td>{b.type}</td
+							><td><span class="tag" class:auth={b.status === 'AUTHORITATIVE'}>{b.status}</span></td><td
+								>{b.items}</td
+							></tr
+						>{/each}
+					{#if !data.baselines.length}<tr><td colspan="4" class="none">No baselines.</td></tr>{/if}
+				</tbody>
+			</table>
+		</div>
+	{:else}
+		<!-- W4-INC-1 (WP-4-007): the intent-to-baseline TRACEABILITY surface, consuming the rph-projections
+		     traceabilityProjector (W2-INC-3). A derived, read-only typed-link view — never authoritative state. -->
+		<div class="panel" data-testid="traceability-panel">
+			<h2>Traceability — typed intent-to-baseline links</h2>
+			<p class="hint">
+				Derived from the event log (rebuildable projection); scoped to this Undertaking's PWUs. Carries no
+				authority.
+			</p>
+			<div class="trace-counts">
+				{#each Object.entries(data.trace.counts) as [type, n] (type)}
+					<span class="tag" data-trace-type={type}>{type} · {n}</span>
 				{/each}
-				{#if !data.trace.links.length}
-					<tr><td colspan="3" class="none">No traceability links.</td></tr>
-				{/if}
-			</tbody>
-		</table>
-	</div>
-{/if}
+			</div>
+			<table>
+				<thead><tr><th>From</th><th>Link</th><th>To</th></tr></thead>
+				<tbody>
+					{#each data.trace.links as l, i (i)}
+						<tr>
+							<td class="mono">{l.from.slice(0, 16)}…</td>
+							<td><span class="tag">{l.type}</span></td>
+							<td class="mono">{l.to.slice(0, 16)}…</td>
+						</tr>
+					{/each}
+					{#if !data.trace.links.length}
+						<tr><td colspan="3" class="none">No traceability links.</td></tr>
+					{/if}
+				</tbody>
+			</table>
+		</div>
+	{/if}
+</div>
 
 <style>
+	/* DR-002 W-1 — the workbench manages its own scrolling, which is what `+layout.svelte` has always promised on
+	   its behalf when it applies `.content.full { padding: 0; overflow: hidden }` to this route. Until now the
+	   promise was unkept: the page had no vertical scroll container at all, so every tab but `graph` was clipped
+	   and unreachable below the fold.
+
+	   FLEX COLUMN, not a plain block, so the graph canvas can FILL the remaining height instead of being told
+	   what that height is. Panels below do not need `flex-shrink: 0`: a flex item's initial `min-height: auto`
+	   already forbids shrinking below its content, so a tall panel keeps its natural height and pushes this
+	   container into overflow — which is exactly the behaviour being restored. */
+	.workbench {
+		height: 100%;
+		padding: 24px;
+		display: flex;
+		flex-direction: column;
+		overflow-y: auto;
+	}
 	.crumbs {
 		font-size: 12px;
 		color: var(--outline);
@@ -727,8 +748,11 @@
 		font-size: 12.5px;
 		margin: 0 0 8px;
 	}
+	/* `flex: 1 1 auto` replaces a `height: calc(100vh - 320px)` that hardcoded the chrome above it — the same
+	   class of unchecked assumption as the layout comment W-1 exists to make true. The canvas now measures the
+	   space it is actually given; `min-height` keeps it usable on a short viewport. */
 	.flow {
-		height: calc(100vh - 320px);
+		flex: 1 1 auto;
 		min-height: 420px;
 		background: var(--surface-low);
 		border-radius: 12px;

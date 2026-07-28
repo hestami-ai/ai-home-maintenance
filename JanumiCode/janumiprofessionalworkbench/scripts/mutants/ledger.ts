@@ -1843,5 +1843,37 @@ export const DECLARED_MUTANTS: readonly DeclaredMutant[] = [
 			'would mean the runner reddens on something other than the mutation, voiding every e2e verdict.',
 		why: 'S-3: proves the new Playwright dispatch distinguishes a real kill from a runner that always fails',
 		source: 'JPWB-SPEC-001-DR-001 S-3'
+	},
+	{
+		id: 'W1-a-the-workbench-loses-its-scroll-container',
+		file: 'apps/rph-demo/src/routes/undertakings/[id]/+page.svelte',
+		// THE DEFECT ITSELF, restored exactly. `+layout.svelte` clips this route on the strength of a comment
+		// promising full-bleed surfaces manage their own scrolling; before W-1 this page had no vertical scroll
+		// container at all, so every tab but `graph` was unreachable below the fold. That is what the sponsor hit.
+		//
+		// NOTE FOR ANYONE WEAKENING THE SPEC LATER: `overflow: hidden` is still scrollable PROGRAMMATICALLY, so a
+		// victim written with `scrollIntoViewIfNeeded()` would go GREEN against this mutation and certify the bug.
+		// The victim asserts on a WHEEL for that reason. Changing it back re-opens the defect silently.
+		find: '\t\toverflow-y: auto;',
+		replace: '\t\toverflow-y: hidden;',
+		expectRed: ['apps/rph-demo/e2e/undertaking-scroll.e2e.ts'],
+		why: 'DR-002 W-1: a Surface a professional cannot scroll does not present the work it claims to present',
+		source: 'JPWB-SPEC-001-DR-002 W-1'
+	},
+	{
+		id: 'W1-b-the-canvas-is-sized-by-a-guess-again',
+		file: 'apps/rph-demo/src/routes/undertakings/[id]/+page.svelte',
+		// THE OPPOSITE FAILURE, and the reason the victim carries a CONTROL case. Making the workbench scroll is
+		// only half a repair: the `graph` tab is a genuinely viewport-locked canvas that pans internally, and a fix
+		// that lets it scroll off the bottom of the page has broken it while turning the main assertion green.
+		//
+		// The mutation is the sizing mistake W-1 retired, restored in the only form still available after
+		// `height: calc(100vh - 320px)` was replaced by `flex: 1 1 auto`: a floor tall enough that the canvas can no
+		// longer shrink into the space it is actually given, so it overflows and the page scrolls on a locked tab.
+		find: '\t\tmin-height: 420px;',
+		replace: '\t\tmin-height: 900px;',
+		expectRed: ['apps/rph-demo/e2e/undertaking-scroll.e2e.ts'],
+		why: 'DR-002 W-1: the CONTROL case is load-bearing — a repair that makes EVERYTHING scroll is not a repair',
+		source: 'JPWB-SPEC-001-DR-002 W-1'
 	}
 ];
