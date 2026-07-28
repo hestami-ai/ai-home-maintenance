@@ -66,6 +66,25 @@
 // THE DISCLOSED LIMIT (JAN-VERIF-DS-001 §4): a DECLARED ledger is not the possible mutant space. This proves the
 // declared set still bites; it says nothing about operators nobody thought of. Generated mutation (Stryker) is
 // the honest successor and is deliberately out of scope — recorded so this is not mistaken for completeness.
+//
+// ── A SECOND DISCLOSED LIMIT: THE SURFACE LAYER IS UNREACHABLE FROM THIS LEDGER (recorded 2026-07-28) ────────
+//
+// The runner executes `bunx vitest run <victim>`. Playwright specs are not vitest specs, so **no guard whose only
+// red-proof is an e2e can be carried here** — and this ledger has, by census, zero entries with `file: 'apps/…'`
+// and zero `expectRed` naming an `*.e2e.ts`.
+//
+// THAT IS A GAP, NOT A POLICY, AND THE TEMPTING WORKAROUND IS THE DANGEROUS ONE. Naming an e2e file as the victim
+// would not fail cleanly: vitest would find no matching spec, exit non-zero under `passWithNoTests: false`, and
+// the runner would record **KILLED** — a verdict produced by the file-matcher rather than by any guard. That is
+// exactly the shape this instrument exists to detect, and it would be manufactured by the instrument itself.
+//
+// The live instance: `runSteps` in `apps/rph-demo/src/routes/undertakings/[id]/+page.server.ts` was made atomic on
+// 2026-07-28 (JPWB-SPEC-001 `SPEC-001-INV-14`, FORK-23 (b)); its red-proof is `e2e/undertaking-atomicity.e2e.ts`,
+// which was written first and observed FAILING on the assessment-count assertion before the fix landed. **No
+// entry was added for it**, deliberately, because an honest one cannot be run today. Closing this needs the
+// runner to dispatch e2e victims to Playwright — which is the same boundary JPWB-SPEC-001 FORK-19 rules on when
+// it adds a `SURFACE` layer to the enforcement register, whose `LAYER_BY_PACKAGE` likewise maps `packages/`
+// prefixes only and fail-closes every `apps/` path to `UNKNOWN`.
 
 export interface DeclaredMutant {
 	/** Stable id, as used in the work package that declared it. */

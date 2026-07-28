@@ -38,6 +38,7 @@ import { attemptsMadeFrom, capabilityIdentities } from '@janumipwb/rph-domain';
 import {
 	buildPwaExport,
 	dispatch,
+	dispatchBatch,
 	getEngine,
 	getRegisteredIntent,
 	mintUiId
@@ -477,15 +478,48 @@ function chg(
 	];
 }
 
-/** Run a command sequence, returning the first rejection (naming the command that failed; DUPLICATE is fine) or
- *  null on success. Prefixing the command type turns an opaque "Schema validation failed" into a locatable one. */
+/**
+ * Run a command sequence ATOMICALLY, returning the rejection that stopped it (naming the command that failed;
+ * DUPLICATE is fine) or null on success. Prefixing the command type turns an opaque "Schema validation failed"
+ * into a locatable one.
+ *
+ * ATOMIC SINCE 2026-07-28, AND IT WAS A REAL DEFECT UNTIL THEN (JPWB-SPEC-001 `SPEC-001-INV-14`, FORK-23 (b)).
+ * This function used to loop `dispatch` one command at a time and `return` on the first refusal — so every command
+ * BEFORE the refused one stayed committed. The seeded reference Undertaking makes that visible in one click:
+ * its root PWU sits at EXECUTING/QUEUED, the overview row offers Record Assurance because it branches on
+ * `workLifecycleState` alone, and the sequence ends in a `QUEUED -> SUCCEEDED` hop that is not an arrow
+ * (`transitions.data.ts:505-509`). The engine refused, correctly — and two ASSURANCE_ASSESSMENT objects were
+ * already on disk, appearing thereafter in the Assurance tab as orphans. Every click minted two more.
+ *
+ * WHAT MAKES THE FIX SMALL IS THAT NOTHING NEW WAS NEEDED. `dispatchBatch` wraps the identical loop — same
+ * ACCEPTED/DUPLICATE accept criteria — in `store.transaction()` and unwinds every commit on the first refusal
+ * (`command-bus.ts:169-188`). This same application already dispatched atomically in two other places: the PWA
+ * Designer (`pwa/[id]/+page.server.ts:632`) and the authoring turn (`authoring-turn.ts:452`). Only this surface
+ * did not, and the specification that ruled it (FORK-8/FORK-23) was itself drafted on the false premise that the
+ * engine had no multi-command envelope — a claim struck at SPEC-001 §11.1.8.
+ *
+ * The error CONTRACT is unchanged: callers still receive `"<CommandType>: <message>"` or null, so no call site
+ * moves. `failedIndex` names the offending command; it is always present on a failed batch, and the fallbacks
+ * exist so a future batch that fails without one degrades to a locatable message rather than to `undefined`.
+ *
+ * RED-PROOF: `e2e/undertaking-atomicity.e2e.ts`. Against the pre-fix implementation its first spec fails on the
+ * assessment-count assertion — NOT on the refusal assertion, which passed throughout. A test that only checked
+ * the error was surfaced would have been green against this defect for as long as it existed.
+ */
 function runSteps(steps: Step[]): string | null {
-	for (const [ct, agg, id, pl] of steps) {
-		const r = dispatch(ct, agg, id, pl);
-		if (r.status !== 'ACCEPTED' && r.status !== 'DUPLICATE')
-			return `${ct}: ${r.error?.message ?? r.status}`;
-	}
-	return null;
+	const batch = dispatchBatch(
+		steps.map(([commandType, targetAggregateType, targetAggregateId, payload]) => ({
+			commandType,
+			targetAggregateType,
+			targetAggregateId,
+			payload
+		}))
+	);
+	if (batch.ok) return null;
+	const at = batch.failedIndex ?? batch.results.length - 1;
+	const commandType = steps[at]?.[0] ?? '(unknown command)';
+	const failed = batch.results[at];
+	return `${commandType}: ${failed?.error?.message ?? failed?.status ?? 'REJECTED'}`;
 }
 
 async function pwuIdFrom(request: Request): Promise<string> {
@@ -627,7 +661,8 @@ export const actions: Actions = {
 					structuredResult: {},
 					noOutputResult: {
 						reason: 'NO_DOWNSTREAM_CONSUMABLE_RESULT',
-						detail: 'Demo lifecycle step: it demonstrates the execution axis and authors no artifact.'
+						detail:
+							'Demo lifecycle step: it demonstrates the execution axis and authors no artifact.'
 					},
 					executionProvenance: {
 						executedBy: { actorId: 'ui-user', actorType: 'HUMAN', displayName: 'Workbench User' }
