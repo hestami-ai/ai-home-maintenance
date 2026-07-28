@@ -47,11 +47,23 @@ test.describe('Undertaking Workbench — create an Undertaking and instantiate a
 		const snap = await introspect(request);
 		const undertaking = snap.undertakings.find((u) => u.state.name === 'Pilot Delivery Program');
 		expect(undertaking, 'new Undertaking exists in the engine').toBeTruthy();
+		// AMENDED FOR DR-002 W-3. This asserted `toHaveLength(1)` and then indexed `pwus[0]`, both of which relied
+		// on a new Undertaking being EMPTY. It now instantiates its PWA's composition tree on creation, so the set
+		// is the eight auto-instantiated PWUs plus the one this test adds by hand — and `pwus[0]` is the root, not
+		// 'Pilot Architecture'.
+		//
+		// The claim is unchanged and is now stated directly instead of via an index: a PWU instantiated BY HAND
+		// from a chosen type is recorded against this Undertaking, realizing that type. The count is kept as an
+		// assertion rather than dropped, because "the manual one exists" would also hold if instantiation had
+		// silently created a hundred.
 		const pwus = snap.pwus.filter((p) => p.state.undertakingId === undertaking!.id);
-		expect(pwus).toHaveLength(1);
-		expect(pwus[0].state.title).toBe('Pilot Architecture');
-		expect(pwus[0].state.isLocalExtension).toBe(false);
-		const type = snap.pwuTypes.find((t) => t.id === String(pwus[0].state.pwuTypeId));
+		expect(pwus, 'eight auto-instantiated PWUs (root + 7 mandatory) plus the one added here').toHaveLength(
+			9
+		);
+		const manual = pwus.find((p) => p.state.title === 'Pilot Architecture');
+		expect(manual, 'the hand-instantiated PWU is recorded against this Undertaking').toBeTruthy();
+		expect(manual!.state.isLocalExtension).toBe(false);
+		const type = snap.pwuTypes.find((t) => t.id === String(manual!.state.pwuTypeId));
 		expect(type?.state.name).toBe('Architecture Definition');
 
 		// VISUAL: capture the workbench with its first instantiated PWU.

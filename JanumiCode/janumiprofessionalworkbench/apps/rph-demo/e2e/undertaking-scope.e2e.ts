@@ -36,7 +36,8 @@ test.describe('Undertaking Workbench — projections are scoped to their subject
 		expect(seeded.baselines.length).toBeGreaterThan(0);
 		expect(seeded.decisions.length).toBeGreaterThan(0);
 
-		// Arrange: a second, empty Undertaking.
+		// Arrange: a second Undertaking. It was EMPTY until DR-002 W-3; it now instantiates its PWA's composition
+		// tree on creation, which is why the traceability control below had to be rewritten rather than relaxed.
 		await gotoHydrated(page, '/undertakings');
 		await page.getByRole('button', { name: '+ New Undertaking' }).click();
 		await page.getByPlaceholder(/Undertaking name/i).fill('Scope Probe');
@@ -44,9 +45,12 @@ test.describe('Undertaking Workbench — projections are scoped to their subject
 		await page.getByRole('button', { name: 'Create Undertaking' }).click();
 		const link = page.getByRole('link', { name: /Scope Probe/ });
 		await expect(link).toBeVisible();
-		await gotoHydrated(page, (await link.getAttribute('href'))!);
+		const probeHref = (await link.getAttribute('href'))!;
+		const probeId = probeHref.replace('/undertakings/', '');
+		await gotoHydrated(page, probeHref);
 
-		// It owns no PWUs, so it owns no assessments, decisions or baselines either.
+		// It owns no assessments, decisions or baselines: instantiating an architecture proposes WORK, and
+		// proposed work carries no governance records until somebody assures, decides or baselines it.
 		for (const tab of ['assurance', 'decisions', 'baselines'] as const) {
 			await page.getByRole('button', { name: tab, exact: true }).click();
 			const idCells = page.locator('main tbody tr td:first-child');
@@ -56,8 +60,27 @@ test.describe('Undertaking Workbench — projections are scoped to their subject
 
 		// Traceability is the CONTROL: it was already scoped before this fix and must remain so. If it ever starts
 		// leaking, the repair regressed something it was supposed to leave alone.
+		//
+		// AMENDED FOR DR-002 W-3, AND THE AMENDMENT MAKES IT STRONGER. It asserted "No traceability links", which
+		// held only because the probe Undertaking owned nothing — an EMPTY view, which is exactly the state FORK-9's
+		// non-example warns cannot distinguish correct scoping from scoping everything to nothing. The probe now
+		// instantiates its PWA's tree and owns real links, so the assertion can finally be what it always meant:
+		// there are links, and every one of them belongs to THIS Undertaking's own PWUs.
 		await page.getByRole('button', { name: 'traceability', exact: true }).click();
-		await expect(page.getByText(/No traceability links/i)).toBeVisible();
+		const own = new Set(
+			(await introspect(request)).pwus
+				.filter((p) => p.state.undertakingId === probeId)
+				.map((p) => p.id)
+		);
+		expect(own.size, 'the probe must own PWUs, or an empty traceability view proves nothing').toBeGreaterThan(
+			0
+		);
+		const linkIds = await page.locator('main tbody tr td.mono').allTextContents();
+		const foreign = linkIds
+			.map((t) => t.replace(/…\s*$/, '').trim())
+			.filter((t) => t.startsWith('pwu_'))
+			.filter((t) => ![...own].some((id) => id.startsWith(t)));
+		expect(foreign, 'every traceability link shown must belong to this Undertaking').toEqual([]);
 	});
 
 	test('CONTROL: the seeded Undertaking still shows ITS OWN records', async ({ page, request }) => {

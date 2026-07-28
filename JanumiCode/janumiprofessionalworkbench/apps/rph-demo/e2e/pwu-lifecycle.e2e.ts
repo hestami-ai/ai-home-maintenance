@@ -31,7 +31,14 @@ test.describe('Undertaking Workbench — PWU lifecycle enforces no-green-without
 		await expect(page.getByText('Arch Work')).toBeVisible();
 
 		// Act 1: Begin & Execute -> executionState SUCCEEDED, but still UNASSESSED (amber, NOT green).
-		await page.getByRole('button', { name: 'Begin & Execute' }).click();
+		// ROW-SCOPED since DR-002 W-3: an Undertaking now instantiates its PWA's composition tree on creation, so
+		// this workbench holds eight auto-instantiated PROPOSED PWUs alongside 'Arch Work' and a bare locator
+		// resolves to nine buttons. Scoping to the row NAMES the subject, which the bare locator only ever did by
+		// accident of there being one.
+		await page
+			.getByRole('row', { name: /Arch Work/ })
+			.getByRole('button', { name: 'Begin & Execute' })
+			.click();
 		await expect(page.getByRole('button', { name: 'Record Assurance' })).toBeVisible();
 		let snap = await introspect(request);
 		let pwu = snap.pwus.find((p) => p.state.title === 'Arch Work')!;

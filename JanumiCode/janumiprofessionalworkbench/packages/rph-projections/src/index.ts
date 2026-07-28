@@ -17,3 +17,4 @@ export * from './calibration.js';
 export * from './pwu-behavior.js';
 export * from './traceability-view.js';
 export * from './compatibility-view.js';
+export * from './composition-plan.js';

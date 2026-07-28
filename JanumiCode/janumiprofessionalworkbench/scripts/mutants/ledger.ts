@@ -1912,5 +1912,61 @@ export const DECLARED_MUTANTS: readonly DeclaredMutant[] = [
 		expectRed: ['apps/rph-demo/src/lib/server/workbench-durability.test.ts'],
 		why: 'DR-002 W-2: work enqueued before a restart must be re-driven after it, not stranded PENDING forever',
 		source: 'JPWB-SPEC-001-DR-002 W-2'
+	},
+	{
+		id: 'W3-a-every-permitted-child-becomes-mandatory',
+		file: 'packages/rph-projections/src/composition-plan.ts',
+		// THE CARDINALITY RULE ITSELF. `mandatoryMinimum` is the ONE place the M/C distinction is decided, so this
+		// mutation is the whole "instantiate everything permitted" defect in a single return.
+		//
+		// On the SEEDED architecture it is worth exactly one PWU — root + 7 becomes root + 7 + the C+ concern, 8
+		// against 9 — which is why the e2e asserts a NUMBER rather than `toBeGreaterThan(0)`. The unit victim is
+		// named instead because it states the rule directly and does not need a browser to do it.
+		find: "	return code === 'M1' || code === 'M+' ? 1 : 0;",
+		replace: '\treturn 1; // MUTANT: conditional children become mandatory',
+		expectRed: ['packages/rph-projections/src/composition-plan.test.ts'],
+		why: 'DR-002 W-3: a C1/C+ child is a professional judgement the surface must OFFER, never make on their behalf',
+		source: 'JPWB-SPEC-001-DR-002 W-3'
+	},
+	{
+		id: 'W3-b-a-rule-less-permitted-child-defaults-to-conditional',
+		file: 'packages/rph-projections/src/composition-plan.ts',
+		// THE DEFAULT, AND IT FAILS SILENTLY IN THE DIRECTION THAT LOOKS FINE. `permittedChildren` is OPTIONAL on a
+		// PWU Type, so a PWA authored before the field existed carries only the flat `permittedChildTypeIds`.
+		// Defaulting those to conditional instantiates NOTHING for such a PWA — and an empty result is
+		// indistinguishable from a correctly-instantiated architecture whose children are all optional. Mandatory
+		// fails loudly instead, which is the only reason anyone would find out.
+		find: "	return declared ?? { typeId, cardinality: 'M1' };",
+		replace: "\treturn declared ?? { typeId, cardinality: 'C+' }; // MUTANT: absent rule means optional",
+		expectRed: ['packages/rph-projections/src/composition-plan.test.ts'],
+		why: 'DR-002 W-3: an unstated cardinality must fail loudly, not resolve to "instantiate nothing"',
+		source: 'JPWB-SPEC-001-DR-002 W-3'
+	},
+	{
+		id: 'W3-c-an-unresolvable-architecture-is-instantiated-anyway',
+		file: 'apps/rph-demo/src/routes/undertakings/+page.server.ts',
+		// THE REFUSAL. A PWA whose root permits a type that does not exist PUBLISHES CLEANLY today — `definePwuType`
+		// never checks that `permittedChildTypeIds` resolve, and the graph projection drops what it cannot resolve.
+		// Without this guard the Undertaking is built anyway, silently missing mandatory work, and the professional
+		// is handed a decomposition that is smaller than the architecture it claims to realize and says nothing
+		// about it. The mutation returns null (no error) so instantiation proceeds.
+		find: '	if (plan.unresolved.length > 0) {',
+		replace: '\tif (false) {',
+		expectRed: ['apps/rph-demo/e2e/pwa-instantiation.e2e.ts'],
+		why: 'DR-002 W-3: an architecture that cannot be instantiated in full must be refused, not quietly truncated',
+		source: 'JPWB-SPEC-001-DR-002 W-3'
+	},
+	{
+		id: 'W3-d-the-instantiated-tree-is-flat',
+		file: 'apps/rph-demo/src/routes/undertakings/+page.server.ts',
+		// THE STRUCTURE, as distinct from the COUNT. Dropping `parentWorkUnitId` leaves every count in the e2e
+		// intact — 8 PWUs on the seed, 3 on the depth fixture — and produces a set of unrelated work units rather
+		// than a decomposition. `professional-work-graph` folds the parent link into the graph, so this is the
+		// difference between an architecture and a list.
+		find: '					: { parentWorkUnitId: pwuIdByKey.get(instance.parentKey)! }),',
+		replace: '					: {}), // MUTANT: the child is created without its parent link',
+		expectRed: ['apps/rph-demo/e2e/pwa-instantiation.e2e.ts'],
+		why: 'DR-002 W-3: instantiating the right NUMBER of work units is not instantiating an architecture',
+		source: 'JPWB-SPEC-001-DR-002 W-3'
 	}
 ];

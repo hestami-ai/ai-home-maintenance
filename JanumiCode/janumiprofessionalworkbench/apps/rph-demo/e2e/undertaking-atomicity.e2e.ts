@@ -90,7 +90,12 @@ test.describe('Undertaking Workbench — multi-Command atomicity (SPEC-001-INV-1
 		await expect(page.getByText('Atomic Work')).toBeVisible();
 
 		const before = await introspect(request);
-		await page.getByRole('button', { name: 'Begin & Execute' }).click();
+		// ROW-SCOPED since DR-002 W-3 — the Undertaking now instantiates its PWA's tree on creation, so eight
+		// auto-instantiated PROPOSED PWUs render the same button and a bare locator resolves to nine.
+		await page
+			.getByRole('row', { name: /Atomic Work/ })
+			.getByRole('button', { name: 'Begin & Execute' })
+			.click();
 		await expect(page.getByRole('button', { name: 'Record Assurance' })).toBeVisible();
 
 		// beginExecute is the largest sequence in the file (eleven Commands). All of them, or none.
