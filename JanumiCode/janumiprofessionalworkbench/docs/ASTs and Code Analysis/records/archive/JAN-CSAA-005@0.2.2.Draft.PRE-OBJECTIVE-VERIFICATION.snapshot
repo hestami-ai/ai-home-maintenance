@@ -6,13 +6,13 @@
 
 **Canonical title:** JPWB TypeScript Repository Semantic Inventory and Conformance Mapping
 
-**Version:** `0.3.0`
+**Version:** `0.2.2`
 
 **Status:** Draft
 
 **Settledness:** HYPOTHESIS
 
-**Classification:** Refreshed controlled-CSAA member candidate; non-authoritative Draft. The former `JAN-CSAA-W1-MANIFEST-002@0.2.0` / `JAN-CSAA-W1-GAP-003` intermediate synchronization path is withdrawn because its exact register preimage and governing authority state changed; its immutable records remain historical evidence. This `0.3.0` pre-objective-verification Draft carries the reconciled current-subject and candidate-propagation corrections while cross-document claim-by-claim verification remains open. This Draft does not self-declare closure
+**Classification:** Refreshed controlled-CSAA member candidate; non-authoritative Draft. The former `JAN-CSAA-W1-MANIFEST-002@0.2.0` / `JAN-CSAA-W1-GAP-003` intermediate synchronization path is withdrawn because its exact register preimage and governing authority state changed; its immutable records remain historical evidence. At this `0.2.2` authoring state, cross-document propagation under `JAN-CSAA-W1-GAP-004` was still awaiting author-side claim-by-claim reconciliation and recording; a later exact successor record controls the live gap state without rewriting these bytes. This Draft does not self-declare closure
 
 **Governing status:** Documentation preparation was activated by `JPWB-REG-005 REG-D-018` and is continued for every documentation subphase by `REG-D-021` as corrected by `REG-D-022`; this document has no member authority
 
@@ -64,7 +64,7 @@
 
 **Structural exemplar:** [Recursive Professional Harness document-set README](<../Recursive Professional Harness/README.md>)
 
-**Supersedes:** `JAN-CSAA-005@0.2.2 / Draft`, preserved at `records/archive/JAN-CSAA-005@0.2.2.Draft.PRE-OBJECTIVE-VERIFICATION.snapshot`
+**Supersedes:** `JAN-CSAA-005@0.2.1 / Draft`, preserved at `records/archive/JAN-CSAA-005@0.2.1.Draft.PRE-REG-D-021.snapshot`
 
 **Superseded by:** None
 
@@ -1409,7 +1409,7 @@ The Draft is ready for continued objective author verification and, after exact 
 
 - direct cited-canon and inherited self-review intake are corrected but remain open for objective author/ledger-closer verification;
 - the adopted README remains the authority and adoption baseline, the MANIFEST-002 intermediate-carriage procedure is withdrawn because its exact preimage and authority state changed, and synchronized member/manifest carriage is reserved for the final corpus transaction rather than a Proposed-promotion gate;
-- at this `0.3.0` pre-objective-verification authoring state, candidate propagation edits for `JAN-CSAA-001` and `JAN-CSAA-002` have not yet received author-side claim-by-claim cross-document reconciliation and recording under `JAN-CSAA-W1-GAP-004`; any later exact reconciliation record controls the live state;
+- at this `0.2.2` authoring state, candidate propagation edits for `JAN-CSAA-001` and `JAN-CSAA-002` had not yet received author-side claim-by-claim cross-document reconciliation and recording under `JAN-CSAA-W1-GAP-004`; any later exact reconciliation record controls the live state;
 - 458 Draft-applicable ledger rows remain `PLANNED` and `NOT_RUN`;
 - 18 author-self-review rows remain `ALLOCATED_TO_POST_LEDGER_SELF_REVIEW` and `NOT_REQUIRED_CURRENT_PHASE` until objective ledger closure;
 - 15 post-Proposed or final-transaction rows remain explicitly allocated to later lifecycle and `NOT_REQUIRED_CURRENT_PHASE`;

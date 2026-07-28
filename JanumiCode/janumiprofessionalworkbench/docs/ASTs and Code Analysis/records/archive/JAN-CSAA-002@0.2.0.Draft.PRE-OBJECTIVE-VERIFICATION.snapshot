@@ -6,7 +6,7 @@
 
 **Canonical title:** TypeScript Semantic Model and Invariant Catalog
 
-**Version:** `0.3.0`
+**Version:** `0.2.0`
 
 **Status:** Draft
 
@@ -50,7 +50,7 @@
 
 **Structural exemplar:** [RPH Canonical Domain Model and Invariant Catalog](<../Recursive Professional Harness/Janumi Professional Workbench Recursive Professional Harness - Canonical Domain Model, Invariant Catalog, State Machines, and Event Contract.md>)
 
-**Supersedes:** `JAN-CSAA-002@0.2.0 / Draft`, preserved at `records/archive/JAN-CSAA-002@0.2.0.Draft.PRE-OBJECTIVE-VERIFICATION.snapshot`
+**Supersedes:** `JAN-CSAA-002@0.1.0 / Draft`, preserved at `records/archive/JAN-CSAA-002@0.1.0.Draft.PRE-REG-D-021.snapshot`
 
 **Superseded by:** None
 
@@ -1462,7 +1462,7 @@ The Wave 1 methods below are author-side adversarial-question, example, and scen
 
 ## 21. Draft acceptance state
 
-This `0.3.0` revision is a non-authoritative Draft reconciliation under `REG-D-018` as extended by `REG-D-021` and corrected by `REG-D-022`. The adopted `JAN-CSAA-000@0.3.0` README remains the authority and manifest baseline; `JAN-CSAA-WORKING-STATUS-001` carries current preparation state without interim README carriage. The withdrawn MANIFEST-002 path and its historical gap evidence remain preserved, but neither an intermediate manifest decision nor a sponsor response blocks ledger closure or Proposed promotion. This Draft does not self-declare closure and is not a Proposed or Normative member.
+This `0.2.0` revision is a non-authoritative Draft reconciliation under `REG-D-018` as extended by `REG-D-021` and corrected by `REG-D-022`. The adopted `JAN-CSAA-000@0.3.0` README remains the authority and manifest baseline; `JAN-CSAA-WORKING-STATUS-001` carries current preparation state without interim README carriage. The withdrawn MANIFEST-002 path and its historical gap evidence remain preserved, but neither an intermediate manifest decision nor a sponsor response blocks ledger closure or Proposed promotion. This Draft does not self-declare closure and is not a Proposed or Normative member.
 
 Present:
 
@@ -1478,7 +1478,7 @@ Present:
 - 553-row independently dispositionable stable candidate requirement catalog comprising 119 retained prior IDs below 131 and 434 continuous, non-reused new IDs from `CSAA-002-REQ-131` through `CSAA-002-REQ-564`, with later verification allocations;
 - open-fork safe defaults.
 
-At this `0.3.0` pre-objective-verification authoring state, which is not an exact review freeze or Proposed-candidate freeze, the following work remains before Proposed. Later exact closure and reconciliation records control live completion state without retroactively rewriting preserved predecessor snapshots:
+At this `0.2.0` authoring-state snapshot, which is not an exact review freeze or Proposed-candidate freeze, the following work remained before Proposed. Later exact closure and reconciliation records control live completion state without rewriting these bytes:
 
 - refresh and reconcile the exact repository subject and current working-status evidence without silently upgrading the historical `JAN-CSAA-005@0.1.0` examples;
 - complete the current-phase author/objective verification needed to close the requirement ledger; later-lifecycle and later-execution allocations remain explicit non-pass states;

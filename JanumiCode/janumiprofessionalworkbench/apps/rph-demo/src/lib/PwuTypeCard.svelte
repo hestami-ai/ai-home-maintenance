@@ -34,7 +34,18 @@
 	<header class="head">
 		<div class="titles">
 			<div class="name">
-				{data.name}{#if data.isRoot}<span class="rootbadge">ROOT</span>{/if}
+				<span class="agenticon" role="img" aria-label="AI agent" title="AI agent">
+					<svg viewBox="0 0 16 16" aria-hidden="true">
+						<path d="M8 4V2.5" />
+						<circle cx="8" cy="2" r="0.7" fill="currentColor" stroke="none" />
+						<rect x="2.5" y="4.5" width="11" height="8.5" rx="2.25" />
+						<path d="M1.5 8.5h1m11 0h1M5.5 10.5h5" />
+						<circle cx="5.75" cy="7.75" r="0.7" fill="currentColor" stroke="none" />
+						<circle cx="10.25" cy="7.75" r="0.7" fill="currentColor" stroke="none" />
+					</svg>
+				</span>
+				<span class="nametext">{data.name}</span>
+				{#if data.isRoot}<span class="rootbadge">ROOT</span>{/if}
 			</div>
 			<div class="kind">{data.pwuKind}</div>
 		</div>
@@ -150,11 +161,40 @@
 		gap: 6px;
 	}
 	.name {
+		display: flex;
+		align-items: flex-start;
+		gap: 5px;
 		font-weight: 600;
 		font-size: 12.5px;
 		line-height: 1.25;
 	}
+	.agenticon {
+		display: inline-grid;
+		flex: 0 0 18px;
+		width: 18px;
+		height: 18px;
+		margin-top: -1px;
+		place-items: center;
+		border: 1px solid var(--graph-node-selected);
+		border-radius: 5px;
+		background: var(--primary-soft);
+		color: var(--graph-node-selected);
+	}
+	.agenticon svg {
+		display: block;
+		width: 13px;
+		height: 13px;
+		fill: none;
+		stroke: currentColor;
+		stroke-width: 1.35;
+		stroke-linecap: round;
+		stroke-linejoin: round;
+	}
+	.nametext {
+		min-width: 0;
+	}
 	.rootbadge {
+		flex: 0 0 auto;
 		font-size: 8.5px;
 		font-weight: 700;
 		letter-spacing: 0.05em;
@@ -162,7 +202,7 @@
 		border: 1px solid var(--graph-node-border);
 		border-radius: 4px;
 		padding: 0 3px;
-		margin-left: 5px;
+		margin-top: 1px;
 		vertical-align: middle;
 	}
 	.kind {

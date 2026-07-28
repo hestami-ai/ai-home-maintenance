@@ -6,57 +6,57 @@
 
 **Canonical title:** JPWB TypeScript Repository Semantic Inventory and Conformance Mapping
 
-**Version:** `0.3.0`
+**Version:** `0.1.0`
 
 **Status:** Draft
 
 **Settledness:** HYPOTHESIS
 
-**Classification:** Refreshed controlled-CSAA member candidate; non-authoritative Draft. The former `JAN-CSAA-W1-MANIFEST-002@0.2.0` / `JAN-CSAA-W1-GAP-003` intermediate synchronization path is withdrawn because its exact register preimage and governing authority state changed; its immutable records remain historical evidence. This `0.3.0` pre-objective-verification Draft carries the reconciled current-subject and candidate-propagation corrections while cross-document claim-by-claim verification remains open. This Draft does not self-declare closure
+**Classification:** Prepared controlled-CSAA member candidate; non-authoritative Draft; live manifest-synchronization state is controlled by `JAN-CSAA-W1-GAP-001` and any later exact recorded disposition; this Draft does not self-declare closure
 
-**Governing status:** Documentation preparation was activated by `JPWB-REG-005 REG-D-018` and is continued for every documentation subphase by `REG-D-021` as corrected by `REG-D-022`; this document has no member authority
+**Governing status:** Draft authoring and adversarial review are commissioned by `JPWB-REG-005 REG-D-018`; this document has no member authority
 
-**Role:** Descriptive, revision-and-worktree-bound inventory of the recorded JPWB TypeScript repository subject and mapping of observed implementation, configuration, tests, evidence instruments, and gaps to their concern-owning obligations
+**Role:** Descriptive, revision-bound inventory of the recorded JPWB TypeScript repository subject and mapping of observed implementation, configuration, tests, evidence instruments, and gaps to their concern-owning obligations
 
-**Authority:** None. `REG-D-018`, as extended by `REG-D-021` and corrected by `REG-D-022`, authorizes documentation-only preparation, reconciliation, objective gate closure, Draft-to-Proposed promotion, and post-Proposed review and validation. Only an individual exact-member `JPWB-REG-005` conferral within the final exact-corpus transaction can make a revision Normative
+**Authority:** None. `REG-D-018` authorizes preparation and review of this Draft; only a later exact-version/digest sponsor conferral can make a revision Normative
 
-**Scope:** Accepted-snapshot workspaces, packages, apps, project contexts, dependency declarations, source classifications, generated contracts, configured commands, architecture rules, tests, coverage, mutation, runtime seams, observability, and missing semantic capabilities within the first JPWB subject
+**Scope:** Recorded-snapshot workspaces, packages, apps, project contexts, dependency declarations, source classifications, generated contracts, configured commands, architecture rules, tests, coverage, mutation, runtime seams, observability, and missing semantic capabilities within the first JPWB subject
 
-**Applicability:** The repository state rooted at `E:/Projects/hestami-ai/JanumiCode/janumiprofessionalworkbench`, bound to parent commit `0e7893f5fd343e3d74ca7dc73bad0221bb95f81c`, the exact two-record unstaged working-tree identity below, the tracked implementation/configuration manifest, and the separately identified generated SvelteKit configuration
+**Applicability:** The repository state rooted at `E:/Projects/hestami-ai/JanumiCode/janumiprofessionalworkbench`, bound to parent commit `e673fb5c2e186fb0873d3720036e5e8d7b00038a`, the explicit implementation/configuration manifest below, and the separately identified generated SvelteKit configuration
 
-**Observation time:** OBS-029 began at `2026-07-28T13:08:58.6982147-04:00`; OBS-030 began at `2026-07-28T13:08:59.3965320-04:00`; the second internally stable read completed at `2026-07-28T13:08:59.7313669-04:00`
+**Observation time:** `2026-07-26T11:52:31.6050250-04:00`
 
-**As-of state:** `CURRENT_FOR_RECORDED_DIRTY_SUBJECT_ONLY`; the selected implementation/configuration scope contained two tracked unstaged changes and was otherwise identical in the accepted pair. The observations do not claim that those changes are correct, tested, approved, staged, committed, behavior-preserving, or current for any later worktree or commit
+**As-of state:** `STALE_FOR_CURRENT_REPOSITORY`; `CURRENT_FOR_RECORDED_SNAPSHOT_ONLY` at the recorded observation. The repository observations are not a claim about any later worktree or commit
 
-**Freshness recheck:** The current author-side recheck is recorded in [JAN-CSAA-005 Current Subject Rebinding Record](<records/JAN-CSAA-005 - Current Subject Rebinding Record.md>). Any mismatch with its OBS-029/030 identities makes affected conclusions stale and prevents a freshness claim. A separate immediately preceding recheck remains required for any exact Proposed-candidate freeze
+**Freshness recheck:** At `2026-07-26T12:26:43.0845620-04:00`, repository `HEAD` was `3492a3da0188c996019965073fd94abdb3b123cf`; comparison with the recorded parent showed implementation/configuration changes and a different `packages` tree. This Draft was not refreshed to that later subject
 
-**Evidence provenance:** [JAN-CSAA-005 Current Subject Rebinding Record](<records/JAN-CSAA-005 - Current Subject Rebinding Record.md>), including the exact current Git subject, tracked-manifest, dirty-content/diff, generated-context, repeated method, carried-forward compatibility analysis, and no-execution boundaries; the [Current Subject Refresh and Compatibility Record](<records/JAN-CSAA-005 - Current Subject Refresh and Compatibility Record.md>), clean [Successor Preparation Evidence Snapshot](<records/JAN-CSAA-005 - Successor Preparation Evidence Snapshot.md>), predecessor [Preparation Evidence Snapshot](<records/JAN-CSAA-005 - Preparation Evidence Snapshot.md>), and [Refresh Blocker Record](<records/JAN-CSAA-005 - Refresh Blocker Record.md>) remain exact historical evidence
+**Evidence provenance:** [JAN-CSAA-005 Preparation Evidence Snapshot](<records/JAN-CSAA-005 - Preparation Evidence Snapshot.md>), including the exact Git subject, tracked-manifest, configuration, method, and no-execution records; [JAN-CSAA-005 Refresh Blocker Record](<records/JAN-CSAA-005 - Refresh Blocker Record.md>), preserving the later failed stable-subject prerequisite without carrying any later fact into this inventory
 
-**Last verification time:** None. Current refresh evidence was observed at the time above, but no objective author verification, author self-review, independent review, build, test, analyzer, generator, mutation, gate, or runtime-trace execution has been performed for this Draft
+**Last verification time:** None. Preparation evidence was observed at the time above, but no independent verification, build, test, analyzer, generator, mutation, gate, or runtime-trace execution has been performed for this Draft
 
 **Staleness and supersession condition:** The conclusion-affecting triggers in §3.4 make affected observations stale. `CSAA-005-REQ-059` and `CSAA-005-REQ-313` preserve this revision and its observations as historical evidence when a successor is authored
 
-**Governs:** While Draft, nothing with program authority. Candidate concern allocation: the method and result of describing accepted-snapshot JPWB repository facts, their revision/worktree provenance, their conformance mappings, their uncertainty, and their staleness
+**Governs:** While Draft, nothing with program authority. Candidate concern allocation: the method and result of describing recorded-snapshot JPWB repository facts, their revision/worktree provenance, their conformance mappings, their uncertainty, and their staleness
 
 **Does not govern:** Canonical Janumi meaning; TypeScript semantic-object meaning; extraction, inference, query, or change-impact algorithms; Analysis Rule Profiles; Analyzer Finding Records; severity, suppression, waiver, or repository-gate semantics; exact machine schemas or APIs; fixture or oracle judgments; provider qualification; physical persistence; coding-agent procedure; installation; execution; topology; implementation permission; source mutation; remediation
 
-**Parent and inherited authorities:** `JAN-CSAA-000@0.3.0`, `JPWB-CON-000`, `JPWB-DOC-001`, `JPWB-DOC-002`, `JPWB-DOC-003`, `JPWB-DOC-004`, and `JPWB-REG-005@1.0.0 REG-D-018`, `REG-D-021`, and `REG-D-022`, each only for its owned concern
+**Parent and inherited authorities:** `JAN-CSAA-000@0.3.0`, `JPWB-CON-000`, `JPWB-DOC-001`, `JPWB-DOC-002`, `JPWB-DOC-003`, `JPWB-DOC-004`, and applicable `JPWB-REG-005` entries, each only for its owned concern
 
 **Precedence and conflict routing:** Canon and recognized enforced reference artifacts retain concern ownership. `JAN-CSAA-001` owns candidate logical architecture; `JAN-CSAA-002` owns candidate provider-independent code-semantic identity; later `JAN-CSAA-003` and `JAN-CSAA-004` are reserved to own analysis/query and rule/finding/gate semantics. This document reports repository facts and divergence without silently adjudicating authority. `CSAA-005-REQ-008` records apparent conflicts, and `CSAA-005-REQ-103` routes them to their concern owner through `JPWB-REG-005`
 
 **Requirement ledger:** [JAN-CSAA-005 Requirement Ledger](<records/JAN-CSAA-005 - Requirement Ledger.md>)
 
-**Verification owner:** The author/integrator owns extraction, ledger-closure evidence, and author self-review. A distinct adversarial reviewer owns Proposed-candidate semantic review, and a distinct integrity/provenance validator owns exact-identity and evidence-continuity validation. The final decision authority and ministerial recorder are also distinct identities. None except the final decision authority can confer Normative status, and the recorder cannot supply or reinterpret judgment
+**Verification owner:** The author owns extraction and self-review evidence. An independent reviewer owns Proposed-candidate adversarial review. Neither can confer Normative status
 
-**Change authority and procedure:** Authors MAY revise this Draft under `REG-D-018` as extended by `REG-D-021` and corrected by `REG-D-022`. Ledger closure and author self-review precede an exact candidate freeze and Proposed promotion. Proposed status is followed by independent adversarial review; completed adversarial review is followed by distinct integrity/provenance validation. Every candidate-byte change after an exact review freeze requires affected re-review unless it is an exact pre-frozen administrative substitution set that enumerates every operation and source/result byte identity, binds exact source and result digests, causes no semantic or judgment change, is independently replayed and result-validated, and is ministerially recorded against exact predicates. Normative status requires an individual exact-member `JPWB-REG-005` conferral in the one final itemized corpus transaction
+**Change authority and procedure:** Authors MAY revise this Draft under `REG-D-018`. The transition controls in inherited `CSAA-000-REQ-165` through `CSAA-000-REQ-168` govern ledger closure, self-review, independent review, and exact-candidate sponsor conferral. A material change to Proposed bytes reopens the affected review
 
-**Current preparation evidence:** [JAN-CSAA-005 Current Subject Rebinding Record](<records/JAN-CSAA-005 - Current Subject Rebinding Record.md>)
+**Preparation evidence:** [JAN-CSAA-005 Preparation Evidence Snapshot](<records/JAN-CSAA-005 - Preparation Evidence Snapshot.md>)
 
-**Review and evidence companions:** Current preparation evidence and requirement ledger above; historical [Current Subject Refresh and Compatibility Record](<records/JAN-CSAA-005 - Current Subject Refresh and Compatibility Record.md>), [Successor Preparation Evidence Snapshot](<records/JAN-CSAA-005 - Successor Preparation Evidence Snapshot.md>), [Preparation Evidence Snapshot](<records/JAN-CSAA-005 - Preparation Evidence Snapshot.md>), and [Refresh Blocker Record](<records/JAN-CSAA-005 - Refresh Blocker Record.md>); [Wave 1 Closure Pass A Current-State and Propagation Gap Record](<records/JAN-CSAA-W1 - Closure Pass A Current-State and Propagation Gap Record.md>); [Sponsor Standing Direction](<records/JAN-CSAA - Sponsor Standing Direction for Autonomous Corpus Preparation and Final Review.md>); [Standing Direction Correction](<records/JAN-CSAA - Standing Direction Interpretation Correction and Assurance Clarification.md>); author self-review and later Proposed-candidate independent-review and integrity-validation records are not yet authored
+**Review and evidence companions:** Preparation evidence and requirement ledger above; [JAN-CSAA-005 Refresh Blocker Record](<records/JAN-CSAA-005 - Refresh Blocker Record.md>); [Wave 1 Manifest Gap Record](<records/JAN-CSAA-W1 - Draft Authoring Initiation and Manifest Gap Record.md>); self-review and formal independent-review records are not yet authored
 
 **Companion enforced artifacts:** None created or selected by this Draft. Existing source, manifests, generated contracts, configurations, tests, and scripts remain revision-bound repository evidence and retain only their existing concern-specific standing
 
-**Conformance-test references:** The documentation subphases for `JAN-CSAA-006` through `JAN-CSAA-008` and the other remaining members are commissioned by `REG-D-021`; executable fixtures, oracle judgments, schemas, types, tests, conformance suites, provider qualification, and results remain unperformed and separately unauthorized under `REG-D-022`
+**Conformance-test references:** Later `JAN-CSAA-006` through `JAN-CSAA-008`; reserved and uncommissioned
 
 **Audience:** Coding-agent designers, TypeScript engineers, software architects, assurance engineers, security reviewers, tool integrators, implementers, and maintainers
 
@@ -64,7 +64,7 @@
 
 **Structural exemplar:** [Recursive Professional Harness document-set README](<../Recursive Professional Harness/README.md>)
 
-**Supersedes:** `JAN-CSAA-005@0.2.2 / Draft`, preserved at `records/archive/JAN-CSAA-005@0.2.2.Draft.PRE-OBJECTIVE-VERIFICATION.snapshot`
+**Supersedes:** None
 
 **Superseded by:** None
 
@@ -76,7 +76,7 @@
 
 This Draft answers a deliberately narrow question:
 
-> What TypeScript repository subject existed at the accepted JPWB snapshot, which configured instruments could observe or verify it, what did those instruments actually cover, and which conclusions remained unsupported?
+> What TypeScript repository subject existed at the recorded JPWB snapshot, which configured instruments could observe or verify it, what did those instruments actually cover, and which conclusions remained unsupported?
 
 It is a parallel evidence feed. It does not make the implementation normative, infer architectural authority from repository presence, or select the recorded-snapshot toolchain as the future CSAA implementation.
 
@@ -88,7 +88,7 @@ The implementation is the source of truth for current implementation facts. Cano
 
 ### 2.1 Descriptive ownership
 
-`JAN-CSAA-005` owns revision-and-worktree-bound description only. It may state that a package, import, command, threshold, generated artifact, runtime seam, or gap was observed in a precisely identified subject. It may not:
+`JAN-CSAA-005` owns recorded-snapshot description only. It may state that a package, import, command, threshold, generated artifact, runtime seam, or gap was observed in a precisely identified subject. It may not:
 
 - declare an observed dependency desirable;
 - convert a roadmap statement into enforced architecture;
@@ -119,28 +119,30 @@ Recorded-snapshot tool                 != qualified CSAA provider
 
 ## 3. Observation identity and subject binding
 
-### 3.1 Exact accepted snapshot
+### 3.1 Exact recorded snapshot
 
 | Field | Recorded value |
 | --- | --- |
-| Observation starts / accepted-window completion | OBS-029 start `2026-07-28T13:08:58.6982147-04:00`; OBS-030 start `2026-07-28T13:08:59.3965320-04:00`; completion `2026-07-28T13:08:59.7313669-04:00` |
+| Observation time | `2026-07-26T11:52:31.6050250-04:00` |
 | Repository root | `E:/Projects/hestami-ai` |
 | JPWB subject root | `E:/Projects/hestami-ai/JanumiCode/janumiprofessionalworkbench` |
-| Branch / parent commit | `main` / `0e7893f5fd343e3d74ca7dc73bad0221bb95f81c` |
-| Explicit perimeter | 19 repository-root-relative pathspecs; 1,005 normalized bytes; SHA-256 `74bfdc46ebddddc7a4cafa12584e76f92faa6489feaf1078ac2772871182b390` |
-| Implementation/configuration status | 2 porcelain-v2 records; 385 normalized bytes; SHA-256 `d09d0ef72e64cc445a2b3e23a6c7082382e2a05df0bd106c6de90f47df183374` |
-| Dirty-content/diff identity | 2 records; 594 normalized bytes; SHA-256 `4c1ac0e964882ab53898eaef176beefc252154ee13700588fb1a42ddc5488aac`; exact per-path content, unstaged-diff, and empty staged-diff identities in `JAN-CSAA-005-EVIDENCE-004@0.1.0` |
-| Tracked implementation/configuration manifest | 541 `git ls-files -s` records; 75,641 normalized bytes; SHA-256 `8b8c4e1d6dee18da4c5814725e69b42b2b8a002a5405b5fea7348ef8edd39a9a` |
-| `packages` Git tree object | `9a1646f73dc4e75e6f1462c15e524e943e5b526a` |
-| `apps` Git tree object | `673f7ae53d54a66ca6cc93f8a602413547c062ef` |
+| Branch / parent commit | `main` / `e673fb5c2e186fb0873d3720036e5e8d7b00038a` |
+| JPWB porcelain-v2 status | 57 records: 15 tracked changes and 42 untracked paths; all observed records were under `docs/**` |
+| JPWB status-manifest SHA-256 | `95178408efa287ddfdd2a29e42be20e75ba0a61a946e0141a47eee73f2102054` |
+| Implementation/configuration status | Zero porcelain-v2 records, including untracked paths, for the explicit scope in §3.2 |
+| Tracked implementation/configuration manifest | 528 `git ls-files -s` records; SHA-256 `43961152982d7082c5f2f5644d84e1b2b4282d834b42319ca44a8d620333d4ea` |
+| `packages` Git tree object | `fc84e78a63513fe7c97fc7516cd265b590277f4b` |
+| `apps` Git tree object | `082b937ce653ad9ecd72b239ffb72aac1a7aa49d` |
 
-The status and dirty-identity digests hash explicitly normalized UTF-8/LF manifests. The tracked subject digest hashes UTF-8, LF-terminated, ordinal-sorted `git ls-files -s` records with one terminal LF. Those records bind paths to Git modes, blob identities, and stages. The two selected tracked files do not equal their parent-commit blobs: `apps/rph-demo/src/lib/PwuTypeCard.svelte` adds a presentational and accessible inline agent icon plus layout styling, and `apps/rph-demo/e2e/pwa-node-graph.e2e.ts` adds one Playwright source assertion for the icon count. Neither staged diff contains bytes. The exact dirty identities are part of the accepted subject rather than treated as noise or omitted.
+The status-manifest digest hashes UTF-8, LF-terminated, ordinal-sorted porcelain-v2 records with one terminal LF. It is worktree-status identity, not a digest of every file.
+
+The tracked subject digest hashes UTF-8, LF-terminated, ordinal-sorted `git ls-files -s` records with one terminal LF. Those records bind paths to Git modes, blob identities, and stages. Because the explicit implementation/configuration scope had no worktree record, its tracked content equals the recorded parent commit.
 
 ### 3.2 Explicit tracked implementation/configuration scope
 
-The 541-record manifest includes:
+The 528-record manifest includes:
 
-- root `package.json`, `bun.lock`, `bunfig.toml`, `turbo.json`, `tsconfig.json`, `vitest.config.ts`, `vitest.dist.config.ts`, and `vitest.projects.ts`;
+- root `package.json`, `bun.lock`, `bunfig.toml`, `turbo.json`, `tsconfig.json`, and `vitest.config.ts`;
 - root ESLint, Prettier, dependency-cruiser, Sonar, and Git-ignore configuration;
 - `.github/**`;
 - `packages/**`;
@@ -159,33 +161,28 @@ This identity includes inventory-only and excluded artifact classes so their exi
 | Path | `apps/rph-demo/.svelte-kit/tsconfig.json` |
 | Bytes | 1,010 |
 | SHA-256 | `c01d35eee60b3cb21e230c392c72c947234d7f406b83959a042a63e09db454c4` |
-| Last-write time, UTC | `2026-07-28T13:36:47.9541763Z` |
+| Last-write time, UTC | `2026-07-26T13:24:25.1297328Z` |
 | Freshness conclusion | Not established |
 
 The file is configuration evidence for the app include surface. It is not compiler-confirmed freshness evidence because `svelte-kit sync` is write-producing and was not authorized or run by this preparation stream.
 
 ### 3.4 Staleness rule
 
-This inventory is `CURRENT_FOR_RECORDED_DIRTY_SUBJECT_ONLY`. It becomes stale for affected conclusions when any of the following changes:
+This inventory is `CURRENT_FOR_RECORDED_SNAPSHOT_ONLY`. It becomes stale for affected conclusions when any of the following changes:
 
 - parent commit;
-- branch identity;
-- the explicit 19-path perimeter membership or serialized identity;
 - a tracked implementation/configuration path;
 - the explicit tracked manifest membership or digest;
-- selected worktree-status membership, dirty content, unstaged diff, or staged diff;
-- the committed `packages` or `apps` tree identity;
-- the generated SvelteKit configuration bytes or recorded last-write identity;
-- mutation-journal presence or the recorded Bun-process quiescence state;
+- the generated SvelteKit configuration bytes;
 - a workspace manifest, export map, lockfile, project context, build/test command, architecture rule, generated source, schema input, runtime entry point, trace source, or evidence instrument;
 - a previously excluded region becomes supported; or
 - an observation is adjudicated by its concern owner.
 
 Under `CSAA-005-REQ-058` and `CSAA-005-REQ-296` through `CSAA-005-REQ-300`, promotion review re-observes the subject rather than inferring freshness from this Draft's modification time.
 
-The [Current Subject Rebinding Record](<records/JAN-CSAA-005 - Current Subject Rebinding Record.md>) preserves the exact accepted OBS-029/030 dirty subject, repeated observation method, compatibility continuity, and invalidation rule. The [Current Subject Refresh and Compatibility Record](<records/JAN-CSAA-005 - Current Subject Refresh and Compatibility Record.md>) preserves historical OBS-027/028, whose parent-commit identity was later invalidated. The [Successor Preparation Evidence Snapshot](<records/JAN-CSAA-005 - Successor Preparation Evidence Snapshot.md>) preserves the complete rejection and later-invalidation history for observations 003 through 018 and the historical clean observations 019 and 020. The earlier [Refresh Blocker Record](<records/JAN-CSAA-005 - Refresh Blocker Record.md>) remains evidence of why the predecessor Draft could not be refreshed at its earlier attempt; no historical record is the source of current facts.
+At the read-only freshness recheck recorded in the metadata, `HEAD` had advanced from `e673fb5c2e186fb0873d3720036e5e8d7b00038a` to `3492a3da0188c996019965073fd94abdb3b123cf`. Eleven selected implementation/configuration paths differed, including `rph-application`, generated and source contract artifacts, `rph-domain`, and the mutation ledger; the `packages` tree changed from `fc84e78a63513fe7c97fc7516cd265b590277f4b` to `a3cd8d959c732caece5a82f34236ab208f28cfb9`. Therefore this inventory is explicitly stale for the current repository and remains only a record of the earlier exact subject. No fact was carried forward to the later commit.
 
-This working Draft carries only facts re-observed or explicitly compatibility-checked against the accepted OBS-029/030 subject. The `0.2.1` pre-`REG-D-021`, `0.2.0` Closure Pass A, and `0.1.0` predecessors remain exact historical snapshots and are not rewritten as if they described a different subject. The two dirty files do not change the recorded workspace, package, dependency, configuration, analyzer, coverage, runtime-trace, or semantic-capability counts; this is a bounded inventory-compatibility conclusion, not a correctness or behavior-preservation judgment.
+The later [Refresh Blocker Record](<records/JAN-CSAA-005 - Refresh Blocker Record.md>) shows that two complete read-only observations did not produce an identical dirty subject. It is evidence of why refresh did not proceed, not a refreshed inventory or a source of carried-forward implementation facts.
 
 ---
 
@@ -296,7 +293,7 @@ Representative observed edges include:
 
 - application to assurance at `packages/rph-application/src/handlers/assurance.ts:14`;
 - application to contracts and ports at `packages/rph-application/src/command-bus.ts:18-21`;
-- application to domain at `packages/rph-application/src/handlers/execution.ts:57`;
+- application to domain at `packages/rph-application/src/handlers/execution.ts:46`;
 - application to projections at `packages/rph-application/src/handlers/pwa-authoring.ts:22`;
 - authoring to contracts and engine at `packages/rph-authoring/src/broker.ts:18-33`;
 - engine to application at `packages/rph-engine/src/engine.ts:13`;
@@ -350,12 +347,11 @@ The root command is `depcruise packages --config .dependency-cruiser.cjs` (`pack
 
 | Artifact class | Recorded count | Classification note |
 | --- | ---: | --- |
-| Package TypeScript under `packages/*/src` | 252 | Includes production, test, generator, and checked-in generated TypeScript |
-| Package `*.test.ts` | 150 | Test |
-| Non-`*.test.ts` package fixtures under `__tests__` | 3 | Test support |
-| Total package test-classified TypeScript | 153 | `*.test.ts` plus non-`*.test.ts` `__tests__` fixtures |
-| Package generator TypeScript under `src/gen` | 7 | Generator source |
-| Projected package build TypeScript | 92 | Arithmetic classification after 153 test-classified and 7 generator files |
+| Package TypeScript under `packages/*/src` | 243 | Includes production, test, generator, and checked-in generated TypeScript |
+| Package `*.test.ts` | 141 | Test |
+| Package fixtures under `__tests__` | 4 | Test support |
+| Package generator TypeScript under `src/gen` | 6 | Generator source |
+| Projected package build TypeScript | 92 | Arithmetic classification after 145 test-classified and 6 generator files |
 | Checked-in generated TypeScript outputs | 5 | Generated source, listed in §8 |
 | Contract vocabulary JSON inputs | 3 | Generator input |
 | Generated JSON schemas | 107 | Generated contract output |
@@ -366,7 +362,7 @@ The root command is `depcruise packages --config .dependency-cruiser.cjs` (`pack
 | Excluded workflow-runtime JavaScript | 1 | `harness/pwa-judge-panel.workflow.js` |
 | Deterministic Playwright files | 28 | Inventory-only test surface |
 | Live Playwright files | 2 | Inventory-only live/network surface |
-| Root verification tests | 4 | Vitest project surface; root TypeScript compiler project remains empty |
+| Root verification tests | 3 | Inventory-only because root project is empty |
 
 Counts describe file classifications, not semantic coverage, test-case count, execution, or correctness.
 
@@ -402,17 +398,15 @@ They are `OBSERVED_UNVERIFIED_DERIVED_OUTPUT`, not evidence of recorded-subject 
 
 The five generated TypeScript outputs contain generated-file headers. Generation and formatting commands are write-producing and were not run.
 
-`packages/rph-contracts/src/gen/schema-manifest.ts` is an additional checked-in generator-support source in the accepted subject. Its presence does not establish that the five TypeScript outputs or 107 schemas are freshly regenerated.
-
 ### 8.2 Precision and provenance limits
 
-Accepted-snapshot generated `packages/rph-contracts/src/objects.ts:65-105` contains 21 helper schemas expressed as `z.record(z.string(), z.unknown())`.
+Recorded-snapshot generated `packages/rph-contracts/src/objects.ts:65-111` contains 24 helper schemas expressed as `z.record(z.string(), z.unknown())`.
 
 `packages/rph-contracts/src/gen/gen-messages.ts:42-66` permits an unknown enum reference to fall back to `z.string()`.
 
-`packages/rph-contracts/vocab/m3-commands-events.json` contains 162 occurrences of `UNRATIFIED-AUTHORED`.
+`packages/rph-contracts/vocab/m3-commands-events.json` contains 161 occurrences of `UNRATIFIED-AUTHORED`, including examples at lines 349, 636, 770, and 824.
 
-The application event gate validates generated `RATIFIED_EVENT_PAYLOADS`; event types outside that map pass unchecked by design (`packages/rph-application/src/handlers/kit.ts:301-328`).
+The application event gate validates generated `RATIFIED_EVENT_PAYLOADS`; event types outside that map pass unchecked by design (`packages/rph-application/src/handlers/kit.ts:281-328`).
 
 Domain traceability direction checking permits unknown relation names because its edge vocabulary is open (`packages/rph-domain/src/traceability.ts:99-106`).
 
@@ -429,8 +423,7 @@ These are precision and provenance limits. This document does not decide whether
 | `bun run build` | Turborepo workspace build | Package `dist`; app Vite build | Not run |
 | `bun run check-types` | Turborepo project diagnostics | Workspace `check-types` scripts | Not run |
 | `bun run lint` | ESLint correctness checks | ESLint-supported JS/TS outside ignores | Not run |
-| `bun run test` | Workspace tests followed by explicit artifact-mode tests | Turborepo workspace traversal, then `test:dist` | Not run |
-| `bun run test:dist` | Root artifact-resolution Vitest after build | Filesystem-derived package and verification projects with no source aliases | Not run |
+| `bun run test` | Turborepo artifact-oriented tests | Package export maps resolve cross-package imports to built artifacts; app has its own Vitest project | Not run |
 | `bun run gen` | Workspace generation | Generated source and schemas; uncached | Not run |
 | `bun run format` | Prettier write | `**/*.ts` subject after ignores | Not run |
 | `bun run format:check` | Prettier check | Same declared TypeScript pattern | Not run |
@@ -439,11 +432,10 @@ These are precision and provenance limits. This document does not decide whether
 | `bun run test:coverage` | Root source-mode V8 coverage | Package source only | Not run |
 | `bun run mutants:preflight` | Declared-mutant anchor and compile applicability | Selected ledger entries | Not run; not measurement even if run |
 | `bun run mutants` | Declared-mutant measurement | Ledger-selected source mutations and target suites | Not run |
-| `bun run mutants:harvest` | Candidate-only discovery for unnamed measurable mutant victims | Writes ignored candidate/report files; not a verification result | Not run |
 | `bun run gate:fast` | Composite type/lint/boundary/build/test/coverage/app-check/E2E command | Multiple configured surfaces | Not run |
 | `bun run gate` | `gate:fast` plus mutation | Multiple configured surfaces | Not run |
 
-The exact root scripts are at `package.json:10-26`. Turborepo makes build depend on dependency builds, gives build a `dist/**` output, makes type/test depend on dependency builds, and marks generation uncached (`turbo.json:4-25`).
+The exact root scripts are at `package.json:10-24`. Turborepo makes build depend on dependency builds, gives build a `dist/**` output, makes type/test depend on dependency builds, and marks generation uncached (`turbo.json:4-25`).
 
 ### 9.2 Resolved tool identities
 
@@ -472,7 +464,7 @@ These are installed-resolution identities in the lockfile, not CSAA provider app
 
 ### 9.3 Compiler and build roles
 
-Package `build` scripts invoke `tsc -p tsconfig.build.json`, and package `check-types` scripts invoke `tsc --noEmit -p tsconfig.json` (`packages/rph-application/package.json:21-24` is representative). The package manifests do not declare package-local `test` scripts; the root Vitest configurations discover and execute package projects.
+Package `build` scripts invoke `tsc -p tsconfig.build.json`; package `check-types` scripts invoke `tsc --noEmit -p tsconfig.json`; package `test` scripts invoke Vitest (`packages/rph-application/package.json:21-24` is representative).
 
 Every RPH package exports a `source` condition and `dist` types/import/default targets (`packages/rph-application/package.json:8-19` is representative). Contracts adds `./hash` (`packages/rph-contracts/package.json:8-26`); authoring adds browser-safe `./catalog` (`packages/rph-authoring/package.json:8-20`).
 
@@ -480,12 +472,12 @@ The compiler is configured to validate project contexts and emit build artifacts
 
 ### 9.4 Artifact and source test roles
 
-The accepted root configurations explicitly preserve two roles:
+Root `vitest.config.ts:24-35` explicitly preserves two roles:
 
-- `bun run test:dist` validates shipped build artifacts and export/emit boundaries after build; and
+- `bun run test` validates shipped build artifacts and export/emit boundaries; and
 - `bun run test:src` resolves workspace imports to source for attribution, coverage, and mutation.
 
-Source and artifact configurations share filesystem-derived projects from `vitest.projects.ts:53-69`. Each discovered package project and the root `verif` project uses `passWithNoTests: false`. The source configuration aliases package and subpath imports to `src` and selects `projectsFor(true)` (`vitest.config.ts:58-99`); the artifact configuration deliberately carries no source alias and selects the same projects (`vitest.dist.config.ts:31-42`). `verif/test-modes.test.ts` statically checks non-vacuity, project-set equality, resolution-mode distinction, and absence of package `--passWithNoTests`.
+The root source configuration aliases package and subpath imports to `src` and defines one `verif` project plus ten package projects (`vitest.config.ts:53-102`).
 
 The presence of both modes is a configured cross-check. Neither mode was executed by this inventory, so no source/artifact agreement result is claimed.
 
@@ -503,12 +495,12 @@ The configured root coverage collection is:
 | Reporters | `text`, `json-summary`, `html` |
 | Output | `./coverage` |
 | Threshold scope | Global; no `perFile` setting |
-| Thresholds | Statements `94.5`; branches `83`; functions `95.5`; lines `96.5` |
+| Thresholds | Statements `94.5`; branches `82.5`; functions `95.5`; lines `96.5` |
 | Automatic update | `false` |
 | App coverage | Absent |
 | LCOV/Sonar ingestion | Absent |
 
-Evidence is `vitest.config.ts:100-145`.
+Evidence is `vitest.config.ts:103-120,138-145`.
 
 `rph-product-realization-pwa/src/ontology.data.ts` is generated but is not among the explicit generated-output coverage exclusions. That affects the configured denominator and is reported as an observation, not silently corrected.
 
@@ -541,11 +533,11 @@ No direct dependency or checked-in configuration was found for ts-morph, Semgrep
 - lint;
 - dependency boundary;
 - format check; and
-- root `test`, which now performs the Turborepo workspace traversal and then explicit artifact-mode testing.
+- Turborepo test.
 
 It does not invoke root source-mode tests, coverage, mutation, `gate`, app `check`, deterministic E2E, live E2E, or Sonar.
 
-Because the root `test` script chains workspace tests and `test:dist`, CI now reaches both the configured workspace traversal and explicit artifact-resolution project set. That is not equivalent to invoking source-mode tests or the root composite gate.
+Because Turborepo traverses workspace build and test scripts, CI still reaches app build/test surfaces configured as workspace tasks. That is not equivalent to invoking the root composite gate.
 
 ---
 
@@ -557,16 +549,14 @@ The declared ledger at `scripts/mutants/ledger.ts` contains:
 
 | Entry classification | Count |
 | --- | ---: |
-| Total entries with stable IDs | 132 |
+| Total entries with stable IDs | 96 |
 | Declared duplicates | 10 |
 | Superseded/retired entries | 4 |
 | Expected compile prevention | 2 |
-| Expected-survive controls | 3 |
-| Non-retired, non-duplicate distinct entries | 118 |
+| Expected-survive controls | 2 |
+| Non-retired, non-duplicate distinct entries | 82 |
 
-The 118 distinct entries comprise 113 ordinary test mutations, two type-prevention checks, and three controls.
-
-Static field reconciliation found 15 empty `expectRed` arrays, zero empty arrays among measurable mutants, and zero arrays naming more than one victim. Those are data-shape observations only; this preparation did not execute a named victim or establish that any victim assertion is correct.
+The 82 distinct entries comprise 78 ordinary test mutations, two type-prevention checks, and two controls.
 
 The ledger expressly disclaims total mutation-space coverage and names generated mutation as a future, out-of-scope successor (`scripts/mutants/ledger.ts:66-68`).
 
@@ -577,28 +567,27 @@ The runner:
 - targets source resolution;
 - checks anchors and compile applicability in preflight;
 - declares that preflight is not measurement;
-- chooses named victim suites or a package-wide fallback;
+- chooses named victim suites or the whole workspace;
 - compiles the mutated package before test execution;
 - journals and applies one source mutation;
 - runs Vitest;
 - restores the original file in `finally`;
 - reports duplicates and retired entries outside the measured denominator; and
-- blocks by default on survivor, unanchored, no-compile, dirty-abort, or unnamed-killed verdicts.
+- blocks by default on survivor, unanchored, no-compile, or dirty-abort verdicts.
 
-The same runner configures `MUTANTS_HARVEST=1` to select measurable entries without named victims, capture failed-suite candidates, and write ignored candidate/report files while explicitly disclaiming verification authority (`scripts/mutants/run.ts:24-28,56-69,397-417,450-484,546-578`). Root `package.json` exposes `mutants:harvest`; `.gitignore` excludes `.harvest.json` and `.harvest-run.json`.
+Evidence is `scripts/mutants/run.ts:1-24,40-50,159-262,357-427`.
 
-Its tracked-cleanliness check ignores untracked paths and is limited to `packages`, `apps`, and `verif` (`run.ts:91-99`).
+Its tracked-cleanliness check ignores untracked paths and is limited to `packages`, `apps`, and `verif` (`run.ts:61-80`).
 
-Crash recovery reads the journal and executes `git checkout -- <file>` before the subsequent dirty-tree refusal (`run.ts:369-390`). If a legitimate intervening edit were made to the journaled path after a killed run, recovery could discard it. This is an instrument-safety observation, not evidence that the loss occurred in this snapshot.
+Crash recovery reads the journal and executes `git checkout -- <file>` before the subsequent dirty-tree refusal (`run.ts:288-313`). If a legitimate intervening edit were made to the journaled path after a killed run, recovery could discard it. This is an instrument-safety observation, not evidence that the loss occurred in this snapshot.
 
 ### 10.3 Self-checking verification files
 
 The root verification files configure checks for:
 
-- ledger identifier, duplicate, successor, rationale, provenance, measurable-victim presence, and exactly-one-victim coherence (`verif/mutant-ledger.test.ts:32-136`);
+- ledger identifier, duplicate, successor, rationale, and provenance coherence (`verif/mutant-ledger.test.ts:32-91`);
 - source versus artifact module identity and behavioral agreement (`verif/source-resolution.test.ts:38-79`); and
-- a non-vacuous reviewable-source walk with no NUL bytes (`verif/source-is-reviewable.test.ts:24-53`); and
-- source/artifact test-mode topology and anti-vacuity (`verif/test-modes.test.ts`).
+- a non-vacuous reviewable-source walk with no NUL bytes (`verif/source-is-reviewable.test.ts:24-53`).
 
 Because root `tsconfig.json` has no files, these are Vitest-executed inventory surfaces rather than compiler-project-supported source under the first static subject.
 
@@ -624,8 +613,6 @@ The package barrels are:
 `EngineHandle` exposes dispatch, atomic/guarded batches, subscription, outbox drain/recovery, object/event reads, fork, ontology, and close (`packages/rph-engine/src/engine.ts:86-116`).
 
 `createEngine` validates root cardinality and optional ontology validation, then defaults to a SQLite storage adapter when none is injected (`engine.ts:118-164`).
-
-The accepted domain enforcement register records implementation, verification, governance, and canon-carriage dispositions. Its carriage arm distinguishes `CARRIED`, `CARRIED_BY_GENERAL_RULE`, and `NO_CANON_CARRIER`; the companion test searches the six named canon artifacts while excluding provenance sidecars and the Ratify Sheet (`packages/rph-domain/src/enforcement-register.ts:77-138`; `enforcement-register.test.ts:77-224`). These are checked-in source and test structures. This preparation did not execute them or validate their individual carriage judgments.
 
 ### 11.2 App route entry points
 
@@ -794,20 +781,20 @@ Under `CSAA-005-REQ-047` and `CSAA-005-REQ-259` through `CSAA-005-REQ-262`, Play
 
 ---
 
-## 15. Accepted-snapshot conformance mapping and open observations
+## 15. Recorded-snapshot conformance mapping and open observations
 
 ### 15.1 Conformance mapping
 
-| Concern | Accepted-snapshot repository evidence | Accepted-snapshot mapping | Limitation |
+| Concern | Recorded-snapshot repository evidence | Recorded-snapshot mapping | Limitation |
 | --- | --- | --- | --- |
 | Workspace discovery | Root manifest and workspace directories | Configured and enumerated | Snapshot-bound |
 | TypeScript strictness | Shared base and package projects | Configured | Commands unexecuted |
 | Package build separation | Normal/build configs | Configured | Build unexecuted |
 | Package architecture | Manifests and dependency-cruiser rules | Configured | Rule command unexecuted; subject limited |
-| Artifact/source test distinction | Package exports, shared project discovery, and separate root source/dist Vitest configs | Configured with anti-vacuity checks | Neither mode executed by this preparation |
+| Artifact/source test distinction | Package exports and root Vitest config | Configured | Neither mode executed |
 | Unit/integration tests | Package/app tests | Present | No recorded-snapshot pass claim |
 | Root coverage | V8 config | Configured | Package-only; no recorded-snapshot measurement |
-| Mutation | 132-entry declared ledger, runner, and root coherence test | Present and bounded; configured to block unnamed measurable victims and multi-victim arrays | Not run by this preparation; not total mutant space |
+| Mutation | Declared ledger and runner | Present and bounded | Not run; not total mutant space |
 | App diagnostics | SvelteKit/Svelte check config | Configured, generated-context-qualified | Sync/check unexecuted |
 | Deterministic UI testing | Playwright config and files | Present | Inventory-only; unexecuted |
 | Live agent testing | Separate Playwright live config and files | Present | Excluded, networked, unexecuted |
@@ -824,14 +811,14 @@ These records are descriptive inventory observations. They have no authoritative
 | --- | --- | --- | --- |
 | `CSAA-005-OBS-001` | Root TypeScript configuration contains no files, leaving root Vitest/mutation/verification TypeScript outside a declared compiler project | High | Project-context design and later CSAA support decision |
 | `CSAA-005-OBS-002` | App project identity depends on ignored generated SvelteKit configuration whose freshness is unproved | High | App build/check evidence owner |
-| `CSAA-005-OBS-003` | Coverage is package-source-only, global-only, lacks LCOV/Sonar ingestion, omits app coverage, and does not explicitly exclude generated `ontology.data.ts`; the configured branch threshold is 83 | High | Existing repository gate owner; later rule/gate owner |
-| `CSAA-005-OBS-004` | CI now invokes workspace tests plus the explicit artifact-mode project set, but remains narrower than `gate:fast`/`gate` and does not invoke source tests, coverage, mutation, app check, E2E, or Sonar | High | CI/gate concern owner |
+| `CSAA-005-OBS-003` | Coverage is package-source-only, global-only, lacks LCOV/Sonar ingestion, omits app coverage, and does not explicitly exclude generated `ontology.data.ts` | High | Existing repository gate owner; later rule/gate owner |
+| `CSAA-005-OBS-004` | CI is narrower than `gate:fast`/`gate` and does not invoke source tests, coverage, mutation, app check, E2E, or Sonar | High | CI/gate concern owner |
 | `CSAA-005-OBS-005` | dependency-cruiser scans packages only and several “only” comments are stronger than their negative regular expressions | High | Architecture-rule owner |
 | `CSAA-005-OBS-006` | No accepted-exception registry was found for dependency rules | High | Architecture-rule and later exception owner |
 | `CSAA-005-OBS-007` | Sonar is configured but no checked-in runner, workflow step, or coverage ingestion was found | High | Static-analysis/gate owner |
 | `CSAA-005-OBS-008` | No security analyzer basis found in the recorded snapshot supports a “no vulnerability” conclusion | High | Later rule/provider/conformance owners |
-| `CSAA-005-OBS-009` | Contracts contain 21 permissive record helpers, 162 `UNRATIFIED-AUTHORED` labels, unknown-enum fallback, selectively validated event shapes, and open relation names | High | Contract and governance concern owners |
-| `CSAA-005-OBS-010` | Mutation evidence is limited to the 132-entry declared ledger and runner configuration; candidate harvest output and source comments are not verification evidence from this preparation, and recovery can overwrite an intervening edit to a journaled file | High | Verification-instrument owner |
+| `CSAA-005-OBS-009` | Contracts contain 24 permissive record helpers, 161 `UNRATIFIED-AUTHORED` labels, unknown-enum fallback, selectively validated event shapes, and open relation names | High | Contract and governance concern owners |
+| `CSAA-005-OBS-010` | Mutation evidence is limited to the declared ledger; runner recovery can overwrite an intervening edit to a journaled file | High | Verification-instrument owner |
 | `CSAA-005-OBS-011` | Declared runtime dependency edges assurance→domain, assurance→ports, engine→domain, and projections→ports had no observed non-test/non-generator source import | Medium | Package-maintenance owner |
 | `CSAA-005-OBS-012` | Live Pi, agy, network, production traces, and ignored result outputs are unverified | High | Host/runtime evidence owner |
 | `CSAA-005-OBS-013` | At the recorded snapshot, the Ports barrel exported Logger and Storage only, while the living roadmap named additional intended ports | High | Port architecture concern owner |
@@ -856,11 +843,11 @@ These differences establish documentation/configuration divergence. They do not 
 
 ---
 
-## 16. Accepted-snapshot semantic-analysis capability boundary
+## 16. Recorded-snapshot semantic-analysis capability boundary
 
-At the accepted snapshot, the repository supported conventional compiler, lint, dependency, test, coverage, mutation, framework-check, UI-test, and event/log evidence surfaces.
+At the recorded snapshot, the repository supported conventional compiler, lint, dependency, test, coverage, mutation, framework-check, UI-test, and event/log evidence surfaces.
 
-The accepted snapshot did not implement the CSAA semantic model described by `JAN-CSAA-002`. Specifically, no checked-in capability was found in that snapshot for:
+The recorded snapshot did not implement the CSAA semantic model described by `JAN-CSAA-002`. Specifically, no checked-in capability was found in that snapshot for:
 
 - provenance-preserving AST ingestion;
 - compiler-context-bound symbol/reference indexes;
@@ -909,7 +896,7 @@ The method did not:
 
 ### 17.3 No-execution statement
 
-This preparation did not run installation, formatting, generation, build, SvelteKit sync, compiler, Svelte check, lint, dependency analysis, tests, coverage, mutation, Playwright, Sonar, another external analyzer, live agent/network execution, production trace collection, or any command intended to write caches or derived artifacts. Concurrent external processes and commits were observed only to reject moving subjects; their outputs and commit messages are not verification results of this preparation.
+This preparation did not run installation, formatting, generation, build, SvelteKit sync, compiler, Svelte check, lint, dependency analysis, tests, coverage, mutation, Playwright, Sonar, another external analyzer, live agent/network execution, production trace collection, or any command intended to write caches or derived artifacts.
 
 A checked-in command is configuration evidence only. Repository comments or roadmap pass claims are repository-recorded claims, not independently repeated verification.
 
@@ -1287,7 +1274,7 @@ These stable IDs are candidate requirements only while this document remains Dra
 
 ### 18.7 Inherited obligation intake
 
-The requirement ledger imports the following eighty-eight individually identified obligations from `JAN-CSAA-000@0.3.0`. Their exact source wording, including controlling conditions and enumerated fields, applicability, local mapping, and open verification state are preserved there rather than weakened into local paraphrase:
+The requirement ledger imports the following seventy individually identified obligations from `JAN-CSAA-000@0.3.0`. Their exact source wording, including controlling conditions and enumerated fields, applicability, local mapping, and open verification state are preserved there rather than weakened into local paraphrase:
 
 | Inherited source IDs | Count | Local concern and substantive site |
 | --- | ---: | --- |
@@ -1298,12 +1285,11 @@ The requirement ledger imports the following eighty-eight individually identifie
 | `CSAA-000-REQ-164`–`168` | 5 | Conferral, transition, separation-of-duties, independent review, and adoption-package controls; metadata, ledger, §§19–20 |
 | `CSAA-000-REQ-380`–`404` | 25 | Evidence-first repository inventory scope and exact tool-role/coverage verification; §§3–17 |
 | `CSAA-000-REQ-642`–`652` | 11 | Documentation-only Wave 1 boundary, experiment prohibition, and exit boundary; metadata, §§1–2, 16, 20 |
-| `CSAA-000-REQ-668`–`685` | 18 | Separately recorded post-ledger author self-review against all charter failure-mode questions; §19 and requirement-ledger verification allocation |
 | `CSAA-000-REQ-737`–`739` | 3 | Activated Wave 1 authoring and adversarial-review commission; metadata, ledger, §§19–20 |
 | `CSAA-000-REQ-745`–`749` | 5 | Controlled lifecycle-state meanings; metadata and §20 |
-| **Total** | **88** | Individually dispositioned in the requirement ledger |
+| **Total** | **70** | Individually dispositioned in the requirement ledger |
 
-The ledger also carries 71 individually identified direct concern-owning canon obligations: 15 from `JPWB-CON-000`, 11 from `JPWB-DOC-001`, 7 from `JPWB-DOC-002`, 20 from `JPWB-DOC-003`, and 18 from `JPWB-DOC-004`. Their controlled polarity reconciles to 35 affirmative and 36 prohibitive rows. Intake is corrected but objective exact-source, applicability, substantive-binding, polarity, and no-concern-capture verification remains `NOT_RUN`; the `JAN-CSAA-000` allocation is not treated as a substitute. Any genuine residual authority conflict is routed to its concern owner through `JPWB-REG-005`; routine intake does not require an intermediate concern-owner response.
+Direct stable-ID deontic intake from `JPWB-CON-000` and `JPWB-DOC-001` through `JPWB-DOC-004` remains `OPEN`. Those authorities are cited for their owned concerns, but this Draft does not claim complete direct-source equivalence or silently treat the `JAN-CSAA-000` allocation as a substitute for concern-owner review.
 
 ### 18.8 Atomic split trace
 
@@ -1377,52 +1363,42 @@ The frozen [Preparation Evidence Snapshot](<records/JAN-CSAA-005 - Preparation E
 
 | Verification target | Current verification route | Status for this Draft |
 | --- | --- | --- |
-| Metadata and authority boundary | Controlled-document review against `JAN-CSAA-000`, `REG-D-018`, `REG-D-021`, and `REG-D-022` | Author objective check pending |
-| Revision/worktree identity | Current-subject evidence and repeated Git observation | OBS-029/030 recorded and matched; two tracked unstaged changes are exact subject members; Proposed-transition freshness recheck remains later |
-| Workspace/project inventory | Manifest/configuration/path inspection | Current compatibility evidence recorded; author verification pending |
-| Dependency graph | Manifest parsing plus bounded source-import inspection | Current compatibility evidence recorded; compiler resolution absent |
-| File classifications and counts | Read-only filesystem enumeration plus dirty-diff compatibility check | Current compatibility evidence recorded; author verification pending |
-| Tool roles and resolved versions | Script/configuration/lockfile inspection | Current compatibility evidence recorded; execution absent |
-| Coverage identity | Root Vitest configuration inspection | Current compatibility evidence recorded; measurement absent |
-| Mutation identity | Ledger, runner, and self-test inspection | Current static evidence recorded; runner not executed by this preparation |
-| Runtime seams and paths | Source inspection | Current compatibility evidence recorded; trace absent |
-| Security capability boundary | Named configuration/dependency/source search | Current bounded absence observation |
-| Observation routing | Author cross-document review; only genuine residual authority conflict routes to the concern owner through `JPWB-REG-005` | Pending |
-| Local requirement atomicity and substantive mapping | 336-row requirement catalog and requirement ledger | Corrected in this Draft; author verification and self-review remain open |
-| Inherited `JAN-CSAA-000` intake | Eighty-eight individually identified source rows, including eighteen explicitly allocated post-ledger self-review obligations | Corrected in the ledger; objective intake verification remains not run |
-| Direct cited-canon intake | Seventy-one concern-aware source rows against `JPWB-CON-000` and `JPWB-DOC-001` through `004` | Corrected in the ledger; objective source/binding/polarity verification remains not run |
+| Metadata and authority boundary | Controlled-document review against `JAN-CSAA-000` and `REG-D-018` | Author self-check pending |
+| Revision/worktree identity | Preparation evidence snapshot, Git re-observation, and Refresh Blocker Record | Initial evidence recorded; current-subject refresh blocked |
+| Workspace/project inventory | Manifest/configuration/path inspection | Initial evidence recorded |
+| Dependency graph | Manifest parsing plus bounded source-import inspection | Initial evidence recorded; compiler resolution absent |
+| File classifications and counts | Read-only filesystem enumeration | Initial evidence recorded |
+| Tool roles and resolved versions | Script/configuration/lockfile inspection | Initial evidence recorded; execution absent |
+| Coverage identity | Root Vitest configuration inspection | Initial evidence recorded; measurement absent |
+| Mutation identity | Ledger, runner, and self-test inspection | Initial evidence recorded; runner absent |
+| Runtime seams and paths | Source inspection | Initial evidence recorded; trace absent |
+| Security capability boundary | Named configuration/dependency/source search | Initial bounded absence observation |
+| Observation routing | Cross-document and concern-owner review | Pending |
+| Local requirement atomicity and substantive mapping | 336-row requirement catalog and requirement ledger | Corrected in this Draft; independent verification not run |
+| Inherited `JAN-CSAA-000` intake | Seventy individually identified source rows with exact source wording in the requirement ledger | Recorded; all verification remains not run |
+| Direct cited-canon intake | Concern-owner source review against `JPWB-CON-000` and `JPWB-DOC-001` through `004` | Open |
 | Requirement closure | Current requirement ledger | Open |
-| Author self-review | Eighteen-question author/integrator review after objective ledger evidence closes | Allocated; not yet active |
-| Formal independent adversarial review | Distinct adversarial reviewer after exact Proposed promotion | Allocated to later lifecycle; not a Draft-promotion prerequisite |
-| Integrity/provenance validation | Distinct validator after completed adversarial review of the unchanged exact Proposed candidate | Allocated to later lifecycle; not a Draft-promotion prerequisite |
-| Final corpus decision and recording | Final decision authority followed by a distinct ministerial recorder, with an individual full-judgment response field for this exact member and for every independently contestable material fork, exception, residual-risk acceptance, or amendment affecting it | Allocated to the one final corpus transaction |
+| Adversarial review | Independent reviewer | Not started |
 
 ---
 
 ## 20. Draft acceptance state
 
-This working revision remains a prepared, non-authoritative Draft candidate under `REG-D-018` as extended by `REG-D-021` and corrected by `REG-D-022`. It preserves the revision-and-worktree subject bound to the exact accepted OBS-029/030 pair, including both tracked unstaged changes; the atomic local judgment grain; exact substantive-site equality; 88-row `JAN-CSAA-000` intake; 71-row direct concern-owning canon intake; and explicit treatment of the frozen predecessor preparation-evidence obligation. It makes a current claim only for the exact recorded dirty subject and its stated compatibility bounds.
+This `0.1.0` revision remains a prepared, non-authoritative Draft candidate under `REG-D-018`. The subject-independent correction in §18 and the ledger establishes atomic local judgment grain, exact substantive-site equality, full-wording `JAN-CSAA-000` intake, and explicit treatment of the frozen preparation-evidence obligation. It does not refresh or reinterpret the stale repository subject.
 
-The `0.2.1`, `0.2.0`, and `0.1.0` predecessor Drafts and ledgers, the Preparation Evidence Snapshot, the Refresh Blocker Record, and every unexecuted MANIFEST-002 record remain exact historical evidence. This successor does not rewrite them, represent their earlier observations as current, or preserve the withdrawn MANIFEST-002 chain as an active solicitation path.
+This correction changes only this Draft, its requirement ledger, and cross-reference metadata in the Refresh Blocker Record. The original Preparation Evidence Snapshot remains exact historical evidence and is not rewritten or superseded.
 
-The Draft is ready for continued objective author verification and, after exact ledger closure, author self-review, but it is not ready for Proposed promotion, exact-candidate independent review, final corpus inclusion, or closure because:
+The Draft is ready for continued author self-review, but it is not ready for Proposed promotion, exact-candidate independent review, adoption, or closure because:
 
-- direct cited-canon and inherited self-review intake are corrected but remain open for objective author/ledger-closer verification;
-- the adopted README remains the authority and adoption baseline, the MANIFEST-002 intermediate-carriage procedure is withdrawn because its exact preimage and authority state changed, and synchronized member/manifest carriage is reserved for the final corpus transaction rather than a Proposed-promotion gate;
-- at this `0.3.0` pre-objective-verification authoring state, candidate propagation edits for `JAN-CSAA-001` and `JAN-CSAA-002` have not yet received author-side claim-by-claim cross-document reconciliation and recording under `JAN-CSAA-W1-GAP-004`; any later exact reconciliation record controls the live state;
-- 458 Draft-applicable ledger rows remain `PLANNED` and `NOT_RUN`;
-- 18 author-self-review rows remain `ALLOCATED_TO_POST_LEDGER_SELF_REVIEW` and `NOT_REQUIRED_CURRENT_PHASE` until objective ledger closure;
-- 15 post-Proposed or final-transaction rows remain explicitly allocated to later lifecycle and `NOT_REQUIRED_CURRENT_PHASE`;
-- one full executable Wave 1 exit row remains allocated to later execution and `NOT_REQUIRED_CURRENT_PHASE`;
-- one predecessor conferral-model condition is satisfied by the recorded successor model and remains `NOT_REQUIRED_CURRENT_PHASE`;
-- one predecessor per-member adoption-package rule is not applicable under the successor final-corpus model and remains `NOT_REQUIRED_CURRENT_PHASE`;
-- one manifest-carriage row is deferred by cited authority to the final corpus transaction and remains `NOT_REQUIRED_CURRENT_PHASE`;
+- direct cited-canon intake remains open for concern-owner review;
+- at this Draft freeze, the controlled-manifest conflict remained open; its live state is controlled by any later exact recorded disposition;
+- the repository subject remains `STALE_FOR_CURRENT_REPOSITORY`;
+- the [Refresh Blocker Record](<records/JAN-CSAA-005 - Refresh Blocker Record.md>) shows that a stable current-subject refresh prerequisite was not met;
+- all 406 local and inherited ledger rows remain `PLANNED` and `NOT_RUN`;
 - author self-review remains open; and
-- any later Proposed transition requires a new exact-candidate byte freeze and freshness recheck after the remaining authoring and self-review work.
+- formal independent adversarial review has not run.
 
-Formal independent adversarial review activates after an exact ledger-closed and self-reviewed candidate becomes Proposed; distinct integrity/provenance validation follows completed adversarial review of the unchanged exact candidate. Their absence blocks final corpus inclusion and Normative conferral; neither creates a circular prerequisite to Proposed promotion. The final package preserves the predecessor evidence grain through individual exact-member and material-fork/exception/residual-risk/amendment fields even though the predecessor per-member package rule is no longer applicable. Documentation-subphase completion does not satisfy the full executable Wave 1 exit.
-
-Draft completion does not confer authority, approve recorded-snapshot or current repository divergence, validate current source, complete any executable wave, or authorize implementation, providers, dependencies, fixtures, schemas, tests, oracle changes, or source/configuration mutation.
+Draft completion does not confer authority, approve recorded-snapshot or current repository divergence, validate current source, or activate a later wave.
 
 ---
 

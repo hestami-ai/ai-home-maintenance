@@ -337,3 +337,139 @@ OUTPUT: Live operational state \+ Continuous feedback loop into Phase 1 backlog.
 | **Phase 5: Verification** | System Integration V\&V | Subsystem assembly, E2E Playwright validation | **JTBD Alignment Gate:** Verifies runtime behaviors match Phase 1 specs. |
 | **Phase 6: Operation** | SRE, DevOps, CI/CD | Canary deployment, telemetry ingestion, auto-backlog | **Blast Radius Review:** JIT credentials & automated rollbacks. |
 
+---
+
+```yaml
+# ==============================================================================
+# ASPLE SYSTEMIC ARCHITECTURAL GOVERNANCE ENGINE
+# Specification: 11 Architectural Disciplines as Prompt Invariants
+# Target Execution Context: Phase 3 (Systems Engineering) & Phase 4 (Construction)
+# Schema Version: 2.0.0
+# ==============================================================================
+
+meta:
+  engine: "ASPLE (Agentic System-Product Lifecycle Engine)"
+  enforcement_target: "Executing Agents (EAs), IAG Reviewers, and CACA Verifiers"
+  lifecycle_hooks:
+    - "Phase 3.2: Subsystem ICD & Architecture Specification"
+    - "Phase 4.2: Adversarial Assertion Synthesis"
+    - "Phase 4.3: TDD Implementation Loop"
+
+global_invariants:
+  strict_mode: true
+  halt_on_violation: true
+  provider_diversity_required: true
+
+disciplines:
+  - id: DISC-01
+    name: "Contract & Interface Evolution"
+    domain: "API & Data Model Lifecycle"
+    governed_risk: "Payload breakage, client session failure, downstream integration drift"
+    prompt_invariants:
+      - "All active API endpoints must be defined using oRPC + Zod schemas with explicit boundary validation."
+      - "Destructive database mutations (DROP COLUMN, RENAME COLUMN, ALTER TYPE) are STRICTLY PROHIBITED in a single release."
+      - "Database schema changes MUST follow the Expand-and-Contract (Parallel Change) Pattern across releases:"
+          step_a: "Expand - Add new nullable/default-valued columns or new tables."
+          step_b: "Migrate - Deploy code that dual-writes to legacy and new schema fields."
+          step_c: "Backfill - Asynchronously backfill historical records via DBOS background workflows."
+          step_d: "Contract - Deprecate and drop legacy fields only after telemetry verifies zero active reads."
+      - "Breaking API changes mandate a Major Version Increment (e.g., v1 -> v2) and MUST maintain concurrent dual-run adapters."
+
+  - id: DISC-02
+    name: "Durable State, Execution & Time Mechanics"
+    domain: "Resilience & Asynchronous Execution"
+    governed_risk: "Process crash data loss, state corruption, duplicate side effects, race conditions"
+    prompt_invariants:
+      - "All multi-step operations, background jobs, and agent execution steps MUST be implemented as DBOS durable workflows."
+      - "Workflow state transitions MUST be checkpointed into Postgres to guarantee seamless execution resumption upon process preemption or container restart."
+      - "All state-mutating endpoints and handlers MUST accept and persist an 'idempotency_key' in Postgres to enforce once-and-only-once execution semantics under retries."
+      - "Workflows MUST rely on monotonic sequence clocks or DBOS step execution logs rather than non-monotonic system wall-clock time during replay loops."
+
+  - id: DISC-03
+    name: "Data Lifecycle, Backup & Disaster Recovery (DR)"
+    domain: "Business Continuity & Persistence"
+    governed_risk: "Catastrophic cloud outage, data corruption, unrecoverable state loss"
+    prompt_invariants:
+      - "Postgres configurations MUST enforce continuous Write-Ahead Logging (WAL) archiving (e.g., pgBackRest / WAL-G) for microsecond-level Point-In-Time Recovery (PITR)."
+      - "Every schema mutation script MUST be paired with an automated, non-destructive rollback script."
+      - "The DR harness MUST validate that restoring the Postgres snapshot successfully restores BOTH business domain data AND DBOS application workflow execution state."
+
+  - id: DISC-04
+    name: "Observability, Causality & Auditability"
+    domain: "Telemetry & System Diagnostics"
+    governed_risk: "Undiagnosable production defects, untraced state transitions, unmapped agent actions"
+    prompt_invariants:
+      - "OpenTelemetry context headers ('trace_id', 'span_id', 'workflow_id', 'agent_execution_id') MUST propagate seamlessly across SvelteKit, oRPC, DBOS, and Postgres query logs."
+      - "All service containers MUST expose standardized metrics endpoints compatible with Netdata collection for CPU, RAM, connection pool saturation, and event loop latency."
+      - "Administrative actions, critical business state changes, and agent-driven schema modifications MUST append an immutable audit log entry to the Governed Stream ledger."
+
+  - id: DISC-05
+    name: "Security, Multi-Tenancy & Governance Invariants"
+    domain: "Data Isolation & Access Control"
+    governed_risk: "Cross-tenant data leaks, over-privileged execution, zero-day injection"
+    prompt_invariants:
+      - "Multi-tenant data isolation MUST be enforced at the database engine layer via Postgres Row-Level Security (RLS) policies; application-level filtering alone is INSUFFICIENT."
+      - "Agents, CI/CD runners, and background workers MUST operate using Just-In-Time (JIT) ephemeral credentials with least-privilege scopes, automatically revoked upon task completion."
+      - "All external input payloads MUST be parsed and sanitized by Zod schemas prior to hitting business logic or persistence layers."
+
+  - id: DISC-06
+    name: "Topology, Packaging & Environment Isolation"
+    domain: "Infrastructure & Code Boundaries"
+    governed_risk: "Environment drift, tight coupling, deployment downtime"
+    prompt_invariants:
+      - "Local development (Docker Compose) and production (Rancher K8s) MUST maintain strict 12-Factor environment parity using identical base container images and Zod-validated environment configs."
+      - "Codebases MUST enforce Modular Monolith boundaries (e.g., via strict internal exports or Nx/Turborepo boundaries); modules MUST NOT perform direct cross-module database table joins."
+      - "Systems MUST support zero-downtime rolling deployments where version N and version N+1 run concurrently against the database schema."
+
+  - id: DISC-07
+    name: "Operational Survivability & Fault Tolerance"
+    domain: "Stability & Load Management"
+    governed_risk: "Cascading outages, API rate-limit lockouts, connection starvation"
+    prompt_invariants:
+      - "All external network calls and inter-service communications MUST be wrapped in configurable circuit breakers with jittered exponential backoff retries."
+      - "oRPC and SvelteKit route handlers MUST enforce rate limiting and request queuing to shield Postgres connection pools during traffic spikes."
+      - "Non-critical subsystem failures (e.g., analytics, recommendation indexers) MUST trigger graceful feature degradation without crashing primary user transactional paths."
+
+  - id: DISC-08
+    name: "Architectural Debt Evolution & Deprecation Management"
+    domain: "Codebase Maintenance"
+    governed_risk: "Accumulation of legacy dead code, abandoned DB columns, unmaintained routes"
+    prompt_invariants:
+      - "Deprecated API fields or features MUST be isolated behind versioned feature flags and annotated with explicit tombstones (e.g., '@deprecated(version=\"2.4.0\", removal=\"3.0.0\")')."
+      - "When telemetry confirms an endpoint or column has received zero traffic over its deprecation window, an automated Phase 1 task MUST be generated to prune the legacy code and drop the schema field."
+
+  - id: DISC-09
+    name: "Financial & Compute Cost Governance (FinOps)"
+    domain: "Resource Optimization"
+    governed_risk: "Unbounded cloud infrastructure bills, runaway LLM API token consumption"
+    prompt_invariants:
+      - "All database queries generated by EAs MUST specify explicit pagination limits, indexed time windows, or execution timeouts to prevent unindexed full-table scans."
+      - "Container deployment specs MUST explicitly define K8s CPU/RAM resource requests and limits."
+      - "LLM execution calls within the Tri-Agent sandbox MUST enforce strict per-task token consumption bounds and iteration circuit breakers."
+
+  - id: DISC-10
+    name: "Legal, Regulatory & Compliance Governance"
+    domain: "Compliance-as-Code"
+    governed_risk: "GPL/AGPL open-source license contamination, GDPR/CCPA privacy violations"
+    prompt_invariants:
+      - "Automated SBOM scanners (e.g., Syft/Trivy) MUST inspect all third-party packages in CI/CD; dependencies with restrictive or copyleft licenses (GPL/AGPL) MUST BE REJECTED."
+      - "Postgres columns storing Personally Identifiable Information (PII) MUST be annotated for field-level encryption and wired into automated 'Right to be Forgotten' (GDPR erasure) DBOS workflows."
+
+  - id: DISC-11
+    name: "Internationalization, Localization & Temporal Context"
+    domain: "Global Domain Context"
+    governed_risk: "Hardcoded locales, time-zone data corruption in persistent storage"
+    prompt_invariants:
+      - "UI components (SvelteKit) and API responses (oRPC) MUST NOT contain raw hardcoded user-facing text or currency formats; all strings MUST resolve through a Zod-validated translation dictionary ('i18n')."
+      - "All persistent timestamps in Postgres MUST use the 'TIMESTAMPTZ' type and be serialized in ISO-8601 UTC format. Local time zone formatting is strictly restricted to the client UI layer."
+
+# ==============================================================================
+# ASSURANCE EVALUATION GATE
+# ==============================================================================
+gate_execution_protocol:
+  step_1: "Incorporate all 11 Disciplines as system constraints inside the Execution Agent's prompt packet."
+  step_2: "Adversarial Assertion Synthesis Agent creates test assertions targeted at invalidating all 11 Disciplines."
+  step_3: "IAG (Reasoning Review) and CACA (Critique Co-Agent) evaluate generated code against this YAML matrix."
+  step_4: "If any Discipline rule is violated: REJECT artifact -> Append violation to Governed Stream -> Trigger Refinement Loop."
+
+```

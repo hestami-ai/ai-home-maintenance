@@ -42,6 +42,7 @@ test.describe('PWA Designer — node graph', () => {
 
 		// Two nodes render on the canvas.
 		await expect(page.locator('.svelte-flow__node')).toHaveCount(2);
+		await expect(page.getByRole('img', { name: 'AI agent' })).toHaveCount(2);
 
 		// Link Alpha Root -> Beta Child (permitted child) by clicking the Alpha node and editing it.
 		await page.locator('.svelte-flow__node').filter({ hasText: 'Alpha Root' }).click();

@@ -6,7 +6,7 @@
 
 **Canonical title:** Codebase Semantic Analysis and Assurance Architecture
 
-**Version:** `0.3.0`
+**Version:** `0.2.0`
 
 **Status:** Draft
 
@@ -50,7 +50,7 @@
 
 **Structural exemplar:** [Recursive Professional Harness document-set README](<../Recursive Professional Harness/README.md>)
 
-**Supersedes:** `JAN-CSAA-001@0.2.0 / Draft`, preserved at `records/archive/JAN-CSAA-001@0.2.0.Draft.PRE-OBJECTIVE-VERIFICATION.snapshot`
+**Supersedes:** `JAN-CSAA-001@0.1.0 / Draft`, preserved at `records/archive/JAN-CSAA-001@0.1.0.Draft.PRE-REG-D-021.snapshot`
 
 **Superseded by:** None
 
@@ -552,7 +552,7 @@ Each row contains one independently reviewable mandatory predicate. A comma-deli
 | Requirement ID | Atomic requirement | Substantive fulfillment outside this catalog |
 | --- | --- | --- |
 | `CSAA-001-CTL-001` | The document SHALL carry the controlled metadata required by `JAN-CSAA-000@0.3.0` §9.3. | Metadata fields; §19 |
-| `CSAA-001-CTL-002` | The document SHALL identify this revision's version as `0.3.0`. | Metadata `Version` |
+| `CSAA-001-CTL-002` | The document SHALL identify this revision's version as `0.2.0`. | Metadata `Version` |
 | `CSAA-001-CTL-003` | The document SHALL state that this Draft has no member authority. | Metadata `Governing status` and `Authority` |
 | `CSAA-001-CTL-004` | The document SHALL cite `REG-D-018`, `REG-D-021`, and `REG-D-022` according to their prospective commission, correction, and no-expansion boundaries. | Metadata `Governing status`, `Authority`, and `Change authority and procedure` |
 | `CSAA-001-CTL-005` | The document SHALL state its candidate `Governs` boundary. | Metadata `Governs` |
@@ -891,7 +891,7 @@ Independent adversarial review uses the [CSAA Controlled Document Review Templat
 
 ## 19. Draft acceptance state
 
-This `0.3.0` revision is a non-authoritative Draft reconciliation under `REG-D-018` as extended by `REG-D-021` and corrected by `REG-D-022`. The adopted `JAN-CSAA-000@0.3.0` README remains the authority and manifest baseline; `JAN-CSAA-WORKING-STATUS-001` carries current preparation state without interim README carriage. The withdrawn MANIFEST-002 path and its historical gap evidence remain preserved, but neither an intermediate manifest decision nor a sponsor response blocks ledger closure or Proposed promotion. This Draft does not self-declare closure and is not a Proposed or Normative member.
+This `0.2.0` revision is a non-authoritative Draft reconciliation under `REG-D-018` as extended by `REG-D-021` and corrected by `REG-D-022`. The adopted `JAN-CSAA-000@0.3.0` README remains the authority and manifest baseline; `JAN-CSAA-WORKING-STATUS-001` carries current preparation state without interim README carriage. The withdrawn MANIFEST-002 path and its historical gap evidence remain preserved, but neither an intermediate manifest decision nor a sponsor response blocks ledger closure or Proposed promotion. This Draft does not self-declare closure and is not a Proposed or Normative member.
 
 The following artifacts are present in this Draft:
 
@@ -909,7 +909,7 @@ The following artifacts are present in this Draft:
 
 The requirement catalog now uses one independently reviewable mandatory predicate per stable ID, maps every predicate to substantive text outside the catalog, and supplies the complete later-allocation matrix in §17.2. The requirement ledger records the applicable inherited intake separately from the 001-authored catalog. This revision also corrects the standing commission, manifest-state, five-role, and Draft-to-Proposed lifecycle surfaces. Those authoring changes do not close verification.
 
-At this `0.3.0` pre-objective-verification authoring state, which is not an exact review freeze or Proposed-candidate freeze, the following work remains before Proposed status. Later exact closure and reconciliation records control live completion state without retroactively rewriting preserved predecessor snapshots:
+At this `0.2.0` authoring-state snapshot, which is not an exact review freeze or Proposed-candidate freeze, the following work remained before Proposed status. Later exact closure and reconciliation records control live completion state without rewriting these bytes:
 
 - complete the current-phase author/objective verification needed to close the requirement ledger; later-lifecycle and later-execution allocations remain explicit non-pass states and are not converted to `PASSED`;
 - bind the ledger to the exact final Draft bytes, current governed overlays, and current repository subject evidence;

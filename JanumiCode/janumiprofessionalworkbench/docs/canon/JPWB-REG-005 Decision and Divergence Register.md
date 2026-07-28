@@ -639,3 +639,225 @@ Filed by the finalizer from every `[ELICITATION: …]` marker in the drafts and 
   record, `JAN-CSAA-W1-MANIFEST-001-COMPLETION-001@0.1.0`, and the delegated
   then-next append-only confirmation.
 - **Status:** EFFECTIVE — MERGE PENDING.
+
+### REG-D-020 — Confirmation of JAN-CSAA-000@0.3.0 Wave 1 manifest synchronization
+
+- **Date:** 2026-07-26T20:05:30.7559771-04:00 · **Type:** DECISION
+  (ministerial exact-carriage confirmation under `REG-D-019`; no new sponsor
+  judgment, delegation, or scope)
+- **Recorder:** Codex documentation recorder, acting under the bounded
+  ministerial-confirmation delegation in `REG-D-019`
+- **Register preimage:** 105,388 bytes, SHA-256
+  `fad01c48361f422bf1f2b5021c466ec4add24de95bd0d285bda46d8a0e2173ab`;
+  exact byte prefix ending in the effective `REG-D-019` pending decision.
+- **Confirmed evidence:** `REG-D-019`; `JAN-CSAA-W1-MANIFEST-001@0.3.0`;
+  `JAN-CSAA-W1-MANIFEST-001-PHASE1-VARIANCE-001@0.1.0` and its successful
+  corrective §3.2 proof; pre-carriage snapshot
+  `records/archive/JAN-CSAA-000@0.3.0.Normative.REG-D-018.README.snapshot`,
+  101,717 bytes, SHA-256
+  `ed2cde24be9ce0a99210644fdf655c192db5ee2c97ce0f587f446a1820ee5710`;
+  active `README.md`, 102,164 bytes, SHA-256
+  `833b97d9fe12ae5e245b6c2920216ec3271e59f68dc24c54d0efd9a1efdf32a1`;
+  and `JAN-CSAA-W1-MANIFEST-001-COMPLETION-001@0.1.0`, 23,951 bytes,
+  SHA-256
+  `a9c487305205b8da3f1f5e391040df85ace00f118a72e243f571b0c5ba79d995`.
+- **Statement:** Every exact predicate delegated by `REG-D-019` verified.
+  The five README operations, preservation snapshot, conditional completion
+  record, eight bound Wave 1 artifacts, no-authority boundary, bounded
+  documentation-only file impact, permanent phase-1 variance evidence, and
+  exact corrective §3.2 rerun match the proposal.
+- **Live-state result:** `CSAA-000-REQ-150` is satisfied only for this exact
+  administrative event. `JAN-CSAA-W1-GAP-001` is CLOSED only for live
+  manifest synchronization. `JAN-CSAA-W1-GAP-002` and the 005 refresh gap
+  remain OPEN; all three ledgers remain overall OPEN; every other gap retains
+  its exact recorded state; every verification row remains NOT_RUN;
+  self-review and formal independent review remain incomplete.
+- **Disposition:** This entry confirms and supersedes only the
+  live `EFFECTIVE — MERGE PENDING` state of `REG-D-019`; it does not rewrite
+  that historical entry, erase the recorded phase-1 variance, or confer member
+  authority.
+- **Merge target:** The exact active README result and the exact conditional
+  completion record identified above; no other artifact and no state beyond
+  the exact live-state and disposition results above.
+- **Status:** EFFECTIVE — MERGED.
+
+### REG-D-021 — JAN-CSAA standing documentation-corpus construction commission and deferred final sponsor review
+
+- **Date:** 2026-07-28T08:58:53.646-04:00 · **Type:** DECISION
+  (accountable-sponsor standing direction, program commission, and bounded
+  process delegation)
+- **Sponsor:** Marshall Hendricks, Architect and accountable sponsor
+- **Sponsor-originated direction:** “We need to remove me from the manual
+  authorization of these documents because it's taking way longer to generate
+  than I had expected. Granted, we do want very high quality documentation so
+  the process itself is fine. But my authorization as sponsor will have to be
+  understood as me reviewing the full corpus of documents once all the waves,
+  etc. have been finished.”
+- **Direction evidence:** `JAN-CSAA-SPONSOR-DIRECTION-001@0.1.0`;
+  `docs/ASTs and Code Analysis/records/JAN-CSAA - Sponsor Standing Direction
+  for Autonomous Corpus Preparation and Final Review.md`; 15,802 bytes;
+  SHA-256
+  `6aae01e189386352a5fc693faa9379ec44c0faffc52bbf0badef9efccb1c6484`;
+  UTF-8 without BOM, CRLF-only, one terminal CRLF.
+- **Register preimage:** 107,854 bytes; SHA-256
+  `d516e7068eae1a2a19fa1259420518f63833af070cf5642a9d95fb4bf2f09872`;
+  UTF-8 without BOM, LF-only, one terminal LF; endpoint
+  `REG-D-020 / EFFECTIVE — MERGED`.
+- **Statement:** The accountable sponsor activates a standing,
+  documentation-only construction commission for the complete reserved
+  `JAN-CSAA-001` through `JAN-CSAA-011` corpus, its requirement ledgers,
+  evidence and review records, cross-corpus closure records, repository-specific
+  design, and detailed implementation roadmap. Documentation agents may author,
+  revise, reconcile, validate, complete objective wave-exit checks, and advance
+  a member from Draft to Proposed after its ledger and author self-review close.
+  Proposed members require independently recorded adversarial review. No
+  intermediate sponsor response, concern-owner appointment or disposition,
+  per-member adoption package, register decision, or README-carriage decision
+  is required merely to continue in-scope documentation work or enter the next
+  documentation wave.
+- **Scope:** The commission completes Wave 1 documentation and activates the
+  documentation-authoring portions of Waves 2, 3, and 4. It permits read-only
+  repository inspection and non-authoritative working-state records. It permits
+  proposed specifications of schemas, fixtures, tests, provider criteria, and
+  implementation work, but it does not perform or confer those artifacts.
+  `JAN-CSAA-000@0.3.0` remains the active Normative charter and adopted-manifest
+  baseline; its final corpus successor may be prepared only as Draft or
+  Proposed before the final sponsor act.
+- **Duration:** Effective on recording until the earliest of the final
+  completed-corpus sponsor disposition, explicit sponsor revocation or
+  supersession, a material authority incompatibility that cannot safely remain
+  an explicit Draft/Proposed assumption or alternative, or recorded program
+  cancellation. There is no per-document or per-wave expiry.
+- **Reviewability:** Permanent IDs, versions, exact candidate digests,
+  provenance, requirement ledgers, self-reviews, independent adversarial
+  reviews, unresolved findings and alternatives, strongest opposing cases,
+  horizontal-closure evidence, and a current working-status record must remain
+  inspectable. The sponsor may inspect or redirect at any time, but intermediate
+  sponsor review is not a continuation predicate and its absence is never
+  approval.
+- **Recording mechanism:** This entry is the single standing commission.
+  Member metadata, ledgers, review records, and a separate non-authoritative
+  working-corpus status record carry preparation state. The adopted README
+  manifest is an authority/adoption baseline and need not churn for every Draft
+  revision or wave transition. Interim sponsor presentations, sponsor-response
+  records, concern-owner authority/determination records, and state-only
+  manifest-ratification packages are not required. At completion, one exact
+  corpus manifest binds every proposed member and its assurance evidence for
+  one sponsor-review event; the accepted set and any exceptions are then
+  recorded and synchronized in one controlled final-carriage procedure.
+- **Separation of duties:** The authoring identity may not independently review
+  the same exact candidate. A separately identified reviewer invocation records
+  method, evidence, findings, and candidate identity; if that reviewer edits
+  candidate bytes, another reviewer must review the affected result. Authors,
+  reviewers, validators, recorders, and program-local records may not confer
+  Normative status, fabricate sponsor voice, waive a requirement, accept risk,
+  weaken a pre-existing oracle, or expand this delegation. Material
+  cross-document semantics require horizontal-closure and single-owner review.
+- **Final sponsor boundary:** Every newly authored member remains Draft or
+  Proposed and non-authoritative until the completed corpus is presented. The
+  sponsor's next required authorization for this documentation program is one
+  final exact-corpus review event. That package preserves the full-judgment
+  evidence required by `REG-D-013`, including individually visible material
+  forks and exceptions, but does not require separate intermediate
+  authorization events. One exact manifest-bound sponsor act may confer all
+  accepted members together while expressly excluding or deferring others.
+- **Transition:** The unexecuted
+  `JAN-CSAA-W1-MANIFEST-002@0.2.0`/`JAN-CSAA-W1-VALIDATION-004@0.1.0`/
+  `INSTRUMENT-002`/`FREEZE-002`/`INTAKE-002` chain is withdrawn from active
+  solicitation and retained unchanged as historical preparation evidence. No
+  Part A assignment, Part B `W1M2-CO-01` response, sponsor presentation,
+  sponsor response, README carriage, archive, completion, or confirmation is
+  authorized for that package. This entry consumes `REG-D-021`, which that
+  proposal expected but did not reserve, and therefore independently defeats
+  its exact pre-recording predicate.
+- **No-expansion boundary:** This decision authorizes no canon amendment,
+  Normative member conferral, application/source/test/configuration/dependency
+  mutation, installation, procurement, provider selection or qualification
+  execution, external scan, network or live-agent execution, production trace,
+  prototype, executable schema/type/fixture/conformance-suite/oracle creation
+  or change, analyzer implementation, deployment topology, retirement, or
+  authority transfer. Each remains subject to its existing separate authority.
+- **Disposition:** The per-member sponsor-conferral procedure in
+  `REG-D-017`, the Wave-1-only commission in `REG-D-018`, and the
+  separately-authorized Wave 2–4 preparation gates in
+  `JAN-CSAA-000@0.3.0` are superseded prospectively only to the extent necessary
+  to implement this standing documentation-preparation model. Their historical
+  acts, substantive semantic baselines, lifecycle distinctions, evidence rules,
+  implementation prohibitions, and final sponsor-conferral requirement remain
+  in force.
+- **Merge target:** Administrative consolidation into the completed
+  `JAN-CSAA-000` successor, final controlled manifest, accepted member metadata,
+  and final corpus-review records. Interim carriage is deliberately deferred to
+  avoid turning working-state changes into repeated sponsor gates.
+- **Status:** EFFECTIVE — MERGE PENDING.
+
+### REG-D-022 — Correction and assurance clarification of the JAN-CSAA standing documentation commission
+
+- **Date:** 2026-07-28T09:18:50.1250030-04:00 · **Type:** DECISION
+  (append-only ministerial correction and assurance clarification under
+  `REG-D-021`; no new sponsor judgment)
+- **Recorder:** Codex documentation recorder and assurance auditor, acting
+  under the sponsor-originated standing direction recorded by `REG-D-021`
+- **Correction evidence:**
+  `JAN-CSAA-STANDING-DIRECTION-CORRECTION-001@0.1.0`;
+  `docs/ASTs and Code Analysis/records/JAN-CSAA - Standing Direction
+  Interpretation Correction and Assurance Clarification.md`; 10,000 bytes;
+  SHA-256
+  `1ac465b6b072808b178827ad1012310070941de794635c7fd0c82a4b8d7eccd4`;
+  UTF-8 without BOM, CRLF-only, one terminal CRLF.
+- **Register preimage:** 115,401 bytes; SHA-256
+  `eb8c26b66981f95e708c3baa4327700591731b440f373e1c1f7b7886cc83464b`;
+  UTF-8 without BOM, LF-only, one terminal LF; endpoint
+  `REG-D-021 / EFFECTIVE — MERGE PENDING`.
+- **Correction 1 — final judgment grain:** One final corpus-review interaction
+  does not authorize a bulk or undifferentiated disposition. The final package
+  must provide one full-judgment surface and individual sponsor response field
+  for every candidate member and every independently contestable material fork,
+  exception, residual-risk acceptance, or amendment. All fields may be answered
+  in one itemized payload. Each accepted member receives a distinct exact-member
+  `JPWB-REG-005` conferral decision within one controlled final transaction.
+  This preserves `REG-D-013` while moving sponsor attention to one final event.
+- **Correction 2 — phase terminology:** Authorization to complete objective
+  “wave” checks under `REG-D-021` means documentation-subphase entry, readiness,
+  transition, and completion only. It does not satisfy or authorize the full
+  executable exit criteria in `JAN-CSAA-000@0.3.0` §15. Wave 2 fixture-oracle
+  evidence, Wave 3 executable schemas/types/fixtures/tests, and Wave 4 provider
+  qualification execution remain unperformed and separately unauthorized. The
+  final documentation corpus must report those predicates as explicit non-pass,
+  later-execution allocations.
+- **Correction 3 — MANIFEST-002 incompatibility:** The statement that consuming
+  `REG-D-021` independently defeated the package's register-identifier
+  predicate is withdrawn. `JAN-CSAA-W1-MANIFEST-002@0.2.0` required the actual
+  next unreserved identifiers. It cannot execute because `REG-D-021` changed
+  its exact frozen register preimage and authority state and expressly withdrew
+  it from solicitation. The complete package remains immutable, historical,
+  non-conferring, and unexecuted.
+- **Assurance clarification 1 — reviewed bytes:** Every candidate-byte change
+  after an exact review freeze triggers affected re-review. The sole exception
+  is an exact pre-frozen administrative substitution set with enumerated
+  operations, source and result digests, no semantic or judgment change,
+  independent replay, independent result validation, and ministerial recording
+  against exact predicates. Undefined “ministerial corrections without
+  re-review” are prohibited.
+- **Assurance clarification 2 — role separation:** For the same exact judgment
+  surface, author/integrator, adversarial reviewer, integrity/provenance
+  validator, final decision authority, and ministerial recorder are distinct
+  identities. Editing candidate bytes makes that identity an author for the
+  result. The recorder may not supply or reinterpret judgment, and the decision
+  authority may not record its own disposition as ministerial recorder.
+- **Template clarification:** `REG-D-017` and W0-16 are modified prospectively
+  only within the exact intermediate-authorization and documentation-wave scope
+  of `REG-D-021`; they are not superseded wholesale. Active review and ledger
+  templates must preserve that wording, the five-role separation, individually
+  dispositionable final surfaces, and exact reviewed-byte continuity.
+- **Disposition:** This entry supersedes `REG-D-021` only where the earlier
+  entry or its interpretation record conflicts with the corrections above.
+  `REG-D-021` otherwise remains effective: no intermediate sponsor gate is
+  restored, all documentation subphases remain commissioned, every member
+  remains Draft or Proposed until final conferral, and every no-expansion
+  boundary remains in force.
+- **Merge target:** Active CSAA review and ledger templates, successor
+  non-authoritative working-status records, the completed `JAN-CSAA-000`
+  successor, final controlled manifest, exact member-review records, and final
+  corpus-review/carriage records.
+- **Status:** EFFECTIVE — MERGE PENDING.

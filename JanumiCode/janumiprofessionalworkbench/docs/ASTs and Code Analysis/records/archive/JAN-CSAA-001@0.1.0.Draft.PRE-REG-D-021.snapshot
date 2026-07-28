@@ -6,19 +6,19 @@
 
 **Canonical title:** Codebase Semantic Analysis and Assurance Architecture
 
-**Version:** `0.3.0`
+**Version:** `0.1.0`
 
 **Status:** Draft
 
 **Settledness:** HYPOTHESIS
 
-**Classification:** Prepared controlled-CSAA member candidate; non-authoritative Draft. `JAN-CSAA-000@0.3.0` remains the adopted authority and manifest baseline, while `JAN-CSAA-WORKING-STATUS-001` carries non-authoritative construction state. No interim README carriage or sponsor response is a continuation or promotion predicate
+**Classification:** Prepared controlled-CSAA member candidate; non-authoritative Draft; live manifest-synchronization state is controlled by `JAN-CSAA-W1-GAP-001` and any later exact recorded disposition; this Draft does not self-declare closure
 
-**Governing status:** Documentation preparation was activated by `JPWB-REG-005 REG-D-018` and is continued for every documentation subphase by `REG-D-021` as corrected by `REG-D-022`; this document has no member authority
+**Governing status:** Draft authoring and adversarial review are commissioned by `JPWB-REG-005 REG-D-018`; this document has no member authority
 
 **Role:** Tool-neutral logical architecture for converting an identified repository subject into revision-bound semantic and execution evidence without allowing tools, topology, or derived results to acquire authority
 
-**Authority:** None. `REG-D-018`, as extended by `REG-D-021` and corrected by `REG-D-022`, authorizes documentation-only preparation, reconciliation, objective gate closure, Draft-to-Proposed promotion, and post-Proposed review and validation. Only an individual exact-member `JPWB-REG-005` conferral within the final exact-corpus transaction can make a revision Normative
+**Authority:** None. `REG-D-018` authorizes preparation and review of this Draft; only a later exact-version/digest sponsor conferral can make a revision Normative
 
 **Scope:** Logical responsibilities, end-to-end information flows, trust boundaries, degraded behavior, observability obligations, quality objectives, and unresolved architecture alternatives for CSAA
 
@@ -28,21 +28,21 @@
 
 **Does not govern:** Semantic-object meanings or exact identities; current repository facts; extraction, query, or change-impact algorithms; analysis-rule or repository-gate meaning; provider qualification; exact schemas or APIs; fixture judgments; executable conformance; physical persistence, migration, or operations; coding-agent employment procedure; concrete providers, deployment, or topology; implementation permission
 
-**Parent and inherited authorities:** `JAN-CSAA-000@0.3.0`, `JPWB-CON-000@1.3.0`, `JPWB-DOC-001@1.1.0`, `JPWB-DOC-002@1.2.0`, `JPWB-DOC-003@1.3.0`, `JPWB-DOC-004@1.3.0`, and `JPWB-REG-005@1.0.0 REG-D-018`, `REG-D-021`, and `REG-D-022`, each only for its owned concern
+**Parent and inherited authorities:** `JAN-CSAA-000@0.3.0`, `JPWB-CON-000@1.3.0`, `JPWB-DOC-001@1.1.0`, `JPWB-DOC-002@1.2.0`, `JPWB-DOC-003@1.3.0`, `JPWB-DOC-004@1.3.0`, and `JPWB-REG-005@1.0.0 REG-D-018`, each only for its owned concern
 
 **Precedence and conflict routing:** Canon and recognized enforced reference artifacts retain concern ownership. `JAN-CSAA-002` owns provider-independent code-semantic identity; `JAN-CSAA-003` is reserved to own analysis and query semantics; `JAN-CSAA-004` is reserved to own technical rule, finding, provider, and repository-gate semantics; `JAN-CSAA-005` owns current JPWB facts. Apparent conflicts are recorded and routed to `JPWB-REG-005`; this Draft does not silently resolve them
 
 **Requirement ledger:** [JAN-CSAA-001 Requirement Ledger](<records/JAN-CSAA-001 - Requirement Ledger.md>)
 
-**Verification owner:** The author/integrator owns extraction, ledger-closure evidence, and author self-review. A distinct adversarial reviewer owns Proposed-candidate semantic review, and a distinct integrity/provenance validator owns exact-identity and evidence-continuity validation. The final decision authority and ministerial recorder are also distinct identities. None except the final decision authority can confer Normative status, and the recorder cannot supply or reinterpret judgment
+**Verification owner:** The author owns extraction and self-review evidence. An independent reviewer owns Proposed-candidate adversarial review. Neither can confer Normative status
 
-**Change authority and procedure:** Authors may revise this Draft under `REG-D-018` as extended by `REG-D-021` and corrected by `REG-D-022`. Advancement to Proposed requires requirement-ledger closure, completed author self-review, resolution of blocking findings, and an exact candidate freeze. Proposed status is followed by independent adversarial review and distinct integrity/provenance validation. Every candidate-byte change after an exact review freeze triggers affected re-review except an exact pre-frozen administrative substitution set that names its operations and source/result digests, causes no semantic or judgment change, and is independently replayed, independently result-validated, and ministerially recorded against exact predicates. Normative status requires an individual exact-member `JPWB-REG-005` sponsor conferral in the one final itemized corpus transaction
+**Change authority and procedure:** Authors may revise this Draft under `REG-D-018`. Advancement to Proposed is gated by requirement-ledger closure and self-review. A material change to a Proposed candidate triggers affected re-review. Normative status or a material Normative change requires an exact-version/digest `JPWB-REG-005` sponsor act
 
-**Review and evidence companions:** Requirement ledger above; current repository compatibility evidence supplied by the [JAN-CSAA-005 Current Subject Rebinding Record](<records/JAN-CSAA-005 - Current Subject Rebinding Record.md>), with prior 005 evidence preserved historically; [Sponsor Standing Direction](<records/JAN-CSAA - Sponsor Standing Direction for Autonomous Corpus Preparation and Final Review.md>); [Standing Direction Correction](<records/JAN-CSAA - Standing Direction Interpretation Correction and Assurance Clarification.md>); authoring-input [Working Corpus Authoring Status 002](<records/JAN-CSAA - Working Corpus Authoring Status 002.md>), with any later exact successor controlling live construction state; historical [Wave 1 Manifest Gap Record](<records/JAN-CSAA-W1 - Draft Authoring Initiation and Manifest Gap Record.md>); self-review, Proposed-candidate review, and integrity-validation records are not yet authored
+**Review and evidence companions:** Requirement ledger above; preparation evidence is supplied by `JAN-CSAA-005`; [Wave 1 Manifest Gap Record](<records/JAN-CSAA-W1 - Draft Authoring Initiation and Manifest Gap Record.md>); self-review and independent-review records are not yet authored
 
 **Companion enforced artifacts:** None created or selected by this Draft. Existing repository configuration and tests are revision-bound evidence cataloged by `JAN-CSAA-005`, not CSAA implementation
 
-**Conformance-test references:** The documentation subphases for `JAN-CSAA-006` through `JAN-CSAA-008` are commissioned by `REG-D-021`; executable fixtures, oracle judgments, schemas, types, tests, conformance suites, and results remain unperformed and separately unauthorized under `REG-D-022`
+**Conformance-test references:** Later `JAN-CSAA-006` through `JAN-CSAA-008`; reserved and uncommissioned
 
 **Audience:** Coding-agent designers, software architects, assurance engineers, security reviewers, tool integrators, implementers, and maintainers
 
@@ -50,7 +50,7 @@
 
 **Structural exemplar:** [Recursive Professional Harness document-set README](<../Recursive Professional Harness/README.md>)
 
-**Supersedes:** `JAN-CSAA-001@0.2.0 / Draft`, preserved at `records/archive/JAN-CSAA-001@0.2.0.Draft.PRE-OBJECTIVE-VERIFICATION.snapshot`
+**Supersedes:** None
 
 **Superseded by:** None
 
@@ -169,7 +169,7 @@ The outer CSAA box is a logical boundary. It does not state whether responsibili
 | Request intake | Question, proposed subject, requested capabilities, budget, caller authority | Accepted or refused analysis intent | No repository execution; records request metadata | Explicit refusal with reason | `001`; employment rules later `010` |
 | Subject acquisition and identity | Repository locator, VCS/worktree state, change set, requested perimeter | Reproducible subject identity | Read-only by default | No snapshot when identity is insufficient | Identity semantics `002` |
 | Workspace/project discovery | Root manifest, package manifests, lockfile, project configs | Workspace/package/project/configuration map | Parse data; do not execute config or lifecycle hooks | Unresolved regions remain partial or unsupported | `001` responsibility; objects `002`; current map `005` |
-| Source classification | Discovered files and project membership | Authored/generated/virtual/test/config/vendor/excluded classifications plus generated/virtual-to-authored origin mappings | Read metadata and content; never relabel generated or virtual material as authored | Unclassified inputs and unresolved origin mappings remain visible | Class and origin meanings `002` |
+| Source classification | Discovered files and project membership | Authored/generated/virtual/test/config/vendor/excluded classifications | Read metadata and content | Unclassified inputs remain visible | Class meanings `002` |
 | Capability planning | Subject map, requested questions, provider declarations, budgets | Dependency-aware analysis plan | No analysis side effects | Unscheduled/skipped capabilities recorded | Analysis semantics later `003` |
 | Provider execution gateway | Bounded inputs, capability grant, plan step | Invocation record, raw output, diagnostics, health | Capability-bounded execution/isolation boundary; mechanism undecided; bounded output only | Crash, timeout, malformed output, denial, cancellation | Provider contract later `004`/`011` |
 | Static semantic extraction | Identified project/artifacts and provider invocation | Raw syntax, binding, type, dependency, call, control/data facts | Provider execution through gateway | Bounded partial result; never invented completeness | Object meanings `002`; algorithms later `003` |
@@ -178,7 +178,6 @@ The outer CSAA box is a logical boundary. It does not state whether responsibili
 | Raw-result capture | Invocation output and diagnostics | Immutable or content-addressed raw reference | Writes only to bounded analysis output | Capture failure blocks normalized provenance claims | Exact shape later `007` |
 | Validation and normalization | Raw results, provider declaration, semantic contract | Provider-independent facts, diagnostics, conflicts | No source mutation | Invalid output semantically inert; disagreement preserved | Semantics `002`; provider rules later `004` |
 | Graph composition | Normalized facts and typed relations | Revision-consistent logical graph views | Derived analysis state only | Partial graph labeled by capability coverage | Semantics `002`; algorithms later `003` |
-| Invalidation planning | Published identities, dependency records, configuration/build/source-origin relations, and observed changes | Explicit affected-set decision, invalidation dependencies, retained uncertainty, and full-or-broadened reanalysis requirement | Derived planning state only; cannot mutate a prior publication | Unresolved dependency broadens the affected set and prevents a currentness claim | `001` responsibility; dependency and freshness semantics `002`; operational recomputation later `009` |
 | Snapshot/evidence publication | Validated candidate, health, coverage, provenance | Published snapshot/evidence-set revision or refusal | Atomic logical publication; mechanism undecided | Prior publication remains distinct from failed candidate | Persistence later `009` |
 | Technical record normalization | Facts, rule results, evidence references | Engineering Evidence Record and Analyzer Finding Record candidates | Append-oriented logical history | No mutation into green; invalid record rejected | Record meanings later `004` |
 | Query/change-impact service | Declared snapshot(s), evidence-set identity, bounded query | Result, explanation, provenance, limits | Read published state | Partial/stale/conflicting result, not an overclaim | Query semantics later `003` |
@@ -237,8 +236,6 @@ The outer CSAA box is a logical boundary. It does not state whether responsibili
 
 Every material flow edge carries the identities needed by its content: subject snapshot, project/configuration context, tool/rule/provider version, run/invocation, raw-result reference, source location, capability coverage, observation time, and epistemic limits.
 
-Classification and normalization carry source-origin relations as first-class evidence. Facts obtained from generated or virtual material retain their authored-origin mapping when one is established, retain an explicit unresolved mapping when it is not, and remain classified as generated or virtual rather than being represented as authored source.
-
 Static semantic-snapshot publication and execution-evidence-set publication are distinct. New coverage or traces can create a successor evidence set without rewriting the static snapshot.
 
 ---
@@ -278,8 +275,6 @@ The execution lane covers build identities, test selection and attempts, asserti
 Correlation never collapses the lanes. An execution observation can be related to authored source only through compatible build/artifact and source-origin evidence. Missing or incompatible mapping yields an explicit unresolved or partial relation.
 
 Correlation independently compares source/build identity, configuration identity, instrumentation identity, workload identity, environment identity, and observation-time identity. Every dimension must be compatible for the claimed relation; a missing or incompatible dimension yields an explicit unresolved or partial result rather than an inferred match.
-
-Generated or virtual semantic facts remain classified as generated or virtual across correlation. A source-origin relation may connect them to authored material, but the relation does not change either endpoint's artifact class and cannot be replaced by a same-file or same-symbol assumption.
 
 ---
 
@@ -338,7 +333,6 @@ No row selects a physical isolation mechanism. A later authorized design may com
 | Cross-subject contamination | Cache or index mixes repositories, branches, tenants, or revisions | Subject/security-principal partitioning; explicit snapshot keys | Cross-partition invariant checks | Physical isolation deferred |
 | Mixed-revision publication | Files change during analysis or partial cache reused | Change detection, invalidation, atomic logical publication | Subject-before/after identity comparison | Efficient incremental mechanism deferred |
 | False green | Failed/unsupported capability omitted from aggregate, or configuration silence is treated as an exception | Coverage/health are mandatory result dimensions; an omitted, absent, or silent configuration entry cannot create an exception | Configuration-to-capability reconciliation and no-false-green validation | Exact gate semantics deferred |
-| Agent bypass or self-disposition | A coding agent skips required analysis, ignores a blocking technical record, or treats its own assertion as an exception, waiver, acceptance, or approval | Required analysis and blocking outcomes remain explicit coordinator inputs; publication refuses an unmet blocking predicate; only an externally owned, identified decision or exception record can change the applicable disposition | Plan-to-invocation, finding-to-publication, and decision-authority reconciliation | Exact rule, exception, and repository-gate semantics remain with `004` |
 | Disagreement erasure | Normalizer chooses one provider output silently | Preserve raw outputs and explicit conflict | Conflict record and provenance links | Resolution policy deferred |
 | Resource exhaustion | Hostile or very large repository consumes CPU/memory/disk/processes | Per-run and per-invocation budgets, backpressure, cancellation | Resource-exhausted outcome and metrics | Numerical budgets need measurement |
 | Query exfiltration | Consumer requests unrestricted source or raw evidence | Authorization, redaction, bounded projections | Query audit | User/role model deferred |
@@ -397,8 +391,6 @@ Required logical event classes include request, acquisition, discovery, classifi
 Run identity, invocation identity, subject identity, snapshot identity, and correlation identity each propagate through scheduling, provider calls, normalization, publication, and query.
 
 Every boundary event records a safe input shape, relevant digests and versions, validation result, latency, resource use, coverage, outcome, and error classification. Errors carry a stable classification, safe diagnostic metadata, and a non-misleading remediation indication. Decisions to skip, retry, fall back, invalidate, publish partial results, or refuse green are observable with their recorded reasons.
-
-For every bounded model or agent try, the provider execution gateway treats each initial request, retry, reformat request, and repair request as its own durable exchange. That exchange retains the exact materialized input presented to the model; the returned output before schema coercion or repair; the resolved provider, model, and version actually invoked; declared truncation or omission; the parse, validation, and repair outcome; and a prompt or template fingerprint, subject to recorded redaction. The fingerprint identifies but never substitutes for the exchange record. Non-model analyzer/provider invocations retain the separate invocation and raw-result provenance already defined above; they are not silently represented as model or agent tries.
 
 Metrics cover latency, queueing, resource use, cancellation, timeout, failure, partiality, staleness, disagreement, cache/invalidation, publication, and recovery.
 
@@ -484,7 +476,7 @@ A bounded foreground path produces explicitly provisional edit-time results whil
 
 ### 13.7 Common comparison criteria
 
-Every alternative is evaluated at the architecture-document grain below. The entries are bounded hypotheses for comparison, not measurements, provider qualifications, selections, or implementation claims.
+Each alternative is evaluated later against:
 
 - exact subject binding and mixed-revision prevention;
 - atomic publication and predecessor visibility;
@@ -496,16 +488,7 @@ Every alternative is evaluated at the architecture-document grain below. The ent
 - operational complexity, portability, retention, export, and provider removal;
 - ability to verify failure paths independently of implementation.
 
-| Alternative | Subject and publication semantics | Provenance and disagreement | Security, confidentiality, and offline use | Recovery and invalidation | Scale and responsiveness | Operability, portability, and removal | Independent failure verification |
-| --- | --- | --- | --- | --- | --- | --- | --- |
-| Storage A — immutable bundles plus catalog | Strong revision isolation if the manifest and publication pointer are one logical transaction; multi-location atomicity remains a risk | Strong raw-artifact retention; derived indexes must preserve links and conflicts | Exportable/offline-friendly, but every bundle, catalog, and index needs the same access and retention partition | Failed index/catalog publication can leave the prior bundle current; compaction and index rebuild need lineage checks | Whole-bundle transfer and multi-index rebuild may be costly; read projections can be tuned independently | Portable artifacts but multiple persistence surfaces and compaction duties; provider removal depends on neutral bundle formats | Good when manifests, raw bundles, indexes, and publication pointers can be fault-injected and reconciled separately |
-| Storage B — partitioned semantic graph plus evidence ledger | Strong only when partition keys prohibit cross-revision edges and publication is atomic; destructive upsert is a principal hazard | Direct graph provenance is convenient, but normalized graph state must not replace the append-only raw ledger or erase disagreement | Fine-grained authorization is possible but graph traversal can cross security partitions unless explicitly constrained | Partition replacement and ledger replay can support recovery; invalidation and partial partition repair are complex | Relationship queries are favorable; large partitions, cross-snapshot comparison, and retention can stress the store | Operationally specialized and potentially less portable; neutral export and complete provider removal require explicit qualification | Requires independent tests for cross-partition leakage, destructive updates, partial writes, and raw-ledger/graph divergence |
-| Storage C — append-only fact log plus projections | Strong temporal history when every projection manifest binds one source offset/set; projection freshness must remain explicit | Strongest raw derivation history if normalization records and conflicts are appended rather than overwritten | Offline use is plausible; replay and projection workers still require bounded access to sensitive history | Replay favors recovery and correction; invalidation becomes successor facts, while rebuild time and schema evolution remain risks | Ingestion scales independently; projection lag and full replay can harm interactive freshness | Projection technologies are replaceable if the log contract stays neutral; migration and long-term retention remain substantial | Good when deterministic rebuild, projection equivalence, lag, corruption, and schema-evolution failures are tested separately |
-| Orchestration A — embedded deterministic DAG | One host can bind the complete plan to one subject; crash boundaries and durable publication handoff remain weak | In-process coordination simplifies trace linkage but must retain per-invocation raw output and conflict | Strong local/offline posture with bounded workers; host compromise has a larger shared blast radius | Deterministic scheduling helps replay; process crash, restart, lease recovery, and long-running cancellation need added mechanisms | Low overhead for small and medium repositories; single-host CPU, memory, and disk bound elasticity | Lowest operating burden and high portability if worker contracts stay neutral; host-specific concurrency can leak into behavior | Good for deterministic schedule, cancellation, timeout, and worker-failure tests; crash/restart verification is weaker without durable state |
-| Orchestration B — durable job/lease coordinator | Durable jobs can retain exact subject and plan identity, but workflow state must not become semantic authority | Per-job traces can be strong; retries must remain distinct invocations and preserve conflicting outputs | Strong isolation options but larger credential, network, and service surface; offline operation is less natural | Best explicit lease, heartbeat, retry, restart, and backpressure model; duplicate delivery and stale lease hazards must remain visible | Favors large repositories and elasticity; coordination latency and service overhead can impair foreground use | Highest operational complexity and topology dependence; portability and provider removal require neutral job and state contracts | Strong for crash, retry, lease-expiry, duplicate-delivery, and cancellation tests if the coordinator itself is included in the subject |
-| Orchestration C — foreground/background | Each lane can be bound exactly, but foreground provisional and background publishable identities must never collapse into one current truth | Both lanes need raw provenance and explicit disagreement/supersession rather than last-writer-wins | Foreground can remain local while background uses broader services; data-flow and authorization boundaries multiply | Background recovery can be durable; foreground invalidation, expiry, and handoff create significant stale-result hazards | Best potential interaction latency with background throughput; duplicated work and promotion delay are costs | Moderate-to-high operating burden because two execution classes and their reconciliation must remain compatible and replaceable | Requires independent tests for stale foreground use, contradictory lane results, promotion races, cancellation, and background failure |
-
-The documentation needed to compare these alternatives may be prepared under the standing commission. A concrete selection, experiment, provider qualification, implementation, or authority-bearing decision remains separately unauthorized; any final authority-bearing disposition is surfaced through the final exact-corpus review or another independently authorized decision path.
+The decision owner and evidence gate are reserved to later commissioned members and sponsor decisions.
 
 ---
 
@@ -530,7 +513,7 @@ Selection and approval remain distinct authority actions. This Draft selects non
 
 ## 15. Revision-bound repository examples
 
-The following are informative historical examples from [JAN-CSAA-005@0.1.0](<records/archive/JAN-CSAA-005@0.1.0.Draft.REG-D-020.snapshot>) §§3, 5, 6, 9, 11, and 14. They are bound to parent commit `e673fb5c2e186fb0873d3720036e5e8d7b00038a`, observation time `2026-07-26T11:52:31.6050250-04:00`, and [JAN-CSAA-005-EVIDENCE-001@0.1.0](<records/JAN-CSAA-005 - Preparation Evidence Snapshot.md>). They become stale under that inventory's §3.4 and are not silently upgraded to the successor inventory:
+The following are informative examples from [JAN-CSAA-005@0.1.0](<JAN-CSAA-005 - JPWB TypeScript Repository Semantic Inventory and Conformance Mapping.md>) §§3, 5, 6, 9, 11, and 14. They are bound to parent commit `e673fb5c2e186fb0873d3720036e5e8d7b00038a`, observation time `2026-07-26T11:52:31.6050250-04:00`, and [JAN-CSAA-005-EVIDENCE-001@0.1.0](<records/JAN-CSAA-005 - Preparation Evidence Snapshot.md>). They become stale under that inventory's §3.4:
 
 - the root TypeScript configuration is discovery context rather than a complete program because its `files` and `include` sets are empty;
 - normal and `tsconfig.build.json` package variants have different inclusion boundaries;
@@ -552,9 +535,9 @@ Each row contains one independently reviewable mandatory predicate. A comma-deli
 | Requirement ID | Atomic requirement | Substantive fulfillment outside this catalog |
 | --- | --- | --- |
 | `CSAA-001-CTL-001` | The document SHALL carry the controlled metadata required by `JAN-CSAA-000@0.3.0` §9.3. | Metadata fields; §19 |
-| `CSAA-001-CTL-002` | The document SHALL identify this revision's version as `0.3.0`. | Metadata `Version` |
+| `CSAA-001-CTL-002` | The document SHALL identify this revision's version as `0.1.0`. | Metadata `Version` |
 | `CSAA-001-CTL-003` | The document SHALL state that this Draft has no member authority. | Metadata `Governing status` and `Authority` |
-| `CSAA-001-CTL-004` | The document SHALL cite `REG-D-018`, `REG-D-021`, and `REG-D-022` according to their prospective commission, correction, and no-expansion boundaries. | Metadata `Governing status`, `Authority`, and `Change authority and procedure` |
+| `CSAA-001-CTL-004` | The document SHALL cite `REG-D-018` only as its documentation-authoring and review commission. | Metadata `Governing status`, `Authority`, and `Change authority and procedure` |
 | `CSAA-001-CTL-005` | The document SHALL state its candidate `Governs` boundary. | Metadata `Governs` |
 | `CSAA-001-CTL-006` | The document SHALL state its `Does not govern` boundary. | Metadata `Does not govern`; §14 |
 | `CSAA-001-CTL-007` | The document SHALL route apparent conflicts by concern to the concern owner or `JPWB-REG-005`. | Metadata `Precedence and conflict routing`; §2 |
@@ -576,18 +559,14 @@ Each row contains one independently reviewable mandatory predicate. A comma-deli
 | `CSAA-001-CTL-023` | This Draft SHALL NOT select a deployment topology. | §§1, 4.2, 5, 13, and 14 |
 | `CSAA-001-CTL-024` | Current repository facts SHALL be referenced through `JAN-CSAA-005`. | §2 concern table; §15 |
 | `CSAA-001-CTL-025` | Current repository facts SHALL NOT be restated as timeless architecture. | §15 |
-| `CSAA-001-CTL-026` | This Draft SHALL distinguish the adopted README authority baseline from the separate non-authoritative working-corpus status record. | Metadata `Classification` and `Review and evidence companions`; §19 |
-| `CSAA-001-CTL-027` | This Draft SHALL NOT claim that interim README carriage or an intermediate sponsor response is required for continuation or Proposed promotion. | Metadata `Classification`; §19 |
+| `CSAA-001-CTL-026` | This Draft SHALL cite the controlled-manifest synchronization control and any later exact recorded disposition. | Metadata `Classification` and `Review and evidence companions`; §19 |
+| `CSAA-001-CTL-027` | This Draft SHALL NOT claim controlled-member recognition before synchronized manifest carriage. | Metadata `Classification`; §19 |
 | `CSAA-001-CTL-028` | The document SHALL identify this revision's status as `Draft`. | Metadata `Status` |
 | `CSAA-001-CTL-029` | This Draft SHALL NOT approve a concrete analyzer provider. | §§1, 13, and 14 |
 | `CSAA-001-CTL-030` | This Draft SHALL NOT approve a concrete storage engine. | §§1, 13, and 14 |
 | `CSAA-001-CTL-031` | This Draft SHALL NOT approve a concrete workflow engine. | §§1, 13, and 14 |
 | `CSAA-001-CTL-032` | This Draft SHALL NOT approve a graph database. | §§1, 13, and 14 |
 | `CSAA-001-CTL-033` | This Draft SHALL NOT approve a deployment topology. | §§1, 4.2, 5, 13, and 14 |
-| `CSAA-001-CTL-034` | No intermediate sponsor or concern-owner response SHALL be a continuation predicate for in-scope documentation work. | Metadata `Classification`, `Authority`, and `Change authority and procedure`; §19 |
-| `CSAA-001-CTL-035` | Documentation-subphase completion SHALL NOT be represented as satisfaction of a full executable Wave 2, Wave 3, or Wave 4 exit. | Metadata `Conformance-test references`; §§14, 17, and 19 |
-| `CSAA-001-CTL-036` | For the same exact judgment surface, the author/integrator, adversarial reviewer, integrity/provenance validator, final decision authority, and ministerial recorder SHALL be distinct identities. | Metadata `Verification owner`; §19 |
-| `CSAA-001-CTL-037` | The ministerial recorder SHALL NOT supply or reinterpret judgment. | Metadata `Verification owner`; §19 |
 
 ### 16.2 Context and responsibilities
 
@@ -816,7 +795,7 @@ Each row contains one independently reviewable mandatory predicate. A comma-deli
 | `CSAA-001-ACC-004` | Acceptance SHALL require defined failure and degraded modes. | §10 |
 | `CSAA-001-ACC-005` | Acceptance SHALL require explicit non-goals. | §14 |
 | `CSAA-001-ACC-006` | Acceptance SHALL require at least two credible storage alternatives. | §13.1–§13.3 |
-| `CSAA-001-ACC-007` | Final-corpus inclusion SHALL require independent adversarial review of the exact Proposed candidate. | §17.1; §19 outstanding work |
+| `CSAA-001-ACC-007` | Acceptance SHALL require independent adversarial review. | §17.1; §19 outstanding work |
 | `CSAA-001-ACC-008` | Independent adversarial review SHALL use the controlled review template. | §17.1 controlled-template paragraph; controlled review template |
 | `CSAA-001-ACC-009` | Every later allocation SHALL identify the exact obligation. | §17.2 allocation matrix |
 | `CSAA-001-ACC-010` | Every later allocation SHALL identify its owning document or authority. | §17.2 allocation matrix |
@@ -826,11 +805,6 @@ Each row contains one independently reviewable mandatory predicate. A comma-deli
 | `CSAA-001-ACC-014` | Every later allocation SHALL identify its safe default. | §17.2 allocation matrix |
 | `CSAA-001-ACC-015` | Every later allocation SHALL identify its current authority status. | §17.2 allocation matrix |
 | `CSAA-001-ACC-016` | Acceptance SHALL require at least two credible orchestration alternatives. | §13.4–§13.6 |
-| `CSAA-001-ACC-017` | Draft-to-Proposed promotion SHALL require a closed requirement ledger and completed author self-review. | Metadata `Change authority and procedure`; §19 |
-| `CSAA-001-ACC-018` | Final-corpus inclusion SHALL require integrity/provenance validation by an identity distinct from the author and adversarial reviewer. | Metadata `Verification owner`; §19 |
-| `CSAA-001-ACC-019` | Every candidate-byte change after an exact review freeze SHALL trigger affected re-review unless it satisfies the exact pre-frozen administrative-substitution exception in `REG-D-022`. | Metadata `Change authority and procedure`; §19 |
-| `CSAA-001-ACC-020` | The final corpus package SHALL provide an individual sponsor-response field for this member and for every independently contestable material fork, exception, residual-risk acceptance, or amendment affecting it. | §17.2 `ALLOC-CONFERRAL`; §19 |
-| `CSAA-001-ACC-021` | An accepted revision SHALL receive its own exact-member `JPWB-REG-005` conferral within the one final corpus transaction. | Metadata `Authority`; §17.2 `ALLOC-CONFERRAL`; §19 |
 
 ---
 
@@ -838,46 +812,46 @@ Each row contains one independently reviewable mandatory predicate. A comma-deli
 
 ### 17.1 Current Draft verification allocation
 
-Independent adversarial review uses the [CSAA Controlled Document Review Template](<templates/CSAA Controlled Document Review Template.md>) as its mandatory starting point and preserves every required field. The methods in the current-Draft table below are author-side adversarial-question and scenario checks; they do not constitute that independent post-Proposed review.
+Independent adversarial review uses the [CSAA Controlled Document Review Template](<templates/CSAA Controlled Document Review Template.md>) as its mandatory starting point and preserves every required field.
 
 | Verification concern | Current Wave 1 method | Later executable owner | Current state |
 | --- | --- | --- | --- |
 | Controlled metadata and filename | Structural document inspection | Document-control automation may later supplement | `NOT_RUN` |
 | Requirement-ID and ledger reconciliation | Mechanical extraction plus self-review | Document-control automation may later supplement | `NOT_RUN` |
 | Ownership and non-duplication | Cross-document semantic review | `JAN-CSAA-008` where executable survivorship applies | `NOT_RUN` |
-| End-to-end flow completeness | Scenario walk-through and author-side adversarial-question audit | `JAN-CSAA-006` and `JAN-CSAA-008` | `NOT_RUN` |
+| End-to-end flow completeness | Scenario walk-through and adversarial review | `JAN-CSAA-006` and `JAN-CSAA-008` | `NOT_RUN` |
 | Hostile repository, path escape, process denial, and network denial | Threat-model review | `JAN-CSAA-008` | `NOT_RUN` |
-| Mixed revision and no-false-green behavior | Author-side adversarial-question audit | `JAN-CSAA-006` and `JAN-CSAA-008` | `NOT_RUN` |
+| Mixed revision and no-false-green behavior | Adversarial review | `JAN-CSAA-006` and `JAN-CSAA-008` | `NOT_RUN` |
 | Cancellation, timeout, recovery, and determinism | Architecture consistency review | `JAN-CSAA-008` and `JAN-CSAA-009` | `NOT_RUN` |
 | Provider removal and disagreement | Boundary review | `JAN-CSAA-008` and `JAN-CSAA-011` | `NOT_RUN` |
-| Storage and orchestration choice | Alternatives remain open | Documentation analysis under the standing commission; any experiment, qualification, implementation, or authority-bearing choice remains separately authorized | `NOT_RUN` |
+| Storage and orchestration choice | Alternatives remain open | Later commissioned decision and qualification | `NOT_RUN` |
 
 ### 17.2 Complete later-allocation matrix
 
 | Allocation ID | Exact obligation allocated | Later owner | Activation or decision gate | Required evidence | Intended verification | Wave 1 safe default | Current authority status |
 | --- | --- | --- | --- | --- | --- | --- | --- |
-| `ALLOC-002` | Define provider-independent semantic objects, identity, provenance, lifecycle, relations, cross-graph invariants, and orthogonal support/coverage/health/freshness/conflict/inference dimensions referenced by `ARC-015`, `ARC-024`, and `DEG-001` | `JAN-CSAA-002` | Documentation preparation is commissioned by `REG-D-021`/`REG-D-022`; semantic authority requires its own exact-member conferral in the final corpus transaction | Exact 002 ledger, source trace, semantic cross-review against 000/001/005, independent review record, integrity-validation record, unresolved-findings record | Controlled semantic-catalog review followed by later 008 conformance for machine-enforced portions | 001 names only architectural consequences and preserves every dimension without redefining it | 002 remains a non-authoritative Draft candidate |
-| `ALLOC-003` | Define extraction, enrichment, query, slicing, comparison, and change-impact semantics referenced by `ARC-011`–`ARC-014` and `ARC-025`–`ARC-027` | `JAN-CSAA-003` | Documentation subphase commissioned by `REG-D-021`/`REG-D-022`; authoring begins on objective predecessor readiness; execution and authority remain separate | Versioned method definitions, soundness/completeness goals, uncertainty limits, fixture bindings, and provider-independent result examples | Independent controlled-document review plus 006 fixtures and 008 executable conformance after separate execution authority | Queries remain snapshot-bound and explicit about partiality; no algorithm is selected | Documentation commissioned; artifact unauthored; no implementation or authority |
-| `ALLOC-004` | Define Analysis Rule Profiles, Analyzer Finding Records, provider contracts, Repository Gate Profiles/Evaluations, suppression/disposition meaning, and gate semantics referenced by `ARC-022`–`ARC-024` and `FLW-022`–`FLW-024` | `JAN-CSAA-004` | Documentation subphase commissioned by `REG-D-021`/`REG-D-022`; authoring begins on objective predecessor readiness; execution and authority remain separate | Versioned rule/gate semantics, finding lifecycle, authority boundaries, provider declarations, negative no-false-green cases | Independent controlled-document review plus 006 fixtures and 008 executable conformance after separate execution authority | Technical records remain non-authoritative; disagreement and degraded states remain visible; no gate meaning is inferred | Documentation commissioned; artifact unauthored; no implementation or authority |
-| `ALLOC-005` | Supply current JPWB repository, project, configuration, tool, test, coverage, and freshness facts used only as revision-bound examples under `CTL-024` and `CTL-025` | `JAN-CSAA-005` | Documentation preparation and inventory review are commissioned by `REG-D-021`/`REG-D-022`; member authority requires its own exact-member conferral in the final corpus transaction | Exact parent/worktree/change-set identity, content/configuration/lockfile digests, observation time, raw inspection evidence, freshness rule | Independent repository/configuration inventory review and integrity validation; later 008 inventory conformance under separate execution authority | Treat 005 as non-authoritative time-bound evidence and preserve the repository-freshness gap | 005 remains a non-authoritative Draft candidate |
-| `ALLOC-006` | Define known-positive, known-negative, partial, stale, conflict, cancellation, timeout, recovery, path-escape, and provider-removal fixture judgments needed by `ACC-001`–`ACC-006` and `ACC-016` | `JAN-CSAA-006` | Documentation specification is commissioned by `REG-D-021`/`REG-D-022`; executable fixtures and oracle judgments require separate authority and independent oracle ownership | Exact fixture subjects, expected outcomes, provenance, judgment owner, review record, and non-vacuity cases | Independent oracle review followed by 008 executable conformance under separate execution authority | No fixture judgment is invented or treated as passed | Documentation commissioned; artifact unauthored; no fixture, oracle, execution, or authority |
-| `ALLOC-007` | Define versioned schemas, APIs, envelopes, error shapes, provider adapters, snapshot/publication contracts, and invalidation/freshness contracts needed to realize §§5–11 | `JAN-CSAA-007` | Documentation specification is commissioned by `REG-D-021`/`REG-D-022`; executable schemas, types, generated artifacts, and implementation require separate authority | Contract package, compatibility rules, generated-artifact specifications, change classification, migration effects, and source-to-contract trace | Independent contract review and later 008 executable conformance under separate execution authority | Logical records and errors remain descriptive; no exact wire or persistence shape is presumed | Documentation commissioned; artifact unauthored; no executable contract or authority |
-| `ALLOC-008` | Specify and later execute requirement-level conformance for trust boundaries, provenance, mixed-revision prevention, no-false-green behavior, degraded modes, observability, determinism, cancellation, and provider replacement under `OBS-013` and `ACC-007`–`ACC-008` | `JAN-CSAA-008` | Documentation specification is commissioned by `REG-D-021`/`REG-D-022`; executable conformance, fixtures, oracle judgments, and results require separate authority | Conferred requirements/contracts/fixtures, exact implementation subject, provider/configuration versions, negative cases, raw results, coverage and limitation declarations | Executable conformance and independent V&V review after separate execution authority | All executable verification remains `NOT_RUN`; architecture review cannot substitute for execution | Documentation commissioned; artifact unauthored; no executable suite, result, pass claim, or authority |
-| `ALLOC-009` | Define physical persistence, incremental recomputation, publication atomicity, invalidation, retention, crash recovery, reconciliation, and operational behavior for §§7, 10, and 12 | `JAN-CSAA-009` | Documentation design is commissioned by `REG-D-021`/`REG-D-022` after objective semantic and contract readiness; implementation and failure-injection execution require separate authority | Failure-injection specifications and later evidence, replay/rebuild proof plan, migration/retention design, idempotency proof plan, load and recovery measurement plan | Independent architecture/operations review plus 008 executable failure-path conformance under separate execution authority | Preserve immutable logical identity and prior-publication distinction; choose no physical mechanism | Documentation commissioned; artifact unauthored; no persistence implementation, execution, or authority |
-| `ALLOC-010` | Define how coding agents and humans request, consume, challenge, refresh, and act on CSAA evidence without self-authorization, as bounded by `ARC-028`–`ARC-030` | `JAN-CSAA-010` with `JPWB-DOC-004` by concern | Documentation protocol is commissioned by `REG-D-021`/`REG-D-022` after objective input readiness; live-agent execution remains unauthorized | Versioned employment protocol, authority envelopes, stop/escalation conditions, trajectory-evidence specification, current-inventory binding | Independent trajectory review and later 008 conformance where executable under separate authority | Consumers receive evidence and limits only; no approval, waiver, exception, or completion is inferred | Documentation commissioned; artifact unauthored; no live-agent execution or authority |
-| `ALLOC-011` | Specify qualification criteria for concrete analyzers and adapters against declared capability, isolation, confidentiality, provenance, failure, licensing, removal, and replacement obligations | `JAN-CSAA-011` | Documentation criteria are commissioned by `REG-D-021`/`REG-D-022`; provider qualification execution, procurement, installation, selection, and approval remain separately unauthorized | Reproducible bake-off specification, exact-version/configuration binding, license/procurement review criteria, threat-assessment criteria, failure/removal test plan, evidence-retention plan | Independent specification review plus later provider-qualification execution and applicable 008 conformance under separate authority | Providers remain replaceable, capability-bounded, untrusted, and non-authoritative; none is selected | Documentation commissioned; artifact unauthored; no qualification execution, provider approval, or authority |
-| `ALLOC-STORAGE` | Decide among or revise the three §13.1–§13.3 storage alternatives while preserving every common criterion and `ALT-004`–`ALT-009` | `JAN-CSAA-009` and final decision authority for any authority-bearing selection | Comparative documentation may proceed under `REG-D-021`/`REG-D-022` after objective prerequisites; experiments, implementation, and authority-bearing selection require separate authority or final itemized disposition | Comparative prototype specification or later authorized experiment, failure/recovery evidence plan, confidentiality/retention review, portability and cost evidence, strongest opposing case | Independent architecture decision review and later 008/009 validation | No selection; retain logical immutable snapshot/evidence behavior only | Open fork; no decision, experiment, implementation, or authority |
-| `ALLOC-ORCH` | Decide among or revise the three §13.4–§13.6 orchestration alternatives while preserving every common criterion and `ALT-005`–`ALT-010` | `JAN-CSAA-009`, `JAN-CSAA-011`, and final decision authority for any authority-bearing selection | Comparative documentation may proceed under `REG-D-021`/`REG-D-022` after objective prerequisites; experiments, provider execution, implementation, and authority-bearing selection require separate authority or final itemized disposition | Crash/restart/cancellation/backpressure measurement plan and later evidence, deterministic-equivalence evidence, provider-isolation evidence, operational-complexity analysis, strongest opposing case | Independent architecture decision review and later 008/009/011 validation | No selection; retain bounded dependency-aware scheduling semantics only | Open fork; no decision, experiment, implementation, or authority |
-| `ALLOC-CONFERRAL` | Present the exact 001 candidate for possible Normative conferral | Final decision authority through `JPWB-REG-005`, with a distinct ministerial recorder | Ledger and author self-review closed; exact Proposed bytes/digest frozen; independent adversarial review and distinct integrity/provenance validation complete; affected re-review complete; final exact-corpus package supplies this member's individual response field and every material fork/exception field | Exact ID/version/SHA-256, closed ledger, review and validator identities/methods, verification evidence, unresolved findings, strongest opposing case, consequence matrix, itemized sponsor response | Exact-corpus compatibility review, individual sponsor disposition, distinct exact-member register decision, and ministerial final carriage in one controlled transaction | Remain Draft or Proposed and non-authoritative | No intermediate conferral requested or presumed; final disposition remains future |
+| `ALLOC-002` | Define provider-independent semantic objects, identity, provenance, lifecycle, relations, cross-graph invariants, and orthogonal support/coverage/health/freshness/conflict/inference dimensions referenced by `ARC-015`, `ARC-024`, and `DEG-001` | `JAN-CSAA-002` | `REG-D-018` permits Draft authoring; semantic authority requires its own exact-version/digest sponsor conferral | Exact 002 ledger, source trace, semantic cross-review against 000/001/005, independent review record, unresolved-findings record | Controlled semantic-catalog review followed by later 008 conformance for machine-enforced portions | 001 names only architectural consequences and preserves every dimension without redefining it | 002 is a non-authoritative Wave 1 Draft candidate |
+| `ALLOC-003` | Define extraction, enrichment, query, slicing, comparison, and change-impact semantics referenced by `ARC-011`–`ARC-014` and `ARC-025`–`ARC-027` | `JAN-CSAA-003` | Separate Wave 2 `JPWB-REG-005` commission, then the member's own conferral | Versioned method definitions, soundness/completeness goals, uncertainty limits, fixture bindings, and provider-independent result examples | Independent controlled-document review plus 006 fixtures and 008 executable conformance after their commissions | Queries remain snapshot-bound and explicit about partiality; no algorithm is selected | Reserved; uncommissioned; no artifact or authority claimed |
+| `ALLOC-004` | Define Analysis Rule Profiles, Analyzer Finding Records, provider contracts, Repository Gate Profiles/Evaluations, suppression/disposition meaning, and gate semantics referenced by `ARC-022`–`ARC-024` and `FLW-022`–`FLW-024` | `JAN-CSAA-004` | Separate Wave 2 `JPWB-REG-005` commission, then the member's own conferral | Versioned rule/gate semantics, finding lifecycle, authority boundaries, provider declarations, negative no-false-green cases | Independent controlled-document review plus 006 fixtures and 008 executable conformance | Technical records remain non-authoritative; disagreement and degraded states remain visible; no gate meaning is inferred | Reserved; uncommissioned; no artifact or authority claimed |
+| `ALLOC-005` | Supply current JPWB repository, project, configuration, tool, test, coverage, and freshness facts used only as revision-bound examples under `CTL-024` and `CTL-025` | `JAN-CSAA-005` | `REG-D-018` permits Draft authoring and inventory review; member authority requires its own exact-version/digest sponsor conferral | Exact parent/worktree/change-set identity, content/configuration/lockfile digests, observation time, raw inspection evidence, freshness rule | Independent repository/configuration inventory review; later 008 inventory conformance after separate commission | Treat 005 as non-authoritative time-bound evidence and preserve the repository-freshness gap | 005 is a non-authoritative Wave 1 Draft candidate |
+| `ALLOC-006` | Define known-positive, known-negative, partial, stale, conflict, cancellation, timeout, recovery, path-escape, and provider-removal fixture judgments needed by `ACC-001`–`ACC-006` and `ACC-016` | `JAN-CSAA-006` | Separate Wave 2 `JPWB-REG-005` commission and oracle-authority separation | Exact fixture subjects, expected outcomes, provenance, judgment owner, review record, and non-vacuity cases | Independent oracle review followed by 008 executable conformance | No fixture judgment is invented or treated as passed | Reserved; uncommissioned; no fixture or oracle authority claimed |
+| `ALLOC-007` | Define versioned schemas, APIs, envelopes, error shapes, provider adapters, snapshot/publication contracts, and invalidation/freshness contracts needed to realize §§5–11 | `JAN-CSAA-007` | Separate Wave 3 `JPWB-REG-005` commission, then exact contract conferral where required | Contract package, compatibility rules, generated artifacts, change classification, migration effects, and source-to-contract trace | Independent contract review and 008 executable conformance | Logical records and errors remain descriptive; no exact wire or persistence shape is presumed | Reserved; uncommissioned; no contract or shape authority claimed |
+| `ALLOC-008` | Execute requirement-level conformance for trust boundaries, provenance, mixed-revision prevention, no-false-green behavior, degraded modes, observability, determinism, cancellation, and provider replacement under `OBS-013` and `ACC-007`–`ACC-008` | `JAN-CSAA-008` | Separate Wave 3 `JPWB-REG-005` commission with independent oracle authority | Conferred requirements/contracts/fixtures, exact implementation subject, provider/configuration versions, negative cases, raw results, coverage and limitation declarations | Executable conformance and independent V&V review | All executable verification remains `NOT_RUN`; architecture review cannot substitute for execution | Reserved; uncommissioned; no executable suite, result, or pass claim |
+| `ALLOC-009` | Define physical persistence, incremental recomputation, publication atomicity, invalidation, retention, crash recovery, reconciliation, and operational behavior for §§7, 10, and 12 | `JAN-CSAA-009` | Separate Wave 3 `JPWB-REG-005` commission after semantic and contract prerequisites | Failure-injection evidence, replay/rebuild proof, migration/retention design, idempotency proof, load and recovery measurements | Independent architecture/operations review plus 008 executable failure-path conformance | Preserve immutable logical identity and prior-publication distinction; choose no physical mechanism | Reserved; uncommissioned; no persistence or operations authority claimed |
+| `ALLOC-010` | Define how coding agents and humans request, consume, challenge, refresh, and act on CSAA evidence without self-authorization, as bounded by `ARC-028`–`ARC-030` | `JAN-CSAA-010` with `JPWB-DOC-004` by concern | Separate Wave 4 `JPWB-REG-005` commission after required corpus inputs are authoritative | Versioned employment protocol, authority envelopes, stop/escalation conditions, trajectory evidence, current-inventory binding | Independent trajectory review and later 008 conformance where executable | Consumers receive evidence and limits only; no approval, waiver, exception, or completion is inferred | Reserved; uncommissioned; no employment protocol authority claimed |
+| `ALLOC-011` | Qualify concrete analyzers and adapters against declared capability, isolation, confidentiality, provenance, failure, licensing, removal, and replacement obligations | `JAN-CSAA-011` | Separate Wave 4 `JPWB-REG-005` provider-qualification commission | Reproducible bake-off, exact versions/configuration, license/procurement review, threat assessment, failure/removal tests, evidence-retention plan | Independent provider-qualification review plus applicable 008 conformance | Providers remain replaceable, capability-bounded, untrusted, and non-authoritative; none is selected | Reserved; uncommissioned; no provider approval claimed |
+| `ALLOC-STORAGE` | Decide among or revise the three §13.1–§13.3 storage alternatives while preserving every common criterion and `ALT-004`–`ALT-009` | `JAN-CSAA-009` and accountable sponsor for any authority-bearing selection | Separate commission naming decision authority after 002/003/004/007 prerequisites and measurement evidence exist | Comparative prototype or analysis, failure/recovery evidence, confidentiality/retention review, portability and cost evidence, strongest opposing case | Independent architecture decision review and later 008/009 validation | No selection; retain logical immutable snapshot/evidence behavior only | Open fork; no decision, experiment, implementation, or authority |
+| `ALLOC-ORCH` | Decide among or revise the three §13.4–§13.6 orchestration alternatives while preserving every common criterion and `ALT-005`–`ALT-010` | `JAN-CSAA-009`, `JAN-CSAA-011`, and accountable sponsor for any authority-bearing selection | Separate commission naming decision authority after provider contracts and failure/recovery evidence exist | Crash/restart/cancellation/backpressure measurements, deterministic-equivalence evidence, provider-isolation evidence, operational complexity analysis, strongest opposing case | Independent architecture decision review and later 008/009/011 validation | No selection; retain bounded dependency-aware scheduling semantics only | Open fork; no decision, experiment, implementation, or authority |
+| `ALLOC-CONFERRAL` | Confer any status or authority beyond Draft authoring for the exact 001 bytes | Accountable sponsor through `JPWB-REG-005` | Ledger and self-review closed, exact Proposed bytes/digest frozen, independent adversarial review complete, adoption package complete, sponsor disposition compatible | Exact ID/version/SHA-256, closed ledger, review identity/method, verification evidence, unresolved findings, strongest opposing case, consequence matrix, itemized sponsor response | Exact-byte adoption-package and pre-recording compatibility review | Remain Draft and non-authoritative | No conferral requested or presumed |
 
-`REG-D-021`/`REG-D-022`, not this table, commission the later documentation subphases. No row creates its allocated artifact or evidence, satisfies objective predecessor readiness, performs executable work, selects an alternative, or confers authority.
+No row activates its later owner, creates its evidence, selects an alternative, or confers authority.
 ---
 
 ## 18. Open forks and safe defaults
 
 | Fork | Wave 1 safe default | Later owner or trigger |
 | --- | --- | --- |
-| Physical storage | No selection; logical immutable snapshot/evidence behavior only | `JAN-CSAA-009` documentation after objective readiness; selection or execution separately authorized |
+| Physical storage | No selection; logical immutable snapshot/evidence behavior only | `JAN-CSAA-009` after commission |
 | Orchestration | No selection; bounded dependency-aware scheduling behavior only | `JAN-CSAA-009` and provider qualification |
 | Foreground provisional analysis | Do not equate provisional result with published snapshot | `JAN-CSAA-003`, `009`, `010` |
 | Multiple provider resolution | Preserve disagreement; no silent winner | `JAN-CSAA-004` |
@@ -891,7 +865,7 @@ Independent adversarial review uses the [CSAA Controlled Document Review Templat
 
 ## 19. Draft acceptance state
 
-This `0.3.0` revision is a non-authoritative Draft reconciliation under `REG-D-018` as extended by `REG-D-021` and corrected by `REG-D-022`. The adopted `JAN-CSAA-000@0.3.0` README remains the authority and manifest baseline; `JAN-CSAA-WORKING-STATUS-001` carries current preparation state without interim README carriage. The withdrawn MANIFEST-002 path and its historical gap evidence remain preserved, but neither an intermediate manifest decision nor a sponsor response blocks ledger closure or Proposed promotion. This Draft does not self-declare closure and is not a Proposed or Normative member.
+This `0.1.0` revision is a prepared, non-authoritative Draft candidate under `REG-D-018`. At this Draft freeze, controlled-manifest synchronization was open under `JAN-CSAA-W1-GAP-001`; its live state is controlled by any later exact recorded disposition. This Draft does not self-declare closure and is not a Proposed or Normative member.
 
 The following artifacts are present in this Draft:
 
@@ -907,25 +881,19 @@ The following artifacts are present in this Draft:
 - later-wave verification allocation;
 - open-fork safe defaults.
 
-The requirement catalog now uses one independently reviewable mandatory predicate per stable ID, maps every predicate to substantive text outside the catalog, and supplies the complete later-allocation matrix in §17.2. The requirement ledger records the applicable inherited intake separately from the 001-authored catalog. This revision also corrects the standing commission, manifest-state, five-role, and Draft-to-Proposed lifecycle surfaces. Those authoring changes do not close verification.
+The requirement catalog now uses one independently reviewable mandatory predicate per stable ID, maps every predicate to substantive text outside the catalog, and supplies the complete later-allocation matrix in §17.2. The requirement ledger now records the applicable inherited intake separately from the 001-authored catalog. Those authoring changes do not close verification.
 
-At this `0.3.0` pre-objective-verification authoring state, which is not an exact review freeze or Proposed-candidate freeze, the following work remains before Proposed status. Later exact closure and reconciliation records control live completion state without retroactively rewriting preserved predecessor snapshots:
+The following work remains before Proposed status:
 
-- complete the current-phase author/objective verification needed to close the requirement ledger; later-lifecycle and later-execution allocations remain explicit non-pass states and are not converted to `PASSED`;
-- bind the ledger to the exact final Draft bytes, current governed overlays, and current repository subject evidence;
-- complete author self-review against the closed ledger and all eighteen `JAN-CSAA-000` adversarial questions;
-- perform author-phase cross-document reconciliation against `JAN-CSAA-002` and `JAN-CSAA-005`;
-- resolve every Draft-phase blocker or major finding and rerun each affected check; and
-- freeze the exact candidate version and digest and record the transition to Proposed.
-
-After Proposed and before final-corpus inclusion:
-
-- a distinct adversarial reviewer reviews the exact Proposed bytes;
-- a distinct integrity/provenance validator validates exact identity, evidence continuity, and role separation;
-- every candidate-byte change after the review freeze receives affected re-review unless it satisfies the exact `REG-D-022` pre-frozen substitution exception; and
-- the reviewed candidate, unresolved findings, strongest opposing case, consequences, and individual member/material-fork response fields are assembled into the one final exact-corpus package.
-
-Documentation-subphase completion does not satisfy any full executable Wave 2, Wave 3, or Wave 4 exit. No intermediate sponsor package is required or solicited.
+- execute and close every requirement-level verification binding; all current verification states remain `NOT_RUN`;
+- reconcile the requirement ledger to frozen final Draft bytes;
+- recheck the live controlled-manifest disposition and refresh the exact repository subject;
+- complete author self-review against all eighteen `JAN-CSAA-000` adversarial questions;
+- perform cross-document review against `JAN-CSAA-002` and `JAN-CSAA-005`;
+- resolve every blocker or major finding;
+- freeze an exact candidate version and digest;
+- obtain independent adversarial review;
+- prepare, but do not presume, a separate sponsor-conferral package.
 
 ---
 
