@@ -27,6 +27,118 @@ function byField(rows: ObjectRow[], field: string, value: string): ObjectRow[] {
 	return rows.filter((r) => r.state[field] === value);
 }
 
+/**
+ * The subject a subject-bindable list query is bound to — REQUIRED, never optional.
+ *
+ * WHY REQUIRED, AND WHY THAT IS THE WHOLE POINT (JPWB-SPEC-001 `SPEC-001-INV-02`, FORK-9).
+ *
+ * `listPwus` used to read `(h, undertakingId?)`. The scope was there and it was OPTIONAL — and the four functions
+ * written after it (`listAssessments`, `listObservations`, `listDecisions`, `listBaselines`) declared no scope
+ * parameter at all. That is not a coincidence; an optional scope is an invitation to omit it, and the omission is
+ * invisible at every call site. The Undertaking Workbench duly consumed all four unscoped, so a brand-new
+ * Undertaking with zero PWUs rendered the SEEDED Undertaking's 65 assessments, 2 decisions and 2 baselines.
+ *
+ * The same defect was found and fixed ONCE before, for `listExecutionPlans`, in the loader rather than here — see
+ * "the F-6 bug" comment at `apps/rph-demo/src/routes/undertakings/[id]/+page.server.ts`. Fixing it at the call
+ * site left the signature able to be misused again, and it immediately was, four times over. Fixing it in the
+ * SIGNATURE makes the omission a **compile error**: the enforcement is the type checker, not a reviewer.
+ *
+ * `WORKSPACE` IS EXPLICIT AND IS NEVER A DEFAULT. A caller that genuinely wants every object of a type says so,
+ * and that statement is reviewable. Today the same intent is indistinguishable from a forgotten argument — which
+ * is exactly the state that produced the leak.
+ */
+export type QueryScope =
+	{ readonly kind: 'UNDERTAKING'; readonly undertakingId: string } | { readonly kind: 'WORKSPACE' };
+
+/**
+ * Every object id that belongs to an Undertaking — the set a subject-bindable object must intersect.
+ *
+ * SCOPING IS MULTI-HOP BY NECESSITY, not by preference. None of the four subject-bindable types carries an
+ * `undertakingId`; they reference their subjects instead. The F-6 fix's own comment states the general fact for
+ * the execution plane — *"a plan carries no undertakingId (F-1)"* — and it holds identically here.
+ *
+ * A TWO-HOP CLOSURE (PWUs ONLY) WAS TRIED FIRST AND WAS WRONG, which is worth recording because the error is
+ * invisible from the object model alone. Of the reference seed's assessments, only the per-PWU *fitness* ones name
+ * a PWU as subject; the three de-minimis FLOOR assessments per PWU name the **Evidence** the step produced
+ * (`reference-undertaking.ts:602`, `satisfyFloor(evidenceId)`). Scoping to PWU ids alone therefore emptied the
+ * owning Undertaking's own Assurance tab — caught by the CONTROL case in `undertaking-scope.e2e.ts`, which exists
+ * precisely because scoping everything to nothing satisfies a leak test. That is FORK-9's NON-EXAMPLE in the
+ * flesh: INV-02 forbids presenting objects OUTSIDE the scope, never presenting the subject's own.
+ *
+ * THE CLOSURE, and why it stops where it does. Seed with the Undertaking's PWU ids; add the EXECUTION_PLANs whose
+ * `workUnitId` is one of them; then add every id those plans' own events reference — the Evidence and Artifacts a
+ * step produced. It is computed from the append-only log rather than from materialized state because
+ * `proposedEvidenceIds` and `outputArtifactIds` travel on the event and are not persisted as step fields.
+ *
+ * It is deliberately NOT a transitive closure over all links. A general reachability walk would eventually absorb
+ * shared objects — policies, intents, the PWA — and re-create the leak in a subtler form. The rule is one hop of
+ * PRODUCTION: things this Undertaking's execution made.
+ */
+function undertakingObjectIds(handle: EngineHandle, undertakingId: string): Set<string> {
+	const ids = new Set(
+		byField(listByType(handle, 'PROFESSIONAL_WORK_UNIT'), 'undertakingId', undertakingId).map(
+			(r) => r.id
+		)
+	);
+	const planIds = new Set(
+		listByType(handle, 'EXECUTION_PLAN')
+			.filter((p) => ids.has(String(p.state.workUnitId ?? '')))
+			.map((p) => p.id)
+	);
+	for (const id of planIds) ids.add(id);
+	for (const e of handle.readAllEvents()) {
+		if (!planIds.has(e.aggregateId)) continue;
+		const payload = (e as { payload?: Record<string, unknown> }).payload ?? {};
+		for (const field of ['proposedEvidenceIds', 'outputArtifactIds']) {
+			const v = payload[field];
+			if (Array.isArray(v)) for (const x of v) ids.add(String(x));
+		}
+	}
+	return ids;
+}
+
+/**
+ * Read a row's subject id list. Absent or malformed reads as EMPTY, which fails CLOSED: an object that names no
+ * subject is admitted to no Undertaking, never to all of them.
+ *
+ * TWO SHAPES, because the four subject-bindable types do not agree on one. Assessment, observation and decision
+ * carry `subjectObjectIds: string[]`. BASELINE carries `itemObjectVersions: BaselineItemVersion[]` — an array of
+ * `{ objectId, semanticVersion, contentHash }` records, NOT a list of ids and NOT a map (`objects.ts:139-144`,
+ * `:674`). An earlier revision of this function assumed the latter two in turn; both stringified the records into
+ * `"[object Object]"`, which matched nothing and silently emptied the owning Undertaking's Baselines tab. It was
+ * caught by the CONTROL case rather than by the leak case, because a scope that admits nothing satisfies a leak
+ * test perfectly.
+ */
+function subjectIdsOf(row: ObjectRow, field: string): string[] {
+	const raw = row.state[field];
+	if (!Array.isArray(raw)) return [];
+	return raw
+		.map((entry) => {
+			if (typeof entry === 'string') return entry;
+			const objectId = (entry as { objectId?: unknown } | null)?.objectId;
+			return typeof objectId === 'string' ? objectId : '';
+		})
+		.filter((id) => id !== '');
+}
+
+/**
+ * Apply a `QueryScope` to rows of a subject-bindable type.
+ *
+ * The intersection is on the SUBJECT field named by the caller, because the four types do not agree on one:
+ * assessment, observation and decision use `subjectObjectIds`; baseline uses `itemObjectVersions`. Passing the
+ * field name keeps that difference visible at each definition instead of hiding it behind a union.
+ */
+function withinScope(
+	handle: EngineHandle,
+	rows: ObjectRow[],
+	scope: QueryScope,
+	subjectField: string
+): ObjectRow[] {
+	if (scope.kind === 'WORKSPACE') return rows;
+	const owned = undertakingObjectIds(handle, scope.undertakingId);
+	return rows.filter((r) => subjectIdsOf(r, subjectField).some((id) => owned.has(id)));
+}
+
 export const listPwas = (h: EngineHandle): ObjectRow[] =>
 	// A DeletePwa tombstones the PWA as publicationStatus DISCARDED; the Library treats it as gone.
 	listByType(h, 'PROFESSIONAL_WORK_ARCHITECTURE').filter(
@@ -43,12 +155,20 @@ export const listPwus = (h: EngineHandle, undertakingId?: string): ObjectRow[] =
 		? byField(listByType(h, 'PROFESSIONAL_WORK_UNIT'), 'undertakingId', undertakingId)
 		: listByType(h, 'PROFESSIONAL_WORK_UNIT');
 export const listExecutionPlans = (h: EngineHandle): ObjectRow[] => listByType(h, 'EXECUTION_PLAN');
-export const listAssessments = (h: EngineHandle): ObjectRow[] =>
-	listByType(h, 'ASSURANCE_ASSESSMENT');
-export const listObservations = (h: EngineHandle): ObjectRow[] =>
-	listByType(h, 'ASSURANCE_OBSERVATION');
-export const listDecisions = (h: EngineHandle): ObjectRow[] => listByType(h, 'DECISION');
-export const listBaselines = (h: EngineHandle): ObjectRow[] => listByType(h, 'BASELINE');
+
+// ── SUBJECT-BINDABLE QUERIES: the scope is REQUIRED (JPWB-SPEC-001 INV-02, FORK-9) ───────────────────────────
+//
+// Every one of these four returned the whole workspace until 2026-07-28. See `QueryScope` above for why the repair
+// is in the signature rather than at the call sites — the short version is that fixing it at a call site is what
+// was tried before, and the signature let it be misused again four times.
+export const listAssessments = (h: EngineHandle, scope: QueryScope): ObjectRow[] =>
+	withinScope(h, listByType(h, 'ASSURANCE_ASSESSMENT'), scope, 'subjectObjectIds');
+export const listObservations = (h: EngineHandle, scope: QueryScope): ObjectRow[] =>
+	withinScope(h, listByType(h, 'ASSURANCE_OBSERVATION'), scope, 'subjectObjectIds');
+export const listDecisions = (h: EngineHandle, scope: QueryScope): ObjectRow[] =>
+	withinScope(h, listByType(h, 'DECISION'), scope, 'subjectObjectIds');
+export const listBaselines = (h: EngineHandle, scope: QueryScope): ObjectRow[] =>
+	withinScope(h, listByType(h, 'BASELINE'), scope, 'itemObjectVersions');
 /** Every ASSURANCE_POLICY definition (any status). The PWA Designer's policy manager lists these; the picker
  *  offers the ACTIVE ones, and the 3 de minimis floor policies are shown locked (§8.4). */
 export const listAssurancePolicies = (h: EngineHandle): ObjectRow[] =>

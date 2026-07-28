@@ -252,8 +252,18 @@ export const load: PageServerLoad = ({ params }) => {
 	const traceCounts: Record<string, number> = {};
 	for (const l of traceLinks) traceCounts[l.type] = (traceCounts[l.type] ?? 0) + 1;
 
+	// ── THE F-6 LEAK, CLOSED (SPEC-001 INV-02 / FORK-9, 2026-07-28) ─────────────────────────────────────────
+	//
+	// These four reads were engine-GLOBAL, so a brand-new Undertaking rendered the SEEDED Undertaking's 65
+	// assessments, 2 decisions and 2 baselines. The execution plane below was fixed for exactly this bug (see
+	// "the F-6 fix" comment) and its four siblings here were left — which is what made the leak survive: on the
+	// seeded Undertaking it is invisible, because that Undertaking owns every object in the workspace.
+	//
+	// The scope is now REQUIRED by the signature rather than remembered at the call site; `queries.ts`'s
+	// `QueryScope` records why that difference is the whole repair.
+	const undertakingScope = { kind: 'UNDERTAKING', undertakingId: params.id } as const;
 	const view = buildAssuranceView(engine.readAllEvents());
-	const assessments = listAssessments(engine).map((a) => {
+	const assessments = listAssessments(engine, undertakingScope).map((a) => {
 		const v = view.assessments[a.id];
 		return {
 			id: a.id,
@@ -294,19 +304,19 @@ export const load: PageServerLoad = ({ params }) => {
 	// assurancePolicyIds plus its PwuType's requiredAssurancePolicyIds (object state, not events); buildApplicablePolicies
 	// marks each assessed or not. Only PWUs that actually have applicable policies are surfaced.
 	const applicablePolicies = buildApplicablePoliciesView(engine, pwus, view);
-	const observations = listObservations(engine).map((o) => ({
+	const observations = listObservations(engine, undertakingScope).map((o) => ({
 		id: o.id,
 		severity: String((o.state.severity ?? '') as string),
 		statement: String((o.state.statement ?? '') as string),
 		disposition: String((o.state.disposition ?? '') as string)
 	}));
-	const decisions = listDecisions(engine).map((dc) => ({
+	const decisions = listDecisions(engine, undertakingScope).map((dc) => ({
 		id: dc.id,
 		type: String((dc.state.decisionType ?? '') as string),
 		status: String((dc.state.status ?? '') as string),
 		rationale: String((dc.state.rationale ?? '') as string)
 	}));
-	const baselines = listBaselines(engine).map((b) => ({
+	const baselines = listBaselines(engine, undertakingScope).map((b) => ({
 		id: b.id,
 		type: String((b.state.baselineType ?? '') as string),
 		status: String((b.state.status ?? '') as string),

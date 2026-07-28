@@ -247,7 +247,10 @@ const isFloorPolicy = (id: unknown): boolean =>
 
 /** True iff an EFFECTIVE governance WAIVER Decision covers `subjectId` (the auditable override of a blocking floor). */
 function hasEffectiveWaiver(engine: EngineHandle, subjectId: string): boolean {
-	return listDecisions(engine).some(
+	// WORKSPACE, and deliberately so (SPEC-001 INV-02 / FORK-9): this lookup's subject is the `subjectId` argument
+	// filtered below, not an Undertaking. A waiver may be authored anywhere in the workspace and still cover this
+	// subject, so narrowing the read to one Undertaking would hide legitimate overrides.
+	return listDecisions(engine, { kind: 'WORKSPACE' }).some(
 		(d) =>
 			d.state.decisionType === 'WAIVER' &&
 			d.state.status === 'EFFECTIVE' &&
@@ -361,7 +364,9 @@ function latestFloorAssessments(
 	pwaId: string
 ): Map<string, LatestAssessment> {
 	const latest = new Map<string, LatestAssessment>();
-	for (const a of listAssessments(engine)) {
+	// WORKSPACE: the subject here is a PWA, which is not owned by any Undertaking — the `includesSubject(…, pwaId)`
+	// filter on the next line is this query's real scope. An UNDERTAKING scope would return nothing.
+	for (const a of listAssessments(engine, { kind: 'WORKSPACE' })) {
 		if (!includesSubject(a.state, pwaId) || !isFloorPolicy(a.state.assurancePolicyId)) continue;
 		const policyId = String(a.state.assurancePolicyId as string);
 		const at = String((a.state.updatedAt ?? '') as string);
@@ -377,7 +382,8 @@ function observationsByAssessment(
 	pwaId: string
 ): Map<string, { code: string; severity: string; statement: string }[]> {
 	const byId = new Map<string, { code: string; severity: string; statement: string }[]>();
-	for (const o of listObservations(engine)) {
+	// WORKSPACE, for the same reason as the assessment fold above: the subject is a PWA.
+	for (const o of listObservations(engine, { kind: 'WORKSPACE' })) {
 		if (!includesSubject(o.state, pwaId)) continue;
 		const aid = String((o.state.assessmentId ?? '') as string);
 		const list = byId.get(aid) ?? [];

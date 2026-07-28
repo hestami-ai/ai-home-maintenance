@@ -19,7 +19,9 @@ const BASELINE_TYPES = [
 ] as const;
 
 export const load: PageServerLoad = () => {
-	const baselines = listBaselines(getEngine()).map((b) => ({
+	// WORKSPACE by design (SPEC-001 INV-02 / FORK-9): this IS the workspace-wide Baseline register. Its declared
+	// subject is the workspace, so the scope states that rather than being omitted.
+	const baselines = listBaselines(getEngine(), { kind: 'WORKSPACE' }).map((b) => ({
 		id: b.id,
 		type: String((b.state.baselineType ?? '') as string),
 		status: String((b.state.status ?? '') as string),

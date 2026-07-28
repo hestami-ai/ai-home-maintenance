@@ -1771,5 +1771,38 @@ export const DECLARED_MUTANTS: readonly DeclaredMutant[] = [
 		expectRed: ['packages/rph-domain/src/enforcement-register.test.ts'],
 		why: 'V-4a: a provenance sidecar is NOT canon, and the exclusion that says so must be load-bearing rather than decorative',
 		source: 'JAN-VERIF V-4a'
+	},
+	{
+		id: 'S1-scope-closure-loses-the-evidence-hop',
+		file: 'packages/rph-engine/src/queries.ts',
+		// NOT A HYPOTHETICAL — this is the first implementation of the scope, restored. It closed over the
+		// Undertaking's PWU ids alone, which is the obvious reading of "belongs to this Undertaking" and is wrong:
+		// only the per-PWU FITNESS assessments name a PWU, while the three de-minimis FLOOR assessments per PWU name
+		// the EVIDENCE the step produced (`reference-undertaking.ts:602`). The result emptied the OWNING
+		// Undertaking's Assurance tab — a leak fix that over-corrected into hiding the subject's own records.
+		//
+		// It was caught by a CONTROL, never by the leak case, and that is the transferable lesson: scoping
+		// EVERYTHING to nothing satisfies a leak test perfectly. Any scope guard needs both halves.
+		find: '\tfor (const id of planIds) ids.add(id);',
+		replace: '\tplanIds.clear();',
+		expectRed: ['packages/rph-engine/src/query-scope.test.ts'],
+		why: 'INV-02: the Undertaking closure must reach the Evidence its own execution produced, or the owning Undertaking loses its floor assessments',
+		source: 'JPWB-SPEC-001-DR-001 S-1'
+	},
+	{
+		id: 'S1-baseline-items-stringify-to-object-Object',
+		file: 'packages/rph-engine/src/queries.ts',
+		// ALSO A RESTORED REAL DEFECT. `BASELINE.itemObjectVersions` is `BaselineItemVersion[]` — records of
+		// `{ objectId, semanticVersion, contentHash }` (`objects.ts:139-144`, `:674`) — not a string list and not a
+		// map, though the vocab field name reads like both. `String(entry)` yields "[object Object]", which matches
+		// no id, so every Baseline silently leaves the owning Undertaking's scope.
+		//
+		// The failure is SILENT in the direction that looks correct: an over-narrow scope shows less, and "less" is
+		// what a scoping fix is expected to produce. Only the CONTROL distinguishes it from success.
+		find: '\t\t\tconst objectId = (entry as { objectId?: unknown } | null)?.objectId;',
+		replace: '\t\t\tconst objectId = String(entry);',
+		expectRed: ['packages/rph-engine/src/query-scope.test.ts'],
+		why: 'INV-02: a Baseline is subject-bound through itemObjectVersions[].objectId, and stringifying the record admits it to no Undertaking at all',
+		source: 'JPWB-SPEC-001-DR-001 S-1'
 	}
 ];

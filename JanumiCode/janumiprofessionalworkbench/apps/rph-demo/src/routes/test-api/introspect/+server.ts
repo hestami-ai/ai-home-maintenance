@@ -31,11 +31,15 @@ export const GET: RequestHandler = () => {
 		undertakings: listUndertakings(e),
 		pwus: listPwus(e),
 		executionPlans: listExecutionPlans(e),
-		assessments: listAssessments(e),
+		// WORKSPACE, and it MUST stay so (SPEC-001 INV-02 / FORK-9). This endpoint is the E2E harness's
+		// GROUND-TRUTH read: specs assert against what the engine holds, precisely so a scoped UI view can be
+		// checked against an unscoped source. Scoping it would blind every spec that uses it — including the two
+		// that prove the scoping fix itself.
+		assessments: listAssessments(e, { kind: 'WORKSPACE' }),
 		assurancePolicies: listAssurancePolicies(e),
-		observations: listObservations(e),
-		decisions: listDecisions(e),
-		baselines: listBaselines(e),
+		observations: listObservations(e, { kind: 'WORKSPACE' }),
+		decisions: listDecisions(e, { kind: 'WORKSPACE' }),
+		baselines: listBaselines(e, { kind: 'WORKSPACE' }),
 		conversations: listConversations(e),
 		// Explicitly separate process-local PREVIEW truth from canonical truth so E2E cannot accidentally conflate
 		// them. This endpoint remains test-mode-only.
@@ -47,7 +51,9 @@ export const GET: RequestHandler = () => {
 							pwaId: pwa.id,
 							summary: summarizeAuthoringTurn(turn),
 							pwuTypes: listPwuTypes(turn.engine, pwa.id),
-							assessments: listAssessments(turn.engine),
+							// WORKSPACE over the CANDIDATE engine — a preview turn's isolated engine holds only that
+							// turn's objects, so its workspace is already the scope.
+							assessments: listAssessments(turn.engine, { kind: 'WORKSPACE' }),
 							conversations: listConversations(turn.engine)
 						}
 					]

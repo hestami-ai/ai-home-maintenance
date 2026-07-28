@@ -12,7 +12,8 @@ import { dispatch, getEngine, hostNow, mintUiId } from '$lib/server/workbench';
 import type { Actions, PageServerLoad } from './$types';
 
 export const load: PageServerLoad = () => {
-	const decisions = listDecisions(getEngine()).map((d) => ({
+	// WORKSPACE by design (SPEC-001 INV-02 / FORK-9): this IS the workspace-wide Decision register.
+	const decisions = listDecisions(getEngine(), { kind: 'WORKSPACE' }).map((d) => ({
 		id: d.id,
 		type: String((d.state.decisionType ?? '') as string),
 		status: String((d.state.status ?? '') as string),
