@@ -2065,11 +2065,16 @@ export const DECLARED_MUTANTS: readonly DeclaredMutant[] = [
 	{
 		id: 'FI-c-the-event-stops-recording-what-it-supersedes',
 		file: 'packages/rph-application/src/handlers/decomposition.ts',
-		// THE AUDIT RECORD. `DecompositionRevised` is absent from RATIFIED_EVENT_PAYLOADS — its vocab entry is
-		// annotated UNRATIFIED-AUTHORED and `gen-messages` skips those — so the engine's own (d2) event gate never
-		// runs for it, and the emitted shape drifted from its own declared schema unobserved for as long as it has
-		// existed. This mutation restores that drift in its smallest form: the resulting status goes unrecorded.
-		// The conformance victim is the ONLY thing standing between this event and silence.
+		// THE AUDIT RECORD. This mutation stops the event recording the status it transitions to.
+		//
+		// ITS VERDICT CHANGED MEANING ON 2026-07-29, and the change is the point. `DecompositionRevised` used to be
+		// absent from RATIFIED_EVENT_PAYLOADS — its vocab provenance carried the not-yet-ratified marker, which
+		// `gen-messages` skips — so the engine's (d2) event gate never ran for it and the emitted shape had drifted
+		// from its own declared schema unobserved for as long as it existed. Then, the conformance victim was the
+		// ONLY thing standing between this event and silence. Since the sponsor conferred ratification (REG-F-006),
+		// the gate runs: this mutation is now refused by the ENGINE at dispatch (VALIDATION_FAILED), and the victim
+		// reddens on the dispatch assertion rather than on the payload assertion. Two independent kills, which is
+		// what ratification bought.
 		find: "\t\t\tstatus: String(next.status ?? '')",
 		replace: "\t\t\tstatus: '' // MUTANT: the resulting status is not recorded",
 		expectRed: ['packages/rph-application/src/handlers/decomposition-revise-conformance.test.ts'],

@@ -2491,6 +2491,7 @@ export const RATIFIED_EVENT_PAYLOADS: Record<string, z.ZodType | undefined> = {
 	BaselinePromoted: BaselinePromotedPayloadSchema,
 	ClaimAsserted: ClaimAssertedPayloadSchema,
 	DecisionEffective: DecisionEffectivePayloadSchema,
+	DecompositionRevised: DecompositionRevisedPayloadSchema,
 	EvidenceAdmitted: EvidenceAdmittedPayloadSchema,
 	ExecutionPlanActivated: ExecutionPlanActivatedPayloadSchema,
 	ExecutionStepSucceeded: ExecutionStepSucceededPayloadSchema,

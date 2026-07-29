@@ -243,10 +243,19 @@ only where a sequence *"is interrupted by a refusal"*. An accepted-but-unapplied
    `rationale`, `semanticVersion`, `status`. Making an event match its own declared shape is likewise not a
    model change.
 
-The shape is asserted in `decomposition-revise-conformance.test.ts` rather than by removing the vocabulary's
-`UNRATIFIED-AUTHORED` annotation, because removing it would add the event to `RATIFIED_EVENT_PAYLOADS` and
-**that is a ratification claim** — the sponsor's under B2, not the author's. A test buys the same guarantee and
-claims nothing.
+**The event payload was subsequently RATIFIED by sponsor conferral (2026-07-29, REG-F-006).** The shape had first
+been asserted only in `decomposition-revise-conformance.test.ts`, deliberately, because clearing the
+vocabulary's not-yet-ratified provenance marker adds the event to `RATIFIED_EVENT_PAYLOADS` and **that is a
+conferral of status** — the sponsor's under B2, never the author's. With it conferred, the engine's own (d2)
+event gate now runs: a non-conforming `DecompositionRevised` is refused at dispatch with `VALIDATION_FAILED`,
+where before it was committed and only the test noticed. The enforcement moved out of the test suite and into
+the engine; the test remains as the direct statement of the shape.
+
+*A trap discovered while performing that conferral, recorded because the next editor will meet it: the
+`sourceSection` field is **both prose and a machine predicate** — `gen-messages` substring-matches it. Writing
+the marker's literal name into the new text, in a sentence explaining that the marker had been removed, silently
+re-applied it and left the event out of enforcement while the entry read as ratified. Caught by simulating the
+generator's filter before trusting the regeneration.*
 
 Three mutants, each proved by hand before recording: `FI-a` restores the acceptance; `FI-b` drops only the DEC-3
 carrier from the guard list — the likelier slip, because the headline case still refuses while obligation
@@ -255,9 +264,13 @@ The CONTROL was already green before the guard was written, proving it could not
 
 **The finding remains OPEN as a CAPABILITY gap.** DOC-003's obligation conservation, constraint disposition and
 impact analysis are still unimplemented; that is a decomposition-model increment awaiting ratification. What
-changed is that the gap is **declared, refused and tested** rather than silent. CON-000 B7 still requires the
-escalation, and B5 still governs the record: see `JPWB-SPEC-001-DR-002-F-I (proposed REG-005 entry).md`.
-Conferral is the sponsor's act.
+changed is that the gap is **declared, refused and enforced** rather than silent.
+
+**CONFERRED 2026-07-29 — the finding now lives in the register as `JPWB-REG-005` §REG-F-006**, which is the
+authority for it; this section is the working record. The B7 escalation CON-000 B7 requires is therefore
+performed rather than documented around, and under B5 the ruling is effective. The interim proposal file has
+been deleted rather than left beside the register entry: a second copy of a conferred disposition is a rival
+authority, which is what B3 exists to prevent. It remains in git history.
 
 ---
 
@@ -313,7 +326,7 @@ that lists only what landed reads as a claim that nothing else is outstanding.
 
 | | Status |
 |---|---|
-| **F-I** — DOC-003's revision obligations unimplemented | **OPEN as a capability gap**, no longer grey: the command now refuses what it cannot perform and its event conforms to its own schema (`50785b5b`). Implementation awaits ratification; the REG-005 entry awaits conferral (CON-000 B5). |
+| **F-I** — DOC-003's revision obligations unimplemented | **OPEN as a capability gap**, conferred to the register as **REG-F-006** (2026-07-29). No longer grey: the command refuses what it cannot perform, and its event payload is ratified and engine-enforced. DOCS_STRONGER remediation awaits the decomposition-model increment. |
 | **S-2's 397 unbound obligations** in SPEC-001 §§0–10 | **OPEN.** W-3/W-4/W-5 made a portion bindable; that binding pass was not run. |
 | `ValidateDecomposition` passes **vacuously** | **OPEN.** Its conservation guard reads the parent's `obligationIds`/`constraintIds`; every surface path sets both `[]`. |
 | **SPEC-001 ratification** | Gated on S-2 reaching zero (CON-000 B2 — a sponsor act regardless). |
