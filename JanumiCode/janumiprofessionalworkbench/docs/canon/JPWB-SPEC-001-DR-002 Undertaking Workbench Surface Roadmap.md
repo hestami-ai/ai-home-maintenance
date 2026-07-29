@@ -56,7 +56,7 @@ record is re-derived before it is acted on. Doing so **withdrew one finding enti
 | **F-F** | Persistence is in-memory only | **CONFIRMED, and smaller than recorded** |
 | **F-G** | `/favicon.png` 404s on every page load | **CONFIRMED** |
 | **F-H** | The help / "Rosetta" system | **NOT A BACKLOG ITEM — it does not exist anywhere** |
-| **F-I** | `ReviseDecomposition` discards three declared payload fields | **NEW — found while planning W-3** |
+| **F-I** | `ReviseDecomposition` performs none of DOC-003's revision obligations | **OPEN — restated 2026-07-29** |
 
 ### F-A — the workbench cannot scroll (CONFIRMED)
 
@@ -167,32 +167,83 @@ started-and-abandoned item; it exists only in an agent's memory of a conversatio
 into this roadmap** — it is unstarted design work, and design work enters through a design note, not a remediation
 roadmap. Recorded here so the absence is deliberate rather than an oversight.
 
-### F-I — a command advertises three fields its handler never reads (NEW)
+### F-I — `ReviseDecomposition` performs none of DOC-003's revision obligations (OPEN)
 
-`ReviseDecompositionPayloadSchema` (`packages/rph-contracts/src/messages.ts:406-411`) declares:
+> **RESTATED 2026-07-29 after adversarial verification, and the correction runs in BOTH directions.** The first
+> statement (below the rule) called this "a command advertises three fields its handler never reads" and cited
+> CON-000 B7. A subsequent conversational re-reading then went the other way — that the fields *are* recorded on
+> the event and that the handler matches a ratified "supersede, new contract = DRAFT" transition, so the finding
+> was largely a misreading. **That second reading was wrong, and citing it would have minted a fresh B7 violation
+> inside the correction to a B7 finding.** Six independent verifiers refuted or qualified every limb of it. What
+> follows is what survived, with a runtime probe behind the load-bearing claims.
 
-```ts
-export const ReviseDecompositionPayloadSchema = z.strictObject({
-	rationale: z.string(),
-	childWorkUnitIds: z.array(z.string()).optional(),
-	obligationAllocations: z.array(ObligationAllocationSchema).optional(),
-	constraintPropagations: z.array(ConstraintPropagationSchema).optional()
-});
-```
+**The ratified obligation.** `JPWB-DOC-003` is OPERATIVE (REG-D-010, 2026-07-24) and binds revision three times:
 
-The handler is `export const reviseDecomposition: CommandHandler = (ctx, command) =>` — it **takes no payload
-parameter at all** (`packages/rph-application/src/handlers/decomposition.ts:277`). It advances status to
-`SUPERSEDED` and bumps `semanticVersion`. A caller supplying revised `childWorkUnitIds` gets `ACCEPTED` and
-**nothing happens to them**.
+- **DEC-2** (`:215`): *"Revising a decomposition is legal, changes the parent's semantic version, and **triggers
+  impact analysis**."*
+- **DEC-3** SCOPE (`:221`): *"governs every decomposition, **revision**, and delegation"* — rule: *"No mandatory
+  obligation silently disappears."*
+- **DEC-4** SCOPE (`:225`): *"governs decomposition, delegation, **semantic revision**, and context assembly."*
 
-This is CON-000 B7 at the command boundary: the schema is an asserted capability that nothing performs, and it
-asserts it in the most convincing possible form — a typed, validated, accepted payload. It is worse than an
-absent field, because an absent field is visible to the caller and a discarded one is not.
+`obligationAllocations` and `constraintPropagations` are precisely the DEC-3 and DEC-4 carriers. So the payload
+is not a speculative shape somebody invented — **it is the shape ratified canon requires**, and the handler
+reads none of it.
 
-**Not repaired by W-3**, which only needs to know the capability is unavailable. Recorded here so the repair is
-scoped deliberately rather than discovered again: either the handler reads the payload, or the schema stops
-declaring what it cannot honour, and that is a decision about the decomposition model rather than about the
-surface.
+**What the handler does.** `packages/rph-application/src/handlers/decomposition.ts:277-289`:
+`export const reviseDecomposition: CommandHandler = (ctx, command) =>` — **no payload parameter**, and no
+`mutate`. It advances `status` to `SUPERSEDED` and bumps `semanticVersion`. Of DEC-2's three requirements it
+performs exactly one (the version bump). Obligation conservation, constraint disposition and impact analysis are
+not performed, not refused, and not recorded as unperformed.
+
+**What happens to the payload, measured rather than reasoned.** A runtime probe (real `SqliteStorageAdapter`,
+real engine) dispatched a revise carrying all four fields. Result `ACCEPTED`; the aggregate's
+`childWorkUnitIds` was **unchanged**, `obligationAllocations` and `constraintPropagations` still `[]`. The fields
+do reach the **event** — `kit.ts:569` emits `command.payload` verbatim when no `eventPayload` builder is supplied
+— but that is a far weaker fact than it sounds, in three ways:
+
+1. All three are `.optional()`, so the ordinary call records nothing but a `rationale` string. Every existing
+   test call site passes `{rationale}` alone.
+2. They survive **only because the event contract is unenforced**.
+   `DecompositionRevisedPayloadSchema` (`messages.ts:1020-1025`) is a `strictObject` requiring
+   `supersedesDecompositionContractId`, `rationale`, `semanticVersion`, `status` — and the emitted payload fails
+   it four ways, including *"Unrecognized keys: childWorkUnitIds, obligationAllocations,
+   constraintPropagations"*. The gate never runs because `DecompositionRevised` is absent from
+   `RATIFIED_EVENT_PAYLOADS`, and it is absent **because** the vocab entry is annotated `UNRATIFIED-AUTHORED`:
+   `gen-messages.ts:226-229` skips such entries. **The annotation is the mechanism that disabled the check, not
+   a disclosure that mitigates it.**
+3. **Nothing reads the event.** Searched two ways across `rph-projections`, `rph-engine`, `rph-assurance`,
+   `rph-authoring` and `apps/rph-demo`: zero consumers.
+
+So the emitted audit record omits the two facts it exists to carry — that a contract was superseded, and at
+which version — and carries three keys its own contract forbids.
+
+**A caution against a tempting defence.** The vocab note *"DOC-002-only; new contract = DRAFT"*
+(`m3-commands-events.json:7150-7157`) does NOT license the handler. It is unratified by its own paired entry
+(*"Do NOT treat this sourceSection as proof the shape is ratified"*), the engine states the vocab's `drivesFrom`
+*"has no ratified authority"* (`kit.ts:507`), and DOC-002 has no DecompositionContract transition matrix at all.
+The only ratified sentence on the subject is DEC-2's, and it describes an **in-place** revision. Nor would
+repairing this contradict the state machine: `checkTransition` constrains `status` only, and `advanceStatus`'s
+`mutate` hook is used at eleven sites — including `supersedeAssurancePolicy` (`assurance.ts:332-351`), which
+writes a payload-derived field **while advancing to SUPERSEDED**. The repair is mechanically available and has
+direct precedent.
+
+**The caller-visible residual, which no obligation catches.** A caller supplying `childWorkUnitIds` receives
+`ACCEPTED` and has no way to learn nothing was applied. SPEC-001's disclosure duties do not reach it: INV-08
+(`:3085`) obliges disclosure only *"when a Command issued from a Surface is refused"*, and INV-14 (`:3286`) fires
+only where a sequence *"is interrupted by a refusal"*. An accepted-but-unapplied command falls between them.
+
+**Disposition — SPONSOR RULING 2026-07-29: leave it. No code change.** Defensible on the corrected evidence:
+no production code issues this command, nothing consumes its event, and the repair is a model decision rather
+than a patch. **The finding stays OPEN.** It is not downgraded, because the gap is against operative ratified
+canon, and because CON-000 B7 requires an asserted-vs-performed gap to be *"escalated via REG-005 — never
+quietly documented around."* This roadmap section is not that escalation: see
+`JPWB-SPEC-001-DR-002-F-I (proposed REG-005 entry).md`, which under CON-000 B5 is what makes the ruling
+effective. Until it is merged, the ruling recorded here is **proposed, not conferred**.
+
+**Nothing pins the behaviour the ruling preserves.** No test in the repository populates those three fields on
+this command, and none asserts on the emitted payload; the `emitted-event-conformance` control cannot see it,
+because its subject is `driveReferenceUndertaking`, which never issues `ReviseDecomposition`. So "leave it"
+currently means "leave it unobserved", and a future change to it would pass silently.
 
 ---
 
@@ -229,6 +280,30 @@ arrangement assertion or a mutant rather than by review.** Recorded here because
 **Two findings were withdrawn or corrected before any code was written** — F-B (the nine "unreachable" actions were
 reachable) and the whole of W-3's original design (`ProposeDecomposition` does not instantiate). Both had been
 authored by inference from names rather than from implementations.
+
+**A fifth instance, recorded 2026-07-29, and it is the one that nearly went into the canon.** F-I was restated
+twice: first as "a command advertises three fields its handler never reads", then — in conversation — as
+"largely a misreading, since the fields are on the event and the handler matches a ratified transition". The
+second restatement was checked by six independent verifiers before it was written down. **Every limb was refuted
+or qualified**: the "ratified transition" it leaned on is unratified by its own entry, the engine states that
+vocabulary field has no authority, and the only ratified sentence on revision (DOC-003 DEC-2) describes an
+in-place revision that the handler does not perform. Writing it would have justified a B7 downgrade by citing an
+unratified source as ratified — a fresh B7 violation inside the correction to a B7 finding. **The inference-from-
+names failure mode has a mirror image: inference-from-a-plausible-reading, in the direction that makes a finding
+go away.** It is the more dangerous of the two, because nothing is left behind to trip over.
+
+### Open at close
+
+The programme's five work packages are complete. These are not, and are recorded here because a status block
+that lists only what landed reads as a claim that nothing else is outstanding.
+
+| | Status |
+|---|---|
+| **F-I** — `ReviseDecomposition` performs none of DOC-003's revision obligations | **OPEN.** Sponsor ruled *leave it* (no code change) 2026-07-29; ruling is **proposed, not conferred** until its REG-005 entry merges (CON-000 B5). |
+| **S-2's 397 unbound obligations** in SPEC-001 §§0–10 | **OPEN.** W-3/W-4/W-5 made a portion bindable; that binding pass was not run. |
+| `ValidateDecomposition` passes **vacuously** | **OPEN.** Its conservation guard reads the parent's `obligationIds`/`constraintIds`; every surface path sets both `[]`. |
+| **SPEC-001 ratification** | Gated on S-2 reaching zero (CON-000 B2 — a sponsor act regardless). |
+| The help / "Rosetta" system | Does not exist anywhere in the repository. Unstarted design work, not backlog. |
 
 ---
 
@@ -318,16 +393,25 @@ mandatory-one-or-more; C1 conditional-zero-or-one; C+ conditional-zero-or-more."
 M1 and M+, 0 for C1 and C+**. W-3 instantiates M1→1, M+→1, C1→0, C+→0, and a permitted child carrying no rule
 defaults to M1.
 
-**Correction 3 — one clause is not buildable at all, and the reason is a defect.** "M+/C+ instantiate one and
-**offer more**" cannot amend a contract once it exists. `reviseDecomposition` is declared
-`(ctx, command)` — **no payload parameter** (`decomposition.ts:277-289`) — while
-`ReviseDecompositionPayloadSchema` declares `childWorkUnitIds`, `obligationAllocations` and
-`constraintPropagations` (`packages/rph-contracts/src/messages.ts:406-411`). All three are **silently discarded**;
-the handler only advances status to `SUPERSEDED` and bumps `semanticVersion`. So W-3 offers further children as an
-affordance that records the parent link **on the PWU** (`parentWorkUnitId`, already folded by
-`professional-work-graph.ts`) and does not amend the contract. **This is recorded as finding F-I below, not
-skipped** — a command whose schema advertises three fields its handler never reads asserts a capability nothing
-performs, which is CON-000 B7 exactly.
+**Correction 3 — one clause cannot be built the way it is written, and the reason is a defect.** *(Heading
+amended 2026-07-29: it read "not buildable at all", which this same paragraph contradicts three sentences
+later.)* "M+/C+ instantiate one and **offer more**" cannot amend a contract once it exists.
+`reviseDecomposition` is declared `(ctx, command)` — **no payload parameter** (`decomposition.ts:277-289`) —
+while `ReviseDecompositionPayloadSchema` declares `childWorkUnitIds`, `obligationAllocations` and
+`constraintPropagations` (`packages/rph-contracts/src/messages.ts:406-411`). None is applied to the contract;
+the handler only advances status to `SUPERSEDED` and bumps `semanticVersion`. So W-3 offers further children as
+an affordance that records the parent link **on the PWU** (`parentWorkUnitId`, already folded by
+`professional-work-graph.ts`) and does not amend the contract. **This is recorded as finding F-I above, not
+skipped.**
+
+*Two claims in this paragraph were checked in 2026-07-29's verification and both need qualifying. First,
+"silently discarded" was too strong for the event and too weak for the object: the fields are written verbatim to
+an unread event log in defiance of that event's own strict schema, and are never applied to the aggregate — see
+F-I. Second, a **second** `DecompositionContract` naming the same parent IS accepted today
+(`dwp03-precondition-coverage.test.ts:318-325`), so "amend" is not the only conceivable route — but nothing
+constrains a parent to one live contract, no gate enforces supersede-before-propose, and no projection consumes
+a second one, so that route is unguarded rather than available. **W-3 built neither**, and the deferred
+affordance is carried as part of F-I.*
 
 - **Red first.** An e2e that creates an Undertaking from the seeded published PWA and asserts — against
   `/test-api/introspect` engine ground truth, not the DOM — that the Undertaking owns **8** PWUs. The seeded root
