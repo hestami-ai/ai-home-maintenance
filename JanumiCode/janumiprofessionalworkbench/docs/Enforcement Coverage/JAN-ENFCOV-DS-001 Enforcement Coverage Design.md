@@ -8,6 +8,42 @@ confirmation before a roadmap is written.*
 
 ---
 
+> ## ⛔ WITHDRAWN 2026-07-29, SAME DAY, BEFORE ANY CODE WAS WRITTEN
+>
+> **The code-side census this document proposes should NOT be built, and the alarm that motivated it was already
+> answered.** An 8-agent adversarial pass refuted the premise, the measurement and the specification in turn. The
+> document is kept because the reasons are worth more than the proposal was.
+>
+> **1 — The alarm was already triaged, by this repository, and found to overstate the gap by an order of
+> magnitude.** `docs/Recursive Professional Harness/JAN-ROADMAP-001-v2/detailed-roadmaps/W1/evidence/hollow-kernel-triage.md`
+> records an 8-agent triage of the same census: **55 dead → 5 genuine gaps**, 19 `DEAD_BY_DESIGN`
+> (introspection / sibling-API / already-enforced-live), 24 `DEFER` to W2/W3. Its own headline reads *"the
+> census's '55 dead' overstated the genuine W1 governance gap by an order of magnitude."* Every number in §3
+> below, and the "74% dead" framing repeated throughout this session, quotes a **pre-triage** figure whose author
+> had already qualified it. A second census would rediscover the same 55 and demand the same triage again.
+>
+> **2 — My own re-measurement (55.6%) was wrong in every component, and looked right by accident.** Denominator:
+> 135 detected vs **296 real** exports — the regexes were blind to `export interface` (121), `export type` (41)
+> and `export class` (1), and **two of the 135 were phantoms**: template-literal text inside
+> `gen/gen-transitions.ts`, whose *real* definitions the `*.data.ts` filter had excluded. Numerator: ≥9 false LIVE
+> (7 matched by **prose comments**, 2 by name collisions) and ≥14 false DEAD from transitive type reachability.
+> The exemplar is exact — **`bindingPermitsExecution` was scored LIVE by the comment
+> *"this layer no longer calls `bindingPermitsExecution` directly"***: the sentence documenting its removal is
+> what marked it alive. And the original 75 landed within 8 of a corrected 83 **because two independent errors
+> cancelled**, which is why it read as plausible.
+>
+> **3 — The census's positive arm would have certified the defect we just spent the day on.**
+> `validateObligationConservation` **is** imported and called (`handlers/decomposition.ts:18, :210`), so any
+> reachability census marks it `WIRED` — while its input is built from `obligationIds` that every surface path
+> sets to `[]`. It is reached **and vacuous**. A census whose green arm certifies an open finding is not a weaker
+> instrument than the register; it is one that would have argued against it.
+>
+> **What survives:** the vocabulary in §5, the tracker finding in §3.1 — which produced a real gate
+> (`verif/tracker-deferrals.test.ts`, commit `9f91fcb6`) — and the open-work carry in §9. **What is superseded:**
+> §3's measurements, §6's D2/D3/D4, and §8's questions. The residual worklist is not "114 rules and a census"; it
+> is the triage's **five WIRE gaps plus its 24 W2/W3 deferrals**, which already exist, already have code-grounded
+> write-paths, and already name their red-first tests.
+
 ## 1. What it is (one line)
 
 Extend the existing `enforcement-register` from one rule family to the ratified catalog, and add the
