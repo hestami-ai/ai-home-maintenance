@@ -1,5 +1,5 @@
 import { test, expect } from '@playwright/test';
-import { resetEngine, introspect, gotoHydrated } from './support/harness';
+import { resetEngine, introspect, gotoHydrated, declareRisk } from './support/harness';
 
 // Slice 2 — Undertaking creation + PWU instantiation (RPH-DOC-010 §14/§25/§28). Closes "there isn't a way to
 // select PWUs because there aren't any": a new Undertaking is instantiated from a PUBLISHED PWA (establishing +
@@ -20,7 +20,8 @@ test.describe('Undertaking Workbench — create an Undertaking and instantiate a
 		await page.getByPlaceholder(/Undertaking name/i).fill('Pilot Delivery Program');
 		await page.getByPlaceholder(/Objective/i).fill('Ship a pilot to first customers');
 		await page.getByPlaceholder(/Intended product/i).fill('Pilot Delivery App');
-		await page.getByRole('combobox').selectOption({ index: 1 }); // the one published PWA
+		await page.getByRole('combobox', { name: 'Instantiate from published PWA' }).selectOption({ index: 1 }); // the one published PWA
+		await declareRisk(page); // DR-002 W-4: the form refuses without a judgement
 		await page.getByRole('button', { name: 'Create Undertaking' }).click();
 
 		// 2. Open the new Undertaking. Read its href and navigate directly — clicking the row is racy against the
@@ -36,8 +37,9 @@ test.describe('Undertaking Workbench — create an Undertaking and instantiate a
 
 		// 3. Instantiate a PWU realizing a PWU Type — the control that was the dead-end.
 		await page.getByRole('button', { name: 'overview' }).click();
-		await page.getByRole('combobox').selectOption({ label: 'Architecture Definition' });
+		await page.getByRole('combobox', { name: 'Select a PWU Type' }).selectOption({ label: 'Architecture Definition' });
 		await page.getByPlaceholder(/Instance title/i).fill('Pilot Architecture');
+		await declareRisk(page); // DR-002 W-4: the form refuses without a judgement
 		await page.getByRole('button', { name: 'Instantiate PWU' }).click();
 
 		// SEMANTIC: the PWU Instance shows in the list.

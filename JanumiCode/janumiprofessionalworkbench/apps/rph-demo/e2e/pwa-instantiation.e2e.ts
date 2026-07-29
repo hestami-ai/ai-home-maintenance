@@ -1,5 +1,5 @@
 import { test, expect } from '@playwright/test';
-import { resetEngine, introspect, gotoHydrated } from './support/harness';
+import { resetEngine, introspect, gotoHydrated, declareRisk } from './support/harness';
 
 // JPWB-SPEC-001-DR-002 W-3 — a Professional Work Architecture is instantiated by the Undertaking that binds it.
 //
@@ -43,7 +43,8 @@ test.describe('Undertaking Workbench — the PWA is instantiated (DR-002 W-3)', 
 		await page.getByPlaceholder(/Undertaking name/i).fill('Instantiation Probe');
 		await page.getByPlaceholder(/Objective/i).fill('Prove the architecture is instantiated');
 		await page.getByPlaceholder(/Intended product/i).fill('Probe Product');
-		await page.getByRole('combobox').selectOption({ index: 1 }); // the one published PWA
+		await page.getByRole('combobox', { name: 'Instantiate from published PWA' }).selectOption({ index: 1 }); // the one published PWA
+		await declareRisk(page); // DR-002 W-4: the form refuses without a judgement
 		await page.getByRole('button', { name: 'Create Undertaking' }).click();
 
 		// Settle on the list re-render before reading engine truth: the row appearing is what proves the form
@@ -149,7 +150,10 @@ test.describe('Undertaking Workbench — the PWA is instantiated (DR-002 W-3)', 
 		await page.getByPlaceholder(/Undertaking name/i).fill(undertakingName);
 		// The option label is `name + ' v' + version`, NOT the bare name — a name-only match selects nothing and
 		// the control would then fail on its selector rather than on what it is testing.
-		await page.getByRole('combobox').selectOption({ label: `${pwaName} v0.1.0` });
+		await page
+			.getByRole('combobox', { name: 'Instantiate from published PWA' })
+			.selectOption({ label: `${pwaName} v0.1.0` });
+		await declareRisk(page); // DR-002 W-4: the form refuses without a judgement
 		await page.getByRole('button', { name: 'Create Undertaking' }).click();
 	}
 

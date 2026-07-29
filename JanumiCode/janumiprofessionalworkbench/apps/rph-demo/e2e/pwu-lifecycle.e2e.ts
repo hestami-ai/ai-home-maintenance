@@ -1,5 +1,5 @@
 import { test, expect } from '@playwright/test';
-import { resetEngine, introspect, gotoHydrated } from './support/harness';
+import { resetEngine, introspect, gotoHydrated, declareRisk } from './support/harness';
 
 // Slice 3 — PWU lifecycle + INV-5 ("no green without assurance"). Drives a PWU through the four axes in the UI and
 // proves the engine keeps execution success and assurance separate: a SUCCEEDED PWU is NOT green until an assurance
@@ -19,14 +19,16 @@ test.describe('Undertaking Workbench — PWU lifecycle enforces no-green-without
 		await gotoHydrated(page, '/undertakings');
 		await page.getByRole('button', { name: '+ New Undertaking' }).click();
 		await page.getByPlaceholder(/Undertaking name/i).fill('Lifecycle Demo');
-		await page.getByRole('combobox').selectOption({ index: 1 });
+		await page.getByRole('combobox', { name: 'Instantiate from published PWA' }).selectOption({ index: 1 });
+		await declareRisk(page); // DR-002 W-4: the form refuses without a judgement
 		await page.getByRole('button', { name: 'Create Undertaking' }).click();
 		const row = page.getByRole('link', { name: /Lifecycle Demo/ });
 		await expect(row).toBeVisible();
 		await gotoHydrated(page, (await row.getAttribute('href'))!);
 		await page.getByRole('button', { name: 'overview' }).click();
-		await page.getByRole('combobox').selectOption({ label: 'Architecture Definition' });
+		await page.getByRole('combobox', { name: 'Select a PWU Type' }).selectOption({ label: 'Architecture Definition' });
 		await page.getByPlaceholder(/Instance title/i).fill('Arch Work');
+		await declareRisk(page); // DR-002 W-4: the form refuses without a judgement
 		await page.getByRole('button', { name: 'Instantiate PWU' }).click();
 		await expect(page.getByText('Arch Work')).toBeVisible();
 

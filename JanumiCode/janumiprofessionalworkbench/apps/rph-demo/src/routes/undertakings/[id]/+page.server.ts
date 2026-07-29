@@ -2,6 +2,7 @@
 // this Undertaking's PWUs), a lifecycle rollup, and the assurance / decision / baseline working sets — all read
 // from the live engine. The PWA-version binding is always visible (RPH-DOC-010 §25 header).
 import { error, fail } from '@sveltejs/kit';
+import { parseRiskProfile } from '$lib/authoring/riskProfile';
 import {
 	getObject,
 	listAssessments,
@@ -558,6 +559,8 @@ export const actions: Actions = {
 		const pwuTypeId = String((form.get('pwuTypeId') ?? '') as string).trim();
 		const title = String((form.get('title') ?? '') as string).trim();
 		if (!pwuTypeId) return fail(400, { error: 'Select a PWU Type to instantiate.' });
+		const risk = parseRiskProfile((field) => form.get(field) as string | null);
+		if (!risk.ok) return fail(400, { error: risk.error });
 		const type = getObject(engine, pwuTypeId);
 		if (!type) return fail(400, { error: 'Unknown PWU Type.' });
 		const intentId = resolveIntentId(engine, params.id);
@@ -587,13 +590,10 @@ export const actions: Actions = {
 			assumptionIds: [],
 			expectedOutputs: [{ outputId: `out_${pwuId}`, kind: 'DOCUMENT' }],
 			assurancePolicyIds: [],
-			riskProfile: {
-				consequence: 'MEDIUM',
-				uncertainty: 'MEDIUM',
-				irreversibility: 'MEDIUM',
-				securitySensitivity: 'MEDIUM',
-				regulatoryExposure: 'LOW'
-			}
+			// DR-002 W-4 — the professional's declared judgement. This line held the five constants that made
+			// finding F-D: MEDIUM/MEDIUM/MEDIUM/MEDIUM/LOW, written into canonical state where nothing downstream
+			// could tell them from a judgement, and failing every disjunct of HIGH_ASSURANCE's risk gate.
+			riskProfile: risk.profile
 		});
 		if (r.status !== 'ACCEPTED') return fail(400, { error: r.error?.message ?? r.status });
 		return { proposed: pwuId };

@@ -1,5 +1,5 @@
 import { test, expect } from '@playwright/test';
-import { resetEngine, introspect, gotoHydrated } from './support/harness';
+import { resetEngine, introspect, gotoHydrated, declareRisk } from './support/harness';
 
 // JPWB-SPEC-001 SPEC-001-INV-02 / FORK-9 — a Projection SHALL be bound to a declared Projection Scope and SHALL
 // NOT present objects outside it.
@@ -41,7 +41,8 @@ test.describe('Undertaking Workbench — projections are scoped to their subject
 		await gotoHydrated(page, '/undertakings');
 		await page.getByRole('button', { name: '+ New Undertaking' }).click();
 		await page.getByPlaceholder(/Undertaking name/i).fill('Scope Probe');
-		await page.getByRole('combobox').selectOption({ index: 1 });
+		await page.getByRole('combobox', { name: 'Instantiate from published PWA' }).selectOption({ index: 1 });
+		await declareRisk(page); // DR-002 W-4: the form refuses without a judgement
 		await page.getByRole('button', { name: 'Create Undertaking' }).click();
 		const link = page.getByRole('link', { name: /Scope Probe/ });
 		await expect(link).toBeVisible();

@@ -1,5 +1,5 @@
 import { test, expect } from '@playwright/test';
-import { resetEngine, introspect, gotoHydrated } from './support/harness';
+import { resetEngine, introspect, gotoHydrated, declareRisk } from './support/harness';
 
 // JPWB-SPEC-001 SPEC-001-INV-14 / FORK-23 (b) — a multi-Command Affordance is ATOMIC where an atomic dispatch
 // exists, and a partially-applied sequence SHALL NOT leave committed state behind.
@@ -79,13 +79,15 @@ test.describe('Undertaking Workbench — multi-Command atomicity (SPEC-001-INV-1
 		await gotoHydrated(page, '/undertakings');
 		await page.getByRole('button', { name: '+ New Undertaking' }).click();
 		await page.getByPlaceholder(/Undertaking name/i).fill('Atomicity Control');
-		await page.getByRole('combobox').selectOption({ index: 1 });
+		await page.getByRole('combobox', { name: 'Instantiate from published PWA' }).selectOption({ index: 1 });
+		await declareRisk(page); // DR-002 W-4: the form refuses without a judgement
 		await page.getByRole('button', { name: 'Create Undertaking' }).click();
 		const link = page.getByRole('link', { name: /Atomicity Control/ });
 		await gotoHydrated(page, (await link.getAttribute('href'))!);
 		await page.getByRole('button', { name: 'overview', exact: true }).click();
-		await page.getByRole('combobox').selectOption({ label: 'Architecture Definition' });
+		await page.getByRole('combobox', { name: 'Select a PWU Type' }).selectOption({ label: 'Architecture Definition' });
 		await page.getByPlaceholder(/Instance title/i).fill('Atomic Work');
+		await declareRisk(page); // DR-002 W-4: the form refuses without a judgement
 		await page.getByRole('button', { name: 'Instantiate PWU' }).click();
 		await expect(page.getByText('Atomic Work')).toBeVisible();
 

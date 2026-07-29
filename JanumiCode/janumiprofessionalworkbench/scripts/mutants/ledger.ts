@@ -1968,5 +1968,39 @@ export const DECLARED_MUTANTS: readonly DeclaredMutant[] = [
 		expectRed: ['apps/rph-demo/e2e/pwa-instantiation.e2e.ts'],
 		why: 'DR-002 W-3: instantiating the right NUMBER of work units is not instantiating an architecture',
 		source: 'JPWB-SPEC-001-DR-002 W-3'
+	},
+	{
+		id: 'W4-a-the-authored-risk-judgement-is-discarded',
+		file: 'apps/rph-demo/src/routes/undertakings/+page.server.ts',
+		// FINDING F-D, RESTORED EXACTLY. Until W-4 every PWU the surface created carried these five literals, and
+		// they are not cosmetic: `riskProfile` selects the assurance profile (rph-assurance/src/applicability.ts
+		// resolves `$.riskProfile`), and HIGH_ASSURANCE gates on RISK_AT_LEAST(CONSEQUENCE,HIGH) OR
+		// RISK_AT_LEAST(SECURITY_SENSITIVITY,HIGH) OR RISK_AT_LEAST(IRREVERSIBILITY,HIGH) OR
+		// RISK_AT_LEAST(REGULATORY_EXPOSURE,HIGH). Five MEDIUMs and a LOW fail every disjunct, so the surface
+		// silently placed EVERY PWU a professional created below the high-assurance floor, whatever the work was.
+		find: '\t\t\t\triskProfile\n\t\t\t}',
+		replace:
+			"\t\t\t\triskProfile: { consequence: 'MEDIUM', uncertainty: 'MEDIUM', irreversibility: 'MEDIUM', securitySensitivity: 'MEDIUM', regulatoryExposure: 'LOW' }\n\t\t\t}",
+		expectRed: ['apps/rph-demo/e2e/risk-profile-authored.e2e.ts'],
+		why: 'DR-002 W-4: a fabricated risk profile is indistinguishable downstream from a professional judgement',
+		source: 'JPWB-SPEC-001-DR-002 W-4'
+	},
+	{
+		id: 'W4-b-an-undeclared-dimension-quietly-defaults',
+		file: 'apps/rph-demo/src/lib/authoring/riskProfile.ts',
+		// THE FIX FOR A FABRICATED VALUE IS NOT A BETTER-CHOSEN ONE. `?? 'MEDIUM'` instead of `?? ''` is a one-token
+		// slip that turns every unanswered dimension back into a literal the surface chose — the same defect W4-a
+		// restores, arriving through the parser instead of the payload. MEDIUM is legal on all five dimensions, so
+		// it parses cleanly and nothing downstream complains.
+		//
+		// THIS IS THE MUTANT THE FIRST VERSION OF THE CONTROL COULD NOT HAVE KILLED. That control drove the browser
+		// form with the risk selects empty and asserted nothing was created — which passed, but only because
+		// `required` stopped the submit before it reached the server. The action never ran, so this mutation would
+		// have SURVIVED behind a green test. The control now POSTs the form action directly.
+		find: "		const raw = (read(riskFieldName(field)) ?? '').trim();",
+		replace: "\t\tconst raw = (read(riskFieldName(field)) ?? 'MEDIUM').trim();",
+		expectRed: ['apps/rph-demo/e2e/risk-profile-authored.e2e.ts'],
+		why: 'DR-002 W-4: absent a judgement the work is refused, because a default is the same defect with a different literal',
+		source: 'JPWB-SPEC-001-DR-002 W-4'
 	}
 ];

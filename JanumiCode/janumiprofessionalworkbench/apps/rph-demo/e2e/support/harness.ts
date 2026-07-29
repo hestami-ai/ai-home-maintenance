@@ -71,3 +71,33 @@ export async function acceptAgentCandidate(
 	expect(res.ok(), 'exact candidate acceptance should succeed').toBeTruthy();
 	return candidateHash!;
 }
+
+/**
+ * Declare a risk judgement on whichever authoring form is open (DR-002 W-4).
+ *
+ * The Undertaking and PWU forms both REQUIRE one — a fabricated default is the defect W-4 removed, so there is
+ * nothing to fall back to and every spec that creates work must now say what kind of work it is.
+ *
+ * Defaults to a MODERATE posture rather than the old fabricated constant, and deliberately not to
+ * MEDIUM/MEDIUM/MEDIUM/MEDIUM/LOW: a helper that reproduced that exact tuple would let a regression to the
+ * hardcoded profile pass every spec that uses it, which is the whole failure W-4 exists to prevent.
+ *
+ * NOTE THE SCALES DIFFER. consequence / uncertainty / irreversibility are LOW|MEDIUM|HIGH|CRITICAL;
+ * securitySensitivity and regulatoryExposure are NONE|LOW|MEDIUM|HIGH — passing CRITICAL to either is refused
+ * with "Schema validation failed", which reads like a wiring fault and is not one.
+ */
+export async function declareRisk(
+	page: Page,
+	overrides: Partial<Record<string, string>> = {}
+): Promise<void> {
+	const declared: Record<string, string> = {
+		Consequence: 'HIGH',
+		Uncertainty: 'MEDIUM',
+		Irreversibility: 'LOW',
+		'Security sensitivity': 'LOW',
+		'Regulatory exposure': 'NONE',
+		...overrides
+	};
+	for (const [label, level] of Object.entries(declared))
+		await page.getByRole('combobox', { name: label, exact: true }).selectOption(level);
+}

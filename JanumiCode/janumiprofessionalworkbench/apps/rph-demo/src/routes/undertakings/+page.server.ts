@@ -5,7 +5,8 @@
 import { fail } from '@sveltejs/kit';
 import { getObject, listPwas, listPwus, listPwuTypes, listUndertakings } from '@janumipwb/rph-engine';
 import { planComposition } from '@janumipwb/rph-projections';
-import type { PermittedChildRule } from '@janumipwb/rph-contracts';
+import type { PermittedChildRule, WorkRiskProfile } from '@janumipwb/rph-contracts';
+import { parseRiskProfile } from '$lib/authoring/riskProfile';
 import {
 	dispatch,
 	dispatchBatch,
@@ -65,6 +66,11 @@ export const actions: Actions = {
 		const product = String((form.get('product') ?? '') as string).trim();
 		const pwaId = String((form.get('pwaId') ?? '') as string).trim();
 		if (!name || !pwaId) return fail(400, { error: 'A name and a published PWA are required.' });
+		// DR-002 W-4 — the risk judgement, refused when absent rather than defaulted. Read BEFORE anything is
+		// dispatched: the Intent lifecycle below commits five commands, and discovering the missing judgement
+		// afterwards would leave an approved Intent behind for an Undertaking that was never created.
+		const risk = parseRiskProfile((field) => form.get(field) as string | null);
+		if (!risk.ok) return fail(400, { error: risk.error });
 		const pwa = getObject(engine, pwaId);
 		if (pwa?.publicationStatus !== 'PUBLISHED')
 			return fail(400, { error: 'Select a published PWA.' });
@@ -115,7 +121,13 @@ export const actions: Actions = {
 		registerUndertakingIntent(undertakingId, intentId);
 
 		// 3. Instantiate the bound PWA's composition tree (DR-002 W-3).
-		const instantiationError = instantiateComposition(undertakingId, intentId, pwaId, pwaVersion);
+		const instantiationError = instantiateComposition(
+			undertakingId,
+			intentId,
+			pwaId,
+			pwaVersion,
+			risk.profile
+		);
 		if (instantiationError) return fail(400, { error: instantiationError });
 		return { created: undertakingId };
 	}
@@ -143,7 +155,8 @@ function instantiateComposition(
 	undertakingId: string,
 	intentId: string,
 	pwaId: string,
-	pwaVersion: string
+	pwaVersion: string,
+	riskProfile: WorkRiskProfile
 ): string | null {
 	const engine = getEngine();
 	// Scope to the BOUND version: a PWU_TYPE binds to a versioned PWA (RPH-CON-009), so a republished PWA has two
@@ -215,17 +228,11 @@ function instantiateComposition(
 				assurancePolicyIds: Array.isArray(type.state.requiredAssurancePolicyIds)
 					? (type.state.requiredAssurancePolicyIds as string[])
 					: [],
-				// W-4 REPLACES THIS. It is the fabricated risk profile recorded as DR-002 finding F-D: five
-				// constants no professional chose, feeding the tier that selects assurance. W-3 does not remove it
-				// because removing it needs the authoring moment W-3 is what creates — but it does not extend the
-				// defect quietly either, and this comment is the disclosure.
-				riskProfile: {
-					consequence: 'MEDIUM',
-					uncertainty: 'MEDIUM',
-					irreversibility: 'MEDIUM',
-					securitySensitivity: 'MEDIUM',
-					regulatoryExposure: 'LOW'
-				}
+				// THE PROFESSIONAL'S JUDGEMENT, not a constant (DR-002 W-4 closing finding F-D). Every PWU this
+				// architecture instantiates carries the risk declared for the Undertaking, because they are all
+				// the same body of work; a per-PWU judgement is a real refinement and belongs to whoever shapes
+				// each PWU, not to a form that has never seen them.
+				riskProfile
 			}
 		};
 	});

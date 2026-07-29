@@ -6,6 +6,7 @@
 	import { getContext } from 'svelte';
 	import { toFlow } from '$lib/toFlow';
 	import { THEME_CONTEXT, type ThemeContext } from '$lib/theme';
+	import { RISK_DIMENSIONS, riskFieldName } from '$lib/authoring/riskProfile';
 	import type { PageData } from './$types';
 
 	let {
@@ -167,11 +168,27 @@
 						(the instance realizes that type — CON-009 ownership).
 					</p>
 					<form method="POST" action="?/proposePwu" use:enhance class="instform">
-						<select name="pwuTypeId" required>
+						<select name="pwuTypeId" aria-label="Select a PWU Type" required>
 							<option value="" disabled selected>Select a PWU Type…</option>
 							{#each data.pwuTypeOptions as o (o.id)}<option value={o.id}>{o.name}</option>{/each}
 						</select>
 						<input name="title" placeholder="Instance title (optional)" />
+						<!-- DR-002 W-4. Nothing preselected, for the reason recorded in `$lib/authoring/riskProfile`:
+						     a default is the fabricated constant with a different literal. -->
+						<fieldset class="risk">
+							<legend>Risk judgement for this PWU</legend>
+							{#each RISK_DIMENSIONS as d (d.field)}
+								<label>
+									<span>{d.label}</span>
+									<select name={riskFieldName(d.field)} aria-label={d.label} required>
+										<option value="" disabled selected>—</option>
+										{#each d.levels as level (level)}
+											<option value={level}>{level}</option>
+										{/each}
+									</select>
+								</label>
+							{/each}
+						</fieldset>
 						<button class="primary" type="submit">Instantiate PWU</button>
 					</form>
 				</div>

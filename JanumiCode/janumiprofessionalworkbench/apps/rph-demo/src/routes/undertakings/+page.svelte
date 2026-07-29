@@ -1,5 +1,6 @@
 <script lang="ts">
 	import { enhance } from '$app/forms';
+	import { RISK_DIMENSIONS, riskFieldName } from '$lib/authoring/riskProfile';
 	import type { PageData } from './$types';
 	let { data, form }: { data: PageData; form: { error?: string; created?: string } | null } =
 		$props();
@@ -25,12 +26,29 @@
 		<input name="name" placeholder="Undertaking name (e.g. Pilot Delivery Program)" required />
 		<input name="objective" placeholder="Objective" />
 		<input name="product" placeholder="Intended product" />
-		<select name="pwaId" required>
+		<select name="pwaId" aria-label="Instantiate from published PWA" required>
 			<option value="" disabled selected>Instantiate from published PWA…</option>
 			{#each data.pwaOptions as p (p.id)}
 				<option value={p.id}>{p.name} v{p.version}</option>
 			{/each}
 		</select>
+		<!-- DR-002 W-4. Every PWU this Undertaking instantiates carries this judgement. NOTHING is preselected:
+		     a default is the fabricated constant with a different literal, and it would be recorded as an answer
+		     to a question nobody asked the professional. `required` makes the browser refuse first. -->
+		<fieldset class="risk">
+			<legend>Risk judgement — selects the assurance profile for this Undertaking's work</legend>
+			{#each RISK_DIMENSIONS as d (d.field)}
+				<label>
+					<span>{d.label}</span>
+					<select name={riskFieldName(d.field)} aria-label={d.label} required>
+						<option value="" disabled selected>—</option>
+						{#each d.levels as level (level)}
+							<option value={level}>{level}</option>
+						{/each}
+					</select>
+				</label>
+			{/each}
+		</fieldset>
 		<button class="primary" type="submit">Create Undertaking</button>
 		{#if form?.error}<span class="err">{form.error}</span>{/if}
 	</form>
