@@ -113,9 +113,28 @@ function sentencesOf(text: string): { line: number; section: string; text: strin
 			return;
 		}
 		if (raw.trim() === '') return;
+		// ── TWO MORE THINGS THAT ARE NOT OBLIGATIONS OF THIS DOCUMENT (found 2026-07-29 by reading all 38) ──────
+		//
+		// (a) QUOTED MASTER TEXT. §3's invariants are built by quoting the governing rule from JCUX / RIWS / CPM
+		//     — `*"UI components SHALL issue semantic Commands."*` — and then stating THIS document's obligation
+		//     beneath it. The quotation is grounding, not a SHALL this specification owes a check for; the check
+		//     belongs to the invariant that cites it. Counting both double-counts the same rule and reports the
+		//     quotation as unbound forever, because a quotation can never carry a `*Verification:*`.
+		// (b) FORK OPTION TEXT outside §11. `NOT_OBLIGATIONS` already excludes §11's fork records for exactly this
+		//     reason — "Options: (a) SHALL …" is a decision record. FORK-18 lives in §2.9.5, so the section-based
+		//     exclusion misses it while the identical reasoning applies.
+		//
+		// Both are STRIPPED rather than skipped, so a line carrying a quotation AND this document's own obligation
+		// keeps the obligation. Neither is a heuristic for "looks unbound": a quotation is identifiable by its own
+		// markup, and an option line by the `*Options:*` marker the document uses for nothing else.
+		const line = raw
+			.replace(/\*"[^"]*"\*/g, ' ')
+			.replace(/\*Options:\*.*$/, ' ')
+			.replace(/^\s*\*\*FORK-\d+\b.*$/, ' ');
+		if (line.trim() === '') return;
 		// A table row is one obligation per cell-group, not one per line; treating the whole row as a unit is
 		// correct here because the binding that governs it is cited at the table head or in the row itself.
-		const parts = raw.startsWith('|') ? [raw] : raw.split(/(?<=[.!?])\s+(?=[A-Z*`])/);
+		const parts = line.startsWith('|') ? [line] : line.split(/(?<=[.!?])\s+(?=[A-Z*`])/);
 		for (const p of parts) out.push({ line: i + 1, section, text: p, para: paras[i] ?? -1 });
 	});
 	return out;
@@ -199,6 +218,34 @@ const WINDOW_FIXTURE = [
 	''
 ].join('\n');
 
+// ── AND THE TWO STRIPS, WHICH ARE THE EASIEST THING HERE TO TURN INTO GAMING ─────────────────────────────────
+//
+// Quoted-master and fork-option stripping REMOVE obligations from the denominator. That is the one kind of edit
+// that improves the headline without improving anything, so each strip is pinned to a fixture proving it removes
+// the thing it names AND leaves a real obligation on the same line standing. Without the second half, "strip
+// quotations" degrades into "strip lines containing quotation marks" and the count falls for free.
+const STRIP_FIXTURE = [
+	'### 4.4.4 Strip fixture',
+	'',
+	'**Master — RIWS §2** (`x:1-2`): *"A Surface SHALL do the quoted thing."* And this document SHALL do its own',
+	'thing. *Verification:* `SPEC-001-FX-99-01`.',
+	'',
+	'**FORK-99 — is it a SHALL or a SHOULD?** *Options:* (a) SHALL — everything; (b) SHOULD — less.',
+	''
+].join('\n');
+const stripped = measure(STRIP_FIXTURE);
+const stripFailures = [
+	// The quoted SHALL is gone; the document's own SHALL on the SAME LINE survives and is bound by its trailing
+	// *Verification:*. One row, bound.
+	stripped.length !== 1
+		? `strip: expected exactly 1 surviving obligation, got ${stripped.length} [${stripped.map((r) => r.text.slice(0, 30)).join(' | ')}]`
+		: '',
+	stripped.length === 1 && !stripped[0]!.bound ? 'strip: the surviving obligation must stay BOUND' : '',
+	stripped.length === 1 && /quoted thing/.test(stripped[0]!.text)
+		? 'strip: the QUOTED obligation survived — the quotation strip is not working'
+		: ''
+].filter((m) => m !== '');
+
 const windowed = measure(WINDOW_FIXTURE);
 const strictly = measure(WINDOW_FIXTURE, true);
 const boundIds = (rows: Row[]): string[] =>
@@ -220,9 +267,9 @@ const windowFailures = [
 		: ''
 ].filter((m) => m !== '');
 
-if (selftestFailures.length + windowFailures.length > 0) {
+if (selftestFailures.length + windowFailures.length + stripFailures.length > 0) {
 	console.error('SELFTEST FAILED — the counter cannot be trusted:');
-	for (const f of [...selftestFailures, ...windowFailures]) console.error(`  ${f}`);
+	for (const f of [...selftestFailures, ...windowFailures, ...stripFailures]) console.error(`  ${f}`);
 	process.exit(2);
 }
 

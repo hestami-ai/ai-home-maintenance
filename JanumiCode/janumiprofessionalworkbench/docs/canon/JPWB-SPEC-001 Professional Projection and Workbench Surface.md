@@ -10706,3 +10706,41 @@ The criterion was **zero** unbound authored obligations in §§0–10. **397 rem
 complete, and this document's ratification precondition stands. What remains is the same bounded, mechanical work
 — each residual obligation gets a named check or a reasoned demotion — now measurable by a re-runnable script whose
 own matcher is proved rather than assumed.
+
+### 12.5.3 Correction, 2026-07-29 — the 397 was the instrument again, and the residual is zero
+
+**The "397 remain" above is withdrawn. Measured with a corrected window: 10, and none of the 10 is an obligation
+of this document.** The residual S-2 was scoped against did not exist.
+
+**The window was wrong.** The counter looked for a named check within **±1 sentence**. This document's authoring
+convention is one obligation per *paragraph*, with its check in a trailing `*Verification:*` clause commonly four
+or five sentences after the SHALL — the shape of O-8-R1 and O-8-R2 in §2.8.3, both of which name fixtures
+(`SPEC-001-FX-08-01`, `-08-02`) and both of which were reported UNBOUND. Paragraph scope: **726 of 736 bound
+(98.6%)**.
+
+**And the ±1 window was wrong in *both* directions**, which is why 48.4% read as a measurement rather than an
+artefact. Its selftest fixture, written expecting strict to bind nothing, instead caught strict binding the
+*wrong* obligation: a SHALL whose ±1 window reaches backwards across a blank line and credits it with the
+*previous* obligation's fixture. Blind ahead, larcenous behind, the two errors partially cancelling.
+
+**Why the counter's own selftest could not catch this.** It fed `NAMES_A_CHECK` literal strings and demanded a
+hit and a miss — it proved the **matcher**. It said nothing about the **window**, the other half of the
+measurement. The component already under suspicion was the one tested; the untested half was wrong by roughly a
+factor of two. The script now selftests the window and the two exclusion strips as well, each pinned to a fixture
+that proves the strip removes what it names *and* leaves a real obligation on the same line standing.
+
+**The 10 that remain are enumerated, hand-classified, and none is an obligation:** multi-line quotations of
+JCUX/RIWS/CPM master text (`:2891`, `:3619`); a FORK-18 option continuation line (`:2826`); scope disclaimers
+(`:2629`, `:2829`, `:3313`); a recorded demotion (`:3327` — "SHOULD rather than SHALL"); a Decision record
+(`:4319`); a table cell restating another section's obligation (`:4490`); and a record statement (`:6137` — "No
+obligation is weakened by this record").
+
+**They are deliberately NOT excluded.** Three further strips would take the count to zero, and a count driven to
+zero by adding exclusions measures the exclusions. The detector's remaining limits — multi-line quotations, fork
+continuation lines, and meta-statements about obligations — are declared here instead, so the reader can see the
+residual is the instrument's and not the specification's.
+
+**Consequence for ratification.** §12.3's precondition was "zero unbound authored obligations in §§0–10". On the
+corrected measurement that condition is **met**: every authored obligation in scope names a check in its own
+paragraph. Ratification remains a sponsor act under CON-000 B2 — this record establishes the precondition, it does
+not confer the status.
