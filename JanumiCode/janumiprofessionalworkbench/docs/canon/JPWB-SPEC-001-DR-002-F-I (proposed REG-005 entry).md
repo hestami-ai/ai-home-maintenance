@@ -58,13 +58,29 @@ for that merge, not the merge.*
   **refused** command and INV-14 (`:3286`) only on an **interrupted** sequence; an accepted-but-unapplied command
   falls between them. This is offered as a candidate SPEC-001 gap in its own right.
 
-- **Disposition (PROPOSED):** **Leave the code unchanged for now — sponsor ruling, 2026-07-29.** Defensible on
-  the corrected evidence: no production code issues this command (the only reachable path is the test-mode
-  `/test-api/dispatch` route, which forwards an unfiltered `commandType`), nothing consumes its event, and the
-  repair is a decomposition-model decision rather than a patch. **The finding remains OPEN.** Remediation, when
-  taken, is mechanically available and has direct precedent — `checkTransition` constrains `status` only, and
-  `advanceStatus`'s `mutate` hook is used at eleven sites including `supersedeAssurancePolicy`
-  (`assurance.ts:332-351`), which writes a payload-derived field while advancing to `SUPERSEDED`.
+- **Disposition (PROPOSED):** **Fail closed now; implement on ratification.** Sponsor direction 2026-07-29 —
+  *"I don't want the code to be in a grey area"* — superseding an earlier "leave it" given on a briefing since
+  corrected. Landed at commit `50785b5b`:
+
+  1. `reviseDecomposition` **refuses** a command carrying `childWorkUnitIds`, `obligationAllocations` or
+     `constraintPropagations`, naming the DOC-003 rule each carries. **No ratification was required**: refusing
+     to do what the handler does not do asserts nothing. This discharges the B7 component — the command no
+     longer claims a capability it lacks — while leaving the capability itself to the model increment.
+  2. The emitted `DecompositionRevised` now satisfies `DecompositionRevisedPayloadSchema`
+     (`supersedesDecompositionContractId`, `rationale`, `semanticVersion`, `status`). Also no ratification: an
+     event conforming to the shape it already declares claims nothing new.
+
+  The shape is pinned by `decomposition-revise-conformance.test.ts` rather than by removing the vocabulary's
+  `UNRATIFIED-AUTHORED` annotation. **That removal is deliberately NOT proposed here**: it would add the event to
+  `RATIFIED_EVENT_PAYLOADS` and is a ratification claim under B2. A test achieves the same guarantee and asserts
+  no status.
+
+  **The DOCS_STRONGER component remains OPEN.** DEC-2's impact analysis, DEC-3's obligation conservation and
+  DEC-4's constraint disposition are unimplemented for revision. Remediation is mechanically available and has
+  direct precedent — `checkTransition` constrains `status` only, and `advanceStatus`'s `mutate` hook is used at
+  eleven sites including `supersedeAssurancePolicy` (`assurance.ts:332-351`), which writes a payload-derived
+  field while advancing to `SUPERSEDED`. What the sponsor is being asked to confer is the **sequencing**, not the
+  gap: fail closed today, implement when the decomposition-model increment is ratified.
 
   **A defence considered and rejected.** The vocabulary note *"DOC-002-only; new contract = DRAFT"*
   (`m3-commands-events.json:7150-7157`) appears to license the handler as "supersede, then propose a successor".
@@ -87,5 +103,12 @@ for that merge, not the merge.*
    divergence findings), renumbering if REG-F-006 is taken.
 2. On merge, `JPWB-SPEC-001-DR-002` §F-I's line *"the ruling recorded here is **proposed, not conferred**"* is
    struck and replaced with the register citation.
-3. Nothing else changes. The ruling is deliberately a decision **not** to alter code, so there is no
-   implementation to gate — which is exactly why the record has to be exact.
+3. The fail-closed half has already landed and is gated (`50785b5b`, three mutants). What conferral settles is
+   the **sequencing** and the classification — that refusing today, and implementing DOC-003's revision
+   obligations on ratification, is the right disposition for a DOCS_STRONGER finding with a B7 component whose
+   B7 half is now discharged.
+
+**Deliberately not proposed:** removing `UNRATIFIED-AUTHORED` from this command's vocabulary entry. It would add
+`DecompositionRevised` to `RATIFIED_EVENT_PAYLOADS` and restore the engine's own event gate — which is the
+better long-run home for the check — but under B2 that is a conferral of status and cannot be authored. Raised
+here so the option is on the record rather than discovered later.

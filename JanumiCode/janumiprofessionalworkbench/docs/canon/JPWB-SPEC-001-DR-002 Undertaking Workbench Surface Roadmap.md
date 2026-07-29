@@ -232,18 +232,32 @@ direct precedent.
 (`:3085`) obliges disclosure only *"when a Command issued from a Surface is refused"*, and INV-14 (`:3286`) fires
 only where a sequence *"is interrupted by a refusal"*. An accepted-but-unapplied command falls between them.
 
-**Disposition — SPONSOR RULING 2026-07-29: leave it. No code change.** Defensible on the corrected evidence:
-no production code issues this command, nothing consumes its event, and the repair is a model decision rather
-than a patch. **The finding stays OPEN.** It is not downgraded, because the gap is against operative ratified
-canon, and because CON-000 B7 requires an asserted-vs-performed gap to be *"escalated via REG-005 — never
-quietly documented around."* This roadmap section is not that escalation: see
-`JPWB-SPEC-001-DR-002-F-I (proposed REG-005 entry).md`, which under CON-000 B5 is what makes the ruling
-effective. Until it is merged, the ruling recorded here is **proposed, not conferred**.
+**Disposition — SPONSOR DIRECTION 2026-07-29: the code SHALL NOT sit in a grey area.** Superseding the earlier
+"leave it", which was given on the briefing corrected above. Resolved at commit `50785b5b` by two changes,
+**neither of which required a ratification decision**:
 
-**Nothing pins the behaviour the ruling preserves.** No test in the repository populates those three fields on
-this command, and none asserts on the emitted payload; the `emitted-event-conformance` control cannot see it,
-because its subject is `driveReferenceUndertaking`, which never issues `ReviseDecomposition`. So "leave it"
-currently means "leave it unobserved", and a future change to it would pass silently.
+1. **A revision carrying a field this handler cannot honour is REFUSED**, by name, citing the obligation each
+   carries. One never needs canon's permission to refuse to do what one does not do. This is B7 **discharged**
+   rather than deferred: the missing capability is now visible on every attempt instead of never.
+2. **The emitted event conforms to the payload schema it declares** — `supersedesDecompositionContractId`,
+   `rationale`, `semanticVersion`, `status`. Making an event match its own declared shape is likewise not a
+   model change.
+
+The shape is asserted in `decomposition-revise-conformance.test.ts` rather than by removing the vocabulary's
+`UNRATIFIED-AUTHORED` annotation, because removing it would add the event to `RATIFIED_EVENT_PAYLOADS` and
+**that is a ratification claim** — the sponsor's under B2, not the author's. A test buys the same guarantee and
+claims nothing.
+
+Three mutants, each proved by hand before recording: `FI-a` restores the acceptance; `FI-b` drops only the DEC-3
+carrier from the guard list — the likelier slip, because the headline case still refuses while obligation
+conservation goes on being silently unperformed; `FI-c` stops the event recording the status it transitions to.
+The CONTROL was already green before the guard was written, proving it could not simply be "refuse everything".
+
+**The finding remains OPEN as a CAPABILITY gap.** DOC-003's obligation conservation, constraint disposition and
+impact analysis are still unimplemented; that is a decomposition-model increment awaiting ratification. What
+changed is that the gap is **declared, refused and tested** rather than silent. CON-000 B7 still requires the
+escalation, and B5 still governs the record: see `JPWB-SPEC-001-DR-002-F-I (proposed REG-005 entry).md`.
+Conferral is the sponsor's act.
 
 ---
 
@@ -299,7 +313,7 @@ that lists only what landed reads as a claim that nothing else is outstanding.
 
 | | Status |
 |---|---|
-| **F-I** — `ReviseDecomposition` performs none of DOC-003's revision obligations | **OPEN.** Sponsor ruled *leave it* (no code change) 2026-07-29; ruling is **proposed, not conferred** until its REG-005 entry merges (CON-000 B5). |
+| **F-I** — DOC-003's revision obligations unimplemented | **OPEN as a capability gap**, no longer grey: the command now refuses what it cannot perform and its event conforms to its own schema (`50785b5b`). Implementation awaits ratification; the REG-005 entry awaits conferral (CON-000 B5). |
 | **S-2's 397 unbound obligations** in SPEC-001 §§0–10 | **OPEN.** W-3/W-4/W-5 made a portion bindable; that binding pass was not run. |
 | `ValidateDecomposition` passes **vacuously** | **OPEN.** Its conservation guard reads the parent's `obligationIds`/`constraintIds`; every surface path sets both `[]`. |
 | **SPEC-001 ratification** | Gated on S-2 reaching zero (CON-000 B2 — a sponsor act regardless). |
