@@ -2035,5 +2035,45 @@ export const DECLARED_MUTANTS: readonly DeclaredMutant[] = [
 		expectRed: ['packages/rph-projections/src/uncertainty-disclosure.test.ts'],
 		why: 'DR-002 W-5: retracting a recorded uncertainty is an act someone performs, never a fold order',
 		source: 'JPWB-SPEC-001-DR-002 W-5'
+	},
+	{
+		id: 'FI-a-an-unperformable-revision-is-accepted-again',
+		file: 'packages/rph-application/src/handlers/decomposition.ts',
+		// F-I ITSELF, restored. Before this guard, a revise carrying childWorkUnitIds returned ACCEPTED and the
+		// contract was untouched — the caller told the revision succeeded, with no way to learn the children were
+		// dropped. The capability remains unimplemented (DOC-003 DEC-2/3/4 is a model increment awaiting
+		// ratification); what this refuses to do is ASSERT it. CON-000 B7 discharged rather than deferred.
+		find: '	if (offered.length > 0) {',
+		replace: '\tif (false) { // MUTANT: accept a revision this handler cannot perform',
+		expectRed: ['packages/rph-application/src/handlers/decomposition-revise-conformance.test.ts'],
+		why: 'F-I: accepting a command you cannot perform is a false assertion, not a deferral',
+		source: 'JPWB-SPEC-001-DR-002 F-I'
+	},
+	{
+		id: 'FI-b-the-obligation-carrier-drops-out-of-the-guard',
+		file: 'packages/rph-application/src/handlers/decomposition.ts',
+		// NARROWER THAN FI-a, AND THE MORE LIKELY SLIP. A guard that caught only `childWorkUnitIds` would look
+		// complete — the headline case refuses — while obligation conservation went on being silently unperformed.
+		// DEC-3 is the rule whose whole subject is that mandatory obligations do not disappear quietly, so it is
+		// the one that must not fall out of the list unnoticed.
+		find: "	['obligationAllocations', 'DOC-003 DEC-3 — obligation conservation across a revision'],",
+		replace: '\t// MUTANT: the DEC-3 carrier is no longer refused',
+		expectRed: ['packages/rph-application/src/handlers/decomposition-revise-conformance.test.ts'],
+		why: 'F-I: a partial guard refuses the obvious field and leaves the obligation carrier silently dropped',
+		source: 'JPWB-SPEC-001-DR-002 F-I'
+	},
+	{
+		id: 'FI-c-the-event-stops-recording-what-it-supersedes',
+		file: 'packages/rph-application/src/handlers/decomposition.ts',
+		// THE AUDIT RECORD. `DecompositionRevised` is absent from RATIFIED_EVENT_PAYLOADS — its vocab entry is
+		// annotated UNRATIFIED-AUTHORED and `gen-messages` skips those — so the engine's own (d2) event gate never
+		// runs for it, and the emitted shape drifted from its own declared schema unobserved for as long as it has
+		// existed. This mutation restores that drift in its smallest form: the resulting status goes unrecorded.
+		// The conformance victim is the ONLY thing standing between this event and silence.
+		find: "\t\t\tstatus: String(next.status ?? '')",
+		replace: "\t\t\tstatus: '' // MUTANT: the resulting status is not recorded",
+		expectRed: ['packages/rph-application/src/handlers/decomposition-revise-conformance.test.ts'],
+		why: 'F-I: an audit record that omits the transition it records is not an audit record',
+		source: 'JPWB-SPEC-001-DR-002 F-I'
 	}
 ];

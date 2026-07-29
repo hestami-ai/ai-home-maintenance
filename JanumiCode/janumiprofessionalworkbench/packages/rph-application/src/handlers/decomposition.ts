@@ -274,8 +274,41 @@ export const validateDecomposition: CommandHandler = (ctx, command, payload) => 
 };
 
 /** ReviseDecomposition — supersede the prior contract (a revision creates a successor, DOC-002 §13.2). */
-export const reviseDecomposition: CommandHandler = (ctx, command) =>
-	advanceStatus(ctx, command, {
+/**
+ * The revision fields this handler CANNOT honour, and the DOC-003 rule each one carries.
+ *
+ * JPWB-SPEC-001-DR-002 F-I. `ReviseDecompositionPayloadSchema` declares all three, and they are precisely the
+ * carriers for DOC-003's revision obligations — DEC-3 (obligation conservation) and DEC-4 (constraint
+ * disposition), both of which SCOPE themselves to revision explicitly, plus DEC-2's impact analysis. This handler
+ * implements none of that: it advances status and bumps the semantic version.
+ *
+ * Implementing them is a decomposition-model increment awaiting ratification. ACCEPTING them meanwhile is not a
+ * deferral, it is a false assertion — the caller is told the revision succeeded and has no way to learn the
+ * children, allocations and dispositions were dropped. So they are REFUSED, by name, citing the obligation. A
+ * refusal to do what this handler does not do needs no ratification; it is CON-000 B7 discharged rather than
+ * deferred, and it makes the missing capability visible on every attempt instead of never.
+ */
+const UNHONOURED_REVISION_FIELDS: readonly (readonly [string, string])[] = [
+	['childWorkUnitIds', 'DOC-003 DEC-2 — a revised child set changes the parent claim and triggers impact analysis'],
+	['obligationAllocations', 'DOC-003 DEC-3 — obligation conservation across a revision'],
+	['constraintPropagations', 'DOC-003 DEC-4 — constraint disposition across a semantic revision']
+];
+
+export const reviseDecomposition: CommandHandler = (ctx, command, payload) => {
+	const p = (payload ?? {}) as Record<string, unknown>;
+	const offered = UNHONOURED_REVISION_FIELDS.filter(([field]) => p[field] !== undefined);
+	if (offered.length > 0) {
+		return reject(
+			command,
+			'RPH_VALIDATION_SEMANTIC_FAILED',
+			`ReviseDecomposition cannot perform a content revision: ${offered
+				.map(([field, rule]) => `${field} (${rule})`)
+				.join('; ')}. This command supersedes the contract and bumps its semantic version; it does not ` +
+				`apply a revised decomposition. Propose a new DecompositionContract for the parent instead. ` +
+				`(JPWB-SPEC-001-DR-002 F-I — the capability is declared on the payload and not yet implemented.)`
+		);
+	}
+	return advanceStatus(ctx, command, {
 		objectType: DECOMP,
 		statusField: 'status',
 		machine: 'DecompositionContract.status',
@@ -285,8 +318,21 @@ export const reviseDecomposition: CommandHandler = (ctx, command) =>
 		// A re-issue bumps semanticVersion, so an un-guarded re-revise would inflate the version with no real change.
 		precondition: fromStates('VALID', 'CONDITIONALLY_VALID', 'INVALID'),
 		eventType: 'DecompositionRevised',
-		bumpSemanticVersion: true
+		bumpSemanticVersion: true,
+		// F-I: emit the shape `DecompositionRevisedPayloadSchema` DECLARES. Without this builder `advanceStatus`
+		// defaults to the raw command payload, which failed that schema four ways — omitting the supersession id,
+		// the bumped version and the resulting status, which are the only facts this event exists to record. It
+		// went undetected because the event is absent from RATIFIED_EVENT_PAYLOADS (its vocab entry is annotated
+		// UNRATIFIED-AUTHORED, and `gen-messages` skips those), so the engine's own event gate never ran for it.
+		// `decomposition-revise-conformance.test.ts` asserts the shape instead — a test claims no ratification.
+		eventPayload: (next) => ({
+			supersedesDecompositionContractId: command.targetAggregateId,
+			rationale: String(p.rationale ?? ''),
+			semanticVersion: Number(next.semanticVersion ?? 0),
+			status: String(next.status ?? '')
+		})
 	});
+};
 
 /** ProposeRecomposition — mint a RecompositionContract in READY (parallel to ProposeDecomposition; WIRE-3a /
  *  §14 / WP-1-006). Before this existed the contract could never be instantiated, so BeginRecomposition and
