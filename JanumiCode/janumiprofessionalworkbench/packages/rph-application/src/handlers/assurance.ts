@@ -12,6 +12,7 @@ import {
 	type Identity,
 	type IndependenceRequirement
 } from '@janumipwb/rph-assurance';
+import { classifyEvidenceInvalidation, TraceGraph } from '@janumipwb/rph-domain';
 import type {
 	ActorReference,
 	AdmitEvidencePayload,
@@ -38,7 +39,8 @@ import {
 	newEnvelope,
 	nextEnvelope,
 	reject,
-	type CommandHandler
+	type CommandHandler,
+	type HandlerContext
 } from './kit.js';
 import { fromStates, noOpEditPrecondition, predicate } from './command-precondition.js';
 
@@ -483,7 +485,56 @@ export const admitEvidence: CommandHandler = (ctx, command, payload) => {
 	});
 };
 
-/** InvalidateEvidence — ADMISSIBLE -> INVALIDATED (P4: dependent claims are re-contested by the controller). */
+/**
+ * The SUPPORTS trace graph, folded from the event log.
+ *
+ * `StorageAdapter` exposes `loadObject(id)` and `readAllEvents()` and no list-by-type, so the SUPPORTS relation
+ * is read where it was recorded: `EvidenceProposed.supportsClaimIds`. Nodes are added before links because
+ * `TraceGraph.addLink` validates directionality only when it knows both endpoints' types — omitting them would
+ * silently skip the check that makes the graph trustworthy.
+ */
+function supportsGraph(ctx: HandlerContext): TraceGraph {
+	const graph = new TraceGraph();
+	for (const event of ctx.store.readAllEvents()) {
+		if (event.eventType !== 'EvidenceProposed') continue;
+		const payload = (event.payload ?? {}) as Record<string, unknown>;
+		const evidenceId = event.aggregateId;
+		const claimIds = Array.isArray(payload.supportsClaimIds)
+			? (payload.supportsClaimIds as unknown[]).filter((c): c is string => typeof c === 'string')
+			: [];
+		if (claimIds.length === 0) continue;
+		graph.addNode({ id: evidenceId, objectType: EVIDENCE });
+		for (const claimId of claimIds) {
+			graph.addNode({ id: claimId, objectType: CLAIM });
+			graph.addLink({
+				id: `${evidenceId}->${claimId}`,
+				relation: 'SUPPORTS',
+				from: evidenceId,
+				to: claimId
+			});
+		}
+	}
+	return graph;
+}
+
+/**
+ * InvalidateEvidence — ADMISSIBLE -> INVALIDATED, naming the claims the evidence was supporting.
+ *
+ * P4 / CT-10, and the last of the W1 hollow-kernel triage's five WIRE gaps. This used to advance the status and
+ * stop, behind a comment that delegated the rest: *"dependent claims are re-contested by the controller"*. No
+ * controller did it, so an invalidation left every claim it undermined exactly as supported as before — the
+ * silent-loss case CT-10 exists to forbid.
+ *
+ * `classifyEvidenceInvalidation` computes the answer and was reachable from nothing but its own tests;
+ * `EvidenceInvalidatedPayloadSchema` has always declared `affectedClaimIds` and nothing ever populated it. So
+ * this is wiring, not design: an existing adversarially-reviewed kernel gains the call site its declared output
+ * field was already waiting for.
+ *
+ * WHAT THIS DOES NOT DO, stated because the difference matters: it RECORDS the impact on the event. It does not
+ * mutate the claims. Re-contesting a claim is a controller act with its own authority and its own command, and
+ * inventing one here would be this repository's recurring defect — a handler performing an act nothing ratified.
+ * The disclosure is what CT-10 requires and what was missing.
+ */
 export const invalidateEvidence: CommandHandler = (ctx, command) =>
 	advanceStatus(ctx, command, {
 		objectType: EVIDENCE,
@@ -493,7 +544,17 @@ export const invalidateEvidence: CommandHandler = (ctx, command) =>
 		// JAN-CMDPRE DWP-03: single in-arrow to INVALIDATED, from ADMISSIBLE (Evidence.status). A re-issue against
 		// already-INVALIDATED evidence would append a second EvidenceInvalidated and re-trigger P4 claim re-contest.
 		precondition: fromStates('ADMISSIBLE'),
-		eventType: 'EvidenceInvalidated'
+		eventType: 'EvidenceInvalidated',
+		eventPayload: (next) => ({
+			invalidationReason: String(
+				((command.payload ?? {}) as Record<string, unknown>).invalidationReason ?? ''
+			),
+			affectedClaimIds: classifyEvidenceInvalidation(
+				supportsGraph(ctx),
+				command.targetAggregateId
+			).map((impact) => impact.objectId),
+			status: String(next.status ?? '')
+		})
 	});
 
 // ---- Claim ----

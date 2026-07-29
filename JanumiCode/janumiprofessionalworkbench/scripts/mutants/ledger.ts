@@ -2080,5 +2080,31 @@ export const DECLARED_MUTANTS: readonly DeclaredMutant[] = [
 		expectRed: ['packages/rph-application/src/handlers/decomposition-revise-conformance.test.ts'],
 		why: 'F-I: an audit record that omits the transition it records is not an audit record',
 		source: 'JPWB-SPEC-001-DR-002 F-I'
+	},
+	{
+		id: 'W4a-invalidated-evidence-names-no-claim',
+		file: 'packages/rph-application/src/handlers/assurance.ts',
+		// P4 / CT-10, and the last of the W1 triage's five WIRE gaps. Before the call site existed, invalidating
+		// evidence advanced its status and stopped — every claim it had been supporting stayed exactly as supported
+		// as before, which is the silent-loss case CT-10 forbids. The mutation restores that: the kernel is not
+		// consulted and the declared `affectedClaimIds` goes back to empty.
+		find: '			affectedClaimIds: classifyEvidenceInvalidation(',
+		replace: '\t\t\taffectedClaimIds: [] as string[], // MUTANT: the kernel is not consulted\n\t\t\t_unused: classifyEvidenceInvalidation(',
+		expectRed: ['packages/rph-application/src/handlers/evidence-invalidation-impact.test.ts'],
+		why: 'W1 WIRE #4: evidence that is withdrawn must re-contest what it was holding up, not leave it silently supported',
+		source: 'W1 hollow-kernel triage — WIRE #4'
+	},
+	{
+		id: 'W4b-only-the-first-supported-claim-is-named',
+		file: 'packages/rph-application/src/handlers/assurance.ts',
+		// THE NARROWER SLIP, and the likelier one. Reporting the FIRST supported claim satisfies "not silently
+		// supported" for the headline case and leaves every other claim exactly as silently supported as before —
+		// which is why the victim asserts on TWO claims rather than one. A single-claim fixture would have been
+		// green under this mutation.
+		find: '			).map((impact) => impact.objectId),',
+		replace: '\t\t\t).map((impact) => impact.objectId).slice(0, 1), // MUTANT: only the first',
+		expectRed: ['packages/rph-application/src/handlers/evidence-invalidation-impact.test.ts'],
+		why: 'W1 WIRE #4: a partial disclosure leaves the un-named claims exactly as unre-contested as no disclosure',
+		source: 'W1 hollow-kernel triage — WIRE #4'
 	}
 ];

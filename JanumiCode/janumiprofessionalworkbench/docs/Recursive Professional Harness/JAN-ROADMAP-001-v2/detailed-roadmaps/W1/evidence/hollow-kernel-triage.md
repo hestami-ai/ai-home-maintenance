@@ -95,3 +95,35 @@ Under the 2026-07-19 procedure change the coding agent resolved the material dec
 ## 5. Consequence for the W1 roadmap
 
 `JAN-W1-DR-001` DWP-003 (state machines) is **already CONFORMANT** (transition enforcement live via `classifyTransition`); its only WIRE items were presentation functions, now DEAD_BY_DESIGN. DWP-004/005/006/007 collapse to the **five** WIRE increments above. This is recorded as a route refinement (Standard §9, living roadmap) — the master W1 *outcomes* are unchanged; the *gap* is smaller and sharper than the census implied.
+
+---
+
+## 6. Closure status, re-verified 2026-07-29
+
+All five WIRE gaps are now closed. Four had already been wired by later increments without this record being
+updated — which is the same reporting failure the tracker gate (`verif/tracker-deferrals.test.ts`) was built to
+catch, arriving here instead of there.
+
+| # | Function | Production call site | Status |
+| --- | --- | --- | --- |
+| 1 | `validateObligationConservation` | `handlers/decomposition.ts:210` | CLOSED (pre-existing) |
+| 2 | `validateConstraintPropagation` | `handlers/decomposition.ts:211` | CLOSED (pre-existing) |
+| 3 | `evaluateRecomposition` | `handlers/decomposition.ts:467` | CLOSED (pre-existing) |
+| 4 | `classifyEvidenceInvalidation` | `handlers/assurance.ts` — `invalidateEvidence` | **CLOSED 2026-07-29**, red-first + two mutants |
+| 5 | `decisionAuthorizesVersions` | `handlers/governance.ts:652` | CLOSED (pre-existing) |
+
+**#4 was the last, and its shape is worth recording.** `EvidenceInvalidatedPayloadSchema` has always declared
+`affectedClaimIds`; nothing ever populated it, and the handler carried a comment delegating the work — *"dependent
+claims are re-contested by the controller"* — to a controller that does not exist. So an invalidation left every
+claim it undermined exactly as supported as before. That is a declared-not-performed field, the same shape as
+REG-005 REG-F-006, closed here by **wiring** rather than by refusal because the kernel that computes the value
+already existed and was adversarially reviewed.
+
+**What it does and does not do.** It RECORDS the impact on the event. It does not mutate the claims: re-contesting
+a claim is a controller act with its own authority and its own command, and inventing one in a handler would be
+the defect this programme keeps finding. The disclosure is what CT-10 requires and what was absent.
+
+**Two mutants, each proved by hand before recording.** `W4a` stops the kernel being consulted. `W4b` reports only
+the FIRST supported claim — the likelier slip, because it satisfies "not silently supported" for the headline case
+while leaving every other claim as silently supported as before. The victim asserts on TWO claims for that reason;
+a single-claim fixture would have been green under `W4b`.
