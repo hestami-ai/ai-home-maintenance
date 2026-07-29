@@ -95,10 +95,40 @@ test.describe('Undertaking Workbench — material uncertainty is disclosed (DR-0
 			'the seeded workbench mixes assessed and unassessed PWUs, and they must not render alike'
 		).toBeGreaterThan(1);
 
-		// O-8-R2: the count is reportable, so a surface that silently renders nothing FAILS rather than passing
-		// quietly. A region with no rows and a region that was never rendered look identical without it.
-		const reported = await page.locator('[data-disclosure-count]').first().getAttribute('data-disclosure-count');
+		// O-8-R2 (SHALL): "Absence of a disclosure SHALL be reportable, not merely undetectable … a conformance run
+		// SHALL [read the expected number] and SHALL fail when the count of rendered disclosures is less than that
+		// number."
+		//
+		// THE FIRST VERSION OF THIS ASSERTION DID NOT SATISFY THAT, and binding the obligation to it would have
+		// been the defect this whole document is about. It read the attribute and asserted `>= 0` — true of a
+		// region rendering nothing at all. The obligation requires the rendered count to be compared against an
+		// EXPECTED number derived independently, so a surface that silently discloses less than the engine holds
+		// FAILS. The expected number here is engine truth: the residual-uncertainty statements on completion
+		// events, scoped to this Undertaking's PWUs.
+		const snap = await introspect(request);
+		const owned = new Set(
+			snap.pwus.filter((p) => p.state.undertakingId === seededId).map((p) => p.id)
+		);
+		const expected = snap.events
+			.filter((e) => e.eventType === 'AssuranceAssessmentCompleted')
+			.flatMap((e) => {
+				const p = (e as { payload?: Record<string, unknown> }).payload ?? {};
+				const subjects = Array.isArray(p.subjectObjectIds) ? (p.subjectObjectIds as string[]) : [];
+				const residuals = Array.isArray(p.residualUncertainty)
+					? (p.residualUncertainty as string[])
+					: [];
+				return subjects.some((s) => owned.has(s)) ? residuals : [];
+			}).length;
+
+		const reported = await page
+			.locator('[data-disclosure-count]')
+			.first()
+			.getAttribute('data-disclosure-count');
 		expect(reported, 'the number of disclosures rendered must be reportable').not.toBeNull();
-		expect(Number(reported)).toBeGreaterThanOrEqual(0);
+		expect(expected, 'the engine must hold at least one, or the comparison proves nothing').toBeGreaterThan(0);
+		expect(
+			Number(reported),
+			'a Surface disclosing FEWER than the engine holds must fail this run, not pass quietly'
+		).toBe(expected);
 	});
 });

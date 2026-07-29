@@ -61,11 +61,52 @@ interface Row {
 	readonly text: string;
 }
 
+// ── THE SECOND DEFECT, FOUND 2026-07-29: THE WINDOW WAS WRONG, AND THE SELFTEST COULD NOT SEE IT ─────────────
+//
+// The header above describes a first counter that was wrong and wrongly trusted, and the selftest at the bottom
+// was the answer to it. That selftest exercises the MATCHER — it feeds `NAMES_A_CHECK` literal strings and
+// demands both a hit and a miss. It says NOTHING about the WINDOW, which is the other half of the measurement,
+// and the window was too narrow by roughly a factor of two.
+//
+// This document's authoring convention is one obligation per PARAGRAPH, with its check named in a
+// `*Verification:*` clause at the END of that paragraph — commonly four or five sentences after the SHALL:
+//
+//     **O-8-R1 (SHALL).** A Surface presenting a PWU SHALL disclose that PWU's material uncertainty. Restating
+//     the master in full … Cf. JCUX SCREEN-INV-006 … *Verification:* `SPEC-001-FX-08-01` seeds a PWU with …
+//
+// A +/-1 SENTENCE window cannot reach it. Measured: 48.4% bound at +/-1 sentence, 80.8% at paragraph scope. So
+// the "397 unbound" this script reported — quoted to the sponsor, written into a work-package brief, and used to
+// scope a roadmap — was substantially an artefact of the window, exactly as its predecessor's 509 was an artefact
+// of the matcher.
+//
+// THE WINDOW IS THEREFORE THE PARAGRAPH, and the selftest below now exercises it. Paragraph scope is not a
+// neutral choice and it errs the other way: a paragraph holding TWO obligations and ONE check binds both. That
+// over-count is declared rather than hidden — see `--strict`, which reports the +/-1 figure alongside, so the two
+// bracket the truth instead of one of them pretending to be it.
+function paragraphIndex(lines: readonly string[]): number[] {
+	const idx: number[] = [];
+	let n = 0;
+	let blank = true;
+	for (const line of lines) {
+		if (line.trim() === '') {
+			blank = true;
+			idx.push(-1);
+			continue;
+		}
+		if (blank) n += 1;
+		blank = false;
+		idx.push(n);
+	}
+	return idx;
+}
+
 /** Split into sentences WITHOUT discarding table rows — the first counter's second defect. */
-function sentencesOf(text: string): { line: number; section: string; text: string }[] {
-	const out: { line: number; section: string; text: string }[] = [];
+function sentencesOf(text: string): { line: number; section: string; text: string; para: number }[] {
+	const out: { line: number; section: string; text: string; para: number }[] = [];
 	let section = '(front matter)';
-	text.split('\n').forEach((raw, i) => {
+	const lines = text.split('\n');
+	const paras = paragraphIndex(lines);
+	lines.forEach((raw, i) => {
 		const heading = /^#{1,4}\s+(.*)$/.exec(raw);
 		if (heading) {
 			section = heading[1]!.trim();
@@ -75,13 +116,18 @@ function sentencesOf(text: string): { line: number; section: string; text: strin
 		// A table row is one obligation per cell-group, not one per line; treating the whole row as a unit is
 		// correct here because the binding that governs it is cited at the table head or in the row itself.
 		const parts = raw.startsWith('|') ? [raw] : raw.split(/(?<=[.!?])\s+(?=[A-Z*`])/);
-		for (const p of parts) out.push({ line: i + 1, section, text: p });
+		for (const p of parts) out.push({ line: i + 1, section, text: p, para: paras[i] ?? -1 });
 	});
 	return out;
 }
 
-function measure(text: string): Row[] {
+function measure(text: string, strict = false): Row[] {
 	const sentences = sentencesOf(text);
+	// The paragraph each sentence belongs to, joined once. This is the WINDOW — see the note above `paragraphIndex`
+	// for why +/-1 sentence was wrong and by how much.
+	const paragraphText = new Map<number, string>();
+	for (const s of sentences)
+		if (s.para >= 0) paragraphText.set(s.para, `${paragraphText.get(s.para) ?? ''} ${s.text}`);
 	// Exclusion LATCHES: §11 and §12 are the last two top-level sections, so once the walk enters one it never
 	// re-enters in-scope ground. Latching rather than re-testing each sentence is what makes the sub-sections
 	// (§11.4's twenty-seven ruling records, §12.5's tables) inherit their parent's exclusion without listing them.
@@ -95,7 +141,13 @@ function measure(text: string): Row[] {
 		// obligation of this document.
 		const bare = s.text.replace(/`[^`]*`/g, '');
 		if (!/\bSHALL\b/.test(bare)) continue;
-		const window = [sentences[i - 1]?.text ?? '', s.text, sentences[i + 1]?.text ?? ''].join(' ');
+		// `--strict` keeps the OLD +/-1 sentence window, deliberately retained rather than deleted: paragraph scope
+		// over-binds where one paragraph carries two obligations and one check, and +/-1 under-binds wherever the
+		// `*Verification:*` clause trails. Reporting both BRACKETS the truth; reporting either alone is what put a
+		// wrong number into a roadmap twice.
+		const window = strict
+			? [sentences[i - 1]?.text ?? '', s.text, sentences[i + 1]?.text ?? ''].join(' ')
+			: (paragraphText.get(s.para) ?? s.text);
 		rows.push({
 			line: s.line,
 			section: s.section,
@@ -128,16 +180,57 @@ const selftestFailures = [
 		(s) => `should NOT match but did: ${s}`
 	)
 ];
-if (selftestFailures.length > 0) {
+// ── AND THE WINDOW, WHICH THE MATCHER SELFTEST ABOVE NEVER TOUCHED ───────────────────────────────────────────
+//
+// The matcher selftest was written as the answer to a counter that was wrong. It proved one half of the
+// measurement and left the other half — HOW FAR the counter looks for the check — completely unexercised. That
+// half was wrong by roughly a factor of two, and nothing here could have told anyone. A selftest that validates
+// the component you were already thinking about is the easiest kind to write and the least useful.
+//
+// This exercises the window on a fixture with the document's real shape: a SHALL whose `*Verification:*` clause
+// trails four sentences later, in the same paragraph.
+const WINDOW_FIXTURE = [
+	'### 2.9.9 Fixture section',
+	'',
+	'**O-9-R1 (SHALL).** A Surface SHALL do the thing. Restating the master in full — CON-000 AX-3.',
+	'Cf. some other document. And another clause entirely. *Verification:* `SPEC-001-FX-09-01` seeds a fixture.',
+	'',
+	'**O-9-R2 (SHALL).** A Surface SHALL do a second thing, and nothing anywhere names a check for it.',
+	''
+].join('\n');
+
+const windowed = measure(WINDOW_FIXTURE);
+const strictly = measure(WINDOW_FIXTURE, true);
+const boundIds = (rows: Row[]): string[] =>
+	rows.filter((r) => r.bound).map((r) => /O-9-R\d/.exec(r.text)?.[0] ?? r.text.slice(0, 20));
+
+// THE FIXTURE PROVED MORE THAN IT WAS BUILT TO. It was written expecting strict to bind NOTHING — the trailing
+// `*Verification:*` being out of reach. Strict binds ONE, and it is the WRONG ONE: O-9-R2, whose +/-1 window
+// reaches BACKWARDS across the blank line into O-9-R1's check. So the old window was defective in both
+// directions at once — blind to a check four sentences ahead, and crediting an obligation with the *previous*
+// obligation's fixture. Those two errors partially cancel in aggregate, which is precisely why 48.4% looked like
+// a measurement rather than an artefact.
+const windowFailures = [
+	boundIds(windowed).join(',') !== 'O-9-R1'
+		? `paragraph window: expected only O-9-R1 bound, got [${boundIds(windowed).join(',')}]`
+		: '',
+	windowed.length !== 2 ? `paragraph window: expected 2 obligations, got ${windowed.length}` : '',
+	boundIds(strictly).join(',') !== 'O-9-R2'
+		? `strict window: expected it to MISS O-9-R1 and wrongly bind O-9-R2, got [${boundIds(strictly).join(',')}]`
+		: ''
+].filter((m) => m !== '');
+
+if (selftestFailures.length + windowFailures.length > 0) {
 	console.error('SELFTEST FAILED — the counter cannot be trusted:');
-	for (const f of selftestFailures) console.error(`  ${f}`);
+	for (const f of [...selftestFailures, ...windowFailures]) console.error(`  ${f}`);
 	process.exit(2);
 }
 
 // An explicit path lets the same instrument be pointed at an OLDER revision (`git show HEAD:… > /tmp/x.md`), which
 // is the only way a before/after claim about this document can be re-derived rather than remembered.
 const target = process.argv[2] && !process.argv[2].startsWith('--') ? process.argv[2] : SPEC;
-const rows = measure(readFileSync(target, 'utf8'));
+const STRICT = process.argv.includes('--strict');
+const rows = measure(readFileSync(target, 'utf8'), STRICT);
 const inScope = rows.filter((r) => r.inScope);
 const bound = inScope.filter((r) => r.bound).length;
 const excluded = rows.length - inScope.length;
@@ -147,7 +240,7 @@ console.log(`normative SHALL/SHALL NOT sentences: ${rows.length}`);
 console.log(`  EXCLUDED as settled records (§11 forks, §12 review): ${excluded}`);
 console.log(`  IN SCOPE: ${inScope.length}`);
 console.log(
-	`    BOUND (a check named within +/-1 sentence): ${bound} (${((bound / inScope.length) * 100).toFixed(1)}%)`
+	`    BOUND (a check named ${STRICT ? 'within +/-1 sentence — THE DEFECTIVE WINDOW, see the note on paragraphIndex' : 'in the same paragraph'}): ${bound} (${((bound / inScope.length) * 100).toFixed(1)}%)`
 );
 console.log(`    UNBOUND: ${inScope.length - bound}`);
 
