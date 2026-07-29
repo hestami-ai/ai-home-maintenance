@@ -282,7 +282,16 @@ export const validateDecomposition: CommandHandler = (ctx, command, payload) => 
  * disposition), both of which SCOPE themselves to revision explicitly, plus DEC-2's impact analysis. This handler
  * implements none of that: it advances status and bumps the semantic version.
  *
- * Implementing them is a decomposition-model increment awaiting ratification. ACCEPTING them meanwhile is not a
+ * IMPLEMENTING THEM IS WIRING, NOT NEW DOMAIN LOGIC, AND IT IS SCHEDULED NOWHERE. The kernel exists and is
+ * adversarially reviewed under M9 — `validateObligationConservation` and `validateConstraintPropagation` in
+ * `@janumipwb/rph-domain`, which `validateDecomposition` already calls a hundred lines below (`:210-211`). The
+ * revise path is a second call site nobody wired: the tracker defers it M9 → "M10/M11" → "M11/M13" → "M13" →
+ * "live-command-drive handlers deferred", every station ✅, and no milestone holds it now. Nor is a ratification
+ * evidently required: DOC-003 is OPERATIVE and already binds revision, so the semantics are settled. (An earlier
+ * version of this comment said it "awaits a decomposition-model increment awaiting ratification" — a phrase that
+ * named no plan item and invented a governance blocker. REG-F-006 carries the correction.)
+ *
+ * ACCEPTING the fields meanwhile is not a
  * deferral, it is a false assertion — the caller is told the revision succeeded and has no way to learn the
  * children, allocations and dispositions were dropped. So they are REFUSED, by name, citing the obligation. A
  * refusal to do what this handler does not do needs no ratification; it is CON-000 B7 discharged rather than

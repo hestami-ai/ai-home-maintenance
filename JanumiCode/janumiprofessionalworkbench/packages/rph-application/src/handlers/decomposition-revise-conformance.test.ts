@@ -11,9 +11,15 @@
 // requirements (the version bump). Runtime-verified before this file existed: a revise carrying all four fields
 // returned ACCEPTED with the aggregate's childWorkUnitIds unchanged and both allocation arrays still [].
 //
-// THE CAPABILITY IS STILL NOT IMPLEMENTED, AND THAT IS DELIBERATE — implementing DOC-003's conservation,
-// disposition and impact analysis is a decomposition-model decision awaiting ratification, not a patch. What is
-// NOT deliberate is asserting the capability while not performing it, which is CON-000 B7. So:
+// THE CAPABILITY IS STILL NOT IMPLEMENTED, AND IT IS SCHEDULED NOWHERE. The kernel exists —
+// `validateObligationConservation` / `validateConstraintPropagation` in `@janumipwb/rph-domain`, adversarially
+// reviewed under M9, and already called by `validateDecomposition` (decomposition.ts:210-211). The revise path
+// is a second call site nobody wired; the tracker defers it M9 → M10/M11 → M11/M13 → M13 → "deferred", every
+// station ✅. Nor is a ratification evidently required: DOC-003 is OPERATIVE and already binds revision. See
+// REG-005 REG-F-006 — an earlier wording called this "a decomposition-model decision awaiting ratification",
+// which named no plan item and invented a blocker.
+//
+// What is NOT deferred is asserting the capability while not performing it, which is CON-000 B7. So:
 //
 //   1. a revise carrying fields the handler cannot honour is REFUSED, naming why;
 //   2. the emitted event conforms to its OWN declared payload schema.

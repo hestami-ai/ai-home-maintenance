@@ -262,8 +262,23 @@ carrier from the guard list — the likelier slip, because the headline case sti
 conservation goes on being silently unperformed; `FI-c` stops the event recording the status it transitions to.
 The CONTROL was already green before the guard was written, proving it could not simply be "refuse everything".
 
-**The finding remains OPEN as a CAPABILITY gap.** DOC-003's obligation conservation, constraint disposition and
-impact analysis are still unimplemented; that is a decomposition-model increment awaiting ratification. What
+**The finding remains OPEN as a CAPABILITY gap — and UNSCHEDULED, which the first wording of this section hid.**
+It said the remainder awaited "a decomposition-model increment awaiting ratification". That named nothing: no
+such item exists in any plan, the phrase was coined here, and it put a governance blocker in front of work that
+appears to need only scheduling — DOC-003 is OPERATIVE and already binds revision, so the semantics are settled.
+
+**The kernel is already built.** `rph-domain/src/decomposition.ts` exports `validateObligationConservation`
+(`:62`) and `validateConstraintPropagation` (`:165`), both adversarially reviewed under milestone M9, and
+`validateDecomposition` already calls them (`rph-application/src/handlers/decomposition.ts:210-211`). The revise
+path is a **second call site nobody wired**.
+
+**How it went missing is the part worth keeping.** The tracker defers that wiring forward four times, every
+station marked ✅ — M9 *"commands/BINDINGS wiring → M10/M11"*, M10 *"command handlers → M11/M13"*, M11
+*"… command handlers … → M13"*, M13 *"✅ core … live-command-drive handlers deferred"*. It fell off the end of
+its own chain, and no milestone holds it now. That is this repository's already-measured pathology — *74% of the
+kernel dead in production* — arriving through deferral notes instead of through code.
+
+DOC-003's obligation conservation, constraint disposition and impact analysis are still unimplemented. What
 changed is that the gap is **declared, refused and enforced** rather than silent.
 
 **CONFERRED 2026-07-29 — the finding now lives in the register as `JPWB-REG-005` §REG-F-006**, which is the
@@ -326,7 +341,7 @@ that lists only what landed reads as a claim that nothing else is outstanding.
 
 | | Status |
 |---|---|
-| **F-I** — DOC-003's revision obligations unimplemented | **OPEN as a capability gap**, conferred to the register as **REG-F-006** (2026-07-29). No longer grey: the command refuses what it cannot perform, and its event payload is ratified and engine-enforced. DOCS_STRONGER remediation awaits the decomposition-model increment. |
+| **F-I** — DOC-003's revision obligations unimplemented | **OPEN as a capability gap**, conferred to the register as **REG-F-006** (2026-07-29). No longer grey: the command refuses what it cannot perform, and its event payload is ratified and engine-enforced. DOCS_STRONGER remediation is **unscheduled**: the M9 conservation kernel exists and `validateDecomposition` already calls it; the revise path is a second call site no milestone still holds. |
 | **S-2's 397 unbound obligations** in SPEC-001 §§0–10 | **OPEN.** W-3/W-4/W-5 made a portion bindable; that binding pass was not run. |
 | `ValidateDecomposition` passes **vacuously** | **OPEN.** Its conservation guard reads the parent's `obligationIds`/`constraintIds`; every surface path sets both `[]`. |
 | **SPEC-001 ratification** | Gated on S-2 reaching zero (CON-000 B2 — a sponsor act regardless). |
