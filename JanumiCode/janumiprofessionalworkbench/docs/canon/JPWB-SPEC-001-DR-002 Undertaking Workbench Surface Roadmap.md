@@ -196,6 +196,42 @@ surface.
 
 ---
 
+## 1a. Status — ALL FIVE LANDED, 2026-07-28
+
+| WP | Commit | Gate |
+|---|---|---|
+| **W-1** the workbench scrolls | `5701ce68` | green |
+| **W-2** durable persistence | `b51e8ef4` | green |
+| **W-3** the PWA instantiates | `ec95a520` | green |
+| **W-4** the risk profile is authored | `602f8d3c` | green |
+| **W-5** the disclosure plane | `42e80883` | green |
+
+Final gate: **148 ledger entries → 134 distinct mutations, KILLED 128, SURVIVED 0, UNANCHORED 0, NO_COMPILE 0,
+KILLED_UNNAMED 0, ABORTED_DIRTY 0, CONTROL_HELD 4.** 1,976 unit tests, 65 e2e. Coverage 95.28 / 83.70 / 97.03 /
+97.19 against ratcheted floors of 95 / 83 / 96.5 / 97.
+
+**The programme's own recurring finding recurred four more times, and every instance was caught by an
+arrangement assertion or a mutant rather than by review.** Recorded here because the *pattern* is the deliverable:
+
+1. **W-1** — the probe measured `main .content`, passed pre-fix, and broke **on the fix**, because the scrollport
+   moves into the page when the page starts owning it. An arrangement assertion that holds in only one of the two
+   states is a defect assertion wearing the wrong label.
+2. **W-2** — a mutant I predicted would redden did not: the seed guard is redundant because command idempotency
+   already prevents the double-seed. Not recorded, per V-3d. What replaced it was an obligation sitting in the
+   engine's own doc comment (`recoverOutbox` — "a durable host SHALL call this at startup"), unmet because nothing
+   had been durable before.
+3. **W-4** — the control drove the browser form and passed **only because `required` stopped the submit**. The
+   server-side refusal never executed, so a one-token mutation (`?? 'MEDIUM'`) would have survived behind green.
+4. **W-5** — the natural data source, `AssuranceAssessment.residualUncertainty`, is always `[]`, and the kernel
+   already recorded that *"the object's `[]` is SILENCE, not a finding of 'none'"*. Reading it would have hardcoded
+   O-8-R7's defect into the component built to satisfy O-8-R7.
+
+**Two findings were withdrawn or corrected before any code was written** — F-B (the nine "unreachable" actions were
+reachable) and the whole of W-3's original design (`ProposeDecomposition` does not instantiate). Both had been
+authored by inference from names rather than from implementations.
+
+---
+
 ## 2. Land order
 
 | WP | Title | Discharges | Why here |
