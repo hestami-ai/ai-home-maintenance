@@ -520,6 +520,38 @@
 			{/if}
 		</div>
 	{:else if tab === 'assurance'}
+		<!-- DR-002 W-5 — SPEC-001 O-8-R1: "A Surface presenting a PWU SHALL disclose that PWU's material
+		     uncertainty." Three states, and collapsing any two of them is O-8-R7: "not yet assessed" is SILENCE,
+		     "none declared" is a validator's FINDING, and only the second means anything was settled. The count is
+		     exposed for O-8-R2 — "absence of a disclosure SHALL be reportable, not merely undetectable" — so a
+		     region that silently renders nothing can be caught rather than read as "nothing to report". -->
+		<div class="panel">
+			<h2>Material uncertainty</h2>
+			<p class="hint">
+				What the assurance left unresolved, per PWU. <b>Not yet assessed</b> means nobody has looked;
+				<b>none declared</b> means a validator looked and recorded nothing outstanding. They are different
+				facts and are never shown alike.
+			</p>
+			<div class="disclosures" data-disclosure-count={data.disclosures.reduce((n, d) => n + d.disclosedCount, 0)}>
+				{#each data.disclosures as d (d.subjectId)}
+					<div class="disclosure" data-disclosure={d.state}>
+						<span class="dtitle">{pwuTitleById.get(d.subjectId) ?? d.subjectId}</span>
+						{#if d.state === 'DECLARED'}
+							<ul>
+								{#each d.statements as s, i (`${d.subjectId}-${i}`)}<li>{s}</li>{/each}
+							</ul>
+						{:else if d.state === 'NONE_DECLARED'}
+							<span class="dnone">No residual uncertainty declared</span>
+						{:else}
+							<span class="dunknown">Not yet assessed</span>
+						{/if}
+					</div>
+				{/each}
+				{#if !data.disclosures.length}
+					<p class="dim">This Undertaking owns no PWUs to disclose against.</p>
+				{/if}
+			</div>
+		</div>
 		<div class="panel">
 			<h2>Assurance — §38 Assurance Workbench</h2>
 			<p class="hint">

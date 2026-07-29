@@ -2002,5 +2002,38 @@ export const DECLARED_MUTANTS: readonly DeclaredMutant[] = [
 		expectRed: ['apps/rph-demo/e2e/risk-profile-authored.e2e.ts'],
 		why: 'DR-002 W-4: absent a judgement the work is refused, because a default is the same defect with a different literal',
 		source: 'JPWB-SPEC-001-DR-002 W-4'
+	},
+	{
+		id: 'W5-a-silence-is-reported-as-a-finding-of-none',
+		file: 'packages/rph-projections/src/uncertainty-disclosure.ts',
+		// O-8-R7: a Surface SHALL NOT present incomplete professional understanding as settled. This mutation makes
+		// every subject read NONE_DECLARED — so a PWU nobody has assessed announces that a validator looked and
+		// found nothing outstanding. It is the single most plausible way to get this component wrong, because the
+		// two states differ in NO rendered statement: both show an empty list.
+		//
+		// It is also the mistake W-5 nearly shipped. The first design read `AssuranceAssessment.residualUncertainty`
+		// from the object store, which is `[]` for every assessment ever made — the assurance handler records that
+		// "the object's [] is SILENCE, not a finding of 'none'", and reconciling it is the §32 increment. Reading
+		// it would have hardcoded exactly this mutation into the design.
+		find: "	return hasAssessment ? 'NONE_DECLARED' : 'UNASSESSED';",
+		replace: "\treturn 'NONE_DECLARED'; // MUTANT: unassessed work reports a finding of none",
+		expectRed: ['packages/rph-projections/src/uncertainty-disclosure.test.ts'],
+		why: 'DR-002 W-5: "nobody looked" and "someone looked and found nothing" are different facts about the work',
+		source: 'JPWB-SPEC-001-DR-002 W-5'
+	},
+	{
+		id: 'W5-b-a-later-clean-assessment-erases-an-earlier-finding',
+		file: 'packages/rph-projections/src/uncertainty-disclosure.ts',
+		// A DISCLOSURE MUST NOT BE RETRACTED BY ORDERING. Folding residuals as "the last completion wins" would let
+		// a subsequent clean assessment silently delete an unresolved finding — a retraction nobody made, arriving
+		// as a side effect of event order. The mutation replaces accumulation with last-write-wins.
+		//
+		// Deliberately NOT a mutation of the count: `disclosedCount` follows `statements`, so attacking the count
+		// alone would prove only that one derives from the other.
+		find: '			if (existing) existing.push(...residuals);',
+		replace: '\t\t\tif (existing) bySubject.set(subject, [...residuals]); // MUTANT: last completion wins',
+		expectRed: ['packages/rph-projections/src/uncertainty-disclosure.test.ts'],
+		why: 'DR-002 W-5: retracting a recorded uncertainty is an act someone performs, never a fold order',
+		source: 'JPWB-SPEC-001-DR-002 W-5'
 	}
 ];

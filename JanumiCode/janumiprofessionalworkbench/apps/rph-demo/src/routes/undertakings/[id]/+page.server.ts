@@ -20,6 +20,7 @@ import {
 import {
 	buildApplicablePolicies,
 	buildAssuranceView,
+	uncertaintyDisclosures,
 	conditionEvaluatorFor,
 	type ExecutionAttemptView,
 	executionAttempts,
@@ -264,6 +265,16 @@ export const load: PageServerLoad = ({ params }) => {
 	// `QueryScope` records why that difference is the whole repair.
 	const undertakingScope = { kind: 'UNDERTAKING', undertakingId: params.id } as const;
 	const view = buildAssuranceView(engine.readAllEvents());
+	// DR-002 W-5 — the uncertainty disclosure, derived from the EVENT LOG and deliberately not from the assessment
+	// object. `AssuranceAssessment.residualUncertainty` exists and is always `[]`: the assurance handler records
+	// that "the object's [] is SILENCE, not a finding of 'none'", and reconciling it is the §32 increment. Reading
+	// the object here would render silence as a professional's finding of none — O-8-R7, committed by the very
+	// component built to satisfy it. Measured on the reference seed: 0 statements on objects, 1 across 32
+	// completion events.
+	const disclosures = uncertaintyDisclosures(
+		engine.readAllEvents(),
+		pwus.map((p) => p.id)
+	);
 	const assessments = listAssessments(engine, undertakingScope).map((a) => {
 		const v = view.assessments[a.id];
 		return {
@@ -430,6 +441,7 @@ export const load: PageServerLoad = ({ params }) => {
 		attemptsByStepId,
 		sequence,
 		assessments,
+		disclosures,
 		applicablePolicies,
 		observations,
 		decisions,
