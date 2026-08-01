@@ -56,6 +56,12 @@ const COVERED_BY_ID: Readonly<Record<string, string>> = {
 	'RPH-EXE-005': 'packages/rph-application/src/handlers/capbind-wp3-input-readiness.test.ts',
 	'RPH-EXE-006': 'packages/rph-application/src/handlers/execution-exe006-explicit-result.test.ts',
 	'RPH-EXE-008': 'packages/rph-application/src/handlers/execution-retry-cap.test.ts',
+	// The RPH-EVD tranche (2026-08-01). REQUIRED per-id, for the reason recorded on RPH-EXE-005 above: without a
+	// row here `coverageFor` falls back to COVERAGE_BY_PREFIX['RPH-EVD'], whose testFile is in rph-assurance —
+	// PURE_KERNEL — and the layer gate correctly reddens a command refusal citing pure-predicate evidence. Only
+	// EVD-007 appears: it is the only rule of the seven the register disposes as ENFORCED, and a per-id COVERED
+	// row for any of the other six would collide with the register's "no disclosed rule is certified COVERED" gate.
+	'RPH-EVD-007': 'packages/rph-application/src/handlers/evidence-admissibility-gate.test.ts',
 	'RPH-PER-001': 'packages/rph-persistence/src/sqlite-storage-adapter.test.ts',
 	'RPH-PER-002': 'packages/rph-persistence/src/sqlite-storage-adapter.test.ts',
 	'RPH-PER-007': 'packages/rph-projections/src/work-projection.test.ts',
@@ -157,7 +163,13 @@ const COVERAGE_BY_PREFIX: Readonly<Record<string, Coverage>> = {
 	'RPH-EVD': {
 		status: 'PARTIAL',
 		testFile: 'packages/rph-assurance/src/assurance-rules.test.ts',
-		note: 'evidence admissibility gate (EVD-003/004/007) asserted; EVD-001/002/006 and the EVD-005 cascade pending'
+		// NOTE CORRECTED 2026-08-01 by the enforcement-register RPH-EVD tranche, and the old text was wrong in both
+		// directions — which is why the register exists. It claimed "EVD-003/004 asserted" on the strength of a
+		// PURE_KERNEL predicate test; both are now dispositioned UNENFORCED_DISCLOSED and OBSERVED being admitted
+		// through a live dispatch. It also claimed "the EVD-005 cascade pending", which JAN-EXECREM WIRE #4 had
+		// already closed to the extent the rule permits (the impact is recorded on the event; the state changes the
+		// rule names are command-unreachable). Per-family status stays PARTIAL: only EVD-007 is enforced.
+		note: 'EVD-007 (admission evaluates the evidence) ENFORCED and cited by id above; EVD-001/003/004 are dispositioned UNENFORCED_DISCLOSED in enforcement-register.ts with observed admissions; EVD-002/005/006 are NOT_A_COMMAND_REFUSAL there. The kernel predicate is asserted here; the enforcement question is answered in the register, not by this row.'
 	},
 	'RPH-TRC': {
 		status: 'PARTIAL',

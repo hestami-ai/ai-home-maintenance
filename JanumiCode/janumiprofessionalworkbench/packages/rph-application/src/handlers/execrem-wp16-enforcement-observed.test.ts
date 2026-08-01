@@ -430,6 +430,65 @@ describe('JAN-EXECREM WP-16 (c) — the enforcement register is OBSERVED, not as
 				seedPwuWorkLifecycleState_FIXTURE(store, PWU, 'BASELINED');
 				return { control, observed: start(2) };
 			}
+		},
+
+		// ── THE RPH-EVD FAMILY (2026-08-01) ────────────────────────────────────────────────────────────────────
+		// Six of the seven are not ENFORCED, so they are `null` here BY TYPE — the map is a total Record, and the
+		// gate below rejects both a missing probe for an ENFORCED row and a probe for a row that is not.
+		// The three disclosed rows are observed being ADMITTED instead, in `evd-disclosure-observed.test.ts`.
+		'RPH-EVD-001': null,
+		'RPH-EVD-002': null,
+		'RPH-EVD-003': null,
+		'RPH-EVD-004': null,
+		'RPH-EVD-005': null,
+		'RPH-EVD-006': null,
+		'RPH-EVD-007': {
+			arrangement:
+				"Evidence proposed with an unstated scope (''), then admitted — the admission must evaluate the evidence rather than advance its status",
+			run: () => {
+				// THE CONTROL IS A SECOND AGGREGATE, not the same one admitted twice: AdmitEvidence's precondition is
+				// `fromStates('PROPOSED')`, so re-admitting the control evidence would be refused by the PRECONDITION
+				// and the probe would be measuring the wrong guard entirely.
+				const propose = (evId: string, scope: string) =>
+					ok(
+						dispatch(
+							'ProposeEvidence',
+							{
+								evidenceId: evId,
+								evidenceType: 'TEST_RESULT',
+								contentReference: { uri: 'file://report.xml' },
+								producedBy: { actorId: 'ci-1', actorType: 'SERVICE', displayName: 'CI' },
+								supportsClaimIds: [],
+								contradictsClaimIds: [],
+								scope,
+								limitations: [],
+								capturedAt: TS
+							},
+							evId,
+							'EVIDENCE'
+						),
+						`propose ${evId}`
+					);
+				const admit = (evId: string) =>
+					dispatch(
+						'AdmitEvidence',
+						{
+							admissibilityAssessmentId: 'asm_01ARZ3NDEKTSV4RRFFQ69G5F01',
+							admittedScope: 'unit tests for module X',
+							admittedClaimIds: []
+						},
+						evId,
+						'EVIDENCE'
+					);
+
+				const EV_OK = 'evd_01ARZ3NDEKTSV4RRFFQ69G5FD1';
+				const EV_BAD = 'evd_01ARZ3NDEKTSV4RRFFQ69G5FC1';
+				propose(EV_OK, 'unit tests for module X');
+				propose(EV_BAD, '');
+				// The control admits WELL-SCOPED evidence — so a guard that refused every admission cannot pass this
+				// row, which is the failure mode an "is it refused?" assertion alone would certify as success.
+				return { control: admit(EV_OK), observed: admit(EV_BAD) };
+			}
 		}
 	};
 

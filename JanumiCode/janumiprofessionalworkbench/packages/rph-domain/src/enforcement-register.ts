@@ -26,12 +26,19 @@
 //   NOT_A_COMMAND_REFUSAL  the statement asserts an outcome, a permission, or a plane that does not exist. A
 //                          declared silence with a reason, so it is distinguishable from an omission.
 //
-// SCOPE, DERIVED RATHER THAN CHOSEN. The register is TOTAL over every `RPH-EXE-*` rule in the ratified catalog
-// (`packages/rph-domain/vocab/m12-conformance.json`) — the id family the execution command surface owns — plus the
-// two `RPH-PWU-*` rules whose ratified statements are themselves about execution and which WP-12b wired into that
-// same surface. A new RPH-EXE rule with no row is a FAILING TEST, not a discovery. The rest of taxonomy layer 3
-// (the Intent lifecycle and the PWU shape/baseline rules) is governed by other command surfaces this remediation
-// never touched; extending the register to them is recorded as follow-up work rather than faked here.
+// SCOPE, DERIVED RATHER THAN CHOSEN. The register is TOTAL over every `RPH-EXE-*` and every `RPH-EVD-*` rule in the
+// ratified catalog (`packages/rph-domain/vocab/m12-conformance.json`), plus the two `RPH-PWU-*` rules whose ratified
+// statements are themselves about execution and which WP-12b wired into that same surface. A new rule in either
+// family with no row is a FAILING TEST, not a discovery — the families are listed as DATA in
+// `enforcement-register.test.ts` (`TOTAL_OVER_FAMILIES`) rather than hard-coded in a filter, so a family cannot be
+// silently dropped from the gate either.
+//
+// RPH-EVD ADDED 2026-08-01. The original scope paragraph recorded the rest of taxonomy layer 3 as "follow-up work
+// rather than faked here"; this is that follow-up discharged for the evidence family, and the remaining families
+// (the Intent lifecycle, the PWU shape/baseline rules, and RPH-ASR) are still exactly that — recorded as owed, not
+// quietly claimed. Extending the register cost a widening of the UNENFORCED arm (see `UnenforcementGuard`), because
+// the evidence rules are not the shape the execution rules were: they are refusals this engine implements at
+// NEITHER layer, where the archetype was a correct predicate nothing asked.
 //
 // THE HONEST LIMIT (DS-001 §8 item 5). A deliberate widening edited consistently across production, this register,
 // and the probe map PASSES. That is intended: it converts a silent one-character change into a three-file,
@@ -164,21 +171,71 @@ export interface EnforcedRule {
 	readonly declaredMutations: readonly string[];
 }
 
+/**
+ * THE DISCLOSURE'S OWN GUARD — what must stay true for "nothing enforces this" to remain true.
+ *
+ * WIDENED 2026-08-01 (the RPH-EVD tranche), and the widening is a FINDING, not a convenience. The original single
+ * shape — name the dead predicate, census its production references — has a precondition its archetype happened to
+ * satisfy and that nothing checked: `capabilityAuthorized`'s census is ONE file, its own definition, so wiring it
+ * into a handler necessarily changes the set and reddens the row.
+ *
+ * That precondition FAILS for every RPH-EVD row. Measured with the gate's own algorithm, the candidate symbols'
+ * baseline censuses ALREADY CONTAIN THE HANDLER FILE (`producedBy` 5 files incl. handlers/assurance.ts;
+ * `parentCompletionClaimId` 3 incl. handlers/decomposition.ts; `admittedScope` 3 incl. handlers/assurance.ts). A
+ * census whose baseline already contains the file the wiring would land in CANNOT DETECT THAT WIRING. Filing those
+ * rows under `DEAD_PREDICATE` would have produced a guard that cannot fail — this repository's most-repeated defect,
+ * shipped green — and filing them under NOT_A_COMMAND_REFUSAL to make the old type compile would have been the TYPE
+ * DRIVING THE FINDING, converting an unmeasured gap into a falsely measured one.
+ *
+ * So the second shape does not compute over TEXT at all. It OBSERVES the admission: dispatch the arrangement the
+ * rule says must be refused and watch the engine ACCEPT it. That is the ENFORCED arm's own instrument, inverted —
+ * and it is strictly stronger than a census, because it reddens on the BEHAVIOUR changing rather than on a symbol
+ * moving. The day someone wires the guard, the acceptance probe fails and the row must be re-dispositioned.
+ */
+export type UnenforcementGuard =
+	| {
+			/** A kernel predicate implements the rule correctly and NOTHING asks it. */
+			readonly kind: 'DEAD_PREDICATE';
+			readonly deadPredicate: string;
+			/**
+			 * Every NON-TEST source file that references `deadPredicate`, repo-relative.
+			 *
+			 * The gate greps the tree and asserts this set exactly — so the day someone wires the predicate into a
+			 * handler, this row goes RED and must be re-dispositioned as ENFORCED with a probe. A prose disclosure
+			 * would instead sit here being quietly false.
+			 *
+			 * ONLY VALID WHEN THE BASELINE EXCLUDES THE WIRING SITE, which is gated below: a census already
+			 * containing a handler file cannot detect the wiring it exists to detect.
+			 */
+			readonly referencedOnlyBy: readonly string[];
+	  }
+	| {
+			/**
+			 * No predicate implements the rule at all, and the gap is proved by OBSERVING the engine accept what the
+			 * rule says it must refuse — through `Engine.dispatch`, with a control.
+			 */
+			readonly kind: 'OBSERVED_ADMISSION';
+			/** The arrangement the ratified statement says must be REFUSED, and which is observed ACCEPTED. */
+			readonly arrangement: string;
+			/**
+			 * THE CONTROL, and it is the mirror of the ENFORCED arm's. There, the control is the same command
+			 * ACCEPTED before the arranging act, so a handler that refused everything could not pass. Here the
+			 * hazard is the opposite — an acceptance that means nothing because the command is never refused for
+			 * ANY reason, or because the arrangement never reached the site. So the control is a SIBLING DEFECT AT
+			 * THE SAME SITE that IS refused: it proves the refusal machinery is alive and simply has no limb for
+			 * this rule.
+			 */
+			readonly control: string;
+			/** Why no kernel predicate can be named — the fact that forced this shape rather than DEAD_PREDICATE. */
+			readonly whyNoPredicate: string;
+	  };
+
 /** A rule whose statement IS a command refusal and which NOTHING in production enforces. */
 export interface UnenforcedRule {
 	readonly kind: 'UNENFORCED_DISCLOSED';
 	readonly canonCarriage: CanonCarriage;
 	readonly why: string;
-	/** The kernel predicate that implements the rule correctly but is never asked. */
-	readonly deadPredicate: string;
-	/**
-	 * Every NON-TEST source file that references `deadPredicate`, repo-relative.
-	 *
-	 * THE DISCLOSURE'S OWN GUARD. The gate greps the tree and asserts this set exactly — so the day someone wires
-	 * the predicate into a handler, this row goes RED and must be re-dispositioned as ENFORCED with a probe. A
-	 * prose disclosure would instead sit here being quietly false.
-	 */
-	readonly referencedOnlyBy: readonly string[];
+	readonly guard: UnenforcementGuard;
 }
 
 /** A rule whose statement asserts an outcome, a permission, or a plane that does not exist. */
@@ -202,7 +259,14 @@ export type RegisteredRuleId =
 	| 'RPH-EXE-008'
 	| 'RPH-EXE-009'
 	| 'RPH-PWU-009'
-	| 'RPH-PWU-010';
+	| 'RPH-PWU-010'
+	| 'RPH-EVD-001'
+	| 'RPH-EVD-002'
+	| 'RPH-EVD-003'
+	| 'RPH-EVD-004'
+	| 'RPH-EVD-005'
+	| 'RPH-EVD-006'
+	| 'RPH-EVD-007';
 
 export const ENFORCEMENT_REGISTER: Readonly<Record<RegisteredRuleId, EnforcementDisposition>> = {
 	'RPH-EXE-001': {
@@ -350,8 +414,11 @@ export const ENFORCEMENT_REGISTER: Readonly<Record<RegisteredRuleId, Enforcement
 			'step-level capability declaration is ratified. capabilityAuthorized keeps no production caller BY ' +
 			'DESIGN. SEPARATELY: the FIRST-authorization containment hole is N-4 and is CLOSED, deliberately not ' +
 			'filed under this rule, whose statement is about operations.',
-		deadPredicate: 'capabilityAuthorized',
-		referencedOnlyBy: ['packages/rph-domain/src/execution.ts']
+		guard: {
+			kind: 'DEAD_PREDICATE',
+			deadPredicate: 'capabilityAuthorized',
+			referencedOnlyBy: ['packages/rph-domain/src/execution.ts']
+		}
 	},
 	'RPH-EXE-005': {
 		// CLOSED 2026-07-26 by JAN-CAPBIND WP-3, and the blocker recorded here was REAL rather than an excuse — which
@@ -499,6 +566,205 @@ export const ENFORCEMENT_REGISTER: Readonly<Record<RegisteredRuleId, Enforcement
 			'delete the BASELINED arm of canResumeExecutionOnPwu — the derived terminal-set arm then refuses with the OTHER reason string, which this marker does not match, so the probe reports MASKED',
 			'delete the pwuOpenness limb of stepAuthorityRefusal'
 		]
+	},
+
+	// ══════════════════════════════════════════════════════════════════════════════════════════════════════════
+	// THE RPH-EVD FAMILY, added 2026-08-01.
+	//
+	// A DIFFERENT SHAPE FROM THE EXECUTION ROWS, and the difference is the reason `UnenforcementGuard` exists. The
+	// execution family's disclosures were "a correct kernel predicate that nothing asks". The evidence family has
+	// three rules this engine implements at NEITHER layer — no guard AND no predicate — and two of them are
+	// observed being ADMITTED through a live `Engine.dispatch` rather than argued from a census.
+	//
+	// EVERY BEHAVIOURAL CLAIM BELOW WAS OBSERVED, NOT READ. Two claims that survived an adversarial review on the
+	// strength of source-reading alone were FALSIFIED the moment they were dispatched: "evidence with no producing
+	// actor is admitted" (it is VALIDATION_FAILED — `ActorReferenceSchema` requires `actorId`/`displayName`
+	// `.min(1)`, so the antecedent is schema-foreclosed), and the same for the empty-actor arrangement generally.
+	// What survived dispatch is narrower and sharper than what was argued, and it is what these rows record.
+	// ══════════════════════════════════════════════════════════════════════════════════════════════════════════
+	'RPH-EVD-001': {
+		kind: 'UNENFORCED_DISCLOSED',
+		canonCarriage: {
+			kind: 'CARRIED',
+			canonAnchor:
+				"an agent's statement that work is done is inert until reified as a governed Claim",
+			note: 'JPWB-DOC-003 §3 (OBJ-5, Claims mediate assertion) states the rule directly and in the same direction: inertness until reification, which is exactly "must become or reference a Claim Object before assurance can evaluate it."'
+		},
+		why:
+			'The statement IS a refusal — "must ... before assurance can evaluate it" is a precondition on evaluation — ' +
+			'and nothing performs it. The route that falsifies the tempting reading (that the command vocabulary makes ' +
+			'an unreified assertion unrepresentable, so the rule is satisfied by construction) is RECOMPOSITION: ' +
+			'`CompleteRecomposition` carries `parentCompletionClaimSupported: z.boolean().optional()` ' +
+			'(packages/rph-contracts/src/messages.ts), which is an agent\'s completion judgement travelling as a ' +
+			'CALLER-TYPED BOOLEAN. It is defaulted to `true` in packages/rph-application/src/handlers/decomposition.ts ' +
+			'and consumed directly by `evaluateRecomposition` (packages/rph-domain/src/decomposition.ts) with no Claim ' +
+			'Object mediating — while the sibling `parentCompletionClaimId`, which IS required on both ' +
+			'`ProposeRecomposition` and `CompleteRecomposition`, is resolved by no handler and read for no decision. So ' +
+			'assurance evaluates a completion assertion that references a Claim id it never loads, on the strength of a ' +
+			'boolean the caller supplied. THE ADJACENT REFUSAL THAT IS NOT THIS ONE, recorded so it is not mistaken ' +
+			'for it: `rejectUnbackedExecutionSuccess` (packages/rph-application/src/handlers/pwu.ts) refuses a declared ' +
+			'`executionState=SUCCEEDED` without a cited EXECUTION_PLAN. That is a completion assertion being refused, ' +
+			'but what it demands is a plan, not a Claim, and filing this rule there would be the subject substitution ' +
+			'this register exists to prevent.',
+		guard: {
+			kind: 'OBSERVED_ADMISSION',
+			arrangement:
+				'CompleteRecomposition carrying `parentCompletionClaimSupported: true` and a `parentCompletionClaimId` that names no existing Claim aggregate — the agent\'s completion assertion reaching evaluation unreified',
+			control:
+				'the same CompleteRecomposition dispatched WITHOUT the arranging BeginRecomposition, which the same handler refuses — so the acceptance above is a missing limb, not a command that is never refused',
+			whyNoPredicate:
+				'No kernel predicate decides whether a completion assertion is reified; `evaluateRecomposition` takes the ' +
+				'boolean as an input rather than deriving it. DEAD_PREDICATE is unavailable for a second and independent ' +
+				'reason: `parentCompletionClaimId`\'s production census ALREADY CONTAINS handlers/decomposition.ts, so a ' +
+				'census guard could not detect the very wiring it would exist to detect.'
+		}
+	},
+	'RPH-EVD-002': {
+		kind: 'NOT_A_COMMAND_REFUSAL',
+		canonCarriage: {
+			kind: 'CARRIED',
+			canonAnchor: 'Claims are supported by admissible evidence through explicit relationships',
+			note: 'JPWB-CON-000 §4. Canon carries the RULE (support requires admissible evidence) even though this engine has no command that could violate it — which is the carriage/enforcement independence RPH-EXE-007 already demonstrates in the other direction.'
+		},
+		why:
+			'"Changing a claim ... to SUPPORTED is rejected" presupposes a command that CHANGES A CLAIM\'S STATUS, and ' +
+			'no such command exists in the ratified vocabulary. `AssertClaim` is the only CLAIM-targeting command; its ' +
+			'`z.strictObject` payload has no `status` field at all, and the handler hard-codes `OPEN` in both the ' +
+			'persisted state and the emitted event. No handler anywhere drives the `Claim.status` machine — the ' +
+			'machine and its transition labels exist in the domain data, but nothing dispatches into them. So there is ' +
+			'no envelope for this refusal to attach to. This is NOT a disguised disclosure: the rule cannot be ' +
+			'violated by any dispatch, because the illegal transition is unreachable rather than unguarded, and ' +
+			'recording it as UNENFORCED_DISCLOSED would claim a gap that no arrangement can demonstrate.'
+	},
+	'RPH-EVD-003': {
+		kind: 'UNENFORCED_DISCLOSED',
+		canonCarriage: {
+			kind: 'CARRIED',
+			canonAnchor: 'provenance is present; content or reference is available',
+			note: 'JPWB-DOC-003 §7, the admissibility conditions. Canon carries BOTH halves of this rule; the engine forecloses one at the schema layer and leaves the other open, which is why the disclosure below is narrower than the ratified statement.'
+		},
+		why:
+			'THE RULE HAS TWO HALVES AND THEY HAVE DIFFERENT ANSWERS — a distinction that only survives being ' +
+			'dispatched, and that source-reading alone got wrong in both directions. (1) THE PRODUCING-ACTOR HALF IS ' +
+			'SCHEMA-FORECLOSED, not unenforced: `ProposeEvidence.producedBy` is a required `ActorReferenceSchema` whose ' +
+			'`actorId` and `displayName` are `.min(1)`, so evidence with no producing actor cannot be proposed at all ' +
+			'(observed: VALIDATION_FAILED / RPH_VALIDATION_SCHEMA_FAILED, never reaching a handler). That is enforcement ' +
+			'at the SCHEMA layer, and this register\'s ENFORCED arm cannot express it — `classifyRefusal` reads only ' +
+			'`REJECTED`, so a schema foreclosure classifies as ADMITTED. (2) THE SOURCE HALF IS NOT ENFORCED. ' +
+			'`ArtifactReferenceSchema` is `z.record(z.string(), z.unknown())`, so `contentReference: {}` — a source ' +
+			'reference pointing at nothing — is schema-valid, and the admissibility guard\'s CONTENT_AVAILABLE limb is ' +
+			'`contentReference === undefined || null`, which `{}` passes. AND THE PROVENANCE LIMB IS STRUCTURALLY ' +
+			'UNFAILABLE: `newEnvelope` (packages/rph-application/src/handlers/kit.ts) sets `provenance` unconditionally ' +
+			'on EVERY object, with a DEFAULTED `originType: \'USER_INPUT\'` and empty source arrays, so ' +
+			'PROVENANCE_PRESENT null-checks a field the engine itself always populates and which names no producing ' +
+			'actor. The actor is in `producedBy`, and `EvidenceForAdmissibility` ' +
+			'(packages/rph-assurance/src/assurance-rules.ts) has no `producedBy` field, so the predicate cannot express ' +
+			'the rule even in principle. A live guard limb that cannot fail is the same defect this programme keeps ' +
+			'finding in tests, here in production.',
+		guard: {
+			kind: 'OBSERVED_ADMISSION',
+			arrangement:
+				'ProposeEvidence with `contentReference: {}` — a source reference naming nothing — then AdmitEvidence, which is ACCEPTED and advances the Evidence to ADMISSIBLE',
+			control:
+				"the byte-identical arrangement with `scope: ''` instead, which the SAME guard at the SAME site REFUSES with RPH_VALIDATION_SEMANTIC_FAILED — so the admission above is a missing limb of a live guard, not a dead guard",
+			whyNoPredicate:
+				'`evidenceAdmissibility` is NOT the dead predicate: it IS asked (the admitEvidence guard calls it) and ' +
+				'it does NOT implement this rule (its input type has no `producedBy`, and CONTENT_AVAILABLE is a ' +
+				'null-check). Naming it would make both clauses of `deadPredicate`\'s own contract false. And ' +
+				'`producedBy`\'s production census already contains handlers/assurance.ts, so a census guard could not ' +
+				'detect the wiring it would exist to detect.'
+		}
+	},
+	'RPH-EVD-004': {
+		kind: 'UNENFORCED_DISCLOSED',
+		canonCarriage: {
+			kind: 'CARRIED',
+			canonAnchor: 'passing tests support only claims within their scope',
+			note: 'JPWB-DOC-003 §7 states the scope constraint on evidential support directly, and in the same direction as the ratified statement.'
+		},
+		why:
+			'The operative clause is a MANDATORY disjunction — "must be rejected or qualified as out of scope" — whose ' +
+			'first disjunct is exactly what AdmitEvidence already performs for the sibling limbs of the same guard. The ' +
+			'plane, the aggregate, the ratified status machine, the registered command and the refusal mechanism all ' +
+			'exist; only this limb does not. NOTHING in production compares an evidence scope to a claim\'s breadth: ' +
+			'`Evidence.scope` is read at exactly one production site, feeding `evidenceAdmissibility`, whose sole scope ' +
+			'limb is `if (!e.scope) failed.push(\'SCOPE_STATED\')` — a non-empty-string test, i.e. "a scope is STATED", ' +
+			'not "the scope is not EXCEEDED". `admittedScope` is written onto the EvidenceAdmitted payload and read by ' +
+			'no production consumer repo-wide. The comparison is not unrepresentable, which is the argument that had ' +
+			'to be tested and failed: `ClaimTypeSchema` contains `FITNESS`, the rule\'s own consequent noun. So a ' +
+			'TEST_RESULT of scope "unit" offered for a FITNESS claim is accepted by every path in this engine, and it ' +
+			'is neither rejected nor qualified.',
+		guard: {
+			kind: 'OBSERVED_ADMISSION',
+			arrangement:
+				"a FITNESS claim asserted, then a TEST_RESULT with scope 'unit' proposed supporting it and admitted with `admittedScope: 'unit'` and that claim in `admittedClaimIds` — accepted, unqualified",
+			control:
+				"the same AdmitEvidence with `scope: ''`, refused by the same guard — the site is alive; the scope-BREADTH comparison is simply absent from it",
+			whyNoPredicate:
+				'No kernel predicate compares evidence scope to claim breadth. `evidenceAdmissibility` has a RELEVANT ' +
+				'limb (`opts.claimId` set-membership), but membership is not breadth, and the call site deliberately ' +
+				'does not pass `claimId` at all. `admittedScope`\'s census already contains handlers/assurance.ts.'
+		}
+	},
+	'RPH-EVD-005': {
+		kind: 'NOT_A_COMMAND_REFUSAL',
+		canonCarriage: {
+			kind: 'CARRIED',
+			canonAnchor:
+				'every dependent supported claim becomes contested, under review, or invalidated; dependent assessments become invalidated or review-required; baseline readiness is recalculated',
+			note: 'JPWB-DOC-003 §7 carries all three consequents verbatim, in order. Carriage is total here even though enforcement is not the question — the rule states outcomes, and canon states the same outcomes.'
+		},
+		why:
+			'The When-clause command is `InvalidateEvidence`, and that dispatch is deliberately ACCEPTED: the handler ' +
+			'is a status advance with a precondition and NO guard, and it computes `classifyEvidenceInvalidation` only ' +
+			'to populate `affectedClaimIds` on the emitted event (JAN-EXECREM WIRE #4). Everything after "makes / makes ' +
+			'/ recalculates" is an OUTCOME of an accepted command, which is this arm by definition. The two state ' +
+			'changes the first two clauses assert are moreover COMMAND-UNREACHABLE — there is no ContestClaim and no ' +
+			'InvalidateAssuranceAssessment in the ratified vocabulary — and the third has no push recalculation ' +
+			'anywhere. The adjacent refusal that IS enforced belongs to a different rule: PromoteBaseline refuses a ' +
+			'baseline resting on invalidated evidence, which is the RPH-BAS family.'
+	},
+	'RPH-EVD-006': {
+		kind: 'NOT_A_COMMAND_REFUSAL',
+		canonCarriage: {
+			kind: 'CARRIED',
+			canonAnchor:
+				'Contradicting evidence remains attached and visible; the record never self-curates toward support.',
+			note: 'JPWB-DOC-003 §7. Note this anchor and RPH-EVD-005\'s resolve to the SAME LINE of the same artifact — one canon sentence carrying two ratified rules — and the two anchors are distinct substrings of it, so neither claim is satisfied by the other\'s text.'
+		},
+		why:
+			'What the rule forbids is a SILENT DISCARD, and no command\'s acceptance discards contradicting evidence, ' +
+			'so there is nothing a dispatch could be arranged to refuse. The one real tension is that `AssertClaim` ' +
+			'carries the subject noun `contradictingEvidenceIds` on its payload — but it routes through `createObject` ' +
+			'with `expectedRevision: undefined`, which the storage adapter turns into a no-op for an existing ' +
+			'aggregate, so a re-assertion cannot overwrite a claim\'s evidence links either. The rule is satisfied by ' +
+			'the absence of any curating command rather than by a guard, and there is no arrangement that would ' +
+			'demonstrate otherwise — which is what separates this from the three disclosures above, each of which is ' +
+			'backed by an observed admission.'
+	},
+	'RPH-EVD-007': {
+		kind: 'ENFORCED',
+		canonCarriage: {
+			kind: 'CARRIED',
+			canonAnchor:
+				'It becomes Evidence only through admission, which evaluates provenance, relevance, scope, and limitations.',
+			note: 'JPWB-DOC-003 §3 carries the rule near-verbatim against the ratified statement, including the four-way evaluation list.'
+		},
+		enforcedAt:
+			'packages/rph-application/src/handlers/assurance.ts — admitEvidence, whose advanceStatus `guard` calls `evidenceAdmissibility` and rejects on `!verdict.admissible`. DECISION: packages/rph-assurance/src/assurance-rules.ts — evidenceAdmissibility.',
+		refusalCode: 'RPH_VALIDATION_SEMANTIC_FAILED',
+		// THE FAILED-CONDITION NAME IS PART OF THE MARKER, DELIBERATELY. The message is built as
+		// `... is inadmissible (§8.11) — failed ${verdict.failed.join(', ')}.`, so the prefix alone would be satisfied
+		// by ANY admissibility failure — including the ones RPH-EVD-003 and RPH-EVD-004 disclose as UNENFORCED. A
+		// marker that stopped at "failed" would let one arrangement green this row while the rule it actually
+		// exercised was a different one, which is the masking hazard this field exists to close.
+		refusalMarker: 'is inadmissible (§8.11) — failed SCOPE_STATED',
+		declaredMutations: [
+			'delete the `guard` from admitEvidence — the status advance then succeeds and the probe reports ADMITTED',
+			"remove the `if (!e.scope) failed.push('SCOPE_STATED')` limb from evidenceAdmissibility",
+			'stop passing `scope: state.scope` into the guard\'s evidenceAdmissibility call — the limb survives but can no longer see the field, the F-30 shape',
+			'delete or rename the arranging ProposeEvidence so the aggregate is never created: `loadOrReject` then refuses with the SAME code RPH_VALIDATION_SEMANTIC_FAILED and the message "Aggregate <id> does not exist", so a code-only probe would report a false KILLED and only the marker reports MASKED (observed)'
+		]
 	}
 };
 
@@ -515,6 +781,27 @@ export function unenforcedRuleIds(): RegisteredRuleId[] {
 	return REGISTERED_RULE_IDS.filter(
 		(id) => ENFORCEMENT_REGISTER[id].kind === 'UNENFORCED_DISCLOSED'
 	);
+}
+
+/** Disclosed rules whose guard is a named dead predicate — the ids the census gate is total over. */
+export function deadPredicateRuleIds(): RegisteredRuleId[] {
+	return unenforcedRuleIds().filter((id) => {
+		const row = ENFORCEMENT_REGISTER[id];
+		return row.kind === 'UNENFORCED_DISCLOSED' && row.guard.kind === 'DEAD_PREDICATE';
+	});
+}
+
+/**
+ * Disclosed rules whose guard is an OBSERVED ADMISSION — the ids the acceptance-probe map must be total over.
+ *
+ * These are the rows whose disclosure is settled by dispatching, not by grepping, and the probe map that observes
+ * them lives beside the enforcement probes in `rph-application` (this package may not drive commands).
+ */
+export function observedAdmissionRuleIds(): RegisteredRuleId[] {
+	return unenforcedRuleIds().filter((id) => {
+		const row = ENFORCEMENT_REGISTER[id];
+		return row.kind === 'UNENFORCED_DISCLOSED' && row.guard.kind === 'OBSERVED_ADMISSION';
+	});
 }
 
 // ══════════════════════════════════════════════════════════════════════════════════════════════════════════════

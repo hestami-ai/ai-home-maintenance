@@ -17,11 +17,13 @@ import { fileURLToPath } from 'node:url';
 import { describe, expect, it } from 'vitest';
 import {
 	classifyRefusal,
+	deadPredicateRuleIds,
 	duplicateRefusalMarkers,
 	ENFORCEMENT_REGISTER,
 	enforcedRuleIds,
 	layerOfTestFile,
 	MIN_REFUSAL_MARKER_LENGTH,
+	observedAdmissionRuleIds,
 	REGISTERED_RULE_IDS,
 	residualSourceStates,
 	shortRefusalMarkers,
@@ -112,18 +114,26 @@ function productionReferencesTo(symbol: string): string[] {
 		.sort((a, b) => a.localeCompare(b));
 }
 
-describe('WP-16 (c) — the register is TOTAL over the ratified RPH-EXE family', () => {
-	it('every RPH-EXE-* rule in the catalog carries a disposition', () => {
+/**
+ * The rule families the register is TOTAL over.
+ *
+ * WIDENED 2026-08-01 to add `RPH-EVD`. The register's original scope paragraph recorded the rest of the taxonomy as
+ * "follow-up work rather than faked here"; this is that follow-up discharged for one family, and it is listed here —
+ * as data, checked below — rather than left as a sentence, because the previous form of this gate hard-coded one
+ * prefix in a filter and nothing would have reported a family being silently dropped from it.
+ */
+const TOTAL_OVER_FAMILIES: readonly string[] = ['RPH-EXE-', 'RPH-EVD-'];
+
+describe('WP-16 (c) — the register is TOTAL over the families it claims', () => {
+	it.each(TOTAL_OVER_FAMILIES)('every %s* rule in the catalog carries a disposition', (family) => {
 		// The anti-recurrence property: a tenth RPH-EXE rule cannot be ratified into the vocab and then quietly go
-		// unenforced, because it lands here as a failing test on the day it is added.
-		const catalogued = catalog.ruleCatalog
-			.map((r) => r.id)
-			.filter((id) => id.startsWith('RPH-EXE-'));
-		expect(catalogued.length, 'the catalog must actually contain the family').toBeGreaterThan(5);
+		// unenforced, because it lands here as a failing test on the day it is added. The same now holds for RPH-EVD.
+		const catalogued = catalog.ruleCatalog.map((r) => r.id).filter((id) => id.startsWith(family));
+		expect(catalogued.length, `the catalog must actually contain ${family}`).toBeGreaterThan(5);
 		const disposed = new Set<string>(REGISTERED_RULE_IDS);
 		expect(
 			catalogued.filter((id) => !disposed.has(id)),
-			'RPH-EXE rule(s) with no disposition'
+			`${family} rule(s) with no disposition`
 		).toEqual([]);
 	});
 
@@ -275,7 +285,7 @@ describe('WP-16 (c) — the LAYER gate: the axis the coverage manifest never had
 });
 
 describe('WP-16 (c) — the disclosures are CHECKED, not merely written', () => {
-	it.each(unenforcedRuleIds())(
+	it.each(deadPredicateRuleIds())(
 		'%s: its dead predicate still has exactly the declared production references',
 		(id: RegisteredRuleId) => {
 			// A prose disclosure outlives the condition it discloses. This one cannot: wire the predicate into a
@@ -283,13 +293,63 @@ describe('WP-16 (c) — the disclosures are CHECKED, not merely written', () => 
 			// with a probe. That is the difference between a disclosure and an excuse.
 			const row = ENFORCEMENT_REGISTER[id];
 			expect(row.kind).toBe('UNENFORCED_DISCLOSED');
-			if (row.kind !== 'UNENFORCED_DISCLOSED') return;
+			if (row.kind !== 'UNENFORCED_DISCLOSED' || row.guard.kind !== 'DEAD_PREDICATE') return;
 			expect(
-				productionReferencesTo(row.deadPredicate),
-				`${id}: ${row.deadPredicate}'s production references changed — re-disposition this row`
-			).toEqual([...row.referencedOnlyBy].sort((a, b) => a.localeCompare(b)));
+				productionReferencesTo(row.guard.deadPredicate),
+				`${id}: ${row.guard.deadPredicate}'s production references changed — re-disposition this row`
+			).toEqual([...row.guard.referencedOnlyBy].sort((a, b) => a.localeCompare(b)));
 		}
 	);
+
+	// ── THE PRECONDITION THE CENSUS GUARD ALWAYS HAD AND NEVER CHECKED (added 2026-08-01) ──────────────────────
+	//
+	// `referencedOnlyBy` detects wiring by watching the reference SET change. That only works if the baseline
+	// EXCLUDES the file the wiring would land in. `capabilityAuthorized`'s baseline is one file — its own
+	// definition — so the archetype satisfied this silently, and nothing checked it.
+	//
+	// It is not satisfied generally. Measured over the RPH-EVD candidates, every plausible symbol's baseline
+	// ALREADY CONTAINED a handler file, so wiring the check into that same handler would have changed nothing and
+	// the row would have stayed green forever. That is a guard that cannot fail, and this gate is what stops one
+	// being written: a DEAD_PREDICATE row whose census already names a command-layer file must instead be
+	// dispositioned with an OBSERVED_ADMISSION guard, which watches behaviour rather than text.
+	it.each(deadPredicateRuleIds())(
+		'%s: its census baseline excludes the command layer, so wiring the predicate can actually redden it',
+		(id: RegisteredRuleId) => {
+			const row = ENFORCEMENT_REGISTER[id];
+			if (row.kind !== 'UNENFORCED_DISCLOSED' || row.guard.kind !== 'DEAD_PREDICATE') return;
+			const commandLayer = row.guard.referencedOnlyBy.filter(
+				(f) => layerOfTestFile(f) === 'COMMAND'
+			);
+			expect(
+				commandLayer,
+				`${id}: the census baseline already contains command-layer file(s), so wiring the guard there ` +
+					`would not change the set — this disclosure cannot detect its own condition ending. Use an ` +
+					`OBSERVED_ADMISSION guard instead.`
+			).toEqual([]);
+		}
+	);
+
+	it('SELFTEST: that precondition gate is not vacuous — a command-layer path IS seen as command-layer', () => {
+		// Without this, a `layerOfTestFile` that returned UNKNOWN for handler paths would make the gate above pass
+		// for exactly the censuses it exists to reject. This is the mirror of the census instrument's own control.
+		expect(layerOfTestFile('packages/rph-application/src/handlers/assurance.ts')).toBe('COMMAND');
+		expect(layerOfTestFile('packages/rph-domain/src/execution.ts')).not.toBe('COMMAND');
+	});
+
+	it('every OBSERVED_ADMISSION guard argues why no predicate could be named', () => {
+		// The arm is the easier one to reach for — it needs no symbol — so the thing that keeps it honest is that it
+		// must positively explain why DEAD_PREDICATE was unavailable, at the same >80-character standard the
+		// register's other reasoned arms carry.
+		for (const id of observedAdmissionRuleIds()) {
+			const row = ENFORCEMENT_REGISTER[id];
+			if (row.kind !== 'UNENFORCED_DISCLOSED' || row.guard.kind !== 'OBSERVED_ADMISSION') continue;
+			expect(row.guard.whyNoPredicate.length, `${id}: whyNoPredicate must be argued`).toBeGreaterThan(
+				80
+			);
+			expect(row.guard.arrangement.length, `${id}: the arrangement must be stated`).toBeGreaterThan(40);
+			expect(row.guard.control.length, `${id}: the control must be stated`).toBeGreaterThan(40);
+		}
+	});
 
 	it('the census instrument is not vacuous — a symbol with real callers is SEEN to have them', () => {
 		// Without this, a broken `productionReferencesTo` returning [] would make every disclosure above pass.
