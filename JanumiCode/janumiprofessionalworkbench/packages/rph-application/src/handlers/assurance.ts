@@ -44,6 +44,9 @@ import {
 } from './kit.js';
 import { fromStates, noOpEditPrecondition, predicate } from './command-precondition.js';
 
+/** Non-object primitive union: the cast that keeps String() off Object's default stringification (S6551). */
+type Stringifiable = string | number | boolean;
+
 // ---- Assurance Policy ----
 const POLICY = 'ASSURANCE_POLICY';
 
@@ -465,7 +468,7 @@ export const admitEvidence: CommandHandler = (ctx, command, payload) => {
 		}),
 		guard: (state) => {
 			const verdict = evidenceAdmissibility({
-				id: String((state.id ?? '') as string | number | boolean),
+				id: String((state.id ?? '') as Stringifiable),
 				provenance: state.provenance,
 				contentReference: state.contentReference,
 				scope: state.scope as string | undefined,
@@ -547,14 +550,14 @@ export const invalidateEvidence: CommandHandler = (ctx, command) =>
 		eventType: 'EvidenceInvalidated',
 		eventPayload: (next) => ({
 			invalidationReason: String(
-				(((command.payload ?? {}) as Record<string, unknown>).invalidationReason ?? '') as
-					string | number | boolean
+				(((command.payload ?? {}) as Record<string, unknown>).invalidationReason ??
+					'') as Stringifiable
 			),
 			affectedClaimIds: classifyEvidenceInvalidation(
 				supportsGraph(ctx),
 				command.targetAggregateId
 			).map((impact) => impact.objectId),
-			status: String((next.status ?? '') as string | number | boolean)
+			status: String((next.status ?? '') as Stringifiable)
 		})
 	});
 
