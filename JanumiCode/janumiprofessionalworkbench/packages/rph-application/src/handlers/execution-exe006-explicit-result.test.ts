@@ -60,8 +60,9 @@ describe('JAN-EXECREM WP-11 / F-01 limb A — RPH-EXE-006 is a real decision', (
 
 	const planOf = () => store.loadObject(PLAN)!;
 	const stepStateOf = (id: string) =>
-		(planOf().state as { steps: { id: string; stepState: string }[] }).steps.find((s) => s.id === id)
-			?.stepState;
+		(planOf().state as { steps: { id: string; stepState: string }[] }).steps.find(
+			(s) => s.id === id
+		)?.stepState;
 	const succeededEvents = () =>
 		store.readAllEvents().filter((e) => e.eventType === 'ExecutionStepSucceeded');
 
@@ -168,7 +169,7 @@ describe('JAN-EXECREM WP-11 / F-01 limb A — RPH-EXE-006 is a real decision', (
 		expect(r.error?.message).toContain('RPH_STEP_RESULT_MISSING');
 		expect(stepStateOf(S1), 'the step must stay RUNNING').toBe('RUNNING');
 		expect(succeededEvents(), 'no ExecutionStepSucceeded may be appended').toHaveLength(0);
-		expect(store.readAllEvents().length).toBe(before.events);
+		expect(store.readAllEvents()).toHaveLength(before.events);
 		expect(planOf().revision, 'no silent revision bump').toBe(before.revision);
 	});
 
@@ -180,7 +181,9 @@ describe('JAN-EXECREM WP-11 / F-01 limb A — RPH-EXE-006 is a real decision', (
 		expect(events).toHaveLength(1);
 		// Validated at the door AND carried onto the event: an assertion the stream drops is one replay cannot
 		// distinguish from the silent omission the rule exists to rule out.
-		expect((events[0]!.payload as { noOutputResult?: unknown }).noOutputResult).toEqual(SAYS_NOTHING);
+		expect((events[0]!.payload as { noOutputResult?: unknown }).noOutputResult).toEqual(
+			SAYS_NOTHING
+		);
 	});
 
 	it('NAMED OUTPUT: a completion naming a recorded result needs no assertion (the seed shape)', () => {

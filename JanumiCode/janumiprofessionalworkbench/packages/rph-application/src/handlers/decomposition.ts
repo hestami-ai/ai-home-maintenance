@@ -298,7 +298,10 @@ export const validateDecomposition: CommandHandler = (ctx, command, payload) => 
  * deferred, and it makes the missing capability visible on every attempt instead of never.
  */
 const UNHONOURED_REVISION_FIELDS: readonly (readonly [string, string])[] = [
-	['childWorkUnitIds', 'DOC-003 DEC-2 — a revised child set changes the parent claim and triggers impact analysis'],
+	[
+		'childWorkUnitIds',
+		'DOC-003 DEC-2 — a revised child set changes the parent claim and triggers impact analysis'
+	],
 	['obligationAllocations', 'DOC-003 DEC-3 — obligation conservation across a revision'],
 	['constraintPropagations', 'DOC-003 DEC-4 — constraint disposition across a semantic revision']
 ];
@@ -312,7 +315,9 @@ export const reviseDecomposition: CommandHandler = (ctx, command, payload) => {
 			'RPH_VALIDATION_SEMANTIC_FAILED',
 			`ReviseDecomposition cannot perform a content revision: ${offered
 				.map(([field, rule]) => `${field} (${rule})`)
-				.join('; ')}. This command supersedes the contract and bumps its semantic version; it does not ` +
+				.join(
+					'; '
+				)}. This command supersedes the contract and bumps its semantic version; it does not ` +
 				`apply a revised decomposition. Propose a new DecompositionContract for the parent instead. ` +
 				`(JPWB-SPEC-001-DR-002 F-I — the capability is declared on the payload and not yet implemented.)`
 		);
@@ -336,9 +341,9 @@ export const reviseDecomposition: CommandHandler = (ctx, command, payload) => {
 		// `decomposition-revise-conformance.test.ts` asserts the shape instead — a test claims no ratification.
 		eventPayload: (next) => ({
 			supersedesDecompositionContractId: command.targetAggregateId,
-			rationale: String(p.rationale ?? ''),
+			rationale: String((p.rationale ?? '') as string | number | boolean),
 			semanticVersion: Number(next.semanticVersion ?? 0),
-			status: String(next.status ?? '')
+			status: String((next.status ?? '') as string | number | boolean)
 		})
 	});
 };
@@ -430,9 +435,9 @@ function buildRecompositionInput(
 		childWorkUnitId,
 		acceptable: ACCEPTABLE_CHILD_ASSURANCE.has(str(loadState(ctx, childWorkUnitId)?.assuranceState))
 	}));
-	const rules = (contract.conflictResolutionRules as
-		| { conflictType: string; action: string }[]
-		| undefined) ?? [];
+	const rules =
+		(contract.conflictResolutionRules as { conflictType: string; action: string }[] | undefined) ??
+		[];
 	return {
 		requiredChildResults,
 		detectedConflicts: (p.detectedConflicts ?? []).map((c) => ({

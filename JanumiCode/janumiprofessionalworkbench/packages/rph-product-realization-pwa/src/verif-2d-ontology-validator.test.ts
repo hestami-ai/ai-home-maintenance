@@ -116,6 +116,6 @@ describe('V-2d — every ontology failure kind is reachable and fires', () => {
 		const reported = kinds(broken({ seedPolicies: stripped })).filter(
 			(k) => k === 'POLICY_NO_CRITERIA'
 		);
-		expect(reported.length).toBe(seedPolicies.length);
+		expect(reported).toHaveLength(seedPolicies.length);
 	});
 });

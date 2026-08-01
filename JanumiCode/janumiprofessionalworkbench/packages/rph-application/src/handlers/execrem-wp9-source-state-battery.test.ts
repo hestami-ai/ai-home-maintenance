@@ -99,8 +99,9 @@ describe('JAN-EXECREM WP-9 — the source-state battery', () => {
 
 	const planOf = () => store.loadObject(PLAN)!;
 	const stepStateOf = (i: number) =>
-		(planOf().state as { steps: { id: string; stepState: string }[] }).steps.find((s) => s.id === sid(i))
-			?.stepState;
+		(planOf().state as { steps: { id: string; stepState: string }[] }).steps.find(
+			(s) => s.id === sid(i)
+		)?.stepState;
 
 	const mkStep = (i: number) => ({
 		id: sid(i),
@@ -201,7 +202,8 @@ describe('JAN-EXECREM WP-9 — the source-state battery', () => {
 							structuredResult: {},
 							noOutputResult: {
 								reason: 'NO_DOWNSTREAM_CONSUMABLE_RESULT',
-								detail: 'Kill-test fixture: every precheck must PASS so the source set is what refuses.'
+								detail:
+									'Kill-test fixture: every precheck must PASS so the source set is what refuses.'
 							},
 							executionProvenance: { executedBy: actor, originType: 'HUMAN_DECISION' }
 						}
@@ -210,9 +212,10 @@ describe('JAN-EXECREM WP-9 — the source-state battery', () => {
 
 			// 1. Refused, 2. with the SOURCE-STATE code — not a precheck's code, which is what proves isolation.
 			expect(r.status, c.why).toBe('REJECTED');
-			expect(r.error?.code, `${c.commandType}: a precheck refused instead — the fixture is not isolating`).toBe(
-				'RPH_ILLEGAL_STATE_TRANSITION'
-			);
+			expect(
+				r.error?.code,
+				`${c.commandType}: a precheck refused instead — the fixture is not isolating`
+			).toBe('RPH_ILLEGAL_STATE_TRANSITION');
 			// 3. The message renders the DECLARED source set, so the refusal names the contract it enforced.
 			for (const src of spec.sourceStates)
 				expect(r.error?.message, `${c.commandType} must render its drivesFrom`).toContain(src);
@@ -235,8 +238,10 @@ describe('JAN-EXECREM WP-9 — the source-state battery', () => {
 		const before = store.readAllEvents().length;
 		const r = dispatch('PruneExecutionStep', { stepId: sid(1) });
 		expect(r.status).toBe('REJECTED');
-		expect(r.error?.code, 'the prunability precheck, not the source set').toBe('RPH_INVARIANT_VIOLATION');
-		expect(store.readAllEvents().length).toBe(before);
+		expect(r.error?.code, 'the prunability precheck, not the source set').toBe(
+			'RPH_INVARIANT_VIOLATION'
+		);
+		expect(store.readAllEvents()).toHaveLength(before);
 		expect(stepStateOf(1)).toBe('SKIPPED');
 	});
 });

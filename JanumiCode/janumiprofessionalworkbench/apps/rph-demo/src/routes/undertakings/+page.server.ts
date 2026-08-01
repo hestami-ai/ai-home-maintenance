@@ -3,7 +3,13 @@
 // and approves its originating Intent (PWU-002 requires an existing intent before any PWU can be proposed), then
 // instantiates the Undertaking with the PWA version bound as a fixed literal (no auto-propagation — §7/§8).
 import { fail } from '@sveltejs/kit';
-import { getObject, listPwas, listPwus, listPwuTypes, listUndertakings } from '@janumipwb/rph-engine';
+import {
+	getObject,
+	listPwas,
+	listPwus,
+	listPwuTypes,
+	listUndertakings
+} from '@janumipwb/rph-engine';
 import { planComposition } from '@janumipwb/rph-projections';
 import type { PermittedChildRule, WorkRiskProfile } from '@janumipwb/rph-contracts';
 import { parseRiskProfile } from '$lib/authoring/riskProfile';
@@ -240,27 +246,29 @@ function instantiateComposition(
 	for (const decomposition of plan.decompositions) {
 		const parentPwuId = pwuIdByKey.get(decomposition.parentKey)!;
 		const contractId = mintUiId('dcp');
-		commands.push({
-			commandType: 'ProposeDecomposition',
-			targetAggregateType: 'DECOMPOSITION_CONTRACT',
-			targetAggregateId: contractId,
-			payload: {
-				parentWorkUnitId: parentPwuId,
-				childWorkUnitIds: decomposition.childKeys.map((k) => pwuIdByKey.get(k)!),
-				rationale:
-					'Instantiated from the bound Professional Work Architecture: every mandatory permitted child of this type.'
+		commands.push(
+			{
+				commandType: 'ProposeDecomposition',
+				targetAggregateType: 'DECOMPOSITION_CONTRACT',
+				targetAggregateId: contractId,
+				payload: {
+					parentWorkUnitId: parentPwuId,
+					childWorkUnitIds: decomposition.childKeys.map((k) => pwuIdByKey.get(k)!),
+					rationale:
+						'Instantiated from the bound Professional Work Architecture: every mandatory permitted child of this type.'
+				}
+			},
+			{
+				commandType: 'ValidateDecomposition',
+				targetAggregateType: 'DECOMPOSITION_CONTRACT',
+				targetAggregateId: contractId,
+				// VALID, AND THE CHECK BEHIND IT IS CURRENTLY VACUOUS — say so rather than let the disposition imply
+				// more than it establishes. The conservation guard reads the PARENT's obligationIds/constraintIds, and
+				// every surface path sets both to `[]`, so nothing is allocated and nothing can fail to be allocated.
+				// It becomes a real check when W-4 gives obligations an authoring moment.
+				payload: { disposition: 'VALID' }
 			}
-		});
-		commands.push({
-			commandType: 'ValidateDecomposition',
-			targetAggregateType: 'DECOMPOSITION_CONTRACT',
-			targetAggregateId: contractId,
-			// VALID, AND THE CHECK BEHIND IT IS CURRENTLY VACUOUS — say so rather than let the disposition imply
-			// more than it establishes. The conservation guard reads the PARENT's obligationIds/constraintIds, and
-			// every surface path sets both to `[]`, so nothing is allocated and nothing can fail to be allocated.
-			// It becomes a real check when W-4 gives obligations an authoring moment.
-			payload: { disposition: 'VALID' }
-		});
+		);
 	}
 
 	const batch = dispatchBatch(commands);

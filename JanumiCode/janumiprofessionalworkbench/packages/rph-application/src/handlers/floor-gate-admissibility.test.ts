@@ -68,9 +68,10 @@ describe('WP-11 — unassessableAiContentBlock: the exhaustive truth table', () 
 				subjectCount,
 				structuredResultHasContent: structuredResultHasContentFlag
 			});
-			expect(r === null, JSON.stringify({ aiProduced, subjectCount, structuredResultHasContentFlag })).toBe(
-				!blocked
-			);
+			expect(
+				r === null,
+				JSON.stringify({ aiProduced, subjectCount, structuredResultHasContentFlag })
+			).toBe(!blocked);
 		}
 	);
 
@@ -82,8 +83,12 @@ describe('WP-11 — unassessableAiContentBlock: the exhaustive truth table', () 
 	it('a multi-subject completion is never blocked by this rule, however much content it carries', () => {
 		// Guards against a `subjectCount === 0` -> `subjectCount >= 0` slip, which would refuse every AI completion.
 		for (const subjectCount of [1, 2, 7])
-			expect(unassessableAiContentBlock({ aiProduced: true, subjectCount, structuredResultHasContent: true })).toBe(
-				null
-			);
+			expect(
+				unassessableAiContentBlock({
+					aiProduced: true,
+					subjectCount,
+					structuredResultHasContent: true
+				})
+			).toBeNull();
 	});
 });

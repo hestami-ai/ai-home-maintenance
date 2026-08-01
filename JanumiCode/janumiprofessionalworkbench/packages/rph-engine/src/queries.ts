@@ -82,7 +82,7 @@ function undertakingObjectIds(handle: EngineHandle, undertakingId: string): Set<
 	);
 	const planIds = new Set(
 		listByType(handle, 'EXECUTION_PLAN')
-			.filter((p) => ids.has(String(p.state.workUnitId ?? '')))
+			.filter((p) => ids.has(String((p.state.workUnitId ?? '') as string | number | boolean)))
 			.map((p) => p.id)
 	);
 	for (const id of planIds) ids.add(id);

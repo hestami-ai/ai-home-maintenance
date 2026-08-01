@@ -230,7 +230,7 @@ function rejectMisboundStep(
 		const verdict = bindingAuthorityVerdict(s.id, {
 			bindingId,
 			bindingResolves: true,
-			boundStepId: String(state.executionStepId ?? '')
+			boundStepId: String((state.executionStepId ?? '') as string | number | boolean)
 		});
 		if (verdict.limb !== 'WRONG_STEP') continue;
 		return reject(
@@ -544,12 +544,12 @@ export const completeExecutionPlan: CommandHandler = (ctx, command) =>
 				stepStates: steps.map((s) => String(s.stepState ?? 'undefined'))
 			});
 			if (verdict.ok) return null;
-			const remedy =
-				verdict.errorCode === 'RPH_PLAN_STEPS_NOT_TERMINAL_SUCCESS'
-					? ' FailExecutionPlan a plan with a failed step.'
-					: verdict.errorCode === 'RPH_PLAN_PRODUCED_NOTHING'
-						? ' FailExecutionPlan or SupersedeExecutionPlan instead.'
-						: '';
+			let remedy = '';
+			if (verdict.errorCode === 'RPH_PLAN_STEPS_NOT_TERMINAL_SUCCESS') {
+				remedy = ' FailExecutionPlan a plan with a failed step.';
+			} else if (verdict.errorCode === 'RPH_PLAN_PRODUCED_NOTHING') {
+				remedy = ' FailExecutionPlan or SupersedeExecutionPlan instead.';
+			}
 			return reject(
 				command,
 				'RPH_INVARIANT_VIOLATION',
@@ -1060,7 +1060,7 @@ function bindingAuthorityRefusal(
 	const verdict = bindingAuthorityVerdict(stepId, {
 		bindingId,
 		bindingResolves: true,
-		boundStepId: String(state.executionStepId ?? ''),
+		boundStepId: String((state.executionStepId ?? '') as string | number | boolean),
 		authorizationStatus: String(state.authorizationStatus),
 		// N-18 (ruling, option C): what the binding actually CONFERS. Resolved rather than assumed — an unreadable
 		// or malformed array yields no identities, which the verdict then reads as "grants nothing" and refuses.

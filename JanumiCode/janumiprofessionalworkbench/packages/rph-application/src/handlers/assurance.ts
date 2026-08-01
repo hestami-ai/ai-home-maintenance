@@ -547,13 +547,14 @@ export const invalidateEvidence: CommandHandler = (ctx, command) =>
 		eventType: 'EvidenceInvalidated',
 		eventPayload: (next) => ({
 			invalidationReason: String(
-				((command.payload ?? {}) as Record<string, unknown>).invalidationReason ?? ''
+				(((command.payload ?? {}) as Record<string, unknown>).invalidationReason ?? '') as
+					string | number | boolean
 			),
 			affectedClaimIds: classifyEvidenceInvalidation(
 				supportsGraph(ctx),
 				command.targetAggregateId
 			).map((impact) => impact.objectId),
-			status: String(next.status ?? '')
+			status: String((next.status ?? '') as string | number | boolean)
 		})
 	});
 
@@ -759,7 +760,9 @@ const evidenceNotAlreadyReceived = predicate(
 		const already = read.aggregateEvents(ASSESSMENT, command.targetAggregateId).some((e) => {
 			if (e.eventType !== 'AssuranceEvidenceReceived') return false;
 			const ep = e.payload as { evidenceId?: string; satisfiesRequirementId?: string };
-			return ep.evidenceId === p.evidenceId && ep.satisfiesRequirementId === p.satisfiesRequirementId;
+			return (
+				ep.evidenceId === p.evidenceId && ep.satisfiesRequirementId === p.satisfiesRequirementId
+			);
 		});
 		return already
 			? `SubmitEvidenceForAssessment: evidence ${p.evidenceId} was already received for requirement '${p.satisfiesRequirementId}' on assessment ${command.targetAggregateId}. Re-issuing would append a second AssuranceEvidenceReceived recording a receipt that already happened.`
