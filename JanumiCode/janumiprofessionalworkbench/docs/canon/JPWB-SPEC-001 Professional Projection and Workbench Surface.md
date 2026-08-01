@@ -108,9 +108,9 @@ retired `Endeavor` (DOC-002:248), and no competing root term (DOC-002:249).
 **Document ID:** `JPWB-SPEC-001`
 **Title:** Professional Projection and Workbench Surface — Deep Reference Specification
 **Version:** `0.1.0`
-**Status:** `DRAFT` — authored under sponsor grant of 2026-07-28 (the Constitution-Discussion ruling); **not ratified**
+**Status:** `RATIFIED` — sponsor conferral **2026-07-29**, recorded at `JPWB-REG-005` **REG-D-023**; authored under the sponsor grant of 2026-07-28 (the Constitution-Discussion ruling)
 **Layer:** Semantic Model
-**Settledness:** `HYPOTHESIS`
+**Settledness:** `RATIFIED` — binding on the surfaces named in *Applies to*, at **this exact version**
 **Series:** `JPWB-SPEC-nnn` deep reference specifications, the depth tier recognized at JPWB-CON-000 B1 and established by JPWB-REG-005 REG-D-009
 **Date:** 2026-07-28
 **Depends on:** JPWB-CON-000 (rule of recognition, values, axioms) · JPWB-DOC-001 §7 (concept of operations, the five workbench contexts) · JPWB-DOC-002 (all vocabulary) · JPWB-DOC-003 (semantic structure, state axes, persistence) · JPWB-DOC-004 (agent conduct, divergence protocol) · JPWB-REG-005 (open questions and rulings)
@@ -164,32 +164,36 @@ This specification therefore treats RIWS (`JAN-RIWS-001`), JCUX (`JAN-JCUX-001`)
 
 **Read this before any other sentence in this document, including the status block above.**
 
-> **This specification is a DRAFT. It has been ratified by nobody. It carries no authority.**
+> **This specification is RATIFIED. Sponsor conferral 2026-07-29, `JPWB-REG-005` REG-D-023. Its obligations bind.**
 >
 > It was authored under the sponsor's grant of **2026-07-28** (the Constitution-Discussion ruling), which
-> authorizes **authoring** and not **ratification**. JPWB-CON-000 Part B clause 2 is the rule that governs its
-> standing: an artifact is canon only by the recognition the constitution confers, and a JPWB-SPEC-series member is
-> recognized only when it is *individually ratified per JPWB-REG-005* (CON-000 B1). **No such entry exists.** The
-> absence is CONFIRMED, with the searches stated in full in the status block above: no JPWB-REG-005 entry records
-> the 2026-07-28 grant, and none records a commission for `JPWB-SPEC-001`.
+> authorized **authoring** and not **ratification**. JPWB-CON-000 Part B clause 2 governs its standing: an artifact
+> is canon only by the recognition the constitution confers, and a JPWB-SPEC-series member is recognized only when
+> it is *individually ratified per JPWB-REG-005* (CON-000 B1). **REG-D-023 is that entry.**
 >
-> Therefore: **every status word in this document is a proposal, not a status.** Where a sentence says a Surface
-> `SHALL` do something, read *“this document proposes that a Surface be required to”*. Where a table says a field is
-> mandatory, read *“this document proposes that the field be mandatory”*. Where an invariant is numbered
-> `SPEC-001-INV-07`, read *“the seventh proposed invariant”* — the numbering is fixed so that a sponsor can rule on
-> a stable target, not because the invariant binds. Where a defect in the built system is called a **violation**,
-> read *“would be a violation if this document were ratified”*; the measurement is real and the classification is
-> proposed.
+> Therefore: **every status word in this document is now a status, not a proposal.** Where a sentence says a
+> Surface `SHALL` do something, it is required to. Where a table says a field is mandatory, it is. Where an
+> invariant is numbered `SPEC-001-INV-07`, it binds. Where a defect in the built system is called a **violation**,
+> it is one.
 >
-> **What an agent may do with this document today.** Read it; cite it as authored working material with its status
-> named; implement against it *voluntarily* and record that choice; propose it for ratification. **What an agent
-> SHALL NOT do**: cite it as ratified authority, treat any `SHALL` here as binding in a review, record a build as
-> conforming to it, or let a citation to it stand in for a citation to the canon. That prohibition is verified by
-> `SPEC-001-CHK-DRAFT-CITATION` — **minted here, and carrying no §10 body yet**, the class §10.8 records — which
-> fails on any citation of `JPWB-SPEC-001` under `docs/`, `packages/` or `apps/` that does not carry this
-> document's `DRAFT` / not-ratified status within the citing sentence or its enclosing comment block, and on any
-> recorded conformance claim naming this document while §1.5 D-12 is unsatisfied. The obligation is stated
-> normatively in the status block above and is verified by `SPEC-001-CHK-REG-ENTRY`: **the filing of a
+> **The version matters.** REG-D-023 confers status on `0.1.0` **exactly**. A later revision is not ratified by
+> inheritance; it carries the status its own register entry gives it, and until one exists an edited copy of this
+> document is authored material again. That is CON-000 B2 (status is conferred, never authored) applied to this
+> document's own future.
+>
+> **Ratified WITH its declared residue, and this is the part not to skim.** §12.5.3 records ten remaining
+> detections in the obligation counter, hand-classified as non-obligations, and deliberately not excluded —
+> because a count driven to zero by adding exclusions measures the exclusions. §12.5 records further editorial
+> debt against v0.1.1: eleven §11.4 citation slips, two fixture ids with no §10 body, five unbound disclosure
+> codes, and two §§1–10 corrections owed. **None is a defect of an obligation.** Ratifying with them declared was
+> preferred to ratifying a version that claimed to have none, and a reader who treats this document as flawless
+> has read it less carefully than the sponsor who ratified it.
+>
+> **`SPEC-001-CHK-DRAFT-CITATION` is RETIRED by this conferral.** It existed solely to fail any citation of this
+> document that did not carry its not-ratified status; that requirement is now false, and a check whose condition
+> has ceased to exist must be retired explicitly rather than left to pass vacuously. Its retirement is recorded in
+> REG-D-023 — a check deleted without a record is indistinguishable from a check that was never run. The
+> register-entry obligation is verified by `SPEC-001-CHK-REG-ENTRY`: **the filing of a
 > JPWB-REG-005 entry naming this specification's scope, its authoring grant, and its forks SHALL precede any
 > ratification act.**
 >
