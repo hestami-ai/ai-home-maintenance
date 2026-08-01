@@ -681,6 +681,96 @@ export interface DeadPredecessorProvenance {
  */
 export type PruneProvenance = BranchDecisionProvenance | DeadPredecessorProvenance;
 
+/** The optional `excludedEdgeId` fragment shared by both provenance shapes — the in-edge off the cut, when it has an id. */
+function excludedEdgeFragment(edge: GateTransition): { readonly excludedEdgeId?: string } {
+	return edge.id === undefined ? {} : { excludedEdgeId: edge.id };
+}
+
+/** Build the BRANCH_DECISION provenance for a live BRANCH source whose recorded decision cut `edge`. */
+function branchCutProvenance(
+	source: string,
+	step: GateStep,
+	edge: GateTransition
+): BranchDecisionProvenance {
+	return {
+		cause: 'BRANCH_DECISION',
+		branchStepId: source,
+		...(step.selectedTransitionId === undefined
+			? {}
+			: { selectedEdgeId: step.selectedTransitionId }),
+		...excludedEdgeFragment(edge)
+	};
+}
+
+/** Build the DEAD_PREDECESSOR provenance for a non-BRANCH source in an irrecoverable terminal state. */
+function deadPredecessorCutProvenance(
+	source: string,
+	step: GateStep,
+	edge: GateTransition
+): DeadPredecessorProvenance {
+	return {
+		cause: 'DEAD_PREDECESSOR',
+		deadStepId: source,
+		deadStepState: step.stepState,
+		...excludedEdgeFragment(edge)
+	};
+}
+
+/**
+ * What the `pruneProvenance` BFS must do with ONE in-edge of the current node:
+ *   - `return`  — this edge IS the cut; stop the whole walk and emit its provenance.
+ *   - `skip`    — this edge names no cause (next edge, the original `continue`).
+ *   - `walk`    — the source is itself dead; keep walking back through the dead subgraph via `source`.
+ */
+type PruneEdgeAction =
+	| { readonly kind: 'return'; readonly provenance: PruneProvenance }
+	| { readonly kind: 'skip' }
+	| { readonly kind: 'walk'; readonly source: string };
+
+const PRUNE_EDGE_SKIP: PruneEdgeAction = { kind: 'skip' };
+
+/**
+ * Classify one in-edge of the node under inspection, PRESERVING the exact `continue` vs enqueue-source vs return
+ * semantics of the original inline loop body.
+ *
+ * A live source with a dead target means this edge is a CUT. Attribute it only when the source actually DECIDED — a
+ * PENDING source has excluded nothing yet, so naming a cause here would be a fabrication.
+ *
+ * BRANCH IS CHECKED FIRST, deliberately (RW-7): a CANCELLED **branch** still reports BRANCH_DECISION with its
+ * recorded selection, because that is the more specific fact and the one an auditor can act on. Ordering it the other
+ * way would silently downgrade every branch cut whose branch was later cancelled.
+ *
+ * THE STATE CHECK (`IRRECOVERABLE_TERMINAL`) IS NOT REDUNDANT with `localOf === 'NEUTRALIZED'`. `localOf` returning
+ * NEUTRALIZED says the edge is DEAD; it does not say WHICH of two reasons killed it. Off a non-BRANCH source a
+ * guard-false CONDITIONAL edge is ALSO neutralized — and that case must yield NO provenance, because off a non-BRANCH
+ * step out-edges are INDEPENDENT filters rather than exclusive arms: the step is unreachable, but no DECISION
+ * excluded it, and inventing one puts a false justification into the governed stream.
+ * `transition-gate-prune-provenance.test.ts` pins exactly that. So the two questions are genuinely distinct and both
+ * must be asked: `localOf` decides whether the edge can still conduct, and the state decides whether a step that can
+ * never conduct is what killed it. That is one question each, not one question twice.
+ */
+function classifyPruneInEdge(
+	ctx: GateContext,
+	live: ReadonlySet<string>,
+	edge: GateTransition
+): PruneEdgeAction {
+	const source = edge.sourceStepId;
+	if (source === undefined) return PRUNE_EDGE_SKIP; // a plan-entry edge cuts nothing
+	if (!live.has(source)) return { kind: 'walk', source }; // dead source — keep walking back through the dead subgraph
+	if (ctx.localOf(edge) !== 'NEUTRALIZED') return PRUNE_EDGE_SKIP;
+	const step = stepOf(ctx, source);
+	if (step === undefined) return PRUNE_EDGE_SKIP;
+	if (step.stepType === 'BRANCH')
+		return { kind: 'return', provenance: branchCutProvenance(source, step, edge) };
+	// THE ARM RW-7 ADDED (N-8). A non-BRANCH source whose edge is NEUTRALIZED reached an irrecoverable terminal state
+	// — the ONLY way `localOf` returns NEUTRALIZED for a non-branch real source — so the subgraph below it is
+	// structurally dead. This used to `continue`, walk off the end of the frontier and return undefined, leaving the
+	// emitted event indistinguishable from a waived skip.
+	if (IRRECOVERABLE_TERMINAL.has(step.stepState))
+		return { kind: 'return', provenance: deadPredecessorCutProvenance(source, step, edge) };
+	return PRUNE_EDGE_SKIP;
+}
+
 /**
  * WHY is `stepId` prunable — which branch decision excluded it, and through which edge (JAN-EXECREM WP-14 / F-37)?
  *
@@ -711,56 +801,11 @@ export function pruneProvenance(
 	while (frontier.length) {
 		const id = frontier.shift()!;
 		for (const edge of inEdgesOf(ctx, id)) {
-			const source = edge.sourceStepId;
-			if (source === undefined) continue; // a plan-entry edge cuts nothing
-			if (live.has(source)) {
-				// A live source with a dead target: this edge is a CUT. Attribute it only when the source actually
-				// DECIDED — a PENDING source has excluded nothing yet, so naming a cause here would be a fabrication.
-				if (ctx.localOf(edge) !== 'NEUTRALIZED') continue;
-				const step = stepOf(ctx, source);
-				if (step === undefined) continue;
-				const excluded = edge.id === undefined ? {} : { excludedEdgeId: edge.id };
-				// BRANCH IS CHECKED FIRST, deliberately (RW-7): a CANCELLED **branch** still reports
-				// BRANCH_DECISION with its recorded selection, because that is the more specific fact and the one an
-				// auditor can act on. Ordering it the other way would silently downgrade every branch cut whose branch
-				// was later cancelled.
-				if (step.stepType === 'BRANCH')
-					return {
-						cause: 'BRANCH_DECISION',
-						branchStepId: source,
-						...(step.selectedTransitionId === undefined
-							? {}
-							: { selectedEdgeId: step.selectedTransitionId }),
-						...excluded
-					};
-				// THE ARM RW-7 ADDED (N-8). A non-BRANCH source whose edge is NEUTRALIZED reached an irrecoverable
-				// terminal state — that is the ONLY way `localOf` returns NEUTRALIZED for a non-branch real source —
-				// so the subgraph below it is structurally dead. This used to `continue`, walk off the end of the
-				// frontier and return undefined, leaving the emitted event indistinguishable from a waived skip.
-				//
-				// THE STATE CHECK IS NOT REDUNDANT, and I briefly removed it believing it was. `localOf` returning
-				// NEUTRALIZED says the edge is DEAD; it does not say WHICH of two reasons killed it. Off a non-BRANCH
-				// source a guard-false CONDITIONAL edge is ALSO neutralized — and that case must yield NO provenance,
-				// because off a non-BRANCH step out-edges are INDEPENDENT filters rather than exclusive arms: the step
-				// is unreachable, but no DECISION excluded it, and inventing one puts a false justification into the
-				// governed stream. `transition-gate-prune-provenance.test.ts` pins exactly that and caught the removal
-				// immediately.
-				//
-				// So the two questions are genuinely distinct and both must be asked: `localOf` decides whether the
-				// edge can still conduct, and the state decides whether a step that can never conduct is what killed
-				// it. That is one question each, not one question twice.
-				if (IRRECOVERABLE_TERMINAL.has(step.stepState))
-					return {
-						cause: 'DEAD_PREDECESSOR',
-						deadStepId: source,
-						deadStepState: step.stepState,
-						...excluded
-					};
-				continue;
-			}
-			if (!seen.has(source)) {
-				seen.add(source);
-				frontier.push(source); // keep walking back through the dead subgraph
+			const action = classifyPruneInEdge(ctx, live, edge);
+			if (action.kind === 'return') return action.provenance;
+			if (action.kind === 'walk' && !seen.has(action.source)) {
+				seen.add(action.source);
+				frontier.push(action.source); // keep walking back through the dead subgraph
 			}
 		}
 	}
