@@ -93,6 +93,45 @@ export class Engine {
 	}
 
 	dispatch(command: DomainCommand): CommandResult {
+		// ── REG-F-011, THE CRASH HALF ────────────────────────────────────────────────────────────────────────
+		//
+		// `commandId` and `correlationId` are the two envelope fields the STORE requires NOT NULL
+		// (`command_receipts.command_id`, `domain_events.correlation_id`). Without this guard a command omitting
+		// either reached the store and threw a raw `SqliteError` straight OUT of `dispatch` — and this method's
+		// entire contract is that it RETURNS a typed, classified `CommandResult`. A caller without a try/catch
+		// failed in a way the error contract says is impossible, and the VALIDATION/INVARIANT/CONCURRENCY
+		// classification was missing exactly where it mattered most.
+		//
+		// DELIBERATELY NARROW. This is NOT envelope validation — REG-F-011 separates the two remediations because
+		// validating the whole envelope against `DomainCommandSchema` would refuse commands the engine accepts
+		// today (several fixtures here omit envelope fields) and owes a caller survey first. This changes no
+		// accept/reject outcome for any well-formed command; it converts a crash into a refusal and nothing else.
+		//
+		// IDENTITY, NOT PRESENCE: `''` satisfies a NOT NULL column, so a presence-only check would leave a receipt
+		// keyed on nothing and let a second such command collide with it.
+		const missingIdentity = (['commandId', 'correlationId'] as const).filter((field) => {
+			const v: unknown = command[field];
+			return typeof v !== 'string' || v.length === 0;
+		});
+		if (missingIdentity.length > 0) {
+			const cid = typeof command.correlationId === 'string' ? command.correlationId : '';
+			return {
+				commandId: typeof command.commandId === 'string' ? command.commandId : '',
+				status: 'VALIDATION_FAILED',
+				producedEventIds: [],
+				error: makeRphError('RPH_VALIDATION_SCHEMA_FAILED', {
+					message:
+						`Command envelope is missing required identity: ${missingIdentity.join(', ')}. ` +
+						`These identify the command receipt and the event correlation, are NOT NULL in the store, ` +
+						`and cannot be defaulted — a command the engine cannot identify cannot be recorded as having ` +
+						`happened (REG-F-011).`,
+					correlationId: cid,
+					targetObjectIds:
+						typeof command.targetAggregateId === 'string' ? [command.targetAggregateId] : []
+				})
+			};
+		}
+
 		const correlationId = command.correlationId;
 		const base = { commandId: command.commandId, producedEventIds: [] as string[] };
 		this.logger.info('command.received', {
