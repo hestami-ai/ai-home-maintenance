@@ -420,6 +420,16 @@ describe('the register\'s RPH-EVD disclosures are OBSERVED, not asserted', () =>
 		'RPH-ASR-007': null, // ENFORCED
 		'RPH-ASR-009': null,
 		'RPH-ASR-011': null,
+		// The RPH-INT family carries NO disclosures: three are ENFORCED (probed in the enforcement map) and four
+		// are NOT_A_COMMAND_REFUSAL, so none appears in either observation map with a probe. Present as nulls
+		// because this Record is total over the id union — which is what forced them to be considered at all.
+		'RPH-INT-001': null,
+		'RPH-INT-002': null,
+		'RPH-INT-003': null,
+		'RPH-INT-004': null,
+		'RPH-INT-005': null,
+		'RPH-INT-006': null,
+		'RPH-INT-007': null,
 
 		'RPH-EVD-001': {
 			arrangement:

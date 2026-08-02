@@ -278,7 +278,14 @@ export type RegisteredRuleId =
 	| 'RPH-ASR-009'
 	| 'RPH-ASR-010'
 	| 'RPH-ASR-011'
-	| 'RPH-ASR-012';
+	| 'RPH-ASR-012'
+	| 'RPH-INT-001'
+	| 'RPH-INT-002'
+	| 'RPH-INT-003'
+	| 'RPH-INT-004'
+	| 'RPH-INT-005'
+	| 'RPH-INT-006'
+	| 'RPH-INT-007';
 
 export const ENFORCEMENT_REGISTER: Readonly<Record<RegisteredRuleId, EnforcementDisposition>> = {
 	'RPH-EXE-001': {
@@ -1092,6 +1099,179 @@ export const ENFORCEMENT_REGISTER: Readonly<Record<RegisteredRuleId, Enforcement
 				'on the command path assembles the required-policy set to compose over, so there is no symbol whose ' +
 				'census could witness the gap closing.'
 		}
+	},
+
+	// ══════════════════════════════════════════════════════════════════════════════════════════════════════════
+	// THE RPH-INT FAMILY, added 2026-08-02 — the Intent lifecycle, which this register's scope paragraph has named
+	// as owed since it was written.
+	//
+	// A THIRD CHARACTERISTIC SHAPE. The execution family's gaps were dead predicates; the evidence and assurance
+	// families' were rules implemented at neither layer. This family is mostly ENFORCED — and its four non-enforced
+	// rows are non-enforced for a reason the register has not carried before: their statements describe what a
+	// SUCCESSFUL command PRODUCES ("accepting X sets status RAW, semantic version 1, revision 1, and emits Y").
+	// There is no arrangement a probe could refuse, and none it could observe being admitted either, because the
+	// rule is violated by a handler doing the wrong thing on a path that succeeds — which a projection test catches
+	// and a refusal probe cannot.
+	// ══════════════════════════════════════════════════════════════════════════════════════════════════════════
+	'RPH-INT-001': {
+		kind: 'NOT_A_COMMAND_REFUSAL',
+		canonCarriage: {
+			kind: 'CARRIED',
+			canonAnchor:
+				'The raw originating expression is preserved exactly; formalization is a later explicit act, never inference',
+			note: 'JPWB-DOC-003 §2 carries both operative clauses of this rule verbatim — the exact preservation and the prohibition on inferring formalization.'
+		},
+		why:
+			'Every clause states what an ACCEPTED CaptureIntent produces: the emitted event, the initial status, ' +
+			'semantic version 1, revision 1, and the preserved expression. Nothing is refused, so the ENFORCED arm ' +
+			'has no refusal to cite and the UNENFORCED arm has no arrangement to name. The one clause that reads as ' +
+			'a prohibition — "infers no formalized objective automatically" — is a constraint on what the HANDLER may ' +
+			'DO on the success path, not a command it must refuse: it would be violated by the handler writing a ' +
+			'formalized objective it was not given, and no probe can arrange that because no command asks for the ' +
+			'inference. The instrument that holds this rule is an assertion over the created state and the emitted ' +
+			'event, which `intent.test.ts` already carries; a refusal probe would be the wrong shape of evidence.'
+	},
+	'RPH-INT-002': {
+		kind: 'NOT_A_COMMAND_REFUSAL',
+		canonCarriage: {
+			kind: 'CARRIED_BY_GENERAL_RULE',
+			canonAnchor: 'formalization is a later explicit act, never inference',
+			note: 'JPWB-DOC-003 §2. GENERAL rather than CARRIED because canon states that formalization is explicit and never inferred, while this rule enumerates what the explicit act PERSISTS (desired outcomes, success conditions) and which status it lands in — specifics canon does not name.'
+		},
+		why:
+			'The same shape as RPH-INT-001, and non-enforced for the same reason: "accepting FormalizeIntent sets ' +
+			'status FORMALIZED, increments the semantic version, persists desired outcomes and success conditions, ' +
+			'and emits IntentFormalized" describes a SUCCESSFUL dispatch in full. The only refusal in the vicinity ' +
+			'belongs to a different rule — approveIntent\'s precondition refuses an out-of-state approval, which is ' +
+			'RPH-INT-003 — and crediting it here would be a subject substitution. What could go wrong with this rule ' +
+			'is a field silently dropped on the success path, which is the F-I shape; the instrument for that is a ' +
+			'state-and-event assertion, not a refusal probe. ' +
+			'AND IT HAS GONE WRONG — DISCOVERED WHILE BUILDING RPH-INT-003\'s PROBE, 2026-08-02, and filed as ' +
+			'REG-F-009. The clause "increments semantic version" IS NOT PERFORMED: `formalizeIntent` does not set ' +
+			'`bumpSemanticVersion`, so a FORMALIZED intent is still at v1; only `reviseIntent` bumps. The probe ' +
+			'fixtures approved v2 on that assumption and had to be corrected to v1 against the running engine. The ' +
+			'disposition is UNCHANGED and correct — no command is refused, and this register still has nothing to ' +
+			'enforce here — but the row would be misleading if it recorded the arm without recording that the ' +
+			'acceptance statement it declines to gate is one the engine does not fully honour.'
+	},
+	'RPH-INT-003': {
+		kind: 'ENFORCED',
+		// NO_CANON_CARRIER IS A RULING, not an omission, and it overrides what the investigation proposed. The
+		// candidate anchor was JPWB-REG-005 REG-Q-007's *Safe default* clause — which does occur in a canon
+		// artifact, so the carriage gate would have passed it. It is refused as carriage because REG-005 is the
+		// Decision and Divergence REGISTER and that sentence is the safe default of an OPEN QUESTION whose own
+		// merge target is DOC-003: it records what to do PENDING a ruling, and treating a pending default as a
+		// ratified carrier would let an unresolved question impersonate canon. The gate cannot make that
+		// distinction — it matches substrings — which is exactly why the judgment is recorded here in prose.
+		canonCarriage: {
+			kind: 'NO_CANON_CARRIER',
+			why:
+				'Canon carries no Intent status machine at all. JPWB-DOC-003 §6 consigns "All exact state ' +
+				'enumerations and the closed transition/guard tables" to repository shapes, and its list of ' +
+				'aggregates that DO carry explicit state sets — decompositions, recompositions, plans, runtime ' +
+				'bindings, assessments, baselines — does not include Intent. STA-6 is the only canon rule whose ' +
+				'scope names the intent lifecycle, and none of its four clauses constrains the ORDER of intent ' +
+				'status transitions. Adopting STA-4 ("the illegal-transition set is absolute") would be a subject ' +
+				'substitution: its nine enumerated laundering paths are all PWU work-lifecycle, plan or baseline. ' +
+				"So this rule's only textual home is the pre-canon conformance specification (§7), and retirement " +
+				'loses it.'
+		},
+		enforcedAt:
+			'DECLARATION: packages/rph-application/src/handlers/intent.ts — approveIntent declares `precondition: fromStates(\'FORMALIZED\', \'REVISED\')`. MECHANISM: packages/rph-application/src/handlers/command-precondition.ts — the FROM_STATES arm of evaluatePrecondition, which mints the code and the message. INVOCATION: intent.ts — advanceIntent evaluates the precondition immediately after loadOrReject and BEFORE the precheck and BEFORE checkTransition.',
+		refusalCode: 'RPH_ILLEGAL_STATE_TRANSITION',
+		// THE TAIL IS THE MARKER, and it has to be. `RPH_ILLEGAL_STATE_TRANSITION` is produced by the machine, by
+		// four prechecks, and by every source set in the system; a code-only probe would prove only that SOMETHING
+		// refused. Widening the precondition to admit RAW makes `checkTransition` refuse the same arrangement with
+		// the SAME code and a different message, so this marker is what distinguishes the site that actually ran.
+		refusalMarker:
+			'to be FORMALIZED or REVISED, but it is RAW. Re-issuing it would append a second IntentApproved',
+		declaredMutations: [
+			"widen the precondition to fromStates('RAW', 'FORMALIZED', 'REVISED') — the INT-004 precheck then fires instead (a RAW intent's desiredOutcomes is always [], since captureIntent hard-codes it and only FormalizeIntent writes outcomes), so the probe reports WRONG_CODE",
+			'widen the precondition AND delete the INT-004 precheck limb — checkTransition then refuses RAW -> APPROVED with the SAME code and a different message, so a code-only probe reports a false KILLED and only the marker reports MASKED',
+			'move the evaluatePrecondition block in advanceIntent to AFTER the precheck call — the INT-004 refusal wins on a RAW intent and the probe reports WRONG_CODE',
+			"change the FROM_STATES arm's code in command-precondition.ts to RPH_VALIDATION_SEMANTIC_FAILED — WRONG_CODE, and it falsifies the ratified statement's own named code"
+		]
+	},
+	'RPH-INT-004': {
+		kind: 'ENFORCED',
+		canonCarriage: {
+			kind: 'CARRIED_BY_GENERAL_RULE',
+			canonAnchor:
+				'is the authorized description of the problem, desired outcomes, users, constraints, non-goals, and s',
+			note: 'JPWB-DOC-002 §5 (the Intent definition) makes desired outcomes constitutive of an AUTHORIZED intent. GENERAL rather than CARRIED because canon defines what an approved intent IS and never states the cardinality this rule enforces — "at least one" is the repository shape of canon\'s definition.'
+		},
+		enforcedAt:
+			'packages/rph-application/src/handlers/intent.ts — approveIntent, the FIRST limb of its `precheck`, evaluated by the shared advanceIntent primitive after the precondition and before checkTransition.',
+		refusalCode: 'RPH_INVARIANT_VIOLATION',
+		refusalMarker: 'An approved intent must record at least one desired outcome (INT-004)',
+		declaredMutations: [
+			'delete the empty-outcomes arm from approveIntent’s precheck — the approval is accepted and the probe reports ADMITTED',
+			'test `outcomes !== undefined` instead of `Array.isArray(outcomes) && outcomes.length > 0` — an empty array passes, which is the arrangement this row refuses',
+			'reorder the precheck so the version-binding limb (RPH-INT-005) runs first — the probe then reports MASKED, since that limb carries its own marker'
+		]
+	},
+	'RPH-INT-005': {
+		kind: 'ENFORCED',
+		canonCarriage: {
+			kind: 'CARRIED_BY_GENERAL_RULE',
+			canonAnchor: 'A decision approving version n never authorizes version n+1.',
+			note: 'JPWB-DOC-003 §8 states the version-binding rule for DECISIONS generally; this rule is its Intent instance. GENERAL rather than CARRIED because canon names decisions and not intent approval specifically — the general rule survives retirement of the pre-canon §7 corpus, the Intent-specific application does not.'
+		},
+		enforcedAt:
+			'packages/rph-application/src/handlers/intent.ts — approveIntent, the SECOND limb of its `precheck` (labelled W3-INC-1): the approval\'s `approvedSemanticVersion` must equal the intent\'s current semanticVersion.',
+		refusalCode: 'RPH_INVARIANT_VIOLATION',
+		// DELIBERATELY NOT sharing RPH-INT-004's marker, and the two are refused by the SAME precheck in sequence —
+		// the RPH-PWU-009/010 situation. INT-004 fires FIRST, so this row's probe must supply desired outcomes to
+		// reach the limb it is about; an arrangement that omitted them would green this row on INT-004's refusal.
+		refusalMarker: 'A stale or mismatched approval cannot govern this intent version',
+		declaredMutations: [
+			'delete the version-comparison arm from approveIntent’s precheck — a stale approval is accepted and the probe reports ADMITTED',
+			'compare against the approval’s own `approvedSemanticVersion` instead of the intent’s current `semanticVersion` — the check becomes a tautology, the F-30 shape',
+			'drop the `typeof currentVersion === \'number\'` fail-closed guard so an unversioned intent skips the comparison entirely'
+		]
+	},
+	'RPH-INT-006': {
+		kind: 'NOT_A_COMMAND_REFUSAL',
+		canonCarriage: {
+			kind: 'CARRIED_BY_GENERAL_RULE',
+			canonAnchor:
+				'upstream semantic change, and post-recomposition sibling conflict route satisfied work into reshapin',
+			note: 'JPWB-DOC-003 §5 states that an upstream semantic change routes satisfied work into reshaping — the consequence this rule enumerates in detail. GENERAL because canon names neither Intent revision specifically nor the six separate effects listed here.'
+		},
+		why:
+			'Six consequents, and every one is an OUTCOME of an accepted ReviseIntent: the version increments, the ' +
+			'event is emitted, impact analysis is requested, descendants are classified, the prior baseline stays ' +
+			'immutable, prior approvals are marked review-required. No dispatch violates this rule by being ACCEPTED. ' +
+			'Two of the six moreover have no plane to occur in — "requests impact analysis" and "classifies affected ' +
+			'descendants" need the impact-analysis surface this engine does not have (`impactedObjects` has no ' +
+			'production caller and awaits a TraceLink-minting command), which is the same blocker that keeps DOC-003 ' +
+			'DEC-2 unimplemented on the revise path under REG-F-006. Filing this as a disclosure would claim a ' +
+			'refusal gap where the truth is an absent capability recorded elsewhere.'
+	},
+	'RPH-INT-007': {
+		kind: 'NOT_A_COMMAND_REFUSAL',
+		canonCarriage: {
+			kind: 'CARRIED',
+			canonAnchor: 'a superseded intent cannot authorize new PWUs',
+			note: 'JPWB-DOC-003 §5 STA-6 states the rule verbatim. Carriage is total here even though enforcement is absent — the independence of the two axes, in the direction RPH-EXE-007 already demonstrates.'
+		},
+		why:
+			'THE ANTECEDENT IS COMMAND-UNREACHABLE, which is an unusual reason for this arm and must be read as ' +
+			'stated: this row does NOT mean ProposePwu is guarded. It is not. `proposePwu` loads the intent, checks ' +
+			'that it EXISTS, then narrows it to `{ ontologyId, ontologyVersion }` and copies those two fields; it ' +
+			'never reads `intentStatus`, so a superseded intent would sail through. But no dispatch sequence can put ' +
+			'an Intent into SUPERSEDED: six INTENT commands are registered, none targets it, `SupersedeIntent` and ' +
+			'`WithdrawIntent` occur nowhere in the repository, intent.ts is the only production writer of the ' +
+			'aggregate, and the engine has no generic aggregate-mutation command. SUPERSEDED and WITHDRAWN are ' +
+			'declared terminal states of the ratified machine and both are unreachable. So the ENFORCED arm is closed ' +
+			'by the absent guard, and BOTH members of the UNENFORCED guard union are closed too: OBSERVED_ADMISSION ' +
+			'has no dispatchable arrangement, and DEAD_PREDICATE has no honest subject — `INTENT_AT_LEAST_PROVISIONAL` ' +
+			'is a trap that would PASS the census gate (its census is pwuGuards.ts alone, excluding the command ' +
+			'layer) while being false on both clauses: it IS asked, from markPwuReady, and its subject is a ROOT PWU ' +
+			'at readiness rather than any PWU at proposal, so a non-root PWU escapes it entirely. That is the ' +
+			'RPH-EXE-005 substitution and the RPH-ASR-004/008 near miss taken together, and it is declined here ' +
+			'deliberately rather than stumbled into. THE RESIDUE, stated because it is real: if SUPERSEDED ever ' +
+			'becomes reachable, this rule becomes a live UNENFORCED_DISCLOSED row on the same day.'
 	}
 };
 

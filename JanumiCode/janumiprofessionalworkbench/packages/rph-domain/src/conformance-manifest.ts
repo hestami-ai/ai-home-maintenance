@@ -77,6 +77,12 @@ const COVERED_BY_ID: Readonly<Record<string, string>> = {
 	// guarantee on the strength of a publish-path refusal. The row is now UNENFORCED_DISCLOSED.
 	'RPH-ASR-002': 'packages/rph-application/src/handlers/execrem-wp16-enforcement-observed.test.ts',
 	'RPH-ASR-007': 'packages/rph-application/src/handlers/execrem-wp16-enforcement-observed.test.ts',
+	// The RPH-INT tranche (2026-08-02). Three of seven are ENFORCED and cite their probes; the other four are
+	// NOT_A_COMMAND_REFUSAL and carry no per-id row, because their statements describe what an ACCEPTED command
+	// produces rather than anything a dispatch could be refused for.
+	'RPH-INT-003': 'packages/rph-application/src/handlers/execrem-wp16-enforcement-observed.test.ts',
+	'RPH-INT-004': 'packages/rph-application/src/handlers/execrem-wp16-enforcement-observed.test.ts',
+	'RPH-INT-005': 'packages/rph-application/src/handlers/execrem-wp16-enforcement-observed.test.ts',
 	'RPH-PER-001': 'packages/rph-persistence/src/sqlite-storage-adapter.test.ts',
 	'RPH-PER-002': 'packages/rph-persistence/src/sqlite-storage-adapter.test.ts',
 	'RPH-PER-007': 'packages/rph-projections/src/work-projection.test.ts',
@@ -163,7 +169,13 @@ const COVERAGE_BY_PREFIX: Readonly<Record<string, Coverage>> = {
 	'RPH-INT': {
 		status: 'PARTIAL',
 		testFile: 'packages/rph-domain/src/{transitions,binding}.test.ts',
-		note: 'state-machine legality + command→event binding covered; INT-004/005/006/007 (Intent-aggregate invariant/version/cascade/authority) pending an Intent-aggregate test'
+		// NOTE CORRECTED 2026-08-02 by the enforcement-register RPH-INT tranche. The old text listed
+		// "INT-004/005/006/007 … pending an Intent-aggregate test", which was stale in both directions: INT-004 and
+		// INT-005 are ENFORCED and now cited by id above (both refused by approveIntent's precheck, in that order),
+		// while INT-006 and INT-007 are not pending a test at all — the register disposes them as
+		// NOT_A_COMMAND_REFUSAL, INT-006 because its six consequents are outcomes (two of which need an
+		// impact-analysis plane that does not exist) and INT-007 because its antecedent is command-unreachable.
+		note: 'INT-003/004/005 ENFORCED and cited by id above; INT-001/002/006/007 are NOT_A_COMMAND_REFUSAL in enforcement-register.ts (INT-001/002 describe what an accepted command produces; INT-006 enumerates outcomes; INT-007 has a command-unreachable antecedent). The enforcement question is answered in the register, not by this row.'
 	},
 	'RPH-PWU': {
 		status: 'PARTIAL',

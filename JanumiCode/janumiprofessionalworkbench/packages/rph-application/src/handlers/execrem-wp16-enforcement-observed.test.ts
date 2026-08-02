@@ -162,6 +162,60 @@ describe('JAN-EXECREM WP-16 (c) — the enforcement register is OBSERVED, not as
 		return ok(dispatch('ActivateExecutionPlan', { authorizedRuntimeBindingIds: [] }), 'activate');
 	}
 
+	// ── intent fixtures (RPH-INT-003/004/005) ────────────────────────────────────────────────────────────────
+	// The lifecycle is RAW -> UNDER_DISCOVERY -> PROVISIONAL -> FORMALIZED.
+	//
+	// A FORMALIZED INTENT IS AT v1, NOT v2, AND THAT IS A FINDING RATHER THAN A FIXTURE DETAIL. RPH-INT-002's
+	// ratified statement says FormalizeIntent "increments semantic version"; `formalizeIntent` does not set
+	// `bumpSemanticVersion`, and only `reviseIntent` does. The controls below therefore approve v1 — and they had
+	// to be corrected to it, because the first draft assumed the rule was performed. See REG-F-009.
+
+	const captureIntent = (id: string) =>
+		ok(
+			dispatch(
+				'CaptureIntent',
+				{ intentId: id, originatingExpression: 'x', ontologyId: 'o', ontologyVersion: '1' },
+				id,
+				'INTENT'
+			),
+			`capture ${id}`
+		);
+
+	/** Drive an intent to FORMALIZED. `outcomes` defaults to one; pass [] for the RPH-INT-004 arrangement. */
+	const formalizeIntent = (id: string, outcomes: unknown[] = [{ statement: 'the outcome' }]) => {
+		ok(dispatch('BeginIntentDiscovery', {}, id, 'INTENT'), `discover ${id}`);
+		ok(dispatch('ProvisionIntent', { ambiguityIds: [] }, id, 'INTENT'), `provision ${id}`);
+		ok(
+			dispatch(
+				'FormalizeIntent',
+				{
+					formalizedObjective: 'objective',
+					desiredOutcomes: outcomes,
+					successConditions: [],
+					nonGoals: [],
+					ambiguityIds: [],
+					constraintIds: [],
+					stakeholderIds: []
+				},
+				id,
+				'INTENT'
+			),
+			`formalize ${id}`
+		);
+	};
+
+	const approveIntent = (id: string, approvedSemanticVersion: number) =>
+		dispatch(
+			'ApproveIntent',
+			{
+				decisionId: `dec_${id.slice(-4)}`,
+				approvedSemanticVersion,
+				approvalScope: 'the whole intent'
+			},
+			id,
+			'INTENT'
+		);
+
 	// ── assurance fixtures (RPH-ASR-002 / RPH-ASR-007) ───────────────────────────────────────────────────────
 	// A subject the assessments can name. The PWU seeded in beforeEach serves; these only need it to exist.
 
@@ -717,7 +771,61 @@ describe('JAN-EXECREM WP-16 (c) — the enforcement register is OBSERVED, not as
 		// RPH-ASR-010 was drafted ENFORCED here against the PWA-publish floor gate and re-dispositioned to
 		// UNENFORCED_DISCLOSED before any probe was written — the floor gate's version binding is real, and is over
 		// a different subject. Its admission is observed in `disclosure-observed.test.ts`.
-		'RPH-ASR-010': null
+		'RPH-ASR-010': null,
+
+		// ── THE RPH-INT FAMILY (2026-08-02) ────────────────────────────────────────────────────────────────────
+		// Four of seven describe what an ACCEPTED command produces and are `null` here by type; they are not
+		// disclosed either, so they appear in neither observation map. Three are refused, all three by
+		// `approveIntent`, and the ORDER of its guards is what these probes have to navigate.
+		'RPH-INT-001': null,
+		'RPH-INT-002': null,
+		'RPH-INT-006': null,
+		'RPH-INT-007': null,
+		'RPH-INT-003': {
+			arrangement: 'ApproveIntent dispatched against a RAW intent — before it has been formalized',
+			run: () => {
+				const RAW = 'int_01ARZ3NDEKTSV4RRFFQ69H6200';
+				captureIntent(RAW);
+				// CONTROL: the SAME command on the SAME kind of intent, driven to FORMALIZED first. So a handler
+				// that refused every approval cannot green this row.
+				const OK = 'int_01ARZ3NDEKTSV4RRFFQ69H6201';
+				captureIntent(OK);
+				formalizeIntent(OK);
+				return { control: approveIntent(OK, 1), observed: approveIntent(RAW, 1) };
+			}
+		},
+		'RPH-INT-004': {
+			arrangement:
+				'ApproveIntent on a FORMALIZED intent whose desiredOutcomes is empty — an approval with nothing to approve',
+			run: () => {
+				const EMPTY = 'int_01ARZ3NDEKTSV4RRFFQ69H6210';
+				captureIntent(EMPTY);
+				formalizeIntent(EMPTY, []); // formalized, but with no desired outcomes
+				const OK = 'int_01ARZ3NDEKTSV4RRFFQ69H6211';
+				captureIntent(OK);
+				formalizeIntent(OK);
+				return { control: approveIntent(OK, 1), observed: approveIntent(EMPTY, 1) };
+			}
+		},
+		'RPH-INT-005': {
+			arrangement:
+				'ApproveIntent naming a semantic version the intent is not at — a stale approval offered as authority',
+			run: () => {
+				// THE MASKING HAZARD THIS ROW HAS TO CLEAR, and it is the reason the fixture supplies outcomes.
+				// RPH-INT-004's limb runs FIRST in the same precheck; an arrangement that omitted desiredOutcomes
+				// would be refused by THAT limb and would green this row on the wrong refusal. The marker would
+				// report MASKED, but only because the marker exists — a code-only probe would report KILLED, since
+				// both limbs carry RPH_INVARIANT_VIOLATION.
+				const STALE = 'int_01ARZ3NDEKTSV4RRFFQ69H6220';
+				captureIntent(STALE);
+				formalizeIntent(STALE);
+				const OK = 'int_01ARZ3NDEKTSV4RRFFQ69H6221';
+				captureIntent(OK);
+				formalizeIntent(OK);
+				// The control names the CURRENT version; the observation names a version the intent is not at.
+				return { control: approveIntent(OK, 1), observed: approveIntent(STALE, 99) };
+			}
+		}
 	};
 
 	it('the probe map is TOTAL over the ENFORCED rows — every claim has an observation', () => {
