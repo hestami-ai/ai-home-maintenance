@@ -63,7 +63,7 @@ describe('AdmitEvidence enforces §8.11 admissibility at the call site (live)', 
 	const INADMISSIBLE = {
 		evidenceId: EV,
 		evidenceType: 'TEST_RESULT',
-		contentReference: {},
+		contentReference: { uri: 'file://fixture-artifact' },
 		producedBy: human,
 		supportsClaimIds: [],
 		contradictsClaimIds: [],
@@ -82,7 +82,7 @@ describe('AdmitEvidence enforces §8.11 admissibility at the call site (live)', 
 
 	it('the kernel already knows this Evidence is inadmissible — nothing in the pipeline asks it', () => {
 		const verdict = evidenceAdmissibility(
-			{ id: EV, provenance: human, contentReference: {}, scope: '', limitations: [] },
+			{ id: EV, provenance: human, contentReference: { uri: 'file://fixture-artifact' }, scope: '', limitations: [] },
 			{}
 		);
 		expect(verdict.admissible).toBe(false);

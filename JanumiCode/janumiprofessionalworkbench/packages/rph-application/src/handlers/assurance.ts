@@ -470,6 +470,10 @@ export const admitEvidence: CommandHandler = (ctx, command, payload) => {
 			const verdict = evidenceAdmissibility({
 				id: String((state.id ?? '') as Stringifiable),
 				provenance: state.provenance,
+				// REG-F-008: the PRODUCING ACTOR, which the predicate could not see before. `proposeEvidence` writes
+				// it from the ratified required `ProposeEvidence.producedBy`; the envelope's `provenance` is a
+				// defaulted origin record and never named an actor.
+				producedBy: state.producedBy,
 				contentReference: state.contentReference,
 				scope: state.scope as string | undefined,
 				limitations: state.limitations as readonly string[] | undefined,

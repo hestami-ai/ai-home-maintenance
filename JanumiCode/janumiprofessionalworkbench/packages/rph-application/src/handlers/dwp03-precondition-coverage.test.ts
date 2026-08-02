@@ -151,7 +151,7 @@ describe('DWP-03 evidence/assumption — re-issue refused on Evidence.status / A
 			h.d('ProposeEvidence', EV, 'EVIDENCE', {
 				evidenceId: EV,
 				evidenceType: 'TEST_RESULT',
-				contentReference: {},
+				contentReference: { uri: 'file://fixture-artifact' },
 				producedBy: HUMAN,
 				supportsClaimIds: [],
 				contradictsClaimIds: [],

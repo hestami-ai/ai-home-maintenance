@@ -69,7 +69,7 @@ describe('WIRE #4 — invalidated evidence re-contests the claims it supported (
 			h.d('ProposeEvidence', evidenceId, 'EVIDENCE', {
 				evidenceId,
 				evidenceType: 'TEST_RESULT',
-				contentReference: {},
+				contentReference: { uri: 'file://fixture-artifact' },
 				producedBy: HUMAN,
 				supportsClaimIds: [...claimIds],
 				contradictsClaimIds: [],

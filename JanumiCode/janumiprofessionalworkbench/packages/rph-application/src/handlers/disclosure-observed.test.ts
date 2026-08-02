@@ -495,27 +495,11 @@ describe('the register\'s RPH-EVD disclosures are OBSERVED, not asserted', () =>
 			}
 		},
 
-		'RPH-EVD-003': {
-			arrangement:
-				'Evidence whose contentReference is {} — a source reference naming nothing — admitted to ADMISSIBLE',
-			run: () => {
-				const EV = 'evd_01ARZ3NDEKTSV4RRFFQ69G5FB1';
-				// THE SCHEMA-FORECLOSED HALF, asserted so this narrower disclosure says where the rest of the rule
-				// went. The producing-actor half CANNOT be arranged: ActorReferenceSchema requires .min(1) ids.
-				expect(
-					proposeEvidence('evd_01ARZ3NDEKTSV4RRFFQ69G5FA1', {
-						producedBy: { actorId: '', actorType: 'MODEL', displayName: '' }
-					}).status,
-					'the producing-actor half is schema-foreclosed; if this ever becomes ACCEPTED the disclosure must widen'
-				).toBe('VALIDATION_FAILED');
-
-				ok(proposeEvidence(EV, { contentReference: {} }), 'propose sourceless evidence');
-				return {
-					admitted: admitEvidence(EV),
-					control: liveGuardControl('evd_01ARZ3NDEKTSV4RRFFQ69G5FC1')
-				};
-			}
-		},
+		// RPH-EVD-003 was disclosed here until 2026-08-02, when REG-F-008's remediation turned this very probe RED
+		// and forced its re-disposition to ENFORCED. Its refusal is now observed in
+		// `execrem-wp16-enforcement-observed.test.ts`. Left as a named null rather than deleted, because the
+		// row moving between the two maps IS the mechanism working and a reader should be able to see it happened.
+		'RPH-EVD-003': null,
 
 		'RPH-EVD-004': {
 			arrangement:

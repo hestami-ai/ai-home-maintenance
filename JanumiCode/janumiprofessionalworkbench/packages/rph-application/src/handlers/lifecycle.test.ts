@@ -182,7 +182,7 @@ describe('Execution / assurance / governance / decomposition handlers (live)', (
 			{
 				evidenceId: EV,
 				evidenceType: 'TEST_RESULT',
-				contentReference: {},
+				contentReference: { uri: 'file://fixture-artifact' },
 				producedBy: human,
 				supportsClaimIds: [],
 				contradictsClaimIds: [],

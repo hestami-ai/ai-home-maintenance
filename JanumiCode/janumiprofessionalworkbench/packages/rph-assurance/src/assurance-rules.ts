@@ -96,11 +96,40 @@ export function aggregateDisposition(
 export interface EvidenceForAdmissibility {
 	readonly id?: string;
 	readonly provenance?: unknown;
+	/**
+	 * THE PRODUCING ACTOR — added 2026-08-02 closing REG-F-008.
+	 *
+	 * This type previously had no field for it, which made RPH-EVD-003 ("an Evidence Object with no producing
+	 * actor or source has its admission rejected") INEXPRESSIBLE to the predicate that was supposed to enforce it.
+	 * `provenance` was standing in, and could not: `newEnvelope` sets that field unconditionally on every object
+	 * with a defaulted `originType`, so a null-check on it can never fail. The actor lives here.
+	 */
+	readonly producedBy?: unknown;
 	readonly contentReference?: unknown;
 	readonly scope?: string;
 	readonly limitations?: readonly string[];
 	readonly status?: string;
 	readonly supportsClaimIds?: readonly string[];
+}
+
+/** Whether a value names an actor — an object carrying a non-empty `actorId`. */
+function namesAnActor(value: unknown): boolean {
+	if (typeof value !== 'object' || value === null) return false;
+	const actorId = (value as { actorId?: unknown }).actorId;
+	return typeof actorId === 'string' && actorId.length > 0;
+}
+
+/**
+ * Whether a content reference points at anything.
+ *
+ * `ArtifactReferenceSchema` is `z.record(z.string(), z.unknown())`, so `{}` is schema-valid — and the previous
+ * `=== undefined || === null` test admitted it. An empty reference names no source, which is exactly the second
+ * half of what RPH-EVD-003 forbids (REG-F-008).
+ */
+function referencesContent(value: unknown): boolean {
+	if (value === undefined || value === null) return false;
+	if (typeof value === 'object') return Object.keys(value as object).length > 0;
+	return String(value).length > 0;
 }
 export interface AdmissibilityResult {
 	readonly admissible: boolean;
@@ -115,9 +144,13 @@ export function evidenceAdmissibility(
 ): AdmissibilityResult {
 	const failed: string[] = [];
 	if (!e.id) failed.push('IDENTITY_STABLE');
-	if (e.provenance === undefined || e.provenance === null) failed.push('PROVENANCE_PRESENT');
-	if (e.contentReference === undefined || e.contentReference === null)
-		failed.push('CONTENT_AVAILABLE');
+	// REG-F-008. Both limbs below were previously null-checks over fields that could not be null in practice, so
+	// neither could fail: `provenance` is set unconditionally by `newEnvelope` with a defaulted originType, and
+	// `contentReference` is a `z.record` that `{}` satisfies. A guard limb that cannot fail is indistinguishable
+	// from an absent one except that it reports success — the shape this programme keeps finding in tests, found
+	// here in production. Both now read the thing the rule is actually about.
+	if (!namesAnActor(e.producedBy)) failed.push('PROVENANCE_PRESENT');
+	if (!referencesContent(e.contentReference)) failed.push('CONTENT_AVAILABLE');
 	if (!e.scope) failed.push('SCOPE_STATED');
 	if (e.limitations === undefined) failed.push('LIMITATIONS_RECORDED'); // an empty array counts as recorded
 	if (e.status === 'INVALIDATED') failed.push('NOT_INVALIDATED');

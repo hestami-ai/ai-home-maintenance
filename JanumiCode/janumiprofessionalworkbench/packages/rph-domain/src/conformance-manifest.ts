@@ -62,6 +62,10 @@ const COVERED_BY_ID: Readonly<Record<string, string>> = {
 	// EVD-007 appears: it is the only rule of the seven the register disposes as ENFORCED, and a per-id COVERED
 	// row for any of the other six would collide with the register's "no disclosed rule is certified COVERED" gate.
 	'RPH-EVD-007': 'packages/rph-application/src/handlers/evidence-admissibility-gate.test.ts',
+	// ADDED 2026-08-02 when REG-F-008's remediation moved EVD-003 from disclosed to ENFORCED. It cites the
+	// enforcement probe rather than the admissibility-gate test because that test's fixture is the SCOPE limb,
+	// which is EVD-007; this rule's refusal is the CONTENT limb, and the two must not share their evidence.
+	'RPH-EVD-003': 'packages/rph-application/src/handlers/execrem-wp16-enforcement-observed.test.ts',
 	// The RPH-ASR tranche (2026-08-02). Same requirement, same reason: the ENFORCED rows must cite evidence at the
 	// COMMAND layer or the register's layer gate reddens. Only TWO of the twelve qualify. The other ten carry no
 	// per-id row — five are disclosed as unenforced (a COVERED row would collide with the register's overclaim

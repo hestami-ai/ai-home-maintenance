@@ -530,7 +530,75 @@ describe('JAN-EXECREM WP-16 (c) — the enforcement register is OBSERVED, not as
 		// The three disclosed rows are observed being ADMITTED instead, in `disclosure-observed.test.ts`.
 		'RPH-EVD-001': null,
 		'RPH-EVD-002': null,
-		'RPH-EVD-003': null,
+		'RPH-EVD-003': {
+			arrangement:
+				'Evidence whose contentReference is {} — a source reference naming nothing — offered for admission (REG-F-008 remediation)',
+			run: () => {
+				const propose = (evId: string, over: Record<string, unknown> = {}) =>
+					ok(
+						dispatch(
+							'ProposeEvidence',
+							{
+								evidenceId: evId,
+								evidenceType: 'TEST_RESULT',
+								contentReference: { uri: 'file://report.xml' },
+								producedBy: { actorId: 'ci-1', actorType: 'SERVICE', displayName: 'CI' },
+								supportsClaimIds: [],
+								contradictsClaimIds: [],
+								scope: 'unit tests for module X',
+								limitations: [],
+								capturedAt: TS,
+								...over
+							},
+							evId,
+							'EVIDENCE'
+						),
+						`propose ${evId}`
+					);
+				const admit = (evId: string) =>
+					dispatch(
+						'AdmitEvidence',
+						{
+							admissibilityAssessmentId: 'asm_01ARZ3NDEKTSV4RRFFQ69G5F02',
+							admittedScope: 'unit tests for module X',
+							admittedClaimIds: []
+						},
+						evId,
+						'EVIDENCE'
+					);
+
+				const EV_OK = 'evd_01ARZ3NDEKTSV4RRFFQ69G5FB2';
+				const EV_BAD = 'evd_01ARZ3NDEKTSV4RRFFQ69G5FB1';
+				propose(EV_OK);
+				propose(EV_BAD, { contentReference: {} });
+
+				// THE SECOND HALF OF THE RULE, asserted here because the marker only pins the CONTENT limb and the
+				// register's declaredMutations name that asymmetry explicitly. A producing actor that names nobody
+				// is refused too — at the SCHEMA layer, since ActorReferenceSchema requires .min(1) ids, so it never
+				// reaches this guard. Recorded so a reader knows where the other half is enforced.
+				expect(
+					dispatch(
+						'ProposeEvidence',
+						{
+							evidenceId: 'evd_01ARZ3NDEKTSV4RRFFQ69G5FA1',
+							evidenceType: 'TEST_RESULT',
+							contentReference: { uri: 'x' },
+							producedBy: { actorId: '', actorType: 'MODEL', displayName: '' },
+							supportsClaimIds: [],
+							contradictsClaimIds: [],
+							scope: 's',
+							limitations: [],
+							capturedAt: TS
+						},
+						'evd_01ARZ3NDEKTSV4RRFFQ69G5FA1',
+						'EVIDENCE'
+					).status,
+					'the producing-actor half is schema-foreclosed; if it ever becomes ACCEPTED this row must widen'
+				).toBe('VALIDATION_FAILED');
+
+				return { control: admit(EV_OK), observed: admit(EV_BAD) };
+			}
+		},
 		'RPH-EVD-004': null,
 		'RPH-EVD-005': null,
 		'RPH-EVD-006': null,

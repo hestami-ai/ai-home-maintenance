@@ -106,7 +106,7 @@ describe('PromoteBaseline blocks on invalidated supporting evidence (P4 / CT-10,
 			{
 				evidenceId: EV,
 				evidenceType: 'TEST_RESULT',
-				contentReference: {},
+				contentReference: { uri: 'file://fixture-artifact' },
 				producedBy: human,
 				supportsClaimIds: [CLAIM],
 				contradictsClaimIds: [],

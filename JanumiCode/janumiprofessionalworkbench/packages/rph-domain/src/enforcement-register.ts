@@ -648,44 +648,37 @@ export const ENFORCEMENT_REGISTER: Readonly<Record<RegisteredRuleId, Enforcement
 			'violated by any dispatch, because the illegal transition is unreachable rather than unguarded, and ' +
 			'recording it as UNENFORCED_DISCLOSED would claim a gap that no arrangement can demonstrate.'
 	},
+	// RE-DISPOSITIONED 2026-08-02, UNENFORCED_DISCLOSED -> ENFORCED, BY THE DISCLOSURE'S OWN GUARD.
+	//
+	// THIS ROW IS THE MECHANISM'S PROOF, so the sequence is recorded rather than summarised. The row was landed
+	// 2026-08-01 disclosing that `contentReference: {}` was admitted and that PROVENANCE_PRESENT was structurally
+	// unfailable, guarded by an OBSERVED_ADMISSION probe. That gap was filed as REG-F-005's sibling, REG-F-008.
+	// Remediating it — teaching `evidenceAdmissibility` to read the PRODUCING ACTOR and to reject a content
+	// reference that references nothing — turned the acceptance probe RED, exactly as the guard's contract says it
+	// must, with a failure message instructing the reader to re-disposition this row. That is what happened.
+	//
+	// The disclosure never had a chance to outlive the condition it disclosed. Compare RPH-EXE-004, whose census
+	// guard has held a real deferral honest for months, and RPH-ASR-010, whose guard is still holding one now.
 	'RPH-EVD-003': {
-		kind: 'UNENFORCED_DISCLOSED',
+		kind: 'ENFORCED',
 		canonCarriage: {
 			kind: 'CARRIED',
 			canonAnchor: 'provenance is present; content or reference is available',
-			note: 'JPWB-DOC-003 §7, the admissibility conditions. Canon carries BOTH halves of this rule; the engine forecloses one at the schema layer and leaves the other open, which is why the disclosure below is narrower than the ratified statement.'
+			note: 'JPWB-DOC-003 §7, the admissibility conditions. Canon carries BOTH halves, and BOTH are now enforced — the producing-actor half at the schema layer (ProposeEvidence.producedBy is a required ActorReferenceSchema with .min(1) ids) and the source half here, semantically.'
 		},
-		why:
-			'THE RULE HAS TWO HALVES AND THEY HAVE DIFFERENT ANSWERS — a distinction that only survives being ' +
-			'dispatched, and that source-reading alone got wrong in both directions. (1) THE PRODUCING-ACTOR HALF IS ' +
-			'SCHEMA-FORECLOSED, not unenforced: `ProposeEvidence.producedBy` is a required `ActorReferenceSchema` whose ' +
-			'`actorId` and `displayName` are `.min(1)`, so evidence with no producing actor cannot be proposed at all ' +
-			'(observed: VALIDATION_FAILED / RPH_VALIDATION_SCHEMA_FAILED, never reaching a handler). That is enforcement ' +
-			'at the SCHEMA layer, and this register\'s ENFORCED arm cannot express it — `classifyRefusal` reads only ' +
-			'`REJECTED`, so a schema foreclosure classifies as ADMITTED. (2) THE SOURCE HALF IS NOT ENFORCED. ' +
-			'`ArtifactReferenceSchema` is `z.record(z.string(), z.unknown())`, so `contentReference: {}` — a source ' +
-			'reference pointing at nothing — is schema-valid, and the admissibility guard\'s CONTENT_AVAILABLE limb is ' +
-			'`contentReference === undefined || null`, which `{}` passes. AND THE PROVENANCE LIMB IS STRUCTURALLY ' +
-			'UNFAILABLE: `newEnvelope` (packages/rph-application/src/handlers/kit.ts) sets `provenance` unconditionally ' +
-			'on EVERY object, with a DEFAULTED `originType: \'USER_INPUT\'` and empty source arrays, so ' +
-			'PROVENANCE_PRESENT null-checks a field the engine itself always populates and which names no producing ' +
-			'actor. The actor is in `producedBy`, and `EvidenceForAdmissibility` ' +
-			'(packages/rph-assurance/src/assurance-rules.ts) has no `producedBy` field, so the predicate cannot express ' +
-			'the rule even in principle. A live guard limb that cannot fail is the same defect this programme keeps ' +
-			'finding in tests, here in production.',
-		guard: {
-			kind: 'OBSERVED_ADMISSION',
-			arrangement:
-				'ProposeEvidence with `contentReference: {}` — a source reference naming nothing — then AdmitEvidence, which is ACCEPTED and advances the Evidence to ADMISSIBLE',
-			control:
-				"the byte-identical arrangement with `scope: ''` instead, which the SAME guard at the SAME site REFUSES with RPH_VALIDATION_SEMANTIC_FAILED — so the admission above is a missing limb of a live guard, not a dead guard",
-			whyNoPredicate:
-				'`evidenceAdmissibility` is NOT the dead predicate: it IS asked (the admitEvidence guard calls it) and ' +
-				'it does NOT implement this rule (its input type has no `producedBy`, and CONTENT_AVAILABLE is a ' +
-				'null-check). Naming it would make both clauses of `deadPredicate`\'s own contract false. And ' +
-				'`producedBy`\'s production census already contains handlers/assurance.ts, so a census guard could not ' +
-				'detect the wiring it would exist to detect.'
-		}
+		enforcedAt:
+			'DECISION: packages/rph-assurance/src/assurance-rules.ts — evidenceAdmissibility, whose PROVENANCE_PRESENT limb now reads `producedBy` through `namesAnActor` and whose CONTENT_AVAILABLE limb uses `referencesContent`. ENFORCEMENT: packages/rph-application/src/handlers/assurance.ts — admitEvidence, whose advanceStatus `guard` passes `producedBy` and rejects on `!verdict.admissible`.',
+		refusalCode: 'RPH_VALIDATION_SEMANTIC_FAILED',
+		// DISTINCT FROM RPH-EVD-007's marker, and the distinction is the failed CONDITION NAME rather than the
+		// prefix — the same discipline EVD-007's row already records. Both rules are refused by the same guard at
+		// the same site, so a marker stopping at "failed" would let one arrangement green both rows.
+		refusalMarker: 'is inadmissible (§8.11) — failed CONTENT_AVAILABLE',
+		declaredMutations: [
+			'restore `contentReference === undefined || null` in place of `referencesContent` — `{}` is admitted again and the probe reports ADMITTED',
+			'make `referencesContent` return true for any non-null value, dropping the empty-record test',
+			'restore the PROVENANCE_PRESENT limb to null-check `provenance` instead of `producedBy` — the limb becomes structurally unfailable again (REG-F-008), which the probe does NOT catch, because it arranges the CONTENT half; that asymmetry is why the row carries a second probe assertion on the provenance limb',
+			'stop passing `producedBy: state.producedBy` at the admitEvidence call site — the predicate can no longer see the actor, the F-30 shape'
+		]
 	},
 	'RPH-EVD-004': {
 		kind: 'UNENFORCED_DISCLOSED',

@@ -86,6 +86,10 @@ describe('evidenceAdmissibility (§6.2, 8 conditions)', () => {
 	const good = {
 		id: 'evd_1',
 		provenance: {},
+		// REG-F-008: PROVENANCE_PRESENT now reads the PRODUCING ACTOR rather than the envelope's auto-populated
+		// `provenance`. This fixture previously passed that limb on `provenance: {}` — which is precisely the
+		// vacuity the finding records: an empty object satisfying a check about who produced the evidence.
+		producedBy: { actorId: 'ci-1', actorType: 'SERVICE', displayName: 'CI' },
 		contentReference: 'ref',
 		scope: 'unit',
 		limitations: [],
