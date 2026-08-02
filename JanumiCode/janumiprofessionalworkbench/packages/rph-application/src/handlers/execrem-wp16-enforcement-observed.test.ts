@@ -435,7 +435,7 @@ describe('JAN-EXECREM WP-16 (c) — the enforcement register is OBSERVED, not as
 		// ── THE RPH-EVD FAMILY (2026-08-01) ────────────────────────────────────────────────────────────────────
 		// Six of the seven are not ENFORCED, so they are `null` here BY TYPE — the map is a total Record, and the
 		// gate below rejects both a missing probe for an ENFORCED row and a probe for a row that is not.
-		// The three disclosed rows are observed being ADMITTED instead, in `evd-disclosure-observed.test.ts`.
+		// The three disclosed rows are observed being ADMITTED instead, in `disclosure-observed.test.ts`.
 		'RPH-EVD-001': null,
 		'RPH-EVD-002': null,
 		'RPH-EVD-003': null,
@@ -489,6 +489,68 @@ describe('JAN-EXECREM WP-16 (c) — the enforcement register is OBSERVED, not as
 				// row, which is the failure mode an "is it refused?" assertion alone would certify as success.
 				return { control: admit(EV_OK), observed: admit(EV_BAD) };
 			}
+		},
+
+		// ── THE RPH-ASR FAMILY (2026-08-02) ────────────────────────────────────────────────────────────────────
+		// Nine of twelve are not ENFORCED and are `null` here by type; four of those nine are observed being
+		// ADMITTED in `disclosure-observed.test.ts`. RPH-ASR-010 is enforced on the PWA PUBLISH path rather than
+		// the assessment path, and its refusal is already driven end to end by `pwa-publish-stale-floor.test.ts`,
+		// which is what the manifest cites; it is probed here as well because this map is total over ENFORCED rows.
+		'RPH-ASR-001': null,
+		'RPH-ASR-003': null,
+		'RPH-ASR-004': null,
+		'RPH-ASR-005': null,
+		'RPH-ASR-006': null,
+		'RPH-ASR-008': null,
+		'RPH-ASR-009': null,
+		'RPH-ASR-011': null,
+		'RPH-ASR-012': null,
+		'RPH-ASR-002': {
+			arrangement:
+				'a completion recommending SATISFIED against a policy whose evidence requirement is required FOR that disposition, with nothing submitted for it',
+			run: () => {
+				const POL = 'pol_01ARZ3NDEKTSV4RRFFQ69G5D02';
+				const ok1 = asrPolicy(POL, {
+					requiredEvidence: [
+						{
+							id: 'R-TRACE',
+							name: 'Requirement trace matrix',
+							description: 'the trace matrix the coverage assessment rests on',
+							requiredForDispositions: ['SATISFIED']
+						}
+					]
+				});
+				expect(ok1.status, `seed policy: ${ok1.message}`).toBe('ACCEPTED');
+				// CONTROL — the SAME policy, the SAME command, recommending a NON-satisfied disposition, which
+				// Gate A lets through. So a gate that refused every completion cannot green this row.
+				const control = asrComplete('asm_01ARZ3NDEKTSV4RRFFQ69G5D02', POL, {
+					dispositionRecommendation: 'INCONCLUSIVE'
+				});
+				const observed = asrComplete('asm_01ARZ3NDEKTSV4RRFFQ69G5D03', POL, {
+					dispositionRecommendation: 'SATISFIED'
+				});
+				return { control, observed };
+			}
+		},
+		'RPH-ASR-007': {
+			arrangement:
+				'a validator result whose subjectSemanticVersions names no version for a declared subject — semantic malformation the schema cannot express',
+			run: () => {
+				const POL = 'pol_01ARZ3NDEKTSV4RRFFQ69G5D07';
+				const ok1 = asrPolicy(POL);
+				expect(ok1.status, `seed policy: ${ok1.message}`).toBe('ACCEPTED');
+				// The control is a WELL-FORMED completion, accepted — the parse step is not refusing everything.
+				const control = asrComplete('asm_01ARZ3NDEKTSV4RRFFQ69G5D07', POL);
+				const observed = asrComplete('asm_01ARZ3NDEKTSV4RRFFQ69G5D08', POL, {
+					subjectSemanticVersions: {}
+				});
+				return { control, observed };
+			}
+		},
+		'RPH-ASR-010': {
+			arrangement:
+				'a PWA published at a version whose de minimis floor was satisfied for an EARLIER version — an assessment of version n offered for version n+1',
+			run: () => publishStaleFloorProbe()
 		}
 	};
 

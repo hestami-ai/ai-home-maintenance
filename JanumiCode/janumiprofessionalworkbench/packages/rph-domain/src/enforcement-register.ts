@@ -266,7 +266,19 @@ export type RegisteredRuleId =
 	| 'RPH-EVD-004'
 	| 'RPH-EVD-005'
 	| 'RPH-EVD-006'
-	| 'RPH-EVD-007';
+	| 'RPH-EVD-007'
+	| 'RPH-ASR-001'
+	| 'RPH-ASR-002'
+	| 'RPH-ASR-003'
+	| 'RPH-ASR-004'
+	| 'RPH-ASR-005'
+	| 'RPH-ASR-006'
+	| 'RPH-ASR-007'
+	| 'RPH-ASR-008'
+	| 'RPH-ASR-009'
+	| 'RPH-ASR-010'
+	| 'RPH-ASR-011'
+	| 'RPH-ASR-012';
 
 export const ENFORCEMENT_REGISTER: Readonly<Record<RegisteredRuleId, EnforcementDisposition>> = {
 	'RPH-EXE-001': {
@@ -765,6 +777,294 @@ export const ENFORCEMENT_REGISTER: Readonly<Record<RegisteredRuleId, Enforcement
 			'stop passing `scope: state.scope` into the guard\'s evidenceAdmissibility call — the limb survives but can no longer see the field, the F-30 shape',
 			'delete or rename the arranging ProposeEvidence so the aggregate is never created: `loadOrReject` then refuses with the SAME code RPH_VALIDATION_SEMANTIC_FAILED and the message "Aggregate <id> does not exist", so a code-only probe would report a false KILLED and only the marker reports MASKED (observed)'
 		]
+	},
+
+	// ══════════════════════════════════════════════════════════════════════════════════════════════════════════
+	// THE RPH-ASR FAMILY, added 2026-08-02. The assurance-assessment surface (§14).
+	//
+	// THE FAMILY'S CHARACTERISTIC SHAPE, and it is a third one distinct from both earlier tranches: several of
+	// these rules name an ACTOR THAT WAS NEVER BUILT. RPH-ASR-004 says "the Assurance Service rejects the
+	// recommendation"; REG-F-007 records that M7's PolicyRegistry and AssuranceService do not exist anywhere in the
+	// repository. Where the rule's decision logic DOES exist it lives in `rph-assurance` and is reached only on the
+	// DE MINIMIS FLOOR path, which folds a boundary rejection to INCONCLUSIVE rather than REJECTED. So the kernel
+	// is neither dead nor wired to the command surface — a third state the DEAD_PREDICATE census cannot describe,
+	// and every disclosure below therefore carries an OBSERVED_ADMISSION guard.
+	//
+	// THE OTHER RECURRING FINDING: the engine has NO REACTOR PLANE. `command-bus.ts` looks up a handler exactly
+	// once per dispatch and no handler re-enters the table; the only event fan-out is a `void` subscriber. A rule
+	// whose consequent is "…and then X is requested" therefore cannot be violated by any dispatch being ACCEPTED,
+	// which is what puts RPH-ASR-001 in the third arm rather than the second.
+	// ══════════════════════════════════════════════════════════════════════════════════════════════════════════
+	'RPH-ASR-001': {
+		kind: 'NOT_A_COMMAND_REFUSAL',
+		canonCarriage: {
+			kind: 'CARRIED_BY_GENERAL_RULE',
+			canonAnchor: 'all-steps-succeeded leaves assurance unassessed until required policies complete',
+			note: 'JPWB-DOC-003 §5 STA-2 (execution success never confers satisfaction) names the same junction and the same operative noun ("required policies"), but states the obligation NEGATIVELY and mentions no Architecture PWU, no Architecture Coverage, no profile, and no REQUEST. GENERAL rather than CARRIED because the general rule survives retirement of the pre-canon §14 corpus and this Architecture-specific application does not.'
+		},
+		why:
+			'The consequent asserts a positive automatic EFFECT — "an Assurance Assessment is requested" — so no ' +
+			'dispatch violates this rule by being ACCEPTED, and there is no arrangement the UNENFORCED arm could name ' +
+			'as one that must be refused. THE PLANE THAT WOULD PERFORM IT DOES NOT EXIST: `command-bus.ts` resolves a ' +
+			'handler exactly once per dispatch and no handler re-enters the table, and the only event fan-out is an ' +
+			'`EventSubscriber = (event) => void` — a read-only observer with no dispatch capability. One command can ' +
+			'never mint another; this engine has no reactor or process-manager plane at all. SEPARATELY, the rule\'s ' +
+			'"profile" subject is ERASED AT THE ENGINE PORT: `ConformanceProfile` exists only as PWA ontology data, ' +
+			'the engine types the array as `readonly unknown[]`, and the published-PWA seam hard-codes it empty. What ' +
+			'the engine actually does with "required but unassessed" is a READ-MODEL row — `buildApplicablePolicies` ' +
+			'joins the PwuType\'s requiredAssurancePolicyIds against the assessment view and reports `assessed: false` ' +
+			'— and a read-model consequence is this arm by definition.'
+	},
+	'RPH-ASR-002': {
+		kind: 'ENFORCED',
+		canonCarriage: {
+			kind: 'CARRIED',
+			canonAnchor: 'An evidence deficit yields an inconclusive disposition, never satisfaction',
+			note: 'JPWB-DOC-003 §7 states the operative half directly: the missing trace matrix is an unmet mandatory evidence requirement, and the rule\'s "cannot become SATISFIED" is exactly canon\'s "never satisfaction".'
+		},
+		enforcedAt:
+			'packages/rph-application/src/handlers/assurance.ts — completeAssuranceAssessment, the GATE A block: the positive-disposition branch folds the received evidence set and refuses when a requirement carrying `requiredForDispositions` has nothing submitted against it.',
+		refusalCode: 'RPH_VALIDATION_SEMANTIC_FAILED',
+		refusalMarker: 'a positive disposition cannot stand with unmet mandatory evidence',
+		declaredMutations: [
+			'delete the GATE A block from completeAssuranceAssessment',
+			'compute `unmet` against the policy\'s full requirement list instead of the `requiredForDispositions` subset — the gate then fires for every assessment and the CONTROL reddens instead, which is the over-refusal shape',
+			'treat a requirement as satisfied when any evidence was submitted at all, rather than evidence submitted FOR that requirement'
+		]
+	},
+	'RPH-ASR-003': {
+		kind: 'NOT_A_COMMAND_REFUSAL',
+		canonCarriage: {
+			kind: 'CARRIED',
+			canonAnchor:
+				'the assessment cannot be satisfied, an independence violation is recorded as a first-class outcome, and another evaluator or a policy-permitted scoped waiver is required',
+			note: 'JPWB-DOC-003 ASR-13 (independence is a verified runtime property) carries all three consequents verbatim and in order — and canon\'s own wording, "recorded as a first-class OUTCOME", is precisely why this is not a refusal. Note canon says another EVALUATOR and a POLICY-PERMITTED SCOPED waiver where the ratified statement says validator and waiver; the anchor is canon\'s wording, not the rule\'s.'
+		},
+		why:
+			'THE RULE IS ENFORCED — AND NOT BY A REFUSAL, which is the distinction this arm exists to keep. ' +
+			'`checkIndependence` IS asked from the command layer (completeAssuranceAssessment consults it), and when ' +
+			'it fails the handler ADVANCES THE ASSESSMENT to the ratified INDEPENDENCE_VIOLATION state and emits the ' +
+			'ratified AssuranceIndependenceViolated event. The dispatch is ACCEPTED; "evaluation is blocked" is ' +
+			'realized as a terminal state the machine will not let reach SATISFIED, not as a rejected command. That ' +
+			'is canon\'s own framing — "recorded as a first-class outcome" — and it is the RPH-EVD-005 shape: an ' +
+			'accepted command whose consequents are outcomes. Recorded explicitly because the tempting move is to ' +
+			'file this under DEAD_PREDICATE on the strength of the pure-kernel test of `checkIndependence`, which ' +
+			'would be the exact substitution this register was built to stop, pointed the other way: the predicate ' +
+			'has a live command-layer caller, so both clauses of `deadPredicate`\'s contract would be false.'
+	},
+	'RPH-ASR-004': {
+		kind: 'UNENFORCED_DISCLOSED',
+		canonCarriage: {
+			kind: 'CARRIED',
+			canonAnchor: 'A recommendation of satisfied with a mandatory criterion unmet is rejected.',
+			note: 'JPWB-DOC-003 §6 carries the rule near-verbatim, including that the validator RECOMMENDS and something else DISPOSES.'
+		},
+		why:
+			'The rule names an actor that does not exist. "The Assurance Service rejects the recommendation" is M7 ' +
+			'scope, and REG-F-007 records that neither PolicyRegistry nor AssuranceService exists anywhere in this ' +
+			'repository. The decision logic DOES exist — `classifyValidatorResult` and `mandatoryCriterionUnmet` in ' +
+			'rph-assurance — but it is reached only on the DE MINIMIS FLOOR path, and that path folds a boundary ' +
+			'rejection to INCONCLUSIVE, never to REJECTED, so it does not implement the ratified consequent even ' +
+			'where it runs. At the command surface, completeAssuranceAssessment consults the policy for permitted ' +
+			'control actions, forbidden open severities, escalation and mandatory evidence — and never compares the ' +
+			'validator\'s recommendation against its own criterion results. A validator may therefore recommend ' +
+			'SATISFIED with a BLOCKING criterion NOT_MET and be taken at its word, which is the precise thing the ' +
+			'rule exists to forbid.',
+		guard: {
+			kind: 'OBSERVED_ADMISSION',
+			arrangement:
+				'a policy whose single criterion is severityIfNotMet BLOCKING, activated, an assessment requested against it, then CompleteAssuranceAssessment carrying dispositionRecommendation SATISFIED while that criterion\'s result is NOT_MET — accepted',
+			control:
+				'the byte-identical completion with `subjectSemanticVersions: {}` while `subjectObjectIds` is unchanged, which the SAME handler refuses in `parseCompletion` — the site rejects malformed validator output and simply never compares the recommendation to the criteria',
+			whyNoPredicate:
+				'`classifyValidatorResult`, `dispositionFromFindings` and `mandatoryCriterionUnmet` all have a census ' +
+				'confined to rph-assurance, so a DEAD_PREDICATE row would mechanically pass the command-layer ' +
+				'precondition — and it would still be false, because all three ARE asked, on the floor path, from a ' +
+				'live production surface the packages-only census cannot see. "Confined to the kernel" is not the same ' +
+				'fact as "never asked", and only the second one licenses that guard.'
+		}
+	},
+	'RPH-ASR-005': {
+		kind: 'UNENFORCED_DISCLOSED',
+		canonCarriage: {
+			kind: 'CARRIED',
+			canonAnchor: 'Unable-to-determine is never treated as met.',
+			note: 'JPWB-DOC-003 §7 states it as an absolute, with no policy override — which is what makes the engine\'s silence a gap rather than a configuration choice.'
+		},
+		why:
+			'A mandatory criterion whose result is UNABLE_TO_DETERMINE does not prevent the assessment from being ' +
+			'completed as SATISFIED. The engine derives mandatoriness correctly — BLOCKING severity marks a criterion ' +
+			'mandatory in the kernel — but completeAssuranceAssessment never reads criterion RESULTS at all: its four ' +
+			'gates read the policy\'s permitted control actions, its forbidden open severities, its escalation rules ' +
+			'and its mandatory EVIDENCE requirements. None of them asks what the criteria came back as. So the ' +
+			'distinction canon draws — that an undetermined mandatory criterion is not a met one — has no reader on ' +
+			'the command path, and the disposition the validator recommends stands unexamined.',
+		guard: {
+			kind: 'OBSERVED_ADMISSION',
+			arrangement:
+				'a policy with one BLOCKING criterion, activated and assessed, completed with dispositionRecommendation SATISFIED while that criterion\'s result is UNABLE_TO_DETERMINE — accepted',
+			control:
+				'the same completion with `subjectSemanticVersions: {}`, refused by `parseCompletion` at the same site with RPH_VALIDATOR_OUTPUT_INVALID',
+			whyNoPredicate:
+				'No predicate on the command path maps a criterion RESULT to a disposition constraint. The kernel ' +
+				'helpers that could are floor-path only and fold to INCONCLUSIVE rather than blocking satisfaction, ' +
+				'so naming one would fail both clauses of `deadPredicate`\'s contract exactly as RPH-ASR-004 records.'
+		}
+	},
+	'RPH-ASR-006': {
+		kind: 'NOT_A_COMMAND_REFUSAL',
+		canonCarriage: {
+			kind: 'CARRIED',
+			canonAnchor:
+				'Infrastructure failure of a validator leaves assurance incomplete — it neither rejects nor satisfies the subject',
+			note: 'JPWB-DOC-003 §8. Canon states the rule as a constraint on what a failure MEANS, not as a command that must be refused — which is the disposition below.'
+		},
+		why:
+			'Both halves of the consequent are non-refusals. VALIDATOR_FAILED is an AssuranceAssessmentState, not an ' +
+			'error code — the contracts say so explicitly — so "makes assessment state VALIDATOR_FAILED" is an ' +
+			'accepted command reaching a state, the RPH-ASR-003 shape. The second half, "or returns it to ready for ' +
+			'retry", is a PERMISSION, and a permission is never a refusal a dispatch could observe; that is the same ' +
+			'reading that puts RPH-EXE-009 in this arm. The rule\'s protective clause — "the assessed work is not ' +
+			'automatically rejected" — forbids an OVER-refusal, and the register has no arm for "nothing wrongly ' +
+			'refuses this" because the absence of a refusal is not something a probe can distinguish from the absence ' +
+			'of the arrangement. Recorded rather than left implicit, since this rule is the one most likely to be ' +
+			'mistaken for a disclosure.'
+	},
+	'RPH-ASR-007': {
+		kind: 'ENFORCED',
+		canonCarriage: {
+			kind: 'CARRIED',
+			canonAnchor:
+				'Malformed or invalid validator output can never mutate authoritative state or create authoritative findings',
+			note: 'JPWB-DOC-003 §8 carries the rule\'s operative consequent verbatim — no authoritative observations, no disposition change.'
+		},
+		enforcedAt:
+			'packages/rph-application/src/handlers/assurance.ts — completeAssuranceAssessment, whose first statement calls `parseCompletion`; the refusing limb requires validatorResult.subjectSemanticVersions to name a version for every declared subject.',
+		refusalCode: 'RPH_VALIDATOR_OUTPUT_INVALID',
+		// THE TIER MATTERS, and choosing the wrong one would have made this row a duplicate of a schema behaviour.
+		// LITERAL malformation is SCHEMA-FORECLOSED: ValidatorResultSchema is a strictObject and
+		// dispositionRecommendation is a ratified enum, so garbage returns VALIDATION_FAILED and never reaches a
+		// handler — which `classifyRefusal` would read as ADMITTED, not as enforcement. What survives to the command
+		// layer is SEMANTIC malformation the schema cannot express: `z.record(z.string(), z.number())` cannot say
+		// "one key per declared subject". That is the limb this row records.
+		refusalMarker: 'validatorResult.subjectSemanticVersions must name a version for every subject',
+		declaredMutations: [
+			'delete the subjectSemanticVersions completeness check from parseCompletion',
+			'compare COUNTS instead of membership — `Object.keys(...).length === subjectObjectIds.length` passes a result that versions the wrong subject',
+			'return the parsed completion instead of the refusal when the check fails, so the assessment advances and observations are created — the exact consequent canon forbids'
+		]
+	},
+	'RPH-ASR-008': {
+		kind: 'UNENFORCED_DISCLOSED',
+		canonCarriage: {
+			kind: 'CARRIED',
+			canonAnchor: 'Open critical findings block satisfaction',
+			note: 'JPWB-DOC-003 §7 states it unconditionally — "block", with no policy predicate — which is exactly the gap: the engine performs it only when a policy opts in.'
+		},
+		why:
+			'THE ENGINE HAS NO DEFAULT, and that is the whole finding. A CRITICAL observation recorded OPEN against a ' +
+			'live assessment does not by itself prevent that assessment from completing SATISFIED. The refusal ' +
+			'machinery exists and works — completeAssuranceAssessment forecloses a positive disposition while an ' +
+			'observation of a forbidden severity is OPEN — but it fires only when the POLICY declares ' +
+			'`dispositionRules.forbiddenOpenSeverities`, and it skips entirely when that set is empty. Canon states ' +
+			'the rule with no policy predicate at all. So every policy that simply omits the clause silently opts out ' +
+			'of a rule canon states absolutely, and the engine supplies nothing in its place.',
+		guard: {
+			kind: 'OBSERVED_ADMISSION',
+			arrangement:
+				'a policy declaring NO dispositionRules, activated and assessed, a CRITICAL observation recorded OPEN against the assessment, then completion with dispositionRecommendation SATISFIED — accepted',
+			control:
+				'THE SAME arrangement with one field added to the policy — dispositionRules forbidding SATISFIED while a CRITICAL observation is OPEN — which IS refused. The strongest control available here: same site, same command, same CRITICAL observation, and the only delta is whether the policy declares the rule. It proves what is missing is the ENGINE\'S OWN DEFAULT, not the mechanism.',
+			whyNoPredicate:
+				'`dispositionFromFindings` implements the rule correctly and its census does exclude the command ' +
+				'layer, so a DEAD_PREDICATE row would pass the precondition gate — and would still be false, because ' +
+				'the predicate IS asked, on the floor path, from a live surface. This is the near miss the ' +
+				'RPH-EVD-003 row warns about, and it is recorded here rather than taken.'
+		}
+	},
+	'RPH-ASR-009': {
+		kind: 'NOT_A_COMMAND_REFUSAL',
+		canonCarriage: {
+			kind: 'CARRIED',
+			canonAnchor:
+				'The condition remains visible in the assessment, the PWU assurance view, review packages, and baseline packages',
+			note: 'JPWB-DOC-003 §7 carries all four surfaces verbatim — and all four are projections, which is the disposition.'
+		},
+		why:
+			'Every one of the rule\'s four consequents is a VISIBILITY property of a projection: the assessment ' +
+			'object, the PWU assurance view, the review package and the baseline package. Nothing here is a command ' +
+			'envelope, and no dispatch can violate the rule by being accepted — a condition is either carried into ' +
+			'the read models or it is not, and if it is not, the defect surfaces as a missing field in a projection ' +
+			'rather than as an admitted command. No kernel predicate decides whether a condition is visible either: ' +
+			'`dispositionFor` returns CONDITIONALLY_SATISFIED and `aggregateDisposition` propagates it, but neither ' +
+			'has a visibility limb and no predicate anywhere takes a "surfaces" argument. Recorded as a read-model ' +
+			'obligation, which is the register\'s third arm by definition — and note that if the projections DID drop ' +
+			'the condition, the instrument that would catch it is a projection test, not this register.'
+	},
+	'RPH-ASR-010': {
+		kind: 'ENFORCED',
+		canonCarriage: {
+			kind: 'CARRIED',
+			canonAnchor:
+				'An assessment of version n never satisfies version n+1; a semantic change to the subject invalidates or forces review of prior assessments',
+			note: 'JPWB-DOC-003 ASR-12 (assurance binds to exact versions and never floats) carries the rule near-verbatim. Canon says "forces REVIEW OF PRIOR ASSESSMENTS" where the ratified statement says re-assessment — a weaker second disjunct, quoted as canon has it.'
+		},
+		enforcedAt:
+			'DECISION: packages/rph-application/src/handlers/floor-gate.ts — floorGateBlock, whose version limb requires the recorded floor to match the subject version being acted on. ENFORCEMENT: packages/rph-application/src/handlers/pwa-authoring.ts — the publish path, which refuses when the floor satisfied for an earlier version is offered for the current one.',
+		refusalCode: 'RPH_INVARIANT_VIOLATION',
+		refusalMarker:
+			'Record a satisfied floor (schema/invariant, identity/provenance, independent reasoning review) for the current version, or a governance waiver, before publishing.',
+		declaredMutations: [
+			'drop the version comparison from floorGateBlock so any satisfied floor for any version passes',
+			'compare against the LATEST recorded floor rather than the floor for the version being published',
+			'default `versionOk` to true when the subject version is unknown, rather than fail-closed'
+		]
+	},
+	'RPH-ASR-011': {
+		kind: 'NOT_A_COMMAND_REFUSAL',
+		canonCarriage: {
+			kind: 'CARRIED',
+			canonAnchor: 'both remain visible and the aggregate becomes contested, inconclusive, or escalated',
+			note: 'JPWB-DOC-003 §7. The same canon line carries RPH-ASR-008 and RPH-ASR-012 through different substrings; each anchor is distinct, so no claim is satisfied by another\'s text.'
+		},
+		why:
+			'All three consequents are outcomes of accepted commands, not refusals. "Both remain visible" is a ' +
+			'property of the event log and the projections over it — nothing curates an assessment away, because no ' +
+			'command exists that could. "The aggregate becomes contested/inconclusive/escalated" is a derived ' +
+			'disposition, computed by `aggregateDisposition` in the kernel and surfaced by the assurance view. And ' +
+			'"results are not averaged silently" forbids an IMPLEMENTATION TECHNIQUE rather than a command: there is ' +
+			'no dispatch whose acceptance would constitute averaging, so there is no arrangement a probe could make. ' +
+			'The rule is a constraint on how the aggregate is DERIVED, and the instrument that can hold it is a ' +
+			'kernel property test over `aggregateDisposition`, not a refusal observed at the bus.'
+	},
+	'RPH-ASR-012': {
+		kind: 'UNENFORCED_DISCLOSED',
+		canonCarriage: {
+			kind: 'CARRIED',
+			canonAnchor: 'Aggregate assurance preserves the strictest unresolved required disposition',
+			note: 'JPWB-DOC-003 §7 states the composition rule directly, and "required" is the word that makes four-satisfied-one-rejected a rejection rather than a majority.'
+		},
+		why:
+			'The kernel composes correctly and the command surface never asks it to. `aggregateDisposition` ' +
+			'implements strictest-unresolved and is unit-proven, but a PWU\'s assuranceState is set by ChangePwuState, ' +
+			'whose backing check — `rejectUnbackedDisposition` — asks only whether the cited assessments SUPPORT the ' +
+			'asserted disposition. It never enumerates the PWU\'s REQUIRED policies, and never composes across them. ' +
+			'So with five required policies, four SATISFIED and one REJECTED, asserting the aggregate SATISFIED while ' +
+			'citing the four satisfied assessments is accepted: the controller selects its own evidence and the ' +
+			'strictest unresolved disposition is simply not consulted. The composition rule and the backing rule are ' +
+			'different questions, and only the second one has a reader.',
+		guard: {
+			kind: 'OBSERVED_ADMISSION',
+			arrangement:
+				'five required policies on one PWU, four assessments SATISFIED and one REJECTED, then ChangePwuState asserting assuranceState SATISFIED while citing only the four satisfied assessments — accepted',
+			control:
+				'the byte-identical ChangePwuState citing ONLY the REJECTED assessment, which `rejectUnbackedDisposition` refuses at the same site — the backing check is alive; it is the COMPOSITION across required policies that is absent',
+			whyNoPredicate:
+				'`aggregateDisposition` is not dead — it is unit-proven and reached on the floor path — so naming it ' +
+				'would fail `deadPredicate`\'s first clause. What is missing is not a predicate but a CALLER: nothing ' +
+				'on the command path assembles the required-policy set to compose over, so there is no symbol whose ' +
+				'census could witness the gap closing.'
+		}
 	}
 };
 

@@ -122,7 +122,7 @@ function productionReferencesTo(symbol: string): string[] {
  * as data, checked below — rather than left as a sentence, because the previous form of this gate hard-coded one
  * prefix in a filter and nothing would have reported a family being silently dropped from it.
  */
-const TOTAL_OVER_FAMILIES: readonly string[] = ['RPH-EXE-', 'RPH-EVD-'];
+const TOTAL_OVER_FAMILIES: readonly string[] = ['RPH-EXE-', 'RPH-EVD-', 'RPH-ASR-'];
 
 describe('WP-16 (c) — the register is TOTAL over the families it claims', () => {
 	it.each(TOTAL_OVER_FAMILIES)('every %s* rule in the catalog carries a disposition', (family) => {

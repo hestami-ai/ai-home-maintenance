@@ -62,6 +62,13 @@ const COVERED_BY_ID: Readonly<Record<string, string>> = {
 	// EVD-007 appears: it is the only rule of the seven the register disposes as ENFORCED, and a per-id COVERED
 	// row for any of the other six would collide with the register's "no disclosed rule is certified COVERED" gate.
 	'RPH-EVD-007': 'packages/rph-application/src/handlers/evidence-admissibility-gate.test.ts',
+	// The RPH-ASR tranche (2026-08-02). Same requirement, same reason: three of the twelve are ENFORCED, and each
+	// must cite evidence at the COMMAND layer or the register's layer gate reddens. The other nine carry no per-id
+	// row — four are disclosed as unenforced (a COVERED row would collide with the register's overclaim gate) and
+	// five are outcomes or read-model obligations that no command refusal can carry.
+	'RPH-ASR-002': 'packages/rph-application/src/handlers/execrem-wp16-enforcement-observed.test.ts',
+	'RPH-ASR-007': 'packages/rph-application/src/handlers/execrem-wp16-enforcement-observed.test.ts',
+	'RPH-ASR-010': 'packages/rph-application/src/handlers/pwa-publish-stale-floor.test.ts',
 	'RPH-PER-001': 'packages/rph-persistence/src/sqlite-storage-adapter.test.ts',
 	'RPH-PER-002': 'packages/rph-persistence/src/sqlite-storage-adapter.test.ts',
 	'RPH-PER-007': 'packages/rph-projections/src/work-projection.test.ts',

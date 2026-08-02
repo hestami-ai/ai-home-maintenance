@@ -176,6 +176,144 @@ describe('the register\'s RPH-EVD disclosures are OBSERVED, not asserted', () =>
 			`propose ${pwuId}`
 		);
 
+	// ── assurance fixtures (the RPH-ASR family) ──────────────────────────────────────────────────────────────
+	//
+	// Every ASR arrangement is the same four dispatches — create policy, activate it, request an assessment,
+	// complete it — differing only in what the POLICY declares and what the VALIDATOR RESULT says. That is
+	// deliberate: it keeps each row's arrangement one field away from its control, so the delta that carries the
+	// finding is visible rather than buried in fixture divergence.
+
+	/**
+	 * A minimal ACTIVE policy. `criterionSeverity` BLOCKING is what makes the criterion MANDATORY under the
+	 * engine's own derivation — MATERIAL would make the arrangement unfaithful to the rules that say "mandatory".
+	 *
+	 * The OMISSIONS are load-bearing and are the point of several rows: no `dispositionRules`, no
+	 * `escalationRules`, no `requiredEvidence`, and an empty-by-default `permittedControlActions` posture, so each
+	 * of completeAssuranceAssessment's gates hits its own stated skip condition and cannot MASK the observation.
+	 */
+	const seedPolicy = (
+		policyId: string,
+		opts: { criterionSeverity?: string; dispositionRules?: unknown[] } = {}
+	): void => {
+		ok(
+			dispatch(
+				'CreateAssurancePolicy',
+				{
+					policyId,
+					version: '1.0.0',
+					name: `ASR probe policy ${policyId}`,
+					purpose: 'Assess the subject against its approved need.',
+					rationale: 'Seeded for a live command-drive disclosure probe.',
+					applicableObjectTypes: ['PROFESSIONAL_WORK_UNIT'],
+					evaluatedClaimTypes: ['FITNESS'],
+					criteria: [
+						{
+							id: 'C1',
+							name: 'Fit',
+							description: 'The subject is fit for its approved need.',
+							criterionType: 'QUALITATIVE',
+							evaluationMethod: 'HUMAN_JUDGMENT',
+							requiredEvidenceIds: [],
+							severityIfNotMet: opts.criterionSeverity ?? 'BLOCKING',
+							mayBeNotApplicable: false
+						}
+					],
+					evaluatorRole: 'REVIEWER',
+					independenceRequirement: 'NONE',
+					findingDefinitions: [
+						{
+							code: 'UNFIT',
+							name: 'Unfit',
+							description: 'Not fit for the approved need.',
+							defaultSeverity: 'CRITICAL',
+							affectedClaimTypes: ['FITNESS'],
+							defaultControlActions: ['CONTINUE']
+						}
+					],
+					permittedControlActions: ['CONTINUE'],
+					...(opts.dispositionRules ? { dispositionRules: opts.dispositionRules } : {})
+				},
+				policyId,
+				'ASSURANCE_POLICY'
+			),
+			`create policy ${policyId}`
+		);
+		// REQUIRED: a non-floor policy is born DRAFT, and requestAssuranceAssessment refuses a non-ACTIVE policy.
+		ok(
+			dispatch('ActivateAssurancePolicy', { policyId }, policyId, 'ASSURANCE_POLICY'),
+			`activate policy ${policyId}`
+		);
+	};
+
+	const requestAssessment = (assessmentId: string, policyId: string): void => {
+		ok(
+			dispatch(
+				'RequestAssuranceAssessment',
+				{
+					assessmentId,
+					assurancePolicyId: policyId,
+					policyVersion: '1.0.0',
+					subjectObjectIds: [PARENT],
+					subjectSemanticVersions: { [PARENT]: 1 },
+					claimIds: []
+				},
+				assessmentId,
+				'ASSURANCE_ASSESSMENT'
+			),
+			`request assessment ${assessmentId}`
+		);
+	};
+
+	/** A schema-valid §20 verdict. `over` mutates the validator result, which is where every ASR delta lives. */
+	const completeAssessment = (
+		assessmentId: string,
+		policyId: string,
+		over: Record<string, unknown> = {}
+	): Outcome =>
+		dispatch(
+			'CompleteAssuranceAssessment',
+			{
+				validatorResult: {
+					validatorId: 'reviewer',
+					validatorVersion: '1',
+					policyId,
+					policyVersion: '1.0.0',
+					assessmentId,
+					subjectObjectIds: [PARENT],
+					subjectSemanticVersions: { [PARENT]: 1 },
+					claimResults: [],
+					evidenceConsideredIds: [],
+					evidenceRejected: [],
+					observations: [],
+					dispositionRecommendation: 'SATISFIED',
+					recommendedControlActions: [],
+					residualUncertainty: [],
+					limitations: [],
+					executionProvenance: {
+						evaluator: { actorId: 'rev-1', actorType: 'HUMAN', displayName: 'Reviewer' }
+					},
+					...over
+				}
+			},
+			assessmentId,
+			'ASSURANCE_ASSESSMENT'
+		);
+
+	/**
+	 * THE SHARED ASR CONTROL: the same command, the same handler, the same parse step, ONE field apart from the
+	 * admitted arrangement — `subjectSemanticVersions: {}` while `subjectObjectIds` still names the subject.
+	 * `z.record(z.string(), z.number())` admits `{}`, so it passes the schema and reaches `parseCompletion`, which
+	 * refuses it. Proves the site rejects malformed validator output and simply never asks the question each
+	 * disclosed row is about.
+	 *
+	 * This is the SAME limb RPH-ASR-007 records as ENFORCED, which is a coherence property rather than a
+	 * coincidence: the register says that limb refuses, and these controls observe it refusing.
+	 */
+	const parseGuardControl = (assessmentId: string, policyId: string): Outcome => {
+		requestAssessment(assessmentId, policyId);
+		return completeAssessment(assessmentId, policyId, { subjectSemanticVersions: {} });
+	};
+
 	beforeEach(() => {
 		store = new SqliteStorageAdapter({ now: () => TS });
 		seq = 0;
@@ -213,6 +351,14 @@ describe('the register\'s RPH-EVD disclosures are OBSERVED, not asserted', () =>
 		'RPH-EVD-005': null,
 		'RPH-EVD-006': null,
 		'RPH-EVD-007': null, // ENFORCED — its refusal is probed in execrem-wp16-enforcement-observed.test.ts
+		'RPH-ASR-001': null,
+		'RPH-ASR-002': null, // ENFORCED
+		'RPH-ASR-003': null,
+		'RPH-ASR-006': null,
+		'RPH-ASR-007': null, // ENFORCED
+		'RPH-ASR-009': null,
+		'RPH-ASR-010': null, // ENFORCED
+		'RPH-ASR-011': null,
 
 		'RPH-EVD-001': {
 			arrangement:
@@ -339,6 +485,148 @@ describe('the register\'s RPH-EVD disclosures are OBSERVED, not asserted', () =>
 					admitted: admitEvidence(EV, { admittedScope: 'unit', admittedClaimIds: [CLAIM] }),
 					control: liveGuardControl('evd_01ARZ3NDEKTSV4RRFFQ69G5FF1')
 				};
+			}
+		},
+
+		'RPH-ASR-004': {
+			arrangement:
+				'a validator recommending SATISFIED while the policy\'s BLOCKING criterion came back NOT_MET — the recommendation taken as the disposition',
+			run: () => {
+				const POL = 'pol_01ARZ3NDEKTSV4RRFFQ69G5A04';
+				const ASM = 'asm_01ARZ3NDEKTSV4RRFFQ69G5A04';
+				seedPolicy(POL, { criterionSeverity: 'BLOCKING' });
+				requestAssessment(ASM, POL);
+				const admitted = completeAssessment(ASM, POL, {
+					dispositionRecommendation: 'SATISFIED',
+					claimResults: [{ criterionId: 'C1', result: 'NOT_MET', statement: 'the blocking criterion is not met' }]
+				});
+				return { admitted, control: parseGuardControl('asm_01ARZ3NDEKTSV4RRFFQ69G5A05', POL) };
+			}
+		},
+
+		'RPH-ASR-005': {
+			arrangement:
+				"a mandatory (BLOCKING) criterion returning UNABLE_TO_DETERMINE while the validator recommends SATISFIED — undetermined treated as met",
+			run: () => {
+				const POL = 'pol_01ARZ3NDEKTSV4RRFFQ69G5A06';
+				const ASM = 'asm_01ARZ3NDEKTSV4RRFFQ69G5A06';
+				seedPolicy(POL, { criterionSeverity: 'BLOCKING' });
+				requestAssessment(ASM, POL);
+				const admitted = completeAssessment(ASM, POL, {
+					dispositionRecommendation: 'SATISFIED',
+					claimResults: [
+						{ criterionId: 'C1', result: 'UNABLE_TO_DETERMINE', statement: 'could not be determined' }
+					]
+				});
+				return { admitted, control: parseGuardControl('asm_01ARZ3NDEKTSV4RRFFQ69G5A07', POL) };
+			}
+		},
+
+		'RPH-ASR-008': {
+			arrangement:
+				'a CRITICAL observation recorded OPEN against a live assessment, then that assessment completed SATISFIED under a policy that declares no dispositionRules',
+			run: () => {
+				const POL = 'pol_01ARZ3NDEKTSV4RRFFQ69G5A08';
+				const ASM = 'asm_01ARZ3NDEKTSV4RRFFQ69G5A08';
+				seedPolicy(POL);
+				requestAssessment(ASM, POL);
+				ok(
+					dispatch(
+						'RecordAssuranceObservation',
+						{
+							assessmentId: ASM,
+							observationType: 'FINDING',
+							findingCode: 'UNFIT',
+							severity: 'CRITICAL',
+							statement: 'a critical finding, left open'
+						},
+						'obs_01ARZ3NDEKTSV4RRFFQ69G5B08',
+						'ASSURANCE_OBSERVATION'
+					),
+					'record CRITICAL observation'
+				);
+				const admitted = completeAssessment(ASM, POL);
+
+				// THE STRONGEST CONTROL IN EITHER TRANCHE, and it is specific to this row rather than the shared
+				// parse-guard one: the SAME command, the SAME site, the SAME still-open CRITICAL observation — and
+				// it IS refused, once the policy declares the rule. The only delta is `dispositionRules`. So what
+				// is missing is not the mechanism but THE ENGINE'S OWN DEFAULT, which is precisely the finding.
+				const POL2 = 'pol_01ARZ3NDEKTSV4RRFFQ69G5A09';
+				const ASM2 = 'asm_01ARZ3NDEKTSV4RRFFQ69G5A0A';
+				seedPolicy(POL2, {
+					dispositionRules: [
+						{ disposition: 'SATISFIED', condition: 'no open critical', forbiddenOpenSeverities: ['CRITICAL'] }
+					]
+				});
+				requestAssessment(ASM2, POL2);
+				ok(
+					dispatch(
+						'RecordAssuranceObservation',
+						{
+							assessmentId: ASM2,
+							observationType: 'FINDING',
+							findingCode: 'UNFIT',
+							severity: 'CRITICAL',
+							statement: 'a critical finding, left open'
+						},
+						'obs_01ARZ3NDEKTSV4RRFFQ69G5B09',
+						'ASSURANCE_OBSERVATION'
+					),
+					'record CRITICAL observation (control)'
+				);
+				return { admitted, control: completeAssessment(ASM2, POL2) };
+			}
+		},
+
+		'RPH-ASR-012': {
+			arrangement:
+				'a PWU assurance disposition asserted SATISFIED while citing only the satisfied assessments, with a REJECTED assessment against another required policy left uncomposed',
+			run: () => {
+				const POL_OK = 'pol_01ARZ3NDEKTSV4RRFFQ69G5C01';
+				const POL_BAD = 'pol_01ARZ3NDEKTSV4RRFFQ69G5C02';
+				const ASM_OK = 'asm_01ARZ3NDEKTSV4RRFFQ69G5C01';
+				const ASM_BAD = 'asm_01ARZ3NDEKTSV4RRFFQ69G5C02';
+				seedPolicy(POL_OK, { criterionSeverity: 'MATERIAL' });
+				seedPolicy(POL_BAD, { criterionSeverity: 'MATERIAL' });
+				requestAssessment(ASM_OK, POL_OK);
+				ok(completeAssessment(ASM_OK, POL_OK), 'complete the SATISFIED assessment');
+				requestAssessment(ASM_BAD, POL_BAD);
+				ok(
+					completeAssessment(ASM_BAD, POL_BAD, { dispositionRecommendation: 'REJECTED' }),
+					'complete the REJECTED assessment'
+				);
+
+				// Assert the aggregate SATISFIED citing ONLY the satisfied assessment. The REJECTED one is a real,
+				// valid assessment against another policy the subject is assessed under, and nothing composes it in.
+				const admitted = dispatch(
+					'ChangePwuState',
+					{
+						pwuId: PARENT,
+						previousState: { assuranceState: 'UNASSESSED' },
+						newState: { assuranceState: 'SATISFIED' },
+						supportingObjectIds: [ASM_OK],
+						rationale: 'the four satisfied assessments'
+					},
+					PARENT,
+					'PROFESSIONAL_WORK_UNIT'
+				);
+
+				// CONTROL — the byte-identical command citing ONLY the REJECTED assessment, refused by
+				// `rejectUnbackedDisposition` at the same site. The BACKING check is alive; the COMPOSITION across
+				// required policies is what is absent.
+				const control = dispatch(
+					'ChangePwuState',
+					{
+						pwuId: CHILD_A,
+						previousState: { assuranceState: 'UNASSESSED' },
+						newState: { assuranceState: 'SATISFIED' },
+						supportingObjectIds: [ASM_BAD],
+						rationale: 'citing only the rejected assessment'
+					},
+					CHILD_A,
+					'PROFESSIONAL_WORK_UNIT'
+				);
+				return { admitted, control };
 			}
 		}
 	};
