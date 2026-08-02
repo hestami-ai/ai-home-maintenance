@@ -133,6 +133,10 @@ const COVERED_BY_ID: Readonly<Record<string, string>> = {
 	//         to keep prose out of the census, not to widen the baseline to admit a doc comment. A census whose
 	//         declared set includes a sentence about the symbol can no longer detect the wiring it exists to
 	//         detect, which is the precondition the DEAD_PREDICATE arm already gates for handler files.
+	// RPH-GOV-001 — re-cited from the PURE_KERNEL family file to the dispatch probe, because the register records
+	// it ENFORCED and the layer gate requires COMMAND-layer evidence for that claim. The kernel test still stands
+	// and still proves what it proved; it just does not prove enforcement.
+	'RPH-GOV-001': 'packages/rph-application/src/handlers/execrem-wp16-enforcement-observed.test.ts',
 	'RPH-PER-001': 'packages/rph-application/src/handlers/execrem-wp16-enforcement-observed.test.ts',
 	'RPH-PER-002': 'packages/rph-engine/src/engine.test.ts',
 	'RPH-PER-007': 'packages/rph-engine/src/projection-rebuild.test.ts'
@@ -157,10 +161,28 @@ const COVERAGE_BY_PREFIX: Readonly<Record<string, Coverage>> = {
 		testFile: 'packages/rph-domain/src/decomposition.test.ts',
 		note: 'RPH-ASM-001..006 by id'
 	},
+	// ── A LAYER OBSERVATION, RECORDED 2026-08-02 WHILE DISPOSITIONING RPH-GOV-001 ────────────────────────────
+	//
+	// This row says COVERED and cites a PURE_KERNEL file for all seven rules. The register's layer gate rejected
+	// that the moment RPH-GOV-001 was recorded ENFORCED, which is the gate working — but the fact underneath is
+	// worth more than the fix, so it is written here rather than only in a commit message.
+	//
+	// The cited test for RPH-GOV-001 reads, in full:
+	//     authorizeDecisionEffective(decision({ status: 'PROPOSED', authorityHeld: false }))
+	// It passes `authorityHeld` IN, as a hand-written boolean, and asserts the pure function returns the right
+	// code. It never asks WHO COMPUTES `authorityHeld`, or whether anything does. That is DS-001 §4 item 2 in its
+	// purest form: the predicate is correct, the test is honest, and the question of enforcement is assumed away
+	// by the fixture. It is also exactly the question REG-F-014 turns out to answer badly — the handler computes
+	// `authorityHeld` from a field the CALLER supplies about itself.
+	//
+	// RPH-BAS (same file) and RPH-ASM (decomposition.test.ts) are both COVERED on PURE_KERNEL evidence too, by id,
+	// for 13 more rules. Their per-id status is NOT being changed here: what layer a test observes is a fact, but
+	// whether each rule is enforced is a judgement the enforcement register makes one rule at a time, and 19 of
+	// these 20 are not yet dispositioned. Recording the observation without pre-judging them is the honest half.
 	'RPH-GOV': {
 		status: 'COVERED',
 		testFile: 'packages/rph-domain/src/governance.test.ts',
-		note: 'RPH-GOV-001..007 by id'
+		note: 'RPH-GOV-001..007 by id — but the evidence is PURE_KERNEL for all seven (see the comment above). GOV-001 is now cited per-id to a COMMAND-layer dispatch probe and dispositioned ENFORCED in enforcement-register.ts, with its live bypass recorded as REG-F-014. GOV-002..007 are under investigation; this prefix row will be re-stated when they land.'
 	},
 	'RPH-BAS': {
 		status: 'COVERED',

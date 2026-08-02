@@ -17,6 +17,7 @@ import { fileURLToPath } from 'node:url';
 import { describe, expect, it } from 'vitest';
 import {
 	classifyRefusal,
+	DECLARABLE_REFUSAL_STATUSES,
 	conflictStatusRuleIds,
 	deadPredicateRuleIds,
 	duplicateRefusalMarkers,
@@ -27,6 +28,7 @@ import {
 	MIN_REFUSAL_MARKER_LENGTH,
 	observedAdmissionRuleIds,
 	REGISTERED_RULE_IDS,
+	rowsDeclaringRefusalStatus,
 	residualSourceStates,
 	shortRefusalMarkers,
 	unenforcedRuleIds,
@@ -600,6 +602,21 @@ describe('classifyRefusal — the declared-status arm is OPT-IN and cannot leak 
 		// If the last CONFLICT row is ever re-dispositioned, this fails and the arm must be removed with it.
 		expect(conflictStatusRuleIds().length).toBeGreaterThan(0);
 	});
+
+	it.each(DECLARABLE_REFUSAL_STATUSES)(
+		'SELFTEST: refusalStatus %s is exercised by at least one row',
+		(status) => {
+			// TOTAL OVER THE UNION, not one hard-coded member. Adding a status to `refusalStatus` without a row that
+			// declares it fails HERE, on the commit that adds it — which is the rule `UNAUTHORIZED` was held out of
+			// the union for one commit to honour ("it goes in when a row needs it, with the probe that proves it").
+			// A per-member test could not have said that; it would have had to be written after the fact, by
+			// someone who remembered.
+			expect(
+				rowsDeclaringRefusalStatus(status),
+				`refusalStatus '${status}' is declared by no row — remove it from the union or land the row`
+			).not.toEqual([]);
+		}
+	);
 });
 
 describe('WP-16 selftest — classifyRefusal', () => {

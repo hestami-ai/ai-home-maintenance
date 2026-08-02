@@ -674,6 +674,7 @@ describe('the register\'s RPH-EVD disclosures are OBSERVED, not asserted', () =>
 		'RPH-CMP-002': null,
 		'RPH-CMP-003': null,
 		'RPH-CMP-004': null,
+		'RPH-GOV-001': null, // ENFORCED — observed in execrem-wp16-enforcement-observed.test.ts
 		'RPH-PER-001': null,
 		'RPH-PER-002': null,
 		// ── THE TWO CROSS-AGGREGATE UNIQUENESS DISCLOSURES ────────────────────────────────────────────────────

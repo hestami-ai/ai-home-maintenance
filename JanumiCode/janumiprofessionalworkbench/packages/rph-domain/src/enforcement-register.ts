@@ -216,11 +216,18 @@ export interface EnforcedRule {
 	 * claim command-layer enforcement while a merely MALFORMED payload greened it — six fixture errors this
 	 * programme surfaced precisely because VALIDATION_FAILED is not a pass.
 	 *
-	 * `UNAUTHORIZED` is real and reachable and is NOT a member either, for the opposite reason: no registered rule
-	 * refuses with `RPH_AUTHORITY_INSUFFICIENT`. An arm no row exercises is an arm no mutant can redden, which is
-	 * this repository's most-repeated defect. It goes in when a row needs it, with the probe that proves it.
+	 * `UNAUTHORIZED` ADDED 2026-08-02, AND THE ADDITION IS THE DISCIPLINE WORKING RATHER THAN AN EXCEPTION TO IT.
+	 * This comment previously read: "`UNAUTHORIZED` is real and reachable and is NOT a member, for the opposite
+	 * reason: no registered rule refuses with `RPH_AUTHORITY_INSUFFICIENT`. An arm no row exercises is an arm no
+	 * mutant can redden… It goes in when a row needs it, with the probe that proves it." RPH-GOV-001 is that row,
+	 * and it arrived within the day. The member is added here TOGETHER with its row and its observation, never
+	 * ahead of them — which is the whole point of the rule that kept it out.
+	 *
+	 * `VALIDATION_FAILED` remains excluded, permanently and for a different reason: it is not a missing member, it
+	 * is the SCHEMA layer's, and reaching it requires `refusalLayer` because the marker must be matched
+	 * structurally rather than as prose.
 	 */
-	readonly refusalStatus?: 'REJECTED' | 'CONFLICT';
+	readonly refusalStatus?: 'REJECTED' | 'CONFLICT' | 'UNAUTHORIZED';
 	/**
 	 * A substring of the refusal MESSAGE that only THIS refusal produces.
 	 *
@@ -413,7 +420,11 @@ export type RegisteredRuleId =
 	| 'RPH-CMP-001'
 	| 'RPH-CMP-002'
 	| 'RPH-CMP-003'
-	| 'RPH-CMP-004';
+	| 'RPH-CMP-004'
+	// RPH-GOV, ONE OF SEVEN (2026-08-02). The family is NOT in `TOTAL_OVER_FAMILIES` — this row lands alone
+	// because its observation forced the `UNAUTHORIZED` status arm, and an arm may not be added ahead of the row
+	// that exercises it. The other six are under investigation.
+	| 'RPH-GOV-001';
 
 export const ENFORCEMENT_REGISTER: Readonly<Record<RegisteredRuleId, EnforcementDisposition>> = {
 	'RPH-EXE-001': {
@@ -2605,6 +2616,61 @@ export const ENFORCEMENT_REGISTER: Readonly<Record<RegisteredRuleId, Enforcement
 			'lifecycle state even if something tried. THE REPLAN CONTROL ACTION the rule conditions on is the part ' +
 			'with no subject: `REPLAN` exists as a `DecisionType` and in the ontology\'s phase mapping, but nothing ' +
 			'derives a milestone FROM an active control action — the projector keys on PWU kind alone.'
+	},
+
+	// ── READ THIS BEFORE READING THE DISPOSITION ────────────────────────────────────────────────────────────────
+	//
+	// RPH-GOV-001 IS RECORDED **ENFORCED**, AND THE REFUSAL IT NAMES CAN BE BYPASSED. Both halves are true, both
+	// were observed, and the row is written this way rather than as a disclosure for a reason argued below — but
+	// the bypass is stated FIRST, because a reader skimming dispositions must not come away believing governance
+	// authority is safe.
+	//
+	// WHAT WAS OBSERVED, by dispatch, three commands, no human actor anywhere in the sequence:
+	//   ProposeDecision issued by an AGENT, payload `authority` naming a HUMAN  -> ACCEPTED
+	//   ApproveDecision on that decision, issued by the SAME AGENT              -> ACCEPTED
+	//   final state: status EFFECTIVE, authority { actorType: 'HUMAN' }
+	// The governed record asserts a human decided. None did. Filed as REG-F-014.
+	//
+	// WHY ENFORCED AND NOT UNENFORCED_DISCLOSED. The disclosure arm's contract is "the statement IS a command
+	// refusal and NOTHING in production enforces it". Something does: `makeDecisionEffective`'s guard refuses with
+	// the rule's OWN ratified error code, at status UNAUTHORIZED, and the refusal is observable end to end. The
+	// arrangement the rule most naturally describes — an agent acting on its own declared authority — IS refused.
+	// Recording that as "nothing enforces it" would be false in the other direction, and would make the register's
+	// disclosure arm mean two different things.
+	//
+	// WHAT IS ACTUALLY WRONG IS THE FIELD'S PROVENANCE, NOT THE CHECK'S ABSENCE. The guard reads
+	// `state.authority.actorType`, which `proposeDecision` copies from the CALLER'S PAYLOAD with no reference to
+	// `command.issuedBy`. So the check fires exactly when the caller DECLARES an insufficient authority and cannot
+	// fire when it declares a sufficient one: it stops the agent that says what it is, not the agent that does
+	// not. The sibling handler `requestWaiver` sets `authority: command.issuedBy` and is not forgeable this way —
+	// two governance handlers, one field, two provenance models, twenty lines apart.
+	//
+	// THE HONEST SUMMARY, and the thing this register can say that a coverage manifest cannot: the rule is
+	// enforced against the arrangement it names, and the enforcement rests on a fact the actor supplies about
+	// itself.
+	'RPH-GOV-001': {
+		kind: 'ENFORCED',
+		canonCarriage: {
+			kind: 'CARRIED',
+			canonAnchor:
+				'An agent may recommend a decision but cannot exercise authority unless delegated',
+			note: 'JPWB-DOC-003 §8 ASR-15 (Authority is positional, attributable, and version-bound), which also states "Authority is checked *before* effect" — satisfied here, the guard runs ahead of any DecisionEffective — and "an approval whose actor … cannot be identified is not authority", which is the clause REG-F-014 reports unmet.'
+		},
+		enforcedAt:
+			'DECISION: packages/rph-domain/src/governance.ts — authorizeDecisionEffective, whose doc comment names this rule by id. ENFORCEMENT: packages/rph-application/src/handlers/governance.ts — the `guard` inside makeDecisionEffective, shared by ApproveDecision and GrantWaiver, which computes `authorityHeld` from the DECISION\'s recorded `authority.actorType` (HUMAN or SYSTEM) and rejects otherwise. THE SUBJECT IS THE RECORDED AUTHORITY, NOT THE ISSUER of the command — see the comment above and REG-F-014; `command.issuedBy` is consulted by NO decision handler.',
+		refusalCode: 'RPH_AUTHORITY_INSUFFICIENT',
+		refusalStatus: 'UNAUTHORIZED',
+		// THE FIRST ROW IN THE REGISTER AT THIS STATUS. `kit.ts`'s STATUS_FOR_CODE has mapped
+		// RPH_AUTHORITY_INSUFFICIENT -> UNAUTHORIZED all along; until this row no registered rule refused with it,
+		// which is exactly why the arm was left out of `refusalStatus` when CONFLICT was added — "it goes in when a
+		// row needs it, with the probe that proves it". It needed it the same day.
+		refusalMarker: 'actor lacks sufficient authority to make this decision effective',
+		declaredMutations: [
+			'widen `authorityHeld` in makeDecisionEffective to accept any actorType — the probe reports ADMITTED',
+			'delete the `if (!check.ok)` arm of the guard — the transition-legality limb of authorizeDecisionEffective still refuses, but with a DIFFERENT reason string, so the probe reports MASKED rather than ADMITTED',
+			"drop `RPH_AUTHORITY_INSUFFICIENT` from STATUS_FOR_CODE in kit.ts — the refusal becomes REJECTED and this row's declared UNAUTHORIZED no longer matches, so the probe reports ADMITTED",
+			'NO MUTATION IS NEEDED TO DEMONSTRATE THE BYPASS — it is live: propose the decision from an AGENT while naming a HUMAN in `authority`, and both commands are ACCEPTED. That is REG-F-014, and it is recorded as a declared mutation entry precisely because a reader re-running these acts must not conclude the set is exhaustive.'
+		]
 	}
 };
 
@@ -2706,7 +2772,7 @@ export function classifyRefusal(
 		readonly refusalCode: string;
 		readonly refusalMarker: string;
 		readonly refusalLayer?: RefusalLayer;
-		readonly refusalStatus?: 'REJECTED' | 'CONFLICT';
+		readonly refusalStatus?: 'REJECTED' | 'CONFLICT' | 'UNAUTHORIZED';
 	}
 ): RefusalVerdict {
 	// ── THE SCHEMA ARM (2026-08-02) ──────────────────────────────────────────────────────────────────────────
@@ -2754,17 +2820,34 @@ export function classifyRefusal(
 }
 
 /**
- * Rows whose refusal carries `CommandResult.status: 'CONFLICT'` rather than `REJECTED`.
+ * Every non-default member of `refusalStatus`, as DATA.
  *
- * Exported so the gate can prove the declared-status arm is NOT VACUOUS. An opt-in widening that no row exercises
- * is a branch no mutant can redden — three of those shipped green in this repository before the discipline was
- * written down — so if the last CONFLICT row is ever re-dispositioned, the selftest fails and the arm goes with it.
+ * `REJECTED` is excluded because it is the DEFAULT — rows that omit the field get it, so it can never be vacuous
+ * and requiring a row to declare it explicitly would prove nothing.
  */
-export function conflictStatusRuleIds(): RegisteredRuleId[] {
+export const DECLARABLE_REFUSAL_STATUSES = ['CONFLICT', 'UNAUTHORIZED'] as const;
+
+/**
+ * Rows declaring a given non-default refusal status.
+ *
+ * Exported so the gate can prove the declared-status arm is NOT VACUOUS, and the gate iterates
+ * `DECLARABLE_REFUSAL_STATUSES` rather than naming one — so a FUTURE member added without a row that exercises it
+ * fails immediately, instead of sitting as a branch no mutant can redden. Three such branches shipped green in this
+ * repository before the discipline was written down; `UNAUTHORIZED` was deliberately kept OUT of the union for one
+ * commit for exactly this reason, and entered it the day RPH-GOV-001 needed it.
+ */
+export function rowsDeclaringRefusalStatus(
+	status: (typeof DECLARABLE_REFUSAL_STATUSES)[number]
+): RegisteredRuleId[] {
 	return REGISTERED_RULE_IDS.filter((id) => {
 		const row = ENFORCEMENT_REGISTER[id];
-		return row.kind === 'ENFORCED' && row.refusalStatus === 'CONFLICT';
+		return row.kind === 'ENFORCED' && row.refusalStatus === status;
 	});
+}
+
+/** Back-compat alias for the CONFLICT selftest, which predates the generalised form. */
+export function conflictStatusRuleIds(): RegisteredRuleId[] {
+	return rowsDeclaringRefusalStatus('CONFLICT');
 }
 
 /** Rows whose refusal is at the contract boundary rather than a handler. */

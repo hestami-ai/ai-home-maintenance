@@ -851,6 +851,51 @@ describe('JAN-EXECREM WP-16 (c) — the enforcement register is OBSERVED, not as
 		'RPH-CMP-002': null,
 		'RPH-CMP-003': null,
 		'RPH-CMP-004': null,
+		'RPH-GOV-001': {
+			arrangement:
+				"a Decision whose recorded `authority.actorType` is AGENT, approved — refused UNAUTHORIZED / RPH_AUTHORITY_INSUFFICIENT, against the byte-identical decision whose authority is HUMAN, which is ACCEPTED",
+			run: () => {
+				const SUBJ = 'pwu_01ARZ3NDEKTSV4RRFFQ69H6600';
+				const OK_ID = 'dec_01ARZ3NDEKTSV4RRFFQ69H6610';
+				const BAD_ID = 'dec_01ARZ3NDEKTSV4RRFFQ69H6611';
+				const AGENT = { actorId: 'a1', actorType: 'AGENT', displayName: 'Agent' };
+				const propose = (id: string, authority: unknown) =>
+					dispatch(
+						'ProposeDecision',
+						{
+							decisionType: 'APPROVAL',
+							subjectObjectIds: [SUBJ],
+							selectedOption: 'ship',
+							rationale: 'r',
+							authority
+						},
+						id,
+						'DECISION'
+					);
+				const approve = (id: string) =>
+					dispatch(
+						'ApproveDecision',
+						{
+							selectedOption: 'ship',
+							rationale: 'r',
+							consideredEvidenceIds: [],
+							consideredObservationIds: [],
+							subjectSemanticVersions: { [SUBJ]: 1 }
+						},
+						id,
+						'DECISION'
+					);
+				// THE CONTROL: the SAME command on a decision differing ONLY in `authority.actorType`. That single
+				// field is the whole delta, which is what pins the refusal to the authority check rather than to
+				// the transition guard, the kind predicate, or the subject-version limb — all of which sit on this
+				// same path and all of which would refuse with a different code.
+				ok(propose(OK_ID, actor), 'propose HUMAN-authority decision');
+				const control = approve(OK_ID);
+				ok(propose(BAD_ID, AGENT), 'propose AGENT-authority decision');
+				const observed = approve(BAD_ID);
+				return { control, observed };
+			}
+		},
 		'RPH-PER-002': null,
 		'RPH-PER-003': null, // disclosed — observed in disclosure-observed.test.ts
 		'RPH-PER-004': null, // disclosed — observed in disclosure-observed.test.ts
