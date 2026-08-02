@@ -789,6 +789,13 @@ describe('JAN-EXECREM WP-16 (c) — the enforcement register is OBSERVED, not as
 		'RPH-INT-006': null,
 		'RPH-INT-007': null,
 		// ── THE FIRST SCHEMA-LAYER ROW (2026-08-02) ────────────────────────────────────────────────────────────
+		'RPH-CON-001': null,
+		'RPH-CON-003': null,
+		'RPH-CON-004': null,
+		'RPH-CON-005': null,
+		'RPH-CON-006': null,
+		'RPH-CON-007': null,
+		'RPH-CON-008': null,
 		'RPH-CON-002': {
 			arrangement:
 				'a CaptureIntent payload carrying an undeclared property, refused by the contract boundary before any handler runs',

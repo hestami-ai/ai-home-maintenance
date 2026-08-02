@@ -132,7 +132,12 @@ const TOTAL_OVER_FAMILIES: readonly string[] = [
 	// which it held 5, then 8, then 9 of its ten rules — because the missing rows were all UNENFORCED_DISCLOSED
 	// with OBSERVED_ADMISSION guards, and landing a disclosure without its observation is the one thing that arm
 	// may never do. The absence was a claim ("this family is not yet total"), gated by this list being data.
-	'RPH-PWU-'
+	'RPH-PWU-',
+	// ADDED 2026-08-02. RPH-CON was called STRUCTURALLY INEXPRESSIBLE by this register's own scope paragraph until
+	// the day it was closed: its obligations are enforced by the CONTRACT, and `classifyRefusal` read only
+	// `REJECTED` while the boundary returns `VALIDATION_FAILED`, so real enforcement classified as ADMITTED. It was
+	// never inexpressible — it was a second layer, and naming it (`RefusalLayer`) took one opt-in field.
+	'RPH-CON-'
 ];
 
 describe('WP-16 (c) — the register is TOTAL over the families it claims', () => {

@@ -96,6 +96,32 @@ describe('the register\'s RPH-EVD disclosures are OBSERVED, not asserted', () =>
 		return { status: r.status, code: r.error?.code, message: r.error?.message };
 	}
 
+	/** `dispatch` with extra ENVELOPE fields — RPH-CON-003's subject is an envelope field, not a payload one. */
+	function dispatchWith(
+		commandType: string,
+		payload: unknown,
+		id: string,
+		aggType: string,
+		envelope: Record<string, unknown>
+	): Outcome {
+		const n = ++seq;
+		const command = {
+			commandId: `c-${n}`,
+			commandType,
+			commandSchemaVersion: 1,
+			targetAggregateType: aggType,
+			targetAggregateId: id,
+			issuedAt: TS,
+			issuedBy: actor,
+			correlationId: 'evd-disclosure',
+			idempotencyKey: `k-${n}`,
+			payload,
+			...envelope
+		};
+		const r = engine.dispatch(command as unknown as DomainCommand);
+		return { status: r.status, code: r.error?.code, message: r.error?.message };
+	}
+
 	const ok = (r: Outcome, what: string): Outcome => {
 		expect(r.status, `${what}: ${r.code ?? ''} ${r.message ?? ''}`).toBe('ACCEPTED');
 		return r;
@@ -206,7 +232,7 @@ describe('the register\'s RPH-EVD disclosures are OBSERVED, not asserted', () =>
 	 */
 	const seedPolicy = (
 		policyId: string,
-		opts: { criterionSeverity?: string; dispositionRules?: unknown[] } = {}
+		opts: { criterionSeverity?: string; dispositionRules?: unknown[]; criteria?: unknown[] } = {}
 	): void => {
 		ok(
 			dispatch(
@@ -219,7 +245,7 @@ describe('the register\'s RPH-EVD disclosures are OBSERVED, not asserted', () =>
 					rationale: 'Seeded for a live command-drive disclosure probe.',
 					applicableObjectTypes: ['PROFESSIONAL_WORK_UNIT'],
 					evaluatedClaimTypes: ['FITNESS'],
-					criteria: [
+					criteria: opts.criteria ?? [
 						{
 							id: 'C1',
 							name: 'Fit',
@@ -655,6 +681,160 @@ describe('the register\'s RPH-EVD disclosures are OBSERVED, not asserted', () =>
 		'RPH-INT-007': null,
 		// ENFORCED at the SCHEMA layer — its refusal is probed in execrem-wp16-enforcement-observed.test.ts.
 		'RPH-CON-002': null,
+		'RPH-CON-001': null, // NOT_A_COMMAND_REFUSAL — and already the register's positive control everywhere
+		'RPH-CON-008': null, // NOT_A_COMMAND_REFUSAL — no presentation command schema exists to constrain
+
+		'RPH-CON-003': {
+			arrangement:
+				'an existing aggregate UPDATED with the envelope field expectedRevision OMITTED — accepted, and the aggregate really advances',
+			run: () => {
+				const I = 'int_01ARZ3NDEKTSV4RRFFQ69G5C31';
+				ok(
+					dispatch(
+						'CaptureIntent',
+						{ intentId: I, originatingExpression: 'x', ontologyId: 'o', ontologyVersion: '1' },
+						I,
+						'INTENT'
+					),
+					'capture'
+				);
+				const admitted = dispatch('BeginIntentDiscovery', {}, I, 'INTENT');
+				// APPLIED, not merely accepted: the update really moved the aggregate, so this is last-write-wins
+				// in the plane PER-4 forbids it in — not a no-op that happened to be tolerated.
+				expect(
+					(store.loadObject(I)?.state as Record<string, unknown>)?.intentStatus,
+					'the omitted-revision update must really have advanced the aggregate'
+				).toBe('UNDER_DISCOVERY');
+
+				// CONTROL — the same update at the same function with ONE field ADDED: a revision that is WRONG.
+				// loadOrReject DOES refuse that. The engine polices a wrong revision and ignores an absent one.
+				const J = 'int_01ARZ3NDEKTSV4RRFFQ69G5C32';
+				ok(
+					dispatch(
+						'CaptureIntent',
+						{ intentId: J, originatingExpression: 'x', ontologyId: 'o', ontologyVersion: '1' },
+						J,
+						'INTENT'
+					),
+					'capture control'
+				);
+				const control = dispatchWith(
+					'BeginIntentDiscovery',
+					{},
+					J,
+					'INTENT',
+					{ expectedRevision: 99 }
+				);
+				return { admitted, control };
+			}
+		},
+
+		'RPH-CON-004': {
+			arrangement:
+				'a declared timestamp field carrying a non-RFC-3339 string — accepted, and persisted verbatim',
+			run: () => {
+				const EV = 'evd_01ARZ3NDEKTSV4RRFFQ69G5C41';
+				const admitted = proposeEvidence(EV, { capturedAt: 'definitely not a timestamp' });
+				expect(
+					(store.loadObject(EV)?.state as Record<string, unknown>)?.capturedAt,
+					'the malformed timestamp must be PERSISTED, not merely tolerated at the boundary'
+				).toBe('definitely not a timestamp');
+
+				// CONTROL — the same payload schema, the same gate, a DECLARED field given an illegal value. It
+				// refuses, so the boundary is alive and constraining on this very schema; what is missing is the
+				// FORMAT constraint on the timestamp, not the gate. Boundary refusals carry VALIDATION_FAILED,
+				// which the row declares via controlStatus.
+				const control = proposeEvidence('evd_01ARZ3NDEKTSV4RRFFQ69G5C42', {
+					evidenceType: 'NOT_A_TYPE'
+				});
+				return { admitted, control };
+			}
+		},
+
+		'RPH-CON-005': {
+			arrangement:
+				'a validator result answering only four of five mandatory criteria, recommending SATISFIED — accepted, and the assessment advances',
+			run: () => {
+				const POL = 'pol_01ARZ3NDEKTSV4RRFFQ69G5C51';
+				const ASM = 'asm_01ARZ3NDEKTSV4RRFFQ69G5C52';
+				// THE POLICY MUST REALLY DECLARE FIVE. The first draft of this probe seeded the default
+				// single-criterion policy and answered C1..C4 — so C1 WAS answered, nothing was unanswered, and the
+				// probe was green for the wrong reason. A wiring mutant that required every declared criterion to
+				// be answered left it green, which is how the misstatement surfaced. The arrangement's own words
+				// ("five criteria, four answered") now hold.
+				seedPolicy(POL, {
+					criteria: [1, 2, 3, 4, 5].map((n) => ({
+						id: `C${n}`,
+						name: `Criterion ${n}`,
+						description: 'a mandatory criterion',
+						criterionType: 'QUALITATIVE',
+						evaluationMethod: 'HUMAN_JUDGMENT',
+						requiredEvidenceIds: [],
+						severityIfNotMet: 'BLOCKING',
+						mayBeNotApplicable: false
+					}))
+				});
+				requestAssessment(ASM, POL);
+				const admitted = completeAssessment(ASM, POL, {
+					claimResults: [
+						{ criterionId: 'C1', result: 'MET' },
+						{ criterionId: 'C2', result: 'MET' },
+						{ criterionId: 'C3', result: 'MET' },
+						{ criterionId: 'C4', result: 'MET' }
+						// C5 answered NOWHERE — the partial output the rule calls invalid.
+					]
+				});
+				expect(
+					(store.loadObject(ASM)?.state as Record<string, unknown>)?.assessmentState,
+					'a partial validator result must really have mutated authoritative state'
+				).toBe('SATISFIED');
+				return { admitted, control: parseGuardControl('asm_01ARZ3NDEKTSV4RRFFQ69G5C53', POL) };
+			}
+		},
+
+		'RPH-CON-006': {
+			arrangement:
+				"a validatorResult declaring policyVersion '1.1.0' against an assessment created under '1.2.0' — accepted",
+			run: () => {
+				const POL = 'pol_01ARZ3NDEKTSV4RRFFQ69G5C61';
+				const ASM = 'asm_01ARZ3NDEKTSV4RRFFQ69G5C62';
+				seedPolicy(POL, { criterionSeverity: 'MATERIAL' });
+				requestAssessment(ASM, POL);
+				const admitted = completeAssessment(ASM, POL, { policyVersion: '1.1.0' });
+				return { admitted, control: parseGuardControl('asm_01ARZ3NDEKTSV4RRFFQ69G5C63', POL) };
+			}
+		},
+
+		'RPH-CON-007': {
+			arrangement:
+				'a validatorResult claiming subject version 1 against an assessment created to assess version 2 — accepted',
+			run: () => {
+				const POL = 'pol_01ARZ3NDEKTSV4RRFFQ69G5C71';
+				const ASM = 'asm_01ARZ3NDEKTSV4RRFFQ69G5C72';
+				seedPolicy(POL, { criterionSeverity: 'MATERIAL' });
+				// The assessment TARGETS version 2 …
+				ok(
+					dispatch(
+						'RequestAssuranceAssessment',
+						{
+							assessmentId: ASM,
+							assurancePolicyId: POL,
+							policyVersion: '1.0.0',
+							subjectObjectIds: [PARENT],
+							subjectSemanticVersions: { [PARENT]: 2 },
+							claimIds: []
+						},
+						ASM,
+						'ASSURANCE_ASSESSMENT'
+					),
+					'request assessment targeting v2'
+				);
+				// … and the validator answers about version 1.
+				const admitted = completeAssessment(ASM, POL, { subjectSemanticVersions: { [PARENT]: 1 } });
+				return { admitted, control: parseGuardControl('asm_01ARZ3NDEKTSV4RRFFQ69G5C73', POL) };
+			}
+		},
+
 		'RPH-PWU-001': null,
 		'RPH-PWU-002': null,
 		'RPH-PWU-004': null,
@@ -1314,11 +1494,18 @@ describe('the register\'s RPH-EVD disclosures are OBSERVED, not asserted', () =>
 			//                      Two independent limbs refuse it. The control still reddens if the site stops
 			//                      refusing at all, which is what it is here to exclude; it is simply not
 			//                      single-limb sensitive, and saying so beats implying a kill that did not happen.
+			// THE EXPECTED CONTROL STATUS IS DECLARED BY THE ROW, defaulting to REJECTED. A boundary refusal carries
+			// VALIDATION_FAILED, so a row whose disclosed gap is at the CONTRACT layer must say so — and only that
+			// row's control may be a boundary refusal. Accepting either status for every row would let a merely
+			// MALFORMED control satisfy a COMMAND row, which is the commonest fixture error in this repository.
+			const expectedControl =
+				(row.guard.kind === 'OBSERVED_ADMISSION' ? row.guard.controlStatus : undefined) ?? 'REJECTED';
 			expect(
 				control.status,
-				`${id}: the control must be REFUSED, proving the site's guard is alive and this rule is simply ` +
-					`missing from it (observed ${control.status} ${control.code ?? ''}: ${control.message ?? ''})`
-			).toBe('REJECTED');
+				`${id}: the control must be REFUSED (${expectedControl}), proving the site's guard is alive and ` +
+					`this rule is simply missing from it (observed ${control.status} ${control.code ?? ''}: ` +
+					`${control.message ?? ''})`
+			).toBe(expectedControl);
 		}
 	);
 

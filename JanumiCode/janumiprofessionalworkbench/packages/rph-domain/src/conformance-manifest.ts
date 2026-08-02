@@ -33,7 +33,11 @@ export interface Coverage {
  *  file is a concrete test that actually asserts that id (conformance.test.ts checks each path exists). */
 const COVERED_BY_ID: Readonly<Record<string, string>> = {
 	'RPH-CON-001': 'packages/rph-contracts/src/envelopes.test.ts',
-	'RPH-CON-004': 'packages/rph-contracts/src/envelopes.test.ts',
+	// 'RPH-CON-004' WAS CERTIFIED COVERED HERE, citing envelopes.test.ts. REMOVED 2026-08-02: the register
+	// disposes it UNENFORCED_DISCLOSED — every timestamp field is typed `z.string()`, so a non-RFC-3339 value is
+	// accepted AND PERSISTED VERBATIM — and the overclaim gate reddened on the first run. This is the SECOND
+	// instance of the miscitation family REG-F-011 records for RPH-CON-001: an rph-contracts test asserting
+	// something adjacent to the rule rather than the rule.
 	'RPH-CON-008': 'packages/rph-contracts/src/messages.test.ts',
 	// RE-CITED 2026-08-02 to the enforcement probe. RPH-CON-002 is the register's first SCHEMA-layer ENFORCED row,
 	// and its evidence is a DISPATCH observing the boundary refuse — not a unit test of the schema in isolation.

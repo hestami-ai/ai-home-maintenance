@@ -241,6 +241,22 @@ export type UnenforcementGuard =
 			readonly control: string;
 			/** Why no kernel predicate can be named — the fact that forced this shape rather than DEAD_PREDICATE. */
 			readonly whyNoPredicate: string;
+			/**
+			 * The status the CONTROL is expected to return. Absent = `REJECTED`, which is every row written before
+			 * 2026-08-02.
+			 *
+			 * OPT-IN, FOR THE SAME REASON `RefusalLayer` IS. A control's job is to prove the site's refusal
+			 * machinery is alive; when the disclosed gap is at the CONTRACT boundary, the alive machinery is the
+			 * boundary and its refusals carry status `VALIDATION_FAILED`, not `REJECTED`. Widening the gate's
+			 * assertion for every row would mean a COMMAND row whose control was merely MALFORMED — the commonest
+			 * fixture error in this repository, six of them this programme — would silently satisfy it. So the row
+			 * declares it, and only the declaring row's control may be a boundary refusal.
+			 *
+			 * `CONFLICT` is a third real value, discovered by running RPH-CON-003's probe: an optimistic-concurrency
+			 * refusal carries its own `CommandResult` status rather than `REJECTED`. Three statuses mean "refused"
+			 * in this engine, which is precisely why the expected one is declared per row instead of guessed.
+			 */
+			readonly controlStatus?: 'REJECTED' | 'VALIDATION_FAILED' | 'CONFLICT';
 	  };
 
 /** A rule whose statement IS a command refusal and which NOTHING in production enforces. */
@@ -307,7 +323,14 @@ export type RegisteredRuleId =
 	| 'RPH-PWU-006'
 	| 'RPH-PWU-007'
 	| 'RPH-PWU-008'
-	| 'RPH-CON-002';
+	| 'RPH-CON-001'
+	| 'RPH-CON-002'
+	| 'RPH-CON-003'
+	| 'RPH-CON-004'
+	| 'RPH-CON-005'
+	| 'RPH-CON-006'
+	| 'RPH-CON-007'
+	| 'RPH-CON-008';
 
 export const ENFORCEMENT_REGISTER: Readonly<Record<RegisteredRuleId, EnforcementDisposition>> = {
 	'RPH-EXE-001': {
@@ -1522,6 +1545,201 @@ export const ENFORCEMENT_REGISTER: Readonly<Record<RegisteredRuleId, Enforcement
 			'have `validateAgainst` return `{ ok: true }` on `unrecognized_keys` while still failing other issues — the probe reports ADMITTED and no other row moves',
 			'drop `details.issues` from the RphError built by `validateAgainst` — the boundary still refuses, but the row can no longer say WHICH field, and the probe reports MASKED. This is the mutation that shows the marker is doing work: a message-only assertion would still report KILLED.'
 		]
+	},
+	'RPH-CON-001': {
+		kind: 'NOT_A_COMMAND_REFUSAL',
+		canonCarriage: {
+			kind: 'NO_CANON_CARRIER',
+			why:
+				'The same delegation RPH-CON-002 records: JPWB-CON-000 B1 assigns "Exact shapes (wire envelopes, ' +
+				'schemas, enum spellings, IDs, error codes)" to the repository\'s generated contracts and names them ' +
+				'shape authority. No canon sentence says a well-formed envelope validates, and none should. As with ' +
+				'RPH-CON-002 the usual retirement risk does not apply — the carrier is generated code.'
+		},
+		why:
+			'THE PUREST ACCEPTANCE STATEMENT IN THE CATALOG: not "accepting X does Y" but simply "X is accepted", ' +
+			'with no consequent at all. Its whole content is that well-formed input is not obstructed, so no ' +
+			'arrangement can be refused and none can be observed being admitted. ARM 1 IS STRUCTURALLY UNBUILDABLE ' +
+			'rather than merely unwarranted: `classifyRefusal` returns ADMITTED for status ACCEPTED in BOTH arms and ' +
+			'only KILLED is a pass, so a row whose evidence IS an acceptance can never produce one. ' +
+			'AND IT IS ALREADY THE REGISTER\'S POSITIVE CONTROL: every probe\'s control half — "the SAME command ' +
+			'ACCEPTED before the arranging act" — is an instance of this rule, so it is continuously exercised ' +
+			'without being a row. Minting an UNENFORCED row would make the disclosure set and the control set share ' +
+			'an arrangement, one dispatch simultaneously proving a gap and proving the machinery alive. ' +
+			'MEASURED RESIDUE, recorded so this row is never read as "the command envelope is validated" — IT IS ' +
+			'NOT. The bus validates only `command.payload`; the envelope is checked against `DomainCommandSchema` ' +
+			'nowhere. The rule therefore holds VACUOUSLY at the bus rather than because a command-schema check ' +
+			'passed. That is REG-F-011, whose crash half is fixed and whose validation half is owed — and reading ' +
+			'the contrapositive ("an incomplete envelope fails validation") as THIS rule would be the substitution ' +
+			'RPH-EXE-005, RPH-ASR-010 and RPH-PWU-003 each decline.'
+	},
+	'RPH-CON-003': {
+		kind: 'UNENFORCED_DISCLOSED',
+		canonCarriage: {
+			kind: 'CARRIED',
+			canonAnchor: 'Updates to existing aggregates declare the revision they believe current',
+			note: 'JPWB-DOC-003 §9 PER-4 (optimistic concurrency; never last-write-wins) states the obligation directly, and states it of the CALLER — which is what makes an omitted declaration a gap rather than a default.'
+		},
+		why:
+			'`loadOrReject` polices a revision that is WRONG and ignores one that is ABSENT — the RPH-PWU-003 delta, ' +
+			'in the concurrency plane. A command updating an existing aggregate with `expectedRevision` omitted is ' +
+			'accepted and the aggregate really moves. The ratified statement\'s escape clause makes it worse rather ' +
+			'than better: "unless the command type is explicitly exempt" presupposes an exemption mechanism, and NO ' +
+			'EXEMPTION MECHANISM OF ANY KIND EXISTS in the repository — so the rule is not partially enforced with a ' +
+			'declared allowlist, it is enforced for no command and exempt for none. Last-write-wins is precisely ' +
+			'what PER-4 forbids, and it is the default for every caller that simply omits the field.',
+		guard: {
+			kind: 'OBSERVED_ADMISSION',
+			arrangement:
+				'an INTENT created by CaptureIntent, then UPDATED by BeginIntentDiscovery with the envelope field `expectedRevision` OMITTED — accepted, and the aggregate really advances (revision 0 -> 1, RAW -> UNDER_DISCOVERY)',
+			control:
+				'the same update with ONE field ADDED — `expectedRevision: 99` against an aggregate at revision 1 — which `loadOrReject` DOES refuse with RPH_REVISION_CONFLICT. The engine polices a revision that is wrong while ignoring one that is absent.',
+			whyNoPredicate:
+				'The comparison is inline in `loadOrReject`, not a named predicate, and it IS asked on every update — ' +
+				'so there is no dead symbol to census. What is absent is the arm for the field being undefined, and ' +
+				'an absent arm has no name for a census to watch.',
+			// An optimistic-concurrency refusal carries its OWN CommandResult status, not REJECTED. Discovered by
+			// running this probe; declared rather than assumed.
+			controlStatus: 'CONFLICT'
+		}
+	},
+	'RPH-CON-004': {
+		kind: 'UNENFORCED_DISCLOSED',
+		canonCarriage: {
+			kind: 'NO_CANON_CARRIER',
+			why:
+				'CON-000 B1 delegates exact shapes — explicitly including "wire envelopes" and enum spellings — to ' +
+				'the repository\'s generated contracts. No canon sentence states a timestamp format, and none should; ' +
+				'the ratified vocabulary is where RFC-3339 would be expressed. As with the other RPH-CON rows the ' +
+				'retirement risk does not apply, because the carrier would be generated code rather than prose.'
+		},
+		why:
+			'The generated payload schemas type every timestamp as `z.string()` rather than an ISO datetime, so a ' +
+			'caller-supplied timestamp is accepted in any shape and PERSISTED VERBATIM. Observed on two different ' +
+			'commands and two different fields: `ProposeEvidence.capturedAt` accepts "definitely not a timestamp" ' +
+			'(and `\'\'`), and `ProposeDecision.effectiveAt` accepts "whenever, honestly". This is not a boundary ' +
+			'that refuses nothing — the SAME payload gate refuses a bad `evidenceType` at the same dispatch, which ' +
+			'is this row\'s control. What is missing is the format constraint on the declared field, and the ' +
+			'consequence reaches further than validation: an unparseable `capturedAt` is what freshness and ' +
+			'staleness rules would have to compare against.',
+		guard: {
+			kind: 'OBSERVED_ADMISSION',
+			arrangement:
+				"ProposeEvidence whose declared `capturedAt` is 'definitely not a timestamp' — accepted, and the value reads back verbatim from the store",
+			control:
+				"the byte-identical ProposeEvidence with `evidenceType: 'NOT_A_TYPE'` — refused by the SAME payload gate with RPH_VALIDATION_SCHEMA_FAILED and issue `invalid_value@evidenceType`. A DECLARED field, so it proves the gate is alive and constraining on this very schema.",
+			whyNoPredicate:
+				'There is no predicate: a format constraint is a SCHEMA fact, expressed by the generated type or not ' +
+				'at all. Nothing could be dead, and nothing could be wired — which is why the guard is behavioural.',
+			// The control is a BOUNDARY refusal, so it carries VALIDATION_FAILED rather than REJECTED. Declared
+			// rather than assumed; see `controlStatus` for why that is opt-in.
+			controlStatus: 'VALIDATION_FAILED'
+		}
+	},
+	'RPH-CON-005': {
+		kind: 'UNENFORCED_DISCLOSED',
+		canonCarriage: {
+			kind: 'CARRIED',
+			canonAnchor: 'Partial output — an unanswered mandatory criterion — is invalid output.',
+			note: 'JPWB-DOC-003 §6 states it as an absolute. Note this anchor and RPH-CON-006/007\'s are distinct substrings of the SAME canon region — one passage carrying three ratified rules, as DOC-003 §7 does for RPH-EVD-005/006.'
+		},
+		why:
+			'`completeAssuranceAssessment` never reads criterion RESULTS at all — the same absence RPH-ASR-004 and ' +
+			'RPH-ASR-005 record from the disposition side, seen here from the COVERAGE side. A policy declaring five ' +
+			'BLOCKING criteria is completed by a validator result answering four, and the assessment advances to ' +
+			'SATISFIED with `completedAt` written. So a PARTIAL validator result mutates authoritative state, which ' +
+			'is the precise consequent DOC-003 forbids. The rule names "the Assurance Service" as the rejecting ' +
+			'actor and REG-F-007 records that no such component exists.',
+		guard: {
+			kind: 'OBSERVED_ADMISSION',
+			arrangement:
+				'a policy with FIVE criteria all severityIfNotMet BLOCKING, assessed, then completed with claimResults answering only four of them and recommending SATISFIED — accepted, and the assessment really advances to SATISFIED',
+			control:
+				'the byte-adjacent completion with `subjectSemanticVersions: {}` while `subjectObjectIds` still names the subject, which `parseCompletion` refuses at the SAME site with RPH_VALIDATOR_OUTPUT_INVALID',
+			whyNoPredicate:
+				'`mandatoryCriterionUnmet` exists in rph-assurance and is reached only on the floor path, where it ' +
+				'folds to INCONCLUSIVE rather than rejecting — so it fails both clauses of `deadPredicate`\'s ' +
+				'contract, the RPH-ASR-004 finding restated for this rule.'
+		}
+	},
+	'RPH-CON-006': {
+		kind: 'UNENFORCED_DISCLOSED',
+		canonCarriage: {
+			kind: 'CARRIED',
+			canonAnchor:
+				'rejects a validator result when identity, policy version, assessment identity, or subject semantic version mismatch',
+			note: 'JPWB-DOC-003 §6. RPH-CON-007 cites the same sentence with its leading clause included; the two rules instantiate different items of the same enumeration (policy version here, subject semantic version there), which is why both anchors resolve to one passage.'
+		},
+		why:
+			'THE CODE FOR THIS RULE EXISTS AND NO REFUSAL CARRIES IT. `RPH_POLICY_VERSION_MISMATCH` is one of the ' +
+			'fifteen ratified error codes, and it occurs in exactly one non-test production file — ' +
+			'`rph-assurance/src/assurance-rules.ts` — as a `reason` STRING on a boundary classification the floor ' +
+			'path folds to INCONCLUSIVE. It is never an `error.code`. Observed: an assessment requested against a ' +
+			'policy at version 1.2.0, completed by a validator result declaring 1.1.0, is ACCEPTED — and the emitted ' +
+			'event records the ASSESSMENT\'s 1.2.0, erasing the version the validator actually claimed to judge. The ' +
+			'record is not merely un-refused; it is silently corrected to look consistent. Filed system-wide as ' +
+			'REG-F-010 group 2.',
+		guard: {
+			kind: 'OBSERVED_ADMISSION',
+			arrangement:
+				"an assessment against a policy at version '1.2.0', completed by a validatorResult declaring policyVersion '1.1.0' — accepted, and the emitted event records the assessment's version rather than the validator's",
+			control:
+				'the byte-identical completion with `subjectSemanticVersions: {}`, refused by `parseCompletion` at the same site with RPH_VALIDATOR_OUTPUT_INVALID — the parse step reads the validator result and does refuse some of it',
+			whyNoPredicate:
+				'`classifyValidatorResult` computes the mismatch and returns it as a boundary `reason`; it is asked ' +
+				'on the floor path, so it is not dead, and it does not produce a refusal, so it does not implement ' +
+				'the rule. Both clauses of `deadPredicate`\'s contract fail.'
+		}
+	},
+	'RPH-CON-007': {
+		kind: 'UNENFORCED_DISCLOSED',
+		canonCarriage: {
+			kind: 'CARRIED',
+			canonAnchor:
+				'The Assurance Service rejects a validator result when identity, policy version, assessment identity, or subject semantic version mismatch',
+			note: 'JPWB-DOC-003 §6, the same sentence RPH-CON-006 cites — this row quotes it from the subject, including the actor the rule names and which REG-F-007 records as never built.'
+		},
+		why:
+			'The subject-version twin of RPH-CON-006, and the same dead code: `RPH_SUBJECT_VERSION_MISMATCH` is ' +
+			'ratified, occurs only as a kernel `reason` string, and is minted by no refusal anywhere. Observed: an ' +
+			'assessment created to assess version 2 is completed by a validator result claiming version 1, is ' +
+			'ACCEPTED, advances to SATISFIED, and the emitted event records the version the VALIDATOR claimed — ' +
+			'overwriting the version the assessment was created to assess. ADJACENT AND DISTINCT, recorded so the ' +
+			'rows are not merged: RPH-ASR-010 discloses that an assessment may bind a version the SUBJECT is not at ' +
+			'(assessment vs world); this rule is the validator result contradicting the ASSESSMENT it answers ' +
+			'(validator vs assessment). Same missing comparison, two different pairs of operands.',
+		guard: {
+			kind: 'OBSERVED_ADMISSION',
+			arrangement:
+				'an assessment requested with subjectSemanticVersions {pwu: 2}, completed by a validatorResult declaring {pwu: 1} — accepted, advancing to SATISFIED, with the event recording the validator’s version',
+			control:
+				'the byte-identical completion against a sibling assessment with `subjectSemanticVersions: {}` — which clears the boundary (z.record admits {}) and reaches the same handler’s same first statement, `parseCompletion`, which refuses',
+			whyNoPredicate:
+				'Same as RPH-CON-006: the kernel classifier computes the mismatch as a `reason` and is asked on the ' +
+				'floor path. What is absent on the command path is any comparison of the validator’s declared ' +
+				'versions against the assessment’s own — `parseCompletion` checks only that a version is NAMED.'
+		}
+	},
+	'RPH-CON-008': {
+		kind: 'NOT_A_COMMAND_REFUSAL',
+		canonCarriage: {
+			kind: 'CARRIED',
+			canonAnchor:
+				'No presentation contract may reference a Command capable of mutating PWU semantic state',
+			note: 'JPWB-DOC-003 §2 states the separation directly and more broadly than the ratified statement, which enumerates four specific forbidden contents.'
+		},
+		why:
+			'THE SUBJECT DOES NOT EXIST. The rule constrains what a presentation/canvas-layout command SCHEMA may ' +
+			'contain, and this repository has no presentation command schema of any kind — the arrangement was ' +
+			'attempted rather than assumed: dispatching `UpdateCanvasLayout` carrying a semantic version field, a ' +
+			'lifecycle mutation, an assurance disposition and a baseline id returns "Unknown command type", and so ' +
+			'does `MoveNode` with an EMPTY payload. A refusal insensitive to the rule\'s antecedent is not this rule ' +
+			'being enforced, and the identical response to both is what closes the ENFORCED arm. The UNENFORCED arm ' +
+			'is closed too: OBSERVED_ADMISSION needs the engine to ACCEPT what the rule forbids, and there is ' +
+			'nothing to accept. This is a rule about a plane that does not exist — arm 3 by its own definition, and ' +
+			'the RPH-EXE-007 shape. THE RESIDUE, stated because it is the whole risk: the day a presentation command ' +
+			'IS authored, this becomes a live rule with a real subject, and nothing in this register would notice. ' +
+			'The rule is satisfied by absence, which is not the same as being enforced.'
 	},
 	'RPH-PWU-008': {
 		kind: 'UNENFORCED_DISCLOSED',
