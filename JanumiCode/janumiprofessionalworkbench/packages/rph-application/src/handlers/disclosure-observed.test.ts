@@ -674,6 +674,13 @@ describe('the register\'s RPH-EVD disclosures are OBSERVED, not asserted', () =>
 		'RPH-CMP-002': null,
 		'RPH-CMP-003': null,
 		'RPH-CMP-004': null,
+		// RPH-GOV, three more (2026-08-02) — all NOT_A_COMMAND_REFUSAL. GOV-002 is arm 3 SPECIFICALLY so it does
+		// not share GOV-001's single refusal site (one mutant would redden both); GOV-004's outcome is not
+		// produced at all; GOV-007's kernel predicate is a CONSTANT FUNCTION that cannot return half its own
+		// declared union. GOV-003/005 (ENFORCED) and GOV-006 (DISCLOSED) still owe observations.
+		'RPH-GOV-002': null,
+		'RPH-GOV-004': null,
+		'RPH-GOV-007': null,
 		'RPH-GOV-001': null, // ENFORCED — observed in execrem-wp16-enforcement-observed.test.ts
 		'RPH-PER-001': null,
 		'RPH-PER-002': null,

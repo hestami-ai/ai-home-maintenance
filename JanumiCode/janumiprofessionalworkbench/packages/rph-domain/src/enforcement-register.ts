@@ -421,10 +421,12 @@ export type RegisteredRuleId =
 	| 'RPH-CMP-002'
 	| 'RPH-CMP-003'
 	| 'RPH-CMP-004'
-	// RPH-GOV, ONE OF SEVEN (2026-08-02). The family is NOT in `TOTAL_OVER_FAMILIES` — this row lands alone
-	// because its observation forced the `UNAUTHORIZED` status arm, and an arm may not be added ahead of the row
-	// that exercises it. The other six are under investigation.
-	| 'RPH-GOV-001';
+	// RPH-GOV, FOUR OF SEVEN (2026-08-02). GOV-003/005 (ENFORCED) and GOV-006 (DISCLOSED) still owe their
+	// observations, so the family stays OUT of `TOTAL_OVER_FAMILIES`.
+	| 'RPH-GOV-001'
+	| 'RPH-GOV-002'
+	| 'RPH-GOV-004'
+	| 'RPH-GOV-007';
 
 export const ENFORCEMENT_REGISTER: Readonly<Record<RegisteredRuleId, EnforcementDisposition>> = {
 	'RPH-EXE-001': {
@@ -2671,6 +2673,73 @@ export const ENFORCEMENT_REGISTER: Readonly<Record<RegisteredRuleId, Enforcement
 			"drop `RPH_AUTHORITY_INSUFFICIENT` from STATUS_FOR_CODE in kit.ts — the refusal becomes REJECTED and this row's declared UNAUTHORIZED no longer matches, so the probe reports ADMITTED",
 			'NO MUTATION IS NEEDED TO DEMONSTRATE THE BYPASS — it is live: propose the decision from an AGENT while naming a HUMAN in `authority`, and both commands are ACCEPTED. That is REG-F-014, and it is recorded as a declared mutation entry precisely because a reader re-running these acts must not conclude the set is exhaustive.'
 		]
+	},
+	'RPH-GOV-002': {
+		kind: 'NOT_A_COMMAND_REFUSAL',
+		canonCarriage: {
+			kind: 'CARRIED',
+			canonAnchor: 'no effective governance decision exists until an authorized actor decides',
+			note: 'JPWB-DOC-003 §8 ASR-15, whose preceding clause ("An agent may recommend a decision but cannot exercise authority unless delegated") is RPH-GOV-001\'s anchor. The two rules are the two halves of one canon sentence, which is exactly why they must not share an enforcement claim — see the `why`.'
+		},
+		why:
+			'AN OUTCOME ASSERTION — "creates NO effective governance decision until an authorized actor approves it" ' +
+			'— and both of its limbs hold, neither by a refusal. Limb 1: `proposeDecision` writes the literal ' +
+			'`status: \'PROPOSED\'` into both the state and the emitted event, and applies no authority check at ' +
+			'all, so an agent MAY propose — which is what the rule permits, not what it forbids. Limb 2 is guarded ' +
+			'by the refusal RPH-GOV-001 already claims. THAT IS THE REASON THIS ROW IS ARM 3 AND NOT A SECOND ' +
+			'ENFORCED ROW, and it is the marker-distinctness hazard one level up: filing it ENFORCED would give two ' +
+			'rules ONE refusal site, so a single mutant would redden both and the register would report two ' +
+			'enforced rules where one arrangement had ever been driven. RPH-PWU-009/010 share a site and are ' +
+			'distinguishable only because they carry genuinely different reason strings; here there is one string. ' +
+			'ALSO RECORDED: the rule\'s own dedicated kernel predicate `isEffectiveApproval` is DEAD — its only ' +
+			'reference outside tests is its own definition. It is not named as this row\'s guard because arm 3 has ' +
+			'no guard, but a reader looking for why the rule feels unenforced should find it here rather than ' +
+			'conclude the census missed it.'
+	},
+	'RPH-GOV-004': {
+		kind: 'NOT_A_COMMAND_REFUSAL',
+		canonCarriage: {
+			kind: 'CARRIED',
+			canonAnchor:
+				'It does not erase a finding, make invalid evidence valid, declare a rejected claim true',
+			note: 'JPWB-DOC-003 §8 ASR-14 (A waiver accepts risk; it never rewrites truth). Canon states the prohibitions; the ratified rule states the positive outcome the same act must produce.'
+		},
+		why:
+			'AN OUTCOME ASSERTION about what granting a waiver PRODUCES — finding still visible, disposition ' +
+			'WAIVED, rationale and authority recorded, evidence unchanged. Nothing is refused. AND THE OUTCOME IS ' +
+			'NOT PRODUCED EITHER, which is the part worth recording rather than leaving as a silence: `GrantWaiver` ' +
+			'advances the DECISION aggregate to EFFECTIVE and emits `WaiverGranted`, and NO command anywhere sets ' +
+			'an `AssuranceObservation.disposition` to WAIVED — so the rule\'s second limb names a state transition ' +
+			'no dispatch performs. Of the other three limbs: "finding stays visible" is satisfied VACUOUSLY ' +
+			'(nothing deletes observations, so nothing can fail it); "records rationale and authority" is met at ' +
+			'the SCHEMA layer, since `RequestWaiverPayloadSchema` requires `rationale`, so its violation surfaces ' +
+			'as VALIDATION_FAILED rather than as this rule; and "leaves evidence unchanged" has no guard at all. ' +
+			'The dedicated kernel predicate `waiverPreservesFindings` is DEAD — definition only, no non-test ' +
+			'reference — which is the same shape as RPH-GOV-002\'s and RPH-GOV-007\'s and is why this family needed ' +
+			'a census rather than a reading.'
+	},
+	'RPH-GOV-007': {
+		kind: 'NOT_A_COMMAND_REFUSAL',
+		canonCarriage: {
+			kind: 'CARRIED',
+			canonAnchor:
+				'revoking a decision triggers impact analysis — dependent baselines and planning cannot keep standing on it silently',
+			note: 'JPWB-DOC-003 §8 ASR-15. Canon carries the rule at full strength, including the "silently" that is the whole point, so retirement of the pre-canon corpus does not retire the obligation.'
+		},
+		why:
+			'A CASCADE OUTCOME ON A PLANE THAT DOES NOT EXIST. All three limbs — the Baseline becoming ' +
+			'review-required or revoked, downstream planning being impacted, impact analysis being initiated — ' +
+			'assert consequences of a SUCCESSFUL `RevokeDecision`, so no dispatch could be rejected for violating ' +
+			'them, and the impact-analysis plane they need is the same one REG-F-006 records as blocking DEC-2. ' +
+			'`revokeDecision` advances the Decision to REVOKED and does nothing else; nothing cascades. THE PART ' +
+			'THAT IS WORSE THAN DEAD, and the reason this row is longer than its disposition warrants: the rule\'s ' +
+			'dedicated kernel predicate `assessDecisionRevocation` is not merely uncalled outside its own test — it ' +
+			'is a CONSTANT FUNCTION. It ignores its `DecisionView` argument entirely and can never return the ' +
+			'`REVOKED` half of its own declared `RevocationOutcome` union. Its unit test therefore cannot ' +
+			'discriminate: no input distinguishes a pass from a failure, so the test proves the function returns ' +
+			'what it always returns. That is a control that cannot fail, in the kernel, under a rule id — the ' +
+			'defect this repository has shipped three times and the reason every gate in this register carries a ' +
+			'named predicted red.'
 	}
 };
 

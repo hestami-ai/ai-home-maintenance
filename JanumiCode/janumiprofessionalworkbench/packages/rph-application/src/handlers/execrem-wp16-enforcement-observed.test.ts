@@ -896,6 +896,13 @@ describe('JAN-EXECREM WP-16 (c) — the enforcement register is OBSERVED, not as
 				return { control, observed };
 			}
 		},
+		// RPH-GOV, three more (2026-08-02) — all NOT_A_COMMAND_REFUSAL. GOV-002 is arm 3 SPECIFICALLY so it does
+		// not share GOV-001's single refusal site (one mutant would redden both); GOV-004's outcome is not
+		// produced at all; GOV-007's kernel predicate is a CONSTANT FUNCTION that cannot return half its own
+		// declared union. GOV-003/005 (ENFORCED) and GOV-006 (DISCLOSED) still owe observations.
+		'RPH-GOV-002': null,
+		'RPH-GOV-004': null,
+		'RPH-GOV-007': null,
 		'RPH-PER-002': null,
 		'RPH-PER-003': null, // disclosed — observed in disclosure-observed.test.ts
 		'RPH-PER-004': null, // disclosed — observed in disclosure-observed.test.ts
