@@ -785,6 +785,7 @@ describe('JAN-EXECREM WP-16 (c) — the enforcement register is OBSERVED, not as
 		'RPH-PWU-001': null,
 		'RPH-PWU-005': null,
 		'RPH-PWU-006': null,
+		'RPH-PWU-008': null,
 		'RPH-PWU-002': {
 			arrangement: 'ProposePwu naming an intentId that resolves to no Intent aggregate',
 			run: () => {

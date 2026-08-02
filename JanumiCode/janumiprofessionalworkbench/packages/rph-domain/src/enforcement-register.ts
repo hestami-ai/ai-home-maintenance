@@ -295,7 +295,8 @@ export type RegisteredRuleId =
 	| 'RPH-PWU-002'
 	| 'RPH-PWU-004'
 	| 'RPH-PWU-005'
-	| 'RPH-PWU-006';
+	| 'RPH-PWU-006'
+	| 'RPH-PWU-008';
 
 export const ENFORCEMENT_REGISTER: Readonly<Record<RegisteredRuleId, EnforcementDisposition>> = {
 	'RPH-EXE-001': {
@@ -1395,6 +1396,37 @@ export const ENFORCEMENT_REGISTER: Readonly<Record<RegisteredRuleId, Enforcement
 			'recording it twice would let one arrangement green two rules — the duplicate-marker failure, one level ' +
 			'up. If the sponsor rules that canon\'s "only when" governs, this row becomes a duplicate of RPH-PWU-007 ' +
 			'rather than a new finding.'
+	},
+	'RPH-PWU-008': {
+		kind: 'UNENFORCED_DISCLOSED',
+		canonCarriage: {
+			kind: 'CARRIED',
+			canonAnchor: 'invalidated work cannot be baselined',
+			note: 'JPWB-DOC-003 §5 STA-4 names this as one of the enumerated laundering paths the illegal-transition set forecloses — stated absolutely, with no policy predicate.'
+		},
+		why:
+			'THE PROMOTION PATH NEVER READS ITS ITEMS. `promoteBaseline` builds its candidate item set from the ' +
+			'COMMAND PAYLOAD (`expectedItemObjectVersions`) and passes it to `canPromoteBaseline` as ' +
+			'`{ objectId, semanticVersion, contentHash? }` — a shape with no lifecycle field to quantify over — and ' +
+			'calls `ctx.store.loadObject` on no item at all. Measured: `workLifecycleState` and `lifecycleStatus` ' +
+			'occur in both governance modules only as WRITES inside `newEnvelope` at object creation; the promotion ' +
+			'path reads a PWU\'s state on no axis. So a PWU sitting in INVALIDATED is frozen into an AUTHORITATIVE ' +
+			'baseline and the engine never asks. WHAT IS ENFORCED NEXT DOOR, recorded so the two are not confused: ' +
+			'the same handler DOES refuse a promotion resting on invalidated EVIDENCE (RPH-BAS family), which is why ' +
+			'this row\'s control is available at the same site — the machinery polices invalidation of one object ' +
+			'type and not of the item it is promoting.',
+		guard: {
+			kind: 'OBSERVED_ADMISSION',
+			arrangement:
+				'a PWU seeded into INVALIDATED, frozen into an APPROVED Baseline and promoted — accepted, and the baseline really becomes AUTHORITATIVE over that item',
+			control:
+				'the byte-identical promotion whose decision considered an Evidence that is then INVALIDATED, which the SAME handler refuses — same command, same site, same word "invalidated", one object type over',
+			whyNoPredicate:
+				'`canPromoteBaseline` is not dead — it is asked on this very path — so naming it would fail ' +
+				'`deadPredicate`\'s first clause. And it could not implement the rule if it were: its item view has ' +
+				'no lifecycle field, so the rule is inexpressible to it, which is the RPH-EVD-003 shape before that ' +
+				'row was fixed. What is absent is a subject on the type, not a caller.'
+		}
 	}
 };
 

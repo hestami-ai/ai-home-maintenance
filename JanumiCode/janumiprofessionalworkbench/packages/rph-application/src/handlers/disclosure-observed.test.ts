@@ -39,6 +39,7 @@ import {
 } from '@janumipwb/rph-domain';
 import { beforeEach, describe, expect, it } from 'vitest';
 import { Engine } from '../index.js';
+import { seedPwuWorkLifecycleState_FIXTURE } from './__tests__/pwu-fixtures.js';
 
 const TS = '2026-08-01T00:00:00Z';
 const actor: ActorReference = { actorId: 'gov-1', actorType: 'HUMAN', displayName: 'Governor' };
@@ -371,6 +372,159 @@ describe('the register\'s RPH-EVD disclosures are OBSERVED, not asserted', () =>
 			reasonCode: 'aggregate assurance'
 		});
 
+	// ── baseline-promotion fixture (RPH-PWU-008) ─────────────────────────────────────────────────────────────
+	//
+	// Modelled on `baseline-invalidated-evidence.test.ts`, which already drives this whole chain green. `tag`
+	// namespaces the ids so the observation and its control are two independent baselines in one store.
+	const baselineChain = (tag: string, opts: { withEvidence?: boolean } = {}) => {
+		//  MUST be uppercase Crockford base32 — the id alphabet excludes lower case (and I, L, O, U). A lowercase
+		// tag produced RPH_VALIDATION_SCHEMA_FAILED on the first run, at the ARRANGING step, which is the honest
+		// place for a malformed fixture to fail.
+		const id = (prefix: string, n: string) => `${prefix}_01ARZ3NDEKTSV4RRFFQ69G5${tag}${n}`;
+		const pwu = id('pwu', 'P0');
+		const pol = id('pol', 'L0');
+		const asm = id('asm', 'A0');
+		const dec = id('dec', 'D0');
+		const baseline = id('bsl', 'B0');
+		const claim = id('clm', 'C0');
+		const evidence = id('evd', 'E0');
+
+		seedPolicy(pol, { criterionSeverity: 'MATERIAL' });
+		proposePwu(pwu);
+
+		if (opts.withEvidence) {
+			ok(
+				dispatch(
+					'AssertClaim',
+					{
+						statement: 'the architecture is fit for its approved need',
+						claimType: 'FITNESS',
+						subjectObjectIds: [pwu],
+						supportingEvidenceIds: [evidence],
+						contradictingEvidenceIds: []
+					},
+					claim,
+					'CLAIM'
+				),
+				'assert claim'
+			);
+			ok(proposeEvidence(evidence, { supportsClaimIds: [claim] }), 'propose control evidence');
+			ok(admitEvidence(evidence, { admittedClaimIds: [claim] }), 'admit control evidence');
+		}
+
+		ok(
+			dispatch(
+				'RequestAssuranceAssessment',
+				{
+					assessmentId: asm,
+					assurancePolicyId: pol,
+					policyVersion: '1.0.0',
+					subjectObjectIds: [pwu],
+					subjectSemanticVersions: { [pwu]: 1 },
+					claimIds: opts.withEvidence ? [claim] : []
+				},
+				asm,
+				'ASSURANCE_ASSESSMENT'
+			),
+			'request baseline assessment'
+		);
+		ok(completeAssessmentFor(asm, pol, pwu), 'complete baseline assessment');
+		ok(
+			dispatch(
+				'ProposeDecision',
+				{
+					decisionType: 'PROMOTE_BASELINE',
+					subjectObjectIds: [pwu],
+					selectedOption: 'promote',
+					rationale: 'ready',
+					// ProposeDecision.authority is an ActorReference, NOT the AuthorityReference that
+					// AssertObligation/AssertConstraint take. Two fields spelled "authority", two shapes.
+					authority: actor
+				},
+				dec,
+				'DECISION'
+			),
+			'propose promotion decision'
+		);
+		ok(
+			dispatch(
+				'ApproveDecision',
+				{
+					selectedOption: 'promote',
+					rationale: 'ready',
+					consideredEvidenceIds: opts.withEvidence ? [evidence] : [],
+					consideredObservationIds: [],
+					subjectSemanticVersions: { [pwu]: 1 }
+				},
+				dec,
+				'DECISION'
+			),
+			'approve promotion decision'
+		);
+		ok(
+			dispatch(
+				'CreateBaseline',
+				{ baselineType: 'ARCHITECTURE', itemObjectIds: [pwu], assuranceAssessmentIds: [asm] },
+				baseline,
+				'BASELINE'
+			),
+			'create baseline'
+		);
+		ok(dispatch('SubmitBaselineForReview', {}, baseline, 'BASELINE'), 'submit baseline');
+		ok(dispatch('ApproveBaseline', {}, baseline, 'BASELINE'), 'approve baseline');
+
+		return {
+			pwu,
+			baseline,
+			evidence,
+			promote: (): Outcome =>
+				dispatch(
+					'PromoteBaseline',
+					{
+						promotionDecisionId: dec,
+						expectedItemObjectVersions: [{ objectId: pwu, semanticVersion: 1 }],
+						requiredAssessmentIds: [asm]
+					},
+					baseline,
+					'BASELINE'
+				)
+		};
+	};
+
+	/** `completeAssessment` bound to an arbitrary subject — the shared helper pins PARENT. */
+	const completeAssessmentFor = (
+		assessmentId: string,
+		policyId: string,
+		subjectId: string
+	): Outcome =>
+		dispatch(
+			'CompleteAssuranceAssessment',
+			{
+				validatorResult: {
+					validatorId: 'reviewer',
+					validatorVersion: '1',
+					policyId,
+					policyVersion: '1.0.0',
+					assessmentId,
+					subjectObjectIds: [subjectId],
+					subjectSemanticVersions: { [subjectId]: 1 },
+					claimResults: [],
+					evidenceConsideredIds: [],
+					evidenceRejected: [],
+					observations: [],
+					dispositionRecommendation: 'SATISFIED',
+					recommendedControlActions: [],
+					residualUncertainty: [],
+					limitations: [],
+					executionProvenance: {
+						evaluator: { actorId: 'rev-1', actorType: 'HUMAN', displayName: 'Reviewer' }
+					}
+				}
+			},
+			assessmentId,
+			'ASSURANCE_ASSESSMENT'
+		);
+
 	const parseGuardControl = (assessmentId: string, policyId: string): Outcome => {
 		requestAssessment(assessmentId, policyId);
 		return completeAssessment(assessmentId, policyId, { subjectSemanticVersions: {} });
@@ -435,6 +589,47 @@ describe('the register\'s RPH-EVD disclosures are OBSERVED, not asserted', () =>
 		'RPH-PWU-004': null,
 		'RPH-PWU-005': null,
 		'RPH-PWU-006': null,
+
+		'RPH-PWU-008': {
+			arrangement:
+				'a PWU in INVALIDATED frozen into a Baseline and promoted to AUTHORITATIVE — the promotion path never reads the item’s lifecycle',
+			run: () => {
+				const B = baselineChain('A');
+				// THE ARRANGEMENT IS SEEDED, THE ADMISSION IS DRIVEN — the same split `pwu-fixtures.ts` states and
+				// the RPH-PWU-010 probe already uses. INVALIDATED has exactly three in-arrows (SATISFIED,
+				// CONDITIONALLY_SATISFIED, RECOMPOSED), so driving it means walking the entire execution and
+				// assurance chain, which can fail for many reasons unrelated to THIS rule — and each would present
+				// as "RPH-PWU-008 is enforced after all". The seeding helper checks the state against the ratified
+				// machine's own list and re-parses the aggregate, so nothing rehearses against an impossible PWU.
+				seedPwuWorkLifecycleState_FIXTURE(store, B.pwu, 'INVALIDATED');
+				expect(
+					(store.loadObject(B.pwu)?.state as Record<string, unknown>)?.workLifecycleState,
+					'the arrangement is only meaningful while the PWU really is INVALIDATED'
+				).toBe('INVALIDATED');
+				const admitted = B.promote();
+				// Assert the ITEM as well as the acceptance: a promotion that quietly dropped the invalidated item
+				// would be a different (and better) engine, and would green this probe for the wrong reason.
+				expect(
+					(store.loadObject(B.baseline)?.state as Record<string, unknown>)?.status,
+					'the baseline must really have become authoritative over the invalidated item'
+				).toBe('AUTHORITATIVE');
+
+				// CONTROL — the SAME command at the SAME site, one object type over. The promotion IS refused when
+				// the EVIDENCE it rests on is invalidated, which proves promoteBaseline polices invalidation and
+				// simply never asks the question about its ITEMS.
+				const C = baselineChain('B', { withEvidence: true });
+				ok(
+					dispatch(
+						'InvalidateEvidence',
+						{ invalidationReason: 'source retracted' },
+						C.evidence,
+						'EVIDENCE'
+					),
+					'invalidate the control evidence'
+				);
+				return { admitted, control: C.promote() };
+			}
+		},
 
 		'RPH-EVD-001': {
 			arrangement:
