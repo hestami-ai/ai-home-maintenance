@@ -833,6 +833,24 @@ describe('JAN-EXECREM WP-16 (c) — the enforcement register is OBSERVED, not as
 		// rebuild, outbox atomicity, restart recovery), and a refusal probe cannot hold any of them. One
 		// (RPH-PER-012) is disclosed by a dead-predicate census in rph-domain. Only RPH-PER-001 is a refusal, and
 		// it is the row that made `refusalStatus` necessary.
+		// ── The three READ-MODEL families (2026-08-02) ────────────────────────────────────────────────────────
+		// All fourteen are NOT_A_COMMAND_REFUSAL, so none is observed here. Nine have no dispatchable subject at
+		// all; five ARE performed, at a layer classifyRefusal cannot reach (a renderer returns no CommandResult).
+		// That boundary is the family's finding — see the register's family header.
+		'RPH-PRJ-001': null,
+		'RPH-PRJ-002': null,
+		'RPH-PRJ-003': null,
+		'RPH-PRJ-004': null,
+		'RPH-PRJ-005': null,
+		'RPH-TRC-001': null,
+		'RPH-TRC-002': null,
+		'RPH-TRC-003': null,
+		'RPH-TRC-004': null,
+		'RPH-TRC-005': null,
+		'RPH-CMP-001': null,
+		'RPH-CMP-002': null,
+		'RPH-CMP-003': null,
+		'RPH-CMP-004': null,
 		'RPH-PER-002': null,
 		'RPH-PER-003': null, // disclosed — observed in disclosure-observed.test.ts
 		'RPH-PER-004': null, // disclosed — observed in disclosure-observed.test.ts

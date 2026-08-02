@@ -42,7 +42,11 @@ interface Rule {
 }
 const catalog = JSON.parse(
 	readFileSync(new URL('../vocab/m12-conformance.json', import.meta.url), 'utf8')
-) as { readonly ruleCatalog: readonly Rule[] };
+) as {
+	readonly ruleCatalog: readonly Rule[];
+	/** The catalog's own per-prefix census — the independent "expected" the family gate now checks against. */
+	readonly ruleCountsByPrefix: Readonly<Record<string, number>>;
+};
 
 const REPO_ROOT = fileURLToPath(new URL('../../../', import.meta.url));
 
@@ -144,7 +148,15 @@ const TOTAL_OVER_FAMILIES: readonly string[] = [
 	// family stayed out of this list until both carried OBSERVED_ADMISSION probes. RPH-PER also cost the third
 	// structural widening: `classifyRefusal` read status REJECTED alone, and RPH-PER-001's real, command-layer
 	// refusal carries CONFLICT, so working enforcement would have classified as ADMITTED.
-	'RPH-PER-'
+	'RPH-PER-',
+	// ADDED 2026-08-02 — the three READ-MODEL families (conformance layer 6). All fourteen rows are
+	// NOT_A_COMMAND_REFUSAL, so unlike RPH-PWU and RPH-PER there was no disclosure to hold the family open for:
+	// nine rules have no dispatchable subject, and five are performed at a layer `classifyRefusal` cannot observe.
+	// RPH-CMP could not even have been claimed here before today — it was exempt from the conformance gate via
+	// `DEFERRABLE_PREFIXES` on a misread of what the family is (REG-F-013).
+	'RPH-PRJ-',
+	'RPH-TRC-',
+	'RPH-CMP-'
 ];
 
 describe('WP-16 (c) — the register is TOTAL over the families it claims', () => {
@@ -152,7 +164,22 @@ describe('WP-16 (c) — the register is TOTAL over the families it claims', () =
 		// The anti-recurrence property: a tenth RPH-EXE rule cannot be ratified into the vocab and then quietly go
 		// unenforced, because it lands here as a failing test on the day it is added. The same now holds for RPH-EVD.
 		const catalogued = catalog.ruleCatalog.map((r) => r.id).filter((id) => id.startsWith(family));
-		expect(catalogued.length, `the catalog must actually contain ${family}`).toBeGreaterThan(5);
+		// THE ANTI-TYPO GUARD, REWRITTEN 2026-08-02 AND NOW STRICTLY STRONGER. It read
+		// `toBeGreaterThan(5)` — a magic number over-fitted to the families that happened to exist when it was
+		// written, every one of which had six or more rules. It rejected RPH-PRJ (5), RPH-TRC (5) and RPH-CMP (4)
+		// as "not in the catalog" when all three are ratified and complete. A threshold cannot tell a small family
+		// from a mistyped prefix, so it was the wrong instrument for the job.
+		//
+		// The catalog carries its OWN per-prefix census, so the check is now an EQUALITY against that data — which
+		// catches the typo (0 !== n), catches a family silently losing a rule, and catches the census itself
+		// drifting from the catalog it counts. Same preference as `TOTAL_OVER_FAMILIES` being data rather than a
+		// hard-coded filter: derive the expectation, never pick a number.
+		const declaredCount = catalog.ruleCountsByPrefix[family.replace(/-$/, '')];
+		expect(declaredCount, `${family} is not in the catalog's own ruleCountsByPrefix`).toBeDefined();
+		expect(
+			catalogued.length,
+			`${family}: the catalog holds ${catalogued.length} rules but its census declares ${String(declaredCount)}`
+		).toBe(declaredCount);
 		const disposed = new Set<string>(REGISTERED_RULE_IDS);
 		expect(
 			catalogued.filter((id) => !disposed.has(id)),

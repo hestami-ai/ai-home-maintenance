@@ -380,7 +380,23 @@ export type RegisteredRuleId =
 	| 'RPH-PER-011'
 	| 'RPH-PER-012'
 	| 'RPH-PER-013'
-	| 'RPH-PER-014';
+	| 'RPH-PER-014'
+	// The three READ-MODEL families (conformance layer 6), closed 2026-08-02. All fourteen are
+	// NOT_A_COMMAND_REFUSAL, and that uniformity is a finding about this register's REACH — see the family header.
+	| 'RPH-PRJ-001'
+	| 'RPH-PRJ-002'
+	| 'RPH-PRJ-003'
+	| 'RPH-PRJ-004'
+	| 'RPH-PRJ-005'
+	| 'RPH-TRC-001'
+	| 'RPH-TRC-002'
+	| 'RPH-TRC-003'
+	| 'RPH-TRC-004'
+	| 'RPH-TRC-005'
+	| 'RPH-CMP-001'
+	| 'RPH-CMP-002'
+	| 'RPH-CMP-003'
+	| 'RPH-CMP-004';
 
 export const ENFORCEMENT_REGISTER: Readonly<Record<RegisteredRuleId, EnforcementDisposition>> = {
 	'RPH-EXE-001': {
@@ -2270,6 +2286,308 @@ export const ENFORCEMENT_REGISTER: Readonly<Record<RegisteredRuleId, Enforcement
 			'driver builds its idempotency key from a prefix documented as "unique per recording run", so a ' +
 			'restarted run mints FRESH keys and the receipt lookup would not fire — resumption would rest on the ' +
 			'state precondition alone.'
+	},
+
+	// ══════════════════════════════════════════════════════════════════════════════════════════════════════════
+	// THE THREE READ-MODEL FAMILIES — RPH-PRJ, RPH-TRC, RPH-CMP — closed 2026-08-02.
+	//
+	// ALL FOURTEEN ARE NOT_A_COMMAND_REFUSAL, AND THAT UNIFORMITY IS THE FINDING. Every previous family produced a
+	// mix, and a family that comes out entirely arm 3 should be read first as a failure of investigation. It was
+	// tested as one: the five load-bearing absences behind these dispositions were sent to adversarial refuters
+	// whose instruction was to FIND the thing, with this register and the manifest explicitly excluded from their
+	// evidence so my own in-flight edits could not be mistaken for finds. What came back is recorded on the rows.
+	//
+	// THE REASON THE FAMILY IS UNIFORM IS STRUCTURAL, and it splits in two:
+	//
+	//   (a) NINE rules have NO DISPATCHABLE SUBJECT. There is no presentation command in this engine (no position,
+	//       layout, viewport, or ordering payload anywhere in the 84 commands), no phase/milestone setter and no
+	//       persisted phase field, no traceability-validation command, and the ratified `TraceLinkSchema` is minted
+	//       by nothing. A rule whose antecedent no dispatch can produce cannot be UNENFORCED_DISCLOSED, because
+	//       that arm demands an arrangement the engine ACCEPTS — the RPH-EVD-002 reasoning, applied nine times.
+	//
+	//   (b) FIVE rules ARE performed, at a layer this instrument cannot observe. RPH-PRJ-002's no-green rule runs
+	//       end to end — a PURE_KERNEL predicate, a READ_MODEL flag, a SURFACE that gates the green marker on it —
+	//       and RPH-TRC-005's invalidation cascade has a live command-layer caller. Neither is a REFUSAL. This is
+	//       the honest boundary of the whole register, and it is worth stating plainly: `LAYER_BY_PACKAGE` can NAME
+	//       the surface (it gained `apps/` for SPEC-001), but `classifyRefusal` observes `CommandResult` and a
+	//       rendering rule produces none. The register can say WHERE such a rule lives; it cannot certify it. A
+	//       fourth arm that let it try would be the vacuous certification this module exists to refuse.
+	//
+	// CARRIAGE IS EXCELLENT AND ARRIVED FROM TWO ARTIFACTS. DOC-003's LYR/REL/STA blocks carry twelve of the
+	// fourteen, several verbatim (REL-3 and REL-4 read almost word-for-word against RPH-TRC-004 and RPH-TRC-003).
+	// The RPH-CMP family's carrier is in DOC-002 §8's retired-terminology table instead — one line that carries all
+	// four rules at once.
+	//
+	// REG-F-013 WAS FOUND HERE: `RPH-CMP` was exempt from the conformance gate via `DEFERRABLE_PREFIXES` on a note
+	// describing dual-run migration apparatus — a different concern — and stale regardless, since the compatibility
+	// projection was built in W2-INC-3. That is the one manifest defect this register's overclaim gate is
+	// structurally blind to: a deferred family makes no claim, so there is nothing to catch it over-claiming.
+	// ══════════════════════════════════════════════════════════════════════════════════════════════════════════
+	'RPH-PRJ-001': {
+		kind: 'NOT_A_COMMAND_REFUSAL',
+		canonCarriage: {
+			kind: 'CARRIED',
+			canonAnchor: 'never summarized into one status field, one progress bar, or one boolean',
+			note: 'JPWB-DOC-003 §5 STA-1 (The four axes never collapse). Canon states the prohibition on collapsing; the ratified rule states the display obligation that follows from it. Same rule, opposite polarity.'
+		},
+		why:
+			'A DISPLAY OBLIGATION — "must display all three states distinctly in Work View". Nothing is refused, and ' +
+			'the subject is a view, not a command. THE INDEPENDENCE IT DEPENDS ON IS REAL AND IS ENFORCED ELSEWHERE: ' +
+			'the four axes are separate fields on the PWU with separate machines, and the cross-axis guard is ' +
+			'RPH-PWU territory, not this rule\'s. What this rule adds is that the SURFACE must not re-collapse what ' +
+			'the model keeps apart — an obligation on rendering, which `classifyRefusal` cannot observe because ' +
+			'rendering returns no `CommandResult`.'
+	},
+	'RPH-PRJ-002': {
+		kind: 'NOT_A_COMMAND_REFUSAL',
+		canonCarriage: {
+			kind: 'CARRIED',
+			canonAnchor: 'all-steps-succeeded leaves assurance unassessed until required policies complete',
+			note: 'JPWB-DOC-003 §5 STA-2 (Execution success never confers satisfaction; successor of legacy INV-5). A DIFFERENT span of STA-2 than the RPH-PWU rows cite, deliberately: this rule is about what may be SHOWN, and this clause is the one about the gap between all-steps-succeeded and assurance.'
+		},
+		why:
+			'THE CLEAREST CASE OF A RULE THIS REGISTER CAN LOCATE BUT NOT CERTIFY, and it is recorded at length ' +
+			'because the temptation to file it as ENFORCED is real. The rule IS performed, end to end, by a chain ' +
+			'this row names so a reader can check it: the decision is `isQualifiedSuccess` in ' +
+			'`packages/rph-projections/src/work-projection.ts` (true ONLY when execution SUCCEEDED **and** assurance ' +
+			'SATISFIED); it becomes the `qualifiedSuccess` field on the graph node in ' +
+			'`packages/rph-projections/src/graph-view.ts`; and `apps/rph-demo/src/lib/toFlow.ts` gates the green ' +
+			'marker on that field in three places. One rule, one predicate, three layers, no duplication. BUT NO ' +
+			'COMMAND IS REFUSED. The rule\'s subject is what the UI may SHOW, and `classifyRefusal` reads a ' +
+			'`CommandResult` — a renderer produces none. Filing it ENFORCED would mean the register certifying a ' +
+			'guarantee it never observed, which is DS-001 item 2 committed deliberately rather than by accident. ' +
+			'THE STATE-LEVEL SIBLING IS A DIFFERENT RULE, and an adversarial pass on this row forced it to be named ' +
+			'precisely rather than gestured at: `WORK_LIFECYCLE_CROSS_AXIS_GUARDS` in ' +
+			'`packages/rph-domain/src/pwuGuards.ts` holds `UNDER_ASSURANCE->SATISFIED` conditional on ' +
+			'`assuranceState === SATISFIED`, and `rejectIllegalWorkLifecycleMove` in ' +
+			'`packages/rph-application/src/handlers/pwu.ts` performs the refusal on `ChangePwuState` with ' +
+			'RPH_INVARIANT_VIOLATION. So the STATE combination IS refused, at the command layer, by a named site — ' +
+			'and that belongs to the RPH-PWU rows. This rule is about the INDICATOR. Conflating them would let one ' +
+			'arrangement green two rules, which is the failure the marker-distinctness gate exists to stop one ' +
+			'level down. THE DISPLAY HALF WAS RE-VERIFIED at the same time and holds: `styleFor` in `toFlow.ts` ' +
+			'selects the success background only on `qualifiedSuccess`, an AMBER background when execution ' +
+			'SUCCEEDED without it — its comment calls that "the visible exec≠assurance gap" — and `labelFor` gates ' +
+			'the ✓ on the same flag.'
+	},
+	'RPH-PRJ-003': {
+		kind: 'NOT_A_COMMAND_REFUSAL',
+		canonCarriage: {
+			kind: 'CARRIED_BY_GENERAL_RULE',
+			canonAnchor: 'Identity is opaque and immutable',
+			note: 'JPWB-DOC-003 §4 OBJ-3. GENERAL because canon states that an object has one stable identity — which is WHY selection can be consistent across views — but says nothing about views, selection, or a UI at all. The general rule survives retirement; this application does not.'
+		},
+		why:
+			'A CROSS-VIEW UI CONSISTENCY PROPERTY ("selecting a PWU in Work View selects the same underlying object ' +
+			'in Execution, Assurance and Traceability Views"). No command exists whose acceptance or refusal could ' +
+			'settle it. The manifest routes this to the M14 surface, correctly. Recorded rather than omitted so the ' +
+			'silence is declared: the property is UNTESTED at any layer today, and a register that simply left the ' +
+			'rule out would read the same as one that had checked.'
+	},
+	'RPH-PRJ-004': {
+		kind: 'NOT_A_COMMAND_REFUSAL',
+		canonCarriage: {
+			kind: 'CARRIED',
+			canonAnchor: 'No presentation operation may change semantic state or increment a semantic version',
+			note: 'JPWB-DOC-003 §2 LYR-3 (Presentation is meaning-inert), which states the rule more strongly than the ratified statement and adds "Layout has its own revision plane" — the plane this repository does not have.'
+		},
+		why:
+			'THE SUBJECT DOES NOT EXIST, and this row is RPH-CON-008\'s twin: that rule forbids a presentation ' +
+			'CONTRACT from referencing a mutating command, this one constrains what a presentation OPERATION may ' +
+			'do, and neither has anything to quantify over. Searched as a concept, not a spelling — position, ' +
+			'layout, canvas, viewport, collapse, ordering — across the command vocabulary, the generated schemas ' +
+			'and the command/event vocab JSON: no presentation command exists among the 84, and no ' +
+			'`presentationRevision` field exists anywhere, so canon\'s "Layout has its own revision plane" describes ' +
+			'a plane this repository has not built. THE PWA DESIGNER DOES RENDER A NODE GRAPH, which is exactly why ' +
+			'this was checked rather than assumed; its layout is computed client-side and never persisted. THE ' +
+			'RESIDUE IS THE SAME AS RPH-CON-008\'s: the day layout IS persisted, this rule becomes live with a real ' +
+			'subject and nothing here would notice. It is satisfied by absence, which is not the same as enforced.'
+	},
+	'RPH-PRJ-005': {
+		kind: 'NOT_A_COMMAND_REFUSAL',
+		canonCarriage: {
+			kind: 'CARRIED_BY_GENERAL_RULE',
+			canonAnchor: 'they are never authoritative write targets',
+			note: 'JPWB-DOC-003 §9 PER-7 (Projections are derived, disposable, and powerless). GENERAL: canon says a projection must not become an authority, which entails that a displayed count must match the canonical one; it never mentions observations, severities, or counts.'
+		},
+		why:
+			'AN AGREEMENT PROPERTY between a rendered count and canonical state. Nothing is refused. It is also the ' +
+			'rule in this family most likely to be quietly violated, and that is worth recording: an agreement ' +
+			'property fails SILENTLY — a wrong count renders exactly as convincingly as a right one — whereas every ' +
+			'refusal rule in this register fails loudly by definition. The manifest routes it to the M14 surface.'
+	},
+	'RPH-TRC-001': {
+		kind: 'NOT_A_COMMAND_REFUSAL',
+		canonCarriage: {
+			kind: 'CARRIED',
+			canonAnchor: 'Every authoritative baseline exhibits the unbroken typed chain',
+			note: 'JPWB-DOC-003 §4 REL-4 (The traceability spine is continuous), which then lists the chain in the same order as the ratified statement: originating expression → approved Intent → work (PWU) → Artifact → Claim → Evidence → Assurance Assessment → Decision → Baseline.'
+		},
+		why:
+			'AN EXISTENCE PROPERTY over a graph ("a typed path MUST EXIST"), not a refusal. The links it quantifies ' +
+			'over are DERIVED: `packages/rph-projections/src/traceability-view.ts` builds them per request from ' +
+			'event payloads via `linksFor`, so the spine is a computed view rather than stored edges, and there is ' +
+			'no command that could break it directly. WHAT WOULD MAKE THIS A REFUSAL is a promotion gate that ' +
+			'checked the chain before making a baseline authoritative; `canPromoteBaseline` carries nine finding ' +
+			'codes and none of them is about the trace spine. That is a real gap, but it belongs to whichever rule ' +
+			'states the promotion precondition — filing it here would be the subject substitution this register ' +
+			'records repeatedly.'
+	},
+	'RPH-TRC-002': {
+		kind: 'NOT_A_COMMAND_REFUSAL',
+		canonCarriage: {
+			kind: 'CARRIED_BY_GENERAL_RULE',
+			canonAnchor: 'constraint, propagation, and assumption (authority and premises made portable)',
+			note: 'JPWB-DOC-003 §4 REL-1, which names constraint propagation as one of the stable relation families. GENERAL because it establishes that the relation TYPE exists, not that a trace must exist for each mandatory constraint — the specific obligation this rule states.'
+		},
+		why:
+			'AN EXISTENCE PROPERTY like RPH-TRC-001, over constraint-propagation paths. Nothing refuses. THE ' +
+			'ADJACENT RULE THAT IS ENFORCED, named so this row is not read as a gap in constraint handling: ' +
+			'exhaustive constraint disposition at decomposition is DEC-4, and `reviseDecomposition` now applies ' +
+			'`constraintPropagations` under a kernel check (REG-F-006). What is unproved is the TRACE — that a ' +
+			'path exists from each mandatory constraint to the child PWUs and artifacts it binds — which is a ' +
+			'property of the derived link graph, not a command outcome.'
+	},
+	'RPH-TRC-003': {
+		kind: 'NOT_A_COMMAND_REFUSAL',
+		canonCarriage: {
+			kind: 'CARRIED',
+			canonAnchor: 'An artifact with no producing PWU fails validation',
+			note: 'JPWB-DOC-003 §4 REL-4, final sentence — near-verbatim against the ratified statement, and the strongest single carriage in this family.'
+		},
+		why:
+			'CANON STATES A REFUSAL AND THERE IS NO VALIDATOR TO PERFORM IT — but the missing thing is a whole ' +
+			'PLANE, not a guard, which is why this is arm 3 rather than a disclosure. "Traceability validation" ' +
+			'names a pass that does not exist: no command validates a trace graph, and searched as a concept ' +
+			'(validate, orphan, unsupported, dangling, unreachable) nothing performs it. UNENFORCED_DISCLOSED needs ' +
+			'an arrangement the engine ACCEPTS, and there is no dispatch whose acceptance would demonstrate this ' +
+			'gap — the RPH-CON-008 shape. THE NEAR-MISS, named so it is not mistaken for coverage: baseline ' +
+			'promotion IS a gate that could plausibly carry this check, and `canPromoteBaseline`\'s nine finding ' +
+			'codes do not include it. Adopting promotion as this rule\'s enforcement site would substitute a ' +
+			'governance act for a validation pass. THE CONCRETE FORM OF THE GAP, found by an adversarial pass and ' +
+			'kept because a future implementer needs the exact site: `recordArtifact` ' +
+			'(packages/rph-application/src/handlers/artifact.ts) is 76 lines containing NO `reject`, NO ' +
+			'`precondition` and NO `guard` at all. It builds `producerIds` by filtering out absent/empty values from ' +
+			'`producingPwuId` and `producingExecutionAttemptId`, so BOTH may be absent, `producerIds` is `[]`, and ' +
+			'that empty array is written straight to `sourceObjectIds`. An unsupported artifact is not merely ' +
+			'undetected later — it is minted freely now. WHY THAT STILL IS NOT A DISCLOSURE, and the second reason ' +
+			'is a structural limit of the arm worth recording: (1) the rule\'s subject is a validation pass, and ' +
+			'filing it against the minting command would assert that `RecordArtifact` should have refused, which is ' +
+			'not what the rule says; (2) OBSERVED_ADMISSION requires a CONTROL — a sibling defect at the SAME SITE ' +
+			'that IS refused, proving the refusal machinery is alive — and a handler that refuses nothing for any ' +
+			'reason cannot host one. A site with no refusals is a site where the disclosure arm has nothing to ' +
+			'measure against. THE RESIDUE: canon carries this rule at full strength, so retirement of the pre-canon ' +
+			'corpus does NOT retire the obligation — it will still be stated, and still be performed by nothing.'
+	},
+	'RPH-TRC-004': {
+		kind: 'NOT_A_COMMAND_REFUSAL',
+		canonCarriage: {
+			kind: 'CARRIED',
+			canonAnchor:
+				'A trace link is never silently rewritten; a correction creates a superseding link and preserves the old one',
+			note: 'JPWB-DOC-003 §4 REL-3 (Trace links are immutable; corrections supersede) — verbatim against the ratified statement in both clauses.'
+		},
+		why:
+			'THE OBJECT THIS RULE PROTECTS IS NEVER CREATED. `TraceLinkSchema` is a ratified contract object, and ' +
+			'its only production reference in the repository is its own declaration in ' +
+			'`packages/rph-contracts/src/objects.ts` — no command mints one, no handler reads one, no table stores ' +
+			'one. THE TYPE A READER WILL FIND FIRST IS A DIFFERENT TYPE: `rph-projections`\' `TraceLink` is a ' +
+			'separate interface built per request from event payloads, and it is recomputed rather than stored, so ' +
+			'"never silently rewritten" is vacuously true of it — there is nothing to rewrite. Immutability holds ' +
+			'because nothing is mutable, which is not the same as being enforced. THIS IS AN INSTANCE OF REG-F-001 ' +
+			'(the governed-objects layer as a projection of code) rather than a new finding, and it is exactly what ' +
+			'DOC-003 OBJ-7 forbids by name: "A governed object that nothing consults is a defect, not ' +
+			'documentation." It is also the concrete blocker recorded under REG-F-006 for DEC-2, whose impact ' +
+			'analysis needs a TraceLink-minting surface that does not exist.'
+	},
+	'RPH-TRC-005': {
+		kind: 'NOT_A_COMMAND_REFUSAL',
+		canonCarriage: {
+			kind: 'CARRIED',
+			canonAnchor: 'Invalidated source objects may invalidate downstream trace claims',
+			note: 'JPWB-DOC-003 §4 REL-3, final sentence. The mechanism half is carried more strongly still by ASR-8: "every dependent supported claim becomes contested, under review, or invalidated".'
+		},
+		why:
+			'A DOWNSTREAM-INDICATION property ("traceability indicates that the claim support is no longer valid"), ' +
+			'not a refusal — nothing is rejected when evidence is invalidated; a cascade is computed. UNLIKE THE ' +
+			'REST OF THIS FAMILY IT IS GENUINELY WIRED, and the census is recorded because the same census is what ' +
+			'condemns its neighbours: `classifyEvidenceInvalidation` (rph-domain) has a production caller in ' +
+			'`packages/rph-application/src/handlers/assurance.ts`, and `impactedObjects` has one in ' +
+			'`handlers/decomposition.ts`. Contrast `validateLinkDirectionality` and `TRACE_DIRECTIONALITY` in the ' +
+			'same kernel module, whose only reference is their own definition file — correct, unit-tested link ' +
+			'machinery that nothing asks. That dead pair is deliberately NOT filed as this row\'s guard: it ' +
+			'implements link DIRECTIONALITY, which no ratified RPH-TRC rule states, and attaching a dead predicate ' +
+			'to a rule it does not implement is the substitution this register exists to prevent.'
+	},
+	'RPH-CMP-001': {
+		kind: 'NOT_A_COMMAND_REFUSAL',
+		canonCarriage: {
+			kind: 'CARRIED',
+			canonAnchor:
+				'Derived compatibility milestone where legacy support requires it; never ontology',
+			note: 'JPWB-DOC-002 §8 (Retired and compatibility terminology), the `phase` row. ONE canon line carries all four RPH-CMP rules — derivation, non-authority, and non-storage — which is why every row in this family cites it. Canon\'s carrier for this family is in the VOCABULARY, not the invariant catalog.'
+		},
+		why:
+			'A DERIVATION property ("derives compatibility milestone INTAKE = COMPLETE"). Nothing is refused. THE ' +
+			'MECHANISM EXISTS: `packages/rph-projections/src/compatibility-view.ts` (`compatibilityProjector`, ' +
+			'`milestoneForKind`) folds the milestone from events, built in W2-INC-3 / WP-2-006. WHAT IS NOT BUILT ' +
+			'is the derivation this rule actually states: the current map is PWU KIND -> milestone, a stable ' +
+			'lookup, while the rule conditions the milestone on an approved Intent Baseline and COMPLETED PWUs. ' +
+			'The projector\'s own header discloses exactly this and names the successor work package (W5 ' +
+			'WP-5-003, "Compatibility Milestone Derivation"). So the row records a real, named, honest deferral — ' +
+			'which is what made REG-F-013 visible: the manifest had deferred this family for a DIFFERENT and wrong ' +
+			'reason while a legitimate one was written in the source file all along.'
+	},
+	'RPH-CMP-002': {
+		kind: 'NOT_A_COMMAND_REFUSAL',
+		canonCarriage: {
+			kind: 'CARRIED',
+			canonAnchor: 'A compatibility kind label on an instance is a descriptive discriminator only',
+			note: 'JPWB-DOC-002 §3, which continues "it never confers type identity" — the non-authority this rule states. Cited to a DIFFERENT DOC-002 passage than its three siblings so a reader can tell which sentence this row rests on.'
+		},
+		why:
+			'THE SUBJECT DOES NOT EXIST — verified adversarially rather than by one grep, because "no command can ' +
+			'set X" is precisely the claim that is easy to make and hard to justify. The complete handler registry ' +
+			'was read end to end (73 registered command types); none names a phase, milestone, or compatibility ' +
+			'anything. There is no persisted phase column or field in the store schema, the contracts, or the ' +
+			'application layer. THE NEAREST THING BY SHAPE IS `ChangePwuState`, which drives the PWU LIFECYCLE ' +
+			'axis — a different field, and adopting it would be the axis substitution STA-1 forbids. A SECOND ' +
+			'NEAR-MISS worth naming: `ontology.data.ts` holds a `compatibilityPhaseMapping` literal whose entries ' +
+			'carry a field spelled `phase`. It is ONTOLOGY DATA — a static kind->label map, not a settable field on ' +
+			'any aggregate. The rule is satisfied by construction: the phase is derived, so there is no "changing ' +
+			'the field directly" for a command to do.'
+	},
+	'RPH-CMP-003': {
+		kind: 'NOT_A_COMMAND_REFUSAL',
+		canonCarriage: {
+			kind: 'CARRIED',
+			canonAnchor:
+				'Derived compatibility milestone where legacy support requires it; never ontology',
+			note: 'JPWB-DOC-002 §8. "Never ontology" is the load-bearing half for THIS rule: a milestone reading ARCHITECTURE = COMPLETE while the root PWU is incomplete is only coherent if the milestone is a projection and not a lifecycle state.'
+		},
+		why:
+			'A DERIVATION property, and the one that best shows WHY the family must not be authoritative: it ' +
+			'requires the compatibility view and the PWU\'s own state to DISAGREE — ARCHITECTURE complete while the ' +
+			'root Product Realization PWU is not — without that disagreement being a defect. Nothing is refused; ' +
+			'what the rule constrains is what a derived label may say. As with RPH-CMP-001 the current derivation ' +
+			'is the W2 baseline kind->milestone map, and the axis-sensitive rules this statement needs are W5 ' +
+			'WP-5-003.'
+	},
+	'RPH-CMP-004': {
+		kind: 'NOT_A_COMMAND_REFUSAL',
+		canonCarriage: {
+			kind: 'CARRIED',
+			canonAnchor: 'never ontology',
+			note: 'JPWB-DOC-002 §8. A SHORT anchor deliberately: this rule\'s whole content is the non-storage clause ("is not stored as the semantic lifecycle state"), and "never ontology" is the exact phrase canon uses for it. Kept distinct from CMP-001/003\'s longer span of the same line so the three rows do not read as one claim made three times.'
+		},
+		why:
+			'A PERMISSION plus a non-storage constraint — "MAY be shown when a replan control action is active", ' +
+			'"is not stored as the semantic lifecycle state". A permission cannot be refused, which puts this row ' +
+			'in the same class as RPH-EXE-009\'s "retry or an alternate strategy MAY be selected". The non-storage ' +
+			'half is satisfied by construction for the same reason as RPH-CMP-002: the whole compatibility view is ' +
+			'an in-memory fold with no persisted column, so there is nowhere for a milestone to be stored AS ' +
+			'lifecycle state even if something tried. THE REPLAN CONTROL ACTION the rule conditions on is the part ' +
+			'with no subject: `REPLAN` exists as a `DecisionType` and in the ontology\'s phase mapping, but nothing ' +
+			'derives a milestone FROM an active control action — the projector keys on PWU kind alone.'
 	}
 };
 

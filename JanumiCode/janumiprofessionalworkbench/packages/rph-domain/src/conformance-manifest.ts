@@ -263,10 +263,33 @@ const COVERAGE_BY_PREFIX: Readonly<Record<string, Coverage>> = {
 		note: 'idempotency/concurrency/replay-equivalence/restart-classification asserted (001/002/007/012); remaining restart-scenario conformance (011/013/014, 003-006/008-010) completes with the M13 replay harness'
 	},
 
-	// DEFERRED — legitimately not an M12-kernel concern.
+	// ── REG-F-013, CORRECTED 2026-08-02 ──────────────────────────────────────────────────────────────────────
+	//
+	// This row read `status: 'DEFERRED'` with the note "dual-run/shadow comparison classification — migration
+	// apparatus, explicitly OUT of 0.1.x (D2) / MP scope", and `RPH-CMP` sat in `DEFERRABLE_PREFIXES` — the set
+	// whose entire job is that nothing else sneaks into DEFERRED. Four ratified rules were exempted from the gate
+	// by name, and BOTH halves of the reason were wrong.
+	//
+	// THE FAMILY IS NOT WHAT THE NOTE SAID. RPH-CMP-001..004 are compatibility MILESTONE rules (INTAKE = COMPLETE
+	// derivation, phase is non-authoritative, ARCHITECTURE = COMPLETE while the root PWU is not, REPLAN derived
+	// from a control action). None is about dual-run, shadow comparison, or migration. The conformance catalog's
+	// own layer table puts RPH-CMP in layer 6 and calls it "the non-authoritative compatibility projection".
+	// D2 IS REAL and correctly recorded elsewhere — the roadmap drops RPH-DOC-009 §21-29 "Persistence, Migration,
+	// Dual-Run, Cutover" under it — but those dropped sections and these §22 rules are different subjects.
+	//
+	// AND IT WAS STALE ANYWAY. The roadmap separately tagged the M5 Compatibility projection "conceptual only
+	// (D2)", which is the likelier origin. It stopped being conceptual in W2-INC-3 (WP-2-006):
+	// `packages/rph-projections/src/compatibility-view.ts` is a real Projector<V> folded from events, with
+	// `CompatibilityMilestone` a ratified contract enum.
+	//
+	// WHY THIS MATTERED MORE THAN THE FOUR MISCITES FOUND THE SAME DAY: a wrong `testFile` leaves the rule inside
+	// the gate, where the enforcement register can catch the overclaim — which is how RPH-PWU-010, RPH-PWU-007,
+	// RPH-CON-004 and RPH-PER-012 were all found. A DEFERRABLE_PREFIXES entry removes the family from the question,
+	// so there is no claim left to over-. It is the one manifest defect the overclaim gate is structurally blind to.
 	'RPH-CMP': {
-		status: 'DEFERRED',
-		note: 'dual-run/shadow comparison classification — migration apparatus, explicitly OUT of 0.1.x (D2) / MP scope'
+		status: 'PARTIAL',
+		testFile: 'packages/rph-projections/src/traceability-compatibility.test.ts',
+		note: 'The BASELINE kind -> milestone derivation is built and folded from events (compatibility-view.ts, W2-INC-3/WP-2-006), so CMP-001/003 have a real mechanism asserted; CMP-002/004 are dispositioned NOT_A_COMMAND_REFUSAL in enforcement-register.ts (no command can set a phase — there is no such field or command anywhere). GENUINELY OUTSTANDING, with a named work package rather than a mistaken one: W5 WP-5-003 "Compatibility Milestone Derivation", the VERSIONED rules that advance a milestone as a PWU progresses through its four axes. That is what a legitimate deferral looks like (REG-F-013).'
 	},
 	'RPH-FIX': {
 		status: 'DEFERRED',
@@ -278,9 +301,18 @@ const COVERAGE_BY_PREFIX: Readonly<Record<string, Coverage>> = {
 	}
 };
 
-/** The families that may legitimately be DEFERRED (integration/e2e/migration). The gate asserts nothing else
- *  sneaks into DEFERRED. */
-export const DEFERRABLE_PREFIXES: ReadonlySet<string> = new Set(['RPH-CMP', 'RPH-FIX', 'RPH-E2E']);
+/**
+ * The families that may legitimately be DEFERRED (integration/e2e). The gate asserts nothing else sneaks into
+ * DEFERRED.
+ *
+ * `RPH-CMP` REMOVED 2026-08-02 (REG-F-013). It was exempted here on a rationale naming a different concern
+ * (DOC-009's dropped dual-run/migration sections) and stale regardless (the compatibility projection was built in
+ * W2-INC-3). THIS SET IS THE MOST DANGEROUS DATA IN THE FILE, and the removal is the occasion to say so: an entry
+ * here does not weaken a claim, it DELETES the claim, and the enforcement register's overclaim gate — which has
+ * caught four bad certifications — cannot see a family that certifies nothing. Everything else in this module
+ * fails LOUDLY when wrong; a wrong entry here fails silently, forever.
+ */
+export const DEFERRABLE_PREFIXES: ReadonlySet<string> = new Set(['RPH-FIX', 'RPH-E2E']);
 
 /** Properties P1–P8 are all asserted generatively in properties.test.ts. */
 export const PROPERTY_COVERAGE: Readonly<Record<string, string>> = {

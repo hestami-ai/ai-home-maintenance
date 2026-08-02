@@ -656,6 +656,24 @@ describe('the register\'s RPH-EVD disclosures are OBSERVED, not asserted', () =>
 		// rph-domain: `classifyInterruptedAttempt` has two repo-wide references, its definition and its own test.
 		// RPH-PER-003 and RPH-PER-004 are the two rows OWED, and they land here when they land, because both are
 		// cross-aggregate uniqueness gaps that only an observation can settle.
+		// ── The three READ-MODEL families (2026-08-02) ────────────────────────────────────────────────────────
+		// All fourteen are NOT_A_COMMAND_REFUSAL, so none is observed here. Nine have no dispatchable subject at
+		// all; five ARE performed, at a layer classifyRefusal cannot reach (a renderer returns no CommandResult).
+		// That boundary is the family's finding — see the register's family header.
+		'RPH-PRJ-001': null,
+		'RPH-PRJ-002': null,
+		'RPH-PRJ-003': null,
+		'RPH-PRJ-004': null,
+		'RPH-PRJ-005': null,
+		'RPH-TRC-001': null,
+		'RPH-TRC-002': null,
+		'RPH-TRC-003': null,
+		'RPH-TRC-004': null,
+		'RPH-TRC-005': null,
+		'RPH-CMP-001': null,
+		'RPH-CMP-002': null,
+		'RPH-CMP-003': null,
+		'RPH-CMP-004': null,
 		'RPH-PER-001': null,
 		'RPH-PER-002': null,
 		// ── THE TWO CROSS-AGGREGATE UNIQUENESS DISCLOSURES ────────────────────────────────────────────────────
