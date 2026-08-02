@@ -296,6 +296,7 @@ export type RegisteredRuleId =
 	| 'RPH-PWU-004'
 	| 'RPH-PWU-005'
 	| 'RPH-PWU-006'
+	| 'RPH-PWU-007'
 	| 'RPH-PWU-008';
 
 export const ENFORCEMENT_REGISTER: Readonly<Record<RegisteredRuleId, EnforcementDisposition>> = {
@@ -1396,6 +1397,40 @@ export const ENFORCEMENT_REGISTER: Readonly<Record<RegisteredRuleId, Enforcement
 			'recording it twice would let one arrangement green two rules — the duplicate-marker failure, one level ' +
 			'up. If the sponsor rules that canon\'s "only when" governs, this row becomes a duplicate of RPH-PWU-007 ' +
 			'rather than a new finding.'
+	},
+	'RPH-PWU-007': {
+		kind: 'UNENFORCED_DISCLOSED',
+		canonCarriage: {
+			kind: 'CARRIED',
+			canonAnchor: 'Any rejected mandatory assessment blocks satisfaction.',
+			note: 'JPWB-DOC-003 §7 states it as an absolute over ANY rejected mandatory assessment — the quantifier is the whole rule, and it is the quantifier the engine does not have.'
+		},
+		why:
+			'THE ENGINE CHECKS THE ASSESSMENT IT WAS HANDED, NEVER THE SET. Reaching workLifecycleState SATISFIED ' +
+			'does require a real backing assessment — `rejectUnbackedDisposition` refuses a controller asserting a ' +
+			'disposition with nothing behind it, and the UNDER_ASSURANCE->SATISFIED cross-axis guard refuses the ' +
+			'arrow unless assuranceState is SATISFIED. Both are live and both are probed. What neither does is ' +
+			'quantify over the PWU\'s REQUIRED assessments: the controller supplies `supportingObjectIds`, the guard ' +
+			'validates THOSE, and a second assessment sitting in REJECTED against a policy the PWU itself declares is ' +
+			'never loaded. THE DECLARATION EXISTS AND IS INERT: `assurancePolicyIds` is a REQUIRED field on ' +
+			'ProposePwu and is written to the aggregate (pwu.ts), and — measured — it is read by nothing anywhere for ' +
+			'any decision. So the rule\'s word "required" has a home on the object and no reader. ADJACENT AND ' +
+			'DISTINCT, recorded so the two are not merged: RPH-ASR-012 discloses the same missing quantifier on the ' +
+			'ASSURANCE axis (aggregate disposition across required policies); this row is the WORK LIFECYCLE axis. ' +
+			'Different rules, different ratified statements, different arrangements — but one underlying absence, and ' +
+			'closing it would likely close both.',
+		guard: {
+			kind: 'OBSERVED_ADMISSION',
+			arrangement:
+				'a PWU whose own assurancePolicyIds names a policy whose required assessment came back REJECTED, moved to workLifecycleState SATISFIED by citing a second, satisfied assessment — accepted, with the rejected one still reading REJECTED',
+			control:
+				'the byte-identical ChangePwuState with ONE field changed — assuranceState left at ASSESSING — which the same site refuses via the UNDER_ASSURANCE->SATISFIED cross-axis guard, proving the arrow’s owner is alive and simply never looks past the assessment it was handed',
+			whyNoPredicate:
+				'`satisfiesP1` and the cross-axis guard are both asked on this path, so neither is dead. The missing ' +
+				'thing is not a predicate but a QUANTIFIER with nothing to quantify over at the call site: no handler ' +
+				'assembles the PWU\'s required-assessment set, so there is no symbol whose census could witness the ' +
+				'gap closing — the RPH-ASR-012 shape exactly.'
+		}
 	},
 	'RPH-PWU-008': {
 		kind: 'UNENFORCED_DISCLOSED',

@@ -147,7 +147,7 @@ describe('the register\'s RPH-EVD disclosures are OBSERVED, not asserted', () =>
 		return admitEvidence(evId);
 	};
 
-	const proposePwu = (pwuId: string) =>
+	const proposePwu = (pwuId: string, over: Record<string, unknown> = {}) =>
 		ok(
 			dispatch(
 				'ProposePwu',
@@ -157,12 +157,24 @@ describe('the register\'s RPH-EVD disclosures are OBSERVED, not asserted', () =>
 					title: pwuId,
 					description: 'd',
 					intentId: INTENT,
-					boundaries: { inScope: [], outOfScope: [], permittedChanges: [], prohibitedChanges: [] },
+					boundaries: {
+						inScope: ['the architecture note'],
+						outOfScope: ['implementation'],
+						permittedChanges: [],
+						prohibitedChanges: []
+					},
 					obligationIds: [],
 					constraintIds: [],
 					assumptionIds: [],
-					expectedOutputs: [],
+					expectedOutputs: [
+						{
+							artifactType: 'DOCUMENT',
+							description: 'the architecture note',
+							verificationCriteria: ['reviewed']
+						}
+					],
 					assurancePolicyIds: [],
+					...over,
 					riskProfile: {
 						consequence: 'HIGH',
 						uncertainty: 'MEDIUM',
@@ -491,11 +503,67 @@ describe('the register\'s RPH-EVD disclosures are OBSERVED, not asserted', () =>
 		};
 	};
 
+	/**
+	 * A plan over `subject` driven to a genuinely SUCCEEDED step, which `rejectUnbackedExecutionSuccess` demands
+	 * before the EXECUTING -> EVIDENCE_PENDING hop will carry executionState SUCCEEDED. Modelled on
+	 * `succeededPlanFor` in pwu.test.ts, including its recorded-output requirement: `completeExecutionStep`
+	 * refuses a step naming results that are not recorded objects, so the evidence is proposed first.
+	 */
+	const succeededPlanFor = (subject: string, planId: string): void => {
+		const stepId = `${planId}-s1`;
+		const evId = `${planId.replace(/^pln/, 'evd')}`;
+		const plan = (t: string, payload: unknown) =>
+			ok(dispatch(t, payload, planId, 'EXECUTION_PLAN'), t);
+		plan('ProposeExecutionPlan', {
+			executionPlanId: planId,
+			workUnitId: subject,
+			steps: [
+				{
+					id: stepId,
+					executionPlanId: planId,
+					stepType: 'HUMAN_INTERACTION',
+					purpose: 'Produce the expected output',
+					inputBindings: [],
+					outputBindings: [],
+					preconditions: [],
+					postconditions: [],
+					stepState: 'QUEUED'
+				}
+			],
+			transitions: [],
+			retryPolicy: {},
+			tacticalChangePolicy: {},
+			escalationPolicy: {},
+			terminationPolicy: {}
+		});
+		plan('ApproveExecutionPlan', {});
+		plan('ActivateExecutionPlan', { authorizedRuntimeBindingIds: [] });
+		plan('StartExecutionStep', { stepId });
+		ok(
+			proposeEvidence(evId, {
+				evidenceType: 'ARTIFACT',
+				contentReference: { kind: 'INLINE', note: 'the produced output' }
+			}),
+			'propose the step output'
+		);
+		plan('CompleteExecutionStep', {
+			executionStepId: stepId,
+			executionAttemptId: `${planId}-a1`,
+			resultStatus: 'SUCCEEDED',
+			outputArtifactIds: [],
+			proposedEvidenceIds: [evId],
+			detectedAssumptionIds: [],
+			structuredResult: {},
+			executionProvenance: {}
+		});
+	};
+
 	/** `completeAssessment` bound to an arbitrary subject — the shared helper pins PARENT. */
 	const completeAssessmentFor = (
 		assessmentId: string,
 		policyId: string,
-		subjectId: string
+		subjectId: string,
+		over: Record<string, unknown> = {}
 	): Outcome =>
 		dispatch(
 			'CompleteAssuranceAssessment',
@@ -518,7 +586,8 @@ describe('the register\'s RPH-EVD disclosures are OBSERVED, not asserted', () =>
 					limitations: [],
 					executionProvenance: {
 						evaluator: { actorId: 'rev-1', actorType: 'HUMAN', displayName: 'Reviewer' }
-					}
+					},
+					...over
 				}
 			},
 			assessmentId,
@@ -589,6 +658,148 @@ describe('the register\'s RPH-EVD disclosures are OBSERVED, not asserted', () =>
 		'RPH-PWU-004': null,
 		'RPH-PWU-005': null,
 		'RPH-PWU-006': null,
+
+		'RPH-PWU-007': {
+			arrangement:
+				'a PWU whose own assurancePolicyIds names a policy whose required assessment came back REJECTED, moved to workLifecycleState SATISFIED by citing a second, satisfied assessment',
+			run: () => {
+				const PWU7 = 'pwu_01ARZ3NDEKTSV4RRFFQ69G5701';
+				const POL_REJ = 'pol_01ARZ3NDEKTSV4RRFFQ69G5702';
+				const POL_OK = 'pol_01ARZ3NDEKTSV4RRFFQ69G5703';
+				const ASM_REJ = 'asm_01ARZ3NDEKTSV4RRFFQ69G5704';
+				const ASM_OK = 'asm_01ARZ3NDEKTSV4RRFFQ69G5705';
+				const PLAN7 = 'pln_01ARZ3NDEKTSV4RRFFQ69G5706';
+
+				seedPolicy(POL_REJ, { criterionSeverity: 'MATERIAL' });
+				seedPolicy(POL_OK, { criterionSeverity: 'MATERIAL' });
+				// A DEDICATED PROVISIONAL INTENT: `checkPwuShapeReadiness` requires a root PWU's intent to be at
+				// least PROVISIONAL, and the shared fixture intent is left RAW on purpose (RPH-EVD-001's
+				// arrangement depends on it). Driving the shared one would couple two unrelated probes.
+				const INT7 = 'int_01ARZ3NDEKTSV4RRFFQ69G5708';
+				ok(
+					dispatch(
+						'CaptureIntent',
+						{ intentId: INT7, originatingExpression: 'x', ontologyId: 'o', ontologyVersion: '1' },
+						INT7,
+						'INTENT'
+					),
+					'capture intent 7'
+				);
+				ok(dispatch('BeginIntentDiscovery', {}, INT7, 'INTENT'), 'discover 7');
+				ok(dispatch('ProvisionIntent', { ambiguityIds: [] }, INT7, 'INTENT'), 'provision 7');
+				// THE PWU DECLARES THE REJECTING POLICY AS APPLICABLE TO ITSELF. `assurancePolicyIds` is a REQUIRED
+				// field on ProposePwu and is WRITTEN to the aggregate (pwu.ts) — and read by nothing, anywhere, for
+				// any decision. That is the gap this row records, and this field is where the rule's "required"
+				// lives.
+				proposePwu(PWU7, { assurancePolicyIds: [POL_REJ], intentId: INT7 });
+
+				// The REJECTED required assessment — the rule's antecedent.
+				ok(
+					dispatch(
+						'RequestAssuranceAssessment',
+						{
+							assessmentId: ASM_REJ,
+							assurancePolicyId: POL_REJ,
+							policyVersion: '1.0.0',
+							subjectObjectIds: [PWU7],
+							subjectSemanticVersions: { [PWU7]: 1 },
+							claimIds: []
+						},
+						ASM_REJ,
+						'ASSURANCE_ASSESSMENT'
+					),
+					'request the rejecting assessment'
+				);
+				ok(
+					completeAssessmentFor(ASM_REJ, POL_REJ, PWU7, {
+						dispositionRecommendation: 'REJECTED'
+					}),
+					'complete it REJECTED'
+				);
+				expect(
+					(store.loadObject(ASM_REJ)?.state as Record<string, unknown>)?.assessmentState,
+					'the antecedent is only real while that assessment truly reads REJECTED'
+				).toBe('REJECTED');
+
+				// A second, satisfied assessment — the one the controller will cite.
+				ok(
+					dispatch(
+						'RequestAssuranceAssessment',
+						{
+							assessmentId: ASM_OK,
+							assurancePolicyId: POL_OK,
+							policyVersion: '1.0.0',
+							subjectObjectIds: [PWU7],
+							subjectSemanticVersions: { [PWU7]: 1 },
+							claimIds: []
+						},
+						ASM_OK,
+						'ASSURANCE_ASSESSMENT'
+					),
+					'request the satisfying assessment'
+				);
+				ok(completeAssessmentFor(ASM_OK, POL_OK, PWU7), 'complete it SATISFIED');
+
+				// Execution genuinely succeeds against a live plan — `rejectUnbackedExecutionSuccess` demands it.
+				succeededPlanFor(PWU7, PLAN7);
+				const hop = (over: Record<string, unknown>) =>
+					ok(pwuState(PWU7, String(over.previousState), String(over.newState), over), 'hop');
+				ok(dispatch('BeginPwuShaping', {}, PWU7, 'PROFESSIONAL_WORK_UNIT'), 'shape');
+				ok(
+					dispatch(
+						'MarkPwuReady',
+						{ shapeReadinessAssessmentId: 'asm_01ARZ3NDEKTSV4RRFFQ69G5707', expectedSemanticVersion: 1 },
+						PWU7,
+						'PROFESSIONAL_WORK_UNIT'
+					),
+					'ready'
+				);
+				hop({ previousState: 'READY', newState: 'PLANNED', executionState: 'PLANNED' });
+				hop({ previousState: 'PLANNED', newState: 'EXECUTING', executionState: 'QUEUED' });
+				hop({ previousState: 'EXECUTING', newState: 'EXECUTING', executionState: 'RUNNING' });
+				hop({
+					previousState: 'EXECUTING',
+					newState: 'EVIDENCE_PENDING',
+					executionState: 'SUCCEEDED',
+					assuranceState: 'EVIDENCE_REQUIRED',
+					supportingObjectIds: [PLAN7]
+				});
+				hop({
+					previousState: 'EVIDENCE_PENDING',
+					newState: 'UNDER_ASSURANCE',
+					executionState: 'SUCCEEDED',
+					assuranceState: 'READY_FOR_ASSESSMENT'
+				});
+				hop({
+					previousState: 'UNDER_ASSURANCE',
+					newState: 'UNDER_ASSURANCE',
+					executionState: 'SUCCEEDED',
+					assuranceState: 'ASSESSING'
+				});
+
+				// THE ADMISSION: SATISFIED, citing only the satisfied assessment, while ASM_REJ still reads REJECTED
+				// against a policy this PWU itself declares.
+				const admitted = pwuState(PWU7, 'UNDER_ASSURANCE', 'SATISFIED', {
+					executionState: 'SUCCEEDED',
+					assuranceState: 'SATISFIED',
+					supportingObjectIds: [ASM_OK],
+					reasonCode: 'controller satisfies'
+				});
+
+				// CONTROL — the byte-identical command with ONE field changed: assuranceState left at ASSESSING,
+				// i.e. the controller declining to assert a disposition rather than cherry-picking one to back it.
+				// Refused by the very limb that decides "the PWU transitions to SATISFIED"
+				// (`rejectIllegalWorkLifecycleMove` -> the UNDER_ASSURANCE->SATISFIED cross-axis guard). So the site
+				// that owns this arrow IS alive; it just never looks past the assessment it was handed.
+				const control = pwuState(PWU7, 'UNDER_ASSURANCE', 'SATISFIED', {
+					executionState: 'SUCCEEDED',
+					assuranceState: 'ASSESSING',
+					supportingObjectIds: [],
+					reasonCode: 'controller satisfies'
+				});
+				return { admitted, control };
+			}
+		},
 
 		'RPH-PWU-008': {
 			arrangement:

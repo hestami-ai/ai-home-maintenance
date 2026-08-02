@@ -37,7 +37,13 @@ const COVERED_BY_ID: Readonly<Record<string, string>> = {
 	'RPH-CON-004': 'packages/rph-contracts/src/envelopes.test.ts',
 	'RPH-CON-008': 'packages/rph-contracts/src/messages.test.ts',
 	'RPH-PWU-005': 'packages/rph-domain/src/execution.test.ts',
-	'RPH-PWU-007': 'packages/rph-domain/src/pwuGuards.test.ts', // satisfiesP1: rejected assurance can't satisfy
+	// 'RPH-PWU-007' WAS CERTIFIED COVERED HERE, citing `pwuGuards.test.ts` — "satisfiesP1: rejected assurance can't
+	// satisfy". REMOVED 2026-08-02, and the removal is the DS-001 defect caught a second time by the instrument
+	// built for it. That cite is PURE_KERNEL: `satisfiesP1` computes the right answer, and the running engine never
+	// asks it for THIS rule's quantifier. The register disclosed RPH-PWU-007 as UNENFORCED with an observed
+	// admission — a PWU whose own assurancePolicyIds names a policy whose assessment came back REJECTED reaches
+	// workLifecycleState SATISFIED by citing a second, satisfied assessment — and the overclaim gate reddened on
+	// the first run, exactly as it did for RPH-PWU-010 when the register was first built. The family stays PARTIAL.
 	// ── COMMAND-layer citations (JAN-EXECREM WP-16). Each of these rules states that a COMMAND IS REJECTED, so its
 	// evidence must be a dispatch through the engine. Before WP-12b wired it, PWU-010's cite here was
 	// `rph-domain/src/execution.test.ts` — a pure-predicate call, for a rule enforced nowhere. PWU-009 is new: the
