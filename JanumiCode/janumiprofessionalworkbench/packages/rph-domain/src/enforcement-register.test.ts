@@ -17,6 +17,7 @@ import { fileURLToPath } from 'node:url';
 import { describe, expect, it } from 'vitest';
 import {
 	classifyRefusal,
+	conflictStatusRuleIds,
 	deadPredicateRuleIds,
 	duplicateRefusalMarkers,
 	ENFORCEMENT_REGISTER,
@@ -491,6 +492,80 @@ describe('classifyRefusal — the SCHEMA arm is OPT-IN and cannot leak into COMM
 		// A SCHEMA row whose marker reads like a COMMAND marker would never match anything and would sit green-by-
 		// never-being-probed if the probe map ever lost it. `malformedSchemaMarkers` is the structural check.
 		expect(malformedSchemaMarkers()).toEqual([]);
+	});
+});
+
+// ── SELFTESTS FOR THE DECLARED-STATUS ARM (2026-08-02, the RPH-PER tranche) ──────────────────────────────────
+//
+// `refusalStatus` exists because this engine has FOUR refusing statuses and the COMMAND arm read one. RPH-PER-001
+// is refused at a named command-layer site with status CONFLICT, and until this field the register would have
+// classified that working refusal as ADMITTED — the exact error it exists to prevent, made by the instrument.
+//
+// The danger is the mirror of the SCHEMA arm's: if CONFLICT counted for every row, a probe whose fixture happened
+// to carry a stale `expectedRevision` would report KILLED without ever reaching the invariant it is about. The
+// arrangement that produced RPH-CON-003's control is one line away from being that fixture, so this is not
+// hypothetical. Hence opt-in, and hence the first test below.
+describe('classifyRefusal — the declared-status arm is OPT-IN and cannot leak into REJECTED rows', () => {
+	const rejectRow = {
+		refusalCode: 'RPH_INVARIANT_VIOLATION',
+		refusalMarker: 'the declared marker text'
+	};
+	const conflictRow = {
+		refusalCode: 'RPH_REVISION_CONFLICT',
+		refusalMarker: 'command expected revision',
+		refusalStatus: 'CONFLICT' as const
+	};
+	/** The real shape, copied from an observed dispatch (see the RPH-PER-001 probe). */
+	const concurrencyRefusal = {
+		status: 'CONFLICT',
+		code: 'RPH_REVISION_CONFLICT',
+		message: 'Revision conflict on int_x: command expected revision 0, actual is 1'
+	};
+
+	it('THE LOAD-BEARING ONE: a CONFLICT does NOT satisfy a row that did not declare it', () => {
+		// A stale expectedRevision in any REJECTED row's fixture must read as ADMITTED — the probe FAILS — because
+		// the arrangement never reached the guard the row is about.
+		expect(classifyRefusal(concurrencyRefusal, rejectRow)).toBe('ADMITTED');
+	});
+
+	it('and a row that merely omits refusalStatus is a REJECTED row', () => {
+		// The default must be the SAFE one. Every row written before this arm existed omits the field.
+		expect(classifyRefusal(concurrencyRefusal, { ...conflictRow, refusalStatus: undefined })).toBe(
+			'ADMITTED'
+		);
+	});
+
+	it('reports KILLED only when the declared status, the code AND the marker all hold', () => {
+		expect(classifyRefusal(concurrencyRefusal, conflictRow)).toBe('KILLED');
+	});
+
+	it('REPORTS FAILURE on each literal failing input, and distinguishes them', () => {
+		// ADMITTED — the command went through.
+		expect(classifyRefusal({ status: 'ACCEPTED' }, conflictRow)).toBe('ADMITTED');
+		// ADMITTED — refused, but with the WRONG status. For a CONFLICT row a plain REJECTED means some other
+		// guard fired first, and the concurrency check the row is about was never reached.
+		expect(classifyRefusal({ ...concurrencyRefusal, status: 'REJECTED' }, conflictRow)).toBe(
+			'ADMITTED'
+		);
+		// WRONG_CODE — the right status carrying a different code is not this refusal.
+		expect(
+			classifyRefusal({ ...concurrencyRefusal, code: 'RPH_INVARIANT_VIOLATION' }, conflictRow)
+		).toBe('WRONG_CODE');
+		// MASKED — right status, right code, but the OTHER site produced it. The store's own conflict message
+		// ('Revision conflict on X (actual revision N)') is byte-different from the handler's, which is exactly
+		// why the marker names the handler's clause and not the shared prefix.
+		expect(
+			classifyRefusal(
+				{ ...concurrencyRefusal, message: 'Revision conflict on int_x (actual revision 1)' },
+				conflictRow
+			)
+		).toBe('MASKED');
+	});
+
+	it('SELFTEST: the arm is not vacuous — some registered row actually declares CONFLICT', () => {
+		// An opt-in arm no row uses is an arm no mutant can redden, and this repository has shipped three of those.
+		// If the last CONFLICT row is ever re-dispositioned, this fails and the arm must be removed with it.
+		expect(conflictStatusRuleIds().length).toBeGreaterThan(0);
 	});
 });
 

@@ -102,10 +102,40 @@ const COVERED_BY_ID: Readonly<Record<string, string>> = {
 	// TOTAL_OVER_FAMILIES.
 	'RPH-PWU-002': 'packages/rph-application/src/handlers/execrem-wp16-enforcement-observed.test.ts',
 	'RPH-PWU-004': 'packages/rph-application/src/handlers/execrem-wp16-enforcement-observed.test.ts',
-	'RPH-PER-001': 'packages/rph-persistence/src/sqlite-storage-adapter.test.ts',
-	'RPH-PER-002': 'packages/rph-persistence/src/sqlite-storage-adapter.test.ts',
-	'RPH-PER-007': 'packages/rph-projections/src/work-projection.test.ts',
-	'RPH-PER-012': 'packages/rph-domain/src/execution.test.ts'
+	// ── THE RPH-PER CITES, ALL FOUR CORRECTED 2026-08-02 WHILE DISPOSITIONING THE FAMILY ─────────────────────
+	//
+	// Every one of the four was wrong, in four different ways, and none was caught by any gate that reads this
+	// file — which is the DS-001 §4 item 2 thesis restated: a manifest row has ONE axis ("is it tested?") and the
+	// answer was truthfully yes in all four cases.
+	//
+	//   001 — cited a STORE-layer test for a rule the register now disposes ENFORCED. The refusal a professional
+	//         actually meets is at the COMMAND layer (`kit.ts`, on the CLIENT's declared expectedRevision); the
+	//         store's own re-check is a second, deeper guard with a different message. Re-cited to the dispatch
+	//         probe, which the register's layer gate REQUIRES for an ENFORCED row.
+	//   002 — cited a test whose own title reads 'RPH-PER-002: rejects a new-aggregate commit when the aggregate
+	//         already exists (REVISION_CONFLICT)'. That is a REVISION CONFLICT — RPH-PER-001's rule. The test says
+	//         nothing about idempotency keys, prior results, or duplicate commands. The mislabel is in the test
+	//         file itself and this manifest inherited it; both are corrected. Re-cited to `engine.test.ts`, which
+	//         asserts the DUPLICATE status and the unchanged event count.
+	//   007 — cited `work-projection.test.ts`, whose relevant test is TITLED '… — NOT RPH-PER-007; see
+	//         projection-rebuild.test.ts'. It was retitled on 2026-07-17 precisely because its old form asserted
+	//         the fold equals ITSELF and was 'actively CONCEALING a defect'; it names its own replacement in its
+	//         own title, and the manifest kept pointing at it regardless.
+	//   012 — REMOVED, not re-cited. It was an OVERCLAIM of the exact shape this register was built for: a
+	//         PURE_KERNEL unit test over hand-built object literals, certifying a rule that is enforced NOWHERE.
+	//         The interrupted-attempt classifier it exercises has two repo-wide references, its definition and
+	//         that test. The rule is now UNENFORCED_DISCLOSED in the enforcement register, and the register's
+	//         overclaim gate refuses to let a disclosed rule be certified COVERED.
+	//
+	//         THE CLASSIFIER IS DELIBERATELY NOT NAMED IN THIS COMMENT, and the reason is a finding in itself:
+	//         writing the bare identifier here turned the register's own dead-predicate census RED, because the
+	//         census greps PRODUCTION FILES and this is one. That is the gate behaving correctly — but the fix is
+	//         to keep prose out of the census, not to widen the baseline to admit a doc comment. A census whose
+	//         declared set includes a sentence about the symbol can no longer detect the wiring it exists to
+	//         detect, which is the precondition the DEAD_PREDICATE arm already gates for handler files.
+	'RPH-PER-001': 'packages/rph-application/src/handlers/execrem-wp16-enforcement-observed.test.ts',
+	'RPH-PER-002': 'packages/rph-engine/src/engine.test.ts',
+	'RPH-PER-007': 'packages/rph-engine/src/projection-rebuild.test.ts'
 };
 
 /** Prefix-level coverage. `testFile` may be a glob/multi-file description for by-concern families; the concrete

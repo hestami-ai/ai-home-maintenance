@@ -647,6 +647,24 @@ describe('the register\'s RPH-EVD disclosures are OBSERVED, not asserted', () =>
 	 * the same property that makes the enforcement map an instrument rather than a document.
 	 */
 	const PROBES: Readonly<Record<RegisteredRuleId, DisclosureProbe | null>> = {
+		// ── RPH-PER, twelve of fourteen (2026-08-02) ──────────────────────────────────────────────────────────
+		// Eleven are NOT_A_COMMAND_REFUSAL (§§18-20 are durability PROPERTIES, not refusals) and one is ENFORCED,
+		// so none is observed here. RPH-PER-012 IS disclosed — but by a DEAD_PREDICATE census, guarded in
+		// rph-domain: `classifyInterruptedAttempt` has two repo-wide references, its definition and its own test.
+		// RPH-PER-003 and RPH-PER-004 are the two rows OWED, and they land here when they land, because both are
+		// cross-aggregate uniqueness gaps that only an observation can settle.
+		'RPH-PER-001': null,
+		'RPH-PER-002': null,
+		'RPH-PER-005': null,
+		'RPH-PER-006': null,
+		'RPH-PER-007': null,
+		'RPH-PER-008': null,
+		'RPH-PER-009': null,
+		'RPH-PER-010': null,
+		'RPH-PER-011': null,
+		'RPH-PER-012': null, // disclosed by a DEAD_PREDICATE census — guarded in rph-domain, not here
+		'RPH-PER-013': null,
+		'RPH-PER-014': null,
 		'RPH-EXE-001': null,
 		'RPH-EXE-002': null,
 		'RPH-EXE-003': null,

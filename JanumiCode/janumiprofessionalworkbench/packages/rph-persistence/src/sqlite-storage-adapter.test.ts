@@ -63,7 +63,10 @@ describe('SqliteStorageAdapter', () => {
 		expect(store.getReceipt('idem_0')?.commandId).toBe('cmd_0');
 	});
 
-	it('RPH-PER-002: rejects a new-aggregate commit when the aggregate already exists (REVISION_CONFLICT)', () => {
+	// RELABELLED 2026-08-02. This read 'RPH-PER-002' for the life of the file and asserts a REVISION CONFLICT —
+	// which is RPH-PER-001's rule, not RPH-PER-002's. Nothing here concerns an idempotency key, a prior result, or
+	// a duplicate command. `conformance-manifest.ts` cited this test for RPH-PER-002 and inherited the error.
+	it('RPH-PER-001 (create arm): rejects a new-aggregate commit when the aggregate already exists (REVISION_CONFLICT)', () => {
 		store.commit(commitInput());
 		const r = store.commit(
 			commitInput({

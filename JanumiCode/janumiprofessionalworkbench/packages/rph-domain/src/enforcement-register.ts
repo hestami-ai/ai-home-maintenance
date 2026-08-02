@@ -129,6 +129,14 @@ export function layerOfTestFile(testFile: string): CoverageLayer {
  * THE DISCLOSED COST: anchors are substrings, so a canon edit that REWORDS a carrier without changing its meaning
  * also goes red. That is the right polarity — a reworded carrier deserves a human confirming it still carries —
  * but it is a real maintenance cost, recorded here rather than discovered later.
+ *
+ * A SECOND, SUBTLER COST, found 2026-08-02 while verifying the RPH-PER anchors and recorded because it is the kind
+ * of thing that reads as a gate passing. `JPWB-REG-005` — the Decision and Divergence Register — is one of the six
+ * artifacts, and a FINDING that quotes a canon rule in order to report the engine VIOLATING it thereby creates
+ * carriage for that rule. Three of the RPH-PER anchors matched REG-005 as well as DOC-003 for exactly that reason
+ * (REG-F-012 quotes PER-5 verbatim). That is not a bug — the text genuinely survives retirement either way — but
+ * a row must cite the artifact that STATES the rule, never the one that merely reports it broken, or the register
+ * would eventually record a rule as carried by nothing but the note saying it is unenforced.
  */
 export type CanonCarriage =
 	| {
@@ -172,6 +180,30 @@ export interface EnforcedRule {
 	 * for why that is opt-in rather than universal.
 	 */
 	readonly refusalLayer?: RefusalLayer;
+	/**
+	 * The `CommandResult.status` that IS this refusal. Absent = `REJECTED`, which is every COMMAND-layer row
+	 * written before 2026-08-02.
+	 *
+	 * OPT-IN, AND THE MIRROR OF `controlStatus` ON THE DISCLOSURE ARM — same hazard, same remedy. This engine has
+	 * FOUR refusing statuses, not one: `kit.ts`'s `STATUS_FOR_CODE` maps `RPH_VALIDATION_SCHEMA_FAILED` ->
+	 * VALIDATION_FAILED, `RPH_REVISION_CONFLICT` -> CONFLICT and `RPH_AUTHORITY_INSUFFICIENT` -> UNAUTHORIZED,
+	 * with everything else falling through to REJECTED. A row whose refusal carries one of the mapped codes was
+	 * therefore UNCLASSIFIABLE by the COMMAND arm, which read `REJECTED` alone and reported a real, working
+	 * refusal as ADMITTED — the same structural blindness that made RPH-CON read as inexpressible until the SCHEMA
+	 * arm named it, now found one layer over at RPH-PER-001.
+	 *
+	 * `VALIDATION_FAILED` IS DELIBERATELY NOT A MEMBER, and the omission is the load-bearing part. A COMMAND row
+	 * may not opt into being satisfied by a boundary refusal: that is what `refusalLayer: 'SCHEMA'` is for, and it
+	 * ALSO changes how the marker is matched (structured `issues` by equality, not prose by substring) because the
+	 * boundary's message is a constant that discriminates nothing. Folding the two axes into one would let a row
+	 * claim command-layer enforcement while a merely MALFORMED payload greened it — six fixture errors this
+	 * programme surfaced precisely because VALIDATION_FAILED is not a pass.
+	 *
+	 * `UNAUTHORIZED` is real and reachable and is NOT a member either, for the opposite reason: no registered rule
+	 * refuses with `RPH_AUTHORITY_INSUFFICIENT`. An arm no row exercises is an arm no mutant can redden, which is
+	 * this repository's most-repeated defect. It goes in when a row needs it, with the probe that proves it.
+	 */
+	readonly refusalStatus?: 'REJECTED' | 'CONFLICT';
 	/**
 	 * A substring of the refusal MESSAGE that only THIS refusal produces.
 	 *
@@ -330,7 +362,23 @@ export type RegisteredRuleId =
 	| 'RPH-CON-005'
 	| 'RPH-CON-006'
 	| 'RPH-CON-007'
-	| 'RPH-CON-008';
+	| 'RPH-CON-008'
+	// RPH-PER, TWELVE OF FOURTEEN (2026-08-02). RPH-PER-003 and RPH-PER-004 are investigated and OWED: both are
+	// UNENFORCED_DISCLOSED with OBSERVED_ADMISSION guards, and landing a disclosure without its observation is the
+	// one thing that arm may never do. The family is therefore deliberately ABSENT from `TOTAL_OVER_FAMILIES`, and
+	// that absence is a gated claim rather than a sentence — exactly as RPH-PWU was held out for three commits.
+	| 'RPH-PER-001'
+	| 'RPH-PER-002'
+	| 'RPH-PER-005'
+	| 'RPH-PER-006'
+	| 'RPH-PER-007'
+	| 'RPH-PER-008'
+	| 'RPH-PER-009'
+	| 'RPH-PER-010'
+	| 'RPH-PER-011'
+	| 'RPH-PER-012'
+	| 'RPH-PER-013'
+	| 'RPH-PER-014';
 
 export const ENFORCEMENT_REGISTER: Readonly<Record<RegisteredRuleId, EnforcementDisposition>> = {
 	'RPH-EXE-001': {
@@ -556,7 +604,13 @@ export const ENFORCEMENT_REGISTER: Readonly<Record<RegisteredRuleId, Enforcement
 			'"produces no second commit" is a statement about an EXTERNAL side effect (a source-control commit) under ' +
 			'a repeated idempotency key. No command is refused; the engine has no source-control plane to make one in. ' +
 			'The adjacent guarantee this engine DOES make — a re-submitted idempotency key returns the prior result and ' +
-			'appends no events — is RPH-PER-002, and is covered at the store layer.'
+			'appends no events — is RPH-PER-002. LAYER CORRECTED 2026-08-02: this sentence read "covered at the store ' +
+			'layer" for six commits. The DECISION is at the COMMAND layer — `command-bus.ts` step 1, in ' +
+			'packages/rph-application/ — and only the receipt LOOKUP (`getReceipt`) is the store\'s. A register whose ' +
+			'entire subject is layer precision may not be loose about its own prose, and no gate reads prose. Found ' +
+			'while dispositioning RPH-PER-002, which also found REG-F-012: canon PER-5 adds a third clause ("Reuse of ' +
+			'a key with a different payload fails") that this engine violates — a DIFFERENT command reusing a key is ' +
+			'silently swallowed and reported DUPLICATE.'
 	},
 	'RPH-EXE-008': {
 		kind: 'ENFORCED',
@@ -1771,6 +1825,334 @@ export const ENFORCEMENT_REGISTER: Readonly<Record<RegisteredRuleId, Enforcement
 				'no lifecycle field, so the rule is inexpressible to it, which is the RPH-EVD-003 shape before that ' +
 				'row was fixed. What is absent is a subject on the type, not a caller.'
 		}
+	},
+
+	// ══════════════════════════════════════════════════════════════════════════════════════════════════════════
+	// THE RPH-PER FAMILY, twelve of fourteen, added 2026-08-02.
+	//
+	// THE SHAPE THIS FAMILY FOUND IS **STATUS**, and it is the third structural blindness this register has had to
+	// name. The COMMAND arm read `REJECTED` alone, and RPH-PER-001's refusal — a real one, at a named command-layer
+	// site, with its own ratified error code — carries status `CONFLICT`. The register would have classified working
+	// enforcement as ADMITTED, which is the exact error it exists to prevent, made by the instrument rather than by
+	// the manifest. `refusalStatus` is the one opt-in field that fixes it, deliberately excluding VALIDATION_FAILED.
+	//
+	// AND THE FAMILY IS MOSTLY NOT REFUSALS AT ALL, which is why ten of these twelve rows are arm 3. §§18-20 of the
+	// conformance specification are DURABILITY properties — replay equivalence, projection rebuild, outbox
+	// atomicity, restart recovery. They state what the system PRESERVES, not what it refuses, and a refusal probe
+	// cannot hold any of them. Recording that as a declared silence with a named enforcement site is the honest
+	// disposition; inventing a fourth arm to make the register look more covering would not be.
+	//
+	// CARRIAGE IS THE STRONGEST OF ANY FAMILY SO FAR: canon has a dedicated twelve-rule persistence section
+	// (JPWB-DOC-003 §9 PER-1..PER-12), and every one of these rows is CARRIED — several near-verbatim. That is
+	// worth stating because the register's other families have needed CARRIED_BY_GENERAL_RULE and NO_CANON_CARRIER
+	// repeatedly; here the pre-canon rule and the canon rule are usually the same sentence twice.
+	//
+	// TWO ROWS ARE OWED (RPH-PER-003, RPH-PER-004) and the family is therefore OUT of `TOTAL_OVER_FAMILIES`. Both
+	// are cross-aggregate uniqueness disclosures needing OBSERVED_ADMISSION probes that drive the governance chain.
+	// ══════════════════════════════════════════════════════════════════════════════════════════════════════════
+	'RPH-PER-001': {
+		kind: 'ENFORCED',
+		canonCarriage: {
+			kind: 'CARRIED',
+			canonAnchor: 'Updates to existing aggregates declare the revision they believe current',
+			note: 'JPWB-DOC-003 §9 PER-4 (Optimistic concurrency; never last-write-wins), which continues "On conflict, the command is rejected" — the ratified statement and the canon rule are the same rule twice. Cited to DOC-003 and NOT to REG-005, which also contains the phrase because REG-F-003 records this very verification.'
+		},
+		// THE FIRST ROW IN THE REGISTER WHOSE REFUSAL IS NOT `REJECTED`. Both halves are named because they are
+		// different checks at different layers producing different messages, and only the first is what the
+		// ratified statement describes: a CLIENT that declared a revision it had read.
+		enforcedAt:
+			'DECISION + ENFORCEMENT: packages/rph-application/src/handlers/kit.ts — the `command.expectedRevision !== existing.revision` arm of the load-for-update path, which returns `reject(command, RPH_REVISION_CONFLICT, …)`; `STATUS_FOR_CODE` in the same file maps that code to CommandResult status CONFLICT. THE SECOND, DEEPER GUARD, named so a reader is not surprised by it: `SqliteStorageAdapter.commit` re-checks the precondition inside the write transaction and returns `{ok:false, reason:"REVISION_CONFLICT"}`, which `commitState` maps to the same status with a DIFFERENT message. The store check closes the check/commit race the handler check cannot; the handler check is the one that sees the CLIENT\'s declared expectation, which is the rule\'s subject.',
+		refusalCode: 'RPH_REVISION_CONFLICT',
+		refusalStatus: 'CONFLICT',
+		// DELIBERATELY THE CLAUSE THAT NAMES THE CLIENT'S EXPECTATION, not the shared 'Revision conflict on …'
+		// prefix. The store's own conflict message is 'Revision conflict on X (actual revision N)' — byte-different
+		// after the id — so a marker stopping at the prefix would let the deeper guard satisfy this row, and the
+		// register would report the client-expectation check as enforced while only the store check had run.
+		refusalMarker: 'command expected revision',
+		// EACH ENTRY BELOW WAS APPLIED AND ITS VERDICT OBSERVED. The first one's stated outcome is a CORRECTION:
+		// it read "the store still refuses, but with the OTHER message, so the probe reports MASKED" until the
+		// mutant was actually run, and that was wrong for a reason worth keeping — see the entry.
+		declaredMutations: [
+			'delete the `command.expectedRevision !== existing.revision` arm in kit.ts — OBSERVED verdict ADMITTED, refused instead by the transition guard with RPH_ILLEGAL_STATE_TRANSITION. THE PREDICTION THAT FAILED, recorded because it is a fact about the two guards: the store\'s own conflict check CANNOT fire in a single-threaded probe, because `commitState` passes it the revision it JUST loaded, so expected always equals actual. The store check exists for a genuine concurrent race and is unreachable from a sequential arrangement — which means this row\'s enforcement rests on the handler arm ALONE, and the "second, deeper guard" named in `enforcedAt` is not a fallback the probe could ever observe.',
+			'change the arm to `command.expectedRevision > existing.revision` so a STALE expectation passes and only a future one refuses',
+			"drop `RPH_REVISION_CONFLICT` from STATUS_FOR_CODE in kit.ts — OBSERVED verdict ADMITTED. THIS IS THE MUTANT THAT PROVES `refusalStatus` IS LOAD-BEARING: the refusal still happens, still carries RPH_REVISION_CONFLICT, and still carries this row's exact marker text — only the STATUS changes, from CONFLICT to REJECTED. A register reading code and marker alone would have called it a kill.",
+			'remove `refusalStatus` from this row — the COMMAND arm falls back to REJECTED and the probe reports ADMITTED, which is the pre-2026-08-02 behaviour and the whole reason the field exists'
+		]
+	},
+	'RPH-PER-002': {
+		kind: 'NOT_A_COMMAND_REFUSAL',
+		canonCarriage: {
+			kind: 'CARRIED',
+			canonAnchor: 'Replaying a mutation with the same idempotency key returns the prior result',
+			note: "JPWB-DOC-003 §9 PER-5 (Idempotency at the business-effect level), near-verbatim against the ratified statement. CANON STATES STRICTLY MORE THAN THIS RULE, and the surplus is violated: PER-5's third clause is \"Reuse of a key with a different payload fails\", a REFUSAL that nothing performs — see the `why` and REG-F-012. Cited to DOC-003, not to REG-005, which also carries the sentence only because REG-F-012 quotes it."
+		},
+		why:
+			'THE STATEMENT IS AN OUTCOME AND THE OUTCOME IS PRODUCED, so neither the ENFORCED arm (which observes ' +
+			'refusals) nor the UNENFORCED arm (which observes admissions of what must be refused) can hold it. ' +
+			'Observed: a re-submitted idempotency key returns status DUPLICATE carrying the PRIOR receipt\'s ' +
+			'`producedEventIds`, the event count is unchanged, and the aggregate does not advance. ENFORCED AT ' +
+			'`packages/rph-application/src/command-bus.ts` — `dispatch` step 1, the `store.getReceipt` lookup — ' +
+			'which is the COMMAND layer; only the receipt READ is the store\'s. (RPH-EXE-007\'s row said "the store ' +
+			'layer" for six commits and is corrected in the same commit as this row.) THE PART CANON ADDS AND THIS ' +
+			'ENGINE VIOLATES, recorded here because a reader of this row must not conclude PER-5 holds: a key reused ' +
+			'for a DIFFERENT command is silently swallowed. Observed — a `CaptureIntent` for aggregate A accepted ' +
+			'under key K, then a wholly different `CaptureIntent` for aggregate B reusing K, returns DUPLICATE and ' +
+			'aggregate B IS NEVER CREATED, with the caller handed A\'s event id as its result. `command_receipts` ' +
+			'stores `command_type`, `target_aggregate_id` AND `result_hash`, `getReceipt` returns all three, and ' +
+			'step 1 compares none of them. That is REG-F-012, filed separately and DELIBERATELY NOT folded into ' +
+			'this row: this rule\'s own statement holds, and letting a satisfied rule carry a disclosure about a ' +
+			'neighbouring sentence is the subject substitution this register records four times over.'
+	},
+	'RPH-PER-005': {
+		kind: 'NOT_A_COMMAND_REFUSAL',
+		canonCarriage: {
+			kind: 'CARRIED',
+			canonAnchor: 'Aggregate event history is gapless and strictly ordered',
+			note: 'JPWB-DOC-003 §9 PER-4, final sentence. Canon states the gapless half as flatly as the ratified rule does; what neither states is which component refuses, and that is the whole content of this row.'
+		},
+		why:
+			'THE ARRANGEMENT IS UNREACHABLE BY ANY DISPATCH, so this is arm 3 on the strength of a WRITE-PATH census ' +
+			'rather than a subject that does not exist. `ctx.store.commit` has exactly ONE production caller ' +
+			'repo-wide — `commitState` in packages/rph-application/src/handlers/kit.ts — which derives ' +
+			'`newRevision` as `loaded.revision + 1` (or 0 on the create path) and sets the event\'s ' +
+			'`aggregateRevision` to that same number. No handler chooses a revision; no command carries one. So no ' +
+			'command can produce a gap or a duplicate, and an UNENFORCED_DISCLOSED row would be claiming a gap no ' +
+			'arrangement can demonstrate — the RPH-EVD-002 reasoning. WHAT IS TRUE AT THE STORE, measured directly ' +
+			'against the adapter because the rule names the event store as its enforcer and this register\'s ' +
+			'instrument only reaches Engine.dispatch — and the two halves DIVERGE. DUPLICATE: refused, by the ' +
+			'schema\'s `UNIQUE (aggregate_type, aggregate_id, aggregate_revision)` — but it THROWS a raw SqliteError ' +
+			'out of `commit`, because `CommitResult` has exactly one failure reason (`REVISION_CONFLICT`) and no ' +
+			'way to RETURN this one. That is REG-F-011\'s shape one layer deeper, and the envelope-identity fix does ' +
+			'not cover it. GAP: ADMITTED — `commit` returned `{ok:true}` for an event whose `aggregateRevision` was ' +
+			'99 on an aggregate at revision 0, leaving the stream [0, 99]. Nothing anywhere checks contiguity. Canon ' +
+			'says gapless; the store permits a gap; only the derived write path makes it unreachable.'
+	},
+	'RPH-PER-006': {
+		kind: 'NOT_A_COMMAND_REFUSAL',
+		canonCarriage: {
+			kind: 'CARRIED',
+			canonAnchor: 'Materialized current state is a cache of this history, not a second authority',
+			note: 'JPWB-DOC-003 §9 PER-2 (History is append-only and material change is event-backed). Canon states the EQUIVALENCE as a subordination — the materialized state is the cache, the history is the authority — which is the same claim the ratified rule makes as an equality.'
+		},
+		why:
+			'A REPLAY-EQUIVALENCE PROPERTY, not a refusal: it asserts that two computations agree. No command is ' +
+			'refused and none could be. IT IS GENUINELY PROVED, which is why this row also records where — ' +
+			'`packages/rph-projections/src/pwu-replay.ts` (`replayPwuAxes`, the only production function in the ' +
+			'repository that reconstructs an aggregate from its own event stream), asserted in ' +
+			'`packages/rph-engine/src/replay-equivalence.test.ts` against the live reference undertaking, comparing ' +
+			'13 PWUs x 4 axes to the materialized objects and carrying a non-triviality control. TWO HONEST LIMITS. ' +
+			'(1) The rule names "an Intent or PWU" and only the PWU half has a reducer; nothing reconstructs an ' +
+			'INTENT. (2) The reducer rebuilds the four AXES, not the whole object. Also recorded: the conformance ' +
+			'manifest lists 006 among the ids awaiting the M13 harness and gives it no per-id row, while the test ' +
+			'asserts it by name — an UNDERclaim, the opposite of this register\'s usual finding, and left as it is ' +
+			'because correcting a manifest row to claim coverage is a step that deserves its own scrutiny.'
+	},
+	'RPH-PER-007': {
+		kind: 'NOT_A_COMMAND_REFUSAL',
+		canonCarriage: {
+			kind: 'CARRIED',
+			canonAnchor: 'Rebuildability, not backup, is their durability guarantee',
+			note: 'JPWB-DOC-003 §9 PER-7 (Projections are derived, disposable, and powerless). Canon carries the rebuild obligation; it does not name the three views, which is a difference of specificity rather than of rule.'
+		},
+		why:
+			'A REBUILD PROPERTY, not a refusal. THE MANIFEST CITE WAS WRONG AND IS CORRECTED IN THIS COMMIT, and it ' +
+			'is the sharpest miscitation this programme has found because the miscited file says so ITSELF. ' +
+			'`conformance-manifest.ts` cited RPH-PER-007 to `packages/rph-projections/src/work-projection.test.ts`, ' +
+			'whose relevant test is TITLED "the fold is pure (identical view every time) — NOT RPH-PER-007; see ' +
+			'projection-rebuild.test.ts". Its comment records that the test previously DID claim the rule while ' +
+			'asserting the fold equals ITSELF over a hand-authored two-event stream — "true of any pure function ' +
+			'and of any broken one" — and that it was "actively CONCEALING a defect" (workProjector defaulted on ' +
+			'every event but two, reporting every PWU as PROPOSED while the objects were BASELINED). The test was ' +
+			'retitled 2026-07-17 and named its own replacement; the manifest kept pointing at it for six months. ' +
+			'THE REAL COVERAGE is `packages/rph-engine/src/projection-rebuild.test.ts` against the live 251-event ' +
+			'reference undertaking. THREE RESIDUES, recorded rather than smoothed: the "expected fixture ' +
+			'projections" the rule compares against DO NOT EXIST (the test substitutes the materialized objects and ' +
+			'says so); `buildAssuranceView` is not a `Projector<V>` at all, so the Assurance third of the rule is ' +
+			'outside the framework the other two live in and has no rebuild-from-all-events test; and neither ' +
+			'`workProjector` nor `compatibilityProjector` has any production consumer.'
+	},
+	'RPH-PER-008': {
+		kind: 'NOT_A_COMMAND_REFUSAL',
+		canonCarriage: {
+			kind: 'CARRIED',
+			canonAnchor: 'atomically persist state, version history, events, outbox, and command receipt',
+			note: 'JPWB-DOC-003 §9 PER-3 (One authoritative write path). Canon enumerates the five things that commit together, which is exactly the ratified rule plus the two the rule leaves implicit.'
+		},
+		why:
+			'AN ATOMICITY PROPERTY OF THE STORE, not a refusal — nothing is rejected, and the rule\'s second clause ' +
+			'("a transaction rollback leaves neither persisted") is a statement about a path no command can take. ' +
+			'THE STRUCTURE HOLDS, by construction rather than by check: in `SqliteStorageAdapter.commit` the event ' +
+			'INSERT and the outbox INSERT are in the SAME `for` loop body inside the SAME transaction callback, and ' +
+			'the outbox row\'s `global_sequence` is `Number(info.lastInsertRowid)` read off the event insert\'s own ' +
+			'return — so the outbox row is DATA-DEPENDENT on the event row and cannot precede it. There is exactly ' +
+			'one `INSERT INTO outbox_messages` in the repository and it is inside that transaction; no relay, no ' +
+			'post-commit write. THREE RESIDUES WORTH THE NEXT READER\'S ATTENTION, none of which this row\'s arm can ' +
+			'hold: the schema declares NO foreign key from `outbox_messages.event_id` to `domain_events.event_id`, ' +
+			'so nothing at the DDL level would prevent an orphan; the one rollback test is titled for the outbox and ' +
+			'never queries it; and `SnapshotOverlayStorageAdapter.commit` — unlike the SQLite one — opens no ' +
+			'transaction of its own, so a bare overlay commit has no rollback boundary at all, and no test anywhere ' +
+			'constructs that adapter.'
+	},
+	'RPH-PER-009': {
+		kind: 'NOT_A_COMMAND_REFUSAL',
+		canonCarriage: {
+			kind: 'CARRIED',
+			canonAnchor: 'Projection lag can never alter an authoritative decision',
+			note: 'JPWB-DOC-003 §9 PER-7, near-verbatim, and the neighbouring clause "canonical commands never validate against projections alone" carries the ratified rule\'s operative half.'
+		},
+		why:
+			'A NEGATIVE STRUCTURAL PROPERTY — "commands continue to validate against canonical state" — which no ' +
+			'refusal probe can observe: there is no command to dispatch whose acceptance or rejection would settle ' +
+			'it. IT HOLDS, and the census that says so is worth recording because the answer was not obvious. ' +
+			'Across all of packages/rph-application/src exactly ONE non-test file imports `@janumipwb/rph-projections` ' +
+			'(`handlers/pwa-authoring.ts`) and the dependency edge is real, not accidental. What it imports is TWO ' +
+			'PURE FUNCTIONS (`buildPwaGraphExport`, `analyzePwaGraph`) whose own module imports no store, no port ' +
+			'and no adapter, fed from `ctx.store.readAllEvents()` and `ctx.store.loadObject()` — canonical state ' +
+			'shaped INTO a projection-layer type, not read OUT of a projection. TWO STRUCTURAL FACTS MAKE THE ' +
+			'MISTAKE HARD TO MAKE ELSEWHERE: `HandlerContext` carries only `store`, with no view handle, and the ' +
+			'declarative-precondition surface is narrower still (`loadObject` and `readAggregateEvents` only). AND ' +
+			'THE PREMISE IS CURRENTLY UNSATISFIABLE ANYWAY: the schema declares five tables and none is a ' +
+			'projection, so nothing is persisted that a restart could leave stale — projections are in-memory folds ' +
+			'rebuilt per request. That last fact is why this row is a declared silence rather than a verification: ' +
+			'the rule holds today for a reason (no persisted projections) that a future caching layer would remove.'
+	},
+	'RPH-PER-010': {
+		kind: 'NOT_A_COMMAND_REFUSAL',
+		canonCarriage: {
+			kind: 'CARRIED',
+			canonAnchor: 'evolution uses upcasters at read time, never event rewriting',
+			note: 'JPWB-DOC-003 §9 PER-2. Canon states the upcaster obligation directly and adds the prohibition the ratified rule states as "without rewriting the event".'
+		},
+		why:
+			'THE ANTECEDENT CANNOT ARISE IN THIS ENGINE, which is a stronger statement than "no upcaster exists" and ' +
+			'is the reason this is arm 3 rather than a disclosure. `DomainEvent` carries exactly one version field, ' +
+			'`eventSchemaVersion`, required; it is WRITTEN at exactly one site (`makeEvent` in kit.ts) as a ' +
+			'hard-coded literal `1`, never parameterised and never derived from the event type; and it is READ ' +
+			'NOWHERE — no comparison, no branch, no switch, anywhere in packages/ or apps/. So every event this ' +
+			'engine can mint is version 1, and "a persisted version-1 event" is the only kind the store can contain. ' +
+			'There is no version-2 event to upcast FROM. Recording this as UNENFORCED_DISCLOSED would claim a gap ' +
+			'that no arrangement can demonstrate. THE ADJACENCY THAT MUST NOT BE MISTAKEN FOR COVERAGE: ' +
+			'`SCHEMA_VERSION` / `PRAGMA user_version` in rph-persistence IS real, fail-closed migration machinery — ' +
+			'for the DATABASE SCHEMA, not the event payload; its own comment says "a forward migration is required ' +
+			'and none is registered yet". THE RESIDUE: the load path is `JSON.parse` plus an unchecked ' +
+			'`as DomainEvent` with no re-validation, and the `StorageAdapter` port declares no hook where an ' +
+			'upcaster could ever be injected — so the day a version-2 event is minted, this rule becomes live with ' +
+			'nowhere to implement it, and nothing in this register would notice.'
+	},
+	'RPH-PER-011': {
+		kind: 'NOT_A_COMMAND_REFUSAL',
+		canonCarriage: {
+			kind: 'CARRIED',
+			canonAnchor: 'Read projections may be rebuilt, delayed, optimized, and independently versioned',
+			note: 'JPWB-DOC-003 §9 PER-7. The canon sentence carries the rule\'s premise (projections lag and are rebuilt) rather than its restart clause; PER-6\'s "Professional correctness never depends on in-memory state" carries the durability half.'
+		},
+		why:
+			'A RECOVERY PROPERTY, not a refusal. IT IS ALSO VACUOUS TODAY, and saying so is the whole value of the ' +
+			'row: the rule\'s premise is "the projection update is interrupted", and there is no persisted ' +
+			'projection to interrupt — the schema declares five tables and none is a read model, ' +
+			'`IncrementalProjection`\'s checkpoint is an in-process integer, and the demo surfaces re-fold the whole ' +
+			'event log on every request. WHAT DOES EXIST is the outbox recovery path (`Engine.recoverOutbox`), and ' +
+			'its census is recorded because it is not what the rule is about and could be mistaken for it: exactly ' +
+			'ONE production caller (`openWorkbench` in apps/rph-demo), invoked once per server process. TWO ' +
+			'STRUCTURAL FACTS ABOUT THAT PATH, stated because they bound what "eventually updated" can mean here: ' +
+			'nothing in production ever registers an event SUBSCRIBER, and `drainOutbox` marks every pending row ' +
+			'PUBLISHED after the subscriber loop whether or not any subscriber exists. There is also no timer, ' +
+			'poller or scheduled task anywhere that would drain the outbox after startup. Nothing is lost today ' +
+			'because nothing consumes the delivery; that is a property of the current wiring, not a guarantee.'
+	},
+	// ── THE DS-001 DEFECT, FOUND FOR THE FOURTH TIME BY THE REGISTER'S OWN GATES ─────────────────────────────
+	//
+	// `conformance-manifest.ts` cites RPH-PER-012's coverage as `packages/rph-domain/src/execution.test.ts` — a
+	// PURE_KERNEL unit test that builds `InterruptedAttemptView` object literals BY HAND and asserts the return
+	// value of `classifyInterruptedAttempt`. No engine, no store, no restart, no dispatch. That is RPH-PWU-010's
+	// sin exactly: a ratified rule, certified COVERED, cited to a pure-predicate test, enforced nowhere. It joins
+	// RPH-PWU-010 (which motivated this register), RPH-PWU-007 and RPH-CON-004.
+	//
+	// AND THE MANIFEST'S PREFIX NOTE SAYS THE QUIET PART: it lists "restart-classification asserted (…012)". The
+	// CLASSIFICATION is asserted. Whether anything ever CLASSIFIES is a different question, and the manifest has
+	// no axis on which to ask it — which is the sentence this whole module exists to make checkable.
+	'RPH-PER-012': {
+		kind: 'UNENFORCED_DISCLOSED',
+		canonCarriage: {
+			kind: 'CARRIED',
+			canonAnchor: 'the attempt enters reconciliation: classify',
+			note: 'JPWB-DOC-003 §9 PER-6 (Uncertain external effects are reconciled, never blindly retried), which is STRONGER than the ratified rule: it enumerates the five classifications ("not started / observably running / succeeded-unrecorded / failed / uncertain") and names restarts explicitly. Canon is emphatic about a rule this engine implements only as a dead type alias.'
+		},
+		why:
+			'THE PREDICATES ARE CORRECT, UNIT-TESTED, AND ASKED BY NOTHING — the archetype this register was built ' +
+			'for. `classifyInterruptedAttempt` and `mayReexecuteWithoutReconciliation` each have exactly TWO ' +
+			'repo-wide references: their own definition and their own test. `ReconciliationClass` has ONE. The ' +
+			'single restart-recovery entry point in the engine seam is `recoverOutbox`, whose subject is outbox ' +
+			'DELIVERY of already-committed events; it never inspects, classifies or gates an ExecutionAttempt, and ' +
+			'the one startup path in the one host is three statements that touch no attempt. WHY WIRING IT IS NOT ' +
+			'A SMALL FIX, recorded so this disclosure is not read as scheduling: (1) there is NO ExecutionAttempt ' +
+			'state machine among the 27 in the ratified transition data, and neither PWU.executionState nor ' +
+			'ExecutionStep.stepState has a RECONCILING/UNCERTAIN/IN_DOUBT member — so there is no state to move the ' +
+			'attempt INTO; (2) the Attempt is a PROJECTION rather than a typed object (Fork A withheld the contract ' +
+			'object), with an untyped `state: string` closed to RUNNING/WAITING/SUCCEEDED/FAILED/CANCELLED and no ' +
+			'field a reconciliation state could be written to; (3) `classifyInterruptedAttempt` requires ' +
+			'`externalOperationId` and `externalStatus`, and NEITHER FIELD EXISTS on any event payload, object ' +
+			'schema or store column — so even a wired call site would have no persisted source to populate its ' +
+			'input. That third fact is the RPH-EXE-005 shape before JAN-CAPBIND: a guard that cannot be non-vacuous ' +
+			'while one of its inputs is unrepresentable. FOUR NEAR-MISSES, named so they are not mistaken for ' +
+			'wiring: `recoverOutbox`\'s docblock phrase "restart recovery avoids duplicate external side effects" ' +
+			'(subject is the outbox); the ratified error code `RPH_EXTERNAL_OPERATION_UNCERTAIN`, which exists for ' +
+			'exactly this condition and has two repo-wide references, both its own declaration (REG-F-010\'s ' +
+			'census, corroborated independently); the `RETRYING` state and the FAILED->QUEUED retry arrow, whose ' +
+			'machine entry carries `guarded: []`; and the authoring turn\'s COMMIT_FAILED state, where the doctrine ' +
+			'IS realised — by offering no retry arrow — but for an in-memory surface candidate, not an attempt.',
+		guard: {
+			kind: 'DEAD_PREDICATE',
+			deadPredicate: 'classifyInterruptedAttempt',
+			referencedOnlyBy: ['packages/rph-domain/src/execution.ts']
+		}
+	},
+	'RPH-PER-013': {
+		kind: 'NOT_A_COMMAND_REFUSAL',
+		canonCarriage: {
+			kind: 'CARRIED_BY_GENERAL_RULE',
+			canonAnchor: 'Professional correctness never depends on in-memory state',
+			note: 'JPWB-DOC-003 §9 PER-6. GENERAL rather than CARRIED because canon states the durability principle and never mentions a pending decision, a review request, or a restarting extension: the general rule survives retirement, this specific application does not.'
+		},
+		why:
+			'A SURVIVAL PROPERTY ("the pending decision remains available"), not a refusal — and its second clause ' +
+			'quantifies over a SUBJECT THAT DOES NOT EXIST. There is no ReviewRequest, HumanReview, review-task or ' +
+			'approval-request entity, field, type or command anywhere in the repository; a pending human decision ' +
+			'IS a DECISION aggregate whose `status` is the string PROPOSED, and "no duplicate review request is ' +
+			'created" has no object to be about. Nor does the rule\'s premise hold as stated: no PWU state means ' +
+			'"waiting for human approval" — the only modelled wait is ExecutionStep RUNNING->WAITING with a ' +
+			'FREE-TEXT `waitReason` and no ratified wait-reason vocabulary, so nothing distinguishes a ' +
+			'human-approval wait from any other. And the "extension" the rule names does not exist: this engine ' +
+			'ships as a web host, not a VS Code extension. WHAT SURVIVES A RESTART, and it does so by construction ' +
+			'rather than by a recovery path: the Decision is a row in the durable store, and the two duplicate ' +
+			'defences — `fromStates(\'PROPOSED\')` on the approval commands and the `command_receipts` idempotency ' +
+			'lookup — are both store-backed, so neither depends on process memory. That is the rule\'s intent ' +
+			'satisfied by a different mechanism than the rule describes, which is precisely why it is recorded as a ' +
+			'declared silence rather than certified.'
+	},
+	'RPH-PER-014': {
+		kind: 'NOT_A_COMMAND_REFUSAL',
+		canonCarriage: {
+			kind: 'CARRIED_BY_GENERAL_RULE',
+			canonAnchor: "When an external operation's completion is uncertain — including across restarts",
+			note: 'JPWB-DOC-003 §9 PER-6. GENERAL because canon\'s subject is an external OPERATION and an Attempt; it nowhere mentions an Assurance Service, a raw validator result, or a disposition boundary. The idempotent-resumption half is carried by PER-5.'
+		},
+		why:
+			'THE PREMISE HAS NO REFERENT IN THIS ENGINE, so there is no interrupted state to resume from. The rule ' +
+			'presupposes "a valid raw validator result PERSISTED ... before authoritative disposition", and no such ' +
+			'intermediate is ever written: `validatorResult` exists only as a field of the ' +
+			'`CompleteAssuranceAssessment` COMMAND payload, and `parseCompletion` validates it and derives the ' +
+			'disposition IN THE SAME DISPATCH that commits the terminal transition. The assessment is born directly ' +
+			'in ASSESSING, and `AssuranceAssessmentState` has no member meaning "validator result in hand, ' +
+			'disposition not yet authoritative" — VALIDATOR_FAILED is a terminal disposition, not a pending one. ' +
+			'The validator\'s content rides the EVENT, never a pre-disposition object. Nor is there a separately ' +
+			'restartable Assurance Service: the path runs in-process. So validation and disposition are ONE atomic ' +
+			'act, and the window the rule describes does not exist to be interrupted. WHAT WOULD SERVE IF IT DID: ' +
+			'the durable `command_receipts` idempotency check plus `fromStates(\'ASSESSING\')` on the completion. ' +
+			'ONE CAVEAT ON THAT, recorded because it bounds the resumption claim: the engine\'s own assurance ' +
+			'driver builds its idempotency key from a prefix documented as "unique per recording run", so a ' +
+			'restarted run mints FRESH keys and the receipt lookup would not fire — resumption would rest on the ' +
+			'state precondition alone.'
 	}
 };
 
@@ -1872,6 +2254,7 @@ export function classifyRefusal(
 		readonly refusalCode: string;
 		readonly refusalMarker: string;
 		readonly refusalLayer?: RefusalLayer;
+		readonly refusalStatus?: 'REJECTED' | 'CONFLICT';
 	}
 ): RefusalVerdict {
 	// ── THE SCHEMA ARM (2026-08-02) ──────────────────────────────────────────────────────────────────────────
@@ -1901,10 +2284,35 @@ export function classifyRefusal(
 		return matched ? 'KILLED' : 'MASKED';
 	}
 
-	if (observed.status !== 'REJECTED') return 'ADMITTED';
+	// ── THE COMMAND ARM, now reading a DECLARED status (2026-08-02, the RPH-PER tranche) ─────────────────────
+	//
+	// The default is `REJECTED`, so every row written before this line is byte-identical in behaviour. What a row
+	// may now do is declare `refusalStatus: 'CONFLICT'` — because an optimistic-concurrency refusal really is a
+	// refusal, really is performed by a named command-layer site, and really does carry its own status. Before
+	// this, RPH-PER-001 would have been classified ADMITTED by a register whose whole purpose is to not do that.
+	//
+	// STILL EXACTLY ONE STATUS PER ROW, never a set. A gate that accepted "any non-ACCEPTED status" would let the
+	// commonest fixture error in this repository — a malformed payload returning VALIDATION_FAILED — satisfy a row
+	// about an invariant it never reached. The row names the one status its site produces, and the mutants named
+	// in `declaredMutations` are what prove it names the right one.
+	if (observed.status !== (expected.refusalStatus ?? 'REJECTED')) return 'ADMITTED';
 	if (observed.code !== expected.refusalCode) return 'WRONG_CODE';
 	if (!(observed.message ?? '').includes(expected.refusalMarker)) return 'MASKED';
 	return 'KILLED';
+}
+
+/**
+ * Rows whose refusal carries `CommandResult.status: 'CONFLICT'` rather than `REJECTED`.
+ *
+ * Exported so the gate can prove the declared-status arm is NOT VACUOUS. An opt-in widening that no row exercises
+ * is a branch no mutant can redden — three of those shipped green in this repository before the discipline was
+ * written down — so if the last CONFLICT row is ever re-dispositioned, the selftest fails and the arm goes with it.
+ */
+export function conflictStatusRuleIds(): RegisteredRuleId[] {
+	return REGISTERED_RULE_IDS.filter((id) => {
+		const row = ENFORCEMENT_REGISTER[id];
+		return row.kind === 'ENFORCED' && row.refusalStatus === 'CONFLICT';
+	});
 }
 
 /** Rows whose refusal is at the contract boundary rather than a handler. */

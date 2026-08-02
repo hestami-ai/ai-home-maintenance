@@ -96,6 +96,37 @@ describe('JAN-EXECREM WP-16 (c) — the enforcement register is OBSERVED, not as
 		return { status: r.status, code: r.error?.code, message: r.error?.message, issues };
 	}
 
+	/**
+	 * `dispatch` with extra ENVELOPE fields. Added 2026-08-02 for RPH-PER-001, whose subject is the envelope field
+	 * `expectedRevision` rather than anything in a payload — the same seam `disclosure-observed.test.ts` needed for
+	 * RPH-CON-003, which is the OTHER half of this field's story: that row discloses that OMITTING it is admitted,
+	 * this one proves that SENDING a stale one is refused.
+	 */
+	function dispatchWith(
+		commandType: string,
+		payload: unknown,
+		id: string,
+		aggType: string,
+		envelope: Record<string, unknown>
+	): Outcome {
+		const n = ++seq;
+		const command = {
+			commandId: `c-${n}`,
+			commandType,
+			commandSchemaVersion: 1,
+			targetAggregateType: aggType,
+			targetAggregateId: id,
+			issuedAt: TS,
+			issuedBy: actor,
+			correlationId: 'wp16',
+			idempotencyKey: `k-${n}`,
+			payload,
+			...envelope
+		};
+		const r = engine.dispatch(command as unknown as DomainCommand);
+		return { status: r.status, code: r.error?.code, message: r.error?.message };
+	}
+
 	const ok = (r: Outcome, what: string): Outcome => {
 		expect(r.status, `${what}: ${r.message}`).toBe('ACCEPTED');
 		return r;
@@ -796,6 +827,56 @@ describe('JAN-EXECREM WP-16 (c) — the enforcement register is OBSERVED, not as
 		'RPH-CON-006': null,
 		'RPH-CON-007': null,
 		'RPH-CON-008': null,
+
+		// ── RPH-PER, twelve of fourteen (2026-08-02) ──────────────────────────────────────────────────────────
+		// Ten are NOT_A_COMMAND_REFUSAL — §§18-20 state durability PROPERTIES (replay equivalence, projection
+		// rebuild, outbox atomicity, restart recovery), and a refusal probe cannot hold any of them. One
+		// (RPH-PER-012) is disclosed by a dead-predicate census in rph-domain. Only RPH-PER-001 is a refusal, and
+		// it is the row that made `refusalStatus` necessary.
+		'RPH-PER-002': null,
+		'RPH-PER-005': null,
+		'RPH-PER-006': null,
+		'RPH-PER-007': null,
+		'RPH-PER-008': null,
+		'RPH-PER-009': null,
+		'RPH-PER-010': null,
+		'RPH-PER-011': null,
+		'RPH-PER-012': null,
+		'RPH-PER-013': null,
+		'RPH-PER-014': null,
+		'RPH-PER-001': {
+			arrangement:
+				"two BeginIntentDiscovery commands both declaring expectedRevision r0 — the first ACCEPTED and producing r0+1, the second refused with RPH_REVISION_CONFLICT at status CONFLICT (the ratified arrangement verbatim: 'two commands expect revision 5 … the first produces revision 6')",
+			run: () => {
+				const ID = 'int_01ARZ3NDEKTSV4RRFFQ69H6500';
+				ok(
+					dispatch(
+						'CaptureIntent',
+						{
+							intentId: ID,
+							originatingExpression: 'x',
+							ontologyId: 'o',
+							ontologyVersion: '1'
+						},
+						ID,
+						'INTENT'
+					),
+					'capture for PER-001'
+				);
+				const r0 = store.loadObject(ID)!.revision;
+				// THE CONTROL IS THE FIRST OF THE TWO RACING COMMANDS — byte-identical to the observed one, and
+				// ACCEPTED. That is what makes this a concurrency proof rather than a proof that
+				// BeginIntentDiscovery is refused: the ONLY difference between the two dispatches is that the
+				// first one happened.
+				const control = dispatchWith('BeginIntentDiscovery', {}, ID, 'INTENT', {
+					expectedRevision: r0
+				});
+				const observed = dispatchWith('BeginIntentDiscovery', {}, ID, 'INTENT', {
+					expectedRevision: r0
+				});
+				return { control, observed };
+			}
+		},
 		'RPH-CON-002': {
 			arrangement:
 				'a CaptureIntent payload carrying an undeclared property, refused by the contract boundary before any handler runs',
